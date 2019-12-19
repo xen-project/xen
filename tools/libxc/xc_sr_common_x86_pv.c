@@ -4,16 +4,16 @@
 
 xen_pfn_t mfn_to_pfn(struct xc_sr_context *ctx, xen_pfn_t mfn)
 {
-    assert(mfn <= ctx->x86_pv.max_mfn);
-    return ctx->x86_pv.m2p[mfn];
+    assert(mfn <= ctx->x86.pv.max_mfn);
+    return ctx->x86.pv.m2p[mfn];
 }
 
 bool mfn_in_pseudophysmap(struct xc_sr_context *ctx, xen_pfn_t mfn)
 {
-    return ((mfn <= ctx->x86_pv.max_mfn) &&
-            (mfn_to_pfn(ctx, mfn) <= ctx->x86_pv.max_pfn) &&
-            (xc_pfn_to_mfn(mfn_to_pfn(ctx, mfn), ctx->x86_pv.p2m,
-                           ctx->x86_pv.width) == mfn));
+    return ((mfn <= ctx->x86.pv.max_mfn) &&
+            (mfn_to_pfn(ctx, mfn) <= ctx->x86.pv.max_pfn) &&
+            (xc_pfn_to_mfn(mfn_to_pfn(ctx, mfn), ctx->x86.pv.p2m,
+                           ctx->x86.pv.width) == mfn));
 }
 
 void dump_bad_pseudophysmap_entry(struct xc_sr_context *ctx, xen_pfn_t mfn)
@@ -21,23 +21,23 @@ void dump_bad_pseudophysmap_entry(struct xc_sr_context *ctx, xen_pfn_t mfn)
     xc_interface *xch = ctx->xch;
     xen_pfn_t pfn = ~0UL;
 
-    ERROR("mfn %#lx, max %#lx", mfn, ctx->x86_pv.max_mfn);
+    ERROR("mfn %#lx, max %#lx", mfn, ctx->x86.pv.max_mfn);
 
-    if ( (mfn != ~0UL) && (mfn <= ctx->x86_pv.max_mfn) )
+    if ( (mfn != ~0UL) && (mfn <= ctx->x86.pv.max_mfn) )
     {
-        pfn = ctx->x86_pv.m2p[mfn];
+        pfn = ctx->x86.pv.m2p[mfn];
         ERROR("  m2p[%#lx] = %#lx, max_pfn %#lx",
-              mfn, pfn, ctx->x86_pv.max_pfn);
+              mfn, pfn, ctx->x86.pv.max_pfn);
     }
 
-    if ( (pfn != ~0UL) && (pfn <= ctx->x86_pv.max_pfn) )
+    if ( (pfn != ~0UL) && (pfn <= ctx->x86.pv.max_pfn) )
         ERROR("  p2m[%#lx] = %#lx",
-              pfn, xc_pfn_to_mfn(pfn, ctx->x86_pv.p2m, ctx->x86_pv.width));
+              pfn, xc_pfn_to_mfn(pfn, ctx->x86.pv.p2m, ctx->x86.pv.width));
 }
 
 xen_pfn_t cr3_to_mfn(struct xc_sr_context *ctx, uint64_t cr3)
 {
-    if ( ctx->x86_pv.width == 8 )
+    if ( ctx->x86.pv.width == 8 )
         return cr3 >> 12;
     else
     {
@@ -53,7 +53,7 @@ uint64_t mfn_to_cr3(struct xc_sr_context *ctx, xen_pfn_t _mfn)
 {
     uint64_t mfn = _mfn;
 
-    if ( ctx->x86_pv.width == 8 )
+    if ( ctx->x86.pv.width == 8 )
         return mfn << 12;
     else
     {
@@ -86,8 +86,8 @@ int x86_pv_domain_info(struct xc_sr_context *ctx)
         ERROR("Invalid guest width %d.  Expected 32 or 64", guest_width * 8);
         return -1;
     }
-    ctx->x86_pv.width = guest_width;
-    ctx->x86_pv.levels = guest_levels;
+    ctx->x86.pv.width = guest_width;
+    ctx->x86.pv.levels = guest_levels;
 
     DPRINTF("%d bits, %d levels", guest_width * 8, guest_levels);
 
@@ -108,9 +108,9 @@ int x86_pv_map_m2p(struct xc_sr_context *ctx)
         goto err;
     }
 
-    ctx->x86_pv.max_mfn = max_page;
-    m2p_size   = M2P_SIZE(ctx->x86_pv.max_mfn);
-    m2p_chunks = M2P_CHUNKS(ctx->x86_pv.max_mfn);
+    ctx->x86.pv.max_mfn = max_page;
+    m2p_size   = M2P_SIZE(ctx->x86.pv.max_mfn);
+    m2p_chunks = M2P_CHUNKS(ctx->x86.pv.max_mfn);
 
     extents_start = malloc(m2p_chunks * sizeof(xen_pfn_t));
     if ( !extents_start )
@@ -137,27 +137,27 @@ int x86_pv_map_m2p(struct xc_sr_context *ctx)
     for ( i = 0; i < m2p_chunks; ++i )
         entries[i].mfn = extents_start[i];
 
-    ctx->x86_pv.m2p = xc_map_foreign_ranges(
+    ctx->x86.pv.m2p = xc_map_foreign_ranges(
         xch, DOMID_XEN, m2p_size, PROT_READ,
         M2P_CHUNK_SIZE, entries, m2p_chunks);
 
-    if ( !ctx->x86_pv.m2p )
+    if ( !ctx->x86.pv.m2p )
     {
         PERROR("Failed to mmap() m2p ranges");
         goto err;
     }
 
-    ctx->x86_pv.nr_m2p_frames = (M2P_CHUNK_SIZE >> PAGE_SHIFT) * m2p_chunks;
+    ctx->x86.pv.nr_m2p_frames = (M2P_CHUNK_SIZE >> PAGE_SHIFT) * m2p_chunks;
 
 #ifdef __i386__
     /* 32 bit toolstacks automatically get the compat m2p */
-    ctx->x86_pv.compat_m2p_mfn0 = entries[0].mfn;
+    ctx->x86.pv.compat_m2p_mfn0 = entries[0].mfn;
 #else
     /* 64 bit toolstacks need to ask Xen specially for it */
     {
         struct xen_machphys_mfn_list xmml = {
             .max_extents = 1,
-            .extent_start = { &ctx->x86_pv.compat_m2p_mfn0 },
+            .extent_start = { &ctx->x86.pv.compat_m2p_mfn0 },
         };
 
         rc = do_memory_op(xch, XENMEM_machphys_compat_mfn_list,
@@ -173,7 +173,7 @@ int x86_pv_map_m2p(struct xc_sr_context *ctx)
 
     /* All Done */
     rc = 0;
-    DPRINTF("max_mfn %#lx", ctx->x86_pv.max_mfn);
+    DPRINTF("max_mfn %#lx", ctx->x86.pv.max_mfn);
 
  err:
     free(entries);

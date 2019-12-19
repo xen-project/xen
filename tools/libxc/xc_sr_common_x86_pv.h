@@ -73,7 +73,7 @@ static inline uint64_t merge_pte(uint64_t pte, xen_pfn_t mfn)
 /*
  * Get current domain information.
  *
- * Fills ctx->x86_pv
+ * Fills ctx->x86.pv
  * - .width
  * - .levels
  * - .fpp
@@ -89,7 +89,7 @@ int x86_pv_domain_info(struct xc_sr_context *ctx);
 /*
  * Maps the Xen M2P.
  *
- * Fills ctx->x86_pv.
+ * Fills ctx->x86.pv.
  * - .max_mfn
  * - .m2p
  *

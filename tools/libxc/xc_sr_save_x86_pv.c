@@ -16,9 +16,9 @@ static int map_shinfo(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
 
-    ctx->x86_pv.shinfo = xc_map_foreign_range(
+    ctx->x86.pv.shinfo = xc_map_foreign_range(
         xch, ctx->domid, PAGE_SIZE, PROT_READ, ctx->dominfo.shared_info_frame);
-    if ( !ctx->x86_pv.shinfo )
+    if ( !ctx->x86.pv.shinfo )
     {
         PERROR("Failed to map shared info frame at mfn %#lx",
                ctx->dominfo.shared_info_frame);
@@ -37,7 +37,7 @@ static int copy_mfns_from_guest(const struct xc_sr_context *ctx,
 {
     size_t x;
 
-    if ( ctx->x86_pv.width == sizeof(unsigned long) )
+    if ( ctx->x86.pv.width == sizeof(unsigned long) )
         memcpy(dst, src, count * sizeof(*dst));
     else
     {
@@ -82,18 +82,18 @@ static int map_p2m_leaves(struct xc_sr_context *ctx, xen_pfn_t *mfns,
     xc_interface *xch = ctx->xch;
     unsigned int x;
 
-    ctx->x86_pv.p2m = xc_map_foreign_pages(xch, ctx->domid, PROT_READ,
+    ctx->x86.pv.p2m = xc_map_foreign_pages(xch, ctx->domid, PROT_READ,
                                            mfns, n_mfns);
-    if ( !ctx->x86_pv.p2m )
+    if ( !ctx->x86.pv.p2m )
     {
         PERROR("Failed to map p2m frames");
         return -1;
     }
 
-    ctx->save.p2m_size = ctx->x86_pv.max_pfn + 1;
-    ctx->x86_pv.p2m_frames = n_mfns;
-    ctx->x86_pv.p2m_pfns = malloc(n_mfns * sizeof(*mfns));
-    if ( !ctx->x86_pv.p2m_pfns )
+    ctx->save.p2m_size = ctx->x86.pv.max_pfn + 1;
+    ctx->x86.pv.p2m_frames = n_mfns;
+    ctx->x86.pv.p2m_pfns = malloc(n_mfns * sizeof(*mfns));
+    if ( !ctx->x86.pv.p2m_pfns )
     {
         ERROR("Cannot allocate %zu bytes for p2m pfns list",
               n_mfns * sizeof(*mfns));
@@ -111,7 +111,7 @@ static int map_p2m_leaves(struct xc_sr_context *ctx, xen_pfn_t *mfns,
             return -1;
         }
 
-        ctx->x86_pv.p2m_pfns[x] = mfn_to_pfn(ctx, mfns[x]);
+        ctx->x86.pv.p2m_pfns[x] = mfn_to_pfn(ctx, mfns[x]);
     }
 
     return 0;
@@ -144,17 +144,17 @@ static int map_p2m_tree(struct xc_sr_context *ctx)
     void *guest_fl = NULL;
     size_t local_fl_size;
 
-    fpp = PAGE_SIZE / ctx->x86_pv.width;
-    fll_entries = (ctx->x86_pv.max_pfn / (fpp * fpp)) + 1;
+    fpp = PAGE_SIZE / ctx->x86.pv.width;
+    fll_entries = (ctx->x86.pv.max_pfn / (fpp * fpp)) + 1;
     if ( fll_entries > fpp )
     {
-        ERROR("max_pfn %#lx too large for p2m tree", ctx->x86_pv.max_pfn);
+        ERROR("max_pfn %#lx too large for p2m tree", ctx->x86.pv.max_pfn);
         goto err;
     }
 
-    fll_mfn = GET_FIELD(ctx->x86_pv.shinfo, arch.pfn_to_mfn_frame_list_list,
-                        ctx->x86_pv.width);
-    if ( fll_mfn == 0 || fll_mfn > ctx->x86_pv.max_mfn )
+    fll_mfn = GET_FIELD(ctx->x86.pv.shinfo, arch.pfn_to_mfn_frame_list_list,
+                        ctx->x86.pv.width);
+    if ( fll_mfn == 0 || fll_mfn > ctx->x86.pv.max_mfn )
     {
         ERROR("Bad mfn %#lx for p2m frame list list", fll_mfn);
         goto err;
@@ -189,7 +189,7 @@ static int map_p2m_tree(struct xc_sr_context *ctx)
     saved_x = 0;
     for ( x = 0; x < fll_entries; ++x )
     {
-        if ( local_fll[x] == 0 || local_fll[x] > ctx->x86_pv.max_mfn )
+        if ( local_fll[x] == 0 || local_fll[x] > ctx->x86.pv.max_mfn )
         {
             ERROR("Bad mfn %#lx at index %u (of %u) in p2m frame list list",
                   local_fll[x], x, fll_entries);
@@ -213,15 +213,15 @@ static int map_p2m_tree(struct xc_sr_context *ctx)
      * needed for p2m and logdirty map.
      */
     max_pfn = (saved_x + 1) * fpp * fpp - 1;
-    if ( max_pfn < ctx->x86_pv.max_pfn )
+    if ( max_pfn < ctx->x86.pv.max_pfn )
     {
-        ctx->x86_pv.max_pfn = max_pfn;
-        fll_entries = (ctx->x86_pv.max_pfn / (fpp * fpp)) + 1;
+        ctx->x86.pv.max_pfn = max_pfn;
+        fll_entries = (ctx->x86.pv.max_pfn / (fpp * fpp)) + 1;
     }
-    ctx->x86_pv.p2m_frames = (ctx->x86_pv.max_pfn + fpp) / fpp;
-    DPRINTF("max_pfn %#lx, p2m_frames %d", ctx->x86_pv.max_pfn,
-            ctx->x86_pv.p2m_frames);
-    fl_entries  = (ctx->x86_pv.max_pfn / fpp) + 1;
+    ctx->x86.pv.p2m_frames = (ctx->x86.pv.max_pfn + fpp) / fpp;
+    DPRINTF("max_pfn %#lx, p2m_frames %d", ctx->x86.pv.max_pfn,
+            ctx->x86.pv.p2m_frames);
+    fl_entries  = (ctx->x86.pv.max_pfn / fpp) + 1;
 
     /* Map the guest mid p2m frames. */
     guest_fl = xc_map_foreign_pages(xch, ctx->domid, PROT_READ,
@@ -249,7 +249,7 @@ static int map_p2m_tree(struct xc_sr_context *ctx)
 
     for ( x = 0; x < fl_entries; ++x )
     {
-        if ( local_fl[x] == 0 || local_fl[x] > ctx->x86_pv.max_mfn )
+        if ( local_fl[x] == 0 || local_fl[x] > ctx->x86.pv.max_mfn )
         {
             ERROR("Bad mfn %#lx at index %u (of %u) in p2m frame list",
                   local_fl[x], x, fl_entries);
@@ -281,11 +281,11 @@ static int get_p2m_generation(struct xc_sr_context *ctx)
     uint64_t p2m_generation;
     int rc;
 
-    p2m_generation = GET_FIELD(ctx->x86_pv.shinfo, arch.p2m_generation,
-                               ctx->x86_pv.width);
+    p2m_generation = GET_FIELD(ctx->x86.pv.shinfo, arch.p2m_generation,
+                               ctx->x86.pv.width);
 
-    rc = (p2m_generation == ctx->x86_pv.p2m_generation) ? 0 : -1;
-    ctx->x86_pv.p2m_generation = p2m_generation;
+    rc = (p2m_generation == ctx->x86.pv.p2m_generation) ? 0 : -1;
+    ctx->x86.pv.p2m_generation = p2m_generation;
 
     return rc;
 }
@@ -322,7 +322,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
 
     p2m_mfn = cr3_to_mfn(ctx, p2m_cr3);
     assert(p2m_mfn != 0);
-    if ( p2m_mfn > ctx->x86_pv.max_mfn )
+    if ( p2m_mfn > ctx->x86.pv.max_mfn )
     {
         ERROR("Bad p2m_cr3 value %#" PRIx64, p2m_cr3);
         errno = ERANGE;
@@ -331,13 +331,13 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
 
     get_p2m_generation(ctx);
 
-    p2m_vaddr = GET_FIELD(ctx->x86_pv.shinfo, arch.p2m_vaddr,
-                          ctx->x86_pv.width);
-    fpp = PAGE_SIZE / ctx->x86_pv.width;
-    ctx->x86_pv.p2m_frames = ctx->x86_pv.max_pfn / fpp + 1;
-    p2m_end = p2m_vaddr + ctx->x86_pv.p2m_frames * PAGE_SIZE - 1;
+    p2m_vaddr = GET_FIELD(ctx->x86.pv.shinfo, arch.p2m_vaddr,
+                          ctx->x86.pv.width);
+    fpp = PAGE_SIZE / ctx->x86.pv.width;
+    ctx->x86.pv.p2m_frames = ctx->x86.pv.max_pfn / fpp + 1;
+    p2m_end = p2m_vaddr + ctx->x86.pv.p2m_frames * PAGE_SIZE - 1;
 
-    if ( ctx->x86_pv.width == 8 )
+    if ( ctx->x86.pv.width == 8 )
     {
         mask = 0x0000ffffffffffffULL;
         if ( !is_canonical_address(p2m_vaddr) ||
@@ -368,8 +368,8 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
 
     DPRINTF("p2m list from %#" PRIx64 " to %#" PRIx64 ", root at %#lx",
             p2m_vaddr, p2m_end, p2m_mfn);
-    DPRINTF("max_pfn %#lx, p2m_frames %d", ctx->x86_pv.max_pfn,
-            ctx->x86_pv.p2m_frames);
+    DPRINTF("max_pfn %#lx, p2m_frames %d", ctx->x86.pv.max_pfn,
+            ctx->x86.pv.p2m_frames);
 
     mfns = malloc(sizeof(*mfns));
     if ( !mfns )
@@ -382,7 +382,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
     saved_mfn = 0;
     idx_start = idx_end = saved_idx = 0;
 
-    for ( level = ctx->x86_pv.levels; level > 0; level-- )
+    for ( level = ctx->x86.pv.levels; level > 0; level-- )
     {
         n_pages = idx_end - idx_start + 1;
         ptes = xc_map_foreign_pages(xch, ctx->domid, PROT_READ, mfns, n_pages);
@@ -407,7 +407,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
         for ( idx = idx_start; idx <= idx_end; idx++ )
         {
             mfn = pte_to_frame(ptes[idx]);
-            if ( mfn == 0 || mfn > ctx->x86_pv.max_mfn )
+            if ( mfn == 0 || mfn > ctx->x86.pv.max_mfn )
             {
                 ERROR("Bad mfn %#lx during page table walk for vaddr %#" PRIx64 " at level %d of p2m list",
                       mfn, off + ((xen_vaddr_t)idx << shift), level);
@@ -432,11 +432,11 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
             if ( saved_idx == idx_end )
                 saved_idx++;
             max_pfn = ((xen_pfn_t)saved_idx << 9) * fpp - 1;
-            if ( max_pfn < ctx->x86_pv.max_pfn )
+            if ( max_pfn < ctx->x86.pv.max_pfn )
             {
-                ctx->x86_pv.max_pfn = max_pfn;
-                ctx->x86_pv.p2m_frames = (ctx->x86_pv.max_pfn + fpp) / fpp;
-                p2m_end = p2m_vaddr + ctx->x86_pv.p2m_frames * PAGE_SIZE - 1;
+                ctx->x86.pv.max_pfn = max_pfn;
+                ctx->x86.pv.p2m_frames = (ctx->x86.pv.max_pfn + fpp) / fpp;
+                p2m_end = p2m_vaddr + ctx->x86.pv.p2m_frames * PAGE_SIZE - 1;
                 idx_end = idx_start + saved_idx;
             }
         }
@@ -466,10 +466,10 @@ static int map_p2m(struct xc_sr_context *ctx)
 {
     uint64_t p2m_cr3;
 
-    ctx->x86_pv.p2m_generation = ~0ULL;
-    ctx->x86_pv.max_pfn = GET_FIELD(ctx->x86_pv.shinfo, arch.max_pfn,
-                                    ctx->x86_pv.width) - 1;
-    p2m_cr3 = GET_FIELD(ctx->x86_pv.shinfo, arch.p2m_cr3, ctx->x86_pv.width);
+    ctx->x86.pv.p2m_generation = ~0ULL;
+    ctx->x86.pv.max_pfn = GET_FIELD(ctx->x86.pv.shinfo, arch.max_pfn,
+                                    ctx->x86.pv.width) - 1;
+    p2m_cr3 = GET_FIELD(ctx->x86.pv.shinfo, arch.p2m_cr3, ctx->x86.pv.width);
 
     return p2m_cr3 ? map_p2m_list(ctx, p2m_cr3) : map_p2m_tree(ctx);
 }
@@ -503,7 +503,7 @@ static int write_one_vcpu_basic(struct xc_sr_context *ctx, uint32_t id)
     /* Vcpu0 is special: Convert the suspend record to a pfn. */
     if ( id == 0 )
     {
-        mfn = GET_FIELD(&vcpu, user_regs.edx, ctx->x86_pv.width);
+        mfn = GET_FIELD(&vcpu, user_regs.edx, ctx->x86.pv.width);
         if ( !mfn_in_pseudophysmap(ctx, mfn) )
         {
             ERROR("Bad mfn for suspend record");
@@ -512,10 +512,10 @@ static int write_one_vcpu_basic(struct xc_sr_context *ctx, uint32_t id)
             goto err;
         }
         SET_FIELD(&vcpu, user_regs.edx, mfn_to_pfn(ctx, mfn),
-                  ctx->x86_pv.width);
+                  ctx->x86.pv.width);
     }
 
-    gdt_count = GET_FIELD(&vcpu, gdt_ents, ctx->x86_pv.width);
+    gdt_count = GET_FIELD(&vcpu, gdt_ents, ctx->x86.pv.width);
     if ( gdt_count > FIRST_RESERVED_GDT_ENTRY )
     {
         ERROR("GDT entry count (%u) out of range (max %u)",
@@ -528,7 +528,7 @@ static int write_one_vcpu_basic(struct xc_sr_context *ctx, uint32_t id)
     /* Convert GDT frames to pfns. */
     for ( i = 0; i < gdt_count; ++i )
     {
-        mfn = GET_FIELD(&vcpu, gdt_frames[i], ctx->x86_pv.width);
+        mfn = GET_FIELD(&vcpu, gdt_frames[i], ctx->x86.pv.width);
         if ( !mfn_in_pseudophysmap(ctx, mfn) )
         {
             ERROR("Bad mfn for frame %u of vcpu%u's GDT", i, id);
@@ -537,11 +537,11 @@ static int write_one_vcpu_basic(struct xc_sr_context *ctx, uint32_t id)
             goto err;
         }
         SET_FIELD(&vcpu, gdt_frames[i], mfn_to_pfn(ctx, mfn),
-                  ctx->x86_pv.width);
+                  ctx->x86.pv.width);
     }
 
     /* Convert CR3 to a pfn. */
-    mfn = cr3_to_mfn(ctx, GET_FIELD(&vcpu, ctrlreg[3], ctx->x86_pv.width));
+    mfn = cr3_to_mfn(ctx, GET_FIELD(&vcpu, ctrlreg[3], ctx->x86.pv.width));
     if ( !mfn_in_pseudophysmap(ctx, mfn) )
     {
         ERROR("Bad mfn for vcpu%u's cr3", id);
@@ -550,10 +550,10 @@ static int write_one_vcpu_basic(struct xc_sr_context *ctx, uint32_t id)
         goto err;
     }
     pfn = mfn_to_pfn(ctx, mfn);
-    SET_FIELD(&vcpu, ctrlreg[3], mfn_to_cr3(ctx, pfn), ctx->x86_pv.width);
+    SET_FIELD(&vcpu, ctrlreg[3], mfn_to_cr3(ctx, pfn), ctx->x86.pv.width);
 
     /* 64bit guests: Convert CR1 (guest pagetables) to pfn. */
-    if ( ctx->x86_pv.levels == 4 && vcpu.x64.ctrlreg[1] )
+    if ( ctx->x86.pv.levels == 4 && vcpu.x64.ctrlreg[1] )
     {
         mfn = vcpu.x64.ctrlreg[1] >> PAGE_SHIFT;
         if ( !mfn_in_pseudophysmap(ctx, mfn) )
@@ -567,7 +567,7 @@ static int write_one_vcpu_basic(struct xc_sr_context *ctx, uint32_t id)
         vcpu.x64.ctrlreg[1] = 1 | ((uint64_t)pfn << PAGE_SHIFT);
     }
 
-    if ( ctx->x86_pv.width == 8 )
+    if ( ctx->x86.pv.width == 8 )
         rc = write_split_record(ctx, &rec, &vcpu, sizeof(vcpu.x64));
     else
         rc = write_split_record(ctx, &rec, &vcpu, sizeof(vcpu.x32));
@@ -794,8 +794,8 @@ static int write_all_vcpu_information(struct xc_sr_context *ctx)
 static int write_x86_pv_info(struct xc_sr_context *ctx)
 {
     struct xc_sr_rec_x86_pv_info info = {
-        .guest_width = ctx->x86_pv.width,
-        .pt_levels = ctx->x86_pv.levels,
+        .guest_width = ctx->x86.pv.width,
+        .pt_levels = ctx->x86.pv.levels,
     };
     struct xc_sr_record rec = {
         .type = REC_TYPE_X86_PV_INFO,
@@ -814,10 +814,10 @@ static int write_x86_pv_p2m_frames(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     int rc; unsigned int i;
-    size_t datasz = ctx->x86_pv.p2m_frames * sizeof(uint64_t);
+    size_t datasz = ctx->x86.pv.p2m_frames * sizeof(uint64_t);
     uint64_t *data = NULL;
     struct xc_sr_rec_x86_pv_p2m_frames hdr = {
-        .end_pfn = ctx->x86_pv.max_pfn,
+        .end_pfn = ctx->x86.pv.max_pfn,
     };
     struct xc_sr_record rec = {
         .type = REC_TYPE_X86_PV_P2M_FRAMES,
@@ -826,7 +826,7 @@ static int write_x86_pv_p2m_frames(struct xc_sr_context *ctx)
     };
 
     /* No need to translate if sizeof(uint64_t) == sizeof(xen_pfn_t). */
-    if ( sizeof(uint64_t) != sizeof(*ctx->x86_pv.p2m_pfns) )
+    if ( sizeof(uint64_t) != sizeof(*ctx->x86.pv.p2m_pfns) )
     {
         if ( !(data = malloc(datasz)) )
         {
@@ -835,15 +835,15 @@ static int write_x86_pv_p2m_frames(struct xc_sr_context *ctx)
             return -1;
         }
 
-        for ( i = 0; i < ctx->x86_pv.p2m_frames; ++i )
-            data[i] = ctx->x86_pv.p2m_pfns[i];
+        for ( i = 0; i < ctx->x86.pv.p2m_frames; ++i )
+            data[i] = ctx->x86.pv.p2m_pfns[i];
     }
     else
-        data = (uint64_t *)ctx->x86_pv.p2m_pfns;
+        data = (uint64_t *)ctx->x86.pv.p2m_pfns;
 
     rc = write_split_record(ctx, &rec, data, datasz);
 
-    if ( data != (uint64_t *)ctx->x86_pv.p2m_pfns )
+    if ( data != (uint64_t *)ctx->x86.pv.p2m_pfns )
         free(data);
 
     return rc;
@@ -857,7 +857,7 @@ static int write_shared_info(struct xc_sr_context *ctx)
     struct xc_sr_record rec = {
         .type = REC_TYPE_SHARED_INFO,
         .length = PAGE_SIZE,
-        .data = ctx->x86_pv.shinfo,
+        .data = ctx->x86.pv.shinfo,
     };
 
     return write_record(ctx, &rec);
@@ -876,7 +876,7 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
 
     type &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
 
-    if ( ctx->x86_pv.levels == 4 )
+    if ( ctx->x86.pv.levels == 4 )
     {
         /* 64bit guests only have Xen mappings in their L4 tables. */
         if ( type == XEN_DOMCTL_PFINFO_L4TAB )
@@ -908,7 +908,7 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
              * are normal but only a few will have Xen mappings.
              */
             i = (HYPERVISOR_VIRT_START_X86_32 >> L2_PAGETABLE_SHIFT_PAE) & 511;
-            if ( pte_to_frame(src[i]) == ctx->x86_pv.compat_m2p_mfn0 )
+            if ( pte_to_frame(src[i]) == ctx->x86.pv.compat_m2p_mfn0 )
             {
                 xen_first = i;
                 xen_last = (HYPERVISOR_VIRT_END_X86_32 >>
@@ -989,9 +989,9 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
 static xen_pfn_t x86_pv_pfn_to_gfn(const struct xc_sr_context *ctx,
                                    xen_pfn_t pfn)
 {
-    assert(pfn <= ctx->x86_pv.max_pfn);
+    assert(pfn <= ctx->x86.pv.max_pfn);
 
-    return xc_pfn_to_mfn(pfn, ctx->x86_pv.p2m, ctx->x86_pv.width);
+    return xc_pfn_to_mfn(pfn, ctx->x86.pv.p2m, ctx->x86.pv.width);
 }
 
 
@@ -1099,7 +1099,7 @@ static int x86_pv_end_of_checkpoint(struct xc_sr_context *ctx)
 
 static int x86_pv_check_vm_state(struct xc_sr_context *ctx)
 {
-    if ( ctx->x86_pv.p2m_generation == ~0ULL )
+    if ( ctx->x86.pv.p2m_generation == ~0ULL )
         return 0;
 
     return x86_pv_check_vm_state_p2m_list(ctx);
@@ -1107,16 +1107,16 @@ static int x86_pv_check_vm_state(struct xc_sr_context *ctx)
 
 static int x86_pv_cleanup(struct xc_sr_context *ctx)
 {
-    free(ctx->x86_pv.p2m_pfns);
+    free(ctx->x86.pv.p2m_pfns);
 
-    if ( ctx->x86_pv.p2m )
-        munmap(ctx->x86_pv.p2m, ctx->x86_pv.p2m_frames * PAGE_SIZE);
+    if ( ctx->x86.pv.p2m )
+        munmap(ctx->x86.pv.p2m, ctx->x86.pv.p2m_frames * PAGE_SIZE);
 
-    if ( ctx->x86_pv.shinfo )
-        munmap(ctx->x86_pv.shinfo, PAGE_SIZE);
+    if ( ctx->x86.pv.shinfo )
+        munmap(ctx->x86.pv.shinfo, PAGE_SIZE);
 
-    if ( ctx->x86_pv.m2p )
-        munmap(ctx->x86_pv.m2p, ctx->x86_pv.nr_m2p_frames * PAGE_SIZE);
+    if ( ctx->x86.pv.m2p )
+        munmap(ctx->x86.pv.m2p, ctx->x86.pv.nr_m2p_frames * PAGE_SIZE);
 
     return 0;
 }

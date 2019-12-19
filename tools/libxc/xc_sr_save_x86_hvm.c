@@ -165,7 +165,7 @@ static int x86_hvm_setup(struct xc_sr_context *ctx)
         return -1;
     }
 
-    ctx->x86_hvm.save.qemu_enabled_logdirty = true;
+    ctx->x86.hvm.save.qemu_enabled_logdirty = true;
 
     return 0;
 }
@@ -212,7 +212,7 @@ static int x86_hvm_cleanup(struct xc_sr_context *ctx)
     xc_interface *xch = ctx->xch;
 
     /* If qemu successfully enabled logdirty mode, attempt to disable. */
-    if ( ctx->x86_hvm.save.qemu_enabled_logdirty &&
+    if ( ctx->x86.hvm.save.qemu_enabled_logdirty &&
          ctx->save.callbacks->switch_qemu_logdirty(
              ctx->domid, 0, ctx->save.callbacks->data) )
     {

@@ -285,77 +285,81 @@ struct xc_sr_context
 
     union /* Guest-arch specific data. */
     {
-        struct /* x86 PV guest. */
+        struct /* x86 */
         {
-            /* 4 or 8; 32 or 64 bit domain */
-            unsigned int width;
-            /* 3 or 4 pagetable levels */
-            unsigned int levels;
-
-            /* Maximum Xen frame */
-            xen_pfn_t max_mfn;
-            /* Read-only machine to phys map */
-            xen_pfn_t *m2p;
-            /* first mfn of the compat m2p (Only needed for 32bit PV guests) */
-            xen_pfn_t compat_m2p_mfn0;
-            /* Number of m2p frames mapped */
-            unsigned long nr_m2p_frames;
-
-            /* Maximum guest frame */
-            xen_pfn_t max_pfn;
-
-            /* Number of frames making up the p2m */
-            unsigned int p2m_frames;
-            /* Guest's phys to machine map.  Mapped read-only (save) or
-             * allocated locally (restore).  Uses guest unsigned longs. */
-            void *p2m;
-            /* The guest pfns containing the p2m leaves */
-            xen_pfn_t *p2m_pfns;
-
-            /* Read-only mapping of guests shared info page */
-            shared_info_any_t *shinfo;
-
-            /* p2m generation count for verifying validity of local p2m. */
-            uint64_t p2m_generation;
-
-            union
+            struct /* x86 PV guest. */
             {
-                struct
+                /* 4 or 8; 32 or 64 bit domain */
+                unsigned int width;
+                /* 3 or 4 pagetable levels */
+                unsigned int levels;
+
+                /* Maximum Xen frame */
+                xen_pfn_t max_mfn;
+                /* Read-only machine to phys map */
+                xen_pfn_t *m2p;
+                /* first mfn of the compat m2p (Only needed for 32bit PV guests) */
+                xen_pfn_t compat_m2p_mfn0;
+                /* Number of m2p frames mapped */
+                unsigned long nr_m2p_frames;
+
+                /* Maximum guest frame */
+                xen_pfn_t max_pfn;
+
+                /* Number of frames making up the p2m */
+                unsigned int p2m_frames;
+                /* Guest's phys to machine map.  Mapped read-only (save) or
+                 * allocated locally (restore).  Uses guest unsigned longs. */
+                void *p2m;
+                /* The guest pfns containing the p2m leaves */
+                xen_pfn_t *p2m_pfns;
+
+                /* Read-only mapping of guests shared info page */
+                shared_info_any_t *shinfo;
+
+                /* p2m generation count for verifying validity of local p2m. */
+                uint64_t p2m_generation;
+
+                union
                 {
-                    /* State machine for the order of received records. */
-                    bool seen_pv_info;
-
-                    /* Types for each page (bounded by max_pfn). */
-                    uint32_t *pfn_types;
-
-                    /* x86 PV per-vcpu storage structure for blobs. */
-                    struct xc_sr_x86_pv_restore_vcpu
+                    struct
                     {
-                        struct xc_sr_blob basic, extd, xsave, msr;
-                    } *vcpus;
-                    unsigned int nr_vcpus;
-                } restore;
-            };
-        } x86_pv;
+                        /* State machine for the order of received records. */
+                        bool seen_pv_info;
 
-        struct /* x86 HVM guest. */
-        {
-            union
+                        /* Types for each page (bounded by max_pfn). */
+                        uint32_t *pfn_types;
+
+                        /* x86 PV per-vcpu storage structure for blobs. */
+                        struct xc_sr_x86_pv_restore_vcpu
+                        {
+                            struct xc_sr_blob basic, extd, xsave, msr;
+                        } *vcpus;
+                        unsigned int nr_vcpus;
+                    } restore;
+                };
+            } pv;
+
+            struct /* x86 HVM guest. */
             {
-                struct
+                union
                 {
-                    /* Whether qemu enabled logdirty mode, and we should
-                     * disable on cleanup. */
-                    bool qemu_enabled_logdirty;
-                } save;
+                    struct
+                    {
+                        /* Whether qemu enabled logdirty mode, and we should
+                         * disable on cleanup. */
+                        bool qemu_enabled_logdirty;
+                    } save;
 
-                struct
-                {
-                    /* HVM context blob. */
-                    struct xc_sr_blob context;
-                } restore;
-            };
-        } x86_hvm;
+                    struct
+                    {
+                        /* HVM context blob. */
+                        struct xc_sr_blob context;
+                    } restore;
+                };
+            } hvm;
+
+        } x86;
     };
 };
 

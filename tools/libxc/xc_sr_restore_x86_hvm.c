@@ -10,7 +10,7 @@ static int handle_hvm_context(struct xc_sr_context *ctx,
                               struct xc_sr_record *rec)
 {
     xc_interface *xch = ctx->xch;
-    int rc = update_blob(&ctx->x86_hvm.restore.context, rec->data, rec->length);
+    int rc = update_blob(&ctx->x86.hvm.restore.context, rec->data, rec->length);
 
     if ( rc )
         ERROR("Unable to allocate %u bytes for hvm context", rec->length);
@@ -129,14 +129,14 @@ static int x86_hvm_setup(struct xc_sr_context *ctx)
 
     if ( ctx->restore.guest_type != DHDR_TYPE_X86_HVM )
     {
-        ERROR("Unable to restore %s domain into an x86_hvm domain",
+        ERROR("Unable to restore %s domain into an x86 HVM domain",
               dhdr_type_to_str(ctx->restore.guest_type));
         return -1;
     }
 
     if ( ctx->restore.guest_page_size != PAGE_SIZE )
     {
-        ERROR("Invalid page size %u for x86_hvm domains",
+        ERROR("Invalid page size %u for x86 HVM domains",
               ctx->restore.guest_page_size);
         return -1;
     }
@@ -201,8 +201,8 @@ static int x86_hvm_stream_complete(struct xc_sr_context *ctx)
     }
 
     rc = xc_domain_hvm_setcontext(xch, ctx->domid,
-                                  ctx->x86_hvm.restore.context.ptr,
-                                  ctx->x86_hvm.restore.context.size);
+                                  ctx->x86.hvm.restore.context.ptr,
+                                  ctx->x86.hvm.restore.context.size);
     if ( rc < 0 )
     {
         PERROR("Unable to restore HVM context");
@@ -225,7 +225,7 @@ static int x86_hvm_stream_complete(struct xc_sr_context *ctx)
 
 static int x86_hvm_cleanup(struct xc_sr_context *ctx)
 {
-    free(ctx->x86_hvm.restore.context.ptr);
+    free(ctx->x86.hvm.restore.context.ptr);
 
     return 0;
 }
