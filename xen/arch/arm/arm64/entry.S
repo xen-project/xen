@@ -2,6 +2,7 @@
 #include <asm/regs.h>
 #include <asm/alternative.h>
 #include <asm/smccc.h>
+#include <asm/macros.h>
 #include <public/xen.h>
 
 /*
@@ -288,6 +289,7 @@ guest_sync:
          */
         mov     x1, xzr
         eret
+        sb
 
 1:
         /*
@@ -413,6 +415,7 @@ return_from_trap:
         ldr     lr, [sp], #(UREGS_SPSR_el1 - UREGS_LR) /* CPSR, PC, SP, LR */
 
         eret
+        sb
 
 /*
  * This function is used to check pending virtual SError in the gap of
