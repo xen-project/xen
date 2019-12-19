@@ -2315,66 +2315,6 @@ void xc_elf_set_logfile(xc_interface *xch, struct elf_binary *elf,
                         int verbose);
 /* Useful for callers who also use libelf. */
 
-/**
- * Checkpoint Compression
- */
-typedef struct compression_ctx comp_ctx;
-comp_ctx *xc_compression_create_context(xc_interface *xch,
-					unsigned long p2m_size);
-void xc_compression_free_context(xc_interface *xch, comp_ctx *ctx);
-
-/**
- * Add a page to compression page buffer, to be compressed later.
- *
- * returns 0 if the page was successfully added to the page buffer
- *
- * returns -1 if there is no space in buffer. In this case, the
- *  application should call xc_compression_compress_pages to compress
- *  the buffer (or atleast part of it), thereby freeing some space in
- *  the page buffer.
- *
- * returns -2 if the pfn is out of bounds, where the bound is p2m_size
- *  parameter passed during xc_compression_create_context.
- */
-int xc_compression_add_page(xc_interface *xch, comp_ctx *ctx, char *page,
-			    unsigned long pfn, int israw);
-
-/**
- * Delta compress pages in the compression buffer and inserts the
- * compressed data into the supplied compression buffer compbuf, whose
- * size is compbuf_size.
- * After compression, the pages are copied to the internal LRU cache.
- *
- * This function compresses as many pages as possible into the
- * supplied compression buffer. It maintains an internal iterator to
- * keep track of pages in the input buffer that are yet to be compressed.
- *
- * returns -1 if the compression buffer has run out of space.  
- * returns 1 on success.
- * returns 0 if no more pages are left to be compressed.
- *  When the return value is non-zero, compbuf_len indicates the actual
- *  amount of data present in compbuf (<=compbuf_size).
- */
-int xc_compression_compress_pages(xc_interface *xch, comp_ctx *ctx,
-				  char *compbuf, unsigned long compbuf_size,
-				  unsigned long *compbuf_len);
-
-/**
- * Resets the internal page buffer that holds dirty pages before compression.
- * Also resets the iterators.
- */
-void xc_compression_reset_pagebuf(xc_interface *xch, comp_ctx *ctx);
-
-/**
- * Caller must supply the compression buffer (compbuf),
- * its size (compbuf_size) and a reference to index variable (compbuf_pos)
- * that is used internally. Each call pulls out one page from the compressed
- * chunk and copies it to dest.
- */
-int xc_compression_uncompress_page(xc_interface *xch, char *compbuf,
-				   unsigned long compbuf_size,
-				   unsigned long *compbuf_pos, char *dest);
-
 /*
  * Execute an image previously loaded with xc_kexec_load().
  *
