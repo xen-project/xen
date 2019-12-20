@@ -13,6 +13,7 @@
 
 #include <asm/apic.h>
 #include <asm/event.h>
+#include <asm/guest/hyperv.h>
 #include <asm/guest/hyperv-tlfs.h>
 #include <asm/hvm/support.h>
 
@@ -82,33 +83,6 @@ static void update_reference_tsc(const struct domain *d, bool initialize)
     p->tsc_sequence = seq;
 }
 
-/*
- * The specification says: "The partition reference time is computed
- * by the following formula:
- *
- * ReferenceTime = ((VirtualTsc * TscScale) >> 64) + TscOffset
- *
- * The multiplication is a 64 bit multiplication, which results in a
- * 128 bit number which is then shifted 64 times to the right to obtain
- * the high 64 bits."
- */
-static uint64_t scale_tsc(uint64_t tsc, uint64_t scale, int64_t offset)
-{
-    uint64_t result;
-
-    /*
-     * Quadword MUL takes an implicit operand in RAX, and puts the result
-     * in RDX:RAX. Because we only want the result of the multiplication
-     * after shifting right by 64 bits, we therefore only need the content
-     * of RDX.
-     */
-    asm ( "mulq %[scale]"
-          : "+a" (tsc), "=d" (result)
-          : [scale] "rm" (scale) );
-
-    return result + offset;
-}
-
 static uint64_t trc_val(const struct domain *d, int64_t offset)
 {
     uint64_t tsc, scale;
@@ -116,7 +90,7 @@ static uint64_t trc_val(const struct domain *d, int64_t offset)
     tsc = hvm_get_guest_tsc(pt_global_vcpu_target(d));
     scale = ((10000ul << 32) / d->arch.tsc_khz) << 32;
 
-    return scale_tsc(tsc, scale, offset);
+    return hv_scale_tsc(tsc, scale, offset);
 }
 
 static void time_ref_count_freeze(const struct domain *d)

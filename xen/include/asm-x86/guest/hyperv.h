@@ -19,9 +19,37 @@
 #ifndef __X86_GUEST_HYPERV_H__
 #define __X86_GUEST_HYPERV_H__
 
-#ifdef CONFIG_HYPERV_GUEST
-
 #include <xen/types.h>
+
+/*
+ * The specification says: "The partition reference time is computed
+ * by the following formula:
+ *
+ * ReferenceTime = ((VirtualTsc * TscScale) >> 64) + TscOffset
+ *
+ * The multiplication is a 64 bit multiplication, which results in a
+ * 128 bit number which is then shifted 64 times to the right to obtain
+ * the high 64 bits."
+ */
+static inline uint64_t hv_scale_tsc(uint64_t tsc, uint64_t scale,
+                                    int64_t offset)
+{
+    uint64_t result;
+
+    /*
+     * Quadword MUL takes an implicit operand in RAX, and puts the result
+     * in RDX:RAX. Because we only want the result of the multiplication
+     * after shifting right by 64 bits, we therefore only need the content
+     * of RDX.
+     */
+    asm ( "mulq %[scale]"
+          : "+a" (tsc), "=d" (result)
+          : [scale] "rm" (scale) );
+
+    return result + offset;
+}
+
+#ifdef CONFIG_HYPERV_GUEST
 
 #include <asm/guest/hypervisor.h>
 

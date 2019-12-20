@@ -725,12 +725,7 @@ static uint64_t read_hyperv_timer(void)
 
     } while ( tsc_page->tsc_sequence != seq );
 
-    /* ret = ((tsc * scale) >> 64) + offset; */
-    asm ( "mul %[scale]; add %[offset], %[ret]"
-          : "+a" (tsc), [ret] "=&d" (ret)
-          : [scale] "rm" (scale), [offset] "rm" (offset) );
-
-    return ret;
+    return hv_scale_tsc(tsc, scale, offset);
 }
 
 static struct platform_timesource __initdata plt_hyperv_timer =
