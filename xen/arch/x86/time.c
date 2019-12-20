@@ -696,9 +696,10 @@ static int64_t __init init_hyperv_timer(struct platform_timesource *pts)
     return freq;
 }
 
-static inline uint64_t read_hyperv_timer(void)
+static uint64_t read_hyperv_timer(void)
 {
-    uint64_t scale, offset, ret, tsc;
+    uint64_t scale, ret, tsc;
+    int64_t offset;
     uint32_t seq;
     const struct ms_hyperv_tsc_page *tsc_page = hyperv_tsc;
 
