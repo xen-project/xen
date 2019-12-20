@@ -273,10 +273,9 @@ int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
  *   '0' -> force to 0
  *   'x' -> we don't care (use default)
  *   'k' -> pass through host value
- *   's' -> pass through the first time and then keep the same value
- *          across save/restore and migration.
+ *   's' -> legacy alias for 'k'
  *
- * For 's' and 'x' the configuration is overwritten with the value applied.
+ * In all cases, the returned string consists of just '0' and '1'.
  */
 int xc_cpuid_set(
     xc_interface *xch, uint32_t domid, const unsigned int *input,
@@ -402,7 +401,8 @@ int xc_cpuid_set(
                 clear_feature(31 - j, regs[i]);
 
             config_transformed[i][j] = config[i][j];
-            if ( config[i][j] == 's' )
+            /* All non 0/1 values get overwritten. */
+            if ( (config[i][j] & ~1) != '0' )
                 config_transformed[i][j] = '0' + val;
         }
     }

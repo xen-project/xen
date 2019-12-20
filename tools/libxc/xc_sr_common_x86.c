@@ -134,8 +134,30 @@ int handle_x86_msr_policy(struct xc_sr_context *ctx, struct xc_sr_record *rec)
 
 int x86_static_data_complete(struct xc_sr_context *ctx, unsigned int *missing)
 {
-    /* TODO: Become conditional on there being no data in the stream. */
-    *missing = XGR_SDD_MISSING_MSR | XGR_SDD_MISSING_CPUID;
+    xc_interface *xch = ctx->xch;
+    uint32_t nr_leaves = 0, nr_msrs = 0;
+    uint32_t err_l = ~0, err_s = ~0, err_m = ~0;
+
+    if ( ctx->x86.restore.cpuid.ptr )
+        nr_leaves = ctx->x86.restore.cpuid.size / sizeof(xen_cpuid_leaf_t);
+    else
+        *missing |= XGR_SDD_MISSING_CPUID;
+
+    if ( ctx->x86.restore.msr.ptr )
+        nr_msrs = ctx->x86.restore.msr.size / sizeof(xen_msr_entry_t);
+    else
+        *missing |= XGR_SDD_MISSING_MSR;
+
+    if ( (nr_leaves || nr_msrs) &&
+         xc_set_domain_cpu_policy(xch, ctx->domid,
+                                  nr_leaves, ctx->x86.restore.cpuid.ptr,
+                                  nr_msrs,   ctx->x86.restore.msr.ptr,
+                                  &err_l, &err_s, &err_m) )
+    {
+        PERROR("Failed to set CPUID policy: leaf %08x, subleaf %08x, msr %08x",
+               err_l, err_s, err_m);
+        return -1;
+    }
 
     return 0;
 }
