@@ -136,6 +136,10 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_TSX_CTRL:
     case MSR_AMD64_LWP_CFG:
     case MSR_AMD64_LWP_CBADDR:
+    case MSR_PPIN_CTL:
+    case MSR_PPIN:
+    case MSR_AMD_PPIN_CTL:
+    case MSR_AMD_PPIN:
         /* Not offered to guests. */
         goto gp_fault;
 
@@ -279,6 +283,10 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case MSR_TSX_CTRL:
     case MSR_AMD64_LWP_CFG:
     case MSR_AMD64_LWP_CBADDR:
+    case MSR_PPIN_CTL:
+    case MSR_PPIN:
+    case MSR_AMD_PPIN_CTL:
+    case MSR_AMD_PPIN:
         /* Not offered to guests. */
         goto gp_fault;
 
