@@ -8528,36 +8528,21 @@ x86_emulate(
         sfence = true;
         break;
 
-    case X86EMUL_OPC(0x0f38, 0x00):    /* pshufb mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x00): /* pshufb xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x01):    /* phaddw mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x01): /* phaddw xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x02):    /* phaddd mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x02): /* phaddd xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x03):    /* phaddsw mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x03): /* phaddsw xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x04):    /* pmaddubsw mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x04): /* pmaddubsw xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x05):    /* phsubw mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x05): /* phsubw xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x06):    /* phsubd mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x06): /* phsubd xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x07):    /* phsubsw mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x07): /* phsubsw xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x08):    /* psignb mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x08): /* psignb xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x09):    /* psignw mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x09): /* psignw xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x0a):    /* psignd mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x0a): /* psignd xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x0b):    /* pmulhrsw mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x0b): /* pmulhrsw xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x1c):    /* pabsb mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x1c): /* pabsb xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x1d):    /* pabsw mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x1d): /* pabsw xmm/m128,xmm */
-    case X86EMUL_OPC(0x0f38, 0x1e):    /* pabsd mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f38, 0x1e): /* pabsd xmm/m128,xmm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x00): /* pshufb {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x01): /* phaddw {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x02): /* phaddd {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x03): /* phaddsw {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x04): /* pmaddubsw {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x05): /* phsubw {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x06): /* phsubd {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x07): /* phsubsw {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x08): /* psignb {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x09): /* psignw {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x0a): /* psignd {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x0b): /* pmulhrsw {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x1c): /* pabsb {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x1d): /* pabsw {,x}mm/mem,{,x}mm */
+    CASE_SIMD_PACKED_INT(0x0f38, 0x1e): /* pabsd {,x}mm/mem,{,x}mm */
         host_and_vcpu_must_have(ssse3);
         if ( vex.pfx )
         {
@@ -9982,8 +9967,7 @@ x86_emulate(
         avx512_vlen_check(b & 2);
         goto simd_imm8_zmm;
 
-    case X86EMUL_OPC(0x0f3a, 0x0f):    /* palignr $imm8,mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f3a, 0x0f): /* palignr $imm8,xmm/m128,xmm */
+    CASE_SIMD_PACKED_INT(0x0f3a, 0x0f): /* palignr $imm8,{,x}mm/mem,{,x}mm */
         host_and_vcpu_must_have(ssse3);
         if ( vex.pfx )
         {
