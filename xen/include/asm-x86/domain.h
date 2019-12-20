@@ -364,7 +364,6 @@ struct arch_domain
     int tsc_mode;            /* see include/asm-x86/time.h */
     bool_t vtsc;             /* tsc is emulated (may change after migrate) */
     s_time_t vtsc_last;      /* previous TSC value (guarantee monotonicity) */
-    spinlock_t vtsc_lock;
     uint64_t vtsc_offset;    /* adjustment for save/restore/migrate */
     uint32_t tsc_khz;        /* cached guest khz for certain emulated or
                                 hardware TSC scaling cases */

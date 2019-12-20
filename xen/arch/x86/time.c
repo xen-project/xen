@@ -2130,19 +2130,15 @@ u64 gtsc_to_gtime(struct domain *d, u64 tsc)
 
 uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs)
 {
-    s_time_t now = get_s_time();
+    s_time_t old, new, now = get_s_time();
     struct domain *d = v->domain;
 
-    spin_lock(&d->arch.vtsc_lock);
+    do {
+        old = d->arch.vtsc_last;
+        new = now > d->arch.vtsc_last ? now : old + 1;
+    } while ( cmpxchg(&d->arch.vtsc_last, old, new) != old );
 
-    if ( (int64_t)(now - d->arch.vtsc_last) > 0 )
-        d->arch.vtsc_last = now;
-    else
-        now = ++d->arch.vtsc_last;
-
-    spin_unlock(&d->arch.vtsc_lock);
-
-    return gtime_to_gtsc(d, now);
+    return gtime_to_gtsc(d, new);
 }
 
 bool clocksource_is_tsc(void)
