@@ -28,6 +28,7 @@
 #include <asm/hvm/monitor.h>
 #include <asm/altp2m.h>
 #include <asm/monitor.h>
+#include <asm/p2m.h>
 #include <asm/paging.h>
 #include <asm/vm_event.h>
 #include <public/vm_event.h>
@@ -159,6 +160,14 @@ int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
     case HVM_MONITOR_SINGLESTEP_BREAKPOINT:
         if ( !ad->monitor.singlestep_enabled )
             return 0;
+        if ( curr->arch.hvm.fast_single_step.enabled )
+        {
+            p2m_altp2m_check(curr, curr->arch.hvm.fast_single_step.p2midx);
+            curr->arch.hvm.single_step = false;
+            curr->arch.hvm.fast_single_step.enabled = false;
+            curr->arch.hvm.fast_single_step.p2midx = 0;
+            return 0;
+        }
         req.reason = VM_EVENT_REASON_SINGLESTEP;
         req.u.singlestep.gfn = gfn_of_rip(rip);
         sync = true;

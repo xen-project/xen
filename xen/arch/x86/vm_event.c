@@ -61,7 +61,8 @@ void vm_event_cleanup_domain(struct domain *d)
 void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v,
                                 vm_event_response_t *rsp)
 {
-    if ( !(rsp->flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP) )
+    if ( !(rsp->flags & (VM_EVENT_FLAG_TOGGLE_SINGLESTEP |
+                         VM_EVENT_FLAG_FAST_SINGLESTEP)) )
         return;
 
     if ( !is_hvm_domain(d) )
@@ -69,7 +70,10 @@ void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v,
 
     ASSERT(atomic_read(&v->vm_event_pause_count));
 
-    hvm_toggle_singlestep(v);
+    if ( rsp->flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP )
+        hvm_toggle_singlestep(v);
+    else
+        hvm_fast_singlestep(v, rsp->u.fast_singlestep.p2midx);
 }
 
 void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)

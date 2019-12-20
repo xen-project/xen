@@ -323,6 +323,7 @@ int hvm_debug_op(struct vcpu *v, int32_t op);
 
 /* Caller should pause vcpu before calling this function */
 void hvm_toggle_singlestep(struct vcpu *v);
+void hvm_fast_singlestep(struct vcpu *v, uint16_t p2midx);
 
 int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                               struct npfec npfec);

@@ -110,6 +110,15 @@
  * interrupt pending after resuming the VCPU.
  */
 #define VM_EVENT_FLAG_GET_NEXT_INTERRUPT (1 << 10)
+/*
+ * Execute fast singlestepping on vm_event response.
+ * Requires the vCPU to be paused already (synchronous events only).
+ *
+ * On a response requires setting the  p2midx field of fast_singlestep to which
+ * Xen will switch the vCPU to on the occurance of the first singlestep, after
+ * which singlestep gets automatically disabled.
+ */
+#define VM_EVENT_FLAG_FAST_SINGLESTEP    (1 << 11)
 
 /*
  * Reasons for the vm event request
@@ -276,6 +285,10 @@ struct vm_event_singlestep {
     uint64_t gfn;
 };
 
+struct vm_event_fast_singlestep {
+    uint16_t p2midx;
+};
+
 struct vm_event_debug {
     uint64_t gfn;
     uint32_t insn_length;
@@ -363,6 +376,7 @@ typedef struct vm_event_st {
         struct vm_event_mov_to_msr            mov_to_msr;
         struct vm_event_desc_access           desc_access;
         struct vm_event_singlestep            singlestep;
+        struct vm_event_fast_singlestep       fast_singlestep;
         struct vm_event_debug                 software_breakpoint;
         struct vm_event_debug                 debug_exception;
         struct vm_event_cpuid                 cpuid;

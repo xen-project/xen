@@ -172,6 +172,10 @@ struct hvm_vcpu {
     bool                flag_dr_dirty;
     bool                debug_state_latch;
     bool                single_step;
+    struct {
+        bool     enabled;
+        uint16_t p2midx;
+    } fast_single_step;
 
     struct hvm_vcpu_asid n1asid;
 
