@@ -15,24 +15,24 @@ our @msgs = (
     #         and its null-ness needs to be passed through to the helper's xc
     #   W  - needs a return value; callback is synchronous
     #   A  - needs a return value; callback is asynchronous
-    [  1, 'sr',     "log",                   [qw(uint32_t level
-                                                 uint32_t errnoval
-                                                 STRING context
-                                                 STRING formatted)] ],
-    [  2, 'sr',     "progress",              [qw(STRING context
-                                                 STRING doing_what),
-                                                'unsigned long', 'done',
-                                                'unsigned long', 'total'] ],
-    [  3, 'srcxA',  "suspend", [] ],
-    [  4, 'srcxA',  "postcopy", [] ],
-    [  5, 'srcxA',  "checkpoint", [] ],
-    [  6, 'srcxA',  "wait_checkpoint", [] ],
-    [  7, 'scxA',   "switch_qemu_logdirty",  [qw(uint32_t domid
-                                              unsigned enable)] ],
-    [  8, 'rcx',    "restore_results",       ['xen_pfn_t', 'store_gfn',
-                                              'xen_pfn_t', 'console_gfn'] ],
-    [  9, 'srW',    "complete",              [qw(int retval
-                                                 int errnoval)] ],
+    [ 'sr',     "log",                   [qw(uint32_t level
+                                             uint32_t errnoval
+                                             STRING context
+                                             STRING formatted)] ],
+    [ 'sr',     "progress",              [qw(STRING context
+                                             STRING doing_what),
+                                            'unsigned long', 'done',
+                                            'unsigned long', 'total'] ],
+    [ 'srcxA',  "suspend", [] ],
+    [ 'srcxA',  "postcopy", [] ],
+    [ 'srcxA',  "checkpoint", [] ],
+    [ 'srcxA',  "wait_checkpoint", [] ],
+    [ 'scxA',   "switch_qemu_logdirty",  [qw(uint32_t domid
+                                          unsigned enable)] ],
+    [ 'rcx',    "restore_results",       ['xen_pfn_t', 'store_gfn',
+                                          'xen_pfn_t', 'console_gfn'] ],
+    [ 'srW',    "complete",              [qw(int retval
+                                             int errnoval)] ],
 );
 
 #----------------------------------------
@@ -43,7 +43,7 @@ our %func_ah;
 our @outfuncs;
 our %out_decls;
 our %out_body;
-our %msgnum_used;
+our $msgnum = 0;
 
 die unless @ARGV==1;
 die if $ARGV[0] =~ m/^-/;
@@ -123,7 +123,7 @@ static int bytes_get(const unsigned char **msg,
 		     void *result, int rlen)
 {
     if (endmsg - *msg < rlen) return 0;
-    memcpy(result,*msg,rlen);
+    memcpy(result, *msg, rlen);
     *msg += rlen;
     return 1;
 }
@@ -167,7 +167,7 @@ static int BLOCK_get(const unsigned char **msg,
                       const unsigned char *const endmsg,
                       const uint8_t **result, uint32_t *result_size)
 {
-    if (!uint32_t_get(msg,endmsg,result_size)) return 0;
+    if (!uint32_t_get(msg, endmsg, result_size)) return 0;
     if (endmsg - *msg < *result_size) return 0;
     *result = (const void*)*msg;
     *msg += *result_size;
@@ -180,7 +180,7 @@ static int STRING_get(const unsigned char **msg,
 {
     const uint8_t *data;
     uint32_t datalen;
-    if (!BLOCK_get(msg,endmsg,&data,&datalen)) return 0;
+    if (!BLOCK_get(msg, endmsg, &data, &datalen)) return 0;
     if (datalen == 0) return 0;
     if (data[datalen-1] != '\\0') return 0;
     *result = (const void*)data;
@@ -228,7 +228,7 @@ foreach my $sr (qw(save restore)) {
            <<END_ALWAYS.($debug ? <<END_DEBUG : '').<<END_ALWAYS);
     const unsigned char *const endmsg = msg + len;
     uint16_t mtype;
-    if (!uint16_t_get(&msg,endmsg,&mtype)) return 0;
+    if (!uint16_t_get(&msg, endmsg, &mtype)) return 0;
 END_ALWAYS
     fprintf(stderr,"libxl callout receiver: got len=%u mtype=%u\\n",len,mtype);
 END_DEBUG
@@ -240,8 +240,8 @@ END_ALWAYS
 }
 
 foreach my $msginfo (@msgs) {
-    my ($msgnum, $flags, $name, $args) = @$msginfo;
-    die if $msgnum_used{$msgnum}++;
+    my ($flags, $name, $args) = @$msginfo;
+    $msgnum++;
 
     my $f_more_sr = sub {
         my ($contents_spec, $fnamebase) = @_;
@@ -290,7 +290,7 @@ END_ALWAYS
         } elsif ($argtype eq 'BLOCK') {
             $c_decl .= "const uint8_t *$arg, uint32_t ${arg}_size, ";
             $c_args .= ", ${arg}_size";
-            $c_get_args .= ",&${arg}_size";
+            $c_get_args .= ", &${arg}_size";
 	    $f_more_sr->("        const uint8_t *$arg;\n".
                          "        uint32_t ${arg}_size;\n");
 	} else {
@@ -299,7 +299,7 @@ END_ALWAYS
 	}
 	$c_callback_args .= "$c_args, ";
 	$c_recv.=
-            "        if (!${typeid}_get(&msg,endmsg,$c_get_args)) return 0;\n";
+            "        if (!${typeid}_get(&msg, endmsg, $c_get_args)) return 0;\n";
         f_more("${encode}_$name", "	${typeid}_put(buf, &len, $c_args);\n");
     }
     $f_more_sr->($c_recv);
@@ -369,7 +369,7 @@ foreach my $sr (qw(save restore)) {
     f_more("${receiveds}_${sr}",
            "    default:\n".
            "        return 0;\n".
-           "    }");
+           "    }\n");
     $cbs{$sr} .= "} ".cbtype($sr).";\n\n";
     if ($ch eq 'h') {
         print $cbs{$sr} or die $!;
