@@ -1358,6 +1358,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     dcs->srs.dcs = dcs;
 
     /* Restore */
+    callbacks->static_data_done = libxl__srm_callout_callback_static_data_done;
     callbacks->restore_results = libxl__srm_callout_callback_restore_results;
 
     /* COLO only supports HVM now because it does not work very
@@ -1425,6 +1426,17 @@ static void libxl__colo_restore_setup_done(libxl__egc *egc,
     }
 
     libxl__stream_read_start(egc, &dcs->srs);
+}
+
+int libxl__srm_callout_callback_static_data_done(void *user)
+{
+    libxl__save_helper_state *shs = user;
+    libxl__domain_create_state *dcs = shs->caller_state;
+    STATE_AO_GC(dcs->ao);
+
+    /* Nothing to do (yet). */
+
+    return 0;
 }
 
 void libxl__srm_callout_callback_restore_results(xen_pfn_t store_mfn,
