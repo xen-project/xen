@@ -243,149 +243,6 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
-static unsigned long timer_mode(const libxl_domain_build_info *info)
-{
-    const libxl_timer_mode mode = info->timer_mode;
-    assert(mode >= LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS &&
-           mode <= LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING);
-    return ((unsigned long)mode);
-}
-
-#if defined(__i386__) || defined(__x86_64__)
-static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
-                                     libxl_domain_build_info *const info)
-{
-    libxl_bitmap enlightenments;
-    libxl_viridian_enlightenment v;
-    uint64_t mask = 0;
-
-    libxl_bitmap_init(&enlightenments);
-    libxl_bitmap_alloc(CTX, &enlightenments,
-                       LIBXL_BUILDINFO_HVM_VIRIDIAN_ENABLE_DISABLE_WIDTH);
-
-    if (libxl_defbool_val(info->u.hvm.viridian)) {
-        /* Enable defaults */
-        libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_BASE);
-        libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_FREQ);
-        libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_TIME_REF_COUNT);
-        libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_APIC_ASSIST);
-        libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_CRASH_CTL);
-    }
-
-    libxl_for_each_set_bit(v, info->u.hvm.viridian_enable) {
-        if (libxl_bitmap_test(&info->u.hvm.viridian_disable, v)) {
-            LOG(ERROR, "%s group both enabled and disabled",
-                libxl_viridian_enlightenment_to_string(v));
-            goto err;
-        }
-        if (libxl_viridian_enlightenment_to_string(v)) /* check validity */
-            libxl_bitmap_set(&enlightenments, v);
-    }
-
-    libxl_for_each_set_bit(v, info->u.hvm.viridian_disable)
-        if (libxl_viridian_enlightenment_to_string(v)) /* check validity */
-            libxl_bitmap_reset(&enlightenments, v);
-
-    /* The base set is a pre-requisite for all others */
-    if (!libxl_bitmap_is_empty(&enlightenments) &&
-        !libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_BASE)) {
-        LOG(ERROR, "base group not enabled");
-        goto err;
-    }
-
-    libxl_for_each_set_bit(v, enlightenments)
-        LOG(DETAIL, "%s group enabled", libxl_viridian_enlightenment_to_string(v));
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_BASE)) {
-        mask |= HVMPV_base_freq;
-
-        if (!libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_FREQ))
-            mask |= HVMPV_no_freq;
-    }
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_TIME_REF_COUNT))
-        mask |= HVMPV_time_ref_count;
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_REFERENCE_TSC))
-        mask |= HVMPV_reference_tsc;
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_HCALL_REMOTE_TLB_FLUSH))
-        mask |= HVMPV_hcall_remote_tlb_flush;
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_APIC_ASSIST))
-        mask |= HVMPV_apic_assist;
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_CRASH_CTL))
-        mask |= HVMPV_crash_ctl;
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_SYNIC))
-        mask |= HVMPV_synic;
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_STIMER))
-        mask |= HVMPV_time_ref_count | HVMPV_synic | HVMPV_stimer;
-
-    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_HCALL_IPI))
-        mask |= HVMPV_hcall_ipi;
-
-    if (mask != 0 &&
-        xc_hvm_param_set(CTX->xch,
-                         domid,
-                         HVM_PARAM_VIRIDIAN,
-                         mask) != 0) {
-        LOGE(ERROR, "Couldn't set viridian feature mask (0x%"PRIx64")", mask);
-        goto err;
-    }
-
-    libxl_bitmap_dispose(&enlightenments);
-    return 0;
-
-err:
-    libxl_bitmap_dispose(&enlightenments);
-    return ERROR_FAIL;
-}
-
-static int hvm_set_mca_capabilities(libxl__gc *gc, uint32_t domid,
-                                    libxl_domain_build_info *const info)
-{
-    unsigned long caps = info->u.hvm.mca_caps;
-
-    if (!caps)
-        return 0;
-
-    return xc_hvm_param_set(CTX->xch, domid, HVM_PARAM_MCA_CAP, caps);
-}
-#endif
-
-static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
-                                libxl_domain_build_info *const info)
-{
-    switch(info->type) {
-    case LIBXL_DOMAIN_TYPE_PVH:
-        xc_hvm_param_set(handle, domid, HVM_PARAM_PAE_ENABLED, true);
-        xc_hvm_param_set(handle, domid, HVM_PARAM_TIMER_MODE,
-                         timer_mode(info));
-        xc_hvm_param_set(handle, domid, HVM_PARAM_NESTEDHVM,
-                         libxl_defbool_val(info->nested_hvm));
-        break;
-    case LIBXL_DOMAIN_TYPE_HVM:
-        xc_hvm_param_set(handle, domid, HVM_PARAM_PAE_ENABLED,
-                         libxl_defbool_val(info->u.hvm.pae));
-#if defined(__i386__) || defined(__x86_64__)
-        xc_hvm_param_set(handle, domid, HVM_PARAM_HPET_ENABLED,
-                         libxl_defbool_val(info->u.hvm.hpet));
-#endif
-        xc_hvm_param_set(handle, domid, HVM_PARAM_TIMER_MODE,
-                         timer_mode(info));
-        xc_hvm_param_set(handle, domid, HVM_PARAM_VPT_ALIGN,
-                         libxl_defbool_val(info->u.hvm.vpt_align));
-        xc_hvm_param_set(handle, domid, HVM_PARAM_NESTEDHVM,
-                         libxl_defbool_val(info->nested_hvm));
-        break;
-    default:
-        abort();
-    }
-}
-
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_config *d_config, libxl__domain_build_state *state)
 {
@@ -397,6 +254,12 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
 
     if (xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus) != 0) {
         LOG(ERROR, "Couldn't set max vcpu count");
+        return ERROR_FAIL;
+    }
+
+    if (libxl_defbool_val(d_config->b_info.disable_migrate) &&
+        xc_domain_disable_migrate(ctx->xch, domid) != 0) {
+        LOG(ERROR, "Couldn't set nomigrate");
         return ERROR_FAIL;
     }
 
@@ -521,40 +384,6 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
 
     state->store_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->store_domid);
     state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->console_domid);
-
-    if (info->type != LIBXL_DOMAIN_TYPE_PV)
-        hvm_set_conf_params(ctx->xch, domid, info);
-
-#if defined(__i386__) || defined(__x86_64__)
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        rc = hvm_set_viridian_features(gc, domid, info);
-        if (rc)
-            return rc;
-
-        rc = hvm_set_mca_capabilities(gc, domid, info);
-        if (rc)
-            return rc;
-    }
-#endif
-
-    /* Alternate p2m support on x86 is available only for PVH/HVM guests. */
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        /* The config parameter "altp2m" replaces the parameter "altp2mhvm". For
-         * legacy reasons, both parameters are accepted on x86 HVM guests.
-         *
-         * If the legacy field info->u.hvm.altp2m is set, activate altp2m.
-         * Otherwise set altp2m based on the field info->altp2m. */
-        if (info->altp2m == LIBXL_ALTP2M_MODE_DISABLED &&
-            libxl_defbool_val(info->u.hvm.altp2m))
-            xc_hvm_param_set(ctx->xch, domid, HVM_PARAM_ALTP2M,
-                             libxl_defbool_val(info->u.hvm.altp2m));
-        else
-            xc_hvm_param_set(ctx->xch, domid, HVM_PARAM_ALTP2M,
-                             info->altp2m);
-    } else if (info->type == LIBXL_DOMAIN_TYPE_PVH) {
-        xc_hvm_param_set(ctx->xch, domid, HVM_PARAM_ALTP2M,
-                         info->altp2m);
-    }
 
     rc = libxl__arch_domain_create(gc, d_config, domid);
 
