@@ -166,29 +166,31 @@ xen_prepost_hooks_fail.o: config.h
 $(LIVEPATCH_PREPOST_HOOKS_FAIL): xen_prepost_hooks_fail.o xen_hello_world_func.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_PREPOST_HOOKS_FAIL) $^
 
-xen_actions_hooks.o: config.h
+xen_action_hooks.o: config.h
 
 .PHONY: $(LIVEPATCH_ACTION_HOOKS)
 $(LIVEPATCH_ACTION_HOOKS): xen_action_hooks.o xen_hello_world_func.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS) $^
 
+xen_action_hooks_nofunc.o: config.h
+
 .PHONY: $(LIVEPATCH_ACTION_HOOKS_NOFUNC)
 $(LIVEPATCH_ACTION_HOOKS_NOFUNC): xen_action_hooks_nofunc.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOFUNC) $^
 
-xen_actions_hooks_marker.o: config.h
+xen_action_hooks_marker.o: config.h
 
 .PHONY: $(LIVEPATCH_ACTION_HOOKS_MARKER)
 $(LIVEPATCH_ACTION_HOOKS_MARKER): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_MARKER) $^
 
-xen_actions_hooks_noapply.o: config.h
+xen_action_hooks_noapply.o: config.h
 
 .PHONY: $(LIVEPATCH_ACTION_HOOKS_NOAPPLY)
 $(LIVEPATCH_ACTION_HOOKS_NOAPPLY): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOAPPLY) $^
 
-xen_actions_hooks_norevert.o: config.h
+xen_action_hooks_norevert.o: config.h
 
 .PHONY: $(LIVEPATCH_ACTION_HOOKS_NOREVERT)
 $(LIVEPATCH_ACTION_HOOKS_NOREVERT): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
@@ -198,7 +200,7 @@ EXPECT_BYTES_COUNT := 8
 CODE_GET_EXPECT=$(shell $(OBJDUMP) -d --insn-width=1 $(1) | sed -n -e '/<'$(2)'>:$$/,/^$$/ p' | tail -n +2 | head -n $(EXPECT_BYTES_COUNT) | awk '{$$0=$$2; printf "%s", substr($$0,length-1)}' | sed 's/.\{2\}/0x&,/g' | sed 's/^/{/;s/,$$/}/g')
 .PHONY: expect_config.h
 expect_config.h: EXPECT_BYTES=$(call CODE_GET_EXPECT,$(BASEDIR)/xen-syms,xen_extra_version)
-expect_config.h: xen_expectations.o
+expect_config.h:
 	(set -e; \
 	 echo "#define EXPECT_BYTES $(EXPECT_BYTES)"; \
          echo "#define EXPECT_BYTES_COUNT $(EXPECT_BYTES_COUNT)") > $@
