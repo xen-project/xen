@@ -327,6 +327,19 @@ struct ms_hyperv_tsc_page {
  */
 
 #define HV_LINUX_VENDOR_ID              0x8100
+union hv_guest_os_id
+{
+    uint64_t raw;
+    struct
+    {
+        uint64_t build_number:16;
+        uint64_t service_pack:8;
+        uint64_t minor:8;
+        uint64_t major:8;
+        uint64_t os:8;
+        uint64_t vendor:16;
+    };
+};
 
 struct hv_reenlightenment_control {
 	__u64 vector:8;

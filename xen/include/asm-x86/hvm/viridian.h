@@ -9,6 +9,8 @@
 #ifndef __ASM_X86_HVM_VIRIDIAN_H__
 #define __ASM_X86_HVM_VIRIDIAN_H__
 
+#include <asm/guest/hyperv-tlfs.h>
+
 union viridian_page_msr
 {
     uint64_t raw;
@@ -83,20 +85,6 @@ struct viridian_vcpu
     uint64_t crash_param[5];
 };
 
-union viridian_guest_os_id_msr
-{
-    uint64_t raw;
-    struct
-    {
-        uint64_t build_number:16;
-        uint64_t service_pack:8;
-        uint64_t minor:8;
-        uint64_t major:8;
-        uint64_t os:8;
-        uint64_t vendor:16;
-    };
-};
-
 struct viridian_time_ref_count
 {
     unsigned long flags;
@@ -112,7 +100,7 @@ struct viridian_time_ref_count
 
 struct viridian_domain
 {
-    union viridian_guest_os_id_msr guest_os_id;
+    union hv_guest_os_id guest_os_id;
     union viridian_page_msr hypercall_gpa;
     struct viridian_time_ref_count time_ref_count;
     struct viridian_page reference_tsc;

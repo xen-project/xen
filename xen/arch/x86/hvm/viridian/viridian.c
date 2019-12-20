@@ -218,7 +218,7 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
 
 static void dump_guest_os_id(const struct domain *d)
 {
-    const union viridian_guest_os_id_msr *goi;
+    const union hv_guest_os_id *goi;
 
     goi = &d->arch.hvm.viridian->guest_os_id;
 
