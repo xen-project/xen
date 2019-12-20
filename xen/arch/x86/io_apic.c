@@ -562,7 +562,7 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
 
     dest = set_desc_affinity(desc, mask);
     if (dest != BAD_APICID) {
-        if ( !x2apic_enabled )
+        if ( !iommu_intremap || !x2apic_enabled )
             dest = SET_APIC_LOGICAL_ID(dest);
         entry = irq_2_pin + irq;
         for (;;) {
@@ -964,7 +964,7 @@ static hw_irq_controller ioapic_edge_type;
 #define IOAPIC_LEVEL	1
 
 #define SET_DEST(ent, mode, val) do { \
-    if (x2apic_enabled) \
+    if (x2apic_enabled && iommu_intremap) \
         (ent).dest.dest32 = (val); \
     else \
         (ent).dest.mode.mode##_dest = (val); \
@@ -1194,14 +1194,14 @@ static void /*__init*/ __print_IO_APIC(bool boot)
 	printk(KERN_DEBUG ".... IRQ redirection table:\n");
 
 	printk(KERN_DEBUG " NR %s Msk Trg IRR Pol Stat DstM DelM Vec\n",
-               x2apic_enabled ? " DestID" : "Dst");
+               (x2apic_enabled && iommu_intremap) ? " DestID" : "Dst");
 
 	for (i = 0; i <= reg_01.bits.entries; i++) {
             struct IO_APIC_route_entry entry;
 
             entry = ioapic_read_entry(apic, i, 0);
 
-            if ( x2apic_enabled )
+            if ( x2apic_enabled && iommu_intremap )
                 printk(KERN_DEBUG " %02x %08x", i, entry.dest.dest32);
             else
                 printk(KERN_DEBUG " %02x  %02x ", i,
@@ -2504,9 +2504,9 @@ void dump_ioapic_irq_info(void)
                    rte.dest_mode ? 'L' : 'P',
                    rte.delivery_status, rte.polarity, rte.irr,
                    rte.trigger ? 'L' : 'E', rte.mask,
-                   x2apic_enabled ? 8 : 2,
-                   x2apic_enabled ? rte.dest.dest32
-                                  : rte.dest.logical.logical_dest);
+                   (x2apic_enabled && iommu_intremap) ? 8 : 2,
+                   (x2apic_enabled && iommu_intremap) ?
+                       rte.dest.dest32 : rte.dest.logical.logical_dest);
 
             if ( entry->next == 0 )
                 break;
