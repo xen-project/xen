@@ -1,4 +1,4 @@
-# Xen Live Patching Design v1
+# Xen Live Patching Design v2
 
 ## Rationale
 
@@ -23,6 +23,9 @@ The document is split in four sections:
  * payload - telemetries of the old code along with binary blob of the new
    function (if needed).
  * reloc - telemetries contained in the payload to construct proper trampoline.
+ * hook - an auxiliary function being called before, during or after payload
+          application or revert.
+ * quiescing zone - period when all CPUs are lock-step with each other.
 
 ## History
 
@@ -270,6 +273,13 @@ like what the Linux kernel module loader does.
 The payload contains at least three sections:
 
  * `.livepatch.funcs` - which is an array of livepatch_func structures.
+   and/or any of:
+ * `.livepatch.hooks.{preapply,postapply,prerevert,postrevert}'
+ * `.livepatch.hooks.{apply,revert}`
+   - which are a pointer to a hook function pointer.
+
+ * `.livepatch.xen_depends` - which is an ELF Note that describes what Xen
+    build-id the payload depends on. **MUST** have one.
  * `.livepatch.depends` - which is an ELF Note that describes what the payload
     depends on. **MUST** have one.
  *  `.note.gnu.build-id` - the build-id of this payload. **MUST** have one.
@@ -287,10 +297,15 @@ which describe the functions to be patched:
         uint32_t old_size;
         uint8_t version;
         uint8_t opaque[31];
+        /* Added to livepatch payload version 2: */
+        uint8_t applied;
+        uint8_t _pad[7];
+        livepatch_expectation_t expect;
     };
 
-The size of the structure is 64 bytes on 64-bit hypervisors. It will be
-52 on 32-bit hypervisors.
+The size of the structure is 104 bytes on 64-bit hypervisors. It will be
+92 on 32-bit hypervisors.
+The version 2 of the payload adds additional 8 bytes to the structure size.
 
  * `name` is the symbol name of the old function. Only used if `old_addr` is
    zero, otherwise will be used during dynamic linking (when hypervisor loads
@@ -314,8 +329,36 @@ The size of the structure is 64 bytes on 64-bit hypervisors. It will be
    * If the value of `new_addr` is zero then `new_size` determines how many
     instruction bytes to NOP (up to opaque size modulo smallest platform
     instruction - 1 byte x86 and 4 bytes on ARM).
- * `version` is to be one.
+ * `version` indicates version of the generated payload.
  * `opaque` **MUST** be zero.
+
+The version 2 of the payload adds the following fields to the structure:
+
+  * `applied` tracks function's applied/reverted state. It has a boolean type
+    either LIVEPATCH_FUNC_NOT_APPLIED or LIVEPATCH_FUNC_APPLIED.
+  * `_pad[7]` adds padding to align to 8 bytes.
+  * `expect` is an optional structure containing expected to-be-replaced data
+    (mostly for inline asm patching). The `expect` structure format is:
+
+    struct livepatch_expectation {
+        uint8_t enabled : 1;
+        uint8_t len : 5;
+        uint8_t rsv: 2;
+        uint8_t data[LIVEPATCH_OPAQUE_SIZE]; /* Same size as opaque[] buffer of
+                                            struct livepatch_func. This is the
+                                            max number of bytes to be patched */
+    };
+    typedef struct livepatch_expectation livepatch_expectation_t;
+
+    * `enabled` allows to enable the expectation check for given function.
+      Default state is disabled.
+    * `len` specifies the number of valid bytes in `data` array. 5 bits is
+      enough to specify values up to 32 (of bytes), which is above the array
+      size.
+    * `rsv` reserved bitfields. **MUST** be zero.
+    * `data` contains expected bytes of content to be replaced. Same size as
+      `opaque` buffer of `struct livepatch_func` (max number of bytes to be
+      patched).
 
 The size of the `livepatch_func` array is determined from the ELF section
 size.
@@ -328,12 +371,32 @@ When reverting a patch, the hypervisor iterates over each `livepatch_func`
 and the core code copies the data from the undo buffer (private internal copy)
 to `old_addr`.
 
-It optionally may contain the address of functions to be called right before
-being applied and after being reverted:
+It optionally may contain the address of hooks to be called right before
+being applied and after being reverted (while all CPUs are still in quiescing
+zone). These hooks do not have access to payload structure.
 
  * `.livepatch.hooks.load` - an array of function pointers.
  * `.livepatch.hooks.unload` - an array of function pointers.
 
+It optionally may also contain the address of pre- and post- vetoing hooks to
+be called before (pre) or after (post) apply and revert payload actions (while
+all CPUs are already released from quiescing zone). These hooks do have
+access to payload structure. The pre-apply hook can prevent from loading the
+payload if encoded in it condition is not met. Accordingly, the pre-revert
+hook can prevent from unloading the livepatch if encoded in it condition is not
+met.
+
+ * `.livepatch.hooks.{preapply,postapply}`
+ * `.livepatch.hooks.{prerevert,postrevert}`
+   - which are a pointer to a single hook function pointer.
+
+Finally, it optionally may also contain the address of apply or revert action
+hooks to be called instead of the default apply and revert payload actions
+(while all CPUs are kept in quiescing zone). These hooks do have access to
+payload structure.
+
+ * `.livepatch.hooks.{apply,revert}`
+   - which are a pointer to a single hook function pointer.
 
 ### Example of .livepatch.funcs
 
@@ -348,6 +411,10 @@ A simple example of what a payload file can be:
         uint32_t old_size;
         uint8_t version;
         uint8_t pad[31];
+        /* Added to livepatch payload version 2: */
+        uint8_t applied;
+        uint8_t _pad[7];
+        livepatch_expectation_t expect;
     };
 
     /* Our replacement function for xen_extra_version. */
@@ -365,11 +432,20 @@ A simple example of what a payload file can be:
         .old_addr = (void *)0xffff82d08013963c, /* Extracted from xen-syms. */
         .new_size = 13, /* To be be computed by scripts. */
         .old_size = 13, /* -----------""---------------  */
+        /* Added to livepatch payload version 2: */
+        .expect = { /* All fields to be filled manually */
+            .enabled = 1,
+            .len = 5,
+            .rsv = 0,
+            .data = { 0x48, 0x8d, 0x05, 0x33, 0x1C }
+        },
     } __attribute__((__section__(".livepatch.funcs")));
 
 Code must be compiled with `-fPIC`.
 
-### .livepatch.hooks.load and .livepatch.hooks.unload
+### Hooks
+
+#### .livepatch.hooks.load and .livepatch.hooks.unload
 
 This section contains an array of function pointers to be executed
 before payload is being applied (.livepatch.funcs) or after reverting
@@ -383,22 +459,106 @@ The type definition of the function are as follow:
     typedef void (*livepatch_loadcall_t)(void);
     typedef void (*livepatch_unloadcall_t)(void);
 
-### .livepatch.depends and .note.gnu.build-id
+#### .livepatch.hooks.preapply
+
+This section contains a pointer to a single function pointer to be executed
+before apply action is scheduled (and thereby before CPUs are put into
+quiescing zone). This is useful to prevent from applying a payload when
+certain expected conditions aren't met or when mutating actions implemented
+in the hook fail or cannot be executed.
+This type of hooks do have access to payload structure.
+
+Each entry in this array is eight bytes.
+
+The type definition of the function are as follow:
+
+    typedef int livepatch_precall_t(livepatch_payload_t *arg);
+
+#### .livepatch.hooks.postapply
+
+This section contains a pointer to a single function pointer to be executed
+after apply action has finished and after all CPUs left the quiescing zone.
+This is useful to provide an ability to follow up on actions performed by
+the preapply hook. Especially, when module application was successful or to
+be able to undo certain preparation steps of the preapply hook in case of a
+failure. The success/failure error code is provided to the postapply hooks
+via the `rc` field of the payload structure.
+This type of hooks do have access to payload structure.
+
+Each entry in this array is eight bytes.
+
+The type definition of the function are as follow:
+
+    typedef void livepatch_postcall_t(livepatch_payload_t *arg);
+
+#### .livepatch.hooks.prerevert
+
+This section contains a pointer to a single function pointer to be executed
+before revert action is scheduled (and thereby before CPUs are put into
+quiescing zone). This is useful to prevent from reverting a payload when
+certain expected conditions aren't met or when mutating actions implemented
+in the hook fail or cannot be executed.
+This type of hooks do have access to payload structure.
+
+Each entry in this array is eight bytes.
+
+The type definition of the function are as follow:
+
+    typedef int livepatch_precall_t(livepatch_payload_t *arg);
+
+#### .livepatch.hooks.postrevert
+
+This section contains a pointer to a single function pointer to be executed
+after revert action has finished and after all CPUs left the quiescing zone.
+This is useful to provide an ability to perform cleanup of all previously
+executed mutating actions in order to restore the original system state from
+before the current payload application. The success/failure error code is
+provided to the postrevert hook via the `rc` field of the payload structure.
+This type of hooks do have access to payload structure.
+
+Each entry in this array is eight bytes.
+
+The type definition of the function are as follow:
+
+    typedef void livepatch_postcall_t(livepatch_payload_t *arg);
+
+#### .livepatch.hooks.apply and .livepatch.hooks.revert
+
+This section contains a pointer to a single function pointer to be executed
+instead of a default apply (or revert) action function. This is useful to
+replace or augment default behavior of the apply (or revert) action that
+requires all CPUs to be in the quiescing zone.
+This type of hooks do have access to payload structure.
+
+Each entry in this array is eight bytes.
+
+The type definition of the function are as follow:
+
+    typedef int livepatch_actioncall_t(livepatch_payload_t *arg);
+
+### .livepatch.xen_depends, .livepatch.depends and .note.gnu.build-id
 
 To support dependencies checking and safe loading (to load the
 appropiate payload against the right hypervisor) there is a need
 to embbed an build-id dependency.
 
-This is done by the payload containing an section `.livepatch.depends`
-which follows the format of an ELF Note. The contents of this
-(name, and description) are specific to the linker utilized to
-build the hypevisor and payload.
+This is done by the payload containing sections `.livepatch.xen_depends`
+and `.livepatch.depends` which follow the format of an ELF Note.
+The contents of these (name, and description) are specific to the linker
+utilized to build the hypevisor and payload.
 
 If GNU linker is used then the name is `GNU` and the description
 is a NT_GNU_BUILD_ID type ID. The description can be an SHA1
 checksum, MD5 checksum or any unique value.
 
 The size of these structures varies with the `--build-id` linker option.
+
+There are two kinds of build-id dependencies:
+
+ * Xen build-id dependency (.livepatch.xen_depends section)
+ * previous payload build-id dependency (.livepatch.depends section)
+
+See "Live patch interdependencies" for more information.
 
 ## Hypercalls
 
@@ -547,8 +707,8 @@ The structure is as follow:
 
 ### XEN_SYSCTL_LIVEPATCH_LIST (2)
 
-Retrieve an array of abbreviated status and names of payloads that are loaded in the
-hypervisor.
+Retrieve an array of abbreviated status, names and metadata of payloads that are
+loaded in the hypervisor.
 
 The caller provides:
 
@@ -557,27 +717,41 @@ The caller provides:
  * `idx` Index iterator. The index into the hypervisor's payload count. It is
     recommended that on first invocation zero be used so that `nr` (which the
     hypervisor will update with the remaining payload count) be provided.
-    Also the hypervisor will provide `version` with the most current value.
+    Also the hypervisor will provide `version` with the most current value,
+    calculated total size of all payloads' names and calculated total size of
+    all payload's metadata.
  * `nr` The max number of entries to populate. Can be zero which will result
     in the hypercall being a probing one and return the number of payloads
     (and update the `version`).
  * `pad` - *MUST* be zero.
  * `status` Virtual address of where to write `struct xen_livepatch_status`
    structures. Caller *MUST* allocate up to `nr` of them.
- * `name` - Virtual address of where to write the unique name of the payload.
-   Caller *MUST* allocate up to `nr` of them. Each *MUST* be of
-   **XEN_LIVEPATCH_NAME_SIZE** size. Note that **XEN_LIVEPATCH_NAME_SIZE** includes
-   the NUL terminator.
+ * `name` - Virtual address of where to write the unique name of the payloads.
+   Caller *MUST* allocate enough space to be able to store all received data
+   (i.e. total allocated space *MUST* match the `name_total_size` value
+   provided by the hypervisor). Individual payload name cannot be longer than
+   **XEN_LIVEPATCH_NAME_SIZE** bytes. Note that **XEN_LIVEPATCH_NAME_SIZE**
+   includes the NUL terminator.
  * `len` - Virtual address of where to write the length of each unique name
    of the payload. Caller *MUST* allocate up to `nr` of them. Each *MUST* be
    of sizeof(uint32_t) (4 bytes).
+ * `metadata` - Virtual address of where to write the metadata of the payloads.
+   Caller *MUST* allocate enough space to be able to store all received data
+   (i.e. total allocated space *MUST* match the `metadata_total_size` value
+   provided by the hypervisor). Individual payload metadata string can be of
+   arbitrary length. The metadata string format is: key=value\0...key=value\0.
+ * `metadata_len` - Virtual address of where to write the length of each metadata
+   string of the payload. Caller *MUST* allocate up to `nr` of them. Each *MUST*
+   be of sizeof(uint32_t) (4 bytes).
 
 If the hypercall returns an positive number, it is the number (upto `nr`
 provided to the hypercall) of the payloads returned, along with `nr` updated
 with the number of remaining payloads, `version` updated (it may be the same
 across hypercalls - if it varies the data is stale and further calls could
-fail). The `status`, `name`, and `len` are updated at their designed index
-value (`idx`) with the returned value of data.
+fail), `name_total_size` and `metadata_total_size` containing total sizes of
+transferred data for both the arrays.
+The `status`, `name`, `len`, `metadata` and `metadata_len` are updated at their
+designed index value (`idx`) with the returned value of data.
 
 If the hypercall returns -XEN_E2BIG the `nr` is too big and should be
 lowered.
@@ -615,13 +789,22 @@ The structure is as follow:
                                                    amount of payloads and version.
                                                    OUT: How many payloads left. */
         uint32_t pad;                           /* IN: Must be zero. */
+        uint32_t name_total_size;               /* OUT: Total size of all transfer names */
+        uint32_t metadata_total_size;           /* OUT: Total size of all transfer metadata */
         XEN_GUEST_HANDLE_64(xen_livepatch_status_t) status;  /* OUT. Must have enough
                                                    space allocate for nr of them. */
-        XEN_GUEST_HANDLE_64(char) id;           /* OUT: Array of names. Each member
-                                                   MUST XEN_LIVEPATCH_NAME_SIZE in size.
-                                                   Must have nr of them. */
+        XEN_GUEST_HANDLE_64(char) name;         /* OUT: Array of names. Each member
+                                                   may have an arbitrary length up to
+                                                   XEN_LIVEPATCH_NAME_SIZE bytes. Must have
+                                                   nr of them. */
         XEN_GUEST_HANDLE_64(uint32) len;        /* OUT: Array of lengths of name's.
                                                    Must have nr of them. */
+        XEN_GUEST_HANDLE_64(char) metadata;     /* OUT: Array of metadata strings. Each
+                                                   member may have an arbitrary length.
+                                                   Must have nr of them. */
+        XEN_GUEST_HANDLE_64(uint32) metadata_len;  /* OUT: Array of lengths of metadata's.
+                                                      Must have nr of them. */
+
     };
 
 ### XEN_SYSCTL_LIVEPATCH_ACTION (3)
@@ -650,6 +833,10 @@ The caller provides:
  * `time` The upper bound of time (ns) the cmd should take. Zero means to use
    the hypervisor default. If within the time the operation does not succeed
    the operation would go in error state.
+ * `flags` provides additional parameters for an action:
+  * *LIVEPATCH_ACTION_APPLY_NODEPS* (1) Apply action ignores inter-module
+  buildid dependency. Checks only if module is built for given hypervisor by
+  comparing buildid.
  * `pad` - *MUST* be zero.
 
 The return value will be zero unless the provided fields are incorrect.
@@ -667,6 +854,10 @@ The structure is as follow:
                                                 /* hypervisor default. */
                                                 /* Or upper bound of time (ns) */
                                                 /* for operation to take. */
+        uint32_t flags;                         /* IN: action flags. */
+                                                /* Provide additional parameters */
+                                                /* for an action. */
+        uint32_t pad;                           /* IN: Always zero. */
     };
 
 
@@ -894,13 +1085,16 @@ but is more complex to implement.
 The second option which requires an build-id of the hypervisor
 is implemented in the Xen hypervisor.
 
-Specifically each payload has two build-id ELF notes:
+Specifically each payload has three build-id ELF notes:
  * The build-id of the payload itself (generated via --build-id).
+ * The build-id of the Xen hypervisor it depends on (extracted from the
+   hypervisor during build time).
  * The build-id of the payload it depends on (extracted from the
    the previous payload or hypervisor during build time).
 
-This means that the very first payload depends on the hypervisor
-build-id.
+This means that every payload depends on the hypervisor build-id and on
+the build-id of the previous payload in the stack.
+The very first payload depends on the hypervisor build-id only.
 
 # Not Yet Done
 

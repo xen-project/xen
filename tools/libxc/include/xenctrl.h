@@ -2558,7 +2558,28 @@ int xc_livepatch_get(xc_interface *xch,
                      xen_livepatch_status_t *status);
 
 /*
- * The heart of this function is to get an array of xen_livepatch_status_t.
+ * Get a number of available payloads and get actual total size of
+ * the payloads' name and metadata arrays.
+ *
+ * This functions is typically executed first before the xc_livepatch_list()
+ * to obtain the sizes and correctly allocate all necessary data resources.
+ *
+ * The return value is zero if the hypercall completed successfully.
+ *
+ * If there was an error performing the sysctl operation, the return value
+ * will contain the hypercall error code value.
+ */
+int xc_livepatch_list_get_sizes(xc_interface *xch, unsigned int *nr,
+                                uint32_t *name_total_size,
+                                uint32_t *metadata_total_size);
+
+/*
+ * The heart of this function is to get an array of the following objects:
+ *   - xen_livepatch_status_t: states and return codes of payloads
+ *   - name: names of payloads
+ *   - len: lengths of corresponding payloads' names
+ *   - metadata: payloads' metadata
+ *   - metadata_len: lengths of corresponding payloads' metadata
  *
  * However it is complex because it has to deal with the hypervisor
  * returning some of the requested data or data being stale
@@ -2569,22 +2590,26 @@ int xc_livepatch_get(xc_interface *xch,
  * 'left' are also updated with the number of entries filled out
  * and respectively the number of entries left to get from hypervisor.
  *
- * It is expected that the caller of this function will take the
- * 'left' and use the value for 'start'. This way we have an
- * cursor in the array. Note that the 'info','name', and 'len' will
- * be updated at the subsequent calls.
+ * It is expected that the caller of this function will first issue the
+ * xc_livepatch_list_get_sizes() in order to obtain total sizes of names
+ * and all metadata as well as the current number of payload entries.
+ * The total sizes are required and supplied via the 'name_total_size' and
+ * 'metadata_total_size' parameters.
  *
- * The 'max' is to be provided by the caller with the maximum
- * number of entries that 'info', 'name', and 'len' arrays can
- * be filled up with.
- *
- * Each entry in the 'name' array is expected to be of XEN_LIVEPATCH_NAME_SIZE
- * length.
+ * The 'max' is to be provided by the caller with the maximum number of
+ * entries that 'info', 'name', 'len', 'metadata' and 'metadata_len' arrays
+ * can be filled up with.
  *
  * Each entry in the 'info' array is expected to be of xen_livepatch_status_t
  * structure size.
  *
+ * Each entry in the 'name' array may have an arbitrary size.
+ *
  * Each entry in the 'len' array is expected to be of uint32_t size.
+ *
+ * Each entry in the 'metadata' array may have an arbitrary size.
+ *
+ * Each entry in the 'metadata_len' array is expected to be of uint32_t size.
  *
  * The return value is zero if the hypercall completed successfully.
  * Note that the return value is _not_ the amount of entries filled
@@ -2595,21 +2620,26 @@ int xc_livepatch_get(xc_interface *xch,
  * will contain the number of entries that had been succesfully
  * retrieved (if any).
  */
-int xc_livepatch_list(xc_interface *xch, unsigned int max, unsigned int start,
-                      xen_livepatch_status_t *info, char *name,
-                      uint32_t *len, unsigned int *done,
-                      unsigned int *left);
+int xc_livepatch_list(xc_interface *xch, const unsigned int max,
+                      const unsigned int start,
+                      struct xen_livepatch_status *info,
+                      char *name, uint32_t *len,
+                      const uint32_t name_total_size,
+                      char *metadata, uint32_t *metadata_len,
+                      const uint32_t metadata_total_size,
+                      unsigned int *done, unsigned int *left);
 
 /*
  * The operations are asynchronous and the hypervisor may take a while
  * to complete them. The `timeout` offers an option to expire the
  * operation if it could not be completed within the specified time
  * (in ns). Value of 0 means let hypervisor decide the best timeout.
+ * The `flags` allows to pass extra parameters to the actions.
  */
-int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout);
-int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout);
-int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout);
-int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout);
+int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
+int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
+int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
+int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
 
 /*
  * Ensure cache coherency after memory modifications. A call to this function

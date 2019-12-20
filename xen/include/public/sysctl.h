@@ -35,7 +35,7 @@
 #include "domctl.h"
 #include "physdev.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000012
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000013
 
 /*
  * Read console content from Xen buffer ring.
@@ -832,7 +832,7 @@ struct xen_sysctl_cpu_featureset {
  *     If zero exit with success.
  */
 
-#define LIVEPATCH_PAYLOAD_VERSION 1
+#define LIVEPATCH_PAYLOAD_VERSION 2
 /*
  * .livepatch.funcs structure layout defined in the `Payload format`
  * section in the Live Patch design document.
@@ -840,6 +840,24 @@ struct xen_sysctl_cpu_featureset {
  * We guard this with __XEN__ as toolstacks SHOULD not use it.
  */
 #ifdef __XEN__
+#define LIVEPATCH_OPAQUE_SIZE 31
+
+struct livepatch_expectation {
+    uint8_t enabled : 1;
+    uint8_t len : 5;        /* Length of data up to LIVEPATCH_OPAQUE_SIZE
+                               (5 bits is enough for now) */
+    uint8_t rsv : 2;        /* Reserved. Zero value */
+    uint8_t data[LIVEPATCH_OPAQUE_SIZE]; /* Same size as opaque[] buffer of
+                                            struct livepatch_func. This is the
+                                            max number of bytes to be patched */
+};
+typedef struct livepatch_expectation livepatch_expectation_t;
+
+typedef enum livepatch_func_state {
+    LIVEPATCH_FUNC_NOT_APPLIED,
+    LIVEPATCH_FUNC_APPLIED
+} livepatch_func_state_t;
+
 struct livepatch_func {
     const char *name;       /* Name of function to be patched. */
     void *new_addr;
@@ -847,7 +865,10 @@ struct livepatch_func {
     uint32_t new_size;
     uint32_t old_size;
     uint8_t version;        /* MUST be LIVEPATCH_PAYLOAD_VERSION. */
-    uint8_t opaque[31];
+    uint8_t opaque[LIVEPATCH_OPAQUE_SIZE];
+    uint8_t applied;
+    uint8_t _pad[7];
+    livepatch_expectation_t expect;
 };
 typedef struct livepatch_func livepatch_func_t;
 #endif
@@ -913,15 +934,17 @@ struct xen_sysctl_livepatch_get {
 };
 
 /*
- * Retrieve an array of abbreviated status and names of payloads that are
- * loaded in the hypervisor.
+ * Retrieve an array of abbreviated status, names and metadata of payloads that
+ * are loaded in the hypervisor.
  *
  * If the hypercall returns an positive number, it is the number (up to `nr`)
  * of the payloads returned, along with `nr` updated with the number of remaining
- * payloads, `version` updated (it may be the same across hypercalls. If it
- * varies the data is stale and further calls could fail). The `status`,
- * `name`, and `len`' are updated at their designed index value (`idx`) with
- * the returned value of data.
+ * payloads, `version` updated (it may be the same across hypercalls. If it varies
+ * the data is stale and further calls could fail), `name_total_size` and
+ * `metadata_total_size` containing total sizes of transferred data for both the
+ * arrays.
+ * The `status`, `name`, `len`, `metadata` and `metadata_len` are updated at their
+ * designed index value (`idx`) with the returned value of data.
  *
  * If the hypercall returns E2BIG the `nr` is too big and should be
  * lowered. The upper limit of `nr` is left to the implemention.
@@ -944,13 +967,21 @@ struct xen_sysctl_livepatch_list {
                                                amount of payloads and version.
                                                OUT: How many payloads left. */
     uint32_t pad;                           /* IN: Must be zero. */
+    uint32_t name_total_size;               /* OUT: Total size of all transfer names */
+    uint32_t metadata_total_size;           /* OUT: Total size of all transfer metadata */
     XEN_GUEST_HANDLE_64(xen_livepatch_status_t) status;  /* OUT. Must have enough
                                                space allocate for nr of them. */
     XEN_GUEST_HANDLE_64(char) name;         /* OUT: Array of names. Each member
-                                               MUST XEN_LIVEPATCH_NAME_SIZE in size.
-                                               Must have nr of them. */
+                                               may have an arbitrary length up to
+                                               XEN_LIVEPATCH_NAME_SIZE bytes. Must have
+                                               nr of them. */
     XEN_GUEST_HANDLE_64(uint32) len;        /* OUT: Array of lengths of name's.
                                                Must have nr of them. */
+    XEN_GUEST_HANDLE_64(char) metadata;     /* OUT: Array of metadata strings. Each
+                                               member may have an arbitrary length.
+                                               Must have nr of them. */
+    XEN_GUEST_HANDLE_64(uint32) metadata_len;  /* OUT: Array of lengths of metadata's.
+                                                  Must have nr of them. */
 };
 
 /*
@@ -970,6 +1001,16 @@ struct xen_sysctl_livepatch_action {
                                             /* hypervisor default. */
                                             /* Or upper bound of time (ns) */
                                             /* for operation to take. */
+
+/*
+ * Override default inter-module buildid dependency chain enforcement.
+ * Check only if module is built for given hypervisor by comparing buildid.
+ */
+#define LIVEPATCH_ACTION_APPLY_NODEPS (1 << 0)
+    uint32_t flags;                         /* IN: action flags. */
+                                            /* Provide additional parameters */
+                                            /* for an action. */
+    uint32_t pad;                           /* IN: Always zero. */
 };
 
 struct xen_sysctl_livepatch_op {

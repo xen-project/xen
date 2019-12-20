@@ -29,9 +29,18 @@ struct xen_sysctl_livepatch_op;
 /* Convenience define for printk. */
 #define LIVEPATCH             "livepatch: "
 /* ELF payload special section names. */
-#define ELF_LIVEPATCH_FUNC    ".livepatch.funcs"
-#define ELF_LIVEPATCH_DEPENDS ".livepatch.depends"
-#define ELF_BUILD_ID_NOTE      ".note.gnu.build-id"
+#define ELF_LIVEPATCH_FUNC        ".livepatch.funcs"
+#define ELF_LIVEPATCH_DEPENDS     ".livepatch.depends"
+#define ELF_LIVEPATCH_XEN_DEPENDS ".livepatch.xen_depends"
+#define ELF_BUILD_ID_NOTE         ".note.gnu.build-id"
+#define ELF_LIVEPATCH_LOAD_HOOKS      ".livepatch.hooks.load"
+#define ELF_LIVEPATCH_UNLOAD_HOOKS    ".livepatch.hooks.unload"
+#define ELF_LIVEPATCH_PREAPPLY_HOOK   ".livepatch.hooks.preapply"
+#define ELF_LIVEPATCH_APPLY_HOOK      ".livepatch.hooks.apply"
+#define ELF_LIVEPATCH_POSTAPPLY_HOOK  ".livepatch.hooks.postapply"
+#define ELF_LIVEPATCH_PREREVERT_HOOK  ".livepatch.hooks.prerevert"
+#define ELF_LIVEPATCH_REVERT_HOOK     ".livepatch.hooks.revert"
+#define ELF_LIVEPATCH_POSTREVERT_HOOK ".livepatch.hooks.postrevert"
 /* Arbitrary limit for payload size and .bss section size. */
 #define LIVEPATCH_MAX_SIZE     MB(2)
 
@@ -114,6 +123,34 @@ void arch_livepatch_post_action(void);
 
 void arch_livepatch_mask(void);
 void arch_livepatch_unmask(void);
+
+static inline void common_livepatch_apply(struct livepatch_func *func)
+{
+    /* If the action has been already executed on this function, do nothing. */
+    if ( func->applied == LIVEPATCH_FUNC_APPLIED )
+    {
+        printk(XENLOG_WARNING LIVEPATCH "%s: %s has been already applied before\n",
+                __func__, func->name);
+        return;
+    }
+
+    arch_livepatch_apply(func);
+    func->applied = LIVEPATCH_FUNC_APPLIED;
+}
+
+static inline void common_livepatch_revert(struct livepatch_func *func)
+{
+    /* If the apply action hasn't been executed on this function, do nothing. */
+    if ( !func->old_addr || func->applied == LIVEPATCH_FUNC_NOT_APPLIED )
+    {
+        printk(XENLOG_WARNING LIVEPATCH "%s: %s has not been applied before\n",
+                __func__, func->name);
+        return;
+    }
+
+    arch_livepatch_revert(func);
+    func->applied = LIVEPATCH_FUNC_NOT_APPLIED;
+}
 #else
 
 /*
