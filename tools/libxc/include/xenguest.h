@@ -112,11 +112,12 @@ struct save_callbacks {
     void* data;
 };
 
+/* Type of stream.  Plain, or using a continuous replication protocol? */
 typedef enum {
-    XC_MIG_STREAM_NONE, /* plain stream */
-    XC_MIG_STREAM_REMUS,
-    XC_MIG_STREAM_COLO,
-} xc_migration_stream_t;
+    XC_STREAM_PLAIN,
+    XC_STREAM_REMUS,
+    XC_STREAM_COLO,
+} xc_stream_type_t;
 
 /**
  * This function will save a running domain.
@@ -125,15 +126,15 @@ typedef enum {
  * @param io_fd the file descriptor to save a domain to
  * @param dom the id of the domain
  * @param flags XCFLAGS_xxx
- * @param stream_type XC_MIG_STREAM_NONE if the far end of the stream
+ * @param stream_type XC_STREAM_PLAIN if the far end of the stream
  *        doesn't use checkpointing
- * @param recv_fd Only used for XC_MIG_STREAM_COLO.  Contains backchannel from
+ * @param recv_fd Only used for XC_STREAM_COLO.  Contains backchannel from
  *        the destination side.
  * @return 0 on success, -1 on failure
  */
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
                    uint32_t flags, struct save_callbacks *callbacks,
-                   xc_migration_stream_t stream_type, int recv_fd);
+                   xc_stream_type_t stream_type, int recv_fd);
 
 /* callbacks provided by xc_domain_restore */
 struct restore_callbacks {
@@ -189,11 +190,11 @@ struct restore_callbacks {
  * @param console_evtchn the console event channel for this domain to use
  * @param console_mfn filled with the gfn of the console page
  * @param console_domid the backend domain for xenconsole
- * @param stream_type XC_MIG_STREAM_NONE if the far end of the stream is using
+ * @param stream_type XC_STREAM_PLAIN if the far end of the stream is using
  *        checkpointing
  * @param callbacks non-NULL to receive a callback to restore toolstack
  *        specific data
- * @param recv_df Only used for XC_MIG_STREAM_COLO.  Contains backchannel to
+ * @param send_back_fd Only used for XC_STREAM_COLO.  Contains backchannel to
  *        the source side.
  * @return 0 on success, -1 on failure
  */
@@ -201,7 +202,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       uint32_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_mfn, uint32_t console_domid,
-                      xc_migration_stream_t stream_type,
+                      xc_stream_type_t stream_type,
                       struct restore_callbacks *callbacks, int send_back_fd);
 
 /**

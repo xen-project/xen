@@ -203,6 +203,9 @@ struct xc_sr_context
     uint32_t domid;
     int fd;
 
+    /* Plain VM, or checkpoints over time. */
+    xc_stream_type_t stream_type;
+
     xc_dominfo_t dominfo;
 
     union /* Common save or restore data. */
@@ -216,9 +219,6 @@ struct xc_sr_context
 
             /* Live migrate vs non live suspend. */
             bool live;
-
-            /* Plain VM, or checkpoints over time. */
-            int checkpointed;
 
             /* Further debugging information in the stream. */
             bool debug;
@@ -249,9 +249,6 @@ struct xc_sr_context
             /* From Domain Header. */
             uint32_t guest_type;
             uint32_t guest_page_size;
-
-            /* Plain VM, or checkpoints over time. */
-            int checkpointed;
 
             /* Currently buffering records between a checkpoint */
             bool buffer_all_records;

@@ -253,7 +253,7 @@ int main(int argc, char **argv)
         uint32_t dom =                      strtoul(NEXTARG,0,10);
         uint32_t flags =                    strtoul(NEXTARG,0,10);
         unsigned cbflags =                  strtoul(NEXTARG,0,10);
-        xc_migration_stream_t stream_type = strtoul(NEXTARG,0,10);
+        xc_stream_type_t stream_type =      strtoul(NEXTARG,0,10);
         assert(!*++argv);
 
         helper_setcallbacks_save(&helper_save_callbacks, cbflags);
@@ -275,7 +275,7 @@ int main(int argc, char **argv)
         unsigned console_evtchn =           strtoul(NEXTARG,0,10);
         domid_t console_domid =             strtoul(NEXTARG,0,10);
         unsigned cbflags =                  strtoul(NEXTARG,0,10);
-        xc_migration_stream_t stream_type = strtoul(NEXTARG,0,10);
+        xc_stream_type_t stream_type =      strtoul(NEXTARG,0,10);
         assert(!*++argv);
 
         helper_setcallbacks_restore(&helper_restore_callbacks, cbflags);

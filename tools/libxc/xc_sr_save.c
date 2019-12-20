@@ -660,7 +660,7 @@ static int suspend_and_send_dirty(struct xc_sr_context *ctx)
 
     bitmap_or(dirty_bitmap, ctx->save.deferred_pages, ctx->save.p2m_size);
 
-    if ( !ctx->save.live && ctx->save.checkpointed == XC_MIG_STREAM_COLO )
+    if ( !ctx->save.live && ctx->stream_type == XC_STREAM_COLO )
     {
         rc = colo_merge_secondary_dirty_bitmap(ctx);
         if ( rc )
@@ -741,7 +741,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    if ( ctx->save.debug && ctx->save.checkpointed != XC_MIG_STREAM_NONE )
+    if ( ctx->save.debug && ctx->stream_type != XC_STREAM_PLAIN )
     {
         rc = verify_frames(ctx);
         if ( rc )
@@ -870,7 +870,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 
         if ( ctx->save.live )
             rc = send_domain_memory_live(ctx);
-        else if ( ctx->save.checkpointed != XC_MIG_STREAM_NONE )
+        else if ( ctx->stream_type != XC_STREAM_PLAIN )
             rc = send_domain_memory_checkpointed(ctx);
         else
             rc = send_domain_memory_nonlive(ctx);
@@ -890,7 +890,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
         if ( rc )
             goto err;
 
-        if ( ctx->save.checkpointed != XC_MIG_STREAM_NONE )
+        if ( ctx->stream_type != XC_STREAM_PLAIN )
         {
             /*
              * We have now completed the initial live portion of the checkpoint
@@ -903,7 +903,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
             if ( rc )
                 goto err;
 
-            if ( ctx->save.checkpointed == XC_MIG_STREAM_COLO )
+            if ( ctx->stream_type == XC_STREAM_COLO )
             {
                 rc = ctx->save.callbacks->checkpoint(ctx->save.callbacks->data);
                 if ( !rc )
@@ -917,14 +917,14 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
             if ( rc <= 0 )
                 goto err;
 
-            if ( ctx->save.checkpointed == XC_MIG_STREAM_COLO )
+            if ( ctx->stream_type == XC_STREAM_COLO )
             {
                 rc = ctx->save.callbacks->wait_checkpoint(
                     ctx->save.callbacks->data);
                 if ( rc <= 0 )
                     goto err;
             }
-            else if ( ctx->save.checkpointed == XC_MIG_STREAM_REMUS )
+            else if ( ctx->stream_type == XC_STREAM_REMUS )
             {
                 rc = ctx->save.callbacks->checkpoint(ctx->save.callbacks->data);
                 if ( rc <= 0 )
@@ -937,7 +937,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
                 goto err;
             }
         }
-    } while ( ctx->save.checkpointed != XC_MIG_STREAM_NONE );
+    } while ( ctx->stream_type != XC_STREAM_PLAIN );
 
     xc_report_progress_single(xch, "End of stream");
 
@@ -967,19 +967,18 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
                    uint32_t flags, struct save_callbacks* callbacks,
-                   xc_migration_stream_t stream_type, int recv_fd)
+                   xc_stream_type_t stream_type, int recv_fd)
 {
-    struct xc_sr_context ctx =
-        {
-            .xch = xch,
-            .fd = io_fd,
-        };
+    struct xc_sr_context ctx = {
+        .xch = xch,
+        .fd = io_fd,
+        .stream_type = stream_type,
+    };
 
     /* GCC 4.4 (of CentOS 6.x vintage) can' t initialise anonymous unions. */
     ctx.save.callbacks = callbacks;
     ctx.save.live  = !!(flags & XCFLAGS_LIVE);
     ctx.save.debug = !!(flags & XCFLAGS_DEBUG);
-    ctx.save.checkpointed = stream_type;
     ctx.save.recv_fd = recv_fd;
 
     if ( xc_domain_getinfo(xch, dom, 1, &ctx.dominfo) != 1 )
@@ -994,18 +993,24 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
         return -1;
     }
 
-    /* If altering migration_stream update this assert too. */
-    assert(stream_type == XC_MIG_STREAM_NONE ||
-           stream_type == XC_MIG_STREAM_REMUS ||
-           stream_type == XC_MIG_STREAM_COLO);
-
-    /* Sanity checks for callbacks. */
-    if ( ctx.dominfo.hvm )
-        assert(callbacks->switch_qemu_logdirty);
-    if ( ctx.save.checkpointed )
-        assert(callbacks->checkpoint && callbacks->postcopy);
-    if ( ctx.save.checkpointed == XC_MIG_STREAM_COLO )
+    /* Sanity check stream_type-related parameters */
+    switch ( stream_type )
+    {
+    case XC_STREAM_COLO:
         assert(callbacks->wait_checkpoint);
+        /* Fallthrough */
+    case XC_STREAM_REMUS:
+        assert(callbacks->checkpoint && callbacks->postcopy);
+        /* Fallthrough */
+    case XC_STREAM_PLAIN:
+        if ( ctx.dominfo.hvm )
+            assert(callbacks->switch_qemu_logdirty);
+        break;
+
+    default:
+        assert(!"Bad stream_type");
+        break;
+    }
 
     DPRINTF("fd %d, dom %u, flags %u, hvm %d",
             io_fd, dom, flags, ctx.dominfo.hvm);

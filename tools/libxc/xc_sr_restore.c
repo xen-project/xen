@@ -512,7 +512,7 @@ static int handle_checkpoint(struct xc_sr_context *ctx)
     int rc = 0, ret;
     unsigned i;
 
-    if ( !ctx->restore.checkpointed )
+    if ( ctx->stream_type == XC_STREAM_PLAIN )
     {
         ERROR("Found checkpoint in non-checkpointed stream");
         rc = -1;
@@ -554,7 +554,7 @@ static int handle_checkpoint(struct xc_sr_context *ctx)
     else
         ctx->restore.buffer_all_records = true;
 
-    if ( ctx->restore.checkpointed == XC_MIG_STREAM_COLO )
+    if ( ctx->stream_type == XC_STREAM_COLO )
     {
 #define HANDLE_CALLBACK_RETURN_VALUE(ret)                   \
     do {                                                    \
@@ -673,7 +673,7 @@ static int setup(struct xc_sr_context *ctx)
     DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
                                     &ctx->restore.dirty_bitmap_hbuf);
 
-    if ( ctx->restore.checkpointed == XC_MIG_STREAM_COLO )
+    if ( ctx->stream_type == XC_STREAM_COLO )
     {
         dirty_bitmap = xc_hypercall_buffer_alloc_pages(xch, dirty_bitmap,
                                 NRPAGES(bitmap_size(ctx->restore.p2m_size)));
@@ -724,7 +724,7 @@ static void cleanup(struct xc_sr_context *ctx)
     for ( i = 0; i < ctx->restore.buffered_rec_num; i++ )
         free(ctx->restore.buffered_records[i].data);
 
-    if ( ctx->restore.checkpointed == XC_MIG_STREAM_COLO )
+    if ( ctx->stream_type == XC_STREAM_COLO )
         xc_hypercall_buffer_free_pages(xch, dirty_bitmap,
                                    NRPAGES(bitmap_size(ctx->restore.p2m_size)));
     free(ctx->restore.buffered_records);
@@ -792,8 +792,7 @@ static int restore(struct xc_sr_context *ctx)
     } while ( rec.type != REC_TYPE_END );
 
  remus_failover:
-
-    if ( ctx->restore.checkpointed == XC_MIG_STREAM_COLO )
+    if ( ctx->stream_type == XC_STREAM_COLO )
     {
         /* With COLO, we have already called stream_complete */
         rc = 0;
@@ -833,36 +832,42 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       uint32_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_gfn, uint32_t console_domid,
-                      xc_migration_stream_t stream_type,
+                      xc_stream_type_t stream_type,
                       struct restore_callbacks *callbacks, int send_back_fd)
 {
     xen_pfn_t nr_pfns;
-    struct xc_sr_context ctx =
-        {
-            .xch = xch,
-            .fd = io_fd,
-        };
+    struct xc_sr_context ctx = {
+        .xch = xch,
+        .fd = io_fd,
+        .stream_type = stream_type,
+    };
 
     /* GCC 4.4 (of CentOS 6.x vintage) can' t initialise anonymous unions. */
     ctx.restore.console_evtchn = console_evtchn;
     ctx.restore.console_domid = console_domid;
     ctx.restore.xenstore_evtchn = store_evtchn;
     ctx.restore.xenstore_domid = store_domid;
-    ctx.restore.checkpointed = stream_type;
     ctx.restore.callbacks = callbacks;
     ctx.restore.send_back_fd = send_back_fd;
 
-    /* Sanity checks for callbacks. */
-    if ( stream_type )
-        assert(callbacks->checkpoint);
-
-    if ( ctx.restore.checkpointed == XC_MIG_STREAM_COLO )
+    /* Sanity check stream_type-related parameters */
+    switch ( stream_type )
     {
-        /* this is COLO restore */
+    case XC_STREAM_COLO:
         assert(callbacks->suspend &&
                callbacks->postcopy &&
                callbacks->wait_checkpoint &&
                callbacks->restore_results);
+        /* Fallthrough */
+    case XC_STREAM_REMUS:
+        assert(callbacks->checkpoint);
+        /* Fallthrough */
+    case XC_STREAM_PLAIN:
+        break;
+
+    default:
+        assert(!"Bad stream_type");
+        break;
     }
 
     if ( xc_domain_getinfo(xch, dom, 1, &ctx.dominfo) != 1 )
