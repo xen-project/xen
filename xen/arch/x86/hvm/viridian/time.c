@@ -45,14 +45,9 @@ static void update_reference_tsc(const struct domain *d, bool initialize)
     if ( !host_tsc_is_safe() || d->arch.vtsc )
     {
         /*
-         * The specification states that valid values of TscSequence range
-         * from 0 to 0xFFFFFFFE. The value 0xFFFFFFFF is used to indicate
-         * this mechanism is no longer a reliable source of time and that
-         * the VM should fall back to a different source.
-         *
-         * Server 2012 (6.2 kernel) and 2012 R2 (6.3 kernel) actually
-         * violate the spec. and rely on a value of 0 to indicate that this
-         * enlightenment should no longer be used.
+         * The value 0 is used to indicate this mechanism is no longer a
+         * reliable source of time and that the VM should fall back to a
+         * different source.
          */
         p->tsc_sequence = 0;
 
@@ -77,10 +72,7 @@ static void update_reference_tsc(const struct domain *d, bool initialize)
     smp_wmb();
 
     seq = p->tsc_sequence + 1;
-    if ( seq == 0xFFFFFFFF || seq == 0 ) /* Avoid both 'invalid' values */
-        seq = 1;
-
-    p->tsc_sequence = seq;
+    p->tsc_sequence = seq ? seq : 1; /* Avoid 'invalid' value 0 */
 }
 
 static uint64_t trc_val(const struct domain *d, int64_t offset)
