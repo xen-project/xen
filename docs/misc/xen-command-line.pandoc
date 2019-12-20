@@ -2322,7 +2322,8 @@ Permit use of x2apic setup for SMP environments.
 ### x2apic_phys (x86)
 > `= <boolean>`
 
-> Default: `true` if **FADT** mandates physical mode, `false` otherwise.
+> Default: `true` if **FADT** mandates physical mode or if interrupt remapping
+>          is not available, `false` otherwise.
 
 In the case that x2apic is in use, this option switches between physical and
 clustered mode.  The default, given no hint from the **FADT**, is cluster
