@@ -1317,6 +1317,14 @@ int __cpu_up(unsigned int cpu)
     if ( (apicid = x86_cpu_to_apicid[cpu]) == BAD_APICID )
         return -ENODEV;
 
+    if ( (!x2apic_enabled && apicid >= APIC_ALL_CPUS) ||
+         (!iommu_intremap && (apicid >> 8)) )
+    {
+        printk("Unsupported: APIC ID %#x in xAPIC mode w/o interrupt remapping\n",
+               apicid);
+        return -EINVAL;
+    }
+
     if ( (ret = do_boot_cpu(apicid, cpu)) != 0 )
         return ret;
 
