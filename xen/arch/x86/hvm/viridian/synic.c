@@ -143,7 +143,7 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
     case HV_X64_MSR_SINT0 ... HV_X64_MSR_SINT15:
     {
         unsigned int sintx = idx - HV_X64_MSR_SINT0;
-        union viridian_sint_msr new, *vs =
+        union hv_synic_sint new, *vs =
             &array_access_nospec(vv->sint, sintx);
         uint8_t vector;
 
@@ -151,7 +151,7 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
             return X86EMUL_EXCEPTION;
 
         /* Vectors must be in the range 0x10-0xff inclusive */
-        new.raw = val;
+        new.as_uint64 = val;
         if ( new.vector < 0x10 )
             return X86EMUL_EXCEPTION;
 
@@ -256,13 +256,13 @@ int viridian_synic_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
     case HV_X64_MSR_SINT0 ... HV_X64_MSR_SINT15:
     {
         unsigned int sintx = idx - HV_X64_MSR_SINT0;
-        const union viridian_sint_msr *vs =
+        const union hv_synic_sint *vs =
             &array_access_nospec(vv->sint, sintx);
 
         if ( !(viridian_feature_mask(d) & HVMPV_synic) )
             return X86EMUL_EXCEPTION;
 
-        *val = vs->raw;
+        *val = vs->as_uint64;
         break;
     }
 
@@ -284,7 +284,7 @@ int viridian_synic_vcpu_init(const struct vcpu *v)
      * initally masked.
      */
     for ( i = 0; i < ARRAY_SIZE(vv->sint); i++ )
-        vv->sint[i].mask = 1;
+        vv->sint[i].masked = 1;
 
     /* Initialize the mapping array with invalid values */
     for ( i = 0; i < ARRAY_SIZE(vv->vector_to_sintx); i++ )
@@ -321,7 +321,7 @@ bool viridian_synic_deliver_timer_msg(struct vcpu *v, unsigned int sintx,
                                       uint64_t delivery)
 {
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
-    const union viridian_sint_msr *vs = &vv->sint[sintx];
+    const union hv_synic_sint *vs = &vv->sint[sintx];
     struct hv_message *msg = vv->simp.ptr;
     struct {
         uint32_t TimerIndex;
@@ -360,7 +360,7 @@ bool viridian_synic_deliver_timer_msg(struct vcpu *v, unsigned int sintx,
     BUILD_BUG_ON(sizeof(payload) > sizeof(msg->u.payload));
     memcpy(msg->u.payload, &payload, sizeof(payload));
 
-    if ( !vs->mask )
+    if ( !vs->masked )
         vlapic_set_irq(vcpu_vlapic(v), vs->vector, 0);
 
     return true;
@@ -371,7 +371,7 @@ bool viridian_synic_is_auto_eoi_sint(const struct vcpu *v,
 {
     const struct viridian_vcpu *vv = v->arch.hvm.viridian;
     unsigned int sintx = vv->vector_to_sintx[vector];
-    const union viridian_sint_msr *vs =
+    const union hv_synic_sint *vs =
         &array_access_nospec(vv->sint, sintx);
 
     if ( sintx >= ARRAY_SIZE(vv->sint) )
@@ -401,7 +401,7 @@ void viridian_synic_save_vcpu_ctxt(const struct vcpu *v,
     BUILD_BUG_ON(ARRAY_SIZE(vv->sint) != ARRAY_SIZE(ctxt->sint_msr));
 
     for ( i = 0; i < ARRAY_SIZE(vv->sint); i++ )
-        ctxt->sint_msr[i] = vv->sint[i].raw;
+        ctxt->sint_msr[i] = vv->sint[i].as_uint64;
 
     ctxt->simp_msr = vv->simp.msr.raw;
 
@@ -430,7 +430,7 @@ void viridian_synic_load_vcpu_ctxt(
     {
         uint8_t vector;
 
-        vv->sint[i].raw = ctxt->sint_msr[i];
+        vv->sint[i].as_uint64 = ctxt->sint_msr[i];
 
         vector = vv->sint[i].vector;
         if ( vector < 0x10 )

@@ -28,20 +28,6 @@ struct viridian_page
     void *ptr;
 };
 
-union viridian_sint_msr
-{
-    uint64_t raw;
-    struct
-    {
-        uint64_t vector:8;
-        uint64_t reserved_preserved1:8;
-        uint64_t mask:1;
-        uint64_t auto_eoi:1;
-        uint64_t polling:1;
-        uint64_t reserved_preserved2:45;
-    };
-};
-
 union viridian_stimer_config_msr
 {
     uint64_t raw;
@@ -77,7 +63,7 @@ struct viridian_vcpu
     uint64_t scontrol;
     uint64_t siefp;
     struct viridian_page simp;
-    union viridian_sint_msr sint[16];
+    union hv_synic_sint sint[16];
     uint8_t vector_to_sintx[256];
     struct viridian_stimer stimer[4];
     unsigned int stimer_enabled;
