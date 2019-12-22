@@ -220,7 +220,7 @@ static void poll_stimer(struct vcpu *v, unsigned int stimerx)
      * is disabled make sure the pending bit is cleared to avoid re-
      * polling.
      */
-    if ( !vs->config.enabled )
+    if ( !vs->config.enable )
     {
         clear_bit(stimerx, &vv->stimer_pending);
         return;
@@ -239,7 +239,7 @@ static void poll_stimer(struct vcpu *v, unsigned int stimerx)
     if ( vs->config.periodic )
         start_stimer(vs);
     else
-        vs->config.enabled = 0;
+        vs->config.enable = 0;
 }
 
 void viridian_time_poll_timers(struct vcpu *v)
@@ -285,7 +285,7 @@ static void time_vcpu_thaw(struct vcpu *v)
     {
         struct viridian_stimer *vs = &vv->stimer[i];
 
-        if ( vs->config.enabled )
+        if ( vs->config.enable )
             start_stimer(vs);
     }
 }
@@ -355,12 +355,12 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
 
         stop_stimer(vs);
 
-        vs->config.raw = val;
+        vs->config.as_uint64 = val;
 
         if ( !vs->config.sintx )
-            vs->config.enabled = 0;
+            vs->config.enable = 0;
 
-        if ( vs->config.enabled )
+        if ( vs->config.enable )
             start_stimer(vs);
 
         break;
@@ -383,11 +383,11 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         vs->count = val;
 
         if ( !vs->count  )
-            vs->config.enabled = 0;
+            vs->config.enable = 0;
         else if ( vs->config.auto_enable )
-            vs->config.enabled = 1;
+            vs->config.enable = 1;
 
-        if ( vs->config.enabled )
+        if ( vs->config.enable )
             start_stimer(vs);
 
         break;
@@ -454,7 +454,7 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
         unsigned int stimerx = (idx - HV_X64_MSR_STIMER0_CONFIG) / 2;
         const struct viridian_stimer *vs =
             &array_access_nospec(vv->stimer, stimerx);
-        union viridian_stimer_config_msr config = vs->config;
+        union hv_stimer_config config = vs->config;
 
         if ( !(viridian_feature_mask(d) & HVMPV_stimer) )
             return X86EMUL_EXCEPTION;
@@ -464,9 +464,9 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
          * the enabled flag is clear.
          */
         if ( !config.periodic && test_bit(stimerx, &vv->stimer_pending) )
-            config.enabled = 0;
+            config.enable = 0;
 
-        *val = config.raw;
+        *val = config.as_uint64;
         break;
     }
 
@@ -549,7 +549,7 @@ void viridian_time_save_vcpu_ctxt(
     {
         const struct viridian_stimer *vs = &vv->stimer[i];
 
-        ctxt->stimer_config_msr[i] = vs->config.raw;
+        ctxt->stimer_config_msr[i] = vs->config.as_uint64;
         ctxt->stimer_count_msr[i] = vs->count;
     }
 }
@@ -564,7 +564,7 @@ void viridian_time_load_vcpu_ctxt(
     {
         struct viridian_stimer *vs = &vv->stimer[i];
 
-        vs->config.raw = ctxt->stimer_config_msr[i];
+        vs->config.as_uint64 = ctxt->stimer_config_msr[i];
         vs->count = ctxt->stimer_count_msr[i];
     }
 }
