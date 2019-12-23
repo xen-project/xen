@@ -600,11 +600,77 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
             goto out;
         }
 
-        ret = xc_domain_create(ctx->xch, domid, &create);
-        if (ret < 0) {
-            LOGED(ERROR, *domid, "domain creation fail");
-            rc = ERROR_FAIL;
-            goto out;
+        for (;;) {
+            uint32_t local_domid;
+            bool recent;
+
+            if (info->domid == RANDOM_DOMID) {
+                uint16_t v;
+
+                ret = libxl__random_bytes(gc, (void *)&v, sizeof(v));
+                if (ret < 0)
+                    break;
+
+                v &= DOMID_MASK;
+                if (!libxl_domid_valid_guest(v))
+                    continue;
+
+                local_domid = v;
+            } else {
+                local_domid = info->domid; /* May not be valid */
+            }
+
+            ret = xc_domain_create(ctx->xch, &local_domid, &create);
+            if (ret < 0) {
+                /*
+                 * If we generated a random domid and creation failed
+                 * because that domid already exists then simply try
+                 * again.
+                 */
+                if (errno == EEXIST && info->domid == RANDOM_DOMID)
+                    continue;
+
+                LOGED(ERROR, local_domid, "domain creation fail");
+                rc = ERROR_FAIL;
+                goto out;
+            }
+
+            /* A new domain now exists */
+            *domid = local_domid;
+
+            rc = libxl__is_domid_recent(gc, local_domid, &recent);
+            if (rc)
+                goto out;
+
+            /* The domid is not recent, so we're done */
+            if (!recent)
+                break;
+
+            /*
+             * If the domid was specified then there's no point in
+             * trying again.
+             */
+            if (libxl_domid_valid_guest(info->domid)) {
+                LOGED(ERROR, local_domid, "domain id recently used");
+                rc = ERROR_FAIL;
+                goto out;
+            }
+
+            /*
+             * The domain is recent and so cannot be used. Clear domid
+             * here since, if xc_domain_destroy() fails below there is
+             * little point calling it again in the error path.
+             */
+            *domid = INVALID_DOMID;
+
+            ret = xc_domain_destroy(ctx->xch, local_domid);
+            if (ret < 0) {
+                LOGED(ERROR, local_domid, "domain destroy fail");
+                rc = ERROR_FAIL;
+                goto out;
+            }
+
+            /* The domain was successfully destroyed, so we can try again */
         }
 
         rc = libxl__arch_domain_save_config(gc, d_config, state, &create);

@@ -1268,6 +1268,14 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  */
 #define LIBXL_HAVE_DOMAIN_NEED_MEMORY_CONFIG
 
+/*
+ * LIBXL_HAVE_CREATEINFO_DOMID
+ *
+ * libxl_domain_create_new() and libxl_domain_create_restore() will use
+ * a domid specified in libxl_domain_create_info().
+ */
+#define LIBXL_HAVE_CREATEINFO_DOMID
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
@@ -1528,6 +1536,7 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 /* domain related functions */
 
 #define INVALID_DOMID ~0
+#define RANDOM_DOMID (INVALID_DOMID - 1)
 
 /* If the result is ERROR_ABORTED, the domain may or may not exist
  * (in a half-created state).  *domid will be valid and will be the

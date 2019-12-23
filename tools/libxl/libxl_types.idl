@@ -409,6 +409,7 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("ssidref",      uint32),
     ("ssid_label",   string),
     ("name",         string),
+    ("domid",        libxl_domid),
     ("uuid",         libxl_uuid),
     ("xsdata",       libxl_key_value_list),
     ("platformdata", libxl_key_value_list),
