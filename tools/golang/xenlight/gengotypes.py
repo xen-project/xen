@@ -252,7 +252,7 @@ def xenlight_golang_define_from_C(ty = None):
     for f in ty.fields:
         if f.type.typename is not None:
             if isinstance(f.type, idl.Array):
-                # TODO
+                body += xenlight_golang_array_from_C(f)
                 continue
 
             body += xenlight_golang_convert_from_C(f)
@@ -398,6 +398,41 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
     s += '}\n'
 
     return (s,extras)
+
+def xenlight_golang_array_from_C(ty = None):
+    """
+    Convert C array to Go slice using the method
+    described here:
+
+    https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
+    """
+    s = ''
+
+    gotypename = xenlight_golang_fmt_name(ty.type.elem_type.typename)
+    goname     = xenlight_golang_fmt_name(ty.name)
+    ctypename  = ty.type.elem_type.typename
+    cname      = ty.name
+    cslice     = 'c{}'.format(goname)
+    clenvar    = ty.type.lenvar.name
+    golenvar   = xenlight_golang_fmt_name(clenvar,exported=False)
+
+    s += '{} := int(xc.{})\n'.format(golenvar, clenvar)
+    s += '{} := '.format(cslice)
+    s +='(*[1<<28]C.{})(unsafe.Pointer(xc.{}))[:{}:{}]\n'.format(ctypename, cname,
+                                                                golenvar, golenvar)
+    s += 'x.{} = make([]{}, {})\n'.format(goname, gotypename, golenvar)
+    s += 'for i, v := range {} {{\n'.format(cslice)
+
+    is_enum = isinstance(ty.type.elem_type,idl.Enumeration)
+    if gotypename in go_builtin_types or is_enum:
+        s += 'x.{}[i] = {}(v)\n'.format(goname, gotypename)
+    else:
+        s += 'if err := x.{}[i].fromC(&v); err != nil {{\n'.format(goname)
+        s += 'return err }\n'
+
+    s += '}\n'
+
+    return s
 
 def xenlight_golang_fmt_name(name, exported = True):
     """
