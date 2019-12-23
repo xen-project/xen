@@ -166,7 +166,7 @@ static const char *const str_7d0[32] =
 
     [26] = "ibrsb",         [27] = "stibp",
     [28] = "l1d_flush",     [29] = "arch_caps",
-    /* 30 */                [31] = "ssbd",
+    [30] = "core_caps",     [31] = "ssbd",
 };
 
 static const char *const str_7a1[32] =

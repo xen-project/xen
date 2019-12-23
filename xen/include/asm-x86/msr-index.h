@@ -32,6 +32,10 @@
 #define EFER_KNOWN_MASK		(EFER_SCE | EFER_LME | EFER_LMA | EFER_NX | \
 				 EFER_SVME | EFER_FFXSE)
 
+#define MSR_TEST_CTRL                   0x00000033
+#define TEST_CTRL_SPLITLOCK_DETECT      (_AC(1, ULL) << 29)
+#define TEST_CTRL_SPLITLOCK_DISABLE     (_AC(1, ULL) << 31)
+
 #define MSR_INTEL_CORE_THREAD_COUNT     0x00000035
 #define MSR_CTC_THREAD_MASK             0x0000ffff
 #define MSR_CTC_CORE_MASK               0xffff0000
@@ -51,6 +55,9 @@
 
 #define PPIN_LOCKOUT			(_AC(1, ULL) << 0)
 #define PPIN_ENABLE			(_AC(1, ULL) << 1)
+
+#define MSR_CORE_CAPABILITIES           0x000000cf
+#define CORE_CAPS_SPLITLOCK_DETECT      (_AC(1, ULL) <<  5)
 
 #define MSR_ARCH_CAPABILITIES		0x0000010a
 #define ARCH_CAPS_RDCL_NO		(_AC(1, ULL) << 0)

@@ -217,6 +217,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"stibp",        0x00000007,  0, CPUID_REG_EDX, 27,  1},
         {"l1d-flush",    0x00000007,  0, CPUID_REG_EDX, 28,  1},
         {"arch-caps",    0x00000007,  0, CPUID_REG_EDX, 29,  1},
+        {"core-caps",    0x00000007,  0, CPUID_REG_EDX, 30,  1},
         {"ssbd",         0x00000007,  0, CPUID_REG_EDX, 31,  1},
 
         {"avx512-bf16",  0x00000007,  1, CPUID_REG_EAX,  5,  1},

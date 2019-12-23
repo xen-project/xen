@@ -132,6 +132,8 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_PRED_CMD:
     case MSR_FLUSH_CMD:
         /* Write-only */
+    case MSR_TEST_CTRL:
+    case MSR_CORE_CAPABILITIES:
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
     case MSR_AMD64_LWP_CFG:
@@ -283,10 +285,12 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         uint64_t rsvd;
 
     case MSR_IA32_PLATFORM_ID:
+    case MSR_CORE_CAPABILITIES:
     case MSR_INTEL_CORE_THREAD_COUNT:
     case MSR_INTEL_PLATFORM_INFO:
     case MSR_ARCH_CAPABILITIES:
         /* Read-only */
+    case MSR_TEST_CTRL:
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
     case MSR_AMD64_LWP_CFG:
