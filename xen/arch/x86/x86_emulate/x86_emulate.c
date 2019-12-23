@@ -6023,59 +6023,72 @@ x86_emulate(
     case X86EMUL_OPC##kind(pfx, opc):        \
     case X86EMUL_OPC##kind##_F3(pfx, opc)
 
+#define CASE_SIMD_ALL_FP_VEX(pfx, opc)       \
+    CASE_SIMD_ALL_FP(, pfx, opc):            \
+    CASE_SIMD_ALL_FP(_VEX, pfx, opc)
+#define CASE_SIMD_PACKED_FP_VEX(pfx, opc)    \
+    CASE_SIMD_PACKED_FP(, pfx, opc):         \
+    CASE_SIMD_PACKED_FP(_VEX, pfx, opc)
+#define CASE_SIMD_SCALAR_FP_VEX(pfx, opc)    \
+    CASE_SIMD_SCALAR_FP(, pfx, opc):         \
+    CASE_SIMD_SCALAR_FP(_VEX, pfx, opc)
+#define CASE_SIMD_SINGLE_FP_VEX(pfx, opc)    \
+    CASE_SIMD_SINGLE_FP(, pfx, opc):         \
+    CASE_SIMD_SINGLE_FP(_VEX, pfx, opc)
+
     CASE_SIMD_SCALAR_FP(, 0x0f, 0x2b):     /* movnts{s,d} xmm,mem */
         host_and_vcpu_must_have(sse4a);
         /* fall through */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x2b):     /* movntp{s,d} xmm,m128 */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x2b): /* vmovntp{s,d} {x,y}mm,mem */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x2b):   /* movntp{s,d} xmm,m128 */
+                                           /* vmovntp{s,d} {x,y}mm,mem */
         generate_exception_if(ea.type != OP_MEM, EXC_UD);
         sfence = true;
         /* fall through */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x10):        /* mov{up,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x10): /* vmovup{s,d} {x,y}mm/mem,{x,y}mm */
-    CASE_SIMD_SCALAR_FP(_VEX, 0x0f, 0x10): /* vmovs{s,d} mem,xmm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x10):      /* mov{up,s}{s,d} xmm/mem,xmm */
+                                           /* vmovup{s,d} {x,y}mm/mem,{x,y}mm */
+                                           /* vmovs{s,d} mem,xmm */
                                            /* vmovs{s,d} xmm,xmm,xmm */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x11):        /* mov{up,s}{s,d} xmm,xmm/mem */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x11): /* vmovup{s,d} {x,y}mm,{x,y}mm/mem */
-    CASE_SIMD_SCALAR_FP(_VEX, 0x0f, 0x11): /* vmovs{s,d} xmm,mem */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x11):      /* mov{up,s}{s,d} xmm,xmm/mem */
+                                           /* vmovup{s,d} {x,y}mm,{x,y}mm/mem */
+                                           /* vmovs{s,d} xmm,mem */
                                            /* vmovs{s,d} xmm,xmm,xmm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x14):     /* unpcklp{s,d} xmm/m128,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x14): /* vunpcklp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x15):     /* unpckhp{s,d} xmm/m128,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x15): /* vunpckhp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x28):     /* movap{s,d} xmm/m128,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x28): /* vmovap{s,d} {x,y}mm/mem,{x,y}mm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x29):     /* movap{s,d} xmm,xmm/m128 */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x29): /* vmovap{s,d} {x,y}mm,{x,y}mm/mem */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x51):        /* sqrt{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x51):    /* vsqrtp{s,d} {x,y}mm/mem,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x14):   /* unpcklp{s,d} xmm/m128,xmm */
+                                           /* vunpcklp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x15):   /* unpckhp{s,d} xmm/m128,xmm */
+                                           /* vunpckhp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x28):   /* movap{s,d} xmm/m128,xmm */
+                                           /* vmovap{s,d} {x,y}mm/mem,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x29):   /* movap{s,d} xmm,xmm/m128 */
+                                           /* vmovap{s,d} {x,y}mm,{x,y}mm/mem */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x51):      /* sqrt{p,s}{s,d} xmm/mem,xmm */
+                                           /* vsqrtp{s,d} {x,y}mm/mem,{x,y}mm */
                                            /* vsqrts{s,d} xmm/m32,xmm,xmm */
-    CASE_SIMD_SINGLE_FP(, 0x0f, 0x52):     /* rsqrt{p,s}s xmm/mem,xmm */
-    CASE_SIMD_SINGLE_FP(_VEX, 0x0f, 0x52): /* vrsqrtps {x,y}mm/mem,{x,y}mm */
+    CASE_SIMD_SINGLE_FP_VEX(0x0f, 0x52):   /* rsqrt{p,s}s xmm/mem,xmm */
+                                           /* vrsqrtps {x,y}mm/mem,{x,y}mm */
                                            /* vrsqrtss xmm/m32,xmm,xmm */
-    CASE_SIMD_SINGLE_FP(, 0x0f, 0x53):     /* rcp{p,s}s xmm/mem,xmm */
-    CASE_SIMD_SINGLE_FP(_VEX, 0x0f, 0x53): /* vrcpps {x,y}mm/mem,{x,y}mm */
+    CASE_SIMD_SINGLE_FP_VEX(0x0f, 0x53):   /* rcp{p,s}s xmm/mem,xmm */
+                                           /* vrcpps {x,y}mm/mem,{x,y}mm */
                                            /* vrcpss xmm/m32,xmm,xmm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x54):     /* andp{s,d} xmm/m128,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x54): /* vandp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x55):     /* andnp{s,d} xmm/m128,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x55): /* vandnp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x56):     /* orp{s,d} xmm/m128,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x56): /* vorp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x57):     /* xorp{s,d} xmm/m128,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x57): /* vxorp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x58):        /* add{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x58):    /* vadd{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x59):        /* mul{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x59):    /* vmul{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x5c):        /* sub{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5c):    /* vsub{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x5d):        /* min{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5d):    /* vmin{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x5e):        /* div{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5e):    /* vdiv{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_ALL_FP(, 0x0f, 0x5f):        /* max{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5f):    /* vmax{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x54):   /* andp{s,d} xmm/m128,xmm */
+                                           /* vandp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x55):   /* andnp{s,d} xmm/m128,xmm */
+                                           /* vandnp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x56):   /* orp{s,d} xmm/m128,xmm */
+                                           /* vorp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x57):   /* xorp{s,d} xmm/m128,xmm */
+                                           /* vxorp{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x58):      /* add{p,s}{s,d} xmm/mem,xmm */
+                                           /* vadd{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x59):      /* mul{p,s}{s,d} xmm/mem,xmm */
+                                           /* vmul{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x5c):      /* sub{p,s}{s,d} xmm/mem,xmm */
+                                           /* vsub{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x5d):      /* min{p,s}{s,d} xmm/mem,xmm */
+                                           /* vmin{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x5e):      /* div{p,s}{s,d} xmm/mem,xmm */
+                                           /* vdiv{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x5f):      /* max{p,s}{s,d} xmm/mem,xmm */
+                                           /* vmax{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     simd_0f_fp:
         if ( vex.opcx == vex_none )
         {
@@ -6162,12 +6175,12 @@ x86_emulate(
 
     case X86EMUL_OPC_66(0x0f, 0x12):       /* movlpd m64,xmm */
     case X86EMUL_OPC_VEX_66(0x0f, 0x12):   /* vmovlpd m64,xmm,xmm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x13):     /* movlp{s,d} xmm,m64 */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x13): /* vmovlp{s,d} xmm,m64 */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x13):   /* movlp{s,d} xmm,m64 */
+                                           /* vmovlp{s,d} xmm,m64 */
     case X86EMUL_OPC_66(0x0f, 0x16):       /* movhpd m64,xmm */
     case X86EMUL_OPC_VEX_66(0x0f, 0x16):   /* vmovhpd m64,xmm,xmm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x17):     /* movhp{s,d} xmm,m64 */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x17): /* vmovhp{s,d} xmm,m64 */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x17):   /* movhp{s,d} xmm,m64 */
+                                           /* vmovhp{s,d} xmm,m64 */
         generate_exception_if(ea.type != OP_MEM, EXC_UD);
         /* fall through */
     case X86EMUL_OPC(0x0f, 0x12):          /* movlps m64,xmm */
@@ -6303,8 +6316,7 @@ x86_emulate(
         op_bytes = (b & 4) && (vex.pfx & VEX_PREFIX_DOUBLE_MASK) ? 16 : 8;
         goto simd_0f_fp;
 
-    CASE_SIMD_SCALAR_FP(, 0x0f, 0x2a):     /* cvtsi2s{s,d} r/m,xmm */
-    CASE_SIMD_SCALAR_FP(_VEX, 0x0f, 0x2a): /* vcvtsi2s{s,d} r/m,xmm,xmm */
+    CASE_SIMD_SCALAR_FP_VEX(0x0f, 0x2a):   /* {,v}cvtsi2s{s,d} r/m,xmm */
         if ( vex.opcx == vex_none )
         {
             if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
@@ -6375,10 +6387,8 @@ x86_emulate(
         state->simd_size = simd_none;
         break;
 
-    CASE_SIMD_SCALAR_FP(, 0x0f, 0x2c):     /* cvtts{s,d}2si xmm/mem,reg */
-    CASE_SIMD_SCALAR_FP(_VEX, 0x0f, 0x2c): /* vcvtts{s,d}2si xmm/mem,reg */
-    CASE_SIMD_SCALAR_FP(, 0x0f, 0x2d):     /* cvts{s,d}2si xmm/mem,reg */
-    CASE_SIMD_SCALAR_FP(_VEX, 0x0f, 0x2d): /* vcvts{s,d}2si xmm/mem,reg */
+    CASE_SIMD_SCALAR_FP_VEX(0x0f, 0x2c):   /* {,v}cvtts{s,d}2si xmm/mem,reg */
+    CASE_SIMD_SCALAR_FP_VEX(0x0f, 0x2d):   /* {,v}cvts{s,d}2si xmm/mem,reg */
         if ( vex.opcx == vex_none )
         {
             if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
@@ -6456,10 +6466,8 @@ x86_emulate(
         opc = init_evex(stub);
         goto cvts_2si;
 
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x2e):     /* ucomis{s,d} xmm/mem,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x2e): /* vucomis{s,d} xmm/mem,xmm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x2f):     /* comis{s,d} xmm/mem,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x2f): /* vcomis{s,d} xmm/mem,xmm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x2e):   /* {,v}ucomis{s,d} xmm/mem,xmm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x2f):   /* {,v}comis{s,d} xmm/mem,xmm */
         if ( vex.opcx == vex_none )
         {
             if ( vex.pfx )
@@ -6705,8 +6713,8 @@ x86_emulate(
         generate_exception_if(!vex.l || vex.w, EXC_UD);
         goto opmask_common;
 
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x50):     /* movmskp{s,d} xmm,reg */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x50): /* vmovmskp{s,d} {x,y}mm,reg */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x50):   /* movmskp{s,d} xmm,reg */
+                                           /* vmovmskp{s,d} {x,y}mm,reg */
     CASE_SIMD_PACKED_INT_VEX(0x0f, 0xd7):  /* pmovmskb {,x}mm,reg */
                                            /* vpmovmskb {x,y}mm,reg */
         opc = init_prefixes(stub);
@@ -6772,8 +6780,8 @@ x86_emulate(
         avx512_vlen_check(false);
         goto simd_zmm;
 
-    CASE_SIMD_ALL_FP(, 0x0f, 0x5a):        /* cvt{p,s}{s,d}2{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5a):    /* vcvtp{s,d}2p{s,d} {x,y}mm/mem,{x,y}mm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0x5a):      /* cvt{p,s}{s,d}2{p,s}{s,d} xmm/mem,xmm */
+                                           /* vcvtp{s,d}2p{s,d} {x,y}mm/mem,{x,y}mm */
                                            /* vcvts{s,d}2s{s,d} xmm/mem,xmm,xmm */
         op_bytes = 4 << (((vex.pfx & VEX_PREFIX_SCALAR_MASK) ? 0 : 1 + vex.l) +
                          !!(vex.pfx & VEX_PREFIX_DOUBLE_MASK));
@@ -6788,8 +6796,8 @@ x86_emulate(
                          evex.w);
         goto avx512f_all_fp;
 
-    CASE_SIMD_PACKED_FP(, 0x0f, 0x5b):     /* cvt{ps,dq}2{dq,ps} xmm/mem,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x5b): /* vcvt{ps,dq}2{dq,ps} {x,y}mm/mem,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0x5b):   /* cvt{ps,dq}2{dq,ps} xmm/mem,xmm */
+                                           /* vcvt{ps,dq}2{dq,ps} {x,y}mm/mem,{x,y}mm */
     case X86EMUL_OPC_F3(0x0f, 0x5b):       /* cvttps2dq xmm/mem,xmm */
     case X86EMUL_OPC_VEX_F3(0x0f, 0x5b):   /* vcvttps2dq {x,y}mm/mem,{x,y}mm */
         d |= TwoOp;
@@ -8105,10 +8113,10 @@ x86_emulate(
         }
         goto add;
 
-    CASE_SIMD_ALL_FP(, 0x0f, 0xc2):        /* cmp{p,s}{s,d} $imm8,xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0xc2):    /* vcmp{p,s}{s,d} $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_FP(, 0x0f, 0xc6):     /* shufp{s,d} $imm8,xmm/mem,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0xc6): /* vshufp{s,d} $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_ALL_FP_VEX(0x0f, 0xc2):      /* cmp{p,s}{s,d} $imm8,xmm/mem,xmm */
+                                           /* vcmp{p,s}{s,d} $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_FP_VEX(0x0f, 0xc6):   /* shufp{s,d} $imm8,xmm/mem,xmm */
+                                           /* vshufp{s,d} $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
         d = (d & ~SrcMask) | SrcMem;
         if ( vex.opcx == vex_none )
         {
