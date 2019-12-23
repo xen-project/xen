@@ -74,6 +74,40 @@ func (e Error) Error() string {
 	return fmt.Sprintf("libxl error: %d", -e)
 }
 
+// Context represents a libxl_ctx.
+type Context struct {
+	ctx    *C.libxl_ctx
+	logger *C.xentoollog_logger_stdiostream
+}
+
+// NewContext returns a new Context.
+func NewContext() (*Context, error) {
+	var ctx Context
+
+	ctx.logger = C.xtl_createlogger_stdiostream(C.stderr, C.XTL_ERROR, 0)
+
+	ret := C.libxl_ctx_alloc(&ctx.ctx, C.LIBXL_VERSION, 0,
+		(*C.xentoollog_logger)(unsafe.Pointer(ctx.logger)))
+	if ret != 0 {
+		return nil, Error(ret)
+	}
+
+	return &ctx, nil
+}
+
+// Close closes the Context.
+func (ctx *Context) Close() error {
+	ret := C.libxl_ctx_free(ctx.ctx)
+	ctx.ctx = nil
+	C.xtl_logger_destroy((*C.xentoollog_logger)(unsafe.Pointer(ctx.logger)))
+
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
+
 /*
  * Types: Builtins
  */
@@ -298,11 +332,6 @@ func (cpl CpuidPolicyList) toC() (C.libxl_cpuid_policy_list, error) {
 	return ccpl, nil
 }
 
-type Context struct {
-	ctx    *C.libxl_ctx
-	logger *C.xentoollog_logger_stdiostream
-}
-
 // Hwcap represents a libxl_hwcap.
 type Hwcap [8]uint32
 
@@ -453,11 +482,6 @@ func SchedulerFromString(name string) (s Scheduler, err error) {
 // libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool_out);
 // void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nb_pool);
 func (Ctx *Context) ListCpupool() (list []Cpupoolinfo) {
-	err := Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	var nbPool C.int
 
 	c_cpupool_list := C.libxl_list_cpupool(Ctx.ctx, &nbPool)
@@ -481,16 +505,11 @@ func (Ctx *Context) ListCpupool() (list []Cpupoolinfo) {
 
 // int libxl_cpupool_info(libxl_ctx *ctx, libxl_cpupoolinfo *info, uint32_t poolid);
 func (Ctx *Context) CpupoolInfo(Poolid uint32) (pool Cpupoolinfo) {
-	err := Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	var c_cpupool C.libxl_cpupoolinfo
 
 	ret := C.libxl_cpupool_info(Ctx.ctx, &c_cpupool, C.uint32_t(Poolid))
 	if ret != 0 {
-		err = Error(-ret)
+		//err = Error(-ret)
 		return
 	}
 	defer C.libxl_cpupoolinfo_dispose(&c_cpupool)
@@ -507,11 +526,6 @@ func (Ctx *Context) CpupoolInfo(Poolid uint32) (pool Cpupoolinfo) {
 // FIXME: uuid
 // FIXME: Setting poolid
 func (Ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitmap) (err error, Poolid uint32) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	poolid := C.uint32_t(C.LIBXL_CPUPOOL_POOLID_ANY)
 	name := C.CString(Name)
 	defer C.free(unsafe.Pointer(name))
@@ -540,11 +554,6 @@ func (Ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitma
 
 // int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
 func (Ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_cpupool_destroy(Ctx.ctx, C.uint32_t(Poolid))
 	if ret != 0 {
 		err = Error(-ret)
@@ -556,11 +565,6 @@ func (Ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
 
 // int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu);
 func (Ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_cpupool_cpuadd(Ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
 	if ret != 0 {
 		err = Error(-ret)
@@ -573,11 +577,6 @@ func (Ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
 // int libxl_cpupool_cpuadd_cpumap(libxl_ctx *ctx, uint32_t poolid,
 //                                 const libxl_bitmap *cpumap);
 func (Ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	cbm, err := Cpumap.toC()
 	if err != nil {
 		return
@@ -595,11 +594,6 @@ func (Ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error
 
 // int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
 func (Ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_cpupool_cpuremove(Ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
 	if ret != 0 {
 		err = Error(-ret)
@@ -612,11 +606,6 @@ func (Ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
 // int libxl_cpupool_cpuremove_cpumap(libxl_ctx *ctx, uint32_t poolid,
 //                                    const libxl_bitmap *cpumap);
 func (Ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	cbm, err := Cpumap.toC()
 	if err != nil {
 		return
@@ -634,11 +623,6 @@ func (Ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err er
 
 // int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid);
 func (Ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	name := C.CString(Name)
 	defer C.free(unsafe.Pointer(name))
 
@@ -653,11 +637,6 @@ func (Ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
 
 // int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
 func (Ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ccpus := C.int(0)
 
 	ret := C.libxl_cpupool_cpuadd_node(Ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
@@ -673,11 +652,6 @@ func (Ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err er
 
 // int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
 func (Ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ccpus := C.int(0)
 
 	ret := C.libxl_cpupool_cpuremove_node(Ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
@@ -693,11 +667,6 @@ func (Ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err
 
 // int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
 func (Ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_cpupool_movedomain(Ctx.ctx, C.uint32_t(Poolid), C.uint32_t(Id))
 	if ret != 0 {
 		err = Error(-ret)
@@ -857,60 +826,8 @@ func (bm Bitmap) String() (s string) {
 	return
 }
 
-/*
- * Context
- */
-var Ctx Context
-
-func (Ctx *Context) IsOpen() bool {
-	return Ctx.ctx != nil
-}
-
-func (Ctx *Context) Open() (err error) {
-	if Ctx.ctx != nil {
-		return
-	}
-
-	Ctx.logger = C.xtl_createlogger_stdiostream(C.stderr, C.XTL_ERROR, 0)
-	if Ctx.logger == nil {
-		err = fmt.Errorf("Cannot open stdiostream")
-		return
-	}
-
-	ret := C.libxl_ctx_alloc(&Ctx.ctx, C.LIBXL_VERSION,
-		0, (*C.xentoollog_logger)(unsafe.Pointer(Ctx.logger)))
-
-	if ret != 0 {
-		err = Error(-ret)
-	}
-	return
-}
-
-func (Ctx *Context) Close() (err error) {
-	ret := C.libxl_ctx_free(Ctx.ctx)
-	Ctx.ctx = nil
-
-	if ret != 0 {
-		err = Error(-ret)
-	}
-	C.xtl_logger_destroy((*C.xentoollog_logger)(unsafe.Pointer(Ctx.logger)))
-	return
-}
-
-func (Ctx *Context) CheckOpen() (err error) {
-	if Ctx.ctx == nil {
-		err = fmt.Errorf("Context not opened")
-	}
-	return
-}
-
 //int libxl_get_max_cpus(libxl_ctx *ctx);
 func (Ctx *Context) GetMaxCpus() (maxCpus int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_get_max_cpus(Ctx.ctx)
 	if ret < 0 {
 		err = Error(-ret)
@@ -922,11 +839,6 @@ func (Ctx *Context) GetMaxCpus() (maxCpus int, err error) {
 
 //int libxl_get_online_cpus(libxl_ctx *ctx);
 func (Ctx *Context) GetOnlineCpus() (onCpus int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_get_online_cpus(Ctx.ctx)
 	if ret < 0 {
 		err = Error(-ret)
@@ -938,10 +850,6 @@ func (Ctx *Context) GetOnlineCpus() (onCpus int, err error) {
 
 //int libxl_get_max_nodes(libxl_ctx *ctx);
 func (Ctx *Context) GetMaxNodes() (maxNodes int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
 	ret := C.libxl_get_max_nodes(Ctx.ctx)
 	if ret < 0 {
 		err = Error(-ret)
@@ -953,10 +861,6 @@ func (Ctx *Context) GetMaxNodes() (maxNodes int, err error) {
 
 //int libxl_get_free_memory(libxl_ctx *ctx, uint64_t *memkb);
 func (Ctx *Context) GetFreeMemory() (memkb uint64, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
 	var cmem C.uint64_t
 	ret := C.libxl_get_free_memory(Ctx.ctx, &cmem)
 
@@ -972,10 +876,6 @@ func (Ctx *Context) GetFreeMemory() (memkb uint64, err error) {
 
 //int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
 func (Ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
 	var cphys C.libxl_physinfo
 	C.libxl_physinfo_init(&cphys)
 	defer C.libxl_physinfo_dispose(&cphys)
@@ -993,11 +893,6 @@ func (Ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
 
 //const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
 func (Ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	var cinfo *C.libxl_version_info
 
 	cinfo = C.libxl_get_version_info(Ctx.ctx)
@@ -1008,11 +903,6 @@ func (Ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
 }
 
 func (Ctx *Context) DomainInfo(Id Domid) (di *Dominfo, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	var cdi C.libxl_dominfo
 	C.libxl_dominfo_init(&cdi)
 	defer C.libxl_dominfo_dispose(&cdi)
@@ -1030,11 +920,6 @@ func (Ctx *Context) DomainInfo(Id Domid) (di *Dominfo, err error) {
 }
 
 func (Ctx *Context) DomainUnpause(Id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_domain_unpause(Ctx.ctx, C.uint32_t(Id), nil)
 
 	if ret != 0 {
@@ -1045,11 +930,6 @@ func (Ctx *Context) DomainUnpause(Id Domid) (err error) {
 
 //int libxl_domain_pause(libxl_ctx *ctx, uint32_t domain);
 func (Ctx *Context) DomainPause(id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_domain_pause(Ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
@@ -1060,11 +940,6 @@ func (Ctx *Context) DomainPause(id Domid) (err error) {
 
 //int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid);
 func (Ctx *Context) DomainShutdown(id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_domain_shutdown(Ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
@@ -1075,11 +950,6 @@ func (Ctx *Context) DomainShutdown(id Domid) (err error) {
 
 //int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid);
 func (Ctx *Context) DomainReboot(id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	ret := C.libxl_domain_reboot(Ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
@@ -1091,11 +961,6 @@ func (Ctx *Context) DomainReboot(id Domid) (err error) {
 //libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain_out);
 //void libxl_dominfo_list_free(libxl_dominfo *list, int nb_domain);
 func (Ctx *Context) ListDomain() (glist []Dominfo) {
-	err := Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	var nbDomain C.int
 	clist := C.libxl_list_domain(Ctx.ctx, &nbDomain)
 	defer C.libxl_dominfo_list_free(clist, nbDomain)
@@ -1118,11 +983,6 @@ func (Ctx *Context) ListDomain() (glist []Dominfo) {
 //				int *nb_vcpu, int *nr_cpus_out);
 //void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
 func (Ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo) {
-	err := Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	var nbVcpu C.int
 	var nrCpu C.int
 
@@ -1153,11 +1013,6 @@ func (ct ConsoleType) String() (str string) {
 //int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
 //libxl_console_type type, char **path);
 func (Ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (path string, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	var cpath *C.char
 	ret := C.libxl_console_get_tty(Ctx.ctx, C.uint32_t(id), C.int(consNum), C.libxl_console_type(conType), &cpath)
 	if ret != 0 {
@@ -1173,11 +1028,6 @@ func (Ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (p
 //int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm,
 //					char **path);
 func (Ctx *Context) PrimaryConsoleGetTty(domid uint32) (path string, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
 	var cpath *C.char
 	ret := C.libxl_primary_console_get_tty(Ctx.ctx, C.uint32_t(domid), &cpath)
 	if ret != 0 {
