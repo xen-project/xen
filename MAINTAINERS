@@ -516,6 +516,7 @@ M:	Paul Durrant <paul@xen.org>
 S:	Supported
 F:	xen/arch/x86/hvm/viridian/
 F:	xen/include/asm-x86/hvm/viridian.h
+F:	xen/include/asm-x86/guest/hyperv-tlfs.h
 
 XENTRACE
 M:	George Dunlap <george.dunlap@eu.citrix.com>
