@@ -6010,21 +6010,18 @@ x86_emulate(
     CASE_SIMD_PACKED_INT(pfx, opc):          \
     case X86EMUL_OPC_VEX_66(pfx, opc)
 
-#define CASE_SIMD_SINGLE_FP(kind, pfx, opc)  \
-    case X86EMUL_OPC##kind(pfx, opc):        \
-    case X86EMUL_OPC##kind##_F3(pfx, opc)
-#define CASE_SIMD_DOUBLE_FP(kind, pfx, opc)  \
-    case X86EMUL_OPC##kind##_66(pfx, opc):   \
-    case X86EMUL_OPC##kind##_F2(pfx, opc)
 #define CASE_SIMD_ALL_FP(kind, pfx, opc)     \
-    CASE_SIMD_SINGLE_FP(kind, pfx, opc):     \
-    CASE_SIMD_DOUBLE_FP(kind, pfx, opc)
+    CASE_SIMD_PACKED_FP(kind, pfx, opc):     \
+    CASE_SIMD_SCALAR_FP(kind, pfx, opc)
 #define CASE_SIMD_PACKED_FP(kind, pfx, opc)  \
     case X86EMUL_OPC##kind(pfx, opc):        \
     case X86EMUL_OPC##kind##_66(pfx, opc)
 #define CASE_SIMD_SCALAR_FP(kind, pfx, opc)  \
     case X86EMUL_OPC##kind##_F3(pfx, opc):   \
     case X86EMUL_OPC##kind##_F2(pfx, opc)
+#define CASE_SIMD_SINGLE_FP(kind, pfx, opc)  \
+    case X86EMUL_OPC##kind(pfx, opc):        \
+    case X86EMUL_OPC##kind##_F3(pfx, opc)
 
     CASE_SIMD_SCALAR_FP(, 0x0f, 0x2b):     /* movnts{s,d} xmm,mem */
         host_and_vcpu_must_have(sse4a);
