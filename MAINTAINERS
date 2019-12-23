@@ -54,6 +54,15 @@ list. Remember to copy the appropriate stable branch maintainer who
 will be listed in this section of the MAINTAINERS file in the
 appropriate branch.
 
+The maintainer for this branch is:
+
+	Jan Beulich <jbeulich@suse.com>
+
+Tools backport requests should also be copied to:
+
+	Ian Jackson <Ian.Jackson@eu.citrix.com>
+
+
 	Unstable Subsystem Maintainers
 	==============================
 
