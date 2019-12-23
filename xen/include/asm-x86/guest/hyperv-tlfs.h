@@ -908,12 +908,12 @@ struct hv_tlb_flush {
 	u64 gva_list[];
 } __packed;
 
-/* HvFlushVirtualAddressSpaceEx, HvFlushVirtualAddressListEx hypercalls */
+/* HvFlushVirtualAddressSpaceEx hypercall */
 struct hv_tlb_flush_ex {
 	u64 address_space;
 	u64 flags;
 	struct hv_vpset hv_vp_set;
-	u64 gva_list[];
+	/* u64 gva_list[]; */
 } __packed;
 
 struct hv_partition_assist_pg {
