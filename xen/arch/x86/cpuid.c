@@ -396,10 +396,11 @@ static void __init calculate_hvm_max_policy(void)
         hvm_featureset[i] &= hvm_featuremask[i];
 
     /*
-     * Xen can provide an APIC emulation to HVM guests even if the host's APIC
-     * isn't enabled.
+     * Xen can provide an (x2)APIC emulation to HVM guests even if the host's
+     * (x2)APIC isn't enabled.
      */
     __set_bit(X86_FEATURE_APIC, hvm_featureset);
+    __set_bit(X86_FEATURE_X2APIC, hvm_featureset);
 
     /*
      * On AMD, PV guests are entirely unable to use SYSENTER as Xen runs in
