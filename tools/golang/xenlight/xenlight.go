@@ -1213,3 +1213,21 @@ func (Ctx *Context) DeviceUsbdevRemove(domid Domid, usbdev *DeviceUsbdev) error 
 
 	return nil
 }
+
+// DomainCreateNew creates a new domain.
+func (Ctx *Context) DomainCreateNew(config *DomainConfig) (Domid, error) {
+	var cdomid C.uint32_t
+	var cconfig C.libxl_domain_config
+	err := config.toC(&cconfig)
+	if err != nil {
+		return Domid(0), fmt.Errorf("converting domain config to C: %v", err)
+	}
+	defer C.libxl_domain_config_dispose(&cconfig)
+
+	ret := C.libxl_domain_create_new(Ctx.ctx, &cconfig, &cdomid, nil, nil)
+	if ret != 0 {
+		return Domid(0), Error(ret)
+	}
+
+	return Domid(cdomid), nil
+}
