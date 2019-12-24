@@ -594,6 +594,7 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
     u32 shadow_cntrl;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     u32 apicv_bit = SECONDARY_EXEC_APIC_REGISTER_VIRT |
+                    SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
                     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY;
 
     host_cntrl &= ~apicv_bit;
