@@ -92,13 +92,13 @@ func (x *VgaInterfaceInfo) toC(xc *C.libxl_vga_interface_info) (err error) {
 
 func (x *VncInfo) fromC(xc *C.libxl_vnc_info) error {
 	if err := x.Enable.fromC(&xc.enable); err != nil {
-		return err
+		return fmt.Errorf("converting field Enable: %v", err)
 	}
 	x.Listen = C.GoString(xc.listen)
 	x.Passwd = C.GoString(xc.passwd)
 	x.Display = int(xc.display)
 	if err := x.Findunused.fromC(&xc.findunused); err != nil {
-		return err
+		return fmt.Errorf("converting field Findunused: %v", err)
 	}
 
 	return nil
@@ -112,7 +112,7 @@ func (x *VncInfo) toC(xc *C.libxl_vnc_info) (err error) {
 	}()
 
 	if err := x.Enable.toC(&xc.enable); err != nil {
-		return err
+		return fmt.Errorf("converting field Enable: %v", err)
 	}
 	if x.Listen != "" {
 		xc.listen = C.CString(x.Listen)
@@ -122,7 +122,7 @@ func (x *VncInfo) toC(xc *C.libxl_vnc_info) (err error) {
 	}
 	xc.display = C.int(x.Display)
 	if err := x.Findunused.toC(&xc.findunused); err != nil {
-		return err
+		return fmt.Errorf("converting field Findunused: %v", err)
 	}
 
 	return nil
@@ -130,23 +130,23 @@ func (x *VncInfo) toC(xc *C.libxl_vnc_info) (err error) {
 
 func (x *SpiceInfo) fromC(xc *C.libxl_spice_info) error {
 	if err := x.Enable.fromC(&xc.enable); err != nil {
-		return err
+		return fmt.Errorf("converting field Enable: %v", err)
 	}
 	x.Port = int(xc.port)
 	x.TlsPort = int(xc.tls_port)
 	x.Host = C.GoString(xc.host)
 	if err := x.DisableTicketing.fromC(&xc.disable_ticketing); err != nil {
-		return err
+		return fmt.Errorf("converting field DisableTicketing: %v", err)
 	}
 	x.Passwd = C.GoString(xc.passwd)
 	if err := x.AgentMouse.fromC(&xc.agent_mouse); err != nil {
-		return err
+		return fmt.Errorf("converting field AgentMouse: %v", err)
 	}
 	if err := x.Vdagent.fromC(&xc.vdagent); err != nil {
-		return err
+		return fmt.Errorf("converting field Vdagent: %v", err)
 	}
 	if err := x.ClipboardSharing.fromC(&xc.clipboard_sharing); err != nil {
-		return err
+		return fmt.Errorf("converting field ClipboardSharing: %v", err)
 	}
 	x.Usbredirection = int(xc.usbredirection)
 	x.ImageCompression = C.GoString(xc.image_compression)
@@ -163,7 +163,7 @@ func (x *SpiceInfo) toC(xc *C.libxl_spice_info) (err error) {
 	}()
 
 	if err := x.Enable.toC(&xc.enable); err != nil {
-		return err
+		return fmt.Errorf("converting field Enable: %v", err)
 	}
 	xc.port = C.int(x.Port)
 	xc.tls_port = C.int(x.TlsPort)
@@ -171,19 +171,19 @@ func (x *SpiceInfo) toC(xc *C.libxl_spice_info) (err error) {
 		xc.host = C.CString(x.Host)
 	}
 	if err := x.DisableTicketing.toC(&xc.disable_ticketing); err != nil {
-		return err
+		return fmt.Errorf("converting field DisableTicketing: %v", err)
 	}
 	if x.Passwd != "" {
 		xc.passwd = C.CString(x.Passwd)
 	}
 	if err := x.AgentMouse.toC(&xc.agent_mouse); err != nil {
-		return err
+		return fmt.Errorf("converting field AgentMouse: %v", err)
 	}
 	if err := x.Vdagent.toC(&xc.vdagent); err != nil {
-		return err
+		return fmt.Errorf("converting field Vdagent: %v", err)
 	}
 	if err := x.ClipboardSharing.toC(&xc.clipboard_sharing); err != nil {
-		return err
+		return fmt.Errorf("converting field ClipboardSharing: %v", err)
 	}
 	xc.usbredirection = C.int(x.Usbredirection)
 	if x.ImageCompression != "" {
@@ -198,10 +198,10 @@ func (x *SpiceInfo) toC(xc *C.libxl_spice_info) (err error) {
 
 func (x *SdlInfo) fromC(xc *C.libxl_sdl_info) error {
 	if err := x.Enable.fromC(&xc.enable); err != nil {
-		return err
+		return fmt.Errorf("converting field Enable: %v", err)
 	}
 	if err := x.Opengl.fromC(&xc.opengl); err != nil {
-		return err
+		return fmt.Errorf("converting field Opengl: %v", err)
 	}
 	x.Display = C.GoString(xc.display)
 	x.Xauthority = C.GoString(xc.xauthority)
@@ -217,10 +217,10 @@ func (x *SdlInfo) toC(xc *C.libxl_sdl_info) (err error) {
 	}()
 
 	if err := x.Enable.toC(&xc.enable); err != nil {
-		return err
+		return fmt.Errorf("converting field Enable: %v", err)
 	}
 	if err := x.Opengl.toC(&xc.opengl); err != nil {
-		return err
+		return fmt.Errorf("converting field Opengl: %v", err)
 	}
 	if x.Display != "" {
 		xc.display = C.CString(x.Display)
@@ -234,7 +234,7 @@ func (x *SdlInfo) toC(xc *C.libxl_sdl_info) (err error) {
 
 func (x *Dominfo) fromC(xc *C.libxl_dominfo) error {
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 	x.Domid = Domid(xc.domid)
 	x.Ssidref = uint32(xc.ssidref)
@@ -268,7 +268,7 @@ func (x *Dominfo) toC(xc *C.libxl_dominfo) (err error) {
 	}()
 
 	if err := x.Uuid.toC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 	xc.domid = C.libxl_domid(x.Domid)
 	xc.ssidref = C.uint32_t(x.Ssidref)
@@ -302,7 +302,7 @@ func (x *Cpupoolinfo) fromC(xc *C.libxl_cpupoolinfo) error {
 	x.Sched = Scheduler(xc.sched)
 	x.NDom = uint32(xc.n_dom)
 	if err := x.Cpumap.fromC(&xc.cpumap); err != nil {
-		return err
+		return fmt.Errorf("converting field Cpumap: %v", err)
 	}
 
 	return nil
@@ -322,7 +322,7 @@ func (x *Cpupoolinfo) toC(xc *C.libxl_cpupoolinfo) (err error) {
 	xc.sched = C.libxl_scheduler(x.Sched)
 	xc.n_dom = C.uint32_t(x.NDom)
 	if err := x.Cpumap.toC(&xc.cpumap); err != nil {
-		return err
+		return fmt.Errorf("converting field Cpumap: %v", err)
 	}
 
 	return nil
@@ -342,7 +342,7 @@ func (x *Channelinfo) fromC(xc *C.libxl_channelinfo) error {
 	case ChannelConnectionPty:
 		var connectionPty ChannelinfoConnectionUnionPty
 		if err := connectionPty.fromC(xc); err != nil {
-			return err
+			return fmt.Errorf("converting field connectionPty: %v", err)
 		}
 		x.ConnectionUnion = connectionPty
 	default:
@@ -403,7 +403,7 @@ func (x *Channelinfo) toC(xc *C.libxl_channelinfo) (err error) {
 
 func (x *Vminfo) fromC(xc *C.libxl_vminfo) error {
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 	x.Domid = Domid(xc.domid)
 
@@ -418,7 +418,7 @@ func (x *Vminfo) toC(xc *C.libxl_vminfo) (err error) {
 	}()
 
 	if err := x.Uuid.toC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 	xc.domid = C.libxl_domid(x.Domid)
 
@@ -488,30 +488,30 @@ func (x *VersionInfo) toC(xc *C.libxl_version_info) (err error) {
 func (x *DomainCreateInfo) fromC(xc *C.libxl_domain_create_info) error {
 	x.Type = DomainType(xc._type)
 	if err := x.Hap.fromC(&xc.hap); err != nil {
-		return err
+		return fmt.Errorf("converting field Hap: %v", err)
 	}
 	if err := x.Oos.fromC(&xc.oos); err != nil {
-		return err
+		return fmt.Errorf("converting field Oos: %v", err)
 	}
 	x.Ssidref = uint32(xc.ssidref)
 	x.SsidLabel = C.GoString(xc.ssid_label)
 	x.Name = C.GoString(xc.name)
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 	if err := x.Xsdata.fromC(&xc.xsdata); err != nil {
-		return err
+		return fmt.Errorf("converting field Xsdata: %v", err)
 	}
 	if err := x.Platformdata.fromC(&xc.platformdata); err != nil {
-		return err
+		return fmt.Errorf("converting field Platformdata: %v", err)
 	}
 	x.Poolid = uint32(xc.poolid)
 	x.PoolName = C.GoString(xc.pool_name)
 	if err := x.RunHotplugScripts.fromC(&xc.run_hotplug_scripts); err != nil {
-		return err
+		return fmt.Errorf("converting field RunHotplugScripts: %v", err)
 	}
 	if err := x.DriverDomain.fromC(&xc.driver_domain); err != nil {
-		return err
+		return fmt.Errorf("converting field DriverDomain: %v", err)
 	}
 	x.Passthrough = Passthrough(xc.passthrough)
 
@@ -527,10 +527,10 @@ func (x *DomainCreateInfo) toC(xc *C.libxl_domain_create_info) (err error) {
 
 	xc._type = C.libxl_domain_type(x.Type)
 	if err := x.Hap.toC(&xc.hap); err != nil {
-		return err
+		return fmt.Errorf("converting field Hap: %v", err)
 	}
 	if err := x.Oos.toC(&xc.oos); err != nil {
-		return err
+		return fmt.Errorf("converting field Oos: %v", err)
 	}
 	xc.ssidref = C.uint32_t(x.Ssidref)
 	if x.SsidLabel != "" {
@@ -540,23 +540,23 @@ func (x *DomainCreateInfo) toC(xc *C.libxl_domain_create_info) (err error) {
 		xc.name = C.CString(x.Name)
 	}
 	if err := x.Uuid.toC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 	if err := x.Xsdata.toC(&xc.xsdata); err != nil {
-		return err
+		return fmt.Errorf("converting field Xsdata: %v", err)
 	}
 	if err := x.Platformdata.toC(&xc.platformdata); err != nil {
-		return err
+		return fmt.Errorf("converting field Platformdata: %v", err)
 	}
 	xc.poolid = C.uint32_t(x.Poolid)
 	if x.PoolName != "" {
 		xc.pool_name = C.CString(x.PoolName)
 	}
 	if err := x.RunHotplugScripts.toC(&xc.run_hotplug_scripts); err != nil {
-		return err
+		return fmt.Errorf("converting field RunHotplugScripts: %v", err)
 	}
 	if err := x.DriverDomain.toC(&xc.driver_domain); err != nil {
-		return err
+		return fmt.Errorf("converting field DriverDomain: %v", err)
 	}
 	xc.passthrough = C.libxl_passthrough(x.Passthrough)
 
@@ -568,7 +568,7 @@ func (x *DomainRestoreParams) fromC(xc *C.libxl_domain_restore_params) error {
 	x.StreamVersion = uint32(xc.stream_version)
 	x.ColoProxyScript = C.GoString(xc.colo_proxy_script)
 	if err := x.UserspaceColoProxy.fromC(&xc.userspace_colo_proxy); err != nil {
-		return err
+		return fmt.Errorf("converting field UserspaceColoProxy: %v", err)
 	}
 
 	return nil
@@ -587,7 +587,7 @@ func (x *DomainRestoreParams) toC(xc *C.libxl_domain_restore_params) (err error)
 		xc.colo_proxy_script = C.CString(x.ColoProxyScript)
 	}
 	if err := x.UserspaceColoProxy.toC(&xc.userspace_colo_proxy); err != nil {
-		return err
+		return fmt.Errorf("converting field UserspaceColoProxy: %v", err)
 	}
 
 	return nil
@@ -628,7 +628,7 @@ func (x *VcpuSchedParams) fromC(xc *C.libxl_vcpu_sched_params) error {
 	x.Vcpus = make([]SchedParams, numVcpus)
 	for i, v := range cVcpus {
 		if err := x.Vcpus[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Vcpus: %v", err)
 		}
 	}
 
@@ -649,7 +649,7 @@ func (x *VcpuSchedParams) toC(xc *C.libxl_vcpu_sched_params) (err error) {
 		cVcpus := (*[1 << 28]C.libxl_sched_params)(unsafe.Pointer(xc.vcpus))[:numVcpus:numVcpus]
 		for i, v := range x.Vcpus {
 			if err := v.toC(&cVcpus[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Vcpus: %v", err)
 			}
 		}
 	}
@@ -699,7 +699,7 @@ func (x *VnodeInfo) fromC(xc *C.libxl_vnode_info) error {
 	}
 	x.Pnode = uint32(xc.pnode)
 	if err := x.Vcpus.fromC(&xc.vcpus); err != nil {
-		return err
+		return fmt.Errorf("converting field Vcpus: %v", err)
 	}
 
 	return nil
@@ -723,7 +723,7 @@ func (x *VnodeInfo) toC(xc *C.libxl_vnode_info) (err error) {
 	}
 	xc.pnode = C.uint32_t(x.Pnode)
 	if err := x.Vcpus.toC(&xc.vcpus); err != nil {
-		return err
+		return fmt.Errorf("converting field Vcpus: %v", err)
 	}
 
 	return nil
@@ -752,20 +752,20 @@ func (x *RdmReserve) toC(xc *C.libxl_rdm_reserve) (err error) {
 func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	x.MaxVcpus = int(xc.max_vcpus)
 	if err := x.AvailVcpus.fromC(&xc.avail_vcpus); err != nil {
-		return err
+		return fmt.Errorf("converting field AvailVcpus: %v", err)
 	}
 	if err := x.Cpumap.fromC(&xc.cpumap); err != nil {
-		return err
+		return fmt.Errorf("converting field Cpumap: %v", err)
 	}
 	if err := x.Nodemap.fromC(&xc.nodemap); err != nil {
-		return err
+		return fmt.Errorf("converting field Nodemap: %v", err)
 	}
 	numVcpuHardAffinity := int(xc.num_vcpu_hard_affinity)
 	cVcpuHardAffinity := (*[1 << 28]C.libxl_bitmap)(unsafe.Pointer(xc.vcpu_hard_affinity))[:numVcpuHardAffinity:numVcpuHardAffinity]
 	x.VcpuHardAffinity = make([]Bitmap, numVcpuHardAffinity)
 	for i, v := range cVcpuHardAffinity {
 		if err := x.VcpuHardAffinity[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field VcpuHardAffinity: %v", err)
 		}
 	}
 	numVcpuSoftAffinity := int(xc.num_vcpu_soft_affinity)
@@ -773,11 +773,11 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	x.VcpuSoftAffinity = make([]Bitmap, numVcpuSoftAffinity)
 	for i, v := range cVcpuSoftAffinity {
 		if err := x.VcpuSoftAffinity[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field VcpuSoftAffinity: %v", err)
 		}
 	}
 	if err := x.NumaPlacement.fromC(&xc.numa_placement); err != nil {
-		return err
+		return fmt.Errorf("converting field NumaPlacement: %v", err)
 	}
 	x.TscMode = TscMode(xc.tsc_mode)
 	x.MaxMemkb = uint64(xc.max_memkb)
@@ -789,13 +789,13 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	x.ExecSsidref = uint32(xc.exec_ssidref)
 	x.ExecSsidLabel = C.GoString(xc.exec_ssid_label)
 	if err := x.Localtime.fromC(&xc.localtime); err != nil {
-		return err
+		return fmt.Errorf("converting field Localtime: %v", err)
 	}
 	if err := x.DisableMigrate.fromC(&xc.disable_migrate); err != nil {
-		return err
+		return fmt.Errorf("converting field DisableMigrate: %v", err)
 	}
 	if err := x.Cpuid.fromC(&xc.cpuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Cpuid: %v", err)
 	}
 	x.BlkdevStart = C.GoString(xc.blkdev_start)
 	numVnumaNodes := int(xc.num_vnuma_nodes)
@@ -803,37 +803,37 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	x.VnumaNodes = make([]VnodeInfo, numVnumaNodes)
 	for i, v := range cVnumaNodes {
 		if err := x.VnumaNodes[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field VnumaNodes: %v", err)
 		}
 	}
 	x.MaxGrantFrames = uint32(xc.max_grant_frames)
 	x.MaxMaptrackFrames = uint32(xc.max_maptrack_frames)
 	x.DeviceModelVersion = DeviceModelVersion(xc.device_model_version)
 	if err := x.DeviceModelStubdomain.fromC(&xc.device_model_stubdomain); err != nil {
-		return err
+		return fmt.Errorf("converting field DeviceModelStubdomain: %v", err)
 	}
 	x.DeviceModel = C.GoString(xc.device_model)
 	x.DeviceModelSsidref = uint32(xc.device_model_ssidref)
 	x.DeviceModelSsidLabel = C.GoString(xc.device_model_ssid_label)
 	x.DeviceModelUser = C.GoString(xc.device_model_user)
 	if err := x.Extra.fromC(&xc.extra); err != nil {
-		return err
+		return fmt.Errorf("converting field Extra: %v", err)
 	}
 	if err := x.ExtraPv.fromC(&xc.extra_pv); err != nil {
-		return err
+		return fmt.Errorf("converting field ExtraPv: %v", err)
 	}
 	if err := x.ExtraHvm.fromC(&xc.extra_hvm); err != nil {
-		return err
+		return fmt.Errorf("converting field ExtraHvm: %v", err)
 	}
 	if err := x.SchedParams.fromC(&xc.sched_params); err != nil {
-		return err
+		return fmt.Errorf("converting field SchedParams: %v", err)
 	}
 	numIoports := int(xc.num_ioports)
 	cIoports := (*[1 << 28]C.libxl_ioport_range)(unsafe.Pointer(xc.ioports))[:numIoports:numIoports]
 	x.Ioports = make([]IoportRange, numIoports)
 	for i, v := range cIoports {
 		if err := x.Ioports[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Ioports: %v", err)
 		}
 	}
 	numIrqs := int(xc.num_irqs)
@@ -847,11 +847,11 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	x.Iomem = make([]IomemRange, numIomem)
 	for i, v := range cIomem {
 		if err := x.Iomem[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Iomem: %v", err)
 		}
 	}
 	if err := x.ClaimMode.fromC(&xc.claim_mode); err != nil {
-		return err
+		return fmt.Errorf("converting field ClaimMode: %v", err)
 	}
 	x.EventChannels = uint32(xc.event_channels)
 	x.Kernel = C.GoString(xc.kernel)
@@ -859,41 +859,41 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	x.Ramdisk = C.GoString(xc.ramdisk)
 	x.DeviceTree = C.GoString(xc.device_tree)
 	if err := x.Acpi.fromC(&xc.acpi); err != nil {
-		return err
+		return fmt.Errorf("converting field Acpi: %v", err)
 	}
 	x.Bootloader = C.GoString(xc.bootloader)
 	if err := x.BootloaderArgs.fromC(&xc.bootloader_args); err != nil {
-		return err
+		return fmt.Errorf("converting field BootloaderArgs: %v", err)
 	}
 	x.TimerMode = TimerMode(xc.timer_mode)
 	if err := x.NestedHvm.fromC(&xc.nested_hvm); err != nil {
-		return err
+		return fmt.Errorf("converting field NestedHvm: %v", err)
 	}
 	if err := x.Apic.fromC(&xc.apic); err != nil {
-		return err
+		return fmt.Errorf("converting field Apic: %v", err)
 	}
 	if err := x.DmRestrict.fromC(&xc.dm_restrict); err != nil {
-		return err
+		return fmt.Errorf("converting field DmRestrict: %v", err)
 	}
 	x.Tee = TeeType(xc.tee)
 	x.Type = DomainType(xc._type)
 	switch x.Type {
-	case DomainTypePv:
-		var typePv DomainBuildInfoTypeUnionPv
-		if err := typePv.fromC(xc); err != nil {
-			return err
-		}
-		x.TypeUnion = typePv
 	case DomainTypeHvm:
 		var typeHvm DomainBuildInfoTypeUnionHvm
 		if err := typeHvm.fromC(xc); err != nil {
-			return err
+			return fmt.Errorf("converting field typeHvm: %v", err)
 		}
 		x.TypeUnion = typeHvm
+	case DomainTypePv:
+		var typePv DomainBuildInfoTypeUnionPv
+		if err := typePv.fromC(xc); err != nil {
+			return fmt.Errorf("converting field typePv: %v", err)
+		}
+		x.TypeUnion = typePv
 	case DomainTypePvh:
 		var typePvh DomainBuildInfoTypeUnionPvh
 		if err := typePvh.fromC(xc); err != nil {
-			return err
+			return fmt.Errorf("converting field typePvh: %v", err)
 		}
 		x.TypeUnion = typePvh
 	default:
@@ -915,100 +915,100 @@ func (x *DomainBuildInfoTypeUnionHvm) fromC(xc *C.libxl_domain_build_info) error
 	x.Firmware = C.GoString(tmp.firmware)
 	x.Bios = BiosType(tmp.bios)
 	if err := x.Pae.fromC(&tmp.pae); err != nil {
-		return err
+		return fmt.Errorf("converting field Pae: %v", err)
 	}
 	if err := x.Apic.fromC(&tmp.apic); err != nil {
-		return err
+		return fmt.Errorf("converting field Apic: %v", err)
 	}
 	if err := x.Acpi.fromC(&tmp.acpi); err != nil {
-		return err
+		return fmt.Errorf("converting field Acpi: %v", err)
 	}
 	if err := x.AcpiS3.fromC(&tmp.acpi_s3); err != nil {
-		return err
+		return fmt.Errorf("converting field AcpiS3: %v", err)
 	}
 	if err := x.AcpiS4.fromC(&tmp.acpi_s4); err != nil {
-		return err
+		return fmt.Errorf("converting field AcpiS4: %v", err)
 	}
 	if err := x.AcpiLaptopSlate.fromC(&tmp.acpi_laptop_slate); err != nil {
-		return err
+		return fmt.Errorf("converting field AcpiLaptopSlate: %v", err)
 	}
 	if err := x.Nx.fromC(&tmp.nx); err != nil {
-		return err
+		return fmt.Errorf("converting field Nx: %v", err)
 	}
 	if err := x.Viridian.fromC(&tmp.viridian); err != nil {
-		return err
+		return fmt.Errorf("converting field Viridian: %v", err)
 	}
 	if err := x.ViridianEnable.fromC(&tmp.viridian_enable); err != nil {
-		return err
+		return fmt.Errorf("converting field ViridianEnable: %v", err)
 	}
 	if err := x.ViridianDisable.fromC(&tmp.viridian_disable); err != nil {
-		return err
+		return fmt.Errorf("converting field ViridianDisable: %v", err)
 	}
 	x.Timeoffset = C.GoString(tmp.timeoffset)
 	if err := x.Hpet.fromC(&tmp.hpet); err != nil {
-		return err
+		return fmt.Errorf("converting field Hpet: %v", err)
 	}
 	if err := x.VptAlign.fromC(&tmp.vpt_align); err != nil {
-		return err
+		return fmt.Errorf("converting field VptAlign: %v", err)
 	}
 	x.MmioHoleMemkb = uint64(tmp.mmio_hole_memkb)
 	x.TimerMode = TimerMode(tmp.timer_mode)
 	if err := x.NestedHvm.fromC(&tmp.nested_hvm); err != nil {
-		return err
+		return fmt.Errorf("converting field NestedHvm: %v", err)
 	}
 	if err := x.Altp2M.fromC(&tmp.altp2m); err != nil {
-		return err
+		return fmt.Errorf("converting field Altp2M: %v", err)
 	}
 	x.SystemFirmware = C.GoString(tmp.system_firmware)
 	x.SmbiosFirmware = C.GoString(tmp.smbios_firmware)
 	x.AcpiFirmware = C.GoString(tmp.acpi_firmware)
 	x.Hdtype = Hdtype(tmp.hdtype)
 	if err := x.Nographic.fromC(&tmp.nographic); err != nil {
-		return err
+		return fmt.Errorf("converting field Nographic: %v", err)
 	}
 	if err := x.Vga.fromC(&tmp.vga); err != nil {
-		return err
+		return fmt.Errorf("converting field Vga: %v", err)
 	}
 	if err := x.Vnc.fromC(&tmp.vnc); err != nil {
-		return err
+		return fmt.Errorf("converting field Vnc: %v", err)
 	}
 	x.Keymap = C.GoString(tmp.keymap)
 	if err := x.Sdl.fromC(&tmp.sdl); err != nil {
-		return err
+		return fmt.Errorf("converting field Sdl: %v", err)
 	}
 	if err := x.Spice.fromC(&tmp.spice); err != nil {
-		return err
+		return fmt.Errorf("converting field Spice: %v", err)
 	}
 	if err := x.GfxPassthru.fromC(&tmp.gfx_passthru); err != nil {
-		return err
+		return fmt.Errorf("converting field GfxPassthru: %v", err)
 	}
 	x.GfxPassthruKind = GfxPassthruKind(tmp.gfx_passthru_kind)
 	x.Serial = C.GoString(tmp.serial)
 	x.Boot = C.GoString(tmp.boot)
 	if err := x.Usb.fromC(&tmp.usb); err != nil {
-		return err
+		return fmt.Errorf("converting field Usb: %v", err)
 	}
 	x.Usbversion = int(tmp.usbversion)
 	x.Usbdevice = C.GoString(tmp.usbdevice)
 	if err := x.VkbDevice.fromC(&tmp.vkb_device); err != nil {
-		return err
+		return fmt.Errorf("converting field VkbDevice: %v", err)
 	}
 	x.Soundhw = C.GoString(tmp.soundhw)
 	if err := x.XenPlatformPci.fromC(&tmp.xen_platform_pci); err != nil {
-		return err
+		return fmt.Errorf("converting field XenPlatformPci: %v", err)
 	}
 	if err := x.UsbdeviceList.fromC(&tmp.usbdevice_list); err != nil {
-		return err
+		return fmt.Errorf("converting field UsbdeviceList: %v", err)
 	}
 	x.VendorDevice = VendorDevice(tmp.vendor_device)
 	if err := x.MsVmGenid.fromC(&tmp.ms_vm_genid); err != nil {
-		return err
+		return fmt.Errorf("converting field MsVmGenid: %v", err)
 	}
 	if err := x.SerialList.fromC(&tmp.serial_list); err != nil {
-		return err
+		return fmt.Errorf("converting field SerialList: %v", err)
 	}
 	if err := x.Rdm.fromC(&tmp.rdm); err != nil {
-		return err
+		return fmt.Errorf("converting field Rdm: %v", err)
 	}
 	x.RdmMemBoundaryMemkb = uint64(tmp.rdm_mem_boundary_memkb)
 	x.McaCaps = uint64(tmp.mca_caps)
@@ -1025,13 +1025,13 @@ func (x *DomainBuildInfoTypeUnionPv) fromC(xc *C.libxl_domain_build_info) error 
 	x.SlackMemkb = uint64(tmp.slack_memkb)
 	x.Bootloader = C.GoString(tmp.bootloader)
 	if err := x.BootloaderArgs.fromC(&tmp.bootloader_args); err != nil {
-		return err
+		return fmt.Errorf("converting field BootloaderArgs: %v", err)
 	}
 	x.Cmdline = C.GoString(tmp.cmdline)
 	x.Ramdisk = C.GoString(tmp.ramdisk)
 	x.Features = C.GoString(tmp.features)
 	if err := x.E820Host.fromC(&tmp.e820_host); err != nil {
-		return err
+		return fmt.Errorf("converting field E820Host: %v", err)
 	}
 	return nil
 }
@@ -1043,7 +1043,7 @@ func (x *DomainBuildInfoTypeUnionPvh) fromC(xc *C.libxl_domain_build_info) error
 
 	tmp := (*C.libxl_domain_build_info_type_union_pvh)(unsafe.Pointer(&xc.u[0]))
 	if err := x.Pvshim.fromC(&tmp.pvshim); err != nil {
-		return err
+		return fmt.Errorf("converting field Pvshim: %v", err)
 	}
 	x.PvshimPath = C.GoString(tmp.pvshim_path)
 	x.PvshimCmdline = C.GoString(tmp.pvshim_cmdline)
@@ -1060,13 +1060,13 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 
 	xc.max_vcpus = C.int(x.MaxVcpus)
 	if err := x.AvailVcpus.toC(&xc.avail_vcpus); err != nil {
-		return err
+		return fmt.Errorf("converting field AvailVcpus: %v", err)
 	}
 	if err := x.Cpumap.toC(&xc.cpumap); err != nil {
-		return err
+		return fmt.Errorf("converting field Cpumap: %v", err)
 	}
 	if err := x.Nodemap.toC(&xc.nodemap); err != nil {
-		return err
+		return fmt.Errorf("converting field Nodemap: %v", err)
 	}
 	if numVcpuHardAffinity := len(x.VcpuHardAffinity); numVcpuHardAffinity > 0 {
 		xc.vcpu_hard_affinity = (*C.libxl_bitmap)(C.malloc(C.ulong(numVcpuHardAffinity) * C.sizeof_libxl_bitmap))
@@ -1074,7 +1074,7 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		cVcpuHardAffinity := (*[1 << 28]C.libxl_bitmap)(unsafe.Pointer(xc.vcpu_hard_affinity))[:numVcpuHardAffinity:numVcpuHardAffinity]
 		for i, v := range x.VcpuHardAffinity {
 			if err := v.toC(&cVcpuHardAffinity[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field VcpuHardAffinity: %v", err)
 			}
 		}
 	}
@@ -1084,12 +1084,12 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		cVcpuSoftAffinity := (*[1 << 28]C.libxl_bitmap)(unsafe.Pointer(xc.vcpu_soft_affinity))[:numVcpuSoftAffinity:numVcpuSoftAffinity]
 		for i, v := range x.VcpuSoftAffinity {
 			if err := v.toC(&cVcpuSoftAffinity[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field VcpuSoftAffinity: %v", err)
 			}
 		}
 	}
 	if err := x.NumaPlacement.toC(&xc.numa_placement); err != nil {
-		return err
+		return fmt.Errorf("converting field NumaPlacement: %v", err)
 	}
 	xc.tsc_mode = C.libxl_tsc_mode(x.TscMode)
 	xc.max_memkb = C.uint64_t(x.MaxMemkb)
@@ -1103,13 +1103,13 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		xc.exec_ssid_label = C.CString(x.ExecSsidLabel)
 	}
 	if err := x.Localtime.toC(&xc.localtime); err != nil {
-		return err
+		return fmt.Errorf("converting field Localtime: %v", err)
 	}
 	if err := x.DisableMigrate.toC(&xc.disable_migrate); err != nil {
-		return err
+		return fmt.Errorf("converting field DisableMigrate: %v", err)
 	}
 	if err := x.Cpuid.toC(&xc.cpuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Cpuid: %v", err)
 	}
 	if x.BlkdevStart != "" {
 		xc.blkdev_start = C.CString(x.BlkdevStart)
@@ -1120,7 +1120,7 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		cVnumaNodes := (*[1 << 28]C.libxl_vnode_info)(unsafe.Pointer(xc.vnuma_nodes))[:numVnumaNodes:numVnumaNodes]
 		for i, v := range x.VnumaNodes {
 			if err := v.toC(&cVnumaNodes[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field VnumaNodes: %v", err)
 			}
 		}
 	}
@@ -1128,7 +1128,7 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 	xc.max_maptrack_frames = C.uint32_t(x.MaxMaptrackFrames)
 	xc.device_model_version = C.libxl_device_model_version(x.DeviceModelVersion)
 	if err := x.DeviceModelStubdomain.toC(&xc.device_model_stubdomain); err != nil {
-		return err
+		return fmt.Errorf("converting field DeviceModelStubdomain: %v", err)
 	}
 	if x.DeviceModel != "" {
 		xc.device_model = C.CString(x.DeviceModel)
@@ -1141,16 +1141,16 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		xc.device_model_user = C.CString(x.DeviceModelUser)
 	}
 	if err := x.Extra.toC(&xc.extra); err != nil {
-		return err
+		return fmt.Errorf("converting field Extra: %v", err)
 	}
 	if err := x.ExtraPv.toC(&xc.extra_pv); err != nil {
-		return err
+		return fmt.Errorf("converting field ExtraPv: %v", err)
 	}
 	if err := x.ExtraHvm.toC(&xc.extra_hvm); err != nil {
-		return err
+		return fmt.Errorf("converting field ExtraHvm: %v", err)
 	}
 	if err := x.SchedParams.toC(&xc.sched_params); err != nil {
-		return err
+		return fmt.Errorf("converting field SchedParams: %v", err)
 	}
 	if numIoports := len(x.Ioports); numIoports > 0 {
 		xc.ioports = (*C.libxl_ioport_range)(C.malloc(C.ulong(numIoports) * C.sizeof_libxl_ioport_range))
@@ -1158,7 +1158,7 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		cIoports := (*[1 << 28]C.libxl_ioport_range)(unsafe.Pointer(xc.ioports))[:numIoports:numIoports]
 		for i, v := range x.Ioports {
 			if err := v.toC(&cIoports[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Ioports: %v", err)
 			}
 		}
 	}
@@ -1176,12 +1176,12 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		cIomem := (*[1 << 28]C.libxl_iomem_range)(unsafe.Pointer(xc.iomem))[:numIomem:numIomem]
 		for i, v := range x.Iomem {
 			if err := v.toC(&cIomem[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Iomem: %v", err)
 			}
 		}
 	}
 	if err := x.ClaimMode.toC(&xc.claim_mode); err != nil {
-		return err
+		return fmt.Errorf("converting field ClaimMode: %v", err)
 	}
 	xc.event_channels = C.uint32_t(x.EventChannels)
 	if x.Kernel != "" {
@@ -1197,23 +1197,23 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		xc.device_tree = C.CString(x.DeviceTree)
 	}
 	if err := x.Acpi.toC(&xc.acpi); err != nil {
-		return err
+		return fmt.Errorf("converting field Acpi: %v", err)
 	}
 	if x.Bootloader != "" {
 		xc.bootloader = C.CString(x.Bootloader)
 	}
 	if err := x.BootloaderArgs.toC(&xc.bootloader_args); err != nil {
-		return err
+		return fmt.Errorf("converting field BootloaderArgs: %v", err)
 	}
 	xc.timer_mode = C.libxl_timer_mode(x.TimerMode)
 	if err := x.NestedHvm.toC(&xc.nested_hvm); err != nil {
-		return err
+		return fmt.Errorf("converting field NestedHvm: %v", err)
 	}
 	if err := x.Apic.toC(&xc.apic); err != nil {
-		return err
+		return fmt.Errorf("converting field Apic: %v", err)
 	}
 	if err := x.DmRestrict.toC(&xc.dm_restrict); err != nil {
-		return err
+		return fmt.Errorf("converting field DmRestrict: %v", err)
 	}
 	xc.tee = C.libxl_tee_type(x.Tee)
 	xc._type = C.libxl_domain_type(x.Type)
@@ -1229,51 +1229,51 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		}
 		hvm.bios = C.libxl_bios_type(tmp.Bios)
 		if err := tmp.Pae.toC(&hvm.pae); err != nil {
-			return err
+			return fmt.Errorf("converting field Pae: %v", err)
 		}
 		if err := tmp.Apic.toC(&hvm.apic); err != nil {
-			return err
+			return fmt.Errorf("converting field Apic: %v", err)
 		}
 		if err := tmp.Acpi.toC(&hvm.acpi); err != nil {
-			return err
+			return fmt.Errorf("converting field Acpi: %v", err)
 		}
 		if err := tmp.AcpiS3.toC(&hvm.acpi_s3); err != nil {
-			return err
+			return fmt.Errorf("converting field AcpiS3: %v", err)
 		}
 		if err := tmp.AcpiS4.toC(&hvm.acpi_s4); err != nil {
-			return err
+			return fmt.Errorf("converting field AcpiS4: %v", err)
 		}
 		if err := tmp.AcpiLaptopSlate.toC(&hvm.acpi_laptop_slate); err != nil {
-			return err
+			return fmt.Errorf("converting field AcpiLaptopSlate: %v", err)
 		}
 		if err := tmp.Nx.toC(&hvm.nx); err != nil {
-			return err
+			return fmt.Errorf("converting field Nx: %v", err)
 		}
 		if err := tmp.Viridian.toC(&hvm.viridian); err != nil {
-			return err
+			return fmt.Errorf("converting field Viridian: %v", err)
 		}
 		if err := tmp.ViridianEnable.toC(&hvm.viridian_enable); err != nil {
-			return err
+			return fmt.Errorf("converting field ViridianEnable: %v", err)
 		}
 		if err := tmp.ViridianDisable.toC(&hvm.viridian_disable); err != nil {
-			return err
+			return fmt.Errorf("converting field ViridianDisable: %v", err)
 		}
 		if tmp.Timeoffset != "" {
 			hvm.timeoffset = C.CString(tmp.Timeoffset)
 		}
 		if err := tmp.Hpet.toC(&hvm.hpet); err != nil {
-			return err
+			return fmt.Errorf("converting field Hpet: %v", err)
 		}
 		if err := tmp.VptAlign.toC(&hvm.vpt_align); err != nil {
-			return err
+			return fmt.Errorf("converting field VptAlign: %v", err)
 		}
 		hvm.mmio_hole_memkb = C.uint64_t(tmp.MmioHoleMemkb)
 		hvm.timer_mode = C.libxl_timer_mode(tmp.TimerMode)
 		if err := tmp.NestedHvm.toC(&hvm.nested_hvm); err != nil {
-			return err
+			return fmt.Errorf("converting field NestedHvm: %v", err)
 		}
 		if err := tmp.Altp2M.toC(&hvm.altp2m); err != nil {
-			return err
+			return fmt.Errorf("converting field Altp2M: %v", err)
 		}
 		if tmp.SystemFirmware != "" {
 			hvm.system_firmware = C.CString(tmp.SystemFirmware)
@@ -1286,25 +1286,25 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		}
 		hvm.hdtype = C.libxl_hdtype(tmp.Hdtype)
 		if err := tmp.Nographic.toC(&hvm.nographic); err != nil {
-			return err
+			return fmt.Errorf("converting field Nographic: %v", err)
 		}
 		if err := tmp.Vga.toC(&hvm.vga); err != nil {
-			return err
+			return fmt.Errorf("converting field Vga: %v", err)
 		}
 		if err := tmp.Vnc.toC(&hvm.vnc); err != nil {
-			return err
+			return fmt.Errorf("converting field Vnc: %v", err)
 		}
 		if tmp.Keymap != "" {
 			hvm.keymap = C.CString(tmp.Keymap)
 		}
 		if err := tmp.Sdl.toC(&hvm.sdl); err != nil {
-			return err
+			return fmt.Errorf("converting field Sdl: %v", err)
 		}
 		if err := tmp.Spice.toC(&hvm.spice); err != nil {
-			return err
+			return fmt.Errorf("converting field Spice: %v", err)
 		}
 		if err := tmp.GfxPassthru.toC(&hvm.gfx_passthru); err != nil {
-			return err
+			return fmt.Errorf("converting field GfxPassthru: %v", err)
 		}
 		hvm.gfx_passthru_kind = C.libxl_gfx_passthru_kind(tmp.GfxPassthruKind)
 		if tmp.Serial != "" {
@@ -1314,33 +1314,33 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 			hvm.boot = C.CString(tmp.Boot)
 		}
 		if err := tmp.Usb.toC(&hvm.usb); err != nil {
-			return err
+			return fmt.Errorf("converting field Usb: %v", err)
 		}
 		hvm.usbversion = C.int(tmp.Usbversion)
 		if tmp.Usbdevice != "" {
 			hvm.usbdevice = C.CString(tmp.Usbdevice)
 		}
 		if err := tmp.VkbDevice.toC(&hvm.vkb_device); err != nil {
-			return err
+			return fmt.Errorf("converting field VkbDevice: %v", err)
 		}
 		if tmp.Soundhw != "" {
 			hvm.soundhw = C.CString(tmp.Soundhw)
 		}
 		if err := tmp.XenPlatformPci.toC(&hvm.xen_platform_pci); err != nil {
-			return err
+			return fmt.Errorf("converting field XenPlatformPci: %v", err)
 		}
 		if err := tmp.UsbdeviceList.toC(&hvm.usbdevice_list); err != nil {
-			return err
+			return fmt.Errorf("converting field UsbdeviceList: %v", err)
 		}
 		hvm.vendor_device = C.libxl_vendor_device(tmp.VendorDevice)
 		if err := tmp.MsVmGenid.toC(&hvm.ms_vm_genid); err != nil {
-			return err
+			return fmt.Errorf("converting field MsVmGenid: %v", err)
 		}
 		if err := tmp.SerialList.toC(&hvm.serial_list); err != nil {
-			return err
+			return fmt.Errorf("converting field SerialList: %v", err)
 		}
 		if err := tmp.Rdm.toC(&hvm.rdm); err != nil {
-			return err
+			return fmt.Errorf("converting field Rdm: %v", err)
 		}
 		hvm.rdm_mem_boundary_memkb = C.uint64_t(tmp.RdmMemBoundaryMemkb)
 		hvm.mca_caps = C.uint64_t(tmp.McaCaps)
@@ -1360,7 +1360,7 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 			pv.bootloader = C.CString(tmp.Bootloader)
 		}
 		if err := tmp.BootloaderArgs.toC(&pv.bootloader_args); err != nil {
-			return err
+			return fmt.Errorf("converting field BootloaderArgs: %v", err)
 		}
 		if tmp.Cmdline != "" {
 			pv.cmdline = C.CString(tmp.Cmdline)
@@ -1372,7 +1372,7 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 			pv.features = C.CString(tmp.Features)
 		}
 		if err := tmp.E820Host.toC(&pv.e820_host); err != nil {
-			return err
+			return fmt.Errorf("converting field E820Host: %v", err)
 		}
 		pvBytes := C.GoBytes(unsafe.Pointer(&pv), C.sizeof_libxl_domain_build_info_type_union_pv)
 		copy(xc.u[:], pvBytes)
@@ -1383,7 +1383,7 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		}
 		var pvh C.libxl_domain_build_info_type_union_pvh
 		if err := tmp.Pvshim.toC(&pvh.pvshim); err != nil {
-			return err
+			return fmt.Errorf("converting field Pvshim: %v", err)
 		}
 		if tmp.PvshimPath != "" {
 			pvh.pvshim_path = C.CString(tmp.PvshimPath)
@@ -1411,10 +1411,10 @@ func (x *DeviceVfb) fromC(xc *C.libxl_device_vfb) error {
 	x.BackendDomname = C.GoString(xc.backend_domname)
 	x.Devid = Devid(xc.devid)
 	if err := x.Vnc.fromC(&xc.vnc); err != nil {
-		return err
+		return fmt.Errorf("converting field Vnc: %v", err)
 	}
 	if err := x.Sdl.fromC(&xc.sdl); err != nil {
-		return err
+		return fmt.Errorf("converting field Sdl: %v", err)
 	}
 	x.Keymap = C.GoString(xc.keymap)
 
@@ -1434,10 +1434,10 @@ func (x *DeviceVfb) toC(xc *C.libxl_device_vfb) (err error) {
 	}
 	xc.devid = C.libxl_devid(x.Devid)
 	if err := x.Vnc.toC(&xc.vnc); err != nil {
-		return err
+		return fmt.Errorf("converting field Vnc: %v", err)
 	}
 	if err := x.Sdl.toC(&xc.sdl); err != nil {
-		return err
+		return fmt.Errorf("converting field Sdl: %v", err)
 	}
 	if x.Keymap != "" {
 		xc.keymap = C.CString(x.Keymap)
@@ -1509,13 +1509,13 @@ func (x *DeviceDisk) fromC(xc *C.libxl_device_disk) error {
 	x.IsCdrom = int(xc.is_cdrom)
 	x.DirectIoSafe = bool(xc.direct_io_safe)
 	if err := x.DiscardEnable.fromC(&xc.discard_enable); err != nil {
-		return err
+		return fmt.Errorf("converting field DiscardEnable: %v", err)
 	}
 	if err := x.ColoEnable.fromC(&xc.colo_enable); err != nil {
-		return err
+		return fmt.Errorf("converting field ColoEnable: %v", err)
 	}
 	if err := x.ColoRestoreEnable.fromC(&xc.colo_restore_enable); err != nil {
-		return err
+		return fmt.Errorf("converting field ColoRestoreEnable: %v", err)
 	}
 	x.ColoHost = C.GoString(xc.colo_host)
 	x.ColoPort = int(xc.colo_port)
@@ -1553,13 +1553,13 @@ func (x *DeviceDisk) toC(xc *C.libxl_device_disk) (err error) {
 	xc.is_cdrom = C.int(x.IsCdrom)
 	xc.direct_io_safe = C.bool(x.DirectIoSafe)
 	if err := x.DiscardEnable.toC(&xc.discard_enable); err != nil {
-		return err
+		return fmt.Errorf("converting field DiscardEnable: %v", err)
 	}
 	if err := x.ColoEnable.toC(&xc.colo_enable); err != nil {
-		return err
+		return fmt.Errorf("converting field ColoEnable: %v", err)
 	}
 	if err := x.ColoRestoreEnable.toC(&xc.colo_restore_enable); err != nil {
-		return err
+		return fmt.Errorf("converting field ColoRestoreEnable: %v", err)
 	}
 	if x.ColoHost != "" {
 		xc.colo_host = C.CString(x.ColoHost)
@@ -1585,7 +1585,7 @@ func (x *DeviceNic) fromC(xc *C.libxl_device_nic) error {
 	x.Mtu = int(xc.mtu)
 	x.Model = C.GoString(xc.model)
 	if err := x.Mac.fromC(&xc.mac); err != nil {
-		return err
+		return fmt.Errorf("converting field Mac: %v", err)
 	}
 	x.Ip = C.GoString(xc.ip)
 	x.Bridge = C.GoString(xc.bridge)
@@ -1665,7 +1665,7 @@ func (x *DeviceNic) toC(xc *C.libxl_device_nic) (err error) {
 		xc.model = C.CString(x.Model)
 	}
 	if err := x.Mac.toC(&xc.mac); err != nil {
-		return err
+		return fmt.Errorf("converting field Mac: %v", err)
 	}
 	if x.Ip != "" {
 		xc.ip = C.CString(x.Ip)
@@ -1934,7 +1934,7 @@ func (x *DeviceUsbdev) fromC(xc *C.libxl_device_usbdev) error {
 	case UsbdevTypeHostdev:
 		var typeHostdev DeviceUsbdevTypeUnionHostdev
 		if err := typeHostdev.fromC(xc); err != nil {
-			return err
+			return fmt.Errorf("converting field typeHostdev: %v", err)
 		}
 		x.TypeUnion = typeHostdev
 	default:
@@ -2008,7 +2008,7 @@ func (x *DeviceVtpm) fromC(xc *C.libxl_device_vtpm) error {
 	x.BackendDomname = C.GoString(xc.backend_domname)
 	x.Devid = Devid(xc.devid)
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 
 	return nil
@@ -2027,7 +2027,7 @@ func (x *DeviceVtpm) toC(xc *C.libxl_device_vtpm) (err error) {
 	}
 	xc.devid = C.libxl_devid(x.Devid)
 	if err := x.Uuid.toC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 
 	return nil
@@ -2103,7 +2103,7 @@ func (x *DeviceChannel) fromC(xc *C.libxl_device_channel) error {
 	case ChannelConnectionSocket:
 		var connectionSocket DeviceChannelConnectionUnionSocket
 		if err := connectionSocket.fromC(xc); err != nil {
-			return err
+			return fmt.Errorf("converting field connectionSocket: %v", err)
 		}
 		x.ConnectionUnion = connectionSocket
 	default:
@@ -2192,7 +2192,7 @@ func (x *DeviceVdispl) fromC(xc *C.libxl_device_vdispl) error {
 	x.Connectors = make([]ConnectorParam, numConnectors)
 	for i, v := range cConnectors {
 		if err := x.Connectors[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Connectors: %v", err)
 		}
 	}
 
@@ -2218,7 +2218,7 @@ func (x *DeviceVdispl) toC(xc *C.libxl_device_vdispl) (err error) {
 		cConnectors := (*[1 << 28]C.libxl_connector_param)(unsafe.Pointer(xc.connectors))[:numConnectors:numConnectors]
 		for i, v := range x.Connectors {
 			if err := v.toC(&cConnectors[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Connectors: %v", err)
 			}
 		}
 	}
@@ -2280,7 +2280,7 @@ func (x *VsndStream) fromC(xc *C.libxl_vsnd_stream) error {
 	x.UniqueId = C.GoString(xc.unique_id)
 	x.Type = VsndStreamType(xc._type)
 	if err := x.Params.fromC(&xc.params); err != nil {
-		return err
+		return fmt.Errorf("converting field Params: %v", err)
 	}
 
 	return nil
@@ -2298,7 +2298,7 @@ func (x *VsndStream) toC(xc *C.libxl_vsnd_stream) (err error) {
 	}
 	xc._type = C.libxl_vsnd_stream_type(x.Type)
 	if err := x.Params.toC(&xc.params); err != nil {
-		return err
+		return fmt.Errorf("converting field Params: %v", err)
 	}
 
 	return nil
@@ -2307,14 +2307,14 @@ func (x *VsndStream) toC(xc *C.libxl_vsnd_stream) (err error) {
 func (x *VsndPcm) fromC(xc *C.libxl_vsnd_pcm) error {
 	x.Name = C.GoString(xc.name)
 	if err := x.Params.fromC(&xc.params); err != nil {
-		return err
+		return fmt.Errorf("converting field Params: %v", err)
 	}
 	numVsndStreams := int(xc.num_vsnd_streams)
 	cStreams := (*[1 << 28]C.libxl_vsnd_stream)(unsafe.Pointer(xc.streams))[:numVsndStreams:numVsndStreams]
 	x.Streams = make([]VsndStream, numVsndStreams)
 	for i, v := range cStreams {
 		if err := x.Streams[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Streams: %v", err)
 		}
 	}
 
@@ -2332,7 +2332,7 @@ func (x *VsndPcm) toC(xc *C.libxl_vsnd_pcm) (err error) {
 		xc.name = C.CString(x.Name)
 	}
 	if err := x.Params.toC(&xc.params); err != nil {
-		return err
+		return fmt.Errorf("converting field Params: %v", err)
 	}
 	if numVsndStreams := len(x.Streams); numVsndStreams > 0 {
 		xc.streams = (*C.libxl_vsnd_stream)(C.malloc(C.ulong(numVsndStreams) * C.sizeof_libxl_vsnd_stream))
@@ -2340,7 +2340,7 @@ func (x *VsndPcm) toC(xc *C.libxl_vsnd_pcm) (err error) {
 		cStreams := (*[1 << 28]C.libxl_vsnd_stream)(unsafe.Pointer(xc.streams))[:numVsndStreams:numVsndStreams]
 		for i, v := range x.Streams {
 			if err := v.toC(&cStreams[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Streams: %v", err)
 			}
 		}
 	}
@@ -2355,14 +2355,14 @@ func (x *DeviceVsnd) fromC(xc *C.libxl_device_vsnd) error {
 	x.ShortName = C.GoString(xc.short_name)
 	x.LongName = C.GoString(xc.long_name)
 	if err := x.Params.fromC(&xc.params); err != nil {
-		return err
+		return fmt.Errorf("converting field Params: %v", err)
 	}
 	numVsndPcms := int(xc.num_vsnd_pcms)
 	cPcms := (*[1 << 28]C.libxl_vsnd_pcm)(unsafe.Pointer(xc.pcms))[:numVsndPcms:numVsndPcms]
 	x.Pcms = make([]VsndPcm, numVsndPcms)
 	for i, v := range cPcms {
 		if err := x.Pcms[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Pcms: %v", err)
 		}
 	}
 
@@ -2388,7 +2388,7 @@ func (x *DeviceVsnd) toC(xc *C.libxl_device_vsnd) (err error) {
 		xc.long_name = C.CString(x.LongName)
 	}
 	if err := x.Params.toC(&xc.params); err != nil {
-		return err
+		return fmt.Errorf("converting field Params: %v", err)
 	}
 	if numVsndPcms := len(x.Pcms); numVsndPcms > 0 {
 		xc.pcms = (*C.libxl_vsnd_pcm)(C.malloc(C.ulong(numVsndPcms) * C.sizeof_libxl_vsnd_pcm))
@@ -2396,7 +2396,7 @@ func (x *DeviceVsnd) toC(xc *C.libxl_device_vsnd) (err error) {
 		cPcms := (*[1 << 28]C.libxl_vsnd_pcm)(unsafe.Pointer(xc.pcms))[:numVsndPcms:numVsndPcms]
 		for i, v := range x.Pcms {
 			if err := v.toC(&cPcms[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Pcms: %v", err)
 			}
 		}
 	}
@@ -2406,17 +2406,17 @@ func (x *DeviceVsnd) toC(xc *C.libxl_device_vsnd) (err error) {
 
 func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	if err := x.CInfo.fromC(&xc.c_info); err != nil {
-		return err
+		return fmt.Errorf("converting field CInfo: %v", err)
 	}
 	if err := x.BInfo.fromC(&xc.b_info); err != nil {
-		return err
+		return fmt.Errorf("converting field BInfo: %v", err)
 	}
 	numDisks := int(xc.num_disks)
 	cDisks := (*[1 << 28]C.libxl_device_disk)(unsafe.Pointer(xc.disks))[:numDisks:numDisks]
 	x.Disks = make([]DeviceDisk, numDisks)
 	for i, v := range cDisks {
 		if err := x.Disks[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Disks: %v", err)
 		}
 	}
 	numNics := int(xc.num_nics)
@@ -2424,7 +2424,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Nics = make([]DeviceNic, numNics)
 	for i, v := range cNics {
 		if err := x.Nics[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Nics: %v", err)
 		}
 	}
 	numPcidevs := int(xc.num_pcidevs)
@@ -2432,7 +2432,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Pcidevs = make([]DevicePci, numPcidevs)
 	for i, v := range cPcidevs {
 		if err := x.Pcidevs[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Pcidevs: %v", err)
 		}
 	}
 	numRdms := int(xc.num_rdms)
@@ -2440,7 +2440,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Rdms = make([]DeviceRdm, numRdms)
 	for i, v := range cRdms {
 		if err := x.Rdms[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Rdms: %v", err)
 		}
 	}
 	numDtdevs := int(xc.num_dtdevs)
@@ -2448,7 +2448,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Dtdevs = make([]DeviceDtdev, numDtdevs)
 	for i, v := range cDtdevs {
 		if err := x.Dtdevs[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Dtdevs: %v", err)
 		}
 	}
 	numVfbs := int(xc.num_vfbs)
@@ -2456,7 +2456,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Vfbs = make([]DeviceVfb, numVfbs)
 	for i, v := range cVfbs {
 		if err := x.Vfbs[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Vfbs: %v", err)
 		}
 	}
 	numVkbs := int(xc.num_vkbs)
@@ -2464,7 +2464,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Vkbs = make([]DeviceVkb, numVkbs)
 	for i, v := range cVkbs {
 		if err := x.Vkbs[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Vkbs: %v", err)
 		}
 	}
 	numVtpms := int(xc.num_vtpms)
@@ -2472,7 +2472,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Vtpms = make([]DeviceVtpm, numVtpms)
 	for i, v := range cVtpms {
 		if err := x.Vtpms[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Vtpms: %v", err)
 		}
 	}
 	numP9S := int(xc.num_p9s)
@@ -2480,7 +2480,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.P9S = make([]DeviceP9, numP9S)
 	for i, v := range cP9S {
 		if err := x.P9S[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field P9S: %v", err)
 		}
 	}
 	numPvcallsifs := int(xc.num_pvcallsifs)
@@ -2488,7 +2488,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Pvcallsifs = make([]DevicePvcallsif, numPvcallsifs)
 	for i, v := range cPvcallsifs {
 		if err := x.Pvcallsifs[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Pvcallsifs: %v", err)
 		}
 	}
 	numVdispls := int(xc.num_vdispls)
@@ -2496,7 +2496,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Vdispls = make([]DeviceVdispl, numVdispls)
 	for i, v := range cVdispls {
 		if err := x.Vdispls[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Vdispls: %v", err)
 		}
 	}
 	numVsnds := int(xc.num_vsnds)
@@ -2504,7 +2504,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Vsnds = make([]DeviceVsnd, numVsnds)
 	for i, v := range cVsnds {
 		if err := x.Vsnds[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Vsnds: %v", err)
 		}
 	}
 	numChannels := int(xc.num_channels)
@@ -2512,7 +2512,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Channels = make([]DeviceChannel, numChannels)
 	for i, v := range cChannels {
 		if err := x.Channels[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Channels: %v", err)
 		}
 	}
 	numUsbctrls := int(xc.num_usbctrls)
@@ -2520,7 +2520,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Usbctrls = make([]DeviceUsbctrl, numUsbctrls)
 	for i, v := range cUsbctrls {
 		if err := x.Usbctrls[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Usbctrls: %v", err)
 		}
 	}
 	numUsbdevs := int(xc.num_usbdevs)
@@ -2528,7 +2528,7 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	x.Usbdevs = make([]DeviceUsbdev, numUsbdevs)
 	for i, v := range cUsbdevs {
 		if err := x.Usbdevs[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Usbdevs: %v", err)
 		}
 	}
 	x.OnPoweroff = ActionOnShutdown(xc.on_poweroff)
@@ -2548,10 +2548,10 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 	}()
 
 	if err := x.CInfo.toC(&xc.c_info); err != nil {
-		return err
+		return fmt.Errorf("converting field CInfo: %v", err)
 	}
 	if err := x.BInfo.toC(&xc.b_info); err != nil {
-		return err
+		return fmt.Errorf("converting field BInfo: %v", err)
 	}
 	if numDisks := len(x.Disks); numDisks > 0 {
 		xc.disks = (*C.libxl_device_disk)(C.malloc(C.ulong(numDisks) * C.sizeof_libxl_device_disk))
@@ -2559,7 +2559,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cDisks := (*[1 << 28]C.libxl_device_disk)(unsafe.Pointer(xc.disks))[:numDisks:numDisks]
 		for i, v := range x.Disks {
 			if err := v.toC(&cDisks[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Disks: %v", err)
 			}
 		}
 	}
@@ -2569,7 +2569,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cNics := (*[1 << 28]C.libxl_device_nic)(unsafe.Pointer(xc.nics))[:numNics:numNics]
 		for i, v := range x.Nics {
 			if err := v.toC(&cNics[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Nics: %v", err)
 			}
 		}
 	}
@@ -2579,7 +2579,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cPcidevs := (*[1 << 28]C.libxl_device_pci)(unsafe.Pointer(xc.pcidevs))[:numPcidevs:numPcidevs]
 		for i, v := range x.Pcidevs {
 			if err := v.toC(&cPcidevs[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Pcidevs: %v", err)
 			}
 		}
 	}
@@ -2589,7 +2589,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cRdms := (*[1 << 28]C.libxl_device_rdm)(unsafe.Pointer(xc.rdms))[:numRdms:numRdms]
 		for i, v := range x.Rdms {
 			if err := v.toC(&cRdms[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Rdms: %v", err)
 			}
 		}
 	}
@@ -2599,7 +2599,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cDtdevs := (*[1 << 28]C.libxl_device_dtdev)(unsafe.Pointer(xc.dtdevs))[:numDtdevs:numDtdevs]
 		for i, v := range x.Dtdevs {
 			if err := v.toC(&cDtdevs[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Dtdevs: %v", err)
 			}
 		}
 	}
@@ -2609,7 +2609,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cVfbs := (*[1 << 28]C.libxl_device_vfb)(unsafe.Pointer(xc.vfbs))[:numVfbs:numVfbs]
 		for i, v := range x.Vfbs {
 			if err := v.toC(&cVfbs[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Vfbs: %v", err)
 			}
 		}
 	}
@@ -2619,7 +2619,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cVkbs := (*[1 << 28]C.libxl_device_vkb)(unsafe.Pointer(xc.vkbs))[:numVkbs:numVkbs]
 		for i, v := range x.Vkbs {
 			if err := v.toC(&cVkbs[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Vkbs: %v", err)
 			}
 		}
 	}
@@ -2629,7 +2629,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cVtpms := (*[1 << 28]C.libxl_device_vtpm)(unsafe.Pointer(xc.vtpms))[:numVtpms:numVtpms]
 		for i, v := range x.Vtpms {
 			if err := v.toC(&cVtpms[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Vtpms: %v", err)
 			}
 		}
 	}
@@ -2639,7 +2639,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cP9S := (*[1 << 28]C.libxl_device_p9)(unsafe.Pointer(xc.p9s))[:numP9S:numP9S]
 		for i, v := range x.P9S {
 			if err := v.toC(&cP9S[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field P9S: %v", err)
 			}
 		}
 	}
@@ -2649,7 +2649,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cPvcallsifs := (*[1 << 28]C.libxl_device_pvcallsif)(unsafe.Pointer(xc.pvcallsifs))[:numPvcallsifs:numPvcallsifs]
 		for i, v := range x.Pvcallsifs {
 			if err := v.toC(&cPvcallsifs[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Pvcallsifs: %v", err)
 			}
 		}
 	}
@@ -2659,7 +2659,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cVdispls := (*[1 << 28]C.libxl_device_vdispl)(unsafe.Pointer(xc.vdispls))[:numVdispls:numVdispls]
 		for i, v := range x.Vdispls {
 			if err := v.toC(&cVdispls[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Vdispls: %v", err)
 			}
 		}
 	}
@@ -2669,7 +2669,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cVsnds := (*[1 << 28]C.libxl_device_vsnd)(unsafe.Pointer(xc.vsnds))[:numVsnds:numVsnds]
 		for i, v := range x.Vsnds {
 			if err := v.toC(&cVsnds[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Vsnds: %v", err)
 			}
 		}
 	}
@@ -2679,7 +2679,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cChannels := (*[1 << 28]C.libxl_device_channel)(unsafe.Pointer(xc.channels))[:numChannels:numChannels]
 		for i, v := range x.Channels {
 			if err := v.toC(&cChannels[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Channels: %v", err)
 			}
 		}
 	}
@@ -2689,7 +2689,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cUsbctrls := (*[1 << 28]C.libxl_device_usbctrl)(unsafe.Pointer(xc.usbctrls))[:numUsbctrls:numUsbctrls]
 		for i, v := range x.Usbctrls {
 			if err := v.toC(&cUsbctrls[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Usbctrls: %v", err)
 			}
 		}
 	}
@@ -2699,7 +2699,7 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 		cUsbdevs := (*[1 << 28]C.libxl_device_usbdev)(unsafe.Pointer(xc.usbdevs))[:numUsbdevs:numUsbdevs]
 		for i, v := range x.Usbdevs {
 			if err := v.toC(&cUsbdevs[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Usbdevs: %v", err)
 			}
 		}
 	}
@@ -2796,7 +2796,7 @@ func (x *Vtpminfo) fromC(xc *C.libxl_vtpminfo) error {
 	x.Evtch = int(xc.evtch)
 	x.Rref = int(xc.rref)
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 
 	return nil
@@ -2822,7 +2822,7 @@ func (x *Vtpminfo) toC(xc *C.libxl_vtpminfo) (err error) {
 	xc.evtch = C.int(x.Evtch)
 	xc.rref = C.int(x.Rref)
 	if err := x.Uuid.toC(&xc.uuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Uuid: %v", err)
 	}
 
 	return nil
@@ -2880,10 +2880,10 @@ func (x *Vcpuinfo) fromC(xc *C.libxl_vcpuinfo) error {
 	x.Running = bool(xc.running)
 	x.VcpuTime = uint64(xc.vcpu_time)
 	if err := x.Cpumap.fromC(&xc.cpumap); err != nil {
-		return err
+		return fmt.Errorf("converting field Cpumap: %v", err)
 	}
 	if err := x.CpumapSoft.fromC(&xc.cpumap_soft); err != nil {
-		return err
+		return fmt.Errorf("converting field CpumapSoft: %v", err)
 	}
 
 	return nil
@@ -2903,10 +2903,10 @@ func (x *Vcpuinfo) toC(xc *C.libxl_vcpuinfo) (err error) {
 	xc.running = C.bool(x.Running)
 	xc.vcpu_time = C.uint64_t(x.VcpuTime)
 	if err := x.Cpumap.toC(&xc.cpumap); err != nil {
-		return err
+		return fmt.Errorf("converting field Cpumap: %v", err)
 	}
 	if err := x.CpumapSoft.toC(&xc.cpumap_soft); err != nil {
-		return err
+		return fmt.Errorf("converting field CpumapSoft: %v", err)
 	}
 
 	return nil
@@ -2927,7 +2927,7 @@ func (x *Physinfo) fromC(xc *C.libxl_physinfo) error {
 	x.MaxPossibleMfn = uint64(xc.max_possible_mfn)
 	x.NrNodes = uint32(xc.nr_nodes)
 	if err := x.HwCap.fromC(&xc.hw_cap); err != nil {
-		return err
+		return fmt.Errorf("converting field HwCap: %v", err)
 	}
 	x.CapHvm = bool(xc.cap_hvm)
 	x.CapPv = bool(xc.cap_pv)
@@ -2960,7 +2960,7 @@ func (x *Physinfo) toC(xc *C.libxl_physinfo) (err error) {
 	xc.max_possible_mfn = C.uint64_t(x.MaxPossibleMfn)
 	xc.nr_nodes = C.uint32_t(x.NrNodes)
 	if err := x.HwCap.toC(&xc.hw_cap); err != nil {
-		return err
+		return fmt.Errorf("converting field HwCap: %v", err)
 	}
 	xc.cap_hvm = C.bool(x.CapHvm)
 	xc.cap_pv = C.bool(x.CapPv)
@@ -3017,7 +3017,7 @@ func (x *Vdisplinfo) fromC(xc *C.libxl_vdisplinfo) error {
 	x.Connectors = make([]Connectorinfo, numConnectors)
 	for i, v := range cConnectors {
 		if err := x.Connectors[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Connectors: %v", err)
 		}
 	}
 
@@ -3048,7 +3048,7 @@ func (x *Vdisplinfo) toC(xc *C.libxl_vdisplinfo) (err error) {
 		cConnectors := (*[1 << 28]C.libxl_connectorinfo)(unsafe.Pointer(xc.connectors))[:numConnectors:numConnectors]
 		for i, v := range x.Connectors {
 			if err := v.toC(&cConnectors[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Connectors: %v", err)
 			}
 		}
 	}
@@ -3082,7 +3082,7 @@ func (x *Pcminfo) fromC(xc *C.libxl_pcminfo) error {
 	x.Streams = make([]Streaminfo, numVsndStreams)
 	for i, v := range cStreams {
 		if err := x.Streams[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Streams: %v", err)
 		}
 	}
 
@@ -3102,7 +3102,7 @@ func (x *Pcminfo) toC(xc *C.libxl_pcminfo) (err error) {
 		cStreams := (*[1 << 28]C.libxl_streaminfo)(unsafe.Pointer(xc.streams))[:numVsndStreams:numVsndStreams]
 		for i, v := range x.Streams {
 			if err := v.toC(&cStreams[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Streams: %v", err)
 			}
 		}
 	}
@@ -3122,7 +3122,7 @@ func (x *Vsndinfo) fromC(xc *C.libxl_vsndinfo) error {
 	x.Pcms = make([]Pcminfo, numVsndPcms)
 	for i, v := range cPcms {
 		if err := x.Pcms[i].fromC(&v); err != nil {
-			return err
+			return fmt.Errorf("converting field Pcms: %v", err)
 		}
 	}
 
@@ -3152,7 +3152,7 @@ func (x *Vsndinfo) toC(xc *C.libxl_vsndinfo) (err error) {
 		cPcms := (*[1 << 28]C.libxl_pcminfo)(unsafe.Pointer(xc.pcms))[:numVsndPcms:numVsndPcms]
 		for i, v := range x.Pcms {
 			if err := v.toC(&cPcms[i]); err != nil {
-				return err
+				return fmt.Errorf("converting field Pcms: %v", err)
 			}
 		}
 	}
@@ -3307,26 +3307,26 @@ func (x *SchedCredit2Params) toC(xc *C.libxl_sched_credit2_params) (err error) {
 func (x *DomainRemusInfo) fromC(xc *C.libxl_domain_remus_info) error {
 	x.Interval = int(xc.interval)
 	if err := x.AllowUnsafe.fromC(&xc.allow_unsafe); err != nil {
-		return err
+		return fmt.Errorf("converting field AllowUnsafe: %v", err)
 	}
 	if err := x.Blackhole.fromC(&xc.blackhole); err != nil {
-		return err
+		return fmt.Errorf("converting field Blackhole: %v", err)
 	}
 	if err := x.Compression.fromC(&xc.compression); err != nil {
-		return err
+		return fmt.Errorf("converting field Compression: %v", err)
 	}
 	if err := x.Netbuf.fromC(&xc.netbuf); err != nil {
-		return err
+		return fmt.Errorf("converting field Netbuf: %v", err)
 	}
 	x.Netbufscript = C.GoString(xc.netbufscript)
 	if err := x.Diskbuf.fromC(&xc.diskbuf); err != nil {
-		return err
+		return fmt.Errorf("converting field Diskbuf: %v", err)
 	}
 	if err := x.Colo.fromC(&xc.colo); err != nil {
-		return err
+		return fmt.Errorf("converting field Colo: %v", err)
 	}
 	if err := x.UserspaceColoProxy.fromC(&xc.userspace_colo_proxy); err != nil {
-		return err
+		return fmt.Errorf("converting field UserspaceColoProxy: %v", err)
 	}
 
 	return nil
@@ -3341,28 +3341,28 @@ func (x *DomainRemusInfo) toC(xc *C.libxl_domain_remus_info) (err error) {
 
 	xc.interval = C.int(x.Interval)
 	if err := x.AllowUnsafe.toC(&xc.allow_unsafe); err != nil {
-		return err
+		return fmt.Errorf("converting field AllowUnsafe: %v", err)
 	}
 	if err := x.Blackhole.toC(&xc.blackhole); err != nil {
-		return err
+		return fmt.Errorf("converting field Blackhole: %v", err)
 	}
 	if err := x.Compression.toC(&xc.compression); err != nil {
-		return err
+		return fmt.Errorf("converting field Compression: %v", err)
 	}
 	if err := x.Netbuf.toC(&xc.netbuf); err != nil {
-		return err
+		return fmt.Errorf("converting field Netbuf: %v", err)
 	}
 	if x.Netbufscript != "" {
 		xc.netbufscript = C.CString(x.Netbufscript)
 	}
 	if err := x.Diskbuf.toC(&xc.diskbuf); err != nil {
-		return err
+		return fmt.Errorf("converting field Diskbuf: %v", err)
 	}
 	if err := x.Colo.toC(&xc.colo); err != nil {
-		return err
+		return fmt.Errorf("converting field Colo: %v", err)
 	}
 	if err := x.UserspaceColoProxy.toC(&xc.userspace_colo_proxy); err != nil {
-		return err
+		return fmt.Errorf("converting field UserspaceColoProxy: %v", err)
 	}
 
 	return nil
@@ -3370,33 +3370,33 @@ func (x *DomainRemusInfo) toC(xc *C.libxl_domain_remus_info) (err error) {
 
 func (x *Event) fromC(xc *C.libxl_event) error {
 	if err := x.Link.fromC(&xc.link); err != nil {
-		return err
+		return fmt.Errorf("converting field Link: %v", err)
 	}
 	x.Domid = Domid(xc.domid)
 	if err := x.Domuuid.fromC(&xc.domuuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Domuuid: %v", err)
 	}
 	x.ForUser = uint64(xc.for_user)
 	x.Type = EventType(xc._type)
 	switch x.Type {
-	case EventTypeOperationComplete:
-		var typeOperationComplete EventTypeUnionOperationComplete
-		if err := typeOperationComplete.fromC(xc); err != nil {
-			return err
-		}
-		x.TypeUnion = typeOperationComplete
 	case EventTypeDomainShutdown:
 		var typeDomainShutdown EventTypeUnionDomainShutdown
 		if err := typeDomainShutdown.fromC(xc); err != nil {
-			return err
+			return fmt.Errorf("converting field typeDomainShutdown: %v", err)
 		}
 		x.TypeUnion = typeDomainShutdown
 	case EventTypeDiskEject:
 		var typeDiskEject EventTypeUnionDiskEject
 		if err := typeDiskEject.fromC(xc); err != nil {
-			return err
+			return fmt.Errorf("converting field typeDiskEject: %v", err)
 		}
 		x.TypeUnion = typeDiskEject
+	case EventTypeOperationComplete:
+		var typeOperationComplete EventTypeUnionOperationComplete
+		if err := typeOperationComplete.fromC(xc); err != nil {
+			return fmt.Errorf("converting field typeOperationComplete: %v", err)
+		}
+		x.TypeUnion = typeOperationComplete
 	default:
 		return fmt.Errorf("invalid union key '%v'", x.Type)
 	}
@@ -3422,7 +3422,7 @@ func (x *EventTypeUnionDiskEject) fromC(xc *C.libxl_event) error {
 	tmp := (*C.libxl_event_type_union_disk_eject)(unsafe.Pointer(&xc.u[0]))
 	x.Vdev = C.GoString(tmp.vdev)
 	if err := x.Disk.fromC(&tmp.disk); err != nil {
-		return err
+		return fmt.Errorf("converting field Disk: %v", err)
 	}
 	return nil
 }
@@ -3445,11 +3445,11 @@ func (x *Event) toC(xc *C.libxl_event) (err error) {
 	}()
 
 	if err := x.Link.toC(&xc.link); err != nil {
-		return err
+		return fmt.Errorf("converting field Link: %v", err)
 	}
 	xc.domid = C.libxl_domid(x.Domid)
 	if err := x.Domuuid.toC(&xc.domuuid); err != nil {
-		return err
+		return fmt.Errorf("converting field Domuuid: %v", err)
 	}
 	xc.for_user = C.uint64_t(x.ForUser)
 	xc._type = C.libxl_event_type(x.Type)
@@ -3473,7 +3473,7 @@ func (x *Event) toC(xc *C.libxl_event) (err error) {
 			disk_eject.vdev = C.CString(tmp.Vdev)
 		}
 		if err := tmp.Disk.toC(&disk_eject.disk); err != nil {
-			return err
+			return fmt.Errorf("converting field Disk: %v", err)
 		}
 		disk_ejectBytes := C.GoBytes(unsafe.Pointer(&disk_eject), C.sizeof_libxl_event_type_union_disk_eject)
 		copy(xc.u[:], disk_ejectBytes)
@@ -3521,18 +3521,18 @@ func (x *PsrHwInfo) fromC(xc *C.libxl_psr_hw_info) error {
 	x.Id = uint32(xc.id)
 	x.Type = PsrFeatType(xc._type)
 	switch x.Type {
-	case PsrFeatTypeMba:
-		var typeMba PsrHwInfoTypeUnionMba
-		if err := typeMba.fromC(xc); err != nil {
-			return err
-		}
-		x.TypeUnion = typeMba
 	case PsrFeatTypeCat:
 		var typeCat PsrHwInfoTypeUnionCat
 		if err := typeCat.fromC(xc); err != nil {
-			return err
+			return fmt.Errorf("converting field typeCat: %v", err)
 		}
 		x.TypeUnion = typeCat
+	case PsrFeatTypeMba:
+		var typeMba PsrHwInfoTypeUnionMba
+		if err := typeMba.fromC(xc); err != nil {
+			return fmt.Errorf("converting field typeMba: %v", err)
+		}
+		x.TypeUnion = typeMba
 	default:
 		return fmt.Errorf("invalid union key '%v'", x.Type)
 	}

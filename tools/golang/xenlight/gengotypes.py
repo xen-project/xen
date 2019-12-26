@@ -314,7 +314,7 @@ def xenlight_golang_convert_from_C(ty = None, outer_name = None, cvarname = None
         # If the type is not castable, we need to call its fromC
         # function.
         s += 'if err := x.{}.fromC(&{}.{});'.format(goname,cvarname,cname)
-        s += 'err != nil {\n return err \n}\n'
+        s += 'err != nil {{\nreturn fmt.Errorf("converting field {}: %v", err) \n}}\n'.format(goname)
 
     elif gotypename == 'string':
         # Use the cgo helper for converting C strings.
@@ -389,7 +389,7 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
 
         s += 'var {} {}\n'.format(goname, gotype)
         s += 'if err := {}.fromC(xc);'.format(goname)
-        s += 'err != nil {\n return err \n}\n'
+        s += 'err != nil {{\n return fmt.Errorf("converting field {}: %v", err) \n}}\n'.format(goname)
 
         field_name = xenlight_golang_fmt_name('{}_union'.format(keyname))
         s += 'x.{} = {}\n'.format(field_name, goname)
@@ -431,7 +431,7 @@ def xenlight_golang_array_from_C(ty = None):
         s += 'x.{}[i] = {}(v)\n'.format(goname, gotypename)
     else:
         s += 'if err := x.{}[i].fromC(&v); err != nil {{\n'.format(goname)
-        s += 'return err }\n'
+        s += 'return fmt.Errorf("converting field {}: %v", err) }}\n'.format(goname)
 
     s += '}\n'
 
@@ -512,7 +512,7 @@ def xenlight_golang_convert_to_C(ty = None, outer_name = None,
     if not is_castable:
         s += 'if err := {}.{}.toC(&{}.{}); err != nil {{\n'.format(govarname,goname,
                                                                    cvarname,cname)
-        s += 'return err\n}\n'
+        s += 'return fmt.Errorf("converting field {}: %v", err) \n}}\n'.format(goname)
 
     elif gotypename == 'string':
         # Use the cgo helper for converting C strings.
@@ -614,7 +614,7 @@ def xenlight_golang_array_to_C(ty = None):
                                                                          golenvar,golenvar)
     s += 'for i,v := range x.{} {{\n'.format(goname)
     s += 'if err := v.toC(&c{}[i]); err != nil {{\n'.format(goname)
-    s += 'return err\n'
+    s += 'return fmt.Errorf("converting field {}: %v", err) \n'.format(goname)
     s += '}\n}\n}\n'
 
     return s
