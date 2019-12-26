@@ -306,9 +306,14 @@ func (el *EvLink) toC(cel *C.libxl_ev_link) (err error) { return }
 // empty when it is returned from libxl.
 type CpuidPolicyList string
 
-func (cpl CpuidPolicyList) fromC(ccpl *C.libxl_cpuid_policy_list) error { return nil }
+func (cpl *CpuidPolicyList) fromC(ccpl *C.libxl_cpuid_policy_list) error { *cpl = ""; return nil }
 
 func (cpl CpuidPolicyList) toC(ccpl *C.libxl_cpuid_policy_list) error {
+	if cpl == "" {
+		*ccpl = nil
+		return nil
+	}
+
 	s := C.CString(string(cpl))
 	defer C.free(unsafe.Pointer(s))
 
@@ -316,7 +321,8 @@ func (cpl CpuidPolicyList) toC(ccpl *C.libxl_cpuid_policy_list) error {
 	if ret != 0 {
 		C.libxl_cpuid_dispose(ccpl)
 
-		return Error(-ret)
+		// libxl_cpuid_parse_config doesn't return a normal libxl error.
+		return ErrorInval
 	}
 
 	return nil
