@@ -36,42 +36,40 @@ import (
 	"unsafe"
 )
 
-var libxlErrors = [...]string{
-	-ErrorNonspecific:                  "Non-specific error",
-	-ErrorVersion:                      "Wrong version",
-	-ErrorFail:                         "Failed",
-	-ErrorNi:                           "Not Implemented",
-	-ErrorNomem:                        "No memory",
-	-ErrorInval:                        "Invalid argument",
-	-ErrorBadfail:                      "Bad Fail",
-	-ErrorGuestTimedout:                "Guest timed out",
-	-ErrorTimedout:                     "Timed out",
-	-ErrorNoparavirt:                   "No Paravirtualization",
-	-ErrorNotReady:                     "Not ready",
-	-ErrorOseventRegFail:               "OS event registration failed",
-	-ErrorBufferfull:                   "Buffer full",
-	-ErrorUnknownChild:                 "Unknown child",
-	-ErrorLockFail:                     "Lock failed",
-	-ErrorJsonConfigEmpty:              "JSON config empty",
-	-ErrorDeviceExists:                 "Device exists",
-	-ErrorCheckpointDevopsDoesNotMatch: "Checkpoint devops does not match",
-	-ErrorCheckpointDeviceNotSupported: "Checkpoint device not supported",
-	-ErrorVnumaConfigInvalid:           "VNUMA config invalid",
-	-ErrorDomainNotfound:               "Domain not found",
-	-ErrorAborted:                      "Aborted",
-	-ErrorNotfound:                     "Not found",
-	-ErrorDomainDestroyed:              "Domain destroyed",
-	-ErrorFeatureRemoved:               "Feature removed",
+var libxlErrors = map[Error]string{
+	ErrorNonspecific:                  "Non-specific error",
+	ErrorVersion:                      "Wrong version",
+	ErrorFail:                         "Failed",
+	ErrorNi:                           "Not Implemented",
+	ErrorNomem:                        "No memory",
+	ErrorInval:                        "Invalid argument",
+	ErrorBadfail:                      "Bad Fail",
+	ErrorGuestTimedout:                "Guest timed out",
+	ErrorTimedout:                     "Timed out",
+	ErrorNoparavirt:                   "No Paravirtualization",
+	ErrorNotReady:                     "Not ready",
+	ErrorOseventRegFail:               "OS event registration failed",
+	ErrorBufferfull:                   "Buffer full",
+	ErrorUnknownChild:                 "Unknown child",
+	ErrorLockFail:                     "Lock failed",
+	ErrorJsonConfigEmpty:              "JSON config empty",
+	ErrorDeviceExists:                 "Device exists",
+	ErrorCheckpointDevopsDoesNotMatch: "Checkpoint devops does not match",
+	ErrorCheckpointDeviceNotSupported: "Checkpoint device not supported",
+	ErrorVnumaConfigInvalid:           "VNUMA config invalid",
+	ErrorDomainNotfound:               "Domain not found",
+	ErrorAborted:                      "Aborted",
+	ErrorNotfound:                     "Not found",
+	ErrorDomainDestroyed:              "Domain destroyed",
+	ErrorFeatureRemoved:               "Feature removed",
 }
 
 func (e Error) Error() string {
-	if 0 < int(e) && int(e) < len(libxlErrors) {
-		s := libxlErrors[e]
-		if s != "" {
-			return s
-		}
+	if s, ok := libxlErrors[e]; ok {
+		return s
 	}
-	return fmt.Sprintf("libxl error: %d", -e)
+
+	return fmt.Sprintf("libxl error: %d", e)
 }
 
 // Context represents a libxl_ctx.
