@@ -889,12 +889,14 @@ func NewVcpuSchedParams() (*VcpuSchedParams, error) {
 
 func (x *VcpuSchedParams) fromC(xc *C.libxl_vcpu_sched_params) error {
 	x.Sched = Scheduler(xc.sched)
-	numVcpus := int(xc.num_vcpus)
-	cVcpus := (*[1 << 28]C.libxl_sched_params)(unsafe.Pointer(xc.vcpus))[:numVcpus:numVcpus]
-	x.Vcpus = make([]SchedParams, numVcpus)
-	for i, v := range cVcpus {
-		if err := x.Vcpus[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Vcpus: %v", err)
+	x.Vcpus = nil
+	if n := int(xc.num_vcpus); n > 0 {
+		cVcpus := (*[1 << 28]C.libxl_sched_params)(unsafe.Pointer(xc.vcpus))[:n:n]
+		x.Vcpus = make([]SchedParams, n)
+		for i, v := range cVcpus {
+			if err := x.Vcpus[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Vcpus: %v", err)
+			}
 		}
 	}
 
@@ -991,11 +993,13 @@ func NewVnodeInfo() (*VnodeInfo, error) {
 
 func (x *VnodeInfo) fromC(xc *C.libxl_vnode_info) error {
 	x.Memkb = uint64(xc.memkb)
-	numDistances := int(xc.num_distances)
-	cDistances := (*[1 << 28]C.uint32_t)(unsafe.Pointer(xc.distances))[:numDistances:numDistances]
-	x.Distances = make([]uint32, numDistances)
-	for i, v := range cDistances {
-		x.Distances[i] = uint32(v)
+	x.Distances = nil
+	if n := int(xc.num_distances); n > 0 {
+		cDistances := (*[1 << 28]C.uint32_t)(unsafe.Pointer(xc.distances))[:n:n]
+		x.Distances = make([]uint32, n)
+		for i, v := range cDistances {
+			x.Distances[i] = uint32(v)
+		}
 	}
 	x.Pnode = uint32(xc.pnode)
 	if err := x.Vcpus.fromC(&xc.vcpus); err != nil {
@@ -1095,20 +1099,24 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	if err := x.Nodemap.fromC(&xc.nodemap); err != nil {
 		return fmt.Errorf("converting field Nodemap: %v", err)
 	}
-	numVcpuHardAffinity := int(xc.num_vcpu_hard_affinity)
-	cVcpuHardAffinity := (*[1 << 28]C.libxl_bitmap)(unsafe.Pointer(xc.vcpu_hard_affinity))[:numVcpuHardAffinity:numVcpuHardAffinity]
-	x.VcpuHardAffinity = make([]Bitmap, numVcpuHardAffinity)
-	for i, v := range cVcpuHardAffinity {
-		if err := x.VcpuHardAffinity[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field VcpuHardAffinity: %v", err)
+	x.VcpuHardAffinity = nil
+	if n := int(xc.num_vcpu_hard_affinity); n > 0 {
+		cVcpuHardAffinity := (*[1 << 28]C.libxl_bitmap)(unsafe.Pointer(xc.vcpu_hard_affinity))[:n:n]
+		x.VcpuHardAffinity = make([]Bitmap, n)
+		for i, v := range cVcpuHardAffinity {
+			if err := x.VcpuHardAffinity[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field VcpuHardAffinity: %v", err)
+			}
 		}
 	}
-	numVcpuSoftAffinity := int(xc.num_vcpu_soft_affinity)
-	cVcpuSoftAffinity := (*[1 << 28]C.libxl_bitmap)(unsafe.Pointer(xc.vcpu_soft_affinity))[:numVcpuSoftAffinity:numVcpuSoftAffinity]
-	x.VcpuSoftAffinity = make([]Bitmap, numVcpuSoftAffinity)
-	for i, v := range cVcpuSoftAffinity {
-		if err := x.VcpuSoftAffinity[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field VcpuSoftAffinity: %v", err)
+	x.VcpuSoftAffinity = nil
+	if n := int(xc.num_vcpu_soft_affinity); n > 0 {
+		cVcpuSoftAffinity := (*[1 << 28]C.libxl_bitmap)(unsafe.Pointer(xc.vcpu_soft_affinity))[:n:n]
+		x.VcpuSoftAffinity = make([]Bitmap, n)
+		for i, v := range cVcpuSoftAffinity {
+			if err := x.VcpuSoftAffinity[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field VcpuSoftAffinity: %v", err)
+			}
 		}
 	}
 	if err := x.NumaPlacement.fromC(&xc.numa_placement); err != nil {
@@ -1133,12 +1141,14 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 		return fmt.Errorf("converting field Cpuid: %v", err)
 	}
 	x.BlkdevStart = C.GoString(xc.blkdev_start)
-	numVnumaNodes := int(xc.num_vnuma_nodes)
-	cVnumaNodes := (*[1 << 28]C.libxl_vnode_info)(unsafe.Pointer(xc.vnuma_nodes))[:numVnumaNodes:numVnumaNodes]
-	x.VnumaNodes = make([]VnodeInfo, numVnumaNodes)
-	for i, v := range cVnumaNodes {
-		if err := x.VnumaNodes[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field VnumaNodes: %v", err)
+	x.VnumaNodes = nil
+	if n := int(xc.num_vnuma_nodes); n > 0 {
+		cVnumaNodes := (*[1 << 28]C.libxl_vnode_info)(unsafe.Pointer(xc.vnuma_nodes))[:n:n]
+		x.VnumaNodes = make([]VnodeInfo, n)
+		for i, v := range cVnumaNodes {
+			if err := x.VnumaNodes[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field VnumaNodes: %v", err)
+			}
 		}
 	}
 	x.MaxGrantFrames = uint32(xc.max_grant_frames)
@@ -1163,26 +1173,32 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	if err := x.SchedParams.fromC(&xc.sched_params); err != nil {
 		return fmt.Errorf("converting field SchedParams: %v", err)
 	}
-	numIoports := int(xc.num_ioports)
-	cIoports := (*[1 << 28]C.libxl_ioport_range)(unsafe.Pointer(xc.ioports))[:numIoports:numIoports]
-	x.Ioports = make([]IoportRange, numIoports)
-	for i, v := range cIoports {
-		if err := x.Ioports[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Ioports: %v", err)
+	x.Ioports = nil
+	if n := int(xc.num_ioports); n > 0 {
+		cIoports := (*[1 << 28]C.libxl_ioport_range)(unsafe.Pointer(xc.ioports))[:n:n]
+		x.Ioports = make([]IoportRange, n)
+		for i, v := range cIoports {
+			if err := x.Ioports[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Ioports: %v", err)
+			}
 		}
 	}
-	numIrqs := int(xc.num_irqs)
-	cIrqs := (*[1 << 28]C.uint32_t)(unsafe.Pointer(xc.irqs))[:numIrqs:numIrqs]
-	x.Irqs = make([]uint32, numIrqs)
-	for i, v := range cIrqs {
-		x.Irqs[i] = uint32(v)
+	x.Irqs = nil
+	if n := int(xc.num_irqs); n > 0 {
+		cIrqs := (*[1 << 28]C.uint32_t)(unsafe.Pointer(xc.irqs))[:n:n]
+		x.Irqs = make([]uint32, n)
+		for i, v := range cIrqs {
+			x.Irqs[i] = uint32(v)
+		}
 	}
-	numIomem := int(xc.num_iomem)
-	cIomem := (*[1 << 28]C.libxl_iomem_range)(unsafe.Pointer(xc.iomem))[:numIomem:numIomem]
-	x.Iomem = make([]IomemRange, numIomem)
-	for i, v := range cIomem {
-		if err := x.Iomem[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Iomem: %v", err)
+	x.Iomem = nil
+	if n := int(xc.num_iomem); n > 0 {
+		cIomem := (*[1 << 28]C.libxl_iomem_range)(unsafe.Pointer(xc.iomem))[:n:n]
+		x.Iomem = make([]IomemRange, n)
+		for i, v := range cIomem {
+			if err := x.Iomem[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Iomem: %v", err)
+			}
 		}
 	}
 	if err := x.ClaimMode.fromC(&xc.claim_mode); err != nil {
@@ -2791,12 +2807,14 @@ func (x *DeviceVdispl) fromC(xc *C.libxl_device_vdispl) error {
 	x.BackendDomname = C.GoString(xc.backend_domname)
 	x.Devid = Devid(xc.devid)
 	x.BeAlloc = bool(xc.be_alloc)
-	numConnectors := int(xc.num_connectors)
-	cConnectors := (*[1 << 28]C.libxl_connector_param)(unsafe.Pointer(xc.connectors))[:numConnectors:numConnectors]
-	x.Connectors = make([]ConnectorParam, numConnectors)
-	for i, v := range cConnectors {
-		if err := x.Connectors[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Connectors: %v", err)
+	x.Connectors = nil
+	if n := int(xc.num_connectors); n > 0 {
+		cConnectors := (*[1 << 28]C.libxl_connector_param)(unsafe.Pointer(xc.connectors))[:n:n]
+		x.Connectors = make([]ConnectorParam, n)
+		for i, v := range cConnectors {
+			if err := x.Connectors[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Connectors: %v", err)
+			}
 		}
 	}
 
@@ -2848,17 +2866,21 @@ func NewVsndParams() (*VsndParams, error) {
 }
 
 func (x *VsndParams) fromC(xc *C.libxl_vsnd_params) error {
-	numSampleRates := int(xc.num_sample_rates)
-	cSampleRates := (*[1 << 28]C.uint32_t)(unsafe.Pointer(xc.sample_rates))[:numSampleRates:numSampleRates]
-	x.SampleRates = make([]uint32, numSampleRates)
-	for i, v := range cSampleRates {
-		x.SampleRates[i] = uint32(v)
+	x.SampleRates = nil
+	if n := int(xc.num_sample_rates); n > 0 {
+		cSampleRates := (*[1 << 28]C.uint32_t)(unsafe.Pointer(xc.sample_rates))[:n:n]
+		x.SampleRates = make([]uint32, n)
+		for i, v := range cSampleRates {
+			x.SampleRates[i] = uint32(v)
+		}
 	}
-	numSampleFormats := int(xc.num_sample_formats)
-	cSampleFormats := (*[1 << 28]C.libxl_vsnd_pcm_format)(unsafe.Pointer(xc.sample_formats))[:numSampleFormats:numSampleFormats]
-	x.SampleFormats = make([]VsndPcmFormat, numSampleFormats)
-	for i, v := range cSampleFormats {
-		x.SampleFormats[i] = VsndPcmFormat(v)
+	x.SampleFormats = nil
+	if n := int(xc.num_sample_formats); n > 0 {
+		cSampleFormats := (*[1 << 28]C.libxl_vsnd_pcm_format)(unsafe.Pointer(xc.sample_formats))[:n:n]
+		x.SampleFormats = make([]VsndPcmFormat, n)
+		for i, v := range cSampleFormats {
+			x.SampleFormats[i] = VsndPcmFormat(v)
+		}
 	}
 	x.ChannelsMin = uint32(xc.channels_min)
 	x.ChannelsMax = uint32(xc.channels_max)
@@ -2964,12 +2986,14 @@ func (x *VsndPcm) fromC(xc *C.libxl_vsnd_pcm) error {
 	if err := x.Params.fromC(&xc.params); err != nil {
 		return fmt.Errorf("converting field Params: %v", err)
 	}
-	numVsndStreams := int(xc.num_vsnd_streams)
-	cStreams := (*[1 << 28]C.libxl_vsnd_stream)(unsafe.Pointer(xc.streams))[:numVsndStreams:numVsndStreams]
-	x.Streams = make([]VsndStream, numVsndStreams)
-	for i, v := range cStreams {
-		if err := x.Streams[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Streams: %v", err)
+	x.Streams = nil
+	if n := int(xc.num_vsnd_streams); n > 0 {
+		cStreams := (*[1 << 28]C.libxl_vsnd_stream)(unsafe.Pointer(xc.streams))[:n:n]
+		x.Streams = make([]VsndStream, n)
+		for i, v := range cStreams {
+			if err := x.Streams[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Streams: %v", err)
+			}
 		}
 	}
 
@@ -3029,12 +3053,14 @@ func (x *DeviceVsnd) fromC(xc *C.libxl_device_vsnd) error {
 	if err := x.Params.fromC(&xc.params); err != nil {
 		return fmt.Errorf("converting field Params: %v", err)
 	}
-	numVsndPcms := int(xc.num_vsnd_pcms)
-	cPcms := (*[1 << 28]C.libxl_vsnd_pcm)(unsafe.Pointer(xc.pcms))[:numVsndPcms:numVsndPcms]
-	x.Pcms = make([]VsndPcm, numVsndPcms)
-	for i, v := range cPcms {
-		if err := x.Pcms[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Pcms: %v", err)
+	x.Pcms = nil
+	if n := int(xc.num_vsnd_pcms); n > 0 {
+		cPcms := (*[1 << 28]C.libxl_vsnd_pcm)(unsafe.Pointer(xc.pcms))[:n:n]
+		x.Pcms = make([]VsndPcm, n)
+		for i, v := range cPcms {
+			if err := x.Pcms[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Pcms: %v", err)
+			}
 		}
 	}
 
@@ -3100,124 +3126,154 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	if err := x.BInfo.fromC(&xc.b_info); err != nil {
 		return fmt.Errorf("converting field BInfo: %v", err)
 	}
-	numDisks := int(xc.num_disks)
-	cDisks := (*[1 << 28]C.libxl_device_disk)(unsafe.Pointer(xc.disks))[:numDisks:numDisks]
-	x.Disks = make([]DeviceDisk, numDisks)
-	for i, v := range cDisks {
-		if err := x.Disks[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Disks: %v", err)
+	x.Disks = nil
+	if n := int(xc.num_disks); n > 0 {
+		cDisks := (*[1 << 28]C.libxl_device_disk)(unsafe.Pointer(xc.disks))[:n:n]
+		x.Disks = make([]DeviceDisk, n)
+		for i, v := range cDisks {
+			if err := x.Disks[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Disks: %v", err)
+			}
 		}
 	}
-	numNics := int(xc.num_nics)
-	cNics := (*[1 << 28]C.libxl_device_nic)(unsafe.Pointer(xc.nics))[:numNics:numNics]
-	x.Nics = make([]DeviceNic, numNics)
-	for i, v := range cNics {
-		if err := x.Nics[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Nics: %v", err)
+	x.Nics = nil
+	if n := int(xc.num_nics); n > 0 {
+		cNics := (*[1 << 28]C.libxl_device_nic)(unsafe.Pointer(xc.nics))[:n:n]
+		x.Nics = make([]DeviceNic, n)
+		for i, v := range cNics {
+			if err := x.Nics[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Nics: %v", err)
+			}
 		}
 	}
-	numPcidevs := int(xc.num_pcidevs)
-	cPcidevs := (*[1 << 28]C.libxl_device_pci)(unsafe.Pointer(xc.pcidevs))[:numPcidevs:numPcidevs]
-	x.Pcidevs = make([]DevicePci, numPcidevs)
-	for i, v := range cPcidevs {
-		if err := x.Pcidevs[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Pcidevs: %v", err)
+	x.Pcidevs = nil
+	if n := int(xc.num_pcidevs); n > 0 {
+		cPcidevs := (*[1 << 28]C.libxl_device_pci)(unsafe.Pointer(xc.pcidevs))[:n:n]
+		x.Pcidevs = make([]DevicePci, n)
+		for i, v := range cPcidevs {
+			if err := x.Pcidevs[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Pcidevs: %v", err)
+			}
 		}
 	}
-	numRdms := int(xc.num_rdms)
-	cRdms := (*[1 << 28]C.libxl_device_rdm)(unsafe.Pointer(xc.rdms))[:numRdms:numRdms]
-	x.Rdms = make([]DeviceRdm, numRdms)
-	for i, v := range cRdms {
-		if err := x.Rdms[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Rdms: %v", err)
+	x.Rdms = nil
+	if n := int(xc.num_rdms); n > 0 {
+		cRdms := (*[1 << 28]C.libxl_device_rdm)(unsafe.Pointer(xc.rdms))[:n:n]
+		x.Rdms = make([]DeviceRdm, n)
+		for i, v := range cRdms {
+			if err := x.Rdms[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Rdms: %v", err)
+			}
 		}
 	}
-	numDtdevs := int(xc.num_dtdevs)
-	cDtdevs := (*[1 << 28]C.libxl_device_dtdev)(unsafe.Pointer(xc.dtdevs))[:numDtdevs:numDtdevs]
-	x.Dtdevs = make([]DeviceDtdev, numDtdevs)
-	for i, v := range cDtdevs {
-		if err := x.Dtdevs[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Dtdevs: %v", err)
+	x.Dtdevs = nil
+	if n := int(xc.num_dtdevs); n > 0 {
+		cDtdevs := (*[1 << 28]C.libxl_device_dtdev)(unsafe.Pointer(xc.dtdevs))[:n:n]
+		x.Dtdevs = make([]DeviceDtdev, n)
+		for i, v := range cDtdevs {
+			if err := x.Dtdevs[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Dtdevs: %v", err)
+			}
 		}
 	}
-	numVfbs := int(xc.num_vfbs)
-	cVfbs := (*[1 << 28]C.libxl_device_vfb)(unsafe.Pointer(xc.vfbs))[:numVfbs:numVfbs]
-	x.Vfbs = make([]DeviceVfb, numVfbs)
-	for i, v := range cVfbs {
-		if err := x.Vfbs[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Vfbs: %v", err)
+	x.Vfbs = nil
+	if n := int(xc.num_vfbs); n > 0 {
+		cVfbs := (*[1 << 28]C.libxl_device_vfb)(unsafe.Pointer(xc.vfbs))[:n:n]
+		x.Vfbs = make([]DeviceVfb, n)
+		for i, v := range cVfbs {
+			if err := x.Vfbs[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Vfbs: %v", err)
+			}
 		}
 	}
-	numVkbs := int(xc.num_vkbs)
-	cVkbs := (*[1 << 28]C.libxl_device_vkb)(unsafe.Pointer(xc.vkbs))[:numVkbs:numVkbs]
-	x.Vkbs = make([]DeviceVkb, numVkbs)
-	for i, v := range cVkbs {
-		if err := x.Vkbs[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Vkbs: %v", err)
+	x.Vkbs = nil
+	if n := int(xc.num_vkbs); n > 0 {
+		cVkbs := (*[1 << 28]C.libxl_device_vkb)(unsafe.Pointer(xc.vkbs))[:n:n]
+		x.Vkbs = make([]DeviceVkb, n)
+		for i, v := range cVkbs {
+			if err := x.Vkbs[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Vkbs: %v", err)
+			}
 		}
 	}
-	numVtpms := int(xc.num_vtpms)
-	cVtpms := (*[1 << 28]C.libxl_device_vtpm)(unsafe.Pointer(xc.vtpms))[:numVtpms:numVtpms]
-	x.Vtpms = make([]DeviceVtpm, numVtpms)
-	for i, v := range cVtpms {
-		if err := x.Vtpms[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Vtpms: %v", err)
+	x.Vtpms = nil
+	if n := int(xc.num_vtpms); n > 0 {
+		cVtpms := (*[1 << 28]C.libxl_device_vtpm)(unsafe.Pointer(xc.vtpms))[:n:n]
+		x.Vtpms = make([]DeviceVtpm, n)
+		for i, v := range cVtpms {
+			if err := x.Vtpms[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Vtpms: %v", err)
+			}
 		}
 	}
-	numP9S := int(xc.num_p9s)
-	cP9S := (*[1 << 28]C.libxl_device_p9)(unsafe.Pointer(xc.p9s))[:numP9S:numP9S]
-	x.P9S = make([]DeviceP9, numP9S)
-	for i, v := range cP9S {
-		if err := x.P9S[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field P9S: %v", err)
+	x.P9S = nil
+	if n := int(xc.num_p9s); n > 0 {
+		cP9S := (*[1 << 28]C.libxl_device_p9)(unsafe.Pointer(xc.p9s))[:n:n]
+		x.P9S = make([]DeviceP9, n)
+		for i, v := range cP9S {
+			if err := x.P9S[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field P9S: %v", err)
+			}
 		}
 	}
-	numPvcallsifs := int(xc.num_pvcallsifs)
-	cPvcallsifs := (*[1 << 28]C.libxl_device_pvcallsif)(unsafe.Pointer(xc.pvcallsifs))[:numPvcallsifs:numPvcallsifs]
-	x.Pvcallsifs = make([]DevicePvcallsif, numPvcallsifs)
-	for i, v := range cPvcallsifs {
-		if err := x.Pvcallsifs[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Pvcallsifs: %v", err)
+	x.Pvcallsifs = nil
+	if n := int(xc.num_pvcallsifs); n > 0 {
+		cPvcallsifs := (*[1 << 28]C.libxl_device_pvcallsif)(unsafe.Pointer(xc.pvcallsifs))[:n:n]
+		x.Pvcallsifs = make([]DevicePvcallsif, n)
+		for i, v := range cPvcallsifs {
+			if err := x.Pvcallsifs[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Pvcallsifs: %v", err)
+			}
 		}
 	}
-	numVdispls := int(xc.num_vdispls)
-	cVdispls := (*[1 << 28]C.libxl_device_vdispl)(unsafe.Pointer(xc.vdispls))[:numVdispls:numVdispls]
-	x.Vdispls = make([]DeviceVdispl, numVdispls)
-	for i, v := range cVdispls {
-		if err := x.Vdispls[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Vdispls: %v", err)
+	x.Vdispls = nil
+	if n := int(xc.num_vdispls); n > 0 {
+		cVdispls := (*[1 << 28]C.libxl_device_vdispl)(unsafe.Pointer(xc.vdispls))[:n:n]
+		x.Vdispls = make([]DeviceVdispl, n)
+		for i, v := range cVdispls {
+			if err := x.Vdispls[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Vdispls: %v", err)
+			}
 		}
 	}
-	numVsnds := int(xc.num_vsnds)
-	cVsnds := (*[1 << 28]C.libxl_device_vsnd)(unsafe.Pointer(xc.vsnds))[:numVsnds:numVsnds]
-	x.Vsnds = make([]DeviceVsnd, numVsnds)
-	for i, v := range cVsnds {
-		if err := x.Vsnds[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Vsnds: %v", err)
+	x.Vsnds = nil
+	if n := int(xc.num_vsnds); n > 0 {
+		cVsnds := (*[1 << 28]C.libxl_device_vsnd)(unsafe.Pointer(xc.vsnds))[:n:n]
+		x.Vsnds = make([]DeviceVsnd, n)
+		for i, v := range cVsnds {
+			if err := x.Vsnds[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Vsnds: %v", err)
+			}
 		}
 	}
-	numChannels := int(xc.num_channels)
-	cChannels := (*[1 << 28]C.libxl_device_channel)(unsafe.Pointer(xc.channels))[:numChannels:numChannels]
-	x.Channels = make([]DeviceChannel, numChannels)
-	for i, v := range cChannels {
-		if err := x.Channels[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Channels: %v", err)
+	x.Channels = nil
+	if n := int(xc.num_channels); n > 0 {
+		cChannels := (*[1 << 28]C.libxl_device_channel)(unsafe.Pointer(xc.channels))[:n:n]
+		x.Channels = make([]DeviceChannel, n)
+		for i, v := range cChannels {
+			if err := x.Channels[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Channels: %v", err)
+			}
 		}
 	}
-	numUsbctrls := int(xc.num_usbctrls)
-	cUsbctrls := (*[1 << 28]C.libxl_device_usbctrl)(unsafe.Pointer(xc.usbctrls))[:numUsbctrls:numUsbctrls]
-	x.Usbctrls = make([]DeviceUsbctrl, numUsbctrls)
-	for i, v := range cUsbctrls {
-		if err := x.Usbctrls[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Usbctrls: %v", err)
+	x.Usbctrls = nil
+	if n := int(xc.num_usbctrls); n > 0 {
+		cUsbctrls := (*[1 << 28]C.libxl_device_usbctrl)(unsafe.Pointer(xc.usbctrls))[:n:n]
+		x.Usbctrls = make([]DeviceUsbctrl, n)
+		for i, v := range cUsbctrls {
+			if err := x.Usbctrls[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Usbctrls: %v", err)
+			}
 		}
 	}
-	numUsbdevs := int(xc.num_usbdevs)
-	cUsbdevs := (*[1 << 28]C.libxl_device_usbdev)(unsafe.Pointer(xc.usbdevs))[:numUsbdevs:numUsbdevs]
-	x.Usbdevs = make([]DeviceUsbdev, numUsbdevs)
-	for i, v := range cUsbdevs {
-		if err := x.Usbdevs[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Usbdevs: %v", err)
+	x.Usbdevs = nil
+	if n := int(xc.num_usbdevs); n > 0 {
+		cUsbdevs := (*[1 << 28]C.libxl_device_usbdev)(unsafe.Pointer(xc.usbdevs))[:n:n]
+		x.Usbdevs = make([]DeviceUsbdev, n)
+		for i, v := range cUsbdevs {
+			if err := x.Usbdevs[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Usbdevs: %v", err)
+			}
 		}
 	}
 	x.OnPoweroff = ActionOnShutdown(xc.on_poweroff)
@@ -3837,12 +3893,14 @@ func (x *Vdisplinfo) fromC(xc *C.libxl_vdisplinfo) error {
 	x.Devid = Devid(xc.devid)
 	x.State = int(xc.state)
 	x.BeAlloc = bool(xc.be_alloc)
-	numConnectors := int(xc.num_connectors)
-	cConnectors := (*[1 << 28]C.libxl_connectorinfo)(unsafe.Pointer(xc.connectors))[:numConnectors:numConnectors]
-	x.Connectors = make([]Connectorinfo, numConnectors)
-	for i, v := range cConnectors {
-		if err := x.Connectors[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Connectors: %v", err)
+	x.Connectors = nil
+	if n := int(xc.num_connectors); n > 0 {
+		cConnectors := (*[1 << 28]C.libxl_connectorinfo)(unsafe.Pointer(xc.connectors))[:n:n]
+		x.Connectors = make([]Connectorinfo, n)
+		for i, v := range cConnectors {
+			if err := x.Connectors[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Connectors: %v", err)
+			}
 		}
 	}
 
@@ -3936,12 +3994,14 @@ func NewPcminfo() (*Pcminfo, error) {
 }
 
 func (x *Pcminfo) fromC(xc *C.libxl_pcminfo) error {
-	numVsndStreams := int(xc.num_vsnd_streams)
-	cStreams := (*[1 << 28]C.libxl_streaminfo)(unsafe.Pointer(xc.streams))[:numVsndStreams:numVsndStreams]
-	x.Streams = make([]Streaminfo, numVsndStreams)
-	for i, v := range cStreams {
-		if err := x.Streams[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Streams: %v", err)
+	x.Streams = nil
+	if n := int(xc.num_vsnd_streams); n > 0 {
+		cStreams := (*[1 << 28]C.libxl_streaminfo)(unsafe.Pointer(xc.streams))[:n:n]
+		x.Streams = make([]Streaminfo, n)
+		for i, v := range cStreams {
+			if err := x.Streams[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Streams: %v", err)
+			}
 		}
 	}
 
@@ -3993,12 +4053,14 @@ func (x *Vsndinfo) fromC(xc *C.libxl_vsndinfo) error {
 	x.FrontendId = uint32(xc.frontend_id)
 	x.Devid = Devid(xc.devid)
 	x.State = int(xc.state)
-	numVsndPcms := int(xc.num_vsnd_pcms)
-	cPcms := (*[1 << 28]C.libxl_pcminfo)(unsafe.Pointer(xc.pcms))[:numVsndPcms:numVsndPcms]
-	x.Pcms = make([]Pcminfo, numVsndPcms)
-	for i, v := range cPcms {
-		if err := x.Pcms[i].fromC(&v); err != nil {
-			return fmt.Errorf("converting field Pcms: %v", err)
+	x.Pcms = nil
+	if n := int(xc.num_vsnd_pcms); n > 0 {
+		cPcms := (*[1 << 28]C.libxl_pcminfo)(unsafe.Pointer(xc.pcms))[:n:n]
+		x.Pcms = make([]Pcminfo, n)
+		for i, v := range cPcms {
+			if err := x.Pcms[i].fromC(&v); err != nil {
+				return fmt.Errorf("converting field Pcms: %v", err)
+			}
 		}
 	}
 
@@ -4109,11 +4171,13 @@ func NewNumainfo() (*Numainfo, error) {
 func (x *Numainfo) fromC(xc *C.libxl_numainfo) error {
 	x.Size = uint64(xc.size)
 	x.Free = uint64(xc.free)
-	numDists := int(xc.num_dists)
-	cDists := (*[1 << 28]C.uint32_t)(unsafe.Pointer(xc.dists))[:numDists:numDists]
-	x.Dists = make([]uint32, numDists)
-	for i, v := range cDists {
-		x.Dists[i] = uint32(v)
+	x.Dists = nil
+	if n := int(xc.num_dists); n > 0 {
+		cDists := (*[1 << 28]C.uint32_t)(unsafe.Pointer(xc.dists))[:n:n]
+		x.Dists = make([]uint32, n)
+		for i, v := range cDists {
+			x.Dists[i] = uint32(v)
+		}
 	}
 
 	return nil

@@ -426,13 +426,12 @@ def xenlight_golang_array_from_C(ty = None):
     cname      = ty.name
     cslice     = 'c{}'.format(goname)
     clenvar    = ty.type.lenvar.name
-    golenvar   = xenlight_golang_fmt_name(clenvar,exported=False)
 
-    s += '{} := int(xc.{})\n'.format(golenvar, clenvar)
+    s += 'x.{} = nil\n'.format(goname)
+    s += 'if n := int(xc.{}); n > 0 {{\n'.format(clenvar)
     s += '{} := '.format(cslice)
-    s +='(*[1<<28]C.{})(unsafe.Pointer(xc.{}))[:{}:{}]\n'.format(ctypename, cname,
-                                                                golenvar, golenvar)
-    s += 'x.{} = make([]{}, {})\n'.format(goname, gotypename, golenvar)
+    s +='(*[1<<28]C.{})(unsafe.Pointer(xc.{}))[:n:n]\n'.format(ctypename, cname)
+    s += 'x.{} = make([]{}, n)\n'.format(goname, gotypename)
     s += 'for i, v := range {} {{\n'.format(cslice)
 
     is_enum = isinstance(ty.type.elem_type,idl.Enumeration)
@@ -442,7 +441,7 @@ def xenlight_golang_array_from_C(ty = None):
         s += 'if err := x.{}[i].fromC(&v); err != nil {{\n'.format(goname)
         s += 'return fmt.Errorf("converting field {}: %v", err) }}\n'.format(goname)
 
-    s += '}\n'
+    s += '}\n}\n'
 
     return s
 
