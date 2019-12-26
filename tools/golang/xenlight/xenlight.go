@@ -17,9 +17,17 @@
 package xenlight
 
 /*
+
 #cgo LDFLAGS: -lxenlight -lyajl -lxentoollog
 #include <stdlib.h>
 #include <libxl.h>
+
+static const libxl_childproc_hooks childproc_hooks = { .chldowner = libxl_sigchld_owner_mainloop };
+
+void xenlight_set_chldproc(libxl_ctx *ctx) {
+	libxl_childproc_setmode(ctx, &childproc_hooks, NULL);
+}
+
 */
 import "C"
 
@@ -33,6 +41,9 @@ import "C"
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"unsafe"
 )
 
@@ -74,8 +85,37 @@ func (e Error) Error() string {
 
 // Context represents a libxl_ctx.
 type Context struct {
-	ctx    *C.libxl_ctx
-	logger *C.xentoollog_logger_stdiostream
+	ctx         *C.libxl_ctx
+	logger      *C.xentoollog_logger_stdiostream
+	sigchld     chan os.Signal
+	sigchldDone chan struct{}
+}
+
+// Golang always unmasks SIGCHLD, and internally has ways of
+// distributing SIGCHLD to multiple recipients.  libxl has provision
+// for this model: just tell it when a SIGCHLD happened, and it will
+// look after its own processes.
+//
+// This should "play nicely" with other users of SIGCHLD as long as
+// they don't reap libxl's processes.
+//
+// Every context needs to be notified on each SIGCHLD; so spin up a
+// new goroutine for each context.  If there are a large number of
+// contexts, this means each context will be woken up looking through
+// its own list of children.
+//
+// The alternate would be to register a fork callback, such that the
+// xenlight package can make a single list of all children, and only
+// notify the specific libxl context(s) that have children woken.  But
+// it's not clear to me this will be much more work than having the
+// xenlight go library do the same thing; doing it in separate go
+// threads has the potential to do it in parallel.  Leave that as an
+// optimization for later if it turns out to be a bottleneck.
+func sigchldHandler(ctx *Context) {
+	for _ = range ctx.sigchld {
+		C.libxl_childproc_sigchld_occurred(ctx.ctx)
+	}
+	close(ctx.sigchldDone)
 }
 
 // NewContext returns a new Context.
@@ -89,19 +129,45 @@ func NewContext() (ctx *Context, err error) {
 		}
 	}()
 
+	// Create a logger
 	ctx.logger = C.xtl_createlogger_stdiostream(C.stderr, C.XTL_ERROR, 0)
 
+	// Allocate a context
 	ret := C.libxl_ctx_alloc(&ctx.ctx, C.LIBXL_VERSION, 0,
 		(*C.xentoollog_logger)(unsafe.Pointer(ctx.logger)))
 	if ret != 0 {
 		return ctx, Error(ret)
 	}
 
+	// Tell libxl that we'll be dealing with SIGCHLD...
+	C.xenlight_set_chldproc(ctx.ctx)
+
+	// ...and arrange to keep that promise.
+	ctx.sigchld = make(chan os.Signal, 2)
+	ctx.sigchldDone = make(chan struct{}, 1)
+	signal.Notify(ctx.sigchld, syscall.SIGCHLD)
+
+	// This goroutine will run until the ctx.sigchld is closed in
+	// ctx.Close(); at which point it will close ctx.sigchldDone.
+	go sigchldHandler(ctx)
+
 	return ctx, nil
 }
 
 // Close closes the Context.
 func (ctx *Context) Close() error {
+	// Tell our SIGCHLD notifier to shut down, and wait for it to exit
+	// before we free the context.
+	if ctx.sigchld != nil {
+		signal.Stop(ctx.sigchld)
+		close(ctx.sigchld)
+
+		<-ctx.sigchldDone
+
+		ctx.sigchld = nil
+		ctx.sigchldDone = nil
+	}
+
 	if ctx.ctx != nil {
 		ret := C.libxl_ctx_free(ctx.ctx)
 		if ret != 0 {
