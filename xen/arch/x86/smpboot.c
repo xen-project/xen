@@ -44,6 +44,7 @@
 #include <asm/spec_ctrl.h>
 #include <asm/time.h>
 #include <asm/tboot.h>
+#include <irq_vectors.h>
 #include <mach_apic.h>
 
 unsigned long __read_mostly trampoline_phys;

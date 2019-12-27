@@ -9,7 +9,6 @@
 #include <xen/percpu.h>
 #include <xen/smp.h>
 #include <asm/hvm/irq.h>
-#include <irq_vectors.h>
 
 extern unsigned int nr_irqs_gsi;
 extern unsigned int nr_irqs;
@@ -24,7 +23,7 @@ extern unsigned int nr_irqs;
 #define LEGACY_VECTOR(irq)          ((irq) + FIRST_LEGACY_VECTOR)
 
 typedef struct {
-    DECLARE_BITMAP(_bits,NR_VECTORS);
+    DECLARE_BITMAP(_bits, X86_NR_VECTORS);
 } vmask_t;
 
 struct irq_desc;
@@ -59,7 +58,7 @@ struct arch_irq_desc {
 
 #define IRQ_VECTOR_UNASSIGNED (-1)
 
-typedef int vector_irq_t[NR_VECTORS];
+typedef int vector_irq_t[X86_NR_VECTORS];
 DECLARE_PER_CPU(vector_irq_t, vector_irq);
 
 extern bool opt_noirqbalance;

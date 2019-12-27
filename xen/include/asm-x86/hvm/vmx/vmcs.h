@@ -19,7 +19,6 @@
 #define __ASM_X86_HVM_VMX_VMCS_H__
 
 #include <asm/hvm/io.h>
-#include <irq_vectors.h>
 
 extern void vmcs_dump_vcpu(struct vcpu *v);
 extern void setup_vmcs_dump(void);
@@ -84,7 +83,7 @@ struct vmx_msr_bitmap {
 };
 
 struct pi_desc {
-    DECLARE_BITMAP(pir, NR_VECTORS);
+    DECLARE_BITMAP(pir, X86_NR_VECTORS);
     union {
         struct {
             u16     on     : 1,  /* bit 256 - Outstanding Notification */
@@ -150,7 +149,7 @@ struct vmx_vcpu {
     unsigned int         host_msr_count;
 
     unsigned long        eoi_exitmap_changed;
-    DECLARE_BITMAP(eoi_exit_bitmap, NR_VECTORS);
+    DECLARE_BITMAP(eoi_exit_bitmap, X86_NR_VECTORS);
     struct pi_desc       pi_desc;
 
     unsigned long        host_cr0;

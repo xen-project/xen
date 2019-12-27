@@ -24,6 +24,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/mach-generic/mach_apic.h>
+#include <irq_vectors.h>
 #include <public/physdev.h>
 
 static int parse_irq_vector_map_param(const char *s);
@@ -44,7 +45,7 @@ vmask_t global_used_vector_map;
 
 struct irq_desc __read_mostly *irq_desc = NULL;
 
-static DECLARE_BITMAP(used_vectors, NR_VECTORS);
+static DECLARE_BITMAP(used_vectors, X86_NR_VECTORS);
 
 static DEFINE_SPINLOCK(vector_lock);
 
@@ -149,7 +150,7 @@ static int __init _bind_irq_vector(struct irq_desc *desc, int vector,
     cpumask_t online_mask;
     int cpu;
 
-    BUG_ON((unsigned)vector >= NR_VECTORS);
+    BUG_ON((unsigned)vector >= X86_NR_VECTORS);
 
     cpumask_and(&online_mask, cpu_mask, &cpu_online_map);
     if (cpumask_empty(&online_mask))
@@ -416,7 +417,7 @@ int __init init_irq_data(void)
     struct irq_desc *desc;
     int irq, vector;
 
-    for ( vector = 0; vector < NR_VECTORS; ++vector )
+    for ( vector = 0; vector < X86_NR_VECTORS; ++vector )
         this_cpu(vector_irq)[vector] = INT_MIN;
 
     irq_desc = xzalloc_array(struct irq_desc, nr_irqs);
@@ -662,7 +663,7 @@ void setup_vector_irq(unsigned int cpu)
     unsigned int irq, vector;
 
     /* Clear vector_irq */
-    for ( vector = 0; vector < NR_VECTORS; ++vector )
+    for ( vector = 0; vector < X86_NR_VECTORS; ++vector )
         per_cpu(vector_irq, cpu)[vector] = INT_MIN;
     /* Mark the inuse vectors */
     for ( irq = 0; irq < nr_irqs; ++irq )
@@ -890,7 +891,7 @@ uint8_t alloc_hipriority_vector(void)
     return next++;
 }
 
-static void (*direct_apic_vector[NR_VECTORS])(struct cpu_user_regs *);
+static void (*direct_apic_vector[X86_NR_VECTORS])(struct cpu_user_regs *);
 void set_direct_apic_vector(
     uint8_t vector, void (*handler)(struct cpu_user_regs *))
 {
@@ -2509,7 +2510,7 @@ static void dump_irqs(unsigned char key)
 
     process_pending_softirqs();
     printk("Direct vector information:\n");
-    for ( i = FIRST_DYNAMIC_VECTOR; i < NR_VECTORS; ++i )
+    for ( i = FIRST_DYNAMIC_VECTOR; i < X86_NR_VECTORS; ++i )
         if ( direct_apic_vector[i] )
             printk("   %#02x -> %ps()\n", i, direct_apic_vector[i]);
 

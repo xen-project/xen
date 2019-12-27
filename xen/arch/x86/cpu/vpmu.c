@@ -34,6 +34,7 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/apic.h>
+#include <irq_vectors.h>
 #include <public/pmu.h>
 #include <xsm/xsm.h>
 

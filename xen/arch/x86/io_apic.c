@@ -35,6 +35,7 @@
 #include <asm/setup.h>
 #include <mach_apic.h>
 #include <io_ports.h>
+#include <irq_vectors.h>
 #include <public/physdev.h>
 #include <xen/trace.h>
 
@@ -75,7 +76,7 @@ static void share_vector_maps(unsigned int src, unsigned int dst)
         return;
 
     bitmap_or(vector_map[src]->_bits, vector_map[src]->_bits,
-              vector_map[dst]->_bits, NR_VECTORS);
+              vector_map[dst]->_bits, X86_NR_VECTORS);
 
     for (pin = 0; pin < nr_ioapic_entries[dst]; ++pin) {
         int irq = apic_pin_2_gsi_irq(dst, pin);

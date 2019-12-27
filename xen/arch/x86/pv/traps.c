@@ -28,6 +28,7 @@
 #include <asm/apic.h>
 #include <asm/shared.h>
 #include <asm/traps.h>
+#include <irq_vectors.h>
 
 void do_entry_int82(struct cpu_user_regs *regs)
 {

@@ -250,9 +250,9 @@ int pv_vcpu_initialise(struct vcpu *v)
     if ( rc )
         return rc;
 
-    BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv.trap_ctxt) >
+    BUILD_BUG_ON(X86_NR_VECTORS * sizeof(*v->arch.pv.trap_ctxt) >
                  PAGE_SIZE);
-    v->arch.pv.trap_ctxt = xzalloc_array(struct trap_info, NR_VECTORS);
+    v->arch.pv.trap_ctxt = xzalloc_array(struct trap_info, X86_NR_VECTORS);
     if ( !v->arch.pv.trap_ctxt )
     {
         rc = -ENOMEM;

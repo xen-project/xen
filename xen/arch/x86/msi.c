@@ -27,6 +27,7 @@
 #include <asm/p2m.h>
 #include <mach_apic.h>
 #include <io_ports.h>
+#include <irq_vectors.h>
 #include <public/physdev.h>
 #include <xen/iommu.h>
 #include <xsm/xsm.h>

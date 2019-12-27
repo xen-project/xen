@@ -36,6 +36,7 @@
 #include <asm/io_apic.h>
 #include <mach_apic.h>
 #include <io_ports.h>
+#include <irq_vectors.h>
 #include <xen/kexec.h>
 #include <asm/guest.h>
 #include <asm/time.h>

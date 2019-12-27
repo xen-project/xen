@@ -1992,7 +1992,7 @@ void __init init_idt_traps(void)
     this_cpu(compat_gdt) = boot_compat_gdt;
 }
 
-extern void (*const autogen_entrypoints[NR_VECTORS])(void);
+extern void (*const autogen_entrypoints[X86_NR_VECTORS])(void);
 void __init trap_init(void)
 {
     unsigned int vector;
@@ -2002,7 +2002,7 @@ void __init trap_init(void)
 
     pv_trap_init();
 
-    for ( vector = 0; vector < NR_VECTORS; ++vector )
+    for ( vector = 0; vector < X86_NR_VECTORS; ++vector )
     {
         if ( autogen_entrypoints[vector] )
         {

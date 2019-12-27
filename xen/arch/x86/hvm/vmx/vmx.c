@@ -1938,7 +1938,7 @@ static void vmx_process_isr(int isr, struct vcpu *v)
      * is acceptable because the subsequent interrupts will set up the eoi
      * bitmap correctly.
      */
-    for ( i = 0x10; i < NR_VECTORS; ++i )
+    for ( i = 0x10; i < X86_NR_VECTORS; ++i )
         if ( vlapic_test_vector(i, &vlapic->regs->data[APIC_IRR]) ||
              vlapic_test_vector(i, &vlapic->regs->data[APIC_ISR]) )
             set_bit(i, v->arch.hvm.vmx.eoi_exit_bitmap);
@@ -2058,7 +2058,7 @@ static void vmx_sync_pir_to_irr(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int group, i;
-    DECLARE_BITMAP(pending_intr, NR_VECTORS);
+    DECLARE_BITMAP(pending_intr, X86_NR_VECTORS);
 
     if ( !pi_test_and_clear_on(&v->arch.hvm.vmx.pi_desc) )
         return;
@@ -2066,7 +2066,7 @@ static void vmx_sync_pir_to_irr(struct vcpu *v)
     for ( group = 0; group < ARRAY_SIZE(pending_intr); group++ )
         pending_intr[group] = pi_get_pir(&v->arch.hvm.vmx.pi_desc, group);
 
-    for_each_set_bit(i, pending_intr, NR_VECTORS)
+    for_each_set_bit(i, pending_intr, X86_NR_VECTORS)
         vlapic_set_vector(i, &vlapic->regs->data[APIC_IRR]);
 }
 

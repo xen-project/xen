@@ -116,4 +116,6 @@
 #define X86_INVPCID_ALL_INCL_GLOBAL 2
 #define X86_INVPCID_ALL_NON_GLOBAL  3
 
+#define X86_NR_VECTORS 256
+
 #endif	/* __XEN_X86_DEFNS_H__ */

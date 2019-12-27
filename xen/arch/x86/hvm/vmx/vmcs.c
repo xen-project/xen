@@ -1156,7 +1156,7 @@ static int construct_vmcs(struct vcpu *v)
         unsigned int i;
 
         /* EOI-exit bitmap */
-        bitmap_zero(v->arch.hvm.vmx.eoi_exit_bitmap, NR_VECTORS);
+        bitmap_zero(v->arch.hvm.vmx.eoi_exit_bitmap, X86_NR_VECTORS);
         for ( i = 0; i < ARRAY_SIZE(v->arch.hvm.vmx.eoi_exit_bitmap); ++i )
             __vmwrite(EOI_EXIT_BITMAP(i), 0);
 

@@ -20,6 +20,7 @@
 #include <asm/hardirq.h>
 #include <asm/hpet.h>
 #include <asm/hvm/support.h>
+#include <irq_vectors.h>
 #include <mach_apic.h>
 
 /*

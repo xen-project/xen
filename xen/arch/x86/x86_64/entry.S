@@ -919,7 +919,7 @@ GLOBAL(autogen_entrypoints)
 autogen_stubs: /* Automatically generated stubs. */
 
         vec = 0
-        .rept NR_VECTORS
+        .rept X86_NR_VECTORS
 
         /* Common interrupts, heading towards do_IRQ(). */
 #ifdef CONFIG_PV
