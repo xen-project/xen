@@ -1990,18 +1990,13 @@ void do_IRQ(struct cpu_user_regs *regs)
          * If higher priority vectors still have their EOIs pending, we may
          * not issue an EOI here, as this would EOI the highest priority one.
          */
-        if ( cpu_has_pending_apic_eoi() )
-        {
-            this_cpu(check_eoi_deferral) = true;
-            desc->handler->end(desc, vector);
-            this_cpu(check_eoi_deferral) = false;
-
-            spin_unlock(&desc->lock);
-            flush_ready_eoi();
-            goto out_no_unlock;
-        }
-
+        this_cpu(check_eoi_deferral) = true;
         desc->handler->end(desc, vector);
+        this_cpu(check_eoi_deferral) = false;
+
+        spin_unlock(&desc->lock);
+        flush_ready_eoi();
+        goto out_no_unlock;
     }
 
  out_no_end:
