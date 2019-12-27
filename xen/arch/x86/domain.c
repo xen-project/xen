@@ -895,6 +895,8 @@ int arch_set_info_guest(
         if ( ((c(ldt_base) & (PAGE_SIZE - 1)) != 0) ||
              (c(ldt_ents) > 8192) )
             return -EINVAL;
+
+        v->arch.pv.vgc_flags = flags;
     }
 
     v->arch.flags |= TF_kernel_mode;
@@ -906,8 +908,6 @@ int arch_set_info_guest(
           */
          !is_hvm_domain(d) && !is_pv_32bit_domain(d) )
         v->arch.flags &= ~TF_kernel_mode;
-
-    v->arch.vgc_flags = flags;
 
     vcpu_setup_fpu(v, v->arch.xsave_area,
                    flags & VGCF_I387_VALID ? &c.nat->fpu_ctxt : NULL,
@@ -1487,7 +1487,7 @@ static void load_segments(struct vcpu *n)
                 domain_crash(n->domain);
             }
 
-            if ( n->arch.vgc_flags & VGCF_failsafe_disables_events )
+            if ( n->arch.pv.vgc_flags & VGCF_failsafe_disables_events )
                 vcpu_info(n, evtchn_upcall_mask) = 1;
 
             regs->entry_vector |= TRAP_syscall;
@@ -1526,7 +1526,7 @@ static void load_segments(struct vcpu *n)
             domain_crash(n->domain);
         }
 
-        if ( n->arch.vgc_flags & VGCF_failsafe_disables_events )
+        if ( n->arch.pv.vgc_flags & VGCF_failsafe_disables_events )
             vcpu_info(n, evtchn_upcall_mask) = 1;
 
         regs->entry_vector |= TRAP_syscall;

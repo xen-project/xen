@@ -69,7 +69,7 @@ void __dummy__(void)
     OFFSET(VCPU_kernel_sp, struct vcpu, arch.pv.kernel_sp);
     OFFSET(VCPU_kernel_ss, struct vcpu, arch.pv.kernel_ss);
     OFFSET(VCPU_iopl, struct vcpu, arch.pv.iopl);
-    OFFSET(VCPU_guest_context_flags, struct vcpu, arch.vgc_flags);
+    OFFSET(VCPU_guest_context_flags, struct vcpu, arch.pv.vgc_flags);
     OFFSET(VCPU_cr3, struct vcpu, arch.cr3);
     OFFSET(VCPU_arch_msrs, struct vcpu, arch.msrs);
     OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);

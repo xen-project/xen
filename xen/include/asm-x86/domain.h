@@ -475,6 +475,8 @@ struct pv_vcpu
     /* map_domain_page() mapping cache. */
     struct mapcache_vcpu mapcache;
 
+    unsigned int vgc_flags;
+
     struct trap_info *trap_ctxt;
 
     unsigned long gdt_frames[FIRST_RESERVED_GDT_PAGE];
@@ -541,7 +543,6 @@ struct arch_vcpu
      */
 
     void              *fpu_ctxt;
-    unsigned long      vgc_flags;
     struct cpu_user_regs user_regs;
 
     /* Debug registers. */

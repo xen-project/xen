@@ -82,17 +82,17 @@ static long register_guest_callback(struct callback_register *reg)
     case CALLBACKTYPE_failsafe:
         curr->arch.pv.failsafe_callback_eip = reg->address;
         if ( reg->flags & CALLBACKF_mask_events )
-            curr->arch.vgc_flags |= VGCF_failsafe_disables_events;
+            curr->arch.pv.vgc_flags |= VGCF_failsafe_disables_events;
         else
-            curr->arch.vgc_flags &= ~VGCF_failsafe_disables_events;
+            curr->arch.pv.vgc_flags &= ~VGCF_failsafe_disables_events;
         break;
 
     case CALLBACKTYPE_syscall:
         curr->arch.pv.syscall_callback_eip = reg->address;
         if ( reg->flags & CALLBACKF_mask_events )
-            curr->arch.vgc_flags |= VGCF_syscall_disables_events;
+            curr->arch.pv.vgc_flags |= VGCF_syscall_disables_events;
         else
-            curr->arch.vgc_flags &= ~VGCF_syscall_disables_events;
+            curr->arch.pv.vgc_flags &= ~VGCF_syscall_disables_events;
         break;
 
     case CALLBACKTYPE_syscall32:
@@ -226,9 +226,9 @@ static long compat_register_guest_callback(struct compat_callback_register *reg)
         curr->arch.pv.failsafe_callback_cs = reg->address.cs;
         curr->arch.pv.failsafe_callback_eip = reg->address.eip;
         if ( reg->flags & CALLBACKF_mask_events )
-            curr->arch.vgc_flags |= VGCF_failsafe_disables_events;
+            curr->arch.pv.vgc_flags |= VGCF_failsafe_disables_events;
         else
-            curr->arch.vgc_flags &= ~VGCF_failsafe_disables_events;
+            curr->arch.pv.vgc_flags &= ~VGCF_failsafe_disables_events;
         break;
 
     case CALLBACKTYPE_syscall32:

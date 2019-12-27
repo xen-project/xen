@@ -1151,8 +1151,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.dr6   = ctxt.dr6;
     v->arch.dr7   = ctxt.dr7;
 
-    v->arch.vgc_flags = VGCF_online;
-
     /* Auxiliary processors should be woken immediately. */
     v->is_initialised = 1;
     clear_bit(_VPF_down, &v->pause_flags);
@@ -3864,8 +3862,6 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     if ( v->arch.xsave_area )
         v->arch.xsave_area->xsave_hdr.xstate_bv = 0;
     vcpu_setup_fpu(v, v->arch.xsave_area, NULL, FCW_RESET);
-
-    v->arch.vgc_flags = VGCF_online;
 
     arch_vcpu_regs_init(v);
     v->arch.user_regs.rip = ip;

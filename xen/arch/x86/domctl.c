@@ -1500,7 +1500,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 #define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
 
     memcpy(&c.nat->fpu_ctxt, v->arch.fpu_ctxt, sizeof(c.nat->fpu_ctxt));
-    c(flags = v->arch.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
+    if ( is_pv_domain(d) )
+        c(flags = v->arch.pv.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
+    else
+        c(flags = 0);
     if ( v->fpu_initialised )
         c(flags |= VGCF_i387_valid);
     if ( !(v->pause_flags & VPF_down) )
