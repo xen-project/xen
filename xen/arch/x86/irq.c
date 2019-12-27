@@ -1144,64 +1144,6 @@ static void irq_guest_eoi_timer_fn(void *data)
     spin_unlock_irq(&desc->lock);
 }
 
-static void __do_IRQ_guest(int irq)
-{
-    struct irq_desc         *desc = irq_to_desc(irq);
-    irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    struct domain      *d;
-    int                 i, sp;
-    struct pending_eoi *peoi = this_cpu(pending_eoi);
-    unsigned int        vector = (u8)get_irq_regs()->entry_vector;
-
-    if ( unlikely(action->nr_guests == 0) )
-    {
-        /* An interrupt may slip through while freeing an ACKTYPE_EOI irq. */
-        ASSERT(action->ack_type == ACKTYPE_EOI);
-        ASSERT(desc->status & IRQ_DISABLED);
-        if ( desc->handler->end )
-            desc->handler->end(desc, vector);
-        return;
-    }
-
-    /*
-     * Stop the timer as soon as we're certain we'll set it again further down,
-     * to prevent the current timeout (if any) to needlessly expire.
-     */
-    if ( action->ack_type != ACKTYPE_NONE )
-        stop_timer(&action->eoi_timer);
-
-    if ( action->ack_type == ACKTYPE_EOI )
-    {
-        sp = pending_eoi_sp(peoi);
-        ASSERT((sp == 0) || (peoi[sp-1].vector < vector));
-        ASSERT(sp < (NR_DYNAMIC_VECTORS-1));
-        peoi[sp].irq = irq;
-        peoi[sp].vector = vector;
-        peoi[sp].ready = 0;
-        pending_eoi_sp(peoi) = sp+1;
-        cpumask_set_cpu(smp_processor_id(), action->cpu_eoi_map);
-    }
-
-    for ( i = 0; i < action->nr_guests; i++ )
-    {
-        struct pirq *pirq;
-
-        d = action->guest[i];
-        pirq = pirq_info(d, domain_irq_to_pirq(d, irq));
-        if ( (action->ack_type != ACKTYPE_NONE) &&
-             !test_and_set_bool(pirq->masked) )
-            action->in_flight++;
-        if ( !is_hvm_domain(d) || !hvm_do_IRQ_dpci(d, pirq) )
-            send_guest_pirq(d, pirq);
-    }
-
-    if ( action->ack_type != ACKTYPE_NONE )
-    {
-        migrate_timer(&action->eoi_timer, smp_processor_id());
-        set_timer(&action->eoi_timer, NOW() + MILLISECS(1));
-    }
-}
-
 /*
  * Retrieve Xen irq-descriptor corresponding to a domain-specific irq.
  * The descriptor is returned locked. This function is safe against changes
@@ -1870,6 +1812,61 @@ static bool pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
     return bound;
 }
 
+static void do_IRQ_guest(struct irq_desc *desc, unsigned int vector)
+{
+    irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
+    unsigned int        i;
+    struct pending_eoi *peoi = this_cpu(pending_eoi);
+
+    if ( unlikely(!action->nr_guests) )
+    {
+        /* An interrupt may slip through while freeing an ACKTYPE_EOI irq. */
+        ASSERT(action->ack_type == ACKTYPE_EOI);
+        ASSERT(desc->status & IRQ_DISABLED);
+        if ( desc->handler->end )
+            desc->handler->end(desc, vector);
+        return;
+    }
+
+    /*
+     * Stop the timer as soon as we're certain we'll set it again further down,
+     * to prevent the current timeout (if any) to needlessly expire.
+     */
+    if ( action->ack_type != ACKTYPE_NONE )
+        stop_timer(&action->eoi_timer);
+
+    if ( action->ack_type == ACKTYPE_EOI )
+    {
+        unsigned int sp = pending_eoi_sp(peoi);
+
+        ASSERT(sp < (NR_DYNAMIC_VECTORS - 1));
+        ASSERT(!sp || (peoi[sp - 1].vector < vector));
+        peoi[sp].irq = desc->irq;
+        peoi[sp].vector = vector;
+        peoi[sp].ready = 0;
+        pending_eoi_sp(peoi) = sp + 1;
+        cpumask_set_cpu(smp_processor_id(), action->cpu_eoi_map);
+    }
+
+    for ( i = 0; i < action->nr_guests; i++ )
+    {
+        struct domain *d = action->guest[i];
+        struct pirq *pirq = pirq_info(d, domain_irq_to_pirq(d, desc->irq));;
+
+        if ( (action->ack_type != ACKTYPE_NONE) &&
+             !test_and_set_bool(pirq->masked) )
+            action->in_flight++;
+        if ( !is_hvm_domain(d) || !hvm_do_IRQ_dpci(d, pirq) )
+            send_guest_pirq(d, pirq);
+    }
+
+    if ( action->ack_type != ACKTYPE_NONE )
+    {
+        migrate_timer(&action->eoi_timer, smp_processor_id());
+        set_timer(&action->eoi_timer, NOW() + MILLISECS(1));
+    }
+}
+
 void do_IRQ(struct cpu_user_regs *regs)
 {
     struct irqaction *action;
@@ -1954,7 +1951,7 @@ void do_IRQ(struct cpu_user_regs *regs)
         }
 
         tsc_in = tb_init_done ? get_cycles() : 0;
-        __do_IRQ_guest(irq);
+        do_IRQ_guest(desc, vector);
         TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
         goto out_no_end;
     }
