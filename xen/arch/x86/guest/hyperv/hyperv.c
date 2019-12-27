@@ -32,6 +32,8 @@ static const struct hypervisor_ops ops = {
 const struct hypervisor_ops *__init hyperv_probe(void)
 {
     uint32_t eax, ebx, ecx, edx;
+    uint64_t required_msrs = HV_X64_MSR_HYPERCALL_AVAILABLE |
+        HV_X64_MSR_VP_INDEX_AVAILABLE;
 
     cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
     if ( !((ebx == 0x7263694d) &&  /* "Micr" */
@@ -56,6 +58,16 @@ const struct hypervisor_ops *__init hyperv_probe(void)
     cpuid(HYPERV_CPUID_IMPLEMENT_LIMITS, &eax, &ebx, &ecx, &edx);
     ms_hyperv.max_vp_index = eax;
     ms_hyperv.max_lp_index = ebx;
+
+    if ( (ms_hyperv.features & required_msrs) != required_msrs )
+    {
+        /*
+         * Oops, required MSRs are not available. Treat this as
+         * "Hyper-V is not available".
+         */
+        memset(&ms_hyperv, 0, sizeof(ms_hyperv));
+        return NULL;
+    }
 
     return &ops;
 }
