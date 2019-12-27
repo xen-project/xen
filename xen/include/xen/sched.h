@@ -406,7 +406,10 @@ struct domain
     /* Domain is paused by controller software? */
     int              controller_pause_count;
 
-    int64_t          time_offset_seconds;
+    struct {
+        int64_t seconds;
+        bool set;
+    } time_offset;
 
 #ifdef CONFIG_HAS_PCI
     struct list_head pdev_list;

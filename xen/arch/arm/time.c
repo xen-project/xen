@@ -353,7 +353,8 @@ void update_vcpu_system_time(struct vcpu *v)
 
 void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
 {
-    d->time_offset_seconds = time_offset_seconds;
+    d->time_offset.seconds = time_offset_seconds;
+    d->time_offset.set = true;
     /* XXX update guest visible wallclock time */
 }
 

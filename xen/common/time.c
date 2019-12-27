@@ -105,7 +105,7 @@ void update_domain_wallclock_time(struct domain *d)
     *wc_version = version_update_begin(*wc_version);
     smp_wmb();
 
-    sec = wc_sec + d->time_offset_seconds;
+    sec = wc_sec + d->time_offset.seconds;
     shared_info(d, wc_sec)    = sec;
     shared_info(d, wc_nsec)   = wc_nsec;
 #ifdef CONFIG_X86
@@ -148,13 +148,13 @@ void do_settime(u64 secs, unsigned int nsecs, u64 system_time_base)
 unsigned long get_localtime(struct domain *d)
 {
     return wc_sec + (wc_nsec + NOW()) / 1000000000ULL
-        + d->time_offset_seconds;
+        + d->time_offset.seconds;
 }
 
 /* Return microsecs after 00:00:00 localtime, 1 January, 1970. */
 uint64_t get_localtime_us(struct domain *d)
 {
-    return (SECONDS(wc_sec + d->time_offset_seconds) + wc_nsec + NOW())
+    return (SECONDS(wc_sec + d->time_offset.seconds) + wc_nsec + NOW())
            / 1000UL;
 }
 

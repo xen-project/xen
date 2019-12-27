@@ -500,6 +500,8 @@ struct hvm_hw_rtc {
     /* Index register for 2-part operations */
     uint8_t cmos_index;
     uint8_t pad0;
+    /* RTC offset from host time */
+    int64_t rtc_offset;
 };
 
 DECLARE_HVM_SAVE_TYPE(RTC, 11, struct hvm_hw_rtc);

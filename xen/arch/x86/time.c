@@ -1288,7 +1288,8 @@ static void update_domain_rtc(void)
 
 void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
 {
-    d->time_offset_seconds = time_offset_seconds;
+    d->time_offset.seconds = time_offset_seconds;
+    d->time_offset.set = true;
     if ( is_hvm_domain(d) )
         rtc_update_clock(d);
     update_domain_wallclock_time(d);

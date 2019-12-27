@@ -64,8 +64,8 @@ int domain_vtimer_init(struct domain *d, struct xen_arch_domainconfig *config)
 {
     d->arch.phys_timer_base.offset = NOW();
     d->arch.virt_timer_base.offset = READ_SYSREG64(CNTPCT_EL0);
-    d->time_offset_seconds = ticks_to_ns(d->arch.virt_timer_base.offset - boot_count);
-    do_div(d->time_offset_seconds, 1000000000);
+    d->time_offset.seconds = ticks_to_ns(d->arch.virt_timer_base.offset - boot_count);
+    do_div(d->time_offset.seconds, 1000000000);
 
     config->clock_frequency = timer_dt_clock_frequency;
 

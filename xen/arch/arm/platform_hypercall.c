@@ -53,7 +53,7 @@ long do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         if ( likely(!op->u.settime64.mbz) )
             do_settime(op->u.settime64.secs,
                        op->u.settime64.nsecs,
-                       op->u.settime64.system_time + SECONDS(d->time_offset_seconds));
+                       op->u.settime64.system_time + SECONDS(d->time_offset.seconds));
         else
             ret = -EINVAL;
         break;

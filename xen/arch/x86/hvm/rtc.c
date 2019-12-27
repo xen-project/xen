@@ -594,7 +594,7 @@ static void rtc_set_time(RTCState *s)
 
     /* We use the guest's setting of the RTC to define the local-time 
      * offset for this domain. */
-    d->time_offset_seconds += (after - before);
+    d->time_offset.seconds += (after - before);
     update_domain_wallclock_time(d);
     /* Also tell qemu-dm about it so it will be remembered for next boot. */
     send_timeoffset_req(after - before);
@@ -747,8 +747,10 @@ static int rtc_save(struct vcpu *v, hvm_domain_context_t *h)
         return 0;
 
     spin_lock(&s->lock);
+    s->hw.rtc_offset = d->time_offset.seconds;
     rc = hvm_save_entry(RTC, 0, h, &s->hw);
     spin_unlock(&s->lock);
+
     return rc;
 }
 
@@ -763,7 +765,7 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
     spin_lock(&s->lock);
 
     /* Restore the registers */
-    if ( hvm_load_entry(RTC, h, &s->hw) != 0 )
+    if ( hvm_load_entry_zeroextend(RTC, h, &s->hw) != 0 )
     {
         spin_unlock(&s->lock);
         return -EINVAL;
@@ -771,6 +773,12 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
 
     /* Reset the wall-clock time.  In normal running, this runs with host 
      * time, so let's keep doing that. */
+    if ( !d->time_offset.set )
+    {
+        d->time_offset.seconds = s->hw.rtc_offset;
+        update_domain_wallclock_time(d);
+    }
+
     s->current_tm = gmtime(get_localtime(d));
     rtc_copy_date(s);
 
