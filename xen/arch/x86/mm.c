@@ -2571,6 +2571,8 @@ int get_page(struct page_info *page, struct domain *domain)
  * - it will not be called more than once without dropping the thus
  *   acquired reference again.
  * Due to get_page() reserving one reference, this call cannot fail.
+ *
+ * Note that some callers rely on this being a full memory barrier.
  */
 static void get_page_light(struct page_info *page)
 {
@@ -2755,7 +2757,7 @@ static int _put_final_page_type(struct page_info *page, unsigned long type,
     else
     {
         BUG_ON(rc != -ERESTART);
-        smp_wmb();
+        /* get_page_light() includes a full barrier. */
         get_page_light(page);
         page->u.inuse.type_info |= PGT_partial;
     }
