@@ -437,9 +437,6 @@ int __init init_irq_data(void)
     return 0;
 }
 
-static void __do_IRQ_guest(int vector);
-static void flush_ready_eoi(void);
-
 static void ack_none(struct irq_desc *desc)
 {
     ack_bad_irq(desc->irq);
@@ -895,145 +892,6 @@ void alloc_direct_apic_vector(
         set_direct_apic_vector(*vector, handler);
     }
     spin_unlock(&lock);
-}
-
-void do_IRQ(struct cpu_user_regs *regs)
-{
-    struct irqaction *action;
-    uint32_t          tsc_in;
-    struct irq_desc  *desc;
-    unsigned int      vector = (u8)regs->entry_vector;
-    int               irq = this_cpu(vector_irq)[vector];
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
-    
-    perfc_incr(irqs);
-    this_cpu(irq_count)++;
-    irq_enter();
-
-    if (irq < 0) {
-        if (direct_apic_vector[vector] != NULL) {
-            (*direct_apic_vector[vector])(regs);
-        } else {
-            const char *kind = ", LAPIC";
-
-            if ( apic_isr_read(vector) )
-                ack_APIC_irq();
-            else
-                kind = "";
-            if ( ! ( vector >= FIRST_LEGACY_VECTOR &&
-                     vector <= LAST_LEGACY_VECTOR &&
-                     bogus_8259A_irq(vector - FIRST_LEGACY_VECTOR) ) )
-            {
-                printk("CPU%u: No irq handler for vector %02x (IRQ %d%s)\n",
-                       smp_processor_id(), vector, irq, kind);
-                desc = irq_to_desc(~irq);
-                if ( ~irq < nr_irqs && irq_desc_initialized(desc) )
-                {
-                    spin_lock(&desc->lock);
-                    printk("IRQ%d a=%04lx[%04lx,%04lx] v=%02x[%02x] t=%s s=%08x\n",
-                           ~irq, *cpumask_bits(desc->affinity),
-                           *cpumask_bits(desc->arch.cpu_mask),
-                           *cpumask_bits(desc->arch.old_cpu_mask),
-                           desc->arch.vector, desc->arch.old_vector,
-                           desc->handler->typename, desc->status);
-                    spin_unlock(&desc->lock);
-                }
-            }
-            TRACE_1D(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
-        }
-        goto out_no_unlock;
-    }
-
-    desc = irq_to_desc(irq);
-
-    spin_lock(&desc->lock);
-    desc->handler->ack(desc);
-
-    if ( likely(desc->status & IRQ_GUEST) )
-    {
-        if ( irq_ratelimit_timer.function && /* irq rate limiting enabled? */
-             unlikely(desc->rl_cnt++ >= irq_ratelimit_threshold) )
-        {
-            s_time_t now = NOW();
-            if ( now < (desc->rl_quantum_start + MILLISECS(10)) )
-            {
-                desc->handler->disable(desc);
-                /*
-                 * If handler->disable doesn't actually mask the interrupt, a 
-                 * disabled irq still can fire. This check also avoids possible 
-                 * deadlocks if ratelimit_timer_fn runs at the same time.
-                 */
-                if ( likely(list_empty(&desc->rl_link)) )
-                {
-                    spin_lock(&irq_ratelimit_lock);
-                    if ( list_empty(&irq_ratelimit_list) )
-                        set_timer(&irq_ratelimit_timer, now + MILLISECS(10));
-                    list_add(&desc->rl_link, &irq_ratelimit_list);
-                    spin_unlock(&irq_ratelimit_lock);
-                }
-                goto out;
-            }
-            desc->rl_cnt = 0;
-            desc->rl_quantum_start = now;
-        }
-
-        tsc_in = tb_init_done ? get_cycles() : 0;
-        __do_IRQ_guest(irq);
-        TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
-        goto out_no_end;
-    }
-
-    desc->status &= ~IRQ_REPLAY;
-    desc->status |= IRQ_PENDING;
-
-    /*
-     * Since we set PENDING, if another processor is handling a different 
-     * instance of this same irq, the other processor will take care of it.
-     */
-    if ( desc->status & (IRQ_DISABLED | IRQ_INPROGRESS) )
-        goto out;
-
-    desc->status |= IRQ_INPROGRESS;
-
-    action = desc->action;
-    while ( desc->status & IRQ_PENDING )
-    {
-        desc->status &= ~IRQ_PENDING;
-        spin_unlock_irq(&desc->lock);
-        tsc_in = tb_init_done ? get_cycles() : 0;
-        action->handler(irq, action->dev_id, regs);
-        TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
-        spin_lock_irq(&desc->lock);
-    }
-
-    desc->status &= ~IRQ_INPROGRESS;
-
- out:
-    if ( desc->handler->end )
-    {
-        /*
-         * If higher priority vectors still have their EOIs pending, we may
-         * not issue an EOI here, as this would EOI the highest priority one.
-         */
-        if ( cpu_has_pending_apic_eoi() )
-        {
-            this_cpu(check_eoi_deferral) = true;
-            desc->handler->end(desc, vector);
-            this_cpu(check_eoi_deferral) = false;
-
-            spin_unlock(&desc->lock);
-            flush_ready_eoi();
-            goto out_no_unlock;
-        }
-
-        desc->handler->end(desc, vector);
-    }
-
- out_no_end:
-    spin_unlock(&desc->lock);
- out_no_unlock:
-    irq_exit();
-    set_irq_regs(old_regs);
 }
 
 static void irq_ratelimit_timer_fn(void *data)
@@ -2010,6 +1868,150 @@ static bool pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
     }
 
     return bound;
+}
+
+void do_IRQ(struct cpu_user_regs *regs)
+{
+    struct irqaction *action;
+    uint32_t          tsc_in;
+    struct irq_desc  *desc;
+    unsigned int      vector = (uint8_t)regs->entry_vector;
+    int               irq = this_cpu(vector_irq)[vector];
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
+
+    perfc_incr(irqs);
+    this_cpu(irq_count)++;
+    irq_enter();
+
+    if ( irq < 0 )
+    {
+        if ( direct_apic_vector[vector] )
+            direct_apic_vector[vector](regs);
+        else
+        {
+            const char *kind = ", LAPIC";
+
+            if ( apic_isr_read(vector) )
+                ack_APIC_irq();
+            else
+                kind = "";
+            if ( !(vector >= FIRST_LEGACY_VECTOR &&
+                   vector <= LAST_LEGACY_VECTOR &&
+                   bogus_8259A_irq(vector - FIRST_LEGACY_VECTOR)) )
+            {
+                printk("CPU%u: No irq handler for vector %02x (IRQ %d%s)\n",
+                       smp_processor_id(), vector, irq, kind);
+                desc = irq_to_desc(~irq);
+                if ( ~irq < nr_irqs && irq_desc_initialized(desc) )
+                {
+                    spin_lock(&desc->lock);
+                    printk("IRQ%d a=%04lx[%04lx,%04lx] v=%02x[%02x] t=%s s=%08x\n",
+                           ~irq, *cpumask_bits(desc->affinity),
+                           *cpumask_bits(desc->arch.cpu_mask),
+                           *cpumask_bits(desc->arch.old_cpu_mask),
+                           desc->arch.vector, desc->arch.old_vector,
+                           desc->handler->typename, desc->status);
+                    spin_unlock(&desc->lock);
+                }
+            }
+            TRACE_1D(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
+        }
+        goto out_no_unlock;
+    }
+
+    desc = irq_to_desc(irq);
+
+    spin_lock(&desc->lock);
+    desc->handler->ack(desc);
+
+    if ( likely(desc->status & IRQ_GUEST) )
+    {
+        if ( irq_ratelimit_timer.function && /* irq rate limiting enabled? */
+             unlikely(desc->rl_cnt++ >= irq_ratelimit_threshold) )
+        {
+            s_time_t now = NOW();
+
+            if ( now < (desc->rl_quantum_start + MILLISECS(10)) )
+            {
+                desc->handler->disable(desc);
+                /*
+                 * If handler->disable doesn't actually mask the interrupt, a
+                 * disabled irq still can fire. This check also avoids possible
+                 * deadlocks if ratelimit_timer_fn runs at the same time.
+                 */
+                if ( likely(list_empty(&desc->rl_link)) )
+                {
+                    spin_lock(&irq_ratelimit_lock);
+                    if ( list_empty(&irq_ratelimit_list) )
+                        set_timer(&irq_ratelimit_timer, now + MILLISECS(10));
+                    list_add(&desc->rl_link, &irq_ratelimit_list);
+                    spin_unlock(&irq_ratelimit_lock);
+                }
+                goto out;
+            }
+            desc->rl_cnt = 0;
+            desc->rl_quantum_start = now;
+        }
+
+        tsc_in = tb_init_done ? get_cycles() : 0;
+        __do_IRQ_guest(irq);
+        TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
+        goto out_no_end;
+    }
+
+    desc->status &= ~IRQ_REPLAY;
+    desc->status |= IRQ_PENDING;
+
+    /*
+     * Since we set PENDING, if another processor is handling a different
+     * instance of this same irq, the other processor will take care of it.
+     */
+    if ( desc->status & (IRQ_DISABLED | IRQ_INPROGRESS) )
+        goto out;
+
+    desc->status |= IRQ_INPROGRESS;
+
+    action = desc->action;
+    while ( desc->status & IRQ_PENDING )
+    {
+        desc->status &= ~IRQ_PENDING;
+        spin_unlock_irq(&desc->lock);
+
+        tsc_in = tb_init_done ? get_cycles() : 0;
+        action->handler(irq, action->dev_id, regs);
+        TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
+
+        spin_lock_irq(&desc->lock);
+    }
+
+    desc->status &= ~IRQ_INPROGRESS;
+
+ out:
+    if ( desc->handler->end )
+    {
+        /*
+         * If higher priority vectors still have their EOIs pending, we may
+         * not issue an EOI here, as this would EOI the highest priority one.
+         */
+        if ( cpu_has_pending_apic_eoi() )
+        {
+            this_cpu(check_eoi_deferral) = true;
+            desc->handler->end(desc, vector);
+            this_cpu(check_eoi_deferral) = false;
+
+            spin_unlock(&desc->lock);
+            flush_ready_eoi();
+            goto out_no_unlock;
+        }
+
+        desc->handler->end(desc, vector);
+    }
+
+ out_no_end:
+    spin_unlock(&desc->lock);
+ out_no_unlock:
+    irq_exit();
+    set_irq_regs(old_regs);
 }
 
 static inline bool is_free_pirq(const struct domain *d,
