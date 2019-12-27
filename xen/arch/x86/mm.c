@@ -2980,17 +2980,19 @@ static int _get_page_type(struct page_info *page, unsigned long type,
             return -EINTR;
     }
 
-    if ( unlikely((x & PGT_type_mask) != type) )
+    if ( unlikely(((x & PGT_type_mask) == PGT_writable_page) !=
+                  (type == PGT_writable_page)) )
     {
         /* Special pages should not be accessible from devices. */
         struct domain *d = page_get_owner(page);
+
         if ( d && is_pv_domain(d) && unlikely(need_iommu_pt_sync(d)) )
         {
             mfn_t mfn = page_to_mfn(page);
 
             if ( (x & PGT_type_mask) == PGT_writable_page )
                 rc = iommu_legacy_unmap(d, _dfn(mfn_x(mfn)), PAGE_ORDER_4K);
-            else if ( type == PGT_writable_page )
+            else
                 rc = iommu_legacy_map(d, _dfn(mfn_x(mfn)), mfn, PAGE_ORDER_4K,
                                       IOMMUF_readable | IOMMUF_writable);
 
