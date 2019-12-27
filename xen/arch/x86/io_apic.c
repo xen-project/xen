@@ -2388,7 +2388,9 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         return 0;
     }
 
-    if ( desc->arch.vector <= 0 || desc->arch.vector > LAST_DYNAMIC_VECTOR )
+    if ( desc->arch.vector <= 0 || desc->arch.vector > LAST_DYNAMIC_VECTOR ||
+         (desc->arch.vector >= FIRST_LEGACY_VECTOR &&
+          desc->arch.vector <= LAST_LEGACY_VECTOR) )
     {
         int vector = desc->arch.vector;
 

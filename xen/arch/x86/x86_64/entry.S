@@ -923,9 +923,9 @@ autogen_stubs: /* Automatically generated stubs. */
 
         /* Common interrupts, heading towards do_IRQ(). */
 #ifdef CONFIG_PV
-        .if vec >= FIRST_DYNAMIC_VECTOR && vec != HYPERCALL_VECTOR && vec != LEGACY_SYSCALL_VECTOR
+        .if vec >= FIRST_IRQ_VECTOR && vec != HYPERCALL_VECTOR && vec != LEGACY_SYSCALL_VECTOR
 #else
-        .if vec >= FIRST_DYNAMIC_VECTOR
+        .if vec >= FIRST_IRQ_VECTOR
 #endif
 
         ALIGN

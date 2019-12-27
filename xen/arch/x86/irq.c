@@ -101,7 +101,7 @@ void unlock_vector_lock(void)
 
 static inline bool valid_irq_vector(unsigned int vector)
 {
-    return vector >= FIRST_DYNAMIC_VECTOR && vector <= LAST_HIPRIORITY_VECTOR;
+    return vector >= FIRST_IRQ_VECTOR && vector <= LAST_IRQ_VECTOR;
 }
 
 static void release_old_vec(struct irq_desc *desc)

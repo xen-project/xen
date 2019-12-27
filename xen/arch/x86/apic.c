@@ -528,9 +528,9 @@ void setup_local_APIC(void)
     init_apic_ldr();
 
     /*
-     * Set Task Priority to reject any interrupts below FIRST_DYNAMIC_VECTOR.
+     * Set Task Priority to reject any interrupts below FIRST_IRQ_VECTOR.
      */
-    apic_write(APIC_TASKPRI, (FIRST_DYNAMIC_VECTOR & 0xF0) - 0x10);
+    apic_write(APIC_TASKPRI, (FIRST_IRQ_VECTOR & 0xF0) - 0x10);
 
     /*
      * After a crash, we no longer service the interrupts and a pending
