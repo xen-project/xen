@@ -361,17 +361,25 @@ void destroy_irq(unsigned int irq)
 int irq_to_vector(int irq)
 {
     int vector = IRQ_VECTOR_UNASSIGNED;
+    const struct irq_desc *desc;
 
     BUG_ON(irq >= nr_irqs || irq < 0);
+    desc = irq_to_desc(irq);
 
     if (IO_APIC_IRQ(irq))
     {
-        vector = irq_to_desc(irq)->arch.vector;
-        if (vector >= FIRST_LEGACY_VECTOR && vector <= LAST_LEGACY_VECTOR)
+        vector = desc->arch.vector;
+        /*
+         * Both parts of the condition are needed here during early boot, as
+         * at that time IRQ0 in particular may still have the 8259A chip set,
+         * but has already got its special IRQ0_VECTOR.
+         */
+        if ( desc->handler->enable == enable_8259A_irq &&
+             vector >= FIRST_LEGACY_VECTOR && vector <= LAST_LEGACY_VECTOR )
             vector = 0;
     }
     else if (MSI_IRQ(irq))
-        vector = irq_to_desc(irq)->arch.vector;
+        vector = desc->arch.vector;
     else
         vector = LEGACY_VECTOR(irq);
 
@@ -568,6 +576,10 @@ next:
             && test_bit(vector, irq_used_vectors) )
             goto next;
 
+        if ( cpumask_test_cpu(0, vec_mask) &&
+             vector >= FIRST_LEGACY_VECTOR && vector <= LAST_LEGACY_VECTOR )
+            goto next;
+
         for_each_cpu(new_cpu, vec_mask)
             if (per_cpu(vector_irq, new_cpu)[vector] >= 0)
                 goto next;
@@ -713,6 +725,10 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
 {
     unsigned vector, me;
 
+    /* This interrupt should not nest inside others. */
+    BUILD_BUG_ON(APIC_PRIO_CLASS(IRQ_MOVE_CLEANUP_VECTOR) !=
+                 APIC_PRIO_CLASS(FIRST_DYNAMIC_VECTOR));
+
     ack_APIC_irq();
 
     me = smp_processor_id();
@@ -730,14 +746,15 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
         if ((int)irq < 0)
             continue;
 
-        if ( vector >= FIRST_LEGACY_VECTOR && vector <= LAST_LEGACY_VECTOR )
-            continue;
-
         desc = irq_to_desc(irq);
         if (!desc)
             continue;
 
         spin_lock(&desc->lock);
+
+        if (desc->handler->enable == enable_8259A_irq)
+            goto unlock;
+
         if (!desc->arch.move_cleanup_count)
             goto unlock;
 
@@ -1894,6 +1911,7 @@ void do_IRQ(struct cpu_user_regs *regs)
                 kind = "";
             if ( !(vector >= FIRST_LEGACY_VECTOR &&
                    vector <= LAST_LEGACY_VECTOR &&
+                   !smp_processor_id() &&
                    bogus_8259A_irq(vector - FIRST_LEGACY_VECTOR)) )
             {
                 printk("CPU%u: No irq handler for vector %02x (IRQ %d%s)\n",

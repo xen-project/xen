@@ -2389,8 +2389,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     }
 
     if ( desc->arch.vector <= 0 || desc->arch.vector > LAST_DYNAMIC_VECTOR ||
-         (desc->arch.vector >= FIRST_LEGACY_VECTOR &&
-          desc->arch.vector <= LAST_LEGACY_VECTOR) )
+         desc->handler->enable == enable_8259A_irq )
     {
         int vector = desc->arch.vector;
 
@@ -2617,7 +2616,7 @@ void __init init_ioapic_mappings(void)
 
     if ( nr_irqs == 0 )
         nr_irqs = cpu_has_apic ?
-                  max(16U + num_present_cpus() * NR_DYNAMIC_VECTORS,
+                  max(0U + num_present_cpus() * NR_DYNAMIC_VECTORS,
                       8 * nr_irqs_gsi) :
                   nr_irqs_gsi;
     else if ( nr_irqs < 16 )
