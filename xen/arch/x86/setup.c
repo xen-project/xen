@@ -1033,11 +1033,14 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
         uint64_t end, limit = ARRAY_SIZE(l2_identmap) << L2_PAGETABLE_SHIFT;
 
+        if ( boot_e820.map[i].type != E820_RAM )
+            continue;
+
         /* Superpage-aligned chunks from BOOTSTRAP_MAP_BASE. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
         e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
         s = max_t(uint64_t, s, BOOTSTRAP_MAP_BASE);
-        if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
+        if ( s >= e )
             continue;
 
         if ( s < limit )
@@ -1286,11 +1289,14 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         uint64_t s, e, mask = PAGE_SIZE - 1;
         uint64_t map_s, map_e;
 
+        if ( boot_e820.map[i].type != E820_RAM )
+            continue;
+
         /* Only page alignment required now. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
         e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
         s = max_t(uint64_t, s, 1<<20);
-        if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
+        if ( s >= e )
             continue;
 
         if ( !acpi_boot_table_init_done &&
