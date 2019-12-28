@@ -661,15 +661,9 @@ trampoline_setup:
         mov     %eax,sym_fs(boot_tsc_stamp)
         mov     %edx,sym_fs(boot_tsc_stamp)+4
 
-        /*
-         * Update frame addresses in page tables excluding l2_identmap
-         * without its first entry which points to l1_identmap.
-         */
+        /* Relocate pagetables to point at Xen's current location in memory. */
         mov     $((__page_tables_end-__page_tables_start)/8),%ecx
-        mov     $(((l2_identmap-__page_tables_start)/8)+1),%edx
-1:      cmp     $((l2_identmap+l2_identmap_sizeof-__page_tables_start)/8),%ecx
-        cmove   %edx,%ecx
-        testl   $_PAGE_PRESENT,sym_fs(__page_tables_start)-8(,%ecx,8)
+1:      testl   $_PAGE_PRESENT,sym_fs(__page_tables_start)-8(,%ecx,8)
         jz      2f
         add     %esi,sym_fs(__page_tables_start)-8(,%ecx,8)
 2:      loop    1b

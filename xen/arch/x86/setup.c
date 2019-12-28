@@ -678,6 +678,9 @@ static unsigned int __init copy_bios_e820(struct e820entry *map, unsigned int li
     return n;
 }
 
+/* How much of the directmap is prebuilt at compile time. */
+#define PREBUILT_MAP_LIMIT (1 << L2_PAGETABLE_SHIFT)
+
 void __init noreturn __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
@@ -1020,7 +1023,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      *
      * We require superpage alignment because the boot allocator is
      * not yet initialised. Hence we can only map superpages in the
-     * address range BOOTSTRAP_MAP_BASE to 4GB, as this is guaranteed
+     * address range PREBUILT_MAP_LIMIT to 4GB, as this is guaranteed
      * not to require dynamic allocation of pagetables.
      *
      * As well as mapping superpages in that range, in preparation for
@@ -1036,10 +1039,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         if ( boot_e820.map[i].type != E820_RAM )
             continue;
 
-        /* Superpage-aligned chunks from BOOTSTRAP_MAP_BASE. */
+        /* Superpage-aligned chunks from PREBUILT_MAP_LIMIT. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
         e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
-        s = max_t(uint64_t, s, BOOTSTRAP_MAP_BASE);
+        s = max_t(uint64_t, s, PREBUILT_MAP_LIMIT);
         if ( s >= e )
             continue;
 
@@ -1346,8 +1349,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
         set_pdx_range(s >> PAGE_SHIFT, e >> PAGE_SHIFT);
 
-        /* Need to create mappings above BOOTSTRAP_MAP_BASE. */
-        map_s = max_t(uint64_t, s, BOOTSTRAP_MAP_BASE);
+        /* Need to create mappings above PREBUILT_MAP_LIMIT. */
+        map_s = max_t(uint64_t, s, PREBUILT_MAP_LIMIT);
         map_e = min_t(uint64_t, e,
                       ARRAY_SIZE(l2_identmap) << L2_PAGETABLE_SHIFT);
 

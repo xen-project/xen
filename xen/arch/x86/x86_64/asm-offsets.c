@@ -165,8 +165,5 @@ void __dummy__(void)
     OFFSET(MB2_efi64_ih, multiboot2_tag_efi64_ih_t, pointer);
     BLANK();
 
-    DEFINE(l2_identmap_sizeof, sizeof(l2_identmap));
-    BLANK();
-
     OFFSET(DOMAIN_vm_assist, struct domain, vm_assist);
 }

@@ -65,24 +65,19 @@ l1_identmap:
         .size l1_identmap, . - l1_identmap
 
 /*
- * __page_tables_start does not cover l1_identmap because it (l1_identmap)
- * contains 1-1 mappings. This means that frame addresses of these mappings
- * are static and should not be updated at runtime.
+ * __page_tables_{start,end} cover the range of pagetables which need
+ * relocating as Xen moves around physical memory.  i.e. each sym_offs()
+ * reference to a different pagetable in the Xen image.
  */
 GLOBAL(__page_tables_start)
 
 /*
- * Space for mapping the first 4GB of memory, with the first 16 megabytes
- * actualy mapped (mostly using superpages).  Uses 4x 4k pages.
+ * Space for 4G worth of 2M mappings, first 2M actually mapped via
+ * l1_identmap[].  Uses 4x 4k pages.
  */
 GLOBAL(l2_identmap)
         .quad sym_offs(l1_identmap) + __PAGE_HYPERVISOR
-        idx = 1
-        .rept 7
-        .quad (idx << L2_PAGETABLE_SHIFT) | PAGE_HYPERVISOR | _PAGE_PSE
-        idx = idx + 1
-        .endr
-        .fill 4 * L2_PAGETABLE_ENTRIES - 8, 8, 0
+        .fill 4 * L2_PAGETABLE_ENTRIES - 1, 8, 0
         .size l2_identmap, . - l2_identmap
 
 /*
