@@ -29,7 +29,7 @@ static inline struct vcpu *mapcache_current_vcpu(void)
      * When current isn't properly set up yet, this is equivalent to
      * running in an idle vCPU (callers must check for NULL).
      */
-    if ( v == INVALID_VCPU )
+    if ( !v )
         return NULL;
 
     /*

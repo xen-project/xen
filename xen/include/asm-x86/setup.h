@@ -4,9 +4,6 @@
 #include <xen/multiboot.h>
 #include <asm/numa.h>
 
-/* vCPU pointer used prior to there being a valid one around */
-#define INVALID_VCPU ((struct vcpu *)0xccccccccccccc000UL)
-
 extern const char __2M_text_start[], __2M_text_end[];
 extern const char __2M_rodata_start[], __2M_rodata_end[];
 extern char __2M_init_start[], __2M_init_end[];

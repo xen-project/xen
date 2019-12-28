@@ -260,7 +260,7 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
                         &mig->mc_coreid, &mig->mc_core_threadid,
                         &mig->mc_apicid, NULL, NULL, NULL);
 
-    if ( curr != INVALID_VCPU )
+    if ( curr )
     {
         mig->mc_domid = curr->domain->domain_id;
         mig->mc_vcpuid = curr->vcpu_id;
