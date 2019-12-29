@@ -519,6 +519,7 @@ S:	Supported
 F:	xen/arch/x86/guest/hyperv/
 F:	xen/arch/x86/hvm/viridian/
 F:	xen/include/asm-x86/guest/hyperv.h
+F:	xen/include/asm-x86/guest/hyperv-hcall.h
 F:	xen/include/asm-x86/guest/hyperv-tlfs.h
 F:	xen/include/asm-x86/hvm/viridian.h
 

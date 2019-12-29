@@ -326,6 +326,10 @@ SECTIONS
   efi = .;
 #endif
 
+#ifdef CONFIG_HYPERV_GUEST
+  hv_hcall_page = ABSOLUTE(HV_HCALL_PAGE);
+#endif
+
   /* Sections to be discarded */
   /DISCARD/ : {
        *(.exit.text)

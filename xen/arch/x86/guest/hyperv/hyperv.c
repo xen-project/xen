@@ -118,6 +118,8 @@ static void __init setup_hypercall_page(void)
 
 static void __init setup(void)
 {
+    ASM_CONSTANT(HV_HCALL_PAGE, __fix_x_to_virt(FIX_X_HYPERV_HCALL));
+
     setup_hypercall_page();
 }
 
