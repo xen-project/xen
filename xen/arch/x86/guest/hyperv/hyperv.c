@@ -30,6 +30,7 @@
 
 struct ms_hyperv_info __read_mostly ms_hyperv;
 DEFINE_PER_CPU_READ_MOSTLY(void *, hv_input_page);
+DEFINE_PER_CPU_READ_MOSTLY(void *, hv_vp_assist);
 DEFINE_PER_CPU_READ_MOSTLY(unsigned int, hv_vp_index);
 
 static uint64_t generate_guest_id(void)
@@ -141,6 +142,31 @@ static int setup_hypercall_pcpu_arg(void)
     return 0;
 }
 
+static int setup_vp_assist(void)
+{
+    union hv_vp_assist_page_msr msr;
+
+    if ( !this_cpu(hv_vp_assist) )
+    {
+        this_cpu(hv_vp_assist) = alloc_xenheap_page();
+        if ( !this_cpu(hv_vp_assist) )
+        {
+            printk("CPU%u: Failed to allocate vp_assist page\n",
+                   smp_processor_id());
+            return -ENOMEM;
+        }
+
+        clear_page(this_cpu(hv_vp_assist));
+    }
+
+    rdmsrl(HV_X64_MSR_VP_ASSIST_PAGE, msr.raw);
+    msr.pfn = virt_to_mfn(this_cpu(hv_vp_assist));
+    msr.enabled = 1;
+    wrmsrl(HV_X64_MSR_VP_ASSIST_PAGE, msr.raw);
+
+    return 0;
+}
+
 static void __init setup(void)
 {
     ASM_CONSTANT(HV_HCALL_PAGE, __fix_x_to_virt(FIX_X_HYPERV_HCALL));
@@ -149,11 +175,20 @@ static void __init setup(void)
 
     if ( setup_hypercall_pcpu_arg() )
         panic("Hyper-V hypercall percpu arg setup failed\n");
+
+    if ( setup_vp_assist() )
+        panic("VP assist page setup failed\n");
 }
 
 static int ap_setup(void)
 {
-    return setup_hypercall_pcpu_arg();
+    int rc;
+
+    rc = setup_hypercall_pcpu_arg();
+    if ( rc )
+        return rc;
+
+    return setup_vp_assist();
 }
 
 static void __init e820_fixup(struct e820map *e820)
