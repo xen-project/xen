@@ -25,5 +25,6 @@
 #include <xen/percpu.h>
 
 DECLARE_PER_CPU(void *, hv_input_page);
+DECLARE_PER_CPU(unsigned int, hv_vp_index);
 
 #endif /* __XEN_HYPERV_PRIVIATE_H__  */
