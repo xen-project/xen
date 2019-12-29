@@ -26,7 +26,10 @@
 #include <asm/guest/hyperv-tlfs.h>
 #include <asm/processor.h>
 
+#include "private.h"
+
 struct ms_hyperv_info __read_mostly ms_hyperv;
+DEFINE_PER_CPU_READ_MOSTLY(void *, hv_input_page);
 
 static uint64_t generate_guest_id(void)
 {
@@ -116,11 +119,35 @@ static void __init setup_hypercall_page(void)
     set_fixmap_x(FIX_X_HYPERV_HCALL, mfn << PAGE_SHIFT);
 }
 
+static int setup_hypercall_pcpu_arg(void)
+{
+    if ( this_cpu(hv_input_page) )
+        return 0;
+
+    this_cpu(hv_input_page) = alloc_xenheap_page();
+    if ( !this_cpu(hv_input_page) )
+    {
+        printk("CPU%u: Failed to allocate hypercall input page\n",
+               smp_processor_id());
+        return -ENOMEM;
+    }
+
+    return 0;
+}
+
 static void __init setup(void)
 {
     ASM_CONSTANT(HV_HCALL_PAGE, __fix_x_to_virt(FIX_X_HYPERV_HCALL));
 
     setup_hypercall_page();
+
+    if ( setup_hypercall_pcpu_arg() )
+        panic("Hyper-V hypercall percpu arg setup failed\n");
+}
+
+static int ap_setup(void)
+{
+    return setup_hypercall_pcpu_arg();
 }
 
 static void __init e820_fixup(struct e820map *e820)
@@ -134,6 +161,7 @@ static void __init e820_fixup(struct e820map *e820)
 static const struct hypervisor_ops ops = {
     .name = "Hyper-V",
     .setup = setup,
+    .ap_setup = ap_setup,
     .e820_fixup = e820_fixup,
 };
 
