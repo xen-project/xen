@@ -30,6 +30,8 @@ void pvh_print_info(void);
 
 #else
 
+#include <xen/lib.h>
+
 #define pvh_boot 0
 
 static inline void pvh_init(multiboot_info_t **mbi, module_t **mod)
