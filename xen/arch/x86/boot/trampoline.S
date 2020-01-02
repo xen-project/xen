@@ -101,8 +101,6 @@ trampoline_protmode_entry:
         mov     $(X86_CR0_PG | X86_CR0_AM | X86_CR0_WP | X86_CR0_NE |\
                   X86_CR0_ET | X86_CR0_MP | X86_CR0_PE), %eax
         mov     %eax,%cr0
-        jmp     1f
-1:
 
         /* Now in compatibility mode. Long-jump into 64-bit mode. */
         ljmp    $BOOT_CS64,$bootsym_rel(start64,6)
@@ -111,26 +109,6 @@ trampoline_protmode_entry:
 start64:
         /* Jump to high mappings. */
         movabs  $__high_start, %rdi
-
-#ifdef CONFIG_INDIRECT_THUNK
-        /*
-         * If booting virtualised, or hot-onlining a CPU, sibling threads can
-         * attempt Branch Target Injection against this jmp.
-         *
-         * We've got no usable stack so can't use a RETPOLINE thunk, and are
-         * further than disp32 from the high mappings so couldn't use
-         * JUMP_THUNK even if it was a non-RETPOLINE thunk.  Furthermore, an
-         * LFENCE isn't necessarily safe to use at this point.
-         *
-         * As this isn't a hotpath, use a fully serialising event to reduce
-         * the speculation window as much as possible.  %ebx needs preserving
-         * for __high_start.
-         */
-        mov     %ebx, %esi
-        cpuid
-        mov     %esi, %ebx
-#endif
-
         jmpq    *%rdi
 
 #include "video.h"
