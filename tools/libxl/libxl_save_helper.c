@@ -217,8 +217,6 @@ int helper_getreply(void *user)
 
 /*----- other callbacks -----*/
 
-static struct save_callbacks helper_save_callbacks;
-
 static void startup(const char *op) {
     xtl_log(&logger,XTL_DEBUG,0,program,"starting %s",op);
 
@@ -234,8 +232,6 @@ static void complete(int retval) {
     exit(0);
 }
 
-static struct restore_callbacks helper_restore_callbacks;
-
 int main(int argc, char **argv)
 {
     int r;
@@ -247,6 +243,7 @@ int main(int argc, char **argv)
     assert(mode);
 
     if (!strcmp(mode,"--save-domain")) {
+        static struct save_callbacks cb;
 
         io_fd =                             atoi(NEXTARG);
         recv_fd =                           atoi(NEXTARG);
@@ -256,16 +253,16 @@ int main(int argc, char **argv)
         xc_stream_type_t stream_type =      strtoul(NEXTARG,0,10);
         assert(!*++argv);
 
-        helper_setcallbacks_save(&helper_save_callbacks, cbflags);
+        helper_setcallbacks_save(&cb, cbflags);
 
         startup("save");
         setup_signals(save_signal_handler);
 
-        r = xc_domain_save(xch, io_fd, dom, flags, &helper_save_callbacks,
-                           stream_type, recv_fd);
+        r = xc_domain_save(xch, io_fd, dom, flags, &cb, stream_type, recv_fd);
         complete(r);
 
     } else if (!strcmp(mode,"--restore-domain")) {
+        static struct restore_callbacks cb;
 
         io_fd =                             atoi(NEXTARG);
         send_back_fd =                      atoi(NEXTARG);
@@ -278,7 +275,7 @@ int main(int argc, char **argv)
         xc_stream_type_t stream_type =      strtoul(NEXTARG,0,10);
         assert(!*++argv);
 
-        helper_setcallbacks_restore(&helper_restore_callbacks, cbflags);
+        helper_setcallbacks_restore(&cb, cbflags);
 
         unsigned long store_mfn = 0;
         unsigned long console_mfn = 0;
@@ -288,8 +285,7 @@ int main(int argc, char **argv)
 
         r = xc_domain_restore(xch, io_fd, dom, store_evtchn, &store_mfn,
                               store_domid, console_evtchn, &console_mfn,
-                              console_domid, stream_type,
-                              &helper_restore_callbacks, send_back_fd);
+                              console_domid, stream_type, &cb, send_back_fd);
         helper_stub_restore_results(store_mfn,console_mfn,0);
         complete(r);
 

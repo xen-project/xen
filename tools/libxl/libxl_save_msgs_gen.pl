@@ -333,7 +333,7 @@ END_ALWAYS
         my $c_v = "(1u<<$msgnum)";
         my $c_cb = "cbs->$name";
         $f_more_sr->("    if ($c_cb) cbflags |= $c_v;\n", $enumcallbacks);
-        $f_more_sr->("    $c_cb = (cbflags & $c_v) ? ${encode}_${name} : 0;\n",
+        $f_more_sr->("    if (cbflags & $c_v) $c_cb = ${encode}_${name};\n",
                      $setcallbacks);
     }
     $f_more_sr->("        return 1;\n    }\n\n");
