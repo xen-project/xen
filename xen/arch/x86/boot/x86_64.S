@@ -36,8 +36,6 @@ ENTRY(__high_start)
         call    __start_xen
         BUG     /* __start_xen() shouldn't return. */
 
-/*** DESCRIPTOR TABLES ***/
-
         .data
         .align 8
 multiboot_ptr:
