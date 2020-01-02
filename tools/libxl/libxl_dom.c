@@ -387,9 +387,11 @@ static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
 }
 
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
-              libxl_domain_config *d_config, libxl__domain_build_state *state)
+                     libxl__domain_create_state *dcs)
 {
+    libxl_domain_config *d_config = dcs->guest_config;
     libxl_domain_build_info *const info = &d_config->b_info;
+    libxl__domain_build_state *state = &dcs->build_state;
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *xs_domid, *con_domid;
     int rc;

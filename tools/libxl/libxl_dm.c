@@ -2097,8 +2097,9 @@ char *libxl__stub_dm_name(libxl__gc *gc, const char *guest_name)
     return GCSPRINTF("%s-dm", guest_name);
 }
 
-void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
+void libxl__spawn_stub_dm(libxl__egc *egc, libxl__domain_create_state *dcs)
 {
+    libxl__stub_dm_spawn_state *sdss = &dcs->sdss;
     STATE_AO_GC(sdss->dm.spawn.ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret;
@@ -2197,7 +2198,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     if (ret)
         goto out;
     uint32_t dm_domid = sdss->pvqemu.guest_domid;
-    ret = libxl__domain_build(gc, dm_config, dm_domid, stubdom_state);
+    ret = libxl__domain_build(gc, dm_domid, dcs);
     if (ret)
         goto out;
 
