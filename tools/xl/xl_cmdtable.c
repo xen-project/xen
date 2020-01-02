@@ -502,7 +502,7 @@ struct cmd_spec cmd_table[] = {
     },
     { "loadpolicy",
       &main_loadpolicy, 0, 1,
-      "Loads a new policy int the Flask Xen security module",
+      "Loads a new policy into the Flask Xen security module",
       "<policy file>",
     },
 #ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
