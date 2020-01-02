@@ -367,7 +367,7 @@ static void __init efi_arch_pre_exit_boot(void)
 {
 }
 
-static void __init efi_arch_post_exit_boot(void)
+static void __init noreturn efi_arch_post_exit_boot(void)
 {
     efi_xen_start(fdt, fdt_totalsize(fdt));
 }

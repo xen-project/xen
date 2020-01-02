@@ -268,7 +268,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
                      [stkoff] "i" (STACK_SIZE - sizeof(struct cpu_info)),
                      "D" (&mbi)
                    : "memory" );
-    for( ; ; ); /* not reached */
+    unreachable();
 }
 
 static void __init efi_arch_cfg_file_early(EFI_FILE_HANDLE dir_handle, char *section)
