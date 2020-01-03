@@ -1342,7 +1342,14 @@ static int hvmemul_write(
     if ( !mapping )
         return linear_write(addr, bytes, p_data, pfec, hvmemul_ctxt);
 
-    memcpy(mapping, p_data, bytes);
+    /* Where possible use single (and hence generally atomic) MOV insns. */
+    switch ( bytes )
+    {
+    case 2: write_u16_atomic(mapping, *(uint16_t *)p_data); break;
+    case 4: write_u32_atomic(mapping, *(uint32_t *)p_data); break;
+    case 8: write_u64_atomic(mapping, *(uint64_t *)p_data); break;
+    default: memcpy(mapping, p_data, bytes);                break;
+    }
 
     hvmemul_unmap_linear_addr(mapping, addr, bytes, hvmemul_ctxt);
 
