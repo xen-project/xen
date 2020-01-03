@@ -504,7 +504,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         dom = op->domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
         {
-            ret = -EINVAL;
+            ret = -EEXIST;
             if ( !is_free_domid(dom) )
                 break;
         }
