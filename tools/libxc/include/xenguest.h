@@ -181,23 +181,27 @@ struct restore_callbacks {
  *
  * Domain is restored in a suspended state ready to be unpaused.
  *
- * @parm xch a handle to an open hypervisor interface
- * @parm fd the file descriptor to restore a domain from
- * @parm dom the id of the domain
- * @parm store_evtchn the store event channel for this domain to use
- * @parm store_mfn returned with the mfn of the store page
- * @parm hvm non-zero if this is a HVM restore
- * @parm pae non-zero if this HVM domain has PAE support enabled
- * @parm stream_type non-zero if the far end of the stream is using checkpointing
- * @parm callbacks non-NULL to receive a callback to restore toolstack
- *       specific data
+ * @param xch a handle to an open hypervisor interface
+ * @param io_fd the file descriptor to restore a domain from
+ * @param dom the id of the domain
+ * @param store_evtchn the xenstore event channel for this domain to use
+ * @param store_mfn filled with the gfn of the store page
+ * @param store_domid the backend domain for xenstore
+ * @param console_evtchn the console event channel for this domain to use
+ * @param console_mfn filled with the gfn of the console page
+ * @param console_domid the backend domain for xenconsole
+ * @param stream_type XC_MIG_STREAM_NONE if the far end of the stream is using
+ *        checkpointing
+ * @param callbacks non-NULL to receive a callback to restore toolstack
+ *        specific data
+ * @param recv_df Only used for XC_MIG_STREAM_COLO.  Contains backchannel to
+ *        the source side.
  * @return 0 on success, -1 on failure
  */
 int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       uint32_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_mfn, uint32_t console_domid,
-                      unsigned int hvm, unsigned int pae,
                       xc_migration_stream_t stream_type,
                       struct restore_callbacks *callbacks, int send_back_fd);
 

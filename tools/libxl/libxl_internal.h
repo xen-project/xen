@@ -4199,8 +4199,7 @@ _hidden int libxl__restore_emulator_xenstore_data
 /* calls libxl__xc_domain_restore_done when done */
 _hidden void libxl__xc_domain_restore(libxl__egc *egc,
                                       libxl__domain_create_state *dcs,
-                                      libxl__save_helper_state *shs,
-                                      int hvm, int pae);
+                                      libxl__save_helper_state *shs);
 /* If rc==0 then retval is the return value from xc_domain_save
  * and errnoval is the errno value it provided.
  * If rc!=0, retval and errnoval are undefined. */

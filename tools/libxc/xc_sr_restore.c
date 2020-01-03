@@ -833,7 +833,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       uint32_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_gfn, uint32_t console_domid,
-                      unsigned int hvm, unsigned int pae,
                       xc_migration_stream_t stream_type,
                       struct restore_callbacks *callbacks, int send_back_fd)
 {
@@ -866,9 +865,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                callbacks->restore_results);
     }
 
-    DPRINTF("fd %d, dom %u, hvm %u, pae %u, stream_type %d",
-            io_fd, dom, hvm, pae, stream_type);
-
     if ( xc_domain_getinfo(xch, dom, 1, &ctx.dominfo) != 1 )
     {
         PERROR("Failed to get domain info");
@@ -880,6 +876,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         ERROR("Domain %u does not exist", dom);
         return -1;
     }
+
+    DPRINTF("fd %d, dom %u, hvm %u, stream_type %d",
+            io_fd, dom, ctx.dominfo.hvm, stream_type);
 
     ctx.domid = dom;
 
@@ -893,19 +892,11 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     }
 
     ctx.restore.p2m_size = nr_pfns;
+    ctx.restore.ops = ctx.dominfo.hvm
+        ? restore_ops_x86_hvm : restore_ops_x86_pv;
 
-    if ( ctx.dominfo.hvm )
-    {
-        ctx.restore.ops = restore_ops_x86_hvm;
-        if ( restore(&ctx) )
-            return -1;
-    }
-    else
-    {
-        ctx.restore.ops = restore_ops_x86_pv;
-        if ( restore(&ctx) )
-            return -1;
-    }
+    if ( restore(&ctx) )
+        return -1;
 
     IPRINTF("XenStore: mfn %#"PRIpfn", dom %d, evt %u",
             ctx.restore.xenstore_gfn,
