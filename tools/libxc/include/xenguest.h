@@ -26,9 +26,6 @@
 
 #define XCFLAGS_LIVE      (1 << 0)
 #define XCFLAGS_DEBUG     (1 << 1)
-#define XCFLAGS_HVM       (1 << 2)
-#define XCFLAGS_STDVGA    (1 << 3)
-#define XCFLAGS_CHECKPOINT_COMPRESS    (1 << 4)
 
 #define X86_64_B_SIZE   64 
 #define X86_32_B_SIZE   32
@@ -124,16 +121,18 @@ typedef enum {
 /**
  * This function will save a running domain.
  *
- * @parm xch a handle to an open hypervisor interface
- * @parm fd the file descriptor to save a domain to
- * @parm dom the id of the domain
+ * @param xch a handle to an open hypervisor interface
+ * @param io_fd the file descriptor to save a domain to
+ * @param dom the id of the domain
+ * @param flags XCFLAGS_xxx
  * @param stream_type XC_MIG_STREAM_NONE if the far end of the stream
  *        doesn't use checkpointing
+ * @param recv_fd Only used for XC_MIG_STREAM_COLO.  Contains backchannel from
+ *        the destination side.
  * @return 0 on success, -1 on failure
  */
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
-                   uint32_t flags /* XCFLAGS_xxx */,
-                   struct save_callbacks* callbacks, int hvm,
+                   uint32_t flags, struct save_callbacks *callbacks,
                    xc_migration_stream_t stream_type, int recv_fd);
 
 /* callbacks provided by xc_domain_restore */

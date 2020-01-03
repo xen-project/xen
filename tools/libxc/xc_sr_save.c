@@ -967,7 +967,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
                    uint32_t flags, struct save_callbacks* callbacks,
-                   int hvm, xc_migration_stream_t stream_type, int recv_fd)
+                   xc_migration_stream_t stream_type, int recv_fd)
 {
     struct xc_sr_context ctx =
         {
@@ -982,21 +982,6 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.save.checkpointed = stream_type;
     ctx.save.recv_fd = recv_fd;
 
-    /* If altering migration_stream update this assert too. */
-    assert(stream_type == XC_MIG_STREAM_NONE ||
-           stream_type == XC_MIG_STREAM_REMUS ||
-           stream_type == XC_MIG_STREAM_COLO);
-
-    /* Sanity checks for callbacks. */
-    if ( hvm )
-        assert(callbacks->switch_qemu_logdirty);
-    if ( ctx.save.checkpointed )
-        assert(callbacks->checkpoint && callbacks->postcopy);
-    if ( ctx.save.checkpointed == XC_MIG_STREAM_COLO )
-        assert(callbacks->wait_checkpoint);
-
-    DPRINTF("fd %d, dom %u, flags %u, hvm %d", io_fd, dom, flags, hvm);
-
     if ( xc_domain_getinfo(xch, dom, 1, &ctx.dominfo) != 1 )
     {
         PERROR("Failed to get domain info");
@@ -1008,6 +993,22 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
         ERROR("Domain %u does not exist", dom);
         return -1;
     }
+
+    /* If altering migration_stream update this assert too. */
+    assert(stream_type == XC_MIG_STREAM_NONE ||
+           stream_type == XC_MIG_STREAM_REMUS ||
+           stream_type == XC_MIG_STREAM_COLO);
+
+    /* Sanity checks for callbacks. */
+    if ( ctx.dominfo.hvm )
+        assert(callbacks->switch_qemu_logdirty);
+    if ( ctx.save.checkpointed )
+        assert(callbacks->checkpoint && callbacks->postcopy);
+    if ( ctx.save.checkpointed == XC_MIG_STREAM_COLO )
+        assert(callbacks->wait_checkpoint);
+
+    DPRINTF("fd %d, dom %u, flags %u, hvm %d",
+            io_fd, dom, flags, ctx.dominfo.hvm);
 
     ctx.domid = dom;
 

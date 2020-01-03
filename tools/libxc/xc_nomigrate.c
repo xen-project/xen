@@ -21,7 +21,7 @@
 #include <xenguest.h>
 
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t flags,
-                   struct save_callbacks* callbacks, int hvm,
+                   struct save_callbacks *callbacks,
                    xc_migration_stream_t stream_type, int recv_fd)
 {
     errno = ENOSYS;
