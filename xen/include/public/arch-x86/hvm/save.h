@@ -639,6 +639,8 @@ struct hvm_msr {
 
 #define CPU_MSR_CODE  20
 
+/* Range 22 - 34 (inclusive) reserved for Amazon */
+
 /*
  * Largest type-code in use
  */
