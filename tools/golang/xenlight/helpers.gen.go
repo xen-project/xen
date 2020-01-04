@@ -381,6 +381,22 @@ func (x *Channelinfo) toC(xc *C.libxl_channelinfo) (err error) {
 	xc.state = C.int(x.State)
 	xc.evtch = C.int(x.Evtch)
 	xc.rref = C.int(x.Rref)
+	xc.connection = C.libxl_channel_connection(x.Connection)
+	switch x.Connection {
+	case ChannelConnectionPty:
+		tmp, ok := x.ConnectionUnion.(ChannelinfoConnectionUnionPty)
+		if !ok {
+			return errors.New("wrong type for union key connection")
+		}
+		var pty C.libxl_channelinfo_connection_union_pty
+		if tmp.Path != "" {
+			pty.path = C.CString(tmp.Path)
+		}
+		ptyBytes := C.GoBytes(unsafe.Pointer(&pty), C.sizeof_libxl_channelinfo_connection_union_pty)
+		copy(xc.u[:], ptyBytes)
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Connection)
+	}
 
 	return nil
 }
@@ -1124,6 +1140,189 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		return err
 	}
 	xc.tee = C.libxl_tee_type(x.Tee)
+	xc._type = C.libxl_domain_type(x.Type)
+	switch x.Type {
+	case DomainTypeHvm:
+		tmp, ok := x.TypeUnion.(DomainBuildInfoTypeUnionHvm)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var hvm C.libxl_domain_build_info_type_union_hvm
+		if tmp.Firmware != "" {
+			hvm.firmware = C.CString(tmp.Firmware)
+		}
+		hvm.bios = C.libxl_bios_type(tmp.Bios)
+		if err := tmp.Pae.toC(&hvm.pae); err != nil {
+			return err
+		}
+		if err := tmp.Apic.toC(&hvm.apic); err != nil {
+			return err
+		}
+		if err := tmp.Acpi.toC(&hvm.acpi); err != nil {
+			return err
+		}
+		if err := tmp.AcpiS3.toC(&hvm.acpi_s3); err != nil {
+			return err
+		}
+		if err := tmp.AcpiS4.toC(&hvm.acpi_s4); err != nil {
+			return err
+		}
+		if err := tmp.AcpiLaptopSlate.toC(&hvm.acpi_laptop_slate); err != nil {
+			return err
+		}
+		if err := tmp.Nx.toC(&hvm.nx); err != nil {
+			return err
+		}
+		if err := tmp.Viridian.toC(&hvm.viridian); err != nil {
+			return err
+		}
+		if err := tmp.ViridianEnable.toC(&hvm.viridian_enable); err != nil {
+			return err
+		}
+		if err := tmp.ViridianDisable.toC(&hvm.viridian_disable); err != nil {
+			return err
+		}
+		if tmp.Timeoffset != "" {
+			hvm.timeoffset = C.CString(tmp.Timeoffset)
+		}
+		if err := tmp.Hpet.toC(&hvm.hpet); err != nil {
+			return err
+		}
+		if err := tmp.VptAlign.toC(&hvm.vpt_align); err != nil {
+			return err
+		}
+		hvm.mmio_hole_memkb = C.uint64_t(tmp.MmioHoleMemkb)
+		hvm.timer_mode = C.libxl_timer_mode(tmp.TimerMode)
+		if err := tmp.NestedHvm.toC(&hvm.nested_hvm); err != nil {
+			return err
+		}
+		if err := tmp.Altp2M.toC(&hvm.altp2m); err != nil {
+			return err
+		}
+		if tmp.SystemFirmware != "" {
+			hvm.system_firmware = C.CString(tmp.SystemFirmware)
+		}
+		if tmp.SmbiosFirmware != "" {
+			hvm.smbios_firmware = C.CString(tmp.SmbiosFirmware)
+		}
+		if tmp.AcpiFirmware != "" {
+			hvm.acpi_firmware = C.CString(tmp.AcpiFirmware)
+		}
+		hvm.hdtype = C.libxl_hdtype(tmp.Hdtype)
+		if err := tmp.Nographic.toC(&hvm.nographic); err != nil {
+			return err
+		}
+		if err := tmp.Vga.toC(&hvm.vga); err != nil {
+			return err
+		}
+		if err := tmp.Vnc.toC(&hvm.vnc); err != nil {
+			return err
+		}
+		if tmp.Keymap != "" {
+			hvm.keymap = C.CString(tmp.Keymap)
+		}
+		if err := tmp.Sdl.toC(&hvm.sdl); err != nil {
+			return err
+		}
+		if err := tmp.Spice.toC(&hvm.spice); err != nil {
+			return err
+		}
+		if err := tmp.GfxPassthru.toC(&hvm.gfx_passthru); err != nil {
+			return err
+		}
+		hvm.gfx_passthru_kind = C.libxl_gfx_passthru_kind(tmp.GfxPassthruKind)
+		if tmp.Serial != "" {
+			hvm.serial = C.CString(tmp.Serial)
+		}
+		if tmp.Boot != "" {
+			hvm.boot = C.CString(tmp.Boot)
+		}
+		if err := tmp.Usb.toC(&hvm.usb); err != nil {
+			return err
+		}
+		hvm.usbversion = C.int(tmp.Usbversion)
+		if tmp.Usbdevice != "" {
+			hvm.usbdevice = C.CString(tmp.Usbdevice)
+		}
+		if err := tmp.VkbDevice.toC(&hvm.vkb_device); err != nil {
+			return err
+		}
+		if tmp.Soundhw != "" {
+			hvm.soundhw = C.CString(tmp.Soundhw)
+		}
+		if err := tmp.XenPlatformPci.toC(&hvm.xen_platform_pci); err != nil {
+			return err
+		}
+		if err := tmp.UsbdeviceList.toC(&hvm.usbdevice_list); err != nil {
+			return err
+		}
+		hvm.vendor_device = C.libxl_vendor_device(tmp.VendorDevice)
+		if err := tmp.MsVmGenid.toC(&hvm.ms_vm_genid); err != nil {
+			return err
+		}
+		if err := tmp.SerialList.toC(&hvm.serial_list); err != nil {
+			return err
+		}
+		if err := tmp.Rdm.toC(&hvm.rdm); err != nil {
+			return err
+		}
+		hvm.rdm_mem_boundary_memkb = C.uint64_t(tmp.RdmMemBoundaryMemkb)
+		hvm.mca_caps = C.uint64_t(tmp.McaCaps)
+		hvmBytes := C.GoBytes(unsafe.Pointer(&hvm), C.sizeof_libxl_domain_build_info_type_union_hvm)
+		copy(xc.u[:], hvmBytes)
+	case DomainTypePv:
+		tmp, ok := x.TypeUnion.(DomainBuildInfoTypeUnionPv)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var pv C.libxl_domain_build_info_type_union_pv
+		if tmp.Kernel != "" {
+			pv.kernel = C.CString(tmp.Kernel)
+		}
+		pv.slack_memkb = C.uint64_t(tmp.SlackMemkb)
+		if tmp.Bootloader != "" {
+			pv.bootloader = C.CString(tmp.Bootloader)
+		}
+		if err := tmp.BootloaderArgs.toC(&pv.bootloader_args); err != nil {
+			return err
+		}
+		if tmp.Cmdline != "" {
+			pv.cmdline = C.CString(tmp.Cmdline)
+		}
+		if tmp.Ramdisk != "" {
+			pv.ramdisk = C.CString(tmp.Ramdisk)
+		}
+		if tmp.Features != "" {
+			pv.features = C.CString(tmp.Features)
+		}
+		if err := tmp.E820Host.toC(&pv.e820_host); err != nil {
+			return err
+		}
+		pvBytes := C.GoBytes(unsafe.Pointer(&pv), C.sizeof_libxl_domain_build_info_type_union_pv)
+		copy(xc.u[:], pvBytes)
+	case DomainTypePvh:
+		tmp, ok := x.TypeUnion.(DomainBuildInfoTypeUnionPvh)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var pvh C.libxl_domain_build_info_type_union_pvh
+		if err := tmp.Pvshim.toC(&pvh.pvshim); err != nil {
+			return err
+		}
+		if tmp.PvshimPath != "" {
+			pvh.pvshim_path = C.CString(tmp.PvshimPath)
+		}
+		if tmp.PvshimCmdline != "" {
+			pvh.pvshim_cmdline = C.CString(tmp.PvshimCmdline)
+		}
+		if tmp.PvshimExtra != "" {
+			pvh.pvshim_extra = C.CString(tmp.PvshimExtra)
+		}
+		pvhBytes := C.GoBytes(unsafe.Pointer(&pvh), C.sizeof_libxl_domain_build_info_type_union_pvh)
+		copy(xc.u[:], pvhBytes)
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Type)
+	}
 	xc.arch_arm.gic_version = C.libxl_gic_version(x.ArchArm.GicVersion)
 	xc.arch_arm.vuart = C.libxl_vuart_type(x.ArchArm.Vuart)
 	xc.altp2m = C.libxl_altp2m_mode(x.Altp2M)
@@ -1689,6 +1888,21 @@ func (x *DeviceUsbdev) toC(xc *C.libxl_device_usbdev) (err error) {
 
 	xc.ctrl = C.libxl_devid(x.Ctrl)
 	xc.port = C.int(x.Port)
+	xc._type = C.libxl_usbdev_type(x.Type)
+	switch x.Type {
+	case UsbdevTypeHostdev:
+		tmp, ok := x.TypeUnion.(DeviceUsbdevTypeUnionHostdev)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var hostdev C.libxl_device_usbdev_type_union_hostdev
+		hostdev.hostbus = C.uint8_t(tmp.Hostbus)
+		hostdev.hostaddr = C.uint8_t(tmp.Hostaddr)
+		hostdevBytes := C.GoBytes(unsafe.Pointer(&hostdev), C.sizeof_libxl_device_usbdev_type_union_hostdev)
+		copy(xc.u[:], hostdevBytes)
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Type)
+	}
 
 	return nil
 }
@@ -1847,6 +2061,22 @@ func (x *DeviceChannel) toC(xc *C.libxl_device_channel) (err error) {
 	xc.devid = C.libxl_devid(x.Devid)
 	if x.Name != "" {
 		xc.name = C.CString(x.Name)
+	}
+	xc.connection = C.libxl_channel_connection(x.Connection)
+	switch x.Connection {
+	case ChannelConnectionSocket:
+		tmp, ok := x.ConnectionUnion.(DeviceChannelConnectionUnionSocket)
+		if !ok {
+			return errors.New("wrong type for union key connection")
+		}
+		var socket C.libxl_device_channel_connection_union_socket
+		if tmp.Path != "" {
+			socket.path = C.CString(tmp.Path)
+		}
+		socketBytes := C.GoBytes(unsafe.Pointer(&socket), C.sizeof_libxl_device_channel_connection_union_socket)
+		copy(xc.u[:], socketBytes)
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Connection)
 	}
 
 	return nil
@@ -2911,6 +3141,43 @@ func (x *Event) toC(xc *C.libxl_event) (err error) {
 		return err
 	}
 	xc.for_user = C.uint64_t(x.ForUser)
+	xc._type = C.libxl_event_type(x.Type)
+	switch x.Type {
+	case EventTypeDomainShutdown:
+		tmp, ok := x.TypeUnion.(EventTypeUnionDomainShutdown)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var domain_shutdown C.libxl_event_type_union_domain_shutdown
+		domain_shutdown.shutdown_reason = C.uint8_t(tmp.ShutdownReason)
+		domain_shutdownBytes := C.GoBytes(unsafe.Pointer(&domain_shutdown), C.sizeof_libxl_event_type_union_domain_shutdown)
+		copy(xc.u[:], domain_shutdownBytes)
+	case EventTypeDiskEject:
+		tmp, ok := x.TypeUnion.(EventTypeUnionDiskEject)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var disk_eject C.libxl_event_type_union_disk_eject
+		if tmp.Vdev != "" {
+			disk_eject.vdev = C.CString(tmp.Vdev)
+		}
+		if err := tmp.Disk.toC(&disk_eject.disk); err != nil {
+			return err
+		}
+		disk_ejectBytes := C.GoBytes(unsafe.Pointer(&disk_eject), C.sizeof_libxl_event_type_union_disk_eject)
+		copy(xc.u[:], disk_ejectBytes)
+	case EventTypeOperationComplete:
+		tmp, ok := x.TypeUnion.(EventTypeUnionOperationComplete)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var operation_complete C.libxl_event_type_union_operation_complete
+		operation_complete.rc = C.int(tmp.Rc)
+		operation_completeBytes := C.GoBytes(unsafe.Pointer(&operation_complete), C.sizeof_libxl_event_type_union_operation_complete)
+		copy(xc.u[:], operation_completeBytes)
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Type)
+	}
 
 	return nil
 }
@@ -2994,6 +3261,33 @@ func (x *PsrHwInfo) toC(xc *C.libxl_psr_hw_info) (err error) {
 	}()
 
 	xc.id = C.uint32_t(x.Id)
+	xc._type = C.libxl_psr_feat_type(x.Type)
+	switch x.Type {
+	case PsrFeatTypeCat:
+		tmp, ok := x.TypeUnion.(PsrHwInfoTypeUnionCat)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var cat C.libxl_psr_hw_info_type_union_cat
+		cat.cos_max = C.uint32_t(tmp.CosMax)
+		cat.cbm_len = C.uint32_t(tmp.CbmLen)
+		cat.cdp_enabled = C.bool(tmp.CdpEnabled)
+		catBytes := C.GoBytes(unsafe.Pointer(&cat), C.sizeof_libxl_psr_hw_info_type_union_cat)
+		copy(xc.u[:], catBytes)
+	case PsrFeatTypeMba:
+		tmp, ok := x.TypeUnion.(PsrHwInfoTypeUnionMba)
+		if !ok {
+			return errors.New("wrong type for union key type")
+		}
+		var mba C.libxl_psr_hw_info_type_union_mba
+		mba.cos_max = C.uint32_t(tmp.CosMax)
+		mba.thrtl_max = C.uint32_t(tmp.ThrtlMax)
+		mba.linear = C.bool(tmp.Linear)
+		mbaBytes := C.GoBytes(unsafe.Pointer(&mba), C.sizeof_libxl_psr_hw_info_type_union_mba)
+		copy(xc.u[:], mbaBytes)
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Type)
+	}
 
 	return nil
 }
