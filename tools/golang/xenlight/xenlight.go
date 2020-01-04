@@ -140,14 +140,12 @@ func (u *Uuid) fromC(c *C.libxl_uuid) error {
 	return nil
 }
 
-func (u *Uuid) toC() (C.libxl_uuid, error) {
-	var c C.libxl_uuid
-
+func (u *Uuid) toC(cu *C.libxl_uuid) error {
 	for i, v := range u {
-		c.uuid[i] = C.uint8_t(v)
+		cu.uuid[i] = C.uint8_t(v)
 	}
 
-	return c, nil
+	return nil
 }
 
 // defboolVal represents a defbool value.
@@ -232,15 +230,13 @@ func (d *Defbool) fromC(c *C.libxl_defbool) error {
 	return nil
 }
 
-func (d *Defbool) toC() (C.libxl_defbool, error) {
-	var c C.libxl_defbool
-
+func (d *Defbool) toC(cd *C.libxl_defbool) error {
 	if !d.IsDefault() {
 		val, _ := d.Val()
-		C.libxl_defbool_set(&c, C.bool(val))
+		C.libxl_defbool_set(cd, C.bool(val))
 	}
 
-	return c, nil
+	return nil
 }
 
 // Mac represents a libxl_mac, or simply a MAC address.
@@ -266,14 +262,12 @@ func (mac *Mac) fromC(cmac *C.libxl_mac) error {
 	return nil
 }
 
-func (mac Mac) toC() (C.libxl_mac, error) {
-	var cmac C.libxl_mac
-
+func (mac Mac) toC(cm *C.libxl_mac) error {
 	for i, v := range mac {
-		cmac[i] = C.uint8_t(v)
+		(*cm)[i] = C.uint8_t(v)
 	}
 
-	return cmac, nil
+	return nil
 }
 
 // MsVmGenid represents a libxl_ms_vm_genid.
@@ -287,14 +281,12 @@ func (mvg *MsVmGenid) fromC(cmvg *C.libxl_ms_vm_genid) error {
 	return nil
 }
 
-func (mvg *MsVmGenid) toC() (C.libxl_ms_vm_genid, error) {
-	var cmvg C.libxl_ms_vm_genid
-
+func (mvg *MsVmGenid) toC(cmvg *C.libxl_ms_vm_genid) error {
 	for i, v := range mvg {
 		cmvg.bytes[i] = C.uint8_t(v)
 	}
 
-	return cmvg, nil
+	return nil
 }
 
 // EvLink represents a libxl_ev_link.
@@ -304,8 +296,8 @@ func (mvg *MsVmGenid) toC() (C.libxl_ms_vm_genid, error) {
 // through the Go package.
 type EvLink struct{}
 
-func (el *EvLink) fromC(cel *C.libxl_ev_link) error      { return nil }
-func (el *EvLink) toC() (cel C.libxl_ev_link, err error) { return }
+func (el *EvLink) fromC(cel *C.libxl_ev_link) error     { return nil }
+func (el *EvLink) toC(cel *C.libxl_ev_link) (err error) { return }
 
 // CpuidPolicyList represents a libxl_cpuid_policy_list.
 //
@@ -316,20 +308,18 @@ type CpuidPolicyList string
 
 func (cpl CpuidPolicyList) fromC(ccpl *C.libxl_cpuid_policy_list) error { return nil }
 
-func (cpl CpuidPolicyList) toC() (C.libxl_cpuid_policy_list, error) {
-	var ccpl C.libxl_cpuid_policy_list
-
+func (cpl CpuidPolicyList) toC(ccpl *C.libxl_cpuid_policy_list) error {
 	s := C.CString(string(cpl))
 	defer C.free(unsafe.Pointer(s))
 
-	ret := C.libxl_cpuid_parse_config(&ccpl, s)
+	ret := C.libxl_cpuid_parse_config(ccpl, s)
 	if ret != 0 {
-		C.libxl_cpuid_dispose(&ccpl)
+		C.libxl_cpuid_dispose(ccpl)
 
-		return ccpl, Error(-ret)
+		return Error(-ret)
 	}
 
-	return ccpl, nil
+	return nil
 }
 
 // Hwcap represents a libxl_hwcap.
@@ -343,14 +333,12 @@ func (hwcap *Hwcap) fromC(chwcap *C.libxl_hwcap) error {
 	return nil
 }
 
-func (hwcap *Hwcap) toC() (C.libxl_hwcap, error) {
-	var chwcap C.libxl_hwcap
-
+func (hwcap *Hwcap) toC(chwcap *C.libxl_hwcap) error {
 	for i, v := range hwcap {
-		chwcap[i] = C.uint32_t(v)
+		(*chwcap)[i] = C.uint32_t(v)
 	}
 
-	return chwcap, nil
+	return nil
 }
 
 // KeyValueList represents a libxl_key_value_list.
@@ -360,8 +348,8 @@ func (hwcap *Hwcap) toC() (C.libxl_hwcap, error) {
 // Go package.
 type KeyValueList struct{}
 
-func (kvl KeyValueList) fromC(ckvl *C.libxl_key_value_list) error      { return nil }
-func (kvl KeyValueList) toC() (ckvl C.libxl_key_value_list, err error) { return }
+func (kvl KeyValueList) fromC(ckvl *C.libxl_key_value_list) error     { return nil }
+func (kvl KeyValueList) toC(ckvl *C.libxl_key_value_list) (err error) { return }
 
 // StringList represents a libxl_string_list.
 type StringList []string
@@ -379,17 +367,17 @@ func (sl *StringList) fromC(csl *C.libxl_string_list) error {
 	return nil
 }
 
-func (sl StringList) toC() (C.libxl_string_list, error) {
+func (sl StringList) toC(csl *C.libxl_string_list) error {
 	var char *C.char
 	size := len(sl)
-	csl := (C.libxl_string_list)(C.malloc(C.ulong(size) * C.ulong(unsafe.Sizeof(char))))
+	*csl = (C.libxl_string_list)(C.malloc(C.ulong(size) * C.ulong(unsafe.Sizeof(char))))
 	clist := (*[1 << 30]*C.char)(unsafe.Pointer(csl))[:size:size]
 
 	for i, v := range sl {
 		clist[i] = C.CString(v)
 	}
 
-	return csl, nil
+	return nil
 }
 
 // Bitmap represents a libxl_bitmap.
@@ -421,9 +409,7 @@ func (bm *Bitmap) fromC(cbm *C.libxl_bitmap) error {
 	return nil
 }
 
-func (bm *Bitmap) toC() (C.libxl_bitmap, error) {
-	var cbm C.libxl_bitmap
-
+func (bm *Bitmap) toC(cbm *C.libxl_bitmap) error {
 	size := len(bm.bitmap)
 	cbm.size = C.uint32_t(size)
 	cbm._map = (*C.uint8_t)(C.malloc(C.ulong(cbm.size) * C.sizeof_uint8_t))
@@ -431,7 +417,7 @@ func (bm *Bitmap) toC() (C.libxl_bitmap, error) {
 
 	copy(cs, bm.bitmap)
 
-	return cbm, nil
+	return nil
 }
 
 func (sr ShutdownReason) String() (str string) {
@@ -534,8 +520,8 @@ func (Ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitma
 	var uuid C.libxl_uuid
 	C.libxl_uuid_generate(&uuid)
 
-	cbm, err := Cpumap.toC()
-	if err != nil {
+	var cbm C.libxl_bitmap
+	if err = Cpumap.toC(&cbm); err != nil {
 		return
 	}
 	defer C.libxl_bitmap_dispose(&cbm)
@@ -577,8 +563,8 @@ func (Ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
 // int libxl_cpupool_cpuadd_cpumap(libxl_ctx *ctx, uint32_t poolid,
 //                                 const libxl_bitmap *cpumap);
 func (Ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
-	cbm, err := Cpumap.toC()
-	if err != nil {
+	var cbm C.libxl_bitmap
+	if err = Cpumap.toC(&cbm); err != nil {
 		return
 	}
 	defer C.libxl_bitmap_dispose(&cbm)
@@ -606,8 +592,8 @@ func (Ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
 // int libxl_cpupool_cpuremove_cpumap(libxl_ctx *ctx, uint32_t poolid,
 //                                    const libxl_bitmap *cpumap);
 func (Ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
-	cbm, err := Cpumap.toC()
-	if err != nil {
+	var cbm C.libxl_bitmap
+	if err = Cpumap.toC(&cbm); err != nil {
 		return
 	}
 	defer C.libxl_bitmap_dispose(&cbm)

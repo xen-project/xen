@@ -37,6 +37,19 @@ func (x *IoportRange) fromC(xc *C.libxl_ioport_range) error {
 	return nil
 }
 
+func (x *IoportRange) toC(xc *C.libxl_ioport_range) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_ioport_range_dispose(xc)
+		}
+	}()
+
+	xc.first = C.uint32_t(x.First)
+	xc.number = C.uint32_t(x.Number)
+
+	return nil
+}
+
 func (x *IomemRange) fromC(xc *C.libxl_iomem_range) error {
 	x.Start = uint64(xc.start)
 	x.Number = uint64(xc.number)
@@ -45,8 +58,34 @@ func (x *IomemRange) fromC(xc *C.libxl_iomem_range) error {
 	return nil
 }
 
+func (x *IomemRange) toC(xc *C.libxl_iomem_range) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_iomem_range_dispose(xc)
+		}
+	}()
+
+	xc.start = C.uint64_t(x.Start)
+	xc.number = C.uint64_t(x.Number)
+	xc.gfn = C.uint64_t(x.Gfn)
+
+	return nil
+}
+
 func (x *VgaInterfaceInfo) fromC(xc *C.libxl_vga_interface_info) error {
 	x.Kind = VgaInterfaceType(xc.kind)
+
+	return nil
+}
+
+func (x *VgaInterfaceInfo) toC(xc *C.libxl_vga_interface_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vga_interface_info_dispose(xc)
+		}
+	}()
+
+	xc.kind = C.libxl_vga_interface_type(x.Kind)
 
 	return nil
 }
@@ -59,6 +98,30 @@ func (x *VncInfo) fromC(xc *C.libxl_vnc_info) error {
 	x.Passwd = C.GoString(xc.passwd)
 	x.Display = int(xc.display)
 	if err := x.Findunused.fromC(&xc.findunused); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (x *VncInfo) toC(xc *C.libxl_vnc_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vnc_info_dispose(xc)
+		}
+	}()
+
+	if err := x.Enable.toC(&xc.enable); err != nil {
+		return err
+	}
+	if x.Listen != "" {
+		xc.listen = C.CString(x.Listen)
+	}
+	if x.Passwd != "" {
+		xc.passwd = C.CString(x.Passwd)
+	}
+	xc.display = C.int(x.Display)
+	if err := x.Findunused.toC(&xc.findunused); err != nil {
 		return err
 	}
 
@@ -92,6 +155,47 @@ func (x *SpiceInfo) fromC(xc *C.libxl_spice_info) error {
 	return nil
 }
 
+func (x *SpiceInfo) toC(xc *C.libxl_spice_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_spice_info_dispose(xc)
+		}
+	}()
+
+	if err := x.Enable.toC(&xc.enable); err != nil {
+		return err
+	}
+	xc.port = C.int(x.Port)
+	xc.tls_port = C.int(x.TlsPort)
+	if x.Host != "" {
+		xc.host = C.CString(x.Host)
+	}
+	if err := x.DisableTicketing.toC(&xc.disable_ticketing); err != nil {
+		return err
+	}
+	if x.Passwd != "" {
+		xc.passwd = C.CString(x.Passwd)
+	}
+	if err := x.AgentMouse.toC(&xc.agent_mouse); err != nil {
+		return err
+	}
+	if err := x.Vdagent.toC(&xc.vdagent); err != nil {
+		return err
+	}
+	if err := x.ClipboardSharing.toC(&xc.clipboard_sharing); err != nil {
+		return err
+	}
+	xc.usbredirection = C.int(x.Usbredirection)
+	if x.ImageCompression != "" {
+		xc.image_compression = C.CString(x.ImageCompression)
+	}
+	if x.StreamingVideo != "" {
+		xc.streaming_video = C.CString(x.StreamingVideo)
+	}
+
+	return nil
+}
+
 func (x *SdlInfo) fromC(xc *C.libxl_sdl_info) error {
 	if err := x.Enable.fromC(&xc.enable); err != nil {
 		return err
@@ -101,6 +205,29 @@ func (x *SdlInfo) fromC(xc *C.libxl_sdl_info) error {
 	}
 	x.Display = C.GoString(xc.display)
 	x.Xauthority = C.GoString(xc.xauthority)
+
+	return nil
+}
+
+func (x *SdlInfo) toC(xc *C.libxl_sdl_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_sdl_info_dispose(xc)
+		}
+	}()
+
+	if err := x.Enable.toC(&xc.enable); err != nil {
+		return err
+	}
+	if err := x.Opengl.toC(&xc.opengl); err != nil {
+		return err
+	}
+	if x.Display != "" {
+		xc.display = C.CString(x.Display)
+	}
+	if x.Xauthority != "" {
+		xc.xauthority = C.CString(x.Xauthority)
+	}
 
 	return nil
 }
@@ -133,12 +260,68 @@ func (x *Dominfo) fromC(xc *C.libxl_dominfo) error {
 	return nil
 }
 
+func (x *Dominfo) toC(xc *C.libxl_dominfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_dominfo_dispose(xc)
+		}
+	}()
+
+	if err := x.Uuid.toC(&xc.uuid); err != nil {
+		return err
+	}
+	xc.domid = C.libxl_domid(x.Domid)
+	xc.ssidref = C.uint32_t(x.Ssidref)
+	if x.SsidLabel != "" {
+		xc.ssid_label = C.CString(x.SsidLabel)
+	}
+	xc.running = C.bool(x.Running)
+	xc.blocked = C.bool(x.Blocked)
+	xc.paused = C.bool(x.Paused)
+	xc.shutdown = C.bool(x.Shutdown)
+	xc.dying = C.bool(x.Dying)
+	xc.never_stop = C.bool(x.NeverStop)
+	xc.shutdown_reason = C.libxl_shutdown_reason(x.ShutdownReason)
+	xc.outstanding_memkb = C.uint64_t(x.OutstandingMemkb)
+	xc.current_memkb = C.uint64_t(x.CurrentMemkb)
+	xc.shared_memkb = C.uint64_t(x.SharedMemkb)
+	xc.paged_memkb = C.uint64_t(x.PagedMemkb)
+	xc.max_memkb = C.uint64_t(x.MaxMemkb)
+	xc.cpu_time = C.uint64_t(x.CpuTime)
+	xc.vcpu_max_id = C.uint32_t(x.VcpuMaxId)
+	xc.vcpu_online = C.uint32_t(x.VcpuOnline)
+	xc.cpupool = C.uint32_t(x.Cpupool)
+	xc.domain_type = C.libxl_domain_type(x.DomainType)
+
+	return nil
+}
+
 func (x *Cpupoolinfo) fromC(xc *C.libxl_cpupoolinfo) error {
 	x.Poolid = uint32(xc.poolid)
 	x.PoolName = C.GoString(xc.pool_name)
 	x.Sched = Scheduler(xc.sched)
 	x.NDom = uint32(xc.n_dom)
 	if err := x.Cpumap.fromC(&xc.cpumap); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (x *Cpupoolinfo) toC(xc *C.libxl_cpupoolinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_cpupoolinfo_dispose(xc)
+		}
+	}()
+
+	xc.poolid = C.uint32_t(x.Poolid)
+	if x.PoolName != "" {
+		xc.pool_name = C.CString(x.PoolName)
+	}
+	xc.sched = C.libxl_scheduler(x.Sched)
+	xc.n_dom = C.uint32_t(x.NDom)
+	if err := x.Cpumap.toC(&xc.cpumap); err != nil {
 		return err
 	}
 
@@ -179,11 +362,49 @@ func (x *ChannelinfoConnectionUnionPty) fromC(xc *C.libxl_channelinfo) error {
 	return nil
 }
 
+func (x *Channelinfo) toC(xc *C.libxl_channelinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_channelinfo_dispose(xc)
+		}
+	}()
+
+	if x.Backend != "" {
+		xc.backend = C.CString(x.Backend)
+	}
+	xc.backend_id = C.uint32_t(x.BackendId)
+	if x.Frontend != "" {
+		xc.frontend = C.CString(x.Frontend)
+	}
+	xc.frontend_id = C.uint32_t(x.FrontendId)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.state = C.int(x.State)
+	xc.evtch = C.int(x.Evtch)
+	xc.rref = C.int(x.Rref)
+
+	return nil
+}
+
 func (x *Vminfo) fromC(xc *C.libxl_vminfo) error {
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
 		return err
 	}
 	x.Domid = Domid(xc.domid)
+
+	return nil
+}
+
+func (x *Vminfo) toC(xc *C.libxl_vminfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vminfo_dispose(xc)
+		}
+	}()
+
+	if err := x.Uuid.toC(&xc.uuid); err != nil {
+		return err
+	}
+	xc.domid = C.libxl_domid(x.Domid)
 
 	return nil
 }
@@ -202,6 +423,48 @@ func (x *VersionInfo) fromC(xc *C.libxl_version_info) error {
 	x.Pagesize = int(xc.pagesize)
 	x.Commandline = C.GoString(xc.commandline)
 	x.BuildId = C.GoString(xc.build_id)
+
+	return nil
+}
+
+func (x *VersionInfo) toC(xc *C.libxl_version_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_version_info_dispose(xc)
+		}
+	}()
+
+	xc.xen_version_major = C.int(x.XenVersionMajor)
+	xc.xen_version_minor = C.int(x.XenVersionMinor)
+	if x.XenVersionExtra != "" {
+		xc.xen_version_extra = C.CString(x.XenVersionExtra)
+	}
+	if x.Compiler != "" {
+		xc.compiler = C.CString(x.Compiler)
+	}
+	if x.CompileBy != "" {
+		xc.compile_by = C.CString(x.CompileBy)
+	}
+	if x.CompileDomain != "" {
+		xc.compile_domain = C.CString(x.CompileDomain)
+	}
+	if x.CompileDate != "" {
+		xc.compile_date = C.CString(x.CompileDate)
+	}
+	if x.Capabilities != "" {
+		xc.capabilities = C.CString(x.Capabilities)
+	}
+	if x.Changeset != "" {
+		xc.changeset = C.CString(x.Changeset)
+	}
+	xc.virt_start = C.uint64_t(x.VirtStart)
+	xc.pagesize = C.int(x.Pagesize)
+	if x.Commandline != "" {
+		xc.commandline = C.CString(x.Commandline)
+	}
+	if x.BuildId != "" {
+		xc.build_id = C.CString(x.BuildId)
+	}
 
 	return nil
 }
@@ -239,11 +502,75 @@ func (x *DomainCreateInfo) fromC(xc *C.libxl_domain_create_info) error {
 	return nil
 }
 
+func (x *DomainCreateInfo) toC(xc *C.libxl_domain_create_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_domain_create_info_dispose(xc)
+		}
+	}()
+
+	xc._type = C.libxl_domain_type(x.Type)
+	if err := x.Hap.toC(&xc.hap); err != nil {
+		return err
+	}
+	if err := x.Oos.toC(&xc.oos); err != nil {
+		return err
+	}
+	xc.ssidref = C.uint32_t(x.Ssidref)
+	if x.SsidLabel != "" {
+		xc.ssid_label = C.CString(x.SsidLabel)
+	}
+	if x.Name != "" {
+		xc.name = C.CString(x.Name)
+	}
+	if err := x.Uuid.toC(&xc.uuid); err != nil {
+		return err
+	}
+	if err := x.Xsdata.toC(&xc.xsdata); err != nil {
+		return err
+	}
+	if err := x.Platformdata.toC(&xc.platformdata); err != nil {
+		return err
+	}
+	xc.poolid = C.uint32_t(x.Poolid)
+	if x.PoolName != "" {
+		xc.pool_name = C.CString(x.PoolName)
+	}
+	if err := x.RunHotplugScripts.toC(&xc.run_hotplug_scripts); err != nil {
+		return err
+	}
+	if err := x.DriverDomain.toC(&xc.driver_domain); err != nil {
+		return err
+	}
+	xc.passthrough = C.libxl_passthrough(x.Passthrough)
+
+	return nil
+}
+
 func (x *DomainRestoreParams) fromC(xc *C.libxl_domain_restore_params) error {
 	x.CheckpointedStream = int(xc.checkpointed_stream)
 	x.StreamVersion = uint32(xc.stream_version)
 	x.ColoProxyScript = C.GoString(xc.colo_proxy_script)
 	if err := x.UserspaceColoProxy.fromC(&xc.userspace_colo_proxy); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (x *DomainRestoreParams) toC(xc *C.libxl_domain_restore_params) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_domain_restore_params_dispose(xc)
+		}
+	}()
+
+	xc.checkpointed_stream = C.int(x.CheckpointedStream)
+	xc.stream_version = C.uint32_t(x.StreamVersion)
+	if x.ColoProxyScript != "" {
+		xc.colo_proxy_script = C.CString(x.ColoProxyScript)
+	}
+	if err := x.UserspaceColoProxy.toC(&xc.userspace_colo_proxy); err != nil {
 		return err
 	}
 
@@ -257,6 +584,23 @@ func (x *SchedParams) fromC(xc *C.libxl_sched_params) error {
 	x.Period = int(xc.period)
 	x.Extratime = int(xc.extratime)
 	x.Budget = int(xc.budget)
+
+	return nil
+}
+
+func (x *SchedParams) toC(xc *C.libxl_sched_params) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_sched_params_dispose(xc)
+		}
+	}()
+
+	xc.vcpuid = C.int(x.Vcpuid)
+	xc.weight = C.int(x.Weight)
+	xc.cap = C.int(x.Cap)
+	xc.period = C.int(x.Period)
+	xc.extratime = C.int(x.Extratime)
+	xc.budget = C.int(x.Budget)
 
 	return nil
 }
@@ -275,6 +619,18 @@ func (x *VcpuSchedParams) fromC(xc *C.libxl_vcpu_sched_params) error {
 	return nil
 }
 
+func (x *VcpuSchedParams) toC(xc *C.libxl_vcpu_sched_params) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vcpu_sched_params_dispose(xc)
+		}
+	}()
+
+	xc.sched = C.libxl_scheduler(x.Sched)
+
+	return nil
+}
+
 func (x *DomainSchedParams) fromC(xc *C.libxl_domain_sched_params) error {
 	x.Sched = Scheduler(xc.sched)
 	x.Weight = int(xc.weight)
@@ -284,6 +640,25 @@ func (x *DomainSchedParams) fromC(xc *C.libxl_domain_sched_params) error {
 	x.Extratime = int(xc.extratime)
 	x.Slice = int(xc.slice)
 	x.Latency = int(xc.latency)
+
+	return nil
+}
+
+func (x *DomainSchedParams) toC(xc *C.libxl_domain_sched_params) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_domain_sched_params_dispose(xc)
+		}
+	}()
+
+	xc.sched = C.libxl_scheduler(x.Sched)
+	xc.weight = C.int(x.Weight)
+	xc.cap = C.int(x.Cap)
+	xc.period = C.int(x.Period)
+	xc.budget = C.int(x.Budget)
+	xc.extratime = C.int(x.Extratime)
+	xc.slice = C.int(x.Slice)
+	xc.latency = C.int(x.Latency)
 
 	return nil
 }
@@ -304,9 +679,38 @@ func (x *VnodeInfo) fromC(xc *C.libxl_vnode_info) error {
 	return nil
 }
 
+func (x *VnodeInfo) toC(xc *C.libxl_vnode_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vnode_info_dispose(xc)
+		}
+	}()
+
+	xc.memkb = C.uint64_t(x.Memkb)
+	xc.pnode = C.uint32_t(x.Pnode)
+	if err := x.Vcpus.toC(&xc.vcpus); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (x *RdmReserve) fromC(xc *C.libxl_rdm_reserve) error {
 	x.Strategy = RdmReserveStrategy(xc.strategy)
 	x.Policy = RdmReservePolicy(xc.policy)
+
+	return nil
+}
+
+func (x *RdmReserve) toC(xc *C.libxl_rdm_reserve) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_rdm_reserve_dispose(xc)
+		}
+	}()
+
+	xc.strategy = C.libxl_rdm_reserve_strategy(x.Strategy)
+	xc.policy = C.libxl_rdm_reserve_policy(x.Policy)
 
 	return nil
 }
@@ -613,6 +1017,120 @@ func (x *DomainBuildInfoTypeUnionPvh) fromC(xc *C.libxl_domain_build_info) error
 	return nil
 }
 
+func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_domain_build_info_dispose(xc)
+		}
+	}()
+
+	xc.max_vcpus = C.int(x.MaxVcpus)
+	if err := x.AvailVcpus.toC(&xc.avail_vcpus); err != nil {
+		return err
+	}
+	if err := x.Cpumap.toC(&xc.cpumap); err != nil {
+		return err
+	}
+	if err := x.Nodemap.toC(&xc.nodemap); err != nil {
+		return err
+	}
+	if err := x.NumaPlacement.toC(&xc.numa_placement); err != nil {
+		return err
+	}
+	xc.tsc_mode = C.libxl_tsc_mode(x.TscMode)
+	xc.max_memkb = C.uint64_t(x.MaxMemkb)
+	xc.target_memkb = C.uint64_t(x.TargetMemkb)
+	xc.video_memkb = C.uint64_t(x.VideoMemkb)
+	xc.shadow_memkb = C.uint64_t(x.ShadowMemkb)
+	xc.iommu_memkb = C.uint64_t(x.IommuMemkb)
+	xc.rtc_timeoffset = C.uint32_t(x.RtcTimeoffset)
+	xc.exec_ssidref = C.uint32_t(x.ExecSsidref)
+	if x.ExecSsidLabel != "" {
+		xc.exec_ssid_label = C.CString(x.ExecSsidLabel)
+	}
+	if err := x.Localtime.toC(&xc.localtime); err != nil {
+		return err
+	}
+	if err := x.DisableMigrate.toC(&xc.disable_migrate); err != nil {
+		return err
+	}
+	if err := x.Cpuid.toC(&xc.cpuid); err != nil {
+		return err
+	}
+	if x.BlkdevStart != "" {
+		xc.blkdev_start = C.CString(x.BlkdevStart)
+	}
+	xc.max_grant_frames = C.uint32_t(x.MaxGrantFrames)
+	xc.max_maptrack_frames = C.uint32_t(x.MaxMaptrackFrames)
+	xc.device_model_version = C.libxl_device_model_version(x.DeviceModelVersion)
+	if err := x.DeviceModelStubdomain.toC(&xc.device_model_stubdomain); err != nil {
+		return err
+	}
+	if x.DeviceModel != "" {
+		xc.device_model = C.CString(x.DeviceModel)
+	}
+	xc.device_model_ssidref = C.uint32_t(x.DeviceModelSsidref)
+	if x.DeviceModelSsidLabel != "" {
+		xc.device_model_ssid_label = C.CString(x.DeviceModelSsidLabel)
+	}
+	if x.DeviceModelUser != "" {
+		xc.device_model_user = C.CString(x.DeviceModelUser)
+	}
+	if err := x.Extra.toC(&xc.extra); err != nil {
+		return err
+	}
+	if err := x.ExtraPv.toC(&xc.extra_pv); err != nil {
+		return err
+	}
+	if err := x.ExtraHvm.toC(&xc.extra_hvm); err != nil {
+		return err
+	}
+	if err := x.SchedParams.toC(&xc.sched_params); err != nil {
+		return err
+	}
+	if err := x.ClaimMode.toC(&xc.claim_mode); err != nil {
+		return err
+	}
+	xc.event_channels = C.uint32_t(x.EventChannels)
+	if x.Kernel != "" {
+		xc.kernel = C.CString(x.Kernel)
+	}
+	if x.Cmdline != "" {
+		xc.cmdline = C.CString(x.Cmdline)
+	}
+	if x.Ramdisk != "" {
+		xc.ramdisk = C.CString(x.Ramdisk)
+	}
+	if x.DeviceTree != "" {
+		xc.device_tree = C.CString(x.DeviceTree)
+	}
+	if err := x.Acpi.toC(&xc.acpi); err != nil {
+		return err
+	}
+	if x.Bootloader != "" {
+		xc.bootloader = C.CString(x.Bootloader)
+	}
+	if err := x.BootloaderArgs.toC(&xc.bootloader_args); err != nil {
+		return err
+	}
+	xc.timer_mode = C.libxl_timer_mode(x.TimerMode)
+	if err := x.NestedHvm.toC(&xc.nested_hvm); err != nil {
+		return err
+	}
+	if err := x.Apic.toC(&xc.apic); err != nil {
+		return err
+	}
+	if err := x.DmRestrict.toC(&xc.dm_restrict); err != nil {
+		return err
+	}
+	xc.tee = C.libxl_tee_type(x.Tee)
+	xc.arch_arm.gic_version = C.libxl_gic_version(x.ArchArm.GicVersion)
+	xc.arch_arm.vuart = C.libxl_vuart_type(x.ArchArm.Vuart)
+	xc.altp2m = C.libxl_altp2m_mode(x.Altp2M)
+
+	return nil
+}
+
 func (x *DeviceVfb) fromC(xc *C.libxl_device_vfb) error {
 	x.BackendDomid = Domid(xc.backend_domid)
 	x.BackendDomname = C.GoString(xc.backend_domname)
@@ -624,6 +1142,31 @@ func (x *DeviceVfb) fromC(xc *C.libxl_device_vfb) error {
 		return err
 	}
 	x.Keymap = C.GoString(xc.keymap)
+
+	return nil
+}
+
+func (x *DeviceVfb) toC(xc *C.libxl_device_vfb) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_vfb_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
+	if err := x.Vnc.toC(&xc.vnc); err != nil {
+		return err
+	}
+	if err := x.Sdl.toC(&xc.sdl); err != nil {
+		return err
+	}
+	if x.Keymap != "" {
+		xc.keymap = C.CString(x.Keymap)
+	}
 
 	return nil
 }
@@ -644,6 +1187,36 @@ func (x *DeviceVkb) fromC(xc *C.libxl_device_vkb) error {
 	x.MultiTouchWidth = uint32(xc.multi_touch_width)
 	x.MultiTouchHeight = uint32(xc.multi_touch_height)
 	x.MultiTouchNumContacts = uint32(xc.multi_touch_num_contacts)
+
+	return nil
+}
+
+func (x *DeviceVkb) toC(xc *C.libxl_device_vkb) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_vkb_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.backend_type = C.libxl_vkb_backend(x.BackendType)
+	if x.UniqueId != "" {
+		xc.unique_id = C.CString(x.UniqueId)
+	}
+	xc.feature_disable_keyboard = C.bool(x.FeatureDisableKeyboard)
+	xc.feature_disable_pointer = C.bool(x.FeatureDisablePointer)
+	xc.feature_abs_pointer = C.bool(x.FeatureAbsPointer)
+	xc.feature_raw_pointer = C.bool(x.FeatureRawPointer)
+	xc.feature_multi_touch = C.bool(x.FeatureMultiTouch)
+	xc.width = C.uint32_t(x.Width)
+	xc.height = C.uint32_t(x.Height)
+	xc.multi_touch_width = C.uint32_t(x.MultiTouchWidth)
+	xc.multi_touch_height = C.uint32_t(x.MultiTouchHeight)
+	xc.multi_touch_num_contacts = C.uint32_t(x.MultiTouchNumContacts)
 
 	return nil
 }
@@ -674,6 +1247,58 @@ func (x *DeviceDisk) fromC(xc *C.libxl_device_disk) error {
 	x.ColoExport = C.GoString(xc.colo_export)
 	x.ActiveDisk = C.GoString(xc.active_disk)
 	x.HiddenDisk = C.GoString(xc.hidden_disk)
+
+	return nil
+}
+
+func (x *DeviceDisk) toC(xc *C.libxl_device_disk) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_disk_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	if x.PdevPath != "" {
+		xc.pdev_path = C.CString(x.PdevPath)
+	}
+	if x.Vdev != "" {
+		xc.vdev = C.CString(x.Vdev)
+	}
+	xc.backend = C.libxl_disk_backend(x.Backend)
+	xc.format = C.libxl_disk_format(x.Format)
+	if x.Script != "" {
+		xc.script = C.CString(x.Script)
+	}
+	xc.removable = C.int(x.Removable)
+	xc.readwrite = C.int(x.Readwrite)
+	xc.is_cdrom = C.int(x.IsCdrom)
+	xc.direct_io_safe = C.bool(x.DirectIoSafe)
+	if err := x.DiscardEnable.toC(&xc.discard_enable); err != nil {
+		return err
+	}
+	if err := x.ColoEnable.toC(&xc.colo_enable); err != nil {
+		return err
+	}
+	if err := x.ColoRestoreEnable.toC(&xc.colo_restore_enable); err != nil {
+		return err
+	}
+	if x.ColoHost != "" {
+		xc.colo_host = C.CString(x.ColoHost)
+	}
+	xc.colo_port = C.int(x.ColoPort)
+	if x.ColoExport != "" {
+		xc.colo_export = C.CString(x.ColoExport)
+	}
+	if x.ActiveDisk != "" {
+		xc.active_disk = C.CString(x.ActiveDisk)
+	}
+	if x.HiddenDisk != "" {
+		xc.hidden_disk = C.CString(x.HiddenDisk)
+	}
 
 	return nil
 }
@@ -748,6 +1373,194 @@ func (x *DeviceNic) fromC(xc *C.libxl_device_nic) error {
 	return nil
 }
 
+func (x *DeviceNic) toC(xc *C.libxl_device_nic) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_nic_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.mtu = C.int(x.Mtu)
+	if x.Model != "" {
+		xc.model = C.CString(x.Model)
+	}
+	if err := x.Mac.toC(&xc.mac); err != nil {
+		return err
+	}
+	if x.Ip != "" {
+		xc.ip = C.CString(x.Ip)
+	}
+	if x.Bridge != "" {
+		xc.bridge = C.CString(x.Bridge)
+	}
+	if x.Ifname != "" {
+		xc.ifname = C.CString(x.Ifname)
+	}
+	if x.Script != "" {
+		xc.script = C.CString(x.Script)
+	}
+	xc.nictype = C.libxl_nic_type(x.Nictype)
+	xc.rate_bytes_per_interval = C.uint64_t(x.RateBytesPerInterval)
+	xc.rate_interval_usecs = C.uint32_t(x.RateIntervalUsecs)
+	if x.Gatewaydev != "" {
+		xc.gatewaydev = C.CString(x.Gatewaydev)
+	}
+	if x.ColoftForwarddev != "" {
+		xc.coloft_forwarddev = C.CString(x.ColoftForwarddev)
+	}
+	if x.ColoSockMirrorId != "" {
+		xc.colo_sock_mirror_id = C.CString(x.ColoSockMirrorId)
+	}
+	if x.ColoSockMirrorIp != "" {
+		xc.colo_sock_mirror_ip = C.CString(x.ColoSockMirrorIp)
+	}
+	if x.ColoSockMirrorPort != "" {
+		xc.colo_sock_mirror_port = C.CString(x.ColoSockMirrorPort)
+	}
+	if x.ColoSockComparePriInId != "" {
+		xc.colo_sock_compare_pri_in_id = C.CString(x.ColoSockComparePriInId)
+	}
+	if x.ColoSockComparePriInIp != "" {
+		xc.colo_sock_compare_pri_in_ip = C.CString(x.ColoSockComparePriInIp)
+	}
+	if x.ColoSockComparePriInPort != "" {
+		xc.colo_sock_compare_pri_in_port = C.CString(x.ColoSockComparePriInPort)
+	}
+	if x.ColoSockCompareSecInId != "" {
+		xc.colo_sock_compare_sec_in_id = C.CString(x.ColoSockCompareSecInId)
+	}
+	if x.ColoSockCompareSecInIp != "" {
+		xc.colo_sock_compare_sec_in_ip = C.CString(x.ColoSockCompareSecInIp)
+	}
+	if x.ColoSockCompareSecInPort != "" {
+		xc.colo_sock_compare_sec_in_port = C.CString(x.ColoSockCompareSecInPort)
+	}
+	if x.ColoSockCompareNotifyId != "" {
+		xc.colo_sock_compare_notify_id = C.CString(x.ColoSockCompareNotifyId)
+	}
+	if x.ColoSockCompareNotifyIp != "" {
+		xc.colo_sock_compare_notify_ip = C.CString(x.ColoSockCompareNotifyIp)
+	}
+	if x.ColoSockCompareNotifyPort != "" {
+		xc.colo_sock_compare_notify_port = C.CString(x.ColoSockCompareNotifyPort)
+	}
+	if x.ColoSockRedirector0Id != "" {
+		xc.colo_sock_redirector0_id = C.CString(x.ColoSockRedirector0Id)
+	}
+	if x.ColoSockRedirector0Ip != "" {
+		xc.colo_sock_redirector0_ip = C.CString(x.ColoSockRedirector0Ip)
+	}
+	if x.ColoSockRedirector0Port != "" {
+		xc.colo_sock_redirector0_port = C.CString(x.ColoSockRedirector0Port)
+	}
+	if x.ColoSockRedirector1Id != "" {
+		xc.colo_sock_redirector1_id = C.CString(x.ColoSockRedirector1Id)
+	}
+	if x.ColoSockRedirector1Ip != "" {
+		xc.colo_sock_redirector1_ip = C.CString(x.ColoSockRedirector1Ip)
+	}
+	if x.ColoSockRedirector1Port != "" {
+		xc.colo_sock_redirector1_port = C.CString(x.ColoSockRedirector1Port)
+	}
+	if x.ColoSockRedirector2Id != "" {
+		xc.colo_sock_redirector2_id = C.CString(x.ColoSockRedirector2Id)
+	}
+	if x.ColoSockRedirector2Ip != "" {
+		xc.colo_sock_redirector2_ip = C.CString(x.ColoSockRedirector2Ip)
+	}
+	if x.ColoSockRedirector2Port != "" {
+		xc.colo_sock_redirector2_port = C.CString(x.ColoSockRedirector2Port)
+	}
+	if x.ColoFilterMirrorQueue != "" {
+		xc.colo_filter_mirror_queue = C.CString(x.ColoFilterMirrorQueue)
+	}
+	if x.ColoFilterMirrorOutdev != "" {
+		xc.colo_filter_mirror_outdev = C.CString(x.ColoFilterMirrorOutdev)
+	}
+	if x.ColoFilterRedirector0Queue != "" {
+		xc.colo_filter_redirector0_queue = C.CString(x.ColoFilterRedirector0Queue)
+	}
+	if x.ColoFilterRedirector0Indev != "" {
+		xc.colo_filter_redirector0_indev = C.CString(x.ColoFilterRedirector0Indev)
+	}
+	if x.ColoFilterRedirector0Outdev != "" {
+		xc.colo_filter_redirector0_outdev = C.CString(x.ColoFilterRedirector0Outdev)
+	}
+	if x.ColoFilterRedirector1Queue != "" {
+		xc.colo_filter_redirector1_queue = C.CString(x.ColoFilterRedirector1Queue)
+	}
+	if x.ColoFilterRedirector1Indev != "" {
+		xc.colo_filter_redirector1_indev = C.CString(x.ColoFilterRedirector1Indev)
+	}
+	if x.ColoFilterRedirector1Outdev != "" {
+		xc.colo_filter_redirector1_outdev = C.CString(x.ColoFilterRedirector1Outdev)
+	}
+	if x.ColoComparePriIn != "" {
+		xc.colo_compare_pri_in = C.CString(x.ColoComparePriIn)
+	}
+	if x.ColoCompareSecIn != "" {
+		xc.colo_compare_sec_in = C.CString(x.ColoCompareSecIn)
+	}
+	if x.ColoCompareOut != "" {
+		xc.colo_compare_out = C.CString(x.ColoCompareOut)
+	}
+	if x.ColoCompareNotifyDev != "" {
+		xc.colo_compare_notify_dev = C.CString(x.ColoCompareNotifyDev)
+	}
+	if x.ColoSockSecRedirector0Id != "" {
+		xc.colo_sock_sec_redirector0_id = C.CString(x.ColoSockSecRedirector0Id)
+	}
+	if x.ColoSockSecRedirector0Ip != "" {
+		xc.colo_sock_sec_redirector0_ip = C.CString(x.ColoSockSecRedirector0Ip)
+	}
+	if x.ColoSockSecRedirector0Port != "" {
+		xc.colo_sock_sec_redirector0_port = C.CString(x.ColoSockSecRedirector0Port)
+	}
+	if x.ColoSockSecRedirector1Id != "" {
+		xc.colo_sock_sec_redirector1_id = C.CString(x.ColoSockSecRedirector1Id)
+	}
+	if x.ColoSockSecRedirector1Ip != "" {
+		xc.colo_sock_sec_redirector1_ip = C.CString(x.ColoSockSecRedirector1Ip)
+	}
+	if x.ColoSockSecRedirector1Port != "" {
+		xc.colo_sock_sec_redirector1_port = C.CString(x.ColoSockSecRedirector1Port)
+	}
+	if x.ColoFilterSecRedirector0Queue != "" {
+		xc.colo_filter_sec_redirector0_queue = C.CString(x.ColoFilterSecRedirector0Queue)
+	}
+	if x.ColoFilterSecRedirector0Indev != "" {
+		xc.colo_filter_sec_redirector0_indev = C.CString(x.ColoFilterSecRedirector0Indev)
+	}
+	if x.ColoFilterSecRedirector0Outdev != "" {
+		xc.colo_filter_sec_redirector0_outdev = C.CString(x.ColoFilterSecRedirector0Outdev)
+	}
+	if x.ColoFilterSecRedirector1Queue != "" {
+		xc.colo_filter_sec_redirector1_queue = C.CString(x.ColoFilterSecRedirector1Queue)
+	}
+	if x.ColoFilterSecRedirector1Indev != "" {
+		xc.colo_filter_sec_redirector1_indev = C.CString(x.ColoFilterSecRedirector1Indev)
+	}
+	if x.ColoFilterSecRedirector1Outdev != "" {
+		xc.colo_filter_sec_redirector1_outdev = C.CString(x.ColoFilterSecRedirector1Outdev)
+	}
+	if x.ColoFilterSecRewriter0Queue != "" {
+		xc.colo_filter_sec_rewriter0_queue = C.CString(x.ColoFilterSecRewriter0Queue)
+	}
+	if x.ColoCheckpointHost != "" {
+		xc.colo_checkpoint_host = C.CString(x.ColoCheckpointHost)
+	}
+	if x.ColoCheckpointPort != "" {
+		xc.colo_checkpoint_port = C.CString(x.ColoCheckpointPort)
+	}
+
+	return nil
+}
+
 func (x *DevicePci) fromC(xc *C.libxl_device_pci) error {
 	x.Func = byte(xc._func)
 	x.Dev = byte(xc.dev)
@@ -764,10 +1577,46 @@ func (x *DevicePci) fromC(xc *C.libxl_device_pci) error {
 	return nil
 }
 
+func (x *DevicePci) toC(xc *C.libxl_device_pci) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_pci_dispose(xc)
+		}
+	}()
+
+	xc._func = C.uint8_t(x.Func)
+	xc.dev = C.uint8_t(x.Dev)
+	xc.bus = C.uint8_t(x.Bus)
+	xc.domain = C.int(x.Domain)
+	xc.vdevfn = C.uint32_t(x.Vdevfn)
+	xc.vfunc_mask = C.uint32_t(x.VfuncMask)
+	xc.msitranslate = C.bool(x.Msitranslate)
+	xc.power_mgmt = C.bool(x.PowerMgmt)
+	xc.permissive = C.bool(x.Permissive)
+	xc.seize = C.bool(x.Seize)
+	xc.rdm_policy = C.libxl_rdm_reserve_policy(x.RdmPolicy)
+
+	return nil
+}
+
 func (x *DeviceRdm) fromC(xc *C.libxl_device_rdm) error {
 	x.Start = uint64(xc.start)
 	x.Size = uint64(xc.size)
 	x.Policy = RdmReservePolicy(xc.policy)
+
+	return nil
+}
+
+func (x *DeviceRdm) toC(xc *C.libxl_device_rdm) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_rdm_dispose(xc)
+		}
+	}()
+
+	xc.start = C.uint64_t(x.Start)
+	xc.size = C.uint64_t(x.Size)
+	xc.policy = C.libxl_rdm_reserve_policy(x.Policy)
 
 	return nil
 }
@@ -779,6 +1628,25 @@ func (x *DeviceUsbctrl) fromC(xc *C.libxl_device_usbctrl) error {
 	x.Ports = int(xc.ports)
 	x.BackendDomid = Domid(xc.backend_domid)
 	x.BackendDomname = C.GoString(xc.backend_domname)
+
+	return nil
+}
+
+func (x *DeviceUsbctrl) toC(xc *C.libxl_device_usbctrl) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_usbctrl_dispose(xc)
+		}
+	}()
+
+	xc._type = C.libxl_usbctrl_type(x.Type)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.version = C.int(x.Version)
+	xc.ports = C.int(x.Ports)
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
 
 	return nil
 }
@@ -812,8 +1680,35 @@ func (x *DeviceUsbdevTypeUnionHostdev) fromC(xc *C.libxl_device_usbdev) error {
 	return nil
 }
 
+func (x *DeviceUsbdev) toC(xc *C.libxl_device_usbdev) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_usbdev_dispose(xc)
+		}
+	}()
+
+	xc.ctrl = C.libxl_devid(x.Ctrl)
+	xc.port = C.int(x.Port)
+
+	return nil
+}
+
 func (x *DeviceDtdev) fromC(xc *C.libxl_device_dtdev) error {
 	x.Path = C.GoString(xc.path)
+
+	return nil
+}
+
+func (x *DeviceDtdev) toC(xc *C.libxl_device_dtdev) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_dtdev_dispose(xc)
+		}
+	}()
+
+	if x.Path != "" {
+		xc.path = C.CString(x.Path)
+	}
 
 	return nil
 }
@@ -823,6 +1718,25 @@ func (x *DeviceVtpm) fromC(xc *C.libxl_device_vtpm) error {
 	x.BackendDomname = C.GoString(xc.backend_domname)
 	x.Devid = Devid(xc.devid)
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (x *DeviceVtpm) toC(xc *C.libxl_device_vtpm) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_vtpm_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
+	if err := x.Uuid.toC(&xc.uuid); err != nil {
 		return err
 	}
 
@@ -840,10 +1754,51 @@ func (x *DeviceP9) fromC(xc *C.libxl_device_p9) error {
 	return nil
 }
 
+func (x *DeviceP9) toC(xc *C.libxl_device_p9) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_p9_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	if x.Tag != "" {
+		xc.tag = C.CString(x.Tag)
+	}
+	if x.Path != "" {
+		xc.path = C.CString(x.Path)
+	}
+	if x.SecurityModel != "" {
+		xc.security_model = C.CString(x.SecurityModel)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
+
+	return nil
+}
+
 func (x *DevicePvcallsif) fromC(xc *C.libxl_device_pvcallsif) error {
 	x.BackendDomid = Domid(xc.backend_domid)
 	x.BackendDomname = C.GoString(xc.backend_domname)
 	x.Devid = Devid(xc.devid)
+
+	return nil
+}
+
+func (x *DevicePvcallsif) toC(xc *C.libxl_device_pvcallsif) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_pvcallsif_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
 
 	return nil
 }
@@ -878,10 +1833,45 @@ func (x *DeviceChannelConnectionUnionSocket) fromC(xc *C.libxl_device_channel) e
 	return nil
 }
 
+func (x *DeviceChannel) toC(xc *C.libxl_device_channel) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_channel_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
+	if x.Name != "" {
+		xc.name = C.CString(x.Name)
+	}
+
+	return nil
+}
+
 func (x *ConnectorParam) fromC(xc *C.libxl_connector_param) error {
 	x.UniqueId = C.GoString(xc.unique_id)
 	x.Width = uint32(xc.width)
 	x.Height = uint32(xc.height)
+
+	return nil
+}
+
+func (x *ConnectorParam) toC(xc *C.libxl_connector_param) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_connector_param_dispose(xc)
+		}
+	}()
+
+	if x.UniqueId != "" {
+		xc.unique_id = C.CString(x.UniqueId)
+	}
+	xc.width = C.uint32_t(x.Width)
+	xc.height = C.uint32_t(x.Height)
 
 	return nil
 }
@@ -899,6 +1889,23 @@ func (x *DeviceVdispl) fromC(xc *C.libxl_device_vdispl) error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (x *DeviceVdispl) toC(xc *C.libxl_device_vdispl) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_vdispl_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.be_alloc = C.bool(x.BeAlloc)
 
 	return nil
 }
@@ -923,10 +1930,42 @@ func (x *VsndParams) fromC(xc *C.libxl_vsnd_params) error {
 	return nil
 }
 
+func (x *VsndParams) toC(xc *C.libxl_vsnd_params) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vsnd_params_dispose(xc)
+		}
+	}()
+
+	xc.channels_min = C.uint32_t(x.ChannelsMin)
+	xc.channels_max = C.uint32_t(x.ChannelsMax)
+	xc.buffer_size = C.uint32_t(x.BufferSize)
+
+	return nil
+}
+
 func (x *VsndStream) fromC(xc *C.libxl_vsnd_stream) error {
 	x.UniqueId = C.GoString(xc.unique_id)
 	x.Type = VsndStreamType(xc._type)
 	if err := x.Params.fromC(&xc.params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (x *VsndStream) toC(xc *C.libxl_vsnd_stream) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vsnd_stream_dispose(xc)
+		}
+	}()
+
+	if x.UniqueId != "" {
+		xc.unique_id = C.CString(x.UniqueId)
+	}
+	xc._type = C.libxl_vsnd_stream_type(x.Type)
+	if err := x.Params.toC(&xc.params); err != nil {
 		return err
 	}
 
@@ -950,6 +1989,23 @@ func (x *VsndPcm) fromC(xc *C.libxl_vsnd_pcm) error {
 	return nil
 }
 
+func (x *VsndPcm) toC(xc *C.libxl_vsnd_pcm) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vsnd_pcm_dispose(xc)
+		}
+	}()
+
+	if x.Name != "" {
+		xc.name = C.CString(x.Name)
+	}
+	if err := x.Params.toC(&xc.params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (x *DeviceVsnd) fromC(xc *C.libxl_device_vsnd) error {
 	x.BackendDomid = Domid(xc.backend_domid)
 	x.BackendDomname = C.GoString(xc.backend_domname)
@@ -966,6 +2022,31 @@ func (x *DeviceVsnd) fromC(xc *C.libxl_device_vsnd) error {
 		if err := x.Pcms[i].fromC(&v); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (x *DeviceVsnd) toC(xc *C.libxl_device_vsnd) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_device_vsnd_dispose(xc)
+		}
+	}()
+
+	xc.backend_domid = C.libxl_domid(x.BackendDomid)
+	if x.BackendDomname != "" {
+		xc.backend_domname = C.CString(x.BackendDomname)
+	}
+	xc.devid = C.libxl_devid(x.Devid)
+	if x.ShortName != "" {
+		xc.short_name = C.CString(x.ShortName)
+	}
+	if x.LongName != "" {
+		xc.long_name = C.CString(x.LongName)
+	}
+	if err := x.Params.toC(&xc.params); err != nil {
+		return err
 	}
 
 	return nil
@@ -1107,6 +2188,28 @@ func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
 	return nil
 }
 
+func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_domain_config_dispose(xc)
+		}
+	}()
+
+	if err := x.CInfo.toC(&xc.c_info); err != nil {
+		return err
+	}
+	if err := x.BInfo.toC(&xc.b_info); err != nil {
+		return err
+	}
+	xc.on_poweroff = C.libxl_action_on_shutdown(x.OnPoweroff)
+	xc.on_reboot = C.libxl_action_on_shutdown(x.OnReboot)
+	xc.on_watchdog = C.libxl_action_on_shutdown(x.OnWatchdog)
+	xc.on_crash = C.libxl_action_on_shutdown(x.OnCrash)
+	xc.on_soft_reset = C.libxl_action_on_shutdown(x.OnSoftReset)
+
+	return nil
+}
+
 func (x *Diskinfo) fromC(xc *C.libxl_diskinfo) error {
 	x.Backend = C.GoString(xc.backend)
 	x.BackendId = uint32(xc.backend_id)
@@ -1116,6 +2219,29 @@ func (x *Diskinfo) fromC(xc *C.libxl_diskinfo) error {
 	x.State = int(xc.state)
 	x.Evtch = int(xc.evtch)
 	x.Rref = int(xc.rref)
+
+	return nil
+}
+
+func (x *Diskinfo) toC(xc *C.libxl_diskinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_diskinfo_dispose(xc)
+		}
+	}()
+
+	if x.Backend != "" {
+		xc.backend = C.CString(x.Backend)
+	}
+	xc.backend_id = C.uint32_t(x.BackendId)
+	if x.Frontend != "" {
+		xc.frontend = C.CString(x.Frontend)
+	}
+	xc.frontend_id = C.uint32_t(x.FrontendId)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.state = C.int(x.State)
+	xc.evtch = C.int(x.Evtch)
+	xc.rref = C.int(x.Rref)
 
 	return nil
 }
@@ -1134,6 +2260,30 @@ func (x *Nicinfo) fromC(xc *C.libxl_nicinfo) error {
 	return nil
 }
 
+func (x *Nicinfo) toC(xc *C.libxl_nicinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_nicinfo_dispose(xc)
+		}
+	}()
+
+	if x.Backend != "" {
+		xc.backend = C.CString(x.Backend)
+	}
+	xc.backend_id = C.uint32_t(x.BackendId)
+	if x.Frontend != "" {
+		xc.frontend = C.CString(x.Frontend)
+	}
+	xc.frontend_id = C.uint32_t(x.FrontendId)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.state = C.int(x.State)
+	xc.evtch = C.int(x.Evtch)
+	xc.rref_tx = C.int(x.RrefTx)
+	xc.rref_rx = C.int(x.RrefRx)
+
+	return nil
+}
+
 func (x *Vtpminfo) fromC(xc *C.libxl_vtpminfo) error {
 	x.Backend = C.GoString(xc.backend)
 	x.BackendId = uint32(xc.backend_id)
@@ -1144,6 +2294,32 @@ func (x *Vtpminfo) fromC(xc *C.libxl_vtpminfo) error {
 	x.Evtch = int(xc.evtch)
 	x.Rref = int(xc.rref)
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (x *Vtpminfo) toC(xc *C.libxl_vtpminfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vtpminfo_dispose(xc)
+		}
+	}()
+
+	if x.Backend != "" {
+		xc.backend = C.CString(x.Backend)
+	}
+	xc.backend_id = C.uint32_t(x.BackendId)
+	if x.Frontend != "" {
+		xc.frontend = C.CString(x.Frontend)
+	}
+	xc.frontend_id = C.uint32_t(x.FrontendId)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.state = C.int(x.State)
+	xc.evtch = C.int(x.Evtch)
+	xc.rref = C.int(x.Rref)
+	if err := x.Uuid.toC(&xc.uuid); err != nil {
 		return err
 	}
 
@@ -1167,6 +2343,33 @@ func (x *Usbctrlinfo) fromC(xc *C.libxl_usbctrlinfo) error {
 	return nil
 }
 
+func (x *Usbctrlinfo) toC(xc *C.libxl_usbctrlinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_usbctrlinfo_dispose(xc)
+		}
+	}()
+
+	xc._type = C.libxl_usbctrl_type(x.Type)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.version = C.int(x.Version)
+	xc.ports = C.int(x.Ports)
+	if x.Backend != "" {
+		xc.backend = C.CString(x.Backend)
+	}
+	xc.backend_id = C.uint32_t(x.BackendId)
+	if x.Frontend != "" {
+		xc.frontend = C.CString(x.Frontend)
+	}
+	xc.frontend_id = C.uint32_t(x.FrontendId)
+	xc.state = C.int(x.State)
+	xc.evtch = C.int(x.Evtch)
+	xc.ref_urb = C.int(x.RefUrb)
+	xc.ref_conn = C.int(x.RefConn)
+
+	return nil
+}
+
 func (x *Vcpuinfo) fromC(xc *C.libxl_vcpuinfo) error {
 	x.Vcpuid = uint32(xc.vcpuid)
 	x.Cpu = uint32(xc.cpu)
@@ -1178,6 +2381,29 @@ func (x *Vcpuinfo) fromC(xc *C.libxl_vcpuinfo) error {
 		return err
 	}
 	if err := x.CpumapSoft.fromC(&xc.cpumap_soft); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (x *Vcpuinfo) toC(xc *C.libxl_vcpuinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vcpuinfo_dispose(xc)
+		}
+	}()
+
+	xc.vcpuid = C.uint32_t(x.Vcpuid)
+	xc.cpu = C.uint32_t(x.Cpu)
+	xc.online = C.bool(x.Online)
+	xc.blocked = C.bool(x.Blocked)
+	xc.running = C.bool(x.Running)
+	xc.vcpu_time = C.uint64_t(x.VcpuTime)
+	if err := x.Cpumap.toC(&xc.cpumap); err != nil {
+		return err
+	}
+	if err := x.CpumapSoft.toC(&xc.cpumap_soft); err != nil {
 		return err
 	}
 
@@ -1211,6 +2437,39 @@ func (x *Physinfo) fromC(xc *C.libxl_physinfo) error {
 	return nil
 }
 
+func (x *Physinfo) toC(xc *C.libxl_physinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_physinfo_dispose(xc)
+		}
+	}()
+
+	xc.threads_per_core = C.uint32_t(x.ThreadsPerCore)
+	xc.cores_per_socket = C.uint32_t(x.CoresPerSocket)
+	xc.max_cpu_id = C.uint32_t(x.MaxCpuId)
+	xc.nr_cpus = C.uint32_t(x.NrCpus)
+	xc.cpu_khz = C.uint32_t(x.CpuKhz)
+	xc.total_pages = C.uint64_t(x.TotalPages)
+	xc.free_pages = C.uint64_t(x.FreePages)
+	xc.scrub_pages = C.uint64_t(x.ScrubPages)
+	xc.outstanding_pages = C.uint64_t(x.OutstandingPages)
+	xc.sharing_freed_pages = C.uint64_t(x.SharingFreedPages)
+	xc.sharing_used_frames = C.uint64_t(x.SharingUsedFrames)
+	xc.max_possible_mfn = C.uint64_t(x.MaxPossibleMfn)
+	xc.nr_nodes = C.uint32_t(x.NrNodes)
+	if err := x.HwCap.toC(&xc.hw_cap); err != nil {
+		return err
+	}
+	xc.cap_hvm = C.bool(x.CapHvm)
+	xc.cap_pv = C.bool(x.CapPv)
+	xc.cap_hvm_directio = C.bool(x.CapHvmDirectio)
+	xc.cap_hap = C.bool(x.CapHap)
+	xc.cap_shadow = C.bool(x.CapShadow)
+	xc.cap_iommu_hap_pt_share = C.bool(x.CapIommuHapPtShare)
+
+	return nil
+}
+
 func (x *Connectorinfo) fromC(xc *C.libxl_connectorinfo) error {
 	x.UniqueId = C.GoString(xc.unique_id)
 	x.Width = uint32(xc.width)
@@ -1219,6 +2478,26 @@ func (x *Connectorinfo) fromC(xc *C.libxl_connectorinfo) error {
 	x.ReqRref = int(xc.req_rref)
 	x.EvtEvtch = int(xc.evt_evtch)
 	x.EvtRref = int(xc.evt_rref)
+
+	return nil
+}
+
+func (x *Connectorinfo) toC(xc *C.libxl_connectorinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_connectorinfo_dispose(xc)
+		}
+	}()
+
+	if x.UniqueId != "" {
+		xc.unique_id = C.CString(x.UniqueId)
+	}
+	xc.width = C.uint32_t(x.Width)
+	xc.height = C.uint32_t(x.Height)
+	xc.req_evtch = C.int(x.ReqEvtch)
+	xc.req_rref = C.int(x.ReqRref)
+	xc.evt_evtch = C.int(x.EvtEvtch)
+	xc.evt_rref = C.int(x.EvtRref)
 
 	return nil
 }
@@ -1243,9 +2522,44 @@ func (x *Vdisplinfo) fromC(xc *C.libxl_vdisplinfo) error {
 	return nil
 }
 
+func (x *Vdisplinfo) toC(xc *C.libxl_vdisplinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vdisplinfo_dispose(xc)
+		}
+	}()
+
+	if x.Backend != "" {
+		xc.backend = C.CString(x.Backend)
+	}
+	xc.backend_id = C.uint32_t(x.BackendId)
+	if x.Frontend != "" {
+		xc.frontend = C.CString(x.Frontend)
+	}
+	xc.frontend_id = C.uint32_t(x.FrontendId)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.state = C.int(x.State)
+	xc.be_alloc = C.bool(x.BeAlloc)
+
+	return nil
+}
+
 func (x *Streaminfo) fromC(xc *C.libxl_streaminfo) error {
 	x.ReqEvtch = int(xc.req_evtch)
 	x.ReqRref = int(xc.req_rref)
+
+	return nil
+}
+
+func (x *Streaminfo) toC(xc *C.libxl_streaminfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_streaminfo_dispose(xc)
+		}
+	}()
+
+	xc.req_evtch = C.int(x.ReqEvtch)
+	xc.req_rref = C.int(x.ReqRref)
 
 	return nil
 }
@@ -1259,6 +2573,16 @@ func (x *Pcminfo) fromC(xc *C.libxl_pcminfo) error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (x *Pcminfo) toC(xc *C.libxl_pcminfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_pcminfo_dispose(xc)
+		}
+	}()
 
 	return nil
 }
@@ -1282,6 +2606,27 @@ func (x *Vsndinfo) fromC(xc *C.libxl_vsndinfo) error {
 	return nil
 }
 
+func (x *Vsndinfo) toC(xc *C.libxl_vsndinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vsndinfo_dispose(xc)
+		}
+	}()
+
+	if x.Backend != "" {
+		xc.backend = C.CString(x.Backend)
+	}
+	xc.backend_id = C.uint32_t(x.BackendId)
+	if x.Frontend != "" {
+		xc.frontend = C.CString(x.Frontend)
+	}
+	xc.frontend_id = C.uint32_t(x.FrontendId)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.state = C.int(x.State)
+
+	return nil
+}
+
 func (x *Vkbinfo) fromC(xc *C.libxl_vkbinfo) error {
 	x.Backend = C.GoString(xc.backend)
 	x.BackendId = uint32(xc.backend_id)
@@ -1291,6 +2636,29 @@ func (x *Vkbinfo) fromC(xc *C.libxl_vkbinfo) error {
 	x.State = int(xc.state)
 	x.Evtch = int(xc.evtch)
 	x.Rref = int(xc.rref)
+
+	return nil
+}
+
+func (x *Vkbinfo) toC(xc *C.libxl_vkbinfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_vkbinfo_dispose(xc)
+		}
+	}()
+
+	if x.Backend != "" {
+		xc.backend = C.CString(x.Backend)
+	}
+	xc.backend_id = C.uint32_t(x.BackendId)
+	if x.Frontend != "" {
+		xc.frontend = C.CString(x.Frontend)
+	}
+	xc.frontend_id = C.uint32_t(x.FrontendId)
+	xc.devid = C.libxl_devid(x.Devid)
+	xc.state = C.int(x.State)
+	xc.evtch = C.int(x.Evtch)
+	xc.rref = C.int(x.Rref)
 
 	return nil
 }
@@ -1308,10 +2676,37 @@ func (x *Numainfo) fromC(xc *C.libxl_numainfo) error {
 	return nil
 }
 
+func (x *Numainfo) toC(xc *C.libxl_numainfo) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_numainfo_dispose(xc)
+		}
+	}()
+
+	xc.size = C.uint64_t(x.Size)
+	xc.free = C.uint64_t(x.Free)
+
+	return nil
+}
+
 func (x *Cputopology) fromC(xc *C.libxl_cputopology) error {
 	x.Core = uint32(xc.core)
 	x.Socket = uint32(xc.socket)
 	x.Node = uint32(xc.node)
+
+	return nil
+}
+
+func (x *Cputopology) toC(xc *C.libxl_cputopology) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_cputopology_dispose(xc)
+		}
+	}()
+
+	xc.core = C.uint32_t(x.Core)
+	xc.socket = C.uint32_t(x.Socket)
+	xc.node = C.uint32_t(x.Node)
 
 	return nil
 }
@@ -1325,6 +2720,21 @@ func (x *Pcitopology) fromC(xc *C.libxl_pcitopology) error {
 	return nil
 }
 
+func (x *Pcitopology) toC(xc *C.libxl_pcitopology) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_pcitopology_dispose(xc)
+		}
+	}()
+
+	xc.seg = C.uint16_t(x.Seg)
+	xc.bus = C.uint8_t(x.Bus)
+	xc.devfn = C.uint8_t(x.Devfn)
+	xc.node = C.uint32_t(x.Node)
+
+	return nil
+}
+
 func (x *SchedCreditParams) fromC(xc *C.libxl_sched_credit_params) error {
 	x.TsliceMs = int(xc.tslice_ms)
 	x.RatelimitUs = int(xc.ratelimit_us)
@@ -1333,8 +2743,22 @@ func (x *SchedCreditParams) fromC(xc *C.libxl_sched_credit_params) error {
 	return nil
 }
 
+func (x *SchedCreditParams) toC(xc *C.libxl_sched_credit_params) (err error) {
+	xc.tslice_ms = C.int(x.TsliceMs)
+	xc.ratelimit_us = C.int(x.RatelimitUs)
+	xc.vcpu_migr_delay_us = C.int(x.VcpuMigrDelayUs)
+
+	return nil
+}
+
 func (x *SchedCredit2Params) fromC(xc *C.libxl_sched_credit2_params) error {
 	x.RatelimitUs = int(xc.ratelimit_us)
+
+	return nil
+}
+
+func (x *SchedCredit2Params) toC(xc *C.libxl_sched_credit2_params) (err error) {
+	xc.ratelimit_us = C.int(x.RatelimitUs)
 
 	return nil
 }
@@ -1361,6 +2785,42 @@ func (x *DomainRemusInfo) fromC(xc *C.libxl_domain_remus_info) error {
 		return err
 	}
 	if err := x.UserspaceColoProxy.fromC(&xc.userspace_colo_proxy); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (x *DomainRemusInfo) toC(xc *C.libxl_domain_remus_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_domain_remus_info_dispose(xc)
+		}
+	}()
+
+	xc.interval = C.int(x.Interval)
+	if err := x.AllowUnsafe.toC(&xc.allow_unsafe); err != nil {
+		return err
+	}
+	if err := x.Blackhole.toC(&xc.blackhole); err != nil {
+		return err
+	}
+	if err := x.Compression.toC(&xc.compression); err != nil {
+		return err
+	}
+	if err := x.Netbuf.toC(&xc.netbuf); err != nil {
+		return err
+	}
+	if x.Netbufscript != "" {
+		xc.netbufscript = C.CString(x.Netbufscript)
+	}
+	if err := x.Diskbuf.toC(&xc.diskbuf); err != nil {
+		return err
+	}
+	if err := x.Colo.toC(&xc.colo); err != nil {
+		return err
+	}
+	if err := x.UserspaceColoProxy.toC(&xc.userspace_colo_proxy); err != nil {
 		return err
 	}
 
@@ -1436,11 +2896,45 @@ func (x *EventTypeUnionOperationComplete) fromC(xc *C.libxl_event) error {
 	return nil
 }
 
+func (x *Event) toC(xc *C.libxl_event) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_event_dispose(xc)
+		}
+	}()
+
+	if err := x.Link.toC(&xc.link); err != nil {
+		return err
+	}
+	xc.domid = C.libxl_domid(x.Domid)
+	if err := x.Domuuid.toC(&xc.domuuid); err != nil {
+		return err
+	}
+	xc.for_user = C.uint64_t(x.ForUser)
+
+	return nil
+}
+
 func (x *PsrCatInfo) fromC(xc *C.libxl_psr_cat_info) error {
 	x.Id = uint32(xc.id)
 	x.CosMax = uint32(xc.cos_max)
 	x.CbmLen = uint32(xc.cbm_len)
 	x.CdpEnabled = bool(xc.cdp_enabled)
+
+	return nil
+}
+
+func (x *PsrCatInfo) toC(xc *C.libxl_psr_cat_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_psr_cat_info_dispose(xc)
+		}
+	}()
+
+	xc.id = C.uint32_t(x.Id)
+	xc.cos_max = C.uint32_t(x.CosMax)
+	xc.cbm_len = C.uint32_t(x.CbmLen)
+	xc.cdp_enabled = C.bool(x.CdpEnabled)
 
 	return nil
 }
@@ -1489,5 +2983,17 @@ func (x *PsrHwInfoTypeUnionMba) fromC(xc *C.libxl_psr_hw_info) error {
 	x.CosMax = uint32(tmp.cos_max)
 	x.ThrtlMax = uint32(tmp.thrtl_max)
 	x.Linear = bool(tmp.linear)
+	return nil
+}
+
+func (x *PsrHwInfo) toC(xc *C.libxl_psr_hw_info) (err error) {
+	defer func() {
+		if err != nil {
+			C.libxl_psr_hw_info_dispose(xc)
+		}
+	}()
+
+	xc.id = C.uint32_t(x.Id)
+
 	return nil
 }

@@ -234,6 +234,9 @@ def xenlight_golang_generate_helpers(path = None, types = None, comment = None):
                 f.write(extra)
                 f.write('\n')
 
+            f.write(xenlight_golang_define_to_C(ty))
+            f.write('\n')
+
     go_fmt(path)
 
 def xenlight_golang_define_from_C(ty = None):
@@ -431,6 +434,84 @@ def xenlight_golang_array_from_C(ty = None):
         s += 'return err }\n'
 
     s += '}\n'
+
+    return s
+
+def xenlight_golang_define_to_C(ty = None, typename = None, nested = False):
+    """
+    Define the toC marshaling function for the type
+    represented by ty.
+    """
+    func = 'func (x *{}) toC(xc *C.{}) (err error){{{}\n return nil \n }}\n'
+    body = ''
+
+    if ty.dispose_fn is not None:
+        body += 'defer func(){{\nif err != nil{{\nC.{}(xc)}}\n}}()\n\n'.format(ty.dispose_fn)
+
+    goname = xenlight_golang_fmt_name(ty.typename)
+    cname  = ty.typename
+
+    for f in ty.fields:
+        if f.type.typename is not None:
+            if isinstance(f.type, idl.Array):
+                # TODO
+                continue
+
+            body += xenlight_golang_convert_to_C(f)
+
+        elif isinstance(f.type, idl.Struct):
+            for nf in f.type.fields:
+                body += xenlight_golang_convert_to_C(nf, outer_name=f.name)
+
+        elif isinstance(f.type, idl.KeyedUnion):
+            # TODO
+            pass
+
+        else:
+            raise Exception('type {} not supported'.format(f.type))
+
+    return func.format(goname, cname, body)
+
+def xenlight_golang_convert_to_C(ty = None, outer_name = None):
+    """
+    Returns a line of Go code that converts the Go type represented
+    by ty to its corresponding Go type.
+
+    If outer_name is set, the type is treated as nested within another field
+    named outer_name.
+    """
+    s = ''
+
+    gotypename = xenlight_golang_fmt_name(ty.type.typename)
+    ctypename  = ty.type.typename
+    goname     = xenlight_golang_fmt_name(ty.name)
+    cname      = ty.name
+
+    # In cgo, C names that conflict with Go keywords can be
+    # accessed by prepending an underscore to the name.
+    if cname in go_keywords:
+        cname = '_' + cname
+
+    # If outer_name is set, treat this as nested.
+    if outer_name is not None:
+        goname = '{}.{}'.format(xenlight_golang_fmt_name(outer_name), goname)
+        cname  = '{}.{}'.format(outer_name, cname)
+
+    is_castable = (ty.type.json_parse_type == 'JSON_INTEGER' or
+                   isinstance(ty.type, idl.Enumeration) or
+                   gotypename in go_builtin_types)
+
+    if not is_castable:
+        s += 'if err := x.{}.toC(&xc.{}); err != nil {{\n'.format(goname,cname)
+        s += 'return err\n}\n'
+
+    elif gotypename == 'string':
+        # Use the cgo helper for converting C strings.
+        s += 'if x.{} != "" {{\n'.format(goname)
+        s += 'xc.{} = C.CString(x.{})}}\n'.format(cname,goname)
+
+    else:
+        s += 'xc.{} = C.{}(x.{})\n'.format(cname,ctypename,goname)
 
     return s
 
