@@ -668,7 +668,11 @@ trampoline_setup:
         add     %esi,sym_fs(__page_tables_start)-8(,%ecx,8)
 2:      loop    1b
 
-        /* Initialize L2 boot-map/direct map page table entries (16MB). */
+        /*
+         * Map Xen into the directmap (needed for early-boot pagetable
+         * handling/walking), and identity map Xen into bootmap (needed for
+         * the transition into long mode), using 2M superpages.
+         */
         lea     sym_esi(start),%ebx
         lea     (1<<L2_PAGETABLE_SHIFT)*7+(PAGE_HYPERVISOR|_PAGE_PSE)(%ebx),%eax
         shr     $(L2_PAGETABLE_SHIFT-3),%ebx
@@ -678,7 +682,7 @@ trampoline_setup:
         sub     $(1<<L2_PAGETABLE_SHIFT),%eax
         loop    1b
 
-        /* Initialize L3 boot-map page directory entry. */
+        /* Initialize L3 boot-map page directory entries. */
         lea     __PAGE_HYPERVISOR+(L2_PAGETABLE_ENTRIES*8)*3+sym_esi(l2_bootmap),%eax
         mov     $4,%ecx
 1:      mov     %eax,sym_fs(l3_bootmap)-8(,%ecx,8)

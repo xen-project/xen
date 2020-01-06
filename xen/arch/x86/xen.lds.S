@@ -381,3 +381,6 @@ ASSERT((trampoline_end - trampoline_start) < TRAMPOLINE_SPACE - MBI_SPACE_MIN,
     "not enough room for trampoline and mbi data")
 ASSERT((wakeup_stack - wakeup_stack_start) >= WAKEUP_STACK_MIN,
     "wakeup stack too small")
+
+/* Plenty of boot code assumes that Xen isn't larger than 16M. */
+ASSERT(_end - _start <= MB(16), "Xen too large for early-boot assumptions")
