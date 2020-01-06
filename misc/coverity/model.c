@@ -82,21 +82,31 @@ void xfree(void *va)
  * allocation of exactly 1 page.
  *
  * map_domain_page() never fails. (It will BUG() before returning NULL)
- *
- * TODO: work out how to correctly model the behaviour that this function will
- * only ever return page aligned pointers.
  */
 void *map_domain_page(unsigned long mfn)
 {
-    return __coverity_alloc__(PAGE_SIZE);
+    unsigned long ptr = (unsigned long)__coverity_alloc__(PAGE_SIZE);
+
+    /*
+     * Expressing the alignment of the memory allocation isn't possible.  As a
+     * substitute, tell Coverity to ignore any path where ptr isn't page
+     * aligned.
+     */
+    if ( ptr & ~PAGE_MASK )
+        __coverity_panic__();
+
+    return (void *)ptr;
 }
 
 /*
- * unmap_domain_page() will unmap a page.  Model it as a free().
+ * unmap_domain_page() will unmap a page.  Model it as a free().  Any *va
+ * within the page is valid to pass.
  */
 void unmap_domain_page(const void *va)
 {
-    __coverity_free__(va);
+    unsigned long ptr = (unsigned long)va & PAGE_MASK;
+
+    __coverity_free__((void *)ptr);
 }
 
 /*
