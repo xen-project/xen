@@ -699,7 +699,7 @@ void __init zap_low_mappings(void)
     /* Replace with mapping of the boot trampoline only. */
     map_pages_to_xen(trampoline_phys, maddr_to_mfn(trampoline_phys),
                      PFN_UP(trampoline_end - trampoline_start),
-                     __PAGE_HYPERVISOR);
+                     __PAGE_HYPERVISOR_RX);
 }
 
 int setup_compat_arg_xlat(struct vcpu *v)
