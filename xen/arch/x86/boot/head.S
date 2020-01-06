@@ -689,12 +689,14 @@ trampoline_setup:
         sub     $(L2_PAGETABLE_ENTRIES*8),%eax
         loop    1b
 
-        /*
-         * During boot, hook 4kB mappings of first 2MB of memory into L2.
-         * This avoids mixing cachability for the legacy VGA region.
-         */
-        lea     __PAGE_HYPERVISOR+sym_esi(l1_identmap),%edi
-        mov     %edi,sym_fs(l2_bootmap)
+        /* Map the permanent trampoline page into l{1,2}_bootmap[]. */
+        mov     sym_esi(trampoline_phys), %ecx
+        lea     __PAGE_HYPERVISOR_RX(%ecx), %edx /* %edx = PTE to write  */
+        shr     $PAGE_SHIFT, %ecx                /* %ecx = Slot to write */
+        mov     %edx, sym_offs(l1_bootmap)(%esi, %ecx, 8)
+
+        lea     __PAGE_HYPERVISOR + sym_esi(l1_bootmap), %edx
+        mov     %edx, sym_esi(l2_bootmap)
 
         /* Apply relocations to bootstrap trampoline. */
         mov     sym_fs(trampoline_phys),%edx
