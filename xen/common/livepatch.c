@@ -1456,7 +1456,9 @@ static void livepatch_do_action(void)
             else
                 other->rc = revert_payload(other);
 
-            if ( !was_action_consistent(other, rc ? LIVEPATCH_FUNC_APPLIED : LIVEPATCH_FUNC_NOT_APPLIED) )
+            if ( !was_action_consistent(other, other->rc
+                                        ? LIVEPATCH_FUNC_APPLIED
+                                        : LIVEPATCH_FUNC_NOT_APPLIED) )
                 panic("livepatch: partially reverted payload '%s'!\n", other->name);
 
             if ( other->rc == 0 )
