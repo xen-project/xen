@@ -345,11 +345,6 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 
 #ifndef __ASSEMBLY__
 
-/* Allocator functions for Xen pagetables. */
-void *alloc_xen_pagetable(void);
-void free_xen_pagetable(void *v);
-l1_pgentry_t *virt_to_xen_l1e(unsigned long v);
-
 /* Convert between PAT/PCD/PWT embedded in PTE flags and 3-bit cacheattr. */
 static inline unsigned int pte_flags_to_cacheattr(unsigned int flags)
 {

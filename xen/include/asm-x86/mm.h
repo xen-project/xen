@@ -579,6 +579,11 @@ void update_cr3(struct vcpu *v);
 int vcpu_destroy_pagetables(struct vcpu *);
 void *do_page_walk(struct vcpu *v, unsigned long addr);
 
+/* Allocator functions for Xen pagetables. */
+void *alloc_xen_pagetable(void);
+void free_xen_pagetable(void *v);
+l1_pgentry_t *virt_to_xen_l1e(unsigned long v);
+
 int __sync_local_execstate(void);
 
 /* Arch-specific portion of memory_op hypercall. */
