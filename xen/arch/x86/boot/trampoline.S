@@ -261,7 +261,7 @@ opt_edid:
         .byte   0
 
 #ifdef CONFIG_VIDEO
-GLOBAL(boot_vid_mode)
+boot_vid_mode:
         .word   VIDEO_80x25                     /* If we don't run at all, assume basic video mode 3 at 80x25. */
 vesa_size:
         .word   0,0,0                           /* width x depth x height */
