@@ -5020,25 +5020,25 @@ static l3_pgentry_t *virt_to_xen_l3e(unsigned long v)
     if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
     {
         bool locking = system_state > SYS_STATE_boot;
-        l3_pgentry_t *pl3e = alloc_xen_pagetable();
+        l3_pgentry_t *l3t = alloc_xen_pagetable();
 
-        if ( !pl3e )
+        if ( !l3t )
             return NULL;
-        clear_page(pl3e);
+        clear_page(l3t);
         if ( locking )
             spin_lock(&map_pgdir_lock);
         if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
         {
-            l4_pgentry_t l4e = l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR);
+            l4_pgentry_t l4e = l4e_from_paddr(__pa(l3t), __PAGE_HYPERVISOR);
 
             l4e_write(pl4e, l4e);
             efi_update_l4_pgtable(l4_table_offset(v), l4e);
-            pl3e = NULL;
+            l3t = NULL;
         }
         if ( locking )
             spin_unlock(&map_pgdir_lock);
-        if ( pl3e )
-            free_xen_pagetable(pl3e);
+        if ( l3t )
+            free_xen_pagetable(l3t);
     }
 
     return l4e_to_l3e(*pl4e) + l3_table_offset(v);
@@ -5055,22 +5055,22 @@ static l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
     {
         bool locking = system_state > SYS_STATE_boot;
-        l2_pgentry_t *pl2e = alloc_xen_pagetable();
+        l2_pgentry_t *l2t = alloc_xen_pagetable();
 
-        if ( !pl2e )
+        if ( !l2t )
             return NULL;
-        clear_page(pl2e);
+        clear_page(l2t);
         if ( locking )
             spin_lock(&map_pgdir_lock);
         if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
         {
-            l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
-            pl2e = NULL;
+            l3e_write(pl3e, l3e_from_paddr(__pa(l2t), __PAGE_HYPERVISOR));
+            l2t = NULL;
         }
         if ( locking )
             spin_unlock(&map_pgdir_lock);
-        if ( pl2e )
-            free_xen_pagetable(pl2e);
+        if ( l2t )
+            free_xen_pagetable(l2t);
     }
 
     BUG_ON(l3e_get_flags(*pl3e) & _PAGE_PSE);
@@ -5088,22 +5088,22 @@ l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
     if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
     {
         bool locking = system_state > SYS_STATE_boot;
-        l1_pgentry_t *pl1e = alloc_xen_pagetable();
+        l1_pgentry_t *l1t = alloc_xen_pagetable();
 
-        if ( !pl1e )
+        if ( !l1t )
             return NULL;
-        clear_page(pl1e);
+        clear_page(l1t);
         if ( locking )
             spin_lock(&map_pgdir_lock);
         if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
         {
-            l2e_write(pl2e, l2e_from_paddr(__pa(pl1e), __PAGE_HYPERVISOR));
-            pl1e = NULL;
+            l2e_write(pl2e, l2e_from_paddr(__pa(l1t), __PAGE_HYPERVISOR));
+            l1t = NULL;
         }
         if ( locking )
             spin_unlock(&map_pgdir_lock);
-        if ( pl1e )
-            free_xen_pagetable(pl1e);
+        if ( l1t )
+            free_xen_pagetable(l1t);
     }
 
     BUG_ON(l2e_get_flags(*pl2e) & _PAGE_PSE);
