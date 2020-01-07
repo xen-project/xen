@@ -351,18 +351,6 @@ static gfn_info_t *rmap_retrieve(uint16_t domain_id, unsigned long gfn,
     return NULL;
 }
 
-/* Returns true if the rmap has only one entry. O(1) complexity. */
-static bool rmap_has_one_entry(const struct page_info *page)
-{
-    return rmap_count(page) == 1;
-}
-
-/* Returns true if the rmap has any entries. O(1) complexity. */
-static bool rmap_has_entries(const struct page_info *page)
-{
-    return rmap_count(page) != 0;
-}
-
 /*
  * The iterator hides the details of how the rmap is implemented. This
  * involves splitting the list_for_each_safe macro into two steps.
@@ -531,7 +519,7 @@ static int audit(void)
         }
 
         /* Check we have a list */
-        if ( (!pg->sharing) || !rmap_has_entries(pg) )
+        if ( (!pg->sharing) || rmap_count(pg) == 0 )
         {
             MEM_SHARING_DEBUG("mfn %lx shared, but empty gfn list!\n",
                               mfn_x(mfn));
@@ -1220,7 +1208,7 @@ int __mem_sharing_unshare_page(struct domain *d,
      * Do the accounting first. If anything fails below, we have bigger
      * bigger fish to fry. First, remove the gfn from the list.
      */
-    last_gfn = rmap_has_one_entry(page);
+    last_gfn = rmap_count(page) == 1;
     if ( last_gfn )
     {
         /*
