@@ -288,7 +288,7 @@ union hv_x64_msr_hypercall_contents {
 		u64 enable:1;
 		u64 reserved:11;
 		u64 guest_physical_address:52;
-	} __packed;
+	};
 };
 
 /*
@@ -300,7 +300,7 @@ struct ms_hyperv_tsc_page {
 	volatile u64 tsc_scale;
 	volatile s64 tsc_offset;
 	u64 reserved2[509];
-}  __packed;
+};
 
 /*
  * The guest OS needs to register the guest ID with the hypervisor.
@@ -347,17 +347,17 @@ struct hv_reenlightenment_control {
 	__u64 enabled:1;
 	__u64 reserved2:15;
 	__u64 target_vp:32;
-}  __packed;
+};
 
 struct hv_tsc_emulation_control {
 	__u64 enabled:1;
 	__u64 reserved:63;
-} __packed;
+};
 
 struct hv_tsc_emulation_status {
 	__u64 inprogress:1;
 	__u64 reserved:63;
-} __packed;
+};
 
 #define HV_X64_MSR_HYPERCALL_ENABLE		0x00000001
 #define HV_X64_MSR_HYPERCALL_PAGE_ADDRESS_SHIFT	12
@@ -445,7 +445,7 @@ typedef struct _HV_REFERENCE_TSC_PAGE {
 	__u32 res1;
 	__u64 tsc_scale;
 	__s64 tsc_offset;
-}  __packed HV_REFERENCE_TSC_PAGE, *PHV_REFERENCE_TSC_PAGE;
+} HV_REFERENCE_TSC_PAGE, *PHV_REFERENCE_TSC_PAGE;
 
 /* Define the number of synthetic interrupt sources. */
 #define HV_SYNIC_SINT_COUNT		(16)
@@ -502,7 +502,7 @@ union hv_message_flags {
 	struct {
 		__u8 msg_pending:1;
 		__u8 reserved:7;
-	} __packed;
+	};
 };
 
 /* Define port identifier type. */
@@ -511,7 +511,7 @@ union hv_port_id {
 	struct {
 		__u32 id:24;
 		__u32 reserved:8;
-	} __packed u;
+	} u;
 };
 
 /* Define synthetic interrupt controller message header. */
@@ -524,7 +524,7 @@ struct hv_message_header {
 		__u64 sender;
 		union hv_port_id port;
 	};
-} __packed;
+};
 
 /* Define synthetic interrupt controller message format. */
 struct hv_message {
@@ -532,12 +532,12 @@ struct hv_message {
 	union {
 		__u64 payload[HV_MESSAGE_PAYLOAD_QWORD_COUNT];
 	} u;
-} __packed;
+};
 
 /* Define the synthetic interrupt message page layout. */
 struct hv_message_page {
 	struct hv_message sint_message[HV_SYNIC_SINT_COUNT];
-} __packed;
+};
 
 /* Define timer message payload structure. */
 struct hv_timer_message_payload {
@@ -545,7 +545,7 @@ struct hv_timer_message_payload {
 	__u32 reserved;
 	__u64 expiration_time;	/* When the timer expired */
 	__u64 delivery_time;	/* When the message was delivered */
-} __packed;
+};
 
 struct hv_nested_enlightenments_control {
 	struct {
@@ -555,7 +555,7 @@ struct hv_nested_enlightenments_control {
 	struct {
 		__u32 reserved;
 	} hypercallControls;
-} __packed;
+};
 
 /* Define virtual processor assist page structure. */
 struct hv_vp_assist_page {
@@ -566,7 +566,7 @@ struct hv_vp_assist_page {
 	__u8 enlighten_vmentry;
 	__u8 reserved2[7];
 	__u64 current_nested_vmcs;
-} __packed;
+};
 
 struct hv_enlightened_vmcs {
 	u32 revision_id;
@@ -742,7 +742,7 @@ struct hv_enlightened_vmcs {
 		u32 nested_flush_hypercall:1;
 		u32 msr_bitmap:1;
 		u32 reserved:30;
-	}  __packed hv_enlightenments_control;
+	}  hv_enlightenments_control;
 	u32 hv_vp_id;
 
 	u64 hv_vm_id;
@@ -752,7 +752,7 @@ struct hv_enlightened_vmcs {
 	u64 padding64_5[7];
 	u64 xss_exit_bitmap;
 	u64 padding64_6[7];
-} __packed;
+};
 
 #define HV_VMX_ENLIGHTENED_CLEAN_FIELD_NONE			0
 #define HV_VMX_ENLIGHTENED_CLEAN_FIELD_IO_BITMAP		BIT(0, UL)
@@ -793,7 +793,7 @@ union hv_stimer_config {
 		u64 reserved_z0:3;
 		u64 sintx:4;
 		u64 reserved_z1:44;
-	} __packed;
+	};
 };
 
 
@@ -808,7 +808,7 @@ union hv_synic_scontrol {
 	struct {
 		u64 enable:1;
 		u64 reserved:63;
-	} __packed;
+	};
 };
 
 /* Define synthetic interrupt source. */
@@ -821,7 +821,7 @@ union hv_synic_sint {
 		u64 auto_eoi:1;
 		u64 polling:1;
 		u64 reserved2:45;
-	} __packed;
+	};
 };
 
 /* Define the format of the SIMP register */
@@ -831,7 +831,7 @@ union hv_synic_simp {
 		u64 simp_enabled:1;
 		u64 preserved:11;
 		u64 base_simp_gpa:52;
-	} __packed;
+	};
 };
 
 /* Define the format of the SIEFP register */
@@ -841,34 +841,34 @@ union hv_synic_siefp {
 		u64 siefp_enabled:1;
 		u64 preserved:11;
 		u64 base_siefp_gpa:52;
-	} __packed;
+	};
 };
 
 struct hv_vpset {
 	u64 format;
 	u64 valid_bank_mask;
 	u64 bank_contents[];
-} __packed;
+};
 
 /* HvCallSendSyntheticClusterIpi hypercall */
 struct hv_send_ipi {
 	u32 vector;
 	u32 reserved;
 	u64 cpu_mask;
-} __packed;
+};
 
 /* HvCallSendSyntheticClusterIpiEx hypercall */
 struct hv_send_ipi_ex {
 	u32 vector;
 	u32 reserved;
 	struct hv_vpset vp_set;
-} __packed;
+};
 
 /* HvFlushGuestPhysicalAddressSpace hypercalls */
 struct hv_guest_mapping_flush {
 	u64 address_space;
 	u64 flags;
-} __packed;
+};
 
 /*
  *  HV_MAX_FLUSH_PAGES = "additional_pages" + 1. It's limited
@@ -906,7 +906,7 @@ struct hv_tlb_flush {
 	u64 flags;
 	u64 processor_mask;
 	u64 gva_list[];
-} __packed;
+};
 
 /* HvFlushVirtualAddressSpaceEx hypercall */
 struct hv_tlb_flush_ex {
@@ -914,7 +914,7 @@ struct hv_tlb_flush_ex {
 	u64 flags;
 	struct hv_vpset hv_vp_set;
 	/* u64 gva_list[]; */
-} __packed;
+};
 
 struct hv_partition_assist_pg {
 	u32 tlb_lock_count;
