@@ -504,6 +504,16 @@ libxl__flock *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid)
     return lock;
 }
 
+libxl__flock *libxl__lock_domid_history(libxl__gc *gc)
+{
+    const char *lockfile;
+
+    lockfile = libxl__domid_history_path(gc, ".lock");
+    if (!lockfile) return NULL;
+
+    return libxl__lock_file(gc, lockfile);
+}
+
 int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_config *d_config)
 {

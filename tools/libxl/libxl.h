@@ -2679,6 +2679,13 @@ static inline int libxl_qemu_monitor_command_0x041200(libxl_ctx *ctx,
 
 #include <libxl_event.h>
 
+/*
+ * This function is for use only during host initialisation. If it is
+ * invoked on a host with running domains, or concurrent libxl
+ * processes then the system may malfuntion.
+ */
+int libxl_clear_domid_history(libxl_ctx *ctx);
+
 #endif /* LIBXL_H */
 
 /*

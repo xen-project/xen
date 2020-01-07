@@ -1268,6 +1268,230 @@ static void dm_destroy_cb(libxl__egc *egc,
     libxl__devices_destroy(egc, &dis->drs);
 }
 
+static unsigned int libxl__get_domid_reuse_timeout(void)
+{
+    const char *env_timeout = getenv("LIBXL_DOMID_REUSE_TIMEOUT");
+
+    return env_timeout ? strtol(env_timeout, NULL, 0) :
+        LIBXL_DOMID_REUSE_TIMEOUT;
+}
+
+char *libxl__domid_history_path(libxl__gc *gc, const char *suffix)
+{
+    return GCSPRINTF("%s/domid-history%s", libxl__run_dir_path(),
+                     suffix ?: "");
+}
+
+int libxl_clear_domid_history(libxl_ctx *ctx)
+{
+    GC_INIT(ctx);
+    char *path;
+    int rc = ERROR_FAIL;
+
+    path = libxl__domid_history_path(gc, NULL);
+    if (!path)
+        goto out;
+
+    if (unlink(path) < 0 && errno != ENOENT) {
+        LOGE(ERROR, "failed to remove '%s'\n", path);
+        goto out;
+    }
+
+    rc = 0;
+
+out:
+    GC_FREE;
+    return rc;
+}
+
+struct libxl__domid_history {
+    long timeout;
+    char *path;
+    FILE *f;
+    struct timespec ts;
+};
+
+static void libxl__domid_history_dispose(
+    struct libxl__domid_history *ctxt)
+{
+    if (ctxt->f) {
+        fclose(ctxt->f);
+        ctxt->f = NULL;
+    }
+}
+
+static int libxl__open_domid_history(libxl__gc *gc,
+                                     struct libxl__domid_history *ctxt)
+{
+    ctxt->timeout = libxl__get_domid_reuse_timeout();
+    ctxt->path = libxl__domid_history_path(gc, NULL);
+
+    ctxt->f = fopen(ctxt->path, "r");
+    if (!ctxt->f && errno != ENOENT) {
+        LOGE(ERROR, "failed to open '%s'", ctxt->path);
+        return ERROR_FAIL;
+    }
+
+    if (clock_gettime(CLOCK_MONOTONIC, &ctxt->ts)) {
+        LOGE(ERROR, "failed to get time");
+        libxl__domid_history_dispose(ctxt);
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
+static int libxl__close_domid_history(libxl__gc *gc,
+                                      struct libxl__domid_history *ctxt)
+{
+    int r;
+
+    if (!ctxt->f) return 0;
+
+    r = fclose(ctxt->f);
+    ctxt->f = NULL;
+    if (r == EOF) {
+        LOGE(ERROR, "failed to close '%s'", ctxt->path);
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
+static int libxl__read_recent(libxl__gc *gc,
+                              struct libxl__domid_history *ctxt,
+                              unsigned long *sec, unsigned int *domid)
+{
+    if (!ctxt->f) {
+        *domid = INVALID_DOMID;
+        return 0;
+    }
+
+    for (;;) {
+        int r = fscanf(ctxt->f, "%lu %u", sec, domid);
+
+        if (r == EOF) {
+            if (ferror(ctxt->f)) {
+                LOGE(ERROR, "failed to read from '%s'", ctxt->path);
+                return ERROR_FAIL;
+            }
+
+            *domid = INVALID_DOMID;
+            break;
+        } else if (r == 2 && libxl_domid_valid_guest(*domid) &&
+                   ctxt->ts.tv_sec - *sec <= ctxt->timeout) {
+            break;
+        }
+    }
+
+    return 0;
+}
+
+static int libxl__mark_domid_recent(libxl__gc *gc, uint32_t domid)
+{
+    libxl__flock *lock;
+    struct libxl__domid_history ctxt;
+    char *new;
+    FILE *nf = NULL;
+    int r, rc;
+
+    lock = libxl__lock_domid_history(gc);
+    if (!lock) {
+        LOGED(ERROR, domid, "failed to acquire lock");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = libxl__open_domid_history(gc, &ctxt);
+    if (rc) goto out;
+
+    new = libxl__domid_history_path(gc, ".new");
+    nf = fopen(new, "a");
+    if (!nf) {
+        LOGED(ERROR, domid, "failed to open '%s'", new);
+        goto out;
+    }
+
+    for (;;) {
+        unsigned long sec;
+        unsigned int val;
+
+        rc = libxl__read_recent(gc, &ctxt, &sec, &val);
+        if (rc) goto out;
+
+        if (val == INVALID_DOMID) /* EOF */
+            break;
+
+        r = fprintf(nf, "%lu %u\n", sec, val);
+        if (r < 0) {
+            LOGED(ERROR, domid, "failed to write to '%s'", new);
+            goto out;
+        }
+    }
+
+    r = fprintf(nf, "%lu %u\n", ctxt.ts.tv_sec, domid);
+    if (r < 0) {
+        LOGED(ERROR, domid, "failed to write to '%s'", new);
+        goto out;
+    }
+
+    r = fclose(nf);
+    nf = NULL;
+    if (r == EOF) {
+        LOGED(ERROR, domid, "failed to close '%s'", new);
+        goto out;
+    }
+
+    rc = libxl__close_domid_history(gc, &ctxt);
+    if (rc) goto out;
+
+    r = rename(new, ctxt.path);
+    if (r) {
+        LOGE(ERROR, "failed to rename '%s' -> '%s'", new, ctxt.path);
+        return ERROR_FAIL;
+    }
+
+out:
+    if (nf) fclose(nf);
+    libxl__domid_history_dispose(&ctxt);
+    if (lock) libxl__unlock_file(lock);
+
+    return rc;
+}
+
+int libxl__is_domid_recent(libxl__gc *gc, uint32_t domid, bool *recent)
+{
+    struct libxl__domid_history ctxt;
+    int rc;
+
+    rc = libxl__open_domid_history(gc, &ctxt);
+    if (rc) goto out;
+
+    *recent = false;
+    for (;;) {
+        unsigned long sec;
+        unsigned int val;
+
+        rc = libxl__read_recent(gc, &ctxt, &sec, &val);
+        if (rc) goto out;
+
+        if (val == INVALID_DOMID) /* EOF */
+            break;
+
+        if (val == domid && ctxt.ts.tv_sec - sec <= ctxt.timeout) {
+            *recent = true;
+            break;
+        }
+    }
+
+    rc = libxl__close_domid_history(gc, &ctxt);
+
+out:
+    libxl__domid_history_dispose(&ctxt);
+
+    return rc;
+}
+
 static void devices_destroy_cb(libxl__egc *egc,
                                libxl__devices_remove_state *drs,
                                int rc)
@@ -1331,6 +1555,8 @@ static void devices_destroy_cb(libxl__egc *egc,
         if (!ctx->xch) goto badchild;
 
         if (!dis->soft_reset) {
+            rc = libxl__mark_domid_recent(gc, domid);
+            if (rc) goto badchild;
             rc = xc_domain_destroy(ctx->xch, domid);
         } else {
             rc = xc_domain_pause(ctx->xch, domid);

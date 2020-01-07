@@ -4263,6 +4263,8 @@ _hidden void libxl__remus_teardown(libxl__egc *egc,
 _hidden void libxl__remus_restore_setup(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
 
+_hidden char *libxl__domid_history_path(libxl__gc *gc,
+                                        const char *suffix);
 
 /*
  * Convenience macros.
@@ -4661,6 +4663,7 @@ libxl__flock *libxl__lock_file(libxl__gc *gc, const char *filename);
 void libxl__unlock_file(libxl__flock *lock);
 
 libxl__flock *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid);
+libxl__flock *libxl__lock_domid_history(libxl__gc *gc);
 
 /*
  * Retrieve / store domain configuration from / to libxl private
@@ -4798,6 +4801,17 @@ static inline const char *libxl__qemu_qmp_path(libxl__gc *gc, int domid)
 _hidden int libxl__domain_pvcontrol(libxl__egc *egc,
                                     libxl__xswait_state *pvcontrol,
                                     domid_t domid, const char *cmd);
+
+/*
+ * Maximum number of seconds after desctruction then a domid remains
+ * 'recent'. Recent domids are not allowed to be re-used. This can be
+ * overidden, for debugging purposes, by the environment variable of the
+ * same name.
+ */
+#define LIBXL_DOMID_REUSE_TIMEOUT 60
+
+/* Check whether a domid is recent */
+int libxl__is_domid_recent(libxl__gc *gc, uint32_t domid, bool *recent);
 
 #endif
 

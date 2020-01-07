@@ -12,6 +12,32 @@
 #define DOMNAME_PATH   "/local/domain/0/name"
 #define DOMID_PATH     "/local/domain/0/domid"
 
+int clear_domid_history(void)
+{
+    int rc = 1;
+    xentoollog_logger_stdiostream *logger;
+    libxl_ctx *ctx;
+
+    logger = xtl_createlogger_stdiostream(stderr, XTL_ERROR, 0);
+    if (!logger)
+        return 1;
+
+    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0,
+                        (xentoollog_logger *)logger)) {
+        fprintf(stderr, "cannot init libxl context\n");
+        goto outlog;
+    }
+
+    if (!libxl_clear_domid_history(ctx))
+        rc = 0;
+
+    libxl_ctx_free(ctx);
+
+outlog:
+    xtl_logger_destroy((xentoollog_logger *)logger);
+    return rc;
+}
+
 int main(int argc, char **argv)
 {
     int rc;
@@ -67,6 +93,10 @@ int main(int argc, char **argv)
     }
 
     rc = gen_stub_json_config(0, &uuid);
+    if (rc)
+        goto out;
+
+    rc = clear_domid_history();
     if (rc)
         goto out;
 
