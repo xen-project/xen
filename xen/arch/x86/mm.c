@@ -5177,10 +5177,11 @@ int map_pages_to_xen(
                 }
                 else
                 {
-                    pl2e = l3e_to_l2e(ol3e);
+                    l2_pgentry_t *l2t = l3e_to_l2e(ol3e);
+
                     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
                     {
-                        ol2e = pl2e[i];
+                        ol2e = l2t[i];
                         if ( !(l2e_get_flags(ol2e) & _PAGE_PRESENT) )
                             continue;
                         if ( l2e_get_flags(ol2e) & _PAGE_PSE )
@@ -5188,21 +5189,21 @@ int map_pages_to_xen(
                         else
                         {
                             unsigned int j;
+                            const l1_pgentry_t *l1t = l2e_to_l1e(ol2e);
 
-                            pl1e = l2e_to_l1e(ol2e);
                             for ( j = 0; j < L1_PAGETABLE_ENTRIES; j++ )
-                                flush_flags(l1e_get_flags(pl1e[j]));
+                                flush_flags(l1e_get_flags(l1t[j]));
                         }
                     }
                     flush_area(virt, flush_flags);
                     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
                     {
-                        ol2e = pl2e[i];
+                        ol2e = l2t[i];
                         if ( (l2e_get_flags(ol2e) & _PAGE_PRESENT) &&
                              !(l2e_get_flags(ol2e) & _PAGE_PSE) )
                             free_xen_pagetable(l2e_to_l1e(ol2e));
                     }
-                    free_xen_pagetable(pl2e);
+                    free_xen_pagetable(l2t);
                 }
             }
 
@@ -5218,6 +5219,7 @@ int map_pages_to_xen(
         {
             unsigned int flush_flags =
                 FLUSH_TLB | FLUSH_ORDER(2 * PAGETABLE_ORDER);
+            l2_pgentry_t *l2t;
 
             /* Skip this PTE if there is no change. */
             if ( ((l3e_get_pfn(ol3e) & ~(L2_PAGETABLE_ENTRIES *
@@ -5239,12 +5241,12 @@ int map_pages_to_xen(
                 continue;
             }
 
-            pl2e = alloc_xen_pagetable();
-            if ( pl2e == NULL )
+            l2t = alloc_xen_pagetable();
+            if ( l2t == NULL )
                 return -ENOMEM;
 
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
-                l2e_write(pl2e + i,
+                l2e_write(l2t + i,
                           l2e_from_pfn(l3e_get_pfn(ol3e) +
                                        (i << PAGETABLE_ORDER),
                                        l3e_get_flags(ol3e)));
@@ -5257,15 +5259,15 @@ int map_pages_to_xen(
             if ( (l3e_get_flags(*pl3e) & _PAGE_PRESENT) &&
                  (l3e_get_flags(*pl3e) & _PAGE_PSE) )
             {
-                l3e_write_atomic(pl3e, l3e_from_mfn(virt_to_mfn(pl2e),
+                l3e_write_atomic(pl3e, l3e_from_mfn(virt_to_mfn(l2t),
                                                     __PAGE_HYPERVISOR));
-                pl2e = NULL;
+                l2t = NULL;
             }
             if ( locking )
                 spin_unlock(&map_pgdir_lock);
             flush_area(virt, flush_flags);
-            if ( pl2e )
-                free_xen_pagetable(pl2e);
+            if ( l2t )
+                free_xen_pagetable(l2t);
         }
 
         pl2e = virt_to_xen_l2e(virt);
@@ -5293,11 +5295,12 @@ int map_pages_to_xen(
                 }
                 else
                 {
-                    pl1e = l2e_to_l1e(ol2e);
+                    l1_pgentry_t *l1t = l2e_to_l1e(ol2e);
+
                     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-                        flush_flags(l1e_get_flags(pl1e[i]));
+                        flush_flags(l1e_get_flags(l1t[i]));
                     flush_area(virt, flush_flags);
-                    free_xen_pagetable(pl1e);
+                    free_xen_pagetable(l1t);
                 }
             }
 
@@ -5319,6 +5322,7 @@ int map_pages_to_xen(
             {
                 unsigned int flush_flags =
                     FLUSH_TLB | FLUSH_ORDER(PAGETABLE_ORDER);
+                l1_pgentry_t *l1t;
 
                 /* Skip this PTE if there is no change. */
                 if ( (((l2e_get_pfn(*pl2e) & ~(L1_PAGETABLE_ENTRIES - 1)) +
@@ -5338,12 +5342,12 @@ int map_pages_to_xen(
                     goto check_l3;
                 }
 
-                pl1e = alloc_xen_pagetable();
-                if ( pl1e == NULL )
+                l1t = alloc_xen_pagetable();
+                if ( l1t == NULL )
                     return -ENOMEM;
 
                 for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-                    l1e_write(&pl1e[i],
+                    l1e_write(&l1t[i],
                               l1e_from_pfn(l2e_get_pfn(*pl2e) + i,
                                            lNf_to_l1f(l2e_get_flags(*pl2e))));
 
@@ -5355,15 +5359,15 @@ int map_pages_to_xen(
                 if ( (l2e_get_flags(*pl2e) & _PAGE_PRESENT) &&
                      (l2e_get_flags(*pl2e) & _PAGE_PSE) )
                 {
-                    l2e_write_atomic(pl2e, l2e_from_mfn(virt_to_mfn(pl1e),
+                    l2e_write_atomic(pl2e, l2e_from_mfn(virt_to_mfn(l1t),
                                                         __PAGE_HYPERVISOR));
-                    pl1e = NULL;
+                    l1t = NULL;
                 }
                 if ( locking )
                     spin_unlock(&map_pgdir_lock);
                 flush_area(virt, flush_flags);
-                if ( pl1e )
-                    free_xen_pagetable(pl1e);
+                if ( l1t )
+                    free_xen_pagetable(l1t);
             }
 
             pl1e  = l2e_to_l1e(*pl2e) + l1_table_offset(virt);
@@ -5388,6 +5392,7 @@ int map_pages_to_xen(
                     ((1u << PAGETABLE_ORDER) - 1)) == 0)) )
             {
                 unsigned long base_mfn;
+                const l1_pgentry_t *l1t;
 
                 if ( locking )
                     spin_lock(&map_pgdir_lock);
@@ -5411,11 +5416,11 @@ int map_pages_to_xen(
                     goto check_l3;
                 }
 
-                pl1e = l2e_to_l1e(ol2e);
-                base_mfn = l1e_get_pfn(*pl1e) & ~(L1_PAGETABLE_ENTRIES - 1);
-                for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++, pl1e++ )
-                    if ( (l1e_get_pfn(*pl1e) != (base_mfn + i)) ||
-                         (l1e_get_flags(*pl1e) != flags) )
+                l1t = l2e_to_l1e(ol2e);
+                base_mfn = l1e_get_pfn(l1t[0]) & ~(L1_PAGETABLE_ENTRIES - 1);
+                for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+                    if ( (l1e_get_pfn(l1t[i]) != (base_mfn + i)) ||
+                         (l1e_get_flags(l1t[i]) != flags) )
                         break;
                 if ( i == L1_PAGETABLE_ENTRIES )
                 {
@@ -5441,6 +5446,7 @@ int map_pages_to_xen(
                 ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1))) )
         {
             unsigned long base_mfn;
+            const l2_pgentry_t *l2t;
 
             if ( locking )
                 spin_lock(&map_pgdir_lock);
@@ -5458,13 +5464,13 @@ int map_pages_to_xen(
                 continue;
             }
 
-            pl2e = l3e_to_l2e(ol3e);
-            base_mfn = l2e_get_pfn(*pl2e) & ~(L2_PAGETABLE_ENTRIES *
+            l2t = l3e_to_l2e(ol3e);
+            base_mfn = l2e_get_pfn(l2t[0]) & ~(L2_PAGETABLE_ENTRIES *
                                               L1_PAGETABLE_ENTRIES - 1);
-            for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
-                if ( (l2e_get_pfn(*pl2e) !=
+            for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
+                if ( (l2e_get_pfn(l2t[i]) !=
                       (base_mfn + (i << PAGETABLE_ORDER))) ||
-                     (l2e_get_flags(*pl2e) != l1f_to_lNf(flags)) )
+                     (l2e_get_flags(l2t[i]) != l1f_to_lNf(flags)) )
                     break;
             if ( i == L2_PAGETABLE_ENTRIES )
             {
