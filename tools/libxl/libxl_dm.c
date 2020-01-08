@@ -432,7 +432,7 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
     uint16_t seg;
     uint8_t bus, devfn;
     uint64_t rdm_start, rdm_size;
-    uint64_t highmem_end = dom->highmem_end ? dom->highmem_end : (1ull<<32);
+    uint64_t highmem_end = dom->highmem_end;
 
     /*
      * We just want to construct RDM once since RDM is specific to the
@@ -557,6 +557,8 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
              * We will move downwards lowmem_end so we have to expand
              * highmem_end.
              */
+            if (!highmem_end)
+                highmem_end = 1ull << 32;
             highmem_end += (dom->lowmem_end - rdm_start);
             /* Now move downwards lowmem_end. */
             dom->lowmem_end = rdm_start;
@@ -577,9 +579,10 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
         conflict = overlaps_rdm(0, dom->lowmem_end,
                                 rdm_start, rdm_size);
         /* Does this entry conflict with highmem? */
-        conflict |= overlaps_rdm((1ULL<<32),
-                                 dom->highmem_end - (1ULL<<32),
-                                 rdm_start, rdm_size);
+        if (highmem_end)
+            conflict |= overlaps_rdm((1ULL << 32),
+                                     highmem_end - (1ULL << 32),
+                                     rdm_start, rdm_size);
 
         if (!conflict)
             continue;
