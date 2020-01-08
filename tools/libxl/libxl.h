@@ -665,7 +665,7 @@ typedef struct libxl__ctx libxl_ctx;
 #if LIBXL_API_VERSION != 0x040200 && LIBXL_API_VERSION != 0x040300 && \
     LIBXL_API_VERSION != 0x040400 && LIBXL_API_VERSION != 0x040500 && \
     LIBXL_API_VERSION != 0x040700 && LIBXL_API_VERSION != 0x040800 && \
-    LIBXL_API_VERSION != 0x041300
+    LIBXL_API_VERSION != 0x041300 && LIBXL_API_VERSION != 0x041400
 #error Unknown LIBXL_API_VERSION
 #endif
 #endif
@@ -2325,9 +2325,27 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num);
 int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str);
 int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
                                   const char* str);
-void libxl_cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid);
-void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
-                     libxl_cpuid_policy_list cpuid);
+#if LIBXL_API_VERSION < 0x041400
+/*
+ * Dropped from the API in Xen 4.14.  At the time of writing, these functions
+ * don't appear to ever have had external callers.
+ *
+ * These have always been used internally during domain construction, and
+ * can't easily be used externally because of their implicit parameters in
+ * other pieces of global state.
+ *
+ * Furthermore, an API user can't usefully determine whether they get
+ * libxl_cpuid (the real implementation) or libxl_nocpuid (no-op stubs).
+ *
+ * The internal behaviour of these functions also needs to change.  Therefore
+ * for simplicitly, provide the no-op stubs.  Yes technically this is an API
+ * change in some cases for existing software, but there is 0 of that in
+ * practice.
+ */
+static inline void libxl_cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid) {}
+static inline void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
+                                   libxl_cpuid_policy_list cpuid) {}
+#endif
 
 /*
  * Functions for allowing users of libxl to store private data

@@ -2056,6 +2056,10 @@ struct libxl__cpuid_policy {
     char *policy[4];
 };
 
+_hidden void libxl__cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid);
+_hidden void libxl__cpuid_set(libxl_ctx *ctx, uint32_t domid,
+                              libxl_cpuid_policy_list cpuid);
+
 /* Calls poll() again - useful to check whether a signaled condition
  * is still true.  Cannot fail.  Returns currently-true revents. */
 _hidden short libxl__fd_poll_recheck(libxl__egc *egc, int fd, short events);
