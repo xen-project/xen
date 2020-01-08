@@ -1858,7 +1858,7 @@ false disable the quirk workaround, which is also the default.
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb,md-clear}=<bool>,
 >              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,eager-fpu,
->              l1d-flush}=<bool> ]`
+>              l1d-flush,srb-lock}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -1929,6 +1929,12 @@ or prevent Xen from issuing an L1 data cache flush on each VMEntry.
 Irrespective of Xen's setting, the feature is virtualised for HVM guests to
 use.  By default, Xen will enable this mitigation on hardware believed to be
 vulnerable to L1TF.
+
+On hardware supporting SRBDS_CTRL, the `srb-lock=` option can be used to force
+or prevent Xen from protect the Special Register Buffer from leaking stale
+data. By default, Xen will enable this mitigation, except on parts where MDS
+is fixed and TAA is fixed/mitigated (in which case, there is believed to be no
+way for an attacker to obtain the stale data).
 
 ### sync\_console
 > `= <boolean>`
