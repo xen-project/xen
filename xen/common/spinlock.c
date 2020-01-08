@@ -85,7 +85,8 @@ static void got_lock(union lock_debug *debug)
 
 static void rel_lock(union lock_debug *debug)
 {
-    ASSERT(debug->cpu == smp_processor_id());
+    if ( atomic_read(&spin_debug) > 0 )
+        ASSERT(debug->cpu == smp_processor_id());
     debug->cpu = SPINLOCK_NO_CPU;
 }
 

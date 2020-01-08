@@ -1077,6 +1077,7 @@ void console_unlock_recursive_irqrestore(unsigned long flags)
 void console_force_unlock(void)
 {
     watchdog_disable();
+    spin_debug_disable();
     spin_lock_init(&console_lock);
     serial_force_unlock(sercon_handle);
     console_locks_busted = 1;
