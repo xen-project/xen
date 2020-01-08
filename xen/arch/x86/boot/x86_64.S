@@ -81,11 +81,20 @@ GLOBAL(l2_directmap)
         .size l2_directmap, . - l2_directmap
 
 /*
- * L2 mapping the Xen text/data/bss region, constructed dynamically.  Uses 1x
- * 4k page.
+ * L2 mapping the Xen text/data/bss region, constructed dynamically.
+ * Executable fixmap is hooked up statically.
+ * Uses 1x 4k page.
  */
 GLOBAL(l2_xenmap)
-        .fill L2_PAGETABLE_ENTRIES, 8, 0
+        idx = 0
+        .rept L2_PAGETABLE_ENTRIES
+        .if idx == l2_table_offset(FIXADDR_X_TOP - 1)
+        .quad sym_offs(l1_fixmap_x) + __PAGE_HYPERVISOR
+        .else
+        .quad 0
+        .endif
+        idx = idx + 1
+        .endr
         .size l2_xenmap, . - l2_xenmap
 
 /* L2 mapping the fixmap.  Uses 1x 4k page. */

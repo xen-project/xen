@@ -12,6 +12,7 @@
 #include <xen/livepatch.h>
 #include <xen/sched.h>
 
+#include <asm/fixmap.h>
 #include <asm/nmi.h>
 #include <asm/livepatch.h>
 
@@ -311,7 +312,7 @@ void __init arch_livepatch_init(void)
     void *start, *end;
 
     start = (void *)xen_virt_end;
-    end = (void *)(XEN_VIRT_END - NR_CPUS * PAGE_SIZE);
+    end = (void *)(XEN_VIRT_END - FIXADDR_X_SIZE - NR_CPUS * PAGE_SIZE);
 
     BUG_ON(end <= start);
 

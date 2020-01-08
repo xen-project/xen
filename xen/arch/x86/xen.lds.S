@@ -352,6 +352,7 @@ SECTIONS
 }
 
 ASSERT(__2M_rwdata_end <= XEN_VIRT_END - XEN_VIRT_START + __XEN_VIRT_START -
+                          FIXADDR_X_SIZE -
                           NR_CPUS * PAGE_SIZE,
        "Xen image overlaps stubs area")
 

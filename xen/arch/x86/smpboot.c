@@ -644,7 +644,7 @@ unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn)
         unmap_domain_page(memset(__map_domain_page(pg), 0xcc, PAGE_SIZE));
     }
 
-    stub_va = XEN_VIRT_END - (cpu + 1) * PAGE_SIZE;
+    stub_va = XEN_VIRT_END - FIXADDR_X_SIZE - (cpu + 1) * PAGE_SIZE;
     if ( map_pages_to_xen(stub_va, page_to_mfn(pg), 1,
                           PAGE_HYPERVISOR_RX | MAP_SMALL_PAGES) )
     {

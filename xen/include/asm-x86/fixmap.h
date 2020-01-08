@@ -15,6 +15,7 @@
 #include <asm/page.h>
 
 #define FIXADDR_TOP (VMAP_VIRT_END - PAGE_SIZE)
+#define FIXADDR_X_TOP (XEN_VIRT_END - PAGE_SIZE)
 
 #ifndef __ASSEMBLY__
 
@@ -88,6 +89,29 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
     BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
     return __virt_to_fix(vaddr);
 }
+
+enum fixed_addresses_x {
+    /* Index 0 is reserved since fix_x_to_virt(0) == FIXADDR_X_TOP. */
+    FIX_X_RESERVED,
+#ifdef CONFIG_HYPERV_GUEST
+    FIX_X_HYPERV_HCALL,
+#endif
+    __end_of_fixed_addresses_x
+};
+
+#define FIXADDR_X_SIZE  (__end_of_fixed_addresses_x << PAGE_SHIFT)
+#define FIXADDR_X_START (FIXADDR_X_TOP - FIXADDR_X_SIZE)
+
+extern void __set_fixmap_x(
+    enum fixed_addresses_x idx, unsigned long mfn, unsigned long flags);
+
+#define set_fixmap_x(idx, phys) \
+    __set_fixmap_x(idx, (phys)>>PAGE_SHIFT, PAGE_HYPERVISOR_RX | MAP_SMALL_PAGES)
+
+#define clear_fixmap_x(idx) __set_fixmap_x(idx, 0, 0)
+
+#define __fix_x_to_virt(x) (FIXADDR_X_TOP - ((x) << PAGE_SHIFT))
+#define fix_x_to_virt(x)   ((void *)__fix_x_to_virt(x))
 
 #endif /* __ASSEMBLY__ */
 

@@ -392,4 +392,7 @@ label: .long (val);                         \
     .size label, . - label;                 \
     .type label, @object
 
+#define ASM_CONSTANT(name, value)                \
+    asm ( ".equ " #name ", %P0; .global " #name  \
+          :: "i" ((value)) );
 #endif /* __X86_ASM_DEFNS_H__ */
