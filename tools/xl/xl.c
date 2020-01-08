@@ -54,6 +54,7 @@ int claim_mode = 1;
 bool progress_use_cr = 0;
 int max_grant_frames = -1;
 int max_maptrack_frames = -1;
+libxl_domid domid_policy = INVALID_DOMID;
 
 xentoollog_level minmsglevel = minmsglevel_default;
 
@@ -227,6 +228,15 @@ static void parse_global_config(const char *configfile,
         parse_cpurange(buf, &global_pv_affinity_mask);
     else
         libxl_bitmap_set_any(&global_pv_affinity_mask);
+
+    if (!xlu_cfg_get_string (config, "domid_policy", &buf, 0)) {
+        if (!strcmp(buf, "xen"))
+            domid_policy = INVALID_DOMID;
+        else if (!strcmp(buf, "random"))
+            domid_policy = RANDOM_DOMID;
+        else
+            fprintf(stderr, "invalid domid_policy option");
+    }
 
     xlu_cfg_destroy(config);
 }

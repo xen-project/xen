@@ -45,6 +45,16 @@ The semantics of each C<KEY> defines which form of C<VALUE> is required.
 
 =over 4
 
+=item B<domid_policy="xen"|"random">
+
+Determines how domain-id is set when creating a new domain.
+
+If set to "xen" then the hypervisor will allocate new domain-id values on a sequential basis.
+
+If set to "random" then a random domain-id value will be chosen.
+
+Default: "xen"
+
 =item B<autoballoon="off"|"on"|"auto">
 
 If set to "on" then C<xl> will automatically reduce the amount of

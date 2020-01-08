@@ -283,6 +283,7 @@ extern int max_maptrack_frames;
 extern libxl_bitmap global_vm_affinity_mask;
 extern libxl_bitmap global_hvm_affinity_mask;
 extern libxl_bitmap global_pv_affinity_mask;
+extern libxl_domid domid_policy;
 
 enum output_format {
     OUTPUT_FORMAT_JSON,
