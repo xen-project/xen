@@ -554,7 +554,7 @@ static int do_boot_cpu(int apicid, int cpu)
         printk("Booting processor %d/%d eip %lx\n",
                cpu, apicid, start_eip);
 
-    stack_start = stack_base[cpu];
+    stack_start = stack_base[cpu] + STACK_SIZE - sizeof(struct cpu_info);
 
     /* This grunge runs the startup process for the targeted processor. */
 
@@ -1084,7 +1084,7 @@ void __init smp_prepare_cpus(void)
     boot_cpu_physical_apicid = get_apic_id();
     x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
-    stack_base[0] = stack_start;
+    stack_base[0] = (void *)((unsigned long)stack_start & ~(STACK_SIZE - 1));
 
     rc = setup_cpu_root_pgt(0);
     if ( rc )

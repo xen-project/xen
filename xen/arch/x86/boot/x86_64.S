@@ -16,7 +16,6 @@ ENTRY(__high_start)
         mov     %rcx,%cr4
 
         mov     stack_start(%rip),%rsp
-        or      $(STACK_SIZE-CPUINFO_sizeof),%rsp
 
         /* Reset EFLAGS (subsumes CLI and CLD). */
         pushq   $0
@@ -42,7 +41,7 @@ multiboot_ptr:
         .long   0
 
 GLOBAL(stack_start)
-        .quad   cpu0_stack
+        .quad   cpu0_stack + STACK_SIZE - CPUINFO_sizeof
 
         .section .data.page_aligned, "aw", @progbits
         .align PAGE_SIZE, 0

@@ -249,23 +249,24 @@ static void __init noreturn efi_arch_post_exit_boot(void)
                    "or     $"__stringify(X86_CR4_PGE)", %[cr4]\n\t"
                    "mov    %[cr4], %%cr4\n\t"
 #endif
-                   "movabs $__start_xen, %[rip]\n\t"
                    "lgdt   boot_gdtr(%%rip)\n\t"
-                   "mov    stack_start(%%rip), %%rsp\n\t"
                    "mov    %[ds], %%ss\n\t"
                    "mov    %[ds], %%ds\n\t"
                    "mov    %[ds], %%es\n\t"
                    "mov    %[ds], %%fs\n\t"
                    "mov    %[ds], %%gs\n\t"
-                   "movl   %[cs], 8(%%rsp)\n\t"
-                   "mov    %[rip], (%%rsp)\n\t"
-                   "lretq  %[stkoff]-16"
+
+                   /* Jump to higher mappings. */
+                   "mov    stack_start(%%rip), %%rsp\n\t"
+                   "movabs $__start_xen, %[rip]\n\t"
+                   "push   %[cs]\n\t"
+                   "push   %[rip]\n\t"
+                   "lretq"
                    : [rip] "=&r" (efer/* any dead 64-bit variable */),
                      [cr4] "+&r" (cr4)
                    : [cr3] "r" (idle_pg_table),
-                     [cs] "ir" (__HYPERVISOR_CS),
+                     [cs] "i" (__HYPERVISOR_CS),
                      [ds] "r" (__HYPERVISOR_DS),
-                     [stkoff] "i" (STACK_SIZE - sizeof(struct cpu_info)),
                      "D" (&mbi)
                    : "memory" );
     unreachable();

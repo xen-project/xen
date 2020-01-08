@@ -400,7 +400,7 @@ __pvh_start:
         sub     $sym_offs(1b), %esi
 
         /* Set up stack. */
-        lea     STACK_SIZE + sym_esi(cpu0_stack), %esp
+        lea     STACK_SIZE - CPUINFO_sizeof + sym_esi(cpu0_stack), %esp
 
         mov     %ebx, sym_esi(pvh_start_info_pa)
 
@@ -447,7 +447,7 @@ __start:
         sub     $sym_offs(1b), %esi
 
         /* Set up stack. */
-        lea     STACK_SIZE + sym_esi(cpu0_stack), %esp
+        lea     STACK_SIZE - CPUINFO_sizeof + sym_esi(cpu0_stack), %esp
 
         /* Bootloaders may set multiboot{1,2}.mem_lower to a nonzero value. */
         xor     %edx,%edx
@@ -616,7 +616,11 @@ trampoline_setup:
         cmpb    $0,sym_fs(efi_platform)
         jnz     1f
 
-        /* Initialize BSS (no nasty surprises!). */
+        /*
+         * Initialise the BSS.
+         *
+         * !!! WARNING - also zeroes the current stack !!!
+         */
         lea     sym_esi(__bss_start), %edi
         lea     sym_esi(__bss_end), %ecx
         sub     %edi,%ecx
