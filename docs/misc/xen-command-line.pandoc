@@ -504,10 +504,10 @@ accounting for hardware capabilities as enumerated via CPUID.
 
 Currently accepted:
 
-The Speculation Control hardware features `md-clear`, `ibrsb`, `stibp`, `ibpb`,
-`l1d-flush` and `ssbd` are used by default if available and applicable.  They can
-be ignored, e.g. `no-ibrsb`, at which point Xen won't use them itself, and
-won't offer them to guests.
+The Speculation Control hardware features `srbds-ctrl`, `md-clear`, `ibrsb`,
+`stibp`, `ibpb`, `l1d-flush` and `ssbd` are used by default if available and
+applicable.  They can be ignored, e.g. `no-ibrsb`, at which point Xen won't
+use them itself, and won't offer them to guests.
 
 `rdrand` can be used to override the default disabling of the feature on certain
 AMD systems.  Its negative form can of course also be used to suppress use and
