@@ -617,16 +617,12 @@ trampoline_setup:
         jnz     1f
 
         /* Initialize BSS (no nasty surprises!). */
-        mov     $sym_offs(__bss_start),%edi
-        mov     $sym_offs(__bss_end),%ecx
-        push    %fs
-        pop     %es
+        lea     sym_esi(__bss_start), %edi
+        lea     sym_esi(__bss_end), %ecx
         sub     %edi,%ecx
         xor     %eax,%eax
         shr     $2,%ecx
         rep stosl
-        push    %ds
-        pop     %es
 
 1:
         /* Interrogate CPU extended features via CPUID. */
