@@ -142,6 +142,7 @@ static const char *str_7d0[32] =
 {
     [ 2] = "avx512_4vnniw", [ 3] = "avx512_4fmaps",
 
+    /*  8 */                [ 9] = "srbds-ctrl",
     [10] = "md-clear",
     /* 12 */                [13] = "tsx-force-abort",
 
