@@ -1588,7 +1588,7 @@ static int promote_l3_table(struct page_info *page)
 
         if ( i > page->nr_validated_ptes && hypercall_preempt_check() )
             rc = -EINTR;
-        else if ( is_pv_32bit_domain(d) && (i == 3) )
+        else if ( i == 3 && is_pv_32bit_domain(d) )
         {
             if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
                  (l3e_get_flags(l3e) & l3_disallow_mask(d)) )
@@ -2310,7 +2310,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
      * Disallow updates to final L3 slot. It contains Xen mappings, and it
      * would be a pain to ensure they remain continuously valid throughout.
      */
-    if ( is_pv_32bit_domain(d) && (pgentry_ptr_to_slot(pl3e) >= 3) )
+    if ( pgentry_ptr_to_slot(pl3e) >= 3 && is_pv_32bit_domain(d) )
         return -EINVAL;
 
     ol3e = l3e_read_atomic(pl3e);
@@ -2470,7 +2470,7 @@ static int cleanup_page_mappings(struct page_info *page)
     {
         struct domain *d = page_get_owner(page);
 
-        if ( d && is_pv_domain(d) && unlikely(need_iommu_pt_sync(d)) )
+        if ( d && unlikely(need_iommu_pt_sync(d)) && is_pv_domain(d) )
         {
             int rc2 = iommu_legacy_unmap(d, _dfn(mfn), PAGE_ORDER_4K);
 
@@ -2984,7 +2984,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
         /* Special pages should not be accessible from devices. */
         struct domain *d = page_get_owner(page);
 
-        if ( d && is_pv_domain(d) && unlikely(need_iommu_pt_sync(d)) )
+        if ( d && unlikely(need_iommu_pt_sync(d)) && is_pv_domain(d) )
         {
             mfn_t mfn = page_to_mfn(page);
 
