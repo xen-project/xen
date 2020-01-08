@@ -162,8 +162,9 @@ static const char *str_7d0[32] =
 
     [ 2] = "avx512_4vnniw", [ 3] = "avx512_4fmaps",
 
-    [4 ... 9] = "REZ",
+    [4 ... 7] = "REZ",
 
+    [ 8] = "REZ",           [ 9] = "srbds-ctrl",
     [10] = "md-clear",      [11] = "REZ",
     [12] = "REZ",           [13] = "tsx-force-abort",
 
