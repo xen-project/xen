@@ -99,6 +99,7 @@ struct save_file_header {
 #define SAVEFILE_BYTEORDER_VALUE ((uint32_t)0x01020304UL)
 
 void save_domain_core_begin(uint32_t domid,
+                            int preserve_domid,
                             const char *override_config_file,
                             uint8_t **config_data_r,
                             int *config_len_r);

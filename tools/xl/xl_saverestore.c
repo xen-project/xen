@@ -32,6 +32,7 @@
 #ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
 
 void save_domain_core_begin(uint32_t domid,
+                            int preserve_domid,
                             const char *override_config_file,
                             uint8_t **config_data_r,
                             int *config_len_r)
@@ -62,6 +63,8 @@ void save_domain_core_begin(uint32_t domid,
             fprintf(stderr, "unable to retrieve domain configuration\n");
             exit(EXIT_FAILURE);
         }
+
+        d_config.c_info.domid = preserve_domid ? domid : 0;
     }
 
     config_c = libxl_domain_config_to_json(ctx, &d_config);
@@ -120,14 +123,15 @@ void save_domain_core_writeconfig(int fd, const char *source,
             hdr.optional_data_len);
 }
 
-static int save_domain(uint32_t domid, const char *filename, int checkpoint,
-                            int leavepaused, const char *override_config_file)
+static int save_domain(uint32_t domid, int preserve_domid,
+                       const char *filename, int checkpoint,
+                       int leavepaused, const char *override_config_file)
 {
     int fd;
     uint8_t *config_data;
     int config_len;
 
-    save_domain_core_begin(domid, override_config_file,
+    save_domain_core_begin(domid, preserve_domid, override_config_file,
                            &config_data, &config_len);
 
     if (!config_len) {
@@ -236,14 +240,18 @@ int main_save(int argc, char **argv)
     const char *config_filename = NULL;
     int checkpoint = 0;
     int leavepaused = 0;
+    int preserve_domid = 0;
     int opt;
 
-    SWITCH_FOREACH_OPT(opt, "cp", NULL, "save", 2) {
+    SWITCH_FOREACH_OPT(opt, "cpD", NULL, "save", 2) {
     case 'c':
         checkpoint = 1;
         break;
     case 'p':
         leavepaused = 1;
+        break;
+    case 'D':
+        preserve_domid = 1;
         break;
     }
 
@@ -257,7 +265,8 @@ int main_save(int argc, char **argv)
     if ( argc - optind >= 3 )
         config_filename = argv[optind + 2];
 
-    save_domain(domid, filename, checkpoint, leavepaused, config_filename);
+    save_domain(domid, preserve_domid, filename, checkpoint, leavepaused,
+                config_filename);
     return EXIT_SUCCESS;
 }
 

@@ -153,7 +153,8 @@ struct cmd_spec cmd_table[] = {
       "[options] <Domain> <CheckpointFile> [<ConfigFile>]",
       "-h  Print this help.\n"
       "-c  Leave domain running after creating the snapshot.\n"
-      "-p  Leave domain paused after creating the snapshot."
+      "-p  Leave domain paused after creating the snapshot.\n"
+      "-D  Store the domain id in the configration."
     },
     { "migrate",
       &main_migrate, 0, 1,
@@ -167,7 +168,8 @@ struct cmd_spec cmd_table[] = {
       "-e              Do not wait in the background (on <host>) for the death\n"
       "                of the domain.\n"
       "--debug         Print huge (!) amount of debug during the migration process.\n"
-      "-p              Do not unpause domain after migrating it."
+      "-p              Do not unpause domain after migrating it.\n"
+      "-D              Preserve the domain id"
     },
     { "restore",
       &main_restore, 0, 1,

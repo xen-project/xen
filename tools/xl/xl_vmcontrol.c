@@ -899,7 +899,8 @@ start:
         autoconnect_console_how = 0;
     }
 
-    d_config.c_info.domid = domid_policy;
+    if (!libxl_domid_valid_guest(d_config.c_info.domid))
+        d_config.c_info.domid = domid_policy;
 
     if ( restoring ) {
         libxl_domain_restore_params params;

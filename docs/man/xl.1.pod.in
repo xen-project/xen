@@ -490,6 +490,13 @@ Display huge (!) amount of debug information during the migration process.
 
 Leave the domain on the receive side paused after migration.
 
+=item B<-D>
+
+Preserve the B<domain-id> in the domain coniguration that is transferred
+such that it will be identical on the destination host, unless that
+configuration is overridden using the B<-C> option. Note that it is not
+possible to use this option for a 'localhost' migration.
+
 =back
 
 =item B<remus> [I<OPTIONS>] I<domain-id> I<host>
@@ -691,6 +698,13 @@ Leave the domain running after creating the snapshot.
 =item B<-p>
 
 Leave the domain paused after creating the snapshot.
+
+=item B<-D>
+
+Preserve the B<domain-id> in the domain coniguration that is embedded in
+the state file such that it will be identical when the domain is restored,
+unless that configuration is overridden. (See the B<restore> operation
+above).
 
 =back
 

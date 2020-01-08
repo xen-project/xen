@@ -176,7 +176,8 @@ static void migrate_do_preamble(int send_fd, int recv_fd, pid_t child,
 
 }
 
-static void migrate_domain(uint32_t domid, const char *rune, int debug,
+static void migrate_domain(uint32_t domid, int preserve_domid,
+                           const char *rune, int debug,
                            const char *override_config_file)
 {
     pid_t child = -1;
@@ -187,7 +188,7 @@ static void migrate_domain(uint32_t domid, const char *rune, int debug,
     uint8_t *config_data;
     int config_len, flags = LIBXL_SUSPEND_LIVE;
 
-    save_domain_core_begin(domid, override_config_file,
+    save_domain_core_begin(domid, preserve_domid, override_config_file,
                            &config_data, &config_len);
 
     if (!config_len) {
@@ -537,13 +538,14 @@ int main_migrate(int argc, char **argv)
     char *rune = NULL;
     char *host;
     int opt, daemonize = 1, monitor = 1, debug = 0, pause_after_migration = 0;
+    int preserve_domid = 0;
     static struct option opts[] = {
         {"debug", 0, 0, 0x100},
         {"live", 0, 0, 0x200},
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "FC:s:ep", opts, "migrate", 2) {
+    SWITCH_FOREACH_OPT(opt, "FC:s:epD", opts, "migrate", 2) {
     case 'C':
         config_filename = optarg;
         break;
@@ -559,6 +561,9 @@ int main_migrate(int argc, char **argv)
         break;
     case 'p':
         pause_after_migration = 1;
+        break;
+    case 'D':
+        preserve_domid = 1;
         break;
     case 0x100: /* --debug */
         debug = 1;
@@ -596,7 +601,7 @@ int main_migrate(int argc, char **argv)
                   pause_after_migration ? " -p" : "");
     }
 
-    migrate_domain(domid, rune, debug, config_filename);
+    migrate_domain(domid, preserve_domid, rune, debug, config_filename);
     return EXIT_SUCCESS;
 }
 
@@ -716,7 +721,7 @@ int main_remus(int argc, char **argv)
             }
         }
 
-        save_domain_core_begin(domid, NULL, &config_data, &config_len);
+        save_domain_core_begin(domid, 0, NULL, &config_data, &config_len);
 
         if (!config_len) {
             fprintf(stderr, "No config file stored for running domain and "
