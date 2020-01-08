@@ -2655,6 +2655,7 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         /* Write-only */
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
+    case MSR_MCU_OPT_CTRL:
         /* Not offered to guests. */
         break;
 
@@ -2880,6 +2881,7 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
         /* The MSR is read-only. */
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
+    case MSR_MCU_OPT_CTRL:
         /* Not offered to guests. */
         break;
 

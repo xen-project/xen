@@ -176,6 +176,9 @@
 #define MSR_IA32_VMX_TRUE_ENTRY_CTLS            0x490
 #define MSR_IA32_VMX_VMFUNC                     0x491
 
+#define MSR_MCU_OPT_CTRL                    0x00000123
+#define  MCU_OPT_CTRL_RNGDS_MITG_DIS        (_AC(1, ULL) <<  0)
+
 /* K7/K8 MSRs. Not complete. See the architecture manual for a more
    complete list. */
 #define MSR_K7_EVNTSEL0			0xc0010000

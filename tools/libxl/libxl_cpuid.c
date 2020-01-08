@@ -158,6 +158,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"de",           0x00000001, NA, CPUID_REG_EDX,  2,  1},
         {"vme",          0x00000001, NA, CPUID_REG_EDX,  1,  1},
         {"fpu",          0x00000001, NA, CPUID_REG_EDX,  0,  1},
+        {"srbds-ctrl",   0x00000007,  0, CPUID_REG_EDX,  9,  1},
         {"md-clear",     0x00000007,  0, CPUID_REG_EDX, 10,  1},
         {"ibrsb",        0x00000007,  0, CPUID_REG_EDX, 26,  1},
         {"stibp",        0x00000007,  0, CPUID_REG_EDX, 27,  1},

@@ -3445,6 +3445,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         /* Write-only */
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
+    case MSR_MCU_OPT_CTRL:
         /* Not offered to guests. */
         goto gp_fault;
 
@@ -3671,6 +3672,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         /* Read-only */
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
+    case MSR_MCU_OPT_CTRL:
         /* Not offered to guests. */
         goto gp_fault;
 
