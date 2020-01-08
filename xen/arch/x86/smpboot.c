@@ -361,12 +361,14 @@ void start_secondary(void *unused)
     microcode_update_one(false);
 
     /*
-     * If MSR_SPEC_CTRL is available, apply Xen's default setting and discard
-     * any firmware settings.  Note: MSR_SPEC_CTRL may only become available
-     * after loading microcode.
+     * If any speculative control MSRs are available, apply Xen's default
+     * settings.  Note: These MSRs may only become available after loading
+     * microcode.
      */
     if ( boot_cpu_has(X86_FEATURE_IBRSB) )
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
+    if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
+        wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
 
     tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
 

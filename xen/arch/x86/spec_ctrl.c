@@ -65,6 +65,9 @@ static unsigned int __initdata l1d_maxphysaddr;
 static bool __initdata cpu_has_bug_msbds_only; /* => minimal HT impact. */
 static bool __initdata cpu_has_bug_mds; /* Any other M{LP,SB,FB}DS combination. */
 
+static int8_t __initdata opt_srb_lock = -1;
+uint64_t __read_mostly default_xen_mcu_opt_ctrl;
+
 static int __init parse_spec_ctrl(const char *s)
 {
     const char *ss;
@@ -112,6 +115,7 @@ static int __init parse_spec_ctrl(const char *s)
             opt_ssbd = false;
             opt_l1d_flush = 0;
             opt_branch_harden = false;
+            opt_srb_lock = 0;
         }
         else if ( val > 0 )
             rc = -EINVAL;
@@ -178,6 +182,8 @@ static int __init parse_spec_ctrl(const char *s)
             opt_l1d_flush = val;
         else if ( (val = parse_boolean("branch-harden", s, ss)) >= 0 )
             opt_branch_harden = val;
+        else if ( (val = parse_boolean("srb-lock", s, ss)) >= 0 )
+            opt_srb_lock = val;
         else
             rc = -EINVAL;
 
@@ -341,7 +347,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s, Other:%s%s%s%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s, Other:%s%s%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
@@ -352,6 +358,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            !(caps & ARCH_CAPS_TSX_CTRL)              ? "" :
            (opt_tsx & 1)                             ? " TSX+" : " TSX-",
+           !boot_cpu_has(X86_FEATURE_SRBDS_CTRL)     ? "" :
+           opt_srb_lock                              ? " SRB_LOCK+" : " SRB_LOCK-",
            opt_ibpb                                  ? " IBPB"  : "",
            opt_l1d_flush                             ? " L1D_FLUSH" : "",
            opt_md_clear_pv || opt_md_clear_hvm       ? " VERW"  : "",
@@ -1149,6 +1157,34 @@ void __init init_speculation_mitigations(void)
         tsx_init();
     }
 
+    /* Calculate suitable defaults for MSR_MCU_OPT_CTRL */
+    if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
+    {
+        uint64_t val;
+
+        rdmsrl(MSR_MCU_OPT_CTRL, val);
+
+        /*
+         * On some SRBDS-affected hardware, it may be safe to relax srb-lock
+         * by default.
+         *
+         * On parts which enumerate MDS_NO and not TAA_NO, TSX is the only way
+         * to access the Fill Buffer.  If TSX isn't available (inc. SKU
+         * reasons on some models), or TSX is explicitly disabled, then there
+         * is no need for the extra overhead to protect RDRAND/RDSEED.
+         */
+        if ( opt_srb_lock == -1 &&
+             (caps & (ARCH_CAPS_MDS_NO|ARCH_CAPS_TAA_NO)) == ARCH_CAPS_MDS_NO &&
+             (!cpu_has_hle || ((caps & ARCH_CAPS_TSX_CTRL) && opt_tsx == 0)) )
+            opt_srb_lock = 0;
+
+        val &= ~MCU_OPT_CTRL_RNGDS_MITG_DIS;
+        if ( !opt_srb_lock )
+            val |= MCU_OPT_CTRL_RNGDS_MITG_DIS;
+
+        default_xen_mcu_opt_ctrl = val;
+    }
+
     print_details(thunk, caps);
 
     /*
@@ -1180,6 +1216,9 @@ void __init init_speculation_mitigations(void)
 
         wrmsrl(MSR_SPEC_CTRL, bsp_delay_spec_ctrl ? 0 : default_xen_spec_ctrl);
     }
+
+    if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
+        wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
 }
 
 static void __init __maybe_unused build_assertions(void)

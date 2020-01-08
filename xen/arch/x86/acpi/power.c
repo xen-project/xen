@@ -295,6 +295,9 @@ static int enter_state(u32 state)
     ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_ist_wrmsr);
     spec_ctrl_exit_idle(ci);
 
+    if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
+        wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
+
  done:
     spin_debug_enable();
     local_irq_restore(flags);
