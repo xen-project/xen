@@ -2124,12 +2124,9 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
                         struct vcpu *pt_vcpu, struct domain *pg_dom)
 {
     bool preserve_ad = (cmd == MMU_PT_UPDATE_PRESERVE_AD);
-    l1_pgentry_t ol1e;
+    l1_pgentry_t ol1e = l1e_read_atomic(pl1e);
     struct domain *pt_dom = pt_vcpu->domain;
     int rc = 0;
-
-    if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
-        return -EFAULT;
 
     ASSERT(!paging_mode_refcounts(pt_dom));
 
@@ -2248,8 +2245,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         return -EPERM;
     }
 
-    if ( unlikely(__copy_from_user(&ol2e, pl2e, sizeof(ol2e)) != 0) )
-        return -EFAULT;
+    ol2e = l2e_read_atomic(pl2e);
 
     if ( l2e_get_flags(nl2e) & _PAGE_PRESENT )
     {
@@ -2311,8 +2307,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     if ( is_pv_32bit_domain(d) && (pgentry_ptr_to_slot(pl3e) >= 3) )
         return -EINVAL;
 
-    if ( unlikely(__copy_from_user(&ol3e, pl3e, sizeof(ol3e)) != 0) )
-        return -EFAULT;
+    ol3e = l3e_read_atomic(pl3e);
 
     if ( l3e_get_flags(nl3e) & _PAGE_PRESENT )
     {
@@ -2378,8 +2373,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         return -EINVAL;
     }
 
-    if ( unlikely(__copy_from_user(&ol4e, pl4e, sizeof(ol4e)) != 0) )
-        return -EFAULT;
+    ol4e = l4e_read_atomic(pl4e);
 
     if ( l4e_get_flags(nl4e) & _PAGE_PRESENT )
     {
