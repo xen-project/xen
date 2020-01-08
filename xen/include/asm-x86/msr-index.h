@@ -179,6 +179,9 @@
 #define MSR_IA32_VMX_TRUE_ENTRY_CTLS            0x490
 #define MSR_IA32_VMX_VMFUNC                     0x491
 
+#define MSR_MCU_OPT_CTRL                    0x00000123
+#define  MCU_OPT_CTRL_RNGDS_MITG_DIS        (_AC(1, ULL) <<  0)
+
 #define MSR_U_CET                           0x000006a0
 #define MSR_S_CET                           0x000006a2
 #define MSR_PL0_SSP                         0x000006a4
