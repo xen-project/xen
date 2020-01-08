@@ -2562,6 +2562,13 @@ static int cpu_schedule_callback(
     unsigned int cpu = (unsigned long)hcpu;
     int rc = 0;
 
+    /*
+     * All scheduler related suspend/resume handling needed is done in
+     * cpupool.c.
+     */
+    if ( system_state > SYS_STATE_active )
+        return NOTIFY_DONE;
+
     rcu_read_lock(&sched_res_rculock);
 
     /*
@@ -2589,8 +2596,7 @@ static int cpu_schedule_callback(
     switch ( action )
     {
     case CPU_UP_PREPARE:
-        if ( system_state != SYS_STATE_resume )
-            rc = cpu_schedule_up(cpu);
+        rc = cpu_schedule_up(cpu);
         break;
     case CPU_DOWN_PREPARE:
         rcu_read_lock(&domlist_read_lock);
@@ -2598,13 +2604,10 @@ static int cpu_schedule_callback(
         rcu_read_unlock(&domlist_read_lock);
         break;
     case CPU_DEAD:
-        if ( system_state == SYS_STATE_suspend )
-            break;
         sched_rm_cpu(cpu);
         break;
     case CPU_UP_CANCELED:
-        if ( system_state != SYS_STATE_resume )
-            cpu_schedule_down(cpu);
+        cpu_schedule_down(cpu);
         break;
     default:
         break;
