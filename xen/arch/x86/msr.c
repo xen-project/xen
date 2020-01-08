@@ -134,6 +134,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         /* Write-only */
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
+    case MSR_MCU_OPT_CTRL:
     case MSR_U_CET:
     case MSR_S_CET:
     case MSR_PL0_SSP ... MSR_INTERRUPT_SSP_TABLE:
@@ -288,6 +289,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         /* Read-only */
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
+    case MSR_MCU_OPT_CTRL:
     case MSR_U_CET:
     case MSR_S_CET:
     case MSR_PL0_SSP ... MSR_INTERRUPT_SSP_TABLE:
