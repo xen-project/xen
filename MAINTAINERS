@@ -173,7 +173,7 @@ ARINC653 SCHEDULER
 M:	Josh Whitehead <josh.whitehead@dornerworks.com>
 M:	Stewart Hildebrand <stewart.hildebrand@dornerworks.com>
 S:	Supported
-L:	DornerWorks Xen-Devel <xen-devel@dornerworks.com>
+L:	xen-devel@dornerworks.com
 F:	xen/common/sched_arinc653.c
 F:	tools/libxc/xc_arinc653.c
 
