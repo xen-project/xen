@@ -1414,23 +1414,22 @@ static int promote_l1_table(struct page_info *page)
     return ret;
 }
 
-static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
+/*
+ * Note: The checks performed by this function are just to enforce a
+ * legacy restriction necessary on 32-bit hosts. There's not much point in
+ * relaxing (dropping) this though, as 32-bit guests would still need to
+ * conform to the original restrictions in order to be able to run on (old)
+ * 32-bit Xen.
+ */
+static bool pae_xen_mappings_check(const struct domain *d,
+                                   const l3_pgentry_t *pl3e)
 {
-    struct page_info *page;
-    l3_pgentry_t     l3e3;
-
-    if ( !is_pv_32bit_domain(d) )
-        return 1;
-
-    pl3e = (l3_pgentry_t *)((unsigned long)pl3e & PAGE_MASK);
-
-    /* 3rd L3 slot contains L2 with Xen-private mappings. It *must* exist. */
-    l3e3 = pl3e[3];
-    if ( !(l3e_get_flags(l3e3) & _PAGE_PRESENT) )
-    {
-        gdprintk(XENLOG_WARNING, "PAE L3 3rd slot is empty\n");
-        return 0;
-    }
+    /*
+     * 3rd L3 slot contains L2 with Xen-private mappings. It *must* exist,
+     * which our caller has already verified.
+     */
+    l3_pgentry_t l3e3 = pl3e[3];
+    const struct page_info *page = l3e_get_page(l3e3);
 
     /*
      * The Xen-private mappings include linear mappings. The L2 thus cannot
@@ -1441,17 +1440,24 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
      *     a. promote_l3_table() calls this function and this check will fail
      *     b. mod_l3_entry() disallows updates to slot 3 in an existing table
      */
-    page = l3e_get_page(l3e3);
     BUG_ON(page->u.inuse.type_info & PGT_pinned);
-    BUG_ON((page->u.inuse.type_info & PGT_count_mask) == 0);
     BUG_ON(!(page->u.inuse.type_info & PGT_pae_xen_l2));
     if ( (page->u.inuse.type_info & PGT_count_mask) != 1 )
     {
+        BUG_ON(!(page->u.inuse.type_info & PGT_count_mask));
         gdprintk(XENLOG_WARNING, "PAE L3 3rd slot is shared\n");
-        return 0;
+        return false;
     }
 
-    return 1;
+    return true;
+}
+
+void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
+{
+    memcpy(&l2t[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
+           &compat_idle_pg_table_l2[
+               l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+           COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2t));
 }
 
 static int promote_l2_table(struct page_info *page, unsigned long type)
@@ -1592,6 +1598,16 @@ static int promote_l3_table(struct page_info *page)
                     l3e_get_mfn(l3e),
                     PGT_l2_page_table | PGT_pae_xen_l2, d,
                     partial_flags | PTF_preemptible | PTF_retain_ref_on_restart);
+
+            if ( !rc )
+            {
+                if ( pae_xen_mappings_check(d, pl3e) )
+                {
+                    pl3e[i] = adjust_guest_l3e(l3e, d);
+                    break;
+                }
+                rc = -EINVAL;
+            }
         }
         else if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         {
@@ -1621,8 +1637,6 @@ static int promote_l3_table(struct page_info *page)
         pl3e[i] = adjust_guest_l3e(l3e, d);
     }
 
-    if ( !rc && !create_pae_xen_mappings(d, pl3e) )
-        rc = -EINVAL;
     if ( rc < 0 && rc != -ERESTART && rc != -EINTR )
     {
         gdprintk(XENLOG_WARNING,
@@ -1662,14 +1676,6 @@ static int promote_l3_table(struct page_info *page)
 
     unmap_domain_page(pl3e);
     return rc;
-}
-
-void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
-{
-    memcpy(&l2t[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
-           &compat_idle_pg_table_l2[
-               l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
-           COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2t));
 }
 #endif /* CONFIG_PV */
 
@@ -2346,10 +2352,6 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     {
         return -EFAULT;
     }
-
-    if ( likely(rc == 0) )
-        if ( !create_pae_xen_mappings(d, pl3e) )
-            BUG();
 
     put_page_from_l3e(ol3e, mfn, PTF_defer);
     return rc;
