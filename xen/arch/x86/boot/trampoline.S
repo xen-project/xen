@@ -129,7 +129,6 @@ gdt_48:
         .quad   0x00cf93000000ffff /* 0x0018: ring 0 data */
         .quad   0x00009b000000ffff /* 0x0020: real-mode code @ BOOT_TRAMPOLINE */
         .quad   0x000093000000ffff /* 0x0028: real-mode data @ BOOT_TRAMPOLINE */
-        .quad   0x00c0930000000fff /* 0x0030: ring 0 Xen data, 16M @ XEN */
 .Ltrampoline_gdt_end:
 
         /* Relocations for trampoline Real Mode segments. */

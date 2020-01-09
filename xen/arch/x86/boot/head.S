@@ -14,14 +14,12 @@
 
 #define sym_offs(sym)     ((sym) - __XEN_VIRT_START)
 #define sym_esi(sym)      sym_offs(sym)(%esi)
-#define sym_fs(sym)       %fs:sym_offs(sym)
 
 #define BOOT_CS32        0x0008
 #define BOOT_CS64        0x0010
 #define BOOT_DS          0x0018
 #define BOOT_PSEUDORM_CS 0x0020
 #define BOOT_PSEUDORM_DS 0x0028
-#define BOOT_FS          0x0030
 
 #define MB2_HT(name)      (MULTIBOOT2_HEADER_TAG_##name)
 #define MB2_TT(name)      (MULTIBOOT2_TAG_TYPE_##name)
@@ -555,24 +553,13 @@ trampoline_bios_setup:
 trampoline_setup:
         /*
          * Called on legacy BIOS and EFI platforms.
-         *
-         * Set the BOOT_FS descriptor base address to %esi.
          */
-        mov     %esi, %edx
-        shr     $16, %edx
-        mov     %si, BOOT_FS + 2 + sym_esi(trampoline_gdt) /* Bits  0-15 */
-        mov     %dl, BOOT_FS + 4 + sym_esi(trampoline_gdt) /* Bits 16-23 */
-        mov     %dh, BOOT_FS + 7 + sym_esi(trampoline_gdt) /* Bits 24-31 */
-
-        /* Load %fs to allow for access to Xen data. */
-        mov     $BOOT_FS, %edx
-        mov     %edx, %fs
 
         /* Save Xen image load base address for later use. */
-        mov     %esi,sym_fs(xen_phys_start)
-        mov     %esi,sym_fs(trampoline_xen_phys_start)
+        mov     %esi, sym_esi(xen_phys_start)
+        mov     %esi, sym_esi(trampoline_xen_phys_start)
 
-        mov     sym_fs(trampoline_phys),%ecx
+        mov     sym_esi(trampoline_phys), %ecx
 
         /* Get bottom-most low-memory stack address. */
         add     $TRAMPOLINE_SPACE,%ecx
@@ -583,13 +570,13 @@ trampoline_setup:
         push    %eax                /* Magic number. */
         call    reloc
 #ifdef CONFIG_PVH_GUEST
-        cmpb    $0, sym_fs(pvh_boot)
+        cmpb    $0, sym_esi(pvh_boot)
         je      1f
-        mov     %eax, sym_fs(pvh_start_info_pa)
+        mov     %eax, sym_esi(pvh_start_info_pa)
         jmp     2f
 #endif
 1:
-        mov     %eax, sym_fs(multiboot_ptr)
+        mov     %eax, sym_esi(multiboot_ptr)
 2:
 
         /*
@@ -613,7 +600,7 @@ trampoline_setup:
          * Do not zero BSS on EFI platform here.
          * It was initialized earlier.
          */
-        cmpb    $0,sym_fs(efi_platform)
+        cmpb    $0, sym_esi(efi_platform)
         jnz     1f
 
         /*
@@ -632,7 +619,7 @@ trampoline_setup:
         /* Interrogate CPU extended features via CPUID. */
         mov     $1, %eax
         cpuid
-        mov     %ecx, sym_fs(boot_cpu_data) + CPUINFO_FEATURE_OFFSET(X86_FEATURE_HYPERVISOR)
+        mov     %ecx, CPUINFO_FEATURE_OFFSET(X86_FEATURE_HYPERVISOR) + sym_esi(boot_cpu_data)
 
         mov     $0x80000000,%eax
         cpuid
@@ -644,7 +631,7 @@ trampoline_setup:
         jbe     1f
         mov     $0x80000001,%eax
         cpuid
-1:      mov     %edx, sym_fs(boot_cpu_data) + CPUINFO_FEATURE_OFFSET(X86_FEATURE_LM)
+1:      mov     %edx, CPUINFO_FEATURE_OFFSET(X86_FEATURE_LM) + sym_esi(boot_cpu_data)
 
         /* Check for NX. Adjust EFER setting if available. */
         bt      $cpufeat_bit(X86_FEATURE_NX), %edx
@@ -658,8 +645,8 @@ trampoline_setup:
 
         /* Stash TSC to calculate a good approximation of time-since-boot */
         rdtsc
-        mov     %eax,sym_fs(boot_tsc_stamp)
-        mov     %edx,sym_fs(boot_tsc_stamp)+4
+        mov     %eax,     sym_esi(boot_tsc_stamp)
+        mov     %edx, 4 + sym_esi(boot_tsc_stamp)
 
         /* Relocate pagetables to point at Xen's current location in memory. */
         mov     $_PAGE_PRESENT, %edx
@@ -752,11 +739,11 @@ trampoline_setup:
         jb      1b
 
         /* Do not parse command line on EFI platform here. */
-        cmpb    $0,sym_fs(efi_platform)
+        cmpb    $0, sym_esi(efi_platform)
         jnz     1f
 
         /* Bail if there is no command line to parse. */
-        mov     sym_fs(multiboot_ptr),%ebx
+        mov     sym_esi(multiboot_ptr), %ebx
         testl   $MBI_CMDLINE,MB_flags(%ebx)
         jz      1f
 
@@ -767,7 +754,7 @@ trampoline_setup:
 
 1:
         /* Switch to low-memory stack which lives at the end of trampoline region. */
-        mov     sym_fs(trampoline_phys),%edi
+        mov     sym_esi(trampoline_phys), %edi
         lea     TRAMPOLINE_SPACE+TRAMPOLINE_STACK_SPACE(%edi),%esp
         lea     trampoline_boot_cpu_entry-trampoline_start(%edi),%eax
         pushl   $BOOT_CS32
