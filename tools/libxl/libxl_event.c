@@ -239,7 +239,7 @@ void libxl__ev_fd_deregister(libxl__gc *gc, libxl__ev_fd *ev)
     ev->fd = -1;
 
     LIBXL_LIST_FOREACH(poller, &CTX->pollers_fds_changed, fds_changed_entry)
-        poller->fds_changed = 1;
+        poller->fds_deregistered = 1;
 
  out:
     CTX_UNLOCK;
@@ -1120,7 +1120,7 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
 
     *nfds_io = used;
 
-    poller->fds_changed = 0;
+    poller->fds_deregistered = 0;
 
     libxl__ev_time *etime = LIBXL_TAILQ_FIRST(&CTX->etimes);
     if (etime) {
@@ -1186,7 +1186,7 @@ static int afterpoll_check_fd(libxl__poller *poller,
             /* again, stale slot entry */
             continue;
 
-        assert(poller->fds_changed || !(fds[slot].revents & POLLNVAL));
+        assert(poller->fds_deregistered || !(fds[slot].revents & POLLNVAL));
 
         /* we mask in case requested events have changed */
         int slot_revents = fds[slot].revents & events;
@@ -1626,7 +1626,7 @@ int libxl__poller_init(libxl__gc *gc, libxl__poller *p)
     int rc;
     p->fd_polls = 0;
     p->fd_rindices = 0;
-    p->fds_changed = 0;
+    p->fds_deregistered = 0;
 
     rc = libxl__pipe_nonblock(CTX, p->wakeup_pipe);
     if (rc) goto out;

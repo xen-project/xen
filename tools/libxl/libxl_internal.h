@@ -629,14 +629,14 @@ struct libxl__poller {
     /*
      * We also use the poller to record whether any fds have been
      * deregistered since we entered poll.  Each poller which is not
-     * idle is on the list pollers_fds_changed.  fds_changed is
+     * idle is on the list pollers_fds_changed.  fds_deregistered is
      * cleared by beforepoll, and tested by afterpoll.  Whenever an fd
-     * event is deregistered, we set the fds_changed of all non-idle
+     * event is deregistered, we set the fds_deregistered of all non-idle
      * pollers.  So afterpoll can tell whether any POLLNVAL is
      * plausibly due to an fd being closed and reopened.
      */
     LIBXL_LIST_ENTRY(libxl__poller) fds_changed_entry;
-    bool fds_changed;
+    bool fds_deregistered;
 };
 
 struct libxl__gc {
