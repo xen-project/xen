@@ -2363,6 +2363,8 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 
 #define EGC_FREE           libxl__egc_cleanup(egc)
 
+#define CTX_UNLOCK_EGC_FREE  do{ CTX_UNLOCK; EGC_FREE; }while(0)
+
 
 /*
  * Machinery for asynchronous operations ("ao")

@@ -1152,8 +1152,7 @@ int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
     CTX_LOCK;
     int rc = beforepoll_internal(gc, ctx->poller_app,
                                  nfds_io, fds, timeout_upd, now);
-    CTX_UNLOCK;
-    EGC_FREE;
+    CTX_UNLOCK_EGC_FREE;
     return rc;
 }
 
@@ -1305,8 +1304,7 @@ void libxl_osevent_afterpoll(libxl_ctx *ctx, int nfds, const struct pollfd *fds,
     EGC_INIT(ctx);
     CTX_LOCK;
     afterpoll_internal(egc, ctx->poller_app, nfds, fds, now);
-    CTX_UNLOCK;
-    EGC_FREE;
+    CTX_UNLOCK_EGC_FREE;
 }
 
 /*
@@ -1342,8 +1340,7 @@ void libxl_osevent_occurred_fd(libxl_ctx *ctx, void *for_libxl,
     fd_occurs(egc, ev, revents_ign);
 
  out:
-    CTX_UNLOCK;
-    EGC_FREE;
+    CTX_UNLOCK_EGC_FREE;
 }
 
 void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
@@ -1365,8 +1362,7 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
     time_occurs(egc, ev, ERROR_TIMEDOUT);
 
  out:
-    CTX_UNLOCK;
-    EGC_FREE;
+    CTX_UNLOCK_EGC_FREE;
 }
 
 void libxl__event_disaster(libxl__egc *egc, const char *msg, int errnoval,
@@ -1546,8 +1542,7 @@ int libxl_event_check(libxl_ctx *ctx, libxl_event **event_r,
     EGC_INIT(ctx);
     CTX_LOCK;
     int rc = event_check_internal(egc, event_r, typemask, pred, pred_user);
-    CTX_UNLOCK;
-    EGC_FREE;
+    CTX_UNLOCK_EGC_FREE;
     return rc;
 }
 
@@ -1772,8 +1767,7 @@ int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
  out:
     libxl__poller_put(ctx, poller);
 
-    CTX_UNLOCK;
-    EGC_FREE;
+    CTX_UNLOCK_EGC_FREE;
     return rc;
 }
 

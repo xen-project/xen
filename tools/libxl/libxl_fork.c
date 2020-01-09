@@ -483,8 +483,7 @@ int libxl_childproc_reaped(libxl_ctx *ctx, pid_t pid, int status)
     assert(CTX->childproc_hooks->chldowner
            == libxl_sigchld_owner_mainloop);
     int rc = childproc_reaped(egc, pid, status);
-    CTX_UNLOCK;
-    EGC_FREE;
+    CTX_UNLOCK_EGC_FREE;
     return rc;
 }
 
@@ -529,8 +528,7 @@ void libxl_childproc_sigchld_occurred(libxl_ctx *ctx)
     assert(CTX->childproc_hooks->chldowner
            == libxl_sigchld_owner_mainloop);
     childproc_checkall(egc);
-    CTX_UNLOCK;
-    EGC_FREE;
+    CTX_UNLOCK_EGC_FREE;
 }
 
 static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
