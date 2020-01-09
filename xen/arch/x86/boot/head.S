@@ -718,23 +718,27 @@ trampoline_setup:
         mov     %edx, sym_esi(l2_bootmap)
 
         /* Apply relocations to bootstrap trampoline. */
-        mov     sym_fs(trampoline_phys),%edx
-        mov     $sym_offs(__trampoline_rel_start),%edi
+        mov     sym_esi(trampoline_phys), %edx
+        lea     sym_esi(__trampoline_rel_start), %edi
+        lea     sym_esi(__trampoline_rel_stop), %ecx
 1:
-        mov     %fs:(%edi),%eax
-        add     %edx,%fs:(%edi,%eax)
+        mov     (%edi), %eax
+        add     %edx, (%edi, %eax)
         add     $4,%edi
-        cmp     $sym_offs(__trampoline_rel_stop),%edi
+
+        cmp     %ecx, %edi
         jb      1b
 
         /* Patch in the trampoline segment. */
         shr     $4,%edx
-        mov     $sym_offs(__trampoline_seg_start),%edi
+        lea     sym_esi(__trampoline_seg_start), %edi
+        lea     sym_esi(__trampoline_seg_stop), %ecx
 1:
-        mov     %fs:(%edi),%eax
-        mov     %dx,%fs:(%edi,%eax)
+        mov     (%edi), %eax
+        mov     %dx, (%edi, %eax)
         add     $4,%edi
-        cmp     $sym_offs(__trampoline_seg_stop),%edi
+
+        cmp     %ecx, %edi
         jb      1b
 
         /* Do not parse command line on EFI platform here. */
@@ -760,9 +764,9 @@ trampoline_setup:
         push    %eax
 
         /* Copy bootstrap trampoline to low memory, below 1MB. */
-        mov     $sym_offs(trampoline_start),%esi
+        lea     sym_esi(trampoline_start), %esi
         mov     $((trampoline_end - trampoline_start) / 4),%ecx
-        rep movsl %fs:(%esi),%es:(%edi)
+        rep movsl
 
         /* Jump into the relocated trampoline. */
         lret
