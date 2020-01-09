@@ -48,7 +48,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     ctx->poller_app = 0;
     LIBXL_LIST_INIT(&ctx->pollers_event);
     LIBXL_LIST_INIT(&ctx->pollers_idle);
-    LIBXL_LIST_INIT(&ctx->pollers_fds_changed);
+    LIBXL_LIST_INIT(&ctx->pollers_active);
 
     LIBXL_LIST_INIT(&ctx->efds);
     LIBXL_TAILQ_INIT(&ctx->etimes);
@@ -177,7 +177,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
     libxl__poller_put(ctx, ctx->poller_app);
     ctx->poller_app = NULL;
     assert(LIBXL_LIST_EMPTY(&ctx->pollers_event));
-    assert(LIBXL_LIST_EMPTY(&ctx->pollers_fds_changed));
+    assert(LIBXL_LIST_EMPTY(&ctx->pollers_active));
     libxl__poller *poller, *poller_tmp;
     LIBXL_LIST_FOREACH_SAFE(poller, &ctx->pollers_idle, entry, poller_tmp) {
         libxl__poller_dispose(poller);

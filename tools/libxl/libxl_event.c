@@ -238,7 +238,7 @@ void libxl__ev_fd_deregister(libxl__gc *gc, libxl__ev_fd *ev)
     LIBXL_LIST_REMOVE(ev, entry);
     ev->fd = -1;
 
-    LIBXL_LIST_FOREACH(poller, &CTX->pollers_fds_changed, fds_changed_entry)
+    LIBXL_LIST_FOREACH(poller, &CTX->pollers_active, active_entry)
         poller->fds_deregistered = 1;
 
  out:
@@ -1663,15 +1663,15 @@ libxl__poller *libxl__poller_get(libxl__gc *gc)
         }
     }
 
-    LIBXL_LIST_INSERT_HEAD(&CTX->pollers_fds_changed, p,
-                           fds_changed_entry);
+    LIBXL_LIST_INSERT_HEAD(&CTX->pollers_active, p,
+                           active_entry);
     return p;
 }
 
 void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p)
 {
     if (!p) return;
-    LIBXL_LIST_REMOVE(p, fds_changed_entry);
+    LIBXL_LIST_REMOVE(p, active_entry);
     LIBXL_LIST_INSERT_HEAD(&ctx->pollers_idle, p, entry);
 }
 

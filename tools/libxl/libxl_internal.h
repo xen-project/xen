@@ -629,13 +629,13 @@ struct libxl__poller {
     /*
      * We also use the poller to record whether any fds have been
      * deregistered since we entered poll.  Each poller which is not
-     * idle is on the list pollers_fds_changed.  fds_deregistered is
+     * idle is on the list pollers_active.  fds_deregistered is
      * cleared by beforepoll, and tested by afterpoll.  Whenever an fd
      * event is deregistered, we set the fds_deregistered of all non-idle
      * pollers.  So afterpoll can tell whether any POLLNVAL is
      * plausibly due to an fd being closed and reopened.
      */
-    LIBXL_LIST_ENTRY(libxl__poller) fds_changed_entry;
+    LIBXL_LIST_ENTRY(libxl__poller) active_entry;
     bool fds_deregistered;
 };
 
@@ -678,7 +678,7 @@ struct libxl__ctx {
 
     libxl__poller *poller_app; /* libxl_osevent_beforepoll and _afterpoll */
     LIBXL_LIST_HEAD(, libxl__poller) pollers_event, pollers_idle;
-    LIBXL_LIST_HEAD(, libxl__poller) pollers_fds_changed;
+    LIBXL_LIST_HEAD(, libxl__poller) pollers_active;
 
     LIBXL_SLIST_HEAD(libxl__osevent_hook_nexi, libxl__osevent_hook_nexus)
         hook_fd_nexi_idle, hook_timeout_nexi_idle;
