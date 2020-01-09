@@ -1352,7 +1352,6 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
     } mc_physcpuinfo;
     uint32_t flags, cmdflags;
     int nlcpu;
-    xen_mc_logical_cpu_t *log_cpus = NULL;
     mctelem_cookie_t mctc;
     mctelem_class_t which;
     unsigned int target;
@@ -1445,11 +1444,13 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
              ? !guest_handle_is_null(mc_physcpuinfo.nat->info)
              : !compat_handle_is_null(mc_physcpuinfo.cmp->info) )
         {
+            xen_mc_logical_cpu_t *log_cpus;
+
             if ( mc_physcpuinfo.nat->ncpus <= 0 )
                 return x86_mcerr("do_mca cpuinfo: ncpus <= 0",
                                  -EINVAL);
             nlcpu = min(nlcpu, (int)mc_physcpuinfo.nat->ncpus);
-            log_cpus = xmalloc_array(xen_mc_logical_cpu_t, nlcpu);
+            log_cpus = xzalloc_array(xen_mc_logical_cpu_t, nlcpu);
             if ( log_cpus == NULL )
                 return x86_mcerr("do_mca cpuinfo", -ENOMEM);
             on_each_cpu(do_mc_get_cpu_info, log_cpus, 1);
