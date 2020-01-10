@@ -140,6 +140,18 @@ static void pollers_note_osevent_added(libxl_ctx *ctx) {
         poller->osevents_added = 1;
 }
 
+static void baton_wake(libxl__gc *gc, libxl__poller *wake)
+{
+    libxl__poller_wakeup(gc, wake);
+
+    wake->osevents_added = 0;
+    /* This serves to make _1_baton idempotent.  It is OK even though
+     * that poller may currently be sleeping on only old osevents,
+     * because it is going to wake up because we've just prodded it,
+     * and it pick up new osevents on its next iteration (or pass
+     * on the baton). */
+}
+
 void libxl__egc_ao_cleanup_1_baton(libxl__gc *gc)
     /* Any poller we had must have been `put' already. */
 {
@@ -160,14 +172,7 @@ void libxl__egc_ao_cleanup_1_baton(libxl__gc *gc)
         /* no-one in libxl waiting for any events */
         return;
 
-    libxl__poller_wakeup(gc, wake);
-
-    wake->osevents_added = 0;
-    /* This serves to make _1_baton idempotent.  It is OK even though
-     * that poller may currently be sleeping on only old osevents,
-     * because it is going to wake up because we've just prodded it,
-     * and it pick up new osevents on its next iteration (or pass
-     * on the baton). */
+    baton_wake(gc, wake);
 }
 
 /*
