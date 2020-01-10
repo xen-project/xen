@@ -480,7 +480,7 @@ F:	tools/tests/cpu-policy/
 F:	tools/tests/x86_emulator/
 
 X86 I/O EMULATION
-M:	Paul Durrant <paul@xen.org>
+M:	Paul Durrant <pdurrant@amazon.com>
 S:	Supported
 F:	xen/arch/x86/hvm/emulate.c
 F:	xen/arch/x86/hvm/intercept.c
@@ -512,7 +512,7 @@ S:	Maintained
 F:	xen/arch/x86/mm/shadow/
 
 X86 VIRIDIAN ENLIGHTENMENTS
-M:	Paul Durrant <paul@xen.org>
+M:	Paul Durrant <pdurrant@amazon.com>
 S:	Supported
 F:	xen/arch/x86/hvm/viridian/
 F:	xen/include/asm-x86/hvm/viridian.h
