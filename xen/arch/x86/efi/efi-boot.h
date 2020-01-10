@@ -611,15 +611,28 @@ static void __init efi_arch_memory_setup(void)
      * Map Xen into the directmap (needed for early-boot pagetable
      * handling/walking), and identity map Xen into bootmap (needed for the
      * transition from the EFI pagetables to Xen), using 2M superpages.
+     *
+     * NB: We are currently in physical mode, so a RIP-relative relocation
+     * against _start/_end gets their real position in memory, which are the
+     * appropriate l2 slots to map.
      */
-    for ( i = 0; i < 8; ++i )
-    {
-        unsigned int slot = (xen_phys_start >> L2_PAGETABLE_SHIFT) + i;
-        paddr_t addr = slot << L2_PAGETABLE_SHIFT;
+#define l2_4G_offset(a)                                                 \
+    (((UINTN)(a) >> L2_PAGETABLE_SHIFT) & (4 * L2_PAGETABLE_ENTRIES - 1))
 
-        l2_directmap[slot] = l2e_from_paddr(addr, PAGE_HYPERVISOR|_PAGE_PSE);
-        l2_bootmap[slot] = l2e_from_paddr(addr, __PAGE_HYPERVISOR|_PAGE_PSE);
+    for ( i  = l2_4G_offset(_start);
+          i <= l2_4G_offset(_end - 1); ++i )
+    {
+        l2_pgentry_t pte = l2e_from_paddr(i << L2_PAGETABLE_SHIFT,
+                                          __PAGE_HYPERVISOR | _PAGE_PSE);
+
+        l2_bootmap[i] = pte;
+
+        /* Bootmap RWX/Non-global.  Directmap RW/Global. */
+        l2e_add_flags(pte, PAGE_HYPERVISOR);
+
+        l2_directmap[i] = pte;
     }
+#undef l2_4G_offset
 }
 
 static void __init efi_arch_handle_module(struct file *file, const CHAR16 *name,

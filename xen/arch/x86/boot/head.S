@@ -687,14 +687,19 @@ trampoline_setup:
          * handling/walking), and identity map Xen into bootmap (needed for
          * the transition into long mode), using 2M superpages.
          */
-        lea     sym_esi(start),%ebx
-        lea     (1<<L2_PAGETABLE_SHIFT)*7+(PAGE_HYPERVISOR_RWX|_PAGE_PSE)(%ebx),%eax
-        shr     $(L2_PAGETABLE_SHIFT-3),%ebx
-        mov     $8,%ecx
-1:      mov     %eax,sym_fs(l2_bootmap)-8(%ebx,%ecx,8)
-        mov     %eax,sym_fs(l2_directmap)-8(%ebx,%ecx,8)
-        sub     $(1<<L2_PAGETABLE_SHIFT),%eax
-        loop    1b
+        lea     sym_esi(_start), %ecx
+        lea     -1 + sym_esi(_end), %edx
+        lea     _PAGE_PSE + PAGE_HYPERVISOR_RWX(%ecx), %eax /* PTE to write. */
+        shr     $L2_PAGETABLE_SHIFT, %ecx                   /* First slot to write. */
+        shr     $L2_PAGETABLE_SHIFT, %edx                   /* Final slot to write. */
+
+1:      mov     %eax, sym_offs(l2_bootmap)  (%esi, %ecx, 8)
+        mov     %eax, sym_offs(l2_directmap)(%esi, %ecx, 8)
+        add     $1, %ecx
+        add     $1 << L2_PAGETABLE_SHIFT, %eax
+
+        cmp     %edx, %ecx
+        jbe     1b
 
         /* Initialize L3 boot-map page directory entries. */
         lea     __PAGE_HYPERVISOR+(L2_PAGETABLE_ENTRIES*8)*3+sym_esi(l2_bootmap),%eax
