@@ -662,11 +662,17 @@ trampoline_setup:
         mov     %edx,sym_fs(boot_tsc_stamp)+4
 
         /* Relocate pagetables to point at Xen's current location in memory. */
-        mov     $((__page_tables_end-__page_tables_start)/8),%ecx
-1:      testl   $_PAGE_PRESENT,sym_fs(__page_tables_start)-8(,%ecx,8)
+        mov     $_PAGE_PRESENT, %edx
+        lea     sym_esi(__page_tables_start), %eax
+        lea     sym_esi(__page_tables_end), %edi
+
+1:      test    %edx, (%eax) /* if page present */
         jz      2f
-        add     %esi,sym_fs(__page_tables_start)-8(,%ecx,8)
-2:      loop    1b
+        add     %esi, (%eax) /* pte += base */
+2:      add     $8, %eax
+
+        cmp     %edi, %eax
+        jb      1b
 
         /* Map Xen into the higher mappings using 2M superpages. */
         lea     _PAGE_PSE + PAGE_HYPERVISOR_RWX + sym_esi(_start), %eax
@@ -701,21 +707,25 @@ trampoline_setup:
         cmp     %edx, %ecx
         jbe     1b
 
-        /* Initialize L3 boot-map page directory entries. */
-        lea     __PAGE_HYPERVISOR+(L2_PAGETABLE_ENTRIES*8)*3+sym_esi(l2_bootmap),%eax
-        mov     $4,%ecx
-1:      mov     %eax,sym_fs(l3_bootmap)-8(,%ecx,8)
-        sub     $(L2_PAGETABLE_ENTRIES*8),%eax
-        loop    1b
+        /* Map 4x l2_bootmap[] into l3_bootmap[0...3] */
+        lea     __PAGE_HYPERVISOR + sym_esi(l2_bootmap), %eax
+        mov     %eax, 0  + sym_esi(l3_bootmap)
+        add     $PAGE_SIZE, %eax
+        mov     %eax, 8  + sym_esi(l3_bootmap)
+        add     $PAGE_SIZE, %eax
+        mov     %eax, 16 + sym_esi(l3_bootmap)
+        add     $PAGE_SIZE, %eax
+        mov     %eax, 24 + sym_esi(l3_bootmap)
 
-        /* Map the permanent trampoline page into l{1,2}_bootmap[]. */
+        /* Map l1_bootmap[] into l2_bootmap[0]. */
+        lea     __PAGE_HYPERVISOR + sym_esi(l1_bootmap), %eax
+        mov     %eax, sym_esi(l2_bootmap)
+
+        /* Map the permanent trampoline page into l1_bootmap[]. */
         mov     sym_esi(trampoline_phys), %ecx
         lea     __PAGE_HYPERVISOR_RX(%ecx), %edx /* %edx = PTE to write  */
         shr     $PAGE_SHIFT, %ecx                /* %ecx = Slot to write */
         mov     %edx, sym_offs(l1_bootmap)(%esi, %ecx, 8)
-
-        lea     __PAGE_HYPERVISOR + sym_esi(l1_bootmap), %edx
-        mov     %edx, sym_esi(l2_bootmap)
 
         /* Apply relocations to bootstrap trampoline. */
         mov     sym_esi(trampoline_phys), %edx
