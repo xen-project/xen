@@ -625,6 +625,7 @@ struct libxl__poller {
     int (*fd_rindices)[3]; /* see libxl_event.c:beforepoll_internal */
 
     int wakeup_pipe[2]; /* 0 means no fd allocated */
+    bool pipe_nonempty;
 
     /*
      * We also use the poller to record whether any fds have been
