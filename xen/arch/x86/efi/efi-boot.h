@@ -59,7 +59,7 @@ static void __init efi_arch_relocate_image(unsigned long delta)
         /*
          * Relevant l{2,3}_bootmap entries get initialized explicitly in
          * efi_arch_memory_setup(), so we must not apply relocations there.
-         * l2_identmap's first slot, otoh, should be handled normally, as
+         * l2_directmap's first slot, otoh, should be handled normally, as
          * efi_arch_memory_setup() won't touch it (xen_phys_start should
          * never be zero).
          */
@@ -586,8 +586,8 @@ static void __init efi_arch_memory_setup(void)
         return;
 
     /* Check that there is at least 4G of mapping space in l2_*map[] */
-    BUILD_BUG_ON((sizeof(l2_bootmap)  / L2_PAGETABLE_ENTRIES) < 4);
-    BUILD_BUG_ON((sizeof(l2_identmap) / L2_PAGETABLE_ENTRIES) < 4);
+    BUILD_BUG_ON((sizeof(l2_bootmap)   / L2_PAGETABLE_ENTRIES) < 4);
+    BUILD_BUG_ON((sizeof(l2_directmap) / L2_PAGETABLE_ENTRIES) < 4);
 
     /* Initialize L3 boot-map page directory entries. */
     for ( i = 0; i < 4; ++i )
@@ -603,7 +603,7 @@ static void __init efi_arch_memory_setup(void)
         unsigned int slot = (xen_phys_start >> L2_PAGETABLE_SHIFT) + i;
         paddr_t addr = slot << L2_PAGETABLE_SHIFT;
 
-        l2_identmap[slot] = l2e_from_paddr(addr, PAGE_HYPERVISOR|_PAGE_PSE);
+        l2_directmap[slot] = l2e_from_paddr(addr, PAGE_HYPERVISOR|_PAGE_PSE);
         l2_bootmap[slot] = l2e_from_paddr(addr, __PAGE_HYPERVISOR|_PAGE_PSE);
     }
 }

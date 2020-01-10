@@ -51,7 +51,7 @@ GLOBAL(stack_start)
  * of physical memory. In any case the VGA hole should be mapped with type UC.
  * Uses 1x 4k page.
  */
-l1_identmap:
+l1_directmap:
         pfn = 0
         .rept L1_PAGETABLE_ENTRIES
         /* VGA hole (0xa0000-0xc0000) should be mapped UC-. */
@@ -62,7 +62,7 @@ l1_identmap:
         .endif
         pfn = pfn + 1
         .endr
-        .size l1_identmap, . - l1_identmap
+        .size l1_directmap, . - l1_directmap
 
 /*
  * __page_tables_{start,end} cover the range of pagetables which need
@@ -73,12 +73,12 @@ GLOBAL(__page_tables_start)
 
 /*
  * Space for 4G worth of 2M mappings, first 2M actually mapped via
- * l1_identmap[].  Uses 4x 4k pages.
+ * l1_directmap[].  Uses 4x 4k pages.
  */
-GLOBAL(l2_identmap)
-        .quad sym_offs(l1_identmap) + __PAGE_HYPERVISOR
+GLOBAL(l2_directmap)
+        .quad sym_offs(l1_directmap) + __PAGE_HYPERVISOR
         .fill 4 * L2_PAGETABLE_ENTRIES - 1, 8, 0
-        .size l2_identmap, . - l2_identmap
+        .size l2_directmap, . - l2_directmap
 
 /*
  * L2 mapping the 1GB Xen text/data/bss region.  At boot it maps 16MB from
@@ -108,15 +108,15 @@ l2_fixmap:
         .endr
         .size l2_fixmap, . - l2_fixmap
 
-/* Identity map, covering the 4 l2_identmap tables.  Uses 1x 4k page. */
-l3_identmap:
+/* Direct map, initially covering the 4 l2_directmap tables.  Uses 1x 4k page. */
+l3_directmap:
         idx = 0
         .rept 4
-        .quad sym_offs(l2_identmap) + (idx << PAGE_SHIFT) + __PAGE_HYPERVISOR
+        .quad sym_offs(l2_directmap) + (idx << PAGE_SHIFT) + __PAGE_HYPERVISOR
         idx = idx + 1
         .endr
         .fill L3_PAGETABLE_ENTRIES - 4, 8, 0
-        .size l3_identmap, . - l3_identmap
+        .size l3_directmap, . - l3_directmap
 
 /* L3 mapping the fixmap.  Uses 1x 4k page. */
 l3_xenmap:
@@ -139,7 +139,7 @@ GLOBAL(idle_pg_table)
         idx = 1
         .rept L4_PAGETABLE_ENTRIES - 1
         .if idx == l4_table_offset(DIRECTMAP_VIRT_START)
-        .quad sym_offs(l3_identmap) + __PAGE_HYPERVISOR
+        .quad sym_offs(l3_directmap) + __PAGE_HYPERVISOR
         .elseif idx == l4_table_offset(XEN_VIRT_START)
         .quad sym_offs(l3_xenmap) + __PAGE_HYPERVISOR
         .else

@@ -678,7 +678,7 @@ trampoline_setup:
         shr     $(L2_PAGETABLE_SHIFT-3),%ebx
         mov     $8,%ecx
 1:      mov     %eax,sym_fs(l2_bootmap)-8(%ebx,%ecx,8)
-        mov     %eax,sym_fs(l2_identmap)-8(%ebx,%ecx,8)
+        mov     %eax,sym_fs(l2_directmap)-8(%ebx,%ecx,8)
         sub     $(1<<L2_PAGETABLE_SHIFT),%eax
         loop    1b
 

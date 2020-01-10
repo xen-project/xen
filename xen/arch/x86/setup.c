@@ -1031,7 +1031,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
-        uint64_t end, limit = ARRAY_SIZE(l2_identmap) << L2_PAGETABLE_SHIFT;
+        uint64_t end, limit = ARRAY_SIZE(l2_directmap) << L2_PAGETABLE_SHIFT;
 
         if ( boot_e820.map[i].type != E820_RAM )
             continue;
@@ -1136,7 +1136,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             /* The only data mappings to be relocated are in the Xen area. */
             pl2e = __va(__pa(l2_xenmap));
             /*
-             * Undo the temporary-hooking of the l1_identmap.  __2M_text_start
+             * Undo the temporary-hooking of the l1_directmap.  __2M_text_start
              * is contained in this PTE.
              */
             BUG_ON(using_2M_mapping() &&
@@ -1349,7 +1349,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         /* Need to create mappings above PREBUILT_MAP_LIMIT. */
         map_s = max_t(uint64_t, s, PREBUILT_MAP_LIMIT);
         map_e = min_t(uint64_t, e,
-                      ARRAY_SIZE(l2_identmap) << L2_PAGETABLE_SHIFT);
+                      ARRAY_SIZE(l2_directmap) << L2_PAGETABLE_SHIFT);
 
         /* Pass mapped memory to allocator /before/ creating new mappings. */
         init_boot_pages(s, min(map_s, e));
