@@ -41,18 +41,25 @@ static void ao__check_destroy(libxl_ctx *ctx, libxl__ao *ao);
  *
  * We need the following property (the "unstale liveness property"):
  *
- * Whenever any thread is blocking in the libxl event loop[1], at
- * least one thread must be using an up to date osevent set.  It is OK
- * for all but one threads to have stale event sets, because so long
- * as one waiting thread has the right event set, any actually
- * interesting event will, if nothing else, wake that "right" thread
- * up.  It will then make some progress and/or, if it exits, ensure
- * that some other thread becomes the "right" thread.
+ * Whenever any thread is blocking as a result of being given an fd
+ * set or timeout by libxl, at least one thread must be using an up to
+ * date osevent set.  It is OK for all but one threads to have stale
+ * event sets, because so long as one waiting thread has the right
+ * event set, any actually interesting event will, if nothing else,
+ * wake that "right" thread up.  It will then make some progress
+ * and/or, if it exits, ensure that some other thread becomes the
+ * "right" thread.
  *
- * [1] TODO: Right now we are considering only the libxl event loop.
- * We need to consider application event loop outside libxl too.
+ * For threads blocking outside libxl and which are receiving libxl's
+ * fd and timeout information via the libxl_osevent_hooks callbacks,
+ * libxl calls this function as soon as it becomes interested.  It is
+ * the responsiblity of a provider of these functions in a
+ * multithreaded environment to make arrangements to wake up event
+ * waiting thread(s) with stale event sets.
  *
- * Argument that our approach is sound:
+ * Waiters outside libxl using _beforepoll are dealt with below.
+ *
+ * For the libxl event loop, the argument is as follows:
  *
  * The issue we are concerned about is libxl sleeping on an out of
  * date fd set, or too long a timeout, so that it doesn't make
@@ -132,7 +139,29 @@ static void ao__check_destroy(libxl_ctx *ctx, libxl__ao *ao);
  * will reenter libxl when it gains the lock and necessarily then
  * becomes a baton holder in category (a).
  *
- * So the "baton invariant" is maintained.  QED.
+ * So the "baton invariant" is maintained.
+ * QED (for waiters in libxl).
+ *
+ *
+ * For waiters outside libxl which used libxl_osevent_beforepoll
+ * to get the fd set:
+ *
+ * As above, adding an osevent involves having an egc or an ao.
+ * It sets poller->osevents_added on all active pollers.  Notably
+ * it sets it on poller_app, which is always active.
+ *
+ * The thread which does this will dispose of its egc or ao before
+ * exiting libxl so it will always wake up the poller_app if the last
+ * call to _beforepoll was before the osevents were added.  So the
+ * application's fd set contains at least a wakeup in the form of the
+ * poller_app fd.  The application cannot sleep on the libxl fd set
+ * until it has called _afterpoll which empties the pipe, and it
+ * is expected to then call _beforepoll again before sleeping.
+ *
+ * So all the application's event waiting thread(s) will always have
+ * an up to date osevent set, and will be woken up if necessary to
+ * achieve this.  (This is in contrast libxl's own event loop where
+ * only one thread need be up to date, as discussed above.)
  */
 static void pollers_note_osevent_added(libxl_ctx *ctx) {
     libxl__poller *poller;
@@ -156,6 +185,9 @@ void libxl__egc_ao_cleanup_1_baton(libxl__gc *gc)
     /* Any poller we had must have been `put' already. */
 {
     libxl__poller *search, *wake=0;
+
+    if (CTX->poller_app->osevents_added)
+        baton_wake(gc, CTX->poller_app);
 
     LIBXL_LIST_FOREACH(search, &CTX->pollers_active, active_entry) {
         if (search == CTX->poller_app)
