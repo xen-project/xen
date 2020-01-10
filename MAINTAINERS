@@ -504,7 +504,6 @@ X86 MEMORY SHARING
 M:	Tamas K Lengyel <tamas@tklengyel.com>
 S:	Odd Fixes
 F:	xen/arch/x86/mm/mem_sharing.c
-F:	tools/memshr
 F:	tools/tests/mem-sharing/
 
 X86 SHADOW PAGETABLES
