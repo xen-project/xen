@@ -585,6 +585,20 @@ static void __init efi_arch_memory_setup(void)
     if ( !efi_enabled(EFI_LOADER) )
         return;
 
+    /*
+     * Map Xen into the higher mappings, using 2M superpages.
+     *
+     * NB: We are currently in physical mode, so a RIP-relative relocation
+     * against _start/_end result in our arbitrary placement by the bootloader
+     * in memory, rather than the intended high mappings position.  Subtract
+     * xen_phys_start to get the appropriate slots in l2_xenmap[].
+     */
+    for ( i =  l2_table_offset((UINTN)_start   - xen_phys_start);
+          i <= l2_table_offset((UINTN)_end - 1 - xen_phys_start); ++i )
+        l2_xenmap[i] =
+            l2e_from_paddr(xen_phys_start + (i << L2_PAGETABLE_SHIFT),
+                           PAGE_HYPERVISOR_RWX | _PAGE_PSE);
+
     /* Check that there is at least 4G of mapping space in l2_*map[] */
     BUILD_BUG_ON((sizeof(l2_bootmap)   / L2_PAGETABLE_ENTRIES) < 4);
     BUILD_BUG_ON((sizeof(l2_directmap) / L2_PAGETABLE_ENTRIES) < 4);

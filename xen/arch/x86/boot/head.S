@@ -668,6 +668,20 @@ trampoline_setup:
         add     %esi,sym_fs(__page_tables_start)-8(,%ecx,8)
 2:      loop    1b
 
+        /* Map Xen into the higher mappings using 2M superpages. */
+        lea     _PAGE_PSE + PAGE_HYPERVISOR_RWX + sym_esi(_start), %eax
+        mov     $sym_offs(_start),   %ecx   /* %eax = PTE to write ^      */
+        mov     $sym_offs(_end - 1), %edx
+        shr     $L2_PAGETABLE_SHIFT, %ecx   /* %ecx = First slot to write */
+        shr     $L2_PAGETABLE_SHIFT, %edx   /* %edx = Final slot to write */
+
+1:      mov     %eax, sym_offs(l2_xenmap)(%esi, %ecx, 8)
+        add     $1, %ecx
+        add     $1 << L2_PAGETABLE_SHIFT, %eax
+
+        cmp     %edx, %ecx
+        jbe     1b
+
         /*
          * Map Xen into the directmap (needed for early-boot pagetable
          * handling/walking), and identity map Xen into bootmap (needed for

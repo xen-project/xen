@@ -360,6 +360,9 @@ ASSERT(__2M_rwdata_end <= XEN_VIRT_END - XEN_VIRT_START + __XEN_VIRT_START -
 ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
 #endif
 
+/* The Multiboot setup paths relies on this to simplify superpage PTE creation. */
+ASSERT(IS_ALIGNED(_start,            MB(2)), "_start misaligned")
+
 ASSERT(IS_ALIGNED(__2M_text_end,     SECTION_ALIGN), "__2M_text_end misaligned")
 ASSERT(IS_ALIGNED(__2M_rodata_start, SECTION_ALIGN), "__2M_rodata_start misaligned")
 ASSERT(IS_ALIGNED(__2M_rodata_end,   SECTION_ALIGN), "__2M_rodata_end misaligned")
