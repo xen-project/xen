@@ -634,9 +634,23 @@ struct libxl__poller {
      * event is deregistered, we set the fds_deregistered of all non-idle
      * pollers.  So afterpoll can tell whether any POLLNVAL is
      * plausibly due to an fd being closed and reopened.
+     *
+     * Additionally, we record whether any fd or time event sources
+     * have been registered.  This is necessary because sometimes we
+     * need to wake up the only libxl thread stuck in
+     * eventloop_iteration so that it will pick up new fds or earlier
+     * timeouts.  osevents_added is cleared by beforepoll, and set by
+     * fd or timeout event registration.  When we are about to leave
+     * libxl (strictly, when we are about to give up an egc), we check
+     * whether there are any pollers.  If there are, then at least one
+     * of them must have osevents_added clear.  If not, we wake up the
+     * first one on the list.  Any entry on pollers_active constitutes
+     * a promise to also make this check, so the baton will never be
+     * dropped.
      */
     LIBXL_LIST_ENTRY(libxl__poller) active_entry;
     bool fds_deregistered;
+    bool osevents_added;
 };
 
 struct libxl__gc {
@@ -2350,7 +2364,10 @@ _hidden libxl_device_model_version libxl__default_device_model(libxl__gc *gc);
         LIBXL_STAILQ_INIT(&(egc).ev_immediates);        \
     } while(0)
 
-_hidden void libxl__egc_cleanup(libxl__egc *egc);
+_hidden void libxl__egc_ao_cleanup_1_baton(libxl__gc *gc);
+  /* Passes the baton for added osevents.  See comment for
+   * osevents_added in struct libxl__poller. */
+_hidden void libxl__egc_cleanup_2_ul_cb_gc(libxl__egc *egc);
   /* Frees memory allocated within this egc's gc, and and report all
    * occurred events via callback, if applicable.  May reenter the
    * application; see restrictions above.  The ctx must be UNLOCKED. */
@@ -2361,9 +2378,11 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
     libxl__egc egc[1]; LIBXL_INIT_EGC(egc[0],ctx);      \
     EGC_GC
 
-#define EGC_FREE           libxl__egc_cleanup(egc)
-
-#define CTX_UNLOCK_EGC_FREE  do{ CTX_UNLOCK; EGC_FREE; }while(0)
+#define CTX_UNLOCK_EGC_FREE  do{                        \
+        libxl__egc_ao_cleanup_1_baton(&egc->gc);        \
+        CTX_UNLOCK;                                     \
+        libxl__egc_cleanup_2_ul_cb_gc(egc);             \
+    }while(0)
 
 
 /*
@@ -2468,8 +2487,9 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 
 #define AO_INPROGRESS ({                                        \
         libxl_ctx *ao__ctx = libxl__gc_owner(&ao->gc);          \
+        /* __ao_inprogress will do egc..1_baton if needed */	\
         CTX_UNLOCK;                                             \
-        EGC_FREE;                                               \
+        libxl__egc_cleanup_2_ul_cb_gc(egc);                     \
         CTX_LOCK;                                               \
         int ao__rc = libxl__ao_inprogress(ao,                   \
                                __FILE__, __LINE__, __func__);   \
@@ -2481,8 +2501,9 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
         libxl_ctx *ao__ctx = libxl__gc_owner(&ao->gc);          \
         assert(rc);                                             \
         libxl__ao_create_fail(ao);                              \
+        libxl__egc_ao_cleanup_1_baton(&egc->gc);                \
         libxl__ctx_unlock(ao__ctx); /* gc is now invalid */     \
-        EGC_FREE;                                               \
+        libxl__egc_cleanup_2_ul_cb_gc(egc);                     \
         (rc);                                                   \
     })
 
