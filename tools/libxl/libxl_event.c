@@ -1453,12 +1453,6 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
         fd_occurs(egc, efd, revents);
     }
 
-    if (afterpoll_check_fd(poller,fds,nfds, poller->wakeup_pipe[0],POLLIN)) {
-        poller->pipe_nonempty = 0;
-        int e = libxl__self_pipe_eatall(poller->wakeup_pipe[0]);
-        if (e) LIBXL__EVENT_DISASTER(gc, "read wakeup", e, 0);
-    }
-
     for (;;) {
         libxl__ev_time *etime = LIBXL_TAILQ_FIRST(&CTX->etimes);
         if (!etime)
@@ -1472,6 +1466,12 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
         time_deregister(gc, etime);
 
         time_occurs(egc, etime, ERROR_TIMEDOUT);
+    }
+
+    if (afterpoll_check_fd(poller,fds,nfds, poller->wakeup_pipe[0],POLLIN)) {
+        poller->pipe_nonempty = 0;
+        int e = libxl__self_pipe_eatall(poller->wakeup_pipe[0]);
+        if (e) LIBXL__EVENT_DISASTER(gc, "read wakeup", e, 0);
     }
 }
 
