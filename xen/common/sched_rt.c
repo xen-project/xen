@@ -122,7 +122,7 @@
  */
 /*
  * RTDS_scheduled: Is this unit either running on, or context-switching off,
- * a phyiscal cpu?
+ * a physical cpu?
  * + Accessed only with global lock held.
  * + Set when chosen as next in rt_schedule().
  * + Cleared after context switch has been saved in rt_context_saved()
