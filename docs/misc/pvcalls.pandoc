@@ -867,24 +867,24 @@ and the second half to the **out** array. They are used as circular
 buffers for transferring data, and, together, they are the data ring.
 
 
-  +---------------------------+                 Indexes page
-  | Command ring:             |                 +----------------------+
-  | @0: xen_pvcalls_connect:  |                 |@0 pvcalls_data_intf: |
-  | @44: ref  +-------------------------------->+@76: ring_order = 1   |
-  |                           |                 |@80: ref[0]+          |
-  +---------------------------+                 |@84: ref[1]+          |
-                                                |           |          |
-                                                |           |          |
-                                                +----------------------+
-                                                            |
-                                                            v (data ring)
-                                                    +-------+-----------+
-                                                    |  @0->4098: in     |
-                                                    |  ref[0]           |
-                                                    |-------------------|
-                                                    |  @4099->8196: out |
-                                                    |  ref[1]           |
-                                                    +-------------------+
+        +---------------------------+                 Indexes page
+        | Command ring:             |                 +----------------------+
+        | @0: xen_pvcalls_connect:  |                 |@0 pvcalls_data_intf: |
+        | @44: ref  +-------------------------------->+@76: ring_order = 1   |
+        |                           |                 |@80: ref[0]+          |
+        +---------------------------+                 |@84: ref[1]+          |
+                                                      |           |          |
+                                                      |           |          |
+                                                      +----------------------+
+                                                                  |
+                                                                  v (data ring)
+                                                          +-------+-----------+
+                                                          |  @0->4098: in     |
+                                                          |  ref[0]           |
+                                                          |-------------------|
+                                                          |  @4099->8196: out |
+                                                          |  ref[1]           |
+                                                          +-------------------+
 
 
 #### Indexes Page Structure
