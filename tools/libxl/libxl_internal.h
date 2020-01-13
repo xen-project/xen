@@ -1281,8 +1281,8 @@ _hidden libxl_event *libxl__event_new(libxl__egc*, libxl_event_type,
 /*
  * In general, call this via the macro LIBXL__EVENT_DISASTER.
  *
- * Event-generating functions may call this if they might have wanted
- * to generate an event (either an internal one ie a
+ * Event-generating functions, or ao machinery, may call this if they
+ * might have wanted to generate an event (either an internal one ie a
  * libxl__ev_FOO_callback or an application event), but are prevented
  * from doing so due to eg lack of memory.
  *
@@ -1290,12 +1290,12 @@ _hidden libxl_event *libxl__event_new(libxl__egc*, libxl_event_type,
  * then crash, although it may fail (and henceforth leave things in a
  * state where many or all calls fail).
  */
-_hidden void libxl__event_disaster(libxl__egc*, const char *msg, int errnoval,
+_hidden void libxl__event_disaster(libxl__gc*, const char *msg, int errnoval,
                                    libxl_event_type type /* may be 0 */,
                                    const char *file, int line,
                                    const char *func);
-#define LIBXL__EVENT_DISASTER(egc, msg, errnoval, type) \
-    libxl__event_disaster(egc, msg, errnoval, type, __FILE__,__LINE__,__func__)
+#define LIBXL__EVENT_DISASTER(gc, msg, errnoval, type) \
+    libxl__event_disaster(gc, msg, errnoval, type, __FILE__,__LINE__,__func__)
 
 
 /* Fills in, or disposes of, the resources held by, a poller whose

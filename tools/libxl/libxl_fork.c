@@ -211,6 +211,7 @@ int libxl__carefd_fd(const libxl__carefd *cf)
 /* Like waitpid(,,WNOHANG) but handles all errors except ECHILD. */
 static pid_t checked_waitpid(libxl__egc *egc, pid_t want, int *status)
 {
+    EGC_GC;
     for (;;) {
         pid_t got = waitpid(want, status, WNOHANG);
         if (got != -1)
@@ -219,7 +220,7 @@ static pid_t checked_waitpid(libxl__egc *egc, pid_t want, int *status)
             return got;
         if (errno == EINTR)
             continue;
-        LIBXL__EVENT_DISASTER(egc, "waitpid() failed", errno, 0);
+        LIBXL__EVENT_DISASTER(gc, "waitpid() failed", errno, 0);
         return 0;
     }
 }
@@ -507,7 +508,7 @@ static void childproc_checkall(libxl__egc *egc)
     found:
         if (got == -1) {
             LIBXL__EVENT_DISASTER
-                (egc, "waitpid() gave ECHILD but we have a child",
+                (gc, "waitpid() gave ECHILD but we have a child",
                  ECHILD, 0);
             /* it must have finished but we don't know its status */
             status = 255<<8; /* no wait.h macro for this! */
@@ -545,14 +546,14 @@ static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
 
     if (revents & ~POLLIN) {
         LOG(ERROR, "unexpected poll event 0x%x on SIGCHLD self pipe", revents);
-        LIBXL__EVENT_DISASTER(egc,
+        LIBXL__EVENT_DISASTER(gc,
                               "unexpected poll event on SIGCHLD self pipe",
                               0, 0);
     }
     assert(revents & POLLIN);
 
     int e = libxl__self_pipe_eatall(selfpipe);
-    if (e) LIBXL__EVENT_DISASTER(egc, "read sigchld pipe", e, 0);
+    if (e) LIBXL__EVENT_DISASTER(gc, "read sigchld pipe", e, 0);
 
     if (CTX->childproc_hooks->chldowner
         == libxl_sigchld_owner_libxl_always_selective_reap) {
@@ -581,7 +582,7 @@ static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
                              " libxl_childproc_hooks->reaped_callback"
                              " (for pid=%lu, status=%d; error code %d)",
                              (unsigned long)pid, status, rc);
-                    LIBXL__EVENT_DISASTER(egc, disasterbuf, 0, 0);
+                    LIBXL__EVENT_DISASTER(gc, disasterbuf, 0, 0);
                     return;
                 }
             } else {

@@ -282,7 +282,7 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
                 hupchk.revents = 0;
                 r = poll(&hupchk, 1, 0);
                 if (r < 0)
-                    LIBXL__EVENT_DISASTER(egc,
+                    LIBXL__EVENT_DISASTER(gc,
      "unexpected failure polling fd for datacopier eof hup check",
                                   errno, 0);
                 if (datacopier_pollhup_handled(egc, dc, fd, hupchk.revents, 0))

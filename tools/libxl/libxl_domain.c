@@ -892,7 +892,7 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
 
         rc = xc_domain_getinfolist(CTX->xch, evg->domid, nentries, domaininfos);
         if (rc == -1) {
-            LIBXL__EVENT_DISASTER(egc, "xc_domain_getinfolist failed while"
+            LIBXL__EVENT_DISASTER(gc, "xc_domain_getinfolist failed while"
                                   " processing @releaseDomain watch event",
                                   errno, 0);
             goto out;

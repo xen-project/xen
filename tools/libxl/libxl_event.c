@@ -261,7 +261,7 @@ short libxl__fd_poll_recheck(libxl__egc *egc, int fd, short events) {
             break;
         assert(r<0);
         if (errno != EINTR) {
-            LIBXL__EVENT_DISASTER(egc, "failed poll to check for fd", errno, 0);
+            LIBXL__EVENT_DISASTER(gc, "failed poll to check for fd", errno, 0);
             return 0;
         }
     }
@@ -509,14 +509,14 @@ static void watchfd_callback(libxl__egc *egc, libxl__ev_fd *ev,
     EGC_GC;
 
     if (revents & (POLLERR|POLLHUP))
-        LIBXL__EVENT_DISASTER(egc, "unexpected poll event on watch fd", 0, 0);
+        LIBXL__EVENT_DISASTER(gc, "unexpected poll event on watch fd", 0, 0);
 
     for (;;) {
         char **event = xs_check_watch(CTX->xsh);
         if (!event) {
             if (errno == EAGAIN) break;
             if (errno == EINTR) continue;
-            LIBXL__EVENT_DISASTER(egc, "cannot check/read watches", errno, 0);
+            LIBXL__EVENT_DISASTER(gc, "cannot check/read watches", errno, 0);
             return;
         }
 
@@ -705,7 +705,7 @@ static int evtchn_revents_check(libxl__egc *egc, int revents)
 
     if (revents & ~POLLIN) {
         LOG(ERROR, "unexpected poll event on event channel fd: %x", revents);
-        LIBXL__EVENT_DISASTER(egc,
+        LIBXL__EVENT_DISASTER(gc,
                    "unexpected poll event on event channel fd", 0, 0);
         libxl__ev_fd_deregister(gc, &CTX->evtchn_efd);
         return ERROR_FAIL;
@@ -746,7 +746,7 @@ static void evtchn_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
         if (port < 0) {
             if (errno == EAGAIN)
                 break;
-            LIBXL__EVENT_DISASTER(egc,
+            LIBXL__EVENT_DISASTER(gc,
      "unexpected failure fetching occurring event port number from evtchn",
                                   errno, 0);
             return;
@@ -966,7 +966,7 @@ static void domaindeathcheck_callback(libxl__egc *egc, libxl__ev_xswatch *w,
     libxl__domaindeathcheck_stop(gc,dc);
 
     if (errno!=ENOENT) {
-        LIBXL__EVENT_DISASTER(egc,"failed to read xenstore"
+        LIBXL__EVENT_DISASTER(gc,"failed to read xenstore"
                               " for domain detach check", errno, 0);
         return;
     }
@@ -1279,7 +1279,7 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
 
     if (afterpoll_check_fd(poller,fds,nfds, poller->wakeup_pipe[0],POLLIN)) {
         int e = libxl__self_pipe_eatall(poller->wakeup_pipe[0]);
-        if (e) LIBXL__EVENT_DISASTER(egc, "read wakeup", e, 0);
+        if (e) LIBXL__EVENT_DISASTER(gc, "read wakeup", e, 0);
     }
 
     for (;;) {
@@ -1365,12 +1365,10 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
     CTX_UNLOCK_EGC_FREE;
 }
 
-void libxl__event_disaster(libxl__egc *egc, const char *msg, int errnoval,
+void libxl__event_disaster(libxl__gc *gc, const char *msg, int errnoval,
                            libxl_event_type type /* may be 0 */,
                            const char *file, int line, const char *func)
 {
-    EGC_GC;
-
     libxl__log(CTX, XTL_CRITICAL, errnoval, file, line, func, INVALID_DOMID,
                "DISASTER in event loop: %s%s%s%s",
                msg,
@@ -1672,8 +1670,9 @@ void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p)
 
 void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p)
 {
+    EGC_GC;
     int e = libxl__self_pipe_wakeup(p->wakeup_pipe[1]);
-    if (e) LIBXL__EVENT_DISASTER(egc, "cannot poke watch pipe", e, 0);
+    if (e) LIBXL__EVENT_DISASTER(gc, "cannot poke watch pipe", e, 0);
 }
 
 /*

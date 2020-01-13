@@ -33,7 +33,7 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
         return;
 
     if (libxl__xs_printf(gc, XBT_NULL, wpath, "")) {
-        LIBXL__EVENT_DISASTER(egc, "xs_write failed acknowledging eject",
+        LIBXL__EVENT_DISASTER(gc, "xs_write failed acknowledging eject",
                               errno, LIBXL_EVENT_TYPE_DISK_EJECT);
         return;
     }
@@ -43,7 +43,7 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
 
     rc = libxl__xs_read_checked(gc, XBT_NULL, evg->be_ptr_path, &backend);
     if (rc) {
-        LIBXL__EVENT_DISASTER(egc, "xs_read failed reading be_ptr_path",
+        LIBXL__EVENT_DISASTER(gc, "xs_read failed reading be_ptr_path",
                               errno, LIBXL_EVENT_TYPE_DISK_EJECT);
         return;
     }
