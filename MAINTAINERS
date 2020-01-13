@@ -198,6 +198,12 @@ F:	xen/include/asm-arm/
 F:	xen/include/public/arch-arm/
 F:	xen/include/public/arch-arm.h
 
+Change Log
+M:	Paul Durrant <pdurrant@amazon.com>
+R:	Lars Kurth <lars.kurth@citrix.com>
+S:	Maintained
+F:	CHANGELOG.md
+
 Continuous Integration (CI)
 M:	Doug Goldstein <cardoe@cardoe.com>
 W:	https://gitlab.com/xen-project/xen
