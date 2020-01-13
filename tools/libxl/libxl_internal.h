@@ -1311,7 +1311,7 @@ _hidden void libxl__poller_put(libxl_ctx*, libxl__poller *p /* may be NULL */);
 
 /* Notifies whoever is polling using p that they should wake up.
  * ctx must be locked. */
-_hidden void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p);
+_hidden void libxl__poller_wakeup(libxl__gc *egc, libxl__poller *p);
 
 /* Internal to fork and child reaping machinery */
 extern const libxl_childproc_hooks libxl__childproc_default_hooks;

@@ -1477,7 +1477,7 @@ void libxl__event_occurred(libxl__egc *egc, libxl_event *event)
         libxl__poller *poller;
         LIBXL_TAILQ_INSERT_TAIL(&CTX->occurred, event, link);
         LIBXL_LIST_FOREACH(poller, &CTX->pollers_event, entry)
-            libxl__poller_wakeup(egc, poller);
+            libxl__poller_wakeup(gc, poller);
     }
 }
 
@@ -1668,9 +1668,8 @@ void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p)
     LIBXL_LIST_INSERT_HEAD(&ctx->pollers_idle, p, entry);
 }
 
-void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p)
+void libxl__poller_wakeup(libxl__gc *gc, libxl__poller *p)
 {
-    EGC_GC;
     int e = libxl__self_pipe_wakeup(p->wakeup_pipe[1]);
     if (e) LIBXL__EVENT_DISASTER(gc, "cannot poke watch pipe", e, 0);
 }
@@ -1924,7 +1923,7 @@ void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
         assert(ao->in_initiator);
         if (!ao->constructing)
             /* don't bother with this if we're not in the event loop */
-            libxl__poller_wakeup(egc, ao->poller);
+            libxl__poller_wakeup(gc, ao->poller);
     } else if (ao->how.callback) {
         LOG(DEBUG, "ao %p: complete for callback", ao);
         LIBXL_TAILQ_INSERT_TAIL(&egc->aos_for_callback, ao, entry_for_callback);
