@@ -739,7 +739,7 @@ The caller provides:
    Caller *MUST* allocate enough space to be able to store all received data
    (i.e. total allocated space *MUST* match the `metadata_total_size` value
    provided by the hypervisor). Individual payload metadata string can be of
-   arbitrary length. The metadata string format is: key=value\0...key=value\0.
+   arbitrary length. The metadata string format is: key=value\\0...key=value\\0.
  * `metadata_len` - Virtual address of where to write the length of each metadata
    string of the payload. Caller *MUST* allocate up to `nr` of them. Each *MUST*
    be of sizeof(uint32_t) (4 bytes).
