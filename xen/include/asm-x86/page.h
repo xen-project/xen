@@ -316,7 +316,11 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 #define _PAGE_AVAIL    _AC(0xE00,U)
 #define _PAGE_PSE_PAT  _AC(0x1000,U)
 #define _PAGE_AVAIL_HIGH (_AC(0x7ff, U) << 12)
+
+#ifndef __ASSEMBLY__
+/* Dependency on NX being available can't be expressed. */
 #define _PAGE_NX       (cpu_has_nx ? _PAGE_NX_BIT : 0)
+#endif
 
 #define PAGE_CACHE_ATTRS (_PAGE_PAT | _PAGE_PCD | _PAGE_PWT)
 

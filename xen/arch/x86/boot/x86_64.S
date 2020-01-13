@@ -56,9 +56,9 @@ l1_directmap:
         .rept L1_PAGETABLE_ENTRIES
         /* VGA hole (0xa0000-0xc0000) should be mapped UC-. */
         .if pfn >= 0xa0 && pfn < 0xc0
-        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR_UCMINUS | MAP_SMALL_PAGES
+        .quad (pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR_UCMINUS | _PAGE_GLOBAL | MAP_SMALL_PAGES
         .else
-        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | MAP_SMALL_PAGES
+        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR_RWX | MAP_SMALL_PAGES
         .endif
         pfn = pfn + 1
         .endr
@@ -89,7 +89,7 @@ GLOBAL(l2_xenmap)
         .quad 0
         idx = 1
         .rept 7
-        .quad sym_offs(__image_base__) + (idx << L2_PAGETABLE_SHIFT) + (PAGE_HYPERVISOR | _PAGE_PSE)
+        .quad sym_offs(__image_base__) + (idx << L2_PAGETABLE_SHIFT) + (PAGE_HYPERVISOR_RWX | _PAGE_PSE)
         idx = idx + 1
         .endr
         .fill L2_PAGETABLE_ENTRIES - 8, 8, 0

@@ -674,7 +674,7 @@ trampoline_setup:
          * the transition into long mode), using 2M superpages.
          */
         lea     sym_esi(start),%ebx
-        lea     (1<<L2_PAGETABLE_SHIFT)*7+(PAGE_HYPERVISOR|_PAGE_PSE)(%ebx),%eax
+        lea     (1<<L2_PAGETABLE_SHIFT)*7+(PAGE_HYPERVISOR_RWX|_PAGE_PSE)(%ebx),%eax
         shr     $(L2_PAGETABLE_SHIFT-3),%ebx
         mov     $8,%ecx
 1:      mov     %eax,sym_fs(l2_bootmap)-8(%ebx,%ecx,8)
