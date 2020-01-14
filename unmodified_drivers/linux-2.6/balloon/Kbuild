@@ -1,8 +1,0 @@
-include $(M)/overrides.mk
-
-obj-m  = xen-balloon.o
-
-EXTRA_CFLAGS += -I$(M)/platform-pci
-
-xen-balloon-y := balloon.o sysfs.o
-xen-balloon-$(CONFIG_XEN_SCRUB_PAGES) += scrub.o

@@ -1,5 +1,0 @@
-include $(M)/overrides.mk
-
-obj-m += xen-vbd.o
-
-xen-vbd-objs := blkfront.o vbd.o

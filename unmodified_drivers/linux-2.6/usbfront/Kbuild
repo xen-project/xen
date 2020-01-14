@@ -1,7 +1,0 @@
-include $(M)/overrides.mk
-
-obj-m += $(if $(shell grep '^\#include "\.\./\.\./' $(obj)/usbfront.h), \
-	      $(warning usbfront cannot be built), \
-	      xen-usb.o)
-
-xen-usb-objs := usbfront-hcd.o xenbus.o

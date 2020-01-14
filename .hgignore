@@ -326,8 +326,4 @@
 ^xen/xen$
 ^xen/xen-syms$
 ^xen/xen\..*$
-^unmodified_drivers/linux-2.6/\.tmp_versions
-^unmodified_drivers/linux-2.6/.*\.cmd$
-^unmodified_drivers/linux-2.6/.*\.ko$
-^unmodified_drivers/linux-2.6/.*\.mod\.c$
 ^LibVNCServer.*

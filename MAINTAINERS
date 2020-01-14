@@ -421,12 +421,6 @@ F:	*/configure
 F:	*/*.ac
 F:	tools/
 
-UNMODIFIED LINUX PV DRIVERS
-M:	Jan Beulich <jbeulich@suse.com>
-S:	Obsolete
-L:	xen-devel@lists.xenproject.org
-F:	unmodified_drivers/linux-2.6/
-
 VM EVENT, MEM ACCESS and MONITOR
 M:	Tamas K Lengyel <tamas@tklengyel.com>
 R:	Alexandru Isaila <aisaila@bitdefender.com>
