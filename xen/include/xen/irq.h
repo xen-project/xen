@@ -127,9 +127,10 @@ struct vcpu;
 
 struct pirq {
     int pirq;
-    u16 evtchn;
-    bool_t masked;
+    evtchn_port_t evtchn;
     struct rcu_head rcu_head;
+    bool masked;
+    /* Architectures may require this field to be last. */
     struct arch_pirq arch;
 };
 
