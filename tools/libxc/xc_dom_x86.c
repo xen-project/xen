@@ -277,8 +277,12 @@ static int alloc_pgtables_x86_32_pae(struct xc_dom_image *dom)
         .levels = PGTBL_LEVELS_I386,
         .vaddr_mask = bits_to_mask(VIRT_BITS_I386),
         .lvl_prot[0] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED,
-        .lvl_prot[1] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
-        .lvl_prot[2] = _PAGE_PRESENT,
+        /*
+         * 64bit Xen runs 32bit PV guests with the PAE entries in an L3
+         * pagetable.  They don't behave exactly like native PAE paging.
+         */
+        .lvl_prot[1 ... 2] =
+            _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
     };
     struct xc_dom_image_x86 *domx86 = dom->arch_private;
 
@@ -488,9 +492,8 @@ static int alloc_pgtables_x86_64(struct xc_dom_image *dom)
         .levels = PGTBL_LEVELS_X86_64,
         .vaddr_mask = bits_to_mask(VIRT_BITS_X86_64),
         .lvl_prot[0] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED,
-        .lvl_prot[1] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
-        .lvl_prot[2] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
-        .lvl_prot[3] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
+        .lvl_prot[1 ... 3] =
+            _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
     };
     struct xc_dom_image_x86 *domx86 = dom->arch_private;
 
