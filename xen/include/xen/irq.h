@@ -8,6 +8,7 @@
 #include <xen/list.h>
 #include <asm/regs.h>
 #include <asm/hardirq.h>
+#include <public/event_channel.h>
 
 struct irqaction {
     void (*handler)(int, void *, struct cpu_user_regs *);
