@@ -17,6 +17,7 @@ DEP_FILES=$(foreach i, $(LINK_FILES), $(XEN_ROOT)/$(i))
 # Exclude some intermediate files and final build products
 LINK_EXCLUDES := '*.[isoa]' '.*.d' '.*.d2' '.config'
 LINK_EXCLUDES += '*.map' 'xen' 'xen.gz' 'xen.efi' 'xen-syms'
+LINK_EXCLUDES += '.*.tmp'
 
 # This is all a giant mess and doesn't really work.
 #
