@@ -83,7 +83,7 @@ static void post_flush(u32 t)
 
 static void do_tlb_flush(void)
 {
-    unsigned long flags;
+    unsigned long flags, cr4;
     u32 t;
 
     /* This non-reentrant function is sometimes called in interrupt context. */
@@ -93,13 +93,13 @@ static void do_tlb_flush(void)
 
     if ( use_invpcid )
         invpcid_flush_all();
-    else
+    else if ( (cr4 = read_cr4()) & X86_CR4_PGE )
     {
-        unsigned long cr4 = read_cr4();
-
-        write_cr4(cr4 ^ X86_CR4_PGE);
+        write_cr4(cr4 & ~X86_CR4_PGE);
         write_cr4(cr4);
     }
+    else
+        write_cr3(read_cr3());
 
     post_flush(t);
 
