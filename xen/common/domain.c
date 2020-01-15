@@ -139,7 +139,19 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
 {
     struct vcpu *v;
 
-    BUG_ON((!is_idle_domain(d) || vcpu_id) && d->vcpu[vcpu_id]);
+    /*
+     * Sanity check some input expectations:
+     * - vcpu_id should be bounded by d->max_vcpus, and not previously
+     *   allocated.
+     * - VCPUs should be tightly packed and allocated in ascending order,
+     *   except for the idle domain which may vary based on PCPU numbering.
+     */
+    if ( vcpu_id >= d->max_vcpus || d->vcpu[vcpu_id] ||
+         (!is_idle_domain(d) && vcpu_id && !d->vcpu[vcpu_id - 1]) )
+    {
+        ASSERT_UNREACHABLE();
+        return NULL;
+    }
 
     if ( (v = alloc_vcpu_struct(d)) == NULL )
         return NULL;
