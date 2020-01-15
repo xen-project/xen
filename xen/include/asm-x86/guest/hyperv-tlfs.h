@@ -318,15 +318,16 @@ struct ms_hyperv_tsc_page {
  *
  * Bit(s)
  * 63 - Indicates if the OS is Open Source or not; 1 is Open Source
- * 62:56 - Os Type; Linux is 0x100
+ * 62:56 - Os Type; Linux 0x1, FreeBSD 0x2, Xen 0x3
  * 55:48 - Distro specific identification
- * 47:16 - Linux kernel version number
+ * 47:16 - Guest OS version number
  * 15:0  - Distro specific identification
  *
  *
  */
 
 #define HV_LINUX_VENDOR_ID              0x8100
+#define HV_XEN_VENDOR_ID                0x8300
 union hv_guest_os_id
 {
     uint64_t raw;

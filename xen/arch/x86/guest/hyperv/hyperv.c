@@ -19,15 +19,27 @@
  * Copyright (c) 2019 Microsoft.
  */
 #include <xen/init.h>
+#include <xen/version.h>
 
+#include <asm/fixmap.h>
 #include <asm/guest.h>
 #include <asm/guest/hyperv-tlfs.h>
+#include <asm/processor.h>
 
 struct ms_hyperv_info __read_mostly ms_hyperv;
 
-static const struct hypervisor_ops ops = {
-    .name = "Hyper-V",
-};
+static uint64_t generate_guest_id(void)
+{
+    union hv_guest_os_id id = {};
+
+    id.vendor = HV_XEN_VENDOR_ID;
+    id.major = xen_major_version();
+    id.minor = xen_minor_version();
+
+    return id.raw;
+}
+
+static const struct hypervisor_ops ops;
 
 const struct hypervisor_ops *__init hyperv_probe(void)
 {
@@ -71,6 +83,57 @@ const struct hypervisor_ops *__init hyperv_probe(void)
 
     return &ops;
 }
+
+static void __init setup_hypercall_page(void)
+{
+    union hv_x64_msr_hypercall_contents hypercall_msr;
+    union hv_guest_os_id guest_id;
+    unsigned long mfn;
+
+    BUILD_BUG_ON(HV_HYP_PAGE_SHIFT != PAGE_SHIFT);
+
+    rdmsrl(HV_X64_MSR_GUEST_OS_ID, guest_id.raw);
+    if ( !guest_id.raw )
+    {
+        guest_id.raw = generate_guest_id();
+        wrmsrl(HV_X64_MSR_GUEST_OS_ID, guest_id.raw);
+    }
+
+    rdmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
+    if ( !hypercall_msr.enable )
+    {
+        mfn = HV_HCALL_MFN;
+        hypercall_msr.enable = 1;
+        hypercall_msr.guest_physical_address = mfn;
+        wrmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
+    }
+    else
+        mfn = hypercall_msr.guest_physical_address;
+
+    rdmsrl(HV_X64_MSR_HYPERCALL, hypercall_msr.as_uint64);
+    BUG_ON(!hypercall_msr.enable);
+
+    set_fixmap_x(FIX_X_HYPERV_HCALL, mfn << PAGE_SHIFT);
+}
+
+static void __init setup(void)
+{
+    setup_hypercall_page();
+}
+
+static void __init e820_fixup(struct e820map *e820)
+{
+    uint64_t s = HV_HCALL_MFN << PAGE_SHIFT;
+
+    if ( !e820_add_range(e820, s, s + PAGE_SIZE, E820_RESERVED) )
+        panic("Unable to reserve Hyper-V hypercall range\n");
+}
+
+static const struct hypervisor_ops ops = {
+    .name = "Hyper-V",
+    .setup = setup,
+    .e820_fixup = e820_fixup,
+};
 
 /*
  * Local variables:
