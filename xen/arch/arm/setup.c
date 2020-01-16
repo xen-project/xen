@@ -594,7 +594,6 @@ static void __init setup_mm(void)
     unsigned long heap_pages, xenheap_pages, domheap_pages;
     int i;
     const uint32_t ctr = READ_CP32(CTR);
-    mfn_t boot_mfn_start, boot_mfn_end;
 
     if ( !bootinfo.mem.nr_banks )
         panic("No memory bank\n");
@@ -667,11 +666,6 @@ static void __init setup_mm(void)
 
     setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
 
-    /* We need a single mapped page for populating bootmem_region_list. */
-    boot_mfn_start = mfn_add(xenheap_mfn_end, -1);
-    boot_mfn_end = xenheap_mfn_end;
-    init_boot_pages(mfn_to_maddr(boot_mfn_start), mfn_to_maddr(boot_mfn_end));
-
     /* Add non-xenheap memory */
     for ( i = 0; i < bootinfo.mem.nr_banks; i++ )
     {
@@ -717,7 +711,7 @@ static void __init setup_mm(void)
 
     /* Add xenheap memory that was not already added to the boot allocator. */
     init_xenheap_pages(mfn_to_maddr(xenheap_mfn_start),
-                       mfn_to_maddr(boot_mfn_start));
+                       mfn_to_maddr(xenheap_mfn_end));
 }
 #else /* CONFIG_ARM_64 */
 static void __init setup_mm(void)
