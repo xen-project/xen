@@ -1923,6 +1923,10 @@ int xc_altp2m_switch_to_view(xc_interface *handle, uint32_t domid,
                              uint16_t view_id);
 int xc_altp2m_set_suppress_ve(xc_interface *handle, uint32_t domid,
                               uint16_t view_id, xen_pfn_t gfn, bool sve);
+int xc_altp2m_set_supress_ve_multi(xc_interface *handle, uint32_t domid,
+                                   uint16_t view_id, xen_pfn_t first_gfn,
+                                   xen_pfn_t last_gfn, bool sve,
+                                   xen_pfn_t *error_gfn, int32_t *error_code);
 int xc_altp2m_get_suppress_ve(xc_interface *handle, uint32_t domid,
                               uint16_t view_id, xen_pfn_t gfn, bool *sve);
 int xc_altp2m_set_mem_access(xc_interface *handle, uint32_t domid,

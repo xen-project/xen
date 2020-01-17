@@ -4520,6 +4520,7 @@ static int do_altp2m_op(
     case HVMOP_altp2m_destroy_p2m:
     case HVMOP_altp2m_switch_p2m:
     case HVMOP_altp2m_set_suppress_ve:
+    case HVMOP_altp2m_set_suppress_ve_multi:
     case HVMOP_altp2m_get_suppress_ve:
     case HVMOP_altp2m_set_mem_access:
     case HVMOP_altp2m_set_mem_access_multi:
@@ -4677,6 +4678,25 @@ static int do_altp2m_op(
             rc = p2m_set_suppress_ve(d, gfn, suppress_ve, altp2m_idx);
         }
         break;
+
+    case HVMOP_altp2m_set_suppress_ve_multi:
+    {
+        uint64_t max_phys_addr = (1UL << d->arch.cpuid->extd.maxphysaddr) - 1;
+
+        a.u.suppress_ve_multi.last_gfn = min(a.u.suppress_ve_multi.last_gfn,
+                                             max_phys_addr);
+
+        if ( a.u.suppress_ve_multi.pad1 ||
+             a.u.suppress_ve_multi.first_gfn > a.u.suppress_ve_multi.last_gfn )
+            rc = -EINVAL;
+        else
+        {
+            rc = p2m_set_suppress_ve_multi(d, &a.u.suppress_ve_multi);
+            if ( (!rc || rc == -ERESTART) && __copy_to_guest(arg, &a, 1) )
+                rc = -EFAULT;
+        }
+        break;
+    }
 
     case HVMOP_altp2m_get_suppress_ve:
         if ( a.u.suppress_ve.pad1 || a.u.suppress_ve.pad2 )

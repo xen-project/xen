@@ -3027,43 +3027,82 @@ out:
 int p2m_set_suppress_ve(struct domain *d, gfn_t gfn, bool suppress_ve,
                         unsigned int altp2m_idx)
 {
+    int rc;
+    struct xen_hvm_altp2m_suppress_ve_multi sve = {
+        altp2m_idx, suppress_ve, 0, 0, gfn_x(gfn), gfn_x(gfn), 0
+    };
+
+    if ( !(rc = p2m_set_suppress_ve_multi(d, &sve)) )
+        rc = sve.first_error;
+
+    return rc;
+}
+
+/*
+ * Set/clear the #VE suppress bit for multiple pages.  Only available on VMX.
+ */
+int p2m_set_suppress_ve_multi(struct domain *d,
+                              struct xen_hvm_altp2m_suppress_ve_multi *sve)
+{
     struct p2m_domain *host_p2m = p2m_get_hostp2m(d);
     struct p2m_domain *ap2m = NULL;
-    struct p2m_domain *p2m;
-    mfn_t mfn;
-    p2m_access_t a;
-    p2m_type_t t;
-    int rc;
+    struct p2m_domain *p2m = host_p2m;
+    uint64_t start = sve->first_gfn;
+    int rc = 0;
 
-    if ( altp2m_idx > 0 )
+    if ( sve->view > 0 )
     {
-        if ( altp2m_idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
-             d->arch.altp2m_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] ==
+        if ( sve->view >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
+             d->arch.altp2m_eptp[array_index_nospec(sve->view, MAX_EPTP)] ==
              mfn_x(INVALID_MFN) )
             return -EINVAL;
 
-        p2m = ap2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
+        p2m = ap2m = array_access_nospec(d->arch.altp2m_p2m, sve->view);
     }
-    else
-        p2m = host_p2m;
 
-    gfn_lock(host_p2m, gfn, 0);
+    p2m_lock(host_p2m);
 
     if ( ap2m )
         p2m_lock(ap2m);
 
-    rc = altp2m_get_effective_entry(p2m, gfn, &mfn, &t, &a, AP2MGET_query);
+    while ( sve->last_gfn >= start )
+    {
+        p2m_access_t a;
+        p2m_type_t t;
+        mfn_t mfn;
+        int err = 0;
 
-    if ( rc )
-        goto out;
+        if ( (err = altp2m_get_effective_entry(p2m, _gfn(start), &mfn, &t, &a,
+                                               AP2MGET_query)) &&
+             !sve->first_error )
+        {
+            sve->first_error_gfn = start; /* Save the gfn of the first error */
+            sve->first_error = err; /* Save the first error code */
+        }
 
-    rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, t, a, suppress_ve);
+        if ( !err && (err = p2m->set_entry(p2m, _gfn(start), mfn,
+                                           PAGE_ORDER_4K, t, a,
+                                           sve->suppress_ve)) &&
+             !sve->first_error )
+        {
+            sve->first_error_gfn = start; /* Save the gfn of the first error */
+            sve->first_error = err; /* Save the first error code */
+        }
 
-out:
+        /* Check for continuation if it's not the last iteration. */
+        if ( sve->last_gfn >= ++start && hypercall_preempt_check() )
+        {
+            rc = -ERESTART;
+            break;
+        }
+    }
+
+    sve->first_gfn = start;
+
     if ( ap2m )
         p2m_unlock(ap2m);
 
-    gfn_unlock(host_p2m, gfn, 0);
+    p2m_unlock(host_p2m);
 
     return rc;
 }

@@ -46,6 +46,16 @@ struct xen_hvm_altp2m_suppress_ve {
     uint64_t gfn;
 };
 
+struct xen_hvm_altp2m_suppress_ve_multi {
+    uint16_t view;
+    uint8_t suppress_ve; /* Boolean type. */
+    uint8_t pad1;
+    int32_t first_error; /* Should be set to 0. */
+    uint64_t first_gfn; /* Value may be updated. */
+    uint64_t last_gfn;
+    uint64_t first_error_gfn; /* Gfn of the first error. */
+};
+
 #if __XEN_INTERFACE_VERSION__ < 0x00040900
 
 /* Set the logical level of one of a domain's PCI INTx wires. */
@@ -339,6 +349,8 @@ struct xen_hvm_altp2m_op {
 #define HVMOP_altp2m_vcpu_disable_notify  13
 /* Get the active vcpu p2m index */
 #define HVMOP_altp2m_get_p2m_idx          14
+/* Set the "Supress #VE" bit for a range of pages */
+#define HVMOP_altp2m_set_suppress_ve_multi 15
     domid_t domain;
     uint16_t pad1;
     uint32_t pad2;
@@ -353,6 +365,7 @@ struct xen_hvm_altp2m_op {
         struct xen_hvm_altp2m_change_gfn           change_gfn;
         struct xen_hvm_altp2m_set_mem_access_multi set_mem_access_multi;
         struct xen_hvm_altp2m_suppress_ve          suppress_ve;
+        struct xen_hvm_altp2m_suppress_ve_multi    suppress_ve_multi;
         struct xen_hvm_altp2m_vcpu_disable_notify  disable_notify;
         struct xen_hvm_altp2m_get_vcpu_p2m_idx     get_vcpu_p2m_idx;
         uint8_t pad[64];

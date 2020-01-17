@@ -75,6 +75,9 @@ long p2m_set_mem_access_multi(struct domain *d,
 int p2m_set_suppress_ve(struct domain *d, gfn_t gfn, bool suppress_ve,
                         unsigned int altp2m_idx);
 
+int p2m_set_suppress_ve_multi(struct domain *d,
+                              struct xen_hvm_altp2m_suppress_ve_multi *suppress_ve);
+
 int p2m_get_suppress_ve(struct domain *d, gfn_t gfn, bool *suppress_ve,
                         unsigned int altp2m_idx);
 
