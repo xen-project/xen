@@ -366,11 +366,12 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
 #ifdef CONFIG_HVM
     if ( altp2m_idx )
     {
-        if ( altp2m_idx >= MAX_ALTP2M ||
-             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+        if ( altp2m_idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
+             d->arch.altp2m_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] ==
+             mfn_x(INVALID_MFN) )
             return -EINVAL;
 
-        ap2m = d->arch.altp2m_p2m[altp2m_idx];
+        ap2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
     }
 #else
     ASSERT(!altp2m_idx);
@@ -425,11 +426,12 @@ long p2m_set_mem_access_multi(struct domain *d,
 #ifdef CONFIG_HVM
     if ( altp2m_idx )
     {
-        if ( altp2m_idx >= MAX_ALTP2M ||
-             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+        if ( altp2m_idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
+             d->arch.altp2m_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] ==
+             mfn_x(INVALID_MFN) )
             return -EINVAL;
 
-        ap2m = d->arch.altp2m_p2m[altp2m_idx];
+        ap2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
     }
 #else
     ASSERT(!altp2m_idx);
@@ -491,11 +493,12 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access,
     }
     else if ( altp2m_idx ) /* altp2m view 0 is treated as the hostp2m */
     {
-        if ( altp2m_idx >= MAX_ALTP2M ||
-             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+        if ( altp2m_idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
+             d->arch.altp2m_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] ==
+             mfn_x(INVALID_MFN) )
             return -EINVAL;
 
-        p2m = d->arch.altp2m_p2m[altp2m_idx];
+        p2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
     }
 #else
     ASSERT(!altp2m_idx);

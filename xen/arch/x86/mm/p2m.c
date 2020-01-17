@@ -2502,7 +2502,7 @@ static void p2m_reset_altp2m(struct domain *d, unsigned int idx,
     struct p2m_domain *p2m;
 
     ASSERT(idx < MAX_ALTP2M);
-    p2m = d->arch.altp2m_p2m[idx];
+    p2m = array_access_nospec(d->arch.altp2m_p2m, idx);
 
     p2m_lock(p2m);
 
@@ -2543,7 +2543,7 @@ static int p2m_activate_altp2m(struct domain *d, unsigned int idx)
 
     ASSERT(idx < MAX_ALTP2M);
 
-    p2m = d->arch.altp2m_p2m[idx];
+    p2m = array_access_nospec(d->arch.altp2m_p2m, idx);
     hostp2m = p2m_get_hostp2m(d);
 
     p2m_lock(p2m);
@@ -2574,12 +2574,13 @@ int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx)
 {
     int rc = -EINVAL;
 
-    if ( idx >= MAX_ALTP2M )
+    if ( idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) )
         return rc;
 
     altp2m_list_lock(d);
 
-    if ( d->arch.altp2m_eptp[idx] == mfn_x(INVALID_MFN) )
+    if ( d->arch.altp2m_eptp[array_index_nospec(idx, MAX_EPTP)] ==
+         mfn_x(INVALID_MFN) )
         rc = p2m_activate_altp2m(d, idx);
 
     altp2m_list_unlock(d);
@@ -2615,7 +2616,7 @@ int p2m_destroy_altp2m_by_id(struct domain *d, unsigned int idx)
     struct p2m_domain *p2m;
     int rc = -EBUSY;
 
-    if ( !idx || idx >= MAX_ALTP2M )
+    if ( !idx || idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) )
         return rc;
 
     rc = domain_pause_except_self(d);
@@ -2625,14 +2626,16 @@ int p2m_destroy_altp2m_by_id(struct domain *d, unsigned int idx)
     rc = -EBUSY;
     altp2m_list_lock(d);
 
-    if ( d->arch.altp2m_eptp[idx] != mfn_x(INVALID_MFN) )
+    if ( d->arch.altp2m_eptp[array_index_nospec(idx, MAX_EPTP)] !=
+         mfn_x(INVALID_MFN) )
     {
-        p2m = d->arch.altp2m_p2m[idx];
+        p2m = array_access_nospec(d->arch.altp2m_p2m, idx);
 
         if ( !_atomic_read(p2m->active_vcpus) )
         {
             p2m_reset_altp2m(d, idx, ALTP2M_DEACTIVATE);
-            d->arch.altp2m_eptp[idx] = mfn_x(INVALID_MFN);
+            d->arch.altp2m_eptp[array_index_nospec(idx, MAX_EPTP)] =
+            mfn_x(INVALID_MFN);
             rc = 0;
         }
     }
@@ -2689,11 +2692,13 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     mfn_t mfn;
     int rc = -EINVAL;
 
-    if ( idx >= MAX_ALTP2M || d->arch.altp2m_eptp[idx] == mfn_x(INVALID_MFN) )
+    if ( idx >=  min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
+         d->arch.altp2m_eptp[array_index_nospec(idx, MAX_EPTP)] ==
+         mfn_x(INVALID_MFN) )
         return rc;
 
     hp2m = p2m_get_hostp2m(d);
-    ap2m = d->arch.altp2m_p2m[idx];
+    ap2m = array_access_nospec(d->arch.altp2m_p2m, idx);
 
     p2m_lock(hp2m);
     p2m_lock(ap2m);
@@ -3032,11 +3037,12 @@ int p2m_set_suppress_ve(struct domain *d, gfn_t gfn, bool suppress_ve,
 
     if ( altp2m_idx > 0 )
     {
-        if ( altp2m_idx >= MAX_ALTP2M ||
-             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+        if ( altp2m_idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
+             d->arch.altp2m_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] ==
+             mfn_x(INVALID_MFN) )
             return -EINVAL;
 
-        p2m = ap2m = d->arch.altp2m_p2m[altp2m_idx];
+        p2m = ap2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
     }
     else
         p2m = host_p2m;
@@ -3075,11 +3081,12 @@ int p2m_get_suppress_ve(struct domain *d, gfn_t gfn, bool *suppress_ve,
 
     if ( altp2m_idx > 0 )
     {
-        if ( altp2m_idx >= MAX_ALTP2M ||
-             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+        if ( altp2m_idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
+             d->arch.altp2m_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] ==
+             mfn_x(INVALID_MFN) )
             return -EINVAL;
 
-        p2m = ap2m = d->arch.altp2m_p2m[altp2m_idx];
+        p2m = ap2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
     }
     else
         p2m = host_p2m;

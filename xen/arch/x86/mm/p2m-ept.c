@@ -1353,7 +1353,7 @@ void setup_ept_dump(void)
 
 void p2m_init_altp2m_ept(struct domain *d, unsigned int i)
 {
-    struct p2m_domain *p2m = d->arch.altp2m_p2m[i];
+    struct p2m_domain *p2m = array_access_nospec(d->arch.altp2m_p2m, i);
     struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
     struct ept_data *ept;
 
@@ -1366,7 +1366,7 @@ void p2m_init_altp2m_ept(struct domain *d, unsigned int i)
     p2m->max_mapped_pfn = p2m->max_remapped_gfn = 0;
     ept = &p2m->ept;
     ept->mfn = pagetable_get_pfn(p2m_get_pagetable(p2m));
-    d->arch.altp2m_eptp[i] = ept->eptp;
+    d->arch.altp2m_eptp[array_index_nospec(i, MAX_EPTP)] = ept->eptp;
 }
 
 unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp)
