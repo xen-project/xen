@@ -955,10 +955,16 @@ u64 stime2tsc(s_time_t stime)
 
 void cstate_restore_tsc(void)
 {
+    struct cpu_time *t = &this_cpu(cpu_time);
+
     if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
         return;
 
-    write_tsc(stime2tsc(read_platform_stime(NULL)));
+    t->stamp.master_stime = read_platform_stime(NULL);
+    t->stamp.local_tsc = stime2tsc(t->stamp.master_stime);
+    t->stamp.local_stime = t->stamp.master_stime;
+
+    write_tsc(t->stamp.local_tsc);
 }
 
 /***************************************************************************
