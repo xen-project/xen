@@ -2562,6 +2562,12 @@ static int p2m_activate_altp2m(struct domain *d, unsigned int idx)
         goto out;
     }
 
+    p2m->default_access = hostp2m->default_access;
+    p2m->domain = hostp2m->domain;
+    p2m->global_logdirty = hostp2m->global_logdirty;
+    p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
+    p2m->max_mapped_pfn = p2m->max_remapped_gfn = 0;
+
     p2m_init_altp2m_ept(d, idx);
 
  out:

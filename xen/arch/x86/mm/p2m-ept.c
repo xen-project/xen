@@ -1357,13 +1357,7 @@ void p2m_init_altp2m_ept(struct domain *d, unsigned int i)
     struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
     struct ept_data *ept;
 
-    p2m->default_access = hostp2m->default_access;
-    p2m->domain = hostp2m->domain;
-
-    p2m->global_logdirty = hostp2m->global_logdirty;
     p2m->ept.ad = hostp2m->ept.ad;
-    p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
-    p2m->max_mapped_pfn = p2m->max_remapped_gfn = 0;
     ept = &p2m->ept;
     ept->mfn = pagetable_get_pfn(p2m_get_pagetable(p2m));
     d->arch.altp2m_eptp[array_index_nospec(i, MAX_EPTP)] = ept->eptp;
