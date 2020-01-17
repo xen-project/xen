@@ -25,6 +25,7 @@
 
 #include <xen/guest_access.h> /* copy_from_guest() */
 #include <xen/iommu.h>
+#include <xen/mem_access.h>
 #include <xen/vm_event.h>
 #include <xen/event.h>
 #include <public/vm_event.h>
@@ -2536,7 +2537,8 @@ void p2m_flush_altp2m(struct domain *d)
     altp2m_list_unlock(d);
 }
 
-static int p2m_activate_altp2m(struct domain *d, unsigned int idx)
+static int p2m_activate_altp2m(struct domain *d, unsigned int idx,
+                               p2m_access_t hvmmem_default_access)
 {
     struct p2m_domain *hostp2m, *p2m;
     int rc;
@@ -2562,7 +2564,7 @@ static int p2m_activate_altp2m(struct domain *d, unsigned int idx)
         goto out;
     }
 
-    p2m->default_access = hostp2m->default_access;
+    p2m->default_access = hvmmem_default_access;
     p2m->domain = hostp2m->domain;
     p2m->global_logdirty = hostp2m->global_logdirty;
     p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
@@ -2579,6 +2581,7 @@ static int p2m_activate_altp2m(struct domain *d, unsigned int idx)
 int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx)
 {
     int rc = -EINVAL;
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
 
     if ( idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) )
         return rc;
@@ -2587,16 +2590,23 @@ int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx)
 
     if ( d->arch.altp2m_eptp[array_index_nospec(idx, MAX_EPTP)] ==
          mfn_x(INVALID_MFN) )
-        rc = p2m_activate_altp2m(d, idx);
+        rc = p2m_activate_altp2m(d, idx, hostp2m->default_access);
 
     altp2m_list_unlock(d);
     return rc;
 }
 
-int p2m_init_next_altp2m(struct domain *d, uint16_t *idx)
+int p2m_init_next_altp2m(struct domain *d, uint16_t *idx,
+                         xenmem_access_t hvmmem_default_access)
 {
     int rc = -EINVAL;
     unsigned int i;
+    p2m_access_t a;
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
+
+    if ( hvmmem_default_access > XENMEM_access_default ||
+         !xenmem_access_to_p2m_access(hostp2m, hvmmem_default_access, &a) )
+        return rc;
 
     altp2m_list_lock(d);
 
@@ -2605,7 +2615,7 @@ int p2m_init_next_altp2m(struct domain *d, uint16_t *idx)
         if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
             continue;
 
-        rc = p2m_activate_altp2m(d, i);
+        rc = p2m_activate_altp2m(d, i, a);
 
         if ( !rc )
             *idx = i;

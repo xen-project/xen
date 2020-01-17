@@ -251,8 +251,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_vcpu_disable_notify_t);
 struct xen_hvm_altp2m_view {
     /* IN/OUT variable */
     uint16_t view;
-    /* Create view only: default access type
-     * NOTE: currently ignored */
     uint16_t hvmmem_default_access; /* xenmem_access_t */
 };
 typedef struct xen_hvm_altp2m_view xen_hvm_altp2m_view_t;

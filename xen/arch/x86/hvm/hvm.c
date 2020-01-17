@@ -4654,7 +4654,8 @@ static int do_altp2m_op(
     }
 
     case HVMOP_altp2m_create_p2m:
-        if ( !(rc = p2m_init_next_altp2m(d, &a.u.view.view)) )
+        if ( !(rc = p2m_init_next_altp2m(d, &a.u.view.view,
+                                         a.u.view.hvmmem_default_access)) )
             rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         break;
 

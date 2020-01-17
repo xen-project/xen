@@ -884,7 +884,8 @@ bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
 int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx);
 
 /* Find an available alternate p2m and make it valid */
-int p2m_init_next_altp2m(struct domain *d, uint16_t *idx);
+int p2m_init_next_altp2m(struct domain *d, uint16_t *idx,
+                         xenmem_access_t hvmmem_default_access);
 
 /* Make a specific alternate p2m invalid */
 int p2m_destroy_altp2m_by_id(struct domain *d, unsigned int idx);

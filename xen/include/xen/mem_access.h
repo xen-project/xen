@@ -58,6 +58,10 @@ typedef enum {
     /* NOTE: Assumed to be only 4 bits right now on x86. */
 } p2m_access_t;
 
+bool xenmem_access_to_p2m_access(const struct p2m_domain *p2m,
+                                 xenmem_access_t xaccess,
+                                 p2m_access_t *paccess);
+
 /*
  * Set access type for a region of gfns.
  * If gfn == INVALID_GFN, sets the default access type.

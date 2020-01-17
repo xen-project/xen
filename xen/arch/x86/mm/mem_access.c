@@ -314,9 +314,9 @@ static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
     return rc;
 }
 
-static bool xenmem_access_to_p2m_access(struct p2m_domain *p2m,
-                                        xenmem_access_t xaccess,
-                                        p2m_access_t *paccess)
+bool xenmem_access_to_p2m_access(const struct p2m_domain *p2m,
+                                 xenmem_access_t xaccess,
+                                 p2m_access_t *paccess)
 {
     static const p2m_access_t memaccess[] = {
 #define ACCESS(ac) [XENMEM_access_##ac] = p2m_access_##ac
