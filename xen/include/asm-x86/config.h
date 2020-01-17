@@ -78,6 +78,7 @@
 /* Total size of syscall and emulation stubs. */
 #define STUB_BUF_SHIFT (L1_CACHE_SHIFT > 7 ? L1_CACHE_SHIFT : 7)
 #define STUB_BUF_SIZE  (1 << STUB_BUF_SHIFT)
+#define STUBS_PER_PAGE (PAGE_SIZE / STUB_BUF_SIZE)
 
 /* Return value for zero-size _xmalloc(), distinguished from NULL. */
 #define ZERO_BLOCK_PTR ((void *)0xBAD0BAD0BAD0BAD0UL)

@@ -1,6 +1,20 @@
 #ifndef __LIB_H__
 #define __LIB_H__
 
+#define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
+
+#define DIV_ROUND(n, d) (((n) + (d) / 2) / (d))
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+
+#define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
+#define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
+
+#define count_args_(dot, a1, a2, a3, a4, a5, a6, a7, a8, x, ...) x
+#define count_args(args...) \
+    count_args_(., ## args, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+
+#ifndef __ASSEMBLY__
+
 #include <xen/inttypes.h>
 #include <xen/stdarg.h>
 #include <xen/types.h>
@@ -51,24 +65,12 @@
 #define SWAP(_a, _b) \
    do { typeof(_a) _t = (_a); (_a) = (_b); (_b) = _t; } while ( 0 )
 
-#define DIV_ROUND(n, d) (((n) + (d) / 2) / (d))
-#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
-
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
 
 #define __ACCESS_ONCE(x) ({                             \
             (void)(typeof(x))0; /* Scalar typecheck. */ \
             (volatile typeof(x) *)&(x); })
 #define ACCESS_ONCE(x) (*__ACCESS_ONCE(x))
-
-#define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
-#define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
-
-#define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
-
-#define count_args_(dot, a1, a2, a3, a4, a5, a6, a7, a8, x, ...) x
-#define count_args(args...) \
-    count_args_(., ## args, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
 struct domain;
 
@@ -193,5 +195,7 @@ void init_constructors(void);
 
 void *bsearch(const void *key, const void *base, size_t num, size_t size,
               int (*cmp)(const void *key, const void *elt));
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __LIB_H__ */

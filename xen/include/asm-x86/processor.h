@@ -563,8 +563,6 @@ void sysenter_entry(void);
 void sysenter_eflags_saved(void);
 void int80_direct_trap(void);
 
-#define STUBS_PER_PAGE (PAGE_SIZE / STUB_BUF_SIZE)
-
 struct stubs {
     union {
         void(*func)(void);
