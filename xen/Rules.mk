@@ -70,10 +70,6 @@ ifneq ($(clang),y)
 CFLAGS += -Wa,--strip-local-absolute
 endif
 
-ifneq ($(max_phys_irqs),)
-CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)
-endif
-
 AFLAGS-y                += -D__ASSEMBLY__
 
 ALL_OBJS := $(ALL_OBJS-y)
