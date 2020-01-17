@@ -79,28 +79,40 @@ type Context struct {
 }
 
 // NewContext returns a new Context.
-func NewContext() (*Context, error) {
-	var ctx Context
+func NewContext() (ctx *Context, err error) {
+	ctx = &Context{}
+
+	defer func() {
+		if err != nil {
+			ctx.Close()
+			ctx = nil
+		}
+	}()
 
 	ctx.logger = C.xtl_createlogger_stdiostream(C.stderr, C.XTL_ERROR, 0)
 
 	ret := C.libxl_ctx_alloc(&ctx.ctx, C.LIBXL_VERSION, 0,
 		(*C.xentoollog_logger)(unsafe.Pointer(ctx.logger)))
 	if ret != 0 {
-		return nil, Error(ret)
+		return ctx, Error(ret)
 	}
 
-	return &ctx, nil
+	return ctx, nil
 }
 
 // Close closes the Context.
 func (ctx *Context) Close() error {
-	ret := C.libxl_ctx_free(ctx.ctx)
-	ctx.ctx = nil
-	C.xtl_logger_destroy((*C.xentoollog_logger)(unsafe.Pointer(ctx.logger)))
+	if ctx.ctx != nil {
+		ret := C.libxl_ctx_free(ctx.ctx)
+		if ret != 0 {
+			return Error(ret)
+		}
+		ctx.ctx = nil
+	}
 
-	if ret != 0 {
-		return Error(ret)
+	if ctx.logger != nil {
+		C.xtl_logger_destroy((*C.xentoollog_logger)(unsafe.Pointer(ctx.logger)))
+		ctx.logger = nil
 	}
 
 	return nil
