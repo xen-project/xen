@@ -1073,7 +1073,7 @@ sub add_categories {
 	    my $ptype = $1;
 	    my $pvalue = $2;
 	    if ($ptype eq "L") {
-		my $list_address = $pvalue;
+		my ($list_name, $list_address) = parse_email($pvalue);            
 		my $list_additional = "";
 		my $list_role = get_list_role($i);
 
