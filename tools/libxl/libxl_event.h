@@ -548,6 +548,8 @@ typedef struct {
  * May not be called when libxl might have any child processes, or the
  * behaviour is undefined.  So it is best to call this at
  * initialisation.
+ *
+ * The value *hooks is not copied and must outlast the libxl_ctx.
  */
 void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
                              void *user);
