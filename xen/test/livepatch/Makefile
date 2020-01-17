@@ -1,5 +1,3 @@
-include $(XEN_ROOT)/Config.mk
-
 ifeq ($(XEN_TARGET_ARCH),x86_64)
 OBJCOPY_MAGIC := -I binary -O elf64-x86-64 -B i386:x86-64
 endif
