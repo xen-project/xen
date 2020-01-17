@@ -215,7 +215,15 @@ hvm_emulate_write(enum x86_segment seg,
         return ~PTR_ERR(ptr);
 
     paging_lock(v->domain);
-    memcpy(ptr, p_data, bytes);
+
+    /* Where possible use single (and hence generally atomic) MOV insns. */
+    switch ( bytes )
+    {
+    case 2: write_u16_atomic(ptr, *(uint16_t *)p_data); break;
+    case 4: write_u32_atomic(ptr, *(uint32_t *)p_data); break;
+    case 8: write_u64_atomic(ptr, *(uint64_t *)p_data); break;
+    default: memcpy(ptr, p_data, bytes);                break;
+    }
 
     if ( tb_init_done )
         v->arch.paging.mode->shadow.trace_emul_write_val(ptr, addr,
