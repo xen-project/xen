@@ -28,8 +28,8 @@ if [[ "${CC}" == "clang"* ]]; then
     cfgargs+=("--disable-stubdom")
 fi
 
-# Qemu requires Python 2.7 or later
-if python -c "import sys; res = sys.version_info < (2, 7); exit(not(res))"; then
+# Qemu requires Python 3.5 or later
+if ! type python3 || python3 -c "import sys; res = sys.version_info < (3, 5); exit(not(res))"; then
     cfgargs+=("--with-system-qemu=/bin/false")
 fi
 
