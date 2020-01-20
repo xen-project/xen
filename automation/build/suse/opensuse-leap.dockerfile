@@ -56,6 +56,7 @@ RUN zypper install -y --no-recommends \
         pkg-config \
         python \
         python-devel \
+        python3-devel \
         systemd-devel \
         tar \
         transfig \

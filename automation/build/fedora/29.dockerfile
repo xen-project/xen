@@ -14,6 +14,7 @@ RUN dnf -y install \
         zlib-devel \
         openssl-devel \
         python-devel \
+        python3-devel \
         libuuid-devel \
         pkgconfig \
         gettext \
