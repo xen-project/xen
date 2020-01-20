@@ -23,6 +23,40 @@
 #include <irq_vectors.h>
 #include <mach_apic.h>
 
+/* Helper functions to prepare APIC register values. */
+static unsigned int prepare_ICR(unsigned int shortcut, int vector)
+{
+    return APIC_DM_FIXED | shortcut | vector;
+}
+
+static unsigned int prepare_ICR2(unsigned int mask)
+{
+    return SET_xAPIC_DEST_FIELD(mask);
+}
+
+void apic_wait_icr_idle(void)
+{
+    if ( x2apic_enabled )
+        return;
+
+    while ( apic_read(APIC_ICR) & APIC_ICR_BUSY )
+        cpu_relax();
+}
+
+/* Helper for sending APIC IPIs using a shorthand. */
+static void send_IPI_shortcut(unsigned int shortcut, int vector,
+                              unsigned int dest)
+{
+    unsigned int cfg;
+
+    /* Wait for idle. */
+    apic_wait_icr_idle();
+    /* Prepare target chip field. */
+    cfg = prepare_ICR(shortcut, vector) | dest;
+    /* Send the IPI. The write to APIC_ICR fires this off. */
+    apic_write(APIC_ICR, cfg);
+}
+
 /*
  * send_IPI_mask(cpumask, vector): sends @vector IPI to CPUs in @cpumask,
  * excluding the local CPU. @cpumask may be empty.
@@ -80,48 +114,9 @@ void send_IPI_self(int vector)
  * The following functions deal with sending IPIs between CPUs.
  */
 
-static inline int __prepare_ICR (unsigned int shortcut, int vector)
-{
-    return APIC_DM_FIXED | shortcut | vector;
-}
-
-static inline int __prepare_ICR2 (unsigned int mask)
-{
-    return SET_xAPIC_DEST_FIELD(mask);
-}
-
-void apic_wait_icr_idle(void)
-{
-    if ( x2apic_enabled )
-        return;
-
-    while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
-        cpu_relax();
-}
-
-static void __default_send_IPI_shortcut(unsigned int shortcut, int vector,
-                                    unsigned int dest)
-{
-    unsigned int cfg;
-
-    /*
-     * Wait for idle.
-     */
-    apic_wait_icr_idle();
-
-    /*
-     * prepare target chip field
-     */
-    cfg = __prepare_ICR(shortcut, vector) | dest;
-    /*
-     * Send the IPI. The write to APIC_ICR fires this off.
-     */
-    apic_write(APIC_ICR, cfg);
-}
-
 void send_IPI_self_legacy(uint8_t vector)
 {
-    __default_send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
+    send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
 }
 
 void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
@@ -145,13 +140,13 @@ void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
     /*
      * prepare target chip field
      */
-    cfg = __prepare_ICR2(mask);
+    cfg = prepare_ICR2(mask);
     apic_write(APIC_ICR2, cfg);
 
     /*
      * program the ICR
      */
-    cfg = __prepare_ICR(0, vector) | APIC_DEST_LOGICAL;
+    cfg = prepare_ICR(0, vector) | APIC_DEST_LOGICAL;
 
     /*
      * Send the IPI. The write to APIC_ICR fires this off.
@@ -181,13 +176,13 @@ void send_IPI_mask_phys(const cpumask_t *mask, int vector)
         /*
          * prepare target chip field
          */
-        cfg = __prepare_ICR2(cpu_physical_id(query_cpu));
+        cfg = prepare_ICR2(cpu_physical_id(query_cpu));
         apic_write(APIC_ICR2, cfg);
 
         /*
          * program the ICR
          */
-        cfg = __prepare_ICR(0, vector) | APIC_DEST_PHYSICAL;
+        cfg = prepare_ICR(0, vector) | APIC_DEST_PHYSICAL;
 
         /*
          * Send the IPI. The write to APIC_ICR fires this off.
