@@ -608,13 +608,12 @@ static int __must_check iommu_flush_iotlb_all(struct domain *d)
 }
 
 /* clear one page's page table */
-static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr,
-                                          unsigned int *flush_flags)
+static void dma_pte_clear_one(struct domain *domain, uint64_t addr,
+                              unsigned int *flush_flags)
 {
     struct domain_iommu *hd = dom_iommu(domain);
     struct dma_pte *page = NULL, *pte = NULL;
     u64 pg_maddr;
-    int rc = 0;
 
     spin_lock(&hd->arch.mapping_lock);
     /* get last level pte */
@@ -622,7 +621,7 @@ static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr,
     if ( pg_maddr == 0 )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        return 0;
+        return;
     }
 
     page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
@@ -632,7 +631,7 @@ static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr,
     {
         spin_unlock(&hd->arch.mapping_lock);
         unmap_vtd_domain_page(page);
-        return 0;
+        return;
     }
 
     dma_clear_pte(*pte);
@@ -642,8 +641,6 @@ static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr,
     iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
 
     unmap_vtd_domain_page(page);
-
-    return rc;
 }
 
 static void iommu_free_pagetable(u64 pt_maddr, int level)
@@ -1800,7 +1797,9 @@ static int __must_check intel_iommu_unmap_page(struct domain *d, dfn_t dfn,
     if ( iommu_hwdom_passthrough && is_hardware_domain(d) )
         return 0;
 
-    return dma_pte_clear_one(d, dfn_to_daddr(dfn), flush_flags);
+    dma_pte_clear_one(d, dfn_to_daddr(dfn), flush_flags);
+
+    return 0;
 }
 
 static int intel_iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
