@@ -215,7 +215,7 @@ static bool vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r,
     }
     else
     {
-        v->arch.phys_timer.cval = cntpct + *r;
+        v->arch.phys_timer.cval = cntpct + (uint64_t)(int32_t)*r;
         if ( v->arch.phys_timer.ctl & CNTx_CTL_ENABLE )
         {
             v->arch.phys_timer.ctl &= ~CNTx_CTL_PENDING;
