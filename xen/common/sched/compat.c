@@ -37,7 +37,7 @@ static int compat_poll(struct compat_sched_poll *compat)
 #define do_poll compat_poll
 #define sched_poll compat_sched_poll
 
-#include "../schedule.c"
+#include "core.c"
 
 int compat_set_timer_op(u32 lo, s32 hi)
 {

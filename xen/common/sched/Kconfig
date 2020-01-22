@@ -1,0 +1,65 @@
+menu "Schedulers"
+	visible if EXPERT = "y"
+
+config SCHED_CREDIT
+	bool "Credit scheduler support"
+	default y
+	---help---
+	  The traditional credit scheduler is a general purpose scheduler.
+
+config SCHED_CREDIT2
+	bool "Credit2 scheduler support"
+	default y
+	---help---
+	  The credit2 scheduler is a general purpose scheduler that is
+	  optimized for lower latency and higher VM density.
+
+config SCHED_RTDS
+	bool "RTDS scheduler support (EXPERIMENTAL)"
+	default y
+	---help---
+	  The RTDS scheduler is a soft and firm real-time scheduler for
+	  multicore, targeted for embedded, automotive, graphics and gaming
+	  in the cloud, and general low-latency workloads.
+
+config SCHED_ARINC653
+	bool "ARINC653 scheduler support (EXPERIMENTAL)"
+	default DEBUG
+	---help---
+	  The ARINC653 scheduler is a hard real-time scheduler for single
+	  cores, targeted for avionics, drones, and medical devices.
+
+config SCHED_NULL
+	bool "Null scheduler support (EXPERIMENTAL)"
+	default y
+	---help---
+	  The null scheduler is a static, zero overhead scheduler,
+	  for when there always are less vCPUs than pCPUs, typically
+	  in embedded or HPC scenarios.
+
+choice
+	prompt "Default Scheduler?"
+	default SCHED_CREDIT2_DEFAULT
+
+	config SCHED_CREDIT_DEFAULT
+		bool "Credit Scheduler" if SCHED_CREDIT
+	config SCHED_CREDIT2_DEFAULT
+		bool "Credit2 Scheduler" if SCHED_CREDIT2
+	config SCHED_RTDS_DEFAULT
+		bool "RT Scheduler" if SCHED_RTDS
+	config SCHED_ARINC653_DEFAULT
+		bool "ARINC653 Scheduler" if SCHED_ARINC653
+	config SCHED_NULL_DEFAULT
+		bool "Null Scheduler" if SCHED_NULL
+endchoice
+
+config SCHED_DEFAULT
+	string
+	default "credit" if SCHED_CREDIT_DEFAULT
+	default "credit2" if SCHED_CREDIT2_DEFAULT
+	default "rtds" if SCHED_RTDS_DEFAULT
+	default "arinc653" if SCHED_ARINC653_DEFAULT
+	default "null" if SCHED_NULL_DEFAULT
+	default "credit2"
+
+endmenu

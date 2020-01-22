@@ -174,7 +174,7 @@ M:	Josh Whitehead <josh.whitehead@dornerworks.com>
 M:	Stewart Hildebrand <stewart.hildebrand@dornerworks.com>
 S:	Supported
 L:	xen-devel@dornerworks.com
-F:	xen/common/sched_arinc653.c
+F:	xen/common/sched/arinc653.c
 F:	tools/libxc/xc_arinc653.c
 
 ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
@@ -218,7 +218,7 @@ CPU POOLS
 M:	Juergen Gross <jgross@suse.com>
 M:	Dario Faggioli <dfaggioli@suse.com>
 S:	Supported
-F:	xen/common/cpupool.c
+F:	xen/common/sched/cpupool.c
 
 DEVICE TREE
 M:	Stefano Stabellini <sstabellini@kernel.org>
@@ -384,13 +384,13 @@ RTDS SCHEDULER
 M:	Dario Faggioli <dfaggioli@suse.com>
 M:	Meng Xu <mengxu@cis.upenn.edu>
 S:	Supported
-F:	xen/common/sched_rt.c
+F:	xen/common/sched/rt.c
 
 SCHEDULING
 M:	George Dunlap <george.dunlap@eu.citrix.com>
 M:	Dario Faggioli <dfaggioli@suse.com>
 S:	Supported
-F:	xen/common/sched*
+F:	xen/common/sched/
 
 SEABIOS UPSTREAM
 M:	Wei Liu <wl@xen.org>
