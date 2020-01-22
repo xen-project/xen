@@ -84,6 +84,9 @@ extern cpumask_t **socket_cpumask;
 #define get_cpu_current(cpu) \
     (get_cpu_info_from_stack((unsigned long)stack_base[cpu])->current_vcpu)
 
+extern unsigned int disabled_cpus;
+extern bool unaccounted_cpus;
+
 #endif /* !__ASSEMBLY__ */
 
 #endif

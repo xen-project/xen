@@ -103,6 +103,7 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 			       processor->lapic_flags & ACPI_MADT_ENABLED
 			       ? KERN_WARNING "WARNING: " : KERN_INFO,
 			       processor->local_apic_id, processor->uid);
+		unaccounted_cpus = true;
 		/*
 		 * Must not return an error here, to prevent
 		 * acpi_table_parse_entries() from terminating early.

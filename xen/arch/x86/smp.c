@@ -8,6 +8,7 @@
  *	later.
  */
 
+#include <xen/cpu.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/delay.h>
@@ -64,7 +65,39 @@ static void send_IPI_shortcut(unsigned int shortcut, int vector,
 
 void send_IPI_mask(const cpumask_t *mask, int vector)
 {
-    alternative_vcall(genapic.send_IPI_mask, mask, vector);
+    bool cpus_locked = false;
+    cpumask_t *scratch = this_cpu(scratch_cpumask);
+
+    /*
+     * This can only be safely used when no CPU hotplug or unplug operations
+     * are taking place, there are no offline CPUs (unless those have been
+     * onlined and parked), there are no disabled CPUs and all possible CPUs in
+     * the system have been accounted for.
+     */
+    if ( system_state > SYS_STATE_smp_boot &&
+         !unaccounted_cpus && !disabled_cpus &&
+         /* NB: get_cpu_maps lock requires enabled interrupts. */
+         local_irq_is_enabled() && (cpus_locked = get_cpu_maps()) &&
+         (park_offline_cpus ||
+          cpumask_equal(&cpu_online_map, &cpu_present_map)) )
+        cpumask_or(scratch, mask, cpumask_of(smp_processor_id()));
+    else
+    {
+        if ( cpus_locked )
+        {
+            put_cpu_maps();
+            cpus_locked = false;
+        }
+        cpumask_clear(scratch);
+    }
+
+    if ( cpumask_equal(scratch, &cpu_online_map) )
+        send_IPI_shortcut(APIC_DEST_ALLBUT, vector, APIC_DEST_PHYSICAL);
+    else
+        alternative_vcall(genapic.send_IPI_mask, mask, vector);
+
+    if ( cpus_locked )
+        put_cpu_maps();
 }
 
 void send_IPI_self(int vector)
