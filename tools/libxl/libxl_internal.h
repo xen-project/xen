@@ -4147,7 +4147,7 @@ struct libxl__domain_create_state {
     libxl__checkpoint_devices_state cds;
     libxl__bootloader_state bl;
     libxl__stub_dm_spawn_state sdss;
-        /* If we're not doing stubdom, we use only dmss.dm,
+        /* If we're not doing stubdom, we use only sdss.dm,
          * for the non-stubdom device model. */
     libxl__stream_read_state srs;
     /* necessary if the domain creation failed and we have to destroy it */
