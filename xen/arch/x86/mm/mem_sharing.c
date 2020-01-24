@@ -840,6 +840,11 @@ static int nominate_page(struct domain *d, gfn_t gfn,
     if ( !p2m_is_sharable(p2mt) )
         goto out;
 
+    /* Skip xen heap pages */
+    page = mfn_to_page(mfn);
+    if ( !page || is_xen_heap_page(page) )
+        goto out;
+
     /* Check if there are mem_access/remapped altp2m entries for this page */
     if ( altp2m_active(d) )
     {
@@ -870,7 +875,6 @@ static int nominate_page(struct domain *d, gfn_t gfn,
     }
 
     /* Try to convert the mfn to the sharable type */
-    page = mfn_to_page(mfn);
     ret = page_make_sharable(d, page, expected_refcnt);
     if ( ret )
         goto out;
