@@ -86,7 +86,7 @@ static enum {
  * memory.
  */
 struct ucode_mod_blob {
-    void *data;
+    const void *data;
     size_t size;
 };
 
@@ -749,7 +749,7 @@ int microcode_update_one(bool start_update)
 int __init early_microcode_update_cpu(void)
 {
     int rc = 0;
-    void *data = NULL;
+    const void *data = NULL;
     size_t len;
     struct microcode_patch *patch;
 
