@@ -4184,47 +4184,6 @@ long do_mmu_update(
 }
 #endif /* CONFIG_PV */
 
-int donate_page(
-    struct domain *d, struct page_info *page, unsigned int memflags)
-{
-    const struct domain *owner = dom_xen;
-
-    spin_lock(&d->page_alloc_lock);
-
-    if ( is_xen_heap_page(page) || ((owner = page_get_owner(page)) != NULL) )
-        goto fail;
-
-    if ( d->is_dying )
-        goto fail;
-
-    if ( page->count_info & ~(PGC_allocated | 1) )
-        goto fail;
-
-    if ( !(memflags & MEMF_no_refcount) )
-    {
-        if ( d->tot_pages >= d->max_pages )
-            goto fail;
-        if ( unlikely(domain_adjust_tot_pages(d, 1) == 1) )
-            get_knownalive_domain(d);
-    }
-
-    page->count_info = PGC_allocated | 1;
-    page_set_owner(page, d);
-    page_list_add_tail(page,&d->page_list);
-
-    spin_unlock(&d->page_alloc_lock);
-    return 0;
-
- fail:
-    spin_unlock(&d->page_alloc_lock);
-    gdprintk(XENLOG_WARNING, "Bad donate mfn %" PRI_mfn
-             " to d%d (owner d%d) caf=%08lx taf=%" PRtype_info "\n",
-             mfn_x(page_to_mfn(page)), d->domain_id,
-             owner ? owner->domain_id : DOMID_INVALID,
-             page->count_info, page->u.inuse.type_info);
-    return -EINVAL;
-}
-
 /*
  * Steal page will attempt to remove `page` from domain `d`.  Upon
  * return, `page` will be in a state similar to the state of a page

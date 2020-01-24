@@ -599,8 +599,6 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
 int __must_check guest_remove_page(struct domain *d, unsigned long gmfn);
 int __must_check steal_page(struct domain *d, struct page_info *page,
                             unsigned int memflags);
-int __must_check donate_page(struct domain *d, struct page_info *page,
-                             unsigned int memflags);
 
 #define RAM_TYPE_CONVENTIONAL 0x00000001
 #define RAM_TYPE_RESERVED     0x00000002
