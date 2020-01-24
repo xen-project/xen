@@ -29,6 +29,7 @@
 #include <asm/hvm/viridian.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/svm/vmcb.h>
+#include <asm/mem_sharing.h>
 #include <public/grant_table.h>
 #include <public/hvm/params.h>
 #include <public/hvm/save.h>
@@ -156,7 +157,6 @@ struct hvm_domain {
 
     struct viridian_domain *viridian;
 
-    bool_t                 mem_sharing_enabled;
     bool_t                 qemu_mapcache_invalidate;
     bool_t                 is_s3_suspended;
 
@@ -192,6 +192,10 @@ struct hvm_domain {
         struct vmx_domain vmx;
         struct svm_domain svm;
     };
+
+#ifdef CONFIG_MEM_SHARING
+    struct mem_sharing_domain mem_sharing;
+#endif
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */

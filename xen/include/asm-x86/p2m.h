@@ -305,10 +305,6 @@ struct p2m_domain {
     unsigned long min_remapped_gfn;
     unsigned long max_remapped_gfn;
 
-    /* When releasing shared gfn's in a preemptible manner, recall where
-     * to resume the search */
-    unsigned long next_shared_gfn_to_relinquish;
-
 #ifdef CONFIG_HVM
     /* Populate-on-demand variables
      * All variables are protected with the pod lock. We cannot rely on

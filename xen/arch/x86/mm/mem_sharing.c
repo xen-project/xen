@@ -197,9 +197,6 @@ static shr_handle_t get_next_handle(void)
     return x + 1;
 }
 
-#define mem_sharing_enabled(d) \
-    (is_hvm_domain(d) && (d)->arch.hvm.mem_sharing_enabled)
-
 static atomic_t nr_saved_mfns   = ATOMIC_INIT(0);
 static atomic_t nr_shared_mfns  = ATOMIC_INIT(0);
 
@@ -1297,6 +1294,7 @@ int __mem_sharing_unshare_page(struct domain *d,
 int relinquish_shared_pages(struct domain *d)
 {
     int rc = 0;
+    struct mem_sharing_domain *msd = &d->arch.hvm.mem_sharing;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     unsigned long gfn, count = 0;
 
@@ -1304,7 +1302,7 @@ int relinquish_shared_pages(struct domain *d)
         return 0;
 
     p2m_lock(p2m);
-    for ( gfn = p2m->next_shared_gfn_to_relinquish;
+    for ( gfn = msd->next_shared_gfn_to_relinquish;
           gfn <= p2m->max_mapped_pfn; gfn++ )
     {
         p2m_access_t a;
@@ -1339,7 +1337,7 @@ int relinquish_shared_pages(struct domain *d)
         {
             if ( hypercall_preempt_check() )
             {
-                p2m->next_shared_gfn_to_relinquish = gfn + 1;
+                msd->next_shared_gfn_to_relinquish = gfn + 1;
                 rc = -ERESTART;
                 break;
             }
@@ -1425,7 +1423,7 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
 
     /* Only HAP is supported */
     rc = -ENODEV;
-    if ( !hap_enabled(d) || !d->arch.hvm.mem_sharing_enabled )
+    if ( !mem_sharing_enabled(d) )
         goto out;
 
     switch ( mso.op )
