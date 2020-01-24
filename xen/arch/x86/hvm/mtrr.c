@@ -818,7 +818,7 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     if ( direct_mmio )
     {
-        if ( (mfn_x(mfn) ^ d->arch.hvm.vmx.apic_access_mfn) >> order )
+        if ( (mfn_x(mfn) ^ mfn_x(d->arch.hvm.vmx.apic_access_mfn)) >> order )
             return MTRR_TYPE_UNCACHABLE;
         if ( order )
             return -1;

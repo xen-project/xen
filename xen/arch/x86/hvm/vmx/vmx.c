@@ -3034,7 +3034,7 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     mfn = page_to_mfn(pg);
     clear_domain_page(mfn);
     share_xen_page_with_guest(pg, d, SHARE_rw);
-    d->arch.hvm.vmx.apic_access_mfn = mfn_x(mfn);
+    d->arch.hvm.vmx.apic_access_mfn = mfn;
 
     return set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), mfn,
                               PAGE_ORDER_4K,
@@ -3043,24 +3043,24 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
 
 static void vmx_free_vlapic_mapping(struct domain *d)
 {
-    unsigned long mfn = d->arch.hvm.vmx.apic_access_mfn;
+    mfn_t mfn = d->arch.hvm.vmx.apic_access_mfn;
 
-    if ( mfn != 0 )
-        free_shared_domheap_page(mfn_to_page(_mfn(mfn)));
+    d->arch.hvm.vmx.apic_access_mfn = _mfn(0);
+    if ( !mfn_eq(mfn, _mfn(0)) )
+        free_shared_domheap_page(mfn_to_page(mfn));
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
 {
     paddr_t virt_page_ma, apic_page_ma;
 
-    if ( v->domain->arch.hvm.vmx.apic_access_mfn == 0 )
+    if ( mfn_eq(v->domain->arch.hvm.vmx.apic_access_mfn, _mfn(0)) )
         return;
 
     ASSERT(cpu_has_vmx_virtualize_apic_accesses);
 
     virt_page_ma = page_to_maddr(vcpu_vlapic(v)->regs_page);
-    apic_page_ma = v->domain->arch.hvm.vmx.apic_access_mfn;
-    apic_page_ma <<= PAGE_SHIFT;
+    apic_page_ma = mfn_to_maddr(v->domain->arch.hvm.vmx.apic_access_mfn);
 
     vmx_vmcs_enter(v);
     __vmwrite(VIRTUAL_APIC_PAGE_ADDR, virt_page_ma);
