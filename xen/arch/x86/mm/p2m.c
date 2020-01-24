@@ -516,7 +516,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
          * Try to unshare. If we fail, communicate ENOMEM without
          * sleeping.
          */
-        if ( mem_sharing_unshare_page(p2m->domain, gfn_l, 0) < 0 )
+        if ( mem_sharing_unshare_page(p2m->domain, gfn_l) < 0 )
             mem_sharing_notify_enomem(p2m->domain, gfn_l, false);
         mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order, NULL);
     }
@@ -897,8 +897,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
         {
             /* Do an unshare to cleanly take care of all corner cases. */
             int rc;
-            rc = mem_sharing_unshare_page(p2m->domain,
-                                          gfn_x(gfn_add(gfn, i)), 0);
+            rc = mem_sharing_unshare_page(p2m->domain, gfn_x(gfn_add(gfn, i)));
             if ( rc )
             {
                 p2m_unlock(p2m);

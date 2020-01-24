@@ -352,7 +352,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
          * might be the only one using this shared page, and we need to
          * trigger proper cleanup. Once done, this is like any other page.
          */
-        rc = mem_sharing_unshare_page(d, gmfn, 0);
+        rc = mem_sharing_unshare_page(d, gmfn);
         if ( rc )
         {
             mem_sharing_notify_enomem(d, gmfn, false);
