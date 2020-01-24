@@ -747,7 +747,9 @@ void hvm_domain_destroy(struct domain *d)
 
     hvm_destroy_cacheattr_region_list(d);
 
-    hvm_funcs.domain_destroy(d);
+    if ( hvm_funcs.domain_destroy )
+        alternative_vcall(hvm_funcs.domain_destroy, d);
+
     rtc_deinit(d);
     stdvga_deinit(d);
     vioapic_deinit(d);

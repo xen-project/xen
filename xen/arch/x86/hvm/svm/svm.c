@@ -1155,10 +1155,6 @@ static int svm_domain_initialise(struct domain *d)
     return 0;
 }
 
-static void svm_domain_destroy(struct domain *d)
-{
-}
-
 static int svm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
@@ -2425,7 +2421,6 @@ static struct hvm_function_table __initdata svm_function_table = {
     .cpu_up               = svm_cpu_up,
     .cpu_down             = svm_cpu_down,
     .domain_initialise    = svm_domain_initialise,
-    .domain_destroy       = svm_domain_destroy,
     .vcpu_initialise      = svm_vcpu_initialise,
     .vcpu_destroy         = svm_vcpu_destroy,
     .save_cpu_ctxt        = svm_save_vmcb_ctxt,
