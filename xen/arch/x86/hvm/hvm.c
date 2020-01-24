@@ -38,6 +38,7 @@
 #include <xen/warning.h>
 #include <xen/vpci.h>
 #include <xen/nospec.h>
+#include <xen/vm_event.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
@@ -1702,7 +1703,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     struct domain *currd = curr->domain;
     struct p2m_domain *p2m, *hostp2m;
     int rc, fall_through = 0, paged = 0;
-    int sharing_enomem = 0;
+    bool sharing_enomem = false;
     vm_event_request_t *req_ptr = NULL;
     bool sync = false;
     unsigned int page_order;
@@ -1894,14 +1895,16 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     if ( p2m_is_paged(p2mt) || (p2mt == p2m_ram_paging_out) )
         paged = 1;
 
-    /* Mem sharing: unshare the page and try again */
-    if ( npfec.write_access && (p2mt == p2m_ram_shared) )
+#ifdef CONFIG_MEM_SHARING
+    /* Mem sharing: if still shared on write access then its enomem */
+    if ( npfec.write_access && p2m_is_shared(p2mt) )
     {
         ASSERT(p2m_is_hostp2m(p2m));
-        sharing_enomem = mem_sharing_unshare_page(currd, gfn);
+        sharing_enomem = true;
         rc = 1;
         goto out_put_gfn;
     }
+#endif
 
     /* Spurious fault? PoD and log-dirty also take this path. */
     if ( p2m_is_ram(p2mt) )
@@ -1955,19 +1958,21 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      */
     if ( paged )
         p2m_mem_paging_populate(currd, gfn);
+
     if ( sharing_enomem )
     {
-        int rv;
-
-        if ( (rv = mem_sharing_notify_enomem(currd, gfn, true)) < 0 )
+#ifdef CONFIG_MEM_SHARING
+        if ( !vm_event_check_ring(currd->vm_event_share) )
         {
-            gdprintk(XENLOG_ERR, "Domain %hu attempt to unshare "
-                     "gfn %lx, ENOMEM and no helper (rc %d)\n",
-                     currd->domain_id, gfn, rv);
+            gprintk(XENLOG_ERR, "Domain %pd attempt to unshare "
+                    "gfn %lx, ENOMEM and no helper\n",
+                    currd, gfn);
             /* Crash the domain */
             rc = 0;
         }
+#endif
     }
+
     if ( req_ptr )
     {
         if ( monitor_traps(curr, sync, req_ptr) < 0 )
