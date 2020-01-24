@@ -1178,7 +1178,6 @@ int cpu_disable_scheduler(unsigned int cpu)
 {
     struct domain *d;
     const struct cpupool *c;
-    cpumask_t online_affinity;
     int ret = 0;
 
     rcu_read_lock(&sched_res_rculock);
@@ -1196,8 +1195,7 @@ int cpu_disable_scheduler(unsigned int cpu)
             unsigned long flags;
             spinlock_t *lock = unit_schedule_lock_irqsave(unit, &flags);
 
-            cpumask_and(&online_affinity, unit->cpu_hard_affinity, c->cpu_valid);
-            if ( cpumask_empty(&online_affinity) &&
+            if ( !cpumask_intersects(unit->cpu_hard_affinity, c->cpu_valid) &&
                  cpumask_test_cpu(cpu, unit->cpu_hard_affinity) )
             {
                 if ( sched_check_affinity_broken(unit) )
@@ -1336,12 +1334,10 @@ static int vcpu_set_affinity(
 
 int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity)
 {
-    cpumask_t online_affinity;
     cpumask_t *online;
 
     online = VCPU2ONLINE(v);
-    cpumask_and(&online_affinity, affinity, online);
-    if ( cpumask_empty(&online_affinity) )
+    if ( !cpumask_intersects(online, affinity) )
         return -EINVAL;
 
     return vcpu_set_affinity(v, affinity, v->sched_unit->cpu_hard_affinity);
@@ -2586,11 +2582,11 @@ static void schedule(void)
 
     if ( gran > 1 )
     {
-        cpumask_t mask;
+        cpumask_t *mask = cpumask_scratch_cpu(cpu);
 
         prev->rendezvous_in_cnt = gran;
-        cpumask_andnot(&mask, sr->cpus, cpumask_of(cpu));
-        cpumask_raise_softirq(&mask, SCHED_SLAVE_SOFTIRQ);
+        cpumask_andnot(mask, sr->cpus, cpumask_of(cpu));
+        cpumask_raise_softirq(mask, SCHED_SLAVE_SOFTIRQ);
         next = sched_wait_rendezvous_in(prev, &lock, cpu, now);
         if ( !next )
             return;
