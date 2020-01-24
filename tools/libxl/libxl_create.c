@@ -1181,18 +1181,18 @@ static void initiate_domain_create(libxl__egc *egc,
 
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
-    const int restore_fd = dcs->restore_fd;
+    libxl__domain_build_state *dbs = &dcs->build_state;
 
     libxl__xswait_init(&dcs->console_xswait);
 
     domid = dcs->domid;
-    libxl__domain_build_state_init(&dcs->build_state);
+    libxl__domain_build_state_init(dbs);
+    dbs->restore = dcs->restore_fd >= 0;
 
     ret = libxl__domain_config_setdefault(gc,d_config,domid);
     if (ret) goto error_out;
 
-    ret = libxl__domain_make(gc, d_config, &dcs->build_state, &domid,
-                             dcs->soft_reset);
+    ret = libxl__domain_make(gc, d_config, dbs, &domid, dcs->soft_reset);
     if (ret) {
         LOGD(ERROR, domid, "cannot make domain: %d", ret);
         dcs->guest_domid = domid;
@@ -1236,7 +1236,7 @@ static void initiate_domain_create(libxl__egc *egc,
     if (ret)
         goto error_out;
 
-    if (restore_fd >= 0 || dcs->soft_reset) {
+    if (dbs->restore || dcs->soft_reset) {
         LOGD(DEBUG, domid, "restoring, not running bootloader");
         domcreate_bootloader_done(egc, &dcs->bl, 0);
     } else  {
@@ -1247,8 +1247,8 @@ static void initiate_domain_create(libxl__egc *egc,
         dcs->bl.disk = bootdisk;
         dcs->bl.domid = dcs->guest_domid;
 
-        dcs->bl.kernel = &dcs->build_state.pv_kernel;
-        dcs->bl.ramdisk = &dcs->build_state.pv_ramdisk;
+        dcs->bl.kernel = &dbs->pv_kernel;
+        dcs->bl.ramdisk = &dbs->pv_ramdisk;
 
         libxl__bootloader_run(egc, &dcs->bl);
     }

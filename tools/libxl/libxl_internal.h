@@ -1397,6 +1397,10 @@ typedef struct {
 
     /* ARM only to deal with broken firmware */
     uint32_t clock_frequency;
+
+    /* Whether this domain is being migrated/restored, or booting fresh.  Only
+     * applicable to the primary domain, not support domains (e.g. stub QEMU). */
+    bool restore;
 } libxl__domain_build_state;
 
 _hidden void libxl__domain_build_state_init(libxl__domain_build_state *s);
