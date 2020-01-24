@@ -75,16 +75,15 @@ struct page_sharing_info
 unsigned int mem_sharing_get_nr_saved_mfns(void);
 unsigned int mem_sharing_get_nr_shared_mfns(void);
 
-#define MEM_SHARING_DESTROY_GFN       (1<<1)
 /* Only fails with -ENOMEM. Enforce it with a BUG_ON wrapper. */
 int __mem_sharing_unshare_page(struct domain *d,
                                unsigned long gfn,
-                               uint16_t flags);
+                               bool destroy);
 
 static inline int mem_sharing_unshare_page(struct domain *d,
                                            unsigned long gfn)
 {
-    int rc = __mem_sharing_unshare_page(d, gfn, 0);
+    int rc = __mem_sharing_unshare_page(d, gfn, false);
     BUG_ON(rc && (rc != -ENOMEM));
     return rc;
 }
