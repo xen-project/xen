@@ -58,6 +58,7 @@ typedef enum {
     /* NOTE: Assumed to be only 4 bits right now on x86. */
 } p2m_access_t;
 
+struct p2m_domain;
 bool xenmem_access_to_p2m_access(const struct p2m_domain *p2m,
                                  xenmem_access_t xaccess,
                                  p2m_access_t *paccess);
@@ -79,6 +80,7 @@ long p2m_set_mem_access_multi(struct domain *d,
 int p2m_set_suppress_ve(struct domain *d, gfn_t gfn, bool suppress_ve,
                         unsigned int altp2m_idx);
 
+struct xen_hvm_altp2m_suppress_ve_multi;
 int p2m_set_suppress_ve_multi(struct domain *d,
                               struct xen_hvm_altp2m_suppress_ve_multi *suppress_ve);
 
