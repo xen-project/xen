@@ -2137,10 +2137,15 @@ logic applies:
    opted in to with `smt=0 spec-ctrl=md-clear`, at which point TSX will remain
    active by default.
 
-### ucode (x86)
+### ucode
 > `= List of [ <integer> | scan=<bool>, nmi=<bool> ]`
 
-Specify how and where to find CPU microcode update blob.
+    Applicability: x86
+    Default: `nmi`
+
+Controls for CPU microcode loading. For early loading, this parameter can
+specify how and where to find the microcode update blob. For late loading,
+this parameter specifies if the update happens within a NMI handler.
 
 'integer' specifies the CPU microcode update blob module index. When positive,
 this specifies the n-th module (in the GrUB entry, zero based) to be used
@@ -2158,6 +2163,8 @@ image that contains microcode. Depending on the platform the blob with the
 microcode in the cpio name space must be:
   - on Intel: kernel/x86/microcode/GenuineIntel.bin
   - on AMD  : kernel/x86/microcode/AuthenticAMD.bin
+When using xen.efi, the `ucode=<filename>` config file setting takes
+precedence over `scan`.
 
 'nmi' determines late loading is performed in NMI handler or just in
 stop_machine context. In NMI handler, even NMIs are blocked, which is
