@@ -147,11 +147,6 @@ static int __init parse_ucode(const char *s)
 }
 custom_param("ucode", parse_ucode);
 
-/*
- * 8MB ought to be enough.
- */
-#define MAX_EARLY_CPIO_MICROCODE (8 << 20)
-
 void __init microcode_scan_module(
     unsigned long *module_map,
     const multiboot_info_t *mbi)
@@ -196,31 +191,12 @@ void __init microcode_scan_module(
         cd = find_cpio_data(p, _blob_start, _blob_size, &offset /* ignore */);
         if ( cd.data )
         {
-                /*
-                 * This is an arbitrary check - it would be sad if the blob
-                 * consumed most of the memory and did not allow guests
-                 * to launch.
-                 */
-                if ( cd.size > MAX_EARLY_CPIO_MICROCODE )
-                {
-                    printk("Multiboot %d microcode payload too big! (%ld, we can do %d)\n",
-                           i, cd.size, MAX_EARLY_CPIO_MICROCODE);
-                    goto err;
-                }
-                ucode_blob.size = cd.size;
-                ucode_blob.data = xmalloc_bytes(cd.size);
-                if ( !ucode_blob.data )
-                    cd.data = NULL;
-                else
-                    memcpy(ucode_blob.data, cd.data, cd.size);
+            ucode_blob.size = cd.size;
+            ucode_blob.data = cd.data;
+            break;
         }
         bootstrap_map(NULL);
-        if ( cd.data )
-            break;
     }
-    return;
-err:
-    bootstrap_map(NULL);
 }
 void __init microcode_grab_module(
     unsigned long *module_map,
@@ -730,7 +706,7 @@ static int __init microcode_init(void)
      */
     if ( ucode_blob.size )
     {
-        xfree(ucode_blob.data);
+        bootstrap_map(NULL);
         ucode_blob.size = 0;
         ucode_blob.data = NULL;
     }
