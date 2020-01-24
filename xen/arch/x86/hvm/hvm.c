@@ -716,6 +716,9 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_relinquish_resources(struct domain *d)
 {
+    if ( hvm_funcs.domain_relinquish_resources )
+        alternative_vcall(hvm_funcs.domain_relinquish_resources, d);
+
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
         hvm_funcs.nhvm_domain_relinquish_resources(d);
 
