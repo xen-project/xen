@@ -3029,12 +3029,22 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     if ( !cpu_has_vmx_virtualize_apic_accesses )
         return 0;
 
-    pg = alloc_domheap_page(d, MEMF_no_owner);
+    pg = alloc_domheap_page(d, MEMF_no_refcount);
     if ( !pg )
         return -ENOMEM;
+
+    if ( !get_page_and_type(pg, d, PGT_writable_page) )
+    {
+        /*
+         * The domain can't possibly know about this page yet, so failure
+         * here is a clear indication of something fishy going on.
+         */
+        domain_crash(d);
+        return -ENODATA;
+    }
+
     mfn = page_to_mfn(pg);
     clear_domain_page(mfn);
-    share_xen_page_with_guest(pg, d, SHARE_rw);
     d->arch.hvm.vmx.apic_access_mfn = mfn;
 
     return set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), mfn,
@@ -3048,7 +3058,12 @@ static void vmx_free_vlapic_mapping(struct domain *d)
 
     d->arch.hvm.vmx.apic_access_mfn = _mfn(0);
     if ( !mfn_eq(mfn, _mfn(0)) )
-        free_shared_domheap_page(mfn_to_page(mfn));
+    {
+        struct page_info *pg = mfn_to_page(mfn);
+
+        put_page_alloc_ref(pg);
+        put_page_and_type(pg);
+    }
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)

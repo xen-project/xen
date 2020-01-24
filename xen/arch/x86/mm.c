@@ -502,16 +502,6 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
     spin_unlock(&d->page_alloc_lock);
 }
 
-void free_shared_domheap_page(struct page_info *page)
-{
-    put_page_alloc_ref(page);
-    if ( !test_and_clear_bit(_PGC_xen_heap, &page->count_info) )
-        ASSERT_UNREACHABLE();
-    page->u.inuse.type_info = 0;
-    page_set_owner(page, NULL);
-    free_domheap_page(page);
-}
-
 void make_cr3(struct vcpu *v, mfn_t mfn)
 {
     struct domain *d = v->domain;

@@ -320,8 +320,6 @@ struct page_info
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
 
-extern void free_shared_domheap_page(struct page_info *page);
-
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
 extern unsigned long max_page;
 extern unsigned long total_pages;
