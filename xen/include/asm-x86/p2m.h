@@ -539,7 +539,7 @@ struct two_gfns {
 static inline void get_two_gfns(struct domain *rd, gfn_t rgfn,
         p2m_type_t *rt, p2m_access_t *ra, mfn_t *rmfn, struct domain *ld,
         gfn_t lgfn, p2m_type_t *lt, p2m_access_t *la, mfn_t *lmfn,
-        p2m_query_t q, struct two_gfns *rval)
+        p2m_query_t q, struct two_gfns *rval, bool lock)
 {
     mfn_t           *first_mfn, *second_mfn, scratch_mfn;
     p2m_access_t    *first_a, *second_a, scratch_a;
@@ -569,10 +569,10 @@ do {                                                    \
 #undef assign_pointers
 
     /* Now do the gets */
-    *first_mfn  = get_gfn_type_access(p2m_get_hostp2m(rval->first_domain),
-                                      gfn_x(rval->first_gfn), first_t, first_a, q, NULL);
-    *second_mfn = get_gfn_type_access(p2m_get_hostp2m(rval->second_domain),
-                                      gfn_x(rval->second_gfn), second_t, second_a, q, NULL);
+    *first_mfn  = __get_gfn_type_access(p2m_get_hostp2m(rval->first_domain),
+                                        gfn_x(rval->first_gfn), first_t, first_a, q, NULL, lock);
+    *second_mfn = __get_gfn_type_access(p2m_get_hostp2m(rval->second_domain),
+                                        gfn_x(rval->second_gfn), second_t, second_a, q, NULL, lock);
 }
 
 static inline void put_two_gfns(struct two_gfns *arg)

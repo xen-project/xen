@@ -943,7 +943,7 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
     unsigned long put_count = 0;
 
     get_two_gfns(sd, sgfn, &smfn_type, NULL, &smfn,
-                 cd, cgfn, &cmfn_type, NULL, &cmfn, 0, &tg);
+                 cd, cgfn, &cmfn_type, NULL, &cmfn, 0, &tg, true);
 
     /*
      * This tricky business is to avoid two callers deadlocking if
@@ -1061,7 +1061,7 @@ err_out:
 }
 
 int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
-                               struct domain *cd, unsigned long cgfn)
+                               struct domain *cd, unsigned long cgfn, bool lock)
 {
     struct page_info *spage;
     int ret = -EINVAL;
@@ -1073,7 +1073,7 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
     struct two_gfns tg;
 
     get_two_gfns(sd, _gfn(sgfn), &smfn_type, NULL, &smfn,
-                 cd, _gfn(cgfn), &cmfn_type, &a, &cmfn, 0, &tg);
+                 cd, _gfn(cgfn), &cmfn_type, &a, &cmfn, 0, &tg, lock);
 
     /* Get the source shared page, check and lock */
     ret = XENMEM_SHARING_OP_S_HANDLE_INVALID;
@@ -1150,7 +1150,8 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
 err_unlock:
     mem_sharing_page_unlock(spage);
 err_out:
-    put_two_gfns(&tg);
+    if ( lock )
+        put_two_gfns(&tg);
     return ret;
 }
 
@@ -1571,7 +1572,7 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
         sh      = mso.u.share.source_handle;
         cgfn    = mso.u.share.client_gfn;
 
-        rc = mem_sharing_add_to_physmap(d, sgfn, sh, cd, cgfn);
+        rc = mem_sharing_add_to_physmap(d, sgfn, sh, cd, cgfn, true);
 
         rcu_unlock_domain(cd);
     }
