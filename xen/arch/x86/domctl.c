@@ -540,7 +540,7 @@ long arch_do_domctl(
         domain_unpause(d);
 
         domctl->u.hvmcontext.size = c.cur;
-        if ( copy_to_guest(domctl->u.hvmcontext.buffer, c.data, c.size) != 0 )
+        if ( copy_to_guest(domctl->u.hvmcontext.buffer, c.data, c.cur) != 0 )
             ret = -EFAULT;
 
     gethvmcontext_out:
