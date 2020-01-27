@@ -125,8 +125,9 @@ Values commonly included in payloads include:
 
 
 
-The following are the actual type values, including the request and
-reply payloads as applicable:
+The following are the actual type values defined in io/xs_wire.h
+(omitting the XS_ prefix), including the request and reply payloads
+as applicable:
 
 
 ---------- Database read, write and permissions operations ----------
@@ -151,6 +152,14 @@ DIRECTORY		<path>|			<child-leaf-name>|*
 	Gives a list of the immediate children of <path>, as only the
 	leafnames.  The resulting children are each named
 	<path>/<child-leaf-name>.
+
+DIRECTORY_PART		<path>|<index|>		<child-leaf-name>|*
+	Performs the same function as DIRECTORY, but returns a
+	sub-list of children starting at <index> in the overall
+	child list and less than or equal to XENSTORE_PAYLOAD_MAX
+	octets in length. If <index> is beyond the end of the
+	overall child list then the returned sub-list will be
+	empty.
 
 GET_PERMS	 	<path>|			<perm-as-string>|+
 SET_PERMS		<path>|<perm-as-string>|+?
