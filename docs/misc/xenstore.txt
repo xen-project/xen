@@ -152,6 +152,15 @@ DIRECTORY		<path>|			<child-leaf-name>|*
 	leafnames.  The resulting children are each named
 	<path>/<child-leaf-name>.
 
+DIRECTORY_PART		<path>|<offset>		<gencnt>|<child-leaf-name>|*
+	Same as DIRECTORY, but to be used for children lists longer than
+	XENSTORE_PAYLOAD_MAX. Input are <path> and the byte offset into
+	the list of children to return. Return values are the generation
+	count <gencnt> of the node (to be used to ensure the node hasn't
+	changed between two reads: <gencnt> being the same for multiple
+	reads guarantees the node hasn't changed) and the list of children
+	starting at the specified <offset> of the complete list.
+
 GET_PERMS	 	<path>|			<perm-as-string>|+
 SET_PERMS		<path>|<perm-as-string>|+?
 	<perm-as-string> is one of the following
