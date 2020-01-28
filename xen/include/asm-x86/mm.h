@@ -583,6 +583,9 @@ void *do_page_walk(struct vcpu *v, unsigned long addr);
 /* Allocator functions for Xen pagetables. */
 void *alloc_xen_pagetable(void);
 void free_xen_pagetable(void *v);
+mfn_t alloc_xen_pagetable_new(void);
+void free_xen_pagetable_new(mfn_t mfn);
+
 l1_pgentry_t *virt_to_xen_l1e(unsigned long v);
 
 int __sync_local_execstate(void);

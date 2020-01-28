@@ -120,6 +120,7 @@
 #include <xen/efi.h>
 #include <xen/grant_table.h>
 #include <xen/hypercall.h>
+#include <xen/mm.h>
 #include <asm/paging.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
@@ -4945,21 +4946,42 @@ int mmcfg_intercept_write(
 
 void *alloc_xen_pagetable(void)
 {
+    mfn_t mfn = alloc_xen_pagetable_new();
+
+    return mfn_eq(mfn, INVALID_MFN) ? NULL : mfn_to_virt(mfn_x(mfn));
+}
+
+void free_xen_pagetable(void *v)
+{
+    mfn_t mfn = v ? virt_to_mfn(v) : INVALID_MFN;
+
+    free_xen_pagetable_new(mfn);
+}
+
+/*
+ * For these PTE APIs, the caller must follow the alloc-map-unmap-free
+ * lifecycle, which means explicitly mapping the PTE pages before accessing
+ * them. The caller must check whether the allocation has succeeded, and only
+ * pass valid MFNs to map_domain_page().
+ */
+mfn_t alloc_xen_pagetable_new(void)
+{
     if ( system_state != SYS_STATE_early_boot )
     {
         void *ptr = alloc_xenheap_page();
 
         BUG_ON(!hardware_domain && !ptr);
-        return ptr;
+        return ptr ? virt_to_mfn(ptr) : INVALID_MFN;
     }
 
-    return mfn_to_virt(mfn_x(alloc_boot_pages(1, 1)));
+    return alloc_boot_pages(1, 1);
 }
 
-void free_xen_pagetable(void *v)
+/* mfn can be INVALID_MFN */
+void free_xen_pagetable_new(mfn_t mfn)
 {
-    if ( system_state != SYS_STATE_early_boot )
-        free_xenheap_page(v);
+    if ( system_state != SYS_STATE_early_boot && !mfn_eq(mfn, INVALID_MFN) )
+        free_xenheap_page(mfn_to_virt(mfn_x(mfn)));
 }
 
 static DEFINE_SPINLOCK(map_pgdir_lock);
