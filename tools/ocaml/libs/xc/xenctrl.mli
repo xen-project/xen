@@ -219,10 +219,3 @@ external pages_to_kib : int64 -> int64 = "stub_pages_to_kib"
 val pages_to_mib : int64 -> int64
 external watchdog : handle -> int -> int32 -> int
   = "stub_xc_watchdog"
-
-external domain_cpuid_set: handle -> domid -> (int64 * (int64 option))
-                        -> string option array
-                        -> string option array
-       = "stub_xc_domain_cpuid_set"
-external domain_cpuid_apply_policy: handle -> domid -> unit
-       = "stub_xc_domain_cpuid_apply_policy"

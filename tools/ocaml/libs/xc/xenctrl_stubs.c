@@ -48,12 +48,6 @@
 #define string_of_option_array(array, index) \
 	((Field(array, index) == Val_none) ? NULL : String_val(Field(Field(array, index), 0)))
 
-/* maybe here we should check the range of the input instead of blindly
- * casting it to uint32 */
-#define cpuid_input_of_val(i1, i2, input) \
-	i1 = (uint32_t) Int64_val(Field(input, 0)); \
-	i2 = ((Field(input, 1) == Val_none) ? 0xffffffff : (uint32_t) Int64_val(Field(Field(input, 1), 0)));
-
 static void Noreturn failwith_xc(xc_interface *xch)
 {
 	char error_str[XC_MAX_ERROR_MSG_LEN + 6];
@@ -823,62 +817,6 @@ CAMLprim value stub_xc_domain_memory_increase_reservation(value xch,
 
 	if (retval)
 		failwith_xc(_H(xch));
-	CAMLreturn(Val_unit);
-}
-
-CAMLprim value stub_xc_domain_cpuid_set(value xch, value domid,
-                                        value input,
-                                        value config)
-{
-	CAMLparam4(xch, domid, input, config);
-	CAMLlocal2(array, tmp);
-#if defined(__i386__) || defined(__x86_64__)
-	int r;
-	unsigned int c_input[2];
-	char *c_config[4], *out_config[4];
-
-	c_config[0] = string_of_option_array(config, 0);
-	c_config[1] = string_of_option_array(config, 1);
-	c_config[2] = string_of_option_array(config, 2);
-	c_config[3] = string_of_option_array(config, 3);
-
-	cpuid_input_of_val(c_input[0], c_input[1], input);
-
-	array = caml_alloc(4, 0);
-	for (r = 0; r < 4; r++) {
-		tmp = Val_none;
-		if (c_config[r]) {
-			tmp = caml_alloc_small(1, 0);
-			Field(tmp, 0) = caml_alloc_string(32);
-		}
-		Store_field(array, r, tmp);
-	}
-
-	for (r = 0; r < 4; r++)
-		out_config[r] = (c_config[r]) ? String_val(Field(Field(array, r), 0)) : NULL;
-
-	r = xc_cpuid_set(_H(xch), _D(domid),
-			 c_input, (const char **)c_config, out_config);
-	if (r < 0)
-		failwith_xc(_H(xch));
-#else
-	caml_failwith("xc_domain_cpuid_set: not implemented");
-#endif
-	CAMLreturn(array);
-}
-
-CAMLprim value stub_xc_domain_cpuid_apply_policy(value xch, value domid)
-{
-	CAMLparam2(xch, domid);
-#if defined(__i386__) || defined(__x86_64__)
-	int r;
-
-	r = xc_cpuid_apply_policy(_H(xch), _D(domid), NULL, 0);
-	if (r < 0)
-		failwith_xc(_H(xch));
-#else
-	caml_failwith("xc_domain_cpuid_apply_policy: not implemented");
-#endif
 	CAMLreturn(Val_unit);
 }
 

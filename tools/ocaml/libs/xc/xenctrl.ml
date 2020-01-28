@@ -256,13 +256,6 @@ external domain_set_memmap_limit: handle -> domid -> int64 -> unit
 external domain_memory_increase_reservation: handle -> domid -> int64 -> unit
        = "stub_xc_domain_memory_increase_reservation"
 
-external domain_cpuid_set: handle -> domid -> (int64 * (int64 option))
-                        -> string option array
-                        -> string option array
-       = "stub_xc_domain_cpuid_set"
-external domain_cpuid_apply_policy: handle -> domid -> unit
-       = "stub_xc_domain_cpuid_apply_policy"
-
 external map_foreign_range: handle -> domid -> int
                          -> nativeint -> Xenmmap.mmap_interface
        = "stub_map_foreign_range"
