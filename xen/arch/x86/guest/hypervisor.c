@@ -52,10 +52,12 @@ void __init hypervisor_setup(void)
         ops->setup();
 }
 
-void hypervisor_ap_setup(void)
+int hypervisor_ap_setup(void)
 {
     if ( ops && ops->ap_setup )
-        ops->ap_setup();
+        return ops->ap_setup();
+
+    return 0;
 }
 
 void hypervisor_resume(void)

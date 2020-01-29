@@ -25,7 +25,7 @@ struct hypervisor_ops {
     /* Main setup routine */
     void (*setup)(void);
     /* AP setup */
-    void (*ap_setup)(void);
+    int (*ap_setup)(void);
     /* Resume from suspension */
     void (*resume)(void);
 };
@@ -34,7 +34,7 @@ struct hypervisor_ops {
 
 const char *hypervisor_probe(void);
 void hypervisor_setup(void);
-void hypervisor_ap_setup(void);
+int hypervisor_ap_setup(void);
 void hypervisor_resume(void);
 
 #else
@@ -44,7 +44,7 @@ void hypervisor_resume(void);
 
 static inline const char *hypervisor_probe(void) { return NULL; }
 static inline void hypervisor_setup(void) { ASSERT_UNREACHABLE(); }
-static inline void hypervisor_ap_setup(void) { ASSERT_UNREACHABLE(); }
+static inline int hypervisor_ap_setup(void) { ASSERT_UNREACHABLE(); return 0; }
 static inline void hypervisor_resume(void) { ASSERT_UNREACHABLE(); }
 
 #endif  /* CONFIG_GUEST */

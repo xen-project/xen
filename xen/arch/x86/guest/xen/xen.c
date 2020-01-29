@@ -113,15 +113,15 @@ static int map_vcpuinfo(void)
     info.mfn = virt_to_mfn(&vcpu_info[vcpu]);
     info.offset = (unsigned long)&vcpu_info[vcpu] & ~PAGE_MASK;
     rc = xen_hypercall_vcpu_op(VCPUOP_register_vcpu_info, vcpu, &info);
-    if ( rc )
-    {
-        BUG_ON(vcpu >= XEN_LEGACY_MAX_VCPUS);
-        this_cpu(vcpu_info) = &XEN_shared_info->vcpu_info[vcpu];
-    }
-    else
+    if ( !rc )
     {
         this_cpu(vcpu_info) = &vcpu_info[vcpu];
         set_bit(vcpu, vcpu_info_mapped);
+    }
+    else if ( vcpu < XEN_LEGACY_MAX_VCPUS )
+    {
+        rc = 0;
+        this_cpu(vcpu_info) = &XEN_shared_info->vcpu_info[vcpu];
     }
 
     return rc;
@@ -202,10 +202,15 @@ static void xen_evtchn_upcall(struct cpu_user_regs *regs)
     ack_APIC_irq();
 }
 
-static void init_evtchn(void)
+static int init_evtchn(void)
 {
     static uint8_t evtchn_upcall_vector;
     int rc;
+    struct xen_hvm_param a = {
+        .domid = DOMID_SELF,
+        .index = HVM_PARAM_CALLBACK_IRQ,
+        .value = 1,
+    };
 
     if ( !evtchn_upcall_vector )
         alloc_direct_apic_vector(&evtchn_upcall_vector, xen_evtchn_upcall);
@@ -215,18 +220,17 @@ static void init_evtchn(void)
     rc = xen_hypercall_set_evtchn_upcall_vector(this_cpu(vcpu_id),
                                                 evtchn_upcall_vector);
     if ( rc )
-        panic("Unable to set evtchn upcall vector: %d\n", rc);
+    {
+        printk("Unable to set evtchn upcall vector: %d\n", rc);
+        return rc;
+    }
 
     /* Trick toolstack to think we are enlightened */
-    {
-        struct xen_hvm_param a = {
-            .domid = DOMID_SELF,
-            .index = HVM_PARAM_CALLBACK_IRQ,
-            .value = 1,
-        };
+    rc = xen_hypercall_hvm_op(HVMOP_set_param, &a);
+    if ( rc )
+        printk("Unable to set HVM_PARAM_CALLBACK_IRQ\n");
 
-        BUG_ON(xen_hypercall_hvm_op(HVMOP_set_param, &a));
-    }
+    return rc;
 }
 
 static void __init setup(void)
@@ -254,14 +258,14 @@ static void __init setup(void)
                XEN_LEGACY_MAX_VCPUS);
     }
 
-    init_evtchn();
+    BUG_ON(init_evtchn());
 }
 
-static void ap_setup(void)
+static int ap_setup(void)
 {
     set_vcpu_id();
-    map_vcpuinfo();
-    init_evtchn();
+
+    return map_vcpuinfo() ?: init_evtchn();
 }
 
 int xg_alloc_unused_page(mfn_t *mfn)
@@ -283,8 +287,8 @@ int xg_free_unused_page(mfn_t mfn)
 
 static void ap_resume(void *unused)
 {
-    map_vcpuinfo();
-    init_evtchn();
+    BUG_ON(map_vcpuinfo());
+    BUG_ON(init_evtchn());
 }
 
 static void resume(void)
@@ -303,7 +307,7 @@ static void resume(void)
         panic("unable to remap vCPU info and vCPUs > legacy limit\n");
 
     /* Setup event channel upcall vector. */
-    init_evtchn();
+    BUG_ON(init_evtchn());
     smp_call_function(ap_resume, NULL, 1);
 
     if ( pv_console )
