@@ -262,6 +262,8 @@ void disconnect_bsp_APIC(int virt_wire_setup)
         /* Go back to Virtual Wire compatibility mode */
         unsigned long value;
 
+        clear_local_APIC();
+
         /* For the spurious interrupt use vector F, and enable it */
         value = apic_read(APIC_SPIV);
         value &= ~APIC_VECTOR_MASK;
@@ -278,10 +280,6 @@ void disconnect_bsp_APIC(int virt_wire_setup)
             value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING;
             value = SET_APIC_DELIVERY_MODE(value, APIC_MODE_EXTINT);
             apic_write(APIC_LVT0, value);
-        }
-        else {
-            /* Disable LVT0 */
-            apic_write(APIC_LVT0, APIC_LVT_MASKED);
         }
 
         /* For LVT1 make it edge triggered, active high, nmi and enabled */
