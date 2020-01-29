@@ -514,10 +514,13 @@ F:	xen/arch/x86/mm/shadow/
 
 X86 VIRIDIAN ENLIGHTENMENTS
 M:	Paul Durrant <pdurrant@amazon.com>
+M:	Wei Liu <wl@xen.org>
 S:	Supported
+F:	xen/arch/x86/guest/hyperv/
 F:	xen/arch/x86/hvm/viridian/
-F:	xen/include/asm-x86/hvm/viridian.h
+F:	xen/include/asm-x86/guest/hyperv.h
 F:	xen/include/asm-x86/guest/hyperv-tlfs.h
+F:	xen/include/asm-x86/hvm/viridian.h
 
 XENTRACE
 M:	George Dunlap <george.dunlap@eu.citrix.com>
