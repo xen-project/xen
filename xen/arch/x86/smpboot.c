@@ -199,6 +199,13 @@ static void smp_callin(void)
         goto halt;
     }
 
+    if ( cpu_has_hypervisor && (rc = hypervisor_ap_setup()) != 0 )
+    {
+        printk("CPU%d: Failed to initialise hypervisor functions. Not coming online.\n", cpu);
+        cpu_error = rc;
+        goto halt;
+    }
+
     if ( (rc = hvm_cpu_up()) != 0 )
     {
         printk("CPU%d: Failed to initialise HVM. Not coming online.\n", cpu);
@@ -370,9 +377,6 @@ void start_secondary(void *unused)
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
 
     tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
-
-    if ( xen_guest )
-        hypervisor_ap_setup();
 
     smp_callin();
 

@@ -44,7 +44,7 @@ void hypervisor_resume(void);
 
 static inline const char *hypervisor_probe(void) { return NULL; }
 static inline void hypervisor_setup(void) { ASSERT_UNREACHABLE(); }
-static inline int hypervisor_ap_setup(void) { ASSERT_UNREACHABLE(); return 0; }
+static inline int hypervisor_ap_setup(void) { return 0; }
 static inline void hypervisor_resume(void) { ASSERT_UNREACHABLE(); }
 
 #endif  /* CONFIG_GUEST */
