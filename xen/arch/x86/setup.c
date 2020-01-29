@@ -954,6 +954,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     else
         panic("Bootloader provided no memory information\n");
 
+    /* This must come before e820 code because it sets paddr_bits. */
+    early_cpu_init();
+
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = raw_max_page = init_e820(memmap_type, &e820_raw);
 
@@ -1531,8 +1534,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     softirq_init();
     tasklet_subsys_init();
-
-    early_cpu_init();
 
     paging_init();
 

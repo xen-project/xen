@@ -420,7 +420,7 @@ static uint64_t __init mtrr_top_of_ram(void)
 {
     uint32_t eax, ebx, ecx, edx;
     uint64_t mtrr_cap, mtrr_def, addr_mask, base, mask, top;
-    unsigned int i, phys_bits = 36;
+    unsigned int i;
 
     /* By default we check only Intel systems. */
     if ( e820_mtrr_clip == -1 )
@@ -445,15 +445,9 @@ static uint64_t __init mtrr_top_of_ram(void)
     if ( !test_bit(X86_FEATURE_MTRR & 31, &edx) )
          return 0;
 
-    /* Find the physical address size for this CPU. */
-    eax = cpuid_eax(0x80000000);
-    if ( (eax >> 16) == 0x8000 && eax >= 0x80000008 )
-    {
-        phys_bits = (uint8_t)cpuid_eax(0x80000008);
-        if ( phys_bits > PADDR_BITS )
-            phys_bits = PADDR_BITS;
-    }
-    addr_mask = ((1ull << phys_bits) - 1) & ~((1ull << 12) - 1);
+    /* paddr_bits must have been set at this point */
+    ASSERT(paddr_bits);
+    addr_mask = ((1ull << paddr_bits) - 1) & PAGE_MASK;
 
     rdmsrl(MSR_MTRRcap, mtrr_cap);
     rdmsrl(MSR_MTRRdefType, mtrr_def);
