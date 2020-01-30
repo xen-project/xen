@@ -18,7 +18,7 @@ static long switch_mode(struct domain *d, enum domain_type type)
 
     if ( d == NULL )
         return -EINVAL;
-    if ( d->tot_pages != 0 )
+    if ( domain_tot_pages(d) != 0 )
         return -EBUSY;
     if ( d->arch.type == type )
         return 0;

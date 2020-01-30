@@ -1268,7 +1268,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         switch ( op )
         {
         case XENMEM_current_reservation:
-            rc = d->tot_pages;
+            rc = domain_tot_pages(d);
             break;
         case XENMEM_maximum_reservation:
             rc = d->max_pages;

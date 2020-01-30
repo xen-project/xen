@@ -420,7 +420,7 @@ static void dump_numa(unsigned char key)
     {
         process_pending_softirqs();
 
-        printk("Domain %u (total: %u):\n", d->domain_id, d->tot_pages);
+        printk("Domain %u (total: %u):\n", d->domain_id, domain_tot_pages(d));
 
         for_each_online_node ( i )
             page_num_node[i] = 0;

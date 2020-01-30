@@ -553,8 +553,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
  *
  * Note that a valid claim may be staked even after memory has been
  * allocated for a domain.  In this case, the claim is not incremental,
- * i.e. if the domain's tot_pages is 3, and a claim is staked for 10,
- * only 7 additional pages are claimed.
+ * i.e. if the domain's total page count is 3, and a claim is staked
+ * for 10, only 7 additional pages are claimed.
  *
  * Caller must be privileged or the hypercall fails.
  */

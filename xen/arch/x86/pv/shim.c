@@ -269,7 +269,7 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
      * Set the max pages to the current number of pages to prevent the
      * guest from depleting the shim memory pool.
      */
-    d->max_pages = d->tot_pages;
+    d->max_pages = domain_tot_pages(d);
 }
 
 static void write_start_info(struct domain *d)
@@ -281,7 +281,7 @@ static void write_start_info(struct domain *d)
 
     snprintf(si->magic, sizeof(si->magic), "xen-3.0-x86_%s",
              is_pv_32bit_domain(d) ? "32p" : "64");
-    si->nr_pages = d->tot_pages;
+    si->nr_pages = domain_tot_pages(d);
     si->shared_info = virt_to_maddr(d->shared_info);
     si->flags = 0;
     BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_STORE_PFN, &si->store_mfn));

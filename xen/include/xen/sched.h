@@ -364,12 +364,18 @@ struct domain
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
     struct page_list_head page_list;  /* linked list */
     struct page_list_head xenpage_list; /* linked list (size xenheap_pages) */
-    unsigned int     tot_pages;       /* number of pages currently possesed */
-    unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
-    unsigned int     outstanding_pages; /* pages claimed but not possessed  */
-    unsigned int     max_pages;       /* maximum value for tot_pages        */
-    atomic_t         shr_pages;       /* number of shared pages             */
-    atomic_t         paged_pages;     /* number of paged-out pages          */
+
+    /*
+     * This field should only be directly accessed by domain_adjust_tot_pages()
+     * and the domain_tot_pages() helper function defined below.
+     */
+    unsigned int     tot_pages;
+
+    unsigned int     xenheap_pages;     /* pages allocated from Xen heap */
+    unsigned int     outstanding_pages; /* pages claimed but not possessed */
+    unsigned int     max_pages;         /* maximum value for domain_tot_pages() */
+    atomic_t         shr_pages;         /* shared pages */
+    atomic_t         paged_pages;       /* paged-out pages */
 
     /* Scheduling. */
     void            *sched_priv;    /* scheduler-specific data */
@@ -538,6 +544,12 @@ struct domain
     struct argo_domain *argo;
 #endif
 };
+
+/* Return number of pages currently posessed by the domain */
+static inline unsigned int domain_tot_pages(const struct domain *d)
+{
+    return d->tot_pages;
+}
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 extern spinlock_t domlist_update_lock;

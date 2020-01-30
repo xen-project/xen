@@ -218,7 +218,7 @@ void dump_pageframe_info(struct domain *d)
 
     printk("Memory pages belonging to domain %u:\n", d->domain_id);
 
-    if ( d->tot_pages >= 10 && d->is_dying < DOMDYING_dead )
+    if ( domain_tot_pages(d) >= 10 && d->is_dying < DOMDYING_dead )
     {
         printk("    DomPage list too long to display\n");
     }

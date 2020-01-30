@@ -519,8 +519,8 @@ int domain_set_outstanding_pages(struct domain *d, unsigned long pages)
         goto out;
     }
 
-    /* disallow a claim not exceeding current tot_pages or above max_pages */
-    if ( (pages <= d->tot_pages) || (pages > d->max_pages) )
+    /* disallow a claim not exceeding domain_tot_pages() or above max_pages */
+    if ( (pages <= domain_tot_pages(d)) || (pages > d->max_pages) )
     {
         ret = -EINVAL;
         goto out;
@@ -533,9 +533,9 @@ int domain_set_outstanding_pages(struct domain *d, unsigned long pages)
 
     /*
      * Note, if domain has already allocated memory before making a claim
-     * then the claim must take tot_pages into account
+     * then the claim must take domain_tot_pages() into account
      */
-    claim = pages - d->tot_pages;
+    claim = pages - domain_tot_pages(d);
     if ( claim > avail_pages )
         goto out;
 
@@ -2270,11 +2270,12 @@ int assign_pages(
 
     if ( !(memflags & MEMF_no_refcount) )
     {
-        if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
+        unsigned int tot_pages = domain_tot_pages(d) + (1 << order);
+
+        if ( unlikely(tot_pages > d->max_pages) )
         {
             gprintk(XENLOG_INFO, "Over-allocation for domain %u: "
-                    "%u > %u\n", d->domain_id,
-                    d->tot_pages + (1 << order), d->max_pages);
+                    "%u > %u\n", d->domain_id, tot_pages, d->max_pages);
             rc = -E2BIG;
             goto out;
         }

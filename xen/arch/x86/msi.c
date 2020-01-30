@@ -992,7 +992,7 @@ static int msix_capability_init(struct pci_dev *dev,
                        seg, bus, slot, func, d->domain_id);
             if ( !is_hardware_domain(d) &&
                  /* Assume a domain without memory has no mappings yet. */
-                 (!is_hardware_domain(currd) || d->tot_pages) )
+                 (!is_hardware_domain(currd) || domain_tot_pages(d)) )
                 domain_crash(d);
             /* XXX How to deal with existing mappings? */
         }

@@ -110,8 +110,9 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
 
     while ( vphysmap_start < vphysmap_end )
     {
-        if ( d->tot_pages + ((round_pgup(vphysmap_end) - vphysmap_start)
-                             >> PAGE_SHIFT) + 3 > nr_pages )
+        if ( domain_tot_pages(d) +
+             ((round_pgup(vphysmap_end) - vphysmap_start) >> PAGE_SHIFT) +
+             3 > nr_pages )
             panic("Dom0 allocation too small for initial P->M table\n");
 
         if ( pl1e )
@@ -264,7 +265,7 @@ static struct page_info * __init alloc_chunk(struct domain *d,
     {
         struct page_info *pg2;
 
-        if ( d->tot_pages + (1 << order) > d->max_pages )
+        if ( domain_tot_pages(d) + (1 << order) > d->max_pages )
             continue;
         pg2 = alloc_domheap_pages(d, order, MEMF_exact_node | MEMF_no_scrub);
         if ( pg2 > page )
@@ -500,13 +501,13 @@ int __init dom0_construct_pv(struct domain *d,
     if ( page == NULL )
         panic("Not enough RAM for domain 0 allocation\n");
     alloc_spfn = mfn_x(page_to_mfn(page));
-    alloc_epfn = alloc_spfn + d->tot_pages;
+    alloc_epfn = alloc_spfn + domain_tot_pages(d);
 
     if ( initrd_len )
     {
         initrd_pfn = vinitrd_start ?
                      (vinitrd_start - v_start) >> PAGE_SHIFT :
-                     d->tot_pages;
+                     domain_tot_pages(d);
         initrd_mfn = mfn = initrd->mod_start;
         count = PFN_UP(initrd_len);
         if ( d->arch.physaddr_bitsize &&
@@ -541,9 +542,9 @@ int __init dom0_construct_pv(struct domain *d,
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
            " Dom0 alloc.:   %"PRIpaddr"->%"PRIpaddr,
            pfn_to_paddr(alloc_spfn), pfn_to_paddr(alloc_epfn));
-    if ( d->tot_pages < nr_pages )
+    if ( domain_tot_pages(d) < nr_pages )
         printk(" (%lu pages to be allocated)",
-               nr_pages - d->tot_pages);
+               nr_pages - domain_tot_pages(d));
     if ( initrd )
     {
         mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
@@ -755,7 +756,7 @@ int __init dom0_construct_pv(struct domain *d,
     snprintf(si->magic, sizeof(si->magic), "xen-3.0-x86_%d%s",
              elf_64bit(&elf) ? 64 : 32, parms.pae ? "p" : "");
 
-    count = d->tot_pages;
+    count = domain_tot_pages(d);
 
     /* Set up the phys->machine table if not part of the initial mapping. */
     if ( parms.p2m_base != UNSET_ADDR )
@@ -786,7 +787,7 @@ int __init dom0_construct_pv(struct domain *d,
             process_pending_softirqs();
     }
     si->first_p2m_pfn = pfn;
-    si->nr_p2m_frames = d->tot_pages - count;
+    si->nr_p2m_frames = domain_tot_pages(d) - count;
     page_list_for_each ( page, &d->page_list )
     {
         mfn = mfn_x(page_to_mfn(page));
@@ -804,15 +805,15 @@ int __init dom0_construct_pv(struct domain *d,
                 process_pending_softirqs();
         }
     }
-    BUG_ON(pfn != d->tot_pages);
+    BUG_ON(pfn != domain_tot_pages(d));
 #ifndef NDEBUG
     alloc_epfn += PFN_UP(initrd_len) + si->nr_p2m_frames;
 #endif
     while ( pfn < nr_pages )
     {
-        if ( (page = alloc_chunk(d, nr_pages - d->tot_pages)) == NULL )
+        if ( (page = alloc_chunk(d, nr_pages - domain_tot_pages(d))) == NULL )
             panic("Not enough RAM for DOM0 reservation\n");
-        while ( pfn < d->tot_pages )
+        while ( pfn < domain_tot_pages(d) )
         {
             mfn = mfn_x(page_to_mfn(page));
 #ifndef NDEBUG

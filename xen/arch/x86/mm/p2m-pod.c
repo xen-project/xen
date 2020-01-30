@@ -302,7 +302,7 @@ out:
  * The following equations should hold:
  *  0 <= P <= T <= B <= M
  *  d->arch.p2m->pod.entry_count == B - P
- *  d->tot_pages == P + d->arch.p2m->pod.count
+ *  domain_tot_pages(d) == P + d->arch.p2m->pod.count
  *
  * Now we have the following potential cases to cover:
  *     B <T': Set the PoD cache size equal to the number of outstanding PoD
@@ -336,7 +336,7 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
     pod_lock(p2m);
 
     /* P == B: Nothing to do (unless the guest is being created). */
-    populated = d->tot_pages - p2m->pod.count;
+    populated = domain_tot_pages(d) - p2m->pod.count;
     if ( populated > 0 && p2m->pod.entry_count == 0 )
         goto out;
 
@@ -348,7 +348,7 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
      * T' < B: Don't reduce the cache size; let the balloon driver
      * take care of it.
      */
-    if ( target < d->tot_pages )
+    if ( target < domain_tot_pages(d) )
         goto out;
 
     pod_target = target - populated;
@@ -1231,8 +1231,8 @@ out_of_memory:
     pod_unlock(p2m);
 
     printk("%s: Dom%d out of PoD memory! (tot=%"PRIu32" ents=%ld dom%d)\n",
-           __func__, d->domain_id, d->tot_pages, p2m->pod.entry_count,
-           current->domain->domain_id);
+           __func__, d->domain_id, domain_tot_pages(d),
+           p2m->pod.entry_count, current->domain->domain_id);
     domain_crash(d);
     return false;
 out_fail:

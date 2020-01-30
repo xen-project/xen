@@ -4876,7 +4876,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         else if ( rc >= 0 )
         {
             p2m = p2m_get_hostp2m(d);
-            target.tot_pages       = d->tot_pages;
+            target.tot_pages       = domain_tot_pages(d);
             target.pod_cache_pages = p2m->pod.count;
             target.pod_entries     = p2m->pod.entry_count;
 

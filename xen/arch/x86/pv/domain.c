@@ -174,7 +174,7 @@ int switch_compat(struct domain *d)
 
     BUILD_BUG_ON(offsetof(struct shared_info, vcpu_info) != 0);
 
-    if ( is_hvm_domain(d) || d->tot_pages != 0 )
+    if ( is_hvm_domain(d) || domain_tot_pages(d) != 0 )
         return -EACCES;
     if ( is_pv_32bit_domain(d) )
         return 0;

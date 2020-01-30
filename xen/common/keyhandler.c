@@ -271,7 +271,7 @@ static void dump_domains(unsigned char key)
                atomic_read(&d->pause_count));
         printk("    nr_pages=%d xenheap_pages=%d shared_pages=%u paged_pages=%u "
                "dirty_cpus={%*pbl} max_pages=%u\n",
-               d->tot_pages, d->xenheap_pages, atomic_read(&d->shr_pages),
+               domain_tot_pages(d), d->xenheap_pages, atomic_read(&d->shr_pages),
                atomic_read(&d->paged_pages), CPUMASK_PR(d->dirty_cpumask),
                d->max_pages);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
