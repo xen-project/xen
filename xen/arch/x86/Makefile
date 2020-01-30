@@ -241,13 +241,9 @@ $(BASEDIR)/include/asm-x86/asm-macros.h: asm-macros.i Makefile
 	echo '#endif' >>$@.new
 	$(call move-if-changed,$@.new,$@)
 
-xen.lds: xen.lds.S
+efi.lds: AFLAGS += -DEFI
+xen.lds efi.lds: xen.lds.S
 	$(CC) -P -E -Ui386 $(filter-out -Wa$(comma)%,$(AFLAGS)) -o $@ $<
-	sed -e 's/.*\.lds\.o:/$(@F):/g' <.$(@F).d >.$(@F).d.new
-	mv -f .$(@F).d.new .$(@F).d
-
-efi.lds: xen.lds.S
-	$(CC) -P -E -Ui386 -DEFI $(filter-out -Wa$(comma)%,$(AFLAGS)) -o $@ $<
 	sed -e 's/.*\.lds\.o:/$(@F):/g' <.$(@F).d >.$(@F).d.new
 	mv -f .$(@F).d.new .$(@F).d
 
