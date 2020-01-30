@@ -2,7 +2,6 @@
 /* Modified for i386/x86-64 Xen by Keir Fraser */
 
 #include <xen/cache.h>
-#include <xen/lib.h>
 #include <asm/page.h>
 #undef ENTRY
 #undef ALIGN
@@ -353,7 +352,7 @@ SECTIONS
 }
 
 ASSERT(__2M_rwdata_end <= XEN_VIRT_END - XEN_VIRT_START + __XEN_VIRT_START -
-                          DIV_ROUND_UP(NR_CPUS, STUBS_PER_PAGE) * PAGE_SIZE,
+                          NR_CPUS * PAGE_SIZE,
        "Xen image overlaps stubs area")
 
 #ifdef CONFIG_KEXEC
