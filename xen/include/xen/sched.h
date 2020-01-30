@@ -374,6 +374,7 @@ struct domain
     unsigned int     xenheap_pages;     /* pages allocated from Xen heap */
     unsigned int     outstanding_pages; /* pages claimed but not possessed */
     unsigned int     max_pages;         /* maximum value for domain_tot_pages() */
+    unsigned int     extra_pages;       /* pages not included in domain_tot_pages() */
     atomic_t         shr_pages;         /* shared pages */
     atomic_t         paged_pages;       /* paged-out pages */
 
@@ -548,7 +549,9 @@ struct domain
 /* Return number of pages currently posessed by the domain */
 static inline unsigned int domain_tot_pages(const struct domain *d)
 {
-    return d->tot_pages;
+    ASSERT(d->extra_pages <= d->tot_pages);
+
+    return d->tot_pages - d->extra_pages;
 }
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */

@@ -119,9 +119,12 @@ struct page_info
 #define PGC_state_offlined PG_mask(2, 9)
 #define PGC_state_free    PG_mask(3, 9)
 #define page_state_is(pg, st) (((pg)->count_info&PGC_state) == PGC_state_##st)
+/* Page is not reference counted */
+#define _PGC_extra        PG_shift(10)
+#define PGC_extra         PG_mask(1, 10)
 
 /* Count of references to this frame. */
-#define PGC_count_width   PG_shift(9)
+#define PGC_count_width   PG_shift(10)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
 /*

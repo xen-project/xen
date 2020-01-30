@@ -4223,7 +4223,8 @@ int steal_page(
     if ( !(owner = page_get_owner_and_reference(page)) )
         goto fail;
 
-    if ( owner != d || is_xen_heap_page(page) )
+    if ( owner != d || is_xen_heap_page(page) ||
+         (page->count_info & PGC_extra) )
         goto fail_put;
 
     /*

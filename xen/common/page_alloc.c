@@ -2268,7 +2268,29 @@ int assign_pages(
         goto out;
     }
 
-    if ( !(memflags & MEMF_no_refcount) )
+#ifndef NDEBUG
+    {
+        unsigned int extra_pages = 0;
+
+        for ( i = 0; i < (1ul << order); i++ )
+        {
+            ASSERT(!(pg[i].count_info & ~PGC_extra));
+            if ( pg[i].count_info & PGC_extra )
+                extra_pages++;
+        }
+
+        ASSERT(!extra_pages ||
+               ((memflags & MEMF_no_refcount) &&
+                extra_pages == 1u << order));
+    }
+#endif
+
+    if ( pg[0].count_info & PGC_extra )
+    {
+        d->extra_pages += 1u << order;
+        memflags &= ~MEMF_no_refcount;
+    }
+    else if ( !(memflags & MEMF_no_refcount) )
     {
         unsigned int tot_pages = domain_tot_pages(d) + (1 << order);
 
@@ -2279,18 +2301,19 @@ int assign_pages(
             rc = -E2BIG;
             goto out;
         }
-
-        if ( unlikely(domain_adjust_tot_pages(d, 1 << order) == (1 << order)) )
-            get_knownalive_domain(d);
     }
+
+    if ( !(memflags & MEMF_no_refcount) &&
+         unlikely(domain_adjust_tot_pages(d, 1 << order) == (1 << order)) )
+        get_knownalive_domain(d);
 
     for ( i = 0; i < (1 << order); i++ )
     {
         ASSERT(page_get_owner(&pg[i]) == NULL);
-        ASSERT(!pg[i].count_info);
         page_set_owner(&pg[i], d);
         smp_wmb(); /* Domain pointer must be visible before updating refcnt. */
-        pg[i].count_info = PGC_allocated | 1;
+        pg[i].count_info =
+            (pg[i].count_info & PGC_extra) | PGC_allocated | 1;
         page_list_add_tail(&pg[i], &d->page_list);
     }
 
@@ -2316,11 +2339,6 @@ struct page_info *alloc_domheap_pages(
 
     if ( memflags & MEMF_no_owner )
         memflags |= MEMF_no_refcount;
-    else if ( (memflags & MEMF_no_refcount) && d )
-    {
-        ASSERT(!(memflags & MEMF_no_refcount));
-        return NULL;
-    }
 
     if ( !dma_bitsize )
         memflags &= ~MEMF_no_dma;
@@ -2333,11 +2351,23 @@ struct page_info *alloc_domheap_pages(
                                   memflags, d)) == NULL)) )
          return NULL;
 
-    if ( d && !(memflags & MEMF_no_owner) &&
-         assign_pages(d, pg, order, memflags) )
+    if ( d && !(memflags & MEMF_no_owner) )
     {
-        free_heap_pages(pg, order, memflags & MEMF_no_scrub);
-        return NULL;
+        if ( memflags & MEMF_no_refcount )
+        {
+            unsigned long i;
+
+            for ( i = 0; i < (1ul << order); i++ )
+            {
+                ASSERT(!pg[i].count_info);
+                pg[i].count_info = PGC_extra;
+            }
+        }
+        if ( assign_pages(d, pg, order, memflags) )
+        {
+            free_heap_pages(pg, order, memflags & MEMF_no_scrub);
+            return NULL;
+        }
     }
 
     return pg;
@@ -2385,6 +2415,11 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
                     BUG();
                 }
                 arch_free_heap_page(d, &pg[i]);
+                if ( pg[i].count_info & PGC_extra )
+                {
+                    ASSERT(d->extra_pages);
+                    d->extra_pages--;
+                }
             }
 
             drop_dom_ref = !domain_adjust_tot_pages(d, -(1 << order));
