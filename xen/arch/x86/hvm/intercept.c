@@ -300,7 +300,7 @@ void register_portio_handler(struct domain *d, unsigned int port,
     handler->portio.action = action;
 }
 
-void relocate_portio_handler(struct domain *d, unsigned int old_port,
+bool relocate_portio_handler(struct domain *d, unsigned int old_port,
                              unsigned int new_port, unsigned int size)
 {
     unsigned int i;
@@ -317,9 +317,11 @@ void relocate_portio_handler(struct domain *d, unsigned int old_port,
              (handler->portio.size = size) )
         {
             handler->portio.port = new_port;
-            break;
+            return true;
         }
     }
+
+    return false;
 }
 
 bool_t hvm_mmio_internal(paddr_t gpa)
