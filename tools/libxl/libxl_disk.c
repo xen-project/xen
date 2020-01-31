@@ -245,7 +245,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
     xs_transaction_t t = XBT_NULL;
     libxl_domain_config d_config;
     libxl_device_disk disk_saved;
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
 
     libxl_domain_config_init(&d_config);
     libxl_device_disk_init(&disk_saved);
@@ -436,7 +436,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
 
 out:
     libxl__xs_transaction_abort(gc, &t);
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     libxl_device_disk_dispose(&disk_saved);
     libxl_domain_config_dispose(&d_config);
     aodev->rc = rc;
@@ -794,7 +794,7 @@ static void cdrom_insert_ejected(libxl__egc *egc,
 {
     EGC_GC;
     libxl__cdrom_insert_state *cis = CONTAINER_OF(qmp, *cis, qmp);
-    libxl__domain_userdata_lock *data_lock = NULL;
+    libxl__flock *data_lock = NULL;
     libxl__device device;
     const char *be_path, *libxl_path;
     flexarray_t *empty = NULL;
@@ -896,7 +896,7 @@ static void cdrom_insert_ejected(libxl__egc *egc,
 out:
     libxl__xs_transaction_abort(gc, &t);
     libxl_domain_config_dispose(&d_config);
-    if (data_lock) libxl__unlock_domain_userdata(data_lock);
+    if (data_lock) libxl__unlock_file(data_lock);
     if (rc) {
         cdrom_insert_done(egc, cis, rc); /* must be last */
     } else if (!has_callback) {
@@ -951,7 +951,7 @@ static void cdrom_insert_inserted(libxl__egc *egc,
 {
     EGC_GC;
     libxl__cdrom_insert_state *cis = CONTAINER_OF(qmp, *cis, qmp);
-    libxl__domain_userdata_lock *data_lock = NULL;
+    libxl__flock *data_lock = NULL;
     libxl_domain_config d_config;
     flexarray_t *insert = NULL;
     xs_transaction_t t = XBT_NULL;
@@ -1029,7 +1029,7 @@ static void cdrom_insert_inserted(libxl__egc *egc,
 out:
     libxl__xs_transaction_abort(gc, &t);
     libxl_domain_config_dispose(&d_config);
-    if (data_lock) libxl__unlock_domain_userdata(data_lock);
+    if (data_lock) libxl__unlock_file(data_lock);
     cdrom_insert_done(egc, cis, rc); /* must be last */
 }
 

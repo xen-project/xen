@@ -202,7 +202,7 @@ static int libxl__device_usbctrl_add_xenstore(libxl__gc *gc, uint32_t domid,
     int i, rc;
     libxl_domain_config d_config;
     libxl_device_usbctrl usbctrl_saved;
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
 
     libxl_domain_config_init(&d_config);
     libxl_device_usbctrl_init(&usbctrl_saved);
@@ -291,7 +291,7 @@ static int libxl__device_usbctrl_add_xenstore(libxl__gc *gc, uint32_t domid,
 
 out:
     libxl__xs_transaction_abort(gc, &t);
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     libxl_device_usbctrl_dispose(&usbctrl_saved);
     libxl_domain_config_dispose(&d_config);
     return rc;
@@ -1266,7 +1266,7 @@ static int libxl__device_usbdev_add_xenstore(libxl__gc *gc, uint32_t domid,
     xs_transaction_t t = XBT_NULL;
     libxl_domain_config d_config;
     libxl_device_usbdev usbdev_saved;
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
 
     libxl_domain_config_init(&d_config);
     libxl_device_usbdev_init(&usbdev_saved);
@@ -1323,7 +1323,7 @@ static int libxl__device_usbdev_add_xenstore(libxl__gc *gc, uint32_t domid,
     rc = 0;
 
 out:
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     libxl_device_usbdev_dispose(&usbdev_saved);
     libxl_domain_config_dispose(&d_config);
     return rc;

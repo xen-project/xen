@@ -4651,11 +4651,13 @@ int libxl__cpuid_policy_is_empty(libxl_cpuid_policy_list *pl);
 typedef struct {
     libxl__carefd *carefd;
     char *path; /* path of the lock file itself */
-} libxl__domain_userdata_lock;
+} libxl__flock;
 /* The CTX_LOCK must be held around uses of this lock */
-libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,
-                                                         uint32_t domid);
-void libxl__unlock_domain_userdata(libxl__domain_userdata_lock *lock);
+
+libxl__flock *libxl__lock_file(libxl__gc *gc, const char *filename);
+void libxl__unlock_file(libxl__flock *lock);
+
+libxl__flock *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid);
 
 /*
  * Retrieve / store domain configuration from / to libxl private

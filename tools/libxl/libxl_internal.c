@@ -400,26 +400,22 @@ int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid)
 /* Portability note: this lock utilises flock(2) so a proper implementation of
  * flock(2) is required.
  */
-libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,
-                                                         uint32_t domid)
+libxl__flock *libxl__lock_file(libxl__gc *gc, const char *lockfile)
 {
-    libxl__domain_userdata_lock *lock = NULL;
-    const char *lockfile;
+    libxl__flock *lock;
     int fd;
     struct stat stab, fstab;
 
-    lockfile = libxl__userdata_path(gc, domid, "domain-userdata-lock", "l");
-    if (!lockfile) goto out;
-
-    lock = libxl__zalloc(NOGC, sizeof(libxl__domain_userdata_lock));
+    lock = libxl__zalloc(NOGC, sizeof(libxl__flock));
     lock->path = libxl__strdup(NOGC, lockfile);
 
     while (true) {
         libxl__carefd_begin();
         fd = open(lockfile, O_RDWR|O_CREAT, 0666);
         if (fd < 0)
-            LOGED(ERROR, domid,
-                  "cannot open lockfile %s, errno=%d", lockfile, errno);
+            LOGE(ERROR,
+                 "cannot open lockfile %s, errno=%d",
+                 lockfile, errno);
         lock->carefd = libxl__carefd_opened(CTX, fd);
         if (fd < 0) goto out;
 
@@ -433,21 +429,21 @@ libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,
                 continue;
             default:
                 /* All other errno: EBADF, EINVAL, ENOLCK, EWOULDBLOCK */
-                LOGED(ERROR, domid,
-                      "unexpected error while trying to lock %s, fd=%d, errno=%d",
+                LOGE(ERROR,
+                     "unexpected error while trying to lock %s, fd=%d, errno=%d",
                       lockfile, fd, errno);
                 goto out;
             }
         }
 
         if (fstat(fd, &fstab)) {
-            LOGED(ERROR, domid, "cannot fstat %s, fd=%d, errno=%d",
+            LOGE(ERROR, "cannot fstat %s, fd=%d, errno=%d",
                   lockfile, fd, errno);
             goto out;
         }
         if (stat(lockfile, &stab)) {
             if (errno != ENOENT) {
-                LOGED(ERROR, domid, "cannot stat %s, errno=%d", lockfile, errno);
+                LOGE(ERROR, "cannot stat %s, errno=%d", lockfile, errno);
                 goto out;
             }
         } else {
@@ -458,20 +454,14 @@ libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,
         libxl__carefd_close(lock->carefd);
     }
 
-    /* Check the domain is still there, if not we should release the
-     * lock and clean up.
-     */
-    if (libxl_domain_info(CTX, NULL, domid))
-        goto out;
-
     return lock;
 
 out:
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     return NULL;
 }
 
-void libxl__unlock_domain_userdata(libxl__domain_userdata_lock *lock)
+void libxl__unlock_file(libxl__flock *lock)
 {
     /* It's important to unlink the file before closing fd to avoid
      * the following race (if close before unlink):
@@ -491,6 +481,27 @@ void libxl__unlock_domain_userdata(libxl__domain_userdata_lock *lock)
     if (lock->carefd) libxl__carefd_close(lock->carefd);
     free(lock->path);
     free(lock);
+}
+
+libxl__flock *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid)
+{
+    const char *lockfile;
+    libxl__flock *lock;
+
+    lockfile = libxl__userdata_path(gc, domid, "domain-userdata-lock", "l");
+    if (!lockfile) return NULL;
+
+    lock = libxl__lock_file(gc, lockfile);
+
+    /* Check the domain is still there, if not we should release the
+     * lock and clean up.
+     */
+    if (libxl_domain_info(CTX, NULL, domid)) {
+        libxl__unlock_file(lock);
+        return NULL;
+    }
+
+    return lock;
 }
 
 int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,

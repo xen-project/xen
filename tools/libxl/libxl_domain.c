@@ -1278,7 +1278,7 @@ static void devices_destroy_cb(libxl__egc *egc,
     uint32_t domid = dis->domid;
     char *dom_path;
     char *vm_path;
-    libxl__domain_userdata_lock *lock;
+    libxl__flock *lock;
 
     dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) {
@@ -1308,7 +1308,7 @@ static void devices_destroy_cb(libxl__egc *egc,
     }
     libxl__userdata_destroyall(gc, domid);
 
-    libxl__unlock_domain_userdata(lock);
+    libxl__unlock_file(lock);
 
     /* Clean up qemu-save and qemu-resume files. They are
      * intermediate files created by libxc. Unfortunately they
@@ -1917,7 +1917,7 @@ static void retrieve_domain_configuration_lock_acquired(
     retrieve_domain_configuration_state *rdcs =
         CONTAINER_OF(devlock, *rdcs, devlock);
     STATE_AO_GC(rdcs->qmp.ao);
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
     bool has_callback = false;
 
     /* Convenience aliases */
@@ -1939,7 +1939,7 @@ static void retrieve_domain_configuration_lock_acquired(
         goto out;
     }
 
-    libxl__unlock_domain_userdata(lock);
+    libxl__unlock_file(lock);
     lock = NULL;
 
     /* We start by querying QEMU, if it is running, for its cpumap as this
@@ -1964,7 +1964,7 @@ static void retrieve_domain_configuration_lock_acquired(
     }
 
 out:
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     if (!has_callback)
         retrieve_domain_configuration_end(egc, rdcs, rc);
 }
@@ -1998,7 +1998,7 @@ static void retrieve_domain_configuration_end(libxl__egc *egc,
     retrieve_domain_configuration_state *rdcs, int rc)
 {
     STATE_AO_GC(rdcs->qmp.ao);
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
 
     /* Convenience aliases */
     libxl_domain_config *const d_config = rdcs->d_config;
@@ -2205,7 +2205,7 @@ static void retrieve_domain_configuration_end(libxl__egc *egc,
 
 out:
     libxl__ev_slowlock_unlock(gc, &rdcs->devlock);
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     libxl_bitmap_dispose(&rdcs->qemuu_cpus);
     libxl__ev_qmp_dispose(gc, &rdcs->qmp);
     libxl__ev_time_deregister(gc, &rdcs->timeout);

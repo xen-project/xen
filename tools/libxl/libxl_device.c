@@ -1850,7 +1850,7 @@ void libxl__device_add_async(libxl__egc *egc, uint32_t domid,
     xs_transaction_t t = XBT_NULL;
     libxl_domain_config d_config;
     void *type_saved;
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
     int rc;
 
     libxl_domain_config_init(&d_config);
@@ -1946,7 +1946,7 @@ void libxl__device_add_async(libxl__egc *egc, uint32_t domid,
 
 out:
     libxl__xs_transaction_abort(gc, &t);
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     dt->dispose(type_saved);
     libxl_domain_config_dispose(&d_config);
     aodev->rc = rc;

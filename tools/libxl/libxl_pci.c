@@ -125,7 +125,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc,
     xs_transaction_t t = XBT_NULL;
     int rc;
     libxl_domain_config d_config;
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
     bool is_stubdomain = libxl_is_stubdom(CTX, domid, NULL);
 
     /* Stubdomain doesn't have own config. */
@@ -195,7 +195,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc,
 
 out:
     libxl__xs_transaction_abort(gc, &t);
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     if (!is_stubdomain)
         libxl_domain_config_dispose(&d_config);
     return rc;

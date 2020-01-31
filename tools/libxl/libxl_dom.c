@@ -1347,7 +1347,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
 {
     GC_INIT(ctx);
     int rc;
-    libxl__domain_userdata_lock *lock;
+    libxl__flock *lock;
 
     CTX_LOCK;
     lock = libxl__lock_domain_userdata(gc, domid);
@@ -1359,7 +1359,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
     rc = libxl__userdata_store(gc, domid, userdata_userid,
                                data, datalen);
 
-    libxl__unlock_domain_userdata(lock);
+    libxl__unlock_file(lock);
 
 out:
     CTX_UNLOCK;
@@ -1408,7 +1408,7 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
 {
     GC_INIT(ctx);
     int rc;
-    libxl__domain_userdata_lock *lock;
+    libxl__flock *lock;
 
     CTX_LOCK;
     lock = libxl__lock_domain_userdata(gc, domid);
@@ -1421,7 +1421,7 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
                                   data_r, datalen_r);
 
 
-    libxl__unlock_domain_userdata(lock);
+    libxl__unlock_file(lock);
 out:
     CTX_UNLOCK;
     GC_FREE;
@@ -1435,7 +1435,7 @@ int libxl_userdata_unlink(libxl_ctx *ctx, uint32_t domid,
     CTX_LOCK;
 
     int rc;
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
     const char *filename;
 
     lock = libxl__lock_domain_userdata(gc, domid);
@@ -1458,7 +1458,7 @@ int libxl_userdata_unlink(libxl_ctx *ctx, uint32_t domid,
     rc = 0;
 out:
     if (lock)
-        libxl__unlock_domain_userdata(lock);
+        libxl__unlock_file(lock);
     CTX_UNLOCK;
     GC_FREE;
     return rc;

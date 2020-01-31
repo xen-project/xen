@@ -30,7 +30,7 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
     uint64_t memorykb, size;
     char *dompath = libxl__xs_get_dompath(gc, domid);
     int rc = 1;
-    libxl__domain_userdata_lock *lock = NULL;
+    libxl__flock *lock = NULL;
     libxl_domain_config d_config;
 
     libxl_domain_config_init(&d_config);
@@ -85,7 +85,7 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
     rc = 0;
 out:
     libxl_domain_config_dispose(&d_config);
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     CTX_UNLOCK;
     GC_FREE;
     return rc;
@@ -184,7 +184,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
     libxl_dominfo ptr;
     char *uuid;
     xs_transaction_t t;
-    libxl__domain_userdata_lock *lock;
+    libxl__flock *lock;
     libxl_domain_config d_config;
 
     libxl_domain_config_init(&d_config);
@@ -338,7 +338,7 @@ out:
 
 out_no_transaction:
     libxl_domain_config_dispose(&d_config);
-    if (lock) libxl__unlock_domain_userdata(lock);
+    if (lock) libxl__unlock_file(lock);
     CTX_UNLOCK;
     GC_FREE;
     return rc;
