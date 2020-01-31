@@ -313,9 +313,9 @@ static int acpi_load(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(PMTIMER, acpi_save, acpi_load,
                           1, HVMSR_PER_DOM);
 
-int pmtimer_change_ioport(struct domain *d, unsigned int version)
+int pmtimer_change_ioport(struct domain *d, uint64_t version)
 {
-    unsigned int old_version;
+    uint64_t old_version;
 
     if ( !has_vpm(d) )
         return -ENODEV;
