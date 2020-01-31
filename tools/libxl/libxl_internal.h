@@ -1972,7 +1972,7 @@ _hidden  void libxl__exec(libxl__gc *gc, int stdinfd, int stdoutfd,
 _hidden int libxl__domain_make(libxl__gc *gc,
                                libxl_domain_config *d_config,
                                libxl__domain_build_state *state,
-                               uint32_t *domid);
+                               uint32_t *domid, bool soft_reset);
 
 _hidden int libxl__domain_build(libxl__gc *gc,
                                 libxl_domain_config *d_config,
@@ -4158,7 +4158,8 @@ struct libxl__domain_create_state {
     int restore_fdfl; /* original flags of restore_fd */
     int send_back_fd;
     libxl_domain_restore_params restore_params;
-    uint32_t domid_soft_reset;
+    uint32_t domid;
+    bool soft_reset;
     libxl__domain_create_cb *callback;
     libxl_asyncprogress_how aop_console_how;
     /* private to domain_create */

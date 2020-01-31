@@ -538,7 +538,7 @@ out:
 
 int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
                        libxl__domain_build_state *state,
-                       uint32_t *domid)
+                       uint32_t *domid, bool soft_reset)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret, rc, nb_vm;
@@ -555,14 +555,15 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     libxl_domain_create_info *info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
 
+    assert(soft_reset || *domid == INVALID_DOMID);
+
     uuid_string = libxl__uuid2string(gc, info->uuid);
     if (!uuid_string) {
         rc = ERROR_NOMEM;
         goto out;
     }
 
-    /* Valid domid here means we're soft resetting. */
-    if (!libxl_domid_valid_guest(*domid)) {
+    if (!soft_reset) {
         struct xen_domctl_createdomain create = {
             .ssidref = info->ssidref,
             .max_vcpus = b_info->max_vcpus,
@@ -610,6 +611,14 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         if (rc < 0)
             goto out;
     }
+
+    /*
+     * If soft_reset is set the the domid will have been valid on entry.
+     * If it was not set then xc_domain_create() should have assigned a
+     * valid value. Either way, if we reach this point, domid should be
+     * valid.
+     */
+    assert(libxl_domid_valid_guest(*domid));
 
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {
@@ -1091,13 +1100,14 @@ static void initiate_domain_create(libxl__egc *egc,
     libxl_domain_config *const d_config = dcs->guest_config;
     const int restore_fd = dcs->restore_fd;
 
-    domid = dcs->domid_soft_reset;
+    domid = dcs->domid;
     libxl__domain_build_state_init(&dcs->build_state);
 
     ret = libxl__domain_config_setdefault(gc,d_config,domid);
     if (ret) goto error_out;
 
-    ret = libxl__domain_make(gc, d_config, &dcs->build_state, &domid);
+    ret = libxl__domain_make(gc, d_config, &dcs->build_state, &domid,
+                             dcs->soft_reset);
     if (ret) {
         LOGD(ERROR, domid, "cannot make domain: %d", ret);
         dcs->guest_domid = domid;
@@ -1141,7 +1151,7 @@ static void initiate_domain_create(libxl__egc *egc,
     if (ret)
         goto error_out;
 
-    if (restore_fd >= 0 || dcs->domid_soft_reset != INVALID_DOMID) {
+    if (restore_fd >= 0 || dcs->soft_reset) {
         LOGD(DEBUG, domid, "restoring, not running bootloader");
         domcreate_bootloader_done(egc, &dcs->bl, 0);
     } else  {
@@ -1217,7 +1227,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     dcs->sdss.dm.callback = domcreate_devmodel_started;
     dcs->sdss.callback = domcreate_devmodel_started;
 
-    if (restore_fd < 0 && dcs->domid_soft_reset == INVALID_DOMID) {
+    if (restore_fd < 0 && !dcs->soft_reset) {
         rc = libxl__domain_build(gc, d_config, domid, state);
         domcreate_rebuild_done(egc, dcs, rc);
         return;
@@ -1827,7 +1837,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     libxl_domain_config_copy(ctx, &cdcs->dcs.guest_config_saved, d_config);
     cdcs->dcs.restore_fd = cdcs->dcs.libxc_fd = restore_fd;
     cdcs->dcs.send_back_fd = send_back_fd;
-    if (restore_fd > -1) {
+    if (restore_fd >= 0) {
         cdcs->dcs.restore_params = *params;
         rc = libxl__fd_flags_modify_save(gc, cdcs->dcs.restore_fd,
                                          ~(O_NONBLOCK|O_NDELAY), 0,
@@ -1835,7 +1845,8 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
         if (rc < 0) goto out_err;
     }
     cdcs->dcs.callback = domain_create_cb;
-    cdcs->dcs.domid_soft_reset = INVALID_DOMID;
+    cdcs->dcs.domid = INVALID_DOMID;
+    cdcs->dcs.soft_reset = false;
 
     if (cdcs->dcs.restore_params.checkpointed_stream ==
         LIBXL_CHECKPOINTED_STREAM_COLO) {
@@ -1905,7 +1916,7 @@ static void soft_reset_dm_suspended(libxl__egc *egc,
                                     int rc);
 static int do_domain_soft_reset(libxl_ctx *ctx,
                                 libxl_domain_config *d_config,
-                                uint32_t domid_soft_reset,
+                                uint32_t domid,
                                 const libxl_asyncop_how *ao_how,
                                 const libxl_asyncprogress_how
                                 *aop_console_how)
@@ -1933,15 +1944,16 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     libxl_domain_config_copy(ctx, &srs->cdcs.dcs.guest_config_saved,
                              d_config);
     cdcs->dcs.restore_fd = -1;
-    cdcs->dcs.domid_soft_reset = domid_soft_reset;
+    cdcs->dcs.domid = domid;
+    cdcs->dcs.soft_reset = true;
     cdcs->dcs.callback = domain_create_cb;
     libxl__ao_progress_gethow(&srs->cdcs.dcs.aop_console_how,
                               aop_console_how);
     cdcs->domid_out = &domid_out;
 
-    dom_path = libxl__xs_get_dompath(gc, domid_soft_reset);
+    dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) {
-        LOGD(ERROR, domid_soft_reset, "failed to read domain path");
+        LOGD(ERROR, domid, "failed to read domain path");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -1950,7 +1962,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
                                 GCSPRINTF("%s/store/ring-ref", dom_path),
                                 &xs_store_mfn);
     if (rc) {
-        LOGD(ERROR, domid_soft_reset, "failed to read store/ring-ref.");
+        LOGD(ERROR, domid, "failed to read store/ring-ref.");
         goto out;
     }
     state->store_mfn = xs_store_mfn ? atol(xs_store_mfn): 0;
@@ -1959,7 +1971,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
                                 GCSPRINTF("%s/console/ring-ref", dom_path),
                                 &xs_console_mfn);
     if (rc) {
-        LOGD(ERROR, domid_soft_reset, "failed to read console/ring-ref.");
+        LOGD(ERROR, domid, "failed to read console/ring-ref.");
         goto out;
     }
     state->console_mfn = xs_console_mfn ? atol(xs_console_mfn): 0;
@@ -1968,20 +1980,20 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
                                   GCSPRINTF("%s/console/tty", dom_path),
                                   &console_tty);
     if (rc) {
-        LOGD(ERROR, domid_soft_reset, "failed to read console/tty.");
+        LOGD(ERROR, domid, "failed to read console/tty.");
         goto out;
     }
     state->console_tty = libxl__strdup(gc, console_tty);
 
     dss->ao = ao;
-    dss->domid = dss->dsps.domid = domid_soft_reset;
+    dss->domid = dss->dsps.domid = domid;
     dss->dsps.dm_savefile = GCSPRINTF(LIBXL_DEVICE_MODEL_SAVE_FILE".%d",
-                                      domid_soft_reset);
+                                      domid);
 
     rc = libxl__save_emulator_xenstore_data(dss, &srs->toolstack_buf,
                                             &srs->toolstack_len);
     if (rc) {
-        LOGD(ERROR, domid_soft_reset, "failed to save toolstack record.");
+        LOGD(ERROR, domid, "failed to save toolstack record.");
         goto out;
     }
 
@@ -2010,10 +2022,10 @@ static void soft_reset_dm_suspended(libxl__egc *egc,
      * xenstore again with probably different store/console/...
      * channels.
      */
-    xs_release_domain(CTX->xsh, cdcs->dcs.domid_soft_reset);
+    xs_release_domain(CTX->xsh, cdcs->dcs.domid);
 
     srs->dds.ao = ao;
-    srs->dds.domid = cdcs->dcs.domid_soft_reset;
+    srs->dds.domid = cdcs->dcs.domid;
     srs->dds.callback = domain_soft_reset_cb;
     srs->dds.soft_reset = true;
     libxl__domain_destroy(egc, &srs->dds);
@@ -2029,7 +2041,7 @@ static void domain_create_cb(libxl__egc *egc,
 
     *cdcs->domid_out = domid;
 
-    if (dcs->restore_fd > -1) {
+    if (dcs->restore_fd >= 0) {
         flrc = libxl__fd_flags_restore(gc,
                 dcs->restore_fd, dcs->restore_fdfl);
         /*
