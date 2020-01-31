@@ -557,6 +557,17 @@ struct hv_nested_enlightenments_control {
 	} hypercallControls;
 };
 
+union hv_vp_assist_page_msr
+{
+    uint64_t raw;
+    struct
+    {
+        uint64_t enabled:1;
+        uint64_t reserved_preserved:11;
+        uint64_t pfn:48;
+    };
+};
+
 /* Define virtual processor assist page structure. */
 struct hv_vp_assist_page {
 	__u32 apic_assist;

@@ -231,7 +231,7 @@ static void dump_guest_os_id(const struct domain *d)
 
 static void dump_hypercall(const struct domain *d)
 {
-    const union viridian_page_msr *hg;
+    const union hv_vp_assist_page_msr *hg;
 
     hg = &d->arch.hvm.viridian->hypercall_gpa;
 

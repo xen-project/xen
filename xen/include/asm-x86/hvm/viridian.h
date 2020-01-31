@@ -11,20 +11,9 @@
 
 #include <asm/guest/hyperv-tlfs.h>
 
-union viridian_page_msr
-{
-    uint64_t raw;
-    struct
-    {
-        uint64_t enabled:1;
-        uint64_t reserved_preserved:11;
-        uint64_t pfn:48;
-    };
-};
-
 struct viridian_page
 {
-    union viridian_page_msr msr;
+    union hv_vp_assist_page_msr msr;
     void *ptr;
 };
 
@@ -70,7 +59,7 @@ struct viridian_time_ref_count
 struct viridian_domain
 {
     union hv_guest_os_id guest_os_id;
-    union viridian_page_msr hypercall_gpa;
+    union hv_vp_assist_page_msr hypercall_gpa;
     struct viridian_time_ref_count time_ref_count;
     struct viridian_page reference_tsc;
 };
