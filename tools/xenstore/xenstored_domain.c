@@ -918,8 +918,8 @@ void wrl_apply_debit_actual(struct domain *domain)
 {
 	struct wrl_timestampt now;
 
-	if (!domain)
-		/* sockets escape the write rate limit */
+	if (!domain || !domid_is_unprivileged(domain->domid))
+		/* sockets and privileged domain escape the write rate limit */
 		return;
 
 	wrl_gettime_now(&now);
