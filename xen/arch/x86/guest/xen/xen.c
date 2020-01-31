@@ -314,11 +314,18 @@ static void resume(void)
         pv_console_init();
 }
 
+static void __init e820_fixup(struct e820map *e820)
+{
+    if ( pv_shim )
+        pv_shim_fixup_e820(e820);
+}
+
 static const struct hypervisor_ops ops = {
     .name = "Xen",
     .setup = setup,
     .ap_setup = ap_setup,
     .resume = resume,
+    .e820_fixup = e820_fixup,
 };
 
 const struct hypervisor_ops *__init xg_probe(void)

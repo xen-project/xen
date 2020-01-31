@@ -19,6 +19,8 @@
 #ifndef __X86_HYPERVISOR_H__
 #define __X86_HYPERVISOR_H__
 
+#include <asm/e820.h>
+
 struct hypervisor_ops {
     /* Name of the hypervisor */
     const char *name;
@@ -28,6 +30,8 @@ struct hypervisor_ops {
     int (*ap_setup)(void);
     /* Resume from suspension */
     void (*resume)(void);
+    /* Fix up e820 map */
+    void (*e820_fixup)(struct e820map *e820);
 };
 
 #ifdef CONFIG_GUEST
@@ -36,6 +40,7 @@ const char *hypervisor_probe(void);
 void hypervisor_setup(void);
 int hypervisor_ap_setup(void);
 void hypervisor_resume(void);
+void hypervisor_e820_fixup(struct e820map *e820);
 
 #else
 
@@ -46,6 +51,7 @@ static inline const char *hypervisor_probe(void) { return NULL; }
 static inline void hypervisor_setup(void) { ASSERT_UNREACHABLE(); }
 static inline int hypervisor_ap_setup(void) { return 0; }
 static inline void hypervisor_resume(void) { ASSERT_UNREACHABLE(); }
+static inline void hypervisor_e820_fixup(struct e820map *e820) {}
 
 #endif  /* CONFIG_GUEST */
 

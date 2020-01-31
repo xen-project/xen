@@ -66,6 +66,12 @@ void hypervisor_resume(void)
         ops->resume();
 }
 
+void __init hypervisor_e820_fixup(struct e820map *e820)
+{
+    if ( ops && ops->e820_fixup )
+        ops->e820_fixup(e820);
+}
+
 /*
  * Local variables:
  * mode: C
