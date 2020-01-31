@@ -218,6 +218,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned in
 
     printf("xenevtchn_bind_virq(%d)", virq);
     port = bind_virq(virq, evtchn_handler, (void*)(intptr_t)fd);
+    printf(" = %d\n", port);
 
     if (port < 0) {
         port_dealloc(port_info);

@@ -88,7 +88,7 @@ static const char *sockmsg_string(enum xsd_sockmsg_type type);
 		char *s = talloc_asprintf(NULL, __VA_ARGS__);		\
 		if (s) {						\
 			trace("%s\n", s);				\
-			syslog(LOG_ERR, "%s",  s);			\
+			syslog(LOG_ERR, "%s\n",  s);			\
 			talloc_free(s);					\
 		} else {						\
 			trace("talloc failure during logging\n");	\
