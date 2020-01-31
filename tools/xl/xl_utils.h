@@ -52,8 +52,6 @@
 #define STR_SKIP_PREFIX( a, b ) \
     ( STR_HAS_PREFIX(a, b) ? ((a) += strlen(b), 1) : 0 )
 
-#define INVALID_DOMID ~0
-
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
 
 /*

@@ -1773,7 +1773,7 @@ static void domcreate_complete(libxl__egc *egc,
             libxl__domain_destroy(egc, &dcs->dds);
             return;
         }
-        dcs->guest_domid = -1;
+        dcs->guest_domid = INVALID_DOMID;
     }
     dcs->callback(egc, dcs, rc, dcs->guest_domid);
 }
