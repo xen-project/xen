@@ -1084,9 +1084,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             unsigned long pte_update_limit;
 
             /* Select relocation address. */
-            e = end - reloc_size;
-            xen_phys_start = e;
-            bootsym(trampoline_xen_phys_start) = e;
+            xen_phys_start = end - reloc_size;
+            e = xen_phys_start + XEN_IMG_OFFSET;
+            bootsym(trampoline_xen_phys_start) = xen_phys_start;
 
             /*
              * No PTEs pointing above this address are candidates for relocation.
@@ -1094,7 +1094,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
              * and the beginning of region for destination image some PTEs may
              * point to addresses in range [e, e + XEN_IMG_OFFSET).
              */
-            pte_update_limit = PFN_DOWN(e + XEN_IMG_OFFSET);
+            pte_update_limit = PFN_DOWN(e);
 
             /*
              * Perform relocation to new physical address.
@@ -1103,7 +1103,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
              * data until after we have switched to the relocated pagetables!
              */
             barrier();
-            move_memory(e + XEN_IMG_OFFSET, XEN_IMG_OFFSET, _end - _start, 1);
+            move_memory(e, XEN_IMG_OFFSET, _end - _start, 1);
 
             /* Walk initial pagetables, relocating page directory entries. */
             pl4e = __va(__pa(idle_pg_table));
