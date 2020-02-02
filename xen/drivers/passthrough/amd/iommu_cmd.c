@@ -64,11 +64,11 @@ int send_iommu_command(struct amd_iommu *iommu, u32 cmd[])
 
 static void flush_command_buffer(struct amd_iommu *iommu)
 {
-    u32 cmd[4], status;
-    int loop_count, comp_wait;
+    unsigned int cmd[4], status, loop_count;
+    bool comp_wait;
 
     /* RW1C 'ComWaitInt' in status register */
-    writel(IOMMU_STATUS_COMP_WAIT_INT_MASK,
+    writel(IOMMU_STATUS_COMP_WAIT_INT,
            iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
 
     /* send an empty COMPLETION_WAIT command to flush command buffer */
@@ -85,16 +85,14 @@ static void flush_command_buffer(struct amd_iommu *iommu)
     loop_count = 1000;
     do {
         status = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-        comp_wait = get_field_from_reg_u32(status,
-                                           IOMMU_STATUS_COMP_WAIT_INT_MASK,
-                                           IOMMU_STATUS_COMP_WAIT_INT_SHIFT);
+        comp_wait = status & IOMMU_STATUS_COMP_WAIT_INT;
         --loop_count;
     } while ( !comp_wait && loop_count );
 
     if ( comp_wait )
     {
         /* RW1C 'ComWaitInt' in status register */
-        writel(IOMMU_STATUS_COMP_WAIT_INT_MASK,
+        writel(IOMMU_STATUS_COMP_WAIT_INT,
                iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
         return;
     }

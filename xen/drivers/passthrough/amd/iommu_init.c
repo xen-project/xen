@@ -344,20 +344,18 @@ static void iommu_reset_log(struct amd_iommu *iommu,
                             struct ring_buffer *log,
                             void (*ctrl_func)(struct amd_iommu *iommu, bool))
 {
-    u32 entry;
-    int log_run, run_bit;
-    int loop_count = 1000;
+    unsigned int entry, run_bit, loop_count = 1000;
+    bool log_run;
 
     BUG_ON(!iommu || ((log != &iommu->event_log) && (log != &iommu->ppr_log)));
 
     run_bit = ( log == &iommu->event_log ) ?
-        IOMMU_STATUS_EVENT_LOG_RUN_SHIFT :
-        IOMMU_STATUS_PPR_LOG_RUN_SHIFT;
+        IOMMU_STATUS_EVENT_LOG_RUN : IOMMU_STATUS_PPR_LOG_RUN;
 
     /* wait until EventLogRun bit = 0 */
     do {
         entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-        log_run = iommu_get_bit(entry, run_bit);
+        log_run = entry & run_bit;
         loop_count--;
     } while ( log_run && loop_count );
 
@@ -371,8 +369,8 @@ static void iommu_reset_log(struct amd_iommu *iommu,
     ctrl_func(iommu, IOMMU_CONTROL_DISABLED);
 
     /* RW1C overflow bit */
-    writel(log == &iommu->event_log ? IOMMU_STATUS_EVENT_OVERFLOW_MASK
-                                    : IOMMU_STATUS_PPR_LOG_OVERFLOW_MASK,
+    writel(log == &iommu->event_log ? IOMMU_STATUS_EVENT_LOG_OVERFLOW
+                                    : IOMMU_STATUS_PPR_LOG_OVERFLOW,
            iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
 
     /*reset event log base address */
@@ -589,7 +587,7 @@ static void iommu_check_event_log(struct amd_iommu *iommu)
     unsigned long flags;
 
     /* RW1C interrupt status bit */
-    writel(IOMMU_STATUS_EVENT_LOG_INT_MASK,
+    writel(IOMMU_STATUS_EVENT_LOG_INT,
            iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
 
     iommu_read_log(iommu, &iommu->event_log,
@@ -599,7 +597,7 @@ static void iommu_check_event_log(struct amd_iommu *iommu)
     
     /* Check event overflow. */
     entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-    if ( iommu_get_bit(entry, IOMMU_STATUS_EVENT_OVERFLOW_SHIFT) )
+    if ( entry & IOMMU_STATUS_EVENT_LOG_OVERFLOW )
         iommu_reset_log(iommu, &iommu->event_log, set_iommu_event_log_control);
     else
     {
@@ -621,7 +619,7 @@ static void iommu_check_event_log(struct amd_iommu *iommu)
      * Re-check to make sure the bit has been cleared.
      */
     entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-    if ( entry & IOMMU_STATUS_EVENT_LOG_INT_MASK )
+    if ( entry & IOMMU_STATUS_EVENT_LOG_INT )
         tasklet_schedule(&amd_iommu_irq_tasklet);
 
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -678,7 +676,7 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
     unsigned long flags;
 
     /* RW1C interrupt status bit */
-    writel(IOMMU_STATUS_PPR_LOG_INT_MASK,
+    writel(IOMMU_STATUS_PPR_LOG_INT,
            iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
 
     iommu_read_log(iommu, &iommu->ppr_log,
@@ -688,7 +686,7 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
 
     /* Check event overflow. */
     entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-    if ( iommu_get_bit(entry, IOMMU_STATUS_PPR_LOG_OVERFLOW_SHIFT) )
+    if ( entry & IOMMU_STATUS_PPR_LOG_OVERFLOW )
         iommu_reset_log(iommu, &iommu->ppr_log, set_iommu_ppr_log_control);
     else
     {
@@ -710,7 +708,7 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
      * Re-check to make sure the bit has been cleared.
      */
     entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-    if ( entry & IOMMU_STATUS_PPR_LOG_INT_MASK )
+    if ( entry & IOMMU_STATUS_PPR_LOG_INT )
         tasklet_schedule(&amd_iommu_irq_tasklet);
 
     spin_unlock_irqrestore(&iommu->lock, flags);

@@ -30,12 +30,6 @@
 #define GUEST_ADDRESS_SIZE_6_LEVEL              0x2
 #define HOST_ADDRESS_SIZE_6_LEVEL               0x2
 
-#define guest_iommu_set_status(iommu, bit) \
-        iommu_set_bit(&((iommu)->reg_status.lo), bit)
-
-#define guest_iommu_clear_status(iommu, bit) \
-        iommu_clear_bit(&((iommu)->reg_status.lo), bit)
-
 #define reg_to_u64(reg) (((uint64_t)reg.hi << 32) | reg.lo )
 #define u64_to_reg(reg, val) \
     do \
@@ -183,7 +177,7 @@ void guest_iommu_add_ppr_log(struct domain *d, u32 entry[])
     if ( ++tail >= iommu->ppr_log.entries )
     {
         tail = 0;
-        guest_iommu_set_status(iommu, IOMMU_STATUS_PPR_LOG_OVERFLOW_SHIFT);
+        iommu->reg_status.lo |= IOMMU_STATUS_PPR_LOG_OVERFLOW;
     }
     iommu_set_rb_pointer(&iommu->ppr_log.reg_tail.lo, tail);
     unmap_domain_page(log_base);
@@ -231,7 +225,7 @@ void guest_iommu_add_event_log(struct domain *d, u32 entry[])
     if ( ++tail >= iommu->event_log.entries )
     {
         tail = 0;
-        guest_iommu_set_status(iommu, IOMMU_STATUS_EVENT_OVERFLOW_SHIFT);
+        iommu->reg_status.lo |= IOMMU_STATUS_EVENT_LOG_OVERFLOW;
     }
 
     iommu_set_rb_pointer(&iommu->event_log.reg_tail.lo, tail);
@@ -322,11 +316,11 @@ static int do_completion_wait(struct domain *d, cmd_entry_t *cmd)
 
     iommu = domain_iommu(d);
 
-    i = iommu_get_bit(cmd->data[0], IOMMU_COMP_WAIT_I_FLAG_SHIFT);
-    s = iommu_get_bit(cmd->data[0], IOMMU_COMP_WAIT_S_FLAG_SHIFT);
+    i = cmd->data[0] & IOMMU_COMP_WAIT_I_FLAG_MASK;
+    s = cmd->data[0] & IOMMU_COMP_WAIT_S_FLAG_MASK;
 
     if ( i )
-        guest_iommu_set_status(iommu, IOMMU_STATUS_COMP_WAIT_INT_SHIFT);
+        iommu->reg_status.lo |= IOMMU_STATUS_COMP_WAIT_INT;
 
     if ( s )
     {
@@ -352,8 +346,7 @@ static int do_completion_wait(struct domain *d, cmd_entry_t *cmd)
         unmap_domain_page(vaddr);
     }
 
-    com_wait_int = iommu_get_bit(iommu->reg_status.lo,
-                                 IOMMU_STATUS_COMP_WAIT_INT_SHIFT);
+    com_wait_int = iommu->reg_status.lo & IOMMU_STATUS_COMP_WAIT_INT;
 
     if ( iommu->reg_ctrl.com_wait_int_en && com_wait_int )
         guest_iommu_deliver_msi(d);
@@ -539,16 +532,16 @@ static int guest_iommu_write_ctrl(struct guest_iommu *iommu, uint64_t val)
     {
         guest_iommu_enable_ring_buffer(iommu, &iommu->event_log,
                                        sizeof(event_entry_t));
-        guest_iommu_set_status(iommu, IOMMU_STATUS_EVENT_LOG_RUN_SHIFT);
-        guest_iommu_clear_status(iommu, IOMMU_STATUS_EVENT_OVERFLOW_SHIFT);
+        iommu->reg_status.lo |=  IOMMU_STATUS_EVENT_LOG_RUN;
+        iommu->reg_status.lo &= ~IOMMU_STATUS_EVENT_LOG_OVERFLOW;
     }
 
     if ( newctrl.iommu_en && newctrl.ppr_en && newctrl.ppr_log_en )
     {
         guest_iommu_enable_ring_buffer(iommu, &iommu->ppr_log,
                                        sizeof(ppr_entry_t));
-        guest_iommu_set_status(iommu, IOMMU_STATUS_PPR_LOG_RUN_SHIFT);
-        guest_iommu_clear_status(iommu, IOMMU_STATUS_PPR_LOG_OVERFLOW_SHIFT);
+        iommu->reg_status.lo |=  IOMMU_STATUS_PPR_LOG_RUN;
+        iommu->reg_status.lo &= ~IOMMU_STATUS_PPR_LOG_OVERFLOW;
     }
 
     if ( newctrl.iommu_en && iommu->reg_ctrl.cmd_buf_en &&
@@ -559,7 +552,7 @@ static int guest_iommu_write_ctrl(struct guest_iommu *iommu, uint64_t val)
     }
 
     if ( iommu->reg_ctrl.event_log_en && !newctrl.event_log_en )
-        guest_iommu_clear_status(iommu, IOMMU_STATUS_EVENT_LOG_RUN_SHIFT);
+        iommu->reg_status.lo &= ~IOMMU_STATUS_EVENT_LOG_RUN;
 
     if ( iommu->reg_ctrl.iommu_en && !newctrl.iommu_en )
         guest_iommu_disable(iommu);
@@ -698,13 +691,13 @@ static void guest_iommu_mmio_write64(struct guest_iommu *iommu,
         u64_to_reg(&iommu->ppr_log.reg_tail, val);
         break;
     case IOMMU_STATUS_MMIO_OFFSET:
-        val &= IOMMU_STATUS_EVENT_OVERFLOW_MASK |
-               IOMMU_STATUS_EVENT_LOG_INT_MASK |
-               IOMMU_STATUS_COMP_WAIT_INT_MASK |
-               IOMMU_STATUS_PPR_LOG_OVERFLOW_MASK |
-               IOMMU_STATUS_PPR_LOG_INT_MASK |
-               IOMMU_STATUS_GAPIC_LOG_OVERFLOW_MASK |
-               IOMMU_STATUS_GAPIC_LOG_INT_MASK;
+        val &= IOMMU_STATUS_EVENT_LOG_OVERFLOW |
+               IOMMU_STATUS_EVENT_LOG_INT |
+               IOMMU_STATUS_COMP_WAIT_INT |
+               IOMMU_STATUS_PPR_LOG_OVERFLOW |
+               IOMMU_STATUS_PPR_LOG_INT |
+               IOMMU_STATUS_GAPIC_LOG_OVERFLOW |
+               IOMMU_STATUS_GAPIC_LOG_INT;
         u64_to_reg(&iommu->reg_status, reg_to_u64(iommu->reg_status) & ~val);
         break;
 
