@@ -481,7 +481,6 @@ struct amd_iommu_pte {
 #define INV_IOMMU_ALL_PAGES_ADDRESS      ((1ULL << 63) - 1)
 
 #define IOMMU_RING_BUFFER_PTR_MASK                  0x0007FFF0
-#define IOMMU_RING_BUFFER_PTR_SHIFT                 4
 
 #define IOMMU_CMD_DEVICE_ID_MASK                    0x0000FFFF
 #define IOMMU_CMD_DEVICE_ID_SHIFT                   0

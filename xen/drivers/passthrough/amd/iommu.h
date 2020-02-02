@@ -58,12 +58,11 @@ struct table_struct {
 };
 
 struct ring_buffer {
+    spinlock_t lock;    /* protect buffer pointers */
     void *buffer;
-    unsigned long entries;
-    unsigned long alloc_size;
     uint32_t tail;
     uint32_t head;
-    spinlock_t lock;    /* protect buffer pointers */
+    uint32_t size;
 };
 
 typedef struct iommu_cap {
@@ -377,19 +376,6 @@ static inline void __free_amd_iommu_tables(void *table, int order)
 static inline int iommu_has_cap(struct amd_iommu *iommu, uint32_t bit)
 {
     return !!(iommu->cap.header & (1u << bit));
-}
-
-/* access tail or head pointer of ring buffer */
-static inline uint32_t iommu_get_rb_pointer(uint32_t reg)
-{
-    return get_field_from_reg_u32(reg, IOMMU_RING_BUFFER_PTR_MASK,
-                                  IOMMU_RING_BUFFER_PTR_SHIFT);
-}
-
-static inline void iommu_set_rb_pointer(uint32_t *reg, uint32_t val)
-{
-    set_field_in_reg_u32(val, *reg, IOMMU_RING_BUFFER_PTR_MASK,
-                         IOMMU_RING_BUFFER_PTR_SHIFT, reg);
 }
 
 /* access device id field from iommu cmd */

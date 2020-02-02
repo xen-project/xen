@@ -117,7 +117,7 @@ static void register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
     iommu_set_addr_lo_to_reg(&entry, addr_lo >> PAGE_SHIFT);
     writel(entry, iommu->mmio_base + IOMMU_CMD_BUFFER_BASE_LOW_OFFSET);
 
-    power_of2_entries = get_order_from_bytes(iommu->cmd_buffer.alloc_size) +
+    power_of2_entries = get_order_from_bytes(iommu->cmd_buffer.size) +
         IOMMU_CMD_BUFFER_POWER_OF2_ENTRIES_PER_PAGE;
 
     entry = 0;
@@ -145,7 +145,7 @@ static void register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
     iommu_set_addr_lo_to_reg(&entry, addr_lo >> PAGE_SHIFT);
     writel(entry, iommu->mmio_base + IOMMU_EVENT_LOG_BASE_LOW_OFFSET);
 
-    power_of2_entries = get_order_from_bytes(iommu->event_log.alloc_size) +
+    power_of2_entries = get_order_from_bytes(iommu->event_log.size) +
                         IOMMU_EVENT_LOG_POWER_OF2_ENTRIES_PER_PAGE;
 
     entry = 0;
@@ -173,7 +173,7 @@ static void register_iommu_ppr_log_in_mmio_space(struct amd_iommu *iommu)
     iommu_set_addr_lo_to_reg(&entry, addr_lo >> PAGE_SHIFT);
     writel(entry, iommu->mmio_base + IOMMU_PPR_LOG_BASE_LOW_OFFSET);
 
-    power_of2_entries = get_order_from_bytes(iommu->ppr_log.alloc_size) +
+    power_of2_entries = get_order_from_bytes(iommu->ppr_log.size) +
                         IOMMU_PPR_LOG_POWER_OF2_ENTRIES_PER_PAGE;
 
     entry = 0;
@@ -300,7 +300,7 @@ static int iommu_read_log(struct amd_iommu *iommu,
                           unsigned int entry_size,
                           void (*parse_func)(struct amd_iommu *, u32 *))
 {
-    u32 tail, head, *entry, tail_offest, head_offset;
+    u32 tail, *entry, tail_offest, head_offset;
 
     BUG_ON(!iommu || ((log != &iommu->event_log) && (log != &iommu->ppr_log)));
     
@@ -315,23 +315,21 @@ static int iommu_read_log(struct amd_iommu *iommu,
         IOMMU_EVENT_LOG_HEAD_OFFSET :
         IOMMU_PPR_LOG_HEAD_OFFSET;
 
-    tail = readl(iommu->mmio_base + tail_offest);
-    tail = iommu_get_rb_pointer(tail);
+    tail = readl(iommu->mmio_base + tail_offest) & IOMMU_RING_BUFFER_PTR_MASK;
 
     while ( tail != log->head )
     {
         /* read event log entry */
-        entry = (u32 *)(log->buffer + log->head * entry_size);
+        entry = log->buffer + log->head;
 
         parse_func(iommu, entry);
-        if ( ++log->head == log->entries )
+
+        log->head += entry_size;
+        if ( log->head == log->size )
             log->head = 0;
 
         /* update head pointer */
-        head = 0;
-        iommu_set_rb_pointer(&head, log->head);
-
-        writel(head, iommu->mmio_base + head_offset);
+        writel(log->head, iommu->mmio_base + head_offset);
     }
 
     spin_unlock(&log->lock);
@@ -1000,7 +998,7 @@ static void __init deallocate_buffer(void *buf, unsigned long sz)
 
 static void __init deallocate_ring_buffer(struct ring_buffer *ring_buf)
 {
-    deallocate_buffer(ring_buf->buffer, ring_buf->alloc_size);
+    deallocate_buffer(ring_buf->buffer, ring_buf->size);
     ring_buf->buffer = NULL;
     ring_buf->head = 0;
     ring_buf->tail = 0;
@@ -1035,11 +1033,9 @@ static void *__init allocate_ring_buffer(struct ring_buffer *ring_buf,
     ring_buf->tail = 0;
 
     spin_lock_init(&ring_buf->lock);
-    
-    ring_buf->alloc_size = PAGE_SIZE << get_order_from_bytes(entries *
-                                                             entry_size);
-    ring_buf->entries = ring_buf->alloc_size / entry_size;
-    ring_buf->buffer = allocate_buffer(ring_buf->alloc_size, name, clear);
+
+    ring_buf->size = PAGE_SIZE << get_order_from_bytes(entries * entry_size);
+    ring_buf->buffer = allocate_buffer(ring_buf->size, name, clear);
 
     return ring_buf->buffer;
 }

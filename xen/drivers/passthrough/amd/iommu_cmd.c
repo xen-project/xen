@@ -24,16 +24,15 @@ static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
 {
     uint32_t tail, head;
 
-    tail = iommu->cmd_buffer.tail;
-    if ( ++tail == iommu->cmd_buffer.entries )
+    tail = iommu->cmd_buffer.tail + IOMMU_CMD_BUFFER_ENTRY_SIZE;
+    if ( tail == iommu->cmd_buffer.size )
         tail = 0;
 
-    head = iommu_get_rb_pointer(readl(iommu->mmio_base +
-                                      IOMMU_CMD_BUFFER_HEAD_OFFSET));
+    head = readl(iommu->mmio_base +
+                 IOMMU_CMD_BUFFER_HEAD_OFFSET) & IOMMU_RING_BUFFER_PTR_MASK;
     if ( head != tail )
     {
-        memcpy(iommu->cmd_buffer.buffer +
-               (iommu->cmd_buffer.tail * IOMMU_CMD_BUFFER_ENTRY_SIZE),
+        memcpy(iommu->cmd_buffer.buffer + iommu->cmd_buffer.tail,
                cmd, IOMMU_CMD_BUFFER_ENTRY_SIZE);
 
         iommu->cmd_buffer.tail = tail;
@@ -45,13 +44,11 @@ static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
 
 static void commit_iommu_command_buffer(struct amd_iommu *iommu)
 {
-    u32 tail = 0;
-
-    iommu_set_rb_pointer(&tail, iommu->cmd_buffer.tail);
-    writel(tail, iommu->mmio_base+IOMMU_CMD_BUFFER_TAIL_OFFSET);
+    writel(iommu->cmd_buffer.tail,
+           iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
 }
 
-int send_iommu_command(struct amd_iommu *iommu, u32 cmd[])
+static int send_iommu_command(struct amd_iommu *iommu, u32 cmd[])
 {
     if ( queue_iommu_command(iommu, cmd) )
     {
@@ -261,7 +258,7 @@ static void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id)
     send_iommu_command(iommu, cmd);
 }
 
-void invalidate_iommu_all(struct amd_iommu *iommu)
+static void invalidate_iommu_all(struct amd_iommu *iommu)
 {
     u32 cmd[4], entry;
 
