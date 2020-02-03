@@ -17,15 +17,12 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/sched.h>
 #include <xen/iocap.h>
-#include <xen/pci.h>
-#include <xen/pci_regs.h>
-#include <xen/paging.h>
 #include <xen/softirq.h>
+
 #include <asm/acpi.h>
-#include <asm/amd-iommu.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
+
+#include "iommu.h"
 #include "../ats.h"
 
 static bool_t __read_mostly init_done;

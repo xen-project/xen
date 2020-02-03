@@ -17,13 +17,10 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/errno.h>
 #include <xen/acpi.h>
-#include <xen/iommu.h>
 #include <xen/pci.h>
-#include <xen/pci_regs.h>
-#include <asm/amd-iommu.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
+
+#include "iommu.h"
 
 static int __init get_iommu_msi_capabilities(
     u16 seg, u8 bus, u8 dev, u8 func, struct amd_iommu *iommu)

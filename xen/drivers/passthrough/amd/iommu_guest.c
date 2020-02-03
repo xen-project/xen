@@ -16,11 +16,9 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/sched.h>
 #include <asm/p2m.h>
-#include <asm/amd-iommu.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
 
+#include "iommu.h"
 
 #define IOMMU_MMIO_SIZE                         0x8000
 #define IOMMU_MMIO_PAGE_NR                      0x8

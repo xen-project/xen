@@ -17,13 +17,12 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/errno.h>
 #include <xen/acpi.h>
 #include <xen/param.h>
-#include <asm/apicdef.h>
+
 #include <asm/io_apic.h>
-#include <asm/amd-iommu.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
+
+#include "iommu.h"
 
 /* Some helper structures, particularly to deal with ranges. */
 

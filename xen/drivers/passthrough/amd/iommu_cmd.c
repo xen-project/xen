@@ -17,9 +17,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/sched.h>
-#include <asm/amd-iommu.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
+#include "iommu.h"
 #include "../ats.h"
 
 static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])

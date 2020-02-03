@@ -17,18 +17,11 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/errno.h>
 #include <xen/acpi.h>
-#include <xen/keyhandler.h>
-#include <xen/pci.h>
-#include <xen/pci_regs.h>
-#include <xen/irq.h>
-#include <asm/amd-iommu.h>
-#include <asm/msi.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
-#include <asm-x86/fixmap.h>
-#include <mach_apic.h>
 #include <xen/delay.h>
+#include <xen/keyhandler.h>
+
+#include "iommu.h"
 
 static int __initdata nr_amd_iommus;
 static bool __initdata pci_init;

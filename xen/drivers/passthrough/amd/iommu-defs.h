@@ -17,8 +17,8 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _ASM_X86_64_AMD_IOMMU_DEFS_H
-#define _ASM_X86_64_AMD_IOMMU_DEFS_H
+#ifndef AMD_IOMMU_DEFS_H
+#define AMD_IOMMU_DEFS_H
 
 /* IOMMU Command Buffer entries: in power of 2 increments, minimum of 256 */
 #define IOMMU_CMD_BUFFER_DEFAULT_ENTRIES	512
@@ -506,7 +506,7 @@ struct amd_iommu_pte {
 #define IOMMU_REG_BASE_ADDR_HIGH_MASK               0x000FFFFF
 #define IOMMU_REG_BASE_ADDR_HIGH_SHIFT              0
 
-#endif /* _ASM_X86_64_AMD_IOMMU_DEFS_H */
+#endif /* AMD_IOMMU_DEFS_H */
 
 /*
  * Local variables:

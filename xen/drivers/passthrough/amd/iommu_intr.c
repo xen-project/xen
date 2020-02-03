@@ -16,12 +16,11 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/err.h>
-#include <xen/sched.h>
-#include <asm/amd-iommu.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
-#include <asm/io_apic.h>
 #include <xen/softirq.h>
+
+#include <asm/io_apic.h>
+
+#include "iommu.h"
 
 union irte32 {
     uint32_t raw;

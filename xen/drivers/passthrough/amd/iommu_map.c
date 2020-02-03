@@ -18,12 +18,8 @@
  */
 
 #include <xen/acpi.h>
-#include <xen/sched.h>
-#include <asm/p2m.h>
-#include <asm/amd-iommu.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
-#include "../ats.h"
-#include <xen/pci.h>
+
+#include "iommu.h"
 
 /* Given pfn and page table level, return pde index */
 static unsigned int pfn_to_pde_idx(unsigned long pfn, unsigned int level)

@@ -38,7 +38,6 @@
 #include <asm/mem_sharing.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/altp2m.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/vm_event.h>
 #include <xsm/xsm.h>
 
