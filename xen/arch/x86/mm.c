@@ -103,6 +103,7 @@
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/domain.h>
 #include <xen/sched.h>
 #include <xen/err.h>

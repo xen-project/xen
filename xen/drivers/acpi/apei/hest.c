@@ -30,6 +30,7 @@
 #include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/pfn.h>
 #include <acpi/acpi.h>
 #include <acpi/apei.h>

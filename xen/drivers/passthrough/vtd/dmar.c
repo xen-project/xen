@@ -24,6 +24,7 @@
 #include <xen/kernel.h>
 #include <xen/acpi.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/xmalloc.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>

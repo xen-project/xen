@@ -27,6 +27,7 @@
 #include <xen/acpi.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/dmi.h>
 #include <asm/fixmap.h>
 #include <asm/page.h>

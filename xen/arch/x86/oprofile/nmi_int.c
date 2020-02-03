@@ -15,6 +15,7 @@
 #include <xen/types.h>
 #include <xen/errno.h>
 #include <xen/init.h>
+#include <xen/param.h>
 #include <xen/string.h>
 #include <xen/delay.h>
 #include <xen/xenoprof.h>

@@ -11,6 +11,7 @@
 #include <xen/console.h>
 #include <xen/init.h>
 #include <xen/irq.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/timer.h>
 #include <xen/serial.h>

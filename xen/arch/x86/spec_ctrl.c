@@ -19,6 +19,7 @@
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/warning.h>
 
 #include <asm/microcode.h>

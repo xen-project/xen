@@ -7,6 +7,7 @@
 #include <xen/domain_page.h>
 #include <xen/errno.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 
 #include <asm/cpufeature.h>

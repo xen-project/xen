@@ -9,6 +9,7 @@
 #include <xen/delay.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/serial.h>
 #include <xen/cache.h>
 

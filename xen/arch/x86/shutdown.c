@@ -6,6 +6,7 @@
 
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/delay.h>

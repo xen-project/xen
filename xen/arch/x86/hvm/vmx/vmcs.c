@@ -18,6 +18,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/errno.h>
 #include <xen/domain_page.h>
 #include <xen/event.h>

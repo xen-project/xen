@@ -19,6 +19,7 @@
 
 #include <xen/errno.h>
 #include <xen/acpi.h>
+#include <xen/param.h>
 #include <asm/apicdef.h>
 #include <asm/io_apic.h>
 #include <asm/amd-iommu.h>

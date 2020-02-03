@@ -20,6 +20,7 @@
 
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/sizes.h>
 #include <xen/warning.h>

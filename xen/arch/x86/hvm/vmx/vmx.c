@@ -17,6 +17,7 @@
 
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/trace.h>
 #include <xen/sched.h>
 #include <xen/irq.h>

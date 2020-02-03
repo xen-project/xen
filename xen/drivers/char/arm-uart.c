@@ -21,6 +21,7 @@
 #include <asm/types.h>
 #include <xen/console.h>
 #include <xen/device_tree.h>
+#include <xen/param.h>
 #include <xen/serial.h>
 #include <xen/errno.h>
 #include <xen/acpi.h>

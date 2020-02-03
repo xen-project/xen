@@ -5,6 +5,7 @@
  *
  */
 
+#include <xen/param.h>
 #include <xen/percpu.h>
 #include <xen/sched.h>
 #include <asm/current.h>

@@ -11,6 +11,7 @@
 #include <xen/keyhandler.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/percpu.h>
 #include <xen/serial.h>
 #include <xen/smp.h>

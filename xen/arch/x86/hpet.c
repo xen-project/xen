@@ -11,6 +11,7 @@
 #include <xen/softirq.h>
 #include <xen/irq.h>
 #include <xen/numa.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <asm/fixmap.h>
 #include <asm/div64.h>

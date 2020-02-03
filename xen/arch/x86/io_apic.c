@@ -24,6 +24,7 @@
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/acpi.h>
 #include <xen/keyhandler.h>

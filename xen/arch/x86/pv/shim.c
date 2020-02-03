@@ -23,6 +23,7 @@
 #include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/iocap.h>
+#include <xen/param.h>
 #include <xen/shutdown.h>
 #include <xen/types.h>
 #include <xen/consoled.h>

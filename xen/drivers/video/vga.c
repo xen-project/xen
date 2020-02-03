@@ -7,6 +7,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/vga.h>
 #include <xen/pci.h>
 #include <asm/io.h>

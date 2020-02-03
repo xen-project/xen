@@ -16,6 +16,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
 #include <xen/time.h>

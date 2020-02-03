@@ -3,6 +3,7 @@
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/stdbool.h>
 #include <asm/flushtlb.h>
 #include <asm/invpcid.h>

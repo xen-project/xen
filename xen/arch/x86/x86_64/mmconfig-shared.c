@@ -14,6 +14,7 @@
 
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/acpi.h>
 #include <xen/xmalloc.h>
 #include <xen/pci.h>

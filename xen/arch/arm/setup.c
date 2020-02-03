@@ -30,6 +30,7 @@
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/softirq.h>
 #include <xen/keyhandler.h>
 #include <xen/cpu.h>

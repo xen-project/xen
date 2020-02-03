@@ -19,6 +19,7 @@
 #include <xen/init.h>
 #include <xen/cpu.h>
 #include <xen/cpumask.h>
+#include <xen/param.h>
 #include <asm/apicdef.h>
 #include <asm/genapic.h>
 #include <asm/apic.h>

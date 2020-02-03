@@ -31,6 +31,7 @@
 #include <xen/errno.h>
 #include <xen/delay.h>
 #include <xen/cpumask.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/timer.h>
 #include <xen/xmalloc.h>

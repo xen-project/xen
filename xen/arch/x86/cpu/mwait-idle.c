@@ -52,6 +52,7 @@
 #include <xen/lib.h>
 #include <xen/cpu.h>
 #include <xen/init.h>
+#include <xen/param.h>
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <asm/cpuidle.h>

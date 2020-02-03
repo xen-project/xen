@@ -7,6 +7,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
+#include <xen/param.h>
 #include <xen/version.h>
 #include <xen/sched.h>
 #include <xen/paging.h>

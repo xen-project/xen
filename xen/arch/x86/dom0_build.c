@@ -7,6 +7,7 @@
 #include <xen/init.h>
 #include <xen/iocap.h>
 #include <xen/libelf.h>
+#include <xen/param.h>
 #include <xen/pfn.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>

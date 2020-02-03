@@ -6,6 +6,7 @@
 
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/xmalloc.h>
 #include <xen/kernel.h>
 #include <xen/vga.h>

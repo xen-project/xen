@@ -9,6 +9,7 @@
 #include <xen/lib.h>
 #include <xen/ctype.h>
 #include <xen/err.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/mm.h>

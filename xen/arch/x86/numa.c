@@ -11,6 +11,7 @@
 #include <xen/nodemask.h>
 #include <xen/numa.h>
 #include <xen/keyhandler.h>
+#include <xen/param.h>
 #include <xen/time.h>
 #include <xen/smp.h>
 #include <xen/pfn.h>

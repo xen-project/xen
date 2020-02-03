@@ -2,6 +2,7 @@
 #include <xen/cpumask.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/sizes.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>

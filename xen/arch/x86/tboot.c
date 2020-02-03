@@ -1,6 +1,7 @@
 #include <xen/init.h>
 #include <xen/types.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>

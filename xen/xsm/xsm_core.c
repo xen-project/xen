@@ -13,6 +13,7 @@
 #include <xen/init.h>
 #include <xen/errno.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 
 #include <xen/hypercall.h>
 #include <xsm/xsm.h>

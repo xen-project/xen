@@ -30,6 +30,7 @@
 #include <xen/err.h>
 #include <xen/errno.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/console.h>
 #include <xen/shutdown.h>
 #include <xen/guest_access.h>

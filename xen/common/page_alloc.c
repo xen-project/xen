@@ -126,6 +126,7 @@
 #include <xen/sched.h>
 #include <xen/spinlock.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>

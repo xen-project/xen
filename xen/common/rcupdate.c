@@ -34,6 +34,7 @@
 #include <xen/types.h>
 #include <xen/kernel.h>
 #include <xen/init.h>
+#include <xen/param.h>
 #include <xen/spinlock.h>
 #include <xen/smp.h>
 #include <xen/rcupdate.h>

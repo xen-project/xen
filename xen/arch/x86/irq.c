@@ -10,6 +10,7 @@
 #include <xen/errno.h>
 #include <xen/event.h>
 #include <xen/irq.h>
+#include <xen/param.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/keyhandler.h>

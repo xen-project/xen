@@ -19,6 +19,7 @@
 #include <xen/cpu.h>
 #include <xen/init.h>
 #include <xen/cpumask.h>
+#include <xen/param.h>
 
 #include <asm/smp.h>
 

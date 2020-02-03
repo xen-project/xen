@@ -28,6 +28,7 @@
 #include <xen/mem_access.h>
 #include <xen/vm_event.h>
 #include <xen/event.h>
+#include <xen/param.h>
 #include <public/vm_event.h>
 #include <asm/domain.h>
 #include <asm/page.h>

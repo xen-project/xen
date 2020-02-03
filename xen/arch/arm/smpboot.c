@@ -23,6 +23,7 @@
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>

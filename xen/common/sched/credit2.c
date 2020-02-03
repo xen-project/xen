@@ -12,6 +12,7 @@
 
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/delay.h>

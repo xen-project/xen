@@ -1,6 +1,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/compat.h>
 #include <xen/dmi.h>
 #include <xen/pfn.h>

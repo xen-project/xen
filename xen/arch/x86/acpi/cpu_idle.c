@@ -37,6 +37,7 @@
 #include <xen/smp.h>
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
+#include <xen/param.h>
 #include <xen/trace.h>
 #include <xen/irq.h>
 #include <asm/cache.h>

@@ -15,6 +15,7 @@
 #include <xen/init.h>
 #include <xen/event.h>
 #include <xen/console.h>
+#include <xen/param.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
 #include <xen/keyhandler.h>

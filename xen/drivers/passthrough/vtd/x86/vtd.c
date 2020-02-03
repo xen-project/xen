@@ -17,6 +17,7 @@
  * Copyright (C) Weidong Han <weidong.han@intel.com>
  */
 
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>

@@ -26,6 +26,7 @@
 #include <xen/livepatch.h>
 #include <xen/mem_access.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/perfc.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>

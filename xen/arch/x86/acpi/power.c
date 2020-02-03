@@ -14,6 +14,7 @@
 #include <xen/acpi.h>
 #include <xen/errno.h>
 #include <xen/iocap.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <asm/acpi.h>
 #include <asm/irq.h>

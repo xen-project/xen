@@ -11,6 +11,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/multiboot.h>
+#include <xen/param.h>
 #include <xen/pci_regs.h>
 #include <xen/pfn.h>
 #if EFI_PAGE_SIZE != PAGE_SIZE

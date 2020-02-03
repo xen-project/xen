@@ -19,6 +19,7 @@
 #include <xen/lib.h>
 #include <xen/dmi.h>
 #include <xen/bitmap.h>
+#include <xen/param.h>
 #include <asm/hvm/support.h>
 
 s8 __read_mostly hvm_port80_allowed = -1;

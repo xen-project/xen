@@ -40,6 +40,7 @@
 #include <xen/watchdog.h>
 #include <asm/debugger.h>
 #include <xen/init.h>
+#include <xen/param.h>
 #include <xen/smp.h>
 #include <xen/console.h>
 #include <xen/errno.h>

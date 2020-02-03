@@ -19,6 +19,7 @@
 #include <asm/types.h>
 #include <asm/io.h>
 #include <xen/lib.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/trace.h>

@@ -8,6 +8,7 @@
 #include <xen/console.h>
 #include <xen/delay.h>
 #include <xen/errno.h>
+#include <xen/param.h>
 #include <xen/pci.h>
 #include <xen/serial.h>
 #include <asm/byteorder.h>

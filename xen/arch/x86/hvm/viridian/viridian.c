@@ -9,6 +9,7 @@
 #include <xen/version.h>
 #include <xen/hypercall.h>
 #include <xen/domain_page.h>
+#include <xen/param.h>
 #include <asm/guest_access.h>
 #include <asm/guest/hyperv-tlfs.h>
 #include <asm/paging.h>

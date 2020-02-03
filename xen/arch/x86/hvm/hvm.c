@@ -35,6 +35,7 @@
 #include <xen/mem_access.h>
 #include <xen/rangeset.h>
 #include <xen/monitor.h>
+#include <xen/param.h>
 #include <xen/warning.h>
 #include <xen/vpci.h>
 #include <xen/nospec.h>

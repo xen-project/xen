@@ -26,6 +26,7 @@
 #include <xen/kernel.h>
 #include <xen/init.h>
 #include <xen/notifier.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>

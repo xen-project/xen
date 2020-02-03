@@ -28,6 +28,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/event.h>
 #include <xen/trace.h>
 #include <xen/grant_table.h>

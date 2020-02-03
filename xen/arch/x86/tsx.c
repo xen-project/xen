@@ -1,4 +1,5 @@
 #include <xen/init.h>
+#include <xen/param.h>
 #include <asm/msr.h>
 
 /*

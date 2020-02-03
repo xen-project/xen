@@ -24,6 +24,7 @@
 
 #include <xen/init.h>
 #include <xen/kernel.h>
+#include <xen/param.h>
 #include <xen/smp.h>
 #include <xen/string.h>
 #include <xen/types.h>

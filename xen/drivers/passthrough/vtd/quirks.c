@@ -17,6 +17,7 @@
  */
 
 #include <xen/irq.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>

@@ -30,6 +30,7 @@
 #include <xen/errno.h>
 #include <acpi/actables.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/device_tree.h>
 
 #include <asm/acpi.h>

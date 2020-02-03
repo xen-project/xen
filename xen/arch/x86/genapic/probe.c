@@ -8,6 +8,7 @@
 #include <xen/kernel.h>
 #include <xen/ctype.h>
 #include <xen/init.h>
+#include <xen/param.h>
 #include <asm/cache.h>
 #include <asm/fixmap.h>
 #include <asm/mpspec.h>

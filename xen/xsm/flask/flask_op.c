@@ -13,6 +13,7 @@
 #include <xsm/xsm.h>
 #include <xen/guest_access.h>
 #include <xen/err.h>
+#include <xen/param.h>
 
 #include <public/xsm/flask_op.h>
 

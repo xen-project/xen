@@ -14,6 +14,7 @@
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/cpumask.h>
+#include <xen/param.h>
 #include <xen/percpu.h>
 #include <xen/sched.h>
 #include <xen/warning.h>

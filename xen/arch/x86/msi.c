@@ -14,6 +14,7 @@
 #include <xen/acpi.h>
 #include <xen/cpu.h>
 #include <xen/errno.h>
+#include <xen/param.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/iocap.h>

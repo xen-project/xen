@@ -24,6 +24,7 @@
 #include <xen/guest_access.h>
 #include <xen/lib.h>
 #include <xen/nospec.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/time.h>
 #include <xsm/xsm.h>

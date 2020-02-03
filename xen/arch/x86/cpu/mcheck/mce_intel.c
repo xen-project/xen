@@ -4,6 +4,7 @@
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <xen/delay.h>
+#include <xen/param.h>
 #include <xen/smp.h>
 #include <xen/mm.h>
 #include <xen/cpu.h>

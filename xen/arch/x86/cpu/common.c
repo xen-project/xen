@@ -1,6 +1,7 @@
 #include <xen/init.h>
 #include <xen/string.h>
 #include <xen/delay.h>
+#include <xen/param.h>
 #include <xen/smp.h>
 #include <asm/current.h>
 #include <asm/debugreg.h>

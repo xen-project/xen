@@ -2,6 +2,7 @@
 #include <xen/lib.h>
 #include <xen/err.h>
 #include <xen/grant_table.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/serial.h>

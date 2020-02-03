@@ -1,6 +1,7 @@
 #include <xen/init.h>
 #include <xen/bitops.h>
 #include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/smp.h>
 #include <xen/pci.h>
 #include <asm/io.h>

@@ -12,6 +12,7 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>

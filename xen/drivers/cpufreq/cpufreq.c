@@ -31,6 +31,7 @@
 #include <xen/delay.h>
 #include <xen/cpumask.h>
 #include <xen/list.h>
+#include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/string.h>
 #include <xen/timer.h>
