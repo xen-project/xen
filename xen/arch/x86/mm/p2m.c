@@ -688,7 +688,6 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 {
     mfn_t top_mfn;
     struct domain *d = p2m->domain;
-    int rc = 0;
 
     p2m_lock(p2m);
 
@@ -721,19 +720,8 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     if ( hap_enabled(d) )
         iommu_share_p2m_table(d);
 
-    P2M_PRINTK("populating p2m table\n");
-
-    /* Initialise physmap tables for slot zero. Other code assumes this. */
-    p2m->defer_nested_flush = 1;
-    rc = p2m_set_entry(p2m, _gfn(0), INVALID_MFN, PAGE_ORDER_4K,
-                       p2m_invalid, p2m->default_access);
-    p2m->defer_nested_flush = 0;
     p2m_unlock(p2m);
-    if ( !rc )
-        P2M_PRINTK("p2m table initialised for slot zero\n");
-    else
-        P2M_PRINTK("failed to initialise p2m table for slot zero (%d)\n", rc);
-    return rc;
+    return 0;
 }
 
 /*
