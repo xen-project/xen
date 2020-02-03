@@ -42,7 +42,7 @@ static inline void page_set_tlbflush_timestamp(struct page_info *page)
  * @lastuse_stamp is a timestamp taken when the PFN we are testing was last 
  * used for a purpose that may have caused the CPU's TLB to become tainted.
  */
-static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
+static inline bool NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 {
     u32 curr_time = tlbflush_current_time();
     /*
