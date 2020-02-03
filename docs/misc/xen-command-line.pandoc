@@ -369,8 +369,8 @@ The accepted name keywords for name=value pairs are:
 The following are examples of correct specifications:
 
     com1=115200,8n1,0x3f8,4
-    com1=115200,8n1,0x3f8,4,reg_width=4,reg_shift=2
-    com1=baud=115200,parity=n,stop_bits=1,io_base=0x3f8,reg_width=4
+    com1=115200,8n1,0x3f8,4,reg-width=4,reg-shift=2
+    com1=baud=115200,parity=n,stop-bits=1,io-base=0x3f8,reg-width=4
 
 ### conring_size
 > `= <size>`
