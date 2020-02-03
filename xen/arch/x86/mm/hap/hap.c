@@ -445,6 +445,13 @@ int hap_enable(struct domain *d, u32 mode)
     unsigned int i;
     int rv = 0;
 
+    if ( mode != (PG_external | PG_translate | PG_refcounts) )
+        return -EINVAL;
+
+    /* The function can only be called once per domain. */
+    if ( d->arch.paging.mode != 0 )
+        return -EEXIST;
+
     domain_pause(d);
 
     old_pages = d->arch.paging.hap.total_pages;
@@ -465,13 +472,10 @@ int hap_enable(struct domain *d, u32 mode)
     d->arch.paging.alloc_page = hap_alloc_p2m_page;
     d->arch.paging.free_page = hap_free_p2m_page;
 
-    /* allocate P2m table */
-    if ( mode & PG_translate )
-    {
-        rv = p2m_alloc_table(p2m_get_hostp2m(d));
-        if ( rv != 0 )
-            goto out;
-    }
+    /* allocate P2M table */
+    rv = p2m_alloc_table(p2m_get_hostp2m(d));
+    if ( rv != 0 )
+        goto out;
 
     for ( i = 0; i < MAX_NESTEDP2M; i++ )
     {
