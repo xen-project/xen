@@ -420,7 +420,7 @@ static int vmx_domain_initialise(struct domain *d)
     return 0;
 }
 
-static void vmx_domain_destroy(struct domain *d)
+static void vmx_domain_relinquish_resources(struct domain *d)
 {
     if ( !has_vlapic(d) )
         return;
@@ -2241,7 +2241,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .cpu_up_prepare       = vmx_cpu_up_prepare,
     .cpu_dead             = vmx_cpu_dead,
     .domain_initialise    = vmx_domain_initialise,
-    .domain_destroy       = vmx_domain_destroy,
+    .domain_relinquish_resources = vmx_domain_relinquish_resources,
     .vcpu_initialise      = vmx_vcpu_initialise,
     .vcpu_destroy         = vmx_vcpu_destroy,
     .save_cpu_ctxt        = vmx_save_vmcs_ctxt,
