@@ -152,7 +152,7 @@ struct guest_buffer {
     struct mmio_reg         reg_base;
     struct mmio_reg         reg_tail;
     struct mmio_reg         reg_head;
-    uint32_t                entries;
+    uint32_t                size;
 };
 
 struct guest_iommu_msi {
