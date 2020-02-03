@@ -292,8 +292,8 @@ static bool_t ept_split_super_page(struct p2m_domain *p2m,
  * and map the next table, if available.  If the entry is empty
  * and read_only is set, 
  * Return values:
- *  0: Failed to map.  Either read_only was set and the entry was
- *   empty, or allocating a new page failed.
+ *  GUEST_TABLE_MAP_FAILED: Failed to map.  Either read_only was set and the
+ *   entry was empty, or allocating a new page failed.
  *  GUEST_TABLE_NORMAL_PAGE: next level mapped normally
  *  GUEST_TABLE_SUPER_PAGE:
  *   The next entry points to a superpage, and caller indicates
@@ -404,12 +404,13 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
     ept_entry_t *table;
     unsigned long gfn_remainder = first_gfn;
     unsigned int i, index;
-    int wrc, rc = 0, ret = GUEST_TABLE_MAP_FAILED;
+    int wrc, rc = 0;
 
     table = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
     for ( i = p2m->ept.wl; i > target; --i )
     {
-        ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
+        int ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
+
         if ( ret == GUEST_TABLE_MAP_FAILED )
             goto out;
         if ( ret != GUEST_TABLE_NORMAL_PAGE )
@@ -434,8 +435,10 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
         ASSERT(wrc == 0);
 
         for ( ; i > target; --i )
-            if ( !ept_next_level(p2m, 1, &table, &gfn_remainder, i) )
+            if ( ept_next_level(p2m, 1, &table, &gfn_remainder, i) !=
+                 GUEST_TABLE_NORMAL_PAGE )
                 break;
+        /* We just installed the pages we need. */
         ASSERT(i == target);
     }
 
@@ -694,12 +697,12 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     for ( i = ept->wl; i > target; i-- )
     {
         ret = ept_next_level(p2m, 0, &table, &gfn_remainder, i);
-        if ( !ret )
+        if ( ret == GUEST_TABLE_MAP_FAILED )
         {
-            rc = -ENOENT;
+            rc = -ENOMEM;
             goto out;
         }
-        else if ( ret != GUEST_TABLE_NORMAL_PAGE )
+        if ( ret != GUEST_TABLE_NORMAL_PAGE )
             break;
     }
 
@@ -756,7 +759,8 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
 
         /* then move to the level we want to make real changes */
         for ( ; i > target; i-- )
-            if ( !ept_next_level(p2m, 0, &table, &gfn_remainder, i) )
+            if ( ept_next_level(p2m, 0, &table, &gfn_remainder, i) !=
+                 GUEST_TABLE_NORMAL_PAGE )
                 break;
         /* We just installed the pages we need. */
         ASSERT(i == target);
@@ -859,7 +863,6 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     ept_entry_t *ept_entry;
     u32 index;
     int i;
-    int ret = 0;
     bool_t recalc = 0;
     mfn_t mfn = INVALID_MFN;
     struct ept_data *ept = &p2m->ept;
@@ -883,13 +886,15 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
     for ( i = ept->wl; i > 0; i-- )
     {
+        int ret;
+
     retry:
         if ( table[gfn_remainder >> (i * EPT_TABLE_ORDER)].recalc )
             recalc = 1;
         ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
-        if ( !ret )
+        if ( ret == GUEST_TABLE_MAP_FAILED )
             goto out;
-        else if ( ret == GUEST_TABLE_POD_PAGE )
+        if ( ret == GUEST_TABLE_POD_PAGE )
         {
             if ( !(q & P2M_ALLOC) )
             {
@@ -905,10 +910,9 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
             if ( p2m_pod_demand_populate(p2m, gfn_, i * EPT_TABLE_ORDER) )
                 goto retry;
-            else
-                goto out;
+            goto out;
         }
-        else if ( ret == GUEST_TABLE_SUPER_PAGE )
+        if ( ret == GUEST_TABLE_SUPER_PAGE )
             break;
     }
 
@@ -1289,7 +1293,6 @@ static void ept_dump_p2m_table(unsigned char key)
     ept_entry_t *table, *ept_entry;
     int order;
     int i;
-    int ret = 0;
     unsigned long gfn, gfn_remainder;
     unsigned long record_counter = 0;
     struct p2m_domain *p2m;
@@ -1307,6 +1310,7 @@ static void ept_dump_p2m_table(unsigned char key)
         for ( gfn = 0; gfn <= p2m->max_mapped_pfn; gfn += 1UL << order )
         {
             char c = 0;
+            int ret = GUEST_TABLE_MAP_FAILED;
 
             gfn_remainder = gfn;
             table = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
