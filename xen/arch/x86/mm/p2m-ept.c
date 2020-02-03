@@ -61,8 +61,8 @@ static int atomic_write_ept_entry(struct p2m_domain *p2m,
     return 0;
 }
 
-static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
-                                  p2m_type_t type, p2m_access_t access)
+static void ept_p2m_type_to_flags(const struct p2m_domain *p2m,
+                                  ept_entry_t *entry)
 {
     /*
      * First apply type permissions.
@@ -75,7 +75,7 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
      * D bit is set for all writable types in EPT leaf entry, except for
      * log-dirty type with PML.
      */
-    switch(type)
+    switch ( entry->sa_p2mt )
     {
         case p2m_invalid:
         case p2m_mmio_dm:
@@ -143,9 +143,8 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
             break;
     }
 
-
     /* Then restrict with access permissions */
-    switch (access) 
+    switch ( entry->access )
     {
         case p2m_access_n:
         case p2m_access_n2rwx:
@@ -269,7 +268,7 @@ static bool_t ept_split_super_page(struct p2m_domain *p2m,
         epte->snp = is_iommu_enabled(p2m->domain) && iommu_snoop;
         epte->suppress_ve = 1;
 
-        ept_p2m_type_to_flags(p2m, epte, epte->sa_p2mt, epte->access);
+        ept_p2m_type_to_flags(p2m, epte);
 
         if ( (level - 1) == target )
             continue;
@@ -524,7 +523,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                     if ( nt != e.sa_p2mt )
                     {
                         e.sa_p2mt = nt;
-                        ept_p2m_type_to_flags(p2m, &e, e.sa_p2mt, e.access);
+                        ept_p2m_type_to_flags(p2m, &e);
                     }
                     e.recalc = 0;
                     wrc = atomic_write_ept_entry(p2m, &epte[i], e, level);
@@ -577,7 +576,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                 e.ipat = ipat;
                 e.recalc = 0;
                 if ( recalc && p2m_is_changeable(e.sa_p2mt) )
-                    ept_p2m_type_to_flags(p2m, &e, e.sa_p2mt, e.access);
+                    ept_p2m_type_to_flags(p2m, &e);
                 wrc = atomic_write_ept_entry(p2m, &epte[i], e, level);
                 ASSERT(wrc == 0);
             }
@@ -793,7 +792,7 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
              iommu_flags )
             need_modify_vtd_table = 0;
 
-        ept_p2m_type_to_flags(p2m, &new_entry, p2mt, p2ma);
+        ept_p2m_type_to_flags(p2m, &new_entry);
     }
 
     if ( sve != -1 )
