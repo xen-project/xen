@@ -473,7 +473,8 @@ int hap_enable(struct domain *d, u32 mode)
             goto out;
     }
 
-    for (i = 0; i < MAX_NESTEDP2M; i++) {
+    for ( i = 0; i < MAX_NESTEDP2M; i++ )
+    {
         rv = p2m_alloc_table(d->arch.nested_p2m[i]);
         if ( rv != 0 )
            goto out;
