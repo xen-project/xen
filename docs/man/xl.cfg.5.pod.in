@@ -2504,7 +2504,7 @@ Available options are: B<filter, all, off>.
 Redirect virtual serial ports to B<DEVICE>s. Please see the
 B<-serial> option in the B<qemu(1)> manpage for details of the valid
 B<DEVICE> options. Default is B<vc> when in graphical mode and
-B<stdio> if B<nographics=1> is used.
+B<stdio> if B<nographic=1> is used.
 
 The form serial=DEVICE is also accepted for backwards compatibility.
 
