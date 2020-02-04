@@ -827,10 +827,10 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
         break;
 
     case REC_TYPE_X86_PV_VCPU_XSAVE:
-        if ( blobsz < 128 )
+        if ( blobsz < 16 )
         {
             ERROR("%s record too short: min %zu, got %u",
-                  rec_name, sizeof(*vhdr) + 128, rec->length);
+                  rec_name, sizeof(*vhdr) + 16, rec->length);
             goto out;
         }
         blob = &vcpu->xsave;
