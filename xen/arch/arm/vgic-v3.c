@@ -320,7 +320,7 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         printk(XENLOG_G_ERR
                "%pv: vGICR: unhandled read r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
-        return 0;
+        goto read_as_zero;
     }
 bad_width:
     printk(XENLOG_G_ERR "%pv vGICR: bad read width %d r%d offset %#08x\n",
@@ -334,6 +334,10 @@ read_as_zero_64:
 
 read_as_zero_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+    *r = 0;
+    return 1;
+
+read_as_zero:
     *r = 0;
     return 1;
 
@@ -638,7 +642,7 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
     default:
         printk(XENLOG_G_ERR "%pv: vGICR: unhandled write r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
-        return 0;
+        goto write_ignore;
     }
 bad_width:
     printk(XENLOG_G_ERR
@@ -652,6 +656,9 @@ write_ignore_64:
 
 write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+    return 1;
+
+write_ignore:
     return 1;
 
 write_impl_defined:
@@ -925,7 +932,7 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: unhandled read r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
-        return 0;
+        goto read_as_zero;
     }
 bad_width:
     printk(XENLOG_G_ERR "%pv: vGICR: SGI: bad read width %d r%d offset %#08x\n",
@@ -1002,7 +1009,7 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: unhandled write r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
-        return 0;
+        goto write_ignore;
     }
 
 bad_width:
@@ -1013,6 +1020,9 @@ bad_width:
 
 write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+    return 1;
+
+write_ignore:
     return 1;
 }
 
@@ -1252,7 +1262,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     default:
         printk(XENLOG_G_ERR "%pv: vGICD: unhandled read r%d offset %#08x\n",
                v, dabt.reg, gicd_reg);
-        return 0;
+        goto read_as_zero;
     }
 
 bad_width:
@@ -1438,7 +1448,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         printk(XENLOG_G_ERR
                "%pv: vGICD: unhandled write r%d=%"PRIregister" offset %#08x\n",
                v, dabt.reg, r, gicd_reg);
-        return 0;
+        goto write_ignore;
     }
 
 bad_width:
