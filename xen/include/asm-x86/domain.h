@@ -97,7 +97,7 @@ struct shadow_domain {
     struct page_list_head freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
-    unsigned int      p2m_pages;    /* number of pages allocates to p2m */
+    unsigned int      p2m_pages;    /* number of pages allocated to p2m */
 
     /* 1-to-1 map for use when HVM vcpus have paging disabled */
     pagetable_t unpaged_pagetable;
@@ -161,7 +161,7 @@ struct hap_domain {
     struct page_list_head freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
-    unsigned int      p2m_pages;    /* number of pages allocates to p2m */
+    unsigned int      p2m_pages;    /* number of pages allocated to p2m */
 };
 
 /************************************************/
