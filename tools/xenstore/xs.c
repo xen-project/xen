@@ -797,6 +797,12 @@ unwind:
 	return false;
 }
 
+/* Always return false a functionality has been removed in Xen 4.9 */
+bool xs_restrict(struct xs_handle *h, unsigned domid)
+{
+	return false;
+}
+
 /* Watch a node for changes (poll on fd to detect, or call read_watch()).
  * When the node (or any child) changes, fd will become readable.
  * Token is returned when watch is read, to allow matching.

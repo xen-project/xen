@@ -134,6 +134,11 @@ bool xs_mkdir(struct xs_handle *h, xs_transaction_t t,
 bool xs_rm(struct xs_handle *h, xs_transaction_t t,
 	   const char *path);
 
+/* Fake function which will always return false (required to let
+ * libxenstore remain at 3.0 version.
+ */
+bool xs_restrict(struct xs_handle *h, unsigned domid);
+
 /* Get permissions of node (first element is owner, first perms is "other").
  * Returns malloced array, or NULL: call free() after use.
  */
