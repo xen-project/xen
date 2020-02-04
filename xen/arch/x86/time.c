@@ -566,6 +566,7 @@ static struct platform_timesource __initdata plt_tsc =
  *
  * Xen clock source is a variant of TSC source.
  */
+static uint64_t xen_timer_last;
 
 static uint64_t xen_timer_cpu_frequency(void)
 {
@@ -611,7 +612,6 @@ static uint64_t read_xen_timer(void)
     uint32_t version;
     uint64_t ret;
     uint64_t last;
-    static uint64_t last_value;
 
     do {
         version = info->version & ~1;
@@ -627,12 +627,17 @@ static uint64_t read_xen_timer(void)
 
     /* Maintain a monotonic global value */
     do {
-        last = read_atomic(&last_value);
+        last = read_atomic(&xen_timer_last);
         if ( ret < last )
             return last;
-    } while ( unlikely(cmpxchg(&last_value, last, ret) != last) );
+    } while ( unlikely(cmpxchg(&xen_timer_last, last, ret) != last) );
 
     return ret;
+}
+
+static void resume_xen_timer(struct platform_timesource *pts)
+{
+    write_atomic(&xen_timer_last, 0);
 }
 
 static struct platform_timesource __initdata plt_xen_timer =
@@ -641,6 +646,7 @@ static struct platform_timesource __initdata plt_xen_timer =
     .name = "XEN PV CLOCK",
     .read_counter = read_xen_timer,
     .init = init_xen_timer,
+    .resume = resume_xen_timer,
     .counter_bits = 63,
 };
 #endif

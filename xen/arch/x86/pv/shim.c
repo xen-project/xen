@@ -326,9 +326,13 @@ int pv_shim_shutdown(uint8_t reason)
         if ( v != current )
             vcpu_pause_by_systemcontroller(v);
 
+    /* Prepare timekeeping code to suspend.*/
+    time_suspend();
+
     rc = xen_hypercall_shutdown(SHUTDOWN_suspend);
     if ( rc )
     {
+        time_resume();
         for_each_vcpu ( d, v )
             if ( v != current )
                 vcpu_unpause_by_systemcontroller(v);
@@ -336,8 +340,9 @@ int pv_shim_shutdown(uint8_t reason)
         return rc;
     }
 
-    /* Resume the shim itself first. */
+    /* Resume the shim itself and timekeeping first. */
     hypervisor_resume();
+    time_resume();
 
     /*
      * ATM there's nothing Xen can do if the console/store pfn changes,
