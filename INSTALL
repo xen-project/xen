@@ -19,6 +19,26 @@ following compile process. Once configure is done, make(1) has to be
 called. Also make(1) recognizes certain arguments. The following sections
 will give an overview.
 
+Xen Hypervisor
+==============
+
+Xen itself is configured via a `kconfig' system borrowed from Linux.
+See docs/misc/kconfig.txt.
+
+Note that unlike with Linux, and contrary to that document, you cannot
+look at Kconfig files, or the default or generated config files etc.,
+to find available configuration options.  This is because it is only
+supported (and security supported) by the Xen Project, to change a
+small subset of the options.  Attempts to change other options will be
+silently overridden.  The only way to find which configuration options
+are available is to run `make menuconfig' or the like.
+
+You can counter-override this behaviour by setting XEN_CONFIG_EXPERT=y
+in your environment.  However, doing this is not supported and the
+resulting configurations do not receive security support.  If you set
+this variable there is nothing stopping you setting dangerously
+experimental combinations of features - not even any warnings.
+
 Options recognized by configure
 ===============================
 
