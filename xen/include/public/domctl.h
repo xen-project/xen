@@ -42,7 +42,8 @@
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
- * If it is specified as zero, an id is auto-allocated and returned.
+ * If it is specified as an invalid value (0 or >= DOMID_FIRST_RESERVED),
+ * an id is auto-allocated and returned.
  */
 /* XEN_DOMCTL_createdomain */
 struct xen_domctl_createdomain {

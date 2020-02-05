@@ -2127,7 +2127,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
         goto out;
     }
 
-    sdss->pvqemu.guest_domid = 0;
+    sdss->pvqemu.guest_domid = INVALID_DOMID;
 
     libxl_domain_create_info_init(&dm_config->c_info);
     dm_config->c_info.type = LIBXL_DOMAIN_TYPE_PV;
