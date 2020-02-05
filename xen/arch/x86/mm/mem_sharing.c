@@ -1061,6 +1061,29 @@ err_out:
     return ret;
 }
 
+/*
+ * This function is intended to be used for plugging a "hole" in the client's
+ * physmap with a shared memory entry. Unfortunately the definition of a "hole"
+ * is currently ambigious. There are two cases one can run into a "hole":
+ *  1) there is no pagetable entry at all
+ *  2) there is a pagetable entry with a type that passes p2m_is_hole
+ *
+ * The intended use-case for this function is case 1.
+ *
+ * During 1) the mem_access being returned is p2m_access_n and that is
+ * incorrect to be applied to the new entry being added the client physmap,
+ * thus we make use of the p2m->default_access instead.
+ * When 2) is true it is possible that the existing pagetable entry also has
+ * a mem_access permission set, which could be p2m_access_n. Since we can't
+ * differentiate whether we are in case 1) or 2), we default to using the
+ * access permission defined as default for the p2m, thus in
+ * case 2) overwriting any custom mem_access permission the user may have set
+ * on a hole page. Custom mem_access permissions being set on a hole are
+ * unheard of but technically possible.
+ *
+ * TODO: to properly resolve this issue implement differentiation between the
+ * two "hole" types.
+ */
 static
 int add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
                    struct domain *cd, unsigned long cgfn, bool lock)
@@ -1071,11 +1094,10 @@ int add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
     p2m_type_t smfn_type, cmfn_type;
     struct gfn_info *gfn_info;
     struct p2m_domain *p2m = p2m_get_hostp2m(cd);
-    p2m_access_t a;
     struct two_gfns tg;
 
     get_two_gfns(sd, _gfn(sgfn), &smfn_type, NULL, &smfn,
-                 cd, _gfn(cgfn), &cmfn_type, &a, &cmfn, 0, &tg, lock);
+                 cd, _gfn(cgfn), &cmfn_type, NULL, &cmfn, 0, &tg, lock);
 
     /* Get the source shared page, check and lock */
     ret = XENMEM_SHARING_OP_S_HANDLE_INVALID;
@@ -1110,7 +1132,7 @@ int add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
     }
 
     ret = p2m_set_entry(p2m, _gfn(cgfn), smfn, PAGE_ORDER_4K,
-                        p2m_ram_shared, a);
+                        p2m_ram_shared, p2m->default_access);
 
     /* Tempted to turn this into an assert */
     if ( ret )
