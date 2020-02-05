@@ -71,7 +71,6 @@ static int write_hvm_params(struct xc_sr_context *ctx)
         HVM_PARAM_ACPI_IOPORTS_LOCATION,
         HVM_PARAM_VIRIDIAN,
         HVM_PARAM_IDENT_PT,
-        HVM_PARAM_PAE_ENABLED,
         HVM_PARAM_VM_GENERATION_ID_ADDR,
         HVM_PARAM_IOREQ_SERVER_PFN,
         HVM_PARAM_NR_IOREQ_SERVER_PAGES,

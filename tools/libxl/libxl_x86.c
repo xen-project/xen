@@ -391,12 +391,10 @@ static int hvm_set_conf_params(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_interface *xch = ctx->xch;
     int ret = ERROR_FAIL;
-    bool pae = true, altp2m = info->altp2m;
+    bool altp2m = info->altp2m;
 
     switch(info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        pae = libxl_defbool_val(info->u.hvm.pae);
-
         /* The config parameter "altp2m" replaces the parameter "altp2mhvm". For
          * legacy reasons, both parameters are accepted on x86 HVM guests.
          *
@@ -425,10 +423,6 @@ static int hvm_set_conf_params(libxl__gc *gc, uint32_t domid,
 
         /* Fallthrough */
     case LIBXL_DOMAIN_TYPE_PVH:
-        if (xc_hvm_param_set(xch, domid, HVM_PARAM_PAE_ENABLED, pae)) {
-            LOG(ERROR, "Couldn't set HVM_PARAM_PAE_ENABLED");
-            goto out;
-        }
         if (xc_hvm_param_set(xch, domid, HVM_PARAM_TIMER_MODE,
                              timer_mode(info))) {
             LOG(ERROR, "Couldn't set HVM_PARAM_TIMER_MODE");

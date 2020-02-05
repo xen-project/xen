@@ -28,6 +28,7 @@
 /* These parameters are deprecated and their meaning is undefined. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
+#define HVM_PARAM_PAE_ENABLED                4
 #define HVM_PARAM_DM_DOMAIN                 13
 #define HVM_PARAM_MEMORY_EVENT_CR0          20
 #define HVM_PARAM_MEMORY_EVENT_CR3          21
@@ -91,8 +92,6 @@
  */
 #define HVM_PARAM_STORE_PFN    1
 #define HVM_PARAM_STORE_EVTCHN 2
-
-#define HVM_PARAM_PAE_ENABLED  4
 
 #define HVM_PARAM_IOREQ_PFN    5
 

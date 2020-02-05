@@ -4104,6 +4104,7 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_X87_FIP_WIDTH:
         break;
     /* The following parameters are deprecated. */
+    case HVM_PARAM_PAE_ENABLED:
     case HVM_PARAM_DM_DOMAIN:
     case HVM_PARAM_MEMORY_EVENT_CR0:
     case HVM_PARAM_MEMORY_EVENT_CR3:
@@ -4407,6 +4408,7 @@ static int hvm_allow_get_param(struct domain *d,
     case HVM_PARAM_X87_FIP_WIDTH:
         break;
     /* The following parameters are deprecated. */
+    case HVM_PARAM_PAE_ENABLED:
     case HVM_PARAM_DM_DOMAIN:
     case HVM_PARAM_MEMORY_EVENT_CR0:
     case HVM_PARAM_MEMORY_EVENT_CR3:

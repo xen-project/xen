@@ -72,6 +72,16 @@ static int handle_hvm_params(struct xc_sr_context *ctx,
         case HVM_PARAM_BUFIOREQ_PFN:
             xc_clear_domain_page(xch, ctx->domid, entry->value);
             break;
+
+        case HVM_PARAM_PAE_ENABLED:
+            /*
+             * This HVM_PARAM only ever existed to pass data into
+             * xc_cpuid_apply_policy().  The function has now been updated to
+             * use a normal calling convention, making the param obsolete.
+             *
+             * Discard if we find it in an old migration stream.
+             */
+            continue;
         }
 
         rc = xc_hvm_param_set(xch, ctx->domid, entry->index, entry->value);
