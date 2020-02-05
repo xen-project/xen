@@ -3255,9 +3255,9 @@ static enum hvm_translation_result __hvm_copy(
     while ( todo > 0 )
     {
         enum hvm_translation_result res;
-        paddr_t gpa = addr & ~PAGE_MASK;
+        unsigned int pgoff = addr & ~PAGE_MASK;
 
-        count = min_t(int, PAGE_SIZE - gpa, todo);
+        count = min_t(int, PAGE_SIZE - pgoff, todo);
 
         res = hvm_translate_get_page(v, addr, flags & HVMCOPY_linear,
                                      pfec, pfinfo, &page, &gfn, &p2mt);
@@ -3279,7 +3279,7 @@ static enum hvm_translation_result __hvm_copy(
             return HVMTRANS_need_retry;
         }
 
-        p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
+        p = __map_domain_page(page) + pgoff;
 
         if ( flags & HVMCOPY_to_guest )
         {
