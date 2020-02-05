@@ -4081,16 +4081,17 @@ static int hvmop_set_evtchn_upcall_vector(
 }
 
 static int hvm_allow_set_param(struct domain *d,
-                               const struct xen_hvm_param *a)
+                               uint32_t index,
+                               uint64_t new_value)
 {
-    uint64_t value = d->arch.hvm.params[a->index];
+    uint64_t value = d->arch.hvm.params[index];
     int rc;
 
     rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_set_param);
     if ( rc )
         return rc;
 
-    switch ( a->index )
+    switch ( index )
     {
     /* The following parameters can be set by the guest. */
     case HVM_PARAM_CALLBACK_IRQ:
@@ -4123,7 +4124,7 @@ static int hvm_allow_set_param(struct domain *d,
     if ( rc )
         return rc;
 
-    switch ( a->index )
+    switch ( index )
     {
     /* The following parameters should only be changed once. */
     case HVM_PARAM_VIRIDIAN:
@@ -4133,7 +4134,7 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
     case HVM_PARAM_ALTP2M:
     case HVM_PARAM_MCA_CAP:
-        if ( value != 0 && a->value != value )
+        if ( value != 0 && new_value != value )
             rc = -EEXIST;
         break;
     default:
@@ -4143,13 +4144,224 @@ static int hvm_allow_set_param(struct domain *d,
     return rc;
 }
 
-static int hvmop_set_param(
-    XEN_GUEST_HANDLE_PARAM(xen_hvm_param_t) arg)
+static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
 {
     struct domain *curr_d = current->domain;
+    struct vcpu *v;
+    int rc;
+
+    if ( index >= HVM_NR_PARAMS )
+        return -EINVAL;
+
+    rc = hvm_allow_set_param(d, index, value);
+    if ( rc )
+        return rc;
+
+    switch ( index )
+    {
+    case HVM_PARAM_CALLBACK_IRQ:
+        hvm_set_callback_via(d, value);
+        hvm_latch_shinfo_size(d);
+        break;
+    case HVM_PARAM_TIMER_MODE:
+        if ( value > HVMPTM_one_missed_tick_pending )
+            rc = -EINVAL;
+        break;
+    case HVM_PARAM_VIRIDIAN:
+        if ( (value & ~HVMPV_feature_mask) ||
+             !(value & HVMPV_base_freq) )
+            rc = -EINVAL;
+        break;
+    case HVM_PARAM_IDENT_PT:
+        /*
+         * Only actually required for VT-x lacking unrestricted_guest
+         * capabilities.  Short circuit the pause if possible.
+         */
+        if ( !paging_mode_hap(d) || !cpu_has_vmx )
+        {
+            d->arch.hvm.params[index] = value;
+            break;
+        }
+
+        /*
+         * Update GUEST_CR3 in each VMCS to point at identity map.
+         * All foreign updates to guest state must synchronise on
+         * the domctl_lock.
+         */
+        rc = -ERESTART;
+        if ( !domctl_lock_acquire() )
+            break;
+
+        rc = 0;
+        domain_pause(d);
+        d->arch.hvm.params[index] = value;
+        for_each_vcpu ( d, v )
+            paging_update_cr3(v, false);
+        domain_unpause(d);
+
+        domctl_lock_release();
+        break;
+    case HVM_PARAM_DM_DOMAIN:
+        /* The only value this should ever be set to is DOMID_SELF */
+        if ( value != DOMID_SELF )
+            rc = -EINVAL;
+
+        value = curr_d->domain_id;
+        break;
+    case HVM_PARAM_ACPI_S_STATE:
+        rc = 0;
+        if ( value == 3 )
+            hvm_s3_suspend(d);
+        else if ( value == 0 )
+            hvm_s3_resume(d);
+        else
+            rc = -EINVAL;
+
+        break;
+    case HVM_PARAM_ACPI_IOPORTS_LOCATION:
+        rc = pmtimer_change_ioport(d, value);
+        break;
+    case HVM_PARAM_MEMORY_EVENT_CR0:
+    case HVM_PARAM_MEMORY_EVENT_CR3:
+    case HVM_PARAM_MEMORY_EVENT_CR4:
+    case HVM_PARAM_MEMORY_EVENT_INT3:
+    case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
+    case HVM_PARAM_MEMORY_EVENT_MSR:
+        /* Deprecated */
+        rc = -EOPNOTSUPP;
+        break;
+    case HVM_PARAM_NESTEDHVM:
+        rc = xsm_hvm_param_nested(XSM_PRIV, d);
+        if ( rc )
+            break;
+        if ( value > 1 )
+            rc = -EINVAL;
+        /*
+         * Remove the check below once we have
+         * shadow-on-shadow.
+         */
+        if ( !paging_mode_hap(d) && value )
+            rc = -EINVAL;
+        if ( value &&
+             d->arch.hvm.params[HVM_PARAM_ALTP2M] )
+            rc = -EINVAL;
+        /* Set up NHVM state for any vcpus that are already up. */
+        if ( value &&
+             !d->arch.hvm.params[HVM_PARAM_NESTEDHVM] )
+            for_each_vcpu(d, v)
+                if ( rc == 0 )
+                    rc = nestedhvm_vcpu_initialise(v);
+        if ( !value || rc )
+            for_each_vcpu(d, v)
+                nestedhvm_vcpu_destroy(v);
+        break;
+    case HVM_PARAM_ALTP2M:
+        rc = xsm_hvm_param_altp2mhvm(XSM_PRIV, d);
+        if ( rc )
+            break;
+        if ( value > XEN_ALTP2M_limited )
+            rc = -EINVAL;
+        if ( value &&
+             d->arch.hvm.params[HVM_PARAM_NESTEDHVM] )
+            rc = -EINVAL;
+        break;
+    case HVM_PARAM_TRIPLE_FAULT_REASON:
+        if ( value > SHUTDOWN_MAX )
+            rc = -EINVAL;
+        break;
+    case HVM_PARAM_IOREQ_SERVER_PFN:
+        d->arch.hvm.ioreq_gfn.base = value;
+        break;
+    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+    {
+        unsigned int i;
+
+        if ( value == 0 ||
+             value > sizeof(d->arch.hvm.ioreq_gfn.mask) * 8 )
+        {
+            rc = -EINVAL;
+            break;
+        }
+        for ( i = 0; i < value; i++ )
+            set_bit(i, &d->arch.hvm.ioreq_gfn.mask);
+
+        break;
+    }
+
+    case HVM_PARAM_IOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_PFN:
+        BUILD_BUG_ON(HVM_PARAM_IOREQ_PFN >
+                     sizeof(d->arch.hvm.ioreq_gfn.legacy_mask) * 8);
+        BUILD_BUG_ON(HVM_PARAM_BUFIOREQ_PFN >
+                     sizeof(d->arch.hvm.ioreq_gfn.legacy_mask) * 8);
+        if ( value )
+            set_bit(index, &d->arch.hvm.ioreq_gfn.legacy_mask);
+        break;
+
+    case HVM_PARAM_X87_FIP_WIDTH:
+        if ( value != 0 && value != 4 && value != 8 )
+        {
+            rc = -EINVAL;
+            break;
+        }
+        d->arch.x87_fip_width = value;
+        break;
+
+    case HVM_PARAM_VM86_TSS:
+        /* Hardware would silently truncate high bits. */
+        if ( value != (uint32_t)value )
+        {
+            if ( d == curr_d )
+                domain_crash(d);
+            rc = -EINVAL;
+        }
+        /* Old hvmloader binaries hardcode the size to 128 bytes. */
+        if ( value )
+            value |= (128ULL << 32) | VM86_TSS_UPDATED;
+        index = HVM_PARAM_VM86_TSS_SIZED;
+        break;
+
+    case HVM_PARAM_VM86_TSS_SIZED:
+        if ( (value >> 32) < sizeof(struct tss32) )
+        {
+            if ( d == curr_d )
+                domain_crash(d);
+            rc = -EINVAL;
+        }
+        /*
+         * Cap at the theoretically useful maximum (base structure plus
+         * 256 bits interrupt redirection bitmap + 64k bits I/O bitmap
+         * plus one padding byte).
+         */
+        if ( (value >> 32) > sizeof(struct tss32) +
+                               (0x100 / 8) + (0x10000 / 8) + 1 )
+            value = (uint32_t)value |
+                      ((sizeof(struct tss32) + (0x100 / 8) +
+                                               (0x10000 / 8) + 1) << 32);
+        value |= VM86_TSS_UPDATED;
+        break;
+
+    case HVM_PARAM_MCA_CAP:
+        rc = vmce_enable_mca_cap(d, value);
+        break;
+    }
+
+    if ( !rc )
+    {
+        d->arch.hvm.params[index] = value;
+
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "set param %u = %"PRIx64,
+                    index, value);
+    }
+
+    return rc;
+}
+
+int hvmop_set_param(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_param_t) arg)
+{
     struct xen_hvm_param a;
     struct domain *d;
-    struct vcpu *v;
     int rc;
 
     if ( copy_from_guest(&a, arg, 1) )
@@ -4166,217 +4378,15 @@ static int hvmop_set_param(
         return -ESRCH;
 
     rc = -EINVAL;
-    if ( !is_hvm_domain(d) )
-        goto out;
+    if ( is_hvm_domain(d) )
+        rc = hvm_set_param(d, a.index, a.value);
 
-    rc = hvm_allow_set_param(d, &a);
-    if ( rc )
-        goto out;
-
-    switch ( a.index )
-    {
-    case HVM_PARAM_CALLBACK_IRQ:
-        hvm_set_callback_via(d, a.value);
-        hvm_latch_shinfo_size(d);
-        break;
-    case HVM_PARAM_TIMER_MODE:
-        if ( a.value > HVMPTM_one_missed_tick_pending )
-            rc = -EINVAL;
-        break;
-    case HVM_PARAM_VIRIDIAN:
-        if ( (a.value & ~HVMPV_feature_mask) ||
-             !(a.value & HVMPV_base_freq) )
-            rc = -EINVAL;
-        break;
-    case HVM_PARAM_IDENT_PT:
-        /*
-         * Only actually required for VT-x lacking unrestricted_guest
-         * capabilities.  Short circuit the pause if possible.
-         */
-        if ( !paging_mode_hap(d) || !cpu_has_vmx )
-        {
-            d->arch.hvm.params[a.index] = a.value;
-            break;
-        }
-
-        /*
-         * Update GUEST_CR3 in each VMCS to point at identity map.
-         * All foreign updates to guest state must synchronise on
-         * the domctl_lock.
-         */
-        rc = -ERESTART;
-        if ( !domctl_lock_acquire() )
-            break;
-
-        rc = 0;
-        domain_pause(d);
-        d->arch.hvm.params[a.index] = a.value;
-        for_each_vcpu ( d, v )
-            paging_update_cr3(v, false);
-        domain_unpause(d);
-
-        domctl_lock_release();
-        break;
-    case HVM_PARAM_DM_DOMAIN:
-        /* The only value this should ever be set to is DOMID_SELF */
-        if ( a.value != DOMID_SELF )
-            rc = -EINVAL;
-
-        a.value = curr_d->domain_id;
-        break;
-    case HVM_PARAM_ACPI_S_STATE:
-        rc = 0;
-        if ( a.value == 3 )
-            hvm_s3_suspend(d);
-        else if ( a.value == 0 )
-            hvm_s3_resume(d);
-        else
-            rc = -EINVAL;
-
-        break;
-    case HVM_PARAM_ACPI_IOPORTS_LOCATION:
-        rc = pmtimer_change_ioport(d, a.value);
-        break;
-    case HVM_PARAM_MEMORY_EVENT_CR0:
-    case HVM_PARAM_MEMORY_EVENT_CR3:
-    case HVM_PARAM_MEMORY_EVENT_CR4:
-    case HVM_PARAM_MEMORY_EVENT_INT3:
-    case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
-    case HVM_PARAM_MEMORY_EVENT_MSR:
-        /* Deprecated */
-        rc = -EOPNOTSUPP;
-        break;
-    case HVM_PARAM_NESTEDHVM:
-        rc = xsm_hvm_param_nested(XSM_PRIV, d);
-        if ( rc )
-            break;
-        if ( a.value > 1 )
-            rc = -EINVAL;
-        /*
-         * Remove the check below once we have
-         * shadow-on-shadow.
-         */
-        if ( !paging_mode_hap(d) && a.value )
-            rc = -EINVAL;
-        if ( a.value &&
-             d->arch.hvm.params[HVM_PARAM_ALTP2M] )
-            rc = -EINVAL;
-        /* Set up NHVM state for any vcpus that are already up. */
-        if ( a.value &&
-             !d->arch.hvm.params[HVM_PARAM_NESTEDHVM] )
-            for_each_vcpu(d, v)
-                if ( rc == 0 )
-                    rc = nestedhvm_vcpu_initialise(v);
-        if ( !a.value || rc )
-            for_each_vcpu(d, v)
-                nestedhvm_vcpu_destroy(v);
-        break;
-    case HVM_PARAM_ALTP2M:
-        rc = xsm_hvm_param_altp2mhvm(XSM_PRIV, d);
-        if ( rc )
-            break;
-        if ( a.value > XEN_ALTP2M_limited )
-            rc = -EINVAL;
-        if ( a.value &&
-             d->arch.hvm.params[HVM_PARAM_NESTEDHVM] )
-            rc = -EINVAL;
-        break;
-    case HVM_PARAM_TRIPLE_FAULT_REASON:
-        if ( a.value > SHUTDOWN_MAX )
-            rc = -EINVAL;
-        break;
-    case HVM_PARAM_IOREQ_SERVER_PFN:
-        d->arch.hvm.ioreq_gfn.base = a.value;
-        break;
-    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
-    {
-        unsigned int i;
-
-        if ( a.value == 0 ||
-             a.value > sizeof(d->arch.hvm.ioreq_gfn.mask) * 8 )
-        {
-            rc = -EINVAL;
-            break;
-        }
-        for ( i = 0; i < a.value; i++ )
-            set_bit(i, &d->arch.hvm.ioreq_gfn.mask);
-
-        break;
-    }
-
-    case HVM_PARAM_IOREQ_PFN:
-    case HVM_PARAM_BUFIOREQ_PFN:
-        BUILD_BUG_ON(HVM_PARAM_IOREQ_PFN >
-                     sizeof(d->arch.hvm.ioreq_gfn.legacy_mask) * 8);
-        BUILD_BUG_ON(HVM_PARAM_BUFIOREQ_PFN >
-                     sizeof(d->arch.hvm.ioreq_gfn.legacy_mask) * 8);
-        if ( a.value )
-            set_bit(a.index, &d->arch.hvm.ioreq_gfn.legacy_mask);
-        break;
-
-    case HVM_PARAM_X87_FIP_WIDTH:
-        if ( a.value != 0 && a.value != 4 && a.value != 8 )
-        {
-            rc = -EINVAL;
-            break;
-        }
-        d->arch.x87_fip_width = a.value;
-        break;
-
-    case HVM_PARAM_VM86_TSS:
-        /* Hardware would silently truncate high bits. */
-        if ( a.value != (uint32_t)a.value )
-        {
-            if ( d == curr_d )
-                domain_crash(d);
-            rc = -EINVAL;
-        }
-        /* Old hvmloader binaries hardcode the size to 128 bytes. */
-        if ( a.value )
-            a.value |= (128ULL << 32) | VM86_TSS_UPDATED;
-        a.index = HVM_PARAM_VM86_TSS_SIZED;
-        break;
-
-    case HVM_PARAM_VM86_TSS_SIZED:
-        if ( (a.value >> 32) < sizeof(struct tss32) )
-        {
-            if ( d == curr_d )
-                domain_crash(d);
-            rc = -EINVAL;
-        }
-        /*
-         * Cap at the theoretically useful maximum (base structure plus
-         * 256 bits interrupt redirection bitmap + 64k bits I/O bitmap
-         * plus one padding byte).
-         */
-        if ( (a.value >> 32) > sizeof(struct tss32) +
-                               (0x100 / 8) + (0x10000 / 8) + 1 )
-            a.value = (uint32_t)a.value |
-                      ((sizeof(struct tss32) + (0x100 / 8) +
-                                               (0x10000 / 8) + 1) << 32);
-        a.value |= VM86_TSS_UPDATED;
-        break;
-
-    case HVM_PARAM_MCA_CAP:
-        rc = vmce_enable_mca_cap(d, a.value);
-        break;
-    }
-
-    if ( rc != 0 )
-        goto out;
-
-    d->arch.hvm.params[a.index] = a.value;
-
-    HVM_DBG_LOG(DBG_LEVEL_HCALL, "set param %u = %"PRIx64,
-                a.index, a.value);
-
- out:
     rcu_unlock_domain(d);
     return rc;
 }
 
 static int hvm_allow_get_param(struct domain *d,
-                               const struct xen_hvm_param *a)
+                               uint32_t index)
 {
     int rc;
 
@@ -4384,7 +4394,7 @@ static int hvm_allow_get_param(struct domain *d,
     if ( rc )
         return rc;
 
-    switch ( a->index )
+    switch ( index )
     {
     /* The following parameters can be read by the guest. */
     case HVM_PARAM_CALLBACK_IRQ:
@@ -4414,6 +4424,41 @@ static int hvm_allow_get_param(struct domain *d,
     return rc;
 }
 
+static int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value)
+{
+    int rc;
+
+    rc = hvm_allow_get_param(d, index);
+    if ( rc )
+        return rc;
+
+    switch ( index )
+    {
+    case HVM_PARAM_ACPI_S_STATE:
+        *value = d->arch.hvm.is_s3_suspended ? 3 : 0;
+        break;
+
+    case HVM_PARAM_VM86_TSS:
+        *value = (uint32_t)d->arch.hvm.params[HVM_PARAM_VM86_TSS_SIZED];
+        break;
+
+    case HVM_PARAM_VM86_TSS_SIZED:
+        *value = d->arch.hvm.params[HVM_PARAM_VM86_TSS_SIZED] &
+                 ~VM86_TSS_UPDATED;
+        break;
+
+    case HVM_PARAM_X87_FIP_WIDTH:
+        *value = d->arch.x87_fip_width;
+        break;
+
+    default:
+        *value = d->arch.hvm.params[index];
+        break;
+    }
+
+    return 0;
+};
+
 static int hvmop_get_param(
     XEN_GUEST_HANDLE_PARAM(xen_hvm_param_t) arg)
 {
@@ -4435,42 +4480,14 @@ static int hvmop_get_param(
         return -ESRCH;
 
     rc = -EINVAL;
-    if ( !is_hvm_domain(d) )
-        goto out;
-
-    rc = hvm_allow_get_param(d, &a);
-    if ( rc )
-        goto out;
-
-    switch ( a.index )
+    if ( is_hvm_domain(d) && !(rc = hvm_get_param(d, a.index, &a.value)) )
     {
-    case HVM_PARAM_ACPI_S_STATE:
-        a.value = d->arch.hvm.is_s3_suspended ? 3 : 0;
-        break;
+        rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
 
-    case HVM_PARAM_VM86_TSS:
-        a.value = (uint32_t)d->arch.hvm.params[HVM_PARAM_VM86_TSS_SIZED];
-        break;
-
-    case HVM_PARAM_VM86_TSS_SIZED:
-        a.value = d->arch.hvm.params[HVM_PARAM_VM86_TSS_SIZED] &
-                  ~VM86_TSS_UPDATED;
-        break;
-
-    case HVM_PARAM_X87_FIP_WIDTH:
-        a.value = d->arch.x87_fip_width;
-        break;
-    default:
-        a.value = d->arch.hvm.params[a.index];
-        break;
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "get param %u = %"PRIx64,
+                    a.index, a.value);
     }
 
-    rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
-
-    HVM_DBG_LOG(DBG_LEVEL_HCALL, "get param %u = %"PRIx64,
-                a.index, a.value);
-
- out:
     rcu_unlock_domain(d);
     return rc;
 }
@@ -5299,6 +5316,36 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     }
 
     alternative_vcall(hvm_funcs.set_segment_register, v, seg, reg);
+}
+
+int hvm_copy_context_and_params(struct domain *dst, struct domain *src)
+{
+    struct hvm_domain_context c = { .size = hvm_save_size(src) };
+    int rc;
+    unsigned int i;
+
+    if ( (c.data = vmalloc(c.size)) == NULL )
+        return -ENOMEM;
+
+    if ( (rc = hvm_save(src, &c)) )
+        return rc;
+
+    for ( i = 0; i < HVM_NR_PARAMS; i++ )
+    {
+        uint64_t value = 0;
+
+        if ( hvm_get_param(src, i, &value) || !value )
+            continue;
+
+        if ( (rc = hvm_set_param(dst, i, value)) )
+            return rc;
+    }
+
+    c.cur = 0;
+    rc = hvm_load(dst, &c);
+    vfree(c.data);
+
+    return rc;
 }
 
 /*

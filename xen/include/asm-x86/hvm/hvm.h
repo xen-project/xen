@@ -337,6 +337,8 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore);
 bool hvm_flush_vcpu_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
                         void *ctxt);
 
+int hvm_copy_context_and_params(struct domain *src, struct domain *dst);
+
 #ifdef CONFIG_HVM
 
 #define hvm_get_guest_tsc(v) hvm_get_guest_tsc_fixed(v, 0)
