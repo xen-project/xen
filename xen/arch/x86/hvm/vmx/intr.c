@@ -209,7 +209,7 @@ static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
                 if ( unlikely(intack.source != hvm_intsrc_none) )
                     vmx_enable_intr_window(v, intack);
             }
-            else
+            else if ( !cpu_has_vmx_virtual_intr_delivery )
                 vmx_enable_intr_window(v, intack);
 
             return 1;
