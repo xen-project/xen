@@ -416,8 +416,22 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
     libxl_cpuid_policy_list cpuid = info->cpuid;
     int i;
     char *cpuid_res[4];
+    bool pae = true;
 
-    xc_cpuid_apply_policy(ctx->xch, domid, NULL, 0);
+    /*
+     * For PV guests, PAE is Xen-controlled (it is the 'p' that differentiates
+     * the xen-3.0-x86_32 and xen-3.0-x86_32p ABIs).  It is mandatory as Xen
+     * is 64bit only these days.
+     *
+     * For PVH guests, there is no top-level PAE control in the domain config,
+     * so is treated as always available.
+     *
+     * HVM guests get a top-level choice of whether PAE is available.
+     */
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM)
+        pae = libxl_defbool_val(info->u.hvm.pae);
+
+    xc_cpuid_apply_policy(ctx->xch, domid, NULL, 0, pae);
 
     if (!cpuid)
         return;
