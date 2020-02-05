@@ -454,9 +454,7 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     if (rc)
         return rc;
 
-    libxl__cpuid_apply_policy(ctx, domid);
-    if (info->cpuid != NULL)
-        libxl__cpuid_set(ctx, domid, info->cpuid);
+    libxl__cpuid_legacy(ctx, domid, info);
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM
         && !libxl_ms_vm_genid_is_zero(&info->u.hvm.ms_vm_genid)) {

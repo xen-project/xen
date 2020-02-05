@@ -410,16 +410,17 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
     return 0;
 }
 
-void libxl__cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid)
+void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
+                         libxl_domain_build_info *info)
 {
-    xc_cpuid_apply_policy(ctx->xch, domid, NULL, 0);
-}
-
-void libxl__cpuid_set(libxl_ctx *ctx, uint32_t domid,
-                      libxl_cpuid_policy_list cpuid)
-{
+    libxl_cpuid_policy_list cpuid = info->cpuid;
     int i;
     char *cpuid_res[4];
+
+    xc_cpuid_apply_policy(ctx->xch, domid, NULL, 0);
+
+    if (!cpuid)
+        return;
 
     for (i = 0; cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++)
         xc_cpuid_set(ctx->xch, domid, cpuid[i].input,
