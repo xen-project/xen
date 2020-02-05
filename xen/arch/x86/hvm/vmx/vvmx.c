@@ -1393,7 +1393,12 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     /* updating host cr0 to sync TS bit */
     __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
 
-    if ( cpu_has_vmx_virtual_intr_delivery )
+    if ( cpu_has_vmx_virtual_intr_delivery &&
+         /*
+          * Only inject the vector if the Ack on exit bit is not set, else the
+          * interrupt will be signaled in the vmcs VM_EXIT_INTR_INFO field.
+          */
+         !(get_vvmcs(v, VM_EXIT_CONTROLS) & VM_EXIT_ACK_INTR_ON_EXIT) )
         nvmx_update_apicv(v);
 
     nvcpu->nv_vmswitch_in_progress = 0;
