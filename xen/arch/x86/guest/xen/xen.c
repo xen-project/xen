@@ -206,11 +206,6 @@ static int init_evtchn(void)
 {
     static uint8_t evtchn_upcall_vector;
     int rc;
-    struct xen_hvm_param a = {
-        .domid = DOMID_SELF,
-        .index = HVM_PARAM_CALLBACK_IRQ,
-        .value = 1,
-    };
 
     if ( !evtchn_upcall_vector )
         alloc_direct_apic_vector(&evtchn_upcall_vector, xen_evtchn_upcall);
@@ -225,10 +220,19 @@ static int init_evtchn(void)
         return rc;
     }
 
-    /* Trick toolstack to think we are enlightened */
-    rc = xen_hypercall_hvm_op(HVMOP_set_param, &a);
-    if ( rc )
-        printk("Unable to set HVM_PARAM_CALLBACK_IRQ\n");
+    if ( smp_processor_id() == 0 )
+    {
+        struct xen_hvm_param a = {
+            .domid = DOMID_SELF,
+            .index = HVM_PARAM_CALLBACK_IRQ,
+            .value = 1,
+        };
+
+        /* Trick toolstack to think we are enlightened */
+        rc = xen_hypercall_hvm_op(HVMOP_set_param, &a);
+        if ( rc )
+            printk("Unable to set HVM_PARAM_CALLBACK_IRQ\n");
+    }
 
     return rc;
 }
