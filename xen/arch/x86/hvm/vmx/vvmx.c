@@ -1283,6 +1283,7 @@ static void load_vvmcs_host_state(struct vcpu *v)
 static void sync_exception_state(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    uint32_t exit_ctrl = get_vvmcs(v, VM_EXIT_CONTROLS);
 
     if ( !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK) )
         return;
@@ -1294,7 +1295,8 @@ static void sync_exception_state(struct vcpu *v)
         set_vvmcs(v, VM_EXIT_REASON, EXIT_REASON_EXTERNAL_INTERRUPT);
         set_vvmcs(v, EXIT_QUALIFICATION, 0);
         set_vvmcs(v, VM_EXIT_INTR_INFO,
-                    nvmx->intr.intr_info);
+                  (exit_ctrl & VM_EXIT_ACK_INTR_ON_EXIT) ? nvmx->intr.intr_info
+                                                         : 0);
         break;
 
     case X86_EVENTTYPE_HW_EXCEPTION:
@@ -1320,7 +1322,7 @@ static void nvmx_update_apicv(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long reason = get_vvmcs(v, VM_EXIT_REASON);
-    uint32_t intr_info = get_vvmcs(v, VM_EXIT_INTR_INFO);
+    uint32_t intr_info = nvmx->intr.intr_info;
 
     if ( reason == EXIT_REASON_EXTERNAL_INTERRUPT &&
          nvmx->intr.source == hvm_intsrc_lapic &&
