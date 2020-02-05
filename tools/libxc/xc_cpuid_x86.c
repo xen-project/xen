@@ -653,17 +653,6 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
         p->extd.itsc = true;
         p->basic.vmx = true;
         p->extd.svm = true;
-
-        /*
-         * BODGE: don't announce x2APIC mode when using nested virtualization,
-         * as it doesn't work properly. This should be removed once the
-         * underlying bug(s) are fixed.
-         */
-        rc = xc_hvm_param_get(xch, domid, HVM_PARAM_NESTEDHVM, &val);
-        if ( rc )
-            goto out;
-        if ( val )
-            p->basic.x2apic = false;
     }
 
     rc = x86_cpuid_copy_to_buffer(p, leaves, &nr_leaves);
