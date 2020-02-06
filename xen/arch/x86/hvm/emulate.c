@@ -1747,7 +1747,8 @@ static int hvmemul_rep_movs(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
+    struct vcpu *curr = current;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     unsigned long saddr, daddr, bytes;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
@@ -1807,8 +1808,8 @@ static int hvmemul_rep_movs(
     }
 
     /* Check for MMIO ops */
-    (void) get_gfn_query_unlocked(current->domain, sgpa >> PAGE_SHIFT, &sp2mt);
-    (void) get_gfn_query_unlocked(current->domain, dgpa >> PAGE_SHIFT, &dp2mt);
+    get_gfn_query_unlocked(curr->domain, sgpa >> PAGE_SHIFT, &sp2mt);
+    get_gfn_query_unlocked(curr->domain, dgpa >> PAGE_SHIFT, &dp2mt);
 
     if ( sp2mt == p2m_mmio_direct || dp2mt == p2m_mmio_direct ||
          (sp2mt == p2m_mmio_dm && dp2mt == p2m_mmio_dm) )
@@ -1873,7 +1874,7 @@ static int hvmemul_rep_movs(
         rc = hvm_copy_from_guest_phys(buf, sgpa, bytes);
 
     if ( rc == HVMTRANS_okay )
-        rc = hvm_copy_to_guest_phys(dgpa, buf, bytes, current);
+        rc = hvm_copy_to_guest_phys(dgpa, buf, bytes, curr);
 
     xfree(buf);
 
@@ -1910,7 +1911,8 @@ static int hvmemul_rep_stos(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
+    struct vcpu *curr = current;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     unsigned long addr, bytes;
     paddr_t gpa;
     p2m_type_t p2mt;
@@ -1943,7 +1945,7 @@ static int hvmemul_rep_stos(
     }
 
     /* Check for MMIO op */
-    (void)get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
+    get_gfn_query_unlocked(curr->domain, gpa >> PAGE_SHIFT, &p2mt);
 
     switch ( p2mt )
     {
@@ -1992,7 +1994,7 @@ static int hvmemul_rep_stos(
         if ( df )
             gpa -= bytes - bytes_per_rep;
 
-        rc = hvm_copy_to_guest_phys(gpa, buf, bytes, current);
+        rc = hvm_copy_to_guest_phys(gpa, buf, bytes, curr);
 
         if ( buf != p_data )
             xfree(buf);
