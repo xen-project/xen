@@ -263,7 +263,8 @@ static struct vnuma_info *vnuma_alloc(unsigned int nr_vnodes,
      * Check if any of the allocations are bigger than PAGE_SIZE.
      * See XSA-77.
      */
-    if ( nr_vnodes * nr_vnodes > (PAGE_SIZE / sizeof(*vnuma->vdistance)) ||
+    if ( nr_vnodes == 0 ||
+         nr_vnodes > (PAGE_SIZE / sizeof(*vnuma->vdistance) / nr_vnodes) ||
          nr_ranges > (PAGE_SIZE / sizeof(*vnuma->vmemrange)) )
         return ERR_PTR(-EINVAL);
 
@@ -302,7 +303,7 @@ static struct vnuma_info *vnuma_init(const struct xen_domctl_vnuma *uinfo,
 
     nr_vnodes = uinfo->nr_vnodes;
 
-    if ( nr_vnodes == 0 || uinfo->nr_vcpus != d->max_vcpus || uinfo->pad != 0 )
+    if ( uinfo->nr_vcpus != d->max_vcpus || uinfo->pad != 0 )
         return ERR_PTR(ret);
 
     info = vnuma_alloc(nr_vnodes, uinfo->nr_vmemranges, d->max_vcpus);
