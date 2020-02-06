@@ -969,7 +969,7 @@ static void gicv2_add_v2m_frame_to_list(paddr_t addr, paddr_t size,
               nr_spis, V2M_MAX_SPI - V2M_MIN_SPI + 1);
 
     /* Allocate an entry to record new v2m frame information. */
-    v2m_data = xzalloc_bytes(sizeof(struct v2m_data));
+    v2m_data = xzalloc(struct v2m_data);
     if ( !v2m_data )
         panic("GICv2: Cannot allocate memory for v2m frame\n");
 
