@@ -32,6 +32,7 @@
 #define HVMOP_get_param           1
 struct xen_hvm_param {
     domid_t  domid;    /* IN */
+    uint16_t pad;
     uint32_t index;    /* IN */
     uint64_t value;    /* IN/OUT */
 };
