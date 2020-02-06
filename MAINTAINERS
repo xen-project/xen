@@ -200,7 +200,7 @@ F:	xen/include/public/arch-arm.h
 
 Change Log
 M:	Paul Durrant <pdurrant@amazon.com>
-R:	Lars Kurth <lars.kurth@citrix.com>
+R:	Community Manager <community.manager@xenproject.org>
 S:	Maintained
 F:	CHANGELOG.md
 
