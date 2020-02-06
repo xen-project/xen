@@ -4105,8 +4105,14 @@ static int hvm_allow_set_param(struct domain *d,
         break;
     /* The following parameters are deprecated. */
     case HVM_PARAM_DM_DOMAIN:
+    case HVM_PARAM_MEMORY_EVENT_CR0:
+    case HVM_PARAM_MEMORY_EVENT_CR3:
+    case HVM_PARAM_MEMORY_EVENT_CR4:
+    case HVM_PARAM_MEMORY_EVENT_INT3:
+    case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
     case HVM_PARAM_BUFIOREQ_EVTCHN:
-        rc = -EPERM;
+    case HVM_PARAM_MEMORY_EVENT_MSR:
+        rc = -EINVAL;
         break;
     /*
      * The following parameters must not be set by the guest
@@ -4220,15 +4226,6 @@ static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
         break;
     case HVM_PARAM_ACPI_IOPORTS_LOCATION:
         rc = pmtimer_change_ioport(d, value);
-        break;
-    case HVM_PARAM_MEMORY_EVENT_CR0:
-    case HVM_PARAM_MEMORY_EVENT_CR3:
-    case HVM_PARAM_MEMORY_EVENT_CR4:
-    case HVM_PARAM_MEMORY_EVENT_INT3:
-    case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
-    case HVM_PARAM_MEMORY_EVENT_MSR:
-        /* Deprecated */
-        rc = -EOPNOTSUPP;
         break;
     case HVM_PARAM_NESTEDHVM:
         rc = xsm_hvm_param_nested(XSM_PRIV, d);
@@ -4411,8 +4408,14 @@ static int hvm_allow_get_param(struct domain *d,
         break;
     /* The following parameters are deprecated. */
     case HVM_PARAM_DM_DOMAIN:
+    case HVM_PARAM_MEMORY_EVENT_CR0:
+    case HVM_PARAM_MEMORY_EVENT_CR3:
+    case HVM_PARAM_MEMORY_EVENT_CR4:
+    case HVM_PARAM_MEMORY_EVENT_INT3:
+    case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
     case HVM_PARAM_BUFIOREQ_EVTCHN:
-        rc = -ENODATA;
+    case HVM_PARAM_MEMORY_EVENT_MSR:
+        rc = -EINVAL;
         break;
     /* The remaining parameters should not be read by the guest. */
     default:

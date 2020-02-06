@@ -28,8 +28,14 @@
 /* These parameters are deprecated and their meaning is undefined. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
-#define HVM_PARAM_DM_DOMAIN 13
-#define HVM_PARAM_BUFIOREQ_EVTCHN 26
+#define HVM_PARAM_DM_DOMAIN                 13
+#define HVM_PARAM_MEMORY_EVENT_CR0          20
+#define HVM_PARAM_MEMORY_EVENT_CR3          21
+#define HVM_PARAM_MEMORY_EVENT_CR4          22
+#define HVM_PARAM_MEMORY_EVENT_INT3         23
+#define HVM_PARAM_MEMORY_EVENT_SINGLE_STEP  25
+#define HVM_PARAM_BUFIOREQ_EVTCHN           26
+#define HVM_PARAM_MEMORY_EVENT_MSR          30
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
@@ -226,14 +232,6 @@
  * You can find these address definitions in <hvm/ioreq.h>
  */
 #define HVM_PARAM_ACPI_IOPORTS_LOCATION 19
-
-/* Deprecated */
-#define HVM_PARAM_MEMORY_EVENT_CR0          20
-#define HVM_PARAM_MEMORY_EVENT_CR3          21
-#define HVM_PARAM_MEMORY_EVENT_CR4          22
-#define HVM_PARAM_MEMORY_EVENT_INT3         23
-#define HVM_PARAM_MEMORY_EVENT_SINGLE_STEP  25
-#define HVM_PARAM_MEMORY_EVENT_MSR          30
 
 /* Boolean: Enable nestedhvm (hvm only) */
 #define HVM_PARAM_NESTEDHVM    24

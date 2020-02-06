@@ -1441,31 +1441,10 @@ int xc_domain_send_trigger(xc_interface *xch,
     return do_domctl(xch, &domctl);
 }
 
-static inline int xc_hvm_param_deprecated_check(uint32_t param)
-{
-    switch ( param )
-    {
-        case HVM_PARAM_MEMORY_EVENT_CR0:
-        case HVM_PARAM_MEMORY_EVENT_CR3:
-        case HVM_PARAM_MEMORY_EVENT_CR4:
-        case HVM_PARAM_MEMORY_EVENT_INT3:
-        case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
-        case HVM_PARAM_MEMORY_EVENT_MSR:
-            return -EOPNOTSUPP;
-        default:
-            break;
-    };
-
-    return 0;
-}
-
 int xc_hvm_param_set(xc_interface *handle, uint32_t dom, uint32_t param, uint64_t value)
 {
     DECLARE_HYPERCALL_BUFFER(xen_hvm_param_t, arg);
-    int rc = xc_hvm_param_deprecated_check(param);
-
-    if ( rc )
-        return rc;
+    int rc;
 
     arg = xc_hypercall_buffer_alloc(handle, arg, sizeof(*arg));
     if ( arg == NULL )
@@ -1484,10 +1463,7 @@ int xc_hvm_param_set(xc_interface *handle, uint32_t dom, uint32_t param, uint64_
 int xc_hvm_param_get(xc_interface *handle, uint32_t dom, uint32_t param, uint64_t *value)
 {
     DECLARE_HYPERCALL_BUFFER(xen_hvm_param_t, arg);
-    int rc = xc_hvm_param_deprecated_check(param);
-
-    if ( rc )
-        return rc;
+    int rc;
 
     arg = xc_hypercall_buffer_alloc(handle, arg, sizeof(*arg));
     if ( arg == NULL )
