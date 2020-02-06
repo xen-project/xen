@@ -92,9 +92,9 @@ static void __init print_e820_memory_map(struct e820entry *map, unsigned int ent
     unsigned int i;
 
     for (i = 0; i < entries; i++) {
-        printk(" %016Lx - %016Lx ",
+        printk(" [%016Lx, %016Lx] ",
                (unsigned long long)(map[i].addr),
-               (unsigned long long)(map[i].addr + map[i].size));
+               (unsigned long long)(map[i].addr + map[i].size) - 1);
         switch (map[i].type) {
         case E820_RAM:
             printk("(usable)\n");
