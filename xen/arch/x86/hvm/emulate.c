@@ -2732,8 +2732,6 @@ void hvm_emulate_init_per_insn(
     unsigned int insn_bytes)
 {
     struct vcpu *curr = current;
-    unsigned int pfec = PFEC_page_present;
-    unsigned long addr;
 
     hvmemul_ctxt->ctxt.lma = hvm_long_mode_active(curr);
 
@@ -2748,14 +2746,23 @@ void hvm_emulate_init_per_insn(
             hvmemul_ctxt->seg_reg[x86_seg_ss].db ? 32 : 16;
     }
 
-    if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
-        pfec |= PFEC_user_mode;
-
     hvmemul_ctxt->insn_buf_eip = hvmemul_ctxt->ctxt.regs->rip;
-    if ( !insn_bytes )
+
+    if ( insn_bytes )
     {
+        hvmemul_ctxt->insn_buf_bytes = insn_bytes;
+        memcpy(hvmemul_ctxt->insn_buf, insn_buf, insn_bytes);
+    }
+    else if ( !(hvmemul_ctxt->insn_buf_bytes =
+                hvm_get_insn_bytes(curr, hvmemul_ctxt->insn_buf)) )
+    {
+        unsigned int pfec = PFEC_page_present | PFEC_insn_fetch;
+        unsigned long addr;
+
+        if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
+            pfec |= PFEC_user_mode;
+
         hvmemul_ctxt->insn_buf_bytes =
-            hvm_get_insn_bytes(curr, hvmemul_ctxt->insn_buf) ?:
             (hvm_virtual_to_linear_addr(x86_seg_cs,
                                         &hvmemul_ctxt->seg_reg[x86_seg_cs],
                                         hvmemul_ctxt->insn_buf_eip,
@@ -2765,14 +2772,8 @@ void hvm_emulate_init_per_insn(
                                         &addr) &&
              hvm_copy_from_guest_linear(hvmemul_ctxt->insn_buf, addr,
                                         sizeof(hvmemul_ctxt->insn_buf),
-                                        pfec | PFEC_insn_fetch,
-                                        NULL) == HVMTRANS_okay) ?
+                                        pfec, NULL) == HVMTRANS_okay) ?
             sizeof(hvmemul_ctxt->insn_buf) : 0;
-    }
-    else
-    {
-        hvmemul_ctxt->insn_buf_bytes = insn_bytes;
-        memcpy(hvmemul_ctxt->insn_buf, insn_buf, insn_bytes);
     }
 }
 
