@@ -1,6 +1,6 @@
 /*
  * intr.c: Interrupt handling for SVM.
- * Copyright (c) 2005, AMD Inc. 
+ * Copyright (c) 2005, AMD Inc.
  * Copyright (c) 2004, Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -83,9 +83,12 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 
     ASSERT(intack.source != hvm_intsrc_none);
 
-    if ( nestedhvm_enabled(v->domain) ) {
+    if ( nestedhvm_enabled(v->domain) )
+    {
         struct nestedvcpu *nv = &vcpu_nestedhvm(v);
-        if ( nv->nv_vmentry_pending ) {
+
+        if ( nv->nv_vmentry_pending )
+        {
             struct vmcb_struct *gvmcb = nv->nv_vvmcx;
 
             /* check if l1 guest injects interrupt into l2 guest via vintr.
@@ -131,7 +134,7 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
         vmcb, general1_intercepts | GENERAL1_INTERCEPT_VINTR);
 }
 
-void svm_intr_assist(void) 
+void svm_intr_assist(void)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
@@ -151,7 +154,8 @@ void svm_intr_assist(void)
             return;
 
         intblk = hvm_interrupt_blocked(v, intack);
-        if ( intblk == hvm_intblk_svm_gif ) {
+        if ( intblk == hvm_intblk_svm_gif )
+        {
             ASSERT(nestedhvm_enabled(v->domain));
             return;
         }
@@ -167,10 +171,11 @@ void svm_intr_assist(void)
              * the l1 guest occurred.
              */
             rc = nestedsvm_vcpu_interrupt(v, intack);
-            switch (rc) {
+            switch ( rc )
+            {
             case NSVM_INTR_NOTINTERCEPTED:
                 /* Inject interrupt into 2nd level guest directly. */
-                break;	
+                break;
             case NSVM_INTR_NOTHANDLED:
             case NSVM_INTR_FORCEVMEXIT:
                 return;
