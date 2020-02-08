@@ -1053,14 +1053,17 @@ static int vcpu_hvm(struct xc_dom_image *dom)
     /* Set the cached part of the relevant segment registers. */
     bsp_ctx.cpu.cs_base = 0;
     bsp_ctx.cpu.ds_base = 0;
+    bsp_ctx.cpu.es_base = 0;
     bsp_ctx.cpu.ss_base = 0;
     bsp_ctx.cpu.tr_base = 0;
     bsp_ctx.cpu.cs_limit = ~0u;
     bsp_ctx.cpu.ds_limit = ~0u;
+    bsp_ctx.cpu.es_limit = ~0u;
     bsp_ctx.cpu.ss_limit = ~0u;
     bsp_ctx.cpu.tr_limit = 0x67;
     bsp_ctx.cpu.cs_arbytes = 0xc9b;
     bsp_ctx.cpu.ds_arbytes = 0xc93;
+    bsp_ctx.cpu.es_arbytes = 0xc93;
     bsp_ctx.cpu.ss_arbytes = 0xc93;
     bsp_ctx.cpu.tr_arbytes = 0x8b;
 
