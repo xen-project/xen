@@ -76,7 +76,7 @@ __UNLIKELY_END(nsvm_hap)
         pop  %r10
         pop  %r9
         pop  %r8
-        add  $8,%rsp /* Skip %rax: restored by VMRUN. */
+        pop  %rcx /* Skip %rax: restored by VMRUN. */
         pop  %rcx
         pop  %rdx
         pop  %rsi
