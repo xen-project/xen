@@ -574,11 +574,13 @@ struct page_info *p2m_get_page_from_gfn(
                 if ( fdom == NULL )
                     page = NULL;
             }
-            else if ( !get_page(page, p2m->domain) &&
-                      /* Page could be shared */
-                      (!dom_cow || !p2m_is_shared(*t) ||
-                       !get_page(page, dom_cow)) )
-                page = NULL;
+            else
+            {
+                struct domain *d = !p2m_is_shared(*t) ? p2m->domain : dom_cow;
+
+                if ( !get_page(page, d) )
+                    page = NULL;
+            }
         }
         p2m_read_unlock(p2m);
 
@@ -594,8 +596,10 @@ struct page_info *p2m_get_page_from_gfn(
     mfn = get_gfn_type_access(p2m, gfn_x(gfn), t, a, q, NULL);
     if ( p2m_is_ram(*t) && mfn_valid(mfn) )
     {
+        struct domain *d = !p2m_is_shared(*t) ? p2m->domain : dom_cow;
+
         page = mfn_to_page(mfn);
-        if ( !get_page(page, p2m->domain) )
+        if ( !get_page(page, d) )
             page = NULL;
     }
     put_gfn(p2m->domain, gfn_x(gfn));
