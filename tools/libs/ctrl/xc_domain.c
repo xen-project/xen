@@ -815,15 +815,6 @@ int xc_domain_set_time_offset(xc_interface *xch,
     return do_domctl(xch, &domctl);
 }
 
-int xc_domain_disable_migrate(xc_interface *xch, uint32_t domid)
-{
-    DECLARE_DOMCTL;
-    domctl.cmd = XEN_DOMCTL_disable_migrate;
-    domctl.domain = domid;
-    domctl.u.disable_migrate.disable = 1;
-    return do_domctl(xch, &domctl);
-}
-
 int xc_domain_set_tsc_info(xc_interface *xch,
                            uint32_t domid,
                            uint32_t tsc_mode,

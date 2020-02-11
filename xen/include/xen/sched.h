@@ -401,8 +401,6 @@ struct domain
     bool             is_privileged;
     /* Can this guest access the Xen console? */
     bool             is_console;
-    /* Non-migratable and non-restoreable? */
-    bool             disable_migrate;
     /* Is this guest being debugged by dom0? */
     bool             debugger_attached;
     /*

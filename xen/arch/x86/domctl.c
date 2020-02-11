@@ -1277,11 +1277,6 @@ long arch_do_domctl(
 
         break;
 
-    case XEN_DOMCTL_disable_migrate:
-        d->disable_migrate = domctl->u.disable_migrate.disable;
-        recalculate_cpuid_policy(d);
-        break;
-
     case XEN_DOMCTL_get_cpu_policy:
         /* Process the CPUID leaves. */
         if ( guest_handle_is_null(domctl->u.cpu_policy.cpuid_policy) )

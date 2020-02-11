@@ -38,7 +38,7 @@
 #include "hvm/save.h"
 #include "memory.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000012
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000013
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
@@ -730,11 +730,6 @@ struct xen_domctl_hvmcontext_partial {
     XEN_GUEST_HANDLE_64(uint8) buffer;  /* OUT: buffer to write record into */
 };
 
-/* XEN_DOMCTL_disable_migrate */
-struct xen_domctl_disable_migrate {
-    uint32_t disable; /* IN: 1: disable migration and restore */
-};
-
 
 /* XEN_DOMCTL_gettscinfo */
 /* XEN_DOMCTL_settscinfo */
@@ -1191,7 +1186,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_gethvmcontext_partial         55
 #define XEN_DOMCTL_vm_event_op                   56
 #define XEN_DOMCTL_mem_sharing_op                57
-#define XEN_DOMCTL_disable_migrate               58
+/* #define XEN_DOMCTL_disable_migrate            58 - Obsolete */
 #define XEN_DOMCTL_gettscinfo                    59
 #define XEN_DOMCTL_settscinfo                    60
 #define XEN_DOMCTL_getpageframeinfo3             61
@@ -1242,7 +1237,6 @@ struct xen_domctl {
         struct xen_domctl_ioport_permission ioport_permission;
         struct xen_domctl_hypercall_init    hypercall_init;
         struct xen_domctl_settimeoffset     settimeoffset;
-        struct xen_domctl_disable_migrate   disable_migrate;
         struct xen_domctl_tsc_info          tsc_info;
         struct xen_domctl_hvmcontext        hvmcontext;
         struct xen_domctl_hvmcontext_partial hvmcontext_partial;

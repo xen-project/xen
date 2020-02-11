@@ -257,12 +257,6 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
         return ERROR_FAIL;
     }
 
-    if (libxl_defbool_val(d_config->b_info.disable_migrate) &&
-        xc_domain_disable_migrate(ctx->xch, domid) != 0) {
-        LOG(ERROR, "Couldn't set nomigrate");
-        return ERROR_FAIL;
-    }
-
     /*
      * Check if the domain has any CPU or node affinity already. If not, try
      * to build up the latter via automatic NUMA placement. In fact, in case

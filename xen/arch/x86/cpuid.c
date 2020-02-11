@@ -708,7 +708,8 @@ int init_domain_cpuid_policy(struct domain *d)
     if ( !p )
         return -ENOMEM;
 
-    if ( d->disable_migrate )
+    /* The hardware domain can't migrate.  Give it ITSC if available. */
+    if ( is_hardware_domain(d) )
         p->extd.itsc = cpu_has_itsc;
 
     /*
