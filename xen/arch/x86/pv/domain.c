@@ -62,7 +62,7 @@ custom_runtime_param("pcid", parse_pcid);
 static void noreturn continue_nonidle_domain(struct vcpu *v)
 {
     check_wakeup_from_wait();
-    reset_stack_and_jump(ret_from_intr);
+    reset_stack_and_jump_nolp(ret_from_intr);
 }
 
 static int setup_compat_l4(struct vcpu *v)

@@ -632,7 +632,7 @@ static void __init noreturn reinit_bsp_stack(void)
     stack_base[0] = stack;
     memguard_guard_stack(stack);
 
-    reset_stack_and_jump(init_done);
+    reset_stack_and_jump_nolp(init_done);
 }
 
 /*

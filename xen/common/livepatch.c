@@ -17,6 +17,7 @@
 #include <xen/spinlock.h>
 #include <xen/string.h>
 #include <xen/symbols.h>
+#include <xen/tasklet.h>
 #include <xen/version.h>
 #include <xen/virtual_region.h>
 #include <xen/vmap.h>
@@ -69,6 +70,7 @@ static struct livepatch_work livepatch_work;
  * Having an per-cpu lessens the load.
  */
 static DEFINE_PER_CPU(bool_t, work_to_do);
+static DEFINE_PER_CPU(struct tasklet, livepatch_tasklet);
 
 static int get_name(const struct xen_livepatch_name *name, char *n)
 {
@@ -1582,17 +1584,16 @@ static int schedule_work(struct payload *data, uint32_t cmd, uint32_t timeout)
     smp_wmb();
 
     livepatch_work.do_work = 1;
-    this_cpu(work_to_do) = 1;
+    tasklet_schedule_on_cpu(&this_cpu(livepatch_tasklet), smp_processor_id());
 
     put_cpu_maps();
 
     return 0;
 }
 
-static void reschedule_fn(void *unused)
+static void tasklet_fn(void *unused)
 {
     this_cpu(work_to_do) = 1;
-    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
 static int livepatch_spin(atomic_t *counter, s_time_t timeout,
@@ -1652,7 +1653,7 @@ void check_for_livepatch_work(void)
     if ( atomic_inc_and_test(&livepatch_work.semaphore) )
     {
         struct payload *p;
-        unsigned int cpus;
+        unsigned int cpus, i;
         bool action_done = false;
 
         p = livepatch_work.data;
@@ -1682,7 +1683,9 @@ void check_for_livepatch_work(void)
         {
             dprintk(XENLOG_DEBUG, LIVEPATCH "%s: CPU%u - IPIing the other %u CPUs\n",
                     p->name, cpu, cpus);
-            smp_call_function(reschedule_fn, NULL, 0);
+            for_each_online_cpu ( i )
+                if ( i != cpu )
+                    tasklet_schedule_on_cpu(&per_cpu(livepatch_tasklet, i), i);
         }
 
         timeout = livepatch_work.timeout + NOW();
@@ -2116,8 +2119,34 @@ static void livepatch_printall(unsigned char key)
     spin_unlock(&payload_lock);
 }
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    if ( action == CPU_UP_PREPARE )
+        tasklet_init(&per_cpu(livepatch_tasklet, cpu), tasklet_fn, NULL);
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
 static int __init livepatch_init(void)
 {
+    unsigned int cpu;
+
+    for_each_online_cpu ( cpu )
+    {
+        void *hcpu = (void *)(long)cpu;
+
+        cpu_callback(&cpu_nfb, CPU_UP_PREPARE, hcpu);
+    }
+
+    register_cpu_notifier(&cpu_nfb);
+
     register_keyhandler('x', livepatch_printall, "print livepatch info", 1);
 
     arch_livepatch_init();

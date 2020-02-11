@@ -23,7 +23,6 @@
 #include <xen/iocap.h>
 #include <xen/irq.h>
 #include <xen/lib.h>
-#include <xen/livepatch.h>
 #include <xen/mem_access.h>
 #include <xen/mm.h>
 #include <xen/param.h>
@@ -2239,11 +2238,6 @@ static void check_for_pcpu_work(void)
     {
         local_irq_enable();
         do_softirq();
-        /*
-         * Must be the last one - as the IPI will trigger us to come here
-         * and we want to patch the hypervisor with almost no stack.
-         */
-        check_for_livepatch_work();
         local_irq_disable();
     }
 }

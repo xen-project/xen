@@ -1890,7 +1890,7 @@ void vmx_do_resume(struct vcpu *v)
     if ( host_cr4 != read_cr4() )
         __vmwrite(HOST_CR4, read_cr4());
 
-    reset_stack_and_jump(vmx_asm_do_vmentry);
+    reset_stack_and_jump_nolp(vmx_asm_do_vmentry);
 }
 
 static inline unsigned long vmr(unsigned long field)
