@@ -485,11 +485,6 @@ struct amd_iommu_pte {
 #define IOMMU_CMD_DEVICE_ID_MASK                    0x0000FFFF
 #define IOMMU_CMD_DEVICE_ID_SHIFT                   0
 
-#define IOMMU_CMD_ADDR_LOW_MASK                     0xFFFFF000
-#define IOMMU_CMD_ADDR_LOW_SHIFT                    12
-#define IOMMU_CMD_ADDR_HIGH_MASK                    0xFFFFFFFF
-#define IOMMU_CMD_ADDR_HIGH_SHIFT                   0
-
 #define IOMMU_REG_BASE_ADDR_LOW_MASK                0xFFFFF000
 #define IOMMU_REG_BASE_ADDR_LOW_SHIFT               12
 #define IOMMU_REG_BASE_ADDR_HIGH_MASK               0x000FFFFF

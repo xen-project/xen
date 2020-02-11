@@ -391,19 +391,6 @@ static inline void iommu_set_devid_to_cmd(uint32_t *cmd, uint16_t id)
                          IOMMU_CMD_DEVICE_ID_SHIFT, cmd);
 }
 
-/* access address field from iommu cmd */
-static inline uint32_t iommu_get_addr_lo_from_cmd(uint32_t cmd)
-{
-    return get_field_from_reg_u32(cmd, IOMMU_CMD_ADDR_LOW_MASK,
-                                  IOMMU_CMD_ADDR_LOW_SHIFT);
-}
-
-static inline uint32_t iommu_get_addr_hi_from_cmd(uint32_t cmd)
-{
-    return get_field_from_reg_u32(cmd, IOMMU_CMD_ADDR_LOW_MASK,
-                                  IOMMU_CMD_ADDR_HIGH_SHIFT);
-}
-
 /* access iommu base addresses field from mmio regs */
 static inline void iommu_set_addr_lo_to_reg(uint32_t *reg, uint32_t addr)
 {
