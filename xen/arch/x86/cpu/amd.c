@@ -298,9 +298,6 @@ static void __init noinline amd_init_levelling(void)
 			ecx |= cpufeat_mask(X86_FEATURE_OSXSAVE);
 		edx |= cpufeat_mask(X86_FEATURE_APIC);
 
-		/* Allow the HYPERVISOR bit to be set via guest policy. */
-		ecx |= cpufeat_mask(X86_FEATURE_HYPERVISOR);
-
 		cpuidmask_defaults._1cd = ((uint64_t)ecx << 32) | edx;
 	}
 

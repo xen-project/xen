@@ -48,7 +48,7 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 }
 #endif
 
-static void domain_cpu_policy_changed(struct domain *d)
+void domain_cpu_policy_changed(struct domain *d)
 {
     const struct cpuid_policy *p = d->arch.cpuid;
     struct vcpu *v;
@@ -105,6 +105,13 @@ static void domain_cpu_policy_changed(struct domain *d)
                 else
                     ecx = 0;
                 edx = cpufeat_mask(X86_FEATURE_APIC);
+
+                /*
+                 * If the Hypervisor bit is set in the policy, we can also
+                 * forward it into real CPUID.
+                 */
+                if ( p->basic.hypervisor )
+                    ecx |= cpufeat_mask(X86_FEATURE_HYPERVISOR);
 
                 mask |= ((uint64_t)ecx << 32) | edx;
                 break;
