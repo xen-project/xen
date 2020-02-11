@@ -2167,8 +2167,6 @@ csched2_context_saved(const struct scheduler *ops, struct sched_unit *unit)
     s_time_t now = NOW();
     LIST_HEAD(were_parked);
 
-    BUG_ON( !is_idle_unit(unit) &&
-            svc->rqd != c2rqd(ops, sched_unit_master(unit)));
     ASSERT(is_idle_unit(unit) ||
            svc->rqd == c2rqd(ops, sched_unit_master(unit)));
 
