@@ -132,10 +132,6 @@ void raise_softirq(unsigned int nr)
     set_bit(nr, &softirq_pending(smp_processor_id()));
 }
 
-void __init softirq_init(void)
-{
-}
-
 /*
  * Local variables:
  * mode: C

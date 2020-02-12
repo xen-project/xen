@@ -876,8 +876,6 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     gic_init();
 
-    softirq_init();
-
     tasklet_subsys_init();
 
     if ( xsm_dt_init() != 1 )

@@ -1533,7 +1533,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     console_init_ring();
     vesa_init();
 
-    softirq_init();
     tasklet_subsys_init();
 
     paging_init();
