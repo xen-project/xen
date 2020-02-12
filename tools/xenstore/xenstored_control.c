@@ -61,6 +61,19 @@ static int do_control_log(void *ctx, struct connection *conn,
 	return 0;
 }
 
+#ifdef __MINIOS__
+static int do_control_memreport(void *ctx, struct connection *conn,
+				char **vec, int num)
+{
+	if (num)
+		return EINVAL;
+
+	talloc_report_full(NULL, stdout);
+
+	send_ack(conn, XS_CONTROL);
+	return 0;
+}
+#else
 static int do_control_logfile(void *ctx, struct connection *conn,
 			      char **vec, int num)
 {
@@ -114,6 +127,7 @@ static int do_control_memreport(void *ctx, struct connection *conn,
 	send_ack(conn, XS_CONTROL);
 	return 0;
 }
+#endif
 
 static int do_control_print(void *ctx, struct connection *conn,
 			    char **vec, int num)
@@ -132,8 +146,12 @@ static int do_control_help(void *, struct connection *, char **, int);
 static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
 	{ "log", do_control_log, "on|off" },
+#ifdef __MINIOS__
+	{ "memreport", do_control_memreport, "" },
+#else
 	{ "logfile", do_control_logfile, "<file>" },
 	{ "memreport", do_control_memreport, "[<file>]" },
+#endif
 	{ "print", do_control_print, "<string>" },
 	{ "help", do_control_help, "" },
 };
