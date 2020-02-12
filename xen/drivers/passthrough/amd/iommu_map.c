@@ -194,12 +194,6 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
 
     next_table_mfn = mfn_x(page_to_mfn(table));
 
-    if ( level == 1 )
-    {
-        pt_mfn[level] = next_table_mfn;
-        return 0;
-    }
-
     while ( level > 1 )
     {
         unsigned int next_level = level - 1;
