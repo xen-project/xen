@@ -2514,7 +2514,8 @@ int __init construct_dom0(struct domain *d)
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
-    if ( !dom0_mem_set && CONFIG_DOM0_MEM[0] )
+    /* The ordering of operands is to work around a clang5 issue. */
+    if ( CONFIG_DOM0_MEM[0] && !dom0_mem_set )
         parse_dom0_mem(CONFIG_DOM0_MEM);
 
     if ( dom0_mem <= 0 )

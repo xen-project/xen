@@ -318,7 +318,8 @@ unsigned long __init dom0_compute_nr_pages(
     unsigned long avail = 0, nr_pages, min_pages, max_pages;
     bool need_paging;
 
-    if ( !dom0_mem_set && CONFIG_DOM0_MEM[0] )
+    /* The ordering of operands is to work around a clang5 issue. */
+    if ( CONFIG_DOM0_MEM[0] && !dom0_mem_set )
         parse_dom0_mem(CONFIG_DOM0_MEM);
 
     for_each_node_mask ( node, dom0_nodes )
