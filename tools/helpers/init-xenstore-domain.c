@@ -24,6 +24,7 @@ static char *param;
 static char *name = "Xenstore";
 static int memory;
 static int maxmem;
+static xc_evtchn_port_or_error_t console_evtchn;
 
 static struct option options[] = {
     { "kernel", 1, NULL, 'k' },
@@ -113,6 +114,12 @@ static int build(xc_interface *xch)
         fprintf(stderr, "xc_domain_setmaxmem failed\n");
         goto err;
     }
+    console_evtchn = xc_evtchn_alloc_unbound(xch, domid, 0);
+    if ( console_evtchn < 0 )
+    {
+        fprintf(stderr, "xc_evtchn_alloc_unbound failed\n");
+        goto err;
+    }
     rv = xc_domain_set_memmap_limit(xch, domid, limit_kb);
     if ( rv )
     {
@@ -133,6 +140,15 @@ static int build(xc_interface *xch)
         snprintf(cmdline, 512, "--event %d --internal-db", rv);
 
     dom = xc_dom_allocate(xch, cmdline, NULL);
+    if ( !dom )
+    {
+        fprintf(stderr, "xc_dom_allocate failed\n");
+        goto err;
+    }
+    dom->container_type = XC_DOM_PV_CONTAINER;
+    dom->xenstore_domid = domid;
+    dom->console_evtchn = console_evtchn;
+
     rv = xc_dom_kernel_file(dom, kernel);
     if ( rv )
     {
@@ -184,6 +200,12 @@ static int build(xc_interface *xch)
     if ( rv )
     {
         fprintf(stderr, "xc_dom_boot_image failed\n");
+        goto err;
+    }
+    rv = xc_dom_gnttab_init(dom);
+    if ( rv )
+    {
+        fprintf(stderr, "xc_dom_gnttab_init failed\n");
         goto err;
     }
 
