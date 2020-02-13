@@ -2342,9 +2342,13 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
  * change in some cases for existing software, but there is 0 of that in
  * practice.
  */
-static inline void libxl_cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid) {}
-static inline void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_cpuid_policy_list cpuid) {}
+static inline void libxl_cpuid_apply_policy(libxl_ctx *ctx __attribute__((unused)),
+                                            uint32_t domid __attribute__((unused)))
+{}
+static inline void libxl_cpuid_set(libxl_ctx *ctx __attribute__((unused)),
+                                   uint32_t domid __attribute__((unused)),
+                                   libxl_cpuid_policy_list cpuid __attribute__((unused)))
+{}
 #endif
 
 /*
