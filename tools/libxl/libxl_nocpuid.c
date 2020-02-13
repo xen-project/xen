@@ -35,7 +35,7 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
 }
 
 void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
-                         libxl_domain_config *d_config)
+                         libxl_domain_build_info *info)
 {
 }
 
