@@ -587,25 +587,24 @@ static void do_nmi_trigger(unsigned char key)
 
 static void do_nmi_stats(unsigned char key)
 {
-    int i;
-    struct domain *d;
-    struct vcpu *v;
+    const struct vcpu *v;
+    unsigned int cpu;
+    bool pend, mask;
 
     printk("CPU\tNMI\n");
-    for_each_online_cpu ( i )
-        printk("%3d\t%3d\n", i, nmi_count(i));
+    for_each_online_cpu ( cpu )
+        printk("%3u\t%3u\n", cpu, nmi_count(cpu));
 
-    if ( ((d = hardware_domain) == NULL) || (d->vcpu == NULL) ||
-         ((v = d->vcpu[0]) == NULL) )
+    if ( !hardware_domain || !(v = domain_vcpu(hardware_domain, 0)) )
         return;
 
-    i = v->async_exception_mask & (1 << VCPU_TRAP_NMI);
-    if ( v->nmi_pending || i )
-        printk("dom0 vpu0: NMI %s%s\n",
-               v->nmi_pending ? "pending " : "",
-               i ? "masked " : "");
+    pend = v->nmi_pending;
+    mask = v->async_exception_mask & (1 << VCPU_TRAP_NMI);
+    if ( pend || mask )
+        printk("%pv: NMI%s%s\n",
+               v, pend ? " pending" : "", mask ? " masked" : "");
     else
-        printk("dom0 vcpu0: NMI neither pending nor masked\n");
+        printk("%pv: NMI neither pending nor masked\n", v);
 }
 
 static __init int register_nmi_trigger(void)
