@@ -9,10 +9,10 @@
 #include <asm/mmio.h>
 #include <asm/gic.h>
 #include <asm/vgic.h>
+#include <asm/vpl011.h>
 #include <public/hvm/params.h>
 #include <xen/serial.h>
 #include <xen/rbtree.h>
-#include <asm-arm/vpl011.h>
 
 struct hvm_domain
 {
