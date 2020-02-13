@@ -191,17 +191,6 @@ struct vcpu
     bool             is_urgent;
     /* VCPU must context_switch without scheduling unit. */
     bool             force_context_switch;
-
-#ifdef VCPU_TRAP_LAST
-#define VCPU_TRAP_NONE    0
-    struct {
-        bool             pending;
-        uint8_t          old_mask;
-    }                async_exception_state[VCPU_TRAP_LAST];
-#define async_exception_state(t) async_exception_state[(t)-1]
-    uint8_t          async_exception_mask;
-#endif
-
     /* Require shutdown to be deferred for some asynchronous operation? */
     bool             defer_shutdown;
     /* VCPU is paused following shutdown request (d->is_shutting_down)? */

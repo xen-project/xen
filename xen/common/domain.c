@@ -1199,10 +1199,6 @@ int vcpu_reset(struct vcpu *v)
     v->fpu_initialised = 0;
     v->fpu_dirtied     = 0;
     v->is_initialised  = 0;
-#ifdef VCPU_TRAP_LAST
-    v->async_exception_mask = 0;
-    memset(v->async_exception_state, 0, sizeof(v->async_exception_state));
-#endif
     if ( v->affinity_broken & VCPU_AFFINITY_OVERRIDE )
         vcpu_temporary_affinity(v, NR_CPUS, VCPU_AFFINITY_OVERRIDE);
     if ( v->affinity_broken & VCPU_AFFINITY_WAIT )
@@ -1510,17 +1506,6 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         break;
     }
-
-#ifdef VCPU_TRAP_NMI
-    case VCPUOP_send_nmi:
-        if ( !guest_handle_is_null(arg) )
-            return -EINVAL;
-
-        if ( !test_and_set_bool(v->nmi_pending) )
-            vcpu_kick(v);
-
-        break;
-#endif
 
     default:
         rc = arch_do_vcpu_op(cmd, v, arg);

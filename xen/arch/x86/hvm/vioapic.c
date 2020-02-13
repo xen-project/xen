@@ -469,7 +469,7 @@ static void vioapic_deliver(struct hvm_vioapic *vioapic, unsigned int pin)
         for_each_vcpu ( d, v )
             if ( vlapic_match_dest(vcpu_vlapic(v), NULL,
                                    0, dest, dest_mode) &&
-                 !test_and_set_bool(v->nmi_pending) )
+                 !test_and_set_bool(v->arch.nmi_pending) )
                 vcpu_kick(v);
         break;
     }

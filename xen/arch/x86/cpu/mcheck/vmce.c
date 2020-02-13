@@ -412,7 +412,7 @@ int inject_vmce(struct domain *d, int vcpu)
 
         if ( (is_hvm_domain(d) ||
               pv_trap_callback_registered(v, TRAP_machine_check)) &&
-             !test_and_set_bool(v->mce_pending) )
+             !test_and_set_bool(v->arch.mce_pending) )
         {
             mce_printk(MCE_VERBOSE, "MCE: inject vMCE to %pv\n", v);
             vcpu_kick(v);

@@ -1246,6 +1246,10 @@ int arch_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 int arch_vcpu_reset(struct vcpu *v)
 {
+    v->arch.async_exception_mask = 0;
+    memset(v->arch.async_exception_state, 0,
+           sizeof(v->arch.async_exception_state));
+
     if ( is_pv_vcpu(v) )
     {
         pv_destroy_gdt(v);
@@ -1264,6 +1268,14 @@ arch_do_vcpu_op(
 
     switch ( cmd )
     {
+    case VCPUOP_send_nmi:
+        if ( !guest_handle_is_null(arg) )
+            return -EINVAL;
+
+        if ( !test_and_set_bool(v->arch.nmi_pending) )
+            vcpu_kick(v);
+        break;
+
     case VCPUOP_register_vcpu_time_memory_area:
     {
         struct vcpu_register_time_memory_area area;

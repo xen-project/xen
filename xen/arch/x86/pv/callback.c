@@ -52,7 +52,7 @@ static int register_guest_nmi_callback(unsigned long address)
      * now.
      */
     if ( curr->vcpu_id == 0 && arch_get_nmi_reason(d) != 0 )
-        curr->nmi_pending = 1;
+        curr->arch.nmi_pending = true;
 
     return 0;
 }

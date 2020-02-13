@@ -176,7 +176,7 @@ int pv_raise_nmi(struct vcpu *v)
 
     if ( cmpxchgptr(v_ptr, NULL, v) )
         return -EBUSY;
-    if ( !test_and_set_bool(v->nmi_pending) )
+    if ( !test_and_set_bool(v->arch.nmi_pending) )
     {
         /* Not safe to wake up a vcpu here */
         raise_softirq(NMI_SOFTIRQ);

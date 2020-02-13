@@ -598,8 +598,8 @@ static void do_nmi_stats(unsigned char key)
     if ( !hardware_domain || !(v = domain_vcpu(hardware_domain, 0)) )
         return;
 
-    pend = v->nmi_pending;
-    mask = v->async_exception_mask & (1 << VCPU_TRAP_NMI);
+    pend = v->arch.nmi_pending;
+    mask = v->arch.async_exception_mask & (1 << VCPU_TRAP_NMI);
     if ( pend || mask )
         printk("%pv: NMI%s%s\n",
                v, pend ? " pending" : "", mask ? " masked" : "");

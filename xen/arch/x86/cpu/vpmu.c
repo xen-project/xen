@@ -329,7 +329,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         vlapic_set_irq(vlapic, vlapic_lvtpc & APIC_VECTOR_MASK, 0);
         break;
     case APIC_MODE_NMI:
-        sampling->nmi_pending = 1;
+        sampling->arch.nmi_pending = true;
         break;
     }
 #endif

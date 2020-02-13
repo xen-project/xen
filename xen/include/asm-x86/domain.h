@@ -19,6 +19,7 @@
 #define is_hvm_pv_evtchn_vcpu(v) (is_hvm_pv_evtchn_domain(v->domain))
 #define is_domain_direct_mapped(d) ((void)(d), 0)
 
+#define VCPU_TRAP_NONE         0
 #define VCPU_TRAP_NMI          1
 #define VCPU_TRAP_MCE          2
 #define VCPU_TRAP_LAST         VCPU_TRAP_MCE
@@ -555,6 +556,13 @@ struct arch_vcpu
     unsigned long      flags; /* TF_ */
 
     struct vpmu_struct vpmu;
+
+    struct {
+        bool    pending;
+        uint8_t old_mask;
+    } async_exception_state[VCPU_TRAP_LAST];
+#define async_exception_state(t) async_exception_state[(t)-1]
+    uint8_t async_exception_mask;
 
     /* Virtual Machine Extensions */
     union {
