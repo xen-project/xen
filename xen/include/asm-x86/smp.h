@@ -5,13 +5,10 @@
  * We need the APIC definitions automatically as part of 'smp.h'
  */
 #ifndef __ASSEMBLY__
+#include <xen/bitops.h>
 #include <xen/kernel.h>
 #include <xen/cpumask.h>
 #include <asm/current.h>
-#endif
-
-#ifndef __ASSEMBLY__
-#include <xen/bitops.h>
 #include <asm/mpspec.h>
 #endif
 
