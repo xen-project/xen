@@ -120,59 +120,59 @@ struct arm_smccc_res {
 #define __constraint_read_6 __constraint_read_5, "r" (r6)
 #define __constraint_read_7 __constraint_read_6, "r" (r7)
 
-#define __declare_arg_0(a0, res)                        \
-    struct arm_smccc_res    *___res = res;              \
-    register unsigned long  r0 asm("r0") = (uint32_t)a0;\
-    register unsigned long  r1 asm("r1");               \
-    register unsigned long  r2 asm("r2");               \
-    register unsigned long  r3 asm("r3")
+#define __declare_arg_0(a0, res)                            \
+    struct arm_smccc_res    *___res = res;                  \
+    register unsigned long  r0 ASM_REG(0) = (uint32_t)a0;   \
+    register unsigned long  r1 ASM_REG(1);                  \
+    register unsigned long  r2 ASM_REG(2);                  \
+    register unsigned long  r3 ASM_REG(3)
 
-#define __declare_arg_1(a0, a1, res)                    \
-    typeof(a1) __a1 = a1;                               \
-    struct arm_smccc_res    *___res = res;              \
-    register unsigned long  r0 asm("r0") = (uint32_t)a0;\
-    register unsigned long  r1 asm("r1") = __a1;        \
-    register unsigned long  r2 asm("r2");               \
-    register unsigned long  r3 asm("r3")
+#define __declare_arg_1(a0, a1, res)                        \
+    typeof(a1) __a1 = a1;                                   \
+    struct arm_smccc_res    *___res = res;                  \
+    register unsigned long  r0 ASM_REG(0) = (uint32_t)a0;   \
+    register unsigned long  r1 ASM_REG(1) = __a1;           \
+    register unsigned long  r2 ASM_REG(2);                  \
+    register unsigned long  r3 ASM_REG(3)
 
-#define __declare_arg_2(a0, a1, a2, res)                \
-    typeof(a1) __a1 = a1;                               \
-    typeof(a2) __a2 = a2;                               \
-    struct arm_smccc_res    *___res = res;				\
-    register unsigned long  r0 asm("r0") = (uint32_t)a0;\
-    register unsigned long  r1 asm("r1") = __a1;        \
-    register unsigned long  r2 asm("r2") = __a2;        \
-    register unsigned long  r3 asm("r3")
+#define __declare_arg_2(a0, a1, a2, res)                    \
+    typeof(a1) __a1 = a1;                                   \
+    typeof(a2) __a2 = a2;                                   \
+    struct arm_smccc_res    *___res = res;				    \
+    register unsigned long  r0 ASM_REG(0) = (uint32_t)a0;   \
+    register unsigned long  r1 ASM_REG(1) = __a1;           \
+    register unsigned long  r2 ASM_REG(2) = __a2;           \
+    register unsigned long  r3 ASM_REG(3)
 
-#define __declare_arg_3(a0, a1, a2, a3, res)            \
-    typeof(a1) __a1 = a1;                               \
-    typeof(a2) __a2 = a2;                               \
-    typeof(a3) __a3 = a3;                               \
-    struct arm_smccc_res    *___res = res;              \
-    register unsigned long  r0 asm("r0") = (uint32_t)a0;\
-    register unsigned long  r1 asm("r1") = __a1;        \
-    register unsigned long  r2 asm("r2") = __a2;        \
-    register unsigned long  r3 asm("r3") = __a3
+#define __declare_arg_3(a0, a1, a2, a3, res)                \
+    typeof(a1) __a1 = a1;                                   \
+    typeof(a2) __a2 = a2;                                   \
+    typeof(a3) __a3 = a3;                                   \
+    struct arm_smccc_res    *___res = res;                  \
+    register unsigned long  r0 ASM_REG(0) = (uint32_t)a0;   \
+    register unsigned long  r1 ASM_REG(1) = __a1;           \
+    register unsigned long  r2 ASM_REG(2) = __a2;           \
+    register unsigned long  r3 ASM_REG(3) = __a3
 
 #define __declare_arg_4(a0, a1, a2, a3, a4, res)        \
     typeof(a4) __a4 = a4;                               \
     __declare_arg_3(a0, a1, a2, a3, res);               \
-    register unsigned long r4 asm("r4") = __a4
+    register unsigned long r4 ASM_REG(4) = __a4
 
 #define __declare_arg_5(a0, a1, a2, a3, a4, a5, res)    \
     typeof(a5) __a5 = a5;                               \
     __declare_arg_4(a0, a1, a2, a3, a4, res);           \
-    register typeof(a5) r5 asm("r5") = __a5
+    register typeof(a5) r5 ASM_REG(5) = __a5
 
 #define __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res)    \
     typeof(a6) __a6 = a6;                                   \
     __declare_arg_5(a0, a1, a2, a3, a4, a5, res);           \
-    register typeof(a6) r6 asm("r6") = __a6
+    register typeof(a6) r6 ASM_REG(6) = __a6
 
 #define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6, a7, res)    \
     typeof(a7) __a7 = a7;                                       \
     __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res);           \
-    register typeof(a7) r7 asm("r7") = __a7
+    register typeof(a7) r7 ASM_REG(7) = __a7
 
 #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
 #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
