@@ -257,6 +257,7 @@ static DEFINE_SPINLOCK(ipmmu_devices_lock);
 #define IMUCTR_TTSEL_MMU(n)    ((n) << 4)
 #define IMUCTR_TTSEL_PMB       (8 << 4)
 #define IMUCTR_TTSEL_MASK      (15 << 4)
+#define IMUCTR_TTSEL_SHIFT     4
 #define IMUCTR_FLUSH           (1 << 1)
 #define IMUCTR_MMUEN           (1 << 0)
 
@@ -434,19 +435,45 @@ static void ipmmu_tlb_invalidate(struct ipmmu_vmsa_domain *domain)
 }
 
 /* Enable MMU translation for the micro-TLB. */
-static void ipmmu_utlb_enable(struct ipmmu_vmsa_domain *domain,
-                              unsigned int utlb)
+static int ipmmu_utlb_enable(struct ipmmu_vmsa_domain *domain,
+                             unsigned int utlb)
 {
     struct ipmmu_vmsa_device *mmu = domain->mmu;
+    uint32_t imuctr;
+
+    /*
+     * We need to prevent the use cases where devices which use the same
+     * micro-TLB are assigned to different Xen domains (micro-TLB cannot be
+     * shared between multiple Xen domains, since it points to the context bank
+     * to use for the page walk).
+     * As each Xen domain uses individual context bank pointed by context_id,
+     * we can potentially recognize that use case by comparing current and new
+     * context_id for already enabled micro-TLB and prevent different context
+     * bank from being set.
+     */
+    imuctr = ipmmu_read(mmu, IMUCTR(utlb));
+    if ( imuctr & IMUCTR_MMUEN )
+    {
+        unsigned int context_id;
+
+        context_id = (imuctr & IMUCTR_TTSEL_MASK) >> IMUCTR_TTSEL_SHIFT;
+        if ( domain->context_id != context_id )
+        {
+            dev_err(mmu->dev, "Micro-TLB %u already assigned to IPMMU context %u\n",
+                    utlb, context_id);
+            return -EINVAL;
+        }
+    }
 
     /*
      * TODO: Reference-count the micro-TLB as several bus masters can be
-     * connected to the same micro-TLB. Prevent the use cases where
-     * the same micro-TLB could be shared between multiple Xen domains.
+     * connected to the same micro-TLB.
      */
     ipmmu_write(mmu, IMUASID(utlb), 0);
-    ipmmu_write(mmu, IMUCTR(utlb), ipmmu_read(mmu, IMUCTR(utlb)) |
+    ipmmu_write(mmu, IMUCTR(utlb), imuctr |
                 IMUCTR_TTSEL_MMU(domain->context_id) | IMUCTR_MMUEN);
+
+    return 0;
 }
 
 /* Disable MMU translation for the micro-TLB. */
@@ -671,7 +698,17 @@ static int ipmmu_attach_device(struct ipmmu_vmsa_domain *domain,
         dev_info(dev, "Reusing IPMMU context %u\n", domain->context_id);
 
     for ( i = 0; i < fwspec->num_ids; ++i )
-        ipmmu_utlb_enable(domain, fwspec->ids[i]);
+    {
+        int ret = ipmmu_utlb_enable(domain, fwspec->ids[i]);
+
+        if ( ret )
+        {
+            while ( i-- )
+                ipmmu_utlb_disable(domain, fwspec->ids[i]);
+
+            return ret;
+        }
+    }
 
     return 0;
 }
