@@ -3816,26 +3816,6 @@ init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
     return spc->runq_id;
 }
 
-static void
-csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
-{
-    struct csched2_private *prv = csched2_priv(ops);
-    spinlock_t *old_lock;
-    unsigned long flags;
-    unsigned rqi;
-
-    write_lock_irqsave(&prv->lock, flags);
-    old_lock = pcpu_schedule_lock(cpu);
-
-    rqi = init_pdata(prv, pdata, cpu);
-    /* Move the scheduler lock to the new runq lock. */
-    get_sched_res(cpu)->schedule_lock = &prv->rqd[rqi].lock;
-
-    /* _Not_ pcpu_schedule_unlock(): schedule_lock may have changed! */
-    spin_unlock(old_lock);
-    write_unlock_irqrestore(&prv->lock, flags);
-}
-
 /* Change the scheduler of cpu to us (Credit2). */
 static spinlock_t *
 csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
@@ -4083,7 +4063,6 @@ static const struct scheduler sched_credit2_def = {
     .alloc_udata    = csched2_alloc_udata,
     .free_udata     = csched2_free_udata,
     .alloc_pdata    = csched2_alloc_pdata,
-    .init_pdata     = csched2_init_pdata,
     .deinit_pdata   = csched2_deinit_pdata,
     .free_pdata     = csched2_free_pdata,
     .switch_sched   = csched2_switch_sched,

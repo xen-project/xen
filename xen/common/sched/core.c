@@ -2775,10 +2775,10 @@ static int cpu_schedule_callback(
      * order. If no per-pCPU memory was allocated, there is no need to
      * provide an implementation of free_pdata. deinit_pdata may, however,
      * be necessary/useful in this case too (e.g., it can undo something done
-     * on scheduler wide data structure during init_pdata). Both deinit_pdata
+     * on scheduler wide data structure during switch_sched). Both deinit_pdata
      * and free_pdata are called during CPU_DEAD.
      *
-     * If someting goes wrong during bringup, we go to CPU_UP_CANCELLED.
+     * If something goes wrong during bringup, we go to CPU_UP_CANCELLED.
      */
     switch ( action )
     {
@@ -2968,9 +2968,8 @@ int schedule_cpu_add(unsigned int cpu, struct cpupool *c)
      * To setup the cpu for the new scheduler we need:
      *  - a valid instance of per-CPU scheduler specific data, as it is
      *    allocated by sched_alloc_pdata(). Note that we do not want to
-     *    initialize it yet (i.e., we are not calling sched_init_pdata()).
-     *    That will be done by the target scheduler, in sched_switch_sched(),
-     *    in proper ordering and with locking.
+     *    initialize it yet, as that will be done by the target scheduler,
+     *    in sched_switch_sched(), in proper ordering and with locking.
      *  - a valid instance of per-vCPU scheduler specific data, for the idle
      *    vCPU of cpu. That is what the target scheduler will use for the
      *    sched_priv field of the per-vCPU info of the idle domain.

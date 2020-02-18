@@ -166,15 +166,6 @@ static void init_pdata(struct null_private *prv, struct null_pcpu *npc,
     npc->unit = NULL;
 }
 
-static void null_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
-{
-    struct null_private *prv = null_priv(ops);
-
-    ASSERT(pdata);
-
-    init_pdata(prv, pdata, cpu);
-}
-
 static void null_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     struct null_private *prv = null_priv(ops);
@@ -1042,7 +1033,6 @@ static const struct scheduler sched_null_def = {
     .deinit         = null_deinit,
     .alloc_pdata    = null_alloc_pdata,
     .free_pdata     = null_free_pdata,
-    .init_pdata     = null_init_pdata,
     .switch_sched   = null_switch_sched,
     .deinit_pdata   = null_deinit_pdata,
 

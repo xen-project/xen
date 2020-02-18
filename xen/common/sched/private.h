@@ -306,7 +306,6 @@ struct scheduler {
                                     struct sched_unit *, void *);
     void         (*free_pdata)     (const struct scheduler *, void *, int);
     void *       (*alloc_pdata)    (const struct scheduler *, int);
-    void         (*init_pdata)     (const struct scheduler *, void *, int);
     void         (*deinit_pdata)   (const struct scheduler *, void *, int);
 
     /* Returns ERR_PTR(-err) for error, NULL for 'nothing needed'. */
@@ -406,13 +405,6 @@ static inline void sched_free_pdata(const struct scheduler *s, void *data,
     ASSERT(s->free_pdata || !data);
     if ( s->free_pdata )
         s->free_pdata(s, data, cpu);
-}
-
-static inline void sched_init_pdata(const struct scheduler *s, void *data,
-                                    int cpu)
-{
-    if ( s->init_pdata )
-        s->init_pdata(s, data, cpu);
 }
 
 static inline void sched_deinit_pdata(const struct scheduler *s, void *data,

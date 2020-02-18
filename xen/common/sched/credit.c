@@ -614,17 +614,6 @@ init_pdata(struct csched_private *prv, struct csched_pcpu *spc, int cpu)
     spc->nr_runnable = 0;
 }
 
-static void
-csched_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
-{
-    unsigned long flags;
-    struct csched_private *prv = CSCHED_PRIV(ops);
-
-    spin_lock_irqsave(&prv->lock, flags);
-    init_pdata(prv, pdata, cpu);
-    spin_unlock_irqrestore(&prv->lock, flags);
-}
-
 /* Change the scheduler of cpu to us (Credit). */
 static spinlock_t *
 csched_switch_sched(struct scheduler *new_ops, unsigned int cpu,
@@ -2273,7 +2262,6 @@ static const struct scheduler sched_credit_def = {
     .alloc_udata    = csched_alloc_udata,
     .free_udata     = csched_free_udata,
     .alloc_pdata    = csched_alloc_pdata,
-    .init_pdata     = csched_init_pdata,
     .deinit_pdata   = csched_deinit_pdata,
     .free_pdata     = csched_free_pdata,
     .switch_sched   = csched_switch_sched,

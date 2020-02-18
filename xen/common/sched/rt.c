@@ -713,36 +713,6 @@ rt_deinit(struct scheduler *ops)
     xfree(prv);
 }
 
-/*
- * Point per_cpu spinlock to the global system lock;
- * All cpu have same global system lock
- */
-static void
-rt_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
-{
-    struct rt_private *prv = rt_priv(ops);
-    spinlock_t *old_lock;
-    unsigned long flags;
-
-    old_lock = pcpu_schedule_lock_irqsave(cpu, &flags);
-
-    /*
-     * TIMER_STATUS_invalid means we are the first cpu that sees the timer
-     * allocated but not initialized, and so it's up to us to initialize it.
-     */
-    if ( prv->repl_timer.status == TIMER_STATUS_invalid )
-    {
-        init_timer(&prv->repl_timer, repl_timer_handler, (void *)ops, cpu);
-        dprintk(XENLOG_DEBUG, "RTDS: timer initialized on cpu %u\n", cpu);
-    }
-
-    /* Move the scheduler lock to our global runqueue lock.  */
-    get_sched_res(cpu)->schedule_lock = &prv->lock;
-
-    /* _Not_ pcpu_schedule_unlock(): per_cpu().schedule_lock changed! */
-    spin_unlock_irqrestore(old_lock, flags);
-}
-
 /* Change the scheduler of cpu to us (RTDS). */
 static spinlock_t *
 rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
@@ -1568,7 +1538,6 @@ static const struct scheduler sched_rtds_def = {
     .dump_settings  = rt_dump,
     .init           = rt_init,
     .deinit         = rt_deinit,
-    .init_pdata     = rt_init_pdata,
     .switch_sched   = rt_switch_sched,
     .deinit_pdata   = rt_deinit_pdata,
     .alloc_domdata  = rt_alloc_domdata,
