@@ -836,7 +836,6 @@ out:
 /* RMRR units derived from command line rmrr option. */
 #define MAX_USER_RMRR_DEV 20
 struct user_rmrr {
-    struct list_head list;
     unsigned long base_pfn, end_pfn;
     unsigned int dev_count;
     u32 sbdf[MAX_USER_RMRR_DEV];
