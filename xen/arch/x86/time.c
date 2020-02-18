@@ -2406,6 +2406,9 @@ static void dump_softtsc(unsigned char key)
     } else
         printk("TSC not marked as either constant or reliable, "
                "warp=%lu (count=%lu)\n", tsc_max_warp, tsc_check_count);
+
+    rcu_read_lock(&domlist_read_lock);
+
     for_each_domain ( d )
     {
         if ( is_hardware_domain(d) && d->arch.tsc_mode == TSC_MODE_DEFAULT )
@@ -2421,6 +2424,8 @@ static void dump_softtsc(unsigned char key)
         printk("\n");
         domcnt++;
     }
+
+    rcu_read_unlock(&domlist_read_lock);
 
     if ( !domcnt )
             printk("No domains have emulated TSC\n");

@@ -1297,6 +1297,8 @@ static void ept_dump_p2m_table(unsigned char key)
     struct p2m_domain *p2m;
     struct ept_data *ept;
 
+    rcu_read_lock(&domlist_read_lock);
+
     for_each_domain(d)
     {
         if ( !hap_enabled(d) )
@@ -1347,6 +1349,8 @@ static void ept_dump_p2m_table(unsigned char key)
             unmap_domain_page(table);
         }
     }
+
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 void setup_ept_dump(void)

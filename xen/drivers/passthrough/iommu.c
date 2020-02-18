@@ -591,6 +591,9 @@ static void iommu_dump_p2m_table(unsigned char key)
     }
 
     ops = iommu_get_ops();
+
+    rcu_read_lock(&domlist_read_lock);
+
     for_each_domain(d)
     {
         if ( is_hardware_domain(d) || !is_iommu_enabled(d) )
@@ -605,6 +608,8 @@ static void iommu_dump_p2m_table(unsigned char key)
         printk("\ndomain%d IOMMU p2m table: \n", d->domain_id);
         ops->dump_p2m_table(d);
     }
+
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 /*

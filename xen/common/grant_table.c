@@ -4104,9 +4104,16 @@ static void gnttab_usage_print(struct domain *rd)
 static void gnttab_usage_print_all(unsigned char key)
 {
     struct domain *d;
+
     printk("%s [ key '%c' pressed\n", __func__, key);
+
+    rcu_read_lock(&domlist_read_lock);
+
     for_each_domain ( d )
         gnttab_usage_print(d);
+
+    rcu_read_unlock(&domlist_read_lock);
+
     printk("%s ] done\n", __func__);
 }
 
