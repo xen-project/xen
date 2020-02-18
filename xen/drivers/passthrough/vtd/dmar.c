@@ -563,7 +563,7 @@ static int register_one_rmrr(struct acpi_rmrr_unit *rmrru)
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     " Non-existent device (%04x:%02x:%02x.%u) is reported"
-                    " in RMRR (%"PRIx64", %"PRIx64")'s scope!\n",
+                    " in RMRR [%"PRIx64",%"PRIx64"]'s scope!\n",
                     rmrru->segment, b, d, f,
                     rmrru->base_address, rmrru->end_address);
             ignore = true;
@@ -578,8 +578,8 @@ static int register_one_rmrr(struct acpi_rmrr_unit *rmrru)
     if ( ignore )
     {
         dprintk(XENLOG_WARNING VTDPREFIX,
-                "  Ignore the RMRR (%"PRIx64", %"PRIx64") due to "
-                "devices under its scope are not PCI discoverable!\n",
+                " Ignore RMRR [%"PRIx64",%"PRIx64"] as no device"
+                " under its scope is PCI discoverable!\n",
                 rmrru->base_address, rmrru->end_address);
         scope_devices_free(&rmrru->scope);
         xfree(rmrru);
@@ -588,7 +588,7 @@ static int register_one_rmrr(struct acpi_rmrr_unit *rmrru)
     else if ( rmrru->base_address > rmrru->end_address )
     {
         dprintk(XENLOG_WARNING VTDPREFIX,
-                "  The RMRR (%"PRIx64", %"PRIx64") is incorrect!\n",
+                " RMRR [%"PRIx64",%"PRIx64"] is incorrect!\n",
                 rmrru->base_address, rmrru->end_address);
         scope_devices_free(&rmrru->scope);
         xfree(rmrru);
@@ -597,8 +597,7 @@ static int register_one_rmrr(struct acpi_rmrr_unit *rmrru)
     else
     {
         if ( iommu_verbose )
-            dprintk(VTDPREFIX,
-                    "  RMRR region: base_addr %"PRIx64" end_addr %"PRIx64"\n",
+            dprintk(VTDPREFIX, " RMRR: [%"PRIx64",%"PRIx64"]\n",
                     rmrru->base_address, rmrru->end_address);
         acpi_register_rmrr_unit(rmrru);
     }
@@ -635,7 +634,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
      */
     if ( !e820_all_mapped(base_addr, end_addr + 1, RAM_TYPE_RESERVED) )
         printk(XENLOG_WARNING VTDPREFIX
-               "  RMRR address range %"PRIx64"..%"PRIx64" not in reserved memory;"
+               " RMRR [%"PRIx64",%"PRIx64"] not in reserved memory;"
                " need \"iommu_inclusive_mapping=1\"?\n",
                 base_addr, end_addr);
 
