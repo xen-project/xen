@@ -95,8 +95,6 @@ bool_t __must_check rangeset_contains_singleton(
 void rangeset_swap(struct rangeset *a, struct rangeset *b);
 
 /* Rangeset pretty printing. */
-void rangeset_printk(
-    struct rangeset *r);
 void rangeset_domain_printk(
     struct domain *d);
 

@@ -541,8 +541,7 @@ static void print_limit(struct rangeset *r, unsigned long s)
     printk((r->flags & RANGESETF_prettyprint_hex) ? "%lx" : "%lu", s);
 }
 
-void rangeset_printk(
-    struct rangeset *r)
+static void rangeset_printk(struct rangeset *r)
 {
     int nr_printed = 0;
     struct range *x;
