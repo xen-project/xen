@@ -187,13 +187,17 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         uint32_t *status, *ptr;
         mfn_t mfn;
 
+        ret = -EINVAL;
+        if ( op->u.page_offline.end < op->u.page_offline.start )
+            break;
+
         ret = xsm_page_offline(XSM_HOOK, op->u.page_offline.cmd);
         if ( ret )
             break;
 
-        ptr = status = xmalloc_bytes( sizeof(uint32_t) *
-                                (op->u.page_offline.end -
-                                  op->u.page_offline.start + 1));
+        ptr = status = xmalloc_array(uint32_t,
+                                     (op->u.page_offline.end -
+                                      op->u.page_offline.start + 1));
         if ( !status )
         {
             dprintk(XENLOG_WARNING, "Out of memory for page offline op\n");
