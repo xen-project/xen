@@ -38,7 +38,7 @@ struct e820map e820;
 struct e820map __initdata e820_raw;
 
 /*
- * This function checks if the entire range <start,end> is mapped with type.
+ * This function checks if the entire range [start,end) is mapped with type.
  *
  * Note: this function only works correct if the e820 table is sorted and
  * not-overlapping, which is the case
@@ -56,7 +56,8 @@ int __init e820_all_mapped(u64 start, u64 end, unsigned type)
 		if (ei->addr >= end || ei->addr + ei->size <= start)
 			continue;
 
-		/* if the region is at the beginning of <start,end> we move
+		/*
+		 * If the region is at the beginning of [start,end) we move
 		 * start to the end of the region since it's ok until there
 		 */
 		if (ei->addr <= start)

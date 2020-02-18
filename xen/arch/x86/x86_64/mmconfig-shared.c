@@ -337,7 +337,7 @@ static int __init is_mmconf_reserved(
     u64 old_size = size;
     int valid = 0;
 
-    while (!e820_all_mapped(addr, addr + size - 1, E820_RESERVED)) {
+    while (!e820_all_mapped(addr, addr + size, E820_RESERVED)) {
         size >>= 1;
         if (size < (16UL<<20))
             break;
