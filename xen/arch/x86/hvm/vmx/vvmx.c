@@ -128,6 +128,16 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         unmap_domain_page(vw);
     }
 
+    if ( cpu_has_vmx_msr_bitmap )
+    {
+        nvmx->msr_merged = alloc_domheap_page(d, MEMF_no_owner);
+        if ( !nvmx->msr_merged )
+        {
+            gdprintk(XENLOG_ERR, "nest: allocation for MSR bitmap failed\n");
+            return -ENOMEM;
+        }
+    }
+
     nvmx->ept.enabled = 0;
     nvmx->guest_vpid = 0;
     nvmx->vmxon_region_pa = INVALID_PADDR;
@@ -183,13 +193,27 @@ void nvmx_vcpu_destroy(struct vcpu *v)
         v->arch.hvm.vmx.vmwrite_bitmap = NULL;
     }
 }
- 
+
+static void vcpu_relinquish_resources(struct vcpu *v)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+
+    if ( nvmx->msr_merged )
+    {
+        free_domheap_page(nvmx->msr_merged);
+        nvmx->msr_merged = NULL;
+    }
+}
+
 void nvmx_domain_relinquish_resources(struct domain *d)
 {
     struct vcpu *v;
 
     for_each_vcpu ( d, v )
+    {
         nvmx_purge_vvmcs(v);
+        vcpu_relinquish_resources(v);
+    }
 }
 
 int nvmx_vcpu_reset(struct vcpu *v)
@@ -548,6 +572,35 @@ unsigned long *_shadow_io_bitmap(struct vcpu *v)
     return nestedhvm_vcpu_iomap_get(port80, portED);
 }
 
+static void update_msrbitmap(struct vcpu *v, uint32_t shadow_ctrl)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    struct vmx_msr_bitmap *msr_bitmap;
+
+    if ( !(shadow_ctrl & CPU_BASED_ACTIVATE_MSR_BITMAP) ||
+         !nvmx->msrbitmap )
+       return;
+
+    msr_bitmap = __map_domain_page(nvmx->msr_merged);
+
+    bitmap_or(msr_bitmap->read_low, nvmx->msrbitmap->read_low,
+              v->arch.hvm.vmx.msr_bitmap->read_low,
+              sizeof(msr_bitmap->read_low) * 8);
+    bitmap_or(msr_bitmap->read_high, nvmx->msrbitmap->read_high,
+              v->arch.hvm.vmx.msr_bitmap->read_high,
+              sizeof(msr_bitmap->read_high) * 8);
+    bitmap_or(msr_bitmap->write_low, nvmx->msrbitmap->write_low,
+              v->arch.hvm.vmx.msr_bitmap->write_low,
+              sizeof(msr_bitmap->write_low) * 8);
+    bitmap_or(msr_bitmap->write_high, nvmx->msrbitmap->write_high,
+              v->arch.hvm.vmx.msr_bitmap->write_high,
+              sizeof(msr_bitmap->write_high) * 8);
+
+    unmap_domain_page(msr_bitmap);
+
+    __vmwrite(MSR_BITMAP, page_to_maddr(nvmx->msr_merged));
+}
+
 void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
 {
     u32 pio_cntrl = (CPU_BASED_ACTIVATE_IO_BITMAP
@@ -558,10 +611,17 @@ void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
     shadow_cntrl = __n2_exec_control(v);
     pio_cntrl &= shadow_cntrl;
     /* Enforce the removed features */
-    shadow_cntrl &= ~(CPU_BASED_ACTIVATE_MSR_BITMAP
-                      | CPU_BASED_ACTIVATE_IO_BITMAP
+    shadow_cntrl &= ~(CPU_BASED_ACTIVATE_IO_BITMAP
                       | CPU_BASED_UNCOND_IO_EXITING);
-    shadow_cntrl |= host_cntrl;
+    /*
+     * Do NOT enforce the MSR bitmap currently used by L1, as certain hardware
+     * virtualization features require specific MSR bitmap settings, but
+     * without the guest also using these same features the bitmap could be
+     * leaking through unwanted MSR accesses.
+     */
+    shadow_cntrl |= host_cntrl & ~CPU_BASED_ACTIVATE_MSR_BITMAP;
+    if ( !(shadow_cntrl & host_cntrl & CPU_BASED_ACTIVATE_MSR_BITMAP) )
+      shadow_cntrl &= ~CPU_BASED_ACTIVATE_MSR_BITMAP;
     if ( pio_cntrl == CPU_BASED_UNCOND_IO_EXITING ) {
         /* L1 VMM intercepts all I/O instructions */
         shadow_cntrl |= CPU_BASED_UNCOND_IO_EXITING;
@@ -583,6 +643,8 @@ void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
         __vmwrite(IO_BITMAP_A, virt_to_maddr(bitmap));
         __vmwrite(IO_BITMAP_B, virt_to_maddr(bitmap) + PAGE_SIZE);
     }
+
+    update_msrbitmap(v, shadow_cntrl);
 
     /* TODO: change L0 intr window to MTF or NMI window */
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, shadow_cntrl);
@@ -1278,6 +1340,9 @@ static void load_vvmcs_host_state(struct vcpu *v)
     hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
 
     set_vvmcs(v, VM_ENTRY_INTR_INFO, 0);
+
+    if ( v->arch.hvm.vmx.exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP )
+        __vmwrite(MSR_BITMAP, virt_to_maddr(v->arch.hvm.vmx.msr_bitmap));
 }
 
 static void sync_exception_state(struct vcpu *v)
