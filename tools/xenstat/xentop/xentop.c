@@ -969,7 +969,7 @@ void do_summary(void)
 	      "%u crashed, %u dying, %u shutdown \n",
 	      num_domains, run, block, pause, crash, dying, shutdown);
 
-	used = xenstat_node_tot_mem(cur_node);
+	used = xenstat_node_tot_mem(cur_node) - xenstat_node_free_mem(cur_node);
 	freeable_mb = 0;
 
 	/* Dump node memory and cpu information */
