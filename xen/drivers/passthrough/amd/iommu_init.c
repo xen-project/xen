@@ -338,7 +338,7 @@ static int iommu_read_log(struct amd_iommu *iommu,
             {
                 AMD_IOMMU_DEBUG("AMD-Vi: No entry written to %s Log\n",
                                 log == &iommu->event_log ? "Event" : "PPR");
-                return 0;
+                goto out;
             }
             udelay(1);
             code = MASK_EXTR(ACCESS_ONCE(entry[1]), IOMMU_EVENT_CODE_MASK);
@@ -357,6 +357,7 @@ static int iommu_read_log(struct amd_iommu *iommu,
         writel(log->head, iommu->mmio_base + head_offset);
     }
 
+ out:
     spin_unlock(&log->lock);
    
     return 0;
