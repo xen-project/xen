@@ -596,6 +596,13 @@ static void update_msrbitmap(struct vcpu *v, uint32_t shadow_ctrl)
               v->arch.hvm.vmx.msr_bitmap->write_high,
               sizeof(msr_bitmap->write_high) * 8);
 
+    /*
+     * Nested VMX doesn't support any x2APIC hardware virtualization, so
+     * make sure all the x2APIC MSRs are trapped.
+     */
+    bitmap_set(msr_bitmap->read_low, MSR_X2APIC_FIRST, 0x100);
+    bitmap_set(msr_bitmap->write_low, MSR_X2APIC_FIRST, 0x100);
+
     unmap_domain_page(msr_bitmap);
 
     __vmwrite(MSR_BITMAP, page_to_maddr(nvmx->msr_merged));
