@@ -12,8 +12,6 @@
 #include <asm/types.h>
 #include <asm/byteorder.h>
 
-#define BITOP_WORD(nr)		((nr) / BITS_PER_LONG)
-
 #ifndef find_next_bit
 /*
  * Find the next set bit in a memory region.
@@ -21,7 +19,7 @@
 unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
 			    unsigned long offset)
 {
-	const unsigned long *p = addr + BITOP_WORD(offset);
+	const unsigned long *p = addr + BIT_WORD(offset);
 	unsigned long result = offset & ~(BITS_PER_LONG-1);
 	unsigned long tmp;
 
@@ -67,7 +65,7 @@ EXPORT_SYMBOL(find_next_bit);
 unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,
 				 unsigned long offset)
 {
-	const unsigned long *p = addr + BITOP_WORD(offset);
+	const unsigned long *p = addr + BIT_WORD(offset);
 	unsigned long result = offset & ~(BITS_PER_LONG-1);
 	unsigned long tmp;
 
@@ -197,7 +195,7 @@ unsigned long find_next_zero_bit_le(const void *addr, unsigned
 
 	if (offset >= size)
 		return size;
-	p += BITOP_WORD(offset);
+	p += BIT_WORD(offset);
 	size -= result;
 	offset &= (BITS_PER_LONG - 1UL);
 	if (offset) {
@@ -243,7 +241,7 @@ unsigned long find_next_bit_le(const void *addr, unsigned
 
 	if (offset >= size)
 		return size;
-	p += BITOP_WORD(offset);
+	p += BIT_WORD(offset);
 	size -= result;
 	offset &= (BITS_PER_LONG - 1UL);
 	if (offset) {

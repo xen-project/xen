@@ -245,4 +245,6 @@ static inline __u32 ror32(__u32 word, unsigned int shift)
           (bit) < (size);                               \
           (bit) = find_next_bit(addr, size, (bit) + 1) )
 
+#define BIT_WORD(nr) ((nr) / BITS_PER_LONG)
+
 #endif
