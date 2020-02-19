@@ -6,19 +6,12 @@
 #include <xen/notifier.h>
 
 /* Safely access cpu_online_map, cpu_present_map, etc. */
-bool_t get_cpu_maps(void);
+bool get_cpu_maps(void);
 void put_cpu_maps(void);
 
 /* Safely perform CPU hotplug and update cpu_online_map, etc. */
-static inline bool cpu_hotplug_begin(void)
-{
-    return get_cpu_maps();
-}
-
-static inline void cpu_hotplug_done(void)
-{
-    put_cpu_maps();
-}
+bool cpu_hotplug_begin(void);
+void cpu_hotplug_done(void);
 
 /* Receive notification of CPU hotplug events. */
 void register_cpu_notifier(struct notifier_block *nb);

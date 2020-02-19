@@ -39,26 +39,36 @@ const unsigned long cpu_bit_bitmap[BITS_PER_LONG+1][BITS_TO_LONGS(NR_CPUS)] = {
 #endif
 };
 
-static DEFINE_SPINLOCK(cpu_add_remove_lock);
+static DEFINE_RWLOCK(cpu_add_remove_lock);
 
-bool_t get_cpu_maps(void)
+bool get_cpu_maps(void)
 {
-    return spin_trylock_recursive(&cpu_add_remove_lock);
+    return read_trylock(&cpu_add_remove_lock);
 }
 
 void put_cpu_maps(void)
 {
-    spin_unlock_recursive(&cpu_add_remove_lock);
+    read_unlock(&cpu_add_remove_lock);
+}
+
+bool cpu_hotplug_begin(void)
+{
+    return write_trylock(&cpu_add_remove_lock);
+}
+
+void cpu_hotplug_done(void)
+{
+    write_unlock(&cpu_add_remove_lock);
 }
 
 static NOTIFIER_HEAD(cpu_chain);
 
 void __init register_cpu_notifier(struct notifier_block *nb)
 {
-    if ( !spin_trylock(&cpu_add_remove_lock) )
+    if ( !write_trylock(&cpu_add_remove_lock) )
         BUG(); /* Should never fail as we are called only during boot. */
     notifier_chain_register(&cpu_chain, nb);
-    spin_unlock(&cpu_add_remove_lock);
+    write_unlock(&cpu_add_remove_lock);
 }
 
 static int cpu_notifier_call_chain(unsigned int cpu, unsigned long action,
