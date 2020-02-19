@@ -1015,7 +1015,7 @@ void do_bottom_line(void)
 		addch(A_REVERSE | 'N');
 		attr_addstr(show_networks ? COLOR_PAIR(1) : 0, "etworks");
 		addstr("  ");
-		
+
 		/* VBDs */
 		attr_addstr(show_vbds ? COLOR_PAIR(1) : 0, "v");
 		addch(A_REVERSE | 'B');
@@ -1123,7 +1123,7 @@ void do_vbd(xenstat_domain *domain)
 		"BlkBack",           /* number 1 */
 		"BlkTap",            /* number 2 */
 	};
-	
+
 	num_vbds = xenstat_domain_num_vbds(domain);
 
 	for (i=0 ; i< num_vbds; i++) {
