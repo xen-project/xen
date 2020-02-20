@@ -40,10 +40,6 @@
 #define amd_offset_level_address(offset, level) \
         ((uint64_t)(offset) << (12 + (PTE_PER_TABLE_SHIFT * ((level) - 1))))
 
-#define PCI_MIN_CAP_OFFSET	0x40
-#define PCI_MAX_CAP_BLOCKS	48
-#define PCI_CAP_PTR_MASK	0xFC
-
 /* IOMMU Capability */
 #define PCI_CAP_ID_MASK		0x000000FF
 #define PCI_CAP_ID_SHIFT	0
