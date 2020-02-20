@@ -500,6 +500,12 @@ F:	xen/include/*/vm_event.h
 F:	xen/include/asm-x86/hvm/monitor.h
 F:	xen/include/asm-x86/hvm/vm_event.h
 
+VPCI
+M:	Roger Pau Monné <roger.pau@citrix.com>
+S:	Supported
+F:	xen/drivers/vpci/
+F:	xen/include/xen/vpci.h
+
 VTPM
 M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
 M:	Quan Xu <quan.xu0@gmail.com>
