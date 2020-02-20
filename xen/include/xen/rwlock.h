@@ -60,6 +60,10 @@ static inline int _read_trylock(rwlock_t *lock)
     if ( likely(_can_read_lock(cnts)) )
     {
         cnts = (u32)atomic_add_return(_QR_BIAS, &lock->cnts);
+        /*
+         * atomic_add_return() is a full barrier so no need for an
+         * arch_lock_acquire_barrier().
+         */
         if ( likely(_can_read_lock(cnts)) )
             return 1;
         atomic_sub(_QR_BIAS, &lock->cnts);
@@ -78,11 +82,19 @@ static inline void _read_lock(rwlock_t *lock)
 
     preempt_disable();
     cnts = atomic_add_return(_QR_BIAS, &lock->cnts);
+    /*
+     * atomic_add_return() is a full barrier so no need for an
+     * arch_lock_acquire_barrier().
+     */
     if ( likely(_can_read_lock(cnts)) )
         return;
 
     /* The slowpath will decrement the reader count, if necessary. */
     queue_read_lock_slowpath(lock);
+    /*
+     * queue_read_lock_slowpath() is using spinlock and therefore is a
+     * full barrier. So no need for an arch_lock_acquire_barrier().
+     */
 }
 
 static inline void _read_lock_irq(rwlock_t *lock)
@@ -106,6 +118,7 @@ static inline unsigned long _read_lock_irqsave(rwlock_t *lock)
  */
 static inline void _read_unlock(rwlock_t *lock)
 {
+    arch_lock_release_barrier();
     /*
      * Atomically decrement the reader count
      */
@@ -141,12 +154,21 @@ static inline unsigned int _write_lock_val(void)
  */
 static inline void _write_lock(rwlock_t *lock)
 {
-    /* Optimize for the unfair lock case where the fair flag is 0. */
     preempt_disable();
+    /*
+     * Optimize for the unfair lock case where the fair flag is 0.
+     *
+     * atomic_cmpxchg() is a full barrier so no need for an
+     * arch_lock_acquire_barrier().
+     */
     if ( atomic_cmpxchg(&lock->cnts, 0, _write_lock_val()) == 0 )
         return;
 
     queue_write_lock_slowpath(lock);
+    /*
+     * queue_write_lock_slowpath() is using spinlock and therefore is a
+     * full barrier. So no need for an arch_lock_acquire_barrier().
+     */
 }
 
 static inline void _write_lock_irq(rwlock_t *lock)
@@ -183,12 +205,17 @@ static inline int _write_trylock(rwlock_t *lock)
         return 0;
     }
 
+    /*
+     * atomic_cmpxchg() is a full barrier so no need for an
+     * arch_lock_acquire_barrier().
+     */
     return 1;
 }
 
 static inline void _write_unlock(rwlock_t *lock)
 {
     ASSERT(_is_write_locked_by_me(atomic_read(&lock->cnts)));
+    arch_lock_release_barrier();
     atomic_and(~(_QW_CPUMASK | _QW_WMASK), &lock->cnts);
     preempt_enable();
 }
