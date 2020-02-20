@@ -3243,7 +3243,7 @@ void scheduler_free(struct scheduler *sched)
 
 void schedule_dump(struct cpupool *c)
 {
-    unsigned int      i;
+    unsigned int      i, j;
     struct scheduler *sched;
     cpumask_t        *cpus;
 
@@ -3254,7 +3254,7 @@ void schedule_dump(struct cpupool *c)
     if ( c != NULL )
     {
         sched = c->sched;
-        cpus = c->cpu_valid;
+        cpus = c->res_valid;
         printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
         sched_dump_settings(sched);
     }
@@ -3264,11 +3264,25 @@ void schedule_dump(struct cpupool *c)
         cpus = &cpupool_free_cpus;
     }
 
-    if ( sched->dump_cpu_state != NULL )
+    printk("CPUs info:\n");
+    for_each_cpu (i, cpus)
     {
-        printk("CPUs info:\n");
-        for_each_cpu (i, cpus)
-            sched_dump_cpu_state(sched, i);
+        struct sched_resource *sr = get_sched_res(i);
+        unsigned long flags;
+        spinlock_t *lock;
+
+        lock = pcpu_schedule_lock_irqsave(i, &flags);
+
+        printk("CPU[%02d] current=%pv, curr=%pv, prev=%pv\n", i,
+               get_cpu_current(i), sr->curr ? sr->curr->vcpu_list : NULL,
+               sr->prev ? sr->prev->vcpu_list : NULL);
+        for_each_cpu (j, sr->cpus)
+            if ( i != j )
+                printk("CPU[%02d] current=%pv\n", j, get_cpu_current(j));
+
+        pcpu_schedule_unlock_irqrestore(lock, flags, i);
+
+        sched_dump_cpu_state(sched, i);
     }
 
     rcu_read_unlock(&sched_res_rculock);
