@@ -889,12 +889,10 @@ const cpumask_t *cpupool_valid_cpus(const struct cpupool *pool)
 
 void dump_runq(unsigned char key)
 {
-    unsigned long    flags;
     s_time_t         now = NOW();
     struct cpupool **c;
 
     spin_lock(&cpupool_lock);
-    local_irq_save(flags);
 
     printk("sched_smt_power_savings: %s\n",
             sched_smt_power_savings? "enabled":"disabled");
@@ -914,7 +912,6 @@ void dump_runq(unsigned char key)
         schedule_dump(*c);
     }
 
-    local_irq_restore(flags);
     spin_unlock(&cpupool_lock);
 }
 
