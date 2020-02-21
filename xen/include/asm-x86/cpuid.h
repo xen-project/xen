@@ -49,7 +49,8 @@ DECLARE_PER_CPU(struct cpuidmasks, cpuidmasks);
 extern struct cpuidmasks cpuidmask_defaults;
 
 extern struct cpuid_policy raw_cpuid_policy, host_cpuid_policy,
-    pv_max_cpuid_policy, hvm_max_cpuid_policy;
+    pv_max_cpuid_policy, pv_def_cpuid_policy,
+    hvm_max_cpuid_policy, hvm_def_cpuid_policy;
 
 extern const struct cpu_policy system_policies[];
 

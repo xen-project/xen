@@ -48,7 +48,7 @@ const struct cpu_policy system_policies[6] = {
         &pv_max_msr_policy,
     },
     [ XEN_SYSCTL_cpu_policy_pv_default ] = {
-        &pv_max_cpuid_policy,
+        &pv_def_cpuid_policy,
         &pv_def_msr_policy,
     },
 #endif
@@ -58,7 +58,7 @@ const struct cpu_policy system_policies[6] = {
         &hvm_max_msr_policy,
     },
     [ XEN_SYSCTL_cpu_policy_hvm_default ] = {
-        &hvm_max_cpuid_policy,
+        &hvm_def_cpuid_policy,
         &hvm_def_msr_policy,
     },
 #endif
@@ -367,10 +367,10 @@ long arch_do_sysctl(
             [XEN_SYSCTL_cpu_featureset_raw]  = &raw_cpuid_policy,
             [XEN_SYSCTL_cpu_featureset_host] = &host_cpuid_policy,
 #ifdef CONFIG_PV
-            [XEN_SYSCTL_cpu_featureset_pv]   = &pv_max_cpuid_policy,
+            [XEN_SYSCTL_cpu_featureset_pv]   = &pv_def_cpuid_policy,
 #endif
 #ifdef CONFIG_HVM
-            [XEN_SYSCTL_cpu_featureset_hvm]  = &hvm_max_cpuid_policy,
+            [XEN_SYSCTL_cpu_featureset_hvm]  = &hvm_def_cpuid_policy,
 #endif
         };
         const struct cpuid_policy *p = NULL;

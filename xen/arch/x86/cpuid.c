@@ -18,6 +18,9 @@ const uint32_t special_features[] = INIT_SPECIAL_FEATURES;
 static const uint32_t pv_max_featuremask[] = INIT_PV_MAX_FEATURES;
 static const uint32_t hvm_shadow_max_featuremask[] = INIT_HVM_SHADOW_MAX_FEATURES;
 static const uint32_t hvm_hap_max_featuremask[] = INIT_HVM_HAP_MAX_FEATURES;
+static const uint32_t pv_def_featuremask[] = INIT_PV_DEF_FEATURES;
+static const uint32_t hvm_shadow_def_featuremask[] = INIT_HVM_SHADOW_DEF_FEATURES;
+static const uint32_t hvm_hap_def_featuremask[] = INIT_HVM_HAP_DEF_FEATURES;
 static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 
 static int __init parse_xen_cpuid(const char *s)
@@ -99,9 +102,11 @@ struct cpuid_policy __read_mostly     raw_cpuid_policy,
                     __read_mostly    host_cpuid_policy;
 #ifdef CONFIG_PV
 struct cpuid_policy __read_mostly  pv_max_cpuid_policy;
+struct cpuid_policy __read_mostly  pv_def_cpuid_policy;
 #endif
 #ifdef CONFIG_HVM
 struct cpuid_policy __read_mostly hvm_max_cpuid_policy;
+struct cpuid_policy __read_mostly hvm_def_cpuid_policy;
 #endif
 
 static void sanitise_featureset(uint32_t *fs)
@@ -381,6 +386,23 @@ static void __init calculate_pv_max_policy(void)
     p->extd.raw[0xa] = EMPTY_LEAF; /* No SVM for PV guests. */
 }
 
+static void __init calculate_pv_def_policy(void)
+{
+    struct cpuid_policy *p = &pv_def_cpuid_policy;
+    uint32_t pv_featureset[FSCAPINTS];
+    unsigned int i;
+
+    *p = pv_max_cpuid_policy;
+    cpuid_policy_to_featureset(p, pv_featureset);
+
+    for ( i = 0; i < ARRAY_SIZE(pv_featureset); ++i )
+        pv_featureset[i] &= pv_def_featuremask[i];
+
+    sanitise_featureset(pv_featureset);
+    cpuid_featureset_to_policy(pv_featureset, p);
+    recalculate_xstate(p);
+}
+
 static void __init calculate_hvm_max_policy(void)
 {
     struct cpuid_policy *p = &hvm_max_cpuid_policy;
@@ -440,16 +462,45 @@ static void __init calculate_hvm_max_policy(void)
     recalculate_xstate(p);
 }
 
+static void __init calculate_hvm_def_policy(void)
+{
+    struct cpuid_policy *p = &hvm_def_cpuid_policy;
+    uint32_t hvm_featureset[FSCAPINTS];
+    unsigned int i;
+    const uint32_t *hvm_featuremask;
+
+    *p = hvm_max_cpuid_policy;
+    cpuid_policy_to_featureset(p, hvm_featureset);
+
+    hvm_featuremask = hvm_hap_supported() ?
+        hvm_hap_def_featuremask : hvm_shadow_def_featuremask;
+
+    for ( i = 0; i < ARRAY_SIZE(hvm_featureset); ++i )
+        hvm_featureset[i] &= hvm_featuremask[i];
+
+    guest_common_feature_adjustments(hvm_featureset);
+
+    sanitise_featureset(hvm_featureset);
+    cpuid_featureset_to_policy(hvm_featureset, p);
+    recalculate_xstate(p);
+}
+
 void __init init_guest_cpuid(void)
 {
     calculate_raw_policy();
     calculate_host_policy();
 
     if ( IS_ENABLED(CONFIG_PV) )
+    {
         calculate_pv_max_policy();
+        calculate_pv_def_policy();
+    }
 
     if ( hvm_enabled )
+    {
         calculate_hvm_max_policy();
+        calculate_hvm_def_policy();
+    }
 }
 
 bool recheck_cpu_features(unsigned int cpu)
@@ -625,8 +676,8 @@ void recalculate_cpuid_policy(struct domain *d)
 int init_domain_cpuid_policy(struct domain *d)
 {
     struct cpuid_policy *p = is_pv_domain(d)
-        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_max_cpuid_policy : NULL)
-        : (IS_ENABLED(CONFIG_HVM) ? &hvm_max_cpuid_policy : NULL);
+        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_def_cpuid_policy : NULL)
+        : (IS_ENABLED(CONFIG_HVM) ? &hvm_def_cpuid_policy : NULL);
 
     if ( !p )
     {
