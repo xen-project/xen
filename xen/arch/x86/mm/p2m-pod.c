@@ -509,7 +509,7 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
     unsigned long ret = 0, i, n;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     bool_t steal_for_cache;
-    long pod, nonpod, ram;
+    long pod = 0, ram = 0;
 
     gfn_lock(p2m, gfn, order);
     pod_lock(p2m);
@@ -524,8 +524,6 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
     if ( unlikely(d->is_dying) )
         goto out_unlock;
 
-    pod = nonpod = ram = 0;
-
     /* Figure out if we need to steal some freed memory for our cache */
     steal_for_cache =  ( p2m->pod.entry_count > p2m->pod.count );
 
@@ -539,19 +537,15 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
         n = 1UL << min(order, cur_order);
         if ( t == p2m_populate_on_demand )
             pod += n;
-        else
-        {
-            nonpod += n;
-            if ( p2m_is_ram(t) )
-                ram += n;
-        }
+        else if ( p2m_is_ram(t) )
+            ram += n;
     }
 
     /* No populate-on-demand?  Don't need to steal anything?  Then we're done!*/
     if ( !pod && !steal_for_cache )
         goto out_unlock;
 
-    if ( !nonpod )
+    if ( i == pod )
     {
         /*
          * All PoD: Mark the whole region invalid and tell caller
@@ -587,7 +581,7 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
          p2m_pod_zero_check_superpage(p2m, _gfn(gfn_x(gfn) & ~(SUPERPAGE_PAGES - 1))) )
     {
         pod = 1UL << order;
-        ram = nonpod = 0;
+        ram = 0;
         ASSERT(steal_for_cache == (p2m->pod.entry_count > p2m->pod.count));
     }
 
@@ -655,7 +649,6 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
 
             steal_for_cache =  ( p2m->pod.entry_count > p2m->pod.count );
 
-            nonpod -= n;
             ram -= n;
             ret += n;
         }
