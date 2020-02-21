@@ -123,7 +123,7 @@ static const char *const str_7c0[32] =
     [ 0] = "prefetchwt1",      [ 1] = "avx512_vbmi",
     [ 2] = "umip",             [ 3] = "pku",
     [ 4] = "ospke",            [ 5] = "waitpkg",
-    [ 6] = "avx512_vbmi2",
+    [ 6] = "avx512_vbmi2",     [ 7] = "cet-ss",
     [ 8] = "gfni",             [ 9] = "vaes",
     [10] = "vpclmulqdq",       [11] = "avx512_vnni",
     [12] = "avx512_bitalg",
@@ -163,6 +163,7 @@ static const char *const str_7d0[32] =
     /* 12 */                [13] = "tsx-force-abort",
 
     [18] = "pconfig",
+    [20] = "cet-ibt",
 
     [26] = "ibrsb",         [27] = "stibp",
     [28] = "l1d_flush",     [29] = "arch_caps",

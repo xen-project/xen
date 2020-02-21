@@ -66,6 +66,14 @@
 #define  TSX_CTRL_RTM_DISABLE               (_AC(1, ULL) <<  0)
 #define  TSX_CTRL_CPUID_CLEAR               (_AC(1, ULL) <<  1)
 
+#define MSR_U_CET                           0x000006a0
+#define MSR_S_CET                           0x000006a2
+#define MSR_PL0_SSP                         0x000006a4
+#define MSR_PL1_SSP                         0x000006a5
+#define MSR_PL2_SSP                         0x000006a6
+#define MSR_PL3_SSP                         0x000006a7
+#define MSR_INTERRUPT_SSP_TABLE             0x000006a8
+
 /*
  * Legacy MSR constants in need of cleanup.  No new MSRs below this comment.
  */
