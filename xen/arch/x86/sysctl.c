@@ -49,7 +49,7 @@ const struct cpu_policy system_policies[6] = {
     },
     [ XEN_SYSCTL_cpu_policy_pv_default ] = {
         &pv_max_cpuid_policy,
-        &pv_max_msr_policy,
+        &pv_def_msr_policy,
     },
 #endif
 #ifdef CONFIG_HVM
@@ -59,7 +59,7 @@ const struct cpu_policy system_policies[6] = {
     },
     [ XEN_SYSCTL_cpu_policy_hvm_default ] = {
         &hvm_max_cpuid_policy,
-        &hvm_max_msr_policy,
+        &hvm_def_msr_policy,
     },
 #endif
 };

@@ -34,9 +34,11 @@ struct msr_policy __read_mostly     raw_msr_policy,
                   __read_mostly    host_msr_policy;
 #ifdef CONFIG_PV
 struct msr_policy __read_mostly  pv_max_msr_policy;
+struct msr_policy __read_mostly  pv_def_msr_policy;
 #endif
 #ifdef CONFIG_HVM
 struct msr_policy __read_mostly hvm_max_msr_policy;
+struct msr_policy __read_mostly hvm_def_msr_policy;
 #endif
 
 static void __init calculate_raw_policy(void)
@@ -56,6 +58,20 @@ static void __init calculate_host_policy(void)
     mp->platform_info.cpuid_faulting = cpu_has_cpuid_faulting;
 }
 
+static void __init calculate_pv_max_policy(void)
+{
+    struct msr_policy *mp = &pv_max_msr_policy;
+
+    *mp = host_msr_policy;
+}
+
+static void __init calculate_pv_def_policy(void)
+{
+    struct msr_policy *mp = &pv_def_msr_policy;
+
+    *mp = pv_max_msr_policy;
+}
+
 static void __init calculate_hvm_max_policy(void)
 {
     struct msr_policy *mp = &hvm_max_msr_policy;
@@ -66,11 +82,11 @@ static void __init calculate_hvm_max_policy(void)
     mp->platform_info.cpuid_faulting = true;
 }
 
-static void __init calculate_pv_max_policy(void)
+static void __init calculate_hvm_def_policy(void)
 {
-    struct msr_policy *mp = &pv_max_msr_policy;
+    struct msr_policy *mp = &hvm_def_msr_policy;
 
-    *mp = host_msr_policy;
+    *mp = hvm_max_msr_policy;
 }
 
 void __init init_guest_msr_policy(void)
@@ -79,17 +95,23 @@ void __init init_guest_msr_policy(void)
     calculate_host_policy();
 
     if ( IS_ENABLED(CONFIG_PV) )
+    {
         calculate_pv_max_policy();
+        calculate_pv_def_policy();
+    }
 
     if ( hvm_enabled )
+    {
         calculate_hvm_max_policy();
+        calculate_hvm_def_policy();
+    }
 }
 
 int init_domain_msr_policy(struct domain *d)
 {
     struct msr_policy *mp = is_pv_domain(d)
-        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_max_msr_policy : NULL)
-        : (IS_ENABLED(CONFIG_HVM) ? &hvm_max_msr_policy : NULL);
+        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_def_msr_policy : NULL)
+        : (IS_ENABLED(CONFIG_HVM) ? &hvm_def_msr_policy : NULL);
 
     if ( !mp )
     {
