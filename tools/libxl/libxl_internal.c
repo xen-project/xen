@@ -234,7 +234,7 @@ void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     fileline[sizeof(fileline)-1] = 0;
 
     domain[0] = 0;
-    if (domid != INVALID_DOMID)
+    if (libxl_domid_valid_guest(domid))
         snprintf(domain, sizeof(domain), "Domain %"PRIu32":", domid);
  x:
     xtl_log(ctx->lg, msglevel, errnoval, "libxl",
