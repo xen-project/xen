@@ -796,7 +796,7 @@ extern void audit_p2m(struct domain *d,
  */
 
 /* Extract the type from the PTE flags that store it */
-static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
+static inline p2m_type_t p2m_flags_to_type(unsigned int flags)
 {
     /* For AMD IOMMUs we need to use type 0 for plain RAM, but we need
      * to make sure that an entirely empty PTE doesn't have RAM type */
