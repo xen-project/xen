@@ -1621,6 +1621,85 @@ DT_DEVICE_START(ns16550, "NS16550 UART", DEVICE_SERIAL)
 DT_DEVICE_END
 
 #endif /* HAS_DEVICE_TREE */
+
+#if defined(CONFIG_ACPI) && defined(CONFIG_ARM)
+#include <xen/acpi.h>
+
+static int __init ns16550_acpi_uart_init(const void *data)
+{
+    struct acpi_table_header *table;
+    struct acpi_table_spcr *spcr;
+    acpi_status status;
+    /*
+     * Same as the DT part.
+     * Only support one UART on ARM which happen to be ns16550_com[0].
+     */
+    struct ns16550 *uart = &ns16550_com[0];
+
+    status = acpi_get_table(ACPI_SIG_SPCR, 0, &table);
+    if ( ACPI_FAILURE(status) )
+    {
+        printk("ns16550: Failed to get SPCR table\n");
+        return -EINVAL;
+    }
+
+    spcr = container_of(table, struct acpi_table_spcr, header);
+
+    /*
+     * The serial port address may be 0 for example
+     * if the console redirection is disabled.
+     */
+    if ( unlikely(!spcr->serial_port.address) )
+    {
+        printk("ns16550: Console redirection is disabled\n");
+        return -EINVAL;
+    }
+
+    if ( unlikely(spcr->serial_port.space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY) )
+    {
+        printk("ns16550: Address space type is not mmio\n");
+        return -EINVAL;
+    }
+
+    ns16550_init_common(uart);
+
+    /*
+     * The baud rate is pre-configured by the firmware.
+     * And currently the ACPI part is only targeting ARM so the flow_control
+     * field and all PCI related ones which we do not care yet are ignored.
+     */
+    uart->baud = BAUD_AUTO;
+    uart->data_bits = 8;
+    uart->parity = spcr->parity;
+    uart->stop_bits = spcr->stop_bits;
+    uart->io_base = spcr->serial_port.address;
+    uart->io_size = spcr->serial_port.bit_width;
+    uart->reg_shift = spcr->serial_port.bit_offset;
+    uart->reg_width = spcr->serial_port.access_width;
+
+    /* The trigger/polarity information is not available in spcr. */
+    irq_set_type(spcr->interrupt, IRQ_TYPE_LEVEL_HIGH);
+    uart->irq = spcr->interrupt;
+
+    uart->vuart.base_addr = uart->io_base;
+    uart->vuart.size = uart->io_size;
+    uart->vuart.data_off = UART_THR << uart->reg_shift;
+    uart->vuart.status_off = UART_LSR << uart->reg_shift;
+    uart->vuart.status = UART_LSR_THRE | UART_LSR_TEMT;
+
+    /* Register with generic serial driver. */
+    serial_register_uart(SERHND_DTUART, &ns16550_driver, uart);
+
+    return 0;
+}
+
+ACPI_DEVICE_START(ans16550, "NS16550 UART", DEVICE_SERIAL)
+    .class_type = ACPI_DBG2_16550_COMPATIBLE,
+    .init = ns16550_acpi_uart_init,
+ACPI_DEVICE_END
+
+#endif /* CONFIG_ACPI && CONFIG_ARM */
+
 /*
  * Local variables:
  * mode: C
