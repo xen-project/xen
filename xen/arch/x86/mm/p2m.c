@@ -1310,15 +1310,16 @@ int set_foreign_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
                                p2m_get_hostp2m(d)->default_access);
 }
 
-int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
-                       unsigned int order, p2m_access_t access)
+int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
+                       unsigned int order)
 {
     if ( order > PAGE_ORDER_4K &&
          rangeset_overlaps_range(mmio_ro_ranges, mfn_x(mfn),
                                  mfn_x(mfn) + (1UL << order) - 1) )
         return PAGE_ORDER_4K + 1;
 
-    return set_typed_p2m_entry(d, gfn, mfn, order, p2m_mmio_direct, access);
+    return set_typed_p2m_entry(d, gfn_x(gfn), mfn, order, p2m_mmio_direct,
+                               p2m_get_hostp2m(d)->default_access);
 }
 
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
@@ -2288,9 +2289,8 @@ int map_mmio_regions(struct domain *d,
         for ( order = mmio_order(d, (gfn_x(start_gfn) + i) | (mfn_x(mfn) + i), nr - i); ;
               order = ret - 1 )
         {
-            ret = set_mmio_p2m_entry(d, gfn_x(start_gfn) + i,
-                                     mfn_add(mfn, i), order,
-                                     p2m_get_hostp2m(d)->default_access);
+            ret = set_mmio_p2m_entry(d, gfn_add(start_gfn, i),
+                                     mfn_add(mfn, i), order);
             if ( ret <= 0 )
                 break;
             ASSERT(ret <= order);

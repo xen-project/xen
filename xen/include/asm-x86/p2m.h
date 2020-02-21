@@ -638,8 +638,8 @@ int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
 int set_foreign_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 
 /* Set mmio addresses in the p2m table (for pass-through) */
-int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
-                       unsigned int order, p2m_access_t access);
+int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
+                       unsigned int order);
 int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                          unsigned int order);
 

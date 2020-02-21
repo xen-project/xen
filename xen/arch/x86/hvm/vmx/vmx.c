@@ -3047,9 +3047,8 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     clear_domain_page(mfn);
     d->arch.hvm.vmx.apic_access_mfn = mfn;
 
-    return set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), mfn,
-                              PAGE_ORDER_4K,
-                              p2m_get_hostp2m(d)->default_access);
+    return set_mmio_p2m_entry(d, gaddr_to_gfn(APIC_DEFAULT_PHYS_BASE), mfn,
+                              PAGE_ORDER_4K);
 }
 
 static void vmx_free_vlapic_mapping(struct domain *d)
