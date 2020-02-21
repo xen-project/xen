@@ -550,17 +550,40 @@ static inline void enable_nmis(void)
 {
     unsigned long tmp;
 
-    asm volatile ( "mov %%rsp, %[tmp]     \n\t"
-                   "push %[ss]            \n\t"
-                   "push %[tmp]           \n\t"
-                   "pushf                 \n\t"
-                   "push %[cs]            \n\t"
-                   "lea 1f(%%rip), %[tmp] \n\t"
-                   "push %[tmp]           \n\t"
-                   "iretq; 1:             \n\t"
-                   : [tmp] "=&r" (tmp)
+    asm volatile ( "mov     %%rsp, %[rsp]        \n\t"
+                   "lea    .Ldone(%%rip), %[rip] \n\t"
+#ifdef CONFIG_XEN_SHSTK
+                   /* Check for CET-SS being active. */
+                   "mov    $1, %k[ssp]           \n\t"
+                   "rdsspq %[ssp]                \n\t"
+                   "cmp    $1, %k[ssp]           \n\t"
+                   "je     .Lshstk_done          \n\t"
+
+                   /* Push 3 words on the shadow stack */
+                   ".rept 3                      \n\t"
+                   "call 1f; nop; 1:             \n\t"
+                   ".endr                        \n\t"
+
+                   /* Fixup to be an IRET shadow stack frame */
+                   "wrssq  %q[cs], -1*8(%[ssp])  \n\t"
+                   "wrssq  %[rip], -2*8(%[ssp])  \n\t"
+                   "wrssq  %[ssp], -3*8(%[ssp])  \n\t"
+
+                   ".Lshstk_done:"
+#endif
+                   /* Write an IRET regular frame */
+                   "push   %[ss]                 \n\t"
+                   "push   %[rsp]                \n\t"
+                   "pushf                        \n\t"
+                   "push   %q[cs]                \n\t"
+                   "push   %[rip]                \n\t"
+                   "iretq                        \n\t"
+                   ".Ldone:                      \n\t"
+                   : [rip] "=&r" (tmp),
+                     [rsp] "=&r" (tmp),
+                     [ssp] "=&r" (tmp)
                    : [ss] "i" (__HYPERVISOR_DS),
-                     [cs] "i" (__HYPERVISOR_CS) );
+                     [cs] "r" (__HYPERVISOR_CS) );
 }
 
 void sysenter_entry(void);
