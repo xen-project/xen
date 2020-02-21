@@ -604,7 +604,174 @@ static bool valid_xcr0(uint64_t xcr0)
     if ( !(xcr0 & X86_XCR0_BNDREGS) != !(xcr0 & X86_XCR0_BNDCSR) )
         return false;
 
+    /* TILECFG and TILEDATA must be the same. */
+    if ( !(xcr0 & X86_XCR0_TILE_CFG) != !(xcr0 & X86_XCR0_TILE_DATA) )
+        return false;
+
     return true;
+}
+
+struct xcheck_state {
+    uint64_t states;
+    uint32_t uncomp_size;
+    uint32_t comp_size;
+};
+
+static void __init check_new_xstate(struct xcheck_state *s, uint64_t new)
+{
+    uint32_t hw_size;
+
+    BUILD_BUG_ON(X86_XCR0_STATES & X86_XSS_STATES);
+
+    BUG_ON(new <= s->states); /* States strictly increase by index. */
+    BUG_ON(s->states & new);  /* States only accumulate. */
+    BUG_ON(!valid_xcr0(s->states | new)); /* Xen thinks it's a good value. */
+    BUG_ON(new & ~(X86_XCR0_STATES | X86_XSS_STATES)); /* Known state. */
+    BUG_ON((new & X86_XCR0_STATES) &&
+           (new & X86_XSS_STATES)); /* User or supervisor, not both. */
+
+    s->states |= new;
+    if ( new & X86_XCR0_STATES )
+    {
+        if ( !set_xcr0(s->states & X86_XCR0_STATES) )
+            BUG();
+    }
+    else
+        set_msr_xss(s->states & X86_XSS_STATES);
+
+    /*
+     * Check the uncompressed size.  First ask hardware.
+     */
+    hw_size = cpuid_count_ebx(0xd, 0);
+
+    if ( new & X86_XSS_STATES )
+    {
+        /*
+         * Supervisor states don't exist in an uncompressed image, so check
+         * that the uncompressed size doesn't change.  Otherwise...
+         */
+        if ( hw_size != s->uncomp_size )
+            panic("XSTATE 0x%016"PRIx64", new sup bits {%63pbl}, uncompressed hw size %#x != prev size %#x\n",
+                  s->states, &new, hw_size, s->uncomp_size);
+    }
+    else
+    {
+        /*
+         * ... some user XSTATEs are out-of-order and fill in prior holes.
+         * The best check we make is that the size never decreases.
+         */
+        if ( hw_size < s->uncomp_size )
+            panic("XSTATE 0x%016"PRIx64", new bits {%63pbl}, uncompressed hw size %#x < prev size %#x\n",
+                  s->states, &new, hw_size, s->uncomp_size);
+    }
+
+    s->uncomp_size = hw_size;
+
+    /*
+     * Check the compressed size, if available.
+     */
+    hw_size = cpuid_count_ebx(0xd, 1);
+
+    if ( cpu_has_xsavec )
+    {
+        /*
+         * All components strictly appear in index order, irrespective of
+         * whether they're user or supervisor.  As each component also has
+         * non-zero size, the accumulated size should strictly increase.
+         */
+        if ( hw_size <= s->comp_size )
+            panic("XSTATE 0x%016"PRIx64", new bits {%63pbl}, compressed hw size %#x <= prev size %#x\n",
+                  s->states, &new, hw_size, s->comp_size);
+
+        s->comp_size = hw_size;
+    }
+    else if ( hw_size ) /* Compressed size reported, but no XSAVEC ? */
+    {
+        static bool once;
+
+        if ( !once )
+        {
+            WARN();
+            once = true;
+        }
+    }
+}
+
+/*
+ * The {un,}compressed XSTATE sizes are reported by dynamic CPUID value, based
+ * on the current %XCR0 and MSR_XSS values.  The exact layout is also feature
+ * and vendor specific.  Cross-check Xen's understanding against real hardware
+ * on boot.
+ *
+ * Testing every combination is prohibitive, so we use a partial approach.
+ * Starting with nothing active, we add new XSTATEs and check that the CPUID
+ * dynamic values never decreases.
+ */
+static void __init noinline xstate_check_sizes(void)
+{
+    uint64_t old_xcr0 = get_xcr0();
+    uint64_t old_xss = get_msr_xss();
+    struct xcheck_state s = {};
+
+    /*
+     * User and supervisor XSTATEs, increasing by index.
+     *
+     * Chronologically, Intel and AMD had identical layouts for AVX (YMM).
+     * AMD introduced LWP in Fam15h, following immediately on from YMM.  Intel
+     * left an LWP-shaped hole when adding MPX (BND{CSR,REGS}) in Skylake.
+     * AMD removed LWP in Fam17h, putting PKRU in the same space, breaking
+     * layout compatibility with Intel and having a knock-on effect on all
+     * subsequent states.
+     */
+    check_new_xstate(&s, X86_XCR0_SSE | X86_XCR0_FP);
+
+    if ( cpu_has_avx )
+        check_new_xstate(&s, X86_XCR0_YMM);
+
+    if ( cpu_has_mpx )
+        check_new_xstate(&s, X86_XCR0_BNDCSR | X86_XCR0_BNDREGS);
+
+    if ( cpu_has_avx512f )
+        check_new_xstate(&s, X86_XCR0_HI_ZMM | X86_XCR0_ZMM | X86_XCR0_OPMASK);
+
+    /*
+     * Intel Broadwell has Processor Trace but no XSAVES.  There doesn't
+     * appear to have been a new enumeration when X86_XSS_PROC_TRACE was
+     * introduced in Skylake.
+     */
+    if ( cpu_has_xsaves && cpu_has_proc_trace )
+        check_new_xstate(&s, X86_XSS_PROC_TRACE);
+
+    if ( cpu_has_pku )
+        check_new_xstate(&s, X86_XCR0_PKRU);
+
+    if ( cpu_has_xsaves && boot_cpu_has(X86_FEATURE_ENQCMD) )
+        check_new_xstate(&s, X86_XSS_PASID);
+
+    if ( cpu_has_xsaves && (boot_cpu_has(X86_FEATURE_CET_SS) ||
+                            boot_cpu_has(X86_FEATURE_CET_IBT)) )
+    {
+        check_new_xstate(&s, X86_XSS_CET_U);
+        check_new_xstate(&s, X86_XSS_CET_S);
+    }
+
+    if ( cpu_has_xsaves && boot_cpu_has(X86_FEATURE_UINTR) )
+        check_new_xstate(&s, X86_XSS_UINTR);
+
+    if ( cpu_has_xsaves && boot_cpu_has(X86_FEATURE_ARCH_LBR) )
+        check_new_xstate(&s, X86_XSS_LBR);
+
+    if ( boot_cpu_has(X86_FEATURE_AMX_TILE) )
+        check_new_xstate(&s, X86_XCR0_TILE_DATA | X86_XCR0_TILE_CFG);
+
+    if ( boot_cpu_has(X86_FEATURE_LWP) )
+        check_new_xstate(&s, X86_XCR0_LWP);
+
+    /* Restore old state now the test is done. */
+    if ( !set_xcr0(old_xcr0) )
+        BUG();
+    if ( cpu_has_xsaves )
+        set_msr_xss(old_xss);
 }
 
 /* Collect the information of processor's extended state */
@@ -683,6 +850,9 @@ void xstate_init(struct cpuinfo_x86 *c)
 
     if ( setup_xstate_features(bsp) && bsp )
         BUG();
+
+    if ( IS_ENABLED(CONFIG_SELF_TESTS) && bsp )
+        xstate_check_sizes();
 }
 
 int validate_xstate(const struct domain *d, uint64_t xcr0, uint64_t xcr0_accum,

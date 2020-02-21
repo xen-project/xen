@@ -77,7 +77,7 @@
 #define X86_CR4_PKS        0x01000000 /* Protection Key Supervisor */
 
 /*
- * XSTATE component flags in XCR0
+ * XSTATE component flags in XCR0 | MSR_XSS
  */
 #define X86_XCR0_FP_POS           0
 #define X86_XCR0_FP               (1ULL << X86_XCR0_FP_POS)
@@ -95,10 +95,33 @@
 #define X86_XCR0_ZMM              (1ULL << X86_XCR0_ZMM_POS)
 #define X86_XCR0_HI_ZMM_POS       7
 #define X86_XCR0_HI_ZMM           (1ULL << X86_XCR0_HI_ZMM_POS)
+#define X86_XSS_PROC_TRACE        (_AC(1, ULL) <<  8)
 #define X86_XCR0_PKRU_POS         9
 #define X86_XCR0_PKRU             (1ULL << X86_XCR0_PKRU_POS)
+#define X86_XSS_PASID             (_AC(1, ULL) << 10)
+#define X86_XSS_CET_U             (_AC(1, ULL) << 11)
+#define X86_XSS_CET_S             (_AC(1, ULL) << 12)
+#define X86_XSS_HDC               (_AC(1, ULL) << 13)
+#define X86_XSS_UINTR             (_AC(1, ULL) << 14)
+#define X86_XSS_LBR               (_AC(1, ULL) << 15)
+#define X86_XSS_HWP               (_AC(1, ULL) << 16)
+#define X86_XCR0_TILE_CFG         (_AC(1, ULL) << 17)
+#define X86_XCR0_TILE_DATA        (_AC(1, ULL) << 18)
 #define X86_XCR0_LWP_POS          62
 #define X86_XCR0_LWP              (1ULL << X86_XCR0_LWP_POS)
+
+#define X86_XCR0_STATES                                                 \
+    (X86_XCR0_FP | X86_XCR0_SSE | X86_XCR0_YMM | X86_XCR0_BNDREGS |     \
+     X86_XCR0_BNDCSR | X86_XCR0_OPMASK | X86_XCR0_ZMM |                 \
+     X86_XCR0_HI_ZMM | X86_XCR0_PKRU | X86_XCR0_TILE_CFG |              \
+     X86_XCR0_TILE_DATA |                                               \
+     X86_XCR0_LWP)
+
+#define X86_XSS_STATES                                                  \
+    (X86_XSS_PROC_TRACE | X86_XSS_PASID | X86_XSS_CET_U |               \
+     X86_XSS_CET_S | X86_XSS_HDC | X86_XSS_UINTR | X86_XSS_LBR |        \
+     X86_XSS_HWP |                                                      \
+     0)
 
 /*
  * Debug status flags in DR6.
