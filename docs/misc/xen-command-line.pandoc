@@ -270,6 +270,23 @@ and not running softirqs. Reduce this if softirqs are not being run frequently
 enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
+### cet
+    = List of [ shstk=<bool> ]
+
+    Applicability: x86
+
+Controls for the use of Control-flow Enforcement Technology.  CET is group a
+of hardware features designed to combat Return-oriented Programming (ROP, also
+call/jmp COP/JOP) attacks.
+
+*   The `shstk=` boolean controls whether Xen uses Shadow Stacks for its own
+    protection.
+
+    The option is available when `CONFIG_XEN_SHSTK` is compiled in, and
+    defaults to `true` on hardware supporting CET-SS.  Specifying
+    `cet=no-shstk` will cause Xen not to use Shadow Stacks even when support
+    is available in hardware.
+
 ### clocksource (x86)
 > `= pit | hpet | acpi | tsc`
 

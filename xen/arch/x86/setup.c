@@ -95,6 +95,36 @@ unsigned long __initdata highmem_start;
 size_param("highmem-start", highmem_start);
 #endif
 
+static bool __initdata opt_xen_shstk = true;
+
+static int __init parse_cet(const char *s)
+{
+    const char *ss;
+    int val, rc = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        if ( (val = parse_boolean("shstk", s, ss)) >= 0 )
+        {
+#ifdef CONFIG_XEN_SHSTK
+            opt_xen_shstk = val;
+#else
+            no_config_param("XEN_SHSTK", "cet", s, ss);
+#endif
+        }
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
+}
+custom_param("cet", parse_cet);
+
 cpumask_t __read_mostly cpu_present_map;
 
 unsigned long __read_mostly xen_phys_start;

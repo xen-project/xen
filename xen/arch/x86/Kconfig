@@ -34,6 +34,10 @@ config ARCH_DEFCONFIG
 config INDIRECT_THUNK
 	def_bool $(cc-option,-mindirect-branch-register)
 
+config HAS_AS_CET_SS
+	# binutils >= 2.29 or LLVM >= 6
+	def_bool $(as-instr,wrssq %rax$(comma)0;setssbsy)
+
 menu "Architecture Features"
 
 source "arch/Kconfig"
@@ -96,6 +100,20 @@ config HVM
 	  This option is needed if you want to run HVM or PVH domains.
 
 	  If unsure, say Y.
+
+config XEN_SHSTK
+	bool "Supervisor Shadow Stacks"
+	depends on HAS_AS_CET_SS && EXPERT
+	default y
+	---help---
+	  Control-flow Enforcement Technology (CET) is a set of features in
+	  hardware designed to combat Return-oriented Programming (ROP, also
+	  call/jump COP/JOP) attacks.  Shadow Stacks are one CET feature
+	  designed to provide return address protection.
+
+	  This option arranges for Xen to use CET-SS for its own protection.
+	  When CET-SS is active, 32bit PV guests cannot be used.  Backwards
+	  compatiblity can be provided vai the PV Shim mechanism.
 
 config SHADOW_PAGING
         bool "Shadow Paging"
