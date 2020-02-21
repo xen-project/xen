@@ -795,6 +795,10 @@ ENTRY(alignment_check)
         movl  $TRAP_alignment_check,4(%rsp)
         jmp   handle_exception
 
+ENTRY(entry_CP)
+        movl  $X86_EXC_CP, 4(%rsp)
+        jmp   handle_exception
+
 ENTRY(double_fault)
         movl  $TRAP_double_fault,4(%rsp)
         /* Set AC to reduce chance of further SMAP faults */
@@ -940,7 +944,8 @@ autogen_stubs: /* Automatically generated stubs. */
         entrypoint 1b
 
         /* Reserved exceptions, heading towards do_reserved_trap(). */
-        .elseif vec == TRAP_copro_seg || vec == TRAP_spurious_int || (vec > TRAP_simd_error && vec < TRAP_nr)
+        .elseif vec == X86_EXC_CSO || vec == X86_EXC_SPV || \
+                vec == X86_EXC_VE  || (vec > X86_EXC_CP && vec < TRAP_nr)
 
 1:      test  $8,%spl        /* 64bit exception frames are 16 byte aligned, but the word */
         jz    2f             /* size is 8 bytes.  Check whether the processor gave us an */

@@ -156,7 +156,9 @@ void (* const exception_table[TRAP_nr])(struct cpu_user_regs *regs) = {
     [TRAP_alignment_check]              = do_trap,
     [TRAP_machine_check]                = (void *)do_machine_check,
     [TRAP_simd_error]                   = do_trap,
-    [TRAP_virtualisation ...
+    [TRAP_virtualisation]               = do_reserved_trap,
+    [X86_EXC_CP]                        = do_entry_CP,
+    [X86_EXC_CP + 1 ...
      (ARRAY_SIZE(exception_table) - 1)] = do_reserved_trap,
 };
 
@@ -1431,6 +1433,10 @@ void do_page_fault(struct cpu_user_regs *regs)
 
     perfc_incr(page_faults);
 
+    /* Any shadow stack access fault is a bug in Xen. */
+    if ( error_code & PFEC_shstk )
+        goto fatal;
+
     if ( unlikely(fixup_page_fault(addr, regs) != 0) )
         return;
 
@@ -1898,6 +1904,43 @@ void do_debug(struct cpu_user_regs *regs)
     pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 }
 
+void do_entry_CP(struct cpu_user_regs *regs)
+{
+    static const char errors[][10] = {
+        [1] = "near ret",
+        [2] = "far/iret",
+        [3] = "endbranch",
+        [4] = "rstorssp",
+        [5] = "setssbsy",
+    };
+    const char *err = "??";
+    unsigned int ec = regs->error_code;
+
+    if ( debugger_trap_entry(TRAP_debug, regs) )
+        return;
+
+    /* Decode ec if possible */
+    if ( ec < ARRAY_SIZE(errors) && errors[ec][0] )
+        err = errors[ec];
+
+    /*
+     * For now, only supervisors shadow stacks should be active.  A #CP from
+     * guest context is probably a Xen bug, but kill the guest in an attempt
+     * to recover.
+     */
+    if ( guest_mode(regs) )
+    {
+        gprintk(XENLOG_ERR, "Hit #CP[%04x] in guest context %04x:%p\n",
+                ec, regs->cs, _p(regs->rip));
+        ASSERT_UNREACHABLE();
+        domain_crash(current->domain);
+        return;
+    }
+
+    show_execution_state(regs);
+    panic("CONTROL-FLOW PROTECTION FAULT: #CP[%04x] %s\n", ec, err);
+}
+
 static void __init noinline __set_intr_gate(unsigned int n,
                                             uint32_t dpl, void *addr)
 {
@@ -1987,6 +2030,7 @@ void __init init_idt_traps(void)
     set_intr_gate(TRAP_alignment_check,&alignment_check);
     set_intr_gate(TRAP_machine_check,&machine_check);
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
+    set_intr_gate(X86_EXC_CP, entry_CP);
 
     /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
     enable_each_ist(idt_table);

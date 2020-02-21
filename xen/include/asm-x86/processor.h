@@ -68,6 +68,7 @@
 #define PFEC_reserved_bit   (_AC(1,U) << 3)
 #define PFEC_insn_fetch     (_AC(1,U) << 4)
 #define PFEC_prot_key       (_AC(1,U) << 5)
+#define PFEC_shstk          (_AC(1,U) << 6)
 #define PFEC_arch_mask      (_AC(0xffff,U)) /* Architectural PFEC values. */
 /* Internally used only flags. */
 #define PFEC_page_paged     (1U<<16)
@@ -535,6 +536,7 @@ DECLARE_TRAP_HANDLER(coprocessor_error);
 DECLARE_TRAP_HANDLER(simd_coprocessor_error);
 DECLARE_TRAP_HANDLER_CONST(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
+DECLARE_TRAP_HANDLER(entry_CP);
 
 DECLARE_TRAP_HANDLER(entry_int82);
 
