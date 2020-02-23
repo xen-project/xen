@@ -617,7 +617,7 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
     int rc;
     /*
      * This sets the vCPU state according to the state described in
-     * docs/misc/hvmlite.markdown.
+     * docs/misc/pvh.pandoc.
      */
     vcpu_hvm_context_t cpu_ctx = {
         .mode = VCPU_HVM_MODE_32B,
