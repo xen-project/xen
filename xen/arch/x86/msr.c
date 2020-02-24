@@ -35,9 +35,6 @@ struct msr_policy __read_mostly     raw_msr_policy,
                   __read_mostly hvm_max_msr_policy,
                   __read_mostly  pv_max_msr_policy;
 
-struct vcpu_msrs __read_mostly hvm_max_vcpu_msrs,
-                 __read_mostly  pv_max_vcpu_msrs;
-
 static void __init calculate_raw_policy(void)
 {
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
@@ -103,10 +100,7 @@ int init_domain_msr_policy(struct domain *d)
 
 int init_vcpu_msr_policy(struct vcpu *v)
 {
-    struct domain *d = v->domain;
-    struct vcpu_msrs *msrs =
-        xmemdup(is_pv_domain(d) ?  &pv_max_vcpu_msrs
-                                : &hvm_max_vcpu_msrs);
+    struct vcpu_msrs *msrs = xzalloc(struct vcpu_msrs);
 
     if ( !msrs )
         return -ENOMEM;
