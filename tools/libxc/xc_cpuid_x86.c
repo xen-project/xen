@@ -436,6 +436,8 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
     xen_cpuid_leaf_t *leaves = NULL;
     struct cpuid_policy *p = NULL;
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
+    uint32_t host_featureset[FEATURESET_NR_ENTRIES] = {};
+    uint32_t len = ARRAY_SIZE(host_featureset);
 
     if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
          di.domid != domid )
@@ -458,6 +460,22 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
          (p = calloc(1, sizeof(*p))) == NULL )
         goto out;
 
+    /* Get the host policy. */
+    rc = xc_get_cpu_featureset(xch, XEN_SYSCTL_cpu_featureset_host,
+                               &len, host_featureset);
+    if ( rc )
+    {
+        /* Tolerate "buffer too small", as we've got the bits we need. */
+        if ( errno == ENOBUFS )
+            rc = 0;
+        else
+        {
+            PERROR("Failed to obtain host featureset");
+            rc = -errno;
+            goto out;
+        }
+    }
+
     /* Get the domain's default policy. */
     nr_msrs = 0;
     rc = xc_get_system_cpu_policy(xch, di.hvm ? XEN_SYSCTL_cpu_policy_hvm_default
@@ -477,6 +495,18 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         ERROR("Failed to deserialise CPUID (err leaf %#x, subleaf %#x) (%d = %s)",
               err_leaf, err_subleaf, -rc, strerror(-rc));
         goto out;
+    }
+
+    /*
+     * Account for feature which have been disabled by default since Xen 4.13,
+     * so migrated-in VM's don't risk seeing features disappearing.
+     */
+    if ( restore )
+    {
+        if ( di.hvm )
+        {
+            p->feat.mpx = test_bit(X86_FEATURE_MPX, host_featureset);
+        }
     }
 
     if ( featureset )
@@ -530,24 +560,6 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
 
     if ( !di.hvm )
     {
-        uint32_t host_featureset[FEATURESET_NR_ENTRIES] = {};
-        uint32_t len = ARRAY_SIZE(host_featureset);
-
-        rc = xc_get_cpu_featureset(xch, XEN_SYSCTL_cpu_featureset_host,
-                                   &len, host_featureset);
-        if ( rc )
-        {
-            /* Tolerate "buffer too small", as we've got the bits we need. */
-            if ( errno == ENOBUFS )
-                rc = 0;
-            else
-            {
-                PERROR("Failed to obtain host featureset");
-                rc = -errno;
-                goto out;
-            }
-        }
-
         /*
          * On hardware without CPUID Faulting, PV guests see real topology.
          * As a consequence, they also need to see the host htt/cmp fields.

@@ -207,7 +207,7 @@ XEN_CPUFEATURE(INVPCID,       5*32+10) /*H  Invalidate Process Context ID */
 XEN_CPUFEATURE(RTM,           5*32+11) /*A  Restricted Transactional Memory */
 XEN_CPUFEATURE(PQM,           5*32+12) /*   Platform QoS Monitoring */
 XEN_CPUFEATURE(NO_FPU_SEL,    5*32+13) /*!  FPU CS/DS stored as zero */
-XEN_CPUFEATURE(MPX,           5*32+14) /*S  Memory Protection Extensions */
+XEN_CPUFEATURE(MPX,           5*32+14) /*s  Memory Protection Extensions */
 XEN_CPUFEATURE(PQE,           5*32+15) /*   Platform QoS Enforcement */
 XEN_CPUFEATURE(AVX512F,       5*32+16) /*A  AVX-512 Foundation Instructions */
 XEN_CPUFEATURE(AVX512DQ,      5*32+17) /*A  AVX-512 Doubleword & Quadword Instrs */
