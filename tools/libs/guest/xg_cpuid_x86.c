@@ -427,7 +427,7 @@ static int xc_cpuid_xend_policy(
 
 int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
                           const uint32_t *featureset, unsigned int nr_features,
-                          bool pae,
+                          bool pae, bool itsc,
                           const struct xc_xend_cpuid *xend)
 {
     int rc;
@@ -556,6 +556,8 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
     }
     else
     {
+        p->extd.itsc = itsc;
+
         if ( di.hvm )
             p->basic.pae = pae;
     }
@@ -625,12 +627,10 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         }
 
         /*
-         * These settings are necessary to cause earlier HVM_PARAM_NESTEDHVM /
-         * XEN_DOMCTL_disable_migrate settings to be reflected correctly in
-         * CPUID.  Xen will discard these bits if configuration hasn't been
-         * set for the domain.
+         * These settings are necessary to cause earlier HVM_PARAM_NESTEDHVM
+         * to be reflected correctly in CPUID.  Xen will discard these bits if
+         * configuration hasn't been set for the domain.
          */
-        p->extd.itsc = true;
         p->basic.vmx = true;
         p->extd.svm = true;
     }

@@ -621,14 +621,6 @@ void recalculate_cpuid_policy(struct domain *d)
     }
 
     /*
-     * ITSC is masked by default (so domains are safe to migrate), but a
-     * toolstack which has configured disable_migrate or vTSC for a domain may
-     * safely select it, and needs a way of doing so.
-     */
-    if ( cpu_has_itsc && (d->disable_migrate || d->arch.vtsc) )
-        __set_bit(X86_FEATURE_ITSC, max_fs);
-
-    /*
      * On hardware with MSR_TSX_CTRL, the admin may have elected to disable
      * TSX and hide the feature bits.  Migrating-in VMs may have been booted
      * pre-mitigation when the TSX features were visbile.

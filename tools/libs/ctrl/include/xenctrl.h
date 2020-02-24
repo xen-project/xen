@@ -1828,14 +1828,14 @@ struct xc_xend_cpuid {
  * cases, and the generated policy must be compatible with a 4.13.
  *
  * Either pass a full new @featureset (and @nr_features), or adjust individual
- * features (@pae).
+ * features (@pae, @itsc).
  *
  * Then (optionally) apply legacy XEND overrides (@xend) to the result.
  */
 int xc_cpuid_apply_policy(xc_interface *xch,
                           uint32_t domid, bool restore,
                           const uint32_t *featureset,
-                          unsigned int nr_features, bool pae,
+                          unsigned int nr_features, bool pae, bool itsc,
                           const struct xc_xend_cpuid *xend);
 int xc_mca_op(xc_interface *xch, struct xen_mc *mc);
 int xc_mca_op_inject_v2(xc_interface *xch, unsigned int flags,

@@ -421,6 +421,7 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
                          libxl_domain_build_info *info)
 {
     bool pae = true;
+    bool itsc;
 
     /*
      * For PV guests, PAE is Xen-controlled (it is the 'p' that differentiates
@@ -435,7 +436,23 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
     if (info->type == LIBXL_DOMAIN_TYPE_HVM)
         pae = libxl_defbool_val(info->u.hvm.pae);
 
-    xc_cpuid_apply_policy(ctx->xch, domid, restore, NULL, 0, pae, info->cpuid);
+    /*
+     * Advertising Invariant TSC to a guest means that the TSC frequency won't
+     * change at any point in the future.
+     *
+     * We do not have enough information about potential migration
+     * destinations to know whether advertising ITSC is safe, but if the guest
+     * isn't going to migrate, then the current hardware is all that matters.
+     *
+     * Alternatively, an internal property of vTSC is that the values read are
+     * invariant.  Advertise ITSC when we know the domain will have emualted
+     * TSC everywhere it goes.
+     */
+    itsc = (libxl_defbool_val(info->disable_migrate) ||
+            info->tsc_mode == LIBXL_TSC_MODE_ALWAYS_EMULATE);
+
+    xc_cpuid_apply_policy(ctx->xch, domid, restore, NULL, 0,
+                          pae, itsc, info->cpuid);
 }
 
 static const char *input_names[2] = { "leaf", "subleaf" };

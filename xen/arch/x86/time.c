@@ -2448,8 +2448,6 @@ int tsc_set_info(struct domain *d,
         }
     }
 
-    recalculate_cpuid_policy(d);
-
     return 0;
 }
 
