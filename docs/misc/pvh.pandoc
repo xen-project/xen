@@ -64,7 +64,7 @@ The following VCPU hypercalls can be used in order to bring up secondary vCPUs:
 
 ## Hardware description ##
 
-PVHv2 guests that have access to hardware (either emulated or real) will also
+PVH guests that have access to hardware (either emulated or real) will also
 have ACPI tables with the description of the hardware that's available to the
 guest. This applies to both privileged and unprivileged guests. A pointer to
 the position of the RSDP in memory (if present) can be fetched from the start
@@ -79,7 +79,7 @@ done for HVM guests.
 
 Interrupts from physical devices are delivered using native methods, this is
 done in order to take advantage of new hardware assisted virtualization
-functions, like posted interrupts. This implies that PVHv2 guests with physical
+functions, like posted interrupts. This implies that PVH guests with physical
 devices will also have the necessary interrupt controllers in order to manage
 the delivery of interrupts from those devices, using the same interfaces that
 are available on native hardware.
