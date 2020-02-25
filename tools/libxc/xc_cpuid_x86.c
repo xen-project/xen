@@ -95,9 +95,12 @@ const uint32_t *xc_get_static_cpu_featuremask(
 
         MASK(KNOWN),
         MASK(SPECIAL),
-        MASK(PV),
-        MASK(HVM_SHADOW),
-        MASK(HVM_HAP),
+        MASK(PV_MAX),
+        MASK(PV_DEF),
+        MASK(HVM_SHADOW_MAX),
+        MASK(HVM_SHADOW_DEF),
+        MASK(HVM_HAP_MAX),
+        MASK(HVM_HAP_DEF),
 
 #undef MASK
     };

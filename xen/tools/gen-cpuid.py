@@ -28,9 +28,12 @@ class State(object):
         # State calculated
         self.nr_entries = 0 # Number of words in a featureset
         self.common_1d = 0 # Common features between 1d and e1d
-        self.pv = set() # PV features
-        self.hvm_shadow = set() # HVM shadow features
-        self.hvm_hap = set() # HVM HAP features
+        self.pv_def = set() # PV default features
+        self.hvm_shadow_def = set() # HVM shadow default features
+        self.hvm_hap_def = set() # HVM HAP default features
+        self.pv_max = set() # PV max features
+        self.hvm_shadow_max = set() # HVM shadow max features
+        self.hvm_hap_max = set() # HVM HAP max features
         self.bitfields = [] # Text to declare named bitfields in C
         self.deep_deps = {} # { feature num => dependant features }
         self.nr_deep_deps = 0 # Number of entries in deep_deps
@@ -126,9 +129,13 @@ def crunch_numbers(state):
                  MTRR, PGE, MCA, CMOV, PAT, PSE36, MMX, FXSR)
     state.common_1d = common_1d
 
-    state.pv = state.raw['A']
-    state.hvm_shadow = state.pv | state.raw['S']
-    state.hvm_hap = state.hvm_shadow | state.raw['H']
+    state.pv_def = state.raw['A']
+    state.hvm_shadow_def = state.pv_def | state.raw['S']
+    state.hvm_hap_def = state.hvm_shadow_def | state.raw['H']
+
+    state.pv_max = state.pv_def
+    state.hvm_shadow_max = state.hvm_shadow_def
+    state.hvm_hap_max = state.hvm_hap_def
 
     #
     # Feature dependency information.
@@ -351,11 +358,17 @@ def write_results(state):
 
 #define INIT_SPECIAL_FEATURES { \\\n%s\n}
 
-#define INIT_PV_FEATURES { \\\n%s\n}
+#define INIT_PV_DEF_FEATURES { \\\n%s\n}
 
-#define INIT_HVM_SHADOW_FEATURES { \\\n%s\n}
+#define INIT_PV_MAX_FEATURES { \\\n%s\n}
 
-#define INIT_HVM_HAP_FEATURES { \\\n%s\n}
+#define INIT_HVM_SHADOW_DEF_FEATURES { \\\n%s\n}
+
+#define INIT_HVM_SHADOW_MAX_FEATURES { \\\n%s\n}
+
+#define INIT_HVM_HAP_DEF_FEATURES { \\\n%s\n}
+
+#define INIT_HVM_HAP_MAX_FEATURES { \\\n%s\n}
 
 #define NR_DEEP_DEPS %sU
 
@@ -366,9 +379,12 @@ def write_results(state):
        next(featureset_to_uint32s(state.common_1d, 1)),
        format_uint32s(state, state.names.keys(), 4),
        format_uint32s(state, state.raw['!'], 4),
-       format_uint32s(state, state.pv, 4),
-       format_uint32s(state, state.hvm_shadow, 4),
-       format_uint32s(state, state.hvm_hap, 4),
+       format_uint32s(state, state.pv_def, 4),
+       format_uint32s(state, state.pv_max, 4),
+       format_uint32s(state, state.hvm_shadow_def, 4),
+       format_uint32s(state, state.hvm_shadow_max, 4),
+       format_uint32s(state, state.hvm_hap_def, 4),
+       format_uint32s(state, state.hvm_hap_max, 4),
        state.nr_deep_deps,
        format_uint32s(state, state.deep_features, 4),
        ))

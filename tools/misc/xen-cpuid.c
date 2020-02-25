@@ -283,12 +283,18 @@ static void dump_info(xc_interface *xch, bool detail)
                       nr_features, "Known", detail);
     decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_SPECIAL),
                       nr_features, "Special", detail);
-    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_PV),
-                      nr_features, "PV Mask", detail);
-    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_HVM_SHADOW),
-                      nr_features, "HVM Shadow Mask", detail);
-    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_HVM_HAP),
-                      nr_features, "HVM Hap Mask", detail);
+    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_PV_MAX),
+                      nr_features, "PV Max", detail);
+    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_PV_DEF),
+                      nr_features, "PV Default", detail);
+    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_HVM_SHADOW_MAX),
+                      nr_features, "HVM Shadow Max", detail);
+    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_HVM_SHADOW_DEF),
+                      nr_features, "HVM Shadow Default", detail);
+    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_HVM_HAP_MAX),
+                      nr_features, "HVM Hap Max", detail);
+    decode_featureset(xc_get_static_cpu_featuremask(XC_FEATUREMASK_HVM_HAP_DEF),
+                      nr_features, "HVM Hap Default", detail);
 
     printf("\nDynamic sets:\n");
     for ( i = 0; i < ARRAY_SIZE(featuresets); ++i )

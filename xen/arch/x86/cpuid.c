@@ -15,9 +15,9 @@
 const uint32_t known_features[] = INIT_KNOWN_FEATURES;
 const uint32_t special_features[] = INIT_SPECIAL_FEATURES;
 
-static const uint32_t pv_featuremask[] = INIT_PV_FEATURES;
-static const uint32_t hvm_shadow_featuremask[] = INIT_HVM_SHADOW_FEATURES;
-static const uint32_t hvm_hap_featuremask[] = INIT_HVM_HAP_FEATURES;
+static const uint32_t pv_max_featuremask[] = INIT_PV_MAX_FEATURES;
+static const uint32_t hvm_shadow_max_featuremask[] = INIT_HVM_SHADOW_MAX_FEATURES;
+static const uint32_t hvm_hap_max_featuremask[] = INIT_HVM_HAP_MAX_FEATURES;
 static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 
 static int __init parse_xen_cpuid(const char *s)
@@ -359,7 +359,7 @@ static void __init calculate_pv_max_policy(void)
     cpuid_policy_to_featureset(p, pv_featureset);
 
     for ( i = 0; i < ARRAY_SIZE(pv_featureset); ++i )
-        pv_featureset[i] &= pv_featuremask[i];
+        pv_featureset[i] &= pv_max_featuremask[i];
 
     /*
      * If Xen isn't virtualising MSR_SPEC_CTRL for PV guests because of
@@ -391,7 +391,7 @@ static void __init calculate_hvm_max_policy(void)
     cpuid_policy_to_featureset(p, hvm_featureset);
 
     hvm_featuremask = hvm_hap_supported() ?
-        hvm_hap_featuremask : hvm_shadow_featuremask;
+        hvm_hap_max_featuremask : hvm_shadow_max_featuremask;
 
     for ( i = 0; i < ARRAY_SIZE(hvm_featureset); ++i )
         hvm_featureset[i] &= hvm_featuremask[i];
@@ -500,7 +500,7 @@ void recalculate_cpuid_policy(struct domain *d)
         if ( !hap_enabled(d) )
         {
             for ( i = 0; i < ARRAY_SIZE(max_fs); i++ )
-                max_fs[i] &= hvm_shadow_featuremask[i];
+                max_fs[i] &= hvm_shadow_max_featuremask[i];
         }
 
         /* Hide nested-virt if it hasn't been explicitly configured. */
@@ -964,7 +964,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
 
             /*
              * PSE36 is not supported in shadow mode.  This bit should be
-             * clear in hvm_shadow_featuremask[].
+             * clear in hvm_shadow_max_featuremask[].
              *
              * However, an unspecified version of Hyper-V from 2011 refuses to
              * start as the "cpu does not provide required hw features" if it
@@ -1003,9 +1003,9 @@ static void __init __maybe_unused build_assertions(void)
 {
     BUILD_BUG_ON(ARRAY_SIZE(known_features) != FSCAPINTS);
     BUILD_BUG_ON(ARRAY_SIZE(special_features) != FSCAPINTS);
-    BUILD_BUG_ON(ARRAY_SIZE(pv_featuremask) != FSCAPINTS);
-    BUILD_BUG_ON(ARRAY_SIZE(hvm_shadow_featuremask) != FSCAPINTS);
-    BUILD_BUG_ON(ARRAY_SIZE(hvm_hap_featuremask) != FSCAPINTS);
+    BUILD_BUG_ON(ARRAY_SIZE(pv_max_featuremask) != FSCAPINTS);
+    BUILD_BUG_ON(ARRAY_SIZE(hvm_shadow_max_featuremask) != FSCAPINTS);
+    BUILD_BUG_ON(ARRAY_SIZE(hvm_hap_max_featuremask) != FSCAPINTS);
     BUILD_BUG_ON(ARRAY_SIZE(deep_features) != FSCAPINTS);
 
     /* Find some more clever allocation scheme if this trips. */

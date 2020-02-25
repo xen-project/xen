@@ -2485,9 +2485,12 @@ uint32_t xc_get_cpu_featureset_size(void);
 enum xc_static_cpu_featuremask {
     XC_FEATUREMASK_KNOWN,
     XC_FEATUREMASK_SPECIAL,
-    XC_FEATUREMASK_PV,
-    XC_FEATUREMASK_HVM_SHADOW,
-    XC_FEATUREMASK_HVM_HAP,
+    XC_FEATUREMASK_PV_MAX,
+    XC_FEATUREMASK_PV_DEF,
+    XC_FEATUREMASK_HVM_SHADOW_MAX,
+    XC_FEATUREMASK_HVM_SHADOW_DEF,
+    XC_FEATUREMASK_HVM_HAP_MAX,
+    XC_FEATUREMASK_HVM_HAP_DEF,
 };
 const uint32_t *xc_get_static_cpu_featuremask(enum xc_static_cpu_featuremask);
 
