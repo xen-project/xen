@@ -3,9 +3,8 @@
 
 import sys, os, re
 
-if (sys.version_info > (3, 0)):
-    def xrange(x):
-        return range(x)
+if sys.version_info < (3, 0):
+    range = xrange
 
 class Fail(Exception):
     pass
@@ -330,10 +329,10 @@ def crunch_numbers(state):
         state.deep_deps[k] = featureset_to_uint32s(v, nr_entries)
 
     # Calculate the bitfield name declarations
-    for word in xrange(nr_entries):
+    for word in range(nr_entries):
 
         names = []
-        for bit in xrange(32):
+        for bit in range(32):
 
             name = state.names.get(word * 32 + bit, "")
 
