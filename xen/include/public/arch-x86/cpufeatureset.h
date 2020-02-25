@@ -87,6 +87,8 @@ enum {
  *   'A' = All guests.
  *   'S' = All HVM guests (not PV guests).
  *   'H' = HVM HAP guests (not PV or HVM Shadow guests).
+ *   Upper case => Available by default
+ *   Lower case => Can be opted-in to, but not available by default.
  */
 
 /* Intel-defined CPU features, CPUID level 0x00000001.edx, word 0 */

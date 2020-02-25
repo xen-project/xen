@@ -23,6 +23,7 @@ class State(object):
         self.raw = {
             '!': set(),
             'A': set(), 'S': set(), 'H': set(),
+            'a': set(), 's': set(), 'h': set(),
         }
 
         # State calculated
@@ -133,9 +134,13 @@ def crunch_numbers(state):
     state.hvm_shadow_def = state.pv_def | state.raw['S']
     state.hvm_hap_def = state.hvm_shadow_def | state.raw['H']
 
+    # TODO: Ignore def/max split until the toolstack migration logic is fixed
     state.pv_max = state.pv_def
     state.hvm_shadow_max = state.hvm_shadow_def
     state.hvm_hap_max = state.hvm_hap_def
+    # state.pv_max =                                state.raw['A'] | state.raw['a']
+    # state.hvm_shadow_max = state.pv_max         | state.raw['S'] | state.raw['s']
+    # state.hvm_hap_max =    state.hvm_shadow_max | state.raw['H'] | state.raw['h']
 
     #
     # Feature dependency information.
