@@ -33,7 +33,7 @@
 #include <asm/psr.h>
 #include <asm/cpuid.h>
 
-const struct cpu_policy system_policies[] = {
+const struct cpu_policy system_policies[6] = {
     [ XEN_SYSCTL_cpu_policy_raw ] = {
         &raw_cpuid_policy,
         &raw_msr_policy,
@@ -42,22 +42,26 @@ const struct cpu_policy system_policies[] = {
         &host_cpuid_policy,
         &host_msr_policy,
     },
+#ifdef CONFIG_PV
     [ XEN_SYSCTL_cpu_policy_pv_max ] = {
         &pv_max_cpuid_policy,
         &pv_max_msr_policy,
-    },
-    [ XEN_SYSCTL_cpu_policy_hvm_max ] = {
-        &hvm_max_cpuid_policy,
-        &hvm_max_msr_policy,
     },
     [ XEN_SYSCTL_cpu_policy_pv_default ] = {
         &pv_max_cpuid_policy,
         &pv_max_msr_policy,
     },
+#endif
+#ifdef CONFIG_HVM
+    [ XEN_SYSCTL_cpu_policy_hvm_max ] = {
+        &hvm_max_cpuid_policy,
+        &hvm_max_msr_policy,
+    },
     [ XEN_SYSCTL_cpu_policy_hvm_default ] = {
         &hvm_max_cpuid_policy,
         &hvm_max_msr_policy,
     },
+#endif
 };
 
 struct l3_cache_info {
@@ -425,6 +429,12 @@ long arch_do_sysctl(
         policy = &system_policies[
             array_index_nospec(sysctl->u.cpu_policy.index,
                                ARRAY_SIZE(system_policies))];
+
+        if ( !policy->cpuid || !policy->msr )
+        {
+            ret = -EOPNOTSUPP;
+            break;
+        }
 
         /* Process the CPUID leaves. */
         if ( guest_handle_is_null(sysctl->u.cpu_policy.cpuid_policy) )

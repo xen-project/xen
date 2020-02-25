@@ -480,7 +480,16 @@ int main(int argc, char **argv)
 
                 if ( xc_get_system_cpu_policy(xch, i, &nr_leaves, leaves,
                                               &nr_msrs, msrs) )
+                {
+                    if ( errno == EOPNOTSUPP )
+                    {
+                        printf("%s policy not supported by Xen\n",
+                               sys_policies[i]);
+                        continue;
+                    }
+
                     err(1, "xc_get_system_cpu_policy(, %s,,)", sys_policies[i]);
+                }
 
                 print_policy(sys_policies[i], leaves, nr_leaves,
                              msrs, nr_msrs);

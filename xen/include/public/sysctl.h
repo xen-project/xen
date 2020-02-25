@@ -1051,6 +1051,8 @@ struct xen_sysctl_set_parameter {
  *               experimental features outside of security support.
  *  - Default_*: Default set of features a PV or HVM guest can use.  This is
  *               the security supported set.
+ * May fail with -EOPNOTSUPP if querying for PV or HVM data when support is
+ * compiled out of Xen.
  */
 struct xen_sysctl_cpu_policy {
 #define XEN_SYSCTL_cpu_policy_raw          0
