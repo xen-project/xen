@@ -95,10 +95,14 @@ static void zero_leaves(struct cpuid_leaf *l,
     memset(&l[first], 0, sizeof(*l) * (last - first + 1));
 }
 
-struct cpuid_policy __read_mostly raw_cpuid_policy,
-    __read_mostly host_cpuid_policy,
-    __read_mostly pv_max_cpuid_policy,
-    __read_mostly hvm_max_cpuid_policy;
+struct cpuid_policy __read_mostly     raw_cpuid_policy,
+                    __read_mostly    host_cpuid_policy;
+#ifdef CONFIG_PV
+struct cpuid_policy __read_mostly  pv_max_cpuid_policy;
+#endif
+#ifdef CONFIG_HVM
+struct cpuid_policy __read_mostly hvm_max_cpuid_policy;
+#endif
 
 static void sanitise_featureset(uint32_t *fs)
 {
@@ -384,9 +388,6 @@ static void __init calculate_hvm_max_policy(void)
     unsigned int i;
     const uint32_t *hvm_featuremask;
 
-    if ( !hvm_enabled )
-        return;
-
     *p = host_cpuid_policy;
     cpuid_policy_to_featureset(p, hvm_featureset);
 
@@ -443,8 +444,12 @@ void __init init_guest_cpuid(void)
 {
     calculate_raw_policy();
     calculate_host_policy();
-    calculate_pv_max_policy();
-    calculate_hvm_max_policy();
+
+    if ( IS_ENABLED(CONFIG_PV) )
+        calculate_pv_max_policy();
+
+    if ( hvm_enabled )
+        calculate_hvm_max_policy();
 }
 
 bool recheck_cpu_features(unsigned int cpu)
@@ -472,10 +477,17 @@ bool recheck_cpu_features(unsigned int cpu)
 void recalculate_cpuid_policy(struct domain *d)
 {
     struct cpuid_policy *p = d->arch.cpuid;
-    const struct cpuid_policy *max =
-        is_pv_domain(d) ? &pv_max_cpuid_policy : &hvm_max_cpuid_policy;
+    const struct cpuid_policy *max = is_pv_domain(d)
+        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_max_cpuid_policy : NULL)
+        : (IS_ENABLED(CONFIG_HVM) ? &hvm_max_cpuid_policy : NULL);
     uint32_t fs[FSCAPINTS], max_fs[FSCAPINTS];
     unsigned int i;
+
+    if ( !max )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
 
     p->x86_vendor = x86_cpuid_lookup_vendor(
         p->basic.vendor_ebx, p->basic.vendor_ecx, p->basic.vendor_edx);
@@ -612,10 +624,17 @@ void recalculate_cpuid_policy(struct domain *d)
 
 int init_domain_cpuid_policy(struct domain *d)
 {
-    struct cpuid_policy *p =
-        xmemdup(is_pv_domain(d) ?  &pv_max_cpuid_policy
-                                : &hvm_max_cpuid_policy);
+    struct cpuid_policy *p = is_pv_domain(d)
+        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_max_cpuid_policy : NULL)
+        : (IS_ENABLED(CONFIG_HVM) ? &hvm_max_cpuid_policy : NULL);
 
+    if ( !p )
+    {
+        ASSERT_UNREACHABLE();
+        return -EOPNOTSUPP;
+    }
+
+    p = xmemdup(p);
     if ( !p )
         return -ENOMEM;
 
