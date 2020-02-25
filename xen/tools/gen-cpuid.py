@@ -20,20 +20,21 @@ class State(object):
         # State parsed from input
         self.names = {}  # Value => Name mapping
         self.values = {} # Name => Value mapping
-        self.raw_special = set()
-        self.raw_pv = set()
-        self.raw_hvm_shadow = set()
-        self.raw_hvm_hap = set()
+        self.raw = {
+            '!': set(),
+            'A': set(), 'S': set(), 'H': set(),
+        }
 
         # State calculated
         self.nr_entries = 0 # Number of words in a featureset
         self.common_1d = 0 # Common features between 1d and e1d
-        self.known = [] # All known features
-        self.special = [] # Features with special semantics
-        self.pv = []
-        self.hvm_shadow = []
-        self.hvm_hap = []
+        self.pv = set() # PV features
+        self.hvm_shadow = set() # HVM shadow features
+        self.hvm_hap = set() # HVM HAP features
         self.bitfields = [] # Text to declare named bitfields in C
+        self.deep_deps = {} # { feature num => dependant features }
+        self.nr_deep_deps = 0 # Number of entries in deep_deps
+        self.deep_features = set() # featureset of keys in deep_deps
 
 def parse_definitions(state):
     """
@@ -81,20 +82,9 @@ def parse_definitions(state):
         state.values[name.lower().replace("_", "-")] = val
 
         for a in attr:
-
-            if a == "!":
-                state.raw_special.add(val)
-            elif a in "ASH":
-                if a == "A":
-                    state.raw_pv.add(val)
-                    state.raw_hvm_shadow.add(val)
-                    state.raw_hvm_hap.add(val)
-                elif attr == "S":
-                    state.raw_hvm_shadow.add(val)
-                    state.raw_hvm_hap.add(val)
-                elif attr == "H":
-                    state.raw_hvm_hap.add(val)
-            else:
+            try:
+                state.raw[a].add(val)
+            except KeyError:
                 raise Fail("Unrecognised attribute '%s' for %s" % (a, name))
 
     if len(state.names) == 0:
@@ -117,10 +107,11 @@ def featureset_to_uint32s(fs, nr):
     if len(words) < nr:
         words.extend([0] * (nr - len(words)))
 
-    return [ "0x%08xU" % x for x in words ]
+    return ("0x%08xU" % x for x in words)
 
-def format_uint32s(words, indent):
+def format_uint32s(state, featureset, indent):
     """ Format a list of uint32_t's suitable for a macro definition """
+    words = featureset_to_uint32s(featureset, state.nr_entries)
     spaces = " " * indent
     return spaces + (", \\\n" + spaces).join(words) + ", \\"
 
@@ -133,13 +124,11 @@ def crunch_numbers(state):
     # Features common between 1d and e1d.
     common_1d = (FPU, VME, DE, PSE, TSC, MSR, PAE, MCE, CX8, APIC,
                  MTRR, PGE, MCA, CMOV, PAT, PSE36, MMX, FXSR)
+    state.common_1d = common_1d
 
-    state.known = featureset_to_uint32s(state.names.keys(), nr_entries)
-    state.common_1d = featureset_to_uint32s(common_1d, 1)[0]
-    state.special = featureset_to_uint32s(state.raw_special, nr_entries)
-    state.pv = featureset_to_uint32s(state.raw_pv, nr_entries)
-    state.hvm_shadow = featureset_to_uint32s(state.raw_hvm_shadow, nr_entries)
-    state.hvm_hap = featureset_to_uint32s(state.raw_hvm_hap, nr_entries)
+    state.pv = state.raw['A']
+    state.hvm_shadow = state.pv | state.raw['S']
+    state.hvm_hap = state.hvm_shadow | state.raw['H']
 
     #
     # Feature dependency information.
@@ -317,16 +306,8 @@ def crunch_numbers(state):
 
         state.deep_deps[feat] = seen[1:]
 
-    state.deep_features = featureset_to_uint32s(deps.keys(), nr_entries)
+    state.deep_features = deps.keys()
     state.nr_deep_deps = len(state.deep_deps.keys())
-
-    try:
-        _tmp = state.deep_deps.iteritems()
-    except AttributeError:
-        _tmp = state.deep_deps.items()
-
-    for k, v in _tmp:
-        state.deep_deps[k] = featureset_to_uint32s(v, nr_entries)
 
     # Calculate the bitfield name declarations
     for word in range(nr_entries):
@@ -382,21 +363,21 @@ def write_results(state):
 
 #define INIT_DEEP_DEPS { \\
 """ % (state.nr_entries,
-       state.common_1d,
-       format_uint32s(state.known, 4),
-       format_uint32s(state.special, 4),
-       format_uint32s(state.pv, 4),
-       format_uint32s(state.hvm_shadow, 4),
-       format_uint32s(state.hvm_hap, 4),
+       next(featureset_to_uint32s(state.common_1d, 1)),
+       format_uint32s(state, state.names.keys(), 4),
+       format_uint32s(state, state.raw['!'], 4),
+       format_uint32s(state, state.pv, 4),
+       format_uint32s(state, state.hvm_shadow, 4),
+       format_uint32s(state, state.hvm_hap, 4),
        state.nr_deep_deps,
-       format_uint32s(state.deep_features, 4),
+       format_uint32s(state, state.deep_features, 4),
        ))
 
     for dep in sorted(state.deep_deps.keys()):
         state.output.write(
             "    { %#xU, /* %s */ { \\\n%s\n    }, }, \\\n"
             % (dep, state.names[dep],
-               format_uint32s(state.deep_deps[dep], 8)
+               format_uint32s(state, state.deep_deps[dep], 8)
            ))
 
     state.output.write(
