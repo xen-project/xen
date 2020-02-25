@@ -944,7 +944,6 @@ map_grant_ref(
     struct domain *ld, *rd, *owner = NULL;
     struct grant_table *lgt, *rgt;
     grant_ref_t ref;
-    struct vcpu   *led;
     grant_handle_t handle;
     mfn_t mfn;
     struct page_info *pg = NULL;
@@ -957,8 +956,7 @@ map_grant_ref(
     uint16_t *status;
     bool_t need_iommu;
 
-    led = current;
-    ld = led->domain;
+    ld = current->domain;
 
     if ( unlikely((op->flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0) )
     {
