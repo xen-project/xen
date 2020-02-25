@@ -58,6 +58,16 @@ understands.
 - XEN_CONFIG_EXPERT: If this is defined in your shell it will be
   automatically passed through to the container.
 
+If your docker host has Linux kernel > 4.11, and you want to use containers
+that run old glibc (for example, CentOS 6 or SLES11SP4), you may need to add
+
+```
+vsyscall=emulate
+```
+
+to the host kernel command line. That enables a legacy interface that is used
+by old glibc.
+
 
 Building a container
 --------------------
