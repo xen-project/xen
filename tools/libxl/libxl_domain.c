@@ -1390,7 +1390,7 @@ static int libxl__read_recent(libxl__gc *gc,
 static int libxl__mark_domid_recent(libxl__gc *gc, uint32_t domid)
 {
     libxl__flock *lock;
-    struct libxl__domid_history ctxt;
+    struct libxl__domid_history ctxt = {};
     char *new;
     FILE *nf = NULL;
     int r, rc;
@@ -1461,7 +1461,7 @@ out:
 
 int libxl__is_domid_recent(libxl__gc *gc, uint32_t domid, bool *recent)
 {
-    struct libxl__domid_history ctxt;
+    struct libxl__domid_history ctxt = {};
     int rc;
 
     rc = libxl__open_domid_history(gc, &ctxt);
