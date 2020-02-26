@@ -31,5 +31,7 @@ nmi_callback_t *set_nmi_callback(nmi_callback_t *callback);
  * Remove the handler previously set.
  */
 void unset_nmi_callback(void);
+
+DECLARE_PER_CPU(unsigned int, nmi_count);
  
 #endif /* ASM_NMI_H */

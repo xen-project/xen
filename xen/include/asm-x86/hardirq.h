@@ -7,7 +7,6 @@
 typedef struct {
 	unsigned int __softirq_pending;
 	unsigned int __local_irq_count;
-	unsigned int __nmi_count;
 	bool_t __mwait_wakeup;
 } __cacheline_aligned irq_cpustat_t;
 

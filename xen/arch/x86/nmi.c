@@ -151,15 +151,14 @@ int nmi_active;
 
 static void __init wait_for_nmis(void *p)
 {
-    unsigned int cpu = smp_processor_id();
-    unsigned int start_count = nmi_count(cpu);
+    unsigned int start_count = this_cpu(nmi_count);
     unsigned long ticks = 10 * 1000 * cpu_khz / nmi_hz;
     unsigned long s, e;
 
     s = rdtsc();
     do {
         cpu_relax();
-        if ( nmi_count(cpu) >= start_count + 2 )
+        if ( this_cpu(nmi_count) >= start_count + 2 )
             break;
         e = rdtsc();
     } while( e - s < ticks );
@@ -177,7 +176,7 @@ void __init check_nmi_watchdog(void)
     printk("Testing NMI watchdog on all CPUs:");
 
     for_each_online_cpu ( cpu )
-        prev_nmi_count[cpu] = nmi_count(cpu);
+        prev_nmi_count[cpu] = per_cpu(nmi_count, cpu);
 
     /*
      * Wait at most 10 ticks for 2 watchdog NMIs on each CPU.
@@ -188,7 +187,7 @@ void __init check_nmi_watchdog(void)
 
     for_each_online_cpu ( cpu )
     {
-        if ( nmi_count(cpu) - prev_nmi_count[cpu] < 2 )
+        if ( per_cpu(nmi_count, cpu) - prev_nmi_count[cpu] < 2 )
         {
             printk(" %d", cpu);
             ok = false;
@@ -593,7 +592,7 @@ static void do_nmi_stats(unsigned char key)
 
     printk("CPU\tNMI\n");
     for_each_online_cpu ( cpu )
-        printk("%3u\t%3u\n", cpu, nmi_count(cpu));
+        printk("%3u\t%3u\n", cpu, per_cpu(nmi_count, cpu));
 
     if ( !hardware_domain || !(v = domain_vcpu(hardware_domain, 0)) )
         return;

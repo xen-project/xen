@@ -1683,13 +1683,15 @@ static int dummy_nmi_callback(const struct cpu_user_regs *regs, int cpu)
 
 static nmi_callback_t *nmi_callback = dummy_nmi_callback;
 
+DEFINE_PER_CPU(unsigned int, nmi_count);
+
 void do_nmi(const struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
     unsigned char reason = 0;
     bool handle_unknown = false;
 
-    ++nmi_count(cpu);
+    this_cpu(nmi_count)++;
 
     if ( nmi_callback(regs, cpu) )
         return;
