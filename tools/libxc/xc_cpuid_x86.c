@@ -90,43 +90,22 @@ uint32_t xc_get_cpu_featureset_size(void)
 const uint32_t *xc_get_static_cpu_featuremask(
     enum xc_static_cpu_featuremask mask)
 {
-    const static uint32_t known[FEATURESET_NR_ENTRIES] = INIT_KNOWN_FEATURES,
-        special[FEATURESET_NR_ENTRIES] = INIT_SPECIAL_FEATURES,
-        pv[FEATURESET_NR_ENTRIES] = INIT_PV_FEATURES,
-        hvm_shadow[FEATURESET_NR_ENTRIES] = INIT_HVM_SHADOW_FEATURES,
-        hvm_hap[FEATURESET_NR_ENTRIES] = INIT_HVM_HAP_FEATURES,
-        deep_features[FEATURESET_NR_ENTRIES] = INIT_DEEP_FEATURES;
+    static const uint32_t masks[][FEATURESET_NR_ENTRIES] = {
+#define MASK(x) [XC_FEATUREMASK_ ## x] = INIT_ ## x ## _FEATURES
 
-    BUILD_BUG_ON(ARRAY_SIZE(known) != FEATURESET_NR_ENTRIES);
-    BUILD_BUG_ON(ARRAY_SIZE(special) != FEATURESET_NR_ENTRIES);
-    BUILD_BUG_ON(ARRAY_SIZE(pv) != FEATURESET_NR_ENTRIES);
-    BUILD_BUG_ON(ARRAY_SIZE(hvm_shadow) != FEATURESET_NR_ENTRIES);
-    BUILD_BUG_ON(ARRAY_SIZE(hvm_hap) != FEATURESET_NR_ENTRIES);
-    BUILD_BUG_ON(ARRAY_SIZE(deep_features) != FEATURESET_NR_ENTRIES);
+        MASK(KNOWN),
+        MASK(SPECIAL),
+        MASK(PV),
+        MASK(HVM_SHADOW),
+        MASK(HVM_HAP),
 
-    switch ( mask )
-    {
-    case XC_FEATUREMASK_KNOWN:
-        return known;
+#undef MASK
+    };
 
-    case XC_FEATUREMASK_SPECIAL:
-        return special;
-
-    case XC_FEATUREMASK_PV:
-        return pv;
-
-    case XC_FEATUREMASK_HVM_SHADOW:
-        return hvm_shadow;
-
-    case XC_FEATUREMASK_HVM_HAP:
-        return hvm_hap;
-
-    case XC_FEATUREMASK_DEEP_FEATURES:
-        return deep_features;
-
-    default:
+    if ( (unsigned int)mask >= ARRAY_SIZE(masks) )
         return NULL;
-    }
+
+    return masks[mask];
 }
 
 int xc_get_cpu_policy_size(xc_interface *xch, uint32_t *nr_leaves,

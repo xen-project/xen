@@ -2488,7 +2488,6 @@ enum xc_static_cpu_featuremask {
     XC_FEATUREMASK_PV,
     XC_FEATUREMASK_HVM_SHADOW,
     XC_FEATUREMASK_HVM_HAP,
-    XC_FEATUREMASK_DEEP_FEATURES,
 };
 const uint32_t *xc_get_static_cpu_featuremask(enum xc_static_cpu_featuremask);
 
