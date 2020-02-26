@@ -224,6 +224,14 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
     return c;
 }
 
+static inline void atomic_and(int m, atomic_t *v)
+{
+    asm volatile (
+        "lock andl %1, %0"
+        : "+m" (*(volatile int *)&v->counter)
+        : "ir" (m) );
+}
+
 #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
 
 #endif /* __ARCH_X86_ATOMIC__ */

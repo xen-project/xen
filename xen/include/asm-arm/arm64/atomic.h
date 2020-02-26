@@ -91,6 +91,20 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 	return result;
 }
 
+static inline void atomic_and(int m, atomic_t *v)
+{
+	unsigned long tmp;
+	int result;
+
+	asm volatile("// atomic_and\n"
+"1:	ldxr	%w0, %2\n"
+"	and	%w0, %w0, %w3\n"
+"	stxr	%w1, %w0, %2\n"
+"	cbnz	%w1, 1b"
+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)
+	: "Ir" (m));
+}
+
 static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
 {
 	unsigned long tmp;

@@ -96,6 +96,23 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 	return result;
 }
 
+static inline void atomic_and(int m, atomic_t *v)
+{
+	unsigned long tmp;
+	int result;
+
+	prefetchw(&v->counter);
+	__asm__ __volatile__("@ atomic_and\n"
+"1:	ldrex	%0, [%3]\n"
+"	and	%0, %0, %4\n"
+"	strex	%1, %0, [%3]\n"
+"	teq	%1, #0\n"
+"	bne	1b"
+	: "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+	: "r" (&v->counter), "Ir" (m)
+	: "cc");
+}
+
 static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
 {
 	int oldval;
