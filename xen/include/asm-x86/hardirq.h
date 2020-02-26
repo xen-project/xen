@@ -7,6 +7,7 @@
 typedef struct {
 	unsigned int __softirq_pending;
 	unsigned int __local_irq_count;
+	unsigned int nmi_count;
 	bool_t __mwait_wakeup;
 } __cacheline_aligned irq_cpustat_t;
 
@@ -16,6 +17,11 @@ typedef struct {
 
 #define irq_enter()	(local_irq_count(smp_processor_id())++)
 #define irq_exit()	(local_irq_count(smp_processor_id())--)
+
+#define nmi_count(cpu)		__IRQ_STAT(cpu, nmi_count)
+#define in_nmi_handler()	(nmi_count(smp_processor_id()) != 0)
+#define nmi_enter()		(nmi_count(smp_processor_id())++)
+#define nmi_exit()		(nmi_count(smp_processor_id())--)
 
 void ack_bad_irq(unsigned int irq);
 

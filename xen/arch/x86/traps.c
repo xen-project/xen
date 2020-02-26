@@ -1692,9 +1692,13 @@ void do_nmi(const struct cpu_user_regs *regs)
     bool handle_unknown = false;
 
     this_cpu(nmi_count)++;
+    nmi_enter();
 
     if ( nmi_callback(regs, cpu) )
+    {
+        nmi_exit();
         return;
+    }
 
     /*
      * Accessing port 0x61 may trap to SMM which has been actually
@@ -1720,6 +1724,8 @@ void do_nmi(const struct cpu_user_regs *regs)
         if ( !(reason & 0xc0) && handle_unknown )
             unknown_nmi_error(regs, reason);
     }
+
+    nmi_exit();
 }
 
 nmi_callback_t *set_nmi_callback(nmi_callback_t *callback)
