@@ -20,8 +20,6 @@
 #define __ASM_X86_HVM_SVM_VMCB_H__
 
 #include <xen/types.h>
-#include <asm/hvm/emulate.h>
-
 
 /* general 1 intercepts */
 enum GenericIntercept1bits

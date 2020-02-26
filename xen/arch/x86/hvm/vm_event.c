@@ -22,6 +22,7 @@
 
 #include <xen/sched.h>
 #include <xen/vm_event.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/support.h>
 #include <asm/vm_event.h>
 

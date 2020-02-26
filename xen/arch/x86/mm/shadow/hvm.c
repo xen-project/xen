@@ -28,6 +28,7 @@
 #include <xen/trace.h>
 
 #include <asm/current.h>
+#include <asm/hvm/emulate.h>
 #include <asm/shadow.h>
 
 #include "private.h"

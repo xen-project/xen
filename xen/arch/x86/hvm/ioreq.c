@@ -28,6 +28,7 @@
 #include <xen/paging.h>
 #include <xen/vpci.h>
 
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/ioreq.h>
 #include <asm/hvm/vmx/vmx.h>

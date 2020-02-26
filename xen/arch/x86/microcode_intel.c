@@ -21,9 +21,10 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#include <xen/lib.h>
-#include <xen/kernel.h>
+#include <xen/err.h>
 #include <xen/init.h>
+#include <xen/kernel.h>
+#include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>

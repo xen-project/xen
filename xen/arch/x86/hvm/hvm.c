@@ -56,6 +56,7 @@
 #include <asm/mc146818rtc.h>
 #include <asm/mce.h>
 #include <asm/monitor.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/support.h>

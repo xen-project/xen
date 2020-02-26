@@ -20,6 +20,7 @@
 #include <xen/lib.h>
 #include <xen/trace.h>
 #include <asm/msr.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/svm.h>

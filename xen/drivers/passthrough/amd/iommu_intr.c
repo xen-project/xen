@@ -16,6 +16,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/err.h>
 #include <xen/softirq.h>
 
 #include <asm/io_apic.h>

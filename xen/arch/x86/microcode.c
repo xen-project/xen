@@ -22,9 +22,10 @@
  */
 
 #include <xen/cpu.h>
-#include <xen/lib.h>
-#include <xen/kernel.h>
+#include <xen/err.h>
 #include <xen/init.h>
+#include <xen/kernel.h>
+#include <xen/lib.h>
 #include <xen/notifier.h>
 #include <xen/param.h>
 #include <xen/sched.h>
