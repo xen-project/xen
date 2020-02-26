@@ -1,5 +1,3 @@
-include $(XEN_ROOT)/Config.mk
-
 ifneq ($(CONFIG_COMPAT),)
 
 compat-arch-$(CONFIG_X86) := x86_32
