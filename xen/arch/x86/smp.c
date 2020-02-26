@@ -68,6 +68,18 @@ void send_IPI_mask(const cpumask_t *mask, int vector)
     bool cpus_locked = false;
     cpumask_t *scratch = this_cpu(scratch_cpumask);
 
+    if ( in_irq() || in_mce_handler() || in_nmi_handler() )
+    {
+        /*
+         * When in IRQ, NMI or #MC context fallback to the old (and simpler)
+         * IPI sending routine, and avoid doing any performance optimizations
+         * (like using a shorthand) in order to avoid using the scratch
+         * cpumask which cannot be used in interrupt context.
+         */
+        alternative_vcall(genapic.send_IPI_mask, mask, vector);
+        return;
+    }
+
     /*
      * This can only be safely used when no CPU hotplug or unplug operations
      * are taking place, there are no offline CPUs (unless those have been
