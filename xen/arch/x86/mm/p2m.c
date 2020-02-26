@@ -2199,8 +2199,9 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
  * synthetic/structure PFEC_* bits.
  */
 void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
-                     p2m_type_t *p2mt, p2m_query_t q, uint32_t *pfec)
+                     p2m_query_t q, uint32_t *pfec)
 {
+    p2m_type_t p2mt;
     struct page_info *page;
 
     if ( !gfn_valid(p2m->domain, gfn) )
@@ -2210,8 +2211,8 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
     }
 
     /* Translate the gfn, unsharing if shared. */
-    page = p2m_get_page_from_gfn(p2m, gfn, p2mt, NULL, q);
-    if ( p2m_is_paging(*p2mt) )
+    page = p2m_get_page_from_gfn(p2m, gfn, &p2mt, NULL, q);
+    if ( p2m_is_paging(p2mt) )
     {
         ASSERT(p2m_is_hostp2m(p2m));
         if ( page )
@@ -2220,7 +2221,7 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
         *pfec = PFEC_page_paged;
         return NULL;
     }
-    if ( p2m_is_shared(*p2mt) )
+    if ( p2m_is_shared(p2mt) )
     {
         if ( page )
             put_page(page);

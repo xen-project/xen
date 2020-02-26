@@ -85,7 +85,6 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
                   uint32_t walk, mfn_t top_mfn, void *top_map)
 {
     struct domain *d = v->domain;
-    p2m_type_t p2mt;
     guest_l1e_t *l1p = NULL;
     guest_l2e_t *l2p = NULL;
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
@@ -153,7 +152,6 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     l3p = map_domain_gfn(p2m,
                          guest_l4e_get_gfn(gw->l4e),
                          &gw->l3mfn,
-                         &p2mt,
                          qt,
                          &rc);
     if ( l3p == NULL )
@@ -232,7 +230,6 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     l2p = map_domain_gfn(p2m,
                          guest_l3e_get_gfn(gw->l3e),
                          &gw->l2mfn,
-                         &p2mt,
                          qt,
                          &rc);
     if ( l2p == NULL )
@@ -326,7 +323,6 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     l1p = map_domain_gfn(p2m,
                          guest_l2e_get_gfn(gw->l2e),
                          &gw->l1mfn,
-                         &p2mt,
                          qt,
                          &rc);
     if ( l1p == NULL )

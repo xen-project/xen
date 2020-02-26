@@ -278,7 +278,6 @@ static int __init pvh_add_mem_range(struct domain *d, uint64_t s, uint64_t e,
 
 static int __init pvh_setup_vmx_realmode_helpers(struct domain *d)
 {
-    p2m_type_t p2mt;
     uint32_t rc, *ident_pt;
     mfn_t mfn;
     paddr_t gaddr;
@@ -317,7 +316,7 @@ static int __init pvh_setup_vmx_realmode_helpers(struct domain *d)
      * superpages.
      */
     ident_pt = map_domain_gfn(p2m_get_hostp2m(d), _gfn(PFN_DOWN(gaddr)),
-                              &mfn, &p2mt, 0, &rc);
+                              &mfn, 0, &rc);
     if ( ident_pt == NULL )
     {
         printk("Unable to map identity page tables\n");

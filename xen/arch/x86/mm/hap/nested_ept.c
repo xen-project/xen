@@ -151,7 +151,6 @@ static uint32_t
 nept_walk_tables(struct vcpu *v, unsigned long l2ga, ept_walk_t *gw)
 {
     int lvl;
-    p2m_type_t p2mt;
     uint32_t rc = 0, ret = 0, gflags;
     struct domain *d = v->domain;
     struct p2m_domain *p2m = d->arch.p2m;
@@ -163,7 +162,7 @@ nept_walk_tables(struct vcpu *v, unsigned long l2ga, ept_walk_t *gw)
 
     for (lvl = 4; lvl > 0; lvl--)
     {
-        lxp = map_domain_gfn(p2m, base_gfn, &lxmfn, &p2mt, P2M_ALLOC, &rc);
+        lxp = map_domain_gfn(p2m, base_gfn, &lxmfn, P2M_ALLOC, &rc);
         if ( !lxp )
             goto map_err;
         gw->lxe[lvl] = lxp[ept_lvl_table_offset(l2ga, lvl)];
