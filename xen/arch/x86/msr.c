@@ -31,9 +31,13 @@
 DEFINE_PER_CPU(uint32_t, tsc_aux);
 
 struct msr_policy __read_mostly     raw_msr_policy,
-                  __read_mostly    host_msr_policy,
-                  __read_mostly hvm_max_msr_policy,
-                  __read_mostly  pv_max_msr_policy;
+                  __read_mostly    host_msr_policy;
+#ifdef CONFIG_PV
+struct msr_policy __read_mostly  pv_max_msr_policy;
+#endif
+#ifdef CONFIG_HVM
+struct msr_policy __read_mostly hvm_max_msr_policy;
+#endif
 
 static void __init calculate_raw_policy(void)
 {
@@ -56,9 +60,6 @@ static void __init calculate_hvm_max_policy(void)
 {
     struct msr_policy *mp = &hvm_max_msr_policy;
 
-    if ( !hvm_enabled )
-        return;
-
     *mp = host_msr_policy;
 
     /* It's always possible to emulate CPUID faulting for HVM guests */
@@ -76,16 +77,27 @@ void __init init_guest_msr_policy(void)
 {
     calculate_raw_policy();
     calculate_host_policy();
-    calculate_hvm_max_policy();
-    calculate_pv_max_policy();
+
+    if ( IS_ENABLED(CONFIG_PV) )
+        calculate_pv_max_policy();
+
+    if ( hvm_enabled )
+        calculate_hvm_max_policy();
 }
 
 int init_domain_msr_policy(struct domain *d)
 {
-    struct msr_policy *mp =
-        xmemdup(is_pv_domain(d) ?  &pv_max_msr_policy
-                                : &hvm_max_msr_policy);
+    struct msr_policy *mp = is_pv_domain(d)
+        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_max_msr_policy : NULL)
+        : (IS_ENABLED(CONFIG_HVM) ? &hvm_max_msr_policy : NULL);
 
+    if ( !mp )
+    {
+        ASSERT_UNREACHABLE();
+        return -EOPNOTSUPP;
+    }
+
+    mp = xmemdup(mp);
     if ( !mp )
         return -ENOMEM;
 
