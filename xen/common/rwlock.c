@@ -69,7 +69,7 @@ void queue_write_lock_slowpath(rwlock_t *lock)
 
     /* Try to acquire the lock directly if no reader is present. */
     if ( !atomic_read(&lock->cnts) &&
-         (atomic_cmpxchg(&lock->cnts, 0, _QW_LOCKED) == 0) )
+         (atomic_cmpxchg(&lock->cnts, 0, _write_lock_val()) == 0) )
         goto unlock;
 
     /*
@@ -93,7 +93,7 @@ void queue_write_lock_slowpath(rwlock_t *lock)
         cnts = atomic_read(&lock->cnts);
         if ( (cnts == _QW_WAITING) &&
              (atomic_cmpxchg(&lock->cnts, _QW_WAITING,
-                             _QW_LOCKED) == _QW_WAITING) )
+                             _write_lock_val()) == _QW_WAITING) )
             break;
 
         cpu_relax();
