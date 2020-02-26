@@ -10,7 +10,7 @@ bool get_cpu_maps(void);
 void put_cpu_maps(void);
 
 /* Safely perform CPU hotplug and update cpu_online_map, etc. */
-bool cpu_hotplug_begin(void);
+void cpu_hotplug_begin(void);
 void cpu_hotplug_done(void);
 
 /* Receive notification of CPU hotplug events. */

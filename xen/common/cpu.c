@@ -51,9 +51,9 @@ void put_cpu_maps(void)
     read_unlock(&cpu_add_remove_lock);
 }
 
-bool cpu_hotplug_begin(void)
+void cpu_hotplug_begin(void)
 {
-    return write_trylock(&cpu_add_remove_lock);
+    write_lock(&cpu_add_remove_lock);
 }
 
 void cpu_hotplug_done(void)
@@ -65,8 +65,7 @@ static NOTIFIER_HEAD(cpu_chain);
 
 void __init register_cpu_notifier(struct notifier_block *nb)
 {
-    if ( !write_trylock(&cpu_add_remove_lock) )
-        BUG(); /* Should never fail as we are called only during boot. */
+    write_lock(&cpu_add_remove_lock);
     notifier_chain_register(&cpu_chain, nb);
     write_unlock(&cpu_add_remove_lock);
 }
@@ -100,8 +99,7 @@ int cpu_down(unsigned int cpu)
     int err;
     struct notifier_block *nb = NULL;
 
-    if ( !cpu_hotplug_begin() )
-        return -EBUSY;
+    cpu_hotplug_begin();
 
     err = -EINVAL;
     if ( (cpu >= nr_cpu_ids) || (cpu == 0) )
@@ -142,8 +140,7 @@ int cpu_up(unsigned int cpu)
     int err;
     struct notifier_block *nb = NULL;
 
-    if ( !cpu_hotplug_begin() )
-        return -EBUSY;
+    cpu_hotplug_begin();
 
     err = -EINVAL;
     if ( (cpu >= nr_cpu_ids) || !cpu_present(cpu) )

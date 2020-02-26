@@ -1255,8 +1255,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
          (pxm >= 256) )
         return -EINVAL;
 
-    if ( !cpu_hotplug_begin() )
-        return -EBUSY;
+    cpu_hotplug_begin();
 
     /* Detect if the cpu has been added before */
     if ( x86_acpiid_to_apicid[acpi_id] != BAD_APICID )
