@@ -71,7 +71,7 @@ ifneq ($(CONFIG_CC_IS_CLANG),y)
 CFLAGS += -Wa,--strip-local-absolute
 endif
 
-AFLAGS-y                += -D__ASSEMBLY__
+AFLAGS += -D__ASSEMBLY__
 
 ALL_OBJS := $(ALL_OBJS-y)
 
@@ -85,7 +85,7 @@ CFLAGS += $(EXTRA_CFLAGS_XEN_CORE)
 # Most CFLAGS are safe for assembly files:
 #  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
 #  -flto makes no sense and annoys clang
-AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu% -flto,$(CFLAGS))
+AFLAGS += $(filter-out -std=gnu% -flto,$(CFLAGS))
 
 # LDFLAGS are only passed directly to $(LD)
 LDFLAGS += $(LDFLAGS_DIRECT)
