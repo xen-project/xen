@@ -230,7 +230,6 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
 %.s: %.c Makefile
 	$(CC) $(filter-out -Wa$(comma)%,$(CFLAGS)) -S $< -o $@
 
-# -std=gnu{89,99} gets confused by # as an end-of-line comment marker
 %.s: %.S Makefile
 	$(CPP) $(filter-out -Wa$(comma)%,$(AFLAGS)) $< -o $@
 
