@@ -1645,6 +1645,12 @@ static int __init ns16550_acpi_uart_init(const void *data)
 
     spcr = container_of(table, struct acpi_table_spcr, header);
 
+    if ( unlikely(spcr->serial_port.space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY) )
+    {
+        printk("ns16550: Address space type is not mmio\n");
+        return -EINVAL;
+    }
+
     /*
      * The serial port address may be 0 for example
      * if the console redirection is disabled.
@@ -1652,12 +1658,6 @@ static int __init ns16550_acpi_uart_init(const void *data)
     if ( unlikely(!spcr->serial_port.address) )
     {
         printk("ns16550: Console redirection is disabled\n");
-        return -EINVAL;
-    }
-
-    if ( unlikely(spcr->serial_port.space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY) )
-    {
-        printk("ns16550: Address space type is not mmio\n");
         return -EINVAL;
     }
 
