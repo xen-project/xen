@@ -90,6 +90,9 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 .PHONY: _tests
 _tests:
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C test tests
+.PHONY: install-tests
+install-tests:
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C test install
 
 .PHONY: _uninstall
 _uninstall: D=$(DESTDIR)

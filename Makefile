@@ -155,13 +155,11 @@ install-docs:
 # We only have build-tests install-tests, not uninstall-tests etc.
 .PHONY: build-tests
 build-tests: build-xen
-	export BASEDIR=$(XEN_ROOT)/xen; \
-	$(MAKE) -f $$BASEDIR/Rules.mk -C xen/test build
+	$(MAKE) -C xen tests
 
 .PHONY: install-tests
 install-tests: install-xen
-	export BASEDIR=$(XEN_ROOT)/xen; \
-	$(MAKE) -f $$BASEDIR/Rules.mk -C xen/test install
+	$(MAKE) -C xen $@
 
 # build xen and the tools and place them in the install
 # directory. 'make install' should then copy them to the normal system
