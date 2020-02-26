@@ -841,7 +841,7 @@ struct xen_domctl_gdbsx_domstatus {
  * in the unshare path. XENMEM_sharing_op_resume is used to wake up
  * vcpus that could not unshare.
  *
- * Note that shring can be turned on (as per the domctl below)
+ * Note that sharing can be turned on (as per the domctl below)
  * *without* this ring being setup.
  */
 #define XEN_DOMCTL_VM_EVENT_OP_SHARING           3
