@@ -363,11 +363,15 @@ long arch_do_sysctl(
 
     case XEN_SYSCTL_get_cpu_featureset:
     {
-        static const struct cpuid_policy *const policy_table[] = {
+        static const struct cpuid_policy *const policy_table[4] = {
             [XEN_SYSCTL_cpu_featureset_raw]  = &raw_cpuid_policy,
             [XEN_SYSCTL_cpu_featureset_host] = &host_cpuid_policy,
+#ifdef CONFIG_PV
             [XEN_SYSCTL_cpu_featureset_pv]   = &pv_max_cpuid_policy,
+#endif
+#ifdef CONFIG_HVM
             [XEN_SYSCTL_cpu_featureset_hvm]  = &hvm_max_cpuid_policy,
+#endif
         };
         const struct cpuid_policy *p = NULL;
         uint32_t featureset[FSCAPINTS];
@@ -389,12 +393,17 @@ long arch_do_sysctl(
 
         /* Look up requested featureset. */
         if ( sysctl->u.cpu_featureset.index < ARRAY_SIZE(policy_table) )
+        {
             p = policy_table[sysctl->u.cpu_featureset.index];
 
-        /* Bad featureset index? */
-        if ( !p )
-            ret = -EINVAL;
+            if ( !p )
+                ret = -EOPNOTSUPP;
+        }
         else
+            /* Bad featureset index? */
+            ret = -EINVAL;
+
+        if ( !ret )
             cpuid_policy_to_featureset(p, featureset);
 
         /* Copy the requested featureset into place. */

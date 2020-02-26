@@ -796,6 +796,8 @@ struct xen_sysctl_cpu_levelling_caps {
  *  - Host: The values Xen is using, (after command line overrides, etc).
  *  -   PV: Maximum set of features which can be given to a PV guest.
  *  -  HVM: Maximum set of features which can be given to a HVM guest.
+ * May fail with -EOPNOTSUPP if querying for PV or HVM data when support is
+ * compiled out of Xen.
  */
 struct xen_sysctl_cpu_featureset {
 #define XEN_SYSCTL_cpu_featureset_raw      0

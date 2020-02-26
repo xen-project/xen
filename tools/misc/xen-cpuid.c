@@ -251,7 +251,7 @@ static void decode_featureset(const uint32_t *features,
     }
 }
 
-static void get_featureset(xc_interface *xch, unsigned int idx)
+static int get_featureset(xc_interface *xch, unsigned int idx)
 {
     struct fsinfo *f = &featuresets[idx];
 
@@ -261,8 +261,7 @@ static void get_featureset(xc_interface *xch, unsigned int idx)
     if ( !f->fs )
         err(1, "calloc(, featureset)");
 
-    if ( xc_get_cpu_featureset(xch, idx, &f->len, f->fs) )
-        err(1, "xc_get_featureset()");
+    return xc_get_cpu_featureset(xch, idx, &f->len, f->fs);
 }
 
 static void dump_info(xc_interface *xch, bool detail)
@@ -294,7 +293,17 @@ static void dump_info(xc_interface *xch, bool detail)
     printf("\nDynamic sets:\n");
     for ( i = 0; i < ARRAY_SIZE(featuresets); ++i )
     {
-        get_featureset(xch, i);
+        if ( get_featureset(xch, i) )
+        {
+            if ( errno == EOPNOTSUPP )
+            {
+                printf("%s featureset not supported by Xen\n",
+                       featuresets[i].name);
+                continue;
+            }
+
+            err(1, "xc_get_featureset()");
+        }
 
         decode_featureset(featuresets[i].fs, featuresets[i].len,
                           featuresets[i].name, detail);
