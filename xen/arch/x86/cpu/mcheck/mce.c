@@ -93,7 +93,9 @@ void x86_mce_vector_register(x86_mce_vector_t hdlr)
 
 void do_machine_check(const struct cpu_user_regs *regs)
 {
+    mce_enter();
     _machine_check_vector(regs);
+    mce_exit();
 }
 
 /*
