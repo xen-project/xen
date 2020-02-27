@@ -563,6 +563,13 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
         /* Just check if RDM > our memory boundary. */
         if (rdm_start > rdm_mem_boundary) {
             /*
+             * For HAP guests round down to a 2Mb boundary to allow use
+             * of large page mappings.
+             */
+            if (libxl_defbool_val(d_config->c_info.hap)
+                && rdm_start > MB(2))
+                rdm_start &= ~(MB(2) - 1);
+            /*
              * We will move downwards lowmem_end so we have to expand
              * highmem_end.
              */
