@@ -1709,6 +1709,8 @@ _hidden void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
                                    libxl__ao_device *aodev);
 _hidden void libxl__device_pci_destroy_all(libxl__egc *egc, uint32_t domid,
                                            libxl__multidev *);
+_hidden int libxl__device_pci_setdefault(libxl__gc *gc, uint32_t domid,
+                                         libxl_device_pci *pci, bool hotplug);
 _hidden bool libxl__is_igd_vga_passthru(libxl__gc *gc,
                                         const libxl_domain_config *d_config);
 

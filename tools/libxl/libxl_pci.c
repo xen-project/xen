@@ -1483,8 +1483,8 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
     return -1;
 }
 
-static int libxl__device_pci_setdefault(libxl__gc *gc, uint32_t domid,
-                                        libxl_device_pci *pci, bool hotplug)
+int libxl__device_pci_setdefault(libxl__gc *gc, uint32_t domid,
+                                 libxl_device_pci *pci, bool hotplug)
 {
     /* We'd like to force reserve rdm specific to a device by default.*/
     if (pci->rdm_policy == LIBXL_RDM_RESERVE_POLICY_INVALID)

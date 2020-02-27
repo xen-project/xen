@@ -488,6 +488,11 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
 
         assert(xrdm);
 
+        rc = libxl__device_pci_setdefault(gc, DOMID_INVALID,
+                                          &d_config->pcidevs[i], false);
+        if (rc)
+            goto out;
+
         for (n = 0; n < nr_entries; ++n) {
             bool new = true;
 
