@@ -92,6 +92,12 @@ LDFLAGS += $(LDFLAGS_DIRECT)
 
 LDFLAGS += $(LDFLAGS-y)
 
+SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
+                                            $(foreach w,1 2 4, \
+                                                        rodata.str$(w).$(a)) \
+                                            rodata.cst$(a)) \
+                         $(foreach r,rel rel.ro,data.$(r).local)
+
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 DEPS = .*.d
@@ -205,12 +211,6 @@ endif
 
 %.o: %.S Makefile
 	$(CC) $(AFLAGS) -c $< -o $@
-
-SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
-					    $(foreach w,1 2 4, \
-							rodata.str$(w).$(a)) \
-					    rodata.cst$(a)) \
-			 $(foreach r,rel rel.ro,data.$(r).local)
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
 	$(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p;}' | while read idx name sz rest; do \
