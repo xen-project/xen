@@ -26,7 +26,7 @@ $(call as-option-add,CFLAGS,CC,".L0: .L1: .skip (.L1 - .L0)",,\
                      -no-integrated-as)
 
 # Check whether clang asm()-s support .include.
-$(call as-option-add,CFLAGS,CC,".include \"asm/indirect_thunk_asm.h\"",,\
+$(call as-option-add,CFLAGS,CC,".include \"asm-x86/indirect_thunk_asm.h\"",,\
                      -no-integrated-as)
 
 # Check whether clang keeps .macro-s between asm()-s:
