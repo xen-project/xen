@@ -471,8 +471,7 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
 
     /* Query RDM entries per-device */
     for (i = 0; i < d_config->num_pcidevs; i++) {
-        unsigned int nr_entries;
-        bool new = true;
+        unsigned int n, nr_entries;
 
         seg = d_config->pcidevs[i].domain;
         bus = d_config->pcidevs[i].bus;
@@ -489,36 +488,41 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
 
         assert(xrdm);
 
-        /*
-         * Need to check whether this entry is already saved in the array.
-         * This could come from two cases:
-         *
-         *   - user may configure to get all RDMs in this platform, which
-         *   is already queried before this point
-         *   - or two assigned devices may share one RDM entry
-         *
-         * Different policies may be configured on the same RDM due to
-         * above two cases. But we don't allow to assign such a group
-         * devies right now so it doesn't come true in our case.
-         */
-        for (j = 0; j < d_config->num_rdms; j++) {
-            if (d_config->rdms[j].start == pfn_to_paddr(xrdm[0].start_pfn))
-            {
-                /*
-                 * So the per-device policy always override the global
-                 * policy in this case.
-                 */
-                d_config->rdms[j].policy = d_config->pcidevs[i].rdm_policy;
-                new = false;
-                break;
-            }
-        }
+        for (n = 0; n < nr_entries; ++n) {
+            bool new = true;
 
-        if (new) {
-            add_rdm_entry(gc, d_config,
-                          pfn_to_paddr(xrdm[0].start_pfn),
-                          pfn_to_paddr(xrdm[0].nr_pages),
-                          d_config->pcidevs[i].rdm_policy);
+            /*
+             * Need to check whether this entry is already saved in the
+             * array. This could come from two cases:
+             *
+             *   - user may configure to get all RDMs in this platform,
+             *   which is already queried before this point
+             *   - or two assigned devices may share one RDM entry
+             *
+             * Different policies may be configured on the same RDM due to
+             * above two cases. But we don't allow to assign such a group
+             * of devices right now so it doesn't come true in our case.
+             */
+            for (j = 0; j < d_config->num_rdms; j++) {
+                if (d_config->rdms[j].start
+                    == pfn_to_paddr(xrdm[n].start_pfn))
+                {
+                    /*
+                     * So the per-device policy always override the
+                     * global policy in this case.
+                     */
+                    d_config->rdms[j].policy
+                        = d_config->pcidevs[i].rdm_policy;
+                    new = false;
+                    break;
+                }
+            }
+
+            if (new)
+                add_rdm_entry(gc, d_config,
+                              pfn_to_paddr(xrdm[n].start_pfn),
+                              pfn_to_paddr(xrdm[n].nr_pages),
+                              d_config->pcidevs[i].rdm_policy);
         }
     }
 
