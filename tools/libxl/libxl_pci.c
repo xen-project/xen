@@ -1567,7 +1567,7 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
         }
     }
 
-    rc = libxl__device_pci_setdefault(gc, domid, pcidev, false);
+    rc = libxl__device_pci_setdefault(gc, domid, pcidev, !starting);
     if (rc) goto out;
 
     if (pcidev->seize && !pciback_dev_is_assigned(gc, pcidev)) {
