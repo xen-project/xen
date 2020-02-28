@@ -66,7 +66,7 @@ static void send_IPI_shortcut(unsigned int shortcut, int vector,
 void send_IPI_mask(const cpumask_t *mask, int vector)
 {
     bool cpus_locked = false;
-    cpumask_t *scratch = this_cpu(scratch_cpumask);
+    cpumask_t *scratch = this_cpu(send_ipi_cpumask);
 
     if ( in_irq() || in_mce_handler() || in_nmi_handler() )
     {

@@ -22,6 +22,7 @@
 DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 DECLARE_PER_CPU(cpumask_var_t, scratch_cpumask);
+DECLARE_PER_CPU(cpumask_var_t, send_ipi_cpumask);
 
 /*
  * Do we, for platform reasons, need to actually keep CPUs online when we

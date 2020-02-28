@@ -57,6 +57,9 @@ DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, scratch_cpumask);
 static cpumask_t scratch_cpu0mask;
 
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, send_ipi_cpumask);
+static cpumask_t send_ipi_cpu0mask;
+
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
 
@@ -930,6 +933,8 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
         FREE_CPUMASK_VAR(per_cpu(cpu_core_mask, cpu));
         if ( per_cpu(scratch_cpumask, cpu) != &scratch_cpu0mask )
             FREE_CPUMASK_VAR(per_cpu(scratch_cpumask, cpu));
+        if ( per_cpu(send_ipi_cpumask, cpu) != &send_ipi_cpu0mask )
+            FREE_CPUMASK_VAR(per_cpu(send_ipi_cpumask, cpu));
     }
 
     cleanup_cpu_root_pgt(cpu);
@@ -1034,7 +1039,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
 
     if ( !(cond_zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
            cond_zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) &&
-           cond_alloc_cpumask_var(&per_cpu(scratch_cpumask, cpu))) )
+           cond_alloc_cpumask_var(&per_cpu(scratch_cpumask, cpu)) &&
+           cond_alloc_cpumask_var(&per_cpu(send_ipi_cpumask, cpu))) )
         goto out;
 
     rc = 0;
@@ -1175,6 +1181,7 @@ void __init smp_prepare_boot_cpu(void)
     cpumask_set_cpu(cpu, &cpu_present_map);
 #if NR_CPUS > 2 * BITS_PER_LONG
     per_cpu(scratch_cpumask, cpu) = &scratch_cpu0mask;
+    per_cpu(send_ipi_cpumask, cpu) = &send_ipi_cpu0mask;
 #endif
 
     get_cpu_info()->use_pv_cr3 = false;
