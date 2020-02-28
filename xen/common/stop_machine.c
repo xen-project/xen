@@ -67,6 +67,12 @@ static void stopmachine_wait_state(void)
         cpu_relax();
 }
 
+/*
+ * Sync all processors and call a function on one or all of them.
+ * As stop_machine_run() is using a tasklet for syncing the processors it is
+ * mandatory to be called only on an idle vcpu, as otherwise active core
+ * scheduling might hang.
+ */
 int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 {
     unsigned int i, nr_cpus;
@@ -74,6 +80,7 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     int ret;
 
     BUG_ON(!local_irq_is_enabled());
+    BUG_ON(!is_idle_vcpu(current));
 
     /* cpu_online_map must not change. */
     if ( !get_cpu_maps() )

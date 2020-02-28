@@ -178,6 +178,10 @@ static int rcu_barrier_action(void *_cpu_count)
     return 0;
 }
 
+/*
+ * As rcu_barrier() is using stop_machine_run() it is allowed to be used in
+ * idle context only (see comment for stop_machine_run()).
+ */
 int rcu_barrier(void)
 {
     atomic_t cpu_count = ATOMIC_INIT(0);
