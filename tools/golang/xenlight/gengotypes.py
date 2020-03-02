@@ -225,6 +225,9 @@ def xenlight_golang_generate_helpers(path = None, types = None, comment = None):
             if not isinstance(ty, idl.Struct):
                 continue
 
+            f.write(xenlight_golang_define_constructor(ty))
+            f.write('\n')
+
             (fdef, extras) = xenlight_golang_define_from_C(ty)
 
             f.write(fdef)
@@ -616,6 +619,75 @@ def xenlight_golang_array_to_C(ty = None):
     s += 'if err := v.toC(&c{}[i]); err != nil {{\n'.format(goname)
     s += 'return fmt.Errorf("converting field {}: %v", err) \n'.format(goname)
     s += '}\n}\n}\n'
+
+    return s
+
+def xenlight_golang_define_constructor(ty = None):
+    s = ''
+
+    ctypename  = ty.typename
+    gotypename = xenlight_golang_fmt_name(ctypename)
+
+    # Since this func is exported, add a comment as per Go conventions.
+    s += '// New{} returns an instance of {}'.format(gotypename,gotypename)
+    s += ' initialized with defaults.\n'
+
+    # If a struct has a keyed union, an extra argument is
+    # required in the function signature, and an extra _init
+    # call is needed.
+    params   = []
+    init_fns = []
+
+    # Add call to parent init_fn first.
+    init_fns.append('C.{}(&xc)'.format(ty.init_fn))
+
+    for f in ty.fields:
+        if not isinstance(f.type, idl.KeyedUnion):
+            continue
+
+        param = f.type.keyvar
+
+        param_ctype  = param.type.typename
+        param_gotype = xenlight_golang_fmt_name(param_ctype)
+        param_goname = xenlight_golang_fmt_name(param.name,exported=False)
+
+        # Serveral keyed unions use 'type' as the key variable name. In
+        # that case, prepend the first letter of the Go type name.
+        if param_goname == 'type':
+            param_goname = '{}type'.format(param_gotype.lower()[0])
+
+        # Add call to keyed union's init_fn.
+        init_fns.append('C.{}_{}(&xc, C.{}({}))'.format(ty.init_fn,
+                                                        param.name,
+                                                        param_ctype,
+                                                        param_goname))
+
+        # Add to params list.
+        params.append('{} {}'.format(param_goname, param_gotype))
+
+    # Define function
+    s += 'func New{}({}) (*{}, error) {{\n'.format(gotypename,
+                                                   ','.join(params),
+                                                   gotypename)
+
+    # Declare variables.
+    s += 'var (\nx {}\nxc C.{})\n\n'.format(gotypename, ctypename)
+
+    # Write init_fn calls.
+    s += '\n'.join(init_fns)
+    s += '\n'
+
+    # Make sure dispose_fn get's called when constructor
+    # returns.
+    if ty.dispose_fn is not None:
+        s += 'defer C.{}(&xc)\n'.format(ty.dispose_fn)
+
+    s += '\n'
+
+    # Call fromC to initialize Go type.
+    s += 'if err := x.fromC(&xc); err != nil {\n'
+    s += 'return nil, err }\n\n'
+    s += 'return &x, nil}\n'
 
     return s
 

@@ -403,6 +403,7 @@ type DomainCreateInfo struct {
 	Ssidref           uint32
 	SsidLabel         string
 	Name              string
+	Domid             Domid
 	Uuid              Uuid
 	Xsdata            KeyValueList
 	Platformdata      KeyValueList

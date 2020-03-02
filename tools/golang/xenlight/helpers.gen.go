@@ -30,6 +30,23 @@ typedef typeof(((struct libxl_psr_hw_info *)NULL)->u.mba)libxl_psr_hw_info_type_
 */
 import "C"
 
+// NewIoportRange returns an instance of IoportRange initialized with defaults.
+func NewIoportRange() (*IoportRange, error) {
+	var (
+		x  IoportRange
+		xc C.libxl_ioport_range
+	)
+
+	C.libxl_ioport_range_init(&xc)
+	defer C.libxl_ioport_range_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *IoportRange) fromC(xc *C.libxl_ioport_range) error {
 	x.First = uint32(xc.first)
 	x.Number = uint32(xc.number)
@@ -48,6 +65,23 @@ func (x *IoportRange) toC(xc *C.libxl_ioport_range) (err error) {
 	xc.number = C.uint32_t(x.Number)
 
 	return nil
+}
+
+// NewIomemRange returns an instance of IomemRange initialized with defaults.
+func NewIomemRange() (*IomemRange, error) {
+	var (
+		x  IomemRange
+		xc C.libxl_iomem_range
+	)
+
+	C.libxl_iomem_range_init(&xc)
+	defer C.libxl_iomem_range_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *IomemRange) fromC(xc *C.libxl_iomem_range) error {
@@ -72,6 +106,23 @@ func (x *IomemRange) toC(xc *C.libxl_iomem_range) (err error) {
 	return nil
 }
 
+// NewVgaInterfaceInfo returns an instance of VgaInterfaceInfo initialized with defaults.
+func NewVgaInterfaceInfo() (*VgaInterfaceInfo, error) {
+	var (
+		x  VgaInterfaceInfo
+		xc C.libxl_vga_interface_info
+	)
+
+	C.libxl_vga_interface_info_init(&xc)
+	defer C.libxl_vga_interface_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *VgaInterfaceInfo) fromC(xc *C.libxl_vga_interface_info) error {
 	x.Kind = VgaInterfaceType(xc.kind)
 
@@ -88,6 +139,23 @@ func (x *VgaInterfaceInfo) toC(xc *C.libxl_vga_interface_info) (err error) {
 	xc.kind = C.libxl_vga_interface_type(x.Kind)
 
 	return nil
+}
+
+// NewVncInfo returns an instance of VncInfo initialized with defaults.
+func NewVncInfo() (*VncInfo, error) {
+	var (
+		x  VncInfo
+		xc C.libxl_vnc_info
+	)
+
+	C.libxl_vnc_info_init(&xc)
+	defer C.libxl_vnc_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *VncInfo) fromC(xc *C.libxl_vnc_info) error {
@@ -126,6 +194,23 @@ func (x *VncInfo) toC(xc *C.libxl_vnc_info) (err error) {
 	}
 
 	return nil
+}
+
+// NewSpiceInfo returns an instance of SpiceInfo initialized with defaults.
+func NewSpiceInfo() (*SpiceInfo, error) {
+	var (
+		x  SpiceInfo
+		xc C.libxl_spice_info
+	)
+
+	C.libxl_spice_info_init(&xc)
+	defer C.libxl_spice_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *SpiceInfo) fromC(xc *C.libxl_spice_info) error {
@@ -196,6 +281,23 @@ func (x *SpiceInfo) toC(xc *C.libxl_spice_info) (err error) {
 	return nil
 }
 
+// NewSdlInfo returns an instance of SdlInfo initialized with defaults.
+func NewSdlInfo() (*SdlInfo, error) {
+	var (
+		x  SdlInfo
+		xc C.libxl_sdl_info
+	)
+
+	C.libxl_sdl_info_init(&xc)
+	defer C.libxl_sdl_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *SdlInfo) fromC(xc *C.libxl_sdl_info) error {
 	if err := x.Enable.fromC(&xc.enable); err != nil {
 		return fmt.Errorf("converting field Enable: %v", err)
@@ -230,6 +332,23 @@ func (x *SdlInfo) toC(xc *C.libxl_sdl_info) (err error) {
 	}
 
 	return nil
+}
+
+// NewDominfo returns an instance of Dominfo initialized with defaults.
+func NewDominfo() (*Dominfo, error) {
+	var (
+		x  Dominfo
+		xc C.libxl_dominfo
+	)
+
+	C.libxl_dominfo_init(&xc)
+	defer C.libxl_dominfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Dominfo) fromC(xc *C.libxl_dominfo) error {
@@ -296,6 +415,23 @@ func (x *Dominfo) toC(xc *C.libxl_dominfo) (err error) {
 	return nil
 }
 
+// NewCpupoolinfo returns an instance of Cpupoolinfo initialized with defaults.
+func NewCpupoolinfo() (*Cpupoolinfo, error) {
+	var (
+		x  Cpupoolinfo
+		xc C.libxl_cpupoolinfo
+	)
+
+	C.libxl_cpupoolinfo_init(&xc)
+	defer C.libxl_cpupoolinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Cpupoolinfo) fromC(xc *C.libxl_cpupoolinfo) error {
 	x.Poolid = uint32(xc.poolid)
 	x.PoolName = C.GoString(xc.pool_name)
@@ -326,6 +462,24 @@ func (x *Cpupoolinfo) toC(xc *C.libxl_cpupoolinfo) (err error) {
 	}
 
 	return nil
+}
+
+// NewChannelinfo returns an instance of Channelinfo initialized with defaults.
+func NewChannelinfo(connection ChannelConnection) (*Channelinfo, error) {
+	var (
+		x  Channelinfo
+		xc C.libxl_channelinfo
+	)
+
+	C.libxl_channelinfo_init(&xc)
+	C.libxl_channelinfo_init_connection(&xc, C.libxl_channel_connection(connection))
+	defer C.libxl_channelinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Channelinfo) fromC(xc *C.libxl_channelinfo) error {
@@ -401,6 +555,23 @@ func (x *Channelinfo) toC(xc *C.libxl_channelinfo) (err error) {
 	return nil
 }
 
+// NewVminfo returns an instance of Vminfo initialized with defaults.
+func NewVminfo() (*Vminfo, error) {
+	var (
+		x  Vminfo
+		xc C.libxl_vminfo
+	)
+
+	C.libxl_vminfo_init(&xc)
+	defer C.libxl_vminfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Vminfo) fromC(xc *C.libxl_vminfo) error {
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
 		return fmt.Errorf("converting field Uuid: %v", err)
@@ -423,6 +594,23 @@ func (x *Vminfo) toC(xc *C.libxl_vminfo) (err error) {
 	xc.domid = C.libxl_domid(x.Domid)
 
 	return nil
+}
+
+// NewVersionInfo returns an instance of VersionInfo initialized with defaults.
+func NewVersionInfo() (*VersionInfo, error) {
+	var (
+		x  VersionInfo
+		xc C.libxl_version_info
+	)
+
+	C.libxl_version_info_init(&xc)
+	defer C.libxl_version_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *VersionInfo) fromC(xc *C.libxl_version_info) error {
@@ -485,6 +673,23 @@ func (x *VersionInfo) toC(xc *C.libxl_version_info) (err error) {
 	return nil
 }
 
+// NewDomainCreateInfo returns an instance of DomainCreateInfo initialized with defaults.
+func NewDomainCreateInfo() (*DomainCreateInfo, error) {
+	var (
+		x  DomainCreateInfo
+		xc C.libxl_domain_create_info
+	)
+
+	C.libxl_domain_create_info_init(&xc)
+	defer C.libxl_domain_create_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *DomainCreateInfo) fromC(xc *C.libxl_domain_create_info) error {
 	x.Type = DomainType(xc._type)
 	if err := x.Hap.fromC(&xc.hap); err != nil {
@@ -496,6 +701,7 @@ func (x *DomainCreateInfo) fromC(xc *C.libxl_domain_create_info) error {
 	x.Ssidref = uint32(xc.ssidref)
 	x.SsidLabel = C.GoString(xc.ssid_label)
 	x.Name = C.GoString(xc.name)
+	x.Domid = Domid(xc.domid)
 	if err := x.Uuid.fromC(&xc.uuid); err != nil {
 		return fmt.Errorf("converting field Uuid: %v", err)
 	}
@@ -539,6 +745,7 @@ func (x *DomainCreateInfo) toC(xc *C.libxl_domain_create_info) (err error) {
 	if x.Name != "" {
 		xc.name = C.CString(x.Name)
 	}
+	xc.domid = C.libxl_domid(x.Domid)
 	if err := x.Uuid.toC(&xc.uuid); err != nil {
 		return fmt.Errorf("converting field Uuid: %v", err)
 	}
@@ -561,6 +768,23 @@ func (x *DomainCreateInfo) toC(xc *C.libxl_domain_create_info) (err error) {
 	xc.passthrough = C.libxl_passthrough(x.Passthrough)
 
 	return nil
+}
+
+// NewDomainRestoreParams returns an instance of DomainRestoreParams initialized with defaults.
+func NewDomainRestoreParams() (*DomainRestoreParams, error) {
+	var (
+		x  DomainRestoreParams
+		xc C.libxl_domain_restore_params
+	)
+
+	C.libxl_domain_restore_params_init(&xc)
+	defer C.libxl_domain_restore_params_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DomainRestoreParams) fromC(xc *C.libxl_domain_restore_params) error {
@@ -593,6 +817,23 @@ func (x *DomainRestoreParams) toC(xc *C.libxl_domain_restore_params) (err error)
 	return nil
 }
 
+// NewSchedParams returns an instance of SchedParams initialized with defaults.
+func NewSchedParams() (*SchedParams, error) {
+	var (
+		x  SchedParams
+		xc C.libxl_sched_params
+	)
+
+	C.libxl_sched_params_init(&xc)
+	defer C.libxl_sched_params_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *SchedParams) fromC(xc *C.libxl_sched_params) error {
 	x.Vcpuid = int(xc.vcpuid)
 	x.Weight = int(xc.weight)
@@ -619,6 +860,23 @@ func (x *SchedParams) toC(xc *C.libxl_sched_params) (err error) {
 	xc.budget = C.int(x.Budget)
 
 	return nil
+}
+
+// NewVcpuSchedParams returns an instance of VcpuSchedParams initialized with defaults.
+func NewVcpuSchedParams() (*VcpuSchedParams, error) {
+	var (
+		x  VcpuSchedParams
+		xc C.libxl_vcpu_sched_params
+	)
+
+	C.libxl_vcpu_sched_params_init(&xc)
+	defer C.libxl_vcpu_sched_params_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *VcpuSchedParams) fromC(xc *C.libxl_vcpu_sched_params) error {
@@ -657,6 +915,23 @@ func (x *VcpuSchedParams) toC(xc *C.libxl_vcpu_sched_params) (err error) {
 	return nil
 }
 
+// NewDomainSchedParams returns an instance of DomainSchedParams initialized with defaults.
+func NewDomainSchedParams() (*DomainSchedParams, error) {
+	var (
+		x  DomainSchedParams
+		xc C.libxl_domain_sched_params
+	)
+
+	C.libxl_domain_sched_params_init(&xc)
+	defer C.libxl_domain_sched_params_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *DomainSchedParams) fromC(xc *C.libxl_domain_sched_params) error {
 	x.Sched = Scheduler(xc.sched)
 	x.Weight = int(xc.weight)
@@ -687,6 +962,23 @@ func (x *DomainSchedParams) toC(xc *C.libxl_domain_sched_params) (err error) {
 	xc.latency = C.int(x.Latency)
 
 	return nil
+}
+
+// NewVnodeInfo returns an instance of VnodeInfo initialized with defaults.
+func NewVnodeInfo() (*VnodeInfo, error) {
+	var (
+		x  VnodeInfo
+		xc C.libxl_vnode_info
+	)
+
+	C.libxl_vnode_info_init(&xc)
+	defer C.libxl_vnode_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *VnodeInfo) fromC(xc *C.libxl_vnode_info) error {
@@ -729,6 +1021,23 @@ func (x *VnodeInfo) toC(xc *C.libxl_vnode_info) (err error) {
 	return nil
 }
 
+// NewRdmReserve returns an instance of RdmReserve initialized with defaults.
+func NewRdmReserve() (*RdmReserve, error) {
+	var (
+		x  RdmReserve
+		xc C.libxl_rdm_reserve
+	)
+
+	C.libxl_rdm_reserve_init(&xc)
+	defer C.libxl_rdm_reserve_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *RdmReserve) fromC(xc *C.libxl_rdm_reserve) error {
 	x.Strategy = RdmReserveStrategy(xc.strategy)
 	x.Policy = RdmReservePolicy(xc.policy)
@@ -747,6 +1056,24 @@ func (x *RdmReserve) toC(xc *C.libxl_rdm_reserve) (err error) {
 	xc.policy = C.libxl_rdm_reserve_policy(x.Policy)
 
 	return nil
+}
+
+// NewDomainBuildInfo returns an instance of DomainBuildInfo initialized with defaults.
+func NewDomainBuildInfo(dtype DomainType) (*DomainBuildInfo, error) {
+	var (
+		x  DomainBuildInfo
+		xc C.libxl_domain_build_info
+	)
+
+	C.libxl_domain_build_info_init(&xc)
+	C.libxl_domain_build_info_init_type(&xc, C.libxl_domain_type(dtype))
+	defer C.libxl_domain_build_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
@@ -1406,6 +1733,23 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 	return nil
 }
 
+// NewDeviceVfb returns an instance of DeviceVfb initialized with defaults.
+func NewDeviceVfb() (*DeviceVfb, error) {
+	var (
+		x  DeviceVfb
+		xc C.libxl_device_vfb
+	)
+
+	C.libxl_device_vfb_init(&xc)
+	defer C.libxl_device_vfb_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *DeviceVfb) fromC(xc *C.libxl_device_vfb) error {
 	x.BackendDomid = Domid(xc.backend_domid)
 	x.BackendDomname = C.GoString(xc.backend_domname)
@@ -1444,6 +1788,23 @@ func (x *DeviceVfb) toC(xc *C.libxl_device_vfb) (err error) {
 	}
 
 	return nil
+}
+
+// NewDeviceVkb returns an instance of DeviceVkb initialized with defaults.
+func NewDeviceVkb() (*DeviceVkb, error) {
+	var (
+		x  DeviceVkb
+		xc C.libxl_device_vkb
+	)
+
+	C.libxl_device_vkb_init(&xc)
+	defer C.libxl_device_vkb_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceVkb) fromC(xc *C.libxl_device_vkb) error {
@@ -1494,6 +1855,23 @@ func (x *DeviceVkb) toC(xc *C.libxl_device_vkb) (err error) {
 	xc.multi_touch_num_contacts = C.uint32_t(x.MultiTouchNumContacts)
 
 	return nil
+}
+
+// NewDeviceDisk returns an instance of DeviceDisk initialized with defaults.
+func NewDeviceDisk() (*DeviceDisk, error) {
+	var (
+		x  DeviceDisk
+		xc C.libxl_device_disk
+	)
+
+	C.libxl_device_disk_init(&xc)
+	defer C.libxl_device_disk_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceDisk) fromC(xc *C.libxl_device_disk) error {
@@ -1576,6 +1954,23 @@ func (x *DeviceDisk) toC(xc *C.libxl_device_disk) (err error) {
 	}
 
 	return nil
+}
+
+// NewDeviceNic returns an instance of DeviceNic initialized with defaults.
+func NewDeviceNic() (*DeviceNic, error) {
+	var (
+		x  DeviceNic
+		xc C.libxl_device_nic
+	)
+
+	C.libxl_device_nic_init(&xc)
+	defer C.libxl_device_nic_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceNic) fromC(xc *C.libxl_device_nic) error {
@@ -1836,6 +2231,23 @@ func (x *DeviceNic) toC(xc *C.libxl_device_nic) (err error) {
 	return nil
 }
 
+// NewDevicePci returns an instance of DevicePci initialized with defaults.
+func NewDevicePci() (*DevicePci, error) {
+	var (
+		x  DevicePci
+		xc C.libxl_device_pci
+	)
+
+	C.libxl_device_pci_init(&xc)
+	defer C.libxl_device_pci_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *DevicePci) fromC(xc *C.libxl_device_pci) error {
 	x.Func = byte(xc._func)
 	x.Dev = byte(xc.dev)
@@ -1874,6 +2286,23 @@ func (x *DevicePci) toC(xc *C.libxl_device_pci) (err error) {
 	return nil
 }
 
+// NewDeviceRdm returns an instance of DeviceRdm initialized with defaults.
+func NewDeviceRdm() (*DeviceRdm, error) {
+	var (
+		x  DeviceRdm
+		xc C.libxl_device_rdm
+	)
+
+	C.libxl_device_rdm_init(&xc)
+	defer C.libxl_device_rdm_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *DeviceRdm) fromC(xc *C.libxl_device_rdm) error {
 	x.Start = uint64(xc.start)
 	x.Size = uint64(xc.size)
@@ -1894,6 +2323,23 @@ func (x *DeviceRdm) toC(xc *C.libxl_device_rdm) (err error) {
 	xc.policy = C.libxl_rdm_reserve_policy(x.Policy)
 
 	return nil
+}
+
+// NewDeviceUsbctrl returns an instance of DeviceUsbctrl initialized with defaults.
+func NewDeviceUsbctrl() (*DeviceUsbctrl, error) {
+	var (
+		x  DeviceUsbctrl
+		xc C.libxl_device_usbctrl
+	)
+
+	C.libxl_device_usbctrl_init(&xc)
+	defer C.libxl_device_usbctrl_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceUsbctrl) fromC(xc *C.libxl_device_usbctrl) error {
@@ -1924,6 +2370,24 @@ func (x *DeviceUsbctrl) toC(xc *C.libxl_device_usbctrl) (err error) {
 	}
 
 	return nil
+}
+
+// NewDeviceUsbdev returns an instance of DeviceUsbdev initialized with defaults.
+func NewDeviceUsbdev(utype UsbdevType) (*DeviceUsbdev, error) {
+	var (
+		x  DeviceUsbdev
+		xc C.libxl_device_usbdev
+	)
+
+	C.libxl_device_usbdev_init(&xc)
+	C.libxl_device_usbdev_init_type(&xc, C.libxl_usbdev_type(utype))
+	defer C.libxl_device_usbdev_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceUsbdev) fromC(xc *C.libxl_device_usbdev) error {
@@ -1983,6 +2447,23 @@ func (x *DeviceUsbdev) toC(xc *C.libxl_device_usbdev) (err error) {
 	return nil
 }
 
+// NewDeviceDtdev returns an instance of DeviceDtdev initialized with defaults.
+func NewDeviceDtdev() (*DeviceDtdev, error) {
+	var (
+		x  DeviceDtdev
+		xc C.libxl_device_dtdev
+	)
+
+	C.libxl_device_dtdev_init(&xc)
+	defer C.libxl_device_dtdev_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *DeviceDtdev) fromC(xc *C.libxl_device_dtdev) error {
 	x.Path = C.GoString(xc.path)
 
@@ -2001,6 +2482,23 @@ func (x *DeviceDtdev) toC(xc *C.libxl_device_dtdev) (err error) {
 	}
 
 	return nil
+}
+
+// NewDeviceVtpm returns an instance of DeviceVtpm initialized with defaults.
+func NewDeviceVtpm() (*DeviceVtpm, error) {
+	var (
+		x  DeviceVtpm
+		xc C.libxl_device_vtpm
+	)
+
+	C.libxl_device_vtpm_init(&xc)
+	defer C.libxl_device_vtpm_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceVtpm) fromC(xc *C.libxl_device_vtpm) error {
@@ -2031,6 +2529,23 @@ func (x *DeviceVtpm) toC(xc *C.libxl_device_vtpm) (err error) {
 	}
 
 	return nil
+}
+
+// NewDeviceP9 returns an instance of DeviceP9 initialized with defaults.
+func NewDeviceP9() (*DeviceP9, error) {
+	var (
+		x  DeviceP9
+		xc C.libxl_device_p9
+	)
+
+	C.libxl_device_p9_init(&xc)
+	defer C.libxl_device_p9_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceP9) fromC(xc *C.libxl_device_p9) error {
@@ -2069,6 +2584,23 @@ func (x *DeviceP9) toC(xc *C.libxl_device_p9) (err error) {
 	return nil
 }
 
+// NewDevicePvcallsif returns an instance of DevicePvcallsif initialized with defaults.
+func NewDevicePvcallsif() (*DevicePvcallsif, error) {
+	var (
+		x  DevicePvcallsif
+		xc C.libxl_device_pvcallsif
+	)
+
+	C.libxl_device_pvcallsif_init(&xc)
+	defer C.libxl_device_pvcallsif_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *DevicePvcallsif) fromC(xc *C.libxl_device_pvcallsif) error {
 	x.BackendDomid = Domid(xc.backend_domid)
 	x.BackendDomname = C.GoString(xc.backend_domname)
@@ -2091,6 +2623,24 @@ func (x *DevicePvcallsif) toC(xc *C.libxl_device_pvcallsif) (err error) {
 	xc.devid = C.libxl_devid(x.Devid)
 
 	return nil
+}
+
+// NewDeviceChannel returns an instance of DeviceChannel initialized with defaults.
+func NewDeviceChannel(connection ChannelConnection) (*DeviceChannel, error) {
+	var (
+		x  DeviceChannel
+		xc C.libxl_device_channel
+	)
+
+	C.libxl_device_channel_init(&xc)
+	C.libxl_device_channel_init_connection(&xc, C.libxl_channel_connection(connection))
+	defer C.libxl_device_channel_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceChannel) fromC(xc *C.libxl_device_channel) error {
@@ -2158,6 +2708,23 @@ func (x *DeviceChannel) toC(xc *C.libxl_device_channel) (err error) {
 	return nil
 }
 
+// NewConnectorParam returns an instance of ConnectorParam initialized with defaults.
+func NewConnectorParam() (*ConnectorParam, error) {
+	var (
+		x  ConnectorParam
+		xc C.libxl_connector_param
+	)
+
+	C.libxl_connector_param_init(&xc)
+	defer C.libxl_connector_param_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *ConnectorParam) fromC(xc *C.libxl_connector_param) error {
 	x.UniqueId = C.GoString(xc.unique_id)
 	x.Width = uint32(xc.width)
@@ -2180,6 +2747,23 @@ func (x *ConnectorParam) toC(xc *C.libxl_connector_param) (err error) {
 	xc.height = C.uint32_t(x.Height)
 
 	return nil
+}
+
+// NewDeviceVdispl returns an instance of DeviceVdispl initialized with defaults.
+func NewDeviceVdispl() (*DeviceVdispl, error) {
+	var (
+		x  DeviceVdispl
+		xc C.libxl_device_vdispl
+	)
+
+	C.libxl_device_vdispl_init(&xc)
+	defer C.libxl_device_vdispl_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceVdispl) fromC(xc *C.libxl_device_vdispl) error {
@@ -2224,6 +2808,23 @@ func (x *DeviceVdispl) toC(xc *C.libxl_device_vdispl) (err error) {
 	}
 
 	return nil
+}
+
+// NewVsndParams returns an instance of VsndParams initialized with defaults.
+func NewVsndParams() (*VsndParams, error) {
+	var (
+		x  VsndParams
+		xc C.libxl_vsnd_params
+	)
+
+	C.libxl_vsnd_params_init(&xc)
+	defer C.libxl_vsnd_params_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *VsndParams) fromC(xc *C.libxl_vsnd_params) error {
@@ -2276,6 +2877,23 @@ func (x *VsndParams) toC(xc *C.libxl_vsnd_params) (err error) {
 	return nil
 }
 
+// NewVsndStream returns an instance of VsndStream initialized with defaults.
+func NewVsndStream() (*VsndStream, error) {
+	var (
+		x  VsndStream
+		xc C.libxl_vsnd_stream
+	)
+
+	C.libxl_vsnd_stream_init(&xc)
+	defer C.libxl_vsnd_stream_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *VsndStream) fromC(xc *C.libxl_vsnd_stream) error {
 	x.UniqueId = C.GoString(xc.unique_id)
 	x.Type = VsndStreamType(xc._type)
@@ -2302,6 +2920,23 @@ func (x *VsndStream) toC(xc *C.libxl_vsnd_stream) (err error) {
 	}
 
 	return nil
+}
+
+// NewVsndPcm returns an instance of VsndPcm initialized with defaults.
+func NewVsndPcm() (*VsndPcm, error) {
+	var (
+		x  VsndPcm
+		xc C.libxl_vsnd_pcm
+	)
+
+	C.libxl_vsnd_pcm_init(&xc)
+	defer C.libxl_vsnd_pcm_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *VsndPcm) fromC(xc *C.libxl_vsnd_pcm) error {
@@ -2346,6 +2981,23 @@ func (x *VsndPcm) toC(xc *C.libxl_vsnd_pcm) (err error) {
 	}
 
 	return nil
+}
+
+// NewDeviceVsnd returns an instance of DeviceVsnd initialized with defaults.
+func NewDeviceVsnd() (*DeviceVsnd, error) {
+	var (
+		x  DeviceVsnd
+		xc C.libxl_device_vsnd
+	)
+
+	C.libxl_device_vsnd_init(&xc)
+	defer C.libxl_device_vsnd_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DeviceVsnd) fromC(xc *C.libxl_device_vsnd) error {
@@ -2402,6 +3054,23 @@ func (x *DeviceVsnd) toC(xc *C.libxl_device_vsnd) (err error) {
 	}
 
 	return nil
+}
+
+// NewDomainConfig returns an instance of DomainConfig initialized with defaults.
+func NewDomainConfig() (*DomainConfig, error) {
+	var (
+		x  DomainConfig
+		xc C.libxl_domain_config
+	)
+
+	C.libxl_domain_config_init(&xc)
+	defer C.libxl_domain_config_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DomainConfig) fromC(xc *C.libxl_domain_config) error {
@@ -2712,6 +3381,23 @@ func (x *DomainConfig) toC(xc *C.libxl_domain_config) (err error) {
 	return nil
 }
 
+// NewDiskinfo returns an instance of Diskinfo initialized with defaults.
+func NewDiskinfo() (*Diskinfo, error) {
+	var (
+		x  Diskinfo
+		xc C.libxl_diskinfo
+	)
+
+	C.libxl_diskinfo_init(&xc)
+	defer C.libxl_diskinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Diskinfo) fromC(xc *C.libxl_diskinfo) error {
 	x.Backend = C.GoString(xc.backend)
 	x.BackendId = uint32(xc.backend_id)
@@ -2746,6 +3432,23 @@ func (x *Diskinfo) toC(xc *C.libxl_diskinfo) (err error) {
 	xc.rref = C.int(x.Rref)
 
 	return nil
+}
+
+// NewNicinfo returns an instance of Nicinfo initialized with defaults.
+func NewNicinfo() (*Nicinfo, error) {
+	var (
+		x  Nicinfo
+		xc C.libxl_nicinfo
+	)
+
+	C.libxl_nicinfo_init(&xc)
+	defer C.libxl_nicinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Nicinfo) fromC(xc *C.libxl_nicinfo) error {
@@ -2784,6 +3487,23 @@ func (x *Nicinfo) toC(xc *C.libxl_nicinfo) (err error) {
 	xc.rref_rx = C.int(x.RrefRx)
 
 	return nil
+}
+
+// NewVtpminfo returns an instance of Vtpminfo initialized with defaults.
+func NewVtpminfo() (*Vtpminfo, error) {
+	var (
+		x  Vtpminfo
+		xc C.libxl_vtpminfo
+	)
+
+	C.libxl_vtpminfo_init(&xc)
+	defer C.libxl_vtpminfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Vtpminfo) fromC(xc *C.libxl_vtpminfo) error {
@@ -2826,6 +3546,23 @@ func (x *Vtpminfo) toC(xc *C.libxl_vtpminfo) (err error) {
 	}
 
 	return nil
+}
+
+// NewUsbctrlinfo returns an instance of Usbctrlinfo initialized with defaults.
+func NewUsbctrlinfo() (*Usbctrlinfo, error) {
+	var (
+		x  Usbctrlinfo
+		xc C.libxl_usbctrlinfo
+	)
+
+	C.libxl_usbctrlinfo_init(&xc)
+	defer C.libxl_usbctrlinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Usbctrlinfo) fromC(xc *C.libxl_usbctrlinfo) error {
@@ -2872,6 +3609,23 @@ func (x *Usbctrlinfo) toC(xc *C.libxl_usbctrlinfo) (err error) {
 	return nil
 }
 
+// NewVcpuinfo returns an instance of Vcpuinfo initialized with defaults.
+func NewVcpuinfo() (*Vcpuinfo, error) {
+	var (
+		x  Vcpuinfo
+		xc C.libxl_vcpuinfo
+	)
+
+	C.libxl_vcpuinfo_init(&xc)
+	defer C.libxl_vcpuinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Vcpuinfo) fromC(xc *C.libxl_vcpuinfo) error {
 	x.Vcpuid = uint32(xc.vcpuid)
 	x.Cpu = uint32(xc.cpu)
@@ -2910,6 +3664,23 @@ func (x *Vcpuinfo) toC(xc *C.libxl_vcpuinfo) (err error) {
 	}
 
 	return nil
+}
+
+// NewPhysinfo returns an instance of Physinfo initialized with defaults.
+func NewPhysinfo() (*Physinfo, error) {
+	var (
+		x  Physinfo
+		xc C.libxl_physinfo
+	)
+
+	C.libxl_physinfo_init(&xc)
+	defer C.libxl_physinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Physinfo) fromC(xc *C.libxl_physinfo) error {
@@ -2972,6 +3743,23 @@ func (x *Physinfo) toC(xc *C.libxl_physinfo) (err error) {
 	return nil
 }
 
+// NewConnectorinfo returns an instance of Connectorinfo initialized with defaults.
+func NewConnectorinfo() (*Connectorinfo, error) {
+	var (
+		x  Connectorinfo
+		xc C.libxl_connectorinfo
+	)
+
+	C.libxl_connectorinfo_init(&xc)
+	defer C.libxl_connectorinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Connectorinfo) fromC(xc *C.libxl_connectorinfo) error {
 	x.UniqueId = C.GoString(xc.unique_id)
 	x.Width = uint32(xc.width)
@@ -3002,6 +3790,23 @@ func (x *Connectorinfo) toC(xc *C.libxl_connectorinfo) (err error) {
 	xc.evt_rref = C.int(x.EvtRref)
 
 	return nil
+}
+
+// NewVdisplinfo returns an instance of Vdisplinfo initialized with defaults.
+func NewVdisplinfo() (*Vdisplinfo, error) {
+	var (
+		x  Vdisplinfo
+		xc C.libxl_vdisplinfo
+	)
+
+	C.libxl_vdisplinfo_init(&xc)
+	defer C.libxl_vdisplinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Vdisplinfo) fromC(xc *C.libxl_vdisplinfo) error {
@@ -3056,6 +3861,23 @@ func (x *Vdisplinfo) toC(xc *C.libxl_vdisplinfo) (err error) {
 	return nil
 }
 
+// NewStreaminfo returns an instance of Streaminfo initialized with defaults.
+func NewStreaminfo() (*Streaminfo, error) {
+	var (
+		x  Streaminfo
+		xc C.libxl_streaminfo
+	)
+
+	C.libxl_streaminfo_init(&xc)
+	defer C.libxl_streaminfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Streaminfo) fromC(xc *C.libxl_streaminfo) error {
 	x.ReqEvtch = int(xc.req_evtch)
 	x.ReqRref = int(xc.req_rref)
@@ -3074,6 +3896,23 @@ func (x *Streaminfo) toC(xc *C.libxl_streaminfo) (err error) {
 	xc.req_rref = C.int(x.ReqRref)
 
 	return nil
+}
+
+// NewPcminfo returns an instance of Pcminfo initialized with defaults.
+func NewPcminfo() (*Pcminfo, error) {
+	var (
+		x  Pcminfo
+		xc C.libxl_pcminfo
+	)
+
+	C.libxl_pcminfo_init(&xc)
+	defer C.libxl_pcminfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Pcminfo) fromC(xc *C.libxl_pcminfo) error {
@@ -3108,6 +3947,23 @@ func (x *Pcminfo) toC(xc *C.libxl_pcminfo) (err error) {
 	}
 
 	return nil
+}
+
+// NewVsndinfo returns an instance of Vsndinfo initialized with defaults.
+func NewVsndinfo() (*Vsndinfo, error) {
+	var (
+		x  Vsndinfo
+		xc C.libxl_vsndinfo
+	)
+
+	C.libxl_vsndinfo_init(&xc)
+	defer C.libxl_vsndinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Vsndinfo) fromC(xc *C.libxl_vsndinfo) error {
@@ -3160,6 +4016,23 @@ func (x *Vsndinfo) toC(xc *C.libxl_vsndinfo) (err error) {
 	return nil
 }
 
+// NewVkbinfo returns an instance of Vkbinfo initialized with defaults.
+func NewVkbinfo() (*Vkbinfo, error) {
+	var (
+		x  Vkbinfo
+		xc C.libxl_vkbinfo
+	)
+
+	C.libxl_vkbinfo_init(&xc)
+	defer C.libxl_vkbinfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Vkbinfo) fromC(xc *C.libxl_vkbinfo) error {
 	x.Backend = C.GoString(xc.backend)
 	x.BackendId = uint32(xc.backend_id)
@@ -3196,6 +4069,23 @@ func (x *Vkbinfo) toC(xc *C.libxl_vkbinfo) (err error) {
 	return nil
 }
 
+// NewNumainfo returns an instance of Numainfo initialized with defaults.
+func NewNumainfo() (*Numainfo, error) {
+	var (
+		x  Numainfo
+		xc C.libxl_numainfo
+	)
+
+	C.libxl_numainfo_init(&xc)
+	defer C.libxl_numainfo_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Numainfo) fromC(xc *C.libxl_numainfo) error {
 	x.Size = uint64(xc.size)
 	x.Free = uint64(xc.free)
@@ -3230,6 +4120,23 @@ func (x *Numainfo) toC(xc *C.libxl_numainfo) (err error) {
 	return nil
 }
 
+// NewCputopology returns an instance of Cputopology initialized with defaults.
+func NewCputopology() (*Cputopology, error) {
+	var (
+		x  Cputopology
+		xc C.libxl_cputopology
+	)
+
+	C.libxl_cputopology_init(&xc)
+	defer C.libxl_cputopology_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *Cputopology) fromC(xc *C.libxl_cputopology) error {
 	x.Core = uint32(xc.core)
 	x.Socket = uint32(xc.socket)
@@ -3250,6 +4157,23 @@ func (x *Cputopology) toC(xc *C.libxl_cputopology) (err error) {
 	xc.node = C.uint32_t(x.Node)
 
 	return nil
+}
+
+// NewPcitopology returns an instance of Pcitopology initialized with defaults.
+func NewPcitopology() (*Pcitopology, error) {
+	var (
+		x  Pcitopology
+		xc C.libxl_pcitopology
+	)
+
+	C.libxl_pcitopology_init(&xc)
+	defer C.libxl_pcitopology_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Pcitopology) fromC(xc *C.libxl_pcitopology) error {
@@ -3276,6 +4200,22 @@ func (x *Pcitopology) toC(xc *C.libxl_pcitopology) (err error) {
 	return nil
 }
 
+// NewSchedCreditParams returns an instance of SchedCreditParams initialized with defaults.
+func NewSchedCreditParams() (*SchedCreditParams, error) {
+	var (
+		x  SchedCreditParams
+		xc C.libxl_sched_credit_params
+	)
+
+	C.libxl_sched_credit_params_init(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *SchedCreditParams) fromC(xc *C.libxl_sched_credit_params) error {
 	x.TsliceMs = int(xc.tslice_ms)
 	x.RatelimitUs = int(xc.ratelimit_us)
@@ -3292,6 +4232,22 @@ func (x *SchedCreditParams) toC(xc *C.libxl_sched_credit_params) (err error) {
 	return nil
 }
 
+// NewSchedCredit2Params returns an instance of SchedCredit2Params initialized with defaults.
+func NewSchedCredit2Params() (*SchedCredit2Params, error) {
+	var (
+		x  SchedCredit2Params
+		xc C.libxl_sched_credit2_params
+	)
+
+	C.libxl_sched_credit2_params_init(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *SchedCredit2Params) fromC(xc *C.libxl_sched_credit2_params) error {
 	x.RatelimitUs = int(xc.ratelimit_us)
 
@@ -3302,6 +4258,23 @@ func (x *SchedCredit2Params) toC(xc *C.libxl_sched_credit2_params) (err error) {
 	xc.ratelimit_us = C.int(x.RatelimitUs)
 
 	return nil
+}
+
+// NewDomainRemusInfo returns an instance of DomainRemusInfo initialized with defaults.
+func NewDomainRemusInfo() (*DomainRemusInfo, error) {
+	var (
+		x  DomainRemusInfo
+		xc C.libxl_domain_remus_info
+	)
+
+	C.libxl_domain_remus_info_init(&xc)
+	defer C.libxl_domain_remus_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *DomainRemusInfo) fromC(xc *C.libxl_domain_remus_info) error {
@@ -3366,6 +4339,24 @@ func (x *DomainRemusInfo) toC(xc *C.libxl_domain_remus_info) (err error) {
 	}
 
 	return nil
+}
+
+// NewEvent returns an instance of Event initialized with defaults.
+func NewEvent(etype EventType) (*Event, error) {
+	var (
+		x  Event
+		xc C.libxl_event
+	)
+
+	C.libxl_event_init(&xc)
+	C.libxl_event_init_type(&xc, C.libxl_event_type(etype))
+	defer C.libxl_event_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *Event) fromC(xc *C.libxl_event) error {
@@ -3493,6 +4484,23 @@ func (x *Event) toC(xc *C.libxl_event) (err error) {
 	return nil
 }
 
+// NewPsrCatInfo returns an instance of PsrCatInfo initialized with defaults.
+func NewPsrCatInfo() (*PsrCatInfo, error) {
+	var (
+		x  PsrCatInfo
+		xc C.libxl_psr_cat_info
+	)
+
+	C.libxl_psr_cat_info_init(&xc)
+	defer C.libxl_psr_cat_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
+}
+
 func (x *PsrCatInfo) fromC(xc *C.libxl_psr_cat_info) error {
 	x.Id = uint32(xc.id)
 	x.CosMax = uint32(xc.cos_max)
@@ -3515,6 +4523,24 @@ func (x *PsrCatInfo) toC(xc *C.libxl_psr_cat_info) (err error) {
 	xc.cdp_enabled = C.bool(x.CdpEnabled)
 
 	return nil
+}
+
+// NewPsrHwInfo returns an instance of PsrHwInfo initialized with defaults.
+func NewPsrHwInfo(ptype PsrFeatType) (*PsrHwInfo, error) {
+	var (
+		x  PsrHwInfo
+		xc C.libxl_psr_hw_info
+	)
+
+	C.libxl_psr_hw_info_init(&xc)
+	C.libxl_psr_hw_info_init_type(&xc, C.libxl_psr_feat_type(ptype))
+	defer C.libxl_psr_hw_info_dispose(&xc)
+
+	if err := x.fromC(&xc); err != nil {
+		return nil, err
+	}
+
+	return &x, nil
 }
 
 func (x *PsrHwInfo) fromC(xc *C.libxl_psr_hw_info) error {
