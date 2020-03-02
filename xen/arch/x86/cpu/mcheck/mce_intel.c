@@ -885,7 +885,7 @@ static void intel_init_ppin(const struct cpuinfo_x86 *c)
             rdmsr_safe(MSR_PPIN_CTL, val);
         }
 
-        if ( (val & (PPIN_ENABLE | PPIN_LOCKOUT)) != PPIN_ENABLE )
+        if ( !(val & PPIN_ENABLE) )
             ppin_msr = 0;
         else if ( c == &boot_cpu_data )
             ppin_msr = MSR_PPIN;

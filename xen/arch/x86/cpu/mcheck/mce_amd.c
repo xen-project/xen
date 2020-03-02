@@ -329,7 +329,7 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
             rdmsrl(MSR_AMD_PPIN_CTL, val);
         }
 
-        if ( (val & (PPIN_ENABLE | PPIN_LOCKOUT)) != PPIN_ENABLE )
+        if ( !(val & PPIN_ENABLE) )
             ppin_msr = 0;
         else if ( ci == &boot_cpu_data )
             ppin_msr = MSR_AMD_PPIN;
