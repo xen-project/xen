@@ -1798,6 +1798,13 @@ int xc_cpuid_set(xc_interface *xch,
                  const unsigned int *input,
                  const char **config,
                  char **config_transformed);
+
+/*
+ * Make adjustments to the CPUID settings for a domain.
+ *
+ * Either pass a full new @featureset (and @nr_features), or adjust individual
+ * features (@pae).
+ */
 int xc_cpuid_apply_policy(xc_interface *xch,
                           uint32_t domid,
                           const uint32_t *featureset,

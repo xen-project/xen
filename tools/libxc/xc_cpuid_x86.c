@@ -532,6 +532,11 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
 
         cpuid_featureset_to_policy(feat, p);
     }
+    else
+    {
+        if ( di.hvm )
+            p->basic.pae = pae;
+    }
 
     if ( !di.hvm )
     {
@@ -614,8 +619,6 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
             }
             break;
         }
-
-        p->basic.pae = pae;
 
         /*
          * These settings are necessary to cause earlier HVM_PARAM_NESTEDHVM /
