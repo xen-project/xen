@@ -324,7 +324,7 @@ static void __init e820_fixup(struct e820map *e820)
         pv_shim_fixup_e820(e820);
 }
 
-static const struct hypervisor_ops ops = {
+static const struct hypervisor_ops __initconstrel ops = {
     .name = "Xen",
     .setup = setup,
     .ap_setup = ap_setup,

@@ -24,52 +24,53 @@
 #include <asm/cache.h>
 #include <asm/guest.h>
 
-static const struct hypervisor_ops *__read_mostly ops;
+static struct hypervisor_ops __read_mostly ops;
 
 const char *__init hypervisor_probe(void)
 {
+    const struct hypervisor_ops *fns;
+
     if ( !cpu_has_hypervisor )
         return NULL;
 
-    ops = xg_probe();
-    if ( ops )
-        return ops->name;
+    fns = xg_probe();
+    if ( !fns )
+        /*
+         * Detection of Hyper-V must come after Xen to avoid false positive due
+         * to viridian support
+         */
+        fns = hyperv_probe();
 
-    /*
-     * Detection of Hyper-V must come after Xen to avoid false positive due
-     * to viridian support
-     */
-    ops = hyperv_probe();
-    if ( ops )
-        return ops->name;
+    if ( fns )
+        ops = *fns;
 
-    return NULL;
+    return ops.name;
 }
 
 void __init hypervisor_setup(void)
 {
-    if ( ops && ops->setup )
-        ops->setup();
+    if ( ops.setup )
+        ops.setup();
 }
 
 int hypervisor_ap_setup(void)
 {
-    if ( ops && ops->ap_setup )
-        return ops->ap_setup();
+    if ( ops.ap_setup )
+        return ops.ap_setup();
 
     return 0;
 }
 
 void hypervisor_resume(void)
 {
-    if ( ops && ops->resume )
-        ops->resume();
+    if ( ops.resume )
+        ops.resume();
 }
 
 void __init hypervisor_e820_fixup(struct e820map *e820)
 {
-    if ( ops && ops->e820_fixup )
-        ops->e820_fixup(e820);
+    if ( ops.e820_fixup )
+        ops.e820_fixup(e820);
 }
 
 /*

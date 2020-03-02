@@ -199,7 +199,7 @@ static void __init e820_fixup(struct e820map *e820)
         panic("Unable to reserve Hyper-V hypercall range\n");
 }
 
-static const struct hypervisor_ops ops = {
+static const struct hypervisor_ops __initconstrel ops = {
     .name = "Hyper-V",
     .setup = setup,
     .ap_setup = ap_setup,
