@@ -16,8 +16,8 @@
 
 #include "libxl_internal.h"
 
-static int libxl__console_tty_path(libxl__gc *gc, uint32_t domid, int cons_num,
-                                   libxl_console_type type, char **tty_path)
+int libxl__console_tty_path(libxl__gc *gc, uint32_t domid, int cons_num,
+                            libxl_console_type type, char **tty_path)
 {
     int rc;
     char *dom_path;

@@ -1517,6 +1517,8 @@ _hidden char *libxl__domain_device_libxl_path(libxl__gc *gc, uint32_t domid, uin
                                               libxl__device_kind device_kind);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
+_hidden int libxl__console_tty_path(libxl__gc *gc, uint32_t domid, int cons_num,
+                                    libxl_console_type type, char **tty_path);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, const char *be_path,
                                     const char *state);
@@ -4182,6 +4184,7 @@ struct libxl__domain_create_state {
     /* necessary if the domain creation failed and we have to destroy it */
     libxl__domain_destroy_state dds;
     libxl__multidev multidev;
+    libxl__xswait_state console_xswait;
 };
 
 _hidden int libxl__device_nic_set_devids(libxl__gc *gc,

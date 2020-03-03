@@ -912,6 +912,8 @@ static void domcreate_devmodel_started(libxl__egc *egc,
 static void domcreate_attach_devices(libxl__egc *egc,
                                      libxl__multidev *multidev,
                                      int ret);
+static void console_xswait_callback(libxl__egc *egc, libxl__xswait_state *xswa,
+                                    int rc, const char *p);
 
 /* Our own function to clean up and call the user's callback.
  * The final call in the sequence. */
@@ -1216,6 +1218,8 @@ static void initiate_domain_create(libxl__egc *egc,
     ret = libxl__device_nic_set_devids(gc, d_config, domid);
     if (ret)
         goto error_out;
+
+    libxl__xswait_init(&dcs->console_xswait);
 
     if (restore_fd >= 0 || dcs->soft_reset) {
         LOGD(DEBUG, domid, "restoring, not running bootloader");
@@ -1771,6 +1775,7 @@ static void domcreate_attach_devices(libxl__egc *egc,
     int domid = dcs->guest_domid;
     libxl_domain_config *const d_config = dcs->guest_config;
     const libxl__device_type *dt;
+    char *tty_path;
 
     if (ret) {
         LOGD(ERROR, domid, "unable to add %s devices",
@@ -1794,15 +1799,54 @@ static void domcreate_attach_devices(libxl__egc *egc,
         return;
     }
 
-    domcreate_console_available(egc, dcs);
+    ret = libxl__console_tty_path(gc, domid, 0, LIBXL_CONSOLE_TYPE_PV, &tty_path);
+    if (ret) {
+        LOG(ERROR, "failed to get domain %d console tty path",
+            domid);
+        goto error_out;
+    }
 
-    domcreate_complete(egc, dcs, 0);
+    dcs->console_xswait.ao = ao;
+    dcs->console_xswait.what = GCSPRINTF("domain %d console tty", domid);
+    dcs->console_xswait.path = tty_path;
+    dcs->console_xswait.timeout_ms = LIBXL_INIT_TIMEOUT * 1000;
+    dcs->console_xswait.callback = console_xswait_callback;
+    ret = libxl__xswait_start(gc, &dcs->console_xswait);
+    if (ret) {
+        LOG(ERROR, "unable to set up watch for domain %d console tty path",
+            domid);
+        goto error_out;
+    }
 
     return;
 
 error_out:
     assert(ret);
     domcreate_complete(egc, dcs, ret);
+}
+
+static void console_xswait_callback(libxl__egc *egc, libxl__xswait_state *xswa,
+                                    int rc, const char *p)
+{
+    EGC_GC;
+    libxl__domain_create_state *dcs = CONTAINER_OF(xswa, *dcs, console_xswait);
+
+    if (rc) {
+        if (rc == ERROR_TIMEDOUT)
+            LOG(ERROR, "%s: timed out", xswa->what);
+        goto out;
+    }
+
+    if (p && p[0] != '\0') {
+        domcreate_console_available(egc, dcs);
+        goto out;
+    }
+
+    return;
+
+out:
+    libxl__xswait_stop(gc, xswa);
+    domcreate_complete(egc, dcs, rc);
 }
 
 static void domcreate_complete(libxl__egc *egc,
@@ -1812,6 +1856,8 @@ static void domcreate_complete(libxl__egc *egc,
     STATE_AO_GC(dcs->ao);
     libxl_domain_config *const d_config = dcs->guest_config;
     libxl_domain_config *d_config_saved = &dcs->guest_config_saved;
+
+    libxl__xswait_stop(gc, &dcs->console_xswait);
 
     libxl__domain_build_state_dispose(&dcs->build_state);
 
