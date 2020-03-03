@@ -323,6 +323,7 @@ F:	xen/arch/x86/cpu/vpmu_intel.c
 
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
+M:	Paul Durrant <pdurrant@amzn.com>
 S:	Supported
 F:	xen/drivers/passthrough/
 X:	xen/drivers/passthrough/amd/
