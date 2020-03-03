@@ -250,7 +250,7 @@ F:	xen/include/public/arch-arm/
 F:	xen/include/public/arch-arm.h
 
 Change Log
-M:	Paul Durrant <pdurrant@amazon.com>
+M:	Paul Durrant <pdurrant@amzn.com>
 R:	Community Manager <community.manager@xenproject.org>
 S:	Maintained
 F:	CHANGELOG.md
@@ -539,7 +539,7 @@ F:	tools/tests/cpu-policy/
 F:	tools/tests/x86_emulator/
 
 X86 I/O EMULATION
-M:	Paul Durrant <pdurrant@amazon.com>
+M:	Paul Durrant <pdurrant@amzn.com>
 S:	Supported
 F:	xen/arch/x86/hvm/emulate.c
 F:	xen/arch/x86/hvm/intercept.c
@@ -573,7 +573,7 @@ S:	Maintained
 F:	xen/arch/x86/mm/shadow/
 
 X86 VIRIDIAN ENLIGHTENMENTS
-M:	Paul Durrant <pdurrant@amazon.com>
+M:	Paul Durrant <pdurrant@amzn.com>
 M:	Wei Liu <wl@xen.org>
 S:	Supported
 F:	xen/arch/x86/guest/hyperv/
