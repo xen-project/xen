@@ -401,7 +401,6 @@ F:	xen/drivers/cpufreq/
 F:	xen/include/acpi/cpufreq/
 
 PUBLIC I/O INTERFACES AND PV DRIVERS DESIGNS
-M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Juergen Gross <jgross@suse.com>
 S:	Supported
 F:	xen/include/public/io/
@@ -604,7 +603,6 @@ M:	George Dunlap <george.dunlap@citrix.com>
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Julien Grall <julien@xen.org>
-M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Wei Liu <wl@xen.org>
 L:	xen-devel@lists.xenproject.org
