@@ -2403,7 +2403,7 @@ csched2_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
         } d;
         d.dom = unit->domain->domain_id;
         d.unit = unit->unit_id;
-        d.rq_id = min_rqd->id;
+        d.rq_id = min_rqd ? min_rqd->id : -1;
         d.b_avgload = min_avgload;
         d.new_cpu = new_cpu;
         __trace_var(TRC_CSCHED2_PICKED_CPU, 1,
