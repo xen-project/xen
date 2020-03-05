@@ -172,6 +172,9 @@ int iommu_domain_init(struct domain *d, unsigned int opts)
     struct domain_iommu *hd = dom_iommu(d);
     int ret = 0;
 
+    if ( is_hardware_domain(d) )
+        check_hwdom_reqs(d); /* may modify iommu_hwdom_strict */
+
     if ( !is_iommu_enabled(d) )
         return 0;
 
@@ -187,9 +190,6 @@ int iommu_domain_init(struct domain *d, unsigned int opts)
     ret = hd->platform_ops->init(d);
     if ( ret || is_system_domain(d) )
         return ret;
-
-    if ( is_hardware_domain(d) )
-        check_hwdom_reqs(d); /* may modify iommu_hwdom_strict */
 
     /*
      * Use shared page tables for HAP and IOMMU if the global option
