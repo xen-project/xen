@@ -493,12 +493,16 @@ func (x *Channelinfo) fromC(xc *C.libxl_channelinfo) error {
 	x.Rref = int(xc.rref)
 	x.Connection = ChannelConnection(xc.connection)
 	switch x.Connection {
+	case ChannelConnectionUnknown:
+		x.ConnectionUnion = nil
 	case ChannelConnectionPty:
 		var connectionPty ChannelinfoConnectionUnionPty
 		if err := connectionPty.fromC(xc); err != nil {
 			return fmt.Errorf("converting field connectionPty: %v", err)
 		}
 		x.ConnectionUnion = connectionPty
+	case ChannelConnectionSocket:
+		x.ConnectionUnion = nil
 	default:
 		return fmt.Errorf("invalid union key '%v'", x.Connection)
 	}
@@ -537,6 +541,8 @@ func (x *Channelinfo) toC(xc *C.libxl_channelinfo) (err error) {
 	xc.rref = C.int(x.Rref)
 	xc.connection = C.libxl_channel_connection(x.Connection)
 	switch x.Connection {
+	case ChannelConnectionUnknown:
+		break
 	case ChannelConnectionPty:
 		tmp, ok := x.ConnectionUnion.(ChannelinfoConnectionUnionPty)
 		if !ok {
@@ -548,6 +554,8 @@ func (x *Channelinfo) toC(xc *C.libxl_channelinfo) (err error) {
 		}
 		ptyBytes := C.GoBytes(unsafe.Pointer(&pty), C.sizeof_libxl_channelinfo_connection_union_pty)
 		copy(xc.u[:], ptyBytes)
+	case ChannelConnectionSocket:
+		break
 	default:
 		return fmt.Errorf("invalid union key '%v'", x.Connection)
 	}
@@ -1223,6 +1231,8 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 			return fmt.Errorf("converting field typePvh: %v", err)
 		}
 		x.TypeUnion = typePvh
+	case DomainTypeInvalid:
+		x.TypeUnion = nil
 	default:
 		return fmt.Errorf("invalid union key '%v'", x.Type)
 	}
@@ -1723,6 +1733,8 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 		}
 		pvhBytes := C.GoBytes(unsafe.Pointer(&pvh), C.sizeof_libxl_domain_build_info_type_union_pvh)
 		copy(xc.u[:], pvhBytes)
+	case DomainTypeInvalid:
+		break
 	default:
 		return fmt.Errorf("invalid union key '%v'", x.Type)
 	}
@@ -2650,6 +2662,10 @@ func (x *DeviceChannel) fromC(xc *C.libxl_device_channel) error {
 	x.Name = C.GoString(xc.name)
 	x.Connection = ChannelConnection(xc.connection)
 	switch x.Connection {
+	case ChannelConnectionUnknown:
+		x.ConnectionUnion = nil
+	case ChannelConnectionPty:
+		x.ConnectionUnion = nil
 	case ChannelConnectionSocket:
 		var connectionSocket DeviceChannelConnectionUnionSocket
 		if err := connectionSocket.fromC(xc); err != nil {
@@ -2690,6 +2706,10 @@ func (x *DeviceChannel) toC(xc *C.libxl_device_channel) (err error) {
 	}
 	xc.connection = C.libxl_channel_connection(x.Connection)
 	switch x.Connection {
+	case ChannelConnectionUnknown:
+		break
+	case ChannelConnectionPty:
+		break
 	case ChannelConnectionSocket:
 		tmp, ok := x.ConnectionUnion.(DeviceChannelConnectionUnionSocket)
 		if !ok {
@@ -4376,6 +4396,8 @@ func (x *Event) fromC(xc *C.libxl_event) error {
 			return fmt.Errorf("converting field typeDomainShutdown: %v", err)
 		}
 		x.TypeUnion = typeDomainShutdown
+	case EventTypeDomainDeath:
+		x.TypeUnion = nil
 	case EventTypeDiskEject:
 		var typeDiskEject EventTypeUnionDiskEject
 		if err := typeDiskEject.fromC(xc); err != nil {
@@ -4388,6 +4410,8 @@ func (x *Event) fromC(xc *C.libxl_event) error {
 			return fmt.Errorf("converting field typeOperationComplete: %v", err)
 		}
 		x.TypeUnion = typeOperationComplete
+	case EventTypeDomainCreateConsoleAvailable:
+		x.TypeUnion = nil
 	default:
 		return fmt.Errorf("invalid union key '%v'", x.Type)
 	}
@@ -4454,6 +4478,8 @@ func (x *Event) toC(xc *C.libxl_event) (err error) {
 		domain_shutdown.shutdown_reason = C.uint8_t(tmp.ShutdownReason)
 		domain_shutdownBytes := C.GoBytes(unsafe.Pointer(&domain_shutdown), C.sizeof_libxl_event_type_union_domain_shutdown)
 		copy(xc.u[:], domain_shutdownBytes)
+	case EventTypeDomainDeath:
+		break
 	case EventTypeDiskEject:
 		tmp, ok := x.TypeUnion.(EventTypeUnionDiskEject)
 		if !ok {
@@ -4477,6 +4503,8 @@ func (x *Event) toC(xc *C.libxl_event) (err error) {
 		operation_complete.rc = C.int(tmp.Rc)
 		operation_completeBytes := C.GoBytes(unsafe.Pointer(&operation_complete), C.sizeof_libxl_event_type_union_operation_complete)
 		copy(xc.u[:], operation_completeBytes)
+	case EventTypeDomainCreateConsoleAvailable:
+		break
 	default:
 		return fmt.Errorf("invalid union key '%v'", x.Type)
 	}

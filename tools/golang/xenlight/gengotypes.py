@@ -335,6 +335,7 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
     gokeyname = xenlight_golang_fmt_name(keyname)
     keytype   = ty.keyvar.type.typename
     gokeytype = xenlight_golang_fmt_name(keytype)
+    field_name = xenlight_golang_fmt_name('{}_union'.format(keyname))
 
     interface_name = '{}_{}_union'.format(struct_name, keyname)
     interface_name = xenlight_golang_fmt_name(interface_name, exported=False)
@@ -351,10 +352,10 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
 
         # Add to list of cases to make for the switch
         # statement below.
+        cases[f.name] = (val, f.type)
+
         if f.type is None:
             continue
-
-        cases[f.name] = val
 
         # Define fromC func for 'union' struct.
         typename   = '{}_{}_union_{}'.format(struct_name,keyname,f.name)
@@ -382,8 +383,14 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
 
     # Create switch statement to determine which 'union element'
     # to populate in the Go struct.
-    for case_name, case_val in cases.items():
+    for case_name, case_tuple in cases.items():
+        (case_val, case_type) = case_tuple
+
         s += 'case {}:\n'.format(case_val)
+
+        if case_type is None:
+            s += "x.{} = nil\n".format(field_name)
+            continue
 
         gotype = '{}_{}_union_{}'.format(struct_name,keyname,case_name)
         gotype = xenlight_golang_fmt_name(gotype)
@@ -394,7 +401,6 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
         s += 'if err := {}.fromC(xc);'.format(goname)
         s += 'err != nil {{\n return fmt.Errorf("converting field {}: %v", err) \n}}\n'.format(goname)
 
-        field_name = xenlight_golang_fmt_name('{}_union'.format(keyname))
         s += 'x.{} = {}\n'.format(field_name, goname)
 
     # End switch statement
@@ -551,10 +557,13 @@ def xenlight_golang_union_to_C(ty = None, union_name = '',
     for f in ty.fields:
         key_val = '{}_{}'.format(keytype, f.name)
         key_val = xenlight_golang_fmt_name(key_val)
-        if f.type is None:
-            continue
 
         s += 'case {}:\n'.format(key_val)
+
+        if f.type is None:
+            s += "break\n"
+            continue
+
         cgotype = '{}_{}_union_{}'.format(struct_name,keyname,f.name)
         gotype  = xenlight_golang_fmt_name(cgotype)
 
