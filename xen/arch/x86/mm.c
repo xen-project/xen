@@ -356,19 +356,21 @@ void __init arch_init_memory(void)
             ASSERT(root_pgt_pv_xen_slots < ROOT_PAGETABLE_PV_XEN_SLOTS);
             if ( l4_table_offset(split_va) == l4_table_offset(split_va - 1) )
             {
-                l3_pgentry_t *l3tab = alloc_xen_pagetable();
+                mfn_t l3mfn = alloc_xen_pagetable_new();
 
-                if ( l3tab )
+                if ( !mfn_eq(l3mfn, INVALID_MFN) )
                 {
-                    const l3_pgentry_t *l3idle =
-                        l4e_to_l3e(idle_pg_table[l4_table_offset(split_va)]);
+                    const l3_pgentry_t *l3idle = map_l3t_from_l4e(
+                            idle_pg_table[l4_table_offset(split_va)]);
+                    l3_pgentry_t *l3tab = map_domain_page(l3mfn);
 
                     for ( i = 0; i < l3_table_offset(split_va); ++i )
                         l3tab[i] = l3idle[i];
                     for ( ; i < L3_PAGETABLE_ENTRIES; ++i )
                         l3tab[i] = l3e_empty();
-                    split_l4e = l4e_from_mfn(virt_to_mfn(l3tab),
-                                             __PAGE_HYPERVISOR_RW);
+                    split_l4e = l4e_from_mfn(l3mfn, __PAGE_HYPERVISOR_RW);
+                    UNMAP_DOMAIN_PAGE(l3idle);
+                    UNMAP_DOMAIN_PAGE(l3tab);
                 }
                 else
                     ++root_pgt_pv_xen_slots;
