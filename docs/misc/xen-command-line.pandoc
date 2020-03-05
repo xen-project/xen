@@ -1917,18 +1917,24 @@ is 1MB.
 ### smap (x86)
 > `= <boolean> | hvm`
 
-> Default: `true`
+> Default: `true` unless running in pv-shim mode on AMD or Hygon hardware
 
 Flag to enable Supervisor Mode Access Prevention
 Use `smap=hvm` to allow SMAP use by HVM guests only.
 
+In PV shim mode on AMD or Hygon hardware due to significant performance impact
+in some cases and generally lower security risk the option defaults to false.
+
 ### smep (x86)
 > `= <boolean> | hvm`
 
-> Default: `true`
+> Default: `true` unless running in pv-shim mode on AMD or Hygon hardware
 
 Flag to enable Supervisor Mode Execution Protection
 Use `smep=hvm` to allow SMEP use by HVM guests only.
+
+In PV shim mode on AMD or Hygon hardware due to significant performance impact
+in some cases and generally lower security risk the option defaults to false.
 
 ### smt (x86)
 > `= <boolean>`
