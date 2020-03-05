@@ -490,8 +490,8 @@ static int __init pvh_populate_p2m(struct domain *d)
 #undef MB1_PAGES
 }
 
-static paddr_t find_memory(const struct domain *d, const struct elf_binary *elf,
-                           size_t size)
+static paddr_t __init find_memory(
+    const struct domain *d, const struct elf_binary *elf, size_t size)
 {
     paddr_t kernel_start = (paddr_t)elf->dest_base & PAGE_MASK;
     paddr_t kernel_end = ROUNDUP((paddr_t)elf->dest_base + elf->dest_size,
