@@ -1228,6 +1228,9 @@ void hvm_destroy_all_ioreq_servers(struct domain *d)
     struct hvm_ioreq_server *s;
     unsigned int id;
 
+    if ( !relocate_portio_handler(d, 0xcf8, 0xcf8, 4) )
+        return;
+
     spin_lock_recursive(&d->arch.hvm.ioreq_server.lock);
 
     /* No need to domain_pause() as the domain is being torn down */

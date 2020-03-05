@@ -836,7 +836,8 @@ void rtc_deinit(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
 
-    if ( !has_vrtc(d) )
+    if ( !has_vrtc(d) || !d->arch.hvm.pl_time ||
+         s->update_timer.status == TIMER_STATUS_invalid )
         return;
 
     spin_barrier(&s->lock);

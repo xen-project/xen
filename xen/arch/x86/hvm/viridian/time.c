@@ -566,6 +566,8 @@ void viridian_time_vcpu_deinit(const struct vcpu *v)
     {
         struct viridian_stimer *vs = &vv->stimer[i];
 
+        if ( !vs->v )
+            continue;
         kill_timer(&vs->timer);
         vs->v = NULL;
     }

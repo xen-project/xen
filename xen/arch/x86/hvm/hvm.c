@@ -695,24 +695,24 @@ int hvm_domain_initialise(struct domain *d)
     return 0;
 
  fail2:
-    rtc_deinit(d);
     stdvga_deinit(d);
     vioapic_deinit(d);
  fail1:
     if ( is_hardware_domain(d) )
         xfree(d->arch.hvm.io_bitmap);
-    xfree(d->arch.hvm.io_handler);
-    xfree(d->arch.hvm.params);
-    xfree(d->arch.hvm.pl_time);
-    xfree(d->arch.hvm.irq);
+    XFREE(d->arch.hvm.io_handler);
+    XFREE(d->arch.hvm.params);
+    XFREE(d->arch.hvm.pl_time);
+    XFREE(d->arch.hvm.irq);
  fail0:
     hvm_destroy_cacheattr_region_list(d);
     destroy_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0);
  fail:
-    viridian_domain_deinit(d);
+    hvm_domain_relinquish_resources(d);
     return rc;
 }
 
+/* This function and all its descendants need to be to be idempotent. */
 void hvm_domain_relinquish_resources(struct domain *d)
 {
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
@@ -726,11 +726,8 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
     /* Stop all asynchronous timer actions. */
     rtc_deinit(d);
-    if ( d->vcpu != NULL && d->vcpu[0] != NULL )
-    {
-        pmtimer_deinit(d);
-        hpet_deinit(d);
-    }
+    pmtimer_deinit(d);
+    hpet_deinit(d);
 }
 
 void hvm_domain_destroy(struct domain *d)
@@ -738,13 +735,19 @@ void hvm_domain_destroy(struct domain *d)
     struct list_head *ioport_list, *tmp;
     struct g2m_ioport *ioport;
 
+    /*
+     * This function would not be called when domain initialization fails
+     * (late enough), so do so here. This requires the function and all its
+     * descendants to be idempotent.
+     */
+    hvm_domain_relinquish_resources(d);
+
     XFREE(d->arch.hvm.io_handler);
     XFREE(d->arch.hvm.params);
 
     hvm_destroy_cacheattr_region_list(d);
 
     hvm_funcs.domain_destroy(d);
-    rtc_deinit(d);
     stdvga_deinit(d);
     vioapic_deinit(d);
 

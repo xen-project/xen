@@ -373,7 +373,7 @@ void pmtimer_deinit(struct domain *d)
 {
     PMTState *s = &d->arch.hvm.pl_time->vpmt;
 
-    if ( !has_vpm(d) )
+    if ( !has_vpm(d) || !d->arch.hvm.pl_time || !s->vcpu )
         return;
 
     kill_timer(&s->timer);

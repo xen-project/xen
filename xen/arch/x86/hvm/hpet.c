@@ -751,7 +751,7 @@ void hpet_deinit(struct domain *d)
     int i;
     HPETState *h = domain_vhpet(d);
 
-    if ( !has_vhpet(d) )
+    if ( !has_vhpet(d) || !d->arch.hvm.pl_time || !h->stime_freq )
         return;
 
     write_lock(&h->lock);
@@ -763,6 +763,8 @@ void hpet_deinit(struct domain *d)
         for ( i = 0; i < HPET_TIMER_NUM; i++ )
             if ( timer_enabled(h, i) )
                 hpet_stop_timer(h, i, guest_time);
+
+        h->hpet.config = 0;
     }
 
     write_unlock(&h->lock);

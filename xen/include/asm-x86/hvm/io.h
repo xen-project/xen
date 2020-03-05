@@ -112,7 +112,7 @@ void register_portio_handler(
     struct domain *d, unsigned int port, unsigned int size,
     portio_action_t action);
 
-void relocate_portio_handler(
+bool relocate_portio_handler(
     struct domain *d, unsigned int old_port, unsigned int new_port,
     unsigned int size);
 
