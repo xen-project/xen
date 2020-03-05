@@ -28,6 +28,7 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <asm/atomic.h>
+#include <asm/e820.h>
 #include <asm/string.h>
 #include "dmar.h"
 #include "iommu.h"
@@ -631,14 +632,11 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
      * not properly represented in the system memory map and
      * inform the user
      */
-    if ( (!page_is_ram_type(paddr_to_pfn(base_addr), RAM_TYPE_RESERVED)) ||
-         (!page_is_ram_type(paddr_to_pfn(end_addr), RAM_TYPE_RESERVED)) )
-    {
+    if ( !e820_all_mapped(base_addr, end_addr + 1, E820_RESERVED) )
         printk(XENLOG_WARNING VTDPREFIX
                "  RMRR address range %"PRIx64"..%"PRIx64" not in reserved memory;"
                " need \"iommu_inclusive_mapping=1\"?\n",
                 base_addr, end_addr);
-    }
 
     rmrru = xzalloc(struct acpi_rmrr_unit);
     if ( !rmrru )
