@@ -2,6 +2,8 @@
 #define _XEN_PARAM_H
 
 #include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/stdbool.h>
 
 /*
  * Used for kernel command line parameter setup
@@ -46,7 +48,8 @@ extern const struct kernel_param __param_start[], __param_end[];
     __kparam __setup_##_var = \
         { .name = __setup_str_##_var, \
           .type = OPT_BOOL, \
-          .len = sizeof(_var), \
+          .len = sizeof(_var) + \
+                 BUILD_BUG_ON_ZERO(sizeof(_var) != sizeof(bool)), \
           .par.var = &_var }
 #define integer_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \
@@ -86,7 +89,8 @@ extern const struct kernel_param __param_start[], __param_end[];
     __rtparam __rtpar_##_var = \
         { .name = _name, \
           .type = OPT_BOOL, \
-          .len = sizeof(_var), \
+          .len = sizeof(_var) + \
+                 BUILD_BUG_ON_ZERO(sizeof(_var) != sizeof(bool)), \
           .par.var = &_var }
 #define integer_runtime_only_param(_name, _var) \
     __rtparam __rtpar_##_var = \

@@ -25,7 +25,7 @@
 #include <asm/hvm/asid.h>
 
 /* Xen command-line option to enable ASIDs */
-static int opt_asid_enabled = 1;
+static bool __read_mostly opt_asid_enabled = true;
 boolean_param("asid", opt_asid_enabled);
 
 /*
