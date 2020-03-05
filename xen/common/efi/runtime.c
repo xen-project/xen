@@ -574,7 +574,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         size = op->u.get_next_variable_name.size;
-        name.raw = xmalloc_bytes(size);
+        name.raw = xzalloc_bytes(size);
         if ( !name.raw )
             return -ENOMEM;
         if ( copy_from_guest(name.raw, op->u.get_next_variable_name.name,
