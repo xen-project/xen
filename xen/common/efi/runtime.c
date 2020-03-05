@@ -194,7 +194,18 @@ void efi_reset_system(bool warm)
 }
 
 #endif /* CONFIG_ARM */
-#endif
+
+const CHAR16 *wmemchr(const CHAR16 *s, CHAR16 c, UINTN n)
+{
+    while ( n && *s != c )
+    {
+        --n;
+        ++s;
+    }
+    return n ? s : NULL;
+}
+
+#endif /* COMPAT */
 
 #ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
 int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
@@ -468,7 +479,12 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         name = xmalloc_array(CHAR16, ++len);
         if ( !name )
            return -ENOMEM;
-        __copy_from_guest(name, op->u.get_variable.name, len);
+        if ( __copy_from_guest(name, op->u.get_variable.name, len) ||
+             wmemchr(name, 0, len) != name + len - 1 )
+        {
+            xfree(name);
+            return -EIO;
+        }
 
         size = op->u.get_variable.size;
         if ( size )
@@ -516,7 +532,12 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         name = xmalloc_array(CHAR16, ++len);
         if ( !name )
            return -ENOMEM;
-        __copy_from_guest(name, op->u.set_variable.name, len);
+        if ( __copy_from_guest(name, op->u.set_variable.name, len) ||
+             wmemchr(name, 0, len) != name + len - 1 )
+        {
+            xfree(name);
+            return -EIO;
+        }
 
         data = xmalloc_bytes(op->u.set_variable.size);
         if ( !data )
