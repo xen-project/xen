@@ -1498,18 +1498,28 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
         if ( find_upstream_bridge(seg, &bus, &devfn, &secbus) < 1 )
             break;
 
+        /*
+         * Mapping a bridge should, if anything, pass the struct pci_dev of
+         * that bridge. Since bridges don't normally get assigned to guests,
+         * their owner would be the wrong one. Pass NULL instead.
+         */
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn,
-                                         pci_get_pdev(seg, bus, devfn));
+                                         NULL);
 
         /*
          * Devices behind PCIe-to-PCI/PCIx bridge may generate different
          * requester-id. It may originate from devfn=0 on the secondary bus
          * behind the bridge. Map that id as well if we didn't already.
+         *
+         * Somewhat similar as for bridges, we don't want to pass a struct
+         * pci_dev here - there may not even exist one for this (secbus,0,0)
+         * tuple. If there is one, without properly working device groups it
+         * may again not have the correct owner.
          */
         if ( !ret && pdev_type(seg, bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE &&
              (secbus != pdev->bus || pdev->devfn != 0) )
             ret = domain_context_mapping_one(domain, drhd->iommu, secbus, 0,
-                                             pci_get_pdev(seg, secbus, 0));
+                                             NULL);
 
         break;
 
