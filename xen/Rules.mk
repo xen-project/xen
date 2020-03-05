@@ -202,7 +202,7 @@ SRCPATH := $(patsubst $(BASEDIR)/%,%,$(CURDIR))
 
 %.o: %.c Makefile
 ifeq ($(CONFIG_ENFORCE_UNIQUE_SYMBOLS),y)
-	$(CC) $(CFLAGS) -c $< -o $(@D)/.$(@F).tmp
+	$(CC) $(CFLAGS) -c $< -o $(@D)/.$(@F).tmp -MQ $@
 ifeq ($(clang),y)
 	$(OBJCOPY) --redefine-sym $<=$(SRCPATH)/$< $(@D)/.$(@F).tmp $@
 else
