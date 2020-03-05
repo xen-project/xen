@@ -39,3 +39,5 @@ extern UINT64 efi_boot_max_var_store_size, efi_boot_remain_var_store_size,
 
 extern UINT64 efi_apple_properties_addr;
 extern UINTN efi_apple_properties_len;
+
+const CHAR16 *wmemchr(const CHAR16 *s, CHAR16 c, UINTN n);

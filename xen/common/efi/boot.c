@@ -280,16 +280,6 @@ static int __init wstrncmp(const CHAR16 *s1, const CHAR16 *s2, UINTN n)
     return n ? *s1 - *s2 : 0;
 }
 
-static const CHAR16 *__init wmemchr(const CHAR16 *s, CHAR16 c, UINTN n)
-{
-    while ( n && *s != c )
-    {
-        --n;
-        ++s;
-    }
-    return n ? s : NULL;
-}
-
 static CHAR16 *__init s2w(union string *str)
 {
     const char *s = str->s;
