@@ -587,9 +587,7 @@ static int64_t __init init_xen_timer(struct platform_timesource *pts)
     if ( !xen_guest )
         return 0;
 
-    pts->frequency = xen_timer_cpu_frequency();
-
-    return pts->frequency;
+    return xen_timer_cpu_frequency();
 }
 
 static always_inline uint64_t read_cycle(const struct vcpu_time_info *info,
@@ -643,6 +641,7 @@ static struct platform_timesource __initdata plt_xen_timer =
 {
     .id = "xen",
     .name = "XEN PV CLOCK",
+    .frequency = 1000000000ULL,
     .read_counter = read_xen_timer,
     .init = init_xen_timer,
     .resume = resume_xen_timer,
