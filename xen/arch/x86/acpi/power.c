@@ -23,6 +23,7 @@
 #include <xen/domain.h>
 #include <xen/console.h>
 #include <xen/iommu.h>
+#include <xen/watchdog.h>
 #include <xen/cpu.h>
 #include <public/platform.h>
 #include <asm/tboot.h>
@@ -223,6 +224,7 @@ static int enter_state(u32 state)
 
     acpi_sleep_prepare(state);
 
+    watchdog_disable();
     console_start_sync();
     printk("Entering ACPI S%d state.\n", state);
 
@@ -235,6 +237,7 @@ static int enter_state(u32 state)
         system_state = SYS_STATE_resume;
         device_power_up(error);
         console_end_sync();
+        watchdog_enable();
         error = -EIO;
         goto done;
     }
@@ -281,6 +284,7 @@ static int enter_state(u32 state)
         tboot_s3_error(error);
 
     console_end_sync();
+    watchdog_enable();
 
     microcode_update_one(true);
 
