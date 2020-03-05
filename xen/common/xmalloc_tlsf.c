@@ -388,7 +388,17 @@ void *xmem_pool_alloc(unsigned long size, struct xmem_pool *pool)
         pool->init_region = region;
     }
 
-    size = (size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE : ROUNDUP_SIZE(size);
+    if ( size < MIN_BLOCK_SIZE )
+        size = MIN_BLOCK_SIZE;
+    else
+    {
+        tmp_size = ROUNDUP_SIZE(size);
+        /* Guard against overflow. */
+        if ( tmp_size < size )
+            return NULL;
+        size = tmp_size;
+    }
+
     /* Rounding up the requested size and calculating fl and sl */
 
     spin_lock(&pool->lock);
@@ -582,6 +592,10 @@ void *_xmalloc(unsigned long size, unsigned long align)
     if ( align < MEM_ALIGN )
         align = MEM_ALIGN;
     size += align - MEM_ALIGN;
+
+    /* Guard against overflow. */
+    if ( size < align - MEM_ALIGN )
+        return NULL;
 
     if ( !xenpool )
         tlsf_init();
