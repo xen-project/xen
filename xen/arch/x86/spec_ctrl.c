@@ -97,8 +97,6 @@ static int __init parse_spec_ctrl(const char *s)
             if ( opt_pv_l1tf_domu < 0 )
                 opt_pv_l1tf_domu = 0;
 
-            opt_branch_harden = false;
-
             if ( opt_tsx == -1 )
                 opt_tsx = -3;
 
@@ -113,6 +111,7 @@ static int __init parse_spec_ctrl(const char *s)
             opt_ibpb = false;
             opt_ssbd = false;
             opt_l1d_flush = 0;
+            opt_branch_harden = false;
         }
         else if ( val > 0 )
             rc = -EINVAL;
