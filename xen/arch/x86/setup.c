@@ -106,9 +106,9 @@ struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 unsigned long __read_mostly mmu_cr4_features = XEN_MINIMAL_CR4;
 
-/* smep: Enable/disable Supervisor Mode Execution Protection (default on). */
-#define SMEP_HVM_ONLY (-1)
-static s8 __initdata opt_smep = 1;
+/* smep: Enable/disable Supervisor Mode Execution Protection */
+#define SMEP_HVM_ONLY (-2)
+static s8 __initdata opt_smep = -1;
 
 /*
  * Initial domain place holder. Needs to be global so it can be created in
@@ -143,9 +143,9 @@ static int __init parse_smep_param(const char *s)
 }
 custom_param("smep", parse_smep_param);
 
-/* smap: Enable/disable Supervisor Mode Access Prevention (default on). */
-#define SMAP_HVM_ONLY (-1)
-static s8 __initdata opt_smap = 1;
+/* smap: Enable/disable Supervisor Mode Access Prevention */
+#define SMAP_HVM_ONLY (-2)
+static s8 __initdata opt_smap = -1;
 
 static int __init parse_smap_param(const char *s)
 {
@@ -1556,6 +1556,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     identify_cpu(&boot_cpu_data);
 
     set_in_cr4(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT);
+
+    /* Do not enable SMEP/SMAP in PV shim on AMD by default */
+    if ( opt_smep == -1 )
+        opt_smep = !pv_shim || boot_cpu_data.x86_vendor != X86_VENDOR_AMD;
+    if ( opt_smap == -1 )
+        opt_smap = !pv_shim || boot_cpu_data.x86_vendor != X86_VENDOR_AMD;
 
     if ( !opt_smep )
         setup_clear_cpu_cap(X86_FEATURE_SMEP);
