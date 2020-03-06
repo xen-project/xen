@@ -51,8 +51,8 @@ dist: install
 
 build install:: include/config/auto.conf
 
-.PHONY: build install uninstall clean distclean MAP tests
-build install uninstall debug clean distclean MAP tests::
+.PHONY: build install uninstall clean distclean MAP
+build install uninstall debug clean distclean MAP::
 ifneq ($(XEN_TARGET_ARCH),x86_32)
 	$(MAKE) -f Rules.mk _$@
 else
@@ -92,8 +92,8 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 		fi; \
 	fi
 
-.PHONY: _tests
-_tests:
+.PHONY: tests
+tests:
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C test tests
 .PHONY: install-tests
 install-tests:
