@@ -5,3 +5,8 @@
 # cc-ifversion
 # Usage:  EXTRA_CFLAGS += $(call cc-ifversion, -lt, 0402, -O1)
 cc-ifversion = $(shell [ $(CONFIG_GCC_VERSION)0 $(1) $(2)000 ] && echo $(3) || echo $(4))
+
+# Shorthand for $(MAKE) clean
+# Usage:
+# $(MAKE) $(clean) dir
+clean := -f $(BASEDIR)/Rules.mk clean -C

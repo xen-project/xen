@@ -189,7 +189,7 @@ FORCE:
 clean:: $(addprefix _clean_, $(subdir-all))
 	rm -f *.o .*.o.tmp *~ core $(DEPS_RM)
 _clean_%/: FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* clean
+	$(MAKE) $(clean) $*
 
 SRCPATH := $(patsubst $(BASEDIR)/%,%,$(CURDIR))
 

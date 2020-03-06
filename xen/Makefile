@@ -120,14 +120,14 @@ _debug:
 .PHONY: _clean
 _clean: delete-unfresh-files
 	$(MAKE) -C tools clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C include clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C xsm clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C crypto clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/arm clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/x86 clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C test clean
+	$(MAKE) $(clean) include
+	$(MAKE) $(clean) common
+	$(MAKE) $(clean) drivers
+	$(MAKE) $(clean) xsm
+	$(MAKE) $(clean) crypto
+	$(MAKE) $(clean) arch/arm
+	$(MAKE) $(clean) arch/x86
+	$(MAKE) $(clean) test
 	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) clean
 	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" -o -name "*.gcno" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map *~ core
