@@ -250,7 +250,7 @@ F:	xen/include/public/arch-arm/
 F:	xen/include/public/arch-arm.h
 
 Change Log
-M:	Paul Durrant <pdurrant@amzn.com>
+M:	Paul Durrant <paul@xen.org>
 R:	Community Manager <community.manager@xenproject.org>
 S:	Maintained
 F:	CHANGELOG.md
@@ -323,7 +323,7 @@ F:	xen/arch/x86/cpu/vpmu_intel.c
 
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
-M:	Paul Durrant <pdurrant@amzn.com>
+M:	Paul Durrant <paul@xen.org>
 S:	Supported
 F:	xen/drivers/passthrough/
 X:	xen/drivers/passthrough/amd/
@@ -538,7 +538,7 @@ F:	tools/tests/cpu-policy/
 F:	tools/tests/x86_emulator/
 
 X86 I/O EMULATION
-M:	Paul Durrant <pdurrant@amzn.com>
+M:	Paul Durrant <paul@xen.org>
 S:	Supported
 F:	xen/arch/x86/hvm/emulate.c
 F:	xen/arch/x86/hvm/intercept.c
@@ -572,7 +572,7 @@ S:	Maintained
 F:	xen/arch/x86/mm/shadow/
 
 X86 VIRIDIAN ENLIGHTENMENTS
-M:	Paul Durrant <pdurrant@amzn.com>
+M:	Paul Durrant <paul@xen.org>
 M:	Wei Liu <wl@xen.org>
 S:	Supported
 F:	xen/arch/x86/guest/hyperv/
