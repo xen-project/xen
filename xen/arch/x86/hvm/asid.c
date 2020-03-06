@@ -83,7 +83,7 @@ void hvm_asid_init(int nasids)
 
 void hvm_asid_flush_vcpu_asid(struct hvm_vcpu_asid *asid)
 {
-    asid->generation = 0;
+    write_atomic(&asid->generation, 0);
 }
 
 void hvm_asid_flush_vcpu(struct vcpu *v)
@@ -121,7 +121,7 @@ bool_t hvm_asid_handle_vmenter(struct hvm_vcpu_asid *asid)
         goto disabled;
 
     /* Test if VCPU has valid ASID. */
-    if ( asid->generation == data->core_asid_generation )
+    if ( read_atomic(&asid->generation) == data->core_asid_generation )
         return 0;
 
     /* If there are no free ASIDs, need to go to a new generation */
@@ -135,7 +135,7 @@ bool_t hvm_asid_handle_vmenter(struct hvm_vcpu_asid *asid)
 
     /* Now guaranteed to be a free ASID. */
     asid->asid = data->next_asid++;
-    asid->generation = data->core_asid_generation;
+    write_atomic(&asid->generation, data->core_asid_generation);
 
     /*
      * When we assign ASID 1, flush all TLB entries as we are starting a new
