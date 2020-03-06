@@ -111,17 +111,14 @@ define gendep
 endef
 $(foreach o,$(filter-out %/,$(obj-y) $(obj-bin-y) $(extra-y)),$(eval $(call gendep,$(o))))
 
-# Ensure each subdirectory has exactly one trailing slash.
-subdir-n := $(patsubst %,%/,$(patsubst %/,%,$(subdir-n) $(subdir-)))
-subdir-y := $(patsubst %,%/,$(patsubst %/,%,$(subdir-y)))
+# Handle objects in subdirs
+# ---------------------------------------------------------------------------
+# o if we encounter foo/ in $(obj-y), replace it by foo/built_in.o
+#   and add the directory to the list of dirs to descend into: $(subdir-y)
+subdir-y := $(subdir-y) $(filter %/, $(obj-y))
+obj-y    := $(patsubst %/, %/built_in.o, $(obj-y))
 
-# Add explicitly declared subdirectories to the object lists.
-obj-y += $(patsubst %/,%/built_in.o,$(subdir-y))
-
-# Add implicitly declared subdirectories (in the object lists) to the
-# subdirectory list, and rewrite the object-list entry.
-subdir-y += $(filter %/,$(obj-y))
-obj-y    := $(patsubst %/,%/built-in.o,$(obj-y))
+subdir-n   := $(subdir-n) $(subdir-) $(filter %/, $(obj-n) $(obj-))
 
 subdir-all := $(subdir-y) $(subdir-n)
 

@@ -2,7 +2,7 @@ obj-y += avc.o
 obj-y += hooks.o
 obj-y += flask_op.o
 
-subdir-y += ss
+obj-y += ss/
 
 CFLAGS += -I./include
 

@@ -1,4 +1,4 @@
-subdir-y += lib
+obj-y += lib/
 
 obj-$(EARLY_PRINTK) += debug.o
 obj-y += domctl.o

@@ -1,11 +1,11 @@
-subdir-$(CONFIG_ARM_32) += arm32
-subdir-$(CONFIG_ARM_64) += arm64
-subdir-$(CONFIG_ARM_64) += efi
-subdir-$(CONFIG_ACPI) += acpi
+obj-$(CONFIG_ARM_32) += arm32/
+obj-$(CONFIG_ARM_64) += arm64/
+obj-$(CONFIG_ARM_64) += efi/
+obj-$(CONFIG_ACPI) += acpi/
 ifneq ($(CONFIG_NO_PLAT),y)
-subdir-y += platforms
+obj-y += platforms/
 endif
-subdir-$(CONFIG_TEE) += tee
+obj-$(CONFIG_TEE) += tee/
 
 obj-$(CONFIG_HAS_ALTERNATIVE) += alternative.o
 obj-y += bootfdt.init.o
@@ -48,7 +48,7 @@ obj-y += sysctl.o
 obj-y += time.o
 obj-y += traps.o
 obj-y += vcpreg.o
-subdir-$(CONFIG_NEW_VGIC) += vgic
+obj-$(CONFIG_NEW_VGIC) += vgic/
 ifneq ($(CONFIG_NEW_VGIC),y)
 obj-y += gic-vgic.o
 obj-y += vgic.o

@@ -1,5 +1,5 @@
-subdir-y += mcheck
-subdir-y += mtrr
+obj-y += mcheck/
+obj-y += mtrr/
 
 obj-y += amd.o
 obj-y += centaur.o

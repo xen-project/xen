@@ -1,5 +1,5 @@
-subdir-y += shadow
-subdir-$(CONFIG_HVM) += hap
+obj-y += shadow/
+obj-$(CONFIG_HVM) += hap/
 
 obj-$(CONFIG_HVM) += altp2m.o
 obj-$(CONFIG_HVM) += guest_walk_2.o guest_walk_3.o guest_walk_4.o

@@ -1,6 +1,6 @@
-subdir-y += svm
-subdir-y += vmx
-subdir-y += viridian
+obj-y += svm/
+obj-y += vmx/
+obj-y += viridian/
 
 obj-y += asid.o
 obj-y += dm.o

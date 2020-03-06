@@ -1,7 +1,7 @@
-subdir-y += char
-subdir-$(CONFIG_HAS_CPUFREQ) += cpufreq
-subdir-$(CONFIG_HAS_PCI) += pci
-subdir-$(CONFIG_HAS_VPCI) += vpci
-subdir-$(CONFIG_HAS_PASSTHROUGH) += passthrough
-subdir-$(CONFIG_ACPI) += acpi
-subdir-$(CONFIG_VIDEO) += video
+obj-y += char/
+obj-$(CONFIG_HAS_CPUFREQ) += cpufreq/
+obj-$(CONFIG_HAS_PCI) += pci/
+obj-$(CONFIG_HAS_VPCI) += vpci/
+obj-$(CONFIG_HAS_PASSTHROUGH) += passthrough/
+obj-$(CONFIG_ACPI) += acpi/
+obj-$(CONFIG_VIDEO) += video/

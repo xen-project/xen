@@ -1,12 +1,12 @@
-subdir-y += acpi
-subdir-y += cpu
-subdir-y += genapic
-subdir-$(CONFIG_GUEST) += guest
-subdir-$(CONFIG_HVM) += hvm
-subdir-y += mm
-subdir-$(CONFIG_XENOPROF) += oprofile
-subdir-$(CONFIG_PV) += pv
-subdir-y += x86_64
+obj-y += acpi/
+obj-y += cpu/
+obj-y += genapic/
+obj-$(CONFIG_GUEST) += guest/
+obj-$(CONFIG_HVM) += hvm/
+obj-y += mm/
+obj-$(CONFIG_XENOPROF) += oprofile/
+obj-$(CONFIG_PV) += pv/
+obj-y += x86_64/
 
 alternative-y := alternative.init.o
 alternative-$(CONFIG_LIVEPATCH) :=

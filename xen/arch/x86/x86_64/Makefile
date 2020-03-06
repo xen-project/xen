@@ -1,4 +1,4 @@
-subdir-$(CONFIG_PV) += compat
+obj-$(CONFIG_PV) += compat/
 
 obj-bin-y += entry.o
 obj-y += traps.o

@@ -1,4 +1,4 @@
-subdir-y += lib
+obj-y += lib/
 
 obj-y += cache.o
 obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR) += bpi.o
