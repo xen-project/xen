@@ -2,6 +2,11 @@
 ####
 # kbuild: Generic definitions
 
+###
+# dependencies
+DEPS = .*.d
+DEPS_INCLUDE = $(addsuffix .d2, $(basename $(wildcard $(DEPS))))
+
 # cc-ifversion
 # Usage:  EXTRA_CFLAGS += $(call cc-ifversion, -lt, 0402, -O1)
 cc-ifversion = $(shell [ $(CONFIG_GCC_VERSION)0 $(1) $(2)000 ] && echo $(3) || echo $(4))
@@ -9,4 +14,4 @@ cc-ifversion = $(shell [ $(CONFIG_GCC_VERSION)0 $(1) $(2)000 ] && echo $(3) || e
 # Shorthand for $(MAKE) clean
 # Usage:
 # $(MAKE) $(clean) dir
-clean := -f $(BASEDIR)/Rules.mk clean -C
+clean := -f $(BASEDIR)/scripts/Makefile.clean clean -C

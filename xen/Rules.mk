@@ -100,8 +100,6 @@ SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
-DEPS = .*.d
-
 include Makefile
 
 define gendep
@@ -117,10 +115,6 @@ $(foreach o,$(filter-out %/,$(obj-y) $(obj-bin-y) $(extra-y)),$(eval $(call gend
 #   and add the directory to the list of dirs to descend into: $(subdir-y)
 subdir-y := $(subdir-y) $(filter %/, $(obj-y))
 obj-y    := $(patsubst %/, %/built_in.o, $(obj-y))
-
-subdir-n   := $(subdir-n) $(subdir-) $(filter %/, $(obj-n) $(obj-))
-
-subdir-all := $(subdir-y) $(subdir-n)
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -DINIT_SECTIONS_ONLY
 
@@ -184,12 +178,6 @@ FORCE:
 
 %/built_in_bin.o: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in_bin.o
-
-.PHONY: clean
-clean:: $(addprefix _clean_, $(subdir-all))
-	rm -f *.o .*.o.tmp *~ core $(DEPS_RM)
-_clean_%/: FORCE
-	$(MAKE) $(clean) $*
 
 SRCPATH := $(patsubst $(BASEDIR)/%,%,$(CURDIR))
 

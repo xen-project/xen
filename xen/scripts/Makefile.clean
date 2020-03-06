@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: GPL-2.0
+# ==========================================================================
+# Cleaning up
+# ==========================================================================
+
+clean::
+
+include $(BASEDIR)/scripts/Kbuild.include
+
+include Makefile
+
+# Figure out what we need to clean from the various variables
+# ==========================================================================
+subdir-all := $(subdir-y) $(subdir-n) $(subdir-) \
+              $(filter %/, $(obj-y) $(obj-n) $(obj-))
+
+DEPS_RM = $(DEPS) $(DEPS_INCLUDE)
+.PHONY: clean
+clean:: $(addprefix _clean_, $(subdir-all))
+	rm -f *.o .*.o.tmp *~ core $(DEPS_RM)
+
+# Descending
+# ---------------------------------------------------------------------------
+
+_clean_%/: FORCE
+	$(MAKE) $(clean) $*
+
+# Force execution of pattern rules (for which PHONY cannot be directly used).
+.PHONY: FORCE
+FORCE:
