@@ -35,6 +35,11 @@ SRCARCH=$(shell echo $(ARCH) | sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g')
 # we need XEN_TARGET_ARCH to generate the proper config
 include $(XEN_ROOT)/Config.mk
 
+# Set ARCH/SUBARCH appropriately.
+export TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
+export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
+                            sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g')
+
 # Allow someone to change their config file
 export KCONFIG_CONFIG ?= .config
 
@@ -46,8 +51,8 @@ dist: install
 
 build install:: include/config/auto.conf
 
-.PHONY: build install uninstall clean distclean cscope TAGS tags MAP gtags tests
-build install uninstall debug clean distclean cscope TAGS tags MAP gtags tests::
+.PHONY: build install uninstall clean distclean MAP tests
+build install uninstall debug clean distclean MAP tests::
 ifneq ($(XEN_TARGET_ARCH),x86_32)
 	$(MAKE) -f Rules.mk _$@
 else
@@ -223,25 +228,25 @@ endef
 xenversion:
 	@echo $(XEN_FULLVERSION)
 
-.PHONY: _TAGS
-_TAGS: 
+.PHONY: TAGS
+TAGS:
 	set -e; rm -f TAGS; \
 	$(call set_exuberant_flags,etags); \
 	$(all_sources) | xargs etags $$exuberant_flags -a
 
-.PHONY: _tags
-_tags: 
+.PHONY: tags
+tags:
 	set -e; rm -f tags; \
 	$(call set_exuberant_flags,ctags); \
 	$(all_sources) | xargs ctags $$exuberant_flags -a
 
-.PHONY: _gtags
-_gtags:
+.PHONY: gtags
+gtags:
 	set -e; rm -f GTAGS GSYMS GPATH GRTAGS
 	$(all_sources) | gtags -f -
 
-.PHONY: _cscope
-_cscope:
+.PHONY: cscope
+cscope:
 	$(all_sources) > cscope.files
 	cscope -k -b -q
 

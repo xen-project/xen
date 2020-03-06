@@ -27,11 +27,6 @@ ifneq ($(origin verbose),undefined)
 $(error "You must use 'make menuconfig' to enable/disable verbose now.")
 endif
 
-# Set ARCH/SUBARCH appropriately.
-override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
-override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
-                              sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g')
-
 TARGET := $(BASEDIR)/xen
 
 # Note that link order matters!
