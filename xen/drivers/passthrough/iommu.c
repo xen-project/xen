@@ -32,7 +32,6 @@ bool_t __read_mostly iommu_enabled;
 bool_t __read_mostly force_iommu;
 bool_t __read_mostly iommu_verbose;
 bool __read_mostly iommu_quarantine = true;
-bool_t __read_mostly iommu_igfx = 1;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_crash_disable;
@@ -73,8 +72,10 @@ static int __init parse_iommu_param(const char *s)
             force_iommu = val;
         else if ( (val = parse_boolean("quarantine", s, ss)) >= 0 )
             iommu_quarantine = val;
+#ifdef CONFIG_X86
         else if ( (val = parse_boolean("igfx", s, ss)) >= 0 )
             iommu_igfx = val;
+#endif
         else if ( (val = parse_boolean("verbose", s, ss)) >= 0 )
             iommu_verbose = val;
         else if ( (val = parse_boolean("snoop", s, ss)) >= 0 )

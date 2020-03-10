@@ -50,6 +50,8 @@ struct mapped_rmrr {
 /* Possible unfiltered LAPIC/MSI messages from untrusted sources? */
 bool __read_mostly untrusted_msi;
 
+bool __read_mostly iommu_igfx = true;
+
 int nr_iommus;
 
 static struct tasklet vtd_fault_tasklet;
