@@ -51,6 +51,7 @@ struct mapped_rmrr {
 bool __read_mostly untrusted_msi;
 
 bool __read_mostly iommu_igfx = true;
+bool __read_mostly iommu_qinval = true;
 
 int nr_iommus;
 

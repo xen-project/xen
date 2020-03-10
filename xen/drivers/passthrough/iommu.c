@@ -33,7 +33,6 @@ bool_t __read_mostly force_iommu;
 bool_t __read_mostly iommu_verbose;
 bool __read_mostly iommu_quarantine = true;
 bool_t __read_mostly iommu_snoop = 1;
-bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_crash_disable;
 
 static bool __hwdom_initdata iommu_hwdom_none;
@@ -75,13 +74,13 @@ static int __init parse_iommu_param(const char *s)
 #ifdef CONFIG_X86
         else if ( (val = parse_boolean("igfx", s, ss)) >= 0 )
             iommu_igfx = val;
+        else if ( (val = parse_boolean("qinval", s, ss)) >= 0 )
+            iommu_qinval = val;
 #endif
         else if ( (val = parse_boolean("verbose", s, ss)) >= 0 )
             iommu_verbose = val;
         else if ( (val = parse_boolean("snoop", s, ss)) >= 0 )
             iommu_snoop = val;
-        else if ( (val = parse_boolean("qinval", s, ss)) >= 0 )
-            iommu_qinval = val;
 #ifndef iommu_intremap
         else if ( (val = parse_boolean("intremap", s, ss)) >= 0 )
             iommu_intremap = val ? iommu_intremap_full : iommu_intremap_off;
