@@ -743,7 +743,8 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
 /* Prepare the p2m for paging a frame in */
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer);
 /* Resume normal operation (in case a domain was paused) */
-void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp);
+struct vm_event_st;
+void p2m_mem_paging_resume(struct domain *d, struct vm_event_st *rsp);
 
 /* 
  * Internal functions, only called by other p2m code

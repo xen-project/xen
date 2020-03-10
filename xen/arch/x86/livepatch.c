@@ -11,6 +11,7 @@
 #include <xen/livepatch_elf.h>
 #include <xen/livepatch.h>
 #include <xen/sched.h>
+#include <xen/vm_event.h>
 
 #include <asm/fixmap.h>
 #include <asm/nmi.h>

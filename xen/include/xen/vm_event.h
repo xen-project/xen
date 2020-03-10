@@ -26,6 +26,29 @@
 #include <xen/sched.h>
 #include <public/vm_event.h>
 
+struct vm_event_domain
+{
+    spinlock_t lock;
+    /* The ring has 64 entries */
+    unsigned char foreign_producers;
+    unsigned char target_producers;
+    /* shared ring page */
+    void *ring_page;
+    struct page_info *ring_pg_struct;
+    /* front-end ring */
+    vm_event_front_ring_t front_ring;
+    /* event channel port (vcpu0 only) */
+    int xen_port;
+    /* vm_event bit for vcpu->pause_flags */
+    int pause_flag;
+    /* list of vcpus waiting for room in the ring */
+    struct waitqueue_head wq;
+    /* the number of vCPUs blocked */
+    unsigned int blocked;
+    /* The last vcpu woken up */
+    unsigned int last_vcpu_wake_up;
+};
+
 /* Clean up on domain destruction */
 void vm_event_cleanup(struct domain *d);
 
