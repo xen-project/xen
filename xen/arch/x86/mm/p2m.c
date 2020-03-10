@@ -695,8 +695,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     p2m_lock(p2m);
 
-    if ( p2m_is_hostp2m(p2m)
-         && !page_list_empty(&d->page_list) )
+    if ( p2m_is_hostp2m(p2m) && domain_tot_pages(d) )
     {
         P2M_ERROR("dom %d already has memory allocated\n", d->domain_id);
         p2m_unlock(p2m);
