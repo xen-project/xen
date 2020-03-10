@@ -54,7 +54,6 @@ static inline bool_t dfn_eq(dfn_t x, dfn_t y)
 
 extern bool_t iommu_enable, iommu_enabled;
 extern bool force_iommu, iommu_quarantine, iommu_verbose;
-extern bool_t iommu_snoop;
 
 #ifdef CONFIG_X86
 extern enum __packed iommu_intremap {
@@ -70,9 +69,10 @@ extern enum __packed iommu_intremap {
    iommu_intremap_restricted,
    iommu_intremap_full,
 } iommu_intremap;
-extern bool iommu_igfx, iommu_qinval;
+extern bool iommu_igfx, iommu_qinval, iommu_snoop;
 #else
 # define iommu_intremap false
+# define iommu_snoop false
 #endif
 
 #if defined(CONFIG_X86) && defined(CONFIG_HVM)

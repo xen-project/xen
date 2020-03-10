@@ -32,7 +32,6 @@ bool_t __read_mostly iommu_enabled;
 bool_t __read_mostly force_iommu;
 bool_t __read_mostly iommu_verbose;
 bool __read_mostly iommu_quarantine = true;
-bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_crash_disable;
 
 static bool __hwdom_initdata iommu_hwdom_none;
@@ -79,8 +78,10 @@ static int __init parse_iommu_param(const char *s)
 #endif
         else if ( (val = parse_boolean("verbose", s, ss)) >= 0 )
             iommu_verbose = val;
+#ifndef iommu_snoop
         else if ( (val = parse_boolean("snoop", s, ss)) >= 0 )
             iommu_snoop = val;
+#endif
 #ifndef iommu_intremap
         else if ( (val = parse_boolean("intremap", s, ss)) >= 0 )
             iommu_intremap = val ? iommu_intremap_full : iommu_intremap_off;
@@ -488,7 +489,9 @@ int __init iommu_setup(void)
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( !iommu_enabled )
     {
-        iommu_snoop = 0;
+#ifndef iommu_snoop
+        iommu_snoop = false;
+#endif
         iommu_hwdom_passthrough = false;
         iommu_hwdom_strict = false;
     }

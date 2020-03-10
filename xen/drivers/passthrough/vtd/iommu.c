@@ -52,6 +52,9 @@ bool __read_mostly untrusted_msi;
 
 bool __read_mostly iommu_igfx = true;
 bool __read_mostly iommu_qinval = true;
+#ifndef iommu_snoop
+bool __read_mostly iommu_snoop = true;
+#endif
 
 int nr_iommus;
 
@@ -2288,8 +2291,10 @@ static int __init vtd_setup(void)
                cap_sps_2mb(iommu->cap) ? ", 2MB" : "",
                cap_sps_1gb(iommu->cap) ? ", 1GB" : "");
 
+#ifndef iommu_snoop
         if ( iommu_snoop && !ecap_snp_ctl(iommu->ecap) )
-            iommu_snoop = 0;
+            iommu_snoop = false;
+#endif
 
         if ( iommu_hwdom_passthrough && !ecap_pass_thru(iommu->ecap) )
             iommu_hwdom_passthrough = false;
@@ -2331,7 +2336,9 @@ static int __init vtd_setup(void)
     }
 
 #define P(p,s) printk("Intel VT-d %s %senabled.\n", s, (p)? "" : "not ")
+#ifndef iommu_snoop
     P(iommu_snoop, "Snoop Control");
+#endif
     P(iommu_hwdom_passthrough, "Dom0 DMA Passthrough");
     P(iommu_qinval, "Queued Invalidation");
     P(iommu_intremap, "Interrupt Remapping");
@@ -2351,7 +2358,9 @@ static int __init vtd_setup(void)
 
  error:
     iommu_enabled = 0;
-    iommu_snoop = 0;
+#ifndef iommu_snoop
+    iommu_snoop = false;
+#endif
     iommu_hwdom_passthrough = false;
     iommu_qinval = 0;
     iommu_intremap = iommu_intremap_off;
