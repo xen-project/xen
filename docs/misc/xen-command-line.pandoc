@@ -1309,6 +1309,8 @@ boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
     This option depends on `intremap`, and is disabled by default due to some
     corner cases in the implementation which have yet to be resolved.
 
+    This option is only valid on x86, and only builds of Xen with HVM support.
+
 *   The `crash-disable` boolean controls disabling IOMMU functionality (DMAR/IR/QI)
     before switching to a crash kernel. This option is inactive by default and
     is for compatibility with older kdump kernels only. Modern kernels copy

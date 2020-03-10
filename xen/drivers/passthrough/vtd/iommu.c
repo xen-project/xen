@@ -2297,13 +2297,15 @@ static int __init vtd_setup(void)
         if ( iommu_intremap && !ecap_intr_remap(iommu->ecap) )
             iommu_intremap = iommu_intremap_off;
 
+#ifndef iommu_intpost
         /*
          * We cannot use posted interrupt if X86_FEATURE_CX16 is
          * not supported, since we count on this feature to
          * atomically update 16-byte IRTE in posted format.
          */
         if ( !cap_intr_post(iommu->cap) || !iommu_intremap || !cpu_has_cx16 )
-            iommu_intpost = 0;
+            iommu_intpost = false;
+#endif
 
         if ( !vtd_ept_page_compatible(iommu) )
             clear_iommu_hap_pt_share();
@@ -2330,7 +2332,9 @@ static int __init vtd_setup(void)
     P(iommu_hwdom_passthrough, "Dom0 DMA Passthrough");
     P(iommu_qinval, "Queued Invalidation");
     P(iommu_intremap, "Interrupt Remapping");
+#ifndef iommu_intpost
     P(iommu_intpost, "Posted Interrupt");
+#endif
     P(iommu_hap_pt_share, "Shared EPT tables");
 #undef P
 
@@ -2348,7 +2352,9 @@ static int __init vtd_setup(void)
     iommu_hwdom_passthrough = false;
     iommu_qinval = 0;
     iommu_intremap = iommu_intremap_off;
-    iommu_intpost = 0;
+#ifndef iommu_intpost
+    iommu_intpost = false;
+#endif
     return ret;
 }
 

@@ -29,6 +29,16 @@ struct iommu_ops __read_mostly iommu_ops;
 
 enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
 
+#ifndef iommu_intpost
+/*
+ * In the current implementation of VT-d posted interrupts, in some extreme
+ * cases, the per cpu list which saves the blocked vCPU will be very long,
+ * and this will affect the interrupt latency, so let this feature off by
+ * default until we find a good solution to resolve it.
+ */
+bool __read_mostly iommu_intpost;
+#endif
+
 int __init iommu_hardware_setup(void)
 {
     struct IO_APIC_route_entry **ioapic_entries = NULL;

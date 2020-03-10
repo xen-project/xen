@@ -43,14 +43,6 @@ bool __read_mostly iommu_hwdom_passthrough;
 bool __hwdom_initdata iommu_hwdom_inclusive;
 int8_t __hwdom_initdata iommu_hwdom_reserved = -1;
 
-/*
- * In the current implementation of VT-d posted interrupts, in some extreme
- * cases, the per cpu list which saves the blocked vCPU will be very long,
- * and this will affect the interrupt latency, so let this feature off by
- * default until we find a good solution to resolve it.
- */
-bool_t __read_mostly iommu_intpost;
-
 #ifndef iommu_hap_pt_share
 bool __read_mostly iommu_hap_pt_share = true;
 #endif
@@ -93,8 +85,10 @@ static int __init parse_iommu_param(const char *s)
         else if ( (val = parse_boolean("intremap", s, ss)) >= 0 )
             iommu_intremap = val ? iommu_intremap_full : iommu_intremap_off;
 #endif
+#ifndef iommu_intpost
         else if ( (val = parse_boolean("intpost", s, ss)) >= 0 )
             iommu_intpost = val;
+#endif
 #ifdef CONFIG_KEXEC
         else if ( (val = parse_boolean("crash-disable", s, ss)) >= 0 )
             iommu_crash_disable = val;
@@ -486,8 +480,10 @@ int __init iommu_setup(void)
         panic("Couldn't enable %s and iommu=required/force\n",
               !iommu_enabled ? "IOMMU" : "Interrupt Remapping");
 
+#ifndef iommu_intpost
     if ( !iommu_intremap )
-        iommu_intpost = 0;
+        iommu_intpost = false;
+#endif
 
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( !iommu_enabled )
@@ -563,9 +559,12 @@ void iommu_crash_shutdown(void)
 
     if ( iommu_enabled )
         iommu_get_ops()->crash_shutdown();
-    iommu_enabled = iommu_intpost = 0;
+    iommu_enabled = false;
 #ifndef iommu_intremap
     iommu_intremap = iommu_intremap_off;
+#endif
+#ifndef iommu_intpost
+    iommu_intpost = false;
 #endif
 }
 
