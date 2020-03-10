@@ -814,6 +814,10 @@ static inline int sh_check_page_has_no_refs(struct page_info *page)
              ((count & PGC_allocated) ? 1 : 0) );
 }
 
+/* Flush the TLB of the selected vCPUs. */
+bool shadow_flush_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
+                      void *ctxt);
+
 #endif /* _XEN_SHADOW_PRIVATE_H */
 
 /*

@@ -140,6 +140,9 @@ struct paging_mode {
                                             unsigned long gfn,
                                             l1_pgentry_t *p, l1_pgentry_t new,
                                             unsigned int level);
+    bool          (*flush_tlb             )(bool (*flush_vcpu)(void *ctxt,
+                                                               struct vcpu *v),
+                                            void *ctxt);
 
     unsigned int guest_levels;
 
@@ -395,6 +398,13 @@ static always_inline unsigned int paging_max_paddr_bits(const struct domain *d)
     }
 
     return bits;
+}
+
+static inline bool paging_flush_tlb(bool (*flush_vcpu)(void *ctxt,
+                                                       struct vcpu *v),
+                                    void *ctxt)
+{
+    return paging_get_hostmode(current)->flush_tlb(flush_vcpu, ctxt);
 }
 
 #endif /* XEN_PAGING_H */

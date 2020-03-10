@@ -609,7 +609,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
          * A false return means that another vcpu is currently trying
          * a similar operation, so back off.
          */
-        if ( !hvm_flush_vcpu_tlb(need_flush, &input_params.vcpu_mask) )
+        if ( !paging_flush_tlb(need_flush, &input_params.vcpu_mask) )
             return HVM_HCALL_preempted;
 
         output.rep_complete = input.rep_count;

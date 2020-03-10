@@ -674,6 +674,60 @@ static void hap_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     hvm_update_guest_cr3(v, noflush);
 }
 
+static bool flush_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
+                      void *ctxt)
+{
+    static DEFINE_PER_CPU(cpumask_t, flush_cpumask);
+    cpumask_t *mask = &this_cpu(flush_cpumask);
+    struct domain *d = current->domain;
+    struct vcpu *v;
+
+    /* Avoid deadlock if more than one vcpu tries this at the same time. */
+    if ( !spin_trylock(&d->hypercall_deadlock_mutex) )
+        return false;
+
+    /* Pause all other vcpus. */
+    for_each_vcpu ( d, v )
+        if ( v != current && flush_vcpu(ctxt, v) )
+            vcpu_pause_nosync(v);
+
+    /* Now that all VCPUs are signalled to deschedule, we wait... */
+    for_each_vcpu ( d, v )
+        if ( v != current && flush_vcpu(ctxt, v) )
+            while ( !vcpu_runnable(v) && v->is_running )
+                cpu_relax();
+
+    /* All other vcpus are paused, safe to unlock now. */
+    spin_unlock(&d->hypercall_deadlock_mutex);
+
+    cpumask_clear(mask);
+
+    /* Flush paging-mode soft state (e.g., va->gfn cache; PAE PDPE cache). */
+    for_each_vcpu ( d, v )
+    {
+        unsigned int cpu;
+
+        if ( !flush_vcpu(ctxt, v) )
+            continue;
+
+        paging_update_cr3(v, false);
+
+        cpu = read_atomic(&v->dirty_cpu);
+        if ( is_vcpu_dirty_cpu(cpu) )
+            __cpumask_set_cpu(cpu, mask);
+    }
+
+    /* Flush TLBs on all CPUs with dirty vcpu state. */
+    flush_tlb_mask(mask);
+
+    /* Done. */
+    for_each_vcpu ( d, v )
+        if ( v != current && flush_vcpu(ctxt, v) )
+            vcpu_unpause(v);
+
+    return true;
+}
+
 const struct paging_mode *
 hap_paging_get_mode(struct vcpu *v)
 {
@@ -786,6 +840,7 @@ static const struct paging_mode hap_paging_real_mode = {
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
+    .flush_tlb              = flush_tlb,
     .guest_levels           = 1
 };
 
@@ -797,6 +852,7 @@ static const struct paging_mode hap_paging_protected_mode = {
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
+    .flush_tlb              = flush_tlb,
     .guest_levels           = 2
 };
 
@@ -808,6 +864,7 @@ static const struct paging_mode hap_paging_pae_mode = {
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
+    .flush_tlb              = flush_tlb,
     .guest_levels           = 3
 };
 
@@ -819,6 +876,7 @@ static const struct paging_mode hap_paging_long_mode = {
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
+    .flush_tlb              = flush_tlb,
     .guest_levels           = 4
 };
 

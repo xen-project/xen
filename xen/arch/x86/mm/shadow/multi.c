@@ -4873,6 +4873,7 @@ const struct paging_mode sh_paging_mode = {
     .update_cr3                    = sh_update_cr3,
     .update_paging_modes           = shadow_update_paging_modes,
     .write_p2m_entry               = shadow_write_p2m_entry,
+    .flush_tlb                     = shadow_flush_tlb,
     .guest_levels                  = GUEST_PAGING_LEVELS,
     .shadow.detach_old_tables      = sh_detach_old_tables,
 #ifdef CONFIG_PV
