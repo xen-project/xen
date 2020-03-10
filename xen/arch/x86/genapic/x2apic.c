@@ -236,12 +236,21 @@ const struct genapic *__init apic_x2apic_probe(void)
         x2apic_phys = !iommu_intremap ||
                       (acpi_gbl_FADT.flags & ACPI_FADT_APIC_PHYSICAL);
     }
-    else if ( !x2apic_phys && !iommu_intremap )
-    {
-        printk("WARNING: x2APIC cluster mode is not supported without interrupt remapping\n"
-               "x2APIC: forcing phys mode\n");
-        x2apic_phys = true;
-    }
+    else if ( !x2apic_phys )
+        switch ( iommu_intremap )
+        {
+        case iommu_intremap_off:
+        case iommu_intremap_restricted:
+            printk("WARNING: x2APIC cluster mode is not supported %s interrupt remapping -"
+                   " forcing phys mode\n",
+                   iommu_intremap == iommu_intremap_off ? "without"
+                                                        : "with restricted");
+            x2apic_phys = true;
+            break;
+
+        case iommu_intremap_full:
+            break;
+        }
 
     if ( x2apic_phys )
         return &apic_x2apic_phys;

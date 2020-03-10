@@ -35,7 +35,7 @@ bool __read_mostly iommu_quarantine = true;
 bool_t __read_mostly iommu_igfx = 1;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
-bool_t __read_mostly iommu_intremap = 1;
+enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
 bool_t __read_mostly iommu_crash_disable;
 
 static bool __hwdom_initdata iommu_hwdom_none;
@@ -91,7 +91,7 @@ static int __init parse_iommu_param(const char *s)
         else if ( (val = parse_boolean("qinval", s, ss)) >= 0 )
             iommu_qinval = val;
         else if ( (val = parse_boolean("intremap", s, ss)) >= 0 )
-            iommu_intremap = val;
+            iommu_intremap = val ? iommu_intremap_full : iommu_intremap_off;
         else if ( (val = parse_boolean("intpost", s, ss)) >= 0 )
             iommu_intpost = val;
 #ifdef CONFIG_KEXEC
@@ -475,7 +475,7 @@ int __init iommu_setup(void)
         iommu_enabled = (rc == 0);
     }
     if ( !iommu_enabled )
-        iommu_intremap = 0;
+        iommu_intremap = iommu_intremap_off;
 
     if ( (force_iommu && !iommu_enabled) ||
          (force_intremap && !iommu_intremap) )
@@ -557,7 +557,8 @@ void iommu_crash_shutdown(void)
 
     if ( iommu_enabled )
         iommu_get_ops()->crash_shutdown();
-    iommu_enabled = iommu_intremap = iommu_intpost = 0;
+    iommu_enabled = iommu_intpost = 0;
+    iommu_intremap = iommu_intremap_off;
 }
 
 int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)

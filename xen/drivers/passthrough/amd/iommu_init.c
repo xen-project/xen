@@ -1139,7 +1139,7 @@ static void __init amd_iommu_init_cleanup(void)
 
     iommu_enabled = 0;
     iommu_hwdom_passthrough = false;
-    iommu_intremap = 0;
+    iommu_intremap = iommu_intremap_off;
     iommuv2_enabled = 0;
 }
 
@@ -1412,6 +1412,9 @@ int __init amd_iommu_prepare(bool xt)
         iommu->ctrl.xt_en = xt && has_xt;
         iommu->ctrl.int_cap_xt_en = xt && has_xt;
     }
+
+    if ( iommu_intremap && !has_xt )
+        iommu_intremap = iommu_intremap_restricted;
 
     rc = amd_iommu_update_ivrs_mapping_acpi();
 

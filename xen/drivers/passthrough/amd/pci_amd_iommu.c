@@ -157,7 +157,7 @@ int __init acpi_ivrs_init(void)
 
     if ( (amd_iommu_detect_acpi() !=0) || (iommu_found() == 0) )
     {
-        iommu_intremap = 0;
+        iommu_intremap = iommu_intremap_off;
         return -ENODEV;
     }
 
