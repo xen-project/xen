@@ -674,31 +674,23 @@ static void hap_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     hvm_update_guest_cr3(v, noflush);
 }
 
+/*
+ * Dummy function to use with on_selected_cpus in order to trigger a vmexit on
+ * selected pCPUs. When the VM resumes execution it will get a new ASID/VPID
+ * and thus a clean TLB.
+ */
+static void dummy_flush(void *data)
+{
+}
+
 static bool flush_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
                       void *ctxt)
 {
     static DEFINE_PER_CPU(cpumask_t, flush_cpumask);
     cpumask_t *mask = &this_cpu(flush_cpumask);
     struct domain *d = current->domain;
+    unsigned int this_cpu = smp_processor_id();
     struct vcpu *v;
-
-    /* Avoid deadlock if more than one vcpu tries this at the same time. */
-    if ( !spin_trylock(&d->hypercall_deadlock_mutex) )
-        return false;
-
-    /* Pause all other vcpus. */
-    for_each_vcpu ( d, v )
-        if ( v != current && flush_vcpu(ctxt, v) )
-            vcpu_pause_nosync(v);
-
-    /* Now that all VCPUs are signalled to deschedule, we wait... */
-    for_each_vcpu ( d, v )
-        if ( v != current && flush_vcpu(ctxt, v) )
-            while ( !vcpu_runnable(v) && v->is_running )
-                cpu_relax();
-
-    /* All other vcpus are paused, safe to unlock now. */
-    spin_unlock(&d->hypercall_deadlock_mutex);
 
     cpumask_clear(mask);
 
@@ -710,20 +702,20 @@ static bool flush_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
         if ( !flush_vcpu(ctxt, v) )
             continue;
 
-        paging_update_cr3(v, false);
+        hvm_asid_flush_vcpu(v);
 
         cpu = read_atomic(&v->dirty_cpu);
-        if ( is_vcpu_dirty_cpu(cpu) )
+        if ( cpu != this_cpu && is_vcpu_dirty_cpu(cpu) )
             __cpumask_set_cpu(cpu, mask);
     }
 
-    /* Flush TLBs on all CPUs with dirty vcpu state. */
-    flush_tlb_mask(mask);
-
-    /* Done. */
-    for_each_vcpu ( d, v )
-        if ( v != current && flush_vcpu(ctxt, v) )
-            vcpu_unpause(v);
+    /*
+     * Trigger a vmexit on all pCPUs with dirty vCPU state in order to force an
+     * ASID/VPID change and hence accomplish a guest TLB flush. Note that vCPUs
+     * not currently running will already be flushed when scheduled because of
+     * the ASID tickle done in the loop above.
+     */
+    on_selected_cpus(mask, dummy_flush, mask, 0);
 
     return true;
 }
