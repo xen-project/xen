@@ -36,12 +36,12 @@
  */
 bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                           struct npfec npfec,
-                          vm_event_request_t **req_ptr);
+                          struct vm_event_st **req_ptr);
 
 /* Check for emulation and mark vcpu for skipping one instruction
  * upon rescheduling if required. */
 bool p2m_mem_access_emulate_check(struct vcpu *v,
-                                  const vm_event_response_t *rsp);
+                                  const struct vm_event_st *rsp);
 
 /* Sanity check for mem_access hardware support */
 bool p2m_mem_access_sanity_check(const struct domain *d);

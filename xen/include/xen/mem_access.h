@@ -24,8 +24,15 @@
 
 #include <xen/types.h>
 #include <xen/mm.h>
-#include <public/memory.h>
-#include <public/vm_event.h>
+
+/*
+ * asm/mem_access.h has functions taking pointers to this as arguments,
+ * and we want to avoid having to include public/vm_event.h here (which
+ * would provide the full struct definition as well as its
+ * vm_event_{request,response}_t typedefs.
+ */
+struct vm_event_st;
+
 #include <asm/mem_access.h>
 
 /*
