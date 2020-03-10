@@ -55,21 +55,24 @@ static inline bool_t dfn_eq(dfn_t x, dfn_t y)
 extern bool_t iommu_enable, iommu_enabled;
 extern bool force_iommu, iommu_quarantine, iommu_verbose, iommu_igfx;
 extern bool_t iommu_snoop, iommu_qinval, iommu_intpost;
+
+#ifdef CONFIG_X86
 extern enum __packed iommu_intremap {
    /*
     * In order to allow traditional boolean uses of the iommu_intremap
     * variable, the "off" value has to come first (yielding a value of zero).
     */
    iommu_intremap_off,
-#ifdef CONFIG_X86
    /*
     * Interrupt remapping enabled, but only able to generate interrupts
     * with an 8-bit APIC ID.
     */
    iommu_intremap_restricted,
-#endif
    iommu_intremap_full,
 } iommu_intremap;
+#else
+# define iommu_intremap false
+#endif
 
 #if defined(CONFIG_IOMMU_FORCE_PT_SHARE)
 #define iommu_hap_pt_share true

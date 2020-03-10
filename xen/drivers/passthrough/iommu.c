@@ -35,7 +35,6 @@ bool __read_mostly iommu_quarantine = true;
 bool_t __read_mostly iommu_igfx = 1;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
-enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
 bool_t __read_mostly iommu_crash_disable;
 
 static bool __hwdom_initdata iommu_hwdom_none;
@@ -90,8 +89,10 @@ static int __init parse_iommu_param(const char *s)
             iommu_snoop = val;
         else if ( (val = parse_boolean("qinval", s, ss)) >= 0 )
             iommu_qinval = val;
+#ifndef iommu_intremap
         else if ( (val = parse_boolean("intremap", s, ss)) >= 0 )
             iommu_intremap = val ? iommu_intremap_full : iommu_intremap_off;
+#endif
         else if ( (val = parse_boolean("intpost", s, ss)) >= 0 )
             iommu_intpost = val;
 #ifdef CONFIG_KEXEC
@@ -474,8 +475,11 @@ int __init iommu_setup(void)
         rc = iommu_hardware_setup();
         iommu_enabled = (rc == 0);
     }
+
+#ifndef iommu_intremap
     if ( !iommu_enabled )
         iommu_intremap = iommu_intremap_off;
+#endif
 
     if ( (force_iommu && !iommu_enabled) ||
          (force_intremap && !iommu_intremap) )
@@ -500,7 +504,9 @@ int __init iommu_setup(void)
         printk(" - Dom0 mode: %s\n",
                iommu_hwdom_passthrough ? "Passthrough" :
                iommu_hwdom_strict ? "Strict" : "Relaxed");
+#ifndef iommu_intremap
         printk("Interrupt remapping %sabled\n", iommu_intremap ? "en" : "dis");
+#endif
         tasklet_init(&iommu_pt_cleanup_tasklet, iommu_free_pagetables, NULL);
     }
 
@@ -558,7 +564,9 @@ void iommu_crash_shutdown(void)
     if ( iommu_enabled )
         iommu_get_ops()->crash_shutdown();
     iommu_enabled = iommu_intpost = 0;
+#ifndef iommu_intremap
     iommu_intremap = iommu_intremap_off;
+#endif
 }
 
 int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)

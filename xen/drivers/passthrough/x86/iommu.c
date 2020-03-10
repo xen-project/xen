@@ -27,6 +27,8 @@
 const struct iommu_init_ops *__initdata iommu_init_ops;
 struct iommu_ops __read_mostly iommu_ops;
 
+enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
+
 int __init iommu_hardware_setup(void)
 {
     struct IO_APIC_route_entry **ioapic_entries = NULL;

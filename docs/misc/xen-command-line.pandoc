@@ -1299,6 +1299,8 @@ boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
     generation of IOMMUs only supported DMA remapping, and Interrupt Remapping
     appeared in the second generation.
 
+    This option is only valid on x86.
+
 *   The `intpost` boolean controls the Posted Interrupt sub-feature.  In
     combination with APIC acceleration (VT-x APICV, SVM AVIC), the IOMMU can
     be configured to deliver interrupts from assigned PCI devices directly
