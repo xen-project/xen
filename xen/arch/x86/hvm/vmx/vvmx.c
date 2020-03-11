@@ -130,12 +130,9 @@ int nvmx_vcpu_initialise(struct vcpu *v)
 
     if ( cpu_has_vmx_msr_bitmap )
     {
-        nvmx->msr_merged = alloc_domheap_page(d, MEMF_no_owner);
+        nvmx->msr_merged = alloc_xenheap_page();
         if ( !nvmx->msr_merged )
-        {
-            gdprintk(XENLOG_ERR, "nest: allocation for MSR bitmap failed\n");
             return -ENOMEM;
-        }
     }
 
     nvmx->ept.enabled = 0;
@@ -198,11 +195,7 @@ static void vcpu_relinquish_resources(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
-    if ( nvmx->msr_merged )
-    {
-        free_domheap_page(nvmx->msr_merged);
-        nvmx->msr_merged = NULL;
-    }
+    FREE_XENHEAP_PAGE(nvmx->msr_merged);
 }
 
 void nvmx_domain_relinquish_resources(struct domain *d)
@@ -575,13 +568,11 @@ unsigned long *_shadow_io_bitmap(struct vcpu *v)
 static void update_msrbitmap(struct vcpu *v, uint32_t shadow_ctrl)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
-    struct vmx_msr_bitmap *msr_bitmap;
+    struct vmx_msr_bitmap *msr_bitmap = nvmx->msr_merged;
 
     if ( !(shadow_ctrl & CPU_BASED_ACTIVATE_MSR_BITMAP) ||
          !nvmx->msrbitmap )
        return;
-
-    msr_bitmap = __map_domain_page(nvmx->msr_merged);
 
     bitmap_or(msr_bitmap->read_low, nvmx->msrbitmap->read_low,
               v->arch.hvm.vmx.msr_bitmap->read_low,
@@ -603,9 +594,7 @@ static void update_msrbitmap(struct vcpu *v, uint32_t shadow_ctrl)
     bitmap_set(msr_bitmap->read_low, MSR_X2APIC_FIRST, 0x100);
     bitmap_set(msr_bitmap->write_low, MSR_X2APIC_FIRST, 0x100);
 
-    unmap_domain_page(msr_bitmap);
-
-    __vmwrite(MSR_BITMAP, page_to_maddr(nvmx->msr_merged));
+    __vmwrite(MSR_BITMAP, virt_to_maddr(nvmx->msr_merged));
 }
 
 void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
