@@ -44,7 +44,7 @@ shift
 destf="$dest"
 for srcf in ${srcs}; do
 	if test -d "$dest"; then
-		destf="$dest/${srcf%%*/}"
+		destf="$dest/${srcf##*/}"
 	fi
 	org="$(sed -n '2q; /^#! *\/usr\/bin\/env python *$/p' $srcf)"
 	if test "x$org" = x; then
