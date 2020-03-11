@@ -323,6 +323,8 @@ struct domain
 
     shared_info_t   *shared_info;     /* shared data area */
 
+    rcu_read_lock_t  rcu_lock;
+
     spinlock_t       domain_lock;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
@@ -609,13 +611,13 @@ int rcu_lock_live_remote_domain_by_id(domid_t dom, struct domain **d);
 static inline void rcu_unlock_domain(struct domain *d)
 {
     if ( d != current->domain )
-        rcu_read_unlock(d);
+        rcu_read_unlock(&d->rcu_lock);
 }
 
 static inline struct domain *rcu_lock_domain(struct domain *d)
 {
     if ( d != current->domain )
-        rcu_read_lock(d);
+        rcu_read_lock(&d->rcu_lock);
     return d;
 }
 

@@ -398,6 +398,7 @@ struct domain *domain_create(domid_t domid,
         goto fail;
 
     atomic_set(&d->refcnt, 1);
+    RCU_READ_LOCK_INIT(&d->rcu_lock);
     spin_lock_init_prof(d, domain_lock);
     spin_lock_init_prof(d, page_alloc_lock);
     spin_lock_init(&d->hypercall_deadlock_mutex);

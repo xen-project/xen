@@ -65,6 +65,7 @@ int rcu_needs_cpu(int cpu);
 struct _rcu_read_lock {};
 typedef struct _rcu_read_lock rcu_read_lock_t;
 #define DEFINE_RCU_READ_LOCK(x) rcu_read_lock_t x
+#define RCU_READ_LOCK_INIT(x)
 
 /**
  * rcu_read_lock - mark the beginning of an RCU read-side critical section.
