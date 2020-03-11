@@ -89,6 +89,8 @@ struct rcu_data {
     /* 3) idle CPUs handling */
     struct timer idle_timer;
     bool idle_timer_active;
+
+    bool            process_callbacks;
 };
 
 /*
@@ -198,7 +200,7 @@ static void force_quiescent_state(struct rcu_data *rdp,
                                   struct rcu_ctrlblk *rcp)
 {
     cpumask_t cpumask;
-    raise_softirq(SCHEDULE_SOFTIRQ);
+    raise_softirq(RCU_SOFTIRQ);
     if (unlikely(rdp->qlen - rdp->last_rs_qlen > rsinterval)) {
         rdp->last_rs_qlen = rdp->qlen;
         /*
@@ -206,7 +208,7 @@ static void force_quiescent_state(struct rcu_data *rdp,
          * rdp->cpu is the current cpu.
          */
         cpumask_andnot(&cpumask, &rcp->cpumask, cpumask_of(rdp->cpu));
-        cpumask_raise_softirq(&cpumask, SCHEDULE_SOFTIRQ);
+        cpumask_raise_softirq(&cpumask, RCU_SOFTIRQ);
     }
 }
 
@@ -263,7 +265,10 @@ static void rcu_do_batch(struct rcu_data *rdp)
     if (!rdp->donelist)
         rdp->donetail = &rdp->donelist;
     else
+    {
+        rdp->process_callbacks = true;
         raise_softirq(RCU_SOFTIRQ);
+    }
 }
 
 /*
@@ -414,7 +419,13 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 
 static void rcu_process_callbacks(void)
 {
-    __rcu_process_callbacks(&rcu_ctrlblk, &this_cpu(rcu_data));
+    struct rcu_data *rdp = &this_cpu(rcu_data);
+
+    if ( rdp->process_callbacks )
+    {
+        rdp->process_callbacks = false;
+        __rcu_process_callbacks(&rcu_ctrlblk, rdp);
+    }
 }
 
 static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
@@ -522,6 +533,9 @@ static void rcu_idle_timer_handler(void* data)
 
 void rcu_check_callbacks(int cpu)
 {
+    struct rcu_data *rdp = &this_cpu(rcu_data);
+
+    rdp->process_callbacks = true;
     raise_softirq(RCU_SOFTIRQ);
 }
 
