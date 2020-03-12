@@ -12,7 +12,7 @@
 #define DOMNAME_PATH   "/local/domain/0/name"
 #define DOMID_PATH     "/local/domain/0/domid"
 
-int clear_domid_history(void)
+static int clear_domid_history(void)
 {
     int rc = 1;
     xentoollog_logger_stdiostream *logger;
