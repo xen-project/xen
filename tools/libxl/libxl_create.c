@@ -1168,6 +1168,8 @@ static void initiate_domain_create(libxl__egc *egc,
     libxl_domain_config *const d_config = dcs->guest_config;
     const int restore_fd = dcs->restore_fd;
 
+    libxl__xswait_init(&dcs->console_xswait);
+
     domid = dcs->domid;
     libxl__domain_build_state_init(&dcs->build_state);
 
@@ -1218,8 +1220,6 @@ static void initiate_domain_create(libxl__egc *egc,
     ret = libxl__device_nic_set_devids(gc, d_config, domid);
     if (ret)
         goto error_out;
-
-    libxl__xswait_init(&dcs->console_xswait);
 
     if (restore_fd >= 0 || dcs->soft_reset) {
         LOGD(DEBUG, domid, "restoring, not running bootloader");
