@@ -1204,14 +1204,14 @@ static void wait_tick_pvh(void)
  * APIC irq that way.
  */
 
-static int __init calibrate_APIC_clock(void)
+static void __init calibrate_APIC_clock(void)
 {
     unsigned long long t1, t2;
-    unsigned long tt1, tt2, result;
+    unsigned long tt1, tt2;
     unsigned int i;
     unsigned long bus_freq; /* KAF: pointer-size avoids compile warns. */
     unsigned int bus_cycle; /* length of one bus cycle in pico-seconds */
-    const unsigned int LOOPS = HZ/10;
+#define LOOPS_FRAC 10U      /* measure for one tenth of a second */
 
     apic_printk(APIC_VERBOSE, "calibrating APIC timer ...\n");
 
@@ -1238,9 +1238,9 @@ static int __init calibrate_APIC_clock(void)
     tt1 = apic_read(APIC_TMCCT);
 
     /*
-     * Let's wait LOOPS ticks:
+     * Let's wait HZ / LOOPS_FRAC ticks:
      */
-    for (i = 0; i < LOOPS; i++)
+    for (i = 0; i < HZ / LOOPS_FRAC; i++)
         if ( !xen_guest )
             wait_8254_wraparound();
         else
@@ -1249,17 +1249,16 @@ static int __init calibrate_APIC_clock(void)
     tt2 = apic_read(APIC_TMCCT);
     t2 = rdtsc_ordered();
 
-    result = (tt1-tt2)*APIC_DIVISOR/LOOPS;
+    bus_freq = (tt1 - tt2) * APIC_DIVISOR * LOOPS_FRAC;
 
-    apic_printk(APIC_VERBOSE, "..... CPU clock speed is %ld.%04ld MHz.\n",
-                ((long)(t2 - t1) / LOOPS) / (1000000 / HZ),
-                ((long)(t2 - t1) / LOOPS) % (1000000 / HZ));
+    apic_printk(APIC_VERBOSE, "..... CPU clock speed is %lu.%04lu MHz.\n",
+                ((unsigned long)(t2 - t1) * LOOPS_FRAC) / 1000000,
+                (((unsigned long)(t2 - t1) * LOOPS_FRAC) / 100) % 10000);
 
     apic_printk(APIC_VERBOSE, "..... host bus clock speed is %ld.%04ld MHz.\n",
-                result / (1000000 / HZ), result % (1000000 / HZ));
+                bus_freq / 1000000, (bus_freq / 100) % 10000);
 
     /* set up multipliers for accurate timer code */
-    bus_freq   = result*HZ;
     bus_cycle  = 1000000000000UL / bus_freq; /* in pico seconds */
     bus_cycle += (1000000000000UL % bus_freq) * 2 > bus_freq;
     bus_scale  = (1000*262144)/bus_cycle;
@@ -1269,7 +1268,7 @@ static int __init calibrate_APIC_clock(void)
     /* reset APIC to zero timeout value */
     __setup_APIC_LVTT(0);
 
-    return result;
+#undef LOOPS_FRAC
 }
 
 void __init setup_boot_APIC_clock(void)
