@@ -2,6 +2,7 @@
 #define __RWLOCK_H__
 
 #include <xen/percpu.h>
+#include <xen/preempt.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>
 
@@ -54,6 +55,7 @@ static inline int _read_trylock(rwlock_t *lock)
 {
     u32 cnts;
 
+    preempt_disable();
     cnts = atomic_read(&lock->cnts);
     if ( likely(_can_read_lock(cnts)) )
     {
@@ -62,6 +64,7 @@ static inline int _read_trylock(rwlock_t *lock)
             return 1;
         atomic_sub(_QR_BIAS, &lock->cnts);
     }
+    preempt_enable();
     return 0;
 }
 
@@ -73,6 +76,7 @@ static inline void _read_lock(rwlock_t *lock)
 {
     u32 cnts;
 
+    preempt_disable();
     cnts = atomic_add_return(_QR_BIAS, &lock->cnts);
     if ( likely(_can_read_lock(cnts)) )
         return;
@@ -106,6 +110,7 @@ static inline void _read_unlock(rwlock_t *lock)
      * Atomically decrement the reader count
      */
     atomic_sub(_QR_BIAS, &lock->cnts);
+    preempt_enable();
 }
 
 static inline void _read_unlock_irq(rwlock_t *lock)
@@ -137,6 +142,7 @@ static inline unsigned int _write_lock_val(void)
 static inline void _write_lock(rwlock_t *lock)
 {
     /* Optimize for the unfair lock case where the fair flag is 0. */
+    preempt_disable();
     if ( atomic_cmpxchg(&lock->cnts, 0, _write_lock_val()) == 0 )
         return;
 
@@ -168,17 +174,23 @@ static inline int _write_trylock(rwlock_t *lock)
 {
     u32 cnts;
 
+    preempt_disable();
     cnts = atomic_read(&lock->cnts);
-    if ( unlikely(cnts) )
+    if ( unlikely(cnts) ||
+         unlikely(atomic_cmpxchg(&lock->cnts, 0, _write_lock_val()) != 0) )
+    {
+        preempt_enable();
         return 0;
+    }
 
-    return likely(atomic_cmpxchg(&lock->cnts, 0, _write_lock_val()) == 0);
+    return 1;
 }
 
 static inline void _write_unlock(rwlock_t *lock)
 {
     ASSERT(_is_write_locked_by_me(atomic_read(&lock->cnts)));
     atomic_and(~(_QW_CPUMASK | _QW_WMASK), &lock->cnts);
+    preempt_enable();
 }
 
 static inline void _write_unlock_irq(rwlock_t *lock)
@@ -274,6 +286,7 @@ static inline void _percpu_read_lock(percpu_rwlock_t **per_cpudata,
     }
 
     /* Indicate this cpu is reading. */
+    preempt_disable();
     this_cpu_ptr(per_cpudata) = percpu_rwlock;
     smp_mb();
     /* Check if a writer is waiting. */
@@ -309,6 +322,7 @@ static inline void _percpu_read_unlock(percpu_rwlock_t **per_cpudata,
     }
     this_cpu_ptr(per_cpudata) = NULL;
     smp_wmb();
+    preempt_enable();
 }
 
 /* Don't inline percpu write lock as it's a complex function. */
