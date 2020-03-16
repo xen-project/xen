@@ -1207,21 +1207,19 @@ static void wait_tick_pvh(void)
 static int __init calibrate_APIC_clock(void)
 {
     unsigned long long t1, t2;
-    long tt1, tt2;
-    long result;
-    int i;
+    unsigned long tt1, tt2, result;
+    unsigned int i;
     unsigned long bus_freq; /* KAF: pointer-size avoids compile warns. */
-    u32 bus_cycle;          /* length of one bus cycle in pico-seconds */
-    const int LOOPS = HZ/10;
+    unsigned int bus_cycle; /* length of one bus cycle in pico-seconds */
+    const unsigned int LOOPS = HZ/10;
 
     apic_printk(APIC_VERBOSE, "calibrating APIC timer ...\n");
 
     /*
-     * Put whatever arbitrary (but long enough) timeout
-     * value into the APIC clock, we just want to get the
-     * counter running for calibration.
+     * Setup the APIC counter to maximum. There is no way the lapic
+     * can underflow in the 100ms detection time frame.
      */
-    __setup_APIC_LVTT(1000000000);
+    __setup_APIC_LVTT(0xffffffff);
 
     if ( !xen_guest )
         /*
@@ -1250,14 +1248,6 @@ static int __init calibrate_APIC_clock(void)
 
     tt2 = apic_read(APIC_TMCCT);
     t2 = rdtsc_ordered();
-
-    /*
-     * The APIC bus clock counter is 32 bits only, it
-     * might have overflown, but note that we use signed
-     * longs, thus no extra care needed.
-     *
-     * underflown to be exact, as the timer counts down ;)
-     */
 
     result = (tt1-tt2)*APIC_DIVISOR/LOOPS;
 
