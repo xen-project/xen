@@ -277,7 +277,7 @@ $(foreach base,arch/x86/mm/guest_walk_% \
                arch/x86/mm/shadow/guest_%, \
     $(foreach ext,o i s,$(call build-intermediate,$(base).$(ext))))
 
-kconfig := oldconfig config menuconfig defconfig \
+kconfig := oldconfig config menuconfig defconfig allyesconfig allnoconfig \
 	nconfig xconfig gconfig savedefconfig listnewconfig olddefconfig \
 	randconfig $(notdir $(wildcard arch/$(SRCARCH)/configs/*_defconfig))
 .PHONY: $(kconfig)
