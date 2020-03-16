@@ -799,9 +799,9 @@ u64 __init hpet_setup(void)
     hpet_resume(hpet_boot_cfg);
 
     hpet_rate = 1000000000000000ULL; /* 10^15 */
-    (void)do_div(hpet_rate, hpet_period);
+    last = do_div(hpet_rate, hpet_period);
 
-    return hpet_rate;
+    return hpet_rate + (last * 2 > hpet_period);
 }
 
 void hpet_resume(u32 *boot_cfg)

@@ -1260,8 +1260,10 @@ static int __init calibrate_APIC_clock(void)
 
     /* set up multipliers for accurate timer code */
     bus_freq   = result*HZ;
-    bus_cycle  = (u32) (1000000000000LL/bus_freq); /* in pico seconds */
+    bus_cycle  = 1000000000000UL / bus_freq; /* in pico seconds */
+    bus_cycle += (1000000000000UL % bus_freq) * 2 > bus_freq;
     bus_scale  = (1000*262144)/bus_cycle;
+    bus_scale += ((1000 * 262144) % bus_cycle) * 2 > bus_cycle;
 
     apic_printk(APIC_VERBOSE, "..... bus_scale = %#x\n", bus_scale);
     /* reset APIC to zero timeout value */

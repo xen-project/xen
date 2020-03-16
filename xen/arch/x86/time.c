@@ -275,7 +275,10 @@ static char *freq_string(u64 freq)
 {
     static char s[20];
     unsigned int x, y;
-    y = (unsigned int)do_div(freq, 1000000) / 1000;
+
+    if ( do_div(freq, 1000) > 500 )
+        ++freq;
+    y = (unsigned int)do_div(freq, 1000);
     x = (unsigned int)freq;
     snprintf(s, sizeof(s), "%u.%03uMHz", x, y);
     return s;
