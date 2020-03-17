@@ -22,6 +22,7 @@
 #include <xen/types.h>         /* for uintNN_t */
 #include <xen/sched.h>         /* for struct vcpu, struct domain */
 #include <asm/hvm/vcpu.h>      /* for vcpu_nestedhvm */
+#include <public/hvm/params.h>
 
 enum nestedhvm_vmexits {
     NESTEDHVM_VMEXIT_ERROR = 0, /* inject VMEXIT w/ invalid VMCB */

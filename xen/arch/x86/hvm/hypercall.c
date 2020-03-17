@@ -24,6 +24,9 @@
 
 #include <asm/hvm/support.h>
 
+#include <public/hvm/hvm_op.h>
+#include <public/hvm/params.h>
+
 static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     const struct vcpu *curr = current;

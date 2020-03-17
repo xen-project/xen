@@ -28,6 +28,7 @@
 #include <asm/hvm/support.h>
 #include <asm/current.h>
 #include <xen/trace.h>
+#include <public/hvm/params.h>
 
 #define USEC_PER_SEC    1000000UL
 #define NS_PER_USEC     1000UL

@@ -26,6 +26,7 @@
 #include <xen/event.h>
 #include <xen/trace.h>
 #include <xen/nospec.h>
+#include <public/hvm/params.h>
 
 #define domain_vhpet(x) (&(x)->arch.hvm.pl_time->vhpet)
 #define vcpu_vhpet(x)   (domain_vhpet((x)->domain))

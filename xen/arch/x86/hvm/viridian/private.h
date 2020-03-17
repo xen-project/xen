@@ -4,6 +4,7 @@
 #define X86_HVM_VIRIDIAN_PRIVATE_H
 
 #include <asm/hvm/save.h>
+#include <public/hvm/params.h>
 
 int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val);
 int viridian_synic_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val);

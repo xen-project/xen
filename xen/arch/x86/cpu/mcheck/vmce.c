@@ -28,6 +28,7 @@
 #include <xen/mm.h>
 #include <asm/hvm/save.h>
 #include <asm/processor.h>
+#include <public/hvm/params.h>
 #include <public/sysctl.h>
 #include <asm/system.h>
 #include <asm/msr.h>

@@ -22,6 +22,7 @@
 #include <asm/event.h>
 #include <asm/apic.h>
 #include <asm/mc146818rtc.h>
+#include <public/hvm/params.h>
 
 #define mode_is(d, name) \
     ((d)->arch.hvm.params[HVM_PARAM_TIMER_MODE] == HVMPTM_##name)

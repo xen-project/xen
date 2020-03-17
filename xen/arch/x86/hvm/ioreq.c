@@ -34,6 +34,7 @@
 #include <asm/hvm/vmx/vmx.h>
 
 #include <public/hvm/ioreq.h>
+#include <public/hvm/params.h>
 
 static void set_ioreq_server(struct domain *d, unsigned int id,
                              struct hvm_ioreq_server *s)

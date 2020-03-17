@@ -20,20 +20,14 @@
 #ifndef __ASM_X86_HVM_DOMAIN_H__
 #define __ASM_X86_HVM_DOMAIN_H__
 
-#include <xen/iommu.h>
-#include <asm/hvm/irq.h>
-#include <asm/hvm/vpt.h>
-#include <asm/hvm/vlapic.h>
-#include <asm/hvm/vioapic.h>
+#include <xen/list.h>
+#include <xen/mm.h>
+#include <xen/radix-tree.h>
+
 #include <asm/hvm/io.h>
-#include <asm/hvm/viridian.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/svm/vmcb.h>
-#include <asm/mem_sharing.h>
-#include <public/grant_table.h>
-#include <public/hvm/params.h>
-#include <public/hvm/save.h>
-#include <public/hvm/hvm_op.h>
+
 #include <public/hvm/dm_op.h>
 
 struct hvm_ioreq_page {

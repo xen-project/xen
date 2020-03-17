@@ -28,6 +28,7 @@
 #include <asm/fixmap.h>
 #include <asm/guest.h>
 
+#include <public/hvm/params.h>
 #include <public/io/console.h>
 
 static struct xencons_interface *cons_ring;

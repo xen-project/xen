@@ -28,6 +28,8 @@
 #include <asm/msr.h>
 #include <asm/setup.h>
 
+#include <public/hvm/params.h>
+
 DEFINE_PER_CPU(uint32_t, tsc_aux);
 
 struct msr_policy __read_mostly     raw_msr_policy,

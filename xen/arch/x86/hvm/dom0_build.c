@@ -38,6 +38,7 @@
 #include <public/arch-x86/hvm/start_info.h>
 #include <public/hvm/hvm_info_table.h>
 #include <public/hvm/hvm_vcpu.h>
+#include <public/hvm/params.h>
 
 /*
  * Have the TSS cover the ISA port range, which makes it

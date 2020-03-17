@@ -35,6 +35,7 @@
 #include <asm/pv/mm.h>
 
 #include <public/arch-x86/cpuid.h>
+#include <public/hvm/params.h>
 
 #include <compat/grant_table.h>
 

@@ -17,6 +17,7 @@
 
 #include <xen/sched.h>
 #include <xsm/xsm.h>
+#include <public/hvm/params.h>
 
 /* Cannot use BUILD_BUG_ON here because the expressions we check are not
  * considered constant at compile time. Instead, rely on constant propagation to

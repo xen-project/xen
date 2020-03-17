@@ -27,6 +27,8 @@
 
 #include <xsm/xsm.h>
 
+#include <public/hvm/hvm_op.h>
+
 struct dmop_args {
     domid_t domid;
     unsigned int nr_bufs;

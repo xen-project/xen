@@ -76,6 +76,7 @@
 #include <asm/hpet.h>
 #include <asm/vpmu.h>
 #include <public/arch-x86/cpuid.h>
+#include <public/hvm/params.h>
 #include <asm/cpuid.h>
 #include <xsm/xsm.h>
 #include <asm/pv/traps.h>

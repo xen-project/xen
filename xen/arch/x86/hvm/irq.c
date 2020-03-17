@@ -26,6 +26,7 @@
 #include <asm/hvm/domain.h>
 #include <asm/hvm/support.h>
 #include <asm/msi.h>
+#include <public/hvm/params.h>
 
 bool hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
 {
