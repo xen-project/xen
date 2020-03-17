@@ -18,8 +18,6 @@
 #ifndef __ASM_X86_HVM_VMX_VMCS_H__
 #define __ASM_X86_HVM_VMX_VMCS_H__
 
-#include <asm/hvm/io.h>
-
 extern void vmcs_dump_vcpu(struct vcpu *v);
 extern void setup_vmcs_dump(void);
 extern int  vmx_cpu_up_prepare(unsigned int cpu);

@@ -26,6 +26,7 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/nestedsvm.h>
 #include <asm/mtrr.h>
+#include <public/hvm/ioreq.h>
 
 enum hvm_io_completion {
     HVMIO_no_completion,
