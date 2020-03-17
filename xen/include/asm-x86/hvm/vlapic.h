@@ -21,8 +21,6 @@
 #define __ASM_X86_HVM_VLAPIC_H__
 
 #include <xen/tasklet.h>
-#include <asm/msr.h>
-#include <public/hvm/ioreq.h>
 #include <asm/hvm/vpt.h>
 
 #define vcpu_vlapic(x)   (&(x)->arch.hvm.vlapic)
