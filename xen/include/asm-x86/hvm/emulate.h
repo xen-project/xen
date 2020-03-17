@@ -13,6 +13,7 @@
 #define __ASM_X86_HVM_EMULATE_H__
 
 #include <xen/err.h>
+#include <xen/mm.h>
 #include <asm/hvm/hvm.h>
 #include <asm/x86_emulate.h>
 

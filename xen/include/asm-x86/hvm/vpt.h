@@ -21,6 +21,7 @@
 
 #include <xen/timer.h>
 #include <xen/list.h>
+#include <xen/rwlock.h>
 #include <asm/hvm/hvm.h>
 
 /*

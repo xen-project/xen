@@ -20,12 +20,11 @@
 #ifndef __ASM_X86_HVM_HVM_H__
 #define __ASM_X86_HVM_HVM_H__
 
+#include <asm/alternative.h>
+#include <asm/asm_defns.h>
 #include <asm/current.h>
 #include <asm/x86_emulate.h>
 #include <asm/hvm/asid.h>
-#include <public/domctl.h>
-#include <public/hvm/save.h>
-#include <xen/mm.h>
 
 #ifdef CONFIG_HVM_FEP
 /* Permit use of the Forced Emulation Prefix in HVM guests */
@@ -326,6 +325,7 @@ int hvm_debug_op(struct vcpu *v, int32_t op);
 void hvm_toggle_singlestep(struct vcpu *v);
 void hvm_fast_singlestep(struct vcpu *v, uint16_t p2midx);
 
+struct npfec;
 int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                               struct npfec npfec);
 
