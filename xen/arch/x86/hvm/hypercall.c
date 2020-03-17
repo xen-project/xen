@@ -23,6 +23,7 @@
 #include <xen/nospec.h>
 
 #include <asm/hvm/support.h>
+#include <asm/hvm/viridian.h>
 
 #include <public/hvm/hvm_op.h>
 #include <public/hvm/params.h>

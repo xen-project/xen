@@ -25,6 +25,7 @@
 #include <xen/sched.h>
 
 #include <asm/debugreg.h>
+#include <asm/hvm/viridian.h>
 #include <asm/msr.h>
 #include <asm/setup.h>
 
