@@ -26,6 +26,8 @@
 #ifndef __XEN_PUBLIC_HVM_SAVE_X86_H__
 #define __XEN_PUBLIC_HVM_SAVE_X86_H__
 
+#include "../../xen.h"
+
 /*
  * Save/restore header: general info about the save file.
  */

@@ -25,7 +25,6 @@
 #define __ASM_X86_HVM_VIOAPIC_H__
 
 #include <xen/types.h>
-#include <xen/smp.h>
 #include <public/hvm/save.h>
 
 #define VIOAPIC_VERSION_ID 0x11 /* IOAPIC version */
