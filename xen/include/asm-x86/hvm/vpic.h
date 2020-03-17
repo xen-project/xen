@@ -27,7 +27,8 @@
 #ifndef __ASM_X86_HVM_VPIC_H__
 #define __ASM_X86_HVM_VPIC_H__
 
-#include <public/hvm/save.h>
+struct domain;
+struct vcpu;
 
 void vpic_irq_positive_edge(struct domain *d, int irq);
 void vpic_irq_negative_edge(struct domain *d, int irq);
