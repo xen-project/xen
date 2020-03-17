@@ -2028,7 +2028,7 @@ static PyMethodDef pyxc_methods[] = {
 
     { "gnttab_hvm_seed",
       (PyCFunction)pyxc_gnttab_hvm_seed,
-      METH_KEYWORDS, "\n"
+      METH_VARARGS | METH_KEYWORDS, "\n"
       "Initialise HVM guest grant table.\n"
       " dom     [int]:      Identifier of domain to build into.\n"
       " console_gmfn [int]: \n"
@@ -2097,7 +2097,7 @@ static PyMethodDef pyxc_methods[] = {
 
     { "sched_credit_domain_set",
       (PyCFunction)pyxc_sched_credit_domain_set,
-      METH_KEYWORDS, "\n"
+      METH_VARARGS | METH_KEYWORDS, "\n"
       "Set the scheduling parameters for a domain when running with the\n"
       "SMP credit scheduler.\n"
       " domid     [int]:   domain id to set\n"
@@ -2115,7 +2115,7 @@ static PyMethodDef pyxc_methods[] = {
 
     { "sched_credit2_domain_set",
       (PyCFunction)pyxc_sched_credit2_domain_set,
-      METH_KEYWORDS, "\n"
+      METH_VARARGS | METH_KEYWORDS, "\n"
       "Set the scheduling parameters for a domain when running with the\n"
       "SMP credit2 scheduler.\n"
       " domid     [int]:   domain id to set\n"
@@ -2393,21 +2393,21 @@ static PyMethodDef pyxc_methods[] = {
 
     { "flask_context_to_sid",
       (PyCFunction)pyflask_context_to_sid,
-      METH_KEYWORDS, "\n"
+      METH_VARARGS | METH_KEYWORDS, "\n"
       "Convert a context string to a dynamic SID.\n"
       " context [str]: String specifying context to be converted\n"
       "Returns: [int]: Numeric SID on success; -1 on error.\n" },
 
     { "flask_sid_to_context",
       (PyCFunction)pyflask_sid_to_context,
-      METH_KEYWORDS, "\n"
+      METH_VARARGS | METH_KEYWORDS, "\n"
       "Convert a dynamic SID to context string.\n"
       " context [int]: SID to be converted\n"
       "Returns: [str]: Numeric SID on success; -1 on error.\n" },
 
     { "flask_load",
       (PyCFunction)pyflask_load,
-      METH_KEYWORDS, "\n"
+      METH_VARARGS | METH_KEYWORDS, "\n"
       "Loads a policy into the hypervisor.\n"
       " policy [str]: policy to be load\n"
       "Returns: [int]: 0 on success; -1 on failure.\n" }, 
@@ -2420,14 +2420,14 @@ static PyMethodDef pyxc_methods[] = {
 
     { "flask_setenforce",
       (PyCFunction)pyflask_setenforce,
-      METH_KEYWORDS, "\n"
+      METH_VARARGS | METH_KEYWORDS, "\n"
       "Modifies the current mode for the Flask XSM module.\n"
       " mode [int]: mode to change to\n"
       "Returns: [int]: 0 on success; -1 on failure.\n" }, 
 
     { "flask_access",
       (PyCFunction)pyflask_access,
-      METH_KEYWORDS, "\n"
+      METH_VARARGS | METH_KEYWORDS, "\n"
       "Returns whether a source context has access to target context based on \
        class and permissions requested.\n"
       " scon [str]: source context\n"
