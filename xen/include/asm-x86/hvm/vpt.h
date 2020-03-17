@@ -19,16 +19,9 @@
 #ifndef __ASM_X86_HVM_VPT_H__
 #define __ASM_X86_HVM_VPT_H__
 
-#include <xen/init.h>
-#include <xen/lib.h>
-#include <xen/time.h>
-#include <xen/errno.h>
-#include <xen/time.h>
 #include <xen/timer.h>
 #include <xen/list.h>
-#include <asm/hvm/vpic.h>
-#include <asm/hvm/irq.h>
-#include <public/hvm/save.h>
+#include <asm/hvm/hvm.h>
 
 /*
  * Abstract layer of periodic time, one short time.
@@ -145,6 +138,7 @@ struct pl_time {    /* platform time */
 void pt_save_timer(struct vcpu *v);
 void pt_restore_timer(struct vcpu *v);
 int pt_update_irq(struct vcpu *v);
+struct hvm_intack;
 void pt_intr_post(struct vcpu *v, struct hvm_intack intack);
 void pt_migrate(struct vcpu *v);
 
