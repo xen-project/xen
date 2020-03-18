@@ -64,6 +64,19 @@ struct hvm_ioreq_server {
     uint8_t                bufioreq_handling;
 };
 
+#ifdef CONFIG_MEM_SHARING
+struct mem_sharing_domain
+{
+    bool enabled;
+
+    /*
+     * When releasing shared gfn's in a preemptible manner, recall where
+     * to resume the search.
+     */
+    unsigned long next_shared_gfn_to_relinquish;
+};
+#endif
+
 /*
  * This structure defines function hooks to support hardware-assisted
  * virtual interrupt delivery to guest. (e.g. VMX PI and SVM AVIC).

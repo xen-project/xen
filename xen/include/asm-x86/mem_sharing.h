@@ -26,17 +26,6 @@
 
 #ifdef CONFIG_MEM_SHARING
 
-struct mem_sharing_domain
-{
-    bool enabled;
-
-    /*
-     * When releasing shared gfn's in a preemptible manner, recall where
-     * to resume the search.
-     */
-    unsigned long next_shared_gfn_to_relinquish;
-};
-
 #define mem_sharing_enabled(d) ((d)->arch.hvm.mem_sharing.enabled)
 
 /* Auditing of memory sharing code? */
