@@ -774,6 +774,9 @@ int libxl__domain_pvcontrol(libxl__egc *egc, libxl__xswait_state *pvcontrol,
     if (rc < 0)
         return rc;
 
+    if (!rc)
+        return ERROR_NOPARAVIRT;
+
     shutdown_path = libxl__domain_pvcontrol_xspath(gc, domid);
     if (!shutdown_path)
         return ERROR_FAIL;
