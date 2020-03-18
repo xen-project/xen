@@ -6,8 +6,8 @@
 #include <xen/vga.h>
 #include <asm/e820.h>
 #include <asm/edd.h>
+#include <asm/microcode.h>
 #include <asm/msr.h>
-#include <asm/processor.h>
 
 static struct file __initdata ucode;
 static multiboot_info_t __initdata mbi = {

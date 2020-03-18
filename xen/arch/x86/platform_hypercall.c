@@ -27,6 +27,7 @@
 #include <public/platform.h>
 #include <acpi/cpufreq/processor_perf.h>
 #include <asm/edd.h>
+#include <asm/microcode.h>
 #include <asm/mtrr.h>
 #include <asm/io_apic.h>
 #include <asm/setup.h>

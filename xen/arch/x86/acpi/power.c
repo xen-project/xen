@@ -30,6 +30,7 @@
 #include <asm/tboot.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
+#include <asm/microcode.h>
 #include <asm/spec_ctrl.h>
 #include <acpi/cpufreq/cpufreq.h>
 

@@ -52,6 +52,7 @@
 #include <asm/cpuid.h>
 #include <asm/spec_ctrl.h>
 #include <asm/guest.h>
+#include <asm/microcode.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool __initdata opt_nosmp;

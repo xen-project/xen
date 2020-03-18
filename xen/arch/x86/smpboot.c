@@ -39,6 +39,7 @@
 #include <asm/div64.h>
 #include <asm/flushtlb.h>
 #include <asm/guest.h>
+#include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/spec_ctrl.h>

@@ -9,7 +9,6 @@
 #include <xen/types.h>
 #include <xen/smp.h>
 #include <xen/percpu.h>
-#include <public/xen.h>
 #include <asm/types.h>
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
@@ -578,13 +577,6 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
                              uint32_t subleaf, struct cpuid_leaf *res);
 int guest_rdmsr_xen(const struct vcpu *v, uint32_t idx, uint64_t *val);
 int guest_wrmsr_xen(struct vcpu *v, uint32_t idx, uint64_t val);
-
-void microcode_set_module(unsigned int);
-int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void), unsigned long len);
-int early_microcode_init(void);
-int microcode_update_one(bool start_update);
-int microcode_init_intel(void);
-int microcode_init_amd(void);
 
 static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
                                      uint8_t *stepping)

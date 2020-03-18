@@ -24,7 +24,6 @@
 
 #include <asm/microcode.h>
 #include <asm/msr.h>
-#include <asm/processor.h>
 #include <asm/pv/domain.h>
 #include <asm/pv/shim.h>
 #include <asm/setup.h>

@@ -34,4 +34,7 @@ struct microcode_ops {
 
 extern const struct microcode_ops *microcode_ops;
 
+int microcode_init_intel(void);
+int microcode_init_amd(void);
+
 #endif /* ASM_X86_MICROCODE_PRIVATE_H */
