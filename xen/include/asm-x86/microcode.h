@@ -41,6 +41,4 @@ struct cpu_signature {
 DECLARE_PER_CPU(struct cpu_signature, cpu_sig);
 extern const struct microcode_ops *microcode_ops;
 
-void microcode_free_patch(struct microcode_patch *patch);
-
 #endif /* ASM_X86__MICROCODE_H */

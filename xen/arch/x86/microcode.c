@@ -250,7 +250,7 @@ static struct microcode_patch *parse_blob(const char *buf, size_t len)
     return NULL;
 }
 
-void microcode_free_patch(struct microcode_patch *microcode_patch)
+static void microcode_free_patch(struct microcode_patch *microcode_patch)
 {
     microcode_ops->free_patch(microcode_patch->mc);
     xfree(microcode_patch);
@@ -763,15 +763,12 @@ int microcode_update_one(bool start_update)
 }
 
 /* BSP calls this function to parse ucode blob and then apply an update. */
-int __init early_microcode_update_cpu(void)
+static int __init early_microcode_update_cpu(void)
 {
     int rc = 0;
     const void *data = NULL;
     size_t len;
     struct microcode_patch *patch;
-
-    if ( !microcode_ops )
-        return -ENOSYS;
 
     if ( ucode_blob.size )
     {
