@@ -22,29 +22,22 @@
  */
 
 #include <xen/cpu.h>
+#include <xen/earlycpio.h>
 #include <xen/err.h>
+#include <xen/guest_access.h>
 #include <xen/init.h>
-#include <xen/kernel.h>
-#include <xen/lib.h>
-#include <xen/notifier.h>
 #include <xen/param.h>
-#include <xen/sched.h>
-#include <xen/smp.h>
-#include <xen/softirq.h>
 #include <xen/spinlock.h>
 #include <xen/stop_machine.h>
-#include <xen/tasklet.h>
-#include <xen/guest_access.h>
-#include <xen/earlycpio.h>
 #include <xen/watchdog.h>
 
 #include <asm/apic.h>
 #include <asm/delay.h>
-#include <asm/msr.h>
 #include <asm/nmi.h>
 #include <asm/processor.h>
 #include <asm/setup.h>
-#include <asm/microcode.h>
+
+#include "private.h"
 
 /*
  * Before performing a late microcode update on any thread, we

@@ -1,4 +1,5 @@
 obj-y += mcheck/
+obj-y += microcode/
 obj-y += mtrr/
 
 obj-y += amd.o
