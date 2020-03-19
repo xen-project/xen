@@ -148,13 +148,19 @@ static void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms
     int i;
     unsigned int num, len;
 
+    e = xs_directory(h, XBT_NULL, path, &num);
+    if (e == NULL) {
+        if (cur_depth && errno == ENOENT) {
+            /* If a node disappears while recursing, silently move on. */
+            return;
+        }
+
+        err(1, "xs_directory (%s)", path);
+    }
+
     newpath = malloc(STRING_MAX);
     if (!newpath)
       err(1, "malloc in do_ls");
-
-    e = xs_directory(h, XBT_NULL, path, &num);
-    if (e == NULL)
-        err(1, "xs_directory (%s)", path);
 
     for (i = 0; i<num; i++) {
         char buf[MAX_STRLEN(unsigned int)+1];
