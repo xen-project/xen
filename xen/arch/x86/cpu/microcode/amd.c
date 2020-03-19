@@ -76,22 +76,12 @@ struct mpbhdr {
 /* See comment in start_update() for cases when this routine fails */
 static int collect_cpu_info(struct cpu_signature *csig)
 {
-    unsigned int cpu = smp_processor_id();
-    struct cpuinfo_x86 *c = &cpu_data[cpu];
-
     memset(csig, 0, sizeof(*csig));
-
-    if ( (c->x86_vendor != X86_VENDOR_AMD) || (c->x86 < 0x10) )
-    {
-        printk(KERN_ERR "microcode: CPU%d not a capable AMD processor\n",
-               cpu);
-        return -EINVAL;
-    }
 
     rdmsrl(MSR_AMD_PATCHLEVEL, csig->rev);
 
     pr_debug("microcode: CPU%d collect_cpu_info: patch_id=%#x\n",
-             cpu, csig->rev);
+             smp_processor_id(), csig->rev);
 
     return 0;
 }
@@ -601,7 +591,7 @@ static int start_update(void)
 }
 #endif
 
-static const struct microcode_ops microcode_amd_ops = {
+const struct microcode_ops amd_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
@@ -613,10 +603,3 @@ static const struct microcode_ops microcode_amd_ops = {
     .compare_patch                    = compare_patch,
     .match_cpu                        = match_cpu,
 };
-
-int __init microcode_init_amd(void)
-{
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-        microcode_ops = &microcode_amd_ops;
-    return 0;
-}

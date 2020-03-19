@@ -210,7 +210,7 @@ scan:
         microcode_scan_module(module_map, mbi);
 }
 
-const struct microcode_ops *microcode_ops;
+static const struct microcode_ops __read_mostly *microcode_ops;
 
 static DEFINE_SPINLOCK(microcode_mutex);
 
@@ -798,23 +798,32 @@ static int __init early_microcode_update_cpu(void)
 
 int __init early_microcode_init(void)
 {
-    int rc;
+    const struct cpuinfo_x86 *c = &boot_cpu_data;
+    int rc = 0;
 
-    rc = microcode_init_intel();
-    if ( rc )
-        return rc;
-
-    rc = microcode_init_amd();
-    if ( rc )
-        return rc;
-
-    if ( microcode_ops )
+    switch ( c->x86_vendor )
     {
-        microcode_ops->collect_cpu_info(&this_cpu(cpu_sig));
+    case X86_VENDOR_AMD:
+        if ( c->x86 >= 0x10 )
+            microcode_ops = &amd_ucode_ops;
+        break;
 
-        if ( ucode_mod.mod_end || ucode_blob.size )
-            rc = early_microcode_update_cpu();
+    case X86_VENDOR_INTEL:
+        if ( c->x86 >= 6 )
+            microcode_ops = &intel_ucode_ops;
+        break;
     }
+
+    if ( !microcode_ops )
+    {
+        printk(XENLOG_WARNING "Microcode loading not available\n");
+        return -ENODEV;
+    }
+
+    microcode_ops->collect_cpu_info(&this_cpu(cpu_sig));
+
+    if ( ucode_mod.mod_end || ucode_blob.size )
+        rc = early_microcode_update_cpu();
 
     return rc;
 }

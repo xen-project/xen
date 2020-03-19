@@ -93,27 +93,14 @@ struct extended_sigtable {
 
 static int collect_cpu_info(struct cpu_signature *csig)
 {
-    unsigned int cpu_num = smp_processor_id();
-    struct cpuinfo_x86 *c = &cpu_data[cpu_num];
     uint64_t msr_content;
 
     memset(csig, 0, sizeof(*csig));
 
-    if ( (c->x86_vendor != X86_VENDOR_INTEL) || (c->x86 < 6) )
-    {
-        printk(KERN_ERR "microcode: CPU%d not a capable Intel "
-               "processor\n", cpu_num);
-        return -1;
-    }
-
     csig->sig = cpuid_eax(0x00000001);
 
-    if ( (c->x86_model >= 5) || (c->x86 > 6) )
-    {
-        /* get processor flags from MSR 0x17 */
-        rdmsrl(MSR_IA32_PLATFORM_ID, msr_content);
-        csig->pf = 1 << ((msr_content >> 50) & 7);
-    }
+    rdmsrl(MSR_IA32_PLATFORM_ID, msr_content);
+    csig->pf = 1 << ((msr_content >> 50) & 7);
 
     wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
     /* As documented in the SDM: Do a CPUID 1 here */
@@ -405,7 +392,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
     return patch;
 }
 
-static const struct microcode_ops microcode_intel_ops = {
+const struct microcode_ops intel_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
@@ -413,10 +400,3 @@ static const struct microcode_ops microcode_intel_ops = {
     .compare_patch                    = compare_patch,
     .match_cpu                        = match_cpu,
 };
-
-int __init microcode_init_intel(void)
-{
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-        microcode_ops = &microcode_intel_ops;
-    return 0;
-}
