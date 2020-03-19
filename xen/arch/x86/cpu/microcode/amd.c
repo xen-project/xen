@@ -295,7 +295,7 @@ static int get_ucode_from_buffer_amd(
     memcpy(mc_amd->mpb, mpbuf->data, mpbuf->len);
 
     pr_debug("microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
-             raw_smp_processor_id(), bufsize, mpbuf->len, *offset,
+             smp_processor_id(), bufsize, mpbuf->len, *offset,
              ((struct microcode_header_amd *)mc_amd->mpb)->processor_rev_id,
              ((struct microcode_header_amd *)mc_amd->mpb)->patch_id);
 

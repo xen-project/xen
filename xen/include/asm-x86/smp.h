@@ -53,7 +53,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
  * from the initial startup. We map APIC_BASE very early in page_setup(),
  * so this is correct in the x86 case.
  */
-#define raw_smp_processor_id() (get_processor_id())
+#define smp_processor_id() get_processor_id()
 
 void __stop_this_cpu(void);
 
