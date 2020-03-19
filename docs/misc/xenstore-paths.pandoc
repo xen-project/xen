@@ -176,10 +176,12 @@ The size of the video RAM this domain is configured with.
 
 #### ~/device/suspend/event-channel = ""|EVTCHN [w]
 
-The domain's suspend event channel. The toolstack will create this
-path with an empty value which the guest may choose to overwrite.
+The domain's suspend event channel. The toolstack may create this
+path with an empty value which the guest may choose to overwrite. If
+the path does not exist then the ~/device path will be writable by the
+guest and hence it may create the suspend event channel path.
 
-If the guest overwrites this, it will be with the number of an unbound
+If the guest writes this, it will be with the number of an unbound
 event channel port it has acquired.  The toolstack is expected to use
 an interdomain bind, and then, when it wishes to ask the guest to
 suspend, to signal the event channel.
@@ -267,7 +269,9 @@ circumstances where the generation ID needs to be changed.
 Paravirtual device frontends are generally specified by their own
 directory within the XenStore hierarchy. Usually this is under
 ~/device/$TYPE/$DEVID although there are exceptions, e.g. ~/console
-for the first PV console.
+for the first PV console. The top level ~/device path itself is normally
+read-only to the guest. However it may writable if the
+'xend_suspend_evtchn_compat' guest configuration option is enabled.
 
 #### ~/device/vbd/$DEVID/* []
 

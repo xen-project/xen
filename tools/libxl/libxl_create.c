@@ -57,6 +57,8 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     if (!c_info->ssidref)
         c_info->ssidref = SECINITSID_DOMU;
 
+    libxl_defbool_setdefault(&c_info->xend_suspend_evtchn_compat, false);
+
     return 0;
 }
 
@@ -748,9 +750,21 @@ retry_transaction:
     libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/memory", dom_path),
                     roperm, ARRAY_SIZE(roperm));
-    libxl__xs_mknod(gc, t,
-                    GCSPRINTF("%s/device", dom_path),
-                    roperm, ARRAY_SIZE(roperm));
+
+    if (!libxl_defbool_val(info->xend_suspend_evtchn_compat)) {
+        libxl__xs_mknod(gc, t,
+                        GCSPRINTF("%s/device", dom_path),
+                        roperm, ARRAY_SIZE(roperm));
+        libxl__xs_mknod(gc, t,
+                        GCSPRINTF("%s/device/suspend/event-channel",
+                                  dom_path),
+                        rwperm, ARRAY_SIZE(rwperm));
+    } else {
+        libxl__xs_mknod(gc, t,
+                        GCSPRINTF("%s/device", dom_path),
+                        rwperm, ARRAY_SIZE(rwperm));
+    }
+
     libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/control", dom_path),
                     roperm, ARRAY_SIZE(roperm));
@@ -782,9 +796,7 @@ retry_transaction:
     libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/control/sysrq", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
-    libxl__xs_mknod(gc, t,
-                    GCSPRINTF("%s/device/suspend/event-channel", dom_path),
-                    rwperm, ARRAY_SIZE(rwperm));
+
     libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/data", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));

@@ -418,6 +418,7 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("run_hotplug_scripts",libxl_defbool),
     ("driver_domain",libxl_defbool),
     ("passthrough",  libxl_passthrough),
+    ("xend_suspend_evtchn_compat",libxl_defbool),
     ], dir=DIR_IN)
 
 libxl_domain_restore_params = Struct("domain_restore_params", [

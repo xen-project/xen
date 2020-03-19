@@ -668,6 +668,19 @@ file.
 
 =back
 
+=item B<xend_suspend_evtchn_compat=BOOLEAN>
+
+If this option is B<true> the xenstore path for the domain's suspend
+event channel will not be created. Instead the old xend behaviour of
+making the whole xenstore B<device> sub-tree writable by the domain will
+be re-instated.
+
+The existence of the suspend event channel path can cause problems with
+certain PV drivers running in the guest (e.g. old Red Hat PV drivers for
+Windows).
+
+If this option is not specified then it will default to B<false>.
+
 =back
 
 =head2 Devices

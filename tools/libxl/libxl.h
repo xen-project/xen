@@ -1272,9 +1272,18 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  * LIBXL_HAVE_CREATEINFO_DOMID
  *
  * libxl_domain_create_new() and libxl_domain_create_restore() will use
- * a domid specified in libxl_domain_create_info().
+ * a domid specified in libxl_domain_create_info.
  */
 #define LIBXL_HAVE_CREATEINFO_DOMID
+
+/*
+ * LIBXL_HAVE_CREATEINFO_XEND_SUSPEND_EVTCHN_COMPAT
+ *
+ * libxl_domain_create_info contains a boolean 'xend_suspend_evtchn_compat'
+ * value to control creation of the xenstore path for a domain's suspend
+ * event channel.
+ */
+#define LIBXL_HAVE_CREATEINFO_XEND_SUSPEND_EVTCHN_COMPAT
 
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
