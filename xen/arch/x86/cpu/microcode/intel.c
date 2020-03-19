@@ -44,6 +44,12 @@ struct microcode_header_intel {
     unsigned int sig;
     unsigned int cksum;
     unsigned int ldrver;
+
+    /*
+     * Microcode for the Pentium Pro and II had all further fields in the
+     * header reserved, had a fixed datasize of 2000 and totalsize of 2048,
+     * and didn't use platform flags despite the availability of the MSR.
+     */
     unsigned int pf;
     unsigned int datasize;
     unsigned int totalsize;
@@ -72,20 +78,21 @@ struct extended_sigtable {
     struct extended_signature sigs[0];
 };
 
-#define DEFAULT_UCODE_DATASIZE  (2000)
+#define PPRO_UCODE_DATASIZE     2000
 #define MC_HEADER_SIZE          (sizeof(struct microcode_header_intel))
-#define DEFAULT_UCODE_TOTALSIZE (DEFAULT_UCODE_DATASIZE + MC_HEADER_SIZE)
 #define EXT_HEADER_SIZE         (sizeof(struct extended_sigtable))
 #define EXT_SIGNATURE_SIZE      (sizeof(struct extended_signature))
 #define DWSIZE                  (sizeof(u32))
-#define get_totalsize(mc) \
-        (((struct microcode_intel *)mc)->hdr.totalsize ? \
-         ((struct microcode_intel *)mc)->hdr.totalsize : \
-         DEFAULT_UCODE_TOTALSIZE)
 
-#define get_datasize(mc) \
-        (((struct microcode_intel *)mc)->hdr.datasize ? \
-         ((struct microcode_intel *)mc)->hdr.datasize : DEFAULT_UCODE_DATASIZE)
+static uint32_t get_datasize(const struct microcode_patch *patch)
+{
+    return patch->hdr.datasize ?: PPRO_UCODE_DATASIZE;
+}
+
+static uint32_t get_totalsize(const struct microcode_patch *patch)
+{
+    return patch->hdr.totalsize ?: PPRO_UCODE_DATASIZE + MC_HEADER_SIZE;
+}
 
 #define sigmatch(s1, s2, p1, p2) \
         (((s1) == (s2)) && (((p1) & (p2)) || (((p1) == 0) && ((p2) == 0))))
@@ -125,8 +132,8 @@ static int microcode_sanity_check(const struct microcode_patch *mc)
     unsigned int ext_sigcount = 0, i;
     uint32_t sum, orig_sum;
 
-    total_size = get_totalsize(mc_header);
-    data_size = get_datasize(mc_header);
+    total_size = get_totalsize(mc);
+    data_size = get_datasize(mc);
     if ( (data_size + MC_HEADER_SIZE) > total_size )
     {
         printk(KERN_ERR "microcode: error! "
@@ -218,8 +225,8 @@ static enum microcode_match_result microcode_update_match(
     unsigned int sig = cpu_sig->sig;
     unsigned int pf = cpu_sig->pf;
     unsigned int rev = cpu_sig->rev;
-    unsigned long data_size = get_datasize(mc_header);
-    const void *end = (const void *)mc_header + get_totalsize(mc_header);
+    unsigned long data_size = get_datasize(mc);
+    const void *end = (const void *)mc_header + get_totalsize(mc);
 
     ASSERT(!microcode_sanity_check(mc));
     if ( sigmatch(sig, mc_header->sig, pf, mc_header->pf) )
@@ -327,7 +334,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
              (mc = buf)->hdr.hdrver != 1 || /* Unrecognised header version?   */
              mc->hdr.ldrver != 1 ||         /* Unrecognised loader version?   */
              size < (blob_size =            /* Insufficient space for patch?  */
-                     get_totalsize(&mc->hdr)) )
+                     get_totalsize(mc)) )
         {
             error = -EINVAL;
             printk(XENLOG_WARNING "microcode: Bad data in container\n");
@@ -352,7 +359,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
 
     if ( saved )
     {
-        patch = xmemdup_bytes(saved, get_totalsize(&saved->hdr));
+        patch = xmemdup_bytes(saved, get_totalsize(saved));
 
         if ( !patch )
             error = -ENOMEM;
