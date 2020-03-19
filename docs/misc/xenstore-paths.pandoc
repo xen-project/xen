@@ -539,6 +539,11 @@ address written in one of these paths to, for example, establish a VNC
 session to the guest (although clearly some level of trust is placed
 in the value supplied by the guest in this case).
 
+#### ~/error [w]
+
+A domain writable path used by some PV drivers to pass error messages
+to the toolstack.
+
 ### Paths private to the toolstack
 
 #### ~/device-model/$DOMID/state [w]
