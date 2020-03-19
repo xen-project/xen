@@ -211,7 +211,7 @@ static enum microcode_match_result compare_patch(
 
     /* Both patches to compare are supposed to be applicable to local CPU. */
     ASSERT(microcode_fits(new->mc_amd) != MIS_UCODE);
-    ASSERT(microcode_fits(new->mc_amd) != MIS_UCODE);
+    ASSERT(microcode_fits(old->mc_amd) != MIS_UCODE);
 
     return compare_header(new_header, old_header);
 }
