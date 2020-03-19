@@ -195,10 +195,10 @@ static int get_free_port(struct domain *d)
     {
         int rc = evtchn_allocate_port(d, port);
 
-        if ( rc == -EBUSY )
-            continue;
-
-        return port;
+        if ( rc == 0 )
+            return port;
+        else if ( rc != -EBUSY )
+            return rc;
     }
 
     return -ENOSPC;
