@@ -270,10 +270,10 @@ static enum microcode_match_result compare_patch(
 static int apply_microcode(const struct microcode_patch *patch)
 {
     uint64_t msr_content;
-    unsigned int val[2];
-    unsigned int cpu_num = raw_smp_processor_id();
+    unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &this_cpu(cpu_sig);
     const struct microcode_intel *mc_intel;
+    uint32_t rev, old_rev = sig->rev;
 
     if ( !patch )
         return -ENOENT;
@@ -294,20 +294,20 @@ static int apply_microcode(const struct microcode_patch *patch)
 
     /* get the current revision from MSR 0x8B */
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
-    val[1] = (uint32_t)(msr_content >> 32);
+    sig->rev = rev = msr_content >> 32;
 
-    if ( val[1] != mc_intel->hdr.rev )
+    if ( rev != mc_intel->hdr.rev )
     {
-        printk(KERN_ERR "microcode: CPU%d update from revision "
-               "%#x to %#x failed. Resulting revision is %#x.\n", cpu_num,
-               sig->rev, mc_intel->hdr.rev, val[1]);
+        printk(XENLOG_ERR
+               "microcode: CPU%u update rev %#x to %#x failed, result %#x\n",
+               cpu, old_rev, mc_intel->hdr.rev, rev);
         return -EIO;
     }
-    printk(KERN_INFO "microcode: CPU%d updated from revision "
-           "%#x to %#x, date = %04x-%02x-%02x\n",
-           cpu_num, sig->rev, val[1], mc_intel->hdr.year,
+
+    printk(XENLOG_WARNING
+           "microcode: CPU%u updated from revision %#x to %#x, date = %04x-%02x-%02x\n",
+           cpu, old_rev, rev, mc_intel->hdr.year,
            mc_intel->hdr.month, mc_intel->hdr.day);
-    sig->rev = val[1];
 
     return 0;
 }

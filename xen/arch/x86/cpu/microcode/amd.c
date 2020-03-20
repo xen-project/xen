@@ -218,11 +218,11 @@ static enum microcode_match_result compare_patch(
 
 static int apply_microcode(const struct microcode_patch *patch)
 {
-    uint32_t rev;
     int hw_err;
     unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     const struct microcode_header_amd *hdr;
+    uint32_t rev, old_rev = sig->rev;
 
     if ( !patch )
         return -ENOENT;
@@ -238,6 +238,7 @@ static int apply_microcode(const struct microcode_patch *patch)
 
     /* get patch id after patching */
     rdmsrl(MSR_AMD_PATCHLEVEL, rev);
+    sig->rev = rev;
 
     /*
      * Some processors leave the ucode blob mapping as UC after the update.
@@ -248,15 +249,14 @@ static int apply_microcode(const struct microcode_patch *patch)
     /* check current patch id and patch's id for match */
     if ( hw_err || (rev != hdr->patch_id) )
     {
-        printk(KERN_ERR "microcode: CPU%d update from revision "
-               "%#x to %#x failed\n", cpu, rev, hdr->patch_id);
+        printk(XENLOG_ERR
+               "microcode: CPU%u update rev %#x to %#x failed, result %#x\n",
+               cpu, old_rev, hdr->patch_id, rev);
         return -EIO;
     }
 
-    printk(KERN_WARNING "microcode: CPU%d updated from revision %#x to %#x\n",
-           cpu, sig->rev, hdr->patch_id);
-
-    sig->rev = rev;
+    printk(XENLOG_WARNING "microcode: CPU%u updated from revision %#x to %#x\n",
+           cpu, old_rev, rev);
 
     return 0;
 }
