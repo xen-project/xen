@@ -67,24 +67,19 @@ struct microcode_patch {
 #define microcode_intel microcode_patch
 
 /* microcode format is extended from prescott processors */
-struct extended_signature {
-    unsigned int sig;
-    unsigned int pf;
-    unsigned int cksum;
-};
-
 struct extended_sigtable {
     unsigned int count;
     unsigned int cksum;
     unsigned int reserved[3];
-    struct extended_signature sigs[0];
+    struct {
+        unsigned int sig;
+        unsigned int pf;
+        unsigned int cksum;
+    } sigs[];
 };
 
 #define PPRO_UCODE_DATASIZE     2000
 #define MC_HEADER_SIZE          (sizeof(struct microcode_header_intel))
-#define EXT_HEADER_SIZE         (sizeof(struct extended_sigtable))
-#define EXT_SIGNATURE_SIZE      (sizeof(struct extended_signature))
-#define DWSIZE                  (sizeof(u32))
 
 static uint32_t get_datasize(const struct microcode_patch *patch)
 {
@@ -132,8 +127,6 @@ static bool signature_matches(const struct cpu_signature *cpu_sig,
     return cpu_sig->pf & ucode_pf;
 }
 
-#define exttable_size(et) ((et)->count * EXT_SIGNATURE_SIZE + EXT_HEADER_SIZE)
-
 static int collect_cpu_info(struct cpu_signature *csig)
 {
     uint64_t msr_content;
@@ -158,93 +151,85 @@ static int collect_cpu_info(struct cpu_signature *csig)
     return 0;
 }
 
-static int microcode_sanity_check(const struct microcode_patch *mc)
+/*
+ * Sanity check a blob which is expected to be a microcode patch.  The 48 byte
+ * header is of a known format, and together with totalsize are within the
+ * bounds of the container.  Everything else is unchecked.
+ */
+static int microcode_sanity_check(const struct microcode_patch *patch)
 {
-    const struct microcode_header_intel *mc_header = &mc->hdr;
-    const struct extended_sigtable *ext_header = NULL;
-    const struct extended_signature *ext_sig;
-    unsigned long total_size, data_size, ext_table_size;
-    unsigned int ext_sigcount = 0, i;
-    uint32_t sum, orig_sum;
+    const struct extended_sigtable *ext;
+    const uint32_t *ptr;
+    unsigned int total_size = get_totalsize(patch);
+    unsigned int data_size = get_datasize(patch);
+    unsigned int i, ext_size;
+    uint32_t sum;
 
-    total_size = get_totalsize(mc);
-    data_size = get_datasize(mc);
-    if ( (data_size + MC_HEADER_SIZE) > total_size )
+    /*
+     * Total size must be a multiple of 1024 bytes.  Data size and the header
+     * must fit within it.
+     */
+    if ( (total_size & 1023) ||
+         data_size > (total_size - MC_HEADER_SIZE) )
     {
-        printk(KERN_ERR "microcode: error! "
-               "Bad data size in microcode data file\n");
+        printk(XENLOG_WARNING "microcode: Bad size\n");
         return -EINVAL;
     }
 
-    if ( (mc_header->ldrver != 1) || (mc_header->hdrver != 1) )
+    /* Checksum the main header and data. */
+    for ( sum = 0, ptr = (const uint32_t *)patch;
+          ptr < (const uint32_t *)&patch->data[data_size]; ++ptr )
+        sum += *ptr;
+
+    if ( sum != 0 )
     {
-        printk(KERN_ERR "microcode: error! "
-               "Unknown microcode update format\n");
+        printk(XENLOG_WARNING "microcode: Bad checksum\n");
         return -EINVAL;
     }
-    ext_table_size = total_size - (MC_HEADER_SIZE + data_size);
-    if ( ext_table_size )
-    {
-        if ( (ext_table_size < EXT_HEADER_SIZE) ||
-             ((ext_table_size - EXT_HEADER_SIZE) % EXT_SIGNATURE_SIZE) )
-        {
-            printk(KERN_ERR "microcode: error! "
-                   "Small exttable size in microcode data file\n");
-            return -EINVAL;
-        }
-        ext_header = (void *)mc + MC_HEADER_SIZE + data_size;
-        if ( ext_table_size != exttable_size(ext_header) )
-        {
-            printk(KERN_ERR "microcode: error! "
-                   "Bad exttable size in microcode data file\n");
-            return -EFAULT;
-        }
-        ext_sigcount = ext_header->count;
-    }
 
-    /* check extended table checksum */
-    if ( ext_table_size )
-    {
-        uint32_t ext_table_sum = 0;
-        uint32_t *ext_tablep = (uint32_t *)ext_header;
+    /* Look to see if there is an extended signature table. */
+    ext_size = total_size - data_size - MC_HEADER_SIZE;
 
-        i = ext_table_size / DWSIZE;
-        while ( i-- )
-            ext_table_sum += ext_tablep[i];
-        if ( ext_table_sum )
-        {
-            printk(KERN_WARNING "microcode: aborting, "
-                   "bad extended signature table checksum\n");
-            return -EINVAL;
-        }
-    }
-
-    /* calculate the checksum */
-    orig_sum = 0;
-    i = (MC_HEADER_SIZE + data_size) / DWSIZE;
-    while ( i-- )
-        orig_sum += ((uint32_t *)mc)[i];
-    if ( orig_sum )
-    {
-        printk(KERN_ERR "microcode: aborting, bad checksum\n");
-        return -EINVAL;
-    }
-    if ( !ext_table_size )
+    /* No extended signature table?  All done. */
+    if ( ext_size == 0 )
         return 0;
-    /* check extended signature checksum */
-    for ( i = 0; i < ext_sigcount; i++ )
+
+    /*
+     * Check the structure of the extended signature table, ensuring that it
+     * fits exactly in the remaining space.
+     */
+    ext = (const void *)&patch->data[data_size];
+    if ( ext_size < sizeof(*ext) ||
+         (ext_size - sizeof(*ext)) % sizeof(ext->sigs[0]) ||
+         (ext_size - sizeof(*ext)) / sizeof(ext->sigs[0]) != ext->count )
     {
-        ext_sig = (void *)ext_header + EXT_HEADER_SIZE +
-            EXT_SIGNATURE_SIZE * i;
-        sum = orig_sum
-            - (mc_header->sig + mc_header->pf + mc_header->cksum)
-            + (ext_sig->sig + ext_sig->pf + ext_sig->cksum);
-        if ( sum )
+        printk(XENLOG_WARNING "microcode: Bad sigtable size\n");
+        return -EINVAL;
+    }
+
+    /* Checksum the whole extended signature table. */
+    for ( sum = 0, ptr = (const uint32_t *)ext;
+          ptr < (const uint32_t *)&ext->sigs[ext->count]; ++ptr )
+        sum += *ptr;
+
+    if ( sum != 0 )
+    {
+        printk(XENLOG_WARNING "microcode: Bad sigtable checksum\n");
+        return -EINVAL;
+    }
+
+    /*
+     * Checksum each indiviudal extended signature as if it had been in the
+     * main header.
+     */
+    sum = patch->hdr.sig + patch->hdr.pf + patch->hdr.cksum;
+    for ( i = 0; i < ext->count; ++i )
+        if ( sum != (ext->sigs[i].sig + ext->sigs[i].pf + ext->sigs[i].cksum) )
         {
-            printk(KERN_ERR "microcode: aborting, bad checksum\n");
+            printk(XENLOG_WARNING "microcode: Bad sigtable checksum\n");
             return -EINVAL;
         }
-    }
+
     return 0;
 }
 
