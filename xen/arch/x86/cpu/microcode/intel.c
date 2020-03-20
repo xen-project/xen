@@ -30,17 +30,12 @@
 
 #define pr_debug(x...) ((void)0)
 
-struct microcode_header_intel {
+struct microcode_patch {
     unsigned int hdrver;
     unsigned int rev;
-    union {
-        struct {
-            uint16_t year;
-            uint8_t day;
-            uint8_t month;
-        };
-        unsigned int date;
-    };
+    uint16_t year;
+    uint8_t  day;
+    uint8_t  month;
     unsigned int sig;
     unsigned int cksum;
     unsigned int ldrver;
@@ -54,17 +49,10 @@ struct microcode_header_intel {
     unsigned int datasize;
     unsigned int totalsize;
     unsigned int reserved[3];
-};
-
-struct microcode_patch {
-    struct microcode_header_intel hdr;
 
     /* Microcode payload.  Format is propriety and encrypted. */
     uint8_t data[];
 };
-
-/* Temporary, until the microcode_* structure are disentangled. */
-#define microcode_intel microcode_patch
 
 /* microcode format is extended from prescott processors */
 struct extended_sigtable {
@@ -79,16 +67,16 @@ struct extended_sigtable {
 };
 
 #define PPRO_UCODE_DATASIZE     2000
-#define MC_HEADER_SIZE          (sizeof(struct microcode_header_intel))
+#define MC_HEADER_SIZE          offsetof(struct microcode_patch, data)
 
 static uint32_t get_datasize(const struct microcode_patch *patch)
 {
-    return patch->hdr.datasize ?: PPRO_UCODE_DATASIZE;
+    return patch->datasize ?: PPRO_UCODE_DATASIZE;
 }
 
 static uint32_t get_totalsize(const struct microcode_patch *patch)
 {
-    return patch->hdr.totalsize ?: PPRO_UCODE_DATASIZE + MC_HEADER_SIZE;
+    return patch->totalsize ?: PPRO_UCODE_DATASIZE + MC_HEADER_SIZE;
 }
 
 /*
@@ -100,8 +88,8 @@ static uint32_t get_totalsize(const struct microcode_patch *patch)
 static const struct extended_sigtable *get_ext_sigtable(
     const struct microcode_patch *patch)
 {
-    if ( patch->hdr.totalsize > (MC_HEADER_SIZE + patch->hdr.datasize) )
-        return (const void *)&patch->data[patch->hdr.datasize];
+    if ( patch->totalsize > (MC_HEADER_SIZE + patch->datasize) )
+        return (const void *)&patch->data[patch->datasize];
 
     return NULL;
 }
@@ -222,7 +210,7 @@ static int microcode_sanity_check(const struct microcode_patch *patch)
      * Checksum each indiviudal extended signature as if it had been in the
      * main header.
      */
-    sum = patch->hdr.sig + patch->hdr.pf + patch->hdr.cksum;
+    sum = patch->sig + patch->pf + patch->cksum;
     for ( i = 0; i < ext->count; ++i )
         if ( sum != (ext->sigs[i].sig + ext->sigs[i].pf + ext->sigs[i].cksum) )
         {
@@ -244,7 +232,7 @@ static enum microcode_match_result microcode_update_match(
     ASSERT(!microcode_sanity_check(mc));
 
     /* Check the main microcode signature. */
-    if ( signature_matches(cpu_sig, mc->hdr.sig, mc->hdr.pf) )
+    if ( signature_matches(cpu_sig, mc->sig, mc->pf) )
         goto found;
 
     /* If there is an extended signature table, check each of them. */
@@ -256,7 +244,7 @@ static enum microcode_match_result microcode_update_match(
     return MIS_UCODE;
 
  found:
-    return mc->hdr.rev > cpu_sig->rev ? NEW_UCODE : OLD_UCODE;
+    return mc->rev > cpu_sig->rev ? NEW_UCODE : OLD_UCODE;
 }
 
 static bool match_cpu(const struct microcode_patch *patch)
@@ -282,7 +270,7 @@ static enum microcode_match_result compare_patch(
     ASSERT(microcode_update_match(old) != MIS_UCODE);
     ASSERT(microcode_update_match(new) != MIS_UCODE);
 
-    return (new->hdr.rev > old->hdr.rev) ? NEW_UCODE : OLD_UCODE;
+    return new->rev > old->rev ? NEW_UCODE : OLD_UCODE;
 }
 
 static int apply_microcode(const struct microcode_patch *patch)
@@ -290,7 +278,6 @@ static int apply_microcode(const struct microcode_patch *patch)
     uint64_t msr_content;
     unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &this_cpu(cpu_sig);
-    const struct microcode_intel *mc_intel;
     uint32_t rev, old_rev = sig->rev;
 
     if ( !patch )
@@ -299,10 +286,8 @@ static int apply_microcode(const struct microcode_patch *patch)
     if ( !match_cpu(patch) )
         return -EINVAL;
 
-    mc_intel = patch;
-
     /* write microcode via MSR 0x79 */
-    wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc_intel->data);
+    wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)patch->data);
     wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
 
     /* As documented in the SDM: Do a CPUID 1 here */
@@ -312,18 +297,17 @@ static int apply_microcode(const struct microcode_patch *patch)
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
     sig->rev = rev = msr_content >> 32;
 
-    if ( rev != mc_intel->hdr.rev )
+    if ( rev != patch->rev )
     {
         printk(XENLOG_ERR
                "microcode: CPU%u update rev %#x to %#x failed, result %#x\n",
-               cpu, old_rev, mc_intel->hdr.rev, rev);
+               cpu, old_rev, patch->rev, rev);
         return -EIO;
     }
 
     printk(XENLOG_WARNING
            "microcode: CPU%u updated from revision %#x to %#x, date = %04x-%02x-%02x\n",
-           cpu, old_rev, rev, mc_intel->hdr.year,
-           mc_intel->hdr.month, mc_intel->hdr.day);
+           cpu, old_rev, rev, patch->year, patch->month, patch->day);
 
     return 0;
 }
@@ -341,8 +325,8 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
         unsigned int blob_size;
 
         if ( size < MC_HEADER_SIZE ||       /* Insufficient space for header? */
-             (mc = buf)->hdr.hdrver != 1 || /* Unrecognised header version?   */
-             mc->hdr.ldrver != 1 ||         /* Unrecognised loader version?   */
+             (mc = buf)->hdrver != 1 ||     /* Unrecognised header version?   */
+             mc->ldrver != 1 ||             /* Unrecognised loader version?   */
              size < (blob_size =            /* Insufficient space for patch?  */
                      get_totalsize(mc)) )
         {
@@ -360,7 +344,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
          * one with higher revision.
          */
         if ( (microcode_update_match(mc) != MIS_UCODE) &&
-             (!saved || (mc->hdr.rev > saved->hdr.rev)) )
+             (!saved || (mc->rev > saved->rev)) )
             saved = mc;
 
         buf  += blob_size;
