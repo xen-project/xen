@@ -116,9 +116,9 @@ static int collect_cpu_info(struct cpu_signature *csig)
     return 0;
 }
 
-static int microcode_sanity_check(const void *mc)
+static int microcode_sanity_check(const struct microcode_patch *mc)
 {
-    const struct microcode_header_intel *mc_header = mc;
+    const struct microcode_header_intel *mc_header = &mc->hdr;
     const struct extended_sigtable *ext_header = NULL;
     const struct extended_signature *ext_sig;
     unsigned long total_size, data_size, ext_table_size;
@@ -150,7 +150,7 @@ static int microcode_sanity_check(const void *mc)
                    "Small exttable size in microcode data file\n");
             return -EINVAL;
         }
-        ext_header = mc + MC_HEADER_SIZE + data_size;
+        ext_header = (void *)mc + MC_HEADER_SIZE + data_size;
         if ( ext_table_size != exttable_size(ext_header) )
         {
             printk(KERN_ERR "microcode: error! "
@@ -208,8 +208,9 @@ static int microcode_sanity_check(const void *mc)
 
 /* Check an update against the CPU signature and current update revision */
 static enum microcode_match_result microcode_update_match(
-    const struct microcode_header_intel *mc_header)
+    const struct microcode_patch *mc)
 {
+    const struct microcode_header_intel *mc_header = &mc->hdr;
     const struct extended_sigtable *ext_header;
     const struct extended_signature *ext_sig;
     unsigned int i;
@@ -220,7 +221,7 @@ static enum microcode_match_result microcode_update_match(
     unsigned long data_size = get_datasize(mc_header);
     const void *end = (const void *)mc_header + get_totalsize(mc_header);
 
-    ASSERT(!microcode_sanity_check(mc_header));
+    ASSERT(!microcode_sanity_check(mc));
     if ( sigmatch(sig, mc_header->sig, pf, mc_header->pf) )
         return (mc_header->rev > rev) ? NEW_UCODE : OLD_UCODE;
 
@@ -246,7 +247,7 @@ static bool match_cpu(const struct microcode_patch *patch)
     if ( !patch )
         return false;
 
-    return microcode_update_match(&patch->hdr) == NEW_UCODE;
+    return microcode_update_match(patch) == NEW_UCODE;
 }
 
 static void free_patch(struct microcode_patch *patch)
@@ -261,8 +262,8 @@ static enum microcode_match_result compare_patch(
      * Both patches to compare are supposed to be applicable to local CPU.
      * Just compare the revision number.
      */
-    ASSERT(microcode_update_match(&old->hdr) != MIS_UCODE);
-    ASSERT(microcode_update_match(&new->hdr) != MIS_UCODE);
+    ASSERT(microcode_update_match(old) != MIS_UCODE);
+    ASSERT(microcode_update_match(new) != MIS_UCODE);
 
     return (new->hdr.rev > old->hdr.rev) ? NEW_UCODE : OLD_UCODE;
 }
@@ -357,7 +358,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
          * If the new update covers current CPU, compare updates and store the
          * one with higher revision.
          */
-        if ( (microcode_update_match(&mc->hdr) != MIS_UCODE) &&
+        if ( (microcode_update_match(mc) != MIS_UCODE) &&
              (!saved || (mc->hdr.rev > saved->hdr.rev)) )
         {
             xfree(saved);
