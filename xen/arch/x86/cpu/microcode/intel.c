@@ -311,48 +311,32 @@ static int apply_microcode(const struct microcode_patch *patch)
     return 0;
 }
 
-static long get_next_ucode_from_buffer(struct microcode_intel **mc,
-                                       const uint8_t *buf, unsigned long size,
-                                       unsigned long offset)
-{
-    struct microcode_header_intel *mc_header;
-    unsigned long total_size;
-
-    /* No more data */
-    if ( offset >= size )
-        return 0;
-    mc_header = (struct microcode_header_intel *)(buf + offset);
-    total_size = get_totalsize(mc_header);
-
-    if ( (offset + total_size) > size )
-    {
-        printk(KERN_ERR "microcode: error! Bad data in microcode data file\n");
-        return -EINVAL;
-    }
-
-    *mc = xmemdup_bytes(mc_header, total_size);
-    if ( *mc == NULL )
-        return -ENOMEM;
-
-    return offset + total_size;
-}
-
 static struct microcode_patch *cpu_request_microcode(const void *buf,
                                                      size_t size)
 {
-    long offset = 0;
     int error = 0;
-    struct microcode_intel *mc, *saved = NULL;
+    const struct microcode_patch *saved = NULL;
     struct microcode_patch *patch = NULL;
 
-    while ( (offset = get_next_ucode_from_buffer(&mc, buf, size, offset)) > 0 )
+    while ( size )
     {
-        error = microcode_sanity_check(mc);
-        if ( error )
+        const struct microcode_patch *mc;
+        unsigned int blob_size;
+
+        if ( size < MC_HEADER_SIZE ||       /* Insufficient space for header? */
+             (mc = buf)->hdr.hdrver != 1 || /* Unrecognised header version?   */
+             mc->hdr.ldrver != 1 ||         /* Unrecognised loader version?   */
+             size < (blob_size =            /* Insufficient space for patch?  */
+                     get_totalsize(&mc->hdr)) )
         {
-            xfree(mc);
+            error = -EINVAL;
+            printk(XENLOG_WARNING "microcode: Bad data in container\n");
             break;
         }
+
+        error = microcode_sanity_check(mc);
+        if ( error )
+            break;
 
         /*
          * If the new update covers current CPU, compare updates and store the
@@ -360,18 +344,19 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
          */
         if ( (microcode_update_match(mc) != MIS_UCODE) &&
              (!saved || (mc->hdr.rev > saved->hdr.rev)) )
-        {
-            xfree(saved);
             saved = mc;
-        }
-        else
-            xfree(mc);
+
+        buf  += blob_size;
+        size -= blob_size;
     }
-    if ( offset < 0 )
-        error = offset;
 
     if ( saved )
-        patch = saved;
+    {
+        patch = xmemdup_bytes(saved, get_totalsize(&saved->hdr));
+
+        if ( !patch )
+            error = -ENOMEM;
+    }
 
     if ( error && !patch )
         patch = ERR_PTR(error);
