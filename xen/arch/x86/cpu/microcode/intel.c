@@ -58,7 +58,9 @@ struct microcode_header_intel {
 
 struct microcode_patch {
     struct microcode_header_intel hdr;
-    unsigned int bits[0];
+
+    /* Microcode payload.  Format is propriety and encrypted. */
+    uint8_t data[];
 };
 
 /* Temporary, until the microcode_* structure are disentangled. */
@@ -94,8 +96,41 @@ static uint32_t get_totalsize(const struct microcode_patch *patch)
     return patch->hdr.totalsize ?: PPRO_UCODE_DATASIZE + MC_HEADER_SIZE;
 }
 
-#define sigmatch(s1, s2, p1, p2) \
-        (((s1) == (s2)) && (((p1) & (p2)) || (((p1) == 0) && ((p2) == 0))))
+/*
+ * A piece of microcode has an extended signature table if there is space
+ * between the end of data[] and the total size.  (This logic also works
+ * appropriately for Pentium Pro/II microcode, which has 0 for both size
+ * fields, and no extended signature table.)
+ */
+static const struct extended_sigtable *get_ext_sigtable(
+    const struct microcode_patch *patch)
+{
+    if ( patch->hdr.totalsize > (MC_HEADER_SIZE + patch->hdr.datasize) )
+        return (const void *)&patch->data[patch->hdr.datasize];
+
+    return NULL;
+}
+
+/*
+ * A piece of microcode is applicable for a CPU if:
+ *  1) the signatures (CPUID.1.EAX - Family/Model/Stepping) match, and
+ *  2) The Platform Flags bitmap intersect.
+ *
+ * A CPU will have a single Platform Flag bit, while the microcode may be
+ * common to multiple platforms and have multiple bits set.
+ *
+ * Note: The Pentium Pro/II microcode didn't use platform flags, and should
+ * treat 0 as a match.  However, Xen being 64bit means that the CPU signature
+ * won't match, allowing us to simplify the logic.
+ */
+static bool signature_matches(const struct cpu_signature *cpu_sig,
+                              unsigned int ucode_sig, unsigned int ucode_pf)
+{
+    if ( cpu_sig->sig != ucode_sig )
+        return false;
+
+    return cpu_sig->pf & ucode_pf;
+}
 
 #define exttable_size(et) ((et)->count * EXT_SIGNATURE_SIZE + EXT_HEADER_SIZE)
 
@@ -217,36 +252,26 @@ static int microcode_sanity_check(const struct microcode_patch *mc)
 static enum microcode_match_result microcode_update_match(
     const struct microcode_patch *mc)
 {
-    const struct microcode_header_intel *mc_header = &mc->hdr;
-    const struct extended_sigtable *ext_header;
-    const struct extended_signature *ext_sig;
+    const struct extended_sigtable *ext;
     unsigned int i;
     struct cpu_signature *cpu_sig = &this_cpu(cpu_sig);
-    unsigned int sig = cpu_sig->sig;
-    unsigned int pf = cpu_sig->pf;
-    unsigned int rev = cpu_sig->rev;
-    unsigned long data_size = get_datasize(mc);
-    const void *end = (const void *)mc_header + get_totalsize(mc);
 
     ASSERT(!microcode_sanity_check(mc));
-    if ( sigmatch(sig, mc_header->sig, pf, mc_header->pf) )
-        return (mc_header->rev > rev) ? NEW_UCODE : OLD_UCODE;
 
-    ext_header = (const void *)(mc_header + 1) + data_size;
-    ext_sig = (const void *)(ext_header + 1);
+    /* Check the main microcode signature. */
+    if ( signature_matches(cpu_sig, mc->hdr.sig, mc->hdr.pf) )
+        goto found;
 
-    /*
-     * Make sure there is enough space to hold an extended header and enough
-     * array elements.
-     */
-    if ( end <= (const void *)ext_sig )
-        return MIS_UCODE;
-
-    for ( i = 0; i < ext_header->count; i++ )
-        if ( sigmatch(sig, ext_sig[i].sig, pf, ext_sig[i].pf) )
-            return (mc_header->rev > rev) ? NEW_UCODE : OLD_UCODE;
+    /* If there is an extended signature table, check each of them. */
+    if ( (ext = get_ext_sigtable(mc)) != NULL )
+        for ( i = 0; i < ext->count; ++i )
+            if ( signature_matches(cpu_sig, ext->sigs[i].sig, ext->sigs[i].pf) )
+                goto found;
 
     return MIS_UCODE;
+
+ found:
+    return mc->hdr.rev > cpu_sig->rev ? NEW_UCODE : OLD_UCODE;
 }
 
 static bool match_cpu(const struct microcode_patch *patch)
@@ -292,7 +317,7 @@ static int apply_microcode(const struct microcode_patch *patch)
     mc_intel = patch;
 
     /* write microcode via MSR 0x79 */
-    wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc_intel->bits);
+    wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc_intel->data);
     wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
 
     /* As documented in the SDM: Do a CPUID 1 here */
