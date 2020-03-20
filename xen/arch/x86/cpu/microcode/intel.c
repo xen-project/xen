@@ -331,13 +331,10 @@ static long get_next_ucode_from_buffer(struct microcode_intel **mc,
         return -EINVAL;
     }
 
-    *mc = xmalloc_bytes(total_size);
+    *mc = xmemdup_bytes(mc_header, total_size);
     if ( *mc == NULL )
-    {
-        printk(KERN_ERR "microcode: error! Can not allocate memory\n");
         return -ENOMEM;
-    }
-    memcpy(*mc, (const void *)(buf + offset), total_size);
+
     return offset + total_size;
 }
 

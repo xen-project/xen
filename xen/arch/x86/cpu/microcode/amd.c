@@ -288,11 +288,10 @@ static int get_ucode_from_buffer_amd(
         return -EINVAL;
     }
 
-    mc_amd->mpb = xmalloc_bytes(mpbuf->len);
+    mc_amd->mpb = xmemdup_bytes(mpbuf->data, mpbuf->len);
     if ( !mc_amd->mpb )
         return -ENOMEM;
     mc_amd->mpb_size = mpbuf->len;
-    memcpy(mc_amd->mpb, mpbuf->data, mpbuf->len);
 
     pr_debug("microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
              smp_processor_id(), bufsize, mpbuf->len, *offset,
@@ -325,14 +324,10 @@ static int install_equiv_cpu_table(
         return -EINVAL;
     }
 
-    mc_amd->equiv_cpu_table = xmalloc_bytes(mpbuf->len);
+    mc_amd->equiv_cpu_table = xmemdup_bytes(mpbuf->data, mpbuf->len);
     if ( !mc_amd->equiv_cpu_table )
-    {
-        printk(KERN_ERR "microcode: Cannot allocate memory for equivalent cpu table\n");
         return -ENOMEM;
-    }
 
-    memcpy(mc_amd->equiv_cpu_table, mpbuf->data, mpbuf->len);
     mc_amd->equiv_cpu_table_size = mpbuf->len;
 
     return 0;

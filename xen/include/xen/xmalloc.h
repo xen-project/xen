@@ -51,6 +51,17 @@
 #define xmalloc_bytes(_bytes) _xmalloc(_bytes, SMP_CACHE_BYTES)
 #define xzalloc_bytes(_bytes) _xzalloc(_bytes, SMP_CACHE_BYTES)
 
+/* Allocate untyped storage and copying an existing instance. */
+#define xmemdup_bytes(_src, _nr)                \
+    ({                                          \
+        unsigned long nr_ = (_nr);              \
+        void *dst_ = xmalloc_bytes(nr_);        \
+                                                \
+        if ( dst_ )                             \
+            memcpy(dst_, _src, nr_);            \
+        dst_;                                   \
+    })
+
 /* Free any of the above. */
 extern void xfree(void *);
 
