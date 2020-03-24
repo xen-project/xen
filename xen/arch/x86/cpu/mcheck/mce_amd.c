@@ -339,5 +339,6 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
     mce_recoverable_register(mc_amd_recoverable_scan);
     mce_register_addrcheck(mc_amd_addrcheck);
 
-    return mcheck_amd_famXX;
+    return ci->x86_vendor == X86_VENDOR_HYGON ?
+            mcheck_hygon : mcheck_amd_famXX;
 }

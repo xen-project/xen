@@ -610,7 +610,8 @@ int show_mca_info(int inited, struct cpuinfo_x86 *c)
         static const char *const type_str[] = {
             [mcheck_amd_famXX] = "AMD",
             [mcheck_amd_k8] = "AMD K8",
-            [mcheck_intel] = "Intel"
+            [mcheck_intel] = "Intel",
+            [mcheck_hygon] = "Hygon"
         };
 
         snprintf(prefix, ARRAY_SIZE(prefix), "%sCPU%u: ",
@@ -625,6 +626,7 @@ int show_mca_info(int inited, struct cpuinfo_x86 *c)
             break;
 
         case mcheck_amd_famXX:
+        case mcheck_hygon:
             printk("%s%s Fam%xh machine check reporting enabled\n",
                    prefix, type_str[inited], c->x86);
             break;

@@ -36,7 +36,8 @@ enum mcheck_type {
     mcheck_none,
     mcheck_amd_famXX,
     mcheck_amd_k8,
-    mcheck_intel
+    mcheck_intel,
+    mcheck_hygon
 };
 
 extern uint8_t cmci_apic_vector;
