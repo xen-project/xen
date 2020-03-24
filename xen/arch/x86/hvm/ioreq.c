@@ -376,7 +376,7 @@ static int hvm_alloc_ioreq_mfn(struct hvm_ioreq_server *s, bool buf)
         return 0;
     }
 
-    page = alloc_domheap_page(s->target, 0);
+    page = alloc_domheap_page(s->target, MEMF_no_refcount);
 
     if ( !page )
         return -ENOMEM;
