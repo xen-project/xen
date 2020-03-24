@@ -616,7 +616,8 @@ static int cpupool_cpu_add(unsigned int cpu)
     get_sched_res(cpu)->cpupool = NULL;
 
     cpus = sched_get_opt_cpumask(cpupool0->gran, cpu);
-    if ( cpumask_subset(cpus, &cpupool_free_cpus) )
+    if ( cpumask_subset(cpus, &cpupool_free_cpus) &&
+         cpumask_weight(cpus) == cpupool_get_granularity(cpupool0) )
         ret = cpupool_assign_cpu_locked(cpupool0, cpu);
 
     rcu_read_unlock(&sched_res_rculock);
