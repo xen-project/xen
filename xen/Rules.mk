@@ -71,7 +71,7 @@ AFLAGS += -D__ASSEMBLY__
 ALL_OBJS := $(ALL_OBJS-y)
 
 # Get gcc to generate the dependencies for us.
-CFLAGS-y += -MMD -MF $(@D)/.$(@F).d
+CFLAGS-y += -MMD -MP -MF $(@D)/.$(@F).d
 
 CFLAGS += $(CFLAGS-y)
 # allow extra CFLAGS externally via EXTRA_CFLAGS_XEN_CORE
