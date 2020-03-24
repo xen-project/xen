@@ -307,7 +307,7 @@ typedef struct evtchn_expand_array evtchn_expand_array_t;
  */
 struct evtchn_set_priority {
     /* IN parameters. */
-    uint32_t port;
+    evtchn_port_t port;
     uint32_t priority;
 };
 typedef struct evtchn_set_priority evtchn_set_priority_t;
