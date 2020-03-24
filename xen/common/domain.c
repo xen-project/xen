@@ -403,6 +403,7 @@ struct domain *domain_create(domid_t domid,
     spin_lock_init_prof(d, page_alloc_lock);
     spin_lock_init(&d->hypercall_deadlock_mutex);
     INIT_PAGE_LIST_HEAD(&d->page_list);
+    INIT_PAGE_LIST_HEAD(&d->extra_page_list);
     INIT_PAGE_LIST_HEAD(&d->xenpage_list);
 
     spin_lock_init(&d->node_affinity_lock);

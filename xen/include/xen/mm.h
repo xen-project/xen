@@ -583,9 +583,8 @@ static inline unsigned int get_order_from_pages(unsigned long nr_pages)
 void scrub_one_page(struct page_info *);
 
 #ifndef arch_free_heap_page
-#define arch_free_heap_page(d, pg)                      \
-    page_list_del(pg, is_xen_heap_page(pg) ?            \
-                      &(d)->xenpage_list : &(d)->page_list)
+#define arch_free_heap_page(d, pg) \
+    page_list_del(pg, page_to_list(d, pg))
 #endif
 
 int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,

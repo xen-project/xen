@@ -251,12 +251,21 @@ void dump_pageframe_info(struct domain *d)
         p2m_pod_dump_data(d);
 
     spin_lock(&d->page_alloc_lock);
+
     page_list_for_each ( page, &d->xenpage_list )
     {
         printk("    XenPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                _p(mfn_x(page_to_mfn(page))),
                page->count_info, page->u.inuse.type_info);
     }
+
+    page_list_for_each ( page, &d->extra_page_list )
+    {
+        printk("    ExtraPage %p: caf=%08lx, taf=%" PRtype_info "\n",
+               _p(mfn_x(page_to_mfn(page))),
+               page->count_info, page->u.inuse.type_info);
+    }
+
     spin_unlock(&d->page_alloc_lock);
 }
 

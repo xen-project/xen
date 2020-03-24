@@ -629,10 +629,8 @@ typedef struct mm_rwlock {
     const char        *locker_function; /* func that took it */
 } mm_rwlock_t;
 
-#define arch_free_heap_page(d, pg)                                      \
-    page_list_del2(pg, is_xen_heap_page(pg) ?                           \
-                       &(d)->xenpage_list : &(d)->page_list,            \
-                   &(d)->arch.relmem_list)
+#define arch_free_heap_page(d, pg) \
+    page_list_del2(pg, page_to_list(d, pg), &(d)->arch.relmem_list)
 
 extern const char zero_page[];
 

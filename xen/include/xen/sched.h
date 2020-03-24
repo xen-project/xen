@@ -329,6 +329,7 @@ struct domain
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
     struct page_list_head page_list;  /* linked list */
+    struct page_list_head extra_page_list; /* linked list (size extra_pages) */
     struct page_list_head xenpage_list; /* linked list (size xenheap_pages) */
 
     /*
@@ -511,6 +512,18 @@ struct domain
     struct argo_domain *argo;
 #endif
 };
+
+static inline struct page_list_head *page_to_list(
+    struct domain *d, const struct page_info *pg)
+{
+    if ( is_xen_heap_page(pg) )
+        return &d->xenpage_list;
+
+    if ( pg->count_info & PGC_extra )
+        return &d->extra_page_list;
+
+    return &d->page_list;
+}
 
 /* Return number of pages currently posessed by the domain */
 static inline unsigned int domain_tot_pages(const struct domain *d)

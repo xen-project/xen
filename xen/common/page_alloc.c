@@ -2314,7 +2314,7 @@ int assign_pages(
         smp_wmb(); /* Domain pointer must be visible before updating refcnt. */
         pg[i].count_info =
             (pg[i].count_info & PGC_extra) | PGC_allocated | 1;
-        page_list_add_tail(&pg[i], &d->page_list);
+        page_list_add_tail(&pg[i], page_to_list(d, &pg[i]));
     }
 
  out:
