@@ -2087,19 +2087,22 @@ static int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
          * The qemu helper process has an untyped mapping of this dom's RAM
          * and the HVM restore program takes another.
          * Also allow one typed refcount for
-         * - Xen heap pages, to match share_xen_page_with_guest(),
-         * - ioreq server pages, to match prepare_ring_for_helper().
+         * - special pages, which are explicitly referenced and mapped by
+         *   Xen.
+         * - ioreq server pages, which may be special pages or normal
+         *   guest pages with an extra reference taken by
+         *   prepare_ring_for_helper().
          */
         if ( !(shadow_mode_external(d)
                && (page->count_info & PGC_count_mask) <= 3
                && ((page->u.inuse.type_info & PGT_count_mask)
-                   == (is_xen_heap_page(page) ||
+                   == (is_special_page(page) ||
                        (is_hvm_domain(d) && is_ioreq_server_page(d, page))))) )
             printk(XENLOG_G_ERR "can't find all mappings of mfn %"PRI_mfn
-                   " (gfn %"PRI_gfn"): c=%lx t=%lx x=%d i=%d\n",
+                   " (gfn %"PRI_gfn"): c=%lx t=%lx s=%d i=%d\n",
                    mfn_x(gmfn), gfn_x(gfn),
                    page->count_info, page->u.inuse.type_info,
-                   !!is_xen_heap_page(page),
+                   is_special_page(page),
                    (is_hvm_domain(d) && is_ioreq_server_page(d, page)));
     }
 

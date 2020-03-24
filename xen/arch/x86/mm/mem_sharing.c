@@ -840,9 +840,8 @@ static int nominate_page(struct domain *d, gfn_t gfn,
     if ( !p2m_is_sharable(p2mt) )
         goto out;
 
-    /* Skip xen heap pages */
     page = mfn_to_page(mfn);
-    if ( !page || is_xen_heap_page(page) )
+    if ( !page || is_special_page(page) )
         goto out;
 
     /* Check if there are mem_access/remapped altp2m entries for this page */

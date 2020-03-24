@@ -77,7 +77,7 @@ int altp2m_vcpu_enable_ve(struct vcpu *v, gfn_t gfn)
      * pageable() predicate for this, due to it having the same properties
      * that we want.
      */
-    if ( !p2m_is_pageable(p2mt) || is_xen_heap_page(pg) )
+    if ( !p2m_is_pageable(p2mt) || is_special_page(pg) )
     {
         rc = -EINVAL;
         goto err;

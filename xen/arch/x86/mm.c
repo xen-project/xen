@@ -1014,7 +1014,7 @@ get_page_from_l1e(
         unsigned long cacheattr = pte_flags_to_cacheattr(l1f);
         int err;
 
-        if ( is_xen_heap_page(page) )
+        if ( is_special_page(page) )
         {
             if ( write )
                 put_page_type(page);
@@ -2447,7 +2447,7 @@ static int cleanup_page_mappings(struct page_info *page)
     {
         page->count_info &= ~PGC_cacheattr_mask;
 
-        BUG_ON(is_xen_heap_page(page));
+        BUG_ON(is_special_page(page));
 
         rc = update_xen_mappings(mfn, 0);
     }
@@ -2477,7 +2477,7 @@ static int cleanup_page_mappings(struct page_info *page)
                 rc = rc2;
         }
 
-        if ( likely(!is_xen_heap_page(page)) )
+        if ( likely(!is_special_page(page)) )
         {
             ASSERT((page->u.inuse.type_info &
                     (PGT_type_mask | PGT_count_mask)) == PGT_writable_page);
@@ -4216,8 +4216,7 @@ int steal_page(
     if ( !(owner = page_get_owner_and_reference(page)) )
         goto fail;
 
-    if ( owner != d || is_xen_heap_page(page) ||
-         (page->count_info & PGC_extra) )
+    if ( owner != d || is_special_page(page) )
         goto fail_put;
 
     /*
@@ -4580,8 +4579,8 @@ int xenmem_add_to_physmap_one(
     prev_mfn = get_gfn(d, gfn_x(gpfn), &p2mt);
     if ( mfn_valid(prev_mfn) )
     {
-        if ( is_xen_heap_mfn(prev_mfn) )
-            /* Xen heap frames are simply unhooked from this phys slot. */
+        if ( is_special_page(mfn_to_page(prev_mfn)) )
+            /* Special pages are simply unhooked from this phys slot. */
             rc = guest_physmap_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */

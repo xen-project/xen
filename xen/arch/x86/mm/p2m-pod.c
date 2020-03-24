@@ -749,8 +749,9 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, gfn_t gfn)
 
         n = 1UL << min(cur_order, SUPERPAGE_ORDER + 0U);
         for ( k = 0, page = mfn_to_page(mfn); k < n; ++k, ++page )
-            if ( !(page->count_info & PGC_allocated) ||
-                 (page->count_info & (PGC_page_table | PGC_xen_heap)) ||
+            if ( is_special_page(page) ||
+                 !(page->count_info & PGC_allocated) ||
+                 (page->count_info & PGC_page_table) ||
                  (page->count_info & PGC_count_mask) > max_ref )
                 goto out;
     }
@@ -883,11 +884,12 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
         pg = mfn_to_page(mfns[i]);
 
         /*
-         * If this is ram, and not a pagetable or from the xen heap, and
+         * If this is ram, and not a pagetable or a special page, and
          * probably not mapped elsewhere, map it; otherwise, skip.
          */
-        if ( p2m_is_ram(types[i]) && (pg->count_info & PGC_allocated) &&
-             !(pg->count_info & (PGC_page_table | PGC_xen_heap)) &&
+        if ( !is_special_page(pg) && p2m_is_ram(types[i]) &&
+             (pg->count_info & PGC_allocated) &&
+             !(pg->count_info & PGC_page_table) &&
              ((pg->count_info & PGC_count_mask) <= max_ref) )
             map[i] = map_domain_page(mfns[i]);
         else

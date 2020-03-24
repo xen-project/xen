@@ -2983,8 +2983,8 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     prev_mfn = get_gfn(tdom, gpfn, &p2mt_prev);
     if ( mfn_valid(prev_mfn) )
     {
-        if ( is_xen_heap_mfn(prev_mfn) )
-            /* Xen heap frames are simply unhooked from this phys slot */
+        if ( is_special_page(mfn_to_page(prev_mfn)) )
+            /* Special pages are simply unhooked from this phys slot */
             rc = guest_physmap_remove_page(tdom, _gfn(gpfn), prev_mfn, 0);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */

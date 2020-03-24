@@ -189,7 +189,7 @@ static void update_pagetable_mac(vmac_ctx_t *ctx)
 
         if ( !mfn_valid(_mfn(mfn)) )
             continue;
-        if ( is_page_in_use(page) && !is_xen_heap_page(page) )
+        if ( is_page_in_use(page) && !is_special_page(page) )
         {
             if ( page->count_info & PGC_page_table )
             {
@@ -289,7 +289,7 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
                               + 3 * PAGE_SIZE)) )
             continue; /* skip tboot and its page tables */
 
-        if ( is_page_in_use(page) && is_xen_heap_page(page) )
+        if ( is_page_in_use(page) && is_special_page(page) )
         {
             void *pg;
 

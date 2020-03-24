@@ -394,7 +394,7 @@ long arch_do_domctl(
             page = get_page_from_gfn(d, gfn, &t, P2M_ALLOC);
 
             if ( unlikely(!page) ||
-                 unlikely(is_xen_heap_page(page)) )
+                 unlikely(is_special_page(page)) )
             {
                 if ( unlikely(p2m_is_broken(t)) )
                     type = XEN_DOMCTL_PFINFO_BROKEN;

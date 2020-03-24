@@ -285,6 +285,11 @@ extern struct domain *dom_cow;
 
 #include <asm/mm.h>
 
+static inline bool is_special_page(const struct page_info *page)
+{
+    return is_xen_heap_page(page) || (page->count_info & PGC_extra);
+}
+
 #ifndef page_list_entry
 struct page_list_head
 {
