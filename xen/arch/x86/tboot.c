@@ -480,6 +480,8 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
                       sizeof(dmar_table_length),
                       pa + sizeof(char) * ACPI_NAME_SIZE);
     dmar_table = xmalloc_bytes(dmar_table_length);
+    if ( !dmar_table )
+        return -ENOMEM;
     tboot_copy_memory(dmar_table, dmar_table_length, pa);
     clear_fixmap(FIX_TBOOT_MAP_ADDRESS);
 
