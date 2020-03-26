@@ -1273,7 +1273,7 @@ do {                                                                    \
 #define jmp_rel(rel)                                                    \
 do {                                                                    \
     unsigned long ip = _regs.r(ip) + (int)(rel);                        \
-    if ( op_bytes == 2 )                                                \
+    if ( op_bytes == 2 && (amd_like(ctxt) || !mode_64bit()) )           \
         ip = (uint16_t)ip;                                              \
     else if ( !mode_64bit() )                                           \
         ip = (uint32_t)ip;                                              \
@@ -3391,7 +3391,13 @@ x86_decode(
 
     case SrcImm:
         if ( !(d & ByteOp) )
+        {
+            if ( mode_64bit() && !amd_like(ctxt) &&
+                 ((ext == ext_none && (b | 1) == 0xe9) /* call / jmp */ ||
+                  (ext == ext_0f && (b | 0xf) == 0x8f) /* jcc */ ) )
+                op_bytes = 4;
             bytes = op_bytes != 8 ? op_bytes : 4;
+        }
         else
         {
     case SrcImmByte:

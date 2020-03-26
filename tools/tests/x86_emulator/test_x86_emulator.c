@@ -757,6 +757,62 @@ static const struct {
         .opc_len = { 4, 4 },
         .stkoff = { 2 + 16, 8 + 16 },
         .disp = { STKVAL_DISP - MMAP_ADDR, STKVAL_DISP },
+    }, {
+        .descr = "jmpw .+16",
+        .opcode = { 0x66, 0xeb, 0x10 },
+        .opc_len = { 3, 3 },
+        .disp = { 3 + 16 - MMAP_ADDR, 3 + 16 },
+    }, {
+        .descr = "jmpw .+128",
+        .opcode = { 0x66, 0xe9, 0x80, 0x00, 0x00, 0x00 },
+        .opc_len = { 4, 6 },
+        .disp = { 4 + 128 - MMAP_ADDR, 6 + 128 },
+    }, {
+        .descr = "callw .+16",
+        .opcode = { 0x66, 0xe8, 0x10, 0x00, 0x00, 0x00 },
+        .opc_len = { 4, 6 },
+        .stkoff = { -2, -8 },
+        .disp = { 4 + 16 - MMAP_ADDR, 6 + 16 },
+    }, {
+        .descr = "jzw .+16",
+        .opcode = { 0x66, 0x74, 0x10 },
+        .opc_len = { 3, 3 },
+        .disp = { 3, 3 },
+    }, {
+        .descr = "jzw .+128",
+        .opcode = { 0x66, 0x0f, 0x84, 0x80, 0x00, 0x00, 0x00 },
+        .opc_len = { 5, 7 },
+        .disp = { 5, 7 },
+    }, {
+        .descr = "jnzw .+16",
+        .opcode = { 0x66, 0x75, 0x10 },
+        .opc_len = { 3, 3 },
+        .disp = { 3 + 16 - MMAP_ADDR, 3 + 16 },
+    }, {
+        .descr = "jnzw .+128",
+        .opcode = { 0x66, 0x0f, 0x85, 0x80, 0x00, 0x00, 0x00 },
+        .opc_len = { 5, 7 },
+        .disp = { 5 + 128 - MMAP_ADDR, 7 + 128 },
+    }, {
+        .descr = "loopqw .+16 (RCX>1)",
+        .opcode = { 0x66, 0xe0, 0x10 },
+        .opc_len = { 3, 3 },
+        .disp = { 3 + 16 - MMAP_ADDR, 3 + 16 },
+    }, {
+        .descr = "looplw .+16 (ECX=1)",
+        .opcode = { 0x66, 0x67, 0xe0, 0x10 },
+        .opc_len = { 4, 4 },
+        .disp = { 4, 4 },
+    }, {
+        .descr = "jrcxzw .+16 (RCX>0)",
+        .opcode = { 0x66, 0xe3, 0x10 },
+        .opc_len = { 3, 3 },
+        .disp = { 3, 3 },
+    }, {
+        .descr = "jecxzw .+16 (ECX=0)",
+        .opcode = { 0x66, 0x67, 0xe3, 0x10 },
+        .opc_len = { 4, 4 },
+        .disp = { 4 + 16 - MMAP_ADDR, 4 + 16 },
     },
 };
 #endif
@@ -1361,6 +1417,7 @@ int main(int argc, char **argv)
         const char *vendor = cp.x86_vendor == X86_VENDOR_INTEL ? "Intel" : "AMD";
         uint64_t *stk = (void *)res + MMAP_SZ - 16;
 
+        regs.rcx = 2;
         for ( i = 0; i < ARRAY_SIZE(vendor_tests); ++i )
         {
             printf("%-*s",
@@ -1370,6 +1427,7 @@ int main(int argc, char **argv)
             regs.eflags = EFLAGS_ALWAYS_SET;
             regs.rip    = (unsigned long)instr;
             regs.rsp    = (unsigned long)stk;
+            regs.rcx   |= 0x8765432100000000UL;
             stk[0]      = regs.rip + STKVAL_DISP;
             rc = x86_emulate(&ctxt, &emulops);
             if ( (rc != X86EMUL_OKAY) ||
@@ -1379,6 +1437,16 @@ int main(int argc, char **argv)
                                ?: vendor_tests[i].opc_len[v])) ||
                  (regs.rsp != (unsigned long)stk + vendor_tests[i].stkoff[v]) )
                 goto fail;
+            /* For now only call insns push something onto the stack. */
+            if ( regs.rsp < (unsigned long)stk )
+            {
+                unsigned long opc_end = (unsigned long)instr +
+                                        vendor_tests[i].opc_len[v];
+
+                if ( memcmp(&opc_end, (void *)regs.rsp,
+                            min((unsigned long)stk - regs.rsp, 8UL)) )
+                    goto fail;
+            }
             printf("okay\n");
         }
 
