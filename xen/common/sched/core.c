@@ -2299,6 +2299,10 @@ void sched_context_switched(struct vcpu *vprev, struct vcpu *vnext)
     rcu_read_unlock(&sched_res_rculock);
 }
 
+/*
+ * Switch to a new context or keep the current one running.
+ * On x86 it won't return, so it needs to drop the still held sched_res_rculock.
+ */
 static void sched_context_switch(struct vcpu *vprev, struct vcpu *vnext,
                                  bool reset_idle_unit, s_time_t now)
 {
@@ -2408,6 +2412,9 @@ static struct vcpu *sched_force_context_switch(struct vcpu *vprev,
  * zero do_schedule() is called and the rendezvous counter for leaving
  * context_switch() is set. All other members will wait until the counter is
  * becoming zero, dropping the schedule lock in between.
+ * Either returns the new unit to run, or NULL if no context switch is
+ * required or (on Arm) has already been performed. If NULL is returned
+ * sched_res_rculock has been dropped.
  */
 static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
                                                    spinlock_t **lock, int cpu,
@@ -2415,7 +2422,8 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
 {
     struct sched_unit *next;
     struct vcpu *v;
-    unsigned int gran = get_sched_res(cpu)->granularity;
+    struct sched_resource *sr = get_sched_res(cpu);
+    unsigned int gran = sr->granularity;
 
     if ( !--prev->rendezvous_in_cnt )
     {
@@ -2481,6 +2489,21 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
             ASSERT(is_idle_unit(prev));
             atomic_set(&prev->next_task->rendezvous_out_cnt, 0);
             prev->rendezvous_in_cnt = 0;
+        }
+
+        /*
+         * Check for scheduling resource switched. This happens when we are
+         * moved away from our cpupool and cpus are subject of the idle
+         * scheduler now.
+         */
+        if ( unlikely(sr != get_sched_res(cpu)) )
+        {
+            ASSERT(is_idle_unit(prev));
+            atomic_set(&prev->next_task->rendezvous_out_cnt, 0);
+            prev->rendezvous_in_cnt = 0;
+            pcpu_schedule_unlock_irq(*lock, cpu);
+            rcu_read_unlock(&sched_res_rculock);
+            return NULL;
         }
     }
 
@@ -2567,10 +2590,10 @@ static void schedule(void)
 
     rcu_read_lock(&sched_res_rculock);
 
+    lock = pcpu_schedule_lock_irq(cpu);
+
     sr = get_sched_res(cpu);
     gran = sr->granularity;
-
-    lock = pcpu_schedule_lock_irq(cpu);
 
     if ( prev->rendezvous_in_cnt )
     {
@@ -3151,7 +3174,10 @@ int schedule_cpu_rm(unsigned int cpu)
         per_cpu(sched_res_idx, cpu_iter) = 0;
         if ( cpu_iter == cpu )
         {
-            idle_vcpu[cpu_iter]->sched_unit->priv = NULL;
+            unit = idle_vcpu[cpu_iter]->sched_unit;
+            unit->priv = NULL;
+            atomic_set(&unit->next_task->rendezvous_out_cnt, 0);
+            unit->rendezvous_in_cnt = 0;
         }
         else
         {
@@ -3182,6 +3208,8 @@ int schedule_cpu_rm(unsigned int cpu)
     }
     sr->scheduler = &sched_idle_ops;
     sr->sched_priv = NULL;
+    sr->granularity = 1;
+    sr->cpupool = NULL;
 
     smp_mb();
     sr->schedule_lock = &sched_free_cpu_lock;
@@ -3193,9 +3221,6 @@ int schedule_cpu_rm(unsigned int cpu)
 
     sched_free_udata(old_ops, vpriv_old);
     sched_free_pdata(old_ops, ppriv_old, cpu);
-
-    sr->granularity = 1;
-    sr->cpupool = NULL;
 
 out:
     rcu_read_unlock(&sched_res_rculock);
