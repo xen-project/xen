@@ -346,12 +346,10 @@ static int num_cpu_cores(struct cpuinfo_x86 *c)
 
 static void init_intel(struct cpuinfo_x86 *c)
 {
-	unsigned int l2 = 0;
-
 	/* Detect the extended topology information if available */
 	detect_extended_topology(c);
 
-	l2 = init_intel_cacheinfo(c);
+	init_intel_cacheinfo(c);
 	if (c->cpuid_level > 9) {
 		unsigned eax = cpuid_eax(10);
 		/* Check for version and the number of counters */

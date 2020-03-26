@@ -116,7 +116,7 @@ static int find_num_cache_leaves(void)
 	return i;
 }
 
-unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
+void init_intel_cacheinfo(struct cpuinfo_x86 *c)
 {
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0; /* Cache sizes */
 	unsigned int new_l1d = 0, new_l1i = 0; /* Cache sizes from cpuid(4) */
@@ -262,6 +262,4 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	}
 
 	c->x86_cache_size = l3 ? l3 : (l2 ? l2 : (l1i+l1d));
-
-	return l2;
 }
