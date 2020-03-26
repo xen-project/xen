@@ -31,6 +31,8 @@ static void __do_softirq(unsigned long ignore_mask)
     unsigned long pending;
     bool rcu_allowed = !(ignore_mask & (1ul << RCU_SOFTIRQ));
 
+    ASSERT(!rcu_allowed || rcu_quiesce_allowed());
+
     for ( ; ; )
     {
         /*
@@ -58,7 +60,7 @@ void process_pending_softirqs(void)
                                 (1ul << SCHED_SLAVE_SOFTIRQ);
 
     /* Block RCU processing in case of rcu_read_lock() held. */
-    if ( preempt_count() )
+    if ( !rcu_quiesce_allowed() )
         ignore_mask |= 1ul << RCU_SOFTIRQ;
 
     ASSERT(!in_irq() && local_irq_is_enabled());

@@ -32,11 +32,34 @@
 #define __XEN_RCUPDATE_H
 
 #include <xen/cache.h>
+#include <xen/compiler.h>
 #include <xen/spinlock.h>
 #include <xen/cpumask.h>
+#include <xen/percpu.h>
 #include <xen/preempt.h>
 
 #define __rcu
+
+DECLARE_PER_CPU(unsigned int, rcu_lock_cnt);
+
+static inline void rcu_quiesce_disable(void)
+{
+    preempt_disable();
+    this_cpu(rcu_lock_cnt)++;
+    barrier();
+}
+
+static inline void rcu_quiesce_enable(void)
+{
+    barrier();
+    this_cpu(rcu_lock_cnt)--;
+    preempt_enable();
+}
+
+static inline bool rcu_quiesce_allowed(void)
+{
+    return !this_cpu(rcu_lock_cnt);
+}
 
 /**
  * struct rcu_head - callback structure for use with RCU
@@ -91,16 +114,24 @@ typedef struct _rcu_read_lock rcu_read_lock_t;
  * will be deferred until the outermost RCU read-side critical section
  * completes.
  *
- * It is illegal to block while in an RCU read-side critical section.
+ * It is illegal to process softirqs or block while in an RCU read-side
+ * critical section.
  */
-#define rcu_read_lock(x)       ({ ((void)(x)); preempt_disable(); })
+static inline void rcu_read_lock(rcu_read_lock_t *lock)
+{
+    rcu_quiesce_disable();
+}
 
 /**
  * rcu_read_unlock - marks the end of an RCU read-side critical section.
  *
  * See rcu_read_lock() for more information.
  */
-#define rcu_read_unlock(x)     ({ ((void)(x)); preempt_enable(); })
+static inline void rcu_read_unlock(rcu_read_lock_t *lock)
+{
+    ASSERT(!rcu_quiesce_allowed());
+    rcu_quiesce_enable();
+}
 
 /*
  * So where is rcu_write_lock()?  It does not exist, as there is no
