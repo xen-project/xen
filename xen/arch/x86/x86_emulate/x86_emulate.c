@@ -6587,7 +6587,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x34): /* sysenter */
         vcpu_must_have(sep);
-        generate_exception_if(mode_ring0(), EXC_GP, 0);
+        generate_exception_if(amd_like(ctxt) && ctxt->lma, EXC_UD);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
         fail_if(ops->read_msr == NULL);
@@ -6610,11 +6610,6 @@ x86_emulate(
         sreg.limit = ~0u;  /* 4GB limit */
         sreg.attr = 0xc93; /* G+DB+P+S+Data */
 
-        fail_if(ops->write_segment == NULL);
-        if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||
-             (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) != 0 )
-            goto done;
-
         if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_EIP,
                                  &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
@@ -6625,11 +6620,19 @@ x86_emulate(
             goto done;
         _regs.r(sp) = ctxt->lma ? msr_val : (uint32_t)msr_val;
 
+        fail_if(!ops->write_segment);
+        if ( (rc = ops->write_segment(x86_seg_cs, &cs,
+                                      ctxt)) != X86EMUL_OKAY ||
+             (rc = ops->write_segment(x86_seg_ss, &sreg,
+                                      ctxt)) != X86EMUL_OKAY )
+            goto done;
+
         singlestep = _regs.eflags & X86_EFLAGS_TF;
         break;
 
     case X86EMUL_OPC(0x0f, 0x35): /* sysexit */
         vcpu_must_have(sep);
+        generate_exception_if(amd_like(ctxt) && ctxt->lma, EXC_UD);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
