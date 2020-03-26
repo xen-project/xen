@@ -4,6 +4,7 @@
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/stop_machine.h>
+#include <xen/rcupdate.h>
 
 unsigned int __read_mostly nr_cpu_ids = NR_CPUS;
 #ifndef nr_cpumask_bits
@@ -53,6 +54,7 @@ void put_cpu_maps(void)
 
 void cpu_hotplug_begin(void)
 {
+    rcu_barrier();
     write_lock(&cpu_add_remove_lock);
 }
 
