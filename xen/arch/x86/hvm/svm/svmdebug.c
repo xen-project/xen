@@ -51,9 +51,9 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
     printk("iopm_base_pa = %#"PRIx64" msrpm_base_pa = %#"PRIx64" tsc_offset = %#"PRIx64"\n",
            vmcb_get_iopm_base_pa(vmcb), vmcb_get_msrpm_base_pa(vmcb),
            vmcb_get_tsc_offset(vmcb));
-    printk("tlb_control = %#x vintr = %#"PRIx64" interrupt_shadow = %#"PRIx64"\n",
+    printk("tlb_control = %#x vintr = %#"PRIx64" int_stat = %#"PRIx64"\n",
            vmcb->tlb_control, vmcb_get_vintr(vmcb).bytes,
-           vmcb->interrupt_shadow);
+           vmcb->int_stat.raw);
     printk("event_inj %016"PRIx64", valid? %d, ec? %d, type %u, vector %#x\n",
            vmcb->event_inj.raw, vmcb->event_inj.v,
            vmcb->event_inj.ev, vmcb->event_inj.type,

@@ -116,7 +116,7 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     regs->rip += inst_len;
     regs->eflags &= ~X86_EFLAGS_RF;
 
-    curr->arch.hvm.svm.vmcb->interrupt_shadow = 0;
+    curr->arch.hvm.svm.vmcb->int_stat.intr_shadow = 0;
 
     if ( regs->eflags & X86_EFLAGS_TF )
         hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
@@ -432,7 +432,7 @@ static unsigned int svm_get_interrupt_shadow(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     unsigned int intr_shadow = 0;
 
-    if ( vmcb->interrupt_shadow )
+    if ( vmcb->int_stat.intr_shadow )
         intr_shadow |= HVM_INTR_SHADOW_MOV_SS | HVM_INTR_SHADOW_STI;
 
     if ( vmcb_get_general1_intercepts(vmcb) & GENERAL1_INTERCEPT_IRET )
@@ -446,7 +446,7 @@ static void svm_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
 
-    vmcb->interrupt_shadow =
+    vmcb->int_stat.intr_shadow =
         !!(intr_shadow & (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI));
 
     general1_intercepts &= ~GENERAL1_INTERCEPT_IRET;
@@ -2945,7 +2945,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
          * retired.
          */
         general1_intercepts &= ~GENERAL1_INTERCEPT_IRET;
-        vmcb->interrupt_shadow = 1;
+        vmcb->int_stat.intr_shadow = 1;
 
         vmcb_set_general1_intercepts(vmcb, general1_intercepts);
         break;
