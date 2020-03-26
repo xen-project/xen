@@ -4659,6 +4659,80 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    if ( stack_exec && cpu_has_avx512_bf16 )
+    {
+        decl_insn(vcvtne2ps2bf16);
+        decl_insn(vcvtneps2bf16);
+        decl_insn(vdpbf16ps);
+        static const struct {
+            float f[16];
+        } in1 = {{
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+        }}, in2 = {{
+            1, -2, 3, -4, 5, -6, 7, -8, 9, -10, 11, -12, 13, -14, 15, -16
+        }}, out = {{
+            1 * 1 + 2 * 2, 3 * 3 + 4 * 4,
+            5 * 5 + 6 * 6, 7 * 7 + 8 * 8,
+            9 * 9 + 10 * 10, 11 * 11 + 12 * 12,
+            13 * 13 + 14 * 14, 15 * 15 + 16 * 16,
+            1 * 1 - 2 * 2, 3 * 3 - 4 * 4,
+            5 * 5 - 6 * 6, 7 * 7 - 8 * 8,
+            9 * 9 - 10 * 10, 11 * 11 - 12 * 12,
+            13 * 13 - 14 * 14, 15 * 15 - 16 * 16
+        }};
+
+        printf("%-40s", "Testing vcvtne2ps2bf16 64(%ecx),%zmm1,%zmm2...");
+        asm volatile ( "vmovups %1, %%zmm1\n"
+                       put_insn(vcvtne2ps2bf16,
+                                /* vcvtne2ps2bf16 64(%0), %%zmm1, %%zmm2 */
+                                ".byte 0x62, 0xf2, 0x77, 0x48, 0x72, 0x51, 0x01")
+                       :: "c" (NULL), "m" (in2) );
+        set_insn(vcvtne2ps2bf16);
+        regs.ecx = (unsigned long)&in1 - 64;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vcvtne2ps2bf16) )
+            goto fail;
+        printf("pending\n");
+
+        printf("%-40s", "Testing vcvtneps2bf16 64(%ecx),%ymm3...");
+        asm volatile ( put_insn(vcvtneps2bf16,
+                                /* vcvtneps2bf16 64(%0), %%ymm3 */
+                                ".byte 0x62, 0xf2, 0x7e, 0x48, 0x72, 0x59, 0x01")
+                       :: "c" (NULL) );
+        set_insn(vcvtneps2bf16);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vcvtneps2bf16) )
+            goto fail;
+        asm ( "vmovdqa %%ymm2, %%ymm5\n\t"
+              "vpcmpeqd %%zmm3, %%zmm5, %%k0\n\t"
+              "kmovw %%k0, %0"
+              : "=g" (rc) : "m" (out) );
+        if ( rc != 0xffff )
+            goto fail;
+        printf("pending\n");
+
+        printf("%-40s", "Testing vdpbf16ps 128(%ecx),%zmm2,%zmm4...");
+        asm volatile ( "vmovdqa %%ymm3, %0\n\t"
+                       "vmovdqa %%ymm3, %1\n"
+                       put_insn(vdpbf16ps,
+                                /* vdpbf16ps 128(%2), %%zmm2, %%zmm4 */
+                                ".byte 0x62, 0xf2, 0x6e, 0x48, 0x52, 0x61, 0x02")
+                       : "=&m" (res[0]), "=&m" (res[8])
+                       : "c" (NULL)
+                       : "memory" );
+        set_insn(vdpbf16ps);
+        regs.ecx = (unsigned long)res - 128;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vdpbf16ps) )
+            goto fail;
+        asm ( "vcmpeqps %1, %%zmm4, %%k0\n\t"
+              "kmovw %%k0, %0"
+              : "=g" (rc) : "m" (out) );
+        if ( rc != 0xffff )
+            goto fail;
+        printf("okay\n");
+    }
+
     printf("%-40s", "Testing invpcid 16(%ecx),%%edx...");
     if ( stack_exec )
     {
