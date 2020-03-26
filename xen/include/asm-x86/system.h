@@ -233,6 +233,9 @@ static always_inline unsigned long __xadd(
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #define set_wmb(var, value) do { var = value; smp_wmb(); } while (0)
 
+#define smp_mb__before_atomic()    do { } while (0)
+#define smp_mb__after_atomic()     do { } while (0)
+
 /**
  * array_index_mask_nospec() - generate a mask that is ~0UL when the
  *      bounds check succeeds and 0 otherwise
