@@ -733,6 +733,34 @@ static struct x86_emulate_ops emulops = {
 #define EFLAGS_ALWAYS_SET (X86_EFLAGS_IF | X86_EFLAGS_MBS)
 #define EFLAGS_MASK (X86_EFLAGS_ARITH_MASK | EFLAGS_ALWAYS_SET)
 
+#define MMAP_ADDR 0x100000
+
+#ifdef __x86_64__
+# define STKVAL_DISP 64
+static const struct {
+    const char *descr;
+    uint8_t opcode[8];
+    /* Index 0: AMD, index 1: Intel. */
+    uint8_t opc_len[2];
+    int8_t stkoff[2];
+    int32_t disp[2];
+} vendor_tests[] = {
+    {
+        .descr = "retw",
+        .opcode = { 0x66, 0xc3 },
+        .opc_len = { 2, 2 },
+        .stkoff = { 2, 8 },
+        .disp = { STKVAL_DISP - MMAP_ADDR, STKVAL_DISP },
+    }, {
+        .descr = "retw $16",
+        .opcode = { 0x66, 0xc2, 0x10, 0x00 },
+        .opc_len = { 4, 4 },
+        .stkoff = { 2 + 16, 8 + 16 },
+        .disp = { STKVAL_DISP - MMAP_ADDR, STKVAL_DISP },
+    },
+};
+#endif
+
 int main(int argc, char **argv)
 {
     struct x86_emulate_ctxt ctxt;
@@ -741,7 +769,9 @@ int main(int argc, char **argv)
     unsigned int *res, i, j;
     bool stack_exec;
     int rc;
-#ifndef __x86_64__
+#ifdef __x86_64__
+    unsigned int vendor_native;
+#else
     unsigned int bcdres_native, bcdres_emul;
 #endif
 
@@ -755,7 +785,7 @@ int main(int argc, char **argv)
     ctxt.addr_size = 8 * sizeof(void *);
     ctxt.sp_size   = 8 * sizeof(void *);
 
-    res = mmap((void *)0x100000, MMAP_SZ, PROT_READ|PROT_WRITE|PROT_EXEC,
+    res = mmap((void *)MMAP_ADDR, MMAP_SZ, PROT_READ|PROT_WRITE|PROT_EXEC,
                MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
     if ( res == MAP_FAILED )
     {
@@ -1323,7 +1353,41 @@ int main(int argc, char **argv)
          (regs.eip != (unsigned long)&instr[3]) )
         goto fail;
     printf("okay\n");
-#endif
+
+    vendor_native = cp.x86_vendor;
+    for ( cp.x86_vendor = X86_VENDOR_AMD; ; )
+    {
+        unsigned int v = cp.x86_vendor == X86_VENDOR_INTEL;
+        const char *vendor = cp.x86_vendor == X86_VENDOR_INTEL ? "Intel" : "AMD";
+        uint64_t *stk = (void *)res + MMAP_SZ - 16;
+
+        for ( i = 0; i < ARRAY_SIZE(vendor_tests); ++i )
+        {
+            printf("%-*s",
+                   40 - printf("Testing %s [%s]", vendor_tests[i].descr, vendor),
+                   "...");
+            memcpy(instr, vendor_tests[i].opcode, vendor_tests[i].opc_len[v]);
+            regs.eflags = EFLAGS_ALWAYS_SET;
+            regs.rip    = (unsigned long)instr;
+            regs.rsp    = (unsigned long)stk;
+            stk[0]      = regs.rip + STKVAL_DISP;
+            rc = x86_emulate(&ctxt, &emulops);
+            if ( (rc != X86EMUL_OKAY) ||
+                 (regs.eflags != EFLAGS_ALWAYS_SET) ||
+                 (regs.rip != (unsigned long)instr +
+                              (vendor_tests[i].disp[v]
+                               ?: vendor_tests[i].opc_len[v])) ||
+                 (regs.rsp != (unsigned long)stk + vendor_tests[i].stkoff[v]) )
+                goto fail;
+            printf("okay\n");
+        }
+
+        if ( cp.x86_vendor == X86_VENDOR_INTEL )
+            break;
+        cp.x86_vendor = X86_VENDOR_INTEL;
+    }
+    cp.x86_vendor = vendor_native;
+#endif /* x86-64 */
 
     printf("%-40s", "Testing shld $1,%ecx,(%edx)...");
     res[0]      = 0x12345678;

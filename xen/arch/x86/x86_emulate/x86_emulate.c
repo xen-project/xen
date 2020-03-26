@@ -4610,7 +4610,8 @@ x86_emulate(
 
     case 0xc2: /* ret imm16 (near) */
     case 0xc3: /* ret (near) */
-        op_bytes = ((op_bytes == 4) && mode_64bit()) ? 8 : op_bytes;
+        op_bytes = (op_bytes == 4 || !amd_like(ctxt)) && mode_64bit()
+                   ? 8 : op_bytes;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + src.val),
                               &dst.val, op_bytes, ctxt, ops)) != 0 ||
              (rc = ops->insn_fetch(x86_seg_cs, dst.val, NULL, 0, ctxt)) )
