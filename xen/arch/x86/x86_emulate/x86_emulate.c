@@ -2523,8 +2523,7 @@ x86_decode_onebyte(
         {
         case 2: /* call (near) */
         case 4: /* jmp (near) */
-        case 6: /* push */
-            if ( mode_64bit() && op_bytes == 4 )
+            if ( mode_64bit() && (op_bytes == 4 || !amd_like(ctxt)) )
                 op_bytes = 8;
             state->desc = DstNone | SrcMem | Mov;
             break;
@@ -2534,6 +2533,12 @@ x86_decode_onebyte(
             /* REX.W ignored on a vendor-dependent basis. */
             if ( op_bytes == 8 && amd_like(ctxt) )
                 op_bytes = 4;
+            state->desc = DstNone | SrcMem | Mov;
+            break;
+
+        case 6: /* push */
+            if ( mode_64bit() && op_bytes == 4 )
+                op_bytes = 8;
             state->desc = DstNone | SrcMem | Mov;
             break;
         }

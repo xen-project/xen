@@ -813,6 +813,17 @@ static const struct {
         .opcode = { 0x66, 0x67, 0xe3, 0x10 },
         .opc_len = { 4, 4 },
         .disp = { 4 + 16 - MMAP_ADDR, 4 + 16 },
+    }, {
+        .descr = "jmpw *(%rsp)",
+        .opcode = { 0x66, 0xff, 0x24, 0x24 },
+        .opc_len = { 4, 4 },
+        .disp = { STKVAL_DISP - MMAP_ADDR, STKVAL_DISP },
+    }, {
+        .descr = "callw *(%rsp)",
+        .opcode = { 0x66, 0xff, 0x14, 0x24 },
+        .opc_len = { 4, 4 },
+        .stkoff = { -2, -8 },
+        .disp = { STKVAL_DISP - MMAP_ADDR, STKVAL_DISP },
     },
 };
 #endif
