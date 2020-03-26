@@ -1836,6 +1836,18 @@ in_protmode(
     return !(in_realmode(ctxt, ops) || (ctxt->regs->eflags & X86_EFLAGS_VM));
 }
 
+static bool
+_amd_like(const struct cpuid_policy *cp)
+{
+    return cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON);
+}
+
+static bool
+amd_like(const struct x86_emulate_ctxt *ctxt)
+{
+    return _amd_like(ctxt->cpuid);
+}
+
 #define vcpu_has_fpu()         (ctxt->cpuid->basic.fpu)
 #define vcpu_has_sep()         (ctxt->cpuid->basic.sep)
 #define vcpu_has_cx8()         (ctxt->cpuid->basic.cx8)
@@ -1995,8 +2007,7 @@ protmode_load_seg(
         case x86_seg_tr:
             goto raise_exn;
         }
-        if ( !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) ||
-             !ops->read_segment ||
+        if ( !_amd_like(cp) || !ops->read_segment ||
              ops->read_segment(seg, sreg, ctxt) != X86EMUL_OKAY )
             memset(sreg, 0, sizeof(*sreg));
         else
@@ -2122,9 +2133,7 @@ protmode_load_seg(
          *   - all 16 bytes read with the high 8 bytes ignored on AMD.
          */
         bool wide = desc.b & 0x1000
-                    ? false : (desc.b & 0xf00) != 0xc00 &&
-                               !(cp->x86_vendor &
-                                 (X86_VENDOR_AMD | X86_VENDOR_HYGON))
+                    ? false : (desc.b & 0xf00) != 0xc00 && !_amd_like(cp)
                                ? mode_64bit() : ctxt->lma;
 
         if ( wide )
@@ -2142,9 +2151,7 @@ protmode_load_seg(
             default:
                 return rc;
             }
-            if ( !mode_64bit() &&
-                 (cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) &&
-                 (desc.b & 0xf00) != 0xc00 )
+            if ( !mode_64bit() && _amd_like(cp) && (desc.b & 0xf00) != 0xc00 )
                 desc_hi.b = desc_hi.a = 0;
             if ( (desc_hi.b & 0x00001f00) ||
                  (seg != x86_seg_none &&
@@ -2525,9 +2532,7 @@ x86_decode_onebyte(
         case 3: /* call (far, absolute indirect) */
         case 5: /* jmp (far, absolute indirect) */
             /* REX.W ignored on a vendor-dependent basis. */
-            if ( op_bytes == 8 &&
-                 (ctxt->cpuid->x86_vendor &
-                  (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+            if ( op_bytes == 8 && amd_like(ctxt) )
                 op_bytes = 4;
             state->desc = DstNone | SrcMem | Mov;
             break;
@@ -2651,8 +2656,7 @@ x86_decode_twobyte(
     case 0xb4: /* lfs */
     case 0xb5: /* lgs */
         /* REX.W ignored on a vendor-dependent basis. */
-        if ( op_bytes == 8 &&
-             (ctxt->cpuid->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+        if ( op_bytes == 8 && amd_like(ctxt) )
             op_bytes = 4;
         break;
 
@@ -4068,9 +4072,7 @@ x86_emulate(
             if ( ea.type == OP_REG )
                 src.val = *ea.reg;
             else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off, &src.val,
-                                       (op_bytes == 2 &&
-                                        !(ctxt->cpuid->x86_vendor &
-                                          (X86_VENDOR_AMD | X86_VENDOR_HYGON))
+                                       (op_bytes == 2 && !amd_like(ctxt)
                                         ? 2 : 4),
                                        ctxt, ops)) )
                 goto done;
