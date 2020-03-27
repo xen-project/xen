@@ -45,6 +45,7 @@ RUN apt-get update && \
         wget \
         git \
         nasm \
+        apt-transport-https \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

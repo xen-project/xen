@@ -44,6 +44,7 @@ RUN apt-get update && \
         git \
         nasm \
         gnupg \
+        apt-transport-https \
         && \
         apt-get autoremove -y && \
         apt-get clean && \
