@@ -79,6 +79,7 @@ static int collect_cpu_info(struct cpu_signature *csig)
 {
     memset(csig, 0, sizeof(*csig));
 
+    csig->sig = cpuid_eax(1);
     rdmsrl(MSR_AMD_PATCHLEVEL, csig->rev);
 
     pr_debug("microcode: CPU%d collect_cpu_info: patch_id=%#x\n",
@@ -177,12 +178,9 @@ static enum microcode_match_result microcode_fits(
     const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     const struct microcode_header_amd *mc_header = mc_amd->mpb;
     const struct equiv_cpu_entry *equiv_cpu_table = mc_amd->equiv_cpu_table;
-    unsigned int current_cpu_id;
     unsigned int equiv_cpu_id;
 
-    current_cpu_id = cpuid_eax(0x00000001);
-
-    if ( !find_equiv_cpu_id(equiv_cpu_table, current_cpu_id, &equiv_cpu_id) )
+    if ( !find_equiv_cpu_id(equiv_cpu_table, sig->sig, &equiv_cpu_id) )
         return MIS_UCODE;
 
     if ( (mc_header->processor_rev_id) != equiv_cpu_id )
@@ -419,12 +417,9 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
     struct microcode_patch *patch = NULL;
     size_t offset = 0, saved_size = 0;
     int error = 0;
-    unsigned int current_cpu_id;
     unsigned int equiv_cpu_id;
     unsigned int cpu = smp_processor_id();
     const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
-
-    current_cpu_id = cpuid_eax(0x00000001);
 
     if ( bufsize < 4 || *(const uint32_t *)buf != UCODE_MAGIC )
     {
@@ -455,7 +450,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
             break;
         }
 
-        if ( find_equiv_cpu_id(mc_amd->equiv_cpu_table, current_cpu_id,
+        if ( find_equiv_cpu_id(mc_amd->equiv_cpu_table, sig->sig,
                                &equiv_cpu_id) )
             break;
 

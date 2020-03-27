@@ -7,7 +7,7 @@
 #include <public/xen.h>
 
 struct cpu_signature {
-    /* CPU signature (CPUID.1.EAX).  Only written on Intel. */
+    /* CPU signature (CPUID.1.EAX). */
     unsigned int sig;
 
     /* Platform Flags.  Only applicable to Intel. */
