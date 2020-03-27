@@ -59,7 +59,7 @@ struct __packed microcode_header_amd {
 #define UCODE_UCODE_TYPE           0x00000001
 
 struct microcode_patch {
-    void *mpb;
+    struct microcode_header_amd *mpb;
     size_t mpb_size;
     struct equiv_cpu_entry *equiv_cpu_table;
     size_t equiv_cpu_table_size;
@@ -330,8 +330,7 @@ static int get_ucode_from_buffer_amd(
 
     pr_debug("microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
              smp_processor_id(), bufsize, mpbuf->len, *offset,
-             ((struct microcode_header_amd *)mc_amd->mpb)->processor_rev_id,
-             ((struct microcode_header_amd *)mc_amd->mpb)->patch_id);
+             mc_amd->mpb->processor_rev_id, mc_amd->mpb->patch_id);
 
     *offset += mpbuf->len + SECTION_HDR_SIZE;
 
