@@ -61,8 +61,6 @@ struct __packed microcode_header_amd {
 struct microcode_patch {
     struct microcode_header_amd *mpb;
     size_t mpb_size;
-    struct equiv_cpu_entry *equiv_cpu_table;
-    size_t equiv_cpu_table_size;
 };
 
 /* Temporary, until the microcode_* structure are disentangled. */
@@ -73,6 +71,31 @@ struct mpbhdr {
     uint32_t len;
     uint8_t data[];
 };
+
+/*
+ * Microcode updates for different CPUs are distinguished by their
+ * processor_rev_id in the header.  This denotes the format of the internals
+ * of the microcode engine, and is fixed for an individual CPU.
+ *
+ * There is a mapping from the CPU signature (CPUID.1.EAX -
+ * family/model/stepping) to the "equivalent CPU identifier" which is
+ * similarly fixed.  In some cases, multiple different CPU signatures map to
+ * the same equiv_id for processor lines which share identical microcode
+ * facilities.
+ *
+ * This mapping can't be calculated in the general case, but is provided in
+ * the microcode container, so the correct piece of microcode for the CPU can
+ * be identified.  We cache it the first time we encounter the correct mapping
+ * for this system.
+ *
+ * Note: for now, we assume a fully homogeneous setup, meaning that there is
+ * exactly one equiv_id we need to worry about for microcode blob
+ * identification.  This may need revisiting in due course.
+ */
+static struct {
+    uint32_t sig;
+    uint16_t id;
+} equiv __read_mostly;
 
 /* See comment in start_update() for cases when this routine fails */
 static int collect_cpu_info(struct cpu_signature *csig)
@@ -150,40 +173,15 @@ static bool check_final_patch_levels(const struct cpu_signature *sig)
     return false;
 }
 
-static bool_t find_equiv_cpu_id(const struct equiv_cpu_entry *equiv_cpu_table,
-                                unsigned int current_cpu_id,
-                                unsigned int *equiv_cpu_id)
-{
-    unsigned int i;
-
-    if ( !equiv_cpu_table )
-        return 0;
-
-    for ( i = 0; equiv_cpu_table[i].installed_cpu != 0; i++ )
-    {
-        if ( current_cpu_id == equiv_cpu_table[i].installed_cpu )
-        {
-            *equiv_cpu_id = equiv_cpu_table[i].equiv_cpu & 0xffff;
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
 static enum microcode_match_result microcode_fits(
     const struct microcode_amd *mc_amd)
 {
     unsigned int cpu = smp_processor_id();
     const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     const struct microcode_header_amd *mc_header = mc_amd->mpb;
-    const struct equiv_cpu_entry *equiv_cpu_table = mc_amd->equiv_cpu_table;
-    unsigned int equiv_cpu_id;
 
-    if ( !find_equiv_cpu_id(equiv_cpu_table, sig->sig, &equiv_cpu_id) )
-        return MIS_UCODE;
-
-    if ( (mc_header->processor_rev_id) != equiv_cpu_id )
+    if ( equiv.sig != sig->sig ||
+         equiv.id  != mc_header->processor_rev_id )
         return MIS_UCODE;
 
     if ( !verify_patch_size(mc_amd->mpb_size) )
@@ -213,7 +211,6 @@ static void free_patch(struct microcode_patch *mc_amd)
 {
     if ( mc_amd )
     {
-        xfree(mc_amd->equiv_cpu_table);
         xfree(mc_amd->mpb);
         xfree(mc_amd);
     }
@@ -335,14 +332,15 @@ static int get_ucode_from_buffer_amd(
     return 0;
 }
 
-static int install_equiv_cpu_table(
-    struct microcode_amd *mc_amd,
+static int scan_equiv_cpu_table(
     const void *data,
     size_t size_left,
     size_t *offset)
 {
+    const struct cpu_signature *sig = &this_cpu(cpu_sig);
     const struct mpbhdr *mpbuf;
     const struct equiv_cpu_entry *eq;
+    unsigned int i, nr;
 
     if ( size_left < (sizeof(*mpbuf) + 4) ||
          (mpbuf = data + *offset + 4,
@@ -362,19 +360,45 @@ static int install_equiv_cpu_table(
 
     if ( mpbuf->len == 0 || mpbuf->len % sizeof(*eq) ||
          (eq = (const void *)mpbuf->data,
-          eq[(mpbuf->len / sizeof(*eq)) - 1].installed_cpu) )
+          nr = mpbuf->len / sizeof(*eq),
+          eq[nr - 1].installed_cpu) )
     {
         printk(KERN_ERR "microcode: Wrong microcode equivalent cpu table length\n");
         return -EINVAL;
     }
 
-    mc_amd->equiv_cpu_table = xmemdup_bytes(mpbuf->data, mpbuf->len);
-    if ( !mc_amd->equiv_cpu_table )
-        return -ENOMEM;
+    /* Search the equiv_cpu_table for the current CPU. */
+    for ( i = 0; i < nr && eq[i].installed_cpu; ++i )
+    {
+        if ( eq[i].installed_cpu != sig->sig )
+            continue;
 
-    mc_amd->equiv_cpu_table_size = mpbuf->len;
+        if ( !equiv.sig ) /* Cache details on first find. */
+        {
+            equiv.sig = sig->sig;
+            equiv.id  = eq[i].equiv_cpu;
+            return 0;
+        }
 
-    return 0;
+        if ( equiv.sig != sig->sig || equiv.id != eq[i].equiv_cpu )
+        {
+            /*
+             * This can only occur if two equiv tables have been seen with
+             * different mappings for the same CPU.  The mapping is fixed, so
+             * one of the tables is wrong.  As we can't calculate the mapping,
+             * we trusted the first table we saw.
+             */
+            printk(XENLOG_ERR
+                   "microcode: Equiv mismatch: cpu %08x, got %04x, cached %04x\n",
+                   sig->sig, eq[i].equiv_cpu, equiv.id);
+            return -EINVAL;
+        }
+
+        return 0;
+    }
+
+    /* equiv_cpu_table was fine, but nothing found for the current CPU. */
+    return -ESRCH;
 }
 
 static int container_fast_forward(const void *data, size_t size_left, size_t *offset)
@@ -417,7 +441,6 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
     struct microcode_patch *patch = NULL;
     size_t offset = 0, saved_size = 0;
     int error = 0;
-    unsigned int equiv_cpu_id;
     unsigned int cpu = smp_processor_id();
     const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
 
@@ -443,15 +466,9 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
      */
     while ( offset < bufsize )
     {
-        error = install_equiv_cpu_table(mc_amd, buf, bufsize - offset, &offset);
-        if ( error )
-        {
-            printk(KERN_ERR "microcode: installing equivalent cpu table failed\n");
-            break;
-        }
+        error = scan_equiv_cpu_table(buf, bufsize - offset, &offset);
 
-        if ( find_equiv_cpu_id(mc_amd->equiv_cpu_table, sig->sig,
-                               &equiv_cpu_id) )
+        if ( !error || error != -ESRCH )
             break;
 
         error = container_fast_forward(buf, bufsize - offset, &offset);
@@ -478,7 +495,6 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
         if ( error == -ENODATA )
             error = 0;
 
-        xfree(mc_amd->equiv_cpu_table);
         xfree(mc_amd);
         goto out;
     }
