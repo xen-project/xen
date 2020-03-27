@@ -71,8 +71,8 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
     unsigned int i;
 
     cpuid_leaf(0, &p->basic.raw[0]);
-    for ( i = 1; i < min_t(unsigned int, ARRAY_SIZE(p->basic.raw),
-                           p->basic.max_leaf); ++i )
+    for ( i = 1; i <= MIN(p->basic.max_leaf,
+                          ARRAY_SIZE(p->basic.raw) - 1); ++i )
     {
         switch ( i )
         {
@@ -116,8 +116,8 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
     {
         cpuid_count_leaf(7, 0, &p->feat.raw[0]);
 
-        for ( i = 1; i < min_t(unsigned int, ARRAY_SIZE(p->feat.raw),
-                               p->feat.max_subleaf); ++i )
+        for ( i = 1; i <= MIN(p->feat.max_subleaf,
+                              ARRAY_SIZE(p->feat.raw) - 1); ++i )
             cpuid_count_leaf(7, i, &p->feat.raw[i]);
     }
 
@@ -172,8 +172,8 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
 
     /* Extended leaves. */
     cpuid_leaf(0x80000000, &p->extd.raw[0]);
-    for ( i = 1; i < min_t(unsigned int, ARRAY_SIZE(p->extd.raw),
-                           p->extd.max_leaf + 1 - 0x80000000); ++i )
+    for ( i = 1; i <= MIN(p->extd.max_leaf & 0xffffU,
+                          ARRAY_SIZE(p->extd.raw) - 1); ++i )
         cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
 
     x86_cpuid_policy_recalc_synth(p);
