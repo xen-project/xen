@@ -2531,10 +2531,10 @@ static __init bool bad_ioapic_register(unsigned int idx)
     {
         printk(KERN_WARNING "I/O APIC %#x registers return all ones, skipping!\n",
                mp_ioapics[idx].mpc_apicaddr);
-        return 1;
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 void __init init_ioapic_mappings(void)
