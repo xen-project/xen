@@ -254,7 +254,7 @@ TRANSACTION_END		F|
 
 ---------- Domain management and xenstored communications ----------
 
-INTRODUCE		<domid>|<mfn>|<evtchn>|?
+INTRODUCE		<domid>|<gfn>|<evtchn>|?
 	Notifies xenstored to communicate with this domain.
 
 	INTRODUCE is currently only used by xend (during domain
@@ -262,12 +262,12 @@ INTRODUCE		<domid>|<mfn>|<evtchn>|?
 	xenstored prevents its use other than by dom0.
 
 	<domid> must be a real domain id (not 0 and not a special
-	DOMID_... value).  <mfn> must be a machine page in that domain
+	DOMID_... value).  <gfn> must be a page in that domain
 	represented in signed decimal (!).  <evtchn> must be event
 	channel is an unbound event channel in <domid> (likewise in
 	decimal), on which xenstored will call bind_interdomain.
 	Violations of these rules may result in undefined behaviour;
-	for example passing a high-bit-set 32-bit mfn as an unsigned
+	for example passing a high-bit-set 32-bit gfn as an unsigned
 	decimal will attempt to use 0x7fffffff instead (!).
 
 RELEASE			<domid>|
