@@ -50,10 +50,13 @@ struct microcode_header_intel {
     unsigned int reserved[3];
 };
 
-struct microcode_intel {
+struct microcode_patch {
     struct microcode_header_intel hdr;
     unsigned int bits[0];
 };
+
+/* Temporary, until the microcode_* structure are disentangled. */
+#define microcode_intel microcode_patch
 
 /* microcode format is extended from prescott processors */
 struct extended_signature {
@@ -243,12 +246,12 @@ static bool match_cpu(const struct microcode_patch *patch)
     if ( !patch )
         return false;
 
-    return microcode_update_match(&patch->mc_intel->hdr) == NEW_UCODE;
+    return microcode_update_match(&patch->hdr) == NEW_UCODE;
 }
 
-static void free_patch(void *mc)
+static void free_patch(struct microcode_patch *patch)
 {
-    xfree(mc);
+    xfree(patch);
 }
 
 static enum microcode_match_result compare_patch(
@@ -258,11 +261,10 @@ static enum microcode_match_result compare_patch(
      * Both patches to compare are supposed to be applicable to local CPU.
      * Just compare the revision number.
      */
-    ASSERT(microcode_update_match(&old->mc_intel->hdr) != MIS_UCODE);
-    ASSERT(microcode_update_match(&new->mc_intel->hdr) != MIS_UCODE);
+    ASSERT(microcode_update_match(&old->hdr) != MIS_UCODE);
+    ASSERT(microcode_update_match(&new->hdr) != MIS_UCODE);
 
-    return (new->mc_intel->hdr.rev > old->mc_intel->hdr.rev) ? NEW_UCODE
-                                                             : OLD_UCODE;
+    return (new->hdr.rev > old->hdr.rev) ? NEW_UCODE : OLD_UCODE;
 }
 
 static int apply_microcode(const struct microcode_patch *patch)
@@ -279,7 +281,7 @@ static int apply_microcode(const struct microcode_patch *patch)
     if ( !match_cpu(patch) )
         return -EINVAL;
 
-    mc_intel = patch->mc_intel;
+    mc_intel = patch;
 
     /* write microcode via MSR 0x79 */
     wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc_intel->bits);
@@ -368,16 +370,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
         error = offset;
 
     if ( saved )
-    {
-        patch = xmalloc(struct microcode_patch);
-        if ( patch )
-            patch->mc_intel = saved;
-        else
-        {
-            xfree(saved);
-            error = -ENOMEM;
-        }
-    }
+        patch = saved;
 
     if ( error && !patch )
         patch = ERR_PTR(error);

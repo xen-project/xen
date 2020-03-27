@@ -58,12 +58,15 @@ struct __packed microcode_header_amd {
 #define UCODE_EQUIV_CPU_TABLE_TYPE 0x00000000
 #define UCODE_UCODE_TYPE           0x00000001
 
-struct microcode_amd {
+struct microcode_patch {
     void *mpb;
     size_t mpb_size;
     struct equiv_cpu_entry *equiv_cpu_table;
     size_t equiv_cpu_table_size;
 };
+
+/* Temporary, until the microcode_* structure are disentangled. */
+#define microcode_amd microcode_patch
 
 struct mpbhdr {
     uint32_t type;
@@ -175,13 +178,11 @@ static enum microcode_match_result microcode_fits(
 
 static bool match_cpu(const struct microcode_patch *patch)
 {
-    return patch && (microcode_fits(patch->mc_amd) == NEW_UCODE);
+    return patch && (microcode_fits(patch) == NEW_UCODE);
 }
 
-static void free_patch(void *mc)
+static void free_patch(struct microcode_patch *mc_amd)
 {
-    struct microcode_amd *mc_amd = mc;
-
     if ( mc_amd )
     {
         xfree(mc_amd->equiv_cpu_table);
@@ -204,12 +205,12 @@ static enum microcode_match_result compare_header(
 static enum microcode_match_result compare_patch(
     const struct microcode_patch *new, const struct microcode_patch *old)
 {
-    const struct microcode_header_amd *new_header = new->mc_amd->mpb;
-    const struct microcode_header_amd *old_header = old->mc_amd->mpb;
+    const struct microcode_header_amd *new_header = new->mpb;
+    const struct microcode_header_amd *old_header = old->mpb;
 
     /* Both patches to compare are supposed to be applicable to local CPU. */
-    ASSERT(microcode_fits(new->mc_amd) != MIS_UCODE);
-    ASSERT(microcode_fits(old->mc_amd) != MIS_UCODE);
+    ASSERT(microcode_fits(new) != MIS_UCODE);
+    ASSERT(microcode_fits(old) != MIS_UCODE);
 
     return compare_header(new_header, old_header);
 }
@@ -228,7 +229,7 @@ static int apply_microcode(const struct microcode_patch *patch)
     if ( !match_cpu(patch) )
         return -EINVAL;
 
-    hdr = patch->mc_amd->mpb;
+    hdr = patch->mpb;
 
     hw_err = wrmsr_safe(MSR_AMD_PATCHLOADER, (unsigned long)hdr);
 
@@ -553,14 +554,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
     {
         mc_amd->mpb = saved;
         mc_amd->mpb_size = saved_size;
-        patch = xmalloc(struct microcode_patch);
-        if ( patch )
-            patch->mc_amd = mc_amd;
-        else
-        {
-            free_patch(mc_amd);
-            error = -ENOMEM;
-        }
+        patch = mc_amd;
     }
     else
         free_patch(mc_amd);

@@ -11,13 +11,8 @@ enum microcode_match_result {
     MIS_UCODE, /* signature mismatched */
 };
 
-struct microcode_patch {
-    union {
-        struct microcode_intel *mc_intel;
-        struct microcode_amd *mc_amd;
-        void *mc;
-    };
-};
+/* Opaque.  Internals are vendor-specific. */
+struct microcode_patch;
 
 struct microcode_ops {
     /*
@@ -62,7 +57,7 @@ struct microcode_ops {
     void (*end_update_percpu)(void);
 
     /* Free a patch previously allocated by cpu_request_microcode(). */
-    void (*free_patch)(void *mc);
+    void (*free_patch)(struct microcode_patch *patch);
 
     /*
      * Is the microcode patch applicable for the current CPU, and newer than

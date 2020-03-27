@@ -245,8 +245,7 @@ static struct microcode_patch *parse_blob(const char *buf, size_t len)
 
 static void microcode_free_patch(struct microcode_patch *microcode_patch)
 {
-    microcode_ops->free_patch(microcode_patch->mc);
-    xfree(microcode_patch);
+    microcode_ops->free_patch(microcode_patch);
 }
 
 /* Return true if cache gets updated. Otherwise, return false */
