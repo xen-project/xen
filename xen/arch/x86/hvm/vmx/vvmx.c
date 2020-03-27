@@ -1384,28 +1384,43 @@ static void nvmx_update_apicv(struct vcpu *v)
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long reason = get_vvmcs(v, VM_EXIT_REASON);
     unsigned long intr_info = get_vvmcs(v, VM_EXIT_INTR_INFO);
+    unsigned long status;
+    int rvi;
 
-    if ( reason == EXIT_REASON_EXTERNAL_INTERRUPT &&
-         nvmx->intr.source == hvm_intsrc_lapic &&
-         (intr_info & INTR_INFO_VALID_MASK) )
+    if ( reason != EXIT_REASON_EXTERNAL_INTERRUPT ||
+         nvmx->intr.source != hvm_intsrc_lapic )
+        return;
+
+    if ( intr_info & INTR_INFO_VALID_MASK )
     {
-        uint16_t status;
-        uint32_t rvi, ppr;
-        uint32_t vector = intr_info & 0xff;
+        uint32_t ppr;
+        unsigned int vector = intr_info & INTR_INFO_VECTOR_MASK;
         struct vlapic *vlapic = vcpu_vlapic(v);
 
+        /*
+         * Update SVI to record the current in service interrupt that's
+         * signaled in EXIT_INTR_INFO.
+         */
         vlapic_ack_pending_irq(v, vector, 1);
 
         ppr = vlapic_set_ppr(vlapic);
         WARN_ON((ppr & 0xf0) != (vector & 0xf0));
 
         status = vector << VMX_GUEST_INTR_STATUS_SVI_OFFSET;
-        rvi = vlapic_has_pending_irq(v);
-        if ( rvi != -1 )
-            status |= rvi & VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
-
-        __vmwrite(GUEST_INTR_STATUS, status);
     }
+    else
+       /* Keep previous SVI if there's any. */
+       __vmread(GUEST_INTR_STATUS, &status);
+
+    rvi = vlapic_has_pending_irq(v);
+    if ( rvi != -1 )
+    {
+        status &= ~VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
+        status |= rvi & VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
+    }
+
+    if ( status )
+        __vmwrite(GUEST_INTR_STATUS, status);
 }
 
 static void virtual_vmexit(struct cpu_user_regs *regs)
