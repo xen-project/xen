@@ -2537,7 +2537,7 @@ static __init bool bad_ioapic_register(unsigned int idx)
     return false;
 }
 
-void __init init_ioapic_mappings(void)
+void __init ioapic_init(void)
 {
     unsigned long ioapic_phys;
     unsigned int i, idx = FIX_IO_APIC_BASE_0;

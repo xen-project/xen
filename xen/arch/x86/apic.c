@@ -978,7 +978,7 @@ __next:
         boot_cpu_physical_apicid = get_apic_id();
     x86_cpu_to_apicid[0] = get_apic_id();
 
-    init_ioapic_mappings();
+    ioapic_init();
 }
 
 /*****************************************************************************
