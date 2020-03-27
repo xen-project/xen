@@ -224,6 +224,18 @@ static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
     return 0;
 }
 
+void vmx_sync_exit_bitmap(struct vcpu *v)
+{
+    const unsigned int n = ARRAY_SIZE(v->arch.hvm.vmx.eoi_exit_bitmap);
+    unsigned int i;
+
+    while ( (i = find_first_bit(&v->arch.hvm.vmx.eoi_exitmap_changed, n)) < n )
+    {
+        clear_bit(i, &v->arch.hvm.vmx.eoi_exitmap_changed);
+        __vmwrite(EOI_EXIT_BITMAP(i), v->arch.hvm.vmx.eoi_exit_bitmap[i]);
+    }
+}
+
 void vmx_intr_assist(void)
 {
     struct hvm_intack intack;
@@ -318,7 +330,6 @@ void vmx_intr_assist(void)
               intack.source != hvm_intsrc_vector )
     {
         unsigned long status;
-        unsigned int i, n;
 
        /*
         * intack.vector is the highest priority vector. So we set eoi_exit_bitmap
@@ -379,13 +390,7 @@ void vmx_intr_assist(void)
                     intack.vector;
         __vmwrite(GUEST_INTR_STATUS, status);
 
-        n = ARRAY_SIZE(v->arch.hvm.vmx.eoi_exit_bitmap);
-        while ( (i = find_first_bit(&v->arch.hvm.vmx.eoi_exitmap_changed,
-                                    n)) < n )
-        {
-            clear_bit(i, &v->arch.hvm.vmx.eoi_exitmap_changed);
-            __vmwrite(EOI_EXIT_BITMAP(i), v->arch.hvm.vmx.eoi_exit_bitmap[i]);
-        }
+        vmx_sync_exit_bitmap(v);
 
         pt_intr_post(v, intack);
     }
