@@ -56,6 +56,7 @@ static void __do_softirq(unsigned long ignore_mask)
 
 void process_pending_softirqs(void)
 {
+    /* Do not enter scheduler as it can preempt the calling context. */
     unsigned long ignore_mask = (1ul << SCHEDULE_SOFTIRQ) |
                                 (1ul << SCHED_SLAVE_SOFTIRQ);
 
@@ -64,7 +65,6 @@ void process_pending_softirqs(void)
         ignore_mask |= 1ul << RCU_SOFTIRQ;
 
     ASSERT(!in_irq() && local_irq_is_enabled());
-    /* Do not enter scheduler as it can preempt the calling context. */
     __do_softirq(ignore_mask);
 }
 
