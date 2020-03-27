@@ -20,8 +20,6 @@
 
 #include <asm/hvm/svm/svm.h>
 #include <asm/msr.h>
-#include <asm/processor.h>
-#include <asm/system.h>
 
 #include "private.h"
 
@@ -231,8 +229,6 @@ static int apply_microcode(const struct microcode_patch *patch)
         return -EINVAL;
 
     hdr = patch->mc_amd->mpb;
-
-    BUG_ON(local_irq_is_enabled());
 
     hw_err = wrmsr_safe(MSR_AMD_PATCHLOADER, (unsigned long)hdr);
 

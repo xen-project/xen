@@ -25,8 +25,6 @@
 #include <xen/init.h>
 
 #include <asm/msr.h>
-#include <asm/processor.h>
-#include <asm/system.h>
 
 #include "private.h"
 
@@ -282,8 +280,6 @@ static int apply_microcode(const struct microcode_patch *patch)
         return -EINVAL;
 
     mc_intel = patch->mc_intel;
-
-    BUG_ON(local_irq_is_enabled());
 
     /* write microcode via MSR 0x79 */
     wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc_intel->bits);
