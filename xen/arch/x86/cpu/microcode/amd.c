@@ -60,7 +60,6 @@ struct __packed microcode_header_amd {
 
 struct microcode_patch {
     struct microcode_header_amd *mpb;
-    size_t mpb_size;
 };
 
 /* Temporary, until the microcode_* structure are disentangled. */
@@ -183,12 +182,6 @@ static enum microcode_match_result microcode_fits(
     if ( equiv.sig != sig->sig ||
          equiv.id  != mc_header->processor_rev_id )
         return MIS_UCODE;
-
-    if ( !verify_patch_size(mc_amd->mpb_size) )
-    {
-        pr_debug("microcode: patch size mismatch\n");
-        return MIS_UCODE;
-    }
 
     if ( mc_header->patch_id <= sig->rev )
     {
@@ -318,10 +311,15 @@ static int get_ucode_from_buffer_amd(
         return -EINVAL;
     }
 
+    if ( !verify_patch_size(mpbuf->len) )
+    {
+        printk(XENLOG_ERR "microcode: patch size mismatch\n");
+        return -EINVAL;
+    }
+
     mc_amd->mpb = xmemdup_bytes(mpbuf->data, mpbuf->len);
     if ( !mc_amd->mpb )
         return -ENOMEM;
-    mc_amd->mpb_size = mpbuf->len;
 
     pr_debug("microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
              smp_processor_id(), bufsize, mpbuf->len, *offset,
@@ -439,7 +437,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
     struct microcode_amd *mc_amd;
     struct microcode_header_amd *saved = NULL;
     struct microcode_patch *patch = NULL;
-    size_t offset = 0, saved_size = 0;
+    size_t offset = 0;
     int error = 0;
     unsigned int cpu = smp_processor_id();
     const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
@@ -515,7 +513,6 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
         {
             xfree(saved);
             saved = mc_amd->mpb;
-            saved_size = mc_amd->mpb_size;
         }
         else
         {
@@ -554,7 +551,6 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
     if ( saved )
     {
         mc_amd->mpb = saved;
-        mc_amd->mpb_size = saved_size;
         patch = mc_amd;
     }
     else
