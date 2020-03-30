@@ -70,6 +70,11 @@ struct mpbhdr {
     uint32_t len;
     uint8_t data[];
 };
+struct container_microcode {
+    uint32_t type; /* UCODE_UCODE_TYPE */
+    uint32_t len;
+    struct microcode_header_amd patch[];
+};
 
 /*
  * Microcode updates for different CPUs are distinguished by their
@@ -280,52 +285,6 @@ static int apply_microcode(const struct microcode_patch *patch)
     return 0;
 }
 
-static int get_ucode_from_buffer_amd(
-    struct microcode_amd *mc_amd,
-    const void *buf,
-    size_t bufsize,
-    size_t *offset)
-{
-    const struct mpbhdr *mpbuf = buf + *offset;
-
-    /* No more data */
-    if ( *offset >= bufsize )
-    {
-        printk(KERN_ERR "microcode: Microcode buffer overrun\n");
-        return -EINVAL;
-    }
-
-    if ( mpbuf->type != UCODE_UCODE_TYPE )
-    {
-        printk(KERN_ERR "microcode: Wrong microcode payload type field\n");
-        return -EINVAL;
-    }
-
-    if ( (*offset + mpbuf->len) > bufsize )
-    {
-        printk(KERN_ERR "microcode: Bad data in microcode data file\n");
-        return -EINVAL;
-    }
-
-    if ( !verify_patch_size(mpbuf->len) )
-    {
-        printk(XENLOG_ERR "microcode: patch size mismatch\n");
-        return -EINVAL;
-    }
-
-    mc_amd->mpb = xmemdup_bytes(mpbuf->data, mpbuf->len);
-    if ( !mc_amd->mpb )
-        return -ENOMEM;
-
-    pr_debug("microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
-             smp_processor_id(), bufsize, mpbuf->len, *offset,
-             mc_amd->mpb->processor_rev_id, mc_amd->mpb->patch_id);
-
-    *offset += mpbuf->len + SECTION_HDR_SIZE;
-
-    return 0;
-}
-
 static int scan_equiv_cpu_table(
     const void *data,
     size_t size_left,
@@ -430,9 +389,9 @@ static int container_fast_forward(const void *data, size_t size_left, size_t *of
 static struct microcode_patch *cpu_request_microcode(const void *buf, size_t size)
 {
     struct microcode_amd *mc_amd;
-    struct microcode_header_amd *saved = NULL;
+    const struct microcode_header_amd *saved = NULL;
     struct microcode_patch *patch = NULL;
-    size_t offset = 0;
+    size_t offset = 0, saved_size = 0;
     int error = 0;
     unsigned int cpu = smp_processor_id();
     const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
@@ -496,57 +455,54 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
      * It's possible the data file has multiple matching ucode,
      * lets keep searching till the latest version
      */
-    while ( (error = get_ucode_from_buffer_amd(mc_amd, buf, size,
-                                               &offset)) == 0 )
+    buf  += offset;
+    size -= offset;
     {
-        /*
-         * If the new ucode covers current CPU, compare ucodes and store the
-         * one with higher revision.
-         */
-        if ( (microcode_fits(mc_amd->mpb) != MIS_UCODE) &&
-             (!saved || (compare_header(mc_amd->mpb, saved) == NEW_UCODE)) )
+        while ( size )
         {
-            xfree(saved);
-            saved = mc_amd->mpb;
-        }
-        else
-        {
-            xfree(mc_amd->mpb);
-            mc_amd->mpb = NULL;
-        }
+            const struct container_microcode *mc;
 
-        if ( offset >= size )
-            break;
+            if ( size < sizeof(*mc) ||
+                 (mc = buf)->type != UCODE_UCODE_TYPE ||
+                 size - sizeof(*mc) < mc->len ||
+                 !verify_patch_size(mc->len) )
+            {
+                printk(XENLOG_ERR "microcode: Bad microcode data\n");
+                error = -EINVAL;
+                break;
+            }
 
-        /*
-         * 1. Given a situation where multiple containers exist and correct
-         *    patch lives on a container that is not the last container.
-         * 2. We match equivalent ids using find_equiv_cpu_id() from the
-         *    earlier while() (On this case, matches on earlier container
-         *    file and we break)
-         * 3. Proceed to while ( (error = get_ucode_from_buffer_amd(mc_amd,
-         *                                  buf, size, &offset)) == 0 )
-         * 4. Find correct patch using microcode_fits() and apply the patch
-         *    (Assume: apply_microcode() is successful)
-         * 5. The while() loop from (3) continues to parse the binary as
-         *    there is a subsequent container file, but...
-         * 6. ...a correct patch can only be on one container and not on any
-         *    subsequent ones. (Refer docs for more info) Therefore, we
-         *    don't have to parse a subsequent container. So, we can abort
-         *    the process here.
-         * 7. This ensures that we retain a success value (= 0) to 'error'
-         *    before if ( mpbuf->type != UCODE_UCODE_TYPE ) evaluates to
-         *    false and returns -EINVAL.
-         */
-        if ( offset + SECTION_HDR_SIZE <= size &&
-             *(const uint32_t *)(buf + offset) == UCODE_MAGIC )
-            break;
+            /*
+             * If the new ucode covers current CPU, compare ucodes and store the
+             * one with higher revision.
+             */
+            if ( (microcode_fits(mc->patch) != MIS_UCODE) &&
+                 (!saved || (compare_header(mc->patch, saved) == NEW_UCODE)) )
+            {
+                saved = mc->patch;
+                saved_size = mc->len;
+            }
+
+            /* Move over the microcode blob. */
+            buf  += sizeof(*mc) + mc->len;
+            size -= sizeof(*mc) + mc->len;
+
+            /*
+             * Peek ahead.  If we see the start of another container, we've
+             * exhaused all microcode blobs in this container.  Exit cleanly.
+             */
+            if ( size >= 4 && *(const uint32_t *)buf == UCODE_MAGIC )
+                break;
+        }
     }
 
     if ( saved )
     {
-        mc_amd->mpb = saved;
-        patch = mc_amd;
+        mc_amd->mpb = xmemdup_bytes(saved, saved_size);
+        if ( mc_amd->mpb )
+            patch = mc_amd;
+        else
+            error = -ENOMEM;
     }
     else
         free_patch(mc_amd);
