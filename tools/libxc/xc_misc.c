@@ -187,11 +187,11 @@ int xc_send_debug_keys(xc_interface *xch, const char *keys)
     return ret;
 }
 
-int xc_set_parameters(xc_interface *xch, char *params)
+int xc_set_parameters(xc_interface *xch, const char *params)
 {
     int ret, len = strlen(params);
     DECLARE_SYSCTL;
-    DECLARE_HYPERCALL_BOUNCE(params, len, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE_IN(params, len);
 
     if ( xc_hypercall_bounce_pre(xch, params) )
         return -1;
