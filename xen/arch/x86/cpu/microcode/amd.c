@@ -25,10 +25,6 @@
 
 #define pr_debug(x...) ((void)0)
 
-#define CONT_HDR_SIZE           12
-#define SECTION_HDR_SIZE        8
-#define PATCH_HDR_SIZE          32
-
 struct __packed equiv_cpu_entry {
     uint32_t installed_cpu;
     uint32_t fixed_errata_mask;
@@ -58,10 +54,10 @@ struct microcode_patch {
 #define UCODE_EQUIV_CPU_TABLE_TYPE 0x00000000
 #define UCODE_UCODE_TYPE           0x00000001
 
-struct mpbhdr {
-    uint32_t type;
+struct container_equiv_table {
+    uint32_t type; /* UCODE_EQUIV_CPU_TABLE_TYPE */
     uint32_t len;
-    uint8_t data[];
+    struct equiv_cpu_entry eq[];
 };
 struct container_microcode {
     uint32_t type; /* UCODE_UCODE_TYPE */
@@ -269,55 +265,25 @@ static int apply_microcode(const struct microcode_patch *patch)
     return 0;
 }
 
-static int scan_equiv_cpu_table(
-    const void *data,
-    size_t size_left,
-    size_t *offset)
+static int scan_equiv_cpu_table(const struct container_equiv_table *et)
 {
     const struct cpu_signature *sig = &this_cpu(cpu_sig);
-    const struct mpbhdr *mpbuf;
-    const struct equiv_cpu_entry *eq;
-    unsigned int i, nr;
-
-    if ( size_left < (sizeof(*mpbuf) + 4) ||
-         (mpbuf = data + *offset + 4,
-          size_left - sizeof(*mpbuf) - 4 < mpbuf->len) )
-    {
-        printk(XENLOG_WARNING "microcode: No space for equivalent cpu table\n");
-        return -EINVAL;
-    }
-
-    *offset += mpbuf->len + CONT_HDR_SIZE;	/* add header length */
-
-    if ( mpbuf->type != UCODE_EQUIV_CPU_TABLE_TYPE )
-    {
-        printk(KERN_ERR "microcode: Wrong microcode equivalent cpu table type field\n");
-        return -EINVAL;
-    }
-
-    if ( mpbuf->len == 0 || mpbuf->len % sizeof(*eq) ||
-         (eq = (const void *)mpbuf->data,
-          nr = mpbuf->len / sizeof(*eq),
-          eq[nr - 1].installed_cpu) )
-    {
-        printk(KERN_ERR "microcode: Wrong microcode equivalent cpu table length\n");
-        return -EINVAL;
-    }
+    unsigned int i, nr = et->len / sizeof(et->eq[0]);
 
     /* Search the equiv_cpu_table for the current CPU. */
-    for ( i = 0; i < nr && eq[i].installed_cpu; ++i )
+    for ( i = 0; i < nr && et->eq[i].installed_cpu; ++i )
     {
-        if ( eq[i].installed_cpu != sig->sig )
+        if ( et->eq[i].installed_cpu != sig->sig )
             continue;
 
         if ( !equiv.sig ) /* Cache details on first find. */
         {
             equiv.sig = sig->sig;
-            equiv.id  = eq[i].equiv_cpu;
+            equiv.id  = et->eq[i].equiv_cpu;
             return 0;
         }
 
-        if ( equiv.sig != sig->sig || equiv.id != eq[i].equiv_cpu )
+        if ( equiv.sig != sig->sig || equiv.id != et->eq[i].equiv_cpu )
         {
             /*
              * This can only occur if two equiv tables have been seen with
@@ -327,7 +293,7 @@ static int scan_equiv_cpu_table(
              */
             printk(XENLOG_ERR
                    "microcode: Equiv mismatch: cpu %08x, got %04x, cached %04x\n",
-                   sig->sig, eq[i].equiv_cpu, equiv.id);
+                   sig->sig, et->eq[i].equiv_cpu, equiv.id);
             return -EINVAL;
         }
 
@@ -338,100 +304,52 @@ static int scan_equiv_cpu_table(
     return -ESRCH;
 }
 
-static int container_fast_forward(const void *data, size_t size_left, size_t *offset)
-{
-    for ( ; ; )
-    {
-        size_t size;
-        const uint32_t *header;
-
-        if ( size_left < SECTION_HDR_SIZE )
-            return -EINVAL;
-
-        header = data + *offset;
-
-        if ( header[0] == UCODE_MAGIC &&
-             header[1] == UCODE_EQUIV_CPU_TABLE_TYPE )
-            break;
-
-        if ( header[0] != UCODE_UCODE_TYPE )
-            return -EINVAL;
-        size = header[1] + SECTION_HDR_SIZE;
-        if ( size < PATCH_HDR_SIZE || size_left < size )
-            return -EINVAL;
-
-        size_left -= size;
-        *offset += size;
-
-        if ( !size_left )
-            return -ENODATA;
-    }
-
-    return 0;
-}
-
 static struct microcode_patch *cpu_request_microcode(const void *buf, size_t size)
 {
     const struct microcode_patch *saved = NULL;
     struct microcode_patch *patch = NULL;
-    size_t offset = 0, saved_size = 0;
+    size_t saved_size = 0;
     int error = 0;
-    unsigned int cpu = smp_processor_id();
-    const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
 
-    if ( size < 4 || *(const uint32_t *)buf != UCODE_MAGIC )
+    while ( size )
     {
-        printk(KERN_ERR "microcode: Wrong microcode patch file magic\n");
-        error = -EINVAL;
-        goto out;
-    }
+        const struct container_equiv_table *et;
+        bool skip_ucode;
 
-    /*
-     * Multiple container file support:
-     * 1. check if this container file has equiv_cpu_id match
-     * 2. If not, fast-fwd to next container file
-     */
-    while ( offset < size )
-    {
-        error = scan_equiv_cpu_table(buf, size - offset, &offset);
-
-        if ( !error || error != -ESRCH )
-            break;
-
-        error = container_fast_forward(buf, size - offset, &offset);
-        if ( error == -ENODATA )
+        if ( size < 4 || *(const uint32_t *)buf != UCODE_MAGIC )
         {
-            ASSERT(offset == size);
+            printk(XENLOG_ERR "microcode: Wrong microcode patch file magic\n");
+            error = -EINVAL;
             break;
         }
-        if ( error )
+
+        /* Move over UCODE_MAGIC. */
+        buf  += 4;
+        size -= 4;
+
+        if ( size < sizeof(*et) ||
+             (et = buf)->type != UCODE_EQUIV_CPU_TABLE_TYPE ||
+             size - sizeof(*et) < et->len ||
+             et->len % sizeof(et->eq[0]) ||
+             et->eq[(et->len / sizeof(et->eq[0])) - 1].installed_cpu )
         {
-            printk(KERN_ERR "microcode: CPU%d incorrect or corrupt container file\n"
-                   "microcode: Failed to update patch level. "
-                   "Current lvl:%#x\n", cpu, sig->rev);
+            printk(XENLOG_ERR "microcode: Bad equivalent cpu table\n");
+            error = -EINVAL;
             break;
         }
-    }
 
-    if ( error )
-    {
-        /*
-         * -ENODATA here means that the blob was parsed fine but no matching
-         * ucode was found. Don't return it to the caller.
-         */
-        if ( error == -ENODATA )
-            error = 0;
+        /* Move over the Equiv table. */
+        buf  += sizeof(*et) + et->len;
+        size -= sizeof(*et) + et->len;
 
-        goto out;
-    }
+        error = scan_equiv_cpu_table(et);
 
-    /*
-     * It's possible the data file has multiple matching ucode,
-     * lets keep searching till the latest version
-     */
-    buf  += offset;
-    size -= offset;
-    {
+        /* -ESRCH means no applicable microcode in this container. */
+        if ( error && error != -ESRCH )
+            break;
+        skip_ucode = error;
+        error = 0;
+
         while ( size )
         {
             const struct container_microcode *mc;
@@ -439,12 +357,15 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
             if ( size < sizeof(*mc) ||
                  (mc = buf)->type != UCODE_UCODE_TYPE ||
                  size - sizeof(*mc) < mc->len ||
-                 !verify_patch_size(mc->len) )
+                 (!skip_ucode && !verify_patch_size(mc->len)) )
             {
                 printk(XENLOG_ERR "microcode: Bad microcode data\n");
                 error = -EINVAL;
                 break;
             }
+
+            if ( skip_ucode )
+                goto skip;
 
             /*
              * If the new ucode covers current CPU, compare ucodes and store the
@@ -458,6 +379,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
             }
 
             /* Move over the microcode blob. */
+        skip:
             buf  += sizeof(*mc) + mc->len;
             size -= sizeof(*mc) + mc->len;
 
@@ -477,7 +399,6 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
             error = -ENOMEM;
     }
 
-  out:
     if ( error && !patch )
         patch = ERR_PTR(error);
 
