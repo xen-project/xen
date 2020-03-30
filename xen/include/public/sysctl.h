@@ -170,7 +170,7 @@ struct xen_sysctl_getdomaininfolist {
 /* XEN_SYSCTL_debug_keys */
 struct xen_sysctl_debug_keys {
     /* IN variables. */
-    XEN_GUEST_HANDLE_64(char) keys;
+    XEN_GUEST_HANDLE_64(const_char) keys;
     uint32_t nr_keys;
 };
 
@@ -1037,7 +1037,7 @@ struct xen_sysctl_livepatch_op {
  */
 
 struct xen_sysctl_set_parameter {
-    XEN_GUEST_HANDLE_64(char) params;       /* IN: pointer to parameters. */
+    XEN_GUEST_HANDLE_64(const_char) params; /* IN: pointer to parameters. */
     uint16_t size;                          /* IN: size of parameters. */
     uint16_t pad[3];                        /* IN: MUST be zero. */
 };
