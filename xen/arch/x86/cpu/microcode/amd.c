@@ -173,31 +173,30 @@ static bool check_final_patch_levels(const struct cpu_signature *sig)
 }
 
 static enum microcode_match_result microcode_fits(
-    const struct microcode_amd *mc_amd)
+    const struct microcode_header_amd *patch)
 {
     unsigned int cpu = smp_processor_id();
     const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
-    const struct microcode_header_amd *mc_header = mc_amd->mpb;
 
     if ( equiv.sig != sig->sig ||
-         equiv.id  != mc_header->processor_rev_id )
+         equiv.id  != patch->processor_rev_id )
         return MIS_UCODE;
 
-    if ( mc_header->patch_id <= sig->rev )
+    if ( patch->patch_id <= sig->rev )
     {
         pr_debug("microcode: patch is already at required level or greater.\n");
         return OLD_UCODE;
     }
 
     pr_debug("microcode: CPU%d found a matching microcode update with version %#x (current=%#x)\n",
-             cpu, mc_header->patch_id, sig->rev);
+             cpu, patch->patch_id, sig->rev);
 
     return NEW_UCODE;
 }
 
 static bool match_cpu(const struct microcode_patch *patch)
 {
-    return patch && (microcode_fits(patch) == NEW_UCODE);
+    return patch && (microcode_fits(patch->mpb) == NEW_UCODE);
 }
 
 static void free_patch(struct microcode_patch *mc_amd)
@@ -223,14 +222,11 @@ static enum microcode_match_result compare_header(
 static enum microcode_match_result compare_patch(
     const struct microcode_patch *new, const struct microcode_patch *old)
 {
-    const struct microcode_header_amd *new_header = new->mpb;
-    const struct microcode_header_amd *old_header = old->mpb;
-
     /* Both patches to compare are supposed to be applicable to local CPU. */
-    ASSERT(microcode_fits(new) != MIS_UCODE);
-    ASSERT(microcode_fits(old) != MIS_UCODE);
+    ASSERT(microcode_fits(new->mpb) != MIS_UCODE);
+    ASSERT(microcode_fits(old->mpb) != MIS_UCODE);
 
-    return compare_header(new_header, old_header);
+    return compare_header(new->mpb, old->mpb);
 }
 
 static int apply_microcode(const struct microcode_patch *patch)
@@ -508,7 +504,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
          * If the new ucode covers current CPU, compare ucodes and store the
          * one with higher revision.
          */
-        if ( (microcode_fits(mc_amd) != MIS_UCODE) &&
+        if ( (microcode_fits(mc_amd->mpb) != MIS_UCODE) &&
              (!saved || (compare_header(mc_amd->mpb, saved) == NEW_UCODE)) )
         {
             xfree(saved);
