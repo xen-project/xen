@@ -1225,7 +1225,7 @@ int xc_readconsolering(xc_interface *xch,
                        unsigned int *pnr_chars,
                        int clear, int incremental, uint32_t *pindex);
 
-int xc_send_debug_keys(xc_interface *xch, char *keys);
+int xc_send_debug_keys(xc_interface *xch, const char *keys);
 int xc_set_parameters(xc_interface *xch, char *params);
 
 typedef struct xen_sysctl_physinfo xc_physinfo_t;

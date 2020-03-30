@@ -182,6 +182,14 @@ enum {
 #define DECLARE_HYPERCALL_BOUNCE(_ubuf, _sz, _dir) DECLARE_NAMED_HYPERCALL_BOUNCE(_ubuf, _ubuf, _sz, _dir)
 
 /*
+ * Declare a bounce buffer shadowing the named user data pointer that
+ * cannot be modified.
+ */
+#define DECLARE_HYPERCALL_BOUNCE_IN(_ubuf, _sz)                     \
+    DECLARE_NAMED_HYPERCALL_BOUNCE(_ubuf, (void *)(_ubuf), _sz,     \
+                                   XC_HYPERCALL_BUFFER_BOUNCE_IN)
+
+/*
  * Set the size of data to bounce. Useful when the size is not known
  * when the bounce buffer is declared.
  */
