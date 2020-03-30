@@ -427,8 +427,7 @@ static int container_fast_forward(const void *data, size_t size_left, size_t *of
     return 0;
 }
 
-static struct microcode_patch *cpu_request_microcode(const void *buf,
-                                                     size_t bufsize)
+static struct microcode_patch *cpu_request_microcode(const void *buf, size_t size)
 {
     struct microcode_amd *mc_amd;
     struct microcode_header_amd *saved = NULL;
@@ -438,7 +437,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
     unsigned int cpu = smp_processor_id();
     const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
 
-    if ( bufsize < 4 || *(const uint32_t *)buf != UCODE_MAGIC )
+    if ( size < 4 || *(const uint32_t *)buf != UCODE_MAGIC )
     {
         printk(KERN_ERR "microcode: Wrong microcode patch file magic\n");
         error = -EINVAL;
@@ -458,17 +457,17 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
      * 1. check if this container file has equiv_cpu_id match
      * 2. If not, fast-fwd to next container file
      */
-    while ( offset < bufsize )
+    while ( offset < size )
     {
-        error = scan_equiv_cpu_table(buf, bufsize - offset, &offset);
+        error = scan_equiv_cpu_table(buf, size - offset, &offset);
 
         if ( !error || error != -ESRCH )
             break;
 
-        error = container_fast_forward(buf, bufsize - offset, &offset);
+        error = container_fast_forward(buf, size - offset, &offset);
         if ( error == -ENODATA )
         {
-            ASSERT(offset == bufsize);
+            ASSERT(offset == size);
             break;
         }
         if ( error )
@@ -497,7 +496,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
      * It's possible the data file has multiple matching ucode,
      * lets keep searching till the latest version
      */
-    while ( (error = get_ucode_from_buffer_amd(mc_amd, buf, bufsize,
+    while ( (error = get_ucode_from_buffer_amd(mc_amd, buf, size,
                                                &offset)) == 0 )
     {
         /*
@@ -516,7 +515,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
             mc_amd->mpb = NULL;
         }
 
-        if ( offset >= bufsize )
+        if ( offset >= size )
             break;
 
         /*
@@ -526,7 +525,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
          *    earlier while() (On this case, matches on earlier container
          *    file and we break)
          * 3. Proceed to while ( (error = get_ucode_from_buffer_amd(mc_amd,
-         *                                  buf, bufsize,&offset)) == 0 )
+         *                                  buf, size, &offset)) == 0 )
          * 4. Find correct patch using microcode_fits() and apply the patch
          *    (Assume: apply_microcode() is successful)
          * 5. The while() loop from (3) continues to parse the binary as
@@ -539,7 +538,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
          *    before if ( mpbuf->type != UCODE_UCODE_TYPE ) evaluates to
          *    false and returns -EINVAL.
          */
-        if ( offset + SECTION_HDR_SIZE <= bufsize &&
+        if ( offset + SECTION_HDR_SIZE <= size &&
              *(const uint32_t *)(buf + offset) == UCODE_MAGIC )
             break;
     }
