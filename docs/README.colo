@@ -5,5 +5,5 @@ response in parallel too. If the response packets from PVM and SVM are
 identical, they are released immediately. Otherwise, a VM checkpoint (on demand)
 is conducted.
 
-See the website at http://wiki.xen.org/wiki/COLO_-_Coarse_Grain_Lock_Stepping
+See the website at https://wiki.xen.org/wiki/COLO_-_Coarse_Grain_Lock_Stepping
 for details.

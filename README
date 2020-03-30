@@ -21,15 +21,15 @@ development community, spearheaded by xen.org (http://www.xen.org).
 
 This file contains some quick-start instructions to install Xen on
 your system. For more information see http:/www.xen.org/ and
-http://wiki.xen.org/
+https://wiki.xen.org/
 
 Quick-Start Guide
 =================
 
 First, this is just a quick-start guide. For more comprehensive
 information see the INSTALL file and the Xen wiki at
-http://wiki.xenproject.org and in particular
-http://wiki.xenproject.org/wiki/Getting_Started.
+https://wiki.xenproject.org and in particular
+https://wiki.xenproject.org/wiki/Getting_Started.
 
 Second, there are a number of prerequisites for building a Xen source
 release. Make sure you have all the following installed, either by
@@ -88,10 +88,10 @@ disabled at compile time:
 Second, you need to acquire a suitable kernel for use in domain 0. If
 possible you should use a kernel provided by your OS distributor. If
 no suitable kernel is available from your OS distributor then refer to
-http://wiki.xen.org/wiki/XenDom0Kernels for suggestions for
+https://wiki.xen.org/wiki/XenDom0Kernels for suggestions for
 suitable kernels to use.
 If you are looking to compile a Dom0 kernel from source, please refer to
-http://wiki.xen.org/wiki/XenParavirtOps.
+https://wiki.xen.org/wiki/XenParavirtOps.
 
 [NB. Unless noted otherwise, all the following steps should be
 performed with root privileges.]
@@ -168,9 +168,9 @@ You can change the preferred xenstored you want to use in the configuration
 but since we cannot stop the daemon a reboot will be required to make the
 change take effect.
 
-[0] http://wiki.xen.org/wiki/XenStore
-[1] http://wiki.xen.org/wiki/XenStoreReference
-[2] http://wiki.xen.org/wiki/Xenstored
+[0] https://wiki.xen.org/wiki/XenStore
+[1] https://wiki.xen.org/wiki/XenStoreReference
+[2] https://wiki.xen.org/wiki/Xenstored
 
 Python Runtime Libraries
 ========================

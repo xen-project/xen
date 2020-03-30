@@ -208,7 +208,7 @@ http://www.dell.com/content/products/category.aspx/optix?c=us&cs=555&l=en&s=biz
 - HP Compaq:  DC7800
 http://h10010.www1.hp.com/wwpc/us/en/en/WF04a/12454-12454-64287-321860-3328898.html
 
-For more information, pls refer to http://wiki.xen.org/wiki/VTdHowTo.
+For more information, pls refer to https://wiki.xen.org/wiki/VTdHowTo.
 
 
 Assigning devices to HVM domains

@@ -1,7 +1,7 @@
 Remus provides fault tolerance for virtual machines by sending continuous
 checkpoints to a backup, which will activate if the target VM fails.
 
-See the website at http://wiki.xen.org/wiki/Remus for details.
+See the website at https://wiki.xen.org/wiki/Remus for details.
 
 Using Remus with libxl on Xen 4.5 and higher:
  To enable network buffering, you need libnl 3.2.8

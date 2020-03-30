@@ -10,7 +10,7 @@
 #
 # For more documentation you can refer to the wiki:
 #
-# http://wiki.xen.org/wiki/Category:Host_Configuration#System_wide_xen_configuration
+# https://wiki.xen.org/wiki/Category:Host_Configuration#System_wide_xen_configuration
 
 PACKAGE_TARNAME          := @PACKAGE_TARNAME@
 prefix                   := @prefix@

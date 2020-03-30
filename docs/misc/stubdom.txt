@@ -19,7 +19,7 @@ config:
     device_model_stubdomain_override = 1
 
 See xl.cfg(5) for more details of the xl domain configuration syntax
-and http://wiki.xen.org/wiki/Device_Model_Stub_Domains for more
+and https://wiki.xen.org/wiki/Device_Model_Stub_Domains for more
 information on device model stub domains
 
 
