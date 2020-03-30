@@ -65,7 +65,7 @@ CAMLprim value stub_string_of_header(value tid, value rid, value ty, value len)
 	};
 
 	ret = caml_alloc_string(sizeof(struct xsd_sockmsg));
-	memcpy(String_val(ret), &xsd, sizeof(struct xsd_sockmsg));
+	memcpy((char *) String_val(ret), &xsd, sizeof(struct xsd_sockmsg));
 
 	CAMLreturn(ret);
 }
