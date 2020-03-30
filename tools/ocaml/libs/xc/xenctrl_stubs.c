@@ -501,7 +501,7 @@ CAMLprim value stub_xc_vcpu_context_get(value xch, value domid,
 		failwith_xc(_H(xch));
 
 	context = caml_alloc_string(sizeof(ctxt));
-	memcpy(String_val(context), (char *) &ctxt.c, sizeof(ctxt.c));
+	memcpy((char *) String_val(context), &ctxt.c, sizeof(ctxt.c));
 
 	CAMLreturn(context);
 }
@@ -680,7 +680,7 @@ CAMLprim value stub_xc_readconsolering(value xch)
 		conring_size = size;
 
 	ring = caml_alloc_string(count);
-	memcpy(String_val(ring), str, count);
+	memcpy((char *) String_val(ring), str, count);
 	free(str);
 
 	CAMLreturn(ring);
