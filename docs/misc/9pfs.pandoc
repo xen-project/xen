@@ -415,5 +415,5 @@ the *size* field of the 9pfs header.
 
 [paper]: https://www.usenix.org/legacy/event/usenix05/tech/freenix/full_papers/hensbergen/hensbergen.pdf
 [website]: https://github.com/chaos/diod/blob/master/protocol.md
-[XenbusStateInitialising]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,xenbus.h.html
-[ring.h]: http://xenbits.xen.org/gitweb/?p=xen.git;a=blob;f=xen/include/public/io/ring.h;hb=HEAD
+[XenbusStateInitialising]: https://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,xenbus.h.html
+[ring.h]: https://xenbits.xen.org/gitweb/?p=xen.git;a=blob;f=xen/include/public/io/ring.h;hb=HEAD

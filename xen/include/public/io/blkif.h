@@ -118,7 +118,7 @@
  *
  *      The underlying storage is not affected by the direct IO memory
  *      lifetime bug.  See:
- *        http://lists.xen.org/archives/html/xen-devel/2012-12/msg01154.html
+ *        https://lists.xen.org/archives/html/xen-devel/2012-12/msg01154.html
  *
  *      Therefore this option gives the backend permission to use
  *      O_DIRECT, notwithstanding that bug.

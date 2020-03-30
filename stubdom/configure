@@ -582,7 +582,7 @@ PACKAGE_TARNAME='xen'
 PACKAGE_VERSION='4.14'
 PACKAGE_STRING='Xen Hypervisor Stub Domains 4.14'
 PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
-PACKAGE_URL='http://www.xen.org/'
+PACKAGE_URL='https://www.xen.org/'
 
 ac_unique_file="xenstore-minios.cfg"
 ac_subst_vars='LTLIBOBJS
@@ -1376,7 +1376,7 @@ Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
 
 Report bugs to <xen-devel@lists.xen.org>.
-Xen Hypervisor Stub Domains home page: <http://www.xen.org/>.
+Xen Hypervisor Stub Domains home page: <https://www.xen.org/>.
 _ACEOF
 ac_status=$?
 fi
@@ -4296,7 +4296,7 @@ Configuration files:
 $config_files
 
 Report bugs to <xen-devel@lists.xen.org>.
-Xen Hypervisor Stub Domains home page: <http://www.xen.org/>."
+Xen Hypervisor Stub Domains home page: <https://www.xen.org/>."
 
 _ACEOF
 cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1

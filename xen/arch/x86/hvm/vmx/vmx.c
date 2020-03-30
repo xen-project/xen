@@ -2490,7 +2490,7 @@ const struct hvm_function_table * __init start_vmx(void)
 
     /*
      * Do not enable EPT when (!cpu_has_vmx_pat), to prevent security hole
-     * (refer to http://xenbits.xen.org/xsa/advisory-60.html).
+     * (refer to https://xenbits.xen.org/xsa/advisory-60.html).
      */
     if ( cpu_has_vmx_ept && (cpu_has_vmx_pat || opt_force_ept) )
     {

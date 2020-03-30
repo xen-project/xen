@@ -7,7 +7,7 @@
 
 #################################
 
-http://www.xen.org/
+https://www.xen.org/
 
 What is Xen?
 ============
@@ -17,10 +17,10 @@ Systems Research Group of the University of Cambridge Computer
 Laboratory, as part of the UK-EPSRC funded XenoServers project.  Xen
 is freely-distributable Open Source software, released under the GNU
 GPL. Since its initial public release, Xen has grown a large
-development community, spearheaded by xen.org (http://www.xen.org).
+development community, spearheaded by xen.org (https://www.xen.org).
 
 This file contains some quick-start instructions to install Xen on
-your system. For more information see http:/www.xen.org/ and
+your system. For more information see https:/www.xen.org/ and
 https://wiki.xen.org/
 
 Quick-Start Guide
@@ -99,7 +99,7 @@ performed with root privileges.]
 1. Download and untar the source tarball file. This will be a
    file named xen-unstable-src.tgz, or xen-$version-src.tgz.
    You can also pull the current version from the git or mercurial
-   repositories at http://xenbits.xen.org/
+   repositories at https://xenbits.xen.org/
 
     # tar xzf xen-unstable-src.tgz
 

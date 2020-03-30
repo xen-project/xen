@@ -1078,8 +1078,8 @@ only as many bytes as available in the buffer up to *[in|out]_prod*.
 reading from the socket.
 
 
-[xenstore]: http://xenbits.xen.org/docs/unstable/misc/xenstore.txt
-[XenbusStateInitialising]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,xenbus.h.html
+[xenstore]: https://xenbits.xen.org/docs/unstable/misc/xenstore.txt
+[XenbusStateInitialising]: https://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,xenbus.h.html
 [address]: http://pubs.opengroup.org/onlinepubs/7908799/xns/syssocket.h.html
 [in]: http://pubs.opengroup.org/onlinepubs/000095399/basedefs/netinet/in.h.html
 [socket]: http://pubs.opengroup.org/onlinepubs/009695399/functions/socket.html
@@ -1089,4 +1089,4 @@ reading from the socket.
 [listen]: http://pubs.opengroup.org/onlinepubs/7908799/xns/listen.html
 [accept]: http://pubs.opengroup.org/onlinepubs/7908799/xns/accept.html
 [poll]: http://pubs.opengroup.org/onlinepubs/7908799/xsh/poll.html
-[ring.h]: http://xenbits.xen.org/gitweb/?p=xen.git;a=blob;f=xen/include/public/io/ring.h;hb=HEAD
+[ring.h]: https://xenbits.xen.org/gitweb/?p=xen.git;a=blob;f=xen/include/public/io/ring.h;hb=HEAD

@@ -627,7 +627,7 @@ Virtual Performance Management Unit for HVM guests
     Status, x86: Supported, Not security supported
 
 Disabled by default (enable with hypervisor command line option).
-This feature is not security supported: see http://xenbits.xen.org/xsa/advisory-163.html
+This feature is not security supported: see https://xenbits.xen.org/xsa/advisory-163.html
 
 ### Argo: Inter-domain message delivery by hypercall
 

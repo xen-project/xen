@@ -583,7 +583,7 @@ PACKAGE_TARNAME='xen'
 PACKAGE_VERSION='4.14'
 PACKAGE_STRING='Xen Hypervisor Tools 4.14'
 PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
-PACKAGE_URL='http://www.xen.org/'
+PACKAGE_URL='https://www.xen.org/'
 
 ac_unique_file="libxl/libxl.c"
 # Factoring default headers for most tests.
@@ -1611,7 +1611,7 @@ Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
 
 Report bugs to <xen-devel@lists.xen.org>.
-Xen Hypervisor Tools home page: <http://www.xen.org/>.
+Xen Hypervisor Tools home page: <https://www.xen.org/>.
 _ACEOF
 ac_status=$?
 fi
@@ -10373,7 +10373,7 @@ Configuration headers:
 $config_headers
 
 Report bugs to <xen-devel@lists.xen.org>.
-Xen Hypervisor Tools home page: <http://www.xen.org/>."
+Xen Hypervisor Tools home page: <https://www.xen.org/>."
 
 _ACEOF
 cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1

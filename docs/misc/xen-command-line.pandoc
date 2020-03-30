@@ -2294,7 +2294,7 @@ provide access to a wealth of low level processor information.
 
 *Warning:*
 As the virtualisation is not 100% safe, don't use the vpmu flag on
-production systems (see http://xenbits.xen.org/xsa/advisory-163.html)!
+production systems (see https://xenbits.xen.org/xsa/advisory-163.html)!
 
 ### vwfi (arm)
 > `= trap | native`

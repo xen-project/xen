@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.67])
 AC_INIT([Xen Hypervisor Stub Domains], m4_esyscmd([../version.sh ../xen/Makefile]),
-    [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
+    [xen-devel@lists.xen.org], [xen], [https://www.xen.org/])
 AC_CONFIG_SRCDIR([xenstore-minios.cfg])
 AC_CONFIG_FILES([../config/Stubdom.mk])
 AC_CONFIG_AUX_DIR([../])

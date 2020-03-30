@@ -582,7 +582,7 @@ PACKAGE_TARNAME='xen'
 PACKAGE_VERSION='4.14'
 PACKAGE_STRING='Xen Hypervisor 4.14'
 PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
-PACKAGE_URL='http://www.xen.org/'
+PACKAGE_URL='https://www.xen.org/'
 
 ac_unique_file="./xen/common/kernel.c"
 enable_option_checking=no
@@ -1336,7 +1336,7 @@ Optional Packages:
                           [PREFIX/lib/debug]
 
 Report bugs to <xen-devel@lists.xen.org>.
-Xen Hypervisor home page: <http://www.xen.org/>.
+Xen Hypervisor home page: <https://www.xen.org/>.
 _ACEOF
 ac_status=$?
 fi
@@ -2904,7 +2904,7 @@ Configuration files:
 $config_files
 
 Report bugs to <xen-devel@lists.xen.org>.
-Xen Hypervisor home page: <http://www.xen.org/>."
+Xen Hypervisor home page: <https://www.xen.org/>."
 
 _ACEOF
 cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1

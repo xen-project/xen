@@ -88,7 +88,7 @@ mechanism. See `Trampoline (e9 opcode)` section for more details.
 ### Example of trampoline and in-place splicing
 
 As example we will assume the hypervisor does not have XSA-132 (see
-[domctl/sysctl: don't leak hypervisor stack to toolstacks](http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=4ff3449f0e9d175ceb9551d3f2aecb59273f639d))
+[domctl/sysctl: don't leak hypervisor stack to toolstacks](https://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=4ff3449f0e9d175ceb9551d3f2aecb59273f639d))
 and we would like to binary patch the hypervisor with it. The original code
 looks as so:
 
@@ -157,7 +157,7 @@ CPU branching logic (I-cache, but it is just one unconditional jump).
 
 For this example we will assume that the hypervisor has not been compiled with
 XSA-125 (see
-[pre-fill structures for certain HYPERVISOR_xen_version sub-ops](http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=fe2e079f642effb3d24a6e1a7096ef26e691d93e))
+[pre-fill structures for certain HYPERVISOR_xen_version sub-ops](https://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=fe2e079f642effb3d24a6e1a7096ef26e691d93e))
 which mem-sets an structure in `xen_version` hypercall. This function is not
 called **anywhere** in the hypervisor (it is called by the guest) but
 referenced in the `compat_hypercall_table` and `hypercall_table` (and

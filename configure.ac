@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.67])
 AC_INIT([Xen Hypervisor], m4_esyscmd([./version.sh ./xen/Makefile]),
-    [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
+    [xen-devel@lists.xen.org], [xen], [https://www.xen.org/])
 AC_CONFIG_SRCDIR([./xen/common/kernel.c])
 AC_CONFIG_FILES([
 	config/Toplevel.mk

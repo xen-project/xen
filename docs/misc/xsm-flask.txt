@@ -49,13 +49,13 @@ driver domains, or stub xenstored - even if those bugs do no worse
 than reduce the security of such a system to one whose device models,
 backend drivers, or xenstore, run in dom0.
 
-For more information see http://xenbits.xen.org/xsa/advisory-77.html.
+For more information see https://xenbits.xen.org/xsa/advisory-77.html.
 
 The following interfaces are covered by this statement.  Interfaces
 not listed here are considered safe for disaggregation, security
 issues found in interfaces not listed here will be handled according
 to the normal security problem response policy
-http://www.xenproject.org/security-policy.html.
+https://www.xenproject.org/security-policy.html.
 
 __HYPERVISOR_domctl (xen/include/public/domctl.h)
 
