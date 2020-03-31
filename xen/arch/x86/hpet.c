@@ -215,7 +215,7 @@ again:
 static void hpet_interrupt_handler(int irq, void *data,
         struct cpu_user_regs *regs)
 {
-    struct hpet_event_channel *ch = (struct hpet_event_channel *)data;
+    struct hpet_event_channel *ch = data;
 
     this_cpu(irq_count)--;
 

@@ -337,7 +337,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
 
 static void vpmu_save_force(void *arg)
 {
-    struct vcpu *v = (struct vcpu *)arg;
+    struct vcpu *v = arg;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )

@@ -253,12 +253,12 @@ static int vvmcs_offset(u32 width, u32 type, u32 index)
     return offset;
 }
 
-u64 get_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding)
+uint64_t get_vvmcs_virtual(void *vvmcs, uint32_t vmcs_encoding)
 {
     union vmcs_encoding enc;
-    u64 *content = (u64 *) vvmcs;
+    uint64_t *content = vvmcs;
     int offset;
-    u64 res;
+    uint64_t res;
 
     enc.word = vmcs_encoding;
     offset = vvmcs_offset(enc.width, enc.type, enc.index);
@@ -307,12 +307,12 @@ enum vmx_insn_errno get_vvmcs_real_safe(const struct vcpu *v, u32 encoding,
     return virtual_vmcs_vmread_safe(v, encoding, val);
 }
 
-void set_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding, u64 val)
+void set_vvmcs_virtual(void *vvmcs, uint32_t vmcs_encoding, uint64_t val)
 {
     union vmcs_encoding enc;
-    u64 *content = (u64 *) vvmcs;
+    uint64_t *content = vvmcs;
     int offset;
-    u64 res;
+    uint64_t res;
 
     enc.word = vmcs_encoding;
     offset = vvmcs_offset(enc.width, enc.type, enc.index);

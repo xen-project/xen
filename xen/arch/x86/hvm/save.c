@@ -417,7 +417,7 @@ void _hvm_read_entry(struct hvm_domain_context *h, void *dest,
     memcpy(dest, &h->data[h->cur], d->length);
 
     if ( d->length < dest_len )
-        memset((char *)dest + d->length, 0, dest_len - d->length);
+        memset(dest + d->length, 0, dest_len - d->length);
 
     h->cur += d->length;
 }

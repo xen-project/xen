@@ -58,7 +58,7 @@ static void transition_pstate(void *pstate)
 
 static void update_cpb(void *data)
 {
-    struct cpufreq_policy *policy = (struct cpufreq_policy *)data;
+    struct cpufreq_policy *policy = data;
 
     if (policy->turbo != CPUFREQ_TURBO_UNSUPPORTED) {
         uint64_t msr_content;
