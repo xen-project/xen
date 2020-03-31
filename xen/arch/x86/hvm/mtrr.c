@@ -317,7 +317,7 @@ static uint8_t effective_mm_type(struct mtrr_state *m,
                                  uint32_t pte_flags,
                                  uint8_t gmtrr_mtype)
 {
-    uint8_t mtrr_mtype, pat_value, effective;
+    uint8_t mtrr_mtype, pat_value;
    
     /* if get_pat_flags() gives a dedicated MTRR type,
      * just use it
@@ -329,9 +329,7 @@ static uint8_t effective_mm_type(struct mtrr_state *m,
 
     pat_value = page_pat_type(pat, pte_flags);
 
-    effective = mm_type_tbl[mtrr_mtype][pat_value];
-
-    return effective;
+    return mm_type_tbl[mtrr_mtype][pat_value];
 }
 
 uint32_t get_pat_flags(struct vcpu *v,

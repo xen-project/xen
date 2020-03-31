@@ -484,7 +484,7 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
 
 int vpic_ack_pending_irq(struct vcpu *v)
 {
-    int irq, vector;
+    int irq;
     struct hvm_hw_vpic *vpic = &v->domain->arch.hvm.vpic[0];
 
     ASSERT(has_vpic(v->domain));
@@ -498,8 +498,7 @@ int vpic_ack_pending_irq(struct vcpu *v)
     if ( irq == -1 )
         return -1;
 
-    vector = vpic[irq >> 3].irq_base + (irq & 7);
-    return vector;
+    return vpic[irq >> 3].irq_base + (irq & 7);
 }
 
 /*

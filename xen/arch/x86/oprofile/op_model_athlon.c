@@ -315,7 +315,6 @@ static int athlon_check_ctrs(unsigned int const cpu,
 {
 	uint64_t msr_content;
 	int i;
-	int ovf = 0;
 	unsigned long eip = regs->rip;
 	int mode = 0;
 	struct vcpu *v = current;
@@ -339,13 +338,11 @@ static int athlon_check_ctrs(unsigned int const cpu,
 		if (CTR_OVERFLOWED(msr_content)) {
 			xenoprof_log_event(current, regs, eip, mode, i);
 			CTR_WRITE(reset_value[i], msrs, i);
-			ovf = 1;
 		}
 	}
 
-	ovf = handle_ibs(mode, regs);
 	/* See op_model_ppro.c */
-	return ovf;
+	return handle_ibs(mode, regs);
 }
 
 static inline void start_ibs(void)

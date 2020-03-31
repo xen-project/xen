@@ -270,7 +270,6 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     struct cpufreq_policy *policy;    
     struct perf_pair readin, cur, *saved;
     unsigned int perf_percent;
-    unsigned int retval;
 
     if (!cpu_online(cpu))
         return 0;
@@ -318,16 +317,13 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     else
         perf_percent = 0;
 
-    retval = policy->cpuinfo.max_freq * perf_percent / 100;
-
-    return retval;
+    return policy->cpuinfo.max_freq * perf_percent / 100;
 }
 
 static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
 {
     struct cpufreq_policy *policy;
     struct acpi_cpufreq_data *data;
-    unsigned int freq;
 
     if (!cpu_online(cpu))
         return 0;
@@ -341,8 +337,7 @@ static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
         data->acpi_data == NULL || data->freq_table == NULL))
         return 0;
 
-    freq = extract_freq(get_cur_val(cpumask_of(cpu)), data);
-    return freq;
+    return extract_freq(get_cur_val(cpumask_of(cpu)), data);
 }
 
 static void feature_detect(void *info)

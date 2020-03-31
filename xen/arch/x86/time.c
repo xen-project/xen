@@ -1142,16 +1142,13 @@ s_time_t get_s_time_fixed(u64 at_tsc)
 {
     const struct cpu_time *t = &this_cpu(cpu_time);
     u64 tsc, delta;
-    s_time_t now;
 
     if ( at_tsc )
         tsc = at_tsc;
     else
         tsc = rdtsc_ordered();
     delta = tsc - t->stamp.local_tsc;
-    now = t->stamp.local_stime + scale_delta(delta, &t->tsc_scale);
-
-    return now;
+    return t->stamp.local_stime + scale_delta(delta, &t->tsc_scale);
 }
 
 s_time_t get_s_time()
