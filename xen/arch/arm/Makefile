@@ -62,6 +62,7 @@ obj-$(CONFIG_SBSA_VUART_CONSOLE) += vpl011.o
 obj-y += vsmc.o
 obj-y += vpsci.o
 obj-y += vuart.o
+extra-y += $(TARGET_SUBARCH)/head.o
 
 #obj-bin-y += ....o
 
@@ -71,8 +72,6 @@ AFLAGS += -DCONFIG_DTB_FILE=\"$(CONFIG_DTB_FILE)\"
 endif
 
 ALL_OBJS := $(TARGET_SUBARCH)/head.o $(ALL_OBJS)
-
-DEPS += $(TARGET_SUBARCH)/.head.o.d
 
 ifdef CONFIG_LIVEPATCH
 all_symbols = --all-symbols
