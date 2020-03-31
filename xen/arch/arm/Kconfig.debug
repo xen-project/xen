@@ -1,0 +1,289 @@
+choice
+	bool "Early printk"
+	optional
+	help
+		You may want to enable early printk if you are debugging code
+		that executes before the console is initialized.
+
+		Note that selecting this option will limit Xen to a single UART
+		definition. Attempting to boot Xen image on a different
+		platform *will not work*, so this option should not be enable
+		for Xens that are intended to be portable.
+
+		Choose one of the UART drivers for early printk, then you'll
+		have to specify the parameters, like the base address.
+
+		Deprecated: Alternatively, there are platform specific options
+		which will have default values for the various parameters. But
+		such option will soon be removed.
+
+	config EARLY_UART_CHOICE_8250
+		select EARLY_UART_8250
+		bool "Early printk via 8250 UART"
+		help
+			Say Y here if you wish the early printk to direct their
+			output to a 8250 UART. You can use this option to
+			provide the parameters for the 8250 UART rather than
+			selecting one of the platform specific options below if
+			you know the parameters for the port.
+
+			This option is preferred over the platform specific
+			options; the platform specific options are deprecated
+			and will soon be removed.
+	config EARLY_UART_CHOICE_CADENCE
+		select EARLY_UART_CADENCE
+		depends on ARM_64
+		bool "Early printk via Cadence UART"
+		help
+			Say Y here if you wish the early printk to direct their
+			output to a Cadence UART. You can use this option to
+			provide the parameters for the Cadence UART rather than
+			selecting one of the platform specific options below if
+			you know the parameters for the port.
+
+			This option is preferred over the platform specific
+			options; the platform specific options are deprecated
+			and will soon be removed.
+	config EARLY_UART_CHOICE_EXYNOS4210
+		select EARLY_UART_EXYNOS4210
+		depends on ARM_32
+		bool "Early printk via Exynos4210 UART"
+		help
+			Say Y here if you wish the early printk to direct their
+			output to a Exynos 4210 UART. You can use this option to
+			provide the parameters for the Exynos 4210 UART rather than
+			selecting one of the platform specific options below if
+			you know the parameters for the port.
+
+			This option is preferred over the platform specific
+			options; the platform specific options are deprecated
+			and will soon be removed.
+	config EARLY_UART_CHOICE_MESON
+		select EARLY_UART_MESON
+		depends on ARM_64
+		bool "Early printk via MESON UART"
+		help
+			Say Y here if you wish the early printk to direct their
+			output to a MESON UART. You can use this option to
+			provide the parameters for the MESON UART rather than
+			selecting one of the platform specific options below if
+			you know the parameters for the port.
+
+			This option is preferred over the platform specific
+			options; the platform specific options are deprecated
+			and will soon be removed.
+	config EARLY_UART_CHOICE_MVEBU
+		select EARLY_UART_MVEBU
+		depends on ARM_64
+		bool "Early printk via MVEBU UART"
+		help
+			Say Y here if you wish the early printk to direct their
+			output to a MVEBU UART. You can use this option to
+			provide the parameters for the MVEBU UART rather than
+			selecting one of the platform specific options below if
+			you know the parameters for the port.
+
+			This option is preferred over the platform specific
+			options; the platform specific options are deprecated
+			and will soon be removed.
+	config EARLY_UART_CHOICE_PL011
+		select EARLY_UART_PL011
+		bool "Early printk via PL011 UART"
+		help
+			Say Y here if you wish the early printk to direct their
+			output to a PL011 UART. You can use this option to
+			provide the parameters for the PL011 UART rather than
+			selecting one of the platform specific options below if
+			you know the parameters for the port.
+
+			This option is preferred over the platform specific
+			options; the platform specific options are deprecated
+			and will soon be removed.
+	config EARLY_UART_CHOICE_SCIF
+		select EARLY_UART_SCIF
+		bool "Early printk via SCIF UART"
+		help
+			Say Y here if you wish the early printk to direct their
+			output to a SCIF UART. You can use this option to
+			provide the parameters for the SCIF UART rather than
+			selecting one of the platform specific options below if
+			you know the parameters for the port.
+
+			This option is preferred over the platform specific
+			options; the platform specific options are deprecated
+			and will soon be removed.
+
+	config EARLY_PRINTK_BRCM
+		bool "Early printk with 8250 on Broadcom 7445D0 boards with A15 processors"
+		select EARLY_UART_8250
+	config EARLY_PRINTK_DRA7
+		bool "Early printk with 8250 on DRA7 platform"
+		select EARLY_UART_8250
+	config EARLY_PRINTK_EXYNOS5250
+		bool "Early printk with the second UART on Exynos5250"
+		select EARLY_UART_EXYNOS4210
+		depends on ARM_32
+	config EARLY_PRINTK_FASTMODEL
+		bool "Early printk with pl011 on ARM Fastmodel software emulators"
+		select EARLY_UART_PL011
+	config EARLY_PRINTK_HIKEY960
+		bool "Early printk with pl011 with Hikey 960"
+		select EARLY_UART_PL011
+	config EARLY_PRINTK_JUNO
+		bool "Early printk with pl011 on Juno platform"
+		select EARLY_UART_PL011
+	config EARLY_PRINTK_LAGER
+		bool "Early printk with SCIF0 on Renesas Lager board (R-Car H2 processor)"
+		select EARLY_UART_SCIF
+	config EARLY_PRINTK_MIDWAY
+		bool "Early printk with pl011 on Calxeda Midway processors"
+		select EARLY_UART_PL011
+	config EARLY_PRINTK_MVEBU
+		bool "Early printk with MVEBU for Marvell Armada 3700 SoCs"
+		select EARLY_UART_MVEBU
+		depends on ARM_64
+	config EARLY_PRINTK_OMAP5432
+		bool "Early printk with UART3 on TI OMAP5432 processors"
+		select EARLY_UART_8250
+	config EARLY_PRINTK_RCAR3
+		bool "Early printk with SCIF2 on Renesas R-Car Gen3 processors"
+		select EARLY_UART_SCIF
+	config EARLY_PRINTK_SEATTLE
+		bool "Early printk with pl011 for AMD Seattle processor"
+		select EARLY_UART_PL011
+	config EARLY_PRINTK_SUN6I
+		bool "Early printk with 8250 on Allwinner A31 processors"
+		select EARLY_UART_8250
+	config EARLY_PRINTK_SUN7I
+		bool "Early printk with 8250 on Allwinner A20 processors"
+		select EARLY_UART_8250
+	config EARLY_PRINTK_THUNDERX
+		bool "Early printk with pl011 for Cavium ThunderX processor"
+		select EARLY_UART_PL011
+		depends on ARM_64
+	config EARLY_PRINTK_VEXPRESS
+		bool "Early printk with pl011 for versatile express"
+		select EARLY_UART_PL011
+	config EARLY_PRINTK_XGENE_MCDIVITT
+		bool "Early printk with 820 on Xgene mcdivitt platform"
+		select EARLY_UART_8250
+	config EARLY_PRINTK_XGENE_STORM
+		bool "Early printk with 820 on Xgene storm platform"
+		select EARLY_UART_8250
+	config EARLY_PRINTK_ZYNQMP
+		bool "Early printk with Cadence UART for Xilinx ZynqMP SoCs"
+		select EARLY_UART_CADENCE
+		depends on ARM_64
+endchoice
+
+
+config EARLY_UART_8250
+	select EARLY_PRINTK
+	bool
+config EARLY_UART_CADENCE
+	select EARLY_PRINTK
+	bool
+config EARLY_UART_EXYNOS4210
+	select EARLY_PRINTK
+	bool
+config EARLY_UART_MESON
+	select EARLY_PRINTK
+	bool
+config EARLY_UART_MVEBU
+	select EARLY_PRINTK
+	bool
+config EARLY_UART_PL011
+	select EARLY_PRINTK
+	bool
+config EARLY_UART_SCIF
+	select EARLY_PRINTK
+	bool
+
+config EARLY_PRINTK
+	bool
+
+config EARLY_UART_BASE_ADDRESS
+	depends on EARLY_PRINTK
+	hex "Early printk, physical base address of debug UART"
+	range 0x0 0xffffffff if ARM_32
+	default 0xF040AB00 if EARLY_PRINTK_BRCM
+	default 0x4806A000 if EARLY_PRINTK_DRA7
+	default 0x1c090000 if EARLY_PRINTK_FASTMODEL
+	default 0x12c20000 if EARLY_PRINTK_EXYNOS5250
+	default 0xfff32000 if EARLY_PRINTK_HIKEY960
+	default 0x7ff80000 if EARLY_PRINTK_JUNO
+	default 0xe6e60000 if EARLY_PRINTK_LAGER
+	default 0xfff36000 if EARLY_PRINTK_MIDWAY
+	default 0xd0012000 if EARLY_PRINTK_MVEBU
+	default 0x48020000 if EARLY_PRINTK_OMAP5432
+	default 0xe6e88000 if EARLY_PRINTK_RCAR3
+	default 0xe1010000 if EARLY_PRINTK_SEATTLE
+	default 0x01c28000 if EARLY_PRINTK_SUN6I
+	default 0x01c28000 if EARLY_PRINTK_SUN7I
+	default 0x87e024000000 if EARLY_PRINTK_THUNDERX
+	default 0x1c090000 if EARLY_PRINTK_VEXPRESS
+	default 0x1c021000 if EARLY_PRINTK_XGENE_MCDIVITT
+	default 0x1c020000 if EARLY_PRINTK_XGENE_STORM
+	default 0xff000000 if EARLY_PRINTK_ZYNQMP
+
+config EARLY_UART_PL011_BAUD_RATE
+	depends on EARLY_UART_PL011
+	int "Early printk UART baud rate for pl011"
+	help
+		Optionally sets the baud rate which should be used to configure
+		the UART at start of day.
+
+		If EARLY_UART_PL011_BAUD_RATE is set to 0 then the code will
+		not try to initialize the UART, so that bootloader or firmware
+		settings can be used for maximum compatibility.
+
+	default 115200 if EARLY_PRINTK_FASTMODEL
+	default 0
+
+config EARLY_UART_INIT
+	depends on EARLY_UART_PL011 && EARLY_UART_PL011_BAUD_RATE != 0
+	def_bool y
+
+config EARLY_UART_8250_REG_SHIFT
+	depends on EARLY_UART_8250
+	int "Early printk, left-shift to apply to the register offsets within the 8250 UART"
+	help
+		EARLY_UART_8250_REG_SHIFT is, optionally, the left-shift to
+		apply to the register offsets within the UART with early
+		printk.
+
+		Default to 0.
+
+	default 2 if EARLY_PRINTK_BRCM
+	default 2 if EARLY_PRINTK_DRA7
+	default 2 if EARLY_PRINTK_OMAP5432
+	default 2 if EARLY_PRINTK_SUN6I
+	default 2 if EARLY_PRINTK_SUN7I
+	default 2 if EARLY_PRINTK_XGENE_MCDIVITT
+	default 2 if EARLY_PRINTK_XGENE_STORM
+	default 0
+
+choice EARLY_UART_SCIF_VERSION
+	prompt "Early printk UART SCIF interface version"
+	depends on EARLY_UART_SCIF
+	default EARLY_UART_SCIF_VERSION_NONE
+	help
+		Select the interface version of the SCIF UART.
+
+		Select EARLY_UART_SCIF_VERSION_NONE to use the default
+		interface version (SCIF).
+	config EARLY_UART_SCIF_VERSION_NONE
+		bool "default SCIF UART interface"
+	config EARLY_UART_SCIF_VERSION_A
+		bool "SCIF UART interface version A"
+endchoice
+
+config EARLY_PRINTK_INC
+	string
+	default "debug-8250.inc" if EARLY_UART_8250
+	default "debug-cadence.inc" if EARLY_UART_CADENCE
+	default "debug-exynos4210.inc" if EARLY_UART_EXYNOS4210
+	default "debug-meson.inc" if EARLY_UART_MESON
+	default "debug-mvebu.inc" if EARLY_UART_MVEBU
+	default "debug-pl011.inc" if EARLY_UART_PL011
+	default "debug-scif.inc" if EARLY_UART_SCIF

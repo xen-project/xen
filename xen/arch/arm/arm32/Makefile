@@ -1,6 +1,6 @@
 obj-y += lib/
 
-obj-$(EARLY_PRINTK) += debug.o
+obj-$(CONFIG_EARLY_PRINTK) += debug.o
 obj-y += domctl.o
 obj-y += domain.o
 obj-y += entry.o

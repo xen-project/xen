@@ -128,6 +128,8 @@ config XMEM_POOL_POISON
 	  Poison free blocks with 0xAA bytes and verify them when a block is
 	  allocated in order to spot use-after-free issues.
 
+source "arch/$(SRCARCH)/Kconfig.debug"
+
 endif # DEBUG || EXPERT
 
 endmenu

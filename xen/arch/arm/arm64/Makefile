@@ -2,7 +2,7 @@ obj-y += lib/
 
 obj-y += cache.o
 obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR) += bpi.o
-obj-$(EARLY_PRINTK) += debug.o
+obj-$(CONFIG_EARLY_PRINTK) += debug.o
 obj-y += domctl.o
 obj-y += domain.o
 obj-y += entry.o

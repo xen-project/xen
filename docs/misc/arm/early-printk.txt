@@ -1,64 +1,39 @@
 How to enable early printk
 
-Early printk can only be enabled if debug=y. You may want to enable it if
-you are debbuging code that executes before the console is initialized.
+Early printk can only be enabled if CONFIG_DEBUG=y or in EXPERT mode. You
+may want to enable it if you are debugging code that executes before the
+console is initialized.
 
 Note that selecting this option will limit Xen to a single UART definition.
 Attempting to boot Xen image on a different platform *will not work*, so this
 option should not be enable for Xens that are intended to be portable.
 
-CONFIG_EARLY_PRINTK=<INC>,<BASE_ADDRESS>,<OTHER_OPTIONS>
+Select one of the "Early printk via * UART" in the choice possible for
+"Early printk" in the "Debugging options" of Kconfig. You will then need to
+set other options, which depends on the driver selected.
 
-<INC> and <BASE_ADDRESS> are mandatory arguments:
+CONFIG_EARLY_UART_BASE_ADDRESS is a mandatory argument, it is the base
+physical address of the UART to use.
 
-  - <INC> is the name of the driver, see xen/arch/arm/arm{32,64}/debug-*.inc
-    (where <INC> corresponds to the wildcarded *).
-  - <BASE_ADDRESS> is the base physical address of the UART to use
+Other options depends on the driver selected:
+  - 8250
+    - CONFIG_EARLY_UART_8250_REG_SHIFT is, optionally, the left-shift to
+      apply to the register offsets within the uart.
+  - pl011
+    - CONFIG_EARLY_UART_PL011_BAUD_RATE is, optionally, a baud rate which
+      should be used to configure the UART at start of day.
 
-<OTHER_OPTIONS> varies depending on <INC>:
+      If CONFIG_EARLY_UART_PL011_BAUD_RATE  is set to 0 then the code will
+      not try to initialize the UART, so that bootloader or firmware
+      settings can be used for maximum compatibility.
+  - scif
+    - CONFIG_EARLY_UART_SCIF_VERSION_* is, optionally, the interface version
+      of the UART. Default to version NONE.
 
-  - 8250,<BASE_ADDRESS>,<REG_SHIFT>
-    - <REG_SHIFT> is, optionally, the left-shift to apply to the
-      register offsets within the uart.
-  - pl011,<BASE_ADDRESS>,<BAUD_RATE>
-    - <BAUD_RATE> is, optionally a baud rate which should be used to
-      configure the UART at start of day.
-
-      If <BAUD_RATE> is not given then the code will not try to
-      initialize the UART, so that bootloader or firmware settings can
-     be used for maximum compatibility.
-  - scif,<BASE_ADDRESS>,<VERSION>
-    - SCIF<VERSION> is, optionally, the interface version of the UART.
-
-      If <VERSION> is not given then the default interface version (SCIF)
-      will be used.
   - For all other uarts there are no additional options.
 
 As a convenience it is also possible to select from a list of
-predefined configurations using CONFIG_EARLY_PRINTK=mach where mach is
-the name of the machine:
-
-  - brcm: printk with 8250 on Broadcom 7445D0 boards with A15 processors.
-  - dra7: printk with 8250 on DRA7 platform
-  - exynos5250: printk with the second UART
-  - fastmodel: printk on ARM Fastmodel software emulators
-  - hikey960: printk with pl011 with Hikey 960
-  - juno: printk with pl011 on Juno platform
-  - lager: printk with SCIF0 on Renesas Lager board (R-Car H2 processor)
-  - midway: printk with the pl011 on Calxeda Midway processors
-  - mvebu: printk with the MVEBU for Marvell Armada 3700 SoCs
-  - omap5432: printk with UART3 on TI OMAP5432 processors
-  - rcar3: printk with SCIF2 on Renesas R-Car Gen3 processors
-  - seattle: printk with pl011 for AMD Seattle processor
-  - sun6i: printk with 8250 on Allwinner A31 processors
-  - sun7i: printk with 8250 on Allwinner A20 processors
-  - thunderx: printk with pl011 for Cavium ThunderX processor
-  - vexpress: printk with pl011 for versatile express
-  - xgene-mcdivitt: printk with 820 on Xgene mcdivitt platform
-  - xgene-storm: printk with 820 on Xgene storm platform
-  - zynqmp: printk with Cadence UART for Xilinx ZynqMP SoCs
-
-These settings are is hardcoded in xen/arch/arm/Rules.mk,
-see there when adding support for new machines.
+predefined configurations available in the list of choice for "Early
+printk" for specific platform.
 
 By default early printk is disabled.
