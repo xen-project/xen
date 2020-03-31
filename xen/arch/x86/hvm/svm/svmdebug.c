@@ -62,8 +62,8 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
            vmcb->exitcode, vmcb->exit_int_info.raw);
     printk("exitinfo1 = %#"PRIx64" exitinfo2 = %#"PRIx64"\n",
            vmcb->exitinfo1, vmcb->exitinfo2);
-    printk("np_enable = %#"PRIx64" guest_asid = %#x\n",
-           vmcb_get_np_enable(vmcb), vmcb_get_guest_asid(vmcb));
+    printk("np_ctrl = %#"PRIx64" guest_asid = %#x\n",
+           vmcb_get_np_ctrl(vmcb), vmcb_get_guest_asid(vmcb));
     printk("virtual vmload/vmsave = %d, virt_ext = %#"PRIx64"\n",
            vmcb->virt_ext.fields.vloadsave_enable, vmcb->virt_ext.bytes);
     printk("cpl = %d efer = %#"PRIx64" star = %#"PRIx64" lstar = %#"PRIx64"\n",

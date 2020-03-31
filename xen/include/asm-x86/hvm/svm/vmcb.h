@@ -447,7 +447,17 @@ struct vmcb_struct {
         } ei;
     };
     intinfo_t exit_int_info;    /* offset 0x88 */
-    u64 _np_enable;             /* offset 0x90 - cleanbit 4 */
+    union {                     /* offset 0x90 - cleanbit 4 */
+        struct {
+            bool _np_enable     :1;
+            bool _sev_enable    :1;
+            bool _sev_es_enable :1;
+            bool _gmet          :1;
+            bool                :1;
+            bool _vte           :1;
+        };
+        uint64_t _np_ctrl;
+    };
     u64 res08[2];
     intinfo_t event_inj;        /* offset 0xA8 */
     u64 _h_cr3;                 /* offset 0xB0 - cleanbit 4 */
@@ -577,19 +587,22 @@ void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable);
  * VMCB accessor functions.
  */
 
-#define VMCB_ACCESSORS(name, cleanbit)            \
+#define VMCB_ACCESSORS_(name, type, cleanbit)     \
 static inline void                                \
 vmcb_set_ ## name(struct vmcb_struct *vmcb,       \
-                  typeof(vmcb->_ ## name) value)  \
+                  type value)                     \
 {                                                 \
     vmcb->_ ## name = value;                      \
     vmcb->cleanbits.fields.cleanbit = 0;          \
 }                                                 \
-static inline typeof(alloc_vmcb()->_ ## name)     \
+static inline type                                \
 vmcb_get_ ## name(const struct vmcb_struct *vmcb) \
 {                                                 \
     return vmcb->_ ## name;                       \
 }
+
+#define VMCB_ACCESSORS(name, cleanbit) \
+        VMCB_ACCESSORS_(name, typeof(alloc_vmcb()->_ ## name), cleanbit)
 
 VMCB_ACCESSORS(cr_intercepts, intercepts)
 VMCB_ACCESSORS(dr_intercepts, intercepts)
@@ -603,7 +616,12 @@ VMCB_ACCESSORS(iopm_base_pa, iopm)
 VMCB_ACCESSORS(msrpm_base_pa, iopm)
 VMCB_ACCESSORS(guest_asid, asid)
 VMCB_ACCESSORS(vintr, tpr)
-VMCB_ACCESSORS(np_enable, np)
+VMCB_ACCESSORS(np_ctrl, np)
+VMCB_ACCESSORS_(np_enable, bool, np)
+VMCB_ACCESSORS_(sev_enable, bool, np)
+VMCB_ACCESSORS_(sev_es_enable, bool, np)
+VMCB_ACCESSORS_(gmet, bool, np)
+VMCB_ACCESSORS_(vte, bool, np)
 VMCB_ACCESSORS(h_cr3, np)
 VMCB_ACCESSORS(g_pat, np)
 VMCB_ACCESSORS(cr0, cr)
