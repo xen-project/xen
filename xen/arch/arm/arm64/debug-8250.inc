@@ -25,7 +25,7 @@
  */
 .macro early_uart_ready xb c
 1:
-       ldrb  w\c, [\xb, #UART_LSR << EARLY_UART_REG_SHIFT]
+       ldrb  w\c, [\xb, #UART_LSR << CONFIG_EARLY_UART_8250_REG_SHIFT]
        and w\c, w\c, #UART_LSR_THRE
        cmp w\c, #UART_LSR_THRE
        b.ne 1b
@@ -38,7 +38,7 @@
  */
 .macro early_uart_transmit xb wt
         /* UART_THR  transmit holding */
-        strb   \wt, [\xb, #UART_THR << EARLY_UART_REG_SHIFT]
+        strb   \wt, [\xb, #UART_THR << CONFIG_EARLY_UART_8250_REG_SHIFT]
 .endm
 
 /*

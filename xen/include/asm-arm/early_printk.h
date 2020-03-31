@@ -15,7 +15,7 @@
 
 /* need to add the uart address offset in page to the fixmap address */
 #define EARLY_UART_VIRTUAL_ADDRESS \
-    (FIXMAP_ADDR(FIXMAP_CONSOLE) +(EARLY_UART_BASE_ADDRESS & ~PAGE_MASK))
+    (FIXMAP_ADDR(FIXMAP_CONSOLE) + (CONFIG_EARLY_UART_BASE_ADDRESS & ~PAGE_MASK))
 
 #endif /* !CONFIG_EARLY_PRINTK */
 

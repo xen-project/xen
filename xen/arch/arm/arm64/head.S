@@ -45,8 +45,8 @@
 #define __HEAD_FLAGS            ((__HEAD_FLAG_PAGE_SIZE << 1) | \
                                  (__HEAD_FLAG_PHYS_BASE << 3))
 
-#if (defined (CONFIG_EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
-#include EARLY_PRINTK_INC
+#if defined(CONFIG_EARLY_PRINTK) && defined(CONFIG_EARLY_PRINTK_INC)
+#include CONFIG_EARLY_PRINTK_INC
 #endif
 
 /*
@@ -363,7 +363,7 @@ GLOBAL(init_secondary)
 1:
 
 #ifdef CONFIG_EARLY_PRINTK
-        ldr   x23, =EARLY_UART_BASE_ADDRESS /* x23 := UART base address */
+        ldr   x23, =CONFIG_EARLY_UART_BASE_ADDRESS /* x23 := UART base address */
         PRINT("- CPU ")
         print_reg x24
         PRINT(" booting -\r\n")
@@ -843,8 +843,8 @@ ENTRY(switch_ttbr)
  * Clobbers x0 - x1
  */
 init_uart:
-        ldr   x23, =EARLY_UART_BASE_ADDRESS
-#ifdef EARLY_PRINTK_INIT_UART
+        ldr   x23, =CONFIG_EARLY_UART_BASE_ADDRESS
+#ifdef CONFIG_EARLY_UART_INIT
         early_uart_init x23, 0
 #endif
         PRINT("- UART enabled -\r\n")

@@ -25,9 +25,9 @@
  * rd: scratch register 2 (unused here)
  */
 .macro early_uart_init rb, rc, rd
-        mov   \rc, #(7372800 / EARLY_PRINTK_BAUD % 16)
+        mov   \rc, #(7372800 / CONFIG_EARLY_UART_PL011_BAUD_RATE % 16)
         str   \rc, [\rb, #FBRD]     /* -> UARTFBRD (Baud divisor fraction) */
-        mov   \rc, #(7372800 / EARLY_PRINTK_BAUD / 16)
+        mov   \rc, #(7372800 / CONFIG_EARLY_UART_PL011_BAUD_RATE / 16)
         str   \rc, [\rb, #IBRD]     /* -> UARTIBRD (Baud divisor integer) */
         mov   \rc, #0x60            /* 8n1 */
         str   \rc, [\rb, #LCR_H]     /* -> UARTLCR_H (Line control) */

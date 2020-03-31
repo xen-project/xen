@@ -36,8 +36,8 @@
 #define XEN_FIRST_SLOT      first_table_offset(XEN_VIRT_START)
 #define XEN_SECOND_SLOT     second_table_offset(XEN_VIRT_START)
 
-#if (defined (CONFIG_EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
-#include EARLY_PRINTK_INC
+#if defined(CONFIG_EARLY_PRINTK) && defined(CONFIG_EARLY_PRINTK_INC)
+#include CONFIG_EARLY_PRINTK_INC
 #endif
 
 /*
@@ -223,7 +223,7 @@ GLOBAL(init_secondary)
 1:
 
 #ifdef CONFIG_EARLY_PRINTK
-        mov_w r11, EARLY_UART_BASE_ADDRESS   /* r11 := UART base address */
+        mov_w r11, CONFIG_EARLY_UART_BASE_ADDRESS   /* r11 := UART base address */
         PRINT("- CPU ")
         print_reg r7
         PRINT(" booting -\r\n")
@@ -706,8 +706,8 @@ ENTRY(switch_ttbr)
  * Clobbers r0 - r3
  */
 init_uart:
-        mov_w r11, EARLY_UART_BASE_ADDRESS
-#ifdef EARLY_PRINTK_INIT_UART
+        mov_w r11, CONFIG_EARLY_UART_BASE_ADDRESS
+#ifdef CONFIG_EARLY_UART_INIT
         early_uart_init r11, r1, r2
 #endif
         PRINT("- UART enabled -\r\n")

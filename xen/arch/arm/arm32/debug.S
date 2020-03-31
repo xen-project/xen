@@ -19,8 +19,8 @@
 
 #include <asm/early_printk.h>
 
-#ifdef EARLY_PRINTK_INC
-#include EARLY_PRINTK_INC
+#if defined (CONFIG_EARLY_PRINTK_INC)
+#include CONFIG_EARLY_PRINTK_INC
 #endif
 
 /*

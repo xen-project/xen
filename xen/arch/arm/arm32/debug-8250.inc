@@ -23,7 +23,7 @@
  */
 .macro early_uart_ready rb rc
 1:
-        ldr     \rc, [\rb, #(UART_LSR << EARLY_UART_REG_SHIFT)] /* Read LSR */
+        ldr     \rc, [\rb, #(UART_LSR << CONFIG_EARLY_UART_8250_REG_SHIFT)] /* Read LSR */
         tst     \rc, #UART_LSR_THRE     /* Check Xmit holding register flag */
         beq     1b                         /* Wait for the UART to be ready */
 .endm
