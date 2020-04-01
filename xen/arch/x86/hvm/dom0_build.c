@@ -463,7 +463,7 @@ static int __init pvh_populate_p2m(struct domain *d)
             enum hvm_translation_result res =
                  hvm_copy_to_guest_phys(mfn_to_maddr(_mfn(addr)),
                                         mfn_to_virt(addr),
-                                        d->arch.e820[i].addr - end,
+                                        end - d->arch.e820[i].addr,
                                         v);
 
             if ( res != HVMTRANS_okay )
