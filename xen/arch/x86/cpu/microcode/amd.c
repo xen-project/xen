@@ -219,9 +219,6 @@ static int apply_microcode(const struct microcode_patch *patch)
     struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     uint32_t rev, old_rev = sig->rev;
 
-    if ( !patch )
-        return -ENOENT;
-
     if ( microcode_fits(patch) != NEW_UCODE )
         return -EINVAL;
 

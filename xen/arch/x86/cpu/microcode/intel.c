@@ -270,9 +270,6 @@ static int apply_microcode(const struct microcode_patch *patch)
     struct cpu_signature *sig = &this_cpu(cpu_sig);
     uint32_t rev, old_rev = sig->rev;
 
-    if ( !patch )
-        return -ENOENT;
-
     if ( microcode_update_match(patch) != NEW_UCODE )
         return -EINVAL;
 
