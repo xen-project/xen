@@ -115,8 +115,9 @@ static bool signature_matches(const struct cpu_signature *cpu_sig,
     return cpu_sig->pf & ucode_pf;
 }
 
-static int collect_cpu_info(struct cpu_signature *csig)
+static void collect_cpu_info(void)
 {
+    struct cpu_signature *csig = &this_cpu(cpu_sig);
     uint64_t msr_content;
 
     memset(csig, 0, sizeof(*csig));
@@ -133,8 +134,6 @@ static int collect_cpu_info(struct cpu_signature *csig)
     csig->rev = (uint32_t)(msr_content >> 32);
     pr_debug("microcode: collect_cpu_info : sig=%#x, pf=%#x, rev=%#x\n",
              csig->sig, csig->pf, csig->rev);
-
-    return 0;
 }
 
 /*

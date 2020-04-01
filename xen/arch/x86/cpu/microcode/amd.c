@@ -90,9 +90,10 @@ static struct {
     uint16_t id;
 } equiv __read_mostly;
 
-/* See comment in start_update() for cases when this routine fails */
-static int collect_cpu_info(struct cpu_signature *csig)
+static void collect_cpu_info(void)
 {
+    struct cpu_signature *csig = &this_cpu(cpu_sig);
+
     memset(csig, 0, sizeof(*csig));
 
     csig->sig = cpuid_eax(1);
@@ -100,8 +101,6 @@ static int collect_cpu_info(struct cpu_signature *csig)
 
     pr_debug("microcode: CPU%d collect_cpu_info: patch_id=%#x\n",
              smp_processor_id(), csig->rev);
-
-    return 0;
 }
 
 static bool_t verify_patch_size(uint32_t patch_size)

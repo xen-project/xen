@@ -33,8 +33,11 @@ struct microcode_ops {
     struct microcode_patch *(*cpu_request_microcode)(const void *buf,
                                                      size_t size);
 
-    /* Obtain microcode-relevant details for the current CPU. */
-    int (*collect_cpu_info)(struct cpu_signature *csig);
+    /*
+     * Obtain microcode-relevant details for the current CPU.  Results in
+     * per_cpu(cpu_sig).
+     */
+    void (*collect_cpu_info)(void);
 
     /*
      * Attempt to load the provided patch into the CPU.  Returns an error if

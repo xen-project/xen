@@ -237,10 +237,9 @@ static const struct microcode_patch *nmi_patch = ZERO_BLOCK_PTR;
  */
 static struct microcode_patch *parse_blob(const char *buf, size_t len)
 {
-    if ( likely(!microcode_ops->collect_cpu_info(&this_cpu(cpu_sig))) )
-        return microcode_ops->cpu_request_microcode(buf, len);
+    microcode_ops->collect_cpu_info();
 
-    return NULL;
+    return microcode_ops->cpu_request_microcode(buf, len);
 }
 
 static void microcode_free_patch(struct microcode_patch *patch)
@@ -306,10 +305,9 @@ static bool wait_cpu_callout(unsigned int nr)
  */
 static int microcode_update_cpu(const struct microcode_patch *patch)
 {
-    int err = microcode_ops->collect_cpu_info(&this_cpu(cpu_sig));
+    int err;
 
-    if ( unlikely(err) )
-        return err;
+    microcode_ops->collect_cpu_info();
 
     spin_lock(&microcode_mutex);
     if ( patch )
@@ -737,7 +735,7 @@ int microcode_update_one(bool start_update)
     if ( !microcode_ops )
         return -EOPNOTSUPP;
 
-    microcode_ops->collect_cpu_info(&this_cpu(cpu_sig));
+    microcode_ops->collect_cpu_info();
 
     if ( start_update && microcode_ops->start_update )
     {
@@ -819,7 +817,7 @@ int __init early_microcode_init(void)
         return -ENODEV;
     }
 
-    microcode_ops->collect_cpu_info(&this_cpu(cpu_sig));
+    microcode_ops->collect_cpu_info();
 
     if ( ucode_mod.mod_end || ucode_blob.size )
         rc = early_microcode_update_cpu();
