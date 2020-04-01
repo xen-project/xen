@@ -60,12 +60,6 @@ struct microcode_ops {
     void (*free_patch)(struct microcode_patch *patch);
 
     /*
-     * Is the microcode patch applicable for the current CPU, and newer than
-     * the currently running patch?
-     */
-    bool (*match_cpu)(const struct microcode_patch *patch);
-
-    /*
      * Given two patches, are they both applicable to the current CPU, and is
      * new a higher revision than old?
      */

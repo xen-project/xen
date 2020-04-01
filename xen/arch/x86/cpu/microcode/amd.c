@@ -188,11 +188,6 @@ static enum microcode_match_result microcode_fits(
     return NEW_UCODE;
 }
 
-static bool match_cpu(const struct microcode_patch *patch)
-{
-    return patch && (microcode_fits(patch) == NEW_UCODE);
-}
-
 static void free_patch(struct microcode_patch *patch)
 {
     xfree(patch);
@@ -227,7 +222,7 @@ static int apply_microcode(const struct microcode_patch *patch)
     if ( !patch )
         return -ENOENT;
 
-    if ( !match_cpu(patch) )
+    if ( microcode_fits(patch) != NEW_UCODE )
         return -EINVAL;
 
     if ( check_final_patch_levels(sig) )
@@ -428,5 +423,4 @@ const struct microcode_ops amd_ucode_ops = {
 #endif
     .free_patch                       = free_patch,
     .compare_patch                    = compare_patch,
-    .match_cpu                        = match_cpu,
 };

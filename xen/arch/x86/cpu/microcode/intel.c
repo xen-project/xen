@@ -245,14 +245,6 @@ static enum microcode_match_result microcode_update_match(
     return mc->rev > cpu_sig->rev ? NEW_UCODE : OLD_UCODE;
 }
 
-static bool match_cpu(const struct microcode_patch *patch)
-{
-    if ( !patch )
-        return false;
-
-    return microcode_update_match(patch) == NEW_UCODE;
-}
-
 static void free_patch(struct microcode_patch *patch)
 {
     xfree(patch);
@@ -281,7 +273,7 @@ static int apply_microcode(const struct microcode_patch *patch)
     if ( !patch )
         return -ENOENT;
 
-    if ( !match_cpu(patch) )
+    if ( microcode_update_match(patch) != NEW_UCODE )
         return -EINVAL;
 
     /* write microcode via MSR 0x79 */
@@ -369,5 +361,4 @@ const struct microcode_ops intel_ucode_ops = {
     .apply_microcode                  = apply_microcode,
     .free_patch                       = free_patch,
     .compare_patch                    = compare_patch,
-    .match_cpu                        = match_cpu,
 };
