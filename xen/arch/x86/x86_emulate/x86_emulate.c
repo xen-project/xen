@@ -5977,6 +5977,82 @@ x86_emulate(
             goto done;
         break;
 
+    case X86EMUL_OPC(0x0f, 0x07): /* sysret */
+        /*
+         * Inject #UD if syscall/sysret are disabled. EFER.SCE can't be set
+         * with the respective CPUID bit clear, so no need for an explicit
+         * check of that one.
+         */
+        fail_if(!ops->read_msr);
+        if ( (rc = ops->read_msr(MSR_EFER, &msr_val, ctxt)) != X86EMUL_OKAY )
+            goto done;
+        generate_exception_if(!(msr_val & EFER_SCE), EXC_UD);
+        generate_exception_if(!amd_like(ctxt) && !mode_64bit(), EXC_UD);
+        generate_exception_if(!mode_ring0(), EXC_GP, 0);
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
+#ifdef __x86_64__
+        /*
+         * Doing this for just Intel (rather than e.g. !amd_like()) as this is
+         * in fact risking to make guest OSes vulnerable to the equivalent of
+         * XSA-7 (CVE-2012-0217).
+         */
+        generate_exception_if(ctxt->cpuid->x86_vendor == X86_VENDOR_INTEL &&
+                              op_bytes == 8 && !is_canonical_address(_regs.rcx),
+                              EXC_GP, 0);
+#endif
+
+        if ( (rc = ops->read_msr(MSR_STAR, &msr_val, ctxt)) != X86EMUL_OKAY )
+            goto done;
+
+        sreg.sel = ((msr_val >> 48) + 8) | 3; /* SELECTOR_RPL_MASK */
+        cs.sel = op_bytes == 8 ? sreg.sel + 8 : sreg.sel - 8;
+
+        cs.base = sreg.base = 0; /* flat segment */
+        cs.limit = sreg.limit = ~0u; /* 4GB limit */
+        cs.attr = 0xcfb; /* G+DB+P+DPL3+S+Code */
+        sreg.attr = 0xcf3; /* G+DB+P+DPL3+S+Data */
+
+        /* Only the selector part of SS gets updated by AMD and alike. */
+        if ( amd_like(ctxt) )
+        {
+            fail_if(!ops->read_segment);
+            if ( (rc = ops->read_segment(x86_seg_ss, &sreg,
+                                         ctxt)) != X86EMUL_OKAY )
+                goto done;
+
+            /* There's explicitly no RPL adjustment here. */
+            sreg.sel = (msr_val >> 48) + 8;
+        }
+
+#ifdef __x86_64__
+        if ( mode_64bit() )
+        {
+            if ( op_bytes == 8 )
+            {
+                cs.attr = 0xafb; /* L+DB+P+DPL3+S+Code */
+                _regs.rip = _regs.rcx;
+            }
+            else
+                _regs.rip = _regs.ecx;
+
+            _regs.eflags = _regs.r11 & ~(X86_EFLAGS_RF | X86_EFLAGS_VM);
+        }
+        else
+#endif
+        {
+            _regs.r(ip) = _regs.ecx;
+            _regs.eflags |= X86_EFLAGS_IF;
+        }
+
+        fail_if(!ops->write_segment);
+        if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != X86EMUL_OKAY ||
+             (rc = ops->write_segment(x86_seg_ss, &sreg,
+                                      ctxt)) != X86EMUL_OKAY )
+            goto done;
+
+        singlestep = _regs.eflags & X86_EFLAGS_TF;
+        break;
+
     case X86EMUL_OPC(0x0f, 0x08): /* invd */
     case X86EMUL_OPC(0x0f, 0x09): /* wbinvd / wbnoinvd */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
