@@ -188,11 +188,6 @@ static enum microcode_match_result microcode_fits(
     return NEW_UCODE;
 }
 
-static void free_patch(struct microcode_patch *patch)
-{
-    xfree(patch);
-}
-
 static enum microcode_match_result compare_header(
     const struct microcode_patch *new, const struct microcode_patch *old)
 {
@@ -418,6 +413,5 @@ const struct microcode_ops amd_ucode_ops = {
     .start_update                     = start_update,
     .end_update_percpu                = svm_host_osvw_init,
 #endif
-    .free_patch                       = free_patch,
     .compare_patch                    = compare_patch,
 };

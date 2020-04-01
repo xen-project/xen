@@ -245,11 +245,6 @@ static enum microcode_match_result microcode_update_match(
     return mc->rev > cpu_sig->rev ? NEW_UCODE : OLD_UCODE;
 }
 
-static void free_patch(struct microcode_patch *patch)
-{
-    xfree(patch);
-}
-
 static enum microcode_match_result compare_patch(
     const struct microcode_patch *new, const struct microcode_patch *old)
 {
@@ -356,6 +351,5 @@ const struct microcode_ops intel_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
-    .free_patch                       = free_patch,
     .compare_patch                    = compare_patch,
 };

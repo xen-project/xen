@@ -25,7 +25,7 @@ struct microcode_ops {
      *
      * If one is found, allocate and return a struct microcode_patch
      * encapsulating the appropriate microcode patch.  Does not alias the
-     * original buffer.
+     * original buffer.  Must be suitable to be freed with a single xfree().
      *
      * If one is not found, (nothing matches the current CPU), return NULL.
      * Also may return ERR_PTR(-err), e.g. bad container, out of memory.
@@ -55,9 +55,6 @@ struct microcode_ops {
      * be called even if start_update() wasn't.
      */
     void (*end_update_percpu)(void);
-
-    /* Free a patch previously allocated by cpu_request_microcode(). */
-    void (*free_patch)(struct microcode_patch *patch);
 
     /*
      * Given two patches, are they both applicable to the current CPU, and is
