@@ -5897,13 +5897,16 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0x05): /* syscall */
-        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
-
-        /* Inject #UD if syscall/sysret are disabled. */
+        /*
+         * Inject #UD if syscall/sysret are disabled. EFER.SCE can't be set
+         * with the respective CPUID bit clear, so no need for an explicit
+         * check of that one.
+         */
         fail_if(ops->read_msr == NULL);
         if ( (rc = ops->read_msr(MSR_EFER, &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
         generate_exception_if((msr_val & EFER_SCE) == 0, EXC_UD);
+        generate_exception_if(!amd_like(ctxt) && !mode_64bit(), EXC_UD);
 
         if ( (rc = ops->read_msr(MSR_STAR, &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
