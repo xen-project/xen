@@ -121,14 +121,12 @@ static int collect_cpu_info(struct cpu_signature *csig)
 
     memset(csig, 0, sizeof(*csig));
 
-    csig->sig = cpuid_eax(0x00000001);
-
     rdmsrl(MSR_IA32_PLATFORM_ID, msr_content);
     csig->pf = 1 << ((msr_content >> 50) & 7);
 
     wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
     /* As documented in the SDM: Do a CPUID 1 here */
-    cpuid_eax(1);
+    csig->sig = cpuid_eax(1);
 
     /* get the current revision from MSR 0x8B */
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
