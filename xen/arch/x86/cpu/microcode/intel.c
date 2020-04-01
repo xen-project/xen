@@ -32,38 +32,38 @@
 #define pr_debug(x...) ((void)0)
 
 struct microcode_patch {
-    unsigned int hdrver;
-    unsigned int rev;
+    uint32_t hdrver;
+    uint32_t rev;
     uint16_t year;
     uint8_t  day;
     uint8_t  month;
-    unsigned int sig;
-    unsigned int cksum;
-    unsigned int ldrver;
+    uint32_t sig;
+    uint32_t cksum;
+    uint32_t ldrver;
 
     /*
      * Microcode for the Pentium Pro and II had all further fields in the
      * header reserved, had a fixed datasize of 2000 and totalsize of 2048,
      * and didn't use platform flags despite the availability of the MSR.
      */
-    unsigned int pf;
-    unsigned int datasize;
-    unsigned int totalsize;
-    unsigned int reserved[3];
+    uint32_t pf;
+    uint32_t datasize;
+    uint32_t totalsize;
+    uint32_t reserved[3];
 
     /* Microcode payload.  Format is propriety and encrypted. */
     uint8_t data[];
-};
 
-/* microcode format is extended from prescott processors */
+    /* Extended header (iff totalsize > datasize, P4 Prescott and later) */
+};
 struct extended_sigtable {
-    unsigned int count;
-    unsigned int cksum;
-    unsigned int reserved[3];
+    uint32_t count;
+    uint32_t cksum;
+    uint32_t rsvd[3];
     struct {
-        unsigned int sig;
-        unsigned int pf;
-        unsigned int cksum;
+        uint32_t sig;
+        uint32_t pf;
+        uint32_t cksum;
     } sigs[];
 };
 

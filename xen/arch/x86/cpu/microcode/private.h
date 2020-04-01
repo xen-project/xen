@@ -1,8 +1,6 @@
 #ifndef ASM_X86_MICROCODE_PRIVATE_H
 #define ASM_X86_MICROCODE_PRIVATE_H
 
-#include <xen/types.h>
-
 #include <asm/microcode.h>
 
 enum microcode_match_result {

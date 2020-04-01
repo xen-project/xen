@@ -24,7 +24,7 @@
 
 #define pr_debug(x...) ((void)0)
 
-struct __packed equiv_cpu_entry {
+struct equiv_cpu_entry {
     uint32_t installed_cpu;
     uint32_t fixed_errata_mask;
     uint32_t fixed_errata_compare;
@@ -102,7 +102,7 @@ static void collect_cpu_info(void)
              smp_processor_id(), csig->rev);
 }
 
-static bool_t verify_patch_size(uint32_t patch_size)
+static bool verify_patch_size(uint32_t patch_size)
 {
     uint32_t max_size;
 
@@ -113,7 +113,7 @@ static bool_t verify_patch_size(uint32_t patch_size)
 #define F17H_MPB_MAX_SIZE 3200
 #define F19H_MPB_MAX_SIZE 4800
 
-    switch (boot_cpu_data.x86)
+    switch ( boot_cpu_data.x86 )
     {
     case 0x14:
         max_size = F14H_MPB_MAX_SIZE;
@@ -135,7 +135,7 @@ static bool_t verify_patch_size(uint32_t patch_size)
         break;
     }
 
-    return (patch_size <= max_size);
+    return patch_size <= max_size;
 }
 
 static bool check_final_patch_levels(const struct cpu_signature *sig)
