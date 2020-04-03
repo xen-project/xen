@@ -801,7 +801,7 @@ static int extend_frame_table(struct mem_hotadd_info *info)
     spfn = _mfn(info->spfn);
     epfn = _mfn(info->epfn);
 
-    eidx = (mfn_to_pdx(epfn) + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT;
+    eidx = DIV_ROUND_UP(mfn_to_pdx(epfn), PDX_GROUP_COUNT);
     nidx = cidx = mfn_to_pdx(spfn)/PDX_GROUP_COUNT;
 
     ASSERT( mfn_to_pdx(epfn) <= (DIRECTMAP_SIZE >> PAGE_SHIFT) &&

@@ -240,7 +240,7 @@ static void __init init_frametable_chunk(void *start, void *end)
 void __init init_frametable(void)
 {
     unsigned int sidx, eidx, nidx;
-    unsigned int max_idx = (max_pdx + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT;
+    unsigned int max_idx = DIV_ROUND_UP(max_pdx, PDX_GROUP_COUNT);
     struct page_info *end_pg, *top_pg;
 
     BUILD_BUG_ON(XEN_VIRT_END > FRAMETABLE_VIRT_START);

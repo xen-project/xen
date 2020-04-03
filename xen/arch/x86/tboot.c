@@ -310,7 +310,7 @@ static void tboot_gen_frametable_integrity(const uint8_t key[TB_KEY_SIZE],
                                            vmac_t *mac)
 {
     unsigned int sidx, eidx, nidx;
-    unsigned int max_idx = (max_pdx + PDX_GROUP_COUNT - 1)/PDX_GROUP_COUNT;
+    unsigned int max_idx = DIV_ROUND_UP(max_pdx, PDX_GROUP_COUNT);
     uint8_t nonce[16] = {};
     vmac_ctx_t ctx;
 
