@@ -768,11 +768,10 @@ void p2m_final_teardown(struct domain *d)
 }
 
 static int __must_check
-p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
+p2m_remove_page(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                 unsigned int page_order)
 {
     unsigned long i;
-    gfn_t gfn = _gfn(gfn_l);
     p2m_type_t t;
     p2m_access_t a;
 
@@ -781,7 +780,7 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
         return 0;
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
-    P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn_l, mfn);
+    P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn_x(gfn), mfn_x(mfn));
 
     for ( i = 0; i < (1UL << page_order); )
     {
@@ -790,21 +789,23 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
                                           &cur_order, NULL);
 
         if ( p2m_is_valid(t) &&
-             (!mfn_valid(_mfn(mfn)) || mfn + i != mfn_x(mfn_return)) )
+             (!mfn_valid(mfn) || !mfn_eq(mfn_add(mfn, i), mfn_return)) )
             return -EILSEQ;
 
-        i += (1UL << cur_order) - ((gfn_l + i) & ((1UL << cur_order) - 1));
+        i += (1UL << cur_order) -
+             ((gfn_x(gfn) + i) & ((1UL << cur_order) - 1));
     }
 
-    if ( mfn_valid(_mfn(mfn)) )
+    if ( mfn_valid(mfn) )
     {
         for ( i = 0; i < (1UL << page_order); i++ )
         {
             p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, NULL, NULL);
             if ( !p2m_is_grant(t) && !p2m_is_shared(t) && !p2m_is_foreign(t) )
-                set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
+                set_gpfn_from_mfn(mfn_x(mfn) + i, INVALID_M2P_ENTRY);
         }
     }
+
     return p2m_set_entry(p2m, gfn, INVALID_MFN, page_order, p2m_invalid,
                          p2m->default_access);
 }
@@ -815,9 +816,11 @@ guest_physmap_remove_page(struct domain *d, gfn_t gfn,
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc;
+
     gfn_lock(p2m, gfn, page_order);
-    rc = p2m_remove_page(p2m, gfn_x(gfn), mfn_x(mfn), page_order);
+    rc = p2m_remove_page(p2m, gfn, mfn, page_order);
     gfn_unlock(p2m, gfn, page_order);
+
     return rc;
 }
 
@@ -981,7 +984,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                 P2M_DEBUG("old gfn=%#lx -> mfn %#lx\n",
                           gfn_x(ogfn) , mfn_x(omfn));
                 if ( mfn_eq(omfn, mfn_add(mfn, i)) &&
-                     (rc = p2m_remove_page(p2m, gfn_x(ogfn), mfn_x(omfn), 0)) )
+                     (rc = p2m_remove_page(p2m, ogfn, omfn, 0)) )
                     goto out;
             }
         }
@@ -2714,7 +2717,7 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     {
         mfn = ap2m->get_entry(ap2m, old_gfn, &t, &a, 0, NULL, NULL);
         rc = mfn_valid(mfn)
-             ? p2m_remove_page(ap2m, gfn_x(old_gfn), mfn_x(mfn), PAGE_ORDER_4K)
+             ? p2m_remove_page(ap2m, old_gfn, mfn, PAGE_ORDER_4K)
              : 0;
         goto out;
     }
