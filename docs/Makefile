@@ -15,7 +15,7 @@ RST-SRC-y := $(sort $(filter-out %index.rst,$(shell find * -type f -name '*.rst'
 
 TXTSRC-y := $(sort $(shell find misc -name '*.txt' -print))
 
-PANDOCSRC-y := $(sort $(shell find designs/ features/ misc/ process/ specs/ -name '*.pandoc' -print))
+PANDOCSRC-y := $(sort $(shell find designs/ features/ misc/ process/ specs/ \( -name '*.pandoc' -o -name '*.md' \) -print))
 
 # Documentation targets
 $(foreach i,$(MAN_SECTIONS), \
@@ -24,15 +24,18 @@ $(foreach i,$(MAN_SECTIONS), \
 
 DOC_HTML := html/SUPPORT.html \
             $(patsubst %.pandoc,html/%.html,$(PANDOCSRC-y)) \
+            $(patsubst %.md,html/%.html,$(PANDOCSRC-y)) \
             $(patsubst %.rst,html/%.html,$(RST-SRC-y)) \
             $(patsubst %,html/%.html,$(MAN-SRC-y)) \
             $(patsubst %.txt,html/%.txt,$(TXTSRC-y)) \
             $(patsubst %,html/hypercall/%/index.html,$(DOC_ARCHES))
 DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
             $(patsubst %.pandoc,txt/%.txt,$(PANDOCSRC-y)) \
+            $(patsubst %.md,txt/%.txt,$(PANDOCSRC-y)) \
             $(patsubst %.rst,txt/%.txt,$(RST-SRC-y)) \
             $(patsubst %,txt/%.txt,$(MAN-SRC-y))
 DOC_PDF  := $(patsubst %.pandoc,pdf/%.pdf,$(PANDOCSRC-y)) \
+            $(patsubst %.md,pdf/%.pdf,$(PANDOCSRC-y)) \
             $(patsubst %.rst,pdf/%.pdf,$(RST-SRC-y))
 
 # Top level build targets
@@ -228,12 +231,10 @@ define GENERATE_PANDOC_RULE
 # $(1) is the target documentation format. $(2) is the source format.
 $(call GENERATE_PANDOC_RULE_RAW,$(1)/%.$(1),%.$(2))
 endef
-$(eval $(call GENERATE_PANDOC_RULE,pdf,pandoc))   # pdf/%.pdf: %.pandoc
-$(eval $(call GENERATE_PANDOC_RULE,pdf,rst))      # pdf/%.pdf: %.rst
-$(eval $(call GENERATE_PANDOC_RULE,txt,pandoc))   # txt/%.txt: %.pandoc
-$(eval $(call GENERATE_PANDOC_RULE,txt,rst))      # txt/%.txt: %.rst
-$(eval $(call GENERATE_PANDOC_RULE,html,pandoc))  # html/%.html: %.pandoc
-$(eval $(call GENERATE_PANDOC_RULE,html,rst))     # html/%.html: %.rst
+
+$(foreach dst-fmt,pdf txt html,\
+$(foreach src-fmt,pandoc md rst,\
+$(eval $(call GENERATE_PANDOC_RULE,$(dst-fmt),$(src-fmt)))))
 
 $(eval $(call GENERATE_PANDOC_RULE_RAW,html/SUPPORT.html,$(XEN_ROOT)/SUPPORT.md))
 
