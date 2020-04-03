@@ -902,7 +902,6 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
         if ( p2m_is_shared(ot) )
         {
             /* Do an unshare to cleanly take care of all corner cases. */
-            int rc;
             rc = mem_sharing_unshare_page(p2m->domain, gfn_x(gfn_add(gfn, i)));
             if ( rc )
             {
