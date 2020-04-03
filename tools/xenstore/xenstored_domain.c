@@ -214,6 +214,7 @@ static void domain_cleanup(void)
 {
 	xc_dominfo_t dominfo;
 	struct domain *domain;
+	struct connection *conn;
 	int notify = 0;
 
  again:
@@ -230,8 +231,10 @@ static void domain_cleanup(void)
 				continue;
 		}
 		if (domain->conn) {
-			talloc_unlink(talloc_autofree_context(), domain->conn);
+			/* domain is a talloc child of domain->conn. */
+			conn = domain->conn;
 			domain->conn = NULL;
+			talloc_unlink(talloc_autofree_context(), conn);
 			notify = 0; /* destroy_domain() fires the watch */
 			goto again;
 		}
