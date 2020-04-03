@@ -69,7 +69,7 @@
 #define GET_PC8_RES(val)  GET_HW_RES_IN_NS(0x630, val) /* some Haswells only */
 #define GET_PC9_RES(val)  GET_HW_RES_IN_NS(0x631, val) /* some Haswells only */
 #define GET_PC10_RES(val) GET_HW_RES_IN_NS(0x632, val) /* some Haswells only */
-#define GET_CC1_RES(val)  GET_HW_RES_IN_NS(0x660, val) /* Silvermont only */
+#define GET_CC1_RES(val)  GET_HW_RES_IN_NS(0x660, val)
 #define GET_CC3_RES(val)  GET_HW_RES_IN_NS(0x3FC, val)
 #define GET_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FD, val)
 #define GET_CC7_RES(val)  GET_HW_RES_IN_NS(0x3FE, val) /* SNB onwards */
@@ -180,8 +180,6 @@ static void do_get_hw_residencies(void *arg)
     case 0x4E:
     case 0x55:
     case 0x5E:
-    /* Cannon Lake */
-    case 0x66:
     /* Kaby Lake */
     case 0x8E:
     case 0x9E:
@@ -202,6 +200,16 @@ static void do_get_hw_residencies(void *arg)
         GET_PC7_RES(hw_res->pc7);
         GET_CC3_RES(hw_res->cc3);
         GET_CC6_RES(hw_res->cc6);
+        break;
+    /* Cannon Lake */
+    case 0x66:
+        GET_PC2_RES(hw_res->pc2);
+        GET_PC3_RES(hw_res->pc3);
+        GET_PC6_RES(hw_res->pc6);
+        GET_PC7_RES(hw_res->pc7);
+        GET_CC1_RES(hw_res->cc1);
+        GET_CC6_RES(hw_res->cc6);
+        GET_CC7_RES(hw_res->cc7);
         break;
     /* Xeon Phi Knights Landing */
     case 0x57:
