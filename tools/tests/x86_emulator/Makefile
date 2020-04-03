@@ -268,7 +268,7 @@ install uninstall:
 ifeq ($(XEN_COMPILE_ARCH),x86_64)
 run32: $(addsuffix .h,$(TESTCASES)) $(addsuffix -opmask.h,$(OPMASK))
 run32 clean32: %32:
-	$(MAKE) -C 32 $*
+	$(MAKE) -C 32 HOSTCC=$(HOSTCC) $*
 clean: clean32
 else
 run32 clean32: %32: %
