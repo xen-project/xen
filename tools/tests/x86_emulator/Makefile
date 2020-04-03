@@ -97,10 +97,12 @@ avx512dq-opmask-vecs := 1 2
 avx512bw-opmask-vecs := 4 8
 
 # Suppress building by default of the harness if the compiler can't deal
-# with any of the extensions used.  Don't alter the "run" target dependencies
+# with some of the extensions used.  Don't alter the "run" target dependencies
 # though, as this target needs to be specified manually, and things may work
 # partially even with older compilers.
 TARGET-y := $(TARGET)
+
+ifeq ($(filter run%,$(MAKECMDGOALS)),)
 
 define simd-check-cc
 TARGET-$(shell echo 'int i;' | $(CC) -x c -c -o /dev/null -m$(1) - || echo y) :=
@@ -114,6 +116,8 @@ TARGET-$(shell echo 'asm("{evex} vzeroall");' | $(CC) -x c -c -o /dev/null - || 
 
 ifeq ($(TARGET-y),)
 $(warning Test harness not built, use newer compiler than "$(CC)" (version $(shell $(CC) -dumpversion)) and an "{evex}" capable assembler)
+endif
+
 endif
 
 all: $(TARGET-y)
