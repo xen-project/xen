@@ -16,7 +16,7 @@
  */
 
 #ifdef __XEN__
-#include <asm/guest_access.h>
+#include <xen/guest_access.h>
 #endif
 
 #include "libelf-private.h"

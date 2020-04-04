@@ -16,6 +16,7 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/guest_access.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/trace.h>
@@ -34,7 +35,6 @@
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/amd.h>
-#include <asm/guest_access.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/i387.h>

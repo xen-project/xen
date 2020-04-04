@@ -32,6 +32,7 @@
 #include <xen/bitops.h>
 #include <xen/config.h>
 #include <xen/domain_page.h>
+#include <xen/guest_access.h>
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/softirq.h>
@@ -39,7 +40,6 @@
 #include <xen/sched.h>
 #include <xen/sizes.h>
 #include <asm/current.h>
-#include <asm/guest_access.h>
 #include <asm/mmio.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>

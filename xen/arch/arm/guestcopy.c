@@ -1,10 +1,10 @@
 #include <xen/domain_page.h>
+#include <xen/guest_access.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
 
 #include <asm/current.h>
-#include <asm/guest_access.h>
 
 #define COPY_flush_dcache   (1U << 0)
 #define COPY_from_guest     (0U << 1)

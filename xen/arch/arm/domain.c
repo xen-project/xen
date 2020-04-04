@@ -12,6 +12,7 @@
 #include <xen/bitops.h>
 #include <xen/errno.h>
 #include <xen/grant_table.h>
+#include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -26,7 +27,6 @@
 #include <asm/current.h>
 #include <asm/event.h>
 #include <asm/gic.h>
-#include <asm/guest_access.h>
 #include <asm/guest_atomics.h>
 #include <asm/irq.h>
 #include <asm/p2m.h>

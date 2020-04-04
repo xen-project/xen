@@ -16,8 +16,9 @@
  */
 
 #include <xen/domain_page.h>
+#include <xen/guest_access.h>
 #include <xen/sched.h>
-#include <asm/guest_access.h>
+
 #include <asm/guest_walk.h>
 #include <asm/short-desc.h>
 

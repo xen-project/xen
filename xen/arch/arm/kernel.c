@@ -5,6 +5,7 @@
  */
 #include <xen/domain_page.h>
 #include <xen/errno.h>
+#include <xen/guest_access.h>
 #include <xen/gunzip.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -14,7 +15,6 @@
 #include <xen/vmap.h>
 
 #include <asm/byteorder.h>
-#include <asm/guest_access.h>
 #include <asm/kernel.h>
 #include <asm/setup.h>
 

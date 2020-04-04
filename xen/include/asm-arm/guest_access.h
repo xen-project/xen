@@ -1,7 +1,6 @@
 #ifndef __ASM_ARM_GUEST_ACCESS_H__
 #define __ASM_ARM_GUEST_ACCESS_H__
 
-#include <xen/guest_access.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
 

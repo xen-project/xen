@@ -5,12 +5,12 @@
  * Hypervisor Top Level Functional Specification for more information.
  */
 
+#include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <xen/version.h>
 #include <xen/hypercall.h>
 #include <xen/domain_page.h>
 #include <xen/param.h>
-#include <asm/guest_access.h>
 #include <asm/guest/hyperv-tlfs.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>

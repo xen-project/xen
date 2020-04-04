@@ -4,12 +4,12 @@
 #ifdef __XEN__
 
 #include <xen/bitops.h>
+#include <xen/guest_access.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/nospec.h>
 #include <xen/types.h>
 
-#include <asm/guest_access.h>
 #include <asm/msr-index.h>
 
 #define copy_to_buffer_offset copy_to_guest_offset
