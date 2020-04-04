@@ -17,11 +17,12 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/types.h>
+#include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/types.h>
+
 #include <asm/current.h>
 #include <asm/guest_access.h>
-#include <xen/lib.h>
 
 #include "decode.h"
 
