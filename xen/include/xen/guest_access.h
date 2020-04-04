@@ -18,20 +18,24 @@
 #define guest_handle_add_offset(hnd, nr) ((hnd).p += (nr))
 #define guest_handle_subtract_offset(hnd, nr) ((hnd).p -= (nr))
 
-/* Cast a guest handle (either XEN_GUEST_HANDLE or XEN_GUEST_HANDLE_PARAM)
- * to the specified type of XEN_GUEST_HANDLE_PARAM. */
+/*
+ * Cast a guest handle (either XEN_GUEST_HANDLE or XEN_GUEST_HANDLE_PARAM)
+ * to the specified type of XEN_GUEST_HANDLE_PARAM.
+ */
 #define guest_handle_cast(hnd, type) ({         \
     type *_x = (hnd).p;                         \
-    (XEN_GUEST_HANDLE_PARAM(type)) { _x };            \
+    (XEN_GUEST_HANDLE_PARAM(type)) { _x };      \
 })
 
 /* Cast a XEN_GUEST_HANDLE to XEN_GUEST_HANDLE_PARAM */
 #define guest_handle_to_param(hnd, type) ({                  \
     typeof((hnd).p) _x = (hnd).p;                            \
     XEN_GUEST_HANDLE_PARAM(type) _y = { _x };                \
-    /* type checking: make sure that the pointers inside     \
+    /*                                                       \
+     * type checking: make sure that the pointers inside     \
      * XEN_GUEST_HANDLE and XEN_GUEST_HANDLE_PARAM are of    \
-     * the same type, then return hnd */                     \
+     * the same type, then return hnd.                       \
+     */                                                      \
     (void)(&_x == &_y.p);                                    \
     _y;                                                      \
 })
@@ -106,13 +110,13 @@
  * guest_handle_subrange_okay().
  */
 
-#define __copy_to_guest_offset(hnd, off, ptr, nr) ({    \
-    const typeof(*(ptr)) *_s = (ptr);                   \
-    char (*_d)[sizeof(*_s)] = (void *)(hnd).p;          \
-    /* Check that the handle is not for a const type */ \
-    void *__maybe_unused _t = (hnd).p;                  \
-    (void)((hnd).p == _s);                              \
-    __raw_copy_to_guest(_d+(off), _s, sizeof(*_s)*(nr));\
+#define __copy_to_guest_offset(hnd, off, ptr, nr) ({        \
+    const typeof(*(ptr)) *_s = (ptr);                       \
+    char (*_d)[sizeof(*_s)] = (void *)(hnd).p;              \
+    /* Check that the handle is not for a const type */     \
+    void *__maybe_unused _t = (hnd).p;                      \
+    (void)((hnd).p == _s);                                  \
+    __raw_copy_to_guest(_d + (off), _s, sizeof(*_s) * (nr));\
 })
 
 #define __clear_guest_offset(hnd, off, nr) ({    \
@@ -120,10 +124,10 @@
     __raw_clear_guest(_d + (off), nr);           \
 })
 
-#define __copy_from_guest_offset(ptr, hnd, off, nr) ({  \
-    const typeof(*(ptr)) *_s = (hnd).p;                 \
-    typeof(*(ptr)) *_d = (ptr);                         \
-    __raw_copy_from_guest(_d, _s+(off), sizeof(*_d)*(nr));\
+#define __copy_from_guest_offset(ptr, hnd, off, nr) ({          \
+    const typeof(*(ptr)) *_s = (hnd).p;                         \
+    typeof(*(ptr)) *_d = (ptr);                                 \
+    __raw_copy_from_guest(_d, _s + (off), sizeof (*_d) * (nr)); \
 })
 
 #define __copy_field_to_guest(hnd, ptr, field) ({       \
