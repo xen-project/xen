@@ -3,20 +3,20 @@
  *
  * Copyright (C) 2011 Citrix Systems, Inc.
  */
+#include <xen/domain_page.h>
 #include <xen/errno.h>
+#include <xen/gunzip.h>
 #include <xen/init.h>
 #include <xen/lib.h>
-#include <xen/mm.h>
-#include <xen/domain_page.h>
-#include <xen/sched.h>
-#include <asm/byteorder.h>
-#include <asm/setup.h>
 #include <xen/libfdt/libfdt.h>
-#include <xen/gunzip.h>
+#include <xen/mm.h>
+#include <xen/sched.h>
 #include <xen/vmap.h>
 
+#include <asm/byteorder.h>
 #include <asm/guest_access.h>
 #include <asm/kernel.h>
+#include <asm/setup.h>
 
 #define UIMAGE_MAGIC          0x27051956
 #define UIMAGE_NMLEN          32
