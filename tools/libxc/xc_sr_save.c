@@ -560,6 +560,13 @@ static int send_memory_live(struct xc_sr_context *ctx)
 
     }
 
+    if ( policy_decision == XGS_POLICY_ABORT )
+    {
+        PERROR("Abort precopy loop");
+        rc = -1;
+        goto out;
+    }
+
  out:
     xc_set_progress_prefix(xch, NULL);
     free(progress_str);
