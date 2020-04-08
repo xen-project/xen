@@ -10,6 +10,7 @@
 #define PAGE_SIZE           (_AC(1,L) << PAGE_SHIFT)
 #define PAGE_MASK           (~(PAGE_SIZE-1))
 #define PAGE_FLAG_MASK      (~0)
+#define PAGE_OFFSET(ptr)    ((unsigned long)(ptr) & ~PAGE_MASK)
 
 #define PAGE_ORDER_4K       0
 #define PAGE_ORDER_2M       9

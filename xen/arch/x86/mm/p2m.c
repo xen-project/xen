@@ -509,6 +509,12 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
 
     mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order, NULL);
 
+    /* Check if we need to fork the page */
+    if ( (q & P2M_ALLOC) && p2m_is_hole(*t) &&
+         !mem_sharing_fork_page(p2m->domain, gfn, q & P2M_UNSHARE) )
+        mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order, NULL);
+
+    /* Check if we need to unshare the page */
     if ( (q & P2M_UNSHARE) && p2m_is_shared(*t) )
     {
         ASSERT(p2m_is_hostp2m(p2m));
@@ -588,7 +594,8 @@ struct page_info *p2m_get_page_from_gfn(
             return page;
 
         /* Error path: not a suitable GFN at all */
-        if ( !p2m_is_ram(*t) && !p2m_is_paging(*t) && !p2m_is_pod(*t) )
+        if ( !p2m_is_ram(*t) && !p2m_is_paging(*t) && !p2m_is_pod(*t) &&
+             !mem_sharing_is_fork(p2m->domain) )
             return NULL;
     }
 

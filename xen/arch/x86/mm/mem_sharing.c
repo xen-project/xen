@@ -22,6 +22,7 @@
 
 #include <xen/types.h>
 #include <xen/domain_page.h>
+#include <xen/event.h>
 #include <xen/spinlock.h>
 #include <xen/rwlock.h>
 #include <xen/mm.h>
@@ -36,6 +37,8 @@
 #include <asm/altp2m.h>
 #include <asm/atomic.h>
 #include <asm/event.h>
+#include <asm/hap.h>
+#include <asm/hvm/hvm.h>
 #include <xsm/xsm.h>
 
 #include "mm-locks.h"
@@ -1443,6 +1446,309 @@ static inline int mem_sharing_control(struct domain *d, bool enable)
     return 0;
 }
 
+/*
+ * Forking a page only gets called when the VM faults due to no entry being
+ * in the EPT for the access. Depending on the type of access we either
+ * populate the physmap with a shared entry for read-only access or
+ * fork the page if its a write access.
+ *
+ * The client p2m is already locked so we only need to lock
+ * the parent's here.
+ */
+int mem_sharing_fork_page(struct domain *d, gfn_t gfn, bool unsharing)
+{
+    int rc = -ENOENT;
+    shr_handle_t handle;
+    struct domain *parent = d->parent;
+    struct p2m_domain *p2m;
+    unsigned long gfn_l = gfn_x(gfn);
+    mfn_t mfn, new_mfn;
+    p2m_type_t p2mt;
+    struct page_info *page;
+
+    if ( !mem_sharing_is_fork(d) )
+        return -ENOENT;
+
+    if ( !unsharing )
+    {
+        /* For read-only accesses we just add a shared entry to the physmap */
+        while ( parent )
+        {
+            if ( !(rc = nominate_page(parent, gfn, 0, &handle)) )
+                break;
+
+            parent = parent->parent;
+        }
+
+        if ( !rc )
+        {
+            /* The client's p2m is already locked */
+            p2m = p2m_get_hostp2m(parent);
+
+            p2m_lock(p2m);
+            rc = add_to_physmap(parent, gfn_l, handle, d, gfn_l, false);
+            p2m_unlock(p2m);
+
+            if ( !rc )
+                return 0;
+        }
+    }
+
+    /*
+     * If it's a write access (ie. unsharing) or if adding a shared entry to
+     * the physmap failed we'll fork the page directly.
+     */
+    p2m = p2m_get_hostp2m(d);
+    parent = d->parent;
+
+    while ( parent )
+    {
+        mfn = get_gfn_query(parent, gfn_l, &p2mt);
+
+        /* We can't fork grant memory from the parent, only regular ram */
+        if ( mfn_valid(mfn) && p2m_is_ram(p2mt) )
+            break;
+
+        put_gfn(parent, gfn_l);
+        parent = parent->parent;
+    }
+
+    if ( !parent )
+        return -ENOENT;
+
+    if ( !(page = alloc_domheap_page(d, 0)) )
+    {
+        put_gfn(parent, gfn_l);
+        return -ENOMEM;
+    }
+
+    new_mfn = page_to_mfn(page);
+    copy_domain_page(new_mfn, mfn);
+    set_gpfn_from_mfn(mfn_x(new_mfn), gfn_l);
+
+    put_gfn(parent, gfn_l);
+
+    return p2m->set_entry(p2m, gfn, new_mfn, PAGE_ORDER_4K, p2m_ram_rw,
+                          p2m->default_access, -1);
+}
+
+static int bring_up_vcpus(struct domain *cd, struct domain *d)
+{
+    unsigned int i;
+    int ret = -EINVAL;
+
+    if ( d->max_vcpus != cd->max_vcpus ||
+        (ret = cpupool_move_domain(cd, d->cpupool)) )
+        return ret;
+
+    for ( i = 0; i < cd->max_vcpus; i++ )
+    {
+        if ( !d->vcpu[i] || cd->vcpu[i] )
+            continue;
+
+        if ( !vcpu_create(cd, i) )
+            return -EINVAL;
+    }
+
+    domain_update_node_affinity(cd);
+    return 0;
+}
+
+static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
+{
+    unsigned int i;
+    struct p2m_domain *p2m = p2m_get_hostp2m(cd);
+    int ret = -EINVAL;
+
+    for ( i = 0; i < cd->max_vcpus; i++ )
+    {
+        const struct vcpu *d_vcpu = d->vcpu[i];
+        struct vcpu *cd_vcpu = cd->vcpu[i];
+        mfn_t vcpu_info_mfn;
+
+        if ( !d_vcpu || !cd_vcpu )
+            continue;
+
+        /* Copy & map in the vcpu_info page if the guest uses one */
+        vcpu_info_mfn = d_vcpu->vcpu_info_mfn;
+        if ( !mfn_eq(vcpu_info_mfn, INVALID_MFN) )
+        {
+            mfn_t new_vcpu_info_mfn = cd_vcpu->vcpu_info_mfn;
+
+            /* Allocate & map the page for it if it hasn't been already */
+            if ( mfn_eq(new_vcpu_info_mfn, INVALID_MFN) )
+            {
+                gfn_t gfn = mfn_to_gfn(d, vcpu_info_mfn);
+                unsigned long gfn_l = gfn_x(gfn);
+                struct page_info *page;
+
+                if ( !(page = alloc_domheap_page(cd, 0)) )
+                    return -ENOMEM;
+
+                new_vcpu_info_mfn = page_to_mfn(page);
+                set_gpfn_from_mfn(mfn_x(new_vcpu_info_mfn), gfn_l);
+
+                ret = p2m->set_entry(p2m, gfn, new_vcpu_info_mfn,
+                                     PAGE_ORDER_4K, p2m_ram_rw,
+                                     p2m->default_access, -1);
+                if ( ret )
+                    return ret;
+
+                ret = map_vcpu_info(cd_vcpu, gfn_l,
+                                    PAGE_OFFSET(d_vcpu->vcpu_info));
+                if ( ret )
+                    return ret;
+            }
+
+            copy_domain_page(new_vcpu_info_mfn, vcpu_info_mfn);
+        }
+
+        /*
+         * TODO: to support VMs with PV interfaces copy additional
+         * settings here, such as PV timers.
+         */
+    }
+
+    return 0;
+}
+
+static int fork_hap_allocation(struct domain *cd, struct domain *d)
+{
+    int rc;
+    bool preempted;
+    unsigned long mb = hap_get_allocation(d);
+
+    if ( mb == hap_get_allocation(cd) )
+        return 0;
+
+    paging_lock(cd);
+    rc = hap_set_allocation(cd, mb << (20 - PAGE_SHIFT), &preempted);
+    paging_unlock(cd);
+
+    return preempted ? -ERESTART : rc;
+}
+
+static void copy_tsc(struct domain *cd, struct domain *d)
+{
+    uint32_t tsc_mode;
+    uint32_t gtsc_khz;
+    uint32_t incarnation;
+    uint64_t elapsed_nsec;
+
+    tsc_get_info(d, &tsc_mode, &elapsed_nsec, &gtsc_khz, &incarnation);
+    /* Don't bump incarnation on set */
+    tsc_set_info(cd, tsc_mode, elapsed_nsec, gtsc_khz, incarnation - 1);
+}
+
+static int copy_special_pages(struct domain *cd, struct domain *d)
+{
+    mfn_t new_mfn, old_mfn;
+    struct p2m_domain *p2m = p2m_get_hostp2m(cd);
+    static const unsigned int params[] =
+    {
+        HVM_PARAM_STORE_PFN,
+        HVM_PARAM_IOREQ_PFN,
+        HVM_PARAM_BUFIOREQ_PFN,
+        HVM_PARAM_CONSOLE_PFN
+    };
+    unsigned int i;
+    int rc;
+
+    for ( i = 0; i < ARRAY_SIZE(params); i++ )
+    {
+        p2m_type_t t;
+        uint64_t value = 0;
+        struct page_info *page;
+
+        if ( hvm_get_param(d, params[i], &value) || !value )
+            continue;
+
+        old_mfn = get_gfn_query_unlocked(d, value, &t);
+        new_mfn = get_gfn_query_unlocked(cd, value, &t);
+
+        /* Allocate the page and map it in if it's not present */
+        if ( mfn_eq(new_mfn, INVALID_MFN) )
+        {
+            if ( !(page = alloc_domheap_page(cd, 0)) )
+                return -ENOMEM;
+
+            new_mfn = page_to_mfn(page);
+            set_gpfn_from_mfn(mfn_x(new_mfn), value);
+
+            rc = p2m->set_entry(p2m, _gfn(value), new_mfn, PAGE_ORDER_4K,
+                                p2m_ram_rw, p2m->default_access, -1);
+            if ( rc )
+                return rc;
+        }
+
+        copy_domain_page(new_mfn, old_mfn);
+    }
+
+    old_mfn = _mfn(virt_to_mfn(d->shared_info));
+    new_mfn = _mfn(virt_to_mfn(cd->shared_info));
+    copy_domain_page(new_mfn, old_mfn);
+
+    return 0;
+}
+
+static int copy_settings(struct domain *cd, struct domain *d)
+{
+    int rc;
+
+    if ( (rc = copy_vcpu_settings(cd, d)) )
+        return rc;
+
+    if ( (rc = hvm_copy_context_and_params(cd, d)) )
+        return rc;
+
+    if ( (rc = copy_special_pages(cd, d)) )
+        return rc;
+
+    copy_tsc(cd, d);
+
+    return rc;
+}
+
+static int fork(struct domain *cd, struct domain *d)
+{
+    int rc = -EBUSY;
+
+    if ( !cd->controller_pause_count )
+        return rc;
+
+    if ( !cd->parent )
+    {
+        if ( !get_domain(d) )
+        {
+            ASSERT_UNREACHABLE();
+            return -EBUSY;
+        }
+
+        domain_pause(d);
+        cd->max_pages = d->max_pages;
+        cd->parent = d;
+    }
+
+    /* This is preemptible so it's the first to get done */
+    if ( (rc = fork_hap_allocation(cd, d)) )
+        goto done;
+
+    if ( (rc = bring_up_vcpus(cd, d)) )
+        goto done;
+
+    rc = copy_settings(cd, d);
+
+ done:
+    if ( rc && rc != -ERESTART )
+    {
+        domain_unpause(d);
+        put_domain(d);
+        cd->parent = NULL;
+    }
+
+    return rc;
+}
+
 int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
 {
     int rc;
@@ -1696,6 +2002,42 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
     case XENMEM_sharing_op_debug_gref:
         rc = debug_gref(d, mso.u.debug.u.gref);
         break;
+
+    case XENMEM_sharing_op_fork:
+    {
+        struct domain *pd;
+
+        rc = -EINVAL;
+        if ( mso.u.fork.pad[0] || mso.u.fork.pad[1] || mso.u.fork.pad[2] )
+            goto out;
+
+        rc = rcu_lock_live_remote_domain_by_id(mso.u.fork.parent_domain,
+                                               &pd);
+        if ( rc )
+            goto out;
+
+        rc = -EINVAL;
+        if ( pd->max_vcpus != d->max_vcpus )
+        {
+            rcu_unlock_domain(pd);
+            goto out;
+        }
+
+        if ( !mem_sharing_enabled(pd) && (rc = mem_sharing_control(pd, true)) )
+        {
+            rcu_unlock_domain(pd);
+            goto out;
+        }
+
+        rc = fork(d, pd);
+
+        if ( rc == -ERESTART )
+            rc = hypercall_create_continuation(__HYPERVISOR_memory_op,
+                                               "lh", XENMEM_sharing_op,
+                                               arg);
+        rcu_unlock_domain(pd);
+        break;
+    }
 
     default:
         rc = -ENOSYS;

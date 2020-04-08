@@ -77,6 +77,14 @@ static inline int mem_sharing_unshare_page(struct domain *d,
     return rc;
 }
 
+static inline bool mem_sharing_is_fork(const struct domain *d)
+{
+    return d->parent;
+}
+
+int mem_sharing_fork_page(struct domain *d, gfn_t gfn,
+                          bool unsharing);
+
 /*
  * If called by a foreign domain, possible errors are
  *   -EBUSY -> ring full
@@ -127,6 +135,16 @@ static inline int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
                                             bool allow_sleep)
 {
     ASSERT_UNREACHABLE();
+    return -EOPNOTSUPP;
+}
+
+static inline bool mem_sharing_is_fork(const struct domain *d)
+{
+    return false;
+}
+
+static inline int mem_sharing_fork_page(struct domain *d, gfn_t gfn, bool lock)
+{
     return -EOPNOTSUPP;
 }
 

@@ -2211,6 +2211,19 @@ int domain_relinquish_resources(struct domain *d)
             ret = relinquish_shared_pages(d);
             if ( ret )
                 return ret;
+
+            /*
+             * If the domain is forked, decrement the parent's pause count
+             * and release the domain.
+             */
+            if ( mem_sharing_is_fork(d) )
+            {
+                struct domain *parent = d->parent;
+
+                d->parent = NULL;
+                domain_unpause(parent);
+                put_domain(parent);
+            }
         }
 #endif
 

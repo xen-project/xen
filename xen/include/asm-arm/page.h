@@ -12,6 +12,7 @@
 #define PADDR_BITS              40
 #endif
 #define PADDR_MASK              ((1ULL << PADDR_BITS)-1)
+#define PAGE_OFFSET(ptr)        ((vaddr_t)(ptr) & ~PAGE_MASK)
 
 #define VADDR_BITS              32
 #define VADDR_MASK              (~0UL)

@@ -482,6 +482,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);
 #define XENMEM_sharing_op_add_physmap       6
 #define XENMEM_sharing_op_audit             7
 #define XENMEM_sharing_op_range_share       8
+#define XENMEM_sharing_op_fork              9
 
 #define XENMEM_SHARING_OP_S_HANDLE_INVALID  (-10)
 #define XENMEM_SHARING_OP_C_HANDLE_INVALID  (-9)
@@ -532,6 +533,10 @@ struct xen_mem_sharing_op {
                 uint32_t gref;     /* IN: gref to debug         */
             } u;
         } debug;
+        struct mem_sharing_op_fork {      /* OP_FORK */
+            domid_t parent_domain;        /* IN: parent's domain id */
+            uint16_t pad[3];              /* Must be set to 0 */
+        } fork;
     } u;
 };
 typedef struct xen_mem_sharing_op xen_mem_sharing_op_t;

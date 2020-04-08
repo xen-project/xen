@@ -321,8 +321,7 @@ static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
 }
 
 /* Return the size of the pool, rounded up to the nearest MB */
-static unsigned int
-hap_get_allocation(struct domain *d)
+unsigned int hap_get_allocation(struct domain *d)
 {
     unsigned int pg = d->arch.paging.hap.total_pages
         + d->arch.paging.hap.p2m_pages;
