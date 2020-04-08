@@ -3227,15 +3227,10 @@ enum hvm_translation_result hvm_translate_get_page(
 #define HVMCOPY_phys       (0u<<2)
 #define HVMCOPY_linear     (1u<<2)
 static enum hvm_translation_result __hvm_copy(
-    void *buf, paddr_t addr, int size, struct vcpu *v, unsigned int flags,
+    void *buf, paddr_t addr, unsigned int size, struct vcpu *v, unsigned int flags,
     uint32_t pfec, pagefault_info_t *pfinfo)
 {
-    gfn_t gfn;
-    struct page_info *page;
-    p2m_type_t p2mt;
     char *p;
-    int count, todo = size;
-
     ASSERT(is_hvm_vcpu(v));
 
     /*
@@ -3254,12 +3249,14 @@ static enum hvm_translation_result __hvm_copy(
         return HVMTRANS_unhandleable;
 #endif
 
-    while ( todo > 0 )
+    while ( size > 0 )
     {
+        struct page_info *page;
+        gfn_t gfn;
+        p2m_type_t p2mt;
         enum hvm_translation_result res;
         unsigned int pgoff = addr & ~PAGE_MASK;
-
-        count = min_t(int, PAGE_SIZE - pgoff, todo);
+        unsigned int count = min((unsigned int)PAGE_SIZE - pgoff, size);
 
         res = hvm_translate_get_page(v, addr, flags & HVMCOPY_linear,
                                      pfec, pfinfo, &page, &gfn, &p2mt);
@@ -3313,7 +3310,7 @@ static enum hvm_translation_result __hvm_copy(
         addr += count;
         if ( buf )
             buf += count;
-        todo -= count;
+        size -= count;
         put_page(page);
     }
 
@@ -3321,21 +3318,21 @@ static enum hvm_translation_result __hvm_copy(
 }
 
 enum hvm_translation_result hvm_copy_to_guest_phys(
-    paddr_t paddr, void *buf, int size, struct vcpu *v)
+    paddr_t paddr, void *buf, unsigned int size, struct vcpu *v)
 {
     return __hvm_copy(buf, paddr, size, v,
                       HVMCOPY_to_guest | HVMCOPY_phys, 0, NULL);
 }
 
 enum hvm_translation_result hvm_copy_from_guest_phys(
-    void *buf, paddr_t paddr, int size)
+    void *buf, paddr_t paddr, unsigned int size)
 {
     return __hvm_copy(buf, paddr, size, current,
                       HVMCOPY_from_guest | HVMCOPY_phys, 0, NULL);
 }
 
 enum hvm_translation_result hvm_copy_to_guest_linear(
-    unsigned long addr, void *buf, int size, uint32_t pfec,
+    unsigned long addr, void *buf, unsigned int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
     return __hvm_copy(buf, addr, size, current,
@@ -3344,7 +3341,7 @@ enum hvm_translation_result hvm_copy_to_guest_linear(
 }
 
 enum hvm_translation_result hvm_copy_from_guest_linear(
-    void *buf, unsigned long addr, int size, uint32_t pfec,
+    void *buf, unsigned long addr, unsigned int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
     return __hvm_copy(buf, addr, size, current,
@@ -3352,7 +3349,7 @@ enum hvm_translation_result hvm_copy_from_guest_linear(
                       PFEC_page_present | pfec, pfinfo);
 }
 
-unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
+unsigned int copy_to_user_hvm(void *to, const void *from, unsigned int len)
 {
     int rc;
 
@@ -3366,7 +3363,7 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
     return rc ? len : 0; /* fake a copy_to_user() return code */
 }
 
-unsigned long clear_user_hvm(void *to, unsigned int len)
+unsigned int clear_user_hvm(void *to, unsigned int len)
 {
     int rc;
 
@@ -3377,10 +3374,11 @@ unsigned long clear_user_hvm(void *to, unsigned int len)
     }
 
     rc = hvm_copy_to_guest_linear((unsigned long)to, NULL, len, 0, NULL);
-    return rc ? len : 0; /* fake a copy_to_user() return code */
+
+    return rc ? len : 0; /* fake a clear_user() return code */
 }
 
-unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
+unsigned int copy_from_user_hvm(void *to, const void *from, unsigned int len)
 {
     int rc;
 
