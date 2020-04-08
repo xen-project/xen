@@ -877,23 +877,25 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
     for ( i = 0; i < count; i++ )
     {
         p2m_access_t a;
-        struct page_info *pg;
 
         mfns[i] = p2m->get_entry(p2m, gfns[i], types + i, &a,
                                  0, NULL, NULL);
-        pg = mfn_to_page(mfns[i]);
 
         /*
          * If this is ram, and not a pagetable or a special page, and
          * probably not mapped elsewhere, map it; otherwise, skip.
          */
-        if ( !is_special_page(pg) && p2m_is_ram(types[i]) &&
-             (pg->count_info & PGC_allocated) &&
-             !(pg->count_info & PGC_page_table) &&
-             ((pg->count_info & PGC_count_mask) <= max_ref) )
-            map[i] = map_domain_page(mfns[i]);
-        else
-            map[i] = NULL;
+        map[i] = NULL;
+        if ( p2m_is_ram(types[i]) )
+        {
+            const struct page_info *pg = mfn_to_page(mfns[i]);
+
+            if ( !is_special_page(pg) &&
+                 (pg->count_info & PGC_allocated) &&
+                 !(pg->count_info & PGC_page_table) &&
+                 ((pg->count_info & PGC_count_mask) <= max_ref) )
+                map[i] = map_domain_page(mfns[i]);
+        }
     }
 
     /*
