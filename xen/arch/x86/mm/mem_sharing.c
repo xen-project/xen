@@ -1749,6 +1749,61 @@ static int fork(struct domain *cd, struct domain *d)
     return rc;
 }
 
+/*
+ * The fork reset operation is intended to be used on short-lived forks only.
+ * There is no hypercall continuation operation implemented for this reason.
+ * For forks that obtain a larger memory footprint it is likely going to be
+ * more performant to create a new fork instead of resetting an existing one.
+ *
+ * TODO: In case this hypercall would become useful on forks with larger memory
+ * footprints the hypercall continuation should be implemented (or if this
+ * feature needs to be become "stable").
+ */
+static int mem_sharing_fork_reset(struct domain *d, struct domain *pd)
+{
+    int rc;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    struct page_info *page, *tmp;
+
+    domain_pause(d);
+
+    /* need recursive lock because we will free pages */
+    spin_lock_recursive(&d->page_alloc_lock);
+    page_list_for_each_safe(page, tmp, &d->page_list)
+    {
+        p2m_type_t p2mt;
+        p2m_access_t p2ma;
+        mfn_t mfn = page_to_mfn(page);
+        gfn_t gfn = mfn_to_gfn(d, mfn);
+
+        mfn = __get_gfn_type_access(p2m, gfn_x(gfn), &p2mt, &p2ma,
+                                    0, NULL, false);
+
+        /* only reset pages that are sharable */
+        if ( !p2m_is_sharable(p2mt) )
+            continue;
+
+        /* take an extra reference or just skip if can't for whatever reason */
+        if ( !get_page(page, d) )
+            continue;
+
+        /* forked memory is 4k, not splitting large pages so this must work */
+        rc = p2m->set_entry(p2m, gfn, INVALID_MFN, PAGE_ORDER_4K,
+                            p2m_invalid, p2m_access_rwx, -1);
+        ASSERT(!rc);
+
+        put_page_alloc_ref(page);
+        put_page(page);
+    }
+    spin_unlock_recursive(&d->page_alloc_lock);
+
+    rc = copy_settings(d, pd);
+
+    domain_unpause(d);
+
+    return rc;
+}
+
 int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
 {
     int rc;
@@ -2035,6 +2090,28 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
             rc = hypercall_create_continuation(__HYPERVISOR_memory_op,
                                                "lh", XENMEM_sharing_op,
                                                arg);
+        rcu_unlock_domain(pd);
+        break;
+    }
+
+    case XENMEM_sharing_op_fork_reset:
+    {
+        struct domain *pd;
+
+        rc = -EINVAL;
+        if ( mso.u.fork.pad[0] || mso.u.fork.pad[1] || mso.u.fork.pad[2] )
+            goto out;
+
+        rc = -ENOSYS;
+        if ( !d->parent )
+            goto out;
+
+        rc = rcu_lock_live_remote_domain_by_id(d->parent->domain_id, &pd);
+        if ( rc )
+            goto out;
+
+        rc = mem_sharing_fork_reset(d, pd);
+
         rcu_unlock_domain(pd);
         break;
     }

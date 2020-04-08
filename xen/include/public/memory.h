@@ -483,6 +483,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);
 #define XENMEM_sharing_op_audit             7
 #define XENMEM_sharing_op_range_share       8
 #define XENMEM_sharing_op_fork              9
+#define XENMEM_sharing_op_fork_reset        10
 
 #define XENMEM_SHARING_OP_S_HANDLE_INVALID  (-10)
 #define XENMEM_SHARING_OP_C_HANDLE_INVALID  (-9)
