@@ -7855,14 +7855,12 @@ void sched_process(struct pcpu_info *p)
             if (opt.dump_all) {
                 struct {
                     unsigned vcpuid:16, domid:16;
-                    unsigned tickled_cpu, skipped;
+                    unsigned tickled_cpu;
                     int credit;
                 } *r = (typeof(r))ri->d;
 
-                printf(" %s csched2:runq_candidate d%uv%u, credit = %d, "
-                       "%u vcpus skipped, ",
-                       ri->dump_header, r->domid, r->vcpuid,
-                       r->credit, r->skipped);
+                printf(" %s csched2:runq_candidate d%uv%u, credit = %d, ",
+                       ri->dump_header, r->domid, r->vcpuid, r->credit);
                 if (r->tickled_cpu == (unsigned)-1)
                     printf("no cpu was tickled\n");
                 else
