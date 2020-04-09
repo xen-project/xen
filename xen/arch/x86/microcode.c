@@ -584,29 +584,17 @@ static int do_microcode_update(void *patch)
     return ret;
 }
 
-int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
+struct ucode_buf {
+    unsigned int len;
+    char buffer[];
+};
+
+static long microcode_update_helper(void *data)
 {
     int ret;
-    void *buffer;
+    struct ucode_buf *buffer = data;
     unsigned int cpu, updated;
     struct microcode_patch *patch;
-
-    if ( len != (uint32_t)len )
-        return -E2BIG;
-
-    if ( microcode_ops == NULL )
-        return -EINVAL;
-
-    buffer = xmalloc_bytes(len);
-    if ( !buffer )
-        return -ENOMEM;
-
-    ret = copy_from_guest(buffer, buf, len);
-    if ( ret )
-    {
-        xfree(buffer);
-        return -EFAULT;
-    }
 
     /* cpu_online_map must not change during update */
     if ( !get_cpu_maps() )
@@ -629,7 +617,7 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
         return -EPERM;
     }
 
-    patch = parse_blob(buffer, len);
+    patch = parse_blob(buffer->buffer, buffer->len);
     xfree(buffer);
     if ( IS_ERR(patch) )
     {
@@ -720,6 +708,33 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
  put:
     put_cpu_maps();
     return ret;
+}
+
+int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
+{
+    int ret;
+    struct ucode_buf *buffer;
+
+    if ( len != (uint32_t)len )
+        return -E2BIG;
+
+    if ( microcode_ops == NULL )
+        return -EINVAL;
+
+    buffer = xmalloc_flex_struct(struct ucode_buf, buffer, len);
+    if ( !buffer )
+        return -ENOMEM;
+
+    ret = copy_from_guest(buffer->buffer, buf, len);
+    if ( ret )
+    {
+        xfree(buffer);
+        return -EFAULT;
+    }
+    buffer->len = len;
+
+    return continue_hypercall_on_cpu(smp_processor_id(),
+                                     microcode_update_helper, buffer);
 }
 
 static int __init microcode_init(void)
