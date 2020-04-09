@@ -874,9 +874,11 @@ int create_domain(struct domain_create *dom_info)
 start:
     assert(domid == INVALID_DOMID);
 
-    rc = acquire_lock();
-    if (rc < 0)
-        goto error_out;
+    if (autoballoon) {
+        rc = acquire_lock();
+        if (rc < 0)
+            goto error_out;
+    }
 
     if (domid_soft_reset == INVALID_DOMID) {
         if (!freemem(domid, &d_config)) {
@@ -939,7 +941,8 @@ start:
     if ( ret )
         goto error_out;
 
-    release_lock();
+    if (autoballoon)
+        release_lock();
 
     if (restore_fd_to_close >= 0) {
         if (close(restore_fd_to_close))
@@ -1113,7 +1116,8 @@ start:
     }
 
 error_out:
-    release_lock();
+    if (autoballoon)
+        release_lock();
     if (libxl_domid_valid_guest(domid)) {
         libxl_domain_destroy(ctx, domid, 0);
         domid = INVALID_DOMID;
