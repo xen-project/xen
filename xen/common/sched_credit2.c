@@ -3260,15 +3260,12 @@ csched2_runtime(const struct scheduler *ops, int cpu,
 static struct csched2_vcpu *
 runq_candidate(struct csched2_runqueue_data *rqd,
                struct csched2_vcpu *scurr,
-               int cpu, s_time_t now,
-               unsigned int *skipped)
+               int cpu, s_time_t now)
 {
     struct list_head *iter, *temp;
     struct csched2_vcpu *snext = NULL;
     struct csched2_private *prv = csched2_priv(per_cpu(scheduler, cpu));
     bool yield = false, soft_aff_preempt = false;
-
-    *skipped = 0;
 
     if ( unlikely(is_idle_vcpu(scurr->vcpu)) )
     {
@@ -3366,10 +3363,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
 
         /* Only consider vcpus that are allowed to run on this processor. */
         if ( !cpumask_test_cpu(cpu, svc->vcpu->cpu_hard_affinity) )
-        {
-            (*skipped)++;
             continue;
-        }
 
         /*
          * If a vcpu is meant to be picked up by another processor, and such
@@ -3378,7 +3372,6 @@ runq_candidate(struct csched2_runqueue_data *rqd,
         if ( svc->tickled_cpu != -1 && svc->tickled_cpu != cpu &&
              cpumask_test_cpu(svc->tickled_cpu, &rqd->tickled) )
         {
-            (*skipped)++;
             SCHED_STAT_CRANK(deferred_to_tickled_cpu);
             continue;
         }
@@ -3390,7 +3383,6 @@ runq_candidate(struct csched2_runqueue_data *rqd,
         if ( svc->vcpu->processor != cpu
              && snext->credit + CSCHED2_MIGRATE_RESIST > svc->credit )
         {
-            (*skipped)++;
             SCHED_STAT_CRANK(migrate_resisted);
             continue;
         }
@@ -3413,14 +3405,13 @@ runq_candidate(struct csched2_runqueue_data *rqd,
     {
         struct {
             unsigned vcpu:16, dom:16;
-            unsigned tickled_cpu, skipped;
+            unsigned tickled_cpu;
             int credit;
         } d;
         d.dom = snext->vcpu->domain->domain_id;
         d.vcpu = snext->vcpu->vcpu_id;
         d.credit = snext->credit;
         d.tickled_cpu = snext->tickled_cpu;
-        d.skipped = *skipped;
         __trace_var(TRC_CSCHED2_RUNQ_CANDIDATE, 1,
                     sizeof(d),
                     (unsigned char *)&d);
@@ -3451,7 +3442,6 @@ csched2_schedule(
     struct csched2_runqueue_data *rqd;
     struct csched2_vcpu * const scurr = csched2_vcpu(current);
     struct csched2_vcpu *snext = NULL;
-    unsigned int skipped_vcpus = 0;
     struct task_slice ret;
     bool tickled;
 
@@ -3529,7 +3519,7 @@ csched2_schedule(
         snext = csched2_vcpu(idle_vcpu[cpu]);
     }
     else
-        snext = runq_candidate(rqd, scurr, cpu, now, &skipped_vcpus);
+        snext = runq_candidate(rqd, scurr, cpu, now);
 
     /* If switching from a non-idle runnable vcpu, put it
      * back on the runqueue. */
@@ -3543,6 +3533,8 @@ csched2_schedule(
     /* Accounting for non-idle tasks */
     if ( !is_idle_vcpu(snext->vcpu) )
     {
+        int top_credit;
+
         /* If switching, remove this from the runqueue and mark it scheduled */
         if ( snext != scurr )
         {
@@ -3570,11 +3562,15 @@ csched2_schedule(
          *  2) no other vcpu with higher credits wants to run.
          *
          * Here, where we want to check for reset, we need to make sure the
-         * proper vcpu is being used. In fact, runqueue_candidate() may have
-         * not returned the first vcpu in the runqueue, for various reasons
+         * proper vcpu is being used. In fact, runq_candidate() may have not
+         * returned the first vcpu in the runqueue, for various reasons
          * (e.g., affinity). Only trigger a reset when it does.
          */
-        if ( skipped_vcpus == 0 && snext->credit <= CSCHED2_CREDIT_RESET )
+        if ( list_empty(&rqd->runq) )
+            top_credit = snext->credit;
+        else
+            top_credit = max(snext->credit, runq_elem(rqd->runq.next)->credit);
+        if ( top_credit <= CSCHED2_CREDIT_RESET )
         {
             reset_credit(ops, cpu, now, snext);
             balance_load(ops, cpu, now);
