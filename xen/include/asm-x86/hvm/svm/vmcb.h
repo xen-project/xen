@@ -318,6 +318,14 @@ typedef union
     } fields;
 } eventinj_t;
 
+typedef union {
+    struct {
+        bool intr_shadow:    1;
+        bool guest_intr_mask:1;
+    };
+    uint64_t raw;
+} intstat_t;
+
 typedef union
 {
     u64 bytes;
@@ -421,7 +429,7 @@ struct vmcb_struct {
     u8  tlb_control;            /* offset 0x5C */
     u8  res07[3];
     vintr_t _vintr;             /* offset 0x60 - cleanbit 3 */
-    u64 interrupt_shadow;       /* offset 0x68 */
+    intstat_t int_stat;         /* offset 0x68 */
     u64 exitcode;               /* offset 0x70 */
     u64 exitinfo1;              /* offset 0x78 */
     u64 exitinfo2;              /* offset 0x80 */
