@@ -539,7 +539,6 @@ int arch_domain_create(struct domain *d,
     INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
     spin_lock_init(&d->arch.e820_lock);
-    spin_lock_init(&d->arch.vtsc_lock);
 
     /* Minimal initialisation for the idle domain. */
     if ( unlikely(is_idle_domain(d)) )
