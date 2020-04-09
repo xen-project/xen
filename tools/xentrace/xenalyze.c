@@ -7718,13 +7718,12 @@ void sched_process(struct pcpu_info *p)
                 struct {
                     unsigned int vcpuid:16, domid:16;
                     int credit_start, credit_end;
-                    unsigned int multiplier;
                 } *r = (typeof(r))ri->d;
 
                 printf(" %s csched2:reset_credits d%uv%u, "
-                       "credit_start = %d, credit_end = %d, mult = %u\n",
+                       "credit_start = %d, credit_end = %d\n",
                        ri->dump_header, r->domid, r->vcpuid,
-                       r->credit_start, r->credit_end, r->multiplier);
+                       r->credit_start, r->credit_end);
             }
             break;
         case TRC_SCHED_CLASS_EVT(CSCHED2, 8):  /* SCHED_TASKLET    */

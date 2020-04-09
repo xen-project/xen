@@ -55,7 +55,7 @@
 0x00022204  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit_add
 0x00022205  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle_check   [ dom:vcpu = 0x%(1)08x, credit = %(2)d, score = %(3)d ]
 0x00022206  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle         [ cpu = %(1)d ]
-0x00022207  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit_reset   [ dom:vcpu = 0x%(1)08x, cr_start = %(2)d, cr_end = %(3)d, mult = %(4)d ]
+0x00022207  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit_reset   [ dom:vcpu = 0x%(1)08x, cr_start = %(2)d, cr_end = %(3)d ]
 0x00022208  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:sched_tasklet
 0x00022209  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:update_load
 0x0002220a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_assign    [ dom:vcpu = 0x%(1)08x, rq_id = %(2)d ]
