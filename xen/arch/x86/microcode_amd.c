@@ -297,6 +297,7 @@ static int install_equiv_cpu_table(
     size_t *offset)
 {
     const struct mpbhdr *mpbuf = data + *offset + 4;
+    const struct equiv_cpu_entry *eq;
 
     *offset += mpbuf->len + CONT_HDR_SIZE;	/* add header length */
 
@@ -306,7 +307,9 @@ static int install_equiv_cpu_table(
         return -EINVAL;
     }
 
-    if ( mpbuf->len == 0 )
+    if ( mpbuf->len == 0 || mpbuf->len % sizeof(*eq) ||
+         (eq = (const void *)mpbuf->data,
+          eq[(mpbuf->len / sizeof(*eq)) - 1].installed_cpu) )
     {
         printk(KERN_ERR "microcode: Wrong microcode equivalent cpu table length\n");
         return -EINVAL;
