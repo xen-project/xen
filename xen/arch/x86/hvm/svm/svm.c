@@ -1032,7 +1032,7 @@ static void noreturn svm_do_resume(struct vcpu *v)
 
     hvm_do_resume(v);
 
-    reset_stack_and_jump(svm_asm_do_resume);
+    reset_stack_and_jump_nolp(svm_asm_do_resume);
 }
 
 void svm_vmenter_helper(const struct cpu_user_regs *regs)

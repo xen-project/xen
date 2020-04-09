@@ -141,7 +141,11 @@ static void idle_loop(void)
 
         /* Are we here for running vcpu context tasklets, or for idling? */
         if ( unlikely(tasklet_work_to_do(cpu)) )
+        {
             do_tasklet();
+            /* Livepatch work is always kicked off via a tasklet. */
+            check_for_livepatch_work();
+        }
         /*
          * Test softirqs twice --- first to see if should even try scrubbing
          * and then, after it is done, whether softirqs became pending
@@ -151,11 +155,6 @@ static void idle_loop(void)
                     !softirq_pending(cpu) )
             pm_idle();
         do_softirq();
-        /*
-         * We MUST be last (or before pm_idle). Otherwise after we get the
-         * softirq we would execute pm_idle (and sleep) and not patch.
-         */
-        check_for_livepatch_work();
     }
 }
 
