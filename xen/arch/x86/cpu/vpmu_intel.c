@@ -900,7 +900,6 @@ int vmx_vpmu_initialise(struct vcpu *v)
 
 int __init core2_vpmu_init(void)
 {
-    u64 caps;
     unsigned int version = 0;
     unsigned int i;
 
@@ -932,8 +931,14 @@ int __init core2_vpmu_init(void)
 
     arch_pmc_cnt = core2_get_arch_pmc_count();
     fixed_pmc_cnt = core2_get_fixed_pmc_count();
-    rdmsrl(MSR_IA32_PERF_CAPABILITIES, caps);
-    full_width_write = (caps >> 13) & 1;
+
+    if ( cpu_has_pdcm )
+    {
+        uint64_t caps;
+
+        rdmsrl(MSR_IA32_PERF_CAPABILITIES, caps);
+        full_width_write = (caps >> 13) & 1;
+    }
 
     fixed_ctrl_mask = ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1);
     /* mask .AnyThread bits for all fixed counters */
