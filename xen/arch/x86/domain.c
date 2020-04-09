@@ -665,6 +665,8 @@ int arch_domain_create(struct domain *d,
      */
     d->arch.x87_fip_width = cpu_has_fpu_sel ? 0 : 8;
 
+    domain_cpu_policy_changed(d);
+
     return 0;
 
  fail:
