@@ -745,9 +745,9 @@ void amd_iommu_share_p2m(struct domain *d)
 int __init amd_iommu_quarantine_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
-    unsigned long max_gfn =
-        PFN_DOWN((1ul << DEFAULT_DOMAIN_ADDRESS_WIDTH) - 1);
-    unsigned int level = amd_iommu_get_paging_mode(max_gfn);
+    unsigned long end_gfn =
+        1ul << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT);
+    unsigned int level = amd_iommu_get_paging_mode(end_gfn);
     uint64_t *table;
 
     if ( hd->arch.root_table )
