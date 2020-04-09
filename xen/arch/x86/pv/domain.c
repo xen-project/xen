@@ -118,6 +118,20 @@ unsigned long pv_fixup_guest_cr4(const struct vcpu *v, unsigned long cr4)
             (mmu_cr4_features & PV_CR4_GUEST_VISIBLE_MASK));
 }
 
+static int8_t __read_mostly opt_global_pages = -1;
+boolean_runtime_param("global-pages", opt_global_pages);
+
+static int __init pge_init(void)
+{
+    if ( opt_global_pages == -1 )
+        opt_global_pages = !cpu_has_hypervisor ||
+                           !(boot_cpu_data.x86_vendor &
+                             (X86_VENDOR_AMD | X86_VENDOR_HYGON));
+
+    return 0;
+}
+__initcall(pge_init);
+
 unsigned long pv_make_cr4(const struct vcpu *v)
 {
     const struct domain *d = v->domain;
@@ -130,7 +144,7 @@ unsigned long pv_make_cr4(const struct vcpu *v)
      */
     if ( d->arch.pv.pcid )
         cr4 |= X86_CR4_PCIDE;
-    else if ( !d->arch.pv.xpti )
+    else if ( !d->arch.pv.xpti && opt_global_pages )
         cr4 |= X86_CR4_PGE;
 
     /*

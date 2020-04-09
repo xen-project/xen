@@ -1087,6 +1087,25 @@ value settable via Xen tools.
 
 Dom0 is using this value for sizing its maptrack table.
 
+### global-pages
+    = <boolean>
+
+    Applicability: x86
+    Default: true unless running virtualized on AMD or Hygon hardware
+
+Control whether to use global pages for PV guests, and thus the need to
+perform TLB flushes by writing to CR4.  This is a performance trade-off.
+
+AMD SVM does not support selective trapping of CR4 writes, which means that a
+global TLB flush (two CR4 writes) takes two VMExits, and massively outweigh
+the benefit of using global pages to begin with.  This case is easy for Xen to
+spot, and is accounted for in the default setting.
+
+Other cases where this option might be a benefit is on VT-x hardware when
+selective CR4 writes are not supported/enabled by the hypervisor, or in any
+virtualised case using shadow paging.  These are not easy for Xen to spot, so
+are not accounted for in the default setting.
+
 ### guest_loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
 
