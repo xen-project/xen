@@ -54,7 +54,6 @@ int amd_iommu_init_late(void);
 int amd_iommu_update_ivrs_mapping_acpi(void);
 int iov_adjust_irq_affinities(void);
 
-int amd_iommu_get_paging_mode(unsigned long entries);
 int amd_iommu_quarantine_init(struct domain *d);
 
 /* mapping functions */
@@ -175,6 +174,22 @@ static inline u32 set_field_in_reg_u32(u32 field, u32 reg_value,
 static inline unsigned long region_to_pages(unsigned long addr, unsigned long size)
 {
     return (PAGE_ALIGN(addr + size) - (addr & PAGE_MASK)) >> PAGE_SHIFT;
+}
+
+static inline int amd_iommu_get_paging_mode(unsigned long max_frames)
+{
+    int level = 1;
+
+    BUG_ON(!max_frames);
+
+    while ( max_frames > PTE_PER_TABLE_SIZE )
+    {
+        max_frames = PTE_PER_TABLE_ALIGN(max_frames) >> PTE_PER_TABLE_SHIFT;
+        if ( ++level > 6 )
+            return -ENOMEM;
+    }
+
+    return level;
 }
 
 static inline struct page_info* alloc_amd_iommu_pgtable(void)

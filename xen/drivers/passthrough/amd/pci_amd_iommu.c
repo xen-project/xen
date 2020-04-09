@@ -231,22 +231,6 @@ static int __must_check allocate_domain_resources(struct domain_iommu *hd)
     return rc;
 }
 
-int amd_iommu_get_paging_mode(unsigned long entries)
-{
-    int level = 1;
-
-    BUG_ON( !entries );
-
-    while ( entries > PTE_PER_TABLE_SIZE )
-    {
-        entries = PTE_PER_TABLE_ALIGN(entries) >> PTE_PER_TABLE_SHIFT;
-        if ( ++level > 6 )
-            return -ENOMEM;
-    }
-
-    return level;
-}
-
 static int amd_iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
@@ -259,8 +243,10 @@ static int amd_iommu_domain_init(struct domain *d)
      *   physical address space we give it, but this isn't known yet so use 4
      *   unilaterally.
      */
-    hd->arch.paging_mode = is_hvm_domain(d)
-        ? 4 : amd_iommu_get_paging_mode(get_upper_mfn_bound());
+    hd->arch.paging_mode = amd_iommu_get_paging_mode(
+        is_hvm_domain(d)
+        ? 1ul << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT)
+        : get_upper_mfn_bound() + 1);
 
     return 0;
 }
