@@ -79,10 +79,10 @@ void __init hypervisor_e820_fixup(struct e820map *e820)
 }
 
 int hypervisor_flush_tlb(const cpumask_t *mask, const void *va,
-                         unsigned int order)
+                         unsigned int flags)
 {
     if ( ops.flush_tlb )
-        return alternative_call(ops.flush_tlb, mask, va, order);
+        return alternative_call(ops.flush_tlb, mask, va, flags);
 
     return -EOPNOTSUPP;
 }

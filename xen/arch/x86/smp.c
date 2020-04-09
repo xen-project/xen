@@ -272,7 +272,7 @@ void flush_area_mask(const cpumask_t *mask, const void *va, unsigned int flags)
         if ( cpu_has_hypervisor &&
              !(flags & ~(FLUSH_TLB | FLUSH_TLB_GLOBAL | FLUSH_VA_VALID |
                          FLUSH_ORDER_MASK)) &&
-             !hypervisor_flush_tlb(mask, va, (flags - 1) & FLUSH_ORDER_MASK) )
+             !hypervisor_flush_tlb(mask, va, flags) )
             return;
 
         spin_lock(&flush_lock);

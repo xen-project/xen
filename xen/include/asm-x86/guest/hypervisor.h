@@ -35,7 +35,7 @@ struct hypervisor_ops {
     /* Fix up e820 map */
     void (*e820_fixup)(struct e820map *e820);
     /* L0 assisted TLB flush */
-    int (*flush_tlb)(const cpumask_t *mask, const void *va, unsigned int order);
+    int (*flush_tlb)(const cpumask_t *mask, const void *va, unsigned int flags);
 };
 
 #ifdef CONFIG_GUEST
@@ -48,11 +48,11 @@ void hypervisor_e820_fixup(struct e820map *e820);
 /*
  * L0 assisted TLB flush.
  * mask: cpumask of the dirty vCPUs that should be flushed.
- * va: linear address to flush, or NULL for global flushes.
- * order: order of the linear address pointed by va.
+ * va: linear address to flush, or NULL for entire address space.
+ * flags: flags for flushing, including the order of va.
  */
 int hypervisor_flush_tlb(const cpumask_t *mask, const void *va,
-                         unsigned int order);
+                         unsigned int flags);
 
 #else
 
@@ -65,7 +65,7 @@ static inline int hypervisor_ap_setup(void) { return 0; }
 static inline void hypervisor_resume(void) { ASSERT_UNREACHABLE(); }
 static inline void hypervisor_e820_fixup(struct e820map *e820) {}
 static inline int hypervisor_flush_tlb(const cpumask_t *mask, const void *va,
-                                       unsigned int order)
+                                       unsigned int flags)
 {
     return -EOPNOTSUPP;
 }

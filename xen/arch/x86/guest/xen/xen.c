@@ -324,7 +324,7 @@ static void __init e820_fixup(struct e820map *e820)
         pv_shim_fixup_e820(e820);
 }
 
-static int flush_tlb(const cpumask_t *mask, const void *va, unsigned int order)
+static int flush_tlb(const cpumask_t *mask, const void *va, unsigned int flags)
 {
     return xen_hypercall_hvm_op(HVMOP_flush_tlbs, NULL);
 }
