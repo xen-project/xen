@@ -281,9 +281,9 @@ static int apply_microcode(unsigned int cpu)
 {
     unsigned long flags;
     uint64_t msr_content;
-    unsigned int val[2];
     unsigned int cpu_num = raw_smp_processor_id();
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
+    uint32_t rev, old_rev = uci->cpu_sig.rev;
 
     /* We should bind the task to the CPU */
     BUG_ON(cpu_num != cpu);
@@ -303,23 +303,24 @@ static int apply_microcode(unsigned int cpu)
 
     /* get the current revision from MSR 0x8B */
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
-    val[1] = (uint32_t)(msr_content >> 32);
+    uci->cpu_sig.rev = rev = msr_content >> 32;
 
     spin_unlock_irqrestore(&microcode_update_lock, flags);
-    if ( val[1] != uci->mc.mc_intel->hdr.rev )
+
+    if ( rev != uci->mc.mc_intel->hdr.rev )
     {
-        printk(KERN_ERR "microcode: CPU%d update from revision "
-               "%#x to %#x failed. Resulting revision is %#x.\n", cpu_num,
-               uci->cpu_sig.rev, uci->mc.mc_intel->hdr.rev, val[1]);
+        printk(XENLOG_ERR
+               "microcode: CPU%u update rev %#x to %#x failed, result %#x\n",
+               cpu, old_rev, uci->mc.mc_intel->hdr.rev, rev);
         return -EIO;
     }
-    printk(KERN_INFO "microcode: CPU%d updated from revision "
-           "%#x to %#x, date = %04x-%02x-%02x \n",
-           cpu_num, uci->cpu_sig.rev, val[1],
+
+    printk(XENLOG_WARNING
+           "microcode: CPU%u updated from revision %#x to %#x, date = %04x-%02x-%02x\n",
+           cpu, old_rev, rev,
            uci->mc.mc_intel->hdr.date & 0xffff,
            uci->mc.mc_intel->hdr.date >> 24,
            (uci->mc.mc_intel->hdr.date >> 16) & 0xff);
-    uci->cpu_sig.rev = val[1];
 
     return 0;
 }

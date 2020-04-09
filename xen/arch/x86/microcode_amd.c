@@ -194,7 +194,7 @@ static int apply_microcode(unsigned int cpu)
 {
     unsigned long flags;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-    uint32_t rev;
+    uint32_t rev, old_rev = uci->cpu_sig.rev;
     struct microcode_amd *mc_amd = uci->mc.mc_amd;
     struct microcode_header_amd *hdr;
     int hw_err;
@@ -215,6 +215,7 @@ static int apply_microcode(unsigned int cpu)
 
     /* get patch id after patching */
     rdmsrl(MSR_AMD_PATCHLEVEL, rev);
+    uci->cpu_sig.rev = rev;
 
     spin_unlock_irqrestore(&microcode_update_lock, flags);
 
@@ -227,15 +228,14 @@ static int apply_microcode(unsigned int cpu)
     /* check current patch id and patch's id for match */
     if ( hw_err || (rev != hdr->patch_id) )
     {
-        printk(KERN_ERR "microcode: CPU%d update from revision "
-               "%#x to %#x failed\n", cpu, rev, hdr->patch_id);
+        printk(XENLOG_ERR
+               "microcode: CPU%u update rev %#x to %#x failed, result %#x\n",
+               cpu, old_rev, hdr->patch_id, rev);
         return -EIO;
     }
 
-    printk(KERN_WARNING "microcode: CPU%d updated from revision %#x to %#x\n",
-           cpu, uci->cpu_sig.rev, hdr->patch_id);
-
-    uci->cpu_sig.rev = rev;
+    printk(XENLOG_WARNING "microcode: CPU%u updated from revision %#x to %#x\n",
+           cpu, old_rev, rev);
 
     return 0;
 }
