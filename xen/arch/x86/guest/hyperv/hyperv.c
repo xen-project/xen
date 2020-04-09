@@ -33,6 +33,8 @@ DEFINE_PER_CPU_READ_MOSTLY(void *, hv_input_page);
 DEFINE_PER_CPU_READ_MOSTLY(void *, hv_vp_assist);
 DEFINE_PER_CPU_READ_MOSTLY(unsigned int, hv_vp_index);
 
+static bool __read_mostly hcall_page_ready;
+
 static uint64_t generate_guest_id(void)
 {
     union hv_guest_os_id id = {};
@@ -119,6 +121,8 @@ static void __init setup_hypercall_page(void)
     BUG_ON(!hypercall_msr.enable);
 
     set_fixmap_x(FIX_X_HYPERV_HCALL, mfn << PAGE_SHIFT);
+
+    hcall_page_ready = true;
 }
 
 static int setup_hypercall_pcpu_arg(void)
@@ -199,11 +203,24 @@ static void __init e820_fixup(struct e820map *e820)
         panic("Unable to reserve Hyper-V hypercall range\n");
 }
 
+static int flush_tlb(const cpumask_t *mask, const void *va,
+                     unsigned int flags)
+{
+    if ( !(ms_hyperv.hints & HV_X64_REMOTE_TLB_FLUSH_RECOMMENDED) )
+        return -EOPNOTSUPP;
+
+    if ( !hcall_page_ready || !this_cpu(hv_input_page) )
+        return -ENXIO;
+
+    return hyperv_flush_tlb(mask, va, flags);
+}
+
 static const struct hypervisor_ops __initconstrel ops = {
     .name = "Hyper-V",
     .setup = setup,
     .ap_setup = ap_setup,
     .e820_fixup = e820_fixup,
+    .flush_tlb = flush_tlb,
 };
 
 /*

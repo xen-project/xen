@@ -1,7 +1,7 @@
 /******************************************************************************
- * arch/x86/guest/hyperv/private.h
+ * arch/x86/guest/hyperv/tlb.c
  *
- * Definitions / declarations only useful to Hyper-V code.
+ * Support for TLB management using hypercalls
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,17 +19,23 @@
  * Copyright (c) 2020 Microsoft.
  */
 
-#ifndef __XEN_HYPERV_PRIVIATE_H__
-#define __XEN_HYPERV_PRIVIATE_H__
-
 #include <xen/cpumask.h>
-#include <xen/percpu.h>
+#include <xen/errno.h>
 
-DECLARE_PER_CPU(void *, hv_input_page);
-DECLARE_PER_CPU(void *, hv_vp_assist);
-DECLARE_PER_CPU(unsigned int, hv_vp_index);
+#include "private.h"
 
 int hyperv_flush_tlb(const cpumask_t *mask, const void *va,
-                     unsigned int flags);
+                     unsigned int flags)
+{
+    return -EOPNOTSUPP;
+}
 
-#endif /* __XEN_HYPERV_PRIVIATE_H__  */
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
