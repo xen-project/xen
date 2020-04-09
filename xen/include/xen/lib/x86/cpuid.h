@@ -181,8 +181,7 @@ struct cpuid_policy
                 uint32_t _7d0;
                 struct { DECL_BITFIELD(7d0); };
             };
-        };
-        struct {
+
             /* Subleaf 1. */
             union {
                 uint32_t _7a1;
