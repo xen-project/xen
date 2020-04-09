@@ -67,7 +67,7 @@
 0x00022210  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:load_check     [ lrq_id[16]:orq_id[16] = 0x%(1)08x, delta = %(2)d ]
 0x00022211  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:load_balance   [ l_bavgload = 0x%(2)08x%(1)08x, o_bavgload = 0x%(4)08x%(3)08x, lrq_id[16]:orq_id[16] = 0x%(5)08x ]
 0x00022212  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:pick_cpu       [ b_avgload = 0x%(2)08x%(1)08x, dom:vcpu = 0x%(3)08x, rq_id[16]:new_cpu[16] = %(4)d ]
-0x00022213  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_candidate [ dom:vcpu = 0x%(1)08x, credit = %(4)d, skipped_vcpus = %(3)d, tickled_cpu = %(2)d ]
+0x00022213  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_candidate [ dom:vcpu = 0x%(1)08x, credit = %(3)d, tickled_cpu = %(2)d ]
 0x00022214  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:schedule       [ rq:cpu = 0x%(1)08x, tasklet[8]:idle[8]:smt_idle[8]:tickled[8] = %(2)08x ]
 0x00022215  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:ratelimit      [ dom:vcpu = 0x%(1)08x, runtime = %(2)d ]
 0x00022216  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_cand_chk  [ dom:vcpu = 0x%(1)08x ]
