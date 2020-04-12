@@ -1045,3 +1045,37 @@ func (Ctx *Context) PrimaryConsoleGetTty(domid uint32) (path string, err error) 
 	path = C.GoString(cpath)
 	return
 }
+
+// DeviceNicAdd adds a nic to a domain.
+func (Ctx *Context) DeviceNicAdd(domid Domid, nic *DeviceNic) error {
+	var cnic C.libxl_device_nic
+
+	if err := nic.toC(&cnic); err != nil {
+		return err
+	}
+	defer C.libxl_device_nic_dispose(&cnic)
+
+	ret := C.libxl_device_nic_add(Ctx.ctx, C.uint32_t(domid), &cnic, nil)
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
+
+// DeviceNicRemove removes a nic from a domain.
+func (Ctx *Context) DeviceNicRemove(domid Domid, nic *DeviceNic) error {
+	var cnic C.libxl_device_nic
+
+	if err := nic.toC(&cnic); err != nil {
+		return err
+	}
+	defer C.libxl_device_nic_dispose(&cnic)
+
+	ret := C.libxl_device_nic_remove(Ctx.ctx, C.uint32_t(domid), &cnic, nil)
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
