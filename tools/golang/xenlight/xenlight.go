@@ -1113,3 +1113,37 @@ func (Ctx *Context) DevicePciRemove(domid Domid, pci *DevicePci) error {
 
 	return nil
 }
+
+// DeviceUsbdevAdd adds a USB device to a domain.
+func (Ctx *Context) DeviceUsbdevAdd(domid Domid, usbdev *DeviceUsbdev) error {
+	var cusbdev C.libxl_device_usbdev
+
+	if err := usbdev.toC(&cusbdev); err != nil {
+		return err
+	}
+	defer C.libxl_device_usbdev_dispose(&cusbdev)
+
+	ret := C.libxl_device_usbdev_add(Ctx.ctx, C.uint32_t(domid), &cusbdev, nil)
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
+
+// DeviceUsbdevRemove removes a USB device from a domain.
+func (Ctx *Context) DeviceUsbdevRemove(domid Domid, usbdev *DeviceUsbdev) error {
+	var cusbdev C.libxl_device_usbdev
+
+	if err := usbdev.toC(&cusbdev); err != nil {
+		return err
+	}
+	defer C.libxl_device_usbdev_dispose(&cusbdev)
+
+	ret := C.libxl_device_usbdev_remove(Ctx.ctx, C.uint32_t(domid), &cusbdev, nil)
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
