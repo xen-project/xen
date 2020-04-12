@@ -1079,3 +1079,37 @@ func (Ctx *Context) DeviceNicRemove(domid Domid, nic *DeviceNic) error {
 
 	return nil
 }
+
+// DevicePciAdd is used to passthrough a PCI device to a domain.
+func (Ctx *Context) DevicePciAdd(domid Domid, pci *DevicePci) error {
+	var cpci C.libxl_device_pci
+
+	if err := pci.toC(&cpci); err != nil {
+		return err
+	}
+	defer C.libxl_device_pci_dispose(&cpci)
+
+	ret := C.libxl_device_pci_add(Ctx.ctx, C.uint32_t(domid), &cpci, nil)
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
+
+// DevicePciRemove removes a PCI device from a domain.
+func (Ctx *Context) DevicePciRemove(domid Domid, pci *DevicePci) error {
+	var cpci C.libxl_device_pci
+
+	if err := pci.toC(&cpci); err != nil {
+		return err
+	}
+	defer C.libxl_device_pci_dispose(&cpci)
+
+	ret := C.libxl_device_pci_remove(Ctx.ctx, C.uint32_t(domid), &cpci, nil)
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
