@@ -257,6 +257,9 @@ static int alloc_xenoprof_struct(
         return -ENOMEM;
     }
 
+    for ( i = 0; i < npages; ++i )
+        clear_page(d->xenoprof->rawbuf + i * PAGE_SIZE);
+
     d->xenoprof->npages = npages;
     d->xenoprof->nbuf = nvcpu;
     d->xenoprof->bufsize = bufsize;
