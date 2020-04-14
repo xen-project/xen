@@ -1031,7 +1031,7 @@ map_grant_ref(
     {
         if ( (rc = _set_status(shah, status, rd, rgt->gt_version, act,
                                op->flags & GNTMAP_readonly, 1,
-                               ld->domain_id) != GNTST_okay) )
+                               ld->domain_id)) != GNTST_okay )
             goto act_release_out;
 
         if ( !act->pin )
