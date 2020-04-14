@@ -61,12 +61,12 @@ struct xenoprof {
 
 #ifndef CONFIG_COMPAT
 #define XENOPROF_COMPAT(x) 0
-#define xenoprof_buf(d, b, field) ((b)->field)
+#define xenoprof_buf(d, b, field) ACCESS_ONCE((b)->field)
 #else
 #define XENOPROF_COMPAT(x) ((x)->is_compat)
-#define xenoprof_buf(d, b, field) (*(!(d)->xenoprof->is_compat ? \
-                                       &(b)->native.field : \
-                                       &(b)->compat.field))
+#define xenoprof_buf(d, b, field) ACCESS_ONCE(*(!(d)->xenoprof->is_compat \
+                                                ? &(b)->native.field \
+                                                : &(b)->compat.field))
 #endif
 
 struct domain;

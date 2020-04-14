@@ -474,25 +474,22 @@ static int add_passive_list(XEN_GUEST_HANDLE_PARAM(void) arg)
 
 
 /* Get space in the buffer */
-static int xenoprof_buf_space(struct domain *d, xenoprof_buf_t * buf, int size)
+static int xenoprof_buf_space(int head, int tail, int size)
 {
-    int head, tail;
-
-    head = xenoprof_buf(d, buf, event_head);
-    tail = xenoprof_buf(d, buf, event_tail);
-
     return ((tail > head) ? 0 : size) + tail - head - 1;
 }
 
 /* Check for space and add a sample. Return 1 if successful, 0 otherwise. */
-static int xenoprof_add_sample(struct domain *d, xenoprof_buf_t *buf,
+static int xenoprof_add_sample(const struct domain *d,
+                               const struct xenoprof_vcpu *v,
                                uint64_t eip, int mode, int event)
 {
+    xenoprof_buf_t *buf = v->buffer;
     int head, tail, size;
 
     head = xenoprof_buf(d, buf, event_head);
     tail = xenoprof_buf(d, buf, event_tail);
-    size = xenoprof_buf(d, buf, event_size);
+    size = v->event_size;
     
     /* make sure indexes in shared buffer are sane */
     if ( (head < 0) || (head >= size) || (tail < 0) || (tail >= size) )
@@ -501,7 +498,7 @@ static int xenoprof_add_sample(struct domain *d, xenoprof_buf_t *buf,
         return 0;
     }
 
-    if ( xenoprof_buf_space(d, buf, size) > 0 )
+    if ( xenoprof_buf_space(head, tail, size) > 0 )
     {
         xenoprof_buf(d, buf, event_log[head].eip) = eip;
         xenoprof_buf(d, buf, event_log[head].mode) = mode;
@@ -525,7 +522,6 @@ static int xenoprof_add_sample(struct domain *d, xenoprof_buf_t *buf,
 int xenoprof_add_trace(struct vcpu *vcpu, uint64_t pc, int mode)
 {
     struct domain *d = vcpu->domain;
-    xenoprof_buf_t *buf = d->xenoprof->vcpu[vcpu->vcpu_id].buffer;
 
     /* Do not accidentally write an escape code due to a broken frame. */
     if ( pc == XENOPROF_ESCAPE_CODE )
@@ -534,7 +530,8 @@ int xenoprof_add_trace(struct vcpu *vcpu, uint64_t pc, int mode)
         return 0;
     }
 
-    return xenoprof_add_sample(d, buf, pc, mode, 0);
+    return xenoprof_add_sample(d, &d->xenoprof->vcpu[vcpu->vcpu_id],
+                               pc, mode, 0);
 }
 
 void xenoprof_log_event(struct vcpu *vcpu, const struct cpu_user_regs *regs,
@@ -565,17 +562,22 @@ void xenoprof_log_event(struct vcpu *vcpu, const struct cpu_user_regs *regs,
     /* Provide backtrace if requested. */
     if ( backtrace_depth > 0 )
     {
-        if ( (xenoprof_buf_space(d, buf, v->event_size) < 2) ||
-             !xenoprof_add_sample(d, buf, XENOPROF_ESCAPE_CODE, mode, 
-                                  XENOPROF_TRACE_BEGIN) )
+        if ( xenoprof_buf_space(xenoprof_buf(d, buf, event_head),
+                                xenoprof_buf(d, buf, event_tail),
+                                v->event_size) < 2 )
         {
             xenoprof_buf(d, buf, lost_samples)++;
             lost_samples++;
             return;
         }
+
+        /* xenoprof_add_sample() will increment lost_samples on failure */
+        if ( !xenoprof_add_sample(d, v, XENOPROF_ESCAPE_CODE, mode,
+                                  XENOPROF_TRACE_BEGIN) )
+            return;
     }
 
-    if ( xenoprof_add_sample(d, buf, pc, mode, event) )
+    if ( xenoprof_add_sample(d, v, pc, mode, event) )
     {
         if ( is_active(vcpu->domain) )
             active_samples++;
