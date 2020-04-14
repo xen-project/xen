@@ -1943,6 +1943,13 @@ int xc_altp2m_change_gfn(xc_interface *handle, uint32_t domid,
                          xen_pfn_t new_gfn);
 int xc_altp2m_get_vcpu_p2m_idx(xc_interface *handle, uint32_t domid,
                                uint32_t vcpuid, uint16_t *p2midx);
+/*
+ * Set view visibility for xc_altp2m_switch_to_view and vmfunc.
+ * Note: If altp2m mode is set to mixed the guest is able to change the view
+ * visibility and then call vmfunc.
+ */
+int xc_altp2m_set_visibility(xc_interface *handle, uint32_t domid,
+                             uint16_t view_id, bool visible);
 
 /** 
  * Mem paging operations.

@@ -410,3 +410,27 @@ int xc_altp2m_get_vcpu_p2m_idx(xc_interface *handle, uint32_t domid,
     xc_hypercall_buffer_free(handle, arg);
     return rc;
 }
+
+int xc_altp2m_set_visibility(xc_interface *handle, uint32_t domid,
+                             uint16_t view_id, bool visible)
+{
+    int rc;
+
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_altp2m_op_t, arg);
+
+    arg = xc_hypercall_buffer_alloc(handle, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->version = HVMOP_ALTP2M_INTERFACE_VERSION;
+    arg->cmd = HVMOP_altp2m_set_visibility;
+    arg->domain = domid;
+    arg->u.set_visibility.altp2m_idx = view_id;
+    arg->u.set_visibility.visible = visible;
+
+    rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+
+    xc_hypercall_buffer_free(handle, arg);
+    return rc;
+}

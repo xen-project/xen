@@ -318,6 +318,12 @@ struct xen_hvm_altp2m_get_vcpu_p2m_idx {
     uint16_t altp2m_idx;
 };
 
+struct xen_hvm_altp2m_set_visibility {
+    uint16_t altp2m_idx;
+    uint8_t visible;
+    uint8_t pad;
+};
+
 struct xen_hvm_altp2m_op {
     uint32_t version;   /* HVMOP_ALTP2M_INTERFACE_VERSION */
     uint32_t cmd;
@@ -350,6 +356,8 @@ struct xen_hvm_altp2m_op {
 #define HVMOP_altp2m_get_p2m_idx          14
 /* Set the "Supress #VE" bit for a range of pages */
 #define HVMOP_altp2m_set_suppress_ve_multi 15
+/* Set visibility for a given altp2m view */
+#define HVMOP_altp2m_set_visibility       16
     domid_t domain;
     uint16_t pad1;
     uint32_t pad2;
@@ -367,6 +375,7 @@ struct xen_hvm_altp2m_op {
         struct xen_hvm_altp2m_suppress_ve_multi    suppress_ve_multi;
         struct xen_hvm_altp2m_vcpu_disable_notify  disable_notify;
         struct xen_hvm_altp2m_get_vcpu_p2m_idx     get_vcpu_p2m_idx;
+        struct xen_hvm_altp2m_set_visibility       set_visibility;
         uint8_t pad[64];
     } u;
 };

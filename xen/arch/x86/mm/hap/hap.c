@@ -492,8 +492,17 @@ int hap_enable(struct domain *d, u32 mode)
             goto out;
         }
 
+        if ( (d->arch.altp2m_visible_eptp = alloc_xenheap_page()) == NULL )
+        {
+            rv = -ENOMEM;
+            goto out;
+        }
+
         for ( i = 0; i < MAX_EPTP; i++ )
+        {
             d->arch.altp2m_eptp[i] = mfn_x(INVALID_MFN);
+            d->arch.altp2m_visible_eptp[i] = mfn_x(INVALID_MFN);
+        }
 
         for ( i = 0; i < MAX_ALTP2M; i++ )
         {
@@ -525,6 +534,12 @@ void hap_final_teardown(struct domain *d)
         {
             free_xenheap_page(d->arch.altp2m_eptp);
             d->arch.altp2m_eptp = NULL;
+        }
+
+        if ( d->arch.altp2m_visible_eptp )
+        {
+            free_xenheap_page(d->arch.altp2m_visible_eptp);
+            d->arch.altp2m_visible_eptp = NULL;
         }
 
         for ( i = 0; i < MAX_ALTP2M; i++ )

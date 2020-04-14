@@ -327,6 +327,7 @@ struct arch_domain
     struct p2m_domain *altp2m_p2m[MAX_ALTP2M];
     mm_lock_t altp2m_list_lock;
     uint64_t *altp2m_eptp;
+    uint64_t *altp2m_visible_eptp;
 #endif
 
     /* NB. protected by d->event_lock and by irq_desc[irq].lock */

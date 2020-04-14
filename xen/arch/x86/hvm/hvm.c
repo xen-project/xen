@@ -4509,6 +4509,7 @@ static int do_altp2m_op(
     case HVMOP_altp2m_get_mem_access:
     case HVMOP_altp2m_change_gfn:
     case HVMOP_altp2m_get_p2m_idx:
+    case HVMOP_altp2m_set_visibility:
         break;
 
     default:
@@ -4784,6 +4785,19 @@ static int do_altp2m_op(
         a.u.get_vcpu_p2m_idx.altp2m_idx = altp2m_vcpu_idx(v);
         rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         break;
+    }
+
+    case HVMOP_altp2m_set_visibility:
+    {
+        unsigned int idx = a.u.set_visibility.altp2m_idx;
+
+        if ( a.u.set_visibility.pad )
+            rc = -EINVAL;
+        else if ( !altp2m_active(d) )
+            rc = -EOPNOTSUPP;
+        else
+            rc = p2m_set_altp2m_view_visibility(d, idx,
+                                                a.u.set_visibility.visible);
     }
 
     default:

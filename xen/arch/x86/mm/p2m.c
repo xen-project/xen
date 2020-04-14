@@ -2533,6 +2533,7 @@ void p2m_flush_altp2m(struct domain *d)
     {
         p2m_reset_altp2m(d, i, ALTP2M_DEACTIVATE);
         d->arch.altp2m_eptp[i] = mfn_x(INVALID_MFN);
+        d->arch.altp2m_visible_eptp[i] = mfn_x(INVALID_MFN);
     }
 
     altp2m_list_unlock(d);
@@ -2652,7 +2653,9 @@ int p2m_destroy_altp2m_by_id(struct domain *d, unsigned int idx)
         {
             p2m_reset_altp2m(d, idx, ALTP2M_DEACTIVATE);
             d->arch.altp2m_eptp[array_index_nospec(idx, MAX_EPTP)] =
-            mfn_x(INVALID_MFN);
+                mfn_x(INVALID_MFN);
+            d->arch.altp2m_visible_eptp[array_index_nospec(idx, MAX_EPTP)] =
+                mfn_x(INVALID_MFN);
             rc = 0;
         }
     }
@@ -2679,7 +2682,7 @@ int p2m_switch_domain_altp2m_by_id(struct domain *d, unsigned int idx)
     rc = -EINVAL;
     altp2m_list_lock(d);
 
-    if ( d->arch.altp2m_eptp[idx] != mfn_x(INVALID_MFN) )
+    if ( d->arch.altp2m_visible_eptp[idx] != mfn_x(INVALID_MFN) )
     {
         for_each_vcpu( d, v )
             if ( idx != vcpu_altp2m(v).p2midx )
@@ -3160,6 +3163,33 @@ int p2m_get_suppress_ve(struct domain *d, gfn_t gfn, bool *suppress_ve,
         p2m_unlock(ap2m);
 
     gfn_unlock(host_p2m, gfn, 0);
+
+    return rc;
+}
+
+int p2m_set_altp2m_view_visibility(struct domain *d, unsigned int altp2m_idx,
+                                   uint8_t visible)
+{
+    int rc = 0;
+
+    altp2m_list_lock(d);
+
+    /*
+     * Eptp index is correlated with altp2m index and should not exceed
+     * min(MAX_ALTP2M, MAX_EPTP).
+     */
+    if ( altp2m_idx >= min(ARRAY_SIZE(d->arch.altp2m_p2m), MAX_EPTP) ||
+         d->arch.altp2m_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] ==
+         mfn_x(INVALID_MFN) )
+        rc = -EINVAL;
+    else if ( visible )
+        d->arch.altp2m_visible_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] =
+            d->arch.altp2m_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)];
+    else
+        d->arch.altp2m_visible_eptp[array_index_nospec(altp2m_idx, MAX_EPTP)] =
+            mfn_x(INVALID_MFN);
+
+    altp2m_list_unlock(d);
 
     return rc;
 }
