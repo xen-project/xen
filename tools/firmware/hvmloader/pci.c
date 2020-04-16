@@ -84,6 +84,7 @@ void pci_setup(void)
     uint32_t vga_devfn = 256;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
+    uint8_t pci_devfn_decode_type[256] = {};
 
     /* Resources assignable to PCI devices via BARs. */
     struct resource {
@@ -119,6 +120,13 @@ void pci_setup(void)
      * option that will have the least impact.
      */
     bool allow_memory_relocate = 1;
+
+    BUILD_BUG_ON((typeof(*pci_devfn_decode_type))PCI_COMMAND_IO !=
+                 PCI_COMMAND_IO);
+    BUILD_BUG_ON((typeof(*pci_devfn_decode_type))PCI_COMMAND_MEMORY !=
+                 PCI_COMMAND_MEMORY);
+    BUILD_BUG_ON((typeof(*pci_devfn_decode_type))PCI_COMMAND_MASTER !=
+                 PCI_COMMAND_MASTER);
 
     s = xenstore_read(HVM_XS_ALLOW_MEMORY_RELOCATE, NULL);
     if ( s )
@@ -208,6 +216,20 @@ void pci_setup(void)
             break;
         }
 
+        /*
+         * It is recommended that BAR programming be done whilst decode
+         * bits are cleared to avoid incorrect mappings being created.
+         * When 64-bit memory BAR is programmed, first by writing the
+         * lower half and then the upper half, which maps to an address
+         * under 4G, as soon as lower half is wriiten, replacing any RAM
+         * mapped in that address, which is not restored back after the
+         * upper half is written and PCI memory is correctly mapped to
+         * its intended high mem address.
+         */
+        cmd = pci_readw(devfn, PCI_COMMAND);
+        cmd &= ~(PCI_COMMAND_MEMORY | PCI_COMMAND_IO);
+        pci_writew(devfn, PCI_COMMAND, cmd);
+
         /* Map the I/O memory and port resources. */
         for ( bar = 0; bar < 7; bar++ )
         {
@@ -289,10 +311,8 @@ void pci_setup(void)
                    devfn>>3, devfn&7, 'A'+pin-1, isa_irq);
         }
 
-        /* Enable bus mastering. */
-        cmd = pci_readw(devfn, PCI_COMMAND);
-        cmd |= PCI_COMMAND_MASTER;
-        pci_writew(devfn, PCI_COMMAND, cmd);
+        /* Enable bus master for this function later */
+        pci_devfn_decode_type[devfn] = PCI_COMMAND_MASTER;
     }
 
     if ( mmio_hole_size )
@@ -497,16 +517,12 @@ void pci_setup(void)
                PRIllx_arg(bar_sz),
                bar_data_upper, bar_data);
 			
-
-        /* Now enable the memory or I/O mapping. */
-        cmd = pci_readw(devfn, PCI_COMMAND);
         if ( (bar_reg == PCI_ROM_ADDRESS) ||
              ((bar_data & PCI_BASE_ADDRESS_SPACE) ==
               PCI_BASE_ADDRESS_SPACE_MEMORY) )
-            cmd |= PCI_COMMAND_MEMORY;
+            pci_devfn_decode_type[devfn] |= PCI_COMMAND_MEMORY;
         else
-            cmd |= PCI_COMMAND_IO;
-        pci_writew(devfn, PCI_COMMAND, cmd);
+            pci_devfn_decode_type[devfn] |= PCI_COMMAND_IO;
     }
 
     if ( pci_hi_mem_start )
@@ -526,10 +542,17 @@ void pci_setup(void)
          * has IO enabled, even if there is no I/O BAR on that
          * particular device.
          */
-        cmd = pci_readw(vga_devfn, PCI_COMMAND);
-        cmd |= PCI_COMMAND_IO;
-        pci_writew(vga_devfn, PCI_COMMAND, cmd);
+        pci_devfn_decode_type[vga_devfn] |= PCI_COMMAND_IO;
     }
+
+    /* Enable bus master, memory and I/O decode for all valid functions. */
+    for ( devfn = 0; devfn < 256; devfn++ )
+        if ( pci_devfn_decode_type[devfn] )
+        {
+            cmd = pci_readw(devfn, PCI_COMMAND);
+            cmd |= pci_devfn_decode_type[devfn];
+            pci_writew(devfn, PCI_COMMAND, cmd);
+        }
 }
 
 /*
