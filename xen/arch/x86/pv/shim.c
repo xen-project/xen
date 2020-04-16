@@ -168,16 +168,17 @@ const struct platform_bad_page *__init pv_shim_reserved_pages(unsigned int *size
 static void __init replace_va_mapping(struct domain *d, l4_pgentry_t *l4start,
                                       unsigned long va, mfn_t mfn)
 {
-    l4_pgentry_t *pl4e = l4start + l4_table_offset(va);
-    l3_pgentry_t *pl3e = l4e_to_l3e(*pl4e) + l3_table_offset(va);
-    l2_pgentry_t *pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(va);
-    l1_pgentry_t *pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
+    l4_pgentry_t l4e = l4start[l4_table_offset(va)];
+    l3_pgentry_t l3e = l3e_from_l4e(l4e, l3_table_offset(va));
+    l2_pgentry_t l2e = l2e_from_l3e(l3e, l2_table_offset(va));
+    l1_pgentry_t *pl1e = map_l1t_from_l2e(l2e) + l1_table_offset(va);
     struct page_info *page = mfn_to_page(l1e_get_mfn(*pl1e));
 
     put_page_and_type(page);
 
     *pl1e = l1e_from_mfn(mfn, (!is_pv_32bit_domain(d) ? L1_PROT
                                                       : COMPAT_L1_PROT));
+    unmap_domain_page(pl1e);
 }
 
 static void evtchn_reserve(struct domain *d, unsigned int port)

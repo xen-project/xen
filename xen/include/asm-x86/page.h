@@ -197,6 +197,25 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 #define map_l2t_from_l3e(x)        (l2_pgentry_t *)map_domain_page(l3e_get_mfn(x))
 #define map_l3t_from_l4e(x)        (l3_pgentry_t *)map_domain_page(l4e_get_mfn(x))
 
+/* Unlike lYe_to_lXe(), lXe_from_lYe() do not rely on the direct map. */
+#define l1e_from_l2e(l2e_, offset_) ({                      \
+        const l1_pgentry_t *l1t_ = map_l1t_from_l2e(l2e_);  \
+        l1_pgentry_t l1e_ = l1t_[offset_];                  \
+        unmap_domain_page(l1t_);                            \
+        l1e_; })
+
+#define l2e_from_l3e(l3e_, offset_) ({                      \
+        const l2_pgentry_t *l2t_ = map_l2t_from_l3e(l3e_);  \
+        l2_pgentry_t l2e_ = l2t_[offset_];                  \
+        unmap_domain_page(l2t_);                            \
+        l2e_; })
+
+#define l3e_from_l4e(l4e_, offset_) ({                      \
+        const l3_pgentry_t *l3t_ = map_l3t_from_l4e(l4e_);  \
+        l3_pgentry_t l3e_ = l3t_[offset_];                  \
+        unmap_domain_page(l3t_);                            \
+        l3e_; })
+
 /* Given a virtual address, get an entry offset into a page table. */
 #define l1_table_offset(a)         \
     (((a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
