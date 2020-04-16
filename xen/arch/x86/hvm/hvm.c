@@ -4798,6 +4798,7 @@ static int do_altp2m_op(
         else
             rc = p2m_set_altp2m_view_visibility(d, idx,
                                                 a.u.set_visibility.visible);
+        break;
     }
 
     default:
