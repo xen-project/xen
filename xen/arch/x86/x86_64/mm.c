@@ -166,14 +166,14 @@ static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
           v += n << PAGE_SHIFT )
     {
         n = L2_PAGETABLE_ENTRIES * L1_PAGETABLE_ENTRIES;
-        l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
-            l3_table_offset(v)];
+        l3e = l3e_from_l4e(idle_pg_table[l4_table_offset(v)],
+                           l3_table_offset(v));
         if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
             continue;
         if ( !(l3e_get_flags(l3e) & _PAGE_PSE) )
         {
             n = L1_PAGETABLE_ENTRIES;
-            l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+            l2e = l2e_from_l3e(l3e, l2_table_offset(v));
             if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
                 continue;
             m2p_start_mfn = l2e_get_mfn(l2e);
@@ -194,11 +194,11 @@ static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
           v != RDWR_COMPAT_MPT_VIRT_END;
           v += 1 << L2_PAGETABLE_SHIFT )
     {
-        l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
-            l3_table_offset(v)];
+        l3e = l3e_from_l4e(idle_pg_table[l4_table_offset(v)],
+                           l3_table_offset(v));
         if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
             continue;
-        l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+        l2e = l2e_from_l3e(l3e, l2_table_offset(v));
         if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
             continue;
         m2p_start_mfn = l2e_get_mfn(l2e);
