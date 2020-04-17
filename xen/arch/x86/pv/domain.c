@@ -243,10 +243,6 @@ int pv_vcpu_initialise(struct vcpu *v)
 
     ASSERT(!is_idle_domain(d));
 
-#ifdef CONFIG_PV_LDT_PAGING
-    spin_lock_init(&v->arch.pv.shadow_ldt_lock);
-#endif
-
     rc = pv_create_gdt_ldt_l1tab(v);
     if ( rc )
         return rc;

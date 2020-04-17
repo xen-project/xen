@@ -1251,40 +1251,9 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
      */
     if ( (l1e_get_flags(l1e) & _PAGE_RW) &&
          ((l1e_owner == pg_owner) || !paging_mode_external(pg_owner)) )
-    {
         put_page_and_type(page);
-    }
     else
-    {
-#ifdef CONFIG_PV_LDT_PAGING
-        /* We expect this is rare so we blow the entire shadow LDT. */
-        if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) ==
-                       PGT_seg_desc_page)) &&
-             unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
-             (l1e_owner == pg_owner) )
-        {
-            struct vcpu *v;
-            cpumask_t *mask = this_cpu(scratch_cpumask);
-
-            cpumask_clear(mask);
-
-            for_each_vcpu ( pg_owner, v )
-            {
-                unsigned int cpu;
-
-                if ( !pv_destroy_ldt(v) )
-                    continue;
-                cpu = read_atomic(&v->dirty_cpu);
-                if ( is_vcpu_dirty_cpu(cpu) )
-                    __cpumask_set_cpu(cpu, mask);
-            }
-
-            if ( !cpumask_empty(mask) )
-                flush_tlb_mask(mask);
-        }
-#endif /* CONFIG_PV_LDT_PAGING */
         put_page(page);
-    }
 }
 
 #ifdef CONFIG_PV

@@ -123,16 +123,7 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
     pl1e = &pv_ldt_ptes(curr)[offset >> PAGE_SHIFT];
     l1e_add_flags(gl1e, _PAGE_RW);
 
-#ifdef CONFIG_PV_LDT_PAGING
-    spin_lock(&curr->arch.pv.shadow_ldt_lock);
-#endif
-
     l1e_write(pl1e, gl1e);
-
-#ifdef CONFIG_PV_LDT_PAGING
-    curr->arch.pv.shadow_ldt_mapcnt++;
-    spin_unlock(&curr->arch.pv.shadow_ldt_lock);
-#endif
 
     return true;
 }

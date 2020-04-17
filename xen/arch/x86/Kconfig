@@ -225,26 +225,3 @@ endmenu
 source "common/Kconfig"
 
 source "drivers/Kconfig"
-
-menu "Deprecated Functionality"
-
-config PV_LDT_PAGING
-	bool "PV LDT Paging-out support"
-	depends on PV
-	---help---
-	  For a very long time, the PV ABI has included the ability to page
-	  out the LDT by transitioning its mapping to not-present.  This
-	  functionality is believed to only exist for the PV Windows XP port
-	  which never came to anything.
-
-	  The implementation contains a vCPU scalability limitation in a
-	  position which is prohibitively complicated to resolve.  As the
-	  feature is believed to be unused in practice, removing the feature
-	  is the easiest remediation.
-
-	  If you discover a usecase which is broken by this option being off,
-	  please contact xen-devel@lists.xenproject.org urgently.  Baring
-	  something unexpected, the code and this option will be deleted 2
-	  releases after Xen 4.12.
-
-endmenu

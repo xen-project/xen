@@ -37,14 +37,7 @@ bool pv_destroy_ldt(struct vcpu *v)
 
     ASSERT(!in_irq());
 
-#ifdef CONFIG_PV_LDT_PAGING
-    spin_lock(&v->arch.pv.shadow_ldt_lock);
-
-    if ( v->arch.pv.shadow_ldt_mapcnt == 0 )
-        goto out;
-#else
     ASSERT(v == current || !vcpu_cpu_dirty(v));
-#endif
 
     pl1e = pv_ldt_ptes(v);
 
@@ -61,14 +54,6 @@ bool pv_destroy_ldt(struct vcpu *v)
         ASSERT_PAGE_IS_DOMAIN(page, v->domain);
         put_page_and_type(page);
     }
-
-#ifdef CONFIG_PV_LDT_PAGING
-    ASSERT(v->arch.pv.shadow_ldt_mapcnt == mappings_dropped);
-    v->arch.pv.shadow_ldt_mapcnt = 0;
-
- out:
-    spin_unlock(&v->arch.pv.shadow_ldt_lock);
-#endif
 
     return mappings_dropped;
 }
