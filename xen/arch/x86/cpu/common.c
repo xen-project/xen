@@ -752,8 +752,9 @@ void load_system_tables(void)
 
 	_set_tssldt_desc(gdt + TSS_ENTRY, (unsigned long)tss,
 			 sizeof(*tss) - 1, SYS_DESC_tss_avail);
-	_set_tssldt_desc(compat_gdt + TSS_ENTRY, (unsigned long)tss,
-			 sizeof(*tss) - 1, SYS_DESC_tss_busy);
+	if ( IS_ENABLED(CONFIG_PV32) )
+		_set_tssldt_desc(compat_gdt + TSS_ENTRY, (unsigned long)tss,
+				 sizeof(*tss) - 1, SYS_DESC_tss_busy);
 
 	per_cpu(full_gdt_loaded, cpu) = false;
 	lgdt(&gdtr);

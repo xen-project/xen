@@ -100,8 +100,10 @@ static DEFINE_PER_CPU(unsigned long, last_extable_addr);
 
 DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, gdt);
 DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, gdt_l1e);
+#ifdef CONFIG_PV32
 DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, compat_gdt);
 DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, compat_gdt_l1e);
+#endif
 
 /* Master table, used by CPU0. */
 idt_entry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
@@ -1999,7 +2001,8 @@ void __init init_idt_traps(void)
     idt_tables[0] = idt_table;
 
     this_cpu(gdt) = boot_gdt;
-    this_cpu(compat_gdt) = boot_compat_gdt;
+    if ( IS_ENABLED(CONFIG_PV32) )
+        this_cpu(compat_gdt) = boot_compat_gdt;
 }
 
 extern void (*const autogen_entrypoints[X86_NR_VECTORS])(void);
@@ -2030,8 +2033,9 @@ void __init trap_init(void)
     /* Cache {,compat_}gdt_l1e now that physically relocation is done. */
     this_cpu(gdt_l1e) =
         l1e_from_pfn(virt_to_mfn(boot_gdt), __PAGE_HYPERVISOR_RW);
-    this_cpu(compat_gdt_l1e) =
-        l1e_from_pfn(virt_to_mfn(boot_compat_gdt), __PAGE_HYPERVISOR_RW);
+    if ( IS_ENABLED(CONFIG_PV32) )
+        this_cpu(compat_gdt_l1e) =
+            l1e_from_pfn(virt_to_mfn(boot_compat_gdt), __PAGE_HYPERVISOR_RW);
 
     percpu_traps_init();
 

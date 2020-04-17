@@ -55,6 +55,7 @@ seg_desc_t boot_gdt[PAGE_SIZE / sizeof(seg_desc_t)] =
     [SEL2GDT(PER_CPU_SELECTOR)] =     { 0x0000910000000000 },
 };
 
+#ifdef CONFIG_PV32
 __section(".data.page_aligned") __aligned(PAGE_SIZE)
 seg_desc_t boot_compat_gdt[PAGE_SIZE / sizeof(seg_desc_t)] =
 {
@@ -83,6 +84,7 @@ seg_desc_t boot_compat_gdt[PAGE_SIZE / sizeof(seg_desc_t)] =
     /* 0xe060 - per-CPU entry (limit == cpu) */
     [SEL2GDT(PER_CPU_SELECTOR)] =     { 0x0000910000000000 },
 };
+#endif
 
 /*
  * Used by each CPU as it starts up, to enter C with a suitable %cs.
