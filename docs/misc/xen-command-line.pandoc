@@ -1694,7 +1694,17 @@ The following resources are available:
     CDP, one COS will corespond two CBMs other than one with CAT, due to the
     sum of CBMs is fixed, that means actual `cos_max` in use will automatically
     reduce to half when CDP is enabled.
-	
+
+### pv
+    = List of [ 32=<bool> ]
+
+    Applicability: x86
+
+Controls for aspects of PV guest support.
+
+*   The `32` boolean controls whether 32bit PV guests can be created.  It
+    defaults to `true`, and is ignored when `CONFIG_PV32` is compiled out.
+
 ### pv-linear-pt (x86)
 > `= <boolean>`
 

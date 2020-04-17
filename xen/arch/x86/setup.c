@@ -53,6 +53,7 @@
 #include <asm/spec_ctrl.h>
 #include <asm/guest.h>
 #include <asm/microcode.h>
+#include <asm/pv/domain.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool __initdata opt_nosmp;
@@ -1870,8 +1871,12 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     {
         snprintf(s, sizeof(s), "xen-%d.%d-x86_64 ", major, minor);
         safe_strcat(*info, s);
-        snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
-        safe_strcat(*info, s);
+
+        if ( opt_pv32 )
+        {
+            snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
+            safe_strcat(*info, s);
+        }
     }
     if ( hvm_enabled )
     {

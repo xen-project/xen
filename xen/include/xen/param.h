@@ -127,4 +127,13 @@ extern const struct kernel_param __param_start[], __param_end[];
     string_param(_name, _var); \
     string_runtime_only_param(_name, _var)
 
+static inline void no_config_param(const char *cfg, const char *param,
+                                   const char *s, const char *e)
+{
+    int len = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
+
+    printk(XENLOG_INFO "CONFIG_%s disabled - ignoring '%s=%*s' setting\n",
+           cfg, param, len, s);
+}
+
 #endif /* _XEN_PARAM_H */

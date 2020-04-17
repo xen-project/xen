@@ -16,6 +16,38 @@
 #include <asm/pv/domain.h>
 #include <asm/shadow.h>
 
+#ifdef CONFIG_PV32
+int8_t __read_mostly opt_pv32 = -1;
+#endif
+
+static __init int parse_pv(const char *s)
+{
+    const char *ss;
+    int val, rc = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        if ( (val = parse_boolean("32", s, ss)) >= 0 )
+        {
+#ifdef CONFIG_PV32
+            opt_pv32 = val;
+#else
+            no_config_param("PV32", "pv", s, ss);
+#endif
+        }
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
+}
+custom_param("pv", parse_pv);
+
 static __read_mostly enum {
     PCID_OFF,
     PCID_ALL,
@@ -174,6 +206,8 @@ int switch_compat(struct domain *d)
 
     BUILD_BUG_ON(offsetof(struct shared_info, vcpu_info) != 0);
 
+    if ( !opt_pv32 )
+        return -EOPNOTSUPP;
     if ( is_hvm_domain(d) || domain_tot_pages(d) != 0 )
         return -EACCES;
     if ( is_pv_32bit_domain(d) )

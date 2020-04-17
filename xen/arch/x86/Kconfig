@@ -49,6 +49,22 @@ config PV
 
 	  If unsure, say Y.
 
+config PV32
+	bool "Support for 32bit PV guests"
+	depends on PV
+	default y
+	---help---
+	  The 32bit PV ABI uses Ring1, an area of the x86 architecture which
+	  was deprecated and mostly removed in the AMD64 spec.  As a result,
+	  it occasionally conflicts with newer x86 hardware features, causing
+	  overheads for Xen to maintain backwards compatibility.
+
+	  People may wish to disable 32bit PV guests for attack surface
+	  reduction, or performance reasons.  Backwards compatibility can be
+	  provided via the PV Shim mechanism.
+
+	  If unsure, say Y.
+
 config PV_LINEAR_PT
        bool "Support for PV linear pagetables"
        depends on PV
