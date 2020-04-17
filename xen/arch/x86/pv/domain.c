@@ -214,7 +214,7 @@ int switch_compat(struct domain *d)
         return 0;
 
     d->arch.has_32bit_shinfo = 1;
-    d->arch.is_32bit_pv = 1;
+    d->arch.pv.is_32bit = true;
 
     for_each_vcpu( d, v )
     {
@@ -234,7 +234,7 @@ int switch_compat(struct domain *d)
     return 0;
 
  undo_and_fail:
-    d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
+    d->arch.pv.is_32bit = d->arch.has_32bit_shinfo = false;
     for_each_vcpu( d, v )
     {
         free_compat_arg_xlat(v);
@@ -351,9 +351,6 @@ int pv_domain_initialise(struct domain *d)
         goto fail;
 
     d->arch.ctxt_switch = &pv_csw;
-
-    /* 64-bit PV guest by default. */
-    d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
     d->arch.pv.xpti = is_hardware_domain(d) ? opt_xpti_hwdom : opt_xpti_domu;
 

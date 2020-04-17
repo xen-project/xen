@@ -98,8 +98,10 @@ void __dummy__(void)
     OFFSET(VCPU_nsvm_hap_enabled, struct vcpu, arch.hvm.nvcpu.u.nsvm.ns_hap_enabled);
     BLANK();
 
-    OFFSET(DOMAIN_is_32bit_pv, struct domain, arch.is_32bit_pv);
+#ifdef CONFIG_PV
+    OFFSET(DOMAIN_is_32bit_pv, struct domain, arch.pv.is_32bit);
     BLANK();
+#endif
 
     OFFSET(VCPUINFO_upcall_pending, struct vcpu_info, evtchn_upcall_pending);
     OFFSET(VCPUINFO_upcall_mask, struct vcpu_info, evtchn_upcall_mask);

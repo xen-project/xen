@@ -262,6 +262,8 @@ struct pv_domain
 
     atomic_t nr_l4_pages;
 
+    /* Is a 32-bit PV guest? */
+    bool is_32bit;
     /* XPTI active? */
     bool xpti;
     /* Use PCID feature? */
@@ -341,8 +343,6 @@ struct arch_domain
     /* NB. protected by d->event_lock and by irq_desc[irq].lock */
     struct radix_tree_root irq_pirq;
 
-    /* Is a 32-bit PV (non-HVM) guest? */
-    bool_t is_32bit_pv;
     /* Is shared-info page in 32-bit format? */
     bool_t has_32bit_shinfo;
 

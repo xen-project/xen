@@ -577,8 +577,8 @@ long arch_do_domctl(
             ret = -EOPNOTSUPP;
         else if ( is_pv_domain(d) )
         {
-            if ( ((domctl->u.address_size.size == 64) && !d->arch.is_32bit_pv) ||
-                 ((domctl->u.address_size.size == 32) && d->arch.is_32bit_pv) )
+            if ( ((domctl->u.address_size.size == 64) && !d->arch.pv.is_32bit) ||
+                 ((domctl->u.address_size.size == 32) &&  d->arch.pv.is_32bit) )
                 ret = 0;
             else if ( domctl->u.address_size.size == 32 )
                 ret = switch_compat(d);

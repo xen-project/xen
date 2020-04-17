@@ -302,6 +302,7 @@ void pv_ring3_init_hypercall_page(void *p)
     }
 }
 
+#ifdef CONFIG_PV32
 void pv_ring1_init_hypercall_page(void *p)
 {
     unsigned int i;
@@ -329,6 +330,7 @@ void pv_ring1_init_hypercall_page(void *p)
         *(u8  *)(p+ 7) = 0xc3;    /* ret */
     }
 }
+#endif
 
 /*
  * Local variables:
