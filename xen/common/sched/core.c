@@ -2484,19 +2484,15 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
 
         *lock = pcpu_schedule_lock_irq(cpu);
 
-        if ( unlikely(!scheduler_active) )
-        {
-            ASSERT(is_idle_unit(prev));
-            atomic_set(&prev->next_task->rendezvous_out_cnt, 0);
-            prev->rendezvous_in_cnt = 0;
-        }
-
         /*
          * Check for scheduling resource switched. This happens when we are
          * moved away from our cpupool and cpus are subject of the idle
          * scheduler now.
+         *
+         * This is also a bail out case when scheduler_disable() has been
+         * called.
          */
-        if ( unlikely(sr != get_sched_res(cpu)) )
+        if ( unlikely(sr != get_sched_res(cpu) || !scheduler_active) )
         {
             ASSERT(is_idle_unit(prev));
             atomic_set(&prev->next_task->rendezvous_out_cnt, 0);
