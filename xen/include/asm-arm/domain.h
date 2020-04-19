@@ -56,14 +56,7 @@ struct arch_domain
     struct vmmio vmmio;
 
     /* Continuable domain_relinquish_resources(). */
-    enum {
-        RELMEM_not_started,
-        RELMEM_tee,
-        RELMEM_xen,
-        RELMEM_page,
-        RELMEM_mapping,
-        RELMEM_done,
-    } relmem;
+    unsigned int rel_priv;
 
     struct {
         uint64_t offset;

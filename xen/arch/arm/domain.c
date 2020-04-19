@@ -674,7 +674,6 @@ int arch_domain_create(struct domain *d,
     int rc, count = 0;
 
     BUILD_BUG_ON(GUEST_MAX_VCPUS < MAX_VIRT_CPUS);
-    d->arch.relmem = RELMEM_not_started;
 
     /* Idle domains do not need this setup */
     if ( is_idle_domain(d) )
@@ -950,13 +949,41 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
     return ret;
 }
 
+/*
+ * Record the current progress. Subsequent hypercall continuations will
+ * logically restart work from this point.
+ *
+ * PROGRESS() markers must not be in the middle of loops. The loop
+ * variable isn't preserved accross a continuation.
+ *
+ * To avoid redundant work, there should be a marker before each
+ * function which may return -ERESTART.
+ */
+enum {
+    PROG_tee = 1,
+    PROG_xen,
+    PROG_page,
+    PROG_mapping,
+    PROG_done,
+};
+
+#define PROGRESS(x)                         \
+    d->arch.rel_priv = PROG_ ## x;          \
+    /* Fallthrough */                       \
+    case PROG_ ## x
+
 int domain_relinquish_resources(struct domain *d)
 {
     int ret = 0;
 
-    switch ( d->arch.relmem )
+    /*
+     * This hypercall can take minutes of wallclock time to complete.  This
+     * logic implements a co-routine, stashing state in struct domain across
+     * hypercall continuation boundaries.
+     */
+    switch ( d->arch.rel_priv )
     {
-    case RELMEM_not_started:
+    case 0:
         ret = iommu_release_dt_devices(d);
         if ( ret )
             return ret;
@@ -967,42 +994,27 @@ int domain_relinquish_resources(struct domain *d)
          */
         domain_vpl011_deinit(d);
 
-        d->arch.relmem = RELMEM_tee;
-        /* Fallthrough */
-
-    case RELMEM_tee:
+    PROGRESS(tee):
         ret = tee_relinquish_resources(d);
         if (ret )
             return ret;
 
-        d->arch.relmem = RELMEM_xen;
-        /* Fallthrough */
-
-    case RELMEM_xen:
+    PROGRESS(xen):
         ret = relinquish_memory(d, &d->xenpage_list);
         if ( ret )
             return ret;
 
-        d->arch.relmem = RELMEM_page;
-        /* Fallthrough */
-
-    case RELMEM_page:
+    PROGRESS(page):
         ret = relinquish_memory(d, &d->page_list);
         if ( ret )
             return ret;
 
-        d->arch.relmem = RELMEM_mapping;
-        /* Fallthrough */
-
-    case RELMEM_mapping:
+    PROGRESS(mapping):
         ret = relinquish_p2m_mapping(d);
         if ( ret )
             return ret;
 
-        d->arch.relmem = RELMEM_done;
-        /* Fallthrough */
-
-    case RELMEM_done:
+    PROGRESS(done):
         break;
 
     default:
@@ -1011,6 +1023,8 @@ int domain_relinquish_resources(struct domain *d)
 
     return 0;
 }
+
+#undef PROGRESS
 
 void arch_dump_domain_info(struct domain *d)
 {
