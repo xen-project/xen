@@ -297,6 +297,9 @@ static int enter_state(u32 state)
     ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_ist_wrmsr);
     spec_ctrl_exit_idle(ci);
 
+    /* (re)initialise SYSCALL/SYSENTER state, amongst other things. */
+    percpu_traps_init();
+
  done:
     spin_debug_enable();
     local_irq_restore(flags);
