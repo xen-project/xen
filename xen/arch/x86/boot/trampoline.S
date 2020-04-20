@@ -145,9 +145,9 @@ gdt_48:
 GLOBAL(trampoline_misc_enable_off)
         .quad   0
 
-/* EFER OR-mask for boot paths.  This gets adjusted with NX when available. */
+/* EFER OR-mask for boot paths.  SCE conditional on PV support, NX added when available. */
 GLOBAL(trampoline_efer)
-        .long   EFER_LME | EFER_SCE
+        .long   EFER_LME | (EFER_SCE * IS_ENABLED(CONFIG_PV))
 
 GLOBAL(trampoline_xen_phys_start)
         .long   0

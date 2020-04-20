@@ -238,9 +238,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
     /* Set system registers and transfer control. */
     asm volatile("pushq $0\n\tpopfq");
     rdmsrl(MSR_EFER, efer);
-    efer |= EFER_SCE;
-    if ( cpu_has_nx )
-        efer |= EFER_NX;
+    efer |= trampoline_efer;
     wrmsrl(MSR_EFER, efer);
     wrmsrl(MSR_IA32_CR_PAT, XEN_MSR_PAT);
     write_cr0(X86_CR0_PE | X86_CR0_MP | X86_CR0_ET | X86_CR0_NE | X86_CR0_WP |

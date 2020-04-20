@@ -496,6 +496,10 @@ static void vmx_vcpu_destroy(struct vcpu *v)
  */
 static void vmx_restore_host_msrs(void)
 {
+    /* No PV guests?  No need to restore host SYSCALL infrastructure. */
+    if ( !IS_ENABLED(CONFIG_PV) )
+        return;
+
     /* Relies on the SYSCALL trampoline being at the start of the stubs. */
     wrmsrl(MSR_STAR,         XEN_MSR_STAR);
     wrmsrl(MSR_LSTAR,        this_cpu(stubs.addr));
