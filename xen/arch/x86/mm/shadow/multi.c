@@ -2694,6 +2694,7 @@ static inline void trace_shadow_emulate_other(u32 event,
     }
 }
 
+#ifdef CONFIG_HVM
 #if GUEST_PAGING_LEVELS == 3
 static DEFINE_PER_CPU(guest_va_t,trace_emulate_initial_va);
 static DEFINE_PER_CPU(int,trace_extra_emulation_count);
@@ -2745,6 +2746,7 @@ static inline void trace_shadow_emulate(guest_l1e_t gl1e, unsigned long va)
         __trace_var(event, 0/*!tsc*/, sizeof(d), &d);
     }
 }
+#endif /* CONFIG_HVM */
 
 /**************************************************************************/
 /* Entry points into the shadow code */
@@ -4896,8 +4898,8 @@ const struct paging_mode sh_paging_mode = {
     .shadow.guess_wrmap            = sh_guess_wrmap,
 #endif
     .shadow.pagetable_dying        = sh_pagetable_dying,
-#endif /* CONFIG_HVM */
     .shadow.trace_emul_write_val   = trace_emulate_write_val,
+#endif /* CONFIG_HVM */
     .shadow.shadow_levels          = SHADOW_PAGING_LEVELS,
 };
 
