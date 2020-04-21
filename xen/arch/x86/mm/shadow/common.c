@@ -2376,7 +2376,6 @@ void sh_reset_l3_up_pointers(struct vcpu *v)
 static void sh_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    const struct paging_mode *old_mode = v->arch.paging.mode;
 
     ASSERT(paging_locked_by_me(d));
 
@@ -2421,11 +2420,11 @@ static void sh_update_paging_modes(struct vcpu *v)
     if ( v->arch.paging.mode )
         v->arch.paging.mode->shadow.detach_old_tables(v);
 
+#ifdef CONFIG_HVM
     if ( !is_pv_domain(d) )
     {
-        ///
-        /// HVM guest
-        ///
+        const struct paging_mode *old_mode = v->arch.paging.mode;
+
         ASSERT(shadow_mode_translate(d));
         ASSERT(shadow_mode_external(d));
 
@@ -2523,6 +2522,7 @@ static void sh_update_paging_modes(struct vcpu *v)
         //        different values for CR4.PSE and CR4.PGE at the same time.
         //        This *does* happen, at least for CR4.PGE...
     }
+#endif /* CONFIG_HVM */
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* We need to check that all the vcpus have paging enabled to
@@ -2703,7 +2703,6 @@ void shadow_teardown(struct domain *d, bool *preempted)
  * Should only be called for dying domains. */
 {
     struct vcpu *v;
-    mfn_t mfn;
     struct page_info *unpaged_pagetable = NULL;
 
     ASSERT(d->is_dying);
@@ -2719,13 +2718,16 @@ void shadow_teardown(struct domain *d, bool *preempted)
             if ( v->arch.paging.mode )
             {
                 v->arch.paging.mode->shadow.detach_old_tables(v);
+#ifdef CONFIG_HVM
                 if ( shadow_mode_external(d) )
                 {
-                    mfn = pagetable_get_mfn(v->arch.monitor_table);
+                    mfn_t mfn = pagetable_get_mfn(v->arch.monitor_table);
+
                     if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
                         v->arch.paging.mode->shadow.destroy_monitor_table(v, mfn);
                     v->arch.monitor_table = pagetable_null();
                 }
+#endif /* CONFIG_HVM */
             }
         }
     }

@@ -1515,7 +1515,7 @@ make_fl1_shadow(struct domain *d, gfn_t gfn)
 }
 
 
-#if SHADOW_PAGING_LEVELS == GUEST_PAGING_LEVELS
+#if SHADOW_PAGING_LEVELS == GUEST_PAGING_LEVELS && defined(CONFIG_HVM)
 mfn_t
 sh_make_monitor_table(struct vcpu *v)
 {
@@ -1965,7 +1965,7 @@ void sh_destroy_l1_shadow(struct domain *d, mfn_t smfn)
     shadow_free(d, smfn);
 }
 
-#if SHADOW_PAGING_LEVELS == GUEST_PAGING_LEVELS
+#if SHADOW_PAGING_LEVELS == GUEST_PAGING_LEVELS && defined(CONFIG_HVM)
 void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
 {
     struct domain *d = v->domain;
@@ -4881,8 +4881,10 @@ const struct paging_mode sh_paging_mode = {
     .shadow.write_guest_entry      = sh_write_guest_entry,
     .shadow.cmpxchg_guest_entry    = sh_cmpxchg_guest_entry,
 #endif
+#ifdef CONFIG_HVM
     .shadow.make_monitor_table     = sh_make_monitor_table,
     .shadow.destroy_monitor_table  = sh_destroy_monitor_table,
+#endif
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     .shadow.guess_wrmap            = sh_guess_wrmap,
 #endif
