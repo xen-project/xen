@@ -82,6 +82,8 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
            vmcb->cstar, vmcb->sfmask);
     printk("KernGSBase = 0x%016"PRIx64" PAT = 0x%016"PRIx64"\n",
            vmcb->kerngsbase, vmcb_get_g_pat(vmcb));
+    printk("SSP = 0x%016"PRIx64" S_CET = 0x%016"PRIx64" ISST = 0x%016"PRIx64"\n",
+           vmcb->_ssp, vmcb->_msr_s_cet, vmcb->_msr_isst);
     printk("H_CR3 = 0x%016"PRIx64" CleanBits = %#x\n",
            vmcb_get_h_cr3(vmcb), vmcb->cleanbits.raw);
 
