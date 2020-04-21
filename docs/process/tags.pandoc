@@ -1,0 +1,55 @@
+Tags: No line splitting
+-----------------------
+Do not split a tag across multiple lines, tags are exempt from the
+"wrap at 75 columns" rule in order to simplify parsing scripts.  For
+example:
+
+        Fixes: 67d01cdb5518 ("x86: infrastructure to allow converting certain indirect calls to direct ones")
+
+
+Fixes Tag
+---------
+
+If your patch fixes a bug in a specific commit, e.g. you found an issue using
+``git bisect``, please use the 'Fixes:' tag with the first 12 characters of
+the SHA-1 ID, and the one line summary.
+
+The following ``git config`` settings can be used to add a pretty format for
+outputting the above style in the ``git log`` or ``git show`` commands:
+
+        [core]
+                abbrev = 12
+        [pretty]
+                fixes = Fixes: %h (\"%s\")
+
+
+Backport Tag
+------------
+
+A backport tag is an optional tag in the commit message to request a
+given commit to be backported to the released trees:
+
+    Backport: 4.9+
+
+It marks a commit for being a candidate for backports to all released
+trees from 4.9 onward.
+
+The backport requester is expected to specify which currently supported
+releases need the backport; but encouraged to specify a release as far
+back as possible which applies. If the requester doesn't know the oldest
+affected tree, they are encouraged to append a comment like the
+following:
+
+    Backport: 4.9+ # maybe older
+
+Maintainers request the Backport tag to be added on commit. Contributors
+are welcome to mark their patches with the Backport tag when they deem
+appropriate. Maintainers will request for it to be removed when that is
+not the case.
+
+Please note that the Backport tag is a **request** for backport, which
+will still need to be evaluated by the maintainers. Maintainers might
+ask the requester to help with the backporting work if it is not
+trivial.
+
+When possible, please use the Fixes tag instead (or in addition).
