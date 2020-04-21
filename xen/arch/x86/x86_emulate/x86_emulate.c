@@ -6022,6 +6022,8 @@ x86_emulate(
 
             /* There's explicitly no RPL adjustment here. */
             sreg.sel = (msr_val >> 48) + 8;
+            /* But DPL needs adjustment, for the new CPL to be correct. */
+            sreg.dpl = 3;
         }
 
 #ifdef __x86_64__
