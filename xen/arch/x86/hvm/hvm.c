@@ -976,11 +976,12 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
 unsigned long hvm_cr4_guest_valid_bits(const struct domain *d)
 {
     const struct cpuid_policy *p = d->arch.cpuid;
-    bool mce, vmxe;
+    bool mce, vmxe, cet;
 
     /* Logic broken out simply to aid readability below. */
     mce  = p->basic.mce || p->basic.mca;
     vmxe = p->basic.vmx && nestedhvm_enabled(d);
+    cet  = p->feat.cet_ss || p->feat.cet_ibt;
 
     return ((p->basic.vme     ? X86_CR4_VME | X86_CR4_PVI : 0) |
             (p->basic.tsc     ? X86_CR4_TSD               : 0) |
@@ -999,7 +1000,8 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d)
             (p->basic.xsave   ? X86_CR4_OSXSAVE           : 0) |
             (p->feat.smep     ? X86_CR4_SMEP              : 0) |
             (p->feat.smap     ? X86_CR4_SMAP              : 0) |
-            (p->feat.pku      ? X86_CR4_PKE               : 0));
+            (p->feat.pku      ? X86_CR4_PKE               : 0) |
+            (cet              ? X86_CR4_CET               : 0));
 }
 
 static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
@@ -2289,6 +2291,12 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
         }
     }
 
+    if ( !(value & X86_CR0_WP) && (v->arch.hvm.guest_cr[4] & X86_CR4_CET) )
+    {
+        gprintk(XENLOG_DEBUG, "Trying to clear WP with CET set\n");
+        return X86EMUL_EXCEPTION;
+    }
+
     if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
     {
         if ( v->arch.hvm.guest_efer & EFER_LME )
@@ -2442,6 +2450,12 @@ int hvm_set_cr4(unsigned long value, bool may_defer)
                         "EFER.LMA is set");
             return X86EMUL_EXCEPTION;
         }
+    }
+
+    if ( (value & X86_CR4_CET) && !(v->arch.hvm.guest_cr[0] & X86_CR0_WP) )
+    {
+        gprintk(XENLOG_DEBUG, "Trying to set CET without WP\n");
+        return X86EMUL_EXCEPTION;
     }
 
     old_cr = v->arch.hvm.guest_cr[4];
