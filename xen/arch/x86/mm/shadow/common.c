@@ -38,6 +38,9 @@
 #include <xen/numa.h>
 #include "private.h"
 
+static int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
+                                            mfn_t smfn, unsigned long offset);
+
 DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
 static int sh_enable_log_dirty(struct domain *, bool log_global);
@@ -1999,8 +2002,8 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
 }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
-int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
-                                     mfn_t smfn, unsigned long off)
+static int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
+                                            mfn_t smfn, unsigned long off)
 {
     struct page_info *sp = mfn_to_page(smfn);
 
