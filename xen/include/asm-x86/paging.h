@@ -92,7 +92,6 @@
  * These shouldn't be used directly by callers; rather use the functions
  * below which will indirect through this table as appropriate. */
 
-struct sh_emulate_ctxt;
 struct shadow_paging_mode {
 #ifdef CONFIG_SHADOW_PAGING
     void          (*detach_old_tables     )(struct vcpu *v);
