@@ -1005,7 +1005,8 @@ static void shadow_blow_tables(struct domain *d)
 
 void shadow_blow_tables_per_domain(struct domain *d)
 {
-    if ( shadow_mode_enabled(d) && d->vcpu != NULL && d->vcpu[0] != NULL ) {
+    if ( shadow_mode_enabled(d) && domain_vcpu(d, 0) )
+    {
         paging_lock(d);
         shadow_blow_tables(d);
         paging_unlock(d);
@@ -1022,14 +1023,7 @@ static void shadow_blow_all_tables(unsigned char c)
     printk("'%c' pressed -> blowing all shadow tables\n", c);
     rcu_read_lock(&domlist_read_lock);
     for_each_domain(d)
-    {
-        if ( shadow_mode_enabled(d) && d->vcpu != NULL && d->vcpu[0] != NULL )
-        {
-            paging_lock(d);
-            shadow_blow_tables(d);
-            paging_unlock(d);
-        }
-    }
+        shadow_blow_tables_per_domain(d);
     rcu_read_unlock(&domlist_read_lock);
 }
 
