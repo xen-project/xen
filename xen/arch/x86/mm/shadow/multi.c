@@ -2764,8 +2764,10 @@ static int sh_page_fault(struct vcpu *v,
     mfn_t gmfn, sl1mfn = _mfn(0);
     shadow_l1e_t sl1e, *ptr_sl1e;
     paddr_t gpa;
+#ifdef CONFIG_HVM
     struct sh_emulate_ctxt emul_ctxt;
     const struct x86_emulate_ops *emul_ops;
+#endif
     int r;
     p2m_type_t p2mt;
     uint32_t rc, error_code;
@@ -3253,7 +3255,13 @@ static int sh_page_fault(struct vcpu *v,
      * caught by user-mode page-table check above.
      */
  emulate_readonly:
+    if ( !is_hvm_domain(d) )
+    {
+        ASSERT_UNREACHABLE();
+        goto not_a_shadow_fault;
+    }
 
+#ifdef CONFIG_HVM
     /* Unshadow if we are writing to a toplevel pagetable that is
      * flagged as a dying process, and that is not currently used. */
     if ( sh_mfn_is_a_page_table(gmfn) && is_hvm_domain(d) &&
@@ -3302,31 +3310,28 @@ static int sh_page_fault(struct vcpu *v,
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
  early_emulation:
 #endif
-    if ( is_hvm_domain(d) )
+    /*
+     * If we are in the middle of injecting an exception or interrupt then
+     * we should not emulate: the fault is a side effect of the processor
+     * trying to deliver the exception (e.g. IDT/GDT accesses, pushing the
+     * exception frame onto the stack).  Furthermore it is almost
+     * certainly the case the handler stack is currently considered to be
+     * a page table, so we should unshadow the faulting page before
+     * exiting.
+     */
+    if ( unlikely(hvm_event_pending(v)) )
     {
-        /*
-         * If we are in the middle of injecting an exception or interrupt then
-         * we should not emulate: the fault is a side effect of the processor
-         * trying to deliver the exception (e.g. IDT/GDT accesses, pushing the
-         * exception frame onto the stack).  Furthermore it is almost
-         * certainly the case the handler stack is currently considered to be
-         * a page table, so we should unshadow the faulting page before
-         * exiting.
-         */
-        if ( unlikely(hvm_event_pending(v)) )
-        {
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
-            if ( fast_emul )
-            {
-                perfc_incr(shadow_fault_fast_emulate_fail);
-                v->arch.paging.last_write_emul_ok = 0;
-            }
-#endif
-            sh_remove_shadows(d, gmfn, 0 /* thorough */, 1 /* must succeed */);
-            trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ,
-                                       va, gfn);
-            return EXCRET_fault_fixed;
+        if ( fast_emul )
+        {
+            perfc_incr(shadow_fault_fast_emulate_fail);
+            v->arch.paging.last_write_emul_ok = 0;
         }
+#endif
+        sh_remove_shadows(d, gmfn, 0 /* thorough */, 1 /* must succeed */);
+        trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ,
+                                   va, gfn);
+        return EXCRET_fault_fixed;
     }
 
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", regs->rip, regs->rsp);
@@ -3334,11 +3339,8 @@ static int sh_page_fault(struct vcpu *v,
     emul_ops = shadow_init_emulation(&emul_ctxt, regs, GUEST_PTE_SIZE);
 
     r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
-
-#ifdef CONFIG_HVM
     if ( r == X86EMUL_EXCEPTION )
     {
-        ASSERT(is_hvm_domain(d));
         /*
          * This emulation covers writes to shadow pagetables.  We tolerate #PF
          * (from accesses spanning pages, concurrent paging updated from
@@ -3360,7 +3362,6 @@ static int sh_page_fault(struct vcpu *v,
             r = X86EMUL_UNHANDLEABLE;
         }
     }
-#endif
 
     /*
      * NB. We do not unshadow on X86EMUL_EXCEPTION. It's not clear that it
@@ -3466,6 +3467,7 @@ static int sh_page_fault(struct vcpu *v,
  emulate_done:
     SHADOW_PRINTK("emulated\n");
     return EXCRET_fault_fixed;
+#endif /* CONFIG_HVM */
 
  mmio:
     if ( !guest_mode(regs) )
@@ -4166,7 +4168,9 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 int sh_rm_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
                                  mfn_t smfn, unsigned long off)
 {
+#ifdef CONFIG_HVM
     struct vcpu *curr = current;
+#endif
     int r;
     shadow_l1e_t *sl1p, sl1e;
     struct page_info *sp;
@@ -4174,10 +4178,12 @@ int sh_rm_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
     ASSERT(mfn_valid(gmfn));
     ASSERT(mfn_valid(smfn));
 
+#ifdef CONFIG_HVM
     /* Remember if we've been told that this process is being torn down */
     if ( curr->domain == d && is_hvm_domain(d) )
         curr->arch.paging.shadow.pagetable_dying
             = mfn_to_page(gmfn)->pagetable_dying;
+#endif
 
     sp = mfn_to_page(smfn);
 
@@ -4433,6 +4439,7 @@ int sh_remove_l3_shadow(struct domain *d, mfn_t sl4mfn, mfn_t sl3mfn)
 }
 #endif /* 64bit guest */
 
+#ifdef CONFIG_HVM
 /**************************************************************************/
 /* Function for the guest to inform us that a process is being torn
  * down.  We remember that as a hint to unshadow its pagetables soon,
@@ -4554,6 +4561,7 @@ static void sh_pagetable_dying(paddr_t gpa)
     put_gfn(d, gpa >> PAGE_SHIFT);
 }
 #endif
+#endif /* CONFIG_HVM */
 
 /**************************************************************************/
 /* Audit tools */
@@ -4887,8 +4895,8 @@ const struct paging_mode sh_paging_mode = {
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     .shadow.guess_wrmap            = sh_guess_wrmap,
 #endif
-#endif /* CONFIG_HVM */
     .shadow.pagetable_dying        = sh_pagetable_dying,
+#endif /* CONFIG_HVM */
     .shadow.trace_emul_write_val   = trace_emulate_write_val,
     .shadow.shadow_levels          = SHADOW_PAGING_LEVELS,
 };

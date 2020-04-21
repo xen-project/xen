@@ -66,7 +66,11 @@ extern int shadow_audit_enable;
 #define SHOPT_FAST_EMULATION      0x80  /* Fast write emulation */
 #define SHOPT_OUT_OF_SYNC        0x100  /* Allow guest writes to L1 PTs */
 
+#ifdef CONFIG_HVM
 #define SHADOW_OPTIMIZATIONS     0x1ff
+#else
+#define SHADOW_OPTIMIZATIONS     (0x1ff & ~SHOPT_FAST_EMULATION)
+#endif
 
 
 /******************************************************************************
@@ -716,26 +720,11 @@ struct sh_emulate_ctxt {
 #endif
 };
 
-#ifdef CONFIG_HVM
 const struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs,
     unsigned int pte_size);
 void shadow_continue_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
-#else
-static inline const struct x86_emulate_ops *shadow_init_emulation(
-    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs,
-    unsigned int pte_size)
-{
-    BUG();
-    return NULL;
-}
-static inline void shadow_continue_emulation(
-    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
-{
-    BUG();
-}
-#endif
 
 /* Stop counting towards early unshadows, as we've seen a real page fault */
 static inline void sh_reset_early_unshadow(struct vcpu *v)

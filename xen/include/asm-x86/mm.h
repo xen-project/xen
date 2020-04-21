@@ -287,7 +287,9 @@ struct page_info
          */
         struct {
             uint16_t shadow_flags;
+#ifdef CONFIG_HVM
             bool pagetable_dying;
+#endif
         };
 
         /* When in use as a shadow, next shadow in this hash chain. */

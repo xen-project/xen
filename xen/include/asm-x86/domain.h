@@ -117,8 +117,10 @@ struct shadow_domain {
     /* OOS */
     bool_t oos_active;
 
+#ifdef CONFIG_HVM
     /* Has this domain ever used HVMOP_pagetable_dying? */
     bool_t pagetable_dying_op;
+#endif
 
 #ifdef CONFIG_PV
     /* PV L1 Terminal Fault mitigation. */
@@ -137,10 +139,12 @@ struct shadow_vcpu {
     unsigned long last_emulated_mfn_for_unshadow;
     /* MFN of the last shadow that we shot a writeable mapping in */
     unsigned long last_writeable_pte_smfn;
+#ifdef CONFIG_HVM
     /* Last frame number that we emulated a write to. */
     unsigned long last_emulated_frame;
     /* Last MFN that we emulated a write successfully */
     unsigned long last_emulated_mfn;
+#endif
 
     /* Shadow out-of-sync: pages that this vcpu has let go out of sync */
     mfn_t oos[SHADOW_OOS_PAGES];
@@ -151,7 +155,9 @@ struct shadow_vcpu {
         unsigned long off[SHADOW_OOS_FIXUPS];
     } oos_fixup[SHADOW_OOS_PAGES];
 
+#ifdef CONFIG_HVM
     bool_t pagetable_dying;
+#endif
 #endif
 };
 
@@ -225,10 +231,12 @@ struct paging_vcpu {
     const struct paging_mode *mode;
     /* Nested Virtualization: paging mode of nested guest */
     const struct paging_mode *nestedmode;
+#ifdef CONFIG_HVM
     /* HVM guest: last emulate was to a pagetable */
     unsigned int last_write_was_pt:1;
     /* HVM guest: last write emulation succeeds */
     unsigned int last_write_emul_ok:1;
+#endif
     /* Translated guest: virtual TLB */
     struct shadow_vtlb *vtlb;
     spinlock_t          vtlb_lock;

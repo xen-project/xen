@@ -66,7 +66,9 @@ int shadow_domain_init(struct domain *d)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     d->arch.paging.shadow.oos_active = 0;
 #endif
+#ifdef CONFIG_HVM
     d->arch.paging.shadow.pagetable_dying_op = 0;
+#endif
 
     return 0;
 }
@@ -690,8 +692,10 @@ void shadow_promote(struct domain *d, mfn_t gmfn, unsigned int type)
     if ( !test_and_set_bit(_PGC_page_table, &page->count_info) )
     {
         page->shadow_flags = 0;
+#ifdef CONFIG_HVM
         if ( is_hvm_domain(d) )
             page->pagetable_dying = false;
+#endif
     }
 
     ASSERT(!(page->shadow_flags & (1u << type)));

@@ -851,6 +851,7 @@ int paging_enable(struct domain *d, u32 mode)
         return shadow_enable(d, mode);
 }
 
+#ifdef CONFIG_HVM
 /* Called from the guest to indicate that a process is being torn down
  * and therefore its pagetables will soon be discarded */
 void pagetable_dying(paddr_t gpa)
@@ -865,6 +866,7 @@ void pagetable_dying(paddr_t gpa)
     BUG();
 #endif
 }
+#endif /* CONFIG_HVM */
 
 /* Print paging-assistance info to the console */
 void paging_dump_domain_info(struct domain *d)
