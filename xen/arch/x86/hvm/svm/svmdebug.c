@@ -83,7 +83,7 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
     printk("KernGSBase = 0x%016"PRIx64" PAT = 0x%016"PRIx64"\n",
            vmcb->kerngsbase, vmcb_get_g_pat(vmcb));
     printk("H_CR3 = 0x%016"PRIx64" CleanBits = %#x\n",
-           vmcb_get_h_cr3(vmcb), vmcb->cleanbits.bytes);
+           vmcb_get_h_cr3(vmcb), vmcb->cleanbits.raw);
 
     /* print out all the selectors */
     printk("       sel attr  limit   base\n");

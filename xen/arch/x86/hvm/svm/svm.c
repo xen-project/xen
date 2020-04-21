@@ -345,7 +345,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     else
         vmcb->event_inj.raw = 0;
 
-    vmcb->cleanbits.bytes = 0;
+    vmcb->cleanbits.raw = 0;
     paging_update_paging_modes(v);
 
     return 0;
@@ -693,12 +693,12 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     case x86_seg_ds:
     case x86_seg_es:
     case x86_seg_ss: /* cpl */
-        vmcb->cleanbits.fields.seg = 0;
+        vmcb->cleanbits.seg = false;
         break;
 
     case x86_seg_gdtr:
     case x86_seg_idtr:
-        vmcb->cleanbits.fields.dt = 0;
+        vmcb->cleanbits.dt = false;
         break;
 
     case x86_seg_fs:
@@ -980,7 +980,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_restore_dr(v);
 
     svm_vmsave_pa(per_cpu(host_vmcb, cpu));
-    vmcb->cleanbits.bytes = 0;
+    vmcb->cleanbits.raw = 0;
     svm_tsc_ratio_load(v);
 
     if ( cpu_has_msr_tsc_aux )
@@ -2594,7 +2594,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     hvm_maybe_deassert_evtchn_irq();
 
-    vmcb->cleanbits.bytes = cpu_has_svm_cleanbits ? ~0u : 0u;
+    vmcb->cleanbits.raw = ~0u;
 
     /* Event delivery caused this intercept? Queue for redelivery. */
     if ( unlikely(vmcb->exit_int_info.v) &&

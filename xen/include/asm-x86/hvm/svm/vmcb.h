@@ -384,34 +384,21 @@ typedef union
 
 typedef union
 {
-    uint32_t bytes;
-    struct
-    {
-        /* cr_intercepts, dr_intercepts, exception_intercepts,
-         * general{1,2}_intercepts, pause_filter_count, tsc_offset */
-        uint32_t intercepts: 1;
-        /* iopm_base_pa, msrpm_base_pa */
-        uint32_t iopm: 1;
-        /* guest_asid */
-        uint32_t asid: 1;
-        /* vintr */
-        uint32_t tpr: 1;
-        /* np_enable, h_cr3, g_pat */
-        uint32_t np: 1;
-        /* cr0, cr3, cr4, efer */
-        uint32_t cr: 1;
-        /* dr6, dr7 */
-        uint32_t dr: 1;
-        /* gdtr, idtr */
-        uint32_t dt: 1;
-        /* cs, ds, es, ss, cpl */
-        uint32_t seg: 1;
-        /* cr2 */
-        uint32_t cr2: 1;
-        /* debugctlmsr, last{branch,int}{to,from}ip */
-        uint32_t lbr: 1;
-        uint32_t resv: 21;
-    } fields;
+    struct {
+        bool intercepts:1; /* 0:  cr/dr/exception/general intercepts,
+                            *     pause_filter_count, tsc_offset */
+        bool iopm:1;       /* 1:  iopm_base_pa, msrpm_base_pa */
+        bool asid:1;       /* 2:  guest_asid */
+        bool tpr:1;        /* 3:  vintr */
+        bool np:1;         /* 4:  np_enable, h_cr3, g_pat */
+        bool cr:1;         /* 5:  cr0, cr3, cr4, efer */
+        bool dr:1;         /* 6:  dr6, dr7 */
+        bool dt:1;         /* 7:  gdtr, idtr */
+        bool seg:1;        /* 8:  cs, ds, es, ss, cpl */
+        bool cr2:1;        /* 9:  cr2 */
+        bool lbr:1;        /* 10: debugctlmsr, last{branch,int}{to,from}ip */
+    };
+    uint32_t raw;
 } vmcbcleanbits_t;
 
 #define IOPM_SIZE   (12 * 1024)
@@ -604,7 +591,7 @@ vmcb_set_ ## name(struct vmcb_struct *vmcb,       \
                   type value)                     \
 {                                                 \
     vmcb->_ ## name = value;                      \
-    vmcb->cleanbits.fields.cleanbit = 0;          \
+    vmcb->cleanbits.cleanbit = false;             \
 }                                                 \
 static inline type                                \
 vmcb_get_ ## name(const struct vmcb_struct *vmcb) \
