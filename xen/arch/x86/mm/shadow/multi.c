@@ -4212,7 +4212,7 @@ int sh_rm_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
 }
 #endif /* OOS */
 
-#if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
+#if defined(CONFIG_HVM) && (SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC)
 static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
 /* Look up this vaddr in the current shadow and see if it's a writeable
  * mapping of this gmfn.  If so, remove it.  Returns 1 if it worked. */
@@ -4884,10 +4884,10 @@ const struct paging_mode sh_paging_mode = {
 #ifdef CONFIG_HVM
     .shadow.make_monitor_table     = sh_make_monitor_table,
     .shadow.destroy_monitor_table  = sh_destroy_monitor_table,
-#endif
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     .shadow.guess_wrmap            = sh_guess_wrmap,
 #endif
+#endif /* CONFIG_HVM */
     .shadow.pagetable_dying        = sh_pagetable_dying,
     .shadow.trace_emul_write_val   = trace_emulate_write_val,
     .shadow.shadow_levels          = SHADOW_PAGING_LEVELS,

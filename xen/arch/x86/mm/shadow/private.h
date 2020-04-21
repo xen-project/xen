@@ -359,6 +359,7 @@ void sh_install_xen_entries_in_l4(struct domain *, mfn_t gl4mfn, mfn_t sl4mfn);
 /* Update the shadows in response to a pagetable write from Xen */
 int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
 
+#ifdef CONFIG_HVM
 /* Remove all writeable mappings of a guest frame from the shadows.
  * Returns non-zero if we need to flush TLBs.
  * level and fault_addr desribe how we found this to be a pagetable;
@@ -366,6 +367,15 @@ int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
 extern int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
                                   unsigned int level,
                                   unsigned long fault_addr);
+#else
+static inline int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
+                                         unsigned int level,
+                                         unsigned long fault_addr)
+{
+    ASSERT(!shadow_mode_refcounts(d));
+    return 0;
+}
+#endif
 
 /* Functions that atomically write PT/P2M entries and update state */
 int shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,

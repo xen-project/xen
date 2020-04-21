@@ -1769,6 +1769,7 @@ static inline void trace_shadow_wrmap_bf(mfn_t gmfn)
     }
 }
 
+#ifdef CONFIG_HVM
 /**************************************************************************/
 /* Remove all writeable mappings of a guest frame from the shadow tables
  * Returns non-zero if we need to flush TLBs.
@@ -2000,6 +2001,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
     /* We killed at least one writeable mapping, so must flush TLBs. */
     return 1;
 }
+#endif /* CONFIG_HVM */
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
 static int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
