@@ -28,8 +28,39 @@ ENTRY(__high_start)
         lretq
 1:
         test    %ebx,%ebx
-        jnz     start_secondary
+        jz      .L_bsp
 
+        /* APs.  Set up shadow stacks before entering C. */
+
+        testl   $cpufeat_mask(X86_FEATURE_XEN_SHSTK), \
+                CPUINFO_FEATURE_OFFSET(X86_FEATURE_XEN_SHSTK) + boot_cpu_data(%rip)
+        je      .L_ap_shstk_done
+
+        /* Set up MSR_S_CET. */
+        mov     $MSR_S_CET, %ecx
+        xor     %edx, %edx
+        mov     $CET_SHSTK_EN | CET_WRSS_EN, %eax
+        wrmsr
+
+        /* Derive MSR_PL0_SSP from %rsp (token written when stack is allocated). */
+        mov     $MSR_PL0_SSP, %ecx
+        mov     %rsp, %rdx
+        shr     $32, %rdx
+        mov     %esp, %eax
+        and     $~(STACK_SIZE - 1), %eax
+        or      $(PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8, %eax
+        wrmsr
+
+        /* Enable CET.  MSR_INTERRUPT_SSP_TABLE is set up later in load_system_tables(). */
+        mov     $XEN_MINIMAL_CR4 | X86_CR4_CET, %ecx
+        mov     %rcx, %cr4
+        setssbsy
+
+.L_ap_shstk_done:
+        call    start_secondary
+        BUG     /* start_secondary() shouldn't return. */
+
+.L_bsp:
         /* Pass off the Multiboot info structure to C land (if applicable). */
         mov     multiboot_ptr(%rip),%edi
         call    __start_xen

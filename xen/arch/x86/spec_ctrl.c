@@ -882,6 +882,14 @@ void __init init_speculation_mitigations(void)
     hw_smt_enabled = check_smt_enabled();
 
     /*
+     * First, disable the use of retpolines if Xen is using shadow stacks, as
+     * they are incompatible.
+     */
+    if ( cpu_has_xen_shstk &&
+         (opt_thunk == THUNK_DEFAULT || opt_thunk == THUNK_RETPOLINE) )
+        thunk = THUNK_JMP;
+
+    /*
      * Has the user specified any custom BTI mitigations?  If so, follow their
      * instructions exactly and disable all heuristics.
      */

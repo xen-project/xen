@@ -329,6 +329,11 @@ void __init early_cpu_init(void)
 	       x86_cpuid_vendor_to_str(c->x86_vendor), c->x86, c->x86,
 	       c->x86_model, c->x86_model, c->x86_mask, eax);
 
+	if (c->cpuid_level >= 7) {
+		cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
+		c->x86_capability[cpufeat_word(X86_FEATURE_CET_SS)] = ecx;
+	}
+
 	eax = cpuid_eax(0x80000000);
 	if ((eax >> 16) == 0x8000 && eax >= 0x80000008) {
 		eax = cpuid_eax(0x80000008);

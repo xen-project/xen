@@ -287,6 +287,10 @@ call/jmp COP/JOP) attacks.
     `cet=no-shstk` will cause Xen not to use Shadow Stacks even when support
     is available in hardware.
 
+    Shadow Stacks are incompatible with 32bit PV guests.  This option will
+    override the `pv=32` boolean to false.  Backwards compatibility can be
+    maintained with the `pv-shim` mechanism.
+
 ### clocksource (x86)
 > `= pit | hpet | acpi | tsc`
 
@@ -1725,6 +1729,10 @@ Controls for aspects of PV guest support.
 
 *   The `32` boolean controls whether 32bit PV guests can be created.  It
     defaults to `true`, and is ignored when `CONFIG_PV32` is compiled out.
+
+    32bit PV guests are incompatible with CET Shadow Stacks.  If Xen is using
+    shadow stacks, this option will be overridden to `false`.  Backwards
+    compatibility can be maintained with the `pv-shim` mechanism.
 
 ### pv-linear-pt (x86)
 > `= <boolean>`

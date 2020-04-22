@@ -664,6 +664,14 @@ static void __init noreturn reinit_bsp_stack(void)
     stack_base[0] = stack;
     memguard_guard_stack(stack);
 
+    if ( cpu_has_xen_shstk )
+    {
+        wrmsrl(MSR_PL0_SSP,
+               (unsigned long)stack + (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8);
+        wrmsrl(MSR_S_CET, CET_SHSTK_EN | CET_WRSS_EN);
+        asm volatile ("setssbsy" ::: "memory");
+    }
+
     reset_stack_and_jump_nolp(init_done);
 }
 
@@ -1064,6 +1072,21 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     /* This must come before e820 code because it sets paddr_bits. */
     early_cpu_init();
+
+    /* Choose shadow stack early, to set infrastructure up appropriately. */
+    if ( opt_xen_shstk && boot_cpu_has(X86_FEATURE_CET_SS) )
+    {
+        printk("Enabling Supervisor Shadow Stacks\n");
+
+        setup_force_cpu_cap(X86_FEATURE_XEN_SHSTK);
+#ifdef CONFIG_PV32
+        if ( opt_pv32 )
+        {
+            opt_pv32 = 0;
+            printk("  - Disabling PV32 due to Shadow Stacks\n");
+        }
+#endif
+    }
 
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = raw_max_page = init_e820(memmap_type, &e820_raw);
@@ -1800,6 +1823,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     do_presmp_initcalls();
 
     alternative_branches();
+
+    /* Defer CR4.CET until alternatives have finished playing with CR0.WP */
+    if ( cpu_has_xen_shstk )
+        set_in_cr4(X86_CR4_CET);
 
     /*
      * NB: when running as a PV shim VCPUOP_up/down is wired to the shim
