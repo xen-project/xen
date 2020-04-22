@@ -37,11 +37,6 @@ CHECK_TYPE(capabilities_info);
 
 CHECK_TYPE(domain_handle);
 
-#ifdef COMPAT_VM_ASSIST_VALID
-#undef VM_ASSIST_VALID
-#define VM_ASSIST_VALID COMPAT_VM_ASSIST_VALID
-#endif
-
 #define DO(fn) int compat_##fn
 #define COMPAT
 
