@@ -932,6 +932,9 @@ int arch_set_info_guest(
         }
     }
 
+    if ( v->vcpu_id == 0 && (c(vm_assist) & ~arch_vm_assist_valid_mask(d)) )
+        return -EINVAL;
+
     if ( is_hvm_domain(d) )
     {
         for ( i = 0; i < ARRAY_SIZE(v->arch.dr); ++i )
