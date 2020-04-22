@@ -1756,6 +1756,7 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn)
     }
 }
 
+#ifdef CONFIG_HVM
 static inline void trace_shadow_wrmap_bf(mfn_t gmfn)
 {
     if ( tb_init_done )
@@ -1767,7 +1768,6 @@ static inline void trace_shadow_wrmap_bf(mfn_t gmfn)
     }
 }
 
-#ifdef CONFIG_HVM
 /**************************************************************************/
 /* Remove all writeable mappings of a guest frame from the shadow tables
  * Returns non-zero if we need to flush TLBs.
