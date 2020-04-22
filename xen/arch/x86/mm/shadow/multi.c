@@ -3680,20 +3680,7 @@ sh_update_linear_entries(struct vcpu *v)
 {
     struct domain *d = v->domain;
 
-    /* Linear pagetables in PV guests
-     * ------------------------------
-     *
-     * Guest linear pagetables, which map the guest pages, are at
-     * LINEAR_PT_VIRT_START.  Shadow linear pagetables, which map the
-     * shadows, are at SH_LINEAR_PT_VIRT_START.  Most of the time these
-     * are set up at shadow creation time, but (of course!) the PAE case
-     * is subtler.  Normal linear mappings are made by having an entry
-     * in the top-level table that points to itself (shadow linear) or
-     * to the guest top-level table (guest linear).  For PAE, to set up
-     * a linear map requires us to copy the four top-level entries into
-     * level-2 entries.  That means that every time we change a PAE l3e,
-     * we need to reflect the change into the copy.
-     *
+    /*
      * Linear pagetables in HVM guests
      * -------------------------------
      *
@@ -3711,34 +3698,30 @@ sh_update_linear_entries(struct vcpu *v)
      */
 
     /* Don't try to update the monitor table if it doesn't exist */
-    if ( shadow_mode_external(d)
-         && pagetable_get_pfn(v->arch.monitor_table) == 0 )
+    if ( !shadow_mode_external(d) ||
+         pagetable_get_pfn(v->arch.monitor_table) == 0 )
         return;
 
 #if SHADOW_PAGING_LEVELS == 4
 
-    /* For PV, one l4e points at the guest l4, one points at the shadow
-     * l4.  No maintenance required.
-     * For HVM, just need to update the l4e that points to the shadow l4. */
+    /* For HVM, just need to update the l4e that points to the shadow l4. */
 
-    if ( shadow_mode_external(d) )
+    /* Use the linear map if we can; otherwise make a new mapping */
+    if ( v == current )
     {
-        /* Use the linear map if we can; otherwise make a new mapping */
-        if ( v == current )
-        {
-            __linear_l4_table[l4_linear_offset(SH_LINEAR_PT_VIRT_START)] =
-                l4e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
-                             __PAGE_HYPERVISOR_RW);
-        }
-        else
-        {
-            l4_pgentry_t *ml4e;
-            ml4e = map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
-            ml4e[l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
-                l4e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
-                             __PAGE_HYPERVISOR_RW);
-            unmap_domain_page(ml4e);
-        }
+        __linear_l4_table[l4_linear_offset(SH_LINEAR_PT_VIRT_START)] =
+            l4e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
+                         __PAGE_HYPERVISOR_RW);
+    }
+    else
+    {
+        l4_pgentry_t *ml4e;
+
+        ml4e = map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
+        ml4e[l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
+            l4e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
+                         __PAGE_HYPERVISOR_RW);
+        unmap_domain_page(ml4e);
     }
 
 #elif SHADOW_PAGING_LEVELS == 3
@@ -3752,7 +3735,6 @@ sh_update_linear_entries(struct vcpu *v)
      * the shadows.
      */
 
-    ASSERT(shadow_mode_external(d));
     {
         /* Install copies of the shadow l3es into the monitor l2 table
          * that maps SH_LINEAR_PT_VIRT_START. */
@@ -3803,20 +3785,16 @@ sh_update_linear_entries(struct vcpu *v)
 #error this should not happen
 #endif
 
-    if ( shadow_mode_external(d) )
-    {
-        /*
-         * Having modified the linear pagetable mapping, flush local host TLBs.
-         * This was not needed when vmenter/vmexit always had the side effect
-         * of flushing host TLBs but, with ASIDs, it is possible to finish
-         * this CR3 update, vmenter the guest, vmexit due to a page fault,
-         * without an intervening host TLB flush. Then the page fault code
-         * could use the linear pagetable to read a top-level shadow page
-         * table entry. But, without this change, it would fetch the wrong
-         * value due to a stale TLB.
-         */
-        flush_tlb_local();
-    }
+    /*
+     * Having modified the linear pagetable mapping, flush local host TLBs.
+     * This was not needed when vmenter/vmexit always had the side effect of
+     * flushing host TLBs but, with ASIDs, it is possible to finish this CR3
+     * update, vmenter the guest, vmexit due to a page fault, without an
+     * intervening host TLB flush. Then the page fault code could use the
+     * linear pagetable to read a top-level shadow page table entry. But,
+     * without this change, it would fetch the wrong value due to a stale TLB.
+     */
+    flush_tlb_local();
 }
 
 
