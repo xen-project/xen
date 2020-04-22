@@ -3626,12 +3626,12 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(cflush, count)) )
             goto out;
         rc = gnttab_cache_flush(cflush, &opaque_in, count);
-        if ( rc > 0 )
+        if ( rc >= 0 )
         {
             guest_handle_add_offset(cflush, rc);
             uop = guest_handle_cast(cflush, void);
+            opaque_out = opaque_in;
         }
-        opaque_out = opaque_in;
         break;
     }
 
@@ -3641,7 +3641,7 @@ do_grant_table_op(
     }
 
   out:
-    if ( rc > 0 || opaque_out != 0 )
+    if ( rc > 0 || (opaque_out != 0 && rc == 0) )
     {
         /* Adjust rc, see gnttab_copy() for why this is needed. */
         if ( cmd == GNTTABOP_copy )
