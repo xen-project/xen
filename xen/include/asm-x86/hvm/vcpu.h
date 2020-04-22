@@ -176,6 +176,9 @@ struct hvm_vcpu {
         uint16_t p2midx;
     } fast_single_step;
 
+    /* (MFN) hypervisor page table */
+    pagetable_t         monitor_table;
+
     struct hvm_vcpu_asid n1asid;
 
     u64                 msr_tsc_adjust;

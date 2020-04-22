@@ -2465,10 +2465,10 @@ static void sh_update_paging_modes(struct vcpu *v)
                 &SHADOW_INTERNAL_NAME(sh_paging_mode, 2);
         }
 
-        if ( pagetable_is_null(v->arch.monitor_table) )
+        if ( pagetable_is_null(v->arch.hvm.monitor_table) )
         {
             mfn_t mmfn = v->arch.paging.mode->shadow.make_monitor_table(v);
-            v->arch.monitor_table = pagetable_from_mfn(mmfn);
+            v->arch.hvm.monitor_table = pagetable_from_mfn(mmfn);
             make_cr3(v, mmfn);
             hvm_update_host_cr3(v);
         }
@@ -2502,10 +2502,10 @@ static void sh_update_paging_modes(struct vcpu *v)
                     return;
                 }
 
-                old_mfn = pagetable_get_mfn(v->arch.monitor_table);
-                v->arch.monitor_table = pagetable_null();
+                old_mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
+                v->arch.hvm.monitor_table = pagetable_null();
                 new_mfn = v->arch.paging.mode->shadow.make_monitor_table(v);
-                v->arch.monitor_table = pagetable_from_mfn(new_mfn);
+                v->arch.hvm.monitor_table = pagetable_from_mfn(new_mfn);
                 SHADOW_PRINTK("new monitor table %"PRI_mfn "\n",
                                mfn_x(new_mfn));
 
@@ -2724,11 +2724,11 @@ void shadow_teardown(struct domain *d, bool *preempted)
 #ifdef CONFIG_HVM
                 if ( shadow_mode_external(d) )
                 {
-                    mfn_t mfn = pagetable_get_mfn(v->arch.monitor_table);
+                    mfn_t mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
 
                     if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
                         v->arch.paging.mode->shadow.destroy_monitor_table(v, mfn);
-                    v->arch.monitor_table = pagetable_null();
+                    v->arch.hvm.monitor_table = pagetable_null();
                 }
 #endif /* CONFIG_HVM */
             }

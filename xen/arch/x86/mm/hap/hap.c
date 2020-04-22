@@ -393,7 +393,7 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
     l4_pgentry_t *l4e;
     mfn_t m4mfn;
 
-    ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
+    ASSERT(pagetable_get_pfn(v->arch.hvm.monitor_table) == 0);
 
     if ( (pg = hap_alloc(d)) == NULL )
         goto oom;
@@ -579,10 +579,10 @@ void hap_teardown(struct domain *d, bool *preempted)
         {
             if ( paging_get_hostmode(v) && paging_mode_external(d) )
             {
-                mfn = pagetable_get_mfn(v->arch.monitor_table);
+                mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
                 if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
                     hap_destroy_monitor_table(v, mfn);
-                v->arch.monitor_table = pagetable_null();
+                v->arch.hvm.monitor_table = pagetable_null();
             }
         }
     }
@@ -758,10 +758,10 @@ static void hap_update_paging_modes(struct vcpu *v)
 
     v->arch.paging.mode = hap_paging_get_mode(v);
 
-    if ( pagetable_is_null(v->arch.monitor_table) )
+    if ( pagetable_is_null(v->arch.hvm.monitor_table) )
     {
         mfn_t mmfn = hap_make_monitor_table(v);
-        v->arch.monitor_table = pagetable_from_mfn(mmfn);
+        v->arch.hvm.monitor_table = pagetable_from_mfn(mmfn);
         make_cr3(v, mmfn);
         hvm_update_host_cr3(v);
     }

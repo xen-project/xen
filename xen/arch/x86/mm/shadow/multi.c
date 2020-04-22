@@ -1521,7 +1521,7 @@ sh_make_monitor_table(struct vcpu *v)
 {
     struct domain *d = v->domain;
 
-    ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
+    ASSERT(pagetable_get_pfn(v->arch.hvm.monitor_table) == 0);
 
     /* Guarantee we can get the memory we need */
     shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS);
@@ -3699,7 +3699,7 @@ sh_update_linear_entries(struct vcpu *v)
 
     /* Don't try to update the monitor table if it doesn't exist */
     if ( !shadow_mode_external(d) ||
-         pagetable_get_pfn(v->arch.monitor_table) == 0 )
+         pagetable_get_pfn(v->arch.hvm.monitor_table) == 0 )
         return;
 
 #if SHADOW_PAGING_LEVELS == 4
@@ -3717,7 +3717,7 @@ sh_update_linear_entries(struct vcpu *v)
     {
         l4_pgentry_t *ml4e;
 
-        ml4e = map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
+        ml4e = map_domain_page(pagetable_get_mfn(v->arch.hvm.monitor_table));
         ml4e[l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
             l4e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
                          __PAGE_HYPERVISOR_RW);
@@ -3752,7 +3752,7 @@ sh_update_linear_entries(struct vcpu *v)
             l4_pgentry_t *ml4e;
             l3_pgentry_t *ml3e;
             int linear_slot = shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START);
-            ml4e = map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
+            ml4e = map_domain_page(pagetable_get_mfn(v->arch.hvm.monitor_table));
 
             ASSERT(l4e_get_flags(ml4e[linear_slot]) & _PAGE_PRESENT);
             l3mfn = l4e_get_mfn(ml4e[linear_slot]);
@@ -4087,7 +4087,7 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     ///
     if ( shadow_mode_external(d) )
     {
-        make_cr3(v, pagetable_get_mfn(v->arch.monitor_table));
+        make_cr3(v, pagetable_get_mfn(v->arch.hvm.monitor_table));
     }
 #if SHADOW_PAGING_LEVELS == 4
     else // not shadow_mode_external...
