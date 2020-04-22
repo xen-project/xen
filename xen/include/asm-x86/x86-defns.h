@@ -73,6 +73,7 @@
 #define X86_CR4_SMEP       0x00100000 /* enable SMEP */
 #define X86_CR4_SMAP       0x00200000 /* enable SMAP */
 #define X86_CR4_PKE        0x00400000 /* enable PKE */
+#define X86_CR4_CET        0x00800000 /* Control-flow Enforcement Technology */
 
 /*
  * XSTATE component flags in XCR0

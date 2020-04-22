@@ -68,6 +68,9 @@
 
 #define MSR_U_CET                           0x000006a0
 #define MSR_S_CET                           0x000006a2
+#define  CET_SHSTK_EN                       (_AC(1, ULL) <<  0)
+#define  CET_WRSS_EN                        (_AC(1, ULL) <<  1)
+
 #define MSR_PL0_SSP                         0x000006a4
 #define MSR_PL1_SSP                         0x000006a5
 #define MSR_PL2_SSP                         0x000006a6
