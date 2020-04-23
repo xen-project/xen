@@ -478,6 +478,14 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
     return tsc + v->arch.hvm.cache_tsc_offset;
 }
 
+void hvm_set_info_guest(struct vcpu *v)
+{
+    if ( hvm_funcs.set_info_guest )
+        alternative_vcall(hvm_funcs.set_info_guest, v);
+
+    hvmemul_cancel(v);
+}
+
 void hvm_migrate_timers(struct vcpu *v)
 {
     rtc_migrate_timers(v);
@@ -1162,6 +1170,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.dr[3] = ctxt.dr3;
     v->arch.dr6   = ctxt.dr6;
     v->arch.dr7   = ctxt.dr7;
+
+    hvmemul_cancel(v);
 
     /* Auxiliary processors should be woken immediately. */
     v->is_initialised = 1;

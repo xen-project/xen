@@ -21,6 +21,7 @@
 #include <xen/iocap.h>
 #include <xen/paging.h>
 #include <asm/irq.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
@@ -1147,11 +1148,16 @@ long arch_do_domctl(
             else
             {
                 vcpu_pause(v);
+
                 v->arch.xcr0 = _xcr0;
                 v->arch.xcr0_accum = _xcr0_accum;
                 v->arch.nonlazy_xstate_used = _xcr0_accum & XSTATE_NONLAZY;
                 compress_xsave_states(v, _xsave_area,
                                       evc->size - PV_XSAVE_HDR_SIZE);
+
+                if ( is_hvm_domain(d) )
+                    hvmemul_cancel(v);
+
                 vcpu_unpause(v);
             }
 

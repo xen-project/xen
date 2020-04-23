@@ -121,6 +121,23 @@ static const struct hvm_io_handler ioreq_server_handler = {
     .ops = &ioreq_server_ops
 };
 
+/*
+ * Drop all records of in-flight emulation. This is needed whenever a vCPU's
+ * register state may have changed behind the emulator's back.
+ */
+void hvmemul_cancel(struct vcpu *v)
+{
+    struct hvm_vcpu_io *vio = &v->arch.hvm.hvm_io;
+
+    vio->io_req.state = STATE_IOREQ_NONE;
+    vio->io_completion = HVMIO_no_completion;
+    vio->mmio_cache_count = 0;
+    vio->mmio_insn_bytes = 0;
+    vio->mmio_access = (struct npfec){};
+    vio->mmio_retry = false;
+    vio->g2m_ioport = NULL;
+}
+
 static int hvmemul_do_io(
     bool_t is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
     uint8_t dir, bool_t df, bool_t data_is_addr, uintptr_t data)

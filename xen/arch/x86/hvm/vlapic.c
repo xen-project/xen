@@ -33,6 +33,7 @@
 #include <asm/apic.h>
 #include <asm/io_apic.h>
 #include <asm/vpmu.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
@@ -305,6 +306,8 @@ static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
     default:
         BUG();
     }
+
+    hvmemul_cancel(target);
 
     vcpu_unpause(target);
 }

@@ -77,6 +77,7 @@ void hvm_emulate_init_per_insn(
     unsigned int insn_bytes);
 void hvm_emulate_writeback(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
+void hvmemul_cancel(struct vcpu *v);
 struct segment_register *hvmemul_get_seg_reg(
     enum x86_segment seg,
     struct hvm_emulate_ctxt *hvmemul_ctxt);

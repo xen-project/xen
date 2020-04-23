@@ -22,6 +22,8 @@
 #include <xen/paging.h>
 #include <xen/sched.h>
 
+#include <asm/hvm/emulate.h>
+
 #include <public/hvm/hvm_vcpu.h>
 
 static int check_segment(struct segment_register *reg, enum x86_segment seg)
@@ -322,6 +324,8 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
                        d->arch.hvm.sync_tsc);
 
     paging_update_paging_modes(v);
+
+    hvmemul_cancel(v);
 
     v->is_initialised = 1;
     set_bit(_VPF_down, &v->pause_flags);
