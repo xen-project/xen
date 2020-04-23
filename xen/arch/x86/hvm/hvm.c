@@ -727,6 +727,8 @@ int hvm_domain_initialise(struct domain *d)
 /* This function and all its descendants need to be to be idempotent. */
 void hvm_domain_relinquish_resources(struct domain *d)
 {
+    struct vcpu *v;
+
     if ( hvm_funcs.domain_relinquish_resources )
         alternative_vcall(hvm_funcs.domain_relinquish_resources, d);
 
@@ -743,6 +745,9 @@ void hvm_domain_relinquish_resources(struct domain *d)
     rtc_deinit(d);
     pmtimer_deinit(d);
     hpet_deinit(d);
+
+    for_each_vcpu ( d, v )
+        hvmemul_cache_destroy(v);
 }
 
 void hvm_domain_destroy(struct domain *d)
@@ -1550,6 +1555,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     v->arch.hvm.inject_event.vector = HVM_EVENT_VECTOR_UNSET;
 
+    rc = hvmemul_cache_init(v);
+    if ( rc )
+        goto fail4;
+
     rc = setup_compat_arg_xlat(v); /* teardown: free_compat_arg_xlat() */
     if ( rc != 0 )
         goto fail4;
@@ -1585,6 +1594,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
  fail5:
     free_compat_arg_xlat(v);
  fail4:
+    hvmemul_cache_destroy(v);
     hvm_funcs.vcpu_destroy(v);
  fail3:
     vlapic_destroy(v);
@@ -2946,6 +2956,7 @@ void hvm_task_switch(
     unsigned int eflags, new_cpl;
     pagefault_info_t pfinfo;
     int exn_raised, rc;
+    unsigned int token = hvmemul_cache_disable(v);
     struct tss32 tss;
 
     hvm_get_segment_register(v, x86_seg_gdtr, &gdt);
@@ -3153,6 +3164,8 @@ void hvm_task_switch(
  out:
     hvm_unmap_entry(optss_desc);
     hvm_unmap_entry(nptss_desc);
+
+    hvmemul_cache_restore(v, token);
 }
 
 enum hvm_translation_result hvm_translate_get_page(
@@ -3240,7 +3253,6 @@ static enum hvm_translation_result __hvm_copy(
     void *buf, paddr_t addr, unsigned int size, struct vcpu *v, unsigned int flags,
     uint32_t pfec, pagefault_info_t *pfinfo)
 {
-    char *p;
     ASSERT(is_hvm_vcpu(v));
 
     /*
@@ -3288,11 +3300,17 @@ static enum hvm_translation_result __hvm_copy(
             return HVMTRANS_need_retry;
         }
 
-        p = __map_domain_page(page) + pgoff;
-
-        if ( flags & HVMCOPY_to_guest )
+        if ( (flags & HVMCOPY_to_guest) ||
+             !hvmemul_read_cache(v, gfn_to_gaddr(gfn) | pgoff, buf, count) )
         {
-            if ( p2m_is_discard_write(p2mt) )
+            void *p = __map_domain_page(page) + pgoff;
+
+            if ( !(flags & HVMCOPY_to_guest) )
+            {
+                memcpy(buf, p, count);
+                hvmemul_write_cache(v, gfn_to_gaddr(gfn) | pgoff, buf, count);
+            }
+            else if ( p2m_is_discard_write(p2mt) )
             {
                 static unsigned long lastpage;
 
@@ -3309,13 +3327,9 @@ static enum hvm_translation_result __hvm_copy(
                     memset(p, 0, count);
                 paging_mark_pfn_dirty(v->domain, _pfn(gfn_x(gfn)));
             }
-        }
-        else
-        {
-            memcpy(buf, p, count);
-        }
 
-        unmap_domain_page(p);
+            unmap_domain_page(p);
+        }
 
         addr += count;
         if ( buf )

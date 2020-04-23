@@ -1040,6 +1040,8 @@ void svm_vmenter_helper(const struct cpu_user_regs *regs)
     struct vcpu *curr = current;
     struct vmcb_struct *vmcb = curr->arch.hvm.svm.vmcb;
 
+    ASSERT(hvmemul_cache_disabled(curr));
+
     svm_asid_handle_vmrun();
 
     if ( unlikely(tb_init_done) )

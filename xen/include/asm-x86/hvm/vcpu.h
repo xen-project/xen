@@ -76,6 +76,8 @@ struct hvm_vcpu_io {
     /* For retries we shouldn't re-fetch the instruction. */
     unsigned int mmio_insn_bytes;
     unsigned char mmio_insn[16];
+    struct hvmemul_cache *cache;
+
     /*
      * For string instruction emulation we need to be able to signal a
      * necessary retry through other than function return codes.

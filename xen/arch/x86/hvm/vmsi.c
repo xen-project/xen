@@ -35,6 +35,7 @@
 #include <xen/irq.h>
 #include <xen/vpci.h>
 #include <public/hvm/ioreq.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
@@ -607,6 +608,7 @@ void msix_write_completion(struct vcpu *v)
     if ( !ctrl_address && snoop_addr &&
          v->arch.hvm.hvm_io.msix_snoop_gpa )
     {
+        unsigned int token = hvmemul_cache_disable(v);
         const struct msi_desc *desc;
         uint32_t data;
 
@@ -621,6 +623,8 @@ void msix_write_completion(struct vcpu *v)
                                       sizeof(data)) == HVMTRANS_okay &&
              !(data & PCI_MSIX_VECTOR_BITMASK) )
             ctrl_address = snoop_addr;
+
+        hvmemul_cache_restore(v, token);
     }
 
     if ( !ctrl_address )

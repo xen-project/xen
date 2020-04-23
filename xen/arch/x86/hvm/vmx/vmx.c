@@ -4362,6 +4362,8 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
 
+    ASSERT(hvmemul_cache_disabled(curr));
+
     /* Shadow EPTP can't be updated here because irqs are disabled */
      if ( nestedhvm_vcpu_in_guestmode(curr) && vcpu_nestedhvm(curr).stale_np2m )
          return false;

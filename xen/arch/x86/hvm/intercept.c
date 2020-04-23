@@ -20,6 +20,7 @@
 #include <xen/types.h>
 #include <xen/sched.h>
 #include <asm/regs.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/domain.h>
@@ -163,6 +164,9 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
         {
             if ( p->data_is_ptr )
             {
+                struct vcpu *curr = current;
+                unsigned int token = hvmemul_cache_disable(curr);
+
                 data = 0;
                 switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
                                                   p->size) )
@@ -179,9 +183,11 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                     ASSERT_UNREACHABLE();
                     /* fall through */
                 default:
-                    domain_crash(current->domain);
+                    domain_crash(curr->domain);
                     return X86EMUL_UNHANDLEABLE;
                 }
+
+                hvmemul_cache_restore(curr, token);
             }
             else
                 data = p->data;
