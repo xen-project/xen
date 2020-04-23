@@ -57,7 +57,6 @@ CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
 $(call cc-option-add,CFLAGS,CC,-Wvla)
 CFLAGS += -pipe -D__XEN__ -include $(BASEDIR)/include/xen/config.h
 CFLAGS-$(CONFIG_DEBUG_INFO) += -g
-CFLAGS += '-D__OBJECT_FILE__="$@"'
 
 ifneq ($(CONFIG_CC_IS_CLANG),y)
 # Clang doesn't understand this command line argument, and doesn't appear to
@@ -69,9 +68,6 @@ endif
 AFLAGS += -D__ASSEMBLY__
 
 ALL_OBJS := $(ALL_OBJS-y)
-
-# Get gcc to generate the dependencies for us.
-CFLAGS-y += -MMD -MP -MF $(@D)/.$(@F).d
 
 CFLAGS += $(CFLAGS-y)
 # allow extra CFLAGS externally via EXTRA_CFLAGS_XEN_CORE
@@ -146,9 +142,12 @@ endif
 # Always build obj-bin files as binary even if they come from C source. 
 $(obj-bin-y): CFLAGS := $(filter-out -flto,$(CFLAGS))
 
+c_flags = -MMD -MP -MF $(@D)/.$(@F).d $(CFLAGS) '-D__OBJECT_FILE__="$@"'
+a_flags = -MMD -MP -MF $(@D)/.$(@F).d $(AFLAGS)
+
 built_in.o: $(obj-y) $(extra-y)
 ifeq ($(obj-y),)
-	$(CC) $(CFLAGS) -c -x c /dev/null -o $@
+	$(CC) $(c_flags) -c -x c /dev/null -o $@
 else
 ifeq ($(CONFIG_LTO),y)
 	$(LD_LTO) -r -o $@ $(filter-out $(extra-y),$^)
@@ -159,7 +158,7 @@ endif
 
 built_in_bin.o: $(obj-bin-y) $(extra-y)
 ifeq ($(obj-bin-y),)
-	$(CC) $(AFLAGS) -c -x assembler /dev/null -o $@
+	$(CC) $(a_flags) -c -x assembler /dev/null -o $@
 else
 	$(LD) $(LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
 endif
@@ -178,7 +177,7 @@ SRCPATH := $(patsubst $(BASEDIR)/%,%,$(CURDIR))
 
 %.o: %.c Makefile
 ifeq ($(CONFIG_ENFORCE_UNIQUE_SYMBOLS),y)
-	$(CC) $(CFLAGS) -c $< -o $(@D)/.$(@F).tmp -MQ $@
+	$(CC) $(c_flags) -c $< -o $(@D)/.$(@F).tmp -MQ $@
 ifeq ($(CONFIG_CC_IS_CLANG),y)
 	$(OBJCOPY) --redefine-sym $<=$(SRCPATH)/$< $(@D)/.$(@F).tmp $@
 else
@@ -186,11 +185,11 @@ else
 endif
 	rm -f $(@D)/.$(@F).tmp
 else
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(c_flags) -c $< -o $@
 endif
 
 %.o: %.S Makefile
-	$(CC) $(AFLAGS) -c $< -o $@
+	$(CC) $(a_flags) -c $< -o $@
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
 	$(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p;}' | while read idx name sz rest; do \
@@ -205,12 +204,12 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
 	$(OBJCOPY) $(foreach s,$(SPECIAL_DATA_SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
 
 %.i: %.c Makefile
-	$(CPP) $(filter-out -Wa$(comma)%,$(CFLAGS)) $< -o $@
+	$(CPP) $(filter-out -Wa$(comma)%,$(c_flags)) $< -o $@
 
 %.s: %.c Makefile
-	$(CC) $(filter-out -Wa$(comma)%,$(CFLAGS)) -S $< -o $@
+	$(CC) $(filter-out -Wa$(comma)%,$(c_flags)) -S $< -o $@
 
 %.s: %.S Makefile
-	$(CPP) $(filter-out -Wa$(comma)%,$(AFLAGS)) $< -o $@
+	$(CPP) $(filter-out -Wa$(comma)%,$(a_flags)) $< -o $@
 
 -include $(DEPS_INCLUDE)
