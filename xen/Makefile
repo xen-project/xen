@@ -49,7 +49,76 @@ default: build
 .PHONY: dist
 dist: install
 
-build install:: include/config/auto.conf
+
+ifneq ($(root-make-done),y)
+# section to run before calling Rules.mk, but only once.
+#
+# To make sure we do not include .config for any of the *config targets
+# catch them early, and hand them over to tools/kconfig/Makefile
+
+clean-targets := %clean
+no-dot-config-targets := $(clean-targets) \
+                         uninstall debug cloc \
+                         cscope TAGS tags MAP gtags \
+                         xenversion
+
+config-build    := n
+need-config     := y
+
+ifneq ($(filter $(no-dot-config-targets), $(MAKECMDGOALS)),)
+    ifeq ($(filter-out $(no-dot-config-targets), $(MAKECMDGOALS)),)
+        need-config := n
+    endif
+endif
+
+ifneq ($(filter %config,$(MAKECMDGOALS)),)
+    config-build := y
+endif
+
+export root-make-done := y
+endif # root-make-done
+
+include scripts/Kbuild.include
+
+# Shorthand for kconfig
+kconfig = -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)"
+
+ifeq ($(config-build),y)
+# ===========================================================================
+# *config targets only - make sure prerequisites are updated, and descend
+# in tools/kconfig to make the *config target
+
+config: FORCE
+	$(MAKE) $(kconfig) $@
+
+# Config.mk tries to include .config file, don't try to remake it
+%/.config: ;
+
+%config: FORCE
+	$(MAKE) $(kconfig) $@
+
+else # !config-build
+
+ifeq ($(need-config),y)
+include include/config/auto.conf
+# Read in dependencies to all Kconfig* files, make sure to run syncconfig if
+# changes are detected.
+include include/config/auto.conf.cmd
+
+# Allow people to just run `make` as before and not force them to configure
+$(KCONFIG_CONFIG):
+	$(MAKE) $(kconfig) defconfig
+
+# The actual configuration files used during the build are stored in
+# include/generated/ and include/config/. Update them if .config is newer than
+# include/config/auto.conf (which mirrors .config).
+#
+# This exploits the 'multi-target pattern rule' trick.
+# The syncconfig should be executed only once to make all the targets.
+include/config/%.conf include/config/%.conf.cmd: $(KCONFIG_CONFIG)
+	$(MAKE) $(kconfig) syncconfig
+
+endif # need-config
 
 .PHONY: build install uninstall clean distclean MAP
 build install uninstall debug clean distclean MAP::
@@ -254,9 +323,6 @@ cscope:
 _MAP:
 	$(NM) -n $(TARGET)-syms | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
 
-.PHONY: FORCE
-FORCE:
-
 %.o %.i %.s: %.c FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(*D) $(@F)
 
@@ -277,25 +343,6 @@ $(foreach base,arch/x86/mm/guest_walk_% \
                arch/x86/mm/shadow/guest_%, \
     $(foreach ext,o i s,$(call build-intermediate,$(base).$(ext))))
 
-kconfig := oldconfig config menuconfig defconfig allyesconfig allnoconfig \
-	nconfig xconfig gconfig savedefconfig listnewconfig olddefconfig \
-	randconfig $(notdir $(wildcard arch/$(SRCARCH)/configs/*_defconfig))
-.PHONY: $(kconfig)
-$(kconfig):
-	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)" $@
-
-include/config/%.conf: include/config/auto.conf.cmd $(KCONFIG_CONFIG)
-	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)" syncconfig
-
-# Allow people to just run `make` as before and not force them to configure
-$(KCONFIG_CONFIG):
-	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)" defconfig
-
-# Break the dependency chain for the first run
-include/config/auto.conf.cmd: ;
-
--include $(BASEDIR)/include/config/auto.conf.cmd
-
 .PHONY: cloc
 cloc:
 	$(eval tmpfile := $(shell mktemp))
@@ -307,3 +354,11 @@ cloc:
 	cloc --list-file=$(tmpfile)
 	rm $(tmpfile)
 
+endif #config-build
+
+PHONY += FORCE
+FORCE:
+
+# Declare the contents of the PHONY variable as phony.  We keep that
+# information in a variable so we can use it in if_changed and friends.
+.PHONY: $(PHONY)
