@@ -77,6 +77,38 @@
 #define MSR_RTIT_ADDR_A(n)                 (0x00000580 + (n) * 2)
 #define MSR_RTIT_ADDR_B(n)                 (0x00000581 + (n) * 2)
 
+/*
+ * Intel Runtime Average Power Limiting (RAPL) interface.  Power plane base
+ * addresses (MSR_*_POWER_LIMIT) are model specific, but have so-far been
+ * consistent since their introduction in SandyBridge.
+ *
+ * Offsets of functionality from the power plane base is architectural, but
+ * not all power planes support all functionality.
+ */
+#define MSR_RAPL_POWER_UNIT                 0x00000606
+
+#define MSR_PKG_POWER_LIMIT                 0x00000610
+#define MSR_PKG_ENERGY_STATUS               0x00000611
+#define MSR_PKG_PERF_STATUS                 0x00000613
+#define MSR_PKG_POWER_INFO                  0x00000614
+
+#define MSR_DRAM_POWER_LIMIT                0x00000618
+#define MSR_DRAM_ENERGY_STATUS              0x00000619
+#define MSR_DRAM_PERF_STATUS                0x0000061b
+#define MSR_DRAM_POWER_INFO                 0x0000061c
+
+#define MSR_PP0_POWER_LIMIT                 0x00000638
+#define MSR_PP0_ENERGY_STATUS               0x00000639
+#define MSR_PP0_POLICY                      0x0000063a
+
+#define MSR_PP1_POWER_LIMIT                 0x00000640
+#define MSR_PP1_ENERGY_STATUS               0x00000641
+#define MSR_PP1_POLICY                      0x00000642
+
+/* Intel Platform-wide power interface. */
+#define MSR_PLATFORM_ENERGY_COUNTER         0x0000064d
+#define MSR_PLATFORM_POWER_LIMIT            0x0000065c
+
 #define MSR_U_CET                           0x000006a0
 #define MSR_S_CET                           0x000006a2
 #define  CET_SHSTK_EN                       (_AC(1, ULL) <<  0)
@@ -91,6 +123,13 @@
 #define MSR_PASID                           0x00000d93
 #define  PASID_PASID_MASK                   0x000fffff
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
+
+#define MSR_F15H_CU_POWER                   0xc001007a
+#define MSR_F15H_CU_MAX_POWER               0xc001007b
+
+#define MSR_AMD_RAPL_POWER_UNIT             0xc0010299
+#define MSR_AMD_CORE_ENERGY_STATUS          0xc001029a
+#define MSR_AMD_PKG_ENERGY_STATUS           0xc001029b
 
 /*
  * Legacy MSR constants in need of cleanup.  No new MSRs below this comment.
