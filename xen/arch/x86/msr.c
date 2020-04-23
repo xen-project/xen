@@ -152,11 +152,20 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_TSX_CTRL:
     case MSR_MCU_OPT_CTRL:
     case MSR_RTIT_OUTPUT_BASE ... MSR_RTIT_ADDR_B(7):
+    case MSR_RAPL_POWER_UNIT:
+    case MSR_PKG_POWER_LIMIT  ... MSR_PKG_POWER_INFO:
+    case MSR_DRAM_POWER_LIMIT ... MSR_DRAM_POWER_INFO:
+    case MSR_PP0_POWER_LIMIT  ... MSR_PP0_POLICY:
+    case MSR_PP1_POWER_LIMIT  ... MSR_PP1_POLICY:
+    case MSR_PLATFORM_ENERGY_COUNTER:
+    case MSR_PLATFORM_POWER_LIMIT:
     case MSR_U_CET:
     case MSR_S_CET:
     case MSR_PL0_SSP ... MSR_INTERRUPT_SSP_TABLE:
     case MSR_AMD64_LWP_CFG:
     case MSR_AMD64_LWP_CBADDR:
+    case MSR_F15H_CU_POWER ... MSR_F15H_CU_MAX_POWER:
+    case MSR_AMD_RAPL_POWER_UNIT ... MSR_AMD_PKG_ENERGY_STATUS:
         /* Not offered to guests. */
         goto gp_fault;
 
@@ -330,11 +339,20 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case MSR_TSX_CTRL:
     case MSR_MCU_OPT_CTRL:
     case MSR_RTIT_OUTPUT_BASE ... MSR_RTIT_ADDR_B(7):
+    case MSR_RAPL_POWER_UNIT:
+    case MSR_PKG_POWER_LIMIT  ... MSR_PKG_POWER_INFO:
+    case MSR_DRAM_POWER_LIMIT ... MSR_DRAM_POWER_INFO:
+    case MSR_PP0_POWER_LIMIT  ... MSR_PP0_POLICY:
+    case MSR_PP1_POWER_LIMIT  ... MSR_PP1_POLICY:
+    case MSR_PLATFORM_ENERGY_COUNTER:
+    case MSR_PLATFORM_POWER_LIMIT:
     case MSR_U_CET:
     case MSR_S_CET:
     case MSR_PL0_SSP ... MSR_INTERRUPT_SSP_TABLE:
     case MSR_AMD64_LWP_CFG:
     case MSR_AMD64_LWP_CBADDR:
+    case MSR_F15H_CU_POWER ... MSR_F15H_CU_MAX_POWER:
+    case MSR_AMD_RAPL_POWER_UNIT ... MSR_AMD_PKG_ENERGY_STATUS:
         /* Not offered to guests. */
         goto gp_fault;
 
