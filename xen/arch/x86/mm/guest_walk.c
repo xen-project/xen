@@ -31,6 +31,7 @@ asm(".file \"" __OBJECT_FILE__ "\"");
 #include <xen/sched.h>
 #include <asm/page.h>
 #include <asm/guest_pt.h>
+#include <asm/hvm/emulate.h>
 
 /*
  * Modify a guest pagetable entry to set the Accessed and Dirty bits.
@@ -80,9 +81,9 @@ static bool set_ad_bits(guest_intpte_t *guest_p, guest_intpte_t *walk_p,
  * requested walk, to see whether the access is permitted.
  */
 bool
-guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
-                  unsigned long va, walk_t *gw,
-                  uint32_t walk, mfn_t top_mfn, void *top_map)
+guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
+                  unsigned long va, walk_t *gw, uint32_t walk,
+                  gfn_t top_gfn, mfn_t top_mfn, void *top_map)
 {
     struct domain *d = v->domain;
     guest_l1e_t *l1p = NULL;
@@ -90,8 +91,13 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
     guest_l3e_t *l3p = NULL;
     guest_l4e_t *l4p;
+    paddr_t l4gpa;
+#endif
+#if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
+    paddr_t l3gpa;
 #endif
     uint32_t gflags, rc;
+    paddr_t l1gpa = 0, l2gpa = 0;
     unsigned int leaf_level;
     p2m_query_t qt = P2M_ALLOC | P2M_UNSHARE;
 
@@ -132,7 +138,13 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     /* Get the l4e from the top level table and check its flags*/
     gw->l4mfn = top_mfn;
     l4p = (guest_l4e_t *) top_map;
-    gw->l4e = l4p[guest_l4_table_offset(va)];
+    l4gpa = gfn_to_gaddr(top_gfn) +
+            guest_l4_table_offset(va) * sizeof(gw->l4e);
+    if ( !hvmemul_read_cache(v, l4gpa, &gw->l4e, sizeof(gw->l4e)) )
+    {
+        gw->l4e = l4p[guest_l4_table_offset(va)];
+        hvmemul_write_cache(v, l4gpa, &gw->l4e, sizeof(gw->l4e));
+    }
     gflags = guest_l4e_get_flags(gw->l4e);
     if ( !(gflags & _PAGE_PRESENT) )
         goto out;
@@ -161,7 +173,13 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     }
 
     /* Get the l3e and check its flags*/
-    gw->l3e = l3p[guest_l3_table_offset(va)];
+    l3gpa = gfn_to_gaddr(guest_l4e_get_gfn(gw->l4e)) +
+            guest_l3_table_offset(va) * sizeof(gw->l3e);
+    if ( !hvmemul_read_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e)) )
+    {
+        gw->l3e = l3p[guest_l3_table_offset(va)];
+        hvmemul_write_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e));
+    }
     gflags = guest_l3e_get_flags(gw->l3e);
     if ( !(gflags & _PAGE_PRESENT) )
         goto out;
@@ -213,7 +231,14 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 #else /* PAE only... */
 
     /* Get the l3e and check its flag */
-    gw->l3e = ((guest_l3e_t *) top_map)[guest_l3_table_offset(va)];
+    l3gpa = gfn_to_gaddr(top_gfn) + ((unsigned long)top_map & ~PAGE_MASK) +
+            guest_l3_table_offset(va) * sizeof(gw->l3e);
+    if ( !hvmemul_read_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e)) )
+    {
+        gw->l3e = ((guest_l3e_t *)top_map)[guest_l3_table_offset(va)];
+        hvmemul_write_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e));
+    }
+
     gflags = guest_l3e_get_flags(gw->l3e);
     if ( !(gflags & _PAGE_PRESENT) )
         goto out;
@@ -238,17 +263,23 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         goto out;
     }
 
-    /* Get the l2e */
-    gw->l2e = l2p[guest_l2_table_offset(va)];
+    l2gpa = gfn_to_gaddr(guest_l3e_get_gfn(gw->l3e));
 
 #else /* 32-bit only... */
 
-    /* Get l2e from the top level table */
     gw->l2mfn = top_mfn;
     l2p = (guest_l2e_t *) top_map;
-    gw->l2e = l2p[guest_l2_table_offset(va)];
+    l2gpa = gfn_to_gaddr(top_gfn);
 
 #endif /* All levels... */
+
+    /* Get the l2e */
+    l2gpa += guest_l2_table_offset(va) * sizeof(gw->l2e);
+    if ( !hvmemul_read_cache(v, l2gpa, &gw->l2e, sizeof(gw->l2e)) )
+    {
+        gw->l2e = l2p[guest_l2_table_offset(va)];
+        hvmemul_write_cache(v, l2gpa, &gw->l2e, sizeof(gw->l2e));
+    }
 
     /* Check the l2e flags. */
     gflags = guest_l2e_get_flags(gw->l2e);
@@ -330,7 +361,15 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         gw->pfec |= rc & PFEC_synth_mask;
         goto out;
     }
-    gw->l1e = l1p[guest_l1_table_offset(va)];
+
+    l1gpa = gfn_to_gaddr(guest_l2e_get_gfn(gw->l2e)) +
+            guest_l1_table_offset(va) * sizeof(gw->l1e);
+    if ( !hvmemul_read_cache(v, l1gpa, &gw->l1e, sizeof(gw->l1e)) )
+    {
+        gw->l1e = l1p[guest_l1_table_offset(va)];
+        hvmemul_write_cache(v, l1gpa, &gw->l1e, sizeof(gw->l1e));
+    }
+
     gflags = guest_l1e_get_flags(gw->l1e);
     if ( !(gflags & _PAGE_PRESENT) )
         goto out;
@@ -441,22 +480,34 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     case 1:
         if ( set_ad_bits(&l1p[guest_l1_table_offset(va)].l1, &gw->l1e.l1,
                          (walk & PFEC_write_access)) )
+        {
             paging_mark_dirty(d, gw->l1mfn);
+            hvmemul_write_cache(v, l1gpa, &gw->l1e, sizeof(gw->l1e));
+        }
         /* Fallthrough */
     case 2:
         if ( set_ad_bits(&l2p[guest_l2_table_offset(va)].l2, &gw->l2e.l2,
                          (walk & PFEC_write_access) && leaf_level == 2) )
+        {
             paging_mark_dirty(d, gw->l2mfn);
+            hvmemul_write_cache(v, l2gpa, &gw->l2e, sizeof(gw->l2e));
+        }
         /* Fallthrough */
 #if GUEST_PAGING_LEVELS == 4 /* 64-bit only... */
     case 3:
         if ( set_ad_bits(&l3p[guest_l3_table_offset(va)].l3, &gw->l3e.l3,
                          (walk & PFEC_write_access) && leaf_level == 3) )
+        {
             paging_mark_dirty(d, gw->l3mfn);
+            hvmemul_write_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e));
+        }
 
         if ( set_ad_bits(&l4p[guest_l4_table_offset(va)].l4, &gw->l4e.l4,
                          false) )
+        {
             paging_mark_dirty(d, gw->l4mfn);
+            hvmemul_write_cache(v, l4gpa, &gw->l4e, sizeof(gw->l4e));
+        }
 #endif
     }
 

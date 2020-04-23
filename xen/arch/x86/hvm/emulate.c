@@ -2940,7 +2940,7 @@ bool hvmemul_read_cache(const struct vcpu *v, paddr_t gpa,
     unsigned int i;
 
     /* Cache unavailable? */
-    if ( cache->num_ents > cache->max_ents )
+    if ( !is_hvm_vcpu(v) || cache->num_ents > cache->max_ents )
         return false;
 
     while ( size > sizeof(cache->ents->data) )
@@ -2972,7 +2972,7 @@ void hvmemul_write_cache(const struct vcpu *v, paddr_t gpa,
     unsigned int i;
 
     /* Cache unavailable? */
-    if ( cache->num_ents > cache->max_ents )
+    if ( !is_hvm_vcpu(v) || cache->num_ents > cache->max_ents )
         return;
 
     while ( size > sizeof(cache->ents->data) )

@@ -428,8 +428,9 @@ static inline unsigned int guest_walk_to_page_order(const walk_t *gw)
 #define guest_walk_tables GPT_RENAME(guest_walk_tables, GUEST_PAGING_LEVELS)
 
 bool
-guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m, unsigned long va,
-                  walk_t *gw, uint32_t pfec, mfn_t top_mfn, void *top_map);
+guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
+                  unsigned long va, walk_t *gw, uint32_t pfec,
+                  gfn_t top_gfn, mfn_t top_mfn, void *top_map);
 
 /* Pretty-print the contents of a guest-walk */
 static inline void print_gw(const walk_t *gw)

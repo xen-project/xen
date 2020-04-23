@@ -130,6 +130,12 @@ static inline bool hvmemul_cache_disabled(struct vcpu *v)
 {
     return hvmemul_cache_disable(v) == hvmemul_cache_disable(v);
 }
+#else
+static inline bool hvmemul_read_cache(const struct vcpu *v, paddr_t gpa,
+                                      void *buf,
+                                      unsigned int size) { return false; }
+static inline void hvmemul_write_cache(const struct vcpu *v, paddr_t gpa,
+                                       const void *buf, unsigned int size) {}
 #endif
 
 void hvm_dump_emulation_state(const char *loglvl, const char *prefix,

@@ -175,9 +175,13 @@ static inline bool
 sh_walk_guest_tables(struct vcpu *v, unsigned long va, walk_t *gw,
                      uint32_t pfec)
 {
+    gfn_t root_gfn = _gfn(paging_mode_external(v->domain)
+                          ? cr3_pa(v->arch.hvm.guest_cr[3]) >> PAGE_SHIFT
+                          : pagetable_get_pfn(v->arch.guest_table));
+
 #if GUEST_PAGING_LEVELS == 3 /* PAE */
     return guest_walk_tables(v, p2m_get_hostp2m(v->domain), va, gw, pfec,
-                             INVALID_MFN, v->arch.paging.shadow.gl3e);
+                             root_gfn, INVALID_MFN, v->arch.paging.shadow.gl3e);
 #else /* 32 or 64 */
     const struct domain *d = v->domain;
     mfn_t root_mfn = (v->arch.flags & TF_kernel_mode
@@ -185,7 +189,7 @@ sh_walk_guest_tables(struct vcpu *v, unsigned long va, walk_t *gw,
                       : pagetable_get_mfn(v->arch.guest_table_user));
     void *root_map = map_domain_page(root_mfn);
     bool ok = guest_walk_tables(v, p2m_get_hostp2m(d), va, gw, pfec,
-                                root_mfn, root_map);
+                                root_gfn, root_mfn, root_map);
 
     unmap_domain_page(root_map);
 
