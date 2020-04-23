@@ -5995,12 +5995,33 @@ void memguard_unguard_range(void *p, unsigned long l)
 
 #endif
 
+static void write_sss_token(unsigned long *ptr)
+{
+    /*
+     * A supervisor shadow stack token is its own linear address, with the
+     * busy bit (0) clear.
+     */
+    *ptr = (unsigned long)ptr;
+}
+
 void memguard_guard_stack(void *p)
 {
-    map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, _PAGE_NONE);
+    /* IST Shadow stacks.  4x 1k in stack page 0. */
+    if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
+    {
+        write_sss_token(p + (IST_MCE * IST_SHSTK_SIZE) - 8);
+        write_sss_token(p + (IST_NMI * IST_SHSTK_SIZE) - 8);
+        write_sss_token(p + (IST_DB  * IST_SHSTK_SIZE) - 8);
+        write_sss_token(p + (IST_DF  * IST_SHSTK_SIZE) - 8);
+    }
+    map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, PAGE_HYPERVISOR_SHSTK);
 
+    /* Primary Shadow Stack.  1x 4k in stack page 5. */
     p += PRIMARY_SHSTK_SLOT * PAGE_SIZE;
-    map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, _PAGE_NONE);
+    if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
+        write_sss_token(p + PAGE_SIZE - 8);
+
+    map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, PAGE_HYPERVISOR_SHSTK);
 }
 
 void memguard_unguard_stack(void *p)

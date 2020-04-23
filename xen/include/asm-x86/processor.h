@@ -440,7 +440,8 @@ struct __packed tss64 {
     uint16_t :16, bitmap;
 };
 struct tss_page {
-    struct tss64 __aligned(PAGE_SIZE) tss;
+    uint64_t __aligned(PAGE_SIZE) ist_ssp[8];
+    struct tss64 tss;
 };
 DECLARE_PER_CPU(struct tss_page, tss_page);
 

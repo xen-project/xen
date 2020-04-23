@@ -769,6 +769,29 @@ void load_system_tables(void)
 	tss->rsp1 = 0x8600111111111111ul;
 	tss->rsp2 = 0x8600111111111111ul;
 
+	/*
+	 * Set up the shadow stack IST.  Used entries must point at the
+	 * supervisor stack token.  Unused entries are poisoned.
+	 *
+	 * This IST Table may be live, and the NMI/#MC entries must
+	 * remain valid on every instruction boundary, hence the
+	 * volatile qualifier.
+	 */
+	if (cpu_has_xen_shstk) {
+		volatile uint64_t *ist_ssp = this_cpu(tss_page).ist_ssp;
+
+		ist_ssp[0] = 0x8600111111111111ul;
+		ist_ssp[IST_MCE] = stack_top + (IST_MCE * IST_SHSTK_SIZE) - 8;
+		ist_ssp[IST_NMI] = stack_top + (IST_NMI * IST_SHSTK_SIZE) - 8;
+		ist_ssp[IST_DB]	 = stack_top + (IST_DB	* IST_SHSTK_SIZE) - 8;
+		ist_ssp[IST_DF]	 = stack_top + (IST_DF	* IST_SHSTK_SIZE) - 8;
+		for ( i = IST_DF + 1;
+		      i < ARRAY_SIZE(this_cpu(tss_page).ist_ssp); ++i )
+			ist_ssp[i] = 0x8600111111111111ul;
+
+		wrmsrl(MSR_INTERRUPT_SSP_TABLE, (unsigned long)ist_ssp);
+	}
+
 	BUILD_BUG_ON(sizeof(*tss) <= 0x67); /* Mandated by the architecture. */
 
 	_set_tssldt_desc(gdt + TSS_ENTRY, (unsigned long)tss,
