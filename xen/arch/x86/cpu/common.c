@@ -753,14 +753,14 @@ void load_system_tables(void)
 	 * valid on every instruction boundary.  (Note: these are all
 	 * semantically ACCESS_ONCE() due to tss's volatile qualifier.)
 	 *
-	 * rsp0 refers to the primary stack.  #MC, #DF, NMI and #DB handlers
+	 * rsp0 refers to the primary stack.  #MC, NMI, #DB and #DF handlers
 	 * each get their own stacks.  No IO Bitmap.
 	 */
 	tss->rsp0 = stack_bottom;
-	tss->ist[IST_MCE - 1] = stack_top + IST_MCE * PAGE_SIZE;
-	tss->ist[IST_DF  - 1] = stack_top + IST_DF  * PAGE_SIZE;
-	tss->ist[IST_NMI - 1] = stack_top + IST_NMI * PAGE_SIZE;
-	tss->ist[IST_DB  - 1] = stack_top + IST_DB  * PAGE_SIZE;
+	tss->ist[IST_MCE - 1] = stack_top + (1 + IST_MCE) * PAGE_SIZE;
+	tss->ist[IST_NMI - 1] = stack_top + (1 + IST_NMI) * PAGE_SIZE;
+	tss->ist[IST_DB  - 1] = stack_top + (1 + IST_DB)  * PAGE_SIZE;
+	tss->ist[IST_DF  - 1] = stack_top + (1 + IST_DF)  * PAGE_SIZE;
 	tss->bitmap = IOBMP_INVALID_OFFSET;
 
 	/* All other stack pointers poisioned. */

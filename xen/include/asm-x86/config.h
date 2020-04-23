@@ -75,6 +75,9 @@
 /* Primary stack is restricted to 8kB by guard pages. */
 #define PRIMARY_STACK_SIZE 8192
 
+/* Primary shadow stack is slot 5 of 8, immediately under the primary stack. */
+#define PRIMARY_SHSTK_SLOT 5
+
 /* Total size of syscall and emulation stubs. */
 #define STUB_BUF_SHIFT (L1_CACHE_SHIFT > 7 ? L1_CACHE_SHIFT : 7)
 #define STUB_BUF_SIZE  (1 << STUB_BUF_SHIFT)

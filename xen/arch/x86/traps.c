@@ -365,20 +365,15 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
 /*
  * Notes for get_stack_trace_bottom() and get_stack_dump_bottom()
  *
- * Stack pages 0 - 3:
+ * Stack pages 1 - 4:
  *   These are all 1-page IST stacks.  Each of these stacks have an exception
  *   frame and saved register state at the top.  The interesting bound for a
  *   trace is the word adjacent to this, while the bound for a dump is the
  *   very top, including the exception frame.
  *
- * Stack pages 4 and 5:
- *   None of these are particularly interesting.  With MEMORY_GUARD, page 5 is
- *   explicitly not present, so attempting to dump or trace it is
- *   counterproductive.  Without MEMORY_GUARD, it is possible for a call chain
- *   to use the entire primary stack and wander into page 5.  In this case,
- *   consider these pages an extension of the primary stack to aid debugging
- *   hopefully rare situations where the primary stack has effective been
- *   overflown.
+ * Stack pages 0 and 5:
+ *   Shadow stacks.  These are mapped read-only, and used by CET-SS capable
+ *   processors.  They will never contain regular stack data.
  *
  * Stack pages 6 and 7:
  *   These form the primary stack, and have a cpu_info at the top.  For a
@@ -392,13 +387,10 @@ unsigned long get_stack_trace_bottom(unsigned long sp)
 {
     switch ( get_stack_page(sp) )
     {
-    case 0 ... 3:
+    case 1 ... 4:
         return ROUNDUP(sp, PAGE_SIZE) -
             offsetof(struct cpu_user_regs, es) - sizeof(unsigned long);
 
-#ifndef MEMORY_GUARD
-    case 4 ... 5:
-#endif
     case 6 ... 7:
         return ROUNDUP(sp, STACK_SIZE) -
             sizeof(struct cpu_info) - sizeof(unsigned long);
@@ -412,12 +404,9 @@ unsigned long get_stack_dump_bottom(unsigned long sp)
 {
     switch ( get_stack_page(sp) )
     {
-    case 0 ... 3:
+    case 1 ... 4:
         return ROUNDUP(sp, PAGE_SIZE) - sizeof(unsigned long);
 
-#ifndef MEMORY_GUARD
-    case 4 ... 5:
-#endif
     case 6 ... 7:
         return ROUNDUP(sp, STACK_SIZE) - sizeof(unsigned long);
 

@@ -16,12 +16,12 @@
  *
  * 7 - Primary stack (with a struct cpu_info at the top)
  * 6 - Primary stack
- * 5 - Optionally not present (MEMORY_GUARD)
- * 4 - Unused; optionally not present (MEMORY_GUARD)
- * 3 - Unused; optionally not present (MEMORY_GUARD)
- * 2 - MCE IST stack
- * 1 - NMI IST stack
- * 0 - Double Fault IST stack
+ * 5 - Primay Shadow Stack (read-only)
+ * 4 - #DF IST stack
+ * 3 - #DB IST stack
+ * 2 - NMI IST stack
+ * 1 - #MC IST stack
+ * 0 - IST Shadow Stacks (4x 1k, read-only)
  */
 
 /*

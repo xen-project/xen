@@ -445,10 +445,10 @@ struct tss_page {
 DECLARE_PER_CPU(struct tss_page, tss_page);
 
 #define IST_NONE 0UL
-#define IST_DF   1UL
+#define IST_MCE  1UL
 #define IST_NMI  2UL
-#define IST_MCE  3UL
-#define IST_DB   4UL
+#define IST_DB   3UL
+#define IST_DF   4UL
 #define IST_MAX  4UL
 
 /* Set the Interrupt Stack Table used by a particular IDT entry. */

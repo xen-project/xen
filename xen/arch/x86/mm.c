@@ -5997,25 +5997,18 @@ void memguard_unguard_range(void *p, unsigned long l)
 
 void memguard_guard_stack(void *p)
 {
-    /* IST_MAX IST pages + at least 1 guard page + primary stack. */
-    BUILD_BUG_ON((IST_MAX + 1) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
+    map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, _PAGE_NONE);
 
-    memguard_guard_range(p + IST_MAX * PAGE_SIZE,
-                         STACK_SIZE - PRIMARY_STACK_SIZE - IST_MAX * PAGE_SIZE);
+    p += PRIMARY_SHSTK_SLOT * PAGE_SIZE;
+    map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, _PAGE_NONE);
 }
 
 void memguard_unguard_stack(void *p)
 {
-    memguard_unguard_range(p + IST_MAX * PAGE_SIZE,
-                           STACK_SIZE - PRIMARY_STACK_SIZE - IST_MAX * PAGE_SIZE);
-}
+    map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, PAGE_HYPERVISOR_RW);
 
-bool memguard_is_stack_guard_page(unsigned long addr)
-{
-    addr &= STACK_SIZE - 1;
-
-    return addr >= IST_MAX * PAGE_SIZE &&
-           addr < STACK_SIZE - PRIMARY_STACK_SIZE;
+    p += PRIMARY_SHSTK_SLOT * PAGE_SIZE;
+    map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, PAGE_HYPERVISOR_RW);
 }
 
 void arch_dump_shared_mem_info(void)
