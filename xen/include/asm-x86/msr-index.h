@@ -96,6 +96,38 @@
 /* Lower 6 bits define the format of the address in the LBR stack */
 #define MSR_IA32_PERF_CAP_LBR_FORMAT	0x3f
 
+/*
+ * Intel Runtime Average Power Limiting (RAPL) interface.  Power plane base
+ * addresses (MSR_*_POWER_LIMIT) are model specific, but have so-far been
+ * consistent since their introduction in SandyBridge.
+ *
+ * Offsets of functionality from the power plane base is architectural, but
+ * not all power planes support all functionality.
+ */
+#define MSR_RAPL_POWER_UNIT		0x00000606
+
+#define MSR_PKG_POWER_LIMIT		0x00000610
+#define MSR_PKG_ENERGY_STATUS		0x00000611
+#define MSR_PKG_PERF_STATUS		0x00000613
+#define MSR_PKG_POWER_INFO		0x00000614
+
+#define MSR_DRAM_POWER_LIMIT		0x00000618
+#define MSR_DRAM_ENERGY_STATUS		0x00000619
+#define MSR_DRAM_PERF_STATUS		0x0000061b
+#define MSR_DRAM_POWER_INFO		0x0000061c
+
+#define MSR_PP0_POWER_LIMIT		0x00000638
+#define MSR_PP0_ENERGY_STATUS		0x00000639
+#define MSR_PP0_POLICY			0x0000063a
+
+#define MSR_PP1_POWER_LIMIT		0x00000640
+#define MSR_PP1_ENERGY_STATUS		0x00000641
+#define MSR_PP1_POLICY			0x00000642
+
+/* Intel Platform-wide power interface. */
+#define MSR_PLATFORM_ENERGY_COUNTER	0x0000064d
+#define MSR_PLATFORM_POWER_LIMIT	0x0000065c
+
 #define MSR_IA32_BNDCFGS		0x00000d90
 #define IA32_BNDCFGS_ENABLE		0x00000001
 #define IA32_BNDCFGS_PRESERVE		0x00000002
@@ -218,6 +250,8 @@
 #define MSR_K8_VM_CR			0xc0010114
 #define MSR_K8_VM_HSAVE_PA		0xc0010117
 
+#define MSR_F15H_CU_POWER		0xc001007a
+#define MSR_F15H_CU_MAX_POWER		0xc001007b
 #define MSR_AMD_FAM15H_EVNTSEL0		0xc0010200
 #define MSR_AMD_FAM15H_PERFCTR0		0xc0010201
 #define MSR_AMD_FAM15H_EVNTSEL1		0xc0010202
@@ -230,6 +264,10 @@
 #define MSR_AMD_FAM15H_PERFCTR4		0xc0010209
 #define MSR_AMD_FAM15H_EVNTSEL5		0xc001020a
 #define MSR_AMD_FAM15H_PERFCTR5		0xc001020b
+
+#define MSR_AMD_RAPL_POWER_UNIT		0xc0010299
+#define MSR_AMD_CORE_ENERGY_STATUS	0xc001029a
+#define MSR_AMD_PKG_ENERGY_STATUS	0xc001029b
 
 #define MSR_AMD_L7S0_FEATURE_MASK	0xc0011002
 #define MSR_AMD_THRM_FEATURE_MASK	0xc0011003
