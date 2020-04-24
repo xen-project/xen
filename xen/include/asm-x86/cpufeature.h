@@ -66,8 +66,6 @@
 
 /* CPUID level 0x80000001.edx */
 #define cpu_has_nx              boot_cpu_has(X86_FEATURE_NX)
-#define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
-                                 && boot_cpu_has(X86_FEATURE_FFXSR))
 #define cpu_has_page1gb         boot_cpu_has(X86_FEATURE_PAGE1GB)
 #define cpu_has_rdtscp          boot_cpu_has(X86_FEATURE_RDTSCP)
 #define cpu_has_3dnow_ext       boot_cpu_has(X86_FEATURE_3DNOWEXT)
