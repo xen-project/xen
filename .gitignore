@@ -1,4 +1,5 @@
 .hg
+.*.cmd
 .*.tmp
 *.orig
 *~

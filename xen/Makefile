@@ -52,7 +52,57 @@ dist: install
 
 ifneq ($(root-make-done),y)
 # section to run before calling Rules.mk, but only once.
+
+# Beautify output
+# ---------------------------------------------------------------------------
 #
+# Normally, we echo the whole command before executing it. By making
+# that echo $($(quiet)$(cmd)), we now have the possibility to set
+# $(quiet) to choose other forms of output instead, e.g.
+#
+#         quiet_cmd_cc_o_c = Compiling $(RELDIR)/$@
+#         cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
+#
+# If $(quiet) is empty, the whole command will be printed.
+# If it is set to "quiet_", only the short version will be printed.
+# If it is set to "silent_", nothing will be printed at all, since
+# the variable $(silent_cmd_cc_o_c) doesn't exist.
+#
+# A simple variant is to prefix commands with $(Q) - that's useful
+# for commands that shall be hidden in non-verbose mode.
+#
+#	$(Q)ln $@ :<
+#
+# If KBUILD_VERBOSE equals 0 then the above command will be hidden.
+# If KBUILD_VERBOSE equals 1 then the above command is displayed.
+#
+# To put more focus on warnings, be less verbose as default
+# Use 'make V=1' to see the full commands
+
+ifeq ("$(origin V)", "command line")
+    KBUILD_VERBOSE := $(V)
+endif
+ifndef KBUILD_VERBOSE
+    KBUILD_VERBOSE := 0
+endif
+
+ifeq ($(KBUILD_VERBOSE),1)
+    quiet :=
+    Q :=
+else
+    quiet := quiet_
+    Q := @
+endif
+
+# If the user is running make -s (silent mode), suppress echoing of
+# commands
+
+ifneq ($(findstring s,$(filter-out --%,$(MAKEFLAGS))),)
+    quiet := silent_
+endif
+
+export quiet Q KBUILD_VERBOSE
+
 # To make sure we do not include .config for any of the *config targets
 # catch them early, and hand them over to tools/kconfig/Makefile
 
@@ -261,7 +311,8 @@ _clean: delete-unfresh-files
 	$(MAKE) $(clean) arch/x86
 	$(MAKE) $(clean) test
 	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) clean
-	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" -o -name "*.gcno" \) -exec rm -f {} \;
+	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" \
+		-o -name "*.gcno" -o -name ".*.cmd" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map *~ core
 	rm -f include/asm-*/asm-offsets.h
 	rm -f .banner

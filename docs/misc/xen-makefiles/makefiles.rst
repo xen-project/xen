@@ -85,3 +85,101 @@ Compilation flags
 
 	CFLAGS-y specifies options for compiling with $(CC).
 	AFLAGS-y specifies assembler options.
+
+
+Build system infrastructure
+===========================
+
+This chapter describe some of the macro used when building Xen.
+
+Macros
+------
+
+
+    if_changed
+	if_changed is the infrastructure used for the following commands.
+
+	Usage::
+
+		target: source(s) FORCE
+			$(call if_changed,ld/objcopy/...)
+
+	When the rule is evaluated, it is checked to see if any files
+	need an update, or the command line has changed since the last
+	invocation. The latter will force a rebuild if any options
+	to the executable have changed.
+	Any target that utilises if_changed must be listed in $(targets),
+	otherwise the command line check will fail, and the target will
+	always be built.
+	if_changed may be used in conjunction with custom commands as
+	defined in "Custom commands".
+
+	Note: It is a typical mistake to forget the FORCE prerequisite.
+	Another common pitfall is that whitespace is sometimes
+	significant; for instance, the below will fail (note the extra space
+	after the comma)::
+
+		target: source(s) FORCE
+
+	**WRONG!**	$(call if_changed, ld/objcopy/...)
+
+	Note:
+		if_changed should not be used more than once per target.
+		It stores the executed command in a corresponding .cmd file
+		and multiple calls would result in overwrites and unwanted
+		results when the target is up to date and only the tests on
+		changed commands trigger execution of commands.
+
+    ld
+	Link target.
+
+	Example::
+
+		targets += setup setup.o bootsect bootsect.o
+		$(obj)/setup $(obj)/bootsect: %: %.o FORCE
+			$(call if_changed,ld)
+
+	$(targets) are assigned all potential targets, by which the build
+	system knows the targets and will:
+
+		1) check for commandline changes
+
+	The ": %: %.o" part of the prerequisite is a shorthand that
+	frees us from listing the setup.o and bootsect.o files.
+
+	Note:
+		It is a common mistake to forget the "targets :=" assignment,
+		resulting in the target file being recompiled for no
+		obvious reason.
+
+    objcopy
+	Copy binary. Uses OBJCOPYFLAGS usually specified in
+	arch/$(ARCH)/Makefile.
+
+Custom commands
+---------------
+
+	When the build system is executing with V=0, then only
+	a shorthand of a command is normally displayed.
+	To enable this behaviour for custom commands, two variables are
+	required to be set::
+
+		quiet_cmd_<command>	- what shall be echoed
+		      cmd_<command>	- the command to execute
+
+	Example::
+
+		# xsm/flask/Makefile
+		mkflask := policy/mkflask.sh
+		quiet_cmd_mkflask = MKFLASK $@
+		cmd_mkflask = $(CONFIG_SHELL) $(mkflask) $(AWK) include \
+			$(FLASK_H_DEPEND)
+
+		include/flask.h: $(FLASK_H_DEPEND) $(mkflask) FORCE
+			$(call if_changed,mkflask)
+
+	When updating the include/flask.h target, the line:
+
+		MKFLASK include/flask.h
+
+	will be displayed with "make V=0". (V=0 is the default)

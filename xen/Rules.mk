@@ -42,6 +42,7 @@ ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 ALL_OBJS-$(CONFIG_CRYPTO)   += $(BASEDIR)/crypto/built_in.o
 
 # Initialise some variables
+targets :=
 CFLAGS-y :=
 AFLAGS-y :=
 
@@ -68,6 +69,10 @@ $(foreach o,$(filter-out %/,$(obj-y) $(obj-bin-y) $(extra-y)),$(eval $(call gend
 #   and add the directory to the list of dirs to descend into: $(subdir-y)
 subdir-y := $(subdir-y) $(filter %/, $(obj-y))
 obj-y    := $(patsubst %/, %/built_in.o, $(obj-y))
+
+# $(subdir-obj-y) is the list of objects in $(obj-y) which uses dir/ to
+# tell kbuild to descend
+subdir-obj-y := $(filter %/built_in.o, $(obj-y))
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS-y += -DINIT_SECTIONS_ONLY
 
@@ -123,6 +128,10 @@ else
 endif
 endif
 
+targets += built_in.o
+targets += $(filter-out $(subdir-obj-y), $(obj-y)) $(extra-y)
+targets += $(MAKECMDGOALS)
+
 built_in_bin.o: $(obj-bin-y) $(extra-y)
 ifeq ($(obj-bin-y),)
 	$(CC) $(a_flags) -c -x assembler /dev/null -o $@
@@ -131,7 +140,7 @@ else
 endif
 
 # Force execution of pattern rules (for which PHONY cannot be directly used).
-.PHONY: FORCE
+PHONY += FORCE
 FORCE:
 
 %/built_in.o: FORCE
@@ -179,4 +188,26 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
 %.s: %.S Makefile
 	$(CPP) $(filter-out -Wa$(comma)%,$(a_flags)) $< -o $@
 
+# Add intermediate targets:
+# When building objects with specific suffix patterns, add intermediate
+# targets that the final targets are derived from.
+intermediate_targets = $(foreach sfx, $(2), \
+				$(patsubst %$(strip $(1)),%$(sfx), \
+					$(filter %$(strip $(1)), $(targets))))
+# %.init.o <- %.o
+targets += $(call intermediate_targets, .init.o, .o)
+
 -include $(DEPS_INCLUDE)
+
+# Read all saved command lines and dependencies for the $(targets) we
+# may be building above, using $(if_changed{,_dep}). As an
+# optimization, we don't need to read them if the target does not
+# exist, we will rebuild anyway in that case.
+
+existing-targets := $(wildcard $(sort $(targets)))
+
+-include $(foreach f,$(existing-targets),$(dir $(f)).$(notdir $(f)).cmd)
+
+# Declare the contents of the PHONY variable as phony.  We keep that
+# information in a variable so we can use it in if_changed and friends.
+.PHONY: $(PHONY)
