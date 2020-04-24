@@ -73,6 +73,7 @@ m4_include([../m4/fetcher.m4])
 m4_include([../m4/ax_compare_version.m4])
 m4_include([../m4/paths.m4])
 m4_include([../m4/systemd.m4])
+m4_include([../m4/golang.m4])
 
 AX_XEN_EXPAND_CONFIG()
 
@@ -84,6 +85,7 @@ AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
 AX_ARG_DEFAULT_ENABLE([xsmpolicy], [Disable XSM policy compilation])
 AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
+AX_ARG_DEFAULT_ENABLE([golang], [Disable Go tools])
 
 AC_ARG_WITH([linux-backend-modules],
     AS_HELP_STRING([--with-linux-backend-modules="mod1 mod2"],
@@ -317,6 +319,16 @@ AS_IF([test "x$ocamltools" = "xy"], [
                 AC_MSG_ERROR([Your version of OCaml: $OCAMLVERSION is not supported])])
             ocamltools="n"
         ])
+    ])
+])
+
+AS_IF([test "x$golang" = "xy"], [
+    AC_PROG_GO
+    AS_IF([test "x$GO" = "xno"], [
+        AS_IF([test "x$enable_golang" =  "xyes"], [
+            AC_MSG_ERROR([Go tools enabled, but missing go compiler])
+        ])
+        golang="n"
     ])
 ])
 

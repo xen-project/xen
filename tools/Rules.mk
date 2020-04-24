@@ -35,8 +35,6 @@ XENSTORE_XENSTORED ?= y
 debug ?= y
 debug_symbols ?= $(debug)
 
-# Set CONFIG_GOLANG=y in .config (or in make) to build golang
-CONFIG_GOLANG ?= n
 XEN_GOPATH        = $(XEN_ROOT)/tools/golang
 XEN_GOCODE_URL    = golang.xenproject.org
 
