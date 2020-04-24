@@ -124,13 +124,55 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 # define CHECK_FOR_LIVEPATCH_WORK ""
 #endif
 
+#ifdef CONFIG_XEN_SHSTK
+/*
+ * We need to unwind the primary shadow stack to its supervisor token, located
+ * in the last word of the primary shadow stack.
+ *
+ * Read the shadow stack pointer, subtract it from supervisor token position,
+ * and divide by 8 to get the number of slots needing popping.
+ *
+ * INCSSPQ can't pop more than 255 entries.  We shouldn't ever need to pop
+ * that many entries, and getting this wrong will cause us to #DF later.  Turn
+ * it into a BUG() now for fractionally easier debugging.
+ */
+# define SHADOW_STACK_WORK                                      \
+    "mov $1, %[ssp];"                                           \
+    "rdsspd %[ssp];"                                            \
+    "cmp $1, %[ssp];"                                           \
+    "je .L_shstk_done.%=;" /* CET not active?  Skip. */         \
+    "mov $%c[skstk_base], %[val];"                              \
+    "and $%c[stack_mask], %[ssp];"                              \
+    "sub %[ssp], %[val];"                                       \
+    "shr $3, %[val];"                                           \
+    "cmp $255, %[val];" /* More than 255 entries?  Crash. */    \
+    UNLIKELY_START(a, shstk_adjust)                             \
+    _ASM_BUGFRAME_TEXT(0)                                       \
+    UNLIKELY_END_SECTION ";"                                    \
+    "incsspq %q[val];"                                          \
+    ".L_shstk_done.%=:"
+#else
+# define SHADOW_STACK_WORK ""
+#endif
+
 #define switch_stack_and_jump(fn, instr)                                \
     ({                                                                  \
+        unsigned int tmp;                                               \
         __asm__ __volatile__ (                                          \
-            "mov %0,%%"__OP"sp;"                                        \
+            SHADOW_STACK_WORK                                           \
+            "mov %[stk], %%rsp;"                                        \
             instr                                                       \
-             "jmp %c1"                                                  \
-            : : "r" (guest_cpu_user_regs()), "i" (fn) : "memory" );     \
+            "jmp %c[fun];"                                              \
+            : [val] "=&r" (tmp),                                        \
+              [ssp] "=&r" (tmp)                                         \
+            : [stk] "r" (guest_cpu_user_regs()),                        \
+              [fun] "i" (fn),                                           \
+              [skstk_base] "i"                                          \
+              ((PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8),               \
+              [stack_mask] "i" (STACK_SIZE - 1),                        \
+              _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__,                \
+                                 __FILE__, NULL)                        \
+            : "memory" );                                               \
         unreachable();                                                  \
     })
 
