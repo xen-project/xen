@@ -329,7 +329,6 @@ void start_secondary(void *unused)
 
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
-    set_processor_id(cpu);
     set_current(idle_vcpu[cpu]);
     this_cpu(curr_vcpu) = idle_vcpu[cpu];
     rdmsrl(MSR_EFER, this_cpu(efer));
@@ -986,6 +985,7 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
 
 static int cpu_smpboot_alloc(unsigned int cpu)
 {
+    struct cpu_info *info;
     unsigned int i, memflags = 0;
     nodeid_t node = cpu_to_node(cpu);
     seg_desc_t *gdt;
@@ -999,6 +999,11 @@ static int cpu_smpboot_alloc(unsigned int cpu)
         stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
     if ( stack_base[cpu] == NULL )
         goto out;
+
+    info = get_cpu_info_from_stack((unsigned long)stack_base[cpu]);
+    info->processor_id = cpu;
+    info->per_cpu_offset = __per_cpu_offset[cpu];
+
     memguard_guard_stack(stack_base[cpu]);
 
     gdt = per_cpu(gdt, cpu) ?: alloc_xenheap_pages(0, memflags);

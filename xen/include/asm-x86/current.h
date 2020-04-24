@@ -100,11 +100,6 @@ static inline struct cpu_info *get_cpu_info(void)
 #define current               (get_current())
 
 #define get_processor_id()    (get_cpu_info()->processor_id)
-#define set_processor_id(id)  do {                                      \
-    struct cpu_info *ci__ = get_cpu_info();                             \
-    ci__->per_cpu_offset = __per_cpu_offset[ci__->processor_id = (id)]; \
-} while (0)
-
 #define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
 
 /*
