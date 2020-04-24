@@ -1,7 +1,10 @@
 CFLAGS-y += -fshort-wchar
 
-%.o: %.ihex
-	$(OBJCOPY) -I ihex -O binary $< $@
+quiet_cmd_objcopy_o_ihex = OBJCOPY $@
+cmd_objcopy_o_ihex = $(OBJCOPY) -I ihex -O binary $< $@
+
+%.o: %.ihex FORCE
+	$(call if_changed,objcopy_o_ihex)
 
 boot.init.o: buildid.o
 

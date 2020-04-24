@@ -56,6 +56,18 @@ SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
 
 include Makefile
 
+# Linking
+# ---------------------------------------------------------------------------
+
+quiet_cmd_ld = LD      $@
+cmd_ld = $(LD) $(XEN_LDFLAGS) -r -o $@ $(real-prereqs)
+
+# Objcopy
+# ---------------------------------------------------------------------------
+
+quiet_cmd_objcopy = OBJCOPY $@
+cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+
 define gendep
     ifneq ($(1),$(subst /,:,$(1)))
         DEPS += $(dir $(1)).$(notdir $(1)).d
@@ -164,29 +176,47 @@ else
 	$(CC) $(c_flags) -c $< -o $@
 endif
 
-%.o: %.S Makefile
-	$(CC) $(a_flags) -c $< -o $@
+quiet_cmd_cc_o_S = CC      $@
+cmd_cc_o_S = $(CC) $(a_flags) -c $< -o $@
 
-$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
-	$(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p;}' | while read idx name sz rest; do \
-		case "$$name" in \
-		.*.local) ;; \
-		.text|.text.*|.data|.data.*|.bss) \
-			test $$sz != 0 || continue; \
-			echo "Error: size of $<:$$name is 0x$$sz" >&2; \
-			exit $$(expr $$idx + 1);; \
-		esac; \
-	done
-	$(OBJCOPY) $(foreach s,$(SPECIAL_DATA_SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
+%.o: %.S FORCE
+	$(call if_changed,cc_o_S)
 
-%.i: %.c Makefile
-	$(CPP) $(filter-out -Wa$(comma)%,$(c_flags)) $< -o $@
 
-%.s: %.c Makefile
-	$(CC) $(filter-out -Wa$(comma)%,$(c_flags)) -S $< -o $@
+quiet_cmd_obj_init_o = INIT_O  $@
+define cmd_obj_init_o
+    $(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p;}' | while read idx name sz rest; do \
+        case "$$name" in \
+        .*.local) ;; \
+        .text|.text.*|.data|.data.*|.bss) \
+            test $$sz != 0 || continue; \
+            echo "Error: size of $<:$$name is 0x$$sz" >&2; \
+            exit $$(expr $$idx + 1);; \
+        esac; \
+    done; \
+    $(OBJCOPY) $(foreach s,$(SPECIAL_DATA_SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
+endef
 
-%.s: %.S Makefile
-	$(CPP) $(filter-out -Wa$(comma)%,$(a_flags)) $< -o $@
+$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o FORCE
+	$(call if_changed,obj_init_o)
+
+quiet_cmd_cpp_i_c = CPP     $@
+cmd_cpp_i_c = $(CPP) $(filter-out -Wa$(comma)%,$(c_flags)) $< -o $@
+
+quiet_cmd_cc_s_c = CC      $@
+cmd_cc_s_c = $(CC) $(filter-out -Wa$(comma)%,$(c_flags)) -S $< -o $@
+
+quiet_cmd_s_S = CPP     $@
+cmd_s_S = $(CPP) $(filter-out -Wa$(comma)%,$(a_flags)) $< -o $@
+
+%.i: %.c FORCE
+	$(call if_changed,cpp_i_c)
+
+%.s: %.c FORCE
+	$(call if_changed,cc_s_c)
+
+%.s: %.S FORCE
+	$(call if_changed,cpp_s_S)
 
 # Add intermediate targets:
 # When building objects with specific suffix patterns, add intermediate
