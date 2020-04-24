@@ -191,9 +191,16 @@ restore_all_guest:
         sarq  $47,%rcx
         incl  %ecx
         cmpl  $1,%ecx
-        movq  8(%rsp),%rcx            # RIP
-        ja    iret_exit_to_guest
+        ja    .Lrestore_rcx_iret_exit_to_guest
 
+        /* Clear the supervisor shadow stack token busy bit. */
+.macro rag_clrssbsy
+        rdsspq %rcx
+        clrssbsy (%rcx)
+.endm
+        ALTERNATIVE "", rag_clrssbsy, X86_FEATURE_XEN_SHSTK
+
+        movq  8(%rsp), %rcx           # RIP
         cmpw  $FLAT_USER_CS32,16(%rsp)# CS
         movq  32(%rsp),%rsp           # RSP
         je    1f
@@ -201,6 +208,8 @@ restore_all_guest:
 1:      sysretl
 
         ALIGN
+.Lrestore_rcx_iret_exit_to_guest:
+        movq  8(%rsp), %rcx           # RIP
 /* No special register assumptions. */
 iret_exit_to_guest:
         andl  $~(X86_EFLAGS_IOPL|X86_EFLAGS_NT|X86_EFLAGS_VM),24(%rsp)
@@ -226,6 +235,7 @@ iret_exit_to_guest:
  * %ss must be saved into the space left by the trampoline.
  */
 ENTRY(lstar_enter)
+        ALTERNATIVE "", "setssbsy", X86_FEATURE_XEN_SHSTK
         /* sti could live here when we don't switch page tables below. */
         movq  8(%rsp),%rax /* Restore %rax. */
         movq  $FLAT_KERNEL_SS,8(%rsp)
@@ -259,6 +269,7 @@ ENTRY(lstar_enter)
         jmp   test_all_events
 
 ENTRY(sysenter_entry)
+        ALTERNATIVE "", "setssbsy", X86_FEATURE_XEN_SHSTK
         /* sti could live here when we don't switch page tables below. */
         pushq $FLAT_USER_SS
         pushq $0
@@ -877,6 +888,27 @@ handle_ist_exception:
         movl  $UREGS_kernel_sizeof/8,%ecx
         movq  %rdi,%rsp
         rep   movsq
+
+        /* Switch Shadow Stacks */
+.macro ist_switch_shstk
+        rdsspq %rdi
+        clrssbsy (%rdi)
+        /*
+         * Switching supervisor shadow stacks is specially hard, as supervisor
+         * and restore tokens are incompatible.
+         *
+         * For now, we only need to switch on to an unused primary shadow
+         * stack, so use SETSSBSY for the purpose, exactly like the
+         * SYSCALL/SYSENTER entry.
+         *
+         * Ideally, we'd want to CLRSSBSY after switching stacks, but that
+         * will leave SSP zeroed so it not an option.  Instead, we transiently
+         * have a zero SSP on this instruction boundary, and depend on IST for
+         * NMI/#MC protection.
+         */
+        setssbsy
+.endm
+        ALTERNATIVE "", ist_switch_shstk, X86_FEATURE_XEN_SHSTK
 1:
 #else
         ASSERT_CONTEXT_IS_XEN
