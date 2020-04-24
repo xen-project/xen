@@ -282,6 +282,8 @@
 ^tools/ocaml/test/xtl$
 ^tools/ocaml/test/send_debug_keys$
 ^tools/ocaml/test/list_domains$
+^tools/golang/src$
+^tools/golang/.*/.*\.gen\.go$
 ^tools/autom4te\.cache$
 ^tools/config\.h$
 ^tools/config\.log$
