@@ -1,3 +1,7 @@
+#
+# See docs/misc/xen-makefiles/makefiles.rst on variables that can be used in
+# Makefile and are consumed by Rules.mk
+#
 
 -include $(BASEDIR)/include/config/auto.conf
 
