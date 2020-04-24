@@ -118,6 +118,64 @@ $(KCONFIG_CONFIG):
 include/config/%.conf include/config/%.conf.cmd: $(KCONFIG_CONFIG)
 	$(MAKE) $(kconfig) syncconfig
 
+ifeq ($(CONFIG_DEBUG),y)
+CFLAGS += -O1
+else
+CFLAGS += -O2
+endif
+
+ifeq ($(CONFIG_FRAME_POINTER),y)
+CFLAGS += -fno-omit-frame-pointer
+else
+CFLAGS += -fomit-frame-pointer
+endif
+
+CFLAGS += -nostdinc -fno-builtin -fno-common
+CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
+$(call cc-option-add,CFLAGS,CC,-Wvla)
+CFLAGS += -pipe -D__XEN__ -include $(BASEDIR)/include/xen/config.h
+CFLAGS-$(CONFIG_DEBUG_INFO) += -g
+
+ifneq ($(CONFIG_CC_IS_CLANG),y)
+# Clang doesn't understand this command line argument, and doesn't appear to
+# have a suitable alternative.  The resulting compiled binary does function,
+# but has an excessively large symbol table.
+CFLAGS += -Wa,--strip-local-absolute
+endif
+
+AFLAGS += -D__ASSEMBLY__
+
+CFLAGS += $(CFLAGS-y)
+# allow extra CFLAGS externally via EXTRA_CFLAGS_XEN_CORE
+CFLAGS += $(EXTRA_CFLAGS_XEN_CORE)
+
+# Most CFLAGS are safe for assembly files:
+#  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
+#  -flto makes no sense and annoys clang
+AFLAGS += $(filter-out -std=gnu% -flto,$(CFLAGS)) $(AFLAGS-y)
+
+# LDFLAGS are only passed directly to $(LD)
+LDFLAGS += $(LDFLAGS_DIRECT) $(LDFLAGS-y)
+
+ifeq ($(CONFIG_UBSAN),y)
+CFLAGS_UBSAN := -fsanitize=undefined
+else
+CFLAGS_UBSAN :=
+endif
+
+ifeq ($(CONFIG_LTO),y)
+CFLAGS += -flto
+LDFLAGS-$(CONFIG_CC_IS_CLANG) += -plugin LLVMgold.so
+endif
+
+include $(BASEDIR)/arch/$(TARGET_ARCH)/arch.mk
+
+# define new variables to avoid the ones defined in Config.mk
+export XEN_CFLAGS := $(CFLAGS)
+export XEN_AFLAGS := $(AFLAGS)
+export XEN_LDFLAGS := $(LDFLAGS)
+export CFLAGS_UBSAN
+
 endif # need-config
 
 .PHONY: build install uninstall clean distclean MAP

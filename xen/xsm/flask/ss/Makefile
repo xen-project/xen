@@ -8,4 +8,4 @@ obj-y += services.o
 obj-y += conditional.o
 obj-y += mls.o
 
-CFLAGS += -I../include
+CFLAGS-y += -I../include

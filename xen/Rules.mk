@@ -38,58 +38,16 @@ ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 ALL_OBJS-$(CONFIG_CRYPTO)   += $(BASEDIR)/crypto/built_in.o
 
 # Initialise some variables
-CFLAGS_UBSAN :=
-
-ifeq ($(CONFIG_DEBUG),y)
-CFLAGS += -O1
-else
-CFLAGS += -O2
-endif
-
-ifeq ($(CONFIG_FRAME_POINTER),y)
-CFLAGS += -fno-omit-frame-pointer
-else
-CFLAGS += -fomit-frame-pointer
-endif
-
-CFLAGS += -nostdinc -fno-builtin -fno-common
-CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
-$(call cc-option-add,CFLAGS,CC,-Wvla)
-CFLAGS += -pipe -D__XEN__ -include $(BASEDIR)/include/xen/config.h
-CFLAGS-$(CONFIG_DEBUG_INFO) += -g
-
-ifneq ($(CONFIG_CC_IS_CLANG),y)
-# Clang doesn't understand this command line argument, and doesn't appear to
-# have an suitable alternative.  The resulting compiled binary does function,
-# but has an excessively large symbol table.
-CFLAGS += -Wa,--strip-local-absolute
-endif
-
-AFLAGS += -D__ASSEMBLY__
+CFLAGS-y :=
+AFLAGS-y :=
 
 ALL_OBJS := $(ALL_OBJS-y)
-
-CFLAGS += $(CFLAGS-y)
-# allow extra CFLAGS externally via EXTRA_CFLAGS_XEN_CORE
-CFLAGS += $(EXTRA_CFLAGS_XEN_CORE)
-
-# Most CFLAGS are safe for assembly files:
-#  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
-#  -flto makes no sense and annoys clang
-AFLAGS += $(filter-out -std=gnu% -flto,$(CFLAGS))
-
-# LDFLAGS are only passed directly to $(LD)
-LDFLAGS += $(LDFLAGS_DIRECT)
-
-LDFLAGS += $(LDFLAGS-y)
 
 SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
                                             $(foreach w,1 2 4, \
                                                         rodata.str$(w).$(a)) \
                                             rodata.cst$(a)) \
                          $(foreach r,rel rel.ro,data.$(r).local)
-
-include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 include Makefile
 
@@ -107,7 +65,7 @@ $(foreach o,$(filter-out %/,$(obj-y) $(obj-bin-y) $(extra-y)),$(eval $(call gend
 subdir-y := $(subdir-y) $(filter %/, $(obj-y))
 obj-y    := $(patsubst %/, %/built_in.o, $(obj-y))
 
-$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -DINIT_SECTIONS_ONLY
+$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS-y += -DINIT_SECTIONS_ONLY
 
 ifeq ($(CONFIG_COVERAGE),y)
 ifeq ($(CONFIG_CC_IS_CLANG),y)
@@ -115,19 +73,16 @@ ifeq ($(CONFIG_CC_IS_CLANG),y)
 else
     COV_FLAGS := -fprofile-arcs -ftest-coverage
 endif
-$(filter-out %.init.o $(nocov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += $(COV_FLAGS)
+$(filter-out %.init.o $(nocov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS-y += $(COV_FLAGS)
 endif
 
 ifeq ($(CONFIG_UBSAN),y)
-CFLAGS_UBSAN += -fsanitize=undefined
 # Any -fno-sanitize= options need to come after any -fsanitize= options
 $(filter-out %.init.o $(noubsan-y),$(obj-y) $(obj-bin-y) $(extra-y)): \
-CFLAGS += $(filter-out -fno-%,$(CFLAGS_UBSAN)) $(filter -fno-%,$(CFLAGS_UBSAN))
+CFLAGS-y += $(filter-out -fno-%,$(CFLAGS_UBSAN)) $(filter -fno-%,$(CFLAGS_UBSAN))
 endif
 
 ifeq ($(CONFIG_LTO),y)
-CFLAGS += -flto
-LDFLAGS-$(CONFIG_CC_IS_CLANG) += -plugin LLVMgold.so
 # Would like to handle all object files as bitcode, but objects made from
 # pure asm are in a different format and have to be collected separately.
 # Mirror the directory tree, collecting them as built_in_bin.o.
@@ -140,10 +95,18 @@ obj-bin-y :=
 endif
 
 # Always build obj-bin files as binary even if they come from C source. 
-$(obj-bin-y): CFLAGS := $(filter-out -flto,$(CFLAGS))
+$(obj-bin-y): XEN_CFLAGS := $(filter-out -flto,$(XEN_CFLAGS))
 
-c_flags = -MMD -MP -MF $(@D)/.$(@F).d $(CFLAGS) '-D__OBJECT_FILE__="$@"'
-a_flags = -MMD -MP -MF $(@D)/.$(@F).d $(AFLAGS)
+# Calculation of flags, first the generic flags, then the arch specific flags,
+# and last the flags modified for a target or a directory.
+
+c_flags = -MMD -MP -MF $(@D)/.$(@F).d $(XEN_CFLAGS) '-D__OBJECT_FILE__="$@"'
+a_flags = -MMD -MP -MF $(@D)/.$(@F).d $(XEN_AFLAGS)
+
+include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
+
+c_flags += $(CFLAGS-y)
+a_flags += $(CFLAGS-y) $(AFLAGS-y)
 
 built_in.o: $(obj-y) $(extra-y)
 ifeq ($(obj-y),)
@@ -152,7 +115,7 @@ else
 ifeq ($(CONFIG_LTO),y)
 	$(LD_LTO) -r -o $@ $(filter-out $(extra-y),$^)
 else
-	$(LD) $(LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
+	$(LD) $(XEN_LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
 endif
 endif
 
@@ -160,7 +123,7 @@ built_in_bin.o: $(obj-bin-y) $(extra-y)
 ifeq ($(obj-bin-y),)
 	$(CC) $(a_flags) -c -x assembler /dev/null -o $@
 else
-	$(LD) $(LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
+	$(LD) $(XEN_LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
 endif
 
 # Force execution of pattern rules (for which PHONY cannot be directly used).

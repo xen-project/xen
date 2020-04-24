@@ -121,32 +121,32 @@ prelink-efi_lto.o: $(ALL_OBJS) efi/runtime.o efi/compat.o
 
 # Link it with all the binary objects
 prelink.o: $(patsubst %/built_in.o,%/built_in_bin.o,$(ALL_OBJS)) prelink_lto.o
-	$(LD) $(LDFLAGS) -r -o $@ $^
+	$(LD) $(XEN_LDFLAGS) -r -o $@ $^
 
 prelink-efi.o: $(patsubst %/built_in.o,%/built_in_bin.o,$(ALL_OBJS)) prelink-efi_lto.o efi/boot.init.o
-	$(LD) $(LDFLAGS) -r -o $@ $^
+	$(LD) $(XEN_LDFLAGS) -r -o $@ $^
 else
 prelink.o: $(ALL_OBJS)
-	$(LD) $(LDFLAGS) -r -o $@ $^
+	$(LD) $(XEN_LDFLAGS) -r -o $@ $^
 
 prelink-efi.o: $(ALL_OBJS) efi/boot.init.o efi/runtime.o efi/compat.o
-	$(LD) $(LDFLAGS) -r -o $@ $(filter-out %/efi/built_in.o,$^)
+	$(LD) $(XEN_LDFLAGS) -r -o $@ $(filter-out %/efi/built_in.o,$^)
 endif
 
 $(TARGET)-syms: prelink.o xen.lds
-	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
+	$(LD) $(XEN_LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0
 	$(NM) -pa --format=sysv $(@D)/.$(@F).0 \
 		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort \
 		>$(@D)/.$(@F).0.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0.o
-	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
+	$(LD) $(XEN_LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(@D)/.$(@F).0.o -o $(@D)/.$(@F).1
 	$(NM) -pa --format=sysv $(@D)/.$(@F).1 \
 		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort $(syms-warn-dup-y) \
 		>$(@D)/.$(@F).1.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
-	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
+	$(LD) $(XEN_LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(@D)/.$(@F).1.o -o $@
 	$(NM) -pa --format=sysv $(@D)/$(@F) \
 		| $(BASEDIR)/tools/symbols --xensyms --sysv --sort \
@@ -159,7 +159,7 @@ note.o: $(TARGET)-syms
 		--rename-section=.data=.note.gnu.build-id -S $@.bin $@
 	rm -f $@.bin
 
-EFI_LDFLAGS = $(patsubst -m%,-mi386pep,$(LDFLAGS)) --subsystem=10
+EFI_LDFLAGS = $(patsubst -m%,-mi386pep,$(XEN_LDFLAGS)) --subsystem=10
 EFI_LDFLAGS += --image-base=$(1) --stack=0,0 --heap=0,0 --strip-debug
 EFI_LDFLAGS += --section-alignment=0x200000 --file-alignment=0x20
 EFI_LDFLAGS += --major-image-version=$(XEN_VERSION)
@@ -168,7 +168,7 @@ EFI_LDFLAGS += --major-os-version=2 --minor-os-version=0
 EFI_LDFLAGS += --major-subsystem-version=2 --minor-subsystem-version=0
 
 # Check if the compiler supports the MS ABI.
-export XEN_BUILD_EFI := $(shell $(CC) $(CFLAGS) -c efi/check.c -o efi/check.o 2>/dev/null && echo y)
+export XEN_BUILD_EFI := $(shell $(CC) $(XEN_CFLAGS) -c efi/check.c -o efi/check.o 2>/dev/null && echo y)
 # Check if the linker supports PE.
 XEN_BUILD_PE := $(if $(XEN_BUILD_EFI),$(shell $(LD) -mi386pep --subsystem=10 -o efi/check.efi efi/check.o 2>/dev/null && echo y))
 CFLAGS-$(XEN_BUILD_EFI) += -DXEN_BUILD_EFI
@@ -178,7 +178,7 @@ $(TARGET).efi: ALT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A ALT_
 
 ifneq ($(build_id_linker),)
 ifeq ($(call ld-ver-build-id,$(LD) $(filter -m%,$(EFI_LDFLAGS))),y)
-CFLAGS += -DBUILD_ID_EFI
+CFLAGS-y += -DBUILD_ID_EFI
 EFI_LDFLAGS += $(build_id_linker)
 note_file := efi/buildid.o
 # NB: this must be the last input in the linker call, because inputs following
@@ -225,7 +225,7 @@ efi/boot.init.o efi/runtime.o efi/compat.o efi/buildid.o efi/relocs-dummy.o: ;
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(BASEDIR)/include/asm-x86/asm-macros.h
 	$(CC) $(filter-out -Wa$(comma)% -flto,$(c_flags)) -S -o $@ $<
 
-asm-macros.i: CFLAGS += -D__ASSEMBLY__ -P
+asm-macros.i: CFLAGS-y += -D__ASSEMBLY__ -P
 
 $(BASEDIR)/include/asm-x86/asm-macros.h: asm-macros.i Makefile
 	echo '#if 0' >$@.new
@@ -238,7 +238,7 @@ $(BASEDIR)/include/asm-x86/asm-macros.h: asm-macros.i Makefile
 	echo '#endif' >>$@.new
 	$(call move-if-changed,$@.new,$@)
 
-efi.lds: AFLAGS += -DEFI
+efi.lds: AFLAGS-y += -DEFI
 xen.lds efi.lds: xen.lds.S
 	$(CC) -P -E -Ui386 $(filter-out -Wa$(comma)%,$(a_flags)) -o $@ $<
 	sed -e 's/.*\.lds\.o:/$(@F):/g' <.$(@F).d >.$(@F).d.new

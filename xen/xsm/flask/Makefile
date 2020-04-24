@@ -4,7 +4,7 @@ obj-y += flask_op.o
 
 obj-y += ss/
 
-CFLAGS += -I./include
+CFLAGS-y += -I./include
 
 AWK = awk
 
