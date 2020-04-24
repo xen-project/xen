@@ -83,9 +83,9 @@
  * Requires nothing
  * Clobbers \tmp (%rax by default), %rcx
  *
- * Requires 256 bytes of stack space, but %rsp has no net change. Based on
- * Google's performance numbers, the loop is unrolled to 16 iterations and two
- * calls per iteration.
+ * Requires 256 bytes of {,shadow}stack space, but %rsp/SSP has no net
+ * change. Based on Google's performance numbers, the loop is unrolled to 16
+ * iterations and two calls per iteration.
  *
  * The call filling the RSB needs a nonzero displacement.  A nop would do, but
  * we use "1: pause; lfence; jmp 1b" to safely contains any ret-based
@@ -114,6 +114,16 @@
     sub $1, %ecx
     jnz .L\@_fill_rsb_loop
     mov %\tmp, %rsp                 /* Restore old %rsp */
+
+#ifdef CONFIG_XEN_SHSTK
+    mov $1, %ecx
+    rdsspd %ecx
+    cmp $1, %ecx
+    je .L\@_shstk_done
+    mov $64, %ecx                   /* 64 * 4 bytes, given incsspd */
+    incsspd %ecx                    /* Restore old SSP */
+.L\@_shstk_done:
+#endif
 .endm
 
 .macro DO_SPEC_CTRL_ENTRY_FROM_HVM
