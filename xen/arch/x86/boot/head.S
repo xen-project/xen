@@ -402,6 +402,9 @@ __pvh_start:
 
         mov     %ebx, sym_esi(pvh_start_info_pa)
 
+        /* Force xen console.  Will revert to user choice in init code. */
+        movb    $-1, sym_esi(opt_console_xen)
+
         /* Prepare gdt and segments */
         add     %esi, sym_esi(gdt_boot_base)
         lgdt    sym_esi(gdt_boot_descr)
