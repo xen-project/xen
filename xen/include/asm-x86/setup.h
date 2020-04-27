@@ -13,6 +13,7 @@ extern char __2M_init_start[], __2M_init_end[];
 extern char __2M_rwdata_start[], __2M_rwdata_end[];
 
 extern unsigned long xenheap_initial_phys_start;
+extern uint64_t boot_tsc_stamp;
 
 void early_cpu_init(void);
 void early_time_init(void);

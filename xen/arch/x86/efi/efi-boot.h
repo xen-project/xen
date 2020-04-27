@@ -8,6 +8,7 @@
 #include <asm/edd.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/setup.h>
 
 static struct file __initdata ucode;
 static multiboot_info_t __initdata mbi = {
@@ -638,6 +639,8 @@ static void __init efi_arch_cpu(void)
 {
     uint32_t eax = cpuid_eax(0x80000000);
     uint32_t *caps = boot_cpu_data.x86_capability;
+
+    boot_tsc_stamp = rdtsc();
 
     caps[cpufeat_word(X86_FEATURE_HYPERVISOR)] = cpuid_ecx(1);
 
