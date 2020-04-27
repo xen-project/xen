@@ -21,10 +21,10 @@ ALL_H_FILES = $(FLASK_H_FILES) $(AV_H_FILES)
 
 $(obj-y) ss/built_in.o: $(ALL_H_FILES)
 
-$(FLASK_H_FILES): $(FLASK_H_DEPEND)
+$(subst include/,%/,$(FLASK_H_FILES)): $(FLASK_H_DEPEND)
 	$(CONFIG_SHELL) policy/mkflask.sh $(AWK) include $(FLASK_H_DEPEND)
 
-$(AV_H_FILES): $(AV_H_DEPEND)
+$(subst include/,%/,$(AV_H_FILES)): $(AV_H_DEPEND)
 	$(CONFIG_SHELL) policy/mkaccess_vector.sh $(AWK) $(AV_H_DEPEND)
 
 obj-bin-$(CONFIG_XSM_FLASK_POLICY) += flask-policy.o
