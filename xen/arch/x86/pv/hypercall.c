@@ -54,7 +54,7 @@ const hypercall_table_t pv_hypercall_table[] = {
     HYPERCALL(console_io),
     COMPAT_CALL(physdev_op_compat),
     COMPAT_CALL(grant_table_op),
-    COMPAT_CALL(vm_assist),
+    HYPERCALL(vm_assist),
     COMPAT_CALL(update_va_mapping_otherdomain),
     COMPAT_CALL(iret),
     COMPAT_CALL(vcpu_op),

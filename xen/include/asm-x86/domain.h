@@ -703,6 +703,25 @@ static inline void pv_inject_sw_interrupt(unsigned int vector)
     pv_inject_event(&event);
 }
 
+#define PV32_VM_ASSIST_MASK ((1UL << VMASST_TYPE_4gb_segments)        | \
+                             (1UL << VMASST_TYPE_4gb_segments_notify) | \
+                             (1UL << VMASST_TYPE_writable_pagetables) | \
+                             (1UL << VMASST_TYPE_pae_extended_cr3)    | \
+                             (1UL << VMASST_TYPE_architectural_iopl)  | \
+                             (1UL << VMASST_TYPE_runstate_update_flag))
+/*
+ * Various of what PV32_VM_ASSIST_MASK has isn't really applicable to 64-bit,
+ * but we can't make such requests fail all of the sudden.
+ */
+#define PV64_VM_ASSIST_MASK (PV32_VM_ASSIST_MASK                      | \
+                             (1UL << VMASST_TYPE_m2p_strict))
+#define HVM_VM_ASSIST_MASK  (1UL << VMASST_TYPE_runstate_update_flag)
+
+#define arch_vm_assist_valid_mask(d) \
+    (is_hvm_domain(d) ? HVM_VM_ASSIST_MASK \
+                      : is_pv_32bit_domain(d) ? PV32_VM_ASSIST_MASK \
+                                              : PV64_VM_ASSIST_MASK)
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

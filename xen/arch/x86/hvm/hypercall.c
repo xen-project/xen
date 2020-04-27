@@ -120,6 +120,7 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 static const hypercall_table_t hvm_hypercall_table[] = {
     HVM_CALL(memory_op),
     HVM_CALL(grant_table_op),
+    HYPERCALL(vm_assist),
     COMPAT_CALL(vcpu_op),
     HVM_CALL(physdev_op),
     COMPAT_CALL(xen_version),

@@ -875,6 +875,9 @@ int arch_set_info_guest(
         v->arch.dr6 = c(debugreg[6]);
         v->arch.dr7 = c(debugreg[7]);
 
+        if ( v->vcpu_id == 0 )
+            d->vm_assist = c.nat->vm_assist;
+
         hvm_set_info_guest(v);
         goto out;
     }
