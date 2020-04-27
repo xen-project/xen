@@ -89,7 +89,7 @@
     char (*_d)[sizeof(*_s)] = (void *)(hnd).p;          \
     /* Check that the handle is not for a const type */ \
     void *__maybe_unused _t = (hnd).p;                  \
-    ((void)((hnd).p == (ptr)));                         \
+    (void)((hnd).p == _s);                              \
     raw_copy_to_guest(_d+(off), _s, sizeof(*_s)*(nr));  \
 })
 
@@ -112,7 +112,7 @@
 #define copy_field_to_guest(hnd, ptr, field) ({         \
     const typeof(&(ptr)->field) _s = &(ptr)->field;     \
     void *_d = &(hnd).p->field;                         \
-    ((void)(&(hnd).p->field == &(ptr)->field));         \
+    (void)(&(hnd).p->field == _s);                      \
     raw_copy_to_guest(_d, _s, sizeof(*_s));             \
 })
 
@@ -141,7 +141,7 @@
     char (*_d)[sizeof(*_s)] = (void *)(hnd).p;          \
     /* Check that the handle is not for a const type */ \
     void *__maybe_unused _t = (hnd).p;                  \
-    ((void)((hnd).p == (ptr)));                         \
+    (void)((hnd).p == _s);                              \
     __raw_copy_to_guest(_d+(off), _s, sizeof(*_s)*(nr));\
 })
 
@@ -159,7 +159,7 @@
 #define __copy_field_to_guest(hnd, ptr, field) ({       \
     const typeof(&(ptr)->field) _s = &(ptr)->field;     \
     void *_d = &(hnd).p->field;                         \
-    ((void)(&(hnd).p->field == &(ptr)->field));         \
+    (void)(&(hnd).p->field == _s);                      \
     __raw_copy_to_guest(_d, _s, sizeof(*_s));           \
 })
 
