@@ -112,6 +112,7 @@ void __dummy__(void)
     OFFSET(CPUINFO_guest_cpu_user_regs, struct cpu_info, guest_cpu_user_regs);
     OFFSET(CPUINFO_verw_sel, struct cpu_info, verw_sel);
     OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
+    OFFSET(CPUINFO_per_cpu_offset, struct cpu_info, per_cpu_offset);
     OFFSET(CPUINFO_cr4, struct cpu_info, cr4);
     OFFSET(CPUINFO_xen_cr3, struct cpu_info, xen_cr3);
     OFFSET(CPUINFO_pv_cr3, struct cpu_info, pv_cr3);
