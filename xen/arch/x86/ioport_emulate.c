@@ -8,7 +8,10 @@
 #include <xen/sched.h>
 #include <xen/dmi.h>
 
-static bool ioemul_handle_proliant_quirk(
+unsigned int (*__read_mostly ioemul_handle_quirk)(
+    uint8_t opcode, char *io_emul_stub, struct cpu_user_regs *regs);
+
+static unsigned int ioemul_handle_proliant_quirk(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs)
 {
     static const char stub[] = {
@@ -19,18 +22,17 @@ static bool ioemul_handle_proliant_quirk(
         0xa8, 0x80, /*    test $0x80, %al */
         0x75, 0xfb, /*    jnz 1b          */
         0x9d,       /*    popf            */
-        0xc3,       /*    ret             */
     };
     uint16_t port = regs->dx;
     uint8_t value = regs->al;
 
     if ( (opcode != 0xee) || (port != 0xcd4) || !(value & 0x80) )
-        return false;
+        return 0;
 
     memcpy(io_emul_stub, stub, sizeof(stub));
     BUILD_BUG_ON(IOEMUL_QUIRK_STUB_BYTES < sizeof(stub));
 
-    return true;
+    return sizeof(stub);
 }
 
 /* This table is the set of system-specific I/O emulation hooks. */

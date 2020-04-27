@@ -118,9 +118,6 @@ idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
  */
 DEFINE_PER_CPU_PAGE_ALIGNED(struct tss_page, tss_page);
 
-bool (*ioemul_handle_quirk)(
-    u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
-
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
