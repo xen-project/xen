@@ -8,6 +8,7 @@
 #include <asm/edd.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/setup.h>
 
 static struct file __initdata ucode;
 static multiboot_info_t __initdata mbi = {
@@ -637,6 +638,8 @@ static void __init efi_arch_handle_module(struct file *file, const CHAR16 *name,
 static void __init efi_arch_cpu(void)
 {
     uint32_t eax = cpuid_eax(0x80000000);
+
+    boot_tsc_stamp = rdtsc();
 
     if ( (eax >> 16) == 0x8000 && eax > 0x80000000 )
     {
