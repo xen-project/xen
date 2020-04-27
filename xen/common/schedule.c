@@ -683,6 +683,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         unsigned int unit_p = new_p;
 
         unitdata = unit->priv;
+        unit->priv = unit_priv[unit_idx];
 
         for_each_sched_unit_vcpu ( unit, v )
         {
@@ -704,7 +705,6 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
          */
         spin_unlock_irq(lock);
 
-        unit->priv = unit_priv[unit_idx];
         if ( !d->is_dying )
             sched_move_irqs(unit);
 
