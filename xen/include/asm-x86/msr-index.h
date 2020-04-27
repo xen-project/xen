@@ -179,6 +179,14 @@
 #define MSR_IA32_VMX_TRUE_ENTRY_CTLS            0x490
 #define MSR_IA32_VMX_VMFUNC                     0x491
 
+#define MSR_U_CET                           0x000006a0
+#define MSR_S_CET                           0x000006a2
+#define MSR_PL0_SSP                         0x000006a4
+#define MSR_PL1_SSP                         0x000006a5
+#define MSR_PL2_SSP                         0x000006a6
+#define MSR_PL3_SSP                         0x000006a7
+#define MSR_INTERRUPT_SSP_TABLE             0x000006a8
+
 /* K7/K8 MSRs. Not complete. See the architecture manual for a more
    complete list. */
 #define MSR_K7_EVNTSEL0			0xc0010000
