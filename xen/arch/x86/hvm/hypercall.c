@@ -124,6 +124,7 @@ static const hypercall_table_t hvm_hypercall_table[] = {
 #ifdef CONFIG_GRANT_TABLE
     HVM_CALL(grant_table_op),
 #endif
+    HYPERCALL(vm_assist),
     COMPAT_CALL(vcpu_op),
     HVM_CALL(physdev_op),
     COMPAT_CALL(xen_version),

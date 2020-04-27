@@ -565,13 +565,6 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return -ENOSYS;
 }
 
-#ifdef VM_ASSIST_VALID
-DO(vm_assist)(unsigned int cmd, unsigned int type)
-{
-    return vm_assist(current->domain, cmd, type, VM_ASSIST_VALID);
-}
-#endif
-
 /*
  * Local variables:
  * mode: C

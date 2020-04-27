@@ -56,7 +56,7 @@ const hypercall_table_t pv_hypercall_table[] = {
 #ifdef CONFIG_GRANT_TABLE
     COMPAT_CALL(grant_table_op),
 #endif
-    COMPAT_CALL(vm_assist),
+    HYPERCALL(vm_assist),
     COMPAT_CALL(update_va_mapping_otherdomain),
     COMPAT_CALL(iret),
     COMPAT_CALL(vcpu_op),

@@ -308,17 +308,6 @@ extern unsigned long xen_phys_start;
 #define ARG_XLAT_START(v)        \
     (ARG_XLAT_VIRT_START + ((v)->vcpu_id << ARG_XLAT_VA_SHIFT))
 
-#define NATIVE_VM_ASSIST_VALID   ((1UL << VMASST_TYPE_4gb_segments)        | \
-                                  (1UL << VMASST_TYPE_4gb_segments_notify) | \
-                                  (1UL << VMASST_TYPE_writable_pagetables) | \
-                                  (1UL << VMASST_TYPE_pae_extended_cr3)    | \
-                                  (1UL << VMASST_TYPE_architectural_iopl)  | \
-                                  (1UL << VMASST_TYPE_runstate_update_flag)| \
-                                  (1UL << VMASST_TYPE_m2p_strict))
-#define VM_ASSIST_VALID          NATIVE_VM_ASSIST_VALID
-#define COMPAT_VM_ASSIST_VALID   (NATIVE_VM_ASSIST_VALID & \
-                                  ((1UL << COMPAT_BITS_PER_LONG) - 1))
-
 #define ELFSIZE 64
 
 #define ARCH_CRASH_SAVE_VMCOREINFO

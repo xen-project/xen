@@ -192,8 +192,6 @@ extern int compat_xsm_op(
 
 extern int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg);
 
-extern int compat_vm_assist(unsigned int cmd, unsigned int type);
-
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_compat_t);
 extern int compat_multicall(
     XEN_GUEST_HANDLE_PARAM(multicall_entry_compat_t) call_list,

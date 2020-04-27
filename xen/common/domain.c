@@ -1601,20 +1601,23 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
-#ifdef VM_ASSIST_VALID
-long vm_assist(struct domain *p, unsigned int cmd, unsigned int type,
-               unsigned long valid)
+#ifdef arch_vm_assist_valid_mask
+long do_vm_assist(unsigned int cmd, unsigned int type)
 {
+    struct domain *currd = current->domain;
+    const unsigned long valid = arch_vm_assist_valid_mask(currd);
+
     if ( type >= BITS_PER_LONG || !test_bit(type, &valid) )
         return -EINVAL;
 
     switch ( cmd )
     {
     case VMASST_CMD_enable:
-        set_bit(type, &p->vm_assist);
+        set_bit(type, &currd->vm_assist);
         return 0;
+
     case VMASST_CMD_disable:
-        clear_bit(type, &p->vm_assist);
+        clear_bit(type, &currd->vm_assist);
         return 0;
     }
 
