@@ -679,7 +679,11 @@ handle_exception_saved:
 1:      movq  %rsp,%rdi
         movzbl UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
-        PERFC_INCR(exceptions, %rax, %rbx)
+#ifdef CONFIG_PERF_COUNTERS
+        lea   per_cpu__perfcounters(%rip), %rcx
+        add   STACK_CPUINFO_FIELD(per_cpu_offset)(%r14), %rcx
+        incl  ASM_PERFC_exceptions * 4(%rcx, %rax, 4)
+#endif
         mov   (%rdx, %rax, 8), %rdx
         INDIRECT_CALL %rdx
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)

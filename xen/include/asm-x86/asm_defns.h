@@ -346,22 +346,6 @@ static always_inline void stac(void)
 
 #endif
 
-#ifdef CONFIG_PERF_COUNTERS
-#define PERFC_INCR(_name,_idx,_cur)             \
-        pushq _cur;                             \
-        movslq VCPU_processor(_cur),_cur;       \
-        pushq %rdx;                             \
-        leaq __per_cpu_offset(%rip),%rdx;       \
-        movq (%rdx,_cur,8),_cur;                \
-        leaq per_cpu__perfcounters(%rip),%rdx;  \
-        addq %rdx,_cur;                         \
-        popq %rdx;                              \
-        incl ASM_PERFC_##_name*4(_cur,_idx,4);  \
-        popq _cur
-#else
-#define PERFC_INCR(_name,_idx,_cur)
-#endif
-
 /* Work around AMD erratum #88 */
 #define safe_swapgs                             \
         "mfence; swapgs;"
