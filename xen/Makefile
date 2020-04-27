@@ -150,10 +150,10 @@ config: FORCE
 else # !config-build
 
 ifeq ($(need-config),y)
-include include/config/auto.conf
+-include include/config/auto.conf
 # Read in dependencies to all Kconfig* files, make sure to run syncconfig if
 # changes are detected.
-include include/config/auto.conf.cmd
+-include include/config/auto.conf.cmd
 
 # Allow people to just run `make` as before and not force them to configure
 $(KCONFIG_CONFIG):
