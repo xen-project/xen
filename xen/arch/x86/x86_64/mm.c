@@ -737,8 +737,8 @@ static void cleanup_frame_table(struct mem_hotadd_info *info)
 
     while (sva < eva)
     {
-        l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(sva)])[
-          l3_table_offset(sva)];
+        l3e = l3e_from_l4e(idle_pg_table[l4_table_offset(sva)],
+                           l3_table_offset(sva));
         if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
              (l3e_get_flags(l3e) & _PAGE_PSE) )
         {
@@ -747,7 +747,7 @@ static void cleanup_frame_table(struct mem_hotadd_info *info)
             continue;
         }
 
-        l2e = l3e_to_l2e(l3e)[l2_table_offset(sva)];
+        l2e = l2e_from_l3e(l3e, l2_table_offset(sva));
         ASSERT(l2e_get_flags(l2e) & _PAGE_PRESENT);
 
         if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) ==
@@ -763,10 +763,10 @@ static void cleanup_frame_table(struct mem_hotadd_info *info)
             continue;
         }
 
-        ASSERT(l1e_get_flags(l2e_to_l1e(l2e)[l1_table_offset(sva)]) &
-                _PAGE_PRESENT);
-         sva = (sva & ~((1UL << PAGE_SHIFT) - 1)) +
-                    (1UL << PAGE_SHIFT);
+        ASSERT(l1e_get_flags(l1e_from_l2e(l2e, l1_table_offset(sva))) &
+               _PAGE_PRESENT);
+
+        sva = (sva & PAGE_MASK) + PAGE_SIZE;
     }
 
     /* Brute-Force flush all TLB */
