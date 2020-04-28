@@ -858,23 +858,27 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
           r < root_table_offset(HYPERVISOR_VIRT_END); ++r )
     {
         l3_pgentry_t *l3t;
+        mfn_t l3mfn;
         unsigned int i3;
 
         if ( !(root_get_flags(rpt[r]) & _PAGE_PRESENT) )
             continue;
 
-        l3t = l4e_to_l3e(rpt[r]);
+        l3mfn = l4e_get_mfn(rpt[r]);
+        l3t = map_domain_page(l3mfn);
 
         for ( i3 = 0; i3 < L3_PAGETABLE_ENTRIES; ++i3 )
         {
             l2_pgentry_t *l2t;
+            mfn_t l2mfn;
             unsigned int i2;
 
             if ( !(l3e_get_flags(l3t[i3]) & _PAGE_PRESENT) )
                 continue;
 
             ASSERT(!(l3e_get_flags(l3t[i3]) & _PAGE_PSE));
-            l2t = l3e_to_l2e(l3t[i3]);
+            l2mfn = l3e_get_mfn(l3t[i3]);
+            l2t = map_domain_page(l2mfn);
 
             for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; ++i2 )
             {
@@ -882,13 +886,15 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
                     continue;
 
                 ASSERT(!(l2e_get_flags(l2t[i2]) & _PAGE_PSE));
-                free_xen_pagetable(l2e_to_l1e(l2t[i2]));
+                free_xen_pagetable_new(l2e_get_mfn(l2t[i2]));
             }
 
-            free_xen_pagetable(l2t);
+            unmap_domain_page(l2t);
+            free_xen_pagetable_new(l2mfn);
         }
 
-        free_xen_pagetable(l3t);
+        unmap_domain_page(l3t);
+        free_xen_pagetable_new(l3mfn);
     }
 
     free_xen_pagetable(rpt);
@@ -896,11 +902,14 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
     /* Also zap the stub mapping for this CPU. */
     if ( stub_linear )
     {
-        l3_pgentry_t *l3t = l4e_to_l3e(common_pgt);
-        l2_pgentry_t *l2t = l3e_to_l2e(l3t[l3_table_offset(stub_linear)]);
-        l1_pgentry_t *l1t = l2e_to_l1e(l2t[l2_table_offset(stub_linear)]);
+        l3_pgentry_t l3e = l3e_from_l4e(common_pgt,
+                                        l3_table_offset(stub_linear));
+        l2_pgentry_t l2e = l2e_from_l3e(l3e, l2_table_offset(stub_linear));
+        l1_pgentry_t *l1t = map_l1t_from_l2e(l2e);
 
         l1t[l1_table_offset(stub_linear)] = l1e_empty();
+
+        unmap_domain_page(l1t);
     }
 }
 
