@@ -289,23 +289,6 @@ IS_DOMAIN_INTRODUCED	<domid>|		T| or F|
 	ie, if INTRODUCE for the domain has not yet been followed by
 	domain destruction or explicit RELEASE.
 
-RESUME			<domid>|
-
-	Arranges that @releaseDomain events will once more be
-	generated when the domain becomes shut down.  This might have
-	to be used if a domain were to be shut down (generating one
-	@releaseDomain) and then subsequently restarted, since the
-	state-sensitive algorithm in xenstored will not otherwise send
-	further watch event notifications if the domain were to be
-	shut down again.
-
-	It is not clear whether this is possible since one would
-	normally expect a domain not to be restarted after being shut
-	down without being destroyed in the meantime.  There are
-	currently no users of this request in xen-unstable.
-
-	xenstored prevents the use of RESUME other than by dom0.
-
 SET_TARGET		<domid>|<tdomid>|
 	Notifies xenstored that domain <domid> is targeting domain
 	<tdomid>. This grants domain <domid> full access to paths
