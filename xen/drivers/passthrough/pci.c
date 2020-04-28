@@ -760,7 +760,6 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
             {
                 unsigned int idx = pos + PCI_SRIOV_BAR + i * 4;
                 uint32_t bar = pci_conf_read32(pdev->sbdf, idx);
-                pci_sbdf_t sbdf = PCI_SBDF3(seg, bus, devfn);
 
                 if ( (bar & PCI_BASE_ADDRESS_SPACE) ==
                      PCI_BASE_ADDRESS_SPACE_IO )
@@ -771,7 +770,8 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
                            seg, bus, slot, func, i);
                     continue;
                 }
-                ret = pci_size_mem_bar(sbdf, idx, NULL, &pdev->vf_rlen[i],
+                ret = pci_size_mem_bar(pdev->sbdf, idx, NULL,
+                                       &pdev->vf_rlen[i],
                                        PCI_BAR_VF |
                                        ((i == PCI_SRIOV_NUM_BARS - 1) ?
                                         PCI_BAR_LAST : 0));
