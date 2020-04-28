@@ -669,6 +669,8 @@ int __init dom0_construct_pv(struct domain *d,
 
     if ( is_pv_32bit_domain(d) )
     {
+        l2_pgentry_t *l2t;
+
         /* Ensure the first four L3 entries are all populated. */
         for ( i = 0, l3tab = l3start; i < 4; ++i, ++l3tab )
         {
@@ -683,7 +685,9 @@ int __init dom0_construct_pv(struct domain *d,
                 l3e_get_page(*l3tab)->u.inuse.type_info |= PGT_pae_xen_l2;
         }
 
-        init_xen_pae_l2_slots(l3e_to_l2e(l3start[3]), d);
+        l2t = map_l2t_from_l3e(l3start[3]);
+        init_xen_pae_l2_slots(l2t, d);
+        unmap_domain_page(l2t);
     }
 
     /* Pages that are part of page tables must be read only. */
