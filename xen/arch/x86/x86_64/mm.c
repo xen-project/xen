@@ -932,13 +932,13 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
               (v < (unsigned long)(machine_to_phys_mapping + max_page));
               i++, v += 1UL << L2_PAGETABLE_SHIFT )
         {
-            l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
-                l3_table_offset(v)];
+            l3e = l3e_from_l4e(idle_pg_table[l4_table_offset(v)],
+                               l3_table_offset(v));
             if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
                 mfn = last_mfn;
             else if ( !(l3e_get_flags(l3e) & _PAGE_PSE) )
             {
-                l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+                l2e = l2e_from_l3e(l3e, l2_table_offset(v));
                 if ( l2e_get_flags(l2e) & _PAGE_PRESENT )
                     mfn = l2e_get_pfn(l2e);
                 else
