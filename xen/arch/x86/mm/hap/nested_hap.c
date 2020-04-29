@@ -84,7 +84,7 @@ nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     safe_write_pte(p, new);
 
     if (old_flags & _PAGE_PRESENT)
-        flush_tlb_mask(p2m->dirty_cpumask);
+        guest_flush_tlb_mask(d, p2m->dirty_cpumask);
 
     paging_unlock(d);
 

@@ -7,6 +7,7 @@
  * Copyright (c) 2003-2006, K A Fraser
  */
 
+#include <xen/paging.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>
@@ -59,8 +60,6 @@ static u32 pre_flush(void)
         raise_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ);
 
  skip_clocktick:
-    hvm_flush_guest_tlbs();
-
     return t2;
 }
 
@@ -118,6 +117,7 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
     local_irq_save(flags);
 
     t = pre_flush();
+    hvm_flush_guest_tlbs();
 
     old_cr4 = read_cr4();
     ASSERT(!(old_cr4 & X86_CR4_PCIDE) || !(old_cr4 & X86_CR4_PGE));
@@ -221,6 +221,9 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
             do_tlb_flush();
     }
 
+    if ( flags & FLUSH_HVM_ASID_CORE )
+        hvm_flush_guest_tlbs();
+
     if ( flags & FLUSH_CACHE )
     {
         const struct cpuinfo_x86 *c = &current_cpu_data;
@@ -253,4 +256,20 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
         get_cpu_info()->root_pgt_changed = true;
 
     return flags;
+}
+
+unsigned int guest_flush_tlb_flags(const struct domain *d)
+{
+    bool shadow = paging_mode_shadow(d);
+    bool asid = is_hvm_domain(d) && (cpu_has_svm || shadow);
+
+    return (shadow ? FLUSH_TLB : 0) | (asid ? FLUSH_HVM_ASID_CORE : 0);
+}
+
+void guest_flush_tlb_mask(const struct domain *d, const cpumask_t *mask)
+{
+    unsigned int flags = guest_flush_tlb_flags(d);
+
+    if ( flags )
+        flush_mask(mask, flags);
 }

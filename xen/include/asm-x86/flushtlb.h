@@ -105,6 +105,12 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4);
 #define FLUSH_VCPU_STATE 0x1000
  /* Flush the per-cpu root page table */
 #define FLUSH_ROOT_PGTBL 0x2000
+#if CONFIG_HVM
+ /* Flush all HVM guests linear TLB (using ASID/VPID) */
+#define FLUSH_HVM_ASID_CORE 0x4000
+#else
+#define FLUSH_HVM_ASID_CORE 0
+#endif
 
 /* Flush local TLBs/caches. */
 unsigned int flush_area_local(const void *va, unsigned int flags);
@@ -158,5 +164,8 @@ static inline int clean_dcache_va_range(const void *p, unsigned long size)
 {
     return clean_and_invalidate_dcache_va_range(p, size);
 }
+
+unsigned int guest_flush_tlb_flags(const struct domain *d);
+void guest_flush_tlb_mask(const struct domain *d, const cpumask_t *mask);
 
 #endif /* __FLUSHTLB_H__ */
