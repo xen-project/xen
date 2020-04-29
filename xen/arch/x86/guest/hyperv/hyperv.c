@@ -33,6 +33,7 @@ DEFINE_PER_CPU_READ_MOSTLY(void *, hv_input_page);
 DEFINE_PER_CPU_READ_MOSTLY(void *, hv_vp_assist);
 DEFINE_PER_CPU_READ_MOSTLY(unsigned int, hv_vp_index);
 
+unsigned int __read_mostly hv_max_vp_index;
 static bool __read_mostly hcall_page_ready;
 
 static uint64_t generate_guest_id(void)
@@ -142,6 +143,9 @@ static int setup_hypercall_pcpu_arg(void)
 
     rdmsrl(HV_X64_MSR_VP_INDEX, vp_index_msr);
     this_cpu(hv_vp_index) = vp_index_msr;
+
+    if ( vp_index_msr > hv_max_vp_index )
+        hv_max_vp_index = vp_index_msr;
 
     return 0;
 }

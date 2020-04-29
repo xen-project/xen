@@ -33,7 +33,7 @@ int cpumask_to_vpset(struct hv_vpset *vpset,
 {
     int nr = 1;
     unsigned int cpu, vcpu_bank, vcpu_offset;
-    unsigned int max_banks = ms_hyperv.max_vp_index / 64;
+    unsigned int max_banks = hv_max_vp_index / 64;
 
     /* Up to 64 banks can be represented by valid_bank_mask */
     if ( max_banks > 64 )

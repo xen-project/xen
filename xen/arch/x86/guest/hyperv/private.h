@@ -28,6 +28,7 @@
 DECLARE_PER_CPU(void *, hv_input_page);
 DECLARE_PER_CPU(void *, hv_vp_assist);
 DECLARE_PER_CPU(unsigned int, hv_vp_index);
+extern unsigned int hv_max_vp_index;
 
 static inline unsigned int hv_vp_index(unsigned int cpu)
 {

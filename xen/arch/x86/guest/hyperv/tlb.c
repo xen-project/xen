@@ -166,7 +166,7 @@ int hyperv_flush_tlb(const cpumask_t *mask, const void *va,
         {
             unsigned int vpid = hv_vp_index(cpu);
 
-            if ( vpid >= ms_hyperv.max_vp_index )
+            if ( vpid > hv_max_vp_index )
             {
                 local_irq_restore(irq_flags);
                 return -ENXIO;
