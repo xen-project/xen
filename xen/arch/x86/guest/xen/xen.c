@@ -324,12 +324,18 @@ static void __init e820_fixup(struct e820map *e820)
         pv_shim_fixup_e820(e820);
 }
 
+static int flush_tlb(const cpumask_t *mask, const void *va, unsigned int order)
+{
+    return xen_hypercall_hvm_op(HVMOP_flush_tlbs, NULL);
+}
+
 static const struct hypervisor_ops __initconstrel ops = {
     .name = "Xen",
     .setup = setup,
     .ap_setup = ap_setup,
     .resume = resume,
     .e820_fixup = e820_fixup,
+    .flush_tlb = flush_tlb,
 };
 
 const struct hypervisor_ops *__init xg_probe(void)

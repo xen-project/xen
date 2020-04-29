@@ -18,6 +18,7 @@
  *
  * Copyright (c) 2019 Microsoft.
  */
+#include <xen/cpumask.h>
 #include <xen/init.h>
 #include <xen/types.h>
 
@@ -51,6 +52,10 @@ void __init hypervisor_setup(void)
 {
     if ( ops.setup )
         ops.setup();
+
+    /* Check if assisted flush is available and disable the TLB clock if so. */
+    if ( !hypervisor_flush_tlb(cpumask_of(smp_processor_id()), NULL, 0) )
+        tlb_clk_enabled = false;
 }
 
 int hypervisor_ap_setup(void)
@@ -71,6 +76,15 @@ void __init hypervisor_e820_fixup(struct e820map *e820)
 {
     if ( ops.e820_fixup )
         ops.e820_fixup(e820);
+}
+
+int hypervisor_flush_tlb(const cpumask_t *mask, const void *va,
+                         unsigned int order)
+{
+    if ( ops.flush_tlb )
+        return alternative_call(ops.flush_tlb, mask, va, order);
+
+    return -EOPNOTSUPP;
 }
 
 /*
