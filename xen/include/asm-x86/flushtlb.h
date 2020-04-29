@@ -21,10 +21,21 @@ extern u32 tlbflush_clock;
 /* Time at which each CPU's TLB was last flushed. */
 DECLARE_PER_CPU(u32, tlbflush_time);
 
-#define tlbflush_current_time() tlbflush_clock
+/* TLB clock is in use. */
+extern bool tlb_clk_enabled;
+
+static inline uint32_t tlbflush_current_time(void)
+{
+    /* Returning 0 from tlbflush_current_time will always force a flush. */
+    return tlb_clk_enabled ? tlbflush_clock : 0;
+}
 
 static inline void page_set_tlbflush_timestamp(struct page_info *page)
 {
+    /* Avoid the write if the TLB clock is disabled. */
+    if ( !tlb_clk_enabled )
+        return;
+
     /*
      * Prevent storing a stale time stamp, which could happen if an update
      * to tlbflush_clock plus a subsequent flush IPI happen between the
@@ -66,6 +77,10 @@ static inline bool NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 static inline void tlbflush_filter(cpumask_t *mask, uint32_t page_timestamp)
 {
     unsigned int cpu;
+
+    /* Short-circuit: there's no need to iterate if the clock is disabled. */
+    if ( !tlb_clk_enabled )
+        return;
 
     for_each_cpu ( cpu, mask )
         if ( !NEED_FLUSH(per_cpu(tlbflush_time, cpu), page_timestamp) )

@@ -33,6 +33,9 @@
 u32 tlbflush_clock = 1U;
 DEFINE_PER_CPU(u32, tlbflush_time);
 
+/* Signals whether the TLB flush clock is in use. */
+bool __read_mostly tlb_clk_enabled = true;
+
 /*
  * pre_flush(): Increment the virtual TLB-flush clock. Returns new clock value.
  * 
@@ -83,12 +86,13 @@ static void post_flush(u32 t)
 static void do_tlb_flush(void)
 {
     unsigned long flags, cr4;
-    u32 t;
+    u32 t = 0;
 
     /* This non-reentrant function is sometimes called in interrupt context. */
     local_irq_save(flags);
 
-    t = pre_flush();
+    if ( tlb_clk_enabled )
+        t = pre_flush();
 
     if ( use_invpcid )
         invpcid_flush_all();
@@ -100,7 +104,8 @@ static void do_tlb_flush(void)
     else
         write_cr3(read_cr3());
 
-    post_flush(t);
+    if ( tlb_clk_enabled )
+        post_flush(t);
 
     local_irq_restore(flags);
 }
@@ -108,7 +113,7 @@ static void do_tlb_flush(void)
 void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
 {
     unsigned long flags, old_cr4;
-    u32 t;
+    u32 t = 0;
 
     /* Throughout this function we make this assumption: */
     ASSERT(!(cr4 & X86_CR4_PCIDE) || !(cr4 & X86_CR4_PGE));
@@ -116,7 +121,8 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
     /* This non-reentrant function is sometimes called in interrupt context. */
     local_irq_save(flags);
 
-    t = pre_flush();
+    if ( tlb_clk_enabled )
+        t = pre_flush();
     hvm_flush_guest_tlbs();
 
     old_cr4 = read_cr4();
@@ -169,7 +175,8 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
     if ( cr4 & X86_CR4_PCIDE )
         invpcid_flush_all_nonglobals();
 
-    post_flush(t);
+    if ( tlb_clk_enabled )
+        post_flush(t);
 
     local_irq_restore(flags);
 }
