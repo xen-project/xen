@@ -11,7 +11,7 @@ config DEBUG
 
 	  You probably want to say 'N' here.
 
-if DEBUG || EXPERT = "y"
+if DEBUG || EXPERT
 
 config CRASH_DEBUG
 	bool "Crash Debugging Support"

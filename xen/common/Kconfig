@@ -12,7 +12,7 @@ config CORE_PARKING
 	bool
 
 config GRANT_TABLE
-	bool "Grant table support" if EXPERT = "y"
+	bool "Grant table support" if EXPERT
 	default y
 	---help---
 	  Grant table provides a generic mechanism to memory sharing
@@ -128,7 +128,7 @@ config KEXEC
 	  If unsure, say Y.
 
 config EFI_SET_VIRTUAL_ADDRESS_MAP
-    bool "EFI: call SetVirtualAddressMap()" if EXPERT = "y"
+    bool "EFI: call SetVirtualAddressMap()" if EXPERT
     ---help---
       Call EFI SetVirtualAddressMap() runtime service to setup memory map for
       further runtime services. According to UEFI spec, it isn't strictly
@@ -139,7 +139,7 @@ config EFI_SET_VIRTUAL_ADDRESS_MAP
 
 config XENOPROF
 	def_bool y
-	prompt "Xen Oprofile Support" if EXPERT = "y"
+	prompt "Xen Oprofile Support" if EXPERT
 	depends on X86
 	---help---
 	  Xen OProfile (Xenoprof) is a system-wide profiler for Xen virtual
@@ -176,7 +176,7 @@ config XSM_FLASK
 
 config XSM_FLASK_AVC_STATS
 	def_bool y
-	prompt "Maintain statistics on the FLASK access vector cache" if EXPERT = "y"
+	prompt "Maintain statistics on the FLASK access vector cache" if EXPERT
 	depends on XSM_FLASK
 	---help---
 	  Maintain counters on the access vector cache that can be viewed using
@@ -249,7 +249,7 @@ config LATE_HWDOM
 	  If unsure, say N.
 
 config ARGO
-	bool "Argo: hypervisor-mediated interdomain communication" if EXPERT = "y"
+	bool "Argo: hypervisor-mediated interdomain communication" if EXPERT
 	---help---
 	  Enables a hypercall for domains to ask the hypervisor to perform
 	  data transfer of messages between domains.
@@ -321,7 +321,7 @@ config SUPPRESS_DUPLICATE_SYMBOL_WARNINGS
 	  build becoming overly verbose.
 
 config CMDLINE
-	string "Built-in hypervisor command string" if EXPERT = "y"
+	string "Built-in hypervisor command string" if EXPERT
 	default ""
 	---help---
 	  Enter arguments here that should be compiled into the hypervisor
@@ -354,7 +354,7 @@ config DOM0_MEM
 	  Leave empty if you are not sure what to specify.
 
 config TRACEBUFFER
-	bool "Enable tracing infrastructure" if EXPERT = "y"
+	bool "Enable tracing infrastructure" if EXPERT
 	default y
 	---help---
 	  Enable tracing infrastructure and pre-defined tracepoints within Xen.

@@ -35,8 +35,7 @@ config DEFCONFIG_LIST
 	default ARCH_DEFCONFIG
 
 config EXPERT
-	string
-	default y if "$(XEN_CONFIG_EXPERT)" = "y"
+	def_bool y if "$(XEN_CONFIG_EXPERT)" = "y"
 
 config LTO
 	bool "Link Time Optimisation"

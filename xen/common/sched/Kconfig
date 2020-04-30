@@ -1,5 +1,5 @@
 menu "Schedulers"
-	visible if EXPERT = "y"
+	visible if EXPERT
 
 config SCHED_CREDIT
 	bool "Credit scheduler support"
