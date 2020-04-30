@@ -158,6 +158,8 @@ struct hvm_irq_dpci {
     DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
     /* Record of mapped Links */
     uint8_t link_cnt[NR_LINK];
+    /* Clean up: Entry with a softirq invocation pending / in progress. */
+    struct hvm_pirq_dpci *pending_pirq_dpci;
 };
 
 /* Machine IRQ to guest device/intx mapping. */
