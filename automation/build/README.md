@@ -34,6 +34,16 @@ the default shell.
 There are several environment variables which the containerize script
 understands.
 
+- DOCKED_CMD: Whether to use docker or podman for running the containers.
+  podman can be used as a regular user (rootless podman), but for that
+  to work, /etc/subuid and /etc/subgid needs to containe the proper
+  entries, for such user.
+  docker is the default, for running with podman, do:
+
+  ```
+  DOCKER_CMD=podman ./automation/scripts/containerize make
+  ```
+
 - CONTAINER: This overrides the container to use. For CentOS 7.2, use:
 
   ```
