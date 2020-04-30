@@ -708,7 +708,16 @@ exception_with_ints_disabled:
         call  search_pre_exception_table
         testq %rax,%rax                 # no fixup code for faulting EIP?
         jz    1b
-        movq  %rax,UREGS_rip(%rsp)
+        movq  %rax,UREGS_rip(%rsp)      # fixup regular stack
+
+#ifdef CONFIG_XEN_SHSTK
+        mov    $1, %edi
+        rdsspq %rdi
+        cmp    $1, %edi
+        je     .L_exn_shstk_done
+        wrssq  %rax, 1*8(%rdi)          # fixup shadow stack
+.L_exn_shstk_done:
+#endif
         subq  $8,UREGS_rsp(%rsp)        # add ec/ev to previous stack frame
         testb $15,UREGS_rsp(%rsp)       # return %rsp is now aligned?
         jz    1f                        # then there is a pad quadword already
