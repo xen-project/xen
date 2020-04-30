@@ -215,11 +215,8 @@ extern unsigned char boot_edid_info[128];
 /* Slot 261: compatibility machine-to-phys conversion table (1GB). */
 #define RDWR_COMPAT_MPT_VIRT_START VMAP_VIRT_END
 #define RDWR_COMPAT_MPT_VIRT_END (RDWR_COMPAT_MPT_VIRT_START + GB(1))
-/* Slot 261: high read-only compat machine-to-phys conversion table (1GB). */
-#define HIRO_COMPAT_MPT_VIRT_START RDWR_COMPAT_MPT_VIRT_END
-#define HIRO_COMPAT_MPT_VIRT_END (HIRO_COMPAT_MPT_VIRT_START + GB(1))
 /* Slot 261: xen text, static data, bss, per-cpu stubs and executable fixmap (1GB). */
-#define XEN_VIRT_START          (HIRO_COMPAT_MPT_VIRT_END)
+#define XEN_VIRT_START          RDWR_COMPAT_MPT_VIRT_END
 #define XEN_VIRT_END            (XEN_VIRT_START + GB(1))
 
 #ifndef CONFIG_BIGMEM

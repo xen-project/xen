@@ -216,9 +216,7 @@ static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
 
 static void destroy_compat_m2p_mapping(struct mem_hotadd_info *info)
 {
-    unsigned long i, va, rwva, pt_pfn;
-    unsigned long smap = info->spfn, emap = info->spfn;
-    l2_pgentry_t *l2_ro_mpt = compat_idle_pg_table_l2;
+    unsigned long i, smap = info->spfn, emap = info->spfn;
 
     if ( smap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2) )
         return;
@@ -228,18 +226,19 @@ static void destroy_compat_m2p_mapping(struct mem_hotadd_info *info)
 
     for ( i = smap; i < emap; )
     {
-        va = HIRO_COMPAT_MPT_VIRT_START +
-              i * sizeof(*compat_machine_to_phys_mapping);
-        rwva = RDWR_COMPAT_MPT_VIRT_START +
-             i * sizeof(*compat_machine_to_phys_mapping);
-        if ( l2e_get_flags(l2_ro_mpt[l2_table_offset(va)]) & _PAGE_PRESENT )
+        unsigned int off = i * sizeof(*compat_machine_to_phys_mapping);
+        l2_pgentry_t *pl2e = compat_idle_pg_table_l2 + l2_table_offset(off);
+
+        if ( l2e_get_flags(*pl2e) & _PAGE_PRESENT )
         {
-            pt_pfn = l2e_get_pfn(l2_ro_mpt[l2_table_offset(va)]);
+            unsigned long pt_pfn = l2e_get_pfn(*pl2e);
+
             if ( hotadd_mem_valid(pt_pfn, info) )
             {
-                destroy_xen_mappings(rwva, rwva +
-                        (1UL << L2_PAGETABLE_SHIFT));
-                l2e_write(&l2_ro_mpt[l2_table_offset(va)], l2e_empty());
+                unsigned long rwva = RDWR_COMPAT_MPT_VIRT_START + off;
+
+                destroy_xen_mappings(rwva, rwva + (1UL << L2_PAGETABLE_SHIFT));
+                l2e_write(pl2e, l2e_empty());
             }
         }
 
@@ -316,10 +315,9 @@ static void destroy_m2p_mapping(struct mem_hotadd_info *info)
  */
 static int setup_compat_m2p_table(struct mem_hotadd_info *info)
 {
-    unsigned long i, va, smap, emap, rwva, epfn = info->epfn;
+    unsigned long i, smap, emap, epfn = info->epfn;
     mfn_t mfn;
     unsigned int n;
-    l2_pgentry_t *l2_ro_mpt = NULL;
     int err = 0;
 
     smap = info->spfn & (~((1UL << (L2_PAGETABLE_SHIFT - 2)) -1));
@@ -337,8 +335,6 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
     emap = ( (epfn + ((1UL << (L2_PAGETABLE_SHIFT - 2)) - 1 )) &
                 ~((1UL << (L2_PAGETABLE_SHIFT - 2)) - 1) );
 
-    l2_ro_mpt = compat_idle_pg_table_l2;
-
 #define MFN(x) (((x) << L2_PAGETABLE_SHIFT) / sizeof(unsigned int))
 #define CNT ((sizeof(*frame_table) & -sizeof(*frame_table)) / \
              sizeof(*compat_machine_to_phys_mapping))
@@ -347,13 +343,11 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
 
     for ( i = smap; i < emap; i += (1UL << (L2_PAGETABLE_SHIFT - 2)) )
     {
-        va = HIRO_COMPAT_MPT_VIRT_START +
-              i * sizeof(*compat_machine_to_phys_mapping);
+        unsigned int off = i * sizeof(*compat_machine_to_phys_mapping);
+        l2_pgentry_t *pl2e = compat_idle_pg_table_l2 + l2_table_offset(off);
+        unsigned long rwva = RDWR_COMPAT_MPT_VIRT_START + off;
 
-        rwva = RDWR_COMPAT_MPT_VIRT_START +
-                i * sizeof(*compat_machine_to_phys_mapping);
-
-        if (l2e_get_flags(l2_ro_mpt[l2_table_offset(va)]) & _PAGE_PRESENT)
+        if ( l2e_get_flags(*pl2e) & _PAGE_PRESENT )
             continue;
 
         for ( n = 0; n < CNT; ++n)
@@ -370,8 +364,7 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
         /* Fill with INVALID_M2P_ENTRY. */
         memset((void *)rwva, 0xFF, 1UL << L2_PAGETABLE_SHIFT);
         /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
-        l2e_write(&l2_ro_mpt[l2_table_offset(va)],
-                  l2e_from_mfn(mfn, _PAGE_PSE|_PAGE_PRESENT));
+        l2e_write(pl2e, l2e_from_mfn(mfn, _PAGE_PSE|_PAGE_PRESENT));
     }
 #undef CNT
 #undef MFN
@@ -620,7 +613,6 @@ void __init paging_init(void)
         goto nomem;
     compat_idle_pg_table_l2 = l2_ro_mpt;
     clear_page(l2_ro_mpt);
-    l2_ro_mpt += l2_table_offset(HIRO_COMPAT_MPT_VIRT_START);
     /* Allocate and map the compatibility mode machine-to-phys table. */
     mpt_size = (mpt_size >> 1) + (1UL << (L2_PAGETABLE_SHIFT - 1));
     if ( mpt_size > RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START )

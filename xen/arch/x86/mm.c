@@ -1423,8 +1423,7 @@ static bool pae_xen_mappings_check(const struct domain *d,
 void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
 {
     memcpy(&l2t[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
-           &compat_idle_pg_table_l2[
-               l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+           compat_idle_pg_table_l2,
            COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2t));
 }
 
