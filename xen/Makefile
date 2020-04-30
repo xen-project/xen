@@ -11,7 +11,6 @@ export XEN_DOMAIN	?= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) |
 export XEN_BUILD_DATE	?= $(shell LC_ALL=C date)
 export XEN_BUILD_TIME	?= $(shell LC_ALL=C date +%T)
 export XEN_BUILD_HOST	?= $(shell hostname)
-export XEN_CONFIG_EXPERT ?= n
 
 # Best effort attempt to find a python interpreter, defaulting to Python 3 if
 # available.  Fall back to just `python` if `which` is nowhere to be found.
