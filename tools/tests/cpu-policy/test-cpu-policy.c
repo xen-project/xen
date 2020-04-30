@@ -570,7 +570,7 @@ static void test_is_compatible_failure(void)
         {
             .name = "Host extd.max_leaf out of range",
             .guest_cpuid.extd.max_leaf = 1,
-            .e = { 0x80000008, -1, -1 },
+            .e = { 0x80000000, -1, -1 },
         },
         {
             .name = "Host no CPUID faulting, Guest wanted",
