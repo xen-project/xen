@@ -283,7 +283,7 @@ int main_vcpupin(int argc, char **argv)
     }
 
     /* Only hard affinity matters here */
-    if (!ignore_masks) {
+    if (!ignore_masks && hard) {
         libxl_dominfo dominfo;
 
         if (libxl_domain_info(ctx, &dominfo, domid)) {
