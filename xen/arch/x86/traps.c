@@ -772,10 +772,31 @@ static void do_reserved_trap(struct cpu_user_regs *regs)
           trapnr, vec_name(trapnr), regs->error_code);
 }
 
+static bool extable_fixup(struct cpu_user_regs *regs, bool print)
+{
+    unsigned long fixup = search_exception_table(regs);
+
+    if ( unlikely(fixup == 0) )
+        return false;
+
+    /*
+     * Don't use dprintk() because the __FILE__ reference is unhelpful.
+     * Can currently be triggered by guests.  Make sure we ratelimit.
+     */
+    if ( IS_ENABLED(CONFIG_DEBUG) && print )
+        printk(XENLOG_GUEST XENLOG_WARNING "Fixup %s[%04x]: %p [%ps] -> %p\n",
+               vec_name(regs->entry_vector), regs->error_code,
+               _p(regs->rip), _p(regs->rip), _p(fixup));
+
+    regs->rip = fixup;
+    this_cpu(last_extable_addr) = regs->rip;
+
+    return true;
+}
+
 static void do_trap(struct cpu_user_regs *regs)
 {
     unsigned int trapnr = regs->entry_vector;
-    unsigned long fixup;
 
     if ( regs->error_code & X86_XEC_EXT )
         goto hardware_trap;
@@ -793,14 +814,8 @@ static void do_trap(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( likely((fixup = search_exception_table(regs)) != 0) )
-    {
-        dprintk(XENLOG_ERR, "Trap %u: %p [%ps] -> %p\n",
-                trapnr, _p(regs->rip), _p(regs->rip), _p(fixup));
-        this_cpu(last_extable_addr) = regs->rip;
-        regs->rip = fixup;
+    if ( likely(extable_fixup(regs, true)) )
         return;
-    }
 
  hardware_trap:
     if ( debugger_trap_fatal(trapnr, regs) )
@@ -1108,12 +1123,8 @@ void do_invalid_op(struct cpu_user_regs *regs)
     }
 
  die:
-    if ( (fixup = search_exception_table(regs)) != 0 )
-    {
-        this_cpu(last_extable_addr) = regs->rip;
-        regs->rip = fixup;
+    if ( likely(extable_fixup(regs, true)) )
         return;
-    }
 
     if ( debugger_trap_fatal(TRAP_invalid_op, regs) )
         return;
@@ -1129,16 +1140,8 @@ void do_int3(struct cpu_user_regs *regs)
 
     if ( !guest_mode(regs) )
     {
-        unsigned long fixup;
-
-        if ( (fixup = search_exception_table(regs)) != 0 )
-        {
-            this_cpu(last_extable_addr) = regs->rip;
-            dprintk(XENLOG_DEBUG, "Trap %u: %p [%ps] -> %p\n",
-                    TRAP_int3, _p(regs->rip), _p(regs->rip), _p(fixup));
-            regs->rip = fixup;
+        if ( likely(extable_fixup(regs, true)) )
             return;
-        }
 
         if ( !debugger_trap_fatal(TRAP_int3, regs) )
             printk(XENLOG_DEBUG "Hit embedded breakpoint at %p [%ps]\n",
@@ -1415,7 +1418,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
 void do_page_fault(struct cpu_user_regs *regs)
 {
-    unsigned long addr, fixup;
+    unsigned long addr;
     unsigned int error_code;
 
     addr = read_cr2();
@@ -1461,11 +1464,9 @@ void do_page_fault(struct cpu_user_regs *regs)
         if ( pf_type != real_fault )
             return;
 
-        if ( likely((fixup = search_exception_table(regs)) != 0) )
+        if ( likely(extable_fixup(regs, false)) )
         {
             perfc_incr(copy_user_faults);
-            this_cpu(last_extable_addr) = regs->rip;
-            regs->rip = fixup;
             return;
         }
 
@@ -1521,7 +1522,6 @@ void do_general_protection(struct cpu_user_regs *regs)
 #ifdef CONFIG_PV
     struct vcpu *v = current;
 #endif
-    unsigned long fixup;
 
     if ( debugger_trap_entry(TRAP_gp_fault, regs) )
         return;
@@ -1588,14 +1588,8 @@ void do_general_protection(struct cpu_user_regs *regs)
 
  gp_in_kernel:
 
-    if ( likely((fixup = search_exception_table(regs)) != 0) )
-    {
-        dprintk(XENLOG_INFO, "GPF (%04x): %p [%ps] -> %p\n",
-                regs->error_code, _p(regs->rip), _p(regs->rip), _p(fixup));
-        this_cpu(last_extable_addr) = regs->rip;
-        regs->rip = fixup;
+    if ( likely(extable_fixup(regs, true)) )
         return;
-    }
 
  hardware_gp:
     if ( debugger_trap_fatal(TRAP_gp_fault, regs) )
@@ -1754,18 +1748,17 @@ void do_device_not_available(struct cpu_user_regs *regs)
 
     if ( !guest_mode(regs) )
     {
-        unsigned long fixup = search_exception_table(regs);
-
-        gprintk(XENLOG_ERR, "#NM: %p [%ps] -> %p\n",
-                _p(regs->rip), _p(regs->rip), _p(fixup));
         /*
          * We shouldn't be able to reach here, but for release builds have
          * the recovery logic in place nevertheless.
          */
-        ASSERT_UNREACHABLE();
-        BUG_ON(!fixup);
-        regs->rip = fixup;
-        return;
+        if ( extable_fixup(regs, true) )
+        {
+            ASSERT_UNREACHABLE();
+            return;
+        }
+
+        fatal_trap(regs, false);
     }
 
 #ifdef CONFIG_PV
