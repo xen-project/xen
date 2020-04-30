@@ -576,6 +576,7 @@ int __init amd_vpmu_init(void)
     {
     case 0x15:
     case 0x17:
+    case 0x19:
         num_counters = F15H_NUM_COUNTERS;
         counters = AMD_F15H_COUNTERS;
         ctrls = AMD_F15H_CTRLS;
