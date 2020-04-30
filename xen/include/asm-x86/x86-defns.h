@@ -118,4 +118,38 @@
 
 #define X86_NR_VECTORS 256
 
+/* Exception Vectors */
+#define X86_EXC_DE             0 /* Divide Error */
+#define X86_EXC_DB             1 /* Debug Exception */
+#define X86_EXC_NMI            2 /* NMI */
+#define X86_EXC_BP             3 /* Breakpoint */
+#define X86_EXC_OF             4 /* Overflow */
+#define X86_EXC_BR             5 /* BOUND Range */
+#define X86_EXC_UD             6 /* Invalid Opcode */
+#define X86_EXC_NM             7 /* Device Not Available */
+#define X86_EXC_DF             8 /* Double Fault */
+#define X86_EXC_CSO            9 /* Coprocessor Segment Overrun */
+#define X86_EXC_TS            10 /* Invalid TSS */
+#define X86_EXC_NP            11 /* Segment Not Present */
+#define X86_EXC_SS            12 /* Stack-Segment Fault */
+#define X86_EXC_GP            13 /* General Porection Fault */
+#define X86_EXC_PF            14 /* Page Fault */
+#define X86_EXC_SPV           15 /* PIC Spurious Interrupt Vector */
+#define X86_EXC_MF            16 /* Maths fault (x87 FPU) */
+#define X86_EXC_AC            17 /* Alignment Check */
+#define X86_EXC_MC            18 /* Machine Check */
+#define X86_EXC_XM            19 /* SIMD Exception */
+#define X86_EXC_VE            20 /* Virtualisation Exception */
+#define X86_EXC_CP            21 /* Control-flow Protection */
+#define X86_EXC_HV            28 /* Hypervisor Injection */
+#define X86_EXC_VC            29 /* VMM Communication */
+#define X86_EXC_SX            30 /* Security Exception */
+
+/* Bitmap of exceptions which have error codes. */
+#define X86_EXC_HAVE_EC                                             \
+    ((1u << X86_EXC_DF) | (1u << X86_EXC_TS) | (1u << X86_EXC_NP) | \
+     (1u << X86_EXC_SS) | (1u << X86_EXC_GP) | (1u << X86_EXC_PF) | \
+     (1u << X86_EXC_AC) | (1u << X86_EXC_CP) |                      \
+     (1u << X86_EXC_VC) | (1u << X86_EXC_SX))
+
 #endif	/* __XEN_X86_DEFNS_H__ */

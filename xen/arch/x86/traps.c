@@ -682,6 +682,22 @@ const char *trapstr(unsigned int trapnr)
     return trapnr < ARRAY_SIZE(strings) ? strings[trapnr] : "???";
 }
 
+static const char *vec_name(unsigned int vec)
+{
+    static const char names[][4] = {
+#define P(x) [X86_EXC_ ## x] = "#" #x
+#define N(x) [X86_EXC_ ## x] = #x
+        P(DE),  P(DB),  N(NMI), P(BP),  P(OF),  P(BR),  P(UD),  P(NM),
+        P(DF),  N(CSO), P(TS),  P(NP),  P(SS),  P(GP),  P(PF),  N(SPV),
+        P(MF),  P(AC),  P(MC),  P(XM),  P(VE),  P(CP),
+                                        P(HV),  P(VC),  P(SX),
+#undef N
+#undef P
+    };
+
+    return (vec < ARRAY_SIZE(names) && names[vec][0]) ? names[vec] : "???";
+}
+
 /*
  * This is called for faults at very unexpected times (e.g., when interrupts
  * are disabled). In such situations we can't do much that is safe. We try to
@@ -739,10 +755,9 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
         }
     }
 
-    panic("FATAL TRAP: vector = %d (%s)\n"
-          "[error_code=%04x] %s\n",
-          trapnr, trapstr(trapnr), regs->error_code,
-          (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
+    panic("FATAL TRAP: vec %u, %s[%04x]%s\n",
+          trapnr, vec_name(trapnr), regs->error_code,
+          (regs->eflags & X86_EFLAGS_IF) ? "" : " IN INTERRUPT CONTEXT");
 }
 
 static void do_reserved_trap(struct cpu_user_regs *regs)
@@ -753,7 +768,8 @@ static void do_reserved_trap(struct cpu_user_regs *regs)
         return;
 
     show_execution_state(regs);
-    panic("FATAL RESERVED TRAP %#x: %s\n", trapnr, trapstr(trapnr));
+    panic("FATAL RESERVED TRAP: vec %u, %s[%04x]\n",
+          trapnr, vec_name(trapnr), regs->error_code);
 }
 
 static void do_trap(struct cpu_user_regs *regs)

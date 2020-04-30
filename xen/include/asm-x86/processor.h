@@ -43,11 +43,7 @@
 #define TRAP_virtualisation   20
 #define TRAP_nr               32
 
-#define TRAP_HAVE_EC                                                    \
-    ((1u << TRAP_double_fault) | (1u << TRAP_invalid_tss) |             \
-     (1u << TRAP_no_segment) | (1u << TRAP_stack_error) |               \
-     (1u << TRAP_gp_fault) | (1u << TRAP_page_fault) |                  \
-     (1u << TRAP_alignment_check))
+#define TRAP_HAVE_EC X86_EXC_HAVE_EC
 
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
 /* NB. Same as VGCF_in_syscall. No bits in common with any other TRAP_ defn. */
