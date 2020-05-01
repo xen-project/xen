@@ -5443,8 +5443,8 @@ int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
  * mappings, but will shatter superpages if necessary, and will destroy
  * mappings if not passed _PAGE_PRESENT.
  *
- * The only flags considered are NX, RW and PRESENT.  All other input flags
- * are ignored.
+ * The only flags considered are NX, D, A, RW and PRESENT.  All other input
+ * flags are ignored.
  *
  * It is an error to call with present flags over an unpopulated range.
  */
@@ -5457,7 +5457,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
     unsigned long v = s;
 
     /* Set of valid PTE bits which may be altered. */
-#define FLAGS_MASK (_PAGE_NX|_PAGE_RW|_PAGE_PRESENT)
+#define FLAGS_MASK (_PAGE_NX|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW|_PAGE_PRESENT)
     nf &= FLAGS_MASK;
 
     ASSERT(IS_ALIGNED(s, PAGE_SIZE));

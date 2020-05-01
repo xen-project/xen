@@ -21,6 +21,7 @@
 #include <asm/processor.h>
 #include <asm/alternative.h>
 #include <xen/init.h>
+#include <asm/setup.h>
 #include <asm/system.h>
 #include <asm/traps.h>
 #include <asm/nmi.h>
@@ -398,6 +399,19 @@ static void __init _alternative_instructions(bool force)
         panic("Timed out waiting for alternatives self-NMI to hit\n");
 
     set_nmi_callback(saved_nmi_callback);
+
+    /*
+     * When Xen is using shadow stacks, the alternatives clearing CR0.WP and
+     * writing into the mappings set dirty bits, turning the mappings into
+     * shadow stack mappings.
+     *
+     * While we can execute from them, this would also permit them to be the
+     * target of WRSS instructions, so reset the dirty after patching.
+     */
+    if ( cpu_has_xen_shstk )
+        modify_xen_mappings(XEN_VIRT_START + MB(2),
+                            (unsigned long)&__2M_text_end,
+                            PAGE_HYPERVISOR_RX);
 }
 
 void __init alternative_instructions(void)
