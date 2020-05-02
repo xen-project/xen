@@ -98,23 +98,41 @@ static always_inline void read_atomic_size(const volatile void *p,
     }
 }
 
+static always_inline void write_atomic_size(volatile void *p,
+                                            void *val,
+                                            unsigned int size)
+{
+    switch ( size )
+    {
+    case 1:
+        write_u8_atomic(p, *(uint8_t *)val);
+        break;
+    case 2:
+        write_u16_atomic(p, *(uint16_t *)val);
+        break;
+    case 4:
+        write_u32_atomic(p, *(uint32_t *)val);
+        break;
+    case 8:
+        write_u64_atomic(p, *(uint64_t *)val);
+        break;
+    default:
+        __bad_atomic_size();
+        break;
+    }
+}
+
 #define read_atomic(p) ({                                               \
     union { typeof(*p) val; char c[0]; } x_;                            \
     read_atomic_size(p, x_.c, sizeof(*p));                              \
     x_.val;                                                             \
 })
 
-#define write_atomic(p, x) ({                                           \
-    typeof(*p) __x = (x);                                               \
-    switch ( sizeof(*p) ) {                                             \
-    case 1: write_u8_atomic((uint8_t *)p, (uint8_t)__x); break;         \
-    case 2: write_u16_atomic((uint16_t *)p, (uint16_t)__x); break;      \
-    case 4: write_u32_atomic((uint32_t *)p, (uint32_t)__x); break;      \
-    case 8: write_u64_atomic((uint64_t *)p, (uint64_t)__x); break;      \
-    default: __bad_atomic_size(); break;                                \
-    }                                                                   \
-    __x;                                                                \
-})
+#define write_atomic(p, x)                                              \
+    do {                                                                \
+        typeof(*p) x_ = (x);                                            \
+        write_atomic_size(p, &x_, sizeof(*p));                          \
+    } while ( false )
 
 #define add_sized(p, x) ({                                              \
     typeof(*(p)) __x = (x);                                             \
