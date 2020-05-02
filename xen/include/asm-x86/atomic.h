@@ -63,6 +63,8 @@ void __bad_atomic_size(void);
 
 #define write_atomic(p, x) ({                             \
     typeof(*(p)) __x = (x);                               \
+    /* Check that the pointer is not a const type */      \
+    void *__maybe_unused p_ = &__x;                       \
     unsigned long x_ = (unsigned long)__x;                \
     switch ( sizeof(*(p)) ) {                             \
     case 1: write_u8_atomic((uint8_t *)(p), x_); break;   \
