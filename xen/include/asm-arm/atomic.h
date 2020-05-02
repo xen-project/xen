@@ -71,18 +71,37 @@ build_add_sized(add_u32_sized, "", WORD, uint32_t)
 #undef build_atomic_write
 #undef build_add_sized
 
+void __bad_atomic_read(const volatile void *p, void *res);
 void __bad_atomic_size(void);
 
+static always_inline void read_atomic_size(const volatile void *p,
+                                           void *res,
+                                           unsigned int size)
+{
+    switch ( size )
+    {
+    case 1:
+        *(uint8_t *)res = read_u8_atomic(p);
+        break;
+    case 2:
+        *(uint16_t *)res = read_u16_atomic(p);
+        break;
+    case 4:
+        *(uint32_t *)res = read_u32_atomic(p);
+        break;
+    case 8:
+        *(uint64_t *)res = read_u64_atomic(p);
+        break;
+    default:
+        __bad_atomic_read(p, res);
+        break;
+    }
+}
+
 #define read_atomic(p) ({                                               \
-    typeof(*p) __x;                                                     \
-    switch ( sizeof(*p) ) {                                             \
-    case 1: __x = (typeof(*p))read_u8_atomic((uint8_t *)p); break;      \
-    case 2: __x = (typeof(*p))read_u16_atomic((uint16_t *)p); break;    \
-    case 4: __x = (typeof(*p))read_u32_atomic((uint32_t *)p); break;    \
-    case 8: __x = (typeof(*p))read_u64_atomic((uint64_t *)p); break;    \
-    default: __x = 0; __bad_atomic_size(); break;                       \
-    }                                                                   \
-    __x;                                                                \
+    union { typeof(*p) val; char c[0]; } x_;                            \
+    read_atomic_size(p, x_.c, sizeof(*p));                              \
+    x_.val;                                                             \
 })
 
 #define write_atomic(p, x) ({                                           \
