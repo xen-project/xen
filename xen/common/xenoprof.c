@@ -23,6 +23,32 @@
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
 
+#define XENOPROF_DOMAIN_IGNORED    0
+#define XENOPROF_DOMAIN_ACTIVE     1
+#define XENOPROF_DOMAIN_PASSIVE    2
+
+#define XENOPROF_IDLE              0
+#define XENOPROF_INITIALIZED       1
+#define XENOPROF_COUNTERS_RESERVED 2
+#define XENOPROF_READY             3
+#define XENOPROF_PROFILING         4
+
+#ifndef CONFIG_COMPAT
+#define XENOPROF_COMPAT(x) false
+typedef struct xenoprof_buf xenoprof_buf_t;
+#define xenoprof_buf(d, b, field) ACCESS_ONCE((b)->field)
+#else
+#include <compat/xenoprof.h>
+#define XENOPROF_COMPAT(x) ((x)->is_compat)
+typedef union {
+    struct xenoprof_buf native;
+    struct compat_oprof_buf compat;
+} xenoprof_buf_t;
+#define xenoprof_buf(d, b, field) ACCESS_ONCE(*(!(d)->xenoprof->is_compat \
+                                                ? &(b)->native.field \
+                                                : &(b)->compat.field))
+#endif
+
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
 

@@ -11,7 +11,6 @@
 #define __XEN_XENOPROF_H__
 
 #include <xen/inttypes.h>
-#include <public/xenoprof.h>
 #include <asm/xenoprof.h>
 
 #define PMU_OWNER_NONE          0
@@ -20,37 +19,9 @@
 
 #ifdef CONFIG_XENOPROF
 
-#define XENOPROF_DOMAIN_IGNORED    0
-#define XENOPROF_DOMAIN_ACTIVE     1
-#define XENOPROF_DOMAIN_PASSIVE    2
-
-#define XENOPROF_IDLE              0
-#define XENOPROF_INITIALIZED       1
-#define XENOPROF_COUNTERS_RESERVED 2
-#define XENOPROF_READY             3
-#define XENOPROF_PROFILING         4
-
-#ifndef CONFIG_COMPAT
-typedef struct xenoprof_buf xenoprof_buf_t;
-#else
-#include <compat/xenoprof.h>
-typedef union {
-	struct xenoprof_buf native;
-	struct compat_oprof_buf compat;
-} xenoprof_buf_t;
-#endif
-
-#ifndef CONFIG_COMPAT
-#define XENOPROF_COMPAT(x) 0
-#define xenoprof_buf(d, b, field) ACCESS_ONCE((b)->field)
-#else
-#define XENOPROF_COMPAT(x) ((x)->is_compat)
-#define xenoprof_buf(d, b, field) ACCESS_ONCE(*(!(d)->xenoprof->is_compat \
-                                                ? &(b)->native.field \
-                                                : &(b)->compat.field))
-#endif
-
 struct domain;
+struct vcpu;
+struct cpu_user_regs;
 
 int acquire_pmu_ownership(int pmu_ownership);
 void release_pmu_ownership(int pmu_ownership);

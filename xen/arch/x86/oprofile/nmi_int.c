@@ -19,7 +19,7 @@
 #include <xen/string.h>
 #include <xen/delay.h>
 #include <xen/xenoprof.h>
-#include <public/xen.h>
+#include <public/xenoprof.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
 #include <asm/regs.h>

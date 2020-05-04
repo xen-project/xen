@@ -29,6 +29,7 @@
 #include <public/platform.h>
 #include <public/version.h>
 #include <public/hvm/params.h>
+#include <public/xenoprof.h>
 #include <public/xsm/flask_op.h>
 
 #include <avc.h>
