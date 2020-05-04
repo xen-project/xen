@@ -372,8 +372,8 @@ static void reset_passive(struct domain *d)
     if ( x == NULL )
         return;
 
-    unshare_xenoprof_page_with_guest(x);
     x->domain_type = XENOPROF_DOMAIN_IGNORED;
+    unshare_xenoprof_page_with_guest(x);
 }
 
 static void reset_active_list(void)
@@ -654,6 +654,13 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( ret < 0 )
             return ret;
     }
+    else
+    {
+        d->xenoprof->domain_ready = 0;
+        d->xenoprof->domain_type = XENOPROF_DOMAIN_IGNORED;
+    }
+
+    d->xenoprof->is_primary = (xenoprof_primary_profiler == d);
 
     ret = share_xenoprof_page_with_guest(
         d, virt_to_mfn(d->xenoprof->rawbuf), d->xenoprof->npages);
@@ -662,10 +669,6 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE_PARAM(void) arg)
 
     xenoprof_reset_buf(d);
 
-    d->xenoprof->domain_type  = XENOPROF_DOMAIN_IGNORED;
-    d->xenoprof->domain_ready = 0;
-    d->xenoprof->is_primary   = (xenoprof_primary_profiler == current->domain);
-        
     xenoprof_get_buffer.nbuf = d->xenoprof->nbuf;
     xenoprof_get_buffer.bufsize = d->xenoprof->bufsize;
     if ( !paging_mode_translate(d) )
