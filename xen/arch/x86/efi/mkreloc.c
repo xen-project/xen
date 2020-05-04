@@ -238,7 +238,7 @@ static void diff_sections(const unsigned char *ptr1, const unsigned char *ptr2,
             fprintf(stderr,
                     "Difference at %.8s:%08" PRIxFAST32 " is %#" PRIxFAST64
                     " (expected %#" PRIxFAST64 ")\n",
-                    sec->name, i, delta, diff);
+                    sec->name, i - disp, delta, diff);
             continue;
         }
         if ( width == 8 && (val1.u64 < base || val1.u64 > end) )
@@ -263,14 +263,14 @@ static void diff_sections(const unsigned char *ptr1, const unsigned char *ptr2,
         {
             fprintf(stderr,
                     "Cannot handle decreasing RVA (at %.8s:%08" PRIxFAST32 ")\n",
-                    sec->name, i);
+                    sec->name, i - disp);
             exit(3);
         }
 
         if ( !(sec->flags & COFF_SECTION_WRITEABLE) )
             fprintf(stderr,
                     "Warning: relocation to r/o section %.8s:%08" PRIxFAST32 "\n",
-                    sec->name, i);
+                    sec->name, i - disp);
 
         printf("\t.word (%u << 12) | 0x%03" PRIxFAST32 "\n",
                reloc, sec->rva + i - disp - rva);
