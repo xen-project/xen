@@ -327,7 +327,7 @@ SECTIONS
 #endif
 
 #ifdef CONFIG_HYPERV_GUEST
-  hv_hcall_page = ABSOLUTE(HV_HCALL_PAGE);
+  hv_hcall_page = ABSOLUTE(HV_HCALL_PAGE - XEN_VIRT_START + __XEN_VIRT_START);
 #endif
 
   /* Sections to be discarded */
