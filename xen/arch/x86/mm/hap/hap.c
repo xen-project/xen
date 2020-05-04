@@ -719,7 +719,7 @@ static bool flush_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
         hvm_asid_flush_vcpu(v);
 
         cpu = read_atomic(&v->dirty_cpu);
-        if ( cpu != this_cpu && is_vcpu_dirty_cpu(cpu) )
+        if ( cpu != this_cpu && is_vcpu_dirty_cpu(cpu) && v->is_running )
             __cpumask_set_cpu(cpu, mask);
     }
 
@@ -729,7 +729,7 @@ static bool flush_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
      * not currently running will already be flushed when scheduled because of
      * the ASID tickle done in the loop above.
      */
-    on_selected_cpus(mask, dummy_flush, mask, 0);
+    on_selected_cpus(mask, dummy_flush, NULL, 0);
 
     return true;
 }
