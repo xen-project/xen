@@ -40,25 +40,6 @@ typedef union {
 } xenoprof_buf_t;
 #endif
 
-struct xenoprof_vcpu {
-    int event_size;
-    xenoprof_buf_t *buffer;
-};
-
-struct xenoprof {
-    char *rawbuf;
-    int npages;
-    int nbuf;
-    int bufsize;
-    int domain_type;
-    int domain_ready;
-    int is_primary;
-#ifdef CONFIG_COMPAT
-    int is_compat;
-#endif
-    struct xenoprof_vcpu *vcpu;
-};
-
 #ifndef CONFIG_COMPAT
 #define XENOPROF_COMPAT(x) 0
 #define xenoprof_buf(d, b, field) ACCESS_ONCE((b)->field)

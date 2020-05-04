@@ -33,6 +33,23 @@ static DEFINE_SPINLOCK(pmu_owner_lock);
 int pmu_owner = 0;
 int pmu_hvm_refcount = 0;
 
+struct xenoprof_vcpu {
+    int event_size;
+    xenoprof_buf_t *buffer;
+};
+
+struct xenoprof {
+    char *rawbuf;
+    int npages;
+    int nbuf;
+    int bufsize;
+    int domain_type;
+#ifdef CONFIG_COMPAT
+    bool is_compat;
+#endif
+    struct xenoprof_vcpu *vcpu;
+};
+
 static struct domain *active_domains[MAX_OPROF_DOMAINS];
 static int active_ready[MAX_OPROF_DOMAINS];
 static unsigned int adomains;
@@ -259,7 +276,6 @@ static int alloc_xenoprof_struct(
     d->xenoprof->npages = npages;
     d->xenoprof->nbuf = nvcpu;
     d->xenoprof->bufsize = bufsize;
-    d->xenoprof->domain_ready = 0;
     d->xenoprof->domain_type = XENOPROF_DOMAIN_IGNORED;
 
     /* Update buffer pointers for active vcpus */
@@ -327,7 +343,6 @@ static int set_active(struct domain *d)
     if ( x == NULL )
         return -EPERM;
 
-    x->domain_ready = 1;
     x->domain_type = XENOPROF_DOMAIN_ACTIVE;
     active_ready[ind] = 1;
     activated++;
@@ -348,7 +363,6 @@ static int reset_active(struct domain *d)
     if ( x == NULL )
         return -EPERM;
 
-    x->domain_ready = 0;
     x->domain_type = XENOPROF_DOMAIN_IGNORED;
     active_ready[ind] = 0;
     active_domains[ind] = NULL;
@@ -655,12 +669,7 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE_PARAM(void) arg)
             return ret;
     }
     else
-    {
-        d->xenoprof->domain_ready = 0;
         d->xenoprof->domain_type = XENOPROF_DOMAIN_IGNORED;
-    }
-
-    d->xenoprof->is_primary = (xenoprof_primary_profiler == d);
 
     ret = share_xenoprof_page_with_guest(
         d, virt_to_mfn(d->xenoprof->rawbuf), d->xenoprof->npages);
