@@ -412,18 +412,10 @@ bool __init xpti_pcid_enabled(void)
 
 static void _toggle_guest_pt(struct vcpu *v)
 {
-    const struct domain *d = v->domain;
-    struct cpu_info *cpu_info = get_cpu_info();
     unsigned long cr3;
 
     v->arch.flags ^= TF_kernel_mode;
     update_cr3(v);
-    if ( d->arch.pv.xpti )
-    {
-        cpu_info->root_pgt_changed = true;
-        cpu_info->pv_cr3 = __pa(this_cpu(root_pgt)) |
-                           (d->arch.pv.pcid ? get_pcid_bits(v, true) : 0);
-    }
 
     /*
      * Don't flush user global mappings from the TLB. Don't tick TLB clock.
@@ -431,15 +423,11 @@ static void _toggle_guest_pt(struct vcpu *v)
      * In shadow mode, though, update_cr3() may need to be accompanied by a
      * TLB flush (for just the incoming PCID), as the top level page table may
      * have changed behind our backs. To be on the safe side, suppress the
-     * no-flush unconditionally in this case. The XPTI CR3 write, if enabled,
-     * will then need to be a flushing one too.
+     * no-flush unconditionally in this case.
      */
     cr3 = v->arch.cr3;
-    if ( shadow_mode_enabled(d) )
-    {
+    if ( shadow_mode_enabled(v->domain) )
         cr3 &= ~X86_CR3_NOFLUSH;
-        cpu_info->pv_cr3 &= ~X86_CR3_NOFLUSH;
-    }
     write_cr3(cr3);
 
     if ( !(v->arch.flags & TF_kernel_mode) )
@@ -455,6 +443,8 @@ static void _toggle_guest_pt(struct vcpu *v)
 
 void toggle_guest_mode(struct vcpu *v)
 {
+    const struct domain *d = v->domain;
+
     ASSERT(!is_pv_32bit_vcpu(v));
 
     /* %fs/%gs bases can only be stale if WR{FS,GS}BASE are usable. */
@@ -468,8 +458,27 @@ void toggle_guest_mode(struct vcpu *v)
     asm volatile ( "swapgs" );
 
     _toggle_guest_pt(v);
+
+    if ( d->arch.pv.xpti )
+    {
+        struct cpu_info *cpu_info = get_cpu_info();
+
+        cpu_info->root_pgt_changed = true;
+        cpu_info->pv_cr3 = __pa(this_cpu(root_pgt)) |
+                           (d->arch.pv.pcid ? get_pcid_bits(v, true) : 0);
+        /*
+         * As in _toggle_guest_pt() the XPTI CR3 write needs to be a TLB-
+         * flushing one too for shadow mode guests.
+         */
+        if ( shadow_mode_enabled(d) )
+            cpu_info->pv_cr3 &= ~X86_CR3_NOFLUSH;
+    }
 }
 
+/*
+ * Must be called in matching pairs without returning to guest context
+ * inbetween.
+ */
 void toggle_guest_pt(struct vcpu *v)
 {
     if ( !is_pv_32bit_vcpu(v) )
