@@ -82,26 +82,26 @@ static long hvm_grant_table_op(
 static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     const struct vcpu *curr = current;
+    const struct domain *currd = curr->domain;
 
     switch ( cmd )
     {
-    default:
-        if ( !is_hardware_domain(curr->domain) )
-            return -ENOSYS;
-        /* fall through */
     case PHYSDEVOP_map_pirq:
     case PHYSDEVOP_unmap_pirq:
     case PHYSDEVOP_eoi:
     case PHYSDEVOP_irq_status_query:
     case PHYSDEVOP_get_free_pirq:
-        if ( !has_pirq(curr->domain) )
+        if ( !has_pirq(currd) )
             return -ENOSYS;
         break;
 
     case PHYSDEVOP_pci_mmcfg_reserved:
-        if ( !has_vpci(curr->domain) )
+        if ( !has_vpci(currd) || !is_hardware_domain(currd) )
             return -ENOSYS;
         break;
+
+    default:
+        return -ENOSYS;
     }
 
     if ( !curr->hcall_compat )
