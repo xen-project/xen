@@ -1,6 +1,8 @@
 #ifndef __PV_EMULATE_H__
 #define __PV_EMULATE_H__
 
+#include <xen/sched.h>
+
 #include <asm/processor.h>
 #include <asm/x86_emulate.h>
 

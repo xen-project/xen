@@ -20,15 +20,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/guest_access.h>
-#include <xen/rangeset.h>
-#include <xen/sched.h>
 #include <xen/trace.h>
-
-#include <asm/domain.h>
-#include <asm/mm.h>
-#include <asm/pci.h>
-#include <asm/pv/mm.h>
 #include <asm/shadow.h>
 
 #include "emulate.h"

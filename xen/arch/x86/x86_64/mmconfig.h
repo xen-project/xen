@@ -75,6 +75,7 @@ static inline void mmio_config_writel(void __iomem *pos, u32 val)
 }
 
 /* function prototypes */
+struct acpi_table_header;
 int acpi_parse_mcfg(struct acpi_table_header *header);
 int pci_mmcfg_reserved(uint64_t address, unsigned int segment,
                        unsigned int start_bus, unsigned int end_bus,

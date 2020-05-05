@@ -20,25 +20,6 @@
  */
 
 #include <xen/err.h>
-#include <xen/errno.h>
-#include <xen/event.h>
-#include <xen/guest_access.h>
-#include <xen/iocap.h>
-#include <xen/spinlock.h>
-#include <xen/trace.h>
-
-#include <asm/apic.h>
-#include <asm/debugreg.h>
-#include <asm/hpet.h>
-#include <asm/hypercall.h>
-#include <asm/mc146818rtc.h>
-#include <asm/p2m.h>
-#include <asm/pv/traps.h>
-#include <asm/shared.h>
-#include <asm/traps.h>
-#include <asm/x86_emulate.h>
-
-#include <xsm/xsm.h>
 
 #include "emulate.h"
 

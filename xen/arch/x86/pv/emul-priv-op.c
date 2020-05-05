@@ -19,25 +19,18 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/errno.h>
+#include <xen/domain_page.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
 #include <xen/iocap.h>
-#include <xen/spinlock.h>
-#include <xen/trace.h>
 
 #include <asm/amd.h>
-#include <asm/apic.h>
 #include <asm/debugreg.h>
 #include <asm/hpet.h>
 #include <asm/hypercall.h>
 #include <asm/mc146818rtc.h>
-#include <asm/p2m.h>
 #include <asm/pv/domain.h>
-#include <asm/pv/traps.h>
 #include <asm/shared.h>
-#include <asm/traps.h>
-#include <asm/x86_emulate.h>
 
 #include <xsm/xsm.h>
 

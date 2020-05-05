@@ -19,15 +19,10 @@
 #include <xen/event.h>
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
-#include <xen/lib.h>
-#include <xen/sched.h>
 #include <compat/callback.h>
 #include <compat/nmi.h>
 
-#include <asm/current.h>
-#include <asm/nmi.h>
 #include <asm/shared.h>
-#include <asm/traps.h>
 
 #include <public/callback.h>
 

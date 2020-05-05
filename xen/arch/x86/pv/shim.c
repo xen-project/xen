@@ -25,14 +25,11 @@
 #include <xen/iocap.h>
 #include <xen/param.h>
 #include <xen/shutdown.h>
-#include <xen/types.h>
 #include <xen/consoled.h>
 #include <xen/pv_console.h>
 
-#include <asm/apic.h>
 #include <asm/dom0_build.h>
 #include <asm/guest.h>
-#include <asm/pv/mm.h>
 
 #include <public/arch-x86/cpuid.h>
 #include <public/hvm/params.h>

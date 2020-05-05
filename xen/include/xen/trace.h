@@ -28,6 +28,7 @@ extern int tb_init_done;
 #define tb_init_done false
 #endif
 
+#include <xen/types.h>
 #include <public/sysctl.h>
 #include <public/trace.h>
 #include <asm/trace.h>

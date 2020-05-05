@@ -22,7 +22,6 @@
 #ifndef _XEN_SHADOW_H
 #define _XEN_SHADOW_H
 
-#include <public/domctl.h>
 #include <xen/sched.h>
 #include <xen/perfc.h>
 #include <xen/domain_page.h>
@@ -30,6 +29,8 @@
 #include <asm/paging.h>
 #include <asm/p2m.h>
 #include <asm/spec_ctrl.h>
+
+#include <public/domctl.h>
 
 /*****************************************************************************
  * Macros to tell which shadow paging mode a domain is in*/
