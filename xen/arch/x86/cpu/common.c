@@ -711,8 +711,6 @@ void load_system_tables(void)
 	struct tss64 *tss = &this_cpu(tss_page).tss;
 	seg_desc_t *gdt =
 		this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY;
-	seg_desc_t *compat_gdt =
-		this_cpu(compat_gdt) - FIRST_RESERVED_GDT_ENTRY;
 
 	const struct desc_ptr gdtr = {
 		.base = (unsigned long)gdt,
@@ -753,8 +751,9 @@ void load_system_tables(void)
 	_set_tssldt_desc(gdt + TSS_ENTRY, (unsigned long)tss,
 			 sizeof(*tss) - 1, SYS_DESC_tss_avail);
 	if ( IS_ENABLED(CONFIG_PV32) )
-		_set_tssldt_desc(compat_gdt + TSS_ENTRY, (unsigned long)tss,
-				 sizeof(*tss) - 1, SYS_DESC_tss_busy);
+		_set_tssldt_desc(
+			this_cpu(compat_gdt) - FIRST_RESERVED_GDT_ENTRY + TSS_ENTRY,
+			(unsigned long)tss, sizeof(*tss) - 1, SYS_DESC_tss_busy);
 
 	per_cpu(full_gdt_loaded, cpu) = false;
 	lgdt(&gdtr);
