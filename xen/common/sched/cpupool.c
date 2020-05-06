@@ -40,19 +40,50 @@ static DEFINE_SPINLOCK(cpupool_lock);
 static enum sched_gran __read_mostly opt_sched_granularity = SCHED_GRAN_cpu;
 static unsigned int __read_mostly sched_granularity = 1;
 
+struct sched_gran_name {
+    enum sched_gran mode;
+    char name[8];
+};
+
+static const struct sched_gran_name sg_name[] = {
+    {SCHED_GRAN_cpu, "cpu"},
+    {SCHED_GRAN_core, "core"},
+    {SCHED_GRAN_socket, "socket"},
+};
+
+static void sched_gran_print(enum sched_gran mode, unsigned int gran)
+{
+    const char *name = "";
+    unsigned int i;
+
+    for ( i = 0; i < ARRAY_SIZE(sg_name); i++ )
+    {
+        if ( mode == sg_name[i].mode )
+        {
+            name = sg_name[i].name;
+            break;
+        }
+    }
+
+    printk("Scheduling granularity: %s, %u CPU%s per sched-resource\n",
+           name, gran, gran == 1 ? "" : "s");
+}
+
 #ifdef CONFIG_HAS_SCHED_GRANULARITY
 static int __init sched_select_granularity(const char *str)
 {
-    if ( strcmp("cpu", str) == 0 )
-        opt_sched_granularity = SCHED_GRAN_cpu;
-    else if ( strcmp("core", str) == 0 )
-        opt_sched_granularity = SCHED_GRAN_core;
-    else if ( strcmp("socket", str) == 0 )
-        opt_sched_granularity = SCHED_GRAN_socket;
-    else
-        return -EINVAL;
+    unsigned int i;
 
-    return 0;
+    for ( i = 0; i < ARRAY_SIZE(sg_name); i++ )
+    {
+        if ( strcmp(sg_name[i].name, str) == 0 )
+        {
+            opt_sched_granularity = sg_name[i].mode;
+            return 0;
+        }
+    }
+
+    return -EINVAL;
 }
 custom_param("sched-gran", sched_select_granularity);
 #endif
@@ -115,6 +146,7 @@ static void __init cpupool_gran_init(void)
         warning_add(fallback);
 
     sched_granularity = gran;
+    sched_gran_print(opt_sched_granularity, sched_granularity);
 }
 
 unsigned int cpupool_get_granularity(const struct cpupool *c)
@@ -911,6 +943,7 @@ void dump_runq(unsigned char key)
     {
         printk("Cpupool %d:\n", (*c)->cpupool_id);
         printk("Cpus: %*pbl\n", CPUMASK_PR((*c)->cpu_valid));
+        sched_gran_print((*c)->gran, cpupool_get_granularity(*c));
         schedule_dump(*c);
     }
 
