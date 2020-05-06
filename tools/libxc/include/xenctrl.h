@@ -2232,6 +2232,20 @@ int xc_memshr_range_share(xc_interface *xch,
                           uint64_t first_gfn,
                           uint64_t last_gfn);
 
+int xc_memshr_fork(xc_interface *xch,
+                   uint32_t source_domain,
+                   uint32_t client_domain,
+                   bool allow_with_iommu);
+
+/*
+ * Note: this function is only intended to be used on short-lived forks that
+ * haven't yet aquired a lot of memory. In case the fork has a lot of memory
+ * it is likely more performant to create a new fork with xc_memshr_fork.
+ *
+ * With VMs that have a lot of memory this call may block for a long time.
+ */
+int xc_memshr_fork_reset(xc_interface *xch, uint32_t forked_domain);
+
 /* Debug calls: return the number of pages referencing the shared frame backing
  * the input argument. Should be one or greater.
  *
