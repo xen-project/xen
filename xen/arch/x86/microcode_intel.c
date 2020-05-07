@@ -30,6 +30,7 @@
 
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/system.h>
 #include <asm/microcode.h>
 
 #define pr_debug(x...) ((void)0)
@@ -299,6 +300,8 @@ static int apply_microcode(const struct microcode_patch *patch)
     mc_intel = patch->mc_intel;
 
     BUG_ON(local_irq_is_enabled());
+
+    wbinvd();
 
     /* write microcode via MSR 0x79 */
     wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc_intel->bits);
