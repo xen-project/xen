@@ -872,7 +872,14 @@ static int pci_clean_dpci_irq(struct domain *d,
         xfree(digl);
     }
 
-    return pt_pirq_softirq_active(pirq_dpci) ? -ERESTART : 0;
+    radix_tree_delete(&d->pirq_tree, dpci_pirq(pirq_dpci)->pirq);
+
+    if ( !pt_pirq_softirq_active(pirq_dpci) )
+        return 0;
+
+    domain_get_irq_dpci(d)->pending_pirq_dpci = pirq_dpci;
+
+    return -ERESTART;
 }
 
 static int pci_clean_dpci_irqs(struct domain *d)
@@ -889,8 +896,18 @@ static int pci_clean_dpci_irqs(struct domain *d)
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
     {
-        int ret = pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
+        int ret = 0;
 
+        if ( hvm_irq_dpci->pending_pirq_dpci )
+        {
+            if ( pt_pirq_softirq_active(hvm_irq_dpci->pending_pirq_dpci) )
+                 ret = -ERESTART;
+            else
+                 hvm_irq_dpci->pending_pirq_dpci = NULL;
+        }
+
+        if ( !ret )
+            ret = pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
         if ( ret )
         {
             spin_unlock(&d->event_lock);
