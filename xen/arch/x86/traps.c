@@ -232,6 +232,7 @@ static void compat_show_guest_stack(struct vcpu *v,
                                     int debug_stack_lines)
 {
     unsigned int i, *stack, addr, mask = STACK_SIZE;
+    void *stack_page = NULL;
 
     stack = (unsigned int *)(unsigned long)regs->esp;
     printk("Guest stack trace from esp=%08lx:\n ", (unsigned long)stack);
@@ -254,7 +255,7 @@ static void compat_show_guest_stack(struct vcpu *v,
                 break;
         if ( !vcpu )
         {
-            stack = do_page_walk(v, (unsigned long)stack);
+            stack_page = stack = do_page_walk(v, (unsigned long)stack);
             if ( (unsigned long)stack < PAGE_SIZE )
             {
                 printk("Inaccessible guest memory.\n");
@@ -281,11 +282,10 @@ static void compat_show_guest_stack(struct vcpu *v,
         printk(" %08x", addr);
         stack++;
     }
-    if ( mask == PAGE_SIZE )
-    {
-        BUILD_BUG_ON(PAGE_SIZE == STACK_SIZE);
-        unmap_domain_page(stack);
-    }
+
+    if ( stack_page )
+        unmap_domain_page(stack_page);
+
     if ( i == 0 )
         printk("Stack empty.");
     printk("\n");
@@ -296,6 +296,7 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     int i;
     unsigned long *stack, addr;
     unsigned long mask = STACK_SIZE;
+    void *stack_page = NULL;
 
     /* Avoid HVM as we don't know what the stack looks like. */
     if ( is_hvm_vcpu(v) )
@@ -324,7 +325,7 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
         vcpu = maddr_get_owner(read_cr3()) == v->domain ? v : NULL;
         if ( !vcpu )
         {
-            stack = do_page_walk(v, (unsigned long)stack);
+            stack_page = stack = do_page_walk(v, (unsigned long)stack);
             if ( (unsigned long)stack < PAGE_SIZE )
             {
                 printk("Inaccessible guest memory.\n");
@@ -351,11 +352,10 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
         printk(" %p", _p(addr));
         stack++;
     }
-    if ( mask == PAGE_SIZE )
-    {
-        BUILD_BUG_ON(PAGE_SIZE == STACK_SIZE);
-        unmap_domain_page(stack);
-    }
+
+    if ( stack_page )
+        unmap_domain_page(stack_page);
+
     if ( i == 0 )
         printk("Stack empty.");
     printk("\n");
