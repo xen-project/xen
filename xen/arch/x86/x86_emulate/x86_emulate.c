@@ -11431,13 +11431,39 @@ x86_insn_is_mem_write(const struct x86_emulate_state *state,
         break;
 
     case X86EMUL_OPC(0x0f, 0x01):
-        return !(state->modrm_reg & 6); /* SGDT / SIDT */
+        switch ( state->modrm_reg & 7 )
+        {
+        case 0: /* SGDT */
+        case 1: /* SIDT */
+        case 4: /* SMSW */
+            return true;
+        }
+        break;
+
+    case X86EMUL_OPC(0x0f, 0xae):
+        switch ( state->modrm_reg & 7 )
+        {
+        case 0: /* FXSAVE */
+        case 3: /* {,V}STMXCSR */
+        case 4: /* XSAVE */
+        case 6: /* XSAVEOPT */
+            return true;
+        }
+        break;
 
     case X86EMUL_OPC(0x0f, 0xba):
         return (state->modrm_reg & 7) > 4; /* BTS / BTR / BTC */
 
     case X86EMUL_OPC(0x0f, 0xc7):
-        return (state->modrm_reg & 7) == 1; /* CMPXCHG{8,16}B */
+        switch ( state->modrm_reg & 7 )
+        {
+        case 1: /* CMPXCHG{8,16}B */
+        case 4: /* XSAVEC */
+        case 5: /* XSAVES */
+        case 7: /* VMPTRST */
+            return true;
+        }
+        break;
     }
 
     return false;
