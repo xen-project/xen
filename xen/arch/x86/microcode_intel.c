@@ -30,6 +30,7 @@
 
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/system.h>
 #include <asm/microcode.h>
 
 #define pr_debug(x...) ((void)0)
@@ -293,6 +294,8 @@ static int apply_microcode(unsigned int cpu)
 
     /* serialize access to the physical write to MSR 0x79 */
     spin_lock_irqsave(&microcode_update_lock, flags);
+
+    wbinvd();
 
     /* write microcode via MSR 0x79 */
     wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)uci->mc.mc_intel->bits);
