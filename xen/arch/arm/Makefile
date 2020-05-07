@@ -68,7 +68,7 @@ extra-y += $(TARGET_SUBARCH)/head.o
 
 ifdef CONFIG_DTB_FILE
 obj-y += dtb.o
-AFLAGS += -DCONFIG_DTB_FILE=\"$(CONFIG_DTB_FILE)\"
+AFLAGS-y += -DCONFIG_DTB_FILE=\"$(CONFIG_DTB_FILE)\"
 endif
 
 ALL_OBJS := $(TARGET_SUBARCH)/head.o $(ALL_OBJS)
