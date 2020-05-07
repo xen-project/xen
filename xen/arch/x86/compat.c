@@ -15,7 +15,7 @@ typedef long ret_t;
 #endif
 
 /* Legacy hypercall (as of 0x00030202). */
-ret_t do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop)
+ret_t do_physdev_op_compat(XEN_GUEST_HANDLE_PARAM(physdev_op_t) uop)
 {
     typeof(do_physdev_op) *fn =
         (void *)pv_hypercall_table[__HYPERVISOR_physdev_op].native;

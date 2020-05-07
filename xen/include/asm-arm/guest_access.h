@@ -40,7 +40,7 @@ int access_guest_memory_by_ipa(struct domain *d, paddr_t ipa, void *buf,
     (XEN_GUEST_HANDLE_PARAM(type)) { _x };            \
 })
 
-/* Cast a XEN_GUEST_HANDLE to XEN_GUEST_HANDLE_PARAM */
+/* Convert a XEN_GUEST_HANDLE to XEN_GUEST_HANDLE_PARAM */
 #define guest_handle_to_param(hnd, type) ({                  \
     typeof((hnd).p) _x = (hnd).p;                            \
     XEN_GUEST_HANDLE_PARAM(type) _y = { _x };                \
@@ -49,18 +49,6 @@ int access_guest_memory_by_ipa(struct domain *d, paddr_t ipa, void *buf,
      * the same type, then return hnd */                     \
     (void)(&_x == &_y.p);                                    \
     _y;                                                      \
-})
-
-
-/* Cast a XEN_GUEST_HANDLE_PARAM to XEN_GUEST_HANDLE */
-#define guest_handle_from_param(hnd, type) ({               \
-    typeof((hnd).p) _x = (hnd).p;                           \
-    XEN_GUEST_HANDLE(type) _y = { _x };                     \
-    /* type checking: make sure that the pointers inside    \
-     * XEN_GUEST_HANDLE and XEN_GUEST_HANDLE_PARAM are of   \
-     * the same type, then return hnd */                    \
-    (void)(&_x == &_y.p);                                   \
-    _y;                                                     \
 })
 
 #define guest_handle_for_field(hnd, type, fld)          \

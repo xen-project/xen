@@ -285,9 +285,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
         guest_from_compat_handle(data, op->u.microcode.data);
 
-        ret = microcode_update(
-                guest_handle_to_param(data, const_void),
-                op->u.microcode.length);
+        ret = microcode_update(data, op->u.microcode.length);
     }
     break;
 
@@ -531,9 +529,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             XEN_GUEST_HANDLE(uint32) pdc;
 
             guest_from_compat_handle(pdc, op->u.set_pminfo.u.pdc);
-            ret = acpi_set_pdc_bits(
-                    op->u.set_pminfo.id,
-                    guest_handle_to_param(pdc, uint32));
+            ret = acpi_set_pdc_bits(op->u.set_pminfo.id, pdc);
         }
         break;
 

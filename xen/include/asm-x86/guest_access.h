@@ -52,18 +52,8 @@
     (XEN_GUEST_HANDLE_PARAM(type)) { _x };            \
 })
 
-/* Cast a XEN_GUEST_HANDLE to XEN_GUEST_HANDLE_PARAM */
+/* Convert a XEN_GUEST_HANDLE to XEN_GUEST_HANDLE_PARAM */
 #define guest_handle_to_param(hnd, type) ({                  \
-    /* type checking: make sure that the pointers inside     \
-     * XEN_GUEST_HANDLE and XEN_GUEST_HANDLE_PARAM are of    \
-     * the same type, then return hnd */                     \
-    (void)((typeof(&(hnd).p)) 0 ==                           \
-        (typeof(&((XEN_GUEST_HANDLE_PARAM(type)) {}).p)) 0); \
-    (hnd);                                                   \
-})
-
-/* Cast a XEN_GUEST_HANDLE_PARAM to XEN_GUEST_HANDLE */
-#define guest_handle_from_param(hnd, type) ({                \
     /* type checking: make sure that the pointers inside     \
      * XEN_GUEST_HANDLE and XEN_GUEST_HANDLE_PARAM are of    \
      * the same type, then return hnd */                     \

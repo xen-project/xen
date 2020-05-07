@@ -4441,20 +4441,16 @@ static int _handle_iomem_range(unsigned long s, unsigned long e,
 {
     if ( s > ctxt->s && !(s >> (paddr_bits - PAGE_SHIFT)) )
     {
-        e820entry_t ent;
-        XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
-        XEN_GUEST_HANDLE(e820entry_t) buffer;
-
         if ( !guest_handle_is_null(ctxt->map.buffer) )
         {
+            e820entry_t ent;
+
             if ( ctxt->n + 1 >= ctxt->map.nr_entries )
                 return -EINVAL;
             ent.addr = (uint64_t)ctxt->s << PAGE_SHIFT;
             ent.size = (uint64_t)(s - ctxt->s) << PAGE_SHIFT;
             ent.type = E820_RESERVED;
-            buffer_param = guest_handle_cast(ctxt->map.buffer, e820entry_t);
-            buffer = guest_handle_from_param(buffer_param, e820entry_t);
-            if ( __copy_to_guest_offset(buffer, ctxt->n, &ent, 1) )
+            if ( __copy_to_guest_offset(ctxt->map.buffer, ctxt->n, &ent, 1) )
                 return -EFAULT;
         }
         ctxt->n++;
@@ -4715,8 +4711,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENMEM_machine_memory_map:
     {
         struct memory_map_context ctxt;
-        XEN_GUEST_HANDLE(e820entry_t) buffer;
-        XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
+        XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer;
         unsigned int i;
         bool store;
 
@@ -4732,8 +4727,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( store && ctxt.map.nr_entries < e820.nr_map + 1 )
             return -EINVAL;
 
-        buffer_param = guest_handle_cast(ctxt.map.buffer, e820entry_t);
-        buffer = guest_handle_from_param(buffer_param, e820entry_t);
+        buffer = guest_handle_cast(ctxt.map.buffer, e820entry_t);
         if ( store && !guest_handle_okay(buffer, ctxt.map.nr_entries) )
             return -EFAULT;
 
