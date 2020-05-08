@@ -453,7 +453,7 @@ static inline void __runq_tickle(const struct csched_unit *new)
                     SCHED_UNIT_STAT_CRANK(cur, kicked_away);
                     SCHED_UNIT_STAT_CRANK(cur, migrate_r);
                     SCHED_STAT_CRANK(migrate_kicked_away);
-                    sched_set_pause_flags_atomic(cur->unit, _VPF_migrating);
+                    sched_set_pause_flags(cur->unit, _VPF_migrating);
                 }
                 /* Tickle cpu anyway, to let new preempt cur. */
                 SCHED_STAT_CRANK(tickled_busy_cpu);
@@ -973,7 +973,7 @@ csched_unit_acct(struct csched_private *prv, unsigned int cpu)
         {
             SCHED_UNIT_STAT_CRANK(svc, migrate_r);
             SCHED_STAT_CRANK(migrate_running);
-            sched_set_pause_flags_atomic(currunit, _VPF_migrating);
+            sched_set_pause_flags(currunit, _VPF_migrating);
             /*
              * As we are about to tickle cpu, we should clear its bit in
              * idlers. But, if we are here, it means there is someone running
