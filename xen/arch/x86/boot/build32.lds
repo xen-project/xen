@@ -31,7 +31,7 @@ SECTIONS
         *(.bss.*)
   }
 
-  /DISCARD/ : {
+  .got.plt : {
         /*
          * PIC/PIE executable contains .got.plt section even if it is not linked
          * with dynamic libraries. In such case it is just placeholder for
@@ -47,6 +47,14 @@ SECTIONS
          *
          * Please check build32.mk for more details.
          */
-        /* *(.got.plt) */
+        *(.got.plt)
+  }
+
+  /DISCARD/ : {
+        /*
+         * Discard everything else, to prevent linkers from putting
+         * orphaned sections ahead of .text, which needs to be first.
+         */
+        *(*)
   }
 }
