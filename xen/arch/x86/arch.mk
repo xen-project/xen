@@ -56,7 +56,7 @@ $(call as-option-add,CFLAGS,CC,\
 $(call as-option-add,CFLAGS,CC,\
     ".L1: .L2: .nops (.L2 - .L1)$$(comma)9",-DHAVE_AS_NOPS_DIRECTIVE)
 
-CFLAGS += -mno-red-zone -fpic -fno-asynchronous-unwind-tables
+CFLAGS += -mno-red-zone -fpic
 
 # Xen doesn't use SSE interally.  If the compiler supports it, also skip the
 # SSE setup for variadic function calls.

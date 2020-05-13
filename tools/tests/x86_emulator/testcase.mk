@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
-CFLAGS += -fno-builtin -fno-asynchronous-unwind-tables -g0 $($(TESTCASE)-cflags)
+CFLAGS += -fno-builtin -g0 $($(TESTCASE)-cflags)
 
 .PHONY: all
 all: $(TESTCASE).bin
