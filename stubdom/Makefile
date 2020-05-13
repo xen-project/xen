@@ -16,7 +16,7 @@ CFLAGS += -O1 -fno-omit-frame-pointer
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
   ifeq ($(wildcard $(MINI_OS)/Config.mk),)
-    $(error Please run `make mini-os-dir' in top-level directory)
+    $(error Please run 'make mini-os-dir' in top-level directory)
   endif
   include $(XEN_ROOT)/Config.mk
 endif
