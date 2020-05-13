@@ -406,9 +406,6 @@ tools/xenstore/xenstore-watch
 tools/xl/_paths.h
 tools/xl/xl
 
-tools/golang/src
-tools/golang/*/*.gen.go
-
 docs/txt/misc/*.txt
 docs/txt/man/*.txt
 docs/figs/*.png

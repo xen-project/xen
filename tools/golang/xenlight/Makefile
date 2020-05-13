@@ -49,7 +49,6 @@ install: build
 clean:
 	$(RM) -r $(XEN_GOPATH)$(GOXL_PKG_DIR)
 	$(RM) $(XEN_GOPATH)/pkg/*/$(XEN_GOCODE_URL)/xenlight.a
-	$(RM) *.gen.go
 
 .PHONY: distclean
 distclean: clean
