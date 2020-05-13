@@ -147,6 +147,12 @@ Output of information in machine-parseable JSON format
 
     Status: Supported
 
+### xenlight Go package
+
+Go (golang) bindings for libxl
+
+    Status: Experimental
+
 ## Toolstack/3rd party
 
 ### libvirt driver for xl
