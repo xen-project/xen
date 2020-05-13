@@ -498,6 +498,9 @@ void unmap_domain_page(const void *va)
     lpae_t *map = this_cpu(xen_dommap);
     int slot = ((unsigned long) va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
 
+    if ( !va )
+        return;
+
     local_irq_save(flags);
 
     ASSERT(slot >= 0 && slot < DOMHEAP_ENTRIES);
