@@ -21,13 +21,15 @@ package xenlight
 #cgo LDFLAGS: -lxenlight -lyajl -lxentoollog
 #include <stdlib.h>
 #include <libxl.h>
+#include <libxl_utils.h>
+
+#define INVALID_DOMID_TYPED ((uint32_t) INVALID_DOMID)
 
 static const libxl_childproc_hooks childproc_hooks = { .chldowner = libxl_sigchld_owner_mainloop };
 
 void xenlight_set_chldproc(libxl_ctx *ctx) {
 	libxl_childproc_setmode(ctx, &childproc_hooks, NULL);
 }
-
 */
 import "C"
 
@@ -74,6 +76,10 @@ var libxlErrors = map[Error]string{
 	ErrorDomainDestroyed:              "Domain destroyed",
 	ErrorFeatureRemoved:               "Feature removed",
 }
+
+const (
+	DomidInvalid Domid = Domid(C.INVALID_DOMID_TYPED)
+)
 
 func (e Error) Error() string {
 	if s, ok := libxlErrors[e]; ok {
@@ -189,6 +195,38 @@ func (ctx *Context) Close() error {
  */
 
 type Domid uint32
+
+// NameToDomid returns the Domid for a domain, given its name, if it exists.
+//
+// NameToDomid does not guarantee that the domid associated with name at
+// the time NameToDomid is called is the same as the domid associated with
+// name at the time NameToDomid returns.
+func (Ctx *Context) NameToDomid(name string) (Domid, error) {
+	var domid C.uint32_t
+
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+
+	if ret := C.libxl_name_to_domid(Ctx.ctx, cname, &domid); ret != 0 {
+		return DomidInvalid, Error(ret)
+	}
+
+	return Domid(domid), nil
+}
+
+// DomidToName returns the name for a domain, given its domid. If there
+// is no domain with the given domid, DomidToName will return the empty
+// string.
+//
+// DomidToName does not guarantee that the name (if any) associated with domid
+// at the time DomidToName is called is the same as the name (if any) associated
+// with domid at the time DomidToName returns.
+func (Ctx *Context) DomidToName(domid Domid) string {
+	cname := C.libxl_domid_to_name(Ctx.ctx, C.uint32_t(domid))
+	defer C.free(unsafe.Pointer(cname))
+
+	return C.GoString(cname)
+}
 
 // Devid is a device ID.
 type Devid int
