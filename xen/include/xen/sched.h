@@ -844,7 +844,7 @@ static inline bool is_vcpu_dirty_cpu(unsigned int cpu)
 
 static inline bool vcpu_cpu_dirty(const struct vcpu *v)
 {
-    return is_vcpu_dirty_cpu(v->dirty_cpu);
+    return is_vcpu_dirty_cpu(read_atomic(&v->dirty_cpu));
 }
 
 void vcpu_block(void);

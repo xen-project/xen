@@ -316,7 +316,7 @@ static void dump_domains(unsigned char key)
                        vcpu_info(v, evtchn_upcall_pending),
                        !vcpu_event_delivery_is_enabled(v));
                 if ( vcpu_cpu_dirty(v) )
-                    printk("dirty_cpu=%u", v->dirty_cpu);
+                    printk("dirty_cpu=%u", read_atomic(&v->dirty_cpu));
                 printk("\n");
                 printk("    pause_count=%d pause_flags=%lx\n",
                        atomic_read(&v->pause_count), v->pause_flags);
