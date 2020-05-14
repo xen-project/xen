@@ -169,7 +169,7 @@ extern int verify_local_APIC (void);
 extern void cache_APIC_registers (void);
 extern void sync_Arb_IDs (void);
 extern void init_bsp_APIC (void);
-extern void setup_local_APIC (void);
+extern void setup_local_APIC(bool bsp);
 extern void init_apic_mappings (void);
 extern void smp_local_timer_interrupt (struct cpu_user_regs *regs);
 extern void setup_boot_APIC_clock (void);

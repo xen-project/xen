@@ -192,7 +192,7 @@ static void smp_callin(void)
      */
     Dprintk("CALLIN, before setup_local_APIC().\n");
     x2apic_ap_setup();
-    setup_local_APIC();
+    setup_local_APIC(false);
 
     /* Save our processor parameters. */
     if ( !smp_store_cpu_info(cpu) )
@@ -1183,7 +1183,7 @@ void __init smp_prepare_cpus(void)
     verify_local_APIC();
 
     connect_bsp_APIC();
-    setup_local_APIC();
+    setup_local_APIC(true);
 
     if ( !skip_ioapic_setup && nr_ioapics )
         setup_IO_APIC();

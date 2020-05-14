@@ -499,7 +499,7 @@ static void resume_x2apic(void)
     __enable_x2apic();
 }
 
-void setup_local_APIC(void)
+void setup_local_APIC(bool bsp)
 {
     unsigned long oldvalue, value, maxlvt;
     int i, j;
@@ -598,8 +598,8 @@ void setup_local_APIC(void)
     if ( directed_eoi_enabled )
     {
         value |= APIC_SPIV_DIRECTED_EOI;
-        apic_printk(APIC_VERBOSE, "Suppress EOI broadcast on CPU#%d\n",
-                    smp_processor_id());
+        if ( bsp )
+            apic_printk(APIC_VERBOSE, "Suppressing EOI broadcast\n");
     }
 
     apic_write(APIC_SPIV, value);
@@ -615,21 +615,22 @@ void setup_local_APIC(void)
      * TODO: set up through-local-APIC from through-I/O-APIC? --macro
      */
     value = apic_read(APIC_LVT0) & APIC_LVT_MASKED;
-    if (!smp_processor_id() && (pic_mode || !value)) {
+    if (bsp && (pic_mode || !value)) {
         value = APIC_DM_EXTINT;
         apic_printk(APIC_VERBOSE, "enabled ExtINT on CPU#%d\n",
                     smp_processor_id());
     } else {
         value = APIC_DM_EXTINT | APIC_LVT_MASKED;
-        apic_printk(APIC_VERBOSE, "masked ExtINT on CPU#%d\n",
-                    smp_processor_id());
+        if (bsp)
+            apic_printk(APIC_VERBOSE, "masked ExtINT on CPU#%d\n",
+                        smp_processor_id());
     }
     apic_write(APIC_LVT0, value);
 
     /*
      * only the BP should see the LINT1 NMI signal, obviously.
      */
-    if (!smp_processor_id())
+    if (bsp)
         value = APIC_DM_NMI;
     else
         value = APIC_DM_NMI | APIC_LVT_MASKED;
@@ -663,7 +664,7 @@ void setup_local_APIC(void)
         printk("Leaving ESR disabled.\n");
     }
 
-    if (nmi_watchdog == NMI_LOCAL_APIC && smp_processor_id())
+    if (nmi_watchdog == NMI_LOCAL_APIC && !bsp)
         setup_apic_nmi_watchdog();
     apic_pm_activate();
 }
@@ -1474,7 +1475,7 @@ int __init APIC_init_uniprocessor (void)
     physids_clear(phys_cpu_present_map);
     physid_set(boot_cpu_physical_apicid, phys_cpu_present_map);
 
-    setup_local_APIC();
+    setup_local_APIC(true);
 
     if (nmi_watchdog == NMI_LOCAL_APIC)
         check_nmi_watchdog();
