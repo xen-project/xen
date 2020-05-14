@@ -1078,12 +1078,7 @@ static void sched_unit_migrate_finish(struct sched_unit *unit)
     sched_spin_unlock_double(old_lock, new_lock, flags);
 
     if ( old_cpu != new_cpu )
-    {
-        /* Vcpus are moved to other pcpus, commit their states to memory. */
-        for_each_sched_unit_vcpu ( unit, v )
-            sync_vcpu_execstate(v);
         sched_move_irqs(unit);
-    }
 
     /* Wake on new CPU. */
     for_each_sched_unit_vcpu ( unit, v )
