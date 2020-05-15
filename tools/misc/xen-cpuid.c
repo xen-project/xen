@@ -161,6 +161,7 @@ static const char *const str_7d0[32] =
 
     [10] = "md-clear",
     /* 12 */                [13] = "tsx-force-abort",
+    [14] = "serialize",
 
     [18] = "pconfig",
     [20] = "cet-ibt",

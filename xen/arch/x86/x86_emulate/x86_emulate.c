@@ -1916,6 +1916,7 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 #define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
 #define vcpu_has_avx512_4vnniw() (ctxt->cpuid->feat.avx512_4vnniw)
 #define vcpu_has_avx512_4fmaps() (ctxt->cpuid->feat.avx512_4fmaps)
+#define vcpu_has_serialize()   (ctxt->cpuid->feat.serialize)
 #define vcpu_has_avx512_bf16() (ctxt->cpuid->feat.avx512_bf16)
 
 #define vcpu_must_have(feat) \
@@ -5637,6 +5638,18 @@ x86_emulate(
             if ( (rc = ops->tlb_op(x86emul_invlpga, truncate_ea(_regs.r(ax)),
                                    _regs.ecx, ctxt)) != X86EMUL_OKAY )
                 goto done;
+            break;
+
+        case 0xe8:
+            switch ( vex.pfx )
+            {
+            case vex_none: /* serialize */
+                host_and_vcpu_must_have(serialize);
+                asm volatile ( ".byte 0x0f, 0x01, 0xe8" );
+                break;
+            default:
+                goto unimplemented_insn;
+            }
             break;
 
         case 0xf8: /* swapgs */
