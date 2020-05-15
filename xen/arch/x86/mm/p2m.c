@@ -1781,7 +1781,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn_l)
  */
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
 {
-    struct page_info *page;
+    struct page_info *page = NULL;
     p2m_type_t p2mt;
     p2m_access_t a;
     gfn_t gfn = _gfn(gfn_l);
@@ -1816,9 +1816,19 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
             goto out;
         /* Get a free page */
         ret = -ENOMEM;
-        page = alloc_domheap_page(p2m->domain, 0);
+        page = alloc_domheap_page(d, 0);
         if ( unlikely(page == NULL) )
             goto out;
+        if ( unlikely(!get_page(page, d)) )
+        {
+            /*
+             * The domain can't possibly know about this page yet, so failure
+             * here is a clear indication of something fishy going on.
+             */
+            domain_crash(d);
+            page = NULL;
+            goto out;
+        }
         mfn = page_to_mfn(page);
         page_extant = 0;
 
@@ -1828,7 +1838,6 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
         if ( ret )
         {
             ret = -EFAULT;
-            put_page(page); /* Don't leak pages */
             goto out;            
         }
     }
@@ -1839,13 +1848,24 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
     ret = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
                         paging_mode_log_dirty(d) ? p2m_ram_logdirty
                                                  : p2m_ram_rw, a);
-    set_gpfn_from_mfn(mfn_x(mfn), gfn_l);
+    if ( !ret )
+    {
+        set_gpfn_from_mfn(mfn_x(mfn), gfn_l);
 
-    if ( !page_extant )
-        atomic_dec(&d->paged_pages);
+        if ( !page_extant )
+            atomic_dec(&d->paged_pages);
+    }
 
  out:
     gfn_unlock(p2m, gfn, 0);
+
+    if ( page )
+    {
+        if ( ret )
+            put_page_alloc_ref(page);
+        put_page(page);
+    }
+
     return ret;
 }
 
