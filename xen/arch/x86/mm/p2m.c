@@ -1816,6 +1816,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
             goto out;
         /* Get a free page */
         ret = -ENOMEM;
+        page_alloc_mm_pre_lock(d);
         page = alloc_domheap_page(d, 0);
         if ( unlikely(page == NULL) )
             goto out;
