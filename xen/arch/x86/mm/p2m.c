@@ -1808,6 +1808,8 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
     /* Allocate a page if the gfn does not have one yet */
     if ( !mfn_valid(mfn) )
     {
+        void *guest_map;
+
         /* If the user did not provide a buffer, we disallow */
         ret = -EINVAL;
         if ( unlikely(user_ptr == NULL) )
@@ -1819,22 +1821,12 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
             goto out;
         mfn = page_to_mfn(page);
         page_extant = 0;
-    }
 
-    /* If we were given a buffer, now is the time to use it */
-    if ( !page_extant && user_ptr )
-    {
-        void *guest_map;
-        int rc;
-
-        ASSERT( mfn_valid(mfn) );
         guest_map = map_domain_page(mfn);
-        rc = copy_from_user(guest_map, user_ptr, PAGE_SIZE);
+        ret = copy_from_user(guest_map, user_ptr, PAGE_SIZE);
         unmap_domain_page(guest_map);
-        if ( rc )
+        if ( ret )
         {
-            gdprintk(XENLOG_ERR, "Failed to load paging-in gfn %lx domain %u "
-                                 "bytes left %d\n", gfn_l, d->domain_id, rc);
             ret = -EFAULT;
             put_page(page); /* Don't leak pages */
             goto out;            
