@@ -2457,13 +2457,20 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
             v = unit2vcpu_cpu(prev, cpu);
         }
         /*
-         * Coming from idle might need to do tasklet work.
+         * Check for any work to be done which might need cpu synchronization.
+         * This is either pending RCU work, or tasklet work when coming from
+         * idle. It is mandatory that RCU softirqs are of higher priority
+         * than scheduling ones as otherwise a deadlock might occur.
          * In order to avoid deadlocks we can't do that here, but have to
-         * continue the idle loop.
+         * schedule the previous vcpu again, which will lead to the desired
+         * processing to be done.
          * Undo the rendezvous_in_cnt decrement and schedule another call of
          * sched_slave().
          */
-        if ( is_idle_unit(prev) && sched_tasklet_check_cpu(cpu) )
+        BUILD_BUG_ON(RCU_SOFTIRQ > SCHED_SLAVE_SOFTIRQ ||
+                     RCU_SOFTIRQ > SCHEDULE_SOFTIRQ);
+        if ( rcu_pending(cpu) ||
+             (is_idle_unit(prev) && sched_tasklet_check_cpu(cpu)) )
         {
             struct vcpu *vprev = current;
 
