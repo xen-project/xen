@@ -344,6 +344,76 @@ static int num_cpu_cores(struct cpuinfo_x86 *c)
 		return 1;
 }
 
+static void intel_log_freq(const struct cpuinfo_x86 *c)
+{
+    unsigned int eax, ebx, ecx, edx;
+    uint64_t msrval;
+    uint8_t max_ratio;
+
+    if ( c->cpuid_level >= 0x15 )
+    {
+        cpuid(0x15, &eax, &ebx, &ecx, &edx);
+        if ( ecx && ebx && eax )
+        {
+            unsigned long long val = ecx;
+
+            val *= ebx;
+            do_div(val, eax);
+            printk("CPU%u: TSC: %uMHz * %u / %u = %LuMHz\n",
+                   smp_processor_id(), ecx, ebx, eax, val);
+        }
+        else if ( ecx | eax | ebx )
+        {
+            printk("CPU%u: TSC:", smp_processor_id());
+            if ( ecx )
+                printk(" core: %uMHz", ecx);
+            if ( ebx && eax )
+                printk(" ratio: %u / %u", ebx, eax);
+            printk("\n");
+        }
+    }
+
+    if ( c->cpuid_level >= 0x16 )
+    {
+        cpuid(0x16, &eax, &ebx, &ecx, &edx);
+        if ( ecx | eax | ebx )
+        {
+            printk("CPU%u:", smp_processor_id());
+            if ( ecx )
+                printk(" bus: %uMHz", ecx);
+            if ( eax )
+                printk(" base: %uMHz", eax);
+            if ( ebx )
+                printk(" max: %uMHz", ebx);
+            printk("\n");
+        }
+    }
+
+    if ( rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msrval) )
+        return;
+    max_ratio = msrval >> 8;
+
+    if ( max_ratio )
+    {
+        unsigned int factor = 10000;
+        uint8_t min_ratio = msrval >> 40;
+
+        if ( c->x86 == 6 )
+            switch ( c->x86_model )
+            {
+            case 0x1a: case 0x1e: case 0x1f: case 0x2e: /* Nehalem */
+            case 0x25: case 0x2c: case 0x2f: /* Westmere */
+                factor = 13333;
+                break;
+            }
+
+        printk("CPU%u: ", smp_processor_id());
+        if ( min_ratio )
+            printk("%u..", (factor * min_ratio + 50) / 100);
+        printk("%u MHz\n", (factor * max_ratio + 50) / 100);
+    }
+}
+
 static void init_intel(struct cpuinfo_x86 *c)
 {
 	/* Detect the extended topology information if available */
@@ -378,6 +448,10 @@ static void init_intel(struct cpuinfo_x86 *c)
 	     ( c->cpuid_level >= 0x00000006 ) &&
 	     ( cpuid_eax(0x00000006) & (1u<<2) ) )
 		__set_bit(X86_FEATURE_ARAT, c->x86_capability);
+
+	if ((opt_cpu_info && !(c->apicid & (c->x86_num_siblings - 1))) ||
+	    c == &boot_cpu_data )
+		intel_log_freq(c);
 }
 
 const struct cpu_dev intel_cpu_dev = {

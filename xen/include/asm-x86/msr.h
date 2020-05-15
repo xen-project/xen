@@ -40,8 +40,8 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 
 /* rdmsr with exception handling */
 #define rdmsr_safe(msr,val) ({\
-    int _rc; \
-    uint32_t lo, hi; \
+    int rc_; \
+    uint32_t lo_, hi_; \
     __asm__ __volatile__( \
         "1: rdmsr\n2:\n" \
         ".section .fixup,\"ax\"\n" \
@@ -49,15 +49,15 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
         "   movl %5,%2\n; jmp 2b\n" \
         ".previous\n" \
         _ASM_EXTABLE(1b, 3b) \
-        : "=a" (lo), "=d" (hi), "=&r" (_rc) \
+        : "=a" (lo_), "=d" (hi_), "=&r" (rc_) \
         : "c" (msr), "2" (0), "i" (-EFAULT)); \
-    val = lo | ((uint64_t)hi << 32); \
-    _rc; })
+    val = lo_ | ((uint64_t)hi_ << 32); \
+    rc_; })
 
 /* wrmsr with exception handling */
 static inline int wrmsr_safe(unsigned int msr, uint64_t val)
 {
-    int _rc;
+    int rc;
     uint32_t lo, hi;
     lo = (uint32_t)val;
     hi = (uint32_t)(val >> 32);
@@ -68,9 +68,9 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
         "3: movl %5,%0\n; jmp 2b\n"
         ".previous\n"
         _ASM_EXTABLE(1b, 3b)
-        : "=&r" (_rc)
+        : "=&r" (rc)
         : "c" (msr), "a" (lo), "d" (hi), "0" (0), "i" (-EFAULT));
-    return _rc;
+    return rc;
 }
 
 static inline uint64_t msr_fold(const struct cpu_user_regs *regs)

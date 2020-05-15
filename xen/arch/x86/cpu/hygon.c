@@ -99,6 +99,8 @@ static void init_hygon(struct cpuinfo_x86 *c)
 		value |= (1 << 27); /* Enable read-only APERF/MPERF bit */
 		wrmsrl(MSR_K7_HWCR, value);
 	}
+
+	amd_log_freq(c);
 }
 
 const struct cpu_dev hygon_cpu_dev = {
