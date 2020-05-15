@@ -1913,6 +1913,7 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 #define vcpu_has_avx512_vnni() (ctxt->cpuid->feat.avx512_vnni)
 #define vcpu_has_avx512_bitalg() (ctxt->cpuid->feat.avx512_bitalg)
 #define vcpu_has_avx512_vpopcntdq() (ctxt->cpuid->feat.avx512_vpopcntdq)
+#define vcpu_has_tsxldtrk()    (ctxt->cpuid->feat.tsxldtrk)
 #define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
 #define vcpu_has_avx512_4vnniw() (ctxt->cpuid->feat.avx512_4vnniw)
 #define vcpu_has_avx512_4fmaps() (ctxt->cpuid->feat.avx512_4fmaps)
@@ -5646,6 +5647,28 @@ x86_emulate(
             case vex_none: /* serialize */
                 host_and_vcpu_must_have(serialize);
                 asm volatile ( ".byte 0x0f, 0x01, 0xe8" );
+                break;
+            case vex_f2: /* xsusldtrk */
+                vcpu_must_have(tsxldtrk);
+                /*
+                 * We're never in a transactional region when coming here
+                 * - nothing else to do.
+                 */
+                break;
+            default:
+                goto unimplemented_insn;
+            }
+            break;
+
+        case 0xe9:
+            switch ( vex.pfx )
+            {
+            case vex_f2: /* xresldtrk */
+                vcpu_must_have(tsxldtrk);
+                /*
+                 * We're never in a transactional region when coming here
+                 * - nothing else to do.
+                 */
                 break;
             default:
                 goto unimplemented_insn;

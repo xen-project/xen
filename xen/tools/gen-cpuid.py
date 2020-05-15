@@ -289,6 +289,9 @@ def crunch_numbers(state):
         # as dependent features simplifies Xen's logic, and prevents the guest
         # from seeing implausible configurations.
         IBRSB: [STIBP, SSBD],
+
+        # In principle the TSXLDTRK insns could also be considered independent.
+        RTM: [TSXLDTRK],
     }
 
     deep_features = tuple(sorted(deps.keys()))
