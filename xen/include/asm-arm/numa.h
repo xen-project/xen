@@ -25,11 +25,6 @@ extern mfn_t first_valid_mfn;
 #define node_start_pfn(nid) (mfn_x(first_valid_mfn))
 #define __node_distance(a, b) (20)
 
-static inline unsigned int arch_get_dma_bitsize(void)
-{
-    return 32;
-}
-
 #endif /* __ARCH_ARM_NUMA_H */
 /*
  * Local variables:

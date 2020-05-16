@@ -155,6 +155,11 @@ bool platform_device_is_blacklisted(const struct dt_device_node *node)
     return (dt_match_node(blacklist, node) != NULL);
 }
 
+unsigned int arch_get_dma_bitsize(void)
+{
+    return ( platform && platform->dma_bitsize ) ? platform->dma_bitsize : 32;
+}
+
 /*
  * Local variables:
  * mode: C

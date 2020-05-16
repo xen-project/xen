@@ -38,6 +38,8 @@ struct platform_desc {
      * List of devices which must not pass-through to a guest
      */
     const struct dt_device_match *blacklist_dev;
+    /* Override the DMA width (32-bit by default). */
+    unsigned int dma_bitsize;
 };
 
 /*

@@ -366,6 +366,8 @@ int arch_acquire_resource(struct domain *d, unsigned int type, unsigned int id,
     return -EOPNOTSUPP;
 }
 
+unsigned int arch_get_dma_bitsize(void);
+
 #endif /*  __ARCH_ARM_MM__ */
 /*
  * Local variables:
