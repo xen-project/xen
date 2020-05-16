@@ -211,10 +211,12 @@ fail:
  *    the ramdisk and DTB must be placed within a certain proximity of
  *    the kernel within RAM.
  * 3. For dom0 we want to place as much of the RAM as we reasonably can
- *    below 4GB, so that it can be used by non-LPAE enabled kernels (32-bit)
- *    or when a device assigned to dom0 can only do 32-bit DMA access.
- * 4. For 32-bit dom0 the kernel must be located below 4GB.
- * 5. We want to have a few largers banks rather than many smaller ones.
+ *    below 4GB, so that it can be used by non-LPAE enabled kernels (32-bit).
+ * 4. Some devices assigned to dom0 can only do 32-bit DMA access or
+ *    even be more restricted. We want to allocate as much of the RAM
+ *    as we reasonably can that can be accessed from all the devices..
+ * 5. For 32-bit dom0 the kernel must be located below 4GB.
+ * 6. We want to have a few largers banks rather than many smaller ones.
  *
  * For the first two requirements we need to make sure that the lowest
  * bank is sufficiently large.
@@ -245,9 +247,9 @@ fail:
  * we give up.
  *
  * For 32-bit domain we require that the initial allocation for the
- * first bank is under 4G. For 64-bit domain, the first bank is preferred
- * to be allocated under 4G. Then for the subsequent allocations we
- * initially allocate memory only from below 4GB. Once that runs out
+ * first bank is part of the low mem. For 64-bit, the first bank is preferred
+ * to be allocated in the low mem. Then for subsequent allocation, we
+ * initially allocate memory only from low mem. Once that runs out out
  * (as described above) we allow higher allocations and continue until
  * that runs out (or we have allocated sufficient dom0 memory).
  */
@@ -262,6 +264,7 @@ static void __init allocate_memory_11(struct domain *d,
     int i;
 
     bool lowmem = true;
+    unsigned int lowmem_bitsize = min(32U, arch_get_dma_bitsize());
     unsigned int bits;
 
     /*
@@ -282,7 +285,7 @@ static void __init allocate_memory_11(struct domain *d,
      */
     while ( order >= min_low_order )
     {
-        for ( bits = order ; bits <= (lowmem ? 32 : PADDR_BITS); bits++ )
+        for ( bits = order ; bits <= lowmem_bitsize; bits++ )
         {
             pg = alloc_domheap_pages(d, order, MEMF_bits(bits));
             if ( pg != NULL )
@@ -296,24 +299,26 @@ static void __init allocate_memory_11(struct domain *d,
         order--;
     }
 
-    /* Failed to allocate bank0 under 4GB */
+    /* Failed to allocate bank0 in the lowmem region. */
     if ( is_32bit_domain(d) )
         panic("Unable to allocate first memory bank\n");
 
-    /* Try to allocate memory from above 4GB */
-    printk(XENLOG_INFO "No bank has been allocated below 4GB.\n");
+    /* Try to allocate memory from above the lowmem region */
+    printk(XENLOG_INFO "No bank has been allocated below %u-bit.\n",
+           lowmem_bitsize);
     lowmem = false;
 
  got_bank0:
 
     /*
-     * If we failed to allocate bank0 under 4GB, continue allocating
-     * memory from above 4GB and fill in banks.
+     * If we failed to allocate bank0 in the lowmem region,
+     * continue allocating from above the lowmem and fill in banks.
      */
     order = get_allocation_size(kinfo->unassigned_mem);
     while ( kinfo->unassigned_mem && kinfo->mem.nr_banks < NR_MEM_BANKS )
     {
-        pg = alloc_domheap_pages(d, order, lowmem ? MEMF_bits(32) : 0);
+        pg = alloc_domheap_pages(d, order,
+                                 lowmem ? MEMF_bits(lowmem_bitsize) : 0);
         if ( !pg )
         {
             order --;
