@@ -19,7 +19,7 @@ clean: subdirs-clean
 distclean: clean
 
 BIOS-bochs-latest: rombios.c biossums 32bitgateway.c tcgbios.c
-	gcc -DBX_SMP_PROCESSORS=1 -E -P $< > _rombios_.c
+	$(CPP) -DBX_SMP_PROCESSORS=1 -P $< > _rombios_.c
 	bcc -o rombios.s -C-c -D__i86__ -0 -S _rombios_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' rombios.s > _rombios_.s
 	as86 _rombios_.s -b tmp.bin -u- -w- -g -0 -j -O -l rombios.txt
@@ -29,6 +29,6 @@ BIOS-bochs-latest: rombios.c biossums 32bitgateway.c tcgbios.c
 	rm -f _rombios_.s
 
 biossums: biossums.c
-	gcc -o biossums biossums.c
+	$(HOSTCC) $(HOSTCFLAGS) -o biossums biossums.c
 
 -include $(DEPS_INCLUDE)
