@@ -1652,7 +1652,7 @@ static int promote_l3_table(struct page_info *page)
  * This function must write all ROOT_PAGETABLE_PV_XEN_SLOTS, to clobber any
  * values a guest may have left there from promote_l4_table().
  *
- * l4t and l4mfn are mandatory, but l4mfn doesn't need to be the mfn under
+ * l4t, l4mfn, and d are mandatory, but l4mfn doesn't need to be the mfn under
  * *l4t.  All other parameters are optional and will either fill or zero the
  * appropriate slots.  Pagetables not shared with guests will gain the
  * extended directmap.
@@ -1664,7 +1664,7 @@ void init_xen_l4_slots(l4_pgentry_t *l4t, mfn_t l4mfn,
      * PV vcpus need a shortened directmap.  HVM and Idle vcpus get the full
      * directmap.
      */
-    bool short_directmap = d && !paging_mode_external(d);
+    bool short_directmap = !paging_mode_external(d);
 
     /* Slot 256: RO M2P (if applicable). */
     l4t[l4_table_offset(RO_MPT_VIRT_START)] =
@@ -1685,10 +1685,9 @@ void init_xen_l4_slots(l4_pgentry_t *l4t, mfn_t l4mfn,
         mfn_eq(sl4mfn, INVALID_MFN) ? l4e_empty() :
         l4e_from_mfn(sl4mfn, __PAGE_HYPERVISOR_RW);
 
-    /* Slot 260: Per-domain mappings (if applicable). */
+    /* Slot 260: Per-domain mappings. */
     l4t[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        d ? l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW)
-          : l4e_empty();
+        l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
 
     /* Slot 261-: text/data/bss, RW M2P, vmap, frametable, directmap. */
 #ifndef NDEBUG
