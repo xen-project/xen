@@ -1137,15 +1137,6 @@ void do_int3(struct cpu_user_regs *regs)
     pv_inject_hw_exception(TRAP_int3, X86_EVENT_NO_EC);
 }
 
-static void reserved_bit_page_fault(unsigned long addr,
-                                    struct cpu_user_regs *regs)
-{
-    printk("%pv: reserved bit in page table (ec=%04X)\n",
-           current, regs->error_code);
-    show_page_walk(addr);
-    show_execution_state(regs);
-}
-
 #ifdef CONFIG_PV
 static int handle_ldt_mapping_fault(unsigned int offset,
                                     struct cpu_user_regs *regs)
@@ -1246,10 +1237,6 @@ static enum pf_type __page_fault_type(unsigned long addr,
      * map_domain_page() is not IRQ-safe.
      */
     if ( in_irq() )
-        return real_fault;
-
-    /* Reserved bit violations are never spurious faults. */
-    if ( error_code & PFEC_reserved_bit )
         return real_fault;
 
     required_flags  = _PAGE_PRESENT;
@@ -1413,14 +1400,6 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     return 0;
 }
 
-/*
- * #PF error code:
- *  Bit 0: Protection violation (=1) ; Page not present (=0)
- *  Bit 1: Write access
- *  Bit 2: User mode (=1) ; Supervisor mode (=0)
- *  Bit 3: Reserved bit violation
- *  Bit 4: Instruction fetch
- */
 void do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr, fixup;
@@ -1438,6 +1417,21 @@ void do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(fixup_page_fault(addr, regs) != 0) )
         return;
+
+    /*
+     * Xen doesn't have reserved bits set in its pagetables, nor do we permit
+     * PV guests to write any.  Such entries would generally be vulnerable to
+     * the L1TF sidechannel.
+     *
+     * The shadow pagetable logic may use reserved bits as part of
+     * SHOPT_FAST_FAULT_PATH.  Pagefaults arising from these will be resolved
+     * via the fixup_page_fault() path.
+     *
+     * Anything remaining is an error, constituting corruption of the
+     * pagetables and probably an L1TF vulnerable gadget.
+     */
+    if ( error_code & PFEC_reserved_bit )
+        goto fatal;
 
     if ( unlikely(!guest_mode(regs)) )
     {
@@ -1457,13 +1451,12 @@ void do_page_fault(struct cpu_user_regs *regs)
         if ( likely((fixup = search_exception_table(regs)) != 0) )
         {
             perfc_incr(copy_user_faults);
-            if ( unlikely(regs->error_code & PFEC_reserved_bit) )
-                reserved_bit_page_fault(addr, regs);
             this_cpu(last_extable_addr) = regs->rip;
             regs->rip = fixup;
             return;
         }
 
+    fatal:
         if ( debugger_trap_fatal(TRAP_page_fault, regs) )
             return;
 
@@ -1474,9 +1467,6 @@ void do_page_fault(struct cpu_user_regs *regs)
               "Faulting linear address: %p\n",
               error_code, _p(addr));
     }
-
-    if ( unlikely(regs->error_code & PFEC_reserved_bit) )
-        reserved_bit_page_fault(addr, regs);
 
     pv_inject_page_fault(regs->error_code, addr);
 }
