@@ -2118,16 +2118,17 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
              paging_mode_translate(pg_dom) )
         {
             p2m_type_t p2mt;
+            gfn_t gfn = _gfn(l1e_get_pfn(nl1e));
             p2m_query_t q = l1e_get_flags(nl1e) & _PAGE_RW ?
                             P2M_ALLOC | P2M_UNSHARE : P2M_ALLOC;
 
-            page = get_page_from_gfn(pg_dom, l1e_get_pfn(nl1e), &p2mt, q);
+            page = get_page_from_gfn(pg_dom, gfn_x(gfn), &p2mt, q);
 
             if ( p2m_is_paged(p2mt) )
             {
                 if ( page )
                     put_page(page);
-                p2m_mem_paging_populate(pg_dom, l1e_get_pfn(nl1e));
+                p2m_mem_paging_populate(pg_dom, gfn);
                 return -ENOENT;
             }
 
@@ -3949,7 +3950,7 @@ long do_mmu_update(
                     put_page(page);
                 if ( p2m_is_paged(p2mt) )
                 {
-                    p2m_mem_paging_populate(pt_owner, gmfn);
+                    p2m_mem_paging_populate(pt_owner, _gfn(gmfn));
                     rc = -ENOENT;
                 }
                 else

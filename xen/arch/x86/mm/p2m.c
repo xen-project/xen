@@ -1835,7 +1835,7 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
         ASSERT(p2m_is_hostp2m(p2m));
         if ( page )
             put_page(page);
-        p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
+        p2m_mem_paging_populate(p2m->domain, gfn);
         *pfec = PFEC_page_paged;
         return NULL;
     }

@@ -278,7 +278,7 @@ static int set_mem_type(struct domain *d,
         if ( p2m_is_paging(t) )
         {
             put_gfn(d, pfn);
-            p2m_mem_paging_populate(d, pfn);
+            p2m_mem_paging_populate(d, _gfn(pfn));
             return -EAGAIN;
         }
 

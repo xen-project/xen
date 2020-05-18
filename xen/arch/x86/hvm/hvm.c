@@ -1988,7 +1988,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      * locks in such circumstance.
      */
     if ( paged )
-        p2m_mem_paging_populate(currd, gfn);
+        p2m_mem_paging_populate(currd, _gfn(gfn));
 
     if ( sharing_enomem )
     {
@@ -3222,7 +3222,7 @@ enum hvm_translation_result hvm_translate_get_page(
     if ( p2m_is_paging(p2mt) )
     {
         put_page(page);
-        p2m_mem_paging_populate(v->domain, gfn_x(gfn));
+        p2m_mem_paging_populate(v->domain, gfn);
         return HVMTRANS_gfn_paged_out;
     }
     if ( p2m_is_shared(p2mt) )

@@ -848,7 +848,7 @@ int guest_wrmsr_xen(struct vcpu *v, uint32_t idx, uint64_t val)
 
             if ( p2m_is_paging(t) )
             {
-                p2m_mem_paging_populate(d, gmfn);
+                p2m_mem_paging_populate(d, _gfn(gmfn));
                 return X86EMUL_RETRY;
             }
 

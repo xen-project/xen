@@ -322,7 +322,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 
         put_gfn(d, gmfn);
 
-        p2m_mem_paging_drop_page(d, gmfn, p2mt);
+        p2m_mem_paging_drop_page(d, _gfn(gmfn), p2mt);
 
         return 0;
     }
@@ -1667,7 +1667,7 @@ int check_get_page_from_gfn(struct domain *d, gfn_t gfn, bool readonly,
         if ( page )
             put_page(page);
 
-        p2m_mem_paging_populate(d, gfn_x(gfn));
+        p2m_mem_paging_populate(d, gfn);
         return -EAGAIN;
     }
 #endif

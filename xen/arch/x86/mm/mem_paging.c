@@ -36,12 +36,11 @@
  * released by the guest. The pager is supposed to drop its reference of the
  * gfn.
  */
-void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
-                              p2m_type_t p2mt)
+void p2m_mem_paging_drop_page(struct domain *d, gfn_t gfn, p2m_type_t p2mt)
 {
     vm_event_request_t req = {
         .reason = VM_EVENT_REASON_MEM_PAGING,
-        .u.mem_paging.gfn = gfn
+        .u.mem_paging.gfn = gfn_x(gfn)
     };
 
     /*
@@ -89,16 +88,15 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
  * already sent to the pager. In this case the caller has to try again until the
  * gfn is fully paged in again.
  */
-void p2m_mem_paging_populate(struct domain *d, unsigned long gfn_l)
+void p2m_mem_paging_populate(struct domain *d, gfn_t gfn)
 {
     struct vcpu *v = current;
     vm_event_request_t req = {
         .reason = VM_EVENT_REASON_MEM_PAGING,
-        .u.mem_paging.gfn = gfn_l
+        .u.mem_paging.gfn = gfn_x(gfn)
     };
     p2m_type_t p2mt;
     p2m_access_t a;
-    gfn_t gfn = _gfn(gfn_l);
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc = vm_event_claim_slot(d, d->vm_event_paging);
@@ -106,8 +104,8 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn_l)
     /* We're paging. There should be a ring. */
     if ( rc == -EOPNOTSUPP )
     {
-        gdprintk(XENLOG_ERR, "Dom%d paging gfn %lx yet no ring in place\n",
-                 d->domain_id, gfn_l);
+        gdprintk(XENLOG_ERR, "%pd paging gfn %"PRI_gfn" yet no ring in place\n",
+                 d, gfn_x(gfn));
         /* Prevent the vcpu from faulting repeatedly on the same gfn */
         if ( v->domain == d )
             vcpu_pause_nosync(v);
@@ -218,13 +216,12 @@ void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp)
  * Once the p2mt is changed the page is readonly for the guest.  On success the
  * pager can write the page contents to disk and later evict the page.
  */
-static int nominate(struct domain *d, unsigned long gfn_l)
+static int nominate(struct domain *d, gfn_t gfn)
 {
     struct page_info *page;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_type_t p2mt;
     p2m_access_t a;
-    gfn_t gfn = _gfn(gfn_l);
     mfn_t mfn;
     int ret = -EBUSY;
 
@@ -279,12 +276,11 @@ static int nominate(struct domain *d, unsigned long gfn_l)
  * could evict it, eviction can not be done either. In this case the gfn is
  * still backed by a mfn.
  */
-static int evict(struct domain *d, unsigned long gfn_l)
+static int evict(struct domain *d, gfn_t gfn)
 {
     struct page_info *page;
     p2m_type_t p2mt;
     p2m_access_t a;
-    gfn_t gfn = _gfn(gfn_l);
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret = -EBUSY;
@@ -346,13 +342,12 @@ static int evict(struct domain *d, unsigned long gfn_l)
  * mfn if populate was called for  gfn which was nominated but not evicted. In
  * this case only the p2mt needs to be forwarded.
  */
-static int prepare(struct domain *d, unsigned long gfn_l,
+static int prepare(struct domain *d, gfn_t gfn,
                    XEN_GUEST_HANDLE_64(const_uint8) buffer)
 {
     struct page_info *page = NULL;
     p2m_type_t p2mt;
     p2m_access_t a;
-    gfn_t gfn = _gfn(gfn_l);
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret, page_extant = 1;
@@ -417,7 +412,7 @@ static int prepare(struct domain *d, unsigned long gfn_l,
                                                  : p2m_ram_rw, a);
     if ( !ret )
     {
-        set_gpfn_from_mfn(mfn_x(mfn), gfn_l);
+        set_gpfn_from_mfn(mfn_x(mfn), gfn_x(gfn));
 
         if ( !page_extant )
             atomic_dec(&d->paged_pages);
@@ -461,15 +456,15 @@ int mem_paging_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_paging_op_t) arg)
     switch( mpo.op )
     {
     case XENMEM_paging_op_nominate:
-        rc = nominate(d, mpo.gfn);
+        rc = nominate(d, _gfn(mpo.gfn));
         break;
 
     case XENMEM_paging_op_evict:
-        rc = evict(d, mpo.gfn);
+        rc = evict(d, _gfn(mpo.gfn));
         break;
 
     case XENMEM_paging_op_prep:
-        rc = prepare(d, mpo.gfn, mpo.buffer);
+        rc = prepare(d, _gfn(mpo.gfn), mpo.buffer);
         if ( !rc )
             copyback = 1;
         break;

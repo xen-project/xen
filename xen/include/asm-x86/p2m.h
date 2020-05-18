@@ -732,10 +732,9 @@ static inline void p2m_pod_init(struct p2m_domain *p2m) {}
 int set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 
 /* Tell xenpaging to drop a paged out frame */
-void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn, 
-                                p2m_type_t p2mt);
+void p2m_mem_paging_drop_page(struct domain *d, gfn_t gfn, p2m_type_t p2mt);
 /* Start populating a paged out frame */
-void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
+void p2m_mem_paging_populate(struct domain *d, gfn_t gfn);
 /* Resume normal operation (in case a domain was paused) */
 struct vm_event_st;
 void p2m_mem_paging_resume(struct domain *d, struct vm_event_st *rsp);
