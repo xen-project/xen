@@ -26,15 +26,33 @@ static int xc_mem_paging_memop(xc_interface *xch, uint32_t domain_id,
                                unsigned int op, uint64_t gfn, void *buffer)
 {
     xen_mem_paging_op_t mpo;
+    DECLARE_HYPERCALL_BOUNCE(buffer, XC_PAGE_SIZE,
+                             XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    int rc;
 
     memset(&mpo, 0, sizeof(mpo));
 
     mpo.op      = op;
     mpo.domain  = domain_id;
     mpo.gfn     = gfn;
-    mpo.buffer  = (unsigned long) buffer;
 
-    return do_memory_op(xch, XENMEM_paging_op, &mpo, sizeof(mpo));
+    if ( buffer )
+    {
+        if ( xc_hypercall_bounce_pre(xch, buffer) )
+        {
+            PERROR("Could not bounce memory for XENMEM_paging_op %u", op);
+            return -1;
+        }
+
+        set_xen_guest_handle(mpo.buffer, buffer);
+    }
+
+    rc = do_memory_op(xch, XENMEM_paging_op, &mpo, sizeof(mpo));
+
+    if ( buffer )
+        xc_hypercall_bounce_post(xch, buffer);
+
+    return rc;
 }
 
 int xc_mem_paging_enable(xc_interface *xch, uint32_t domain_id,
@@ -92,28 +110,13 @@ int xc_mem_paging_prep(xc_interface *xch, uint32_t domain_id, uint64_t gfn)
 int xc_mem_paging_load(xc_interface *xch, uint32_t domain_id,
                        uint64_t gfn, void *buffer)
 {
-    int rc, old_errno;
-
     errno = EINVAL;
 
     if ( !buffer )
         return -1;
 
-    if ( ((unsigned long) buffer) & (XC_PAGE_SIZE - 1) )
-        return -1;
-
-    if ( mlock(buffer, XC_PAGE_SIZE) )
-        return -1;
-
-    rc = xc_mem_paging_memop(xch, domain_id,
-                             XENMEM_paging_op_prep,
-                             gfn, buffer);
-
-    old_errno = errno;
-    munlock(buffer, XC_PAGE_SIZE);
-    errno = old_errno;
-
-    return rc;
+    return xc_mem_paging_memop(xch, domain_id, XENMEM_paging_op_prep,
+                               gfn, buffer);
 }
 
 

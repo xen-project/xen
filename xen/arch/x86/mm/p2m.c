@@ -1779,7 +1779,8 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn_l)
  * mfn if populate was called for  gfn which was nominated but not evicted. In
  * this case only the p2mt needs to be forwarded.
  */
-int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
+int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l,
+                        XEN_GUEST_HANDLE_64(const_uint8) buffer)
 {
     struct page_info *page = NULL;
     p2m_type_t p2mt;
@@ -1788,13 +1789,9 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret, page_extant = 1;
-    const void *user_ptr = (const void *) buffer;
 
-    if ( user_ptr )
-        /* Sanity check the buffer and bail out early if trouble */
-        if ( (buffer & (PAGE_SIZE - 1)) || 
-             (!access_ok(user_ptr, PAGE_SIZE)) )
-            return -EINVAL;
+    if ( !guest_handle_okay(buffer, PAGE_SIZE) )
+        return -EINVAL;
 
     gfn_lock(p2m, gfn, 0);
 
@@ -1812,7 +1809,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
 
         /* If the user did not provide a buffer, we disallow */
         ret = -EINVAL;
-        if ( unlikely(user_ptr == NULL) )
+        if ( unlikely(guest_handle_is_null(buffer)) )
             goto out;
         /* Get a free page */
         ret = -ENOMEM;
@@ -1834,7 +1831,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
         page_extant = 0;
 
         guest_map = map_domain_page(mfn);
-        ret = copy_from_user(guest_map, user_ptr, PAGE_SIZE);
+        ret = copy_from_guest(guest_map, buffer, PAGE_SIZE);
         unmap_domain_page(guest_map);
         if ( ret )
         {
