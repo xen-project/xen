@@ -962,6 +962,7 @@ static void dm_stopped(libxl__egc *egc, libxl__ev_qmp *ev,
                        const libxl__json_object *response, int rc);
 static void dm_state_fd_ready(libxl__egc *egc, libxl__ev_qmp *ev,
                               const libxl__json_object *response, int rc);
+static void dm_state_save_to_fdset(libxl__egc *egc, libxl__ev_qmp *ev, int fdset);
 static void dm_state_saved(libxl__egc *egc, libxl__ev_qmp *ev,
                            const libxl__json_object *response, int rc);
 
@@ -994,9 +995,16 @@ static void dm_stopped(libxl__egc *egc, libxl__ev_qmp *ev,
     EGC_GC;
     libxl__domain_suspend_state *dsps = CONTAINER_OF(ev, *dsps, qmp);
     const char *const filename = dsps->dm_savefile;
+    uint32_t dm_domid = libxl_get_stubdom_id(CTX, dsps->domid);
 
     if (rc)
         goto error;
+
+    if (dm_domid) {
+        /* see Linux stubdom interface in docs/stubdom.txt */
+        dm_state_save_to_fdset(egc, ev, 1);
+        return;
+    }
 
     ev->payload_fd = open(filename, O_WRONLY | O_CREAT, 0600);
     if (ev->payload_fd < 0) {
@@ -1028,7 +1036,6 @@ static void dm_state_fd_ready(libxl__egc *egc, libxl__ev_qmp *ev,
     EGC_GC;
     int fdset;
     const libxl__json_object *o;
-    libxl__json_object *args = NULL;
     libxl__domain_suspend_state *dsps = CONTAINER_OF(ev, *dsps, qmp);
 
     close(ev->payload_fd);
@@ -1043,6 +1050,21 @@ static void dm_state_fd_ready(libxl__egc *egc, libxl__ev_qmp *ev,
         goto error;
     }
     fdset = libxl__json_object_get_integer(o);
+    dm_state_save_to_fdset(egc, ev, fdset);
+    return;
+
+error:
+    assert(rc);
+    libxl__remove_file(gc, dsps->dm_savefile);
+    dsps->callback_device_model_done(egc, dsps, rc);
+}
+
+static void dm_state_save_to_fdset(libxl__egc *egc, libxl__ev_qmp *ev, int fdset)
+{
+    EGC_GC;
+    int rc;
+    libxl__json_object *args = NULL;
+    libxl__domain_suspend_state *dsps = CONTAINER_OF(ev, *dsps, qmp);
 
     ev->callback = dm_state_saved;
 
@@ -1060,7 +1082,8 @@ static void dm_state_fd_ready(libxl__egc *egc, libxl__ev_qmp *ev,
 
 error:
     assert(rc);
-    libxl__remove_file(gc, dsps->dm_savefile);
+    if (!libxl_get_stubdom_id(CTX, dsps->domid))
+        libxl__remove_file(gc, dsps->dm_savefile);
     dsps->callback_device_model_done(egc, dsps, rc);
 }
 

@@ -1745,10 +1745,19 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     }
 
     if (state->saved_state) {
-        /* This file descriptor is meant to be used by QEMU */
-        *dm_state_fd = open(state->saved_state, O_RDONLY);
-        flexarray_append(dm_args, "-incoming");
-        flexarray_append(dm_args, GCSPRINTF("fd:%d",*dm_state_fd));
+        if (is_stubdom) {
+            /* Linux stubdomain must replace $STUBDOM_RESTORE_INCOMING_ARG
+             * with the approriate fd:$num argument for the
+             * STUBDOM_CONSOLE_RESTORE console 2.
+             */
+            flexarray_append(dm_args, "-incoming");
+            flexarray_append(dm_args, "$STUBDOM_RESTORE_INCOMING_ARG");
+        } else {
+            /* This file descriptor is meant to be used by QEMU */
+            *dm_state_fd = open(state->saved_state, O_RDONLY);
+            flexarray_append(dm_args, "-incoming");
+            flexarray_append(dm_args, GCSPRINTF("fd:%d",*dm_state_fd));
+        }
     }
     for (i = 0; b_info->extra && b_info->extra[i] != NULL; i++)
         flexarray_append(dm_args, b_info->extra[i]);
@@ -2226,14 +2235,6 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     libxl__xswait_init(&sdss->xswait);
 
     assert(libxl_defbool_val(guest_config->b_info.device_model_stubdomain));
-
-    if (libxl__stubdomain_is_linux(&guest_config->b_info)) {
-        if (d_state->saved_state) {
-            LOG(ERROR, "Save/Restore not supported yet with Linux Stubdom.");
-            ret = -1;
-            goto out;
-        }
-    }
 
     sdss->pvqemu.guest_domid = INVALID_DOMID;
 
