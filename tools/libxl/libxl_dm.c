@@ -2070,20 +2070,17 @@ static int libxl__write_stub_dmargs(libxl__gc *gc,
                                     int dm_domid, int guest_domid,
                                     char **args)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     int i;
-    char *vm_path;
-    char *dmargs, *path;
+    char *dmargs;
     int dmargs_size;
     struct xs_permissions roperm[2];
-    xs_transaction_t t;
+    xs_transaction_t t = XBT_NULL;
+    int rc;
 
     roperm[0].id = 0;
     roperm[0].perms = XS_PERM_NONE;
     roperm[1].id = dm_domid;
     roperm[1].perms = XS_PERM_READ;
-
-    vm_path = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("/local/domain/%d/vm", guest_domid));
 
     i = 0;
     dmargs_size = 0;
@@ -2102,17 +2099,43 @@ static int libxl__write_stub_dmargs(libxl__gc *gc,
         }
         i++;
     }
-    path = GCSPRINTF("%s/image/dmargs", vm_path);
 
-retry_transaction:
-    t = xs_transaction_start(ctx->xsh);
-    xs_write(ctx->xsh, t, path, dmargs, strlen(dmargs));
-    xs_set_permissions(ctx->xsh, t, path, roperm, ARRAY_SIZE(roperm));
-    xs_set_permissions(ctx->xsh, t, GCSPRINTF("%s/rtc/timeoffset", vm_path), roperm, ARRAY_SIZE(roperm));
-    if (!xs_transaction_end(ctx->xsh, t, 0))
-        if (errno == EAGAIN)
-            goto retry_transaction;
+    for (;;) {
+        const char *vm_path;
+        char *path;
+
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        rc = libxl__xs_read_mandatory(gc, t,
+                                      GCSPRINTF("/local/domain/%d/vm",
+                                                guest_domid),
+                                      &vm_path);
+        if (rc) goto out;
+
+        path = GCSPRINTF("%s/image/dmargs", vm_path);
+
+        rc = libxl__xs_mknod(gc, t, path, roperm, ARRAY_SIZE(roperm));
+        if (rc) goto out;
+
+        rc = libxl__xs_write_checked(gc, t, path, dmargs);
+        if (rc) goto out;
+
+        rc = libxl__xs_mknod(gc, t, GCSPRINTF("%s/rtc/timeoffset", vm_path),
+                             roperm, ARRAY_SIZE(roperm));
+        if (rc) goto out;
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc<0) goto out;
+    }
+
     return 0;
+
+ out:
+    libxl__xs_transaction_abort(gc, &t);
+
+    return rc;
 }
 
 static int libxl__store_libxl_entry(libxl__gc *gc, uint32_t domid,
