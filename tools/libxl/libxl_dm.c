@@ -3734,12 +3734,18 @@ out:
 
 int libxl__dm_active(libxl__gc *gc, uint32_t domid)
 {
-    char *pid, *path;
+    char *pid, *dm_domid, *path;
 
     path = GCSPRINTF("/local/domain/%d/image/device-model-pid", domid);
     pid = libxl__xs_read(gc, XBT_NULL, path);
 
-    return pid != NULL;
+    if (pid)
+        return true;
+
+    path = GCSPRINTF("/local/domain/%d/image/device-model-domid", domid);
+    dm_domid = libxl__xs_read(gc, XBT_NULL, path);
+
+    return dm_domid != NULL;
 }
 
 int libxl__dm_check_start(libxl__gc *gc, libxl_domain_config *d_config,
