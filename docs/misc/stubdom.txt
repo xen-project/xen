@@ -23,6 +23,59 @@ and https://wiki.xen.org/wiki/Device_Model_Stub_Domains for more
 information on device model stub domains
 
 
+Toolstack to MiniOS ioemu stubdomain protocol
+---------------------------------------------
+
+This section describe communication protocol between toolstack and
+qemu-traditional running in MiniOS stubdomain. The protocol include
+expectations of both qemu and stubdomain itself.
+
+Setup (done by toolstack, expected by stubdomain):
+ - Block devices for target domain are connected as PV disks to stubdomain,
+   according to configuration order, starting with xvda
+ - Network devices for target domain are connected as PV nics to stubdomain,
+   according to configuration order, starting with 0
+ - if graphics output is expected, VFB and VKB devices are set for stubdomain
+   (its backend is responsible for exposing them using appropriate protocol
+   like VNC or Spice)
+ - other target domain's devices are not connected at this point to stubdomain
+   (may be hot-plugged later)
+ - QEMU command line (space separated arguments) is stored in
+   /vm/<target-uuid>/image/dmargs xenstore path
+ - target domain id is stored in /local/domain/<stubdom-id>/target xenstore path
+?? - bios type is stored in /local/domain/<target-id>/hvmloader/bios
+ - stubdomain's console 0 is connected to qemu log file
+ - stubdomain's console 1 is connected to qemu save file (for saving state)
+ - stubdomain's console 2 is connected to qemu save file (for restoring state)
+ - next consoles are connected according to target guest's serial console configuration
+
+Startup:
+1. PV stubdomain is started with ioemu-stubdom.gz kernel and no initrd
+2. stubdomain initialize relevant devices
+3. stubdomain signal readiness by writing "running" to /local/domain/<stubdom-id>/device-model/<target-id>/state xenstore path
+4. now stubdomain is considered running
+
+Runtime control (hotplug etc):
+Toolstack can issue command through xenstore. The sequence is (from toolstack POV):
+1. Write parameter to /local/domain/<stubdom-id>/device-model/<target-id>/parameter.
+2. Write command to /local/domain/<stubdom-id>/device-model/<target-id>/command.
+3. Wait for command result in /local/domain/<stubdom-id>/device-model/<target-id>/state (command specific value).
+4. Write "running" back to /local/domain/<stubdom-id>/device-model/<target-id>/state.
+
+Defined commands:
+ - "pci-ins" - PCI hot plug, results:
+   - "pci-inserted" - success
+   - "pci-insert-failed" - failure
+ - "pci-rem" - PCI hot remove, results:
+   - "pci-removed" - success
+   - ??
+ - "save" - save domain state to console 1, results:
+   - "paused" - success
+ - "continue" - resume domain execution, after loading state from console 2 (require -loadvm command argument), results:
+   - "running" - success
+
+
+
                                    PV-GRUB
                                    =======
 
