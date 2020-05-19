@@ -1894,6 +1894,13 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             }
 
             if (disks[i].is_cdrom) {
+                if (disk > 4) {
+                    LOGD(WARN, guest_domid, "Emulated CDROM can be only one of the first 4 disks.\n"
+                         "Disk %s will be available via PV drivers but not as an "
+                         "emulated disk.",
+                         disks[i].vdev);
+                    continue;
+                }
                 drive = libxl__sprintf(gc,
                          "if=ide,index=%d,readonly=on,media=cdrom,id=ide-%i",
                          disk, dev_number);
@@ -1971,6 +1978,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                                        &disks[i],
                                                        colo_mode);
                 } else {
+                    LOGD(WARN, guest_domid, "Only 4 emulated IDE disks are supported.\n"
+                         "Disk %s will be available via PV drivers but not as an "
+                         "emulated disk.",
+                         disks[i].vdev);
                     continue; /* Do not emulate this disk */
                 }
 
