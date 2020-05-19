@@ -2324,6 +2324,23 @@ _hidden int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
   /* Return the system-wide default device model */
 _hidden libxl_device_model_version libxl__default_device_model(libxl__gc *gc);
 
+static inline
+bool libxl__stubdomain_is_linux_running(libxl__gc *gc, uint32_t domid)
+{
+    /* same logic as in libxl__stubdomain_is_linux */
+    return libxl__device_model_version_running(gc, domid)
+        == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+}
+
+static inline
+bool libxl__stubdomain_is_linux(libxl_domain_build_info *b_info)
+{
+    /* right now qemu-tranditional implies MiniOS stubdomain and qemu-xen
+     * implies Linux stubdomain */
+    return libxl_defbool_val(b_info->device_model_stubdomain) &&
+        b_info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+}
+
 #define DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, fmt, _a...)              \
     libxl__sprintf(gc, "/local/domain/%u/device-model/%u" fmt, dm_domid,   \
                    domid, ##_a)
