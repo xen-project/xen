@@ -1200,7 +1200,11 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                       GCSPRINTF("%d", guest_domid), NULL);
     flexarray_append(dm_args, "-no-shutdown");
 
-    /* There is currently no way to access the QMP socket in the stubdom */
+    /*
+     * QMP access to qemu running in stubdomain is done over vchan. The
+     * stubdomain init script adds the appropriate monitor options for
+     * vchan-socket-proxy.
+     */
     if (!is_stubdom) {
         flexarray_append(dm_args, "-chardev");
         if (state->dm_monitor_fd >= 0) {
@@ -2205,6 +2209,23 @@ static void stubdom_pvqemu_unpaused(libxl__egc *egc,
 static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
                               int rc, const char *p);
 
+static void spawn_qmp_proxy(libxl__egc *egc,
+                            libxl__stub_dm_spawn_state *sdss);
+
+static void qmp_proxy_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
+                              const char *xsdata);
+
+static void qmp_proxy_startup_failed(libxl__egc *egc,
+                                     libxl__spawn_state *spawn,
+                                     int rc);
+
+static void qmp_proxy_detached(libxl__egc *egc,
+                               libxl__spawn_state *spawn);
+
+static void qmp_proxy_spawn_outcome(libxl__egc *egc,
+                                    libxl__stub_dm_spawn_state *sdss,
+                                    int rc);
+
 char *libxl__stub_dm_name(libxl__gc *gc, const char *guest_name)
 {
     return GCSPRINTF("%s-dm", guest_name);
@@ -2486,24 +2507,150 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
             goto out;
     }
 
-    sdss->pvqemu.spawn.ao = ao;
-    sdss->pvqemu.guest_domid = dm_domid;
-    sdss->pvqemu.guest_config = &sdss->dm_config;
-    sdss->pvqemu.build_state = &sdss->dm_state;
-    sdss->pvqemu.callback = spawn_stubdom_pvqemu_cb;
-
-    if (!need_qemu) {
-        /* If dom0 qemu not needed, do not launch it */
-        spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, 0);
+    sdss->qmp_proxy_spawn.ao = ao;
+    if (libxl__stubdomain_is_linux(&guest_config->b_info)) {
+        spawn_qmp_proxy(egc, sdss);
     } else {
-        libxl__spawn_local_dm(egc, &sdss->pvqemu);
+        qmp_proxy_spawn_outcome(egc, sdss, 0);
     }
 
     return;
 
 out:
     assert(ret);
-    spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, ret);
+    qmp_proxy_spawn_outcome(egc, sdss, ret);
+}
+
+static void spawn_qmp_proxy(libxl__egc *egc,
+                            libxl__stub_dm_spawn_state *sdss)
+{
+    STATE_AO_GC(sdss->qmp_proxy_spawn.ao);
+    const uint32_t guest_domid = sdss->dm.guest_domid;
+    const uint32_t dm_domid = sdss->pvqemu.guest_domid;
+    const char *dom_path = libxl__xs_get_dompath(gc, dm_domid);
+    char **args;
+    int nr = 0;
+    int rc, logfile_w, null;
+
+    if (access(STUBDOM_QMP_PROXY_PATH, X_OK) < 0) {
+        LOGED(ERROR, guest_domid, "qmp proxy %s is not executable", STUBDOM_QMP_PROXY_PATH);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    sdss->qmp_proxy_spawn.what = GCSPRINTF("domain %d device model qmp proxy", guest_domid);
+    sdss->qmp_proxy_spawn.pidpath = GCSPRINTF("%s/image/qmp-proxy-pid", dom_path);
+    sdss->qmp_proxy_spawn.xspath = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID,
+                                                        dm_domid, "/qmp-proxy-state");
+    sdss->qmp_proxy_spawn.timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
+    sdss->qmp_proxy_spawn.midproc_cb = libxl__spawn_record_pid;
+    sdss->qmp_proxy_spawn.confirm_cb = qmp_proxy_confirm;
+    sdss->qmp_proxy_spawn.failure_cb = qmp_proxy_startup_failed;
+    sdss->qmp_proxy_spawn.detached_cb = qmp_proxy_detached;
+
+    const int arraysize = 6;
+    GCNEW_ARRAY(args, arraysize);
+    args[nr++] = STUBDOM_QMP_PROXY_PATH;
+    args[nr++] = GCSPRINTF("--state-path=%s", sdss->qmp_proxy_spawn.xspath);
+    args[nr++] = GCSPRINTF("%u", dm_domid);
+    args[nr++] = GCSPRINTF("%s/device-model/%u/qmp-vchan", dom_path, guest_domid);
+    args[nr++] = (char*)libxl__qemu_qmp_path(gc, guest_domid);
+    args[nr++] = NULL;
+    assert(nr == arraysize);
+
+    logfile_w = libxl__create_qemu_logfile(gc, GCSPRINTF("qmp-proxy-%s",
+                                                         sdss->dm_config.c_info.name));
+    if (logfile_w < 0) {
+        rc = logfile_w;
+        goto out;
+    }
+    null = open("/dev/null", O_RDWR);
+    if (null < 0) {
+        LOGED(ERROR, guest_domid, "unable to open /dev/null");
+        rc = ERROR_FAIL;
+        goto out_close;
+    }
+
+    rc = libxl__spawn_spawn(egc, &sdss->qmp_proxy_spawn);
+    if (rc < 0)
+        goto out_close;
+    if (!rc) { /* inner child */
+        setsid();
+        libxl__exec(gc, null, null, logfile_w, STUBDOM_QMP_PROXY_PATH, args, NULL);
+        /* unreachable */
+    }
+
+    rc = 0;
+
+out_close:
+    if (logfile_w >= 0)
+        close(logfile_w);
+    if (null >= 0)
+        close(null);
+out:
+    if (rc)
+        qmp_proxy_spawn_outcome(egc, sdss, rc);
+}
+
+static void qmp_proxy_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
+                              const char *xsdata)
+{
+    STATE_AO_GC(spawn->ao);
+
+    if (!xsdata)
+        return;
+
+    if (strcmp(xsdata, "running"))
+        return;
+
+    libxl__spawn_initiate_detach(gc, spawn);
+}
+
+static void qmp_proxy_startup_failed(libxl__egc *egc,
+                                     libxl__spawn_state *spawn,
+                                     int rc)
+{
+    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(spawn, *sdss, qmp_proxy_spawn);
+    qmp_proxy_spawn_outcome(egc, sdss, rc);
+}
+
+static void qmp_proxy_detached(libxl__egc *egc,
+                               libxl__spawn_state *spawn)
+{
+    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(spawn, *sdss, qmp_proxy_spawn);
+    qmp_proxy_spawn_outcome(egc, sdss, 0);
+}
+
+static void qmp_proxy_spawn_outcome(libxl__egc *egc,
+                                    libxl__stub_dm_spawn_state *sdss,
+                                    int rc)
+{
+    STATE_AO_GC(sdss->qmp_proxy_spawn.ao);
+    int need_pvqemu = libxl__need_xenpv_qemu(gc, &sdss->dm_config);
+
+    if (rc) goto out;
+
+    if (need_pvqemu < 0) {
+        rc = need_pvqemu;
+        goto out;
+    }
+
+    sdss->pvqemu.spawn.ao = ao;
+    sdss->pvqemu.guest_config = &sdss->dm_config;
+    sdss->pvqemu.build_state = &sdss->dm_state;
+    sdss->pvqemu.callback = spawn_stubdom_pvqemu_cb;
+    if (need_pvqemu) {
+        libxl__spawn_local_dm(egc, &sdss->pvqemu);
+    } else {
+        /* If dom0 qemu not needed, do not launch it */
+        spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, 0);
+    }
+
+    return;
+
+out:
+    assert(rc);
+    spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, rc);
 }
 
 static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,

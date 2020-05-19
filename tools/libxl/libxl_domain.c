@@ -1260,9 +1260,19 @@ static void dm_destroy_cb(libxl__egc *egc,
     libxl__destroy_domid_state *dis = CONTAINER_OF(ddms, *dis, ddms);
     STATE_AO_GC(dis->ao);
     uint32_t domid = dis->domid;
+    uint32_t target_domid;
 
     if (rc < 0)
         LOGD(ERROR, domid, "libxl__destroy_device_model failed");
+
+    if (libxl_is_stubdom(CTX, domid, &target_domid) &&
+        libxl__stubdomain_is_linux_running(gc, target_domid)) {
+        char *path = GCSPRINTF("/local/domain/%d/image/qmp-proxy-pid", domid);
+
+        libxl__kill_xs_path(gc, path, "QMP Proxy");
+        /* qmp-proxy for stubdom registers target_domid's QMP sockets. */
+        libxl__qmp_cleanup(gc, target_domid);
+    }
 
     dis->drs.ao = ao;
     dis->drs.domid = domid;

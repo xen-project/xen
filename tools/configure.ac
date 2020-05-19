@@ -194,6 +194,15 @@ AC_SUBST(qemu_xen)
 AC_SUBST(qemu_xen_path)
 AC_SUBST(qemu_xen_systemd)
 
+AC_ARG_WITH([stubdom-qmp-proxy],
+    AC_HELP_STRING([--stubdom-qmp-proxy@<:@=PATH@:>@],
+        [Use supplied binary PATH as a QMP proxy into stubdomain]),[
+    stubdom_qmp_proxy="$withval"
+],[
+    stubdom_qmp_proxy="$bindir/vchan-socket-proxy"
+])
+AC_DEFINE_UNQUOTED([STUBDOM_QMP_PROXY_PATH], ["$stubdom_qmp_proxy"], [QMP proxy path])
+
 AC_ARG_WITH([system-seabios],
     AS_HELP_STRING([--with-system-seabios@<:@=PATH@:>@],
        [Use system supplied seabios PATH instead of building and installing

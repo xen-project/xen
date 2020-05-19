@@ -4166,6 +4166,7 @@ typedef struct {
     libxl__destroy_domid_state dis;
     libxl__multidev multidev;
     libxl__xswait_state xswait;
+    libxl__spawn_state qmp_proxy_spawn;
 } libxl__stub_dm_spawn_state;
 
 _hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
