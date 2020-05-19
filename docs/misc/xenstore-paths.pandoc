@@ -148,6 +148,11 @@ The domain's own ID.
 The process ID of the device model associated with this domain, if it
 has one.
 
+#### ~/image/device-model-domid = INTEGER   [INTERNAL]
+
+The domain ID of the device model stubdomain associated with this domain,
+if it has one.
+
 #### ~/cpu/[0-9]+/availability = ("online"|"offline") [PV]
 
 One node for each virtual CPU up to the guest's configured
