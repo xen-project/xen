@@ -2327,6 +2327,22 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
         dm_config->num_vkbs = 1;
     }
 
+    if (guest_config->b_info.stubdomain_kernel &&
+        access(guest_config->b_info.stubdomain_kernel, R_OK) != 0) {
+        LOGED(ERROR, guest_domid, "could not access stubdomain kernel %s",
+              guest_config->b_info.stubdomain_kernel);
+        ret = ERROR_INVAL;
+        goto out;
+    }
+
+    if (guest_config->b_info.stubdomain_ramdisk &&
+        access(guest_config->b_info.stubdomain_ramdisk, R_OK) != 0) {
+        LOGED(ERROR, guest_domid, "could not access stubdomain ramdisk %s",
+              guest_config->b_info.stubdomain_ramdisk);
+        ret = ERROR_INVAL;
+        goto out;
+    }
+
     stubdom_state->pv_kernel.path = guest_config->b_info.stubdomain_kernel;
     stubdom_state->pv_ramdisk.path = guest_config->b_info.stubdomain_ramdisk;
 
