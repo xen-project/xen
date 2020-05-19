@@ -2733,10 +2733,29 @@ model which they were installed with.
 
 =item B<device_model_override="PATH">
 
-Override the path to the binary to be used as the device-model. The
-binary provided here MUST be consistent with the
-B<device_model_version> which you have specified. You should not
-normally need to specify this option.
+Override the path to the binary to be used as the device-model running in
+toolstack domain. The binary provided here MUST be consistent with the
+B<device_model_version> which you have specified. You should not normally need
+to specify this option.
+
+=item B<stubdomain_kernel="PATH">
+
+Override the path to the kernel image used as device-model stubdomain.
+The binary provided here MUST be consistent with the
+B<device_model_version> which you have specified.
+In case of B<qemu-xen-traditional> it is expected to be MiniOS-based stubdomain
+image, in case of B<qemu-xen> it is expected to be Linux-based stubdomain
+kernel.
+
+=item B<stubdomain_ramdisk="PATH">
+
+Override the path to the ramdisk image used as device-model stubdomain.
+The binary provided here is to be used by a kernel pointed by B<stubdomain_kernel>.
+It is known to be used only by Linux-based stubdomain kernel.
+
+=item B<stubdomain_memory=MBYTES>
+
+Start the stubdomain with MBYTES megabytes of RAM. Default is 128.
 
 =item B<device_model_stubdomain_override=BOOLEAN>
 

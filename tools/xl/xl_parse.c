@@ -2525,6 +2525,13 @@ skip_usbdev:
     xlu_cfg_replace_string(config, "device_model_user",
                            &b_info->device_model_user, 0);
 
+    xlu_cfg_replace_string (config, "stubdomain_kernel",
+                            &b_info->stubdomain_kernel, 0);
+    xlu_cfg_replace_string (config, "stubdomain_ramdisk",
+                            &b_info->stubdomain_ramdisk, 0);
+    if (!xlu_cfg_get_long (config, "stubdomain_memory", &l, 0))
+        b_info->stubdomain_memkb = l * 1024;
+
 #define parse_extra_args(type)                                            \
     e = xlu_cfg_get_list_as_string_list(config, "device_model_args"#type, \
                                     &b_info->extra##type, 0);            \
