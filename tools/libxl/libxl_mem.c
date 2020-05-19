@@ -459,8 +459,10 @@ int libxl__domain_need_memory_calculate(libxl__gc *gc,
     case LIBXL_DOMAIN_TYPE_PVH:
     case LIBXL_DOMAIN_TYPE_HVM:
         *need_memkb += LIBXL_HVM_EXTRA_MEMORY;
-        if (libxl_defbool_val(b_info->device_model_stubdomain))
-            *need_memkb += 32 * 1024;
+        if (libxl_defbool_val(b_info->device_model_stubdomain)) {
+            *need_memkb += b_info->stubdomain_memkb;
+            *need_memkb += b_info->video_memkb;
+        }
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         *need_memkb += LIBXL_PV_EXTRA_MEMORY;

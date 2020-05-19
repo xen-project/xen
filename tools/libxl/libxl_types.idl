@@ -518,6 +518,9 @@ libxl_domain_build_info = Struct("domain_build_info",[
     
     ("device_model_version", libxl_device_model_version),
     ("device_model_stubdomain", libxl_defbool),
+    ("stubdomain_memkb",   MemKB),
+    ("stubdomain_kernel",  string),
+    ("stubdomain_ramdisk", string),
     # if you set device_model you must set device_model_version too
     ("device_model",     string),
     ("device_model_ssidref", uint32),

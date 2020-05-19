@@ -171,6 +171,40 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         }
     }
 
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
+        libxl_defbool_val(b_info->device_model_stubdomain)) {
+        if (!b_info->stubdomain_kernel) {
+            switch (b_info->device_model_version) {
+                case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+                    b_info->stubdomain_kernel =
+                        libxl__abs_path(NOGC, "ioemu-stubdom.gz", libxl__xenfirmwaredir_path());
+                    break;
+                case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+                    b_info->stubdomain_kernel =
+                        libxl__abs_path(NOGC,
+                                "qemu-stubdom-linux-kernel",
+                                libxl__xenfirmwaredir_path());
+                    break;
+                default:
+                    abort();
+            }
+        }
+        if (!b_info->stubdomain_ramdisk) {
+            switch (b_info->device_model_version) {
+                case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+                    break;
+                case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+                    b_info->stubdomain_ramdisk =
+                        libxl__abs_path(NOGC,
+                                "qemu-stubdom-linux-rootfs",
+                                libxl__xenfirmwaredir_path());
+                    break;
+                default:
+                    abort();
+            }
+        }
+    }
+
     if (!b_info->max_vcpus)
         b_info->max_vcpus = 1;
     if (!b_info->avail_vcpus.size) {
@@ -205,6 +239,17 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         b_info->max_memkb = 32 * 1024;
     if (b_info->target_memkb == LIBXL_MEMKB_DEFAULT)
         b_info->target_memkb = b_info->max_memkb;
+
+    if (b_info->stubdomain_memkb == LIBXL_MEMKB_DEFAULT) {
+        if (libxl_defbool_val(b_info->device_model_stubdomain)) {
+            if (libxl__stubdomain_is_linux(b_info))
+                b_info->stubdomain_memkb = LIBXL_LINUX_STUBDOM_MEM * 1024;
+            else
+                b_info->stubdomain_memkb = 28 * 1024; // MiniOS
+        } else {
+            b_info->stubdomain_memkb = 0; // no stubdomain
+        }
+    }
 
     libxl_defbool_setdefault(&b_info->claim_mode, false);
 
