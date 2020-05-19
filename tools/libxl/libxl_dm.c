@@ -734,14 +734,15 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
         if (libxl_defbool_val(vnc->findunused)) {
             flexarray_append(dm_args, "-vncunused");
         }
-    } else
+    } else if (!sdl) {
         /*
          * VNC is not enabled by default by qemu-xen-traditional,
-         * however passing -vnc none causes SDL to not be
-         * (unexpectedly) enabled by default. This is overridden by
-         * explicitly passing -sdl below as required.
+         * however skipping -vnc causes SDL to be
+         * (unexpectedly) enabled by default. If undesired, disable graphics at
+         * all.
          */
-        flexarray_append_pair(dm_args, "-vnc", "none");
+        flexarray_append(dm_args, "-nographic");
+    }
 
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
