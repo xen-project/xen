@@ -2068,13 +2068,11 @@ static int libxl__vfb_and_vkb_from_hvm_guest_config(libxl__gc *gc,
 
 static int libxl__write_stub_dmargs(libxl__gc *gc,
                                     int dm_domid, int guest_domid,
-                                    char **args)
+                                    char **args, bool is_linux_stubdom)
 {
-    int i;
-    char *dmargs;
-    int dmargs_size;
     struct xs_permissions roperm[2];
     xs_transaction_t t = XBT_NULL;
+    char *dmargs;
     int rc;
 
     roperm[0].id = 0;
@@ -2082,22 +2080,27 @@ static int libxl__write_stub_dmargs(libxl__gc *gc,
     roperm[1].id = dm_domid;
     roperm[1].perms = XS_PERM_READ;
 
-    i = 0;
-    dmargs_size = 0;
-    while (args[i] != NULL) {
-        dmargs_size = dmargs_size + strlen(args[i]) + 1;
-        i++;
-    }
-    dmargs_size++;
-    dmargs = (char *) libxl__malloc(gc, dmargs_size);
-    i = 1;
-    dmargs[0] = '\0';
-    while (args[i] != NULL) {
-        if (strcmp(args[i], "-sdl") && strcmp(args[i], "-M") && strcmp(args[i], "xenfv")) {
-            strcat(dmargs, " ");
-            strcat(dmargs, args[i]);
+    if (!is_linux_stubdom) {
+        int dmargs_size = 0;
+        int i = 0;
+
+        while (args[i] != NULL) {
+            dmargs_size = dmargs_size + strlen(args[i]) + 1;
+            i++;
         }
-        i++;
+
+        dmargs_size++;
+        dmargs = (char *) libxl__malloc(gc, dmargs_size);
+
+        i = 1;
+        dmargs[0] = '\0';
+        while (args[i] != NULL) {
+            if (strcmp(args[i], "-sdl") && strcmp(args[i], "-M") && strcmp(args[i], "xenfv")) {
+                strcat(dmargs, " ");
+                strcat(dmargs, args[i]);
+            }
+            i++;
+        }
     }
 
     for (;;) {
@@ -2113,17 +2116,33 @@ static int libxl__write_stub_dmargs(libxl__gc *gc,
                                       &vm_path);
         if (rc) goto out;
 
-        path = GCSPRINTF("%s/image/dmargs", vm_path);
+        if (is_linux_stubdom) {
+            int i;
 
-        rc = libxl__xs_mknod(gc, t, path, roperm, ARRAY_SIZE(roperm));
-        if (rc) goto out;
+            path = GCSPRINTF("%s/image/dm-argv", vm_path);
 
-        rc = libxl__xs_write_checked(gc, t, path, dmargs);
-        if (rc) goto out;
+            rc = libxl__xs_mknod(gc, t, path, roperm, ARRAY_SIZE(roperm));
+            if (rc) goto out;
 
-        rc = libxl__xs_mknod(gc, t, GCSPRINTF("%s/rtc/timeoffset", vm_path),
-                             roperm, ARRAY_SIZE(roperm));
-        if (rc) goto out;
+            for (i=1; args[i] != NULL; i++) {
+                rc = libxl__xs_write_checked(gc, t,
+                                             GCSPRINTF("%s/%03d", path, i),
+                                             args[i]);
+                if (rc) goto out;
+            }
+        } else {
+            path = GCSPRINTF("%s/image/dmargs", vm_path);
+
+            rc = libxl__xs_mknod(gc, t, path, roperm, ARRAY_SIZE(roperm));
+            if (rc) goto out;
+
+            rc = libxl__xs_write_checked(gc, t, path, dmargs);
+            if (rc) goto out;
+
+            rc = libxl__xs_mknod(gc, t, GCSPRINTF("%s/rtc/timeoffset", vm_path),
+                                 roperm, ARRAY_SIZE(roperm));
+            if (rc) goto out;
+        }
 
         rc = libxl__xs_transaction_commit(gc, &t);
         if (!rc) break;
@@ -2298,7 +2317,9 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 
     libxl__store_libxl_entry(gc, guest_domid, "dm-version",
         libxl_device_model_version_to_string(dm_config->b_info.device_model_version));
-    libxl__write_stub_dmargs(gc, dm_domid, guest_domid, args);
+
+    libxl__write_stub_dmargs(gc, dm_domid, guest_domid, args,
+                             libxl__stubdomain_is_linux(&guest_config->b_info));
     libxl__xs_printf(gc, XBT_NULL,
                      GCSPRINTF("%s/image/device-model-domid",
                                libxl__xs_get_dompath(gc, guest_domid)),
