@@ -3225,32 +3225,7 @@ out:
 /* Generic function to signal a Qemu instance to exit */
 static int kill_device_model(libxl__gc *gc, const char *xs_path_pid)
 {
-    const char *xs_pid;
-    int ret, pid;
-
-    ret = libxl__xs_read_checked(gc, XBT_NULL, xs_path_pid, &xs_pid);
-    if (ret || !xs_pid) {
-        LOG(ERROR, "unable to find device model pid in %s", xs_path_pid);
-        ret = ret ? : ERROR_FAIL;
-        goto out;
-    }
-    pid = atoi(xs_pid);
-
-    ret = kill(pid, SIGHUP);
-    if (ret < 0 && errno == ESRCH) {
-        LOG(ERROR, "Device Model already exited");
-        ret = 0;
-    } else if (ret == 0) {
-        LOG(DEBUG, "Device Model signaled");
-        ret = 0;
-    } else {
-        LOGE(ERROR, "failed to kill Device Model [%d]", pid);
-        ret = ERROR_FAIL;
-        goto out;
-    }
-
-out:
-    return ret;
+    return libxl__kill_xs_path(gc, xs_path_pid, "Device Model");
 }
 
 /* Helper to destroy a Qdisk backend */

@@ -2711,6 +2711,9 @@ int libxl__async_exec_start(libxl__async_exec_state *aes);
 bool libxl__async_exec_inuse(const libxl__async_exec_state *aes);
 
 _hidden void libxl__kill(libxl__gc *gc, pid_t pid, int sig, const char *what);
+/* kill SIGHUP a pid stored in xenstore */
+_hidden int libxl__kill_xs_path(libxl__gc *gc, const char *xs_path_pid,
+                                const char *what);
 
 /*----- device addition/removal -----*/
 

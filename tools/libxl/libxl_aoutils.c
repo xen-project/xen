@@ -626,6 +626,38 @@ void libxl__kill(libxl__gc *gc, pid_t pid, int sig, const char *what)
                 what, (unsigned long)pid, sig);
 }
 
+/* Generic function to signal (HUP) a pid stored in xenstore */
+int libxl__kill_xs_path(libxl__gc *gc, const char *xs_path_pid,
+                        const char *what)
+{
+    const char *xs_pid;
+    int ret, pid;
+
+    ret = libxl__xs_read_checked(gc, XBT_NULL, xs_path_pid, &xs_pid);
+    if (ret || !xs_pid) {
+        LOG(ERROR, "unable to find %s pid in %s", what, xs_path_pid);
+        ret = ret ? : ERROR_FAIL;
+        goto out;
+    }
+    pid = atoi(xs_pid);
+
+    ret = kill(pid, SIGHUP);
+    if (ret < 0 && errno == ESRCH) {
+        LOG(ERROR, "%s already exited", what);
+        ret = 0;
+    } else if (ret == 0) {
+        LOG(DEBUG, "%s signaled", what);
+        ret = 0;
+    } else {
+        LOGE(ERROR, "failed to kill %s [%d]", what, pid);
+        ret = ERROR_FAIL;
+        goto out;
+    }
+
+out:
+    return ret;
+}
+
 /*
  * Local variables:
  * mode: C
