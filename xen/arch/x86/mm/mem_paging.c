@@ -385,6 +385,9 @@ static int prepare(struct domain *d, gfn_t gfn,
              * The domain can't possibly know about this page yet, so failure
              * here is a clear indication of something fishy going on.
              */
+            gprintk(XENLOG_ERR,
+                    "%pd: fresh page for GFN %"PRI_gfn" in unexpected state\n",
+                    d, gfn_x(gfn));
             domain_crash(d);
             page = NULL;
             goto out;
@@ -423,6 +426,10 @@ static int prepare(struct domain *d, gfn_t gfn,
 
     if ( page )
     {
+        /*
+         * Free the page on error.  Drop our temporary reference in all
+         * cases.
+         */
         if ( ret )
             put_page_alloc_ref(page);
         put_page(page);
