@@ -91,9 +91,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
 {
     int fd = xgt->fd;
     struct ioctl_gntdev_map_grant_ref *map;
-    unsigned int map_size = ROUNDUP((sizeof(*map) + (count - 1) *
-                                    sizeof(struct ioctl_gntdev_map_grant_ref)),
-                                    PAGE_SHIFT);
+    unsigned int map_size = sizeof(*map) + (count - 1) * sizeof(map->refs[0]);
     void *addr = NULL;
     int domids_stride = 1;
     int i;
@@ -102,10 +100,10 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
         domids_stride = 0;
 
     if ( map_size <= PAGE_SIZE )
-        map = alloca(sizeof(*map) +
-                     (count - 1) * sizeof(struct ioctl_gntdev_map_grant_ref));
+        map = alloca(map_size);
     else
     {
+        map_size = ROUNDUP(map_size, PAGE_SHIFT);
         map = mmap(NULL, map_size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANON | MAP_POPULATE, -1, 0);
         if ( map == MAP_FAILED )

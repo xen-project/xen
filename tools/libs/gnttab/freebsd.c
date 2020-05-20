@@ -74,7 +74,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     void *addr = NULL;
     int domids_stride;
     unsigned int refs_size = ROUNDUP(count *
-                                     sizeof(struct ioctl_gntdev_map_grant_ref),
+                                     sizeof(struct ioctl_gntdev_grant_ref),
                                      PAGE_SHIFT);
 
     domids_stride = (flags & XENGNTTAB_GRANT_MAP_SINGLE_DOMAIN) ? 0 : 1;
