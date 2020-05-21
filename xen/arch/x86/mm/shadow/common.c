@@ -38,9 +38,6 @@
 #include <xen/numa.h>
 #include "private.h"
 
-static int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
-                                            mfn_t smfn, unsigned long offset);
-
 DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
 static int sh_enable_log_dirty(struct domain *, bool log_global);
@@ -252,6 +249,33 @@ static inline void _sh_resync_l1(struct vcpu *v, mfn_t gmfn, mfn_t snpmfn)
         SHADOW_INTERNAL_NAME(sh_resync_l1, 4)(v, gmfn, snpmfn);
 }
 
+static int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
+                                            mfn_t smfn, unsigned long off)
+{
+    ASSERT(mfn_valid(smfn));
+    ASSERT(mfn_valid(gmfn));
+
+    switch ( mfn_to_page(smfn)->u.sh.type )
+    {
+    case SH_type_l1_32_shadow:
+    case SH_type_fl1_32_shadow:
+        return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, 2)
+            (d, gmfn, smfn, off);
+
+    case SH_type_l1_pae_shadow:
+    case SH_type_fl1_pae_shadow:
+        return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, 3)
+            (d, gmfn, smfn, off);
+
+    case SH_type_l1_64_shadow:
+    case SH_type_fl1_64_shadow:
+        return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, 4)
+            (d, gmfn, smfn, off);
+
+    default:
+        return 0;
+    }
+}
 
 /*
  * Fixup arrays: We limit the maximum number of writable mappings to
@@ -2000,34 +2024,6 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
     return 1;
 }
 #endif /* CONFIG_HVM */
-
-#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
-static int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
-                                            mfn_t smfn, unsigned long off)
-{
-    struct page_info *sp = mfn_to_page(smfn);
-
-    ASSERT(mfn_valid(smfn));
-    ASSERT(mfn_valid(gmfn));
-
-    if ( sp->u.sh.type == SH_type_l1_32_shadow
-         || sp->u.sh.type == SH_type_fl1_32_shadow )
-    {
-        return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,2)
-            (d, gmfn, smfn, off);
-    }
-    else if ( sp->u.sh.type == SH_type_l1_pae_shadow
-              || sp->u.sh.type == SH_type_fl1_pae_shadow )
-        return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,3)
-            (d, gmfn, smfn, off);
-    else if ( sp->u.sh.type == SH_type_l1_64_shadow
-              || sp->u.sh.type == SH_type_fl1_64_shadow )
-        return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,4)
-            (d, gmfn, smfn, off);
-
-    return 0;
-}
-#endif
 
 /**************************************************************************/
 /* Remove all mappings of a guest frame from the shadow tables.
