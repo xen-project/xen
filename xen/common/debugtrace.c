@@ -95,7 +95,7 @@ static void debugtrace_dump_worker(void)
 
     debugtrace_dump_buffer(dt_data, "global");
 
-    for ( cpu = 0; cpu < nr_cpu_ids; cpu++ )
+    for_each_online_cpu ( cpu )
     {
         char buf[16];
 
