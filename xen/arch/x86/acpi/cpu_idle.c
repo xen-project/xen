@@ -583,8 +583,16 @@ bool errata_c6_workaround(void)
          * registers), the processor may dispatch the second interrupt (from
          * the IRR bit) before the first interrupt has completed and written to
          * the EOI register, causing the first interrupt to never complete.
+         *
+         * Note: Haswell hasn't had errata issued, but this issue was first
+         * discovered on Haswell hardware, and is affected.
          */
         static const struct x86_cpu_id isr_errata[] = {
+            /* Haswell */
+            INTEL_FAM6_MODEL(0x3c),
+            INTEL_FAM6_MODEL(0x3f),
+            INTEL_FAM6_MODEL(0x45),
+            INTEL_FAM6_MODEL(0x46),
             /* Broadwell */
             INTEL_FAM6_MODEL(0x47),
             INTEL_FAM6_MODEL(0x3d),
