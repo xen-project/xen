@@ -297,6 +297,41 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 }
 
 /*
+ * Errata BA80, AAK120, AAM108, AAO67, BD59, AAY54: Rapid Core C3/C6 Transition
+ * May Cause Unpredictable System Behavior
+ *
+ * Under a complex set of internal conditions, cores rapidly performing C3/C6
+ * transitions in a system with Intel Hyper-Threading Technology enabled may
+ * cause a machine check error (IA32_MCi_STATUS.MCACOD = 0x0106), system hang
+ * or unpredictable system behavior.
+ */
+static void probe_c3_errata(const struct cpuinfo_x86 *c)
+{
+#define INTEL_FAM6_MODEL(m) { X86_VENDOR_INTEL, 6, m, X86_FEATURE_ALWAYS }
+    static const struct x86_cpu_id models[] = {
+        /* Nehalem */
+        INTEL_FAM6_MODEL(0x1a),
+        INTEL_FAM6_MODEL(0x1e),
+        INTEL_FAM6_MODEL(0x1f),
+        INTEL_FAM6_MODEL(0x2e),
+        /* Westmere (note Westmere-EX is not affected) */
+        INTEL_FAM6_MODEL(0x2c),
+        INTEL_FAM6_MODEL(0x25),
+        { }
+    };
+#undef INTEL_FAM6_MODEL
+
+    /* Serialized by the AP bringup code. */
+    if ( max_cstate > 1 && (c->apicid & (c->x86_num_siblings - 1)) &&
+         x86_match_cpu(models) )
+    {
+        printk(XENLOG_WARNING
+	       "Disabling C-states C3 and C6 due to CPU errata\n");
+        max_cstate = 1;
+    }
+}
+
+/*
  * P4 Xeon errata 037 workaround.
  * Hardware prefetcher may cause stale data to be loaded into the cache.
  *
@@ -323,6 +358,8 @@ static void Intel_errata_workarounds(struct cpuinfo_x86 *c)
 
 	if (cpu_has_tsx_force_abort && opt_rtm_abort)
 		wrmsrl(MSR_TSX_FORCE_ABORT, TSX_FORCE_ABORT_RTM);
+
+	probe_c3_errata(c);
 }
 
 
