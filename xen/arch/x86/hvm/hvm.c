@@ -1046,6 +1046,13 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
+    if ( ctxt.cr3 >> d->arch.cpuid->extd.maxphysaddr )
+    {
+        printk(XENLOG_G_ERR "HVM%d restore: bad CR3 %#" PRIx64 "\n",
+               d->domain_id, ctxt.cr3);
+        return -EINVAL;
+    }
+
     if ( (ctxt.flags & ~XEN_X86_FPU_INITIALISED) != 0 )
     {
         gprintk(XENLOG_ERR, "bad flags value in CPU context: %#x\n",
@@ -2359,10 +2366,18 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
 int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
 {
     struct vcpu *v = current;
+    struct domain *currd = v->domain;
     struct page_info *page;
     unsigned long old = v->arch.hvm.guest_cr[3];
 
-    if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
+    if ( value >> currd->arch.cpuid->extd.maxphysaddr )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_1,
+                    "Attempt to set reserved CR3 bit(s): %lx", value);
+        return X86EMUL_EXCEPTION;
+    }
+
+    if ( may_defer && unlikely(currd->arch.monitor.write_ctrlreg_enabled &
                                monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3)) )
     {
         ASSERT(v->arch.vm_event);
@@ -2378,13 +2393,12 @@ int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
         }
     }
 
-    if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
+    if ( hvm_paging_enabled(v) && !paging_mode_hap(currd) &&
          ((value ^ v->arch.hvm.guest_cr[3]) >> PAGE_SHIFT) )
     {
         /* Shadow-mode CR3 change. Check PDBR and update refcounts. */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
-        page = get_page_from_gfn(v->domain, value >> PAGE_SHIFT,
-                                 NULL, P2M_ALLOC);
+        page = get_page_from_gfn(currd, value >> PAGE_SHIFT, NULL, P2M_ALLOC);
         if ( !page )
             goto bad_cr3;
 
@@ -2400,7 +2414,7 @@ int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
 
  bad_cr3:
     gdprintk(XENLOG_ERR, "Invalid CR3\n");
-    domain_crash(v->domain);
+    domain_crash(currd);
     return X86EMUL_UNHANDLEABLE;
 }
 
