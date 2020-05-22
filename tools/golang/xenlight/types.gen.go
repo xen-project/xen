@@ -509,6 +509,9 @@ type DomainBuildInfo struct {
 	MaxMaptrackFrames     uint32
 	DeviceModelVersion    DeviceModelVersion
 	DeviceModelStubdomain Defbool
+	StubdomainMemkb       uint64
+	StubdomainKernel      string
+	StubdomainRamdisk     string
 	DeviceModel           string
 	DeviceModelSsidref    uint32
 	DeviceModelSsidLabel  string

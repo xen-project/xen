@@ -1163,6 +1163,9 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 	if err := x.DeviceModelStubdomain.fromC(&xc.device_model_stubdomain); err != nil {
 		return fmt.Errorf("converting field DeviceModelStubdomain: %v", err)
 	}
+	x.StubdomainMemkb = uint64(xc.stubdomain_memkb)
+	x.StubdomainKernel = C.GoString(xc.stubdomain_kernel)
+	x.StubdomainRamdisk = C.GoString(xc.stubdomain_ramdisk)
 	x.DeviceModel = C.GoString(xc.device_model)
 	x.DeviceModelSsidref = uint32(xc.device_model_ssidref)
 	x.DeviceModelSsidLabel = C.GoString(xc.device_model_ssid_label)
@@ -1488,6 +1491,13 @@ func (x *DomainBuildInfo) toC(xc *C.libxl_domain_build_info) (err error) {
 	xc.device_model_version = C.libxl_device_model_version(x.DeviceModelVersion)
 	if err := x.DeviceModelStubdomain.toC(&xc.device_model_stubdomain); err != nil {
 		return fmt.Errorf("converting field DeviceModelStubdomain: %v", err)
+	}
+	xc.stubdomain_memkb = C.uint64_t(x.StubdomainMemkb)
+	if x.StubdomainKernel != "" {
+		xc.stubdomain_kernel = C.CString(x.StubdomainKernel)
+	}
+	if x.StubdomainRamdisk != "" {
+		xc.stubdomain_ramdisk = C.CString(x.StubdomainRamdisk)
 	}
 	if x.DeviceModel != "" {
 		xc.device_model = C.CString(x.DeviceModel)
