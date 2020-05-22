@@ -840,6 +840,7 @@ int arch_set_info_guest(
 #ifdef CONFIG_PV
     mfn_t cr3_mfn;
     struct page_info *cr3_page = NULL;
+    unsigned int nr_gdt_frames;
     int rc = 0;
 #endif
 
@@ -957,6 +958,10 @@ int arch_set_info_guest(
     /* Ensure real hardware interrupts are enabled. */
     v->arch.user_regs.eflags |= X86_EFLAGS_IF;
 
+    nr_gdt_frames = DIV_ROUND_UP(c(gdt_ents), 512);
+    if ( nr_gdt_frames > ARRAY_SIZE(v->arch.pv.gdt_frames) )
+        return -EINVAL;
+
     if ( !v->is_initialised )
     {
         if ( !compat && !(flags & VGCF_in_kernel) && !c.nat->ctrlreg[1] )
@@ -988,9 +993,9 @@ int arch_set_info_guest(
             fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
         }
 
-        for ( i = 0; i < ARRAY_SIZE(v->arch.pv.gdt_frames); ++i )
-            fail |= v->arch.pv.gdt_frames[i] != c(gdt_frames[i]);
         fail |= v->arch.pv.gdt_ents != c(gdt_ents);
+        for ( i = 0; !fail && i < nr_gdt_frames; ++i )
+            fail = v->arch.pv.gdt_frames[i] != c(gdt_frames[i]);
 
         fail |= v->arch.pv.ldt_base != c(ldt_base);
         fail |= v->arch.pv.ldt_ents != c(ldt_ents);
@@ -1095,12 +1100,8 @@ int arch_set_info_guest(
     else
     {
         unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv.gdt_frames)];
-        unsigned int nr_frames = DIV_ROUND_UP(c.cmp->gdt_ents, 512);
 
-        if ( nr_frames > ARRAY_SIZE(v->arch.pv.gdt_frames) )
-            return -EINVAL;
-
-        for ( i = 0; i < nr_frames; ++i )
+        for ( i = 0; i < nr_gdt_frames; ++i )
             gdt_frames[i] = c.cmp->gdt_frames[i];
 
         rc = (int)pv_set_gdt(v, gdt_frames, c.cmp->gdt_ents);
