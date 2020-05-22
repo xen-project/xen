@@ -2365,10 +2365,8 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
 
 int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
 {
-    struct vcpu *v = current;
-    struct domain *currd = v->domain;
-    struct page_info *page;
-    unsigned long old = v->arch.hvm.guest_cr[3];
+    struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
 
     if ( value >> currd->arch.cpuid->extd.maxphysaddr )
     {
@@ -2380,36 +2378,38 @@ int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
     if ( may_defer && unlikely(currd->arch.monitor.write_ctrlreg_enabled &
                                monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3)) )
     {
-        ASSERT(v->arch.vm_event);
+        ASSERT(curr->arch.vm_event);
 
-        if ( hvm_monitor_crX(CR3, value, old) )
+        if ( hvm_monitor_crX(CR3, value, curr->arch.hvm.guest_cr[3]) )
         {
             /* The actual write will occur in hvm_do_resume(), if permitted. */
-            v->arch.vm_event->write_data.do_write.cr3 = 1;
-            v->arch.vm_event->write_data.cr3 = value;
-            v->arch.vm_event->write_data.cr3_noflush = noflush;
+            curr->arch.vm_event->write_data.do_write.cr3 = 1;
+            curr->arch.vm_event->write_data.cr3 = value;
+            curr->arch.vm_event->write_data.cr3_noflush = noflush;
 
             return X86EMUL_OKAY;
         }
     }
 
-    if ( hvm_paging_enabled(v) && !paging_mode_hap(currd) &&
-         ((value ^ v->arch.hvm.guest_cr[3]) >> PAGE_SHIFT) )
+    if ( hvm_paging_enabled(curr) && !paging_mode_hap(currd) &&
+         ((value ^ curr->arch.hvm.guest_cr[3]) >> PAGE_SHIFT) )
     {
         /* Shadow-mode CR3 change. Check PDBR and update refcounts. */
+        struct page_info *page;
+
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
         page = get_page_from_gfn(currd, value >> PAGE_SHIFT, NULL, P2M_ALLOC);
         if ( !page )
             goto bad_cr3;
 
-        put_page(pagetable_get_page(v->arch.guest_table));
-        v->arch.guest_table = pagetable_from_page(page);
+        put_page(pagetable_get_page(curr->arch.guest_table));
+        curr->arch.guest_table = pagetable_from_page(page);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
     }
 
-    v->arch.hvm.guest_cr[3] = value;
-    paging_update_cr3(v, noflush);
+    curr->arch.hvm.guest_cr[3] = value;
+    paging_update_cr3(curr, noflush);
     return X86EMUL_OKAY;
 
  bad_cr3:
