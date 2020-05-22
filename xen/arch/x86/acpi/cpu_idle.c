@@ -548,7 +548,7 @@ void trace_exit_reason(u32 *irq_traced)
     }
 }
 
-bool errata_c6_eoi_workaround(void)
+bool errata_c6_workaround(void)
 {
     static int8_t __read_mostly fix_needed = -1;
 
@@ -573,10 +573,40 @@ bool errata_c6_eoi_workaround(void)
             INTEL_FAM6_MODEL(0x2f),
             { }
         };
+        /*
+         * Errata BDX99, CLX30, SKX100, CFW125, BDF104, BDH85, BDM135, KWB131:
+         * A Pending Fixed Interrupt May Be Dispatched Before an Interrupt of
+         * The Same Priority Completes.
+         *
+         * Resuming from C6 Sleep-State, with Fixed Interrupts of the same
+         * priority queued (in the corresponding bits of the IRR and ISR APIC
+         * registers), the processor may dispatch the second interrupt (from
+         * the IRR bit) before the first interrupt has completed and written to
+         * the EOI register, causing the first interrupt to never complete.
+         */
+        static const struct x86_cpu_id isr_errata[] = {
+            /* Broadwell */
+            INTEL_FAM6_MODEL(0x47),
+            INTEL_FAM6_MODEL(0x3d),
+            INTEL_FAM6_MODEL(0x4f),
+            INTEL_FAM6_MODEL(0x56),
+            /* Skylake (client) */
+            INTEL_FAM6_MODEL(0x5e),
+            INTEL_FAM6_MODEL(0x4e),
+            /* {Sky/Cascade}lake (server) */
+            INTEL_FAM6_MODEL(0x55),
+            /* {Kaby/Coffee/Whiskey/Amber} Lake */
+            INTEL_FAM6_MODEL(0x9e),
+            INTEL_FAM6_MODEL(0x8e),
+            /* Cannon Lake */
+            INTEL_FAM6_MODEL(0x66),
+            { }
+        };
 #undef INTEL_FAM6_MODEL
 
-        fix_needed = cpu_has_apic && !directed_eoi_enabled &&
-                     x86_match_cpu(eoi_errata);
+        fix_needed = cpu_has_apic &&
+                     ((!directed_eoi_enabled && x86_match_cpu(eoi_errata)) ||
+                      x86_match_cpu(isr_errata));
     }
 
     return (fix_needed && cpu_has_pending_apic_eoi());
@@ -685,7 +715,7 @@ static void acpi_processor_idle(void)
         return;
     }
 
-    if ( (cx->type >= ACPI_STATE_C3) && errata_c6_eoi_workaround() )
+    if ( (cx->type >= ACPI_STATE_C3) && errata_c6_workaround() )
         cx = power->safe_state;
 
 

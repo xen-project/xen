@@ -26,6 +26,6 @@ void update_idle_stats(struct acpi_processor_power *,
 void update_last_cx_stat(struct acpi_processor_power *,
                          struct acpi_processor_cx *, uint64_t);
 
-bool errata_c6_eoi_workaround(void);
+bool errata_c6_workaround(void);
 
 #endif /* __X86_ASM_CPUIDLE_H__ */

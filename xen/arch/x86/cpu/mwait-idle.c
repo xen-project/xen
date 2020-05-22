@@ -770,7 +770,7 @@ static void mwait_idle(void)
 		return;
 	}
 
-	if ((cx->type >= 3) && errata_c6_eoi_workaround())
+	if ((cx->type >= 3) && errata_c6_workaround())
 		cx = power->safe_state;
 
 	eax = cx->address;
