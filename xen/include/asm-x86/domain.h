@@ -285,6 +285,8 @@ struct monitor_write_data {
         unsigned int cr4 : 1;
     } do_write;
 
+    bool cr3_noflush;
+
     uint32_t msr;
     uint64_t value;
     uint64_t cr0;

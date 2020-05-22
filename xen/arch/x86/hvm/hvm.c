@@ -2132,8 +2132,14 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
         break;
 
     case 3:
-        rc = hvm_set_cr3(val, true);
+    {
+        bool noflush = hvm_pcid_enabled(curr) && (val & X86_CR3_NOFLUSH);
+
+        if ( noflush )
+            val &= ~X86_CR3_NOFLUSH;
+        rc = hvm_set_cr3(val, noflush, true);
         break;
+    }
 
     case 4:
         rc = hvm_set_cr4(val, true);
@@ -2350,12 +2356,11 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
     return X86EMUL_OKAY;
 }
 
-int hvm_set_cr3(unsigned long value, bool may_defer)
+int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
 {
     struct vcpu *v = current;
     struct page_info *page;
     unsigned long old = v->arch.hvm.guest_cr[3];
-    bool noflush = false;
 
     if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
                                monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3)) )
@@ -2367,15 +2372,10 @@ int hvm_set_cr3(unsigned long value, bool may_defer)
             /* The actual write will occur in hvm_do_resume(), if permitted. */
             v->arch.vm_event->write_data.do_write.cr3 = 1;
             v->arch.vm_event->write_data.cr3 = value;
+            v->arch.vm_event->write_data.cr3_noflush = noflush;
 
             return X86EMUL_OKAY;
         }
-    }
-
-    if ( hvm_pcid_enabled(v) ) /* Clear the noflush bit. */
-    {
-        noflush = value & X86_CR3_NOFLUSH;
-        value &= ~X86_CR3_NOFLUSH;
     }
 
     if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
@@ -3073,7 +3073,7 @@ void hvm_task_switch(
     if ( task_switch_load_seg(x86_seg_ldtr, tss.ldt, new_cpl, 0) )
         goto out;
 
-    rc = hvm_set_cr3(tss.cr3, true);
+    rc = hvm_set_cr3(tss.cr3, false, true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
     if ( rc != X86EMUL_OKAY )

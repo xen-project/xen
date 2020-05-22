@@ -136,7 +136,7 @@ void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value);
  */
 int hvm_set_efer(uint64_t value);
 int hvm_set_cr0(unsigned long value, bool may_defer);
-int hvm_set_cr3(unsigned long value, bool may_defer);
+int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer);
 int hvm_set_cr4(unsigned long value, bool may_defer);
 int hvm_descriptor_access_intercept(uint64_t exit_info,
                                     uint64_t vmx_exit_qualification,

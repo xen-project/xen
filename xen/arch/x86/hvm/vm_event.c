@@ -111,7 +111,7 @@ void hvm_vm_event_do_resume(struct vcpu *v)
 
     if ( unlikely(w->do_write.cr3) )
     {
-        if ( hvm_set_cr3(w->cr3, false) == X86EMUL_EXCEPTION )
+        if ( hvm_set_cr3(w->cr3, w->cr3_noflush, false) == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
         w->do_write.cr3 = 0;

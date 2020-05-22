@@ -2169,8 +2169,14 @@ static int hvmemul_write_cr(
         break;
 
     case 3:
-        rc = hvm_set_cr3(val, true);
+    {
+        bool noflush = hvm_pcid_enabled(current) && (val & X86_CR3_NOFLUSH);
+
+        if ( noflush )
+            val &= ~X86_CR3_NOFLUSH;
+        rc = hvm_set_cr3(val, noflush, true);
         break;
+    }
 
     case 4:
         rc = hvm_set_cr4(val, true);

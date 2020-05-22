@@ -324,7 +324,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
         v->arch.guest_table = pagetable_null();
         /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
     }
-    rc = hvm_set_cr3(n1vmcb->_cr3, true);
+    rc = hvm_set_cr3(n1vmcb->_cr3, false, true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
     if (rc != X86EMUL_OKAY)
@@ -583,7 +583,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         nestedsvm_vmcb_set_nestedp2m(v, ns_vmcb, n2vmcb);
 
         /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
-        rc = hvm_set_cr3(ns_vmcb->_cr3, true);
+        rc = hvm_set_cr3(ns_vmcb->_cr3, false, true);
         if ( rc == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         if (rc != X86EMUL_OKAY)
@@ -597,7 +597,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
          * we assume it intercepts page faults.
          */
         /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
-        rc = hvm_set_cr3(ns_vmcb->_cr3, true);
+        rc = hvm_set_cr3(ns_vmcb->_cr3, false, true);
         if ( rc == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         if (rc != X86EMUL_OKAY)

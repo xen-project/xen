@@ -1104,7 +1104,7 @@ static void load_shadow_guest_state(struct vcpu *v)
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
-    rc = hvm_set_cr3(get_vvmcs(v, GUEST_CR3), true);
+    rc = hvm_set_cr3(get_vvmcs(v, GUEST_CR3), false, true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
@@ -1318,7 +1318,7 @@ static void load_vvmcs_host_state(struct vcpu *v)
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
-    rc = hvm_set_cr3(get_vvmcs(v, HOST_CR3), true);
+    rc = hvm_set_cr3(get_vvmcs(v, HOST_CR3), false, true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
