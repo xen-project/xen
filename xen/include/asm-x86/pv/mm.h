@@ -25,7 +25,8 @@
 
 int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs);
 
-long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries);
+int pv_set_gdt(struct vcpu *v, const unsigned long frames[],
+               unsigned int entries);
 void pv_destroy_gdt(struct vcpu *v);
 
 bool pv_map_ldt_shadow_page(unsigned int off);
@@ -43,8 +44,8 @@ static inline int pv_ro_page_fault(unsigned long addr,
     return 0;
 }
 
-static inline long pv_set_gdt(struct vcpu *v, unsigned long *frames,
-                              unsigned int entries)
+static inline int pv_set_gdt(struct vcpu *v, const unsigned long frames[],
+                             unsigned int entries)
 { ASSERT_UNREACHABLE(); return -EINVAL; }
 static inline void pv_destroy_gdt(struct vcpu *v) { ASSERT_UNREACHABLE(); }
 

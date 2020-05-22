@@ -1096,7 +1096,7 @@ int arch_set_info_guest(
         return rc;
 
     if ( !compat )
-        rc = (int)pv_set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
+        rc = pv_set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
     else
     {
         unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv.gdt_frames)];
@@ -1104,7 +1104,7 @@ int arch_set_info_guest(
         for ( i = 0; i < nr_gdt_frames; ++i )
             gdt_frames[i] = c.cmp->gdt_frames[i];
 
-        rc = (int)pv_set_gdt(v, gdt_frames, c.cmp->gdt_ents);
+        rc = pv_set_gdt(v, gdt_frames, c.cmp->gdt_ents);
     }
     if ( rc != 0 )
         return rc;
