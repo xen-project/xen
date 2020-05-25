@@ -2482,7 +2482,7 @@ const struct hvm_function_table * __init start_vmx(void)
 {
     set_in_cr4(X86_CR4_VMXE);
 
-    if ( _vmx_cpu_up(true) )
+    if ( vmx_vmcs_init() )
     {
         printk("VMX: failed to initialise.\n");
         return NULL;
@@ -2552,8 +2552,6 @@ const struct hvm_function_table * __init start_vmx(void)
         vmx_function_table.set_guest_bndcfgs = vmx_set_guest_bndcfgs;
         vmx_function_table.get_guest_bndcfgs = vmx_get_guest_bndcfgs;
     }
-
-    setup_vmcs_dump();
 
     lbr_tsx_fixup_check();
     bdf93_fixup_check();

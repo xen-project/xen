@@ -315,10 +315,6 @@ static int vmx_init_vmcs_config(void)
 
         if ( !opt_ept_ad )
             _vmx_ept_vpid_cap &= ~VMX_EPT_AD_BIT;
-        else if ( /* Work around Erratum AVR41 on Avoton processors. */
-                  boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 0x4d &&
-                  opt_ept_ad < 0 )
-            _vmx_ept_vpid_cap &= ~VMX_EPT_AD_BIT;
 
         /*
          * Additional sanity checking before using EPT:
@@ -652,7 +648,7 @@ void vmx_cpu_dead(unsigned int cpu)
     vmx_pi_desc_fixup(cpu);
 }
 
-int _vmx_cpu_up(bool bsp)
+static int _vmx_cpu_up(bool bsp)
 {
     u32 eax, edx;
     int rc, bios_locked, cpu = smp_processor_id();
@@ -2108,9 +2104,21 @@ static void vmcs_dump(unsigned char ch)
     printk("**************************************\n");
 }
 
-void __init setup_vmcs_dump(void)
+int __init vmx_vmcs_init(void)
 {
-    register_keyhandler('v', vmcs_dump, "dump VT-x VMCSs", 1);
+    int ret;
+
+    if ( opt_ept_ad < 0 )
+        /* Work around Erratum AVR41 on Avoton processors. */
+        opt_ept_ad = !(boot_cpu_data.x86 == 6 &&
+                       boot_cpu_data.x86_model == 0x4d);
+
+    ret = _vmx_cpu_up(true);
+
+    if ( !ret )
+        register_keyhandler('v', vmcs_dump, "dump VT-x VMCSs", 1);
+
+    return ret;
 }
 
 static void __init __maybe_unused build_assertions(void)
