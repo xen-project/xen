@@ -1444,7 +1444,7 @@ static inline int mem_sharing_control(struct domain *d, bool enable,
 {
     if ( enable )
     {
-        if ( unlikely(!is_hvm_domain(d)) )
+        if ( unlikely(!is_hvm_domain(d) || !cpu_has_vmx) )
             return -EOPNOTSUPP;
 
         if ( unlikely(!hap_enabled(d)) )
