@@ -22,6 +22,7 @@ case "_${CONTAINER}" in
     _fedora) CONTAINER="${BASE}/fedora:29";;
     _jessie) CONTAINER="${BASE}/debian:jessie" ;;
     _stretch|_) CONTAINER="${BASE}/debian:stretch" ;;
+    _unstable|_) CONTAINER="${BASE}/debian:unstable" ;;
     _trusty) CONTAINER="${BASE}/ubuntu:trusty" ;;
     _xenial) CONTAINER="${BASE}/ubuntu:xenial" ;;
 esac
@@ -91,4 +92,3 @@ exec docker run \
     -${termint}i --rm -- \
     ${CONTAINER} \
     ${cmd}
-
