@@ -314,10 +314,12 @@ libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain_out)
 {
     libxl_dominfo *ptr = NULL;
     int i, ret;
-    xc_domaininfo_t info[1024];
+    xc_domaininfo_t *info;
     int size = 0;
     uint32_t domid = 0;
     GC_INIT(ctx);
+
+    GCNEW_ARRAY(info, 1024);
 
     while ((ret = xc_domain_getinfolist(ctx->xch, domid, 1024, info)) > 0) {
         ptr = libxl__realloc(NOGC, ptr, (size + ret) * sizeof(libxl_dominfo));
