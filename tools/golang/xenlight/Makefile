@@ -4,8 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 # Standing boldly against convention, we insist on installing the
 # package source under $(prefix)/share/gocode
 GOCODE_DIR ?= $(prefix)/share/gocode/
-GOXL_PKG_DIR = /src/$(XEN_GOCODE_URL)/xenlight/
-GOXL_INSTALL_DIR = $(GOCODE_DIR)$(GOXL_PKG_DIR)
+GOXL_INSTALL_DIR = $(GOCODE_DIR)/src/$(XEN_GOCODE_URL)/xenlight/
 
 GO ?= go
 
@@ -14,16 +13,7 @@ LIBXL_SRC_DIR = ../../libxl
 .PHONY: all
 all: build
 
-.PHONY: package
-package: $(XEN_GOPATH)$(GOXL_PKG_DIR)
-
 GOXL_GEN_FILES = types.gen.go helpers.gen.go
-
-$(XEN_GOPATH)/src/$(XEN_GOCODE_URL)/xenlight/: xenlight.go $(GOXL_GEN_FILES)
-	$(INSTALL_DIR) $(XEN_GOPATH)$(GOXL_PKG_DIR)
-	$(INSTALL_DATA) xenlight.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
-	$(INSTALL_DATA) types.gen.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
-	$(INSTALL_DATA) helpers.gen.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
 
 # NOTE: This target is called from libxl/Makefile:all.  Since that
 # target must finish before golang/Makefile is called, this is
@@ -43,23 +33,21 @@ idl-gen: $(GOXL_GEN_FILES)
 # in the LDFLAGS; and thus we need to add -L$(XEN_XENLIGHT) here
 # so that it can find the actual library.
 .PHONY: build
-build: package
+build: xenlight.go $(GOXL_GEN_FILES)
 	CGO_CFLAGS="$(CFLAGS_libxenlight) $(CFLAGS_libxentoollog)" CGO_LDFLAGS="$(LDLIBS_libxenlight) $(LDLIBS_libxentoollog) -L$(XEN_XENLIGHT) -L$(XEN_LIBXENTOOLLOG)" $(GO) build -x
 
 .PHONY: install
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(GOXL_INSTALL_DIR)
-	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)xenlight.go $(DESTDIR)$(GOXL_INSTALL_DIR)
-	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)types.gen.go $(DESTDIR)$(GOXL_INSTALL_DIR)
-	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)helpers.gen.go $(DESTDIR)$(GOXL_INSTALL_DIR)
+	$(INSTALL_DATA) xenlight.go $(DESTDIR)$(GOXL_INSTALL_DIR)
+	$(INSTALL_DATA) types.gen.go $(DESTDIR)$(GOXL_INSTALL_DIR)
+	$(INSTALL_DATA) helpers.gen.go $(DESTDIR)$(GOXL_INSTALL_DIR)
 
 .PHONY: uninstall
 	rm -rf $(DESTDIR)$(GOXL_INSTALL_DIR)
 
 .PHONY: clean
 clean:
-	$(RM) -r $(XEN_GOPATH)$(GOXL_PKG_DIR)
-	$(RM) $(XEN_GOPATH)/pkg/*/$(XEN_GOCODE_URL)/xenlight.a
 
 .PHONY: distclean
 distclean: clean
