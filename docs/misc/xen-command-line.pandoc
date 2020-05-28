@@ -1840,6 +1840,20 @@ with read and write permissions.
 
 Choose the default scheduler.
 
+### sched_credit2_max_cpus_runqueue
+> `= <integer>`
+
+> Default: `16`
+
+Defines how many CPUs will be put, at most, in each Credit2 runqueue.
+
+Runqueues are still arranged according to the host topology (and following
+what indicated by the 'credit2_runqueue' parameter). But we also have a cap
+to the number of CPUs that share each runqueues.
+
+A value that is a submultiple of the number of online CPUs is recommended,
+as that would likely produce a perfectly balanced runqueue configuration.
+
 ### sched_credit2_migrate_resist
 > `= <integer>`
 

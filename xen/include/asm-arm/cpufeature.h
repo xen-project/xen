@@ -64,6 +64,11 @@ static inline bool cpus_have_cap(unsigned int num)
     return test_bit(num, cpu_hwcaps);
 }
 
+static inline cpu_nr_siblings(unsigned int)
+{
+    return 1;
+}
+
 /* System capability check for constant cap */
 #define cpus_have_const_cap(num) ({                 \
         register_t __ret;                           \
