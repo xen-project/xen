@@ -218,7 +218,7 @@ testidl.c: libxl_types.idl gentest.py libxl.h $(AUTOINCS)
 .PHONY: all
 all: $(CLIENTS) $(TEST_PROGS) $(PKG_CONFIG) $(PKG_CONFIG_LOCAL) \
 		libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
-	$(AUTOSRCS) $(AUTOINCS)
+	$(AUTOSRCS) $(AUTOINCS) idl-external
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(SAVE_HELPER_OBJS) \
 		$(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS): \
@@ -273,6 +273,21 @@ _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_
 	$(call move-if-changed,__libxl_type$(stem)_private.h,_libxl_type$(stem)_private.h)
 	$(call move-if-changed,__libxl_type$(stem)_json.h,_libxl_type$(stem)_json.h)
 	$(call move-if-changed,__libxl_type$(stem).c,_libxl_type$(stem).c)
+
+# NOTE: This is safe to do at the moment because idl-external and
+# idl-gen are only called from libxl/Makefile:all, which must return
+# before golang/Makefile is callid.  idl-external and idl-gen must
+# never be called from another part of the make system without careful thought
+# about races with tools/golang/xenlight/Makefile:all
+.PHONY: idl-external
+idl-external:
+	$(MAKE) -C $(XEN_ROOT)/tools/golang/xenlight idl-gen
+
+LIBXL_IDLGEN_FILES = _libxl_types.h _libxl_types_json.h _libxl_types_private.h _libxl_types.c \
+	_libxl_types_internal.h _libxl_types_internal_json.h _libxl_types_internal_private.h _libxl_types_internal.c
+
+
+idl-gen: $(LIBXL_GEN_FILES) idl-external
 
 libxenlight.so: libxenlight.so.$(MAJOR)
 	$(SYMLINK_SHLIB) $< $@
