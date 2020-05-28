@@ -19,6 +19,7 @@ RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
         iasl \
         inetutils \
         iproute \
+        lib32-glibc \
         libaio \
         libcacard \
         libgl \
