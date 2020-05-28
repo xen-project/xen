@@ -838,6 +838,20 @@ static inline bool same_core(unsigned int cpua, unsigned int cpub)
            cpu_to_core(cpua) == cpu_to_core(cpub);
 }
 
+static inline bool
+cpu_runqueue_match(const struct csched2_runqueue_data *rqd, unsigned int cpu)
+{
+    unsigned int peer_cpu = rqd->pick_bias;
+
+    BUG_ON(cpu_to_socket(peer_cpu) == XEN_INVALID_SOCKET_ID);
+
+    /* OPT_RUNQUEUE_CPU will never find an existing runqueue. */
+    return opt_runqueue == OPT_RUNQUEUE_ALL ||
+           (opt_runqueue == OPT_RUNQUEUE_CORE && same_core(peer_cpu, cpu)) ||
+           (opt_runqueue == OPT_RUNQUEUE_SOCKET && same_socket(peer_cpu, cpu)) ||
+           (opt_runqueue == OPT_RUNQUEUE_NODE && same_node(peer_cpu, cpu));
+}
+
 static struct csched2_runqueue_data *
 cpu_add_to_runqueue(struct csched2_private *prv, unsigned int cpu)
 {
@@ -855,21 +869,11 @@ cpu_add_to_runqueue(struct csched2_private *prv, unsigned int cpu)
     rqd_ins = &prv->rql;
     list_for_each_entry ( rqd, &prv->rql, rql )
     {
-        unsigned int peer_cpu;
-
         /* Remember first unused queue index. */
         if ( !rqi_unused && rqd->id > rqi )
             rqi_unused = true;
 
-        peer_cpu = rqd->pick_bias;
-        BUG_ON(cpu_to_socket(cpu) == XEN_INVALID_SOCKET_ID ||
-               cpu_to_socket(peer_cpu) == XEN_INVALID_SOCKET_ID);
-
-        /* OPT_RUNQUEUE_CPU will never find an existing runqueue. */
-        if ( opt_runqueue == OPT_RUNQUEUE_ALL ||
-             (opt_runqueue == OPT_RUNQUEUE_CORE && same_core(peer_cpu, cpu)) ||
-             (opt_runqueue == OPT_RUNQUEUE_SOCKET && same_socket(peer_cpu, cpu)) ||
-             (opt_runqueue == OPT_RUNQUEUE_NODE && same_node(peer_cpu, cpu)) )
+        if ( cpu_runqueue_match(rqd, cpu) )
         {
             rqd_valid = true;
             break;
@@ -3743,6 +3747,8 @@ csched2_alloc_pdata(const struct scheduler *ops, int cpu)
     struct csched2_private *prv = csched2_priv(ops);
     struct csched2_pcpu *spc;
     struct csched2_runqueue_data *rqd;
+
+    BUG_ON(cpu_to_socket(cpu) == XEN_INVALID_SOCKET_ID);
 
     spc = xzalloc(struct csched2_pcpu);
     if ( spc == NULL )
