@@ -40,5 +40,6 @@ RUN dnf -y install \
         nasm \
         ocaml \
         ocaml-findlib \
+        golang \
     && dnf clean all && \
     rm -rf /var/cache/dnf

@@ -45,6 +45,7 @@ RUN apt-get update && \
         nasm \
         gnupg \
         apt-transport-https \
+        golang \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

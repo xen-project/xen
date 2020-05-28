@@ -16,6 +16,7 @@ RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
         ghostscript \
         git \
         gnutls \
+        go \
         iasl \
         inetutils \
         iproute \
