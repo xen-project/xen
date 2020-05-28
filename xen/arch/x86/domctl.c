@@ -1583,7 +1583,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     }
     else
     {
-        c(ldt_base = v->arch.pv.ldt_base);
+        c(ldt_base = v->arch.pv.ldt_ents ? v->arch.pv.ldt_base : 0);
         c(ldt_ents = v->arch.pv.ldt_ents);
         for ( i = 0; i < ARRAY_SIZE(v->arch.pv.gdt_frames); ++i )
             c(gdt_frames[i] = v->arch.pv.gdt_frames[i]);

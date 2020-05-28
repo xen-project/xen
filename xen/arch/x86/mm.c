@@ -3669,14 +3669,15 @@ long do_mmuext_op(
         case MMUEXT_SET_LDT:
         {
             unsigned int ents = op.arg2.nr_ents;
-            unsigned long ptr = ents ? op.arg1.linear_addr : 0;
+            unsigned long ptr = ents ? op.arg1.linear_addr
+                                     : (unsigned long)ZERO_BLOCK_PTR;
 
             if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
             else if ( paging_mode_external(currd) )
                 rc = -EINVAL;
-            else if ( ((ptr & (PAGE_SIZE - 1)) != 0) || !__addr_ok(ptr) ||
-                      (ents > 8192) )
+            else if ( (ents > 8192) ||
+                      (ents && ((ptr & (PAGE_SIZE - 1)) || !__addr_ok(ptr))) )
             {
                 gdprintk(XENLOG_WARNING,
                          "Bad args to SET_LDT: ptr=%lx, ents=%x\n", ptr, ents);

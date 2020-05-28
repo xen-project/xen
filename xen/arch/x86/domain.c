@@ -967,8 +967,10 @@ int arch_set_info_guest(
         if ( !compat && !(flags & VGCF_in_kernel) && !c.nat->ctrlreg[1] )
             return -EINVAL;
 
-        v->arch.pv.ldt_base = c(ldt_base);
         v->arch.pv.ldt_ents = c(ldt_ents);
+        v->arch.pv.ldt_base = v->arch.pv.ldt_ents
+                              ? c(ldt_base)
+                              : (unsigned long)ZERO_BLOCK_PTR;
     }
     else
     {
@@ -997,8 +999,9 @@ int arch_set_info_guest(
         for ( i = 0; !fail && i < nr_gdt_frames; ++i )
             fail = v->arch.pv.gdt_frames[i] != c(gdt_frames[i]);
 
-        fail |= v->arch.pv.ldt_base != c(ldt_base);
         fail |= v->arch.pv.ldt_ents != c(ldt_ents);
+        if ( v->arch.pv.ldt_ents )
+            fail |= v->arch.pv.ldt_base != c(ldt_base);
 
         if ( fail )
            return -EOPNOTSUPP;
