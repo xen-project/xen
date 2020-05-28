@@ -275,6 +275,7 @@ struct scheduler {
     char *opt_name;         /* option name for this scheduler    */
     unsigned int sched_id;  /* ID for this scheduler             */
     void *sched_data;       /* global data pointer               */
+    struct cpupool *cpupool;/* points to this scheduler's pool   */
 
     int          (*global_init)    (void);
 

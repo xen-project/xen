@@ -287,6 +287,7 @@ static struct cpupool *cpupool_create(
         if ( c->sched == NULL )
             goto err;
     }
+    c->sched->cpupool = c;
     c->gran = opt_sched_granularity;
 
     *q = c;
