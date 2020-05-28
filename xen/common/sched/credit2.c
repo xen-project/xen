@@ -3766,20 +3766,15 @@ csched2_alloc_pdata(const struct scheduler *ops, int cpu)
     return spc;
 }
 
-/* Returns the ID of the runqueue the cpu is assigned to. */
-static struct csched2_runqueue_data *
-init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
-           unsigned int cpu)
+/*
+ * Do what's necessary to add cpu to the rqd (including activating the
+ * runqueue, if this is the first CPU we put in it).
+ */
+static void
+init_cpu_runqueue(struct csched2_private *prv, struct csched2_pcpu *spc,
+                  unsigned int cpu, struct csched2_runqueue_data *rqd)
 {
-    struct csched2_runqueue_data *rqd;
     unsigned int rcpu;
-
-    ASSERT(rw_is_write_locked(&prv->lock));
-    ASSERT(!cpumask_test_cpu(cpu, &prv->initialized));
-    /* CPU data needs to be allocated, but still uninitialized. */
-    ASSERT(spc);
-
-    rqd = spc->rqd;
 
     ASSERT(rqd && !cpumask_test_cpu(cpu, &spc->rqd->active));
 
@@ -3816,6 +3811,22 @@ init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
 
     if ( rqd->nr_cpus == 1 )
         rqd->pick_bias = cpu;
+}
+
+/* Returns a pointer to the runqueue the cpu is assigned to. */
+static struct csched2_runqueue_data *
+init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
+           unsigned int cpu)
+{
+    struct csched2_runqueue_data *rqd;
+
+    ASSERT(rw_is_write_locked(&prv->lock));
+    ASSERT(!cpumask_test_cpu(cpu, &prv->initialized));
+    /* CPU data needs to be allocated, but still uninitialized. */
+    ASSERT(spc);
+
+    rqd = spc->rqd;
+    init_cpu_runqueue(prv, spc, cpu, rqd);
 
     return rqd;
 }
