@@ -116,6 +116,17 @@ config SPECULATIVE_HARDEN_BRANCH
 
 endmenu
 
+config HYPFS
+	bool "Hypervisor file system support"
+	default y
+	---help---
+	  Support Xen hypervisor file system. This file system is used to
+	  present various hypervisor internal data to dom0 and in some
+	  cases to allow modifying settings. Disabling the support might
+	  result in some features not being available.
+
+	  If unsure, say Y.
+
 config KEXEC
 	bool "kexec support"
 	default y

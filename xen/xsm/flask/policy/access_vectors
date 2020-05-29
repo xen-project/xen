@@ -67,6 +67,8 @@ class xen
     lockprof
 # XEN_SYSCTL_cpupool_op
     cpupool_op
+# hypfs hypercall
+    hypfs_op
 # XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_getinfo, XEN_SYSCTL_sched_id, XEN_DOMCTL_SCHEDOP_getvcpuinfo
     getscheduler
 # XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_putinfo, XEN_DOMCTL_SCHEDOP_putvcpuinfo

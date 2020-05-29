@@ -85,6 +85,9 @@ const hypercall_table_t pv_hypercall_table[] = {
     HYPERCALL(hvm_op),
     COMPAT_CALL(dm_op),
 #endif
+#ifdef CONFIG_HYPFS
+    HYPERCALL(hypfs_op),
+#endif
     HYPERCALL(mca),
     HYPERCALL(arch_1),
 };

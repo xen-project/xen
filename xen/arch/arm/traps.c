@@ -1381,6 +1381,9 @@ static arm_hypercall_t arm_hypercall_table[] = {
 #ifdef CONFIG_ARGO
     HYPERCALL(argo_op, 5),
 #endif
+#ifdef CONFIG_HYPFS
+    HYPERCALL(hypfs_op, 5),
+#endif
 };
 
 #ifndef NDEBUG

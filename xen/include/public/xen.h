@@ -130,6 +130,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_argo_op              39
 #define __HYPERVISOR_xenpmu_op            40
 #define __HYPERVISOR_dm_op                41
+#define __HYPERVISOR_hypfs_op             42
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48

@@ -9,6 +9,7 @@ headers-y := \
     compat/event_channel.h \
     compat/features.h \
     compat/grant_table.h \
+    compat/hypfs.h \
     compat/kexec.h \
     compat/memory.h \
     compat/nmi.h \

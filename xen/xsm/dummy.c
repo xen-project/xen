@@ -103,6 +103,7 @@ void __init xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, resource_setup_misc);
 
     set_to_dummy_if_null(ops, page_offline);
+    set_to_dummy_if_null(ops, hypfs_op);
     set_to_dummy_if_null(ops, hvm_param);
     set_to_dummy_if_null(ops, hvm_control);
     set_to_dummy_if_null(ops, hvm_param_nested);

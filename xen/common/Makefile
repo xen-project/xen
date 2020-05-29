@@ -14,6 +14,7 @@ obj-$(CONFIG_CRASH_DEBUG) += gdbstub.o
 obj-$(CONFIG_GRANT_TABLE) += grant_table.o
 obj-y += guestcopy.o
 obj-bin-y += gunzip.init.o
+obj-$(CONFIG_HYPFS) += hypfs.o
 obj-y += irq.o
 obj-y += kernel.o
 obj-y += keyhandler.o

@@ -1173,6 +1173,11 @@ static inline int flask_page_offline(uint32_t cmd)
     }
 }
 
+static inline int flask_hypfs_op(void)
+{
+    return domain_has_xen(current->domain, XEN__HYPFS_OP);
+}
+
 static int flask_add_to_physmap(struct domain *d1, struct domain *d2)
 {
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
@@ -1812,6 +1817,7 @@ static struct xsm_operations flask_ops = {
     .resource_setup_misc = flask_resource_setup_misc,
 
     .page_offline = flask_page_offline,
+    .hypfs_op = flask_hypfs_op,
     .hvm_param = flask_hvm_param,
     .hvm_control = flask_hvm_param,
     .hvm_param_nested = flask_hvm_param_nested,

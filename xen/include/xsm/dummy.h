@@ -434,6 +434,12 @@ static XSM_INLINE int xsm_page_offline(XSM_DEFAULT_ARG uint32_t cmd)
     return xsm_default_action(action, current->domain, NULL);
 }
 
+static XSM_INLINE int xsm_hypfs_op(XSM_DEFAULT_VOID)
+{
+    XSM_ASSERT_ACTION(XSM_PRIV);
+    return xsm_default_action(action, current->domain, NULL);
+}
+
 static XSM_INLINE long xsm_do_xsm_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
 {
     return -ENOSYS;
