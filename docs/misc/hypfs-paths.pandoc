@@ -1,0 +1,107 @@
+# Xenhypfs Paths
+
+This document attempts to define all the paths which are available
+in the Xen hypervisor file system (hypfs).
+
+The hypervisor file system can be accessed via the xenhypfs tool.
+
+## Notation
+
+The hypervisor file system is similar to the Linux kernel's sysfs.
+In this document directories are always specified with a trailing "/".
+
+The following notation conventions apply:
+
+        DIRECTORY/
+
+        PATH = VALUES [TAGS]
+
+The first syntax defines a directory. It normally contains related
+entries and the general scope of the directory is described.
+
+The second syntax defines a file entry containing values which are
+either set by the hypervisor or, if the file is writable, can be set
+by the user.
+
+PATH can contain simple regex constructs following the Perl compatible
+regexp syntax described in pcre(3) or perlre(1).
+
+A hypervisor file system entry name can be any 0-delimited byte string
+not containing any '/' character. The names "." and ".." are reserved
+for file system internal use.
+
+VALUES are strings and can take the following forms (note that this represents
+only the syntax used in this document):
+
+* STRING -- an arbitrary 0-delimited byte string.
+* INTEGER -- An integer, in decimal representation unless otherwise
+  noted.
+* "a literal string" -- literal strings are contained within quotes.
+* (VALUE | VALUE | ... ) -- a set of alternatives. Alternatives are
+  separated by a "|" and all the alternatives are enclosed in "(" and
+  ")".
+* {VALUE, VALUE, ... } -- a list of possible values separated by "," and
+  enclosed in "{" and "}".
+
+Additional TAGS may follow as a comma separated set of the following
+tags enclosed in square brackets.
+
+* w -- Path is writable by the user. This capability is usually
+  limited to the control domain (e.g. dom0).
+* ARM | ARM32 | ARM64 | X86: the path is available for the respective
+  architecture only.
+* PV --  Path is valid for PV capable hypervisors only.
+* HVM -- Path is valid for HVM capable hypervisors only.
+* CONFIG_* -- Path is valid only in case the hypervisor was built with
+  the respective config option.
+
+So an entry could look like this:
+
+    /cpu-bugs/active-pv/xpti = ("No"|{"dom0", "domU", "PCID-on"}) [w,X86,PV]
+
+Possible values would be "No" or a list of "dom0", "domU", and "PCID-on" with
+the list elements separated by spaces, e.g. "dom0 PCID-on".
+The entry would be writable and it would exist on X86 only and only if the
+hypervisor is configured to support PV guests.
+
+## Example
+
+A populated Xen hypervisor file system might look like the following example:
+
+    /
+        buildinfo/           directory containing build-time data
+            config           contents of .config file used to build Xen
+        cpu-bugs/            x86: directory of cpu bug information
+            l1tf             "Vulnerable" or "Not vulnerable"
+            mds              "Vulnerable" or "Not vulnerable"
+            meltdown         "Vulnerable" or "Not vulnerable"
+            spec-store-bypass "Vulnerable" or "Not vulnerable"
+            spectre-v1       "Vulnerable" or "Not vulnerable"
+            spectre-v2       "Vulnerable" or "Not vulnerable"
+            mitigations/     directory of mitigation settings
+                bti-thunk    "N/A", "RETPOLINE", "LFENCE" or "JMP"
+                spec-ctrl    "No", "IBRS+" or "IBRS-"
+                ibpb         "No" or "Yes"
+                l1d-flush    "No" or "Yes"
+                md-clear     "No" or "VERW"
+                l1tf-barrier "No" or "Yes"
+            active-hvm/      directory for mitigations active in hvm doamins
+                msr-spec-ctrl "No" or "Yes"
+                rsb          "No" or "Yes"
+                eager-fpu    "No" or "Yes"
+                md-clear     "No" or "Yes"
+            active-pv/       directory for mitigations active in pv doamins
+                msr-spec-ctrl "No" or "Yes"
+                rsb          "No" or "Yes"
+                eager-fpu    "No" or "Yes"
+                md-clear     "No" or "Yes"
+                xpti         "No" or list of "dom0", "domU", "PCID-on"
+                l1tf-shadow  "No" or list of "dom0", "domU"
+        params/              directory with hypervisor parameter values
+                             (boot/runtime parameters)
+
+## General Paths
+
+#### /
+
+The root of the hypervisor file system.
