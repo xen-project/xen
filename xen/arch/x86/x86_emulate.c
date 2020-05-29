@@ -43,6 +43,12 @@
     }                                                      \
 })
 
+#ifndef CONFIG_HVM
+# define X86EMUL_NO_FPU
+# define X86EMUL_NO_MMX
+# define X86EMUL_NO_SIMD
+#endif
+
 #include "x86_emulate/x86_emulate.c"
 
 int x86emul_read_xcr(unsigned int reg, uint64_t *val,

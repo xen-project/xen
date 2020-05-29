@@ -73,6 +73,9 @@ obj-y += vm_event.o
 obj-y += xstate.o
 extra-y += asm-macros.i
 
+ifneq ($(CONFIG_HVM),y)
+x86_emulate.o: CFLAGS-y += -Wno-unused-label
+endif
 x86_emulate.o: x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
 
 efi-y := $(shell if [ ! -r $(BASEDIR)/include/xen/compile.h -o \
