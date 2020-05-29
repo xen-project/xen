@@ -1,0 +1,43 @@
+#!/bin/sh
+# usage: binfile [-i] [-a <align>] <target-src.S> <binary-file> <varname>
+# -a <align>  align data at 2^<align> boundary (default: byte alignment)
+# -i          add to .init.rodata (default: .rodata) section
+
+section=""
+align=0
+
+OPTIND=1
+while getopts "ia:" opt; do
+    case "$opt" in
+    i)
+        section=".init"
+        ;;
+    a)
+        align=$OPTARG
+        ;;
+    esac
+done
+let "SHIFT=$OPTIND-1"
+shift $SHIFT
+
+target=$1
+binsource=$2
+varname=$3
+
+cat <<EOF >$target
+#include <asm/asm_defns.h>
+
+        .section $section.rodata, "a", %progbits
+
+        .p2align $align
+        .global $varname
+$varname:
+        .incbin "$binsource"
+.Lend:
+
+        .type $varname, %object
+        .size $varname, .Lend - $varname
+
+        .global ${varname}_size
+        ASM_INT(${varname}_size, .Lend - $varname)
+EOF

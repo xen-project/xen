@@ -314,6 +314,7 @@ xen/test/livepatch/*.livepatch
 xen/tools/kconfig/.tmp_gtkcheck
 xen/tools/kconfig/.tmp_qtcheck
 xen/tools/symbols
+xen/xsm/flask/flask-policy.S
 xen/xsm/flask/include/av_perm_to_string.h
 xen/xsm/flask/include/av_permissions.h
 xen/xsm/flask/include/class_to_string.h
