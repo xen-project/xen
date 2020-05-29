@@ -1554,7 +1554,7 @@ void __init efi_init_memory(void)
 
         if ( desc->Attribute & (efi_bs_revision < EFI_REVISION(2, 5)
                                 ? EFI_MEMORY_WP : EFI_MEMORY_RO) )
-            prot &= ~_PAGE_RW;
+            prot &= ~(_PAGE_DIRTY | _PAGE_RW);
         if ( desc->Attribute & EFI_MEMORY_XP )
             prot |= _PAGE_NX;
 
