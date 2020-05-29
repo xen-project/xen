@@ -17,7 +17,7 @@ while getopts "ia:" opt; do
         ;;
     esac
 done
-let "SHIFT=$OPTIND-1"
+SHIFT=$((OPTIND-1))
 shift $SHIFT
 
 target=$1
