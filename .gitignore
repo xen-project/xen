@@ -298,6 +298,8 @@ xen/arch/*/efi/boot.c
 xen/arch/*/efi/compat.c
 xen/arch/*/efi/efi.h
 xen/arch/*/efi/runtime.c
+xen/common/config_data.S
+xen/common/config.gz
 xen/include/headers*.chk
 xen/include/asm
 xen/include/asm-*/asm-offsets.h

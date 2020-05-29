@@ -390,6 +390,10 @@ static HYPFS_STRING_INIT(compile_date, "compile_date");
 static HYPFS_STRING_INIT(compile_domain, "compile_domain");
 static HYPFS_STRING_INIT(extra, "extra");
 
+#ifdef CONFIG_HYPFS_CONFIG
+static HYPFS_STRING_INIT(config, "config");
+#endif
+
 static int __init buildinfo_init(void)
 {
     hypfs_add_dir(&hypfs_root, &buildinfo, true);
@@ -414,6 +418,13 @@ static int __init buildinfo_init(void)
     hypfs_add_leaf(&version, &extra, true);
     hypfs_add_leaf(&version, &major, true);
     hypfs_add_leaf(&version, &minor, true);
+
+#ifdef CONFIG_HYPFS_CONFIG
+    config.e.encoding = XEN_HYPFS_ENC_GZIP;
+    config.e.size = xen_config_data_size;
+    config.u.content = xen_config_data;
+    hypfs_add_leaf(&buildinfo, &config, true);
+#endif
 
     return 0;
 }

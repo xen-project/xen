@@ -1,6 +1,7 @@
 obj-$(CONFIG_ARGO) += argo.o
 obj-y += bitmap.o
 obj-y += bsearch.o
+obj-$(CONFIG_HYPFS_CONFIG) += config_data.o
 obj-$(CONFIG_CORE_PARKING) += core_parking.o
 obj-y += cpu.o
 obj-$(CONFIG_DEBUG_TRACE) += debugtrace.o
@@ -73,3 +74,14 @@ obj-$(CONFIG_UBSAN) += ubsan/
 
 obj-$(CONFIG_NEEDS_LIBELF) += libelf/
 obj-$(CONFIG_HAS_DEVICE_TREE) += libfdt/
+
+config.gz: ../.config
+	gzip -c $< >$@
+
+config_data.o: config.gz
+
+config_data.S: $(XEN_ROOT)/xen/tools/binfile
+	$(SHELL) $(XEN_ROOT)/xen/tools/binfile $@ config.gz xen_config_data
+
+clean::
+	rm -f config_data.S config.gz 2>/dev/null

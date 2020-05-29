@@ -135,6 +135,10 @@ Information about the compile domain.
 
 The compiler used to build Xen.
 
+#### /buildinfo/config = STRING [CONFIG_HYPFS_CONFIG]
+
+The contents of the `xen/.config` file at the time of the hypervisor build.
+
 #### /buildinfo/version/
 
 A directory containing version information of the hypervisor.
