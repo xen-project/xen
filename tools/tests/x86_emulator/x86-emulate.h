@@ -160,6 +160,8 @@ static inline bool xcr0_mask(uint64_t mask)
 #define cpu_has_avx512_vnni (cp.feat.avx512_vnni && xcr0_mask(0xe6))
 #define cpu_has_avx512_bitalg (cp.feat.avx512_bitalg && xcr0_mask(0xe6))
 #define cpu_has_avx512_vpopcntdq (cp.feat.avx512_vpopcntdq && xcr0_mask(0xe6))
+#define cpu_has_movdiri    cp.feat.movdiri
+#define cpu_has_movdir64b  cp.feat.movdir64b
 #define cpu_has_avx512_4vnniw (cp.feat.avx512_4vnniw && xcr0_mask(0xe6))
 #define cpu_has_avx512_4fmaps (cp.feat.avx512_4fmaps && xcr0_mask(0xe6))
 #define cpu_has_serialize  cp.feat.serialize

@@ -652,6 +652,18 @@ static int cmpxchg(
     return X86EMUL_OKAY;
 }
 
+static int blk(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    uint32_t *eflags,
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return x86_emul_blk((void *)offset, p_data, bytes, eflags, state, ctxt);
+}
+
 static int read_segment(
     enum x86_segment seg,
     struct segment_register *reg,
@@ -721,6 +733,7 @@ static struct x86_emulate_ops emulops = {
     .insn_fetch = fetch,
     .write      = write,
     .cmpxchg    = cmpxchg,
+    .blk        = blk,
     .read_segment = read_segment,
     .cpuid      = emul_test_cpuid,
     .read_cr    = emul_test_read_cr,
@@ -2338,6 +2351,50 @@ int main(int argc, char **argv)
          (regs.eip != (unsigned long)&instr[4]) )
         goto fail;
     printf("okay\n");
+
+    printf("%-40s", "Testing movdiri %edx,(%ecx)...");
+    if ( stack_exec && cpu_has_movdiri )
+    {
+        instr[0] = 0x0f; instr[1] = 0x38; instr[2] = 0xf9; instr[3] = 0x11;
+
+        regs.eip = (unsigned long)&instr[0];
+        regs.ecx = (unsigned long)memset(res, -1, 16);
+        regs.edx = 0x44332211;
+
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.eip != (unsigned long)&instr[4]) ||
+             res[0] != 0x44332211 || ~res[1] )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing movdir64b 144(%edx),%ecx...");
+    if ( stack_exec && cpu_has_movdir64b )
+    {
+        instr[0] = 0x66; instr[1] = 0x0f; instr[2] = 0x38; instr[3] = 0xf8;
+        instr[4] = 0x8a; instr[5] = 0x90; instr[8] = instr[7] = instr[6] = 0;
+
+        regs.eip = (unsigned long)&instr[0];
+        for ( i = 0; i < 64; ++i )
+            res[i] = i - 20;
+        regs.edx = (unsigned long)res;
+        regs.ecx = (unsigned long)(res + 16);
+
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.eip != (unsigned long)&instr[9]) ||
+             res[15] != -5 || res[32] != 12 )
+            goto fail;
+        for ( i = 16; i < 32; ++i )
+            if ( res[i] != i )
+                goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
 
     printf("%-40s", "Testing movq %mm3,(%ecx)...");
     if ( stack_exec && cpu_has_mmx )

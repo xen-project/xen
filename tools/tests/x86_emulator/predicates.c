@@ -510,6 +510,8 @@ static const struct {
     /*{ 0xf6 }, { 2, 2 }, F, W }, wrss */
     { { 0xf6 }, { 2, 2 }, T, R, pfx_66 }, /* adcx */
     { { 0xf6 }, { 2, 2 }, T, R, pfx_f3 }, /* adox */
+    { { 0xf8 }, { 2, 2 }, F, W, pfx_66 }, /* movdir64b */
+    { { 0xf9 }, { 2, 2 }, F, W }, /* movdiri */
 };
 #undef CND
 #undef REG

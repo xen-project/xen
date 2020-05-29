@@ -1441,6 +1441,47 @@ static int hvmemul_rmw(
     return rc;
 }
 
+static int hvmemul_blk(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    uint32_t *eflags,
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    unsigned long addr;
+    uint32_t pfec = PFEC_page_present;
+    int rc;
+    void *mapping = NULL;
+
+    rc = hvmemul_virtual_to_linear(
+        seg, offset, bytes, NULL, hvm_access_write, hvmemul_ctxt, &addr);
+    if ( rc != X86EMUL_OKAY || !bytes )
+        return rc;
+
+    if ( x86_insn_is_mem_write(state, ctxt) )
+        pfec |= PFEC_write_access;
+
+    if ( is_x86_system_segment(seg) )
+        pfec |= PFEC_implicit;
+    else if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
+        pfec |= PFEC_user_mode;
+
+    mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
+    if ( IS_ERR(mapping) )
+        return ~PTR_ERR(mapping);
+    if ( !mapping )
+        return X86EMUL_UNHANDLEABLE;
+
+    rc = x86_emul_blk(mapping, p_data, bytes, eflags, state, ctxt);
+    hvmemul_unmap_linear_addr(mapping, addr, bytes, hvmemul_ctxt);
+
+    return rc;
+}
+
 static int hvmemul_write_discard(
     enum x86_segment seg,
     unsigned long offset,
@@ -2518,6 +2559,7 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .write         = hvmemul_write,
     .rmw           = hvmemul_rmw,
     .cmpxchg       = hvmemul_cmpxchg,
+    .blk           = hvmemul_blk,
     .validate      = hvmemul_validate,
     .rep_ins       = hvmemul_rep_ins,
     .rep_outs      = hvmemul_rep_outs,

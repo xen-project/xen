@@ -118,6 +118,8 @@
 #define cpu_has_avx512_bitalg   boot_cpu_has(X86_FEATURE_AVX512_BITALG)
 #define cpu_has_avx512_vpopcntdq boot_cpu_has(X86_FEATURE_AVX512_VPOPCNTDQ)
 #define cpu_has_rdpid           boot_cpu_has(X86_FEATURE_RDPID)
+#define cpu_has_movdiri         boot_cpu_has(X86_FEATURE_MOVDIRI)
+#define cpu_has_movdir64b       boot_cpu_has(X86_FEATURE_MOVDIR64B)
 
 /* CPUID level 0x80000007.edx */
 #define cpu_has_itsc            boot_cpu_has(X86_FEATURE_ITSC)

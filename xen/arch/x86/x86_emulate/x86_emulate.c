@@ -548,6 +548,8 @@ static const struct ext0f38_table {
     [0xf1] = { .to_mem = 1, .two_op = 1 },
     [0xf2 ... 0xf3] = {},
     [0xf5 ... 0xf7] = {},
+    [0xf8] = { .simd_size = simd_other },
+    [0xf9] = { .to_mem = 1, .two_op = 1 /* Mov */ },
 };
 
 /* Shift values between src and dst sizes of pmov{s,z}x{b,w,d}{w,d,q}. */
@@ -851,6 +853,10 @@ struct x86_emulate_state {
         rmw_xchg,
         rmw_xor,
     } rmw;
+    enum {
+        blk_NONE,
+        blk_movdir,
+    } blk;
     uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
     uint8_t sib_index, sib_scale;
     uint8_t rex_prefix;
@@ -1915,6 +1921,8 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 #define vcpu_has_avx512_vpopcntdq() (ctxt->cpuid->feat.avx512_vpopcntdq)
 #define vcpu_has_tsxldtrk()    (ctxt->cpuid->feat.tsxldtrk)
 #define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
+#define vcpu_has_movdiri()     (ctxt->cpuid->feat.movdiri)
+#define vcpu_has_movdir64b()   (ctxt->cpuid->feat.movdir64b)
 #define vcpu_has_avx512_4vnniw() (ctxt->cpuid->feat.avx512_4vnniw)
 #define vcpu_has_avx512_4fmaps() (ctxt->cpuid->feat.avx512_4fmaps)
 #define vcpu_has_serialize()   (ctxt->cpuid->feat.serialize)
@@ -2736,10 +2744,12 @@ x86_decode_0f38(
     {
     case 0x00 ... 0xef:
     case 0xf2 ... 0xf5:
-    case 0xf7 ... 0xff:
+    case 0xf7 ... 0xf8:
+    case 0xfa ... 0xff:
         op_bytes = 0;
         /* fall through */
     case 0xf6: /* adcx / adox */
+    case 0xf9: /* movdiri */
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
 
@@ -10218,6 +10228,34 @@ x86_emulate(
                             : "0" ((uint32_t)src.val), "rm" (_regs.edx) );
         break;
 
+    case X86EMUL_OPC_66(0x0f38, 0xf8): /* movdir64b r,m512 */
+        host_and_vcpu_must_have(movdir64b);
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        src.val = truncate_ea(*dst.reg);
+        generate_exception_if(!is_aligned(x86_seg_es, src.val, 64, ctxt, ops),
+                              EXC_GP, 0);
+        fail_if(!ops->blk);
+        state->blk = blk_movdir;
+        BUILD_BUG_ON(sizeof(*mmvalp) < 64);
+        if ( (rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp, 64,
+                             ctxt)) != X86EMUL_OKAY ||
+             (rc = ops->blk(x86_seg_es, src.val, mmvalp, 64, &_regs.eflags,
+                            state, ctxt)) != X86EMUL_OKAY )
+            goto done;
+        state->simd_size = simd_none;
+        break;
+
+    case X86EMUL_OPC(0x0f38, 0xf9): /* movdiri mem,r */
+        host_and_vcpu_must_have(movdiri);
+        generate_exception_if(dst.type != OP_MEM, EXC_UD);
+        fail_if(!ops->blk);
+        state->blk = blk_movdir;
+        if ( (rc = ops->blk(dst.mem.seg, dst.mem.off, &src.val, op_bytes,
+                            &_regs.eflags, state, ctxt)) != X86EMUL_OKAY )
+            goto done;
+        dst.type = OP_NONE;
+        break;
+
 #ifndef X86EMUL_NO_SIMD
 
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x00): /* vpermq $imm8,ymm/m256,ymm */
@@ -11477,6 +11515,77 @@ int x86_emul_rmw(
     return X86EMUL_OKAY;
 }
 
+int x86_emul_blk(
+    void *ptr,
+    void *data,
+    unsigned int bytes,
+    uint32_t *eflags,
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt)
+{
+    switch ( state->blk )
+    {
+        /*
+         * Throughout this switch(), memory clobbers are used to compensate
+         * that other operands may not properly express the (full) memory
+         * ranges covered.
+         */
+    case blk_movdir:
+        switch ( bytes )
+        {
+#ifdef __x86_64__
+        case sizeof(uint32_t):
+# ifdef HAVE_AS_MOVDIR
+            asm ( "movdiri %0, (%1)"
+                  :: "r" (*(uint32_t *)data), "r" (ptr) : "memory" );
+# else
+            /* movdiri %esi, (%rdi) */
+            asm ( ".byte 0x0f, 0x38, 0xf9, 0x37"
+                  :: "S" (*(uint32_t *)data), "D" (ptr) : "memory" );
+# endif
+            break;
+#endif
+
+        case sizeof(unsigned long):
+#ifdef HAVE_AS_MOVDIR
+            asm ( "movdiri %0, (%1)"
+                  :: "r" (*(unsigned long *)data), "r" (ptr) : "memory" );
+#else
+            /* movdiri %rsi, (%rdi) */
+            asm ( ".byte 0x48, 0x0f, 0x38, 0xf9, 0x37"
+                  :: "S" (*(unsigned long *)data), "D" (ptr) : "memory" );
+#endif
+            break;
+
+        case 64:
+            if ( ((unsigned long)ptr & 0x3f) )
+            {
+                ASSERT_UNREACHABLE();
+                return X86EMUL_UNHANDLEABLE;
+            }
+#ifdef HAVE_AS_MOVDIR
+            asm ( "movdir64b (%0), %1" :: "r" (data), "r" (ptr) : "memory" );
+#else
+            /* movdir64b (%rsi), %rdi */
+            asm ( ".byte 0x66, 0x0f, 0x38, 0xf8, 0x3e"
+                  :: "S" (data), "D" (ptr) : "memory" );
+#endif
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            return X86EMUL_UNHANDLEABLE;
+        }
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    return X86EMUL_OKAY;
+}
+
 static void __init __maybe_unused build_assertions(void)
 {
     /* Check the values against SReg3 encoding in opcode/ModRM bytes. */
@@ -11759,6 +11868,9 @@ x86_insn_is_mem_write(const struct x86_emulate_state *state,
         {
         case 0x63:                         /* ARPL */
             return !mode_64bit();
+
+        case X86EMUL_OPC_66(0x0f38, 0xf8): /* MOVDIR64B */
+            return true;
         }
 
         return false;
