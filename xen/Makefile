@@ -48,6 +48,7 @@ default: build
 .PHONY: dist
 dist: install
 
+include scripts/Kbuild.include
 
 ifneq ($(root-make-done),y)
 # section to run before calling Rules.mk, but only once.
@@ -124,10 +125,36 @@ ifneq ($(filter %config,$(MAKECMDGOALS)),)
     config-build := y
 endif
 
+# CLANG_FLAGS needs to be calculated before calling Kconfig
+ifneq ($(shell $(CC) --version 2>&1 | head -n 1 | grep clang),)
+CLANG_FLAGS :=
+
+ifeq ($(TARGET_ARCH),x86)
+# The tests to select whether the integrated assembler is usable need to happen
+# before testing any assembler features, or else the result of the tests would
+# be stale if the integrated assembler is not used.
+
+# Older clang's built-in assembler doesn't understand .skip with labels:
+# https://bugs.llvm.org/show_bug.cgi?id=27369
+t1 = $(call as-insn,$(CC),".L0: .L1: .skip (.L1 - .L0)",,-no-integrated-as)
+
+# Check whether clang asm()-s support .include.
+t2 = $(call as-insn,$(CC) -I$(BASEDIR)/include,".include \"asm-x86/indirect_thunk_asm.h\"",,-no-integrated-as)
+
+# Check whether clang keeps .macro-s between asm()-s:
+# https://bugs.llvm.org/show_bug.cgi?id=36110
+t3 = $(call as-insn,$(CC),".macro FOO;.endm"$(close); asm volatile $(open)".macro FOO;.endm",-no-integrated-as)
+
+CLANG_FLAGS += $(call or,$(t1),$(t2),$(t3))
+endif
+
+CLANG_FLAGS += -Werror=unknown-warning-option
+CFLAGS += $(CLANG_FLAGS)
+export CLANG_FLAGS
+endif
+
 export root-make-done := y
 endif # root-make-done
-
-include scripts/Kbuild.include
 
 # Shorthand for kconfig
 kconfig = -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)"
