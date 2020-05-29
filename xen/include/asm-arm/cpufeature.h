@@ -64,7 +64,7 @@ static inline bool cpus_have_cap(unsigned int num)
     return test_bit(num, cpu_hwcaps);
 }
 
-static inline cpu_nr_siblings(unsigned int)
+static inline int cpu_nr_siblings(unsigned int cpu)
 {
     return 1;
 }
