@@ -250,7 +250,7 @@ xop.h avx512f.h: simd-fma.c
 
 endif # 32-bit override
 
-$(TARGET): x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o wrappers.o
+$(TARGET): x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o predicates.o wrappers.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
 
 .PHONY: clean
@@ -289,7 +289,7 @@ x86.h := $(addprefix $(XEN_ROOT)/tools/include/xen/asm/,\
                      cpuid.h cpuid-autogen.h)
 x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
 
-x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o wrappers.o: %.o: %.c $(x86_emulate.h)
+x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o predicates.o wrappers.o: %.o: %.c $(x86_emulate.h)
 	$(HOSTCC) $(HOSTCFLAGS) -c -g -o $@ $<
 
 x86-emulate.o: x86_emulate/x86_emulate.c

@@ -11382,10 +11382,6 @@ int x86_emulate_wrapper(
 }
 #endif
 
-#ifdef __XEN__
-
-#include <xen/err.h>
-
 struct x86_emulate_state *
 x86_decode_insn(
     struct x86_emulate_ctxt *ctxt,
@@ -11408,7 +11404,7 @@ x86_decode_insn(
     if ( unlikely(rc != X86EMUL_OKAY) )
         return ERR_PTR(-rc);
 
-#ifndef NDEBUG
+#if defined(__XEN__) && !defined(NDEBUG)
     /*
      * While we avoid memory allocation (by use of per-CPU data) above,
      * nevertheless make sure callers properly release the state structure
@@ -11428,12 +11424,12 @@ x86_decode_insn(
 
 static inline void check_state(const struct x86_emulate_state *state)
 {
-#ifndef NDEBUG
+#if defined(__XEN__) && !defined(NDEBUG)
     ASSERT(state->caller);
 #endif
 }
 
-#ifndef NDEBUG
+#if defined(__XEN__) && !defined(NDEBUG)
 void x86_emulate_free_state(struct x86_emulate_state *state)
 {
     check_state(state);
@@ -11806,5 +11802,3 @@ x86_insn_length(const struct x86_emulate_state *state,
 
     return state->ip - ctxt->regs->r(ip);
 }
-
-#endif

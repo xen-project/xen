@@ -1,6 +1,12 @@
 #include "x86-emulate.h"
 
+#include <errno.h>
 #include <sys/mman.h>
+
+#define DEFINE_PER_CPU(type, var) type per_cpu_##var
+#define this_cpu(var) per_cpu_##var
+
+#define ERR_PTR(val) NULL
 
 #define cpu_has_amd_erratum(nr) 0
 #define cpu_has_mpx false

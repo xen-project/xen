@@ -4810,6 +4810,8 @@ int main(int argc, char **argv)
     if ( stack_exec )
         evex_disp8_test(instr, &ctxt, &emulops);
 
+    predicates_test(instr, &ctxt, fetch);
+
     for ( j = 0; j < ARRAY_SIZE(blobs); j++ )
     {
         if ( blobs[j].check_cpu && !blobs[j].check_cpu() )

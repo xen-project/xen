@@ -730,8 +730,6 @@ x86emul_unhandleable_rw(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt);
 
-#ifdef __XEN__
-
 struct x86_emulate_state *
 x86_decode_insn(
     struct x86_emulate_ctxt *ctxt,
@@ -767,11 +765,13 @@ bool
 x86_insn_is_cr_access(const struct x86_emulate_state *state,
                       const struct x86_emulate_ctxt *ctxt);
 
-#ifdef NDEBUG
+#if !defined(__XEN__) || defined(NDEBUG)
 static inline void x86_emulate_free_state(struct x86_emulate_state *state) {}
 #else
 void x86_emulate_free_state(struct x86_emulate_state *state);
 #endif
+
+#ifdef __XEN__
 
 int x86emul_read_xcr(unsigned int reg, uint64_t *val,
                      struct x86_emulate_ctxt *ctxt);
