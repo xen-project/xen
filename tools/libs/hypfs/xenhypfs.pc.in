@@ -1,0 +1,10 @@
+prefix=@@prefix@@
+includedir=@@incdir@@
+libdir=@@libdir@@
+
+Name: Xenhypfs
+Description: The Xenhypfs library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir} @@cflagslocal@@
+Libs: @@libsflag@@${libdir} -lxenhypfs
+Requires.private: xentoolcore,xentoollog,xencall,z

@@ -110,6 +110,8 @@ tools/libs/evtchn/headers.chk
 tools/libs/evtchn/xenevtchn.pc
 tools/libs/gnttab/headers.chk
 tools/libs/gnttab/xengnttab.pc
+tools/libs/hypfs/headers.chk
+tools/libs/hypfs/xenhypfs.pc
 tools/libs/call/headers.chk
 tools/libs/call/xencall.pc
 tools/libs/foreignmemory/headers.chk

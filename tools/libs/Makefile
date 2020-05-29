@@ -9,6 +9,7 @@ SUBDIRS-y += gnttab
 SUBDIRS-y += call
 SUBDIRS-y += foreignmemory
 SUBDIRS-y += devicemodel
+SUBDIRS-y += hypfs
 
 ifeq ($(CONFIG_RUMP),y)
 SUBDIRS-y := toolcore

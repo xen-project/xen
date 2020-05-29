@@ -1,0 +1,10 @@
+VERS_1.0 {
+	global:
+		xenhypfs_open;
+		xenhypfs_close;
+		xenhypfs_read_raw;
+		xenhypfs_read;
+		xenhypfs_readdir;
+		xenhypfs_write;
+	local: *; /* Do not expose anything by default */
+};
