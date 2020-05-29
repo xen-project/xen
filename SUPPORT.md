@@ -109,6 +109,20 @@ ARM only has one guest type at the moment
 
     Status: Supported
 
+## Hypervisor file system
+
+### Build info
+
+    Status: Supported
+
+### Hypervisor config
+
+    Status: Supported
+
+### Runtime parameters
+
+    Status: Supported
+
 ## Toolstack
 
 ### xl
