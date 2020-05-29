@@ -856,6 +856,9 @@ struct x86_emulate_state {
     enum {
         blk_NONE,
         blk_enqcmd,
+#ifndef X86EMUL_NO_FPU
+        blk_fst, /* FNSTENV, FNSAVE */
+#endif
         blk_movdir,
     } blk;
     uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
@@ -895,6 +898,50 @@ struct x86_emulate_state {
 #define PTR_POISON ((void *)0x8086000000008086UL) /* non-canonical */
 #else
 #define PTR_POISON NULL /* 32-bit builds are for user-space, so NULL is OK. */
+#endif
+
+#ifndef X86EMUL_NO_FPU
+struct x87_env16 {
+    uint16_t fcw;
+    uint16_t fsw;
+    uint16_t ftw;
+    union {
+        struct {
+            uint16_t fip_lo;
+            uint16_t fop:11, :1, fip_hi:4;
+            uint16_t fdp_lo;
+            uint16_t :12, fdp_hi:4;
+        } real;
+        struct {
+            uint16_t fip;
+            uint16_t fcs;
+            uint16_t fdp;
+            uint16_t fds;
+        } prot;
+    } mode;
+};
+
+struct x87_env32 {
+    uint32_t fcw:16, :16;
+    uint32_t fsw:16, :16;
+    uint32_t ftw:16, :16;
+    union {
+        struct {
+            /* some CPUs/FPUs also store the full FIP here */
+            uint32_t fip_lo:16, :16;
+            uint32_t fop:11, :1, fip_hi:16, :4;
+            /* some CPUs/FPUs also store the full FDP here */
+            uint32_t fdp_lo:16, :16;
+            uint32_t :12, fdp_hi:16, :4;
+        } real;
+        struct {
+            uint32_t fip;
+            uint32_t fcs:16, fop:11, :5;
+            uint32_t fdp;
+            uint32_t fds:16, :16;
+        } prot;
+    } mode;
+};
 #endif
 
 typedef union {
@@ -4924,9 +4971,22 @@ x86_emulate(
                     goto done;
                 emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
                 break;
-            case 6: /* fnstenv - TODO */
+            case 6: /* fnstenv */
+                fail_if(!ops->blk);
+                state->blk = blk_fst;
+                /*
+                 * REX is meaningless for this insn by this point - (ab)use
+                 * the field to communicate real vs protected mode to ->blk().
+                 */
+                /*state->*/rex_prefix = in_protmode(ctxt, ops);
+                if ( (rc = ops->blk(ea.mem.seg, ea.mem.off, NULL,
+                                    op_bytes > 2 ? sizeof(struct x87_env32)
+                                                 : sizeof(struct x87_env16),
+                                    &_regs.eflags,
+                                    state, ctxt)) != X86EMUL_OKAY )
+                    goto done;
                 state->fpu_ctrl = true;
-                goto unimplemented_insn;
+                break;
             case 7: /* fnstcw m2byte */
                 state->fpu_ctrl = true;
             fpu_memdst16:
@@ -5080,9 +5140,24 @@ x86_emulate(
                 emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
                 break;
             case 4: /* frstor - TODO */
-            case 6: /* fnsave - TODO */
                 state->fpu_ctrl = true;
                 goto unimplemented_insn;
+            case 6: /* fnsave */
+                fail_if(!ops->blk);
+                state->blk = blk_fst;
+                /*
+                 * REX is meaningless for this insn by this point - (ab)use
+                 * the field to communicate real vs protected mode to ->blk().
+                 */
+                /*state->*/rex_prefix = in_protmode(ctxt, ops);
+                if ( (rc = ops->blk(ea.mem.seg, ea.mem.off, NULL,
+                                    op_bytes > 2 ? sizeof(struct x87_env32) + 80
+                                                 : sizeof(struct x87_env16) + 80,
+                                    &_regs.eflags,
+                                    state, ctxt)) != X86EMUL_OKAY )
+                    goto done;
+                state->fpu_ctrl = true;
+                break;
             case 7: /* fnstsw m2byte */
                 state->fpu_ctrl = true;
                 goto fpu_memdst16;
@@ -11559,6 +11634,14 @@ int x86_emul_blk(
     switch ( state->blk )
     {
         bool zf;
+#ifndef X86EMUL_NO_FPU
+        struct {
+            struct x87_env32 env;
+            struct {
+               uint8_t bytes[10];
+            } freg[8];
+        } fpstate;
+#endif
 
         /*
          * Throughout this switch(), memory clobbers are used to compensate
@@ -11587,6 +11670,98 @@ int x86_emul_blk(
         if ( zf )
             *eflags |= X86_EFLAGS_ZF;
         break;
+
+#ifndef X86EMUL_NO_FPU
+
+    case blk_fst:
+        ASSERT(!data);
+
+        /* Don't chance consuming uninitialized data. */
+        memset(&fpstate, 0, sizeof(fpstate));
+        if ( bytes > sizeof(fpstate.env) )
+            asm ( "fnsave %0" : "+m" (fpstate) );
+        else
+            asm ( "fnstenv %0" : "+m" (fpstate.env) );
+
+        /* state->rex_prefix carries CR0.PE && !EFLAGS.VM setting */
+        switch ( bytes )
+        {
+        case sizeof(fpstate.env): /* 32-bit FNSTENV */
+        case sizeof(fpstate):     /* 32-bit FNSAVE */
+            if ( !state->rex_prefix )
+            {
+                /* Convert 32-bit prot to 32-bit real/vm86 format. */
+                unsigned int fip = fpstate.env.mode.prot.fip +
+                                   (fpstate.env.mode.prot.fcs << 4);
+                unsigned int fdp = fpstate.env.mode.prot.fdp +
+                                   (fpstate.env.mode.prot.fds << 4);
+                unsigned int fop = fpstate.env.mode.prot.fop;
+
+                memset(&fpstate.env.mode, 0, sizeof(fpstate.env.mode));
+                fpstate.env.mode.real.fip_lo = fip;
+                fpstate.env.mode.real.fip_hi = fip >> 16;
+                fpstate.env.mode.real.fop = fop;
+                fpstate.env.mode.real.fdp_lo = fdp;
+                fpstate.env.mode.real.fdp_hi = fdp >> 16;
+            }
+            memcpy(ptr, &fpstate.env, sizeof(fpstate.env));
+            if ( bytes == sizeof(fpstate.env) )
+                ptr = NULL;
+            else
+                ptr += sizeof(fpstate.env);
+            break;
+
+        case sizeof(struct x87_env16):                        /* 16-bit FNSTENV */
+        case sizeof(struct x87_env16) + sizeof(fpstate.freg): /* 16-bit FNSAVE */
+            if ( state->rex_prefix )
+            {
+                /* Convert 32-bit prot to 16-bit prot format. */
+                struct x87_env16 *env = ptr;
+
+                env->fcw = fpstate.env.fcw;
+                env->fsw = fpstate.env.fsw;
+                env->ftw = fpstate.env.ftw;
+                env->mode.prot.fip = fpstate.env.mode.prot.fip;
+                env->mode.prot.fcs = fpstate.env.mode.prot.fcs;
+                env->mode.prot.fdp = fpstate.env.mode.prot.fdp;
+                env->mode.prot.fds = fpstate.env.mode.prot.fds;
+            }
+            else
+            {
+                /* Convert 32-bit prot to 16-bit real/vm86 format. */
+                unsigned int fip = fpstate.env.mode.prot.fip +
+                                   (fpstate.env.mode.prot.fcs << 4);
+                unsigned int fdp = fpstate.env.mode.prot.fdp +
+                                   (fpstate.env.mode.prot.fds << 4);
+                struct x87_env16 env = {
+                    .fcw = fpstate.env.fcw,
+                    .fsw = fpstate.env.fsw,
+                    .ftw = fpstate.env.ftw,
+                    .mode.real.fip_lo = fip,
+                    .mode.real.fip_hi = fip >> 16,
+                    .mode.real.fop = fpstate.env.mode.prot.fop,
+                    .mode.real.fdp_lo = fdp,
+                    .mode.real.fdp_hi = fdp >> 16
+                };
+
+                memcpy(ptr, &env, sizeof(env));
+            }
+            if ( bytes == sizeof(struct x87_env16) )
+                ptr = NULL;
+            else
+                ptr += sizeof(struct x87_env16);
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            return X86EMUL_UNHANDLEABLE;
+        }
+
+        if ( ptr )
+            memcpy(ptr, fpstate.freg, sizeof(fpstate.freg));
+        break;
+
+#endif /* X86EMUL_NO_FPU */
 
     case blk_movdir:
         switch ( bytes )

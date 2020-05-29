@@ -129,6 +129,7 @@ static inline bool xcr0_mask(uint64_t mask)
 }
 
 #define cache_line_size() (cp.basic.clflush_size * 8)
+#define cpu_has_fpu        cp.basic.fpu
 #define cpu_has_mmx        cp.basic.mmx
 #define cpu_has_fxsr       cp.basic.fxsr
 #define cpu_has_sse        cp.basic.sse

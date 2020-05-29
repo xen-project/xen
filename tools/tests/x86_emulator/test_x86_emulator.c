@@ -748,6 +748,25 @@ static struct x86_emulate_ops emulops = {
 
 #define MMAP_ADDR 0x100000
 
+/*
+ * 64-bit OSes may not (be able to) properly restore the two selectors in
+ * the FPU environment. Zap them so that memcmp() on two saved images will
+ * work regardless of whether a context switch occurred in the middle.
+ */
+static void zap_fpsel(unsigned int *env, bool is_32bit)
+{
+    if ( is_32bit )
+    {
+        env[4] &= ~0xffff;
+        env[6] &= ~0xffff;
+    }
+    else
+    {
+        env[2] &= ~0xffff;
+        env[3] &= ~0xffff;
+    }
+}
+
 #ifdef __x86_64__
 # define STKVAL_DISP 64
 static const struct {
@@ -2391,6 +2410,62 @@ int main(int argc, char **argv)
         for ( i = 16; i < 32; ++i )
             if ( res[i] != i )
                 goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing fnstenv 4(%ecx)...");
+    if ( stack_exec && cpu_has_fpu )
+    {
+        const uint16_t three = 3;
+
+        asm volatile ( "fninit\n\t"
+                       "fld1\n\t"
+                       "fidivs %1\n\t"
+                       "fstenv %0"
+                       : "=m" (res[9]) : "m" (three) : "memory" );
+        zap_fpsel(&res[9], true);
+        instr[0] = 0xd9; instr[1] = 0x71; instr[2] = 0x04;
+        regs.eip = (unsigned long)&instr[0];
+        regs.ecx = (unsigned long)res;
+        res[8] = 0xaa55aa55;
+        rc = x86_emulate(&ctxt, &emulops);
+        zap_fpsel(&res[1], true);
+        if ( (rc != X86EMUL_OKAY) ||
+             memcmp(res + 1, res + 9, 28) ||
+             res[8] != 0xaa55aa55 ||
+             (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing 16-bit fnsave (%ecx)...");
+    if ( stack_exec && cpu_has_fpu )
+    {
+        const uint16_t five = 5;
+
+        asm volatile ( "fninit\n\t"
+                       "fld1\n\t"
+                       "fidivs %1\n\t"
+                       "fsaves %0"
+                       : "=m" (res[25]) : "m" (five) : "memory" );
+        zap_fpsel(&res[25], false);
+        asm volatile ( "frstors %0" :: "m" (res[25]) : "memory" );
+        instr[0] = 0x66; instr[1] = 0xdd; instr[2] = 0x31;
+        regs.eip = (unsigned long)&instr[0];
+        regs.ecx = (unsigned long)res;
+        res[23] = 0xaa55aa55;
+        res[24] = 0xaa55aa55;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             memcmp(res, res + 25, 94) ||
+             (res[23] >> 16) != 0xaa55 ||
+             res[24] != 0xaa55aa55 ||
+             (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
         printf("okay\n");
     }
     else
