@@ -105,3 +105,48 @@ A populated Xen hypervisor file system might look like the following example:
 #### /
 
 The root of the hypervisor file system.
+
+#### /buildinfo/
+
+A directory containing static information generated while building the
+hypervisor.
+
+#### /buildinfo/changeset = STRING
+
+Git commit of the hypervisor.
+
+#### /buildinfo/compileinfo/
+
+A directory containing information about compilation of Xen.
+
+#### /buildinfo/compileinfo/compile_by = STRING
+
+Information who compiled the hypervisor.
+
+#### /buildinfo/compileinfo/compile_date = STRING
+
+Date of the hypervisor compilation.
+
+#### /buildinfo/compileinfo/compile_domain = STRING
+
+Information about the compile domain.
+
+#### /buildinfo/compileinfo/compiler = STRING
+
+The compiler used to build Xen.
+
+#### /buildinfo/version/
+
+A directory containing version information of the hypervisor.
+
+#### /buildinfo/version/extra = STRING
+
+Extra version information.
+
+#### /buildinfo/version/major = INTEGER
+
+The major version of Xen.
+
+#### /buildinfo/version/minor = INTEGER
+
+The minor version of Xen.

@@ -13,6 +13,7 @@
 #include <xen/paging.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
+#include <xen/hypfs.h>
 #include <xsm/xsm.h>
 #include <asm/current.h>
 #include <public/version.h>
@@ -372,6 +373,52 @@ void __init do_initcalls(void)
     for ( call = __presmp_initcall_end; call < __initcall_end; call++ )
         (*call)();
 }
+
+#ifdef CONFIG_HYPFS
+static unsigned int __read_mostly major_version;
+static unsigned int __read_mostly minor_version;
+
+static HYPFS_DIR_INIT(buildinfo, "buildinfo");
+static HYPFS_DIR_INIT(compileinfo, "compileinfo");
+static HYPFS_DIR_INIT(version, "version");
+static HYPFS_UINT_INIT(major, "major", major_version);
+static HYPFS_UINT_INIT(minor, "minor", minor_version);
+static HYPFS_STRING_INIT(changeset, "changeset");
+static HYPFS_STRING_INIT(compiler, "compiler");
+static HYPFS_STRING_INIT(compile_by, "compile_by");
+static HYPFS_STRING_INIT(compile_date, "compile_date");
+static HYPFS_STRING_INIT(compile_domain, "compile_domain");
+static HYPFS_STRING_INIT(extra, "extra");
+
+static int __init buildinfo_init(void)
+{
+    hypfs_add_dir(&hypfs_root, &buildinfo, true);
+
+    hypfs_string_set_reference(&changeset, xen_changeset());
+    hypfs_add_leaf(&buildinfo, &changeset, true);
+
+    hypfs_add_dir(&buildinfo, &compileinfo, true);
+    hypfs_string_set_reference(&compiler, xen_compiler());
+    hypfs_string_set_reference(&compile_by, xen_compile_by());
+    hypfs_string_set_reference(&compile_date, xen_compile_date());
+    hypfs_string_set_reference(&compile_domain, xen_compile_domain());
+    hypfs_add_leaf(&compileinfo, &compiler, true);
+    hypfs_add_leaf(&compileinfo, &compile_by, true);
+    hypfs_add_leaf(&compileinfo, &compile_date, true);
+    hypfs_add_leaf(&compileinfo, &compile_domain, true);
+
+    major_version = xen_major_version();
+    minor_version = xen_minor_version();
+    hypfs_add_dir(&buildinfo, &version, true);
+    hypfs_string_set_reference(&extra, xen_extra_version());
+    hypfs_add_leaf(&version, &extra, true);
+    hypfs_add_leaf(&version, &major, true);
+    hypfs_add_leaf(&version, &minor, true);
+
+    return 0;
+}
+__initcall(buildinfo_init);
+#endif
 
 # define DO(fn) long do_##fn
 
