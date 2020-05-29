@@ -43,6 +43,8 @@
     }                                                      \
 })
 
+#define FXSAVE_AREA current->arch.fpu_ctxt
+
 #ifndef CONFIG_HVM
 # define X86EMUL_NO_FPU
 # define X86EMUL_NO_MMX

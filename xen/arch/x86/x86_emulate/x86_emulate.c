@@ -860,6 +860,11 @@ struct x86_emulate_state {
         blk_fld, /* FLDENV, FRSTOR */
         blk_fst, /* FNSTENV, FNSAVE */
 #endif
+#if !defined(X86EMUL_NO_FPU) || !defined(X86EMUL_NO_MMX) || \
+    !defined(X86EMUL_NO_SIMD)
+        blk_fxrstor,
+        blk_fxsave,
+#endif
         blk_movdir,
     } blk;
     uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
@@ -952,6 +957,29 @@ typedef union {
     uint64_t __attribute__ ((aligned(64))) zmm[8];
     uint32_t data32[16];
 } mmval_t;
+
+struct x86_fxsr {
+    uint16_t fcw;
+    uint16_t fsw;
+    uint8_t ftw, :8;
+    uint16_t fop;
+    union {
+        struct {
+            uint32_t offs;
+            uint16_t sel, :16;
+        };
+        uint64_t addr;
+    } fip, fdp;
+    uint32_t mxcsr;
+    uint32_t mxcsr_mask;
+    struct {
+        uint8_t data[10];
+        uint16_t :16, :16, :16;
+    } fpreg[8];
+    uint64_t __attribute__ ((aligned(16))) xmm[16][2];
+    uint64_t rsvd[6];
+    uint64_t avl[6];
+};
 
 /*
  * While proper alignment gets specified above, this doesn't get honored by
@@ -1910,6 +1938,7 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 #define vcpu_has_cmov()        (ctxt->cpuid->basic.cmov)
 #define vcpu_has_clflush()     (ctxt->cpuid->basic.clflush)
 #define vcpu_has_mmx()         (ctxt->cpuid->basic.mmx)
+#define vcpu_has_fxsr()        (ctxt->cpuid->basic.fxsr)
 #define vcpu_has_sse()         (ctxt->cpuid->basic.sse)
 #define vcpu_has_sse2()        (ctxt->cpuid->basic.sse2)
 #define vcpu_has_sse3()        (ctxt->cpuid->basic.sse3)
@@ -8148,6 +8177,49 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xae): case X86EMUL_OPC_66(0x0f, 0xae): /* Grp15 */
         switch ( modrm_reg & 7 )
         {
+#if !defined(X86EMUL_NO_FPU) || !defined(X86EMUL_NO_MMX) || \
+    !defined(X86EMUL_NO_SIMD)
+        case 0: /* fxsave */
+        case 1: /* fxrstor */
+            generate_exception_if(vex.pfx, EXC_UD);
+            vcpu_must_have(fxsr);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
+            generate_exception_if(!is_aligned(ea.mem.seg, ea.mem.off, 16,
+                                              ctxt, ops),
+                                  EXC_GP, 0);
+            fail_if(!ops->blk);
+            op_bytes =
+#ifdef __x86_64__
+                !mode_64bit() ? offsetof(struct x86_fxsr, xmm[8]) :
+#endif
+                sizeof(struct x86_fxsr);
+            if ( amd_like(ctxt) )
+            {
+                /* Assume "normal" operation in case of missing hooks. */
+                if ( !ops->read_cr ||
+                     ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
+                    cr4 = X86_CR4_OSFXSR;
+                if ( !ops->read_msr ||
+                     ops->read_msr(MSR_EFER, &msr_val, ctxt) != X86EMUL_OKAY )
+                    msr_val = 0;
+                if ( !(cr4 & X86_CR4_OSFXSR) ||
+                     (mode_64bit() && mode_ring0() && (msr_val & EFER_FFXSE)) )
+                    op_bytes = offsetof(struct x86_fxsr, xmm[0]);
+            }
+            /*
+             * This could also be X86EMUL_FPU_mmx, but it shouldn't be
+             * X86EMUL_FPU_xmm, as we don't want CR4.OSFXSR checked.
+             */
+            get_fpu(X86EMUL_FPU_fpu);
+            state->fpu_ctrl = true;
+            state->blk = modrm_reg & 1 ? blk_fxrstor : blk_fxsave;
+            if ( (rc = ops->blk(ea.mem.seg, ea.mem.off, NULL,
+                                sizeof(struct x86_fxsr), &_regs.eflags,
+                                state, ctxt)) != X86EMUL_OKAY )
+                goto done;
+            break;
+#endif /* X86EMUL_NO_{FPU,MMX,SIMD} */
+
 #ifndef X86EMUL_NO_SIMD
         case 2: /* ldmxcsr */
             generate_exception_if(vex.pfx, EXC_UD);
@@ -11634,6 +11706,8 @@ int x86_emul_blk(
     struct x86_emulate_state *state,
     struct x86_emulate_ctxt *ctxt)
 {
+    int rc = X86EMUL_OKAY;
+
     switch ( state->blk )
     {
         bool zf;
@@ -11852,6 +11926,86 @@ int x86_emul_blk(
 
 #endif /* X86EMUL_NO_FPU */
 
+#if !defined(X86EMUL_NO_FPU) || !defined(X86EMUL_NO_MMX) || \
+    !defined(X86EMUL_NO_SIMD)
+
+    case blk_fxrstor:
+    {
+        struct x86_fxsr *fxsr = FXSAVE_AREA;
+
+        ASSERT(!data);
+        ASSERT(bytes == sizeof(*fxsr));
+        ASSERT(state->op_bytes <= bytes);
+
+        if ( state->op_bytes < sizeof(*fxsr) )
+        {
+            if ( state->rex_prefix & REX_W )
+            {
+                /*
+                 * The only way to force fxsaveq on a wide range of gas
+                 * versions. On older versions the rex64 prefix works only if
+                 * we force an addressing mode that doesn't require extended
+                 * registers.
+                 */
+                asm volatile ( ".byte 0x48; fxsave (%1)"
+                               : "=m" (*fxsr) : "R" (fxsr) );
+            }
+            else
+                asm volatile ( "fxsave %0" : "=m" (*fxsr) );
+        }
+
+        /*
+         * Don't chance the reserved or available ranges to contain any
+         * data FXRSTOR may actually consume in some way: Copy only the
+         * defined portion, and zero the rest.
+         */
+        memcpy(fxsr, ptr, min(state->op_bytes,
+                              (unsigned int)offsetof(struct x86_fxsr, rsvd)));
+        memset(fxsr->rsvd, 0, sizeof(*fxsr) - offsetof(struct x86_fxsr, rsvd));
+
+        generate_exception_if(fxsr->mxcsr & ~mxcsr_mask, EXC_GP, 0);
+
+        if ( state->rex_prefix & REX_W )
+        {
+            /* See above for why operand/constraints are this way. */
+            asm volatile ( ".byte 0x48; fxrstor (%1)"
+                           :: "m" (*fxsr), "R" (fxsr) );
+        }
+        else
+            asm volatile ( "fxrstor %0" :: "m" (*fxsr) );
+        break;
+    }
+
+    case blk_fxsave:
+    {
+        struct x86_fxsr *fxsr = FXSAVE_AREA;
+
+        ASSERT(!data);
+        ASSERT(bytes == sizeof(*fxsr));
+        ASSERT(state->op_bytes <= bytes);
+
+        if ( state->op_bytes < sizeof(*fxsr) )
+            /* Don't chance consuming uninitialized data. */
+            memset(fxsr, 0, state->op_bytes);
+        else
+            fxsr = ptr;
+
+        if ( state->rex_prefix & REX_W )
+        {
+            /* See above for why operand/constraints are this way. */
+            asm volatile ( ".byte 0x48; fxsave (%1)"
+                           : "=m" (*fxsr) : "R" (fxsr) );
+        }
+        else
+            asm volatile ( "fxsave %0" : "=m" (*fxsr) );
+
+        if ( fxsr != ptr ) /* i.e. state->op_bytes < sizeof(*fxsr) */
+            memcpy(ptr, fxsr, state->op_bytes);
+        break;
+    }
+
+#endif /* X86EMUL_NO_{FPU,MMX,SIMD} */
+
     case blk_movdir:
         switch ( bytes )
         {
@@ -11905,7 +12059,8 @@ int x86_emul_blk(
         return X86EMUL_UNHANDLEABLE;
     }
 
-    return X86EMUL_OKAY;
+ done:
+    return rc;
 }
 
 static void __init __maybe_unused build_assertions(void)

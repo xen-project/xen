@@ -36,6 +36,13 @@ struct cpuid_policy cp;
 static char fpu_save_area[4096] __attribute__((__aligned__((64))));
 static bool use_xsave;
 
+/*
+ * Re-use the area above also as scratch space for the emulator itself.
+ * (When debugging the emulator, care needs to be taken when inserting
+ * printf() or alike function calls into regions using this.)
+ */
+#define FXSAVE_AREA ((struct x86_fxsr *)fpu_save_area)
+
 void emul_save_fpu_state(void)
 {
     if ( use_xsave )
