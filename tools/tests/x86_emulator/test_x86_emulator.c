@@ -2442,6 +2442,27 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing fldenv 8(%edx)...");
+    if ( stack_exec && cpu_has_fpu )
+    {
+        asm volatile ( "fnstenv %0\n\t"
+                       "fninit"
+                       : "=m" (res[2]) :: "memory" );
+        zap_fpsel(&res[2], true);
+        instr[0] = 0xd9; instr[1] = 0x62; instr[2] = 0x08;
+        regs.eip = (unsigned long)&instr[0];
+        regs.edx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        asm volatile ( "fnstenv %0" : "=m" (res[9]) :: "memory" );
+        if ( (rc != X86EMUL_OKAY) ||
+             memcmp(res + 2, res + 9, 28) ||
+             (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing 16-bit fnsave (%ecx)...");
     if ( stack_exec && cpu_has_fpu )
     {
@@ -2465,6 +2486,31 @@ int main(int argc, char **argv)
              (res[23] >> 16) != 0xaa55 ||
              res[24] != 0xaa55aa55 ||
              (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing frstor (%edx)...");
+    if ( stack_exec && cpu_has_fpu )
+    {
+        const uint16_t seven = 7;
+
+        asm volatile ( "fninit\n\t"
+                       "fld1\n\t"
+                       "fidivs %1\n\t"
+                       "fnsave %0\n\t"
+                       : "=&m" (res[0]) : "m" (seven) : "memory" );
+        zap_fpsel(&res[0], true);
+        instr[0] = 0xdd; instr[1] = 0x22;
+        regs.eip = (unsigned long)&instr[0];
+        regs.edx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        asm volatile ( "fnsave %0" : "=m" (res[27]) :: "memory" );
+        if ( (rc != X86EMUL_OKAY) ||
+             memcmp(res, res + 27, 108) ||
+             (regs.eip != (unsigned long)&instr[2]) )
             goto fail;
         printf("okay\n");
     }
