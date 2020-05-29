@@ -74,6 +74,10 @@
 #define MSR_PL3_SSP                         0x000006a7
 #define MSR_INTERRUPT_SSP_TABLE             0x000006a8
 
+#define MSR_PASID                           0x00000d93
+#define  PASID_PASID_MASK                   0x000fffff
+#define  PASID_VALID                        (_AC(1, ULL) << 31)
+
 /*
  * Legacy MSR constants in need of cleanup.  No new MSRs below this comment.
  */
