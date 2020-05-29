@@ -663,15 +663,56 @@ int libxl_set_parameters(libxl_ctx *ctx, char *params)
 {
     int ret;
     GC_INIT(ctx);
+    char *par, *val, *end, *path;
+    xenhypfs_handle *hypfs;
 
-    ret = xc_set_parameters(ctx->xch, params);
-    if (ret < 0) {
-        LOGEV(ERROR, ret, "setting parameters");
-        GC_FREE;
-        return ERROR_FAIL;
+    hypfs = xenhypfs_open(ctx->lg, 0);
+    if (!hypfs) {
+        LOGE(ERROR, "opening Xen hypfs");
+        ret = ERROR_FAIL;
+        goto out;
     }
+
+    while (isblank(*params))
+        params++;
+
+    for (par = params; *par; par = end) {
+        end = strchr(par, ' ');
+        if (!end)
+            end = par + strlen(par);
+
+        val = strchr(par, '=');
+        if (val > end)
+            val = NULL;
+        if (!val && !strncmp(par, "no", 2)) {
+            path = libxl__sprintf(gc, "/params/%s", par + 2);
+            path[end - par - 2 + 8] = 0;
+            val = "no";
+            par += 2;
+        } else {
+            path = libxl__sprintf(gc, "/params/%s", par);
+            path[val - par + 8] = 0;
+            val = libxl__strndup(gc, val + 1, end - val - 1);
+        }
+
+	LOG(DEBUG, "setting node \"%s\" to value \"%s\"", path, val);
+        ret = xenhypfs_write(hypfs, path, val);
+        if (ret < 0) {
+            LOGE(ERROR, "setting parameters");
+            ret = ERROR_FAIL;
+            goto out;
+        }
+
+        while (isblank(*end))
+            end++;
+    }
+
+    ret = 0;
+
+out:
+    xenhypfs_close(hypfs);
     GC_FREE;
-    return 0;
+    return ret;
 }
 
 static int fd_set_flags(libxl_ctx *ctx, int fd,

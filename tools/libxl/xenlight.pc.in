@@ -9,4 +9,4 @@ Description: The Xenlight library for Xen hypervisor
 Version: @@version@@
 Cflags: -I${includedir}
 Libs: @@libsflag@@${libdir} -lxenlight
-Requires.private: xentoollog,xenevtchn,xencontrol,xenguest,xenstore
+Requires.private: xentoollog,xenevtchn,xencontrol,xenguest,xenstore,xenhypfs

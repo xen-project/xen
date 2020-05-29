@@ -20,7 +20,7 @@ LIBUUID_LIBS += -luuid
 endif
 
 LIBXL_LIBS =
-LIBXL_LIBS = $(LDLIBS_libxentoollog) $(LDLIBS_libxenevtchn) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libxentoolcore) $(PTYFUNCS_LIBS) $(LIBUUID_LIBS)
+LIBXL_LIBS = $(LDLIBS_libxentoollog) $(LDLIBS_libxenevtchn) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenhypfs) $(LDLIBS_libxenstore) $(LDLIBS_libxentoolcore) $(PTYFUNCS_LIBS) $(LIBUUID_LIBS)
 ifeq ($(CONFIG_LIBNL),y)
 LIBXL_LIBS += $(LIBNL3_LIBS)
 endif
@@ -33,6 +33,7 @@ CFLAGS_LIBXL += $(CFLAGS_libxentoolcore)
 CFLAGS_LIBXL += $(CFLAGS_libxenevtchn)
 CFLAGS_LIBXL += $(CFLAGS_libxenctrl)
 CFLAGS_LIBXL += $(CFLAGS_libxenguest)
+CFLAGS_LIBXL += $(CFLAGS_libxenhypfs)
 CFLAGS_LIBXL += $(CFLAGS_libxenstore)
 ifeq ($(CONFIG_LIBNL),y)
 CFLAGS_LIBXL += $(LIBNL3_CFLAGS)

@@ -168,7 +168,6 @@ int main_set_parameters(int argc, char **argv)
 
     if (libxl_set_parameters(ctx, params)) {
         fprintf(stderr, "cannot set parameters: %s\n", params);
-        fprintf(stderr, "Use \"xl dmesg\" to look for possible reason.\n");
         return EXIT_FAILURE;
     }
 
