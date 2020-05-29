@@ -368,6 +368,7 @@ tools/libxl/test_timedereg
 tools/libxl/test_fdderegrace
 tools/firmware/etherboot/eb-roms.h
 tools/firmware/etherboot/gpxe-git-snapshot.tar.gz
+tools/misc/xenhypfs
 tools/misc/xenwatchdogd
 tools/misc/xen-hvmcrash
 tools/misc/xen-lowmemd

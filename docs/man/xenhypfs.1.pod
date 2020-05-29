@@ -1,0 +1,60 @@
+=head1 NAME
+
+xenhypfs - Xen tool to access Xen hypervisor file system
+
+=head1 SYNOPSIS
+
+B<xenhypfs> I<subcommand> [I<options>] [I<args>]
+
+=head1 DESCRIPTION
+
+The B<xenhypfs> program is used to access the Xen hypervisor file system.
+It can be used to show the available entries, to show their contents and
+(if allowed) to modify their contents.
+
+=head1 SUBCOMMANDS
+
+=over 4
+
+=item B<ls> I<path>
+
+List the available entries below I<path>.
+
+=item B<cat> [I<-b>] I<path>
+
+Show the contents of the entry specified by I<path>. Non-printable characters
+other than white space characters (like tab, new line) will be shown as
+B<\xnn> (B<nn> being a two digit hex number) unless the option B<-b> is
+specified.
+
+=item B<write> I<path> I<value>
+
+Set the contents of the entry specified by I<path> to I<value>.
+
+=item B<tree>
+
+Show all the entries of the file system as a tree.
+
+=back
+
+=head1 RETURN CODES
+
+=over 4
+
+=item B<0>
+
+Success
+
+=item B<1>
+
+Invalid usage (e.g. unknown subcommand, unknown option, missing parameter).
+
+=item B<2>
+
+Entry not found while traversing the tree.
+
+=item B<3>
+
+Access right violation.
+
+=back
