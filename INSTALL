@@ -365,12 +365,5 @@ make XEN_TARGET_ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
         DESTDIR=/some/path install
 
 
-TODO
-====
-
- - DESTDIR should be empty, not "/"
- - add make uninstall targets
- - replace private path variables as needed (SBINDIR/sbindir)
- - ...
 
 # vim: tw=72 et
