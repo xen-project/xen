@@ -20,7 +20,11 @@
 
 #define __weak        __attribute__((__weak__))
 
-#define nocall        __attribute__((error("Nonstandard ABI")))
+#if !defined(__clang__)
+# define nocall       __attribute__((__error__("Nonstandard ABI")))
+#else
+# define nocall
+#endif
 
 #if (!defined(__clang__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 5))
 #define unreachable() do {} while (1)
