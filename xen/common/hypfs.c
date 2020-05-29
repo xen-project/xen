@@ -126,7 +126,7 @@ int hypfs_add_leaf(struct hypfs_entry_dir *parent,
 {
     int ret;
 
-    if ( !leaf->content )
+    if ( !leaf->u.content )
         ret = -EINVAL;
     else
         ret = add_entry(parent, &leaf->e);
@@ -255,7 +255,7 @@ int hypfs_read_leaf(const struct hypfs_entry *entry,
 
     l = container_of(entry, const struct hypfs_entry_leaf, e);
 
-    return copy_to_guest(uaddr, l->content, entry->size) ? -EFAULT: 0;
+    return copy_to_guest(uaddr, l->u.content, entry->size) ? -EFAULT: 0;
 }
 
 static int hypfs_read(const struct hypfs_entry *entry,
@@ -317,7 +317,7 @@ int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
         goto out;
 
     ret = 0;
-    memcpy(leaf->write_ptr, buf, ulen);
+    memcpy(leaf->u.write_ptr, buf, ulen);
     leaf->e.size = ulen;
 
  out:
@@ -341,7 +341,7 @@ int hypfs_write_bool(struct hypfs_entry_leaf *leaf,
     if ( copy_from_guest(&buf, uaddr, ulen) )
         return -EFAULT;
 
-    *(bool *)leaf->write_ptr = buf;
+    *(bool *)leaf->u.write_ptr = buf;
 
     return 0;
 }

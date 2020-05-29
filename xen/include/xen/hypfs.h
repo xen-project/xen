@@ -26,7 +26,7 @@ struct hypfs_entry_leaf {
     union {
         const void *content;
         void *write_ptr;
-    };
+    } u;
 };
 
 struct hypfs_entry_dir {
@@ -68,7 +68,7 @@ struct hypfs_entry_dir {
 static inline void hypfs_string_set_reference(struct hypfs_entry_leaf *leaf,
                                               const char *str)
 {
-    leaf->content = str;
+    leaf->u.content = str;
     leaf->e.size = strlen(str) + 1;
 }
 
@@ -81,7 +81,7 @@ static inline void hypfs_string_set_reference(struct hypfs_entry_leaf *leaf,
         .e.max_size = (wr) ? sizeof(contvar) : 0,        \
         .e.read = hypfs_read_leaf,                       \
         .e.write = (wr),                                 \
-        .content = &(contvar),                           \
+        .u.content = &(contvar),                         \
     }
 
 #define HYPFS_UINT_INIT(var, nam, contvar)                       \
