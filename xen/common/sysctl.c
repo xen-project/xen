@@ -471,42 +471,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
             copyback = 1;
         break;
 
-    case XEN_SYSCTL_set_parameter:
-    {
-#define XEN_SET_PARAMETER_MAX_SIZE 1023
-        char *params;
-
-        if ( op->u.set_parameter.pad[0] || op->u.set_parameter.pad[1] ||
-             op->u.set_parameter.pad[2] )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if ( op->u.set_parameter.size > XEN_SET_PARAMETER_MAX_SIZE )
-        {
-            ret = -E2BIG;
-            break;
-        }
-        params = xmalloc_bytes(op->u.set_parameter.size + 1);
-        if ( !params )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-        if ( copy_from_guest(params, op->u.set_parameter.params,
-                             op->u.set_parameter.size) )
-            ret = -EFAULT;
-        else
-        {
-            params[op->u.set_parameter.size] = 0;
-            ret = runtime_parse(params);
-        }
-
-        xfree(params);
-
-        break;
-    }
-
     default:
         ret = arch_do_sysctl(op, u_sysctl);
         copyback = 0;

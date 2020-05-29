@@ -196,17 +196,6 @@ static void __init _cmdline_parse(const char *cmdline)
     parse_params(cmdline, __setup_start, __setup_end);
 }
 
-int runtime_parse(const char *line)
-{
-    int ret;
-
-    hypfs_write_lock();
-    ret = parse_params(line, __param_start, __param_end);
-    hypfs_unlock();
-
-    return ret;
-}
-
 /**
  *    cmdline_parse -- parses the xen command line.
  * If CONFIG_CMDLINE is set, it would be parsed prior to @cmdline.

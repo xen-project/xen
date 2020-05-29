@@ -112,11 +112,6 @@ static void __init init_ept_param(struct param_hypfs *par)
     update_ept_param();
     custom_runtime_set_var(par, opt_ept_setting);
 }
-#else
-static void update_ept_param(void)
-{
-}
-#endif
 
 static int parse_ept_param_runtime(const char *s);
 custom_runtime_only_param("ept", parse_ept_param_runtime, init_ept_param);
@@ -172,6 +167,7 @@ static int parse_ept_param_runtime(const char *s)
 
     return 0;
 }
+#endif
 
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;

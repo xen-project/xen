@@ -122,8 +122,9 @@ config HYPFS
 	---help---
 	  Support Xen hypervisor file system. This file system is used to
 	  present various hypervisor internal data to dom0 and in some
-	  cases to allow modifying settings. Disabling the support might
-	  result in some features not being available.
+	  cases to allow modifying settings. Disabling the support will
+	  result in some features not being available, e.g. runtime parameter
+	  setting.
 
 	  If unsure, say Y.
 

@@ -42,7 +42,7 @@ static void hypfs_read_lock(void)
     this_cpu(hypfs_locked) = hypfs_read_locked;
 }
 
-void hypfs_write_lock(void)
+static void hypfs_write_lock(void)
 {
     ASSERT(this_cpu(hypfs_locked) == hypfs_unlocked);
 
@@ -50,7 +50,7 @@ void hypfs_write_lock(void)
     this_cpu(hypfs_locked) = hypfs_write_locked;
 }
 
-void hypfs_unlock(void)
+static void hypfs_unlock(void)
 {
     enum hypfs_lock_state locked = this_cpu(hypfs_locked);
 
@@ -369,7 +369,7 @@ int hypfs_write_custom(struct hypfs_entry_leaf *leaf,
         goto out;
 
     p = container_of(leaf, struct param_hypfs, hypfs);
-    ret = p->param->par.func(buf);
+    ret = p->func(buf);
 
  out:
     xfree(buf);

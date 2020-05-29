@@ -54,11 +54,6 @@ SECTIONS
        *(.data.rel.ro)
        *(.data.rel.ro.*)
 
-       . = ALIGN(POINTER_ALIGN);
-       __param_start = .;
-       *(.data.param)
-       __param_end = .;
-
        __proc_info_start = .;
        *(.proc.info)
        __proc_info_end = .;

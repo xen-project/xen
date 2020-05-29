@@ -99,8 +99,6 @@ class xen2
     livepatch_op
 # XEN_SYSCTL_coverage_op
     coverage_op
-# XEN_SYSCTL_set_parameter
-    set_parameter
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on

@@ -118,11 +118,6 @@ int hypfs_write_bool(struct hypfs_entry_leaf *leaf,
                      XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
 int hypfs_write_custom(struct hypfs_entry_leaf *leaf,
                        XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
-void hypfs_write_lock(void);
-void hypfs_unlock(void);
-#else
-static inline void hypfs_write_lock(void) {}
-static inline void hypfs_unlock(void) {}
 #endif
 
 #endif /* __XEN_HYPFS_H__ */
