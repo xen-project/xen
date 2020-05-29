@@ -97,6 +97,30 @@ static int __init parse_ept_param(const char *s)
 }
 custom_param("ept", parse_ept_param);
 
+#ifdef CONFIG_HYPFS
+static char opt_ept_setting[10];
+
+static void update_ept_param(void)
+{
+    if ( opt_ept_exec_sp >= 0 )
+        snprintf(opt_ept_setting, sizeof(opt_ept_setting), "exec-sp=%d",
+                 opt_ept_exec_sp);
+}
+
+static void __init init_ept_param(struct param_hypfs *par)
+{
+    update_ept_param();
+    custom_runtime_set_var(par, opt_ept_setting);
+}
+#else
+static void update_ept_param(void)
+{
+}
+#endif
+
+static int parse_ept_param_runtime(const char *s);
+custom_runtime_only_param("ept", parse_ept_param_runtime, init_ept_param);
+
 static int parse_ept_param_runtime(const char *s)
 {
     struct domain *d;
@@ -114,6 +138,10 @@ static int parse_ept_param_runtime(const char *s)
         return -EINVAL;
 
     opt_ept_exec_sp = val;
+
+    update_ept_param();
+    custom_runtime_set_var(param_2_parfs(parse_ept_param_runtime),
+                           opt_ept_setting);
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
@@ -144,7 +172,6 @@ static int parse_ept_param_runtime(const char *s)
 
     return 0;
 }
-custom_runtime_only_param("ept", parse_ept_param_runtime);
 
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;

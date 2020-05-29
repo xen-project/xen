@@ -198,7 +198,13 @@ static void __init _cmdline_parse(const char *cmdline)
 
 int runtime_parse(const char *line)
 {
-    return parse_params(line, __param_start, __param_end);
+    int ret;
+
+    hypfs_write_lock();
+    ret = parse_params(line, __param_start, __param_end);
+    hypfs_unlock();
+
+    return ret;
 }
 
 /**
@@ -429,6 +435,27 @@ static int __init buildinfo_init(void)
     return 0;
 }
 __initcall(buildinfo_init);
+
+static HYPFS_DIR_INIT(params, "params");
+
+static int __init param_init(void)
+{
+    struct param_hypfs *param;
+
+    hypfs_add_dir(&hypfs_root, &params, true);
+
+    for ( param = __paramhypfs_start; param < __paramhypfs_end; param++ )
+    {
+        if ( param->init_leaf )
+            param->init_leaf(param);
+        else if ( param->hypfs.e.type == XEN_HYPFS_TYPE_STRING )
+            param->hypfs.e.size = strlen(param->hypfs.u.content) + 1;
+        hypfs_add_leaf(&params, &param->hypfs, true);
+    }
+
+    return 0;
+}
+__initcall(param_init);
 #endif
 
 # define DO(fn) long do_##fn

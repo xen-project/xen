@@ -89,6 +89,14 @@ SECTIONS
        __start_schedulers_array = .;
        *(.data.schedulers)
        __end_schedulers_array = .;
+
+#ifdef CONFIG_HYPFS
+       . = ALIGN(8);
+       __paramhypfs_start = .;
+       *(.data.paramhypfs)
+       __paramhypfs_end = .;
+#endif
+
        *(.data.rel)
        *(.data.rel.*)
        CONSTRUCTORS

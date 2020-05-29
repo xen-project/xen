@@ -154,3 +154,12 @@ The major version of Xen.
 #### /buildinfo/version/minor = INTEGER
 
 The minor version of Xen.
+
+#### /params/
+
+A directory of runtime parameters.
+
+#### /params/*
+
+The individual parameters. The description of the different parameters can be
+found in `docs/misc/xen-command-line.pandoc`.
