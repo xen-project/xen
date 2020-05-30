@@ -25,6 +25,7 @@
 #include <xen/trace.h>
 #include <xen/cpu.h>
 #include <xen/keyhandler.h>
+#include <asm/cpufeature.h>
 #include <asm/processor.h>
 
 #include "private.h"
