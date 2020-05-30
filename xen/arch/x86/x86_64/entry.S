@@ -193,12 +193,14 @@ restore_all_guest:
         cmpl  $1,%ecx
         ja    .Lrestore_rcx_iret_exit_to_guest
 
+#ifdef CONFIG_XEN_SHSTK
         /* Clear the supervisor shadow stack token busy bit. */
 .macro rag_clrssbsy
         rdsspq %rcx
         clrssbsy (%rcx)
 .endm
         ALTERNATIVE "", rag_clrssbsy, X86_FEATURE_XEN_SHSTK
+#endif
 
         movq  8(%rsp), %rcx           # RIP
         cmpw  $FLAT_USER_CS32,16(%rsp)# CS
@@ -235,7 +237,9 @@ iret_exit_to_guest:
  * %ss must be saved into the space left by the trampoline.
  */
 ENTRY(lstar_enter)
+#ifdef CONFIG_XEN_SHSTK
         ALTERNATIVE "", "setssbsy", X86_FEATURE_XEN_SHSTK
+#endif
         /* sti could live here when we don't switch page tables below. */
         movq  8(%rsp),%rax /* Restore %rax. */
         movq  $FLAT_KERNEL_SS,8(%rsp)
@@ -269,7 +273,9 @@ ENTRY(lstar_enter)
         jmp   test_all_events
 
 ENTRY(sysenter_entry)
+#ifdef CONFIG_XEN_SHSTK
         ALTERNATIVE "", "setssbsy", X86_FEATURE_XEN_SHSTK
+#endif
         /* sti could live here when we don't switch page tables below. */
         pushq $FLAT_USER_SS
         pushq $0
@@ -889,6 +895,7 @@ handle_ist_exception:
         movq  %rdi,%rsp
         rep   movsq
 
+#ifdef CONFIG_XEN_SHSTK
         /* Switch Shadow Stacks */
 .macro ist_switch_shstk
         rdsspq %rdi
@@ -909,6 +916,7 @@ handle_ist_exception:
         setssbsy
 .endm
         ALTERNATIVE "", ist_switch_shstk, X86_FEATURE_XEN_SHSTK
+#endif
 1:
 #else
         ASSERT_CONTEXT_IS_XEN

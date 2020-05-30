@@ -31,7 +31,7 @@ ENTRY(__high_start)
         jz      .L_bsp
 
         /* APs.  Set up shadow stacks before entering C. */
-
+#ifdef CONFIG_XEN_SHSTK
         testl   $cpufeat_mask(X86_FEATURE_XEN_SHSTK), \
                 CPUINFO_FEATURE_OFFSET(X86_FEATURE_XEN_SHSTK) + boot_cpu_data(%rip)
         je      .L_ap_shstk_done
@@ -55,6 +55,7 @@ ENTRY(__high_start)
         mov     $XEN_MINIMAL_CR4 | X86_CR4_CET, %ecx
         mov     %rcx, %cr4
         setssbsy
+#endif
 
 .L_ap_shstk_done:
         call    start_secondary

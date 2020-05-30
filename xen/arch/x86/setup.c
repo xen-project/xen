@@ -664,7 +664,7 @@ static void __init noreturn reinit_bsp_stack(void)
     stack_base[0] = stack;
     memguard_guard_stack(stack);
 
-    if ( cpu_has_xen_shstk )
+    if ( IS_ENABLED(CONFIG_XEN_SHSTK) && cpu_has_xen_shstk )
     {
         wrmsrl(MSR_PL0_SSP,
                (unsigned long)stack + (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8);
