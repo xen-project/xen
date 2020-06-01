@@ -673,7 +673,7 @@ static void show_hvm_stack(struct vcpu *v, const struct cpu_user_regs *regs)
  * For the cases where the stack should not be inspected, pretend that the
  * passed stack pointer is already out of reasonable bounds.
  */
-unsigned long get_stack_trace_bottom(unsigned long sp)
+static unsigned long get_stack_trace_bottom(unsigned long sp)
 {
     switch ( get_stack_page(sp) )
     {
@@ -690,7 +690,7 @@ unsigned long get_stack_trace_bottom(unsigned long sp)
     }
 }
 
-unsigned long get_stack_dump_bottom(unsigned long sp)
+static unsigned long get_stack_dump_bottom(unsigned long sp)
 {
     switch ( get_stack_page(sp) )
     {

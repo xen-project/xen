@@ -118,14 +118,6 @@ static inline attr_const struct cpu_info *get_cpu_info(void)
 #define get_stack_bottom()                      \
     ((unsigned long)(&get_cpu_info()->guest_cpu_user_regs + 1))
 
-/*
- * Get the reasonable stack bounds for stack traces and stack dumps.  Stack
- * dumps have a slightly larger range to include exception frames in the
- * printed information.  The returned word is inside the interesting range.
- */
-unsigned long get_stack_trace_bottom(unsigned long sp);
-unsigned long get_stack_dump_bottom (unsigned long sp);
-
 #ifdef CONFIG_LIVEPATCH
 # define CHECK_FOR_LIVEPATCH_WORK "call check_for_livepatch_work;"
 #elif defined(CONFIG_DEBUG)
