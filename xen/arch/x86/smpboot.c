@@ -369,7 +369,7 @@ void start_secondary(void *unused)
 
     initialize_cpu_data(cpu);
 
-    microcode_update_one(false);
+    microcode_update_one();
 
     /*
      * If MSR_SPEC_CTRL is available, apply Xen's default setting and discard

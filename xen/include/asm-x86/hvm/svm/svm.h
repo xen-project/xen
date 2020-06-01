@@ -94,9 +94,6 @@ extern u32 svm_feature_flags;
 #define DEFAULT_TSC_RATIO       0x0000000100000000ULL
 #define TSC_RATIO_RSVD_BITS     0xffffff0000000000ULL
 
-extern void svm_host_osvw_reset(void);
-extern void svm_host_osvw_init(void);
-
 /* EXITINFO1 fields on NPT faults */
 #define _NPT_PFEC_with_gla     32
 #define NPT_PFEC_with_gla      (1UL<<_NPT_PFEC_with_gla)

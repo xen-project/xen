@@ -46,20 +46,6 @@ struct microcode_ops {
     int (*apply_microcode)(const struct microcode_patch *patch);
 
     /*
-     * Optional.  If provided and applicable to the specific update attempt,
-     * is run once by the initiating CPU.  Returning an error will abort the
-     * load attempt.
-     */
-    int (*start_update)(void);
-
-    /*
-     * Optional.  If provided, called on every CPU which completes a microcode
-     * load.  May be called in the case of some errors, and not others.  May
-     * be called even if start_update() wasn't.
-     */
-    void (*end_update_percpu)(void);
-
-    /*
      * Given two patches, are they both applicable to the current CPU, and is
      * new a higher revision than old?
      */

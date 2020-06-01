@@ -18,7 +18,6 @@
 #include <xen/init.h>
 #include <xen/mm.h> /* TODO: Fix asm/tlbflush.h breakage */
 
-#include <asm/hvm/svm/svm.h>
 #include <asm/msr.h>
 
 #include "private.h"
@@ -395,26 +394,9 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
     return patch;
 }
 
-#ifdef CONFIG_HVM
-static int start_update(void)
-{
-    /*
-     * svm_host_osvw_init() will be called on each cpu by calling '.end_update'
-     * in common code.
-     */
-    svm_host_osvw_reset();
-
-    return 0;
-}
-#endif
-
 const struct microcode_ops amd_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
-#ifdef CONFIG_HVM
-    .start_update                     = start_update,
-    .end_update_percpu                = svm_host_osvw_init,
-#endif
     .compare_patch                    = compare_patch,
 };

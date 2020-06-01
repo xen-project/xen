@@ -546,9 +546,6 @@ static int do_microcode_update(void *patch)
     else
         ret = secondary_thread_fn();
 
-    if ( microcode_ops->end_update_percpu )
-        microcode_ops->end_update_percpu();
-
     return ret;
 }
 
@@ -619,16 +616,6 @@ static long microcode_update_helper(void *data)
         goto put;
     }
     spin_unlock(&microcode_mutex);
-
-    if ( microcode_ops->start_update )
-    {
-        ret = microcode_ops->start_update();
-        if ( ret )
-        {
-            microcode_free_patch(patch);
-            goto put;
-        }
-    }
 
     cpumask_clear(&cpu_callin_map);
     atomic_set(&cpu_out, 0);
@@ -728,28 +715,14 @@ static int __init microcode_init(void)
 __initcall(microcode_init);
 
 /* Load a cached update to current cpu */
-int microcode_update_one(bool start_update)
+int microcode_update_one(void)
 {
-    int err;
-
     if ( !microcode_ops )
         return -EOPNOTSUPP;
 
     microcode_ops->collect_cpu_info();
 
-    if ( start_update && microcode_ops->start_update )
-    {
-        err = microcode_ops->start_update();
-        if ( err )
-            return err;
-    }
-
-    err = microcode_update_cpu(NULL);
-
-    if ( microcode_ops->end_update_percpu )
-        microcode_ops->end_update_percpu();
-
-    return err;
+    return microcode_update_cpu(NULL);
 }
 
 /* BSP calls this function to parse ucode blob and then apply an update. */
@@ -790,7 +763,7 @@ static int __init early_microcode_update_cpu(void)
     spin_unlock(&microcode_mutex);
     ASSERT(rc);
 
-    return microcode_update_one(true);
+    return microcode_update_one();
 }
 
 int __init early_microcode_init(void)
