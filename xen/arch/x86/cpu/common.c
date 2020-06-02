@@ -738,9 +738,14 @@ void load_system_tables(void)
 	unsigned int i, cpu = smp_processor_id();
 	unsigned long stack_bottom = get_stack_bottom(),
 		stack_top = stack_bottom & ~(STACK_SIZE - 1);
+	/*
+	 * NB: define tss_page as a local variable because clang 3.5 doesn't
+	 * support using ARRAY_SIZE against per-cpu variables.
+	 */
+	struct tss_page *tss_page = &this_cpu(tss_page);
 
 	/* The TSS may be live.	 Disuade any clever optimisations. */
-	volatile struct tss64 *tss = &this_cpu(tss_page).tss;
+	volatile struct tss64 *tss = &tss_page->tss;
 	seg_desc_t *gdt =
 		this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY;
 
@@ -783,15 +788,14 @@ void load_system_tables(void)
 	 * volatile qualifier.
 	 */
 	if (cpu_has_xen_shstk) {
-		volatile uint64_t *ist_ssp = this_cpu(tss_page).ist_ssp;
+		volatile uint64_t *ist_ssp = tss_page->ist_ssp;
 
 		ist_ssp[0] = 0x8600111111111111ul;
 		ist_ssp[IST_MCE] = stack_top + (IST_MCE * IST_SHSTK_SIZE) - 8;
 		ist_ssp[IST_NMI] = stack_top + (IST_NMI * IST_SHSTK_SIZE) - 8;
 		ist_ssp[IST_DB]	 = stack_top + (IST_DB	* IST_SHSTK_SIZE) - 8;
 		ist_ssp[IST_DF]	 = stack_top + (IST_DF	* IST_SHSTK_SIZE) - 8;
-		for ( i = IST_DF + 1;
-		      i < ARRAY_SIZE(this_cpu(tss_page).ist_ssp); ++i )
+		for ( i = IST_DF + 1; i < ARRAY_SIZE(tss_page->ist_ssp); ++i )
 			ist_ssp[i] = 0x8600111111111111ul;
 
 		wrmsrl(MSR_INTERRUPT_SSP_TABLE, (unsigned long)ist_ssp);
