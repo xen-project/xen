@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Hypervisor framework to ease porting Xen to run on hypervisors.
  - Initial support to run on Hyper-V.
  - Initial hypervisor file system (hypfs) support.
+ - libxl support for running qemu-xen device model in a linux stubdomain.
 
 ## [4.13.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.13.0) - 2019-12-17
 
