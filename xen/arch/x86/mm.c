@@ -1235,8 +1235,14 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
      *
      * (Note that the undestroyable active grants are not a security hole in
      * Xen. All active grants can safely be cleaned up when the domain dies.)
+     *
+     * NB: the preprocessor conditional is required in order to prevent clang's
+     * -Wtautological-constant-compare complaining about converting the result
+     * of a << into a bool is always true if it's evaluated directly in the if
+     * condition.
      */
-    if ( _PAGE_GNTTAB && (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
+#if _PAGE_GNTTAB
+    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
          !l1e_owner->is_shutting_down && !l1e_owner->is_dying )
     {
         gdprintk(XENLOG_WARNING,
@@ -1244,6 +1250,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
                  l1e_get_intpte(l1e));
         domain_crash(l1e_owner);
     }
+#endif
 
     /*
      * Remember we didn't take a type-count of foreign writable mappings
