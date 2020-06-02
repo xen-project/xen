@@ -148,9 +148,14 @@ static int xenhypfs_tree_sub(char *path, unsigned int depth)
         printf("%*s%s%s\n", depth * 2, "", ent[i].name,
                ent[i].type == xenhypfs_type_dir ? "/" : "");
         if (ent[i].type == xenhypfs_type_dir) {
-            asprintf(&p, "%s%s%s", path, (depth == 1) ? "" : "/", ent[i].name);
+            if (asprintf(&p, "%s%s%s", path, (depth == 1) ? "" : "/",
+                         ent[i].name) < 0) {
+                ret = 2;
+                break;
+            }
             if (xenhypfs_tree_sub(p, depth + 1))
                 ret = 2;
+            free(p);
         }
     }
 
