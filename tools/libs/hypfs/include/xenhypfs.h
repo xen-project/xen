@@ -26,22 +26,27 @@ struct xentoollog_logger;
 
 typedef struct xenhypfs_handle xenhypfs_handle;
 
+enum xenhypfs_type {
+    xenhypfs_type_dir,
+    xenhypfs_type_blob,
+    xenhypfs_type_string,
+    xenhypfs_type_uint,
+    xenhypfs_type_int,
+    xenhypfs_type_bool,
+};
+
+enum xenhypfs_encoding {
+    xenhypfs_enc_plain,
+    xenhypfs_enc_gzip
+};
+
 struct xenhypfs_dirent {
     char *name;
     size_t size;
-    enum {
-        xenhypfs_type_dir,
-        xenhypfs_type_blob,
-        xenhypfs_type_string,
-        xenhypfs_type_uint,
-        xenhypfs_type_int,
-        xenhypfs_type_bool
-    } type;
-    enum {
-        xenhypfs_enc_plain,
-        xenhypfs_enc_gzip
-    } encoding;
-    bool is_writable;
+    unsigned short type;
+    unsigned short encoding;
+    unsigned int flags;
+#define XENHYPFS_FLAG_WRITABLE  0x00000001
 };
 
 xenhypfs_handle *xenhypfs_open(struct xentoollog_logger *logger,

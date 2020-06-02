@@ -204,7 +204,7 @@ static void xenhypfs_set_attrs(struct xen_hypfs_direntry *entry,
         dirent->type = xenhypfs_type_blob;
     }
 
-    dirent->is_writable = entry->max_write_len;
+    dirent->flags = entry->max_write_len ? XENHYPFS_FLAG_WRITABLE : 0;
 }
 
 void *xenhypfs_read_raw(xenhypfs_handle *fshdl, const char *path,

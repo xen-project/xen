@@ -125,7 +125,8 @@ static int xenhypfs_ls(char *path)
     } else {
         for (i = 0; i < n; i++)
             printf("%s r%c %s\n", xenhypfs_type(ent + i),
-                   ent[i].is_writable ? 'w' : '-', ent[i].name);
+                   (ent[i].flags & XENHYPFS_FLAG_WRITABLE) ? 'w' : '-',
+                   ent[i].name);
 
         free(ent);
     }
