@@ -25,6 +25,8 @@ case "_${CONTAINER}" in
     _unstable|_) CONTAINER="${BASE}/debian:unstable" ;;
     _trusty) CONTAINER="${BASE}/ubuntu:trusty" ;;
     _xenial) CONTAINER="${BASE}/ubuntu:xenial" ;;
+    _opensuse-leap|_leap) CONTAINER="${BASE}/suse:opensuse-leap" ;;
+    _opensuse-tumbleweed|_tumbleweed) CONTAINER="${BASE}/suse:opensuse-tumbleweed" ;;
 esac
 
 # Use this variable to control whether root should be used
