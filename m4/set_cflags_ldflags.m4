@@ -15,7 +15,7 @@ for ldflag in $APPEND_LIB
 do
     APPEND_LDFLAGS="$APPEND_LDFLAGS -L$ldflag"
 done
-if [ ! -z $EXTRA_PREFIX ]; then
+if test ! -z "$EXTRA_PREFIX" ; then
     CPPFLAGS="$CPPFLAGS -I$EXTRA_PREFIX/include"
     LDFLAGS="$LDFLAGS -L$EXTRA_PREFIX/lib"
 fi
