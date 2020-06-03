@@ -6,6 +6,7 @@ CONFIG_PV_SHIM=y
 CONFIG_PV_SHIM_EXCLUSIVE=y
 CONFIG_NR_CPUS=32
 # Disable features not used by the PV shim
+# CONFIG_HYPFS is not set
 # CONFIG_SHADOW_PAGING is not set
 # CONFIG_BIGMEM is not set
 # CONFIG_HVM_FEP is not set
