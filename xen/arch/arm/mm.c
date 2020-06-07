@@ -1033,6 +1033,7 @@ static int xen_pt_next_level(bool read_only, unsigned int level,
 {
     lpae_t *entry;
     int ret;
+    mfn_t mfn;
 
     entry = *table + offset;
 
@@ -1050,8 +1051,10 @@ static int xen_pt_next_level(bool read_only, unsigned int level,
     if ( lpae_is_mapping(*entry, level) )
         return XEN_TABLE_SUPER_PAGE;
 
+    mfn = lpae_get_mfn(*entry);
+
     xen_unmap_table(*table);
-    *table = xen_map_table(lpae_get_mfn(*entry));
+    *table = xen_map_table(mfn);
 
     return XEN_TABLE_NORMAL_PAGE;
 }
