@@ -58,7 +58,7 @@ txt: $(DOC_TXT)
 .PHONY: figs
 figs:
 ifneq ($(FIG2DEV),)
-	set -x; $(MAKE) -C figs
+	$(MAKE) -C figs
 else
 	@echo "fig2dev (transfig) not installed; skipping figs."
 endif
@@ -105,12 +105,12 @@ else
 endif
 
 # HTML manpages
+# sed used to fix up links between man-pages
+# 1) L<xl(1)> -> L<xl(1)|relative:xl.1.html>
+# 2) <a href="relative:xl.1.html"> -> <a href="xl.1.html">
 html/man/%.$(1).html: man/%.$(1).pod Makefile
 ifneq ($(POD2HTML),)
 	@$(INSTALL_DIR) $$(@D)
-	# Fix up links between man-pages
-	# 1) L<xl(1)> -> L<xl(1)|relative:xl.1.html>
-	# 2) <a href="relative:xl.1.html"> -> <a href="xl.1.html">
 	sed -r -e 's%L<([^>]+)\(([1-9])\)>%L<\1(\2)|relative:\1.\2.html>%g' $$< | \
 		$(POD2HTML) | \
 		sed -r -e 's%( href=")relative:%\1%g' > $$@
