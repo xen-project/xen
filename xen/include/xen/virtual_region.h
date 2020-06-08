@@ -33,6 +33,7 @@ void setup_virtual_regions(const struct exception_table_entry *start,
 void unregister_init_virtual_region(void);
 void register_virtual_region(struct virtual_region *r);
 void unregister_virtual_region(struct virtual_region *r);
+void reset_virtual_region_perms(void);
 
 #endif /* __XEN_VIRTUAL_REGION_H__ */
 
