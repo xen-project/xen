@@ -243,6 +243,15 @@ sub r_toplevel ($) {
     $had_unknown = undef;
     $had_feature = undef;
 
+    # Pandoc's JSON output changed some time between 1.17.2 (stretch)
+    # and 2.2.1 (buster).  I can find no documentation about this
+    # change or about the compatibility rules.  (It seems that
+    # processing the parse tree *is* supported upstream: they offer
+    # many libraries to do this inside the pandoc process.)
+    # Empirically, what has changed is just the top level structure.
+    # Also pandoc wants the same structure back that it spat out,
+    # when we ask it to format snippets.
+
     my $blocks;
     if (ref $i eq 'ARRAY') {
 	$pandoc_toplevel_constructor = sub {
@@ -256,6 +265,17 @@ sub r_toplevel ($) {
 	    next unless ref $e eq 'ARRAY';
 	    r_content $e;
 	}
+    } elsif (ref $i eq 'HASH') {
+	my $api_version = $i->{'pandoc-api-version'};
+	$pandoc_toplevel_constructor = sub {
+	    my ($blocks) = @_;
+	    return {
+		    blocks => $blocks,
+		    meta => { },
+		    'pandoc-api-version' => $api_version,
+		   };
+	};
+	r_content $i->{blocks};
     } else {
 	die;
     }
