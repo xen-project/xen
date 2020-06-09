@@ -180,9 +180,15 @@ static void do_get_hw_residencies(void *arg)
     case 0x4E:
     case 0x55:
     case 0x5E:
+    /* Ice Lake */
+    case 0x7D:
+    case 0x7E:
     /* Kaby Lake */
     case 0x8E:
     case 0x9E:
+    /* Comet Lake */
+    case 0xA5:
+    case 0xA6:
         GET_PC2_RES(hw_res->pc2);
         GET_CC7_RES(hw_res->cc7);
         /* fall through */

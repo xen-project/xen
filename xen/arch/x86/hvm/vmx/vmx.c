@@ -2438,8 +2438,12 @@ static bool __init has_if_pschange_mc(void)
     case 0x4e: /* Skylake M */
     case 0x5e: /* Skylake D */
     case 0x55: /* Skylake-X / Cascade Lake */
+    case 0x7d: /* Ice Lake */
+    case 0x7e: /* Ice Lake */
     case 0x8e: /* Kaby / Coffee / Whiskey Lake M */
     case 0x9e: /* Kaby / Coffee / Whiskey Lake D */
+    case 0xa5: /* Comet Lake H/S */
+    case 0xa6: /* Comet Lake U */
         return true;
 
         /*
@@ -2781,10 +2785,14 @@ static const struct lbr_info *last_branch_msr_get(void)
         case 0x66:
         /* Goldmont Plus */
         case 0x7a:
+        /* Ice Lake */
+        case 0x7d: case 0x7e:
         /* Tremont */
         case 0x86:
         /* Kaby Lake */
         case 0x8e: case 0x9e:
+        /* Comet Lake */
+        case 0xa5: case 0xa6:
             return sk_lbr;
         /* Atom */
         case 0x1c: case 0x26: case 0x27: case 0x35: case 0x36:
