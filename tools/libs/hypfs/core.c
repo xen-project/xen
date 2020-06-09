@@ -74,8 +74,8 @@ xenhypfs_handle *xenhypfs_open(xentoollog_logger *logger,
     return fshdl;
 
 err:
-    xtl_logger_destroy(fshdl->logger_tofree);
     xencall_close(fshdl->xcall);
+    xtl_logger_destroy(fshdl->logger_tofree);
     free(fshdl);
     return NULL;
 }
