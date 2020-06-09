@@ -241,14 +241,25 @@ static int _parse_loglvl(const char *s, int *lower, int *upper, char *val)
 
 static int parse_loglvl(const char *s)
 {
-    return _parse_loglvl(s, &xenlog_lower_thresh, &xenlog_upper_thresh,
-                         xenlog_val);
+    int ret;
+
+    ret = _parse_loglvl(s, &xenlog_lower_thresh, &xenlog_upper_thresh,
+                        xenlog_val);
+    custom_runtime_set_var(param_2_parfs(parse_loglvl), xenlog_val);
+
+    return ret;
 }
 
 static int parse_guest_loglvl(const char *s)
 {
-    return _parse_loglvl(s, &xenlog_guest_lower_thresh,
-                         &xenlog_guest_upper_thresh, xenlog_guest_val);
+    int ret;
+
+    ret = _parse_loglvl(s, &xenlog_guest_lower_thresh,
+                        &xenlog_guest_upper_thresh, xenlog_guest_val);
+    custom_runtime_set_var(param_2_parfs(parse_guest_loglvl),
+                           xenlog_guest_val);
+
+    return ret;
 }
 
 static char *loglvl_str(int lvl)
