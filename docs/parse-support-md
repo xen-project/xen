@@ -232,6 +232,8 @@ sub r_content ($) {
     }
 }
 
+our $pandoc_toplevel_constructor;
+
 sub r_toplevel ($) {
     my ($i) = @_;
 
@@ -241,9 +243,21 @@ sub r_toplevel ($) {
     $had_unknown = undef;
     $had_feature = undef;
 
-    foreach my $e (@$i) {
-        next unless ref $e eq 'ARRAY';
-        r_content $e;
+    my $blocks;
+    if (ref $i eq 'ARRAY') {
+	$pandoc_toplevel_constructor = sub {
+	    my ($blocks) = @_;
+	    return [
+		    { unMeta => { } },
+		    $blocks,
+		   ];
+	};
+	foreach my $e (@$i) {
+	    next unless ref $e eq 'ARRAY';
+	    r_content $e;
+	}
+    } else {
+	die;
     }
 }
 
@@ -274,10 +288,10 @@ sub pandoc2html_inline ($) {
     my ($content) = @_;
 
     my $json_fh = IO::File::new_tmpfile or die $!;
-    my $j = to_json([
-                     { unMeta => { } },
-                     [{ t => 'Para', c => $content }],
-                    ]) or die $!;
+
+    my $blocks = [{ t => 'Para', c => $content }];
+    my $data = $pandoc_toplevel_constructor->($blocks);
+    my $j = to_json($data) or die $!;
     print $json_fh $j;
     flush $json_fh or die $!;
     seek $json_fh,0,0 or die $!;
