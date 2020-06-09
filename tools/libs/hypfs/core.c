@@ -241,10 +241,8 @@ void *xenhypfs_read_raw(xenhypfs_handle *fshdl, const char *path,
         if (!ret)
             break;
 
-        if (ret != ENOBUFS) {
-            errno = -ret;
+        if (errno != ENOBUFS)
             goto out;
-        }
     }
 
     content = malloc(entry->content_len);
