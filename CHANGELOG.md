@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Initial support to run on Hyper-V.
  - Initial hypervisor file system (hypfs) support.
  - libxl support for running qemu-xen device model in a linux stubdomain.
+ - New 'domid_policy', allowing domain-ids to be randomly chosen.
+ - Option to preserve domain-id across migrate or save+restore.
 
 ## [4.13.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.13.0) - 2019-12-17
 
