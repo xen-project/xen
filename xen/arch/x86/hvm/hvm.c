@@ -3601,13 +3601,15 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
         ASSERT(v->arch.vm_event);
 
-        /* The actual write will occur in hvm_do_resume() (if permitted). */
-        v->arch.vm_event->write_data.do_write.msr = 1;
-        v->arch.vm_event->write_data.msr = msr;
-        v->arch.vm_event->write_data.value = msr_content;
+        if ( hvm_monitor_msr(msr, msr_content, msr_old_content) )
+        {
+            /* The actual write will occur in hvm_do_resume(), if permitted. */
+            v->arch.vm_event->write_data.do_write.msr = 1;
+            v->arch.vm_event->write_data.msr = msr;
+            v->arch.vm_event->write_data.value = msr_content;
 
-        hvm_monitor_msr(msr, msr_content, msr_old_content);
-        return X86EMUL_OKAY;
+            return X86EMUL_OKAY;
+        }
     }
 
     if ( (ret = guest_wrmsr(v, msr, msr_content)) != X86EMUL_UNHANDLEABLE )

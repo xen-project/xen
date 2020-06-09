@@ -59,6 +59,10 @@ int arch_monitor_domctl_op(struct domain *d, struct xen_domctl_monitor_op *mop)
         domain_unpause(d);
         break;
 
+    case XEN_DOMCTL_MONITOR_OP_CONTROL_REGISTERS:
+        d->arch.monitor.control_register_values = true;
+        break;
+
     default:
         rc = -EOPNOTSUPP;
     }

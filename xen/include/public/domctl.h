@@ -1025,6 +1025,12 @@ struct xen_domctl_psr_cmt_op {
 #define XEN_DOMCTL_MONITOR_OP_DISABLE           1
 #define XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES  2
 #define XEN_DOMCTL_MONITOR_OP_EMULATE_EACH_REP  3
+/*
+ * Control register feature can result in guest-crashes when the monitor
+ * subsystem is being turned off. User has to take special precautions
+ * to ensure all vCPUs have resumed before it is safe to turn it off.
+ */
+#define XEN_DOMCTL_MONITOR_OP_CONTROL_REGISTERS 4
 
 #define XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG         0
 #define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR            1
