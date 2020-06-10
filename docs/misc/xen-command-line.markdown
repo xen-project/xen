@@ -454,12 +454,18 @@ choice of `dom0-kernel` is deprecated and not supported by all Dom0 kernels.
 This option allows for fine tuning of the facilities Xen will use, after
 accounting for hardware capabilities as enumerated via CPUID.
 
+Unless otherwise noted, options only have any effect in their negative form,
+to hide the named feature(s).  Ignoring a feature using this mechanism will
+cause Xen not to use the feature, nor offer them as usable to guests.
+
 Currently accepted:
 
 The Speculation Control hardware features `srbds-ctrl`, `md-clear`, `ibrsb`,
 `stibp`, `ibpb`, `l1d-flush` and `ssbd` are used by default if available and
-applicable.  They can be ignored, e.g. `no-ibrsb`, at which point Xen won't
-use them itself, and won't offer them to guests.
+applicable.  They can all be ignored.
+
+`rdrand` and `rdseed` can be ignored, as a mitigation to XSA-320 /
+CVE-2020-0543.
 
 ### cpuid\_mask\_cpu (AMD only)
 > `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`

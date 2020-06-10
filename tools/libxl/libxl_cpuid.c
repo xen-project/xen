@@ -89,7 +89,7 @@ static libxl_cpuid_policy_list cpuid_find_match(libxl_cpuid_policy_list *list,
 int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
 {
 #define NA XEN_CPUID_INPUT_UNUSED
-    struct cpuid_flags cpuid_flags[] = {
+    static const struct cpuid_flags cpuid_flags[] = {
         {"maxleaf",      0x00000000, NA, CPUID_REG_EAX,  0, 32},
       /* the following two entries are subject to tweaking later in the code */
         {"family",       0x00000001, NA, CPUID_REG_EAX,  8,  8},
@@ -100,6 +100,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"clflush",      0x00000001, NA, CPUID_REG_EBX,  8,  8},
         {"brandid",      0x00000001, NA, CPUID_REG_EBX,  0,  8},
         {"hypervisor",   0x00000001, NA, CPUID_REG_ECX, 31,  1},
+        {"rdrand",       0x00000001, NA, CPUID_REG_ECX, 30,  1},
         {"f16c",         0x00000001, NA, CPUID_REG_ECX, 29,  1},
         {"avx",          0x00000001, NA, CPUID_REG_ECX, 28,  1},
         {"osxsave",      0x00000001, NA, CPUID_REG_ECX, 27,  1},
@@ -160,6 +161,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"fpu",          0x00000001, NA, CPUID_REG_EDX,  0,  1},
         {"srbds-ctrl",   0x00000007,  0, CPUID_REG_EDX,  9,  1},
         {"md-clear",     0x00000007,  0, CPUID_REG_EDX, 10,  1},
+        {"rdseed",       0x00000007,  0, CPUID_REG_EBX, 18,  1},
         {"ibrsb",        0x00000007,  0, CPUID_REG_EDX, 26,  1},
         {"stibp",        0x00000007,  0, CPUID_REG_EDX, 27,  1},
         {"l1d-flush",    0x00000007,  0, CPUID_REG_EDX, 28,  1},
@@ -211,7 +213,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
 #undef NA
     char *sep, *val, *endptr;
     int i;
-    struct cpuid_flags *flag;
+    const struct cpuid_flags *flag;
     struct libxl__cpuid_policy *entry;
     unsigned long num;
     char flags[33], *resstr;

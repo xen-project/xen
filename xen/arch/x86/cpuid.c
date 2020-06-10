@@ -63,6 +63,16 @@ static int __init parse_xen_cpuid(const char *s)
             if ( !val )
                 setup_clear_cpu_cap(X86_FEATURE_SRBDS_CTRL);
         }
+        else if ( (val = parse_boolean("rdrand", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_RDRAND);
+        }
+        else if ( (val = parse_boolean("rdseed", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_RDSEED);
+        }
         else
             rc = -EINVAL;
 
