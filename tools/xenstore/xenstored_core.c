@@ -419,7 +419,8 @@ static struct node *read_node(struct connection *conn, const void *ctx,
 	return node;
 }
 
-int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node)
+int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
+		   bool no_quota_check)
 {
 	TDB_DATA data;
 	void *p;
@@ -429,7 +430,7 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node)
 		+ node->num_perms*sizeof(node->perms[0])
 		+ node->datalen + node->childlen;
 
-	if (domain_is_unprivileged(conn) &&
+	if (!no_quota_check && domain_is_unprivileged(conn) &&
 	    data.dsize >= quota_max_entry_size) {
 		errno = ENOSPC;
 		return errno;
@@ -457,14 +458,15 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node)
 	return 0;
 }
 
-static int write_node(struct connection *conn, struct node *node)
+static int write_node(struct connection *conn, struct node *node,
+		      bool no_quota_check)
 {
 	TDB_DATA key;
 
 	if (access_node(conn, node, NODE_ACCESS_WRITE, &key))
 		return errno;
 
-	return write_node_raw(conn, &key, node);
+	return write_node_raw(conn, &key, node, no_quota_check);
 }
 
 static enum xs_perm_type perm_for_conn(struct connection *conn,
@@ -1001,7 +1003,7 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 	/* We write out the nodes down, setting destructor in case
 	 * something goes wrong. */
 	for (i = node; i; i = i->parent) {
-		if (write_node(conn, i)) {
+		if (write_node(conn, i, false)) {
 			domain_entry_dec(conn, i);
 			return NULL;
 		}
@@ -1041,7 +1043,7 @@ static int do_write(struct connection *conn, struct buffered_data *in)
 	} else {
 		node->data = in->buffer + offset;
 		node->datalen = datalen;
-		if (write_node(conn, node))
+		if (write_node(conn, node, false))
 			return errno;
 	}
 
@@ -1117,7 +1119,7 @@ static int remove_child_entry(struct connection *conn, struct node *node,
 	size_t childlen = strlen(node->children + offset);
 	memdel(node->children, offset, childlen + 1, node->childlen);
 	node->childlen -= childlen + 1;
-	return write_node(conn, node);
+	return write_node(conn, node, true);
 }
 
 
@@ -1256,7 +1258,7 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	node->num_perms = num;
 	domain_entry_inc(conn, node);
 
-	if (write_node(conn, node))
+	if (write_node(conn, node, false))
 		return errno;
 
 	fire_watches(conn, in, name, false);
@@ -1516,7 +1518,7 @@ static void manual_node(const char *name, const char *child)
 	if (child)
 		node->childlen = strlen(child) + 1;
 
-	if (write_node(NULL, node))
+	if (write_node(NULL, node, false))
 		barf_perror("Could not create initial node %s", name);
 	talloc_free(node);
 }
