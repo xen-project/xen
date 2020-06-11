@@ -155,12 +155,15 @@ static int connect_socket(const char *path_or_fd) {
     }
 
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd == -1)
+    if (fd == -1) {
+        perror("socket");
         return -1;
+    }
 
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, path_or_fd);
     if (connect(fd, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        perror("connect");
         close(fd);
         return -1;
     }
@@ -457,7 +460,7 @@ int main(int argc, char **argv)
                 input_fd = output_fd = connect_socket(socket_path);
             }
             if (input_fd == -1) {
-                perror("connect socket");
+                fprintf(stderr, "connect_socket failed\n");
                 return 1;
             }
             if (data_loop(ctrl, input_fd, output_fd) != 0)
