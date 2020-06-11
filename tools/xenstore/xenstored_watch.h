@@ -25,7 +25,7 @@ int do_watch(struct connection *conn, struct buffered_data *in);
 int do_unwatch(struct connection *conn, struct buffered_data *in);
 
 /* Fire all watches: recurse means all the children are affected (ie. rm). */
-void fire_watches(struct connection *conn, void *tmp, const char *name,
+void fire_watches(struct connection *conn, const void *tmp, const char *name,
 		  bool recurse);
 
 void conn_delete_all_watches(struct connection *conn);
