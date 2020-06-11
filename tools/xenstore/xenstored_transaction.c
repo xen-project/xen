@@ -114,6 +114,9 @@ struct accessed_node
 	/* Generation count (or NO_GENERATION) for conflict checking. */
 	uint64_t generation;
 
+	/* Original node permissions. */
+	struct node_perms perms;
+
 	/* Generation count checking required? */
 	bool check_gen;
 
@@ -260,6 +263,15 @@ int access_node(struct connection *conn, struct node *node,
 		i->node = talloc_strdup(i, node->name);
 		if (!i->node)
 			goto nomem;
+		if (node->generation != NO_GENERATION && node->perms.num) {
+			i->perms.p = talloc_array(i, struct xs_permissions,
+						  node->perms.num);
+			if (!i->perms.p)
+				goto nomem;
+			i->perms.num = node->perms.num;
+			memcpy(i->perms.p, node->perms.p,
+			       i->perms.num * sizeof(*i->perms.p));
+		}
 
 		introduce = true;
 		i->ta_node = false;
@@ -368,9 +380,14 @@ static int finalize_transaction(struct connection *conn,
 				talloc_free(data.dptr);
 				if (ret)
 					goto err;
-			} else if (tdb_delete(tdb_ctx, key))
+				fire_watches(conn, trans, i->node, NULL, false,
+					     i->perms.p ? &i->perms : NULL);
+			} else {
+				fire_watches(conn, trans, i->node, NULL, false,
+					     i->perms.p ? &i->perms : NULL);
+				if (tdb_delete(tdb_ctx, key))
 					goto err;
-			fire_watches(conn, trans, i->node, false);
+			}
 		}
 
 		if (i->ta_node && tdb_delete(tdb_ctx, ta_key))

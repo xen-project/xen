@@ -152,15 +152,17 @@ void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
 /* Canonicalize this path if possible. */
 char *canonicalize(struct connection *conn, const void *ctx, const char *node);
 
+/* Get access permissions. */
+enum xs_perm_type perm_for_conn(struct connection *conn,
+				const struct node_perms *perms);
+
 /* Write a node to the tdb data base. */
 int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 		   bool no_quota_check);
 
-/* Get this node, checking we have permissions. */
-struct node *get_node(struct connection *conn,
-		      const void *ctx,
-		      const char *name,
-		      enum xs_perm_type perm);
+/* Get a node from the tdb data base. */
+struct node *read_node(struct connection *conn, const void *ctx,
+		       const char *name);
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 void check_store(void);
@@ -170,6 +172,9 @@ enum xs_perm_type perm_for_conn(struct connection *conn,
 
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);
+
+/* Get name of parent node. */
+char *get_parent(const void *ctx, const char *node);
 
 /* Tracing infrastructure. */
 void trace_create(const void *data, const char *type);

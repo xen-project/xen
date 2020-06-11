@@ -85,22 +85,6 @@ static void add_event(struct connection *conn,
 	unsigned int len;
 	char *data;
 
-	if (!check_special_event(name)) {
-		/* Can this conn load node, or see that it doesn't exist? */
-		struct node *node = get_node(conn, ctx, name, XS_PERM_READ);
-		/*
-		 * XXX We allow EACCES here because otherwise a non-dom0
-		 * backend driver cannot watch for disappearance of a frontend
-		 * xenstore directory. When the directory disappears, we
-		 * revert to permissions of the parent directory for that path,
-		 * which will typically disallow access for the backend.
-		 * But this breaks device-channel teardown!
-		 * Really we should fix this better...
-		 */
-		if (!node && errno != ENOENT && errno != EACCES)
-			return;
-	}
-
 	if (watch->relative_path) {
 		name += strlen(watch->relative_path);
 		if (*name == '/') /* Could be "" */
@@ -118,11 +102,59 @@ static void add_event(struct connection *conn,
 }
 
 /*
+ * Check permissions of a specific watch to fire:
+ * Either the node itself or its parent have to be readable by the connection
+ * the watch has been setup for. In case a watch event is created due to
+ * changed permissions we need to take the old permissions into account, too.
+ */
+static bool watch_permitted(struct connection *conn, const void *ctx,
+			    const char *name, struct node *node,
+			    struct node_perms *perms)
+{
+	enum xs_perm_type perm;
+	struct node *parent;
+	char *parent_name;
+
+	if (perms) {
+		perm = perm_for_conn(conn, perms);
+		if (perm & XS_PERM_READ)
+			return true;
+	}
+
+	if (!node) {
+		node = read_node(conn, ctx, name);
+		if (!node)
+			return false;
+	}
+
+	perm = perm_for_conn(conn, &node->perms);
+	if (perm & XS_PERM_READ)
+		return true;
+
+	parent = node->parent;
+	if (!parent) {
+		parent_name = get_parent(ctx, node->name);
+		if (!parent_name)
+			return false;
+		parent = read_node(conn, ctx, parent_name);
+		if (!parent)
+			return false;
+	}
+
+	perm = perm_for_conn(conn, &parent->perms);
+
+	return perm & XS_PERM_READ;
+}
+
+/*
  * Check whether any watch events are to be sent.
  * Temporary memory allocations are done with ctx.
+ * We need to take the (potential) old permissions of the node into account
+ * as a watcher losing permissions to access a node should receive the
+ * watch event, too.
  */
 void fire_watches(struct connection *conn, const void *ctx, const char *name,
-		  bool exact)
+		  struct node *node, bool exact, struct node_perms *perms)
 {
 	struct connection *i;
 	struct watch *watch;
@@ -134,8 +166,13 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 	/* Create an event for each watch. */
 	list_for_each_entry(i, &connections, list) {
 		/* introduce/release domain watches */
-		if (check_special_event(name) && !check_perms_special(name, i))
-			continue;
+		if (check_special_event(name)) {
+			if (!check_perms_special(name, i))
+				continue;
+		} else {
+			if (!watch_permitted(i, ctx, name, node, perms))
+				continue;
+		}
 
 		list_for_each_entry(watch, &i->watches, list) {
 			if (exact) {
