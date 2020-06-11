@@ -1268,13 +1268,17 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 static struct {
 	const char *str;
 	int (*func)(struct connection *conn, struct buffered_data *in);
+	unsigned int flags;
+#define XS_FLAG_NOTID		(1U << 0)	/* Ignore transaction id. */
 } const wire_funcs[XS_TYPE_COUNT] = {
 	[XS_CONTROL]           = { "CONTROL",           do_control },
 	[XS_DIRECTORY]         = { "DIRECTORY",         send_directory },
 	[XS_READ]              = { "READ",              do_read },
 	[XS_GET_PERMS]         = { "GET_PERMS",         do_get_perms },
-	[XS_WATCH]             = { "WATCH",             do_watch },
-	[XS_UNWATCH]           = { "UNWATCH",           do_unwatch },
+	[XS_WATCH]             =
+	    { "WATCH",         do_watch,        XS_FLAG_NOTID },
+	[XS_UNWATCH]           =
+	    { "UNWATCH",       do_unwatch,      XS_FLAG_NOTID },
 	[XS_TRANSACTION_START] = { "TRANSACTION_START", do_transaction_start },
 	[XS_TRANSACTION_END]   = { "TRANSACTION_END",   do_transaction_end },
 	[XS_INTRODUCE]         = { "INTRODUCE",         do_introduce },
@@ -1296,7 +1300,7 @@ static struct {
 
 static const char *sockmsg_string(enum xsd_sockmsg_type type)
 {
-	if ((unsigned)type < XS_TYPE_COUNT && wire_funcs[type].str)
+	if ((unsigned int)type < ARRAY_SIZE(wire_funcs) && wire_funcs[type].str)
 		return wire_funcs[type].str;
 
 	return "**UNKNOWN**";
@@ -1311,7 +1315,14 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	enum xsd_sockmsg_type type = in->hdr.msg.type;
 	int ret;
 
-	trans = transaction_lookup(conn, in->hdr.msg.tx_id);
+	if ((unsigned int)type >= XS_TYPE_COUNT || !wire_funcs[type].func) {
+		eprintf("Client unknown operation %i", type);
+		send_error(conn, ENOSYS);
+		return;
+	}
+
+	trans = (wire_funcs[type].flags & XS_FLAG_NOTID)
+		? NULL : transaction_lookup(conn, in->hdr.msg.tx_id);
 	if (IS_ERR(trans)) {
 		send_error(conn, -PTR_ERR(trans));
 		return;
@@ -1320,12 +1331,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	assert(conn->transaction == NULL);
 	conn->transaction = trans;
 
-	if ((unsigned)type < XS_TYPE_COUNT && wire_funcs[type].func)
-		ret = wire_funcs[type].func(conn, in);
-	else {
-		eprintf("Client unknown operation %i", type);
-		ret = ENOSYS;
-	}
+	ret = wire_funcs[type].func(conn, in);
 	if (ret)
 		send_error(conn, ret);
 
