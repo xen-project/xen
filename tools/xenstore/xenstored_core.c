@@ -1089,74 +1089,76 @@ static int do_mkdir(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-static void delete_node(struct connection *conn, struct node *node)
-{
-	unsigned int i;
-	char *name;
-
-	/* Delete self, then delete children.  If we crash, then the worst
-	   that can happen is the children will continue to take up space, but
-	   will otherwise be unreachable. */
-	delete_node_single(conn, node);
-
-	/* Delete children, too. */
-	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
-		struct node *child;
-
-		name = talloc_asprintf(node, "%s/%s", node->name,
-				       node->children + i);
-		child = name ? read_node(conn, node, name) : NULL;
-		if (child) {
-			delete_node(conn, child);
-		}
-		else {
-			trace("delete_node: Error deleting child '%s/%s'!\n",
-			      node->name, node->children + i);
-			/* Skip it, we've already deleted the parent. */
-		}
-		talloc_free(name);
-	}
-}
-
-
 /* Delete memory using memmove. */
 static void memdel(void *mem, unsigned off, unsigned len, unsigned total)
 {
 	memmove(mem + off, mem + off + len, total - off - len);
 }
 
-
-static int remove_child_entry(struct connection *conn, struct node *node,
-			      size_t offset)
+static void remove_child_entry(struct connection *conn, struct node *node,
+			       size_t offset)
 {
 	size_t childlen = strlen(node->children + offset);
+
 	memdel(node->children, offset, childlen + 1, node->childlen);
 	node->childlen -= childlen + 1;
-	return write_node(conn, node, true);
+	if (write_node(conn, node, true))
+		corrupt(conn, "Can't update parent node '%s'", node->name);
 }
 
-
-static int delete_child(struct connection *conn,
-			struct node *node, const char *childname)
+static void delete_child(struct connection *conn,
+			 struct node *node, const char *childname)
 {
 	unsigned int i;
 
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
 		if (streq(node->children+i, childname)) {
-			return remove_child_entry(conn, node, i);
+			remove_child_entry(conn, node, i);
+			return;
 		}
 	}
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
-	return ENOENT;
 }
 
+static int delete_node(struct connection *conn, struct node *parent,
+		       struct node *node)
+{
+	char *name;
+
+	/* Delete children. */
+	while (node->childlen) {
+		struct node *child;
+
+		name = talloc_asprintf(node, "%s/%s", node->name,
+				       node->children);
+		child = name ? read_node(conn, node, name) : NULL;
+		if (child) {
+			if (delete_node(conn, node, child))
+				return errno;
+		} else {
+			trace("delete_node: Error deleting child '%s/%s'!\n",
+			      node->name, node->children);
+			/* Quit deleting. */
+			errno = ENOMEM;
+			return errno;
+		}
+		talloc_free(name);
+	}
+
+	delete_node_single(conn, node);
+	delete_child(conn, parent, basename(node->name));
+	talloc_free(node);
+
+	return 0;
+}
 
 static int _rm(struct connection *conn, const void *ctx, struct node *node,
 	       const char *name)
 {
-	/* Delete from parent first, then if we crash, the worst that can
-	   happen is the child will continue to take up space, but will
-	   otherwise be unreachable. */
+	/*
+	 * Deleting node by node, so the result is always consistent even in
+	 * case of a failure.
+	 */
 	struct node *parent;
 	char *parentname = get_parent(ctx, name);
 
@@ -1167,11 +1169,13 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 	if (!parent)
 		return (errno == ENOMEM) ? ENOMEM : EINVAL;
 
-	if (delete_child(conn, parent, basename(name)))
-		return EINVAL;
-
-	delete_node(conn, node);
-	return 0;
+	/*
+	 * Fire the watches now, when we can still see the node permissions.
+	 * This fine as we are single threaded and the next possible read will
+	 * be handled only after the node has been really removed.
+	 */
+	fire_watches(conn, ctx, name, true);
+	return delete_node(conn, parent, node);
 }
 
 
@@ -1209,7 +1213,6 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 	if (ret)
 		return ret;
 
-	fire_watches(conn, in, name, true);
 	send_ack(conn, XS_RM);
 
 	return 0;
