@@ -518,5 +518,14 @@ int main(int argc, char **argv)
         }
     }
 
+    if (state.output_fd >= 0)
+        close(state.output_fd);
+    if (state.input_fd >= 0)
+        close(state.input_fd);
+    if (state.ctrl)
+        libxenvchan_close(state.ctrl);
+    if (socket_fd >= 0)
+        close(socket_fd);
+
     return ret;
 }
