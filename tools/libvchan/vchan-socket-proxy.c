@@ -286,13 +286,13 @@ static void discard_buffers(struct libxenvchan *ctrl) {
     }
 }
 
-int data_loop(struct libxenvchan *ctrl, int input_fd, int output_fd)
+int data_loop(struct vchan_proxy_state *state)
 {
     int ret;
     int libxenvchan_fd;
     int max_fd;
 
-    libxenvchan_fd = libxenvchan_fd_for_select(ctrl);
+    libxenvchan_fd = libxenvchan_fd_for_select(state->ctrl);
     for (;;) {
         fd_set rfds;
         fd_set wfds;
@@ -300,15 +300,15 @@ int data_loop(struct libxenvchan *ctrl, int input_fd, int output_fd)
         FD_ZERO(&wfds);
 
         max_fd = -1;
-        if (input_fd != -1 && insiz != BUFSIZE) {
-            FD_SET(input_fd, &rfds);
-            if (input_fd > max_fd)
-                max_fd = input_fd;
+        if (state->input_fd != -1 && insiz != BUFSIZE) {
+            FD_SET(state->input_fd, &rfds);
+            if (state->input_fd > max_fd)
+                max_fd = state->input_fd;
         }
-        if (output_fd != -1 && outsiz) {
-            FD_SET(output_fd, &wfds);
-            if (output_fd > max_fd)
-                max_fd = output_fd;
+        if (state->output_fd != -1 && outsiz) {
+            FD_SET(state->output_fd, &wfds);
+            if (state->output_fd > max_fd)
+                max_fd = state->output_fd;
         }
         FD_SET(libxenvchan_fd, &rfds);
         if (libxenvchan_fd > max_fd)
@@ -319,52 +319,53 @@ int data_loop(struct libxenvchan *ctrl, int input_fd, int output_fd)
             exit(1);
         }
         if (FD_ISSET(libxenvchan_fd, &rfds)) {
-            libxenvchan_wait(ctrl);
-            if (!libxenvchan_is_open(ctrl)) {
+            libxenvchan_wait(state->ctrl);
+            if (!libxenvchan_is_open(state->ctrl)) {
                 if (verbose)
                     fprintf(stderr, "vchan client disconnected\n");
                 while (outsiz)
-                    socket_wr(output_fd);
-                close(output_fd);
-                close(input_fd);
-                discard_buffers(ctrl);
+                    socket_wr(state->output_fd);
+                close(state->output_fd);
+                close(state->input_fd);
+                discard_buffers(state->ctrl);
                 break;
             }
-            vchan_wr(ctrl);
+            vchan_wr(state->ctrl);
         }
 
-        if (FD_ISSET(input_fd, &rfds)) {
-            ret = read(input_fd, inbuf + insiz, BUFSIZE - insiz);
+        if (FD_ISSET(state->input_fd, &rfds)) {
+            ret = read(state->input_fd, inbuf + insiz, BUFSIZE - insiz);
             if (ret < 0 && errno != EAGAIN)
                 exit(1);
             if (verbose)
                 fprintf(stderr, "from-unix: %.*s\n", ret, inbuf + insiz);
             if (ret == 0) {
                 /* EOF on socket, write everything in the buffer and close the
-                 * input_fd socket */
+                 * state->input_fd socket */
                 while (insiz) {
-                    vchan_wr(ctrl);
-                    libxenvchan_wait(ctrl);
+                    vchan_wr(state->ctrl);
+                    libxenvchan_wait(state->ctrl);
                 }
-                close(input_fd);
-                input_fd = -1;
+                close(state->input_fd);
+                state->input_fd = -1;
                 /* TODO: maybe signal the vchan client somehow? */
                 break;
             }
             if (ret)
                 insiz += ret;
-            vchan_wr(ctrl);
+            vchan_wr(state->ctrl);
         }
-        if (FD_ISSET(output_fd, &wfds))
-            socket_wr(output_fd);
-        while (libxenvchan_data_ready(ctrl) && outsiz < BUFSIZE) {
-            ret = libxenvchan_read(ctrl, outbuf + outsiz, BUFSIZE - outsiz);
+        if (FD_ISSET(state->output_fd, &wfds))
+            socket_wr(state->output_fd);
+        while (libxenvchan_data_ready(state->ctrl) && outsiz < BUFSIZE) {
+            ret = libxenvchan_read(state->ctrl, outbuf + outsiz,
+                                   BUFSIZE - outsiz);
             if (ret < 0)
                 exit(1);
             if (verbose)
                 fprintf(stderr, "from-vchan: %.*s\n", ret, outbuf + outsiz);
             outsiz += ret;
-            socket_wr(output_fd);
+            socket_wr(state->output_fd);
         }
     }
     return 0;
@@ -481,7 +482,7 @@ int main(int argc, char **argv)
                 ret = 1;
                 break;
             }
-            if (data_loop(state.ctrl, state.input_fd, state.output_fd) != 0)
+            if (data_loop(&state) != 0)
                 break;
             /* keep it running only when get UNIX socket path */
             if (socket_path[0] != '/')
@@ -504,7 +505,7 @@ int main(int argc, char **argv)
                 ret = 1;
                 break;
             }
-            if (data_loop(state.ctrl, state.input_fd, state.output_fd) != 0)
+            if (data_loop(&state) != 0)
                 break;
             /* don't reconnect if output was stdout */
             if (strcmp(socket_path, "-") == 0)
