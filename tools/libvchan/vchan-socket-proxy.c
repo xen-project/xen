@@ -388,6 +388,7 @@ int main(int argc, char **argv)
     const char *vchan_path;
     const char *state_path = NULL;
     int opt;
+    int ret;
 
     while ((opt = getopt_long(argc, argv, "m:vs:", options, NULL)) != -1) {
         switch (opt) {
@@ -454,6 +455,8 @@ int main(int argc, char **argv)
         xs_close(xs);
     }
 
+    ret = 0;
+
     for (;;) {
         if (is_server) {
             /* wait for vchan connection */
@@ -468,7 +471,8 @@ int main(int argc, char **argv)
             }
             if (input_fd == -1) {
                 fprintf(stderr, "connect_socket failed\n");
-                return 1;
+                ret = 1;
+                break;
             }
             if (data_loop(ctrl, input_fd, output_fd) != 0)
                 break;
@@ -481,14 +485,16 @@ int main(int argc, char **argv)
                 input_fd = output_fd = accept(socket_fd, NULL, NULL);
             if (input_fd == -1) {
                 perror("accept");
-                return 1;
+                ret = 1;
+                break;
             }
             set_nonblocking(input_fd, 1);
             set_nonblocking(output_fd, 1);
             ctrl = connect_vchan(domid, vchan_path);
             if (!ctrl) {
                 perror("vchan client init");
-                return 1;
+                ret = 1;
+                break;
             }
             if (data_loop(ctrl, input_fd, output_fd) != 0)
                 break;
@@ -500,5 +506,6 @@ int main(int argc, char **argv)
             ctrl = NULL;
         }
     }
-    return 0;
+
+    return ret;
 }
