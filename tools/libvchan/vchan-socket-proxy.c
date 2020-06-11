@@ -89,6 +89,12 @@ int insiz = 0;
 int outsiz = 0;
 int verbose = 0;
 
+struct vchan_proxy_state {
+    struct libxenvchan *ctrl;
+    int output_fd;
+    int input_fd;
+};
+
 static void vchan_wr(struct libxenvchan *ctrl) {
     int ret;
 
@@ -381,8 +387,9 @@ int main(int argc, char **argv)
 {
     int is_server = 0;
     int socket_fd = -1;
-    int input_fd, output_fd;
-    struct libxenvchan *ctrl = NULL;
+    struct vchan_proxy_state state = { .ctrl = NULL,
+                                       .input_fd = -1,
+                                       .output_fd = -1 };
     const char *socket_path;
     int domid;
     const char *vchan_path;
@@ -422,15 +429,15 @@ int main(int argc, char **argv)
     socket_path = argv[optind+2];
 
     if (is_server) {
-        ctrl = libxenvchan_server_init(NULL, domid, vchan_path, 0, 0);
-        if (!ctrl) {
+        state.ctrl = libxenvchan_server_init(NULL, domid, vchan_path, 0, 0);
+        if (!state.ctrl) {
             perror("libxenvchan_server_init");
             exit(1);
         }
     } else {
         if (strcmp(socket_path, "-") == 0) {
-            input_fd = 0;
-            output_fd = 1;
+            state.input_fd = 0;
+            state.output_fd = 1;
         } else {
             socket_fd = listen_socket(socket_path);
             if (socket_fd == -1) {
@@ -460,21 +467,21 @@ int main(int argc, char **argv)
     for (;;) {
         if (is_server) {
             /* wait for vchan connection */
-            while (libxenvchan_is_open(ctrl) != 1)
-                libxenvchan_wait(ctrl);
+            while (libxenvchan_is_open(state.ctrl) != 1)
+                libxenvchan_wait(state.ctrl);
             /* vchan client connected, setup local FD if needed */
             if (strcmp(socket_path, "-") == 0) {
-                input_fd = 0;
-                output_fd = 1;
+                state.input_fd = 0;
+                state.output_fd = 1;
             } else {
-                input_fd = output_fd = connect_socket(socket_path);
+                state.input_fd = state.output_fd = connect_socket(socket_path);
             }
-            if (input_fd == -1) {
+            if (state.input_fd == -1) {
                 fprintf(stderr, "connect_socket failed\n");
                 ret = 1;
                 break;
             }
-            if (data_loop(ctrl, input_fd, output_fd) != 0)
+            if (data_loop(state.ctrl, state.input_fd, state.output_fd) != 0)
                 break;
             /* keep it running only when get UNIX socket path */
             if (socket_path[0] != '/')
@@ -482,28 +489,29 @@ int main(int argc, char **argv)
         } else {
             /* wait for local socket connection */
             if (strcmp(socket_path, "-") != 0)
-                input_fd = output_fd = accept(socket_fd, NULL, NULL);
-            if (input_fd == -1) {
+                state.input_fd = state.output_fd = accept(socket_fd,
+                                                          NULL, NULL);
+            if (state.input_fd == -1) {
                 perror("accept");
                 ret = 1;
                 break;
             }
-            set_nonblocking(input_fd, 1);
-            set_nonblocking(output_fd, 1);
-            ctrl = connect_vchan(domid, vchan_path);
-            if (!ctrl) {
+            set_nonblocking(state.input_fd, 1);
+            set_nonblocking(state.output_fd, 1);
+            state.ctrl = connect_vchan(domid, vchan_path);
+            if (!state.ctrl) {
                 perror("vchan client init");
                 ret = 1;
                 break;
             }
-            if (data_loop(ctrl, input_fd, output_fd) != 0)
+            if (data_loop(state.ctrl, state.input_fd, state.output_fd) != 0)
                 break;
             /* don't reconnect if output was stdout */
             if (strcmp(socket_path, "-") == 0)
                 break;
 
-            libxenvchan_close(ctrl);
-            ctrl = NULL;
+            libxenvchan_close(state.ctrl);
+            state.ctrl = NULL;
         }
     }
 
