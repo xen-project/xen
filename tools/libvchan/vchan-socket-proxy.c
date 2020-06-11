@@ -349,6 +349,8 @@ int data_loop(struct vchan_proxy_state *state)
                     libxenvchan_wait(state->ctrl);
                 }
                 close(state->input_fd);
+                if (state->input_fd == state->output_fd)
+                    state->output_fd = -1;
                 state->input_fd = -1;
                 /* TODO: maybe signal the vchan client somehow? */
                 break;
