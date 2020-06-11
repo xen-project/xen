@@ -148,12 +148,18 @@ static int connect_socket(const char *path_or_fd) {
         return fd;
     }
 
+    if (strlen(path_or_fd) >= sizeof(addr.sun_path)) {
+        fprintf(stderr, "UNIX socket path \"%s\" too long (%zd >= %zd)\n",
+                path_or_fd, strlen(path_or_fd), sizeof(addr.sun_path));
+        return -1;
+    }
+
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == -1)
         return -1;
 
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path_or_fd, sizeof(addr.sun_path));
+    strcpy(addr.sun_path, path_or_fd);
     if (connect(fd, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
         close(fd);
         return -1;
@@ -174,13 +180,19 @@ static int listen_socket(const char *path_or_fd) {
         return fd;
     }
 
+    if (strlen(path_or_fd) >= sizeof(addr.sun_path)) {
+        fprintf(stderr, "UNIX socket path \"%s\" too long (%zd >= %zd)\n",
+                path_or_fd, strlen(path_or_fd), sizeof(addr.sun_path));
+        return -1;
+    }
+
     /* if not a number, assume a socket path */
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == -1)
         return -1;
 
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path_or_fd, sizeof(addr.sun_path));
+    strcpy(addr.sun_path, path_or_fd);
     if (bind(fd, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
         close(fd);
         return -1;
