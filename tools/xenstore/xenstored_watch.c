@@ -77,7 +77,7 @@ static bool is_child(const char *child, const char *parent)
  * Temporary memory allocations are done with ctx.
  */
 static void add_event(struct connection *conn,
-		      void *ctx,
+		      const void *ctx,
 		      struct watch *watch,
 		      const char *name)
 {
@@ -121,7 +121,7 @@ static void add_event(struct connection *conn,
  * Check whether any watch events are to be sent.
  * Temporary memory allocations are done with ctx.
  */
-void fire_watches(struct connection *conn, void *ctx, const char *name,
+void fire_watches(struct connection *conn, const void *ctx, const char *name,
 		  bool recurse)
 {
 	struct connection *i;
