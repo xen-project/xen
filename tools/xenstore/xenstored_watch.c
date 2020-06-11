@@ -133,6 +133,10 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 
 	/* Create an event for each watch. */
 	list_for_each_entry(i, &connections, list) {
+		/* introduce/release domain watches */
+		if (check_special_event(name) && !check_perms_special(name, i))
+			continue;
+
 		list_for_each_entry(watch, &i->watches, list) {
 			if (exact) {
 				if (streq(name, watch->node))
