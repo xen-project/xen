@@ -360,8 +360,8 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *p_ro_sock_pollfd_idx,
  * If it fails, returns NULL and sets errno.
  * Temporary memory allocations will be done with ctx.
  */
-static struct node *read_node(struct connection *conn, const void *ctx,
-			      const char *name)
+struct node *read_node(struct connection *conn, const void *ctx,
+		       const char *name)
 {
 	TDB_DATA key, data;
 	struct xs_tdb_record_hdr *hdr;
@@ -496,7 +496,7 @@ enum xs_perm_type perm_for_conn(struct connection *conn,
  * Get name of node parent.
  * Temporary memory allocations are done with ctx.
  */
-static char *get_parent(const void *ctx, const char *node)
+char *get_parent(const void *ctx, const char *node)
 {
 	char *parent;
 	char *slash = strrchr(node + 1, '/');
@@ -568,10 +568,10 @@ static int errno_from_parents(struct connection *conn, const void *ctx,
  * If it fails, returns NULL and sets errno.
  * Temporary memory allocations are done with ctx.
  */
-struct node *get_node(struct connection *conn,
-		      const void *ctx,
-		      const char *name,
-		      enum xs_perm_type perm)
+static struct node *get_node(struct connection *conn,
+			     const void *ctx,
+			     const char *name,
+			     enum xs_perm_type perm)
 {
 	struct node *node;
 
@@ -1058,7 +1058,7 @@ static int do_write(struct connection *conn, struct buffered_data *in)
 			return errno;
 	}
 
-	fire_watches(conn, in, name, false);
+	fire_watches(conn, in, name, node, false, NULL);
 	send_ack(conn, XS_WRITE);
 
 	return 0;
@@ -1080,7 +1080,7 @@ static int do_mkdir(struct connection *conn, struct buffered_data *in)
 		node = create_node(conn, in, name, NULL, 0);
 		if (!node)
 			return errno;
-		fire_watches(conn, in, name, false);
+		fire_watches(conn, in, name, node, false, NULL);
 	}
 	send_ack(conn, XS_MKDIR);
 
@@ -1143,7 +1143,7 @@ static int delete_node(struct connection *conn, const void *ctx,
 		talloc_free(name);
 	}
 
-	fire_watches(conn, ctx, node->name, true);
+	fire_watches(conn, ctx, node->name, node, true, NULL);
 	delete_node_single(conn, node);
 	delete_child(conn, parent, basename(node->name));
 	talloc_free(node);
@@ -1167,13 +1167,14 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 	parent = read_node(conn, ctx, parentname);
 	if (!parent)
 		return (errno == ENOMEM) ? ENOMEM : EINVAL;
+	node->parent = parent;
 
 	/*
 	 * Fire the watches now, when we can still see the node permissions.
 	 * This fine as we are single threaded and the next possible read will
 	 * be handled only after the node has been really removed.
 	 */
-	fire_watches(conn, ctx, name, false);
+	fire_watches(conn, ctx, name, node, false, NULL);
 	return delete_node(conn, ctx, parent, node);
 }
 
@@ -1239,7 +1240,7 @@ static int do_get_perms(struct connection *conn, struct buffered_data *in)
 
 static int do_set_perms(struct connection *conn, struct buffered_data *in)
 {
-	struct node_perms perms;
+	struct node_perms perms, old_perms;
 	char *name, *permstr;
 	struct node *node;
 
@@ -1275,6 +1276,7 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	    perms.p[0].id != node->perms.p[0].id)
 		return EPERM;
 
+	old_perms = node->perms;
 	domain_entry_dec(conn, node);
 	node->perms = perms;
 	domain_entry_inc(conn, node);
@@ -1282,7 +1284,7 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	if (write_node(conn, node, false))
 		return errno;
 
-	fire_watches(conn, in, name, false);
+	fire_watches(conn, in, name, node, false, &old_perms);
 	send_ack(conn, XS_SET_PERMS);
 
 	return 0;
