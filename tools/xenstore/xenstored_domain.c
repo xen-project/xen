@@ -657,12 +657,12 @@ void domain_entry_inc(struct connection *conn, struct node *node)
 	if (!conn)
 		return;
 
-	if (node->perms && node->perms[0].id != conn->id) {
+	if (node->perms.p && node->perms.p[0].id != conn->id) {
 		if (conn->transaction) {
 			transaction_entry_inc(conn->transaction,
-				node->perms[0].id);
+				node->perms.p[0].id);
 		} else {
-			d = find_domain_by_domid(node->perms[0].id);
+			d = find_domain_by_domid(node->perms.p[0].id);
 			if (d)
 				d->nbentry++;
 		}
@@ -683,12 +683,12 @@ void domain_entry_dec(struct connection *conn, struct node *node)
 	if (!conn)
 		return;
 
-	if (node->perms && node->perms[0].id != conn->id) {
+	if (node->perms.p && node->perms.p[0].id != conn->id) {
 		if (conn->transaction) {
 			transaction_entry_dec(conn->transaction,
-				node->perms[0].id);
+				node->perms.p[0].id);
 		} else {
-			d = find_domain_by_domid(node->perms[0].id);
+			d = find_domain_by_domid(node->perms.p[0].id);
 			if (d && d->nbentry)
 				d->nbentry--;
 		}
