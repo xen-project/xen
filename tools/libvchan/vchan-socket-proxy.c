@@ -188,16 +188,20 @@ static int listen_socket(const char *path_or_fd) {
 
     /* if not a number, assume a socket path */
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd == -1)
+    if (fd == -1) {
+        perror("socket");
         return -1;
+    }
 
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, path_or_fd);
     if (bind(fd, (const struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        perror("bind");
         close(fd);
         return -1;
     }
     if (listen(fd, 5) != 0) {
+        perror("listen");
         close(fd);
         return -1;
     }
@@ -419,7 +423,7 @@ int main(int argc, char **argv)
         } else {
             socket_fd = listen_socket(socket_path);
             if (socket_fd == -1) {
-                perror("listen socket");
+                fprintf(stderr, "listen socket failed\n");
                 return 1;
             }
         }
