@@ -326,7 +326,9 @@ int data_loop(struct vchan_proxy_state *state)
                 while (outsiz)
                     socket_wr(state->output_fd);
                 close(state->output_fd);
+                state->output_fd = -1;
                 close(state->input_fd);
+                state->input_fd = -1;
                 discard_buffers(state->ctrl);
                 break;
             }
