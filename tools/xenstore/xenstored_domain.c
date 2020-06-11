@@ -377,7 +377,7 @@ int do_introduce(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
 		return EINVAL;
 
-	if (domain_is_unprivileged(conn) || !conn->can_write)
+	if (!conn->can_write)
 		return EACCES;
 
 	domid = atoi(vec[0]);
@@ -445,7 +445,7 @@ int do_set_target(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
 		return EINVAL;
 
-	if (domain_is_unprivileged(conn) || !conn->can_write)
+	if (!conn->can_write)
 		return EACCES;
 
 	domid = atoi(vec[0]);
@@ -479,9 +479,6 @@ static struct domain *onearg_domain(struct connection *conn,
 	domid = atoi(domid_str);
 	if (!domid)
 		return ERR_PTR(-EINVAL);
-
-	if (domain_is_unprivileged(conn))
-		return ERR_PTR(-EACCES);
 
 	return find_connected_domain(domid);
 }
