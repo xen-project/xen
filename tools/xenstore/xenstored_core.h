@@ -109,6 +109,11 @@ struct connection
 };
 extern struct list_head connections;
 
+struct node_perms {
+	unsigned int num;
+	struct xs_permissions *p;
+};
+
 struct node {
 	const char *name;
 
@@ -120,8 +125,7 @@ struct node {
 #define NO_GENERATION ~((uint64_t)0)
 
 	/* Permissions. */
-	unsigned int num_perms;
-	struct xs_permissions *perms;
+	struct node_perms perms;
 
 	/* Contents. */
 	unsigned int datalen;
