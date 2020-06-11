@@ -232,8 +232,15 @@ static struct libxenvchan *connect_vchan(int domid, const char *path) {
         goto out;
     }
     /* wait for vchan server to create *path* */
-    xs_watch(xs, path, "path");
-    xs_watch(xs, "@releaseDomain", "release");
+    if (!xs_watch(xs, path, "path")) {
+        fprintf(stderr, "xs_watch(%s) failed.\n", path);
+        goto out;
+    }
+    if (!xs_watch(xs, "@releaseDomain", "release")) {
+        fprintf(stderr, "xs_watch(@releaseDomain failed.\n");
+        goto out;
+    }
+
     while ((watch_ret = xs_read_watch(xs, &watch_num))) {
         /* don't care about exact which fired the watch */
         free(watch_ret);
