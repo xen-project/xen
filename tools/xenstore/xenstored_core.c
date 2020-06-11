@@ -927,11 +927,6 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 	if (!parent)
 		return NULL;
 
-	if (domain_entry(conn) >= quota_nb_entry_per_domain) {
-		errno = ENOSPC;
-		return NULL;
-	}
-
 	/* Add child to parent. */
 	base = basename(name);
 	baselen = strlen(base) + 1;
@@ -964,7 +959,6 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 	node->children = node->data = NULL;
 	node->childlen = node->datalen = 0;
 	node->parent = parent;
-	domain_entry_inc(conn, node);
 	return node;
 
 nomem:
@@ -984,6 +978,9 @@ static int destroy_node(void *_node)
 	key.dsize = strlen(node->name);
 
 	tdb_delete(tdb_ctx, key);
+
+	domain_entry_dec(talloc_parent(node), node);
+
 	return 0;
 }
 
@@ -1000,18 +997,34 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 	node->data = data;
 	node->datalen = datalen;
 
-	/* We write out the nodes down, setting destructor in case
-	 * something goes wrong. */
+	/*
+	 * We write out the nodes bottom up.
+	 * All new created nodes will have i->parent set, while the final
+	 * node will be already existing and won't have i->parent set.
+	 * New nodes are subject to quota handling.
+	 * Initially set a destructor for all new nodes removing them from
+	 * TDB again and undoing quota accounting for the case of an error
+	 * during the write loop.
+	 */
 	for (i = node; i; i = i->parent) {
-		if (write_node(conn, i, false)) {
-			domain_entry_dec(conn, i);
+		/* i->parent is set for each new node, so check quota. */
+		if (i->parent &&
+		    domain_entry(conn) >= quota_nb_entry_per_domain) {
+			errno = ENOSPC;
 			return NULL;
 		}
-		talloc_set_destructor(i, destroy_node);
+		if (write_node(conn, i, false))
+			return NULL;
+
+		/* Account for new node, set destructor for error case. */
+		if (i->parent) {
+			domain_entry_inc(conn, i);
+			talloc_set_destructor(i, destroy_node);
+		}
 	}
 
 	/* OK, now remove destructors so they stay around */
-	for (i = node; i; i = i->parent)
+	for (i = node; i->parent; i = i->parent)
 		talloc_set_destructor(i, NULL);
 	return node;
 }
