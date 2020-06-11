@@ -403,14 +403,14 @@ static struct node *read_node(struct connection *conn, const void *ctx,
 	/* Datalen, childlen, number of permissions */
 	hdr = (void *)data.dptr;
 	node->generation = hdr->generation;
-	node->num_perms = hdr->num_perms;
+	node->perms.num = hdr->num_perms;
 	node->datalen = hdr->datalen;
 	node->childlen = hdr->childlen;
 
 	/* Permissions are struct xs_permissions. */
-	node->perms = hdr->perms;
+	node->perms.p = hdr->perms;
 	/* Data is binary blob (usually ascii, no nul). */
-	node->data = node->perms + node->num_perms;
+	node->data = node->perms.p + node->perms.num;
 	/* Children is strings, nul separated. */
 	node->children = node->data + node->datalen;
 
@@ -427,7 +427,7 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	struct xs_tdb_record_hdr *hdr;
 
 	data.dsize = sizeof(*hdr)
-		+ node->num_perms*sizeof(node->perms[0])
+		+ node->perms.num * sizeof(node->perms.p[0])
 		+ node->datalen + node->childlen;
 
 	if (!no_quota_check && domain_is_unprivileged(conn) &&
@@ -439,12 +439,13 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	data.dptr = talloc_size(node, data.dsize);
 	hdr = (void *)data.dptr;
 	hdr->generation = node->generation;
-	hdr->num_perms = node->num_perms;
+	hdr->num_perms = node->perms.num;
 	hdr->datalen = node->datalen;
 	hdr->childlen = node->childlen;
 
-	memcpy(hdr->perms, node->perms, node->num_perms*sizeof(node->perms[0]));
-	p = hdr->perms + node->num_perms;
+	memcpy(hdr->perms, node->perms.p,
+	       node->perms.num * sizeof(*node->perms.p));
+	p = hdr->perms + node->perms.num;
 	memcpy(p, node->data, node->datalen);
 	p += node->datalen;
 	memcpy(p, node->children, node->childlen);
@@ -470,8 +471,7 @@ static int write_node(struct connection *conn, struct node *node,
 }
 
 static enum xs_perm_type perm_for_conn(struct connection *conn,
-				       struct xs_permissions *perms,
-				       unsigned int num)
+				       const struct node_perms *perms)
 {
 	unsigned int i;
 	enum xs_perm_type mask = XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER;
@@ -480,16 +480,16 @@ static enum xs_perm_type perm_for_conn(struct connection *conn,
 		mask &= ~XS_PERM_WRITE;
 
 	/* Owners and tools get it all... */
-	if (!domain_is_unprivileged(conn) || perms[0].id == conn->id
-                || (conn->target && perms[0].id == conn->target->id))
+	if (!domain_is_unprivileged(conn) || perms->p[0].id == conn->id
+                || (conn->target && perms->p[0].id == conn->target->id))
 		return (XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER) & mask;
 
-	for (i = 1; i < num; i++)
-		if (perms[i].id == conn->id
-                        || (conn->target && perms[i].id == conn->target->id))
-			return perms[i].perms & mask;
+	for (i = 1; i < perms->num; i++)
+		if (perms->p[i].id == conn->id
+                        || (conn->target && perms->p[i].id == conn->target->id))
+			return perms->p[i].perms & mask;
 
-	return perms[0].perms & mask;
+	return perms->p[0].perms & mask;
 }
 
 /*
@@ -536,7 +536,7 @@ static int ask_parents(struct connection *conn, const void *ctx,
 		return 0;
 	}
 
-	*perm = perm_for_conn(conn, node->perms, node->num_perms);
+	*perm = perm_for_conn(conn, &node->perms);
 	return 0;
 }
 
@@ -582,8 +582,7 @@ struct node *get_node(struct connection *conn,
 	node = read_node(conn, ctx, name);
 	/* If we don't have permission, we don't have node. */
 	if (node) {
-		if ((perm_for_conn(conn, node->perms, node->num_perms) & perm)
-		    != perm) {
+		if ((perm_for_conn(conn, &node->perms) & perm) != perm) {
 			errno = EACCES;
 			node = NULL;
 		}
@@ -759,16 +758,15 @@ const char *onearg(struct buffered_data *in)
 	return in->buffer;
 }
 
-static char *perms_to_strings(const void *ctx,
-			      struct xs_permissions *perms, unsigned int num,
+static char *perms_to_strings(const void *ctx, const struct node_perms *perms,
 			      unsigned int *len)
 {
 	unsigned int i;
 	char *strings = NULL;
 	char buffer[MAX_STRLEN(unsigned int) + 1];
 
-	for (*len = 0, i = 0; i < num; i++) {
-		if (!xs_perm_to_string(&perms[i], buffer, sizeof(buffer)))
+	for (*len = 0, i = 0; i < perms->num; i++) {
+		if (!xs_perm_to_string(&perms->p[i], buffer, sizeof(buffer)))
 			return NULL;
 
 		strings = talloc_realloc(ctx, strings, char,
@@ -947,13 +945,13 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 		goto nomem;
 
 	/* Inherit permissions, except unprivileged domains own what they create */
-	node->num_perms = parent->num_perms;
-	node->perms = talloc_memdup(node, parent->perms,
-				    node->num_perms * sizeof(node->perms[0]));
-	if (!node->perms)
+	node->perms.num = parent->perms.num;
+	node->perms.p = talloc_memdup(node, parent->perms.p,
+				      node->perms.num * sizeof(*node->perms.p));
+	if (!node->perms.p)
 		goto nomem;
 	if (domain_is_unprivileged(conn))
-		node->perms[0].id = conn->id;
+		node->perms.p[0].id = conn->id;
 
 	/* No children, no data */
 	node->children = node->data = NULL;
@@ -1230,7 +1228,7 @@ static int do_get_perms(struct connection *conn, struct buffered_data *in)
 	if (!node)
 		return errno;
 
-	strings = perms_to_strings(node, node->perms, node->num_perms, &len);
+	strings = perms_to_strings(node, &node->perms, &len);
 	if (!strings)
 		return errno;
 
@@ -1241,13 +1239,12 @@ static int do_get_perms(struct connection *conn, struct buffered_data *in)
 
 static int do_set_perms(struct connection *conn, struct buffered_data *in)
 {
-	unsigned int num;
-	struct xs_permissions *perms;
+	struct node_perms perms;
 	char *name, *permstr;
 	struct node *node;
 
-	num = xs_count_strings(in->buffer, in->used);
-	if (num < 2)
+	perms.num = xs_count_strings(in->buffer, in->used);
+	if (perms.num < 2)
 		return EINVAL;
 
 	/* First arg is node name. */
@@ -1258,21 +1255,21 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 		return errno;
 
 	permstr = in->buffer + strlen(in->buffer) + 1;
-	num--;
+	perms.num--;
 
-	perms = talloc_array(node, struct xs_permissions, num);
-	if (!perms)
+	perms.p = talloc_array(node, struct xs_permissions, perms.num);
+	if (!perms.p)
 		return ENOMEM;
-	if (!xs_strings_to_perms(perms, num, permstr))
+	if (!xs_strings_to_perms(perms.p, perms.num, permstr))
 		return errno;
 
 	/* Unprivileged domains may not change the owner. */
-	if (domain_is_unprivileged(conn) && perms[0].id != node->perms[0].id)
+	if (domain_is_unprivileged(conn) &&
+	    perms.p[0].id != node->perms.p[0].id)
 		return EPERM;
 
 	domain_entry_dec(conn, node);
 	node->perms = perms;
-	node->num_perms = num;
 	domain_entry_inc(conn, node);
 
 	if (write_node(conn, node, false))
@@ -1547,8 +1544,8 @@ static void manual_node(const char *name, const char *child)
 		barf_perror("Could not allocate initial node %s", name);
 
 	node->name = name;
-	node->perms = &perms;
-	node->num_perms = 1;
+	node->perms.p = &perms;
+	node->perms.num = 1;
 	node->children = (char *)child;
 	if (child)
 		node->childlen = strlen(child) + 1;
