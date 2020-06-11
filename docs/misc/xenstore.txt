@@ -170,6 +170,9 @@ SET_PERMS		<path>|<perm-as-string>|+?
 		n<domid>	no access
 	See http://wiki.xen.org/wiki/XenBus section
 	`Permissions' for details of the permissions system.
+	It is possible to set permissions for the special watch paths
+	"@introduceDomain" and "@releaseDomain" to enable receiving those
+	watches in unprivileged domains.
 
 ---------- Watches ----------
 
@@ -194,6 +197,8 @@ WATCH			<wpath>|<token>|?
 	    @releaseDomain 	occurs on any domain crash or
 				shutdown, and also on RELEASE
 				and domain destruction
+	<wspecial> events are sent to privileged callers or explicitly
+	via SET_PERMS enabled domains only.
 
 	When a watch is first set up it is triggered once straight
 	away, with <path> equal to <wpath>.  Watches may be triggered
