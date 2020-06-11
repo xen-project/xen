@@ -41,6 +41,9 @@ static evtchn_port_t virq_port;
 
 xenevtchn_handle *xce_handle = NULL;
 
+static struct node_perms dom_release_perms;
+static struct node_perms dom_introduce_perms;
+
 struct domain
 {
 	struct list_head list;
@@ -582,6 +585,59 @@ void restore_existing_connections(void)
 {
 }
 
+static int set_dom_perms_default(struct node_perms *perms)
+{
+	perms->num = 1;
+	perms->p = talloc_array(NULL, struct xs_permissions, perms->num);
+	if (!perms->p)
+		return -1;
+	perms->p->id = 0;
+	perms->p->perms = XS_PERM_NONE;
+
+	return 0;
+}
+
+static struct node_perms *get_perms_special(const char *name)
+{
+	if (!strcmp(name, "@releaseDomain"))
+		return &dom_release_perms;
+	if (!strcmp(name, "@introduceDomain"))
+		return &dom_introduce_perms;
+	return NULL;
+}
+
+int set_perms_special(struct connection *conn, const char *name,
+		      struct node_perms *perms)
+{
+	struct node_perms *p;
+
+	p = get_perms_special(name);
+	if (!p)
+		return EINVAL;
+
+	if ((perm_for_conn(conn, p) & (XS_PERM_WRITE | XS_PERM_OWNER)) !=
+	    (XS_PERM_WRITE | XS_PERM_OWNER))
+		return EACCES;
+
+	p->num = perms->num;
+	talloc_free(p->p);
+	p->p = perms->p;
+	talloc_steal(NULL, perms->p);
+
+	return 0;
+}
+
+bool check_perms_special(const char *name, struct connection *conn)
+{
+	struct node_perms *p;
+
+	p = get_perms_special(name);
+	if (!p)
+		return false;
+
+	return perm_for_conn(conn, p) & XS_PERM_READ;
+}
+
 static int dom0_init(void) 
 { 
 	evtchn_port_t port;
@@ -602,6 +658,10 @@ static int dom0_init(void)
 	talloc_steal(dom0->conn, dom0); 
 
 	xenevtchn_notify(xce_handle, dom0->port);
+
+	if (set_dom_perms_default(&dom_release_perms) ||
+	    set_dom_perms_default(&dom_introduce_perms))
+		return -1;
 
 	return 0; 
 }

@@ -470,8 +470,8 @@ static int write_node(struct connection *conn, struct node *node,
 	return write_node_raw(conn, &key, node, no_quota_check);
 }
 
-static enum xs_perm_type perm_for_conn(struct connection *conn,
-				       const struct node_perms *perms)
+enum xs_perm_type perm_for_conn(struct connection *conn,
+				const struct node_perms *perms)
 {
 	unsigned int i;
 	enum xs_perm_type mask = XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER;
@@ -1247,20 +1247,27 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	if (perms.num < 2)
 		return EINVAL;
 
+	permstr = in->buffer + strlen(in->buffer) + 1;
+	perms.num--;
+
+	perms.p = talloc_array(in, struct xs_permissions, perms.num);
+	if (!perms.p)
+		return ENOMEM;
+	if (!xs_strings_to_perms(perms.p, perms.num, permstr))
+		return errno;
+
 	/* First arg is node name. */
+	if (strstarts(in->buffer, "@")) {
+		if (set_perms_special(conn, in->buffer, &perms))
+			return errno;
+		send_ack(conn, XS_SET_PERMS);
+		return 0;
+	}
+
 	/* We must own node to do this (tools can do this too). */
 	node = get_node_canonicalized(conn, in, in->buffer, &name,
 				      XS_PERM_WRITE | XS_PERM_OWNER);
 	if (!node)
-		return errno;
-
-	permstr = in->buffer + strlen(in->buffer) + 1;
-	perms.num--;
-
-	perms.p = talloc_array(node, struct xs_permissions, perms.num);
-	if (!perms.p)
-		return ENOMEM;
-	if (!xs_strings_to_perms(perms.p, perms.num, permstr))
 		return errno;
 
 	/* Unprivileged domains may not change the owner. */
