@@ -338,6 +338,13 @@ AS_IF([test "x$golang" = "xy"], [
             AC_MSG_ERROR([Go tools enabled, but missing go compiler])
         ])
         golang="n"
+    ], [
+        AX_COMPARE_VERSION([$GOVERSION], [lt], [1.11.1], [
+            AS_IF([test "x$enable_golang" = "xyes"], [
+                AC_MSG_ERROR(["Your version of go: $GOVERSION is not supported"])
+            ])
+            golang="n"
+        ])
     ])
 ])
 
