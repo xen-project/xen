@@ -425,7 +425,7 @@ static int xc_cpuid_xend_policy(
     return rc;
 }
 
-int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
+int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
                           const uint32_t *featureset, unsigned int nr_features,
                           bool pae,
                           const struct xc_xend_cpuid *xend)

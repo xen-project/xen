@@ -1822,13 +1822,18 @@ struct xc_xend_cpuid {
 /*
  * Make adjustments to the CPUID settings for a domain.
  *
+ * This path is used in two cases.  First, for fresh boots of the domain, and
+ * secondly for migrate-in/restore of pre-4.14 guests (where CPUID data was
+ * missing from the stream).  The @restore parameter distinguishes these
+ * cases, and the generated policy must be compatible with a 4.13.
+ *
  * Either pass a full new @featureset (and @nr_features), or adjust individual
  * features (@pae).
  *
  * Then (optionally) apply legacy XEND overrides (@xend) to the result.
  */
 int xc_cpuid_apply_policy(xc_interface *xch,
-                          uint32_t domid,
+                          uint32_t domid, bool restore,
                           const uint32_t *featureset,
                           unsigned int nr_features, bool pae,
                           const struct xc_xend_cpuid *xend);

@@ -416,7 +416,7 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
     return 0;
 }
 
-void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
+void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
                          libxl_domain_build_info *info)
 {
     bool pae = true;
@@ -434,7 +434,7 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
     if (info->type == LIBXL_DOMAIN_TYPE_HVM)
         pae = libxl_defbool_val(info->u.hvm.pae);
 
-    xc_cpuid_apply_policy(ctx->xch, domid, NULL, 0, pae, info->cpuid);
+    xc_cpuid_apply_policy(ctx->xch, domid, restore, NULL, 0, pae, info->cpuid);
 }
 
 static const char *input_names[2] = { "leaf", "subleaf" };

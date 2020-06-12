@@ -1447,7 +1447,7 @@ int libxl__srm_callout_callback_static_data_done(unsigned int missing,
      * stream doesn't contain any CPUID data.
      */
     if (missing & XGR_SDD_MISSING_CPUID)
-        libxl__cpuid_legacy(ctx, dcs->guest_domid, info);
+        libxl__cpuid_legacy(ctx, dcs->guest_domid, true, info);
 
     return 0;
 }
