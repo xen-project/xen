@@ -420,12 +420,17 @@ void libxl_cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid)
 void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
                      libxl_cpuid_policy_list cpuid)
 {
-    int i;
+    int i, j;
     char *cpuid_res[4];
 
     for (i = 0; cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++)
+    {
         xc_cpuid_set(ctx->xch, domid, cpuid[i].input,
                      (const char**)(cpuid[i].policy), cpuid_res);
+
+        for (j = 0; j < ARRAY_SIZE(cpuid_res); ++j)
+            free(cpuid_res[j]);
+    }
 }
 
 static const char *input_names[2] = { "leaf", "subleaf" };
