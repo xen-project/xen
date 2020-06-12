@@ -38,8 +38,6 @@ enum {
 
 #define bitmaskof(idx)      (1u << ((idx) & 31))
 #define featureword_of(idx) ((idx) >> 5)
-#define clear_feature(idx, dst) ((dst) &= ~bitmaskof(idx))
-#define set_feature(idx, dst)   ((dst) |=  bitmaskof(idx))
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
 {
@@ -259,15 +257,42 @@ int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
     return ret;
 }
 
+static int compare_leaves(const void *l, const void *r)
+{
+    const xen_cpuid_leaf_t *lhs = l;
+    const xen_cpuid_leaf_t *rhs = r;
+
+    if ( lhs->leaf != rhs->leaf )
+        return lhs->leaf < rhs->leaf ? -1 : 1;
+
+    if ( lhs->subleaf != rhs->subleaf )
+        return lhs->subleaf < rhs->subleaf ? -1 : 1;
+
+    return 0;
+}
+
+static xen_cpuid_leaf_t *find_leaf(
+    xen_cpuid_leaf_t *leaves, unsigned int nr_leaves,
+    const struct xc_xend_cpuid *xend)
+{
+    const xen_cpuid_leaf_t key = { xend->leaf, xend->subleaf };
+
+    return bsearch(&key, leaves, nr_leaves, sizeof(*leaves), compare_leaves);
+}
+
 int xc_cpuid_set(
     xc_interface *xch, uint32_t domid, const struct xc_xend_cpuid *xend)
 {
     int rc;
-    unsigned int i, j, regs[4] = {}, polregs[4] = {};
     xc_dominfo_t di;
-    xen_cpuid_leaf_t *leaves = NULL;
-    unsigned int nr_leaves, policy_leaves, nr_msrs;
+    unsigned int nr_leaves, nr_msrs;
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
+    /*
+     * Three full policies.  The host, domain max, and domain current for the
+     * domain type.
+     */
+    xen_cpuid_leaf_t *host = NULL, *max = NULL, *cur = NULL;
+    unsigned int nr_host, nr_max, nr_cur;
 
     if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
          di.domid != domid )
@@ -286,99 +311,101 @@ int xc_cpuid_set(
     }
 
     rc = -ENOMEM;
-    if ( (leaves = calloc(nr_leaves, sizeof(*leaves))) == NULL )
+    if ( (host = calloc(nr_leaves, sizeof(*host))) == NULL ||
+         (max  = calloc(nr_leaves, sizeof(*max)))  == NULL ||
+         (cur  = calloc(nr_leaves, sizeof(*cur)))  == NULL )
     {
         ERROR("Unable to allocate memory for %u CPUID leaves", nr_leaves);
         goto fail;
     }
 
+    /* Get the domain's current policy. */
+    nr_msrs = 0;
+    nr_cur = nr_leaves;
+    rc = xc_get_domain_cpu_policy(xch, domid, &nr_cur, cur, &nr_msrs, NULL);
+    if ( rc )
+    {
+        PERROR("Failed to obtain d%d current policy", domid);
+        rc = -errno;
+        goto fail;
+    }
+
     /* Get the domain's max policy. */
     nr_msrs = 0;
-    policy_leaves = nr_leaves;
+    nr_max = nr_leaves;
     rc = xc_get_system_cpu_policy(xch, di.hvm ? XEN_SYSCTL_cpu_policy_hvm_max
                                               : XEN_SYSCTL_cpu_policy_pv_max,
-                                  &policy_leaves, leaves, &nr_msrs, NULL);
+                                  &nr_max, max, &nr_msrs, NULL);
     if ( rc )
     {
         PERROR("Failed to obtain %s max policy", di.hvm ? "hvm" : "pv");
         rc = -errno;
         goto fail;
     }
-    for ( i = 0; i < policy_leaves; ++i )
-        if ( leaves[i].leaf == xend->leaf &&
-             leaves[i].subleaf == xend->subleaf )
-        {
-            polregs[0] = leaves[i].a;
-            polregs[1] = leaves[i].b;
-            polregs[2] = leaves[i].c;
-            polregs[3] = leaves[i].d;
-            break;
-        }
 
     /* Get the host policy. */
     nr_msrs = 0;
-    policy_leaves = nr_leaves;
+    nr_host = nr_leaves;
     rc = xc_get_system_cpu_policy(xch, XEN_SYSCTL_cpu_policy_host,
-                                  &policy_leaves, leaves, &nr_msrs, NULL);
+                                  &nr_host, host, &nr_msrs, NULL);
     if ( rc )
     {
         PERROR("Failed to obtain host policy");
         rc = -errno;
         goto fail;
     }
-    for ( i = 0; i < policy_leaves; ++i )
-        if ( leaves[i].leaf == xend->leaf &&
-             leaves[i].subleaf == xend->subleaf )
-        {
-            regs[0] = leaves[i].a;
-            regs[1] = leaves[i].b;
-            regs[2] = leaves[i].c;
-            regs[3] = leaves[i].d;
-            break;
-        }
 
-    for ( i = 0; i < 4; i++ )
+    rc = -EINVAL;
+    for ( ; xend->leaf != XEN_CPUID_INPUT_UNUSED; ++xend )
     {
-        if ( xend->policy[i] == NULL )
+        xen_cpuid_leaf_t *cur_leaf = find_leaf(cur, nr_cur, xend);
+        const xen_cpuid_leaf_t *max_leaf = find_leaf(max, nr_max, xend);
+        const xen_cpuid_leaf_t *host_leaf = find_leaf(host, nr_host, xend);
+
+        if ( cur_leaf == NULL || max_leaf == NULL || host_leaf == NULL )
         {
-            regs[i] = polregs[i];
-            continue;
+            ERROR("Missing leaf %#x, subleaf %#x", xend->leaf, xend->subleaf);
+            goto fail;
         }
 
-        /*
-         * Notes for following this algorithm:
-         *
-         * While it will accept any leaf data, it only makes sense to use on
-         * feature leaves.  regs[] initially contains the host values.  This,
-         * with the fall-through chain, is how the 's' and 'k' options work.
-         */
-        for ( j = 0; j < 32; j++ )
+        for ( unsigned int i = 0; i < ARRAY_SIZE(xend->policy); i++ )
         {
-            unsigned char val = !!((regs[i] & (1U << (31 - j))));
-            unsigned char polval = !!((polregs[i] & (1U << (31 - j))));
+            uint32_t *cur_reg = &cur_leaf->a + i;
+            const uint32_t *max_reg = &max_leaf->a + i;
+            const uint32_t *host_reg = &host_leaf->a + i;
 
-            rc = -EINVAL;
-            if ( !strchr("10xks", xend->policy[i][j]) )
-                goto fail;
+            if ( xend->policy[i] == NULL )
+                continue;
 
-            if ( xend->policy[i][j] == '1' )
-                val = 1;
-            else if ( xend->policy[i][j] == '0' )
-                val = 0;
-            else if ( xend->policy[i][j] == 'x' )
-                val = polval;
+            for ( unsigned int j = 0; j < 32; j++ )
+            {
+                bool val;
 
-            if ( val )
-                set_feature(31 - j, regs[i]);
-            else
-                clear_feature(31 - j, regs[i]);
+                if ( xend->policy[i][j] == '1' )
+                    val = true;
+                else if ( xend->policy[i][j] == '0' )
+                    val = false;
+                else if ( xend->policy[i][j] == 'x' )
+                    val = test_bit(31 - j, max_reg);
+                else if ( xend->policy[i][j] == 'k' ||
+                          xend->policy[i][j] == 's' )
+                    val = test_bit(31 - j, host_reg);
+                else
+                {
+                    ERROR("Bad character '%c' in policy[%d] string '%s'",
+                          xend->policy[i][j], i, xend->policy[i]);
+                    goto fail;
+                }
+
+                clear_bit(31 - j, cur_reg);
+                if ( val )
+                    set_bit(31 - j, cur_reg);
+            }
         }
     }
 
-    /* Feed the transformed leaf back up to Xen. */
-    leaves[0] = (xen_cpuid_leaf_t){ xend->leaf, xend->subleaf,
-                                    regs[0], regs[1], regs[2], regs[3] };
-    rc = xc_set_domain_cpu_policy(xch, domid, 1, leaves, 0, NULL,
+    /* Feed the transformed currrent policy back up to Xen. */
+    rc = xc_set_domain_cpu_policy(xch, domid, nr_cur, cur, 0, NULL,
                                   &err_leaf, &err_subleaf, &err_msr);
     if ( rc )
     {
@@ -391,7 +418,9 @@ int xc_cpuid_set(
     /* Success! */
 
  fail:
-    free(leaves);
+    free(cur);
+    free(max);
+    free(host);
 
     return rc;
 }

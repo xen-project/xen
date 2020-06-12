@@ -420,7 +420,6 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
                          libxl_domain_build_info *info)
 {
     libxl_cpuid_policy_list cpuid = info->cpuid;
-    int i;
     bool pae = true;
 
     /*
@@ -441,8 +440,7 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
     if (!cpuid)
         return;
 
-    for (i = 0; cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++)
-        xc_cpuid_set(ctx->xch, domid, &cpuid[i]);
+    xc_cpuid_set(ctx->xch, domid, info->cpuid);
 }
 
 static const char *input_names[2] = { "leaf", "subleaf" };
