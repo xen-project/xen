@@ -512,11 +512,21 @@ The Speculation Control hardware features `srbds-ctrl`, `md-clear`, `ibrsb`,
 `stibp`, `ibpb`, `l1d-flush` and `ssbd` are used by default if available and
 applicable.  They can all be ignored.
 
-`rdrand` and `rdseed` can be ignored, as a mitigation to XSA-320 /
-CVE-2020-0543.  The RDRAND feature is disabled by default on certain AMD
-systems, due to possible malfunctions after ACPI S3 suspend/resume.  `rdrand`
-may be used in its positive form to override Xen's default behaviour on these
-systems, and make the feature fully usable.
+`rdrand` and `rdseed` have multiple interactions.
+
+*   For Special Register Buffer Data Sampling (SRBDS, XSA-320, CVE-2020-0543),
+    RDRAND and RDSEED can be ignored.
+
+    Due to the absence of microcode to address SRBDS on IvyBridge client
+    hardware, the RDRAND feature is hidden by default for guests, unless
+    `rdrand` is used in its positive form.  Irrespective of the setting here,
+    VMs can use RDRAND if explicitly enabled in guest config file, and VMs
+    already using RDRAND can migrate in.
+
+*   The RDRAND feature is disabled by default on AMD Fam15/16 systems, due to
+    possible malfunctions after ACPI S3 suspend/resume.  `rdrand` may be used
+    in its positive form to override Xen's default behaviour on these systems,
+    and make the feature fully usable.
 
 ### cpuid_mask_cpu
 > `= fam_0f_rev_[cdefg] | fam_10_rev_[bc] | fam_11_rev_b`

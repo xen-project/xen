@@ -149,7 +149,7 @@ XEN_CPUFEATURE(XSAVE,         1*32+26) /*A  XSAVE/XRSTOR/XSETBV/XGETBV */
 XEN_CPUFEATURE(OSXSAVE,       1*32+27) /*!  OSXSAVE */
 XEN_CPUFEATURE(AVX,           1*32+28) /*A  Advanced Vector Extensions */
 XEN_CPUFEATURE(F16C,          1*32+29) /*A  Half-precision convert instruction */
-XEN_CPUFEATURE(RDRAND,        1*32+30) /*A  Digital Random Number Generator */
+XEN_CPUFEATURE(RDRAND,        1*32+30) /*!A Digital Random Number Generator */
 XEN_CPUFEATURE(HYPERVISOR,    1*32+31) /*!A Running under some hypervisor */
 
 /* AMD-defined CPU features, CPUID level 0x80000001.edx, word 2 */

@@ -503,6 +503,8 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
      */
     if ( restore )
     {
+        p->basic.rdrand = test_bit(X86_FEATURE_RDRAND, host_featureset);
+
         if ( di.hvm )
         {
             p->feat.mpx = test_bit(X86_FEATURE_MPX, host_featureset);
