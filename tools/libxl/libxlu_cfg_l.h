@@ -13,9 +13,243 @@
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 6
-#define YY_FLEX_SUBMINOR_VERSION 1
+#define YY_FLEX_SUBMINOR_VERSION 4
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
+#endif
+
+#ifdef yy_create_buffer
+#define xlu__cfg_yy_create_buffer_ALREADY_DEFINED
+#else
+#define yy_create_buffer xlu__cfg_yy_create_buffer
+#endif
+
+#ifdef yy_delete_buffer
+#define xlu__cfg_yy_delete_buffer_ALREADY_DEFINED
+#else
+#define yy_delete_buffer xlu__cfg_yy_delete_buffer
+#endif
+
+#ifdef yy_scan_buffer
+#define xlu__cfg_yy_scan_buffer_ALREADY_DEFINED
+#else
+#define yy_scan_buffer xlu__cfg_yy_scan_buffer
+#endif
+
+#ifdef yy_scan_string
+#define xlu__cfg_yy_scan_string_ALREADY_DEFINED
+#else
+#define yy_scan_string xlu__cfg_yy_scan_string
+#endif
+
+#ifdef yy_scan_bytes
+#define xlu__cfg_yy_scan_bytes_ALREADY_DEFINED
+#else
+#define yy_scan_bytes xlu__cfg_yy_scan_bytes
+#endif
+
+#ifdef yy_init_buffer
+#define xlu__cfg_yy_init_buffer_ALREADY_DEFINED
+#else
+#define yy_init_buffer xlu__cfg_yy_init_buffer
+#endif
+
+#ifdef yy_flush_buffer
+#define xlu__cfg_yy_flush_buffer_ALREADY_DEFINED
+#else
+#define yy_flush_buffer xlu__cfg_yy_flush_buffer
+#endif
+
+#ifdef yy_load_buffer_state
+#define xlu__cfg_yy_load_buffer_state_ALREADY_DEFINED
+#else
+#define yy_load_buffer_state xlu__cfg_yy_load_buffer_state
+#endif
+
+#ifdef yy_switch_to_buffer
+#define xlu__cfg_yy_switch_to_buffer_ALREADY_DEFINED
+#else
+#define yy_switch_to_buffer xlu__cfg_yy_switch_to_buffer
+#endif
+
+#ifdef yypush_buffer_state
+#define xlu__cfg_yypush_buffer_state_ALREADY_DEFINED
+#else
+#define yypush_buffer_state xlu__cfg_yypush_buffer_state
+#endif
+
+#ifdef yypop_buffer_state
+#define xlu__cfg_yypop_buffer_state_ALREADY_DEFINED
+#else
+#define yypop_buffer_state xlu__cfg_yypop_buffer_state
+#endif
+
+#ifdef yyensure_buffer_stack
+#define xlu__cfg_yyensure_buffer_stack_ALREADY_DEFINED
+#else
+#define yyensure_buffer_stack xlu__cfg_yyensure_buffer_stack
+#endif
+
+#ifdef yylex
+#define xlu__cfg_yylex_ALREADY_DEFINED
+#else
+#define yylex xlu__cfg_yylex
+#endif
+
+#ifdef yyrestart
+#define xlu__cfg_yyrestart_ALREADY_DEFINED
+#else
+#define yyrestart xlu__cfg_yyrestart
+#endif
+
+#ifdef yylex_init
+#define xlu__cfg_yylex_init_ALREADY_DEFINED
+#else
+#define yylex_init xlu__cfg_yylex_init
+#endif
+
+#ifdef yylex_init_extra
+#define xlu__cfg_yylex_init_extra_ALREADY_DEFINED
+#else
+#define yylex_init_extra xlu__cfg_yylex_init_extra
+#endif
+
+#ifdef yylex_destroy
+#define xlu__cfg_yylex_destroy_ALREADY_DEFINED
+#else
+#define yylex_destroy xlu__cfg_yylex_destroy
+#endif
+
+#ifdef yyget_debug
+#define xlu__cfg_yyget_debug_ALREADY_DEFINED
+#else
+#define yyget_debug xlu__cfg_yyget_debug
+#endif
+
+#ifdef yyset_debug
+#define xlu__cfg_yyset_debug_ALREADY_DEFINED
+#else
+#define yyset_debug xlu__cfg_yyset_debug
+#endif
+
+#ifdef yyget_extra
+#define xlu__cfg_yyget_extra_ALREADY_DEFINED
+#else
+#define yyget_extra xlu__cfg_yyget_extra
+#endif
+
+#ifdef yyset_extra
+#define xlu__cfg_yyset_extra_ALREADY_DEFINED
+#else
+#define yyset_extra xlu__cfg_yyset_extra
+#endif
+
+#ifdef yyget_in
+#define xlu__cfg_yyget_in_ALREADY_DEFINED
+#else
+#define yyget_in xlu__cfg_yyget_in
+#endif
+
+#ifdef yyset_in
+#define xlu__cfg_yyset_in_ALREADY_DEFINED
+#else
+#define yyset_in xlu__cfg_yyset_in
+#endif
+
+#ifdef yyget_out
+#define xlu__cfg_yyget_out_ALREADY_DEFINED
+#else
+#define yyget_out xlu__cfg_yyget_out
+#endif
+
+#ifdef yyset_out
+#define xlu__cfg_yyset_out_ALREADY_DEFINED
+#else
+#define yyset_out xlu__cfg_yyset_out
+#endif
+
+#ifdef yyget_leng
+#define xlu__cfg_yyget_leng_ALREADY_DEFINED
+#else
+#define yyget_leng xlu__cfg_yyget_leng
+#endif
+
+#ifdef yyget_text
+#define xlu__cfg_yyget_text_ALREADY_DEFINED
+#else
+#define yyget_text xlu__cfg_yyget_text
+#endif
+
+#ifdef yyget_lineno
+#define xlu__cfg_yyget_lineno_ALREADY_DEFINED
+#else
+#define yyget_lineno xlu__cfg_yyget_lineno
+#endif
+
+#ifdef yyset_lineno
+#define xlu__cfg_yyset_lineno_ALREADY_DEFINED
+#else
+#define yyset_lineno xlu__cfg_yyset_lineno
+#endif
+
+#ifdef yyget_column
+#define xlu__cfg_yyget_column_ALREADY_DEFINED
+#else
+#define yyget_column xlu__cfg_yyget_column
+#endif
+
+#ifdef yyset_column
+#define xlu__cfg_yyset_column_ALREADY_DEFINED
+#else
+#define yyset_column xlu__cfg_yyset_column
+#endif
+
+#ifdef yywrap
+#define xlu__cfg_yywrap_ALREADY_DEFINED
+#else
+#define yywrap xlu__cfg_yywrap
+#endif
+
+#ifdef yyget_lval
+#define xlu__cfg_yyget_lval_ALREADY_DEFINED
+#else
+#define yyget_lval xlu__cfg_yyget_lval
+#endif
+
+#ifdef yyset_lval
+#define xlu__cfg_yyset_lval_ALREADY_DEFINED
+#else
+#define yyset_lval xlu__cfg_yyset_lval
+#endif
+
+#ifdef yyget_lloc
+#define xlu__cfg_yyget_lloc_ALREADY_DEFINED
+#else
+#define yyget_lloc xlu__cfg_yyget_lloc
+#endif
+
+#ifdef yyset_lloc
+#define xlu__cfg_yyset_lloc_ALREADY_DEFINED
+#else
+#define yyset_lloc xlu__cfg_yyset_lloc
+#endif
+
+#ifdef yyalloc
+#define xlu__cfg_yyalloc_ALREADY_DEFINED
+#else
+#define yyalloc xlu__cfg_yyalloc
+#endif
+
+#ifdef yyrealloc
+#define xlu__cfg_yyrealloc_ALREADY_DEFINED
+#else
+#define yyrealloc xlu__cfg_yyrealloc
+#endif
+
+#ifdef yyfree
+#define xlu__cfg_yyfree_ALREADY_DEFINED
+#else
+#define yyfree xlu__cfg_yyfree
 #endif
 
 /* First, we deal with  platform-specific or compiler-specific issues. */
@@ -88,9 +322,15 @@ typedef unsigned int flex_uint32_t;
 #define UINT32_MAX             (4294967295U)
 #endif
 
+#ifndef SIZE_MAX
+#define SIZE_MAX               (~(size_t)0)
+#endif
+
 #endif /* ! C99 */
 
 #endif /* ! FLEXINT_H */
+
+/* begin standard C++ headers. */
 
 /* TODO: this is always defined, so inline it */
 #define yyconst const
@@ -192,21 +432,21 @@ struct yy_buffer_state
 	};
 #endif /* !YY_STRUCT_YY_BUFFER_STATE */
 
-void xlu__cfg_yyrestart (FILE *input_file ,yyscan_t yyscanner );
-void xlu__cfg_yy_switch_to_buffer (YY_BUFFER_STATE new_buffer ,yyscan_t yyscanner );
-YY_BUFFER_STATE xlu__cfg_yy_create_buffer (FILE *file,int size ,yyscan_t yyscanner );
-void xlu__cfg_yy_delete_buffer (YY_BUFFER_STATE b ,yyscan_t yyscanner );
-void xlu__cfg_yy_flush_buffer (YY_BUFFER_STATE b ,yyscan_t yyscanner );
-void xlu__cfg_yypush_buffer_state (YY_BUFFER_STATE new_buffer ,yyscan_t yyscanner );
-void xlu__cfg_yypop_buffer_state (yyscan_t yyscanner );
+void yyrestart ( FILE *input_file , yyscan_t yyscanner );
+void yy_switch_to_buffer ( YY_BUFFER_STATE new_buffer , yyscan_t yyscanner );
+YY_BUFFER_STATE yy_create_buffer ( FILE *file, int size , yyscan_t yyscanner );
+void yy_delete_buffer ( YY_BUFFER_STATE b , yyscan_t yyscanner );
+void yy_flush_buffer ( YY_BUFFER_STATE b , yyscan_t yyscanner );
+void yypush_buffer_state ( YY_BUFFER_STATE new_buffer , yyscan_t yyscanner );
+void yypop_buffer_state ( yyscan_t yyscanner );
 
-YY_BUFFER_STATE xlu__cfg_yy_scan_buffer (char *base,yy_size_t size ,yyscan_t yyscanner );
-YY_BUFFER_STATE xlu__cfg_yy_scan_string (yyconst char *yy_str ,yyscan_t yyscanner );
-YY_BUFFER_STATE xlu__cfg_yy_scan_bytes (yyconst char *bytes,int len ,yyscan_t yyscanner );
+YY_BUFFER_STATE yy_scan_buffer ( char *base, yy_size_t size , yyscan_t yyscanner );
+YY_BUFFER_STATE yy_scan_string ( const char *yy_str , yyscan_t yyscanner );
+YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, int len , yyscan_t yyscanner );
 
-void *xlu__cfg_yyalloc (yy_size_t ,yyscan_t yyscanner );
-void *xlu__cfg_yyrealloc (void *,yy_size_t ,yyscan_t yyscanner );
-void xlu__cfg_yyfree (void * ,yyscan_t yyscanner );
+void *yyalloc ( yy_size_t , yyscan_t yyscanner );
+void *yyrealloc ( void *, yy_size_t , yyscan_t yyscanner );
+void yyfree ( void * , yyscan_t yyscanner );
 
 #define xlu__cfg_yywrap(yyscanner) (/*CONSTCOND*/1)
 #define YY_SKIP_YYWRAP
@@ -231,50 +471,50 @@ void xlu__cfg_yyfree (void * ,yyscan_t yyscanner );
 #define YY_EXTRA_TYPE void *
 #endif
 
-int xlu__cfg_yylex_init (yyscan_t* scanner);
+int yylex_init (yyscan_t* scanner);
 
-int xlu__cfg_yylex_init_extra (YY_EXTRA_TYPE user_defined,yyscan_t* scanner);
+int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
 
 /* Accessor methods to globals.
    These are made visible to non-reentrant scanners for convenience. */
 
-int xlu__cfg_yylex_destroy (yyscan_t yyscanner );
+int yylex_destroy ( yyscan_t yyscanner );
 
-int xlu__cfg_yyget_debug (yyscan_t yyscanner );
+int yyget_debug ( yyscan_t yyscanner );
 
-void xlu__cfg_yyset_debug (int debug_flag ,yyscan_t yyscanner );
+void yyset_debug ( int debug_flag , yyscan_t yyscanner );
 
-YY_EXTRA_TYPE xlu__cfg_yyget_extra (yyscan_t yyscanner );
+YY_EXTRA_TYPE yyget_extra ( yyscan_t yyscanner );
 
-void xlu__cfg_yyset_extra (YY_EXTRA_TYPE user_defined ,yyscan_t yyscanner );
+void yyset_extra ( YY_EXTRA_TYPE user_defined , yyscan_t yyscanner );
 
-FILE *xlu__cfg_yyget_in (yyscan_t yyscanner );
+FILE *yyget_in ( yyscan_t yyscanner );
 
-void xlu__cfg_yyset_in  (FILE * _in_str ,yyscan_t yyscanner );
+void yyset_in  ( FILE * _in_str , yyscan_t yyscanner );
 
-FILE *xlu__cfg_yyget_out (yyscan_t yyscanner );
+FILE *yyget_out ( yyscan_t yyscanner );
 
-void xlu__cfg_yyset_out  (FILE * _out_str ,yyscan_t yyscanner );
+void yyset_out  ( FILE * _out_str , yyscan_t yyscanner );
 
-			int xlu__cfg_yyget_leng (yyscan_t yyscanner );
+			int yyget_leng ( yyscan_t yyscanner );
 
-char *xlu__cfg_yyget_text (yyscan_t yyscanner );
+char *yyget_text ( yyscan_t yyscanner );
 
-int xlu__cfg_yyget_lineno (yyscan_t yyscanner );
+int yyget_lineno ( yyscan_t yyscanner );
 
-void xlu__cfg_yyset_lineno (int _line_number ,yyscan_t yyscanner );
+void yyset_lineno ( int _line_number , yyscan_t yyscanner );
 
-int xlu__cfg_yyget_column  (yyscan_t yyscanner );
+int yyget_column  ( yyscan_t yyscanner );
 
-void xlu__cfg_yyset_column (int _column_no ,yyscan_t yyscanner );
+void yyset_column ( int _column_no , yyscan_t yyscanner );
 
-YYSTYPE * xlu__cfg_yyget_lval (yyscan_t yyscanner );
+YYSTYPE * yyget_lval ( yyscan_t yyscanner );
 
-void xlu__cfg_yyset_lval (YYSTYPE * yylval_param ,yyscan_t yyscanner );
+void yyset_lval ( YYSTYPE * yylval_param , yyscan_t yyscanner );
 
-       YYLTYPE *xlu__cfg_yyget_lloc (yyscan_t yyscanner );
+       YYLTYPE *yyget_lloc ( yyscan_t yyscanner );
     
-        void xlu__cfg_yyset_lloc (YYLTYPE * yylloc_param ,yyscan_t yyscanner );
+        void yyset_lloc ( YYLTYPE * yylloc_param , yyscan_t yyscanner );
     
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -282,18 +522,18 @@ void xlu__cfg_yyset_lval (YYSTYPE * yylval_param ,yyscan_t yyscanner );
 
 #ifndef YY_SKIP_YYWRAP
 #ifdef __cplusplus
-extern "C" int xlu__cfg_yywrap (yyscan_t yyscanner );
+extern "C" int yywrap ( yyscan_t yyscanner );
 #else
-extern int xlu__cfg_yywrap (yyscan_t yyscanner );
+extern int yywrap ( yyscan_t yyscanner );
 #endif
 #endif
 
 #ifndef yytext_ptr
-static void yy_flex_strncpy (char *,yyconst char *,int ,yyscan_t yyscanner);
+static void yy_flex_strncpy ( char *, const char *, int , yyscan_t yyscanner);
 #endif
 
 #ifdef YY_NEED_STRLEN
-static int yy_flex_strlen (yyconst char * ,yyscan_t yyscanner);
+static int yy_flex_strlen ( const char * , yyscan_t yyscanner);
 #endif
 
 #ifndef YY_NO_INPUT
@@ -321,10 +561,10 @@ static int yy_flex_strlen (yyconst char * ,yyscan_t yyscanner);
 #ifndef YY_DECL
 #define YY_DECL_IS_OURS 1
 
-extern int xlu__cfg_yylex \
-               (YYSTYPE * yylval_param,YYLTYPE * yylloc_param ,yyscan_t yyscanner);
+extern int yylex \
+               (YYSTYPE * yylval_param, YYLTYPE * yylloc_param , yyscan_t yyscanner);
 
-#define YY_DECL int xlu__cfg_yylex \
+#define YY_DECL int yylex \
                (YYSTYPE * yylval_param, YYLTYPE * yylloc_param , yyscan_t yyscanner)
 #endif /* !YY_DECL */
 
@@ -342,8 +582,153 @@ extern int xlu__cfg_yylex \
 #undef YY_DECL
 #endif
 
+#ifndef xlu__cfg_yy_create_buffer_ALREADY_DEFINED
+#undef yy_create_buffer
+#endif
+#ifndef xlu__cfg_yy_delete_buffer_ALREADY_DEFINED
+#undef yy_delete_buffer
+#endif
+#ifndef xlu__cfg_yy_scan_buffer_ALREADY_DEFINED
+#undef yy_scan_buffer
+#endif
+#ifndef xlu__cfg_yy_scan_string_ALREADY_DEFINED
+#undef yy_scan_string
+#endif
+#ifndef xlu__cfg_yy_scan_bytes_ALREADY_DEFINED
+#undef yy_scan_bytes
+#endif
+#ifndef xlu__cfg_yy_init_buffer_ALREADY_DEFINED
+#undef yy_init_buffer
+#endif
+#ifndef xlu__cfg_yy_flush_buffer_ALREADY_DEFINED
+#undef yy_flush_buffer
+#endif
+#ifndef xlu__cfg_yy_load_buffer_state_ALREADY_DEFINED
+#undef yy_load_buffer_state
+#endif
+#ifndef xlu__cfg_yy_switch_to_buffer_ALREADY_DEFINED
+#undef yy_switch_to_buffer
+#endif
+#ifndef xlu__cfg_yypush_buffer_state_ALREADY_DEFINED
+#undef yypush_buffer_state
+#endif
+#ifndef xlu__cfg_yypop_buffer_state_ALREADY_DEFINED
+#undef yypop_buffer_state
+#endif
+#ifndef xlu__cfg_yyensure_buffer_stack_ALREADY_DEFINED
+#undef yyensure_buffer_stack
+#endif
+#ifndef xlu__cfg_yylex_ALREADY_DEFINED
+#undef yylex
+#endif
+#ifndef xlu__cfg_yyrestart_ALREADY_DEFINED
+#undef yyrestart
+#endif
+#ifndef xlu__cfg_yylex_init_ALREADY_DEFINED
+#undef yylex_init
+#endif
+#ifndef xlu__cfg_yylex_init_extra_ALREADY_DEFINED
+#undef yylex_init_extra
+#endif
+#ifndef xlu__cfg_yylex_destroy_ALREADY_DEFINED
+#undef yylex_destroy
+#endif
+#ifndef xlu__cfg_yyget_debug_ALREADY_DEFINED
+#undef yyget_debug
+#endif
+#ifndef xlu__cfg_yyset_debug_ALREADY_DEFINED
+#undef yyset_debug
+#endif
+#ifndef xlu__cfg_yyget_extra_ALREADY_DEFINED
+#undef yyget_extra
+#endif
+#ifndef xlu__cfg_yyset_extra_ALREADY_DEFINED
+#undef yyset_extra
+#endif
+#ifndef xlu__cfg_yyget_in_ALREADY_DEFINED
+#undef yyget_in
+#endif
+#ifndef xlu__cfg_yyset_in_ALREADY_DEFINED
+#undef yyset_in
+#endif
+#ifndef xlu__cfg_yyget_out_ALREADY_DEFINED
+#undef yyget_out
+#endif
+#ifndef xlu__cfg_yyset_out_ALREADY_DEFINED
+#undef yyset_out
+#endif
+#ifndef xlu__cfg_yyget_leng_ALREADY_DEFINED
+#undef yyget_leng
+#endif
+#ifndef xlu__cfg_yyget_text_ALREADY_DEFINED
+#undef yyget_text
+#endif
+#ifndef xlu__cfg_yyget_lineno_ALREADY_DEFINED
+#undef yyget_lineno
+#endif
+#ifndef xlu__cfg_yyset_lineno_ALREADY_DEFINED
+#undef yyset_lineno
+#endif
+#ifndef xlu__cfg_yyget_column_ALREADY_DEFINED
+#undef yyget_column
+#endif
+#ifndef xlu__cfg_yyset_column_ALREADY_DEFINED
+#undef yyset_column
+#endif
+#ifndef xlu__cfg_yywrap_ALREADY_DEFINED
+#undef yywrap
+#endif
+#ifndef xlu__cfg_yyget_lval_ALREADY_DEFINED
+#undef yyget_lval
+#endif
+#ifndef xlu__cfg_yyset_lval_ALREADY_DEFINED
+#undef yyset_lval
+#endif
+#ifndef xlu__cfg_yyget_lloc_ALREADY_DEFINED
+#undef yyget_lloc
+#endif
+#ifndef xlu__cfg_yyset_lloc_ALREADY_DEFINED
+#undef yyset_lloc
+#endif
+#ifndef xlu__cfg_yyalloc_ALREADY_DEFINED
+#undef yyalloc
+#endif
+#ifndef xlu__cfg_yyrealloc_ALREADY_DEFINED
+#undef yyrealloc
+#endif
+#ifndef xlu__cfg_yyfree_ALREADY_DEFINED
+#undef yyfree
+#endif
+#ifndef xlu__cfg_yytext_ALREADY_DEFINED
+#undef yytext
+#endif
+#ifndef xlu__cfg_yyleng_ALREADY_DEFINED
+#undef yyleng
+#endif
+#ifndef xlu__cfg_yyin_ALREADY_DEFINED
+#undef yyin
+#endif
+#ifndef xlu__cfg_yyout_ALREADY_DEFINED
+#undef yyout
+#endif
+#ifndef xlu__cfg_yy_flex_debug_ALREADY_DEFINED
+#undef yy_flex_debug
+#endif
+#ifndef xlu__cfg_yylineno_ALREADY_DEFINED
+#undef yylineno
+#endif
+#ifndef xlu__cfg_yytables_fload_ALREADY_DEFINED
+#undef yytables_fload
+#endif
+#ifndef xlu__cfg_yytables_destroy_ALREADY_DEFINED
+#undef yytables_destroy
+#endif
+#ifndef xlu__cfg_yyTABLES_NAME_ALREADY_DEFINED
+#undef yyTABLES_NAME
+#endif
+
 #line 105 "libxlu_cfg_l.l"
 
-#line 348 "libxlu_cfg_l.h"
+#line 733 "libxlu_cfg_l.h"
 #undef xlu__cfg_yyIN_HEADER
 #endif /* xlu__cfg_yyHEADER_H */
