@@ -280,7 +280,7 @@ static xen_cpuid_leaf_t *find_leaf(
     return bsearch(&key, leaves, nr_leaves, sizeof(*leaves), compare_leaves);
 }
 
-int xc_cpuid_set(
+static int xc_cpuid_xend_policy(
     xc_interface *xch, uint32_t domid, const struct xc_xend_cpuid *xend)
 {
     int rc;
@@ -427,7 +427,8 @@ int xc_cpuid_set(
 
 int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
                           const uint32_t *featureset, unsigned int nr_features,
-                          bool pae)
+                          bool pae,
+                          const struct xc_xend_cpuid *xend)
 {
     int rc;
     xc_dominfo_t di;
@@ -636,6 +637,9 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
         rc = -errno;
         goto out;
     }
+
+    if ( xend && (rc = xc_cpuid_xend_policy(xch, domid, xend)) )
+        goto out;
 
     rc = 0;
 

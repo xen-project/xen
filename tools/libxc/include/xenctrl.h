@@ -1819,20 +1819,19 @@ struct xc_xend_cpuid {
     char *policy[4];
 };
 
-int xc_cpuid_set(xc_interface *xch,
-                 uint32_t domid,
-                 const struct xc_xend_cpuid *xend);
-
 /*
  * Make adjustments to the CPUID settings for a domain.
  *
  * Either pass a full new @featureset (and @nr_features), or adjust individual
  * features (@pae).
+ *
+ * Then (optionally) apply legacy XEND overrides (@xend) to the result.
  */
 int xc_cpuid_apply_policy(xc_interface *xch,
                           uint32_t domid,
                           const uint32_t *featureset,
-                          unsigned int nr_features, bool pae);
+                          unsigned int nr_features, bool pae,
+                          const struct xc_xend_cpuid *xend);
 int xc_mca_op(xc_interface *xch, struct xen_mc *mc);
 int xc_mca_op_inject_v2(xc_interface *xch, unsigned int flags,
                         xc_cpumap_t cpumap, unsigned int nr_cpus);
