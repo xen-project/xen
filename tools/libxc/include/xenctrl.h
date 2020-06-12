@@ -1795,8 +1795,7 @@ int xc_domain_debug_control(xc_interface *xch,
 int xc_cpuid_set(xc_interface *xch,
                  uint32_t domid,
                  const unsigned int *input,
-                 const char **config,
-                 char **config_transformed);
+                 const char **config);
 
 /*
  * Make adjustments to the CPUID settings for a domain.

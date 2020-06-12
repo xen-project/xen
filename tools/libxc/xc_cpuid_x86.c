@@ -279,7 +279,7 @@ int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
  */
 int xc_cpuid_set(
     xc_interface *xch, uint32_t domid, const unsigned int *input,
-    const char **config, char **config_transformed)
+    const char **config)
 {
     int rc;
     unsigned int i, j, regs[4] = {}, polregs[4] = {};
@@ -287,9 +287,6 @@ int xc_cpuid_set(
     xen_cpuid_leaf_t *leaves = NULL;
     unsigned int nr_leaves, policy_leaves, nr_msrs;
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
-
-    for ( i = 0; i < 4; ++i )
-        config_transformed[i] = NULL;
 
     if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
          di.domid != domid )
@@ -365,13 +362,6 @@ int xc_cpuid_set(
             continue;
         }
 
-        config_transformed[i] = calloc(33, 1); /* 32 bits, NUL terminator. */
-        if ( config_transformed[i] == NULL )
-        {
-            rc = -ENOMEM;
-            goto fail;
-        }
-
         /*
          * Notes for following this algorithm:
          *
@@ -399,11 +389,6 @@ int xc_cpuid_set(
                 set_feature(31 - j, regs[i]);
             else
                 clear_feature(31 - j, regs[i]);
-
-            config_transformed[i][j] = config[i][j];
-            /* All non 0/1 values get overwritten. */
-            if ( (config[i][j] & ~1) != '0' )
-                config_transformed[i][j] = '0' + val;
         }
     }
 
@@ -421,16 +406,8 @@ int xc_cpuid_set(
     }
 
     /* Success! */
-    goto out;
 
  fail:
-    for ( i = 0; i < 4; i++ )
-    {
-        free(config_transformed[i]);
-        config_transformed[i] = NULL;
-    }
-
- out:
     free(leaves);
 
     return rc;
