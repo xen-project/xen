@@ -16,7 +16,7 @@ static unsigned int nr_failures;
 #define fail(fmt, ...)                          \
 ({                                              \
     nr_failures++;                              \
-    printf(fmt, ##__VA_ARGS__);                 \
+    (void)printf(fmt, ##__VA_ARGS__);           \
 })
 
 #define memdup(ptr)                             \
@@ -64,6 +64,45 @@ static void test_vendor_identification(void)
             fail("  Test '%.12s', expected vendor %u, got %u\n",
                  t->ident, t->vendor, vendor);
     }
+}
+
+static bool leaves_are_sorted(const xen_cpuid_leaf_t *leaves, unsigned int nr)
+{
+    for ( unsigned int i = 1; i < nr; ++i )
+    {
+        /* leaf index went backwards => not sorted. */
+        if ( leaves[i - 1].leaf > leaves[i].leaf )
+            return false;
+
+        /* leaf index went forwards => ok */
+        if ( leaves[i - 1].leaf < leaves[i].leaf )
+            continue;
+
+        /* leave index the same, subleaf didn't increase => not sorted. */
+        if ( leaves[i - 1].subleaf >= leaves[i].subleaf )
+            return false;
+    }
+
+    return true;
+}
+
+static void test_cpuid_current(void)
+{
+    struct cpuid_policy p;
+    xen_cpuid_leaf_t leaves[CPUID_MAX_SERIALISED_LEAVES];
+    unsigned int nr = ARRAY_SIZE(leaves);
+    int rc;
+
+    printf("Testing CPUID on current CPU\n");
+
+    x86_cpuid_policy_fill_native(&p);
+
+    rc = x86_cpuid_copy_to_buffer(&p, leaves, &nr);
+    if ( rc != 0 )
+        return fail("  Serialise, expected rc 0, got %d\n", rc);
+
+    if ( !leaves_are_sorted(leaves, nr) )
+        return fail("  Leaves not sorted\n");
 }
 
 static void test_cpuid_serialise_success(void)
@@ -175,6 +214,13 @@ static void test_cpuid_serialise_success(void)
         {
             fail("  Test %s, expected %u leaves, got %u\n",
                  t->name, t->nr_leaves, nr);
+            goto test_done;
+        }
+
+        if ( !leaves_are_sorted(leaves, nr) )
+        {
+            fail("  Test %s, leaves not sorted\n",
+                 t->name);
             goto test_done;
         }
 
@@ -613,6 +659,7 @@ int main(int argc, char **argv)
 
     test_vendor_identification();
 
+    test_cpuid_current();
     test_cpuid_serialise_success();
     test_cpuid_deserialise_failure();
     test_cpuid_out_of_range_clearing();
