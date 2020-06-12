@@ -1792,10 +1792,36 @@ int xc_domain_debug_control(xc_interface *xch,
                             uint32_t vcpu);
 
 #if defined(__i386__) || defined(__x86_64__)
+
+/*
+ * CPUID policy data, expressed in the legacy XEND format.
+ *
+ * Policy is an array of strings, 32 chars long:
+ *   policy[0] = eax
+ *   policy[1] = ebx
+ *   policy[2] = ecx
+ *   policy[3] = edx
+ *
+ * The format of the string is the following:
+ *   '1' -> force to 1
+ *   '0' -> force to 0
+ *   'x' -> we don't care (use default)
+ *   'k' -> pass through host value
+ *   's' -> legacy alias for 'k'
+ */
+struct xc_xend_cpuid {
+    union {
+        struct {
+            uint32_t leaf, subleaf;
+        };
+        uint32_t input[2];
+    };
+    char *policy[4];
+};
+
 int xc_cpuid_set(xc_interface *xch,
                  uint32_t domid,
-                 const unsigned int *input,
-                 const char **config);
+                 const struct xc_xend_cpuid *xend);
 
 /*
  * Make adjustments to the CPUID settings for a domain.

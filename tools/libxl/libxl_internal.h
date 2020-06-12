@@ -2056,16 +2056,6 @@ typedef yajl_gen_status (*libxl__gen_json_callback)(yajl_gen hand, void *);
 _hidden char *libxl__object_to_json(libxl_ctx *ctx, const char *type,
                                     libxl__gen_json_callback gen, void *p);
 
-  /* holds the CPUID response for a single CPUID leaf
-   * input contains the value of the EAX and ECX register,
-   * and each policy string contains a filter to apply to
-   * the host given values for that particular leaf.
-   */
-struct libxl__cpuid_policy {
-    uint32_t input[2];
-    char *policy[4];
-};
-
 _hidden void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
                                  libxl_domain_build_info *info);
 

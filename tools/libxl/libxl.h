@@ -1310,11 +1310,11 @@ typedef struct {
 void libxl_bitmap_init(libxl_bitmap *map);
 void libxl_bitmap_dispose(libxl_bitmap *map);
 
-/* libxl_cpuid_policy_list is a dynamic array storing CPUID policies
- * for multiple leafs. It is terminated with an entry holding
- * XEN_CPUID_INPUT_UNUSED in input[0]
+/*
+ * libxl_cpuid_policy is opaque in the libxl ABI.  Users of both libxl and
+ * libxc may not make assumptions about xc_xend_cpuid.
  */
-typedef struct libxl__cpuid_policy libxl_cpuid_policy;
+typedef struct xc_xend_cpuid libxl_cpuid_policy;
 typedef libxl_cpuid_policy * libxl_cpuid_policy_list;
 void libxl_cpuid_dispose(libxl_cpuid_policy_list *cpuid_list);
 int libxl_cpuid_policy_list_length(const libxl_cpuid_policy_list *l);

@@ -259,27 +259,8 @@ int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
     return ret;
 }
 
-/*
- * Configure a single input with the informatiom from config.
- *
- * Config is an array of strings:
- *   config[0] = eax
- *   config[1] = ebx
- *   config[2] = ecx
- *   config[3] = edx
- *
- * The format of the string is the following:
- *   '1' -> force to 1
- *   '0' -> force to 0
- *   'x' -> we don't care (use default)
- *   'k' -> pass through host value
- *   's' -> legacy alias for 'k'
- *
- * In all cases, the returned string consists of just '0' and '1'.
- */
 int xc_cpuid_set(
-    xc_interface *xch, uint32_t domid, const unsigned int *input,
-    const char **config)
+    xc_interface *xch, uint32_t domid, const struct xc_xend_cpuid *xend)
 {
     int rc;
     unsigned int i, j, regs[4] = {}, polregs[4] = {};
@@ -324,7 +305,8 @@ int xc_cpuid_set(
         goto fail;
     }
     for ( i = 0; i < policy_leaves; ++i )
-        if ( leaves[i].leaf == input[0] && leaves[i].subleaf == input[1] )
+        if ( leaves[i].leaf == xend->leaf &&
+             leaves[i].subleaf == xend->subleaf )
         {
             polregs[0] = leaves[i].a;
             polregs[1] = leaves[i].b;
@@ -345,7 +327,8 @@ int xc_cpuid_set(
         goto fail;
     }
     for ( i = 0; i < policy_leaves; ++i )
-        if ( leaves[i].leaf == input[0] && leaves[i].subleaf == input[1] )
+        if ( leaves[i].leaf == xend->leaf &&
+             leaves[i].subleaf == xend->subleaf )
         {
             regs[0] = leaves[i].a;
             regs[1] = leaves[i].b;
@@ -356,7 +339,7 @@ int xc_cpuid_set(
 
     for ( i = 0; i < 4; i++ )
     {
-        if ( config[i] == NULL )
+        if ( xend->policy[i] == NULL )
         {
             regs[i] = polregs[i];
             continue;
@@ -375,14 +358,14 @@ int xc_cpuid_set(
             unsigned char polval = !!((polregs[i] & (1U << (31 - j))));
 
             rc = -EINVAL;
-            if ( !strchr("10xks", config[i][j]) )
+            if ( !strchr("10xks", xend->policy[i][j]) )
                 goto fail;
 
-            if ( config[i][j] == '1' )
+            if ( xend->policy[i][j] == '1' )
                 val = 1;
-            else if ( config[i][j] == '0' )
+            else if ( xend->policy[i][j] == '0' )
                 val = 0;
-            else if ( config[i][j] == 'x' )
+            else if ( xend->policy[i][j] == 'x' )
                 val = polval;
 
             if ( val )
@@ -393,7 +376,7 @@ int xc_cpuid_set(
     }
 
     /* Feed the transformed leaf back up to Xen. */
-    leaves[0] = (xen_cpuid_leaf_t){ input[0], input[1],
+    leaves[0] = (xen_cpuid_leaf_t){ xend->leaf, xend->subleaf,
                                     regs[0], regs[1], regs[2], regs[3] };
     rc = xc_set_domain_cpu_policy(xch, domid, 1, leaves, 0, NULL,
                                   &err_leaf, &err_subleaf, &err_msr);

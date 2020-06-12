@@ -288,7 +288,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
     char *sep, *val, *endptr;
     int i;
     const struct cpuid_flags *flag;
-    struct libxl__cpuid_policy *entry;
+    struct xc_xend_cpuid *entry;
     unsigned long num;
     char flags[33], *resstr;
 
@@ -366,7 +366,7 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
     char *endptr;
     unsigned long value;
     uint32_t leaf, subleaf = XEN_CPUID_INPUT_UNUSED;
-    struct libxl__cpuid_policy *entry;
+    struct xc_xend_cpuid *entry;
 
     /* parse the leaf number */
     value = strtoul(str, &endptr, 0);
@@ -442,8 +442,7 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid,
         return;
 
     for (i = 0; cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++)
-        xc_cpuid_set(ctx->xch, domid, cpuid[i].input,
-                     (const char**)cpuid[i].policy);
+        xc_cpuid_set(ctx->xch, domid, &cpuid[i]);
 }
 
 static const char *input_names[2] = { "leaf", "subleaf" };
