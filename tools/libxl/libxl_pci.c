@@ -1561,7 +1561,7 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
             LOGD(ERROR, domid,
                  "PCI device %04x:%02x:%02x.%u %s?",
                  pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func,
-                 errno == ENOSYS ? "cannot be assigned - no IOMMU"
+                 errno == EOPNOTSUPP ? "cannot be assigned - no IOMMU"
                  : "already assigned to a different guest");
             goto out;
         }
