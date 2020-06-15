@@ -431,8 +431,6 @@ x.Evtch = int(xc.evtch)
 x.Rref = int(xc.rref)
 x.Connection = ChannelConnection(xc.connection)
 switch x.Connection{
-case ChannelConnectionUnknown:
-x.ConnectionUnion = nil
 case ChannelConnectionPty:
 var connectionPty ChannelinfoConnectionUnionPty
 if err := connectionPty.fromC(xc);err != nil {
@@ -440,6 +438,8 @@ if err := connectionPty.fromC(xc);err != nil {
 }
 x.ConnectionUnion = connectionPty
 case ChannelConnectionSocket:
+x.ConnectionUnion = nil
+case ChannelConnectionUnknown:
 x.ConnectionUnion = nil
 default:
 return fmt.Errorf("invalid union key '%v'", x.Connection)}
@@ -1098,6 +1098,8 @@ if err := typeHvm.fromC(xc);err != nil {
  return fmt.Errorf("converting field typeHvm: %v", err)
 }
 x.TypeUnion = typeHvm
+case DomainTypeInvalid:
+x.TypeUnion = nil
 case DomainTypePv:
 var typePv DomainBuildInfoTypeUnionPv
 if err := typePv.fromC(xc);err != nil {
@@ -1110,8 +1112,6 @@ if err := typePvh.fromC(xc);err != nil {
  return fmt.Errorf("converting field typePvh: %v", err)
 }
 x.TypeUnion = typePvh
-case DomainTypeInvalid:
-x.TypeUnion = nil
 default:
 return fmt.Errorf("invalid union key '%v'", x.Type)}
 x.ArchArm.GicVersion = GicVersion(xc.arch_arm.gic_version)
@@ -2360,8 +2360,6 @@ x.Devid = Devid(xc.devid)
 x.Name = C.GoString(xc.name)
 x.Connection = ChannelConnection(xc.connection)
 switch x.Connection{
-case ChannelConnectionUnknown:
-x.ConnectionUnion = nil
 case ChannelConnectionPty:
 x.ConnectionUnion = nil
 case ChannelConnectionSocket:
@@ -2370,6 +2368,8 @@ if err := connectionSocket.fromC(xc);err != nil {
  return fmt.Errorf("converting field connectionSocket: %v", err)
 }
 x.ConnectionUnion = connectionSocket
+case ChannelConnectionUnknown:
+x.ConnectionUnion = nil
 default:
 return fmt.Errorf("invalid union key '%v'", x.Connection)}
 
@@ -3933,28 +3933,28 @@ return fmt.Errorf("converting field Domuuid: %v", err)
 x.ForUser = uint64(xc.for_user)
 x.Type = EventType(xc._type)
 switch x.Type{
-case EventTypeDomainShutdown:
-var typeDomainShutdown EventTypeUnionDomainShutdown
-if err := typeDomainShutdown.fromC(xc);err != nil {
- return fmt.Errorf("converting field typeDomainShutdown: %v", err)
-}
-x.TypeUnion = typeDomainShutdown
-case EventTypeDomainDeath:
-x.TypeUnion = nil
 case EventTypeDiskEject:
 var typeDiskEject EventTypeUnionDiskEject
 if err := typeDiskEject.fromC(xc);err != nil {
  return fmt.Errorf("converting field typeDiskEject: %v", err)
 }
 x.TypeUnion = typeDiskEject
+case EventTypeDomainCreateConsoleAvailable:
+x.TypeUnion = nil
+case EventTypeDomainDeath:
+x.TypeUnion = nil
+case EventTypeDomainShutdown:
+var typeDomainShutdown EventTypeUnionDomainShutdown
+if err := typeDomainShutdown.fromC(xc);err != nil {
+ return fmt.Errorf("converting field typeDomainShutdown: %v", err)
+}
+x.TypeUnion = typeDomainShutdown
 case EventTypeOperationComplete:
 var typeOperationComplete EventTypeUnionOperationComplete
 if err := typeOperationComplete.fromC(xc);err != nil {
  return fmt.Errorf("converting field typeOperationComplete: %v", err)
 }
 x.TypeUnion = typeOperationComplete
-case EventTypeDomainCreateConsoleAvailable:
-x.TypeUnion = nil
 default:
 return fmt.Errorf("invalid union key '%v'", x.Type)}
 

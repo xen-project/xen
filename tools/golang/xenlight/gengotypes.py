@@ -379,7 +379,7 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
 
     # Create switch statement to determine which 'union element'
     # to populate in the Go struct.
-    for case_name, case_tuple in cases.items():
+    for case_name, case_tuple in sorted(cases.items()):
         (case_val, case_type) = case_tuple
 
         s += 'case {}:\n'.format(case_val)
