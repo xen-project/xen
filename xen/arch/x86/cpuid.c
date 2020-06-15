@@ -402,6 +402,8 @@ static void __init calculate_pv_def_policy(void)
     for ( i = 0; i < ARRAY_SIZE(pv_featureset); ++i )
         pv_featureset[i] &= pv_def_featuremask[i];
 
+    guest_common_feature_adjustments(pv_featureset);
+
     sanitise_featureset(pv_featureset);
     cpuid_featureset_to_policy(pv_featureset, p);
     recalculate_xstate(p);
