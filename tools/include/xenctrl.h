@@ -1583,6 +1583,79 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, xc_cpumap_t mask);
 
 int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask);
 
+/**
+ * Enable vmtrace for given vCPU.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid domain identifier
+ * @parm vcpu vcpu identifier
+ * @return 0 on success, -1 on failure
+ */
+int xc_vmtrace_enable(xc_interface *xch, uint32_t domid, uint32_t vcpu);
+
+/**
+ * Enable vmtrace for given vCPU.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid domain identifier
+ * @parm vcpu vcpu identifier
+ * @return 0 on success, -1 on failure
+ */
+int xc_vmtrace_disable(xc_interface *xch, uint32_t domid, uint32_t vcpu);
+
+/**
+ * Enable vmtrace for a given vCPU, along with resetting status/offset
+ * details.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid domain identifier
+ * @parm vcpu vcpu identifier
+ * @return 0 on success, -1 on failure
+ */
+int xc_vmtrace_reset_and_enable(xc_interface *xch, uint32_t domid,
+                                uint32_t vcpu);
+
+/**
+ * Get current output position inside the trace buffer.
+ *
+ * Repeated calls will return different values if tracing is enabled.  It is
+ * platform specific what happens when the buffer fills completely.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid domain identifier
+ * @parm vcpu vcpu identifier
+ * @parm pos current output position in bytes
+ * @return 0 on success, -1 on failure
+ */
+int xc_vmtrace_output_position(xc_interface *xch, uint32_t domid,
+                               uint32_t vcpu, uint64_t *pos);
+
+/**
+ * Get platform specific vmtrace options.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid domain identifier
+ * @parm vcpu vcpu identifier
+ * @parm key platform-specific input
+ * @parm value platform-specific output
+ * @return 0 on success, -1 on failure
+ */
+int xc_vmtrace_get_option(xc_interface *xch, uint32_t domid,
+                          uint32_t vcpu, uint64_t key, uint64_t *value);
+
+/**
+ * Set platform specific vntvmtrace options.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid domain identifier
+ * @parm vcpu vcpu identifier
+ * @parm key platform-specific input
+ * @parm value platform-specific input
+ * @return 0 on success, -1 on failure
+ */
+int xc_vmtrace_set_option(xc_interface *xch, uint32_t domid,
+                          uint32_t vcpu, uint64_t key, uint64_t value);
+
 int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
 int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);
 

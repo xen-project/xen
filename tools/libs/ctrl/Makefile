@@ -22,6 +22,7 @@ SRCS-y       += xc_pm.c
 SRCS-y       += xc_cpu_hotplug.c
 SRCS-y       += xc_resume.c
 SRCS-y       += xc_vm_event.c
+SRCS-y       += xc_vmtrace.c
 SRCS-y       += xc_monitor.c
 SRCS-y       += xc_mem_paging.c
 SRCS-y       += xc_mem_access.c
