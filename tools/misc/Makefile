@@ -50,6 +50,10 @@ TARGETS_COPY += xenpvnetboot
 # Everything which needs to be built
 TARGETS_BUILD := $(filter-out $(TARGETS_COPY),$(TARGETS_ALL))
 
+# ... including build-only targets
+TARGETS_BUILD-$(CONFIG_X86)    += xen-vmtrace
+TARGETS_BUILD += $(TARGETS_BUILD-y)
+
 .PHONY: all build
 all build: $(TARGETS_BUILD)
 
@@ -89,6 +93,9 @@ xen-hvmcrash: xen-hvmcrash.o
 
 xen-memshare: xen-memshare.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
+
+xen-vmtrace: xen-vmtrace.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenforeignmemory) $(APPEND_LDFLAGS)
 
 xenperf: xenperf.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
