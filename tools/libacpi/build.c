@@ -351,7 +351,6 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
     struct acpi_20_waet *waet;
     struct acpi_20_tcpa *tcpa;
     unsigned char *ssdt;
-    static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
     void *lasa;
 
     /* MADT. */
@@ -413,9 +412,8 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
 
     /* TPM TCPA and SSDT. */
     if ( (config->table_flags & ACPI_HAS_TCPA) &&
-         (config->tis_hdr[0] == tis_signature[0]) &&
-         (config->tis_hdr[1] == tis_signature[1]) &&
-         (config->tis_hdr[2] == tis_signature[2]) )
+         (config->tis_hdr[0] != 0 && config->tis_hdr[0] != 0xffff) &&
+         (config->tis_hdr[1] != 0 && config->tis_hdr[1] != 0xffff) )
     {
         ssdt = ctxt->mem_ops.alloc(ctxt, sizeof(ssdt_tpm), 16);
         if (!ssdt) return -1;
