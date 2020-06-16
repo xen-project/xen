@@ -428,6 +428,20 @@ static void vmx_domain_relinquish_resources(struct domain *d)
     vmx_free_vlapic_mapping(d);
 }
 
+static void vmx_init_ipt(struct vcpu *v)
+{
+    unsigned int size = v->domain->vmtrace_size;
+
+    if ( !size )
+        return;
+
+    /* Checked by domain creation logic. */
+    ASSERT(v->vmtrace.pg);
+    ASSERT(size >= PAGE_SIZE && (size & (size - 1)) == 0);
+
+    v->arch.msrs->rtit.output_limit = size - 1;
+}
+
 static int vmx_vcpu_initialise(struct vcpu *v)
 {
     int rc;
@@ -470,6 +484,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
     }
 
     vmx_install_vlapic_mapping(v);
+    vmx_init_ipt(v);
 
     return 0;
 }
@@ -508,22 +523,39 @@ static void vmx_restore_host_msrs(void)
 
 static void vmx_save_guest_msrs(struct vcpu *v)
 {
+    struct vcpu_msrs *msrs = v->arch.msrs;
+
     /*
      * We cannot cache SHADOW_GS_BASE while the VCPU runs, as it can
      * be updated at any time via SWAPGS, which we cannot trap.
      */
     v->arch.hvm.vmx.shadow_gs = read_gs_shadow();
+
+    if ( v->arch.hvm.vmx.ipt_active )
+    {
+        rdmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
+        rdmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
+    }
 }
 
 static void vmx_restore_guest_msrs(struct vcpu *v)
 {
+    const struct vcpu_msrs *msrs = v->arch.msrs;
+
     write_gs_shadow(v->arch.hvm.vmx.shadow_gs);
     wrmsrl(MSR_STAR,           v->arch.hvm.vmx.star);
     wrmsrl(MSR_LSTAR,          v->arch.hvm.vmx.lstar);
     wrmsrl(MSR_SYSCALL_MASK,   v->arch.hvm.vmx.sfmask);
 
     if ( cpu_has_msr_tsc_aux )
-        wrmsr_tsc_aux(v->arch.msrs->tsc_aux);
+        wrmsr_tsc_aux(msrs->tsc_aux);
+
+    if ( v->arch.hvm.vmx.ipt_active )
+    {
+        wrmsrl(MSR_RTIT_OUTPUT_BASE, page_to_maddr(v->vmtrace.pg));
+        wrmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
+        wrmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
+    }
 }
 
 void vmx_update_cpu_exec_control(struct vcpu *v)

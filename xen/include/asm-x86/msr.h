@@ -306,6 +306,38 @@ struct vcpu_msrs
         };
     } misc_features_enables;
 
+    /*
+     * 0x00000560 ... 57x - MSR_RTIT_*
+     *
+     * "Real Time Instruction Trace", now called Processor Trace.
+     *
+     * These MSRs are not exposed to guests.  They are controlled by Xen
+     * behind the scenes, when vmtrace is enabled for the domain.
+     *
+     * MSR_RTIT_OUTPUT_BASE not stored here.  It is fixed per vcpu, and
+     * derived from v->vmtrace.buf.
+     */
+    struct {
+        /*
+         * Placed in the MSR load/save lists.  Only modified by hypercall in
+         * the common case.
+         */
+        uint64_t ctl;
+
+        /*
+         * Updated by hardware in non-root mode.  Synchronised here on vcpu
+         * context switch.
+         */
+        uint64_t status;
+        union {
+            uint64_t output_mask;
+            struct {
+                uint32_t output_limit;
+                uint32_t output_offset;
+            };
+        };
+    } rtit;
+
     /* 0x00000da0 - MSR_IA32_XSS */
     struct {
         uint64_t raw;

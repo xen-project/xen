@@ -243,7 +243,7 @@ static bool_t cap_check(const char *name, u32 expected, u32 saw)
     return saw != expected;
 }
 
-static int vmx_init_vmcs_config(void)
+static int vmx_init_vmcs_config(bool bsp)
 {
     u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
     u32 _vmx_pin_based_exec_control;
@@ -291,6 +291,20 @@ static int vmx_init_vmcs_config(void)
         _vmx_cpu_based_exec_control &=
             ~(CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING);
 
+    rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
+
+    /* Check whether IPT is supported in VMX operation. */
+    if ( bsp )
+        vmtrace_available = cpu_has_proc_trace &&
+                            (_vmx_misc_cap & VMX_MISC_PROC_TRACE);
+    else if ( vmtrace_available &&
+              !(_vmx_misc_cap & VMX_MISC_PROC_TRACE) )
+    {
+        printk("VMX: IPT capabilities differ between CPU%u and BSP\n",
+               smp_processor_id());
+        return -EINVAL;
+    }
+
     if ( _vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
     {
         min = 0;
@@ -305,7 +319,6 @@ static int vmx_init_vmcs_config(void)
                SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS |
                SECONDARY_EXEC_XSAVES |
                SECONDARY_EXEC_TSC_SCALING);
-        rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
         if ( _vmx_misc_cap & VMX_MISC_VMWRITE_ALL )
             opt |= SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
         if ( opt_vpid_enabled )
@@ -715,7 +728,7 @@ static int _vmx_cpu_up(bool bsp)
         wrmsr(MSR_IA32_FEATURE_CONTROL, eax, 0);
     }
 
-    if ( (rc = vmx_init_vmcs_config()) != 0 )
+    if ( (rc = vmx_init_vmcs_config(bsp)) != 0 )
         return rc;
 
     INIT_LIST_HEAD(&this_cpu(active_vmcs_list));

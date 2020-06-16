@@ -188,6 +188,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"avx512-ifma",  0x00000007,  0, CPUID_REG_EBX, 21,  1},
         {"clflushopt",   0x00000007,  0, CPUID_REG_EBX, 23,  1},
         {"clwb",         0x00000007,  0, CPUID_REG_EBX, 24,  1},
+        {"proc-trace",   0x00000007,  0, CPUID_REG_EBX, 25,  1},
         {"avx512pf",     0x00000007,  0, CPUID_REG_EBX, 26,  1},
         {"avx512er",     0x00000007,  0, CPUID_REG_EBX, 27,  1},
         {"avx512cd",     0x00000007,  0, CPUID_REG_EBX, 28,  1},

@@ -106,7 +106,7 @@ static const char *const str_7b0[32] =
     [18] = "rdseed",   [19] = "adx",
     [20] = "smap",     [21] = "avx512-ifma",
     [22] = "pcommit",  [23] = "clflushopt",
-    [24] = "clwb",     [25] = "pt",
+    [24] = "clwb",     [25] = "proc-trace",
     [26] = "avx512pf", [27] = "avx512er",
     [28] = "avx512cd", [29] = "sha",
     [30] = "avx512bw", [31] = "avx512vl",
