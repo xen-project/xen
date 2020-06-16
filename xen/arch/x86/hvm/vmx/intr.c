@@ -256,6 +256,12 @@ void vmx_intr_assist(void)
     if ( unlikely(v->arch.vm_event) && v->arch.vm_event->sync_event )
         return;
 
+#ifdef CONFIG_MEM_SHARING
+    /* Block event injection for VM fork if requested */
+    if ( unlikely(v->domain->arch.hvm.mem_sharing.block_interrupts) )
+        return;
+#endif
+
     /* Crank the handle on interrupt state. */
     pt_vector = pt_update_irq(v);
 

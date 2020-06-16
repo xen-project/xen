@@ -67,7 +67,7 @@ struct hvm_ioreq_server {
 #ifdef CONFIG_MEM_SHARING
 struct mem_sharing_domain
 {
-    bool enabled;
+    bool enabled, block_interrupts;
 
     /*
      * When releasing shared gfn's in a preemptible manner, recall where
