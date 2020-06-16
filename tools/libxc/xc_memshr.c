@@ -240,7 +240,7 @@ int xc_memshr_debug_gref(xc_interface *xch,
 }
 
 int xc_memshr_fork(xc_interface *xch, uint32_t pdomid, uint32_t domid,
-                   bool allow_with_iommu)
+                   bool allow_with_iommu, bool block_interrupts)
 {
     xen_mem_sharing_op_t mso;
 
@@ -251,6 +251,8 @@ int xc_memshr_fork(xc_interface *xch, uint32_t pdomid, uint32_t domid,
 
     if ( allow_with_iommu )
         mso.u.fork.flags |= XENMEM_FORK_WITH_IOMMU_ALLOWED;
+    if ( block_interrupts )
+        mso.u.fork.flags |= XENMEM_FORK_BLOCK_INTERRUPTS;
 
     return xc_memshr_memop(xch, domid, &mso);
 }

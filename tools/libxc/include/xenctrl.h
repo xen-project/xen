@@ -2240,7 +2240,8 @@ int xc_memshr_range_share(xc_interface *xch,
 int xc_memshr_fork(xc_interface *xch,
                    uint32_t source_domain,
                    uint32_t client_domain,
-                   bool allow_with_iommu);
+                   bool allow_with_iommu,
+                   bool block_interrupts);
 
 /*
  * Note: this function is only intended to be used on short-lived forks that
