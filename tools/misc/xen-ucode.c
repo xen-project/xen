@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
         fprintf(stderr,
                 "xen-ucode: Xen microcode updating tool\n"
                 "Usage: %s <microcode blob>\n", argv[0]);
-        return 0;
+        exit(2);
     }
 
     filename = argv[1];
@@ -34,14 +34,14 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "Could not open %s. (err: %s)\n",
                 filename, strerror(errno));
-        return errno;
+        exit(1);
     }
 
     if ( fstat(fd, &st) != 0 )
     {
         fprintf(stderr, "Could not get the size of %s. (err: %s)\n",
                 filename, strerror(errno));
-        return errno;
+        exit(1);
     }
 
     len = st.st_size;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     if ( buf == MAP_FAILED )
     {
         fprintf(stderr, "mmap failed. (error: %s)\n", strerror(errno));
-        return errno;
+        exit(1);
     }
 
     xch = xc_interface_open(NULL, NULL, 0);
@@ -57,20 +57,23 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "Error opening xc interface. (err: %s)\n",
                 strerror(errno));
-        return errno;
+        exit(1);
     }
 
     ret = xc_microcode_update(xch, buf, len);
     if ( ret )
+    {
         fprintf(stderr, "Failed to update microcode. (err: %s)\n",
                 strerror(errno));
+        exit(1);
+    }
 
     xc_interface_close(xch);
 
     if ( munmap(buf, len) )
     {
         printf("Could not unmap: %d(%s)\n", errno, strerror(errno));
-        return errno;
+        exit(1);
     }
     close(fd);
 
