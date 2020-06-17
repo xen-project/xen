@@ -162,7 +162,8 @@ static void shutdown_domain(uint32_t domid,
     }
 }
 
-static void wait_for_domain_deaths(libxl_evgen_domain_death **deathws, int nr)
+static void wait_for_domain_deaths(libxl_evgen_domain_death **deathws, int nr,
+                                   int wait_for_shutdown_or_death)
 {
     int rc, count = 0;
     LOG("Waiting for %d domains", nr);
@@ -183,8 +184,12 @@ static void wait_for_domain_deaths(libxl_evgen_domain_death **deathws, int nr)
         case LIBXL_EVENT_TYPE_DOMAIN_SHUTDOWN:
             LOG("Domain %d has been shut down, reason code %d",
                 event->domid, event->u.domain_shutdown.shutdown_reason);
-            libxl_evdisable_domain_death(ctx, deathws[event->for_user]);
-            count++;
+            if (wait_for_shutdown_or_death) {
+                libxl_evdisable_domain_death(ctx, deathws[event->for_user]);
+                count++;
+            } else {
+                LOG("Domain %d continue waiting for death", event->domid);
+            }
             break;
         default:
             LOG("Unexpected event type %d", event->type);
@@ -214,7 +219,7 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
         all = 1;
         break;
     case 'w':
-        wait_for_it = 1;
+        wait_for_it++;
         break;
     case 'F':
         fallback_trigger = 1;
@@ -246,7 +251,7 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
         }
 
         if (deathws) {
-            wait_for_domain_deaths(deathws, nrdeathws);
+            wait_for_domain_deaths(deathws, nrdeathws, wait_for_it == 1);
             free(deathws);
         }
 
@@ -258,7 +263,7 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
         fn(domid, wait_for_it ? &deathw : NULL, 0, fallback_trigger);
 
         if (wait_for_it)
-            wait_for_domain_deaths(&deathw, 1);
+            wait_for_domain_deaths(&deathw, 1, wait_for_it == 1);
     }
 
 

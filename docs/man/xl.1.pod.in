@@ -743,7 +743,9 @@ of a Xen system.
 
 =item B<-w>, B<--wait>
 
-Wait for the domain to complete shutdown before returning.
+Wait for the domain to complete shutdown before returning.  If given once,
+the wait is for domain shutdown or domain death.  If given multiple times,
+the wait is for domain death only.
 
 =item B<-F>
 
