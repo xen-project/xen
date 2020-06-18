@@ -681,6 +681,15 @@ Windows).
 
 If this option is not specified then it will default to B<false>.
 
+=item B<vmtrace_buf_kb=KBYTES>
+
+Specifies the size of vmtrace buffer that would be allocated for each
+vCPU belonging to this domain.  Disabled (i.e.  B<vmtrace_buf_kb=0>) by
+default.
+
+B<NOTE>: Acceptable values are platform specific.  For Intel Processor
+Trace, this value must be a power of 2 between 4k and 16M.
+
 =back
 
 =head2 Devices

@@ -514,6 +514,7 @@ GicVersion GicVersion
 Vuart VuartType
 }
 Altp2M Altp2MMode
+VmtraceBufKb int
 }
 
 type domainBuildInfoTypeUnion interface {

@@ -648,6 +648,10 @@ libxl_domain_build_info = Struct("domain_build_info",[
     # supported by x86 HVM and ARM support is planned.
     ("altp2m", libxl_altp2m_mode),
 
+    # Size of preallocated vmtrace trace buffers (in KBYTES).
+    # Use zero value to disable this feature.
+    ("vmtrace_buf_kb", integer),
+
     ], dir=DIR_IN,
        copy_deprecated_fn="libxl__domain_build_info_copy_deprecated",
 )
