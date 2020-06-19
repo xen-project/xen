@@ -201,7 +201,7 @@ void hvm_gsi_deassert(struct domain *d, unsigned int gsi)
     int trig = vioapic_get_trigger_mode(d, gsi);
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
 
-    if ( trig <= VIOAPIC_EDGE_TRIG || gsi >= hvm_irq->nr_gsis )
+    if ( trig != VIOAPIC_LEVEL_TRIG || gsi >= hvm_irq->nr_gsis )
     {
         ASSERT(trig == VIOAPIC_EDGE_TRIG && gsi < hvm_irq->nr_gsis);
         return;
