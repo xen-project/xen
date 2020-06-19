@@ -215,6 +215,15 @@ static bool optee_probe(void)
     return true;
 }
 
+/*
+ * TODO: There is a potential issue with guests that either have RAM
+ * at IPA of 0x0 or some of their memory is mapped at PA 0x0. This is
+ * because PA of 0x0 is considered as NULL pointer by OP-TEE. It will
+ * not be able to map buffer with such pointer to TA address space, or
+ * use such buffer for communication with the guest. We either need to
+ * check that guest have no such mappings or ensure that OP-TEE
+ * enabled guest will not be created with such mappings.
+ */
 static int optee_domain_init(struct domain *d)
 {
     struct arm_smccc_res resp;
@@ -725,6 +734,15 @@ static int translate_noncontig(struct optee_domain *ctx,
         uint64_t next_page_data;
     } *guest_data, *xen_data;
 
+    /*
+     * Special case: a buffer with buf_ptr == 0x0 is considered as a
+     * NULL pointer by OP-TEE. No translation is needed. This can lead
+     * to an issue as IPA 0x0 is a valid address for Xen. See the
+     * comment near optee_domain_init()
+     */
+    if ( !param->u.tmem.buf_ptr )
+        return 0;
+
     /* Offset of user buffer withing OPTEE_MSG_NONCONTIG_PAGE_SIZE-sized page */
     offset = param->u.tmem.buf_ptr & (OPTEE_MSG_NONCONTIG_PAGE_SIZE - 1);
 
@@ -865,9 +883,12 @@ static int translate_params(struct optee_domain *ctx,
             }
             else
             {
-                gdprintk(XENLOG_WARNING, "Guest tries to use old tmem arg\n");
-                ret = -EINVAL;
-                goto out;
+                if ( call->xen_arg->params[i].u.tmem.buf_ptr )
+                {
+                    gdprintk(XENLOG_WARNING, "Guest tries to use old tmem arg\n");
+                    ret = -EINVAL;
+                    goto out;
+                }
             }
             break;
         case OPTEE_MSG_ATTR_TYPE_NONE:
