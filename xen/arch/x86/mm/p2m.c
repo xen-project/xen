@@ -1178,7 +1178,7 @@ static int finish_type_change(struct p2m_domain *p2m,
         rc = p2m->recalc(p2m, gfn);
         /*
          * ept->recalc could return 0/1/-ENOMEM. pt->recalc could return
-         * 0/-ENOMEM/-ENOENT, -ENOENT isn't an error as we are looping
+         * 0/1/-ENOMEM/-ENOENT, -ENOENT isn't an error as we are looping
          * gfn here.
          */
         if ( rc == -ENOENT )
