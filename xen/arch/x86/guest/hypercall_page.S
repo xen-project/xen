@@ -17,9 +17,9 @@ GLOBAL(hypercall_page)
  */
 #define DECLARE_HYPERCALL(name)                                                 \
         .globl HYPERCALL_ ## name;                                              \
-        .set   HYPERCALL_ ## name, hypercall_page + __HYPERVISOR_ ## name * 32; \
         .type  HYPERCALL_ ## name, STT_FUNC;                                    \
-        .size  HYPERCALL_ ## name, 32
+        .size  HYPERCALL_ ## name, 32;                                          \
+        .set   HYPERCALL_ ## name, hypercall_page + __HYPERVISOR_ ## name * 32
 
 DECLARE_HYPERCALL(set_trap_table)
 DECLARE_HYPERCALL(mmu_update)
