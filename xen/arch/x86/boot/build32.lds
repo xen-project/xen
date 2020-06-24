@@ -50,6 +50,20 @@ SECTIONS
         *(.got.plt)
   }
 
+  /*
+   * Discarding .shstrtab is not supported by LLD (LLVM LD) and will trigger an
+   * error. Also keep the rest of the control sections to match GNU LD behavior.
+   */
+  .shstrtab : {
+        *(.shstrtab)
+  }
+  .strtab : {
+        *(.strtab)
+  }
+  .symtab : {
+        *(.symtab)
+  }
+
   /DISCARD/ : {
         /*
          * Discard everything else, to prevent linkers from putting
