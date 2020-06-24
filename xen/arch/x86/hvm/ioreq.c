@@ -107,15 +107,7 @@ static void hvm_io_assist(struct hvm_ioreq_vcpu *sv, uint64_t data)
     ioreq_t *ioreq = &v->arch.hvm.hvm_io.io_req;
 
     if ( hvm_ioreq_needs_completion(ioreq) )
-    {
-        ioreq->state = STATE_IORESP_READY;
         ioreq->data = data;
-    }
-    else
-        ioreq->state = STATE_IOREQ_NONE;
-
-    msix_write_completion(v);
-    vcpu_end_shutdown_deferral(v);
 
     sv->pending = false;
 }
@@ -206,6 +198,12 @@ bool handle_hvm_io_completion(struct vcpu *v)
             }
         }
     }
+
+    vio->io_req.state = hvm_ioreq_needs_completion(&vio->io_req) ?
+        STATE_IORESP_READY : STATE_IOREQ_NONE;
+
+    msix_write_completion(v);
+    vcpu_end_shutdown_deferral(v);
 
     io_completion = vio->io_completion;
     vio->io_completion = HVMIO_no_completion;
