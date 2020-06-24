@@ -545,26 +545,35 @@ void trace_exit_reason(u32 *irq_traced)
     }
 }
 
-/*
- * "AAJ72. EOI Transaction May Not be Sent if Software Enters Core C6 During 
- * an Interrupt Service Routine"
- * 
- * There was an errata with some Core i7 processors that an EOI transaction 
- * may not be sent if software enters core C6 during an interrupt service 
- * routine. So we don't enter deep Cx state if there is an EOI pending.
- */
-static bool errata_c6_eoi_workaround(void)
+bool errata_c6_eoi_workaround(void)
 {
-    static int8_t fix_needed = -1;
+    static int8_t __read_mostly fix_needed = -1;
 
     if ( unlikely(fix_needed == -1) )
     {
-        int model = boot_cpu_data.x86_model;
-        fix_needed = (cpu_has_apic && !directed_eoi_enabled &&
-                      (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) &&
-                      (boot_cpu_data.x86 == 6) &&
-                      ((model == 0x1a) || (model == 0x1e) || (model == 0x1f) ||
-                       (model == 0x25) || (model == 0x2c) || (model == 0x2f)));
+#define INTEL_FAM6_MODEL(m) { X86_VENDOR_INTEL, 6, m, X86_FEATURE_ALWAYS }
+        /*
+         * Errata AAJ72: EOI Transaction May Not be Sent if Software Enters
+         * Core C6 During an Interrupt Service Routine"
+         *
+         * There was an errata with some Core i7 processors that an EOI
+         * transaction may not be sent if software enters core C6 during an
+         * interrupt service routine. So we don't enter deep Cx state if
+         * there is an EOI pending.
+         */
+        static const struct x86_cpu_id eoi_errata[] = {
+            INTEL_FAM6_MODEL(0x1a),
+            INTEL_FAM6_MODEL(0x1e),
+            INTEL_FAM6_MODEL(0x1f),
+            INTEL_FAM6_MODEL(0x25),
+            INTEL_FAM6_MODEL(0x2c),
+            INTEL_FAM6_MODEL(0x2f),
+            { }
+        };
+#undef INTEL_FAM6_MODEL
+
+        fix_needed = cpu_has_apic && !directed_eoi_enabled &&
+                     x86_match_cpu(eoi_errata);
     }
 
     return (fix_needed && cpu_has_pending_apic_eoi());
@@ -672,7 +681,7 @@ static void acpi_processor_idle(void)
         return;
     }
 
-    if ( (cx->type == ACPI_STATE_C3) && errata_c6_eoi_workaround() )
+    if ( (cx->type >= ACPI_STATE_C3) && errata_c6_eoi_workaround() )
         cx = power->safe_state;
 
 
