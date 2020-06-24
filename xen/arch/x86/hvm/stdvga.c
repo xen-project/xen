@@ -322,7 +322,7 @@ static int stdvga_mem_read(const struct hvm_io_handler *handler,
         data = stdvga_mem_readb(addr);
         data |= stdvga_mem_readb(addr + 1) << 8;
         data |= stdvga_mem_readb(addr + 2) << 16;
-        data |= stdvga_mem_readb(addr + 3) << 24;
+        data |= (uint32_t)stdvga_mem_readb(addr + 3) << 24;
         break;
 
     case 8:
