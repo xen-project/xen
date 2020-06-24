@@ -138,7 +138,8 @@ static void pt_pirq_softirq_reset(struct hvm_pirq_dpci *pirq_dpci)
 
 bool pt_irq_need_timer(uint32_t flags)
 {
-    return !(flags & (HVM_IRQ_DPCI_GUEST_MSI | HVM_IRQ_DPCI_TRANSLATE));
+    return !(flags & (HVM_IRQ_DPCI_GUEST_MSI | HVM_IRQ_DPCI_TRANSLATE |
+                      HVM_IRQ_DPCI_NO_EOI));
 }
 
 static int pt_irq_guest_eoi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
@@ -558,6 +559,12 @@ int pt_irq_create_bind(
                      */
                     ASSERT(!mask);
                     share = trigger_mode;
+                    if ( trigger_mode == VIOAPIC_EDGE_TRIG )
+                        /*
+                         * Edge IO-APIC interrupt, no EOI or unmask to perform
+                         * and hence no timer needed.
+                         */
+                        pirq_dpci->flags |= HVM_IRQ_DPCI_NO_EOI;
                 }
             }
 
@@ -897,17 +904,13 @@ static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
             send_guest_pirq(d, pirq);
 
             if ( pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI )
-            {
-                spin_unlock(&d->event_lock);
-                return;
-            }
+                goto out;
         }
 
         if ( pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI )
         {
             vmsi_deliver_pirq(d, pirq_dpci);
-            spin_unlock(&d->event_lock);
-            return;
+            goto out;
         }
 
         list_for_each_entry ( digl, &pirq_dpci->digl_list, list )
@@ -920,6 +923,8 @@ static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
         if ( pirq_dpci->flags & HVM_IRQ_DPCI_IDENTITY_GSI )
         {
             hvm_gsi_assert(d, pirq->pirq);
+            if ( pirq_dpci->flags & HVM_IRQ_DPCI_NO_EOI )
+                goto out;
             pirq_dpci->pending++;
         }
 
@@ -927,8 +932,7 @@ static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
         {
             /* for translated MSI to INTx interrupt, eoi as early as possible */
             __msi_pirq_eoi(pirq_dpci);
-            spin_unlock(&d->event_lock);
-            return;
+            goto out;
         }
 
         /*
@@ -941,6 +945,8 @@ static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
         ASSERT(pt_irq_need_timer(pirq_dpci->flags));
         set_timer(&pirq_dpci->timer, NOW() + PT_IRQ_TIME_OUT);
     }
+
+ out:
     spin_unlock(&d->event_lock);
 }
 
