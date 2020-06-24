@@ -729,11 +729,12 @@ static cpumask_t cpu_initialized;
  */
 void load_system_tables(void)
 {
-	unsigned int cpu = smp_processor_id();
+	unsigned int i, cpu = smp_processor_id();
 	unsigned long stack_bottom = get_stack_bottom(),
 		stack_top = stack_bottom & ~(STACK_SIZE - 1);
 
-	struct tss64 *tss = &this_cpu(tss_page).tss;
+	/* The TSS may be live.	 Disuade any clever optimisations. */
+	volatile struct tss64 *tss = &this_cpu(tss_page).tss;
 	seg_desc_t *gdt =
 		this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY;
 	seg_desc_t *compat_gdt =
@@ -748,30 +749,26 @@ void load_system_tables(void)
 		.limit = (IDT_ENTRIES * sizeof(idt_entry_t)) - 1,
 	};
 
-	*tss = (struct tss64){
-		/* Main stack for interrupts/exceptions. */
-		.rsp0 = stack_bottom,
+	/*
+	 * Set up the TSS.  Warning - may be live, and the NMI/#MC must remain
+	 * valid on every instruction boundary.  (Note: these are all
+	 * semantically ACCESS_ONCE() due to tss's volatile qualifier.)
+	 *
+	 * rsp0 refers to the primary stack.  #MC, #DF, NMI and #DB handlers
+	 * each get their own stacks.  No IO Bitmap.
+	 */
+	tss->rsp0 = stack_bottom;
+	tss->ist[IST_MCE - 1] = stack_top + IST_MCE * PAGE_SIZE;
+	tss->ist[IST_DF  - 1] = stack_top + IST_DF  * PAGE_SIZE;
+	tss->ist[IST_NMI - 1] = stack_top + IST_NMI * PAGE_SIZE;
+	tss->ist[IST_DB  - 1] = stack_top + IST_DB  * PAGE_SIZE;
+	tss->bitmap = IOBMP_INVALID_OFFSET;
 
-		/* Ring 1 and 2 stacks poisoned. */
-		.rsp1 = 0x8600111111111111ul,
-		.rsp2 = 0x8600111111111111ul,
-
-		/*
-		 * MCE, NMI and Double Fault handlers get their own stacks.
-		 * All others poisoned.
-		 */
-		.ist = {
-			[IST_MCE - 1] = stack_top + IST_MCE * PAGE_SIZE,
-			[IST_DF  - 1] = stack_top + IST_DF  * PAGE_SIZE,
-			[IST_NMI - 1] = stack_top + IST_NMI * PAGE_SIZE,
-			[IST_DB  - 1] = stack_top + IST_DB  * PAGE_SIZE,
-
-			[IST_MAX ... ARRAY_SIZE(tss->ist) - 1] =
-				0x8600111111111111ul,
-		},
-
-		.bitmap = IOBMP_INVALID_OFFSET,
-	};
+	/* All other stack pointers poisioned. */
+	for ( i = IST_MAX; i < ARRAY_SIZE(tss->ist); ++i )
+		tss->ist[i] = 0x8600111111111111ul;
+	tss->rsp1 = 0x8600111111111111ul;
+	tss->rsp2 = 0x8600111111111111ul;
 
 	BUILD_BUG_ON(sizeof(*tss) <= 0x67); /* Mandated by the architecture. */
 
