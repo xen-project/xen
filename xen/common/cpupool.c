@@ -519,6 +519,9 @@ static int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
     debugtrace_printk("cpupool_unassign_cpu(pool=%d,cpu=%d)\n",
                       c->cpupool_id, cpu);
 
+    if ( !cpu_online(cpu) )
+        return -EINVAL;
+
     master_cpu = sched_get_resource_cpu(cpu);
     ret = cpupool_unassign_cpu_start(c, master_cpu);
     if ( ret )
