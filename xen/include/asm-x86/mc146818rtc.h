@@ -110,4 +110,7 @@ outb_p((val),RTC_PORT(1)); \
 
 #define RTC_IRQ 8
 
+unsigned int rtc_guest_read(unsigned int port);
+void rtc_guest_write(unsigned int port, unsigned int data);
+
 #endif /* _ASM_MC146818RTC_H */

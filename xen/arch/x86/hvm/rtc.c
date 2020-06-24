@@ -799,12 +799,38 @@ void rtc_reset(struct domain *d)
     s->pt.source = PTSRC_isa;
 }
 
+/* RTC mediator for HVM hardware domain. */
+static int hw_rtc_io(int dir, unsigned int port, unsigned int size,
+                     uint32_t *val)
+{
+    if ( dir == IOREQ_READ )
+        *val = ~0;
+
+    if ( size != 1 )
+    {
+        gdprintk(XENLOG_WARNING, "bad RTC access size (%u)\n", size);
+        return X86EMUL_OKAY;
+    }
+
+    if ( dir == IOREQ_WRITE )
+        rtc_guest_write(port, *val);
+    else
+        *val = rtc_guest_read(port);
+
+    return X86EMUL_OKAY;
+}
+
 void rtc_init(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
 
     if ( !has_vrtc(d) )
+    {
+        if ( is_hardware_domain(d) )
+            /* Hardware domain gets mediated access to the physical RTC. */
+            register_portio_handler(d, RTC_PORT(0), 2, hw_rtc_io);
         return;
+    }
 
     spin_lock_init(&s->lock);
 
