@@ -492,7 +492,10 @@ The Speculation Control hardware features `srbds-ctrl`, `md-clear`, `ibrsb`,
 applicable.  They can all be ignored.
 
 `rdrand` and `rdseed` can be ignored, as a mitigation to XSA-320 /
-CVE-2020-0543.
+CVE-2020-0543.  The RDRAND feature is disabled by default on certain AMD
+systems, due to possible malfunctions after ACPI S3 suspend/resume.  `rdrand`
+may be used in its positive form to override Xen's default behaviour on these
+systems, and make the feature fully usable.
 
 ### cpuid_mask_cpu
 > `= fam_0f_rev_[cdefg] | fam_10_rev_[bc] | fam_11_rev_b`

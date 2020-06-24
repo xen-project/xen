@@ -10,6 +10,7 @@
 #include <asm/io.h>
 #include <asm/mpspec.h>
 #include <asm/apic.h>
+#include <asm/random.h>
 #include <mach_apic.h>
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
 
@@ -92,6 +93,11 @@ void __init setup_force_cpu_cap(unsigned int cap)
 	}
 
 	__set_bit(cap, boot_cpu_data.x86_capability);
+}
+
+bool __init is_forced_cpu_cap(unsigned int cap)
+{
+	return test_bit(cap, forced_caps);
 }
 
 static void default_init(struct cpuinfo_x86 * c)
@@ -496,6 +502,27 @@ void identify_cpu(struct cpuinfo_x86 *c)
 		printk(" %08x", c->x86_capability[i]);
 	printk("\n");
 #endif
+
+	/*
+	 * If RDRAND is available, make an attempt to check that it actually
+	 * (still) works.
+	 */
+	if (cpu_has(c, X86_FEATURE_RDRAND)) {
+		unsigned int prev = 0;
+
+		for (i = 0; i < 5; ++i)
+		{
+			unsigned int cur = arch_get_random();
+
+			if (prev && cur != prev)
+				break;
+			prev = cur;
+		}
+
+		if (i >= 5)
+			printk(XENLOG_WARNING "CPU%u: RDRAND appears to not work\n",
+			       smp_processor_id());
+	}
 
 	if (system_state == SYS_STATE_resume)
 		return;

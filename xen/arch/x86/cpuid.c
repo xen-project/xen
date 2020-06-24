@@ -68,6 +68,8 @@ static int __init parse_xen_cpuid(const char *s)
         {
             if ( !val )
                 setup_clear_cpu_cap(X86_FEATURE_RDRAND);
+            else if ( (cpuid_ecx(1) & cpufeat_mask(X86_FEATURE_RDRAND)) )
+                setup_force_cpu_cap(X86_FEATURE_RDRAND);
         }
         else if ( (val = parse_boolean("rdseed", s, ss)) >= 0 )
         {
