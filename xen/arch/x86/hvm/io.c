@@ -132,13 +132,15 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
 {
     struct vcpu *curr = current;
     struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
-    unsigned long data;
+    unsigned int data;
     int rc;
 
     ASSERT((size - 1) < 4 && size != 3);
 
     if ( dir == IOREQ_WRITE )
         data = guest_cpu_user_regs()->eax;
+    else
+        data = ~0; /* Avoid any risk of stack rubble. */
 
     rc = hvmemul_do_pio_buffer(port, size, dir, &data);
 
@@ -151,7 +153,7 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
         if ( dir == IOREQ_READ )
         {
             if ( size == 4 ) /* Needs zero extension. */
-                guest_cpu_user_regs()->rax = (uint32_t)data;
+                guest_cpu_user_regs()->rax = data;
             else
                 memcpy(&guest_cpu_user_regs()->rax, &data, size);
         }
@@ -167,7 +169,9 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
         break;
 
     default:
-        gdprintk(XENLOG_ERR, "Weird HVM ioemulation status %d.\n", rc);
+        gprintk(XENLOG_ERR, "Unexpected PIO status %d, port %#x %s 0x%0*x\n",
+                rc, port, dir == IOREQ_WRITE ? "write" : "read",
+                size * 2, data & ((1u << (size * 8)) - 1));
         domain_crash(curr->domain);
         return false;
     }
