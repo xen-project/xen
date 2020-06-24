@@ -2449,7 +2449,7 @@ static void pi_notification_interrupt(struct cpu_user_regs *regs)
 }
 
 static void __init lbr_tsx_fixup_check(void);
-static void __init bdf93_fixup_check(void);
+static void __init ler_to_fixup_check(void);
 
 /*
  * Calculate whether the CPU is vulnerable to Instruction Fetch page
@@ -2628,7 +2628,7 @@ const struct hvm_function_table * __init start_vmx(void)
     setup_vmcs_dump();
 
     lbr_tsx_fixup_check();
-    bdf93_fixup_check();
+    ler_to_fixup_check();
 
     return &vmx_function_table;
 }
@@ -2927,11 +2927,11 @@ enum
 
 #define LBR_MSRS_INSERTED      (1u << 0)
 #define LBR_FIXUP_TSX          (1u << 1)
-#define LBR_FIXUP_BDF93        (1u << 2)
-#define LBR_FIXUP_MASK         (LBR_FIXUP_TSX | LBR_FIXUP_BDF93)
+#define LBR_FIXUP_LER_TO       (1u << 2)
+#define LBR_FIXUP_MASK         (LBR_FIXUP_TSX | LBR_FIXUP_LER_TO)
 
 static bool __read_mostly lbr_tsx_fixup_needed;
-static bool __read_mostly bdf93_fixup_needed;
+static bool __read_mostly ler_to_fixup_needed;
 
 static void __init lbr_tsx_fixup_check(void)
 {
@@ -2939,7 +2939,7 @@ static void __init lbr_tsx_fixup_check(void)
     uint32_t lbr_format;
 
     /*
-     * HSM182, HSD172, HSE117, BDM127, BDD117, BDF85, BDE105:
+     * Haswell erratum HSM182 et al, Broadwell erratum BDM127 et al:
      *
      * On processors that do not support Intel Transactional Synchronization
      * Extensions (Intel TSX) (CPUID.07H.EBX bits 4 and 11 are both zero),
@@ -2963,8 +2963,11 @@ static void __init lbr_tsx_fixup_check(void)
     case 0x45: /* HSM182 - 4th gen Core */
     case 0x46: /* HSM182, HSD172 - 4th gen Core (GT3) */
     case 0x3d: /* BDM127 - 5th gen Core */
-    case 0x47: /* BDD117 - 5th gen Core (GT3) */
-    case 0x4f: /* BDF85  - Xeon E5-2600 v4 */
+    case 0x47: /* BDD117 - 5th gen Core (GT3)
+                  BDW117 - Xeon E3-1200 v4 */
+    case 0x4f: /* BDF85  - Xeon E5-2600 v4
+                  BDH75  - Core-i7 for LGA2011-v3 Socket
+                  BDX88  - Xeon E7-x800 v4 */
     case 0x56: /* BDE105 - Xeon D-1500 */
         break;
     default:
@@ -2985,18 +2988,31 @@ static void __init lbr_tsx_fixup_check(void)
         lbr_tsx_fixup_needed = true;
 }
 
-static void __init bdf93_fixup_check(void)
+static void __init ler_to_fixup_check(void)
 {
     /*
-     * Broadwell erratum BDF93:
+     * Broadwell erratum BDF93 et al:
      *
      * Reads from MSR_LER_TO_LIP (MSR 1DEH) may return values for bits[63:61]
      * that are not equal to bit[47].  Attempting to context switch this value
      * may cause a #GP.  Software should sign extend the MSR.
      */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
-         boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 0x4f )
-        bdf93_fixup_needed = true;
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
+        return;
+
+    switch ( boot_cpu_data.x86_model )
+    {
+    case 0x3d: /* BDM131 - 5th gen Core */
+    case 0x47: /* BDD??? - 5th gen Core (H-Processor line)
+                  BDW120 - Xeon E3-1200 v4 */
+    case 0x4f: /* BDF93  - Xeon E5-2600 v4
+                  BDH80  - Core-i7 for LGA2011-v3 Socket
+                  BDX93  - Xeon E7-x800 v4 */
+    case 0x56: /* BDE??? - Xeon D-1500 */
+        ler_to_fixup_needed = true;
+        break;
+    }
 }
 
 static int is_last_branch_msr(u32 ecx)
@@ -3357,8 +3373,8 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             v->arch.hvm.vmx.lbr_flags |= LBR_MSRS_INSERTED;
             if ( lbr_tsx_fixup_needed )
                 v->arch.hvm.vmx.lbr_flags |= LBR_FIXUP_TSX;
-            if ( bdf93_fixup_needed )
-                v->arch.hvm.vmx.lbr_flags |= LBR_FIXUP_BDF93;
+            if ( ler_to_fixup_needed )
+                v->arch.hvm.vmx.lbr_flags |= LBR_FIXUP_LER_TO;
         }
 
         __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
@@ -4418,7 +4434,7 @@ static void sign_extend_msr(struct vcpu *v, u32 msr, int type)
         entry->data = canonicalise_addr(entry->data);
 }
 
-static void bdf93_fixup(void)
+static void ler_to_fixup(void)
 {
     struct vcpu *curr = current;
 
@@ -4431,8 +4447,8 @@ static void lbr_fixup(void)
 
     if ( curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_TSX )
         lbr_tsx_fixup();
-    if ( curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_BDF93 )
-        bdf93_fixup();
+    if ( curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_LER_TO )
+        ler_to_fixup();
 }
 
 /* Returns false if the vmentry has to be restarted */
