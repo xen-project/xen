@@ -587,6 +587,18 @@ void xstate_init(struct cpuinfo_x86 *c)
     u32 eax, ebx, ecx, edx;
     u64 feature_mask;
 
+    if ( bsp )
+    {
+        static typeof(current->arch.xsave_area->fpu_sse) __initdata ctxt;
+
+        asm ( "fxsave %0" : "=m" (ctxt) );
+        if ( ctxt.mxcsr_mask )
+            mxcsr_mask = ctxt.mxcsr_mask;
+    }
+
+    if ( !cpu_has_xsave )
+        return;
+
     if ( (bsp && !use_xsave) ||
          boot_cpu_data.cpuid_level < XSTATE_CPUID )
     {
@@ -610,8 +622,6 @@ void xstate_init(struct cpuinfo_x86 *c)
 
     if ( bsp )
     {
-        static typeof(current->arch.xsave_area->fpu_sse) __initdata ctxt;
-
         xfeature_mask = feature_mask;
         /*
          * xsave_cntxt_size is the max size required by enabled features.
@@ -620,10 +630,6 @@ void xstate_init(struct cpuinfo_x86 *c)
         xsave_cntxt_size = _xstate_ctxt_size(feature_mask);
         printk("xstate: size: %#x and states: %#"PRIx64"\n",
                xsave_cntxt_size, xfeature_mask);
-
-        asm ( "fxsave %0" : "=m" (ctxt) );
-        if ( ctxt.mxcsr_mask )
-            mxcsr_mask = ctxt.mxcsr_mask;
     }
     else
     {

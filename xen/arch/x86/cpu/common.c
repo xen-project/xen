@@ -487,8 +487,7 @@ void identify_cpu(struct cpuinfo_x86 *c)
 
 	/* Now the feature flags better reflect actual CPU features! */
 
-	if ( cpu_has_xsave )
-		xstate_init(c);
+	xstate_init(c);
 
 #ifdef NOISY_CAPS
 	printk(KERN_DEBUG "CPU: After all inits, caps:");
