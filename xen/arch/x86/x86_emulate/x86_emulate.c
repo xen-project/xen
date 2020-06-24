@@ -84,7 +84,7 @@ static const opcode_desc_t opcode_table[256] = {
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     ByteOp|DstEax|SrcImm, DstEax|SrcImm, 0, ImplicitOps,
     /* 0x38 - 0x3F */
-    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     ByteOp|DstEax|SrcImm, DstEax|SrcImm, 0, ImplicitOps,
     /* 0x40 - 0x4F */
@@ -2405,7 +2405,6 @@ x86_decode_onebyte(
     case 0x60: /* pusha */
     case 0x61: /* popa */
     case 0x62: /* bound */
-    case 0x82: /* Grp1 (x86/32 only) */
     case 0xc4: /* les */
     case 0xc5: /* lds */
     case 0xce: /* into */
@@ -2413,6 +2412,14 @@ x86_decode_onebyte(
     case 0xd5: /* aad */
     case 0xd6: /* salc */
         state->not_64bit = true;
+        break;
+
+    case 0x82: /* Grp1 (x86/32 only) */
+        state->not_64bit = true;
+        /* fall through */
+    case 0x80: case 0x81: case 0x83: /* Grp1 */
+        if ( (modrm_reg & 7) == 7 ) /* cmp */
+            state->desc = (state->desc & ByteOp) | DstNone | SrcMem;
         break;
 
     case 0x90: /* nop / pause */
@@ -2443,6 +2450,11 @@ x86_decode_onebyte(
 
     case 0xc8: /* enter imm16,imm8 */
         imm2 = insn_fetch_type(uint8_t);
+        break;
+
+    case 0xf6: case 0xf7: /* Grp3 */
+        if ( !(modrm_reg & 6) ) /* test */
+            state->desc = (state->desc & ByteOp) | DstNone | SrcMem;
         break;
 
     case 0xff: /* Grp5 */
@@ -3725,13 +3737,11 @@ x86_emulate(
         break;
 
     case 0x38: case 0x39: cmp: /* cmp reg,mem */
-        if ( ops->rmw && dst.type == OP_MEM &&
-             (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
-                              dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
-            goto done;
-        /* fall through */
+        emulate_2op_SrcV("cmp", dst, src, _regs.eflags);
+        dst.type = OP_NONE;
+        break;
+
     case 0x3a ... 0x3d: /* cmp */
-        generate_exception_if(lock_prefix, EXC_UD);
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
@@ -4033,7 +4043,9 @@ x86_emulate(
         case 4: goto and;
         case 5: goto sub;
         case 6: goto xor;
-        case 7: goto cmp;
+        case 7:
+            dst.val = imm1;
+            goto cmp;
         }
         break;
 
@@ -5026,11 +5038,8 @@ x86_emulate(
             unsigned long u[2], v;
 
         case 0 ... 1: /* test */
-            generate_exception_if(lock_prefix, EXC_UD);
-            if ( ops->rmw && dst.type == OP_MEM &&
-                 (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
-                                  dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
-                goto done;
+            dst.val = imm1;
+            dst.bytes = src.bytes;
             goto test;
         case 2: /* not */
             if ( ops->rmw && dst.type == OP_MEM )
