@@ -586,7 +586,7 @@ void microcode_set_module(unsigned int);
 int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void), unsigned long len);
 int early_microcode_update_cpu(void);
 int early_microcode_init(void);
-int microcode_update_one(bool start_update);
+int microcode_update_one(void);
 int microcode_init_intel(void);
 int microcode_init_amd(void);
 

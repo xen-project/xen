@@ -358,7 +358,7 @@ void start_secondary(void *unused)
 
     initialize_cpu_data(cpu);
 
-    microcode_update_one(false);
+    microcode_update_one();
 
     /*
      * If any speculative control MSRs are available, apply Xen's default

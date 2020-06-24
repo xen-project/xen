@@ -1082,7 +1082,7 @@ static void svm_guest_osvw_init(struct domain *d)
     spin_unlock(&osvw_lock);
 }
 
-void svm_host_osvw_reset()
+static void svm_host_osvw_reset(void)
 {
     spin_lock(&osvw_lock);
 
@@ -1092,7 +1092,7 @@ void svm_host_osvw_reset()
     spin_unlock(&osvw_lock);
 }
 
-void svm_host_osvw_init()
+static void svm_host_osvw_init(void)
 {
     spin_lock(&osvw_lock);
 
