@@ -3,6 +3,7 @@
 #include <xen/mm.h>
 #include <xen/smp.h>
 #include <xen/pci.h>
+#include <xen/warning.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
@@ -644,6 +645,26 @@ static void init_amd(struct cpuinfo_x86 *c)
 		disable_c1e(NULL);
 		if (acpi_smi_cmd && (acpi_enable_value | acpi_disable_value))
 			amd_acpi_c1e_quirk = true;
+		break;
+
+	case 0x15: case 0x16:
+		/*
+		 * There are some Fam15/Fam16 systems where upon resume from S3
+		 * firmware fails to re-setup properly functioning RDRAND.
+		 * By the time we can spot the problem, it is too late to take
+		 * action, and there is nothing Xen can do to repair the problem.
+		 * Clear the feature unless force-enabled on the command line.
+		 */
+		if (c == &boot_cpu_data &&
+		    cpu_has(c, X86_FEATURE_RDRAND) &&
+		    !is_forced_cpu_cap(X86_FEATURE_RDRAND)) {
+			static const char __initconst text[] =
+				"RDRAND may cease to work on this hardware upon resume from S3.\n"
+				"Please choose an explicit cpuid={no-}rdrand setting.\n";
+
+			setup_clear_cpu_cap(X86_FEATURE_RDRAND);
+			warning_add(text);
+		}
 		break;
 	}
 
