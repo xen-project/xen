@@ -235,13 +235,13 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
 	$(OBJCOPY) $(foreach s,$(SPECIAL_DATA_SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
 
 %.i: %.c Makefile
-	$(CPP) $(filter-out -Wa$(comma)%,$(CFLAGS)) $< -o $@
+	$(CPP) $(filter-out -Wa$(comma)%,$(CFLAGS)) -MQ $@ -o $@ $<
 
 %.s: %.c Makefile
 	$(CC) $(filter-out -Wa$(comma)%,$(CFLAGS)) -S $< -o $@
 
 # -std=gnu{89,99} gets confused by # as an end-of-line comment marker
 %.s: %.S Makefile
-	$(CPP) $(filter-out -Wa$(comma)%,$(AFLAGS)) $< -o $@
+	$(CPP) $(filter-out -Wa$(comma)%,$(AFLAGS)) -MQ $@ -o $@ $<
 
 -include $(DEPS_INCLUDE)
