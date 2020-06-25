@@ -176,6 +176,10 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
                           ARRAY_SIZE(p->extd.raw) - 1); ++i )
         cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
 
+    /* Don't report leaves from possible lower level hypervisor, for now. */
+    p->hv_limit = 0;
+    p->hv2_limit = 0;
+
     x86_cpuid_policy_recalc_synth(p);
 }
 
