@@ -45,18 +45,14 @@ claim_lock()
     while true; do
         eval "exec $_lockfd<>$_lockfile"
         flock -x $_lockfd || return $?
-        # We can't just stat /dev/stdin or /proc/self/fd/$_lockfd or
-        # use bash's test -ef because those all go through what is
-        # actually a synthetic symlink in /proc and we aren't
-        # guaranteed that our stat(2) won't lose the race with an
-        # rm(1) between reading the synthetic link and traversing the
-        # file system to find the inum.  stat(1) translates '-' into an
-        # fstat(2) of FD 0.  So we just need to arrange the FDs properly
-        # to get the fstat(2) we need.  stat will output two lines like:
+        # Although /dev/stdin (i.e. /proc/self/fd/0) looks like a symlink,
+        # stat(2) bypasses the synthetic symlink and directly accesses the
+        # underlying open-file.  So this works correctly even if the file
+        # has been renamed or unlinked.  stat will output two lines like:
         # WW.XXX
         # YY.ZZZ
         # which need to be separated and compared.
-        if stat=$( stat -L -c '%D.%i' - $_lockfile 0<&$_lockfd 2>/dev/null )
+        if stat=$( stat -L -c '%D.%i' /dev/stdin $_lockfile 0<&$_lockfd 2>/dev/null )
         then
             local file_stat
             local fd_stat
