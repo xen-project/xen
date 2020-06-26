@@ -662,6 +662,7 @@ GREP
 CPP
 pyconfig
 PYTHONPATH
+BASH
 CHECKPOLICY
 XENSTORED
 GO
@@ -686,7 +687,6 @@ SET_MAKE
 AWK
 IASL
 XGETTEXT
-BASH
 FLEX
 BISON
 PERL
@@ -843,7 +843,6 @@ PYTHON
 PERL
 BISON
 FLEX
-BASH
 XGETTEXT
 AS86
 LD86
@@ -1589,7 +1588,6 @@ Some influential environment variables:
   PERL        Path to Perl parser
   BISON       Path to Bison parser generator
   FLEX        Path to Flex lexical analyser generator
-  BASH        Path to bash shell
   XGETTEXT    Path to xgetttext tool
   AS86        Path to as86 tool
   LD86        Path to ld86 tool
@@ -4706,7 +4704,6 @@ if test ! -z "$EXTRA_PREFIX" ; then
 fi
 CPPFLAGS="$PREPEND_CPPFLAGS $CPPFLAGS $APPEND_CPPFLAGS"
 LDFLAGS="$PREPEND_LDFLAGS $LDFLAGS $APPEND_LDFLAGS"
-
 
 
 
