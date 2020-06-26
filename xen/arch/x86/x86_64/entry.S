@@ -26,18 +26,30 @@
 /* %rbx: struct vcpu */
 ENTRY(switch_to_kernel)
         leaq  VCPU_trap_bounce(%rbx),%rdx
-        /* TB_eip = (32-bit syscall && syscall32_addr) ?
-         *          syscall32_addr : syscall_addr */
-        xor   %eax,%eax
+
+        /* TB_eip = 32-bit syscall ? syscall32_addr : syscall_addr */
+        mov   VCPU_syscall32_addr(%rbx), %rcx
+        mov   VCPU_syscall_addr(%rbx), %rax
         cmpw  $FLAT_USER_CS32,UREGS_cs(%rsp)
-        cmoveq VCPU_syscall32_addr(%rbx),%rax
-        testq %rax,%rax
-        cmovzq VCPU_syscall_addr(%rbx),%rax
-        movq  %rax,TRAPBOUNCE_eip(%rdx)
+        cmove %rcx, %rax
+
         /* TB_flags = VGCF_syscall_disables_events ? TBF_INTERRUPT : 0 */
         btl   $_VGCF_syscall_disables_events,VCPU_guest_context_flags(%rbx)
         setc  %cl
         leal  (,%rcx,TBF_INTERRUPT),%ecx
+
+        test  %rax, %rax
+UNLIKELY_START(z, syscall_no_callback) /* TB_eip == 0 => #UD */
+        mov   VCPU_trap_ctxt(%rbx), %rdi
+        movl  $X86_EXC_UD, UREGS_entry_vector(%rsp)
+        subl  $2, UREGS_rip(%rsp)
+        mov   X86_EXC_UD * TRAPINFO_sizeof + TRAPINFO_eip(%rdi), %rax
+        testb $4, X86_EXC_UD * TRAPINFO_sizeof + TRAPINFO_flags(%rdi)
+        setnz %cl
+        lea   TBF_EXCEPTION(, %rcx, TBF_INTERRUPT), %ecx
+UNLIKELY_END(syscall_no_callback)
+
+        movq  %rax,TRAPBOUNCE_eip(%rdx)
         movb  %cl,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
         andl  $~X86_EFLAGS_DF,UREGS_eflags(%rsp)
