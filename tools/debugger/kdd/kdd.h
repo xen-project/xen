@@ -68,7 +68,6 @@ typedef struct {
     uint16_t len;     /* Payload length, excl. header and trailing byte */
     uint32_t id;      /* Echoed in responses */
     uint32_t sum;     /* Unsigned sum of all payload bytes */
-    uint8_t payload[0];
 } PACKED kdd_hdr;
 
 #define KDD_PKT_CMD 0x0002      /* Debugger commands (and replies to them) */
@@ -323,7 +322,7 @@ typedef struct {
         kdd_msg msg;
         kdd_reg reg;
         kdd_stc stc;
-        uint8_t payload[0];
+        uint8_t payload[65536];
     };
 } PACKED kdd_pkt;
 
