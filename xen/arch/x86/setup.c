@@ -95,7 +95,11 @@ unsigned long __initdata highmem_start;
 size_param("highmem-start", highmem_start);
 #endif
 
+#ifdef CONFIG_XEN_SHSTK
 static bool __initdata opt_xen_shstk = true;
+#else
+#define opt_xen_shstk false
+#endif
 
 static int __init parse_cet(const char *s)
 {
