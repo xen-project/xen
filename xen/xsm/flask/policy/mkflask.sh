@@ -37,51 +37,51 @@ BEGIN	{
 		printf("static char *initial_sid_to_string[] =\n{\n") > debugfile2;
 		printf("    \"null\",\n") > debugfile2;
 	}
-/^[ \t]*#/	{ 
+/^[ \t]*#/	{
 			next;
 		}
-$1 == "class"	{ 
+$1 == "class"	{
 			if (nextstate != "CLASS")
 			{
 				printf("Parse error:  Unexpected class definition on line %d\n", NR);
-				next;	
+				next;
 			}
 
 			if ($2 in class_found)
 			{
 				printf("Duplicate class definition for %s on line %d.\n", $2, NR);
 				next;
-			}	
+			}
 			class_found[$2] = 1;
 
 			class_value++;
 
 			printf("#define SECCLASS_%s", toupper($2)) > outfile;
-			for (i = 0; i < 40 - length($2); i++) 
-				printf(" ") > outfile; 
-			printf("%d\n", class_value) > outfile; 
+			for (i = 0; i < 40 - length($2); i++)
+				printf(" ") > outfile;
+			printf("%d\n", class_value) > outfile;
 
 			printf("    S_(\"%s\")\n", $2) > debugfile;
 		}
-$1 == "sid"	{ 
+$1 == "sid"	{
 			if (nextstate == "CLASS")
 			{
 			    nextstate = "SID";
-			    printf("\n/*\n * Security identifier indices for initial entities\n */\n") > outfile;			    
+			    printf("\n/*\n * Security identifier indices for initial entities\n */\n") > outfile;
 			}
 
 			if ($2 in sid_found)
 			{
 				printf("Duplicate SID definition for %s on line %d.\n", $2, NR);
 				next;
-			}	
+			}
 			sid_found[$2] = 1;
 			sid_value++;
 
 			printf("#define SECINITSID_%s", toupper($2)) > outfile;
-			for (i = 0; i < 37 - length($2); i++) 
-				printf(" ") > outfile; 
-			printf("%d\n", sid_value) > outfile; 
+			for (i = 0; i < 37 - length($2); i++)
+				printf(" ") > outfile;
+			printf("%d\n", sid_value) > outfile;
 			printf("    \"%s\",\n", $2) > debugfile2;
 		}
 END	{
@@ -89,9 +89,9 @@ END	{
 			printf("Parse error:  Unexpected end of file\n");
 
 		printf("\n#define SECINITSID_NUM") > outfile;
-		for (i = 0; i < 34; i++) 
-			printf(" ") > outfile; 
-		printf("%d\n", sid_value) > outfile; 
+		for (i = 0; i < 34; i++)
+			printf(" ") > outfile;
+		printf("%d\n", sid_value) > outfile;
 		printf("\n#endif /* __XEN__ || __XEN_TOOLS__ */\n") > outfile;
 		printf("\n#endif\n") > outfile;
 		printf("};\n\n") > debugfile2;
