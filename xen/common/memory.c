@@ -1096,6 +1096,9 @@ static unsigned int resource_max_frames(const struct domain *d,
     case XENMEM_resource_ioreq_server:
         return ioreq_server_max_frames(d);
 
+    case XENMEM_resource_vmtrace_buf:
+        return d->vmtrace_size >> PAGE_SHIFT;
+
     default:
         return -EOPNOTSUPP;
     }
@@ -1136,6 +1139,29 @@ static int acquire_ioreq_server(struct domain *d,
 #endif
 }
 
+static int acquire_vmtrace_buf(
+    struct domain *d, unsigned int id, unsigned int frame,
+    unsigned int nr_frames, xen_pfn_t mfn_list[])
+{
+    const struct vcpu *v = domain_vcpu(d, id);
+    unsigned int i;
+    mfn_t mfn;
+
+    if ( !v )
+        return -ENOENT;
+
+    if ( !v->vmtrace.pg ||
+         (frame + nr_frames) > (d->vmtrace_size >> PAGE_SHIFT) )
+        return -EINVAL;
+
+    mfn = page_to_mfn(v->vmtrace.pg);
+
+    for ( i = 0; i < nr_frames; i++ )
+        mfn_list[i] = mfn_x(mfn) + frame + i;
+
+    return nr_frames;
+}
+
 /*
  * Returns -errno on error, or positive in the range [1, nr_frames] on
  * success.  Returning less than nr_frames contitutes a request for a
@@ -1152,6 +1178,9 @@ static int _acquire_resource(
 
     case XENMEM_resource_ioreq_server:
         return acquire_ioreq_server(d, id, frame, nr_frames, mfn_list);
+
+    case XENMEM_resource_vmtrace_buf:
+        return acquire_vmtrace_buf(d, id, frame, nr_frames, mfn_list);
 
     default:
         return -EOPNOTSUPP;
