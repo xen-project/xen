@@ -155,6 +155,55 @@ void arch_get_domain_info(const struct domain *d,
     info->arch_config.emulation_flags = d->arch.emulation_flags;
 }
 
+static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
+                         XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
+{
+    struct vcpu *v;
+    int rc;
+
+    if ( !d->vmtrace_size || d == current->domain /* No vcpu_pause() */ )
+        return -EINVAL;
+
+    ASSERT(is_hvm_domain(d)); /* Restricted by domain creation logic. */
+
+    v = domain_vcpu(d, op->vcpu);
+    if ( !v )
+        return -ENOENT;
+
+    vcpu_pause(v);
+    switch ( op->cmd )
+    {
+    case XEN_DOMCTL_vmtrace_enable:
+    case XEN_DOMCTL_vmtrace_disable:
+    case XEN_DOMCTL_vmtrace_reset_and_enable:
+        rc = hvm_vmtrace_control(
+            v, op->cmd != XEN_DOMCTL_vmtrace_disable,
+            op->cmd == XEN_DOMCTL_vmtrace_reset_and_enable);
+        break;
+
+    case XEN_DOMCTL_vmtrace_output_position:
+        rc = hvm_vmtrace_output_position(v, &op->value);
+        if ( rc >= 0 )
+            rc = 0;
+        break;
+
+    case XEN_DOMCTL_vmtrace_get_option:
+        rc = hvm_vmtrace_get_option(v, op->key, &op->value);
+        break;
+
+    case XEN_DOMCTL_vmtrace_set_option:
+        rc = hvm_vmtrace_set_option(v, op->key, op->value);
+        break;
+
+    default:
+        rc = -EOPNOTSUPP;
+        break;
+    }
+    vcpu_unpause(v);
+
+    return rc;
+}
+
 #define MAX_IOPORTS 0x10000
 
 long arch_do_domctl(
@@ -1318,6 +1367,12 @@ long arch_do_domctl(
         }
 
         domain_unpause(d);
+        break;
+
+    case XEN_DOMCTL_vmtrace_op:
+        ret = do_vmtrace_op(d, &domctl->u.vmtrace_op, u_domctl);
+        if ( !ret )
+            copyback = true;
         break;
 
     default:

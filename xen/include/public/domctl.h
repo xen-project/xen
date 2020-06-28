@@ -1135,6 +1135,39 @@ struct xen_domctl_vuart_op {
                                  */
 };
 
+/* XEN_DOMCTL_vmtrace_op: Perform VM tracing operations. */
+struct xen_domctl_vmtrace_op {
+    uint32_t cmd;           /* IN */
+    uint32_t vcpu;          /* IN */
+    uint64_aligned_t key;   /* IN     - @cmd specific data. */
+    uint64_aligned_t value; /* IN/OUT - @cmd specific data. */
+
+    /*
+     * General enable/disable of tracing.
+     *
+     * XEN_DOMCTL_vmtrace_reset_and_enable is provided as optimisation for
+     * common usecases, which want to reset status and position information
+     * when turning tracing back on.
+     */
+#define XEN_DOMCTL_vmtrace_enable             1
+#define XEN_DOMCTL_vmtrace_disable            2
+#define XEN_DOMCTL_vmtrace_reset_and_enable   3
+
+    /* Obtain the current output position within the buffer.  Fills @value. */
+#define XEN_DOMCTL_vmtrace_output_position    4
+
+    /*
+     * Get/Set platform specific configuration.
+     *
+     * For Intel Processor Trace, @key/@value are interpreted as MSR
+     * reads/writes to MSR_RTIT_*, filtered to a safe subset.
+     */
+#define XEN_DOMCTL_vmtrace_get_option         5
+#define XEN_DOMCTL_vmtrace_set_option         6
+};
+typedef struct xen_domctl_vmtrace_op xen_domctl_vmtrace_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_vmtrace_op_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -1219,6 +1252,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_vuart_op                      81
 #define XEN_DOMCTL_get_cpu_policy                82
 #define XEN_DOMCTL_set_cpu_policy                83
+#define XEN_DOMCTL_vmtrace_op                    84
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1279,6 +1313,7 @@ struct xen_domctl {
         struct xen_domctl_monitor_op        monitor_op;
         struct xen_domctl_psr_alloc         psr_alloc;
         struct xen_domctl_vuart_op          vuart_op;
+        struct xen_domctl_vmtrace_op        vmtrace_op;
         uint8_t                             pad[128];
     } u;
 };

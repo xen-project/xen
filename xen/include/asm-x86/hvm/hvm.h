@@ -214,6 +214,12 @@ struct hvm_function_table {
     bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
     int (*altp2m_vcpu_emulate_vmfunc)(const struct cpu_user_regs *regs);
 
+    /* vmtrace */
+    int (*vmtrace_control)(struct vcpu *v, bool enable, bool reset);
+    int (*vmtrace_output_position)(struct vcpu *v, uint64_t *pos);
+    int (*vmtrace_set_option)(struct vcpu *v, uint64_t key, uint64_t value);
+    int (*vmtrace_get_option)(struct vcpu *v, uint64_t key, uint64_t *value);
+
     /*
      * Parameters and callbacks for hardware-assisted TSC scaling,
      * which are valid only when the hardware feature is available.
@@ -655,6 +661,41 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
     return false;
 }
 
+static inline int hvm_vmtrace_control(struct vcpu *v, bool enable, bool reset)
+{
+    if ( hvm_funcs.vmtrace_control )
+        return hvm_funcs.vmtrace_control(v, enable, reset);
+
+    return -EOPNOTSUPP;
+}
+
+/* Returns -errno, or a boolean of whether tracing is currently active. */
+static inline int hvm_vmtrace_output_position(struct vcpu *v, uint64_t *pos)
+{
+    if ( hvm_funcs.vmtrace_output_position )
+        return hvm_funcs.vmtrace_output_position(v, pos);
+
+    return -EOPNOTSUPP;
+}
+
+static inline int hvm_vmtrace_set_option(
+    struct vcpu *v, uint64_t key, uint64_t value)
+{
+    if ( hvm_funcs.vmtrace_set_option )
+        return hvm_funcs.vmtrace_set_option(v, key, value);
+
+    return -EOPNOTSUPP;
+}
+
+static inline int hvm_vmtrace_get_option(
+    struct vcpu *v, uint64_t key, uint64_t *value)
+{
+    if ( hvm_funcs.vmtrace_get_option )
+        return hvm_funcs.vmtrace_get_option(v, key, value);
+
+    return -EOPNOTSUPP;
+}
+
 /*
  * This must be defined as a macro instead of an inline function,
  * because it uses 'struct vcpu' and 'struct domain' which have
@@ -749,6 +790,28 @@ static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
 static inline bool hvm_has_set_descriptor_access_exiting(void)
 {
     return false;
+}
+
+static inline int hvm_vmtrace_control(struct vcpu *v, bool enable, bool reset)
+{
+    return -EOPNOTSUPP;
+}
+
+static inline int hvm_vmtrace_output_position(struct vcpu *v, uint64_t *pos)
+{
+    return -EOPNOTSUPP;
+}
+
+static inline int hvm_vmtrace_set_option(
+    struct vcpu *v, uint64_t key, uint64_t value)
+{
+    return -EOPNOTSUPP;
+}
+
+static inline int hvm_vmtrace_get_option(
+    struct vcpu *v, uint64_t key, uint64_t *value)
+{
+    return -EOPNOTSUPP;
 }
 
 #define is_viridian_domain(d) ((void)(d), false)
