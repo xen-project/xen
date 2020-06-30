@@ -113,7 +113,7 @@ config XEN_SHSTK
 
 	  This option arranges for Xen to use CET-SS for its own protection.
 	  When CET-SS is active, 32bit PV guests cannot be used.  Backwards
-	  compatiblity can be provided vai the PV Shim mechanism.
+	  compatiblity can be provided via the PV Shim mechanism.
 
 config SHADOW_PAGING
         bool "Shadow Paging"
