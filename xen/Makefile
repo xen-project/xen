@@ -17,8 +17,6 @@ export XEN_BUILD_HOST	?= $(shell hostname)
 PYTHON_INTERPRETER	:= $(word 1,$(shell which python3 python python2 2>/dev/null) python)
 export PYTHON		?= $(PYTHON_INTERPRETER)
 
-export CC CXX LD
-
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
 
@@ -41,6 +39,8 @@ export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
 
 # Allow someone to change their config file
 export KCONFIG_CONFIG ?= .config
+
+export CC CXX LD
 
 .PHONY: default
 default: build
