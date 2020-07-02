@@ -132,6 +132,69 @@ static void vcpu_info_reset(struct vcpu *v)
     v->vcpu_info_mfn = INVALID_MFN;
 }
 
+static void vmtrace_free_buffer(struct vcpu *v)
+{
+    const struct domain *d = v->domain;
+    struct page_info *pg = v->vmtrace.pg;
+    unsigned int i;
+
+    if ( !pg )
+        return;
+
+    v->vmtrace.pg = NULL;
+
+    for ( i = 0; i < (d->vmtrace_size >> PAGE_SHIFT); i++ )
+    {
+        put_page_alloc_ref(&pg[i]);
+        put_page_and_type(&pg[i]);
+    }
+}
+
+static int vmtrace_alloc_buffer(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    struct page_info *pg;
+    unsigned int i;
+
+    if ( !d->vmtrace_size )
+        return 0;
+
+    pg = alloc_domheap_pages(d, get_order_from_bytes(d->vmtrace_size),
+                             MEMF_no_refcount);
+    if ( !pg )
+        return -ENOMEM;
+
+    for ( i = 0; i < (d->vmtrace_size >> PAGE_SHIFT); i++ )
+        if ( unlikely(!get_page_and_type(&pg[i], d, PGT_writable_page)) )
+            /*
+             * The domain can't possibly know about this page yet, so failure
+             * here is a clear indication of something fishy going on.
+             */
+            goto refcnt_err;
+
+    /*
+     * We must only let vmtrace_free_buffer() take any action in the success
+     * case when we've taken all the refs it intends to drop.
+     */
+    v->vmtrace.pg = pg;
+    return 0;
+
+ refcnt_err:
+    /*
+     * We can theoretically reach this point if someone has taken 2^43 refs on
+     * the frames in the time the above loop takes to execute, or someone has
+     * made a blind decrease reservation hypercall and managed to pick the
+     * right mfn.  Free the memory we safely can, and leak the rest.
+     */
+    while ( i-- )
+    {
+        put_page_alloc_ref(&pg[i]);
+        put_page_and_type(&pg[i]);
+    }
+
+    return -ENODATA;
+}
+
 /*
  * Release resources held by a vcpu.  There may or may not be live references
  * to the vcpu, and it may or may not be fully constructed.
@@ -140,6 +203,8 @@ static void vcpu_info_reset(struct vcpu *v)
  */
 static int vcpu_teardown(struct vcpu *v)
 {
+    vmtrace_free_buffer(v);
+
     return 0;
 }
 
@@ -199,6 +264,9 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     }
 
     if ( sched_init_vcpu(v) != 0 )
+        goto fail_wq;
+
+    if ( vmtrace_alloc_buffer(v) != 0 )
         goto fail_wq;
 
     if ( arch_vcpu_create(v) != 0 )
@@ -449,6 +517,12 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         }
     }
 
+    if ( config->vmtrace_size && !vmtrace_available )
+    {
+        dprintk(XENLOG_INFO, "vmtrace requested but not available\n");
+        return -EINVAL;
+    }
+
     return arch_sanitise_domain_config(config);
 }
 
@@ -474,7 +548,10 @@ struct domain *domain_create(domid_t domid,
     ASSERT(is_system_domain(d) ? config == NULL : config != NULL);
 
     if ( config )
+    {
         d->options = config->flags;
+        d->vmtrace_size = config->vmtrace_size;
+    }
 
     /* Sort out our idea of is_control_domain(). */
     d->is_privileged = is_priv;

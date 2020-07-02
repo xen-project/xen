@@ -95,6 +95,9 @@ struct xen_domctl_createdomain {
     int32_t max_grant_frames;
     int32_t max_maptrack_frames;
 
+    /* Per-vCPU buffer size in bytes.  0 to disable. */
+    uint32_t vmtrace_size;
+
     struct xen_arch_domainconfig arch;
 };
 

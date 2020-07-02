@@ -660,6 +660,29 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( config->vmtrace_size )
+    {
+        unsigned int size = config->vmtrace_size;
+
+        ASSERT(vmtrace_available); /* Checked by common code. */
+
+        /*
+         * For now, vmtrace is restricted to HVM guests, and using a
+         * power-of-2 buffer between 4k and 64M in size.
+         */
+        if ( !hvm )
+        {
+            dprintk(XENLOG_INFO, "vmtrace not supported for PV\n");
+            return -EINVAL;
+        }
+
+        if ( size < PAGE_SIZE || size > MB(64) || (size & (size - 1)) )
+        {
+            dprintk(XENLOG_INFO, "Unsupported vmtrace size: %#x\n", size);
+            return -EINVAL;
+        }
+    }
+
     return 0;
 }
 
