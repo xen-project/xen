@@ -5,7 +5,7 @@
 #include <asm/gic.h>
 #include <asm/flushtlb.h>
 
-void flush_tlb_mask(const cpumask_t *mask)
+void arch_flush_tlb_mask(const cpumask_t *mask)
 {
     /* No need to IPI other processors on ARM, the processor takes care of it. */
     flush_all_guests_tlb();

@@ -393,7 +393,7 @@ static inline void grant_write_unlock(struct grant_table *gt)
 static inline void gnttab_flush_tlb(const struct domain *d)
 {
     if ( !paging_mode_external(d) )
-        flush_tlb_mask(d->dirty_cpumask);
+        arch_flush_tlb_mask(d->dirty_cpumask);
 }
 
 static inline unsigned int

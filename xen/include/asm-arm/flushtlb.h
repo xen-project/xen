@@ -26,7 +26,7 @@ static inline void page_set_tlbflush_timestamp(struct page_info *page)
 #endif
 
 /* Flush specified CPUs' TLBs */
-void flush_tlb_mask(const cpumask_t *mask);
+void arch_flush_tlb_mask(const cpumask_t *mask);
 
 /*
  * Flush a range of VA's hypervisor mappings from the TLB of the local
