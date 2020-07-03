@@ -79,11 +79,11 @@ typedef struct {
 /* State of the debugger stub */
 typedef struct {
     union {
-        uint8_t txb[sizeof (kdd_hdr)];           /* Marshalling area for tx */
+        uint8_t txb[sizeof (kdd_pkt)];           /* Marshalling area for tx */
         kdd_pkt txp;                 /* Also readable as a packet structure */
     };
     union {
-        uint8_t rxb[sizeof (kdd_hdr)];           /* Marshalling area for rx */
+        uint8_t rxb[sizeof (kdd_pkt)];           /* Marshalling area for rx */
         kdd_pkt rxp;                 /* Also readable as a packet structure */
     };
     unsigned int cur;       /* Offset into rx where we'll put the next byte */
