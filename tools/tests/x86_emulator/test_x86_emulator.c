@@ -2577,6 +2577,7 @@ int main(int argc, char **argv)
         regs.ecx = (unsigned long)(res + 0x81);
         rc = x86_emulate(&ctxt, &emulops);
         asm volatile ( "fxsave %0" : "=m" (res[0x100]) :: "memory" );
+        zap_xfpsel(&res[0x100]);
         if ( (rc != X86EMUL_OKAY) ||
              memcmp(res + 0x100, res + 0x80, 0x200) ||
              (regs.eip != (unsigned long)&instr[4]) )
