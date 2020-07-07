@@ -51,11 +51,6 @@ unsigned int get_cache_line_size(void)
     return ((cpuid_ebx(1) >> 8) & 0xff) * 8;
 }
 
-void cacheline_flush(char * addr)
-{
-    clflush(addr);
-}
-
 void flush_all_cache()
 {
     wbinvd();
