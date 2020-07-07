@@ -147,7 +147,7 @@ static int context_get_domain_id(struct context_entry *context,
 
 static int iommus_incoherent;
 
-void iommu_sync_cache(const void *addr, unsigned int size)
+static void sync_cache(const void *addr, unsigned int size)
 {
     int i;
     static unsigned int clflush_size = 0;
@@ -180,7 +180,7 @@ uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node)
         vaddr = __map_domain_page(cur_pg);
         memset(vaddr, 0, PAGE_SIZE);
 
-        iommu_sync_cache(vaddr, PAGE_SIZE);
+        sync_cache(vaddr, PAGE_SIZE);
         unmap_domain_page(vaddr);
         cur_pg++;
     }
@@ -2778,6 +2778,7 @@ const struct iommu_ops __initconstrel intel_iommu_ops = {
     .iotlb_flush_all = iommu_flush_iotlb_all,
     .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_p2m_table = vtd_dump_p2m_table,
+    .sync_cache = sync_cache,
 };
 
 const struct iommu_init_ops __initconstrel intel_iommu_init_ops = {
