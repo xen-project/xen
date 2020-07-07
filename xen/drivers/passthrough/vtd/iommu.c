@@ -149,8 +149,8 @@ static int iommus_incoherent;
 
 static void sync_cache(const void *addr, unsigned int size)
 {
-    int i;
-    static unsigned int clflush_size = 0;
+    static unsigned long clflush_size = 0;
+    const void *end = addr + size;
 
     if ( !iommus_incoherent )
         return;
@@ -158,8 +158,9 @@ static void sync_cache(const void *addr, unsigned int size)
     if ( clflush_size == 0 )
         clflush_size = get_cache_line_size();
 
-    for ( i = 0; i < size; i += clflush_size )
-        cacheline_flush((char *)addr + i);
+    addr -= (unsigned long)addr & (clflush_size - 1);
+    for ( ; addr < end; addr += clflush_size )
+        cacheline_flush((char *)addr);
 }
 
 /* Allocate page table, return its machine address */
