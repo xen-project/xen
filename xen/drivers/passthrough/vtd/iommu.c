@@ -158,7 +158,8 @@ static void __init free_intel_iommu(struct intel_iommu *intel)
 }
 
 static int iommus_incoherent;
-static void __iommu_flush_cache(void *addr, unsigned int size)
+
+void iommu_sync_cache(const void *addr, unsigned int size)
 {
     int i;
     static unsigned int clflush_size = 0;
@@ -171,16 +172,6 @@ static void __iommu_flush_cache(void *addr, unsigned int size)
 
     for ( i = 0; i < size; i += clflush_size )
         cacheline_flush((char *)addr + i);
-}
-
-void iommu_flush_cache_entry(void *addr, unsigned int size)
-{
-    __iommu_flush_cache(addr, size);
-}
-
-void iommu_flush_cache_page(void *addr, unsigned long npages)
-{
-    __iommu_flush_cache(addr, PAGE_SIZE * npages);
 }
 
 /* Allocate page table, return its machine address */
@@ -207,7 +198,7 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
         vaddr = __map_domain_page(cur_pg);
         memset(vaddr, 0, PAGE_SIZE);
 
-        iommu_flush_cache_page(vaddr, 1);
+        iommu_sync_cache(vaddr, PAGE_SIZE);
         unmap_domain_page(vaddr);
         cur_pg++;
     }
@@ -242,7 +233,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
         }
         set_root_value(*root, maddr);
         set_root_present(*root);
-        iommu_flush_cache_entry(root, sizeof(struct root_entry));
+        iommu_sync_cache(root, sizeof(struct root_entry));
     }
     maddr = (u64) get_context_addr(*root);
     unmap_vtd_domain_page(root_entries);
@@ -300,7 +291,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
              */
             dma_set_pte_readable(*pte);
             dma_set_pte_writable(*pte);
-            iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
+            iommu_sync_cache(pte, sizeof(struct dma_pte));
         }
 
         if ( level == 2 )
@@ -681,7 +672,7 @@ static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr,
     *flush_flags |= IOMMU_FLUSHF_modified;
 
     spin_unlock(&hd->arch.mapping_lock);
-    iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
+    iommu_sync_cache(pte, sizeof(struct dma_pte));
 
     unmap_vtd_domain_page(page);
 
@@ -720,7 +711,7 @@ static void iommu_free_page_table(struct page_info *pg)
             iommu_free_pagetable(dma_pte_addr(*pte), next_level);
 
         dma_clear_pte(*pte);
-        iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
+        iommu_sync_cache(pte, sizeof(struct dma_pte));
     }
 
     unmap_vtd_domain_page(pt_vaddr);
@@ -1449,7 +1440,7 @@ int domain_context_mapping_one(
     context_set_address_width(*context, agaw);
     context_set_fault_enable(*context);
     context_set_present(*context);
-    iommu_flush_cache_entry(context, sizeof(struct context_entry));
+    iommu_sync_cache(context, sizeof(struct context_entry));
     spin_unlock(&iommu->lock);
 
     /* Context entry was previously non-present (with domid 0). */
@@ -1602,7 +1593,7 @@ int domain_context_unmap_one(
 
     context_clear_present(*context);
     context_clear_entry(*context);
-    iommu_flush_cache_entry(context, sizeof(struct context_entry));
+    iommu_sync_cache(context, sizeof(struct context_entry));
 
     iommu_domid= domain_iommu_domid(domain, iommu);
     if ( iommu_domid == -1 )
@@ -1837,7 +1828,7 @@ static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,
 
     *pte = new;
 
-    iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
+    iommu_sync_cache(pte, sizeof(struct dma_pte));
     spin_unlock(&hd->arch.mapping_lock);
     unmap_vtd_domain_page(page);
 
@@ -1912,7 +1903,7 @@ int iommu_pte_flush(struct domain *d, uint64_t dfn, uint64_t *pte,
     int iommu_domid;
     int rc = 0;
 
-    iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
+    iommu_sync_cache(pte, sizeof(struct dma_pte));
 
     for_each_drhd_unit ( drhd )
     {
@@ -2777,7 +2768,7 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
             dma_set_pte_addr(*pte, maddr);
             dma_set_pte_readable(*pte);
         }
-        iommu_flush_cache_page(parent, 1);
+        iommu_sync_cache(parent, PAGE_SIZE);
 
         unmap_vtd_domain_page(parent);
         parent = map_vtd_domain_page(maddr);
