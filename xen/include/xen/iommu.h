@@ -250,6 +250,7 @@ struct iommu_ops {
     int (*setup_hpet_msi)(struct msi_desc *);
 
     int (*adjust_irq_affinities)(void);
+    void (*sync_cache)(const void *addr, unsigned int size);
 #endif /* CONFIG_X86 */
 
     int __must_check (*suspend)(void);
