@@ -90,6 +90,19 @@ static int atomic_write_ept_entry(ept_entry_t *entryptr, ept_entry_t new,
 
     write_atomic(&entryptr->epte, new.epte);
 
+    /*
+     * The recalc field on the EPT is used to signal either that a
+     * recalculation of the EMT field is required (which doesn't effect the
+     * IOMMU), or a type change. Type changes can only be between ram_rw,
+     * logdirty and ioreq_server: changes to/from logdirty won't work well with
+     * an IOMMU anyway, as IOMMU #PFs are not synchronous and will lead to
+     * aborts, and changes to/from ioreq_server are already fully flushed
+     * before returning to guest context (see
+     * XEN_DMOP_map_mem_type_to_ioreq_server).
+     */
+    if ( !new.recalc && iommu_hap_pt_share )
+        iommu_sync_cache(entryptr, sizeof(*entryptr));
+
     if ( unlikely(oldmfn != mfn_x(INVALID_MFN)) )
         put_page(mfn_to_page(oldmfn));
 
@@ -319,6 +332,9 @@ static bool_t ept_split_super_page(struct p2m_domain *p2m,
             break;
     }
 
+    if ( iommu_hap_pt_share )
+        iommu_sync_cache(table, EPT_PAGETABLE_ENTRIES * sizeof(ept_entry_t));
+
     unmap_domain_page(table);
 
     /* Even failed we should install the newly allocated ept page. */
@@ -377,6 +393,9 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
         next = ept_set_middle_entry(p2m, &e);
         if ( !next )
             return GUEST_TABLE_MAP_FAILED;
+
+        if ( iommu_hap_pt_share )
+            iommu_sync_cache(next, EPT_PAGETABLE_ENTRIES * sizeof(ept_entry_t));
 
         rc = atomic_write_ept_entry(ept_entry, e, next_level);
         ASSERT(rc == 0);
@@ -874,7 +893,7 @@ out:
          need_modify_vtd_table )
     {
         if ( iommu_hap_pt_share )
-            rc = iommu_pte_flush(d, gfn, &ept_entry->epte, order, vtd_pte_present);
+            rc = iommu_flush_iotlb(d, gfn, vtd_pte_present, 1u << order);
         else
         {
             if ( iommu_flags )
