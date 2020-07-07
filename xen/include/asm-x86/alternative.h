@@ -114,6 +114,11 @@ extern void alternative_branches(void);
 #define alternative(oldinstr, newinstr, feature)                        \
         asm volatile (ALTERNATIVE(oldinstr, newinstr, feature) : : : "memory")
 
+#define alternative_2(oldinstr, newinstr1, feature1, newinstr2, feature2) \
+	asm volatile (ALTERNATIVE_2(oldinstr, newinstr1, feature1,	\
+				    newinstr2, feature2)		\
+		      : : : "memory")
+
 /*
  * Alternative inline assembly with input.
  *
