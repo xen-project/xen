@@ -159,7 +159,7 @@ static void __init free_intel_iommu(struct intel_iommu *intel)
 
 static int iommus_incoherent;
 
-void iommu_sync_cache(const void *addr, unsigned int size)
+static void sync_cache(const void *addr, unsigned int size)
 {
     int i;
     static unsigned int clflush_size = 0;
@@ -198,7 +198,7 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
         vaddr = __map_domain_page(cur_pg);
         memset(vaddr, 0, PAGE_SIZE);
 
-        iommu_sync_cache(vaddr, PAGE_SIZE);
+        sync_cache(vaddr, PAGE_SIZE);
         unmap_domain_page(vaddr);
         cur_pg++;
     }
@@ -2813,6 +2813,7 @@ const struct iommu_ops __initconstrel intel_iommu_ops = {
     .iotlb_flush_all = iommu_flush_iotlb_all,
     .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_p2m_table = vtd_dump_p2m_table,
+    .sync_cache = sync_cache,
 };
 
 /*
