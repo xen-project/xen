@@ -3881,10 +3881,8 @@ int shadow_track_dirty_vram(struct domain *d,
             int dirty = 0;
             paddr_t sl1ma = dirty_vram->sl1ma[i];
 
-            if ( !mfn_eq(mfn, INVALID_MFN) )
-            {
+            if ( mfn_eq(mfn, INVALID_MFN) )
                 dirty = 1;
-            }
             else
             {
                 page = mfn_to_page(mfn);
