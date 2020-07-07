@@ -612,13 +612,14 @@ static int __must_check iommu_flush_iotlb(struct domain *d,
         if ( iommu_domid == -1 )
             continue;
 
-        if ( page_count != 1 || gfn == gfn_x(INVALID_GFN) )
+        if ( !page_count || (page_count & (page_count - 1)) ||
+             gfn == gfn_x(INVALID_GFN) || !IS_ALIGNED(gfn, page_count) )
             rc = iommu_flush_iotlb_dsi(iommu, iommu_domid,
                                        0, flush_dev_iotlb);
         else
             rc = iommu_flush_iotlb_psi(iommu, iommu_domid,
                                        (paddr_t)gfn << PAGE_SHIFT_4K,
-                                       PAGE_ORDER_4K,
+                                       get_order_from_pages(page_count),
                                        !dma_old_pte_present,
                                        flush_dev_iotlb);
 
