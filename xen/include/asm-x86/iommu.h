@@ -98,6 +98,13 @@ extern bool untrusted_msi;
 int pi_update_irte(const struct pi_desc *pi_desc, const struct pirq *pirq,
                    const uint8_t gvec);
 
+#define iommu_sync_cache(addr, size) ({                 \
+    const struct iommu_ops *ops = iommu_get_ops();      \
+                                                        \
+    if ( ops->sync_cache )                              \
+        ops->sync_cache(addr, size);                    \
+})
+
 #endif /* !__ARCH_X86_IOMMU_H__ */
 /*
  * Local variables:
