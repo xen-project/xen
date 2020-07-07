@@ -1930,53 +1930,6 @@ static int intel_iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
     return 0;
 }
 
-int iommu_pte_flush(struct domain *d, uint64_t dfn, uint64_t *pte,
-                    int order, int present)
-{
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu = NULL;
-    struct domain_iommu *hd = dom_iommu(d);
-    bool_t flush_dev_iotlb;
-    int iommu_domid;
-    int rc = 0;
-
-    iommu_sync_cache(pte, sizeof(struct dma_pte));
-
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-        if ( !test_bit(iommu->index, &hd->arch.iommu_bitmap) )
-            continue;
-
-        flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
-        iommu_domid= domain_iommu_domid(d, iommu);
-        if ( iommu_domid == -1 )
-            continue;
-
-        rc = iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                   __dfn_to_daddr(dfn),
-                                   order, !present, flush_dev_iotlb);
-        if ( rc > 0 )
-        {
-            iommu_flush_write_buffer(iommu);
-            rc = 0;
-        }
-    }
-
-    if ( unlikely(rc) )
-    {
-        if ( !d->is_shutting_down && printk_ratelimit() )
-            printk(XENLOG_ERR VTDPREFIX
-                   " d%d: IOMMU pages flush failed: %d\n",
-                   d->domain_id, rc);
-
-        if ( !is_hardware_domain(d) )
-            domain_crash(d);
-    }
-
-    return rc;
-}
-
 static int __init vtd_ept_page_compatible(struct iommu *iommu)
 {
     u64 ept_cap, vtd_cap = iommu->cap;
