@@ -68,7 +68,6 @@ int __must_check qinval_device_iotlb_sync(struct vtd_iommu *iommu,
                                           u16 did, u16 size, u64 addr);
 
 unsigned int get_cache_line_size(void);
-void cacheline_flush(char *);
 void flush_all_cache(void);
 
 uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node);
