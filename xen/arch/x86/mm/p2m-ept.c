@@ -186,8 +186,9 @@ static void ept_p2m_type_to_flags(const struct p2m_domain *p2m,
 #define GUEST_TABLE_SUPER_PAGE  2
 #define GUEST_TABLE_POD_PAGE    3
 
-/* Fill in middle levels of ept table */
-static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
+/* Fill in middle level of ept table; return pointer to mapped new table. */
+static ept_entry_t *ept_set_middle_entry(struct p2m_domain *p2m,
+                                         ept_entry_t *ept_entry)
 {
     mfn_t mfn;
     ept_entry_t *table;
@@ -195,7 +196,12 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 
     mfn = p2m_alloc_ptp(p2m, 0);
     if ( mfn_eq(mfn, INVALID_MFN) )
-        return 0;
+        return NULL;
+
+    table = map_domain_page(mfn);
+
+    for ( i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
+        table[i].suppress_ve = 1;
 
     ept_entry->epte = 0;
     ept_entry->mfn = mfn_x(mfn);
@@ -207,14 +213,7 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 
     ept_entry->suppress_ve = 1;
 
-    table = map_domain_page(mfn);
-
-    for ( i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
-        table[i].suppress_ve = 1;
-
-    unmap_domain_page(table);
-
-    return 1;
+    return table;
 }
 
 /* free ept sub tree behind an entry */
@@ -252,10 +251,10 @@ static bool_t ept_split_super_page(struct p2m_domain *p2m,
 
     ASSERT(is_epte_superpage(ept_entry));
 
-    if ( !ept_set_middle_entry(p2m, &new_ept) )
+    table = ept_set_middle_entry(p2m, &new_ept);
+    if ( !table )
         return 0;
 
-    table = map_domain_page(_mfn(new_ept.mfn));
     trunk = 1UL << ((level - 1) * EPT_TABLE_ORDER);
 
     for ( i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
@@ -266,7 +265,6 @@ static bool_t ept_split_super_page(struct p2m_domain *p2m,
         epte->sp = (level > 1);
         epte->mfn += i * trunk;
         epte->snp = is_iommu_enabled(p2m->domain) && iommu_snoop;
-        epte->suppress_ve = 1;
 
         ept_p2m_type_to_flags(p2m, epte);
 
@@ -305,8 +303,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
                           ept_entry_t **table, unsigned long *gfn_remainder,
                           int next_level)
 {
-    unsigned long mfn;
-    ept_entry_t *ept_entry, e;
+    ept_entry_t *ept_entry, *next = NULL, e;
     u32 shift, index;
 
     shift = next_level * EPT_TABLE_ORDER;
@@ -331,19 +328,17 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
         if ( read_only )
             return GUEST_TABLE_MAP_FAILED;
 
-        if ( !ept_set_middle_entry(p2m, ept_entry) )
+        next = ept_set_middle_entry(p2m, ept_entry);
+        if ( !next )
             return GUEST_TABLE_MAP_FAILED;
-        else
-            e = atomic_read_ept_entry(ept_entry); /* Refresh */
+        /* e is now stale and hence may not be used anymore below. */
     }
-
     /* The only time sp would be set here is if we had hit a superpage */
-    if ( is_epte_superpage(&e) )
+    else if ( is_epte_superpage(&e) )
         return GUEST_TABLE_SUPER_PAGE;
 
-    mfn = e.mfn;
     unmap_domain_page(*table);
-    *table = map_domain_page(_mfn(mfn));
+    *table = next ?: map_domain_page(_mfn(e.mfn));
     *gfn_remainder &= (1UL << shift) - 1;
     return GUEST_TABLE_NORMAL_PAGE;
 }
