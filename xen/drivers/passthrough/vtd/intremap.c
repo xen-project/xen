@@ -230,7 +230,7 @@ static void free_remap_entry(struct vtd_iommu *iommu, int index)
                      iremap_entries, iremap_entry);
 
     update_irte(iommu, iremap_entry, &new_ire, false);
-    iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
+    iommu_sync_cache(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
     unmap_vtd_domain_page(iremap_entries);
@@ -406,7 +406,7 @@ static int ioapic_rte_to_remap_entry(struct vtd_iommu *iommu,
     }
 
     update_irte(iommu, iremap_entry, &new_ire, !init);
-    iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
+    iommu_sync_cache(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
     unmap_vtd_domain_page(iremap_entries);
@@ -695,7 +695,7 @@ static int msi_msg_to_remap_entry(
     update_irte(iommu, iremap_entry, &new_ire, msi_desc->irte_initialized);
     msi_desc->irte_initialized = true;
 
-    iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
+    iommu_sync_cache(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
     unmap_vtd_domain_page(iremap_entries);
