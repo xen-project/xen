@@ -612,10 +612,8 @@ static int __must_check iommu_flush_all(void)
     return rc;
 }
 
-static int __must_check iommu_flush_iotlb(struct domain *d,
-                                          unsigned long gfn,
-                                          bool_t dma_old_pte_present,
-                                          unsigned int page_count)
+int iommu_flush_iotlb(struct domain *d, unsigned long gfn,
+                      bool dma_old_pte_present, unsigned int page_count)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct acpi_drhd_unit *drhd;
@@ -1878,53 +1876,6 @@ static int __must_check intel_iommu_unmap_page(struct domain *d,
         return 0;
 
     return dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
-}
-
-int iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
-                    int order, int present)
-{
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu = NULL;
-    struct domain_iommu *hd = dom_iommu(d);
-    bool_t flush_dev_iotlb;
-    int iommu_domid;
-    int rc = 0;
-
-    iommu_sync_cache(pte, sizeof(struct dma_pte));
-
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-        if ( !test_bit(iommu->index, &hd->arch.iommu_bitmap) )
-            continue;
-
-        flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
-        iommu_domid= domain_iommu_domid(d, iommu);
-        if ( iommu_domid == -1 )
-            continue;
-
-        rc = iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                   (paddr_t)gfn << PAGE_SHIFT_4K,
-                                   order, !present, flush_dev_iotlb);
-        if ( rc > 0 )
-        {
-            iommu_flush_write_buffer(iommu);
-            rc = 0;
-        }
-    }
-
-    if ( unlikely(rc) )
-    {
-        if ( !d->is_shutting_down && printk_ratelimit() )
-            printk(XENLOG_ERR VTDPREFIX
-                   " d%d: IOMMU pages flush failed: %d\n",
-                   d->domain_id, rc);
-
-        if ( !is_hardware_domain(d) )
-            domain_crash(d);
-    }
-
-    return rc;
 }
 
 static int __init vtd_ept_page_compatible(struct iommu *iommu)
