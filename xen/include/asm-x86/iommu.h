@@ -97,10 +97,6 @@ static inline int iommu_adjust_irq_affinities(void)
            : 0;
 }
 
-/* While VT-d specific, this must get declared in a generic header. */
-int __must_check iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
-                                 int order, int present);
-
 static inline bool iommu_supports_x2apic(void)
 {
     return iommu_init_ops && iommu_init_ops->supports_x2apic
