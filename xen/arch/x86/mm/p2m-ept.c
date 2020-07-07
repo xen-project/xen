@@ -306,6 +306,8 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
     ept_entry_t *ept_entry, *next = NULL, e;
     u32 shift, index;
 
+    ASSERT(next_level);
+
     shift = next_level * EPT_TABLE_ORDER;
 
     index = *gfn_remainder >> shift;
@@ -322,16 +324,20 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
 
     if ( !is_epte_present(&e) )
     {
+        int rc;
+
         if ( e.sa_p2mt == p2m_populate_on_demand )
             return GUEST_TABLE_POD_PAGE;
 
         if ( read_only )
             return GUEST_TABLE_MAP_FAILED;
 
-        next = ept_set_middle_entry(p2m, ept_entry);
+        next = ept_set_middle_entry(p2m, &e);
         if ( !next )
             return GUEST_TABLE_MAP_FAILED;
-        /* e is now stale and hence may not be used anymore below. */
+
+        rc = atomic_write_ept_entry(p2m, ept_entry, e, next_level);
+        ASSERT(rc == 0);
     }
     /* The only time sp would be set here is if we had hit a superpage */
     else if ( is_epte_superpage(&e) )
