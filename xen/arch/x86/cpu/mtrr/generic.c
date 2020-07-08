@@ -570,23 +570,6 @@ int generic_validate_add_page(unsigned long base, unsigned long size, unsigned i
 {
 	unsigned long lbase, last;
 
-	/*  For Intel PPro stepping <= 7, must be 4 MiB aligned 
-	    and not touch 0x70000000->0x7003FFFF */
-	if (is_cpu(INTEL) && boot_cpu_data.x86 == 6 &&
-	    boot_cpu_data.x86_model == 1 &&
-	    boot_cpu_data.x86_mask <= 7) {
-		if (base & ((1 << (22 - PAGE_SHIFT)) - 1)) {
-			printk(KERN_WARNING "mtrr: base(%#lx000) is not 4 MiB aligned\n", base);
-			return -EINVAL;
-		}
-		if (!(base + size < 0x70000 || base > 0x7003F) &&
-		    (type == MTRR_TYPE_WRCOMB
-		     || type == MTRR_TYPE_WRBACK)) {
-			printk(KERN_WARNING "mtrr: writable mtrr between 0x70000000 and 0x7003FFFF may hang the CPU.\n");
-			return -EINVAL;
-		}
-	}
-
 	/*  Check upper bits of base and last are equal and lower bits are 0
 	    for base and 1 for last  */
 	last = base + size - 1;
