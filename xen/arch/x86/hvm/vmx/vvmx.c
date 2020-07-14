@@ -1234,7 +1234,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
         paging_update_paging_modes(v);
 
     if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
-         !(v->arch.hvm.guest_efer & EFER_LMA) )
+         !hvm_long_mode_active(v) )
         vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
     regs->rip = get_vvmcs(v, GUEST_RIP);
@@ -1437,7 +1437,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     sync_exception_state(v);
 
     if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
-         !(v->arch.hvm.guest_efer & EFER_LMA) )
+         !hvm_long_mode_active(v) )
         shadow_to_vvmcs_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
     /* This will clear current pCPU bit in p2m->dirty_cpumask */

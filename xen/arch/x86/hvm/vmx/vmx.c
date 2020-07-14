@@ -1312,18 +1312,14 @@ static void vmx_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
 
 static void vmx_load_pdptrs(struct vcpu *v)
 {
-    unsigned long cr3 = v->arch.hvm.guest_cr[3];
-    uint64_t *guest_pdptes;
+    uint32_t cr3 = v->arch.hvm.guest_cr[3];
+    const uint64_t *guest_pdptes;
     struct page_info *page;
     p2m_type_t p2mt;
-    char *p;
 
     /* EPT needs to load PDPTRS into VMCS for PAE. */
-    if ( !hvm_pae_enabled(v) || (v->arch.hvm.guest_efer & EFER_LMA) )
+    if ( !hvm_pae_enabled(v) || hvm_long_mode_active(v) )
         return;
-
-    if ( (cr3 & 0x1fUL) && !hvm_pcid_enabled(v) )
-        goto crash;
 
     page = get_page_from_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
     if ( !page )
@@ -1332,14 +1328,13 @@ static void vmx_load_pdptrs(struct vcpu *v)
          * queue, but this is the wrong place. We're holding at least
          * the paging lock */
         gdprintk(XENLOG_ERR,
-                 "Bad cr3 on load pdptrs gfn %lx type %d\n",
+                 "Bad cr3 on load pdptrs gfn %"PRIx32" type %d\n",
                  cr3 >> PAGE_SHIFT, (int) p2mt);
-        goto crash;
+        domain_crash(v->domain);
+        return;
     }
 
-    p = __map_domain_page(page);
-
-    guest_pdptes = (uint64_t *)(p + (cr3 & ~PAGE_MASK));
+    guest_pdptes = __map_domain_page(page) + (cr3 & ~(PAGE_MASK | 0x1f));
 
     /*
      * We do not check the PDPTRs for validity. The CPU will do this during
@@ -1356,12 +1351,9 @@ static void vmx_load_pdptrs(struct vcpu *v)
 
     vmx_vmcs_exit(v);
 
-    unmap_domain_page(p);
+    unmap_domain_page(guest_pdptes);
     put_page(page);
     return;
-
- crash:
-    domain_crash(v->domain);
 }
 
 static void vmx_update_host_cr3(struct vcpu *v)
