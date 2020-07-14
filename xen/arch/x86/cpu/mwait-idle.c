@@ -721,7 +721,7 @@ static void mwait_idle(void)
 	unsigned int cpu = smp_processor_id();
 	struct acpi_processor_power *power = processor_powers[cpu];
 	struct acpi_processor_cx *cx = NULL;
-	unsigned int eax, next_state, cstate;
+	unsigned int next_state;
 	u64 before, after;
 	u32 exp = 0, pred = 0, irq_traced[4] = { 0 };
 
@@ -773,9 +773,6 @@ static void mwait_idle(void)
 	if ((cx->type >= 3) && errata_c6_workaround())
 		cx = power->safe_state;
 
-	eax = cx->address;
-	cstate = ((eax >> MWAIT_SUBSTATE_SIZE) & MWAIT_CSTATE_MASK) + 1;
-
 #if 0 /* XXX Can we/do we need to do something similar on Xen? */
 	/*
 	 * leave_mm() to avoid costly and often unnecessary wakeups
@@ -785,7 +782,7 @@ static void mwait_idle(void)
 		leave_mm(cpu);
 #endif
 
-	if (!(lapic_timer_reliable_states & (1 << cstate)))
+	if (!(lapic_timer_reliable_states & (1 << cx->type)))
 		lapic_timer_off();
 
 	before = alternative_call(cpuidle_get_tick);
@@ -794,7 +791,7 @@ static void mwait_idle(void)
 	update_last_cx_stat(power, cx, before);
 
 	if (cpu_is_haltable(cpu))
-		mwait_idle_with_hints(eax, MWAIT_ECX_INTERRUPT_BREAK);
+		mwait_idle_with_hints(cx->address, MWAIT_ECX_INTERRUPT_BREAK);
 
 	after = alternative_call(cpuidle_get_tick);
 
@@ -807,7 +804,7 @@ static void mwait_idle(void)
 	update_idle_stats(power, cx, before, after);
 	local_irq_enable();
 
-	if (!(lapic_timer_reliable_states & (1 << cstate)))
+	if (!(lapic_timer_reliable_states & (1 << cx->type)))
 		lapic_timer_on();
 
 	rcu_idle_exit(cpu);
