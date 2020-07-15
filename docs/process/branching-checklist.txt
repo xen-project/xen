@@ -86,8 +86,8 @@ including turning off debug.
 
 Set off a manual osstest run, since the osstest cr-for-branches change
 will take a while to take effect:
-  ssh osstest.test-lab
-  cd branches/for-xen-$v-testing.git
+  ssh osstest@osstest.test-lab
+  cd testing.git
   screen -S $v
   BRANCHES=xen-$v-testing ./cr-for-branches branches -w "./cr-daily-branch --real"
 
