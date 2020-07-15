@@ -543,7 +543,7 @@ static void handle_rtc_once(uint8_t index, uint8_t value)
     if ( value & (RTC_PIE | RTC_AIE | RTC_UIE ) )
     {
         cpuidle_disable_deep_cstate();
-        pv_rtc_handler = NULL;
+        ACCESS_ONCE(pv_rtc_handler) = NULL;
     }
 }
 

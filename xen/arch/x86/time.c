@@ -1148,6 +1148,8 @@ void rtc_guest_write(unsigned int port, unsigned int data)
 
     switch ( port )
     {
+        typeof(pv_rtc_handler) hook;
+
     case RTC_PORT(0):
         /*
          * All PV domains (and PVH dom0) are allowed to write to the latched
@@ -1160,6 +1162,11 @@ void rtc_guest_write(unsigned int port, unsigned int data)
     case RTC_PORT(1):
         if ( !ioports_access_permitted(currd, RTC_PORT(0), RTC_PORT(1)) )
             break;
+
+        hook = ACCESS_ONCE(pv_rtc_handler);
+        if ( hook )
+            hook(currd->arch.cmos_idx & 0x7f, data);
+
         spin_lock_irqsave(&rtc_lock, flags);
         outb(currd->arch.cmos_idx & 0x7f, RTC_PORT(0));
         outb(data, RTC_PORT(1));
