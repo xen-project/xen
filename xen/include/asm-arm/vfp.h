@@ -1,7 +1,7 @@
 #ifndef _ASM_VFP_H
 #define _ASM_VFP_H
 
-#include <xen/sched.h>
+struct vcpu;
 
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/vfp.h>

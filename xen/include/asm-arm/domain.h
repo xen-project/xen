@@ -2,7 +2,7 @@
 #define __ASM_DOMAIN_H__
 
 #include <xen/cache.h>
-#include <xen/sched.h>
+#include <xen/timer.h>
 #include <asm/page.h>
 #include <asm/p2m.h>
 #include <asm/vfp.h>
@@ -11,8 +11,6 @@
 #include <asm/vgic.h>
 #include <asm/vpl011.h>
 #include <public/hvm/params.h>
-#include <xen/serial.h>
-#include <xen/rbtree.h>
 
 struct hvm_domain
 {
