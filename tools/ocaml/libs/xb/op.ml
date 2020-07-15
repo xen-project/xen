@@ -28,7 +28,7 @@ let operation_c_mapping =
            Transaction_end; Introduce; Release;
            Getdomainpath; Write; Mkdir; Rm;
            Setperms; Watchevent; Error; Isintroduced;
-           Resume; Set_target; Reset_watches |]
+           Resume; Set_target; Invalid; Reset_watches |]
 let size = Array.length operation_c_mapping
 
 let array_search el a =
