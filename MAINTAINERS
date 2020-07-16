@@ -298,6 +298,7 @@ F:	tools/debugger/gdbsx/
 
 GOLANG BINDINGS
 M:	George Dunlap <george.dunlap@citrix.com>
+M:     Nick Rosbrook <rosbrookn@ainfosec.com>
 S:	Maintained
 F:	tools/golang
 
