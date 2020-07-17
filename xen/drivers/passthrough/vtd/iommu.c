@@ -59,6 +59,7 @@ bool __read_mostly iommu_snoop = true;
 
 int nr_iommus;
 
+static struct iommu_ops vtd_ops;
 static struct tasklet vtd_fault_tasklet;
 
 static int setup_hwdom_device(u8 devfn, struct pci_dev *);
@@ -146,15 +147,10 @@ static int context_get_domain_id(struct context_entry *context,
     return domid;
 }
 
-static int iommus_incoherent;
-
 static void sync_cache(const void *addr, unsigned int size)
 {
     static unsigned long clflush_size = 0;
     const void *end = addr + size;
-
-    if ( !iommus_incoherent )
-        return;
 
     if ( clflush_size == 0 )
         clflush_size = get_cache_line_size();
@@ -217,7 +213,8 @@ uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node)
         vaddr = __map_domain_page(cur_pg);
         memset(vaddr, 0, PAGE_SIZE);
 
-        sync_cache(vaddr, PAGE_SIZE);
+        if ( (iommu_ops.init ? &iommu_ops : &vtd_ops)->sync_cache )
+            sync_cache(vaddr, PAGE_SIZE);
         unmap_domain_page(vaddr);
         cur_pg++;
     }
@@ -1227,7 +1224,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     iommu->nr_pt_levels = agaw_to_level(agaw);
 
     if ( !ecap_coherent(iommu->ecap) )
-        iommus_incoherent = 1;
+        vtd_ops.sync_cache = sync_cache;
 
     /* allocate domain id bitmap */
     nr_dom = cap_ndoms(iommu->cap);
@@ -2737,7 +2734,7 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
     return level ? -ENOMEM : rc;
 }
 
-const struct iommu_ops __initconstrel intel_iommu_ops = {
+static struct iommu_ops __initdata vtd_ops = {
     .init = intel_iommu_domain_init,
     .hwdom_init = intel_iommu_hwdom_init,
     .quarantine_init = intel_iommu_quarantine_init,
@@ -2768,11 +2765,10 @@ const struct iommu_ops __initconstrel intel_iommu_ops = {
     .iotlb_flush_all = iommu_flush_iotlb_all,
     .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_p2m_table = vtd_dump_p2m_table,
-    .sync_cache = sync_cache,
 };
 
 const struct iommu_init_ops __initconstrel intel_iommu_init_ops = {
-    .ops = &intel_iommu_ops,
+    .ops = &vtd_ops,
     .setup = vtd_setup,
     .supports_x2apic = intel_iommu_supports_eim,
 };
