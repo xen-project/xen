@@ -199,7 +199,6 @@ static void sync_cache(const void *addr, unsigned int size)
 uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node)
 {
     struct page_info *pg, *cur_pg;
-    u64 *vaddr;
     unsigned int i;
 
     pg = alloc_domheap_pages(NULL, get_order_from_pages(npages),
@@ -210,8 +209,9 @@ uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node)
     cur_pg = pg;
     for ( i = 0; i < npages; i++ )
     {
-        vaddr = __map_domain_page(cur_pg);
-        memset(vaddr, 0, PAGE_SIZE);
+        void *vaddr = __map_domain_page(cur_pg);
+
+        clear_page(vaddr);
 
         if ( (iommu_ops.init ? &iommu_ops : &vtd_ops)->sync_cache )
             sync_cache(vaddr, PAGE_SIZE);
