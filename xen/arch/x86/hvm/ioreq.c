@@ -103,23 +103,12 @@ bool hvm_io_pending(struct vcpu *v)
     return false;
 }
 
-static void hvm_io_assist(struct hvm_ioreq_vcpu *sv, uint64_t data)
-{
-    struct vcpu *v = sv->vcpu;
-    ioreq_t *ioreq = &v->arch.hvm.hvm_io.io_req;
-
-    if ( hvm_ioreq_needs_completion(ioreq) )
-        ioreq->data = data;
-
-    sv->pending = false;
-}
-
 static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
 {
     unsigned int prev_state = STATE_IOREQ_NONE;
+    uint64_t data = ~0;
 
-    while ( sv->pending )
-    {
+    do {
         unsigned int state = p->state;
 
         smp_rmb();
@@ -132,7 +121,6 @@ static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
              * emulator is dying and it races with an I/O being
              * requested.
              */
-            hvm_io_assist(sv, ~0ul);
             break;
         }
 
@@ -149,7 +137,7 @@ static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
         {
         case STATE_IORESP_READY: /* IORESP_READY -> NONE */
             p->state = STATE_IOREQ_NONE;
-            hvm_io_assist(sv, p->data);
+            data = p->data;
             break;
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
@@ -164,7 +152,13 @@ static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
             domain_crash(sv->vcpu->domain);
             return false; /* bail */
         }
-    }
+    } while ( false );
+
+    p = &sv->vcpu->arch.hvm.hvm_io.io_req;
+    if ( hvm_ioreq_needs_completion(p) )
+        p->data = data;
+
+    sv->pending = false;
 
     return true;
 }
