@@ -81,7 +81,8 @@ static ioreq_t *get_ioreq(struct hvm_ioreq_server *s, struct vcpu *v)
     return &p->vcpu_ioreq[v->vcpu_id];
 }
 
-bool hvm_io_pending(struct vcpu *v)
+static struct hvm_ioreq_vcpu *get_pending_vcpu(const struct vcpu *v,
+                                               struct hvm_ioreq_server **srvp)
 {
     struct domain *d = v->domain;
     struct hvm_ioreq_server *s;
@@ -96,11 +97,20 @@ bool hvm_io_pending(struct vcpu *v)
                               list_entry )
         {
             if ( sv->vcpu == v && sv->pending )
-                return true;
+            {
+                if ( srvp )
+                    *srvp = s;
+                return sv;
+            }
         }
     }
 
-    return false;
+    return NULL;
+}
+
+bool hvm_io_pending(struct vcpu *v)
+{
+    return get_pending_vcpu(v, NULL);
 }
 
 static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
@@ -165,8 +175,8 @@ bool handle_hvm_io_completion(struct vcpu *v)
     struct domain *d = v->domain;
     struct hvm_vcpu_io *vio = &v->arch.hvm.hvm_io;
     struct hvm_ioreq_server *s;
+    struct hvm_ioreq_vcpu *sv;
     enum hvm_io_completion io_completion;
-    unsigned int id;
 
     if ( has_vpci(d) && vpci_process_pending(v) )
     {
@@ -174,23 +184,9 @@ bool handle_hvm_io_completion(struct vcpu *v)
         return false;
     }
 
-    FOR_EACH_IOREQ_SERVER(d, id, s)
-    {
-        struct hvm_ioreq_vcpu *sv;
-
-        list_for_each_entry ( sv,
-                              &s->ioreq_vcpu_list,
-                              list_entry )
-        {
-            if ( sv->vcpu == v && sv->pending )
-            {
-                if ( !hvm_wait_for_io(sv, get_ioreq(s, v)) )
-                    return false;
-
-                break;
-            }
-        }
-    }
+    sv = get_pending_vcpu(v, &s);
+    if ( sv && !hvm_wait_for_io(sv, get_ioreq(s, v)) )
+        return false;
 
     vio->io_req.state = hvm_ioreq_needs_completion(&vio->io_req) ?
         STATE_IORESP_READY : STATE_IOREQ_NONE;
