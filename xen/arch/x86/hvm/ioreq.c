@@ -106,24 +106,17 @@ bool hvm_io_pending(struct vcpu *v)
 static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
 {
     unsigned int prev_state = STATE_IOREQ_NONE;
+    unsigned int state = p->state;
     uint64_t data = ~0;
 
-    do {
-        unsigned int state = p->state;
+    smp_rmb();
 
-        smp_rmb();
-
-    recheck:
-        if ( unlikely(state == STATE_IOREQ_NONE) )
-        {
-            /*
-             * The only reason we should see this case is when an
-             * emulator is dying and it races with an I/O being
-             * requested.
-             */
-            break;
-        }
-
+    /*
+     * The only reason we should see this condition be false is when an
+     * emulator dying races with I/O being requested.
+     */
+    while ( likely(state != STATE_IOREQ_NONE) )
+    {
         if ( unlikely(state < prev_state) )
         {
             gdprintk(XENLOG_ERR, "Weird HVM ioreq state transition %u -> %u\n",
@@ -139,20 +132,24 @@ static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
             p->state = STATE_IOREQ_NONE;
             data = p->data;
             break;
+
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
             wait_on_xen_event_channel(sv->ioreq_evtchn,
                                       ({ state = p->state;
                                          smp_rmb();
                                          state != prev_state; }));
-            goto recheck;
+            continue;
+
         default:
             gdprintk(XENLOG_ERR, "Weird HVM iorequest state %u\n", state);
             sv->pending = false;
             domain_crash(sv->vcpu->domain);
             return false; /* bail */
         }
-    } while ( false );
+
+        break;
+    }
 
     p = &sv->vcpu->arch.hvm.hvm_io.io_req;
     if ( hvm_ioreq_needs_completion(p) )
