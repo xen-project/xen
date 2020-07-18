@@ -1,17 +1,20 @@
 ifdef V
-  ifeq ("$(origin V)", "command line")
-    BUILD_VERBOSE = $(V)
-  endif
+	ifeq ("$(origin V)", "command line")
+		BUILD_VERBOSE = $(V)
+	endif
+else
+	V := 1
+	BUILD_VERBOSE := 1
 endif
 ifndef BUILD_VERBOSE
-  BUILD_VERBOSE = 0
+	BUILD_VERBOSE := 0
 endif
 ifeq ($(BUILD_VERBOSE),1)
-  E = @true
-  Q =
+	E := @true
+	Q :=
 else
-  E = @echo
-  Q = @
+	E := @echo
+	Q := @
 endif
 
 .NOTPARALLEL:
