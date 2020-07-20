@@ -249,13 +249,13 @@ to boot with memory < maxmem.
 
 Allow sharing of identical pages between guests
 
-    Status, x86 HVM: Expermental
+    Status, x86 HVM: Experimental
 
 ### Memory Paging
 
 Allow pages belonging to guests to be paged to disk
 
-    Status, x86 HVM: Experimenal
+    Status, x86 HVM: Experimental
 
 ### Alternative p2m
 
