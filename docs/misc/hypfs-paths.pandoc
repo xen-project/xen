@@ -5,6 +5,9 @@ in the Xen hypervisor file system (hypfs).
 
 The hypervisor file system can be accessed via the xenhypfs tool.
 
+The availability of the hypervisor file system depends on the hypervisor
+config option CONFIG_HYPFS, which is on per default.
+
 ## Notation
 
 The hypervisor file system is similar to the Linux kernel's sysfs.
@@ -63,6 +66,23 @@ Possible values would be "No" or a list of "dom0", "domU", and "PCID-on" with
 the list elements separated by spaces, e.g. "dom0 PCID-on".
 The entry would be writable and it would exist on X86 only and only if the
 hypervisor is configured to support PV guests.
+
+# Stability
+
+Path *presence* is not stable, but path *meaning* is always stable: if a tool
+you write finds a path present, it can rely on behavior in future versions of
+the hypervisors, and in different configurations.  Specifically:
+
+1. Conditions under which paths are used may be extended, restricted, or
+   removed.  For example, a path that’s always available only on ARM systems
+   may become available on x86; or a path available on both systems may be
+   restricted to only appearing on ARM systems.  Paths may also disappear
+   entirely.
+2. However, the meaning of a path will never change.  If a path is present,
+   it will always have exactly the meaning that it always had.  In order to
+   maintain this, removed paths should be retained with the tag [REMOVED].
+   The path may be restored *only* if the restored version of the path is
+   compatible with the previous functionality.
 
 ## Example
 
