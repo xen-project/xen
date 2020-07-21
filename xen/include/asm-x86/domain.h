@@ -135,6 +135,14 @@ struct shadow_vcpu {
     l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
     /* PAE guests: per-vcpu cache of the top-level *guest* entries */
     l3_pgentry_t gl3e[4] __attribute__((__aligned__(32)));
+
+    /* shadow(s) of guest (MFN) */
+#ifdef CONFIG_HVM
+    pagetable_t shadow_table[4];
+#else
+    pagetable_t shadow_table[1];
+#endif
+
     /* Last MFN that we emulated a write to as unshadow heuristics. */
     unsigned long last_emulated_mfn_for_unshadow;
     /* MFN of the last shadow that we shot a writeable mapping in */
@@ -576,6 +584,10 @@ struct arch_vcpu
         struct hvm_vcpu hvm;
     };
 
+    /*
+     * guest_table{,_user} hold a ref to the page, and also a type-count
+     * unless shadow refcounts are in use
+     */
     pagetable_t guest_table_user;       /* (MFN) x86/64 user-space pagetable */
     pagetable_t guest_table;            /* (MFN) guest notion of cr3 */
     struct page_info *old_guest_table;  /* partially destructed pagetable */
@@ -583,9 +595,7 @@ struct arch_vcpu
                                         /* former, if any */
     bool old_guest_table_partial;       /* Are we dropping a type ref, or just
                                          * finishing up a partial de-validation? */
-    /* guest_table holds a ref to the page, and also a type-count unless
-     * shadow refcounts are in use */
-    pagetable_t shadow_table[4];        /* (MFN) shadow(s) of guest */
+
     unsigned long cr3;                  /* (MA) value to install in HW CR3 */
 
     /*

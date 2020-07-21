@@ -959,13 +959,15 @@ static void _shadow_prealloc(struct domain *d, unsigned int pages)
     perfc_incr(shadow_prealloc_2);
 
     for_each_vcpu(d, v)
-        for ( i = 0 ; i < 4 ; i++ )
+        for ( i = 0; i < ARRAY_SIZE(v->arch.paging.shadow.shadow_table); i++ )
         {
-            if ( !pagetable_is_null(v->arch.shadow_table[i]) )
+            if ( !pagetable_is_null(v->arch.paging.shadow.shadow_table[i]) )
             {
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PREALLOC_UNHOOK);
-                shadow_unhook_mappings(d,
-                               pagetable_get_mfn(v->arch.shadow_table[i]), 0);
+                shadow_unhook_mappings(
+                    d,
+                    pagetable_get_mfn(v->arch.paging.shadow.shadow_table[i]),
+                    0);
 
                 /* See if that freed up enough space */
                 if ( d->arch.paging.shadow.free_pages >= pages )
@@ -1018,10 +1020,12 @@ void shadow_blow_tables(struct domain *d)
 
     /* Second pass: unhook entries of in-use shadows */
     for_each_vcpu(d, v)
-        for ( i = 0 ; i < 4 ; i++ )
-            if ( !pagetable_is_null(v->arch.shadow_table[i]) )
-                shadow_unhook_mappings(d,
-                               pagetable_get_mfn(v->arch.shadow_table[i]), 0);
+        for ( i = 0; i < ARRAY_SIZE(v->arch.paging.shadow.shadow_table); i++ )
+            if ( !pagetable_is_null(v->arch.paging.shadow.shadow_table[i]) )
+                shadow_unhook_mappings(
+                    d,
+                    pagetable_get_mfn(v->arch.paging.shadow.shadow_table[i]),
+                    0);
 
     /* Make sure everyone sees the unshadowings */
     guest_flush_tlb_mask(d, d->dirty_cpumask);
