@@ -3560,13 +3560,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
          break;
 
     default:
-        if ( (ret = vmce_rdmsr(msr, msr_content)) < 0 )
-            goto gp_fault;
-        /* If ret == 0 then this is not an MCE MSR, see other MSRs. */
-        ret = ((ret == 0)
-               ? alternative_call(hvm_funcs.msr_read_intercept,
-                                  msr, msr_content)
-               : X86EMUL_OKAY);
+        ret = alternative_call(hvm_funcs.msr_read_intercept, msr, msr_content);
         break;
     }
 
@@ -3696,13 +3690,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         break;
 
     default:
-        if ( (ret = vmce_wrmsr(msr, msr_content)) < 0 )
-            goto gp_fault;
-        /* If ret == 0 then this is not an MCE MSR, see other MSRs. */
-        ret = ((ret == 0)
-               ? alternative_call(hvm_funcs.msr_write_intercept,
-                                  msr, msr_content)
-               : X86EMUL_OKAY);
+        ret = alternative_call(hvm_funcs.msr_write_intercept, msr, msr_content);
         break;
     }
 

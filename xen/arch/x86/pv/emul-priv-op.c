@@ -855,8 +855,6 @@ static int read_msr(unsigned int reg, uint64_t *val,
 
     switch ( reg )
     {
-        int rc;
-
     case MSR_FS_BASE:
         if ( is_pv_32bit_domain(currd) )
             break;
@@ -955,12 +953,6 @@ static int read_msr(unsigned int reg, uint64_t *val,
         }
         /* fall through */
     default:
-        rc = vmce_rdmsr(reg, val);
-        if ( rc < 0 )
-            break;
-        if ( rc )
-            return X86EMUL_OKAY;
-        /* fall through */
     normal:
         /* Everyone can read the MSR space. */
         /* gdprintk(XENLOG_WARNING, "Domain attempted RDMSR %08x\n", reg); */
@@ -991,7 +983,6 @@ static int write_msr(unsigned int reg, uint64_t val,
     switch ( reg )
     {
         uint64_t temp;
-        int rc;
 
     case MSR_FS_BASE:
         if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
@@ -1122,12 +1113,6 @@ static int write_msr(unsigned int reg, uint64_t val,
         }
         /* fall through */
     default:
-        rc = vmce_wrmsr(reg, val);
-        if ( rc < 0 )
-            break;
-        if ( rc )
-            return X86EMUL_OKAY;
-
         if ( (rdmsr_safe(reg, temp) != 0) || (val != temp) )
     invalid:
             gdprintk(XENLOG_WARNING,
