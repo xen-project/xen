@@ -131,15 +131,16 @@ struct shadow_domain {
 
 struct shadow_vcpu {
 #ifdef CONFIG_SHADOW_PAGING
+#ifdef CONFIG_HVM
     /* PAE guests: per-vcpu shadow top-level table */
     l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
     /* PAE guests: per-vcpu cache of the top-level *guest* entries */
     l3_pgentry_t gl3e[4] __attribute__((__aligned__(32)));
 
     /* shadow(s) of guest (MFN) */
-#ifdef CONFIG_HVM
     pagetable_t shadow_table[4];
 #else
+    /* shadow of guest (MFN) */
     pagetable_t shadow_table[1];
 #endif
 
