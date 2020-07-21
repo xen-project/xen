@@ -593,6 +593,10 @@ static const struct test avx512_vnni_all[] = {
     INSN(pdpwssds, 66, 0f38, 53, vl, d, vl),
 };
 
+static const struct test avx512_vp2intersect_all[] = {
+    INSN(p2intersect, f2, 0f38, 68, vl, dq, vl)
+};
+
 static const struct test avx512_vpopcntdq_all[] = {
     INSN(popcnt, 66, 0f38, 55, vl, dq, vl)
 };
@@ -996,6 +1000,7 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512_vbmi, all);
     RUN(avx512_vbmi2, all);
     RUN(avx512_vnni, all);
+    RUN(avx512_vp2intersect, all);
     RUN(avx512_vpopcntdq, all);
 
     if ( cpu_has_avx512f )

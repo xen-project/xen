@@ -260,7 +260,7 @@ def crunch_numbers(state):
         # AVX512 features are built on top of AVX512F
         AVX512F: [AVX512DQ, AVX512_IFMA, AVX512PF, AVX512ER, AVX512CD,
                   AVX512BW, AVX512VL, AVX512_4VNNIW, AVX512_4FMAPS,
-                  AVX512_VNNI, AVX512_VPOPCNTDQ],
+                  AVX512_VNNI, AVX512_VPOPCNTDQ, AVX512_VP2INTERSECT],
 
         # AVX512 extensions acting on vectors of bytes/words are made
         # dependents of AVX512BW (as to requiring wider than 16-bit mask
