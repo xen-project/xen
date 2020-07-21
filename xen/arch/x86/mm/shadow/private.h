@@ -438,6 +438,14 @@ mfn_t oos_snapshot_lookup(struct domain *d, mfn_t gmfn);
 
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
+/* Deliberately free all the memory we can: tear down all of d's shadows. */
+void shadow_blow_tables(struct domain *d);
+
+/*
+ * Remove all mappings of a guest frame from the shadow tables.
+ * Returns non-zero if we need to flush TLBs.
+ */
+int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn);
 
 /* Reset the up-pointers of every L3 shadow to 0.
  * This is called when l3 shadows stop being pinnable, to clear out all
