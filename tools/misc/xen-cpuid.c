@@ -75,7 +75,7 @@ static const char *const str_e1d[32] =
 
 static const char *const str_e1c[32] =
 {
-    [ 0] = "lahf_lm",    [ 1] = "cmp",
+    [ 0] = "lahf-lm",    [ 1] = "cmp",
     [ 2] = "svm",        [ 3] = "extapic",
     [ 4] = "cr8d",       [ 5] = "lzcnt",
     [ 6] = "sse4a",      [ 7] = "msse",
@@ -86,10 +86,10 @@ static const char *const str_e1c[32] =
     [16] = "fma4",       [17] = "tce",
     /* [18] */           [19] = "nodeid",
     /* [20] */           [21] = "tbm",
-    [22] = "topoext",    [23] = "perfctr_core",
-    [24] = "perfctr_nb", /* [25] */
+    [22] = "topoext",    [23] = "perfctr-core",
+    [24] = "perfctr-nb", /* [25] */
     [26] = "dbx",        [27] = "perftsc",
-    [28] = "pcx_l2i",    [29] = "monitorx",
+    [28] = "pcx-l2i",    [29] = "monitorx",
 };
 
 static const char *const str_7b0[32] =
@@ -97,7 +97,7 @@ static const char *const str_7b0[32] =
     [ 0] = "fsgsbase", [ 1] = "tsc-adj",
     [ 2] = "sgx",      [ 3] = "bmi1",
     [ 4] = "hle",      [ 5] = "avx2",
-    [ 6] = "fdp_exn",  [ 7] = "smep",
+    [ 6] = "fdp-exn",  [ 7] = "smep",
     [ 8] = "bmi2",     [ 9] = "erms",
     [10] = "invpcid",  [11] = "rtm",
     [12] = "pqm",      [13] = "depfpp",
@@ -120,21 +120,21 @@ static const char *const str_Da1[32] =
 
 static const char *const str_7c0[32] =
 {
-    [ 0] = "prefetchwt1",      [ 1] = "avx512_vbmi",
+    [ 0] = "prefetchwt1",      [ 1] = "avx512-vbmi",
     [ 2] = "umip",             [ 3] = "pku",
     [ 4] = "ospke",            [ 5] = "waitpkg",
-    [ 6] = "avx512_vbmi2",     [ 7] = "cet-ss",
+    [ 6] = "avx512-vbmi2",     [ 7] = "cet-ss",
     [ 8] = "gfni",             [ 9] = "vaes",
-    [10] = "vpclmulqdq",       [11] = "avx512_vnni",
-    [12] = "avx512_bitalg",
-    [14] = "avx512_vpopcntdq",
+    [10] = "vpclmulqdq",       [11] = "avx512-vnni",
+    [12] = "avx512-bitalg",
+    [14] = "avx512-vpopcntdq",
     [16] = "tsxldtrk",
 
     [22] = "rdpid",
     /* 24 */                   [25] = "cldemote",
     /* 26 */                   [27] = "movdiri",
     [28] = "movdir64b",
-    [30] = "sgx_lc",
+    [30] = "sgx-lc",
 };
 
 static const char *const str_e7d[32] =
@@ -157,7 +157,7 @@ static const char *const str_e8b[32] =
 
 static const char *const str_7d0[32] =
 {
-    [ 2] = "avx512_4vnniw", [ 3] = "avx512_4fmaps",
+    [ 2] = "avx512-4vnniw", [ 3] = "avx512-4fmaps",
     [ 4] = "fsrm",
 
     [ 8] = "avx512-vp2intersect", [ 9] = "srbds-ctrl",
@@ -169,13 +169,13 @@ static const char *const str_7d0[32] =
     [20] = "cet-ibt",
 
     [26] = "ibrsb",         [27] = "stibp",
-    [28] = "l1d_flush",     [29] = "arch_caps",
-    [30] = "core_caps",     [31] = "ssbd",
+    [28] = "l1d-flush",     [29] = "arch-caps",
+    [30] = "core-caps",     [31] = "ssbd",
 };
 
 static const char *const str_7a1[32] =
 {
-    /* 4 */                 [ 5] = "avx512_bf16",
+    /* 4 */                 [ 5] = "avx512-bf16",
 };
 
 static const struct {
