@@ -2560,6 +2560,80 @@ void shadow_update_paging_modes(struct vcpu *v)
     paging_unlock(v->domain);
 }
 
+/* Set up the top-level shadow and install it in slot 'slot' of shadow_table */
+void sh_set_toplevel_shadow(struct vcpu *v,
+                            unsigned int slot,
+                            mfn_t gmfn,
+                            unsigned int root_type,
+                            mfn_t (*make_shadow)(struct vcpu *v,
+                                                 mfn_t gmfn,
+                                                 uint32_t shadow_type))
+{
+    mfn_t smfn;
+    pagetable_t old_entry, new_entry;
+    struct domain *d = v->domain;
+
+    /* Remember the old contents of this slot */
+    old_entry = v->arch.paging.shadow.shadow_table[slot];
+
+    /* Now figure out the new contents: is this a valid guest MFN? */
+    if ( !mfn_valid(gmfn) )
+    {
+        new_entry = pagetable_null();
+        goto install_new_entry;
+    }
+
+    /* Guest mfn is valid: shadow it and install the shadow */
+    smfn = get_shadow_status(d, gmfn, root_type);
+    if ( !mfn_valid(smfn) )
+    {
+        /* Make sure there's enough free shadow memory. */
+        shadow_prealloc(d, root_type, 1);
+        /* Shadow the page. */
+        smfn = make_shadow(v, gmfn, root_type);
+    }
+    ASSERT(mfn_valid(smfn));
+
+    /* Take a ref to this page: it will be released in sh_detach_old_tables()
+     * or the next call to set_toplevel_shadow() */
+    if ( sh_get_ref(d, smfn, 0) )
+    {
+        /* Pin the shadow and put it (back) on the list of pinned shadows */
+        sh_pin(d, smfn);
+
+        new_entry = pagetable_from_mfn(smfn);
+    }
+    else
+    {
+        printk(XENLOG_G_ERR "can't install %"PRI_mfn" as toplevel shadow\n",
+               mfn_x(smfn));
+        domain_crash(d);
+        new_entry = pagetable_null();
+    }
+
+ install_new_entry:
+    /* Done.  Install it */
+    SHADOW_PRINTK("%u [%u] gmfn %#"PRI_mfn" smfn %#"PRI_mfn"\n",
+                  v->arch.paging.mode->shadow.shadow_levels, slot,
+                  mfn_x(gmfn), mfn_x(pagetable_get_mfn(new_entry)));
+    v->arch.paging.shadow.shadow_table[slot] = new_entry;
+
+    /* Decrement the refcount of the old contents of this slot */
+    if ( !pagetable_is_null(old_entry) )
+    {
+        mfn_t old_smfn = pagetable_get_mfn(old_entry);
+        /* Need to repin the old toplevel shadow if it's been unpinned
+         * by shadow_prealloc(): in PV mode we're still running on this
+         * shadow and it's not safe to free it yet. */
+        if ( !mfn_to_page(old_smfn)->u.sh.pinned && !sh_pin(d, old_smfn) )
+        {
+            printk(XENLOG_G_ERR "can't re-pin %"PRI_mfn"\n", mfn_x(old_smfn));
+            domain_crash(d);
+        }
+        sh_put_ref(d, old_smfn, 0);
+    }
+}
+
 /**************************************************************************/
 /* Turning on and off shadow features */
 

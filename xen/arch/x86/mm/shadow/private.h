@@ -357,6 +357,15 @@ mfn_t shadow_alloc(struct domain *d,
                     unsigned long backpointer);
 void  shadow_free(struct domain *d, mfn_t smfn);
 
+/* Set up the top-level shadow and install it in slot 'slot' of shadow_table */
+void sh_set_toplevel_shadow(struct vcpu *v,
+                            unsigned int slot,
+                            mfn_t gmfn,
+                            unsigned int root_type,
+                            mfn_t (*make_shadow)(struct vcpu *v,
+                                                 mfn_t gmfn,
+                                                 uint32_t shadow_type));
+
 /* Install the xen mappings in various flavours of shadow */
 void sh_install_xen_entries_in_l4(struct domain *, mfn_t gl4mfn, mfn_t sl4mfn);
 
@@ -698,6 +707,58 @@ static inline void sh_unpin(struct domain *d, mfn_t smfn)
     sh_terminate_list(&tmp_list);
 
     sh_put_ref(d, smfn, 0);
+}
+
+
+/**************************************************************************/
+/* Hash table mapping from guest pagetables to shadows
+ *
+ * Normal case: maps the mfn of a guest page to the mfn of its shadow page.
+ * FL1's:       see multi.c.
+ */
+
+static inline mfn_t
+get_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type)
+/* Look for shadows in the hash table */
+{
+    mfn_t smfn = shadow_hash_lookup(d, mfn_x(gmfn), shadow_type);
+    ASSERT(!mfn_valid(smfn) || mfn_to_page(smfn)->u.sh.head);
+    perfc_incr(shadow_get_shadow_status);
+    return smfn;
+}
+
+static inline void
+set_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
+/* Put a shadow into the hash table */
+{
+    int res;
+
+    SHADOW_PRINTK("d%d gmfn=%lx, type=%08x, smfn=%lx\n",
+                  d->domain_id, mfn_x(gmfn), shadow_type, mfn_x(smfn));
+
+    ASSERT(mfn_to_page(smfn)->u.sh.head);
+
+    /* 32-bit PV guests don't own their l4 pages so can't get_page them */
+    if ( !is_pv_32bit_domain(d) || shadow_type != SH_type_l4_64_shadow )
+    {
+        res = get_page(mfn_to_page(gmfn), d);
+        ASSERT(res == 1);
+    }
+
+    shadow_hash_insert(d, mfn_x(gmfn), shadow_type, smfn);
+}
+
+static inline void
+delete_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
+/* Remove a shadow from the hash table */
+{
+    SHADOW_PRINTK("d%d gmfn=%"PRI_mfn", type=%08x, smfn=%"PRI_mfn"\n",
+                  d->domain_id, mfn_x(gmfn), shadow_type, mfn_x(smfn));
+    ASSERT(mfn_to_page(smfn)->u.sh.head);
+    shadow_hash_delete(d, mfn_x(gmfn), shadow_type, smfn);
+    /* 32-bit PV guests don't own their l4 pages; see set_shadow_status */
+    if ( !is_pv_32bit_domain(d) || shadow_type != SH_type_l4_64_shadow )
+        put_page(mfn_to_page(gmfn));
 }
 
 
