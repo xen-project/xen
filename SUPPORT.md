@@ -9,10 +9,10 @@ for the definitions of the support status levels etc.
 
 # Release Support
 
-    Xen-Version: 4.14
-    Initial-Release: 2020-07-24
-    Supported-Until: 2022-01-24
-    Security-Support-Until: 2023-07-24
+    Xen-Version: 4.14-rc
+    Initial-Release: n/a
+    Supported-Until: TBD
+    Security-Support-Until: Unreleased - not yet security-supported
 
 Release Notes
 : <a href="https://wiki.xenproject.org/wiki/Xen_Project_4.14_Release_Notes">RN</a>
