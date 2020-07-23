@@ -312,6 +312,10 @@ int osdep_xenforeignmemory_map_resource(
     };
     int rc;
 
+    if ( !fres->addr && !fres->nr_frames )
+        /* Request for resource size.  Skip mmap(). */
+        goto skip_mmap;
+
     fres->addr = mmap(fres->addr, fres->nr_frames << PAGE_SHIFT,
                       fres->prot, fres->flags | MAP_SHARED, fmem->fd, 0);
     if ( fres->addr == MAP_FAILED )
@@ -319,6 +323,7 @@ int osdep_xenforeignmemory_map_resource(
 
     mr.addr = (uintptr_t)fres->addr;
 
+ skip_mmap:
     rc = ioctl(fmem->fd, IOCTL_PRIVCMD_MMAP_RESOURCE, &mr);
     if ( rc )
     {
@@ -329,12 +334,19 @@ int osdep_xenforeignmemory_map_resource(
         else
             errno = EOPNOTSUPP;
 
-        saved_errno = errno;
-        (void)osdep_xenforeignmemory_unmap_resource(fmem, fres);
-        errno = saved_errno;
+        if ( fres->addr )
+        {
+            saved_errno = errno;
+            osdep_xenforeignmemory_unmap_resource(fmem, fres);
+            errno = saved_errno;
+        }
 
         return -1;
     }
+
+    /* If requesting size, copy back. */
+    if ( !fres->addr )
+        fres->nr_frames = mr.num;
 
     return 0;
 }

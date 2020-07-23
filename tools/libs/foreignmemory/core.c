@@ -188,6 +188,24 @@ int xenforeignmemory_unmap_resource(
     return rc;
 }
 
+int xenforeignmemory_resource_size(
+    xenforeignmemory_handle *fmem, domid_t domid, unsigned int type,
+    unsigned int id, size_t *size)
+{
+    xenforeignmemory_resource_handle fres = {
+        .domid = domid,
+        .type  = type,
+        .id    = id,
+    };
+    int rc = osdep_xenforeignmemory_map_resource(fmem, &fres);
+
+    if ( rc )
+        return rc;
+
+    *size = fres.nr_frames << PAGE_SHIFT;
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C
