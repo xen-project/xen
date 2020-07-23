@@ -56,6 +56,8 @@ int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
 int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
                      mfn_t *mfn);
 
+unsigned int gnttab_resource_max_frames(const struct domain *d, unsigned int id);
+
 int gnttab_acquire_resource(
     struct domain *d, unsigned int id, unsigned int frame,
     unsigned int nr_frames, xen_pfn_t mfn_list[]);
@@ -90,6 +92,12 @@ static inline int gnttab_map_frame(struct domain *d, unsigned long idx,
                                    gfn_t gfn, mfn_t *mfn)
 {
     return -EINVAL;
+}
+
+static inline unsigned int gnttab_resource_max_frames(
+    const struct domain *d, unsigned int id)
+{
+    return 0;
 }
 
 static inline int gnttab_acquire_resource(

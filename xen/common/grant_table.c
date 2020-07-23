@@ -3987,6 +3987,29 @@ static int gnttab_get_shared_frame_mfn(struct domain *d,
     return 0;
 }
 
+unsigned int gnttab_resource_max_frames(const struct domain *d, unsigned int id)
+{
+    const struct grant_table *gt = d->grant_table;
+    unsigned int nr = 0;
+
+    /* Don't need the grant lock.  This limit is fixed at domain create time. */
+    switch ( id )
+    {
+    case XENMEM_resource_grant_table_id_shared:
+        nr = gt->max_grant_frames;
+        break;
+
+    case XENMEM_resource_grant_table_id_status:
+        if ( GNTTAB_MAX_VERSION < 2 )
+            break;
+
+        nr = grant_to_status_frames(gt->max_grant_frames);
+        break;
+    }
+
+    return nr;
+}
+
 int gnttab_acquire_resource(
     struct domain *d, unsigned int id, unsigned int frame,
     unsigned int nr_frames, xen_pfn_t mfn_list[])

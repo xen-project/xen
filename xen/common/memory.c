@@ -1054,6 +1054,42 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
     return xsm_add_to_physmap(XSM_TARGET, current->domain, d);
 }
 
+unsigned int ioreq_server_max_frames(const struct domain *d)
+{
+    unsigned int nr = 0;
+
+#ifdef CONFIG_IOREQ_SERVER
+    if ( is_hvm_domain(d) )
+        /* One frame for the buf-ioreq ring, and one frame per 128 vcpus. */
+        nr = 1 + DIV_ROUND_UP(d->max_vcpus * sizeof(struct ioreq), PAGE_SIZE);
+#endif
+
+    return nr;
+}
+
+/*
+ * Return 0 on any kind of error.  Caller converts to -EINVAL.
+ *
+ * All nonzero values should be repeatable (i.e. derived from some fixed
+ * property of the domain), and describe the full resource (i.e. mapping the
+ * result of this call will be the entire resource).
+ */
+static unsigned int resource_max_frames(const struct domain *d,
+                                        unsigned int type, unsigned int id)
+{
+    switch ( type )
+    {
+    case XENMEM_resource_grant_table:
+        return gnttab_resource_max_frames(d, id);
+
+    case XENMEM_resource_ioreq_server:
+        return ioreq_server_max_frames(d);
+
+    default:
+        return -EOPNOTSUPP;
+    }
+}
+
 static int acquire_ioreq_server(struct domain *d,
                                 unsigned int id,
                                 unsigned int frame,
@@ -1099,6 +1135,7 @@ static int acquire_resource(
      * use-cases then per-CPU arrays or heap allocations may be required.
      */
     xen_pfn_t mfn_list[32];
+    unsigned int max_frames;
     int rc;
 
     if ( !arch_acquire_resource_check(currd) )
@@ -1109,19 +1146,6 @@ static int acquire_resource(
 
     if ( xmar.pad != 0 )
         return -EINVAL;
-
-    if ( guest_handle_is_null(xmar.frame_list) )
-    {
-        if ( xmar.nr_frames )
-            return -EINVAL;
-
-        xmar.nr_frames = ARRAY_SIZE(mfn_list);
-
-        if ( __copy_field_to_guest(arg, &xmar, nr_frames) )
-            return -EFAULT;
-
-        return 0;
-    }
 
     if ( xmar.nr_frames > ARRAY_SIZE(mfn_list) )
         return -E2BIG;
@@ -1146,6 +1170,22 @@ static int acquire_resource(
     rc = xsm_domain_resource_map(XSM_DM_PRIV, d);
     if ( rc )
         goto out;
+
+    max_frames = resource_max_frames(d, xmar.type, xmar.id);
+
+    rc = -EINVAL;
+    if ( !max_frames )
+        goto out;
+
+    if ( guest_handle_is_null(xmar.frame_list) )
+    {
+        if ( xmar.nr_frames )
+            goto out;
+
+        xmar.nr_frames = max_frames;
+        rc = __copy_field_to_guest(arg, &xmar, nr_frames) ? -EFAULT : 0;
+        goto out;
+    }
 
     switch ( xmar.type )
     {
