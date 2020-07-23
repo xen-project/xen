@@ -1113,7 +1113,10 @@ static int write_msr(unsigned int reg, uint64_t val,
         }
         /* fall through */
     default:
-        if ( (rdmsr_safe(reg, temp) != 0) || (val != temp) )
+        if ( rdmsr_safe(reg, temp) )
+            break;
+
+        if ( val != temp )
     invalid:
             gdprintk(XENLOG_WARNING,
                      "Domain attempted WRMSR %08x from 0x%016"PRIx64" to 0x%016"PRIx64"\n",
