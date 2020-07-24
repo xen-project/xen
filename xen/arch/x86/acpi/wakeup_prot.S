@@ -49,6 +49,10 @@ ENTRY(s3_resume)
         mov     %rax, %cr0
 
         mov     $__HYPERVISOR_DS64, %eax
+        mov     %eax, %ds
+        mov     %eax, %es
+        mov     %eax, %fs
+        mov     %eax, %gs
         mov     %eax, %ss
         mov     saved_rsp(%rip), %rsp
 
