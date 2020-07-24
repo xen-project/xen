@@ -72,7 +72,7 @@ struct spinlock;
 
 struct lock_profile {
     struct lock_profile *next;       /* forward link */
-    char                *name;       /* lock name */
+    const char          *name;       /* lock name */
     struct spinlock     *lock;       /* the lock itself */
     u64                 lock_cnt;    /* # of complete locking ops */
     u64                 block_cnt;   /* # of complete wait for lock */
@@ -118,11 +118,11 @@ struct lock_profile_qhead {
     } while(0)
 
 void _lock_profile_register_struct(
-    int32_t, struct lock_profile_qhead *, int32_t, char *);
+    int32_t, struct lock_profile_qhead *, int32_t);
 void _lock_profile_deregister_struct(int32_t, struct lock_profile_qhead *);
 
-#define lock_profile_register_struct(type, ptr, idx, print)                   \
-    _lock_profile_register_struct(type, &((ptr)->profile_head), idx, print)
+#define lock_profile_register_struct(type, ptr, idx)                          \
+    _lock_profile_register_struct(type, &((ptr)->profile_head), idx)
 #define lock_profile_deregister_struct(type, ptr)                             \
     _lock_profile_deregister_struct(type, &((ptr)->profile_head))
 
@@ -138,7 +138,7 @@ struct lock_profile_qhead { };
 #define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
 
 #define spin_lock_init_prof(s, l) spin_lock_init(&((s)->l))
-#define lock_profile_register_struct(type, ptr, idx, print)
+#define lock_profile_register_struct(type, ptr, idx)
 #define lock_profile_deregister_struct(type, ptr)
 #define spinlock_profile_printall(key)
 

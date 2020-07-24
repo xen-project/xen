@@ -392,7 +392,7 @@ struct domain *domain_create(domid_t domid,
         d->max_vcpus = config->max_vcpus;
     }
 
-    lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid, "Domain");
+    lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid);
 
     if ( (err = xsm_alloc_security_domain(d)) != 0 )
         goto fail;

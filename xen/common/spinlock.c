@@ -338,7 +338,7 @@ void _spin_unlock_recursive(spinlock_t *lock)
 
 struct lock_profile_anc {
     struct lock_profile_qhead *head_q;   /* first head of this type */
-    char                      *name;     /* descriptive string for print */
+    const char                *name;     /* descriptive string for print */
 };
 
 typedef void lock_profile_subfunc(
@@ -348,7 +348,10 @@ extern struct lock_profile *__lock_profile_start;
 extern struct lock_profile *__lock_profile_end;
 
 static s_time_t lock_profile_start;
-static struct lock_profile_anc lock_profile_ancs[LOCKPROF_TYPE_N];
+static struct lock_profile_anc lock_profile_ancs[] = {
+    [LOCKPROF_TYPE_GLOBAL] = { .name = "Global" },
+    [LOCKPROF_TYPE_PERDOM] = { .name = "Domain" },
+};
 static struct lock_profile_qhead lock_profile_glb_q;
 static spinlock_t lock_profile_lock = SPIN_LOCK_UNLOCKED;
 
@@ -473,13 +476,12 @@ int spinlock_profile_control(struct xen_sysctl_lockprof_op *pc)
 }
 
 void _lock_profile_register_struct(
-    int32_t type, struct lock_profile_qhead *qhead, int32_t idx, char *name)
+    int32_t type, struct lock_profile_qhead *qhead, int32_t idx)
 {
     qhead->idx = idx;
     spin_lock(&lock_profile_lock);
     qhead->head_q = lock_profile_ancs[type].head_q;
     lock_profile_ancs[type].head_q = qhead;
-    lock_profile_ancs[type].name = name;
     spin_unlock(&lock_profile_lock);
 }
 
@@ -504,6 +506,8 @@ static int __init lock_prof_init(void)
 {
     struct lock_profile **q;
 
+    BUILD_BUG_ON(ARRAY_SIZE(lock_profile_ancs) != LOCKPROF_TYPE_N);
+
     for ( q = &__lock_profile_start; q < &__lock_profile_end; q++ )
     {
         (*q)->next = lock_profile_glb_q.elem_q;
@@ -511,9 +515,8 @@ static int __init lock_prof_init(void)
         (*q)->lock->profile = *q;
     }
 
-    _lock_profile_register_struct(
-        LOCKPROF_TYPE_GLOBAL, &lock_profile_glb_q,
-        0, "Global lock");
+    _lock_profile_register_struct(LOCKPROF_TYPE_GLOBAL,
+                                  &lock_profile_glb_q, 0);
 
     return 0;
 }
