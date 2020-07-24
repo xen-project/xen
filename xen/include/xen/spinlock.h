@@ -103,10 +103,16 @@ struct lock_profile_qhead {
     do {                                                                      \
         struct lock_profile *prof;                                            \
         prof = xzalloc(struct lock_profile);                                  \
-        if (!prof) break;                                                     \
+        (s)->l = (spinlock_t)_SPIN_LOCK_UNLOCKED(prof);                       \
+        if ( !prof )                                                          \
+        {                                                                     \
+            printk(XENLOG_WARNING                                             \
+                   "lock profiling unavailable for %p(%d)'s %s\n",            \
+                   s, (s)->profile_head.idx, #l);                             \
+            break;                                                            \
+        }                                                                     \
         prof->name = #l;                                                      \
         prof->lock = &(s)->l;                                                 \
-        (s)->l = (spinlock_t)_SPIN_LOCK_UNLOCKED(prof);                       \
         prof->next = (s)->profile_head.elem_q;                                \
         (s)->profile_head.elem_q = prof;                                      \
     } while(0)
