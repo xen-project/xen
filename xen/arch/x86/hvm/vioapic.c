@@ -391,11 +391,6 @@ static void ioapic_inj_irq(
     vlapic_set_irq(target, vector, trig_mode);
 }
 
-static inline int pit_channel0_enabled(void)
-{
-    return pt_active(&current->domain->arch.vpit.pt0);
-}
-
 static void vioapic_deliver(struct hvm_vioapic *vioapic, unsigned int pin)
 {
     uint16_t dest = vioapic->redirtbl[pin].fields.dest_id;
@@ -421,7 +416,7 @@ static void vioapic_deliver(struct hvm_vioapic *vioapic, unsigned int pin)
     {
 #ifdef IRQ0_SPECIAL_ROUTING
         /* Force round-robin to pick VCPU 0 */
-        if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
+        if ( (irq == hvm_isa_irq_to_gsi(0)) && pt_active(&d->arch.vpit.pt0) )
         {
             v = d->vcpu ? d->vcpu[0] : NULL;
             target = v ? vcpu_vlapic(v) : NULL;
@@ -446,7 +441,7 @@ static void vioapic_deliver(struct hvm_vioapic *vioapic, unsigned int pin)
     {
 #ifdef IRQ0_SPECIAL_ROUTING
         /* Do not deliver timer interrupts to VCPU != 0 */
-        if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
+        if ( (irq == hvm_isa_irq_to_gsi(0)) && pt_active(&d->arch.vpit.pt0) )
         {
             if ( (v = d->vcpu ? d->vcpu[0] : NULL) != NULL )
                 ioapic_inj_irq(vioapic, vcpu_vlapic(v), vector,
