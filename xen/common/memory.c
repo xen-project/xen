@@ -1187,48 +1187,50 @@ static int acquire_resource(
         goto out;
     }
 
-    switch ( xmar.type )
-    {
-    case XENMEM_resource_grant_table:
-        rc = gnttab_acquire_resource(d, xmar.id, xmar.frame, xmar.nr_frames,
-                                     mfn_list);
-        break;
-
-    case XENMEM_resource_ioreq_server:
-        rc = acquire_ioreq_server(d, xmar.id, xmar.frame, xmar.nr_frames,
-                                  mfn_list);
-        break;
-
-    default:
-        rc = -EOPNOTSUPP;
-        break;
-    }
-
-    if ( rc )
-        goto out;
-
-    if ( !paging_mode_translate(currd) )
-    {
-        if ( copy_to_guest(xmar.frame_list, mfn_list, xmar.nr_frames) )
-            rc = -EFAULT;
-    }
-    else
-    {
-        xen_pfn_t gfn_list[ARRAY_SIZE(mfn_list)];
-        unsigned int i;
-
-        if ( copy_from_guest(gfn_list, xmar.frame_list, xmar.nr_frames) )
-            rc = -EFAULT;
-
-        for ( i = 0; !rc && i < xmar.nr_frames; i++ )
+    do {
+        switch ( xmar.type )
         {
-            rc = set_foreign_p2m_entry(currd, d, gfn_list[i],
-                                       _mfn(mfn_list[i]));
-            /* rc should be -EIO for any iteration other than the first */
-            if ( rc && i )
-                rc = -EIO;
+        case XENMEM_resource_grant_table:
+            rc = gnttab_acquire_resource(d, xmar.id, xmar.frame, xmar.nr_frames,
+                                         mfn_list);
+            break;
+
+        case XENMEM_resource_ioreq_server:
+            rc = acquire_ioreq_server(d, xmar.id, xmar.frame, xmar.nr_frames,
+                                      mfn_list);
+            break;
+
+        default:
+            rc = -EOPNOTSUPP;
+            break;
         }
-    }
+
+        if ( rc )
+            goto out;
+
+        if ( !paging_mode_translate(currd) )
+        {
+            if ( copy_to_guest(xmar.frame_list, mfn_list, xmar.nr_frames) )
+                rc = -EFAULT;
+        }
+        else
+        {
+            xen_pfn_t gfn_list[ARRAY_SIZE(mfn_list)];
+            unsigned int i;
+
+            if ( copy_from_guest(gfn_list, xmar.frame_list, xmar.nr_frames) )
+                rc = -EFAULT;
+
+            for ( i = 0; !rc && i < xmar.nr_frames; i++ )
+            {
+                rc = set_foreign_p2m_entry(currd, d, gfn_list[i],
+                                           _mfn(mfn_list[i]));
+                /* rc should be -EIO for any iteration other than the first */
+                if ( rc && i )
+                    rc = -EIO;
+            }
+        }
+    } while ( 0 );
 
  out:
     rcu_unlock_domain(d);
