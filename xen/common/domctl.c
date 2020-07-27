@@ -959,6 +959,14 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     return ret;
 }
 
+static void __init __maybe_unused build_assertions(void)
+{
+    struct xen_domctl d;
+
+    BUILD_BUG_ON(sizeof(d) != 16 /* header */ + 128 /* union */);
+    BUILD_BUG_ON(offsetof(typeof(d), u) != 16);
+}
+
 /*
  * Local variables:
  * mode: C
