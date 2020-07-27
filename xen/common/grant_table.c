@@ -4053,6 +4053,9 @@ int gnttab_acquire_resource(
     for ( i = 0; i < nr_frames; ++i )
         mfn_list[i] = virt_to_mfn(vaddrs[frame + i]);
 
+    /* Success.  Passed nr_frames back to the caller. */
+    rc = nr_frames;
+
  out:
     grant_write_unlock(gt);
 

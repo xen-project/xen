@@ -402,22 +402,9 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
         case XENMEM_acquire_resource:
         {
             xen_pfn_t *xen_frame_list = NULL;
-            unsigned int max_nr_frames;
 
             if ( copy_from_guest(&cmp.mar, compat, 1) )
                 return -EFAULT;
-
-            /*
-             * The number of frames handled is currently limited to a
-             * small number by the underlying implementation, so the
-             * scratch space should be sufficient for bouncing the
-             * frame addresses.
-             */
-            max_nr_frames = (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.mar)) /
-                sizeof(*xen_frame_list);
-
-            if ( cmp.mar.nr_frames > max_nr_frames )
-                return -E2BIG;
 
             /* Marshal the frame list in the remainder of the xlat space. */
             if ( !compat_handle_is_null(cmp.mar.frame_list) )
@@ -432,6 +419,28 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 
             if ( xen_frame_list && cmp.mar.nr_frames )
             {
+                unsigned int xlat_max_frames =
+                    (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.mar)) /
+                    sizeof(*xen_frame_list);
+
+                if ( start_extent >= cmp.mar.nr_frames )
+                    return -EINVAL;
+
+                /*
+                 * Adjust nat to account for work done on previous
+                 * continuations, leaving cmp pristine.  Hide the continaution
+                 * from the native code to prevent double accounting.
+                 */
+                nat.mar->nr_frames -= start_extent;
+                nat.mar->frame += start_extent;
+                cmd &= MEMOP_CMD_MASK;
+
+                /*
+                 * If there are two many frames to fit within the xlat buffer,
+                 * we'll need to loop to marshal them all.
+                 */
+                nat.mar->nr_frames = min(nat.mar->nr_frames, xlat_max_frames);
+
                 /*
                  * frame_list is an input for translated guests, and an output
                  * for untranslated guests.  Only copy in for translated guests.
@@ -444,14 +453,14 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                                              cmp.mar.nr_frames) ||
                          __copy_from_compat_offset(
                              compat_frame_list, cmp.mar.frame_list,
-                             0, cmp.mar.nr_frames) )
+                             start_extent, nat.mar->nr_frames) )
                         return -EFAULT;
 
                     /*
                      * Iterate backwards over compat_frame_list[] expanding
                      * compat_pfn_t to xen_pfn_t in place.
                      */
-                    for ( int x = cmp.mar.nr_frames - 1; x >= 0; --x )
+                    for ( int x = nat.mar->nr_frames - 1; x >= 0; --x )
                         xen_frame_list[x] = compat_frame_list[x];
                 }
             }
@@ -600,9 +609,11 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
         case XENMEM_acquire_resource:
         {
             DEFINE_XEN_GUEST_HANDLE(compat_mem_acquire_resource_t);
+            unsigned int done;
 
             if ( compat_handle_is_null(cmp.mar.frame_list) )
             {
+                ASSERT(split == 0 && rc == 0);
                 if ( __copy_field_to_guest(
                          guest_handle_cast(compat,
                                            compat_mem_acquire_resource_t),
@@ -610,6 +621,21 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                     return -EFAULT;
                 break;
             }
+
+            if ( split < 0 )
+            {
+                /* Continuation occurred. */
+                ASSERT(rc != XENMEM_acquire_resource);
+                done = cmd >> MEMOP_EXTENT_SHIFT;
+            }
+            else
+            {
+                /* No continuation. */
+                ASSERT(rc == 0);
+                done = nat.mar->nr_frames;
+            }
+
+            ASSERT(done <= nat.mar->nr_frames);
 
             /*
              * frame_list is an input for translated guests, and an output for
@@ -626,21 +652,67 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                  */
                 BUILD_BUG_ON(sizeof(compat_pfn_t) > sizeof(xen_pfn_t));
 
-                for ( i = 0; i < cmp.mar.nr_frames; i++ )
+                rc = 0;
+                for ( i = 0; i < done; i++ )
                 {
                     compat_pfn_t frame = xen_frame_list[i];
 
                     if ( frame != xen_frame_list[i] )
-                        return -ERANGE;
+                    {
+                        rc = -ERANGE;
+                        break;
+                    }
 
                     compat_frame_list[i] = frame;
                 }
 
-                if ( __copy_to_compat_offset(cmp.mar.frame_list, 0,
-                                             compat_frame_list,
-                                             cmp.mar.nr_frames) )
-                    return -EFAULT;
+                if ( !rc && __copy_to_compat_offset(
+                         cmp.mar.frame_list, start_extent,
+                         compat_frame_list, done) )
+                    rc = -EFAULT;
+
+                if ( rc )
+                {
+                    if ( split < 0 )
+                    {
+                        gdprintk(XENLOG_ERR,
+                                 "Cannot cancel continuation: %ld\n", rc);
+                        domain_crash(current->domain);
+                    }
+                    return rc;
+                }
             }
+
+            start_extent += done;
+
+            /* Completely done. */
+            if ( start_extent == cmp.mar.nr_frames )
+                break;
+
+            /*
+             * Done a "full" batch, but we were limited by space in the xlat
+             * area.  Go around the loop again without necesserily returning
+             * to guest context.
+             */
+            if ( done == nat.mar->nr_frames )
+            {
+                split = 1;
+                break;
+            }
+
+            /* Explicit continuation request from a higher level. */
+            if ( done < nat.mar->nr_frames )
+                return hypercall_create_continuation(
+                    __HYPERVISOR_memory_op, "ih",
+                    op | (start_extent << MEMOP_EXTENT_SHIFT), compat);
+
+            /*
+             * Well... Somethings gone wrong with the two levels of chunking.
+             * My condolences to whomever next has to debug this mess.
+             */
+            ASSERT_UNREACHABLE();
+            domain_crash(current->domain);
+            split = 0;
             break;
         }
 

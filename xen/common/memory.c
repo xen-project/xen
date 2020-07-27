@@ -1129,23 +1129,41 @@ static int acquire_ioreq_server(struct domain *d,
         mfn_list[i] = mfn_x(mfn);
     }
 
-    return 0;
+    /* Success.  Passed nr_frames back to the caller. */
+    return nr_frames;
 #else
     return -EOPNOTSUPP;
 #endif
 }
 
+/*
+ * Returns -errno on error, or positive in the range [1, nr_frames] on
+ * success.  Returning less than nr_frames contitutes a request for a
+ * continuation.  Callers can depend on frame + nr_frames not overflowing.
+ */
+static int _acquire_resource(
+    struct domain *d, unsigned int type, unsigned int id, unsigned int frame,
+    unsigned int nr_frames, xen_pfn_t mfn_list[])
+{
+    switch ( type )
+    {
+    case XENMEM_resource_grant_table:
+        return gnttab_acquire_resource(d, id, frame, nr_frames, mfn_list);
+
+    case XENMEM_resource_ioreq_server:
+        return acquire_ioreq_server(d, id, frame, nr_frames, mfn_list);
+
+    default:
+        return -EOPNOTSUPP;
+    }
+}
+
 static int acquire_resource(
-    XEN_GUEST_HANDLE_PARAM(xen_mem_acquire_resource_t) arg)
+    XEN_GUEST_HANDLE_PARAM(xen_mem_acquire_resource_t) arg,
+    unsigned long start_extent)
 {
     struct domain *d, *currd = current->domain;
     xen_mem_acquire_resource_t xmar;
-    /*
-     * The mfn_list and gfn_list (below) arrays are ok on stack for the
-     * moment since they are small, but if they need to grow in future
-     * use-cases then per-CPU arrays or heap allocations may be required.
-     */
-    xen_pfn_t mfn_list[32];
     unsigned int max_frames;
     int rc;
 
@@ -1157,9 +1175,6 @@ static int acquire_resource(
 
     if ( xmar.pad != 0 )
         return -EINVAL;
-
-    if ( xmar.nr_frames > ARRAY_SIZE(mfn_list) )
-        return -E2BIG;
 
     /*
      * The ABI is rather unfortunate.  nr_frames (and therefore the total size
@@ -1190,7 +1205,7 @@ static int acquire_resource(
 
     if ( guest_handle_is_null(xmar.frame_list) )
     {
-        if ( xmar.nr_frames )
+        if ( xmar.nr_frames || start_extent )
             goto out;
 
         xmar.nr_frames = max_frames;
@@ -1198,30 +1213,47 @@ static int acquire_resource(
         goto out;
     }
 
+    /*
+     * Limiting nr_frames at (UINT_MAX >> MEMOP_EXTENT_SHIFT) isn't ideal.  If
+     * it ever becomes a practical problem, we can switch to mutating
+     * xmar.{frame,nr_frames,frame_list} in guest memory.
+     */
+    rc = -EINVAL;
+    if ( start_extent >= xmar.nr_frames ||
+         xmar.nr_frames > (UINT_MAX >> MEMOP_EXTENT_SHIFT) )
+        goto out;
+
+    /* Adjust for work done on previous continuations. */
+    xmar.nr_frames -= start_extent;
+    xmar.frame += start_extent;
+    guest_handle_add_offset(xmar.frame_list, start_extent);
+
     do {
-        switch ( xmar.type )
-        {
-        case XENMEM_resource_grant_table:
-            rc = gnttab_acquire_resource(d, xmar.id, xmar.frame, xmar.nr_frames,
-                                         mfn_list);
-            break;
+        /*
+         * Arbitrary size.  Not too much stack space, and a reasonable stride
+         * for continuation checks.
+         */
+        xen_pfn_t mfn_list[32];
+        unsigned int todo = MIN(ARRAY_SIZE(mfn_list), xmar.nr_frames), done;
 
-        case XENMEM_resource_ioreq_server:
-            rc = acquire_ioreq_server(d, xmar.id, xmar.frame, xmar.nr_frames,
-                                      mfn_list);
-            break;
-
-        default:
-            rc = -EOPNOTSUPP;
-            break;
-        }
-
-        if ( rc )
+        rc = _acquire_resource(d, xmar.type, xmar.id, xmar.frame,
+                               todo, mfn_list);
+        if ( rc < 0 )
             goto out;
 
+        done = rc;
+        rc = 0;
+        if ( done == 0 || done > todo )
+        {
+            ASSERT_UNREACHABLE();
+            rc = -EINVAL;
+            goto out;
+        }
+
+        /* Adjust guest frame_list appropriately. */
         if ( !paging_mode_translate(currd) )
         {
-            if ( copy_to_guest(xmar.frame_list, mfn_list, xmar.nr_frames) )
+            if ( copy_to_guest(xmar.frame_list, mfn_list, done) )
                 rc = -EFAULT;
         }
         else
@@ -1229,10 +1261,10 @@ static int acquire_resource(
             xen_pfn_t gfn_list[ARRAY_SIZE(mfn_list)];
             unsigned int i;
 
-            if ( copy_from_guest(gfn_list, xmar.frame_list, xmar.nr_frames) )
+            if ( copy_from_guest(gfn_list, xmar.frame_list, done) )
                 rc = -EFAULT;
 
-            for ( i = 0; !rc && i < xmar.nr_frames; i++ )
+            for ( i = 0; !rc && i < done; i++ )
             {
                 rc = set_foreign_p2m_entry(currd, d, gfn_list[i],
                                            _mfn(mfn_list[i]));
@@ -1241,7 +1273,32 @@ static int acquire_resource(
                     rc = -EIO;
             }
         }
-    } while ( 0 );
+
+        if ( rc )
+            goto out;
+
+        xmar.nr_frames -= done;
+        xmar.frame += done;
+        guest_handle_add_offset(xmar.frame_list, done);
+        start_extent += done;
+
+        /*
+         * Explicit continuation request from _acquire_resource(), or we've
+         * still got more work to do.
+         */
+        if ( done < todo ||
+             (xmar.nr_frames && hypercall_preempt_check()) )
+        {
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_memory_op, "lh",
+                XENMEM_acquire_resource | (start_extent << MEMOP_EXTENT_SHIFT),
+                arg);
+            goto out;
+        }
+
+    } while ( xmar.nr_frames );
+
+    rc = 0;
 
  out:
     rcu_unlock_domain(d);
@@ -1708,7 +1765,8 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case XENMEM_acquire_resource:
         rc = acquire_resource(
-            guest_handle_cast(arg, xen_mem_acquire_resource_t));
+            guest_handle_cast(arg, xen_mem_acquire_resource_t),
+            start_extent);
         break;
 
     default:
