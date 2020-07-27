@@ -86,13 +86,13 @@ static int pt_irq_vector(struct periodic_time *pt, enum hvm_intsrc src)
         return pt->irq;
 
     isa_irq = pt->irq;
-    gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     if ( src == hvm_intsrc_pic )
         return (v->domain->arch.hvm.vpic[isa_irq >> 3].irq_base
                 + (isa_irq & 7));
 
     ASSERT(src == hvm_intsrc_lapic);
+    gsi = pt->source == PTSRC_isa ? hvm_isa_irq_to_gsi(isa_irq) : pt->irq;
     vector = vioapic_get_vector(v->domain, gsi);
     if ( vector < 0 )
     {
