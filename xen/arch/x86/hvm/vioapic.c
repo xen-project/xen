@@ -415,12 +415,14 @@ static void vioapic_deliver(struct hvm_vioapic *vioapic, unsigned int pin)
     case dest_LowestPrio:
     {
 #ifdef IRQ0_SPECIAL_ROUTING
-        /* Force round-robin to pick VCPU 0 */
-        if ( (irq == hvm_isa_irq_to_gsi(0)) && pt_active(&d->arch.vpit.pt0) )
-        {
-            v = d->vcpu ? d->vcpu[0] : NULL;
-            target = v ? vcpu_vlapic(v) : NULL;
-        }
+        struct vlapic *lapic0 = vcpu_vlapic(d->vcpu[0]);
+
+        /* Force to pick vCPU 0 if part of the destination list */
+        if ( (irq == hvm_isa_irq_to_gsi(0)) && pt_active(&d->arch.vpit.pt0) &&
+             vlapic_match_dest(lapic0, NULL, 0, dest, dest_mode) &&
+             /* Mimic the vlapic_enabled check found in vlapic_lowest_prio. */
+             vlapic_enabled(lapic0) )
+            target = lapic0;
         else
 #endif
             target = vlapic_lowest_prio(d, NULL, 0, dest, dest_mode);
