@@ -22,6 +22,9 @@ config GRANT_TABLE
 
 	  If unsure, say Y.
 
+config ARCH_ACQUIRE_RESOURCE
+	bool
+
 config HAS_ALTERNATIVE
 	bool
 
