@@ -42,15 +42,14 @@ static uint32_t control_read(const struct pci_dev *pdev, unsigned int reg,
 static int update_entry(struct vpci_msix_entry *entry,
                         const struct pci_dev *pdev, unsigned int nr)
 {
-    uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
     int rc = vpci_msix_arch_disable_entry(entry, pdev);
 
     /* Ignore ENOENT, it means the entry wasn't setup. */
     if ( rc && rc != -ENOENT )
     {
         gprintk(XENLOG_WARNING,
-                "%04x:%02x:%02x.%u: unable to disable entry %u for update: %d\n",
-                pdev->seg, pdev->bus, slot, func, nr, rc);
+                "%pp: unable to disable entry %u for update: %d\n",
+                &pdev->sbdf, nr, rc);
         return rc;
     }
 
@@ -59,9 +58,8 @@ static int update_entry(struct vpci_msix_entry *entry,
                                                       VPCI_MSIX_TABLE));
     if ( rc )
     {
-        gprintk(XENLOG_WARNING,
-                "%04x:%02x:%02x.%u: unable to enable entry %u: %d\n",
-                pdev->seg, pdev->bus, slot, func, nr, rc);
+        gprintk(XENLOG_WARNING, "%pp: unable to enable entry %u: %d\n",
+                &pdev->sbdf, nr, rc);
         /* Entry is likely not properly configured. */
         return rc;
     }
@@ -72,7 +70,6 @@ static int update_entry(struct vpci_msix_entry *entry,
 static void control_write(const struct pci_dev *pdev, unsigned int reg,
                           uint32_t val, void *data)
 {
-    uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
     struct vpci_msix *msix = data;
     bool new_masked = val & PCI_MSIX_FLAGS_MASKALL;
     bool new_enabled = val & PCI_MSIX_FLAGS_ENABLE;
@@ -133,9 +130,8 @@ static void control_write(const struct pci_dev *pdev, unsigned int reg,
                 /* Ignore non-present entry. */
                 break;
             default:
-                gprintk(XENLOG_WARNING,
-                        "%04x:%02x:%02x.%u: unable to disable entry %u: %d\n",
-                        pdev->seg, pdev->bus, slot, func, i, rc);
+                gprintk(XENLOG_WARNING, "%pp: unable to disable entry %u: %d\n",
+                        &pdev->sbdf, i, rc);
                 return;
             }
         }
@@ -180,8 +176,7 @@ static bool access_allowed(const struct pci_dev *pdev, unsigned long addr,
         return true;
 
     gprintk(XENLOG_WARNING,
-            "%04x:%02x:%02x.%u: unaligned or invalid size MSI-X table access\n",
-            pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+            "%pp: unaligned or invalid size MSI-X table access\n", &pdev->sbdf);
 
     return false;
 }
@@ -431,10 +426,9 @@ int vpci_make_msix_hole(const struct pci_dev *pdev)
             default:
                 put_gfn(d, start);
                 gprintk(XENLOG_WARNING,
-                        "%04x:%02x:%02x.%u: existing mapping (mfn: %" PRI_mfn
+                        "%pp: existing mapping (mfn: %" PRI_mfn
                         "type: %d) at %#lx clobbers MSIX MMIO area\n",
-                        pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
-                        PCI_FUNC(pdev->devfn), mfn_x(mfn), t, start);
+                        &pdev->sbdf, mfn_x(mfn), t, start);
                 return -EEXIST;
             }
             put_gfn(d, start);

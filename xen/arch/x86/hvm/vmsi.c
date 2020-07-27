@@ -697,10 +697,8 @@ static int vpci_msi_update(const struct pci_dev *pdev, uint32_t data,
 
         if ( rc )
         {
-            gdprintk(XENLOG_ERR,
-                     "%04x:%02x:%02x.%u: failed to bind PIRQ %u: %d\n",
-                     pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
-                     PCI_FUNC(pdev->devfn), pirq + i, rc);
+            gdprintk(XENLOG_ERR, "%pp: failed to bind PIRQ %u: %d\n",
+                     &pdev->sbdf, pirq + i, rc);
             while ( bind.machine_irq-- > pirq )
                 pt_irq_destroy_bind(pdev->domain, &bind);
             return rc;
@@ -754,9 +752,7 @@ static int vpci_msi_enable(const struct pci_dev *pdev, uint32_t data,
                                    &msi_info);
     if ( rc )
     {
-        gdprintk(XENLOG_ERR, "%04x:%02x:%02x.%u: failed to map PIRQ: %d\n",
-                 pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
-                 PCI_FUNC(pdev->devfn), rc);
+        gdprintk(XENLOG_ERR, "%pp: failed to map PIRQ: %d\n", &pdev->sbdf, rc);
         return rc;
     }
 

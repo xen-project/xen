@@ -289,8 +289,7 @@ void vpci_dump_msi(void)
             msi = pdev->vpci->msi;
             if ( msi && msi->enabled )
             {
-                printk("%04x:%02x:%02x.%u MSI\n", pdev->seg, pdev->bus,
-                       PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+                printk("%pp MSI\n", &pdev->sbdf);
 
                 printk("  enabled: %d 64-bit: %d",
                        msi->enabled, msi->address64);
@@ -307,8 +306,7 @@ void vpci_dump_msi(void)
             {
                 int rc;
 
-                printk("%04x:%02x:%02x.%u MSI-X\n", pdev->seg, pdev->bus,
-                       PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+                printk("%pp MSI-X\n", &pdev->sbdf);
 
                 printk("  entries: %u maskall: %d enabled: %d\n",
                        msix->max_entries, msix->masked, msix->enabled);

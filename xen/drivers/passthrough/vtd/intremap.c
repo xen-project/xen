@@ -521,16 +521,13 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
         }
         else
             dprintk(XENLOG_WARNING VTDPREFIX,
-                    "d%d: no upstream bridge for %04x:%02x:%02x.%u\n",
-                    pdev->domain->domain_id,
-                    seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                    "d%d: no upstream bridge for %pp\n",
+                    pdev->domain->domain_id, &pdev->sbdf);
         break;
 
     default:
-        dprintk(XENLOG_WARNING VTDPREFIX,
-                "d%d: unknown(%u): %04x:%02x:%02x.%u\n",
-                pdev->domain->domain_id, pdev->type,
-                seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_WARNING VTDPREFIX, "d%d: unknown(%u): %pp\n",
+                pdev->domain->domain_id, pdev->type, &pdev->sbdf);
         break;
    }
 }

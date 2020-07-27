@@ -48,3 +48,8 @@ Domain and vCPU information:
                The domain part as above, with the vcpu_id printed in decimal.
                  e.g.  d0v1
                        d[IDLE]v0
+
+PCI:
+
+       %pp     PCI device address in S:B:D.F format from a pci_sbdf_t.
+                 e.g.  0004:02:00.0
