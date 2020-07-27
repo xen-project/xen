@@ -438,26 +438,11 @@ static void vioapic_deliver(struct hvm_vioapic *vioapic, unsigned int pin)
     }
 
     case dest_Fixed:
-    {
-#ifdef IRQ0_SPECIAL_ROUTING
-        /* Do not deliver timer interrupts to VCPU != 0 */
-        if ( (irq == hvm_isa_irq_to_gsi(0)) && pt_active(&d->arch.vpit.pt0) )
-        {
-            if ( (v = d->vcpu ? d->vcpu[0] : NULL) != NULL )
-                ioapic_inj_irq(vioapic, vcpu_vlapic(v), vector,
-                               trig_mode, delivery_mode);
-        }
-        else
-#endif
-        {
-            for_each_vcpu ( d, v )
-                if ( vlapic_match_dest(vcpu_vlapic(v), NULL,
-                                       0, dest, dest_mode) )
-                    ioapic_inj_irq(vioapic, vcpu_vlapic(v), vector,
-                                   trig_mode, delivery_mode);
-        }
+        for_each_vcpu ( d, v )
+            if ( vlapic_match_dest(vcpu_vlapic(v), NULL, 0, dest, dest_mode) )
+                ioapic_inj_irq(vioapic, vcpu_vlapic(v), vector, trig_mode,
+                               delivery_mode);
         break;
-    }
 
     case dest_NMI:
     {
