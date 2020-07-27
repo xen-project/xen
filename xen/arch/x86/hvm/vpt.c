@@ -636,14 +636,19 @@ static void pt_resume(struct periodic_time *pt)
 
 void pt_may_unmask_irq(struct domain *d, struct periodic_time *vlapic_pt)
 {
-    int i;
-
     if ( d )
     {
-        pt_resume(&d->arch.vpit.pt0);
-        pt_resume(&d->arch.hvm.pl_time->vrtc.pt);
-        for ( i = 0; i < HPET_TIMER_NUM; i++ )
-            pt_resume(&d->arch.hvm.pl_time->vhpet.pt[i]);
+        if ( has_vpit(d) )
+            pt_resume(&d->arch.vpit.pt0);
+        if ( has_vrtc(d) )
+            pt_resume(&d->arch.hvm.pl_time->vrtc.pt);
+        if ( has_vhpet(d) )
+        {
+            unsigned int i;
+
+            for ( i = 0; i < HPET_TIMER_NUM; i++ )
+                pt_resume(&d->arch.hvm.pl_time->vhpet.pt[i]);
+        }
     }
 
     if ( vlapic_pt )
