@@ -55,6 +55,8 @@ static int get_reserved_device_memory(xen_pfn_t start, xen_ulong_t nr,
 
 int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 {
+    struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
     int split, op = cmd & MEMOP_CMD_MASK;
     long rc;
     unsigned int start_extent = cmd >> MEMOP_EXTENT_SHIFT;
@@ -399,7 +401,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 
         case XENMEM_acquire_resource:
         {
-            xen_pfn_t *xen_frame_list;
+            xen_pfn_t *xen_frame_list = NULL;
             unsigned int max_nr_frames;
 
             if ( copy_from_guest(&cmp.mar, compat, 1) )
@@ -417,27 +419,9 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             if ( cmp.mar.nr_frames > max_nr_frames )
                 return -E2BIG;
 
-            if ( compat_handle_is_null(cmp.mar.frame_list) )
-                xen_frame_list = NULL;
-            else
-            {
+            /* Marshal the frame list in the remainder of the xlat space. */
+            if ( !compat_handle_is_null(cmp.mar.frame_list) )
                 xen_frame_list = (xen_pfn_t *)(nat.mar + 1);
-
-                if ( !compat_handle_okay(cmp.mar.frame_list,
-                                         cmp.mar.nr_frames) )
-                    return -EFAULT;
-
-                for ( i = 0; i < cmp.mar.nr_frames; i++ )
-                {
-                    compat_pfn_t frame;
-
-                    if ( __copy_from_compat_offset(
-                             &frame, cmp.mar.frame_list, i, 1) )
-                        return -EFAULT;
-
-                    xen_frame_list[i] = frame;
-                }
-            }
 
 #define XLAT_mem_acquire_resource_HNDL_frame_list(_d_, _s_) \
             set_xen_guest_handle((_d_)->frame_list, xen_frame_list)
@@ -446,6 +430,31 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 
 #undef XLAT_mem_acquire_resource_HNDL_frame_list
 
+            if ( xen_frame_list && cmp.mar.nr_frames )
+            {
+                /*
+                 * frame_list is an input for translated guests, and an output
+                 * for untranslated guests.  Only copy in for translated guests.
+                 */
+                if ( paging_mode_translate(currd) )
+                {
+                    compat_pfn_t *compat_frame_list = (void *)xen_frame_list;
+
+                    if ( !compat_handle_okay(cmp.mar.frame_list,
+                                             cmp.mar.nr_frames) ||
+                         __copy_from_compat_offset(
+                             compat_frame_list, cmp.mar.frame_list,
+                             0, cmp.mar.nr_frames) )
+                        return -EFAULT;
+
+                    /*
+                     * Iterate backwards over compat_frame_list[] expanding
+                     * compat_pfn_t to xen_pfn_t in place.
+                     */
+                    for ( int x = cmp.mar.nr_frames - 1; x >= 0; --x )
+                        xen_frame_list[x] = compat_frame_list[x];
+                }
+            }
             break;
         }
         default:
@@ -590,8 +599,6 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 
         case XENMEM_acquire_resource:
         {
-            const xen_pfn_t *xen_frame_list = (xen_pfn_t *)(nat.mar + 1);
-            compat_pfn_t *compat_frame_list = (compat_pfn_t *)(nat.mar + 1);
             DEFINE_XEN_GUEST_HANDLE(compat_mem_acquire_resource_t);
 
             if ( compat_handle_is_null(cmp.mar.frame_list) )
@@ -601,9 +608,18 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                                            compat_mem_acquire_resource_t),
                          nat.mar, nr_frames) )
                     return -EFAULT;
+                break;
             }
-            else
+
+            /*
+             * frame_list is an input for translated guests, and an output for
+             * untranslated guests.  Only copy out for untranslated guests.
+             */
+            if ( !paging_mode_translate(currd) )
             {
+                const xen_pfn_t *xen_frame_list = (xen_pfn_t *)(nat.mar + 1);
+                compat_pfn_t *compat_frame_list = (compat_pfn_t *)(nat.mar + 1);
+
                 /*
                  * NOTE: the smaller compat array overwrites the native
                  *       array.
@@ -625,7 +641,6 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                                              cmp.mar.nr_frames) )
                     return -EFAULT;
             }
-
             break;
         }
 
