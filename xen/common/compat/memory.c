@@ -599,7 +599,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                 if ( __copy_field_to_guest(
                          guest_handle_cast(compat,
                                            compat_mem_acquire_resource_t),
-                         &cmp.mar, nr_frames) )
+                         nat.mar, nr_frames) )
                     return -EFAULT;
             }
             else
