@@ -170,9 +170,9 @@ void inline _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data)
             cb(data);
         arch_lock_relax();
     }
+    arch_lock_acquire_barrier();
     got_lock(&lock->debug);
     LOCK_PROFILE_GOT;
-    arch_lock_acquire_barrier();
 }
 
 void _spin_lock(spinlock_t *lock)
@@ -198,9 +198,9 @@ unsigned long _spin_lock_irqsave(spinlock_t *lock)
 
 void _spin_unlock(spinlock_t *lock)
 {
-    arch_lock_release_barrier();
     LOCK_PROFILE_REL;
     rel_lock(&lock->debug);
+    arch_lock_release_barrier();
     add_sized(&lock->tickets.head, 1);
     arch_lock_signal();
     preempt_enable();
@@ -249,15 +249,15 @@ int _spin_trylock(spinlock_t *lock)
         preempt_enable();
         return 0;
     }
+    /*
+     * cmpxchg() is a full barrier so no need for an
+     * arch_lock_acquire_barrier().
+     */
     got_lock(&lock->debug);
 #ifdef CONFIG_DEBUG_LOCK_PROFILE
     if (lock->profile)
         lock->profile->time_locked = NOW();
 #endif
-    /*
-     * cmpxchg() is a full barrier so no need for an
-     * arch_lock_acquire_barrier().
-     */
     return 1;
 }
 
