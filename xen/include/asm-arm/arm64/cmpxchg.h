@@ -160,7 +160,13 @@ static always_inline bool __cmpxchg_mb_timeout(volatile void *ptr,
 					       int size,
 					       unsigned int max_try)
 {
-	return __int_cmpxchg(ptr, old, new, size, true, max_try);
+	bool ret;
+
+	smp_mb();
+	ret = __int_cmpxchg(ptr, old, new, size, true, max_try);
+	smp_mb();
+
+	return ret;
 }
 
 #define cmpxchg(ptr, o, n) \
