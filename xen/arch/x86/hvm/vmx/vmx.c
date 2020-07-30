@@ -2003,6 +2003,8 @@ static void __vmx_deliver_posted_interrupt(struct vcpu *v)
 
 static void vmx_deliver_posted_intr(struct vcpu *v, u8 vector)
 {
+    struct pi_desc old, new, prev;
+
     if ( pi_test_and_set_pir(vector, &v->arch.hvm.vmx.pi_desc) )
         return;
 
@@ -2014,41 +2016,36 @@ static void vmx_deliver_posted_intr(struct vcpu *v, u8 vector)
          * VMEntry as it used to be.
          */
         pi_set_on(&v->arch.hvm.vmx.pi_desc);
-    }
-    else
-    {
-        struct pi_desc old, new, prev;
-
-        prev.control = v->arch.hvm.vmx.pi_desc.control;
-
-        do {
-            /*
-             * Currently, we don't support urgent interrupt, all
-             * interrupts are recognized as non-urgent interrupt,
-             * Besides that, if 'ON' is already set, no need to
-             * sent posted-interrupts notification event as well,
-             * according to hardware behavior.
-             */
-            if ( pi_test_sn(&prev) || pi_test_on(&prev) )
-            {
-                vcpu_kick(v);
-                return;
-            }
-
-            old.control = v->arch.hvm.vmx.pi_desc.control &
-                          ~((1 << POSTED_INTR_ON) | (1 << POSTED_INTR_SN));
-            new.control = v->arch.hvm.vmx.pi_desc.control |
-                          (1 << POSTED_INTR_ON);
-
-            prev.control = cmpxchg(&v->arch.hvm.vmx.pi_desc.control,
-                                   old.control, new.control);
-        } while ( prev.control != old.control );
-
-        __vmx_deliver_posted_interrupt(v);
+        vcpu_kick(v);
         return;
     }
 
-    vcpu_kick(v);
+    prev.control = v->arch.hvm.vmx.pi_desc.control;
+
+    do {
+        /*
+         * Currently, we don't support urgent interrupt, all
+         * interrupts are recognized as non-urgent interrupt,
+         * Besides that, if 'ON' is already set, no need to
+         * send posted-interrupts notification event as well,
+         * according to hardware behavior.
+         */
+        if ( pi_test_sn(&prev) || pi_test_on(&prev) )
+        {
+            vcpu_kick(v);
+            return;
+        }
+
+        old.control = v->arch.hvm.vmx.pi_desc.control &
+                      ~((1 << POSTED_INTR_ON) | (1 << POSTED_INTR_SN));
+        new.control = v->arch.hvm.vmx.pi_desc.control |
+                      (1 << POSTED_INTR_ON);
+
+        prev.control = cmpxchg(&v->arch.hvm.vmx.pi_desc.control,
+                               old.control, new.control);
+    } while ( prev.control != old.control );
+
+    __vmx_deliver_posted_interrupt(v);
 }
 
 static void vmx_sync_pir_to_irr(struct vcpu *v)
