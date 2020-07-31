@@ -815,23 +815,13 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
         return -1;
     }
 
-    if ( direct_mmio )
-    {
-        if ( (mfn_x(mfn) ^ mfn_x(d->arch.hvm.vmx.apic_access_mfn)) >> order )
-            return MTRR_TYPE_UNCACHABLE;
-        if ( order )
-            return -1;
-        *ipat = 1;
-        return MTRR_TYPE_WRBACK;
-    }
-
     if ( !mfn_valid(mfn) )
     {
         *ipat = 1;
         return MTRR_TYPE_UNCACHABLE;
     }
 
-    if ( !is_iommu_enabled(d) && !cache_flush_permitted(d) )
+    if ( !direct_mmio && !is_iommu_enabled(d) && !cache_flush_permitted(d) )
     {
         *ipat = 1;
         return MTRR_TYPE_WRBACK;
@@ -847,6 +837,9 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
             return MTRR_TYPE_WRBACK;
         }
     }
+
+    if ( direct_mmio )
+        return MTRR_TYPE_UNCACHABLE;
 
     gmtrr_mtype = hvm_get_mem_pinned_cacheattr(d, _gfn(gfn), order);
     if ( gmtrr_mtype >= 0 )
