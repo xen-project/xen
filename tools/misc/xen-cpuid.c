@@ -133,7 +133,7 @@ static const char *const str_7c0[32] =
     [22] = "rdpid",
     /* 24 */                   [25] = "cldemote",
     /* 26 */                   [27] = "movdiri",
-    [28] = "movdir64b",
+    [28] = "movdir64b",        [29] = "enqcmd",
     [30] = "sgx-lc",
 };
 
