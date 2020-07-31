@@ -3370,7 +3370,7 @@ x86_decode(
         {
             generate_exception_if(d & vSIB, EXC_UD);
             modrm_rm |= ((rex_prefix & 1) << 3) |
-                        (evex_encoded() && !evex.x) << 4;
+                        ((evex_encoded() && !evex.x) << 4);
             ea.type = OP_REG;
         }
         else if ( ad_bytes == 2 )
@@ -3417,7 +3417,7 @@ x86_decode(
                     ea.mem.off = insn_fetch_type(int16_t);
                 break;
             case 1:
-                ea.mem.off += insn_fetch_type(int8_t) << disp8scale;
+                ea.mem.off += insn_fetch_type(int8_t) * (1 << disp8scale);
                 break;
             case 2:
                 ea.mem.off += insn_fetch_type(int16_t);
@@ -3479,7 +3479,7 @@ x86_decode(
                 pc_rel = mode_64bit();
                 break;
             case 1:
-                ea.mem.off += insn_fetch_type(int8_t) << disp8scale;
+                ea.mem.off += insn_fetch_type(int8_t) * (1 << disp8scale);
                 break;
             case 2:
                 ea.mem.off += insn_fetch_type(int32_t);
@@ -10028,7 +10028,8 @@ x86_emulate(
                 continue;
 
             rc = ops->write(ea.mem.seg,
-                            truncate_ea(ea.mem.off + (idx << state->sib_scale)),
+                            truncate_ea(ea.mem.off +
+                                        idx * (1 << state->sib_scale)),
                             (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
             if ( rc != X86EMUL_OKAY )
             {
@@ -10146,7 +10147,7 @@ x86_emulate(
                   ? ops->write
                   : ops->read)(ea.mem.seg,
                                truncate_ea(ea.mem.off +
-                                           (idx << state->sib_scale)),
+                                           idx * (1 << state->sib_scale)),
                                NULL, 0, ctxt);
             if ( rc == X86EMUL_EXCEPTION )
             {
