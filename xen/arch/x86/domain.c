@@ -1122,8 +1122,6 @@ int arch_set_info_guest(
 
     if ( !cr3_page )
         rc = -EINVAL;
-    else if ( paging_mode_refcounts(d) )
-        /* nothing */;
     else if ( cr3_page == v->arch.old_guest_table )
     {
         v->arch.old_guest_table = NULL;
@@ -1144,8 +1142,7 @@ int arch_set_info_guest(
         case -ERESTART:
             break;
         case 0:
-            if ( !compat && !VM_ASSIST(d, m2p_strict) &&
-                 !paging_mode_refcounts(d) )
+            if ( !compat && !VM_ASSIST(d, m2p_strict) )
                 fill_ro_mpt(cr3_mfn);
             break;
         default:
@@ -1166,7 +1163,7 @@ int arch_set_info_guest(
 
             if ( !cr3_page )
                 rc = -EINVAL;
-            else if ( !paging_mode_refcounts(d) )
+            else
             {
                 rc = get_page_type_preemptible(cr3_page, PGT_root_page_table);
                 switch ( rc )

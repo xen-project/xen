@@ -3149,9 +3149,9 @@ int vcpu_destroy_pagetables(struct vcpu *v)
     return rc;
 }
 
+#ifdef CONFIG_PV
 int new_guest_cr3(mfn_t mfn)
 {
-#ifdef CONFIG_PV
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     int rc;
@@ -3220,7 +3220,7 @@ int new_guest_cr3(mfn_t mfn)
 
     pv_destroy_ldt(curr); /* Unconditional TLB flush later. */
 
-    if ( !VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
+    if ( !VM_ASSIST(d, m2p_strict) )
         fill_ro_mpt(mfn);
     curr->arch.guest_table = pagetable_from_mfn(mfn);
     update_cr3(curr);
@@ -3231,30 +3231,24 @@ int new_guest_cr3(mfn_t mfn)
     {
         struct page_info *page = mfn_to_page(old_base_mfn);
 
-        if ( paging_mode_refcounts(d) )
-            put_page(page);
-        else
-            switch ( rc = put_page_and_type_preemptible(page) )
-            {
-            case -EINTR:
-            case -ERESTART:
-                curr->arch.old_guest_ptpg = NULL;
-                curr->arch.old_guest_table = page;
-                curr->arch.old_guest_table_partial = (rc == -ERESTART);
-                rc = -ERESTART;
-                break;
-            default:
-                BUG_ON(rc);
-                break;
-            }
+        switch ( rc = put_page_and_type_preemptible(page) )
+        {
+        case -EINTR:
+        case -ERESTART:
+            curr->arch.old_guest_ptpg = NULL;
+            curr->arch.old_guest_table = page;
+            curr->arch.old_guest_table_partial = (rc == -ERESTART);
+            rc = -ERESTART;
+            break;
+        default:
+            BUG_ON(rc);
+            break;
+        }
     }
 
     return rc;
-#else
-    ASSERT_UNREACHABLE();
-    return -EINVAL;
-#endif
 }
+#endif
 
 #ifdef CONFIG_PV
 static int vcpumask_to_pcpumask(
