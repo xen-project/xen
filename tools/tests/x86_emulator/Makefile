@@ -295,4 +295,9 @@ x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o predicates.o wrappers.o: 
 x86-emulate.o: x86_emulate/x86_emulate.c
 x86-emulate.o: HOSTCFLAGS += -D__XEN_TOOLS__
 
+# In order for our custom .type assembler directives to reliably land after
+# gcc's, we need to keep it from re-ordering top-level constructs.
+$(call cc-option-add,HOSTCFLAGS-toplevel,HOSTCC,-fno-toplevel-reorder)
+test_x86_emulator.o: HOSTCFLAGS += $(HOSTCFLAGS-toplevel)
+
 test_x86_emulator.o: $(addsuffix .h,$(TESTCASES)) $(addsuffix -opmask.h,$(OPMASK))
