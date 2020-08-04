@@ -226,7 +226,7 @@ int __must_check amd_iommu_map_page(struct domain *d, dfn_t dfn,
                                     unsigned int *flush_flags);
 int __must_check amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
                                       unsigned int *flush_flags);
-int __must_check amd_iommu_alloc_root(struct domain_iommu *hd);
+int __must_check amd_iommu_alloc_root(struct domain *d);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
                                        paddr_t phys_addr, unsigned long size,
                                        int iw, int ir);
@@ -354,22 +354,6 @@ static inline int amd_iommu_get_paging_mode(unsigned long max_frames)
     }
 
     return level;
-}
-
-static inline struct page_info *alloc_amd_iommu_pgtable(void)
-{
-    struct page_info *pg = alloc_domheap_page(NULL, 0);
-
-    if ( pg )
-        clear_domain_page(page_to_mfn(pg));
-
-    return pg;
-}
-
-static inline void free_amd_iommu_pgtable(struct page_info *pg)
-{
-    if ( pg )
-        free_domheap_page(pg);
 }
 
 static inline void *__alloc_amd_iommu_tables(unsigned int order)
