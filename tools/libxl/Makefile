@@ -282,9 +282,7 @@ _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_
 # about races with tools/golang/xenlight/Makefile:all
 .PHONY: idl-external
 idl-external:
-ifeq ($(CONFIG_GOLANG),y)
 	$(MAKE) -C $(XEN_ROOT)/tools/golang/xenlight idl-gen
-endif
 
 LIBXL_IDLGEN_FILES = _libxl_types.h _libxl_types_json.h _libxl_types_private.h _libxl_types.c \
 	_libxl_types_internal.h _libxl_types_internal_json.h _libxl_types_internal_private.h _libxl_types_internal.c
