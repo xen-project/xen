@@ -257,20 +257,20 @@ static u64 bus_to_context_maddr(struct vtd_iommu *iommu, u8 bus)
 static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
 {
     struct domain_iommu *hd = dom_iommu(domain);
-    int addr_width = agaw_to_width(hd->arch.agaw);
+    int addr_width = agaw_to_width(hd->arch.vtd.agaw);
     struct dma_pte *parent, *pte = NULL;
-    int level = agaw_to_level(hd->arch.agaw);
+    int level = agaw_to_level(hd->arch.vtd.agaw);
     int offset;
     u64 pte_maddr = 0;
 
     addr &= (((u64)1) << addr_width) - 1;
     ASSERT(spin_is_locked(&hd->arch.mapping_lock));
-    if ( !hd->arch.pgd_maddr &&
+    if ( !hd->arch.vtd.pgd_maddr &&
          (!alloc ||
-          ((hd->arch.pgd_maddr = alloc_pgtable_maddr(1, hd->node)) == 0)) )
+          ((hd->arch.vtd.pgd_maddr = alloc_pgtable_maddr(1, hd->node)) == 0)) )
         goto out;
 
-    parent = (struct dma_pte *)map_vtd_domain_page(hd->arch.pgd_maddr);
+    parent = (struct dma_pte *)map_vtd_domain_page(hd->arch.vtd.pgd_maddr);
     while ( level > 1 )
     {
         offset = address_level_offset(addr, level);
@@ -593,7 +593,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
     {
         iommu = drhd->iommu;
 
-        if ( !test_bit(iommu->index, &hd->arch.iommu_bitmap) )
+        if ( !test_bit(iommu->index, &hd->arch.vtd.iommu_bitmap) )
             continue;
 
         flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
@@ -1278,7 +1278,10 @@ void __init iommu_free(struct acpi_drhd_unit *drhd)
 
 static int intel_iommu_domain_init(struct domain *d)
 {
-    dom_iommu(d)->arch.agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
+    struct domain_iommu *hd = dom_iommu(d);
+
+    hd->arch.vtd.agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
+    INIT_LIST_HEAD(&hd->arch.vtd.mapped_rmrrs);
 
     return 0;
 }
@@ -1375,10 +1378,10 @@ int domain_context_mapping_one(
         spin_lock(&hd->arch.mapping_lock);
 
         /* Ensure we have pagetables allocated down to leaf PTE. */
-        if ( hd->arch.pgd_maddr == 0 )
+        if ( hd->arch.vtd.pgd_maddr == 0 )
         {
             addr_to_dma_page_maddr(domain, 0, 1);
-            if ( hd->arch.pgd_maddr == 0 )
+            if ( hd->arch.vtd.pgd_maddr == 0 )
             {
             nomem:
                 spin_unlock(&hd->arch.mapping_lock);
@@ -1389,7 +1392,7 @@ int domain_context_mapping_one(
         }
 
         /* Skip top levels of page tables for 2- and 3-level DRHDs. */
-        pgd_maddr = hd->arch.pgd_maddr;
+        pgd_maddr = hd->arch.vtd.pgd_maddr;
         for ( agaw = level_to_agaw(4);
               agaw != level_to_agaw(iommu->nr_pt_levels);
               agaw-- )
@@ -1443,7 +1446,7 @@ int domain_context_mapping_one(
     if ( rc > 0 )
         rc = 0;
 
-    set_bit(iommu->index, &hd->arch.iommu_bitmap);
+    set_bit(iommu->index, &hd->arch.vtd.iommu_bitmap);
 
     unmap_vtd_domain_page(context_entries);
 
@@ -1714,7 +1717,7 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
     {
         int iommu_domid;
 
-        clear_bit(iommu->index, &dom_iommu(domain)->arch.iommu_bitmap);
+        clear_bit(iommu->index, &dom_iommu(domain)->arch.vtd.iommu_bitmap);
 
         iommu_domid = domain_iommu_domid(domain, iommu);
         if ( iommu_domid == -1 )
@@ -1739,7 +1742,7 @@ static void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    list_for_each_entry_safe ( mrmrr, tmp, &hd->arch.mapped_rmrrs, list )
+    list_for_each_entry_safe ( mrmrr, tmp, &hd->arch.vtd.mapped_rmrrs, list )
     {
         list_del(&mrmrr->list);
         xfree(mrmrr);
@@ -1751,8 +1754,9 @@ static void iommu_domain_teardown(struct domain *d)
         return;
 
     spin_lock(&hd->arch.mapping_lock);
-    iommu_free_pagetable(hd->arch.pgd_maddr, agaw_to_level(hd->arch.agaw));
-    hd->arch.pgd_maddr = 0;
+    iommu_free_pagetable(hd->arch.vtd.pgd_maddr,
+                         agaw_to_level(hd->arch.vtd.agaw));
+    hd->arch.vtd.pgd_maddr = 0;
     spin_unlock(&hd->arch.mapping_lock);
 }
 
@@ -1892,7 +1896,7 @@ static void iommu_set_pgd(struct domain *d)
     mfn_t pgd_mfn;
 
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
-    dom_iommu(d)->arch.pgd_maddr =
+    dom_iommu(d)->arch.vtd.pgd_maddr =
         pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 }
 
@@ -1912,7 +1916,7 @@ static int rmrr_identity_mapping(struct domain *d, bool_t map,
      * No need to acquire hd->arch.mapping_lock: Both insertion and removal
      * get done while holding pcidevs_lock.
      */
-    list_for_each_entry( mrmrr, &hd->arch.mapped_rmrrs, list )
+    list_for_each_entry( mrmrr, &hd->arch.vtd.mapped_rmrrs, list )
     {
         if ( mrmrr->base == rmrr->base_address &&
              mrmrr->end == rmrr->end_address )
@@ -1959,7 +1963,7 @@ static int rmrr_identity_mapping(struct domain *d, bool_t map,
     mrmrr->base = rmrr->base_address;
     mrmrr->end = rmrr->end_address;
     mrmrr->count = 1;
-    list_add_tail(&mrmrr->list, &hd->arch.mapped_rmrrs);
+    list_add_tail(&mrmrr->list, &hd->arch.vtd.mapped_rmrrs);
 
     return 0;
 }
@@ -2657,8 +2661,9 @@ static void vtd_dump_p2m_table(struct domain *d)
         return;
 
     hd = dom_iommu(d);
-    printk("p2m table has %d levels\n", agaw_to_level(hd->arch.agaw));
-    vtd_dump_p2m_table_level(hd->arch.pgd_maddr, agaw_to_level(hd->arch.agaw), 0, 0);
+    printk("p2m table has %d levels\n", agaw_to_level(hd->arch.vtd.agaw));
+    vtd_dump_p2m_table_level(hd->arch.vtd.pgd_maddr,
+                             agaw_to_level(hd->arch.vtd.agaw), 0, 0);
 }
 
 static int __init intel_iommu_quarantine_init(struct domain *d)
@@ -2669,7 +2674,7 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
     unsigned int level = agaw_to_level(agaw);
     int rc;
 
-    if ( hd->arch.pgd_maddr )
+    if ( hd->arch.vtd.pgd_maddr )
     {
         ASSERT_UNREACHABLE();
         return 0;
@@ -2677,11 +2682,11 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
 
     spin_lock(&hd->arch.mapping_lock);
 
-    hd->arch.pgd_maddr = alloc_pgtable_maddr(1, hd->node);
-    if ( !hd->arch.pgd_maddr )
+    hd->arch.vtd.pgd_maddr = alloc_pgtable_maddr(1, hd->node);
+    if ( !hd->arch.vtd.pgd_maddr )
         goto out;
 
-    parent = map_vtd_domain_page(hd->arch.pgd_maddr);
+    parent = map_vtd_domain_page(hd->arch.vtd.pgd_maddr);
     while ( level )
     {
         uint64_t maddr;

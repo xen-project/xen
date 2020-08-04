@@ -139,7 +139,6 @@ int arch_iommu_domain_init(struct domain *d)
     struct domain_iommu *hd = dom_iommu(d);
 
     spin_lock_init(&hd->arch.mapping_lock);
-    INIT_LIST_HEAD(&hd->arch.mapped_rmrrs);
 
     return 0;
 }

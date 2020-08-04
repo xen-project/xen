@@ -45,16 +45,23 @@ typedef uint64_t daddr_t;
 
 struct arch_iommu
 {
-    u64 pgd_maddr;                 /* io page directory machine address */
-    spinlock_t mapping_lock;            /* io page table lock */
-    int agaw;     /* adjusted guest address width, 0 is level 2 30-bit */
-    u64 iommu_bitmap;              /* bitmap of iommu(s) that the domain uses */
-    struct list_head mapped_rmrrs;
+    spinlock_t mapping_lock; /* io page table lock */
 
-    /* amd iommu support */
-    int paging_mode;
-    struct page_info *root_table;
-    struct guest_iommu *g_iommu;
+    union {
+        /* Intel VT-d */
+        struct {
+            uint64_t pgd_maddr; /* io page directory machine address */
+            unsigned int agaw; /* adjusted guest address width, 0 is level 2 30-bit */
+            uint64_t iommu_bitmap; /* bitmap of iommu(s) that the domain uses */
+            struct list_head mapped_rmrrs;
+        } vtd;
+        /* AMD IOMMU */
+        struct {
+            unsigned int paging_mode;
+            struct page_info *root_table;
+            struct guest_iommu *g_iommu;
+        } amd;
+    };
 };
 
 extern struct iommu_ops iommu_ops;

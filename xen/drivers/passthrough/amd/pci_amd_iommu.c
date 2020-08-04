@@ -91,7 +91,8 @@ static void amd_iommu_setup_domain_device(
     u8 bus = pdev->bus;
     const struct domain_iommu *hd = dom_iommu(domain);
 
-    BUG_ON( !hd->arch.root_table || !hd->arch.paging_mode ||
+    BUG_ON( !hd->arch.amd.root_table ||
+            !hd->arch.amd.paging_mode ||
             !iommu->dev_table.buffer );
 
     if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
@@ -110,8 +111,8 @@ static void amd_iommu_setup_domain_device(
 
         /* bind DTE to domain page-tables */
         amd_iommu_set_root_page_table(
-            dte, page_to_maddr(hd->arch.root_table), domain->domain_id,
-            hd->arch.paging_mode, valid);
+            dte, page_to_maddr(hd->arch.amd.root_table),
+            domain->domain_id, hd->arch.amd.paging_mode, valid);
 
         /* Undo what amd_iommu_disable_domain_device() may have done. */
         ivrs_dev = &get_ivrs_mappings(iommu->seg)[req_id];
@@ -131,8 +132,8 @@ static void amd_iommu_setup_domain_device(
                         "root table = %#"PRIx64", "
                         "domain = %d, paging mode = %d\n",
                         req_id, pdev->type,
-                        page_to_maddr(hd->arch.root_table),
-                        domain->domain_id, hd->arch.paging_mode);
+                        page_to_maddr(hd->arch.amd.root_table),
+                        domain->domain_id, hd->arch.amd.paging_mode);
     }
 
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -206,10 +207,10 @@ static int iov_enable_xt(void)
 
 int amd_iommu_alloc_root(struct domain_iommu *hd)
 {
-    if ( unlikely(!hd->arch.root_table) )
+    if ( unlikely(!hd->arch.amd.root_table) )
     {
-        hd->arch.root_table = alloc_amd_iommu_pgtable();
-        if ( !hd->arch.root_table )
+        hd->arch.amd.root_table = alloc_amd_iommu_pgtable();
+        if ( !hd->arch.amd.root_table )
             return -ENOMEM;
     }
 
@@ -239,7 +240,7 @@ static int amd_iommu_domain_init(struct domain *d)
      *   physical address space we give it, but this isn't known yet so use 4
      *   unilaterally.
      */
-    hd->arch.paging_mode = amd_iommu_get_paging_mode(
+    hd->arch.amd.paging_mode = amd_iommu_get_paging_mode(
         is_hvm_domain(d)
         ? 1ul << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT)
         : get_upper_mfn_bound() + 1);
@@ -305,7 +306,7 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
         AMD_IOMMU_DEBUG("Disable: device id = %#x, "
                         "domain = %d, paging mode = %d\n",
                         req_id,  domain->domain_id,
-                        dom_iommu(domain)->arch.paging_mode);
+                        dom_iommu(domain)->arch.amd.paging_mode);
     }
     spin_unlock_irqrestore(&iommu->lock, flags);
 
@@ -420,10 +421,11 @@ static void deallocate_iommu_page_tables(struct domain *d)
     struct domain_iommu *hd = dom_iommu(d);
 
     spin_lock(&hd->arch.mapping_lock);
-    if ( hd->arch.root_table )
+    if ( hd->arch.amd.root_table )
     {
-        deallocate_next_page_table(hd->arch.root_table, hd->arch.paging_mode);
-        hd->arch.root_table = NULL;
+        deallocate_next_page_table(hd->arch.amd.root_table,
+                                   hd->arch.amd.paging_mode);
+        hd->arch.amd.root_table = NULL;
     }
     spin_unlock(&hd->arch.mapping_lock);
 }
@@ -598,11 +600,12 @@ static void amd_dump_p2m_table(struct domain *d)
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
-    if ( !hd->arch.root_table )
+    if ( !hd->arch.amd.root_table )
         return;
 
-    printk("p2m table has %d levels\n", hd->arch.paging_mode);
-    amd_dump_p2m_table_level(hd->arch.root_table, hd->arch.paging_mode, 0, 0);
+    printk("p2m table has %u levels\n", hd->arch.amd.paging_mode);
+    amd_dump_p2m_table_level(hd->arch.amd.root_table,
+                             hd->arch.amd.paging_mode, 0, 0);
 }
 
 static const struct iommu_ops __initconstrel _iommu_ops = {
