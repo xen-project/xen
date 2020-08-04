@@ -2153,7 +2153,8 @@ int domain_relinquish_resources(struct domain *d)
         d->arch.rel_priv = PROG_ ## x; /* Fallthrough */ case PROG_ ## x
 
         enum {
-            PROG_paging = 1,
+            PROG_iommu_pagetables = 1,
+            PROG_paging,
             PROG_vcpu_pagetables,
             PROG_shared,
             PROG_xen,
@@ -2165,6 +2166,12 @@ int domain_relinquish_resources(struct domain *d)
 
     case 0:
         ret = pci_release_devices(d);
+        if ( ret )
+            return ret;
+
+    PROGRESS(iommu_pagetables):
+
+        ret = iommu_free_pgtables(d);
         if ( ret )
             return ret;
 

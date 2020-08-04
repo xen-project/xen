@@ -46,6 +46,10 @@ typedef uint64_t daddr_t;
 struct arch_iommu
 {
     spinlock_t mapping_lock; /* io page table lock */
+    struct {
+        struct page_list_head list;
+        spinlock_t lock;
+    } pgtables;
 
     union {
         /* Intel VT-d */
@@ -130,6 +134,9 @@ int pi_update_irte(const struct pi_desc *pi_desc, const struct pirq *pirq,
     if ( ops->sync_cache )                              \
         iommu_vcall(ops, sync_cache, addr, size);       \
 })
+
+int __must_check iommu_free_pgtables(struct domain *d);
+struct page_info *__must_check iommu_alloc_pgtable(struct domain *d);
 
 #endif /* !__ARCH_X86_IOMMU_H__ */
 /*
