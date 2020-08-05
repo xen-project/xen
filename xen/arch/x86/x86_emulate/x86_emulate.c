@@ -12266,6 +12266,8 @@ x86_insn_is_mem_access(const struct x86_emulate_state *state,
          ... X86EMUL_OPC_F2(0x0f, 0x1f): /* NOP space */
         case X86EMUL_OPC(0x0f, 0xb9): /* UD1 */
         case X86EMUL_OPC(0x0f, 0xff): /* UD0 */
+        case X86EMUL_OPC_EVEX_66(0x0f38, 0xc6): /* V{GATH,SCATT}ERPF*D* */
+        case X86EMUL_OPC_EVEX_66(0x0f38, 0xc7): /* V{GATH,SCATT}ERPF*Q* */
             return false;
 
         case X86EMUL_OPC(0x0f, 0x01):
