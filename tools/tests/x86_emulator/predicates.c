@@ -517,6 +517,138 @@ static const struct {
 };
 #undef CND
 #undef REG
+static const struct {
+    uint8_t opc[2];
+    bool modrm:1; /* Should register form (also) be tested? */
+    uint8_t mem:2;
+} fpu[] = {
+    { { 0xd8, 0x00 }, T, R }, /* fadd */
+    { { 0xd8, 0x08 }, T, R }, /* fmul */
+    { { 0xd8, 0x10 }, T, R }, /* fcom */
+    { { 0xd8, 0x18 }, T, R }, /* fcomp */
+    { { 0xd8, 0x20 }, T, R }, /* fsub */
+    { { 0xd8, 0x28 }, T, R }, /* fsubr */
+    { { 0xd8, 0x30 }, T, R }, /* fdiv */
+    { { 0xd8, 0x38 }, T, R }, /* fdivr */
+    { { 0xd9, 0x00 }, T, R }, /* fld */
+    { { 0xd9, 0x10 }, F, W }, /* fst */
+    { { 0xd9, 0x18 }, T, W }, /* fstp */
+    { { 0xd9, 0x20 }, F, R }, /* fldenv */
+    { { 0xd9, 0x28 }, F, R }, /* fldcw */
+    { { 0xd9, 0x30 }, F, W }, /* fnstenv */
+    { { 0xd9, 0x38 }, F, W }, /* fnstcw */
+    { { 0xd9, 0xc8 }, F, N }, /* fxch */
+    { { 0xd9, 0xd0 }, F, N }, /* fnop */
+    { { 0xd9, 0xe0 }, F, N }, /* fchs */
+    { { 0xd9, 0xe1 }, F, N }, /* fabs */
+    { { 0xd9, 0xe4 }, F, N }, /* ftst */
+    { { 0xd9, 0xe5 }, F, N }, /* fxam */
+    { { 0xd9, 0xe6 }, F, N }, /* ftstp */
+    { { 0xd9, 0xe8 }, F, N }, /* fld1 */
+    { { 0xd9, 0xe9 }, F, N }, /* fldl2t */
+    { { 0xd9, 0xea }, F, N }, /* fldl2e */
+    { { 0xd9, 0xeb }, F, N }, /* fldpi */
+    { { 0xd9, 0xec }, F, N }, /* fldlg2 */
+    { { 0xd9, 0xed }, F, N }, /* fldln2 */
+    { { 0xd9, 0xee }, F, N }, /* fldz */
+    { { 0xd9, 0xf0 }, F, N }, /* f2xm1 */
+    { { 0xd9, 0xf1 }, F, N }, /* fyl2x */
+    { { 0xd9, 0xf2 }, F, N }, /* fptan */
+    { { 0xd9, 0xf3 }, F, N }, /* fpatan */
+    { { 0xd9, 0xf4 }, F, N }, /* fxtract */
+    { { 0xd9, 0xf5 }, F, N }, /* fprem1 */
+    { { 0xd9, 0xf6 }, F, N }, /* fdecstp */
+    { { 0xd9, 0xf7 }, F, N }, /* fincstp */
+    { { 0xd9, 0xf8 }, F, N }, /* fprem */
+    { { 0xd9, 0xf9 }, F, N }, /* fyl2xp1 */
+    { { 0xd9, 0xfa }, F, N }, /* fsqrt */
+    { { 0xd9, 0xfb }, F, N }, /* fsincos */
+    { { 0xd9, 0xfc }, F, N }, /* frndint */
+    { { 0xd9, 0xfd }, F, N }, /* fscale */
+    { { 0xd9, 0xfe }, F, N }, /* fsin */
+    { { 0xd9, 0xff }, F, N }, /* fcos */
+    { { 0xda, 0x00 }, F, R }, /* fiadd */
+    { { 0xda, 0x08 }, F, R }, /* fimul */
+    { { 0xda, 0x10 }, F, R }, /* ficom */
+    { { 0xda, 0x18 }, F, R }, /* ficomp */
+    { { 0xda, 0x20 }, F, R }, /* fisub */
+    { { 0xda, 0x28 }, F, R }, /* fisubr */
+    { { 0xda, 0x30 }, F, R }, /* fidiv */
+    { { 0xda, 0x38 }, F, R }, /* fidivr */
+    { { 0xda, 0xc0 }, F, N }, /* fcmovb */
+    { { 0xda, 0xc8 }, F, N }, /* fcmove */
+    { { 0xda, 0xd0 }, F, N }, /* fcmovbe */
+    { { 0xda, 0xd8 }, F, N }, /* fcmovu */
+    { { 0xda, 0xe9 }, F, N }, /* fucompp */
+    { { 0xdb, 0x00 }, F, R }, /* fild */
+    { { 0xdb, 0x08 }, F, W }, /* fisttp */
+    { { 0xdb, 0x10 }, F, W }, /* fist */
+    { { 0xdb, 0x18 }, F, W }, /* fistp */
+    { { 0xdb, 0x28 }, F, R }, /* fld */
+    { { 0xdb, 0x38 }, F, W }, /* fstp */
+    { { 0xdb, 0xc0 }, F, N }, /* fcmovnb */
+    { { 0xdb, 0xc8 }, F, N }, /* fcmovne */
+    { { 0xdb, 0xd0 }, F, N }, /* fcmovnbe */
+    { { 0xdb, 0xd8 }, F, N }, /* fcmovnu */
+    { { 0xdb, 0xe0 }, F, N }, /* fneni */
+    { { 0xdb, 0xe1 }, F, N }, /* fndisi */
+    { { 0xdb, 0xe2 }, F, N }, /* fnclex */
+    { { 0xdb, 0xe3 }, F, N }, /* fninit */
+    { { 0xdb, 0xe4 }, F, N }, /* fsetpm */
+    { { 0xdb, 0xe5 }, F, N }, /* frstpm */
+    { { 0xdb, 0xe8 }, F, N }, /* fucomi */
+    { { 0xdb, 0xf0 }, F, N }, /* fcomi */
+    { { 0xdc, 0x00 }, T, R }, /* fadd */
+    { { 0xdc, 0x08 }, T, R }, /* fmul */
+    { { 0xdc, 0x10 }, T, R }, /* fcom */
+    { { 0xdc, 0x18 }, T, R }, /* fcomp */
+    { { 0xdc, 0x20 }, T, R }, /* fsub */
+    { { 0xdc, 0x28 }, T, R }, /* fsubr */
+    { { 0xdc, 0x30 }, T, R }, /* fdiv */
+    { { 0xdc, 0x38 }, T, R }, /* fdivr */
+    { { 0xdd, 0x00 }, F, R }, /* fld */
+    { { 0xdd, 0x08 }, F, W }, /* fisttp */
+    { { 0xdd, 0x10 }, T, W }, /* fst */
+    { { 0xdd, 0x18 }, T, W }, /* fstp */
+    { { 0xdd, 0x20 }, F, R }, /* frstor */
+    { { 0xdd, 0x30 }, F, W }, /* fnsave */
+    { { 0xdd, 0x38 }, F, W }, /* fnstsw */
+    { { 0xdd, 0xc0 }, F, N }, /* ffree */
+    { { 0xdd, 0xc8 }, F, N }, /* fxch */
+    { { 0xdd, 0xe0 }, F, N }, /* fucom */
+    { { 0xdd, 0xe8 }, F, N }, /* fucomp */
+    { { 0xde, 0x00 }, F, R }, /* fiadd */
+    { { 0xde, 0x08 }, F, R }, /* fimul */
+    { { 0xde, 0x10 }, F, R }, /* ficom */
+    { { 0xde, 0x18 }, F, R }, /* ficomp */
+    { { 0xde, 0x20 }, F, R }, /* fisub */
+    { { 0xde, 0x28 }, F, R }, /* fisubr */
+    { { 0xde, 0x30 }, F, R }, /* fidiv */
+    { { 0xde, 0x38 }, F, R }, /* fidivr */
+    { { 0xde, 0xc0 }, F, N }, /* faddp */
+    { { 0xde, 0xc8 }, F, N }, /* fmulp */
+    { { 0xde, 0xd0 }, F, N }, /* fcomp */
+    { { 0xde, 0xd9 }, F, N }, /* fcompp */
+    { { 0xde, 0xe0 }, F, N }, /* fsubrp */
+    { { 0xde, 0xe8 }, F, N }, /* fsubp */
+    { { 0xde, 0xf0 }, F, N }, /* fdivrp */
+    { { 0xde, 0xf8 }, F, N }, /* fdivp */
+    { { 0xdf, 0x00 }, F, R }, /* fild */
+    { { 0xdf, 0x08 }, F, W }, /* fisttp */
+    { { 0xdf, 0x10 }, F, W }, /* fist */
+    { { 0xdf, 0x18 }, F, W }, /* fistp */
+    { { 0xdf, 0x20 }, F, R }, /* fbld */
+    { { 0xdf, 0x28 }, F, R }, /* fild */
+    { { 0xdf, 0x30 }, F, W }, /* fbstp */
+    { { 0xdf, 0x38 }, F, W }, /* fistp */
+    { { 0xdf, 0xc0 }, F, N }, /* ffreep */
+    { { 0xdf, 0xc8 }, F, N }, /* fxch */
+    { { 0xdf, 0xd0 }, F, N }, /* fstp */
+    { { 0xdf, 0xd8 }, F, N }, /* fstp */
+    { { 0xdf, 0xe0 }, F, N }, /* fnstsw */
+    { { 0xdf, 0xe8 }, F, N }, /* fucomip */
+    { { 0xdf, 0xf0 }, F, N }, /* fcomip */
+};
 #undef F
 #undef N
 #undef R
@@ -665,6 +797,16 @@ void predicates_test(void *instr, struct x86_emulate_ctxt *ctxt,
             do_test(instr, legacy_0f38[t].len[m] + ((void *)ptr - instr),
                     legacy_0f38[t].modrm ? (void *)ptr - instr + 1 : 0,
                     legacy_0f38[t].mem, ctxt, fetch);
+        }
+
+        memset(instr + ARRAY_SIZE(fpu[t].opc), 0xcc, 13);
+
+        for ( t = 0; t < ARRAY_SIZE(fpu); ++t )
+        {
+            memcpy(instr, fpu[t].opc, ARRAY_SIZE(fpu[t].opc));
+
+            do_test(instr, ARRAY_SIZE(fpu[t].opc), fpu[t].modrm, fpu[t].mem,
+                    ctxt, fetch);
         }
 
         if ( errors )
