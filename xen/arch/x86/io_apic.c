@@ -2589,10 +2589,11 @@ static void __init ioapic_init_mappings(void)
         union IO_APIC_reg_01 reg_01;
         paddr_t ioapic_phys = mp_ioapics[i].mpc_apicaddr;
 
-        if ( !ioapic_phys )
+        if ( !ioapic_phys || !IS_ALIGNED(ioapic_phys, KB(1)) )
         {
             printk(KERN_ERR
-                   "WARNING: bogus zero IO-APIC address found in MPTABLE, disabling IO/APIC support!\n");
+                   "WARNING: bogus IO-APIC address %08lx found in MPTABLE, disabling IO-APIC support\n",
+                   ioapic_phys);
             smp_found_config = false;
             skip_ioapic_setup = true;
             break;
