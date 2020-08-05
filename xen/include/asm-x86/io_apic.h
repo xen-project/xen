@@ -14,8 +14,8 @@
  */
 
 #define IO_APIC_BASE(idx)                                               \
-    ((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + (idx))         \
-                      + (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
+    ((volatile uint32_t *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + (idx))    \
+                           + (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
 
 #define IO_APIC_ID(idx) (mp_ioapics[idx].mpc_apicid)
 
@@ -135,8 +135,10 @@ unsigned int io_apic_gsi_base(unsigned int apic);
 
 static inline unsigned int __io_apic_read(unsigned int apic, unsigned int reg)
 {
-    *IO_APIC_BASE(apic) = reg;
-    return *(IO_APIC_BASE(apic) + 4);
+    volatile uint32_t *regs = IO_APIC_BASE(apic);
+
+    regs[0] = reg;
+    return regs[4];
 }
 
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
@@ -148,8 +150,10 @@ static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 
 static inline void __io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
-    *IO_APIC_BASE(apic) = reg;
-    *(IO_APIC_BASE(apic) + 4) = value;
+    volatile uint32_t *regs = IO_APIC_BASE(apic);
+
+    regs[0] = reg;
+    regs[4] = value;
 }
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
