@@ -752,6 +752,13 @@ static struct x86_emulate_ops emulops = {
  * 64-bit OSes may not (be able to) properly restore the two selectors in
  * the FPU environment. Zap them so that memcmp() on two saved images will
  * work regardless of whether a context switch occurred in the middle.
+ *
+ * Additionally on AMD-like CPUs FDP/FIP/FOP may get lost across context
+ * switches, when there's no unmasked pending FP exception: With
+ * CPUID.80000008.EBX[2] clear, the fields don't get written/read by
+ * {F,}XSAVE / {F,}XRSTOR (which OSes often compensate for by invoking an
+ * insn forcing the fields to gain a deterministic value), whereas with said
+ * bit set, zeroes will get written (and hence later restored).
  */
 static void zap_fpsel(unsigned int *env, bool is_32bit)
 {
@@ -764,6 +771,21 @@ static void zap_fpsel(unsigned int *env, bool is_32bit)
     {
         env[2] &= ~0xffff;
         env[3] &= ~0xffff;
+    }
+
+    if ( cp.x86_vendor != X86_VENDOR_AMD && cp.x86_vendor != X86_VENDOR_HYGON )
+        return;
+
+    if ( is_32bit )
+    {
+        env[3] = 0;
+        env[4] = 0;
+        env[5] = 0;
+    }
+    else
+    {
+        env[1] &= 0xffff;
+        env[2] = 0;
     }
 }
 
@@ -2460,6 +2482,7 @@ int main(int argc, char **argv)
         regs.edx = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
         asm volatile ( "fnstenv %0" : "=m" (res[9]) :: "memory" );
+        zap_fpsel(&res[9], true);
         if ( (rc != X86EMUL_OKAY) ||
              memcmp(res + 2, res + 9, 28) ||
              (regs.eip != (unsigned long)&instr[3]) )
@@ -2487,6 +2510,7 @@ int main(int argc, char **argv)
         res[23] = 0xaa55aa55;
         res[24] = 0xaa55aa55;
         rc = x86_emulate(&ctxt, &emulops);
+        zap_fpsel(&res[0], false);
         if ( (rc != X86EMUL_OKAY) ||
              memcmp(res, res + 25, 94) ||
              (res[23] >> 16) != 0xaa55 ||
@@ -2514,6 +2538,7 @@ int main(int argc, char **argv)
         regs.edx = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
         asm volatile ( "fnsave %0" : "=m" (res[27]) :: "memory" );
+        zap_fpsel(&res[27], true);
         if ( (rc != X86EMUL_OKAY) ||
              memcmp(res, res + 27, 108) ||
              (regs.eip != (unsigned long)&instr[2]) )
