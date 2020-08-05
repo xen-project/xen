@@ -21,8 +21,8 @@ static const struct {
     uint8_t opc[8];
     uint8_t len[2]; /* 32- and 64-bit mode */
     bool modrm:1; /* Should register form (also) be tested? */
-    unsigned int mem:2;
-    unsigned int pfx:2;
+    uint8_t mem:2;
+    uint8_t pfx:2;
 #define REG(opc, more...) \
     { { (opc) | 0 }, more }, /* %?ax */ \
     { { (opc) | 1 }, more }, /* %?cx */ \
@@ -334,53 +334,53 @@ static const struct {
     /*{ 0x01, 0x28 }, { 2, 2 }, F, W, pfx_f3 }, rstorssp */
     { { 0x01, 0x30 }, { 2, 2 }, T, R }, /* lmsw */
     { { 0x01, 0x38 }, { 2, 2 }, F, N }, /* invlpg */
-    { { 0x01, 0xc0 }, { 2, 2 }, T, N }, /* enclv */
-    { { 0x01, 0xc1 }, { 2, 2 }, T, N }, /* vmcall */
+    { { 0x01, 0xc0 }, { 2, 2 }, F, N }, /* enclv */
+    { { 0x01, 0xc1 }, { 2, 2 }, F, N }, /* vmcall */
     /*{ 0x01, 0xc2 }, { 2, 2 }, F, R }, vmlaunch */
     /*{ 0x01, 0xc3 }, { 2, 2 }, F, R }, vmresume */
-    { { 0x01, 0xc4 }, { 2, 2 }, T, N }, /* vmxoff */
-    { { 0x01, 0xc5 }, { 2, 2 }, T, N }, /* pconfig */
-    { { 0x01, 0xc8 }, { 2, 2 }, T, N }, /* monitor */
-    { { 0x01, 0xc9 }, { 2, 2 }, T, N }, /* mwait */
-    { { 0x01, 0xca }, { 2, 2 }, T, N }, /* clac */
-    { { 0x01, 0xcb }, { 2, 2 }, T, N }, /* stac */
-    { { 0x01, 0xcf }, { 2, 2 }, T, N }, /* encls */
-    { { 0x01, 0xd0 }, { 2, 2 }, T, N }, /* xgetbv */
-    { { 0x01, 0xd1 }, { 2, 2 }, T, N }, /* xsetbv */
-    { { 0x01, 0xd4 }, { 2, 2 }, T, N }, /* vmfunc */
-    { { 0x01, 0xd5 }, { 2, 2 }, T, N }, /* xend */
-    { { 0x01, 0xd6 }, { 2, 2 }, T, N }, /* xtest */
-    { { 0x01, 0xd7 }, { 2, 2 }, T, N }, /* enclu */
+    { { 0x01, 0xc4 }, { 2, 2 }, F, N }, /* vmxoff */
+    { { 0x01, 0xc5 }, { 2, 2 }, F, N }, /* pconfig */
+    { { 0x01, 0xc8 }, { 2, 2 }, F, N }, /* monitor */
+    { { 0x01, 0xc9 }, { 2, 2 }, F, N }, /* mwait */
+    { { 0x01, 0xca }, { 2, 2 }, F, N }, /* clac */
+    { { 0x01, 0xcb }, { 2, 2 }, F, N }, /* stac */
+    { { 0x01, 0xcf }, { 2, 2 }, F, N }, /* encls */
+    { { 0x01, 0xd0 }, { 2, 2 }, F, N }, /* xgetbv */
+    { { 0x01, 0xd1 }, { 2, 2 }, F, N }, /* xsetbv */
+    { { 0x01, 0xd4 }, { 2, 2 }, F, N }, /* vmfunc */
+    { { 0x01, 0xd5 }, { 2, 2 }, F, N }, /* xend */
+    { { 0x01, 0xd6 }, { 2, 2 }, F, N }, /* xtest */
+    { { 0x01, 0xd7 }, { 2, 2 }, F, N }, /* enclu */
     /*{ 0x01, 0xd8 }, { 2, 2 }, F, R }, vmrun */
-    { { 0x01, 0xd9 }, { 2, 2 }, T, N }, /* vmcall */
-    { { 0x01, 0xd9 }, { 2, 2 }, T, N, pfx_f3 }, /* vmgexit */
-    { { 0x01, 0xd9 }, { 2, 2 }, T, N, pfx_f2 }, /* vmgexit */
+    { { 0x01, 0xd9 }, { 2, 2 }, F, N }, /* vmcall */
+    { { 0x01, 0xd9 }, { 2, 2 }, F, N, pfx_f3 }, /* vmgexit */
+    { { 0x01, 0xd9 }, { 2, 2 }, F, N, pfx_f2 }, /* vmgexit */
     /*{ 0x01, 0xda }, { 2, 2 }, F, R }, vmload */
     /*{ 0x01, 0xdb }, { 2, 2 }, F, W }, vmsave */
-    { { 0x01, 0xdc }, { 2, 2 }, T, N }, /* stgi */
-    { { 0x01, 0xdd }, { 2, 2 }, T, N }, /* clgi */
+    { { 0x01, 0xdc }, { 2, 2 }, F, N }, /* stgi */
+    { { 0x01, 0xdd }, { 2, 2 }, F, N }, /* clgi */
     /*{ 0x01, 0xde }, { 2, 2 }, F, R }, skinit */
-    { { 0x01, 0xdf }, { 2, 2 }, T, N }, /* invlpga */
-    { { 0x01, 0xe8 }, { 2, 2 }, T, N }, /* serialize */
+    { { 0x01, 0xdf }, { 2, 2 }, F, N }, /* invlpga */
+    { { 0x01, 0xe8 }, { 2, 2 }, F, N }, /* serialize */
     /*{ 0x01, 0xe8 }, { 2, 2 }, F, W, pfx_f3 }, setssbsy */
-    { { 0x01, 0xe8 }, { 2, 2 }, T, N, pfx_f2 }, /* xsusldtrk */
-    { { 0x01, 0xe9 }, { 2, 2 }, T, N, pfx_f2 }, /* xresldtrk */
+    { { 0x01, 0xe8 }, { 2, 2 }, F, N, pfx_f2 }, /* xsusldtrk */
+    { { 0x01, 0xe9 }, { 2, 2 }, F, N, pfx_f2 }, /* xresldtrk */
     /*{ 0x01, 0xea }, { 2, 2 }, F, W, pfx_f3 }, saveprevssp */
-    { { 0x01, 0xee }, { 2, 2 }, T, N }, /* rdpkru */
-    { { 0x01, 0xef }, { 2, 2 }, T, N }, /* wrpkru */
-    { { 0x01, 0xf8 }, { 0, 2 }, T, N }, /* swapgs */
-    { { 0x01, 0xf9 }, { 2, 2 }, T, N }, /* rdtscp */
-    { { 0x01, 0xfa }, { 2, 2 }, T, N }, /* monitorx */
-    { { 0x01, 0xfa }, { 2, 2 }, T, N, pfx_f3 }, /* mcommit */
-    { { 0x01, 0xfb }, { 2, 2 }, T, N }, /* mwaitx */
+    { { 0x01, 0xee }, { 2, 2 }, F, N }, /* rdpkru */
+    { { 0x01, 0xef }, { 2, 2 }, F, N }, /* wrpkru */
+    { { 0x01, 0xf8 }, { 0, 2 }, F, N }, /* swapgs */
+    { { 0x01, 0xf9 }, { 2, 2 }, F, N }, /* rdtscp */
+    { { 0x01, 0xfa }, { 2, 2 }, F, N }, /* monitorx */
+    { { 0x01, 0xfa }, { 2, 2 }, F, N, pfx_f3 }, /* mcommit */
+    { { 0x01, 0xfb }, { 2, 2 }, F, N }, /* mwaitx */
     { { 0x01, 0xfc }, { 2, 2 }, F, W }, /* clzero */
-    { { 0x01, 0xfd }, { 2, 2 }, T, N }, /* rdpru */
-    { { 0x01, 0xfe }, { 2, 2 }, T, N }, /* invlpgb */
-    { { 0x01, 0xfe }, { 0, 2 }, T, N, pfx_f3 }, /* rmpadjust */
-    { { 0x01, 0xfe }, { 0, 2 }, T, N, pfx_f2 }, /* rmpupdate */
-    { { 0x01, 0xff }, { 2, 2 }, T, N }, /* tlbsync */
-    { { 0x01, 0xff }, { 0, 2 }, T, N, pfx_f3 }, /* psmash */
-    { { 0x01, 0xff }, { 0, 2 }, T, N, pfx_f2 }, /* pvalidate */
+    { { 0x01, 0xfd }, { 2, 2 }, F, N }, /* rdpru */
+    { { 0x01, 0xfe }, { 2, 2 }, F, N }, /* invlpgb */
+    { { 0x01, 0xfe }, { 0, 2 }, F, N, pfx_f3 }, /* rmpadjust */
+    { { 0x01, 0xfe }, { 0, 2 }, F, N, pfx_f2 }, /* rmpupdate */
+    { { 0x01, 0xff }, { 2, 2 }, F, N }, /* tlbsync */
+    { { 0x01, 0xff }, { 0, 2 }, F, N, pfx_f3 }, /* psmash */
+    { { 0x01, 0xff }, { 0, 2 }, F, N, pfx_f2 }, /* pvalidate */
     { { 0x02 }, { 2, 2 }, T, R }, /* lar */
     { { 0x03 }, { 2, 2 }, T, R }, /* lsl */
     { { 0x05 }, { 1, 1 }, F, N }, /* syscall */
