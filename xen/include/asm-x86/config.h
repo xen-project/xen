@@ -144,18 +144,16 @@ extern unsigned char boot_edid_info[128];
  *  0xffff82d000000000 - 0xffff82d03fffffff [1GB,   2^30 bytes, PML4:261]
  *    Compatibility machine-to-phys translation table.
  *  0xffff82d040000000 - 0xffff82d07fffffff [1GB,   2^30 bytes, PML4:261]
- *    High read-only compatibility machine-to-phys translation table.
- *  0xffff82d080000000 - 0xffff82d0bfffffff [1GB,   2^30 bytes, PML4:261]
  *    Xen text, static data, bss.
 #ifndef CONFIG_BIGMEM
- *  0xffff82d0c0000000 - 0xffff82dfffffffff [61GB,              PML4:261]
+ *  0xffff82d080000000 - 0xffff82dfffffffff [62GB,              PML4:261]
  *    Reserved for future use.
  *  0xffff82e000000000 - 0xffff82ffffffffff [128GB, 2^37 bytes, PML4:261]
  *    Page-frame information array.
  *  0xffff830000000000 - 0xffff87ffffffffff [5TB, 5*2^40 bytes, PML4:262-271]
  *    1:1 direct mapping of all physical memory.
 #else
- *  0xffff82d0c0000000 - 0xffff82ffffffffff [189GB,             PML4:261]
+ *  0xffff82d080000000 - 0xffff82ffffffffff [190GB,             PML4:261]
  *    Reserved for future use.
  *  0xffff830000000000 - 0xffff847fffffffff [1.5TB, 3*2^39 bytes, PML4:262-264]
  *    Page-frame information array.
