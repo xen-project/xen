@@ -13,9 +13,9 @@
  * Copyright (C) 1997, 1998, 1999, 2000 Ingo Molnar
  */
 
-#define IO_APIC_BASE(idx) \
-		((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + idx) \
-		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
+#define IO_APIC_BASE(idx)                                               \
+    ((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + (idx))         \
+                      + (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
 
 #define IO_APIC_ID(idx) (mp_ioapics[idx].mpc_apicid)
 
@@ -78,14 +78,14 @@ extern int nr_ioapics;
 extern int nr_ioapic_entries[MAX_IO_APICS];
 
 enum ioapic_irq_destination_types {
-	dest_Fixed = 0,
-	dest_LowestPrio = 1,
-	dest_SMI = 2,
-	dest__reserved_1 = 3,
-	dest_NMI = 4,
-	dest_INIT = 5,
-	dest__reserved_2 = 6,
-	dest_ExtINT = 7
+    dest_Fixed = 0,
+    dest_LowestPrio = 1,
+    dest_SMI = 2,
+    dest__reserved_1 = 3,
+    dest_NMI = 4,
+    dest_INIT = 5,
+    dest__reserved_2 = 6,
+    dest_ExtINT = 7
 };
 
 struct IO_APIC_route_entry {
@@ -135,28 +135,28 @@ unsigned int io_apic_gsi_base(unsigned int apic);
 
 static inline unsigned int __io_apic_read(unsigned int apic, unsigned int reg)
 {
-	*IO_APIC_BASE(apic) = reg;
-	return *(IO_APIC_BASE(apic)+4);
+    *IO_APIC_BASE(apic) = reg;
+    return *(IO_APIC_BASE(apic) + 4);
 }
 
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
-	if (ioapic_reg_remapped(reg))
-		return iommu_read_apic_from_ire(apic, reg);
-	return __io_apic_read(apic, reg);
+    if ( ioapic_reg_remapped(reg) )
+        return iommu_read_apic_from_ire(apic, reg);
+    return __io_apic_read(apic, reg);
 }
 
 static inline void __io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	*IO_APIC_BASE(apic) = reg;
-	*(IO_APIC_BASE(apic)+4) = value;
+    *IO_APIC_BASE(apic) = reg;
+    *(IO_APIC_BASE(apic) + 4) = value;
 }
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	if (ioapic_reg_remapped(reg))
-		return iommu_update_ire_from_apic(apic, reg, value);
-	__io_apic_write(apic, reg, value);
+    if ( ioapic_reg_remapped(reg) )
+        return iommu_update_ire_from_apic(apic, reg, value);
+    __io_apic_write(apic, reg, value);
 }
 
 /*
@@ -165,9 +165,9 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
  */
 static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	if (ioapic_reg_remapped(reg))
-		return iommu_update_ire_from_apic(apic, reg, value);
-	*(IO_APIC_BASE(apic)+4) = value;
+    if ( ioapic_reg_remapped(reg) )
+        return iommu_update_ire_from_apic(apic, reg, value);
+    *(IO_APIC_BASE(apic) + 4) = value;
 }
 
 /* 1 if "noapic" boot option passed */
