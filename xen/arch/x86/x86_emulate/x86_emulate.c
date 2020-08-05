@@ -9735,7 +9735,7 @@ x86_emulate(
 
                 rc = ops->read(ea.mem.seg,
                                truncate_ea(ea.mem.off +
-                                           (idx << state->sib_scale)),
+                                           idx * (1 << state->sib_scale)),
                                (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
                 if ( rc != X86EMUL_OKAY )
                 {
@@ -9857,7 +9857,8 @@ x86_emulate(
                 continue;
 
             rc = ops->read(ea.mem.seg,
-                           truncate_ea(ea.mem.off + (idx << state->sib_scale)),
+                           truncate_ea(ea.mem.off +
+                                       idx * (1 << state->sib_scale)),
                            (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
             if ( rc != X86EMUL_OKAY )
             {
