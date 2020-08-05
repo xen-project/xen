@@ -12360,6 +12360,14 @@ x86_insn_is_mem_write(const struct x86_emulate_state *state,
         case X86EMUL_OPC_F2(0x0f38, 0xf8): /* ENQCMD */
         case X86EMUL_OPC_F3(0x0f38, 0xf8): /* ENQCMDS */
             return true;
+
+        case X86EMUL_OPC_EVEX_F3(0x0f38, 0x10) ...
+             X86EMUL_OPC_EVEX_F3(0x0f38, 0x15): /* VPMOVUS* */
+        case X86EMUL_OPC_EVEX_F3(0x0f38, 0x20) ...
+             X86EMUL_OPC_EVEX_F3(0x0f38, 0x25): /* VPMOVS* */
+        case X86EMUL_OPC_EVEX_F3(0x0f38, 0x30) ...
+             X86EMUL_OPC_EVEX_F3(0x0f38, 0x35): /* VPMOV{D,Q,W}* */
+            return state->modrm_mod != 3;
         }
 
         return false;
@@ -12401,12 +12409,6 @@ x86_insn_is_mem_write(const struct x86_emulate_state *state,
     case X86EMUL_OPC(0x0f, 0xab):        /* BTS */
     case X86EMUL_OPC(0x0f, 0xb3):        /* BTR */
     case X86EMUL_OPC(0x0f, 0xbb):        /* BTC */
-    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x10) ...
-         X86EMUL_OPC_EVEX_F3(0x0f38, 0x15): /* VPMOVUS* */
-    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x20) ...
-         X86EMUL_OPC_EVEX_F3(0x0f38, 0x25): /* VPMOVS* */
-    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x30) ...
-         X86EMUL_OPC_EVEX_F3(0x0f38, 0x35): /* VPMOV{D,Q,W}* */
         return true;
 
     case 0xd9:
