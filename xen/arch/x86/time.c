@@ -453,16 +453,13 @@ static u64 read_pmtimer_count(void)
 static s64 __init init_pmtimer(struct platform_timesource *pts)
 {
     u64 start;
-    u32 count, target, mask = 0xffffff;
+    u32 count, target, mask;
 
-    if ( !pmtmr_ioport || !pmtmr_width )
+    if ( !pmtmr_ioport || (pmtmr_width != 24 && pmtmr_width != 32) )
         return 0;
 
-    if ( pmtmr_width == 32 )
-    {
-        pts->counter_bits = 32;
-        mask = 0xffffffff;
-    }
+    pts->counter_bits = pmtmr_width;
+    mask = 0xffffffff >> (32 - pmtmr_width);
 
     count = inl(pmtmr_ioport) & mask;
     start = rdtsc_ordered();
@@ -482,7 +479,6 @@ static struct platform_timesource __initdata plt_pmtimer =
     .name = "ACPI PM Timer",
     .frequency = ACPI_PM_FREQUENCY,
     .read_counter = read_pmtimer_count,
-    .counter_bits = 24,
     .init = init_pmtimer
 };
 

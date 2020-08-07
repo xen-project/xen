@@ -473,10 +473,17 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 
 #ifdef CONFIG_X86_PM_TIMER
 	/* detect the location of the ACPI PM Timer */
-	if (fadt->header.revision >= FADT2_REVISION_ID) {
+	if (fadt->header.revision >= FADT2_REVISION_ID &&
+	    fadt->xpm_timer_block.space_id == ACPI_ADR_SPACE_SYSTEM_IO) {
 		/* FADT rev. 2 */
-		if (fadt->xpm_timer_block.space_id ==
-		    ACPI_ADR_SPACE_SYSTEM_IO) {
+		if (fadt->xpm_timer_block.access_width != 0 &&
+		    ACPI_ACCESS_BIT_WIDTH(fadt->xpm_timer_block.access_width) != 32)
+			printk(KERN_WARNING PREFIX "PM-Timer has invalid access width(%u)\n",
+			       fadt->xpm_timer_block.access_width);
+		else if (fadt->xpm_timer_block.bit_offset != 0)
+			printk(KERN_WARNING PREFIX "PM-Timer has invalid bit offset(%u)\n",
+			       fadt->xpm_timer_block.bit_offset);
+		else {
 			pmtmr_ioport = fadt->xpm_timer_block.address;
 			pmtmr_width = fadt->xpm_timer_block.bit_width;
 		}
@@ -488,8 +495,12 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
  	 */
 	if (!pmtmr_ioport) {
 		pmtmr_ioport = fadt->pm_timer_block;
-		pmtmr_width = fadt->pm_timer_length == 4 ? 24 : 0;
+		pmtmr_width = fadt->pm_timer_length == 4 ? 32 : 0;
 	}
+	if (pmtmr_width < 32 && (fadt->flags & ACPI_FADT_32BIT_TIMER))
+		printk(KERN_WARNING PREFIX "PM-Timer is too short\n");
+	if (pmtmr_width > 24 && !(fadt->flags & ACPI_FADT_32BIT_TIMER))
+		pmtmr_width = 24;
 	if (pmtmr_ioport)
 		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x (%u bits)\n",
 		       pmtmr_ioport, pmtmr_width);
