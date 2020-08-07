@@ -66,6 +66,12 @@ ENTRY(__ret_point)
         mov     REF(saved_ss), %ss
         LOAD_GREG(sp)
 
+        mov     $__HYPERVISOR_DS64, %eax
+        mov     %eax, %ds
+        mov     %eax, %es
+        mov     %eax, %fs
+        mov     %eax, %gs
+
         /* Reload code selector */
         pushq   $__HYPERVISOR_CS
         leaq    1f(%rip),%rax
