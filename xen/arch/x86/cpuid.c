@@ -1057,7 +1057,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         {
             /* Fast-forward MSR_APIC_BASE.EN. */
             if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-                res->d &= ~cpufeat_bit(X86_FEATURE_APIC);
+                res->d &= ~cpufeat_mask(X86_FEATURE_APIC);
 
             /*
              * PSE36 is not supported in shadow mode.  This bit should be
