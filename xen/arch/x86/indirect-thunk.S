@@ -24,10 +24,12 @@
 .macro IND_THUNK_LFENCE reg:req
         lfence
         jmp *%\reg
+        int3 /* Halt straight-line speculation */
 .endm
 
 .macro IND_THUNK_JMP reg:req
         jmp *%\reg
+        int3 /* Halt straight-line speculation */
 .endm
 
 /*
