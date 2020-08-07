@@ -1320,7 +1320,7 @@ static void vmx_load_pdptrs(struct vcpu *v)
     if ( (cr3 & 0x1fUL) && !hvm_pcid_enabled(v) )
         goto crash;
 
-    page = get_page_from_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt, P2M_UNSHARE);
+    page = get_page_from_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
     if ( !page )
     {
         /* Ideally you don't want to crash but rather go into a wait 
