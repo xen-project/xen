@@ -300,7 +300,6 @@ int __init dom0_construct_pv(struct domain *d,
     struct page_info *page = NULL;
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
-    unsigned long long value;
     void *image_base = bootstrap_map(image);
     unsigned long image_len = image->mod_end;
     void *image_start = image_base + image_headroom;
@@ -357,27 +356,36 @@ int __init dom0_construct_pv(struct domain *d,
         goto out;
 
     /* compatibility check */
+    printk(" Xen  kernel: 64-bit, lsb%s\n",
+           IS_ENABLED(CONFIG_PV32) ? ", compat32" : "");
     compatible = 0;
     machine = elf_uval(&elf, elf.ehdr, e_machine);
-    printk(" Xen  kernel: 64-bit, lsb, compat32\n");
-    if ( elf_32bit(&elf) && parms.pae == XEN_PAE_BIMODAL )
-        parms.pae = XEN_PAE_EXTCR3;
-    if ( elf_32bit(&elf) && parms.pae && machine == EM_386 )
-    {
-        if ( unlikely(rc = switch_compat(d)) )
-        {
-            printk("Dom0 failed to switch to compat: %d\n", rc);
-            return rc;
-        }
 
-        compatible = 1;
+#ifdef CONFIG_PV32
+    if ( elf_32bit(&elf) )
+    {
+        if ( parms.pae == XEN_PAE_BIMODAL )
+            parms.pae = XEN_PAE_EXTCR3;
+        if ( parms.pae && machine == EM_386 )
+        {
+            if ( unlikely(rc = switch_compat(d)) )
+            {
+                printk("Dom0 failed to switch to compat: %d\n", rc);
+                return rc;
+            }
+
+            compatible = 1;
+        }
     }
-    if (elf_64bit(&elf) && machine == EM_X86_64)
+#endif
+
+    if ( elf_64bit(&elf) && machine == EM_X86_64 )
         compatible = 1;
-    printk(" Dom0 kernel: %s%s, %s, paddr %#" PRIx64 " -> %#" PRIx64 "\n",
-           elf_64bit(&elf) ? "64-bit" : "32-bit",
-           parms.pae       ? ", PAE"  : "",
-           elf_msb(&elf)   ? "msb"    : "lsb",
+
+    printk(" Dom0 kernel: %s-bit%s, %s, paddr %#" PRIx64 " -> %#" PRIx64 "\n",
+           elf_64bit(&elf) ? "64" : elf_32bit(&elf) ? "32" : "??",
+           parms.pae       ? ", PAE" : "",
+           elf_msb(&elf)   ? "msb"   : "lsb",
            elf.pstart, elf.pend);
     if ( elf.bsd_symtab_pstart )
         printk(" Dom0 symbol map %#" PRIx64 " -> %#" PRIx64 "\n",
@@ -405,23 +413,30 @@ int __init dom0_construct_pv(struct domain *d,
     if ( parms.pae == XEN_PAE_EXTCR3 )
             set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
-    if ( !pv_shim && (parms.virt_hv_start_low != UNSET_ADDR) &&
-         elf_32bit(&elf) )
+#ifdef CONFIG_PV32
+    if ( elf_32bit(&elf) )
     {
-        unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
-        value = (parms.virt_hv_start_low + mask) & ~mask;
-        BUG_ON(!is_pv_32bit_domain(d));
-        if ( value > __HYPERVISOR_COMPAT_VIRT_START )
-            panic("Domain 0 expects too high a hypervisor start address\n");
-        HYPERVISOR_COMPAT_VIRT_START(d) =
-            max_t(unsigned int, m2p_compat_vstart, value);
-    }
+        if ( !pv_shim && (parms.virt_hv_start_low != UNSET_ADDR) )
+        {
+            unsigned long value = ROUNDUP(parms.virt_hv_start_low,
+                                          1UL << L2_PAGETABLE_SHIFT);
 
-    if ( (parms.p2m_base != UNSET_ADDR) && elf_32bit(&elf) )
-    {
-        printk(XENLOG_WARNING "P2M table base ignored\n");
-        parms.p2m_base = UNSET_ADDR;
+            if ( value > __HYPERVISOR_COMPAT_VIRT_START )
+            {
+                printk("Dom0 expects too high a hypervisor start address\n");
+                return -ERANGE;
+            }
+            HYPERVISOR_COMPAT_VIRT_START(d) =
+                max_t(unsigned int, m2p_compat_vstart, value);
+        }
+
+        if ( parms.p2m_base != UNSET_ADDR )
+        {
+            printk(XENLOG_WARNING "P2M table base ignored\n");
+            parms.p2m_base = UNSET_ADDR;
+        }
     }
+#endif
 
     /*
      * Why do we need this? The number of page-table frames depends on the
