@@ -185,11 +185,11 @@ cmd_cc_o_S = $(CC) $(a_flags) -c $< -o $@
 
 quiet_cmd_obj_init_o = INIT_O  $@
 define cmd_obj_init_o
-    $(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p;}' | while read idx name sz rest; do \
+    $(OBJDUMP) -h $< | while read idx name sz rest; do \
         case "$$name" in \
         .*.local) ;; \
         .text|.text.*|.data|.data.*|.bss) \
-            test $$sz != 0 || continue; \
+            test $$(echo $$sz | sed 's,00*,0,') != 0 || continue; \
             echo "Error: size of $<:$$name is 0x$$sz" >&2; \
             exit $$(expr $$idx + 1);; \
         esac; \
