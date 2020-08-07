@@ -796,6 +796,7 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
 {
     int gmtrr_mtype, hmtrr_mtype;
     struct vcpu *v = current;
+    unsigned long i;
 
     *ipat = 0;
 
@@ -836,6 +837,17 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     {
         *ipat = 1;
         return MTRR_TYPE_WRBACK;
+    }
+
+    for ( i = 0; i < (1ul << order); i++ )
+    {
+        if ( is_xen_heap_page(mfn_to_page(mfn_add(mfn, i))) )
+        {
+            if ( order )
+                return -1;
+            *ipat = 1;
+            return MTRR_TYPE_WRBACK;
+        }
     }
 
     gmtrr_mtype = hvm_get_mem_pinned_cacheattr(d, _gfn(gfn), order);
