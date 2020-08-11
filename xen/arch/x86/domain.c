@@ -1581,9 +1581,9 @@ static void load_segments(struct vcpu *n)
 
     if ( !fs_gs_done && !compat )
     {
-        wrfsbase(n->arch.pv.fs_base);
-        wrgsshadow(n->arch.pv.gs_base_kernel);
-        wrgsbase(n->arch.pv.gs_base_user);
+        write_fs_base(n->arch.pv.fs_base);
+        write_gs_shadow(n->arch.pv.gs_base_kernel);
+        write_gs_base(n->arch.pv.gs_base_user);
 
         /* If in kernel mode then switch the GS bases around. */
         if ( (n->arch.flags & TF_kernel_mode) )
@@ -1707,9 +1707,9 @@ static void save_segments(struct vcpu *v)
 
     if ( !is_pv_32bit_vcpu(v) )
     {
-        unsigned long gs_base = rdgsbase();
+        unsigned long gs_base = read_gs_base();
 
-        v->arch.pv.fs_base = rdfsbase();
+        v->arch.pv.fs_base = read_fs_base();
         if ( v->arch.flags & TF_kernel_mode )
             v->arch.pv.gs_base_kernel = gs_base;
         else

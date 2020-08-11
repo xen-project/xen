@@ -540,10 +540,10 @@ static int read_segment(enum x86_segment seg,
             reg->base = 0;
             break;
         case x86_seg_fs:
-            reg->base = rdfsbase();
+            reg->base = read_fs_base();
             break;
         case x86_seg_gs:
-            reg->base = rdgsbase();
+            reg->base = read_gs_base();
             break;
         }
 
@@ -900,13 +900,13 @@ static int read_msr(unsigned int reg, uint64_t *val,
     case MSR_FS_BASE:
         if ( is_pv_32bit_domain(currd) )
             break;
-        *val = rdfsbase();
+        *val = read_fs_base();
         return X86EMUL_OKAY;
 
     case MSR_GS_BASE:
         if ( is_pv_32bit_domain(currd) )
             break;
-        *val = rdgsbase();
+        *val = read_gs_base();
         return X86EMUL_OKAY;
 
     case MSR_SHADOW_GS_BASE:
@@ -1024,19 +1024,19 @@ static int write_msr(unsigned int reg, uint64_t val,
     case MSR_FS_BASE:
         if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
             break;
-        wrfsbase(val);
+        write_fs_base(val);
         return X86EMUL_OKAY;
 
     case MSR_GS_BASE:
         if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
             break;
-        wrgsbase(val);
+        write_gs_base(val);
         return X86EMUL_OKAY;
 
     case MSR_SHADOW_GS_BASE:
         if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
             break;
-        wrgsshadow(val);
+        write_gs_shadow(val);
         curr->arch.pv.gs_base_user = val;
         return X86EMUL_OKAY;
 

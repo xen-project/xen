@@ -512,12 +512,12 @@ static void vmx_save_guest_msrs(struct vcpu *v)
      * We cannot cache SHADOW_GS_BASE while the VCPU runs, as it can
      * be updated at any time via SWAPGS, which we cannot trap.
      */
-    v->arch.hvm.vmx.shadow_gs = rdgsshadow();
+    v->arch.hvm.vmx.shadow_gs = read_gs_shadow();
 }
 
 static void vmx_restore_guest_msrs(struct vcpu *v)
 {
-    wrgsshadow(v->arch.hvm.vmx.shadow_gs);
+    write_gs_shadow(v->arch.hvm.vmx.shadow_gs);
     wrmsrl(MSR_STAR,           v->arch.hvm.vmx.star);
     wrmsrl(MSR_LSTAR,          v->arch.hvm.vmx.lstar);
     wrmsrl(MSR_SYSCALL_MASK,   v->arch.hvm.vmx.sfmask);
@@ -2958,7 +2958,7 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_SHADOW_GS_BASE:
-        *msr_content = rdgsshadow();
+        *msr_content = read_gs_shadow();
         break;
 
     case MSR_STAR:
@@ -3182,7 +3182,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         else if ( msr == MSR_GS_BASE )
             __vmwrite(GUEST_GS_BASE, msr_content);
         else
-            wrgsshadow(msr_content);
+            write_gs_shadow(msr_content);
 
         break;
 

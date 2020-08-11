@@ -192,7 +192,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     {
     case SEGBASE_FS:
         if ( is_canonical_address(base) )
-            wrfsbase(base);
+            write_fs_base(base);
         else
             ret = -EINVAL;
         break;
@@ -200,7 +200,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     case SEGBASE_GS_USER:
         if ( is_canonical_address(base) )
         {
-            wrgsshadow(base);
+            write_gs_shadow(base);
             v->arch.pv.gs_base_user = base;
         }
         else
@@ -209,7 +209,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
 
     case SEGBASE_GS_KERNEL:
         if ( is_canonical_address(base) )
-            wrgsbase(base);
+            write_gs_base(base);
         else
             ret = -EINVAL;
         break;
@@ -258,7 +258,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
                        : [flat] "r" (FLAT_USER_DS32) );
 
         /* Update the cache of the inactive base, as read from the GDT/LDT. */
-        v->arch.pv.gs_base_user = rdgsbase();
+        v->arch.pv.gs_base_user = read_gs_base();
 
         asm volatile ( safe_swapgs );
         break;

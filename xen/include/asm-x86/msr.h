@@ -156,7 +156,7 @@ static inline unsigned long __rdgsbase(void)
     return base;
 }
 
-static inline unsigned long rdfsbase(void)
+static inline unsigned long read_fs_base(void)
 {
     unsigned long base;
 
@@ -168,7 +168,7 @@ static inline unsigned long rdfsbase(void)
     return base;
 }
 
-static inline unsigned long rdgsbase(void)
+static inline unsigned long read_gs_base(void)
 {
     unsigned long base;
 
@@ -180,7 +180,7 @@ static inline unsigned long rdgsbase(void)
     return base;
 }
 
-static inline unsigned long rdgsshadow(void)
+static inline unsigned long read_gs_shadow(void)
 {
     unsigned long base;
 
@@ -196,7 +196,7 @@ static inline unsigned long rdgsshadow(void)
     return base;
 }
 
-static inline void wrfsbase(unsigned long base)
+static inline void write_fs_base(unsigned long base)
 {
     if ( read_cr4() & X86_CR4_FSGSBASE )
 #ifdef HAVE_AS_FSGSBASE
@@ -208,7 +208,7 @@ static inline void wrfsbase(unsigned long base)
         wrmsrl(MSR_FS_BASE, base);
 }
 
-static inline void wrgsbase(unsigned long base)
+static inline void write_gs_base(unsigned long base)
 {
     if ( read_cr4() & X86_CR4_FSGSBASE )
 #ifdef HAVE_AS_FSGSBASE
@@ -220,7 +220,7 @@ static inline void wrgsbase(unsigned long base)
         wrmsrl(MSR_GS_BASE, base);
 }
 
-static inline void wrgsshadow(unsigned long base)
+static inline void write_gs_shadow(unsigned long base)
 {
     if ( read_cr4() & X86_CR4_FSGSBASE )
     {

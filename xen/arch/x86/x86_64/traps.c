@@ -44,9 +44,9 @@ static void read_registers(struct cpu_user_regs *regs, unsigned long crs[8])
     crs[3] = read_cr3();
     crs[4] = read_cr4();
     read_sregs(regs);
-    crs[5] = rdfsbase();
-    crs[6] = rdgsbase();
-    crs[7] = rdgsshadow();
+    crs[5] = read_fs_base();
+    crs[6] = read_gs_base();
+    crs[7] = read_gs_shadow();
 }
 
 static void _show_registers(

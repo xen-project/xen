@@ -452,7 +452,7 @@ void toggle_guest_mode(struct vcpu *v)
      * Update the cached value of the GS base about to become inactive, as a
      * subsequent context switch won't bother re-reading it.
      */
-    gs_base = rdgsbase();
+    gs_base = read_gs_base();
     if ( v->arch.flags & TF_kernel_mode )
         v->arch.pv.gs_base_kernel = gs_base;
     else
