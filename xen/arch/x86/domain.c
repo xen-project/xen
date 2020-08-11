@@ -1537,6 +1537,7 @@ arch_do_vcpu_op(
 static void load_segments(struct vcpu *n)
 {
     struct cpu_user_regs *uregs = &n->arch.user_regs;
+    unsigned long gsb = 0, gss = 0;
     bool compat = is_pv_32bit_vcpu(n);
     bool all_segs_okay = true, fs_gs_done = false;
 
@@ -1556,18 +1557,25 @@ static void load_segments(struct vcpu *n)
                    : [ok] "+r" (all_segs_okay)          \
                    : [_val] "rm" (val) )
 
-#ifdef CONFIG_HVM
-    if ( cpu_has_svm && !compat && (uregs->fs | uregs->gs) <= 3 )
+    if ( !compat )
     {
-        unsigned long gsb = n->arch.flags & TF_kernel_mode
-            ? n->arch.pv.gs_base_kernel : n->arch.pv.gs_base_user;
-        unsigned long gss = n->arch.flags & TF_kernel_mode
-            ? n->arch.pv.gs_base_user : n->arch.pv.gs_base_kernel;
+        gsb = n->arch.pv.gs_base_kernel;
+        gss = n->arch.pv.gs_base_user;
 
-        fs_gs_done = svm_load_segs(n->arch.pv.ldt_ents, LDT_VIRT_START(n),
-                                   n->arch.pv.fs_base, gsb, gss);
-    }
+        /*
+         * Figure out which way around gsb/gss want to be.  gsb needs to be
+         * the active context, and gss needs to be the inactive context.
+         */
+        if ( !(n->arch.flags & TF_kernel_mode) )
+            SWAP(gsb, gss);
+
+#ifdef CONFIG_HVM
+        if ( cpu_has_svm && (uregs->fs | uregs->gs) <= 3 )
+            fs_gs_done = svm_load_segs(n->arch.pv.ldt_ents, LDT_VIRT_START(n),
+                                       n->arch.pv.fs_base, gsb, gss);
 #endif
+    }
+
     if ( !fs_gs_done )
     {
         load_LDT(n);
@@ -1581,13 +1589,19 @@ static void load_segments(struct vcpu *n)
 
     if ( !fs_gs_done && !compat )
     {
-        write_fs_base(n->arch.pv.fs_base);
-        write_gs_shadow(n->arch.pv.gs_base_kernel);
-        write_gs_base(n->arch.pv.gs_base_user);
-
-        /* If in kernel mode then switch the GS bases around. */
-        if ( (n->arch.flags & TF_kernel_mode) )
+        if ( read_cr4() & X86_CR4_FSGSBASE )
+        {
+            __wrgsbase(gss);
+            __wrfsbase(n->arch.pv.fs_base);
             asm volatile ( "swapgs" );
+            __wrgsbase(gsb);
+        }
+        else
+        {
+            wrmsrl(MSR_FS_BASE, n->arch.pv.fs_base);
+            wrmsrl(MSR_GS_BASE, gsb);
+            wrmsrl(MSR_SHADOW_GS_BASE, gss);
+        }
     }
 
     if ( unlikely(!all_segs_okay) )
@@ -1707,9 +1721,20 @@ static void save_segments(struct vcpu *v)
 
     if ( !is_pv_32bit_vcpu(v) )
     {
-        unsigned long gs_base = read_gs_base();
+        unsigned long fs_base, gs_base;
 
-        v->arch.pv.fs_base = read_fs_base();
+        if ( read_cr4() & X86_CR4_FSGSBASE )
+        {
+            fs_base = __rdfsbase();
+            gs_base = __rdgsbase();
+        }
+        else
+        {
+            rdmsrl(MSR_FS_BASE, fs_base);
+            rdmsrl(MSR_GS_BASE, gs_base);
+        }
+
+        v->arch.pv.fs_base = fs_base;
         if ( v->arch.flags & TF_kernel_mode )
             v->arch.pv.gs_base_kernel = gs_base;
         else
