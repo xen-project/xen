@@ -81,7 +81,7 @@ case "$command" in
         ;&
     online)
         setup_virtual_bridge_port "$dev"
-        set_mtu "$bridge" "$dev"
+        set_mtu "$bridge" "$dev" "$type_if"
         add_to_bridge "$bridge" "$dev"
         ;;
     remove)
