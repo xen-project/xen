@@ -298,6 +298,9 @@ A virtual keyboard device frontend. Described by
 A virtual network device frontend. Described by
 [xen/include/public/io/netif.h][NETIF]
 
+NOTE: ~/device/vif/$DEVID/mtu can be used to inform the frontend of an
+      increased MTU. (The default MTU is 1500 octets).
+
 #### ~/device/vscsi/$DEVID/* []
 
 A virtual scsi device frontend. Described by
