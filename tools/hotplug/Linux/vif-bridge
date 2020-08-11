@@ -84,12 +84,7 @@ case "$command" in
         ;;
 
     offline)
-        if which brctl >&/dev/null; then
-            do_without_error brctl delif "$bridge" "$dev"
-        else
-            do_without_error ip link set "$dev" nomaster
-        fi
-        do_without_error ifconfig "$dev" down
+        remove_from_bridge "$bridge" "$dev"
         ;;
 
     add)
