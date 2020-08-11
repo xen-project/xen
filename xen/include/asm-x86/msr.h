@@ -156,6 +156,24 @@ static inline unsigned long __rdgsbase(void)
     return base;
 }
 
+static inline void __wrfsbase(unsigned long base)
+{
+#ifdef HAVE_AS_FSGSBASE
+    asm volatile ( "wrfsbase %0" :: "r" (base) );
+#else
+    asm volatile ( ".byte 0xf3, 0x48, 0x0f, 0xae, 0xd0" :: "a" (base) );
+#endif
+}
+
+static inline void __wrgsbase(unsigned long base)
+{
+#ifdef HAVE_AS_FSGSBASE
+    asm volatile ( "wrgsbase %0" :: "r" (base) );
+#else
+    asm volatile ( ".byte 0xf3, 0x48, 0x0f, 0xae, 0xd8" :: "a" (base) );
+#endif
+}
+
 static inline unsigned long read_fs_base(void)
 {
     unsigned long base;
@@ -199,11 +217,7 @@ static inline unsigned long read_gs_shadow(void)
 static inline void write_fs_base(unsigned long base)
 {
     if ( read_cr4() & X86_CR4_FSGSBASE )
-#ifdef HAVE_AS_FSGSBASE
-        asm volatile ( "wrfsbase %0" :: "r" (base) );
-#else
-        asm volatile ( ".byte 0xf3, 0x48, 0x0f, 0xae, 0xd0" :: "a" (base) );
-#endif
+        __wrfsbase(base);
     else
         wrmsrl(MSR_FS_BASE, base);
 }
@@ -211,11 +225,7 @@ static inline void write_fs_base(unsigned long base)
 static inline void write_gs_base(unsigned long base)
 {
     if ( read_cr4() & X86_CR4_FSGSBASE )
-#ifdef HAVE_AS_FSGSBASE
-        asm volatile ( "wrgsbase %0" :: "r" (base) );
-#else
-        asm volatile ( ".byte 0xf3, 0x48, 0x0f, 0xae, 0xd8" :: "a" (base) );
-#endif
+        __wrgsbase(base);
     else
         wrmsrl(MSR_GS_BASE, base);
 }
