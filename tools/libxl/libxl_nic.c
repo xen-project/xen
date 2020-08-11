@@ -53,13 +53,15 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
+#define LIBXL_DEVICE_NIC_MTU_DEFAULT 1500
+
 static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
                                         libxl_device_nic *nic, bool hotplug)
 {
     int rc;
 
     if (!nic->mtu)
-        nic->mtu = 1492;
+        nic->mtu = LIBXL_DEVICE_NIC_MTU_DEFAULT;
     if (!nic->model) {
         nic->model = strdup("rtl8139");
         if (!nic->model) return ERROR_NOMEM;
@@ -223,6 +225,11 @@ static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
                             nic->rate_interval_usecs));
     }
 
+    if (nic->mtu != LIBXL_DEVICE_NIC_MTU_DEFAULT) {
+        flexarray_append(back, "mtu");
+        flexarray_append(back, GCSPRINTF("%u", nic->mtu));
+    }
+    
     flexarray_append(back, "bridge");
     flexarray_append(back, libxl__strdup(gc, nic->bridge));
     flexarray_append(back, "handle");
@@ -236,6 +243,9 @@ static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
     flexarray_append(front, "mac");
     flexarray_append(front, GCSPRINTF(
                                     LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
+
+    flexarray_append(ro_front, "mtu");
+    flexarray_append(ro_front, GCSPRINTF("%u", nic->mtu));
 
     return 0;
 }
@@ -275,7 +285,20 @@ static int libxl__nic_from_xenstore(libxl__gc *gc, const char *libxl_path,
     rc = libxl__backendpath_parse_domid(gc, tmp, &nic->backend_domid);
     if (rc) goto out;
 
-    /* nic->mtu = */
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/mtu", libxl_path), &tmp);
+    if (rc) goto out;
+    if (tmp) {
+        char *endptr;
+
+        nic->mtu = strtol(tmp, &endptr, 10);
+        if (*endptr != '\0') {
+            rc = ERROR_INVAL;
+            goto out;
+        }
+    } else {
+        nic->mtu = LIBXL_DEVICE_NIC_MTU_DEFAULT;
+    }
 
     rc = libxl__xs_read_checked(gc, XBT_NULL,
                                 GCSPRINTF("%s/mac", libxl_path), &tmp);
