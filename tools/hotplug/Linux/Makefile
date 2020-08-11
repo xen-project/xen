@@ -6,7 +6,6 @@ XEN_SCRIPTS = vif-bridge
 XEN_SCRIPTS += vif-route
 XEN_SCRIPTS += vif-nat
 XEN_SCRIPTS += vif-openvswitch
-XEN_SCRIPTS += vif2
 XEN_SCRIPTS += vif-setup
 XEN_SCRIPTS-$(CONFIG_LIBNL) += remus-netbuf-setup
 XEN_SCRIPTS += block
