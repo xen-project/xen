@@ -1728,6 +1728,16 @@ static void load_segments(struct vcpu *n)
     }
 }
 
+/*
+ * Record all guest segment state.  The guest can load segment selectors
+ * without trapping, which will also alter the 64bit FS/GS bases.  Arbitrary
+ * changes to bases can also be made with the WR{FS,GS}BASE instructions, when
+ * enabled.
+ *
+ * Guests however cannot use SWAPGS, so there is no mechanism to modify the
+ * inactive GS base behind Xen's back.  Therefore, Xen's copy of the inactive
+ * GS base is still accurate, and doesn't need reading back from hardware.
+ */
 static void save_segments(struct vcpu *v)
 {
     struct cpu_user_regs *regs = &v->arch.user_regs;
@@ -1738,14 +1748,15 @@ static void save_segments(struct vcpu *v)
     regs->fs = read_sreg(fs);
     regs->gs = read_sreg(gs);
 
-    /* %fs/%gs bases can only be stale if WR{FS,GS}BASE are usable. */
-    if ( (read_cr4() & X86_CR4_FSGSBASE) && !is_pv_32bit_vcpu(v) )
+    if ( !is_pv_32bit_vcpu(v) )
     {
-        v->arch.pv.fs_base = __rdfsbase();
+        unsigned long gs_base = rdgsbase();
+
+        v->arch.pv.fs_base = rdfsbase();
         if ( v->arch.flags & TF_kernel_mode )
-            v->arch.pv.gs_base_kernel = __rdgsbase();
+            v->arch.pv.gs_base_kernel = gs_base;
         else
-            v->arch.pv.gs_base_user = __rdgsbase();
+            v->arch.pv.gs_base_user = gs_base;
     }
 
     if ( regs->ds )

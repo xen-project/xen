@@ -527,7 +527,24 @@ struct pv_vcpu
     bool_t syscall32_disables_events;
     bool_t sysenter_disables_events;
 
-    /* Segment base addresses. */
+    /*
+     * 64bit segment bases.
+     *
+     * FS and the active GS are always stale when the vCPU is in context, as
+     * the guest can change them behind Xen's back with MOV SREG, or
+     * WR{FS,GS}BASE on capable hardware.
+     *
+     * The inactive GS base is never stale, as guests can't use SWAPGS to
+     * access it - all modification is performed by Xen either directly
+     * (hypercall, #GP emulation), or indirectly (toggle_guest_mode()).
+     *
+     * The vCPU context switch path is optimised based on this fact, so any
+     * path updating or swapping the inactive base must update the cached
+     * value as well.
+     *
+     * Which GS base is active and inactive depends on whether the vCPU is in
+     * user or kernel context.
+     */
     unsigned long fs_base;
     unsigned long gs_base_kernel;
     unsigned long gs_base_user;

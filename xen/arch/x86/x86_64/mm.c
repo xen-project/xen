@@ -1030,10 +1030,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     {
     case SEGBASE_FS:
         if ( is_canonical_address(base) )
-        {
             wrfsbase(base);
-            v->arch.pv.fs_base = base;
-        }
         else
             ret = -EINVAL;
         break;
@@ -1050,10 +1047,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
 
     case SEGBASE_GS_KERNEL:
         if ( is_canonical_address(base) )
-        {
             wrgsbase(base);
-            v->arch.pv.gs_base_kernel = base;
-        }
         else
             ret = -EINVAL;
         break;
