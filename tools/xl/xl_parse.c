@@ -563,6 +563,8 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
     } else if (MATCH_OPTION("devid", token, oparg)) {
         nic->devid = parse_ulong(oparg);
+    } else if (MATCH_OPTION("mtu", token, oparg)) {
+        nic->mtu = parse_ulong(oparg);
     } else {
         fprintf(stderr, "unrecognized argument `%s'\n", token);
         return 1;

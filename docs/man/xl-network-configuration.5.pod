@@ -249,3 +249,9 @@ on the underlying netback implementation.
 Specifies the devid manually instead of letting xl choose the lowest index available.
 
 NOTE: This should not be set unless you have a reason to.
+
+=head2 mtu
+
+Specifies the MTU (i.e. the maximum size of an IP payload, exclusing headers). The
+default value is 1500 but, if the VIF is attached to a bridge, it will be set to match
+unless overridden by this parameter.

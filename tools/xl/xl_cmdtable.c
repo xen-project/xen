@@ -338,7 +338,7 @@ struct cmd_spec cmd_table[] = {
       "Create a new virtual network device",
       "<Domain> [type=<type>] [mac=<mac>] [bridge=<bridge>] "
       "[ip=<ip>] [script=<script>] [backend=<BackDomain>] [vifname=<name>] "
-      "[rate=<rate>] [model=<model>] [accel=<accel>]",
+      "[rate=<rate>] [model=<model>] [accel=<accel>] [mtu=<mtu>]",
     },
     { "network-list",
       &main_networklist, 0, 0,
