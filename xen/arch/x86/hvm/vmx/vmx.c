@@ -1885,9 +1885,9 @@ static void vmx_set_info_guest(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-static void vmx_update_eoi_exit_bitmap(struct vcpu *v, u8 vector, u8 trig)
+static void vmx_update_eoi_exit_bitmap(struct vcpu *v, uint8_t vector, bool set)
 {
-    if ( trig )
+    if ( set )
         vmx_set_eoi_exit_bitmap(v, vector);
     else
         vmx_clear_eoi_exit_bitmap(v, vector);

@@ -192,7 +192,7 @@ struct hvm_function_table {
     void (*nhvm_domain_relinquish_resources)(struct domain *d);
 
     /* Virtual interrupt delivery */
-    void (*update_eoi_exit_bitmap)(struct vcpu *v, u8 vector, u8 trig);
+    void (*update_eoi_exit_bitmap)(struct vcpu *v, uint8_t vector, bool set);
     void (*process_isr)(int isr, struct vcpu *v);
     void (*deliver_posted_intr)(struct vcpu *v, u8 vector);
     void (*sync_pir_to_irr)(struct vcpu *v);
