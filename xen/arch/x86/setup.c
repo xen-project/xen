@@ -680,6 +680,15 @@ static void __init noreturn reinit_bsp_stack(void)
 }
 
 /*
+ * x86 early command line parsing in xen/arch/x86/boot/cmdline.c
+ * has options that are only used during the very initial boot process,
+ * so they can be ignored now.
+ */
+ignore_param("no-real-mode");
+ignore_param("edd");
+ignore_param("edid");
+
+/*
  * Some scripts add "placeholder" to work around a grub error where it ate the
  * first parameter.
  */
