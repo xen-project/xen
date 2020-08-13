@@ -31,7 +31,6 @@ struct viridian_vcpu
     struct viridian_page vp_assist;
     bool apic_assist_pending;
     bool polled;
-    unsigned int msg_pending;
     uint64_t scontrol;
     uint64_t siefp;
     struct viridian_page simp;
@@ -89,7 +88,6 @@ void viridian_apic_assist_clear(const struct vcpu *v);
 void viridian_synic_poll(struct vcpu *v);
 bool viridian_synic_is_auto_eoi_sint(const struct vcpu *v,
                                      unsigned int vector);
-void viridian_synic_ack_sint(const struct vcpu *v, unsigned int vector);
 
 #endif /* __ASM_X86_HVM_VIRIDIAN_H__ */
 

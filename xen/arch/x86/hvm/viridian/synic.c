@@ -137,7 +137,6 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         if ( !(viridian_feature_mask(d) & HVMPV_synic) )
             return X86EMUL_EXCEPTION;
 
-        vv->msg_pending = 0;
         break;
 
     case HV_X64_MSR_SINT0 ... HV_X64_MSR_SINT15:
@@ -167,9 +166,6 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
 
         printk(XENLOG_G_INFO "%pv: VIRIDIAN SINT%u: vector: %x\n", v, sintx,
                vector);
-
-        if ( new.polling )
-            __clear_bit(sintx, &vv->msg_pending);
 
         *vs = new;
         break;
@@ -334,9 +330,6 @@ bool viridian_synic_deliver_timer_msg(struct vcpu *v, unsigned int sintx,
         .DeliveryTime = delivery,
     };
 
-    if ( test_bit(sintx, &vv->msg_pending) )
-        return false;
-
     /*
      * To avoid using an atomic test-and-set, and barrier before calling
      * vlapic_set_irq(), this function must be called in context of the
@@ -346,12 +339,9 @@ bool viridian_synic_deliver_timer_msg(struct vcpu *v, unsigned int sintx,
 
     msg += sintx;
 
+    /* There is no need to set message_pending as we do not require an EOM */
     if ( msg->header.message_type != HVMSG_NONE )
-    {
-        msg->header.message_flags.msg_pending = 1;
-        __set_bit(sintx, &vv->msg_pending);
         return false;
-    }
 
     msg->header.message_type = HVMSG_TIMER_EXPIRED;
     msg->header.message_flags.msg_pending = 0;
@@ -378,18 +368,6 @@ bool viridian_synic_is_auto_eoi_sint(const struct vcpu *v,
         return false;
 
     return vs->auto_eoi;
-}
-
-void viridian_synic_ack_sint(const struct vcpu *v, unsigned int vector)
-{
-    struct viridian_vcpu *vv = v->arch.hvm.viridian;
-    unsigned int sintx = vv->vector_to_sintx[vector];
-
-    ASSERT(v == current);
-
-    if ( sintx < ARRAY_SIZE(vv->sint) )
-        __clear_bit(array_index_nospec(sintx, ARRAY_SIZE(vv->sint)),
-                    &vv->msg_pending);
 }
 
 void viridian_synic_save_vcpu_ctxt(const struct vcpu *v,
