@@ -900,6 +900,10 @@ static int read_msr(unsigned int reg, uint64_t *val,
         *val = guest_efer(currd);
         return X86EMUL_OKAY;
 
+    case MSR_IA32_CR_PAT:
+        *val = XEN_MSR_PAT;
+        return X86EMUL_OKAY;
+
     case MSR_K7_FID_VID_CTL:
     case MSR_K7_FID_VID_STATUS:
     case MSR_K8_PSTATE_LIMIT:
