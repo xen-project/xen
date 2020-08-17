@@ -308,8 +308,6 @@ let _ =
 		);
 	);
 
-	Select.use_poll (not cf.use_select);
-
 	Sys.set_signal Sys.sighup (Sys.Signal_handle sighup_handler);
 	Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ -> quit := true));
 	Sys.set_signal Sys.sigusr1 (Sys.Signal_handle (fun _ -> sigusr1_handler store));
@@ -453,7 +451,7 @@ let _ =
 		let inset, outset = Connections.select ~only_if:is_peaceful cons in
 		let rset, wset, _ =
 		try
-			Select.select (spec_fds @ inset) outset [] timeout
+			Poll.poll_select (spec_fds @ inset) outset [] timeout
 		with Unix.Unix_error(Unix.EINTR, _, _) ->
 			[], [], [] in
 		let sfds, cfds =

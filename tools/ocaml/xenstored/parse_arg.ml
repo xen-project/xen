@@ -25,7 +25,6 @@ type config =
 	tracefile: string option; (* old xenstored compatibility *)
 	restart: bool;
 	disable_socket: bool;
-	use_select: bool;
 }
 
 let do_argv =
@@ -37,7 +36,7 @@ let do_argv =
 	and config_file = ref ""
 	and restart = ref false
 	and disable_socket = ref false
-	and use_select = ref false in
+	in
 
 	let speclist =
 		[ ("--no-domain-init", Arg.Unit (fun () -> domain_init := false),
@@ -54,9 +53,8 @@ let do_argv =
 		  ("-T", Arg.Set_string tracefile, ""); (* for compatibility *)
 		  ("--restart", Arg.Set restart, "Read database on starting");
 		  ("--disable-socket", Arg.Unit (fun () -> disable_socket := true), "Disable socket");
-		  ("--use-select", Arg.Unit (fun () -> use_select := true), "Use select instead of poll"); (* for backward compatibility and testing *)
 		] in
-	let usage_msg = "usage : xenstored [--config-file <filename>] [--no-domain-init] [--help] [--no-fork] [--reraise-top-level] [--restart] [--disable-socket] [--use-select]" in
+	let usage_msg = "usage : xenstored [--config-file <filename>] [--no-domain-init] [--help] [--no-fork] [--reraise-top-level] [--restart] [--disable-socket]" in
 	Arg.parse speclist (fun _ -> ()) usage_msg;
 	{
 		domain_init = !domain_init;
@@ -68,5 +66,4 @@ let do_argv =
 		tracefile = if !tracefile <> "" then Some !tracefile else None;
 		restart = !restart;
 		disable_socket = !disable_socket;
-		use_select = !use_select;
 	}

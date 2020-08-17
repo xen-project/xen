@@ -63,15 +63,5 @@ let poll_select in_fds out_fds exc_fds timeout =
 			 (if event.except then fd :: x else x))
 			a r
 
-(* If the use_poll function is not called at all, we default to the original Unix.select behavior *)
-let select_fun = ref Unix.select
-
-let use_poll yes =
-	let sel_fun, max_fd =
-		if yes then poll_select, get_sys_fs_nr_open ()
-		else Unix.select, 1024 in
-	select_fun := sel_fun;
-	set_fd_limit max_fd
-
-let select in_fds out_fds exc_fds timeout =
-	(!select_fun) in_fds out_fds exc_fds timeout
+let () =
+        set_fd_limit (get_sys_fs_nr_open ())
