@@ -872,6 +872,13 @@ static int read_msr(unsigned int reg, uint64_t *val,
 
     switch ( reg )
     {
+    case MSR_APIC_BASE:
+        /* Linux PV guests will attempt to read APIC_BASE. */
+        *val = APIC_BASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
+        if ( !curr->vcpu_id )
+            *val |= APIC_BASE_BSP;
+        return X86EMUL_OKAY;
+
     case MSR_FS_BASE:
         if ( is_pv_32bit_domain(currd) )
             break;
