@@ -72,7 +72,7 @@ ifeq ($(CONFIG_OVMF),y)
 	rm -f $(INST_DIR)/ovmf.bin
 endif
 ifeq ($(CONFIG_IPXE),y)
-	rm -r $(INST_DIR)/ipxe.bin
+	rm -f $(INST_DIR)/ipxe.bin
 endif
 ifeq ($(CONFIG_PV_SHIM),y)
 	rm -f $(INST_DIR)/xen-shim
