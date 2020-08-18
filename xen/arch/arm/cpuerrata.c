@@ -477,8 +477,14 @@ static const struct arm_cpu_capabilities arm_errata[] = {
     },
 #endif
     {
+        /* Neoverse r0p0 - r2p0 */
+        .desc = "ARM erratum 1165522",
+        .capability = ARM64_WORKAROUND_AT_SPECULATE,
+        MIDR_RANGE(MIDR_NEOVERSE_N1, 0, 2 << MIDR_VARIANT_SHIFT),
+    },
+    {
         /* Cortex-A76 r0p0 - r2p0 */
-        .desc = "ARM erratum 116522",
+        .desc = "ARM erratum 1165522",
         .capability = ARM64_WORKAROUND_AT_SPECULATE,
         MIDR_RANGE(MIDR_CORTEX_A76, 0, 2 << MIDR_VARIANT_SHIFT),
     },
