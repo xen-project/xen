@@ -1252,14 +1252,14 @@ int libxl__prepare_sockaddr_un(libxl__gc *gc,
                                struct sockaddr_un *un, const char *path,
                                const char *what)
 {
-    if (sizeof(un->sun_path) <= strlen(path)) {
+    if (sizeof(un->sun_path) - 1 <= strlen(path)) {
         LOG(ERROR, "UNIX socket path '%s' is too long for %s", path, what);
-        LOG(DEBUG, "Path must be less than %zu bytes", sizeof(un->sun_path));
+        LOG(DEBUG, "Path must be less than %zu bytes", sizeof(un->sun_path) - 1);
         return ERROR_INVAL;
     }
     memset(un, 0, sizeof(struct sockaddr_un));
     un->sun_family = AF_UNIX;
-    strncpy(un->sun_path, path, sizeof(un->sun_path));
+    strncpy(un->sun_path, path, sizeof(un->sun_path) - 1);
     return 0;
 }
 
