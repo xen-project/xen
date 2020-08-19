@@ -45,10 +45,11 @@ static int pcidev_struct_fill(libxl_device_pci *pcidev, unsigned int domain,
 #define STATE_TYPE      9
 #define STATE_RDM_STRATEGY      10
 #define STATE_RESERVE_POLICY    11
+#define INVALID         0xffffffff
 int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str)
 {
     unsigned state = STATE_DOMAIN;
-    unsigned dom, bus, dev, func, vslot = 0;
+    unsigned dom = INVALID, bus = INVALID, dev = INVALID, func = INVALID, vslot = 0;
     char *buf2, *tok, *ptr, *end, *optkey = NULL;
 
     if ( NULL == (buf2 = ptr = strdup(str)) )
@@ -169,6 +170,8 @@ int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str
 
     if ( tok != ptr || state != STATE_TERMINAL )
         goto parse_error;
+
+    assert(dom != INVALID && bus != INVALID && dev != INVALID && func != INVALID);
 
     /* Just a pretty way to fill in the values */
     pcidev_struct_fill(pcidev, dom, bus, dev, func, vslot << 3);
