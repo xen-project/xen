@@ -64,18 +64,18 @@ first_file()
 
 find_dhcpd_conf_file()
 {
-  first_file -f /etc/dhcp3/dhcpd.conf /etc/dhcpd.conf
+  first_file -f /etc/dhcp/dhcpd.conf /etc/dhcp3/dhcpd.conf /etc/dhcpd.conf
 }
 
 
 find_dhcpd_init_file()
 {
-  first_file -x /etc/init.d/{dhcp3-server,dhcp,dhcpd}
+  first_file -x /etc/init.d/{isc-dhcp-server,dhcp-server,dhcp3-server,dhcp,dhcpd}
 }
 
 find_dhcpd_arg_file()
 {
-  first_file -f /etc/sysconfig/dhcpd /etc/defaults/dhcp /etc/default/dhcp3-server
+  first_file -f /etc/sysconfig/dhcpd /etc/defaults/dhcp /etc/default/dhcp-server /etc/default/dhcp3-server
 }
 
 # configure interfaces which act as pure bridge ports:
