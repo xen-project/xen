@@ -249,15 +249,15 @@ static void vpic_ioport_write(
                 if ( priority == VPIC_PRIO_NONE )
                     break;
                 pin = (priority + vpic->priority_add) & 7;
-                vpic->isr &= ~(1 << pin);
-                if ( cmd == 5 )
-                    vpic->priority_add = (pin + 1) & 7;
-                break;
+                goto common_eoi;
+
             case 3: /* Specific EOI                */
             case 7: /* Specific EOI & Rotate       */
                 pin = val & 7;
+
+            common_eoi:
                 vpic->isr &= ~(1 << pin);
-                if ( cmd == 7 )
+                if ( cmd == 7 || cmd == 5 )
                     vpic->priority_add = (pin + 1) & 7;
                 /* Release lock and EOI the physical interrupt (if any). */
                 vpic_update_int_output(vpic);
