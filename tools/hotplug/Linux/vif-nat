@@ -85,7 +85,7 @@ router_ip=$(routing_ip "$ip")
 # Split the given IP/bits pair.
 vif_ip=`echo ${ip} | awk -F/ '{print $1}'`
 
-hostname=$(xenstore_read "$XENBUS_PATH/domain" | tr -- '_.:/+' '-----')
+hostname=dom$domid
 if [ "$vifid" != "1" ]
 then
   hostname="$hostname-$vifid"
