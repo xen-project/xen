@@ -3,8 +3,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 1
 MINOR    = 2
-LIBNAME  := call
-USELIBS  := toollog toolcore
 
 SRCS-y                 += core.c buffer.c
 SRCS-$(CONFIG_Linux)   += linux.c

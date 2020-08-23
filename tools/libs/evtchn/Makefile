@@ -3,8 +3,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 1
 MINOR    = 1
-LIBNAME  := evtchn
-USELIBS  := toollog toolcore
 
 SRCS-y                 += core.c
 SRCS-$(CONFIG_Linux)   += linux.c

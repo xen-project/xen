@@ -1,18 +1,18 @@
 # Common Makefile for building a lib.
 #
 # Variables taken as input:
-#   LIBNAME: name of lib to build, will be prepended with "libxen"
 #   MAJOR:   major version of lib
 #   MINOR:   minor version of lib
-#   USELIBS: xen libs to use (e.g. "toolcore toollog")
+
+LIBNAME := $(notdir $(CURDIR))
 
 SHLIB_LDFLAGS += -Wl,--version-script=libxen$(LIBNAME).map
 
 CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -I./include $(CFLAGS_xeninclude)
-CFLAGS   += $(foreach lib, $(USELIBS), $(CFLAGS_libxen$(lib)))
+CFLAGS   += $(foreach lib, $(USELIBS_$(LIBNAME)), $(CFLAGS_libxen$(lib)))
 
-LDUSELIBS = $(foreach lib, $(USELIBS), $(LDLIBS_libxen$(lib)))
+LDUSELIBS = $(foreach lib, $(USELIBS_$(LIBNAME)), $(LDLIBS_libxen$(lib)))
 
 LIB_OBJS := $(SRCS-y:.c=.o)
 PIC_OBJS := $(SRCS-y:.c=.opic)

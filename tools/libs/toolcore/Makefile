@@ -3,7 +3,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR	= 1
 MINOR	= 0
-LIBNAME  := toolcore
 AUTOINCS := include/_xentoolcore_list.h
 
 SRCS-y	+= handlereg.c

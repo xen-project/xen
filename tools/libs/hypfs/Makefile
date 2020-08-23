@@ -3,8 +3,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 1
 MINOR    = 0
-LIBNAME  := hypfs
-USELIBS  := toollog toolcore call
 
 APPEND_LDFLAGS += -lz
 
