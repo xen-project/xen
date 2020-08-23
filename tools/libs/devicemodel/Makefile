@@ -15,5 +15,5 @@ SRCS-$(CONFIG_MiniOS)  += compat.c
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_LIBXENDEVICEMODEL)/include
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxendevicemodel)/include
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude)

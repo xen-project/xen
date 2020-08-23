@@ -10,7 +10,7 @@ SRCS-y	+= handlereg.c
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_LIBXENTOOLCORE)/include
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxentoolcore)/include
 
 $(LIB_OBJS): $(AUTOINCS)
 $(PIC_OBJS): $(AUTOINCS)

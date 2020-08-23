@@ -30,11 +30,11 @@ idl-gen: $(GOXL_GEN_FILES)
 #
 # NB that because the users of this library need to be able to
 # recompile the library from source, it needs to include '-lxenlight'
-# in the LDFLAGS; and thus we need to add -L$(XEN_XENLIGHT) here
+# in the LDFLAGS; and thus we need to add -L$(XEN_libxenlight) here
 # so that it can find the actual library.
 .PHONY: build
 build: xenlight.go $(GOXL_GEN_FILES)
-	CGO_CFLAGS="$(CFLAGS_libxenlight) $(CFLAGS_libxentoollog)" CGO_LDFLAGS="$(LDLIBS_libxenlight) $(LDLIBS_libxentoollog) -L$(XEN_XENLIGHT) -L$(XEN_LIBXENTOOLLOG)" $(GO) build -x
+	CGO_CFLAGS="$(CFLAGS_libxenlight) $(CFLAGS_libxentoollog)" CGO_LDFLAGS="$(LDLIBS_libxenlight) $(LDLIBS_libxentoollog) -L$(XEN_libxenlight) -L$(XEN_libxentoollog)" $(GO) build -x
 
 .PHONY: install
 install: build

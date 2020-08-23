@@ -17,5 +17,5 @@ SRCS-$(CONFIG_NetBSD)  += gnttab_unimp.c gntshr_unimp.c
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_LIBXENGNTTAB)/include
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxengnttab)/include
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude)
