@@ -1,10 +1,13 @@
 # Common Makefile for building a lib.
 #
 # Variables taken as input:
-#   MAJOR:   major version of lib
-#   MINOR:   minor version of lib
+#   PKG_CONFIG: name of pkg-config file (xen$(LIBNAME).pc if empty)
+#   MAJOR:   major version of lib (Xen version if empty)
+#   MINOR:   minor version of lib (0 if empty)
 
 LIBNAME := $(notdir $(CURDIR))
+MAJOR ?= $(shell $(XEN_ROOT)/version.sh $(XEN_ROOT)/xen/Makefile)
+MINOR ?= 0
 
 SHLIB_LDFLAGS += -Wl,--version-script=libxen$(LIBNAME).map
 
@@ -22,7 +25,7 @@ ifneq ($(nosharedlibs),y)
 LIB += libxen$(LIBNAME).so
 endif
 
-PKG_CONFIG := xen$(LIBNAME).pc
+PKG_CONFIG ?= xen$(LIBNAME).pc
 PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
 
 ifneq ($(CONFIG_LIBXC_MINIOS),y)
@@ -32,7 +35,7 @@ $(PKG_CONFIG_INST): PKG_CONFIG_INCDIR = $(includedir)
 $(PKG_CONFIG_INST): PKG_CONFIG_LIBDIR = $(libdir)
 endif
 
-PKG_CONFIG_LOCAL := $(foreach pc,$(PKG_CONFIG),$(PKG_CONFIG_DIR)/$(pc))
+PKG_CONFIG_LOCAL := $(PKG_CONFIG_DIR)/$(PKG_CONFIG)
 
 LIBHEADER ?= xen$(LIBNAME).h
 LIBHEADERS = $(foreach h, $(LIBHEADER), include/$(h))
@@ -45,7 +48,7 @@ $(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)
 all: build
 
 .PHONY: build
-build: libs
+build: libs libxen$(LIBNAME).map
 
 .PHONY: libs
 libs: headers.chk $(LIB) $(PKG_CONFIG_INST) $(PKG_CONFIG_LOCAL)
@@ -63,6 +66,9 @@ else
 endif
 
 headers.chk: $(LIBHEADERSGLOB) $(AUTOINCS)
+
+libxen$(LIBNAME).map:
+	echo 'VERS_$(MAJOR).$(MINOR) { global: *; };' >$@
 
 $(LIBHEADERSGLOB): $(LIBHEADERS)
 	for i in $(realpath $(LIBHEADERS)); do ln -sf $$i $(XEN_ROOT)/tools/include; done
@@ -87,7 +93,7 @@ install: build
 	$(SYMLINK_SHLIB) libxen$(LIBNAME).so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxen$(LIBNAME).so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxen$(LIBNAME).so.$(MAJOR) $(DESTDIR)$(libdir)/libxen$(LIBNAME).so
 	for i in $(LIBHEADERS); do $(INSTALL_DATA) $$i $(DESTDIR)$(includedir); done
-	$(INSTALL_DATA) xen$(LIBNAME).pc $(DESTDIR)$(PKG_INSTALLDIR)
+	$(INSTALL_DATA) $(PKG_CONFIG) $(DESTDIR)$(PKG_INSTALLDIR)
 
 .PHONY: uninstall
 uninstall:
@@ -107,8 +113,9 @@ clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS_RM) $(LIB_OBJS) $(PIC_OBJS)
 	rm -f libxen$(LIBNAME).so.$(MAJOR).$(MINOR) libxen$(LIBNAME).so.$(MAJOR)
 	rm -f headers.chk
-	rm -f xen$(LIBNAME).pc
+	rm -f $(PKG_CONFIG)
 	rm -f $(LIBHEADERSGLOB)
+	rm -f _paths.h
 
 .PHONY: distclean
 distclean: clean
