@@ -225,14 +225,6 @@ INSTALL_PYTHON_PROG = \
 %.opic: %.S
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) $(CFLAGS.opic) -fPIC -c -o $@ $< $(APPEND_CFLAGS)
 
-headers.chk:
-	for i in $(filter %.h,$^); do \
-	    $(CC) -x c -ansi -Wall -Werror $(CFLAGS_xeninclude) \
-	          -S -o /dev/null $$i || exit 1; \
-	    echo $$i; \
-	done >$@.new
-	mv $@.new $@
-
 subdirs-all subdirs-clean subdirs-install subdirs-distclean subdirs-uninstall: .phony
 	@set -e; for subdir in $(SUBDIRS) $(SUBDIRS-y); do \
 		$(MAKE) subdir-$(patsubst subdirs-%,%,$@)-$$subdir; \

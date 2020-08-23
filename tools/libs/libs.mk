@@ -34,6 +34,10 @@ endif
 
 PKG_CONFIG_LOCAL := $(foreach pc,$(PKG_CONFIG),$(PKG_CONFIG_DIR)/$(pc))
 
+LIBHEADER ?= xen$(LIBNAME).h
+LIBHEADERS = $(foreach h, $(LIBHEADER), include/$(h))
+LIBHEADERSGLOB = $(foreach h, $(LIBHEADER), $(XEN_ROOT)/tools/include/$(h))
+
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_PREFIX = $(XEN_ROOT)
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)
 
@@ -47,7 +51,22 @@ build:
 .PHONY: libs
 libs: headers.chk $(LIB) $(PKG_CONFIG_INST) $(PKG_CONFIG_LOCAL)
 
-headers.chk: $(wildcard include/*.h) $(AUTOINCS)
+ifneq ($(NO_HEADERS_CHK),y)
+headers.chk:
+	for i in $(filter %.h,$^); do \
+	    $(CC) -x c -ansi -Wall -Werror $(CFLAGS_xeninclude) \
+	          -S -o /dev/null $$i || exit 1; \
+	    echo $$i; \
+	done >$@.new
+	mv $@.new $@
+else
+.PHONY: headers.chk
+endif
+
+headers.chk: $(LIBHEADERSGLOB) $(AUTOINCS)
+
+$(LIBHEADERSGLOB): $(LIBHEADERS)
+	for i in $(realpath $(LIBHEADERS)); do ln -sf $$i $(XEN_ROOT)/tools/include; done
 
 libxen$(LIBNAME).a: $(LIB_OBJS)
 	$(AR) rc $@ $^
@@ -68,13 +87,13 @@ install: build
 	$(INSTALL_DATA) libxen$(LIBNAME).a $(DESTDIR)$(libdir)
 	$(SYMLINK_SHLIB) libxen$(LIBNAME).so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxen$(LIBNAME).so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxen$(LIBNAME).so.$(MAJOR) $(DESTDIR)$(libdir)/libxen$(LIBNAME).so
-	$(INSTALL_DATA) include/xen$(LIBNAME).h $(DESTDIR)$(includedir)
+	for i in $(LIBHEADERS); do $(INSTALL_DATA) $$i $(DESTDIR)$(includedir); done
 	$(INSTALL_DATA) xen$(LIBNAME).pc $(DESTDIR)$(PKG_INSTALLDIR)
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xen$(LIBNAME).pc
-	rm -f $(DESTDIR)$(includedir)/xen$(LIBNAME).h
+	for i in $(LIBHEADER); do rm -f $(DESTDIR)$(includedir)/$(LIBHEADER); done
 	rm -f $(DESTDIR)$(libdir)/libxen$(LIBNAME).so
 	rm -f $(DESTDIR)$(libdir)/libxen$(LIBNAME).so.$(MAJOR)
 	rm -f $(DESTDIR)$(libdir)/libxen$(LIBNAME).so.$(MAJOR).$(MINOR)
@@ -90,6 +109,7 @@ clean:
 	rm -f libxen$(LIBNAME).so.$(MAJOR).$(MINOR) libxen$(LIBNAME).so.$(MAJOR)
 	rm -f headers.chk
 	rm -f xen$(LIBNAME).pc
+	rm -f $(LIBHEADERSGLOB)
 
 .PHONY: distclean
 distclean: clean
