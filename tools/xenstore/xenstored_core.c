@@ -73,8 +73,6 @@ static unsigned int nr_fds;
 static int sock = -1;
 static int ro_sock = -1;
 
-#define ROUNDUP(_x, _w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
-
 static bool verbose = false;
 LIST_HEAD(connections);
 int tracefd = -1;

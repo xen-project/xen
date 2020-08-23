@@ -5,9 +5,6 @@
 #include <xentoolcore_internal.h>
 #include <xengnttab.h>
 
-/* Set of macros/defines used by both Linux and FreeBSD */
-#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
-
 #define GTERROR(_l, _f...) xtl_log(_l, XTL_ERROR, errno, "gnttab", _f)
 #define GSERROR(_l, _f...) xtl_log(_l, XTL_ERROR, errno, "gntshr", _f)
 

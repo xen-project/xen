@@ -59,4 +59,8 @@
     })
 #endif
 
+#ifndef ROUNDUP
+#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
+#endif
+
 #endif	/* __XEN_TOOLS_LIBS__ */

@@ -16,13 +16,12 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <xen-tools/libs.h>
 
 #include "private.h"
 
 #define DBGPRINTF(_m...) \
     xtl_log(xcall->logger, XTL_DEBUG, -1, "xencall:buffer", _m)
-
-#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
 pthread_mutex_t cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 

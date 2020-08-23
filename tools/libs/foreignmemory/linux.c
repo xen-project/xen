@@ -25,10 +25,9 @@
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <xen-tools/libs.h>
 
 #include "private.h"
-
-#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0

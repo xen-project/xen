@@ -49,9 +49,7 @@
 #include <sys/ioctl.h>
 #include <libutil.h>
 #endif
-
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#include <xen-tools/libs.h>
 
 /* Each 10 bits takes ~ 3 digits, plus one, plus one for nul terminator. */
 #define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)
@@ -79,8 +77,6 @@ static xengnttab_handle *xgt_handle = NULL;
 static struct pollfd  *fds;
 static unsigned int current_array_size;
 static unsigned int nr_fds;
-
-#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
 struct buffer {
 	char *data;
