@@ -184,7 +184,7 @@ static int vpic_intack(struct hvm_hw_vpic *vpic)
 static void vpic_ioport_write(
     struct hvm_hw_vpic *vpic, uint32_t addr, uint32_t val)
 {
-    int priority, cmd, irq;
+    int priority, cmd;
     uint8_t mask, unmasked = 0;
 
     vpic_lock(vpic);
@@ -230,6 +230,8 @@ static void vpic_ioport_write(
         }
         else
         {
+            unsigned int pin;
+
             /* OCW2 */
             cmd = val >> 5;
             switch ( cmd )
@@ -246,22 +248,22 @@ static void vpic_ioport_write(
                 priority = vpic_get_priority(vpic, mask);
                 if ( priority == VPIC_PRIO_NONE )
                     break;
-                irq = (priority + vpic->priority_add) & 7;
-                vpic->isr &= ~(1 << irq);
+                pin = (priority + vpic->priority_add) & 7;
+                vpic->isr &= ~(1 << pin);
                 if ( cmd == 5 )
-                    vpic->priority_add = (irq + 1) & 7;
+                    vpic->priority_add = (pin + 1) & 7;
                 break;
             case 3: /* Specific EOI                */
             case 7: /* Specific EOI & Rotate       */
-                irq = val & 7;
-                vpic->isr &= ~(1 << irq);
+                pin = val & 7;
+                vpic->isr &= ~(1 << pin);
                 if ( cmd == 7 )
-                    vpic->priority_add = (irq + 1) & 7;
+                    vpic->priority_add = (pin + 1) & 7;
                 /* Release lock and EOI the physical interrupt (if any). */
                 vpic_update_int_output(vpic);
                 vpic_unlock(vpic);
                 hvm_dpci_eoi(current->domain,
-                             hvm_isa_irq_to_gsi((addr >> 7) ? (irq|8) : irq),
+                             hvm_isa_irq_to_gsi((addr >> 7) ? (pin | 8) : pin),
                              NULL);
                 return; /* bail immediately */
             case 6: /* Set Priority                */
