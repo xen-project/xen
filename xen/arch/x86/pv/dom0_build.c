@@ -288,7 +288,8 @@ int __init dom0_construct_pv(struct domain *d,
                              module_t *initrd,
                              char *cmdline)
 {
-    int i, rc, compatible, order, machine;
+    int i, rc, order, machine;
+    bool compatible;
     struct cpu_user_regs *regs;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
@@ -358,7 +359,7 @@ int __init dom0_construct_pv(struct domain *d,
     /* compatibility check */
     printk(" Xen  kernel: 64-bit, lsb%s\n",
            IS_ENABLED(CONFIG_PV32) ? ", compat32" : "");
-    compatible = 0;
+    compatible = false;
     machine = elf_uval(&elf, elf.ehdr, e_machine);
 
 #ifdef CONFIG_PV32
@@ -374,13 +375,16 @@ int __init dom0_construct_pv(struct domain *d,
                 return rc;
             }
 
-            compatible = 1;
+            compatible = true;
         }
     }
 #endif
 
     if ( elf_64bit(&elf) && machine == EM_X86_64 )
-        compatible = 1;
+        compatible = true;
+
+    if ( elf_msb(&elf) )
+        compatible = false;
 
     printk(" Dom0 kernel: %s-bit%s, %s, paddr %#" PRIx64 " -> %#" PRIx64 "\n",
            elf_64bit(&elf) ? "64" : elf_32bit(&elf) ? "32" : "??",
