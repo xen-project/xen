@@ -40,6 +40,8 @@ EMIT_FILE;
 #include <asm/mem_sharing.h>
 #include <public/memory.h>
 
+#define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
+
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
 l2_pgentry_t *compat_idle_pg_table_l2;
@@ -1452,6 +1454,20 @@ destroy_frametable:
                          (unsigned long)mfn_to_virt(epfn));
 
     return ret;
+}
+
+void set_gpfn_from_mfn(unsigned long mfn, unsigned long pfn)
+{
+    const struct domain *d = page_get_owner(mfn_to_page(_mfn(mfn)));
+    unsigned long entry = (d && (d == dom_cow)) ? SHARED_M2P_ENTRY : pfn;
+
+    if ( unlikely(!machine_to_phys_mapping_valid) )
+        return;
+
+    if ( mfn < (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 )
+        compat_machine_to_phys_mapping[mfn] = entry;
+
+    machine_to_phys_mapping[mfn] = entry;
 }
 
 #include "compat/mm.c"

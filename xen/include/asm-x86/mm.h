@@ -494,25 +494,13 @@ extern paddr_t mem_hotplug;
 #define SHARED_M2P_ENTRY         (~0UL - 1UL)
 #define SHARED_M2P(_e)           ((_e) == SHARED_M2P_ENTRY)
 
-#define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
-#define _set_gpfn_from_mfn(mfn, pfn) ({                        \
-    struct domain *d = page_get_owner(mfn_to_page(_mfn(mfn))); \
-    unsigned long entry = (d && (d == dom_cow)) ?              \
-        SHARED_M2P_ENTRY : (pfn);                              \
-    ((void)((mfn) >= (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 || \
-            (compat_machine_to_phys_mapping[(mfn)] = (unsigned int)(entry))), \
-     machine_to_phys_mapping[(mfn)] = (entry));                \
-    })
-
 /*
  * Disable some users of set_gpfn_from_mfn() (e.g., free_heap_pages()) until
  * the machine_to_phys_mapping is actually set up.
  */
 extern bool machine_to_phys_mapping_valid;
-#define set_gpfn_from_mfn(mfn, pfn) do {        \
-    if ( machine_to_phys_mapping_valid )        \
-        _set_gpfn_from_mfn(mfn, pfn);           \
-} while (0)
+
+void set_gpfn_from_mfn(unsigned long mfn, unsigned long pfn);
 
 extern struct rangeset *mmio_ro_ranges;
 
