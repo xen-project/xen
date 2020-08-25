@@ -1380,7 +1380,7 @@ static void free_heap_pages(
 {
     unsigned long mask;
     mfn_t mfn = page_to_mfn(pg);
-    unsigned int i, node = phys_to_nid(page_to_maddr(pg)), tainted = 0;
+    unsigned int i, node = phys_to_nid(mfn_to_maddr(mfn)), tainted = 0;
     unsigned int zone = page_to_zone(pg);
 
     ASSERT(order <= MAX_ORDER);
@@ -1417,7 +1417,7 @@ static void free_heap_pages(
         default:
             printk(XENLOG_ERR
                    "pg[%u] MFN %"PRI_mfn" c=%#lx o=%u v=%#lx t=%#x\n",
-                   i, mfn_x(page_to_mfn(pg + i)),
+                   i, mfn_x(mfn) + i,
                    pg[i].count_info, pg[i].v.free.order,
                    pg[i].u.free.val, pg[i].tlbflush_timestamp);
             BUG();
