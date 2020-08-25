@@ -42,8 +42,12 @@
 #define _PGT_validated    PG_shift(6)
 #define PGT_validated     PG_mask(1, 6)
  /* PAE only: is this an L2 page directory containing Xen-private mappings? */
+#ifdef CONFIG_PV32
 #define _PGT_pae_xen_l2   PG_shift(7)
 #define PGT_pae_xen_l2    PG_mask(1, 7)
+#else
+#define PGT_pae_xen_l2    0
+#endif
 /* Has this page been *partially* validated for use as its current type? */
 #define _PGT_partial      PG_shift(8)
 #define PGT_partial       PG_mask(1, 8)

@@ -128,6 +128,15 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
     return true;
 }
 
+#ifdef CONFIG_PV32
+void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
+{
+    memcpy(&l2t[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
+           compat_idle_pg_table_l2,
+           COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2t));
+}
+#endif
+
 /*
  * Local variables:
  * mode: C

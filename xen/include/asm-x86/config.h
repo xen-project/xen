@@ -142,7 +142,7 @@ extern unsigned char boot_edid_info[128];
  *  0xffff82c000000000 - 0xffff82cfffffffff [64GB,  2^36 bytes, PML4:261]
  *    vmap()/ioremap()/fixmap area.
  *  0xffff82d000000000 - 0xffff82d03fffffff [1GB,   2^30 bytes, PML4:261]
- *    Compatibility machine-to-phys translation table.
+ *    Compatibility machine-to-phys translation table (CONFIG_PV32).
  *  0xffff82d040000000 - 0xffff82d07fffffff [1GB,   2^30 bytes, PML4:261]
  *    Xen text, static data, bss.
 #ifndef CONFIG_BIGMEM
@@ -246,9 +246,18 @@ extern unsigned char boot_edid_info[128];
 
 #ifndef __ASSEMBLY__
 
+#ifdef CONFIG_PV32
+
 /* This is not a fixed value, just a lower limit. */
 #define __HYPERVISOR_COMPAT_VIRT_START 0xF5800000
 #define HYPERVISOR_COMPAT_VIRT_START(d) ((d)->arch.hv_compat_vstart)
+
+#else /* !CONFIG_PV32 */
+
+#define HYPERVISOR_COMPAT_VIRT_START(d) ((void)(d), 0)
+
+#endif /* CONFIG_PV32 */
+
 #define MACH2PHYS_COMPAT_VIRT_START    HYPERVISOR_COMPAT_VIRT_START
 #define MACH2PHYS_COMPAT_VIRT_END      0xFFE00000
 #define MACH2PHYS_COMPAT_NR_ENTRIES(d) \

@@ -34,17 +34,30 @@ EMIT_FILE;
 #include <asm/fixmap.h>
 #include <asm/hypercall.h>
 #include <asm/msr.h>
+#include <asm/pv/domain.h>
 #include <asm/setup.h>
 #include <asm/numa.h>
 #include <asm/mem_paging.h>
 #include <asm/mem_sharing.h>
 #include <public/memory.h>
 
+#ifdef CONFIG_PV32
+
 #define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
 
-unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
+unsigned int __initdata m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
-l2_pgentry_t *compat_idle_pg_table_l2;
+l2_pgentry_t *__read_mostly compat_idle_pg_table_l2;
+
+#else /* !CONFIG_PV32 */
+
+/*
+ * Declare the symbol such that (dead) code referencing it can be built
+ * without a lot of #ifdef-ary (relying on DCE by the compiler).
+ */
+extern unsigned int compat_machine_to_phys_mapping[];
+
+#endif /* CONFIG_PV32 */
 
 void *do_page_walk(struct vcpu *v, unsigned long addr)
 {
@@ -220,7 +233,8 @@ static void destroy_compat_m2p_mapping(struct mem_hotadd_info *info)
 {
     unsigned long i, smap = info->spfn, emap = info->spfn;
 
-    if ( smap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2) )
+    if ( !opt_pv32 ||
+         smap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2) )
         return;
 
     if ( emap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2) )
@@ -328,7 +342,8 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
      * Notice: For hot-added memory, only range below m2p_compat_vstart
      * will be filled up (assuming memory is discontinous when booting).
      */
-    if   ((smap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2)) )
+    if ( !opt_pv32 ||
+         (smap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2)) )
         return 0;
 
     if ( epfn > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2) )
@@ -611,17 +626,24 @@ void __init paging_init(void)
 #undef MFN
 
     /* Create user-accessible L2 directory to map the MPT for compat guests. */
-    if ( (l2_ro_mpt = alloc_xen_pagetable()) == NULL )
-        goto nomem;
-    compat_idle_pg_table_l2 = l2_ro_mpt;
-    clear_page(l2_ro_mpt);
-    /* Allocate and map the compatibility mode machine-to-phys table. */
-    mpt_size = (mpt_size >> 1) + (1UL << (L2_PAGETABLE_SHIFT - 1));
-    if ( mpt_size > RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START )
-        mpt_size = RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START;
-    mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
-    if ( (m2p_compat_vstart + mpt_size) < MACH2PHYS_COMPAT_VIRT_END )
-        m2p_compat_vstart = MACH2PHYS_COMPAT_VIRT_END - mpt_size;
+    if ( opt_pv32 )
+    {
+        if ( (l2_ro_mpt = alloc_xen_pagetable()) == NULL )
+            goto nomem;
+        compat_idle_pg_table_l2 = l2_ro_mpt;
+        clear_page(l2_ro_mpt);
+
+        /* Allocate and map the compatibility mode machine-to-phys table. */
+        mpt_size = (mpt_size >> 1) + (1UL << (L2_PAGETABLE_SHIFT - 1));
+        if ( mpt_size > RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START )
+            mpt_size = RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START;
+        mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+        if ( (m2p_compat_vstart + mpt_size) < MACH2PHYS_COMPAT_VIRT_END )
+            m2p_compat_vstart = MACH2PHYS_COMPAT_VIRT_END - mpt_size;
+    }
+    else
+        mpt_size = 0;
+
 #define MFN(x) (((x) << L2_PAGETABLE_SHIFT) / sizeof(unsigned int))
 #define CNT ((sizeof(*frame_table) & -sizeof(*frame_table)) / \
              sizeof(*compat_machine_to_phys_mapping))
@@ -847,23 +869,24 @@ void __init subarch_init_memory(void)
                 mfn_to_page(_mfn(m2p_start_mfn + i)), SHARE_ro);
     }
 
-    for ( v  = RDWR_COMPAT_MPT_VIRT_START;
-          v != RDWR_COMPAT_MPT_VIRT_END;
-          v += 1 << L2_PAGETABLE_SHIFT )
-    {
-        l3e = l3e_from_l4e(idle_pg_table[l4_table_offset(v)],
-                           l3_table_offset(v));
-        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-            continue;
-        l2e = l2e_from_l3e(l3e, l2_table_offset(v));
-        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-            continue;
-        m2p_start_mfn = l2e_get_pfn(l2e);
+    if ( opt_pv32 )
+        for ( v  = RDWR_COMPAT_MPT_VIRT_START;
+              v != RDWR_COMPAT_MPT_VIRT_END;
+              v += 1 << L2_PAGETABLE_SHIFT )
+        {
+            l3e = l3e_from_l4e(idle_pg_table[l4_table_offset(v)],
+                               l3_table_offset(v));
+            if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+                continue;
+            l2e = l2e_from_l3e(l3e, l2_table_offset(v));
+            if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+                continue;
+            m2p_start_mfn = l2e_get_pfn(l2e);
 
-        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-            share_xen_page_with_privileged_guests(
-                mfn_to_page(_mfn(m2p_start_mfn + i)), SHARE_ro);
-    }
+            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+                share_xen_page_with_privileged_guests(
+                    mfn_to_page(_mfn(m2p_start_mfn + i)), SHARE_ro);
+        }
 
     /* Mark all of direct map NX if hardware supports it. */
     if ( !cpu_has_nx )
@@ -935,6 +958,9 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case XENMEM_machphys_compat_mfn_list:
+        if ( !opt_pv32 )
+            return -EOPNOTSUPP;
+
         if ( copy_from_guest(&xmml, arg, 1) )
             return -EFAULT;
 
@@ -1464,7 +1490,8 @@ void set_gpfn_from_mfn(unsigned long mfn, unsigned long pfn)
     if ( unlikely(!machine_to_phys_mapping_valid) )
         return;
 
-    if ( mfn < (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 )
+    if ( opt_pv32 &&
+         mfn < (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 )
         compat_machine_to_phys_mapping[mfn] = entry;
 
     machine_to_phys_mapping[mfn] = entry;

@@ -307,7 +307,9 @@ struct arch_domain
 {
     struct page_info *perdomain_l3_pg;
 
+#ifdef CONFIG_PV32
     unsigned int hv_compat_vstart;
+#endif
 
     /* Maximum physical-address bitwidth supported by this guest. */
     unsigned int physaddr_bitsize;

@@ -103,6 +103,9 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             .max_mfn = MACH2PHYS_COMPAT_NR_ENTRIES(d) - 1
         };
 
+        if ( !opt_pv32 )
+            return -EOPNOTSUPP;
+
         if ( copy_to_guest(arg, &mapping, 1) )
             rc = -EFAULT;
 
@@ -114,6 +117,9 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         unsigned long limit;
         compat_pfn_t last_mfn;
+
+        if ( !opt_pv32 )
+            return -EOPNOTSUPP;
 
         if ( copy_from_guest(&xmml, arg, 1) )
             return -EFAULT;

@@ -764,8 +764,10 @@ int arch_domain_create(struct domain *d,
     }
     d->arch.emulation_flags = emflags;
 
+#ifdef CONFIG_PV32
     HYPERVISOR_COMPAT_VIRT_START(d) =
         is_pv_domain(d) ? __HYPERVISOR_COMPAT_VIRT_START : ~0u;
+#endif
 
     if ( (rc = paging_domain_init(d)) != 0 )
         goto fail;
