@@ -353,7 +353,7 @@ F:	xen/arch/x86/machine_kexec.c
 F:	xen/arch/x86/x86_64/kexec_reloc.S
 
 LIBXENLIGHT
-M:	Ian Jackson <ian.jackson@eu.citrix.com>
+M:	Ian Jackson <iwj@xenproject.org>
 M:	Wei Liu <wl@xen.org>
 M:	Anthony PERARD <anthony.perard@citrix.com>
 S:	Supported
@@ -413,7 +413,7 @@ S:	Supported
 F:	tools/python
 
 QEMU-DM
-M:	Ian Jackson <ian.jackson@eu.citrix.com>
+M:	Ian Jackson <iwj@xenproject.org>
 S:	Supported
 T:	git https://xenbits.xenproject.org/git-http/qemu-xen-traditional.git
 
@@ -465,7 +465,7 @@ F:	xen/arch/arm/tee/
 F:	xen/include/asm-arm/tee
 
 TOOLSTACK
-M:	Ian Jackson <ian.jackson@eu.citrix.com>
+M:	Ian Jackson <iwj@xenproject.org>
 M:	Wei Liu <wl@xen.org>
 S:	Supported
 F:	autogen.sh
@@ -602,7 +602,7 @@ F:	docs/misc/xsm-flask.txt
 THE REST
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
 M:	George Dunlap <george.dunlap@citrix.com>
-M:	Ian Jackson <ian.jackson@eu.citrix.com>
+M:	Ian Jackson <iwj@xenproject.org>
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Julien Grall <julien@xen.org>
 M:	Stefano Stabellini <sstabellini@kernel.org>
