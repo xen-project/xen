@@ -23,7 +23,6 @@ obj-$(CONFIG_GDBSX) += debug.o
 obj-y += delay.o
 obj-y += desc.o
 obj-bin-y += dmi_scan.init.o
-obj-y += domctl.o
 obj-y += domain.o
 obj-bin-y += dom0_build.init.o
 obj-y += domain_page.o
@@ -51,7 +50,6 @@ obj-y += numa.o
 obj-y += pci.o
 obj-y += percpu.o
 obj-y += physdev.o x86_64/physdev.o
-obj-y += platform_hypercall.o x86_64/platform_hypercall.o
 obj-y += psr.o
 obj-y += setup.o
 obj-y += shutdown.o
@@ -60,7 +58,6 @@ obj-y += smpboot.o
 obj-y += spec_ctrl.o
 obj-y += srat.o
 obj-y += string.o
-obj-y += sysctl.o
 obj-y += time.o
 obj-y += trace.o
 obj-y += traps.o
@@ -71,6 +68,13 @@ obj-$(CONFIG_TBOOT) += tboot.o
 obj-y += hpet.o
 obj-y += vm_event.o
 obj-y += xstate.o
+
+ifneq ($(CONFIG_PV_SHIM_EXCLUSIVE),y)
+obj-y += domctl.o
+obj-y += platform_hypercall.o x86_64/platform_hypercall.o
+obj-y += sysctl.o
+endif
+
 extra-y += asm-macros.i
 
 ifneq ($(CONFIG_HVM),y)

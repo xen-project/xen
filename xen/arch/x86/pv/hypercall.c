@@ -42,7 +42,9 @@ const hypercall_table_t pv_hypercall_table[] = {
     COMPAT_CALL(set_callbacks),
     HYPERCALL(fpu_taskswitch),
     HYPERCALL(sched_op_compat),
+#ifndef CONFIG_PV_SHIM_EXCLUSIVE
     COMPAT_CALL(platform_op),
+#endif
     HYPERCALL(set_debugreg),
     HYPERCALL(get_debugreg),
     COMPAT_CALL(update_descriptor),
@@ -72,8 +74,10 @@ const hypercall_table_t pv_hypercall_table[] = {
 #endif
     HYPERCALL(event_channel_op),
     COMPAT_CALL(physdev_op),
+#ifndef CONFIG_PV_SHIM_EXCLUSIVE
     HYPERCALL(sysctl),
     HYPERCALL(domctl),
+#endif
 #ifdef CONFIG_KEXEC
     COMPAT_CALL(kexec_op),
 #endif
@@ -89,7 +93,9 @@ const hypercall_table_t pv_hypercall_table[] = {
     HYPERCALL(hypfs_op),
 #endif
     HYPERCALL(mca),
+#ifndef CONFIG_PV_SHIM_EXCLUSIVE
     HYPERCALL(arch_1),
+#endif
 };
 
 #undef do_arch_1

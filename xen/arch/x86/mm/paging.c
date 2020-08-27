@@ -47,6 +47,8 @@
 /* Per-CPU variable for enforcing the lock ordering */
 DEFINE_PER_CPU(int, mm_lock_level);
 
+#ifndef CONFIG_PV_SHIM_EXCLUSIVE
+
 /************************************************/
 /*              LOG DIRTY SUPPORT               */
 /************************************************/
@@ -628,6 +630,8 @@ void paging_log_dirty_init(struct domain *d, const struct log_dirty_ops *ops)
     d->arch.paging.log_dirty.ops = ops;
 }
 
+#endif /* CONFIG_PV_SHIM_EXCLUSIVE */
+
 /************************************************/
 /*           CODE FOR PAGING SUPPORT            */
 /************************************************/
@@ -667,7 +671,7 @@ void paging_vcpu_init(struct vcpu *v)
         shadow_vcpu_init(v);
 }
 
-
+#ifndef CONFIG_PV_SHIM_EXCLUSIVE
 int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
                   XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl,
                   bool_t resuming)
@@ -788,6 +792,7 @@ long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     return ret;
 }
+#endif /* CONFIG_PV_SHIM_EXCLUSIVE */
 
 /* Call when destroying a domain */
 int paging_teardown(struct domain *d)
@@ -803,10 +808,12 @@ int paging_teardown(struct domain *d)
     if ( preempted )
         return -ERESTART;
 
+#ifndef CONFIG_PV_SHIM_EXCLUSIVE
     /* clean up log dirty resources. */
     rc = paging_free_log_dirty_bitmap(d, 0);
     if ( rc == -ERESTART )
         return rc;
+#endif
 
     /* Move populate-on-demand cache back to domain_list for destruction */
     rc = p2m_pod_empty_cache(d);

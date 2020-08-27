@@ -154,6 +154,8 @@ struct paging_mode {
 /*****************************************************************************
  * Log dirty code */
 
+#ifndef CONFIG_PV_SHIM_EXCLUSIVE
+
 /* get the dirty bitmap for a specific range of pfns */
 void paging_log_dirty_range(struct domain *d,
                             unsigned long begin_pfn,
@@ -201,6 +203,15 @@ struct sh_dirty_vram {
     uint8_t *dirty_bitmap;
     s_time_t last_dirty;
 };
+
+#else /* !CONFIG_PV_SHIM_EXCLUSIVE */
+
+static inline void paging_log_dirty_init(struct domain *d,
+                                         const struct log_dirty_ops *ops) {}
+static inline void paging_mark_dirty(struct domain *d, mfn_t gmfn) {}
+static inline void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn) {}
+
+#endif /* CONFIG_PV_SHIM_EXCLUSIVE */
 
 /*****************************************************************************
  * Entry points into the paging-assistance code */
