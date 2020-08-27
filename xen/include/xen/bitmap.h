@@ -273,6 +273,13 @@ static inline void bitmap_clear(unsigned long *map, unsigned int start,
 void bitmap_long_to_byte(uint8_t *bp, const unsigned long *lp, int nbits);
 void bitmap_byte_to_long(unsigned long *lp, const uint8_t *bp, int nbits);
 
+struct xenctl_bitmap;
+int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
+                            const struct xenctl_bitmap *xenctl_bitmap,
+                            unsigned int nbits);
+int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
+                            const unsigned long *bitmap, unsigned int nbits);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __XEN_BITMAP_H */

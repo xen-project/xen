@@ -9,6 +9,8 @@
 #include <xen/errno.h>
 #include <xen/bitmap.h>
 #include <xen/bitops.h>
+#include <xen/cpumask.h>
+#include <xen/guest_access.h>
 #include <asm/byteorder.h>
 
 /*
@@ -384,3 +386,88 @@ void bitmap_byte_to_long(unsigned long *lp, const uint8_t *bp, int nbits)
 }
 
 #endif
+
+int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
+                            const unsigned long *bitmap, unsigned int nbits)
+{
+    unsigned int guest_bytes, copy_bytes, i;
+    uint8_t zero = 0;
+    int err = 0;
+    uint8_t *bytemap = xmalloc_array(uint8_t, (nbits + 7) / 8);
+
+    if ( !bytemap )
+        return -ENOMEM;
+
+    guest_bytes = (xenctl_bitmap->nr_bits + 7) / 8;
+    copy_bytes  = min(guest_bytes, (nbits + 7) / 8);
+
+    bitmap_long_to_byte(bytemap, bitmap, nbits);
+
+    if ( copy_bytes &&
+         copy_to_guest(xenctl_bitmap->bitmap, bytemap, copy_bytes) )
+        err = -EFAULT;
+
+    xfree(bytemap);
+
+    for ( i = copy_bytes; !err && i < guest_bytes; i++ )
+        if ( copy_to_guest_offset(xenctl_bitmap->bitmap, i, &zero, 1) )
+            err = -EFAULT;
+
+    return err;
+}
+
+int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
+                            const struct xenctl_bitmap *xenctl_bitmap,
+                            unsigned int nbits)
+{
+    unsigned int guest_bytes, copy_bytes;
+    int err = 0;
+    uint8_t *bytemap = xzalloc_array(uint8_t, (nbits + 7) / 8);
+
+    if ( !bytemap )
+        return -ENOMEM;
+
+    guest_bytes = (xenctl_bitmap->nr_bits + 7) / 8;
+    copy_bytes  = min(guest_bytes, (nbits + 7) / 8);
+
+    if ( copy_bytes )
+    {
+        if ( copy_from_guest(bytemap, xenctl_bitmap->bitmap, copy_bytes) )
+            err = -EFAULT;
+        if ( (xenctl_bitmap->nr_bits & 7) && (guest_bytes == copy_bytes) )
+            bytemap[guest_bytes - 1] &= ~(0xff << (xenctl_bitmap->nr_bits & 7));
+    }
+
+    if ( !err )
+        bitmap_byte_to_long(bitmap, bytemap, nbits);
+
+    xfree(bytemap);
+
+    return err;
+}
+
+int cpumask_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_cpumap,
+                             const cpumask_t *cpumask)
+{
+    return bitmap_to_xenctl_bitmap(xenctl_cpumap, cpumask_bits(cpumask),
+                                   nr_cpu_ids);
+}
+
+int xenctl_bitmap_to_cpumask(cpumask_var_t *cpumask,
+                             const struct xenctl_bitmap *xenctl_cpumap)
+{
+    int err = 0;
+
+    if ( alloc_cpumask_var(cpumask) )
+    {
+        err = xenctl_bitmap_to_bitmap(cpumask_bits(*cpumask), xenctl_cpumap,
+                                      nr_cpu_ids);
+        /* In case of error, cleanup is up to us, as the caller won't care! */
+        if ( err )
+            free_cpumask_var(*cpumask);
+    }
+    else
+        err = -ENOMEM;
+
+    return err;
+}
