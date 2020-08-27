@@ -112,7 +112,6 @@ static CHAR16 *FormatDec(UINT64 Val, CHAR16 *Buffer);
 static CHAR16 *FormatHex(UINT64 Val, UINTN Width, CHAR16 *Buffer);
 static void  DisplayUint(UINT64 Val, INTN Width);
 static CHAR16 *wstrcpy(CHAR16 *d, const CHAR16 *s);
-static void noreturn blexit(const CHAR16 *str);
 static void PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode);
 static char *get_value(const struct file *cfg, const char *section,
                               const char *item);
@@ -154,56 +153,6 @@ static CHAR16 __initdata newline[] = L"\r\n";
 
 #define PrintStr(s) StdOut->OutputString(StdOut, s)
 #define PrintErr(s) StdErr->OutputString(StdErr, s)
-
-#ifdef CONFIG_ARM
-/*
- * TODO: Enable EFI boot allocator on ARM.
- * This code can be common for x86 and ARM.
- * Things TODO on ARM before enabling ebmalloc:
- *   - estimate required EBMALLOC_SIZE value,
- *   - where (in which section) ebmalloc_mem[] should live; if in
- *     .bss.page_aligned, as it is right now, then whole BSS zeroing
- *     have to be disabled in xen/arch/arm/arm64/head.S; though BSS
- *     should be initialized somehow before use of variables living there,
- *   - use ebmalloc() in ARM/common EFI boot code,
- *   - call free_ebmalloc_unused_mem() somewhere in init code.
- */
-#define EBMALLOC_SIZE	MB(0)
-#else
-#define EBMALLOC_SIZE	MB(1)
-#endif
-
-static char __section(".bss.page_aligned") __aligned(PAGE_SIZE)
-    ebmalloc_mem[EBMALLOC_SIZE];
-static unsigned long __initdata ebmalloc_allocated;
-
-/* EFI boot allocator. */
-static void __init __maybe_unused *ebmalloc(size_t size)
-{
-    void *ptr = ebmalloc_mem + ebmalloc_allocated;
-
-    ebmalloc_allocated += ROUNDUP(size, sizeof(void *));
-
-    if ( ebmalloc_allocated > sizeof(ebmalloc_mem) )
-        blexit(L"Out of static memory\r\n");
-
-    return ptr;
-}
-
-static void __init __maybe_unused free_ebmalloc_unused_mem(void)
-{
-#if 0 /* FIXME: Putting a hole in the BSS breaks the IOMMU mappings for dom0. */
-    unsigned long start, end;
-
-    start = (unsigned long)ebmalloc_mem + PAGE_ALIGN(ebmalloc_allocated);
-    end = (unsigned long)ebmalloc_mem + sizeof(ebmalloc_mem);
-
-    destroy_xen_mappings(start, end);
-    init_xenheap_pages(__pa(start), __pa(end));
-
-    printk(XENLOG_INFO "Freed %lukB unused BSS memory\n", (end - start) >> 10);
-#endif
-}
 
 /*
  * Include architecture specific implementation here, which references the
@@ -321,7 +270,7 @@ static bool __init match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2)
            !memcmp(guid1->Data4, guid2->Data4, sizeof(guid1->Data4));
 }
 
-static void __init noreturn blexit(const CHAR16 *str)
+void __init noreturn blexit(const CHAR16 *str)
 {
     if ( str )
         PrintStr((CHAR16 *)str);
