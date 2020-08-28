@@ -33,7 +33,7 @@ uninstall:
 
 .PHONY: test
 test:
-	LD_LIBRARY_PATH=$$(readlink -f ../libxc):$$(readlink -f ../xenstore) $(PYTHON) -m unittest discover
+	LD_LIBRARY_PATH=$$(readlink -f ../libs/ctrl):$$(readlink -f ../xenstore) $(PYTHON) -m unittest discover
 
 .PHONY: clean
 clean:

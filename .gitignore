@@ -114,6 +114,9 @@ tools/libs/hypfs/headers.chk
 tools/libs/hypfs/xenhypfs.pc
 tools/libs/call/headers.chk
 tools/libs/call/xencall.pc
+tools/libs/ctrl/_*.[ch]
+tools/libs/ctrl/libxenctrl.map
+tools/libs/ctrl/xencontrol.pc
 tools/libs/foreignmemory/headers.chk
 tools/libs/foreignmemory/xenforeignmemory.pc
 tools/libs/devicemodel/headers.chk
@@ -195,6 +198,11 @@ tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
 tools/libvchan/xenvchan.pc
 tools/libxc/*.pc
+tools/libxc/xc_bitops.h
+tools/libxc/xc_core.h
+tools/libxc/xc_core_arm.h
+tools/libxc/xc_core_x86.h
+tools/libxc/xc_private.h
 tools/libxl/_libxl.api-for-check
 tools/libxl/*.api-ok
 tools/libxl/*.pc

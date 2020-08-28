@@ -16,3 +16,5 @@ LIBS_LIBS += devicemodel
 USELIBS_devicemodel := toollog toolcore call
 LIBS_LIBS += hypfs
 USELIBS_hypfs := toollog toolcore call
+LIBS_LIBS += ctrl
+USELIBS_ctrl := toollog call evtchn gnttab foreignmemory devicemodel

@@ -9,7 +9,7 @@ extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
 PATH_XEN      = XEN_ROOT + "/tools/include"
 PATH_LIBXENTOOLLOG = XEN_ROOT + "/tools/libs/toollog"
 PATH_LIBXENEVTCHN = XEN_ROOT + "/tools/libs/evtchn"
-PATH_LIBXC    = XEN_ROOT + "/tools/libxc"
+PATH_LIBXENCTRL = XEN_ROOT + "/tools/libs/ctrl"
 PATH_LIBXL    = XEN_ROOT + "/tools/libxl"
 PATH_XENSTORE = XEN_ROOT + "/tools/xenstore"
 
@@ -18,11 +18,11 @@ xc = Extension("xc",
                include_dirs       = [ PATH_XEN,
                                       PATH_LIBXENTOOLLOG + "/include",
                                       PATH_LIBXENEVTCHN + "/include",
-                                      PATH_LIBXC + "/include",
+                                      PATH_LIBXENCTRL + "/include",
                                       "xen/lowlevel/xc" ],
-               library_dirs       = [ PATH_LIBXC ],
+               library_dirs       = [ PATH_LIBXENCTRL ],
                libraries          = [ "xenctrl" ],
-               depends            = [ PATH_LIBXC + "/libxenctrl.so" ],
+               depends            = [ PATH_LIBXENCTRL + "/libxenctrl.so" ],
                extra_link_args    = [ "-Wl,-rpath-link="+PATH_LIBXENTOOLLOG ],
                sources            = [ "xen/lowlevel/xc/xc.c" ])
 

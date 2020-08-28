@@ -226,7 +226,7 @@ M:	Stewart Hildebrand <stewart.hildebrand@dornerworks.com>
 S:	Supported
 L:	xen-devel@dornerworks.com
 F:	xen/common/sched/arinc653.c
-F:	tools/libxc/xc_arinc653.c
+F:	tools/libs/ctrl/xc_arinc653.c
 
 ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
 M:	Stefano Stabellini <sstabellini@kernel.org>
