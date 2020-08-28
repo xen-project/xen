@@ -34,7 +34,7 @@ PKG_CONFIG_DESC ?= The $(PKG_CONFIG_NAME) library for Xen hypervisor
 PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
 PKG_CONFIG_USELIBS := $(SHLIB_libxen$(LIBNAME))
 PKG_CONFIG_LIB := xen$(LIBNAME)
-PKG_CONFIG_REQPRIV := $(subst $(space),$(comma),$(strip $(foreach lib,$(USELIBS_$(LIBNAME)),xen$(lib))))
+PKG_CONFIG_REQPRIV := $(subst $(space),$(comma),$(strip $(foreach lib,$(patsubst ctrl,control,$(USELIBS_$(LIBNAME))),xen$(lib))))
 
 ifneq ($(CONFIG_LIBXC_MINIOS),y)
 PKG_CONFIG_INST := $(PKG_CONFIG)

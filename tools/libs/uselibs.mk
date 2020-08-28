@@ -18,3 +18,5 @@ LIBS_LIBS += hypfs
 USELIBS_hypfs := toollog toolcore call
 LIBS_LIBS += ctrl
 USELIBS_ctrl := toollog call evtchn gnttab foreignmemory devicemodel
+LIBS_LIBS += guest
+USELIBS_guest := evtchn ctrl

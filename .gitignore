@@ -71,7 +71,6 @@ stubdom/include
 stubdom/ioemu
 stubdom/ioemu/
 stubdom/libs-*
-stubdom/libxc-*
 stubdom/libxencall-*
 stubdom/libxenevtchn-*
 stubdom/libxenforeignmemory-*
@@ -121,6 +120,14 @@ tools/libs/foreignmemory/headers.chk
 tools/libs/foreignmemory/xenforeignmemory.pc
 tools/libs/devicemodel/headers.chk
 tools/libs/devicemodel/xendevicemodel.pc
+tools/libs/guest/_*.[ch]
+tools/libs/guest/libxenguest.map
+tools/libs/guest/xenguest.pc
+tools/libs/guest/xc_bitops.h
+tools/libs/guest/xc_core.h
+tools/libs/guest/xc_core_arm.h
+tools/libs/guest/xc_core_x86.h
+tools/libs/guest/xc_private.h
 tools/console/xenconsole
 tools/console/xenconsoled
 tools/console/client/_paths.h
@@ -197,12 +204,6 @@ tools/include/xen-xsm/*
 tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
 tools/libvchan/xenvchan.pc
-tools/libxc/*.pc
-tools/libxc/xc_bitops.h
-tools/libxc/xc_core.h
-tools/libxc/xc_core_arm.h
-tools/libxc/xc_core_x86.h
-tools/libxc/xc_private.h
 tools/libxl/_libxl.api-for-check
 tools/libxl/*.api-ok
 tools/libxl/*.pc
@@ -370,7 +371,6 @@ tools/include/xen-foreign/arm64.h
 tools/misc/xen-hptool
 tools/misc/xen-mfndump
 tools/libs/toolcore/include/_*.h
-tools/libxc/_*.[ch]
 tools/libxl/_*.[ch]
 tools/libxl/testidl
 tools/libxl/testidl.c

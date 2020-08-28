@@ -10,6 +10,7 @@ SUBDIRS-y += call
 SUBDIRS-y += foreignmemory
 SUBDIRS-y += devicemodel
 SUBDIRS-y += ctrl
+SUBDIRS-y += guest
 SUBDIRS-y += hypfs
 
 ifeq ($(CONFIG_RUMP),y)

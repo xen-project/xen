@@ -7,7 +7,7 @@ BOOT=$(OBJ_DIR)/boot-$(XEN_TARGET_ARCH).o
 
 DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/libs/toollog/include
 DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/libs/ctrl/include
-DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/libxc/include
+DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/libs/guest/include
 DEF_CPPFLAGS += -I$(XEN_ROOT)/tools/include -I.
 DEF_CPPFLAGS += -I../grub-upstream/stage1
 DEF_CPPFLAGS += -I../grub-upstream/stage2

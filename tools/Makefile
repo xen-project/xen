@@ -6,7 +6,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
 SUBDIRS-y += libs
-SUBDIRS-y += libxc
 SUBDIRS-y += flask
 SUBDIRS-y += fuzz
 SUBDIRS-y += xenstore
@@ -44,7 +43,7 @@ SUBDIRS-y += pygrub
 SUBDIRS-$(OCAML_TOOLS) += ocaml
 
 ifeq ($(CONFIG_RUMP),y)
-SUBDIRS-y := libs libxc xenstore
+SUBDIRS-y := libs xenstore
 endif
 
 # For the sake of linking, set the sys-root
