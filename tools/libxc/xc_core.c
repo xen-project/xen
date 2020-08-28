@@ -60,11 +60,12 @@
  *
  */
 
-#include "xg_private.h"
+#include "xc_private.h"
 #include "xc_core.h"
-#include "xenctrl_dom.h"
 #include <stdlib.h>
 #include <unistd.h>
+
+#include <xen/libelf/libelf.h>
 
 /* number of pages to write at a time */
 #define DUMP_INCREMENT (4 * 1024)

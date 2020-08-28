@@ -22,6 +22,8 @@
 #ifndef XENGUEST_H
 #define XENGUEST_H
 
+#include <xenctrl_dom.h>
+
 #define XC_NUMA_NO_NODE   (~0U)
 
 #define XCFLAGS_LIVE      (1 << 0)
@@ -248,12 +250,6 @@ int xc_linux_build(xc_interface *xch,
                    unsigned long *store_mfn,
                    unsigned int console_evtchn,
                    unsigned long *console_mfn);
-
-struct xc_hvm_firmware_module {
-    uint8_t  *data;
-    uint32_t  length;
-    uint64_t  guest_addr_out;
-};
 
 /*
  * Sets *lockfd to -1.

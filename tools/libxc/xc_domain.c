@@ -21,8 +21,7 @@
 
 #include "xc_private.h"
 #include "xc_core.h"
-#include "xg_private.h"
-#include "xg_save_restore.h"
+#include "xc_private.h"
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
 

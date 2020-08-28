@@ -109,15 +109,6 @@ static inline int get_platform_info(xc_interface *xch, uint32_t dom,
 #define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
 #define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
 
-#define GET_FIELD(_p, _f, _w) (((_w) == 8) ? ((_p)->x64._f) : ((_p)->x32._f))
-
-#define SET_FIELD(_p, _f, _v, _w) do {          \
-    if ((_w) == 8)                              \
-        (_p)->x64._f = (_v);                    \
-    else                                        \
-        (_p)->x32._f = (_v);                    \
-} while (0)
-
 #define UNFOLD_CR3(_c)                                                  \
   ((uint64_t)((dinfo->guest_width == 8)                                 \
               ? ((_c) >> 12)                                            \

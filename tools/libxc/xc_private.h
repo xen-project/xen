@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <sys/ioctl.h>
 
 #include "_paths.h"
@@ -62,6 +63,39 @@ struct iovec {
 #include <sys/uio.h>
 #endif
 
+#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
+
+#define GET_FIELD(_p, _f, _w) (((_w) == 8) ? ((_p)->x64._f) : ((_p)->x32._f))
+
+#define SET_FIELD(_p, _f, _v, _w) do {          \
+    if ((_w) == 8)                              \
+        (_p)->x64._f = (_v);                    \
+    else                                        \
+        (_p)->x32._f = (_v);                    \
+} while (0)
+
+/* XXX SMH: following skanky macros rely on variable p2m_size being set */
+/* XXX TJD: also, "guest_width" should be the guest's sizeof(unsigned long) */
+
+struct domain_info_context {
+    unsigned int guest_width;
+    unsigned long p2m_size;
+};
+
+/* Number of xen_pfn_t in a page */
+#define FPP             (PAGE_SIZE/(dinfo->guest_width))
+
+/* Number of entries in the pfn_to_mfn_frame_list_list */
+#define P2M_FLL_ENTRIES (((dinfo->p2m_size)+(FPP*FPP)-1)/(FPP*FPP))
+
+/* Number of entries in the pfn_to_mfn_frame_list */
+#define P2M_FL_ENTRIES  (((dinfo->p2m_size)+FPP-1)/FPP)
+
+/* Size in bytes of the pfn_to_mfn_frame_list     */
+#define P2M_GUEST_FL_SIZE ((P2M_FL_ENTRIES) * (dinfo->guest_width))
+#define P2M_TOOLS_FL_SIZE ((P2M_FL_ENTRIES) *                           \
+                           max_t(size_t, sizeof(xen_pfn_t), dinfo->guest_width))
+
 #define DECLARE_DOMCTL struct xen_domctl domctl
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
 #define DECLARE_PHYSDEV_OP struct physdev_op physdev_op
@@ -74,6 +108,8 @@ struct iovec {
 #define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               XC_PAGE_SIZE
 #define PAGE_MASK               XC_PAGE_MASK
+
+#define INVALID_PFN ((xen_pfn_t)-1)
 
 /*
 ** Define max dirty page cache to permit during save/restore -- need to balance 

@@ -17,9 +17,7 @@
 #define _XC_DOM_H
 
 #include <xen/libelf/libelf.h>
-#include <xenguest.h>
 
-#define INVALID_PFN ((xen_pfn_t)-1)
 #define X86_HVM_NR_SPECIAL_PAGES    8
 #define X86_HVM_END_SPECIAL_REGION  0xff000u
 #define XG_MAX_MODULES 2
@@ -36,6 +34,12 @@ struct xc_dom_seg {
     xen_vaddr_t vend;
     xen_pfn_t pfn;
     xen_pfn_t pages;
+};
+
+struct xc_hvm_firmware_module {
+    uint8_t  *data;
+    uint32_t  length;
+    uint64_t  guest_addr_out;
 };
 
 struct xc_dom_mem {
@@ -255,6 +259,8 @@ struct xc_dom_arch {
     int (*setup_pgtables) (struct xc_dom_image * dom);
 
     /* arch-specific data structs setup */
+    /* in Mini-OS environment start_info might be a macro, avoid collision. */
+#undef start_info
     int (*start_info) (struct xc_dom_image * dom);
     int (*shared_info) (struct xc_dom_image * dom, void *shared_info);
     int (*vcpu) (struct xc_dom_image * dom);

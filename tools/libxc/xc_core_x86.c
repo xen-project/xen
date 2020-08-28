@@ -17,11 +17,9 @@
  *
  */
 
-#include "xg_private.h"
+#include "xc_private.h"
 #include "xc_core.h"
 #include <xen/hvm/e820.h>
-
-#define GET_FIELD(_p, _f) ((dinfo->guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
 
 int
 xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
@@ -98,7 +96,7 @@ xc_core_arch_map_p2m_rw(xc_interface *xch, struct domain_info_context *dinfo, xc
 
     live_p2m_frame_list_list =
         xc_map_foreign_range(xch, dom, PAGE_SIZE, PROT_READ,
-                             GET_FIELD(live_shinfo, arch.pfn_to_mfn_frame_list_list));
+                             GET_FIELD(live_shinfo, arch.pfn_to_mfn_frame_list_list, dinfo->guest_width));
 
     if ( !live_p2m_frame_list_list )
     {

@@ -215,7 +215,7 @@ install: build
 	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)$(libdir)
 	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenctrl.so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR) $(DESTDIR)$(libdir)/libxenctrl.so
-	$(INSTALL_DATA) include/xenctrl.h include/xenctrl_compat.h $(DESTDIR)$(includedir)
+	$(INSTALL_DATA) include/xenctrl.h include/xenctrl_compat.h include/xenctrl_dom.h $(DESTDIR)$(includedir)
 	$(INSTALL_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
 	$(INSTALL_DATA) libxenguest.a $(DESTDIR)$(libdir)
 	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenguest.so.$(MAJOR)
@@ -235,6 +235,7 @@ uninstall:
 	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xencontrol.pc
 	rm -f $(DESTDIR)$(includedir)/xenctrl.h
 	rm -f $(DESTDIR)$(includedir)/xenctrl_compat.h
+	rm -f $(DESTDIR)$(includedir)/xenctrl_dom.h
 	rm -f $(DESTDIR)$(libdir)/libxenctrl.so
 	rm -f $(DESTDIR)$(libdir)/libxenctrl.so.$(MAJOR)
 	rm -f $(DESTDIR)$(libdir)/libxenctrl.so.$(MAJOR).$(MINOR)

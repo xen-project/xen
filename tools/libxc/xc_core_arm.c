@@ -16,7 +16,7 @@
  *
  */
 
-#include "xg_private.h"
+#include "xc_private.h"
 #include "xc_core.h"
 
 #include <xen-tools/libs.h>

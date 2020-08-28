@@ -97,15 +97,6 @@ typedef uint64_t x86_pgentry_t;
 
 #define NRPAGES(x) (ROUNDUP(x, PAGE_SHIFT) >> PAGE_SHIFT)
 
-
-/* XXX SMH: following skanky macros rely on variable p2m_size being set */
-/* XXX TJD: also, "guest_width" should be the guest's sizeof(unsigned long) */
-
-struct domain_info_context {
-    unsigned int guest_width;
-    unsigned long p2m_size;
-};
-
 static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
                                       unsigned gwidth)
 {
@@ -121,19 +112,6 @@ static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
     }
 }
 
-/* Number of xen_pfn_t in a page */
-#define FPP             (PAGE_SIZE/(dinfo->guest_width))
-
-/* Number of entries in the pfn_to_mfn_frame_list_list */
-#define P2M_FLL_ENTRIES (((dinfo->p2m_size)+(FPP*FPP)-1)/(FPP*FPP))
-
-/* Number of entries in the pfn_to_mfn_frame_list */
-#define P2M_FL_ENTRIES  (((dinfo->p2m_size)+FPP-1)/FPP)
-
-/* Size in bytes of the pfn_to_mfn_frame_list     */
-#define P2M_GUEST_FL_SIZE ((P2M_FL_ENTRIES) * (dinfo->guest_width))
-#define P2M_TOOLS_FL_SIZE ((P2M_FL_ENTRIES) *                           \
-                           max_t(size_t, sizeof(xen_pfn_t), dinfo->guest_width))
 
 /* Masks for PTE<->PFN conversions */
 #define MADDR_BITS_X86  ((dinfo->guest_width == 8) ? 52 : 44)

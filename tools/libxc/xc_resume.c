@@ -14,8 +14,6 @@
  */
 
 #include "xc_private.h"
-#include "xg_private.h"
-#include "xg_save_restore.h"
 
 #if defined(__i386__) || defined(__x86_64__)
 

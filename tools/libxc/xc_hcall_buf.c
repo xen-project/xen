@@ -19,7 +19,6 @@
 #include <string.h>
 
 #include "xc_private.h"
-#include "xg_private.h"
 
 xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(HYPERCALL_BUFFER_NULL) = {
     .hbuf = NULL,
