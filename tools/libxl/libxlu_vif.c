@@ -1,4 +1,5 @@
-#include "libxl_osdeps.h" /* must come before any other headers */
+#define _GNU_SOURCE
+
 #include "libxlu_internal.h"
 
 static const char *vif_bytes_per_sec_re = "^[0-9]+[GMK]?[Bb]/s$";

@@ -1,7 +1,7 @@
-#line 2 "libxlu_disk_l.c"
-#include "libxl_osdeps.h" /* must come before any other headers */
+#line 1 "libxlu_disk_l.c"
+#define _GNU_SOURCE
 
-#line 5 "libxlu_disk_l.c"
+#line 4 "libxlu_disk_l.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -1199,9 +1199,9 @@ static int vdev_and_devtype(DiskParseContext *dpc, char *str) {
 #undef DPC /* needs to be defined differently the actual lexer */
 #define DPC ((DiskParseContext*)yyextra)
 
-#line 1203 "libxlu_disk_l.c"
+#line 1202 "libxlu_disk_l.c"
 
-#line 1205 "libxlu_disk_l.c"
+#line 1204 "libxlu_disk_l.c"
 
 #define INITIAL 0
 #define LEXERR 1
@@ -1483,7 +1483,7 @@ YY_DECL
 #line 180 "libxlu_disk_l.l"
  /*----- the scanner rules which do the parsing -----*/
 
-#line 1487 "libxlu_disk_l.c"
+#line 1486 "libxlu_disk_l.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1836,7 +1836,7 @@ YY_RULE_SETUP
 #line 291 "libxlu_disk_l.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1840 "libxlu_disk_l.c"
+#line 1839 "libxlu_disk_l.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(LEXERR):
 				yyterminate();

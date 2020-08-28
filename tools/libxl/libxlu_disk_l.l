@@ -28,7 +28,7 @@
  */
 
 %top{
-#include "libxl_osdeps.h" /* must come before any other headers */
+#define _GNU_SOURCE
 }
 
 %{

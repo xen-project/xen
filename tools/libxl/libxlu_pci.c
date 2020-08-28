@@ -1,4 +1,5 @@
-#include "libxl_osdeps.h" /* must come before any other headers */
+#define _GNU_SOURCE
+
 #include "libxlu_internal.h"
 #include "libxlu_disk_l.h"
 #include "libxlu_disk_i.h"

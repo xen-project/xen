@@ -15,8 +15,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-
-#include "libxl_osdeps.h" /* must come before any other headers */
+#define _GNU_SOURCE
 
 #include <limits.h>
 
