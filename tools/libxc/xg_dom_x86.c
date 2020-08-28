@@ -38,7 +38,7 @@
 #include <xen-tools/libs.h>
 
 #include "xg_private.h"
-#include "xc_dom.h"
+#include "xenctrl_dom.h"
 #include "xenctrl.h"
 
 /* ------------------------------------------------------------------------ */

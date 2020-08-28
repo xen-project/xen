@@ -32,7 +32,7 @@
 #include <assert.h>
 
 #include "xg_private.h"
-#include "xc_dom.h"
+#include "xenctrl_dom.h"
 #include "_paths.h"
 
 /* ------------------------------------------------------------------------ */

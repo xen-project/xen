@@ -17,7 +17,7 @@
 #include "libxl_arch.h"
 #include <stdlib.h>
 
-#include <xc_dom.h>
+#include <xenctrl_dom.h>
 
 bool libxl__vnuma_configured(const libxl_domain_build_info *b_info)
 {

@@ -19,7 +19,7 @@
 
 #include "libxl_internal.h"
 
-#include <xc_dom.h>
+#include <xenctrl_dom.h>
 #include <xen/hvm/e820.h>
 #include <sys/types.h>
 #include <pwd.h>

@@ -1,7 +1,7 @@
 #include "libxl_internal.h"
 #include "libxl_arch.h"
 
-#include <xc_dom.h>
+#include <xenctrl_dom.h>
 
 int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,

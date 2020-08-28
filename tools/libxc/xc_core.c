@@ -62,7 +62,7 @@
 
 #include "xg_private.h"
 #include "xc_core.h"
-#include "xc_dom.h"
+#include "xenctrl_dom.h"
 #include <stdlib.h>
 #include <unistd.h>
 

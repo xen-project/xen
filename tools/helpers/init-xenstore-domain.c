@@ -8,7 +8,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <xenctrl.h>
-#include <xc_dom.h>
+#include <xenctrl_dom.h>
 #include <xenstore.h>
 #include <xen/sys/xenbus_dev.h>
 #include <xen-xsm/flask/flask.h>

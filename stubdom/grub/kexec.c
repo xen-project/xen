@@ -20,7 +20,7 @@
 #include <sys/mman.h>
 
 #include <xenctrl.h>
-#include <xc_dom.h>
+#include <xenctrl_dom.h>
 
 #include <kernel.h>
 #include <console.h>

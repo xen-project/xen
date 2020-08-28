@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 
 #include <xen/elfnote.h>
-#include "xc_dom.h"
+#include "xenctrl_dom.h"
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
 

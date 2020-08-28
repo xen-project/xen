@@ -20,7 +20,7 @@
 #include "libxl_internal.h"
 #include "libxl_arch.h"
 
-#include <xc_dom.h>
+#include <xenctrl_dom.h>
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/e820.h>

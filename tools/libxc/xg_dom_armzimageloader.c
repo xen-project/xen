@@ -25,7 +25,7 @@
 #include <inttypes.h>
 
 #include "xg_private.h"
-#include "xc_dom.h"
+#include "xenctrl_dom.h"
 
 #include <arpa/inet.h> /* XXX ntohl is not the right function... */
 

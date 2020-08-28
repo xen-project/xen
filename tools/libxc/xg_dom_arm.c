@@ -24,7 +24,7 @@
 #include <xen-tools/libs.h>
 
 #include "xg_private.h"
-#include "xc_dom.h"
+#include "xenctrl_dom.h"
 
 #define NR_MAGIC_PAGES 4
 #define CONSOLE_PFN_OFFSET 0

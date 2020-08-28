@@ -12,7 +12,7 @@
 #include <sys/mman.h>
 
 #include <xg_private.h>
-#include <xc_dom.h> /* gunzip bits */
+#include <xenctrl_dom.h> /* gunzip bits */
 
 #include <xen/libelf/libelf.h>
 
