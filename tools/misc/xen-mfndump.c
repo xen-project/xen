@@ -207,7 +207,7 @@ int dump_ptes_func(int argc, char *argv[])
         goto out;
     }
 
-    page = xc_map_foreign_range(xch, domid, PAGE_SIZE, PROT_READ,
+    page = xc_map_foreign_range(xch, domid, XC_PAGE_SIZE, PROT_READ,
                                 minfo.p2m_table[pfn]);
     if ( !page )
     {
@@ -216,7 +216,7 @@ int dump_ptes_func(int argc, char *argv[])
         goto out;
     }
 
-    pte_num = PAGE_SIZE / 8;
+    pte_num = XC_PAGE_SIZE / 8;
 
     printf(" --- Dumping %d PTEs for domain %d ---\n", pte_num, domid);
     printf(" Guest Width: %u, PT Levels: %u P2M size: = %lu\n",
@@ -252,7 +252,7 @@ int dump_ptes_func(int argc, char *argv[])
 
  out:
     if ( page )
-        munmap(page, PAGE_SIZE);
+        munmap(page, XC_PAGE_SIZE);
     xc_unmap_domain_meminfo(xch, &minfo);
     munmap(m2p_table, M2P_SIZE(max_mfn));
     return rc;
@@ -290,7 +290,7 @@ int lookup_pte_func(int argc, char *argv[])
         return -1;
     }
 
-    pte_num = PAGE_SIZE / 8;
+    pte_num = XC_PAGE_SIZE / 8;
 
     printf(" --- Lookig for PTEs mapping mfn 0x%lx for domain %d ---\n",
            mfn, domid);
@@ -302,7 +302,7 @@ int lookup_pte_func(int argc, char *argv[])
         if ( !(minfo.pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) )
             continue;
 
-        page = xc_map_foreign_range(xch, domid, PAGE_SIZE, PROT_READ,
+        page = xc_map_foreign_range(xch, domid, XC_PAGE_SIZE, PROT_READ,
                                     minfo.p2m_table[i]);
         if ( !page )
             continue;
@@ -312,15 +312,15 @@ int lookup_pte_func(int argc, char *argv[])
             uint64_t pte = ((const uint64_t*)page)[j];
 
 #define __MADDR_BITS_X86  ((minfo.guest_width == 8) ? 52 : 44)
-#define __MFN_MASK_X86    ((1ULL << (__MADDR_BITS_X86 - PAGE_SHIFT_X86)) - 1)
-            if ( ((pte >> PAGE_SHIFT_X86) & __MFN_MASK_X86) == mfn)
+#define __MFN_MASK_X86    ((1ULL << (__MADDR_BITS_X86 - XC_PAGE_SHIFT)) - 1)
+            if ( ((pte >> XC_PAGE_SHIFT) & __MFN_MASK_X86) == mfn)
                 printf("  0x%lx <-- [0x%lx][%lu]: 0x%"PRIx64"\n",
                        mfn, minfo.p2m_table[i], j, pte);
 #undef __MADDR_BITS_X86
 #undef __MFN_MASK_X8
         }
 
-        munmap(page, PAGE_SIZE);
+        munmap(page, XC_PAGE_SIZE);
         page = NULL;
     }
 
@@ -355,8 +355,8 @@ int memcmp_mfns_func(int argc, char *argv[])
         return -1;
     }
 
-    page1 = xc_map_foreign_range(xch, domid1, PAGE_SIZE, PROT_READ, mfn1);
-    page2 = xc_map_foreign_range(xch, domid2, PAGE_SIZE, PROT_READ, mfn2);
+    page1 = xc_map_foreign_range(xch, domid1, XC_PAGE_SIZE, PROT_READ, mfn1);
+    page2 = xc_map_foreign_range(xch, domid2, XC_PAGE_SIZE, PROT_READ, mfn2);
     if ( !page1 || !page2 )
     {
         ERROR("Failed to map either 0x%lx[dom %d] or 0x%lx[dom %d]\n",
@@ -368,13 +368,13 @@ int memcmp_mfns_func(int argc, char *argv[])
     printf(" --- Comparing the content of 2 MFNs ---\n");
     printf(" 1: 0x%lx[dom %d], 2: 0x%lx[dom %d]\n",
            mfn1, domid1, mfn2, domid2);
-    printf("  memcpy(1, 2) = %d\n", memcmp(page1, page2, PAGE_SIZE));
+    printf("  memcpy(1, 2) = %d\n", memcmp(page1, page2, XC_PAGE_SIZE));
 
  out:
     if ( page1 )
-        munmap(page1, PAGE_SIZE);
+        munmap(page1, XC_PAGE_SIZE);
     if ( page2 )
-        munmap(page2, PAGE_SIZE);
+        munmap(page2, XC_PAGE_SIZE);
     return rc;
 }
 
