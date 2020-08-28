@@ -54,20 +54,20 @@ CTRL_SRCS-y       += xc_devicemodel_compat.c
 GUEST_SRCS-y :=
 GUEST_SRCS-y += xg_private.c
 GUEST_SRCS-y += xg_domain.c
-GUEST_SRCS-y += xc_suspend.c
+GUEST_SRCS-y += xg_suspend.c
 ifeq ($(CONFIG_MIGRATE),y)
-GUEST_SRCS-y += xc_sr_common.c
-GUEST_SRCS-$(CONFIG_X86) += xc_sr_common_x86.c
-GUEST_SRCS-$(CONFIG_X86) += xc_sr_common_x86_pv.c
-GUEST_SRCS-$(CONFIG_X86) += xc_sr_restore_x86_pv.c
-GUEST_SRCS-$(CONFIG_X86) += xc_sr_restore_x86_hvm.c
-GUEST_SRCS-$(CONFIG_X86) += xc_sr_save_x86_pv.c
-GUEST_SRCS-$(CONFIG_X86) += xc_sr_save_x86_hvm.c
-GUEST_SRCS-y += xc_sr_restore.c
-GUEST_SRCS-y += xc_sr_save.c
-GUEST_SRCS-y += xc_offline_page.c
+GUEST_SRCS-y += xg_sr_common.c
+GUEST_SRCS-$(CONFIG_X86) += xg_sr_common_x86.c
+GUEST_SRCS-$(CONFIG_X86) += xg_sr_common_x86_pv.c
+GUEST_SRCS-$(CONFIG_X86) += xg_sr_restore_x86_pv.c
+GUEST_SRCS-$(CONFIG_X86) += xg_sr_restore_x86_hvm.c
+GUEST_SRCS-$(CONFIG_X86) += xg_sr_save_x86_pv.c
+GUEST_SRCS-$(CONFIG_X86) += xg_sr_save_x86_hvm.c
+GUEST_SRCS-y += xg_sr_restore.c
+GUEST_SRCS-y += xg_sr_save.c
+GUEST_SRCS-y += xg_offline_page.c
 else
-GUEST_SRCS-y += xc_nomigrate.c
+GUEST_SRCS-y += xg_nomigrate.c
 endif
 
 vpath %.c ../../xen/common/libelf
@@ -88,25 +88,26 @@ GUEST_SRCS-y                 += cpuid.c msr.c
 endif
 
 # new domain builder
-GUEST_SRCS-y                 += xc_dom_core.c xc_dom_boot.c
-GUEST_SRCS-y                 += xc_dom_elfloader.c
-GUEST_SRCS-$(CONFIG_X86)     += xc_dom_bzimageloader.c
-GUEST_SRCS-$(CONFIG_X86)     += xc_dom_decompress_lz4.c
-GUEST_SRCS-$(CONFIG_X86)     += xc_dom_hvmloader.c
-GUEST_SRCS-$(CONFIG_ARM)     += xc_dom_armzimageloader.c
-GUEST_SRCS-y                 += xc_dom_binloader.c
-GUEST_SRCS-y                 += xc_dom_compat_linux.c
+GUEST_SRCS-y                 += xg_dom_core.c
+GUEST_SRCS-y                 += xg_dom_boot.c
+GUEST_SRCS-y                 += xg_dom_elfloader.c
+GUEST_SRCS-$(CONFIG_X86)     += xg_dom_bzimageloader.c
+GUEST_SRCS-$(CONFIG_X86)     += xg_dom_decompress_lz4.c
+GUEST_SRCS-$(CONFIG_X86)     += xg_dom_hvmloader.c
+GUEST_SRCS-$(CONFIG_ARM)     += xg_dom_armzimageloader.c
+GUEST_SRCS-y                 += xg_dom_binloader.c
+GUEST_SRCS-y                 += xg_dom_compat_linux.c
 
-GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
-GUEST_SRCS-$(CONFIG_X86)     += xc_cpuid_x86.c
-GUEST_SRCS-$(CONFIG_ARM)     += xc_dom_arm.c
+GUEST_SRCS-$(CONFIG_X86)     += xg_dom_x86.c
+GUEST_SRCS-$(CONFIG_X86)     += xg_cpuid_x86.c
+GUEST_SRCS-$(CONFIG_ARM)     += xg_dom_arm.c
 
 ifeq ($(CONFIG_LIBXC_MINIOS),y)
-GUEST_SRCS-y                 += xc_dom_decompress_unsafe.c
-GUEST_SRCS-y                 += xc_dom_decompress_unsafe_bzip2.c
-GUEST_SRCS-y                 += xc_dom_decompress_unsafe_lzma.c
-GUEST_SRCS-y                 += xc_dom_decompress_unsafe_lzo1x.c
-GUEST_SRCS-y                 += xc_dom_decompress_unsafe_xz.c
+GUEST_SRCS-y                 += xg_dom_decompress_unsafe.c
+GUEST_SRCS-y                 += xg_dom_decompress_unsafe_bzip2.c
+GUEST_SRCS-y                 += xg_dom_decompress_unsafe_lzma.c
+GUEST_SRCS-y                 += xg_dom_decompress_unsafe_lzo1x.c
+GUEST_SRCS-y                 += xg_dom_decompress_unsafe_xz.c
 endif
 
 -include $(XEN_TARGET_ARCH)/Makefile
