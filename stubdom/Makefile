@@ -342,7 +342,6 @@ define do_links
   cd $(dir $@); \
   ln -sf $(dir $<)include/*.h include/; \
   ln -sf $(dir $<)*.[ch] .; \
-  ln -sf $(dir $<)*.pc.in .; \
   ln -sf $(dir $<)Makefile .
   touch $@
 endef

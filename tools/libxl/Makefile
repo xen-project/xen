@@ -195,8 +195,19 @@ PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
 
 ifneq ($(CONFIG_LIBXC_MINIOS),y)
 PKG_CONFIG_INST := $(PKG_CONFIG)
+xenlight.pc: PKG_CONFIG_NAME = Xenlight
+xenlight.pc: PKG_CONFIG_DESC = The Xenlight library for Xen hypervisor
 xenlight.pc: PKG_CONFIG_VERSION = $(MAJOR).$(MINOR)
+xenlight.pc: PKG_CONFIG_VARS = xenfirmwaredir=$(XENFIRMWAREDIR) libexec_bin=$(LIBEXEC_BIN)
+xenlight.pc: PKG_CONFIG_USELIBS = $(SHLIB_libxenlight)
+xenlight.pc: PKG_CONFIG_LIB = xenlight
+xenlight.pc: PKG_CONFIG_REQPRIV = xentoollog,xenevtchn,xencontrol,xenguest,xenstore,xenhypfs
+xlutil.pc: PKG_CONFIG_NAME = Xlutil
+xlutil.pc: PKG_CONFIG_DESC = The xl utility library for Xen hypervisor
 xlutil.pc: PKG_CONFIG_VERSION = $(XLUMAJOR).$(XLUMINOR)
+xlutil.pc: PKG_CONFIG_USELIBS = $(SHLIB_libxlutil)
+xlutil.pc: PKG_CONFIG_LIB = xlutil
+xlutil.pc: PKG_CONFIG_REQPRIV = xenlight
 $(PKG_CONFIG_INST): PKG_CONFIG_PREFIX = $(prefix)
 $(PKG_CONFIG_INST): PKG_CONFIG_INCDIR = $(includedir)
 $(PKG_CONFIG_INST): PKG_CONFIG_LIBDIR = $(libdir)
@@ -204,8 +215,19 @@ endif
 
 PKG_CONFIG_LOCAL := $(foreach pc,$(PKG_CONFIG),$(PKG_CONFIG_DIR)/$(pc))
 
+$(PKG_CONFIG_DIR)/xenlight.pc: PKG_CONFIG_NAME = Xenlight
+$(PKG_CONFIG_DIR)/xenlight.pc: PKG_CONFIG_DESC = The Xenlight library for Xen hypervisor
 $(PKG_CONFIG_DIR)/xenlight.pc: PKG_CONFIG_VERSION = $(MAJOR).$(MINOR)
+$(PKG_CONFIG_DIR)/xenlight.pc: PKG_CONFIG_VARS = xenfirmwaredir=$(XENFIRMWAREDIR) libexec_bin=$(LIBEXEC_BIN)
+$(PKG_CONFIG_DIR)/xenlight.pc: PKG_CONFIG_USELIBS = $(SHLIB_libxenlight)
+$(PKG_CONFIG_DIR)/xenlight.pc: PKG_CONFIG_LIB = xenlight
+$(PKG_CONFIG_DIR)/xenlight.pc: PKG_CONFIG_REQPRIV = xentoollog,xenevtchn,xencontrol,xenguest,xenstore,xenhypfs
+$(PKG_CONFIG_DIR)/xlutil.pc: PKG_CONFIG_NAME = Xlutil
+$(PKG_CONFIG_DIR)/xlutil.pc: PKG_CONFIG_DESC = The xl utility library for Xen hypervisor
 $(PKG_CONFIG_DIR)/xlutil.pc: PKG_CONFIG_VERSION = $(XLUMAJOR).$(XLUMINOR)
+$(PKG_CONFIG_DIR)/xlutil.pc: PKG_CONFIG_USELIBS = $(SHLIB_libxlutil)
+$(PKG_CONFIG_DIR)/xlutil.pc: PKG_CONFIG_LIB = xlutil
+$(PKG_CONFIG_DIR)/xlutil.pc: PKG_CONFIG_REQPRIV = xenlight
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_PREFIX = $(XEN_ROOT)
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(CURDIR)
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)

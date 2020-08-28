@@ -38,7 +38,12 @@ LDLIBS-y = $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl) -lyajl
 LDLIBS-$(CONFIG_SunOS) += -lkstat
 
 PKG_CONFIG := xenstat.pc
+PKG_CONFIG_NAME := Xenstat
+PKG_CONFIG_DESC := The Xenstat library for Xen hypervisor
 PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
+PKG_CONFIG_USELIBS := $(SHLIB_libxenstat)
+PKG_CONFIG_LIB := xenstat
+PKG_CONFIG_REQPRIV := xencontrol,xenstore
 
 ifneq ($(CONFIG_LIBXC_MINIOS),y)
 PKG_CONFIG_INST := $(PKG_CONFIG)

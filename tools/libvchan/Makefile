@@ -23,7 +23,12 @@ CFLAGS += -I../include -I.
 io.o io.opic: CFLAGS += $(CFLAGS_libxenctrl) # for xen_mb et al
 
 PKG_CONFIG := xenvchan.pc
+PKG_CONFIG_NAME := Xenvchan
+PKG_CONFIG_DESC := The Xenvchan library for Xen hypervisor
 PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
+PKG_CONFIG_USELIBS := $(SHLIB_libxenvchan)
+PKG_CONFIG_LIB := xenvchan
+PKG_CONFIG_REQPRIV := xentoollog,xenstore,xenevtchn,xengnttab
 
 ifneq ($(CONFIG_LIBXC_MINIOS),y)
 PKG_CONFIG_INST := $(PKG_CONFIG)

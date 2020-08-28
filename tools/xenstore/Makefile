@@ -105,8 +105,7 @@ xs.opic: CFLAGS += -DUSE_PTHREAD
 ifeq ($(CONFIG_Linux),y)
 xs.opic: CFLAGS += -DUSE_DLSYM
 libxenstore.so.$(MAJOR).$(MINOR): APPEND_LDFLAGS += -ldl
-else
-PKG_CONFIG_REMOVE += -ldl
+PKG_CONFIG_LIBSPRIV := -ldl
 endif
 
 libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
@@ -116,7 +115,12 @@ libxenstore.a: xs.o xs_lib.o
 	$(AR) rcs $@ $^
 
 PKG_CONFIG := xenstore.pc
+PKG_CONFIG_NAME := Xenstore
+PKG_CONFIG_DESC := The Xenstore library for Xen hypervisor
 PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
+PKG_CONFIG_USELIBS := $(SHLIB_libxenstore)
+PKG_CONFIG_LIB := xenstore
+PKG_CONFIG_REQPRIV := xenevtchn,xencontrol,xengnttab,xentoolcore
 
 ifneq ($(CONFIG_LIBXC_MINIOS),y)
 PKG_CONFIG_INST := $(PKG_CONFIG)

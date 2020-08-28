@@ -209,27 +209,33 @@ endif
 
 PKG_CONFIG_DIR ?= $(XEN_ROOT)/tools/pkg-config
 
-PKG_CONFIG_FILTER = $(foreach l,$(PKG_CONFIG_REMOVE),-e 's!\([ ,]\)$(l),!\1!g' -e 's![ ,]$(l)$$!!g')
-
-$(PKG_CONFIG_DIR)/%.pc: %.pc.in Makefile $(XEN_ROOT)/tools/Rules.mk
+$(PKG_CONFIG_DIR):
 	mkdir -p $(PKG_CONFIG_DIR)
-	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
-	     -e 's!@@prefix@@!$(PKG_CONFIG_PREFIX)!g' \
-	     -e 's!@@incdir@@!$(PKG_CONFIG_INCDIR)!g' \
-	     -e 's!@@libdir@@!$(PKG_CONFIG_LIBDIR)!g' \
-	     -e 's!@@firmwaredir@@!$(XENFIRMWAREDIR)!g' \
-	     -e 's!@@libexecbin@@!$(LIBEXEC_BIN)!g' \
-	     -e 's!@@cflagslocal@@!$(PKG_CONFIG_CFLAGS_LOCAL)!g' \
-	     -e 's!@@libsflag@@\([^ ]*\)!-L\1 -Wl,-rpath-link=\1!g' \
-	     $(PKG_CONFIG_FILTER) < $< > $@
 
-%.pc: %.pc.in Makefile $(XEN_ROOT)/tools/Rules.mk
-	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
-	     -e 's!@@prefix@@!$(PKG_CONFIG_PREFIX)!g' \
-	     -e 's!@@incdir@@!$(PKG_CONFIG_INCDIR)!g' \
-	     -e 's!@@libdir@@!$(PKG_CONFIG_LIBDIR)!g' \
-	     -e 's!@@firmwaredir@@!$(XENFIRMWAREDIR)!g' \
-	     -e 's!@@libexecbin@@!$(LIBEXEC_BIN)!g' \
-	     -e 's!@@cflagslocal@@!!g' \
-	     -e 's!@@libsflag@@!-L!g' \
-	     $(PKG_CONFIG_FILTER) < $< > $@
+$(PKG_CONFIG_DIR)/%.pc: Makefile $(XEN_ROOT)/tools/Rules.mk $(PKG_CONFIG_DIR)
+	$(file >$@,prefix=$(PKG_CONFIG_PREFIX))
+	$(file >>$@,includedir=$(PKG_CONFIG_INCDIR))
+	$(file >>$@,libdir=$(PKG_CONFIG_LIBDIR))
+	$(foreach var,$(PKG_CONFIG_VARS),$(file >>$@,$(var)))
+	$(file >>$@,)
+	$(file >>$@,Name: $(PKG_CONFIG_NAME))
+	$(file >>$@,Description: $(PKG_CONFIG_DESC))
+	$(file >>$@,Version: $(PKG_CONFIG_VERSION))
+	$(file >>$@,Cflags: -I$${includedir} $(CFLAGS_xeninclude))
+	$(file >>$@,Libs: -L$${libdir} $(PKG_CONFIG_USELIBS) -l$(PKG_CONFIG_LIB))
+	$(file >>$@,Libs.private: $(PKG_CONFIG_LIBSPRIV))
+	$(file >>$@,Requires.private: $(PKG_CONFIG_REQPRIV))
+
+%.pc: Makefile $(XEN_ROOT)/tools/Rules.mk
+	$(file >$@,prefix=$(PKG_CONFIG_PREFIX))
+	$(file >>$@,includedir=$(PKG_CONFIG_INCDIR))
+	$(file >>$@,libdir=$(PKG_CONFIG_LIBDIR))
+	$(foreach var,$(PKG_CONFIG_VARS),$(file >>$@,$(var)))
+	$(file >>$@,)
+	$(file >>$@,Name: $(PKG_CONFIG_NAME))
+	$(file >>$@,Description: $(PKG_CONFIG_DESC))
+	$(file >>$@,Version: $(PKG_CONFIG_VERSION))
+	$(file >>$@,Cflags: -I$${includedir})
+	$(file >>$@,Libs: -L$${libdir} -l$(PKG_CONFIG_LIB))
+	$(file >>$@,Libs.private: $(PKG_CONFIG_LIBSPRIV))
+	$(file >>$@,Requires.private: $(PKG_CONFIG_REQPRIV))

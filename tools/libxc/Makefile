@@ -158,6 +158,28 @@ $(CTRL_PIC_OBJS) $(GUEST_PIC_OBJS): xc_private.h
 PKG_CONFIG := xencontrol.pc xenguest.pc
 PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
 
+xencontrol.pc: PKG_CONFIG_NAME = Xencontrol
+xencontrol.pc: PKG_CONFIG_DESC = The Xencontrol library for Xen hypervisor
+xencontrol.pc: PKG_CONFIG_USELIBS = $(SHLIB_libxenctrl)
+xencontrol.pc: PKG_CONFIG_LIB = xenctrl
+xencontrol.pc: PKG_CONFIG_REQPRIV = xenevtchn,xengnttab,xencall,xenforeignmemory,xendevicemodel,xentoollog
+xenguest.pc: PKG_CONFIG_NAME = Xenguest
+xenguest.pc: PKG_CONFIG_DESC = The Xenguest library for Xen hypervisor
+xenguest.pc: PKG_CONFIG_USELIBS = $(SHLIB_libxenguest)
+xenguest.pc: PKG_CONFIG_LIB = xenguest
+xenguest.pc: PKG_CONFIG_REQPRIV = xentoollog,xencall,xenforeignmemory,xenevtchn
+
+$(PKG_CONFIG_DIR)/xencontrol.pc: PKG_CONFIG_NAME = Xencontrol
+$(PKG_CONFIG_DIR)/xencontrol.pc: PKG_CONFIG_DESC = The Xencontrol library for Xen hypervisor
+$(PKG_CONFIG_DIR)/xencontrol.pc: PKG_CONFIG_USELIBS = $(SHLIB_libxenctrl)
+$(PKG_CONFIG_DIR)/xencontrol.pc: PKG_CONFIG_LIB = xenctrl
+$(PKG_CONFIG_DIR)/xencontrol.pc: PKG_CONFIG_REQPRIV = xenevtchn,xengnttab,xencall,xenforeignmemory,xendevicemodel,xentoollog
+$(PKG_CONFIG_DIR)/xenguest.pc: PKG_CONFIG_NAME = Xenguest
+$(PKG_CONFIG_DIR)/xenguest.pc: PKG_CONFIG_DESC = The Xenguest library for Xen hypervisor
+$(PKG_CONFIG_DIR)/xenguest.pc: PKG_CONFIG_USELIBS = $(SHLIB_libxenguest)
+$(PKG_CONFIG_DIR)/xenguest.pc: PKG_CONFIG_LIB = xenguest
+$(PKG_CONFIG_DIR)/xenguest.pc: PKG_CONFIG_REQPRIV = xentoollog,xencall,xenforeignmemory,xenevtchn
+
 ifneq ($(CONFIG_LIBXC_MINIOS),y)
 PKG_CONFIG_INST := $(PKG_CONFIG)
 $(PKG_CONFIG_INST): PKG_CONFIG_PREFIX = $(prefix)

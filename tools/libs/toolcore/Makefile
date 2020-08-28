@@ -9,6 +9,7 @@ SRCS-y	+= handlereg.c
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
+PKG_CONFIG_DESC := Central support for Xen Hypervisor userland libraries
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxentoolcore)/include
 
 $(LIB_OBJS): $(AUTOINCS)
