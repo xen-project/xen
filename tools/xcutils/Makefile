@@ -15,8 +15,7 @@ PROGRAMS = readnotes lsevtchn
 
 CFLAGS += -Werror
 
-# incorrectly uses libxc internals
-CFLAGS_readnotes.o  := $(CFLAGS_libxenevtchn) $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) -I$(XEN_ROOT)/tools/libxc $(CFLAGS_libxencall)
+CFLAGS_readnotes.o  := $(CFLAGS_libxenevtchn) $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 CFLAGS_lsevtchn.o   := $(CFLAGS_libxenevtchn) $(CFLAGS_libxenctrl)
 
 .PHONY: all

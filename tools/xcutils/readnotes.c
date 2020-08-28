@@ -11,8 +11,9 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
-#include <xg_private.h>
-#include <xenctrl_dom.h> /* gunzip bits */
+#include <xen/xen.h>
+#include <xenctrl.h>
+#include <xenguest.h>
 
 #include <xen/libelf/libelf.h>
 
