@@ -12,6 +12,7 @@ SUBDIRS-y += devicemodel
 SUBDIRS-y += ctrl
 SUBDIRS-y += guest
 SUBDIRS-y += hypfs
+SUBDIRS-y += store
 
 ifeq ($(CONFIG_RUMP),y)
 SUBDIRS-y := toolcore

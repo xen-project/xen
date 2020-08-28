@@ -20,3 +20,5 @@ LIBS_LIBS += ctrl
 USELIBS_ctrl := toollog call evtchn gnttab foreignmemory devicemodel
 LIBS_LIBS += guest
 USELIBS_guest := evtchn ctrl
+LIBS_LIBS += store
+USELIBS_store := toolcore

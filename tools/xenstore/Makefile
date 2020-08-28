@@ -34,17 +34,7 @@ XENSTORED_OBJS_$(CONFIG_MiniOS) = xenstored_minios.o
 XENSTORED_OBJS += $(XENSTORED_OBJS_y)
 LDLIBS_xenstored += -lrt
 
-ifneq ($(XENSTORE_STATIC_CLIENTS),y)
-LIBXENSTORE := libxenstore.so
-else
-LIBXENSTORE := libxenstore.a
-xenstore xenstore-control: CFLAGS += -static
-endif
-
-ALL_TARGETS = libxenstore.a clients
-ifneq ($(nosharedlibs),y)
-ALL_TARGETS += libxenstore.so
-endif
+ALL_TARGETS = clients
 ifeq ($(XENSTORE_XENSTORED),y)
 ALL_TARGETS += xs_tdb_dump xenstored
 endif
@@ -87,64 +77,21 @@ xenstored.a: $(XENSTORED_OBJS)
 $(CLIENTS): xenstore
 	ln -f xenstore $@
 
-xenstore: xenstore_client.o $(LIBXENSTORE)
+xenstore: xenstore_client.o
 	$(CC) $< $(LDFLAGS) $(LDLIBS_libxenstore) $(LDLIBS_libxentoolcore) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
-xenstore-control: xenstore_control.o $(LIBXENSTORE)
+xenstore-control: xenstore_control.o
 	$(CC) $< $(LDFLAGS) $(LDLIBS_libxenstore) $(LDLIBS_libxentoolcore) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 	$(CC) $^ $(LDFLAGS) -o $@ $(APPEND_LDFLAGS)
 
-libxenstore.so: libxenstore.so.$(MAJOR)
-	ln -sf $< $@
-libxenstore.so.$(MAJOR): libxenstore.so.$(MAJOR).$(MINOR)
-	ln -sf $< $@
-
-xs.opic: CFLAGS += -DUSE_PTHREAD
-ifeq ($(CONFIG_Linux),y)
-xs.opic: CFLAGS += -DUSE_DLSYM
-libxenstore.so.$(MAJOR).$(MINOR): APPEND_LDFLAGS += -ldl
-PKG_CONFIG_LIBSPRIV := -ldl
-endif
-
-libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
-	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxentoolcore) $(SOCKET_LIBS) $(PTHREAD_LIBS) $(APPEND_LDFLAGS)
-
-libxenstore.a: xs.o xs_lib.o
-	$(AR) rcs $@ $^
-
-PKG_CONFIG := xenstore.pc
-PKG_CONFIG_NAME := Xenstore
-PKG_CONFIG_DESC := The Xenstore library for Xen hypervisor
-PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
-PKG_CONFIG_USELIBS := $(SHLIB_libxenstore)
-PKG_CONFIG_LIB := xenstore
-PKG_CONFIG_REQPRIV := xenevtchn,xencontrol,xengnttab,xentoolcore
-
-ifneq ($(CONFIG_LIBXC_MINIOS),y)
-PKG_CONFIG_INST := $(PKG_CONFIG)
-$(PKG_CONFIG_INST): PKG_CONFIG_PREFIX = $(prefix)
-$(PKG_CONFIG_INST): PKG_CONFIG_INCDIR = $(includedir)
-$(PKG_CONFIG_INST): PKG_CONFIG_LIBDIR = $(libdir)
-endif
-
-PKG_CONFIG_LOCAL := $(foreach pc,$(PKG_CONFIG),$(PKG_CONFIG_DIR)/$(pc))
-
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_PREFIX = $(XEN_ROOT)
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxenstore)/include
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude)
-
-$(LIBXENSTORE): $(PKG_CONFIG_INST) $(PKG_CONFIG_LOCAL)
-
 .PHONY: clean
 clean:
-	rm -f *.a *.o *.opic *.so* xenstored_probes.h
+	rm -f *.a *.o xenstored_probes.h
 	rm -f xenstored xs_random xs_stress xs_crashme
 	rm -f xs_tdb_dump xenstore-control init-xenstore-domain
 	rm -f xenstore $(CLIENTS)
-	rm -f xenstore.pc
 	$(RM) $(DEPS_RM)
 
 .PHONY: distclean
@@ -161,8 +108,6 @@ tarball: clean
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)
-	$(INSTALL_DIR) $(DESTDIR)$(includedir)
-	$(INSTALL_DIR) $(DESTDIR)$(includedir)/xenstore-compat
 ifeq ($(XENSTORE_XENSTORED),y)
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_LIB_STORED)
@@ -173,32 +118,9 @@ endif
 	set -e ; for c in $(CLIENTS) ; do \
 		ln -f $(DESTDIR)$(bindir)/xenstore $(DESTDIR)$(bindir)/$${c} ; \
 	done
-	$(INSTALL_DIR) $(DESTDIR)$(libdir)
-	$(INSTALL_SHLIB) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
-	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenstore.so.$(MAJOR)
-	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)$(libdir)/libxenstore.so
-	$(INSTALL_DATA) libxenstore.a $(DESTDIR)$(libdir)
-	$(INSTALL_DATA) include/xenstore.h $(DESTDIR)$(includedir)
-	$(INSTALL_DATA) include/xenstore_lib.h $(DESTDIR)$(includedir)
-	$(INSTALL_DATA) include/compat/xs.h $(DESTDIR)$(includedir)/xenstore-compat/xs.h
-	$(INSTALL_DATA) include/compat/xs_lib.h $(DESTDIR)$(includedir)/xenstore-compat/xs_lib.h
-	ln -sf xenstore-compat/xs.h  $(DESTDIR)$(includedir)/xs.h
-	ln -sf xenstore-compat/xs_lib.h $(DESTDIR)$(includedir)/xs_lib.h
-	$(INSTALL_DATA) xenstore.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
 .PHONY: uninstall
 uninstall:
-	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xenstore.pc
-	rm -f $(DESTDIR)$(includedir)/xs_lib.h
-	rm -f $(DESTDIR)$(includedir)/xs.h
-	rm -f $(DESTDIR)$(includedir)/xenstore-compat/xs_lib.h
-	rm -f $(DESTDIR)$(includedir)/xenstore-compat/xs.h
-	rm -f $(DESTDIR)$(includedir)/xenstore_lib.h
-	rm -f $(DESTDIR)$(includedir)/xenstore.h
-	rm -f $(DESTDIR)$(libdir)/libxenstore.a
-	rm -f $(DESTDIR)$(libdir)/libxenstore.so
-	rm -f $(DESTDIR)$(libdir)/libxenstore.so.$(MAJOR)
-	rm -f $(DESTDIR)$(libdir)/libxenstore.so.$(MAJOR).$(MINOR)
 	rm -f $(addprefix $(DESTDIR)$(bindir)/, $(CLIENTS))
 	rm -f $(DESTDIR)$(bindir)/xenstore
 	rm -f $(DESTDIR)$(bindir)/xenstore-control

@@ -43,7 +43,7 @@ SUBDIRS-y += pygrub
 SUBDIRS-$(OCAML_TOOLS) += ocaml
 
 ifeq ($(CONFIG_RUMP),y)
-SUBDIRS-y := libs xenstore
+SUBDIRS-y := libs
 endif
 
 # For the sake of linking, set the sys-root

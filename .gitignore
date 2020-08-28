@@ -128,6 +128,12 @@ tools/libs/guest/xc_core.h
 tools/libs/guest/xc_core_arm.h
 tools/libs/guest/xc_core_x86.h
 tools/libs/guest/xc_private.h
+tools/libs/store/headers.chk
+tools/libs/store/list.h
+tools/libs/store/utils.h
+tools/libs/store/xenstore.pc
+tools/libs/store/xs_lib.c
+tools/libs/store/include/xenstore_lib.h
 tools/console/xenconsole
 tools/console/xenconsoled
 tools/console/client/_paths.h
@@ -282,7 +288,6 @@ tools/xenstore/xenstore-control
 tools/xenstore/xenstore-ls
 tools/xenstore/xenstored
 tools/xenstore/xenstored_test
-tools/xenstore/xenstore.pc
 tools/xenstore/xs_tdb_dump
 tools/xentrace/xentrace_setsize
 tools/xentrace/tbctl
