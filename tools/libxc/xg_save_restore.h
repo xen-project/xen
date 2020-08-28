@@ -109,10 +109,6 @@ static inline int get_platform_info(xc_interface *xch, uint32_t dom,
 #define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
 #define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
 
-/* Returns TRUE if the PFN is currently mapped */
-#define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
-
-
 #define GET_FIELD(_p, _f, _w) (((_w) == 8) ? ((_p)->x64._f) : ((_p)->x32._f))
 
 #define SET_FIELD(_p, _f, _v, _w) do {          \

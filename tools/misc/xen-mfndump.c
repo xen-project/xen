@@ -5,7 +5,10 @@
 #include <unistd.h>
 #include <inttypes.h>
 
-#include "xg_save_restore.h"
+#include <xen-tools/libs.h>
+
+#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), 21)
+#define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
 
 static xc_interface *xch;
 
