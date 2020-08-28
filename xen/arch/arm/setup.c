@@ -133,6 +133,18 @@ static void __init processor_id(void)
            cpu_has_simd ? " AdvancedSIMD" : "",
            cpu_has_gicv3 ? " GICv3-SysReg" : "");
 
+    /* Warn user if we find unknown floating-point features */
+    if ( cpu_has_fp && (boot_cpu_feature64(fp) >= 2) )
+        printk(XENLOG_WARNING "WARNING: Unknown Floating-point ID:%d, "
+               "this may result in corruption on the platform\n",
+               boot_cpu_feature64(fp));
+
+    /* Warn user if we find unknown AdvancedSIMD features */
+    if ( cpu_has_simd && (boot_cpu_feature64(simd) >= 2) )
+        printk(XENLOG_WARNING "WARNING: Unknown AdvancedSIMD ID:%d, "
+               "this may result in corruption on the platform\n",
+               boot_cpu_feature64(simd));
+
     printk("  Debug Features: %016"PRIx64" %016"PRIx64"\n",
            boot_cpu_data.dbg64.bits[0], boot_cpu_data.dbg64.bits[1]);
     printk("  Auxiliary Features: %016"PRIx64" %016"PRIx64"\n",
