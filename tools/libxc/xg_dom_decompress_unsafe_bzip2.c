@@ -3,7 +3,7 @@
 #include <inttypes.h>
 
 #include "xg_private.h"
-#include "xc_dom_decompress_unsafe.h"
+#include "xg_dom_decompress_unsafe.h"
 
 #include "../../xen/common/bunzip2.c"
 

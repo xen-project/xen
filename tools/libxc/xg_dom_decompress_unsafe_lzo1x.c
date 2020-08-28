@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "xg_private.h"
-#include "xc_dom_decompress_unsafe.h"
+#include "xg_dom_decompress_unsafe.h"
 
 typedef uint8_t u8;
 typedef uint32_t u32;

@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <arpa/inet.h>
 
-#include "xc_sr_common_x86.h"
+#include "xg_sr_common_x86.h"
 
 /*
  * Process an HVM_CONTEXT record from the stream.

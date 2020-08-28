@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include "xc_sr_common_x86_pv.h"
+#include "xg_sr_common_x86_pv.h"
 
 static xen_pfn_t pfn_to_mfn(const struct xc_sr_context *ctx, xen_pfn_t pfn)
 {

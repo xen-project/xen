@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <arpa/inet.h>
 
-#include "xc_sr_common.h"
+#include "xg_sr_common.h"
 
 /*
  * Writes an Image header and Domain header into the stream.

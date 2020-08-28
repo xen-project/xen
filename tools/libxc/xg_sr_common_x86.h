@@ -1,7 +1,7 @@
 #ifndef __COMMON_X86__H
 #define __COMMON_X86__H
 
-#include "xc_sr_common.h"
+#include "xg_sr_common.h"
 
 /*
  * Obtains a domains TSC information from Xen and writes a X86_TSC_INFO record

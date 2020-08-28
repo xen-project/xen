@@ -8,7 +8,7 @@
 #include "xc_dom.h"
 #include "xc_bitops.h"
 
-#include "xc_sr_stream_format.h"
+#include "xg_sr_stream_format.h"
 
 /* String representation of Domain Header types. */
 const char *dhdr_type_to_str(uint32_t type);

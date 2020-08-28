@@ -1,4 +1,4 @@
-#include "xc_sr_common_x86.h"
+#include "xg_sr_common_x86.h"
 
 int write_x86_tsc_info(struct xc_sr_context *ctx)
 {

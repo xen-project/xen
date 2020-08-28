@@ -1,7 +1,7 @@
 #ifndef __COMMON_X86_PV_H
 #define __COMMON_X86_PV_H
 
-#include "xc_sr_common_x86.h"
+#include "xg_sr_common_x86.h"
 
 /* Virtual address ranges reserved for hypervisor. */
 #define HYPERVISOR_VIRT_START_X86_64 0xFFFF800000000000ULL

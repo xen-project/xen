@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include "xc_sr_common.h"
+#include "xg_sr_common.h"
 
 #include <xen-tools/libs.h>
 

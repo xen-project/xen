@@ -32,7 +32,7 @@
 #include <inttypes.h>
 
 #include "xg_private.h"
-#include "xc_dom_decompress.h"
+#include "xg_dom_decompress.h"
 
 #include <xen-tools/libs.h>
 

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "xg_private.h"
-#include "xc_dom_decompress.h"
+#include "xg_dom_decompress.h"
 
 #define CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
 

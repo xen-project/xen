@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include "xc_sr_common_x86.h"
+#include "xg_sr_common_x86.h"
 
 #include <xen/hvm/params.h>
 

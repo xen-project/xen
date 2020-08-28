@@ -3,7 +3,7 @@
 #include <inttypes.h>
 
 #include "xg_private.h"
-#include "xc_dom_decompress_unsafe.h"
+#include "xg_dom_decompress_unsafe.h"
 
 static struct xc_dom_image *unsafe_dom;
 static unsigned char *output_blob;

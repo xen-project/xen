@@ -2,7 +2,7 @@
 
 #include <assert.h>
 
-#include "xc_sr_common.h"
+#include "xg_sr_common.h"
 
 /*
  * Read and validate the Image and Domain headers.

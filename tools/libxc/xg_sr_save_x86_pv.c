@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <limits.h>
 
-#include "xc_sr_common_x86_pv.h"
+#include "xg_sr_common_x86_pv.h"
 
 /* Check a 64 bit virtual address for being canonical. */
 static inline bool is_canonical_address(xen_vaddr_t vaddr)
