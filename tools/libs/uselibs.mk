@@ -22,3 +22,5 @@ LIBS_LIBS += guest
 USELIBS_guest := evtchn ctrl
 LIBS_LIBS += store
 USELIBS_store := toolcore
+LIBS_LIBS += vchan
+USELIBS_vchan := toollog store gnttab evtchn
