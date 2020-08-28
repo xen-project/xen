@@ -18,8 +18,8 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <errno.h>
 
-#include "xc_bitops.h"
 #include "policy.h"
 
 

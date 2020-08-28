@@ -43,7 +43,7 @@ static void *page_in(void *arg)
         /* Ignore errors */
         page = xc_map_foreign_pages(pia->xch, pia->dom, PROT_READ, gfns, num);
         if (page)
-            munmap(page, PAGE_SIZE * num);
+            munmap(page, XC_PAGE_SIZE * num);
     }
     page_in_possible = 0;
     pthread_exit(NULL);

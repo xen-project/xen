@@ -30,7 +30,6 @@
 #include <xenstore.h>
 #include <getopt.h>
 
-#include "xc_bitops.h"
 #include "file_ops.h"
 #include "policy.h"
 #include "xenpaging.h"
@@ -183,12 +182,12 @@ static void *init_page(void)
     void *buffer;
 
     /* Allocated page memory */
-    errno = posix_memalign(&buffer, PAGE_SIZE, PAGE_SIZE);
+    errno = posix_memalign(&buffer, XC_PAGE_SIZE, XC_PAGE_SIZE);
     if ( errno != 0 )
         return NULL;
 
     /* Lock buffer in memory so it can't be paged out */
-    if ( mlock(buffer, PAGE_SIZE) < 0 )
+    if ( mlock(buffer, XC_PAGE_SIZE) < 0 )
     {
         free(buffer);
         buffer = NULL;
@@ -277,7 +276,6 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     struct xenpaging *paging;
     xc_domaininfo_t domain_info;
     xc_interface *xch = NULL;
-    xentoollog_logger *dbg = NULL;
     char *p;
     int rc;
     unsigned long ring_pfn, mmap_pfn;
@@ -291,12 +289,11 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     if ( xenpaging_getopts(paging, argc, argv) )
         goto err;
 
-    /* Enable debug output */
-    if ( paging->debug )
-        dbg = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr, XTL_DEBUG, 0);
+    paging->logger = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr,
+                         paging->debug ? XTL_DEBUG : XTL_PROGRESS, 0);
 
     /* Open connection to xen */
-    paging->xc_handle = xch = xc_interface_open(dbg, NULL, 0);
+    paging->xc_handle = xch = xc_interface_open(paging->logger, NULL, 0);
     if ( !xch )
         goto err;
 
@@ -416,7 +413,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     SHARED_RING_INIT((vm_event_sring_t *)paging->vm_event.ring_page);
     BACK_RING_INIT(&paging->vm_event.back_ring,
                    (vm_event_sring_t *)paging->vm_event.ring_page,
-                   PAGE_SIZE);
+                   XC_PAGE_SIZE);
 
     /* Now that the ring is set, remove it from the guest's physmap */
     if ( xc_domain_decrease_reservation_exact(xch, 
@@ -490,15 +487,17 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
             xs_close(paging->xs_handle);
         if ( xch )
             xc_interface_close(xch);
+        if ( paging->logger )
+            xtl_logger_destroy(paging->logger);
         if ( paging->paging_buffer )
         {
-            munlock(paging->paging_buffer, PAGE_SIZE);
+            munlock(paging->paging_buffer, XC_PAGE_SIZE);
             free(paging->paging_buffer);
         }
 
         if ( paging->vm_event.ring_page )
         {
-            munmap(paging->vm_event.ring_page, PAGE_SIZE);
+            munmap(paging->vm_event.ring_page, XC_PAGE_SIZE);
         }
 
         free(dom_path);
@@ -523,7 +522,7 @@ static void xenpaging_teardown(struct xenpaging *paging)
 
     paging->xc_handle = NULL;
     /* Tear down domain paging in Xen */
-    munmap(paging->vm_event.ring_page, PAGE_SIZE);
+    munmap(paging->vm_event.ring_page, XC_PAGE_SIZE);
     rc = xc_mem_paging_disable(xch, paging->vm_event.domain_id);
     if ( rc != 0 )
     {
@@ -551,6 +550,8 @@ static void xenpaging_teardown(struct xenpaging *paging)
 
     /* Close connection to Xen */
     xc_interface_close(xch);
+
+    xtl_logger_destroy(paging->logger);
 }
 
 static void get_request(struct vm_event *vm_event, vm_event_request_t *req)
@@ -598,8 +599,7 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
     void *page;
     xen_pfn_t victim = gfn;
     int ret;
-
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl;
 
     /* Nominate page */
     ret = xc_mem_paging_nominate(xch, paging->vm_event.domain_id, gfn);
@@ -627,13 +627,13 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
     if ( ret < 0 )
     {
         PERROR("Error copying page %lx", gfn);
-        munmap(page, PAGE_SIZE);
+        munmap(page, XC_PAGE_SIZE);
         ret = -1;
         goto out;
     }
 
     /* Release page */
-    munmap(page, PAGE_SIZE);
+    munmap(page, XC_PAGE_SIZE);
 
     /* Tell Xen to evict page */
     ret = xc_mem_paging_evict(xch, paging->vm_event.domain_id, gfn);

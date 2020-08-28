@@ -20,7 +20,7 @@
 
 
 #include <unistd.h>
-#include <xc_private.h>
+#include <xenctrl.h>
 
 static int file_op(int fd, void *page, int i,
                    ssize_t (*fn)(int, void *, size_t))
@@ -29,13 +29,13 @@ static int file_op(int fd, void *page, int i,
     int total = 0;
     int bytes;
 
-    offset = lseek(fd, offset << PAGE_SHIFT, SEEK_SET);
+    offset = lseek(fd, offset << XC_PAGE_SHIFT, SEEK_SET);
     if ( offset == (off_t)-1 )
         return -1;
 
-    while ( total < PAGE_SIZE )
+    while ( total < XC_PAGE_SIZE )
     {
-        bytes = fn(fd, page + total, PAGE_SIZE - total);
+        bytes = fn(fd, page + total, XC_PAGE_SIZE - total);
         if ( bytes <= 0 )
             return -1;
 
