@@ -52,7 +52,9 @@ CTRL_SRCS-y       += xc_gnttab_compat.c
 CTRL_SRCS-y       += xc_devicemodel_compat.c
 
 GUEST_SRCS-y :=
-GUEST_SRCS-y += xg_private.c xc_suspend.c
+GUEST_SRCS-y += xg_private.c
+GUEST_SRCS-y += xg_domain.c
+GUEST_SRCS-y += xc_suspend.c
 ifeq ($(CONFIG_MIGRATE),y)
 GUEST_SRCS-y += xc_sr_common.c
 GUEST_SRCS-$(CONFIG_X86) += xc_sr_common_x86.c
