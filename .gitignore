@@ -128,6 +128,10 @@ tools/libs/guest/xc_core.h
 tools/libs/guest/xc_core_arm.h
 tools/libs/guest/xc_core_x86.h
 tools/libs/guest/xc_private.h
+tools/libs/stat/_paths.h
+tools/libs/stat/headers.chk
+tools/libs/stat/libxenstat.map
+tools/libs/stat/xenstat.pc
 tools/libs/store/headers.chk
 tools/libs/store/list.h
 tools/libs/store/utils.h
@@ -276,9 +280,6 @@ tools/xenmon/xentrace_setmask
 tools/xenmon/xenbaked
 tools/xenpaging/xenpaging
 tools/xenpmd/xenpmd
-tools/xenstat/libxenstat/src/_paths.h
-tools/xenstat/libxenstat/xenstat.pc
-tools/xenstat/xentop/xentop
 tools/xenstore/xenstore
 tools/xenstore/xenstore-chmod
 tools/xenstore/xenstore-exists
@@ -291,6 +292,7 @@ tools/xenstore/xenstore-ls
 tools/xenstore/xenstored
 tools/xenstore/xenstored_test
 tools/xenstore/xs_tdb_dump
+tools/xentop/xentop
 tools/xentrace/xentrace_setsize
 tools/xentrace/tbctl
 tools/xentrace/xenctx

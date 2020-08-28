@@ -13,6 +13,7 @@ SUBDIRS-y += ctrl
 SUBDIRS-y += guest
 SUBDIRS-y += hypfs
 SUBDIRS-y += store
+SUBDIRS-y += stat
 SUBDIRS-$(CONFIG_Linux) += vchan
 
 ifeq ($(CONFIG_RUMP),y)

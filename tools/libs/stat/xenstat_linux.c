@@ -64,7 +64,7 @@ static const char PROCNETDEV_HEADER[] =
 
 /* We need to get the name of the bridge interface for use with bonding interfaces */
 /* Use excludeName parameter to avoid adding bridges we don't care about, eg. virbr0 */
-void getBridge(char *excludeName, char *result, size_t resultLen)
+static void getBridge(char *excludeName, char *result, size_t resultLen)
 {
 	struct dirent *de;
 	DIR *d;
@@ -89,7 +89,7 @@ void getBridge(char *excludeName, char *result, size_t resultLen)
 
 /* parseNetLine provides regular expression based parsing for lines from /proc/net/dev, all the */
 /* information are parsed but not all are used in our case, ie. for xenstat */
-int parseNetDevLine(char *line, char *iface, unsigned long long *rxBytes, unsigned long long *rxPackets,
+static int parseNetDevLine(char *line, char *iface, unsigned long long *rxBytes, unsigned long long *rxPackets,
 		unsigned long long *rxErrs, unsigned long long *rxDrops, unsigned long long *rxFifo,
 		unsigned long long *rxFrames, unsigned long long *rxComp, unsigned long long *rxMcast,
 		unsigned long long *txBytes, unsigned long long *txPackets, unsigned long long *txErrs,

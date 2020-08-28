@@ -18,7 +18,6 @@ include $(XEN_ROOT)/tools/libs/uselibs.mk
 XEN_libxenlight    = $(XEN_ROOT)/tools/libxl
 # Currently libxlutil lives in the same directory as libxenlight
 XEN_libxlutil      = $(XEN_libxenlight)
-XEN_libxenstat     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
@@ -107,11 +106,6 @@ CFLAGS_libxenguest += $(CFLAGS_libxenevtchn) $(CFLAGS_libxenforeignmemory)
 ifeq ($(CONFIG_Linux),y)
 LDLIBS_libxenstore += -ldl
 endif
-
-CFLAGS_libxenstat  = -I$(XEN_libxenstat)
-SHDEPS_libxenstat  = $(SHLIB_libxenctrl) $(SHLIB_libxenstore)
-LDLIBS_libxenstat  = $(SHDEPS_libxenstat) $(XEN_libxenstat)/libxenstat$(libextension)
-SHLIB_libxenstat   = $(SHDEPS_libxenstat) -Wl,-rpath-link=$(XEN_libxenstat)
 
 ifeq ($(debug),y)
 # Disable optimizations

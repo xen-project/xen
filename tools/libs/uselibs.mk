@@ -24,3 +24,5 @@ LIBS_LIBS += store
 USELIBS_store := toolcore
 LIBS_LIBS += vchan
 USELIBS_vchan := toollog store gnttab evtchn
+LIBS_LIBS += stat
+USELIBS_stat := ctrl store
