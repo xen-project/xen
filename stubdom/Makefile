@@ -25,7 +25,7 @@ endif
 
 include $(XEN_ROOT)/tools/libs/uselibs.mk
 
-define LIB_deps =
+define LIB_deps
  LIBDEPS_$(1) = $$(foreach use,$$(USELIBS_$(1)),libxen$$(use))
 endef
 $(foreach lib,$(LIBS_LIBS),$(eval $(call LIB_deps,$(lib))))
