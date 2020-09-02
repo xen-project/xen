@@ -22,17 +22,13 @@ dir=$(dirname "$0")
 main_ip=$(dom0_ip)
 
 case "${command}" in
-    add)
-        ;&
-    online)
+    add|online)
         ifconfig ${dev} ${main_ip} netmask 255.255.255.255 up
         echo 1 >/proc/sys/net/ipv4/conf/${dev}/proxy_arp
         ipcmd='add'
         cmdprefix=''
         ;;
-    remove)
-        ;&
-    offline)
+    remove|offline)
         do_without_error ifdown ${dev}
         ipcmd='del'
         cmdprefix='do_without_error'

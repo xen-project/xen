@@ -77,16 +77,12 @@ then
 fi
 
 case "$command" in
-    add)
-        ;&
-    online)
+    add|online)
         setup_virtual_bridge_port "$dev"
         set_mtu "$bridge" "$dev" "$type_if"
         add_to_bridge "$bridge" "$dev"
         ;;
-    remove)
-        ;&
-    offline)
+    remove|offline)
         remove_from_bridge "$bridge" "$dev"
         ;;
 esac
