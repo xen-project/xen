@@ -32,6 +32,8 @@ void pv_destroy_gdt(struct vcpu *v);
 bool pv_map_ldt_shadow_page(unsigned int off);
 bool pv_destroy_ldt(struct vcpu *v);
 
+int validate_segdesc_page(struct page_info *page);
+
 #else
 
 #include <xen/errno.h>

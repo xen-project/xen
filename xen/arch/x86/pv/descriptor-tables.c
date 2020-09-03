@@ -185,6 +185,106 @@ int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list,
     return ret;
 }
 
+static bool check_descriptor(const struct domain *dom, seg_desc_t *d)
+{
+    unsigned int a = d->a, b = d->b, cs, dpl;
+
+    /* A not-present descriptor will always fault, so is safe. */
+    if ( !(b & _SEGMENT_P) )
+        return true;
+
+    /* Check and fix up the DPL. */
+    dpl = (b >> 13) & 3;
+    __fixup_guest_selector(dom, dpl);
+    b = (b & ~_SEGMENT_DPL) | (dpl << 13);
+
+    /* All code and data segments are okay. No base/limit checking. */
+    if ( b & _SEGMENT_S )
+    {
+        if ( is_pv_32bit_domain(dom) )
+        {
+            unsigned long base, limit;
+
+            if ( b & _SEGMENT_L )
+                goto bad;
+
+            /*
+             * Older PAE Linux guests use segments which are limited to
+             * 0xf6800000. Extend these to allow access to the larger read-only
+             * M2P table available in 32on64 mode.
+             */
+            base = (b & 0xff000000) | ((b & 0xff) << 16) | (a >> 16);
+
+            limit = (b & 0xf0000) | (a & 0xffff);
+            limit++; /* We add one because limit is inclusive. */
+
+            if ( b & _SEGMENT_G )
+                limit <<= 12;
+
+            if ( (base == 0) && (limit > HYPERVISOR_COMPAT_VIRT_START(dom)) )
+            {
+                a |= 0x0000ffff;
+                b |= 0x000f0000;
+            }
+        }
+
+        goto good;
+    }
+
+    /* Invalid type 0 is harmless. It is used for 2nd half of a call gate. */
+    if ( (b & _SEGMENT_TYPE) == 0x000 )
+        return true;
+
+    /* Everything but a call gate is discarded here. */
+    if ( (b & _SEGMENT_TYPE) != 0xc00 )
+        goto bad;
+
+    /* Validate the target code selector. */
+    cs = a >> 16;
+    if ( !guest_gate_selector_okay(dom, cs) )
+        goto bad;
+    /*
+     * Force DPL to zero, causing a GP fault with its error code indicating
+     * the gate in use, allowing emulation. This is necessary because with
+     * native guests (kernel in ring 3) call gates cannot be used directly
+     * to transition from user to kernel mode (and whether a gate is used
+     * to enter the kernel can only be determined when the gate is being
+     * used), and with compat guests call gates cannot be used at all as
+     * there are only 64-bit ones.
+     * Store the original DPL in the selector's RPL field.
+     */
+    b &= ~_SEGMENT_DPL;
+    cs = (cs & ~3) | dpl;
+    a = (a & 0xffffU) | (cs << 16);
+
+    /* Reserved bits must be zero. */
+    if ( b & (is_pv_32bit_domain(dom) ? 0xe0 : 0xff) )
+        goto bad;
+
+ good:
+    d->a = a;
+    d->b = b;
+    return true;
+
+ bad:
+    return false;
+}
+
+int validate_segdesc_page(struct page_info *page)
+{
+    const struct domain *owner = page_get_owner(page);
+    seg_desc_t *descs = __map_domain_page(page);
+    unsigned i;
+
+    for ( i = 0; i < 512; i++ )
+        if ( unlikely(!check_descriptor(owner, &descs[i])) )
+            break;
+
+    unmap_domain_page(descs);
+
+    return i == 512 ? 0 : -EINVAL;
+}
+
 long do_update_descriptor(uint64_t gaddr, seg_desc_t d)
 {
     struct domain *currd = current->domain;

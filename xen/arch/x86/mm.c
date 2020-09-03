@@ -585,23 +585,6 @@ const char __section(".bss.page_aligned.const") __aligned(PAGE_SIZE)
     zero_page[PAGE_SIZE];
 
 
-#ifdef CONFIG_PV
-static int validate_segdesc_page(struct page_info *page)
-{
-    const struct domain *owner = page_get_owner(page);
-    seg_desc_t *descs = __map_domain_page(page);
-    unsigned i;
-
-    for ( i = 0; i < 512; i++ )
-        if ( unlikely(!check_descriptor(owner, &descs[i])) )
-            break;
-
-    unmap_domain_page(descs);
-
-    return i == 512 ? 0 : -EINVAL;
-}
-#endif
-
 static int _get_page_type(struct page_info *page, unsigned long type,
                           bool preemptible);
 
