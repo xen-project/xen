@@ -391,6 +391,7 @@ struct xen_mc_physcpuinfo {
     /* OUT */
     XEN_GUEST_HANDLE(xen_mc_logical_cpu_t) info;
 };
+typedef struct xen_mc_physcpuinfo xen_mc_physcpuinfo_t;
 
 #define XEN_MC_msrinject    4
 #define MC_MSRINJ_MAXMSRS       8
@@ -436,9 +437,9 @@ struct xen_mc {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_MCA_INTERFACE_VERSION */
     union {
-        struct xen_mc_fetch        mc_fetch;
+        xen_mc_fetch_t             mc_fetch;
         xen_mc_notifydomain_t      mc_notifydomain;
-        struct xen_mc_physcpuinfo  mc_physcpuinfo;
+        xen_mc_physcpuinfo_t       mc_physcpuinfo;
         xen_mc_msrinject_t         mc_msrinject;
         xen_mc_mceinject_t         mc_mceinject;
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
