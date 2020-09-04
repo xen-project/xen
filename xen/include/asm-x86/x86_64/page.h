@@ -106,8 +106,7 @@ typedef l4_pgentry_t root_pgentry_t;
 #define l4_linear_offset(_a) (((_a) & VADDR_MASK) >> L4_PAGETABLE_SHIFT)
 
 #define is_guest_l2_slot(_d, _t, _s)                   \
-    ( !is_pv_32bit_domain(_d) ||                       \
-      !((_t) & PGT_pae_xen_l2) ||                      \
+    ( !((_t) & PGT_pae_xen_l2) ||                      \
       ((_s) < COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_d)) )
 #define is_guest_l4_slot(_d, _s)                    \
     ( is_pv_32bit_domain(_d)                        \
