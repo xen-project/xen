@@ -292,6 +292,12 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         *val = msrs->tsc_aux;
         break;
 
+    case MSR_AMD64_DE_CFG:
+        if ( !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+            goto gp_fault;
+        *val = AMD64_DE_CFG_LFENCE_SERIALISE;
+        break;
+
     case MSR_AMD64_DR0_ADDRESS_MASK:
     case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
         if ( !cp->extd.dbext )
@@ -515,6 +521,15 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         msrs->tsc_aux = val;
         if ( v == curr )
             wrmsr_tsc_aux(val);
+        break;
+
+    case MSR_AMD64_DE_CFG:
+        /*
+         * OpenBSD 6.7 will panic if writing to DE_CFG triggers a #GP:
+         * https://www.illumos.org/issues/12998 - drop writes.
+         */
+        if ( !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+            goto gp_fault;
         break;
 
     case MSR_AMD64_DR0_ADDRESS_MASK:
