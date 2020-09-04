@@ -291,6 +291,8 @@ struct netfront_dev *net_dev;
 int
 minios_probe (struct nic *nic)
 {
+    char *ip;
+
     if (net_dev)
         return 1;
 
@@ -298,7 +300,7 @@ minios_probe (struct nic *nic)
     grub_memset ((char *) arptable, 0,
                  MAX_ARP * sizeof (struct arptable_t));
 
-    net_dev = init_netfront(NULL, (void*) -1, nic->node_addr, NULL, NULL, NULL);
+    net_dev = init_netfront(NULL, (void*) -1, nic->node_addr, &ip);
     if (!net_dev)
         return 0;
 
