@@ -229,11 +229,11 @@ DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_ext_t);
 struct physdev_op {
     uint32_t cmd;
     union {
-        struct physdev_irq_status_query      irq_status_query;
-        struct physdev_set_iopl              set_iopl;
-        struct physdev_set_iobitmap          set_iobitmap;
-        struct physdev_apic                  apic_op;
-        struct physdev_irq                   irq_op;
+        physdev_irq_status_query_t irq_status_query;
+        physdev_set_iopl_t         set_iopl;
+        physdev_set_iobitmap_t     set_iobitmap;
+        physdev_apic_t             apic_op;
+        physdev_irq_t              irq_op;
     } u;
 };
 typedef struct physdev_op physdev_op_t;
@@ -334,7 +334,7 @@ struct physdev_dbgp_op {
     uint8_t op;
     uint8_t bus;
     union {
-        struct physdev_pci_device pci;
+        physdev_pci_device_t pci;
     } u;
 };
 typedef struct physdev_dbgp_op physdev_dbgp_op_t;

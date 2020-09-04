@@ -53,9 +53,10 @@ struct xen_hypfs_direntry {
     uint32_t content_len;      /* Current length of data. */
     uint32_t max_write_len;    /* Max. length for writes (0 if read-only). */
 };
+typedef struct xen_hypfs_direntry xen_hypfs_direntry_t;
 
 struct xen_hypfs_dirlistentry {
-    struct xen_hypfs_direntry e;
+    xen_hypfs_direntry_t e;
     /* Offset in bytes to next entry (0 == this is the last entry). */
     uint16_t off_next;
     /* Zero terminated entry name, possibly with some padding for alignment. */

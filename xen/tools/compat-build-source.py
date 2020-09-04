@@ -9,6 +9,7 @@ pats = [
  [ r"^\s*#\s*endif /\* (XEN_HAVE.*) \*/\s+", r"__EnDif__" ],
  [ r"^\s*#\s*define\s+([A-Z_]*_GUEST_HANDLE)", r"#define HIDE_\1" ],
  [ r"^\s*#\s*define\s+([a-z_]*_guest_handle)", r"#define hide_\1" ],
+ [ r"^\s*#\s*define\s+(u?int64)_aligned_t\s.*aligned.*", r"typedef \1_T __attribute__((aligned(4))) \1_compat_T;" ],
  [ r"XEN_GUEST_HANDLE(_[0-9A-Fa-f]+)?", r"COMPAT_HANDLE" ],
 ];
 

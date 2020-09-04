@@ -726,7 +726,7 @@ struct vcpu_info {
 #endif /* XEN_HAVE_PV_UPCALL_MASK */
     xen_ulong_t evtchn_pending_sel;
     struct arch_vcpu_info arch;
-    struct vcpu_time_info time;
+    vcpu_time_info_t time;
 }; /* 64 bytes (x86) */
 #ifndef __XEN__
 typedef struct vcpu_info vcpu_info_t;
@@ -1031,6 +1031,7 @@ struct xenctl_bitmap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
     uint32_t nr_bits;
 };
+typedef struct xenctl_bitmap xenctl_bitmap_t;
 #endif
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */

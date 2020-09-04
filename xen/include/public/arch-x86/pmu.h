@@ -105,7 +105,7 @@ struct xen_pmu_arch {
          * Processor's registers at the time of interrupt.
          * WO for hypervisor, RO for guests.
          */
-        struct xen_pmu_regs regs;
+        xen_pmu_regs_t regs;
         /* Padding for adding new registers to xen_pmu_regs in the future */
 #define XENPMU_REGS_PAD_SZ  64
         uint8_t pad[XENPMU_REGS_PAD_SZ];
@@ -132,8 +132,8 @@ struct xen_pmu_arch {
      * hypervisor into hardware during XENPMU_flush
      */
     union {
-        struct xen_pmu_amd_ctxt amd;
-        struct xen_pmu_intel_ctxt intel;
+        xen_pmu_amd_ctxt_t amd;
+        xen_pmu_intel_ctxt_t intel;
 
         /*
          * Padding for contexts (fixed parts only, does not include MSR banks

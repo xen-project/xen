@@ -127,7 +127,7 @@ struct xen_pmu_data {
     uint8_t pad[6];
 
     /* Architecture-specific information */
-    struct xen_pmu_arch pmu;
+    xen_pmu_arch_t pmu;
 };
 
 #endif /* __XEN_PUBLIC_PMU_H__ */

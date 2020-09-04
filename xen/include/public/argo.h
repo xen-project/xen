@@ -67,8 +67,8 @@ typedef struct xen_argo_addr
 
 typedef struct xen_argo_send_addr
 {
-    struct xen_argo_addr src;
-    struct xen_argo_addr dst;
+    xen_argo_addr_t src;
+    xen_argo_addr_t dst;
 } xen_argo_send_addr_t;
 
 typedef struct xen_argo_ring
@@ -121,7 +121,7 @@ typedef struct xen_argo_unregister_ring
 
 typedef struct xen_argo_ring_data_ent
 {
-    struct xen_argo_addr ring;
+    xen_argo_addr_t ring;
     uint16_t flags;
     uint16_t pad;
     uint32_t space_required;
@@ -132,13 +132,13 @@ typedef struct xen_argo_ring_data
 {
     uint32_t nent;
     uint32_t pad;
-    struct xen_argo_ring_data_ent data[XEN_FLEX_ARRAY_DIM];
+    xen_argo_ring_data_ent_t data[XEN_FLEX_ARRAY_DIM];
 } xen_argo_ring_data_t;
 
 struct xen_argo_ring_message_header
 {
     uint32_t len;
-    struct xen_argo_addr source;
+    xen_argo_addr_t source;
     uint32_t message_type;
     uint8_t data[XEN_FLEX_ARRAY_DIM];
 };

@@ -418,6 +418,21 @@ check_field ()
 			"}")
 				level=$(expr $level - 1) id=
 				;;
+			compat_*_t)
+				if [ $level = 2 ]
+				then
+					fields=" "
+					token="${token%_t}"
+					token="${token#compat_}"
+				fi
+				;;
+			evtchn_*_compat_t)
+				if [ $level = 2 -a $token != evtchn_port_compat_t ]
+				then
+					fields=" "
+					token="${token%_compat_t}"
+				fi
+				;;
 			[a-zA-Z]*)
 				id=$token
 				;;
@@ -463,6 +478,14 @@ build_check ()
 			;;
 		"]")
 			arrlvl=$(expr $arrlvl - 1)
+			;;
+		compat_*_t)
+			if [ $level = 2 -a $token != compat_argo_port_t ]
+			then
+				fields=" "
+				token="${token%_t}"
+				token="${token#compat_}"
+			fi
 			;;
 		[a-zA-Z_]*)
 			test $level != 2 -o $arrlvl != 1 || id=$token

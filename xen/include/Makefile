@@ -34,15 +34,6 @@ headers-$(CONFIG_XSM_FLASK) += compat/xsm/flask_op.h
 cppflags-y                := -include public/xen-compat.h -DXEN_GENERATING_COMPAT_HEADERS
 cppflags-$(CONFIG_X86)    += -m32
 
-# 8-byte types are 4-byte aligned on x86_32 ...
-ifeq ($(CONFIG_CC_IS_CLANG),y)
-prefix-$(CONFIG_X86)      := \#pragma pack(push, 4)
-suffix-$(CONFIG_X86)      := \#pragma pack(pop)
-else
-prefix-$(CONFIG_X86)      := \#pragma pack(4)
-suffix-$(CONFIG_X86)      := \#pragma pack()
-endif
-
 endif
 
 public-$(CONFIG_X86) := $(wildcard public/arch-x86/*.h public/arch-x86/*/*.h)
@@ -57,10 +48,8 @@ compat/%.h: compat/%.i Makefile $(BASEDIR)/tools/compat-build-header.py
 	echo "#define $$id" >>$@.new; \
 	echo "#include <xen/compat.h>" >>$@.new; \
 	$(if $(filter-out compat/arch-%.h,$@),echo "#include <$(patsubst compat/%,public/%,$@)>" >>$@.new;) \
-	$(if $(prefix-y),echo "$(prefix-y)" >>$@.new;) \
 	grep -v '^# [0-9]' $< | \
 	$(PYTHON) $(BASEDIR)/tools/compat-build-header.py | uniq >>$@.new; \
-	$(if $(suffix-y),echo "$(suffix-y)" >>$@.new;) \
 	echo "#endif /* $$id */" >>$@.new
 	mv -f $@.new $@
 

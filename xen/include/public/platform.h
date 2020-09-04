@@ -42,6 +42,7 @@ struct xenpf_settime32 {
     uint32_t nsecs;
     uint64_t system_time;
 };
+typedef struct xenpf_settime32 xenpf_settime32_t;
 #define XENPF_settime64           62
 struct xenpf_settime64 {
     /* IN variables. */
@@ -50,6 +51,7 @@ struct xenpf_settime64 {
     uint32_t mbz;
     uint64_t system_time;
 };
+typedef struct xenpf_settime64 xenpf_settime64_t;
 #if __XEN_INTERFACE_VERSION__ < 0x00040600
 #define XENPF_settime XENPF_settime32
 #define xenpf_settime xenpf_settime32
@@ -529,6 +531,7 @@ struct xenpf_cpu_hotadd
 	uint32_t acpi_id;
 	uint32_t pxm;
 };
+typedef struct xenpf_cpu_hotadd xenpf_cpu_hotadd_t;
 
 #define XENPF_mem_hotadd    59
 struct xenpf_mem_hotadd
@@ -538,6 +541,7 @@ struct xenpf_mem_hotadd
     uint32_t pxm;
     uint32_t flags;
 };
+typedef struct xenpf_mem_hotadd xenpf_mem_hotadd_t;
 
 #define XENPF_core_parking  60
 
@@ -622,29 +626,29 @@ struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
     union {
-        struct xenpf_settime           settime;
-        struct xenpf_settime32         settime32;
-        struct xenpf_settime64         settime64;
-        struct xenpf_add_memtype       add_memtype;
-        struct xenpf_del_memtype       del_memtype;
-        struct xenpf_read_memtype      read_memtype;
-        struct xenpf_microcode_update  microcode;
-        struct xenpf_platform_quirk    platform_quirk;
-        struct xenpf_efi_runtime_call  efi_runtime_call;
-        struct xenpf_firmware_info     firmware_info;
-        struct xenpf_enter_acpi_sleep  enter_acpi_sleep;
-        struct xenpf_change_freq       change_freq;
-        struct xenpf_getidletime       getidletime;
-        struct xenpf_set_processor_pminfo set_pminfo;
-        struct xenpf_pcpuinfo          pcpu_info;
-        struct xenpf_pcpu_version      pcpu_version;
-        struct xenpf_cpu_ol            cpu_ol;
-        struct xenpf_cpu_hotadd        cpu_add;
-        struct xenpf_mem_hotadd        mem_add;
-        struct xenpf_core_parking      core_parking;
-        struct xenpf_resource_op       resource_op;
-        struct xenpf_symdata           symdata;
-        uint8_t                        pad[128];
+        xenpf_settime_t               settime;
+        xenpf_settime32_t             settime32;
+        xenpf_settime64_t             settime64;
+        xenpf_add_memtype_t           add_memtype;
+        xenpf_del_memtype_t           del_memtype;
+        xenpf_read_memtype_t          read_memtype;
+        xenpf_microcode_update_t      microcode;
+        xenpf_platform_quirk_t        platform_quirk;
+        xenpf_efi_runtime_call_t      efi_runtime_call;
+        xenpf_firmware_info_t         firmware_info;
+        xenpf_enter_acpi_sleep_t      enter_acpi_sleep;
+        xenpf_change_freq_t           change_freq;
+        xenpf_getidletime_t           getidletime;
+        xenpf_set_processor_pminfo_t  set_pminfo;
+        xenpf_pcpuinfo_t              pcpu_info;
+        xenpf_pcpu_version_t          pcpu_version;
+        xenpf_cpu_ol_t                cpu_ol;
+        xenpf_cpu_hotadd_t            cpu_add;
+        xenpf_mem_hotadd_t            mem_add;
+        xenpf_core_parking_t          core_parking;
+        xenpf_resource_op_t           resource_op;
+        xenpf_symdata_t               symdata;
+        uint8_t                       pad[128];
     } u;
 };
 typedef struct xen_platform_op xen_platform_op_t;

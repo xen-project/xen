@@ -69,6 +69,7 @@ struct vcpu_hvm_x86_32 {
 
     uint16_t pad2[3];
 };
+typedef struct vcpu_hvm_x86_32 xen_vcpu_hvm_x86_32_t;
 
 /*
  * The layout of the _ar fields of the segment registers is the
@@ -114,6 +115,7 @@ struct vcpu_hvm_x86_64 {
      * the 32-bit structure should be used instead.
      */
 };
+typedef struct vcpu_hvm_x86_64 xen_vcpu_hvm_x86_64_t;
 
 struct vcpu_hvm_context {
 #define VCPU_HVM_MODE_32B 0  /* 32bit fields of the structure will be used. */
@@ -124,8 +126,8 @@ struct vcpu_hvm_context {
 
     /* CPU registers. */
     union {
-        struct vcpu_hvm_x86_32 x86_32;
-        struct vcpu_hvm_x86_64 x86_64;
+        xen_vcpu_hvm_x86_32_t x86_32;
+        xen_vcpu_hvm_x86_64_t x86_64;
     } cpu_regs;
 };
 typedef struct vcpu_hvm_context vcpu_hvm_context_t;

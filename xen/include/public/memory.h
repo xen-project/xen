@@ -604,7 +604,7 @@ struct xen_reserved_device_memory_map {
     XEN_GUEST_HANDLE(xen_reserved_device_memory_t) buffer;
     /* IN */
     union {
-        struct physdev_pci_device pci;
+        physdev_pci_device_t pci;
     } dev;
 };
 typedef struct xen_reserved_device_memory_map xen_reserved_device_memory_map_t;
