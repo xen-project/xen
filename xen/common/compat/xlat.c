@@ -54,6 +54,22 @@ CHECK_evtchn_op;
 #undef xen_evtchn_status
 #undef xen_evtchn_unmask
 
+#define xen_evtchn_expand_array evtchn_expand_array
+CHECK_evtchn_expand_array;
+#undef xen_evtchn_expand_array
+
+#define xen_evtchn_init_control evtchn_init_control
+CHECK_evtchn_init_control;
+#undef xen_evtchn_init_control
+
+#define xen_evtchn_reset evtchn_reset
+CHECK_evtchn_reset;
+#undef xen_evtchn_reset
+
+#define xen_evtchn_set_priority evtchn_set_priority
+CHECK_evtchn_set_priority;
+#undef xen_evtchn_set_priority
+
 #define xen_mmu_update mmu_update
 CHECK_mmu_update;
 #undef xen_mmu_update

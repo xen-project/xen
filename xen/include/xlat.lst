@@ -66,8 +66,12 @@
 ?	evtchn_bind_vcpu		event_channel.h
 ?	evtchn_bind_virq		event_channel.h
 ?	evtchn_close			event_channel.h
+?	evtchn_expand_array		event_channel.h
+?	evtchn_init_control		event_channel.h
 ?	evtchn_op			event_channel.h
+?	evtchn_reset			event_channel.h
 ?	evtchn_send			event_channel.h
+?	evtchn_set_priority		event_channel.h
 ?	evtchn_status			event_channel.h
 ?	evtchn_unmask			event_channel.h
 ?	gnttab_cache_flush		grant_table.h
