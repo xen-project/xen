@@ -171,14 +171,11 @@
 ?	xenoprof_init			xenoprof.h
 ?	xenoprof_passive		xenoprof.h
 ?	flask_access			xsm/flask_op.h
-!	flask_boolean			xsm/flask_op.h
 ?	flask_cache_stats		xsm/flask_op.h
 ?	flask_hash_stats		xsm/flask_op.h
-!	flask_load			xsm/flask_op.h
 ?	flask_ocontext			xsm/flask_op.h
 ?	flask_peersid			xsm/flask_op.h
 ?	flask_relabel			xsm/flask_op.h
 ?	flask_setavc_threshold		xsm/flask_op.h
 ?	flask_setenforce		xsm/flask_op.h
-!	flask_sid_context		xsm/flask_op.h
 ?	flask_transition		xsm/flask_op.h

@@ -790,8 +790,6 @@ CHECK_flask_transition;
 #define xen_flask_load compat_flask_load
 #define flask_security_load compat_security_load
 
-#define xen_flask_userlist compat_flask_userlist
-
 #define xen_flask_sid_context compat_flask_sid_context
 #define flask_security_context compat_security_context
 #define flask_security_sid compat_security_sid
