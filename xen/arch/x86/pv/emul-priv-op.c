@@ -877,6 +877,7 @@ static int read_msr(unsigned int reg, uint64_t *val,
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
+    const struct cpuid_policy *cp = currd->arch.cpuid;
     bool vpmu_msr = false;
     int ret;
 
@@ -898,19 +899,19 @@ static int read_msr(unsigned int reg, uint64_t *val,
         return X86EMUL_OKAY;
 
     case MSR_FS_BASE:
-        if ( is_pv_32bit_domain(currd) )
+        if ( !cp->extd.lm )
             break;
         *val = read_fs_base();
         return X86EMUL_OKAY;
 
     case MSR_GS_BASE:
-        if ( is_pv_32bit_domain(currd) )
+        if ( !cp->extd.lm )
             break;
         *val = read_gs_base();
         return X86EMUL_OKAY;
 
     case MSR_SHADOW_GS_BASE:
-        if ( is_pv_32bit_domain(currd) )
+        if ( !cp->extd.lm )
             break;
         *val = curr->arch.pv.gs_base_user;
         return X86EMUL_OKAY;
@@ -1006,6 +1007,7 @@ static int write_msr(unsigned int reg, uint64_t val,
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
+    const struct cpuid_policy *cp = currd->arch.cpuid;
     bool vpmu_msr = false;
     int ret;
 
@@ -1022,22 +1024,22 @@ static int write_msr(unsigned int reg, uint64_t val,
         uint64_t temp;
 
     case MSR_FS_BASE:
-        if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
-            break;
-        write_fs_base(val);
-        return X86EMUL_OKAY;
-
     case MSR_GS_BASE:
-        if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
-            break;
-        write_gs_base(val);
-        return X86EMUL_OKAY;
-
     case MSR_SHADOW_GS_BASE:
-        if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
+        if ( !cp->extd.lm || !is_canonical_address(val) )
             break;
-        write_gs_shadow(val);
-        curr->arch.pv.gs_base_user = val;
+
+        if ( reg == MSR_FS_BASE )
+            write_fs_base(val);
+        else if ( reg == MSR_GS_BASE )
+            write_gs_base(val);
+        else if ( reg == MSR_SHADOW_GS_BASE )
+        {
+            write_gs_shadow(val);
+            curr->arch.pv.gs_base_user = val;
+        }
+        else
+            ASSERT_UNREACHABLE();
         return X86EMUL_OKAY;
 
     case MSR_EFER:
