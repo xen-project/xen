@@ -1312,10 +1312,12 @@ CHECK_FIELD_(struct, mc_fetch, fetch_id);
 CHECK_FIELD_(struct, mc_physcpuinfo, ncpus);
 # define CHECK_compat_mc_physcpuinfo struct mc_physcpuinfo
 
-#define CHECK_compat_mc_inject_v2   struct mc_inject_v2
+# define xen_ctl_bitmap              xenctl_bitmap
+
 CHECK_mc;
 # undef CHECK_compat_mc_fetch
 # undef CHECK_compat_mc_physcpuinfo
+# undef xen_ctl_bitmap
 
 # define xen_mc_info                 mc_info
 CHECK_mc_info;

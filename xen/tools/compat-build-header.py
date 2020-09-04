@@ -19,6 +19,7 @@ pats = [
  [ r"(^|[^\w])xen_?(\w*)_compat_t([^\w]|$$)", r"\1compat_\2_t\3" ],
  [ r"(^|[^\w])XEN_?", r"\1COMPAT_" ],
  [ r"(^|[^\w])Xen_?", r"\1Compat_" ],
+ [ r"(^|[^\w])COMPAT_HANDLE_64\(", r"\1XEN_GUEST_HANDLE_64(" ],
  [ r"(^|[^\w])long([^\w]|$$)", r"\1int\2" ]
 ];
 

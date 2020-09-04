@@ -429,6 +429,7 @@ struct xen_mc_inject_v2 {
     uint32_t flags;
     xenctl_bitmap_t cpumap;
 };
+typedef struct xen_mc_inject_v2 xen_mc_inject_v2_t;
 #endif
 
 struct xen_mc {
@@ -441,7 +442,7 @@ struct xen_mc {
         xen_mc_msrinject_t         mc_msrinject;
         xen_mc_mceinject_t         mc_mceinject;
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
-        struct xen_mc_inject_v2    mc_inject_v2;
+        xen_mc_inject_v2_t         mc_inject_v2;
 #endif
     } u;
 };

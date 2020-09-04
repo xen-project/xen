@@ -44,6 +44,7 @@
 ?	mcinfo_recovery			arch-x86/xen-mca.h
 !	mc_fetch			arch-x86/xen-mca.h
 ?	mc_info				arch-x86/xen-mca.h
+?	mc_inject_v2			arch-x86/xen-mca.h
 ?	mc_mceinject			arch-x86/xen-mca.h
 ?	mc_msrinject			arch-x86/xen-mca.h
 ?	mc_notifydomain			arch-x86/xen-mca.h
