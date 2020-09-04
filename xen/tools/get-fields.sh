@@ -218,7 +218,7 @@ for line in sys.stdin.readlines():
 				fi
 				;;
 			[\,\;])
-				if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
+				if [ $level = 2 -a -n "$(echo $id | $SED 's,_\?pad[[:digit:]]*,,')" ]
 				then
 					if [ $kind = union ]
 					then
@@ -347,7 +347,7 @@ build_body ()
 			fi
 			;;
 		[\,\;])
-			if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
+			if [ $level = 2 -a -n "$(echo $id | $SED 's,_\?pad[[:digit:]]*,,')" ]
 			then
 				if [ -z "$array" -a -z "$array_type" ]
 				then
@@ -437,7 +437,7 @@ check_field ()
 				id=$token
 				;;
 			[\,\;])
-				if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
+				if [ $level = 2 -a -n "$(echo $id | $SED 's,_\?pad[[:digit:]]*,,')" ]
 				then
 					check_field $1 $2 $3.$id "$fields"
 					test "$token" != ";" || fields= id=
@@ -491,7 +491,7 @@ build_check ()
 			test $level != 2 -o $arrlvl != 1 || id=$token
 			;;
 		[\,\;])
-			if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
+			if [ $level = 2 -a -n "$(echo $id | $SED 's,_\?pad[[:digit:]]*,,')" ]
 			then
 				check_field $kind $1 $id "$fields"
 				test "$token" != ";" || fields= id=

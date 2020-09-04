@@ -354,10 +354,13 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                 return -EFAULT;
 
 #define XLAT_vnuma_topology_info_HNDL_vdistance_h(_d_, _s_)		\
+            case XLAT_vnuma_topology_info_vdistance_pad:                \
             guest_from_compat_handle((_d_)->vdistance.h, (_s_)->vdistance.h)
 #define XLAT_vnuma_topology_info_HNDL_vcpu_to_vnode_h(_d_, _s_)		\
+            case XLAT_vnuma_topology_info_vcpu_to_vnode_pad:            \
             guest_from_compat_handle((_d_)->vcpu_to_vnode.h, (_s_)->vcpu_to_vnode.h)
 #define XLAT_vnuma_topology_info_HNDL_vmemrange_h(_d_, _s_)		\
+            case XLAT_vnuma_topology_info_vmemrange_pad:                \
             guest_from_compat_handle((_d_)->vmemrange.h, (_s_)->vmemrange.h)
 
             XLAT_vnuma_topology_info(nat.vnuma, &cmp.vnuma);
