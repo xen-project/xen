@@ -3,32 +3,34 @@ ifneq ($(CONFIG_COMPAT),)
 compat-arch-$(CONFIG_X86) := x86_32
 
 headers-y := \
-    compat/argo.h \
-    compat/callback.h \
+    compat/arch-$(compat-arch-y).h \
     compat/elfnote.h \
     compat/event_channel.h \
     compat/features.h \
-    compat/grant_table.h \
-    compat/hypfs.h \
-    compat/kexec.h \
     compat/memory.h \
     compat/nmi.h \
     compat/physdev.h \
     compat/platform.h \
+    compat/pmu.h \
     compat/sched.h \
-    compat/trace.h \
     compat/vcpu.h \
     compat/version.h \
     compat/xen.h \
-    compat/xenoprof.h
+    compat/xlat.h
 headers-$(CONFIG_X86)     += compat/arch-x86/pmu.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen-mca.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen-$(compat-arch-y).h
-headers-$(CONFIG_X86)     += compat/hvm/dm_op.h
-headers-$(CONFIG_X86)     += compat/hvm/hvm_op.h
-headers-$(CONFIG_X86)     += compat/hvm/hvm_vcpu.h
-headers-y                 += compat/arch-$(compat-arch-y).h compat/pmu.h compat/xlat.h
+headers-$(CONFIG_ARGO)    += compat/argo.h
+headers-$(CONFIG_PV)      += compat/callback.h
+headers-$(CONFIG_GRANT_TABLE) += compat/grant_table.h
+headers-$(CONFIG_HVM)     += compat/hvm/dm_op.h
+headers-$(CONFIG_HVM)     += compat/hvm/hvm_op.h
+headers-$(CONFIG_HVM)     += compat/hvm/hvm_vcpu.h
+headers-$(CONFIG_HYPFS)   += compat/hypfs.h
+headers-$(CONFIG_KEXEC)   += compat/kexec.h
+headers-$(CONFIG_TRACEBUFFER) += compat/trace.h
+headers-$(CONFIG_XENOPROF) += compat/xenoprof.h
 headers-$(CONFIG_XSM_FLASK) += compat/xsm/flask_op.h
 
 cppflags-y                := -include public/xen-compat.h -DXEN_GENERATING_COMPAT_HEADERS

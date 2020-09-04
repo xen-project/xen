@@ -718,6 +718,8 @@ static int dm_op(const struct dmop_args *op_args)
     return rc;
 }
 
+#include <compat/hvm/dm_op.h>
+
 CHECK_dm_op_create_ioreq_server;
 CHECK_dm_op_get_ioreq_server_info;
 CHECK_dm_op_ioreq_server_range;

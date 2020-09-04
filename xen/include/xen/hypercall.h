@@ -216,8 +216,6 @@ extern long compat_argo_op(
     unsigned long arg4);
 #endif
 
-#include <compat/hvm/dm_op.h>
-
 extern int
 compat_dm_op(
     domid_t domid,

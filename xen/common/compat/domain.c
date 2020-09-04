@@ -11,7 +11,6 @@ EMIT_FILE;
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <compat/vcpu.h>
-#include <compat/hvm/hvm_vcpu.h>
 
 #define xen_vcpu_set_periodic_timer vcpu_set_periodic_timer
 CHECK_vcpu_set_periodic_timer;
@@ -25,6 +24,10 @@ CHECK_SIZE_(struct, vcpu_info);
 CHECK_vcpu_register_vcpu_info;
 #undef xen_vcpu_register_vcpu_info
 
+#ifdef CONFIG_HVM
+
+#include <compat/hvm/hvm_vcpu.h>
+
 #define xen_vcpu_hvm_context vcpu_hvm_context
 #define xen_vcpu_hvm_x86_32 vcpu_hvm_x86_32
 #define xen_vcpu_hvm_x86_64 vcpu_hvm_x86_64
@@ -32,6 +35,8 @@ CHECK_vcpu_hvm_context;
 #undef xen_vcpu_hvm_x86_64
 #undef xen_vcpu_hvm_x86_32
 #undef xen_vcpu_hvm_context
+
+#endif
 
 int compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -49,6 +54,7 @@ int compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) ar
         if ( v->vcpu_info == &dummy_vcpu_info )
             return -EINVAL;
 
+#ifdef CONFIG_HVM
         if ( is_hvm_vcpu(v) )
         {
             struct vcpu_hvm_context ctxt;
@@ -61,6 +67,7 @@ int compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) ar
             domain_unlock(d);
         }
         else
+#endif
         {
             struct compat_vcpu_guest_context *ctxt;
 
