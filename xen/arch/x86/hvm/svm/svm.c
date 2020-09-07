@@ -1917,6 +1917,9 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             goto gpf;
         break;
 
+    case MSR_K8_SYSCFG:
+    case MSR_K8_TOP_MEM1:
+    case MSR_K8_TOP_MEM2:
     case MSR_K8_VM_CR:
         *msr_content = 0;
         break;
@@ -2094,6 +2097,9 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             goto gpf;
         break;
 
+    case MSR_K8_TOP_MEM1:
+    case MSR_K8_TOP_MEM2:
+    case MSR_K8_SYSCFG:
     case MSR_K8_VM_CR:
         /* ignore write. handle all bits as read-only. */
         break;
