@@ -30,6 +30,8 @@
 
 #include <xen/sys/gntdev.h>
 
+#include <xen-tools/libs.h>
+
 #include "private.h"
 
 #define PAGE_SHIFT           12
