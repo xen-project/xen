@@ -3163,7 +3163,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     switch ( msr )
     {
-        uint64_t rsvd;
+        uint64_t rsvd, tmp;
 
     case MSR_IA32_SYSENTER_CS:
         __vmwrite(GUEST_SYSENTER_CS, msr_content);
@@ -3300,6 +3300,17 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_IA32_VMX_BASIC ... MSR_IA32_VMX_VMFUNC:
         /* None of these MSRs are writeable. */
         goto gp_fault;
+
+    case MSR_IA32_MISC_ENABLE:
+        /*
+         * Silently drop writes that don't change the reported value: At least
+         * some Windows guests will expect to be able to write to MISC_ENABLE
+         * with the same value that's been read from it.
+         */
+        if ( vmx_msr_read_intercept(msr, &tmp) != X86EMUL_OKAY ||
+             tmp != msr_content )
+            goto gp_fault;
+        break;
 
     case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
     case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(7):
