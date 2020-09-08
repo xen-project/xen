@@ -1925,7 +1925,7 @@ static void __context_switch(void)
     /* Prefetch the VMCB if we expect to use it later in the context switch */
     if ( cpu_has_svm && is_pv_domain(nd) && !is_pv_32bit_domain(nd) &&
          !is_idle_domain(nd) )
-        svm_load_segs(0, 0, 0, 0, 0);
+        svm_load_segs_prefetch();
 #endif
 
     if ( need_full_gdt(nd) && !per_cpu(full_gdt_loaded, cpu) )

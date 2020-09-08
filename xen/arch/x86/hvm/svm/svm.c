@@ -1520,6 +1520,19 @@ static void svm_init_erratum_383(const struct cpuinfo_x86 *c)
 }
 
 #ifdef CONFIG_PV
+void svm_load_segs_prefetch(void)
+{
+    const struct vmcb_struct *vmcb = this_cpu(host_vmcb_va);
+
+    if ( vmcb )
+        /*
+         * The main reason for this prefetch is for the TLB fill.  Use the
+         * opportunity to fetch the lowest address used, to get the best
+         * behaviour out of hardware's next-line prefetcher.
+         */
+        prefetchw(&vmcb->fs);
+}
+
 bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
                    unsigned long fs_base, unsigned long gs_base,
                    unsigned long gs_shadow)
@@ -1530,17 +1543,15 @@ bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
     if ( unlikely(!vmcb) )
         return false;
 
-    if ( !ldt_base )
-    {
-        /*
-         * The actual structure field used here was arbitrarily chosen.
-         * Empirically it doesn't seem to matter much which element is used,
-         * and a clear explanation of the otherwise poor performance has not
-         * been found/provided so far.
-         */
-        prefetchw(&vmcb->ldtr);
-        return true;
-    }
+    vmcb->fs.sel = 0;
+    vmcb->fs.attr = 0;
+    vmcb->fs.limit = 0;
+    vmcb->fs.base = fs_base;
+
+    vmcb->gs.sel = 0;
+    vmcb->gs.attr = 0;
+    vmcb->gs.limit = 0;
+    vmcb->gs.base = gs_base;
 
     if ( likely(!ldt_ents) )
         memset(&vmcb->ldtr, 0, sizeof(vmcb->ldtr));
@@ -1557,16 +1568,6 @@ bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
         vmcb->ldtr.limit = ldt_ents * 8 - 1;
         vmcb->ldtr.base = ldt_base;
     }
-
-    vmcb->fs.sel = 0;
-    vmcb->fs.attr = 0;
-    vmcb->fs.limit = 0;
-    vmcb->fs.base = fs_base;
-
-    vmcb->gs.sel = 0;
-    vmcb->gs.attr = 0;
-    vmcb->gs.limit = 0;
-    vmcb->gs.base = gs_base;
 
     vmcb->kerngsbase = gs_shadow;
 

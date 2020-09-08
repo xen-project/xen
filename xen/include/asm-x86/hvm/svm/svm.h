@@ -50,12 +50,13 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len);
 void svm_update_guest_cr(struct vcpu *, unsigned int cr, unsigned int flags);
 
 /*
- * PV context switch helper. Calls with zero ldt_base request a prefetch of
- * the VMCB area to be loaded from, instead of an actual load of state.
+ * PV context switch helpers.  Prefetching the VMCB area itself has been shown
+ * to be useful for performance.
  *
  * Must only be used for NUL FS/GS, as the segment attributes/limits are not
  * read from the GDT/LDT.
  */
+void svm_load_segs_prefetch(void);
 bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
                    unsigned long fs_base, unsigned long gs_base,
                    unsigned long gs_shadow);
