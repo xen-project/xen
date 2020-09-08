@@ -1557,7 +1557,7 @@ static void load_segments(struct vcpu *n)
                    : [_val] "rm" (val) )
 
 #ifdef CONFIG_HVM
-    if ( cpu_has_svm && !compat )
+    if ( cpu_has_svm && !compat && (uregs->fs | uregs->gs) <= 3 )
     {
         unsigned long gsb = n->arch.flags & TF_kernel_mode
             ? n->arch.pv.gs_base_kernel : n->arch.pv.gs_base_user;
@@ -1565,8 +1565,7 @@ static void load_segments(struct vcpu *n)
             ? n->arch.pv.gs_base_user : n->arch.pv.gs_base_kernel;
 
         fs_gs_done = svm_load_segs(n->arch.pv.ldt_ents, LDT_VIRT_START(n),
-                                   uregs->fs, n->arch.pv.fs_base,
-                                   uregs->gs, gsb, gss);
+                                   n->arch.pv.fs_base, gsb, gss);
     }
 #endif
     if ( !fs_gs_done )
@@ -1929,7 +1928,7 @@ static void __context_switch(void)
     /* Prefetch the VMCB if we expect to use it later in the context switch */
     if ( cpu_has_svm && is_pv_domain(nd) && !is_pv_32bit_domain(nd) &&
          !is_idle_domain(nd) )
-        svm_load_segs(0, 0, 0, 0, 0, 0, 0);
+        svm_load_segs(0, 0, 0, 0, 0);
 #endif
 
     if ( need_full_gdt(nd) && !per_cpu(full_gdt_loaded, cpu) )

@@ -52,10 +52,12 @@ void svm_update_guest_cr(struct vcpu *, unsigned int cr, unsigned int flags);
 /*
  * PV context switch helper. Calls with zero ldt_base request a prefetch of
  * the VMCB area to be loaded from, instead of an actual load of state.
+ *
+ * Must only be used for NUL FS/GS, as the segment attributes/limits are not
+ * read from the GDT/LDT.
  */
 bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
-                   unsigned int fs_sel, unsigned long fs_base,
-                   unsigned int gs_sel, unsigned long gs_base,
+                   unsigned long fs_base, unsigned long gs_base,
                    unsigned long gs_shadow);
 
 extern u32 svm_feature_flags;
