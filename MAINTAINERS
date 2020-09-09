@@ -357,7 +357,8 @@ M:	Ian Jackson <iwj@xenproject.org>
 M:	Wei Liu <wl@xen.org>
 M:	Anthony PERARD <anthony.perard@citrix.com>
 S:	Supported
-F:	tools/libxl/
+F:	tools/libs/guest/
+F:	tools/libs/light/
 F:	tools/xl/
 
 LIVEPATCH
@@ -428,9 +429,9 @@ M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
 M:	Yang Hongyang <imhy.yang@gmail.com>
 S:	Maintained
 F:	docs/README.remus
-F:	tools/libxl/libxl_remus_*
-F:	tools/libxl/libxl_netbuffer.c
-F:	tools/libxl/libxl_nonetbuffer.c
+F:	tools/libs/light/libxl_remus_*
+F:	tools/libs/light/libxl_netbuffer.c
+F:	tools/libs/light/libxl_nonetbuffer.c
 F:	tools/hotplug/Linux/remus-netbuf-setup
 F:	tools/hotplug/Linux/block-drbd-probe
 
