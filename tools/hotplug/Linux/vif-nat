@@ -95,12 +95,11 @@ dhcparg_remove_entry()
 {
   local tmpfile=$(mktemp)
   sed -e "s/${dev} //" "$dhcpd_arg_file" >"$tmpfile"
-  if diff "$tmpfile" "$dhcpd_arg_file" >/dev/null
+  if ! diff "$tmpfile" "$dhcpd_arg_file" >/dev/null
   then
-    rm "$tmpfile"
-  else
-    mv "$tmpfile" "$dhcpd_arg_file"
+    cp "$tmpfile" "$dhcpd_arg_file"
   fi
+  rm "$tmpfile"
 }
 
 dhcparg_add_entry()
@@ -109,11 +108,11 @@ dhcparg_add_entry()
   local tmpfile=$(mktemp)
   # handle Red Hat, SUSE, and Debian styles, with or without quotes
   sed -e 's/^DHCPDARGS="*\([^"]*\)"*/DHCPDARGS="\1'"${dev} "'"/' \
-     "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
+     "$dhcpd_arg_file" >"$tmpfile" && cp "$tmpfile" "$dhcpd_arg_file"
   sed -e 's/^DHCPD_INTERFACE="*\([^"]*\)"*/DHCPD_INTERFACE="\1'"${dev} "'"/' \
-     "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
+     "$dhcpd_arg_file" >"$tmpfile" && cp "$tmpfile" "$dhcpd_arg_file"
   sed -e 's/^INTERFACES="*\([^"]*\)"*/INTERFACES="\1'"${dev} "'"/' \
-     "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
+     "$dhcpd_arg_file" >"$tmpfile" && cp "$tmpfile" "$dhcpd_arg_file"
   rm -f "$tmpfile"
 }
 
@@ -121,12 +120,11 @@ dhcp_remove_entry()
 {
   local tmpfile=$(mktemp)
   grep -v "host $hostname" "$dhcpd_conf_file" >"$tmpfile"
-  if diff "$tmpfile" "$dhcpd_conf_file" >/dev/null
+  if ! diff "$tmpfile" "$dhcpd_conf_file" >/dev/null
   then
-    rm "$tmpfile"
-  else
-    mv "$tmpfile" "$dhcpd_conf_file"
+    cp "$tmpfile" "$dhcpd_conf_file"
   fi
+  rm "$tmpfile"
   dhcparg_remove_entry
 }
 
