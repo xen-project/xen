@@ -94,8 +94,8 @@ else
 zlib-options = $(ZLIB)
 endif
 
-xc_dom_bzimageloader.o: CFLAGS += $(filter -D%,$(zlib-options))
-xc_dom_bzimageloader.opic: CFLAGS += $(filter -D%,$(zlib-options))
+xg_dom_bzimageloader.o: CFLAGS += $(filter -D%,$(zlib-options))
+xg_dom_bzimageloader.opic: CFLAGS += $(filter -D%,$(zlib-options))
 
 LIBHEADER := xenguest.h
 
