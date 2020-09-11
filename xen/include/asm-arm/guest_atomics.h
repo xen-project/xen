@@ -96,14 +96,14 @@ static inline unsigned long __guest_cmpxchg(struct domain *d,
 
     perfc_incr(atomics_guest);
 
-    if ( __cmpxchg_mb_timeout(ptr, &oldval, new, size,
-                              this_cpu(guest_safe_atomic_max)) )
+    if ( __cmpxchg_timeout(ptr, &oldval, new, size,
+                           this_cpu(guest_safe_atomic_max)) )
         return oldval;
 
     perfc_incr(atomics_guest_paused);
 
     domain_pause_nosync(d);
-    oldval = __cmpxchg_mb(ptr, old, new, size);
+    oldval = __cmpxchg(ptr, old, new, size);
     domain_unpause(d);
 
     return oldval;
