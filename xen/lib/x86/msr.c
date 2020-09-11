@@ -39,6 +39,7 @@ int x86_msr_copy_to_buffer(const struct msr_policy *p,
     })
 
     COPY_MSR(MSR_INTEL_PLATFORM_INFO, p->plaform_info.raw);
+    COPY_MSR(MSR_ARCH_CAPABILITIES,   p->arch_caps.raw);
 
 #undef COPY_MSR
 
@@ -96,6 +97,7 @@ int x86_msr_copy_from_buffer(struct msr_policy *p,
 })
 
         case MSR_INTEL_PLATFORM_INFO: ASSIGN(plaform_info.raw); break;
+        case MSR_ARCH_CAPABILITIES:   ASSIGN(arch_caps.raw);    break;
 
 #undef ASSIGN
 
