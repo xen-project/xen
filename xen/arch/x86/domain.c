@@ -1017,13 +1017,9 @@ int arch_set_info_guest(
     if ( !compat )
     {
         v->arch.pv.syscall_callback_eip = c.nat->syscall_callback_eip;
-        /* non-nul selector kills fs_base */
-        v->arch.pv.fs_base =
-            !(v->arch.user_regs.fs & ~3) ? c.nat->fs_base : 0;
+        v->arch.pv.fs_base = c.nat->fs_base;
         v->arch.pv.gs_base_kernel = c.nat->gs_base_kernel;
-        /* non-nul selector kills gs_base_user */
-        v->arch.pv.gs_base_user =
-            !(v->arch.user_regs.gs & ~3) ? c.nat->gs_base_user : 0;
+        v->arch.pv.gs_base_user = c.nat->gs_base_user;
     }
     else
     {
@@ -1342,58 +1338,60 @@ arch_do_vcpu_op(
 }
 
 /*
- * Loading a nul selector does not clear bases and limits on AMD or Hygon
- * CPUs. Be on the safe side and re-initialize both to flat segment values
- * before loading a nul selector.
+ * Notes on PV segment handling:
+ *  - 32bit: All data from the GDT/LDT.
+ *  - 64bit: In addition, 64bit FS/GS/GS_KERN bases.
+ *
+ * Linux's ABI with userspace expects to preserve the full selector and
+ * segment base, even sel != NUL, base != GDT/LDT for 64bit code.  Xen must
+ * honour this when context switching, to avoid breaking Linux's ABI.
+ *
+ * Note: It is impossible to preserve a selector value of 1, 2 or 3, as these
+ *       get reset to 0 by an IRET back to guest context.  Code playing with
+ *       arcane corners of x86 get to keep all resulting pieces.
+ *
+ * Therefore, we:
+ *  - Load the LDT.
+ *  - Load each segment selector.
+ *    - Any error loads zero, and triggers a failsafe callback.
+ *  - For 64bit, further load the 64bit bases.
+ *
+ * An optimisation exists on SVM-capable hardware, where we use a VMLOAD
+ * instruction to load the LDT and full FS/GS/GS_KERN data in one go.
+ *
+ * AMD-like CPUs prior to Zen2 do not zero the segment base or limit when
+ * loading a NUL selector.  This is a problem in principle when context
+ * switching to a 64bit guest, as a NUL FS/GS segment is usable and will pick
+ * up the stale base.
+ *
+ * However, it is not an issue in practice.  NUL segments are unusable for
+ * 32bit guests (so any stale base won't be used), and we unconditionally
+ * write the full FS/GS bases for 64bit guests.
  */
-#define preload_segment(seg, value) do {              \
-    if ( !((value) & ~3) &&                           \
-         (boot_cpu_data.x86_vendor &                  \
-          (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )      \
-        asm volatile ( "movl %k0, %%" #seg            \
-                       :: "r" (FLAT_USER_DS32) );     \
-} while ( false )
-
-#define loadsegment(seg,value) ({               \
-    int __r = 1;                                \
-    asm volatile (                              \
-        "1: movl %k1,%%" #seg "\n2:\n"          \
-        ".section .fixup,\"ax\"\n"              \
-        "3: xorl %k0,%k0\n"                     \
-        "   movl %k0,%%" #seg "\n"              \
-        "   jmp 2b\n"                           \
-        ".previous\n"                           \
-        _ASM_EXTABLE(1b, 3b)                    \
-        : "=r" (__r) : "r" (value), "0" (__r) );\
-    __r; })
-
-/*
- * save_segments() writes a mask of segments which are dirty (non-zero),
- * allowing load_segments() to avoid some expensive segment loads and
- * MSR writes.
- */
-static DEFINE_PER_CPU(unsigned int, dirty_segment_mask);
-#define DIRTY_DS           0x01
-#define DIRTY_ES           0x02
-#define DIRTY_FS           0x04
-#define DIRTY_GS           0x08
-#define DIRTY_FS_BASE      0x10
-#define DIRTY_GS_BASE      0x20
-
 static void load_segments(struct vcpu *n)
 {
     struct cpu_user_regs *uregs = &n->arch.user_regs;
-    int all_segs_okay = 1;
-    unsigned int dirty_segment_mask, cpu = smp_processor_id();
-    bool fs_gs_done = false;
+    bool compat = is_pv_32bit_vcpu(n);
+    bool all_segs_okay = true, fs_gs_done = false;
 
-    /* Load and clear the dirty segment mask. */
-    dirty_segment_mask = per_cpu(dirty_segment_mask, cpu);
-    per_cpu(dirty_segment_mask, cpu) = 0;
+    /*
+     * Attempt to load @seg with selector @val.  On error, clear
+     * @all_segs_okay in function scope, and load NUL into @sel.
+     */
+#define TRY_LOAD_SEG(seg, val)                          \
+    asm volatile ( "1: mov %k[_val], %%" #seg "\n\t"    \
+                   "2:\n\t"                             \
+                   ".section .fixup, \"ax\"\n\t"        \
+                   "3: xor %k[ok], %k[ok]\n\t"          \
+                   "   mov %k[ok], %%" #seg "\n\t"      \
+                   "   jmp 2b\n\t"                      \
+                   ".previous\n\t"                      \
+                   _ASM_EXTABLE(1b, 3b)                 \
+                   : [ok] "+r" (all_segs_okay)          \
+                   : [_val] "rm" (val) )
 
 #ifdef CONFIG_HVM
-    if ( cpu_has_svm && !is_pv_32bit_vcpu(n) &&
-         !(read_cr4() & X86_CR4_FSGSBASE) && !((uregs->fs | uregs->gs) & ~3) )
+    if ( cpu_has_svm && !compat && (uregs->fs | uregs->gs) <= 3 )
     {
         unsigned long gsb = n->arch.flags & TF_kernel_mode
             ? n->arch.pv.gs_base_kernel : n->arch.pv.gs_base_user;
@@ -1401,62 +1399,25 @@ static void load_segments(struct vcpu *n)
             ? n->arch.pv.gs_base_user : n->arch.pv.gs_base_kernel;
 
         fs_gs_done = svm_load_segs(n->arch.pv.ldt_ents, LDT_VIRT_START(n),
-                                   uregs->fs, n->arch.pv.fs_base,
-                                   uregs->gs, gsb, gss);
+                                   n->arch.pv.fs_base, gsb, gss);
     }
 #endif
     if ( !fs_gs_done )
+    {
         load_LDT(n);
 
-    /* Either selector != 0 ==> reload. */
-    if ( unlikely((dirty_segment_mask & DIRTY_DS) | uregs->ds) )
-    {
-        preload_segment(ds, uregs->ds);
-        all_segs_okay &= loadsegment(ds, uregs->ds);
+        TRY_LOAD_SEG(fs, uregs->fs);
+        TRY_LOAD_SEG(gs, uregs->gs);
     }
 
-    /* Either selector != 0 ==> reload. */
-    if ( unlikely((dirty_segment_mask & DIRTY_ES) | uregs->es) )
-    {
-        preload_segment(es, uregs->es);
-        all_segs_okay &= loadsegment(es, uregs->es);
-    }
+    TRY_LOAD_SEG(ds, uregs->ds);
+    TRY_LOAD_SEG(es, uregs->es);
 
-    /* Either selector != 0 ==> reload. */
-    if ( unlikely((dirty_segment_mask & DIRTY_FS) | uregs->fs) && !fs_gs_done )
+    if ( !fs_gs_done && !compat )
     {
-        all_segs_okay &= loadsegment(fs, uregs->fs);
-        /* non-nul selector updates fs_base */
-        if ( uregs->fs & ~3 )
-            dirty_segment_mask &= ~DIRTY_FS_BASE;
-    }
-
-    /* Either selector != 0 ==> reload. */
-    if ( unlikely((dirty_segment_mask & DIRTY_GS) | uregs->gs) && !fs_gs_done )
-    {
-        all_segs_okay &= loadsegment(gs, uregs->gs);
-        /* non-nul selector updates gs_base_user */
-        if ( uregs->gs & ~3 )
-            dirty_segment_mask &= ~DIRTY_GS_BASE;
-    }
-
-    if ( !fs_gs_done && !is_pv_32bit_vcpu(n) )
-    {
-        /* This can only be non-zero if selector is NULL. */
-        if ( n->arch.pv.fs_base | (dirty_segment_mask & DIRTY_FS_BASE) )
-            wrfsbase(n->arch.pv.fs_base);
-
-        /*
-         * Most kernels have non-zero GS base, so don't bother testing.
-         * (For old AMD hardware this is also a serialising instruction,
-         * avoiding erratum #88.)
-         */
+        wrfsbase(n->arch.pv.fs_base);
         wrgsshadow(n->arch.pv.gs_base_kernel);
-
-        /* This can only be non-zero if selector is NULL. */
-        if ( n->arch.pv.gs_base_user |
-             (dirty_segment_mask & DIRTY_GS_BASE) )
-            wrgsbase(n->arch.pv.gs_base_user);
+        wrgsbase(n->arch.pv.gs_base_user);
 
         /* If in kernel mode then switch the GS bases around. */
         if ( (n->arch.flags & TF_kernel_mode) )
@@ -1575,7 +1536,6 @@ static void load_segments(struct vcpu *n)
 static void save_segments(struct vcpu *v)
 {
     struct cpu_user_regs *regs = &v->arch.user_regs;
-    unsigned int dirty_segment_mask = 0;
 
     regs->ds = read_sreg(ds);
     regs->es = read_sreg(es);
@@ -1592,35 +1552,6 @@ static void save_segments(struct vcpu *v)
         else
             v->arch.pv.gs_base_user = gs_base;
     }
-
-    if ( regs->ds )
-        dirty_segment_mask |= DIRTY_DS;
-
-    if ( regs->es )
-        dirty_segment_mask |= DIRTY_ES;
-
-    if ( regs->fs || is_pv_32bit_vcpu(v) )
-    {
-        dirty_segment_mask |= DIRTY_FS;
-        /* non-nul selector kills fs_base */
-        if ( regs->fs & ~3 )
-            v->arch.pv.fs_base = 0;
-    }
-    if ( v->arch.pv.fs_base )
-        dirty_segment_mask |= DIRTY_FS_BASE;
-
-    if ( regs->gs || is_pv_32bit_vcpu(v) )
-    {
-        dirty_segment_mask |= DIRTY_GS;
-        /* non-nul selector kills gs_base_user */
-        if ( regs->gs & ~3 )
-            v->arch.pv.gs_base_user = 0;
-    }
-    if ( v->arch.flags & TF_kernel_mode ? v->arch.pv.gs_base_kernel
-                                        : v->arch.pv.gs_base_user )
-        dirty_segment_mask |= DIRTY_GS_BASE;
-
-    this_cpu(dirty_segment_mask) = dirty_segment_mask;
 }
 
 void paravirt_ctxt_switch_from(struct vcpu *v)
@@ -1830,8 +1761,8 @@ static void __context_switch(void)
 #if defined(CONFIG_PV) && defined(CONFIG_HVM)
     /* Prefetch the VMCB if we expect to use it later in the context switch */
     if ( cpu_has_svm && is_pv_domain(nd) && !is_pv_32bit_domain(nd) &&
-         !is_idle_domain(nd) && !(read_cr4() & X86_CR4_FSGSBASE) )
-        svm_load_segs(0, 0, 0, 0, 0, 0, 0);
+         !is_idle_domain(nd) )
+        svm_load_segs(0, 0, 0, 0, 0);
 #endif
 
     if ( need_full_gdt(nd) && !per_cpu(full_gdt_loaded, cpu) )
