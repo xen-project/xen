@@ -210,7 +210,7 @@ static bool admin_io_okay(unsigned int port, unsigned int bytes,
         return false;
 
     /* We also never permit direct access to the RTC/CMOS registers. */
-    if ( ((port & ~1) == RTC_PORT(0)) )
+    if ( port <= RTC_PORT(1) && port + bytes > RTC_PORT(0) )
         return false;
 
     return ioports_access_permitted(d, port, port + bytes - 1);
@@ -297,6 +297,17 @@ static uint32_t guest_io_read(unsigned int port, unsigned int bytes,
             if ( pci_cfg_ok(currd, port & 3, size, NULL) )
                 sub_data = pci_conf_read(currd->arch.pci_cf8, port & 3, size);
         }
+        else if ( ioports_access_permitted(currd, port, port) )
+        {
+            if ( bytes > 1 && !(port & 1) &&
+                 ioports_access_permitted(currd, port, port + 1) )
+            {
+                sub_data = inw(port);
+                size = 2;
+            }
+            else
+                sub_data = inb(port);
+        }
 
         if ( size == 4 )
             return sub_data;
@@ -373,25 +384,36 @@ static int read_io(unsigned int port, unsigned int bytes,
     return X86EMUL_OKAY;
 }
 
+static void _guest_io_write(unsigned int port, unsigned int bytes,
+                            uint32_t data)
+{
+    switch ( bytes )
+    {
+    case 1:
+        outb(data, port);
+        if ( amd_acpi_c1e_quirk )
+            amd_check_disable_c1e(port, data);
+        break;
+
+    case 2:
+        outw(data, port);
+        break;
+
+    case 4:
+        outl(data, port);
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
+}
+
 static void guest_io_write(unsigned int port, unsigned int bytes,
                            uint32_t data, struct domain *currd)
 {
     if ( admin_io_okay(port, bytes, currd) )
     {
-        switch ( bytes )
-        {
-        case 1:
-            outb((uint8_t)data, port);
-            if ( amd_acpi_c1e_quirk )
-                amd_check_disable_c1e(port, (uint8_t)data);
-            break;
-        case 2:
-            outw((uint16_t)data, port);
-            break;
-        case 4:
-            outl(data, port);
-            break;
-        }
+        _guest_io_write(port, bytes, data);
         return;
     }
 
@@ -419,6 +441,13 @@ static void guest_io_write(unsigned int port, unsigned int bytes,
                 size = 2;
             if ( pci_cfg_ok(currd, port & 3, size, &data) )
                 pci_conf_write(currd->arch.pci_cf8, port & 3, size, data);
+        }
+        else if ( ioports_access_permitted(currd, port, port) )
+        {
+            if ( bytes > 1 && !(port & 1) &&
+                 ioports_access_permitted(currd, port, port + 1) )
+                size = 2;
+            _guest_io_write(port, size, data);
         }
 
         if ( size == 4 )
