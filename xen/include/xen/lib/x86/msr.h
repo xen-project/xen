@@ -48,6 +48,27 @@ typedef xen_msr_entry_t msr_entry_buffer_t[];
 int x86_msr_copy_to_buffer(const struct msr_policy *policy,
                            msr_entry_buffer_t msrs, uint32_t *nr_entries);
 
+/**
+ * Unserialise an msr_policy object from an array of msrs.
+ *
+ * @param policy     The msr_policy object to unserialise into.
+ * @param msrs       The array of msrs to unserialise from.
+ * @param nr_entries The number of entries in 'msrs'.
+ * @param err_msr    Optional hint filled on error.
+ * @returns -errno
+ *
+ * Reads at most MSR_MAX_SERIALISED_ENTRIES.  May fail for a number of reasons
+ * based on the content in an individual 'msrs' entry, including the MSR index
+ * not being valid in the policy, the flags field being nonzero, or if the
+ * value provided would truncate when stored in the policy.  In such cases,
+ * the optional err_* pointer is filled in to aid diagnostics.
+ *
+ * No content validation is performed on the data stored in the policy object.
+ */
+int x86_msr_copy_from_buffer(struct msr_policy *policy,
+                             const msr_entry_buffer_t msrs, uint32_t nr_entries,
+                             uint32_t *err_msr);
+
 #endif /* !XEN_LIB_X86_MSR_H */
 
 /*
