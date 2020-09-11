@@ -1327,11 +1327,18 @@ destroy_frametable:
 
 void set_gpfn_from_mfn(unsigned long mfn, unsigned long pfn)
 {
-    const struct domain *d = page_get_owner(mfn_to_page(_mfn(mfn)));
-    unsigned long entry = (d && (d == dom_cow)) ? SHARED_M2P_ENTRY : pfn;
+    unsigned long entry = pfn;
 
     if ( unlikely(!machine_to_phys_mapping_valid) )
         return;
+
+    if ( entry != INVALID_M2P_ENTRY )
+    {
+        const struct domain *d = page_get_owner(mfn_to_page(_mfn(mfn)));
+
+        if ( d && (d == dom_cow) )
+            entry = SHARED_M2P_ENTRY;
+    }
 
     if ( opt_pv32 &&
          mfn < (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 )
