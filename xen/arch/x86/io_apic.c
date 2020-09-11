@@ -2542,7 +2542,7 @@ void __init init_ioapic_mappings(void)
 
     if ( smp_found_config )
         nr_irqs_gsi = 0;
-    for ( i = 0; i < nr_ioapics; i++ )
+    for ( i = 0; i < nr_ioapics; i++, idx++ )
     {
         if ( smp_found_config )
         {
@@ -2565,7 +2565,6 @@ void __init init_ioapic_mappings(void)
         set_fixmap_nocache(idx, ioapic_phys);
         apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08Lx (%08lx)\n",
                     __fix_to_virt(idx), ioapic_phys);
-        idx++;
 
         if ( bad_ioapic_register(i) )
         {
