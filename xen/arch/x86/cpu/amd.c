@@ -624,10 +624,10 @@ void amd_log_freq(const struct cpuinfo_x86 *c)
 	if (idx && idx < h &&
 	    !rdmsr_safe(0xC0010064 + idx, val) && (val >> 63) &&
 	    !rdmsr_safe(0xC0010064, hi) && (hi >> 63))
-		printk("CPU%u: %lu (%lu..%lu) MHz\n",
+		printk("CPU%u: %lu (%lu ... %lu) MHz\n",
 		       smp_processor_id(), FREQ(val), FREQ(lo), FREQ(hi));
 	else if (h && !rdmsr_safe(0xC0010064, hi) && (hi >> 63))
-		printk("CPU%u: %lu..%lu MHz\n",
+		printk("CPU%u: %lu ... %lu MHz\n",
 		       smp_processor_id(), FREQ(lo), FREQ(hi));
 	else
 		printk("CPU%u: %lu MHz\n", smp_processor_id(), FREQ(lo));
