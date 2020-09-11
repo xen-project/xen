@@ -220,8 +220,10 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         break;
 
     case MSR_ARCH_CAPABILITIES:
-        /* Not implemented yet. */
-        goto gp_fault;
+        if ( !cp->feat.arch_caps )
+            goto gp_fault;
+        *val = mp->arch_caps.raw;
+        break;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
         *val = msrs->misc_features_enables.raw;
