@@ -967,7 +967,7 @@ GLOBAL(trap_nop)
 GLOBAL(autogen_entrypoints)
         /* pop into the .init.rodata section and record an entry point. */
         .macro entrypoint ent
-        .pushsection .init.rodata
+        .pushsection .init.rodata, "a", @progbits
         .quad \ent
         .popsection
         .endm
@@ -1012,5 +1012,5 @@ autogen_stubs: /* Automatically generated stubs. */
         vec = vec + 1
         .endr
 
-        .section .init.rodata
+        .section .init.rodata, "a", @progbits
         .size autogen_entrypoints, . - autogen_entrypoints
