@@ -1632,6 +1632,8 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
             copy_domain_page(new_vcpu_info_mfn, vcpu_info_mfn);
         }
 
+        hvm_vmtrace_reset(cd_vcpu);
+
         /*
          * TODO: to support VMs with PV interfaces copy additional
          * settings here, such as PV timers.
@@ -1782,6 +1784,7 @@ static int fork(struct domain *cd, struct domain *d)
         cd->max_pages = d->max_pages;
         *cd->arch.cpuid = *d->arch.cpuid;
         *cd->arch.msr = *d->arch.msr;
+        cd->vmtrace_size = d->vmtrace_size;
         cd->parent = d;
     }
 

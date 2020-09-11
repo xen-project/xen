@@ -2392,6 +2392,16 @@ static int vmtrace_output_position(struct vcpu *v, uint64_t *pos)
     return v->arch.hvm.vmx.ipt_active;
 }
 
+static int vmtrace_reset(struct vcpu *v)
+{
+    if ( !v->arch.hvm.vmx.ipt_active )
+        return -EINVAL;
+
+    v->arch.msrs->rtit.output_offset = 0;
+    v->arch.msrs->rtit.status = 0;
+    return 0;
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -2451,6 +2461,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .vmtrace_output_position = vmtrace_output_position,
     .vmtrace_set_option = vmtrace_set_option,
     .vmtrace_get_option = vmtrace_get_option,
+    .vmtrace_reset = vmtrace_reset,
     .tsc_scaling = {
         .max_ratio = VMX_TSC_MULTIPLIER_MAX,
     },
