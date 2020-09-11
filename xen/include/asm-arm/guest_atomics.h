@@ -115,6 +115,28 @@ static inline unsigned long __guest_cmpxchg(struct domain *d,
                                          (unsigned long)(n),\
                                          sizeof (*(ptr))))
 
+static inline uint64_t guest_cmpxchg64(struct domain *d,
+                                       volatile uint64_t *ptr,
+                                       uint64_t old,
+                                       uint64_t new)
+{
+    uint64_t oldval = old;
+
+    perfc_incr(atomics_guest);
+
+    if ( __cmpxchg64_timeout(ptr, &oldval, new,
+                             this_cpu(guest_safe_atomic_max)) )
+        return oldval;
+
+    perfc_incr(atomics_guest_paused);
+
+    domain_pause_nosync(d);
+    oldval = cmpxchg64(ptr, old, new);
+    domain_unpause(d);
+
+    return oldval;
+}
+
 #endif /* _ARM_GUEST_ATOMICS_H */
 /*
  * Local variables:

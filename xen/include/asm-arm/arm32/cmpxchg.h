@@ -87,6 +87,37 @@ __CMPXCHG_CASE(b, 1)
 __CMPXCHG_CASE(h, 2)
 __CMPXCHG_CASE( , 4)
 
+static inline bool __cmpxchg_case_8(volatile uint64_t *ptr,
+			 	    uint64_t *old,
+			 	    uint64_t new,
+			 	    bool timeout,
+				    unsigned int max_try)
+{
+	uint64_t oldval;
+	uint64_t res;
+
+	do {
+		asm volatile(
+		"	ldrexd		%1, %H1, [%3]\n"
+		"	teq		%1, %4\n"
+		"	teqeq		%H1, %H4\n"
+		"	movne		%0, #0\n"
+		"	movne		%H0, #0\n"
+		"	bne		2f\n"
+		"	strexd		%0, %5, %H5, [%3]\n"
+		"2:"
+		: "=&r" (res), "=&r" (oldval), "+Qo" (*ptr)
+		: "r" (ptr), "r" (*old), "r" (new)
+		: "memory", "cc");
+		if (!res)
+			break;
+	} while (!timeout || ((--max_try) > 0));
+
+	*old = oldval;
+
+	return !res;
+}
+
 static always_inline bool __int_cmpxchg(volatile void *ptr, unsigned long *old,
 					unsigned long new, int size,
 					bool timeout, unsigned int max_try)
@@ -145,11 +176,48 @@ static always_inline bool __cmpxchg_timeout(volatile void *ptr,
 	return ret;
 }
 
+/*
+ * The helper may fail to update the memory if the action takes too long.
+ *
+ * @old: On call the value pointed contains the expected old value. It will be
+ * updated to the actual old value.
+ * @max_try: Maximum number of iterations
+ *
+ * The helper will return true when the update has succeeded (i.e no
+ * timeout) and false if the update has failed.
+ */
+static always_inline bool __cmpxchg64_timeout(volatile uint64_t *ptr,
+					      uint64_t *old,
+					      uint64_t new,
+					      unsigned int max_try)
+{
+	bool ret;
+
+	smp_mb();
+	ret = __cmpxchg_case_8(ptr, old, new, true, max_try);
+	smp_mb();
+
+	return ret;
+}
+
 #define cmpxchg(ptr,o,n)						\
 	((__typeof__(*(ptr)))__cmpxchg((ptr),				\
 				       (unsigned long)(o),		\
 				       (unsigned long)(n),		\
 				       sizeof(*(ptr))))
+
+static inline uint64_t cmpxchg64(volatile uint64_t *ptr,
+				 uint64_t old,
+				 uint64_t new)
+{
+	smp_mb();
+	if (!__cmpxchg_case_8(ptr, &old, new, false, 0))
+		ASSERT_UNREACHABLE();
+	smp_mb();
+
+	return old;
+}
+
 #endif
 /*
  * Local variables:

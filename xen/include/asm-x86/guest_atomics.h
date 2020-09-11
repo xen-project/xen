@@ -20,6 +20,7 @@
     ((void)(d), test_and_change_bit(nr, p))
 
 #define guest_cmpxchg(d, ptr, o, n) ((void)(d), cmpxchg(ptr, o, n))
+#define guest_cmpxchg64 guest_cmpxchg
 
 #endif /* _X86_GUEST_ATOMICS_H */
 /*
