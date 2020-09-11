@@ -394,16 +394,19 @@ static void _toggle_guest_pt(struct vcpu *v)
 
 void toggle_guest_mode(struct vcpu *v)
 {
+    unsigned long gs_base;
+
     ASSERT(!is_pv_32bit_vcpu(v));
 
-    /* %fs/%gs bases can only be stale if WR{FS,GS}BASE are usable. */
-    if ( read_cr4() & X86_CR4_FSGSBASE )
-    {
-        if ( v->arch.flags & TF_kernel_mode )
-            v->arch.pv.gs_base_kernel = __rdgsbase();
-        else
-            v->arch.pv.gs_base_user = __rdgsbase();
-    }
+    /*
+     * Update the cached value of the GS base about to become inactive, as a
+     * subsequent context switch won't bother re-reading it.
+     */
+    gs_base = rdgsbase();
+    if ( v->arch.flags & TF_kernel_mode )
+        v->arch.pv.gs_base_kernel = gs_base;
+    else
+        v->arch.pv.gs_base_user = gs_base;
     asm volatile ( "swapgs" );
 
     _toggle_guest_pt(v);
