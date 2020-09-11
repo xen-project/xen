@@ -262,29 +262,23 @@ static int ptwr_do_page_fault(struct x86_emulate_ctxt *ctxt,
         .pte = pte,
     };
     struct page_info *page;
-    int rc;
+    int rc = X86EMUL_UNHANDLEABLE;
 
     page = get_page_from_mfn(l1e_get_mfn(pte), current->domain);
     if ( !page )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( !page_lock(page) )
+    if ( page_lock(page) )
     {
-        put_page(page);
-        return X86EMUL_UNHANDLEABLE;
-    }
+        if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table )
+        {
+            ctxt->data = &ptwr_ctxt;
+            rc = x86_emulate(ctxt, &ptwr_emulate_ops);
+        }
 
-    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
-    {
         page_unlock(page);
-        put_page(page);
-        return X86EMUL_UNHANDLEABLE;
     }
 
-    ctxt->data = &ptwr_ctxt;
-    rc = x86_emulate(ctxt, &ptwr_emulate_ops);
-
-    page_unlock(page);
     put_page(page);
 
     return rc;
