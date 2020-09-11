@@ -1590,8 +1590,7 @@ static void svm_init_erratum_383(const struct cpuinfo_x86 *c)
 
 #ifdef CONFIG_PV
 bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
-                   unsigned int fs_sel, unsigned long fs_base,
-                   unsigned int gs_sel, unsigned long gs_base,
+                   unsigned long fs_base, unsigned long gs_base,
                    unsigned long gs_shadow)
 {
     unsigned int cpu = smp_processor_id();
@@ -1628,14 +1627,12 @@ bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
         vmcb->ldtr.base = ldt_base;
     }
 
-    ASSERT(!(fs_sel & ~3));
-    vmcb->fs.sel = fs_sel;
+    vmcb->fs.sel = 0;
     vmcb->fs.attr = 0;
     vmcb->fs.limit = 0;
     vmcb->fs.base = fs_base;
 
-    ASSERT(!(gs_sel & ~3));
-    vmcb->gs.sel = gs_sel;
+    vmcb->gs.sel = 0;
     vmcb->gs.attr = 0;
     vmcb->gs.limit = 0;
     vmcb->gs.base = gs_base;
