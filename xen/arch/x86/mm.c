@@ -271,6 +271,23 @@ static l4_pgentry_t __read_mostly split_l4e;
 #define root_pgt_pv_xen_slots ROOT_PAGETABLE_PV_XEN_SLOTS
 #endif
 
+/*
+ * Originally cloned from share_xen_page_with_guest(), just to avoid setting
+ * PGC_xen_heap on non-heap (typically) MMIO pages. Other pieces got dropped
+ * simply because they're not needed in this context.
+ */ 
+static void __init assign_io_page(struct page_info *page)
+{
+    set_gpfn_from_mfn(mfn_x(page_to_mfn(page)), INVALID_M2P_ENTRY);
+
+    /* The incremented type count pins as writable. */
+    page->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;
+
+    page_set_owner(page, dom_io);
+
+    page->count_info |= PGC_allocated | 1;
+}
+
 void __init arch_init_memory(void)
 {
     unsigned long i, pfn, rstart_pfn, rend_pfn, iostart_pfn, ioend_pfn;
@@ -291,7 +308,7 @@ void __init arch_init_memory(void)
      */
     BUG_ON(pvh_boot && trampoline_phys != 0x1000);
     for ( i = 0; i < 0x100; i++ )
-        share_xen_page_with_guest(mfn_to_page(_mfn(i)), dom_io, SHARE_rw);
+        assign_io_page(mfn_to_page(_mfn(i)));
 
     /* Any areas not specified as RAM by the e820 map are considered I/O. */
     for ( i = 0, pfn = 0; pfn < max_page; i++ )
@@ -332,7 +349,7 @@ void __init arch_init_memory(void)
             if ( !mfn_valid(_mfn(pfn)) )
                 continue;
 
-            share_xen_page_with_guest(mfn_to_page(_mfn(pfn)), dom_io, SHARE_rw);
+            assign_io_page(mfn_to_page(_mfn(pfn)));
         }
 
         /* Skip the RAM region. */
@@ -477,6 +494,8 @@ unsigned long domain_get_maximum_gpfn(struct domain *d)
 void share_xen_page_with_guest(struct page_info *page, struct domain *d,
                                enum XENSHARE_flags flags)
 {
+    ASSERT(d != dom_io); /* Should use assign_io_page(). */
+
     if ( page_get_owner(page) == d )
         return;
 
