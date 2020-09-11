@@ -3,7 +3,7 @@
 #define XEN_LIB_X86_MSR_H
 
 /* Maximum number of MSRs written when serialising msr_policy. */
-#define MSR_MAX_SERIALISED_ENTRIES 1
+#define MSR_MAX_SERIALISED_ENTRIES 2
 
 /* MSR policy object for shared per-domain MSRs */
 struct msr_policy
@@ -23,6 +23,28 @@ struct msr_policy
             bool cpuid_faulting:1;
         };
     } platform_info;
+
+    /*
+     * 0x0000010a - MSR_ARCH_CAPABILITIES
+     *
+     * This is an Intel-only MSR, which provides miscellaneous enumeration,
+     * including those which indicate that microarchitectrual sidechannels are
+     * fixed in hardware.
+     */
+    union {
+        uint32_t raw;
+        struct {
+            bool rdcl_no:1;
+            bool ibrs_all:1;
+            bool rsba:1;
+            bool skip_l1dfl:1;
+            bool ssb_no:1;
+            bool mds_no:1;
+            bool if_pschange_mc_no:1;
+            bool tsx_ctrl:1;
+            bool taa_no:1;
+        };
+    } arch_caps;
 };
 
 #ifdef __XEN__
