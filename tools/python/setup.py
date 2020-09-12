@@ -10,7 +10,7 @@ PATH_XEN      = XEN_ROOT + "/tools/include"
 PATH_LIBXENTOOLLOG = XEN_ROOT + "/tools/libs/toollog"
 PATH_LIBXENEVTCHN = XEN_ROOT + "/tools/libs/evtchn"
 PATH_LIBXENCTRL = XEN_ROOT + "/tools/libs/ctrl"
-PATH_LIBXL    = XEN_ROOT + "/tools/libxl"
+PATH_LIBXENGUEST = XEN_ROOT + "/tools/libs/guest"
 PATH_XENSTORE = XEN_ROOT + "/tools/libs/store"
 
 xc = Extension("xc",
@@ -19,10 +19,11 @@ xc = Extension("xc",
                                       PATH_LIBXENTOOLLOG + "/include",
                                       PATH_LIBXENEVTCHN + "/include",
                                       PATH_LIBXENCTRL + "/include",
+                                      PATH_LIBXENGUEST + "/include",
                                       "xen/lowlevel/xc" ],
-               library_dirs       = [ PATH_LIBXENCTRL ],
-               libraries          = [ "xenctrl" ],
-               depends            = [ PATH_LIBXENCTRL + "/libxenctrl.so" ],
+               library_dirs       = [ PATH_LIBXENCTRL, PATH_LIBXENGUEST ],
+               libraries          = [ "xenctrl", "xenguest" ],
+               depends            = [ PATH_LIBXENCTRL + "/libxenctrl.so", PATH_LIBXENGUEST + "/libxenguest.so" ],
                extra_link_args    = [ "-Wl,-rpath-link="+PATH_LIBXENTOOLLOG ],
                sources            = [ "xen/lowlevel/xc/xc.c" ])
 
