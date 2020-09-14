@@ -8,6 +8,8 @@ LIBHEADER := libxenvchan.h
 SRCS-y += init.c
 SRCS-y += io.c
 
+NO_HEADERS_CHK := y
+
 include $(XEN_ROOT)/tools/libs/libs.mk
 
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxenvchan)/include
