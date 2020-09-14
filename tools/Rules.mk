@@ -186,29 +186,33 @@ $(PKG_CONFIG_DIR):
 	mkdir -p $(PKG_CONFIG_DIR)
 
 $(PKG_CONFIG_DIR)/%.pc: Makefile $(XEN_ROOT)/tools/Rules.mk $(PKG_CONFIG_DIR)
-	$(file >$@,prefix=$(PKG_CONFIG_PREFIX))
-	$(file >>$@,includedir=$(PKG_CONFIG_INCDIR))
-	$(file >>$@,libdir=$(PKG_CONFIG_LIBDIR))
-	$(foreach var,$(PKG_CONFIG_VARS),$(file >>$@,$(var)))
-	$(file >>$@,)
-	$(file >>$@,Name: $(PKG_CONFIG_NAME))
-	$(file >>$@,Description: $(PKG_CONFIG_DESC))
-	$(file >>$@,Version: $(PKG_CONFIG_VERSION))
-	$(file >>$@,Cflags: -I$${includedir} $(CFLAGS_xeninclude))
-	$(file >>$@,Libs: -L$${libdir} $(PKG_CONFIG_USELIBS) -l$(PKG_CONFIG_LIB))
-	$(file >>$@,Libs.private: $(PKG_CONFIG_LIBSPRIV))
-	$(file >>$@,Requires.private: $(PKG_CONFIG_REQPRIV))
+	{ \
+	echo "prefix=$(PKG_CONFIG_PREFIX)"; \
+	echo "includedir=$(PKG_CONFIG_INCDIR)"; \
+	echo "libdir=$(PKG_CONFIG_LIBDIR)"; \
+	$(foreach var,$(PKG_CONFIG_VARS),echo $(var);) \
+	echo ""; \
+	echo "Name: $(PKG_CONFIG_NAME)"; \
+	echo "Description: $(PKG_CONFIG_DESC)"; \
+	echo "Version: $(PKG_CONFIG_VERSION)"; \
+	echo "Cflags: -I\$${includedir} $(CFLAGS_xeninclude)"; \
+	echo "Libs: -L\$${libdir} $(PKG_CONFIG_USELIBS) -l$(PKG_CONFIG_LIB)"; \
+	echo "Libs.private: $(PKG_CONFIG_LIBSPRIV)"; \
+	echo "Requires.private: $(PKG_CONFIG_REQPRIV)"; \
+	} > $@
 
 %.pc: Makefile $(XEN_ROOT)/tools/Rules.mk
-	$(file >$@,prefix=$(PKG_CONFIG_PREFIX))
-	$(file >>$@,includedir=$(PKG_CONFIG_INCDIR))
-	$(file >>$@,libdir=$(PKG_CONFIG_LIBDIR))
-	$(foreach var,$(PKG_CONFIG_VARS),$(file >>$@,$(var)))
-	$(file >>$@,)
-	$(file >>$@,Name: $(PKG_CONFIG_NAME))
-	$(file >>$@,Description: $(PKG_CONFIG_DESC))
-	$(file >>$@,Version: $(PKG_CONFIG_VERSION))
-	$(file >>$@,Cflags: -I$${includedir})
-	$(file >>$@,Libs: -L$${libdir} -l$(PKG_CONFIG_LIB))
-	$(file >>$@,Libs.private: $(PKG_CONFIG_LIBSPRIV))
-	$(file >>$@,Requires.private: $(PKG_CONFIG_REQPRIV))
+	{ \
+	echo "prefix=$(PKG_CONFIG_PREFIX)"; \
+	echo "includedir=$(PKG_CONFIG_INCDIR)"; \
+	echo "libdir=$(PKG_CONFIG_LIBDIR)"; \
+	$(foreach var,$(PKG_CONFIG_VARS),echo $(var);) \
+	echo ""; \
+	echo "Name: $(PKG_CONFIG_NAME)"; \
+	echo "Description: $(PKG_CONFIG_DESC)"; \
+	echo "Version: $(PKG_CONFIG_VERSION)"; \
+	echo "Cflags: -I\$${includedir}"; \
+	echo "Libs: -L\$${libdir} -l$(PKG_CONFIG_LIB)"; \
+	echo "Libs.private: $(PKG_CONFIG_LIBSPRIV)"; \
+	echo "Requires.private: $(PKG_CONFIG_REQPRIV)"; \
+	} > $@
