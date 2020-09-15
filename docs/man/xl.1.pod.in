@@ -1389,7 +1389,7 @@ Note that only PV block devices are supported by block-attach.
 Requests to attach emulated devices (eg, vdev=hdc) will result in only
 the PV view being available to the guest.
 
-=item B<block-detach> I<domain-id> I<devid> [I<OPTIONS>]
+=item B<block-detach> [I<OPTIONS>] I<domain-id> I<devid>
 
 Detach a domain's virtual block device. I<devid> may be the symbolic
 name or the numeric device id given to the device by domain 0.  You
@@ -1406,7 +1406,7 @@ B<OPTIONS>
 =item B<--force>
 
 If this parameter is specified the device will be forcefully detached, which
-may cause IO errors in the domain.
+may cause IO errors in the domain and possibly a guest crash
 
 =back
 

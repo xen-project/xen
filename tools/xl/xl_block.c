@@ -96,12 +96,21 @@ int main_blocklist(int argc, char **argv)
 
 int main_blockdetach(int argc, char **argv)
 {
+    static struct option opts[] = {
+        {"force", 0, 0, 'f'},
+        COMMON_LONG_OPTS
+    };
     uint32_t domid;
     int opt, rc = 0;
     libxl_device_disk disk;
+    bool force = false;
 
-    SWITCH_FOREACH_OPT(opt, "", NULL, "block-detach", 2) {
-        /* No options */
+    SWITCH_FOREACH_OPT(opt, "f", opts, "block-detach", 2) {
+    case 'f':
+        force = true;
+        break;
+    default:
+        break;
     }
 
     domid = find_domain(argv[optind]);
@@ -110,9 +119,11 @@ int main_blockdetach(int argc, char **argv)
         fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
-    rc = libxl_device_disk_remove(ctx, domid, &disk, 0);
+    rc = !force ? libxl_device_disk_safe_remove(ctx, domid, &disk, 0) :
+        libxl_device_disk_destroy(ctx, domid, &disk, 0);
     if (rc) {
-        fprintf(stderr, "libxl_device_disk_remove failed.\n");
+        fprintf(stderr, "libxl_device_disk_%s failed.\n",
+                !force ? "safe_remove" : "destroy");
         return 1;
     }
     libxl_device_disk_dispose(&disk);

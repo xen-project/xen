@@ -368,7 +368,8 @@ struct cmd_spec cmd_table[] = {
     { "block-detach",
       &main_blockdetach, 0, 1,
       "Destroy a domain's virtual block device",
-      "<Domain> <DevId>",
+      "[option] <Domain> <DevId>",
+      "-f, --force        do not wait for the domain to release the device"
     },
     { "vtpm-attach",
       &main_vtpmattach, 1, 1,
