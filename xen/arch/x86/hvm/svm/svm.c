@@ -1861,6 +1861,30 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content = 1ULL << 61; /* MC4_MISC.Locked */
         break;
 
+    case MSR_F10_BU_CFG:
+        if ( !rdmsr_safe(msr, *msr_content) )
+            break;
+
+        if ( boot_cpu_data.x86 == 0xf )
+        {
+            /*
+             * Win2k8 x64 reads this MSR on revF chips, where it wasn't
+             * publically available; it uses a magic constant in %rdi as a
+             * password, which we don't have in rdmsr_safe().  Since we'll
+             * throw a #GP for later writes, just use a plausible value here
+             * (the reset value from rev10h chips) if the real CPU didn't
+             * provide one.
+             */
+            *msr_content = 0x10200020;
+            break;
+        }
+        goto gpf;
+
+    case MSR_F10_BU_CFG2:
+        if ( rdmsr_safe(msr, *msr_content) )
+            goto gpf;
+        break;
+
     case MSR_IA32_EBC_FREQUENCY_ID:
         /*
          * This Intel-only register may be accessed if this HVM guest
@@ -1939,19 +1963,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     default:
         if ( rdmsr_safe(msr, *msr_content) == 0 )
             break;
-
-        if ( boot_cpu_data.x86 == 0xf && msr == MSR_F10_BU_CFG )
-        {
-            /* Win2k8 x64 reads this MSR on revF chips, where it
-             * wasn't publically available; it uses a magic constant
-             * in %rdi as a password, which we don't have in
-             * rdmsr_safe().  Since we'll ignore the later writes,
-             * just use a plausible value here (the reset value from
-             * rev10h chips) if the real CPU didn't provide one. */
-            *msr_content = 0x0000000010200020ull;
-            break;
-        }
-
         goto gpf;
     }
 
@@ -2105,6 +2116,12 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( (msr_content & ~PAGE_MASK) || msr_content > 0xfd00000000ULL )
             goto gpf;
         nsvm->ns_msr_hsavepa = msr_content;
+        break;
+
+    case MSR_F10_BU_CFG:
+    case MSR_F10_BU_CFG2:
+        if ( rdmsr_safe(msr, msr_content) )
+            goto gpf;
         break;
 
     case MSR_AMD64_TSC_RATIO:
