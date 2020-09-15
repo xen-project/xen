@@ -830,6 +830,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     module_t *mod;
     unsigned long nr_pages, raw_max_page, modules_headroom, module_map[1];
     int i, j, e820_warn = 0, bytes = 0;
+    unsigned long eb_start, eb_end;
     bool acpi_boot_table_init_done = false, relocated = false;
     int ret;
     struct ns16550_defaults ns16550 = {
@@ -1145,7 +1146,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
         /*
          * This needs to remain in sync with xen_in_range() and the
-         * respective reserve_e820_ram() invocation below.
+         * respective reserve_e820_ram() invocation below. No need to
+         * query efi_boot_mem_unused() here, though.
          */
         mod[mbi->mods_count].mod_start = virt_to_mfn(_stext);
         mod[mbi->mods_count].mod_end = __2M_rwdata_end - _stext;
@@ -1417,8 +1419,18 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !xen_phys_start )
         panic("Not enough memory to relocate Xen\n");
 
+    /* FIXME: Putting a hole in .bss would shatter the large page mapping. */
+    if ( using_2M_mapping() )
+        efi_boot_mem_unused(NULL, NULL);
+
     /* This needs to remain in sync with xen_in_range(). */
-    reserve_e820_ram(&boot_e820, __pa(_stext), __pa(__2M_rwdata_end));
+    if ( efi_boot_mem_unused(&eb_start, &eb_end) )
+    {
+        reserve_e820_ram(&boot_e820, __pa(_stext), __pa(eb_start));
+        reserve_e820_ram(&boot_e820, __pa(eb_end), __pa(__2M_rwdata_end));
+    }
+    else
+        reserve_e820_ram(&boot_e820, __pa(_stext), __pa(__2M_rwdata_end));
 
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area(&boot_e820);
@@ -1979,7 +1991,7 @@ int __hwdom_init xen_in_range(unsigned long mfn)
     paddr_t start, end;
     int i;
 
-    enum { region_s3, region_ro, region_rw, nr_regions };
+    enum { region_s3, region_ro, region_rw, region_bss, nr_regions };
     static struct {
         paddr_t s, e;
     } xen_regions[nr_regions] __hwdom_initdata;
@@ -2004,6 +2016,14 @@ int __hwdom_init xen_in_range(unsigned long mfn)
         /* hypervisor .data + .bss */
         xen_regions[region_rw].s = __pa(&__2M_rwdata_start);
         xen_regions[region_rw].e = __pa(&__2M_rwdata_end);
+        if ( efi_boot_mem_unused(&start, &end) )
+        {
+            ASSERT(__pa(start) >= xen_regions[region_rw].s);
+            ASSERT(__pa(end) <= xen_regions[region_rw].e);
+            xen_regions[region_rw].e = __pa(start);
+            xen_regions[region_bss].s = __pa(end);
+            xen_regions[region_bss].e = __pa(&__2M_rwdata_end);
+        }
     }
 
     start = (paddr_t)mfn << PAGE_SHIFT;
