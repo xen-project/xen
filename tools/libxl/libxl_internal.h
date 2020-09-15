@@ -2730,12 +2730,20 @@ _hidden void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev);
 /* generic callback for devices that only need to set ao_complete */
 _hidden void device_addrm_aocomplete(libxl__egc *egc, libxl__ao_device *aodev);
 
+typedef struct {
+    enum {
+        LIBXL__FORCE_AUTO, /* Re-execute with FORCE_ON if op times out */
+        LIBXL__FORCE_ON,
+        LIBXL__FORCE_OFF,
+    } flag;
+} libxl__force;
+
 struct libxl__ao_device {
     /* filled in by user */
     libxl__ao *ao;
     libxl__device_action action;
     libxl__device *dev;
-    int force;
+    libxl__force force;
     libxl__device_callback *callback;
     /* return value, zeroed by user on entry, is valid on callback */
     int rc;
@@ -3787,7 +3795,7 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
         aodev->action = LIBXL__DEVICE_ACTION_REMOVE;                    \
         aodev->dev = device;                                            \
         aodev->callback = device_addrm_aocomplete;                      \
-        aodev->force = f;                                               \
+        aodev->force.flag = f;                                          \
         libxl__initiate_device_##remtype##_remove(egc, aodev);          \
                                                                         \
     out:                                                                \
@@ -3862,12 +3870,20 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
 
 
 #define LIBXL_DEFINE_DEVICE_REMOVE(type)                                \
-    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, remove, 0)            \
-    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, destroy, 1)
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, remove,               \
+                                   LIBXL__FORCE_AUTO)                   \
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, destroy,              \
+                                   LIBXL__FORCE_ON)
 
 #define LIBXL_DEFINE_DEVICE_REMOVE_CUSTOM(type)                         \
-    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, type, remove, 0)               \
-    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, type, destroy, 1)
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, type, remove,                  \
+                                   LIBXL__FORCE_AUTO)                   \
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, type, destroy,                 \
+                                   LIBXL__FORCE_ON)
+
+#define LIBXL_DEFINE_DEVICE_SAFE_REMOVE(type)                           \
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, safe_remove,          \
+                                   LIBXL__FORCE_OFF)
 
 #define LIBXL_DEFINE_DEVICE_LIST(type)                                  \
     libxl_device_##type *libxl_device_##type##_list(libxl_ctx *ctx,     \
@@ -4028,7 +4044,7 @@ struct libxl__devices_remove_state {
     libxl__ao *ao;
     uint32_t domid;
     libxl__devices_remove_callback *callback;
-    int force; /* libxl_device_TYPE_destroy rather than _remove */
+    libxl__force force; /* libxl_device_TYPE_destroy rather than _remove */
     /* private */
     libxl__multidev multidev;
     int num_devices;

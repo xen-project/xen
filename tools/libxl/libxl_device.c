@@ -973,7 +973,7 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
             goto out;
         }
 
-        if (aodev->force)
+        if (aodev->force.flag == LIBXL__FORCE_ON)
             libxl__xs_path_cleanup(gc, t,
                                    libxl__device_frontend_path(gc, aodev->dev));
 
@@ -1092,9 +1092,9 @@ static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
 
     if (rc == ERROR_TIMEDOUT &&
         aodev->action == LIBXL__DEVICE_ACTION_REMOVE &&
-        !aodev->force) {
+        aodev->force.flag == LIBXL__FORCE_AUTO) {
         LOGD(DEBUG, aodev->dev->domid, "Timeout reached, initiating forced remove");
-        aodev->force = 1;
+        aodev->force.flag = LIBXL__FORCE_ON;
         libxl__initiate_device_generic_remove(egc, aodev);
         return;
     }
@@ -1319,7 +1319,8 @@ static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev)
     device_hotplug_clean(gc, aodev);
 
     /* Clean xenstore if it's a disconnection */
-    if (aodev->action == LIBXL__DEVICE_ACTION_REMOVE) {
+    if (aodev->action == LIBXL__DEVICE_ACTION_REMOVE &&
+        (aodev->force.flag == LIBXL__FORCE_ON || !aodev->rc)) {
         rc = libxl__device_destroy(gc, aodev->dev);
         if (!aodev->rc)
             aodev->rc = rc;

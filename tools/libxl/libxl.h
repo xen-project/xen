@@ -439,6 +439,12 @@
 #define LIBXL_HAVE_CREATEINFO_PASSTHROUGH 1
 
 /*
+ * LIBXL_HAVE_DISK_SAFE_REMOVE indicates that the
+ * libxl_device_disk_safe_remove() function is defined.
+ */
+#define LIBXL_HAVE_DISK_SAFE_REMOVE 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -1936,15 +1942,6 @@ void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
  *   structure is passed in are filled in with appropriate values for
  *   the device created.
  *
- * libxl_device_<type>_remove(ctx, domid, device):
- *
- *   Removes the given device from the specified domain by performing
- *   an orderly unplug with guest co-operation. This requires that the
- *   guest is running.
- *
- *   This method is currently synchronous and therefore can block
- *   while interacting with the guest.
- *
  * libxl_device_<type>_destroy(ctx, domid, device):
  *
  *   Removes the given device from the specified domain without guest
@@ -1953,6 +1950,22 @@ void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
  *
  *   This function does not interact with the guest and therefore
  *   cannot block on the guest.
+ *
+ * libxl_device_<type>_remove(ctx, domid, device):
+ *
+ *   Removes the given device from the specified domain by performing
+ *   an orderly unplug with guest co-operation. This requires that the
+ *   guest is running.
+ *
+ *   This method is currently synchronous and therefore can block
+ *   while interacting with the guest. There is a time-out of 10s on
+ *   this interaction after which libxl_device_<type>_destroy()
+ *   semantics apply.
+ *
+ * libxl_device_<type>_safe_remove(ctx, domid, device):
+ *
+ *   This has the same semantics as libxl_device_<type>_remove() but,
+ *   in the event of hitting the 10s time-out, this function will fail.
  *
  * Controllers
  * -----------
@@ -2033,6 +2046,10 @@ int libxl_device_disk_destroy(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk,
                               const libxl_asyncop_how *ao_how)
                               LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_device_disk_safe_remove(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_device_disk *disk,
+                                  const libxl_asyncop_how *ao_how)
+                                  LIBXL_EXTERNAL_CALLERS_ONLY;
 
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx,
                                           uint32_t domid, int *num)

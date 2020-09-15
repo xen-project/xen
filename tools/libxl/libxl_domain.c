@@ -1279,7 +1279,7 @@ static void dm_destroy_cb(libxl__egc *egc,
     dis->drs.ao = ao;
     dis->drs.domid = domid;
     dis->drs.callback = devices_destroy_cb;
-    dis->drs.force = 1;
+    dis->drs.force.flag = LIBXL__FORCE_ON;
     libxl__devices_destroy(egc, &dis->drs);
 }
 

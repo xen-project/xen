@@ -1277,7 +1277,7 @@ void libxl__device_disk_local_initiate_detach(libxl__egc *egc,
         aodev->action = LIBXL__DEVICE_ACTION_REMOVE;
         aodev->dev = device;
         aodev->callback = local_device_detach_cb;
-        aodev->force = 0;
+        aodev->force.flag = LIBXL__FORCE_AUTO;
         libxl__initiate_device_generic_remove(egc, aodev);
         return;
     }
@@ -1318,10 +1318,12 @@ out:
  * libxl__add_disks
  * libxl_device_disk_remove
  * libxl_device_disk_destroy
+ * libxl_device_disk_safe_remove
  */
 LIBXL_DEFINE_DEVICE_ADD(disk)
 LIBXL_DEFINE_DEVICES_ADD(disk)
 LIBXL_DEFINE_DEVICE_REMOVE(disk)
+LIBXL_DEFINE_DEVICE_SAFE_REMOVE(disk)
 
 static int libxl_device_disk_compare(const libxl_device_disk *d1,
                                      const libxl_device_disk *d2)
