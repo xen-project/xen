@@ -61,6 +61,8 @@
 
 #define MSR_TSX_FORCE_ABORT                 0x0000010f
 #define  TSX_FORCE_ABORT_RTM                (_AC(1, ULL) <<  0)
+#define  TSX_CPUID_CLEAR                    (_AC(1, ULL) <<  1)
+#define  TSX_ENABLE_RTM                     (_AC(1, ULL) <<  2)
 
 #define MSR_TSX_CTRL                        0x00000122
 #define  TSX_CTRL_RTM_DISABLE               (_AC(1, ULL) <<  0)
