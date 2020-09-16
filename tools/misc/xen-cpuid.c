@@ -161,7 +161,7 @@ static const char *const str_7d0[32] =
     [ 4] = "fsrm",
 
     [ 8] = "avx512-vp2intersect", [ 9] = "srbds-ctrl",
-    [10] = "md-clear",
+    [10] = "md-clear",            [11] = "rtm-always-abort",
     /* 12 */                [13] = "tsx-force-abort",
     [14] = "serialize",
 

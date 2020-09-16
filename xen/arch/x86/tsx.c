@@ -60,6 +60,38 @@ void tsx_init(void)
              */
 
             /*
+             * Probe for the June 2021 microcode which de-features TSX on
+             * client parts.  (Note - this is a subset of parts impacted by
+             * the memory ordering errata.)
+             *
+             * RTM_ALWAYS_ABORT enumerates the new functionality, but is also
+             * read as zero if TSX_FORCE_ABORT.ENABLE_RTM has been set before
+             * we run.
+             *
+             * Undo this behaviour in Xen's view of the world.
+             */
+            bool has_rtm_always_abort = cpu_has_rtm_always_abort;
+
+            if ( !has_rtm_always_abort )
+            {
+                uint64_t val;
+
+                rdmsrl(MSR_TSX_FORCE_ABORT, val);
+
+                if ( val & TSX_ENABLE_RTM )
+                    has_rtm_always_abort = true;
+            }
+
+            /*
+             * Always force RTM_ALWAYS_ABORT, even if it currently visible.
+             * If the user explicitly opts to enable TSX, we'll set
+             * TSX_FORCE_ABORT.ENABLE_RTM and cause RTM_ALWAYS_ABORT to be
+             * hidden from the general CPUID scan later.
+             */
+            if ( has_rtm_always_abort )
+                setup_force_cpu_cap(X86_FEATURE_RTM_ALWAYS_ABORT);
+
+            /*
              * If no explicit tsx= option is provided, pick a default.
              *
              * This deliberately overrides the implicit opt_tsx=-3 from
@@ -67,9 +99,16 @@ void tsx_init(void)
              * - parse_spec_ctrl() ran before any CPU details where know.
              * - We now know we're running on a CPU not affected by TAA (as
              *   TSX_FORCE_ABORT is enumerated).
+             * - When RTM_ALWAYS_ABORT is enumerated, TSX malfunctions, so we
+             *   only ever want it enabled by explicit user choice.
+             *
+             * Without RTM_ALWAYS_ABORT, leave TSX active.  In particular,
+             * this includes SKX where TSX is still supported.
+             *
+             * With RTM_ALWAYS_ABORT, disable TSX.
              */
             if ( opt_tsx < 0 )
-                opt_tsx = 1;
+                opt_tsx = !cpu_has_rtm_always_abort;
         }
 
         /*
@@ -90,7 +129,7 @@ void tsx_init(void)
          * Force the features to be visible in Xen's view if we see any of the
          * infrastructure capable of hiding them.
          */
-        if ( cpu_has_tsx_ctrl )
+        if ( cpu_has_tsx_ctrl || cpu_has_tsx_force_abort )
         {
             setup_force_cpu_cap(X86_FEATURE_HLE);
             setup_force_cpu_cap(X86_FEATURE_RTM);
@@ -131,9 +170,36 @@ void tsx_init(void)
         /* Check bottom bit only.  Higher bits are various sentinels. */
         rtm_disabled = !(opt_tsx & 1);
 
-        lo &= ~TSX_FORCE_ABORT_RTM;
-        if ( rtm_disabled )
-            lo |= TSX_FORCE_ABORT_RTM;
+        lo &= ~(TSX_FORCE_ABORT_RTM | TSX_CPUID_CLEAR | TSX_ENABLE_RTM);
+
+        if ( cpu_has_rtm_always_abort )
+        {
+            /*
+             * June 2021 microcode, on a client part with TSX de-featured:
+             *  - There are no mitigations for the TSX memory ordering errata.
+             *  - Performance counter 3 works.  (I.e. it isn't being used by
+             *    microcode to work around the memory ordering errata.)
+             *  - TSX_FORCE_ABORT.FORCE_ABORT_RTM is fixed read1/write-discard.
+             *  - TSX_FORCE_ABORT.TSX_CPUID_CLEAR can be used to hide the
+             *    HLE/RTM CPUID bits.
+             *  - TSX_FORCE_ABORT.ENABLE_RTM may be used to opt in to
+             *    re-enabling RTM, at the users own risk.
+             */
+            lo |= rtm_disabled ? TSX_CPUID_CLEAR : TSX_ENABLE_RTM;
+        }
+        else
+        {
+            /*
+             * Either a server part where TSX isn't de-featured, or pre-June
+             * 2021 microcode:
+             *  - By default, the TSX memory ordering errata is worked around
+             *    in microcode at the cost of Performance Counter 3.
+             *  - "Working TSX" vs "Working PCR3" can be selected by way of
+             *    setting TSX_FORCE_ABORT.FORCE_ABORT_RTM.
+             */
+            if ( rtm_disabled )
+                lo |= TSX_FORCE_ABORT_RTM;
+        }
 
         wrmsr(MSR_TSX_FORCE_ABORT, lo, hi);
     }

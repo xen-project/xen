@@ -2309,6 +2309,12 @@ Several microcode updates are relevant:
    and formally retiring HLE from the architecture.  The user can disable TSX
    to mitigate TAA, and elect to hide the HLE/RTM CPUID bits.
 
+ * June 2021, removing the workaround for March 2019 on client CPUs and
+   formally de-featured TSX on SKL/KBL/WHL/CFL (Note: SKX still retains the
+   March 2019 fix).  Introduced the ability to hide the HLE/RTM CPUID bits.
+   PCR3 works fine, and TSX is disabled by default, but the user can re-enable
+   TSX at their own risk, accepting that the memory order erratum is unfixed.
+
 On systems with the ability to configure TSX, this boolean offers system wide
 control of whether TSX is enabled or disabled.
 
@@ -2325,6 +2331,13 @@ control of whether TSX is enabled or disabled.
  * When no explicit `tsx=` option is given, parts susceptible to the memory
    ordering errata default to `true` to enable working TSX.  Alternatively,
    selecting `tsx=0` will disable TSX and restore PCR3 to a working state.
+
+   SKX and SKL/KBL/WHL/CFL on pre-June 2021 microcode default to `true`.
+   Alternatively, selecting `tsx=0` will disable TSX and restore PCR3 to a
+   working state.
+
+   SKL/KBL/WHL/CFL on the June 2021 microcode or later default to `false`.
+   Alternatively, selecting `tsx=1` will re-enable TSX at the users own risk.
 
 ### ucode
 > `= List of [ <integer> | scan=<bool>, nmi=<bool>, allow-same=<bool> ]`
