@@ -2307,7 +2307,9 @@ Several microcode updates are relevant:
    Introduced MSR_TSX_CTRL on all TSX-enabled MDS_NO parts to date,
    CLX/WHL-R/CFL-R, with the controls becoming architectural moving forward
    and formally retiring HLE from the architecture.  The user can disable TSX
-   to mitigate TAA, and elect to hide the HLE/RTM CPUID bits.
+   to mitigate TAA, and elect to hide the HLE/RTM CPUID bits.  Also causes
+   VERW to once-again flush the microarchiectural buffers in case a TAA
+   mitigation is wanted along with TSX being enabled.
 
  * June 2021, removing the workaround for March 2019 on client CPUs and
    formally de-featured TSX on SKL/KBL/WHL/CFL (Note: SKX still retains the
@@ -2315,18 +2317,31 @@ Several microcode updates are relevant:
    PCR3 works fine, and TSX is disabled by default, but the user can re-enable
    TSX at their own risk, accepting that the memory order erratum is unfixed.
 
+ * February 2022, removing the VERW flushing workaround from November 2019 on
+   client CPUs and formally de-featuring TSX on WHL-R/CFL-R (Note: CLX still
+   retains the VERW flushing workaround).  TSX defaults to disabled, and is
+   locked off when SGX is enabled in the BIOS.  When SGX is not enabled, TSX
+   can be re-enabled at the users own risk, as it reintroduces the TSX Async
+   Abort speculative vulnerability.
+
 On systems with the ability to configure TSX, this boolean offers system wide
 control of whether TSX is enabled or disabled.
+
+When TSX is disabled, transactions unconditionally abort.  This is compatible
+with the TSX spec, which requires software to have a non-transactional path as
+a fallback.  The RTM and HLE CPUID bits are hidden from VMs by default, but
+can be re-enabled if required.  This allows VMs which previously saw RTM/HLE
+to be migrated in, although any TSX-enabled software will run with reduced
+performance.
+
+ * When TSX is locked off by firmware, `tsx=` is ignored and treated as
+   `false`.
 
  * An explicit `tsx=` choice is honoured, even if it is `true` and would
    result in a vulnerable system.
 
  * When no explicit `tsx=` choice is given, parts vulnerable to TAA will be
    mitigated by disabling TSX, as this is the lowest overhead option.
-
-   If the use of TSX is important, the more expensive TAA mitigations can be
-   opted in to with `smt=0 spec-ctrl=md-clear`, at which point TSX will remain
-   active by default.
 
  * When no explicit `tsx=` option is given, parts susceptible to the memory
    ordering errata default to `true` to enable working TSX.  Alternatively,
