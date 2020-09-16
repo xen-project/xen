@@ -52,12 +52,6 @@ bool efi_enabled(unsigned int feature)
 
 void __init efi_init_memory(void) { }
 
-bool efi_boot_mem_unused(unsigned long *start, unsigned long *end)
-{
-    *start = *end = (unsigned long)_end;
-    return false;
-}
-
 void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e) { }
 
 bool efi_rs_using_pgtables(void)
