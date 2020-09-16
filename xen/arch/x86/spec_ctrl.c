@@ -1185,11 +1185,14 @@ void __init init_speculation_mitigations(void)
      * the MDS mitigation of disabling HT and using VERW flushing.
      *
      * On CPUs which advertise MDS_NO, VERW has no flushing side effect until
-     * the TSX_CTRL microcode is loaded, despite the MD_CLEAR CPUID bit being
+     * the TSX_CTRL microcode (Nov 2019), despite the MD_CLEAR CPUID bit being
      * advertised, and there isn't a MD_CLEAR_2 flag to use...
      *
+     * Furthermore, the VERW flushing side effect is removed again on client
+     * parts with the Feb 2022 microcode.
+     *
      * If we're on affected hardware, able to do something about it (which
-     * implies that VERW now works), no explicit TSX choice and traditional
+     * implies that VERW might work), no explicit TSX choice and traditional
      * MDS mitigations (no-SMT, VERW) not obviosuly in use (someone might
      * plausibly value TSX higher than Hyperthreading...), disable TSX to
      * mitigate TAA.
