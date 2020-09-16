@@ -14,6 +14,9 @@
  * This is arranged such that the bottom bit encodes whether TSX is actually
  * disabled, while identifying various explicit (>=0) and implicit (<0)
  * conditions.
+ *
+ * This option only has any effect on systems presenting a mechanism of
+ * controlling TSX behaviour, and where TSX isn't force-disabled by firmware.
  */
 int8_t __read_mostly opt_tsx = -1;
 int8_t __read_mostly cpu_has_tsx_ctrl = -1;
@@ -53,6 +56,66 @@ void tsx_init(void)
 
         cpu_has_tsx_ctrl = !!(caps & ARCH_CAPS_TSX_CTRL);
         has_rtm_always_abort = cpu_has_rtm_always_abort;
+
+        if ( cpu_has_tsx_ctrl && cpu_has_srbds_ctrl )
+        {
+            /*
+             * On a TAA-vulnerable or later part with at least the May 2020
+             * microcode mitigating SRBDS.
+             */
+            uint64_t val;
+
+            rdmsrl(MSR_MCU_OPT_CTRL, val);
+
+            /*
+             * Probe for the February 2022 microcode which de-features TSX on
+             * TAA-vulnerable client parts - WHL-R/CFL-R.
+             *
+             * RTM_ALWAYS_ABORT (read above) enumerates the new functionality,
+             * but is read as zero if MCU_OPT_CTRL.RTM_ALLOW has been set
+             * before we run.  Undo this.
+             */
+            if ( val & MCU_OPT_CTRL_RTM_ALLOW )
+                has_rtm_always_abort = true;
+
+            if ( has_rtm_always_abort )
+            {
+                if ( val & MCU_OPT_CTRL_RTM_LOCKED )
+                {
+                    /*
+                     * If RTM_LOCKED is set, TSX is disabled because SGX is
+                     * enabled, and there is nothing we can do.  Override with
+                     * tsx=0 so all other logic takes sensible actions.
+                     */
+                    printk(XENLOG_WARNING "TSX locked by firmware - disabling\n");
+                    opt_tsx = 0;
+                }
+                else
+                {
+                    /*
+                     * Otherwise, set RTM_ALLOW.  Not because we necessarily
+                     * intend to enable RTM, but it prevents
+                     * MSR_TSX_CTRL.RTM_DISABLE from being ignored, thus
+                     * allowing the rest of the TSX selection logic to work as
+                     * before.
+                     */
+                    val |= MCU_OPT_CTRL_RTM_ALLOW;
+                }
+
+                set_in_mcu_opt_ctrl(
+                    MCU_OPT_CTRL_RTM_LOCKED | MCU_OPT_CTRL_RTM_ALLOW, val);
+
+                /*
+                 * If no explicit tsx= option is provided, pick a default.
+                 *
+                 * With RTM_ALWAYS_ABORT, the default ucode behaviour is to
+                 * disable, so match that.  This does not override explicit user
+                 * choices, or implicit choices as a side effect of spec-ctrl=0.
+                 */
+                if ( opt_tsx == -1 )
+                    opt_tsx = 0;
+            }
+        }
 
         if ( cpu_has_tsx_force_abort )
         {
@@ -142,6 +205,19 @@ void tsx_init(void)
      */
     if ( cpu_has_tsx_ctrl )
     {
+        /*
+         * On a TAA-vulnerable part with at least the November 2019 microcode,
+         * or newer part with TAA fixed.
+         *
+         * Notes:
+         *  - With the February 2022 microcode, if SGX has caused TSX to be
+         *    locked off, opt_tsx is overridden to 0.  TSX_CTRL.RTM_DISABLE is
+         *    an ignored bit, but we write it such that it matches the
+         *    behaviour enforced by microcode.
+         *  - Otherwise, if SGX isn't enabled and TSX is available to be
+         *    controlled, we have or will set MSR_MCU_OPT_CTRL.RTM_ALLOW to
+         *    let TSX_CTRL.RTM_DISABLE be usable.
+         */
         uint32_t hi, lo;
 
         rdmsr(MSR_TSX_CTRL, lo, hi);
