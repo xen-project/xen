@@ -78,6 +78,8 @@
 
 #define MSR_MCU_OPT_CTRL                    0x00000123
 #define  MCU_OPT_CTRL_RNGDS_MITG_DIS        (_AC(1, ULL) <<  0)
+#define  MCU_OPT_CTRL_RTM_ALLOW             (_AC(1, ULL) <<  1)
+#define  MCU_OPT_CTRL_RTM_LOCKED            (_AC(1, ULL) <<  2)
 
 #define MSR_RTIT_OUTPUT_BASE                0x00000560
 #define MSR_RTIT_OUTPUT_MASK                0x00000561
