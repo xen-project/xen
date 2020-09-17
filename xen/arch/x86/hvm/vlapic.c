@@ -191,8 +191,7 @@ uint32_t vlapic_set_ppr(struct vlapic *vlapic)
    return ppr;
 }
 
-static bool vlapic_match_logical_addr(const struct vlapic *vlapic,
-                                      uint32_t mda)
+static bool vlapic_match_logical_addr(const struct vlapic *vlapic, uint32_t mda)
 {
     bool result = false;
     uint32_t logical_id = vlapic_get_reg(vlapic, APIC_LDR);
@@ -208,11 +207,11 @@ static bool vlapic_match_logical_addr(const struct vlapic *vlapic,
     {
     case APIC_DFR_FLAT:
         if ( logical_id & mda )
-            result = 1;
+            result = true;
         break;
     case APIC_DFR_CLUSTER:
         if ( ((logical_id >> 4) == (mda >> 0x4)) && (logical_id & mda & 0xf) )
-            result = 1;
+            result = true;
         break;
     default:
         printk(XENLOG_G_WARNING "%pv: bad LAPIC DFR value %08x\n",
@@ -244,7 +243,7 @@ bool vlapic_match_dest(
         return (target == source);
 
     case APIC_DEST_ALLINC:
-        return 1;
+        return true;
 
     case APIC_DEST_ALLBUT:
         return (target != source);
@@ -254,7 +253,7 @@ bool vlapic_match_dest(
         break;
     }
 
-    return 0;
+    return false;
 }
 
 static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
@@ -462,7 +461,7 @@ static bool is_multicast_dest(struct vlapic *vlapic, unsigned int short_hand,
                               uint32_t dest, bool dest_mode)
 {
     if ( vlapic_domain(vlapic)->max_vcpus <= 2 )
-        return 0;
+        return false;
 
     if ( short_hand )
         return short_hand != APIC_DEST_SELF;
@@ -837,7 +836,7 @@ void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
 
     case APIC_LVTT:         /* LVT Timer Reg */
         if ( vlapic_lvtt_tdt(vlapic) !=
-             ((val & APIC_TIMER_MODE_MASK) == APIC_TIMER_MODE_TSC_DEADLINE))
+             ((val & APIC_TIMER_MODE_MASK) == APIC_TIMER_MODE_TSC_DEADLINE) )
         {
             vlapic_set_reg(vlapic, APIC_TMICT, 0);
             vlapic->hw.tdt_msr = 0;
@@ -1163,7 +1162,7 @@ int guest_wrmsr_apic_base(struct vcpu *v, uint64_t val)
     return X86EMUL_OKAY;
 }
 
-uint64_t  vlapic_tdt_msr_get(struct vlapic *vlapic)
+uint64_t vlapic_tdt_msr_get(struct vlapic *vlapic)
 {
     if ( !vlapic_lvtt_tdt(vlapic) )
         return 0;
@@ -1184,7 +1183,7 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "ignore tsc deadline msr write");
         return;
     }
-    
+
     /* new_value = 0, >0 && <= now, > now */
     guest_tsc = hvm_get_guest_tsc(v);
     if ( value > guest_tsc )
@@ -1539,8 +1538,8 @@ static int cf_check lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
     s = vcpu_vlapic(v);
-    
-    if ( hvm_load_entry_zeroextend(LAPIC, h, &s->hw) != 0 ) 
+
+    if ( hvm_load_entry_zeroextend(LAPIC, h, &s->hw) != 0 )
         return -EINVAL;
 
     s->loaded.hw = 1;
@@ -1573,8 +1572,8 @@ static int cf_check lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
     s = vcpu_vlapic(v);
-    
-    if ( hvm_load_entry(LAPIC_REGS, h, s->regs) != 0 ) 
+
+    if ( hvm_load_entry(LAPIC_REGS, h, s->regs) != 0 )
         return -EINVAL;
 
     s->loaded.id = vlapic_get_reg(s, APIC_ID);
