@@ -29,14 +29,14 @@ void pv_inject_event(const struct x86_event *event)
     bool use_error_code;
 
     ASSERT(vector == event->vector); /* Confirm no truncation. */
-    if ( event->type == X86_EVENTTYPE_HW_EXCEPTION )
+    if ( event->type == X86_ET_HW_EXC )
     {
         ASSERT(vector < 32);
         use_error_code = X86_EXC_HAVE_EC & (1u << vector);
     }
     else
     {
-        ASSERT(event->type == X86_EVENTTYPE_SW_INTERRUPT);
+        ASSERT(event->type == X86_ET_SW_INT);
         use_error_code = false;
     }
     if ( use_error_code )
@@ -51,7 +51,7 @@ void pv_inject_event(const struct x86_event *event)
     tb->cs    = ti->cs;
     tb->eip   = ti->address;
 
-    switch ( vector | -(event->type == X86_EVENTTYPE_SW_INTERRUPT) )
+    switch ( vector | -(event->type == X86_ET_SW_INT) )
     {
     case X86_EXC_PF:
         curr->arch.pv.ctrlreg[2] = event->cr2;

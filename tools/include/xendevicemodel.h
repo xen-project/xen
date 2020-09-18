@@ -308,7 +308,7 @@ int xendevicemodel_set_mem_type(
  * @parm domid the domain id to be serviced
  * @parm vcpu the vcpu id
  * @parm vector the interrupt vector
- * @parm type the event type (see the definition of enum x86_event_type)
+ * @parm type the event type (see x86-defns.h:X86_ET_*)
  * @parm error_code the error code or ~0 to skip
  * @parm insn_len the instruction length
  * @parm extra type-specific extra data (%cr2 for #PF, pending_dbg for #DB)

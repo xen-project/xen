@@ -219,10 +219,10 @@ int hvm_event_needs_reinjection(uint8_t type, uint8_t vector)
 {
     switch ( type )
     {
-    case X86_EVENTTYPE_EXT_INTR:
-    case X86_EVENTTYPE_NMI:
+    case X86_ET_EXT_INTR:
+    case X86_ET_NMI:
         return 1;
-    case X86_EVENTTYPE_HW_EXCEPTION:
+    case X86_ET_HW_EXC:
         /*
          * SVM uses type 3 ("HW Exception") for #OF and #BP. We explicitly
          * check for these vectors, as they are really SW Exceptions. SVM has
@@ -1738,7 +1738,7 @@ void hvm_inject_event(const struct x86_event *event)
 {
     struct vcpu *curr = current;
     const uint8_t vector = event->vector;
-    const bool has_ec = ((event->type == X86_EVENTTYPE_HW_EXCEPTION) &&
+    const bool has_ec = ((event->type == X86_ET_HW_EXC) &&
                          (vector < 32) && ((X86_EXC_HAVE_EC & (1u << vector))));
 
     ASSERT(vector == event->vector); /* Confirm no truncation. */

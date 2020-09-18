@@ -204,4 +204,18 @@
 #define X86_MT_UCM    0x07 /* UC- */
 #define X86_NUM_MT    0x08
 
+/*
+ * Event Types.
+ *
+ * These encodings were first used in VMCB/VMCS fields, but have become
+ * architectural in the FRED spec.
+ */
+#define X86_ET_EXT_INTR    0 /* External Interrupt */
+#define X86_ET_NMI         2 /* NMI */
+#define X86_ET_HW_EXC      3 /* Hardware Exception (#PF/#GP/etc) */
+#define X86_ET_SW_INT      4 /* Software Interrupt (INT $n) */
+#define X86_ET_PRIV_SW_EXC 5 /* Privileged Software Exception (ICEBP/INT1) */
+#define X86_ET_SW_EXC      6 /* Software Exception (INT3, INTO) */
+#define X86_ET_OTHER       7 /* Misc event: MTF=0, SYSCALL=1, SYSENTER=2 */
+
 #endif	/* __XEN_X86_DEFNS_H__ */

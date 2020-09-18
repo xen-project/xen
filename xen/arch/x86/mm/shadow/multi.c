@@ -2701,7 +2701,7 @@ static int cf_check sh_page_fault(
          * else is an emulation bug, or a guest playing with the instruction
          * stream under Xen's feet.
          */
-        if ( emul_ctxt.ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
+        if ( emul_ctxt.ctxt.event.type == X86_ET_HW_EXC &&
              ((emul_ctxt.ctxt.event.vector == X86_EXC_PF) ||
               (((emul_ctxt.ctxt.event.vector == X86_EXC_GP) ||
                 (emul_ctxt.ctxt.event.vector == X86_EXC_SS)) &&

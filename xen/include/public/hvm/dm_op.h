@@ -302,7 +302,7 @@ struct xen_dm_op_inject_event {
     uint8_t vector;
     /* IN - event type (DMOP_EVENT_* ) */
     uint8_t type;
-/* NB. This enumeration precisely matches hvm.h:X86_EVENTTYPE_* */
+/* NB. This enumeration precisely matches x86-defns.h:X86_ET_* */
 # define XEN_DMOP_EVENT_ext_int    0 /* external interrupt */
 # define XEN_DMOP_EVENT_nmi        2 /* nmi */
 # define XEN_DMOP_EVENT_hw_exc     3 /* hardware exception */

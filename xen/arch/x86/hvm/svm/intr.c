@@ -35,7 +35,7 @@ static void svm_inject_nmi(struct vcpu *v)
 
     event.raw = 0;
     event.v = true;
-    event.type = X86_EVENTTYPE_NMI;
+    event.type = X86_ET_NMI;
     event.vector = X86_EXC_NMI;
 
     ASSERT(!vmcb->event_inj.v);
@@ -56,7 +56,7 @@ static void svm_inject_extint(struct vcpu *v, int vector)
 
     event.raw = 0;
     event.v = true;
-    event.type = X86_EVENTTYPE_EXT_INTR;
+    event.type = X86_ET_EXT_INTR;
     event.vector = vector;
 
     ASSERT(!vmcb->event_inj.v);

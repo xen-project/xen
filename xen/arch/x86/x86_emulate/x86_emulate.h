@@ -59,24 +59,11 @@ static inline bool is_x86_system_segment(enum x86_segment seg)
     return seg >= x86_seg_tr && seg < x86_seg_none;
 }
 
-/*
- * x86 event types. This enumeration is valid for:
- *  Intel VMX: {VM_ENTRY,VM_EXIT,IDT_VECTORING}_INTR_INFO[10:8]
- *  AMD SVM: eventinj[10:8] and exitintinfo[10:8] (types 0-4 only)
- */
-enum x86_event_type {
-    X86_EVENTTYPE_EXT_INTR,         /* External interrupt */
-    X86_EVENTTYPE_NMI = 2,          /* NMI */
-    X86_EVENTTYPE_HW_EXCEPTION,     /* Hardware exception */
-    X86_EVENTTYPE_SW_INTERRUPT,     /* Software interrupt (CD nn) */
-    X86_EVENTTYPE_PRI_SW_EXCEPTION, /* ICEBP (F1) */
-    X86_EVENTTYPE_SW_EXCEPTION,     /* INT3 (CC), INTO (CE) */
-};
 #define X86_EVENT_NO_EC (-1)        /* No error code. */
 
 struct x86_event {
     int16_t       vector;
-    uint8_t       type;         /* X86_EVENTTYPE_* */
+    uint8_t       type;         /* X86_ET_* */
     uint8_t       insn_len;     /* Instruction length */
     int32_t       error_code;   /* X86_EVENT_NO_EC if n/a */
     union {
@@ -821,7 +808,7 @@ static inline void x86_emul_hw_exception(
     ASSERT(!ctxt->event_pending);
 
     ctxt->event.vector = vector;
-    ctxt->event.type = X86_EVENTTYPE_HW_EXCEPTION;
+    ctxt->event.type = X86_ET_HW_EXC;
     ctxt->event.error_code = error_code;
 
     ctxt->event_pending = true;
@@ -833,7 +820,7 @@ static inline void x86_emul_pagefault(
     ASSERT(!ctxt->event_pending);
 
     ctxt->event.vector = X86_EXC_PF;
-    ctxt->event.type = X86_EVENTTYPE_HW_EXCEPTION;
+    ctxt->event.type = X86_ET_HW_EXC;
     ctxt->event.error_code = error_code;
     ctxt->event.cr2 = cr2;
 

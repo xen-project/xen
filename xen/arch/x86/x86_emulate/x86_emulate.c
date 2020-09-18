@@ -2372,19 +2372,19 @@ x86_emulate(
         {
         case 0xcc: /* int3 */
             ctxt->event.vector = X86_EXC_BP;
-            ctxt->event.type = X86_EVENTTYPE_SW_EXCEPTION;
+            ctxt->event.type = X86_ET_SW_EXC;
             break;
         case 0xcd: /* int imm8 */
             ctxt->event.vector = imm1;
-            ctxt->event.type = X86_EVENTTYPE_SW_INTERRUPT;
+            ctxt->event.type = X86_ET_SW_INT;
             break;
         case 0xce: /* into */
             ctxt->event.vector = X86_EXC_OF;
-            ctxt->event.type = X86_EVENTTYPE_SW_EXCEPTION;
+            ctxt->event.type = X86_ET_SW_EXC;
             break;
         case 0xf1: /* icebp */
             ctxt->event.vector = X86_EXC_DB;
-            ctxt->event.type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
+            ctxt->event.type = X86_ET_PRIV_SW_EXC;
             break;
         }
         ctxt->event.error_code = X86_EVENT_NO_EC;
@@ -8597,16 +8597,14 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(x86_seg_fs != 4);
     BUILD_BUG_ON(x86_seg_gs != 5);
 
-    /*
-     * Check X86_EVENTTYPE_* against VMCB EVENTINJ and VMCS INTR_INFO type
-     * fields.
-     */
-    BUILD_BUG_ON(X86_EVENTTYPE_EXT_INTR != 0);
-    BUILD_BUG_ON(X86_EVENTTYPE_NMI != 2);
-    BUILD_BUG_ON(X86_EVENTTYPE_HW_EXCEPTION != 3);
-    BUILD_BUG_ON(X86_EVENTTYPE_SW_INTERRUPT != 4);
-    BUILD_BUG_ON(X86_EVENTTYPE_PRI_SW_EXCEPTION != 5);
-    BUILD_BUG_ON(X86_EVENTTYPE_SW_EXCEPTION != 6);
+    /* Check X86_ET_* against VMCB EVENTINJ and VMCS INTR_INFO type fields. */
+    BUILD_BUG_ON(X86_ET_EXT_INTR    != 0);
+    BUILD_BUG_ON(X86_ET_NMI         != 2);
+    BUILD_BUG_ON(X86_ET_HW_EXC      != 3);
+    BUILD_BUG_ON(X86_ET_SW_INT      != 4);
+    BUILD_BUG_ON(X86_ET_PRIV_SW_EXC != 5);
+    BUILD_BUG_ON(X86_ET_SW_EXC      != 6);
+    BUILD_BUG_ON(X86_ET_OTHER       != 7);
 }
 
 #ifndef NDEBUG

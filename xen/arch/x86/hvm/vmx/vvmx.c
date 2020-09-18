@@ -1346,7 +1346,7 @@ static void sync_exception_state(struct vcpu *v)
 
     switch ( MASK_EXTR(nvmx->intr.intr_info, INTR_INFO_INTR_TYPE_MASK) )
     {
-    case X86_EVENTTYPE_EXT_INTR:
+    case X86_ET_EXT_INTR:
         /* rename exit_reason to EXTERNAL_INTERRUPT */
         set_vvmcs(v, VM_EXIT_REASON, EXIT_REASON_EXTERNAL_INTERRUPT);
         set_vvmcs(v, EXIT_QUALIFICATION, 0);
@@ -1355,14 +1355,14 @@ static void sync_exception_state(struct vcpu *v)
                                                          : 0);
         break;
 
-    case X86_EVENTTYPE_HW_EXCEPTION:
-    case X86_EVENTTYPE_SW_INTERRUPT:
-    case X86_EVENTTYPE_SW_EXCEPTION:
+    case X86_ET_HW_EXC:
+    case X86_ET_SW_INT:
+    case X86_ET_SW_EXC:
         /* throw to L1 */
         set_vvmcs(v, VM_EXIT_INTR_INFO, nvmx->intr.intr_info);
         set_vvmcs(v, VM_EXIT_INTR_ERROR_CODE, nvmx->intr.error_code);
         break;
-    case X86_EVENTTYPE_NMI:
+    case X86_ET_NMI:
         set_vvmcs(v, VM_EXIT_REASON, EXIT_REASON_EXCEPTION_NMI);
         set_vvmcs(v, EXIT_QUALIFICATION, 0);
         set_vvmcs(v, VM_EXIT_INTR_INFO, nvmx->intr.intr_info);
@@ -2445,7 +2445,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_EXCEPTION_NMI:
     {
         unsigned long intr_info;
-        u32 valid_mask = MASK_INSR(X86_EVENTTYPE_HW_EXCEPTION,
+        u32 valid_mask = MASK_INSR(X86_ET_HW_EXC,
                                   INTR_INFO_INTR_TYPE_MASK) |
                          INTR_INFO_VALID_MASK;
         u64 exec_bitmap;
