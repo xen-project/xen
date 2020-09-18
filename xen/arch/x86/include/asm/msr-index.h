@@ -115,6 +115,17 @@
 #define  MCU_OPT_CTRL_GDS_MIT_DIS           (_AC(1, ULL) <<  4)
 #define  MCU_OPT_CTRL_GDS_MIT_LOCK          (_AC(1, ULL) <<  5)
 
+#define MSR_FRED_RSP_SL0                    0x000001cc
+#define MSR_FRED_RSP_SL1                    0x000001cd
+#define MSR_FRED_RSP_SL2                    0x000001ce
+#define MSR_FRED_RSP_SL3                    0x000001cf
+#define MSR_FRED_STK_LVLS                   0x000001d0
+#define MSR_FRED_SSP_SL0                    MSR_PL0_SSP
+#define MSR_FRED_SSP_SL1                    0x000001d1
+#define MSR_FRED_SSP_SL2                    0x000001d2
+#define MSR_FRED_SSP_SL3                    0x000001d3
+#define MSR_FRED_CONFIG                     0x000001d4
+
 #define MSR_RTIT_OUTPUT_BASE                0x00000560
 #define MSR_RTIT_OUTPUT_MASK                0x00000561
 #define MSR_RTIT_CTL                        0x00000570

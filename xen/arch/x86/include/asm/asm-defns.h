@@ -4,6 +4,14 @@
     .byte 0x0f, 0x01, 0xfc
 .endm
 
+/* binutils >= 2.41 or LLVM >= 19 */
+.macro eretu
+    .byte 0xf3, 0x0f, 0x01, 0xca
+.endm
+.macro erets
+    .byte 0xf2, 0x0f, 0x01, 0xca
+.endm
+
 /*
  * Call a noreturn function.  This could be JMP, but CALL results in a more
  * helpful backtrace.  BUG is to catch functions which do decide to return...
