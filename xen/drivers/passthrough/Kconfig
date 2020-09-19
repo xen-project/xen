@@ -14,7 +14,7 @@ config ARM_SMMU
 	  ARM SMMU architecture.
 
 config IPMMU_VMSA
-	bool "Renesas IPMMU-VMSA found in R-Car Gen3 SoCs" if EXPERT
+	bool "Renesas IPMMU-VMSA found in R-Car Gen3 SoCs"
 	depends on ARM_64
 	---help---
 	  Support for implementations of the Renesas IPMMU-VMSA found

@@ -25,7 +25,7 @@ config RCAR3
 	bool "Renesas RCar3 support"
 	depends on ARM_64
 	select HAS_SCIF
-	select IPMMU_VMSA if EXPERT
+	select IPMMU_VMSA
 	---help---
 	Enable all the required drivers for Renesas RCar3
 
