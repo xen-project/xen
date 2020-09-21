@@ -1942,6 +1942,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_K8_TOP_MEM1:
     case MSR_K8_TOP_MEM2:
     case MSR_K8_VM_CR:
+    case MSR_AMD64_EX_CFG:
         *msr_content = 0;
         break;
 
@@ -2108,6 +2109,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_K8_TOP_MEM2:
     case MSR_K8_SYSCFG:
     case MSR_K8_VM_CR:
+    case MSR_AMD64_EX_CFG:
         /* ignore write. handle all bits as read-only. */
         break;
 
