@@ -41,7 +41,7 @@
 
 typedef EFI_STATUS
 (/* _not_ EFIAPI */ *EFI_SHIM_LOCK_VERIFY) (
-    IN VOID *Buffer,
+    IN const VOID *Buffer,
     IN UINT32 Size);
 
 typedef struct {
@@ -104,7 +104,8 @@ struct file {
     UINTN size;
     union {
         EFI_PHYSICAL_ADDRESS addr;
-        void *ptr;
+        char *str;
+        const void *ptr;
     };
 };
 
@@ -592,7 +593,7 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
             efi_arch_handle_module(file, name, options);
         }
 
-        ret = FileHandle->Read(FileHandle, &file->size, file->ptr);
+        ret = FileHandle->Read(FileHandle, &file->size, file->str);
         if ( !EFI_ERROR(ret) && file->size != size )
             ret = EFI_ABORTED;
         if ( EFI_ERROR(ret) )
@@ -616,7 +617,7 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
 
 static void __init pre_parse(const struct file *cfg)
 {
-    char *ptr = cfg->ptr, *end = ptr + cfg->size;
+    char *ptr = cfg->str, *end = ptr + cfg->size;
     bool start = true, comment = false;
 
     for ( ; ptr < end; ++ptr )
@@ -645,7 +646,7 @@ static void __init pre_parse(const struct file *cfg)
 static char *__init get_value(const struct file *cfg, const char *section,
                               const char *item)
 {
-    char *ptr = cfg->ptr, *end = ptr + cfg->size;
+    char *ptr = cfg->str, *end = ptr + cfg->size;
     size_t slen = section ? strlen(section) : 0, ilen = strlen(item);
     bool match = !slen;
 
