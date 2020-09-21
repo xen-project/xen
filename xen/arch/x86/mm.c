@@ -2510,12 +2510,12 @@ struct domain *page_get_owner_and_reference(struct page_info *page)
 }
 
 
-int get_page(struct page_info *page, struct domain *domain)
+bool get_page(struct page_info *page, const struct domain *domain)
 {
-    struct domain *owner = page_get_owner_and_reference(page);
+    const struct domain *owner = page_get_owner_and_reference(page);
 
     if ( likely(owner == domain) )
-        return 1;
+        return true;
 
     if ( !paging_mode_refcounts(domain) && !domain->is_dying )
         gprintk(XENLOG_INFO,
@@ -2526,7 +2526,7 @@ int get_page(struct page_info *page, struct domain *domain)
     if ( owner )
         put_page(page);
 
-    return 0;
+    return false;
 }
 
 /*

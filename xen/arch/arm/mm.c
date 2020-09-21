@@ -1560,17 +1560,17 @@ void put_page(struct page_info *page)
     }
 }
 
-int get_page(struct page_info *page, struct domain *domain)
+bool get_page(struct page_info *page, const struct domain *domain)
 {
-    struct domain *owner = page_get_owner_and_reference(page);
+    const struct domain *owner = page_get_owner_and_reference(page);
 
     if ( likely(owner == domain) )
-        return 1;
+        return true;
 
     if ( owner != NULL )
         put_page(page);
 
-    return 0;
+    return false;
 }
 
 /* Common code requires get_page_type and put_page_type.

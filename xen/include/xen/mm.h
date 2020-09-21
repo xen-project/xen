@@ -151,7 +151,7 @@ TYPE_SAFE(unsigned long, pfn);
 struct page_info;
 
 void put_page(struct page_info *);
-int get_page(struct page_info *, struct domain *);
+bool get_page(struct page_info *, const struct domain *);
 struct domain *__must_check page_get_owner_and_reference(struct page_info *);
 
 /* Boot-time allocator. Turns into generic allocator after bootstrap. */
