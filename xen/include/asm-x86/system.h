@@ -220,7 +220,7 @@ static always_inline unsigned long __xadd(
  *
  * Refer to the vendor system programming manuals for further details.
  */
-#define smp_mb()        mb()
+#define smp_mb()        asm volatile ( "lock addl $0, -4(%%rsp)" ::: "memory" )
 #define smp_rmb()       barrier()
 #define smp_wmb()       barrier()
 

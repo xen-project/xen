@@ -68,11 +68,11 @@
 #define xen_barrier() asm volatile ( "" : : : "memory")
 
 #if defined(__i386__)
-#define xen_mb()  asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
+#define xen_mb()  asm volatile ( "lock addl $0, -4(%%esp)" ::: "memory" )
 #define xen_rmb() xen_barrier()
 #define xen_wmb() xen_barrier()
 #elif defined(__x86_64__)
-#define xen_mb()  asm volatile ( "mfence" : : : "memory")
+#define xen_mb()  asm volatile ( "lock addl $0, -32(%%rsp)" ::: "memory" )
 #define xen_rmb() xen_barrier()
 #define xen_wmb() xen_barrier()
 #elif defined(__arm__)
