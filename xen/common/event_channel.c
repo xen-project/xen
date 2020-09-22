@@ -1291,7 +1291,16 @@ int alloc_unbound_xen_event_channel(
 
 void free_xen_event_channel(struct domain *d, int port)
 {
-    BUG_ON(!port_is_valid(d, port));
+    if ( !port_is_valid(d, port) )
+    {
+        /*
+         * Make sure ->is_dying is read /after/ ->valid_evtchns, pairing
+         * with the spin_barrier() and BUG_ON() in evtchn_destroy().
+         */
+        smp_rmb();
+        BUG_ON(!d->is_dying);
+        return;
+    }
 
     evtchn_close(d, port, 0);
 }
@@ -1303,7 +1312,17 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
     struct domain *rd;
     unsigned long flags;
 
-    ASSERT(port_is_valid(ld, lport));
+    if ( !port_is_valid(ld, lport) )
+    {
+        /*
+         * Make sure ->is_dying is read /after/ ->valid_evtchns, pairing
+         * with the spin_barrier() and BUG_ON() in evtchn_destroy().
+         */
+        smp_rmb();
+        ASSERT(ld->is_dying);
+        return;
+    }
+
     lchn = evtchn_from_port(ld, lport);
 
     spin_lock_irqsave(&lchn->lock, flags);
@@ -1375,8 +1394,7 @@ int evtchn_init(struct domain *d)
     return 0;
 }
 
-
-void evtchn_destroy(struct domain *d)
+int evtchn_destroy(struct domain *d)
 {
     unsigned int i;
 
@@ -1385,14 +1403,29 @@ void evtchn_destroy(struct domain *d)
     spin_barrier(&d->event_lock);
 
     /* Close all existing event channels. */
-    for ( i = 0; port_is_valid(d, i); i++ )
+    for ( i = d->valid_evtchns; --i; )
+    {
         evtchn_close(d, i, 0);
+
+        /*
+         * Avoid preempting when called from domain_create()'s error path,
+         * and don't check too often (choice of frequency is arbitrary).
+         */
+        if ( i && !(i & 0x3f) && d->is_dying != DOMDYING_dead &&
+             hypercall_preempt_check() )
+        {
+            write_atomic(&d->valid_evtchns, i);
+            return -ERESTART;
+        }
+    }
 
     ASSERT(!d->active_evtchns);
 
     clear_global_virq_handlers(d);
 
     evtchn_fifo_destroy(d);
+
+    return 0;
 }
 
 
