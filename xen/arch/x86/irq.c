@@ -2323,14 +2323,24 @@ static void dump_irqs(unsigned char key)
 
             for ( i = 0; i < action->nr_guests; i++ )
             {
+                struct evtchn *evtchn;
+                unsigned int pending = 2, masked = 2;
+
                 d = action->guest[i];
                 pirq = domain_irq_to_pirq(d, irq);
                 info = pirq_info(d, pirq);
+                evtchn = evtchn_from_port(d, info->evtchn);
+                local_irq_disable();
+                if ( spin_trylock(&evtchn->lock) )
+                {
+                    pending = evtchn_is_pending(d, evtchn);
+                    masked = evtchn_is_masked(d, evtchn);
+                    spin_unlock(&evtchn->lock);
+                }
+                local_irq_enable();
                 printk("%u:%3d(%c%c%c)",
-                       d->domain_id, pirq,
-                       evtchn_port_is_pending(d, info->evtchn) ? 'P' : '-',
-                       evtchn_port_is_masked(d, info->evtchn) ? 'M' : '-',
-                       (info->masked ? 'M' : '-'));
+                       d->domain_id, pirq, "-P?"[pending],
+                       "-M?"[masked], info->masked ? 'M' : '-');
                 if ( i != action->nr_guests )
                     printk(",");
             }

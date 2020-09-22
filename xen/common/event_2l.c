@@ -63,8 +63,10 @@ static void evtchn_2l_unmask(struct domain *d, struct evtchn *evtchn)
     }
 }
 
-static bool evtchn_2l_is_pending(const struct domain *d, evtchn_port_t port)
+static bool evtchn_2l_is_pending(const struct domain *d,
+                                 const struct evtchn *evtchn)
 {
+    evtchn_port_t port = evtchn->port;
     unsigned int max_ports = BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d);
 
     ASSERT(port < max_ports);
@@ -72,8 +74,10 @@ static bool evtchn_2l_is_pending(const struct domain *d, evtchn_port_t port)
             guest_test_bit(d, port, &shared_info(d, evtchn_pending)));
 }
 
-static bool evtchn_2l_is_masked(const struct domain *d, evtchn_port_t port)
+static bool evtchn_2l_is_masked(const struct domain *d,
+                                const struct evtchn *evtchn)
 {
+    evtchn_port_t port = evtchn->port;
     unsigned int max_ports = BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d);
 
     ASSERT(port < max_ports);

@@ -47,4 +47,10 @@ static inline int arch_virq_is_global(uint32_t virq)
     return 1;
 }
 
+#ifdef CONFIG_PV_SHIM
+# include <asm/pv/shim.h>
+# define arch_evtchn_is_special(chn) \
+             (pv_shim && (chn)->port && (chn)->state == ECS_RESERVED)
+#endif
+
 #endif
