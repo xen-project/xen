@@ -626,7 +626,6 @@ int domain_kill(struct domain *d)
         domain_pause(d);
         d->is_dying = DOMDYING_dying;
         spin_barrier(&d->domain_lock);
-        evtchn_destroy(d);
         gnttab_release_mappings(d);
         tmem_destroy(d->tmem_client);
         vnuma_destroy(d->vnuma);
@@ -634,6 +633,9 @@ int domain_kill(struct domain *d)
         d->tmem_client = NULL;
         /* fallthrough */
     case DOMDYING_dying:
+        rc = evtchn_destroy(d);
+        if ( rc )
+            break;
         rc = domain_relinquish_resources(d);
         if ( rc != 0 )
             break;
