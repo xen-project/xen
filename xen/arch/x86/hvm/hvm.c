@@ -646,6 +646,8 @@ int hvm_domain_initialise(struct domain *d)
     /* need link to containing domain */
     d->arch.hvm.pl_time->domain = d;
 
+    rwlock_init(&d->arch.hvm.pl_time->pt_migrate);
+
     /* Set the default IO Bitmap. */
     if ( is_hardware_domain(d) )
     {
