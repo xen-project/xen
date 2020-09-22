@@ -769,16 +769,14 @@ static int msix_capability_init(struct pci_dev *dev,
 {
     struct arch_msix *msix = dev->msix;
     struct msi_desc *entry = NULL;
-    int vf;
     u16 control;
     u64 table_paddr;
     u32 table_offset;
-    u8 bir, pbus, pslot, pfunc;
     u16 seg = dev->seg;
     u8 bus = dev->bus;
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
-    bool maskall = msix->host_maskall;
+    bool maskall = msix->host_maskall, zap_on_error = false;
     unsigned int pos = pci_find_cap_offset(seg, bus, slot, func,
                                            PCI_CAP_ID_MSIX);
 
@@ -820,43 +818,45 @@ static int msix_capability_init(struct pci_dev *dev,
 
     /* Locate MSI-X table region */
     table_offset = pci_conf_read32(dev->sbdf, msix_table_offset_reg(pos));
-    bir = (u8)(table_offset & PCI_MSIX_BIRMASK);
-    table_offset &= ~PCI_MSIX_BIRMASK;
+    if ( !msix->used_entries &&
+         (!msi ||
+          (is_hardware_domain(current->domain) &&
+           (dev->domain == current->domain || dev->domain == dom_io))) )
+    {
+        unsigned int bir = table_offset & PCI_MSIX_BIRMASK, pbus, pslot, pfunc;
+        int vf;
+        paddr_t pba_paddr;
+        unsigned int pba_offset;
 
-    if ( !dev->info.is_virtfn )
-    {
-        pbus = bus;
-        pslot = slot;
-        pfunc = func;
-        vf = -1;
-    }
-    else
-    {
-        pbus = dev->info.physfn.bus;
-        pslot = PCI_SLOT(dev->info.physfn.devfn);
-        pfunc = PCI_FUNC(dev->info.physfn.devfn);
-        vf = PCI_BDF2(dev->bus, dev->devfn);
-    }
-
-    table_paddr = read_pci_mem_bar(seg, pbus, pslot, pfunc, bir, vf);
-    WARN_ON(msi && msi->table_base != table_paddr);
-    if ( !table_paddr )
-    {
-        if ( !msi || !msi->table_base )
+        if ( !dev->info.is_virtfn )
         {
-            pci_conf_write16(dev->sbdf, msix_control_reg(pos),
-                             control & ~PCI_MSIX_FLAGS_ENABLE);
-            xfree(entry);
-            return -ENXIO;
+            pbus = bus;
+            pslot = slot;
+            pfunc = func;
+            vf = -1;
         }
-        table_paddr = msi->table_base;
-    }
-    table_paddr += table_offset;
+        else
+        {
+            pbus = dev->info.physfn.bus;
+            pslot = PCI_SLOT(dev->info.physfn.devfn);
+            pfunc = PCI_FUNC(dev->info.physfn.devfn);
+            vf = PCI_BDF2(dev->bus, dev->devfn);
+        }
 
-    if ( !msix->used_entries )
-    {
-        u64 pba_paddr;
-        u32 pba_offset;
+        table_paddr = read_pci_mem_bar(seg, pbus, pslot, pfunc, bir, vf);
+        WARN_ON(msi && msi->table_base != table_paddr);
+        if ( !table_paddr )
+        {
+            if ( !msi || !msi->table_base )
+            {
+                pci_conf_write16(dev->sbdf, msix_control_reg(pos),
+                                 control & ~PCI_MSIX_FLAGS_ENABLE);
+                xfree(entry);
+                return -ENXIO;
+            }
+            table_paddr = msi->table_base;
+        }
+        table_paddr += table_offset & ~PCI_MSIX_BIRMASK;
 
         msix->table.first = PFN_DOWN(table_paddr);
         msix->table.last = PFN_DOWN(table_paddr +
@@ -875,7 +875,18 @@ static int msix_capability_init(struct pci_dev *dev,
                                   BITS_TO_LONGS(msix->nr_entries) - 1);
         WARN_ON(rangeset_overlaps_range(mmio_ro_ranges, msix->pba.first,
                                         msix->pba.last));
+
+        zap_on_error = true;
     }
+    else if ( !msix->table.first )
+    {
+        pci_conf_write16(dev->sbdf, msix_control_reg(pos), control);
+        xfree(entry);
+        return -ENODATA;
+    }
+    else
+        table_paddr = (msix->table.first << PAGE_SHIFT) +
+                      (table_offset & ~PCI_MSIX_BIRMASK & ~PAGE_MASK);
 
     if ( entry )
     {
@@ -886,8 +897,15 @@ static int msix_capability_init(struct pci_dev *dev,
 
         if ( idx < 0 )
         {
-            pci_conf_write16(dev->sbdf, msix_control_reg(pos),
-                             control & ~PCI_MSIX_FLAGS_ENABLE);
+            if ( zap_on_error )
+            {
+                msix->table.first = 0;
+                msix->pba.first = 0;
+
+                control &= ~PCI_MSIX_FLAGS_ENABLE;
+            }
+
+            pci_conf_write16(dev->sbdf, msix_control_reg(pos), control);
             xfree(entry);
             return idx;
         }
@@ -1076,9 +1094,14 @@ static void _pci_cleanup_msix(struct arch_msix *msix)
         if ( rangeset_remove_range(mmio_ro_ranges, msix->table.first,
                                    msix->table.last) )
             WARN();
+        msix->table.first = 0;
+        msix->table.last = 0;
+
         if ( rangeset_remove_range(mmio_ro_ranges, msix->pba.first,
                                    msix->pba.last) )
             WARN();
+        msix->pba.first = 0;
+        msix->pba.last = 0;
     }
 }
 
