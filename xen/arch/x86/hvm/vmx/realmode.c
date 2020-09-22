@@ -96,15 +96,11 @@ static void realmode_deliver_exception(
 void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct vcpu *curr = current;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     int rc;
 
     perfc_incr(realmode_emulations);
 
-    rc = hvm_emulate_one(hvmemul_ctxt);
-
-    if ( hvm_ioreq_needs_completion(&vio->io_req) )
-        vio->io_completion = HVMIO_realmode_completion;
+    rc = hvm_emulate_one(hvmemul_ctxt, HVMIO_realmode_completion);
 
     if ( rc == X86EMUL_UNHANDLEABLE )
     {

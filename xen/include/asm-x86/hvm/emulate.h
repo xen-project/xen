@@ -46,6 +46,8 @@ struct hvm_emulate_ctxt {
 
     uint32_t intr_shadow;
 
+    bool is_mem_access;
+
     bool_t set_context;
 };
 
@@ -56,11 +58,14 @@ enum emul_kind {
     EMUL_KIND_SET_CONTEXT_INSN
 };
 
+enum hvm_io_completion;
+
 bool __nonnull(1, 2) hvm_emulate_one_insn(
     hvm_emulate_validate_t *validate,
     const char *descr);
 int hvm_emulate_one(
-    struct hvm_emulate_ctxt *hvmemul_ctxt);
+    struct hvm_emulate_ctxt *hvmemul_ctxt,
+    enum hvm_io_completion completion);
 void hvm_emulate_one_vm_event(enum emul_kind kind,
     unsigned int trapnr,
     unsigned int errcode);
