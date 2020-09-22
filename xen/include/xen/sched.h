@@ -345,6 +345,16 @@ struct domain
     struct evtchn  **evtchn_group[NR_EVTCHN_GROUPS]; /* all other buckets */
     unsigned int     max_evtchn_port; /* max permitted port number */
     unsigned int     valid_evtchns;   /* number of allocated event channels */
+    /*
+     * Number of in-use event channels.  Writers should use write_atomic().
+     * Readers need to use read_atomic() only when not holding event_lock.
+     */
+    unsigned int     active_evtchns;
+    /*
+     * Number of event channels used internally by Xen (not subject to
+     * EVTCHNOP_reset).  Read/write access like for active_evtchns.
+     */
+    unsigned int     xen_evtchns;
     spinlock_t       event_lock;
     const struct evtchn_port_ops *evtchn_port_ops;
     struct evtchn_fifo_domain *evtchn_fifo;
