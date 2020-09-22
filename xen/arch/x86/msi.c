@@ -183,54 +183,6 @@ void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask, struct msi_msg 
                 MSI_DATA_VECTOR(vector);
 }
 
-static bool read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
-{
-    switch ( entry->msi_attrib.type )
-    {
-    case PCI_CAP_ID_MSI:
-    {
-        struct pci_dev *dev = entry->dev;
-        int pos = entry->msi_attrib.pos;
-        uint16_t data;
-
-        msg->address_lo = pci_conf_read32(dev->sbdf,
-                                          msi_lower_address_reg(pos));
-        if ( entry->msi_attrib.is_64 )
-        {
-            msg->address_hi = pci_conf_read32(dev->sbdf,
-                                              msi_upper_address_reg(pos));
-            data = pci_conf_read16(dev->sbdf, msi_data_reg(pos, 1));
-        }
-        else
-        {
-            msg->address_hi = 0;
-            data = pci_conf_read16(dev->sbdf, msi_data_reg(pos, 0));
-        }
-        msg->data = data;
-        break;
-    }
-    case PCI_CAP_ID_MSIX:
-    {
-        void __iomem *base = entry->mask_base;
-
-        if ( unlikely(!msix_memory_decoded(entry->dev,
-                                           entry->msi_attrib.pos)) )
-            return false;
-        msg->address_lo = readl(base + PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET);
-        msg->address_hi = readl(base + PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET);
-        msg->data = readl(base + PCI_MSIX_ENTRY_DATA_OFFSET);
-        break;
-    }
-    default:
-        BUG();
-    }
-
-    if ( iommu_intremap )
-        iommu_read_msi_from_ire(entry, msg);
-
-    return true;
-}
-
 static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
     entry->msg = *msg;
@@ -302,10 +254,7 @@ void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
 
     ASSERT(spin_is_locked(&desc->lock));
 
-    memset(&msg, 0, sizeof(msg));
-    if ( !read_msi_msg(msi_desc, &msg) )
-        return;
-
+    msg = msi_desc->msg;
     msg.data &= ~MSI_DATA_VECTOR_MASK;
     msg.data |= MSI_DATA_VECTOR(desc->arch.vector);
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
