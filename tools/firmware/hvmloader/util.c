@@ -871,10 +871,37 @@ static unsigned long acpi_v2p(struct acpi_ctxt *ctxt, void *v)
     return virt_to_phys(v);
 }
 
+static unsigned long acpi_alloc_up = ACPI_MEMORY_DYNAMIC_START - 1;
+
+unsigned long acpi_pages_allocated(void)
+{
+    return (acpi_alloc_up >> PAGE_SHIFT) -
+            ((ACPI_MEMORY_DYNAMIC_START - 1) >> PAGE_SHIFT);
+}
+
 static void *acpi_mem_alloc(struct acpi_ctxt *ctxt,
                             uint32_t size, uint32_t align)
 {
-    return mem_alloc(size, align);
+    unsigned long s, e;
+
+    /* Align to at least 16 bytes. */
+    if ( align < 16 )
+        align = 16;
+
+    s = (acpi_alloc_up + align) & ~(align - 1);
+    e = s + size - 1;
+
+    BUG_ON((e < s) || (e >= RESERVED_MEMORY_DYNAMIC_START));
+
+    while ( (acpi_alloc_up >> PAGE_SHIFT) != (e >> PAGE_SHIFT) )
+    {
+        acpi_alloc_up += PAGE_SIZE;
+        mem_hole_populate_ram(acpi_alloc_up >> PAGE_SHIFT, 1);
+    }
+
+    acpi_alloc_up = e;
+
+    return (void *)s;
 }
 
 static void acpi_mem_free(struct acpi_ctxt *ctxt,

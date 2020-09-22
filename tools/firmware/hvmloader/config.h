@@ -2,6 +2,7 @@
 #define __HVMLOADER_CONFIG_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 enum virtual_vga { VGA_none, VGA_std, VGA_cirrus, VGA_pt };
 extern enum virtual_vga virtual_vga;
@@ -62,6 +63,8 @@ extern uint8_t ioapic_version;
 extern unsigned long pci_mem_start, pci_mem_end;
 extern uint64_t pci_hi_mem_start, pci_hi_mem_end;
 
+extern bool acpi_enabled;
+
 /* Memory map. */
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
@@ -71,7 +74,8 @@ extern uint64_t pci_hi_mem_start, pci_hi_mem_end;
 #define RESERVED_MEMBASE              0xFC000000
 /* NB. ACPI_INFO_PHYSICAL_ADDRESS *MUST* match definition in acpi/dsdt.asl! */
 #define ACPI_INFO_PHYSICAL_ADDRESS    0xFC000000
-#define RESERVED_MEMORY_DYNAMIC_START 0xFC001000
+#define ACPI_MEMORY_DYNAMIC_START     0xFC001000
+#define RESERVED_MEMORY_DYNAMIC_START 0xFC100000
 #define RESERVED_MEMORY_DYNAMIC_END   0xFE000000
 /*
  * GUEST_RESERVED: Physical address space reserved for guest use.

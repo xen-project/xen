@@ -28,7 +28,6 @@
 #include <xen/hvm/ioreq.h>
 #include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/e820.h>
-#include <stdbool.h>
 
 unsigned long pci_mem_start = HVM_BELOW_4G_MMIO_START;
 unsigned long pci_mem_end = PCI_MEM_END;
