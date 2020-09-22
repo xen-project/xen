@@ -572,12 +572,22 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
 
     case XEN_DOMCTL_soft_reset:
+    case XEN_DOMCTL_soft_reset_cont:
         if ( d == current->domain ) /* no domain_pause() */
         {
             ret = -EINVAL;
             break;
         }
-        ret = domain_soft_reset(d);
+        ret = domain_soft_reset(d, op->cmd == XEN_DOMCTL_soft_reset_cont);
+        if ( ret == -ERESTART )
+        {
+            op->cmd = XEN_DOMCTL_soft_reset_cont;
+            if ( !__copy_field_to_guest(u_domctl, op, cmd) )
+                ret = hypercall_create_continuation(__HYPERVISOR_domctl,
+                                                    "h", u_domctl);
+            else
+                ret = -EFAULT;
+        }
         break;
 
     case XEN_DOMCTL_destroydomain:

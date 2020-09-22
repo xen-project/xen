@@ -1214,7 +1214,7 @@ void domain_unpause_except_self(struct domain *d)
         domain_unpause(d);
 }
 
-int domain_soft_reset(struct domain *d)
+int domain_soft_reset(struct domain *d, bool resuming)
 {
     struct vcpu *v;
     int rc;
@@ -1228,7 +1228,7 @@ int domain_soft_reset(struct domain *d)
         }
     spin_unlock(&d->shutdown_lock);
 
-    rc = evtchn_reset(d);
+    rc = evtchn_reset(d, resuming);
     if ( rc )
         return rc;
 
