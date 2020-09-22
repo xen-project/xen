@@ -156,8 +156,9 @@ int evtchn_allocate_port(struct domain *d, evtchn_port_t port)
 
     if ( port_is_valid(d, port) )
     {
-        if ( evtchn_from_port(d, port)->state != ECS_FREE ||
-             evtchn_port_is_busy(d, port) )
+        const struct evtchn *chn = evtchn_from_port(d, port);
+
+        if ( chn->state != ECS_FREE || evtchn_is_busy(d, chn) )
             return -EBUSY;
     }
     else
@@ -770,6 +771,7 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
     unsigned long flags;
     int port;
     struct domain *d;
+    struct evtchn *chn;
 
     ASSERT(!virq_is_global(virq));
 
@@ -780,7 +782,10 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
         goto out;
 
     d = v->domain;
-    evtchn_port_set_pending(d, v->vcpu_id, evtchn_from_port(d, port));
+    chn = evtchn_from_port(d, port);
+    spin_lock(&chn->lock);
+    evtchn_port_set_pending(d, v->vcpu_id, chn);
+    spin_unlock(&chn->lock);
 
  out:
     spin_unlock_irqrestore(&v->virq_lock, flags);
@@ -809,7 +814,9 @@ static void send_guest_global_virq(struct domain *d, uint32_t virq)
         goto out;
 
     chn = evtchn_from_port(d, port);
+    spin_lock(&chn->lock);
     evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
+    spin_unlock(&chn->lock);
 
  out:
     spin_unlock_irqrestore(&v->virq_lock, flags);
@@ -819,6 +826,7 @@ void send_guest_pirq(struct domain *d, const struct pirq *pirq)
 {
     int port;
     struct evtchn *chn;
+    unsigned long flags;
 
     /*
      * PV guests: It should not be possible to race with __evtchn_close(). The
@@ -833,7 +841,9 @@ void send_guest_pirq(struct domain *d, const struct pirq *pirq)
     }
 
     chn = evtchn_from_port(d, port);
+    spin_lock_irqsave(&chn->lock, flags);
     evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
+    spin_unlock_irqrestore(&chn->lock, flags);
 }
 
 static struct domain *global_virq_handlers[NR_VIRQS] __read_mostly;
@@ -1028,12 +1038,15 @@ int evtchn_unmask(unsigned int port)
 {
     struct domain *d = current->domain;
     struct evtchn *evtchn;
+    unsigned long flags;
 
     if ( unlikely(!port_is_valid(d, port)) )
         return -EINVAL;
 
     evtchn = evtchn_from_port(d, port);
+    spin_lock_irqsave(&evtchn->lock, flags);
     evtchn_port_unmask(d, evtchn);
+    spin_unlock_irqrestore(&evtchn->lock, flags);
 
     return 0;
 }
@@ -1446,8 +1459,8 @@ static void domain_dump_evtchn_info(struct domain *d)
 
         printk("    %4u [%d/%d/",
                port,
-               evtchn_port_is_pending(d, port),
-               evtchn_port_is_masked(d, port));
+               evtchn_is_pending(d, chn),
+               evtchn_is_masked(d, chn));
         evtchn_port_print_state(d, chn);
         printk("]: s=%d n=%d x=%d",
                chn->state, chn->notify_vcpu_id, chn->xen_consumer);
