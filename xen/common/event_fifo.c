@@ -477,7 +477,7 @@ static void cleanup_event_array(struct domain *d)
     d->evtchn_fifo = NULL;
 }
 
-static void setup_ports(struct domain *d)
+static void setup_ports(struct domain *d, unsigned int prev_evtchns)
 {
     unsigned int port;
 
@@ -487,7 +487,7 @@ static void setup_ports(struct domain *d)
      * - save its pending state.
      * - set default priority.
      */
-    for ( port = 1; port < d->max_evtchns; port++ )
+    for ( port = 1; port < prev_evtchns; port++ )
     {
         struct evtchn *evtchn;
 
@@ -539,6 +539,8 @@ int evtchn_fifo_init_control(struct evtchn_init_control *init_control)
     if ( !d->evtchn_fifo )
     {
         struct vcpu *vcb;
+        /* Latch the value before it changes during setup_event_array(). */
+        unsigned int prev_evtchns = max_evtchns(d);
 
         for_each_vcpu ( d, vcb ) {
             rc = setup_control_block(vcb);
@@ -555,8 +557,7 @@ int evtchn_fifo_init_control(struct evtchn_init_control *init_control)
             goto error;
 
         d->evtchn_port_ops = &evtchn_port_ops_fifo;
-        d->max_evtchns = EVTCHN_FIFO_NR_CHANNELS;
-        setup_ports(d);
+        setup_ports(d, prev_evtchns);
     }
     else
         rc = map_control_block(v, gfn, offset);
