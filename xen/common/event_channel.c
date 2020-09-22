@@ -255,6 +255,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     int            port;
     domid_t        dom = alloc->dom;
     long           rc;
+    unsigned long  flags;
 
     d = rcu_lock_domain_by_any_id(dom);
     if ( d == NULL )
@@ -270,14 +271,14 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     if ( rc )
         goto out;
 
-    spin_lock(&chn->lock);
+    spin_lock_irqsave(&chn->lock, flags);
 
     chn->state = ECS_UNBOUND;
     if ( (chn->u.unbound.remote_domid = alloc->remote_dom) == DOMID_SELF )
         chn->u.unbound.remote_domid = current->domain->domain_id;
     evtchn_port_init(d, chn);
 
-    spin_unlock(&chn->lock);
+    spin_unlock_irqrestore(&chn->lock, flags);
 
     alloc->port = port;
 
@@ -290,26 +291,32 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 }
 
 
-static void double_evtchn_lock(struct evtchn *lchn, struct evtchn *rchn)
+static unsigned long double_evtchn_lock(struct evtchn *lchn,
+                                        struct evtchn *rchn)
 {
-    if ( lchn < rchn )
+    unsigned long flags;
+
+    if ( lchn <= rchn )
     {
-        spin_lock(&lchn->lock);
-        spin_lock(&rchn->lock);
+        spin_lock_irqsave(&lchn->lock, flags);
+        if ( lchn != rchn )
+            spin_lock(&rchn->lock);
     }
     else
     {
-        if ( lchn != rchn )
-            spin_lock(&rchn->lock);
+        spin_lock_irqsave(&rchn->lock, flags);
         spin_lock(&lchn->lock);
     }
+
+    return flags;
 }
 
-static void double_evtchn_unlock(struct evtchn *lchn, struct evtchn *rchn)
+static void double_evtchn_unlock(struct evtchn *lchn, struct evtchn *rchn,
+                                 unsigned long flags)
 {
-    spin_unlock(&lchn->lock);
     if ( lchn != rchn )
-        spin_unlock(&rchn->lock);
+        spin_unlock(&lchn->lock);
+    spin_unlock_irqrestore(&rchn->lock, flags);
 }
 
 static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
@@ -319,6 +326,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     int            lport, rport = bind->remote_port;
     domid_t        rdom = bind->remote_dom;
     long           rc;
+    unsigned long  flags;
 
     if ( rdom == DOMID_SELF )
         rdom = current->domain->domain_id;
@@ -354,7 +362,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     if ( rc )
         goto out;
 
-    double_evtchn_lock(lchn, rchn);
+    flags = double_evtchn_lock(lchn, rchn);
 
     lchn->u.interdomain.remote_dom  = rd;
     lchn->u.interdomain.remote_port = rport;
@@ -371,7 +379,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
      */
     evtchn_port_set_pending(ld, lchn->notify_vcpu_id, lchn);
 
-    double_evtchn_unlock(lchn, rchn);
+    double_evtchn_unlock(lchn, rchn, flags);
 
     bind->local_port = lport;
 
@@ -394,6 +402,7 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     struct domain *d = current->domain;
     int            virq = bind->virq, vcpu = bind->vcpu;
     int            rc = 0;
+    unsigned long  flags;
 
     if ( (virq < 0) || (virq >= ARRAY_SIZE(v->virq_to_evtchn)) )
         return -EINVAL;
@@ -426,14 +435,14 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
 
     chn = evtchn_from_port(d, port);
 
-    spin_lock(&chn->lock);
+    spin_lock_irqsave(&chn->lock, flags);
 
     chn->state          = ECS_VIRQ;
     chn->notify_vcpu_id = vcpu;
     chn->u.virq         = virq;
     evtchn_port_init(d, chn);
 
-    spin_unlock(&chn->lock);
+    spin_unlock_irqrestore(&chn->lock, flags);
 
     v->virq_to_evtchn[virq] = bind->port = port;
 
@@ -450,6 +459,7 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     struct domain *d = current->domain;
     int            port, vcpu = bind->vcpu;
     long           rc = 0;
+    unsigned long  flags;
 
     if ( (vcpu < 0) || (vcpu >= d->max_vcpus) ||
          (d->vcpu[vcpu] == NULL) )
@@ -462,13 +472,13 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
 
     chn = evtchn_from_port(d, port);
 
-    spin_lock(&chn->lock);
+    spin_lock_irqsave(&chn->lock, flags);
 
     chn->state          = ECS_IPI;
     chn->notify_vcpu_id = vcpu;
     evtchn_port_init(d, chn);
 
-    spin_unlock(&chn->lock);
+    spin_unlock_irqrestore(&chn->lock, flags);
 
     bind->port = port;
 
@@ -512,6 +522,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     struct pirq   *info;
     int            port = 0, pirq = bind->pirq;
     long           rc;
+    unsigned long  flags;
 
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
         return -EINVAL;
@@ -544,14 +555,14 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
         goto out;
     }
 
-    spin_lock(&chn->lock);
+    spin_lock_irqsave(&chn->lock, flags);
 
     chn->state  = ECS_PIRQ;
     chn->u.pirq.irq = pirq;
     link_pirq_port(port, chn, v);
     evtchn_port_init(d, chn);
 
-    spin_unlock(&chn->lock);
+    spin_unlock_irqrestore(&chn->lock, flags);
 
     bind->port = port;
 
@@ -572,6 +583,7 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     struct evtchn *chn1, *chn2;
     int            port2;
     long           rc = 0;
+    unsigned long  flags;
 
  again:
     spin_lock(&d1->event_lock);
@@ -671,14 +683,14 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
         BUG_ON(chn2->state != ECS_INTERDOMAIN);
         BUG_ON(chn2->u.interdomain.remote_dom != d1);
 
-        double_evtchn_lock(chn1, chn2);
+        flags = double_evtchn_lock(chn1, chn2);
 
         evtchn_free(d1, chn1);
 
         chn2->state = ECS_UNBOUND;
         chn2->u.unbound.remote_domid = d1->domain_id;
 
-        double_evtchn_unlock(chn1, chn2);
+        double_evtchn_unlock(chn1, chn2, flags);
 
         goto out;
 
@@ -686,9 +698,9 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
         BUG();
     }
 
-    spin_lock(&chn1->lock);
+    spin_lock_irqsave(&chn1->lock, flags);
     evtchn_free(d1, chn1);
-    spin_unlock(&chn1->lock);
+    spin_unlock_irqrestore(&chn1->lock, flags);
 
  out:
     if ( d2 != NULL )
@@ -708,13 +720,14 @@ int evtchn_send(struct domain *ld, unsigned int lport)
     struct evtchn *lchn, *rchn;
     struct domain *rd;
     int            rport, ret = 0;
+    unsigned long  flags;
 
     if ( !port_is_valid(ld, lport) )
         return -EINVAL;
 
     lchn = evtchn_from_port(ld, lport);
 
-    spin_lock(&lchn->lock);
+    spin_lock_irqsave(&lchn->lock, flags);
 
     /* Guest cannot send via a Xen-attached event channel. */
     if ( unlikely(consumer_is_xen(lchn)) )
@@ -749,7 +762,7 @@ int evtchn_send(struct domain *ld, unsigned int lport)
     }
 
 out:
-    spin_unlock(&lchn->lock);
+    spin_unlock_irqrestore(&lchn->lock, flags);
 
     return ret;
 }
@@ -1240,6 +1253,7 @@ int alloc_unbound_xen_event_channel(
 {
     struct evtchn *chn;
     int            port, rc;
+    unsigned long  flags;
 
     spin_lock(&ld->event_lock);
 
@@ -1252,14 +1266,14 @@ int alloc_unbound_xen_event_channel(
     if ( rc )
         goto out;
 
-    spin_lock(&chn->lock);
+    spin_lock_irqsave(&chn->lock, flags);
 
     chn->state = ECS_UNBOUND;
     chn->xen_consumer = get_xen_consumer(notification_fn);
     chn->notify_vcpu_id = lvcpu;
     chn->u.unbound.remote_domid = remote_domid;
 
-    spin_unlock(&chn->lock);
+    spin_unlock_irqrestore(&chn->lock, flags);
 
     write_atomic(&ld->xen_evtchns, ld->xen_evtchns + 1);
 
@@ -1282,11 +1296,12 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
 {
     struct evtchn *lchn, *rchn;
     struct domain *rd;
+    unsigned long flags;
 
     ASSERT(port_is_valid(ld, lport));
     lchn = evtchn_from_port(ld, lport);
 
-    spin_lock(&lchn->lock);
+    spin_lock_irqsave(&lchn->lock, flags);
 
     if ( likely(lchn->state == ECS_INTERDOMAIN) )
     {
@@ -1296,7 +1311,7 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
         evtchn_port_set_pending(rd, rchn->notify_vcpu_id, rchn);
     }
 
-    spin_unlock(&lchn->lock);
+    spin_unlock_irqrestore(&lchn->lock, flags);
 }
 
 void evtchn_check_pollers(struct domain *d, unsigned int port)
