@@ -128,6 +128,13 @@ struct pl_time {    /* platform time */
     struct RTCState  vrtc;
     struct HPETState vhpet;
     struct PMTState  vpmt;
+    /*
+     * rwlock to prevent periodic_time vCPU migration. Take the lock in read
+     * mode in order to prevent the vcpu field of periodic_time from changing.
+     * Lock must be taken in write mode when changes to the vcpu field are
+     * performed, as it allows exclusive access to all the timers of a domain.
+     */
+    rwlock_t pt_migrate;
     /* guest_time = Xen sys time + stime_offset */
     int64_t stime_offset;
     /* Ensures monotonicity in appropriate timer modes. */
