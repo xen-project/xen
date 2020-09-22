@@ -81,20 +81,11 @@ void send_invalidate_req(void)
 bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate, const char *descr)
 {
     struct hvm_emulate_ctxt ctxt;
-    struct vcpu *curr = current;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     int rc;
 
     hvm_emulate_init_once(&ctxt, validate, guest_cpu_user_regs());
 
-    rc = hvm_emulate_one(&ctxt);
-
-    if ( hvm_ioreq_needs_completion(&vio->io_req) )
-        vio->io_completion = HVMIO_mmio_completion;
-    else
-        vio->mmio_access = (struct npfec){};
-
-    switch ( rc )
+    switch ( rc = hvm_emulate_one(&ctxt, HVMIO_no_completion) )
     {
     case X86EMUL_UNHANDLEABLE:
         hvm_dump_emulation_state(XENLOG_G_WARNING, descr, &ctxt, rc);

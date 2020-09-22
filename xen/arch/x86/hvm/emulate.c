@@ -1603,8 +1603,10 @@ static int hvmemul_validate(
     const struct x86_emulate_state *state,
     struct x86_emulate_ctxt *ctxt)
 {
-    const struct hvm_emulate_ctxt *hvmemul_ctxt =
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+
+    hvmemul_ctxt->is_mem_access = x86_insn_is_mem_access(state, ctxt);
 
     return !hvmemul_ctxt->validate || hvmemul_ctxt->validate(state, ctxt)
            ? X86EMUL_OKAY : X86EMUL_UNHANDLEABLE;
@@ -2516,8 +2518,14 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .vmfunc        = hvmemul_vmfunc,
 };
 
+/*
+ * Note that passing HVMIO_no_completion into this function serves as kind
+ * of (but not fully) an "auto select completion" indicator.  When there's
+ * no completion needed, the passed in value will be ignored in any case.
+ */
 static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
-    const struct x86_emulate_ops *ops)
+    const struct x86_emulate_ops *ops,
+    enum hvm_io_completion completion)
 {
     const struct cpu_user_regs *regs = hvmemul_ctxt->ctxt.regs;
     struct vcpu *curr = current;
@@ -2535,15 +2543,30 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
         rc = X86EMUL_RETRY;
 
     if ( !hvm_ioreq_needs_completion(&vio->io_req) )
+        completion = HVMIO_no_completion;
+    else if ( completion == HVMIO_no_completion )
+        completion = (vio->io_req.type != IOREQ_TYPE_PIO ||
+                      hvmemul_ctxt->is_mem_access) ? HVMIO_mmio_completion
+                                                   : HVMIO_pio_completion;
+
+    switch ( vio->io_completion = completion )
     {
+    case HVMIO_no_completion:
+    case HVMIO_pio_completion:
         vio->mmio_cache_count = 0;
         vio->mmio_insn_bytes = 0;
-    }
-    else
-    {
+        vio->mmio_access = (struct npfec){};
+        break;
+
+    case HVMIO_mmio_completion:
+    case HVMIO_realmode_completion:
         BUILD_BUG_ON(sizeof(vio->mmio_insn) < sizeof(hvmemul_ctxt->insn_buf));
         vio->mmio_insn_bytes = hvmemul_ctxt->insn_buf_bytes;
         memcpy(vio->mmio_insn, hvmemul_ctxt->insn_buf, vio->mmio_insn_bytes);
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
     }
 
     if ( hvmemul_ctxt->ctxt.retire.singlestep )
@@ -2584,9 +2607,10 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
 }
 
 int hvm_emulate_one(
-    struct hvm_emulate_ctxt *hvmemul_ctxt)
+    struct hvm_emulate_ctxt *hvmemul_ctxt,
+    enum hvm_io_completion completion)
 {
-    return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops);
+    return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops, completion);
 }
 
 int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
@@ -2595,11 +2619,13 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
         .read       = x86emul_unhandleable_rw,
         .insn_fetch = hvmemul_insn_fetch,
         .write      = mmcfg_intercept_write,
+        .validate   = hvmemul_validate,
     };
     static const struct x86_emulate_ops hvm_ro_emulate_ops_mmio = {
         .read       = x86emul_unhandleable_rw,
         .insn_fetch = hvmemul_insn_fetch,
         .write      = mmio_ro_emulated_write,
+        .validate   = hvmemul_validate,
     };
     struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = gla };
     struct hvm_emulate_ctxt ctxt;
@@ -2619,8 +2645,8 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
     hvm_emulate_init_once(&ctxt, x86_insn_is_mem_write,
                           guest_cpu_user_regs());
     ctxt.ctxt.data = &mmio_ro_ctxt;
-    rc = _hvm_emulate_one(&ctxt, ops);
-    switch ( rc )
+
+    switch ( rc = _hvm_emulate_one(&ctxt, ops, HVMIO_no_completion) )
     {
     case X86EMUL_UNHANDLEABLE:
     case X86EMUL_UNIMPLEMENTED:
@@ -2647,7 +2673,8 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     switch ( kind )
     {
     case EMUL_KIND_NOWRITE:
-        rc = _hvm_emulate_one(&ctx, &hvm_emulate_ops_no_write);
+        rc = _hvm_emulate_one(&ctx, &hvm_emulate_ops_no_write,
+                              HVMIO_no_completion);
         break;
     case EMUL_KIND_SET_CONTEXT_INSN: {
         struct vcpu *curr = current;
@@ -2668,7 +2695,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     /* Fall-through */
     default:
         ctx.set_context = (kind == EMUL_KIND_SET_CONTEXT_DATA);
-        rc = hvm_emulate_one(&ctx);
+        rc = hvm_emulate_one(&ctx, HVMIO_no_completion);
     }
 
     switch ( rc )
@@ -2765,6 +2792,8 @@ void hvm_emulate_init_per_insn(
         hvmemul_ctxt->insn_buf_bytes = insn_bytes;
         memcpy(hvmemul_ctxt->insn_buf, insn_buf, insn_bytes);
     }
+
+    hvmemul_ctxt->is_mem_access = false;
 }
 
 void hvm_emulate_writeback(
