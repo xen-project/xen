@@ -913,7 +913,8 @@ static int read_msr(unsigned int reg, uint64_t *val,
         return X86EMUL_OKAY;
 
     case MSR_IA32_MISC_ENABLE:
-        rdmsrl(reg, *val);
+        if ( rdmsr_safe(reg, *val) )
+            break;
         *val = guest_misc_enable(*val);
         return X86EMUL_OKAY;
 
@@ -1053,7 +1054,8 @@ static int write_msr(unsigned int reg, uint64_t val,
         break;
 
     case MSR_IA32_MISC_ENABLE:
-        rdmsrl(reg, temp);
+        if ( rdmsr_safe(reg, temp) )
+            break;
         if ( val != guest_misc_enable(temp) )
             goto invalid;
         return X86EMUL_OKAY;
