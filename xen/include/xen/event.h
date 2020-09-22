@@ -107,8 +107,6 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
 
 static inline bool_t port_is_valid(struct domain *d, unsigned int p)
 {
-    if ( p >= d->max_evtchns )
-        return 0;
     return p < read_atomic(&d->valid_evtchns);
 }
 
