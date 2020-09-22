@@ -296,23 +296,26 @@ static void evtchn_fifo_unmask(struct domain *d, struct evtchn *evtchn)
         evtchn_fifo_set_pending(v, evtchn);
 }
 
-static bool evtchn_fifo_is_pending(const struct domain *d, evtchn_port_t port)
+static bool evtchn_fifo_is_pending(const struct domain *d,
+                                   const struct evtchn *evtchn)
 {
-    const event_word_t *word = evtchn_fifo_word_from_port(d, port);
+    const event_word_t *word = evtchn_fifo_word_from_port(d, evtchn->port);
 
     return word && guest_test_bit(d, EVTCHN_FIFO_PENDING, word);
 }
 
-static bool_t evtchn_fifo_is_masked(const struct domain *d, evtchn_port_t port)
+static bool_t evtchn_fifo_is_masked(const struct domain *d,
+                                    const struct evtchn *evtchn)
 {
-    const event_word_t *word = evtchn_fifo_word_from_port(d, port);
+    const event_word_t *word = evtchn_fifo_word_from_port(d, evtchn->port);
 
     return !word || guest_test_bit(d, EVTCHN_FIFO_MASKED, word);
 }
 
-static bool_t evtchn_fifo_is_busy(const struct domain *d, evtchn_port_t port)
+static bool_t evtchn_fifo_is_busy(const struct domain *d,
+                                  const struct evtchn *evtchn)
 {
-    const event_word_t *word = evtchn_fifo_word_from_port(d, port);
+    const event_word_t *word = evtchn_fifo_word_from_port(d, evtchn->port);
 
     return word && guest_test_bit(d, EVTCHN_FIFO_LINKED, word);
 }
