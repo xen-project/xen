@@ -359,7 +359,6 @@ struct domain
     /* Event channel information. */
     struct evtchn   *evtchn;                         /* first bucket only */
     struct evtchn  **evtchn_group[NR_EVTCHN_GROUPS]; /* all other buckets */
-    unsigned int     max_evtchns;     /* number supported by ABI */
     unsigned int     max_evtchn_port; /* max permitted port number */
     unsigned int     valid_evtchns;   /* number of allocated event channels */
     spinlock_t       event_lock;
