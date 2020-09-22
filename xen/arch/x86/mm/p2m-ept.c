@@ -843,14 +843,14 @@ out:
          need_modify_vtd_table )
     {
         if ( iommu_use_hap_pt(d) )
-            rc = iommu_iotlb_flush(d, _dfn(gfn), (1u << order),
+            rc = iommu_iotlb_flush(d, _dfn(gfn), 1ul << order,
                                    (iommu_flags ? IOMMU_FLUSHF_added : 0) |
                                    (vtd_pte_present ? IOMMU_FLUSHF_modified
                                                     : 0));
         else if ( need_iommu_pt_sync(d) )
             rc = iommu_flags ?
-                iommu_legacy_map(d, _dfn(gfn), mfn, order, iommu_flags) :
-                iommu_legacy_unmap(d, _dfn(gfn), order);
+                iommu_legacy_map(d, _dfn(gfn), mfn, 1ul << order, iommu_flags) :
+                iommu_legacy_unmap(d, _dfn(gfn), 1ul << order);
     }
 
     unmap_domain_page(table);

@@ -679,9 +679,9 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     if ( need_iommu_pt_sync(p2m->domain) &&
          (iommu_old_flags != iommu_pte_flags || old_mfn != mfn_x(mfn)) )
         rc = iommu_pte_flags
-             ? iommu_legacy_map(d, _dfn(gfn), mfn, page_order,
+             ? iommu_legacy_map(d, _dfn(gfn), mfn, 1ul << page_order,
                                 iommu_pte_flags)
-             : iommu_legacy_unmap(d, _dfn(gfn), page_order);
+             : iommu_legacy_unmap(d, _dfn(gfn), 1ul << page_order);
 
     /*
      * Free old intermediate tables if necessary.  This has to be the

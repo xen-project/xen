@@ -146,23 +146,23 @@ enum
 #define IOMMU_FLUSHF_modified (1u << _IOMMU_FLUSHF_modified)
 
 int __must_check iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
-                           unsigned int page_order, unsigned int flags,
+                           unsigned long page_count, unsigned int flags,
                            unsigned int *flush_flags);
 int __must_check iommu_unmap(struct domain *d, dfn_t dfn,
-                             unsigned int page_order,
+                             unsigned long page_count,
                              unsigned int *flush_flags);
 
 int __must_check iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
-                                  unsigned int page_order,
+                                  unsigned long page_count,
                                   unsigned int flags);
 int __must_check iommu_legacy_unmap(struct domain *d, dfn_t dfn,
-                                    unsigned int page_order);
+                                    unsigned long page_count);
 
 int __must_check iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
                                    unsigned int *flags);
 
 int __must_check iommu_iotlb_flush(struct domain *d, dfn_t dfn,
-                                   unsigned int page_count,
+                                   unsigned long page_count,
                                    unsigned int flush_flags);
 int __must_check iommu_iotlb_flush_all(struct domain *d,
                                        unsigned int flush_flags);
@@ -281,7 +281,7 @@ struct iommu_ops {
     void (*share_p2m)(struct domain *d);
     void (*crash_shutdown)(void);
     int __must_check (*iotlb_flush)(struct domain *d, dfn_t dfn,
-                                    unsigned int page_count,
+                                    unsigned long page_count,
                                     unsigned int flush_flags);
     int __must_check (*iotlb_flush_all)(struct domain *d);
     int (*get_reserved_device_memory)(iommu_grdm_t *, void *);

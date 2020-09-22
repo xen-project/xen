@@ -2534,7 +2534,7 @@ static int __must_check arm_smmu_iotlb_flush_all(struct domain *d)
 }
 
 static int __must_check arm_smmu_iotlb_flush(struct domain *d, dfn_t dfn,
-					     unsigned int page_count,
+					     unsigned long page_count,
 					     unsigned int flush_flags)
 {
 	ASSERT(flush_flags);

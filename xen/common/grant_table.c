@@ -1225,7 +1225,7 @@ map_grant_ref(
             kind = IOMMUF_readable;
         else
             kind = 0;
-        if ( kind && iommu_legacy_map(ld, _dfn(mfn_x(mfn)), mfn, 0, kind) )
+        if ( kind && iommu_legacy_map(ld, _dfn(mfn_x(mfn)), mfn, 1, kind) )
         {
             double_gt_unlock(lgt, rgt);
             rc = GNTST_general_error;
@@ -1479,9 +1479,9 @@ unmap_common(
 
         kind = mapkind(lgt, rd, op->mfn);
         if ( !kind )
-            err = iommu_legacy_unmap(ld, _dfn(mfn_x(op->mfn)), 0);
+            err = iommu_legacy_unmap(ld, _dfn(mfn_x(op->mfn)), 1);
         else if ( !(kind & MAPKIND_WRITE) )
-            err = iommu_legacy_map(ld, _dfn(mfn_x(op->mfn)), op->mfn, 0,
+            err = iommu_legacy_map(ld, _dfn(mfn_x(op->mfn)), op->mfn, 1,
                                    IOMMUF_readable);
 
         double_gt_unlock(lgt, rgt);

@@ -584,7 +584,7 @@ static int __must_check iommu_flush_all(void)
 
 static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
                                           bool_t dma_old_pte_present,
-                                          unsigned int page_count)
+                                          unsigned long page_count)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct acpi_drhd_unit *drhd;
@@ -632,7 +632,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
 
 static int __must_check iommu_flush_iotlb_pages(struct domain *d,
                                                 dfn_t dfn,
-                                                unsigned int page_count,
+                                                unsigned long page_count,
                                                 unsigned int flush_flags)
 {
     ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));

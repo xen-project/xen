@@ -235,7 +235,7 @@ void iommu_domain_destroy(struct domain *d)
 }
 
 int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
-              unsigned int page_order, unsigned int flags,
+              unsigned long page_count, unsigned int flags,
               unsigned int *flush_flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
@@ -245,10 +245,7 @@ int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
     if ( !is_iommu_enabled(d) )
         return 0;
 
-    ASSERT(IS_ALIGNED(dfn_x(dfn), (1ul << page_order)));
-    ASSERT(IS_ALIGNED(mfn_x(mfn), (1ul << page_order)));
-
-    for ( i = 0; i < (1ul << page_order); i++ )
+    for ( i = 0; i < page_count; i++ )
     {
         rc = iommu_call(hd->platform_ops, map_page, d, dfn_add(dfn, i),
                         mfn_add(mfn, i), flags, flush_flags);
@@ -278,25 +275,26 @@ int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
      * Something went wrong so, if we were dealing with more than a single
      * page, flush everything and clear flush flags.
      */
-    if ( page_order && unlikely(rc) && !iommu_iotlb_flush_all(d, *flush_flags) )
+    if ( page_count > 1 && unlikely(rc) &&
+         !iommu_iotlb_flush_all(d, *flush_flags) )
         *flush_flags = 0;
 
     return rc;
 }
 
 int iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
-                     unsigned int page_order, unsigned int flags)
+                     unsigned long page_count, unsigned int flags)
 {
     unsigned int flush_flags = 0;
-    int rc = iommu_map(d, dfn, mfn, page_order, flags, &flush_flags);
+    int rc = iommu_map(d, dfn, mfn, page_count, flags, &flush_flags);
 
     if ( !this_cpu(iommu_dont_flush_iotlb) && !rc )
-        rc = iommu_iotlb_flush(d, dfn, (1u << page_order), flush_flags);
+        rc = iommu_iotlb_flush(d, dfn, page_count, flush_flags);
 
     return rc;
 }
 
-int iommu_unmap(struct domain *d, dfn_t dfn, unsigned int page_order,
+int iommu_unmap(struct domain *d, dfn_t dfn, unsigned long page_count,
                 unsigned int *flush_flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
@@ -306,9 +304,7 @@ int iommu_unmap(struct domain *d, dfn_t dfn, unsigned int page_order,
     if ( !is_iommu_enabled(d) )
         return 0;
 
-    ASSERT(IS_ALIGNED(dfn_x(dfn), (1ul << page_order)));
-
-    for ( i = 0; i < (1ul << page_order); i++ )
+    for ( i = 0; i < page_count; i++ )
     {
         int err = iommu_call(hd->platform_ops, unmap_page, d, dfn_add(dfn, i),
                              flush_flags);
@@ -335,19 +331,20 @@ int iommu_unmap(struct domain *d, dfn_t dfn, unsigned int page_order,
      * Something went wrong so, if we were dealing with more than a single
      * page, flush everything and clear flush flags.
      */
-    if ( page_order && unlikely(rc) && !iommu_iotlb_flush_all(d, *flush_flags) )
+    if ( page_count > 1 && unlikely(rc) &&
+         !iommu_iotlb_flush_all(d, *flush_flags) )
         *flush_flags = 0;
 
     return rc;
 }
 
-int iommu_legacy_unmap(struct domain *d, dfn_t dfn, unsigned int page_order)
+int iommu_legacy_unmap(struct domain *d, dfn_t dfn, unsigned long page_count)
 {
     unsigned int flush_flags = 0;
-    int rc = iommu_unmap(d, dfn, page_order, &flush_flags);
+    int rc = iommu_unmap(d, dfn, page_count, &flush_flags);
 
     if ( !this_cpu(iommu_dont_flush_iotlb) && !rc )
-        rc = iommu_iotlb_flush(d, dfn, (1u << page_order), flush_flags);
+        rc = iommu_iotlb_flush(d, dfn, page_count, flush_flags);
 
     return rc;
 }
@@ -363,7 +360,7 @@ int iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
     return iommu_call(hd->platform_ops, lookup_page, d, dfn, mfn, flags);
 }
 
-int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned int page_count,
+int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned long page_count,
                       unsigned int flush_flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
@@ -382,7 +379,7 @@ int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned int page_count,
     {
         if ( !d->is_shutting_down && printk_ratelimit() )
             printk(XENLOG_ERR
-                   "d%d: IOMMU IOTLB flush failed: %d, dfn %"PRI_dfn", page count %u flags %x\n",
+                   "d%d: IOMMU IOTLB flush failed: %d, dfn %"PRI_dfn", page count %lu flags %x\n",
                    d->domain_id, rc, dfn_x(dfn), page_count, flush_flags);
 
         if ( !is_hardware_domain(d) )
