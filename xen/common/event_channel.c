@@ -185,6 +185,13 @@ int evtchn_allocate_port(struct domain *d, evtchn_port_t port)
             return -ENOMEM;
         bucket_from_port(d, port) = chn;
 
+        /*
+         * d->valid_evtchns is used to check whether the bucket can be
+         * accessed without the per-domain lock. Therefore,
+         * d->valid_evtchns should be seen *after* the new bucket has
+         * been setup.
+         */
+        smp_wmb();
         write_atomic(&d->valid_evtchns, d->valid_evtchns + EVTCHNS_PER_BUCKET);
     }
 
