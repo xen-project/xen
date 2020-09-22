@@ -1058,6 +1058,14 @@ static int acquire_resource(
     xen_pfn_t mfn_list[32];
     int rc;
 
+    /*
+     * FIXME: Until foreign pages inserted into the P2M are properly
+     *        reference counted, it is unsafe to allow mapping of
+     *        resource pages unless the caller is the hardware domain.
+     */
+    if ( paging_mode_translate(currd) && !is_hardware_domain(currd) )
+        return -EACCES;
+
     if ( copy_from_guest(&xmar, arg, 1) )
         return -EFAULT;
 
@@ -1113,14 +1121,6 @@ static int acquire_resource(
     {
         xen_pfn_t gfn_list[ARRAY_SIZE(mfn_list)];
         unsigned int i;
-
-        /*
-         * FIXME: Until foreign pages inserted into the P2M are properly
-         *        reference counted, it is unsafe to allow mapping of
-         *        resource pages unless the caller is the hardware domain.
-         */
-        if ( !is_hardware_domain(currd) )
-            return -EACCES;
 
         if ( copy_from_guest(gfn_list, xmar.frame_list, xmar.nr_frames) )
             rc = -EFAULT;
