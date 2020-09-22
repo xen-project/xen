@@ -662,8 +662,11 @@ void pv_shim_inject_evtchn(unsigned int port)
     if ( port_is_valid(guest, port) )
     {
         struct evtchn *chn = evtchn_from_port(guest, port);
+        unsigned long flags;
 
+        spin_lock_irqsave(&chn->lock, flags);
         evtchn_port_set_pending(guest, chn->notify_vcpu_id, chn);
+        spin_unlock_irqrestore(&chn->lock, flags);
     }
 }
 
