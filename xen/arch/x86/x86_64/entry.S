@@ -90,7 +90,6 @@ process_softirqs:
         sti
 .Lbounce_exception:
         call  create_bounce_frame
-        movb  $0, TRAPBOUNCE_flags(%rdx)
         jmp   test_all_events
 
         ALIGN
@@ -512,6 +511,11 @@ UNLIKELY_START(z, create_bounce_frame_bad_bounce_ip)
         jmp   asm_domain_crash_synchronous  /* Does not return */
 __UNLIKELY_END(create_bounce_frame_bad_bounce_ip)
         movq  %rax,UREGS_rip+8(%rsp)
+
+        /* Trapbounce complete.  Clobber state to avoid an erroneous second injection. */
+        xor   %eax, %eax
+        mov   %rax, TRAPBOUNCE_eip(%rdx)
+        mov   %al,  TRAPBOUNCE_flags(%rdx)
         ret
 
         .pushsection .fixup, "ax", @progbits
