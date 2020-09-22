@@ -155,6 +155,9 @@ int build_e820_table(struct e820entry *e820,
 {
     unsigned int nr = 0, i, j;
     uint32_t low_mem_end = hvm_info->low_mem_pgend << PAGE_SHIFT;
+    unsigned long acpi_mem_end = acpi_enabled ?
+        ACPI_MEMORY_DYNAMIC_START + (acpi_pages_allocated() << PAGE_SHIFT) :
+        RESERVED_MEMBASE;
 
     if ( !lowmem_reserved_base )
             lowmem_reserved_base = 0xA0000;
@@ -199,8 +202,23 @@ int build_e820_table(struct e820entry *e820,
     nr++;
 
     /*
+     * Mark populated reserved memory that contains ACPI tables as ACPI data.
+     * That should help the guest to treat it correctly later: e.g. pass to
+     * the next kernel on kexec or reclaim if necessary.
+     */
+
+    if ( acpi_enabled )
+    {
+        e820[nr].addr = RESERVED_MEMBASE;
+        e820[nr].size = acpi_mem_end - RESERVED_MEMBASE;
+        e820[nr].type = E820_ACPI;
+        nr++;
+    }
+
+    /*
      * Explicitly reserve space for special pages.
-     * This space starts at RESERVED_MEMBASE an extends to cover various
+     * This space starts right after ACPI region (to avoid creating a hole that
+     * might be accidentally occupied by MMIO) and extends to cover various
      * fixed hardware mappings (e.g., LAPIC, IOAPIC, default SVGA framebuffer).
      *
      * If igd_opregion_pgbase we need to split the RESERVED region in two.
@@ -210,8 +228,8 @@ int build_e820_table(struct e820entry *e820,
     {
         uint32_t igd_opregion_base = igd_opregion_pgbase << PAGE_SHIFT;
 
-        e820[nr].addr = RESERVED_MEMBASE;
-        e820[nr].size = (uint32_t) igd_opregion_base - RESERVED_MEMBASE;
+        e820[nr].addr = acpi_mem_end;
+        e820[nr].size = igd_opregion_base - acpi_mem_end;
         e820[nr].type = E820_RESERVED;
         nr++;
 
@@ -227,7 +245,7 @@ int build_e820_table(struct e820entry *e820,
     }
     else
     {
-        e820[nr].addr = RESERVED_MEMBASE;
+        e820[nr].addr = acpi_mem_end;
         e820[nr].size = (uint32_t)-e820[nr].addr;
         e820[nr].type = E820_RESERVED;
         nr++;
