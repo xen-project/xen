@@ -78,7 +78,6 @@ compat_process_softirqs:
         sti
 .Lcompat_bounce_exception:
         call  compat_create_bounce_frame
-        movb  $0, TRAPBOUNCE_flags(%rdx)
         jmp   compat_test_all_events
 
 	ALIGN
@@ -349,7 +348,13 @@ __UNLIKELY_END(compat_bounce_null_selector)
         movl  %eax,UREGS_cs+8(%rsp)
         movl  TRAPBOUNCE_eip(%rdx),%eax
         movl  %eax,UREGS_rip+8(%rsp)
+
+        /* Trapbounce complete.  Clobber state to avoid an erroneous second injection. */
+        xor   %eax, %eax
+        mov   %ax,  TRAPBOUNCE_cs(%rdx)
+        mov   %al,  TRAPBOUNCE_flags(%rdx)
         ret
+
 .section .fixup,"ax"
 .Lfx13:
         xorl  %edi,%edi
