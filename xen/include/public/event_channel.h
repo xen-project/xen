@@ -74,6 +74,9 @@
 #define EVTCHNOP_init_control    11
 #define EVTCHNOP_expand_array    12
 #define EVTCHNOP_set_priority    13
+#ifdef __XEN__
+#define EVTCHNOP_reset_cont      14
+#endif
 /* ` } */
 
 typedef uint32_t evtchn_port_t;
