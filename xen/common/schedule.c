@@ -1434,7 +1434,7 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
 
         rc = -EINVAL;
-        if ( port >= d->max_evtchns )
+        if ( !port_is_valid(d, port) )
             goto out;
 
         rc = 0;

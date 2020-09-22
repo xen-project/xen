@@ -151,7 +151,7 @@ static void free_evtchn_bucket(struct domain *d, struct evtchn *bucket)
 
 int evtchn_allocate_port(struct domain *d, evtchn_port_t port)
 {
-    if ( port > d->max_evtchn_port || port >= d->max_evtchns )
+    if ( port > d->max_evtchn_port || port >= max_evtchns(d) )
         return -ENOSPC;
 
     if ( port_is_valid(d, port) )
@@ -1396,13 +1396,11 @@ static void domain_dump_evtchn_info(struct domain *d)
 
     spin_lock(&d->event_lock);
 
-    for ( port = 1; port < d->max_evtchns; ++port )
+    for ( port = 1; port_is_valid(d, port); ++port )
     {
         const struct evtchn *chn;
         char *ssid;
 
-        if ( !port_is_valid(d, port) )
-            continue;
         chn = evtchn_from_port(d, port);
         if ( chn->state == ECS_FREE )
             continue;
