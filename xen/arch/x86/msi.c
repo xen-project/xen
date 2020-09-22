@@ -214,13 +214,10 @@ static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         pci_conf_write32(dev->sbdf, msi_lower_address_reg(pos),
                          msg->address_lo);
         if ( entry->msi_attrib.is_64 )
-        {
             pci_conf_write32(dev->sbdf, msi_upper_address_reg(pos),
                              msg->address_hi);
-            pci_conf_write16(dev->sbdf, msi_data_reg(pos, 1), msg->data);
-        }
-        else
-            pci_conf_write16(dev->sbdf, msi_data_reg(pos, 0), msg->data);
+        pci_conf_write16(dev->sbdf, msi_data_reg(pos, entry->msi_attrib.is_64),
+                         msg->data);
         break;
     }
     case PCI_CAP_ID_MSIX:
