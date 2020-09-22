@@ -265,10 +265,15 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
 
     addr &= (((u64)1) << addr_width) - 1;
     ASSERT(spin_is_locked(&hd->arch.mapping_lock));
-    if ( !hd->arch.vtd.pgd_maddr &&
-         (!alloc ||
-          ((hd->arch.vtd.pgd_maddr = alloc_pgtable_maddr(1, hd->node)) == 0)) )
-        goto out;
+    if ( !hd->arch.vtd.pgd_maddr )
+    {
+        struct page_info *pg;
+
+        if ( !alloc || !(pg = iommu_alloc_pgtable(domain)) )
+            goto out;
+
+        hd->arch.vtd.pgd_maddr = page_to_maddr(pg);
+    }
 
     parent = (struct dma_pte *)map_vtd_domain_page(hd->arch.vtd.pgd_maddr);
     while ( level > 1 )
@@ -279,13 +284,16 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
         pte_maddr = dma_pte_addr(*pte);
         if ( !pte_maddr )
         {
+            struct page_info *pg;
+
             if ( !alloc )
                 break;
 
-            pte_maddr = alloc_pgtable_maddr(1, hd->node);
-            if ( !pte_maddr )
+            pg = iommu_alloc_pgtable(domain);
+            if ( !pg )
                 break;
 
+            pte_maddr = page_to_maddr(pg);
             dma_set_pte_addr(*pte, pte_maddr);
 
             /*
@@ -673,45 +681,6 @@ static void dma_pte_clear_one(struct domain *domain, uint64_t addr,
     iommu_sync_cache(pte, sizeof(struct dma_pte));
 
     unmap_vtd_domain_page(page);
-}
-
-static void iommu_free_pagetable(u64 pt_maddr, int level)
-{
-    struct page_info *pg = maddr_to_page(pt_maddr);
-
-    if ( pt_maddr == 0 )
-        return;
-
-    PFN_ORDER(pg) = level;
-    spin_lock(&iommu_pt_cleanup_lock);
-    page_list_add_tail(pg, &iommu_pt_cleanup_list);
-    spin_unlock(&iommu_pt_cleanup_lock);
-}
-
-static void iommu_free_page_table(struct page_info *pg)
-{
-    unsigned int i, next_level = PFN_ORDER(pg) - 1;
-    u64 pt_maddr = page_to_maddr(pg);
-    struct dma_pte *pt_vaddr, *pte;
-
-    PFN_ORDER(pg) = 0;
-    pt_vaddr = (struct dma_pte *)map_vtd_domain_page(pt_maddr);
-
-    for ( i = 0; i < PTE_NUM; i++ )
-    {
-        pte = &pt_vaddr[i];
-        if ( !dma_pte_present(*pte) )
-            continue;
-
-        if ( next_level >= 1 )
-            iommu_free_pagetable(dma_pte_addr(*pte), next_level);
-
-        dma_clear_pte(*pte);
-        iommu_sync_cache(pte, sizeof(struct dma_pte));
-    }
-
-    unmap_vtd_domain_page(pt_vaddr);
-    free_pgtable_maddr(pt_maddr);
 }
 
 static int iommu_set_root_entry(struct vtd_iommu *iommu)
@@ -1748,16 +1717,7 @@ static void iommu_domain_teardown(struct domain *d)
         xfree(mrmrr);
     }
 
-    ASSERT(is_iommu_enabled(d));
-
-    if ( iommu_use_hap_pt(d) )
-        return;
-
-    spin_lock(&hd->arch.mapping_lock);
-    iommu_free_pagetable(hd->arch.vtd.pgd_maddr,
-                         agaw_to_level(hd->arch.vtd.agaw));
     hd->arch.vtd.pgd_maddr = 0;
-    spin_unlock(&hd->arch.mapping_lock);
 }
 
 static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,
@@ -2669,22 +2629,27 @@ static void vtd_dump_p2m_table(struct domain *d)
 static int __init intel_iommu_quarantine_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
+    struct page_info *pg;
     struct dma_pte *parent;
     unsigned int agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
     unsigned int level = agaw_to_level(agaw);
-    int rc;
+    int rc = 0;
+
+    spin_lock(&hd->arch.mapping_lock);
 
     if ( hd->arch.vtd.pgd_maddr )
     {
         ASSERT_UNREACHABLE();
-        return 0;
+        goto out;
     }
 
-    spin_lock(&hd->arch.mapping_lock);
+    pg = iommu_alloc_pgtable(d);
 
-    hd->arch.vtd.pgd_maddr = alloc_pgtable_maddr(1, hd->node);
-    if ( !hd->arch.vtd.pgd_maddr )
+    rc = -ENOMEM;
+    if ( !pg )
         goto out;
+
+    hd->arch.vtd.pgd_maddr = page_to_maddr(pg);
 
     parent = map_vtd_domain_page(hd->arch.vtd.pgd_maddr);
     while ( level )
@@ -2697,10 +2662,12 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
          * page table pages, and the resulting allocations are always
          * zeroed.
          */
-        maddr = alloc_pgtable_maddr(1, hd->node);
-        if ( !maddr )
-            break;
+        pg = iommu_alloc_pgtable(d);
 
+        if ( !pg )
+            goto out;
+
+        maddr = page_to_maddr(pg);
         for ( offset = 0; offset < PTE_NUM; offset++ )
         {
             struct dma_pte *pte = &parent[offset];
@@ -2716,13 +2683,16 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
     }
     unmap_vtd_domain_page(parent);
 
+    rc = 0;
+
  out:
     spin_unlock(&hd->arch.mapping_lock);
 
-    rc = iommu_flush_iotlb_all(d);
+    if ( !rc )
+        rc = iommu_flush_iotlb_all(d);
 
-    /* Pages leaked in failure case */
-    return level ? -ENOMEM : rc;
+    /* Pages may be leaked in failure case */
+    return rc;
 }
 
 static struct iommu_ops __initdata vtd_ops = {
@@ -2737,7 +2707,6 @@ static struct iommu_ops __initdata vtd_ops = {
     .map_page = intel_iommu_map_page,
     .unmap_page = intel_iommu_unmap_page,
     .lookup_page = intel_iommu_lookup_page,
-    .free_page_table = iommu_free_page_table,
     .reassign_device = reassign_device_ownership,
     .get_device_group_id = intel_iommu_group_id,
     .enable_x2apic = intel_iommu_enable_eim,

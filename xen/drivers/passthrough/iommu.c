@@ -225,8 +225,10 @@ static void iommu_teardown(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
-    hd->platform_ops->teardown(d);
-    tasklet_schedule(&iommu_pt_cleanup_tasklet);
+    iommu_vcall(hd->platform_ops, teardown, d);
+
+    if ( hd->platform_ops->free_page_table )
+        tasklet_schedule(&iommu_pt_cleanup_tasklet);
 }
 
 void iommu_domain_destroy(struct domain *d)
