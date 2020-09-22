@@ -107,7 +107,17 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
 
 static inline bool_t port_is_valid(struct domain *d, unsigned int p)
 {
-    return p < read_atomic(&d->valid_evtchns);
+    if ( p >= read_atomic(&d->valid_evtchns) )
+        return false;
+
+    /*
+     * The caller will usually access the event channel afterwards and
+     * may be done without taking the per-domain lock. The barrier is
+     * going in pair the smp_wmb() barrier in evtchn_allocate_port().
+     */
+    smp_rmb();
+
+    return true;
 }
 
 static inline struct evtchn *evtchn_from_port(struct domain *d, unsigned int p)
