@@ -26,6 +26,9 @@ struct kernel_param {
     } par;
 };
 
+/* Maximum length of a single parameter string. */
+#define MAX_PARAM_SIZE 128
+
 extern const struct kernel_param __setup_start[], __setup_end[];
 
 #define __param(att)      static const att \

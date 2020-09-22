@@ -297,7 +297,9 @@ int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
     int ret;
 
     ASSERT(this_cpu(hypfs_locked) == hypfs_write_locked);
-    ASSERT(ulen <= leaf->e.max_size);
+
+    if ( ulen > leaf->e.max_size )
+        return -ENOSPC;
 
     if ( leaf->e.type != XEN_HYPFS_TYPE_STRING &&
          leaf->e.type != XEN_HYPFS_TYPE_BLOB && ulen != leaf->e.size )
@@ -356,6 +358,10 @@ int hypfs_write_custom(struct hypfs_entry_leaf *leaf,
 
     ASSERT(this_cpu(hypfs_locked) == hypfs_write_locked);
 
+    /* Avoid oversized buffer allocation. */
+    if ( ulen > MAX_PARAM_SIZE )
+        return -ENOSPC;
+
     buf = xzalloc_array(char, ulen);
     if ( !buf )
         return -ENOMEM;
@@ -385,9 +391,6 @@ static int hypfs_write(struct hypfs_entry *entry,
         return -EACCES;
 
     ASSERT(entry->max_size);
-
-    if ( ulen > entry->max_size )
-        return -ENOSPC;
 
     l = container_of(entry, struct hypfs_entry_leaf, e);
 
