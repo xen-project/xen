@@ -195,6 +195,8 @@ int evtchn_allocate_port(struct domain *d, evtchn_port_t port)
         write_atomic(&d->valid_evtchns, d->valid_evtchns + EVTCHNS_PER_BUCKET);
     }
 
+    write_atomic(&d->active_evtchns, d->active_evtchns + 1);
+
     return 0;
 }
 
@@ -218,10 +220,25 @@ static int get_free_port(struct domain *d)
     return -ENOSPC;
 }
 
+/*
+ * Check whether a port is still marked free, and if so update the domain
+ * counter accordingly.  To be used on function exit paths.
+ */
+static void check_free_port(struct domain *d, evtchn_port_t port)
+{
+    if ( port_is_valid(d, port) &&
+         evtchn_from_port(d, port)->state == ECS_FREE )
+        write_atomic(&d->active_evtchns, d->active_evtchns - 1);
+}
+
 void evtchn_free(struct domain *d, struct evtchn *chn)
 {
     /* Clear pending event to avoid unexpected behavior on re-bind. */
     evtchn_port_clear_pending(d, chn);
+
+    if ( consumer_is_xen(chn) )
+        write_atomic(&d->xen_evtchns, d->xen_evtchns - 1);
+    write_atomic(&d->active_evtchns, d->active_evtchns - 1);
 
     /* Reset binding to vcpu0 when the channel is freed. */
     chn->state          = ECS_FREE;
@@ -265,6 +282,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     alloc->port = port;
 
  out:
+    check_free_port(d, port);
     spin_unlock(&d->event_lock);
     rcu_unlock_domain(d);
 
@@ -358,6 +376,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     bind->local_port = lport;
 
  out:
+    check_free_port(ld, lport);
     spin_unlock(&ld->event_lock);
     if ( ld != rd )
         spin_unlock(&rd->event_lock);
@@ -491,7 +510,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     struct domain *d = current->domain;
     struct vcpu   *v = d->vcpu[0];
     struct pirq   *info;
-    int            port, pirq = bind->pirq;
+    int            port = 0, pirq = bind->pirq;
     long           rc;
 
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
@@ -539,6 +558,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     arch_evtchn_bind_pirq(d, pirq);
 
  out:
+    check_free_port(d, port);
     spin_unlock(&d->event_lock);
 
     return rc;
@@ -1013,10 +1033,10 @@ int evtchn_unmask(unsigned int port)
     return 0;
 }
 
-
 int evtchn_reset(struct domain *d)
 {
     unsigned int i;
+    int rc = 0;
 
     if ( d != current->domain && !d->controller_pause_count )
         return -EINVAL;
@@ -1026,7 +1046,9 @@ int evtchn_reset(struct domain *d)
 
     spin_lock(&d->event_lock);
 
-    if ( d->evtchn_fifo )
+    if ( d->active_evtchns > d->xen_evtchns )
+        rc = -EAGAIN;
+    else if ( d->evtchn_fifo )
     {
         /* Switching back to 2-level ABI. */
         evtchn_fifo_destroy(d);
@@ -1035,7 +1057,7 @@ int evtchn_reset(struct domain *d)
 
     spin_unlock(&d->event_lock);
 
-    return 0;
+    return rc;
 }
 
 static long evtchn_set_priority(const struct evtchn_set_priority *set_priority)
@@ -1221,10 +1243,9 @@ int alloc_unbound_xen_event_channel(
 
     spin_lock(&ld->event_lock);
 
-    rc = get_free_port(ld);
+    port = rc = get_free_port(ld);
     if ( rc < 0 )
         goto out;
-    port = rc;
     chn = evtchn_from_port(ld, port);
 
     rc = xsm_evtchn_unbound(XSM_TARGET, ld, chn, remote_domid);
@@ -1240,7 +1261,10 @@ int alloc_unbound_xen_event_channel(
 
     spin_unlock(&chn->lock);
 
+    write_atomic(&ld->xen_evtchns, ld->xen_evtchns + 1);
+
  out:
+    check_free_port(ld, port);
     spin_unlock(&ld->event_lock);
 
     return rc < 0 ? rc : port;
@@ -1316,6 +1340,7 @@ int evtchn_init(struct domain *d)
         return -EINVAL;
     }
     evtchn_from_port(d, 0)->state = ECS_RESERVED;
+    write_atomic(&d->active_evtchns, 0);
 
 #if MAX_VIRT_CPUS > BITS_PER_LONG
     d->poll_mask = xzalloc_array(unsigned long,
@@ -1342,6 +1367,8 @@ void evtchn_destroy(struct domain *d)
     /* Close all existing event channels. */
     for ( i = 0; port_is_valid(d, i); i++ )
         evtchn_close(d, i, 0);
+
+    ASSERT(!d->active_evtchns);
 
     clear_global_virq_handlers(d);
 
