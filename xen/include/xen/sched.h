@@ -348,6 +348,8 @@ struct domain
      * EVTCHNOP_reset).  Read/write access like for active_evtchns.
      */
     unsigned int     xen_evtchns;
+    /* Port to resume from in evtchn_reset(), when in a continuation. */
+    unsigned int     next_evtchn;
     spinlock_t       event_lock;
     const struct evtchn_port_ops *evtchn_port_ops;
     struct evtchn_fifo_domain *evtchn_fifo;
@@ -616,7 +618,7 @@ int domain_shutdown(struct domain *d, u8 reason);
 void domain_resume(struct domain *d);
 void domain_pause_for_debugger(void);
 
-int domain_soft_reset(struct domain *d);
+int domain_soft_reset(struct domain *d, bool resuming);
 
 int vcpu_start_shutdown_deferral(struct vcpu *v);
 void vcpu_end_shutdown_deferral(struct vcpu *v);

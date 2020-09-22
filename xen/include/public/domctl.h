@@ -1130,7 +1130,10 @@ struct xen_domctl {
 #define XEN_DOMCTL_iomem_permission              20
 #define XEN_DOMCTL_ioport_permission             21
 #define XEN_DOMCTL_hypercall_init                22
-#define XEN_DOMCTL_arch_setup                    23 /* Obsolete IA64 only */
+#ifdef __XEN__
+/* #define XEN_DOMCTL_arch_setup                 23 Obsolete IA64 only */
+#define XEN_DOMCTL_soft_reset_cont               23
+#endif
 #define XEN_DOMCTL_settimeoffset                 24
 #define XEN_DOMCTL_getvcpuaffinity               25
 #define XEN_DOMCTL_real_mode_area                26 /* Obsolete PPC only */
