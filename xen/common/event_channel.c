@@ -1057,7 +1057,7 @@ int evtchn_unmask(unsigned int port)
     return 0;
 }
 
-int evtchn_reset(struct domain *d)
+int evtchn_reset(struct domain *d, bool resuming)
 {
     unsigned int i;
     int rc = 0;
@@ -1065,10 +1065,39 @@ int evtchn_reset(struct domain *d)
     if ( d != current->domain && !d->controller_pause_count )
         return -EINVAL;
 
-    for ( i = 0; port_is_valid(d, i); i++ )
+    spin_lock(&d->event_lock);
+
+    /*
+     * If we are resuming, then start where we stopped. Otherwise, check
+     * that a reset operation is not already in progress, and if none is,
+     * record that this is now the case.
+     */
+    i = resuming ? d->next_evtchn : !d->next_evtchn;
+    if ( i > d->next_evtchn )
+        d->next_evtchn = i;
+
+    spin_unlock(&d->event_lock);
+
+    if ( !i )
+        return -EBUSY;
+
+    for ( ; port_is_valid(d, i); i++ )
+    {
         evtchn_close(d, i, 1);
 
+        /* NB: Choice of frequency is arbitrary. */
+        if ( !(i & 0x3f) && hypercall_preempt_check() )
+        {
+            spin_lock(&d->event_lock);
+            d->next_evtchn = i;
+            spin_unlock(&d->event_lock);
+            return -ERESTART;
+        }
+    }
+
     spin_lock(&d->event_lock);
+
+    d->next_evtchn = 0;
 
     if ( d->active_evtchns > d->xen_evtchns )
         rc = -EAGAIN;
@@ -1204,7 +1233,8 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
-    case EVTCHNOP_reset: {
+    case EVTCHNOP_reset:
+    case EVTCHNOP_reset_cont: {
         struct evtchn_reset reset;
         struct domain *d;
 
@@ -1217,9 +1247,13 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = xsm_evtchn_reset(XSM_TARGET, current->domain, d);
         if ( !rc )
-            rc = evtchn_reset(d);
+            rc = evtchn_reset(d, cmd == EVTCHNOP_reset_cont);
 
         rcu_unlock_domain(d);
+
+        if ( rc == -ERESTART )
+            rc = hypercall_create_continuation(__HYPERVISOR_event_channel_op,
+                                               "ih", EVTCHNOP_reset_cont, arg);
         break;
     }
 
