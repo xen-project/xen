@@ -136,7 +136,7 @@ struct evtchn
 } __attribute__((aligned(64)));
 
 int  evtchn_init(struct domain *d, unsigned int max_port);
-void evtchn_destroy(struct domain *d); /* from domain_kill */
+int  evtchn_destroy(struct domain *d); /* from domain_kill */
 void evtchn_destroy_final(struct domain *d); /* from complete_domain_destroy */
 
 struct waitqueue_vcpu;
