@@ -15,9 +15,7 @@ XEN_INCLUDE        = $(XEN_ROOT)/tools/include
 
 include $(XEN_ROOT)/tools/libs/uselibs.mk
 
-XEN_libxenlight    = $(XEN_ROOT)/tools/libxl
-# Currently libxlutil lives in the same directory as libxenlight
-XEN_libxlutil      = $(XEN_libxenlight)
+XEN_libxlutil      = $(XEN_ROOT)/tools/libxl
 
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
@@ -107,6 +105,8 @@ ifeq ($(CONFIG_Linux),y)
 LDLIBS_libxenstore += -ldl
 endif
 
+CFLAGS_libxenlight += $(CFLAGS_libxenctrl)
+
 ifeq ($(debug),y)
 # Disable optimizations
 CFLAGS += -O0 -fno-omit-frame-pointer
@@ -115,11 +115,6 @@ PY_CFLAGS += $(PY_NOOPT_CFLAGS)
 else
 CFLAGS += -O2 -fomit-frame-pointer
 endif
-
-CFLAGS_libxenlight = -I$(XEN_libxenlight) $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
-SHDEPS_libxenlight = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libxenhypfs) $(SHLIB_libxenguest)
-LDLIBS_libxenlight = $(SHDEPS_libxenlight) $(XEN_libxenlight)/libxenlight$(libextension)
-SHLIB_libxenlight  = $(SHDEPS_libxenlight) -Wl,-rpath-link=$(XEN_libxenlight)
 
 CFLAGS_libxlutil = -I$(XEN_libxlutil)
 SHDEPS_libxlutil = $(SHLIB_libxenlight)

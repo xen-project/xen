@@ -585,7 +585,7 @@ PACKAGE_STRING='Xen Hypervisor Tools 4.15'
 PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
 PACKAGE_URL='https://www.xen.org/'
 
-ac_unique_file="libxl/libxl.c"
+ac_unique_file="libs/light/libxl.c"
 # Factoring default headers for most tests.
 ac_includes_default="\
 #include <stdio.h>

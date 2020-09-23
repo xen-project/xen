@@ -1,0 +1,330 @@
+LIBXENLIGHT CODING STYLE
+========================
+
+
+AN APOLOGY AND WARNING
+----------------------
+
+Much of the code in libxl does not yet follow this coding style
+document in every respect.  However, new code is expected to conform.
+
+Patches to improve the style of existing code are welcome.  Please
+separate these out from functional changes.
+
+If it is not feasible to conform fully to the style while patching old
+code, without doing substantial style reengineering first, we may
+accept patches which contain nonconformant elements, provided that
+they don't make the coding style problem worse overall.
+
+In this case, the new code should conform to the prevailing style in
+the area being touched.
+
+
+MEMORY ALLOCATION
+-----------------
+
+Memory allocation for libxl-internal purposes should normally be done
+with the provided gc mechanisms; there is then no need to free.  See
+"libxl memory management" in libxl.h.
+
+
+CONVENTIONAL VARIABLE NAMES
+---------------------------
+
+The following local variable names should be used where applicable:
+
+  int rc;    /* a libxl error code - and not anything else */
+  int r;     /* the return value from a system call (or libxc call) */
+  bool ok;   /* the success return value from a boolean function */
+
+  uint32_t domid;
+  libxl__gc *gc;
+  libxl__egc *egc;
+  libxl__ao *ao;
+
+  libxl_foo_bar_state *fbs;    /* local variable */
+  libxl_foo_bar_state foo_bar; /* inside another state struct */
+
+
+CONVENIENCE MACROS
+------------------
+
+There are a number of convenience macros which shorten the program and
+avoid opportunity for mistakes.  In some cases non-use of the macros
+produces functional bugs or incorrect error handling.  Use the macros
+whenever they are applicable.  For example:
+
+ Usually, don't use:     Instead, use (see libxl_internal.h):
+  libxl__log[v]           LOG, LOGE, LOGEV
+  libxl__sprintf          GCSPRINTF
+  libxl__*alloc et al.    GCNEW, GCNEW_ARRAY, GCREALLOC_ARRAY
+  isalnum etc. directly   CTYPE
+  libxl__ctx_[un]lock     CTX_LOCK, CTX_UNLOCK
+  gc=...; ao=...;         EGC_GC, AO_GC, STATE_AO_GC
+  explicit gc creation    GC_INIT, GC_FREE
+  memset(..,0,sizeof..)   FILLZERO
+
+Instead of malloc et al one should (as an exception to the above) use
+libxl__{zalloc,calloc,realloc} etc but passing NOGC.
+
+ERROR HANDLING
+--------------
+
+Unless, there are good reasons to do otherwise, the following error
+handling and cleanup paradigm should be used:
+
+  * All local variables referring to resources which might need
+    cleaning up are declared at the top of the function, and
+    initialised to a sentinel value indicating "nothing allocated".
+    For example,
+            libxl_evgen_disk_eject *evg = NULL;
+            int nullfd = -1;
+
+  * If the function is to return a libxl error value, `rc' is
+    used to contain the error code, but it is NOT initialised:
+            int rc;
+
+  * There is only one error cleanup path out of the function.  It
+    starts with a label `out:'.  That error cleanup path checks for
+    each allocated resource and frees it iff necessary.  It then
+    returns rc.  For example,
+         out:
+             if (evg) libxl__evdisable_disk_eject(gc, evg);
+             if (nullfd >= 0) close(nullfd);
+             return rc;
+
+  * Function calls which might fail (ie most function calls) are
+    handled by putting the return/status value into a variable, and
+    then checking it in a separate statement:
+            char *dompath = libxl__xs_get_dompath(gc, bl->domid);
+            if (!dompath) { rc = ERROR_FAIL; goto out; }
+
+  * If a resource is freed in the main body of the function (for
+    example, in a loop), the corresponding variable has to be reset to
+    the sentinel at the point where it's freed.
+
+Whether to use the `out' path for successful returns as well as error
+returns is a matter of taste and convenience for the specific
+function.  Not reusing the out path is fine if the duplicated function
+exit code is only `CTX_UNLOCK; GC_FREE;' (or similar).
+
+If you reuse the `out' path for successful returns, there may be
+resources which are to be returned to the caller rather than freed.
+In that case you have to reset the local variable to `nothing here',
+to avoid the resource being freed on the out path.  That resetting
+should be done immediately after the resource value is stored at the
+applicable _r function parameter (or equivalent).  Do not test `rc' in
+the out section, to discover whether to free things.
+
+The uses of the single-line formatting in the examples above are
+permitted exceptions to the usual libxl code formatting rules.
+
+
+
+IDEMPOTENT DATA STRUCTURE CONSTRUCTION/DESTRUCTION
+--------------------------------------------------
+
+Nontrivial data structures (in structs) should come with an idempotent
+_dispose function, which must free all resources associated with the
+data structure (but not free the struct itself).
+
+Such a struct should also come with an _init function which
+initialises the struct so that _dispose is a no-op.
+
+
+ASYNCHRONOUS/LONG-RUNNING OPERATIONS
+------------------------------------
+
+All long-running operations in libxl need to use the asynchronous
+operation machinery.  Consult the programmer documentation in
+libxl_internal.h for details - search for "Machinery for asynchronous
+operations".
+
+The code for asynchronous operations should be laid out in
+chronological order.  That is, where there is a chain of callback
+functions, each subsequent function should be, textually, the next
+function in the file.  This will normally involve predeclaring the
+callback functions.  Synchronous helper functions should be separated
+out into a section preceding the main callback chain.
+
+Control flow arrangements in asynchronous operations should be made as
+simple as possible, because it can otherwise be very hard to see
+through the tangle.
+
+
+When inventing a new sub-operation in asynchronous code, consider
+whether to structure it formally as a sub-operation with its own state
+structure.  (See, for example, libxl__datacopier_*.)
+
+An ao-suboperation state structure should contain, in this order:
+  * fields that the caller must fill in, and which are,
+    effectively, the parameters to the operation, including:
+      - libxl__ao *ao
+      - the callback function pointer(s), which
+        should be named callback or callback_*.
+  * shared information fields or ones used for returning information
+    to the calling operation
+  * private fields
+These sections should be clearly demarcated by comments.
+
+An asynchronous operation should normally have an idempotent stop or
+cancel function.  It should normally also have an _init function for
+its state struct, which arranges that the stop is a no-op.
+
+The permitted order of calls into your ao operation's methods must be
+documented in comments, if it is nontrivial.
+
+
+When using an ao sub-operation, you should normally:
+ * Physically include the sub-operation state struct in your
+   own state struct;
+ * Use CONTAINER_OF to find your own state struct at the start of
+   your implementations of the sub-operation callback functions;
+ * Unconditionally initialise the sub-operation's struct (with its
+   _init method) in your own _init method.
+ * Unconditionally cancel or destroy the sub-operation in your own
+   cancel or destroy method.
+
+
+FORMATTING AND NAMING
+---------------------
+
+Blatantly copied from qemu and linux with few modifications.
+
+
+1. Whitespace
+
+Of course, the most important aspect in any coding style is whitespace.
+Crusty old coders who have trouble spotting the glasses on their noses
+can tell the difference between a tab and eight spaces from a distance
+of approximately fifteen parsecs.  Many a flamewar have been fought and
+lost on this issue.
+
+Libxenlight indents are four spaces.  Tabs are never used, except in
+Makefiles where they have been irreversibly coded into the syntax.
+Spaces of course are superior to tabs because:
+
+ - You have just one way to specify whitespace, not two.  Ambiguity breeds
+   mistakes.
+ - The confusion surrounding 'use tabs to indent, spaces to justify' is gone.
+ - Tab indents push your code to the right, making your screen seriously
+   unbalanced.
+ - Tabs will be rendered incorrectly on editors who are misconfigured not
+   to use tab stops of eight positions.
+ - Tabs are rendered badly in patches, causing off-by-one errors in almost
+   every line.
+ - It is the libxenlight coding style.
+
+Do not leave whitespace dangling off the ends of lines.
+
+
+2. Line width
+
+Lines are limited to 75 characters.
+
+Rationale:
+ - Some people like to tile their 24" screens with a 6x4 matrix of 80x24
+   xterms and use vi in all of them.  The best way to punish them is to
+   let them keep doing it.
+ - In an 80 column terminal, some room needs to be left for > quoting
+   characters, +/- diff characters, and so on, in emails.
+ - Code and especially patches is much more readable if limited to a sane
+   line length.  Eighty is traditional.
+ - It is the libxenlight coding style.
+
+
+3. Naming
+
+C is a Spartan language, and so should your naming be.  Unlike Modula-2
+and Pascal programmers, C programmers do not use cute names like
+ThisVariableIsATemporaryCounter.  A C programmer would call that
+variable "tmp", which is much easier to write, and not the least more
+difficult to understand.
+
+HOWEVER, while mixed-case names are frowned upon, descriptive names for
+global variables are a must.  To call a global function "foo" is a
+shooting offense.
+
+GLOBAL variables (to be used only if you _really_ need them) need to
+have descriptive names, as do global functions.  If you have a function
+that counts the number of active users, you should call that
+"count_active_users()" or similar, you should _not_ call it "cntusr()".
+
+Encoding the type of a function into the name (so-called Hungarian
+notation) is brain damaged - the compiler knows the types anyway and can
+check those, and it only confuses the programmer.
+
+LOCAL variable names should be short, and to the point.  If you have
+some random integer loop counter, it should probably be called "i".
+Calling it "loop_counter" is non-productive, if there is no chance of it
+being mis-understood.  Similarly, "tmp" can be just about any type of
+variable that is used to hold a temporary value.
+
+Local variables used to store return values should have descriptive name
+like "rc" or "ret". Following the same reasoning the label used as exit
+path should be called "out".
+
+Function arguments which are used to return values to the caller
+should be suffixed `_r' or `_out'.
+
+Variables, type names and function names are
+lower_case_with_underscores.
+Type names and function names use the prefix libxl__ when internal to
+libxenlight and libxl_ when exported in libxl.h.
+Xl should avoid using libxl_ and libxl__ as prefix for its own function
+names.
+
+When wrapping standard library functions, use the prefix libxl_ to alert
+readers that they are seeing a wrapped version; otherwise avoid this prefix.
+
+Typedefs are used to eliminate the redundant 'struct' keyword.
+It is the libxenlight coding style.
+
+
+4. Statements
+
+Don't put multiple statements on a single line.
+Don't put multiple assignments on a single line either.
+Error code paths with an if statement and a goto or a return on the same
+line are allowed. Examples:
+
+    if (rc) goto out;
+    if (rc < 0) return;
+
+Libxenlight coding style is super simple.  Avoid tricky expressions.
+
+
+5. Block structure
+
+Every indented statement is braced, but blocks that contain just one
+statement may have the braces omitted.  To avoid confusion, either all
+the blocks in an if...else chain have braces, or none of them do.
+
+The opening brace is on the line that contains the control flow
+statement that introduces the new block; the closing brace is on the
+same line as the else keyword, or on a line by itself if there is no
+else keyword.  Examples:
+
+    if (a == 5) {
+        printf("a was 5.\n");
+    } else if (a == 6) {
+        printf("a was 6.\n");
+    } else {
+        printf("a was something else entirely.\n");
+    }
+
+    if (a == 5)
+        printf("a was 5.\n");
+
+An exception is the opening brace for a function; for reasons of tradition
+and clarity it comes on a line by itself:
+
+    void a_function(void)
+    {
+        do_something();
+    }
+
+Rationale: a consistent (except for functions...) bracing style reduces
+ambiguity and avoids needless churn when lines are added or removed.
+Furthermore, it is the libxenlight coding style.
+

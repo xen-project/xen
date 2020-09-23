@@ -26,3 +26,5 @@ LIBS_LIBS += vchan
 USELIBS_vchan := toollog store gnttab evtchn
 LIBS_LIBS += stat
 USELIBS_stat := ctrl store
+LIBS_LIBS += light
+USELIBS_light := toollog evtchn toolcore ctrl store hypfs guest

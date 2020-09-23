@@ -50,10 +50,10 @@ xenlight.mli: xenlight.mli.in _libxl_types.mli.in
 	  < xenlight.mli.in > xenlight.mli.tmp
 	$(Q)mv xenlight.mli.tmp xenlight.mli
 
-_libxl_types.ml.in _libxl_types.mli.in _libxl_types.inc: genwrap.py $(XEN_ROOT)/tools/libxl/libxl_types.idl \
-                $(XEN_ROOT)/tools/libxl/idl.py
-	PYTHONPATH=$(XEN_ROOT)/tools/libxl $(PYTHON) genwrap.py \
-		$(XEN_ROOT)/tools/libxl/libxl_types.idl \
+_libxl_types.ml.in _libxl_types.mli.in _libxl_types.inc: genwrap.py $(XEN_ROOT)/tools/libs/light/libxl_types.idl \
+                $(XEN_ROOT)/tools/libs/light/idl.py
+	PYTHONPATH=$(XEN_ROOT)/tools/libs/light $(PYTHON) genwrap.py \
+		$(XEN_ROOT)/tools/libs/light/libxl_types.idl \
 		_libxl_types.mli.in _libxl_types.ml.in _libxl_types.inc
 
 libs: $(LIBS)

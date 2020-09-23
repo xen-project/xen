@@ -8,7 +8,7 @@ GOXL_INSTALL_DIR = $(GOCODE_DIR)/src/$(XEN_GOCODE_URL)/xenlight/
 
 GO ?= go
 
-LIBXL_SRC_DIR = ../../libxl
+LIBXL_SRC_DIR = $(XEN_ROOT)/tools/libs/light
 
 .PHONY: all
 all: build

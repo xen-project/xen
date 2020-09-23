@@ -15,6 +15,7 @@ SUBDIRS-y += hypfs
 SUBDIRS-y += store
 SUBDIRS-y += stat
 SUBDIRS-$(CONFIG_Linux) += vchan
+SUBDIRS-y += light
 
 ifeq ($(CONFIG_RUMP),y)
 SUBDIRS-y := toolcore
