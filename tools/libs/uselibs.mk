@@ -28,3 +28,6 @@ LIBS_LIBS += stat
 USELIBS_stat := ctrl store
 LIBS_LIBS += light
 USELIBS_light := toollog evtchn toolcore ctrl store hypfs guest
+LIBS_LIBS += util
+USELIBS_util := light
+FILENAME_util := xlutil

@@ -15,8 +15,6 @@ XEN_INCLUDE        = $(XEN_ROOT)/tools/include
 
 include $(XEN_ROOT)/tools/libs/uselibs.mk
 
-XEN_libxenutil     = $(XEN_ROOT)/tools/libxl
-
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
 XENSTORE_XENSTORED ?= y
@@ -116,11 +114,6 @@ PY_CFLAGS += $(PY_NOOPT_CFLAGS)
 else
 CFLAGS += -O2 -fomit-frame-pointer
 endif
-
-CFLAGS_libxenutil = -I$(XEN_libxenutil)
-SHDEPS_libxenutil = $(SHLIB_libxenlight)
-LDLIBS_libxenutil = $(SHDEPS_libxenutil) $(XEN_libxenutil)/libxlutil$(libextension)
-SHLIB_libxenutil  = $(SHDEPS_libxenutil) -Wl,-rpath-link=$(XEN_libxenutil)
 
 CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
 
