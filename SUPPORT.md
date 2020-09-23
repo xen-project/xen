@@ -62,8 +62,8 @@ supported in this document.
 
     Status, AMD IOMMU: Supported
     Status, Intel VT-d: Supported
-    Status, ARM SMMUv1: Supported
-    Status, ARM SMMUv2: Supported
+    Status, ARM SMMUv1: Supported, not security supported
+    Status, ARM SMMUv2: Supported, not security supported
     Status, Renesas IPMMU-VMSA: Supported, not security supported
 
 ### ARM/GICv3 ITS
