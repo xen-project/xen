@@ -15,7 +15,7 @@ XEN_INCLUDE        = $(XEN_ROOT)/tools/include
 
 include $(XEN_ROOT)/tools/libs/uselibs.mk
 
-XEN_libxlutil      = $(XEN_ROOT)/tools/libxl
+XEN_libxenutil     = $(XEN_ROOT)/tools/libxl
 
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
@@ -116,10 +116,10 @@ else
 CFLAGS += -O2 -fomit-frame-pointer
 endif
 
-CFLAGS_libxlutil = -I$(XEN_libxlutil)
-SHDEPS_libxlutil = $(SHLIB_libxenlight)
-LDLIBS_libxlutil = $(SHDEPS_libxlutil) $(XEN_libxlutil)/libxlutil$(libextension)
-SHLIB_libxlutil  = $(SHDEPS_libxlutil) -Wl,-rpath-link=$(XEN_libxlutil)
+CFLAGS_libxenutil = -I$(XEN_libxenutil)
+SHDEPS_libxenutil = $(SHLIB_libxenlight)
+LDLIBS_libxenutil = $(SHDEPS_libxenutil) $(XEN_libxenutil)/libxlutil$(libextension)
+SHLIB_libxenutil  = $(SHDEPS_libxenutil) -Wl,-rpath-link=$(XEN_libxenutil)
 
 CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
 
