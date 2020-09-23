@@ -722,6 +722,7 @@ int writev_exact(int fd, const struct iovec *iov, int iovcnt)
                     if ( !local_iov )
                     {
                         saved_errno = ENOMEM;
+                        rc = -1;
                         goto out;
                     }
 
