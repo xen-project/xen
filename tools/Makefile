@@ -237,7 +237,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	$$source/configure --enable-xen --target-list=i386-softmmu \
 		$(QEMU_XEN_ENABLE_DEBUG) \
 		$$enable_trace_backend \
-		--prefix=$(LIBEXEC) \
+		--prefix=$(prefix) \
 		--libdir=$(LIBEXEC_LIB) \
 		--includedir=$(LIBEXEC_INC) \
 		--extra-cflags="-DXC_WANT_COMPAT_EVTCHN_API=1 \
@@ -249,6 +249,10 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--bindir=$(LIBEXEC_BIN) \
 		--datadir=$(SHAREDIR)/qemu-xen \
 		--localstatedir=$(localstatedir) \
+		--docdir=$(LIBEXEC)/share/doc \
+		--mandir=$(LIBEXEC)/share/man \
+		--libexecdir=$(LIBEXEC)/libexec \
+		--firmwarepath=$(LIBEXEC)/share/qemu-firmware \
 		--disable-kvm \
 		--disable-docs \
 		--disable-guest-agent \
