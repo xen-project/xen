@@ -92,27 +92,29 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 void __iomem *
 acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 {
-	if (system_state >= SYS_STATE_boot) {
-		mfn_t mfn = _mfn(PFN_DOWN(phys));
-		unsigned int offs = phys & (PAGE_SIZE - 1);
+	void *ptr;
+	mfn_t mfn = _mfn(PFN_DOWN(phys));
+	unsigned int offs = PAGE_OFFSET(phys);
 
-		/* The low first Mb is always mapped on x86. */
-		if (IS_ENABLED(CONFIG_X86) && !((phys + size - 1) >> 20))
-			return __va(phys);
-		return __vmap(&mfn, PFN_UP(offs + size), 1, 1,
-			      ACPI_MAP_MEM_ATTR, VMAP_DEFAULT) + offs;
-	}
-	return __acpi_map_table(phys, size);
+	/* Try the arch specific implementation first */
+	ptr = __acpi_map_table(phys, size);
+	if (ptr)
+		return ptr;
+
+	/* No common implementation for early boot map */
+	if (unlikely(system_state < SYS_STATE_boot))
+		return NULL;
+
+	ptr = __vmap(&mfn, PFN_UP(offs + size), 1, 1,
+		     ACPI_MAP_MEM_ATTR, VMAP_DEFAULT);
+
+	return !ptr ? NULL : (ptr + offs);
 }
 
 void acpi_os_unmap_memory(void __iomem * virt, acpi_size size)
 {
-	if (IS_ENABLED(CONFIG_X86) &&
-	    (unsigned long)virt >= DIRECTMAP_VIRT_START &&
-	    (unsigned long)virt < DIRECTMAP_VIRT_END) {
-		ASSERT(!((__pa(virt) + size - 1) >> 20));
+	if (__acpi_unmap_table(virt, size))
 		return;
-	}
 
 	if (system_state >= SYS_STATE_boot)
 		vunmap((void *)((unsigned long)virt & PAGE_MASK));

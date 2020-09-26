@@ -30,6 +30,10 @@ char *__acpi_map_table(paddr_t phys, unsigned long size)
     unsigned long base, offset, mapped_size;
     int idx;
 
+    /* No arch specific implementation after early boot */
+    if ( system_state >= SYS_STATE_boot )
+        return NULL;
+
     offset = phys & (PAGE_SIZE - 1);
     mapped_size = PAGE_SIZE - offset;
     set_fixmap(FIXMAP_ACPI_BEGIN, maddr_to_mfn(phys), PAGE_HYPERVISOR);
@@ -47,6 +51,14 @@ char *__acpi_map_table(paddr_t phys, unsigned long size)
     }
 
     return ((char *) base + offset);
+}
+
+bool __acpi_unmap_table(const void *ptr, unsigned long size)
+{
+    vaddr_t vaddr = (vaddr_t)ptr;
+
+    return ((vaddr >= FIXMAP_ADDR(FIXMAP_ACPI_BEGIN)) &&
+            (vaddr < (FIXMAP_ADDR(FIXMAP_ACPI_END) + PAGE_SIZE)));
 }
 
 /* True to indicate PSCI 0.2+ is implemented */
