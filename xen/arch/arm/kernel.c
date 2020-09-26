@@ -307,7 +307,7 @@ static __init int kernel_decompress(struct bootmodule *mod)
      * Free the original kernel, update the pointers to the
      * decompressed kernel
      */
-    dt_unreserved_regions(addr, addr + size, init_domheap_pages, 0);
+    fw_unreserved_regions(addr, addr + size, init_domheap_pages, 0);
 
     return 0;
 }
