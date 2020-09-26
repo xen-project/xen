@@ -25,40 +25,79 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 
+static bool fixmap_inuse;
+
 char *__acpi_map_table(paddr_t phys, unsigned long size)
 {
-    unsigned long base, offset, mapped_size;
-    int idx;
+    unsigned long base, offset;
+    mfn_t mfn;
+    unsigned int idx;
 
     /* No arch specific implementation after early boot */
     if ( system_state >= SYS_STATE_boot )
         return NULL;
 
     offset = phys & (PAGE_SIZE - 1);
-    mapped_size = PAGE_SIZE - offset;
-    set_fixmap(FIXMAP_ACPI_BEGIN, maddr_to_mfn(phys), PAGE_HYPERVISOR);
-    base = FIXMAP_ADDR(FIXMAP_ACPI_BEGIN);
+    base = FIXMAP_ADDR(FIXMAP_ACPI_BEGIN) + offset;
 
-    /* Most cases can be covered by the below. */
+    /* Check the fixmap is big enough to map the region */
+    if ( (FIXMAP_ADDR(FIXMAP_ACPI_END) + PAGE_SIZE - base) < size )
+        return NULL;
+
+    /* With the fixmap, we can only map one region at the time */
+    if ( fixmap_inuse )
+        return NULL;
+
+    fixmap_inuse = true;
+
+    size += offset;
+    mfn = maddr_to_mfn(phys);
     idx = FIXMAP_ACPI_BEGIN;
-    while ( mapped_size < size )
-    {
-        if ( ++idx > FIXMAP_ACPI_END )
-            return NULL;    /* cannot handle this */
-        phys += PAGE_SIZE;
-        set_fixmap(idx, maddr_to_mfn(phys), PAGE_HYPERVISOR);
-        mapped_size += PAGE_SIZE;
-    }
 
-    return ((char *) base + offset);
+    do {
+        set_fixmap(idx, mfn, PAGE_HYPERVISOR);
+        size -= min(size, (unsigned long)PAGE_SIZE);
+        mfn = mfn_add(mfn, 1);
+        idx++;
+    } while ( size > 0 );
+
+    return (char *)base;
 }
 
 bool __acpi_unmap_table(const void *ptr, unsigned long size)
 {
     vaddr_t vaddr = (vaddr_t)ptr;
+    unsigned int idx;
 
-    return ((vaddr >= FIXMAP_ADDR(FIXMAP_ACPI_BEGIN)) &&
-            (vaddr < (FIXMAP_ADDR(FIXMAP_ACPI_END) + PAGE_SIZE)));
+    /* We are only handling fixmap address in the arch code */
+    if ( (vaddr < FIXMAP_ADDR(FIXMAP_ACPI_BEGIN)) ||
+         (vaddr >= (FIXMAP_ADDR(FIXMAP_ACPI_END) + PAGE_SIZE)) )
+        return false;
+
+    /*
+     * __acpi_map_table() will always return a pointer in the first page
+     * for the ACPI fixmap region. The caller is expected to free with
+     * the same address.
+     */
+    ASSERT((vaddr & PAGE_MASK) == FIXMAP_ADDR(FIXMAP_ACPI_BEGIN));
+
+    /* The region allocated fit in the ACPI fixmap region. */
+    ASSERT(size < (FIXMAP_ADDR(FIXMAP_ACPI_END) + PAGE_SIZE - vaddr));
+    ASSERT(fixmap_inuse);
+
+    fixmap_inuse = false;
+
+    size += vaddr - FIXMAP_ADDR(FIXMAP_ACPI_BEGIN);
+    idx = FIXMAP_ACPI_BEGIN;
+
+    do
+    {
+        clear_fixmap(idx);
+        size -= min(size, (unsigned long)PAGE_SIZE);
+        idx++;
+    } while ( size > 0 );
+
+    return true;
 }
 
 /* True to indicate PSCI 0.2+ is implemented */
