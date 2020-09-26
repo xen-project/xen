@@ -987,7 +987,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     system_state = SYS_STATE_active;
 
-    create_domUs();
+    if ( acpi_disabled )
+        create_domUs();
 
     domain_unpause_by_systemcontroller(dom0);
 
