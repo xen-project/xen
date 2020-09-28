@@ -268,16 +268,6 @@ static int hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
     return 0;
 }
 
-static void __maybe_unused
-hpet_msi_read(struct hpet_event_channel *ch, struct msi_msg *msg)
-{
-    msg->data = hpet_read32(HPET_Tn_ROUTE(ch->idx));
-    msg->address_lo = hpet_read32(HPET_Tn_ROUTE(ch->idx) + 4);
-    msg->address_hi = MSI_ADDR_BASE_HI;
-    if ( iommu_intremap )
-        iommu_read_msi_from_ire(&ch->msi, msg);
-}
-
 static unsigned int hpet_msi_startup(struct irq_desc *desc)
 {
     hpet_msi_unmask(desc);
