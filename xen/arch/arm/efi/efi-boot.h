@@ -420,7 +420,7 @@ static void __init efi_arch_memory_setup(void)
 
 static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
                                            CHAR16 *cmdline_options,
-                                           char *cfgfile_options)
+                                           const char *cfgfile_options)
 {
     union string name;
     char *buf;
@@ -481,8 +481,9 @@ static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
     efi_bs->FreePool(buf);
 }
 
-static void __init efi_arch_handle_module(struct file *file, const CHAR16 *name,
-                                          char *options)
+static void __init efi_arch_handle_module(const struct file *file,
+                                          const CHAR16 *name,
+                                          const char *options)
 {
     int node;
     int chosen;

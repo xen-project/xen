@@ -294,7 +294,7 @@ static void __init efi_arch_cfg_file_late(EFI_FILE_HANDLE dir_handle, char *sect
 
 static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
                                            CHAR16 *cmdline_options,
-                                           char *cfgfile_options)
+                                           const char *cfgfile_options)
 {
     union string name;
 
@@ -635,8 +635,9 @@ static void __init efi_arch_memory_setup(void)
 #undef l2_4G_offset
 }
 
-static void __init efi_arch_handle_module(struct file *file, const CHAR16 *name,
-                                          char *options)
+static void __init efi_arch_handle_module(const struct file *file,
+                                          const CHAR16 *name,
+                                          const char *options)
 {
     union string local_name;
     void *ptr;

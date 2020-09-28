@@ -120,7 +120,7 @@ static char *split_string(char *s);
 static CHAR16 *s2w(union string *str);
 static char *w2s(const union string *str);
 static bool read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
-                      struct file *file, char *options);
+                      struct file *file, const char *options);
 static size_t wstrlen(const CHAR16 * s);
 static int set_color(u32 mask, int bpp, u8 *pos, u8 *sz);
 static bool match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2);
@@ -540,7 +540,7 @@ static char * __init split_string(char *s)
 }
 
 static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
-                             struct file *file, char *options)
+                             struct file *file, const char *options)
 {
     EFI_FILE_HANDLE FileHandle = NULL;
     UINT64 size;
@@ -1101,7 +1101,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     union string section = { NULL }, name;
     bool base_video = false;
-    char *option_str;
+    const char *option_str;
     bool use_cfg_file;
 
     __set_bit(EFI_BOOT, &efi_flags);
