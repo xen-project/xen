@@ -74,7 +74,8 @@ int shadow_domctl(struct domain *d,
                   struct xen_domctl_shadow_op *sc,
                   XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 
-/* Call when destroying a domain */
+/* Call when destroying a vcpu/domain */
+void shadow_vcpu_teardown(struct vcpu *v);
 void shadow_teardown(struct domain *d, bool *preempted);
 
 /* Call once all of the references to the domain have gone away */

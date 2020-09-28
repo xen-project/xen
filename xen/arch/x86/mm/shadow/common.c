@@ -2779,6 +2779,34 @@ int shadow_enable(struct domain *d, u32 mode)
     return rv;
 }
 
+void shadow_vcpu_teardown(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+
+    paging_lock(d);
+
+    if ( !paging_mode_shadow(d) || !v->arch.paging.mode )
+        goto out;
+
+    v->arch.paging.mode->shadow.detach_old_tables(v);
+#ifdef CONFIG_HVM
+    if ( shadow_mode_external(d) )
+    {
+        mfn_t mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
+
+        if ( mfn_x(mfn) )
+            sh_destroy_monitor_table(
+                v, mfn,
+                v->arch.paging.mode->shadow.shadow_levels);
+
+        v->arch.hvm.monitor_table = pagetable_null();
+    }
+#endif
+
+ out:
+    paging_unlock(d);
+}
+
 void shadow_teardown(struct domain *d, bool *preempted)
 /* Destroy the shadow pagetables of this domain and free its shadow memory.
  * Should only be called for dying domains. */
@@ -2789,31 +2817,11 @@ void shadow_teardown(struct domain *d, bool *preempted)
     ASSERT(d->is_dying);
     ASSERT(d != current->domain);
 
+    /* TODO - Remove when the teardown path is better structured. */
+    for_each_vcpu ( d, v )
+        shadow_vcpu_teardown(v);
+
     paging_lock(d);
-
-    if ( shadow_mode_enabled(d) )
-    {
-        /* Release the shadow and monitor tables held by each vcpu */
-        for_each_vcpu(d, v)
-        {
-            if ( v->arch.paging.mode )
-            {
-                v->arch.paging.mode->shadow.detach_old_tables(v);
-#ifdef CONFIG_HVM
-                if ( shadow_mode_external(d) )
-                {
-                    mfn_t mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
-
-                    if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
-                        sh_destroy_monitor_table(
-                            v, mfn,
-                            v->arch.paging.mode->shadow.shadow_levels);
-                    v->arch.hvm.monitor_table = pagetable_null();
-                }
-#endif /* CONFIG_HVM */
-            }
-        }
-    }
 
 #if (SHADOW_OPTIMIZATIONS & (SHOPT_VIRTUAL_TLB|SHOPT_OUT_OF_SYNC))
     /* Free the virtual-TLB array attached to each vcpu */

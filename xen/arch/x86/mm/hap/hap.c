@@ -563,30 +563,37 @@ void hap_final_teardown(struct domain *d)
     paging_unlock(d);
 }
 
+void hap_vcpu_teardown(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    mfn_t mfn;
+
+    paging_lock(d);
+
+    if ( !paging_mode_hap(d) || !v->arch.paging.mode )
+        goto out;
+
+    mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
+    if ( mfn_x(mfn) )
+        hap_destroy_monitor_table(v, mfn);
+    v->arch.hvm.monitor_table = pagetable_null();
+
+ out:
+    paging_unlock(d);
+}
+
 void hap_teardown(struct domain *d, bool *preempted)
 {
     struct vcpu *v;
-    mfn_t mfn;
 
     ASSERT(d->is_dying);
     ASSERT(d != current->domain);
 
-    paging_lock(d); /* Keep various asserts happy */
+    /* TODO - Remove when the teardown path is better structured. */
+    for_each_vcpu ( d, v )
+        hap_vcpu_teardown(v);
 
-    if ( paging_mode_enabled(d) )
-    {
-        /* release the monitor table held by each vcpu */
-        for_each_vcpu ( d, v )
-        {
-            if ( paging_get_hostmode(v) && paging_mode_external(d) )
-            {
-                mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
-                if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
-                    hap_destroy_monitor_table(v, mfn);
-                v->arch.hvm.monitor_table = pagetable_null();
-            }
-        }
-    }
+    paging_lock(d); /* Keep various asserts happy */
 
     if ( d->arch.paging.hap.total_pages != 0 )
     {

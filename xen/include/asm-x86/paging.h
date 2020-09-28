@@ -237,7 +237,8 @@ int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
 /* Helper hypercall for dealing with continuations. */
 long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
 
-/* Call when destroying a domain */
+/* Call when destroying a vcpu/domain */
+void paging_vcpu_teardown(struct vcpu *v);
 int paging_teardown(struct domain *d);
 
 /* Call once all of the references to the domain have gone away */

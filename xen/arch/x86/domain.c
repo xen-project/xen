@@ -588,6 +588,7 @@ int arch_vcpu_create(struct vcpu *v)
     return rc;
 
  fail:
+    paging_vcpu_teardown(v);
     vcpu_destroy_fpu(v);
     xfree(v->arch.msrs);
     v->arch.msrs = NULL;

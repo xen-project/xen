@@ -794,6 +794,14 @@ long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 }
 #endif /* PG_log_dirty */
 
+void paging_vcpu_teardown(struct vcpu *v)
+{
+    if ( hap_enabled(v->domain) )
+        hap_vcpu_teardown(v);
+    else
+        shadow_vcpu_teardown(v);
+}
+
 /* Call when destroying a domain */
 int paging_teardown(struct domain *d)
 {
