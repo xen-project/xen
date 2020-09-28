@@ -47,16 +47,14 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
     else
 #endif
     {
-        intpte_t t = old;
-
         for ( ; ; )
         {
-            intpte_t _new = new;
+            intpte_t _new = new, t;
 
             if ( preserve_ad )
                 _new |= old & (_PAGE_ACCESSED | _PAGE_DIRTY);
 
-            paging_cmpxchg_guest_entry(v, p, &t, _new, mfn);
+            t = paging_cmpxchg_guest_entry(v, p, old, _new, mfn);
 
             if ( t == old )
                 break;

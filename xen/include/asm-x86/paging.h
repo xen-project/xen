@@ -102,8 +102,8 @@ struct shadow_paging_mode {
 #ifdef CONFIG_PV
     void          (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
                                             intpte_t new, mfn_t gmfn);
-    void          (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
-                                            intpte_t *old, intpte_t new,
+    intpte_t      (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
+                                            intpte_t old, intpte_t new,
                                             mfn_t gmfn);
 #endif
 #ifdef CONFIG_HVM
@@ -351,16 +351,15 @@ static inline void paging_write_guest_entry(
  * true if not.  N.B. caller should check the value of "old" to see if the
  * cmpxchg itself was successful.
  */
-static inline void paging_cmpxchg_guest_entry(
-    struct vcpu *v, intpte_t *p, intpte_t *old, intpte_t new, mfn_t gmfn)
+static inline intpte_t paging_cmpxchg_guest_entry(
+    struct vcpu *v, intpte_t *p, intpte_t old, intpte_t new, mfn_t gmfn)
 {
 #ifdef CONFIG_SHADOW_PAGING
     if ( unlikely(paging_mode_shadow(v->domain)) && paging_get_hostmode(v) )
-        paging_get_hostmode(v)->shadow.cmpxchg_guest_entry(v, p, old,
-                                                           new, gmfn);
-    else
+        return paging_get_hostmode(v)->shadow.cmpxchg_guest_entry(v, p, old,
+                                                                  new, gmfn);
 #endif
-        *old = cmpxchg(p, *old, new);
+    return cmpxchg(p, old, new);
 }
 
 #endif /* CONFIG_PV */

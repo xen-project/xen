@@ -39,22 +39,22 @@ sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
 
 /*
  * Cmpxchg a new value into the guest pagetable, and update the shadows
- * appropriately.
- * N.B. caller should check the value of "old" to see if the cmpxchg itself
- * was successful.
+ * appropriately.  Returns the previous entry found, which the caller is
+ * expected to check to see if the cmpxchg was successful.
  */
-void
-sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t *old,
+intpte_t
+sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t old,
                        intpte_t new, mfn_t gmfn)
 {
     intpte_t t;
 
     paging_lock(v->domain);
-    t = cmpxchg(p, *old, new);
-    if ( t == *old )
+    t = cmpxchg(p, old, new);
+    if ( t == old )
         sh_validate_guest_entry(v, gmfn, p, sizeof(new));
-    *old = t;
     paging_unlock(v->domain);
+
+    return t;
 }
 
 /*

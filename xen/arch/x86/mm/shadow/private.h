@@ -398,8 +398,8 @@ int shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
 /* Functions that atomically write PV guest PT entries */
 void sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new,
                           mfn_t gmfn);
-void sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t *old,
-                            intpte_t new, mfn_t gmfn);
+intpte_t sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t old,
+                                intpte_t new, mfn_t gmfn);
 
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.
  * Called to initialize paging structures if the paging mode
