@@ -273,6 +273,59 @@ static int __init parse_extra_guest_irqs(const char *s)
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
 /*
+ * Release resources held by a domain.  There may or may not be live
+ * references to the domain, and it may or may not be fully constructed.
+ *
+ * d->is_dying differing between DOMDYING_dying and DOMDYING_dead can be used
+ * to determine if live references to the domain exist, and also whether
+ * continuations are permitted.
+ *
+ * If d->is_dying is DOMDYING_dead, this must not return non-zero.
+ */
+static int domain_teardown(struct domain *d)
+{
+    BUG_ON(!d->is_dying);
+
+    /*
+     * This hypercall can take minutes of wallclock time to complete.  This
+     * logic implements a co-routine, stashing state in struct domain across
+     * hypercall continuation boundaries.
+     */
+    switch ( d->teardown.val )
+    {
+        /*
+         * Record the current progress.  Subsequent hypercall continuations
+         * will logically restart work from this point.
+         *
+         * PROGRESS() markers must not be in the middle of loops.  The loop
+         * variable isn't preserved across a continuation.
+         *
+         * To avoid redundant work, there should be a marker before each
+         * function which may return -ERESTART.
+         */
+#define PROGRESS(x)                             \
+        d->teardown.val = PROG_ ## x;           \
+        /* Fallthrough */                       \
+    case PROG_ ## x
+
+        enum {
+            PROG_done = 1,
+        };
+
+    case 0:
+    PROGRESS(done):
+        break;
+
+#undef PROGRESS
+
+    default:
+        BUG();
+    }
+
+    return 0;
+}
+
+/*
  * Destroy a domain once all references to it have been dropped.  Used either
  * from the RCU path, or from the domain_create() error path before the domain
  * is inserted into the domlist.
@@ -552,6 +605,10 @@ struct domain *domain_create(domid_t domid,
     if ( init_status & INIT_watchdog )
         watchdog_domain_destroy(d);
 
+    /* Must not hit a continuation in this context. */
+    if ( domain_teardown(d) )
+        ASSERT_UNREACHABLE();
+
     _domain_destroy(d);
 
     return ERR_PTR(err);
@@ -732,6 +789,9 @@ int domain_kill(struct domain *d)
         domain_set_outstanding_pages(d, 0);
         /* fallthrough */
     case DOMDYING_dying:
+        rc = domain_teardown(d);
+        if ( rc )
+            break;
         rc = evtchn_destroy(d);
         if ( rc )
             break;

@@ -525,6 +525,14 @@ struct domain
     /* Argo interdomain communication support */
     struct argo_domain *argo;
 #endif
+
+    /*
+     * Continuation information for domain_teardown().  All fields entirely
+     * private.
+     */
+    struct {
+        unsigned int val;
+    } teardown;
 };
 
 static inline struct page_list_head *page_to_list(
