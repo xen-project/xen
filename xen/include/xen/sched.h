@@ -532,6 +532,7 @@ struct domain
      */
     struct {
         unsigned int val;
+        struct vcpu *vcpu;
     } teardown;
 };
 

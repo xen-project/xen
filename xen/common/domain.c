@@ -130,6 +130,22 @@ static void vcpu_info_reset(struct vcpu *v)
     v->vcpu_info_mfn = INVALID_MFN;
 }
 
+/*
+ * Release resources held by a vcpu.  There may or may not be live references
+ * to the vcpu, and it may or may not be fully constructed.
+ *
+ * If d->is_dying is DOMDYING_dead, this must not return non-zero.
+ */
+static int vcpu_teardown(struct vcpu *v)
+{
+    return 0;
+}
+
+/*
+ * Destoy a vcpu once all references to it have been dropped.  Used either
+ * from domain_destroy()'s RCU path, or from the vcpu_create() error path
+ * before the vcpu is placed on the domain's vcpu list.
+ */
 static void vcpu_destroy(struct vcpu *v)
 {
     free_vcpu_struct(v);
@@ -206,6 +222,11 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     sched_destroy_vcpu(v);
  fail_wq:
     destroy_waitqueue_vcpu(v);
+
+    /* Must not hit a continuation in this context. */
+    if ( vcpu_teardown(v) )
+        ASSERT_UNREACHABLE();
+
     vcpu_destroy(v);
 
     return NULL;
@@ -284,6 +305,9 @@ custom_param("extra_guest_irqs", parse_extra_guest_irqs);
  */
 static int domain_teardown(struct domain *d)
 {
+    struct vcpu *v;
+    int rc;
+
     BUG_ON(!d->is_dying);
 
     /*
@@ -298,7 +322,9 @@ static int domain_teardown(struct domain *d)
          * will logically restart work from this point.
          *
          * PROGRESS() markers must not be in the middle of loops.  The loop
-         * variable isn't preserved across a continuation.
+         * variable isn't preserved across a continuation.  PROGRESS_VCPU()
+         * markers may be used in the middle of for_each_vcpu() loops, which
+         * preserve v but no other loop variables.
          *
          * To avoid redundant work, there should be a marker before each
          * function which may return -ERESTART.
@@ -308,14 +334,32 @@ static int domain_teardown(struct domain *d)
         /* Fallthrough */                       \
     case PROG_ ## x
 
+#define PROGRESS_VCPU(x)                        \
+        d->teardown.val = PROG_vcpu_ ## x;      \
+        d->teardown.vcpu = v;                   \
+        /* Fallthrough */                       \
+    case PROG_vcpu_ ## x:                       \
+        v = d->teardown.vcpu
+
         enum {
-            PROG_done = 1,
+            PROG_vcpu_teardown = 1,
+            PROG_done,
         };
 
     case 0:
+        for_each_vcpu ( d, v )
+        {
+            PROGRESS_VCPU(teardown);
+
+            rc = vcpu_teardown(v);
+            if ( rc )
+                return rc;
+        }
+
     PROGRESS(done):
         break;
 
+#undef PROGRESS_VCPU
 #undef PROGRESS
 
     default:
