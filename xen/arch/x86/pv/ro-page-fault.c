@@ -168,10 +168,9 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
     if ( p_old )
     {
         ol1e = l1e_from_intpte(old);
-        if ( !paging_cmpxchg_guest_entry(v, &l1e_get_intpte(*pl1e),
-                                         &old, l1e_get_intpte(nl1e), mfn) )
-            ret = X86EMUL_UNHANDLEABLE;
-        else if ( l1e_get_intpte(ol1e) == old )
+        paging_cmpxchg_guest_entry(v, &l1e_get_intpte(*pl1e), &old,
+                                   l1e_get_intpte(nl1e), mfn);
+        if ( l1e_get_intpte(ol1e) == old )
             ret = X86EMUL_OKAY;
         else
         {

@@ -43,9 +43,7 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
 
 #ifndef PTE_UPDATE_WITH_CMPXCHG
     if ( !preserve_ad )
-    {
-        rv = paging_write_guest_entry(v, p, new, mfn);
-    }
+        paging_write_guest_entry(v, p, new, mfn);
     else
 #endif
     {
@@ -58,14 +56,7 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
             if ( preserve_ad )
                 _new |= old & (_PAGE_ACCESSED | _PAGE_DIRTY);
 
-            rv = paging_cmpxchg_guest_entry(v, p, &t, _new, mfn);
-            if ( unlikely(rv == 0) )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "Failed to update %" PRIpte " -> %" PRIpte
-                         ": saw %" PRIpte "\n", old, _new, t);
-                break;
-            }
+            paging_cmpxchg_guest_entry(v, p, &t, _new, mfn);
 
             if ( t == old )
                 break;

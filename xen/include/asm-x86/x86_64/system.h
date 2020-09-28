@@ -59,47 +59,4 @@ static always_inline __uint128_t cmpxchg16b_local_(
     __cmpxchg16b(_p, (void *)(o), (void *)(n));            \
 })
 
-/*
- * This function causes value _o to be changed to _n at location _p.
- * If this access causes a fault then we return 1, otherwise we return 0.
- * If no fault occurs then _o is updated to the value we saw at _p. If this
- * is the same as the initial value of _o then _n is written to location _p.
- */
-#define __cmpxchg_user(_p, _o, _n, _oppre, _regtype)                    \
-    stac();                                                             \
-    asm volatile (                                                      \
-        "1: lock cmpxchg %"_oppre"[new], %[ptr]\n"                      \
-        "2:\n"                                                          \
-        ".section .fixup,\"ax\"\n"                                      \
-        "3:     movl $1, %[rc]\n"                                       \
-        "       jmp 2b\n"                                               \
-        ".previous\n"                                                   \
-        _ASM_EXTABLE(1b, 3b)                                            \
-        : "+a" (_o), [rc] "=r" (_rc),                                   \
-          [ptr] "+m" (*(volatile typeof(*(_p)) *)(_p))                  \
-        : [new] _regtype (_n), "[rc]" (0)                               \
-        : "memory");                                                    \
-    clac()
-
-#define cmpxchg_user(_p, _o, _n)                                        \
-({                                                                      \
-    int _rc;                                                            \
-    switch ( sizeof(*(_p)) )                                            \
-    {                                                                   \
-    case 1:                                                             \
-        __cmpxchg_user(_p, _o, _n, "b", "q");                           \
-        break;                                                          \
-    case 2:                                                             \
-        __cmpxchg_user(_p, _o, _n, "w", "r");                           \
-        break;                                                          \
-    case 4:                                                             \
-        __cmpxchg_user(_p, _o, _n, "k", "r");                           \
-        break;                                                          \
-    case 8:                                                             \
-        __cmpxchg_user(_p, _o, _n, "q", "r");                           \
-        break;                                                          \
-    }                                                                   \
-    _rc;                                                                \
-})
-
 #endif /* __X86_64_SYSTEM_H__ */

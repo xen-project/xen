@@ -4033,8 +4033,8 @@ long do_mmu_update(
 
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
-                    if ( paging_write_guest_entry(v, va, req.val, mfn) )
-                        rc = 0;
+                    paging_write_guest_entry(v, va, req.val, mfn);
+                    rc = 0;
                     break;
                 }
                 page_unlock(page);
@@ -4044,9 +4044,9 @@ long do_mmu_update(
             else if ( get_page_type(page, PGT_writable_page) )
             {
                 perfc_incr(writable_mmu_updates);
-                if ( paging_write_guest_entry(v, va, req.val, mfn) )
-                    rc = 0;
+                paging_write_guest_entry(v, va, req.val, mfn);
                 put_page_type(page);
+                rc = 0;
             }
 
             put_page(page);

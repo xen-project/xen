@@ -100,9 +100,9 @@ struct shadow_paging_mode {
 #ifdef CONFIG_SHADOW_PAGING
     void          (*detach_old_tables     )(struct vcpu *v);
 #ifdef CONFIG_PV
-    bool          (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
+    void          (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
                                             intpte_t new, mfn_t gmfn);
-    bool          (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
+    void          (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
                                             intpte_t *old, intpte_t new,
                                             mfn_t gmfn);
 #endif
@@ -333,15 +333,15 @@ static inline void paging_update_paging_modes(struct vcpu *v)
  * paging-assistance state appropriately.  Returns false if we page-faulted,
  * true for success.
  */
-static inline bool paging_write_guest_entry(
+static inline void paging_write_guest_entry(
     struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
 {
 #ifdef CONFIG_SHADOW_PAGING
     if ( unlikely(paging_mode_shadow(v->domain)) && paging_get_hostmode(v) )
-        return paging_get_hostmode(v)->shadow.write_guest_entry(v, p, new,
-                                                                gmfn);
+        paging_get_hostmode(v)->shadow.write_guest_entry(v, p, new, gmfn);
+    else
 #endif
-    return !__copy_to_user(p, &new, sizeof(new));
+        write_atomic(p, new);
 }
 
 
@@ -351,15 +351,16 @@ static inline bool paging_write_guest_entry(
  * true if not.  N.B. caller should check the value of "old" to see if the
  * cmpxchg itself was successful.
  */
-static inline bool paging_cmpxchg_guest_entry(
+static inline void paging_cmpxchg_guest_entry(
     struct vcpu *v, intpte_t *p, intpte_t *old, intpte_t new, mfn_t gmfn)
 {
 #ifdef CONFIG_SHADOW_PAGING
     if ( unlikely(paging_mode_shadow(v->domain)) && paging_get_hostmode(v) )
-        return paging_get_hostmode(v)->shadow.cmpxchg_guest_entry(v, p, old,
-                                                                  new, gmfn);
+        paging_get_hostmode(v)->shadow.cmpxchg_guest_entry(v, p, old,
+                                                           new, gmfn);
+    else
 #endif
-    return !cmpxchg_user(p, *old, new);
+        *old = cmpxchg(p, *old, new);
 }
 
 #endif /* CONFIG_PV */
