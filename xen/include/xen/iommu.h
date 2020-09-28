@@ -194,7 +194,6 @@ struct msi_desc;
 struct msi_msg;
 
 int iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
-void iommu_read_msi_from_ire(struct msi_desc *msi_desc, struct msi_msg *msg);
 
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #endif /* HAS_PCI */

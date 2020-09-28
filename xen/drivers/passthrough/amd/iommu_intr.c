@@ -659,47 +659,6 @@ int amd_iommu_msi_msg_update_ire(
     return rc;
 }
 
-void amd_iommu_read_msi_from_ire(
-    struct msi_desc *msi_desc, struct msi_msg *msg)
-{
-    unsigned int offset = msg->data & (INTREMAP_MAX_ENTRIES - 1);
-    const struct pci_dev *pdev = msi_desc->dev;
-    u16 bdf = pdev ? PCI_BDF2(pdev->bus, pdev->devfn) : hpet_sbdf.bdf;
-    u16 seg = pdev ? pdev->seg : hpet_sbdf.seg;
-    const struct amd_iommu *iommu = _find_iommu_for_device(seg, bdf);
-    union irte_ptr entry;
-
-    if ( IS_ERR_OR_NULL(iommu) )
-        return;
-
-    entry = get_intremap_entry(iommu, get_dma_requestor_id(seg, bdf), offset);
-
-    if ( msi_desc->msi_attrib.type == PCI_CAP_ID_MSI )
-    {
-        int nr = msi_desc->msi_attrib.entry_nr;
-
-        ASSERT(!(offset & (msi_desc[-nr].msi.nvec - 1)));
-        offset |= nr;
-    }
-
-    msg->data &= ~(INTREMAP_MAX_ENTRIES - 1);
-    /* The IntType fields match for both formats. */
-    msg->data |= MASK_INSR(entry.ptr32->flds.int_type,
-                           MSI_DATA_DELIVERY_MODE_MASK);
-    if ( iommu->ctrl.ga_en )
-    {
-        msg->data |= MASK_INSR(entry.ptr128->full.vector,
-                               MSI_DATA_VECTOR_MASK);
-        msg->dest32 = get_full_dest(entry.ptr128);
-    }
-    else
-    {
-        msg->data |= MASK_INSR(entry.ptr32->flds.vector,
-                               MSI_DATA_VECTOR_MASK);
-        msg->dest32 = entry.ptr32->flds.dest;
-    }
-}
-
 int amd_iommu_free_intremap_table(
     const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping,
     uint16_t bdf)

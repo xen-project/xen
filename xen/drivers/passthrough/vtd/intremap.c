@@ -532,68 +532,6 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
    }
 }
 
-static int remap_entry_to_msi_msg(
-    struct vtd_iommu *iommu, struct msi_msg *msg, unsigned int index)
-{
-    struct iremap_entry *iremap_entry = NULL, *iremap_entries;
-    struct msi_msg_remap_entry *remap_rte;
-    unsigned long flags;
-
-    remap_rte = (struct msi_msg_remap_entry *) msg;
-    index += (remap_rte->address_lo.index_15 << 15) |
-             remap_rte->address_lo.index_0_14;
-
-    if ( index >= IREMAP_ENTRY_NR )
-    {
-        dprintk(XENLOG_ERR VTDPREFIX,
-                "MSI index (%d) for remap table is invalid\n",
-                index);
-        return -EFAULT;
-    }
-
-    spin_lock_irqsave(&iommu->intremap.lock, flags);
-
-    GET_IREMAP_ENTRY(iommu->intremap.maddr, index,
-                     iremap_entries, iremap_entry);
-
-    if ( iremap_entry->val == 0 )
-    {
-        dprintk(XENLOG_ERR VTDPREFIX,
-                "MSI index (%d) has an empty entry\n",
-                index);
-        unmap_vtd_domain_page(iremap_entries);
-        spin_unlock_irqrestore(&iommu->intremap.lock, flags);
-        return -EFAULT;
-    }
-
-    msg->address_hi = MSI_ADDR_BASE_HI;
-    msg->address_lo =
-        MSI_ADDR_BASE_LO |
-        ((iremap_entry->remap.dm == 0) ?
-            MSI_ADDR_DESTMODE_PHYS:
-            MSI_ADDR_DESTMODE_LOGIC) |
-        ((iremap_entry->remap.dlm != dest_LowestPrio) ?
-            MSI_ADDR_REDIRECTION_CPU:
-            MSI_ADDR_REDIRECTION_LOWPRI);
-    if ( x2apic_enabled )
-        msg->dest32 = iremap_entry->remap.dst;
-    else
-        msg->dest32 = (iremap_entry->remap.dst >> 8) & 0xff;
-    msg->address_lo |= MSI_ADDR_DEST_ID(msg->dest32);
-
-    msg->data =
-        MSI_DATA_TRIGGER_EDGE |
-        MSI_DATA_LEVEL_ASSERT |
-        ((iremap_entry->remap.dlm != dest_LowestPrio) ?
-            MSI_DATA_DELIVERY_FIXED:
-            MSI_DATA_DELIVERY_LOWPRI) |
-        iremap_entry->remap.vector;
-
-    unmap_vtd_domain_page(iremap_entries);
-    spin_unlock_irqrestore(&iommu->intremap.lock, flags);
-    return 0;
-}
-
 static int msi_msg_to_remap_entry(
     struct vtd_iommu *iommu, struct pci_dev *pdev,
     struct msi_desc *msi_desc, struct msi_msg *msg)
@@ -699,20 +637,6 @@ static int msi_msg_to_remap_entry(
     spin_unlock_irqrestore(&iommu->intremap.lock, flags);
 
     return 0;
-}
-
-void msi_msg_read_remap_rte(
-    struct msi_desc *msi_desc, struct msi_msg *msg)
-{
-    struct pci_dev *pdev = msi_desc->dev;
-    struct acpi_drhd_unit *drhd = NULL;
-
-    drhd = pdev ? acpi_find_matched_drhd_unit(pdev)
-                : hpet_to_drhd(msi_desc->hpet_id);
-    if ( drhd )
-        remap_entry_to_msi_msg(drhd->iommu, msg,
-                               msi_desc->msi_attrib.type == PCI_CAP_ID_MSI
-                               ? msi_desc->msi_attrib.entry_nr : 0);
 }
 
 int msi_msg_write_remap_rte(

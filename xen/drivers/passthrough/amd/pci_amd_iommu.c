@@ -572,7 +572,6 @@ static const struct iommu_ops __initconstrel _iommu_ops = {
     .update_ire_from_apic = amd_iommu_ioapic_update_ire,
     .update_ire_from_msi = amd_iommu_msi_msg_update_ire,
     .read_apic_from_ire = amd_iommu_read_ioapic_from_ire,
-    .read_msi_from_ire = amd_iommu_read_msi_from_ire,
     .setup_hpet_msi = amd_setup_hpet_msi,
     .adjust_irq_affinities = iov_adjust_irq_affinities,
     .suspend = amd_iommu_suspend,
