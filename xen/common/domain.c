@@ -391,24 +391,7 @@ struct domain *domain_create(domid_t domid,
 
     TRACE_1D(TRC_DOM0_DOM_ADD, d->domain_id);
 
-    /*
-     * Allocate d->vcpu[] and set ->max_vcpus up early.  Various per-domain
-     * resources want to be sized based on max_vcpus.
-     */
-    if ( !is_system_domain(d) )
-    {
-        err = -ENOMEM;
-        d->vcpu = xzalloc_array(struct vcpu *, config->max_vcpus);
-        if ( !d->vcpu )
-            goto fail;
-
-        d->max_vcpus = config->max_vcpus;
-    }
-
     lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid);
-
-    if ( (err = xsm_alloc_security_domain(d)) != 0 )
-        goto fail;
 
     atomic_set(&d->refcnt, 1);
     RCU_READ_LOCK_INIT(&d->rcu_lock);
@@ -433,6 +416,25 @@ struct domain *domain_create(domid_t domid,
 #ifdef CONFIG_HAS_PCI
     INIT_LIST_HEAD(&d->pdev_list);
 #endif
+
+    /* All error paths can depend on the above setup. */
+
+    /*
+     * Allocate d->vcpu[] and set ->max_vcpus up early.  Various per-domain
+     * resources want to be sized based on max_vcpus.
+     */
+    if ( !is_system_domain(d) )
+    {
+        err = -ENOMEM;
+        d->vcpu = xzalloc_array(struct vcpu *, config->max_vcpus);
+        if ( !d->vcpu )
+            goto fail;
+
+        d->max_vcpus = config->max_vcpus;
+    }
+
+    if ( (err = xsm_alloc_security_domain(d)) != 0 )
+        goto fail;
 
     err = -ENOMEM;
     if ( !zalloc_cpumask_var(&d->dirty_cpumask) )
