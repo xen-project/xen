@@ -34,6 +34,24 @@ config HAS_EX_TABLE
 config HAS_FAST_MULTIPLY
 	bool
 
+config HAS_IOPORTS
+	bool
+
+config HAS_KEXEC
+	bool
+
+config HAS_MEM_PAGING
+	bool
+
+config HAS_PDX
+	bool
+
+config HAS_SCHED_GRANULARITY
+	bool
+
+config HAS_UBSAN
+	bool
+
 config MEM_ACCESS_ALWAYS_ON
 	bool
 
@@ -44,24 +62,6 @@ config MEM_ACCESS
 
 	  Framework to configure memory access types for guests and receive
 	  related events in userspace.
-
-config HAS_MEM_PAGING
-	bool
-
-config HAS_PDX
-	bool
-
-config HAS_UBSAN
-	bool
-
-config HAS_KEXEC
-	bool
-
-config HAS_IOPORTS
-	bool
-
-config HAS_SCHED_GRANULARITY
-	bool
 
 config NEEDS_LIBELF
 	bool
