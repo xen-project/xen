@@ -272,8 +272,6 @@ class hvm
 #  source = domain whose memory is being shared
 #  target = client domain
     share_mem
-# HVMOP_set_param setting HVM_PARAM_NESTEDHVM
-    nested
 # HVMOP_set_param setting HVM_PARAM_ALTP2MHVM
     altp2mhvm
 # HVMOP_altp2m_set_domain_state HVMOP_altp2m_get_domain_state

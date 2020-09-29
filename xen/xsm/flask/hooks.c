@@ -1218,11 +1218,6 @@ static int flask_hvm_param(struct domain *d, unsigned long op)
     return current_has_perm(d, SECCLASS_HVM, perm);
 }
 
-static int flask_hvm_param_nested(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__NESTED);
-}
-
 static int flask_hvm_param_altp2mhvm(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM);
@@ -1826,7 +1821,6 @@ static struct xsm_operations flask_ops = {
     .hypfs_op = flask_hypfs_op,
     .hvm_param = flask_hvm_param,
     .hvm_control = flask_hvm_param,
-    .hvm_param_nested = flask_hvm_param_nested,
     .hvm_param_altp2mhvm = flask_hvm_param_altp2mhvm,
     .hvm_altp2mhvm_op = flask_hvm_altp2mhvm_op,
 

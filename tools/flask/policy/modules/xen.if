@@ -59,7 +59,7 @@ define(`create_domain_common', `
 	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op updatemp };
 	allow $1 $2:grant setup;
 	allow $1 $2:hvm { getparam hvmctl sethvmc
-			setparam nested altp2mhvm altp2mhvm_op dm };
+			setparam altp2mhvm altp2mhvm_op dm };
 ')
 
 # create_domain(priv, target)

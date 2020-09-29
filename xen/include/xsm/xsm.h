@@ -137,7 +137,6 @@ struct xsm_operations {
 
     int (*hvm_param) (struct domain *d, unsigned long op);
     int (*hvm_control) (struct domain *d, unsigned long op);
-    int (*hvm_param_nested) (struct domain *d);
     int (*hvm_param_altp2mhvm) (struct domain *d);
     int (*hvm_altp2mhvm_op) (struct domain *d, uint64_t mode, uint32_t op);
     int (*get_vnumainfo) (struct domain *d);
@@ -563,11 +562,6 @@ static inline int xsm_hvm_param (xsm_default_t def, struct domain *d, unsigned l
 static inline int xsm_hvm_control(xsm_default_t def, struct domain *d, unsigned long op)
 {
     return xsm_ops->hvm_control(d, op);
-}
-
-static inline int xsm_hvm_param_nested (xsm_default_t def, struct domain *d)
-{
-    return xsm_ops->hvm_param_nested(d);
 }
 
 static inline int xsm_hvm_param_altp2mhvm (xsm_default_t def, struct domain *d)
