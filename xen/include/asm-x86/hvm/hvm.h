@@ -334,7 +334,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 /* Check CR4/EFER values */
 const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg);
-unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore);
+unsigned long hvm_cr4_guest_valid_bits(const struct domain *d);
 
 int hvm_copy_context_and_params(struct domain *src, struct domain *dst);
 

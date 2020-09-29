@@ -1529,7 +1529,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
              */
             v->arch.hvm.vmx.cr4_host_mask =
                 (HVM_CR4_HOST_MASK | X86_CR4_PKE |
-                 ~hvm_cr4_guest_valid_bits(v->domain, false));
+                 ~hvm_cr4_guest_valid_bits(v->domain));
 
             v->arch.hvm.vmx.cr4_host_mask |= v->arch.hvm.vmx.vmx_realmode ?
                                              X86_CR4_VME : 0;

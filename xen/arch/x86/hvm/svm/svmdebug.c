@@ -106,6 +106,7 @@ bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
     unsigned long cr0 = vmcb_get_cr0(vmcb);
     unsigned long cr3 = vmcb_get_cr3(vmcb);
     unsigned long cr4 = vmcb_get_cr4(vmcb);
+    unsigned long valid;
     uint64_t efer = vmcb_get_efer(vmcb);
 
 #define PRINTF(fmt, args...) do { \
@@ -130,9 +131,10 @@ bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
            (cr3 >> v->domain->arch.cpuid->extd.maxphysaddr))) )
         PRINTF("CR3: MBZ bits are set (%#"PRIx64")\n", cr3);
 
-    if ( cr4 & ~hvm_cr4_guest_valid_bits(v->domain, false) )
+    valid = hvm_cr4_guest_valid_bits(v->domain);
+    if ( cr4 & ~valid )
         PRINTF("CR4: invalid bits are set (%#"PRIx64", valid: %#"PRIx64")\n",
-               cr4, hvm_cr4_guest_valid_bits(v->domain, false));
+               cr4, valid);
 
     if ( vmcb_get_dr6(vmcb) >> 32 )
         PRINTF("DR6: bits [63:32] are not zero (%#"PRIx64")\n",
