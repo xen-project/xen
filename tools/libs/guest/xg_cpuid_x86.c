@@ -427,7 +427,7 @@ static int xc_cpuid_xend_policy(
 
 int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
                           const uint32_t *featureset, unsigned int nr_features,
-                          bool pae, bool itsc,
+                          bool pae, bool itsc, bool nested_virt,
                           const struct xc_xend_cpuid *xend)
 {
     int rc;
@@ -559,7 +559,11 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         p->extd.itsc = itsc;
 
         if ( di.hvm )
+        {
             p->basic.pae = pae;
+            p->basic.vmx = nested_virt;
+            p->extd.svm = nested_virt;
+        }
     }
 
     if ( !di.hvm )
@@ -625,14 +629,6 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
             }
             break;
         }
-
-        /*
-         * These settings are necessary to cause earlier HVM_PARAM_NESTEDHVM
-         * to be reflected correctly in CPUID.  Xen will discard these bits if
-         * configuration hasn't been set for the domain.
-         */
-        p->basic.vmx = true;
-        p->extd.svm = true;
     }
 
     rc = x86_cpuid_copy_to_buffer(p, leaves, &nr_leaves);

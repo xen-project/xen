@@ -422,6 +422,7 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
 {
     bool pae = true;
     bool itsc;
+    bool nested_virt = libxl_defbool_val(info->nested_hvm);
 
     /*
      * For PV guests, PAE is Xen-controlled (it is the 'p' that differentiates
@@ -452,7 +453,7 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
             info->tsc_mode == LIBXL_TSC_MODE_ALWAYS_EMULATE);
 
     xc_cpuid_apply_policy(ctx->xch, domid, restore, NULL, 0,
-                          pae, itsc, info->cpuid);
+                          pae, itsc, nested_virt, info->cpuid);
 }
 
 static const char *input_names[2] = { "leaf", "subleaf" };
