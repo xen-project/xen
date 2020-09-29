@@ -4086,6 +4086,7 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_MEMORY_EVENT_CR3:
     case HVM_PARAM_MEMORY_EVENT_CR4:
     case HVM_PARAM_MEMORY_EVENT_INT3:
+    case HVM_PARAM_NESTEDHVM:
     case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
     case HVM_PARAM_BUFIOREQ_EVTCHN:
     case HVM_PARAM_MEMORY_EVENT_MSR:
@@ -4204,39 +4205,12 @@ static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
     case HVM_PARAM_ACPI_IOPORTS_LOCATION:
         rc = pmtimer_change_ioport(d, value);
         break;
-    case HVM_PARAM_NESTEDHVM:
-        rc = xsm_hvm_param_nested(XSM_PRIV, d);
-        if ( rc )
-            break;
-        if ( value > 1 )
-            rc = -EINVAL;
-        /*
-         * Remove the check below once we have
-         * shadow-on-shadow.
-         */
-        if ( !paging_mode_hap(d) && value )
-            rc = -EINVAL;
-        if ( value &&
-             d->arch.hvm.params[HVM_PARAM_ALTP2M] )
-            rc = -EINVAL;
-        /* Set up NHVM state for any vcpus that are already up. */
-        if ( value &&
-             !d->arch.hvm.params[HVM_PARAM_NESTEDHVM] )
-            for_each_vcpu(d, v)
-                if ( rc == 0 )
-                    rc = nestedhvm_vcpu_initialise(v);
-        if ( !value || rc )
-            for_each_vcpu(d, v)
-                nestedhvm_vcpu_destroy(v);
-        break;
     case HVM_PARAM_ALTP2M:
         rc = xsm_hvm_param_altp2mhvm(XSM_PRIV, d);
         if ( rc )
             break;
-        if ( value > XEN_ALTP2M_limited )
-            rc = -EINVAL;
-        if ( value &&
-             d->arch.hvm.params[HVM_PARAM_NESTEDHVM] )
+        if ( (value > XEN_ALTP2M_limited) ||
+             (value && nestedhvm_enabled(d)) )
             rc = -EINVAL;
         break;
     case HVM_PARAM_TRIPLE_FAULT_REASON:
@@ -4390,6 +4364,7 @@ static int hvm_allow_get_param(struct domain *d,
     case HVM_PARAM_MEMORY_EVENT_CR3:
     case HVM_PARAM_MEMORY_EVENT_CR4:
     case HVM_PARAM_MEMORY_EVENT_INT3:
+    case HVM_PARAM_NESTEDHVM:
     case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
     case HVM_PARAM_BUFIOREQ_EVTCHN:
     case HVM_PARAM_MEMORY_EVENT_MSR:

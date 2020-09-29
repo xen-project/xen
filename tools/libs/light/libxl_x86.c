@@ -426,11 +426,6 @@ static int hvm_set_conf_params(libxl__gc *gc, uint32_t domid,
             LOG(ERROR, "Couldn't set HVM_PARAM_TIMER_MODE");
             goto out;
         }
-        if (xc_hvm_param_set(xch, domid, HVM_PARAM_NESTEDHVM,
-                             libxl_defbool_val(info->nested_hvm))) {
-            LOG(ERROR, "Couldn't set HVM_PARAM_NESTEDHVM");
-            goto out;
-        }
         if (xc_hvm_param_set(xch, domid, HVM_PARAM_ALTP2M, altp2m)) {
             LOG(ERROR, "Couldn't set HVM_PARAM_ALTP2M");
             goto out;

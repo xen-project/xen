@@ -34,10 +34,9 @@ enum nestedhvm_vmexits {
 };
 
 /* Nested HVM on/off per domain */
-static always_inline bool nestedhvm_enabled(const struct domain *d)
+static inline bool nestedhvm_enabled(const struct domain *d)
 {
-    return is_hvm_domain(d) && d->arch.hvm.params &&
-        d->arch.hvm.params[HVM_PARAM_NESTEDHVM];
+    return IS_ENABLED(CONFIG_HVM) && (d->options & XEN_DOMCTL_CDF_nested_virt);
 }
 
 /* Nested VCPU */
