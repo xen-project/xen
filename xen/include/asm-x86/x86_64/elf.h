@@ -54,7 +54,7 @@ static inline void elf_core_save_regs(ELF_Gregset *core_regs,
     asm volatile("movq %%rsi,%0" : "=m"(core_regs->rsi));
     asm volatile("movq %%rdi,%0" : "=m"(core_regs->rdi));
     /* orig_rax not filled in for now */
-    core_regs->rip = (unsigned long)elf_core_save_regs;
+    asm ( "call 0f; 0: popq %0" : "=m" (core_regs->rip) );
     core_regs->cs = read_sreg(cs);
     asm volatile("pushfq; popq %0" :"=m"(core_regs->rflags));
     asm volatile("movq %%rsp,%0" : "=m"(core_regs->rsp));
