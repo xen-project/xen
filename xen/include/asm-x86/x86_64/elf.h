@@ -1,6 +1,7 @@
 #ifndef __X86_64_ELF_H__
 #define __X86_64_ELF_H__
 
+#include <asm/msr.h>
 #include <asm/regs.h>
 
 typedef struct {
@@ -59,8 +60,8 @@ static inline void elf_core_save_regs(ELF_Gregset *core_regs,
     asm volatile("pushfq; popq %0" :"=m"(core_regs->rflags));
     asm volatile("movq %%rsp,%0" : "=m"(core_regs->rsp));
     core_regs->ss = read_sreg(ss);
-    /* thread_fs not filled in for now */
-    /* thread_gs not filled in for now */
+    rdmsrl(MSR_FS_BASE, core_regs->thread_fs);
+    rdmsrl(MSR_GS_BASE, core_regs->thread_gs);
     core_regs->ds = read_sreg(ds);
     core_regs->es = read_sreg(es);
     core_regs->fs = read_sreg(fs);
