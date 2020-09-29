@@ -611,10 +611,12 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
         if (info->type != LIBXL_DOMAIN_TYPE_PV) {
             create.flags |= XEN_DOMCTL_CDF_hvm;
-            create.flags |=
-                libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
-            create.flags |=
-                libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
+
+            if ( libxl_defbool_val(info->hap) )
+                create.flags |= XEN_DOMCTL_CDF_hap;
+
+            if ( !libxl_defbool_val(info->oos) )
+                create.flags |= XEN_DOMCTL_CDF_oos_off;
         }
 
         assert(info->passthrough != LIBXL_PASSTHROUGH_DEFAULT);
