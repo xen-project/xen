@@ -37,8 +37,6 @@ typedef struct {
 static inline void elf_core_save_regs(ELF_Gregset *core_regs, 
                                       crash_xen_core_t *xen_core_regs)
 {
-    unsigned long tmp;
-
     asm volatile("movq %%r15,%0" : "=m"(core_regs->r15));
     asm volatile("movq %%r14,%0" : "=m"(core_regs->r14));
     asm volatile("movq %%r13,%0" : "=m"(core_regs->r13));
@@ -67,17 +65,10 @@ static inline void elf_core_save_regs(ELF_Gregset *core_regs,
     core_regs->fs = read_sreg(fs);
     core_regs->gs = read_sreg(gs);
 
-    asm volatile("mov %%cr0, %0" : "=r" (tmp) : );
-    xen_core_regs->cr0 = tmp;
-
-    asm volatile("mov %%cr2, %0" : "=r" (tmp) : );
-    xen_core_regs->cr2 = tmp;
-
-    asm volatile("mov %%cr3, %0" : "=r" (tmp) : );
-    xen_core_regs->cr3 = tmp;
-
-    asm volatile("mov %%cr4, %0" : "=r" (tmp) : );
-    xen_core_regs->cr4 = tmp;
+    asm ( "mov %%cr0, %0" : "=r" (xen_core_regs->cr0) );
+    asm ( "mov %%cr2, %0" : "=r" (xen_core_regs->cr2) );
+    asm ( "mov %%cr3, %0" : "=r" (xen_core_regs->cr3) );
+    asm ( "mov %%cr4, %0" : "=r" (xen_core_regs->cr4) );
 }
 
 #endif /* __X86_64_ELF_H__ */
