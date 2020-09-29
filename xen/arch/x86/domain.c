@@ -1703,10 +1703,7 @@ static void save_segments(struct vcpu *v)
 {
     struct cpu_user_regs *regs = &v->arch.user_regs;
 
-    regs->ds = read_sreg(ds);
-    regs->es = read_sreg(es);
-    regs->fs = read_sreg(fs);
-    regs->gs = read_sreg(gs);
+    read_sregs(regs);
 
     if ( !is_pv_32bit_vcpu(v) )
     {

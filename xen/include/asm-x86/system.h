@@ -5,12 +5,6 @@
 #include <xen/bitops.h>
 #include <asm/processor.h>
 
-#define read_sreg(name)                                         \
-({  unsigned int __sel;                                         \
-    asm volatile ( "mov %%" STR(name) ",%0" : "=r" (__sel) );   \
-    __sel;                                                      \
-})
-
 static inline void wbinvd(void)
 {
     asm volatile ( "wbinvd" ::: "memory" );

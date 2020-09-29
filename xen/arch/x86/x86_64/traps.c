@@ -43,10 +43,7 @@ static void read_registers(struct cpu_user_regs *regs, unsigned long crs[8])
     crs[2] = read_cr2();
     crs[3] = read_cr3();
     crs[4] = read_cr4();
-    regs->ds = read_sreg(ds);
-    regs->es = read_sreg(es);
-    regs->fs = read_sreg(fs);
-    regs->gs = read_sreg(gs);
+    read_sregs(regs);
     crs[5] = rdfsbase();
     crs[6] = rdgsbase();
     crs[7] = rdgsshadow();
