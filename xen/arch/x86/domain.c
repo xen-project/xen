@@ -629,6 +629,7 @@ void arch_vcpu_destroy(struct vcpu *v)
 int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
     bool hvm = config->flags & XEN_DOMCTL_CDF_hvm;
+    bool hap = config->flags & XEN_DOMCTL_CDF_hap;
     unsigned int max_vcpus;
 
     if ( hvm ? !hvm_enabled : !IS_ENABLED(CONFIG_PV) )
@@ -653,13 +654,13 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
-    if ( (config->flags & XEN_DOMCTL_CDF_hap) && !hvm_hap_supported() )
+    if ( hap && !hvm_hap_supported() )
     {
-        dprintk(XENLOG_INFO, "HAP requested but not supported\n");
+        dprintk(XENLOG_INFO, "HAP requested but not available\n");
         return -EINVAL;
     }
 
-    if ( !(config->flags & XEN_DOMCTL_CDF_hvm) )
+    if ( !hvm )
         /*
          * It is only meaningful for XEN_DOMCTL_CDF_oos_off to be clear
          * for HVM guests.

@@ -299,6 +299,10 @@ static void _domain_destroy(struct domain *d)
 
 static int sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
+    bool hvm = config->flags & XEN_DOMCTL_CDF_hvm;
+    bool hap = config->flags & XEN_DOMCTL_CDF_hap;
+    bool iommu = config->flags & XEN_DOMCTL_CDF_iommu;
+
     if ( config->flags & ~(XEN_DOMCTL_CDF_hvm |
                            XEN_DOMCTL_CDF_hap |
                            XEN_DOMCTL_CDF_s3_integrity |
@@ -310,36 +314,41 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
-    if ( config->iommu_opts & ~XEN_DOMCTL_IOMMU_no_sharept )
-    {
-        dprintk(XENLOG_INFO, "Unknown IOMMU options %#x\n", config->iommu_opts);
-        return -EINVAL;
-    }
-
-    if ( !(config->flags & XEN_DOMCTL_CDF_iommu) && config->iommu_opts )
-    {
-        dprintk(XENLOG_INFO,
-                "IOMMU options specified but IOMMU not enabled\n");
-        return -EINVAL;
-    }
-
     if ( config->max_vcpus < 1 )
     {
         dprintk(XENLOG_INFO, "No vCPUS\n");
         return -EINVAL;
     }
 
-    if ( !(config->flags & XEN_DOMCTL_CDF_hvm) &&
-         (config->flags & XEN_DOMCTL_CDF_hap) )
+    if ( hap && !hvm )
     {
         dprintk(XENLOG_INFO, "HAP requested for non-HVM guest\n");
         return -EINVAL;
     }
 
-    if ( (config->flags & XEN_DOMCTL_CDF_iommu) && !iommu_enabled )
+    if ( iommu )
     {
-        dprintk(XENLOG_INFO, "IOMMU is not enabled\n");
-        return -EINVAL;
+        if ( config->iommu_opts & ~XEN_DOMCTL_IOMMU_no_sharept )
+        {
+            dprintk(XENLOG_INFO, "Unknown IOMMU options %#x\n",
+                    config->iommu_opts);
+            return -EINVAL;
+        }
+
+        if ( !iommu_enabled )
+        {
+            dprintk(XENLOG_INFO, "IOMMU requested but not available\n");
+            return -EINVAL;
+        }
+    }
+    else
+    {
+        if ( config->iommu_opts )
+        {
+            dprintk(XENLOG_INFO,
+                    "IOMMU options specified but IOMMU not requested\n");
+            return -EINVAL;
+        }
     }
 
     return arch_sanitise_domain_config(config);
