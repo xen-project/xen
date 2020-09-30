@@ -54,6 +54,14 @@ void acpi_smp_init_cpus(void);
  */
 paddr_t acpi_get_table_offset(struct membank tbl_add[], EFI_MEM_RES index);
 
+/* Macros for consistency checks of the GICC subtable of MADT */
+#define ACPI_MADT_GICC_LENGTH	\
+    (acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
+
+#define BAD_MADT_GICC_ENTRY(entry, end)						\
+    (!(entry) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||	\
+     (entry)->header.length != ACPI_MADT_GICC_LENGTH)
+
 #ifdef CONFIG_ACPI
 extern bool acpi_disabled;
 /* Basic configuration for ACPI */
