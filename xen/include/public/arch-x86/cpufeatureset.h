@@ -127,7 +127,7 @@ XEN_CPUFEATURE(PCLMULQDQ,     1*32+ 1) /*A  Carry-less multiplication */
 XEN_CPUFEATURE(DTES64,        1*32+ 2) /*   64-bit Debug Store */
 XEN_CPUFEATURE(MONITOR,       1*32+ 3) /*   Monitor/Mwait support */
 XEN_CPUFEATURE(DSCPL,         1*32+ 4) /*   CPL Qualified Debug Store */
-XEN_CPUFEATURE(VMX,           1*32+ 5) /*S  Virtual Machine Extensions */
+XEN_CPUFEATURE(VMX,           1*32+ 5) /*h  Virtual Machine Extensions */
 XEN_CPUFEATURE(SMX,           1*32+ 6) /*   Safer Mode Extensions */
 XEN_CPUFEATURE(EIST,          1*32+ 7) /*   Enhanced SpeedStep */
 XEN_CPUFEATURE(TM2,           1*32+ 8) /*   Thermal Monitor 2 */
@@ -166,7 +166,7 @@ XEN_CPUFEATURE(3DNOW,         2*32+31) /*A  3DNow! */
 /* AMD-defined CPU features, CPUID level 0x80000001.ecx, word 3 */
 XEN_CPUFEATURE(LAHF_LM,       3*32+ 0) /*A  LAHF/SAHF in long mode */
 XEN_CPUFEATURE(CMP_LEGACY,    3*32+ 1) /*!A If yes HyperThreading not valid */
-XEN_CPUFEATURE(SVM,           3*32+ 2) /*S  Secure virtual machine */
+XEN_CPUFEATURE(SVM,           3*32+ 2) /*h  Secure virtual machine */
 XEN_CPUFEATURE(EXTAPIC,       3*32+ 3) /*   Extended APIC space */
 XEN_CPUFEATURE(CR8_LEGACY,    3*32+ 4) /*S  CR8 in 32-bit mode */
 XEN_CPUFEATURE(ABM,           3*32+ 5) /*A  Advanced bit manipulation */
