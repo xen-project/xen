@@ -933,6 +933,11 @@ int evtchn_status(evtchn_status_t *status)
     }
 
     chn = evtchn_from_port(d, port);
+    if ( consumer_is_xen(chn) )
+    {
+        rc = -EACCES;
+        goto out;
+    }
 
     rc = xsm_evtchn_status(XSM_TARGET, d, chn);
     if ( rc )
