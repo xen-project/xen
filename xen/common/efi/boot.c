@@ -150,10 +150,17 @@ static struct file __initdata cfg;
 static struct file __initdata kernel;
 static struct file __initdata ramdisk;
 static struct file __initdata xsm;
-static CHAR16 __initdata newline[] = L"\r\n";
+static const CHAR16 __initconst newline[] = L"\r\n";
 
-#define PrintStr(s) StdOut->OutputString(StdOut, s)
-#define PrintErr(s) StdErr->OutputString(StdErr, s)
+static void __init PrintStr(const CHAR16 *s)
+{
+    StdOut->OutputString(StdOut, (CHAR16 *)s );
+}
+
+static void __init PrintErr(const CHAR16 *s)
+{
+    StdErr->OutputString(StdErr, (CHAR16 *)s );
+}
 
 /*
  * Include architecture specific implementation here, which references the
@@ -274,7 +281,7 @@ static bool __init match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2)
 void __init noreturn blexit(const CHAR16 *str)
 {
     if ( str )
-        PrintStr((CHAR16 *)str);
+        PrintStr(str);
     PrintStr(newline);
 
     if ( !efi_bs )
@@ -315,7 +322,7 @@ static void __init PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode)
     EFI_STATUS ErrIdx = ErrCode & ~EFI_ERROR_MASK;
 
     StdOut = StdErr;
-    PrintErr((CHAR16 *)mesg);
+    PrintErr(mesg);
     PrintErr(L": ");
 
     if( (ErrIdx < ARRAY_SIZE(ErrCodeToStr)) && ErrCodeToStr[ErrIdx] )
@@ -545,7 +552,7 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     EFI_FILE_HANDLE FileHandle = NULL;
     UINT64 size;
     EFI_STATUS ret;
-    CHAR16 *what = NULL;
+    const CHAR16 *what = NULL;
 
     if ( !name )
         PrintErrMesg(L"No filename", EFI_OUT_OF_RESOURCES);
