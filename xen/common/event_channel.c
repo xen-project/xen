@@ -614,17 +614,18 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     case ECS_PIRQ: {
         struct pirq *pirq = pirq_info(d1, chn1->u.pirq.irq);
 
-        if ( !pirq )
-            break;
-        if ( !is_hvm_domain(d1) )
-            pirq_guest_unbind(d1, pirq);
-        pirq->evtchn = 0;
-        pirq_cleanup_check(pirq, d1);
-        unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
+        if ( pirq )
+        {
+            if ( !is_hvm_domain(d1) )
+                pirq_guest_unbind(d1, pirq);
+            pirq->evtchn = 0;
+            pirq_cleanup_check(pirq, d1);
 #ifdef CONFIG_X86
-        if ( is_hvm_domain(d1) && domain_pirq_to_irq(d1, pirq->pirq) > 0 )
-            unmap_domain_pirq_emuirq(d1, pirq->pirq);
+            if ( is_hvm_domain(d1) && domain_pirq_to_irq(d1, pirq->pirq) > 0 )
+                unmap_domain_pirq_emuirq(d1, pirq->pirq);
 #endif
+        }
+        unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
         break;
     }
 
