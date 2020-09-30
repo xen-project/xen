@@ -240,19 +240,6 @@ static inline bool evtchn_is_pending(const struct domain *d,
     return evtchn_usable(evtchn) && d->evtchn_port_ops->is_pending(d, evtchn);
 }
 
-static inline bool evtchn_port_is_pending(struct domain *d, evtchn_port_t port)
-{
-    struct evtchn *evtchn = evtchn_from_port(d, port);
-    bool rc;
-    unsigned long flags;
-
-    spin_lock_irqsave(&evtchn->lock, flags);
-    rc = evtchn_is_pending(d, evtchn);
-    spin_unlock_irqrestore(&evtchn->lock, flags);
-
-    return rc;
-}
-
 static inline bool evtchn_is_masked(const struct domain *d,
                                     const struct evtchn *evtchn)
 {
@@ -277,6 +264,25 @@ static inline bool evtchn_is_busy(const struct domain *d,
 {
     return d->evtchn_port_ops->is_busy &&
            d->evtchn_port_ops->is_busy(d, evtchn);
+}
+
+/* Returns negative errno, zero for not pending, or positive for pending. */
+static inline int evtchn_port_poll(struct domain *d, evtchn_port_t port)
+{
+    int rc = -EINVAL;
+
+    if ( port_is_valid(d, port) )
+    {
+        struct evtchn *evtchn = evtchn_from_port(d, port);
+        unsigned long flags;
+
+        spin_lock_irqsave(&evtchn->lock, flags);
+        if ( evtchn_usable(evtchn) )
+            rc = evtchn_is_pending(d, evtchn);
+        spin_unlock_irqrestore(&evtchn->lock, flags);
+    }
+
+    return rc;
 }
 
 static inline int evtchn_port_set_priority(struct domain *d,

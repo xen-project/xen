@@ -1427,13 +1427,13 @@ static long do_poll(struct sched_poll *sched_poll)
         if ( __copy_from_guest_offset(&port, sched_poll->ports, i, 1) )
             goto out;
 
-        rc = -EINVAL;
-        if ( !port_is_valid(d, port) )
+        rc = evtchn_port_poll(d, port);
+        if ( rc )
+        {
+            if ( rc > 0 )
+                rc = 0;
             goto out;
-
-        rc = 0;
-        if ( evtchn_port_is_pending(d, port) )
-            goto out;
+        }
     }
 
     if ( sched_poll->nr_ports == 1 )
