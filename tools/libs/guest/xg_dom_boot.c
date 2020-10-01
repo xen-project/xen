@@ -43,13 +43,13 @@ static int setup_hypercall_page(struct xc_dom_image *dom)
     xen_pfn_t pfn;
     int rc;
 
-    if ( dom->parms.virt_hypercall == -1 )
+    if ( dom->parms->virt_hypercall == -1 )
         return 0;
-    pfn = (dom->parms.virt_hypercall - dom->parms.virt_base)
+    pfn = (dom->parms->virt_hypercall - dom->parms->virt_base)
         >> XC_DOM_PAGE_SHIFT(dom);
 
     DOMPRINTF("%s: vaddr=0x%" PRIx64 " pfn=0x%" PRIpfn "", __FUNCTION__,
-                  dom->parms.virt_hypercall, pfn);
+                  dom->parms->virt_hypercall, pfn);
     domctl.cmd = XEN_DOMCTL_hypercall_init;
     domctl.domain = dom->guest_domid;
     domctl.u.hypercall_init.gmfn = xc_dom_p2m(dom, pfn);

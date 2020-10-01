@@ -73,7 +73,7 @@ static elf_negerrnoval xc_dom_probe_hvm_kernel(struct xc_dom_image *dom)
      * else we might be trying to load a PV kernel.
      */
     elf_parse_binary(&elf);
-    rc = elf_xen_parse(&elf, &dom->parms);
+    rc = elf_xen_parse(&elf, dom->parms);
     if ( rc == 0 )
         return -EINVAL;
 
@@ -227,7 +227,7 @@ static elf_errorstatus xc_dom_load_hvm_kernel(struct xc_dom_image *dom)
         goto error;
     }
 
-    dom->parms.phys_entry = elf_uval(elf, elf->ehdr, e_entry);
+    dom->parms->phys_entry = elf_uval(elf, elf->ehdr, e_entry);
 
     free(entries);
     return 0;

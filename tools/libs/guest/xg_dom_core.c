@@ -735,6 +735,7 @@ void xc_dom_release(struct xc_dom_image *dom)
         xc_dom_unmap_all(dom);
     xc_dom_free_all(dom);
     free(dom->arch_private);
+    free(dom->parms);
     free(dom);
 }
 
@@ -753,6 +754,12 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     memset(dom, 0, sizeof(*dom));
     dom->xch = xch;
 
+    dom->parms = malloc(sizeof(*dom->parms));
+    if (!dom->parms)
+        goto err;
+    memset(dom->parms, 0, sizeof(*dom->parms));
+    dom->alloc_malloc += sizeof(*dom->parms);
+
     dom->max_kernel_size = XC_DOM_DECOMPRESS_MAX;
     dom->max_module_size = XC_DOM_DECOMPRESS_MAX;
     dom->max_devicetree_size = XC_DOM_DECOMPRESS_MAX;
@@ -762,12 +769,12 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     if ( features )
         elf_xen_parse_features(features, dom->f_requested, NULL);
 
-    dom->parms.virt_base = UNSET_ADDR;
-    dom->parms.virt_entry = UNSET_ADDR;
-    dom->parms.virt_hypercall = UNSET_ADDR;
-    dom->parms.virt_hv_start_low = UNSET_ADDR;
-    dom->parms.elf_paddr_offset = UNSET_ADDR;
-    dom->parms.p2m_base = UNSET_ADDR;
+    dom->parms->virt_base = UNSET_ADDR;
+    dom->parms->virt_entry = UNSET_ADDR;
+    dom->parms->virt_hypercall = UNSET_ADDR;
+    dom->parms->virt_hv_start_low = UNSET_ADDR;
+    dom->parms->elf_paddr_offset = UNSET_ADDR;
+    dom->parms->p2m_base = UNSET_ADDR;
 
     dom->flags = SIF_VIRT_P2M_4TOOLS;
 
@@ -920,8 +927,8 @@ int xc_dom_parse_image(struct xc_dom_image *dom)
     for ( i = 0; i < XENFEAT_NR_SUBMAPS; i++ )
     {
         dom->f_active[i] |= dom->f_requested[i]; /* cmd line */
-        dom->f_active[i] |= dom->parms.f_required[i]; /* kernel   */
-        if ( (dom->f_active[i] & dom->parms.f_supported[i]) !=
+        dom->f_active[i] |= dom->parms->f_required[i]; /* kernel   */
+        if ( (dom->f_active[i] & dom->parms->f_supported[i]) !=
              dom->f_active[i] )
         {
             xc_dom_panic(dom->xch, XC_INVALID_PARAM,
@@ -1142,8 +1149,8 @@ int xc_dom_build_image(struct xc_dom_image *dom)
         goto err;
     }
     page_size = XC_DOM_PAGE_SIZE(dom);
-    if ( dom->parms.virt_base != UNSET_ADDR )
-        dom->virt_alloc_end = dom->parms.virt_base;
+    if ( dom->parms->virt_base != UNSET_ADDR )
+        dom->virt_alloc_end = dom->parms->virt_base;
 
     /* load kernel */
     if ( xc_dom_alloc_segment(dom, &dom->kernel_seg, "kernel",
@@ -1157,7 +1164,7 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     /* Don't load ramdisk / other modules now if no initial mapping required. */
     for ( mod = 0; mod < dom->num_modules; mod++ )
     {
-        unmapped_initrd = (dom->parms.unmapped_initrd &&
+        unmapped_initrd = (dom->parms->unmapped_initrd &&
                            !dom->modules[mod].seg.vstart);
 
         if ( dom->modules[mod].blob && !unmapped_initrd )
@@ -1199,10 +1206,10 @@ int xc_dom_build_image(struct xc_dom_image *dom)
 
     /* allocate other pages */
     if ( !dom->arch_hooks->p2m_base_supported ||
-         dom->parms.p2m_base >= dom->parms.virt_base ||
-         (dom->parms.p2m_base & (XC_DOM_PAGE_SIZE(dom) - 1)) )
-        dom->parms.p2m_base = UNSET_ADDR;
-    if ( dom->arch_hooks->alloc_p2m_list && dom->parms.p2m_base == UNSET_ADDR &&
+         dom->parms->p2m_base >= dom->parms->virt_base ||
+         (dom->parms->p2m_base & (XC_DOM_PAGE_SIZE(dom) - 1)) )
+        dom->parms->p2m_base = UNSET_ADDR;
+    if ( dom->arch_hooks->alloc_p2m_list && dom->parms->p2m_base == UNSET_ADDR &&
          dom->arch_hooks->alloc_p2m_list(dom) != 0 )
         goto err;
     if ( dom->arch_hooks->alloc_magic_pages(dom) != 0 )
@@ -1228,7 +1235,7 @@ int xc_dom_build_image(struct xc_dom_image *dom)
 
     for ( mod = 0; mod < dom->num_modules; mod++ )
     {
-        unmapped_initrd = (dom->parms.unmapped_initrd &&
+        unmapped_initrd = (dom->parms->unmapped_initrd &&
                            !dom->modules[mod].seg.vstart);
 
         /* Load ramdisk / other modules if no initial mapping required. */
@@ -1247,17 +1254,59 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     }
 
     /* Allocate p2m list if outside of initial kernel mapping. */
-    if ( dom->arch_hooks->alloc_p2m_list && dom->parms.p2m_base != UNSET_ADDR )
+    if ( dom->arch_hooks->alloc_p2m_list && dom->parms->p2m_base != UNSET_ADDR )
     {
         if ( dom->arch_hooks->alloc_p2m_list(dom) != 0 )
             goto err;
-        dom->p2m_seg.vstart = dom->parms.p2m_base;
+        dom->p2m_seg.vstart = dom->parms->p2m_base;
     }
 
     return 0;
 
  err:
     return -1;
+}
+
+void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
+                          xen_vaddr_t vaddr, size_t *safe_region_out)
+{
+    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
+    xen_pfn_t page = (vaddr - dom->parms->virt_base) / page_size;
+    unsigned int offset = (vaddr - dom->parms->virt_base) % page_size;
+    xen_pfn_t safe_region_count;
+    void *ptr;
+
+    *safe_region_out = 0;
+    ptr = xc_dom_pfn_to_ptr_retcount(dom, page, 0, &safe_region_count);
+    if ( ptr == NULL )
+        return ptr;
+    *safe_region_out = (safe_region_count << XC_DOM_PAGE_SHIFT(dom)) - offset;
+    return ptr + offset;
+}
+
+uint64_t xc_dom_virt_base(struct xc_dom_image *dom)
+{
+    return dom->parms->virt_base;
+}
+
+uint64_t xc_dom_virt_entry(struct xc_dom_image *dom)
+{
+    return dom->parms->virt_entry;
+}
+
+uint64_t xc_dom_virt_hypercall(struct xc_dom_image *dom)
+{
+    return dom->parms->virt_hypercall;
+}
+
+char *xc_dom_guest_os(struct xc_dom_image *dom)
+{
+    return dom->parms->guest_os;
+}
+
+bool xc_dom_feature_get(struct xc_dom_image *dom, unsigned int nr)
+{
+    return elf_xen_feature_get(nr, dom->parms->f_supported);
 }
 
 /*

@@ -214,8 +214,8 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
 
     dom->kernel_seg.vstart = image_info->load_addr;
     dom->kernel_seg.vend   = bss_end_addr;
-    dom->parms.virt_base   = start_addr;
-    dom->parms.virt_entry  = image_info->entry_addr;
+    dom->parms->virt_base   = start_addr;
+    dom->parms->virt_entry  = image_info->entry_addr;
 
     pae_flags = image_info->flags & XEN_MULTIBOOT_FLAG_PAE_MASK;
     switch (pae_flags >> XEN_MULTIBOOT_FLAG_PAE_SHIFT) {
@@ -237,7 +237,7 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
         {
             DOMPRINTF("%s: PAE fixup", __FUNCTION__);
             dom->guest_type = "xen-3.0-x86_32p";
-            dom->parms.pae  = XEN_PAE_EXTCR3;
+            dom->parms->pae  = XEN_PAE_EXTCR3;
         }
         break;
     }

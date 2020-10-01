@@ -252,7 +252,7 @@ static int alloc_pgtables_pv(struct xc_dom_image *dom)
         try_virt_end = round_up(dom->virt_alloc_end + pages * PAGE_SIZE_X86,
                                 bits_to_mask(22)); /* 4MB alignment */
 
-        if ( count_pgtables(dom, dom->parms.virt_base, try_virt_end, 0) )
+        if ( count_pgtables(dom, dom->parms->virt_base, try_virt_end, 0) )
             return -1;
 
         pages = map->area.pgtables + extra_pages;
@@ -464,7 +464,7 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
 
     l3pfn = domx86->maps[0].lvls[2].pfn;
     l3mfn = xc_dom_p2m(dom, l3pfn);
-    if ( dom->parms.pae == XEN_PAE_YES )
+    if ( dom->parms->pae == XEN_PAE_YES )
     {
         if ( l3mfn >= 0x100000 )
             l3mfn = move_l3_below_4G(dom, l3pfn, l3mfn);
@@ -553,9 +553,9 @@ static int alloc_p2m_list_x86_64(struct xc_dom_image *dom)
     unsigned lvl;
 
     p2m_alloc_size = round_pg_up(p2m_alloc_size);
-    if ( dom->parms.p2m_base != UNSET_ADDR )
+    if ( dom->parms->p2m_base != UNSET_ADDR )
     {
-        from = dom->parms.p2m_base;
+        from = dom->parms->p2m_base;
         to = from + p2m_alloc_size - 1;
         if ( count_pgtables(dom, from, to, dom->pfn_alloc_end) )
             return -1;
@@ -739,7 +739,7 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     dom->xenstore_pfn = special_pfn(SPECIALPAGE_XENSTORE);
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_pfn);
 
-    dom->parms.virt_hypercall = -1;
+    dom->parms->virt_hypercall = -1;
 
     rc = 0;
     goto out;
@@ -822,7 +822,7 @@ static int start_info_x86_64(struct xc_dom_image *dom)
     start_info->pt_base = dom->pgtables_seg.vstart;
     start_info->nr_pt_frames = domx86->maps[0].area.pgtables;
     start_info->mfn_list = dom->p2m_seg.vstart;
-    if ( dom->parms.p2m_base != UNSET_ADDR )
+    if ( dom->parms->p2m_base != UNSET_ADDR )
     {
         start_info->first_p2m_pfn = dom->p2m_seg.pfn;
         start_info->nr_p2m_frames = dom->p2m_seg.pages;
@@ -889,19 +889,19 @@ static int vcpu_x86_32(struct xc_dom_image *dom)
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
 
-    ctxt->user_regs.eip = dom->parms.virt_entry;
+    ctxt->user_regs.eip = dom->parms->virt_entry;
     ctxt->user_regs.esp =
-        dom->parms.virt_base + (dom->bootstack_pfn + 1) * PAGE_SIZE_X86;
+        dom->parms->virt_base + (dom->bootstack_pfn + 1) * PAGE_SIZE_X86;
     ctxt->user_regs.esi =
-        dom->parms.virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
+        dom->parms->virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
     ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
 
     ctxt->debugreg[6] = X86_DR6_DEFAULT;
     ctxt->debugreg[7] = X86_DR7_DEFAULT;
 
     ctxt->flags = VGCF_in_kernel_X86_32 | VGCF_online_X86_32;
-    if ( dom->parms.pae == XEN_PAE_EXTCR3 ||
-         dom->parms.pae == XEN_PAE_BIMODAL )
+    if ( dom->parms->pae == XEN_PAE_EXTCR3 ||
+         dom->parms->pae == XEN_PAE_BIMODAL )
         ctxt->vm_assist |= (1UL << VMASST_TYPE_pae_extended_cr3);
 
     cr3_pfn = xc_dom_p2m(dom, dom->pgtables_seg.pfn);
@@ -939,11 +939,11 @@ static int vcpu_x86_64(struct xc_dom_image *dom)
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
 
-    ctxt->user_regs.rip = dom->parms.virt_entry;
+    ctxt->user_regs.rip = dom->parms->virt_entry;
     ctxt->user_regs.rsp =
-        dom->parms.virt_base + (dom->bootstack_pfn + 1) * PAGE_SIZE_X86;
+        dom->parms->virt_base + (dom->bootstack_pfn + 1) * PAGE_SIZE_X86;
     ctxt->user_regs.rsi =
-        dom->parms.virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
+        dom->parms->virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
     ctxt->user_regs.rflags = 1 << 9; /* Interrupt Enable */
 
     ctxt->debugreg[6] = X86_DR6_DEFAULT;
@@ -1070,7 +1070,7 @@ static int vcpu_hvm(struct xc_dom_image *dom)
     bsp_ctx.cpu.cr0 = X86_CR0_PE | X86_CR0_ET;
 
     /* Set the IP. */
-    bsp_ctx.cpu.rip = dom->parms.phys_entry;
+    bsp_ctx.cpu.rip = dom->parms->phys_entry;
 
     bsp_ctx.cpu.dr6 = X86_DR6_DEFAULT;
     bsp_ctx.cpu.dr7 = X86_DR7_DEFAULT;
@@ -1806,8 +1806,8 @@ static int bootlate_hvm(struct xc_dom_image *dom)
     for ( i = 0; i < dom->num_modules; i++ )
     {
         struct xc_hvm_firmware_module mod;
-        uint64_t base = dom->parms.virt_base != UNSET_ADDR ?
-            dom->parms.virt_base : 0;
+        uint64_t base = dom->parms->virt_base != UNSET_ADDR ?
+            dom->parms->virt_base : 0;
 
         mod.guest_addr_out =
             dom->modules[i].seg.vstart - base;

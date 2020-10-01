@@ -22,8 +22,6 @@
 #ifndef XENGUEST_H
 #define XENGUEST_H
 
-#include <xen/libelf/libelf.h>
-
 #define XC_NUMA_NO_NODE   (~0U)
 
 #define XCFLAGS_LIVE      (1 << 0)
@@ -109,7 +107,7 @@ struct xc_dom_image {
     uint32_t f_requested[XENFEAT_NR_SUBMAPS];
 
     /* info from (elf) kernel image */
-    struct elf_dom_parms parms;
+    struct elf_dom_parms *parms;
     char *guest_type;
 
     /* memory layout */
@@ -390,6 +388,13 @@ void *xc_dom_pfn_to_ptr_retcount(struct xc_dom_image *dom, xen_pfn_t first,
                                  xen_pfn_t count, xen_pfn_t *count_out);
 void xc_dom_unmap_one(struct xc_dom_image *dom, xen_pfn_t pfn);
 void xc_dom_unmap_all(struct xc_dom_image *dom);
+void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
+                          xen_vaddr_t vaddr, size_t *safe_region_out);
+uint64_t xc_dom_virt_base(struct xc_dom_image *dom);
+uint64_t xc_dom_virt_entry(struct xc_dom_image *dom);
+uint64_t xc_dom_virt_hypercall(struct xc_dom_image *dom);
+char *xc_dom_guest_os(struct xc_dom_image *dom);
+bool xc_dom_feature_get(struct xc_dom_image *dom, unsigned int nr);
 
 static inline void *xc_dom_seg_to_ptr_pages(struct xc_dom_image *dom,
                                       struct xc_dom_seg *seg,
@@ -409,24 +414,6 @@ static inline void *xc_dom_seg_to_ptr(struct xc_dom_image *dom,
     xen_pfn_t dummy;
 
     return xc_dom_seg_to_ptr_pages(dom, seg, &dummy);
-}
-
-static inline void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
-                                        xen_vaddr_t vaddr,
-                                        size_t *safe_region_out)
-{
-    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
-    xen_pfn_t page = (vaddr - dom->parms.virt_base) / page_size;
-    unsigned int offset = (vaddr - dom->parms.virt_base) % page_size;
-    xen_pfn_t safe_region_count;
-    void *ptr;
-
-    *safe_region_out = 0;
-    ptr = xc_dom_pfn_to_ptr_retcount(dom, page, 0, &safe_region_count);
-    if ( ptr == NULL )
-        return ptr;
-    *safe_region_out = (safe_region_count << XC_DOM_PAGE_SHIFT(dom)) - offset;
-    return ptr + offset;
 }
 
 static inline xen_pfn_t xc_dom_p2m(struct xc_dom_image *dom, xen_pfn_t pfn)

@@ -56,7 +56,7 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
     uint64_t machine = elf_uval(elf, elf->ehdr, e_machine);
 
     if ( dom->container_type == XC_DOM_HVM_CONTAINER &&
-         dom->parms.phys_entry != UNSET_ADDR32 )
+         dom->parms->phys_entry != UNSET_ADDR32 )
         return "hvm-3.0-x86_32";
     if ( dom->container_type == XC_DOM_HVM_CONTAINER )
     {
@@ -69,7 +69,7 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
     switch ( machine )
     {
     case EM_386:
-        switch ( dom->parms.pae )
+        switch ( dom->parms->pae )
         {
         case XEN_PAE_BIMODAL:
             if ( strstr(dom->xen_caps, "xen-3.0-x86_32p") )
@@ -135,7 +135,7 @@ static elf_negerrnoval xc_dom_probe_elf_kernel(struct xc_dom_image *dom)
      * or else we might be trying to load a plain ELF.
      */
     elf_parse_binary(&elf);
-    rc = elf_xen_parse(&elf, &dom->parms);
+    rc = elf_xen_parse(&elf, dom->parms);
     if ( rc != 0 )
         return rc;
 
@@ -166,13 +166,13 @@ static elf_negerrnoval xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
 
     /* parse binary and get xen meta info */
     elf_parse_binary(elf);
-    if ( elf_xen_parse(elf, &dom->parms) != 0 )
+    if ( elf_xen_parse(elf, dom->parms) != 0 )
     {
         rc = -EINVAL;
         goto out;
     }
 
-    if ( elf_xen_feature_get(XENFEAT_dom0, dom->parms.f_required) )
+    if ( elf_xen_feature_get(XENFEAT_dom0, dom->parms->f_required) )
     {
         xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: Kernel does not"
                      " support unprivileged (DomU) operation", __FUNCTION__);
@@ -181,8 +181,8 @@ static elf_negerrnoval xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     }
 
     /* find kernel segment */
-    dom->kernel_seg.vstart = dom->parms.virt_kstart;
-    dom->kernel_seg.vend   = dom->parms.virt_kend;
+    dom->kernel_seg.vstart = dom->parms->virt_kstart;
+    dom->kernel_seg.vend   = dom->parms->virt_kend;
 
     dom->guest_type = xc_dom_guest_type(dom, elf);
     if ( dom->guest_type == NULL )

@@ -111,8 +111,8 @@ static int xc_dom_parse_zimage32_kernel(struct xc_dom_image *dom)
     dom->kernel_seg.vstart = v_start;
     dom->kernel_seg.vend   = v_end;
 
-    dom->parms.virt_entry = entry_addr;
-    dom->parms.virt_base = rambase;
+    dom->parms->virt_entry = entry_addr;
+    dom->parms->virt_base = rambase;
 
     dom->guest_type = "xen-3.0-armv7l";
     DOMPRINTF("%s: %s: 0x%" PRIx64 " -> 0x%" PRIx64 "",
@@ -200,8 +200,8 @@ static int xc_dom_parse_zimage64_kernel(struct xc_dom_image *dom)
     dom->kernel_seg.vend   = v_end;
 
     /* Call the kernel at offset 0 */
-    dom->parms.virt_entry = v_start;
-    dom->parms.virt_base = rambase;
+    dom->parms->virt_entry = v_start;
+    dom->parms->virt_base = rambase;
 
     dom->guest_type = "xen-3.0-aarch64";
     DOMPRINTF("%s: %s: 0x%" PRIx64 " -> 0x%" PRIx64 "",

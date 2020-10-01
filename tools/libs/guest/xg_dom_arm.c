@@ -117,7 +117,7 @@ static int vcpu_arm32(struct xc_dom_image *dom)
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
 
-    ctxt->user_regs.pc32 = dom->parms.virt_entry;
+    ctxt->user_regs.pc32 = dom->parms->virt_entry;
 
     /* Linux boot protocol. See linux.Documentation/arm/Booting. */
     ctxt->user_regs.r0_usr = 0; /* SBZ */
@@ -161,7 +161,7 @@ static int vcpu_arm64(struct xc_dom_image *dom)
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
 
-    ctxt->user_regs.pc64 = dom->parms.virt_entry;
+    ctxt->user_regs.pc64 = dom->parms->virt_entry;
 
     /* Linux boot protocol. See linux.Documentation/arm64/booting.txt. */
     ctxt->user_regs.x0 = dom->devicetree_blob ?

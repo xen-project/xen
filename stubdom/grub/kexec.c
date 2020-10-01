@@ -222,6 +222,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     char features[] = "";
     struct mmu_update *m2p_updates;
     unsigned long nr_m2p_updates;
+    uint64_t virt_base;
 
     DEBUG("booting with cmdline %s\n", cmdline);
     xc_handle = xc_interface_open(0,0,0);
@@ -294,10 +295,11 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
         goto out;
     }
 
+    virt_base = xc_dom_virt_base(dom);
     /* copy hypercall page */
     /* TODO: domctl instead, but requires privileges */
-    if (dom->parms.virt_hypercall != -1) {
-        pfn = PHYS_PFN(dom->parms.virt_hypercall - dom->parms.virt_base);
+    if (xc_dom_virt_hypercall(dom) != -1) {
+        pfn = PHYS_PFN(xc_dom_virt_hypercall(dom) - virt_base);
         memcpy((void *) pages[pfn], hypercall_page, PAGE_SIZE);
     }
 
@@ -313,11 +315,11 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     /* Move current console, xenstore and boot MFNs to the allocated place */
     do_exchange(dom, dom->console_pfn, start_info.console.domU.mfn);
     do_exchange(dom, dom->xenstore_pfn, start_info.store_mfn);
-    DEBUG("virt base at %llx\n", dom->parms.virt_base);
+    DEBUG("virt base at %llx\n", virt_base);
     DEBUG("bootstack_pfn %lx\n", dom->bootstack_pfn);
-    _boot_target = dom->parms.virt_base + PFN_PHYS(dom->bootstack_pfn);
+    _boot_target = virt_base + PFN_PHYS(dom->bootstack_pfn);
     DEBUG("_boot_target %lx\n", _boot_target);
-    do_exchange(dom, PHYS_PFN(_boot_target - dom->parms.virt_base),
+    do_exchange(dom, PHYS_PFN(_boot_target - virt_base),
             virt_to_mfn(&_boot_page));
 
     if ( dom->arch_hooks->setup_pgtables )
@@ -373,13 +375,13 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     _boot_oldpdmfn = virt_to_mfn(start_info.pt_base);
     DEBUG("boot old pd mfn %lx\n", _boot_oldpdmfn);
     DEBUG("boot pd virt %lx\n", dom->pgtables_seg.vstart);
-    _boot_pdmfn = dom->pv_p2m[PHYS_PFN(dom->pgtables_seg.vstart - dom->parms.virt_base)];
+    _boot_pdmfn = dom->pv_p2m[PHYS_PFN(dom->pgtables_seg.vstart - virt_base)];
     DEBUG("boot pd mfn %lx\n", _boot_pdmfn);
     _boot_stack = _boot_target + PAGE_SIZE;
     DEBUG("boot stack %lx\n", _boot_stack);
-    _boot_start_info = dom->parms.virt_base + PFN_PHYS(dom->start_info_pfn);
+    _boot_start_info = virt_base + PFN_PHYS(dom->start_info_pfn);
     DEBUG("boot start info %lx\n", _boot_start_info);
-    _boot_start = dom->parms.virt_entry;
+    _boot_start = xc_dom_virt_entry(dom);
     DEBUG("boot start %lx\n", _boot_start);
 
     /* Keep only useful entries */

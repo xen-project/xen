@@ -31,6 +31,7 @@
 
 #include <xen/memory.h>
 #include <xen/elfnote.h>
+#include <xen/libelf/libelf.h>
 
 #ifndef ELFSIZE
 #include <limits.h>
