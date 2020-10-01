@@ -41,6 +41,19 @@
 #endif
 #endif
 
+struct xc_dom_loader {
+    char *name;
+    /* Sadly the error returns from these functions are not consistent: */
+    elf_negerrnoval (*probe) (struct xc_dom_image * dom);
+    elf_negerrnoval (*parser) (struct xc_dom_image * dom);
+    elf_errorstatus (*loader) (struct xc_dom_image * dom);
+
+    struct xc_dom_loader *next;
+};
+
+#define __init __attribute__ ((constructor))
+void xc_dom_register_loader(struct xc_dom_loader *loader);
+
 char *xc_read_image(xc_interface *xch,
                     const char *filename, unsigned long *size);
 char *xc_inflate_buffer(xc_interface *xch,

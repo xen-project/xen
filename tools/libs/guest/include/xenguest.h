@@ -247,21 +247,6 @@ struct xc_dom_image {
     unsigned int max_vcpus;
 };
 
-/* --- pluggable kernel loader ------------------------------------- */
-
-struct xc_dom_loader {
-    char *name;
-    /* Sadly the error returns from these functions are not consistent: */
-    elf_negerrnoval (*probe) (struct xc_dom_image * dom);
-    elf_negerrnoval (*parser) (struct xc_dom_image * dom);
-    elf_errorstatus (*loader) (struct xc_dom_image * dom);
-
-    struct xc_dom_loader *next;
-};
-
-#define __init __attribute__ ((constructor))
-void xc_dom_register_loader(struct xc_dom_loader *loader);
-
 /* --- arch specific hooks ----------------------------------------- */
 
 struct xc_dom_arch {
