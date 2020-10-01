@@ -31,7 +31,6 @@
 #include <zlib.h>
 
 #include "xg_private.h"
-#include "xenctrl_dom.h"
 #include "xc_core.h"
 #include <xen/hvm/params.h>
 #include <xen/grant_table.h>

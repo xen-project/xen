@@ -30,7 +30,6 @@
 
 #include "xenctrl.h"
 #include "xg_private.h"
-#include "xenctrl_dom.h"
 
 /* ------------------------------------------------------------------------ */
 

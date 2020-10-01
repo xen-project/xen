@@ -1,5 +1,3 @@
-#include "xenctrl_dom.h"
-
 typedef int decompress_fn(unsigned char *inbuf, unsigned int len,
                           int (*fill)(void*, unsigned int),
                           int (*flush)(void*, unsigned int),

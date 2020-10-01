@@ -17,8 +17,6 @@
 #include "libxl_internal.h"
 #include "libxl_arch.h"
 
-#include <xenctrl_dom.h>
-
 _hidden
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom);

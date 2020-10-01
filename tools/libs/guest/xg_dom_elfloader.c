@@ -26,7 +26,6 @@
 #include <inttypes.h>
 
 #include "xg_private.h"
-#include "xenctrl_dom.h"
 #include "xc_bitops.h"
 
 #define XEN_VER "xen-3.0"

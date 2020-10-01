@@ -18,8 +18,6 @@
 #include <xen/hvm/e820.h>
 #include "libacpi/libacpi.h"
 
-#include <xenctrl_dom.h>
-
  /* Number of pages holding ACPI tables */
 #define NUM_ACPI_PAGES 16
 

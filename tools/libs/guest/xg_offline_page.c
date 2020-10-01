@@ -28,7 +28,6 @@
 #include <xc_core.h>
 
 #include "xc_private.h"
-#include "xenctrl_dom.h"
 #include "xg_private.h"
 #include "xg_save_restore.h"
 

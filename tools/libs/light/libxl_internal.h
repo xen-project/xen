@@ -57,7 +57,6 @@
 #include <xenctrl.h>
 #include <xenguest.h>
 #include <xenhypfs.h>
-#include <xenctrl_dom.h>
 
 #include <xen-tools/libs.h>
 

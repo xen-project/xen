@@ -1,6 +1,4 @@
-#ifndef __MINIOS__
-# include "xenctrl_dom.h"
-#else
+#ifdef __MINIOS__
 # include "xg_dom_decompress_unsafe.h"
 #endif
 

@@ -26,7 +26,6 @@
 #include <assert.h>
 
 #include "xg_private.h"
-#include "xenctrl_dom.h"
 #include "xc_bitops.h"
 
 /* ------------------------------------------------------------------------ */

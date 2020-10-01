@@ -3,7 +3,6 @@
 #include "libxl_libfdt_compat.h"
 #include "libxl_arm.h"
 
-#include <xenctrl_dom.h>
 #include <stdbool.h>
 #include <libfdt.h>
 #include <assert.h>

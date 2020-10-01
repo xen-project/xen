@@ -49,7 +49,7 @@ CFLAGS += -include $(XEN_ROOT)/tools/config.h
 # Needed for posix_fadvise64() in xc_linux.c
 CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
 
-LIBHEADER := xenctrl.h xenctrl_compat.h xenctrl_dom.h
+LIBHEADER := xenctrl.h xenctrl_compat.h
 PKG_CONFIG := xencontrol.pc
 PKG_CONFIG_NAME := Xencontrol
 

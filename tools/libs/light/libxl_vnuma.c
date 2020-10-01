@@ -17,8 +17,6 @@
 #include "libxl_arch.h"
 #include <stdlib.h>
 
-#include <xenctrl_dom.h>
-
 bool libxl__vnuma_configured(const libxl_domain_build_info *b_info)
 {
     return b_info->num_vnuma_nodes != 0;

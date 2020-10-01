@@ -83,7 +83,6 @@
 #include <inttypes.h>
 
 #include "xg_private.h"
-#include "xenctrl_dom.h"
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE_X86-1))&PAGE_MASK_X86)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK_X86)
