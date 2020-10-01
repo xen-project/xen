@@ -3140,6 +3140,7 @@ static void device_model_postconfig_chardev(libxl__egc *egc,
 {
     EGC_GC;
     libxl__dm_spawn_state *dmss = CONTAINER_OF(qmp, *dmss, qmp);
+    const libxl_vnc_info *vnc = libxl__dm_vnc(dmss->guest_config);
     const libxl__json_object *item = NULL;
     const libxl__json_object *o = NULL;
     int i = 0;
@@ -3196,6 +3197,9 @@ static void device_model_postconfig_chardev(libxl__egc *egc,
                               "%s", filename + ptyl);
         if (rc) goto out;
     }
+
+    if (!vnc)
+        goto out;
 
     qmp->callback = device_model_postconfig_vnc;
     rc = libxl__ev_qmp_send(egc, qmp, "query-vnc", NULL);
