@@ -17,17 +17,12 @@
 #define INVALID_VMID 0 /* VMID 0 is reserved */
 
 #ifdef CONFIG_ARM_64
-static unsigned int __read_mostly p2m_root_order;
-static unsigned int __read_mostly p2m_root_level;
-#define P2M_ROOT_ORDER    p2m_root_order
-#define P2M_ROOT_LEVEL p2m_root_level
+unsigned int __read_mostly p2m_root_order;
+unsigned int __read_mostly p2m_root_level;
 static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
 /* VMID is by default 8 bit width on AArch64 */
 #define MAX_VMID       max_vmid
 #else
-/* First level P2M is always 2 consecutive pages */
-#define P2M_ROOT_LEVEL 1
-#define P2M_ROOT_ORDER    1
 /* VMID is always 8 bit width on AArch32 */
 #define MAX_VMID        MAX_VMID_8_BIT
 #endif
