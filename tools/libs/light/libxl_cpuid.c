@@ -422,7 +422,15 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
 {
     bool pae = true;
     bool itsc;
-    bool nested_virt = libxl_defbool_val(info->nested_hvm);
+
+    /*
+     * Gross hack.  Using libxl_defbool_val() here causes libvirt to crash in
+     * __vfscanf_internal(), which is probably collateral damage from a side
+     * effect of the assert().
+     *
+     * Unblock things for now by opencoding without the assert.
+     */
+    bool nested_virt = info->nested_hvm.val > 0;
 
     /*
      * For PV guests, PAE is Xen-controlled (it is the 'p' that differentiates
