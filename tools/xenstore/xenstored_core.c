@@ -71,7 +71,6 @@ static unsigned int current_array_size;
 static unsigned int nr_fds;
 
 static int sock = -1;
-static int ro_sock = -1;
 
 static bool verbose = false;
 LIST_HEAD(connections);
@@ -311,8 +310,7 @@ fail:
 	return -1;
 }
 
-static void initialize_fds(int *p_sock_pollfd_idx, int *p_ro_sock_pollfd_idx,
-			   int *ptimeout)
+static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 {
 	struct connection *conn;
 	struct wrl_timestampt now;
@@ -325,8 +323,6 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *p_ro_sock_pollfd_idx,
 
 	if (sock != -1)
 		*p_sock_pollfd_idx = set_fd(sock, POLLIN|POLLPRI);
-	if (ro_sock != -1)
-		*p_ro_sock_pollfd_idx = set_fd(ro_sock, POLLIN|POLLPRI);
 	if (reopen_log_pipe[0] != -1)
 		reopen_log_pipe0_pollfd_idx =
 			set_fd(reopen_log_pipe[0], POLLIN|POLLPRI);
@@ -471,9 +467,6 @@ static enum xs_perm_type perm_for_conn(struct connection *conn,
 {
 	unsigned int i;
 	enum xs_perm_type mask = XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER;
-
-	if (!conn->can_write)
-		mask &= ~XS_PERM_WRITE;
 
 	/* Owners and tools get it all... */
 	if (!domain_is_unprivileged(conn) || perms[0].id == conn->id
@@ -1422,7 +1415,6 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->pollfd_idx = -1;
 	new->write = write;
 	new->read = read;
-	new->can_write = true;
 	new->transaction_started = 0;
 	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);
@@ -1435,7 +1427,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 }
 
 #ifdef NO_SOCKETS
-static void accept_connection(int sock, bool canwrite)
+static void accept_connection(int sock)
 {
 }
 #else
@@ -1477,7 +1469,7 @@ static int readfd(struct connection *conn, void *data, unsigned int len)
 	return rc;
 }
 
-static void accept_connection(int sock, bool canwrite)
+static void accept_connection(int sock)
 {
 	int fd;
 	struct connection *conn;
@@ -1487,10 +1479,9 @@ static void accept_connection(int sock, bool canwrite)
 		return;
 
 	conn = new_connection(writefd, readfd);
-	if (conn) {
+	if (conn)
 		conn->fd = fd;
-		conn->can_write = canwrite;
-	} else
+	else
 		close(fd);
 }
 #endif
@@ -1794,28 +1785,21 @@ static void destroy_fds(void)
 {
 	if (sock >= 0)
 		close(sock);
-	if (ro_sock >= 0)
-		close(ro_sock);
 }
 
 static void init_sockets(void)
 {
 	struct sockaddr_un addr;
 	const char *soc_str = xs_daemon_socket();
-	const char *soc_str_ro = xs_daemon_socket_ro();
 
 	/* Create sockets for them to listen to. */
 	atexit(destroy_fds);
 	sock = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (sock < 0)
 		barf_perror("Could not create socket");
-	ro_sock = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (ro_sock < 0)
-		barf_perror("Could not create socket");
 
 	/* FIXME: Be more sophisticated, don't mug running daemon. */
 	unlink(soc_str);
-	unlink(soc_str_ro);
 
 	addr.sun_family = AF_UNIX;
 
@@ -1825,17 +1809,10 @@ static void init_sockets(void)
 	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
 		barf_perror("Could not bind socket to %s", soc_str);
 
-	if(strlen(soc_str_ro) >= sizeof(addr.sun_path))
-		barf_perror("socket string '%s' too long", soc_str_ro);
-	strcpy(addr.sun_path, soc_str_ro);
-	if (bind(ro_sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-		barf_perror("Could not bind socket to %s", soc_str_ro);
-
-	if (chmod(soc_str, 0600) != 0
-	    || chmod(soc_str_ro, 0660) != 0)
+	if (chmod(soc_str, 0600) != 0)
 		barf_perror("Could not chmod sockets");
 
-	if (listen(sock, 1) != 0 || listen(ro_sock, 1) != 0)
+	if (listen(sock, 1) != 0)
 		barf_perror("Could not listen on sockets");
 }
 #endif
@@ -1893,7 +1870,7 @@ int priv_domid = 0;
 int main(int argc, char *argv[])
 {
 	int opt;
-	int sock_pollfd_idx = -1, ro_sock_pollfd_idx = -1;
+	int sock_pollfd_idx = -1;
 	bool dofork = true;
 	bool outputpid = false;
 	bool no_domain_init = false;
@@ -2010,7 +1987,7 @@ int main(int argc, char *argv[])
 		tracefile = talloc_strdup(NULL, tracefile);
 
 	/* Get ready to listen to the tools. */
-	initialize_fds(&sock_pollfd_idx, &ro_sock_pollfd_idx, &timeout);
+	initialize_fds(&sock_pollfd_idx, &timeout);
 
 	/* Tell the kernel we're up and running. */
 	xenbus_notify_running();
@@ -2051,18 +2028,8 @@ int main(int argc, char *argv[])
 				barf_perror("sock poll failed");
 				break;
 			} else if (fds[sock_pollfd_idx].revents & POLLIN) {
-				accept_connection(sock, true);
+				accept_connection(sock);
 				sock_pollfd_idx = -1;
-			}
-		}
-
-		if (ro_sock_pollfd_idx != -1) {
-			if (fds[ro_sock_pollfd_idx].revents & ~POLLIN) {
-				barf_perror("ro sock poll failed");
-				break;
-			} else if (fds[ro_sock_pollfd_idx].revents & POLLIN) {
-				accept_connection(ro_sock, false);
-				ro_sock_pollfd_idx = -1;
 			}
 		}
 
@@ -2128,7 +2095,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		initialize_fds(&sock_pollfd_idx, &ro_sock_pollfd_idx, &timeout);
+		initialize_fds(&sock_pollfd_idx, &timeout);
 	}
 }
 

@@ -63,13 +63,7 @@ const char *xs_daemon_socket(void)
 
 const char *xs_daemon_socket_ro(void)
 {
-	static char buf[PATH_MAX];
-	const char *s = xs_daemon_path();
-	if (s == NULL)
-		return NULL;
-	if (snprintf(buf, sizeof(buf), "%s_ro", s) >= PATH_MAX)
-		return NULL;
-	return buf;
+	return xs_daemon_path();
 }
 
 const char *xs_domain_dev(void)

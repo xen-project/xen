@@ -77,9 +77,6 @@ struct connection
 	/* Who am I? 0 for socket connections. */
 	unsigned int id;
 
-	/* Is this a read-only connection? */
-	bool can_write;
-
 	/* Buffered incoming data. */
 	struct buffered_data *in;
 
