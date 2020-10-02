@@ -116,9 +116,9 @@ config XEN_SHSTK
 	  compatiblity can be provided via the PV Shim mechanism.
 
 config SHADOW_PAGING
-        bool "Shadow Paging"
-        default y
-        ---help---
+	bool "Shadow Paging"
+	default !PV_SHIM_EXCLUSIVE
+	---help---
 
           Shadow paging is a software alternative to hardware paging support
           (Intel EPT, AMD NPT).
@@ -165,8 +165,8 @@ config HVM_FEP
 	  If unsure, say N.
 
 config TBOOT
-	def_bool y
-	prompt "Xen tboot support" if EXPERT
+	bool "Xen tboot support" if EXPERT
+	default y if !PV_SHIM_EXCLUSIVE
 	select CRYPTO
 	---help---
 	  Allows support for Trusted Boot using the Intel(R) Trusted Execution

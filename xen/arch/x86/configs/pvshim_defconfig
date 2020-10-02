@@ -8,12 +8,9 @@ CONFIG_NR_CPUS=32
 CONFIG_EXPERT=y
 CONFIG_SCHED_NULL=y
 # Disable features not used by the PV shim
-# CONFIG_HVM is not set
 # CONFIG_XEN_SHSTK is not set
 # CONFIG_HYPFS is not set
-# CONFIG_SHADOW_PAGING is not set
 # CONFIG_BIGMEM is not set
-# CONFIG_TBOOT is not set
 # CONFIG_KEXEC is not set
 # CONFIG_XENOPROF is not set
 # CONFIG_XSM is not set
