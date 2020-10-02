@@ -319,7 +319,7 @@ struct xs_handle *xs_open(unsigned long flags)
 	else
 		xsh = get_handle(xs_daemon_socket());
 
-	if (!xsh && !(flags & XS_OPEN_SOCKETONLY))
+	if (!xsh)
 		xsh = get_handle(xs_domain_dev());
 
 	if (xsh && (flags & XS_UNWATCH_FILTER))
