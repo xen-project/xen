@@ -21,6 +21,27 @@
 
 #include <public/event_channel.h>
 
+struct evtchn_fifo_queue {
+    uint32_t *head; /* points into control block */
+    uint32_t tail;
+    uint8_t priority;
+    spinlock_t lock;
+};
+
+struct evtchn_fifo_vcpu {
+    struct evtchn_fifo_control_block *control_block;
+    struct evtchn_fifo_queue queue[EVTCHN_FIFO_MAX_QUEUES];
+};
+
+#define EVTCHN_FIFO_EVENT_WORDS_PER_PAGE (PAGE_SIZE / sizeof(event_word_t))
+#define EVTCHN_FIFO_MAX_EVENT_ARRAY_PAGES \
+    (EVTCHN_FIFO_NR_CHANNELS / EVTCHN_FIFO_EVENT_WORDS_PER_PAGE)
+
+struct evtchn_fifo_domain {
+    event_word_t *event_array[EVTCHN_FIFO_MAX_EVENT_ARRAY_PAGES];
+    unsigned int num_evtchns;
+};
+
 static inline event_word_t *evtchn_fifo_word_from_port(const struct domain *d,
                                                        unsigned int port)
 {
