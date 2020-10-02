@@ -50,10 +50,6 @@ I<and> the permissions for any domain not explicitly listed in
 subsequent entries.  The key owner always has full access (read,
 write, and set permissions).
 
-=item B<-s>
-
-Connect to the Xenstore daemon using a local socket only.
-
 =back
 
 =head1 BUGS

@@ -16,10 +16,6 @@ Read values of one or more Xenstore I<PATH>s.
 
 Prefix value with key name.
 
-=item B<-s>
-
-Connect to the Xenstore daemon using a local socket only.
-
 =item B<-R>
 
 Read raw value, skip escaping non-printable characters (\x..).

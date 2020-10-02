@@ -46,10 +46,6 @@ write, and set permissions).
 
 Apply the permissions to the key and all its I<children>.
 
-=item B<-s>
-
-Connect to the Xenstore daemon using a local socket only.
-
 =item B<-u>
 
 Apply the permissions to the key and all its I<parents>.

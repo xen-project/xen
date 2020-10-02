@@ -530,7 +530,7 @@ main(int argc, char **argv)
 {
     struct xs_handle *xsh;
     xs_transaction_t xth = XBT_NULL;
-    int ret = 0, socket = 0;
+    int ret = 0;
     int prefix = 0;
     int tidy = 0;
     int upto = 0;
@@ -565,7 +565,6 @@ main(int argc, char **argv)
 	static struct option long_options[] = {
 	    {"help",    0, 0, 'h'},
 	    {"flat",    0, 0, 'f'}, /* MODE_ls */
-	    {"socket",  0, 0, 's'},
 	    {"prefix",  0, 0, 'p'}, /* MODE_read || MODE_list || MODE_ls */
 	    {"tidy",    0, 0, 't'}, /* MODE_rm */
 	    {"upto",    0, 0, 'u'}, /* MODE_chmod */
@@ -592,9 +591,6 @@ main(int argc, char **argv)
 	    } else {
 		usage(mode, switch_argv, argv[0]);
 	    }
-            break;
-        case 's':
-            socket = 1;
             break;
 	case 'p':
 	    if ( mode == MODE_read || mode == MODE_list || mode == MODE_ls )
@@ -675,7 +671,7 @@ main(int argc, char **argv)
 	    max_width = ws.ws_col - 2;
     }
 
-    xsh = xs_open(socket ? XS_OPEN_SOCKETONLY : 0);
+    xsh = xs_open(0);
     if (xsh == NULL) err(1, "xs_open");
 
 again:
