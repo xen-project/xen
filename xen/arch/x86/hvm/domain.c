@@ -39,7 +39,7 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
     {
         if ( seg != x86_seg_ds && seg != x86_seg_es )
         {
-            gprintk(XENLOG_ERR, "Null selector provided for CS, SS or TR\n");
+            gprintk(XENLOG_ERR, "Null segment attributes for CS, SS or TR\n");
             return -EINVAL;
         }
         return 0;
