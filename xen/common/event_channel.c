@@ -231,7 +231,11 @@ void evtchn_free(struct domain *d, struct evtchn *chn)
     evtchn_port_clear_pending(d, chn);
 
     if ( consumer_is_xen(chn) )
+    {
         write_atomic(&d->xen_evtchns, d->xen_evtchns - 1);
+        /* Decrement ->xen_evtchns /before/ ->active_evtchns. */
+        smp_wmb();
+    }
     write_atomic(&d->active_evtchns, d->active_evtchns - 1);
 
     /* Reset binding to vcpu0 when the channel is freed. */
@@ -1069,6 +1073,19 @@ int evtchn_unmask(unsigned int port)
     return 0;
 }
 
+static bool has_active_evtchns(const struct domain *d)
+{
+    unsigned int xen = read_atomic(&d->xen_evtchns);
+
+    /*
+     * Read ->xen_evtchns /before/ active_evtchns, to prevent
+     * evtchn_reset() exiting its loop early.
+     */
+    smp_rmb();
+
+    return read_atomic(&d->active_evtchns) > xen;
+}
+
 int evtchn_reset(struct domain *d, bool resuming)
 {
     unsigned int i;
@@ -1093,7 +1110,7 @@ int evtchn_reset(struct domain *d, bool resuming)
     if ( !i )
         return -EBUSY;
 
-    for ( ; port_is_valid(d, i); i++ )
+    for ( ; port_is_valid(d, i) && has_active_evtchns(d); i++ )
     {
         evtchn_close(d, i, 1);
 
@@ -1332,6 +1349,10 @@ int alloc_unbound_xen_event_channel(
 
     spin_unlock_irqrestore(&chn->lock, flags);
 
+    /*
+     * Increment ->xen_evtchns /after/ ->active_evtchns. No explicit
+     * barrier needed due to spin-locked region just above.
+     */
     write_atomic(&ld->xen_evtchns, ld->xen_evtchns + 1);
 
  out:
