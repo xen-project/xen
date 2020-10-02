@@ -398,7 +398,7 @@ int main(int argc, char **argv)
 		exit(EINVAL);
 	}
 
-	xs = xs_daemon_open();
+	xs = xs_open(0);
 	if (xs == NULL) {
 		err(errno, "Could not contact XenStore");
 	}

@@ -24,7 +24,7 @@ void cleanup(void)
     if (xch)
         xc_interface_close(xch);
     if (xs_handle)
-        xs_daemon_close(xs_handle);
+        xs_close(xs_handle);
 }
 
 /* Never shrink dom0 below 1 GiB */
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-    xs_handle = xs_daemon_open();
+    xs_handle = xs_open(0);
     if (xs_handle == NULL)
     {
         perror("Failed to open xenstore connection");

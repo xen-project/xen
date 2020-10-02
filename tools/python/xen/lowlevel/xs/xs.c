@@ -791,7 +791,7 @@ static PyObject *xspy_close(XsHandle *self)
         PySequence_SetItem(self->watches, i, Py_None);
     }
 
-    xs_daemon_close(xh);
+    xs_close(xh);
     self->xh = NULL;
 
     Py_INCREF(Py_None);
@@ -985,7 +985,7 @@ xshandle_init(XsHandle *self, PyObject *args, PyObject *kwds)
                                      &readonly))
         goto fail;
 
-    self->xh = (readonly ? xs_daemon_open_readonly() : xs_daemon_open());
+    self->xh = xs_open(0);
     if (!self->xh)
         goto fail;
 
@@ -999,7 +999,7 @@ xshandle_init(XsHandle *self, PyObject *args, PyObject *kwds)
 static void xshandle_dealloc(XsHandle *self)
 {
     if (self->xh) {
-        xs_daemon_close(self->xh);
+        xs_close(self->xh);
         self->xh = NULL;
     }
 

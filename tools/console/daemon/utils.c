@@ -104,7 +104,7 @@ void daemonize(const char *pidfile)
 bool xen_setup(void)
 {
 	
-	xs = xs_daemon_open();
+	xs = xs_open(0);
 	if (xs == NULL) {
 		dolog(LOG_ERR,
 		      "Failed to contact xenstore (%m).  Is it running?");
@@ -131,7 +131,7 @@ bool xen_setup(void)
 
  out:
 	if (xs)
-		xs_daemon_close(xs);
+		xs_close(xs);
 	if (xc)
 		xc_interface_close(xc);
 	return false;

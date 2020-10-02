@@ -663,7 +663,7 @@ int libxl__ev_child_xenstore_reopen(libxl__gc *gc, const char *what) {
     int rc;
 
     assert(!CTX->xsh);
-    CTX->xsh = xs_daemon_open();
+    CTX->xsh = xs_open(0);
     if (!CTX->xsh) {
         LOGE(ERROR, "%s: xenstore reopen failed", what);
         rc = ERROR_FAIL;  goto out;

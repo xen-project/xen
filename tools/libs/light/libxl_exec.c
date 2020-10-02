@@ -178,7 +178,7 @@ int libxl__xenstore_child_wait_deprecated(libxl__gc *gc,
     unsigned int num;
     char **l = NULL;
 
-    xsh = xs_daemon_open();
+    xsh = xs_open(0);
     if (xsh == NULL) {
         LOG(ERROR, "Unable to open xenstore connection");
         goto err;
@@ -206,7 +206,7 @@ int libxl__xenstore_child_wait_deprecated(libxl__gc *gc,
 
         free(p);
         xs_unwatch(xsh, path, path);
-        xs_daemon_close(xsh);
+        xs_close(xsh);
         return rc;
 again:
         free(p);
@@ -226,7 +226,7 @@ again:
     LOG(ERROR, "%s not ready", what);
 
     xs_unwatch(xsh, path, path);
-    xs_daemon_close(xsh);
+    xs_close(xsh);
 err:
     return -1;
 }

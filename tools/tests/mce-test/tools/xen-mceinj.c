@@ -411,13 +411,13 @@ static long xs_get_dom_mem(int domid)
     unsigned int plen;
     struct xs_handle *xs;
 
-    xs = xs_daemon_open();
+    xs = xs_open(0);
     if (!xs)
         return -1;
 
     sprintf(path, "/local/domain/%d/memory/target", domid);
     memstr = xs_read(xs, XBT_NULL, path, &plen);
-    xs_daemon_close(xs);
+    xs_close(xs);
 
     if (!memstr || !plen)
         return -1;

@@ -103,9 +103,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
         rc = ERROR_FAIL; goto out;
     }
 
-    ctx->xsh = xs_daemon_open();
-    if (!ctx->xsh)
-        ctx->xsh = xs_domain_open();
+    ctx->xsh = xs_open(0);
     if (!ctx->xsh) {
         LOGEV(ERROR, errno, "cannot connect to xenstore");
         rc = ERROR_FAIL; goto out;
@@ -171,7 +169,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
 
     if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_dispose(&ctx->version_info);
-    if (ctx->xsh) xs_daemon_close(ctx->xsh);
+    if (ctx->xsh) xs_close(ctx->xsh);
     if (ctx->xce) xenevtchn_close(ctx->xce);
 
     libxl__poller_put(ctx, ctx->poller_app);

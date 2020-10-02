@@ -502,18 +502,18 @@ int main(int argc, char *argv[])
 #ifndef RUN_STANDALONE
     daemonize();
 #endif
-    xs = (struct xs_handle *)xs_daemon_open();
+    xs = xs_open(0);
     if ( xs == NULL ) 
         return -1;
 
     if ( write_one_time_battery_info() == 0 ) 
     {
-        xs_daemon_close(xs);
+        xs_close(xs);
         return -1;
     }
 
     wait_for_and_update_battery_status_request();
-    xs_daemon_close(xs);
+    xs_close(xs);
     return 0;
 }
 

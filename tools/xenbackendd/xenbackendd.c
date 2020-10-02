@@ -122,7 +122,7 @@ usage(void)
 static int
 xen_setup(void)
 {
-	xs = xs_daemon_open();
+	xs = xs_open(0);
 	if (xs == NULL) {
 		dolog(LOG_ERR,
 		    "Failed to contact xenstore (%s).  Is it running?",
@@ -138,7 +138,7 @@ xen_setup(void)
 
  out:
 	if (xs) {
-		xs_daemon_close(xs);
+		xs_close(xs);
 		xs = NULL;
 	}
 	return -1;

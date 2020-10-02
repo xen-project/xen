@@ -107,7 +107,7 @@ xenstat_handle *xenstat_init(void)
 		return NULL;
 	}
 
-	handle->xshandle = xs_daemon_open_readonly(); /* open handle to xenstore*/
+	handle->xshandle = xs_open(0); /* open handle to xenstore*/
 	if (handle->xshandle == NULL) {
 		perror("unable to open xenstore");
 		xc_interface_close(handle->xc_handle);
@@ -125,7 +125,7 @@ void xenstat_uninit(xenstat_handle * handle)
 		for (i = 0; i < NUM_COLLECTORS; i++)
 			collectors[i].uninit(handle);
 		xc_interface_close(handle->xc_handle);
-		xs_daemon_close(handle->xshandle);
+		xs_close(handle->xshandle);
 		free(handle->priv);
 		free(handle);
 	}

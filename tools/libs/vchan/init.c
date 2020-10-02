@@ -251,7 +251,7 @@ static int init_xs_srv(struct libxenvchan *ctrl, int domain, const char* xs_base
 	char ref[16];
 	char* domid_str = NULL;
 	xs_transaction_t xs_trans = XBT_NULL;
-	xs = xs_domain_open();
+	xs = xs_open(0);
 	if (!xs)
 		goto fail;
 	domid_str = xs_read(xs, 0, "domid", NULL);
@@ -293,7 +293,7 @@ retry_transaction:
 	}
  fail_xs_open:
 	free(domid_str);
-	xs_daemon_close(xs);
+	xs_close(xs);
  fail:
 	return ret;
 }
@@ -408,9 +408,7 @@ struct libxenvchan *libxenvchan_client_init(struct xentoollog_logger *logger,
 	ctrl->write.order = ctrl->read.order = 0;
 	ctrl->is_server = 0;
 
-	xs = xs_daemon_open();
-	if (!xs)
-		xs = xs_domain_open();
+	xs = xs_open(0);
 	if (!xs)
 		goto fail;
 
@@ -452,7 +450,7 @@ struct libxenvchan *libxenvchan_client_init(struct xentoollog_logger *logger,
 
  out:
 	if (xs)
-		xs_daemon_close(xs);
+		xs_close(xs);
 	return ctrl;
  fail:
 	libxenvchan_close(ctrl);
