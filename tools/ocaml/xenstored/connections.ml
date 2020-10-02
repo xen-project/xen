@@ -31,7 +31,7 @@ let create () = {
 	watches = Trie.create ()
 }
 
-let add_anonymous cons fd _can_write =
+let add_anonymous cons fd =
 	let xbcon = Xenbus.Xb.open_fd fd in
 	let con = Connection.create xbcon None in
 	Hashtbl.add cons.anonymous (Xenbus.Xb.get_fd xbcon) con

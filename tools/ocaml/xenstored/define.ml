@@ -18,7 +18,6 @@ let xenstored_major = 1
 let xenstored_minor = 0
 
 let xs_daemon_socket = Paths.xen_run_stored ^ "/socket"
-let xs_daemon_socket_ro = Paths.xen_run_stored ^ "/socket_ro"
 
 let default_config_dir = Paths.xen_config_dir
 

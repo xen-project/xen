@@ -242,12 +242,11 @@ let _ =
 		()
 	);
 
-	let rw_sock, ro_sock =
+	let rw_sock =
 		if cf.disable_socket then
-			None, None
+			None
 		else
-			Some (Unix.handle_unix_error Utils.create_unix_socket Define.xs_daemon_socket),
-			Some (Unix.handle_unix_error Utils.create_unix_socket Define.xs_daemon_socket_ro)
+			Some (Unix.handle_unix_error Utils.create_unix_socket Define.xs_daemon_socket)
 		in
 
 	if cf.daemonize then
@@ -320,15 +319,14 @@ let _ =
 
 	let spec_fds =
 		(match rw_sock with None -> [] | Some x -> [ x ]) @
-		(match ro_sock with None -> [] | Some x -> [ x ]) @
 		(if cf.domain_init then [ Event.fd eventchn ] else [])
 		in
 
 	let process_special_fds rset =
-		let accept_connection can_write fd =
+		let accept_connection fd =
 			let (cfd, _addr) = Unix.accept fd in
 			debug "new connection through socket";
-			Connections.add_anonymous cons cfd can_write
+			Connections.add_anonymous cons cfd
 		and handle_eventchn _fd =
 			let port = Event.pending eventchn in
 			debug "pending port %d" (Xeneventchn.to_int port);
@@ -348,8 +346,7 @@ let _ =
 			if List.mem fd set then
 				fct fd in
 
-		maybe (fun fd -> do_if_set fd rset (accept_connection true)) rw_sock;
-		maybe (fun fd -> do_if_set fd rset (accept_connection false)) ro_sock;
+		maybe (fun fd -> do_if_set fd rset accept_connection) rw_sock;
 		do_if_set (Event.fd eventchn) rset (handle_eventchn)
 	in
 
