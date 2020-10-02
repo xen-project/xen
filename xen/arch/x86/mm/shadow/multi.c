@@ -618,6 +618,7 @@ _sh_propagate(struct vcpu *v,
         }
     }
 
+#ifdef CONFIG_HVM
     if ( unlikely(level == 1) && is_hvm_domain(d) )
     {
         struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
@@ -632,6 +633,7 @@ _sh_propagate(struct vcpu *v,
                 sflags &= ~_PAGE_RW;
         }
     }
+#endif
 
     /* Read-only memory */
     if ( p2m_is_readonly(p2mt) )
@@ -1050,6 +1052,7 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
                                        mfn_t sl1mfn,
                                        struct domain *d)
 {
+#ifdef CONFIG_HVM
     mfn_t mfn = shadow_l1e_get_mfn(new_sl1e);
     int flags = shadow_l1e_get_flags(new_sl1e);
     unsigned long gfn;
@@ -1074,6 +1077,7 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
             dirty_vram->sl1ma[i] = mfn_to_maddr(sl1mfn)
                 | ((unsigned long)sl1e & ~PAGE_MASK);
     }
+#endif
 }
 
 static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
@@ -1081,6 +1085,7 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
                                        mfn_t sl1mfn,
                                        struct domain *d)
 {
+#ifdef CONFIG_HVM
     mfn_t mfn = shadow_l1e_get_mfn(old_sl1e);
     int flags = shadow_l1e_get_flags(old_sl1e);
     unsigned long gfn;
@@ -1140,6 +1145,7 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
             dirty_vram->last_dirty = NOW();
         }
     }
+#endif
 }
 
 static int shadow_set_l1e(struct domain *d,

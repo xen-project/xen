@@ -67,8 +67,12 @@
 #define PG_translate   0
 #define PG_external    0
 #endif
+#if defined(CONFIG_HVM) || !defined(CONFIG_PV_SHIM_EXCLUSIVE)
 /* Enable log dirty mode */
 #define PG_log_dirty   (XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY << PG_mode_shift)
+#else
+#define PG_log_dirty   0
+#endif
 
 /* All paging modes. */
 #define PG_MASK (PG_refcounts | PG_log_dirty | PG_translate | PG_external)
@@ -154,7 +158,7 @@ struct paging_mode {
 /*****************************************************************************
  * Log dirty code */
 
-#ifndef CONFIG_PV_SHIM_EXCLUSIVE
+#if PG_log_dirty
 
 /* get the dirty bitmap for a specific range of pfns */
 void paging_log_dirty_range(struct domain *d,
@@ -195,23 +199,28 @@ int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn);
 #define L4_LOGDIRTY_IDX(pfn) ((pfn_x(pfn) >> (PAGE_SHIFT + 3 + PAGETABLE_ORDER * 2)) & \
                               (LOGDIRTY_NODE_ENTRIES-1))
 
+#ifdef CONFIG_HVM
 /* VRAM dirty tracking support */
 struct sh_dirty_vram {
     unsigned long begin_pfn;
     unsigned long end_pfn;
+#ifdef CONFIG_SHADOW_PAGING
     paddr_t *sl1ma;
     uint8_t *dirty_bitmap;
     s_time_t last_dirty;
+#endif
 };
+#endif
 
-#else /* !CONFIG_PV_SHIM_EXCLUSIVE */
+#else /* !PG_log_dirty */
 
 static inline void paging_log_dirty_init(struct domain *d,
                                          const struct log_dirty_ops *ops) {}
 static inline void paging_mark_dirty(struct domain *d, mfn_t gmfn) {}
 static inline void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn) {}
+static inline bool paging_mfn_is_dirty(struct domain *d, mfn_t gmfn) { return false; }
 
-#endif /* CONFIG_PV_SHIM_EXCLUSIVE */
+#endif /* PG_log_dirty */
 
 /*****************************************************************************
  * Entry points into the paging-assistance code */

@@ -2869,12 +2869,14 @@ void shadow_teardown(struct domain *d, bool *preempted)
      * calls now that we've torn down the bitmap */
     d->arch.paging.mode &= ~PG_log_dirty;
 
-    if ( d->arch.hvm.dirty_vram )
+#ifdef CONFIG_HVM
+    if ( is_hvm_domain(d) && d->arch.hvm.dirty_vram )
     {
         xfree(d->arch.hvm.dirty_vram->sl1ma);
         xfree(d->arch.hvm.dirty_vram->dirty_bitmap);
         XFREE(d->arch.hvm.dirty_vram);
     }
+#endif
 
 out:
     paging_unlock(d);
