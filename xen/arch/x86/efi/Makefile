@@ -8,7 +8,7 @@ cmd_objcopy_o_ihex = $(OBJCOPY) -I ihex -O binary $< $@
 
 boot.init.o: buildid.o
 
-EFIOBJ := boot.init.o ebmalloc.o compat.o runtime.o
+EFIOBJ := boot.init.o pe.init.o ebmalloc.o compat.o runtime.o
 
 $(call cc-option-add,cflags-stack-boundary,CC,-mpreferred-stack-boundary=4)
 $(EFIOBJ): CFLAGS-stack-boundary := $(cflags-stack-boundary)
