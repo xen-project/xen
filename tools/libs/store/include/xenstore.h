@@ -60,15 +60,12 @@ typedef uint32_t xs_transaction_t;
 /* Open a connection to the xs daemon.
  * Attempts to make a connection over the socket interface,
  * and if it fails, then over the  xenbus interface.
- * Mode 0 specifies read-write access, XS_OPEN_READONLY for
- * read-only access.
  *
  * * Connections made with xs_open(0) (which might be shared page or
  *   socket based) are only guaranteed to work in the parent after
  *   fork.
  * * xs_daemon_open*() and xs_domain_open() are deprecated synonyms
  *   for xs_open(0).
- * * XS_OPEN_READONLY has no bearing on any of this.
  *
  * Returns a handle or NULL.
  */
@@ -83,11 +80,6 @@ void xs_close(struct xs_handle *xsh /* NULL ok */);
  */
 struct xs_handle *xs_daemon_open(void);
 struct xs_handle *xs_domain_open(void);
-
-/* Connect to the xs daemon (readonly for non-root clients).
- * Returns a handle or NULL.
- * Deprecated, please use xs_open(XS_OPEN_READONLY) instead
- */
 struct xs_handle *xs_daemon_open_readonly(void);
 
 /* Close the connection to the xs daemon.

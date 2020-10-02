@@ -302,7 +302,7 @@ struct xs_handle *xs_daemon_open(void)
 
 struct xs_handle *xs_daemon_open_readonly(void)
 {
-	return xs_open(XS_OPEN_READONLY);
+	return xs_open(0);
 }
 
 struct xs_handle *xs_domain_open(void)
@@ -314,10 +314,7 @@ struct xs_handle *xs_open(unsigned long flags)
 {
 	struct xs_handle *xsh = NULL;
 
-	if (flags & XS_OPEN_READONLY)
-		xsh = get_handle(xs_daemon_socket_ro());
-	else
-		xsh = get_handle(xs_daemon_socket());
+	xsh = get_handle(xs_daemon_socket());
 
 	if (!xsh)
 		xsh = get_handle(xs_domain_dev());
