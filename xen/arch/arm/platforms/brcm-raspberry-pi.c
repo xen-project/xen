@@ -17,6 +17,10 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/delay.h>
+#include <xen/mm.h>
+#include <xen/vmap.h>
+#include <asm/io.h>
 #include <asm/platform.h>
 
 static const char *const rpi4_dt_compat[] __initconst =
@@ -37,12 +41,69 @@ static const struct dt_device_match rpi4_blacklist_dev[] __initconst =
      * The aux peripheral also shares a page with the aux UART.
      */
     DT_MATCH_COMPATIBLE("brcm,bcm2835-aux"),
+    /* Special device used for rebooting */
+    DT_MATCH_COMPATIBLE("brcm,bcm2835-pm"),
     { /* sentinel */ },
 };
+
+
+#define PM_PASSWORD                 0x5a000000
+#define PM_RSTC                     0x1c
+#define PM_WDOG                     0x24
+#define PM_RSTC_WRCFG_FULL_RESET    0x00000020
+#define PM_RSTC_WRCFG_CLR           0xffffffcf
+
+static void __iomem *rpi4_map_watchdog(void)
+{
+    void __iomem *base;
+    struct dt_device_node *node;
+    paddr_t start, len;
+    int ret;
+
+    node = dt_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm");
+    if ( !node )
+        return NULL;
+
+    ret = dt_device_get_address(node, 0, &start, &len);
+    if ( ret )
+    {
+        printk("Cannot read watchdog register address\n");
+        return NULL;
+    }
+
+    base = ioremap_nocache(start & PAGE_MASK, PAGE_SIZE);
+    if ( !base )
+    {
+        printk("Unable to map watchdog register!\n");
+        return NULL;
+    }
+
+    return base;
+}
+
+static void rpi4_reset(void)
+{
+    uint32_t val;
+    void __iomem *base = rpi4_map_watchdog();
+
+    if ( !base )
+        return;
+
+    /* use a timeout of 10 ticks (~150us) */
+    writel(10 | PM_PASSWORD, base + PM_WDOG);
+    val = readl(base + PM_RSTC);
+    val &= PM_RSTC_WRCFG_CLR;
+    val |= PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
+    writel(val, base + PM_RSTC);
+
+    /* No sleeping, possibly atomic. */
+    mdelay(1);
+}
 
 PLATFORM_START(rpi4, "Raspberry Pi 4")
     .compatible     = rpi4_dt_compat,
     .blacklist_dev  = rpi4_blacklist_dev,
+    .reset = rpi4_reset,
     .dma_bitsize    = 30,
 PLATFORM_END
 
