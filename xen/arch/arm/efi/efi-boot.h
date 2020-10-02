@@ -314,7 +314,10 @@ static void __init *fdt_increase_size(struct file *fdtfile, int add_size)
     if ( fdt_size )
     {
         if ( fdt_open_into(dtbfile.ptr, new_fdt, pages * EFI_PAGE_SIZE) )
+        {
+            efi_bs->FreePages(fdt_addr, pages);
             return NULL;
+        }
     }
     else
     {
@@ -326,7 +329,10 @@ static void __init *fdt_increase_size(struct file *fdtfile, int add_size)
          * system table that is passed in the FDT.
          */
         if ( fdt_create_empty_tree(new_fdt, pages * EFI_PAGE_SIZE) )
+        {
+            efi_bs->FreePages(fdt_addr, pages);
             return NULL;
+        }
     }
 
     /*
@@ -335,12 +341,13 @@ static void __init *fdt_increase_size(struct file *fdtfile, int add_size)
      * code will free it.  If the original FDT came from a configuration
      * table, we don't own that memory and can't free it.
      */
-    if ( dtbfile.size )
+    if ( dtbfile.need_to_free )
         efi_bs->FreePages(dtbfile.addr, PFN_UP(dtbfile.size));
 
     /* Update 'file' info for new memory so we clean it up on error exits */
     dtbfile.addr = fdt_addr;
     dtbfile.size = pages * EFI_PAGE_SIZE;
+    dtbfile.need_to_free = true;
     return new_fdt;
 }
 
@@ -546,7 +553,7 @@ static void __init efi_arch_cpu(void)
 
 static void __init efi_arch_blexit(void)
 {
-    if ( dtbfile.addr && dtbfile.size )
+    if ( dtbfile.need_to_free )
         efi_bs->FreePages(dtbfile.addr, PFN_UP(dtbfile.size));
     if ( memmap )
         efi_bs->FreePool(memmap);
