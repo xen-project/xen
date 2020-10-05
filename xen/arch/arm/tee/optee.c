@@ -1127,25 +1127,7 @@ static int handle_rpc_return(struct optee_domain *ctx,
          */
         if ( shm_rpc->xen_arg->cmd == OPTEE_RPC_CMD_SHM_FREE )
         {
-            uint64_t cookie = shm_rpc->xen_arg->params[0].u.value.b;
-
-            free_optee_shm_buf(ctx, cookie);
-
-            /*
-             * OP-TEE asks to free the buffer, but this is not the same
-             * buffer we previously allocated for it. While nothing
-             * prevents OP-TEE from asking this, it is the strange
-             * situation. This may or may not be caused by a bug in
-             * OP-TEE or mediator. But is better to print warning.
-             */
-            if ( call->rpc_data_cookie && call->rpc_data_cookie != cookie )
-            {
-                gprintk(XENLOG_ERR,
-                        "Saved RPC cookie does not corresponds to OP-TEE's (%"PRIx64" != %"PRIx64")\n",
-                        call->rpc_data_cookie, cookie);
-
-                WARN();
-            }
+            free_optee_shm_buf(ctx, shm_rpc->xen_arg->params[0].u.value.b);
             call->rpc_data_cookie = 0;
         }
         unmap_domain_page(shm_rpc->xen_arg);
