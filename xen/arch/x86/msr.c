@@ -122,6 +122,7 @@ int init_vcpu_msr_policy(struct vcpu *v)
 
 int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
+    const struct domain *d = v->domain;
     const struct cpuid_policy *cp = v->domain->arch.cpuid;
     const struct msr_domain_policy *dp = v->domain->arch.msr;
     const struct msr_vcpu_policy *vp = v->arch.msr;
@@ -164,6 +165,25 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         break;
 
         /*
+         * These MSRs are not enumerated in CPUID.  They have been around
+         * since the Pentium 4, and implemented by other vendors.
+         *
+         * Some versions of Windows try reading these before setting up a #GP
+         * handler, and Linux has several unguarded reads as well.  Provide
+         * RAZ semantics, in general, but permit a cpufreq controller dom0 to
+         * have full access.
+         */
+    case MSR_IA32_PERF_STATUS:
+    case MSR_IA32_PERF_CTL:
+        if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR)) )
+            goto gp_fault;
+
+        *val = 0;
+        if ( likely(!is_cpufreq_controller(d)) || rdmsr_safe(msr, *val) == 0 )
+            break;
+        goto gp_fault;
+
+        /*
          * TODO: Implement when we have better topology representation.
     case MSR_INTEL_CORE_THREAD_COUNT:
          */
@@ -192,6 +212,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case MSR_INTEL_CORE_THREAD_COUNT:
     case MSR_INTEL_PLATFORM_INFO:
     case MSR_ARCH_CAPABILITIES:
+    case MSR_IA32_PERF_STATUS:
         /* Read-only */
     case MSR_TSX_FORCE_ABORT:
     case MSR_TSX_CTRL:
@@ -282,6 +303,21 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
             ctxt_switch_levelling(v);
         break;
     }
+
+        /*
+         * This MSR is not enumerated in CPUID.  It has been around since the
+         * Pentium 4, and implemented by other vendors.
+         *
+         * To match the RAZ semantics, implement as write-discard, except for
+         * a cpufreq controller dom0 which has full access.
+         */
+    case MSR_IA32_PERF_CTL:
+        if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR)) )
+            goto gp_fault;
+
+        if ( likely(!is_cpufreq_controller(d)) || wrmsr_safe(msr, val) == 0 )
+            break;
+        goto gp_fault;
 
     default:
         return X86EMUL_UNHANDLEABLE;

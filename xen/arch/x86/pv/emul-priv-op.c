@@ -835,12 +835,6 @@ static inline uint64_t guest_misc_enable(uint64_t val)
     return val;
 }
 
-static inline bool is_cpufreq_controller(const struct domain *d)
-{
-    return ((cpufreq_controller == FREQCTL_dom0_kernel) &&
-            is_hardware_domain(d));
-}
-
 static int read_msr(unsigned int reg, uint64_t *val,
                     struct x86_emulate_ctxt *ctxt)
 {
@@ -1123,14 +1117,6 @@ static int write_msr(unsigned int reg, uint64_t val,
     case MSR_IA32_APERF:
         if ( (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL) &&
              (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) )
-            break;
-        if ( likely(!is_cpufreq_controller(currd)) ||
-             wrmsr_safe(reg, val) == 0 )
-            return X86EMUL_OKAY;
-        break;
-
-    case MSR_IA32_PERF_CTL:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
             break;
         if ( likely(!is_cpufreq_controller(currd)) ||
              wrmsr_safe(reg, val) == 0 )

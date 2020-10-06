@@ -917,6 +917,22 @@ extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen
 } cpufreq_controller;
 
+static always_inline bool is_cpufreq_controller(const struct domain *d)
+{
+    /*
+     * A PV dom0 can be nominated as the cpufreq controller, instead of using
+     * Xen's cpufreq driver, at which point dom0 gets direct access to certain
+     * MSRs.
+     *
+     * This interface only works when dom0 is identity pinned and has the same
+     * number of vCPUs as pCPUs on the system.
+     *
+     * It would be far better to paravirtualise the interface.
+     */
+    return (is_pv_domain(d) && is_hardware_domain(d) &&
+            cpufreq_controller == FREQCTL_dom0_kernel);
+}
+
 #define CPUPOOLID_NONE    -1
 
 struct cpupool *cpupool_get_by_id(int poolid);
