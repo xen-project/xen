@@ -242,6 +242,25 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
             goto gp_fault;
         break;
 
+        /*
+         * These MSRs are not enumerated in CPUID.  They have been around
+         * since the Pentium 4, and implemented by other vendors.
+         *
+         * Some versions of Windows try reading these before setting up a #GP
+         * handler, and Linux has several unguarded reads as well.  Provide
+         * RAZ semantics, in general, but permit a cpufreq controller dom0 to
+         * have full access.
+         */
+    case MSR_IA32_PERF_STATUS:
+    case MSR_IA32_PERF_CTL:
+        if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR)) )
+            goto gp_fault;
+
+        *val = 0;
+        if ( likely(!is_cpufreq_controller(d)) || rdmsr_safe(msr, *val) == 0 )
+            break;
+        goto gp_fault;
+
     case MSR_IA32_THERM_STATUS:
         if ( cp->x86_vendor != X86_VENDOR_INTEL )
             goto gp_fault;
@@ -447,6 +466,21 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( vmce_wrmsr(msr, val) < 0 )
             goto gp_fault;
         break;
+
+        /*
+         * This MSR is not enumerated in CPUID.  It has been around since the
+         * Pentium 4, and implemented by other vendors.
+         *
+         * To match the RAZ semantics, implement as write-discard, except for
+         * a cpufreq controller dom0 which has full access.
+         */
+    case MSR_IA32_PERF_CTL:
+        if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR)) )
+            goto gp_fault;
+
+        if ( likely(!is_cpufreq_controller(d)) || wrmsr_safe(msr, val) == 0 )
+            break;
+        goto gp_fault;
 
     case MSR_X2APIC_FIRST ... MSR_X2APIC_LAST:
         if ( !is_hvm_domain(d) || v != curr )
