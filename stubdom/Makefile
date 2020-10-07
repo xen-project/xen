@@ -367,7 +367,10 @@ $(foreach lib,$(STUB_LIBS),$(eval $(call BUILD_lib,$(lib))))
 xenstore/stamp: $(XEN_ROOT)/tools/xenstore/Makefile
 	$(do_links)
 
-LINK_DIRS := xenstore $(foreach dir,$(STUB_LIBS),libs-$(XEN_TARGET_ARCH)/$(dir))
+xenstorepvh/stamp: $(XEN_ROOT)/tools/xenstore/Makefile
+	$(do_links)
+
+LINK_DIRS := xenstore xenstorepvh $(foreach dir,$(STUB_LIBS),libs-$(XEN_TARGET_ARCH)/$(dir))
 LINK_STAMPS := $(foreach dir,$(LINK_DIRS),$(dir)/stamp)
 
 mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET) $(LINK_STAMPS)
@@ -486,6 +489,17 @@ xenstore-minios-config.mk: $(CURDIR)/xenstore-minios.cfg
 xenstore: $(CROSS_ROOT) xenstore-minios-config.mk
 	CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat xenstore-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ xenstored.a CONFIG_STUBDOM=y
 
+#############
+# xenstorepvh
+#############
+
+xenstorepvh-minios-config.mk: $(CURDIR)/xenstorepvh-minios.cfg
+	MINIOS_CONFIG="$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
+
+.PHONY: xenstorepvh
+xenstorepvh: $(CROSS_ROOT) xenstorepvh-minios-config.mk
+	CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat xenstorepvh-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ xenstored.a CONFIG_STUBDOM=y
+
 ########
 # minios
 ########
@@ -519,6 +533,10 @@ pv-grub: mini-os-$(XEN_TARGET_ARCH)-grub libxenguest grub
 xenstore-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstore libxenguest xenstore
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/xenstore-minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/xenstore/xenstored.a
 
+.PHONY: xenstorepvh-stubdom
+xenstorepvh-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstorepvh libxenguest xenstorepvh
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/xenstorepvh-minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/xenstorepvh/xenstored.a
+
 #########
 # install
 #########
@@ -547,6 +565,10 @@ install-caml: caml-stubdom
 install-xenstore: xenstore-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
 	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-xenstore/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/xenstore-stubdom.gz"
+
+install-xenstorepvh: xenstorepvh-stubdom
+	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
+	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-xenstorepvh/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/xenstorepvh-stubdom.gz"
 
 install-vtpm: vtpm-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
@@ -581,6 +603,9 @@ uninstall-grub:
 uninstall-xenstore:
 	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/xenstore-stubdom.gz
 
+uninstall-xenstorepvh:
+	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/xenstorepvh-stubdom.gz
+
 uninstall-vtpm:
 	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/vtpm-stubdom.gz
 
@@ -600,6 +625,7 @@ clean:
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-caml
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-grub
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-xenstore
+	rm -fr mini-os-$(XEN_TARGET_ARCH)-xenstorepvh
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-vtpm
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-vtpmmgr
 	$(MAKE) DESTDIR= -C caml clean
@@ -612,6 +638,7 @@ clean:
 	rm -fr pkg-config
 	-[ ! -d ioemu ] || $(MAKE) DESTDIR= -C ioemu clean
 	-[ ! -d xenstore ] || $(MAKE) DESTDIR= -C xenstore clean
+	-[ ! -d xenstorepvh ] || $(MAKE) DESTDIR= -C xenstorepvh clean
 
 # clean the cross-compilation result
 .PHONY: crossclean
@@ -620,7 +647,7 @@ crossclean: clean
 	rm -fr newlib-$(XEN_TARGET_ARCH)
 	rm -fr zlib-$(XEN_TARGET_ARCH) pciutils-$(XEN_TARGET_ARCH)
 	rm -fr libs-$(XEN_TARGET_ARCH)
-	rm -fr ioemu xenstore
+	rm -fr ioemu xenstore xenstorepvh
 	rm -fr gmp-$(XEN_TARGET_ARCH)
 	rm -fr polarssl-$(XEN_TARGET_ARCH)
 	rm -fr openssl-$(XEN_TARGET_ARCH)

@@ -630,6 +630,7 @@ WGET
 CMAKE
 extfiles
 debug
+xenstorepvh
 xenstore
 grub
 caml
@@ -689,6 +690,7 @@ enable_c_stubdom
 enable_caml_stubdom
 enable_pv_grub
 enable_xenstore_stubdom
+enable_xenstore_pvh_stubdom
 enable_vtpm_stubdom
 enable_vtpmmgr_stubdom
 enable_qemu_traditional
@@ -1343,6 +1345,9 @@ Optional Features:
   --disable-pv-grub       Build and install pv-grub (default is ENABLED)
   --disable-xenstore-stubdom
                           Build and install xenstore-stubdom (default is
+                          ENABLED)
+  --disable-xenstorepvh-stubdom
+                          Build and install xenstorepvh-stubdom (default is
                           ENABLED)
   --enable-vtpm-stubdom   Build and install vtpm-stubdom
   --enable-vtpmmgr-stubdom
@@ -2171,6 +2176,48 @@ STUBDOM_TARGETS="$STUBDOM_TARGETS xenstore"
 STUBDOM_BUILD="$STUBDOM_BUILD xenstore-stubdom"
 STUBDOM_INSTALL="$STUBDOM_INSTALL install-xenstore"
 STUBDOM_UNINSTALL="$STUBDOM_UNINSTALL install-xenstore"
+
+
+fi
+
+
+
+
+# Check whether --enable-xenstorepvh-stubdom was given.
+if test "${enable_xenstore_pvh_stubdom+set}" = set; then :
+  enableval=$enable_xenstore_pvh_stubdom;
+
+if test "x$enableval" = "xyes"; then :
+
+
+xenstorepvh=y
+STUBDOM_TARGETS="$STUBDOM_TARGETS xenstorepvh"
+STUBDOM_BUILD="$STUBDOM_BUILD xenstorepvh-stubdom"
+STUBDOM_INSTALL="$STUBDOM_INSTALL install-xenstorepvh"
+STUBDOM_UNINSTALL="$STUBDOM_UNINSTALL install-xenstorepvh"
+
+
+else
+
+if test "x$enableval" = "xno"; then :
+
+
+xenstorepvh=n
+
+
+fi
+
+fi
+
+
+else
+
+
+xenstorepvh=y
+STUBDOM_TARGETS="$STUBDOM_TARGETS xenstorepvh"
+STUBDOM_BUILD="$STUBDOM_BUILD xenstorepvh-stubdom"
+STUBDOM_INSTALL="$STUBDOM_INSTALL install-xenstorepvh"
+STUBDOM_UNINSTALL="$STUBDOM_UNINSTALL install-xenstorepvh"
 
 
 fi

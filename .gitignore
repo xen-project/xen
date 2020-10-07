@@ -91,6 +91,7 @@ stubdom/stubdompath.sh
 stubdom/tpm_emulator-*
 stubdom/vtpm/vtpm_manager.h
 stubdom/xenstore
+stubdom/xenstorepvh
 stubdom/zlib-*
 tools/*/build/lib*/*.py
 tools/autom4te.cache/
