@@ -560,7 +560,7 @@ out:
 
 int libxl_get_free_memory_0x040700(libxl_ctx *ctx, uint32_t *memkb)
 {
-    uint64_t my_memkb;
+    uint64_t my_memkb = 0;
     int rc;
 
     rc = libxl_get_free_memory(ctx, &my_memkb);
