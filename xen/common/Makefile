@@ -78,14 +78,14 @@ obj-$(CONFIG_UBSAN) += ubsan/
 obj-$(CONFIG_NEEDS_LIBELF) += libelf/
 obj-$(CONFIG_HAS_DEVICE_TREE) += libfdt/
 
-CONF_FILE := $(if $(patsubst /%,,$(KCONFIG_CONFIG)),$(XEN_ROOT)/xen/)$(KCONFIG_CONFIG)
+CONF_FILE := $(if $(patsubst /%,,$(KCONFIG_CONFIG)),$(BASEDIR)/)$(KCONFIG_CONFIG)
 config.gz: $(CONF_FILE)
 	gzip -c $< >$@
 
 config_data.o: config.gz
 
-config_data.S: $(XEN_ROOT)/xen/tools/binfile
-	$(SHELL) $(XEN_ROOT)/xen/tools/binfile $@ config.gz xen_config_data
+config_data.S: $(BASEDIR)/tools/binfile
+	$(SHELL) $(BASEDIR)/tools/binfile $@ config.gz xen_config_data
 
 clean::
 	rm -f config_data.S config.gz 2>/dev/null

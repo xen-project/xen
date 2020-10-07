@@ -9,7 +9,7 @@ Q :=
 kecho := :
 
 # eventually you'll want to do out of tree builds
-srctree := $(XEN_ROOT)/xen
+srctree := $(BASEDIR)
 objtree := $(srctree)
 src := tools/kconfig
 obj := $(src)
