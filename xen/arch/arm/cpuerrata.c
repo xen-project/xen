@@ -187,7 +187,7 @@ warn:
         ASSERT(system_state < SYS_STATE_active);
         warning_add("No support for ARM_SMCCC_ARCH_WORKAROUND_1.\n"
                     "Please update your firmware.\n");
-        warned = false;
+        warned = true;
     }
 
     return 0;
