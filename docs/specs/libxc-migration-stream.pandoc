@@ -3,7 +3,7 @@
   Andrew Cooper <<andrew.cooper3@citrix.com>>
   Wen Congyang <<wency@cn.fujitsu.com>>
   Yang Hongyang <<hongyang.yang@easystack.cn>>
-% Revision 2
+% Revision 3
 
 Introduction
 ============
@@ -227,7 +227,13 @@ type         0x00000000: END
 
              0x0000000F: CHECKPOINT_DIRTY_PFN_LIST (Secondary -> Primary)
 
-             0x00000010 - 0x7FFFFFFF: Reserved for future _mandatory_
+             0x00000010: STATIC_DATA_END
+
+             0x00000011: X86_CPUID_POLICY
+
+             0x00000012: X86_MSR_POLICY
+
+             0x00000013 - 0x7FFFFFFF: Reserved for future _mandatory_
              records.
 
              0x80000000 - 0xFFFFFFFF: Reserved for future _optional_
@@ -732,6 +738,7 @@ A typical save record for an x86 HVM guest image would look like:
 * X86_TSC_INFO
 * HVM_PARAMS
 * HVM_CONTEXT
+* END record
 
 HVM_PARAMS must precede HVM_CONTEXT, as certain parameters can affect
 the validity of architectural state in the context.
