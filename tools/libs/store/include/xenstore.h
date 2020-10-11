@@ -23,6 +23,7 @@
 
 #define XBT_NULL 0
 
+/* Following open flags are deprecated and ignored! */
 #define XS_OPEN_READONLY	(1UL<<0)
 #define XS_OPEN_SOCKETONLY      (1UL<<1)
 
