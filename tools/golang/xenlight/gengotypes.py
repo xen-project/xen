@@ -3,7 +3,14 @@
 import os
 import sys
 
-sys.path.append('{0}/tools/libxl'.format(os.environ['XEN_ROOT']))
+try:
+    sys.path.append(os.environ['LIBXL_SRC_DIR'])
+except:
+    # If we get here, then we expect the 'import idl'
+    # expression to fail. That error is more informative,
+    # so let it happen.
+    pass
+
 import idl
 
 # Go versions of some builtin types.

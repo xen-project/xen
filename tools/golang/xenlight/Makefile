@@ -16,7 +16,7 @@ all: build
 GOXL_GEN_FILES = types.gen.go helpers.gen.go
 
 %.gen.go: gengotypes.py $(LIBXL_SRC_DIR)/libxl_types.idl $(LIBXL_SRC_DIR)/idl.py
-	XEN_ROOT=$(XEN_ROOT) $(PYTHON) gengotypes.py $(LIBXL_SRC_DIR)/libxl_types.idl
+	LIBXL_SRC_DIR=$(LIBXL_SRC_DIR) $(PYTHON) gengotypes.py $(LIBXL_SRC_DIR)/libxl_types.idl
 
 # Go will do its own dependency checking, and not actuall go through
 # with the build if none of the input files have changed.
