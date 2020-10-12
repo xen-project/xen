@@ -5,19 +5,20 @@ include $(XEN_ROOT)/tools/Rules.mk
 all: build
 
 PY_CFLAGS = $(CFLAGS) $(PY_NOOPT_CFLAGS)
-PY_LDFLAGS = $(LDFLAGS) $(APPEND_LDFLAGS)
+PY_LDFLAGS = $(SHLIB_LDFLAGS) $(APPEND_LDFLAGS)
 INSTALL_LOG = build/installed_files.txt
 
 .PHONY: build
 build:
-	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" $(PYTHON) setup.py build
+	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" LDSHARED="$(CC)" LDFLAGS="$(PY_LDFLAGS)" $(PYTHON) setup.py build
 
 .PHONY: install
 install:
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 
-	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" LDFLAGS="$(PY_LDFLAGS)" $(PYTHON) \
-		setup.py install --record $(INSTALL_LOG) $(PYTHON_PREFIX_ARG) \
+	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" LDSHARED="$(CC)" \
+		LDFLAGS="$(PY_LDFLAGS)" $(PYTHON) setup.py install \
+		--record $(INSTALL_LOG) $(PYTHON_PREFIX_ARG) \
 		--root="$(DESTDIR)" --force
 
 	$(INSTALL_PYTHON_PROG) scripts/convert-legacy-stream $(DESTDIR)$(LIBEXEC_BIN)
