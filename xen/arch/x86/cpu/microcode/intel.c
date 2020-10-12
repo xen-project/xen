@@ -126,13 +126,16 @@ static void collect_cpu_info(void)
     rdmsrl(MSR_IA32_PLATFORM_ID, msr_content);
     csig->pf = 1 << ((msr_content >> 50) & 7);
 
-    wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
-    /* As documented in the SDM: Do a CPUID 1 here */
+    /*
+     * Obtaining the microcode version involves writing 0 to the "read only"
+     * UCODE_REV MSR, executing any CPUID instruction, after which a nonzero
+     * revision should appear.
+     */
+    wrmsrl(MSR_IA32_UCODE_REV, 0);
     csig->sig = cpuid_eax(1);
-
-    /* get the current revision from MSR 0x8B */
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
-    csig->rev = (uint32_t)(msr_content >> 32);
+    csig->rev = msr_content >> 32;
+
     pr_debug("microcode: collect_cpu_info : sig=%#x, pf=%#x, rev=%#x\n",
              csig->sig, csig->pf, csig->rev);
 }
@@ -270,14 +273,15 @@ static int apply_microcode(const struct microcode_patch *patch)
 
     wbinvd();
 
-    /* write microcode via MSR 0x79 */
     wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)patch->data);
-    wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
 
-    /* As documented in the SDM: Do a CPUID 1 here */
-    cpuid_eax(1);
-
-    /* get the current revision from MSR 0x8B */
+    /*
+     * Obtaining the microcode version involves writing 0 to the "read only"
+     * UCODE_REV MSR, executing any CPUID instruction, after which a nonzero
+     * revision should appear.
+     */
+    wrmsrl(MSR_IA32_UCODE_REV, 0);
+    cpuid_eax(0);
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
     sig->rev = rev = msr_content >> 32;
 
