@@ -12,8 +12,6 @@ all-y:
 xen-foreign:
 	$(MAKE) -C xen-foreign
 
-XEN_LIB_X86_INCLUDES = $(filter-out %autogen.h, $(XEN_ROOT)/xen/include/xen/lib/x86/Makefile $(wildcard $(XEN_ROOT)/xen/include/xen/lib/x86/*.h))
-
 xen-dir:
 	@rm -rf xen acpi
 	mkdir -p xen/libelf acpi
@@ -26,11 +24,10 @@ xen-dir:
 	ln -s $(XEN_ROOT)/xen/include/acpi/platform acpi/
 	ln -s $(XEN_ROOT)/xen/include/acpi/ac*.h acpi/
 ifeq ($(CONFIG_X86),y)
-	ln -sf $(XEN_ROOT)/xen/include/asm-x86 xen/asm
+	ln -s $(XEN_ROOT)/xen/include/asm-x86 xen/asm
 	mkdir -p xen/lib/x86
-	for f in $(patsubst $(XEN_ROOT)/xen/include/xen/lib/x86/%,%,$(XEN_LIB_X86_INCLUDES)); do \
-		ln -sf $(XEN_ROOT)/xen/include/xen/lib/x86/$$f xen/lib/x86/$$f; \
-	done
+	ln -s $(filter-out %autogen.h,$(wildcard $(XEN_ROOT)/xen/include/xen/lib/x86/*.h)) xen/lib/x86/
+	ln -s $(XEN_ROOT)/xen/include/xen/lib/x86/Makefile xen/lib/x86/
 endif
 
 all-$(CONFIG_X86): xen-dir
