@@ -216,7 +216,8 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_SYSREG64(n->arch.ttbr1, TTBR1_EL1);
 
     /*
-     * Erratum #852523: DACR32_EL2 must be restored before one of the
+     * Erratum #852523 (Cortex-A57) or erratum #853709 (Cortex-A72):
+     * DACR32_EL2 must be restored before one of the
      * following sysregs: SCTLR_EL1, TCR_EL1, TTBR0_EL1, TTBR1_EL1 or
      * CONTEXTIDR_EL1.
      */
@@ -245,7 +246,8 @@ static void ctxt_switch_to(struct vcpu *n)
 
     /*
      * This write to sysreg CONTEXTIDR_EL1 ensures we don't hit erratum
-     * #852523. I.e DACR32_EL2 is not correctly synchronized.
+     * #852523 (Cortex-A57) or #853709 (Cortex-A72).
+     * I.e DACR32_EL2 is not correctly synchronized.
      */
     WRITE_SYSREG(n->arch.contextidr, CONTEXTIDR_EL1);
     WRITE_SYSREG(n->arch.tpidr_el0, TPIDR_EL0);
