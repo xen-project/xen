@@ -4,8 +4,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 # Relative to $(XEN_ROOT)/xen/xsm/flask
 FLASK_H_DEPEND := policy/initial_sids
 
-.PHONY: all all-y build
-all build: all-y xen-foreign xen/.dir xen-xsm/.dir
+.PHONY: all all-y build xen-dir
+all build: all-y xen-foreign xen-dir xen-xsm/.dir
 all-y:
 
 .PHONY: xen-foreign
@@ -15,7 +15,7 @@ xen-foreign:
 XEN_PUBLIC_INCLUDES = $(wildcard $(XEN_ROOT)/xen/include/public/*.h)
 XEN_LIB_X86_INCLUDES = $(filter-out %autogen.h, $(XEN_ROOT)/xen/include/xen/lib/x86/Makefile $(wildcard $(XEN_ROOT)/xen/include/xen/lib/x86/*.h))
 
-xen/.dir: $(XEN_PUBLIC_INCLUDES) $(XEN_LIB_X86_INCLUDES)
+xen-dir:
 	@rm -rf xen acpi
 	mkdir -p xen/libelf acpi
 	ln -sf $(XEN_ROOT)/xen/include/public/COPYING xen
@@ -33,9 +33,8 @@ ifeq ($(CONFIG_X86),y)
 		ln -sf $(XEN_ROOT)/xen/include/xen/lib/x86/$$f xen/lib/x86/$$f; \
 	done
 endif
-	touch $@
 
-all-$(CONFIG_X86): xen/.dir
+all-$(CONFIG_X86): xen-dir
 	$(MAKE) -C xen/lib/x86 all XEN_ROOT=$(XEN_ROOT) PYTHON=$(PYTHON)
 
 # Not xen/xsm as that clashes with link to
