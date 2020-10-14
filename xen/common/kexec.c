@@ -10,6 +10,7 @@
 #include <xen/lib.h>
 #include <xen/acpi.h>
 #include <xen/ctype.h>
+#include <xen/elfcore.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/param.h>

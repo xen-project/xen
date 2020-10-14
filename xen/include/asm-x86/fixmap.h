@@ -21,7 +21,6 @@
 
 #include <xen/acpi.h>
 #include <xen/pfn.h>
-#include <xen/kexec.h>
 #include <asm/apicdef.h>
 #include <asm/msi.h>
 #include <acpi/apei.h>

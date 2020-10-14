@@ -56,7 +56,7 @@ typedef struct
     int pr_fpvalid;              /* True if math co-processor being used.  */
 } ELF_Prstatus;
 
-typedef struct {
+typedef struct crash_xen_info {
     unsigned long xen_major_version;
     unsigned long xen_minor_version;
     unsigned long xen_extra_version;

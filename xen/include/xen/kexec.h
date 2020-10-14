@@ -5,7 +5,6 @@
 
 #include <public/kexec.h>
 
-#include <xen/elfcore.h>
 #include <xen/kimage.h>
 
 typedef struct xen_kexec_reserve {
@@ -51,7 +50,7 @@ void machine_reboot_kexec(struct kexec_image *image);
 void machine_kexec(struct kexec_image *image);
 void kexec_crash(void);
 void kexec_crash_save_cpu(void);
-crash_xen_info_t *kexec_crash_save_info(void);
+struct crash_xen_info *kexec_crash_save_info(void);
 void machine_crash_shutdown(void);
 int machine_kexec_get(xen_kexec_range_t *range);
 int machine_kexec_get_xen(xen_kexec_range_t *range);

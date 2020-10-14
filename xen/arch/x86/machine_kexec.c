@@ -16,8 +16,9 @@
  */
 
 #include <xen/types.h>
+#include <xen/domain_page.h>
+#include <xen/elfstructs.h>
 #include <xen/kexec.h>
-#include <xen/guest_access.h>
 #include <asm/fixmap.h>
 #include <asm/hpet.h>
 #include <asm/page.h>
