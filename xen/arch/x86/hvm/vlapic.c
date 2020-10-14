@@ -1610,27 +1610,17 @@ int vlapic_init(struct vcpu *v)
 
     vlapic->pt.source = PTSRC_lapic;
 
-    if (vlapic->regs_page == NULL)
+    vlapic->regs_page = alloc_domheap_page(v->domain, MEMF_no_owner);
+    if ( !vlapic->regs_page )
+        return -ENOMEM;
+
+    vlapic->regs = __map_domain_page_global(vlapic->regs_page);
+    if ( vlapic->regs == NULL )
     {
-        vlapic->regs_page = alloc_domheap_page(v->domain, MEMF_no_owner);
-        if ( vlapic->regs_page == NULL )
-        {
-            dprintk(XENLOG_ERR, "alloc vlapic regs error: %d/%d\n",
-                    v->domain->domain_id, v->vcpu_id);
-            return -ENOMEM;
-        }
+        free_domheap_page(vlapic->regs_page);
+        return -ENOMEM;
     }
-    if (vlapic->regs == NULL) 
-    {
-        vlapic->regs = __map_domain_page_global(vlapic->regs_page);
-        if ( vlapic->regs == NULL )
-        {
-            free_domheap_page(vlapic->regs_page);
-            dprintk(XENLOG_ERR, "map vlapic regs error: %d/%d\n",
-                    v->domain->domain_id, v->vcpu_id);
-            return -ENOMEM;
-        }
-    }
+
     clear_page(vlapic->regs);
 
     vlapic_reset(vlapic);
