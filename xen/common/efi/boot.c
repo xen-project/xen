@@ -637,10 +637,13 @@ static bool __init read_section(const EFI_LOADED_IMAGE *image,
                                 const CHAR16 *name, struct file *file,
                                 const char *options)
 {
-    file->ptr = pe_find_section(image->ImageBase, image->ImageSize,
-                                name, &file->size);
-    if ( !file->ptr )
+    const void *ptr = pe_find_section(image->ImageBase, image->ImageSize,
+                                      name, &file->size);
+
+    if ( !ptr )
         return false;
+
+    file->ptr = ptr;
 
     handle_file_info(name, file, options);
 
