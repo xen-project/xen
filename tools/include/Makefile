@@ -12,15 +12,14 @@ all-y:
 xen-foreign:
 	$(MAKE) -C xen-foreign
 
-XEN_PUBLIC_INCLUDES = $(wildcard $(XEN_ROOT)/xen/include/public/*.h)
 XEN_LIB_X86_INCLUDES = $(filter-out %autogen.h, $(XEN_ROOT)/xen/include/xen/lib/x86/Makefile $(wildcard $(XEN_ROOT)/xen/include/xen/lib/x86/*.h))
 
 xen-dir:
 	@rm -rf xen acpi
 	mkdir -p xen/libelf acpi
-	ln -sf $(XEN_ROOT)/xen/include/public/COPYING xen
-	ln -sf $(XEN_PUBLIC_INCLUDES) xen
-	ln -sf $(addprefix $(XEN_ROOT)/xen/include/public/,arch-x86 arch-arm hvm io xsm) xen
+	ln -s $(XEN_ROOT)/xen/include/public/COPYING xen/
+	ln -s $(XEN_ROOT)/xen/include/public/*.h xen/
+	ln -s $(XEN_ROOT)/xen/include/public/*/ xen/
 	ln -sf ../xen-sys/$(XEN_OS) xen/sys
 	ln -sf $(addprefix $(XEN_ROOT)/xen/include/xen/,libelf.h elfstructs.h) xen/libelf/
 	ln -s ../xen-foreign xen/foreign
