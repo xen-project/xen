@@ -102,6 +102,7 @@ FILE *get_next_battery_file(DIR *battery_dir,
     FILE *file = 0;
     struct dirent *dir_entries;
     char file_name[284];
+    int ret;
     
     do 
     {
@@ -111,11 +112,15 @@ FILE *get_next_battery_file(DIR *battery_dir,
         if ( strlen(dir_entries->d_name) < 4 )
             continue;
         if ( battery_info_type == BIF ) 
-            snprintf(file_name, sizeof(file_name), BATTERY_INFO_FILE_PATH,
+            ret = snprintf(file_name, sizeof(file_name), BATTERY_INFO_FILE_PATH,
                      dir_entries->d_name);
         else 
-            snprintf(file_name, sizeof(file_name), BATTERY_STATE_FILE_PATH,
+            ret = snprintf(file_name, sizeof(file_name), BATTERY_STATE_FILE_PATH,
                      dir_entries->d_name);
+        /* This should not happen but is needed to pass gcc checks */
+        if (ret < 0)
+            continue;
+        file_name[sizeof(file_name) - 1] = '\0';
         file = fopen(file_name, "r");
     } while ( !file );
 
