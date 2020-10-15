@@ -601,10 +601,7 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
                                     PFN_UP(size), &file->addr);
     }
     if ( EFI_ERROR(ret) )
-    {
-        file->addr = 0;
         what = what ?: L"Allocation";
-    }
     else
     {
         file->need_to_free = true;
@@ -1271,8 +1268,11 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             name.s = get_value(&cfg, "global", "chain");
             if ( !name.s )
                 break;
-            efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
-            cfg.addr = 0;
+            if ( cfg.need_to_free )
+            {
+                efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
+                cfg.need_to_free = false;
+            }
             if ( !read_file(dir_handle, s2w(&name), &cfg, NULL) )
             {
                 PrintStr(L"Chained configuration file '");

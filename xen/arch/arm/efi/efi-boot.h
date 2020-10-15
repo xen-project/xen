@@ -591,7 +591,7 @@ static bool __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
 
     fdt = lookup_fdt_config_table(SystemTable);
     dtbfile.ptr = fdt;
-    dtbfile.size = 0;  /* Config table memory can't be freed, so set size to 0 */
+    dtbfile.need_to_free = false; /* Config table memory can't be freed. */
     if ( !fdt || fdt_node_offset_by_compatible(fdt, 0, "multiboot,module") < 0 )
     {
         /*
