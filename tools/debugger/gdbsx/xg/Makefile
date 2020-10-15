@@ -12,7 +12,7 @@ CFLAGS += $(CFLAGS_xeninclude)
 all: build
 
 .PHONY: build
-build: xen-headers xg_all.a $(XG_HDRS) $(XG_OBJS) Makefile
+build: xg_all.a $(XG_HDRS) $(XG_OBJS) Makefile
 # build: mk-symlinks xg_all.a $(XG_HDRS) $(XG_OBJS) Makefile
 # build: mk-symlinks xg_all.a
 
@@ -20,9 +20,6 @@ xg_all.a: $(XG_OBJS) Makefile $(XG_HDRS)
 	ar cr $@ $(XG_OBJS)    # problems using -m32 in ld 
 #	$(LD) -b elf32-i386 $(LDFLAGS) -r -o $@ $^
 #	$(CC) -m32 -c -o $@ $^
-
-xen-headers:
-	$(MAKE) -C ../../../include
 
 # xg_main.o: xg_main.c Makefile $(XG_HDRS)
 #$(CC) -c $(CFLAGS) -o $@ $<
