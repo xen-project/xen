@@ -36,6 +36,7 @@ void machine_halt(void)
 void machine_restart(unsigned int delay_millisecs)
 {
     int timeout = 10;
+    unsigned long count = 0;
 
     watchdog_disable();
     console_start_sync();
@@ -59,6 +60,9 @@ void machine_restart(unsigned int delay_millisecs)
     {
         platform_reset();
         mdelay(100);
+        if ( (count % 50) == 0 )
+            printk(XENLOG_ERR "Xen: Platform reset did not work properly!\n");
+        count++;
     }
 }
 
