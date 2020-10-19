@@ -21,12 +21,8 @@ CFLAGS += $(CFLAGS_libxentoolcore)
 CFLAGS += -DXEN_LIB_STORED="\"$(XEN_LIB_STORED)\""
 CFLAGS += -DXEN_RUN_STORED="\"$(XEN_RUN_STORED)\""
 
-LINK_FILES = xs_lib.c list.h utils.h
-
-$(LIB_OBJS): $(LINK_FILES)
-
-$(LINK_FILES):
-	ln -sf $(XEN_ROOT)/tools/xenstore/$@ $@
+vpath xs_lib.c $(XEN_ROOT)/tools/xenstore
+CFLAGS += -I $(XEN_ROOT)/tools/xenstore
 
 xs.opic: CFLAGS += -DUSE_PTHREAD
 ifeq ($(CONFIG_Linux),y)
