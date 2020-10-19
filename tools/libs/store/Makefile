@@ -21,12 +21,12 @@ CFLAGS += $(CFLAGS_libxentoolcore)
 CFLAGS += -DXEN_LIB_STORED="\"$(XEN_LIB_STORED)\""
 CFLAGS += -DXEN_RUN_STORED="\"$(XEN_RUN_STORED)\""
 
-LINK_FILES = xs_lib.c include/xenstore_lib.h list.h utils.h
+LINK_FILES = xs_lib.c list.h utils.h
 
 $(LIB_OBJS): $(LINK_FILES)
 
 $(LINK_FILES):
-	ln -sf $(XEN_ROOT)/tools/xenstore/$(notdir $@) $@
+	ln -sf $(XEN_ROOT)/tools/xenstore/$@ $@
 
 xs.opic: CFLAGS += -DUSE_PTHREAD
 ifeq ($(CONFIG_Linux),y)
@@ -35,9 +35,6 @@ else
 PKG_CONFIG_REMOVE += -ldl
 endif
 
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxenstore)/include
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude)
-
 .PHONY: install
 install: install-headers
 
@@ -45,8 +42,8 @@ install: install-headers
 install-headers:
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)/xenstore-compat
-	$(INSTALL_DATA) include/compat/xs.h $(DESTDIR)$(includedir)/xenstore-compat/xs.h
-	$(INSTALL_DATA) include/compat/xs_lib.h $(DESTDIR)$(includedir)/xenstore-compat/xs_lib.h
+	$(INSTALL_DATA) $(XEN_INCLUDE)/xenstore-compat/xs.h $(DESTDIR)$(includedir)/xenstore-compat/xs.h
+	$(INSTALL_DATA) $(XEN_INCLUDE)/xenstore-compat/xs_lib.h $(DESTDIR)$(includedir)/xenstore-compat/xs_lib.h
 	ln -sf xenstore-compat/xs.h  $(DESTDIR)$(includedir)/xs.h
 	ln -sf xenstore-compat/xs_lib.h $(DESTDIR)$(includedir)/xs_lib.h
 

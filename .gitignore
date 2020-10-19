@@ -144,7 +144,6 @@ tools/libs/light/test_timedereg
 tools/libs/light/test_fdderegrace
 tools/libs/light/tmp.*
 tools/libs/light/xenlight.pc
-tools/libs/light/include/_*.h
 tools/libs/stat/_paths.h
 tools/libs/stat/headers.chk
 tools/libs/stat/libxenstat.map
@@ -154,7 +153,6 @@ tools/libs/store/list.h
 tools/libs/store/utils.h
 tools/libs/store/xenstore.pc
 tools/libs/store/xs_lib.c
-tools/libs/store/include/xenstore_lib.h
 tools/libs/util/*.pc
 tools/libs/util/_paths.h
 tools/libs/util/libxlu_cfg_y.output
@@ -232,7 +230,8 @@ tools/hotplug/Linux/xendomains
 tools/hotplug/NetBSD/rc.d/xencommons
 tools/hotplug/NetBSD/rc.d/xendriverdomain
 tools/include/acpi
-tools/include/*.h
+tools/include/_libxl*.h
+tools/include/_xentoolcore_list.h
 tools/include/xen/*
 tools/include/xen-xsm/*
 tools/include/xen-foreign/*.(c|h|size)

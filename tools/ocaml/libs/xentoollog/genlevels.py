@@ -6,7 +6,7 @@ import sys
 from functools import reduce
 
 def read_levels():
-	f = open('../../../libs/toollog/include/xentoollog.h', 'r')
+	f = open('../../../include/xentoollog.h', 'r')
 
 	levels = []
 	record = False

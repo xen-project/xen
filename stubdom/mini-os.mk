@@ -5,7 +5,7 @@
 # XEN_ROOT
 # MINIOS_TARGET_ARCH
 
-XENSTORE_CPPFLAGS = -isystem $(XEN_ROOT)/tools/libs/store/include
+XENSTORE_CPPFLAGS = -isystem $(XEN_ROOT)/tools/include
 TOOLCORE_PATH = $(XEN_ROOT)/stubdom/libs-$(MINIOS_TARGET_ARCH)/toolcore
 TOOLLOG_PATH = $(XEN_ROOT)/stubdom/libs-$(MINIOS_TARGET_ARCH)/toollog
 EVTCHN_PATH = $(XEN_ROOT)/stubdom/libs-$(MINIOS_TARGET_ARCH)/evtchn

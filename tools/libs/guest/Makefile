@@ -113,9 +113,6 @@ xc_private.h: _paths.h
 
 $(LIB_OBJS) $(PIC_OBJS): $(LINK_FILES)
 
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxenctrl)/include
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude)
-
 .PHONY: cleanlocal
 cleanlocal:
 	rm -f libxenguest.map

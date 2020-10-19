@@ -49,7 +49,7 @@ xentoollog.mli: xentoollog.mli.in _xtl_levels.mli.in
 
 libs: $(LIBS)
 
-_xtl_levels.ml.in _xtl_levels.mli.in _xtl_levels.inc: genlevels.py $(XEN_ROOT)/tools/libs/toollog/include/xentoollog.h
+_xtl_levels.ml.in _xtl_levels.mli.in _xtl_levels.inc: genlevels.py $(XEN_INCLUDE)/xentoollog.h
 	$(PYTHON) genlevels.py _xtl_levels.mli.in _xtl_levels.ml.in _xtl_levels.inc
 
 .PHONY: install

@@ -9,6 +9,3 @@ APPEND_LDFLAGS += -lz
 SRCS-y                 += core.c
 
 include ../libs.mk
-
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxenhypfs)/include
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude)

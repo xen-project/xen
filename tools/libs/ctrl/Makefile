@@ -62,9 +62,6 @@ $(eval $(genpath-target))
 
 $(LIB_OBJS) $(PIC_OBJS): _paths.h
 
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxenctrl)/include
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude)
-
 clean: cleanlocal
 
 .PHONY: cleanlocal

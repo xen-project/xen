@@ -1,6 +1,12 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+# Caution: some tools/libs/*/Makefile generate header files directly in
+# tools/include, and they do the [un]install actions for those, too.
+# In case other headers need to be built cwin tools/include this should be
+# taken into account, i.e. there should be no rules added here for generating
+# any tools/include/*.h files.
+
 # Relative to $(XEN_ROOT)/xen/xsm/flask
 FLASK_H_DEPEND := policy/initial_sids
 

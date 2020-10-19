@@ -30,8 +30,6 @@ APPEND_LDFLAGS += $(LDLIBS-y)
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_libxenstat)/include
-
 $(LIB_OBJS): _paths.h
 
 PYLIB=bindings/swig/python/_xenstat.so

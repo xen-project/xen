@@ -47,10 +47,10 @@ endif
 PKG_CONFIG_LOCAL := $(PKG_CONFIG_DIR)/$(PKG_CONFIG)
 
 LIBHEADER ?= $(LIB_FILE_NAME).h
-LIBHEADERS = $(foreach h, $(LIBHEADER), include/$(h))
-LIBHEADERSGLOB = $(foreach h, $(LIBHEADER), $(XEN_ROOT)/tools/include/$(h))
+LIBHEADERS = $(foreach h, $(LIBHEADER), $(XEN_INCLUDE)/$(h))
 
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_PREFIX = $(XEN_ROOT)
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_INCLUDE)
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)
 
 .PHONY: all
@@ -74,13 +74,10 @@ else
 .PHONY: headers.chk
 endif
 
-headers.chk: $(LIBHEADERSGLOB) $(AUTOINCS)
+headers.chk: $(AUTOINCS)
 
 libxen$(LIBNAME).map:
 	echo 'VERS_$(MAJOR).$(MINOR) { global: *; };' >$@
-
-$(LIBHEADERSGLOB): $(LIBHEADERS)
-	for i in $(realpath $(LIBHEADERS)); do ln -sf $$i $(XEN_ROOT)/tools/include; done
 
 lib$(LIB_FILE_NAME).a: $(LIB_OBJS)
 	$(AR) rc $@ $^
@@ -123,7 +120,6 @@ clean:
 	rm -f lib$(LIB_FILE_NAME).so.$(MAJOR).$(MINOR) lib$(LIB_FILE_NAME).so.$(MAJOR)
 	rm -f headers.chk
 	rm -f $(PKG_CONFIG)
-	rm -f $(LIBHEADERSGLOB)
 	rm -f _paths.h
 
 .PHONY: distclean
