@@ -6,11 +6,6 @@ ifeq ($(CONFIG_LIBXC_MINIOS),y)
 override CONFIG_MIGRATE := n
 endif
 
-LINK_FILES := xc_private.h xc_core.h xc_core_x86.h xc_core_arm.h xc_bitops.h
-
-$(LINK_FILES):
-	ln -sf $(XEN_ROOT)/tools/libs/ctrl/$(notdir $@) $@
-
 SRCS-y += xg_private.c
 SRCS-y += xg_domain.c
 SRCS-y += xg_suspend.c
@@ -28,6 +23,8 @@ SRCS-y += xg_offline_page.c
 else
 SRCS-y += xg_nomigrate.c
 endif
+
+CFLAGS += -I$(XEN_libxenctrl)
 
 vpath %.c ../../../xen/common/libelf
 CFLAGS += -I../../../xen/common/libelf
@@ -110,8 +107,6 @@ genpath-target = $(call buildmakevars2header,_paths.h)
 $(eval $(genpath-target))
 
 xc_private.h: _paths.h
-
-$(LIB_OBJS) $(PIC_OBJS): $(LINK_FILES)
 
 .PHONY: cleanlocal
 cleanlocal:
