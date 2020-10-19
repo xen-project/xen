@@ -3969,7 +3969,8 @@ long do_mmu_update(
     struct vcpu *curr = current, *v = curr;
     struct domain *d = v->domain, *pt_owner = d, *pg_owner;
     mfn_t map_mfn = INVALID_MFN, mfn;
-    bool sync_guest = false;
+    bool flush_linear_pt = false, flush_root_pt_local = false,
+        flush_root_pt_others = false;
     uint32_t xsm_needed = 0;
     uint32_t xsm_checked = 0;
     int rc = put_old_guest_table(curr);
@@ -4119,6 +4120,8 @@ long do_mmu_update(
                         break;
                     rc = mod_l2_entry(va, l2e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                    if ( !rc )
+                        flush_linear_pt = true;
                     break;
 
                 case PGT_l3_page_table:
@@ -4126,6 +4129,8 @@ long do_mmu_update(
                         break;
                     rc = mod_l3_entry(va, l3e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                    if ( !rc )
+                        flush_linear_pt = true;
                     break;
 
                 case PGT_l4_page_table:
@@ -4133,6 +4138,8 @@ long do_mmu_update(
                         break;
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                    if ( !rc )
+                        flush_linear_pt = true;
                     if ( !rc && pt_owner->arch.pv.xpti )
                     {
                         bool local_in_use = false;
@@ -4141,7 +4148,7 @@ long do_mmu_update(
                                     mfn) )
                         {
                             local_in_use = true;
-                            get_cpu_info()->root_pgt_changed = true;
+                            flush_root_pt_local = true;
                         }
 
                         /*
@@ -4153,7 +4160,7 @@ long do_mmu_update(
                              (1 + !!(page->u.inuse.type_info & PGT_pinned) +
                               mfn_eq(pagetable_get_mfn(curr->arch.guest_table_user),
                                      mfn) + local_in_use) )
-                            sync_guest = true;
+                            flush_root_pt_others = true;
                     }
                     break;
 
@@ -4255,19 +4262,61 @@ long do_mmu_update(
     if ( va )
         unmap_domain_page(va);
 
-    if ( sync_guest )
+    /*
+     * Perform required TLB maintenance.
+     *
+     * This logic currently depend on flush_linear_pt being a superset of the
+     * flush_root_pt_* conditions.
+     *
+     * pt_owner may not be current->domain.  This may occur during
+     * construction of 32bit PV guests, or debugging of PV guests.  The
+     * behaviour cannot be correct with domain unpaused.  We therefore expect
+     * pt_owner->dirty_cpumask to be empty, but it is a waste of effort to
+     * explicitly check for, and exclude, this corner case.
+     *
+     * flush_linear_pt requires a FLUSH_TLB to all dirty CPUs.  The flush must
+     * be performed now to maintain correct behaviour across a multicall.
+     * i.e. we cannot relax FLUSH_TLB to FLUSH_ROOT_PGTBL, given that the
+     * former is a side effect of the latter, because the resync (which is in
+     * the return-to-guest path) happens too late.
+     *
+     * flush_root_pt_* requires FLUSH_ROOT_PGTBL on either the local CPU
+     * (implies pt_owner == current->domain and current->processor set in
+     * pt_owner->dirty_cpumask), and/or all *other* dirty CPUs as there are
+     * references we can't account for locally.
+     */
+    if ( flush_linear_pt /* || flush_root_pt_local || flush_root_pt_others */ )
     {
-        /*
-         * Force other vCPU-s of the affected guest to pick up L4 entry
-         * changes (if any).
-         */
         unsigned int cpu = smp_processor_id();
-        cpumask_t *mask = per_cpu(scratch_cpumask, cpu);
+        cpumask_t *mask = pt_owner->dirty_cpumask;
 
-        cpumask_andnot(mask, pt_owner->dirty_cpumask, cpumask_of(cpu));
+        /*
+         * Always handle local flushing separately (if applicable), to
+         * separate the flush invocations appropriately for scope of the two
+         * flush_root_pt_* variables.
+         */
+        if ( likely(cpumask_test_cpu(cpu, mask)) )
+        {
+            mask = per_cpu(scratch_cpumask, cpu);
+
+            cpumask_copy(mask, pt_owner->dirty_cpumask);
+            __cpumask_clear_cpu(cpu, mask);
+
+            flush_local(FLUSH_TLB |
+                        (flush_root_pt_local ? FLUSH_ROOT_PGTBL : 0));
+        }
+        else
+            /* Sanity check.  flush_root_pt_local implies local cpu is dirty. */
+            ASSERT(!flush_root_pt_local);
+
+        /* Flush the remote dirty CPUs.  Does not include the local CPU. */
         if ( !cpumask_empty(mask) )
-            flush_mask(mask, FLUSH_ROOT_PGTBL);
+            flush_mask(mask, FLUSH_TLB |
+                       (flush_root_pt_others ? FLUSH_ROOT_PGTBL : 0));
     }
+    else
+        /* Sanity check.  flush_root_pt_* implies flush_linear_pt. */
+        ASSERT(!flush_root_pt_local && !flush_root_pt_others);
 
     perfc_add(num_page_updates, i);
 
