@@ -38,7 +38,7 @@ static unsigned int pfn_to_pde_idx(unsigned long pfn, unsigned int level)
 static unsigned int clear_iommu_pte_present(unsigned long l1_mfn,
                                             unsigned long dfn)
 {
-    struct amd_iommu_pte *table, *pte;
+    union amd_iommu_pte *table, *pte;
     unsigned int flush_flags;
 
     table = map_domain_page(_mfn(l1_mfn));
@@ -52,7 +52,7 @@ static unsigned int clear_iommu_pte_present(unsigned long l1_mfn,
     return flush_flags;
 }
 
-static unsigned int set_iommu_pde_present(struct amd_iommu_pte *pte,
+static unsigned int set_iommu_pde_present(union amd_iommu_pte *pte,
                                           unsigned long next_mfn,
                                           unsigned int next_level, bool iw,
                                           bool ir)
@@ -87,7 +87,7 @@ static unsigned int set_iommu_pte_present(unsigned long pt_mfn,
                                           int pde_level,
                                           bool iw, bool ir)
 {
-    struct amd_iommu_pte *table, *pde;
+    union amd_iommu_pte *table, *pde;
     unsigned int flush_flags;
 
     table = map_domain_page(_mfn(pt_mfn));
@@ -178,7 +178,7 @@ void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
 static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
                               unsigned long pt_mfn[], bool map)
 {
-    struct amd_iommu_pte *pde, *next_table_vaddr;
+    union amd_iommu_pte *pde, *next_table_vaddr;
     unsigned long  next_table_mfn;
     unsigned int level;
     struct page_info *table;
@@ -458,7 +458,7 @@ int __init amd_iommu_quarantine_init(struct domain *d)
     unsigned long end_gfn =
         1ul << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT);
     unsigned int level = amd_iommu_get_paging_mode(end_gfn);
-    struct amd_iommu_pte *table;
+    union amd_iommu_pte *table;
 
     if ( hd->arch.root_table )
     {
@@ -489,7 +489,7 @@ int __init amd_iommu_quarantine_init(struct domain *d)
 
         for ( i = 0; i < PTE_PER_TABLE_SIZE; i++ )
         {
-            struct amd_iommu_pte *pde = &table[i];
+            union amd_iommu_pte *pde = &table[i];
 
             /*
              * PDEs are essentially a subset of PTEs, so this function
