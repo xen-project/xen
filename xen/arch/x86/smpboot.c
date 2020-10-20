@@ -997,15 +997,17 @@ static int cpu_smpboot_alloc(unsigned int cpu)
         memflags = MEMF_node(node);
 
     if ( stack_base[cpu] == NULL )
+    {
         stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
-    if ( stack_base[cpu] == NULL )
-        goto out;
+        if ( !stack_base[cpu] )
+            goto out;
+
+        memguard_guard_stack(stack_base[cpu]);
+    }
 
     info = get_cpu_info_from_stack((unsigned long)stack_base[cpu]);
     info->processor_id = cpu;
     info->per_cpu_offset = __per_cpu_offset[cpu];
-
-    memguard_guard_stack(stack_base[cpu]);
 
     gdt = per_cpu(gdt, cpu) ?: alloc_xenheap_pages(0, memflags);
     if ( gdt == NULL )
