@@ -83,11 +83,31 @@ static int check_for_xen(int pv_context)
 
         if ( !strcmp("XenVMMXenVMM", signature) && (regs[0] >= (base + 2)) )
             goto found;
+
+        /* Higher base addresses are possible only with HVM. */
+        if ( pv_context )
+            break;
     }
 
     return 0;
 
  found:
+    /*
+     * On CPUID faulting capable hardware even un-escaped CPUID will return
+     * the hypervisor leaves. Need to further distinguish modes.
+     */
+    if ( !pv_context )
+    {
+        /*
+         * XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD is a PV-only feature
+         * pre-dating CPUID faulting support in Xen. Hence we can use it to
+         * tell whether we shouldn't report "success" to our caller here.
+         */
+        cpuid(base + 2, regs, 0);
+        if ( regs[2] & (1u << 0) )
+            return 0;
+    }
+
     cpuid(base + 1, regs, pv_context);
     if ( regs[0] )
     {
