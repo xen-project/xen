@@ -202,16 +202,21 @@ int build_e820_table(struct e820entry *e820,
     nr++;
 
     /*
-     * Mark populated reserved memory that contains ACPI tables as ACPI data.
+     * Mark populated reserved memory that contains ACPI tables as ACPI NVS.
      * That should help the guest to treat it correctly later: e.g. pass to
-     * the next kernel on kexec or reclaim if necessary.
+     * the next kernel on kexec.
+     *
+     * Using NVS type instead of a regular one helps to prevent potential
+     * space reuse by an ACPI unaware / buggy bootloader, option ROM, etc.
+     * before an ACPI OS takes control. This is possible due to the fact that
+     * ACPI NVS memory is explicitly described as non-reclaimable in ACPI spec.
      */
 
     if ( acpi_enabled )
     {
         e820[nr].addr = RESERVED_MEMBASE;
         e820[nr].size = acpi_mem_end - RESERVED_MEMBASE;
-        e820[nr].type = E820_ACPI;
+        e820[nr].type = E820_NVS;
         nr++;
     }
 
