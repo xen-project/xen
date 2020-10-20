@@ -1,4 +1,4 @@
-# Copy this file to /etc/bash_completion.d/xl.sh
+# Copy this file to /etc/bash_completion.d/xl
 
 _xl()
 {
