@@ -5227,6 +5227,7 @@ int map_pages_to_xen(
     l2_pgentry_t *pl2e, ol2e;
     l1_pgentry_t *pl1e, ol1e;
     unsigned int  i;
+    int rc = -ENOMEM;
 
 #define flush_flags(oldf) do {                 \
     unsigned int o_ = (oldf);                  \
@@ -5247,7 +5248,8 @@ int map_pages_to_xen(
         l3_pgentry_t ol3e, *pl3e = virt_to_xen_l3e(virt);
 
         if ( !pl3e )
-            return -ENOMEM;
+            goto out;
+
         ol3e = *pl3e;
 
         if ( cpu_has_page1gb &&
@@ -5335,7 +5337,7 @@ int map_pages_to_xen(
 
             pl2e = alloc_xen_pagetable();
             if ( pl2e == NULL )
-                return -ENOMEM;
+                goto out;
 
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
                 l2e_write(pl2e + i,
@@ -5364,7 +5366,7 @@ int map_pages_to_xen(
 
         pl2e = virt_to_xen_l2e(virt);
         if ( !pl2e )
-            return -ENOMEM;
+            goto out;
 
         if ( ((((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
                ((1u << PAGETABLE_ORDER) - 1)) == 0) &&
@@ -5407,7 +5409,7 @@ int map_pages_to_xen(
             {
                 pl1e = virt_to_xen_l1e(virt);
                 if ( pl1e == NULL )
-                    return -ENOMEM;
+                    goto out;
             }
             else if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
             {
@@ -5434,7 +5436,7 @@ int map_pages_to_xen(
 
                 pl1e = alloc_xen_pagetable();
                 if ( pl1e == NULL )
-                    return -ENOMEM;
+                    goto out;
 
                 for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
                     l1e_write(&pl1e[i],
@@ -5578,7 +5580,10 @@ int map_pages_to_xen(
 
 #undef flush_flags
 
-    return 0;
+    rc = 0;
+
+ out:
+    return rc;
 }
 
 int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
