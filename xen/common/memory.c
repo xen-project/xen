@@ -284,7 +284,10 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     p2m_type_t p2mt;
 #endif
     mfn_t mfn;
+#ifdef CONFIG_HAS_PASSTHROUGH
+    bool *dont_flush_p, dont_flush;
     int rc;
+#endif
 
 #ifdef CONFIG_X86
     mfn = get_gfn_query(d, gmfn, &p2mt);
@@ -359,7 +362,21 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         return -ENXIO;
     }
 
+#ifdef CONFIG_HAS_PASSTHROUGH
+    /*
+     * Since we're likely to free the page below, we need to suspend
+     * xenmem_add_to_physmap()'s suppressing of IOMMU TLB flushes.
+     */
+    dont_flush_p = &this_cpu(iommu_dont_flush_iotlb);
+    dont_flush = *dont_flush_p;
+    *dont_flush_p = false;
+#endif
+
     rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
+
+#ifdef CONFIG_HAS_PASSTHROUGH
+    *dont_flush_p = dont_flush;
+#endif
 
     /*
      * With the lack of an IOMMU on some platforms, domains with DMA-capable
