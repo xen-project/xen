@@ -984,7 +984,6 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 
     svm_restore_dr(v);
 
-    svm_vmsave_pa(per_cpu(host_vmcb, cpu));
     vmcb->cleanbits.raw = 0;
     svm_tsc_ratio_load(v);
 
@@ -1609,6 +1608,8 @@ static int _svm_cpu_up(bool bsp)
     /* Initialize OSVW bits to be used by guests */
     svm_host_osvw_init();
 
+    /* Minimal checking that enough CPU setup was done by now. */
+    ASSERT(str() == TSS_SELECTOR);
     svm_vmsave_pa(per_cpu(host_vmcb, cpu));
 
     return 0;
