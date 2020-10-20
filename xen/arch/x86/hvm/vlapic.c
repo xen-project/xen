@@ -1626,6 +1626,7 @@ int vlapic_init(struct vcpu *v)
         vlapic->regs = __map_domain_page_global(vlapic->regs_page);
         if ( vlapic->regs == NULL )
         {
+            free_domheap_page(vlapic->regs_page);
             dprintk(XENLOG_ERR, "map vlapic regs error: %d/%d\n",
                     v->domain->domain_id, v->vcpu_id);
             return -ENOMEM;
