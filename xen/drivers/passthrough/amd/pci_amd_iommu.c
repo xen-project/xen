@@ -387,7 +387,7 @@ static void deallocate_next_page_table(struct page_info *pg, int level)
 
 static void deallocate_page_table(struct page_info *pg)
 {
-    struct amd_iommu_pte *table_vaddr;
+    union amd_iommu_pte *table_vaddr;
     unsigned int index, level = PFN_ORDER(pg);
 
     PFN_ORDER(pg) = 0;
@@ -402,7 +402,7 @@ static void deallocate_page_table(struct page_info *pg)
 
     for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
     {
-        struct amd_iommu_pte *pde = &table_vaddr[index];
+        union amd_iommu_pte *pde = &table_vaddr[index];
 
         if ( pde->mfn && pde->next_level && pde->pr )
         {
@@ -554,7 +554,7 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
                                      paddr_t gpa, int indent)
 {
     paddr_t address;
-    struct amd_iommu_pte *table_vaddr;
+    const union amd_iommu_pte *table_vaddr;
     int index;
 
     if ( level < 1 )
@@ -570,7 +570,7 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
 
     for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
     {
-        struct amd_iommu_pte *pde = &table_vaddr[index];
+        const union amd_iommu_pte *pde = &table_vaddr[index];
 
         if ( !(index % 2) )
             process_pending_softirqs();

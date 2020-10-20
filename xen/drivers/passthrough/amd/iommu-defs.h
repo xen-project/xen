@@ -451,20 +451,23 @@ union amd_iommu_x2apic_control {
 #define IOMMU_PAGE_TABLE_U32_PER_ENTRY	(IOMMU_PAGE_TABLE_ENTRY_SIZE / 4)
 #define IOMMU_PAGE_TABLE_ALIGNMENT	4096
 
-struct amd_iommu_pte {
-    uint64_t pr:1;
-    uint64_t ignored0:4;
-    uint64_t a:1;
-    uint64_t d:1;
-    uint64_t ignored1:2;
-    uint64_t next_level:3;
-    uint64_t mfn:40;
-    uint64_t reserved:7;
-    uint64_t u:1;
-    uint64_t fc:1;
-    uint64_t ir:1;
-    uint64_t iw:1;
-    uint64_t ignored2:1;
+union amd_iommu_pte {
+    uint64_t raw;
+    struct {
+        bool pr:1;
+        unsigned int ign0:4;
+        bool a:1;
+        bool d:1;
+        unsigned int ign1:2;
+        unsigned int next_level:3;
+        uint64_t mfn:40;
+        unsigned int :7;
+        bool u:1;
+        bool fc:1;
+        bool ir:1;
+        bool iw:1;
+        unsigned int ign2:1;
+    };
 };
 
 /* Paging modes */
