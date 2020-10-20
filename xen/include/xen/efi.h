@@ -33,6 +33,7 @@ struct compat_pf_efi_runtime_call;
 
 bool efi_enabled(unsigned int feature);
 void efi_init_memory(void);
+bool efi_boot_mem_unused(unsigned long *start, unsigned long *end);
 bool efi_rs_using_pgtables(void);
 unsigned long efi_get_time(void);
 void efi_halt_system(void);
