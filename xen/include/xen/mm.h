@@ -588,8 +588,22 @@ void scrub_one_page(struct page_info *);
                       &(d)->xenpage_list : &(d)->page_list)
 #endif
 
+union add_to_physmap_extra {
+    /*
+     * XENMAPSPACE_gmfn: When deferring TLB flushes, a page reference needs
+     * to be kept until after the flush, so the page can't get removed from
+     * the domain (and re-used for another purpose) beforehand. By passing
+     * non-NULL, the caller of xenmem_add_to_physmap_one() indicates it wants
+     * to have ownership of such a reference transferred in the success case.
+     */
+    struct page_info **ppage;
+
+    /* XENMAPSPACE_gmfn_foreign */
+    domid_t foreign_domid;
+};
+
 int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
-                              union xen_add_to_physmap_batch_extra extra,
+                              union add_to_physmap_extra extra,
                               unsigned long idx, gfn_t gfn);
 
 int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
