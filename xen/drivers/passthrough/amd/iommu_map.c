@@ -147,7 +147,22 @@ void amd_iommu_set_root_page_table(
     u32 *dte, u64 root_ptr, u16 domain_id, u8 paging_mode, u8 valid)
 {
     u64 addr_hi, addr_lo;
-    u32 entry;
+    u32 entry, dte0 = dte[0];
+
+    if ( valid ||
+         get_field_from_reg_u32(dte0, IOMMU_DEV_TABLE_VALID_MASK,
+                                IOMMU_DEV_TABLE_VALID_SHIFT) )
+    {
+        set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, dte0,
+                             IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
+                             IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT, &dte0);
+        set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, dte0,
+                             IOMMU_DEV_TABLE_VALID_MASK,
+                             IOMMU_DEV_TABLE_VALID_SHIFT, &dte0);
+        dte[0] = dte0;
+        smp_wmb();
+    }
+
     set_field_in_reg_u32(domain_id, 0,
                          IOMMU_DEV_TABLE_DOMAIN_ID_MASK,
                          IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT, &entry);
@@ -166,8 +181,9 @@ void amd_iommu_set_root_page_table(
                          IOMMU_DEV_TABLE_IO_READ_PERMISSION_MASK,
                          IOMMU_DEV_TABLE_IO_READ_PERMISSION_SHIFT, &entry);
     dte[1] = entry;
+    smp_wmb();
 
-    set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
+    set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, dte0,
                          IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_MASK,
                          IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_SHIFT, &entry);
     set_field_in_reg_u32(paging_mode, entry,
@@ -180,7 +196,7 @@ void amd_iommu_set_root_page_table(
                          IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_DEV_TABLE_VALID_MASK,
                          IOMMU_DEV_TABLE_VALID_SHIFT, &entry);
-    dte[0] = entry;
+    write_atomic(&dte[0], entry);
 }
 
 void iommu_dte_set_iotlb(u32 *dte, u8 i)
@@ -212,6 +228,7 @@ void __init amd_iommu_set_intremap_table(
                         IOMMU_DEV_TABLE_INT_CONTROL_MASK,
                         IOMMU_DEV_TABLE_INT_CONTROL_SHIFT, &entry);
     dte[5] = entry;
+    smp_wmb();
 
     set_field_in_reg_u32((u32)addr_lo >> 6, 0,
                         IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_MASK,
@@ -229,7 +246,7 @@ void __init amd_iommu_set_intremap_table(
                          IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_DEV_TABLE_INT_VALID_MASK,
                          IOMMU_DEV_TABLE_INT_VALID_SHIFT, &entry);
-    dte[4] = entry;
+    write_atomic(&dte[4], entry);
 }
 
 void __init iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev)
