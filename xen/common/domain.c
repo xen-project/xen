@@ -310,6 +310,12 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( config->iommu_opts & ~XEN_DOMCTL_IOMMU_no_sharept )
+    {
+        dprintk(XENLOG_INFO, "Unknown IOMMU options %#x\n", config->iommu_opts);
+        return -EINVAL;
+    }
+
     if ( !(config->flags & XEN_DOMCTL_CDF_iommu) && config->iommu_opts )
     {
         dprintk(XENLOG_INFO,
