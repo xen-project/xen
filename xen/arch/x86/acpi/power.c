@@ -276,9 +276,6 @@ static int enter_state(u32 state)
 
     mcheck_init(&boot_cpu_data, false);
 
-    /* Restore CR4 from cached value, now MCE is set up. */
-    write_cr4(read_cr4());
-
     printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.\n", state);
 
     if ( (state == ACPI_STATE_S3) && error )
