@@ -41,7 +41,7 @@ static unsigned int clear_iommu_pte_present(unsigned long l1_mfn,
     pte = &table[pfn_to_pde_idx(dfn, 1)];
 
     flush_flags = pte->pr ? IOMMU_FLUSHF_modified : 0;
-    memset(pte, 0, sizeof(*pte));
+    write_atomic(&pte->raw, 0);
 
     unmap_domain_page(table);
 
@@ -53,26 +53,30 @@ static unsigned int set_iommu_pde_present(union amd_iommu_pte *pte,
                                           unsigned int next_level, bool iw,
                                           bool ir)
 {
+    union amd_iommu_pte new = {}, old;
     unsigned int flush_flags = IOMMU_FLUSHF_added;
-
-    if ( pte->pr &&
-         (pte->mfn != next_mfn ||
-          pte->iw != iw ||
-          pte->ir != ir ||
-          pte->next_level != next_level) )
-            flush_flags |= IOMMU_FLUSHF_modified;
 
     /*
      * FC bit should be enabled in PTE, this helps to solve potential
      * issues with ATS devices
      */
-    pte->fc = !next_level;
+    new.fc = !next_level;
 
-    pte->mfn = next_mfn;
-    pte->iw = iw;
-    pte->ir = ir;
-    pte->next_level = next_level;
-    pte->pr = 1;
+    new.mfn = next_mfn;
+    new.iw = iw;
+    new.ir = ir;
+    new.next_level = next_level;
+    new.pr = true;
+
+    old.raw = read_atomic(&pte->raw);
+    old.ign0 = 0;
+    old.ign1 = 0;
+    old.ign2 = 0;
+
+    if ( old.pr && old.raw != new.raw )
+        flush_flags |= IOMMU_FLUSHF_modified;
+
+    write_atomic(&pte->raw, new.raw);
 
     return flush_flags;
 }
