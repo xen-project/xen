@@ -41,7 +41,7 @@ static void clear_iommu_pte_present(unsigned long l1_mfn, unsigned long gfn)
 
     table = map_domain_page(_mfn(l1_mfn));
     pte = table + pfn_to_pde_idx(gfn, IOMMU_PAGING_MODE_LEVEL_1);
-    *pte = 0;
+    write_atomic(pte, 0);
     unmap_domain_page(table);
 }
 
@@ -49,7 +49,7 @@ static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
                                     unsigned int next_level,
                                     bool_t iw, bool_t ir)
 {
-    uint64_t addr_lo, addr_hi, maddr_next;
+    uint64_t addr_lo, addr_hi, maddr_next, full;
     u32 entry;
     bool need_flush = false, old_present;
 
@@ -106,7 +106,7 @@ static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
     if ( next_level == IOMMU_PAGING_MODE_LEVEL_0 )
         set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
                              IOMMU_PTE_FC_MASK, IOMMU_PTE_FC_SHIFT, &entry);
-    pde[1] = entry;
+    full = (uint64_t)entry << 32;
 
     /* mark next level as 'present' */
     set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
@@ -118,7 +118,9 @@ static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
     set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
                          IOMMU_PDE_PRESENT_MASK,
                          IOMMU_PDE_PRESENT_SHIFT, &entry);
-    pde[0] = entry;
+    full |= entry;
+
+    write_atomic((uint64_t *)pde, full);
 
     return need_flush;
 }
