@@ -359,6 +359,9 @@ int arch_vcpu_create(struct vcpu *v)
         vmce_init_vcpu(v);
 
         arch_vcpu_regs_init(v);
+
+        if ( (rc = init_vcpu_msr_policy(v)) )
+            goto fail;
     }
     else if ( (rc = xstate_alloc_save_area(v)) != 0 )
         return rc;
@@ -383,9 +386,6 @@ int arch_vcpu_create(struct vcpu *v)
     if ( !is_idle_domain(v->domain) )
     {
         vpmu_initialise(v);
-
-        if ( (rc = init_vcpu_msr_policy(v)) )
-            goto fail;
 
         cpuid_policy_updated(v);
     }
