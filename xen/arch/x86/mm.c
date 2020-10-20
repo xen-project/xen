@@ -2088,6 +2088,50 @@ void page_unlock(struct page_info *page)
     current_locked_page_set(NULL);
 }
 
+/*
+ * L3 table locks:
+ *
+ * Used for serialization in map_pages_to_xen() and modify_xen_mappings().
+ *
+ * For Xen PT pages, the page->u.inuse.type_info is unused and it is safe to
+ * reuse the PGT_locked flag. This lock is taken only when we move down to L3
+ * tables and below, since L4 (and above, for 5-level paging) is still globally
+ * protected by map_pgdir_lock.
+ *
+ * PV MMU update hypercalls call map_pages_to_xen while holding a page's page_lock().
+ * This has two implications:
+ * - We cannot reuse reuse current_locked_page_* for debugging
+ * - To avoid the chance of deadlock, even for different pages, we
+ *   must never grab page_lock() after grabbing l3t_lock().  This
+ *   includes any page_lock()-based locks, such as
+ *   mem_sharing_page_lock().
+ *
+ * Also note that we grab the map_pgdir_lock while holding the
+ * l3t_lock(), so to avoid deadlock we must avoid grabbing them in
+ * reverse order.
+ */
+static void l3t_lock(struct page_info *page)
+{
+    unsigned long x, nx;
+
+    do {
+        while ( (x = page->u.inuse.type_info) & PGT_locked )
+            cpu_relax();
+        nx = x | PGT_locked;
+    } while ( cmpxchg(&page->u.inuse.type_info, x, nx) != x );
+}
+
+static void l3t_unlock(struct page_info *page)
+{
+    unsigned long x, nx, y = page->u.inuse.type_info;
+
+    do {
+        x = y;
+        BUG_ON(!(x & PGT_locked));
+        nx = x & ~PGT_locked;
+    } while ( (y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x );
+}
+
 #ifdef CONFIG_PV
 /*
  * PTE flags that a guest may change without re-validating the PTE.
@@ -5078,6 +5122,23 @@ l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
                          flush_area_local((const void *)v, f) : \
                          flush_area_all((const void *)v, f))
 
+#define L3T_INIT(page) (page) = ZERO_BLOCK_PTR
+
+#define L3T_LOCK(page)        \
+    do {                      \
+        if ( locking )        \
+            l3t_lock(page);   \
+    } while ( false )
+
+#define L3T_UNLOCK(page)                           \
+    do {                                           \
+        if ( locking && (page) != ZERO_BLOCK_PTR ) \
+        {                                          \
+            l3t_unlock(page);                      \
+            (page) = ZERO_BLOCK_PTR;               \
+        }                                          \
+    } while ( false )
+
 int map_pages_to_xen(
     unsigned long virt,
     mfn_t mfn,
@@ -5089,6 +5150,7 @@ int map_pages_to_xen(
     l1_pgentry_t *pl1e, ol1e;
     unsigned int  i;
     int rc = -ENOMEM;
+    struct page_info *current_l3page;
 
 #define flush_flags(oldf) do {                 \
     unsigned int o_ = (oldf);                  \
@@ -5104,13 +5166,20 @@ int map_pages_to_xen(
     }                                          \
 } while (0)
 
+    L3T_INIT(current_l3page);
+
     while ( nr_mfns != 0 )
     {
-        l3_pgentry_t ol3e, *pl3e = virt_to_xen_l3e(virt);
+        l3_pgentry_t *pl3e, ol3e;
 
+        L3T_UNLOCK(current_l3page);
+
+        pl3e = virt_to_xen_l3e(virt);
         if ( !pl3e )
             goto out;
 
+        current_l3page = virt_to_page(pl3e);
+        L3T_LOCK(current_l3page);
         ol3e = *pl3e;
 
         if ( cpu_has_page1gb &&
@@ -5450,6 +5519,7 @@ int map_pages_to_xen(
     rc = 0;
 
  out:
+    L3T_UNLOCK(current_l3page);
     return rc;
 }
 
@@ -5478,6 +5548,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
     unsigned int  i;
     unsigned long v = s;
     int rc = -ENOMEM;
+    struct page_info *current_l3page;
 
     /* Set of valid PTE bits which may be altered. */
 #define FLAGS_MASK (_PAGE_NX|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW|_PAGE_PRESENT)
@@ -5486,11 +5557,22 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
     ASSERT(IS_ALIGNED(s, PAGE_SIZE));
     ASSERT(IS_ALIGNED(e, PAGE_SIZE));
 
+    L3T_INIT(current_l3page);
+
     while ( v < e )
     {
-        l3_pgentry_t *pl3e = virt_to_xen_l3e(v);
+        l3_pgentry_t *pl3e;
 
-        if ( !pl3e || !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
+        L3T_UNLOCK(current_l3page);
+
+        pl3e = virt_to_xen_l3e(v);
+        if ( !pl3e )
+            goto out;
+
+        current_l3page = virt_to_page(pl3e);
+        L3T_LOCK(current_l3page);
+
+        if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
         {
             /* Confirm the caller isn't trying to create new mappings. */
             ASSERT(!(nf & _PAGE_PRESENT));
@@ -5716,8 +5798,12 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
     rc = 0;
 
  out:
+    L3T_UNLOCK(current_l3page);
     return rc;
 }
+
+#undef L3T_LOCK
+#undef L3T_UNLOCK
 
 #undef flush_area
 
