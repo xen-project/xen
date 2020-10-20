@@ -69,7 +69,7 @@ ENTRY(s3_resume)
          * so SETSSBSY will successfully load a value useful for us, then
          * reset MSR_PL0_SSP to its usual value and pop the temporary token.
          */
-        mov     saved_rsp(%rip), %rdi
+        mov     saved_ssp(%rip), %rdi
         cmpq    $1, %rdi
         je      .L_shstk_done
 
