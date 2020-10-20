@@ -4633,7 +4633,7 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
 int xenmem_add_to_physmap_one(
     struct domain *d,
     unsigned int space,
-    union xen_add_to_physmap_batch_extra extra,
+    union add_to_physmap_extra extra,
     unsigned long idx,
     gfn_t gpfn)
 {
@@ -4723,9 +4723,20 @@ int xenmem_add_to_physmap_one(
         rc = guest_physmap_add_page(d, gpfn, mfn, PAGE_ORDER_4K);
 
  put_both:
-    /* In the XENMAPSPACE_gmfn, we took a ref of the gfn at the top */
+    /*
+     * In the XENMAPSPACE_gmfn case, we took a ref of the gfn at the top.
+     * We also may need to transfer ownership of the page reference to our
+     * caller.
+     */
     if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
+    {
         put_gfn(d, gfn);
+        if ( !rc && extra.ppage )
+        {
+            *extra.ppage = page;
+            page = NULL;
+        }
+    }
 
     if ( page )
         put_page(page);

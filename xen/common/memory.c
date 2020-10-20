@@ -768,11 +768,10 @@ static int xenmem_add_to_physmap(struct domain *d,
 {
     unsigned int done = 0;
     long rc = 0;
-    union xen_add_to_physmap_batch_extra extra;
+    union add_to_physmap_extra extra = {};
+    struct page_info *pages[16];
 
-    if ( xatp->space != XENMAPSPACE_gmfn_foreign )
-        extra.res0 = 0;
-    else
+    if ( xatp->space == XENMAPSPACE_gmfn_foreign )
         extra.foreign_domid = DOMID_INVALID;
 
     if ( xatp->space != XENMAPSPACE_gmfn_range )
@@ -788,7 +787,10 @@ static int xenmem_add_to_physmap(struct domain *d,
 
 #ifdef CONFIG_HAS_PASSTHROUGH
     if ( need_iommu(d) )
+    {
         this_cpu(iommu_dont_flush_iotlb) = 1;
+        extra.ppage = &pages[0];
+    }
 #endif
 
     while ( xatp->size > done )
@@ -801,8 +803,12 @@ static int xenmem_add_to_physmap(struct domain *d,
         xatp->idx++;
         xatp->gpfn++;
 
+        if ( extra.ppage )
+            ++extra.ppage;
+
         /* Check for continuation if it's not the last iteration. */
-        if ( xatp->size > ++done && hypercall_preempt_check() )
+        if ( (++done > ARRAY_SIZE(pages) && extra.ppage) ||
+             (xatp->size > done && hypercall_preempt_check()) )
         {
             rc = start + done;
             break;
@@ -813,12 +819,22 @@ static int xenmem_add_to_physmap(struct domain *d,
     if ( need_iommu(d) )
     {
         int ret;
+        unsigned int i;
 
         this_cpu(iommu_dont_flush_iotlb) = 0;
 
         ret = iommu_iotlb_flush(d, xatp->idx - done, done);
         if ( unlikely(ret) && rc >= 0 )
             rc = ret;
+
+        /*
+         * Now that the IOMMU TLB flush was done for the original GFN, drop
+         * the page references. The 2nd flush below is fine to make later, as
+         * whoever removes the page again from its new GFN will have to do
+         * another flush anyway.
+         */
+        for ( i = 0; i < done; ++i )
+            put_page(pages[i]);
 
         ret = iommu_iotlb_flush(d, xatp->gpfn - done, done);
         if ( unlikely(ret) && rc >= 0 )
@@ -835,6 +851,7 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
 {
     unsigned int done = 0;
     int rc;
+    union add_to_physmap_extra extra = {};
 
     if ( xatpb->size < start )
         return -EILSEQ;
@@ -848,6 +865,19 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
          !guest_handle_okay(xatpb->gpfns, xatpb->size) ||
          !guest_handle_okay(xatpb->errs, xatpb->size) )
         return -EFAULT;
+
+    switch ( xatpb->space )
+    {
+    case XENMAPSPACE_dev_mmio:
+        /* res0 is reserved for future use. */
+        if ( xatpb->u.res0 )
+            return -EOPNOTSUPP;
+        break;
+
+    case XENMAPSPACE_gmfn_foreign:
+        extra.foreign_domid = xatpb->u.foreign_domid;
+        break;
+    }
 
     while ( xatpb->size > done )
     {
@@ -866,8 +896,7 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
             goto out;
         }
 
-        rc = xenmem_add_to_physmap_one(d, xatpb->space,
-                                       xatpb->u,
+        rc = xenmem_add_to_physmap_one(d, xatpb->space, extra,
                                        idx, _gfn(gpfn));
 
         if ( unlikely(__copy_to_guest_offset(xatpb->errs, 0, &rc, 1)) )

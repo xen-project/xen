@@ -1225,7 +1225,7 @@ void share_xen_page_with_privileged_guests(
 int xenmem_add_to_physmap_one(
     struct domain *d,
     unsigned int space,
-    union xen_add_to_physmap_batch_extra extra,
+    union add_to_physmap_extra extra,
     unsigned long idx,
     gfn_t gfn)
 {
@@ -1297,10 +1297,6 @@ int xenmem_add_to_physmap_one(
         break;
     }
     case XENMAPSPACE_dev_mmio:
-        /* extra should be 0. Reserved for future use. */
-        if ( extra.res0 )
-            return -EOPNOTSUPP;
-
         rc = map_dev_mmio_region(d, gfn, 1, _mfn(idx));
         return rc;
 
