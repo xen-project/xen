@@ -225,8 +225,8 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
         /* Moved to a different queue? */
         if ( old_q != q )
         {
-            evtchn->last_vcpu_id = evtchn->notify_vcpu_id;
-            evtchn->last_priority = evtchn->priority;
+            evtchn->last_vcpu_id = v->vcpu_id;
+            evtchn->last_priority = q->priority;
 
             spin_unlock_irqrestore(&old_q->lock, flags);
             spin_lock_irqsave(&q->lock, flags);
