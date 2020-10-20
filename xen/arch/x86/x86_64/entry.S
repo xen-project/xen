@@ -299,7 +299,6 @@ UNLIKELY_START(nz, sysenter_nt_set)
         pushfq
         andl  $~X86_EFLAGS_NT,(%rsp)
         popfq
-        xorl  %eax,%eax
 UNLIKELY_END(sysenter_nt_set)
         testq %rax,%rax
         leal  (,%rcx,TBF_INTERRUPT),%ecx
