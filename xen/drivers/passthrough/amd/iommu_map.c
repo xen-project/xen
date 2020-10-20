@@ -49,7 +49,7 @@ static unsigned int clear_iommu_pte_present(unsigned long l1_mfn,
                                          IOMMU_PTE_PRESENT_SHIFT) ?
                                          IOMMU_FLUSHF_modified : 0;
 
-    *pte = 0;
+    write_atomic(pte, 0);
     unmap_domain_page(table);
 
     return flush_flags;
@@ -60,7 +60,7 @@ static unsigned int set_iommu_pde_present(uint32_t *pde,
                                           unsigned int next_level, bool iw,
                                           bool ir)
 {
-    uint64_t maddr_next;
+    uint64_t maddr_next, full;
     uint32_t addr_lo, addr_hi, entry;
     bool old_present;
     unsigned int flush_flags = IOMMU_FLUSHF_added;
@@ -119,7 +119,7 @@ static unsigned int set_iommu_pde_present(uint32_t *pde,
     if ( next_level == 0 )
         set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
                              IOMMU_PTE_FC_MASK, IOMMU_PTE_FC_SHIFT, &entry);
-    pde[1] = entry;
+    full = (uint64_t)entry << 32;
 
     /* mark next level as 'present' */
     set_field_in_reg_u32(addr_lo >> PAGE_SHIFT, 0,
@@ -131,7 +131,9 @@ static unsigned int set_iommu_pde_present(uint32_t *pde,
     set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
                          IOMMU_PDE_PRESENT_MASK,
                          IOMMU_PDE_PRESENT_SHIFT, &entry);
-    pde[0] = entry;
+    full |= entry;
+
+    write_atomic((uint64_t *)pde, full);
 
     return flush_flags;
 }
