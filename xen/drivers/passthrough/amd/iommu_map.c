@@ -107,11 +107,18 @@ void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
                                    uint64_t root_ptr, uint16_t domain_id,
                                    uint8_t paging_mode, bool valid)
 {
+    if ( valid || dte->v )
+    {
+        dte->tv = false;
+        dte->v = true;
+        smp_wmb();
+    }
     dte->domain_id = domain_id;
     dte->pt_root = paddr_to_pfn(root_ptr);
     dte->iw = true;
     dte->ir = true;
     dte->paging_mode = paging_mode;
+    smp_wmb();
     dte->tv = true;
     dte->v = valid;
 }
@@ -134,6 +141,7 @@ void amd_iommu_set_intremap_table(
     }
 
     dte->ig = false; /* unmapped interrupts result in i/o page faults */
+    smp_wmb();
     dte->iv = valid;
 }
 

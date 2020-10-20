@@ -120,7 +120,10 @@ static void amd_iommu_setup_domain_device(
         /* Undo what amd_iommu_disable_domain_device() may have done. */
         ivrs_dev = &get_ivrs_mappings(iommu->seg)[req_id];
         if ( dte->it_root )
+        {
             dte->int_ctl = IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED;
+            smp_wmb();
+        }
         dte->iv = iommu_intremap;
         dte->ex = ivrs_dev->dte_allow_exclusion;
         dte->sys_mgt = MASK_EXTR(ivrs_dev->device_flags, ACPI_IVHD_SYSTEM_MGMT);
