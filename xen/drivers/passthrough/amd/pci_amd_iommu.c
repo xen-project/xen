@@ -495,7 +495,7 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
                                      paddr_t gpa, int indent)
 {
     paddr_t address;
-    struct amd_iommu_pte *table_vaddr;
+    const union amd_iommu_pte *table_vaddr;
     int index;
 
     if ( level < 1 )
@@ -511,7 +511,7 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
 
     for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
     {
-        struct amd_iommu_pte *pde = &table_vaddr[index];
+        const union amd_iommu_pte *pde = &table_vaddr[index];
 
         if ( !(index % 2) )
             process_pending_softirqs();
