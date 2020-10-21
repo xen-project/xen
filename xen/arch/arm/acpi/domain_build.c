@@ -42,17 +42,18 @@ static int __init acpi_iomem_deny_access(struct domain *d)
     status = acpi_get_table(ACPI_SIG_SPCR, 0,
                             (struct acpi_table_header **)&spcr);
 
-    if ( ACPI_FAILURE(status) )
+    if ( ACPI_SUCCESS(status) )
     {
-        printk("Failed to get SPCR table\n");
-        return -EINVAL;
+        mfn = spcr->serial_port.address >> PAGE_SHIFT;
+        /* Deny MMIO access for UART */
+        rc = iomem_deny_access(d, mfn, mfn + 1);
+        if ( rc )
+            return rc;
     }
-
-    mfn = spcr->serial_port.address >> PAGE_SHIFT;
-    /* Deny MMIO access for UART */
-    rc = iomem_deny_access(d, mfn, mfn + 1);
-    if ( rc )
-        return rc;
+    else
+    {
+        printk("Failed to get SPCR table, Xen console may be unavailable\n");
+    }
 
     /* Deny MMIO access for GIC regions */
     return gic_iomem_deny_access(d);
