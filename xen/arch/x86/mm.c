@@ -4188,7 +4188,7 @@ long do_mmu_update(
 
         cpumask_andnot(mask, pt_owner->dirty_cpumask, cpumask_of(cpu));
         if ( !cpumask_empty(mask) )
-            flush_mask(mask, FLUSH_TLB_GLOBAL | FLUSH_ROOT_PGTBL);
+            flush_mask(mask, FLUSH_ROOT_PGTBL);
     }
 
     perfc_add(num_page_updates, i);
