@@ -7,11 +7,12 @@
  * Version 2 or later.  See the file COPYING for more details.
  */
 
+#include "event_channel.h"
+
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
-#include <xen/event.h>
 
 #include <asm/guest_atomics.h>
 

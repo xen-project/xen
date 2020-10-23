@@ -14,17 +14,17 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "event_channel.h"
+
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
-#include <xen/event.h>
 #include <xen/irq.h>
 #include <xen/iocap.h>
 #include <xen/compat.h>
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
-#include <xen/event_fifo.h>
 #include <asm/current.h>
 
 #include <public/xen.h>

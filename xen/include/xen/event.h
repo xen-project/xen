@@ -105,12 +105,6 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
 #define bucket_from_port(d, p) \
     ((group_from_port(d, p))[((p) % EVTCHNS_PER_GROUP) / EVTCHNS_PER_BUCKET])
 
-static inline unsigned int max_evtchns(const struct domain *d)
-{
-    return d->evtchn_fifo ? EVTCHN_FIFO_NR_CHANNELS
-                          : BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d);
-}
-
 static inline bool_t port_is_valid(struct domain *d, unsigned int p)
 {
     if ( p >= read_atomic(&d->valid_evtchns) )
@@ -176,8 +170,6 @@ static bool evtchn_usable(const struct evtchn *evtchn)
 
 void evtchn_check_pollers(struct domain *d, unsigned int port);
 
-void evtchn_2l_init(struct domain *d);
-
 /* Close all event channels and reset to 2-level ABI. */
 int evtchn_reset(struct domain *d, bool resuming);
 
@@ -227,13 +219,6 @@ static inline void evtchn_port_clear_pending(struct domain *d,
         d->evtchn_port_ops->clear_pending(d, evtchn);
 }
 
-static inline void evtchn_port_unmask(struct domain *d,
-                                      struct evtchn *evtchn)
-{
-    if ( evtchn_usable(evtchn) )
-        d->evtchn_port_ops->unmask(d, evtchn);
-}
-
 static inline bool evtchn_is_pending(const struct domain *d,
                                      const struct evtchn *evtchn)
 {
@@ -259,13 +244,6 @@ static inline bool evtchn_port_is_masked(struct domain *d, evtchn_port_t port)
     return rc;
 }
 
-static inline bool evtchn_is_busy(const struct domain *d,
-                                  const struct evtchn *evtchn)
-{
-    return d->evtchn_port_ops->is_busy &&
-           d->evtchn_port_ops->is_busy(d, evtchn);
-}
-
 /* Returns negative errno, zero for not pending, or positive for pending. */
 static inline int evtchn_port_poll(struct domain *d, evtchn_port_t port)
 {
@@ -283,23 +261,6 @@ static inline int evtchn_port_poll(struct domain *d, evtchn_port_t port)
     }
 
     return rc;
-}
-
-static inline int evtchn_port_set_priority(struct domain *d,
-                                           struct evtchn *evtchn,
-                                           unsigned int priority)
-{
-    if ( !d->evtchn_port_ops->set_priority )
-        return -ENOSYS;
-    if ( !evtchn_usable(evtchn) )
-        return -EACCES;
-    return d->evtchn_port_ops->set_priority(d, evtchn, priority);
-}
-
-static inline void evtchn_port_print_state(struct domain *d,
-                                           const struct evtchn *evtchn)
-{
-    d->evtchn_port_ops->print_state(d, evtchn);
 }
 
 #endif /* __XEN_EVENT_H__ */

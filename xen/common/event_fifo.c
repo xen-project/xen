@@ -7,12 +7,12 @@
  * Version 2 or later.  See the file COPYING for more details.
  */
 
+#include "event_channel.h"
+
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
-#include <xen/event.h>
-#include <xen/event_fifo.h>
 #include <xen/paging.h>
 #include <xen/mm.h>
 #include <xen/domain_page.h>
