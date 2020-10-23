@@ -1154,20 +1154,17 @@ static long evtchn_set_priority(const struct evtchn_set_priority *set_priority)
 {
     struct domain *d = current->domain;
     unsigned int port = set_priority->port;
+    struct evtchn *chn;
     long ret;
-
-    spin_lock(&d->event_lock);
+    unsigned long flags;
 
     if ( !port_is_valid(d, port) )
-    {
-        spin_unlock(&d->event_lock);
         return -EINVAL;
-    }
 
-    ret = evtchn_port_set_priority(d, evtchn_from_port(d, port),
-                                   set_priority->priority);
-
-    spin_unlock(&d->event_lock);
+    chn = evtchn_from_port(d, port);
+    spin_lock_irqsave(&chn->lock, flags);
+    ret = evtchn_port_set_priority(d, chn, set_priority->priority);
+    spin_unlock_irqrestore(&chn->lock, flags);
 
     return ret;
 }
