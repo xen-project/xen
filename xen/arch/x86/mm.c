@@ -795,6 +795,9 @@ static int update_xen_mappings(unsigned long mfn, unsigned int cacheattr)
     unsigned long xen_va =
         XEN_VIRT_START + ((mfn - PFN_DOWN(xen_phys_start)) << PAGE_SHIFT);
 
+    if ( boot_cpu_has(X86_FEATURE_XEN_SELFSNOOP) )
+        return 0;
+
     if ( unlikely(alias) && cacheattr )
         err = map_pages_to_xen(xen_va, _mfn(mfn), 1, 0);
     if ( !err )
@@ -802,6 +805,7 @@ static int update_xen_mappings(unsigned long mfn, unsigned int cacheattr)
                      PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
     if ( unlikely(alias) && !cacheattr && !err )
         err = map_pages_to_xen(xen_va, _mfn(mfn), 1, PAGE_HYPERVISOR);
+
     return err;
 }
 
