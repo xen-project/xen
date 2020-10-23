@@ -178,6 +178,17 @@ unsigned long long parse_size_and_unit(const char *s, const char **ps);
 
 uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c);
 
+/*
+ * A slightly more typesafe variant of cmpxchg() when the entities dealt with
+ * are pointers.
+ */
+#define cmpxchgptr(ptr, o, n) ({                                        \
+    __typeof__(**(ptr)) *const o_ = (o);                                \
+    __typeof__(**(ptr)) *n_ = (n);                                      \
+    ((__typeof__(*(ptr)))__cmpxchg(ptr, (unsigned long)o_,              \
+                                   (unsigned long)n_, sizeof(*(ptr)))); \
+})
+
 #define TAINT_SYNC_CONSOLE              (1u << 0)
 #define TAINT_MACHINE_CHECK             (1u << 1)
 #define TAINT_ERROR_INJECT              (1u << 2)

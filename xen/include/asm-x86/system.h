@@ -148,13 +148,6 @@ static always_inline unsigned long cmpxchg_local_(
     return prev;
 }
 
-#define cmpxchgptr(ptr,o,n) ({                                          \
-    const __typeof__(**(ptr)) *__o = (o);                               \
-    __typeof__(**(ptr)) *__n = (n);                                     \
-    ((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)__o,            \
-                                   (unsigned long)__n,sizeof(*(ptr)))); \
-})
-
 /*
  * Undefined symbol to cause link failure if a wrong size is used with
  * arch_fetch_and_add().
