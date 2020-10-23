@@ -4599,7 +4599,7 @@ int xenmem_add_to_physmap_one(
         if ( is_special_page(mfn_to_page(prev_mfn)) )
             /* Special pages are simply unhooked from this phys slot. */
             rc = guest_physmap_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
-        else
+        else if ( !mfn_eq(mfn, prev_mfn) )
             /* Normal domain memory is freed, to avoid leaking memory. */
             rc = guest_remove_page(d, gfn_x(gpfn));
     }
