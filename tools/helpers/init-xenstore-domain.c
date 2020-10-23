@@ -18,6 +18,10 @@
 #include "init-dom-json.h"
 #include "_paths.h"
 
+#define LAPIC_BASE_ADDRESS  0xfee00000UL
+#define MB(x)               ((uint64_t)x << 20)
+#define GB(x)               ((uint64_t)x << 30)
+
 static uint32_t domid = ~0;
 static char *kernel;
 static char *ramdisk;
@@ -69,6 +73,8 @@ static int build(xc_interface *xch)
     int rv, xs_fd;
     struct xc_dom_image *dom = NULL;
     int limit_kb = (maxmem ? : (memory + 1)) * 1024;
+    uint64_t mem_size = MB(memory);
+    struct e820entry e820[3];
     struct xen_domctl_createdomain config = {
         .ssidref = SECINITSID_DOMU,
         .flags = XEN_DOMCTL_CDF_xs_domain,
@@ -101,6 +107,66 @@ static int build(xc_interface *xch)
         }
     }
 
+    dom = xc_dom_allocate(xch, NULL, NULL);
+    if ( !dom )
+    {
+        fprintf(stderr, "xc_dom_allocate failed\n");
+        rv = -1;
+        goto err;
+    }
+
+    rv = xc_dom_kernel_file(dom, kernel);
+    if ( rv )
+    {
+        fprintf(stderr, "xc_dom_kernel_file failed\n");
+        goto err;
+    }
+
+    if ( ramdisk )
+    {
+        rv = xc_dom_module_file(dom, ramdisk, NULL);
+        if ( rv )
+        {
+            fprintf(stderr, "xc_dom_module_file failed\n");
+            goto err;
+        }
+    }
+
+    dom->container_type = XC_DOM_HVM_CONTAINER;
+    rv = xc_dom_parse_image(dom);
+    if ( rv )
+    {
+        dom->container_type = XC_DOM_PV_CONTAINER;
+        rv = xc_dom_parse_image(dom);
+        if ( rv )
+        {
+            fprintf(stderr, "xc_dom_parse_image failed\n");
+            goto err;
+        }
+    }
+    else
+    {
+        config.flags |= XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap;
+        config.arch.emulation_flags = XEN_X86_EMU_LAPIC;
+        dom->target_pages = mem_size >> XC_PAGE_SHIFT;
+        dom->mmio_size = GB(4) - LAPIC_BASE_ADDRESS;
+        dom->lowmem_end = (mem_size > LAPIC_BASE_ADDRESS) ?
+                          LAPIC_BASE_ADDRESS : mem_size;
+        dom->highmem_end = (mem_size > LAPIC_BASE_ADDRESS) ?
+                           GB(4) + mem_size - LAPIC_BASE_ADDRESS : 0;
+        dom->mmio_start = LAPIC_BASE_ADDRESS;
+        dom->max_vcpus = 1;
+        e820[0].addr = 0;
+        e820[0].size = dom->lowmem_end;
+        e820[0].type = E820_RAM;
+        e820[1].addr = LAPIC_BASE_ADDRESS;
+        e820[1].size = dom->mmio_size;
+        e820[1].type = E820_RESERVED;
+        e820[2].addr = GB(4);
+        e820[2].size = dom->highmem_end - GB(4);
+        e820[2].type = E820_RAM;
+    }
+
     rv = xc_domain_create(xch, &domid, &config);
     if ( rv )
     {
@@ -125,11 +191,15 @@ static int build(xc_interface *xch)
         fprintf(stderr, "xc_evtchn_alloc_unbound failed\n");
         goto err;
     }
-    rv = xc_domain_set_memmap_limit(xch, domid, limit_kb);
-    if ( rv )
+
+    if ( dom->container_type == XC_DOM_PV_CONTAINER )
     {
-        fprintf(stderr, "xc_domain_set_memmap_limit failed\n");
-        goto err;
+        rv = xc_domain_set_memmap_limit(xch, domid, limit_kb);
+        if ( rv )
+        {
+            fprintf(stderr, "xc_domain_set_memmap_limit failed\n");
+            goto err;
+        }
     }
 
     rv = ioctl(xs_fd, IOCTL_XENBUS_BACKEND_SETUP, domid);
@@ -144,43 +214,14 @@ static int build(xc_interface *xch)
     else
         snprintf(cmdline, 512, "--event %d --internal-db", rv);
 
-    dom = xc_dom_allocate(xch, cmdline, NULL);
-    if ( !dom )
-    {
-        fprintf(stderr, "xc_dom_allocate failed\n");
-        goto err;
-    }
-    dom->container_type = XC_DOM_PV_CONTAINER;
+    dom->cmdline = xc_dom_strdup(dom, cmdline);
     dom->xenstore_domid = domid;
     dom->console_evtchn = console_evtchn;
-
-    rv = xc_dom_kernel_file(dom, kernel);
-    if ( rv )
-    {
-        fprintf(stderr, "xc_dom_kernel_file failed\n");
-        goto err;
-    }
-
-    if ( ramdisk )
-    {
-        rv = xc_dom_module_file(dom, ramdisk, NULL);
-        if ( rv )
-        {
-            fprintf(stderr, "xc_dom_module_file failed\n");
-            goto err;
-        }
-    }
 
     rv = xc_dom_boot_xen_init(dom, xch, domid);
     if ( rv )
     {
         fprintf(stderr, "xc_dom_boot_xen_init failed\n");
-        goto err;
-    }
-    rv = xc_dom_parse_image(dom);
-    if ( rv )
-    {
-        fprintf(stderr, "xc_dom_parse_image failed\n");
         goto err;
     }
     rv = xc_dom_mem_init(dom, memory);
@@ -194,6 +235,16 @@ static int build(xc_interface *xch)
     {
         fprintf(stderr, "xc_dom_boot_mem_init failed\n");
         goto err;
+    }
+    if ( dom->container_type == XC_DOM_HVM_CONTAINER )
+    {
+        rv = xc_domain_set_memory_map(xch, domid, e820,
+                                      dom->highmem_end ? 3 : 2);
+        if ( rv )
+        {
+            fprintf(stderr, "xc_domain_set_memory_map failed\n");
+            goto err;
+        }
     }
     rv = xc_dom_build_image(dom);
     if ( rv )
