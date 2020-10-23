@@ -10,6 +10,7 @@
 #include <xenctrl.h>
 #include <xenguest.h>
 #include <xenstore.h>
+#include <xentoollog.h>
 #include <xen/sys/xenbus_dev.h>
 #include <xen-xsm/flask/flask.h>
 #include <xen/io/xenbus.h>
@@ -36,6 +37,7 @@ static struct option options[] = {
     { "param", 1, NULL, 'p' },
     { "name", 1, NULL, 'n' },
     { "maxmem", 1, NULL, 'M' },
+    { "verbose", 0, NULL, 'v' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -57,7 +59,8 @@ static void usage(void)
 "  --maxmem <max size>        maximum memory size in the format:\n"
 "                             <MB val>|<a>/<b>|<MB val>:<a>/<b>\n"
 "                             (an absolute value in MB, a fraction a/b of\n"
-"                             the host memory, or the maximum of both)\n");
+"                             the host memory, or the maximum of both)\n"
+"  -v[v[v]]                   verbosity of domain building\n");
 }
 
 static int build(xc_interface *xch)
@@ -349,8 +352,10 @@ int main(int argc, char** argv)
     char buf[16], be_path[64], fe_path[64];
     int rv, fd;
     char *maxmem_str = NULL;
+    xentoollog_level minmsglevel = XTL_PROGRESS;
+    xentoollog_logger *logger = NULL;
 
-    while ( (opt = getopt_long(argc, argv, "", options, NULL)) != -1 )
+    while ( (opt = getopt_long(argc, argv, "v", options, NULL)) != -1 )
     {
         switch ( opt )
         {
@@ -375,6 +380,10 @@ int main(int argc, char** argv)
         case 'M':
             maxmem_str = optarg;
             break;
+        case 'v':
+            if ( minmsglevel )
+                minmsglevel--;
+            break;
         default:
             usage();
             return 2;
@@ -387,11 +396,15 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    xch = xc_interface_open(NULL, NULL, 0);
+    logger = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr,
+                                                               minmsglevel, 0);
+
+    xch = xc_interface_open(logger, logger, 0);
     if ( !xch )
     {
         fprintf(stderr, "xc_interface_open() failed\n");
-        return 1;
+        rv = 1;
+        goto out;
     }
 
     if ( maxmem_str )
@@ -400,7 +413,8 @@ int main(int argc, char** argv)
         if ( maxmem < 0 )
         {
             xc_interface_close(xch);
-            return 1;
+            rv = 1;
+            goto out;
         }
     }
 
@@ -414,17 +428,24 @@ int main(int argc, char** argv)
     xc_interface_close(xch);
 
     if ( rv )
-        return 1;
+    {
+        rv = 1;
+        goto out;
+    }
 
     rv = gen_stub_json_config(domid, NULL);
     if ( rv )
-        return 3;
+    {
+        rv = 3;
+        goto out;
+    }
 
     xsh = xs_open(0);
     if ( !xsh )
     {
         fprintf(stderr, "xs_open() failed.\n");
-        return 3;
+        rv = 3;
+        goto out;
     }
     snprintf(buf, 16, "%d", domid);
     do_xs_write(xsh, "/tool/xenstored/domid", buf);
@@ -460,7 +481,8 @@ int main(int argc, char** argv)
     if ( fd < 0 )
     {
         fprintf(stderr, "Creating " XEN_RUN_DIR "/xenstored.pid failed\n");
-        return 3;
+        rv = 3;
+        goto out;
     }
     rv = snprintf(buf, 16, "domid:%d\n", domid);
     rv = write(fd, buf, rv);
@@ -469,10 +491,17 @@ int main(int argc, char** argv)
     {
         fprintf(stderr,
                 "Writing domid to " XEN_RUN_DIR "/xenstored.pid failed\n");
-        return 3;
+        rv = 3;
+        goto out;
     }
 
-    return 0;
+    rv = 0;
+
+ out:
+    if ( logger )
+        xtl_logger_destroy(logger);
+
+    return rv;
 }
 
 /*
