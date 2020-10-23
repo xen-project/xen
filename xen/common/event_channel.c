@@ -778,9 +778,15 @@ out:
     return ret;
 }
 
-int guest_enabled_event(struct vcpu *v, uint32_t virq)
+bool evtchn_virq_enabled(const struct vcpu *v, unsigned int virq)
 {
-    return ((v != NULL) && (v->virq_to_evtchn[virq] != 0));
+    if ( !v )
+        return false;
+
+    if ( virq_is_global(virq) && v->vcpu_id )
+        v = domain_vcpu(v->domain, 0);
+
+    return v->virq_to_evtchn[virq];
 }
 
 void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)

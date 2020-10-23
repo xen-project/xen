@@ -85,8 +85,8 @@ int alloc_unbound_xen_event_channel(
     xen_event_channel_notification_t notification_fn);
 void free_xen_event_channel(struct domain *d, int port);
 
-/* Query if event channel is in use by the guest */
-int guest_enabled_event(struct vcpu *v, uint32_t virq);
+/* Query whether a vIRQ is in use by the guest. */
+bool evtchn_virq_enabled(const struct vcpu *v, unsigned int virq);
 
 /* Notify remote end of a Xen-attached event channel.*/
 void notify_via_xen_event_channel(struct domain *ld, int lport);
