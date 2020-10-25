@@ -7,7 +7,9 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 PROGS += xen-init-dom0
 ifeq ($(CONFIG_Linux),y)
+ifeq ($(CONFIG_X86),y)
 PROGS += init-xenstore-domain
+endif
 endif
 
 XEN_INIT_DOM0_OBJS = xen-init-dom0.o init-dom-json.o
@@ -37,17 +39,11 @@ init-xenstore-domain: $(INIT_XENSTORE_DOMAIN_OBJS)
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
-	$(INSTALL_PROG) xen-init-dom0 $(DESTDIR)$(LIBEXEC_BIN)
-ifeq ($(CONFIG_Linux),y)
-	$(INSTALL_PROG) init-xenstore-domain $(DESTDIR)$(LIBEXEC_BIN)
-endif
+	for i in $(PROGS); do $(INSTALL_PROG) $$i $(DESTDIR)$(LIBEXEC_BIN); done
 
 .PHONY: uninstall
 uninstall:
-ifeq ($(CONFIG_Linux),y)
-	rm -f $(DESTDIR)$(LIBEXEC_BIN)/init-xenstore-domain
-endif
-	rm -f $(DESTDIR)$(LIBEXEC_BIN)/xen-init-dom0
+	for i in $(PROGS); do rm -f $(DESTDIR)$(LIBEXEC_BIN)/$$i; done
 
 .PHONY: clean
 clean:
