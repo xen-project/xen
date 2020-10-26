@@ -503,6 +503,18 @@ void check_local_cpu_errata(void)
 void __init enable_errata_workarounds(void)
 {
     enable_cpu_capabilities(arm_errata);
+
+#ifdef CONFIG_ARM64_ERRATUM_832075
+    if ( cpus_have_cap(ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE) )
+    {
+        printk_once("**** This CPU is affected by the errata 832075.                      ****\n"
+                    "**** Guests without CPU erratum workarounds can deadlock the system! ****\n"
+                    "**** Only trusted guests should be used.                             ****\n");
+
+        /* Taint the machine has being insecure */
+        add_taint(TAINT_MACHINE_UNSECURE);
+    }
+#endif
 }
 
 static int cpu_errata_callback(struct notifier_block *nfb,

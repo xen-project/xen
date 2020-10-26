@@ -38,6 +38,9 @@ supported in this document.
 ### ARM v8
 
     Status: Supported
+    Status, Cortex A57 r0p0-r1p1: Supported, not security supported
+
+For the Cortex A57 r0p0 - r1p1, see Errata 832075.
 
 ## Host hardware support
 
