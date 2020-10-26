@@ -33,7 +33,7 @@
 
 struct microcode_patch {
     uint32_t hdrver;
-    uint32_t rev;
+    int32_t rev;
     uint16_t year;
     uint8_t  day;
     uint8_t  month;
@@ -222,10 +222,21 @@ static int microcode_sanity_check(const struct microcode_patch *patch)
     return 0;
 }
 
+/*
+ * Production microcode has a positive revision.  Pre-production microcode has
+ * a negative revision.
+ */
 static enum microcode_match_result compare_revisions(
-    uint32_t old_rev, uint32_t new_rev)
+    int32_t old_rev, int32_t new_rev)
 {
     if ( new_rev > old_rev )
+        return NEW_UCODE;
+
+    /*
+     * Treat pre-production as always applicable - anyone using pre-production
+     * microcode knows what they are doing, and can keep any resulting pieces.
+     */
+    if ( new_rev < 0 )
         return NEW_UCODE;
 
     return OLD_UCODE;
