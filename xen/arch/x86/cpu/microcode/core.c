@@ -95,6 +95,8 @@ static bool_t __initdata ucode_scan;
 /* By default, ucode loading is done in NMI handler */
 static bool ucode_in_nmi = true;
 
+bool __read_mostly opt_ucode_allow_same;
+
 /* Protected by microcode_mutex */
 static struct microcode_patch *microcode_cache;
 
@@ -121,6 +123,8 @@ static int __init parse_ucode(const char *s)
 
         if ( (val = parse_boolean("nmi", s, ss)) >= 0 )
             ucode_in_nmi = val;
+        else if ( (val = parse_boolean("allow-same", s, ss)) >= 0 )
+            opt_ucode_allow_same = val;
         else if ( !ucode_mod_forced ) /* Not forced by EFI */
         {
             if ( (val = parse_boolean("scan", s, ss)) >= 0 )

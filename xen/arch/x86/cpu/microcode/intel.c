@@ -232,6 +232,9 @@ static enum microcode_match_result compare_revisions(
     if ( new_rev > old_rev )
         return NEW_UCODE;
 
+    if ( opt_ucode_allow_same && new_rev == old_rev )
+        return NEW_UCODE;
+
     /*
      * Treat pre-production as always applicable - anyone using pre-production
      * microcode knows what they are doing, and can keep any resulting pieces.

@@ -174,6 +174,9 @@ static enum microcode_match_result compare_revisions(
     if ( new_rev > old_rev )
         return NEW_UCODE;
 
+    if ( opt_ucode_allow_same && new_rev == old_rev )
+        return NEW_UCODE;
+
     return OLD_UCODE;
 }
 

@@ -3,6 +3,8 @@
 
 #include <asm/microcode.h>
 
+extern bool opt_ucode_allow_same;
+
 enum microcode_match_result {
     OLD_UCODE, /* signature matched, but revision id is older or equal */
     NEW_UCODE, /* signature matched, but revision id is newer */
