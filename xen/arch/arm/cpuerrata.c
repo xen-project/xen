@@ -157,7 +157,6 @@ extern char __smccc_workaround_1_smc_start[], __smccc_workaround_1_smc_end[];
 static int enable_smccc_arch_workaround_1(void *data)
 {
     struct arm_smccc_res res;
-    static bool warned = false;
     const struct arm_cpu_capabilities *entry = data;
 
     /*
@@ -182,13 +181,8 @@ static int enable_smccc_arch_workaround_1(void *data)
                                      "call ARM_SMCCC_ARCH_WORKAROUND_1");
 
 warn:
-    if ( !warned )
-    {
-        ASSERT(system_state < SYS_STATE_active);
-        warning_add("No support for ARM_SMCCC_ARCH_WORKAROUND_1.\n"
-                    "Please update your firmware.\n");
-        warned = true;
-    }
+    printk_once("**** No support for ARM_SMCCC_ARCH_WORKAROUND_1. ****\n"
+                "**** Please update your firmware.                ****\n");
 
     return 0;
 }
