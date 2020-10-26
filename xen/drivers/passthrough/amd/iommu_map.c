@@ -81,19 +81,34 @@ static unsigned int set_iommu_pde_present(union amd_iommu_pte *pte,
     return flush_flags;
 }
 
-static unsigned int set_iommu_pte_present(unsigned long pt_mfn,
-                                          unsigned long dfn,
-                                          unsigned long next_mfn,
-                                          int pde_level,
-                                          bool iw, bool ir)
+static unsigned int set_iommu_ptes_present(unsigned long pt_mfn,
+                                           unsigned long dfn,
+                                           unsigned long next_mfn,
+                                           unsigned int nr_ptes,
+                                           unsigned int pde_level,
+                                           bool iw, bool ir)
 {
     union amd_iommu_pte *table, *pde;
-    unsigned int flush_flags;
+    unsigned int page_sz, flush_flags = 0;
 
     table = map_domain_page(_mfn(pt_mfn));
     pde = &table[pfn_to_pde_idx(dfn, pde_level)];
+    page_sz = 1U << (PTE_PER_TABLE_SHIFT * (pde_level - 1));
 
-    flush_flags = set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
+    if ( (void *)(pde + nr_ptes) > (void *)table + PAGE_SIZE )
+    {
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
+
+    while ( nr_ptes-- )
+    {
+        flush_flags |= set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
+
+        ++pde;
+        next_mfn += page_sz;
+    }
+
     unmap_domain_page(table);
 
     return flush_flags;
@@ -220,11 +235,8 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
         /* Split super page frame into smaller pieces.*/
         if ( pde->pr && !pde->next_level && next_table_mfn )
         {
-            int i;
             unsigned long mfn, pfn;
-            unsigned int page_sz;
 
-            page_sz = 1 << (PTE_PER_TABLE_SHIFT * (next_level - 1));
             pfn =  dfn & ~((1 << (PTE_PER_TABLE_SHIFT * next_level)) - 1);
             mfn = next_table_mfn;
 
@@ -238,16 +250,12 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
             }
 
             next_table_mfn = mfn_x(page_to_mfn(table));
+
+            set_iommu_ptes_present(next_table_mfn, pfn, mfn, PTE_PER_TABLE_SIZE,
+                                   next_level, true, true);
+            smp_wmb();
             set_iommu_pde_present(pde, next_table_mfn, next_level, true,
                                   true);
-
-            for ( i = 0; i < PTE_PER_TABLE_SIZE; i++ )
-            {
-                set_iommu_pte_present(next_table_mfn, pfn, mfn, next_level,
-                                      true, true);
-                mfn += page_sz;
-                pfn += page_sz;
-             }
 
             amd_iommu_flush_all_pages(d);
         }
@@ -318,9 +326,9 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     }
 
     /* Install 4k mapping */
-    *flush_flags |= set_iommu_pte_present(pt_mfn[1], dfn_x(dfn), mfn_x(mfn),
-                                          1, (flags & IOMMUF_writable),
-                                          (flags & IOMMUF_readable));
+    *flush_flags |= set_iommu_ptes_present(pt_mfn[1], dfn_x(dfn), mfn_x(mfn),
+                                           1, 1, (flags & IOMMUF_writable),
+                                           (flags & IOMMUF_readable));
 
     spin_unlock(&hd->arch.mapping_lock);
 
