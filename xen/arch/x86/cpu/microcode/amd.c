@@ -168,6 +168,15 @@ static bool check_final_patch_levels(const struct cpu_signature *sig)
     return false;
 }
 
+static enum microcode_match_result compare_revisions(
+    uint32_t old_rev, uint32_t new_rev)
+{
+    if ( new_rev > old_rev )
+        return NEW_UCODE;
+
+    return OLD_UCODE;
+}
+
 static enum microcode_match_result microcode_fits(
     const struct microcode_patch *patch)
 {
@@ -178,16 +187,7 @@ static enum microcode_match_result microcode_fits(
          equiv.id  != patch->processor_rev_id )
         return MIS_UCODE;
 
-    if ( patch->patch_id <= sig->rev )
-    {
-        pr_debug("microcode: patch is already at required level or greater.\n");
-        return OLD_UCODE;
-    }
-
-    pr_debug("microcode: CPU%d found a matching microcode update with version %#x (current=%#x)\n",
-             cpu, patch->patch_id, sig->rev);
-
-    return NEW_UCODE;
+    return compare_revisions(sig->rev, patch->patch_id);
 }
 
 static enum microcode_match_result compare_header(
@@ -196,7 +196,7 @@ static enum microcode_match_result compare_header(
     if ( new->processor_rev_id != old->processor_rev_id )
         return MIS_UCODE;
 
-    return new->patch_id > old->patch_id ? NEW_UCODE : OLD_UCODE;
+    return compare_revisions(old->patch_id, new->patch_id);
 }
 
 static enum microcode_match_result compare_patch(

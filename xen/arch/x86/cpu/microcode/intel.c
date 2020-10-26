@@ -222,6 +222,15 @@ static int microcode_sanity_check(const struct microcode_patch *patch)
     return 0;
 }
 
+static enum microcode_match_result compare_revisions(
+    uint32_t old_rev, uint32_t new_rev)
+{
+    if ( new_rev > old_rev )
+        return NEW_UCODE;
+
+    return OLD_UCODE;
+}
+
 /* Check an update against the CPU signature and current update revision */
 static enum microcode_match_result microcode_update_match(
     const struct microcode_patch *mc)
@@ -245,7 +254,7 @@ static enum microcode_match_result microcode_update_match(
     return MIS_UCODE;
 
  found:
-    return mc->rev > cpu_sig->rev ? NEW_UCODE : OLD_UCODE;
+    return compare_revisions(cpu_sig->rev, mc->rev);
 }
 
 static enum microcode_match_result compare_patch(
@@ -258,7 +267,7 @@ static enum microcode_match_result compare_patch(
     ASSERT(microcode_update_match(old) != MIS_UCODE);
     ASSERT(microcode_update_match(new) != MIS_UCODE);
 
-    return new->rev > old->rev ? NEW_UCODE : OLD_UCODE;
+    return compare_revisions(old->rev, new->rev);
 }
 
 static int apply_microcode(const struct microcode_patch *patch)
@@ -332,7 +341,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
          * one with higher revision.
          */
         if ( (microcode_update_match(mc) != MIS_UCODE) &&
-             (!saved || (mc->rev > saved->rev)) )
+             (!saved || compare_revisions(saved->rev, mc->rev) == NEW_UCODE) )
             saved = mc;
 
         buf  += blob_size;
