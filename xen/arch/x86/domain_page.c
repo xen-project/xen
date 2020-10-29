@@ -333,21 +333,14 @@ void unmap_domain_page_global(const void *ptr)
 mfn_t domain_page_map_to_mfn(const void *ptr)
 {
     unsigned long va = (unsigned long)ptr;
-    const l1_pgentry_t *pl1e;
 
     if ( va >= DIRECTMAP_VIRT_START )
         return _mfn(virt_to_mfn(ptr));
 
     if ( va >= VMAP_VIRT_START && va < VMAP_VIRT_END )
-    {
-        pl1e = virt_to_xen_l1e(va);
-        BUG_ON(!pl1e);
-    }
-    else
-    {
-        ASSERT(va >= MAPCACHE_VIRT_START && va < MAPCACHE_VIRT_END);
-        pl1e = &__linear_l1_table[l1_linear_offset(va)];
-    }
+        return vmap_to_mfn(va);
 
-    return l1e_get_mfn(*pl1e);
+    ASSERT(va >= MAPCACHE_VIRT_START && va < MAPCACHE_VIRT_END);
+
+    return l1e_get_mfn(__linear_l1_table[l1_linear_offset(va)]);
 }
