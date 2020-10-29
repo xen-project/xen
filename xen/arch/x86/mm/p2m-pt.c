@@ -779,9 +779,9 @@ pod_retry_l3:
         }
         if ( flags & _PAGE_PSE )
         {
-            mfn = _mfn(l3e_get_pfn(*l3e) +
-                       l2_table_offset(addr) * L1_PAGETABLE_ENTRIES +
-                       l1_table_offset(addr));
+            mfn = mfn_add(l3e_get_mfn(*l3e),
+                          l2_table_offset(addr) * L1_PAGETABLE_ENTRIES +
+                          l1_table_offset(addr));
             *t = p2m_recalc_type(recalc || _needs_recalc(flags),
                                  p2m_flags_to_type(flags), p2m, gfn);
             unmap_domain_page(l3e);
@@ -820,7 +820,7 @@ pod_retry_l2:
     }
     if ( flags & _PAGE_PSE )
     {
-        mfn = _mfn(l2e_get_pfn(*l2e) + l1_table_offset(addr));
+        mfn = mfn_add(l2e_get_mfn(*l2e), l1_table_offset(addr));
         *t = p2m_recalc_type(recalc || _needs_recalc(flags),
                              p2m_flags_to_type(flags), p2m, gfn);
         unmap_domain_page(l2e);
