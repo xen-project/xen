@@ -616,7 +616,6 @@ int __init dom0_construct_pv(struct domain *d,
         v->arch.pv.event_callback_cs    = FLAT_COMPAT_KERNEL_CS;
     }
 
-    /* WARNING: The new domain must have its 'processor' field filled in! */
     if ( !is_pv_32bit_domain(d) )
     {
         maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
