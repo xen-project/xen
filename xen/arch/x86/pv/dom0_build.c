@@ -31,10 +31,10 @@
 #define L3_PROT (BASE_PROT|_PAGE_DIRTY)
 #define L4_PROT (BASE_PROT|_PAGE_DIRTY)
 
-void __init dom0_update_physmap(struct domain *d, unsigned long pfn,
+void __init dom0_update_physmap(bool compat, unsigned long pfn,
                                 unsigned long mfn, unsigned long vphysmap_s)
 {
-    if ( !is_pv_32bit_domain(d) )
+    if ( !compat )
         ((unsigned long *)vphysmap_s)[pfn] = mfn;
     else
         ((unsigned int *)vphysmap_s)[pfn] = mfn;
@@ -289,7 +289,7 @@ int __init dom0_construct_pv(struct domain *d,
                              char *cmdline)
 {
     int i, rc, order, machine;
-    bool compatible;
+    bool compatible, compat;
     struct cpu_user_regs *regs;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
@@ -380,6 +380,8 @@ int __init dom0_construct_pv(struct domain *d,
     }
 #endif
 
+    compat = is_pv_32bit_domain(d);
+
     if ( elf_64bit(&elf) && machine == EM_X86_64 )
         compatible = true;
 
@@ -463,9 +465,9 @@ int __init dom0_construct_pv(struct domain *d,
         vinitrd_end    = vinitrd_start + initrd_len;
         vphysmap_start = round_pgup(vinitrd_end);
     }
-    vphysmap_end     = vphysmap_start + (nr_pages * (!is_pv_32bit_domain(d) ?
-                                                     sizeof(unsigned long) :
-                                                     sizeof(unsigned int)));
+
+    vphysmap_end = vphysmap_start +
+        (nr_pages * (compat ? sizeof(unsigned int) : sizeof(unsigned long)));
     if ( parms.p2m_base != UNSET_ADDR )
         vphysmap_end = vphysmap_start;
     vstartinfo_start = round_pgup(vphysmap_end);
@@ -496,9 +498,9 @@ int __init dom0_construct_pv(struct domain *d,
 #define NR(_l,_h,_s) \
     (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
        ((_l) & ~((1UL<<(_s))-1))) >> (_s))
-        if ( (!is_pv_32bit_domain(d) + /* # L4 */
+        if ( (!compat + /* # L4 */
               NR(v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
-              (!is_pv_32bit_domain(d) ?
+              (!compat ?
                NR(v_start, v_end, L3_PAGETABLE_SHIFT) : /* # L2 */
                4) + /* # compat L2 */
               NR(v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
@@ -600,23 +602,22 @@ int __init dom0_construct_pv(struct domain *d,
         mpt_alloc -= PAGE_ALIGN(initrd_len);
 
     /* Overlap with Xen protected area? */
-    if ( !is_pv_32bit_domain(d) ?
-         ((v_start < HYPERVISOR_VIRT_END) &&
-          (v_end > HYPERVISOR_VIRT_START)) :
-         (v_end > HYPERVISOR_COMPAT_VIRT_START(d)) )
+    if ( compat
+         ? v_end > HYPERVISOR_COMPAT_VIRT_START(d)
+         : (v_start < HYPERVISOR_VIRT_END) && (v_end > HYPERVISOR_VIRT_START) )
     {
         printk("DOM0 image overlaps with Xen private area.\n");
         rc = -EINVAL;
         goto out;
     }
 
-    if ( is_pv_32bit_domain(d) )
+    if ( compat )
     {
         v->arch.pv.failsafe_callback_cs = FLAT_COMPAT_KERNEL_CS;
         v->arch.pv.event_callback_cs    = FLAT_COMPAT_KERNEL_CS;
     }
 
-    if ( !is_pv_32bit_domain(d) )
+    if ( !compat )
     {
         maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
         l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
@@ -677,8 +678,7 @@ int __init dom0_construct_pv(struct domain *d,
             mfn = pfn++;
         else
             mfn = initrd_mfn++;
-        *l1tab = l1e_from_pfn(mfn, (!is_pv_32bit_domain(d) ?
-                                    L1_PROT : COMPAT_L1_PROT));
+        *l1tab = l1e_from_pfn(mfn, compat ? COMPAT_L1_PROT : L1_PROT);
         l1tab++;
 
         page = mfn_to_page(_mfn(mfn));
@@ -687,7 +687,7 @@ int __init dom0_construct_pv(struct domain *d,
             BUG();
     }
 
-    if ( is_pv_32bit_domain(d) )
+    if ( compat )
     {
         l2_pgentry_t *l2t;
 
@@ -806,7 +806,7 @@ int __init dom0_construct_pv(struct domain *d,
         if ( pfn > REVERSE_START && (vinitrd_start || pfn < initrd_pfn) )
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
-        dom0_update_physmap(d, pfn, mfn, vphysmap_start);
+        dom0_update_physmap(compat, pfn, mfn, vphysmap_start);
         if ( !(pfn & 0xfffff) )
             process_pending_softirqs();
     }
@@ -818,12 +818,12 @@ int __init dom0_construct_pv(struct domain *d,
         BUG_ON(SHARED_M2P(get_gpfn_from_mfn(mfn)));
         if ( get_gpfn_from_mfn(mfn) >= count )
         {
-            BUG_ON(is_pv_32bit_domain(d));
+            BUG_ON(compat);
             if ( !page->u.inuse.type_info &&
                  !get_page_and_type(page, d, PGT_writable_page) )
                 BUG();
 
-            dom0_update_physmap(d, pfn, mfn, vphysmap_start);
+            dom0_update_physmap(compat, pfn, mfn, vphysmap_start);
             ++pfn;
             if ( !(pfn & 0xfffff) )
                 process_pending_softirqs();
@@ -843,7 +843,7 @@ int __init dom0_construct_pv(struct domain *d,
 #ifndef NDEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
-            dom0_update_physmap(d, pfn, mfn, vphysmap_start);
+            dom0_update_physmap(compat, pfn, mfn, vphysmap_start);
 #undef pfn
             page++; pfn++;
             if ( !(pfn & 0xfffff) )
@@ -878,7 +878,7 @@ int __init dom0_construct_pv(struct domain *d,
                           vphysmap_start, si);
 
 #ifdef CONFIG_COMPAT
-    if ( is_pv_32bit_domain(d) )
+    if ( compat )
         xlat_start_info(si, pv_shim ? XLAT_start_info_console_domU
                                     : XLAT_start_info_console_dom0);
 #endif
@@ -899,11 +899,9 @@ int __init dom0_construct_pv(struct domain *d,
      */
     regs = &v->arch.user_regs;
     regs->ds = regs->es = regs->fs = regs->gs =
-        !is_pv_32bit_domain(d) ? FLAT_KERNEL_DS : FLAT_COMPAT_KERNEL_DS;
-    regs->ss = (!is_pv_32bit_domain(d) ?
-                FLAT_KERNEL_SS : FLAT_COMPAT_KERNEL_SS);
-    regs->cs = (!is_pv_32bit_domain(d) ?
-                FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS);
+               (compat ? FLAT_COMPAT_KERNEL_DS : FLAT_KERNEL_DS);
+    regs->ss = (compat ? FLAT_COMPAT_KERNEL_SS : FLAT_KERNEL_SS);
+    regs->cs = (compat ? FLAT_COMPAT_KERNEL_CS : FLAT_KERNEL_CS);
     regs->rip = parms.virt_entry;
     regs->rsp = vstack_end;
     regs->rsi = vstartinfo_start;
