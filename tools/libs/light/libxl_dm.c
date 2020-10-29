@@ -1778,9 +1778,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             /* Switching here to the machine "pc" which does not add
              * the xen-platform device instead of the default "xenfv" machine.
              */
-            machinearg = libxl__strdup(gc, "pc,accel=xen");
+            machinearg = libxl__strdup(gc, "pc,accel=xen,suppress-vmdesc=on");
         } else {
-            machinearg = libxl__strdup(gc, "xenfv");
+            machinearg = libxl__strdup(gc, "xenfv,suppress-vmdesc=on");
         }
         if (b_info->u.hvm.mmio_hole_memkb) {
             uint64_t max_ram_below_4g = (1ULL << 32) -
