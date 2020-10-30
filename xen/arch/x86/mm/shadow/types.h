@@ -262,15 +262,6 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define sh_rm_write_access_from_sl1p INTERNAL_NAME(sh_rm_write_access_from_sl1p)
 #endif
 
-/* sh_make_monitor_table depends only on the number of shadow levels */
-#define sh_make_monitor_table \
-        SHADOW_SH_NAME(sh_make_monitor_table, SHADOW_PAGING_LEVELS)
-#define sh_destroy_monitor_table \
-        SHADOW_SH_NAME(sh_destroy_monitor_table, SHADOW_PAGING_LEVELS)
-
-mfn_t sh_make_monitor_table(struct vcpu *v);
-void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn);
-
 #if SHADOW_PAGING_LEVELS == 3
 #define MFN_FITS_IN_HVM_CR3(_MFN) !(mfn_x(_MFN) >> 20)
 #endif

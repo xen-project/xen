@@ -1405,84 +1405,6 @@ make_fl1_shadow(struct domain *d, gfn_t gfn)
 }
 
 
-#if SHADOW_PAGING_LEVELS == GUEST_PAGING_LEVELS && defined(CONFIG_HVM)
-mfn_t
-sh_make_monitor_table(struct vcpu *v)
-{
-    struct domain *d = v->domain;
-
-    ASSERT(pagetable_get_pfn(v->arch.hvm.monitor_table) == 0);
-
-    /* Guarantee we can get the memory we need */
-    shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS);
-
-    {
-        mfn_t m4mfn;
-        l4_pgentry_t *l4e;
-
-        m4mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-        mfn_to_page(m4mfn)->shadow_flags = 4;
-
-        l4e = map_domain_page(m4mfn);
-
-        /*
-         * Create a self-linear mapping, but no shadow-linear mapping.  A
-         * shadow-linear mapping will either be inserted below when creating
-         * lower level monitor tables, or later in sh_update_cr3().
-         */
-        init_xen_l4_slots(l4e, m4mfn, d, INVALID_MFN, false);
-
-#if SHADOW_PAGING_LEVELS < 4
-        {
-            mfn_t m3mfn, m2mfn;
-            l3_pgentry_t *l3e;
-            /* Install an l3 table and an l2 table that will hold the shadow
-             * linear map entries.  This overrides the linear map entry that
-             * was installed by sh_install_xen_entries_in_l4. */
-
-            m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-            mfn_to_page(m3mfn)->shadow_flags = 3;
-            l4e[shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START)]
-                = l4e_from_mfn(m3mfn, __PAGE_HYPERVISOR_RW);
-
-            m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-            mfn_to_page(m2mfn)->shadow_flags = 2;
-            l3e = map_domain_page(m3mfn);
-            l3e[0] = l3e_from_mfn(m2mfn, __PAGE_HYPERVISOR_RW);
-            unmap_domain_page(l3e);
-
-            if ( is_pv_32bit_domain(d) )
-            {
-                l2_pgentry_t *l2t;
-
-                /* For 32-bit PV guests, we need to map the 32-bit Xen
-                 * area into its usual VAs in the monitor tables */
-                m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-                mfn_to_page(m3mfn)->shadow_flags = 3;
-                l4e[0] = l4e_from_mfn(m3mfn, __PAGE_HYPERVISOR_RW);
-
-                m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-                mfn_to_page(m2mfn)->shadow_flags = 2;
-                l3e = map_domain_page(m3mfn);
-                l3e[3] = l3e_from_mfn(m2mfn, _PAGE_PRESENT);
-
-                l2t = map_domain_page(m2mfn);
-                init_xen_pae_l2_slots(l2t, d);
-                unmap_domain_page(l2t);
-
-                unmap_domain_page(l3e);
-            }
-
-        }
-#endif /* SHADOW_PAGING_LEVELS < 4 */
-
-        unmap_domain_page(l4e);
-
-        return m4mfn;
-    }
-}
-#endif /* SHADOW_PAGING_LEVELS == GUEST_PAGING_LEVELS */
-
 /**************************************************************************/
 /* These functions also take a virtual address and return the level-N
  * shadow table mfn and entry, but they create the shadow pagetables if
@@ -1859,50 +1781,6 @@ void sh_destroy_l1_shadow(struct domain *d, mfn_t smfn)
     /* Put the memory back in the pool */
     shadow_free(d, smfn);
 }
-
-#if SHADOW_PAGING_LEVELS == GUEST_PAGING_LEVELS && defined(CONFIG_HVM)
-void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
-{
-    struct domain *d = v->domain;
-    ASSERT(mfn_to_page(mmfn)->u.sh.type == SH_type_monitor_table);
-
-#if SHADOW_PAGING_LEVELS != 4
-    {
-        mfn_t m3mfn;
-        l4_pgentry_t *l4e = map_domain_page(mmfn);
-        l3_pgentry_t *l3e;
-        int linear_slot = shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START);
-
-        /* Need to destroy the l3 and l2 monitor pages used
-         * for the linear map */
-        ASSERT(l4e_get_flags(l4e[linear_slot]) & _PAGE_PRESENT);
-        m3mfn = l4e_get_mfn(l4e[linear_slot]);
-        l3e = map_domain_page(m3mfn);
-        ASSERT(l3e_get_flags(l3e[0]) & _PAGE_PRESENT);
-        shadow_free(d, l3e_get_mfn(l3e[0]));
-        unmap_domain_page(l3e);
-        shadow_free(d, m3mfn);
-
-        if ( is_pv_32bit_domain(d) )
-        {
-            /* Need to destroy the l3 and l2 monitor pages that map the
-             * Xen VAs at 3GB-4GB */
-            ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
-            m3mfn = l4e_get_mfn(l4e[0]);
-            l3e = map_domain_page(m3mfn);
-            ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
-            shadow_free(d, l3e_get_mfn(l3e[3]));
-            unmap_domain_page(l3e);
-            shadow_free(d, m3mfn);
-        }
-        unmap_domain_page(l4e);
-    }
-#endif
-
-    /* Put the memory back in the pool */
-    shadow_free(d, mmfn);
-}
-#endif
 
 /**************************************************************************/
 /* Functions to destroy non-Xen mappings in a pagetable hierarchy.
@@ -4705,8 +4583,6 @@ const struct paging_mode sh_paging_mode = {
     .shadow.cmpxchg_guest_entry    = sh_cmpxchg_guest_entry,
 #endif
 #ifdef CONFIG_HVM
-    .shadow.make_monitor_table     = sh_make_monitor_table,
-    .shadow.destroy_monitor_table  = sh_destroy_monitor_table,
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     .shadow.guess_wrmap            = sh_guess_wrmap,
 #endif

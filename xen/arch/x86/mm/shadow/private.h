@@ -366,9 +366,6 @@ void sh_set_toplevel_shadow(struct vcpu *v,
                                                  mfn_t gmfn,
                                                  uint32_t shadow_type));
 
-/* Install the xen mappings in various flavours of shadow */
-void sh_install_xen_entries_in_l4(struct domain *, mfn_t gl4mfn, mfn_t sl4mfn);
-
 /* Update the shadows in response to a pagetable write from Xen */
 int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
 
@@ -409,6 +406,14 @@ void shadow_update_paging_modes(struct vcpu *v);
 /* Unhook the non-Xen mappings in this top-level shadow mfn.
  * With user_only == 1, unhooks only the user-mode mappings. */
 void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only);
+
+/*
+ * sh_{make,destroy}_monitor_table() depend only on the number of shadow
+ * levels.
+ */
+mfn_t sh_make_monitor_table(const struct vcpu *v, unsigned int shadow_levels);
+void sh_destroy_monitor_table(const struct vcpu *v, mfn_t mmfn,
+                              unsigned int shadow_levels);
 
 /* VRAM dirty tracking helpers. */
 void shadow_vram_get_mfn(mfn_t mfn, unsigned int l1f,

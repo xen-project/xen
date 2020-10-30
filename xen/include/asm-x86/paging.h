@@ -107,8 +107,6 @@ struct shadow_paging_mode {
                                             mfn_t gmfn);
 #endif
 #ifdef CONFIG_HVM
-    mfn_t         (*make_monitor_table    )(struct vcpu *v);
-    void          (*destroy_monitor_table )(struct vcpu *v, mfn_t mmfn);
     int           (*guess_wrmap           )(struct vcpu *v, 
                                             unsigned long vaddr, mfn_t gmfn);
     void          (*pagetable_dying       )(paddr_t gpa);

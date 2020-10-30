@@ -2467,7 +2467,9 @@ static void sh_update_paging_modes(struct vcpu *v)
 
         if ( pagetable_is_null(v->arch.hvm.monitor_table) )
         {
-            mfn_t mmfn = v->arch.paging.mode->shadow.make_monitor_table(v);
+            mfn_t mmfn = sh_make_monitor_table(
+                             v, v->arch.paging.mode->shadow.shadow_levels);
+
             v->arch.hvm.monitor_table = pagetable_from_mfn(mmfn);
             make_cr3(v, mmfn);
             hvm_update_host_cr3(v);
@@ -2504,7 +2506,8 @@ static void sh_update_paging_modes(struct vcpu *v)
 
                 old_mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
                 v->arch.hvm.monitor_table = pagetable_null();
-                new_mfn = v->arch.paging.mode->shadow.make_monitor_table(v);
+                new_mfn = sh_make_monitor_table(
+                              v, v->arch.paging.mode->shadow.shadow_levels);
                 v->arch.hvm.monitor_table = pagetable_from_mfn(new_mfn);
                 SHADOW_PRINTK("new monitor table %"PRI_mfn "\n",
                                mfn_x(new_mfn));
@@ -2516,7 +2519,8 @@ static void sh_update_paging_modes(struct vcpu *v)
                 if ( v == current )
                     write_ptbase(v);
                 hvm_update_host_cr3(v);
-                old_mode->shadow.destroy_monitor_table(v, old_mfn);
+                sh_destroy_monitor_table(v, old_mfn,
+                                         old_mode->shadow.shadow_levels);
             }
         }
 
@@ -2801,7 +2805,9 @@ void shadow_teardown(struct domain *d, bool *preempted)
                     mfn_t mfn = pagetable_get_mfn(v->arch.hvm.monitor_table);
 
                     if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
-                        v->arch.paging.mode->shadow.destroy_monitor_table(v, mfn);
+                        sh_destroy_monitor_table(
+                            v, mfn,
+                            v->arch.paging.mode->shadow.shadow_levels);
                     v->arch.hvm.monitor_table = pagetable_null();
                 }
 #endif /* CONFIG_HVM */

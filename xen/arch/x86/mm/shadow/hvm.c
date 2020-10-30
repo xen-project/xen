@@ -691,6 +691,88 @@ static void sh_emulate_unmap_dest(struct vcpu *v, void *addr,
     atomic_inc(&v->domain->arch.paging.shadow.gtable_dirty_version);
 }
 
+mfn_t sh_make_monitor_table(const struct vcpu *v, unsigned int shadow_levels)
+{
+    struct domain *d = v->domain;
+    mfn_t m4mfn;
+    l4_pgentry_t *l4e;
+
+    ASSERT(!pagetable_get_pfn(v->arch.hvm.monitor_table));
+
+    /* Guarantee we can get the memory we need */
+    shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS);
+    m4mfn = shadow_alloc(d, SH_type_monitor_table, 0);
+    mfn_to_page(m4mfn)->shadow_flags = 4;
+
+    l4e = map_domain_page(m4mfn);
+
+    /*
+     * Create a self-linear mapping, but no shadow-linear mapping.  A
+     * shadow-linear mapping will either be inserted below when creating
+     * lower level monitor tables, or later in sh_update_cr3().
+     */
+    init_xen_l4_slots(l4e, m4mfn, d, INVALID_MFN, false);
+
+    if ( shadow_levels < 4 )
+    {
+        mfn_t m3mfn, m2mfn;
+        l3_pgentry_t *l3e;
+
+        /*
+         * Install an l3 table and an l2 table that will hold the shadow
+         * linear map entries.  This overrides the empty entry that was
+         * installed by init_xen_l4_slots().
+         */
+        m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
+        mfn_to_page(m3mfn)->shadow_flags = 3;
+        l4e[l4_table_offset(SH_LINEAR_PT_VIRT_START)]
+            = l4e_from_mfn(m3mfn, __PAGE_HYPERVISOR_RW);
+
+        m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
+        mfn_to_page(m2mfn)->shadow_flags = 2;
+        l3e = map_domain_page(m3mfn);
+        l3e[0] = l3e_from_mfn(m2mfn, __PAGE_HYPERVISOR_RW);
+        unmap_domain_page(l3e);
+    }
+
+    unmap_domain_page(l4e);
+
+    return m4mfn;
+}
+
+void sh_destroy_monitor_table(const struct vcpu *v, mfn_t mmfn,
+                              unsigned int shadow_levels)
+{
+    struct domain *d = v->domain;
+
+    ASSERT(mfn_to_page(mmfn)->u.sh.type == SH_type_monitor_table);
+
+    if ( shadow_levels < 4 )
+    {
+        mfn_t m3mfn;
+        l4_pgentry_t *l4e = map_domain_page(mmfn);
+        l3_pgentry_t *l3e;
+        unsigned int linear_slot = l4_table_offset(SH_LINEAR_PT_VIRT_START);
+
+        /*
+         * Need to destroy the l3 and l2 monitor pages used
+         * for the linear map.
+         */
+        ASSERT(l4e_get_flags(l4e[linear_slot]) & _PAGE_PRESENT);
+        m3mfn = l4e_get_mfn(l4e[linear_slot]);
+        l3e = map_domain_page(m3mfn);
+        ASSERT(l3e_get_flags(l3e[0]) & _PAGE_PRESENT);
+        shadow_free(d, l3e_get_mfn(l3e[0]));
+        unmap_domain_page(l3e);
+        shadow_free(d, m3mfn);
+
+        unmap_domain_page(l4e);
+    }
+
+    /* Put the memory back in the pool */
+    shadow_free(d, mmfn);
+}
+
 /**************************************************************************/
 /* VRAM dirty tracking support */
 int shadow_track_dirty_vram(struct domain *d,
