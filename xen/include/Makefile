@@ -24,6 +24,7 @@ headers-$(CONFIG_X86)     += compat/arch-x86/xen-$(compat-arch-y).h
 headers-$(CONFIG_ARGO)    += compat/argo.h
 headers-$(CONFIG_PV)      += compat/callback.h
 headers-$(CONFIG_GRANT_TABLE) += compat/grant_table.h
+headers-$(CONFIG_PV_SHIM) += compat/grant_table.h
 headers-$(CONFIG_HVM)     += compat/hvm/dm_op.h
 headers-$(CONFIG_HVM)     += compat/hvm/hvm_op.h
 headers-$(CONFIG_HVM)     += compat/hvm/hvm_vcpu.h
