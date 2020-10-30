@@ -175,7 +175,7 @@ static const char *const str_7d0[32] =
 
 static const char *const str_7a1[32] =
 {
-    /* 4 */                 [ 5] = "avx512-bf16",
+    [ 4] = "avx-vnni",      [ 5] = "avx512-bf16",
 };
 
 static const struct {

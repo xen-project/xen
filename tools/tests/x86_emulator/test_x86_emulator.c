@@ -5028,6 +5028,61 @@ int main(int argc, char **argv)
         printf("okay\n");
     }
 
+    printf("%-40s", "Testing vpdpwssd (%ecx),%{y,z}mmA,%{y,z}mmB...");
+    if ( stack_exec && cpu_has_avx512_vnni && cpu_has_avx_vnni )
+    {
+        /* Do the same operation two ways and compare the results. */
+        decl_insn(vpdpwssd_vex1);
+        decl_insn(vpdpwssd_vex2);
+        decl_insn(vpdpwssd_evex);
+
+        for ( i = 0; i < 24; ++i )
+            res[i] = i | (~i << 16);
+
+        asm volatile ( "vmovdqu32 32(%0), %%zmm1\n\t"
+                       "vextracti64x4 $1, %%zmm1, %%ymm2\n\t"
+                       "vpxor %%xmm0, %%xmm0, %%xmm3\n\t"
+                       "vpxor %%xmm0, %%xmm0, %%xmm4\n\t"
+                       "vpxor %%xmm0, %%xmm0, %%xmm5\n"
+                       put_insn(vpdpwssd_vex1,
+                                /* %{vex%} vpdpwssd (%1), %%ymm1, %%ymm3" */
+                                ".byte 0xc4, 0xe2, 0x75, 0x52, 0x19") "\n"
+                       put_insn(vpdpwssd_vex2,
+                                /* "%{vex%} vpdpwssd 32(%1), %%ymm2, %%ymm4" */
+                                ".byte 0xc4, 0xe2, 0x6d, 0x52, 0x61, 0x20") "\n"
+                       put_insn(vpdpwssd_evex,
+                                /* "vpdpwssd (%1), %%zmm1, %%zmm5" */
+                                ".byte 0x62, 0xf2, 0x75, 0x48, 0x52, 0x29")
+                       :: "r" (res), "c" (NULL) );
+
+        set_insn(vpdpwssd_vex1);
+        regs.ecx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpdpwssd_vex1) )
+            goto fail;
+
+        set_insn(vpdpwssd_vex2);
+        regs.ecx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpdpwssd_vex2) )
+            goto fail;
+
+        set_insn(vpdpwssd_evex);
+        regs.ecx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpdpwssd_evex) )
+            goto fail;
+
+        asm ( "vinserti64x4 $1, %%ymm4, %%zmm3, %%zmm0\n\t"
+              "vpcmpeqd %%zmm0, %%zmm5, %%k0\n\t"
+              "kmovw %%k0, %0" : "=g" (rc) );
+        if ( rc != 0xffff )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing invpcid 16(%ecx),%%edx...");
     if ( stack_exec )
     {

@@ -226,6 +226,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"core-caps",    0x00000007,  0, CPUID_REG_EDX, 30,  1},
         {"ssbd",         0x00000007,  0, CPUID_REG_EDX, 31,  1},
 
+        {"avx-vnni",     0x00000007,  1, CPUID_REG_EAX,  4,  1},
         {"avx512-bf16",  0x00000007,  1, CPUID_REG_EAX,  5,  1},
 
         {"lahfsahf",     0x80000001, NA, CPUID_REG_ECX,  0,  1},
