@@ -326,14 +326,11 @@ int hvm_hypercall(struct cpu_user_regs *regs)
 
     HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu -> %lx", eax, regs->rax);
 
-    if ( curr->hcall_preempted )
-        return HVM_HCALL_preempted;
-
     if ( unlikely(currd->arch.hvm.qemu_mapcache_invalidate) &&
          test_and_clear_bool(currd->arch.hvm.qemu_mapcache_invalidate) )
         send_invalidate_req();
 
-    return HVM_HCALL_completed;
+    return curr->hcall_preempted ? HVM_HCALL_preempted : HVM_HCALL_completed;
 }
 
 /*
