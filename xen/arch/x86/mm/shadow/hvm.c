@@ -903,6 +903,104 @@ int shadow_track_dirty_vram(struct domain *d,
     return rc;
 }
 
+void shadow_vram_get_mfn(mfn_t mfn, unsigned int l1f,
+                         mfn_t sl1mfn, const void *sl1e,
+                         const struct domain *d)
+{
+    unsigned long gfn;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
+
+    ASSERT(is_hvm_domain(d));
+
+    if ( !dirty_vram /* tracking disabled? */ ||
+         !(l1f & _PAGE_RW) /* read-only mapping? */ ||
+         !mfn_valid(mfn) /* mfn can be invalid in mmio_direct */)
+        return;
+
+    gfn = gfn_x(mfn_to_gfn(d, mfn));
+    /* Page sharing not supported on shadow PTs */
+    BUG_ON(SHARED_M2P(gfn));
+
+    if ( (gfn >= dirty_vram->begin_pfn) && (gfn < dirty_vram->end_pfn) )
+    {
+        unsigned long i = gfn - dirty_vram->begin_pfn;
+        const struct page_info *page = mfn_to_page(mfn);
+
+        if ( (page->u.inuse.type_info & PGT_count_mask) == 1 )
+            /* Initial guest reference, record it */
+            dirty_vram->sl1ma[i] = mfn_to_maddr(sl1mfn) |
+                                   PAGE_OFFSET(sl1e);
+    }
+}
+
+void shadow_vram_put_mfn(mfn_t mfn, unsigned int l1f,
+                         mfn_t sl1mfn, const void *sl1e,
+                         const struct domain *d)
+{
+    unsigned long gfn;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
+
+    ASSERT(is_hvm_domain(d));
+
+    if ( !dirty_vram /* tracking disabled? */ ||
+         !(l1f & _PAGE_RW) /* read-only mapping? */ ||
+         !mfn_valid(mfn) /* mfn can be invalid in mmio_direct */)
+        return;
+
+    gfn = gfn_x(mfn_to_gfn(d, mfn));
+    /* Page sharing not supported on shadow PTs */
+    BUG_ON(SHARED_M2P(gfn));
+
+    if ( (gfn >= dirty_vram->begin_pfn) && (gfn < dirty_vram->end_pfn) )
+    {
+        unsigned long i = gfn - dirty_vram->begin_pfn;
+        const struct page_info *page = mfn_to_page(mfn);
+        bool dirty = false;
+        paddr_t sl1ma = mfn_to_maddr(sl1mfn) | PAGE_OFFSET(sl1e);
+
+        if ( (page->u.inuse.type_info & PGT_count_mask) == 1 )
+        {
+            /* Last reference */
+            if ( dirty_vram->sl1ma[i] == INVALID_PADDR )
+            {
+                /* We didn't know it was that one, let's say it is dirty */
+                dirty = true;
+            }
+            else
+            {
+                ASSERT(dirty_vram->sl1ma[i] == sl1ma);
+                dirty_vram->sl1ma[i] = INVALID_PADDR;
+                if ( l1f & _PAGE_DIRTY )
+                    dirty = true;
+            }
+        }
+        else
+        {
+            /* We had more than one reference, just consider the page dirty. */
+            dirty = true;
+            /* Check that it's not the one we recorded. */
+            if ( dirty_vram->sl1ma[i] == sl1ma )
+            {
+                /* Too bad, we remembered the wrong one... */
+                dirty_vram->sl1ma[i] = INVALID_PADDR;
+            }
+            else
+            {
+                /*
+                 * Ok, our recorded sl1e is still pointing to this page, let's
+                 * just hope it will remain.
+                 */
+            }
+        }
+
+        if ( dirty )
+        {
+            dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
+            dirty_vram->last_dirty = NOW();
+        }
+    }
+}
+
 /*
  * Local variables:
  * mode: C

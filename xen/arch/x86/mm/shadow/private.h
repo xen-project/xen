@@ -410,6 +410,14 @@ void shadow_update_paging_modes(struct vcpu *v);
  * With user_only == 1, unhooks only the user-mode mappings. */
 void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only);
 
+/* VRAM dirty tracking helpers. */
+void shadow_vram_get_mfn(mfn_t mfn, unsigned int l1f,
+                         mfn_t sl1mfn, const void *sl1e,
+                         const struct domain *d);
+void shadow_vram_put_mfn(mfn_t mfn, unsigned int l1f,
+                         mfn_t sl1mfn, const void *sl1e,
+                         const struct domain *d);
+
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
 /* Allow a shadowed page to go out of sync */
 int sh_unsync(struct vcpu *v, mfn_t gmfn);
