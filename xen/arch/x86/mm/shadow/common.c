@@ -3121,6 +3121,8 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                  && mfn_valid(nmfn) )
                 npte = map_domain_page(nmfn);
 
+            gfn &= ~(L1_PAGETABLE_ENTRIES - 1);
+
             for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             {
                 if ( !npte
@@ -3129,8 +3131,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                 {
                     /* This GFN->MFN mapping has gone away */
                     sh_remove_all_shadows_and_parents(d, omfn);
-                    if ( sh_remove_all_mappings(d, omfn,
-                                                _gfn(gfn + (i << PAGE_SHIFT))) )
+                    if ( sh_remove_all_mappings(d, omfn, _gfn(gfn + i)) )
                         cpumask_or(&flushmask, &flushmask, d->dirty_cpumask);
                 }
                 omfn = mfn_add(omfn, 1);
