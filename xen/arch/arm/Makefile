@@ -95,11 +95,13 @@ prelink_lto.o: $(ALL_OBJS)
 
 # Link it with all the binary objects
 prelink.o: $(patsubst %/built_in.o,%/built_in_bin.o,$(ALL_OBJS)) prelink_lto.o
-	$(LD) $(XEN_LDFLAGS) -r -o $@ $^
+	$(call if_changed,ld)
 else
 prelink.o: $(ALL_OBJS) FORCE
 	$(call if_changed,ld)
 endif
+
+targets += prelink.o
 
 $(TARGET)-syms: prelink.o xen.lds
 	$(LD) $(XEN_LDFLAGS) -T xen.lds -N prelink.o \
