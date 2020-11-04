@@ -13,7 +13,7 @@
 
 static atomic_t spin_debug __read_mostly = ATOMIC_INIT(0);
 
-static void check_lock(union lock_debug *debug)
+static void check_lock(union lock_debug *debug, bool try)
 {
     bool irq_safe = !local_irq_is_enabled();
 
@@ -42,7 +42,13 @@ static void check_lock(union lock_debug *debug)
      * 
      * To guard against this subtle bug we latch the IRQ safety of every
      * spinlock in the system, on first use.
+     *
+     * A spin_trylock() with interrupts off is always fine, as this can't
+     * block and above deadlock scenario doesn't apply.
      */
+    if ( try && irq_safe )
+        return;
+
     if ( unlikely(debug->irq_safe != irq_safe) )
     {
         union lock_debug seen, new = { 0 };
@@ -102,7 +108,7 @@ void spin_debug_disable(void)
 
 #else /* CONFIG_DEBUG_LOCKS */
 
-#define check_lock(l) ((void)0)
+#define check_lock(l, t) ((void)0)
 #define check_barrier(l) ((void)0)
 #define got_lock(l) ((void)0)
 #define rel_lock(l) ((void)0)
@@ -159,7 +165,7 @@ void inline _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data)
     spinlock_tickets_t tickets = SPINLOCK_TICKET_INC;
     LOCK_PROFILE_VAR;
 
-    check_lock(&lock->debug);
+    check_lock(&lock->debug, false);
     preempt_disable();
     tickets.head_tail = arch_fetch_and_add(&lock->tickets.head_tail,
                                            tickets.head_tail);
@@ -220,8 +226,6 @@ void _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
 
 int _spin_is_locked(spinlock_t *lock)
 {
-    check_lock(&lock->debug);
-
     /*
      * Recursive locks may be locked by another CPU, yet we return
      * "false" here, making this function suitable only for use in
@@ -236,7 +240,7 @@ int _spin_trylock(spinlock_t *lock)
 {
     spinlock_tickets_t old, new;
 
-    check_lock(&lock->debug);
+    check_lock(&lock->debug, true);
     old = observe_lock(&lock->tickets);
     if ( old.head != old.tail )
         return 0;
@@ -294,7 +298,7 @@ int _spin_trylock_recursive(spinlock_t *lock)
     BUILD_BUG_ON(NR_CPUS > SPINLOCK_NO_CPU);
     BUILD_BUG_ON(SPINLOCK_RECURSE_BITS < 3);
 
-    check_lock(&lock->debug);
+    check_lock(&lock->debug, true);
 
     if ( likely(lock->recurse_cpu != cpu) )
     {
