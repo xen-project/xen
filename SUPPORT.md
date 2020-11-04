@@ -738,6 +738,21 @@ See the section **Blkback** for image formats supported by QEMU.
 
     Status: Supported, not security supported
 
+### qemu-xen-traditional ###
+
+The Xen Project provides an old version of qemu with modifications
+which enable use as a device model stub domain.  The old version is
+normally selected by default only in a stub dm configuration, but it
+can be requested explicitly in other configurations, for example in
+`xl` with `device_model_version="QEMU_XEN_TRADITIONAL"`.
+
+    Status, Device Model Stub Domains: Supported, with caveats
+    Status, as host process device model: No security support, not recommended
+
+qemu-xen-traditional is security supported only for those available
+devices which are supported for mainstream QEMU (see above), with
+trusted driver domains (see Device Model Stub Domains).
+
 ## Virtual Firmware
 
 ### x86/HVM iPXE
