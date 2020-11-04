@@ -342,7 +342,7 @@ int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     bool mmio_ro;
 
     /* Attempt to read the PTE that maps the VA being accessed. */
-    pte = guest_get_eff_l1e(addr);
+    pte = guest_get_eff_kern_l1e(addr);
 
     /* We are only looking for read-only mappings */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT | _PAGE_RW)) != _PAGE_PRESENT) )

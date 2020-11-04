@@ -56,27 +56,6 @@ l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn)
 }
 
 /*
- * Read the guest's l1e that maps this address, from the kernel-mode
- * page tables.
- */
-static l1_pgentry_t guest_get_eff_kern_l1e(unsigned long linear)
-{
-    struct vcpu *curr = current;
-    const bool user_mode = !(curr->arch.flags & TF_kernel_mode);
-    l1_pgentry_t l1e;
-
-    if ( user_mode )
-        toggle_guest_pt(curr);
-
-    l1e = guest_get_eff_l1e(linear);
-
-    if ( user_mode )
-        toggle_guest_pt(curr);
-
-    return l1e;
-}
-
-/*
  * Map a guest's LDT page (covering the byte at @offset from start of the LDT)
  * into Xen's virtual range.  Returns true if the mapping changed, false
  * otherwise.

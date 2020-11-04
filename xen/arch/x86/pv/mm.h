@@ -5,8 +5,11 @@ l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn);
 
 int new_guest_cr3(mfn_t mfn);
 
-/* Read a PV guest's l1e that maps this linear address. */
-static inline l1_pgentry_t guest_get_eff_l1e(unsigned long linear)
+/*
+ * Read the guest's l1e that maps this address, from the kernel-mode
+ * page tables.
+ */
+static inline l1_pgentry_t guest_get_eff_kern_l1e(unsigned long linear)
 {
     l1_pgentry_t l1e;
 
