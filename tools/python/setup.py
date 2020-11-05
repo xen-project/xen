@@ -4,6 +4,10 @@ import os, sys
 
 XEN_ROOT = "../.."
 
+SHLIB_libxenctrl = os.environ['SHLIB_libxenctrl'].split()
+SHLIB_libxenguest = os.environ['SHLIB_libxenguest'].split()
+SHLIB_libxenstore = os.environ['SHLIB_libxenstore'].split()
+
 extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
 
 PATH_XEN      = XEN_ROOT + "/tools/include"
@@ -24,7 +28,7 @@ xc = Extension("xc",
                library_dirs       = [ PATH_LIBXENCTRL, PATH_LIBXENGUEST ],
                libraries          = [ "xenctrl", "xenguest" ],
                depends            = [ PATH_LIBXENCTRL + "/libxenctrl.so", PATH_LIBXENGUEST + "/libxenguest.so" ],
-               extra_link_args    = [ "-Wl,-rpath-link="+PATH_LIBXENTOOLLOG ],
+               extra_link_args    = SHLIB_libxenctrl + SHLIB_libxenguest,
                sources            = [ "xen/lowlevel/xc/xc.c" ])
 
 xs = Extension("xs",
@@ -33,6 +37,7 @@ xs = Extension("xs",
                library_dirs       = [ PATH_XENSTORE ],
                libraries          = [ "xenstore" ],
                depends            = [ PATH_XENSTORE + "/libxenstore.so" ],
+               extra_link_args    = SHLIB_libxenstore,
                sources            = [ "xen/lowlevel/xs/xs.c" ])
 
 plat = os.uname()[0]
