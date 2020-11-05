@@ -1410,7 +1410,7 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
         show_execution_state(regs);
         break;
     default:
-        panic("DOM%d: Unhandled debug trap %#x\n", domid, code);
+        printk("DOM%d: Unhandled debug trap %#x\n", domid, code);
         break;
     }
 }
