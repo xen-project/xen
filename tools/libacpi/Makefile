@@ -89,11 +89,6 @@ iasl:
 	@echo 
 	@exit 1
 
-build.o: ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h ssdt_laptop_slate.h
-
-acpi.a: $(OBJS)
-	$(AR) rc $@ $(OBJS)
-
 clean:
 	rm -f $(C_SRC) $(H_SRC) $(MK_DSDT) $(C_SRC:=.$(TMP_SUFFIX))
 	rm -f $(patsubst %.c,%.hex,$(C_SRC)) $(patsubst %.c,%.aml,$(C_SRC)) $(patsubst %.c,%.asl,$(C_SRC))
