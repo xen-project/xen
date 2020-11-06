@@ -69,11 +69,6 @@ bool_t pcidevs_locked(void)
     return !!spin_is_locked(&_pcidevs_lock);
 }
 
-bool_t pcidevs_trylock(void)
-{
-    return !!spin_trylock_recursive(&_pcidevs_lock);
-}
-
 static struct radix_tree_root pci_segments;
 
 static inline struct pci_seg *get_pseg(u16 seg)
