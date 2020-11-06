@@ -1351,7 +1351,7 @@ All the specified CPUs that can be added to the cpupool will be added
 to it. If some CPU can't (e.g., because they're already part of another
 cpupool), an error is reported about each one of them.
 
-=item B<cpupool-cpu-remove> I<cpus|node:nodes>
+=item B<cpupool-cpu-remove> I<cpu-pool> I<cpus|node:nodes>
 
 Removes one or more CPUs or NUMA nodes from I<cpu-pool>. CPUs and NUMA
 nodes can be specified as single CPU/node IDs or as ranges, using the
