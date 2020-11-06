@@ -167,6 +167,12 @@ Go (golang) bindings for libxl
 
     Status: Experimental
 
+### Linux device model stubdomains
+
+Support for running qemu-xen device model in a linux stubdomain.
+
+    Status: Tech Preview
+
 ## Toolstack/3rd party
 
 ### libvirt driver for xl
