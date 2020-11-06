@@ -1177,6 +1177,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         LOG(ERROR, "hvm build set params failed");
         goto out;
     }
+    state->vuart_gfn = dom->vuart_gfn;
 
     rc = hvm_build_set_xs_values(gc, domid, dom, info);
     if (rc != 0) {
