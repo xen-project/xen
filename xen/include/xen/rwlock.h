@@ -56,6 +56,7 @@ static inline int _read_trylock(rwlock_t *lock)
     u32 cnts;
 
     preempt_disable();
+    check_lock(&lock->lock.debug, true);
     cnts = atomic_read(&lock->cnts);
     if ( likely(_can_read_lock(cnts)) )
     {
@@ -87,7 +88,11 @@ static inline void _read_lock(rwlock_t *lock)
      * arch_lock_acquire_barrier().
      */
     if ( likely(_can_read_lock(cnts)) )
+    {
+        /* The slow path calls check_lock() via spin_lock(). */
+        check_lock(&lock->lock.debug, false);
         return;
+    }
 
     /* The slowpath will decrement the reader count, if necessary. */
     queue_read_lock_slowpath(lock);
@@ -162,7 +167,11 @@ static inline void _write_lock(rwlock_t *lock)
      * arch_lock_acquire_barrier().
      */
     if ( atomic_cmpxchg(&lock->cnts, 0, _write_lock_val()) == 0 )
+    {
+        /* The slow path calls check_lock() via spin_lock(). */
+        check_lock(&lock->lock.debug, false);
         return;
+    }
 
     queue_write_lock_slowpath(lock);
     /*
@@ -197,6 +206,7 @@ static inline int _write_trylock(rwlock_t *lock)
     u32 cnts;
 
     preempt_disable();
+    check_lock(&lock->lock.debug, true);
     cnts = atomic_read(&lock->cnts);
     if ( unlikely(cnts) ||
          unlikely(atomic_cmpxchg(&lock->cnts, 0, _write_lock_val()) != 0) )
@@ -327,6 +337,11 @@ static inline void _percpu_read_lock(percpu_rwlock_t **per_cpudata,
         this_cpu_ptr(per_cpudata) = percpu_rwlock;
         /* Drop the read lock because we don't need it anymore. */
         read_unlock(&percpu_rwlock->rwlock);
+    }
+    else
+    {
+        /* All other paths have implicit check_lock() calls via read_lock(). */
+        check_lock(&percpu_rwlock->rwlock.lock.debug, false);
     }
 }
 
