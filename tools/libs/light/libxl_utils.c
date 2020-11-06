@@ -688,21 +688,21 @@ int libxl_bitmap_is_empty(const libxl_bitmap *bitmap)
 
 int libxl_bitmap_test(const libxl_bitmap *bitmap, int bit)
 {
-    if (bit >= bitmap->size * 8)
+    if (bit >= bitmap->size * 8 || bit < 0)
         return 0;
     return (bitmap->map[bit / 8] & (1 << (bit & 7))) ? 1 : 0;
 }
 
 void libxl_bitmap_set(libxl_bitmap *bitmap, int bit)
 {
-    if (bit >= bitmap->size * 8)
+    if (bit >= bitmap->size * 8 || bit < 0)
         return;
     bitmap->map[bit / 8] |= 1 << (bit & 7);
 }
 
 void libxl_bitmap_reset(libxl_bitmap *bitmap, int bit)
 {
-    if (bit >= bitmap->size * 8)
+    if (bit >= bitmap->size * 8 || bit < 0)
         return;
     bitmap->map[bit / 8] &= ~(1 << (bit & 7));
 }
