@@ -240,13 +240,16 @@ int _spin_trylock(spinlock_t *lock)
 {
     spinlock_tickets_t old, new;
 
+    preempt_disable();
     check_lock(&lock->debug, true);
     old = observe_lock(&lock->tickets);
     if ( old.head != old.tail )
+    {
+        preempt_enable();
         return 0;
+    }
     new = old;
     new.tail++;
-    preempt_disable();
     if ( cmpxchg(&lock->tickets.head_tail,
                  old.head_tail, new.head_tail) != old.head_tail )
     {
