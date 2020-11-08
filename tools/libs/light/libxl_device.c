@@ -763,6 +763,12 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
              * from the backend path.
              */
             libxl__xs_path_cleanup(gc, t, be_path);
+        } else if (domid == LIBXL_TOOLSTACK_DOMID && !libxl_only) {
+            /*
+             * Then, toolstack domain is in charge of removing the parent
+             * directory if empty already.
+             */
+            libxl__xs_path_cleanup(gc, t, be_path);
         }
 
         rc = libxl__xs_transaction_commit(gc, &t);
