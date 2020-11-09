@@ -226,6 +226,24 @@ config ARM64_ERRATUM_834220
 
 	  If unsure, say Y.
 
+config ARM_ERRATUM_858921
+	bool "Cortex-A73: 858921: Possible wrong read value for CNTVCT or CNTPCT"
+	default y
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 858921 on Cortex-A73 (all versions).
+
+	  Affected Cortex-A73 might return wrong read value for CNTVCT or CNTPCT
+	  when the counter crosses a 32bit boundary.
+
+	  The workaround involves performing the read twice, and to return
+	  one or the other value depending on whether a transition has taken place.
+	  Please note that this does not necessarily enable the workaround,
+	  as it depends on the alternative framework, which will only patch
+	  the kernel if an affected CPU is detected.
+
+	  If unsure, say Y.
+
 endmenu
 
 config ARM64_HARDEN_BRANCH_PREDICTOR

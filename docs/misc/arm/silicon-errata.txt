@@ -51,6 +51,7 @@ stable hypervisors.
 | ARM            | Cortex-A57      | #1319537        | N/A                     |
 | ARM            | Cortex-A72      | #1319367        | N/A                     |
 | ARM            | Cortex-A72      | #853709         | N/A                     |
+| ARM            | Cortex-A73      | #858921         | ARM_ERRATUM_858921      |
 | ARM            | Cortex-A76      | #1165522        | N/A                     |
 | ARM            | Neoverse-N1     | #1165522        | N/A
 | ARM            | MMU-500         | #842869         | N/A                     |

@@ -470,6 +470,14 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         .matches = has_ssbd_mitigation,
     },
 #endif
+#ifdef CONFIG_ARM_ERRATUM_858921
+    {
+        /* Cortex-A73 (all versions) */
+        .desc = "ARM erratum 858921",
+        .capability = ARM_WORKAROUND_858921,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+    },
+#endif
     {
         /* Neoverse r0p0 - r2p0 */
         .desc = "ARM erratum 1165522",
