@@ -62,7 +62,7 @@ static void virt_timer_expired(void *data)
 
 int domain_vtimer_init(struct domain *d, struct xen_arch_domainconfig *config)
 {
-    d->arch.virt_timer_base.offset = READ_SYSREG64(CNTPCT_EL0);
+    d->arch.virt_timer_base.offset = get_cycles();
     d->time_offset_seconds = ticks_to_ns(d->arch.virt_timer_base.offset - boot_count);
     do_div(d->time_offset_seconds, 1000000000);
 
