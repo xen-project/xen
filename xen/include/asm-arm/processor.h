@@ -351,6 +351,7 @@
 #define VTCR_RES1       (_AC(1,UL)<<31)
 
 /* HCPTR Hyp. Coprocessor Trap Register */
+#define HCPTR_TAM       ((_AC(1,U)<<30))
 #define HCPTR_TTA       ((_AC(1,U)<<20))        /* Trap trace registers */
 #define HCPTR_CP(x)     ((_AC(1,U)<<(x)))       /* Trap Coprocessor x */
 #define HCPTR_CP_MASK   ((_AC(1,U)<<14)-1)
