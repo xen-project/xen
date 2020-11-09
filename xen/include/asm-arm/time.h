@@ -3,6 +3,7 @@
 
 #include <asm/sysregs.h>
 #include <asm/system.h>
+#include <asm/cpuerrata.h>
 
 #define DT_MATCH_TIMER                      \
     DT_MATCH_COMPATIBLE("arm,armv7-timer"), \
@@ -13,7 +14,26 @@ typedef uint64_t cycles_t;
 static inline cycles_t get_cycles (void)
 {
         isb();
-        return READ_SYSREG64(CNTPCT_EL0);
+        /*
+         * ARM_WORKAROUND_858921: Cortex-A73 (all versions) counter read
+         * can return a wrong value when the counter crosses a 32bit boundary.
+         */
+        if ( !check_workaround_858921() )
+            return READ_SYSREG64(CNTPCT_EL0);
+        else
+        {
+            /*
+             * A recommended workaround for erratum 858921 is to:
+             *  1- Read twice CNTPCT.
+             *  2- Compare bit[32] of the two read values.
+             *      - If bit[32] is different, keep the old value.
+             *      - If bit[32] is the same, keep the new value.
+             */
+            cycles_t old, new;
+            old = READ_SYSREG64(CNTPCT_EL0);
+            new = READ_SYSREG64(CNTPCT_EL0);
+            return (((old ^ new) >> 32) & 1) ? old : new;
+        }
 }
 
 /* List of timer's IRQ */
