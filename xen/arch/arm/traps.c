@@ -150,7 +150,8 @@ void init_traps(void)
      * On ARM64 the TCPx bits which we set here (0..9,12,13) are all
      * RES1, i.e. they would trap whether we did this write or not.
      */
-    WRITE_SYSREG((HCPTR_CP_MASK & ~(HCPTR_CP(10) | HCPTR_CP(11))) | HCPTR_TTA,
+    WRITE_SYSREG((HCPTR_CP_MASK & ~(HCPTR_CP(10) | HCPTR_CP(11))) |
+                 HCPTR_TTA | HCPTR_TAM,
                  CPTR_EL2);
 
     /*
