@@ -2495,14 +2495,12 @@ static void dump_irqs(unsigned char key)
                 pirq = domain_irq_to_pirq(d, irq);
                 info = pirq_info(d, pirq);
                 evtchn = evtchn_from_port(d, info->evtchn);
-                local_irq_disable();
-                if ( spin_trylock(&evtchn->lock) )
+                if ( evtchn_read_trylock(evtchn) )
                 {
                     pending = evtchn_is_pending(d, evtchn);
                     masked = evtchn_is_masked(d, evtchn);
-                    spin_unlock(&evtchn->lock);
+                    evtchn_read_unlock(evtchn);
                 }
-                local_irq_enable();
                 printk("d%d:%3d(%c%c%c)%c",
                        d->domain_id, pirq, "-P?"[pending],
                        "-M?"[masked], info->masked ? 'M' : '-',

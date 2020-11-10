@@ -51,6 +51,29 @@
 #define consumer_is_xen(e) (!!(e)->xen_consumer)
 
 /*
+ * Lock an event channel exclusively. This is allowed only when the channel is
+ * free or unbound either when taking or when releasing the lock, as any
+ * concurrent operation on the event channel using evtchn_read_trylock() will
+ * just assume the event channel is free or unbound at the moment when the
+ * evtchn_read_trylock() returns false.
+ */
+static inline void evtchn_write_lock(struct evtchn *evtchn)
+{
+    write_lock(&evtchn->lock);
+
+    evtchn->old_state = evtchn->state;
+}
+
+static inline void evtchn_write_unlock(struct evtchn *evtchn)
+{
+    /* Enforce lock discipline. */
+    ASSERT(evtchn->old_state == ECS_FREE || evtchn->old_state == ECS_UNBOUND ||
+           evtchn->state == ECS_FREE || evtchn->state == ECS_UNBOUND);
+
+    write_unlock(&evtchn->lock);
+}
+
+/*
  * The function alloc_unbound_xen_event_channel() allows an arbitrary
  * notifier function to be specified. However, very few unique functions
  * are specified in practice, so to prevent bloating the evtchn structure
@@ -133,7 +156,7 @@ static struct evtchn *alloc_evtchn_bucket(struct domain *d, unsigned int port)
             return NULL;
         }
         chn[i].port = port + i;
-        spin_lock_init(&chn[i].lock);
+        rwlock_init(&chn[i].lock);
     }
     return chn;
 }
@@ -255,7 +278,6 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     int            port;
     domid_t        dom = alloc->dom;
     long           rc;
-    unsigned long  flags;
 
     d = rcu_lock_domain_by_any_id(dom);
     if ( d == NULL )
@@ -271,14 +293,14 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     if ( rc )
         goto out;
 
-    spin_lock_irqsave(&chn->lock, flags);
+    evtchn_write_lock(chn);
 
     chn->state = ECS_UNBOUND;
     if ( (chn->u.unbound.remote_domid = alloc->remote_dom) == DOMID_SELF )
         chn->u.unbound.remote_domid = current->domain->domain_id;
     evtchn_port_init(d, chn);
 
-    spin_unlock_irqrestore(&chn->lock, flags);
+    evtchn_write_unlock(chn);
 
     alloc->port = port;
 
@@ -291,32 +313,26 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 }
 
 
-static unsigned long double_evtchn_lock(struct evtchn *lchn,
-                                        struct evtchn *rchn)
+static void double_evtchn_lock(struct evtchn *lchn, struct evtchn *rchn)
 {
-    unsigned long flags;
-
     if ( lchn <= rchn )
     {
-        spin_lock_irqsave(&lchn->lock, flags);
+        evtchn_write_lock(lchn);
         if ( lchn != rchn )
-            spin_lock(&rchn->lock);
+            evtchn_write_lock(rchn);
     }
     else
     {
-        spin_lock_irqsave(&rchn->lock, flags);
-        spin_lock(&lchn->lock);
+        evtchn_write_lock(rchn);
+        evtchn_write_lock(lchn);
     }
-
-    return flags;
 }
 
-static void double_evtchn_unlock(struct evtchn *lchn, struct evtchn *rchn,
-                                 unsigned long flags)
+static void double_evtchn_unlock(struct evtchn *lchn, struct evtchn *rchn)
 {
     if ( lchn != rchn )
-        spin_unlock(&lchn->lock);
-    spin_unlock_irqrestore(&rchn->lock, flags);
+        evtchn_write_unlock(lchn);
+    evtchn_write_unlock(rchn);
 }
 
 static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
@@ -326,7 +342,6 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     int            lport, rport = bind->remote_port;
     domid_t        rdom = bind->remote_dom;
     long           rc;
-    unsigned long  flags;
 
     if ( rdom == DOMID_SELF )
         rdom = current->domain->domain_id;
@@ -362,7 +377,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     if ( rc )
         goto out;
 
-    flags = double_evtchn_lock(lchn, rchn);
+    double_evtchn_lock(lchn, rchn);
 
     lchn->u.interdomain.remote_dom  = rd;
     lchn->u.interdomain.remote_port = rport;
@@ -379,7 +394,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
      */
     evtchn_port_set_pending(ld, lchn->notify_vcpu_id, lchn);
 
-    double_evtchn_unlock(lchn, rchn, flags);
+    double_evtchn_unlock(lchn, rchn);
 
     bind->local_port = lport;
 
@@ -402,7 +417,6 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     struct domain *d = current->domain;
     int            virq = bind->virq, vcpu = bind->vcpu;
     int            rc = 0;
-    unsigned long  flags;
 
     if ( (virq < 0) || (virq >= ARRAY_SIZE(v->virq_to_evtchn)) )
         return -EINVAL;
@@ -440,14 +454,14 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
 
     chn = evtchn_from_port(d, port);
 
-    spin_lock_irqsave(&chn->lock, flags);
+    evtchn_write_lock(chn);
 
     chn->state          = ECS_VIRQ;
     chn->notify_vcpu_id = vcpu;
     chn->u.virq         = virq;
     evtchn_port_init(d, chn);
 
-    spin_unlock_irqrestore(&chn->lock, flags);
+    evtchn_write_unlock(chn);
 
     v->virq_to_evtchn[virq] = bind->port = port;
 
@@ -464,7 +478,6 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     struct domain *d = current->domain;
     int            port, vcpu = bind->vcpu;
     long           rc = 0;
-    unsigned long  flags;
 
     if ( domain_vcpu(d, vcpu) == NULL )
         return -ENOENT;
@@ -476,13 +489,13 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
 
     chn = evtchn_from_port(d, port);
 
-    spin_lock_irqsave(&chn->lock, flags);
+    evtchn_write_lock(chn);
 
     chn->state          = ECS_IPI;
     chn->notify_vcpu_id = vcpu;
     evtchn_port_init(d, chn);
 
-    spin_unlock_irqrestore(&chn->lock, flags);
+    evtchn_write_unlock(chn);
 
     bind->port = port;
 
@@ -526,7 +539,6 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     struct pirq   *info;
     int            port = 0, pirq = bind->pirq;
     long           rc;
-    unsigned long  flags;
 
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
         return -EINVAL;
@@ -559,14 +571,14 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
         goto out;
     }
 
-    spin_lock_irqsave(&chn->lock, flags);
+    evtchn_write_lock(chn);
 
     chn->state  = ECS_PIRQ;
     chn->u.pirq.irq = pirq;
     link_pirq_port(port, chn, v);
     evtchn_port_init(d, chn);
 
-    spin_unlock_irqrestore(&chn->lock, flags);
+    evtchn_write_unlock(chn);
 
     bind->port = port;
 
@@ -587,7 +599,6 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     struct evtchn *chn1, *chn2;
     int            port2;
     long           rc = 0;
-    unsigned long  flags;
 
  again:
     spin_lock(&d1->event_lock);
@@ -688,14 +699,14 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
         BUG_ON(chn2->state != ECS_INTERDOMAIN);
         BUG_ON(chn2->u.interdomain.remote_dom != d1);
 
-        flags = double_evtchn_lock(chn1, chn2);
+        double_evtchn_lock(chn1, chn2);
 
         evtchn_free(d1, chn1);
 
         chn2->state = ECS_UNBOUND;
         chn2->u.unbound.remote_domid = d1->domain_id;
 
-        double_evtchn_unlock(chn1, chn2, flags);
+        double_evtchn_unlock(chn1, chn2);
 
         goto out;
 
@@ -703,9 +714,9 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
         BUG();
     }
 
-    spin_lock_irqsave(&chn1->lock, flags);
+    evtchn_write_lock(chn1);
     evtchn_free(d1, chn1);
-    spin_unlock_irqrestore(&chn1->lock, flags);
+    evtchn_write_unlock(chn1);
 
  out:
     if ( d2 != NULL )
@@ -725,7 +736,6 @@ int evtchn_send(struct domain *ld, unsigned int lport)
     struct evtchn *lchn, *rchn;
     struct domain *rd;
     int            rport, ret = 0;
-    unsigned long  flags;
 
     if ( !port_is_valid(ld, lport) )
         return -EINVAL;
@@ -738,7 +748,7 @@ int evtchn_send(struct domain *ld, unsigned int lport)
 
     lchn = evtchn_from_port(ld, lport);
 
-    spin_lock_irqsave(&lchn->lock, flags);
+    evtchn_read_lock(lchn);
 
     /* Guest cannot send via a Xen-attached event channel. */
     if ( unlikely(consumer_is_xen(lchn)) )
@@ -773,7 +783,7 @@ int evtchn_send(struct domain *ld, unsigned int lport)
     }
 
 out:
-    spin_unlock_irqrestore(&lchn->lock, flags);
+    evtchn_read_unlock(lchn);
 
     return ret;
 }
@@ -806,9 +816,11 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
 
     d = v->domain;
     chn = evtchn_from_port(d, port);
-    spin_lock(&chn->lock);
-    evtchn_port_set_pending(d, v->vcpu_id, chn);
-    spin_unlock(&chn->lock);
+    if ( evtchn_read_trylock(chn) )
+    {
+        evtchn_port_set_pending(d, v->vcpu_id, chn);
+        evtchn_read_unlock(chn);
+    }
 
  out:
     spin_unlock_irqrestore(&v->virq_lock, flags);
@@ -837,9 +849,11 @@ void send_guest_global_virq(struct domain *d, uint32_t virq)
         goto out;
 
     chn = evtchn_from_port(d, port);
-    spin_lock(&chn->lock);
-    evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
-    spin_unlock(&chn->lock);
+    if ( evtchn_read_trylock(chn) )
+    {
+        evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
+        evtchn_read_unlock(chn);
+    }
 
  out:
     spin_unlock_irqrestore(&v->virq_lock, flags);
@@ -849,7 +863,6 @@ void send_guest_pirq(struct domain *d, const struct pirq *pirq)
 {
     int port;
     struct evtchn *chn;
-    unsigned long flags;
 
     /*
      * PV guests: It should not be possible to race with __evtchn_close(). The
@@ -864,9 +877,11 @@ void send_guest_pirq(struct domain *d, const struct pirq *pirq)
     }
 
     chn = evtchn_from_port(d, port);
-    spin_lock_irqsave(&chn->lock, flags);
-    evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
-    spin_unlock_irqrestore(&chn->lock, flags);
+    if ( evtchn_read_trylock(chn) )
+    {
+        evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
+        evtchn_read_unlock(chn);
+    }
 }
 
 static struct domain *global_virq_handlers[NR_VIRQS] __read_mostly;
@@ -1068,15 +1083,17 @@ int evtchn_unmask(unsigned int port)
 {
     struct domain *d = current->domain;
     struct evtchn *evtchn;
-    unsigned long flags;
 
     if ( unlikely(!port_is_valid(d, port)) )
         return -EINVAL;
 
     evtchn = evtchn_from_port(d, port);
-    spin_lock_irqsave(&evtchn->lock, flags);
+
+    evtchn_read_lock(evtchn);
+
     evtchn_port_unmask(d, evtchn);
-    spin_unlock_irqrestore(&evtchn->lock, flags);
+
+    evtchn_read_unlock(evtchn);
 
     return 0;
 }
@@ -1156,15 +1173,17 @@ static long evtchn_set_priority(const struct evtchn_set_priority *set_priority)
     unsigned int port = set_priority->port;
     struct evtchn *chn;
     long ret;
-    unsigned long flags;
 
     if ( !port_is_valid(d, port) )
         return -EINVAL;
 
     chn = evtchn_from_port(d, port);
-    spin_lock_irqsave(&chn->lock, flags);
+
+    evtchn_read_lock(chn);
+
     ret = evtchn_port_set_priority(d, chn, set_priority->priority);
-    spin_unlock_irqrestore(&chn->lock, flags);
+
+    evtchn_read_unlock(chn);
 
     return ret;
 }
@@ -1332,7 +1351,6 @@ int alloc_unbound_xen_event_channel(
 {
     struct evtchn *chn;
     int            port, rc;
-    unsigned long  flags;
 
     spin_lock(&ld->event_lock);
 
@@ -1345,14 +1363,14 @@ int alloc_unbound_xen_event_channel(
     if ( rc )
         goto out;
 
-    spin_lock_irqsave(&chn->lock, flags);
+    evtchn_write_lock(chn);
 
     chn->state = ECS_UNBOUND;
     chn->xen_consumer = get_xen_consumer(notification_fn);
     chn->notify_vcpu_id = lvcpu;
     chn->u.unbound.remote_domid = remote_domid;
 
-    spin_unlock_irqrestore(&chn->lock, flags);
+    evtchn_write_unlock(chn);
 
     /*
      * Increment ->xen_evtchns /after/ ->active_evtchns. No explicit
@@ -1388,7 +1406,6 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
 {
     struct evtchn *lchn, *rchn;
     struct domain *rd;
-    unsigned long flags;
 
     if ( !port_is_valid(ld, lport) )
     {
@@ -1403,7 +1420,8 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
 
     lchn = evtchn_from_port(ld, lport);
 
-    spin_lock_irqsave(&lchn->lock, flags);
+    if ( !evtchn_read_trylock(lchn) )
+        return;
 
     if ( likely(lchn->state == ECS_INTERDOMAIN) )
     {
@@ -1413,7 +1431,7 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
         evtchn_port_set_pending(rd, rchn->notify_vcpu_id, rchn);
     }
 
-    spin_unlock_irqrestore(&lchn->lock, flags);
+    evtchn_read_unlock(lchn);
 }
 
 void evtchn_check_pollers(struct domain *d, unsigned int port)
