@@ -281,16 +281,6 @@ static int flask_evtchn_send(struct domain *d, struct evtchn *chn)
 {
     int rc;
 
-    /*
-     * When called with non-NULL chn, memory allocation may not be permitted.
-     * Allow AVC to preallocate nodes as necessary upon early notification.
-     */
-    if ( !chn )
-    {
-        avc_prealloc();
-        return 0;
-    }
-
     switch ( chn->state )
     {
     case ECS_INTERDOMAIN:
