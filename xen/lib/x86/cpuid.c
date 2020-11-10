@@ -165,7 +165,7 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
         for ( i = 2; i < min_t(unsigned int, 63,
                                ARRAY_SIZE(p->xstate.raw)); ++i )
         {
-            if ( xstates & (1ul << i) )
+            if ( xstates & (1ull << i) )
                 cpuid_count_leaf(0xd, i, &p->xstate.raw[i]);
         }
     }
