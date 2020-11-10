@@ -18,6 +18,9 @@ int x86_cpu_policies_are_compatible(const struct cpu_policy *host,
     if ( guest->cpuid->basic.max_leaf > host->cpuid->basic.max_leaf )
         FAIL_CPUID(0, NA);
 
+    if ( guest->cpuid->feat.max_subleaf > host->cpuid->feat.max_subleaf )
+        FAIL_CPUID(7, 0);
+
     if ( guest->cpuid->extd.max_leaf > host->cpuid->extd.max_leaf )
         FAIL_CPUID(0x80000000, NA);
 
