@@ -61,13 +61,24 @@ static inline void evtchn_write_lock(struct evtchn *evtchn)
 {
     write_lock(&evtchn->lock);
 
+#ifndef NDEBUG
     evtchn->old_state = evtchn->state;
+#endif
+}
+
+static inline unsigned int old_state(const struct evtchn *evtchn)
+{
+#ifndef NDEBUG
+    return evtchn->old_state;
+#else
+    return ECS_RESERVED; /* Just to allow things to build. */
+#endif
 }
 
 static inline void evtchn_write_unlock(struct evtchn *evtchn)
 {
     /* Enforce lock discipline. */
-    ASSERT(evtchn->old_state == ECS_FREE || evtchn->old_state == ECS_UNBOUND ||
+    ASSERT(old_state(evtchn) == ECS_FREE || old_state(evtchn) == ECS_UNBOUND ||
            evtchn->state == ECS_FREE || evtchn->state == ECS_UNBOUND);
 
     write_unlock(&evtchn->lock);
