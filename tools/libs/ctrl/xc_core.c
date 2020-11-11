@@ -439,6 +439,7 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
     unsigned long i;
     unsigned long j;
     unsigned long nr_pages;
+    unsigned long max_mfn;
 
     xc_core_memory_map_t *memory_map = NULL;
     unsigned int nr_memory_map;
@@ -575,6 +576,10 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
 
         sts = xc_core_arch_map_p2m(xch, dinfo->guest_width, &info, live_shinfo,
                                    &p2m, &dinfo->p2m_size);
+        if ( sts != 0 )
+            goto out;
+
+        sts = xc_maximum_ram_page(xch, &max_mfn);
         if ( sts != 0 )
             goto out;
     }
@@ -818,19 +823,12 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
         {
             uint64_t gmfn;
             void *vaddr;
-            
-            if ( j >= nr_pages )
-            {
-                /*
-                 * When live dump-mode (-L option) is specified,
-                 * guest domain may increase memory.
-                 */
-                IPRINTF("exceeded nr_pages (%ld) losing pages", nr_pages);
-                goto copy_done;
-            }
 
             if ( !auto_translated_physmap )
             {
+                if ( i >= dinfo->p2m_size )
+                    break;
+
                 if ( dinfo->guest_width >= sizeof(unsigned long) )
                 {
                     if ( dinfo->guest_width == sizeof(unsigned long) )
@@ -846,6 +844,14 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
                     if ( gmfn == (uint32_t)INVALID_PFN )
                        continue;
                 }
+                if ( gmfn > max_mfn )
+                    continue;
+
+                if ( j >= nr_pages )
+                {
+                    j++;
+                    continue;
+                }
 
                 p2m_array[j].pfn = i;
                 p2m_array[j].gmfn = gmfn;
@@ -854,6 +860,12 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
             {
                 if ( !xc_core_arch_gpfn_may_present(&arch_ctxt, i) )
                     continue;
+
+                if ( j >= nr_pages )
+                {
+                    j++;
+                    continue;
+                }
 
                 gmfn = i;
                 pfn_array[j] = i;
@@ -879,7 +891,15 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
         }
     }
 
-copy_done:
+    if ( j > nr_pages )
+    {
+        /*
+         * When live dump-mode (-L option) is specified,
+         * guest domain may increase memory.
+         */
+        IPRINTF("exceeded nr_pages (%ld) losing %ld pages", nr_pages, j - nr_pages);
+    }
+
     sts = dump_rtn(xch, args, dump_mem_start, dump_mem - dump_mem_start);
     if ( sts != 0 )
         goto out;
