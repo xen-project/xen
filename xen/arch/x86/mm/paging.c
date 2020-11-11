@@ -941,27 +941,7 @@ void paging_update_nestedmode(struct vcpu *v)
         v->arch.paging.nestedmode = NULL;
     hvm_asid_flush_vcpu(v);
 }
-#endif
 
-int paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-                           l1_pgentry_t *p, l1_pgentry_t new,
-                           unsigned int level)
-{
-    struct domain *d = p2m->domain;
-    struct vcpu *v = current;
-    int rc = 0;
-
-    if ( v->domain != d )
-        v = d->vcpu ? d->vcpu[0] : NULL;
-    if ( likely(v && paging_mode_enabled(d) && paging_get_hostmode(v) != NULL) )
-        rc = paging_get_hostmode(v)->write_p2m_entry(p2m, gfn, p, new, level);
-    else
-        safe_write_pte(p, new);
-
-    return rc;
-}
-
-#ifdef CONFIG_HVM
 int __init paging_set_allocation(struct domain *d, unsigned int pages,
                                  bool *preempted)
 {

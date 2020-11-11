@@ -108,6 +108,31 @@ static unsigned long p2m_type_to_flags(const struct p2m_domain *p2m,
     }
 }
 
+/*
+ * Atomically write a P2M entry and update the paging-assistance state
+ * appropriately.
+ * Arguments: the domain in question, the GFN whose mapping is being updated,
+ * a pointer to the entry to be written, the MFN in which the entry resides,
+ * the new contents of the entry, and the level in the p2m tree at which
+ * we are writing.
+ */
+static int write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
+                           l1_pgentry_t *p, l1_pgentry_t new,
+                           unsigned int level)
+{
+    struct domain *d = p2m->domain;
+    const struct vcpu *v = current;
+    int rc = 0;
+
+    if ( v->domain != d )
+        v = d->vcpu ? d->vcpu[0] : NULL;
+    if ( likely(v && paging_mode_enabled(d) && paging_get_hostmode(v)) )
+        rc = paging_get_hostmode(v)->write_p2m_entry(p2m, gfn, p, new, level);
+    else
+        safe_write_pte(p, new);
+
+    return rc;
+}
 
 // Find the next level's P2M entry, checking for out-of-range gfn's...
 // Returns NULL on error.
@@ -594,7 +619,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
         entry_content.l1 = l3e_content.l3;
 
         rc = p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 3);
-        /* NB: paging_write_p2m_entry() handles tlb flushes properly */
+        /* NB: write_p2m_entry() handles tlb flushes properly */
         if ( rc )
             goto out;
     }
@@ -631,7 +656,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
 
         /* level 1 entry */
         rc = p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 1);
-        /* NB: paging_write_p2m_entry() handles tlb flushes properly */
+        /* NB: write_p2m_entry() handles tlb flushes properly */
         if ( rc )
             goto out;
     }
@@ -666,7 +691,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
         entry_content.l1 = l2e_content.l2;
 
         rc = p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 2);
-        /* NB: paging_write_p2m_entry() handles tlb flushes properly */
+        /* NB: write_p2m_entry() handles tlb flushes properly */
         if ( rc )
             goto out;
     }
@@ -1107,7 +1132,7 @@ void p2m_pt_init(struct p2m_domain *p2m)
     p2m->recalc = do_recalc;
     p2m->change_entry_type_global = p2m_pt_change_entry_type_global;
     p2m->change_entry_type_range = p2m_pt_change_entry_type_range;
-    p2m->write_p2m_entry = paging_write_p2m_entry;
+    p2m->write_p2m_entry = write_p2m_entry;
 #if P2M_AUDIT
     p2m->audit_p2m = p2m_pt_audit_p2m;
 #else

@@ -369,18 +369,6 @@ static inline void safe_write_pte(l1_pgentry_t *p, l1_pgentry_t new)
     *p = new;
 }
 
-/* Atomically write a P2M entry and update the paging-assistance state 
- * appropriately. 
- * Arguments: the domain in question, the GFN whose mapping is being updated, 
- * a pointer to the entry to be written, the MFN in which the entry resides, 
- * the new contents of the entry, and the level in the p2m tree at which 
- * we are writing. */
-struct p2m_domain;
-
-int paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-                           l1_pgentry_t *p, l1_pgentry_t new,
-                           unsigned int level);
-
 /*
  * Called from the guest to indicate that the a process is being
  * torn down and its pagetables will soon be discarded.
