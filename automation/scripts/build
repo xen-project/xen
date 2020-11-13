@@ -10,9 +10,9 @@ cc-ver()
 
 # random config or default config
 if [[ "${RANDCONFIG}" == "y" ]]; then
-    make -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
+    make -j$(nproc) -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
 else
-    make -C xen defconfig
+    make -j$(nproc) -C xen defconfig
 fi
 
 # build up our configure options
@@ -45,7 +45,7 @@ make -j$(nproc) dist
 # Extract artifacts to avoid getting rewritten by customised builds
 cp xen/.config xen-config
 mkdir binaries
-if [[ "${XEN_TARGET_ARCH}" == "x86_64" ]]; then
+if [[ "${XEN_TARGET_ARCH}" != "x86_32" ]]; then
     cp xen/xen binaries/xen
 fi
 
