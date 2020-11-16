@@ -46,8 +46,9 @@
 #define ARM_SMCCC_1_1 8
 #define ARM64_WORKAROUND_AT_SPECULATE 9
 #define ARM_WORKAROUND_858921 10
+#define ARM64_WORKAROUND_REPEAT_TLBI 11
 
-#define ARM_NCAPS           11
+#define ARM_NCAPS           12
 
 #ifndef __ASSEMBLY__
 

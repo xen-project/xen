@@ -424,6 +424,20 @@ static const struct arm_cpu_capabilities arm_errata[] = {
                    (1 << MIDR_VARIANT_SHIFT) | 2),
     },
 #endif
+#ifdef CONFIG_ARM64_ERRATUM_1286807
+    {
+        /* Cortex-A76 r0p0 - r3p0 */
+        .desc = "ARM erratum 1286807",
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_RANGE(MIDR_CORTEX_A76, 0, 3 << MIDR_VARIANT_SHIFT),
+    },
+    {
+        /* Neoverse-N1 r0p0 - r3p0 */
+        .desc = "ARM erratum 1286807",
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_RANGE(MIDR_NEOVERSE_N1, 0, 3 << MIDR_VARIANT_SHIFT),
+    },
+#endif
 #ifdef CONFIG_ARM64_HARDEN_BRANCH_PREDICTOR
     {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
