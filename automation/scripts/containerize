@@ -7,7 +7,7 @@
 # and /etc/subgid.
 #
 docker_cmd=${DOCKER_CMD:-"docker"}
-[ "$DOCKER_CMD" = "podman" ] && userns_podman="--userns=keep-id"
+[ "$DOCKER_CMD" = "podman" ] && userns_podman="--userns=keep-id" selinux=",z"
 
 einfo() {
     echo "$*" >&2
@@ -94,9 +94,9 @@ einfo "*** Launching container ..."
 exec ${docker_cmd} run \
     ${userarg} \
     ${SSH_AUTH_SOCK:+-e SSH_AUTH_SOCK="/tmp/ssh-agent/${SSH_AUTH_NAME}"} \
-    -v "${CONTAINER_PATH}":/build:rw \
+    -v "${CONTAINER_PATH}":/build:rw${selinux} \
     -v "${HOME}/.ssh":/root/.ssh:ro \
-    ${SSH_AUTH_DIR:+-v "${SSH_AUTH_DIR}":/tmp/ssh-agent} \
+    ${SSH_AUTH_DIR:+-v "${SSH_AUTH_DIR}":/tmp/ssh-agent${selinux}} \
     ${XEN_CONFIG_EXPERT:+-e XEN_CONFIG_EXPERT=${XEN_CONFIG_EXPERT}} \
     ${CONTAINER_ARGS} \
     -${termint}i --rm -- \
