@@ -28,6 +28,7 @@ case "_${CONTAINER}" in
     _centos7) CONTAINER="${BASE}/centos:7" ;;
     _centos72) CONTAINER="${BASE}/centos:7.2" ;;
     _fedora) CONTAINER="${BASE}/fedora:29";;
+    _focal) CONTAINER="${BASE}/ubuntu:focal" ;;
     _jessie) CONTAINER="${BASE}/debian:jessie" ;;
     _stretch|_) CONTAINER="${BASE}/debian:stretch" ;;
     _unstable|_) CONTAINER="${BASE}/debian:unstable" ;;
