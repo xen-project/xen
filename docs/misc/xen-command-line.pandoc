@@ -1886,9 +1886,11 @@ with read and write permissions.
 ### sched
 > `= credit | credit2 | arinc653 | rtds | null`
 
-> Default: `sched=credit`
+> Default: `sched=credit2`
 
-Choose the default scheduler.
+Choose the default scheduler. Note the default scheduler is selectable via
+Kconfig and depends on enabled schedulers. Check
+`CONFIG_SCHED_DEFAULT` to see which scheduler is the default.
 
 ### sched_credit2_max_cpus_runqueue
 > `= <integer>`
