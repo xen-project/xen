@@ -435,7 +435,7 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
     case 0x3728: /* Xeon C5500/C3500 (JasperForest) */
     case 0x3c28: /* Sandybridge */
         val = pci_conf_read32(pdev->sbdf, 0x1AC);
-        pci_conf_write32(pdev->sbdf, 0x1AC, val | (1 << 31));
+        pci_conf_write32(pdev->sbdf, 0x1AC, val | (1U << 31));
         printk(XENLOG_INFO "Masked VT-d error signaling on %pp\n", &pdev->sbdf);
         break;
 
