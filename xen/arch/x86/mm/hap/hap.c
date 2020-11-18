@@ -780,7 +780,7 @@ hap_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, l1_pgentry_t *p,
 {
     struct domain *d = p2m->domain;
     uint32_t old_flags;
-    bool_t flush_nestedp2m = 0;
+    mfn_t omfn;
     int rc;
 
     /* We know always use the host p2m here, regardless if the vcpu
@@ -790,21 +790,11 @@ hap_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, l1_pgentry_t *p,
 
     paging_lock(d);
     old_flags = l1e_get_flags(*p);
-
-    if ( nestedhvm_enabled(d) && (old_flags & _PAGE_PRESENT) 
-         && !p2m_get_hostp2m(d)->defer_nested_flush ) {
-        /* We are replacing a valid entry so we need to flush nested p2ms,
-         * unless the only change is an increase in access rights. */
-        mfn_t omfn = l1e_get_mfn(*p);
-        mfn_t nmfn = l1e_get_mfn(new);
-
-        flush_nestedp2m = !(mfn_eq(omfn, nmfn)
-            && perms_strictly_increased(old_flags, l1e_get_flags(new)) );
-    }
+    omfn = l1e_get_mfn(*p);
 
     rc = p2m_entry_modify(p2m, p2m_flags_to_type(l1e_get_flags(new)),
                           p2m_flags_to_type(old_flags), l1e_get_mfn(new),
-                          l1e_get_mfn(*p), level);
+                          omfn, level);
     if ( rc )
     {
         paging_unlock(d);
@@ -817,7 +807,14 @@ hap_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, l1_pgentry_t *p,
 
     paging_unlock(d);
 
-    if ( flush_nestedp2m )
+    if ( nestedhvm_enabled(d) && (old_flags & _PAGE_PRESENT) &&
+         !p2m_get_hostp2m(d)->defer_nested_flush &&
+         /*
+          * We are replacing a valid entry so we need to flush nested p2ms,
+          * unless the only change is an increase in access rights.
+          */
+         (!mfn_eq(omfn, l1e_get_mfn(new)) ||
+          !perms_strictly_increased(old_flags, l1e_get_flags(new))) )
         p2m_flush_nestedp2m(d);
 
     return 0;
