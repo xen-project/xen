@@ -3144,7 +3144,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
     }
 }
 
-int
+static int
 shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
                        l1_pgentry_t *p, l1_pgentry_t new,
                        unsigned int level)
@@ -3188,6 +3188,11 @@ shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     paging_unlock(d);
 
     return 0;
+}
+
+void shadow_p2m_init(struct p2m_domain *p2m)
+{
+    p2m->write_p2m_entry = shadow_write_p2m_entry;
 }
 
 /**************************************************************************/

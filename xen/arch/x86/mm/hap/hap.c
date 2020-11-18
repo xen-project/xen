@@ -823,6 +823,11 @@ hap_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, l1_pgentry_t *p,
     return 0;
 }
 
+void hap_p2m_init(struct p2m_domain *p2m)
+{
+    p2m->write_p2m_entry = hap_write_p2m_entry;
+}
+
 static unsigned long hap_gva_to_gfn_real_mode(
     struct vcpu *v, struct p2m_domain *p2m, unsigned long gva, uint32_t *pfec)
 {
@@ -846,7 +851,6 @@ static const struct paging_mode hap_paging_real_mode = {
     .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_real_mode,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
-    .write_p2m_entry        = hap_write_p2m_entry,
     .flush_tlb              = flush_tlb,
     .guest_levels           = 1
 };
@@ -858,7 +862,6 @@ static const struct paging_mode hap_paging_protected_mode = {
     .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_2_levels,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
-    .write_p2m_entry        = hap_write_p2m_entry,
     .flush_tlb              = flush_tlb,
     .guest_levels           = 2
 };
@@ -870,7 +873,6 @@ static const struct paging_mode hap_paging_pae_mode = {
     .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_3_levels,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
-    .write_p2m_entry        = hap_write_p2m_entry,
     .flush_tlb              = flush_tlb,
     .guest_levels           = 3
 };
@@ -882,7 +884,6 @@ static const struct paging_mode hap_paging_long_mode = {
     .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_4_levels,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
-    .write_p2m_entry        = hap_write_p2m_entry,
     .flush_tlb              = flush_tlb,
     .guest_levels           = 4
 };

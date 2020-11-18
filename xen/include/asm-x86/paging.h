@@ -139,10 +139,6 @@ struct paging_mode {
     void          (*update_cr3            )(struct vcpu *v, int do_locking,
                                             bool noflush);
     void          (*update_paging_modes   )(struct vcpu *v);
-    int           (*write_p2m_entry       )(struct p2m_domain *p2m,
-                                            unsigned long gfn,
-                                            l1_pgentry_t *p, l1_pgentry_t new,
-                                            unsigned int level);
     bool          (*flush_tlb             )(bool (*flush_vcpu)(void *ctxt,
                                                                struct vcpu *v),
                                             void *ctxt);

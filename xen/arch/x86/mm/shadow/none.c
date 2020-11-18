@@ -60,21 +60,12 @@ static void _update_paging_modes(struct vcpu *v)
     ASSERT_UNREACHABLE();
 }
 
-static int _write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-                            l1_pgentry_t *p, l1_pgentry_t new,
-                            unsigned int level)
-{
-    ASSERT_UNREACHABLE();
-    return -EOPNOTSUPP;
-}
-
 static const struct paging_mode sh_paging_none = {
     .page_fault                    = _page_fault,
     .invlpg                        = _invlpg,
     .gva_to_gfn                    = _gva_to_gfn,
     .update_cr3                    = _update_cr3,
     .update_paging_modes           = _update_paging_modes,
-    .write_p2m_entry               = _write_p2m_entry,
 };
 
 void shadow_vcpu_init(struct vcpu *v)

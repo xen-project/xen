@@ -387,11 +387,6 @@ static inline int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
 }
 #endif
 
-/* Functions that atomically write PT/P2M entries and update state */
-int shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-                           l1_pgentry_t *p, l1_pgentry_t new,
-                           unsigned int level);
-
 /* Functions that atomically write PV guest PT entries */
 void sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new,
                           mfn_t gmfn);

@@ -836,6 +836,9 @@ void p2m_flush_nestedp2m(struct domain *d);
 /* Flushes the np2m specified by np2m_base (if it exists) */
 void np2m_flush_base(struct vcpu *v, unsigned long np2m_base);
 
+void hap_p2m_init(struct p2m_domain *p2m);
+void shadow_p2m_init(struct p2m_domain *p2m);
+
 int nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     l1_pgentry_t *p, l1_pgentry_t new, unsigned int level);
 
