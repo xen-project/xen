@@ -198,7 +198,8 @@ static int p2m_init_nestedp2m(struct domain *d)
             return -ENOMEM;
         }
         p2m->p2m_class = p2m_nested;
-        p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
+        p2m->write_p2m_entry_pre = NULL;
+        p2m->write_p2m_entry_post = nestedp2m_write_p2m_entry_post;
         list_add(&p2m->np2m_list, &p2m_get_hostp2m(d)->np2m_list);
     }
 

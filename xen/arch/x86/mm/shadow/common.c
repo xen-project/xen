@@ -3144,34 +3144,22 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
     }
 }
 
-static int
-shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-                       l1_pgentry_t *p, l1_pgentry_t new,
-                       unsigned int level)
+static void
+sh_write_p2m_entry_pre(struct domain *d, unsigned long gfn, l1_pgentry_t *p,
+                       l1_pgentry_t new, unsigned int level)
 {
-    struct domain *d = p2m->domain;
-    int rc;
-
-    paging_lock(d);
-
     /* If there are any shadows, update them.  But if shadow_teardown()
      * has already been called then it's not safe to try. */
     if ( likely(d->arch.paging.shadow.total_pages != 0) )
          sh_unshadow_for_p2m_change(d, gfn, p, new, level);
-
-    rc = p2m_entry_modify(p2m, p2m_flags_to_type(l1e_get_flags(new)),
-                          p2m_flags_to_type(l1e_get_flags(*p)),
-                          l1e_get_mfn(new), l1e_get_mfn(*p), level);
-    if ( rc )
-    {
-        paging_unlock(d);
-        return rc;
-    }
-
-    /* Update the entry with new content */
-    safe_write_pte(p, new);
+}
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH)
+static void
+sh_write_p2m_entry_post(struct p2m_domain *p2m, unsigned int oflags)
+{
+    struct domain *d = p2m->domain;
+
     /* If we're doing FAST_FAULT_PATH, then shadow mode may have
        cached the fact that this is an mmio region in the shadow
        page tables.  Blow the tables away to remove the cache.
@@ -3183,16 +3171,15 @@ shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
         shadow_blow_tables(d);
         d->arch.paging.shadow.has_fast_mmio_entries = false;
     }
-#endif
-
-    paging_unlock(d);
-
-    return 0;
 }
+#else
+# define sh_write_p2m_entry_post NULL
+#endif
 
 void shadow_p2m_init(struct p2m_domain *p2m)
 {
-    p2m->write_p2m_entry = shadow_write_p2m_entry;
+    p2m->write_p2m_entry_pre  = sh_write_p2m_entry_pre;
+    p2m->write_p2m_entry_post = sh_write_p2m_entry_post;
 }
 
 /**************************************************************************/

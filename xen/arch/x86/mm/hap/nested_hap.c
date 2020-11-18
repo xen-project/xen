@@ -71,24 +71,11 @@
 /*        NESTED VIRT P2M FUNCTIONS         */
 /********************************************/
 
-int
-nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-    l1_pgentry_t *p, l1_pgentry_t new, unsigned int level)
+void
+nestedp2m_write_p2m_entry_post(struct p2m_domain *p2m, unsigned int oflags)
 {
-    struct domain *d = p2m->domain;
-    uint32_t old_flags;
-
-    paging_lock(d);
-
-    old_flags = l1e_get_flags(*p);
-    safe_write_pte(p, new);
-
-    if (old_flags & _PAGE_PRESENT)
-        guest_flush_tlb_mask(d, p2m->dirty_cpumask);
-
-    paging_unlock(d);
-
-    return 0;
+    if ( oflags & _PAGE_PRESENT )
+        guest_flush_tlb_mask(p2m->domain, p2m->dirty_cpumask);
 }
 
 /********************************************/

@@ -122,17 +122,55 @@ static int write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
 {
     struct domain *d = p2m->domain;
     const struct vcpu *v = current;
-    int rc = 0;
 
     if ( v->domain != d )
         v = d->vcpu ? d->vcpu[0] : NULL;
     if ( likely(v && paging_mode_enabled(d) && paging_get_hostmode(v)) ||
          p2m_is_nestedp2m(p2m) )
-        rc = p2m->write_p2m_entry(p2m, gfn, p, new, level);
+    {
+        unsigned int oflags;
+        mfn_t omfn;
+        int rc;
+
+        paging_lock(d);
+
+        if ( p2m->write_p2m_entry_pre )
+            p2m->write_p2m_entry_pre(d, gfn, p, new, level);
+
+        oflags = l1e_get_flags(*p);
+        omfn = l1e_get_mfn(*p);
+
+        rc = p2m_entry_modify(p2m, p2m_flags_to_type(l1e_get_flags(new)),
+                              p2m_flags_to_type(oflags), l1e_get_mfn(new),
+                              omfn, level);
+        if ( rc )
+        {
+            paging_unlock(d);
+            return rc;
+        }
+
+        safe_write_pte(p, new);
+
+        if ( p2m->write_p2m_entry_post )
+            p2m->write_p2m_entry_post(p2m, oflags);
+
+        paging_unlock(d);
+
+        if ( nestedhvm_enabled(d) && !p2m_is_nestedp2m(p2m) &&
+             (oflags & _PAGE_PRESENT) &&
+             !p2m_get_hostp2m(d)->defer_nested_flush &&
+             /*
+              * We are replacing a valid entry so we need to flush nested p2ms,
+              * unless the only change is an increase in access rights.
+              */
+             (!mfn_eq(omfn, l1e_get_mfn(new)) ||
+              !perms_strictly_increased(oflags, l1e_get_flags(new))) )
+            p2m_flush_nestedp2m(d);
+    }
     else
         safe_write_pte(p, new);
 
-    return rc;
+    return 0;
 }
 
 // Find the next level's P2M entry, checking for out-of-range gfn's...

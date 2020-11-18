@@ -272,10 +272,13 @@ struct p2m_domain {
                                                   unsigned long first_gfn,
                                                   unsigned long last_gfn);
     void               (*memory_type_changed)(struct p2m_domain *p2m);
-    
-    int                (*write_p2m_entry)(struct p2m_domain *p2m,
-                                          unsigned long gfn, l1_pgentry_t *p,
-                                          l1_pgentry_t new, unsigned int level);
+    void               (*write_p2m_entry_pre)(struct domain *d,
+                                              unsigned long gfn,
+                                              l1_pgentry_t *p,
+                                              l1_pgentry_t new,
+                                              unsigned int level);
+    void               (*write_p2m_entry_post)(struct p2m_domain *p2m,
+                                               unsigned int oflags);
 #if P2M_AUDIT
     long               (*audit_p2m)(struct p2m_domain *p2m);
 #endif
@@ -472,7 +475,7 @@ void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
  *
  * This is also used in the shadow code whenever the paging lock is
  * held -- in those cases, the caller is protected against concurrent
- * p2m updates by the fact that shadow_write_p2m_entry() also takes
+ * p2m updates by the fact that write_p2m_entry() also takes
  * the paging lock.
  *
  * Note that an unlocked accessor only makes sense for a "query" lookup.
@@ -841,8 +844,8 @@ void np2m_flush_base(struct vcpu *v, unsigned long np2m_base);
 void hap_p2m_init(struct p2m_domain *p2m);
 void shadow_p2m_init(struct p2m_domain *p2m);
 
-int nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-    l1_pgentry_t *p, l1_pgentry_t new, unsigned int level);
+void nestedp2m_write_p2m_entry_post(struct p2m_domain *p2m,
+                                    unsigned int oflags);
 
 /*
  * Alternate p2m: shadow p2m tables used for alternate memory views
