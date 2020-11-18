@@ -1661,10 +1661,18 @@ void do_general_protection(struct cpu_user_regs *regs)
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
 }
 
-static void pci_serr_softirq(void)
+static bool pci_serr_cont;
+
+static bool pci_serr_nmicont(void)
 {
+    if ( !pci_serr_cont )
+        return false;
+
+    pci_serr_cont = false;
     printk("\n\nNMI - PCI system error (SERR)\n");
     outb(inb(0x61) & 0x0b, 0x61); /* re-enable the PCI SERR error line. */
+
+    return true;
 }
 
 static void nmi_hwdom_report(unsigned int reason_idx)
@@ -1689,9 +1697,9 @@ static void pci_serr_error(const struct cpu_user_regs *regs)
         nmi_hwdom_report(_XEN_NMIREASON_pci_serr);
         /* fallthrough */
     case 'i': /* 'ignore' */
-        /* Would like to print a diagnostic here but can't call printk()
-           from NMI context -- raise a softirq instead. */
-        raise_softirq(PCI_SERR_SOFTIRQ);
+        /* Issue error message in NMI continuation. */
+        pci_serr_cont = true;
+        trigger_nmi_continuation();
         break;
     default:  /* 'fatal' */
         console_force_unlock();
@@ -1805,6 +1813,9 @@ void unset_nmi_callback(void)
 bool nmi_check_continuation(void)
 {
     bool ret = false;
+
+    if ( pci_serr_nmicont() )
+        ret = true;
 
     if ( nmi_oprofile_send_virq() )
         ret = true;
@@ -2157,8 +2168,6 @@ void __init trap_init(void)
     percpu_traps_init();
 
     cpu_init();
-
-    open_softirq(PCI_SERR_SOFTIRQ, pci_serr_softirq);
 }
 
 void activate_debugregs(const struct vcpu *curr)
