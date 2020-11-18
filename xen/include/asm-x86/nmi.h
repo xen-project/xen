@@ -33,5 +33,14 @@ nmi_callback_t *set_nmi_callback(nmi_callback_t *callback);
 void unset_nmi_callback(void);
 
 DECLARE_PER_CPU(unsigned int, nmi_count);
- 
+
+/**
+ * trigger_nmi_continuation
+ *
+ * Schedule continuation to be started in interrupt context after NMI handling.
+ */
+void trigger_nmi_continuation(void);
+
+/* Check for NMI continuation pending. */
+bool nmi_check_continuation(void);
 #endif /* ASM_NMI_H */

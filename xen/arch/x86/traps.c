@@ -79,6 +79,7 @@
 #include <public/hvm/params.h>
 #include <asm/cpuid.h>
 #include <xsm/xsm.h>
+#include <asm/mach-default/irq_vectors.h>
 #include <asm/pv/traps.h>
 #include <asm/pv/mm.h>
 
@@ -1798,6 +1799,26 @@ nmi_callback_t *set_nmi_callback(nmi_callback_t *callback)
 void unset_nmi_callback(void)
 {
     nmi_callback = dummy_nmi_callback;
+}
+
+bool nmi_check_continuation(void)
+{
+    bool ret = false;
+
+    return ret;
+}
+
+void trigger_nmi_continuation(void)
+{
+    /*
+     * Issue a self-IPI. Handling is done in spurious_interrupt().
+     * NMI could have happened in IPI sequence, so wait for ICR being idle
+     * again before leaving NMI handler.
+     * This relies on self-IPI using a simple shorthand, thus avoiding any
+     * use of locking or percpu cpumasks.
+     */
+    send_IPI_self(SPURIOUS_APIC_VECTOR);
+    apic_wait_icr_idle();
 }
 
 void do_device_not_available(struct cpu_user_regs *regs)

@@ -163,6 +163,7 @@ void send_IPI_self(int vector)
 
 void send_IPI_self_legacy(uint8_t vector)
 {
+    /* NMI continuation handling relies on using a shorthand here. */
     send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
 }
 

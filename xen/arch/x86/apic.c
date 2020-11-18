@@ -40,6 +40,7 @@
 #include <irq_vectors.h>
 #include <xen/kexec.h>
 #include <asm/guest.h>
+#include <asm/nmi.h>
 #include <asm/time.h>
 
 static bool __read_mostly tdt_enabled;
@@ -1376,16 +1377,22 @@ void spurious_interrupt(struct cpu_user_regs *regs)
 {
     /*
      * Check if this is a vectored interrupt (most likely, as this is probably
-     * a request to dump local CPU state). Vectored interrupts are ACKed;
-     * spurious interrupts are not.
+     * a request to dump local CPU state or to continue NMI handling).
+     * Vectored interrupts are ACKed; spurious interrupts are not.
      */
     if (apic_isr_read(SPURIOUS_APIC_VECTOR)) {
+        bool is_spurious;
+
         ack_APIC_irq();
+        is_spurious = !nmi_check_continuation();
         if (this_cpu(state_dump_pending)) {
             this_cpu(state_dump_pending) = false;
             dump_execstate(regs);
-            return;
+            is_spurious = false;
         }
+
+        if ( !is_spurious )
+            return;
     }
 
     /* see sw-dev-man vol 3, chapter 7.4.13.5 */
