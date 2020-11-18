@@ -69,6 +69,8 @@ int passive_domain_do_rdmsr(unsigned int msr, uint64_t *msr_content);
 int passive_domain_do_wrmsr(unsigned int msr, uint64_t msr_content);
 void passive_domain_destroy(struct vcpu *v);
 
+bool nmi_oprofile_send_virq(void);
+
 #else
 
 static inline int passive_domain_do_rdmsr(unsigned int msr,
@@ -84,6 +86,11 @@ static inline int passive_domain_do_wrmsr(unsigned int msr,
 }
 
 static inline void passive_domain_destroy(struct vcpu *v) {}
+
+static inline bool nmi_oprofile_send_virq(void)
+{
+    return false;
+}
 
 #endif /* CONFIG_XENOPROF */
 

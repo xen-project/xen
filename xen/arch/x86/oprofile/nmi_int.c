@@ -38,6 +38,8 @@ static unsigned long saved_lvtpc[NR_CPUS];
 
 static char *cpu_type;
 
+static DEFINE_PER_CPU(struct vcpu *, nmi_cont_vcpu);
+
 static int passive_domain_msr_op_checks(unsigned int msr, int *typep, int *indexp)
 {
 	struct vpmu_struct *vpmu = vcpu_vpmu(current);
@@ -83,14 +85,27 @@ void passive_domain_destroy(struct vcpu *v)
 		model->free_msr(v);
 }
 
+bool nmi_oprofile_send_virq(void)
+{
+	struct vcpu *v = xchg(&this_cpu(nmi_cont_vcpu), NULL);
+
+	if (v)
+		send_guest_vcpu_virq(v, VIRQ_XENOPROF);
+
+	return v;
+}
+
 static int nmi_callback(const struct cpu_user_regs *regs, int cpu)
 {
 	int xen_mode, ovf;
 
 	ovf = model->check_ctrs(cpu, &cpu_msrs[cpu], regs);
 	xen_mode = ring_0(regs);
-	if ( ovf && is_active(current->domain) && !xen_mode )
-		send_guest_vcpu_virq(current, VIRQ_XENOPROF);
+	if (ovf && is_active(current->domain) && !xen_mode &&
+	    !this_cpu(nmi_cont_vcpu)) {
+		this_cpu(nmi_cont_vcpu) = current;
+		trigger_nmi_continuation();
+	}
 
 	if ( ovf == 2 )
 		current->arch.nmi_pending = true;

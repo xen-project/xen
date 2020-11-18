@@ -65,6 +65,7 @@
 #include <asm/debugger.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
+#include <asm/xenoprof.h>
 #include <asm/shared.h>
 #include <asm/x86_emulate.h>
 #include <asm/traps.h>
@@ -1804,6 +1805,9 @@ void unset_nmi_callback(void)
 bool nmi_check_continuation(void)
 {
     bool ret = false;
+
+    if ( nmi_oprofile_send_virq() )
+        ret = true;
 
     return ret;
 }
