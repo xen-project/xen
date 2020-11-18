@@ -434,3 +434,12 @@ debian-unstable-gcc-debug-arm64-randconfig:
     CONTAINER: debian:unstable-arm64v8
     RANDCONFIG: y
 
+alpine-3.12-gcc-arm64:
+  extends: .gcc-arm64-build
+  variables:
+    CONTAINER: alpine:3.12-arm64v8
+
+alpine-3.12-gcc-debug-arm64:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: alpine:3.12-arm64v8
