@@ -31,6 +31,14 @@
 #include <asm/mem_sharing.h>
 #include <asm/page.h>    /* for pagetable_t */
 
+/* Debugging and auditing of the P2M code? */
+#if !defined(NDEBUG) && defined(CONFIG_HVM)
+#define P2M_AUDIT     1
+#else
+#define P2M_AUDIT     0
+#endif
+#define P2M_DEBUGGING 0
+
 extern bool_t opt_hap_1gb, opt_hap_2mb;
 
 /*
@@ -268,7 +276,9 @@ struct p2m_domain {
     int                (*write_p2m_entry)(struct p2m_domain *p2m,
                                           unsigned long gfn, l1_pgentry_t *p,
                                           l1_pgentry_t new, unsigned int level);
+#if P2M_AUDIT
     long               (*audit_p2m)(struct p2m_domain *p2m);
+#endif
 
     /*
      * P2M updates may require TLBs to be flushed (invalidated).
@@ -757,14 +767,6 @@ extern void p2m_pt_init(struct p2m_domain *p2m);
 
 void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
                      p2m_query_t q, uint32_t *pfec);
-
-/* Debugging and auditing of the P2M code? */
-#ifndef NDEBUG
-#define P2M_AUDIT     1
-#else
-#define P2M_AUDIT     0
-#endif
-#define P2M_DEBUGGING 0
 
 #if P2M_AUDIT
 extern void audit_p2m(struct domain *d,

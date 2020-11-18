@@ -2435,7 +2435,7 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 
 /*** Audit ***/
 
-#if P2M_AUDIT && defined(CONFIG_HVM)
+#if P2M_AUDIT
 void audit_p2m(struct domain *d,
                uint64_t *orphans,
                 uint64_t *m2p_bad,

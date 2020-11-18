@@ -1012,7 +1012,7 @@ long arch_do_domctl(
         break;
 #endif
 
-#if P2M_AUDIT && defined(CONFIG_HVM)
+#if P2M_AUDIT
     case XEN_DOMCTL_audit_p2m:
         if ( d == currd )
             ret = -EPERM;
