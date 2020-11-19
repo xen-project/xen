@@ -59,7 +59,7 @@ mm_printk(const char *fmt, ...) {}
     {                                       \
         dprintk(XENLOG_ERR, fmt, ## args);  \
         WARN();                             \
-    } while (0);
+    } while (0)
 #endif
 
 /*
