@@ -1499,7 +1499,7 @@ static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
 
     host_gicc = container_of(header, struct acpi_madt_generic_interrupt,
                              header);
-    size = sizeof(struct acpi_madt_generic_interrupt);
+    size = ACPI_MADT_GICC_LENGTH;
     for ( i = 0; i < d->max_vcpus; i++ )
     {
         gicc = (struct acpi_madt_generic_interrupt *)(base_ptr + table_len);
@@ -1558,7 +1558,7 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
     struct acpi_madt_generic_interrupt *processor =
                container_of(header, struct acpi_madt_generic_interrupt, header);
 
-    if ( BAD_MADT_ENTRY(processor, end) )
+    if ( BAD_MADT_GICC_ENTRY(processor, end) )
         return -EINVAL;
 
     /* Read from APIC table and fill up the GIC variables */
@@ -1628,7 +1628,7 @@ gic_acpi_get_madt_cpu_num(struct acpi_subtable_header *header,
     struct acpi_madt_generic_interrupt *cpuif;
 
     cpuif = (struct acpi_madt_generic_interrupt *)header;
-    if ( BAD_MADT_ENTRY(cpuif, end) || !cpuif->gicr_base_address )
+    if ( BAD_MADT_GICC_ENTRY(cpuif, end) || !cpuif->gicr_base_address )
         return -EINVAL;
 
     return 0;

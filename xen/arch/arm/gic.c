@@ -454,7 +454,7 @@ unsigned long gic_get_hwdom_madt_size(const struct domain *d)
     unsigned long madt_size;
 
     madt_size = sizeof(struct acpi_table_madt)
-                + sizeof(struct acpi_madt_generic_interrupt) * d->max_vcpus
+                + ACPI_MADT_GICC_LENGTH * d->max_vcpus
                 + sizeof(struct acpi_madt_generic_distributor)
                 + gic_hw_ops->get_hwdom_extra_madt_size(d);
 
