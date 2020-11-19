@@ -1735,15 +1735,6 @@ static void __init gicv3_acpi_init(void)
 }
 #else
 static void __init gicv3_acpi_init(void) { }
-static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
-{
-    return 0;
-}
-
-static unsigned long gicv3_get_hwdom_extra_madt_size(const struct domain *d)
-{
-    return 0;
-}
 #endif
 
 static bool gic_dist_supports_lpis(void)
@@ -1858,8 +1849,10 @@ static const struct gic_hw_operations gicv3_ops = {
     .read_pending_state  = gicv3_read_pending_state,
     .secondary_init      = gicv3_secondary_cpu_init,
     .make_hwdom_dt_node  = gicv3_make_hwdom_dt_node,
+#ifdef CONFIG_ACPI
     .make_hwdom_madt     = gicv3_make_hwdom_madt,
     .get_hwdom_extra_madt_size = gicv3_get_hwdom_extra_madt_size,
+#endif
     .iomem_deny_access   = gicv3_iomem_deny_access,
     .do_LPI              = gicv3_do_LPI,
 };

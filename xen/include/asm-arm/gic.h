@@ -378,12 +378,14 @@ struct gic_hw_operations {
     /* Create GIC node for the hardware domain */
     int (*make_hwdom_dt_node)(const struct domain *d,
                               const struct dt_device_node *gic, void *fdt);
+#ifdef CONFIG_ACPI
     /* Create MADT table for the hardware domain */
     int (*make_hwdom_madt)(const struct domain *d, u32 offset);
-    /* Map extra GIC MMIO, irqs and other hw stuffs to the hardware domain. */
-    int (*map_hwdom_extra_mappings)(struct domain *d);
     /* Query the size of hardware domain madt table */
     unsigned long (*get_hwdom_extra_madt_size)(const struct domain *d);
+#endif
+    /* Map extra GIC MMIO, irqs and other hw stuffs to the hardware domain. */
+    int (*map_hwdom_extra_mappings)(struct domain *d);
     /* Deny access to GIC regions */
     int (*iomem_deny_access)(const struct domain *d);
     /* Handle LPIs, which require special handling */
@@ -435,8 +437,12 @@ void register_gic_ops(const struct gic_hw_operations *ops);
 int gic_make_hwdom_dt_node(const struct domain *d,
                            const struct dt_device_node *gic,
                            void *fdt);
+
+#ifdef CONFIG_ACPI
 int gic_make_hwdom_madt(const struct domain *d, u32 offset);
 unsigned long gic_get_hwdom_madt_size(const struct domain *d);
+#endif
+
 int gic_map_hwdom_extra_mappings(struct domain *d);
 int gic_iomem_deny_access(const struct domain *d);
 

@@ -443,6 +443,7 @@ int gic_make_hwdom_dt_node(const struct domain *d,
     return gic_hw_ops->make_hwdom_dt_node(d, gic, fdt);
 }
 
+#ifdef CONFIG_ACPI
 int gic_make_hwdom_madt(const struct domain *d, u32 offset)
 {
     return gic_hw_ops->make_hwdom_madt(d, offset);
@@ -459,6 +460,7 @@ unsigned long gic_get_hwdom_madt_size(const struct domain *d)
 
     return madt_size;
 }
+#endif
 
 int gic_iomem_deny_access(const struct domain *d)
 {
