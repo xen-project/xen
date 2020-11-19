@@ -284,10 +284,7 @@ void dump_hyp_walk(vaddr_t addr)
            "on CPU%d via TTBR 0x%016"PRIx64"\n",
            addr, smp_processor_id(), ttbr);
 
-    if ( smp_processor_id() == 0 )
-        BUG_ON( (lpae_t *)(unsigned long)(ttbr - phys_offset) != pgtable );
-    else
-        BUG_ON( virt_to_maddr(pgtable) != ttbr );
+    BUG_ON( virt_to_maddr(pgtable) != ttbr );
     dump_pt_walk(ttbr, addr, HYP_PT_ROOT_LEVEL, 1);
 }
 
