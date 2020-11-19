@@ -72,10 +72,11 @@ domid_t __read_mostly max_init_domid;
 
 static __used void init_done(void)
 {
+    discard_initial_modules();
+
     /* Must be done past setting system_state. */
     unregister_init_virtual_region();
 
-    discard_initial_modules();
     free_init_memory();
     startup_cpu_idle_loop();
 }
