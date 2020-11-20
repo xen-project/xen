@@ -28,6 +28,14 @@ if [[ "${CC}" == "clang"* ]]; then
     cfgargs+=("--disable-stubdom")
 fi
 
+if ! test -z "$(ldd /bin/ls|grep musl|head -1)"; then
+    # disable --disable-werror for QEMUU when building with MUSL
+    cfgargs+=("--with-extra-qemuu-configure-args=\"--disable-werror\"")
+    # hvmloader doesn't build on MUSL systems
+    cfgargs+=("--disable-seabios")
+    cfgargs+=("--disable-rombios")
+fi
+
 # Qemu requires Python 3.5 or later
 if ! type python3 || python3 -c "import sys; res = sys.version_info < (3, 5); exit(not(res))"; then
     cfgargs+=("--with-system-qemu=/bin/false")
