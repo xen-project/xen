@@ -70,7 +70,8 @@ static void guest_iommu_disable(struct guest_iommu *iommu)
 
 static uint64_t get_guest_cr3_from_dte(struct amd_iommu_dte *dte)
 {
-    return ((dte->gcr3_trp_51_31 << 31) | (dte->gcr3_trp_30_15 << 15) |
+    return (((uint64_t)dte->gcr3_trp_51_31 << 31) |
+            (dte->gcr3_trp_30_15 << 15) |
             (dte->gcr3_trp_14_12 << 12)) >> PAGE_SHIFT;
 }
 
