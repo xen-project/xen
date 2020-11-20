@@ -331,6 +331,7 @@ _clean: delete-unfresh-files
 	$(MAKE) $(clean) include
 	$(MAKE) $(clean) common
 	$(MAKE) $(clean) drivers
+	$(MAKE) $(clean) lib
 	$(MAKE) $(clean) xsm
 	$(MAKE) $(clean) crypto
 	$(MAKE) $(clean) arch/arm
@@ -414,7 +415,7 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  echo ""; \
 	  echo "#endif") <$< >$@
 
-SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers test
+SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers lib test
 define all_sources
     ( find include/asm-$(TARGET_ARCH) -name '*.h' -print; \
       find include -name 'asm-*' -prune -o -name '*.h' -print; \
