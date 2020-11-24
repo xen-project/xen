@@ -153,312 +153,6 @@ struct ns16550_config_param {
     unsigned int uart_offset;
     unsigned int first_offset;
 };
-
-/*
- * Create lookup tables for specific devices. It is assumed that if
- * the device found is MMIO, then you have indexed it here. Else, the
- * driver does nothing for MMIO based devices.
- */
-static const struct ns16550_config_param __initconst uart_param[] = {
-    [param_default] = {
-        .reg_width = 1,
-        .lsr_mask = UART_LSR_THRE,
-        .max_ports = 1,
-    },
-    [param_trumanage] = {
-        .reg_shift = 2,
-        .reg_width = 1,
-        .fifo_size = 16,
-        .lsr_mask = (UART_LSR_THRE | UART_LSR_TEMT),
-        .mmio = 1,
-        .max_ports = 1,
-    },
-    [param_oxford] = {
-        .base_baud = 4000000,
-        .uart_offset = 0x200,
-        .first_offset = 0x1000,
-        .reg_width = 1,
-        .fifo_size = 16,
-        .lsr_mask = UART_LSR_THRE,
-        .mmio = 1,
-        .max_ports = 1, /* It can do more, but we would need more custom code.*/
-    },
-    [param_oxford_2port] = {
-        .base_baud = 4000000,
-        .uart_offset = 0x200,
-        .first_offset = 0x1000,
-        .reg_width = 1,
-        .fifo_size = 16,
-        .lsr_mask = UART_LSR_THRE,
-        .mmio = 1,
-        .max_ports = 2,
-    },
-    [param_pericom_1port] = {
-        .base_baud = 921600,
-        .uart_offset = 8,
-        .reg_width = 1,
-        .fifo_size = 16,
-        .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
-        .max_ports = 1,
-    },
-    [param_pericom_2port] = {
-        .base_baud = 921600,
-        .uart_offset = 8,
-        .reg_width = 1,
-        .fifo_size = 16,
-        .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
-        .max_ports = 2,
-    },
-    /*
-     * Of the two following ones, we can't really use all of their ports,
-     * unless ns16550_com[] would get grown.
-     */
-    [param_pericom_4port] = {
-        .base_baud = 921600,
-        .uart_offset = 8,
-        .reg_width = 1,
-        .fifo_size = 16,
-        .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
-        .max_ports = 4,
-    },
-    [param_pericom_8port] = {
-        .base_baud = 921600,
-        .uart_offset = 8,
-        .reg_width = 1,
-        .fifo_size = 16,
-        .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
-        .max_ports = 8,
-    }
-};
-static const struct ns16550_config __initconst uart_config[] =
-{
-    /* Broadcom TruManage device */
-    {
-        .vendor_id = PCI_VENDOR_ID_BROADCOM,
-        .dev_id = 0x160a,
-        .param = param_trumanage,
-    },
-    /* OXPCIe952 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc11b,
-        .param = param_oxford,
-    },
-    /* OXPCIe952 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc11f,
-        .param = param_oxford,
-    },
-    /* OXPCIe952 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc138,
-        .param = param_oxford,
-    },
-    /* OXPCIe952 2 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc158,
-        .param = param_oxford_2port,
-    },
-    /* OXPCIe952 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc13d,
-        .param = param_oxford,
-    },
-    /* OXPCIe952 2 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc15d,
-        .param = param_oxford_2port,
-    },
-    /* OXPCIe952 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc40b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc40f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc41b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc41f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc42b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc42f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc43b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc43f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc44b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc44f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc45b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc45f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc46b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc46f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc47b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc47f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc48b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc48f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc49b,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc49f,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc4ab,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc4af,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc4bb,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc4bf,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc4cb,
-        .param = param_oxford,
-    },
-    /* OXPCIe200 1 Native UART  */
-    {
-        .vendor_id = PCI_VENDOR_ID_OXSEMI,
-        .dev_id = 0xc4cf,
-        .param = param_oxford,
-    },
-    /* Pericom PI7C9X7951 Uno UART */
-    {
-        .vendor_id = PCI_VENDOR_ID_PERICOM,
-        .dev_id = 0x7951,
-        .param = param_pericom_1port
-    },
-    /* Pericom PI7C9X7952 Duo UART */
-    {
-        .vendor_id = PCI_VENDOR_ID_PERICOM,
-        .dev_id = 0x7952,
-        .param = param_pericom_2port
-    },
-    /* Pericom PI7C9X7954 Quad UART */
-    {
-        .vendor_id = PCI_VENDOR_ID_PERICOM,
-        .dev_id = 0x7954,
-        .param = param_pericom_4port
-    },
-    /* Pericom PI7C9X7958 Octal UART */
-    {
-        .vendor_id = PCI_VENDOR_ID_PERICOM,
-        .dev_id = 0x7958,
-        .param = param_pericom_8port
-    }
-};
 #endif
 
 static void ns16550_delayed_resume(void *data);
@@ -1045,6 +739,314 @@ static int __init check_existence(struct ns16550 *uart)
 }
 
 #ifdef CONFIG_HAS_PCI
+
+/*
+ * Create lookup tables for specific devices. It is assumed that if
+ * the device found is MMIO, then you have indexed it here. Else, the
+ * driver does nothing for MMIO based devices.
+ */
+static const struct ns16550_config_param __initconst uart_param[] = {
+    [param_default] = {
+        .reg_width = 1,
+        .lsr_mask = UART_LSR_THRE,
+        .max_ports = 1,
+    },
+    [param_trumanage] = {
+        .reg_shift = 2,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = (UART_LSR_THRE | UART_LSR_TEMT),
+        .mmio = 1,
+        .max_ports = 1,
+    },
+    [param_oxford] = {
+        .base_baud = 4000000,
+        .uart_offset = 0x200,
+        .first_offset = 0x1000,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .mmio = 1,
+        .max_ports = 1, /* It can do more, but we would need more custom code.*/
+    },
+    [param_oxford_2port] = {
+        .base_baud = 4000000,
+        .uart_offset = 0x200,
+        .first_offset = 0x1000,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .mmio = 1,
+        .max_ports = 2,
+    },
+    [param_pericom_1port] = {
+        .base_baud = 921600,
+        .uart_offset = 8,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .max_ports = 1,
+    },
+    [param_pericom_2port] = {
+        .base_baud = 921600,
+        .uart_offset = 8,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .max_ports = 2,
+    },
+    /*
+     * Of the two following ones, we can't really use all of their ports,
+     * unless ns16550_com[] would get grown.
+     */
+    [param_pericom_4port] = {
+        .base_baud = 921600,
+        .uart_offset = 8,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .max_ports = 4,
+    },
+    [param_pericom_8port] = {
+        .base_baud = 921600,
+        .uart_offset = 8,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .max_ports = 8,
+    }
+};
+
+static const struct ns16550_config __initconst uart_config[] =
+{
+    /* Broadcom TruManage device */
+    {
+        .vendor_id = PCI_VENDOR_ID_BROADCOM,
+        .dev_id = 0x160a,
+        .param = param_trumanage,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc11b,
+        .param = param_oxford,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc11f,
+        .param = param_oxford,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc138,
+        .param = param_oxford,
+    },
+    /* OXPCIe952 2 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc158,
+        .param = param_oxford_2port,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc13d,
+        .param = param_oxford,
+    },
+    /* OXPCIe952 2 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc15d,
+        .param = param_oxford_2port,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc40b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc40f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc41b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc41f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc42b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc42f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc43b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc43f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc44b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc44f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc45b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc45f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc46b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc46f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc47b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc47f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc48b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc48f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc49b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc49f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4ab,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4af,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4bb,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4bf,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4cb,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4cf,
+        .param = param_oxford,
+    },
+    /* Pericom PI7C9X7951 Uno UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_PERICOM,
+        .dev_id = 0x7951,
+        .param = param_pericom_1port
+    },
+    /* Pericom PI7C9X7952 Duo UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_PERICOM,
+        .dev_id = 0x7952,
+        .param = param_pericom_2port
+    },
+    /* Pericom PI7C9X7954 Quad UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_PERICOM,
+        .dev_id = 0x7954,
+        .param = param_pericom_4port
+    },
+    /* Pericom PI7C9X7958 Octal UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_PERICOM,
+        .dev_id = 0x7958,
+        .param = param_pericom_8port
+    }
+};
+
 static int __init
 pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
 {
@@ -1211,7 +1213,8 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
 
     return 0;
 }
-#endif
+
+#endif /* CONFIG_HAS_PCI */
 
 /*
  * Used to parse name value pairs and return which value it is along with
