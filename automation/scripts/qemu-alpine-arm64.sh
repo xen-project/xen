@@ -8,10 +8,36 @@ apt-get -qy install --no-install-recommends qemu-system-aarch64 \
                                             u-boot-tools \
                                             device-tree-compiler \
                                             cpio \
-                                            curl
+                                            curl \
+                                            busybox-static
 
-mkdir -p binaries/rootfs
-cd binaries/rootfs
+# DomU Busybox
+cd binaries
+mkdir -p initrd
+mkdir -p initrd/bin
+mkdir -p initrd/sbin
+mkdir -p initrd/etc
+mkdir -p initrd/dev
+mkdir -p initrd/proc
+mkdir -p initrd/sys
+mkdir -p initrd/lib
+mkdir -p initrd/var
+mkdir -p initrd/mnt
+cp /bin/busybox initrd/bin/busybox
+initrd/bin/busybox --install initrd/bin
+echo "#!/bin/sh
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+/bin/sh" > initrd/init
+chmod +x initrd/init
+cd initrd
+find . | cpio --create --format='newc' | gzip > ../initrd.cpio.gz
+cd ..
+
+mkdir -p rootfs
+cd rootfs
 tar xvzf ../initrd.tar.gz
 mkdir proc
 mkdir run
@@ -19,12 +45,23 @@ mkdir srv
 mkdir sys
 rm var/run
 cp -ar ../dist/install/* .
+mv ../initrd.cpio.gz ./root
+cp ../Image ./root
+echo "name=\"test\"
+memory=512
+vcpus=1
+kernel=\"/root/Image\"
+ramdisk=\"/root/initrd.cpio.gz\"
+extra=\"console=hvc0 root=/dev/ram0 rdinit=/bin/sh\"
+" > root/test.cfg
 echo "#!/bin/bash
 
 export LD_LIBRARY_PATH=/usr/local/lib
 bash /etc/init.d/xencommons start
 
 xl list
+
+xl create -c /root/test.cfg
 
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
@@ -69,7 +106,7 @@ bash imagebuilder/scripts/uboot-script-gen -t tftp -d binaries/ -c binaries/conf
 rm -f smoke.serial
 set +e
 echo "  virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"| \
-timeout -k 1 480 \
+timeout -k 1 720 \
 qemu-system-aarch64 \
     -machine virtualization=true \
     -cpu cortex-a57 -machine type=virt \
@@ -81,5 +118,5 @@ qemu-system-aarch64 \
     -bios /usr/lib/u-boot/qemu_arm64/u-boot.bin |& tee smoke.serial
 
 set -e
-grep -q "Domain-0" smoke.serial || exit 1
+(grep -q "Domain-0" smoke.serial && grep -q "BusyBox" smoke.serial) || exit 1
 exit 0
