@@ -22,6 +22,30 @@ build-each-commit-gcc:
     - /^coverity-tested\/.*/
     - /^stable-.*/
 
+qemu-alpine-arm64-gcc:
+  stage: test
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+  script:
+    - ./automation/scripts/qemu-alpine-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
+  dependencies:
+    - alpine-3.12-gcc-arm64
+    - alpine-3.12-arm64-rootfs-export
+    - kernel-5.9.9-arm64-export
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  tags:
+    - arm64
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
+
 qemu-smoke-arm64-gcc:
   stage: test
   image: registry.gitlab.com/xen-project/xen/${CONTAINER}

@@ -55,6 +55,7 @@ cp xen/.config xen-config
 mkdir binaries
 if [[ "${XEN_TARGET_ARCH}" != "x86_32" ]]; then
     cp xen/xen binaries/xen
+    cp -r dist binaries/
 fi
 
 # Build all the configs we care about
