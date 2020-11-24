@@ -468,3 +468,29 @@ alpine-3.12-gcc-debug-arm64:
   extends: .gcc-arm64-build-debug
   variables:
     CONTAINER: alpine:3.12-arm64v8
+
+
+# Arm test artifacts
+
+alpine-3.12-arm64-rootfs-export:
+  stage: build
+  image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.12-arm64v8
+  script:
+    - mkdir binaries && cp /initrd.tar.gz binaries/initrd.tar.gz
+  artifacts:
+    paths:
+      - binaries/initrd.tar.gz
+  tags:
+    - arm64
+
+kernel-5.9.9-arm64-export:
+  stage: build
+  image: registry.gitlab.com/xen-project/xen/tests-artifacts/kernel:5.9.9-arm64v8
+  script:
+    - mkdir binaries && cp /Image binaries/Image
+  artifacts:
+    paths:
+      - binaries/Image
+  tags:
+    - arm64
+
