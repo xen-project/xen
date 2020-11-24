@@ -31,38 +31,6 @@
 #include <asm/fixmap.h>
 #endif
 
-/*
- * Configure serial port with a string:
- *   <baud>[/<base_baud>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]]].
- * The tail of the string can be omitted if platform defaults are sufficient.
- * If the baud rate is pre-configured, perhaps by a bootloader, then 'auto'
- * can be specified in place of a numeric baud rate. Polled mode is specified
- * by requesting irq 0.
- */
-static char __initdata opt_com1[128] = "";
-static char __initdata opt_com2[128] = "";
-string_param("com1", opt_com1);
-string_param("com2", opt_com2);
-
-enum serial_param_type {
-    baud,
-    clock_hz,
-    data_bits,
-    io_base,
-    irq,
-    parity,
-    reg_shift,
-    reg_width,
-    stop_bits,
-#ifdef CONFIG_HAS_PCI
-    bridge_bdf,
-    device,
-    port_bdf,
-#endif
-    /* List all parameters before this line. */
-    num_serial_params
-};
-
 static struct ns16550 {
     int baud, clock_hz, data_bits, parity, stop_bits, fifo_size, irq;
     u64 io_base;   /* I/O port or memory-mapped I/O address. */
@@ -97,32 +65,6 @@ static struct ns16550 {
     const struct ns16550_config_param *param; /* Points into .init.*! */
 #endif
 } ns16550_com[2] = { { 0 } };
-
-struct serial_param_var {
-    char name[12];
-    enum serial_param_type type;
-};
-
-/*
- * Enum struct keeping a table of all accepted parameter names for parsing
- * com_console_options for serial port com1 and com2.
- */
-static const struct serial_param_var __initconst sp_vars[] = {
-    {"baud", baud},
-    {"clock-hz", clock_hz},
-    {"data-bits", data_bits},
-    {"io-base", io_base},
-    {"irq", irq},
-    {"parity", parity},
-    {"reg-shift", reg_shift},
-    {"reg-width", reg_width},
-    {"stop-bits", stop_bits},
-#ifdef CONFIG_HAS_PCI
-    {"bridge", bridge_bdf},
-    {"dev", device},
-    {"port", port_bdf},
-#endif
-};
 
 #ifdef CONFIG_HAS_PCI
 struct ns16550_config {
@@ -674,6 +616,19 @@ static struct uart_driver __read_mostly ns16550_driver = {
 #endif
 };
 
+static void ns16550_init_common(struct ns16550 *uart)
+{
+    uart->clock_hz  = UART_CLOCK_HZ;
+
+    /* Default is no transmit FIFO. */
+    uart->fifo_size = 1;
+
+    /* Default lsr_mask = UART_LSR_THRE */
+    uart->lsr_mask  = UART_LSR_THRE;
+}
+
+#ifdef CONFIG_X86
+
 static int __init parse_parity_char(int c)
 {
     switch ( c )
@@ -1217,6 +1172,64 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
 #endif /* CONFIG_HAS_PCI */
 
 /*
+ * Configure serial port with a string:
+ *   <baud>[/<base_baud>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]]].
+ * The tail of the string can be omitted if platform defaults are sufficient.
+ * If the baud rate is pre-configured, perhaps by a bootloader, then 'auto'
+ * can be specified in place of a numeric baud rate. Polled mode is specified
+ * by requesting irq 0.
+ */
+static char __initdata opt_com1[128] = "";
+static char __initdata opt_com2[128] = "";
+string_param("com1", opt_com1);
+string_param("com2", opt_com2);
+
+enum serial_param_type {
+    baud,
+    clock_hz,
+    data_bits,
+    io_base,
+    irq,
+    parity,
+    reg_shift,
+    reg_width,
+    stop_bits,
+#ifdef CONFIG_HAS_PCI
+    bridge_bdf,
+    device,
+    port_bdf,
+#endif
+    /* List all parameters before this line. */
+    num_serial_params
+};
+
+struct serial_param_var {
+    char name[12];
+    enum serial_param_type type;
+};
+
+/*
+ * Enum struct keeping a table of all accepted parameter names for parsing
+ * com_console_options for serial port com1 and com2.
+ */
+static const struct serial_param_var __initconst sp_vars[] = {
+    {"baud", baud},
+    {"clock-hz", clock_hz},
+    {"data-bits", data_bits},
+    {"io-base", io_base},
+    {"irq", irq},
+    {"parity", parity},
+    {"reg-shift", reg_shift},
+    {"reg-width", reg_width},
+    {"stop-bits", stop_bits},
+#ifdef CONFIG_HAS_PCI
+    {"bridge", bridge_bdf},
+    {"dev", device},
+    {"port", port_bdf},
+#endif
+};
+
+/*
  * Used to parse name value pairs and return which value it is along with
  * pointer for the extracted value.
  */
@@ -1504,17 +1517,6 @@ static void __init ns16550_parse_port_config(
     serial_register_uart(uart - ns16550_com, &ns16550_driver, uart);
 }
 
-static void ns16550_init_common(struct ns16550 *uart)
-{
-    uart->clock_hz  = UART_CLOCK_HZ;
-
-    /* Default is no transmit FIFO. */
-    uart->fifo_size = 1;
-
-    /* Default lsr_mask = UART_LSR_THRE */
-    uart->lsr_mask  = UART_LSR_THRE;
-}
-
 void __init ns16550_init(int index, struct ns16550_defaults *defaults)
 {
     struct ns16550 *uart;
@@ -1540,6 +1542,8 @@ void __init ns16550_init(int index, struct ns16550_defaults *defaults)
 
     ns16550_parse_port_config(uart, (index == 0) ? opt_com1 : opt_com2);
 }
+
+#endif /* CONFIG_X86 */
 
 #ifdef CONFIG_HAS_DEVICE_TREE
 static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
