@@ -12,8 +12,6 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 
-#define bt_ioremap(b,l)  ((void *)__acpi_map_table(b,l))
-#define bt_iounmap(b,l)  ((void)0)
 #define memcpy_fromio    memcpy
 #define alloc_bootmem(l) xmalloc_bytes(l)
 
@@ -111,9 +109,32 @@ enum dmi_entry_type {
 #define dmi_printk(x)
 #endif
 
-static char * __init dmi_string(struct dmi_header *dm, u8 s)
+static const void *__init bt_ioremap(paddr_t addr, unsigned int len)
 {
-	char *bp=(char *)dm;
+    mfn_t mfn = _mfn(PFN_DOWN(addr));
+    unsigned int offs = PAGE_OFFSET(addr);
+
+    if ( addr + len <= MB(1) )
+        return __va(addr);
+
+    if ( system_state < SYS_STATE_boot )
+        return __acpi_map_table(addr, len);
+
+    return __vmap(&mfn, PFN_UP(offs + len), 1, 1, PAGE_HYPERVISOR_RO,
+                  VMAP_DEFAULT) + offs;
+}
+
+static void __init bt_iounmap(const void *ptr, unsigned int len)
+{
+    if ( (unsigned long)ptr < DIRECTMAP_VIRT_START &&
+         system_state >= SYS_STATE_boot )
+        vunmap(ptr);
+}
+
+static const char *__init dmi_string(const struct dmi_header *dm, uint8_t s)
+{
+	const char *bp = (const void *)dm;
+
 	bp+=dm->length;
 	if(!s)
 		return "";
@@ -133,11 +154,10 @@ static char * __init dmi_string(struct dmi_header *dm, u8 s)
  */
  
 static int __init dmi_table(paddr_t base, u32 len, int num,
-			    void (*decode)(struct dmi_header *))
+			    void (*decode)(const struct dmi_header *))
 {
-	u8 *buf;
-	struct dmi_header *dm;
-	u8 *data;
+	const uint8_t *buf, *data;
+	const struct dmi_header *dm;
 	int i=0;
 		
 	buf = bt_ioremap(base, len);
@@ -301,7 +321,7 @@ typedef union {
 
 static int __init _dmi_iterate(const struct dmi_eps *dmi,
 			       const smbios_eps_u smbios,
-			       void (*decode)(struct dmi_header *))
+			       void (*decode)(const struct dmi_header *))
 {
 	int num;
 	u32 len;
@@ -335,7 +355,7 @@ static int __init _dmi_iterate(const struct dmi_eps *dmi,
 	return dmi_table(base, len, num, decode);
 }
 
-static int __init dmi_iterate(void (*decode)(struct dmi_header *))
+static int __init dmi_iterate(void (*decode)(const struct dmi_header *))
 {
 	struct dmi_eps dmi;
 	struct smbios3_eps smbios3;
@@ -370,7 +390,7 @@ static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 	return -1;
 }
 
-static int __init dmi_efi_iterate(void (*decode)(struct dmi_header *))
+static int __init dmi_efi_iterate(void (*decode)(const struct dmi_header *))
 {
 	int ret = -1;
 
@@ -433,10 +453,11 @@ static char *__initdata dmi_ident[DMI_STRING_MAX];
  *	Save a DMI string
  */
  
-static void __init dmi_save_ident(struct dmi_header *dm, int slot, int string)
+static void __init dmi_save_ident(const struct dmi_header *dm, int slot, int string)
 {
-	char *d = (char*)dm;
-	char *p = dmi_string(dm, d[string]);
+	const char *d = (const void *)dm;
+	const char *p = dmi_string(dm, d[string]);
+
 	if(p==NULL || *p == 0)
 		return;
 	if (dmi_ident[slot])
@@ -629,10 +650,10 @@ static const struct dmi_blacklist __initconstrel dmi_blacklist[] = {
  *	out of here.
  */
 
-static void __init dmi_decode(struct dmi_header *dm)
+static void __init dmi_decode(const struct dmi_header *dm)
 {
 #ifdef DMI_DEBUG
-	u8 *data = (u8 *)dm;
+	const uint8_t *data = (const void *)dm;
 #endif
 	
 	switch(dm->type)
