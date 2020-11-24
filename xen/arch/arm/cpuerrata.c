@@ -506,6 +506,12 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         .capability = ARM64_WORKAROUND_AT_SPECULATE,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
     },
+    {
+        /* Cortex-A55 (All versions as erratum is open in SDEN v14) */
+        .desc = "ARM erratum 1530923",
+        .capability = ARM64_WORKAROUND_AT_SPECULATE,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A55),
+    },
     {},
 };
 
