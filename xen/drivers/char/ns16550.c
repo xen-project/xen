@@ -662,9 +662,7 @@ static int __init check_existence(struct ns16550 *uart)
     return 1; /* Everything is MMIO */
 #endif
 
-#ifdef CONFIG_HAS_PCI
     pci_serial_early_init(uart);
-#endif
 
     /*
      * Do a simple existence test first; if we fail this,
