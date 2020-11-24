@@ -12,12 +12,6 @@ apt-get -qy install --no-install-recommends qemu-system-aarch64 \
                                             busybox-static \
                                             cpio
 
-cd binaries
-apt-get download linux-image-*[0-9]-arm64
-dpkg -i --ignore-depends=initramfs-tools ./linux-image-*arm64.deb || true
-cp /boot/vmlinuz-*arm64 ./Image
-cd ..
-
 # XXX Silly workaround to get the following QEMU command to work
 # QEMU looks for "efi-virtio.rom" even if it is unneeded
 cp /usr/share/qemu/pvh.bin /usr/share/qemu/efi-virtio.rom

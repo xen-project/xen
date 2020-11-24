@@ -55,6 +55,7 @@ qemu-smoke-arm64-gcc:
     - ./automation/scripts/qemu-smoke-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
   dependencies:
     - debian-unstable-gcc-arm64
+    - kernel-5.9.9-arm64-export
   artifacts:
     paths:
       - smoke.serial
