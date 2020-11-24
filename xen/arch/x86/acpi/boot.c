@@ -422,8 +422,7 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	if (!facs_pa)
 		goto bad;
 
-	facs = (struct acpi_table_facs *)
-		__acpi_map_table(facs_pa, sizeof(struct acpi_table_facs));
+	facs = acpi_os_map_memory(facs_pa, sizeof(*facs));
 	if (!facs)
 		goto bad;
 
@@ -448,11 +447,16 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 		offsetof(struct acpi_table_facs, firmware_waking_vector);
 	acpi_sinfo.vector_width = 32;
 
+	acpi_os_unmap_memory(facs, sizeof(*facs));
+
 	printk(KERN_INFO PREFIX
 	       "            wakeup_vec[%"PRIx64"], vec_size[%x]\n",
 	       acpi_sinfo.wakeup_vector, acpi_sinfo.vector_width);
 	return;
-bad:
+
+ bad:
+	if (facs)
+		acpi_os_unmap_memory(facs, sizeof(*facs));
 	memset(&acpi_sinfo, 0,
 	       offsetof(struct acpi_sleep_info, sleep_control));
 	memset(&acpi_sinfo.sleep_status + 1, 0,
