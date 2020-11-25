@@ -15,8 +15,10 @@ that they can have an idea what to expect from the Release Manager.
 
 # Xen release cycle
 
-The Xen hypervisor project now releases every 8 months. The actual release date
-depends on a lot of factors.
+The Xen hypervisor project now releases every 8 months.  We aim to
+release in the first half of March/July/November.  These dates have
+been chosen to avoid major holidays and cultural events; if one
+release slips, ideally the subsequent release cycle would be shortened.
 
 We can roughly divide one release into two periods. The development period
 and the freeze period. The former is 6 months long and the latter is about 2
@@ -32,6 +34,12 @@ date" and it is normally two weeks before the "cut-off date".
 During freeze period, the tree is closed for new features. Only bug fixes are
 accepted. This period can be shorter or longer than 2 months. If it ends up
 longer than 2 months, it eats into the next development period.
+
+The precise release schedule depends on a lot of factors and needs to
+be set afresh by the Release Manager in each release cycle.  When the
+release is in March, particular consideration should be given to the
+Chinese New Year holiday which will then typically occur during the
+freeze, so the freeze should probably be extended to compensate.
 
 # The different roles in a Xen release
 
