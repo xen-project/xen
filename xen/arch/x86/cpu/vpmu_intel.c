@@ -90,8 +90,8 @@ static uint64_t __read_mostly global_ovf_ctrl_mask, global_ctrl_mask;
 static unsigned int __read_mostly regs_sz;
 /* Offset into context of the beginning of PMU register block */
 static const unsigned int regs_off =
-        sizeof(((struct xen_pmu_intel_ctxt *)0)->fixed_counters) +
-        sizeof(((struct xen_pmu_intel_ctxt *)0)->arch_counters);
+    sizeof_field(struct xen_pmu_intel_ctxt, fixed_counters) +
+    sizeof_field(struct xen_pmu_intel_ctxt, arch_counters);
 
 /*
  * QUIRK to workaround an issue on various family 6 cpus.

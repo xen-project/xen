@@ -1617,19 +1617,19 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     total_pages = nr_pages;
 
     /* Sanity check for unwanted bloat of certain hypercall structures. */
-    BUILD_BUG_ON(sizeof(((struct xen_platform_op *)0)->u) !=
-                 sizeof(((struct xen_platform_op *)0)->u.pad));
-    BUILD_BUG_ON(sizeof(((struct xen_domctl *)0)->u) !=
-                 sizeof(((struct xen_domctl *)0)->u.pad));
-    BUILD_BUG_ON(sizeof(((struct xen_sysctl *)0)->u) !=
-                 sizeof(((struct xen_sysctl *)0)->u.pad));
+    BUILD_BUG_ON(sizeof_field(struct xen_platform_op, u) !=
+                 sizeof_field(struct xen_platform_op, u.pad));
+    BUILD_BUG_ON(sizeof_field(struct xen_domctl, u) !=
+                 sizeof_field(struct xen_domctl, u.pad));
+    BUILD_BUG_ON(sizeof_field(struct xen_sysctl, u) !=
+                 sizeof_field(struct xen_sysctl, u.pad));
 
     BUILD_BUG_ON(sizeof(start_info_t) > PAGE_SIZE);
     BUILD_BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
     BUILD_BUG_ON(sizeof(struct vcpu_info) != 64);
 
-    BUILD_BUG_ON(sizeof(((struct compat_platform_op *)0)->u) !=
-                 sizeof(((struct compat_platform_op *)0)->u.pad));
+    BUILD_BUG_ON(sizeof_field(struct compat_platform_op, u) !=
+                 sizeof_field(struct compat_platform_op, u.pad));
     BUILD_BUG_ON(sizeof(start_info_compat_t) > PAGE_SIZE);
     BUILD_BUG_ON(sizeof(struct compat_vcpu_info) != 64);
 
