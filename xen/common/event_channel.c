@@ -326,23 +326,18 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 
 static void double_evtchn_lock(struct evtchn *lchn, struct evtchn *rchn)
 {
-    if ( lchn <= rchn )
-    {
-        evtchn_write_lock(lchn);
-        if ( lchn != rchn )
-            evtchn_write_lock(rchn);
-    }
-    else
-    {
-        evtchn_write_lock(rchn);
-        evtchn_write_lock(lchn);
-    }
+    ASSERT(lchn != rchn);
+
+    if ( lchn > rchn )
+        SWAP(lchn, rchn);
+
+    evtchn_write_lock(lchn);
+    evtchn_write_lock(rchn);
 }
 
 static void double_evtchn_unlock(struct evtchn *lchn, struct evtchn *rchn)
 {
-    if ( lchn != rchn )
-        evtchn_write_unlock(lchn);
+    evtchn_write_unlock(lchn);
     evtchn_write_unlock(rchn);
 }
 
