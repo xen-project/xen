@@ -242,13 +242,15 @@ void vunmap(const void *va)
 static void *vmalloc_type(size_t size, enum vmap_region type)
 {
     mfn_t *mfn;
-    size_t pages, i;
+    unsigned int i, pages = PFN_UP(size);
     struct page_info *pg;
     void *va;
 
     ASSERT(size);
 
-    pages = PFN_UP(size);
+    if ( PFN_DOWN(size) > pages )
+        return NULL;
+
     mfn = xmalloc_array(mfn_t, pages);
     if ( mfn == NULL )
         return NULL;
