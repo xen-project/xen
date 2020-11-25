@@ -104,7 +104,7 @@ install: build
 .PHONY: uninstall
 uninstall:
 	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/$(LIB_FILE_NAME).pc
-	for i in $(LIBHEADER); do rm -f $(DESTDIR)$(includedir)/$(LIBHEADER); done
+	for i in $(LIBHEADER); do rm -f $(DESTDIR)$(includedir)/$$i; done
 	rm -f $(DESTDIR)$(libdir)/lib$(LIB_FILE_NAME).so
 	rm -f $(DESTDIR)$(libdir)/lib$(LIB_FILE_NAME).so.$(MAJOR)
 	rm -f $(DESTDIR)$(libdir)/lib$(LIB_FILE_NAME).so.$(MAJOR).$(MINOR)
