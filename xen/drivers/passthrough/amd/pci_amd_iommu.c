@@ -494,8 +494,8 @@ static int amd_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 
 #include <asm/io_apic.h>
 
-static void amd_dump_p2m_table_level(struct page_info* pg, int level, 
-                                     paddr_t gpa, int indent)
+static void amd_dump_page_table_level(struct page_info *pg, int level,
+                                      paddr_t gpa, int indent)
 {
     paddr_t address;
     const union amd_iommu_pte *table_vaddr;
@@ -507,7 +507,7 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
     table_vaddr = __map_domain_page(pg);
     if ( table_vaddr == NULL )
     {
-        printk("Failed to map IOMMU domain page %"PRIpaddr"\n", 
+        printk("AMD IOMMU failed to map domain page %"PRIpaddr"\n",
                 page_to_maddr(pg));
         return;
     }
@@ -524,7 +524,7 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
 
         if ( pde->next_level && (pde->next_level != (level - 1)) )
         {
-            printk("IOMMU p2m table error. next_level = %d, expected %d\n",
+            printk("AMD IOMMU table error. next_level = %d, expected %d\n",
                    pde->next_level, level - 1);
 
             continue;
@@ -532,7 +532,7 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
 
         address = gpa + amd_offset_level_address(index, level);
         if ( pde->next_level >= 1 )
-            amd_dump_p2m_table_level(
+            amd_dump_page_table_level(
                 mfn_to_page(_mfn(pde->mfn)), pde->next_level,
                 address, indent + 1);
         else
@@ -545,16 +545,16 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
     unmap_domain_page(table_vaddr);
 }
 
-static void amd_dump_p2m_table(struct domain *d)
+static void amd_dump_page_tables(struct domain *d)
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
     if ( !hd->arch.amd.root_table )
         return;
 
-    printk("p2m table has %u levels\n", hd->arch.amd.paging_mode);
-    amd_dump_p2m_table_level(hd->arch.amd.root_table,
-                             hd->arch.amd.paging_mode, 0, 0);
+    printk("AMD IOMMU %pd table has %u levels\n", d, hd->arch.amd.paging_mode);
+    amd_dump_page_table_level(hd->arch.amd.root_table,
+                              hd->arch.amd.paging_mode, 0, 0);
 }
 
 static const struct iommu_ops __initconstrel _iommu_ops = {
@@ -580,7 +580,7 @@ static const struct iommu_ops __initconstrel _iommu_ops = {
     .suspend = amd_iommu_suspend,
     .resume = amd_iommu_resume,
     .crash_shutdown = amd_iommu_crash_shutdown,
-    .dump_p2m_table = amd_dump_p2m_table,
+    .dump_page_tables = amd_dump_page_tables,
 };
 
 static const struct iommu_init_ops __initconstrel _iommu_init_ops = {
