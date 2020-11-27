@@ -318,6 +318,48 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     return pte_maddr;
 }
 
+static uint64_t domain_pgd_maddr(struct domain *d, unsigned int nr_pt_levels)
+{
+    struct domain_iommu *hd = dom_iommu(d);
+    uint64_t pgd_maddr;
+    unsigned int agaw;
+
+    ASSERT(spin_is_locked(&hd->arch.mapping_lock));
+
+    if ( iommu_use_hap_pt(d) )
+    {
+        pagetable_t pgt = p2m_get_pagetable(p2m_get_hostp2m(d));
+
+        return pagetable_get_paddr(pgt);
+    }
+
+    if ( !hd->arch.vtd.pgd_maddr )
+    {
+        /* Ensure we have pagetables allocated down to leaf PTE. */
+        addr_to_dma_page_maddr(d, 0, 1);
+
+        if ( !hd->arch.vtd.pgd_maddr )
+            return 0;
+    }
+
+    pgd_maddr = hd->arch.vtd.pgd_maddr;
+
+    /* Skip top levels of page tables for 2- and 3-level DRHDs. */
+    for ( agaw = level_to_agaw(4);
+          agaw != level_to_agaw(nr_pt_levels);
+          agaw-- )
+    {
+        const struct dma_pte *p = map_vtd_domain_page(pgd_maddr);
+
+        pgd_maddr = dma_pte_addr(*p);
+        unmap_vtd_domain_page(p);
+        if ( !pgd_maddr )
+            return 0;
+    }
+
+    return pgd_maddr;
+}
+
 static void iommu_flush_write_buffer(struct vtd_iommu *iommu)
 {
     u32 val;
@@ -1286,7 +1328,7 @@ int domain_context_mapping_one(
     struct context_entry *context, *context_entries;
     u64 maddr, pgd_maddr;
     u16 seg = iommu->drhd->segment;
-    int agaw, rc, ret;
+    int rc, ret;
     bool_t flush_dev_iotlb;
 
     ASSERT(pcidevs_locked());
@@ -1340,37 +1382,18 @@ int domain_context_mapping_one(
     if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
     {
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
-        agaw = level_to_agaw(iommu->nr_pt_levels);
     }
     else
     {
         spin_lock(&hd->arch.mapping_lock);
 
-        /* Ensure we have pagetables allocated down to leaf PTE. */
-        if ( hd->arch.vtd.pgd_maddr == 0 )
+        pgd_maddr = domain_pgd_maddr(domain, iommu->nr_pt_levels);
+        if ( !pgd_maddr )
         {
-            addr_to_dma_page_maddr(domain, 0, 1);
-            if ( hd->arch.vtd.pgd_maddr == 0 )
-            {
-            nomem:
-                spin_unlock(&hd->arch.mapping_lock);
-                spin_unlock(&iommu->lock);
-                unmap_vtd_domain_page(context_entries);
-                return -ENOMEM;
-            }
-        }
-
-        /* Skip top levels of page tables for 2- and 3-level DRHDs. */
-        pgd_maddr = hd->arch.vtd.pgd_maddr;
-        for ( agaw = level_to_agaw(4);
-              agaw != level_to_agaw(iommu->nr_pt_levels);
-              agaw-- )
-        {
-            struct dma_pte *p = map_vtd_domain_page(pgd_maddr);
-            pgd_maddr = dma_pte_addr(*p);
-            unmap_vtd_domain_page(p);
-            if ( pgd_maddr == 0 )
-                goto nomem;
+            spin_unlock(&hd->arch.mapping_lock);
+            spin_unlock(&iommu->lock);
+            unmap_vtd_domain_page(context_entries);
+            return -ENOMEM;
         }
 
         context_set_address_root(*context, pgd_maddr);
@@ -1389,7 +1412,7 @@ int domain_context_mapping_one(
         return -EFAULT;
     }
 
-    context_set_address_width(*context, agaw);
+    context_set_address_width(*context, level_to_agaw(iommu->nr_pt_levels));
     context_set_fault_enable(*context);
     context_set_present(*context);
     iommu_sync_cache(context, sizeof(struct context_entry));
@@ -1846,18 +1869,6 @@ static int __init vtd_ept_page_compatible(struct vtd_iommu *iommu)
 
     return (ept_has_2mb(ept_cap) && opt_hap_2mb) <= cap_sps_2mb(vtd_cap) &&
            (ept_has_1gb(ept_cap) && opt_hap_1gb) <= cap_sps_1gb(vtd_cap);
-}
-
-/*
- * set VT-d page table directory to EPT table if allowed
- */
-static void iommu_set_pgd(struct domain *d)
-{
-    mfn_t pgd_mfn;
-
-    pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
-    dom_iommu(d)->arch.vtd.pgd_maddr =
-        pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 }
 
 static int rmrr_identity_mapping(struct domain *d, bool_t map,
@@ -2718,7 +2729,6 @@ static struct iommu_ops __initdata vtd_ops = {
     .adjust_irq_affinities = adjust_vtd_irq_affinities,
     .suspend = vtd_suspend,
     .resume = vtd_resume,
-    .share_p2m = iommu_set_pgd,
     .crash_shutdown = vtd_crash_shutdown,
     .iotlb_flush = iommu_flush_iotlb_pages,
     .iotlb_flush_all = iommu_flush_iotlb_all,
