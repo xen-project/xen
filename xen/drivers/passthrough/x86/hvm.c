@@ -1036,6 +1036,72 @@ unlock:
     spin_unlock(&d->event_lock);
 }
 
+static int pci_clean_dpci_irq(struct domain *d,
+                              struct hvm_pirq_dpci *pirq_dpci, void *arg)
+{
+    struct dev_intx_gsi_link *digl, *tmp;
+
+    pirq_guest_unbind(d, dpci_pirq(pirq_dpci));
+
+    if ( pt_irq_need_timer(pirq_dpci->flags) )
+        kill_timer(&pirq_dpci->timer);
+
+    list_for_each_entry_safe ( digl, tmp, &pirq_dpci->digl_list, list )
+    {
+        list_del(&digl->list);
+        xfree(digl);
+    }
+
+    radix_tree_delete(&d->pirq_tree, dpci_pirq(pirq_dpci)->pirq);
+
+    if ( !pt_pirq_softirq_active(pirq_dpci) )
+        return 0;
+
+    domain_get_irq_dpci(d)->pending_pirq_dpci = pirq_dpci;
+
+    return -ERESTART;
+}
+
+int arch_pci_clean_pirqs(struct domain *d)
+{
+    struct hvm_irq_dpci *hvm_irq_dpci = NULL;
+
+    if ( !is_iommu_enabled(d) )
+        return 0;
+
+    if ( !is_hvm_domain(d) )
+        return 0;
+
+    spin_lock(&d->event_lock);
+    hvm_irq_dpci = domain_get_irq_dpci(d);
+    if ( hvm_irq_dpci != NULL )
+    {
+        int ret = 0;
+
+        if ( hvm_irq_dpci->pending_pirq_dpci )
+        {
+            if ( pt_pirq_softirq_active(hvm_irq_dpci->pending_pirq_dpci) )
+                 ret = -ERESTART;
+            else
+                 hvm_irq_dpci->pending_pirq_dpci = NULL;
+        }
+
+        if ( !ret )
+            ret = pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
+        if ( ret )
+        {
+            spin_unlock(&d->event_lock);
+            return ret;
+        }
+
+        hvm_domain_irq(d)->dpci = NULL;
+        free_hvm_irq_dpci(hvm_irq_dpci);
+    }
+    spin_unlock(&d->event_lock);
+
+    return 0;
+}
+
 /*
  * Note: 'pt_pirq_softirq_reset' can clear the STATE_SCHED before we get to
  * doing it. If that is the case we let 'pt_pirq_softirq_reset' do ref-counting.
