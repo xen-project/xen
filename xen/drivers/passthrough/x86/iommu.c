@@ -18,6 +18,7 @@
 #include <xen/guest_access.h>
 #include <xen/event.h>
 #include <xen/softirq.h>
+#include <xen/vm_event.h>
 #include <xsm/xsm.h>
 
 #include <asm/hvm/io.h>
@@ -306,6 +307,18 @@ struct page_info *iommu_alloc_pgtable(struct domain *d)
     spin_unlock(&hd->arch.pgtables.lock);
 
     return pg;
+}
+
+bool arch_iommu_use_permitted(const struct domain *d)
+{
+    /*
+     * Prevent device assign if mem paging, mem sharing or log-dirty
+     * have been enabled for this domain.
+     */
+    return d == dom_io ||
+           (likely(!mem_sharing_enabled(d)) &&
+            likely(!vm_event_check_ring(d->vm_event_paging)) &&
+            likely(!p2m_get_hostp2m(d)->global_logdirty));
 }
 
 /*

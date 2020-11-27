@@ -23,7 +23,6 @@
 #include <xen/iommu.h>
 #include <xen/irq.h>
 #include <xen/param.h>
-#include <xen/vm_event.h>
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
 #include <xen/event.h>
@@ -1421,12 +1420,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     if ( !is_iommu_enabled(d) )
         return 0;
 
-    /* Prevent device assign if mem paging or mem sharing have been 
-     * enabled for this domain */
-    if ( d != dom_io &&
-         unlikely(mem_sharing_enabled(d) ||
-                  vm_event_check_ring(d->vm_event_paging) ||
-                  p2m_get_hostp2m(d)->global_logdirty) )
+    if ( !arch_iommu_use_permitted(d) )
         return -EXDEV;
 
     /* device_assigned() should already have cleared the device for assignment */
