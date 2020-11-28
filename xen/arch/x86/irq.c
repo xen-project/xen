@@ -432,9 +432,14 @@ int __init init_irq_data(void)
 
     for ( irq = 0; irq < nr_irqs_gsi; irq++ )
     {
+        int rc;
+
         desc = irq_to_desc(irq);
         desc->irq = irq;
-        init_one_irq_desc(desc);
+
+        rc = init_one_irq_desc(desc);
+        if ( rc )
+            return rc;
     }
     for ( ; irq < nr_irqs; irq++ )
         irq_to_desc(irq)->irq = irq;
