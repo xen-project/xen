@@ -87,38 +87,6 @@ static void evtchn_fifo_init(struct domain *d, struct evtchn *evtchn)
                  d->domain_id, evtchn->port);
 }
 
-static struct evtchn_fifo_queue *lock_old_queue(const struct domain *d,
-                                                struct evtchn *evtchn,
-                                                unsigned long *flags)
-{
-    struct vcpu *v;
-    struct evtchn_fifo_queue *q, *old_q;
-    unsigned int try;
-    union evtchn_fifo_lastq lastq;
-
-    for ( try = 0; try < 3; try++ )
-    {
-        lastq.raw = read_atomic(&evtchn->fifo_lastq);
-        v = d->vcpu[lastq.last_vcpu_id];
-        old_q = &v->evtchn_fifo->queue[lastq.last_priority];
-
-        spin_lock_irqsave(&old_q->lock, *flags);
-
-        v = d->vcpu[lastq.last_vcpu_id];
-        q = &v->evtchn_fifo->queue[lastq.last_priority];
-
-        if ( old_q == q )
-            return old_q;
-
-        spin_unlock_irqrestore(&old_q->lock, *flags);
-    }
-
-    gprintk(XENLOG_WARNING,
-            "dom%d port %d lost event (too many queue changes)\n",
-            d->domain_id, evtchn->port);
-    return NULL;
-}          
-
 static int try_set_link(event_word_t *word, event_word_t *w, uint32_t link)
 {
     event_word_t new, old;
@@ -190,6 +158,9 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
     event_word_t *word;
     unsigned long flags;
     bool_t was_pending;
+    struct evtchn_fifo_queue *q, *old_q;
+    unsigned int try;
+    bool linked = true;
 
     port = evtchn->port;
     word = evtchn_fifo_word_from_port(d, port);
@@ -204,7 +175,59 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
         return;
     }
 
+    /*
+     * Lock all queues related to the event channel (in case of a queue change
+     * this might be two).
+     * It is mandatory to do that before setting and testing the PENDING bit
+     * and to hold the current queue lock until the event has been put into the
+     * list of pending events in order to avoid waking up a guest without the
+     * event being visibly pending in the guest.
+     */
+    for ( try = 0; try < 3; try++ )
+    {
+        union evtchn_fifo_lastq lastq;
+        const struct vcpu *old_v;
+
+        lastq.raw = read_atomic(&evtchn->fifo_lastq);
+        old_v = d->vcpu[lastq.last_vcpu_id];
+
+        q = &v->evtchn_fifo->queue[evtchn->priority];
+        old_q = &old_v->evtchn_fifo->queue[lastq.last_priority];
+
+        if ( q == old_q )
+            spin_lock_irqsave(&q->lock, flags);
+        else if ( q < old_q )
+        {
+            spin_lock_irqsave(&q->lock, flags);
+            spin_lock(&old_q->lock);
+        }
+        else
+        {
+            spin_lock_irqsave(&old_q->lock, flags);
+            spin_lock(&q->lock);
+        }
+
+        lastq.raw = read_atomic(&evtchn->fifo_lastq);
+        old_v = d->vcpu[lastq.last_vcpu_id];
+        if ( q == &v->evtchn_fifo->queue[evtchn->priority] &&
+             old_q == &old_v->evtchn_fifo->queue[lastq.last_priority] )
+            break;
+
+        if ( q != old_q )
+            spin_unlock(&old_q->lock);
+        spin_unlock_irqrestore(&q->lock, flags);
+    }
+
     was_pending = guest_test_and_set_bit(d, EVTCHN_FIFO_PENDING, word);
+
+    /* If we didn't get the lock bail out. */
+    if ( try == 3 )
+    {
+        gprintk(XENLOG_WARNING,
+                "%pd port %u lost event (too many queue changes)\n",
+                d, evtchn->port);
+        goto done;
+    }
 
     /*
      * Link the event if it unmasked and not already linked.
@@ -212,9 +235,7 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
     if ( !guest_test_bit(d, EVTCHN_FIFO_MASKED, word) &&
          !guest_test_bit(d, EVTCHN_FIFO_LINKED, word) )
     {
-        struct evtchn_fifo_queue *q, *old_q;
         event_word_t *tail_word;
-        bool_t linked = 0;
 
         /*
          * Control block not mapped.  The guest must not unmask an
@@ -225,25 +246,11 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
         {
             printk(XENLOG_G_WARNING
                    "%pv has no FIFO event channel control block\n", v);
-            goto done;
+            goto unlock;
         }
-
-        /*
-         * No locking around getting the queue. This may race with
-         * changing the priority but we are allowed to signal the
-         * event once on the old priority.
-         */
-        q = &v->evtchn_fifo->queue[evtchn->priority];
-
-        old_q = lock_old_queue(d, evtchn, &flags);
-        if ( !old_q )
-            goto done;
 
         if ( guest_test_and_set_bit(d, EVTCHN_FIFO_LINKED, word) )
-        {
-            spin_unlock_irqrestore(&old_q->lock, flags);
-            goto done;
-        }
+            goto unlock;
 
         /*
          * If this event was a tail, the old queue is now empty and
@@ -262,8 +269,8 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
             lastq.last_priority = q->priority;
             write_atomic(&evtchn->fifo_lastq, lastq.raw);
 
-            spin_unlock_irqrestore(&old_q->lock, flags);
-            spin_lock_irqsave(&q->lock, flags);
+            spin_unlock(&old_q->lock);
+            old_q = q;
         }
 
         /*
@@ -276,6 +283,7 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
          * If the queue is empty (i.e., we haven't linked to the new
          * event), head must be updated.
          */
+        linked = false;
         if ( q->tail )
         {
             tail_word = evtchn_fifo_word_from_port(d, q->tail);
@@ -284,15 +292,19 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
         if ( !linked )
             write_atomic(q->head, port);
         q->tail = port;
-
-        spin_unlock_irqrestore(&q->lock, flags);
-
-        if ( !linked
-             && !guest_test_and_set_bit(d, q->priority,
-                                        &v->evtchn_fifo->control_block->ready) )
-            vcpu_mark_events_pending(v);
     }
+
+ unlock:
+    if ( q != old_q )
+        spin_unlock(&old_q->lock);
+    spin_unlock_irqrestore(&q->lock, flags);
+
  done:
+    if ( !linked &&
+         !guest_test_and_set_bit(d, q->priority,
+                                 &v->evtchn_fifo->control_block->ready) )
+        vcpu_mark_events_pending(v);
+
     if ( !was_pending )
         evtchn_check_pollers(d, port);
 }
