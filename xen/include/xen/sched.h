@@ -93,31 +93,33 @@ struct evtchn
 #define ECS_PIRQ         4 /* Channel is bound to a physical IRQ line.       */
 #define ECS_VIRQ         5 /* Channel is bound to a virtual IRQ line.        */
 #define ECS_IPI          6 /* Channel is bound to a virtual IPI line.        */
-    u8  state;             /* ECS_* */
-    u8  xen_consumer:XEN_CONSUMER_BITS; /* Consumer in Xen if nonzero */
-    u8  pending:1;
-    u16 notify_vcpu_id;    /* VCPU for local delivery notification */
-    u32 port;
+    unsigned char state;   /* ECS_* */
+#ifndef NDEBUG
+    unsigned char old_state; /* State when taking lock in write mode. */
+#endif
+    unsigned char xen_consumer:XEN_CONSUMER_BITS; /* Consumer in Xen if != 0 */
+    evtchn_port_t port;
     union {
         struct {
             domid_t remote_domid;
-        } unbound;     /* state == ECS_UNBOUND */
+        } unbound;          /* state == ECS_UNBOUND */
         struct {
             evtchn_port_t  remote_port;
             struct domain *remote_dom;
-        } interdomain; /* state == ECS_INTERDOMAIN */
+        } interdomain;      /* state == ECS_INTERDOMAIN */
         struct {
-            u32            irq;
+            unsigned int   irq;
             evtchn_port_t  next_port;
             evtchn_port_t  prev_port;
-        } pirq;        /* state == ECS_PIRQ */
-        u16 virq;      /* state == ECS_VIRQ */
+        } pirq;             /* state == ECS_PIRQ */
+        unsigned int virq;  /* state == ECS_VIRQ */
     } u;
-    u8 priority;
-#ifndef NDEBUG
-    u8 old_state;      /* State when taking lock in write mode. */
-#endif
-    u32 fifo_lastq;    /* Data for fifo events identifying last queue. */
+
+    bool pending;                  /* FIFO event channels only. */
+    unsigned char priority;        /* FIFO event channels only. */
+    unsigned short notify_vcpu_id; /* VCPU for local delivery notification */
+    uint32_t fifo_lastq;           /* Data for identifying last queue. */
+
 #ifdef CONFIG_XSM
     union {
 #ifdef XSM_NEED_GENERIC_EVTCHN_SSID
@@ -133,7 +135,7 @@ struct evtchn
          * allocations, and on 64-bit platforms with only FLASK enabled,
          * reduces the size of struct evtchn.
          */
-        u32 flask_sid;
+        uint32_t flask_sid;
 #endif
     } ssid;
 #endif

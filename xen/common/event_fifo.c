@@ -200,7 +200,7 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
      */
     if ( unlikely(!word) )
     {
-        evtchn->pending = 1;
+        evtchn->pending = true;
         return;
     }
 
@@ -535,7 +535,7 @@ static void setup_ports(struct domain *d, unsigned int prev_evtchns)
         evtchn = evtchn_from_port(d, port);
 
         if ( guest_test_bit(d, port, &shared_info(d, evtchn_pending)) )
-            evtchn->pending = 1;
+            evtchn->pending = true;
 
         evtchn_fifo_set_priority(d, evtchn, EVTCHN_FIFO_PRIORITY_DEFAULT);
     }
