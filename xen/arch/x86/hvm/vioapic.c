@@ -260,7 +260,7 @@ static void vioapic_write_redirent(
         pent->fields.remote_irr = 0;
     else if ( !ent.fields.mask &&
               !ent.fields.remote_irr &&
-              hvm_irq->gsi_assert_count[idx] )
+              hvm_irq->gsi_assert_count[gsi] )
     {
         pent->fields.remote_irr = 1;
         vioapic_deliver(vioapic, idx);
