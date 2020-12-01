@@ -59,7 +59,6 @@ struct xsm_operations {
     int (*evtchn_interdomain) (struct domain *d1, struct evtchn *chn1,
                                         struct domain *d2, struct evtchn *chn2);
     void (*evtchn_close_post) (struct evtchn *chn);
-    /* Note: Next hook may be called with 'chn' set to NULL. See call site. */
     int (*evtchn_send) (struct domain *d, struct evtchn *chn);
     int (*evtchn_status) (struct domain *d, struct evtchn *chn);
     int (*evtchn_reset) (struct domain *d1, struct domain *d2);

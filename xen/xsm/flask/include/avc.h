@@ -91,8 +91,6 @@ int avc_has_perm_noaudit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
 int avc_has_perm(u32 ssid, u32 tsid, u16 tclass, u32 requested,
                                              struct avc_audit_data *auditdata);
 
-void avc_prealloc(void);
-
 /* Exported to selinuxfs */
 struct xen_flask_hash_stats;
 int avc_get_hash_stats(struct xen_flask_hash_stats *arg);
