@@ -740,12 +740,6 @@ int evtchn_send(struct domain *ld, unsigned int lport)
     if ( !port_is_valid(ld, lport) )
         return -EINVAL;
 
-    /*
-     * As the call further down needs to avoid allocations (due to running
-     * with IRQs off), give XSM a chance to pre-allocate if needed.
-     */
-    xsm_evtchn_send(XSM_HOOK, ld, NULL);
-
     lchn = evtchn_from_port(ld, lport);
 
     evtchn_read_lock(lchn);
