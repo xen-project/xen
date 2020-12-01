@@ -357,7 +357,7 @@ static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 			memcpy_fromio(&smbios3, q, sizeof(smbios3));
 			if (memcmp(smbios3.anchor, "_SM3_", 5) ||
 			    smbios3.length < sizeof(smbios3) ||
-			    q < p + 0x10000 - smbios3.length ||
+			    q > p + 0x10000 - smbios3.length ||
 			    !dmi_checksum(q, smbios3.length))
 				smbios3.length = 0;
 		}
