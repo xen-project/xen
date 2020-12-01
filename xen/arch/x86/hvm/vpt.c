@@ -400,7 +400,7 @@ int pt_update_irq(struct vcpu *v)
                  * associated with the timer.
                  */
                 time_cb *cb = NULL;
-                void *cb_priv;
+                void *cb_priv = NULL;
 
                 pt_vcpu_lock(v);
                 /* Make sure the timer is still on the list. */
