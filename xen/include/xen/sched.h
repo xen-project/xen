@@ -114,8 +114,7 @@ struct evtchn
 #ifndef NDEBUG
     u8 old_state;      /* State when taking lock in write mode. */
 #endif
-    u8 last_priority;
-    u16 last_vcpu_id;
+    u32 fifo_lastq;    /* Data for fifo events identifying last queue. */
 #ifdef CONFIG_XSM
     union {
 #ifdef XSM_NEED_GENERIC_EVTCHN_SSID
