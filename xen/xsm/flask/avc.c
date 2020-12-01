@@ -24,9 +24,7 @@
 #include <xen/prefetch.h>
 #include <xen/kernel.h>
 #include <xen/sched.h>
-#include <xen/cpu.h>
 #include <xen/init.h>
-#include <xen/percpu.h>
 #include <xen/rcupdate.h>
 #include <asm/atomic.h>
 #include <asm/current.h>
@@ -343,79 +341,17 @@ static inline int avc_reclaim_node(void)
     return ecx;
 }
 
-static struct avc_node *new_node(void)
-{
-    struct avc_node *node = xzalloc(struct avc_node);
-
-    if ( node )
-    {
-        INIT_RCU_HEAD(&node->rhead);
-        INIT_HLIST_NODE(&node->list);
-        avc_cache_stats_incr(allocations);
-    }
-
-    return node;
-}
-
-/*
- * avc_has_perm_noaudit() may consume up to two nodes, which we may not be
- * able to obtain from the allocator at that point. Since the is merely
- * about caching earlier decisions, allow for (just) one pre-allocated node.
- */
-static DEFINE_PER_CPU(struct avc_node *, prealloc_node);
-
-void avc_prealloc(void)
-{
-    struct avc_node **prealloc = &this_cpu(prealloc_node);
-
-    if ( !*prealloc )
-        *prealloc = new_node();
-}
-
-static int cpu_callback(struct notifier_block *nfb, unsigned long action,
-                        void *hcpu)
-{
-    unsigned int cpu = (unsigned long)hcpu;
-    struct avc_node **prealloc = &per_cpu(prealloc_node, cpu);
-
-    if ( action == CPU_DEAD && *prealloc )
-    {
-        xfree(*prealloc);
-        *prealloc = NULL;
-        avc_cache_stats_incr(frees);
-    }
-
-    return NOTIFY_DONE;
-}
-
-static struct notifier_block cpu_nfb = {
-    .notifier_call = cpu_callback,
-    .priority = 99
-};
-
-static int __init cpu_nfb_init(void)
-{
-    register_cpu_notifier(&cpu_nfb);
-    return 0;
-}
-__initcall(cpu_nfb_init);
-
 static struct avc_node *avc_alloc_node(void)
 {
-    struct avc_node *node, **prealloc = &this_cpu(prealloc_node);
+    struct avc_node *node;
 
-    node = *prealloc;
-    *prealloc = NULL;
+    node = xzalloc(struct avc_node);
+    if (!node)
+        goto out;
 
-    if ( !node )
-    {
-        /* Must not call xmalloc() & Co with IRQs off. */
-        if ( !local_irq_is_enabled() )
-            goto out;
-        node = new_node();
-        if ( !node )
-            goto out;
-    }
+    INIT_RCU_HEAD(&node->rhead);
+    INIT_HLIST_NODE(&node->list);
+    avc_cache_stats_incr(allocations);
 
     atomic_inc(&avc_cache.active_nodes);
     if ( atomic_read(&avc_cache.active_nodes) > avc_cache_threshold )
