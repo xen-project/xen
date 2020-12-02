@@ -3189,6 +3189,7 @@ int schedule_cpu_rm(unsigned int cpu)
             /* Adjust cpu masks of resources (old and new). */
             cpumask_clear_cpu(cpu_iter, sr->cpus);
             cpumask_set_cpu(cpu_iter, sr_new[idx]->cpus);
+            cpumask_set_cpu(cpu_iter, &sched_res_mask);
 
             /* Init timer. */
             init_timer(&sr_new[idx]->s_timer, s_timer_fn, NULL, cpu_iter);
