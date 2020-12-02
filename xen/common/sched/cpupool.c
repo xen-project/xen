@@ -151,7 +151,7 @@ static void __init cpupool_gran_init(void)
 
 unsigned int cpupool_get_granularity(const struct cpupool *c)
 {
-    return c ? sched_granularity : 1;
+    return c ? c->sched_gran : 1;
 }
 
 static void free_cpupool_struct(struct cpupool *c)
@@ -289,6 +289,7 @@ static struct cpupool *cpupool_create(
     }
     c->sched->cpupool = c;
     c->gran = opt_sched_granularity;
+    c->sched_gran = sched_granularity;
 
     *q = c;
 

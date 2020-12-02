@@ -514,6 +514,7 @@ struct cpupool
     struct scheduler *sched;
     atomic_t         refcnt;
     enum sched_gran  gran;
+    unsigned int     sched_gran;     /* Number of cpus per sched-item. */
 };
 
 static inline cpumask_t *cpupool_domain_master_cpumask(const struct domain *d)
