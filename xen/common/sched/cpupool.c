@@ -11,15 +11,15 @@
  * (C) 2009, Juergen Gross, Fujitsu Technology Solutions
  */
 
-#include <xen/lib.h>
-#include <xen/init.h>
+#include <xen/cpu.h>
 #include <xen/cpumask.h>
+#include <xen/init.h>
+#include <xen/keyhandler.h>
+#include <xen/lib.h>
 #include <xen/param.h>
 #include <xen/percpu.h>
 #include <xen/sched.h>
 #include <xen/warning.h>
-#include <xen/keyhandler.h>
-#include <xen/cpu.h>
 
 #include "private.h"
 
