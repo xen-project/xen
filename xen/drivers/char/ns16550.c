@@ -8,6 +8,15 @@
  * Copyright (c) 2003-2005, K A Fraser
  */
 
+/*
+ * The PCI part of the code in this file currently is only known to
+ * work on x86. Undo this hack once the logic has been suitably
+ * abstracted.
+ */
+#if defined(CONFIG_HAS_PCI) && defined(CONFIG_X86)
+# define NS16550_PCI
+#endif
+
 #include <xen/console.h>
 #include <xen/init.h>
 #include <xen/irq.h>
@@ -16,7 +25,7 @@
 #include <xen/timer.h>
 #include <xen/serial.h>
 #include <xen/iocap.h>
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/pci_ids.h>
@@ -51,7 +60,7 @@ static struct ns16550 {
     unsigned int timeout_ms;
     bool_t intr_works;
     bool_t dw_usr_bsy;
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
     /* PCI card parameters. */
     bool_t pb_bdf_enable;   /* if =1, pb-bdf effective, port behind bridge */
     bool_t ps_bdf_enable;   /* if =1, ps_bdf effective, port on pci card */
@@ -66,7 +75,7 @@ static struct ns16550 {
 #endif
 } ns16550_com[2] = { { 0 } };
 
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
 struct ns16550_config {
     u16 vendor_id;
     u16 dev_id;
@@ -256,7 +265,7 @@ static int ns16550_getc(struct serial_port *port, char *pc)
 
 static void pci_serial_early_init(struct ns16550 *uart)
 {
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
     if ( !uart->ps_bdf_enable || uart->io_base >= 0x10000 )
         return;
 
@@ -355,7 +364,7 @@ static void __init ns16550_init_preirq(struct serial_port *port)
 
 static void __init ns16550_init_irq(struct serial_port *port)
 {
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
     struct ns16550 *uart = port->uart;
 
     if ( uart->msi )
@@ -397,7 +406,7 @@ static void __init ns16550_init_postirq(struct serial_port *port)
     uart->timeout_ms = max_t(
         unsigned int, 1, (bits * uart->fifo_size * 1000) / uart->baud);
 
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
     if ( uart->bar || uart->ps_bdf_enable )
     {
         if ( uart->param && uart->param->mmio &&
@@ -477,7 +486,7 @@ static void ns16550_suspend(struct serial_port *port)
 
     stop_timer(&uart->timer);
 
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
     if ( uart->bar )
        uart->cr = pci_conf_read16(PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
                                   uart->ps_bdf[2]), PCI_COMMAND);
@@ -486,7 +495,7 @@ static void ns16550_suspend(struct serial_port *port)
 
 static void _ns16550_resume(struct serial_port *port)
 {
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
     struct ns16550 *uart = port->uart;
 
     if ( uart->bar )
