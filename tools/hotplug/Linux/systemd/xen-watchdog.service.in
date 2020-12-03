@@ -6,7 +6,9 @@ ConditionPathExists=/proc/xen/capabilities
 
 [Service]
 Type=forking
-ExecStart=@sbindir@/xenwatchdogd 30 15
+Environment="XENWATCHDOGD_ARGS=30 15"
+EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
+ExecStart=@sbindir@/xenwatchdogd $XENWATCHDOGD_ARGS
 KillSignal=USR1
 
 [Install]

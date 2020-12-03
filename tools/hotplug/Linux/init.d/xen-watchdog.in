@@ -19,6 +19,11 @@
 
 . @XEN_SCRIPT_DIR@/hotplugpath.sh
 
+xencommons_config=@CONFIG_DIR@/@CONFIG_LEAF_DIR@
+
+test -f $xencommons_config/xencommons && . $xencommons_config/xencommons
+
+test -n "$XENWATCHDOGD_ARGS" || XENWATCHDOGD_ARGS='30 15'
 DAEMON=${sbindir}/xenwatchdogd
 base=$(basename $DAEMON)
 
@@ -46,7 +51,7 @@ start() {
 	local r
 	echo -n $"Starting domain watchdog daemon: "
 
-	$DAEMON 30 15
+	$DAEMON $XENWATCHDOGD_ARGS
 	r=$?
 	[ "$r" -eq 0 ] && success $"$base startup" || failure $"$base startup"
 	echo
