@@ -577,6 +577,69 @@ static unsigned int vpmask_nr(const struct hypercall_vpmask *vpmask)
     return bitmap_weight(vpmask->mask, HVM_MAX_VCPUS);
 }
 
+#define HV_VPSET_BANK_SIZE \
+    sizeof_field(struct hv_vpset, bank_contents[0])
+
+#define HV_VPSET_SIZE(banks)   \
+    (offsetof(struct hv_vpset, bank_contents) + \
+     ((banks) * HV_VPSET_BANK_SIZE))
+
+#define HV_VPSET_MAX_BANKS \
+    (sizeof_field(struct hv_vpset, valid_bank_mask) * 8)
+
+union hypercall_vpset {
+    struct hv_vpset set;
+    uint8_t pad[HV_VPSET_SIZE(HV_VPSET_MAX_BANKS)];
+};
+
+static DEFINE_PER_CPU(union hypercall_vpset, hypercall_vpset);
+
+static unsigned int hv_vpset_nr_banks(struct hv_vpset *vpset)
+{
+    return hweight64(vpset->valid_bank_mask);
+}
+
+static uint16_t hv_vpset_to_vpmask(const struct hv_vpset *set,
+                                   struct hypercall_vpmask *vpmask)
+{
+#define NR_VPS_PER_BANK (HV_VPSET_BANK_SIZE * 8)
+
+    switch ( set->format )
+    {
+    case HV_GENERIC_SET_ALL:
+        vpmask_fill(vpmask);
+        return 0;
+
+    case HV_GENERIC_SET_SPARSE_4K:
+    {
+        uint64_t bank_mask;
+        unsigned int vp, bank = 0;
+
+        vpmask_empty(vpmask);
+        for ( vp = 0, bank_mask = set->valid_bank_mask;
+              bank_mask;
+              vp += NR_VPS_PER_BANK, bank_mask >>= 1 )
+        {
+            if ( bank_mask & 1 )
+            {
+                uint64_t mask = set->bank_contents[bank];
+
+                vpmask_set(vpmask, vp, mask);
+                bank++;
+            }
+        }
+        return 0;
+    }
+
+    default:
+        break;
+    }
+
+    return -EINVAL;
+
+#undef NR_VPS_PER_BANK
+}
+
 /*
  * Windows should not issue the hypercalls requiring this callback in the
  * case where vcpu_id would exceed the size of the mask.
@@ -643,6 +706,78 @@ static int hvcall_flush(const union hypercall_input *input,
     {
         vpmask_empty(vpmask);
         vpmask_set(vpmask, 0, input_params.vcpu_mask);
+    }
+
+    /*
+     * A false return means that another vcpu is currently trying
+     * a similar operation, so back off.
+     */
+    if ( !paging_flush_tlb(need_flush, vpmask) )
+        return -ERESTART;
+
+    output->rep_complete = input->rep_count;
+
+    return 0;
+}
+
+static int hvcall_flush_ex(const union hypercall_input *input,
+                           union hypercall_output *output,
+                           paddr_t input_params_gpa,
+                           paddr_t output_params_gpa)
+{
+    struct hypercall_vpmask *vpmask = &this_cpu(hypercall_vpmask);
+    struct {
+        uint64_t address_space;
+        uint64_t flags;
+        struct hv_vpset set;
+    } input_params;
+
+    /* These hypercalls should never use the fast-call convention. */
+    if ( input->fast )
+        return -EINVAL;
+
+    /* Get input parameters. */
+    if ( hvm_copy_from_guest_phys(&input_params, input_params_gpa,
+                                  sizeof(input_params)) != HVMTRANS_okay )
+        return -EINVAL;
+
+    if ( input_params.flags & HV_FLUSH_ALL_PROCESSORS )
+        vpmask_fill(vpmask);
+    else
+    {
+        union hypercall_vpset *vpset = &this_cpu(hypercall_vpset);
+        struct hv_vpset *set = &vpset->set;
+        size_t size;
+        int rc;
+
+        *set = input_params.set;
+        if ( set->format == HV_GENERIC_SET_SPARSE_4K )
+        {
+            unsigned long offset = offsetof(typeof(input_params),
+                                            set.bank_contents);
+
+            size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
+
+            if ( offsetof(typeof(*vpset), set.bank_contents[0]) + size >
+                 sizeof(*vpset) )
+            {
+                ASSERT_UNREACHABLE();
+                return -EINVAL;
+            }
+
+            if ( hvm_copy_from_guest_phys(&set->bank_contents[0],
+                                          input_params_gpa + offset,
+                                          size) != HVMTRANS_okay)
+                return -EINVAL;
+
+            size += sizeof(*set);
+        }
+        else
+            size = sizeof(*set);
+
+        rc = hv_vpset_to_vpmask(set, vpmask);
+        if ( rc )
+            return rc;
     }
 
     /*
@@ -768,6 +903,12 @@ int viridian_hypercall(struct cpu_user_regs *regs)
     case HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST:
         rc = hvcall_flush(&input, &output, input_params_gpa,
                           output_params_gpa);
+        break;
+
+    case HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX:
+    case HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX:
+        rc = hvcall_flush_ex(&input, &output, input_params_gpa,
+                             output_params_gpa);
         break;
 
     case HVCALL_SEND_IPI:
