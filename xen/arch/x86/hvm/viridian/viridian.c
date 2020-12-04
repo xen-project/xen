@@ -551,6 +551,26 @@ static bool vpmask_test(const struct hypercall_vpmask *vpmask,
     return test_bit(vp, vpmask->mask);
 }
 
+static unsigned int vpmask_first(const struct hypercall_vpmask *vpmask)
+{
+    return find_first_bit(vpmask->mask, HVM_MAX_VCPUS);
+}
+
+static unsigned int vpmask_next(const struct hypercall_vpmask *vpmask,
+                                unsigned int vp)
+{
+    /*
+     * If vp + 1 > HVM_MAX_VCPUS then find_next_bit() will return
+     * HVM_MAX_VCPUS, ensuring the for_each_vp ( ... ) loop terminates.
+     */
+    return find_next_bit(vpmask->mask, HVM_MAX_VCPUS, vp + 1);
+}
+
+#define for_each_vp(vpmask, vp) \
+	for ( (vp) = vpmask_first(vpmask); \
+	      (vp) < HVM_MAX_VCPUS; \
+	      (vp) = vpmask_next(vpmask, vp) )
+
 /*
  * Windows should not issue the hypercalls requiring this callback in the
  * case where vcpu_id would exceed the size of the mask.
@@ -631,13 +651,21 @@ static int hvcall_flush(const union hypercall_input *input,
     return 0;
 }
 
+static void send_ipi(struct hypercall_vpmask *vpmask, uint8_t vector)
+{
+    struct domain *currd = current->domain;
+    unsigned int vp;
+
+    for_each_vp ( vpmask, vp )
+        vlapic_set_irq(vcpu_vlapic(currd->vcpu[vp]), vector, 0);
+}
+
 static int hvcall_ipi(const union hypercall_input *input,
                       union hypercall_output *output,
                       paddr_t input_params_gpa,
                       paddr_t output_params_gpa)
 {
-    struct domain *currd = current->domain;
-    struct vcpu *v;
+    struct hypercall_vpmask *vpmask = &this_cpu(hypercall_vpmask);
     uint32_t vector;
     uint64_t vcpu_mask;
 
@@ -676,16 +704,10 @@ static int hvcall_ipi(const union hypercall_input *input,
     if ( vector < 0x10 || vector > 0xff )
         return -EINVAL;
 
-    for_each_vcpu ( currd, v )
-    {
-        if ( v->vcpu_id >= (sizeof(vcpu_mask) * 8) )
-            return -EINVAL;
+    vpmask_empty(vpmask);
+    vpmask_set(vpmask, 0, vcpu_mask);
 
-        if ( !(vcpu_mask & (1ul << v->vcpu_id)) )
-            continue;
-
-        vlapic_set_irq(vcpu_vlapic(v), vector, 0);
-    }
+    send_ipi(vpmask, vector);
 
     return 0;
 }
