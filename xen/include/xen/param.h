@@ -116,8 +116,7 @@ extern struct param_hypfs __paramhypfs_start[], __paramhypfs_end[];
         { .hypfs.e.type = XEN_HYPFS_TYPE_STRING, \
           .hypfs.e.encoding = XEN_HYPFS_ENC_PLAIN, \
           .hypfs.e.name = (nam), \
-          .hypfs.e.read = hypfs_read_leaf, \
-          .hypfs.e.write = hypfs_write_custom, \
+          .hypfs.e.funcs = &hypfs_custom_wr_funcs, \
           .init_leaf = (initfunc), \
           .func = (variable) }
 #define boolean_runtime_only_param(nam, variable) \
@@ -127,8 +126,7 @@ extern struct param_hypfs __paramhypfs_start[], __paramhypfs_end[];
           .hypfs.e.name = (nam), \
           .hypfs.e.size = sizeof(variable), \
           .hypfs.e.max_size = sizeof(variable), \
-          .hypfs.e.read = hypfs_read_leaf, \
-          .hypfs.e.write = hypfs_write_bool, \
+          .hypfs.e.funcs = &hypfs_bool_wr_funcs, \
           .hypfs.u.content = &(variable) }
 #define integer_runtime_only_param(nam, variable) \
     __paramfs __parfs_##variable = \
@@ -137,8 +135,7 @@ extern struct param_hypfs __paramhypfs_start[], __paramhypfs_end[];
           .hypfs.e.name = (nam), \
           .hypfs.e.size = sizeof(variable), \
           .hypfs.e.max_size = sizeof(variable), \
-          .hypfs.e.read = hypfs_read_leaf, \
-          .hypfs.e.write = hypfs_write_leaf, \
+          .hypfs.e.funcs = &hypfs_leaf_wr_funcs, \
           .hypfs.u.content = &(variable) }
 #define size_runtime_only_param(nam, variable) \
     __paramfs __parfs_##variable = \
@@ -147,8 +144,7 @@ extern struct param_hypfs __paramhypfs_start[], __paramhypfs_end[];
           .hypfs.e.name = (nam), \
           .hypfs.e.size = sizeof(variable), \
           .hypfs.e.max_size = sizeof(variable), \
-          .hypfs.e.read = hypfs_read_leaf, \
-          .hypfs.e.write = hypfs_write_leaf, \
+          .hypfs.e.funcs = &hypfs_leaf_wr_funcs, \
           .hypfs.u.content = &(variable) }
 #define string_runtime_only_param(nam, variable) \
     __paramfs __parfs_##variable = \
@@ -157,8 +153,7 @@ extern struct param_hypfs __paramhypfs_start[], __paramhypfs_end[];
           .hypfs.e.name = (nam), \
           .hypfs.e.size = 0, \
           .hypfs.e.max_size = sizeof(variable), \
-          .hypfs.e.read = hypfs_read_leaf, \
-          .hypfs.e.write = hypfs_write_leaf, \
+          .hypfs.e.funcs = &hypfs_leaf_wr_funcs, \
           .hypfs.u.content = &(variable) }
 
 #else

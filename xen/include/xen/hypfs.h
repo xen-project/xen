@@ -7,6 +7,32 @@
 #include <public/hypfs.h>
 
 struct hypfs_entry_leaf;
+struct hypfs_entry;
+
+/*
+ * Per-node callbacks:
+ *
+ * The callbacks are always called with the hypfs lock held.
+ *
+ * The read() callback is used to return the contents of a node (either
+ * directory or leaf). It is NOT used to get directory entries during traversal
+ * of the tree.
+ *
+ * The write() callback is used to modify the contents of a node. Writing
+ * directories is not supported (this means all nodes are added at boot time).
+ */
+struct hypfs_funcs {
+    int (*read)(const struct hypfs_entry *entry,
+                XEN_GUEST_HANDLE_PARAM(void) uaddr);
+    int (*write)(struct hypfs_entry_leaf *leaf,
+                 XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
+};
+
+extern const struct hypfs_funcs hypfs_dir_funcs;
+extern const struct hypfs_funcs hypfs_leaf_ro_funcs;
+extern const struct hypfs_funcs hypfs_leaf_wr_funcs;
+extern const struct hypfs_funcs hypfs_bool_wr_funcs;
+extern const struct hypfs_funcs hypfs_custom_wr_funcs;
 
 struct hypfs_entry {
     unsigned short type;
@@ -15,10 +41,7 @@ struct hypfs_entry {
     unsigned int max_size;
     const char *name;
     struct list_head list;
-    int (*read)(const struct hypfs_entry *entry,
-                XEN_GUEST_HANDLE_PARAM(void) uaddr);
-    int (*write)(struct hypfs_entry_leaf *leaf,
-                 XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
+    const struct hypfs_funcs *funcs;
 };
 
 struct hypfs_entry_leaf {
@@ -42,7 +65,7 @@ struct hypfs_entry_dir {
         .e.size = 0,                              \
         .e.max_size = 0,                          \
         .e.list = LIST_HEAD_INIT(var.e.list),     \
-        .e.read = hypfs_read_dir,                 \
+        .e.funcs = &hypfs_dir_funcs,              \
         .dirlist = LIST_HEAD_INIT(var.dirlist),   \
     }
 
@@ -52,7 +75,7 @@ struct hypfs_entry_dir {
         .e.encoding = XEN_HYPFS_ENC_PLAIN,        \
         .e.name = (nam),                          \
         .e.max_size = (msz),                      \
-        .e.read = hypfs_read_leaf,                \
+        .e.funcs = &hypfs_leaf_ro_funcs,          \
     }
 
 /* Content and size need to be set via hypfs_string_set_reference(). */
@@ -72,35 +95,37 @@ static inline void hypfs_string_set_reference(struct hypfs_entry_leaf *leaf,
     leaf->e.size = strlen(str) + 1;
 }
 
-#define HYPFS_FIXEDSIZE_INIT(var, typ, nam, contvar, wr) \
-    struct hypfs_entry_leaf __read_mostly var = {        \
-        .e.type = (typ),                                 \
-        .e.encoding = XEN_HYPFS_ENC_PLAIN,               \
-        .e.name = (nam),                                 \
-        .e.size = sizeof(contvar),                       \
-        .e.max_size = (wr) ? sizeof(contvar) : 0,        \
-        .e.read = hypfs_read_leaf,                       \
-        .e.write = (wr),                                 \
-        .u.content = &(contvar),                         \
+#define HYPFS_FIXEDSIZE_INIT(var, typ, nam, contvar, fn, wr) \
+    struct hypfs_entry_leaf __read_mostly var = {            \
+        .e.type = (typ),                                     \
+        .e.encoding = XEN_HYPFS_ENC_PLAIN,                   \
+        .e.name = (nam),                                     \
+        .e.size = sizeof(contvar),                           \
+        .e.max_size = (wr) ? sizeof(contvar) : 0,            \
+        .e.funcs = (fn),                                     \
+        .u.content = &(contvar),                             \
     }
 
 #define HYPFS_UINT_INIT(var, nam, contvar)                       \
-    HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_UINT, nam, contvar, NULL)
+    HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_UINT, nam, contvar, \
+                         &hypfs_leaf_ro_funcs, 0)
 #define HYPFS_UINT_INIT_WRITABLE(var, nam, contvar)              \
     HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_UINT, nam, contvar, \
-                         hypfs_write_leaf)
+                         &hypfs_leaf_wr_funcs, 1)
 
 #define HYPFS_INT_INIT(var, nam, contvar)                        \
-    HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_INT, nam, contvar, NULL)
+    HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_INT, nam, contvar,  \
+                         &hypfs_leaf_ro_funcs, 0)
 #define HYPFS_INT_INIT_WRITABLE(var, nam, contvar)               \
     HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_INT, nam, contvar, \
-                         hypfs_write_leaf)
+                         &hypfs_leaf_wr_funcs, 1)
 
 #define HYPFS_BOOL_INIT(var, nam, contvar)                       \
-    HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_BOOL, nam, contvar, NULL)
+    HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_BOOL, nam, contvar, \
+                         &hypfs_leaf_ro_funcs, 0)
 #define HYPFS_BOOL_INIT_WRITABLE(var, nam, contvar)              \
     HYPFS_FIXEDSIZE_INIT(var, XEN_HYPFS_TYPE_BOOL, nam, contvar, \
-                         hypfs_write_bool)
+                         &hypfs_bool_wr_funcs, 1)
 
 extern struct hypfs_entry_dir hypfs_root;
 
@@ -112,6 +137,8 @@ int hypfs_read_dir(const struct hypfs_entry *entry,
                    XEN_GUEST_HANDLE_PARAM(void) uaddr);
 int hypfs_read_leaf(const struct hypfs_entry *entry,
                     XEN_GUEST_HANDLE_PARAM(void) uaddr);
+int hypfs_write_deny(struct hypfs_entry_leaf *leaf,
+                     XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
 int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
                      XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
 int hypfs_write_bool(struct hypfs_entry_leaf *leaf,
