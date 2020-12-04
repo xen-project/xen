@@ -445,6 +445,13 @@
 #define LIBXL_HAVE_DISK_SAFE_REMOVE 1
 
 /*
+ * LIBXL_HAVE_VIRIDIAN_EX_PROCESSOR_MASKS indicates that the
+ * 'ex_processor_masks' value is present in the viridian enlightenment
+ * enumeration.
+ */
+#define LIBXL_HAVE_VIRIDIAN_EX_PROCESSOR_MASKS 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

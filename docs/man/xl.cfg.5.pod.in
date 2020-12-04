@@ -2318,6 +2318,14 @@ This set incorporates use of a hypercall for interprocessor interrupts.
 This enlightenment may improve performance of Windows guests with multiple
 virtual CPUs.
 
+=item B<ex_processor_masks>
+
+This set enables new hypercall variants taking a variably-sized sparse
+B<Virtual Processor Set> as an argument, rather than a simple 64-bit
+mask. Hence this enlightenment must be specified for guests with more
+than 64 vCPUs if B<hcall_remote_tlb_flush> and/or B<hcall_ipi> are also
+specified.
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which
