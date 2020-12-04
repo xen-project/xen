@@ -441,7 +441,7 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
 
     spin_lock(&d->event_lock);
 
-    if ( v->virq_to_evtchn[virq] != 0 )
+    if ( read_atomic(&v->virq_to_evtchn[virq]) )
         ERROR_EXIT(-EEXIST);
 
     if ( port != 0 )
@@ -469,7 +469,8 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
 
     evtchn_write_unlock(chn);
 
-    v->virq_to_evtchn[virq] = bind->port = port;
+    bind->port = port;
+    write_atomic(&v->virq_to_evtchn[virq], port);
 
  out:
     spin_unlock(&d->event_lock);
@@ -655,9 +656,9 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     case ECS_VIRQ:
         for_each_vcpu ( d1, v )
         {
-            if ( v->virq_to_evtchn[chn1->u.virq] != port1 )
+            if ( read_atomic(&v->virq_to_evtchn[chn1->u.virq]) != port1 )
                 continue;
-            v->virq_to_evtchn[chn1->u.virq] = 0;
+            write_atomic(&v->virq_to_evtchn[chn1->u.virq], 0);
             spin_barrier(&v->virq_lock);
         }
         break;
@@ -796,7 +797,7 @@ bool evtchn_virq_enabled(const struct vcpu *v, unsigned int virq)
     if ( virq_is_global(virq) && v->vcpu_id )
         v = domain_vcpu(v->domain, 0);
 
-    return v->virq_to_evtchn[virq];
+    return read_atomic(&v->virq_to_evtchn[virq]);
 }
 
 void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
@@ -810,7 +811,7 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
 
     spin_lock_irqsave(&v->virq_lock, flags);
 
-    port = v->virq_to_evtchn[virq];
+    port = read_atomic(&v->virq_to_evtchn[virq]);
     if ( unlikely(port == 0) )
         goto out;
 
@@ -844,7 +845,7 @@ void send_guest_global_virq(struct domain *d, uint32_t virq)
 
     spin_lock_irqsave(&v->virq_lock, flags);
 
-    port = v->virq_to_evtchn[virq];
+    port = read_atomic(&v->virq_to_evtchn[virq]);
     if ( unlikely(port == 0) )
         goto out;
 
