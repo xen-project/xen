@@ -1402,7 +1402,6 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
 {
     irq_guest_action_t *action;
     cpumask_t           cpu_eoi_map;
-    int                 irq;
 
     if ( !(desc->status & IRQ_GUEST) )
     {
@@ -1411,7 +1410,6 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
     }
 
     action = (irq_guest_action_t *)desc->action;
-    irq = desc - irq_desc;
 
     if ( unlikely(!test_and_clear_bool(pirq->masked)) ||
          unlikely(--action->in_flight != 0) )
@@ -1531,7 +1529,6 @@ int pirq_shared(struct domain *d, int pirq)
 
 int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
 {
-    unsigned int        irq;
     struct irq_desc         *desc;
     irq_guest_action_t *action, *newaction = NULL;
     int                 rc = 0;
@@ -1548,7 +1545,6 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
     }
 
     action = (irq_guest_action_t *)desc->action;
-    irq = desc - irq_desc;
 
     if ( !(desc->status & IRQ_GUEST) )
     {
@@ -1663,13 +1659,11 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
 static irq_guest_action_t *__pirq_guest_unbind(
     struct domain *d, struct pirq *pirq, struct irq_desc *desc)
 {
-    unsigned int        irq;
     irq_guest_action_t *action;
     cpumask_t           cpu_eoi_map;
     int                 i;
 
     action = (irq_guest_action_t *)desc->action;
-    irq = desc - irq_desc;
 
     if ( unlikely(action == NULL) )
     {
