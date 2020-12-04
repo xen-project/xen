@@ -459,7 +459,7 @@ static void stream_continue(libxl__egc *egc,
         while (process_record(egc, stream))
             ; /*
                * Nothing! process_record() helpfully tells us if no specific
-               * futher actions have been set up, in which case we want to go
+               * further actions have been set up, in which case we want to go
                * ahead and process the next record.
                */
         break;

@@ -1,5 +1,5 @@
 /*
- * parse xen-specific informations out of elf kernel binaries.
+ * parse xen-specific information out of elf kernel binaries.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

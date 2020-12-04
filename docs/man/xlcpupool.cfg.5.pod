@@ -106,7 +106,7 @@ means that cpus 2,3,5 will be member of the cpupool.
 means that cpus 0,2,3 and 5 will be member of the cpupool. A "node:" or
 "nodes:" modifier can be used. E.g., "0,node:1,nodes:2-3,^10-13" means
 that pcpus 0, plus all the cpus of NUMA nodes 1,2,3 with the exception
-of cpus 10,11,12,13 will be memeber of the cpupool.
+of cpus 10,11,12,13 will be members of the cpupool.
 
 =back
 

@@ -154,7 +154,7 @@ struct cmd_spec cmd_table[] = {
       "-h  Print this help.\n"
       "-c  Leave domain running after creating the snapshot.\n"
       "-p  Leave domain paused after creating the snapshot.\n"
-      "-D  Store the domain id in the configration."
+      "-D  Store the domain id in the configuration."
     },
     { "migrate",
       &main_migrate, 0, 1,

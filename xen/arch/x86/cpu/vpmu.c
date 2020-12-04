@@ -680,7 +680,7 @@ static void pvpmu_finish(struct domain *d, xen_pmu_params_t *params)
         vcpu_unpause(v);
 }
 
-/* Dump some vpmu informations on console. Used in keyhandler dump_domains(). */
+/* Dump some vpmu information to console. Used in keyhandler dump_domains(). */
 void vpmu_dump(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);

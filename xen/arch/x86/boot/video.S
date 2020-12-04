@@ -177,7 +177,7 @@ dac_set:
         movb    $0, _param(PARAM_LFB_COLORS+7)
 
 dac_done:
-# get protected mode interface informations
+# get protected mode interface information
         movw    $0x4f0a, %ax
         xorw    %bx, %bx
         xorw    %di, %di

@@ -2385,7 +2385,7 @@ If B<videoram> is set less than 128MB, an error will be triggered.
 
 =item B<stdvga=BOOLEAN>
 
-Speficies a standard VGA card with VBE (VESA BIOS Extensions) as the
+Specifies a standard VGA card with VBE (VESA BIOS Extensions) as the
 emulated graphics device. If your guest supports VBE 2.0 or
 later (e.g. Windows XP onwards) then you should enable this.
 stdvga supports more video ram and bigger resolutions than Cirrus.

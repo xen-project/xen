@@ -507,7 +507,7 @@ class security
 #
 class version
 {
-# Extra informations (-unstable).
+# Extra information (-unstable).
     xen_extraversion
 # Compile information of the hypervisor.
     xen_compile_info

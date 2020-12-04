@@ -214,7 +214,7 @@ struct iommu_domain
 	struct list_head		list;
 };
 
-/* Xen: Describes informations required for a Xen domain */
+/* Xen: Describes information required for a Xen domain */
 struct arm_smmu_xen_domain {
 	spinlock_t			lock;
 	/* List of context (i.e iommu_domain) associated to this domain */

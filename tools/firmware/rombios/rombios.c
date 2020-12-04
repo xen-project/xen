@@ -2607,7 +2607,7 @@ void ata_detect( )
   write_byte(ebda_seg,&EbdaData->ata.channels[3].irq,11);
 #endif
 #if BX_MAX_ATA_INTERFACES > 4
-#error Please fill the ATA interface informations
+#error Please fill the ATA interface information
 #endif
 
   // Device detection

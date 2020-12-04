@@ -3246,7 +3246,7 @@ x86_decode(
             case 0x23: /* mov reg,dr */
                 /*
                  * Mov to/from cr/dr ignore the encoding of Mod, and behave as
-                 * if they were encoded as reg/reg instructions.  No futher
+                 * if they were encoded as reg/reg instructions.  No further
                  * disp/SIB bytes are fetched.
                  */
                 modrm_mod = 3;

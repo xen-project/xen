@@ -170,7 +170,7 @@ static int MP_processor_info_x(struct mpc_config_processor *m,
 	if (num_processors >= 8 && hotplug
 	    && genapic.name == apic_default.name) {
 		printk_once(XENLOG_WARNING
-			    "WARNING: CPUs limit of 8 reached - ignoring futher processors\n");
+			    "WARNING: CPUs limit of 8 reached - ignoring further processors\n");
 		unaccounted_cpus = true;
 		return -ENOSPC;
 	}

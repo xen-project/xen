@@ -1578,7 +1578,7 @@ List vsnd devices for a domain.
 Creates a new keyboard device in the domain specified by I<domain-id>.
 I<vkb-device> describes the device to attach, using the same format as the
 B<VKB_SPEC_STRING> string in the domain config file. See L<xl.cfg(5)>
-for more informations.
+for more information.
 
 =item B<vkb-detach> I<domain-id> I<devid>
 
