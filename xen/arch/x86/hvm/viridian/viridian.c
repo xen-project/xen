@@ -581,13 +581,72 @@ static int hvcall_flush(const union hypercall_input *input,
     return 0;
 }
 
+static int hvcall_ipi(const union hypercall_input *input,
+                      union hypercall_output *output,
+                      paddr_t input_params_gpa,
+                      paddr_t output_params_gpa)
+{
+    struct domain *currd = current->domain;
+    struct vcpu *v;
+    uint32_t vector;
+    uint64_t vcpu_mask;
+
+    /* Get input parameters. */
+    if ( input->fast )
+    {
+        if ( input_params_gpa >> 32 )
+            return -EINVAL;
+
+        vector = input_params_gpa;
+        vcpu_mask = output_params_gpa;
+    }
+    else
+    {
+        struct {
+            uint32_t vector;
+            uint8_t target_vtl;
+            uint8_t reserved_zero[3];
+            uint64_t vcpu_mask;
+        } input_params;
+
+        if ( hvm_copy_from_guest_phys(&input_params, input_params_gpa,
+                                      sizeof(input_params)) != HVMTRANS_okay )
+            return -EINVAL;
+
+        if ( input_params.target_vtl ||
+             input_params.reserved_zero[0] ||
+             input_params.reserved_zero[1] ||
+             input_params.reserved_zero[2] )
+            return -EINVAL;
+
+        vector = input_params.vector;
+        vcpu_mask = input_params.vcpu_mask;
+    }
+
+    if ( vector < 0x10 || vector > 0xff )
+        return -EINVAL;
+
+    for_each_vcpu ( currd, v )
+    {
+        if ( v->vcpu_id >= (sizeof(vcpu_mask) * 8) )
+            return -EINVAL;
+
+        if ( !(vcpu_mask & (1ul << v->vcpu_id)) )
+            continue;
+
+        vlapic_set_irq(vcpu_vlapic(v), vector, 0);
+    }
+
+    return 0;
+}
+
 int viridian_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
     int mode = hvm_guest_x86_mode(curr);
     unsigned long input_params_gpa, output_params_gpa;
-    uint16_t status = HV_STATUS_SUCCESS;
+    int rc = 0;
     union hypercall_input input;
     union hypercall_output output = {};
 
@@ -600,11 +659,13 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         input_params_gpa = regs->rdx;
         output_params_gpa = regs->r8;
         break;
+
     case 4:
         input.raw = (regs->rdx << 32) | regs->eax;
         input_params_gpa = (regs->rbx << 32) | regs->ecx;
         output_params_gpa = (regs->rdi << 32) | regs->esi;
         break;
+
     default:
         goto out;
     }
@@ -616,92 +677,18 @@ int viridian_hypercall(struct cpu_user_regs *regs)
          * See section 14.5.1 of the specification.
          */
         do_sched_op(SCHEDOP_yield, guest_handle_from_ptr(NULL, void));
-        status = HV_STATUS_SUCCESS;
         break;
 
     case HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE:
     case HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST:
-    {
-        int rc = hvcall_flush(&input, &output, input_params_gpa,
-                              output_params_gpa);
-
-        switch ( rc )
-        {
-        case 0:
-            break;
-
-        case -ERESTART:
-            return HVM_HCALL_preempted;
-
-        default:
-            ASSERT_UNREACHABLE();
-            /* Fallthrough */
-        case -EINVAL:
-            status = HV_STATUS_INVALID_PARAMETER;
-            break;
-        }
-
+        rc = hvcall_flush(&input, &output, input_params_gpa,
+                          output_params_gpa);
         break;
-    }
 
     case HVCALL_SEND_IPI:
-    {
-        struct vcpu *v;
-        uint32_t vector;
-        uint64_t vcpu_mask;
-
-        status = HV_STATUS_INVALID_PARAMETER;
-
-        /* Get input parameters. */
-        if ( input.fast )
-        {
-            if ( input_params_gpa >> 32 )
-                break;
-
-            vector = input_params_gpa;
-            vcpu_mask = output_params_gpa;
-        }
-        else
-        {
-            struct {
-                uint32_t vector;
-                uint8_t target_vtl;
-                uint8_t reserved_zero[3];
-                uint64_t vcpu_mask;
-            } input_params;
-
-            if ( hvm_copy_from_guest_phys(&input_params, input_params_gpa,
-                                          sizeof(input_params)) !=
-                 HVMTRANS_okay )
-                break;
-
-            if ( input_params.target_vtl ||
-                 input_params.reserved_zero[0] ||
-                 input_params.reserved_zero[1] ||
-                 input_params.reserved_zero[2] )
-                break;
-
-            vector = input_params.vector;
-            vcpu_mask = input_params.vcpu_mask;
-        }
-
-        if ( vector < 0x10 || vector > 0xff )
-            break;
-
-        for_each_vcpu ( currd, v )
-        {
-            if ( v->vcpu_id >= (sizeof(vcpu_mask) * 8) )
-                break;
-
-            if ( !(vcpu_mask & (1ul << v->vcpu_id)) )
-                continue;
-
-            vlapic_set_irq(vcpu_vlapic(v), vector, 0);
-        }
-
-        status = HV_STATUS_SUCCESS;
+        rc = hvcall_ipi(&input, &output, input_params_gpa,
+                        output_params_gpa);
         break;
-    }
 
     default:
         gprintk(XENLOG_WARNING, "unimplemented hypercall %04x\n",
@@ -714,12 +701,31 @@ int viridian_hypercall(struct cpu_user_regs *regs)
          * Given that return a status of 'invalid code' has not so far
          * caused any problems it's not worth logging.
          */
-        status = HV_STATUS_INVALID_HYPERCALL_CODE;
+        rc = -EOPNOTSUPP;
         break;
     }
 
  out:
-    output.result = status;
+    switch ( rc )
+    {
+    case 0:
+        break;
+
+    case -ERESTART:
+        return HVM_HCALL_preempted;
+
+    case -EOPNOTSUPP:
+        output.result = HV_STATUS_INVALID_HYPERCALL_CODE;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        /* Fallthrough */
+    case -EINVAL:
+        output.result = HV_STATUS_INVALID_PARAMETER;
+        break;
+    }
+
     switch ( mode )
     {
     case 8:
