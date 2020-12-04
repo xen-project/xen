@@ -860,6 +860,75 @@ static int hvcall_ipi(const union hypercall_input *input,
     return 0;
 }
 
+static int hvcall_ipi_ex(const union hypercall_input *input,
+                         union hypercall_output *output,
+                         paddr_t input_params_gpa,
+                         paddr_t output_params_gpa)
+{
+    struct hypercall_vpmask *vpmask = &this_cpu(hypercall_vpmask);
+    struct {
+        uint32_t vector;
+        uint8_t target_vtl;
+        uint8_t reserved_zero[3];
+        struct hv_vpset set;
+    } input_params;
+    union hypercall_vpset *vpset = &this_cpu(hypercall_vpset);
+    struct hv_vpset *set = &vpset->set;
+    size_t size;
+    int rc;
+
+    /* These hypercalls should never use the fast-call convention. */
+    if ( input->fast )
+        return -EINVAL;
+
+    /* Get input parameters. */
+    if ( hvm_copy_from_guest_phys(&input_params, input_params_gpa,
+                                  sizeof(input_params)) != HVMTRANS_okay )
+        return -EINVAL;
+
+    if ( input_params.target_vtl ||
+         input_params.reserved_zero[0] ||
+         input_params.reserved_zero[1] ||
+         input_params.reserved_zero[2] )
+        return HV_STATUS_INVALID_PARAMETER;
+
+    if ( input_params.vector < 0x10 || input_params.vector > 0xff )
+        return HV_STATUS_INVALID_PARAMETER;
+
+    *set = input_params.set;
+    if ( set->format == HV_GENERIC_SET_SPARSE_4K )
+    {
+        unsigned long offset = offsetof(typeof(input_params),
+                                        set.bank_contents);
+
+        size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
+
+        if ( offsetof(typeof(*vpset), set.bank_contents[0]) + size >
+             sizeof(*vpset) )
+        {
+            ASSERT_UNREACHABLE();
+            return -EINVAL;
+        }
+
+        if ( hvm_copy_from_guest_phys(&set->bank_contents,
+                                      input_params_gpa + offset,
+                                      size) != HVMTRANS_okay)
+            return -EINVAL;
+
+        size += sizeof(*set);
+    }
+    else
+        size = sizeof(*set);
+
+    rc = hv_vpset_to_vpmask(set, vpmask);
+    if ( rc )
+        return rc;
+
+    send_ipi(vpmask, input_params.vector);
+
+    return 0;
+}
+
 int viridian_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -914,6 +983,11 @@ int viridian_hypercall(struct cpu_user_regs *regs)
     case HVCALL_SEND_IPI:
         rc = hvcall_ipi(&input, &output, input_params_gpa,
                         output_params_gpa);
+        break;
+
+    case HVCALL_SEND_IPI_EX:
+        rc = hvcall_ipi_ex(&input, &output, input_params_gpa,
+                           output_params_gpa);
         break;
 
     default:
