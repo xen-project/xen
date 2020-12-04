@@ -27,22 +27,32 @@ CHECK_hypfs_dirlistentry;
 const struct hypfs_funcs hypfs_dir_funcs = {
     .read = hypfs_read_dir,
     .write = hypfs_write_deny,
+    .getsize = hypfs_getsize,
+    .findentry = hypfs_dir_findentry,
 };
 const struct hypfs_funcs hypfs_leaf_ro_funcs = {
     .read = hypfs_read_leaf,
     .write = hypfs_write_deny,
+    .getsize = hypfs_getsize,
+    .findentry = hypfs_leaf_findentry,
 };
 const struct hypfs_funcs hypfs_leaf_wr_funcs = {
     .read = hypfs_read_leaf,
     .write = hypfs_write_leaf,
+    .getsize = hypfs_getsize,
+    .findentry = hypfs_leaf_findentry,
 };
 const struct hypfs_funcs hypfs_bool_wr_funcs = {
     .read = hypfs_read_leaf,
     .write = hypfs_write_bool,
+    .getsize = hypfs_getsize,
+    .findentry = hypfs_leaf_findentry,
 };
 const struct hypfs_funcs hypfs_custom_wr_funcs = {
     .read = hypfs_read_leaf,
     .write = hypfs_write_custom,
+    .getsize = hypfs_getsize,
+    .findentry = hypfs_leaf_findentry,
 };
 
 static DEFINE_RWLOCK(hypfs_lock);
@@ -97,6 +107,8 @@ static int add_entry(struct hypfs_entry_dir *parent, struct hypfs_entry *new)
 
     ASSERT(new->funcs->read);
     ASSERT(new->funcs->write);
+    ASSERT(new->funcs->getsize);
+    ASSERT(new->funcs->findentry);
 
     hypfs_write_lock();
 
@@ -176,15 +188,41 @@ static int hypfs_get_path_user(char *buf,
     return 0;
 }
 
+struct hypfs_entry *hypfs_leaf_findentry(const struct hypfs_entry_dir *dir,
+                                         const char *name,
+                                         unsigned int name_len)
+{
+    return ERR_PTR(-ENOTDIR);
+}
+
+struct hypfs_entry *hypfs_dir_findentry(const struct hypfs_entry_dir *dir,
+                                        const char *name,
+                                        unsigned int name_len)
+{
+    struct hypfs_entry *entry;
+
+    list_for_each_entry ( entry, &dir->dirlist, list )
+    {
+        int cmp = strncmp(name, entry->name, name_len);
+
+        if ( cmp < 0 )
+            return ERR_PTR(-ENOENT);
+
+        if ( !cmp && strlen(entry->name) == name_len )
+            return entry;
+    }
+
+    return ERR_PTR(-ENOENT);
+}
+
 static struct hypfs_entry *hypfs_get_entry_rel(struct hypfs_entry_dir *dir,
                                                const char *path)
 {
     const char *end;
     struct hypfs_entry *entry;
     unsigned int name_len;
-    bool again = true;
 
-    while ( again )
+    for ( ; ; )
     {
         if ( dir->e.type != XEN_HYPFS_TYPE_DIR )
             return ERR_PTR(-ENOENT);
@@ -197,28 +235,12 @@ static struct hypfs_entry *hypfs_get_entry_rel(struct hypfs_entry_dir *dir,
             end = strchr(path, '\0');
         name_len = end - path;
 
-        again = false;
+        entry = dir->e.funcs->findentry(dir, path, name_len);
+        if ( IS_ERR(entry) || !*end )
+            return entry;
 
-        list_for_each_entry ( entry, &dir->dirlist, list )
-        {
-            int cmp = strncmp(path, entry->name, name_len);
-            struct hypfs_entry_dir *d = container_of(entry,
-                                                     struct hypfs_entry_dir, e);
-
-            if ( cmp < 0 )
-                return ERR_PTR(-ENOENT);
-            if ( !cmp && strlen(entry->name) == name_len )
-            {
-                if ( !*end )
-                    return entry;
-
-                again = true;
-                dir = d;
-                path = end + 1;
-
-                break;
-            }
-        }
+        path = end + 1;
+        dir = container_of(entry, struct hypfs_entry_dir, e);
     }
 
     return ERR_PTR(-ENOENT);
@@ -232,12 +254,17 @@ static struct hypfs_entry *hypfs_get_entry(const char *path)
     return hypfs_get_entry_rel(&hypfs_root, path + 1);
 }
 
+unsigned int hypfs_getsize(const struct hypfs_entry *entry)
+{
+    return entry->size;
+}
+
 int hypfs_read_dir(const struct hypfs_entry *entry,
                    XEN_GUEST_HANDLE_PARAM(void) uaddr)
 {
     const struct hypfs_entry_dir *d;
     const struct hypfs_entry *e;
-    unsigned int size = entry->size;
+    unsigned int size = entry->funcs->getsize(entry);
 
     ASSERT(this_cpu(hypfs_locked) != hypfs_unlocked);
 
@@ -252,7 +279,7 @@ int hypfs_read_dir(const struct hypfs_entry *entry,
         direntry.e.pad = 0;
         direntry.e.type = e->type;
         direntry.e.encoding = e->encoding;
-        direntry.e.content_len = e->size;
+        direntry.e.content_len = e->funcs->getsize(e);
         direntry.e.max_write_len = e->max_size;
         direntry.off_next = list_is_last(&e->list, &d->dirlist) ? 0 : e_len;
         if ( copy_to_guest(uaddr, &direntry, 1) )
@@ -275,18 +302,20 @@ int hypfs_read_leaf(const struct hypfs_entry *entry,
                     XEN_GUEST_HANDLE_PARAM(void) uaddr)
 {
     const struct hypfs_entry_leaf *l;
+    unsigned int size = entry->funcs->getsize(entry);
 
     ASSERT(this_cpu(hypfs_locked) != hypfs_unlocked);
 
     l = container_of(entry, const struct hypfs_entry_leaf, e);
 
-    return copy_to_guest(uaddr, l->u.content, entry->size) ? -EFAULT: 0;
+    return copy_to_guest(uaddr, l->u.content, size) ?  -EFAULT : 0;
 }
 
 static int hypfs_read(const struct hypfs_entry *entry,
                       XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned long ulen)
 {
     struct xen_hypfs_direntry e;
+    unsigned int size = entry->funcs->getsize(entry);
     long ret = -EINVAL;
 
     if ( ulen < sizeof(e) )
@@ -295,7 +324,7 @@ static int hypfs_read(const struct hypfs_entry *entry,
     e.pad = 0;
     e.type = entry->type;
     e.encoding = entry->encoding;
-    e.content_len = entry->size;
+    e.content_len = size;
     e.max_write_len = entry->max_size;
 
     ret = -EFAULT;
@@ -303,7 +332,7 @@ static int hypfs_read(const struct hypfs_entry *entry,
         goto out;
 
     ret = -ENOBUFS;
-    if ( ulen < entry->size + sizeof(e) )
+    if ( ulen < size + sizeof(e) )
         goto out;
 
     guest_handle_add_offset(uaddr, sizeof(e));
@@ -319,15 +348,16 @@ int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
 {
     char *buf;
     int ret;
+    struct hypfs_entry *e = &leaf->e;
 
     ASSERT(this_cpu(hypfs_locked) == hypfs_write_locked);
     ASSERT(leaf->e.max_size);
 
-    if ( ulen > leaf->e.max_size )
+    if ( ulen > e->max_size )
         return -ENOSPC;
 
-    if ( leaf->e.type != XEN_HYPFS_TYPE_STRING &&
-         leaf->e.type != XEN_HYPFS_TYPE_BLOB && ulen != leaf->e.size )
+    if ( e->type != XEN_HYPFS_TYPE_STRING &&
+         e->type != XEN_HYPFS_TYPE_BLOB && ulen != e->funcs->getsize(e) )
         return -EDOM;
 
     buf = xmalloc_array(char, ulen);
@@ -339,14 +369,14 @@ int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
         goto out;
 
     ret = -EINVAL;
-    if ( leaf->e.type == XEN_HYPFS_TYPE_STRING &&
-         leaf->e.encoding == XEN_HYPFS_ENC_PLAIN &&
+    if ( e->type == XEN_HYPFS_TYPE_STRING &&
+         e->encoding == XEN_HYPFS_ENC_PLAIN &&
          memchr(buf, 0, ulen) != (buf + ulen - 1) )
         goto out;
 
     ret = 0;
     memcpy(leaf->u.write_ptr, buf, ulen);
-    leaf->e.size = ulen;
+    e->size = ulen;
 
  out:
     xfree(buf);
@@ -360,7 +390,7 @@ int hypfs_write_bool(struct hypfs_entry_leaf *leaf,
 
     ASSERT(this_cpu(hypfs_locked) == hypfs_write_locked);
     ASSERT(leaf->e.type == XEN_HYPFS_TYPE_BOOL &&
-           leaf->e.size == sizeof(bool) &&
+           leaf->e.funcs->getsize(&leaf->e) == sizeof(bool) &&
            leaf->e.max_size == sizeof(bool) );
 
     if ( ulen != leaf->e.max_size )

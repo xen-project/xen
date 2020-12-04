@@ -78,6 +78,7 @@ XEN_ERRNO(EBUSY,	16)	/* Device or resource busy */
 XEN_ERRNO(EEXIST,	17)	/* File exists */
 XEN_ERRNO(EXDEV,	18)	/* Cross-device link */
 XEN_ERRNO(ENODEV,	19)	/* No such device */
+XEN_ERRNO(ENOTDIR,	20)	/* Not a directory */
 XEN_ERRNO(EISDIR,	21)	/* Is a directory */
 XEN_ERRNO(EINVAL,	22)	/* Invalid argument */
 XEN_ERRNO(ENFILE,	23)	/* File table overflow */
