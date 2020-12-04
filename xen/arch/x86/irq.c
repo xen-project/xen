@@ -1042,6 +1042,11 @@ typedef struct {
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
+static irq_guest_action_t *guest_action(const struct irq_desc *desc)
+{
+    return desc->status & IRQ_GUEST ? (void *)desc->action : NULL;
+}
+
 /*
  * Stack of interrupts awaiting EOI on each CPU. These must be popped in
  * order, as only the current highest-priority pending irq can be EOIed.
@@ -1111,10 +1116,8 @@ static void irq_guest_eoi_timer_fn(void *data)
 
     spin_lock_irq(&desc->lock);
     
-    if ( !(desc->status & IRQ_GUEST) )
+    if ( !(action = guest_action(desc)) )
         goto out;
-
-    action = (irq_guest_action_t *)desc->action;
 
     ASSERT(action->ack_type != ACKTYPE_NONE);
 
@@ -1351,16 +1354,15 @@ static void flush_ready_eoi(void)
     pending_eoi_sp(peoi) = sp+1;
 }
 
-static void __set_eoi_ready(struct irq_desc *desc)
+static void __set_eoi_ready(const struct irq_desc *desc)
 {
-    irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
+    irq_guest_action_t *action = guest_action(desc);
     struct pending_eoi *peoi = this_cpu(pending_eoi);
     int                 irq, sp;
 
     irq = desc - irq_desc;
 
-    if ( !(desc->status & IRQ_GUEST) ||
-         (action->in_flight != 0) ||
+    if ( !action || action->in_flight ||
          !cpumask_test_and_clear_cpu(smp_processor_id(),
                                      action->cpu_eoi_map) )
         return;
@@ -1400,18 +1402,11 @@ void pirq_guest_eoi(struct pirq *pirq)
 
 void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
 {
-    irq_guest_action_t *action;
+    irq_guest_action_t *action = guest_action(desc);
     cpumask_t           cpu_eoi_map;
 
-    if ( !(desc->status & IRQ_GUEST) )
-    {
-        spin_unlock_irq(&desc->lock);
-        return;
-    }
-
-    action = (irq_guest_action_t *)desc->action;
-
-    if ( unlikely(!test_and_clear_bool(pirq->masked)) ||
+    if ( unlikely(!action) ||
+         unlikely(!test_and_clear_bool(pirq->masked)) ||
          unlikely(--action->in_flight != 0) )
     {
         spin_unlock_irq(&desc->lock);
@@ -1510,8 +1505,8 @@ static int irq_acktype(const struct irq_desc *desc)
 
 int pirq_shared(struct domain *d, int pirq)
 {
-    struct irq_desc         *desc;
-    irq_guest_action_t *action;
+    struct irq_desc    *desc;
+    const irq_guest_action_t *action;
     unsigned long       flags;
     int                 shared;
 
@@ -1519,8 +1514,8 @@ int pirq_shared(struct domain *d, int pirq)
     if ( desc == NULL )
         return 0;
 
-    action = (irq_guest_action_t *)desc->action;
-    shared = ((desc->status & IRQ_GUEST) && (action->nr_guests > 1));
+    action = guest_action(desc);
+    shared = (action && (action->nr_guests > 1));
 
     spin_unlock_irqrestore(&desc->lock, flags);
 
@@ -1544,9 +1539,7 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         goto out;
     }
 
-    action = (irq_guest_action_t *)desc->action;
-
-    if ( !(desc->status & IRQ_GUEST) )
+    if ( !(action = guest_action(desc)) )
     {
         if ( desc->action != NULL )
         {
@@ -1659,20 +1652,17 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
 static irq_guest_action_t *__pirq_guest_unbind(
     struct domain *d, struct pirq *pirq, struct irq_desc *desc)
 {
-    irq_guest_action_t *action;
+    irq_guest_action_t *action = guest_action(desc);
     cpumask_t           cpu_eoi_map;
     int                 i;
-
-    action = (irq_guest_action_t *)desc->action;
 
     if ( unlikely(action == NULL) )
     {
         dprintk(XENLOG_G_WARNING, "dom%d: pirq %d: desc->action is NULL!\n",
                 d->domain_id, pirq->pirq);
+        BUG_ON(!(desc->status & IRQ_GUEST));
         return NULL;
     }
-
-    BUG_ON(!(desc->status & IRQ_GUEST));
 
     for ( i = 0; (i < action->nr_guests) && (action->guest[i] != d); i++ )
         continue;
@@ -1793,14 +1783,12 @@ static bool pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
     desc = pirq_spin_lock_irq_desc(pirq, NULL);
     BUG_ON(desc == NULL);
 
-    if ( !(desc->status & IRQ_GUEST) )
-        goto out;
-
-    action = (irq_guest_action_t *)desc->action;
+    action = guest_action(desc);
     if ( unlikely(action == NULL) )
     {
-        dprintk(XENLOG_G_WARNING, "dom%d: pirq %d: desc->action is NULL!\n",
-            d->domain_id, pirq->pirq);
+        if ( desc->status & IRQ_GUEST )
+            dprintk(XENLOG_G_WARNING, "%pd: pirq %d: desc->action is NULL!\n",
+                    d, pirq->pirq);
         goto out;
     }
 
@@ -1827,7 +1815,7 @@ static bool pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
 
 static void do_IRQ_guest(struct irq_desc *desc, unsigned int vector)
 {
-    irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
+    irq_guest_action_t *action = guest_action(desc);
     unsigned int        i;
     struct pending_eoi *peoi = this_cpu(pending_eoi);
 
@@ -2444,7 +2432,6 @@ static void dump_irqs(unsigned char key)
 {
     int i, irq, pirq;
     struct irq_desc *desc;
-    irq_guest_action_t *action;
     struct domain *d;
     const struct pirq *info;
     unsigned long flags;
@@ -2454,6 +2441,8 @@ static void dump_irqs(unsigned char key)
 
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
+        const irq_guest_action_t *action;
+
         if ( !(irq & 0x1f) )
             process_pending_softirqs();
 
@@ -2473,10 +2462,9 @@ static void dump_irqs(unsigned char key)
         if ( ssid )
             printk("Z=%-25s ", ssid);
 
-        if ( desc->status & IRQ_GUEST )
+        action = guest_action(desc);
+        if ( action )
         {
-            action = (irq_guest_action_t *)desc->action;
-
             printk("in-flight=%d%c",
                    action->in_flight, action->nr_guests ? ' ' : '\n');
 
@@ -2651,17 +2639,15 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
 void fixup_eoi(void)
 {
     unsigned int irq, sp;
-    struct irq_desc *desc;
-    irq_guest_action_t *action;
     struct pending_eoi *peoi;
 
     /* Clean up cpu_eoi_map of every interrupt to exclude this CPU. */
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
-        desc = irq_to_desc(irq);
-        if ( !(desc->status & IRQ_GUEST) )
+        irq_guest_action_t *action = guest_action(irq_to_desc(irq));
+
+        if ( !action )
             continue;
-        action = (irq_guest_action_t *)desc->action;
         cpumask_clear_cpu(smp_processor_id(), action->cpu_eoi_map);
     }
 
