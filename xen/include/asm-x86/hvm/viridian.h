@@ -55,10 +55,20 @@ struct viridian_time_ref_count
     int64_t off;
 };
 
+enum {
+    _HCALL_spin_wait,
+    _HCALL_flush,
+    _HCALL_flush_ex,
+    _HCALL_ipi,
+    _HCALL_ipi_ex,
+    _HCALL_nr /* must be last */
+};
+
 struct viridian_domain
 {
     union hv_guest_os_id guest_os_id;
     union hv_vp_assist_page_msr hypercall_gpa;
+    DECLARE_BITMAP(hypercall_flags, _HCALL_nr);
     struct viridian_time_ref_count time_ref_count;
     struct viridian_page reference_tsc;
 };
