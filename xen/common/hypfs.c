@@ -187,7 +187,7 @@ static struct hypfs_entry *hypfs_get_entry_rel(struct hypfs_entry_dir *dir,
     while ( again )
     {
         if ( dir->e.type != XEN_HYPFS_TYPE_DIR )
-            return NULL;
+            return ERR_PTR(-ENOENT);
 
         if ( !*path )
             return &dir->e;
@@ -206,7 +206,7 @@ static struct hypfs_entry *hypfs_get_entry_rel(struct hypfs_entry_dir *dir,
                                                      struct hypfs_entry_dir, e);
 
             if ( cmp < 0 )
-                return NULL;
+                return ERR_PTR(-ENOENT);
             if ( !cmp && strlen(entry->name) == name_len )
             {
                 if ( !*end )
@@ -221,13 +221,13 @@ static struct hypfs_entry *hypfs_get_entry_rel(struct hypfs_entry_dir *dir,
         }
     }
 
-    return NULL;
+    return ERR_PTR(-ENOENT);
 }
 
 static struct hypfs_entry *hypfs_get_entry(const char *path)
 {
     if ( path[0] != '/' )
-        return NULL;
+        return ERR_PTR(-EINVAL);
 
     return hypfs_get_entry_rel(&hypfs_root, path + 1);
 }
@@ -454,9 +454,9 @@ long do_hypfs_op(unsigned int cmd,
         goto out;
 
     entry = hypfs_get_entry(path);
-    if ( !entry )
+    if ( IS_ERR(entry) )
     {
-        ret = -ENOENT;
+        ret = PTR_ERR(entry);
         goto out;
     }
 
