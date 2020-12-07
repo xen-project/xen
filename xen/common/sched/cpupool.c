@@ -16,6 +16,7 @@
 #include <xen/init.h>
 #include <xen/keyhandler.h>
 #include <xen/lib.h>
+#include <xen/list.h>
 #include <xen/param.h>
 #include <xen/percpu.h>
 #include <xen/sched.h>
@@ -23,13 +24,10 @@
 
 #include "private.h"
 
-#define for_each_cpupool(ptr)    \
-    for ((ptr) = &cpupool_list; *(ptr) != NULL; (ptr) = &((*(ptr))->next))
-
 struct cpupool *cpupool0;                /* Initial cpupool with Dom0 */
 cpumask_t cpupool_free_cpus;             /* cpus not in any cpupool */
 
-static struct cpupool *cpupool_list;     /* linked list, sorted by poolid */
+static LIST_HEAD(cpupool_list);          /* linked list, sorted by poolid */
 
 static int cpupool_moving_cpu = -1;
 static struct cpupool *cpupool_cpu_moving = NULL;
@@ -189,15 +187,15 @@ static struct cpupool *alloc_cpupool_struct(void)
  */
 static struct cpupool *__cpupool_find_by_id(unsigned int id, bool exact)
 {
-    struct cpupool **q;
+    struct cpupool *q;
 
     ASSERT(spin_is_locked(&cpupool_lock));
 
-    for_each_cpupool(q)
-        if ( (*q)->cpupool_id >= id )
-            break;
+    list_for_each_entry(q, &cpupool_list, list)
+        if ( q->cpupool_id == id || (!exact && q->cpupool_id > id) )
+            return q;
 
-    return (!exact || (*q == NULL) || ((*q)->cpupool_id == id)) ? *q : NULL;
+    return NULL;
 }
 
 static struct cpupool *cpupool_find_by_id(unsigned int poolid)
@@ -246,8 +244,7 @@ static struct cpupool *cpupool_create(
     unsigned int poolid, unsigned int sched_id, int *perr)
 {
     struct cpupool *c;
-    struct cpupool **q;
-    unsigned int last = 0;
+    struct cpupool *q;
 
     *perr = -ENOMEM;
     if ( (c = alloc_cpupool_struct()) == NULL )
@@ -260,23 +257,42 @@ static struct cpupool *cpupool_create(
 
     spin_lock(&cpupool_lock);
 
-    for_each_cpupool(q)
+    if ( poolid != CPUPOOLID_NONE )
     {
-        last = (*q)->cpupool_id;
-        if ( (poolid != CPUPOOLID_NONE) && (last >= poolid) )
-            break;
-    }
-    if ( *q != NULL )
-    {
-        if ( (*q)->cpupool_id == poolid )
+        q = __cpupool_find_by_id(poolid, false);
+        if ( !q )
+            list_add_tail(&c->list, &cpupool_list);
+        else
         {
-            *perr = -EEXIST;
-            goto err;
+            list_add_tail(&c->list, &q->list);
+            if ( q->cpupool_id == poolid )
+            {
+                *perr = -EEXIST;
+                goto err;
+            }
         }
-        c->next = *q;
+
+        c->cpupool_id = poolid;
+    }
+    else
+    {
+        /* Cpupool 0 is created with specified id at boot and never removed. */
+        ASSERT(!list_empty(&cpupool_list));
+
+        q = list_last_entry(&cpupool_list, struct cpupool, list);
+        /* In case of wrap search for first free id. */
+        if ( q->cpupool_id == CPUPOOLID_NONE - 1 )
+        {
+            list_for_each_entry(q, &cpupool_list, list)
+                if ( q->cpupool_id + 1 != list_next_entry(q, list)->cpupool_id )
+                    break;
+        }
+
+        list_add(&c->list, &q->list);
+
+        c->cpupool_id = q->cpupool_id + 1;
     }
 
-    c->cpupool_id = (poolid == CPUPOOLID_NONE) ? (last + 1) : poolid;
     if ( poolid == 0 )
     {
         c->sched = scheduler_get_default();
@@ -291,8 +307,6 @@ static struct cpupool *cpupool_create(
     c->gran = opt_sched_granularity;
     c->sched_gran = sched_granularity;
 
-    *q = c;
-
     spin_unlock(&cpupool_lock);
 
     debugtrace_printk("Created cpupool %u with scheduler %s (%s)\n",
@@ -302,6 +316,8 @@ static struct cpupool *cpupool_create(
     return c;
 
  err:
+    list_del(&c->list);
+
     spin_unlock(&cpupool_lock);
     free_cpupool_struct(c);
     return NULL;
@@ -312,27 +328,19 @@ static struct cpupool *cpupool_create(
  * possible failures:
  * - pool still in use
  * - cpus still assigned to pool
- * - pool not in list
  */
 static int cpupool_destroy(struct cpupool *c)
 {
-    struct cpupool **q;
-
     spin_lock(&cpupool_lock);
-    for_each_cpupool(q)
-        if ( *q == c )
-            break;
-    if ( *q != c )
-    {
-        spin_unlock(&cpupool_lock);
-        return -ENOENT;
-    }
+
     if ( (c->n_dom != 0) || cpumask_weight(c->cpu_valid) )
     {
         spin_unlock(&cpupool_lock);
         return -EBUSY;
     }
-    *q = c->next;
+
+    list_del(&c->list);
+
     spin_unlock(&cpupool_lock);
 
     cpupool_put(c);
@@ -732,17 +740,17 @@ static int cpupool_cpu_remove_prologue(unsigned int cpu)
  */
 static void cpupool_cpu_remove_forced(unsigned int cpu)
 {
-    struct cpupool **c;
+    struct cpupool *c;
     int ret;
     unsigned int master_cpu = sched_get_resource_cpu(cpu);
 
-    for_each_cpupool ( c )
+    list_for_each_entry(c, &cpupool_list, list)
     {
-        if ( cpumask_test_cpu(master_cpu, (*c)->cpu_valid) )
+        if ( cpumask_test_cpu(master_cpu, c->cpu_valid) )
         {
-            ret = cpupool_unassign_cpu_start(*c, master_cpu);
+            ret = cpupool_unassign_cpu_start(c, master_cpu);
             BUG_ON(ret);
-            ret = cpupool_unassign_cpu_finish(*c);
+            ret = cpupool_unassign_cpu_finish(c);
             BUG_ON(ret);
         }
     }
@@ -929,7 +937,7 @@ const cpumask_t *cpupool_valid_cpus(const struct cpupool *pool)
 void dump_runq(unsigned char key)
 {
     s_time_t         now = NOW();
-    struct cpupool **c;
+    struct cpupool *c;
 
     spin_lock(&cpupool_lock);
 
@@ -944,12 +952,12 @@ void dump_runq(unsigned char key)
         schedule_dump(NULL);
     }
 
-    for_each_cpupool(c)
+    list_for_each_entry(c, &cpupool_list, list)
     {
-        printk("Cpupool %u:\n", (*c)->cpupool_id);
-        printk("Cpus: %*pbl\n", CPUMASK_PR((*c)->cpu_valid));
-        sched_gran_print((*c)->gran, cpupool_get_granularity(*c));
-        schedule_dump(*c);
+        printk("Cpupool %u:\n", c->cpupool_id);
+        printk("Cpus: %*pbl\n", CPUMASK_PR(c->cpu_valid));
+        sched_gran_print(c->gran, cpupool_get_granularity(c));
+        schedule_dump(c);
     }
 
     spin_unlock(&cpupool_lock);

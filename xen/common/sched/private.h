@@ -8,8 +8,9 @@
 #ifndef __XEN_SCHED_IF_H__
 #define __XEN_SCHED_IF_H__
 
-#include <xen/percpu.h>
 #include <xen/err.h>
+#include <xen/list.h>
+#include <xen/percpu.h>
 #include <xen/rcupdate.h>
 
 /* cpus currently in no cpupool */
@@ -510,6 +511,7 @@ struct cpupool
     unsigned int     n_dom;
     cpumask_var_t    cpu_valid;      /* all cpus assigned to pool */
     cpumask_var_t    res_valid;      /* all scheduling resources of pool */
+    struct list_head list;
     struct cpupool   *next;
     struct scheduler *sched;
     atomic_t         refcnt;
