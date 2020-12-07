@@ -56,7 +56,6 @@ struct hvm_vioapic {
     };
 };
 
-#define hvm_vioapic_size(cnt) offsetof(struct hvm_vioapic, redirtbl[cnt])
 #define domain_vioapic(d, i) ((d)->arch.hvm.vioapic[i])
 #define vioapic_domain(v) ((v)->domain)
 

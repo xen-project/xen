@@ -622,9 +622,9 @@ void vioapic_reset(struct domain *d)
         unsigned int nr_pins = vioapic->nr_pins, base_gsi = vioapic->base_gsi;
         unsigned int pin;
 
-        memset(vioapic, 0, hvm_vioapic_size(nr_pins));
+        memset(vioapic, 0, offsetof(typeof(*vioapic), redirtbl));
         for ( pin = 0; pin < nr_pins; pin++ )
-            vioapic->redirtbl[pin].fields.mask = 1;
+            vioapic->redirtbl[pin] = (union vioapic_redir_entry){ .fields.mask = 1 };
 
         if ( !is_hardware_domain(d) )
         {
@@ -685,7 +685,8 @@ int vioapic_init(struct domain *d)
         }
 
         if ( (domain_vioapic(d, i) =
-              xmalloc_bytes(hvm_vioapic_size(nr_pins))) == NULL )
+              xmalloc_flex_struct(struct hvm_vioapic, redirtbl,
+                                  nr_pins)) == NULL )
         {
             vioapic_free(d, nr_vioapics);
             return -ENOMEM;
