@@ -3233,26 +3233,25 @@ struct scheduler *scheduler_get_default(void)
     return &ops;
 }
 
-struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr)
+struct scheduler *scheduler_alloc(unsigned int sched_id)
 {
     int i;
+    int ret;
     struct scheduler *sched;
 
     for ( i = 0; i < NUM_SCHEDULERS; i++ )
         if ( schedulers[i] && schedulers[i]->sched_id == sched_id )
             goto found;
-    *perr = -ENOENT;
-    return NULL;
+    return ERR_PTR(-ENOENT);
 
  found:
-    *perr = -ENOMEM;
     if ( (sched = xmalloc(struct scheduler)) == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
     memcpy(sched, schedulers[i], sizeof(*sched));
-    if ( (*perr = sched_init(sched)) != 0 )
+    if ( (ret = sched_init(sched)) != 0 )
     {
         xfree(sched);
-        sched = NULL;
+        sched = ERR_PTR(ret);
     }
 
     return sched;

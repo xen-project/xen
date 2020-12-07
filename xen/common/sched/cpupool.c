@@ -240,15 +240,15 @@ void cpupool_put(struct cpupool *pool)
  * - poolid already used
  * - unknown scheduler
  */
-static struct cpupool *cpupool_create(
-    unsigned int poolid, unsigned int sched_id, int *perr)
+static struct cpupool *cpupool_create(unsigned int poolid,
+                                      unsigned int sched_id)
 {
     struct cpupool *c;
     struct cpupool *q;
+    int ret;
 
-    *perr = -ENOMEM;
     if ( (c = alloc_cpupool_struct()) == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     /* One reference for caller, one reference for cpupool_destroy(). */
     atomic_set(&c->refcnt, 2);
@@ -267,7 +267,7 @@ static struct cpupool *cpupool_create(
             list_add_tail(&c->list, &q->list);
             if ( q->cpupool_id == poolid )
             {
-                *perr = -EEXIST;
+                ret = -EEXIST;
                 goto err;
             }
         }
@@ -294,15 +294,15 @@ static struct cpupool *cpupool_create(
     }
 
     if ( poolid == 0 )
-    {
         c->sched = scheduler_get_default();
-    }
     else
+        c->sched = scheduler_alloc(sched_id);
+    if ( IS_ERR(c->sched) )
     {
-        c->sched = scheduler_alloc(sched_id, perr);
-        if ( c->sched == NULL )
-            goto err;
+        ret = PTR_ERR(c->sched);
+        goto err;
     }
+
     c->sched->cpupool = c;
     c->gran = opt_sched_granularity;
     c->sched_gran = sched_granularity;
@@ -312,15 +312,16 @@ static struct cpupool *cpupool_create(
     debugtrace_printk("Created cpupool %u with scheduler %s (%s)\n",
                       c->cpupool_id, c->sched->name, c->sched->opt_name);
 
-    *perr = 0;
     return c;
 
  err:
     list_del(&c->list);
 
     spin_unlock(&cpupool_lock);
+
     free_cpupool_struct(c);
-    return NULL;
+
+    return ERR_PTR(ret);
 }
 /*
  * destroys the given cpupool
@@ -767,7 +768,7 @@ static void cpupool_cpu_remove_forced(unsigned int cpu)
  */
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 {
-    int ret;
+    int ret = 0;
     struct cpupool *c;
 
     switch ( op->op )
@@ -779,8 +780,10 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 
         poolid = (op->cpupool_id == XEN_SYSCTL_CPUPOOL_PAR_ANY) ?
             CPUPOOLID_NONE: op->cpupool_id;
-        c = cpupool_create(poolid, op->sched_id, &ret);
-        if ( c != NULL )
+        c = cpupool_create(poolid, op->sched_id);
+        if ( IS_ERR(c) )
+            ret = PTR_ERR(c);
+        else
         {
             op->cpupool_id = c->cpupool_id;
             cpupool_put(c);
@@ -1003,12 +1006,11 @@ static struct notifier_block cpu_nfb = {
 static int __init cpupool_init(void)
 {
     unsigned int cpu;
-    int err;
 
     cpupool_gran_init();
 
-    cpupool0 = cpupool_create(0, 0, &err);
-    BUG_ON(cpupool0 == NULL);
+    cpupool0 = cpupool_create(0, 0);
+    BUG_ON(IS_ERR(cpupool0));
     cpupool_put(cpupool0);
     register_cpu_notifier(&cpu_nfb);
 
