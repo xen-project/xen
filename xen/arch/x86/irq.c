@@ -42,6 +42,10 @@ integer_param("nr_irqs", nr_irqs);
 int __read_mostly opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_DEFAULT;
 custom_param("irq_vector_map", parse_irq_vector_map_param);
 
+/* Max number of guests IRQ could be shared with */
+static unsigned char __read_mostly irq_max_guests;
+integer_param("irq-max-guests", irq_max_guests);
+
 vmask_t global_used_vector_map;
 
 struct irq_desc __read_mostly *irq_desc = NULL;
@@ -434,6 +438,9 @@ int __init init_irq_data(void)
     }
     for ( ; irq < nr_irqs; irq++ )
         irq_to_desc(irq)->irq = irq;
+
+    if ( !irq_max_guests )
+        irq_max_guests = 16;
 
 #ifdef CONFIG_PV
     /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */
@@ -1028,7 +1035,6 @@ int __init setup_irq(unsigned int irq, unsigned int irqflags,
  * HANDLING OF GUEST-BOUND PHYSICAL IRQS
  */
 
-#define IRQ_MAX_GUESTS 7
 typedef struct {
     u8 nr_guests;
     u8 in_flight;
@@ -1039,7 +1045,7 @@ typedef struct {
 #define ACKTYPE_EOI    2     /* EOI on the CPU that was interrupted  */
     cpumask_var_t cpu_eoi_map; /* CPUs that need to EOI this interrupt */
     struct timer eoi_timer;
-    struct domain *guest[IRQ_MAX_GUESTS];
+    struct domain *guest[];
 } irq_guest_action_t;
 
 static irq_guest_action_t *guest_action(const struct irq_desc *desc)
@@ -1553,7 +1559,8 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         if ( newaction == NULL )
         {
             spin_unlock_irq(&desc->lock);
-            if ( (newaction = xmalloc(irq_guest_action_t)) != NULL &&
+            if ( (newaction = xmalloc_flex_struct(irq_guest_action_t, guest,
+                                                  irq_max_guests)) != NULL &&
                  zalloc_cpumask_var(&newaction->cpu_eoi_map) )
                 goto retry;
             xfree(newaction);
@@ -1622,11 +1629,12 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         goto retry;
     }
 
-    if ( action->nr_guests == IRQ_MAX_GUESTS )
+    if ( action->nr_guests == irq_max_guests )
     {
-        printk(XENLOG_G_INFO "Cannot bind IRQ%d to dom%d. "
-               "Already at max share.\n",
-               pirq->pirq, v->domain->domain_id);
+        printk(XENLOG_G_INFO
+               "Cannot bind IRQ%d to %pd: already at max share %u"
+               " (increase with irq-max-guests= option)\n",
+               pirq->pirq, v->domain, irq_max_guests);
         rc = -EBUSY;
         goto unlock_out;
     }
@@ -2510,6 +2518,10 @@ static void dump_irqs(unsigned char key)
 
 static int __init setup_dump_irqs(void)
 {
+    /* In lieu of being able to live in init_irq_data(). */
+    BUILD_BUG_ON(sizeof(irq_max_guests) >
+                 sizeof_field(irq_guest_action_t, nr_guests));
+
     register_keyhandler('i', dump_irqs, "dump interrupt bindings", 1);
     return 0;
 }

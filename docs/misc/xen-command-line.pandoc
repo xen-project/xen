@@ -1641,6 +1641,16 @@ This option is ignored in **pv-shim** mode.
 ### nr_irqs (x86)
 > `= <integer>`
 
+### irq-max-guests (x86)
+> `= <integer>`
+
+> Default: `16`
+
+Maximum number of guests any individual IRQ could be shared between,
+i.e. a limit on the number of guests it is possible to start each having
+assigned a device sharing a common interrupt line.  Accepts values between
+1 and 255.
+
 ### numa (x86)
 > `= on | off | fake=<integer> | noacpi`
 
