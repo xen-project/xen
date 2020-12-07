@@ -5194,6 +5194,62 @@ l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
         }                                          \
     } while ( false )
 
+/* Translate mapped Xen address to MFN. */
+mfn_t xen_map_to_mfn(unsigned long va)
+{
+#define CHECK_MAPPED(cond)          \
+    do {                            \
+        if ( !(cond) )              \
+        {                           \
+            ASSERT_UNREACHABLE();   \
+            ret = INVALID_MFN;      \
+            goto out;               \
+        }                           \
+    } while ( false )
+
+    bool locking = system_state > SYS_STATE_boot;
+    unsigned int l2_offset = l2_table_offset(va);
+    unsigned int l1_offset = l1_table_offset(va);
+    const l3_pgentry_t *pl3e = virt_to_xen_l3e(va);
+    const l2_pgentry_t *pl2e = NULL;
+    const l1_pgentry_t *pl1e = NULL;
+    struct page_info *l3page;
+    mfn_t ret;
+
+    L3T_INIT(l3page);
+    CHECK_MAPPED(pl3e);
+    l3page = virt_to_page(pl3e);
+    L3T_LOCK(l3page);
+
+    CHECK_MAPPED(l3e_get_flags(*pl3e) & _PAGE_PRESENT);
+    if ( l3e_get_flags(*pl3e) & _PAGE_PSE )
+    {
+        ret = mfn_add(l3e_get_mfn(*pl3e),
+                      (l2_offset << PAGETABLE_ORDER) + l1_offset);
+        goto out;
+    }
+
+    pl2e = map_l2t_from_l3e(*pl3e) + l2_offset;
+    CHECK_MAPPED(l2e_get_flags(*pl2e) & _PAGE_PRESENT);
+    if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
+    {
+        ret = mfn_add(l2e_get_mfn(*pl2e), l1_offset);
+        goto out;
+    }
+
+    pl1e = map_l1t_from_l2e(*pl2e) + l1_offset;
+    CHECK_MAPPED(l1e_get_flags(*pl1e) & _PAGE_PRESENT);
+    ret = l1e_get_mfn(*pl1e);
+
+#undef CHECK_MAPPED
+ out:
+    L3T_UNLOCK(l3page);
+    unmap_domain_page(pl1e);
+    unmap_domain_page(pl2e);
+    unmap_domain_page(pl3e);
+    return ret;
+}
+
 int map_pages_to_xen(
     unsigned long virt,
     mfn_t mfn,
