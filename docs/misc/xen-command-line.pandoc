@@ -1644,7 +1644,7 @@ This option is ignored in **pv-shim** mode.
 ### irq-max-guests (x86)
 > `= <integer>`
 
-> Default: `16`
+> Default: `32`
 
 Maximum number of guests any individual IRQ could be shared between,
 i.e. a limit on the number of guests it is possible to start each having
