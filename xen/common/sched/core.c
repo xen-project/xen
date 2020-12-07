@@ -757,7 +757,7 @@ void sched_destroy_vcpu(struct vcpu *v)
     }
 }
 
-int sched_init_domain(struct domain *d, int poolid)
+int sched_init_domain(struct domain *d, unsigned int poolid)
 {
     void *sdom;
     int ret;

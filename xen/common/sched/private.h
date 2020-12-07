@@ -505,8 +505,8 @@ static inline void sched_unit_unpause(const struct sched_unit *unit)
 
 struct cpupool
 {
-    int              cpupool_id;
-#define CPUPOOLID_NONE    (-1)
+    unsigned int     cpupool_id;
+#define CPUPOOLID_NONE    (~0U)
     unsigned int     n_dom;
     cpumask_var_t    cpu_valid;      /* all cpus assigned to pool */
     cpumask_var_t    res_valid;      /* all scheduling resources of pool */
@@ -601,9 +601,9 @@ int cpu_disable_scheduler(unsigned int cpu);
 int schedule_cpu_add(unsigned int cpu, struct cpupool *c);
 int schedule_cpu_rm(unsigned int cpu);
 int sched_move_domain(struct domain *d, struct cpupool *c);
-struct cpupool *cpupool_get_by_id(int poolid);
+struct cpupool *cpupool_get_by_id(unsigned int poolid);
 void cpupool_put(struct cpupool *pool);
-int cpupool_add_domain(struct domain *d, int poolid);
+int cpupool_add_domain(struct domain *d, unsigned int poolid);
 void cpupool_rm_domain(struct domain *d);
 
 #endif /* __XEN_SCHED_IF_H__ */

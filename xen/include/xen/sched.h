@@ -693,7 +693,7 @@ void noreturn asm_domain_crash_synchronous(unsigned long addr);
 void scheduler_init(void);
 int  sched_init_vcpu(struct vcpu *v);
 void sched_destroy_vcpu(struct vcpu *v);
-int  sched_init_domain(struct domain *d, int poolid);
+int  sched_init_domain(struct domain *d, unsigned int poolid);
 void sched_destroy_domain(struct domain *d);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 long sched_adjust_global(struct xen_sysctl_scheduler_op *);
@@ -1091,7 +1091,7 @@ static always_inline bool is_cpufreq_controller(const struct domain *d)
 
 int cpupool_move_domain(struct domain *d, struct cpupool *c);
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
-int cpupool_get_id(const struct domain *d);
+unsigned int cpupool_get_id(const struct domain *d);
 const cpumask_t *cpupool_valid_cpus(const struct cpupool *pool);
 extern void dump_runq(unsigned char key);
 
