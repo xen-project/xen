@@ -44,9 +44,6 @@ static const u32 __read_mostly *counters;
 static const u32 __read_mostly *ctrls;
 static bool_t __read_mostly k7_counters_mirrored;
 
-/* Total size of PMU registers block (copied to/from PV(H) guest) */
-static unsigned int __read_mostly regs_sz;
-
 #define F10H_NUM_COUNTERS   4
 #define F15H_NUM_COUNTERS   6
 #define MAX_NUM_COUNTERS    F15H_NUM_COUNTERS
@@ -156,12 +153,9 @@ static inline u32 get_fam15h_addr(u32 addr)
 
 static void amd_vpmu_init_regs(struct xen_pmu_amd_ctxt *ctxt)
 {
-    unsigned i;
-    uint64_t *ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
-
-    memset(&ctxt->regs[0], 0, regs_sz);
-    for ( i = 0; i < num_counters; i++ )
-        ctrl_regs[i] = ctrl_rsvd[i];
+    memset(&ctxt->regs[0], 0, num_counters * sizeof(ctxt->regs[0]));
+    memcpy(&ctxt->regs[num_counters], &ctrl_rsvd[0],
+           num_counters * sizeof(ctxt->regs[0]));
 }
 
 static void amd_vpmu_set_msr_bitmap(struct vcpu *v)
@@ -242,7 +236,8 @@ static int amd_vpmu_load(struct vcpu *v, bool_t from_guest)
         ctxt = vpmu->context;
         ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
 
-        memcpy(&ctxt->regs[0], &guest_ctxt->regs[0], regs_sz);
+        memcpy(&ctxt->regs[0], &guest_ctxt->regs[0],
+               2 * num_counters * sizeof(ctxt->regs[0]));
 
         for ( i = 0; i < num_counters; i++ )
         {
@@ -316,7 +311,8 @@ static int amd_vpmu_save(struct vcpu *v,  bool_t to_guest)
         ASSERT(!has_vlapic(v->domain));
         ctxt = vpmu->context;
         guest_ctxt = &vpmu->xenpmu_data->pmu.c.amd;
-        memcpy(&guest_ctxt->regs[0], &ctxt->regs[0], regs_sz);
+        memcpy(&guest_ctxt->regs[0], &ctxt->regs[0],
+               2 * num_counters * sizeof(ctxt->regs[0]));
     }
 
     return 1;
@@ -508,7 +504,8 @@ int svm_vpmu_initialise(struct vcpu *v)
     if ( !counters )
         return -EINVAL;
 
-    ctxt = xmalloc_bytes(sizeof(*ctxt) + regs_sz);
+    ctxt = xmalloc_flex_struct(struct xen_pmu_amd_ctxt, regs,
+                               2 * num_counters);
     if ( !ctxt )
     {
         printk(XENLOG_G_WARNING "Insufficient memory for PMU, "
@@ -564,8 +561,6 @@ static int __init common_init(void)
         rdmsrl(ctrls[i], ctrl_rsvd[i]);
         ctrl_rsvd[i] &= CTRL_RSVD_MASK;
     }
-
-    regs_sz = 2 * sizeof(uint64_t) * num_counters;
 
     return 0;
 }
