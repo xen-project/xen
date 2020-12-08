@@ -452,6 +452,12 @@
 #define LIBXL_HAVE_VIRIDIAN_EX_PROCESSOR_MASKS 1
 
 /*
+ * LIBXL_HAVE_DEVICE_PCI_LIST_FREE indicates that the
+ * libxl_device_pci_list_free() function is defined.
+ */
+#define LIBXL_HAVE_DEVICE_PCI_LIST_FREE 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -2321,6 +2327,7 @@ int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid,
 
 libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid,
                                         int *num);
+void libxl_device_pci_list_free(libxl_device_pci* list, int num);
 
 /*
  * Turns the current process into a backend device service daemon

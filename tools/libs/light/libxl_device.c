@@ -2011,7 +2011,7 @@ void *libxl__device_list(libxl__gc *gc, const libxl__device_type *dt,
     void *r = NULL;
     void *list = NULL;
     void *item = NULL;
-    char *libxl_path;
+    char *path;
     char **dir = NULL;
     unsigned int ndirs = 0;
     unsigned int ndevs = 0;
@@ -2019,42 +2019,46 @@ void *libxl__device_list(libxl__gc *gc, const libxl__device_type *dt,
 
     *num = 0;
 
-    libxl_path = GCSPRINTF("%s/device/%s",
-                           libxl__xs_libxl_path(gc, domid),
-                           libxl__device_kind_to_string(dt->type));
+    if (dt->get_path) {
+        rc = dt->get_path(gc, domid, &path);
+        if (rc) goto out;
+    } else {
+        path = GCSPRINTF("%s/device/%s",
+                         libxl__xs_libxl_path(gc, domid),
+                         libxl__device_kind_to_string(dt->type));
+    }
 
-    dir = libxl__xs_directory(gc, XBT_NULL, libxl_path, &ndirs);
-
-    if (dir && ndirs) {
-        if (dt->get_num) {
-            if (ndirs != 1) {
-                LOGD(ERROR, domid, "multiple entries in %s\n", libxl_path);
-                rc = ERROR_FAIL;
-                goto out;
-            }
-            rc = dt->get_num(gc, GCSPRINTF("%s/%s", libxl_path, *dir), &ndevs);
-            if (rc) goto out;
-        } else {
+    if (dt->get_num) {
+        rc = dt->get_num(gc, path, &ndevs);
+        if (rc) goto out;
+    } else {
+        dir = libxl__xs_directory(gc, XBT_NULL, path, &ndirs);
+        if (dir && ndirs)
             ndevs = ndirs;
+    }
+
+    if (!ndevs)
+        return NULL;
+
+    list = libxl__malloc(NOGC, dt->dev_elem_size * ndevs);
+    item = list;
+
+    while (*num < ndevs) {
+        dt->init(item);
+
+        if (dt->from_xenstore) {
+            int nr = dt->get_num ? *num : atoi(*dir);
+            char *device_path = dt->get_num ? path :
+                GCSPRINTF("%s/%d", path, nr);
+
+            rc = dt->from_xenstore(gc, device_path, nr, item);
+            if (rc) goto out;
         }
-        list = libxl__malloc(NOGC, dt->dev_elem_size * ndevs);
-        item = list;
 
-        while (*num < ndevs) {
-            dt->init(item);
-
-            if (dt->from_xenstore) {
-                int nr = dt->get_num ? *num : atoi(*dir);
-                char *device_libxl_path = GCSPRINTF("%s/%s", libxl_path, *dir);
-                rc = dt->from_xenstore(gc, device_libxl_path, nr, item);
-                if (rc) goto out;
-            }
-
-            item = (uint8_t *)item + dt->dev_elem_size;
-            ++(*num);
-            if (!dt->get_num)
-                ++dir;
-        }
+        item = (uint8_t *)item + dt->dev_elem_size;
+        ++(*num);
+        if (!dt->get_num)
+            ++dir;
     }
 
     r = list;
