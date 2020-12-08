@@ -30,7 +30,7 @@ APPEND_LDFLAGS += $(LDLIBS-y)
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-$(LIB_OBJS): _paths.h
+$(LIB_OBJS) $(PIC_OBJS): _paths.h
 
 PYLIB=bindings/swig/python/_xenstat.so
 PYMOD=bindings/swig/python/xenstat.py
