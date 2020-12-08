@@ -79,39 +79,55 @@ static void libxl__device_from_pci(libxl__gc *gc, uint32_t domid,
     device->kind = LIBXL__DEVICE_KIND_PCI;
 }
 
-static int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
-                                     const libxl_device_pci *pci,
-                                     int num)
+static void libxl__create_pci_backend(libxl__gc *gc, xs_transaction_t t,
+                                      uint32_t domid, const libxl_device_pci *pci)
 {
-    flexarray_t *front = NULL;
-    flexarray_t *back = NULL;
-    libxl__device device;
-    int i;
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    flexarray_t *front, *back;
+    char *fe_path, *be_path;
+    struct xs_permissions fe_perms[2], be_perms[2];
+
+    LOGD(DEBUG, domid, "Creating pci backend");
 
     front = flexarray_make(gc, 16, 1);
     back = flexarray_make(gc, 16, 1);
 
-    LOGD(DEBUG, domid, "Creating pci backend");
+    fe_path = libxl__domain_device_frontend_path(gc, domid, 0,
+                                                 LIBXL__DEVICE_KIND_PCI);
+    be_path = libxl__domain_device_backend_path(gc, 0, domid, 0,
+                                                LIBXL__DEVICE_KIND_PCI);
 
-    /* add pci device */
-    libxl__device_from_pci(gc, domid, pci, &device);
-
+    flexarray_append_pair(back, "frontend", fe_path);
     flexarray_append_pair(back, "frontend-id", GCSPRINTF("%d", domid));
-    flexarray_append_pair(back, "online", "1");
+    flexarray_append_pair(back, "online", GCSPRINTF("%d", 1));
     flexarray_append_pair(back, "state", GCSPRINTF("%d", XenbusStateInitialising));
     flexarray_append_pair(back, "domain", libxl__domid_to_name(gc, domid));
 
-    for (i = 0; i < num; i++, pci++)
-        libxl_create_pci_backend_device(gc, back, i, pci);
+    be_perms[0].id = 0;
+    be_perms[0].perms = XS_PERM_NONE;
+    be_perms[1].id = domid;
+    be_perms[1].perms = XS_PERM_READ;
 
-    flexarray_append_pair(back, "num_devs", GCSPRINTF("%d", num));
+    xs_rm(ctx->xsh, t, be_path);
+    xs_mkdir(ctx->xsh, t, be_path);
+    xs_set_permissions(ctx->xsh, t, be_path, be_perms,
+                       ARRAY_SIZE(be_perms));
+    libxl__xs_writev(gc, t, be_path, libxl__xs_kvs_of_flexarray(gc, back));
+
+    flexarray_append_pair(front, "backend", be_path);
     flexarray_append_pair(front, "backend-id", GCSPRINTF("%d", 0));
     flexarray_append_pair(front, "state", GCSPRINTF("%d", XenbusStateInitialising));
 
-    return libxl__device_generic_add(gc, XBT_NULL, &device,
-                                     libxl__xs_kvs_of_flexarray(gc, back),
-                                     libxl__xs_kvs_of_flexarray(gc, front),
-                                     NULL);
+    fe_perms[0].id = domid;
+    fe_perms[0].perms = XS_PERM_NONE;
+    fe_perms[1].id = 0;
+    fe_perms[1].perms = XS_PERM_READ;
+
+    xs_rm(ctx->xsh, t, fe_path);
+    xs_mkdir(ctx->xsh, t, fe_path);
+    xs_set_permissions(ctx->xsh, t, fe_path,
+                       fe_perms, ARRAY_SIZE(fe_perms));
+    libxl__xs_writev(gc, t, fe_path, libxl__xs_kvs_of_flexarray(gc, front));
 }
 
 static int libxl__device_pci_add_xenstore(libxl__gc *gc,
@@ -135,8 +151,6 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc,
     be_path = libxl__domain_device_backend_path(gc, 0, domid, 0,
                                                 LIBXL__DEVICE_KIND_PCI);
     num_devs = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/num_devs", be_path));
-    if (!num_devs)
-        return libxl__create_pci_backend(gc, domid, pci, 1);
 
     libxl_domain_type domtype = libxl__domain_type(gc, domid);
     if (domtype == LIBXL_DOMAIN_TYPE_INVALID)
@@ -150,17 +164,17 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc,
     back = flexarray_make(gc, 16, 1);
 
     LOGD(DEBUG, domid, "Adding new pci device to xenstore");
-    num = atoi(num_devs);
+    num = num_devs ? atoi(num_devs) : 0;
     libxl_create_pci_backend_device(gc, back, num, pci);
     flexarray_append_pair(back, "num_devs", GCSPRINTF("%d", num + 1));
-    if (!starting)
+    if (num && !starting)
         flexarray_append_pair(back, "state", GCSPRINTF("%d", XenbusStateReconfiguring));
 
     /*
      * Stubdomin config is derived from its target domain, it doesn't have
      * its own file.
      */
-    if (!is_stubdomain) {
+    if (!is_stubdomain && !starting) {
         lock = libxl__lock_domain_userdata(gc, domid);
         if (!lock) {
             rc = ERROR_LOCK_FAIL;
@@ -170,6 +184,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc,
         rc = libxl__get_domain_configuration(gc, domid, &d_config);
         if (rc) goto out;
 
+        LOGD(DEBUG, domid, "Adding new pci device to config");
         device_add_domain_config(gc, &d_config, &libxl__pci_devtype,
                                  pci);
 
@@ -185,6 +200,10 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc,
             rc = libxl__set_domain_configuration(gc, domid, &d_config);
             if (rc) goto out;
         }
+
+        /* This is the first device, so create the backend */
+        if (!num_devs)
+            libxl__create_pci_backend(gc, t, domid, pci);
 
         libxl__xs_writev(gc, t, be_path, libxl__xs_kvs_of_flexarray(gc, back));
 
@@ -1437,7 +1456,7 @@ out_no_irq:
         }
     }
 
-    if (!starting && !libxl_get_stubdom_id(CTX, domid))
+    if (!libxl_get_stubdom_id(CTX, domid))
         rc = libxl__device_pci_add_xenstore(gc, domid, pci, starting);
     else
         rc = 0;
@@ -1765,28 +1784,12 @@ static void libxl__add_pcis(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
 }
 
 static void add_pcis_done(libxl__egc *egc, libxl__multidev *multidev,
-                             int rc)
+                          int rc)
 {
     EGC_GC;
     add_pcis_state *apds = CONTAINER_OF(multidev, *apds, multidev);
-
-    /* Convenience aliases */
-    libxl_domain_config *d_config = apds->d_config;
-    libxl_domid domid = apds->domid;
     libxl__ao_device *aodev = apds->outer_aodev;
 
-    if (rc) goto out;
-
-    if (d_config->num_pcidevs > 0 && !libxl_get_stubdom_id(CTX, domid)) {
-        rc = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
-                                       d_config->num_pcidevs);
-        if (rc < 0) {
-            LOGD(ERROR, domid, "libxl_create_pci_backend failed: %d", rc);
-            goto out;
-        }
-    }
-
-out:
     aodev->rc = rc;
     aodev->callback(egc, aodev);
 }
