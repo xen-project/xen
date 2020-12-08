@@ -1374,7 +1374,7 @@ LIBXL_DEFINE_DEVICE_LIST(disk)
 
 #define libxl__device_disk_update_devid NULL
 
-DEFINE_DEVICE_TYPE_STRUCT(disk, VBD,
+DEFINE_DEVICE_TYPE_STRUCT(disk, VBD, disks,
     .merge       = libxl_device_disk_merge,
     .dm_needed   = libxl_device_disk_dm_needed,
     .from_xenstore = (device_from_xenstore_fn_t)libxl__disk_from_xenstore,

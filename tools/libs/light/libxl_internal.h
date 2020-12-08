@@ -1709,7 +1709,7 @@ _hidden int libxl__pci_topology_init(libxl__gc *gc,
 /* from libxl_pci */
 
 _hidden void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
-                                   libxl_device_pci *pcidev, bool starting,
+                                   libxl_device_pci *pci, bool starting,
                                    libxl__ao_device *aodev);
 _hidden void libxl__device_pci_destroy_all(libxl__egc *egc, uint32_t domid,
                                            libxl__multidev *);
@@ -3945,29 +3945,26 @@ struct libxl__device_type {
     device_set_xenstore_config_fn_t set_xenstore_config;
 };
 
-#define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, kind, ...)                    \
+#define DEFINE_DEVICE_TYPE_STRUCT(name, kind, array, ...)                      \
     const libxl__device_type libxl__ ## name ## _devtype = {                   \
-        .type          = LIBXL__DEVICE_KIND_ ## kind,                       \
-        .ptr_offset    = offsetof(libxl_domain_config, name ## s),             \
-        .num_offset    = offsetof(libxl_domain_config, num_ ## name ## s),     \
-        .dev_elem_size = sizeof(libxl_device_ ## sname),                       \
+        .type          = LIBXL__DEVICE_KIND_ ## kind,                          \
+        .ptr_offset    = offsetof(libxl_domain_config, array),                 \
+        .num_offset    = offsetof(libxl_domain_config, num_ ## array),         \
+        .dev_elem_size = sizeof(libxl_device_ ## name),                        \
         .add           = libxl__add_ ## name ## s,                             \
         .set_default   = (device_set_default_fn_t)                             \
-                         libxl__device_ ## sname ## _setdefault,               \
+                         libxl__device_ ## name ## _setdefault,                \
         .to_device     = (device_to_device_fn_t)libxl__device_from_ ## name,   \
-        .init          = (device_init_fn_t)libxl_device_ ## sname ## _init,    \
-        .copy          = (device_copy_fn_t)libxl_device_ ## sname ## _copy,    \
+        .init          = (device_init_fn_t)libxl_device_ ## name ## _init,     \
+        .copy          = (device_copy_fn_t)libxl_device_ ## name ## _copy,     \
         .dispose       = (device_dispose_fn_t)                                 \
-                         libxl_device_ ## sname ## _dispose,                   \
+                         libxl_device_ ## name ## _dispose,                    \
         .compare       = (device_compare_fn_t)                                 \
-                         libxl_device_ ## sname ## _compare,                   \
+                         libxl_device_ ## name ## _compare,                    \
         .update_devid  = (device_update_devid_fn_t)                            \
-                         libxl__device_ ## sname ## _update_devid,             \
+                         libxl__device_ ## name ## _update_devid,              \
         __VA_ARGS__                                                            \
     }
-
-#define DEFINE_DEVICE_TYPE_STRUCT(name, kind, ...)                             \
-    DEFINE_DEVICE_TYPE_STRUCT_X(name, name, kind, __VA_ARGS__)
 
 static inline void **libxl__device_type_get_ptr(
     const libxl__device_type *dt, const libxl_domain_config *d_config)
@@ -3995,7 +3992,7 @@ extern const libxl__device_type libxl__nic_devtype;
 extern const libxl__device_type libxl__vtpm_devtype;
 extern const libxl__device_type libxl__usbctrl_devtype;
 extern const libxl__device_type libxl__usbdev_devtype;
-extern const libxl__device_type libxl__pcidev_devtype;
+extern const libxl__device_type libxl__pci_devtype;
 extern const libxl__device_type libxl__vdispl_devtype;
 extern const libxl__device_type libxl__p9_devtype;
 extern const libxl__device_type libxl__pvcallsif_devtype;

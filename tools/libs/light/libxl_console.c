@@ -725,7 +725,7 @@ static LIBXL_DEFINE_DEVICE_FROM_TYPE(vfb)
 /* vfb */
 LIBXL_DEFINE_DEVICE_REMOVE(vfb)
 
-DEFINE_DEVICE_TYPE_STRUCT(vfb, VFB,
+DEFINE_DEVICE_TYPE_STRUCT(vfb, VFB, vfbs,
     .skip_attach = 1,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)
                            libxl__set_xenstore_vfb,

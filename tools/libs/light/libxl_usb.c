@@ -2139,7 +2139,7 @@ void libxl_device_usbdev_list_free(libxl_device_usbdev *list, int nr)
 
 LIBXL_DEFINE_DEVID_TO_DEVICE(usbctrl)
 LIBXL_DEFINE_DEVICE_LIST(usbctrl)
-DEFINE_DEVICE_TYPE_STRUCT(usbctrl, VUSB,
+DEFINE_DEVICE_TYPE_STRUCT(usbctrl, VUSB, usbctrls,
     .from_xenstore = (device_from_xenstore_fn_t)libxl__usbctrl_from_xenstore,
     .dm_needed = libxl_device_usbctrl_dm_needed
 );
@@ -2147,7 +2147,7 @@ DEFINE_DEVICE_TYPE_STRUCT(usbctrl, VUSB,
 #define libxl__device_from_usbdev NULL
 #define libxl__device_usbdev_update_devid NULL
 
-DEFINE_DEVICE_TYPE_STRUCT(usbdev, VUSB);
+DEFINE_DEVICE_TYPE_STRUCT(usbdev, VUSB, usbdevs);
 
 /*
  * Local variables:

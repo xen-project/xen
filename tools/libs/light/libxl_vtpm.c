@@ -231,7 +231,7 @@ LIBXL_DEFINE_DEVICE_ADD(vtpm)
 LIBXL_DEFINE_DEVICE_REMOVE(vtpm)
 LIBXL_DEFINE_DEVICE_LIST(vtpm)
 
-DEFINE_DEVICE_TYPE_STRUCT(vtpm, VTPM,
+DEFINE_DEVICE_TYPE_STRUCT(vtpm, VTPM, vtpms,
     .update_config = libxl_device_vtpm_update_config,
     .from_xenstore = (device_from_xenstore_fn_t)libxl__vtpm_from_xenstore,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)

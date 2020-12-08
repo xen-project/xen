@@ -206,7 +206,7 @@ LIBXL_DEFINE_DEVICE_ADD(vdispl)
 LIBXL_DEFINE_DEVICE_REMOVE(vdispl)
 LIBXL_DEFINE_DEVICE_LIST(vdispl)
 
-DEFINE_DEVICE_TYPE_STRUCT(vdispl, VDISPL,
+DEFINE_DEVICE_TYPE_STRUCT(vdispl, VDISPL, vdispls,
     .update_config = (device_update_config_fn_t)libxl__update_config_vdispl,
     .from_xenstore = (device_from_xenstore_fn_t)libxl__vdispl_from_xenstore,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)

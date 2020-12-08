@@ -670,7 +670,7 @@ LIBXL_DEFINE_DEVICE_ADD(vsnd)
 LIBXL_DEFINE_DEVICE_REMOVE(vsnd)
 LIBXL_DEFINE_DEVICE_LIST(vsnd)
 
-DEFINE_DEVICE_TYPE_STRUCT(vsnd, VSND,
+DEFINE_DEVICE_TYPE_STRUCT(vsnd, VSND, vsnds,
     .update_config = (device_update_config_fn_t) libxl__update_config_vsnd,
     .from_xenstore = (device_from_xenstore_fn_t) libxl__vsnd_from_xenstore,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)

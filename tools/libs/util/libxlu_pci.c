@@ -23,15 +23,15 @@ static int hex_convert(const char *str, unsigned int *val, unsigned int mask)
     return 0;
 }
 
-static int pcidev_struct_fill(libxl_device_pci *pcidev, unsigned int domain,
-                               unsigned int bus, unsigned int dev,
-                               unsigned int func, unsigned int vdevfn)
+static int pci_struct_fill(libxl_device_pci *pci, unsigned int domain,
+                           unsigned int bus, unsigned int dev,
+                           unsigned int func, unsigned int vdevfn)
 {
-    pcidev->domain = domain;
-    pcidev->bus = bus;
-    pcidev->dev = dev;
-    pcidev->func = func;
-    pcidev->vdevfn = vdevfn;
+    pci->domain = domain;
+    pci->bus = bus;
+    pci->dev = dev;
+    pci->func = func;
+    pci->vdevfn = vdevfn;
     return 0;
 }
 
@@ -47,7 +47,7 @@ static int pcidev_struct_fill(libxl_device_pci *pcidev, unsigned int domain,
 #define STATE_RDM_STRATEGY      10
 #define STATE_RESERVE_POLICY    11
 #define INVALID         0xffffffff
-int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str)
+int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pci, const char *str)
 {
     unsigned state = STATE_DOMAIN;
     unsigned dom = INVALID, bus = INVALID, dev = INVALID, func = INVALID, vslot = 0;
@@ -110,11 +110,11 @@ int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str
                 }
                 *ptr = '\0';
                 if ( !strcmp(tok, "*") ) {
-                    pcidev->vfunc_mask = LIBXL_PCI_FUNC_ALL;
+                    pci->vfunc_mask = LIBXL_PCI_FUNC_ALL;
                 }else{
                     if ( hex_convert(tok, &func, 0x7) )
                         goto parse_error;
-                    pcidev->vfunc_mask = (1 << 0);
+                    pci->vfunc_mask = (1 << 0);
                 }
                 tok = ptr + 1;
             }
@@ -141,18 +141,18 @@ int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str
                 state = (*ptr == ',') ? STATE_OPTIONS_K : STATE_TERMINAL;
                 *ptr = '\0';
                 if ( !strcmp(optkey, "msitranslate") ) {
-                    pcidev->msitranslate = atoi(tok);
+                    pci->msitranslate = atoi(tok);
                 }else if ( !strcmp(optkey, "power_mgmt") ) {
-                    pcidev->power_mgmt = atoi(tok);
+                    pci->power_mgmt = atoi(tok);
                 }else if ( !strcmp(optkey, "permissive") ) {
-                    pcidev->permissive = atoi(tok);
+                    pci->permissive = atoi(tok);
                 }else if ( !strcmp(optkey, "seize") ) {
-                    pcidev->seize = atoi(tok);
+                    pci->seize = atoi(tok);
                 } else if (!strcmp(optkey, "rdm_policy")) {
                     if (!strcmp(tok, "strict")) {
-                        pcidev->rdm_policy = LIBXL_RDM_RESERVE_POLICY_STRICT;
+                        pci->rdm_policy = LIBXL_RDM_RESERVE_POLICY_STRICT;
                     } else if (!strcmp(tok, "relaxed")) {
-                        pcidev->rdm_policy = LIBXL_RDM_RESERVE_POLICY_RELAXED;
+                        pci->rdm_policy = LIBXL_RDM_RESERVE_POLICY_RELAXED;
                     } else {
                         XLU__PCI_ERR(cfg, "%s is not an valid PCI RDM property"
                                           " policy: 'strict' or 'relaxed'.",
@@ -175,7 +175,7 @@ int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str
     assert(dom != INVALID && bus != INVALID && dev != INVALID && func != INVALID);
 
     /* Just a pretty way to fill in the values */
-    pcidev_struct_fill(pcidev, dom, bus, dev, func, vslot << 3);
+    pci_struct_fill(pci, dom, bus, dev, func, vslot << 3);
 
     free(buf2);
 

@@ -1809,7 +1809,7 @@ out:
 #define libxl__device_from_dtdev NULL
 #define libxl__device_dtdev_setdefault NULL
 #define libxl__device_dtdev_update_devid NULL
-static DEFINE_DEVICE_TYPE_STRUCT(dtdev, NONE);
+static DEFINE_DEVICE_TYPE_STRUCT(dtdev, NONE, dtdevs);
 
 const libxl__device_type *device_type_tbl[] = {
     &libxl__disk_devtype,
@@ -1817,7 +1817,7 @@ const libxl__device_type *device_type_tbl[] = {
     &libxl__vtpm_devtype,
     &libxl__usbctrl_devtype,
     &libxl__usbdev_devtype,
-    &libxl__pcidev_devtype,
+    &libxl__pci_devtype,
     &libxl__dtdev_devtype,
     &libxl__vdispl_devtype,
     &libxl__vsnd_devtype,

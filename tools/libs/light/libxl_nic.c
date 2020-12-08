@@ -528,7 +528,7 @@ LIBXL_DEFINE_DEVICE_ADD(nic)
 LIBXL_DEFINE_DEVICES_ADD(nic)
 LIBXL_DEFINE_DEVICE_REMOVE(nic)
 
-DEFINE_DEVICE_TYPE_STRUCT(nic, VIF,
+DEFINE_DEVICE_TYPE_STRUCT(nic, VIF, nics,
     .update_config = libxl_device_nic_update_config,
     .from_xenstore = (device_from_xenstore_fn_t)libxl__nic_from_xenstore,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)

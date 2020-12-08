@@ -336,7 +336,7 @@ static LIBXL_DEFINE_UPDATE_DEVID(vkb)
 LIBXL_DEFINE_DEVICE_LIST(vkb)
 LIBXL_DEFINE_DEVICE_REMOVE(vkb)
 
-DEFINE_DEVICE_TYPE_STRUCT(vkb, VKBD,
+DEFINE_DEVICE_TYPE_STRUCT(vkb, VKBD, vkbs,
     .skip_attach = 1,
     .dm_needed = libxl__device_vkb_dm_needed,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)

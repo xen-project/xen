@@ -2307,15 +2307,15 @@ int libxl_device_pvcallsif_destroy(libxl_ctx *ctx, uint32_t domid,
 
 /* PCI Passthrough */
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid,
-                         libxl_device_pci *pcidev,
+                         libxl_device_pci *pci,
                          const libxl_asyncop_how *ao_how)
                          LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid,
-                            libxl_device_pci *pcidev,
+                            libxl_device_pci *pci,
                             const libxl_asyncop_how *ao_how)
                             LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid,
-                             libxl_device_pci *pcidev,
+                             libxl_device_pci *pci,
                              const libxl_asyncop_how *ao_how)
                              LIBXL_EXTERNAL_CALLERS_ONLY;
 
@@ -2359,8 +2359,8 @@ int libxl_device_events_handler(libxl_ctx *ctx,
  * added or is not bound, the functions will emit a warning but return
  * SUCCESS.
  */
-int libxl_device_pci_assignable_add(libxl_ctx *ctx, libxl_device_pci *pcidev, int rebind);
-int libxl_device_pci_assignable_remove(libxl_ctx *ctx, libxl_device_pci *pcidev, int rebind);
+int libxl_device_pci_assignable_add(libxl_ctx *ctx, libxl_device_pci *pci, int rebind);
+int libxl_device_pci_assignable_remove(libxl_ctx *ctx, libxl_device_pci *pci, int rebind);
 libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num);
 
 /* CPUID handling */
