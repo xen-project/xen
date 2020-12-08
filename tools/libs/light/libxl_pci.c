@@ -426,10 +426,10 @@ static void pci_info_xs_remove(libxl__gc *gc, libxl_pci_bdf *pcibdf,
     xs_rm(ctx->xsh, XBT_NULL, path);
 }
 
-libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
+libxl_pci_bdf *libxl_pci_bdf_assignable_list(libxl_ctx *ctx, int *num)
 {
     GC_INIT(ctx);
-    libxl_device_pci *pcis = NULL, *new;
+    libxl_pci_bdf *pcibdfs = NULL, *new;
     struct dirent *de;
     DIR *dir;
 
@@ -450,17 +450,17 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
         if (sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4)
             continue;
 
-        new = realloc(pcis, ((*num) + 1) * sizeof(*new));
+        new = realloc(pcibdfs, ((*num) + 1) * sizeof(*new));
         if (NULL == new)
             continue;
 
-        pcis = new;
-        new = pcis + *num;
+        pcibdfs = new;
+        new = pcibdfs + *num;
 
-        libxl_device_pci_init(new);
-        pcibdf_struct_fill(&new->bdf, dom, bus, dev, func);
+        libxl_pci_bdf_init(new);
+        pcibdf_struct_fill(new, dom, bus, dev, func);
 
-        if (pci_info_xs_read(gc, &new->bdf, "domid")) /* already assigned */
+        if (pci_info_xs_read(gc, new, "domid")) /* already assigned */
             continue;
 
         (*num)++;
@@ -469,15 +469,15 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
     closedir(dir);
 out:
     GC_FREE;
-    return pcis;
+    return pcibdfs;
 }
 
-void libxl_device_pci_assignable_list_free(libxl_device_pci *list, int num)
+void libxl_pci_bdf_assignable_list_free(libxl_pci_bdf *list, int num)
 {
     int i;
 
     for (i = 0; i < num; i++)
-        libxl_device_pci_dispose(&list[i]);
+        libxl_pci_bdf_dispose(&list[i]);
 
     free(list);
 }
@@ -745,6 +745,7 @@ static int pciback_dev_unassign(libxl__gc *gc, libxl_pci_bdf *pcibdf)
 
 static int libxl__pci_bdf_assignable_add(libxl__gc *gc,
                                          libxl_pci_bdf *pcibdf,
+                                         const char *name,
                                          int rebind)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -752,6 +753,23 @@ static int libxl__pci_bdf_assignable_add(libxl__gc *gc,
     char *spath, *driver_path = NULL;
     int rc;
     struct stat st;
+
+    /* Sanitise any name that was passed */
+    if (name) {
+        unsigned int i, n = strlen(name);
+
+        if (n > 64) { /* Reasonable upper bound on name length */
+            LOG(ERROR, "Name too long");
+            return ERROR_FAIL;
+        }
+
+        for (i = 0; i < n; i++) {
+            if (!isgraph(name[i])) {
+                LOG(ERROR, "Names may only include printable characters");
+                return ERROR_FAIL;
+            }
+        }
+    }
 
     /* Local copy for convenience */
     dom = pcibdf->domain;
@@ -773,7 +791,7 @@ static int libxl__pci_bdf_assignable_add(libxl__gc *gc,
     }
     if ( rc ) {
         LOG(WARN, PCI_BDF" already assigned to pciback", dom, bus, dev, func);
-        goto quarantine;
+        goto name;
     }
 
     /* Check to see if there's already a driver that we need to unbind from */
@@ -804,7 +822,12 @@ static int libxl__pci_bdf_assignable_add(libxl__gc *gc,
         return ERROR_FAIL;
     }
 
-quarantine:
+name:
+    if (name)
+        pci_info_xs_write(gc, pcibdf, "name", name);
+    else
+        pci_info_xs_remove(gc, pcibdf, "name");
+
     /*
      * DOMID_IO is just a sentinel domain, without any actual mappings,
      * so always pass XEN_DOMCTL_DEV_RDM_RELAXED to avoid assignment being
@@ -868,32 +891,85 @@ static int libxl__pci_bdf_assignable_remove(libxl__gc *gc,
         }
     }
 
+    pci_info_xs_remove(gc, pcibdf, "name");
+
     return 0;
 }
 
-int libxl_device_pci_assignable_add(libxl_ctx *ctx, libxl_device_pci *pci,
+int libxl_pci_bdf_assignable_add(libxl_ctx *ctx, libxl_pci_bdf *pcibdf,
+                                 const char *name, int rebind)
+{
+    GC_INIT(ctx);
+    int rc;
+
+    rc = libxl__pci_bdf_assignable_add(gc, pcibdf, name, rebind);
+
+    GC_FREE;
+    return rc;
+}
+
+
+int libxl_pci_bdf_assignable_remove(libxl_ctx *ctx, libxl_pci_bdf *pcibdf,
                                     int rebind)
 {
     GC_INIT(ctx);
     int rc;
 
-    rc = libxl__pci_bdf_assignable_add(gc, &pci->bdf, rebind);
+    rc = libxl__pci_bdf_assignable_remove(gc, pcibdf, rebind);
 
     GC_FREE;
     return rc;
 }
 
-
-int libxl_device_pci_assignable_remove(libxl_ctx *ctx, libxl_device_pci *pci,
-                                       int rebind)
+libxl_pci_bdf *libxl_pci_bdf_assignable_name2bdf(libxl_ctx *ctx,
+                                                 const char *name)
 {
     GC_INIT(ctx);
-    int rc;
+    char **bdfs;
+    libxl_pci_bdf *pcibdf = NULL;
+    unsigned int i, n;
 
-    rc = libxl__pci_bdf_assignable_remove(gc, &pci->bdf, rebind);
+    bdfs = libxl__xs_directory(gc, XBT_NULL, PCI_INFO_PATH, &n);
+    if (!n)
+        goto out;
+
+    pcibdf = calloc(1, sizeof(*pcibdf));
+    if (!pcibdf)
+        goto out;
+
+    for (i = 0; i < n; i++) {
+        unsigned dom, bus, dev, func;
+        const char *tmp;
+
+        if (sscanf(bdfs[i], PCI_BDF_XSPATH, &dom, &bus, &dev, &func) != 4)
+            continue;
+
+        pcibdf_struct_fill(pcibdf, dom, bus, dev, func);
+
+        tmp = pci_info_xs_read(gc, pcibdf, "name");
+        if (tmp && !strcmp(tmp, name))
+            goto out;
+    }
+
+    free(pcibdf);
+    pcibdf = NULL;
+
+out:
+    GC_FREE;
+    return pcibdf;
+}
+
+char *libxl_pci_bdf_assignable_bdf2name(libxl_ctx *ctx,
+                                        libxl_pci_bdf *pcibdf)
+{
+    GC_INIT(ctx);
+    char *name = NULL, *tmp = pci_info_xs_read(gc, pcibdf, "name");
+
+    if (tmp)
+        name = strdup(tmp);
 
     GC_FREE;
-    return rc;
+    return name;
 }
 
 /*
@@ -1490,17 +1566,17 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid,
 
 static bool is_bdf_assignable(libxl_ctx *ctx, libxl_pci_bdf *pcibdf)
 {
-    libxl_device_pci *pcis;
+    libxl_pci_bdf *pcibdfs;
     int num, i;
 
-    pcis = libxl_device_pci_assignable_list(ctx, &num);
+    pcibdfs = libxl_pci_bdf_assignable_list(ctx, &num);
 
     for (i = 0; i < num; i++) {
-        if (COMPARE_BDF(pcibdf, &pcis[i].bdf))
+        if (COMPARE_BDF(pcibdf, &pcibdfs[i]))
             break;
     }
 
-    libxl_device_pci_assignable_list_free(pcis, num);
+    libxl_pci_bdf_assignable_list_free(pcibdfs, num);
 
     return i < num;
 }
@@ -1551,7 +1627,7 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
     if (rc) goto out;
 
     if (pci->seize && !pciback_dev_is_assigned(gc, &pci->bdf)) {
-        rc = libxl__pci_bdf_assignable_add(gc, &pci->bdf, 1);
+        rc = libxl__pci_bdf_assignable_add(gc, &pci->bdf, NULL, 1);
         if ( rc )
             goto out;
     }
@@ -2448,6 +2524,48 @@ DEFINE_DEVICE_TYPE_STRUCT(pci, PCI, pcidevs,
     .get_path = libxl__device_pci_get_path,
     .from_xenstore = libxl__device_pci_from_xs_be,
 );
+
+int libxl_device_pci_assignable_add(libxl_ctx *ctx, libxl_device_pci *pci,
+                                    int rebind)
+{
+    return libxl_pci_bdf_assignable_add(ctx, &pci->bdf, NULL, rebind);
+}
+
+int libxl_device_pci_assignable_remove(libxl_ctx *ctx, libxl_device_pci *pci,
+                                       int rebind)
+{
+    return libxl_pci_bdf_assignable_remove(ctx, &pci->bdf, rebind);
+}
+
+libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx,
+                                                   int *num)
+{
+    libxl_pci_bdf *pcibdfs = libxl_pci_bdf_assignable_list(ctx, num);
+    libxl_device_pci *pcis;
+    unsigned int i;
+
+    if (!pcibdfs)
+        return NULL;
+
+    pcis = calloc(*num, sizeof(*pcis));
+    if (!pcis) {
+        libxl_pci_bdf_assignable_list_free(pcibdfs, *num);
+        return NULL;
+    }
+
+    for (i = 0; i < *num; i++) {
+        libxl_device_pci_init(&pcis[i]);
+        libxl_pci_bdf_copy(ctx, &pcis[i].bdf, &pcibdfs[i]);
+    }
+
+    libxl_pci_bdf_assignable_list_free(pcibdfs, *num);
+    return pcis;
+}
+
+void libxl_device_pci_assignable_list_free(libxl_device_pci *list, int num)
+{
+    libxl_device_pci_list_free(list, num);
+}
 
 /*
  * Local variables:
