@@ -584,6 +584,13 @@ F:	xen/include/asm-x86/guest/hyperv-hcall.h
 F:	xen/include/asm-x86/guest/hyperv-tlfs.h
 F:	xen/include/asm-x86/hvm/viridian.h
 
+XENSTORE
+M:	Ian Jackson <iwj@xenproject.org>
+M:	Wei Liu <wl@xen.org>
+M:	Juergen Gross <jgross@suse.com>
+S:	Supported
+F:	tools/xenstore/
+
 XENTRACE
 M:	George Dunlap <george.dunlap@citrix.com>
 S:	Supported
