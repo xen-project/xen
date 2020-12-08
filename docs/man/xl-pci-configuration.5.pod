@@ -6,32 +6,105 @@ xl-pci-configuration - XL PCI Configuration Syntax
 
 =head1 SYNTAX
 
-This document specifies the format for B<PCI_SPEC_STRING> which is used by
-the L<xl.cfg(5)> pci configuration option, and related L<xl(1)> commands.
+This document specifies the format for B<BDF> and B<PCI_SPEC_STRING> which are
+used by the L<xl.cfg(5)> pci configuration option, and related L<xl(1)>
+commands.
 
-Each B<PCI_SPEC_STRING> has the form of
-B<[DDDD:]BB:DD.F[@VSLOT],KEY=VALUE,KEY=VALUE,...> where:
+A B<BDF> has the following form:
+
+    [DDDD:]BB:SS.F
+
+B<DDDD> is the domain number, B<BB> is the bus number, B<SS> is the device (or
+slot) number, and B<F> is the function number. This is the same scheme as
+used in the output of L<lspci(1)> for the device in question. By default
+L<lspci(1)> will omit the domain (B<DDDD>) if it is zero and hence a zero
+value for domain may also be omitted when specifying a B<BDF>.
+
+Each B<PCI_SPEC_STRING> has the one of the forms:
 
 =over 4
 
-=item B<[DDDD:]BB:DD.F>
+    [<bdf>[@<vslot>,][<key>=<value>,]*
+    [<key>=<value>,]*
 
-Identifies the PCI device from the host perspective in the domain
-(B<DDDD>), Bus (B<BB>), Device (B<DD>) and Function (B<F>) syntax. This is
-the same scheme as used in the output of B<lspci(1)> for the device in
-question.
+=back
 
-Note: by default B<lspci(1)> will omit the domain (B<DDDD>) if it
-is zero and it is optional here also. You may specify the function
-(B<F>) as B<*> to indicate all functions.
+For example, these strings are equivalent:
 
-=item B<@VSLOT>
+=over 4
 
-Specifies the virtual slot where the guest will see this
-device. This is equivalent to the B<DD> which the guest sees. In a
-guest B<DDDD> and B<BB> are C<0000:00>.
+    36:00.0@20,seize=1
+    36:00.0,vslot=20,seize=1
+    bdf=36:00.0,vslot=20,seize=1
 
-=item B<permissive=BOOLEAN>
+=back
+
+More formally, the string is a series of comma-separated keyword/value
+pairs, flags and positional parameters.  Parameters which are not bare
+keywords and which do not contain "=" symbols are assigned to the
+positional parameters, in the order specified below.  The positional
+parameters may also be specified by name.
+
+Each parameter may be specified at most once, either as a positional
+parameter or a named parameter.  Default values apply if the parameter
+is not specified, or if it is specified with an empty value (whether
+positionally or explicitly).
+
+B<NOTE>: In context of B<xl pci-detach> (see L<xl(1)>), parameters other than
+B<bdf> will be ignored.
+
+=head1 Positional Parameters
+
+=over 4
+
+=item B<bdf>=I<BDF>
+
+=over 4
+
+=item Description
+
+This identifies the PCI device from the host perspective.
+
+In the context of a B<PCI_SPEC_STRING> you may specify the function (B<F>) as
+B<*> to indicate all functions of a multi-function device.
+
+=item Default Value
+
+None. This parameter is mandatory as it identifies the device.
+
+=back
+
+=item B<vslot>=I<NUMBER>
+
+=over 4
+
+=item Description
+
+Specifies the virtual slot (device) number where the guest will see this
+device. For example, running L<lspci(1)> in a Linux guest where B<vslot>
+was specified as C<8> would identify the device as C<00:08.0>. Virtual domain
+and bus numbers are always 0.
+
+B<NOTE:> This parameter is always parsed as a hexidecimal value.
+
+=item Default Value
+
+None. This parameter is not mandatory. An available B<vslot> will be selected
+if this parameter is not specified.
+
+=back
+
+=back
+
+=head1 Other Parameters and Flags
+
+=over 4
+
+=item B<permissive>=I<BOOLEAN>
+
+=over 4
+
+=item Description
 
 By default pciback only allows PV guests to write "known safe" values
 into PCI configuration space, likewise QEMU (both qemu-xen and
@@ -46,33 +119,79 @@ more control over the device, which may have security or stability
 implications.  It is recommended to only enable this option for
 trusted VMs under administrator's control.
 
-=item B<msitranslate=BOOLEAN>
+=item Default Value
+
+0
+
+=back
+
+=item B<msitranslate>=I<BOOLEAN>
+
+=over 4
+
+=item Description
 
 Specifies that MSI-INTx translation should be turned on for the PCI
 device. When enabled, MSI-INTx translation will always enable MSI on
-the PCI device regardless of whether the guest uses INTx or MSI. Some
-device drivers, such as NVIDIA's, detect an inconsistency and do not
+the PCI device regardless of whether the guest uses INTx or MSI.
+
+=item Default Value
+
+Some device drivers, such as NVIDIA's, detect an inconsistency and do not
 function when this option is enabled. Therefore the default is false (0).
 
-=item B<seize=BOOLEAN>
+=back
 
-Tells B<xl> to automatically attempt to re-assign a device to
-pciback if it is not already assigned.
+=item B<seize>=I<BOOLEAN>
 
-B<WARNING:> If you set this option, B<xl> will gladly re-assign a critical
+=over 4
+
+=item Description
+
+Tells L<xl(1)> to automatically attempt to make the device assignable to
+guests if that has not already been done by the B<pci-assignable-add>
+command.
+
+B<WARNING:> If you set this option, L<xl> will gladly re-assign a critical
 system device, such as a network or a disk controller being used by
 dom0 without confirmation.  Please use with care.
 
-=item B<power_mgmt=BOOLEAN>
+=item Default Value
+
+0
+
+=back
+
+=item B<power_mgmt>=I<BOOLEAN>
+
+=over 4
+
+=item Description
 
 B<(HVM only)> Specifies that the VM should be able to program the
-D0-D3hot power management states for the PCI device. The default is false (0).
+D0-D3hot power management states for the PCI device.
 
-=item B<rdm_policy=STRING>
+=item Default Value
+
+0
+
+=back
+
+=item B<rdm_policy>=I<STRING>
+
+=over 4
+
+=item Description
 
 B<(HVM/x86 only)> This is the same as the policy setting inside the B<rdm>
-option but just specific to a given device. The default is "relaxed".
+option in L<xl.cfg(5)> but just specific to a given device.
 
-Note: this would override global B<rdm> option.
+B<NOTE>: This overrides the global B<rdm> option.
+
+=item Default Value
+
+"strict"
+
+=back
 
 =back
