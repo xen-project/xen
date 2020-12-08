@@ -336,50 +336,6 @@ retry_transaction2:
     return 0;
 }
 
-static int get_all_assigned_devices(libxl__gc *gc, libxl_device_pci **list, int *num)
-{
-    char **domlist;
-    unsigned int nd = 0, i;
-
-    *list = NULL;
-    *num = 0;
-
-    domlist = libxl__xs_directory(gc, XBT_NULL, "/local/domain", &nd);
-    for(i = 0; i < nd; i++) {
-        char *path, *num_devs;
-
-        path = GCSPRINTF("/local/domain/0/backend/%s/%s/0/num_devs",
-                         libxl__device_kind_to_string(LIBXL__DEVICE_KIND_PCI),
-                         domlist[i]);
-        num_devs = libxl__xs_read(gc, XBT_NULL, path);
-        if ( num_devs ) {
-            int ndev = atoi(num_devs), j;
-            char *devpath, *bdf;
-
-            for(j = 0; j < ndev; j++) {
-                devpath = GCSPRINTF("/local/domain/0/backend/%s/%s/0/dev-%u",
-                                    libxl__device_kind_to_string(LIBXL__DEVICE_KIND_PCI),
-                                    domlist[i], j);
-                bdf = libxl__xs_read(gc, XBT_NULL, devpath);
-                if ( bdf ) {
-                    unsigned dom, bus, dev, func;
-                    if ( sscanf(bdf, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
-                        continue;
-
-                    *list = realloc(*list, sizeof(libxl_device_pci) * ((*num) + 1));
-                    if (*list == NULL)
-                        return ERROR_NOMEM;
-                    pci_struct_fill(*list + *num, dom, bus, dev, func, 0);
-                    (*num)++;
-                }
-            }
-        }
-    }
-    libxl__ptr_add(gc, *list);
-
-    return 0;
-}
-
 static int is_pci_in_array(libxl_device_pci *assigned, int num_assigned,
                            int dom, int bus, int dev, int func)
 {
@@ -427,18 +383,57 @@ static int sysfs_write_bdf(libxl__gc *gc, const char * sysfs_path,
     return 0;
 }
 
+#define PCI_INFO_PATH "/libxl/pci"
+
+static char *pci_info_xs_path(libxl__gc *gc, libxl_device_pci *pci,
+                              const char *node)
+{
+    return node ?
+        GCSPRINTF(PCI_INFO_PATH"/"PCI_BDF_XSPATH"/%s",
+                  pci->domain, pci->bus, pci->dev, pci->func,
+                  node) :
+        GCSPRINTF(PCI_INFO_PATH"/"PCI_BDF_XSPATH,
+                  pci->domain, pci->bus, pci->dev, pci->func);
+}
+
+
+static int pci_info_xs_write(libxl__gc *gc, libxl_device_pci *pci,
+                              const char *node, const char *val)
+{
+    char *path = pci_info_xs_path(gc, pci, node);
+    int rc = libxl__xs_printf(gc, XBT_NULL, path, "%s", val);
+
+    if (rc) LOGE(WARN, "Write of %s to node %s failed.", val, path);
+
+    return rc;
+}
+
+static char *pci_info_xs_read(libxl__gc *gc, libxl_device_pci *pci,
+                              const char *node)
+{
+    char *path = pci_info_xs_path(gc, pci, node);
+
+    return libxl__xs_read(gc, XBT_NULL, path);
+}
+
+static void pci_info_xs_remove(libxl__gc *gc, libxl_device_pci *pci,
+                               const char *node)
+{
+    char *path = pci_info_xs_path(gc, pci, node);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+
+    /* Remove the xenstore entry */
+    xs_rm(ctx->xsh, XBT_NULL, path);
+}
+
 libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
 {
     GC_INIT(ctx);
-    libxl_device_pci *pcis = NULL, *new, *assigned;
+    libxl_device_pci *pcis = NULL, *new;
     struct dirent *de;
     DIR *dir;
-    int r, num_assigned;
 
     *num = 0;
-
-    r = get_all_assigned_devices(gc, &assigned, &num_assigned);
-    if (r) goto out;
 
     dir = opendir(SYSFS_PCIBACK_DRIVER);
     if (NULL == dir) {
@@ -455,9 +450,6 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
         if (sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4)
             continue;
 
-        if (is_pci_in_array(assigned, num_assigned, dom, bus, dev, func))
-            continue;
-
         new = realloc(pcis, ((*num) + 1) * sizeof(*new));
         if (NULL == new)
             continue;
@@ -467,6 +459,10 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
 
         memset(new, 0, sizeof(*new));
         pci_struct_fill(new, dom, bus, dev, func, 0);
+
+        if (pci_info_xs_read(gc, new, "domid")) /* already assigned */
+            continue;
+
         (*num)++;
     }
 
@@ -735,48 +731,6 @@ static int pciback_dev_unassign(libxl__gc *gc, libxl_device_pci *pci)
         }
     }
     return 0;
-}
-
-#define PCI_INFO_PATH "/libxl/pci"
-
-static char *pci_info_xs_path(libxl__gc *gc, libxl_device_pci *pci,
-                              const char *node)
-{
-    return node ?
-        GCSPRINTF(PCI_INFO_PATH"/"PCI_BDF_XSPATH"/%s",
-                  pci->domain, pci->bus, pci->dev, pci->func,
-                  node) :
-        GCSPRINTF(PCI_INFO_PATH"/"PCI_BDF_XSPATH,
-                  pci->domain, pci->bus, pci->dev, pci->func);
-}
-
-
-static void pci_info_xs_write(libxl__gc *gc, libxl_device_pci *pci,
-                              const char *node, const char *val)
-{
-    char *path = pci_info_xs_path(gc, pci, node);
-
-    if ( libxl__xs_printf(gc, XBT_NULL, path, "%s", val) < 0 ) {
-        LOGE(WARN, "Write of %s to node %s failed.", val, path);
-    }
-}
-
-static char *pci_info_xs_read(libxl__gc *gc, libxl_device_pci *pci,
-                              const char *node)
-{
-    char *path = pci_info_xs_path(gc, pci, node);
-
-    return libxl__xs_read(gc, XBT_NULL, path);
-}
-
-static void pci_info_xs_remove(libxl__gc *gc, libxl_device_pci *pci,
-                               const char *node)
-{
-    char *path = pci_info_xs_path(gc, pci, node);
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-
-    /* Remove the xenstore entry */
-    xs_rm(ctx->xsh, XBT_NULL, path);
 }
 
 static int libxl__device_pci_assignable_add(libxl__gc *gc,
@@ -1594,6 +1548,9 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
         goto out;
     }
 
+    rc = pci_info_xs_write(gc, pci, "domid", GCSPRINTF("%u", domid));
+    if (rc) goto out;
+
     libxl__device_pci_reset(gc, pci->domain, pci->bus, pci->dev, pci->func);
 
     stubdomid = libxl_get_stubdom_id(ctx, domid);
@@ -1721,6 +1678,7 @@ static void device_pci_add_done(libxl__egc *egc,
              "PCI device %x:%x:%x.%x (rc %d)",
              pci->domain, pci->bus, pci->dev, pci->func,
              rc);
+        pci_info_xs_remove(gc, pci, "domid");
     }
     aodev->rc = rc;
     aodev->callback(egc, aodev);
@@ -2282,6 +2240,9 @@ out:
     libxl__xswait_stop(gc, &prs->xswait);
     libxl__ev_time_deregister(gc, &prs->timeout);
     libxl__ev_time_deregister(gc, &prs->retry_timer);
+
+    if (!rc) pci_info_xs_remove(gc, pci, "domid");
+
     aodev->rc = rc;
     aodev->callback(egc, aodev);
 }
