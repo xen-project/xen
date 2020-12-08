@@ -336,24 +336,17 @@ retry_transaction2:
     return 0;
 }
 
-static int is_pci_in_array(libxl_device_pci *assigned, int num_assigned,
-                           int dom, int bus, int dev, int func)
+static bool is_pci_in_array(libxl_device_pci *pcis, int num,
+                            libxl_device_pci *pci)
 {
     int i;
 
-    for(i = 0; i < num_assigned; i++) {
-        if ( assigned[i].domain != dom )
-            continue;
-        if ( assigned[i].bus != bus )
-            continue;
-        if ( assigned[i].dev != dev )
-            continue;
-        if ( assigned[i].func != func )
-            continue;
-        return 1;
+    for (i = 0; i < num; i++) {
+        if (COMPARE_PCI(pci, &pcis[i]))
+            break;
     }
 
-    return 0;
+    return i < num;
 }
 
 /* Write the standard BDF into the sysfs path given by sysfs_path. */
@@ -1487,21 +1480,17 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid,
     return AO_INPROGRESS;
 }
 
-static int libxl_pci_assignable(libxl_ctx *ctx, libxl_device_pci *pci)
+static bool libxl_pci_assignable(libxl_ctx *ctx, libxl_device_pci *pci)
 {
     libxl_device_pci *pcis;
-    int num, i;
+    int num;
+    bool assignable;
 
     pcis = libxl_device_pci_assignable_list(ctx, &num);
-    for (i = 0; i < num; i++) {
-        if (pcis[i].domain == pci->domain &&
-            pcis[i].bus == pci->bus &&
-            pcis[i].dev == pci->dev &&
-            pcis[i].func == pci->func)
-            break;
-    }
+    assignable = is_pci_in_array(pcis, num, pci);
     libxl_device_pci_assignable_list_free(pcis, num);
-    return i != num;
+
+    return assignable;
 }
 
 static void device_pci_add_stubdom_wait(libxl__egc *egc,
@@ -1834,8 +1823,7 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
         goto out_fail;
     }
 
-    attached = is_pci_in_array(pcis, num, pci->domain,
-                               pci->bus, pci->dev, pci->func);
+    attached = is_pci_in_array(pcis, num, pci);
     libxl_device_pci_list_free(pcis, num);
 
     rc = ERROR_INVAL;
