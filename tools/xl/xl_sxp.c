@@ -194,8 +194,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
         fprintf(fh, "\t(device\n");
         fprintf(fh, "\t\t(pci\n");
         fprintf(fh, "\t\t\t(pci dev %04x:%02x:%02x.%01x@%02x)\n",
-               d_config->pcidevs[i].domain, d_config->pcidevs[i].bus,
-               d_config->pcidevs[i].dev, d_config->pcidevs[i].func,
+               d_config->pcidevs[i].bdf.domain, d_config->pcidevs[i].bdf.bus,
+               d_config->pcidevs[i].bdf.dev, d_config->pcidevs[i].bdf.func,
                d_config->pcidevs[i].vdevfn);
         fprintf(fh, "\t\t\t(opts msitranslate %d power_mgmt %d)\n",
                d_config->pcidevs[i].msitranslate,

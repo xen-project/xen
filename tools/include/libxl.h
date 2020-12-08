@@ -464,6 +464,12 @@
 #define LIBXL_HAVE_DEVICE_PCI_ASSIGNABLE_LIST_FREE 1
 
 /*
+ * LIBXL_HAVE_PCI_BDF indicates that the 'libxl_pci_bdf' type is defined
+ * is embedded in the 'libxl_device_pci' type.
+ */
+#define LIBXL_HAVE_PCI_BDF 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

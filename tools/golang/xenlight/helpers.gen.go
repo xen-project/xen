@@ -1999,6 +1999,41 @@ xc.colo_checkpoint_port = C.CString(x.ColoCheckpointPort)}
  return nil
  }
 
+// NewPciBdf returns an instance of PciBdf initialized with defaults.
+func NewPciBdf() (*PciBdf, error) {
+var (
+x PciBdf
+xc C.libxl_pci_bdf)
+
+C.libxl_pci_bdf_init(&xc)
+defer C.libxl_pci_bdf_dispose(&xc)
+
+if err := x.fromC(&xc); err != nil {
+return nil, err }
+
+return &x, nil}
+
+func (x *PciBdf) fromC(xc *C.libxl_pci_bdf) error {
+ x.Func = byte(xc._func)
+x.Dev = byte(xc.dev)
+x.Bus = byte(xc.bus)
+x.Domain = int(xc.domain)
+
+ return nil}
+
+func (x *PciBdf) toC(xc *C.libxl_pci_bdf) (err error){defer func(){
+if err != nil{
+C.libxl_pci_bdf_dispose(xc)}
+}()
+
+xc._func = C.uint8_t(x.Func)
+xc.dev = C.uint8_t(x.Dev)
+xc.bus = C.uint8_t(x.Bus)
+xc.domain = C.int(x.Domain)
+
+ return nil
+ }
+
 // NewDevicePci returns an instance of DevicePci initialized with defaults.
 func NewDevicePci() (*DevicePci, error) {
 var (
@@ -2014,10 +2049,9 @@ return nil, err }
 return &x, nil}
 
 func (x *DevicePci) fromC(xc *C.libxl_device_pci) error {
- x.Func = byte(xc._func)
-x.Dev = byte(xc.dev)
-x.Bus = byte(xc.bus)
-x.Domain = int(xc.domain)
+ if err := x.Bdf.fromC(&xc.bdf);err != nil {
+return fmt.Errorf("converting field Bdf: %v", err)
+}
 x.Vdevfn = uint32(xc.vdevfn)
 x.VfuncMask = uint32(xc.vfunc_mask)
 x.Msitranslate = bool(xc.msitranslate)
@@ -2033,10 +2067,9 @@ if err != nil{
 C.libxl_device_pci_dispose(xc)}
 }()
 
-xc._func = C.uint8_t(x.Func)
-xc.dev = C.uint8_t(x.Dev)
-xc.bus = C.uint8_t(x.Bus)
-xc.domain = C.int(x.Domain)
+if err := x.Bdf.toC(&xc.bdf); err != nil {
+return fmt.Errorf("converting field Bdf: %v", err)
+}
 xc.vdevfn = C.uint32_t(x.Vdevfn)
 xc.vfunc_mask = C.uint32_t(x.VfuncMask)
 xc.msitranslate = C.bool(x.Msitranslate)
@@ -2766,13 +2799,13 @@ if err := x.Nics[i].fromC(&v); err != nil {
 return fmt.Errorf("converting field Nics: %v", err) }
 }
 }
-x.Pcidevs = nil
-if n := int(xc.num_pcidevs); n > 0 {
-cPcidevs := (*[1<<28]C.libxl_device_pci)(unsafe.Pointer(xc.pcidevs))[:n:n]
-x.Pcidevs = make([]DevicePci, n)
-for i, v := range cPcidevs {
-if err := x.Pcidevs[i].fromC(&v); err != nil {
-return fmt.Errorf("converting field Pcidevs: %v", err) }
+x.Pcis = nil
+if n := int(xc.num_pcis); n > 0 {
+cPcis := (*[1<<28]C.libxl_device_pci)(unsafe.Pointer(xc.pcis))[:n:n]
+x.Pcis = make([]DevicePci, n)
+for i, v := range cPcis {
+if err := x.Pcis[i].fromC(&v); err != nil {
+return fmt.Errorf("converting field Pcis: %v", err) }
 }
 }
 x.Rdms = nil
@@ -2922,13 +2955,13 @@ return fmt.Errorf("converting field Nics: %v", err)
 }
 }
 }
-if numPcidevs := len(x.Pcidevs); numPcidevs > 0 {
-xc.pcidevs = (*C.libxl_device_pci)(C.malloc(C.ulong(numPcidevs)*C.sizeof_libxl_device_pci))
-xc.num_pcidevs = C.int(numPcidevs)
-cPcidevs := (*[1<<28]C.libxl_device_pci)(unsafe.Pointer(xc.pcidevs))[:numPcidevs:numPcidevs]
-for i,v := range x.Pcidevs {
-if err := v.toC(&cPcidevs[i]); err != nil {
-return fmt.Errorf("converting field Pcidevs: %v", err)
+if numPcis := len(x.Pcis); numPcis > 0 {
+xc.pcis = (*C.libxl_device_pci)(C.malloc(C.ulong(numPcis)*C.sizeof_libxl_device_pci))
+xc.num_pcis = C.int(numPcis)
+cPcis := (*[1<<28]C.libxl_device_pci)(unsafe.Pointer(xc.pcis))[:numPcis:numPcis]
+for i,v := range x.Pcis {
+if err := v.toC(&cPcis[i]); err != nil {
+return fmt.Errorf("converting field Pcis: %v", err)
 }
 }
 }

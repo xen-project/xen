@@ -27,10 +27,10 @@ static int pci_struct_fill(libxl_device_pci *pci, unsigned int domain,
                            unsigned int bus, unsigned int dev,
                            unsigned int func, unsigned int vdevfn)
 {
-    pci->domain = domain;
-    pci->bus = bus;
-    pci->dev = dev;
-    pci->func = func;
+    pci->bdf.domain = domain;
+    pci->bdf.bus = bus;
+    pci->bdf.dev = dev;
+    pci->bdf.func = func;
     pci->vdevfn = vdevfn;
     return 0;
 }

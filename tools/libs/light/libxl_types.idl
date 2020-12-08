@@ -770,18 +770,22 @@ libxl_device_nic = Struct("device_nic", [
     ("colo_checkpoint_port", string)
     ])
 
+libxl_pci_bdf = Struct("pci_bdf", [
+    ("func", uint8),
+    ("dev", uint8),
+    ("bus", uint8),
+    ("domain", integer),
+    ])
+
 libxl_device_pci = Struct("device_pci", [
-    ("func",      uint8),
-    ("dev",       uint8),
-    ("bus",       uint8),
-    ("domain",    integer),
-    ("vdevfn",    uint32),
+    ("bdf", libxl_pci_bdf),
+    ("vdevfn", uint32),
     ("vfunc_mask", uint32),
     ("msitranslate", bool),
     ("power_mgmt", bool),
     ("permissive", bool),
     ("seize", bool),
-    ("rdm_policy",      libxl_rdm_reserve_policy),
+    ("rdm_policy", libxl_rdm_reserve_policy),
     ])
 
 libxl_device_rdm = Struct("device_rdm", [

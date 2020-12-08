@@ -34,7 +34,8 @@ static void pcilist(uint32_t domid)
     for (i = 0; i < num; i++) {
         printf("%02x.%01x %04x:%02x:%02x.%01x\n",
                (pcis[i].vdevfn >> 3) & 0x1f, pcis[i].vdevfn & 0x7,
-               pcis[i].domain, pcis[i].bus, pcis[i].dev, pcis[i].func);
+               pcis[i].bdf.domain, pcis[i].bdf.bus, pcis[i].bdf.dev,
+               pcis[i].bdf.func);
     }
     libxl_device_pci_list_free(pcis, num);
 }
@@ -163,7 +164,8 @@ static void pciassignable_list(void)
         return;
     for (i = 0; i < num; i++) {
         printf("%04x:%02x:%02x.%01x\n",
-               pcis[i].domain, pcis[i].bus, pcis[i].dev, pcis[i].func);
+               pcis[i].bdf.domain, pcis[i].bdf.bus, pcis[i].bdf.dev,
+               pcis[i].bdf.func);
     }
     libxl_device_pci_assignable_list_free(pcis, num);
 }
