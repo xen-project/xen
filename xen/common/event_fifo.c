@@ -230,28 +230,23 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
     }
 
     /*
+     * Control block not mapped.  The guest must not unmask an
+     * event until the control block is initialized, so we can
+     * just drop the event.
+     */
+    if ( unlikely(!v->evtchn_fifo->control_block) )
+    {
+        printk(XENLOG_G_WARNING
+               "%pv has no FIFO event channel control block\n", v);
+        goto unlock;
+    }
+
+    /*
      * Link the event if it unmasked and not already linked.
      */
     if ( !guest_test_bit(d, EVTCHN_FIFO_MASKED, word) &&
-         !guest_test_bit(d, EVTCHN_FIFO_LINKED, word) )
+         !guest_test_and_set_bit(d, EVTCHN_FIFO_LINKED, word) )
     {
-        event_word_t *tail_word;
-
-        /*
-         * Control block not mapped.  The guest must not unmask an
-         * event until the control block is initialized, so we can
-         * just drop the event.
-         */
-        if ( unlikely(!v->evtchn_fifo->control_block) )
-        {
-            printk(XENLOG_G_WARNING
-                   "%pv has no FIFO event channel control block\n", v);
-            goto unlock;
-        }
-
-        if ( guest_test_and_set_bit(d, EVTCHN_FIFO_LINKED, word) )
-            goto unlock;
-
         /*
          * If this event was a tail, the old queue is now empty and
          * its tail must be invalidated to prevent adding an event to
@@ -286,6 +281,8 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
         linked = false;
         if ( q->tail )
         {
+            event_word_t *tail_word;
+
             tail_word = evtchn_fifo_word_from_port(d, q->tail);
             linked = evtchn_fifo_set_link(d, tail_word, port);
         }
