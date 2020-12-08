@@ -1487,10 +1487,10 @@ void parse_config_data(const char *config_source,
              * the global policy by default.
              */
             pci->rdm_policy = b_info->u.hvm.rdm.policy;
-            e = xlu_pci_parse_bdf(config, pci, buf);
+            e = xlu_pci_parse_spec_string(config, pci, buf);
             if (e) {
                 fprintf(stderr,
-                        "unable to parse PCI BDF `%s' for passthrough\n",
+                        "unable to parse PCI_SPEC_STRING `%s' for passthrough\n",
                         buf);
                 exit(-e);
             }

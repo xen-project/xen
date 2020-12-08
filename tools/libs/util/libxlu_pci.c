@@ -1,5 +1,7 @@
 #define _GNU_SOURCE
 
+#include <ctype.h>
+
 #include "libxlu_internal.h"
 #include "libxlu_disk_l.h"
 #include "libxlu_disk_i.h"
@@ -9,185 +11,213 @@
 #define XLU__PCI_ERR(_c, _x, _a...) \
     if((_c) && (_c)->report) fprintf((_c)->report, _x, ##_a)
 
-static int hex_convert(const char *str, unsigned int *val, unsigned int mask)
+static int parse_bdf(libxl_pci_bdf *bdfp, uint32_t *vfunc_maskp,
+                     const char *str, const char **endp)
 {
-    unsigned long ret;
-    char *end;
+    const char *ptr = str;
+    unsigned int colons = 0;
+    unsigned int domain, bus, dev, func;
+    int n;
 
-    ret = strtoul(str, &end, 16);
-    if ( end == str || *end != '\0' )
-        return -1;
-    if ( ret & ~mask )
-        return -1;
-    *val = (unsigned int)ret & mask;
-    return 0;
-}
-
-static int pci_struct_fill(libxl_device_pci *pci, unsigned int domain,
-                           unsigned int bus, unsigned int dev,
-                           unsigned int func, unsigned int vdevfn)
-{
-    pci->bdf.domain = domain;
-    pci->bdf.bus = bus;
-    pci->bdf.dev = dev;
-    pci->bdf.func = func;
-    pci->vdevfn = vdevfn;
-    return 0;
-}
-
-#define STATE_DOMAIN    0
-#define STATE_BUS       1
-#define STATE_DEV       2
-#define STATE_FUNC      3
-#define STATE_VSLOT     4
-#define STATE_OPTIONS_K 6
-#define STATE_OPTIONS_V 7
-#define STATE_TERMINAL  8
-#define STATE_TYPE      9
-#define STATE_RDM_STRATEGY      10
-#define STATE_RESERVE_POLICY    11
-#define INVALID         0xffffffff
-int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pci, const char *str)
-{
-    unsigned state = STATE_DOMAIN;
-    unsigned dom = INVALID, bus = INVALID, dev = INVALID, func = INVALID, vslot = 0;
-    char *buf2, *tok, *ptr, *end, *optkey = NULL;
-
-    if ( NULL == (buf2 = ptr = strdup(str)) )
-        return ERROR_NOMEM;
-
-    for(tok = ptr, end = ptr + strlen(ptr) + 1; ptr < end; ptr++) {
-        switch(state) {
-        case STATE_DOMAIN:
-            if ( *ptr == ':' ) {
-                state = STATE_BUS;
-                *ptr = '\0';
-                if ( hex_convert(tok, &dom, 0xffff) )
-                    goto parse_error;
-                tok = ptr + 1;
-            }
-            break;
-        case STATE_BUS:
-            if ( *ptr == ':' ) {
-                state = STATE_DEV;
-                *ptr = '\0';
-                if ( hex_convert(tok, &bus, 0xff) )
-                    goto parse_error;
-                tok = ptr + 1;
-            }else if ( *ptr == '.' ) {
-                state = STATE_FUNC;
-                *ptr = '\0';
-                if ( dom & ~0xff )
-                    goto parse_error;
-                bus = dom;
-                dom = 0;
-                if ( hex_convert(tok, &dev, 0xff) )
-                    goto parse_error;
-                tok = ptr + 1;
-            }
-            break;
-        case STATE_DEV:
-            if ( *ptr == '.' ) {
-                state = STATE_FUNC;
-                *ptr = '\0';
-                if ( hex_convert(tok, &dev, 0xff) )
-                    goto parse_error;
-                tok = ptr + 1;
-            }
-            break;
-        case STATE_FUNC:
-            if ( *ptr == '\0' || *ptr == '@' || *ptr == ',' ) {
-                switch( *ptr ) {
-                case '\0':
-                    state = STATE_TERMINAL;
-                    break;
-                case '@':
-                    state = STATE_VSLOT;
-                    break;
-                case ',':
-                    state = STATE_OPTIONS_K;
-                    break;
-                }
-                *ptr = '\0';
-                if ( !strcmp(tok, "*") ) {
-                    pci->vfunc_mask = LIBXL_PCI_FUNC_ALL;
-                }else{
-                    if ( hex_convert(tok, &func, 0x7) )
-                        goto parse_error;
-                    pci->vfunc_mask = (1 << 0);
-                }
-                tok = ptr + 1;
-            }
-            break;
-        case STATE_VSLOT:
-            if ( *ptr == '\0' || *ptr == ',' ) {
-                state = ( *ptr == ',' ) ? STATE_OPTIONS_K : STATE_TERMINAL;
-                *ptr = '\0';
-                if ( hex_convert(tok, &vslot, 0xff) )
-                    goto parse_error;
-                tok = ptr + 1;
-            }
-            break;
-        case STATE_OPTIONS_K:
-            if ( *ptr == '=' ) {
-                state = STATE_OPTIONS_V;
-                *ptr = '\0';
-                optkey = tok;
-                tok = ptr + 1;
-            }
-            break;
-        case STATE_OPTIONS_V:
-            if ( *ptr == ',' || *ptr == '\0' ) {
-                state = (*ptr == ',') ? STATE_OPTIONS_K : STATE_TERMINAL;
-                *ptr = '\0';
-                if ( !strcmp(optkey, "msitranslate") ) {
-                    pci->msitranslate = atoi(tok);
-                }else if ( !strcmp(optkey, "power_mgmt") ) {
-                    pci->power_mgmt = atoi(tok);
-                }else if ( !strcmp(optkey, "permissive") ) {
-                    pci->permissive = atoi(tok);
-                }else if ( !strcmp(optkey, "seize") ) {
-                    pci->seize = atoi(tok);
-                } else if (!strcmp(optkey, "rdm_policy")) {
-                    if (!strcmp(tok, "strict")) {
-                        pci->rdm_policy = LIBXL_RDM_RESERVE_POLICY_STRICT;
-                    } else if (!strcmp(tok, "relaxed")) {
-                        pci->rdm_policy = LIBXL_RDM_RESERVE_POLICY_RELAXED;
-                    } else {
-                        XLU__PCI_ERR(cfg, "%s is not an valid PCI RDM property"
-                                          " policy: 'strict' or 'relaxed'.",
-                                     tok);
-                        goto parse_error;
-                    }
-                } else {
-                    XLU__PCI_ERR(cfg, "Unknown PCI BDF option: %s", optkey);
-                }
-                tok = ptr + 1;
-            }
-        default:
-            break;
-        }
+    /* Count occurrences of ':' to detrmine presence/absence of the 'domain' */
+    while (isxdigit(*ptr) || *ptr == ':') {
+        if (*ptr == ':')
+            colons++;
+        ptr++;
     }
 
-    if ( tok != ptr || state != STATE_TERMINAL )
-        goto parse_error;
+    ptr = str;
+    switch (colons) {
+    case 1:
+        domain = 0;
+        if (sscanf(ptr, "%x:%x.%n", &bus, &dev, &n) != 2)
+            return ERROR_INVAL;
+        break;
+    case 2:
+        if (sscanf(ptr, "%x:%x:%x.%n", &domain, &bus, &dev, &n) != 3)
+            return ERROR_INVAL;
+        break;
+    default:
+        return ERROR_INVAL;
+    }
 
-    assert(dom != INVALID && bus != INVALID && dev != INVALID && func != INVALID);
+    if (domain > 0xffff || bus > 0xff || dev > 0x1f)
+        return ERROR_INVAL;
 
-    /* Just a pretty way to fill in the values */
-    pci_struct_fill(pci, dom, bus, dev, func, vslot << 3);
+    ptr += n;
+    if (*ptr == '*') {
+        if (!vfunc_maskp)
+            return ERROR_INVAL;
+        *vfunc_maskp = LIBXL_PCI_FUNC_ALL;
+        func = 0;
+        ptr++;
+    } else {
+        if (sscanf(ptr, "%x%n", &func, &n) != 1)
+            return ERROR_INVAL;
+        if (func > 7)
+            return ERROR_INVAL;
+        if (vfunc_maskp)
+            *vfunc_maskp = 1;
+        ptr += n;
+    }
 
-    free(buf2);
+    bdfp->domain = domain;
+    bdfp->bus = bus;
+    bdfp->dev = dev;
+    bdfp->func = func;
+
+    if (endp)
+        *endp = ptr;
 
     return 0;
+}
 
-parse_error:
-    free(buf2);
-    return ERROR_INVAL;
+static int parse_vslot(uint32_t *vdevfnp, const char *str, const char **endp)
+{
+    const char *ptr = str;
+    unsigned int val;
+    int n;
+
+    if (sscanf(ptr, "%x%n", &val, &n) != 1)
+        return ERROR_INVAL;
+
+    if (val > 0x1f)
+        return ERROR_INVAL;
+
+    ptr += n;
+
+    *vdevfnp = val << 3;
+
+    if (endp)
+        *endp = ptr;
+
+    return 0;
+}
+
+static int parse_key_val(char **keyp, char**valp, const char *str,
+                         const char **endp)
+{
+    const char *ptr = str;
+    char *key, *val;
+
+    while (*ptr != '=' && *ptr != '\0')
+        ptr++;
+
+    if (*ptr == '\0')
+        return ERROR_INVAL;
+
+    key = strndup(str, ptr - str);
+    if (!key)
+        return ERROR_NOMEM;
+
+    str = ++ptr; /* skip '=' */
+    while (*ptr != ',' && *ptr != '\0')
+        ptr++;
+
+    val = strndup(str, ptr - str);
+    if (!val) {
+        free(key);
+        return ERROR_NOMEM;
+    }
+
+    if (*ptr == ',')
+        ptr++;
+
+    *keyp = key;
+    *valp = val;
+    *endp = ptr;
+
+    return 0;
+}
+
+static int parse_rdm_policy(XLU_Config *cfg, libxl_rdm_reserve_policy *policy,
+                            const char *str)
+{
+    int ret = libxl_rdm_reserve_policy_from_string(str, policy);
+
+    if (ret)
+        XLU__PCI_ERR(cfg, "Unknown RDM policy: %s", str);
+
+    return ret;
+}
+
+int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_pci_bdf *bdf, const char *str)
+{
+    return parse_bdf(bdf, NULL, str, NULL);
+}
+
+int xlu_pci_parse_spec_string(XLU_Config *cfg, libxl_device_pci *pcidev,
+                              const char *str)
+{
+    const char *ptr = str;
+    bool bdf_present = false;
+    int ret;
+
+    /* Attempt to parse 'bdf' as positional parameter */
+    ret = parse_bdf(&pcidev->bdf, &pcidev->vfunc_mask, ptr, &ptr);
+    if (!ret) {
+        bdf_present = true;
+
+        /* Check whether 'vslot' if present */
+        if (*ptr == '@') {
+            ret = parse_vslot(&pcidev->vdevfn, ++ptr, &ptr);
+            if (ret)
+                return ret;
+        }
+        if (*ptr == ',')
+            ptr++;
+        else if (*ptr != '\0')
+            return ERROR_INVAL;
+    }
+
+    /* Parse the rest as 'key=val' pairs */
+    while (*ptr != '\0') {
+        char *key, *val;
+
+        ret = parse_key_val(&key, &val, ptr, &ptr);
+        if (ret)
+            return ret;
+
+        if (!strcmp(key, "bdf")) {
+            ret = parse_bdf(&pcidev->bdf, &pcidev->vfunc_mask, val, NULL);
+            bdf_present = !ret;
+        } else if (!strcmp(key, "vslot")) {
+            ret = parse_vslot(&pcidev->vdevfn, val, NULL);
+        } else if (!strcmp(key, "permissive")) {
+            pcidev->permissive = atoi(val);
+        } else if (!strcmp(key, "msitranslate")) {
+            pcidev->msitranslate = atoi(val);
+        } else if (!strcmp(key, "seize")) {
+            pcidev->seize= atoi(val);
+        } else if (!strcmp(key, "power_mgmt")) {
+            pcidev->power_mgmt = atoi(val);
+        } else if (!strcmp(key, "rdm_policy")) {
+            ret = parse_rdm_policy(cfg, &pcidev->rdm_policy, val);
+        } else {
+            XLU__PCI_ERR(cfg, "Unknown PCI_SPEC_STRING option: %s", key);
+            ret = ERROR_INVAL;
+        }
+
+        free(key);
+        free(val);
+
+        if (ret)
+            return ret;
+    }
+
+    if (!bdf_present)
+        return ERROR_INVAL;
+
+    return 0;
 }
 
 int xlu_rdm_parse(XLU_Config *cfg, libxl_rdm_reserve *rdm, const char *str)
 {
+#define STATE_TYPE           0
+#define STATE_RDM_STRATEGY   1
+#define STATE_RESERVE_POLICY 2
+#define STATE_TERMINAL       3
+
     unsigned state = STATE_TYPE;
     char *buf2, *tok, *ptr, *end;
 
@@ -227,15 +257,8 @@ int xlu_rdm_parse(XLU_Config *cfg, libxl_rdm_reserve *rdm, const char *str)
             if (*ptr == ',' || *ptr == '\0') {
                 state = *ptr == ',' ? STATE_TYPE : STATE_TERMINAL;
                 *ptr = '\0';
-                if (!strcmp(tok, "strict")) {
-                    rdm->policy = LIBXL_RDM_RESERVE_POLICY_STRICT;
-                } else if (!strcmp(tok, "relaxed")) {
-                    rdm->policy = LIBXL_RDM_RESERVE_POLICY_RELAXED;
-                } else {
-                    XLU__PCI_ERR(cfg, "Unknown RDM property policy value: %s",
-                                 tok);
+                if (!parse_rdm_policy(cfg, &rdm->policy, tok))
                     goto parse_error;
-                }
                 tok = ptr + 1;
             }
         default:
@@ -253,6 +276,11 @@ int xlu_rdm_parse(XLU_Config *cfg, libxl_rdm_reserve *rdm, const char *str)
 parse_error:
     free(buf2);
     return ERROR_INVAL;
+
+#undef STATE_TYPE
+#undef STATE_RDM_STRATEGY
+#undef STATE_RESERVE_POLICY
+#undef STATE_TERMINAL
 }
 
 /*

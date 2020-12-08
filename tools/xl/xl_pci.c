@@ -55,7 +55,7 @@ int main_pcilist(int argc, char **argv)
     return 0;
 }
 
-static int pcidetach(uint32_t domid, const char *bdf, int force)
+static int pcidetach(uint32_t domid, const char *spec_string, int force)
 {
     libxl_device_pci pci;
     XLU_Config *config;
@@ -66,8 +66,9 @@ static int pcidetach(uint32_t domid, const char *bdf, int force)
     config = xlu_cfg_init(stderr, "command line");
     if (!config) { perror("xlu_cfg_inig"); exit(-1); }
 
-    if (xlu_pci_parse_bdf(config, &pci, bdf)) {
-        fprintf(stderr, "pci-detach: malformed BDF specification \"%s\"\n", bdf);
+    if (xlu_pci_parse_spec_string(config, &pci, spec_string)) {
+        fprintf(stderr, "pci-detach: malformed PCI_SPEC_STRING \"%s\"\n",
+                spec_string);
         exit(2);
     }
     if (force) {
@@ -89,7 +90,7 @@ int main_pcidetach(int argc, char **argv)
     uint32_t domid;
     int opt;
     int force = 0;
-    const char *bdf = NULL;
+    const char *spec_string = NULL;
 
     SWITCH_FOREACH_OPT(opt, "f", NULL, "pci-detach", 2) {
     case 'f':
@@ -98,15 +99,15 @@ int main_pcidetach(int argc, char **argv)
     }
 
     domid = find_domain(argv[optind]);
-    bdf = argv[optind + 1];
+    spec_string = argv[optind + 1];
 
-    if (pcidetach(domid, bdf, force))
+    if (pcidetach(domid, spec_string, force))
         return EXIT_FAILURE;
 
     return EXIT_SUCCESS;
 }
 
-static int pciattach(uint32_t domid, const char *bdf, const char *vs)
+static int pciattach(uint32_t domid, const char *spec_string)
 {
     libxl_device_pci pci;
     XLU_Config *config;
@@ -117,8 +118,9 @@ static int pciattach(uint32_t domid, const char *bdf, const char *vs)
     config = xlu_cfg_init(stderr, "command line");
     if (!config) { perror("xlu_cfg_inig"); exit(-1); }
 
-    if (xlu_pci_parse_bdf(config, &pci, bdf)) {
-        fprintf(stderr, "pci-attach: malformed BDF specification \"%s\"\n", bdf);
+    if (xlu_pci_parse_spec_string(config, &pci, spec_string)) {
+        fprintf(stderr, "pci-attach: malformed PCI_SPEC_STRING \"%s\"\n",
+                spec_string);
         exit(2);
     }
 
@@ -135,19 +137,16 @@ int main_pciattach(int argc, char **argv)
 {
     uint32_t domid;
     int opt;
-    const char *bdf = NULL, *vs = NULL;
+    const char *spec_string = NULL;
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "pci-attach", 2) {
         /* No options */
     }
 
     domid = find_domain(argv[optind]);
-    bdf = argv[optind + 1];
+    spec_string = argv[optind + 1];
 
-    if (optind + 1 < argc)
-        vs = argv[optind + 2];
-
-    if (pciattach(domid, bdf, vs))
+    if (pciattach(domid, spec_string))
         return EXIT_FAILURE;
 
     return EXIT_SUCCESS;
@@ -193,8 +192,8 @@ static int pciassignable_add(const char *bdf, int rebind)
     config = xlu_cfg_init(stderr, "command line");
     if (!config) { perror("xlu_cfg_init"); exit(-1); }
 
-    if (xlu_pci_parse_bdf(config, &pci, bdf)) {
-        fprintf(stderr, "pci-assignable-add: malformed BDF specification \"%s\"\n", bdf);
+    if (xlu_pci_parse_bdf(config, &pci.bdf, bdf)) {
+        fprintf(stderr, "pci-assignable-add: malformed BDF \"%s\"\n", bdf);
         exit(2);
     }
 
@@ -235,8 +234,8 @@ static int pciassignable_remove(const char *bdf, int rebind)
     config = xlu_cfg_init(stderr, "command line");
     if (!config) { perror("xlu_cfg_init"); exit(-1); }
 
-    if (xlu_pci_parse_bdf(config, &pci, bdf)) {
-        fprintf(stderr, "pci-assignable-remove: malformed BDF specification \"%s\"\n", bdf);
+    if (xlu_pci_parse_bdf(config, &pci.bdf, bdf)) {
+        fprintf(stderr, "pci-assignable-remove: malformed BDF \"%s\"\n", bdf);
         exit(2);
     }
 
