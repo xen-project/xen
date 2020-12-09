@@ -21,7 +21,10 @@ static inline unsigned long bitmap_size(unsigned long nr_bits)
 
 static inline void *bitmap_alloc(unsigned long nr_bits)
 {
-    return calloc(1, bitmap_size(nr_bits));
+    unsigned long longs;
+
+    longs = (nr_bits + BITS_PER_LONG - 1) / BITS_PER_LONG;
+    return calloc(longs, sizeof(unsigned long));
 }
 
 static inline void bitmap_set(void *addr, unsigned long nr_bits)
