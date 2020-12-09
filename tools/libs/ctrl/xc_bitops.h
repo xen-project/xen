@@ -6,9 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Needed by several includees, but no longer used for bitops. */
 #define BITS_PER_LONG (sizeof(unsigned long) * 8)
-#define ORDER_LONG (sizeof(unsigned long) == 4 ? 5 : 6)
 
 #define BITMAP_ENTRY(_nr,_bmap) ((_bmap))[(_nr) / 8]
 #define BITMAP_SHIFT(_nr) ((_nr) % 8)
