@@ -470,6 +470,13 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     evtchn_write_unlock(chn);
 
     bind->port = port;
+    /*
+     * If by any, the update of virq_to_evtchn[] would need guarding by
+     * virq_lock, but since this is the last action here, there's no strict
+     * need to acquire the lock. Hence holding event_lock isn't helpful
+     * anymore at this point, but utilize that its unlocking acts as the
+     * otherwise necessary smp_wmb() here.
+     */
     write_atomic(&v->virq_to_evtchn[virq], port);
 
  out:
@@ -656,10 +663,12 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     case ECS_VIRQ:
         for_each_vcpu ( d1, v )
         {
-            if ( read_atomic(&v->virq_to_evtchn[chn1->u.virq]) != port1 )
-                continue;
-            write_atomic(&v->virq_to_evtchn[chn1->u.virq], 0);
-            spin_barrier(&v->virq_lock);
+            unsigned long flags;
+
+            write_lock_irqsave(&v->virq_lock, flags);
+            if ( read_atomic(&v->virq_to_evtchn[chn1->u.virq]) == port1 )
+                write_atomic(&v->virq_to_evtchn[chn1->u.virq], 0);
+            write_unlock_irqrestore(&v->virq_lock, flags);
         }
         break;
 
@@ -809,7 +818,7 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
 
     ASSERT(!virq_is_global(virq));
 
-    spin_lock_irqsave(&v->virq_lock, flags);
+    read_lock_irqsave(&v->virq_lock, flags);
 
     port = read_atomic(&v->virq_to_evtchn[virq]);
     if ( unlikely(port == 0) )
@@ -824,7 +833,7 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
     }
 
  out:
-    spin_unlock_irqrestore(&v->virq_lock, flags);
+    read_unlock_irqrestore(&v->virq_lock, flags);
 }
 
 void send_guest_global_virq(struct domain *d, uint32_t virq)
@@ -843,7 +852,7 @@ void send_guest_global_virq(struct domain *d, uint32_t virq)
     if ( unlikely(v == NULL) )
         return;
 
-    spin_lock_irqsave(&v->virq_lock, flags);
+    read_lock_irqsave(&v->virq_lock, flags);
 
     port = read_atomic(&v->virq_to_evtchn[virq]);
     if ( unlikely(port == 0) )
@@ -857,7 +866,7 @@ void send_guest_global_virq(struct domain *d, uint32_t virq)
     }
 
  out:
-    spin_unlock_irqrestore(&v->virq_lock, flags);
+    read_unlock_irqrestore(&v->virq_lock, flags);
 }
 
 void send_guest_pirq(struct domain *d, const struct pirq *pirq)
