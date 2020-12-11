@@ -130,13 +130,13 @@ c_flags += $(CFLAGS-y)
 a_flags += $(CFLAGS-y) $(AFLAGS-y)
 
 built_in.o: $(obj-y) $(extra-y)
-ifeq ($(obj-y),)
+ifeq ($(strip $(obj-y)),)
 	$(CC) $(c_flags) -c -x c /dev/null -o $@
 else
 ifeq ($(CONFIG_LTO),y)
-	$(LD_LTO) -r -o $@ $(filter-out $(extra-y),$^)
+	$(LD_LTO) -r -o $@ $(filter $(obj-y),$^)
 else
-	$(LD) $(XEN_LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
+	$(LD) $(XEN_LDFLAGS) -r -o $@ $(filter $(obj-y),$^)
 endif
 endif
 
@@ -145,10 +145,10 @@ targets += $(filter-out $(subdir-obj-y), $(obj-y)) $(extra-y)
 targets += $(MAKECMDGOALS)
 
 built_in_bin.o: $(obj-bin-y) $(extra-y)
-ifeq ($(obj-bin-y),)
+ifeq ($(strip $(obj-bin-y)),)
 	$(CC) $(a_flags) -c -x assembler /dev/null -o $@
 else
-	$(LD) $(XEN_LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
+	$(LD) $(XEN_LDFLAGS) -r -o $@ $(filter $(obj-bin-y),$^)
 endif
 
 # Force execution of pattern rules (for which PHONY cannot be directly used).
