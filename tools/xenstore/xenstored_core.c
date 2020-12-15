@@ -1276,8 +1276,10 @@ static struct {
 	int (*func)(struct connection *conn, struct buffered_data *in);
 	unsigned int flags;
 #define XS_FLAG_NOTID		(1U << 0)	/* Ignore transaction id. */
+#define XS_FLAG_PRIV		(1U << 1)	/* Privileged domain only. */
 } const wire_funcs[XS_TYPE_COUNT] = {
-	[XS_CONTROL]           = { "CONTROL",           do_control },
+	[XS_CONTROL]           =
+	    { "CONTROL",       do_control,      XS_FLAG_PRIV },
 	[XS_DIRECTORY]         = { "DIRECTORY",         send_directory },
 	[XS_READ]              = { "READ",              do_read },
 	[XS_GET_PERMS]         = { "GET_PERMS",         do_get_perms },
@@ -1287,8 +1289,10 @@ static struct {
 	    { "UNWATCH",       do_unwatch,      XS_FLAG_NOTID },
 	[XS_TRANSACTION_START] = { "TRANSACTION_START", do_transaction_start },
 	[XS_TRANSACTION_END]   = { "TRANSACTION_END",   do_transaction_end },
-	[XS_INTRODUCE]         = { "INTRODUCE",         do_introduce },
-	[XS_RELEASE]           = { "RELEASE",           do_release },
+	[XS_INTRODUCE]         =
+	    { "INTRODUCE",     do_introduce,    XS_FLAG_PRIV },
+	[XS_RELEASE]           =
+	    { "RELEASE",       do_release,      XS_FLAG_PRIV },
 	[XS_GET_DOMAIN_PATH]   = { "GET_DOMAIN_PATH",   do_get_domain_path },
 	[XS_WRITE]             = { "WRITE",             do_write },
 	[XS_MKDIR]             = { "MKDIR",             do_mkdir },
@@ -1297,9 +1301,11 @@ static struct {
 	[XS_WATCH_EVENT]       = { "WATCH_EVENT",       NULL },
 	[XS_ERROR]             = { "ERROR",             NULL },
 	[XS_IS_DOMAIN_INTRODUCED] =
-			{ "IS_DOMAIN_INTRODUCED", do_is_domain_introduced },
-	[XS_RESUME]            = { "RESUME",            do_resume },
-	[XS_SET_TARGET]        = { "SET_TARGET",        do_set_target },
+	    { "IS_DOMAIN_INTRODUCED", do_is_domain_introduced, XS_FLAG_PRIV },
+	[XS_RESUME]            =
+	    { "RESUME",        do_resume,       XS_FLAG_PRIV },
+	[XS_SET_TARGET]        =
+	    { "SET_TARGET",    do_set_target,   XS_FLAG_PRIV },
 	[XS_RESET_WATCHES]     = { "RESET_WATCHES",     do_reset_watches },
 	[XS_DIRECTORY_PART]    = { "DIRECTORY_PART",    send_directory_part },
 };
@@ -1324,6 +1330,12 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	if ((unsigned int)type >= XS_TYPE_COUNT || !wire_funcs[type].func) {
 		eprintf("Client unknown operation %i", type);
 		send_error(conn, ENOSYS);
+		return;
+	}
+
+	if ((wire_funcs[type].flags & XS_FLAG_PRIV) &&
+	    domain_is_unprivileged(conn)) {
+		send_error(conn, EACCES);
 		return;
 	}
 
