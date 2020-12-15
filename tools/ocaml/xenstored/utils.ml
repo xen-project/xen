@@ -88,19 +88,17 @@ let read_file_single_integer filename =
 	Unix.close fd;
 	int_of_string (Bytes.sub_string buf 0 sz)
 
-let path_complete path connection_path =
-	if String.get path 0 <> '/' then
-		connection_path ^ path
-	else
-		path
-
+(* @path may be guest data and needs its length validating.  @connection_path
+ * is generated locally in xenstored and always of the form "/local/domain/$N/" *)
 let path_validate path connection_path =
-	if String.length path = 0 || String.length path > 1024 then
-		raise Define.Invalid_path
-	else
-		let cpath = path_complete path connection_path in
-		if String.get cpath 0 <> '/' then
-			raise Define.Invalid_path
-		else
-			cpath
+	let len = String.length path in
 
+	if len = 0 || len > 1024 then raise Define.Invalid_path;
+
+	let abs_path =
+		match String.get path 0 with
+		| '/' | '@' -> path
+		| _   -> connection_path ^ path
+	in
+
+	abs_path
