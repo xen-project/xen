@@ -420,7 +420,7 @@ let do_introduce con _t domains cons data =
 		else try
 			let ndom = Domains.create domains domid mfn port in
 			Connections.add_domain cons ndom;
-			Connections.fire_spec_watches cons "@introduceDomain";
+			Connections.fire_spec_watches cons Store.Path.introduce_domain;
 			ndom
 		with _ -> raise Invalid_Cmd_Args
 	in
@@ -439,7 +439,7 @@ let do_release con _t domains cons data =
 	Domains.del domains domid;
 	Connections.del_domain cons domid;
 	if fire_spec_watches
-	then Connections.fire_spec_watches cons "@releaseDomain"
+	then Connections.fire_spec_watches cons Store.Path.release_domain
 	else raise Invalid_Cmd_Args
 
 let do_resume con _t domains _cons data =
