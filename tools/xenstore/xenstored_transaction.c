@@ -276,7 +276,7 @@ int access_node(struct connection *conn, struct node *node,
 			i->check_gen = true;
 			if (node->generation != NO_GENERATION) {
 				set_tdb_key(trans_name, &local_key);
-				ret = write_node_raw(conn, &local_key, node);
+				ret = write_node_raw(conn, &local_key, node, true);
 				if (ret)
 					goto err;
 				i->ta_node = true;

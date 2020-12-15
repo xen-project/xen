@@ -146,7 +146,8 @@ void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
 char *canonicalize(struct connection *conn, const void *ctx, const char *node);
 
 /* Write a node to the tdb data base. */
-int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node);
+int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
+		   bool no_quota_check);
 
 /* Get this node, checking we have permissions. */
 struct node *get_node(struct connection *conn,
