@@ -47,13 +47,11 @@ struct watch
 	char *node;
 };
 
-static bool check_event_node(const char *node)
+static bool check_special_event(const char *name)
 {
-	if (!node || !strstarts(node, "@")) {
-		errno = EINVAL;
-		return false;
-	}
-	return true;
+	assert(name);
+
+	return strstarts(name, "@");
 }
 
 /* Is child a subnode of parent, or equal? */
@@ -87,7 +85,7 @@ static void add_event(struct connection *conn,
 	unsigned int len;
 	char *data;
 
-	if (!check_event_node(name)) {
+	if (!check_special_event(name)) {
 		/* Can this conn load node, or see that it doesn't exist? */
 		struct node *node = get_node(conn, ctx, name, XS_PERM_READ);
 		/*
