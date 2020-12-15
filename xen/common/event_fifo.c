@@ -55,6 +55,13 @@ static inline event_word_t *evtchn_fifo_word_from_port(const struct domain *d,
 {
     unsigned int p, w;
 
+    /*
+     * Callers aren't required to hold d->event_lock, so we need to synchronize
+     * with evtchn_fifo_init_control() setting d->evtchn_port_ops /after/
+     * d->evtchn_fifo.
+     */
+    smp_rmb();
+
     if ( unlikely(port >= d->evtchn_fifo->num_evtchns) )
         return NULL;
 
@@ -605,6 +612,10 @@ int evtchn_fifo_init_control(struct evtchn_init_control *init_control)
         if ( rc < 0 )
             goto error;
 
+        /*
+         * This call, as a side effect, synchronizes with
+         * evtchn_fifo_word_from_port().
+         */
         rc = map_control_block(v, gfn, offset);
         if ( rc < 0 )
             goto error;
