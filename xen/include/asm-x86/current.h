@@ -129,15 +129,22 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 # define CHECK_FOR_LIVEPATCH_WORK ""
 #endif
 
-#define reset_stack_and_jump(fn)                                        \
+#define switch_stack_and_jump(fn, instr, constr)                        \
     ({                                                                  \
         __asm__ __volatile__ (                                          \
             "mov %0,%%"__OP"sp;"                                        \
             CHECK_FOR_LIVEPATCH_WORK                                    \
-             "jmp %c1"                                                  \
-            : : "r" (guest_cpu_user_regs()), "i" (fn) : "memory" );     \
+            instr "1"                                                   \
+            : : "r" (guest_cpu_user_regs()), constr (fn) : "memory" );  \
         unreachable();                                                  \
     })
+
+#define reset_stack_and_jump(fn)                                        \
+    switch_stack_and_jump(fn, "jmp %c", "i")
+
+/* The constraint may only specify non-call-clobbered registers. */
+#define reset_stack_and_jump_ind(fn)                                    \
+    switch_stack_and_jump(fn, "INDIRECT_JMP %", "b")
 
 /*
  * Which VCPU's state is currently running on each CPU?
