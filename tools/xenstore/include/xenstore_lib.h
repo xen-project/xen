@@ -34,6 +34,7 @@ enum xs_perm_type {
 	/* Internal use. */
 	XS_PERM_ENOENT_OK = 4,
 	XS_PERM_OWNER = 8,
+	XS_PERM_IGNORE = 16,
 };
 
 struct xs_permissions
