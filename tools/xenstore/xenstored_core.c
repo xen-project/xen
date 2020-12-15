@@ -102,6 +102,7 @@ int quota_nb_watch_per_domain = 128;
 int quota_max_entry_size = 2048; /* 2K */
 int quota_max_transaction = 10;
 int quota_nb_perms_per_node = 5;
+int quota_max_path_len = XENSTORE_REL_PATH_MAX;
 
 void trace(const char *fmt, ...)
 {
@@ -734,6 +735,9 @@ static bool valid_chars(const char *node)
 
 bool is_valid_nodename(const char *node)
 {
+	int local_off = 0;
+	unsigned int domid;
+
 	/* Must start in /. */
 	if (!strstarts(node, "/"))
 		return false;
@@ -746,7 +750,10 @@ bool is_valid_nodename(const char *node)
 	if (strstr(node, "//"))
 		return false;
 
-	if (strlen(node) > XENSTORE_ABS_PATH_MAX)
+	if (sscanf(node, "/local/domain/%5u/%n", &domid, &local_off) != 1)
+		local_off = 0;
+
+	if (strlen(node) > local_off + quota_max_path_len)
 		return false;
 
 	return valid_chars(node);
@@ -806,6 +813,8 @@ static struct node *get_node_canonicalized(struct connection *conn,
 	if (!canonical_name)
 		canonical_name = &tmp_name;
 	*canonical_name = canonicalize(conn, ctx, name);
+	if (!*canonical_name)
+		return NULL;
 	return get_node(conn, ctx, *canonical_name, perm);
 }
 
@@ -1926,6 +1935,7 @@ static void usage(void)
 "  -W, --watch-nb <nb>     limit the number of watches per domain,\n"
 "  -t, --transaction <nb>  limit the number of transaction allowed per domain,\n"
 "  -A, --perm-nb <nb>      limit the number of permissions per node,\n"
+"  -M, --path-max <chars>  limit the allowed Xenstore node path length,\n"
 "  -R, --no-recovery       to request that no recovery should be attempted when\n"
 "                          the store is corrupted (debug only),\n"
 "  -I, --internal-db       store database in memory, not on disk\n"
@@ -1947,6 +1957,7 @@ static struct option options[] = {
 	{ "trace-file", 1, NULL, 'T' },
 	{ "transaction", 1, NULL, 't' },
 	{ "perm-nb", 1, NULL, 'A' },
+	{ "path-max", 1, NULL, 'M' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "internal-db", 0, NULL, 'I' },
 	{ "verbose", 0, NULL, 'V' },
@@ -1969,7 +1980,7 @@ int main(int argc, char *argv[])
 	int timeout;
 
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:T:RVW:", options,
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:M:T:RVW:", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -2013,6 +2024,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'A':
 			quota_nb_perms_per_node = strtol(optarg, NULL, 10);
+			break;
+			quota_max_path_len = strtol(optarg, NULL, 10);
+			quota_max_path_len = min(XENSTORE_REL_PATH_MAX,
+						 quota_max_path_len);
 			break;
 		case 'e':
 			dom0_event = strtol(optarg, NULL, 10);
