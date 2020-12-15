@@ -134,6 +134,10 @@ let del_watch cons con path token =
 		cons.watches <- Trie.set cons.watches key watches;
  	watch
 
+let del_watches cons con =
+	Connection.del_watches con;
+	cons.watches <- Trie.map (del_watches_of_con con) cons.watches
+
 (* path is absolute *)
 let fire_watches ?oldroot root cons path recurse =
 	let key = key_of_path path in
