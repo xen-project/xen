@@ -95,6 +95,7 @@ let parse_config filename =
 		("conflict-max-history-seconds", Config.Set_float Define.conflict_max_history_seconds);
 		("conflict-rate-limit-is-aggregate", Config.Set_bool Define.conflict_rate_limit_is_aggregate);
 		("perms-activate", Config.Set_bool Perms.activate);
+		("perms-watch-activate", Config.Set_bool Perms.watch_activate);
 		("quota-activate", Config.Set_bool Quota.activate);
 		("quota-maxwatch", Config.Set_int Define.maxwatch);
 		("quota-transaction", Config.Set_int Define.maxtransaction);
