@@ -155,13 +155,13 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 # define SHADOW_STACK_WORK ""
 #endif
 
-#define switch_stack_and_jump(fn, instr)                                \
+#define reset_stack_and_jump(fn)                                        \
     ({                                                                  \
         unsigned int tmp;                                               \
         __asm__ __volatile__ (                                          \
             SHADOW_STACK_WORK                                           \
             "mov %[stk], %%rsp;"                                        \
-            instr                                                       \
+            CHECK_FOR_LIVEPATCH_WORK                                    \
             "jmp %c[fun];"                                              \
             : [val] "=&r" (tmp),                                        \
               [ssp] "=&r" (tmp)                                         \
@@ -175,12 +175,6 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
             : "memory" );                                               \
         unreachable();                                                  \
     })
-
-#define reset_stack_and_jump(fn)                                        \
-    switch_stack_and_jump(fn, CHECK_FOR_LIVEPATCH_WORK)
-
-#define reset_stack_and_jump_nolp(fn)                                   \
-    switch_stack_and_jump(fn, "")
 
 /*
  * Which VCPU's state is currently running on each CPU?
