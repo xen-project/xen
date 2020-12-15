@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -35,6 +36,7 @@ void barf(const char *fmt, ...)
 	va_end(arglist);
 
  	if (bytes >= 0) {
+		syslog(LOG_CRIT, "%s\n", str);
 		xprintf("%s\n", str);
 		free(str);
 	}
@@ -54,6 +56,7 @@ void barf_perror(const char *fmt, ...)
 	va_end(arglist);
 
  	if (bytes >= 0) {
+		syslog(LOG_CRIT, "%s: %s\n", str, strerror(err));
 		xprintf("%s: %s\n", str, strerror(err));
 		free(str);
 	}
