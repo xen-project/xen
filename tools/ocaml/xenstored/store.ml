@@ -214,6 +214,11 @@ let rec lookup node path fct =
 
 let apply rnode path fct =
 	lookup rnode path fct
+
+let introduce_domain = "@introduceDomain"
+let release_domain = "@releaseDomain"
+let specials = List.map of_string [ introduce_domain; release_domain ]
+
 end
 
 (* The Store.t type *)
