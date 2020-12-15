@@ -65,6 +65,11 @@ void domain_watch_inc(struct connection *conn);
 void domain_watch_dec(struct connection *conn);
 int domain_watch(struct connection *conn);
 
+/* Special node permission handling. */
+int set_perms_special(struct connection *conn, const char *name,
+		      struct node_perms *perms);
+bool check_perms_special(const char *name, struct connection *conn);
+
 /* Write rate limiting */
 
 #define WRL_FACTOR   1000 /* for fixed-point arithmetic */

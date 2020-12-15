@@ -162,6 +162,8 @@ struct node *get_node(struct connection *conn,
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 void check_store(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
+enum xs_perm_type perm_for_conn(struct connection *conn,
+				const struct node_perms *perms);
 
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);
