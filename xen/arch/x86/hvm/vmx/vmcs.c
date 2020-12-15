@@ -1785,8 +1785,9 @@ void vmx_vmentry_failure(void)
     domain_crash_synchronous();
 }
 
-void vmx_do_resume(struct vcpu *v)
+void vmx_do_resume(void)
 {
+    struct vcpu *v = current;
     bool_t debug_state;
 
     if ( v->arch.hvm_vmx.active_cpu == smp_processor_id() )

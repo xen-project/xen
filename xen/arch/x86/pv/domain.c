@@ -64,7 +64,7 @@ custom_runtime_param("pcid", parse_pcid);
 #undef page_to_mfn
 #define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
 
-static void noreturn continue_nonidle_domain(struct vcpu *v)
+static void noreturn continue_nonidle_domain(void)
 {
     check_wakeup_from_wait();
     reset_stack_and_jump(ret_from_intr);
