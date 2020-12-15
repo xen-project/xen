@@ -286,6 +286,8 @@ let _ =
 	let quit = ref false in
 
 	Logging.init_xenstored_log();
+	List.iter (fun path ->
+		Store.write store Perms.Connection.full_rights path "") Store.Path.specials;
 
 	let filename = Paths.xen_run_stored ^ "/db" in
 	if cf.restart && Sys.file_exists filename then (
@@ -335,7 +337,7 @@ let _ =
 					let (notify, deaddom) = Domains.cleanup domains in
 					List.iter (Connections.del_domain cons) deaddom;
 					if deaddom <> [] || notify then
-						Connections.fire_spec_watches cons "@releaseDomain"
+						Connections.fire_spec_watches cons Store.Path.release_domain
 				)
 				else
 					let c = Connections.find_domain_by_port cons port in
