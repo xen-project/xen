@@ -129,21 +129,15 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 # define CHECK_FOR_LIVEPATCH_WORK ""
 #endif
 
-#define switch_stack_and_jump(fn, instr)                                \
+#define reset_stack_and_jump(fn)                                        \
     ({                                                                  \
         __asm__ __volatile__ (                                          \
             "mov %0,%%"__OP"sp;"                                        \
-            instr                                                       \
+            CHECK_FOR_LIVEPATCH_WORK                                    \
              "jmp %c1"                                                  \
             : : "r" (guest_cpu_user_regs()), "i" (fn) : "memory" );     \
         unreachable();                                                  \
     })
-
-#define reset_stack_and_jump(fn)                                        \
-    switch_stack_and_jump(fn, CHECK_FOR_LIVEPATCH_WORK)
-
-#define reset_stack_and_jump_nolp(fn)                                   \
-    switch_stack_and_jump(fn, "")
 
 /*
  * Which VCPU's state is currently running on each CPU?

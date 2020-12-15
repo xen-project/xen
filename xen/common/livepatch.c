@@ -1300,6 +1300,11 @@ void check_for_livepatch_work(void)
     s_time_t timeout;
     unsigned long flags;
 
+    /* Only do any work when invoked in truly idle state. */
+    if ( system_state != SYS_STATE_active ||
+         !is_idle_domain(current->sched_unit->domain) )
+        return;
+
     /* Fast path: no work to do. */
     if ( !per_cpu(work_to_do, cpu ) )
         return;
