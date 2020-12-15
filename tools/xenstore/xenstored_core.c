@@ -682,6 +682,9 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 	/* Replies reuse the request buffer, events need a new one. */
 	if (type != XS_WATCH_EVENT) {
 		bdata = conn->in;
+		/* Drop asynchronous responses, e.g. errors for watch events. */
+		if (!bdata)
+			return;
 		bdata->inhdr = true;
 		bdata->used = 0;
 		conn->in = NULL;
