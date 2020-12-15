@@ -252,6 +252,10 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
      * Link the event if it unmasked and not already linked.
      */
     if ( !guest_test_bit(d, EVTCHN_FIFO_MASKED, word) &&
+         /*
+          * This also acts as the read counterpart of the smp_wmb() in
+          * map_control_block().
+          */
          !guest_test_and_set_bit(d, EVTCHN_FIFO_LINKED, word) )
     {
         /*
@@ -478,6 +482,7 @@ static int setup_control_block(struct vcpu *v)
 static int map_control_block(struct vcpu *v, uint64_t gfn, uint32_t offset)
 {
     void *virt;
+    struct evtchn_fifo_control_block *control_block;
     unsigned int i;
     int rc;
 
@@ -488,10 +493,15 @@ static int map_control_block(struct vcpu *v, uint64_t gfn, uint32_t offset)
     if ( rc < 0 )
         return rc;
 
-    v->evtchn_fifo->control_block = virt + offset;
+    control_block = virt + offset;
 
     for ( i = 0; i <= EVTCHN_FIFO_PRIORITY_MIN; i++ )
-        v->evtchn_fifo->queue[i].head = &v->evtchn_fifo->control_block->head[i];
+        v->evtchn_fifo->queue[i].head = &control_block->head[i];
+
+    /* All queue heads must have been set before setting the control block. */
+    smp_wmb();
+
+    v->evtchn_fifo->control_block = control_block;
 
     return 0;
 }
