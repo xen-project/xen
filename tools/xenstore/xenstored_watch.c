@@ -92,6 +92,10 @@ static void add_event(struct connection *conn,
 	}
 
 	len = strlen(name) + 1 + strlen(watch->token) + 1;
+	/* Don't try to send over-long events. */
+	if (len > XENSTORE_PAYLOAD_MAX)
+		return;
+
 	data = talloc_array(ctx, char, len);
 	if (!data)
 		return;
