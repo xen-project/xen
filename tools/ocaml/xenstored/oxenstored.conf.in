@@ -61,6 +61,7 @@ quota-maxsize = 2048
 quota-maxwatch = 100
 quota-transaction = 10
 quota-maxrequests = 1024
+quota-path-max = 1024
 
 # Activate filed base backend
 persistent = false

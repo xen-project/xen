@@ -93,12 +93,25 @@ let read_file_single_integer filename =
 let path_validate path connection_path =
 	let len = String.length path in
 
-	if len = 0 || len > 1024 then raise Define.Invalid_path;
+	if len = 0 then raise Define.Invalid_path;
 
 	let abs_path =
 		match String.get path 0 with
 		| '/' | '@' -> path
 		| _   -> connection_path ^ path
 	in
+
+	(* Regardless whether client specified absolute or relative path,
+	   canonicalize it (above) and, for domain-relative paths, check the
+	   length of the relative part.
+
+	   This prevents paths becoming invalid across migrate when the length
+	   of the domid changes in @param connection_path.
+	 *)
+	let len = String.length abs_path in
+	let on_absolute _ _ = len in
+	let on_relative _ offset = len - offset in
+	let len = Scanf.ksscanf abs_path on_absolute "/local/domain/%d/%n" on_relative in
+	if len > !Define.path_max then raise Define.Invalid_path;
 
 	abs_path
