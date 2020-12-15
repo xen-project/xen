@@ -437,7 +437,8 @@ let setperms store perm path nperms =
 	| Some node ->
 		let old_owner = Node.get_owner node in
 		let new_owner = Perms.Node.get_owner nperms in
-		if not ((old_owner = new_owner) || (Perms.Connection.is_dom0 perm)) then Quota.check store.quota new_owner 0;
+		if not ((old_owner = new_owner) || (Perms.Connection.is_dom0 perm)) then
+			raise Define.Permission_denied;
 		store.root <- path_setperms store perm path nperms;
 		Quota.del_entry store.quota old_owner;
 		Quota.add_entry store.quota new_owner
