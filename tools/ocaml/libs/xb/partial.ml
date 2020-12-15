@@ -28,6 +28,7 @@ external header_of_string_internal: string -> int * int * int * int
          = "stub_header_of_string"
 
 let xenstore_payload_max = 4096 (* xen/include/public/io/xs_wire.h *)
+let xenstore_rel_path_max = 2048 (* xen/include/public/io/xs_wire.h *)
 
 let of_string s =
 	let tid, rid, opint, dlen = header_of_string_internal s in

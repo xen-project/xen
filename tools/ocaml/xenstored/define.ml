@@ -31,6 +31,8 @@ let conflict_rate_limit_is_aggregate = ref true
 
 let domid_self = 0x7FF0
 
+let path_max = ref Xenbus.Partial.xenstore_rel_path_max
+
 exception Not_a_directory of string
 exception Not_a_value of string
 exception Already_exist
