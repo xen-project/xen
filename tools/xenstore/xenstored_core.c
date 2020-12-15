@@ -1344,6 +1344,32 @@ static struct {
 	[XS_DIRECTORY_PART]    = { "DIRECTORY_PART",    send_directory_part },
 };
 
+/*
+ * Keep the connection alive but stop processing any new request or sending
+ * reponse. This is to allow sending @releaseDomain watch event at the correct
+ * moment and/or to allow the connection to restart (not yet implemented).
+ *
+ * All watches, transactions, buffers will be freed.
+ */
+static void ignore_connection(struct connection *conn)
+{
+	struct buffered_data *out, *tmp;
+
+	trace("CONN %p ignored\n", conn);
+
+	conn->is_ignored = true;
+	conn_delete_all_watches(conn);
+	conn_delete_all_transactions(conn);
+
+	list_for_each_entry_safe(out, tmp, &conn->out_list, list) {
+		list_del(&out->list);
+		talloc_free(out);
+	}
+
+	talloc_free(conn->in);
+	conn->in = NULL;
+}
+
 static const char *sockmsg_string(enum xsd_sockmsg_type type)
 {
 	if ((unsigned int)type < ARRAY_SIZE(wire_funcs) && wire_funcs[type].str)
@@ -1402,8 +1428,10 @@ static void consider_message(struct connection *conn)
 	assert(conn->in == NULL);
 }
 
-/* Errors in reading or allocating here mean we get out of sync, so we
- * drop the whole client connection. */
+/*
+ * Errors in reading or allocating here means we get out of sync, so we mark
+ * the connection as ignored.
+ */
 static void handle_input(struct connection *conn)
 {
 	int bytes;
@@ -1460,14 +1488,14 @@ static void handle_input(struct connection *conn)
 	return;
 
 bad_client:
-	/* Kill it. */
-	talloc_free(conn);
+	ignore_connection(conn);
 }
 
 static void handle_output(struct connection *conn)
 {
+	/* Ignore the connection if an error occured */
 	if (!write_messages(conn))
-		talloc_free(conn);
+		ignore_connection(conn);
 }
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
@@ -1483,6 +1511,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->write = write;
 	new->read = read;
 	new->can_write = true;
+	new->is_ignored = false;
 	new->transaction_started = 0;
 	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);
@@ -2185,8 +2214,9 @@ int main(int argc, char *argv[])
 					if (fds[conn->pollfd_idx].revents
 					    & ~(POLLIN|POLLOUT))
 						talloc_free(conn);
-					else if (fds[conn->pollfd_idx].revents
-						 & POLLIN)
+					else if ((fds[conn->pollfd_idx].revents
+						  & POLLIN) &&
+						 !conn->is_ignored)
 						handle_input(conn);
 				}
 				if (talloc_free(conn) == 0)
@@ -2198,8 +2228,9 @@ int main(int argc, char *argv[])
 					if (fds[conn->pollfd_idx].revents
 					    & ~(POLLIN|POLLOUT))
 						talloc_free(conn);
-					else if (fds[conn->pollfd_idx].revents
-						 & POLLOUT)
+					else if ((fds[conn->pollfd_idx].revents
+						  & POLLOUT) &&
+						 !conn->is_ignored)
 						handle_output(conn);
 				}
 				if (talloc_free(conn) == 0)

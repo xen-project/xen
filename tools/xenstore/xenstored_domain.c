@@ -298,6 +298,10 @@ bool domain_can_read(struct connection *conn)
 
 	if (domain_is_unprivileged(conn) && conn->domain->wrl_credit < 0)
 		return false;
+
+	if (conn->is_ignored)
+		return false;
+
 	return (intf->req_cons != intf->req_prod);
 }
 
@@ -315,6 +319,10 @@ bool domain_is_unprivileged(struct connection *conn)
 bool domain_can_write(struct connection *conn)
 {
 	struct xenstore_domain_interface *intf = conn->domain->interface;
+
+	if (conn->is_ignored)
+		return false;
+
 	return ((intf->rsp_prod - intf->rsp_cons) != XENSTORE_RING_SIZE);
 }
 
