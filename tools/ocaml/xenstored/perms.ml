@@ -79,9 +79,9 @@ let of_string s =
 let string_of_perm perm =
 	Printf.sprintf "%c%u" (char_of_permty (snd perm)) (fst perm)
 
-let to_string permvec =
+let to_string ?(sep="\000") permvec =
 	let l = ((permvec.owner, permvec.other) :: permvec.acl) in
-	String.concat "\000" (List.map string_of_perm l)
+	String.concat sep (List.map string_of_perm l)
 
 end
 
@@ -132,8 +132,8 @@ let check_owner (connection:Connection.t) (node:Node.t) =
 	then Connection.is_owner connection (Node.get_owner node)
 	else true
 
-(* check if the current connection has the requested perm on the current node *)
-let check (connection:Connection.t) request (node:Node.t) =
+(* check if the current connection lacks the requested perm on the current node *)
+let lacks (connection:Connection.t) request (node:Node.t) =
 	let check_acl domainid =
 		let perm =
 			if List.mem_assoc domainid (Node.get_acl node)
@@ -154,11 +154,19 @@ let check (connection:Connection.t) request (node:Node.t) =
 			info "Permission denied: Domain %d has write only access" domainid;
 			false
 	in
-	if !activate
+	!activate
 	&& not (Connection.is_dom0 connection)
 	&& not (check_owner connection node)
 	&& not (List.exists check_acl (Connection.get_owners connection))
+
+(* check if the current connection has the requested perm on the current node.
+*  Raises an exception if it doesn't. *)
+let check connection request node =
+	if lacks connection request node
 	then raise Define.Permission_denied
+
+(* check if the current connection has the requested perm on the current node *)
+let has connection request node = not (lacks connection request node)
 
 let equiv perm1 perm2 =
 	(Node.to_string perm1) = (Node.to_string perm2)
