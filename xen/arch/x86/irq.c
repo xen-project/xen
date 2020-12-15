@@ -441,8 +441,15 @@ int __init init_irq_data(void)
     set_bit(HYPERCALL_VECTOR, used_vectors);
 #endif
     
-    /* IRQ_MOVE_CLEANUP_VECTOR used for clean up vectors */
-    set_bit(IRQ_MOVE_CLEANUP_VECTOR, used_vectors);
+    /*
+     * Mark vectors up to the cleanup one as used, to prevent an infinite loop
+     * invoking irq_move_cleanup_interrupt.
+     */
+    BUILD_BUG_ON(IRQ_MOVE_CLEANUP_VECTOR < FIRST_DYNAMIC_VECTOR);
+    for ( vector = FIRST_DYNAMIC_VECTOR;
+          vector <= IRQ_MOVE_CLEANUP_VECTOR;
+          vector++ )
+        __set_bit(vector, used_vectors);
 
     return 0;
 }
@@ -727,10 +734,6 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
 {
     unsigned vector, me;
 
-    /* This interrupt should not nest inside others. */
-    BUILD_BUG_ON(APIC_PRIO_CLASS(IRQ_MOVE_CLEANUP_VECTOR) !=
-                 APIC_PRIO_CLASS(FIRST_DYNAMIC_VECTOR));
-
     ack_APIC_irq();
 
     me = smp_processor_id();
@@ -774,6 +777,11 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
          */
         if ( irr & (1u << (vector % 32)) )
         {
+            if ( vector < IRQ_MOVE_CLEANUP_VECTOR )
+            {
+                ASSERT_UNREACHABLE();
+                goto unlock;
+            }
             send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
             TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP_DELAY,
                      irq, vector, smp_processor_id());
