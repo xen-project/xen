@@ -1850,8 +1850,9 @@ void vmx_vmentry_failure(void)
     domain_crash(curr->domain);
 }
 
-void vmx_do_resume(struct vcpu *v)
+void vmx_do_resume(void)
 {
+    struct vcpu *v = current;
     bool_t debug_state;
     unsigned long host_cr4;
 

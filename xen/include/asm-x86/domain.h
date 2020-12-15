@@ -337,7 +337,7 @@ struct arch_domain
     const struct arch_csw {
         void (*from)(struct vcpu *);
         void (*to)(struct vcpu *);
-        void (*tail)(struct vcpu *);
+        void noreturn (*tail)(void);
     } *ctxt_switch;
 
 #ifdef CONFIG_HVM

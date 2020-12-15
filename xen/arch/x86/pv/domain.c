@@ -110,7 +110,7 @@ static int parse_pcid(const char *s)
     return rc;
 }
 
-static void noreturn continue_nonidle_domain(struct vcpu *v)
+static void noreturn continue_nonidle_domain(void)
 {
     check_wakeup_from_wait();
     reset_stack_and_jump(ret_from_intr);
