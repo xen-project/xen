@@ -89,6 +89,13 @@ let check_owner node connection =
 
 let rec recurse fct node = fct node; List.iter (recurse fct) node.children
 
+(** [recurse_map f tree] applies [f] on each node in the tree recursively *)
+let recurse_map f =
+	let rec walk node =
+		f { node with children = List.rev_map walk node.children |> List.rev }
+	in
+	walk
+
 let unpack node = (Symbol.to_string node.name, node.perms, node.value)
 
 end
@@ -434,6 +441,15 @@ let setperms store perm path nperms =
 		store.root <- path_setperms store perm path nperms;
 		Quota.del_entry store.quota old_owner;
 		Quota.add_entry store.quota new_owner
+
+let reset_permissions store domid =
+	Logging.info "store|node" "Cleaning up xenstore ACLs for domid %d" domid;
+	store.root <- Node.recurse_map (fun node ->
+		let perms = Perms.Node.remove_domid ~domid node.perms in
+		if perms <> node.perms then
+			Logging.debug "store|node" "Changed permissions for node %s" (Node.get_name node);
+		{ node with perms }
+	) store.root
 
 type ops = {
 	store: t;
