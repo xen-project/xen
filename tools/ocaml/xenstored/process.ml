@@ -498,12 +498,19 @@ let retain_op_in_history ty =
 	| Xenbus.Xb.Op.Reset_watches
 	| Xenbus.Xb.Op.Invalid           -> false
 
+let maybe_ignore_transaction = function
+	| Xenbus.Xb.Op.Watch | Xenbus.Xb.Op.Unwatch -> fun tid ->
+		if tid <> Transaction.none then
+			debug "Ignoring transaction ID %d for watch/unwatch" tid;
+		Transaction.none
+	| _ -> fun x -> x
+
 (**
  * Nothrow guarantee.
  *)
 let process_packet ~store ~cons ~doms ~con ~req =
 	let ty = req.Packet.ty in
-	let tid = req.Packet.tid in
+	let tid = maybe_ignore_transaction ty req.Packet.tid in
 	let rid = req.Packet.rid in
 	try
 		let fct = function_of_type ty in
