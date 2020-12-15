@@ -27,6 +27,8 @@ enum node_access_type {
 
 struct transaction;
 
+extern uint64_t generation;
+
 int do_transaction_start(struct connection *conn, struct buffered_data *node);
 int do_transaction_end(struct connection *conn, struct buffered_data *in);
 
