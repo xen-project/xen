@@ -38,7 +38,6 @@ type t =
 }
 
 let is_dom0 d = d.id = 0
-let get_path dom = "/local/domain/" ^ (sprintf "%u" dom.id)
 let get_id domain = domain.id
 let get_interface d = d.interface
 let get_mfn d = d.mfn
