@@ -443,6 +443,7 @@ let do_release con t domains cons data =
 	let fire_spec_watches = Domains.exist domains domid in
 	Domains.del domains domid;
 	Connections.del_domain cons domid;
+	Store.reset_permissions (Transaction.get_store t) domid;
 	if fire_spec_watches
 	then Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.release_domain
 	else raise Invalid_Cmd_Args

@@ -58,6 +58,15 @@ let get_other perms = perms.other
 let get_acl perms = perms.acl
 let get_owner perm = perm.owner
 
+(** [remote_domid ~domid perm] removes all ACLs for [domid] from perm.
+* If [domid] was the owner then it is changed to Dom0.
+* This is used for cleaning up after dead domains.
+* *)
+let remove_domid ~domid perm =
+	let acl = List.filter (fun (acl_domid, _) -> acl_domid <> domid) perm.acl in
+	let owner = if perm.owner = domid then 0 else perm.owner in
+	{ perm with acl; owner }
+
 let default0 = create 0 NONE []
 
 let perm_of_string s =
