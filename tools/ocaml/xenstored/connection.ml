@@ -210,8 +210,7 @@ let fire_watch watch path =
 		end else
 			path
 	in
-	let data = Utils.join_by_null [ new_path; watch.token; "" ] in
-	send_reply watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data
+	fire_single_watch { watch with path = new_path }
 
 (* Search for a valid unused transaction id. *)
 let rec valid_transaction_id con proposed_id =
