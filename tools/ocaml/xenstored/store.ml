@@ -273,15 +273,17 @@ let path_rm store perm path =
 			Node.del_childname node name
 		with Not_found ->
 			raise Define.Doesnt_exist in
-	if path = [] then
+	if path = [] then (
+		Node.check_perm store.root perm Perms.WRITE;
 		Node.del_all_children store.root
-	else
+	) else
 		Path.apply_modify store.root path do_rm
 
 let path_setperms store perm path perms =
-	if path = [] then
+	if path = [] then (
+		Node.check_perm store.root perm Perms.WRITE;
 		Node.set_perms store.root perms
-	else
+	) else
 		let do_setperms node name =
 			let c = Node.find node name in
 			Node.check_owner c perm;
@@ -313,9 +315,10 @@ let read store perm path =
 
 let ls store perm path =
 	let children =
-		if path = [] then
-			(Node.get_children store.root)
-		else
+		if path = [] then (
+			Node.check_perm store.root perm Perms.READ;
+			Node.get_children store.root
+		) else
 			let do_ls node name =
 				let cnode = Node.find node name in
 				Node.check_perm cnode perm Perms.READ;
@@ -324,9 +327,10 @@ let ls store perm path =
 	List.rev (List.map (fun n -> Symbol.to_string n.Node.name) children)
 
 let getperms store perm path =
-	if path = [] then
-		(Node.get_perms store.root)
-	else
+	if path = [] then (
+		Node.check_perm store.root perm Perms.READ;
+		Node.get_perms store.root
+	) else
 		let fct n name =
 			let c = Node.find n name in
 			Node.check_perm c perm Perms.READ;
