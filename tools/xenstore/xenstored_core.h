@@ -80,6 +80,9 @@ struct connection
 	/* Is this a read-only connection? */
 	bool can_write;
 
+	/* Is this connection ignored? */
+	bool is_ignored;
+
 	/* Buffered incoming data. */
 	struct buffered_data *in;
 
