@@ -56,15 +56,17 @@ let split_one_path data con =
 	| path :: "" :: [] -> Store.Path.create path (Connection.get_path con)
 	| _                -> raise Invalid_Cmd_Args
 
-let process_watch ops cons =
+let process_watch t cons =
+	let oldroot = t.Transaction.oldroot in
+	let newroot = Store.get_root t.store in
+	let ops = Transaction.get_paths t |> List.rev in
 	let do_op_watch op cons =
-		let recurse = match (fst op) with
-		| Xenbus.Xb.Op.Write    -> false
-		| Xenbus.Xb.Op.Mkdir    -> false
-		| Xenbus.Xb.Op.Rm       -> true
-		| Xenbus.Xb.Op.Setperms -> false
+		let recurse, oldroot, root = match (fst op) with
+		| Xenbus.Xb.Op.Write|Xenbus.Xb.Op.Mkdir -> false, None, newroot
+		| Xenbus.Xb.Op.Rm       -> true, None, oldroot
+		| Xenbus.Xb.Op.Setperms -> false, Some oldroot, newroot
 		| _              -> raise (Failure "huh ?") in
-		Connections.fire_watches cons (snd op) recurse in
+		Connections.fire_watches ?oldroot root cons (snd op) recurse in
 	List.iter (fun op -> do_op_watch op cons) ops
 
 let create_implicit_path t perm path =
@@ -205,7 +207,7 @@ let reply_ack fct con t doms cons data =
 	fct con t doms cons data;
 	Packet.Ack (fun () ->
 		if Transaction.get_id t = Transaction.none then
-			process_watch (Transaction.get_paths t) cons
+			process_watch t cons
 	)
 
 let reply_data fct con t doms cons data =
@@ -353,14 +355,17 @@ let transaction_replay c t doms cons =
 			ignore @@ Connection.end_transaction c tid None
 		)
 
-let do_watch con _t _domains cons data =
+let do_watch con t _domains cons data =
 	let (node, token) =
 		match (split None '\000' data) with
 		| [node; token; ""]   -> node, token
 		| _                   -> raise Invalid_Cmd_Args
 		in
 	let watch = Connections.add_watch cons con node token in
-	Packet.Ack (fun () -> Connection.fire_single_watch watch)
+	Packet.Ack (fun () ->
+		(* xenstore.txt says this watch is fired immediately,
+		   implying even if path doesn't exist or is unreadable *)
+		Connection.fire_single_watch_unchecked watch)
 
 let do_unwatch con _t _domains cons data =
 	let (node, token) =
@@ -391,7 +396,7 @@ let do_transaction_end con t domains cons data =
 	if not success then
 		raise Transaction_again;
 	if commit then begin
-		process_watch (List.rev (Transaction.get_paths t)) cons;
+		process_watch t cons;
 		match t.Transaction.ty with
 		| Transaction.No ->
 			() (* no need to record anything *)
@@ -399,7 +404,7 @@ let do_transaction_end con t domains cons data =
 			record_commit ~con ~tid:id ~before:oldstore ~after:cstore
 	end
 
-let do_introduce con _t domains cons data =
+let do_introduce con t domains cons data =
 	if not (Connection.is_dom0 con)
 	then raise Define.Permission_denied;
 	let (domid, mfn, port) =
@@ -420,14 +425,14 @@ let do_introduce con _t domains cons data =
 		else try
 			let ndom = Domains.create domains domid mfn port in
 			Connections.add_domain cons ndom;
-			Connections.fire_spec_watches cons Store.Path.introduce_domain;
+			Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.introduce_domain;
 			ndom
 		with _ -> raise Invalid_Cmd_Args
 	in
 	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
 		raise Domain_not_match
 
-let do_release con _t domains cons data =
+let do_release con t domains cons data =
 	if not (Connection.is_dom0 con)
 	then raise Define.Permission_denied;
 	let domid =
@@ -439,7 +444,7 @@ let do_release con _t domains cons data =
 	Domains.del domains domid;
 	Connections.del_domain cons domid;
 	if fire_spec_watches
-	then Connections.fire_spec_watches cons Store.Path.release_domain
+	then Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.release_domain
 	else raise Invalid_Cmd_Args
 
 let do_resume con _t domains _cons data =
@@ -507,6 +512,8 @@ let maybe_ignore_transaction = function
 		Transaction.none
 	| _ -> fun x -> x
 
+
+let () = Printexc.record_backtrace true
 (**
  * Nothrow guarantee.
  *)
@@ -548,7 +555,8 @@ let process_packet ~store ~cons ~doms ~con ~req =
 		(* Put the response on the wire *)
 		send_response ty con t rid response
 	with exn ->
-		error "process packet: %s" (Printexc.to_string exn);
+		let bt = Printexc.get_backtrace () in
+		error "process packet: %s. %s" (Printexc.to_string exn) bt;
 		Connection.send_error con tid rid "EIO"
 
 let do_input store cons doms con =
