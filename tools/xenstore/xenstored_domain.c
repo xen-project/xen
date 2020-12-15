@@ -54,10 +54,6 @@ struct domain
 	/* Event channel port */
 	evtchn_port_t port;
 
-	/* The remote end of the event channel, used only to validate
-	   repeated domain introductions. */
-	evtchn_port_t remote_port;
-
 	/* Domain path in store. */
 	char *path;
 
@@ -382,7 +378,6 @@ static int new_domain(struct domain *domain, int port)
 	domain->conn->domain = domain;
 	domain->conn->id = domain->domid;
 
-	domain->remote_port = port;
 	domain->nbentry = 0;
 	domain->nbwatch = 0;
 
@@ -470,7 +465,6 @@ int do_introduce(struct connection *conn, struct buffered_data *in)
 			xenevtchn_unbind(xce_handle, domain->port);
 		rc = xenevtchn_bind_interdomain(xce_handle, domid, port);
 		domain->port = (rc == -1) ? 0 : rc;
-		domain->remote_port = port;
 	}
 
 	domain_conn_reset(domain);
@@ -634,11 +628,6 @@ const char *get_implicit_path(const struct connection *conn)
 	if (!conn->domain)
 		return "/local/domain/0";
 	return conn->domain->path;
-}
-
-/* Restore existing connections. */
-void restore_existing_connections(void)
-{
 }
 
 static int set_dom_perms_default(struct node_perms *perms)

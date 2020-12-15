@@ -2087,9 +2087,6 @@ int main(int argc, char *argv[])
 	if (!no_domain_init)
 		domain_init();
 
-	/* Restore existing connections. */
-	restore_existing_connections();
-
 	if (outputpid) {
 		printf("%ld\n", (long)getpid());
 		fflush(stdout);
