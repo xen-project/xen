@@ -77,6 +77,9 @@ struct connection
 	/* Who am I? 0 for socket connections. */
 	unsigned int id;
 
+	/* Is this connection ignored? */
+	bool is_ignored;
+
 	/* Buffered incoming data. */
 	struct buffered_data *in;
 
