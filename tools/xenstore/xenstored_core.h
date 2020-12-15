@@ -220,6 +220,8 @@ extern xengnttab_handle **xgt_handle;
 
 int remember_string(struct hashtable *hash, const char *str);
 
+void set_tdb_key(const char *name, TDB_DATA *key);
+
 #endif /* _XENSTORED_CORE_H */
 
 /*

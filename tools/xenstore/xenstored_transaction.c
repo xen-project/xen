@@ -168,12 +168,6 @@ struct transaction
 extern int quota_max_transaction;
 uint64_t generation;
 
-static void set_tdb_key(const char *name, TDB_DATA *key)
-{
-	key->dptr = (char *)name;
-	key->dsize = strlen(name);
-}
-
 static struct accessed_node *find_accessed_node(struct transaction *trans,
 						const char *name)
 {

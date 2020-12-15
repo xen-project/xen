@@ -352,6 +352,16 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	}
 }
 
+void set_tdb_key(const char *name, TDB_DATA *key)
+{
+	/*
+	 * Dropping const is fine here, as the key will never be modified
+	 * by TDB.
+	 */
+	key->dptr = (char *)name;
+	key->dsize = strlen(name);
+}
+
 /*
  * If it fails, returns NULL and sets errno.
  * Temporary memory allocations will be done with ctx.
@@ -985,9 +995,7 @@ static int destroy_node(void *_node)
 	if (streq(node->name, "/"))
 		corrupt(NULL, "Destroying root node!");
 
-	key.dptr = (void *)node->name;
-	key.dsize = strlen(node->name);
-
+	set_tdb_key(node->name, &key);
 	tdb_delete(tdb_ctx, key);
 
 	domain_entry_dec(talloc_parent(node), node);
