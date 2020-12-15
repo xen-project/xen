@@ -44,6 +44,16 @@ conflict-rate-limit-is-aggregate = true
 # Activate node permission system
 perms-activate = true
 
+# Activate the watch permission system
+# When this is enabled unprivileged guests can only get watch events
+# for xenstore entries that they would've been able to read.
+#
+# When this is disabled unprivileged guests may get watch events
+# for xenstore entries that they cannot read. The watch event contains
+# only the entry name, not the value.
+# This restores behaviour prior to XSA-115.
+perms-watch-activate = true
+
 # Activate quota
 quota-activate = true
 quota-maxentity = 1000
