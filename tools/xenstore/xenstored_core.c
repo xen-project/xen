@@ -1111,8 +1111,8 @@ static void delete_child(struct connection *conn,
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
 }
 
-static int delete_node(struct connection *conn, struct node *parent,
-		       struct node *node)
+static int delete_node(struct connection *conn, const void *ctx,
+		       struct node *parent, struct node *node)
 {
 	char *name;
 
@@ -1124,7 +1124,7 @@ static int delete_node(struct connection *conn, struct node *parent,
 				       node->children);
 		child = name ? read_node(conn, node, name) : NULL;
 		if (child) {
-			if (delete_node(conn, node, child))
+			if (delete_node(conn, ctx, node, child))
 				return errno;
 		} else {
 			trace("delete_node: Error deleting child '%s/%s'!\n",
@@ -1136,6 +1136,7 @@ static int delete_node(struct connection *conn, struct node *parent,
 		talloc_free(name);
 	}
 
+	fire_watches(conn, ctx, node->name, true);
 	delete_node_single(conn, node);
 	delete_child(conn, parent, basename(node->name));
 	talloc_free(node);
@@ -1165,8 +1166,8 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 	 * This fine as we are single threaded and the next possible read will
 	 * be handled only after the node has been really removed.
 	 */
-	fire_watches(conn, ctx, name, true);
-	return delete_node(conn, parent, node);
+	fire_watches(conn, ctx, name, false);
+	return delete_node(conn, ctx, parent, node);
 }
 
 

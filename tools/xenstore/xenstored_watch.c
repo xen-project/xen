@@ -122,7 +122,7 @@ static void add_event(struct connection *conn,
  * Temporary memory allocations are done with ctx.
  */
 void fire_watches(struct connection *conn, const void *ctx, const char *name,
-		  bool recurse)
+		  bool exact)
 {
 	struct connection *i;
 	struct watch *watch;
@@ -134,10 +134,13 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 	/* Create an event for each watch. */
 	list_for_each_entry(i, &connections, list) {
 		list_for_each_entry(watch, &i->watches, list) {
-			if (is_child(name, watch->node))
-				add_event(i, ctx, watch, name);
-			else if (recurse && is_child(watch->node, name))
-				add_event(i, ctx, watch, watch->node);
+			if (exact) {
+				if (streq(name, watch->node))
+					add_event(i, ctx, watch, name);
+			} else {
+				if (is_child(name, watch->node))
+					add_event(i, ctx, watch, name);
+			}
 		}
 	}
 }
