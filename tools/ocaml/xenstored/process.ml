@@ -166,7 +166,9 @@ let do_setperms con t _domains _cons data =
 let do_error _con _t _domains _cons _data =
 	raise Define.Unknown_operation
 
-let do_isintroduced _con _t domains _cons data =
+let do_isintroduced con _t domains _cons data =
+	if not (Connection.is_dom0 con)
+	then raise Define.Permission_denied;
 	let domid =
 		match (split None '\000' data) with
 		| domid :: _ -> int_of_string domid
