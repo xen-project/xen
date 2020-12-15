@@ -47,7 +47,12 @@
  * transaction.
  * Each time the global generation count is copied to either a node or a
  * transaction it is incremented. This ensures all nodes and/or transactions
- * are having a unique generation count.
+ * are having a unique generation count. The increment is done _before_ the
+ * copy as that is needed for checking whether a domain was created before
+ * or after a node has been written (the domain's generation is set with the
+ * actual generation count without incrementing it, in order to support
+ * writing a node for a domain before the domain has been officially
+ * introduced).
  *
  * Transaction conflicts are detected by checking the generation count of all
  * nodes read in the transaction to match with the generation count in the
@@ -161,7 +166,7 @@ struct transaction
 };
 
 extern int quota_max_transaction;
-static uint64_t generation;
+uint64_t generation;
 
 static void set_tdb_key(const char *name, TDB_DATA *key)
 {
@@ -237,7 +242,7 @@ int access_node(struct connection *conn, struct node *node,
 	bool introduce = false;
 
 	if (type != NODE_ACCESS_READ) {
-		node->generation = generation++;
+		node->generation = ++generation;
 		if (conn && !conn->transaction)
 			wrl_apply_debit_direct(conn);
 	}
@@ -374,7 +379,7 @@ static int finalize_transaction(struct connection *conn,
 				if (!data.dptr)
 					goto err;
 				hdr = (void *)data.dptr;
-				hdr->generation = generation++;
+				hdr->generation = ++generation;
 				ret = tdb_store(tdb_ctx, key, data,
 						TDB_REPLACE);
 				talloc_free(data.dptr);
@@ -462,7 +467,7 @@ int do_transaction_start(struct connection *conn, struct buffered_data *in)
 	INIT_LIST_HEAD(&trans->accessed);
 	INIT_LIST_HEAD(&trans->changed_domains);
 	trans->fail = false;
-	trans->generation = generation++;
+	trans->generation = ++generation;
 
 	/* Pick an unused transaction identifier. */
 	do {

@@ -101,6 +101,7 @@ int quota_nb_entry_per_domain = 1000;
 int quota_nb_watch_per_domain = 128;
 int quota_max_entry_size = 2048; /* 2K */
 int quota_max_transaction = 10;
+int quota_nb_perms_per_node = 5;
 
 void trace(const char *fmt, ...)
 {
@@ -407,8 +408,13 @@ struct node *read_node(struct connection *conn, const void *ctx,
 
 	/* Permissions are struct xs_permissions. */
 	node->perms.p = hdr->perms;
+	if (domain_adjust_node_perms(node)) {
+		talloc_free(node);
+		return NULL;
+	}
+
 	/* Data is binary blob (usually ascii, no nul). */
-	node->data = node->perms.p + node->perms.num;
+	node->data = node->perms.p + hdr->num_perms;
 	/* Children is strings, nul separated. */
 	node->children = node->data + node->datalen;
 
@@ -423,6 +429,9 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	TDB_DATA data;
 	void *p;
 	struct xs_tdb_record_hdr *hdr;
+
+	if (domain_adjust_node_perms(node))
+		return errno;
 
 	data.dsize = sizeof(*hdr)
 		+ node->perms.num * sizeof(node->perms.p[0])
@@ -483,8 +492,9 @@ enum xs_perm_type perm_for_conn(struct connection *conn,
 		return (XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER) & mask;
 
 	for (i = 1; i < perms->num; i++)
-		if (perms->p[i].id == conn->id
-                        || (conn->target && perms->p[i].id == conn->target->id))
+		if (!(perms->p[i].perms & XS_PERM_IGNORE) &&
+		    (perms->p[i].id == conn->id ||
+		     (conn->target && perms->p[i].id == conn->target->id)))
 			return perms->p[i].perms & mask;
 
 	return perms->p[0].perms & mask;
@@ -1249,8 +1259,12 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	if (perms.num < 2)
 		return EINVAL;
 
-	permstr = in->buffer + strlen(in->buffer) + 1;
 	perms.num--;
+	if (domain_is_unprivileged(conn) &&
+	    perms.num > quota_nb_perms_per_node)
+		return ENOSPC;
+
+	permstr = in->buffer + strlen(in->buffer) + 1;
 
 	perms.p = talloc_array(in, struct xs_permissions, perms.num);
 	if (!perms.p)
@@ -1951,6 +1965,7 @@ static void usage(void)
 "  -S, --entry-size <size> limit the size of entry per domain, and\n"
 "  -W, --watch-nb <nb>     limit the number of watches per domain,\n"
 "  -t, --transaction <nb>  limit the number of transaction allowed per domain,\n"
+"  -A, --perm-nb <nb>      limit the number of permissions per node,\n"
 "  -R, --no-recovery       to request that no recovery should be attempted when\n"
 "                          the store is corrupted (debug only),\n"
 "  -I, --internal-db       store database in memory, not on disk\n"
@@ -1971,6 +1986,7 @@ static struct option options[] = {
 	{ "entry-size", 1, NULL, 'S' },
 	{ "trace-file", 1, NULL, 'T' },
 	{ "transaction", 1, NULL, 't' },
+	{ "perm-nb", 1, NULL, 'A' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "internal-db", 0, NULL, 'I' },
 	{ "verbose", 0, NULL, 'V' },
@@ -1993,7 +2009,7 @@ int main(int argc, char *argv[])
 	int timeout;
 
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RVW:", options,
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:T:RVW:", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -2034,6 +2050,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'W':
 			quota_nb_watch_per_domain = strtol(optarg, NULL, 10);
+			break;
+		case 'A':
+			quota_nb_perms_per_node = strtol(optarg, NULL, 10);
 			break;
 		case 'e':
 			dom0_event = strtol(optarg, NULL, 10);

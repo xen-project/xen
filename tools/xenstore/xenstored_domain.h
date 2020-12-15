@@ -56,6 +56,9 @@ bool domain_can_write(struct connection *conn);
 
 bool domain_is_unprivileged(struct connection *conn);
 
+/* Remove node permissions for no longer existing domains. */
+int domain_adjust_node_perms(struct node *node);
+
 /* Quota manipulation */
 void domain_entry_inc(struct connection *conn, struct node *);
 void domain_entry_dec(struct connection *conn, struct node *);
