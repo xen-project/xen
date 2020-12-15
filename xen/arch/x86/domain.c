@@ -121,7 +121,7 @@ static void play_dead(void)
     (*dead_idle)();
 }
 
-static void idle_loop(void)
+static void noreturn idle_loop(void)
 {
     unsigned int cpu = smp_processor_id();
 
@@ -158,11 +158,6 @@ void startup_cpu_idle_loop(void)
     cpumask_set_cpu(v->processor, v->domain->dirty_cpumask);
     v->dirty_cpu = v->processor;
 
-    reset_stack_and_jump(idle_loop);
-}
-
-static void noreturn continue_idle_domain(struct vcpu *v)
-{
     reset_stack_and_jump(idle_loop);
 }
 
@@ -456,7 +451,7 @@ int arch_domain_create(struct domain *d,
         static const struct arch_csw idle_csw = {
             .from = paravirt_ctxt_switch_from,
             .to   = paravirt_ctxt_switch_to,
-            .tail = continue_idle_domain,
+            .tail = idle_loop,
         };
 
         d->arch.ctxt_switch = &idle_csw;
@@ -1764,20 +1759,12 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     /* Ensure that the vcpu has an up-to-date time base. */
     update_vcpu_system_time(next);
 
-    /*
-     * Schedule tail *should* be a terminal function pointer, but leave a
-     * bug frame around just in case it returns, to save going back into the
-     * context switching code and leaving a far more subtle crash to diagnose.
-     */
-    nextd->arch.ctxt_switch->tail(next);
-    BUG();
+    reset_stack_and_jump_ind(nextd->arch.ctxt_switch->tail);
 }
 
 void continue_running(struct vcpu *same)
 {
-    /* See the comment above. */
-    same->domain->arch.ctxt_switch->tail(same);
-    BUG();
+    reset_stack_and_jump_ind(same->domain->arch.ctxt_switch->tail);
 }
 
 int __sync_local_execstate(void)
