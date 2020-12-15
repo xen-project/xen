@@ -179,8 +179,8 @@ let do_isintroduced con _t domains _cons data =
 	if domid = Define.domid_self || Domains.exist domains domid then "T\000" else "F\000"
 
 (* only in xen >= 4.2 *)
-let do_reset_watches con _t _domains _cons _data =
-  Connection.del_watches con;
+let do_reset_watches con _t _domains cons _data =
+  Connections.del_watches cons con;
   Connection.del_transactions con
 
 (* only in >= xen3.3                                                                                    *)
