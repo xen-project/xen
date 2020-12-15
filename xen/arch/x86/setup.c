@@ -676,7 +676,7 @@ static void __init noreturn reinit_bsp_stack(void)
         asm volatile ("setssbsy" ::: "memory");
     }
 
-    reset_stack_and_jump_nolp(init_done);
+    reset_stack_and_jump(init_done);
 }
 
 /*

@@ -192,7 +192,7 @@ static void noreturn continue_idle_domain(struct vcpu *v)
 {
     /* Idle vcpus might be attached to non-idle units! */
     if ( !is_idle_domain(v->sched_unit->domain) )
-        reset_stack_and_jump_nolp(guest_idle_loop);
+        reset_stack_and_jump(guest_idle_loop);
 
     reset_stack_and_jump(idle_loop);
 }
