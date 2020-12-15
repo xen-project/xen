@@ -155,18 +155,18 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 # define SHADOW_STACK_WORK ""
 #endif
 
-#define reset_stack_and_jump(fn)                                        \
+#define switch_stack_and_jump(fn, instr, constr)                        \
     ({                                                                  \
         unsigned int tmp;                                               \
         __asm__ __volatile__ (                                          \
             SHADOW_STACK_WORK                                           \
             "mov %[stk], %%rsp;"                                        \
             CHECK_FOR_LIVEPATCH_WORK                                    \
-            "jmp %c[fun];"                                              \
+            instr "[fun]"                                               \
             : [val] "=&r" (tmp),                                        \
               [ssp] "=&r" (tmp)                                         \
             : [stk] "r" (guest_cpu_user_regs()),                        \
-              [fun] "i" (fn),                                           \
+              [fun] constr (fn),                                        \
               [skstk_base] "i"                                          \
               ((PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8),               \
               [stack_mask] "i" (STACK_SIZE - 1),                        \
@@ -175,6 +175,13 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
             : "memory" );                                               \
         unreachable();                                                  \
     })
+
+#define reset_stack_and_jump(fn)                                        \
+    switch_stack_and_jump(fn, "jmp %c", "i")
+
+/* The constraint may only specify non-call-clobbered registers. */
+#define reset_stack_and_jump_ind(fn)                                    \
+    switch_stack_and_jump(fn, "INDIRECT_JMP %", "b")
 
 /*
  * Which VCPU's state is currently running on each CPU?
