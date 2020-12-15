@@ -218,7 +218,7 @@ let fire_single_watch_unchecked watch =
 let fire_single_watch (oldroot, root) watch =
 	let abspath = get_watch_path watch.con watch.path |> Store.Path.of_string in
 	let perms = lookup_watch_perms oldroot root abspath in
-	if List.exists (Perms.has watch.con.perm READ) perms then
+	if Perms.can_fire_watch watch.con.perm perms then
 		fire_single_watch_unchecked watch
 	else
 		let perms = perms |> List.map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in

@@ -20,6 +20,7 @@ let info fmt = Logging.info "perms" fmt
 open Stdext
 
 let activate = ref true
+let watch_activate = ref true
 
 type permty = READ | WRITE | RDWR | NONE
 
@@ -167,6 +168,10 @@ let check connection request node =
 
 (* check if the current connection has the requested perm on the current node *)
 let has connection request node = not (lacks connection request node)
+
+let can_fire_watch connection perms =
+	not !watch_activate
+	|| List.exists (has connection READ) perms
 
 let equiv perm1 perm2 =
 	(Node.to_string perm1) = (Node.to_string perm2)
