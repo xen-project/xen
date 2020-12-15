@@ -133,14 +133,22 @@ void play_dead(void)
 static void idle_loop(void)
 {
     unsigned int cpu = smp_processor_id();
+    /*
+     * Idle vcpus might be attached to non-idle units! We don't do any
+     * standard idle work like tasklets or livepatching in this case.
+     */
+    bool guest = !is_idle_domain(current->sched_unit->domain);
 
     for ( ; ; )
     {
         if ( cpu_is_offline(cpu) )
+        {
+            ASSERT(!guest);
             play_dead();
+        }
 
         /* Are we here for running vcpu context tasklets, or for idling? */
-        if ( unlikely(tasklet_work_to_do(cpu)) )
+        if ( !guest && unlikely(tasklet_work_to_do(cpu)) )
         {
             do_tasklet();
             /* Livepatch work is always kicked off via a tasklet. */
@@ -151,28 +159,14 @@ static void idle_loop(void)
          * and then, after it is done, whether softirqs became pending
          * while we were scrubbing.
          */
-        else if ( !softirq_pending(cpu) && !scrub_free_pages()  &&
-                    !softirq_pending(cpu) )
-            pm_idle();
-        do_softirq();
-    }
-}
-
-/*
- * Idle loop for siblings in active schedule units.
- * We don't do any standard idle work like tasklets or livepatching.
- */
-static void guest_idle_loop(void)
-{
-    unsigned int cpu = smp_processor_id();
-
-    for ( ; ; )
-    {
-        ASSERT(!cpu_is_offline(cpu));
-
-        if ( !softirq_pending(cpu) && !scrub_free_pages() &&
-             !softirq_pending(cpu))
-            sched_guest_idle(pm_idle, cpu);
+        else if ( !softirq_pending(cpu) && !scrub_free_pages() &&
+                  !softirq_pending(cpu) )
+        {
+            if ( guest )
+                sched_guest_idle(pm_idle, cpu);
+            else
+                pm_idle();
+        }
         do_softirq();
     }
 }
@@ -190,10 +184,6 @@ void startup_cpu_idle_loop(void)
 
 static void noreturn continue_idle_domain(struct vcpu *v)
 {
-    /* Idle vcpus might be attached to non-idle units! */
-    if ( !is_idle_domain(v->sched_unit->domain) )
-        reset_stack_and_jump(guest_idle_loop);
-
     reset_stack_and_jump(idle_loop);
 }
 
