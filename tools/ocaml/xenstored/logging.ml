@@ -161,6 +161,8 @@ let xenstored_log_nb_lines = ref 13215
 let xenstored_log_nb_chars = ref (-1)
 let xenstored_logger = ref (None: logger option)
 
+let debug_enabled () = !xenstored_log_level = Debug
+
 let set_xenstored_log_destination s =
 	xenstored_log_destination := log_destination_of_string s
 
@@ -204,6 +206,7 @@ type access_type =
 	| Commit
 	| Newconn
 	| Endconn
+	| Watch_not_fired
 	| XbOp of Xenbus.Xb.Op.operation
 
 let string_of_tid ~con tid =
@@ -217,6 +220,7 @@ let string_of_access_type = function
 	| Commit                  -> "commit   "
 	| Newconn                 -> "newconn  "
 	| Endconn                 -> "endconn  "
+	| Watch_not_fired         -> "w notfired"
 
 	| XbOp op -> match op with
 	| Xenbus.Xb.Op.Debug             -> "debug    "
@@ -331,3 +335,7 @@ let xb_answer ~tid ~con ~ty data =
 		| _ -> false, Debug
 	in
 	if print then access_logging ~tid ~con ~data (XbOp ty) ~level
+
+let watch_not_fired ~con perms path =
+	let data = Printf.sprintf "EPERM perms=[%s] path=%s" perms path in
+	access_logging ~tid:0 ~con ~data Watch_not_fired ~level:Info

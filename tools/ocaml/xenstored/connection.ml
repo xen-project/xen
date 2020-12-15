@@ -196,11 +196,36 @@ let list_watches con =
 		con.watches [] in
 	List.concat ll
 
-let fire_single_watch watch =
+let dbg fmt = Logging.debug "connection" fmt
+let info fmt = Logging.info "connection" fmt
+
+let lookup_watch_perm path = function
+| None -> []
+| Some root ->
+	try Store.Path.apply root path @@ fun parent name ->
+		Store.Node.get_perms parent ::
+		try [Store.Node.get_perms (Store.Node.find parent name)]
+		with Not_found -> []
+	with Define.Invalid_path | Not_found -> []
+
+let lookup_watch_perms oldroot root path =
+	lookup_watch_perm path oldroot @ lookup_watch_perm path (Some root)
+
+let fire_single_watch_unchecked watch =
 	let data = Utils.join_by_null [watch.path; watch.token; ""] in
 	send_reply watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data
 
-let fire_watch watch path =
+let fire_single_watch (oldroot, root) watch =
+	let abspath = get_watch_path watch.con watch.path |> Store.Path.of_string in
+	let perms = lookup_watch_perms oldroot root abspath in
+	if List.exists (Perms.has watch.con.perm READ) perms then
+		fire_single_watch_unchecked watch
+	else
+		let perms = perms |> List.map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in
+		let con = get_domstr watch.con in
+		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath)
+
+let fire_watch roots watch path =
 	let new_path =
 		if watch.is_relative && path.[0] = '/'
 		then begin
@@ -210,7 +235,7 @@ let fire_watch watch path =
 		end else
 			path
 	in
-	fire_single_watch { watch with path = new_path }
+	fire_single_watch roots { watch with path = new_path }
 
 (* Search for a valid unused transaction id. *)
 let rec valid_transaction_id con proposed_id =

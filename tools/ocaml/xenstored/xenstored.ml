@@ -337,7 +337,9 @@ let _ =
 					let (notify, deaddom) = Domains.cleanup domains in
 					List.iter (Connections.del_domain cons) deaddom;
 					if deaddom <> [] || notify then
-						Connections.fire_spec_watches cons Store.Path.release_domain
+						Connections.fire_spec_watches
+							(Store.get_root store)
+							cons Store.Path.release_domain
 				)
 				else
 					let c = Connections.find_domain_by_port cons port in
