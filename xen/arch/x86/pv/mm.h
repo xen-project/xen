@@ -11,16 +11,24 @@ int new_guest_cr3(mfn_t mfn);
  */
 static inline l1_pgentry_t guest_get_eff_kern_l1e(unsigned long linear)
 {
+    struct vcpu *curr = current;
+    bool user_mode = !(curr->arch.flags & TF_kernel_mode);
     l1_pgentry_t l1e;
 
-    ASSERT(!paging_mode_translate(current->domain));
-    ASSERT(!paging_mode_external(current->domain));
+    ASSERT(!paging_mode_translate(curr->domain));
+    ASSERT(!paging_mode_external(curr->domain));
+
+    if ( user_mode )
+        toggle_guest_pt(curr);
 
     if ( unlikely(!__addr_ok(linear)) ||
          __copy_from_user(&l1e,
                           &__linear_l1_table[l1_linear_offset(linear)],
                           sizeof(l1_pgentry_t)) )
         l1e = l1e_empty();
+
+    if ( user_mode )
+        toggle_guest_pt(curr);
 
     return l1e;
 }
