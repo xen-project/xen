@@ -1392,8 +1392,8 @@ static inline bool was_action_consistent(const struct payload *data, livepatch_f
 }
 
 /*
- * This function is executed having all other CPUs with no deep stack (we may
- * have cpu_idle on it) and IRQs disabled.
+ * This function is executed having all other CPUs with no deep stack (when
+ * idle) and IRQs disabled.
  */
 static void livepatch_do_action(void)
 {
