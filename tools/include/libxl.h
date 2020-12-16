@@ -464,25 +464,6 @@
 #define LIBXL_HAVE_DEVICE_PCI_ASSIGNABLE_LIST_FREE 1
 
 /*
- * LIBXL_HAVE_PCI_BDF indicates that the 'libxl_pci_bdf' type is defined
- * is embedded in the 'libxl_device_pci' type.
- */
-#define LIBXL_HAVE_PCI_BDF 1
-
-/*
- * LIBXL_HAVE_PCI_ASSIGNABLE_BDF indicates that the
- * libxl_pci_bdf_assignable_add/remove/list/list_free() functions all
- * exist.
- */
-#define LIBXL_HAVE_PCI_ASSIGNABLE_BDF 1
-
-/*
- * LIBXL_HAVE_DEVICE_PCI_NAME indicates that the 'name' field of
- * libxl_device_pci is defined.
- */
-#define LIBXL_HAVE_DEVICE_PCI_NAME 1
-
-/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -2370,9 +2351,9 @@ int libxl_device_events_handler(libxl_ctx *ctx,
                                 LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /*
- * Functions related to making PCI devices with the specified BDF
- * assignable -- that is, bound to the pciback driver, ready to be given to
- * a guest via libxl_pci_device_add.
+ * Functions related to making devices assignable -- that is, bound to
+ * the pciback driver, ready to be given to a guest via
+ * libxl_pci_device_add.
  *
  * - ..._add() will unbind the device from its current driver (if
  * already bound) and re-bind it to pciback; at that point it will be
@@ -2384,31 +2365,16 @@ int libxl_device_events_handler(libxl_ctx *ctx,
  * rebind is non-zero, attempt to assign it back to the driver
  * from whence it came.
  *
- * - ..._list() will return a list of the PCI BDFs available to be
+ * - ..._list() will return a list of the PCI devices available to be
  * assigned.
  *
  * add and remove are idempotent: if the device in question is already
  * added or is not bound, the functions will emit a warning but return
  * SUCCESS.
  */
-int libxl_pci_bdf_assignable_add(libxl_ctx *ctx, libxl_pci_bdf *pcibdf,
-                                 const char *name, int rebind);
-int libxl_pci_bdf_assignable_remove(libxl_ctx *ctx, libxl_pci_bdf *pcibdf,
-                                    int rebind);
-libxl_pci_bdf *libxl_pci_bdf_assignable_list(libxl_ctx *ctx, int *num);
-void libxl_pci_bdf_assignable_list_free(libxl_pci_bdf *list, int num);
-libxl_pci_bdf *libxl_pci_bdf_assignable_name2bdf(libxl_ctx *ctx,
-                                                 const char *name);
-char *libxl_pci_bdf_assignable_bdf2name(libxl_ctx *ctx,
-                                        libxl_pci_bdf *pcibdf);
-
-/* Compatibility functions - Use libxl_pci_bdf_assignable_* instead */
-int libxl_device_pci_assignable_add(libxl_ctx *ctx, libxl_device_pci *pci,
-                                    int rebind);
-int libxl_device_pci_assignable_remove(libxl_ctx *ctx, libxl_device_pci *pci,
-                                       int rebind);
-libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx,
-                                                   int *num);
+int libxl_device_pci_assignable_add(libxl_ctx *ctx, libxl_device_pci *pci, int rebind);
+int libxl_device_pci_assignable_remove(libxl_ctx *ctx, libxl_device_pci *pci, int rebind);
+libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num);
 void libxl_device_pci_assignable_list_free(libxl_device_pci *list, int num);
 
 /* CPUID handling */

@@ -90,12 +90,12 @@ struct cmd_spec cmd_table[] = {
     { "pci-attach",
       &main_pciattach, 0, 1,
       "Insert a new pass-through pci device",
-      "<Domain> <PCI_SPEC_STRING>",
+      "<Domain> <BDF> [Virtual Slot]",
     },
     { "pci-detach",
       &main_pcidetach, 0, 1,
       "Remove a domain's pass-through pci device",
-      "<Domain> <PCI_SPEC_STRING>",
+      "<Domain> <BDF>",
     },
     { "pci-list",
       &main_pcilist, 0, 0,
@@ -105,25 +105,21 @@ struct cmd_spec cmd_table[] = {
     { "pci-assignable-add",
       &main_pciassignable_add, 0, 1,
       "Make a device assignable for pci-passthru",
-      "[options] <BDF>",
-      "-n NAME, --name=NAME    Name the assignable device.\n"
+      "<BDF>",
       "-h                      Print this help.\n"
     },
     { "pci-assignable-remove",
       &main_pciassignable_remove, 0, 1,
       "Remove a device from being assignable",
-      "[options] <BDF>|NAME",
+      "[options] <BDF>",
       "-h                      Print this help.\n"
       "-r                      Attempt to re-assign the device to the\n"
-      "                        original driver."
+      "                        original driver"
     },
     { "pci-assignable-list",
       &main_pciassignable_list, 0, 0,
       "List all the assignable pci devices",
-      "[options]",
-      "-h                      Print this help.\n"
-      "-n, --show-names        Display assignable device names where\n"
-      "                        supplied.\n"
+      "",
     },
     { "pause",
       &main_pause, 0, 1,

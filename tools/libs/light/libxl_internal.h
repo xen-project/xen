@@ -4746,11 +4746,10 @@ void libxl__xcinfo2xlinfo(libxl_ctx *ctx,
  * devices have same identifier. */
 #define COMPARE_DEVID(a, b) ((a)->devid == (b)->devid)
 #define COMPARE_DISK(a, b) (!strcmp((a)->vdev, (b)->vdev))
-#define COMPARE_BDF(a, b) ((a)->domain == (b)->domain && \
+#define COMPARE_PCI(a, b) ((a)->domain == (b)->domain && \
                            (a)->bus == (b)->bus &&       \
                            (a)->dev == (b)->dev &&       \
                            (a)->func == (b)->func)
-#define COMPARE_PCI(a, b) COMPARE_BDF(&((a)->bdf), &((b)->bdf))
 #define COMPARE_USB(a, b) ((a)->ctrl == (b)->ctrl && \
                            (a)->port == (b)->port)
 #define COMPARE_USBCTRL(a, b) ((a)->devid == (b)->devid)

@@ -707,15 +707,11 @@ ColoCheckpointHost string
 ColoCheckpointPort string
 }
 
-type PciBdf struct {
+type DevicePci struct {
 Func byte
 Dev byte
 Bus byte
 Domain int
-}
-
-type DevicePci struct {
-Bdf PciBdf
 Vdevfn uint32
 VfuncMask uint32
 Msitranslate bool
@@ -900,7 +896,7 @@ CInfo DomainCreateInfo
 BInfo DomainBuildInfo
 Disks []DeviceDisk
 Nics []DeviceNic
-Pcis []DevicePci
+Pcidevs []DevicePci
 Rdms []DeviceRdm
 Dtdevs []DeviceDtdev
 Vfbs []DeviceVfb

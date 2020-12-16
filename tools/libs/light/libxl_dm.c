@@ -472,10 +472,10 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
     for (i = 0; i < d_config->num_pcidevs; i++) {
         unsigned int n, nr_entries;
 
-        seg = d_config->pcidevs[i].bdf.domain;
-        bus = d_config->pcidevs[i].bdf.bus;
-        devfn = PCI_DEVFN(d_config->pcidevs[i].bdf.dev,
-                          d_config->pcidevs[i].bdf.func);
+        seg = d_config->pcidevs[i].domain;
+        bus = d_config->pcidevs[i].bus;
+        devfn = PCI_DEVFN(d_config->pcidevs[i].dev,
+                          d_config->pcidevs[i].func);
         nr_entries = 0;
         rc = libxl__xc_device_get_rdm(gc, 0,
                                       seg, bus, devfn, &nr_entries, &xrdm);
