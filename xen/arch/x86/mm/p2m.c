@@ -1466,6 +1466,8 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
     return ret;
 }
 
+#ifdef CONFIG_MEM_SHARING
+
 /* Returns: 0 for success, -errno for failure */
 int set_shared_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn)
 {
@@ -1504,7 +1506,10 @@ int set_shared_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn)
     return rc;
 }
 
+#endif /* CONFIG_MEM_SHARING */
+
 #ifdef CONFIG_HVM
+
 static struct p2m_domain *
 p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)
 {
