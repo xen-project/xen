@@ -120,6 +120,14 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 
 #ifdef CONFIG_LIVEPATCH
 # define CHECK_FOR_LIVEPATCH_WORK "call check_for_livepatch_work;"
+#elif defined(CONFIG_DEBUG)
+/* Mimic the clobbering effect a call has on registers. */
+# define CHECK_FOR_LIVEPATCH_WORK \
+    "mov $0x1234567890abcdef, %%rax\n\t" \
+    "mov %%rax, %%rcx; mov %%rax, %%rdx\n\t" \
+    "mov %%rax, %%rsi; mov %%rax, %%rdi\n\t" \
+    "mov %%rax, %%r8; mov %%rax, %%r9\n\t" \
+    "mov %%rax, %%r10; mov %%rax, %%r11\n\t"
 #else
 # define CHECK_FOR_LIVEPATCH_WORK ""
 #endif
