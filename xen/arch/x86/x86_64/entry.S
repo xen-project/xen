@@ -557,8 +557,10 @@ ENTRY(dom_crash_sync_extable)
         .text
 
 /* No special register assumptions. */
-ENTRY(ret_from_intr)
 #ifdef CONFIG_PV
+ENTRY(continue_pv_domain)
+        call  check_wakeup_from_wait
+ret_from_intr:
         GET_CURRENT(bx)
         testb $3, UREGS_cs(%rsp)
         jz    restore_all_xen
@@ -567,6 +569,7 @@ ENTRY(ret_from_intr)
         je    test_all_events
         jmp   compat_test_all_events
 #else
+ret_from_intr:
         ASSERT_CONTEXT_IS_XEN
         jmp   restore_all_xen
 #endif

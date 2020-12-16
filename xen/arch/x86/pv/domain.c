@@ -110,12 +110,6 @@ static int parse_pcid(const char *s)
     return rc;
 }
 
-static void noreturn continue_nonidle_domain(void)
-{
-    check_wakeup_from_wait();
-    reset_stack_and_jump(ret_from_intr);
-}
-
 static int setup_compat_l4(struct vcpu *v)
 {
     struct page_info *pg;
@@ -341,13 +335,14 @@ void pv_domain_destroy(struct domain *d)
     FREE_XENHEAP_PAGE(d->arch.pv.gdt_ldt_l1tab);
 }
 
+void noreturn continue_pv_domain(void);
 
 int pv_domain_initialise(struct domain *d)
 {
     static const struct arch_csw pv_csw = {
         .from = paravirt_ctxt_switch_from,
         .to   = paravirt_ctxt_switch_to,
-        .tail = continue_nonidle_domain,
+        .tail = continue_pv_domain,
     };
     int rc = -ENOMEM;
 

@@ -23,7 +23,6 @@ asm ( "\t.equ CONFIG_INDIRECT_THUNK, "
 #include <asm/indirect_thunk_asm.h>
 
 #ifndef __ASSEMBLY__
-void ret_from_intr(void);
 
 /*
  * This output constraint should be used for any inline asm which has a "call"
