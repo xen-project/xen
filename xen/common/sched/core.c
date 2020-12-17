@@ -613,17 +613,45 @@ static void sched_move_irqs(const struct sched_unit *unit)
         vcpu_move_irqs(v);
 }
 
+/*
+ * Move a domain from one cpupool to another.
+ *
+ * A domain with any vcpu having temporary affinity settings will be denied
+ * to move. Hard and soft affinities will be reset.
+ *
+ * In order to support cpupools with different scheduling granularities all
+ * scheduling units are replaced by new ones.
+ *
+ * The complete move is done in the following steps:
+ * - check prerequisites (no vcpu with temporary affinities)
+ * - allocate all new data structures (scheduler specific domain data, unit
+ *   memory, scheduler specific unit data)
+ * - pause domain
+ * - temporarily move all (old) units to the same scheduling resource (this
+ *   makes the final resource assignment easier in case the new cpupool has
+ *   a larger granularity than the old one, as the scheduling locks for all
+ *   vcpus must be held for that operation)
+ * - remove old units from scheduling
+ * - set new cpupool and scheduler domain data pointers in struct domain
+ * - switch all vcpus to new units, still assigned to the old scheduling
+ *   resource
+ * - migrate all new units to scheduling resources of the new cpupool
+ * - unpause the domain
+ * - free the old memory (scheduler specific domain data, unit memory,
+ *   scheduler specific unit data)
+ */
 int sched_move_domain(struct domain *d, struct cpupool *c)
 {
     struct vcpu *v;
-    struct sched_unit *unit;
+    struct sched_unit *unit, *old_unit;
+    struct sched_unit *new_units = NULL, *old_units;
+    struct sched_unit **unit_ptr = &new_units;
     unsigned int new_p, unit_idx;
-    void **unit_priv;
     void *domdata;
-    void *unitdata;
-    struct scheduler *old_ops;
+    struct scheduler *old_ops = dom_scheduler(d);
     void *old_domdata;
     unsigned int gran = cpupool_get_granularity(c);
+    unsigned int n_units = DIV_ROUND_UP(d->max_vcpus, gran);
     int ret = 0;
 
     for_each_vcpu ( d, v )
@@ -641,52 +669,76 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         goto out;
     }
 
-    unit_priv = xzalloc_array(void *, DIV_ROUND_UP(d->max_vcpus, gran));
-    if ( unit_priv == NULL )
+    for ( unit_idx = 0; unit_idx < n_units; unit_idx++ )
     {
-        sched_free_domdata(c->sched, domdata);
-        ret = -ENOMEM;
-        goto out;
-    }
-
-    unit_idx = 0;
-    for_each_sched_unit ( d, unit )
-    {
-        unit_priv[unit_idx] = sched_alloc_udata(c->sched, unit, domdata);
-        if ( unit_priv[unit_idx] == NULL )
+        unit = sched_alloc_unit_mem();
+        if ( unit )
         {
-            for ( unit_idx = 0; unit_priv[unit_idx]; unit_idx++ )
-                sched_free_udata(c->sched, unit_priv[unit_idx]);
-            xfree(unit_priv);
-            sched_free_domdata(c->sched, domdata);
-            ret = -ENOMEM;
-            goto out;
+            /* Initialize unit for sched_alloc_udata() to work. */
+            unit->domain = d;
+            unit->unit_id = unit_idx * gran;
+            unit->vcpu_list = d->vcpu[unit->unit_id];
+            unit->priv = sched_alloc_udata(c->sched, unit, domdata);
+            *unit_ptr = unit;
         }
-        unit_idx++;
+
+        if ( !unit || !unit->priv )
+        {
+            old_units = new_units;
+            old_domdata = domdata;
+            ret = -ENOMEM;
+            goto out_free;
+        }
+
+        unit_ptr = &unit->next_in_list;
     }
 
     domain_pause(d);
 
-    old_ops = dom_scheduler(d);
     old_domdata = d->sched_priv;
 
+    /*
+     * Temporarily move all units to same processor to make locking
+     * easier when moving the new units to the new processors.
+     */
+    new_p = cpumask_first(d->cpupool->cpu_valid);
     for_each_sched_unit ( d, unit )
     {
+        spinlock_t *lock = unit_schedule_lock_irq(unit);
+
+        sched_set_res(unit, get_sched_res(new_p));
+        spin_unlock_irq(lock);
+
         sched_remove_unit(old_ops, unit);
     }
+
+    old_units = d->sched_unit_list;
 
     d->cpupool = c;
     d->sched_priv = domdata;
 
+    unit = new_units;
+    for_each_vcpu ( d, v )
+    {
+        old_unit = v->sched_unit;
+        if ( unit->unit_id + gran == v->vcpu_id )
+            unit = unit->next_in_list;
+
+        unit->state_entry_time = old_unit->state_entry_time;
+        unit->runstate_cnt[v->runstate.state]++;
+        /* Temporarily use old resource assignment */
+        unit->res = get_sched_res(new_p);
+
+        v->sched_unit = unit;
+    }
+
+    d->sched_unit_list = new_units;
+
     new_p = cpumask_first(c->cpu_valid);
-    unit_idx = 0;
     for_each_sched_unit ( d, unit )
     {
         spinlock_t *lock;
         unsigned int unit_p = new_p;
-
-        unitdata = unit->priv;
-        unit->priv = unit_priv[unit_idx];
 
         for_each_sched_unit_vcpu ( unit, v )
         {
@@ -713,8 +765,6 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
         sched_insert_unit(c->sched, unit);
 
-        sched_free_udata(old_ops, unitdata);
-
         unit_idx++;
     }
 
@@ -722,11 +772,19 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
     domain_unpause(d);
 
+ out_free:
+    for ( unit = old_units; unit; )
+    {
+        if ( unit->priv )
+            sched_free_udata(c->sched, unit->priv);
+        old_unit = unit;
+        unit = unit->next_in_list;
+        xfree(old_unit);
+    }
+
     sched_free_domdata(old_ops, old_domdata);
 
-    xfree(unit_priv);
-
-out:
+ out:
     rcu_read_unlock(&sched_res_rculock);
 
     return ret;
