@@ -283,6 +283,8 @@ extern void identify_cpu(struct cpuinfo_arm *);
 extern struct cpuinfo_arm cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
+extern struct cpuinfo_arm guest_cpuinfo;
+
 #endif /* __ASSEMBLY__ */
 
 #endif

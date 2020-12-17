@@ -24,6 +24,8 @@
 
 DECLARE_BITMAP(cpu_hwcaps, ARM_NCAPS);
 
+struct cpuinfo_arm __read_mostly guest_cpuinfo;
+
 void update_cpu_capabilities(const struct arm_cpu_capabilities *caps,
                              const char *info)
 {
@@ -150,6 +152,55 @@ void identify_cpu(struct cpuinfo_arm *c)
         c->mvfr.bits[1] = READ_SYSREG(MVFR1_EL1);
         c->mvfr.bits[2] = READ_SYSREG(MVFR2_EL1);
 }
+
+/*
+ * This function is creating a cpuinfo structure with values modified to mask
+ * all cpu features that should not be published to guest.
+ * The created structure is then used to provide ID registers values to guests.
+ */
+static int __init create_guest_cpuinfo(void)
+{
+    /*
+     * TODO: The code is currently using only the features detected on the boot
+     * core. In the long term we should try to compute values containing only
+     * features supported by all cores.
+     */
+    guest_cpuinfo = boot_cpu_data;
+
+#ifdef CONFIG_ARM_64
+    /* Hide MPAM support as xen does not support it */
+    guest_cpuinfo.pfr64.mpam = 0;
+    guest_cpuinfo.pfr64.mpam_frac = 0;
+
+    /* Hide SVE as Xen does not support it */
+    guest_cpuinfo.pfr64.sve = 0;
+    guest_cpuinfo.zfr64.bits[0] = 0;
+
+    /* Hide MTE support as Xen does not support it */
+    guest_cpuinfo.pfr64.mte = 0;
+#endif
+
+    /* Hide AMU support */
+#ifdef CONFIG_ARM_64
+    guest_cpuinfo.pfr64.amu = 0;
+#endif
+    guest_cpuinfo.pfr32.amu = 0;
+
+    /* Hide RAS support as Xen does not support it */
+#ifdef CONFIG_ARM_64
+    guest_cpuinfo.pfr64.ras = 0;
+    guest_cpuinfo.pfr64.ras_frac = 0;
+#endif
+    guest_cpuinfo.pfr32.ras = 0;
+    guest_cpuinfo.pfr32.ras_frac = 0;
+
+    return 0;
+}
+/*
+ * This function needs to be run after all smp are started to have
+ * cpuinfo structures for all cores.
+ */
+__initcall(create_guest_cpuinfo);
 
 /*
  * Local variables:
