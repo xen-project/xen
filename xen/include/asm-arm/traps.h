@@ -62,6 +62,7 @@ void do_cp15_64(struct cpu_user_regs *regs, const union hsr hsr);
 void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr);
 void do_cp14_64(struct cpu_user_regs *regs, const union hsr hsr);
 void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr);
+void do_cp10(struct cpu_user_regs *regs, const union hsr hsr);
 void do_cp(struct cpu_user_regs *regs, const union hsr hsr);
 
 /* SMCCC handling */

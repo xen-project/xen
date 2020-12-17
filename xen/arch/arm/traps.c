@@ -2097,6 +2097,11 @@ void do_trap_guest_sync(struct cpu_user_regs *regs)
         perfc_incr(trap_cp14_dbg);
         do_cp14_dbg(regs, hsr);
         break;
+    case HSR_EC_CP10:
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs));
+        perfc_incr(trap_cp10);
+        do_cp10(regs, hsr);
+        break;
     case HSR_EC_CP:
         GUEST_BUG_ON(!psr_mode_is_32bit(regs));
         perfc_incr(trap_cp);

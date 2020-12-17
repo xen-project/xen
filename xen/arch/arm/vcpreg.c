@@ -664,6 +664,43 @@ void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
     inject_undef_exception(regs, hsr);
 }
 
+void do_cp10(struct cpu_user_regs *regs, const union hsr hsr)
+{
+    const struct hsr_cp32 cp32 = hsr.cp32;
+    int regidx = cp32.reg;
+
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
+    }
+
+    switch ( hsr.bits & HSR_CP32_REGS_MASK )
+    {
+    /*
+     * HCR.TID3 is trapping access to MVFR register used to identify the
+     * VFP/Simd using VMRS/VMSR instructions.
+     * Exception encoding is using MRC/MCR standard with the reg field in Crn
+     * as are declared MVFR0 and MVFR1 in cpregs.h
+     */
+    GENERATE_TID3_INFO(MVFR0, mvfr, 0)
+    GENERATE_TID3_INFO(MVFR1, mvfr, 1)
+    GENERATE_TID3_INFO(MVFR2, mvfr, 2)
+
+    default:
+        gdprintk(XENLOG_ERR,
+                 "%s p10, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
+                 cp32.read ? "mrc" : "mcr",
+                 cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
+        gdprintk(XENLOG_ERR, "unhandled 32-bit CP10 access %#x\n",
+                 hsr.bits & HSR_CP32_REGS_MASK);
+        inject_undef_exception(regs, hsr);
+        return;
+    }
+
+    advance_pc(regs, hsr);
+}
+
 void do_cp(struct cpu_user_regs *regs, const union hsr hsr)
 {
     const struct hsr_cp cp = hsr.cp;
