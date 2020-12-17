@@ -148,6 +148,7 @@ struct cpuinfo_arm {
     union {
         uint64_t bits[2];
         struct {
+            /* PFR0 */
             unsigned long el0:4;
             unsigned long el1:4;
             unsigned long el2:4;
@@ -155,9 +156,23 @@ struct cpuinfo_arm {
             unsigned long fp:4;   /* Floating Point */
             unsigned long simd:4; /* Advanced SIMD */
             unsigned long gic:4;  /* GIC support */
-            unsigned long __res0:28;
+            unsigned long ras:4;
+            unsigned long sve:4;
+            unsigned long sel2:4;
+            unsigned long mpam:4;
+            unsigned long amu:4;
+            unsigned long dit:4;
+            unsigned long __res0:4;
             unsigned long csv2:4;
-            unsigned long __res1:4;
+            unsigned long cvs3:4;
+
+            /* PFR1 */
+            unsigned long bt:4;
+            unsigned long ssbs:4;
+            unsigned long mte:4;
+            unsigned long ras_frac:4;
+            unsigned long mpam_frac:4;
+            unsigned long __res1:44;
         };
     } pfr64;
 
@@ -170,7 +185,7 @@ struct cpuinfo_arm {
     } aux64;
 
     union {
-        uint64_t bits[2];
+        uint64_t bits[3];
         struct {
             unsigned long pa_range:4;
             unsigned long asid_bits:4;
@@ -190,12 +205,18 @@ struct cpuinfo_arm {
             unsigned long pan:4;
             unsigned long __res1:8;
             unsigned long __res2:32;
+
+            unsigned long __res3:64;
         };
     } mm64;
 
     struct {
         uint64_t bits[2];
     } isa64;
+
+    struct {
+        register_t bits[1];
+    } zfr64;
 
 #endif
 
@@ -204,25 +225,38 @@ struct cpuinfo_arm {
      * when running in 32-bit mode.
      */
     union {
-        uint32_t bits[2];
+        uint32_t bits[3];
         struct {
+            /* PFR0 */
             unsigned long arm:4;
             unsigned long thumb:4;
             unsigned long jazelle:4;
             unsigned long thumbee:4;
-            unsigned long __res0:16;
+            unsigned long csv2:4;
+            unsigned long amu:4;
+            unsigned long dit:4;
+            unsigned long ras:4;
 
+            /* PFR1 */
             unsigned long progmodel:4;
             unsigned long security:4;
             unsigned long mprofile:4;
             unsigned long virt:4;
             unsigned long gentimer:4;
-            unsigned long __res1:12;
+            unsigned long sec_frac:4;
+            unsigned long virt_frac:4;
+            unsigned long gic:4;
+
+            /* PFR2 */
+            unsigned long csv3:4;
+            unsigned long ssbs:4;
+            unsigned long ras_frac:4;
+            unsigned long __res2:20;
         };
     } pfr32;
 
     struct {
-        uint32_t bits[1];
+        uint32_t bits[2];
     } dbg32;
 
     struct {
@@ -230,12 +264,16 @@ struct cpuinfo_arm {
     } aux32;
 
     struct {
-        uint32_t bits[4];
+        uint32_t bits[6];
     } mm32;
 
     struct {
-        uint32_t bits[6];
+        uint32_t bits[7];
     } isa32;
+
+    struct {
+        register_t bits[3];
+    } mvfr;
 };
 
 extern struct cpuinfo_arm boot_cpu_data;

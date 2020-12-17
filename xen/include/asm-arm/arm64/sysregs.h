@@ -57,6 +57,34 @@
 #define ICH_AP1R2_EL2             __AP1Rx_EL2(2)
 #define ICH_AP1R3_EL2             __AP1Rx_EL2(3)
 
+/*
+ * Define ID coprocessor registers if they are not
+ * already defined by the compiler.
+ *
+ * Values picked from linux kernel
+ */
+#ifndef ID_AA64MMFR2_EL1
+#define ID_AA64MMFR2_EL1            S3_0_C0_C7_2
+#endif
+#ifndef ID_PFR2_EL1
+#define ID_PFR2_EL1                 S3_0_C0_C3_4
+#endif
+#ifndef ID_MMFR4_EL1
+#define ID_MMFR4_EL1                S3_0_C0_C2_6
+#endif
+#ifndef ID_MMFR5_EL1
+#define ID_MMFR5_EL1                S3_0_C0_C3_6
+#endif
+#ifndef ID_ISAR6_EL1
+#define ID_ISAR6_EL1                S3_0_C0_C2_7
+#endif
+#ifndef ID_AA64ZFR0_EL1
+#define ID_AA64ZFR0_EL1             S3_0_C0_C4_4
+#endif
+#ifndef ID_DFR1_EL1
+#define ID_DFR1_EL1                 S3_0_C0_C3_5
+#endif
+
 /* Access to system registers */
 
 #define READ_SYSREG32(name) ((uint32_t)READ_SYSREG64(name))

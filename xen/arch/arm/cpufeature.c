@@ -114,15 +114,20 @@ void identify_cpu(struct cpuinfo_arm *c)
 
         c->mm64.bits[0]  = READ_SYSREG(ID_AA64MMFR0_EL1);
         c->mm64.bits[1]  = READ_SYSREG(ID_AA64MMFR1_EL1);
+        c->mm64.bits[2]  = READ_SYSREG(ID_AA64MMFR2_EL1);
 
         c->isa64.bits[0] = READ_SYSREG(ID_AA64ISAR0_EL1);
         c->isa64.bits[1] = READ_SYSREG(ID_AA64ISAR1_EL1);
+
+        c->zfr64.bits[0] = READ_SYSREG(ID_AA64ZFR0_EL1);
 #endif
 
         c->pfr32.bits[0] = READ_SYSREG(ID_PFR0_EL1);
         c->pfr32.bits[1] = READ_SYSREG(ID_PFR1_EL1);
+        c->pfr32.bits[2] = READ_SYSREG(ID_PFR2_EL1);
 
         c->dbg32.bits[0] = READ_SYSREG(ID_DFR0_EL1);
+        c->dbg32.bits[1] = READ_SYSREG(ID_DFR1_EL1);
 
         c->aux32.bits[0] = READ_SYSREG(ID_AFR0_EL1);
 
@@ -130,6 +135,8 @@ void identify_cpu(struct cpuinfo_arm *c)
         c->mm32.bits[1]  = READ_SYSREG(ID_MMFR1_EL1);
         c->mm32.bits[2]  = READ_SYSREG(ID_MMFR2_EL1);
         c->mm32.bits[3]  = READ_SYSREG(ID_MMFR3_EL1);
+        c->mm32.bits[4]  = READ_SYSREG(ID_MMFR4_EL1);
+        c->mm32.bits[5]  = READ_SYSREG(ID_MMFR5_EL1);
 
         c->isa32.bits[0] = READ_SYSREG(ID_ISAR0_EL1);
         c->isa32.bits[1] = READ_SYSREG(ID_ISAR1_EL1);
@@ -137,6 +144,11 @@ void identify_cpu(struct cpuinfo_arm *c)
         c->isa32.bits[3] = READ_SYSREG(ID_ISAR3_EL1);
         c->isa32.bits[4] = READ_SYSREG(ID_ISAR4_EL1);
         c->isa32.bits[5] = READ_SYSREG(ID_ISAR5_EL1);
+        c->isa32.bits[6] = READ_SYSREG(ID_ISAR6_EL1);
+
+        c->mvfr.bits[0] = READ_SYSREG(MVFR0_EL1);
+        c->mvfr.bits[1] = READ_SYSREG(MVFR1_EL1);
+        c->mvfr.bits[2] = READ_SYSREG(MVFR2_EL1);
 }
 
 /*
