@@ -69,6 +69,14 @@ TVM_REG(CONTEXTIDR_EL1)
         break;                                                          \
     }
 
+/* Macro to generate easily case for ID co-processor emulation */
+#define GENERATE_TID3_INFO(reg, field, offset)                          \
+    case HSR_SYSREG_##reg:                                              \
+    {                                                                   \
+        return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr,   \
+                                  1, guest_cpuinfo.field.bits[offset]); \
+    }
+
 void do_sysreg(struct cpu_user_regs *regs,
                const union hsr hsr)
 {
@@ -258,6 +266,80 @@ void do_sysreg(struct cpu_user_regs *regs,
          * memory mapped interface (i.e GICv2 compatibility).
          */
         return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
+
+    /*
+     * HCR_EL2.TID3
+     *
+     * This is trapping most Identification registers used by a guest
+     * to identify the processor features
+     */
+    GENERATE_TID3_INFO(ID_PFR0_EL1, pfr32, 0)
+    GENERATE_TID3_INFO(ID_PFR1_EL1, pfr32, 1)
+    GENERATE_TID3_INFO(ID_PFR2_EL1, pfr32, 2)
+    GENERATE_TID3_INFO(ID_DFR0_EL1, dbg32, 0)
+    GENERATE_TID3_INFO(ID_DFR1_EL1, dbg32, 1)
+    GENERATE_TID3_INFO(ID_AFR0_EL1, aux32, 0)
+    GENERATE_TID3_INFO(ID_MMFR0_EL1, mm32, 0)
+    GENERATE_TID3_INFO(ID_MMFR1_EL1, mm32, 1)
+    GENERATE_TID3_INFO(ID_MMFR2_EL1, mm32, 2)
+    GENERATE_TID3_INFO(ID_MMFR3_EL1, mm32, 3)
+    GENERATE_TID3_INFO(ID_MMFR4_EL1, mm32, 4)
+    GENERATE_TID3_INFO(ID_MMFR5_EL1, mm32, 5)
+    GENERATE_TID3_INFO(ID_ISAR0_EL1, isa32, 0)
+    GENERATE_TID3_INFO(ID_ISAR1_EL1, isa32, 1)
+    GENERATE_TID3_INFO(ID_ISAR2_EL1, isa32, 2)
+    GENERATE_TID3_INFO(ID_ISAR3_EL1, isa32, 3)
+    GENERATE_TID3_INFO(ID_ISAR4_EL1, isa32, 4)
+    GENERATE_TID3_INFO(ID_ISAR5_EL1, isa32, 5)
+    GENERATE_TID3_INFO(ID_ISAR6_EL1, isa32, 6)
+    GENERATE_TID3_INFO(MVFR0_EL1, mvfr, 0)
+    GENERATE_TID3_INFO(MVFR1_EL1, mvfr, 1)
+    GENERATE_TID3_INFO(MVFR2_EL1, mvfr, 2)
+    GENERATE_TID3_INFO(ID_AA64PFR0_EL1, pfr64, 0)
+    GENERATE_TID3_INFO(ID_AA64PFR1_EL1, pfr64, 1)
+    GENERATE_TID3_INFO(ID_AA64DFR0_EL1, dbg64, 0)
+    GENERATE_TID3_INFO(ID_AA64DFR1_EL1, dbg64, 1)
+    GENERATE_TID3_INFO(ID_AA64ISAR0_EL1, isa64, 0)
+    GENERATE_TID3_INFO(ID_AA64ISAR1_EL1, isa64, 1)
+    GENERATE_TID3_INFO(ID_AA64MMFR0_EL1, mm64, 0)
+    GENERATE_TID3_INFO(ID_AA64MMFR1_EL1, mm64, 1)
+    GENERATE_TID3_INFO(ID_AA64MMFR2_EL1, mm64, 2)
+    GENERATE_TID3_INFO(ID_AA64AFR0_EL1, aux64, 0)
+    GENERATE_TID3_INFO(ID_AA64AFR1_EL1, aux64, 1)
+    GENERATE_TID3_INFO(ID_AA64ZFR0_EL1, zfr64, 0)
+
+    /*
+     * Those cases are catching all Reserved registers trapped by TID3 which
+     * currently have no assignment.
+     * HCR.TID3 is trapping all registers in the group 3:
+     * Op0 == 3, op1 == 0, CRn == c0,CRm == {c1-c7}, op2 == {0-7}.
+     * Those registers are defined as being RO in the Arm Architecture
+     * Reference manual Armv8 (Chapter D12.3.2 of issue F.c) so handle them
+     * as Read-only read as zero.
+     */
+    case HSR_SYSREG(3,0,c0,c3,3):
+    case HSR_SYSREG(3,0,c0,c3,7):
+    case HSR_SYSREG(3,0,c0,c4,2):
+    case HSR_SYSREG(3,0,c0,c4,3):
+    case HSR_SYSREG(3,0,c0,c4,5):
+    case HSR_SYSREG(3,0,c0,c4,6):
+    case HSR_SYSREG(3,0,c0,c4,7):
+    case HSR_SYSREG(3,0,c0,c5,2):
+    case HSR_SYSREG(3,0,c0,c5,3):
+    case HSR_SYSREG(3,0,c0,c5,6):
+    case HSR_SYSREG(3,0,c0,c5,7):
+    case HSR_SYSREG(3,0,c0,c6,2):
+    case HSR_SYSREG(3,0,c0,c6,3):
+    case HSR_SYSREG(3,0,c0,c6,4):
+    case HSR_SYSREG(3,0,c0,c6,5):
+    case HSR_SYSREG(3,0,c0,c6,6):
+    case HSR_SYSREG(3,0,c0,c6,7):
+    case HSR_SYSREG(3,0,c0,c7,3):
+    case HSR_SYSREG(3,0,c0,c7,4):
+    case HSR_SYSREG(3,0,c0,c7,5):
+    case HSR_SYSREG(3,0,c0,c7,6):
+    case HSR_SYSREG(3,0,c0,c7,7):
+        return handle_ro_raz(regs, regidx, hsr.sysreg.read, hsr, 1);
 
     /*
      * HCR_EL2.TIDCP
