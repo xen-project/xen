@@ -344,7 +344,8 @@ static int hypfs_read(const struct hypfs_entry *entry,
 }
 
 int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen)
+                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                     unsigned int ulen)
 {
     char *buf;
     int ret;
@@ -384,7 +385,8 @@ int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
 }
 
 int hypfs_write_bool(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen)
+                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                     unsigned int ulen)
 {
     bool buf;
 
@@ -405,7 +407,8 @@ int hypfs_write_bool(struct hypfs_entry_leaf *leaf,
 }
 
 int hypfs_write_custom(struct hypfs_entry_leaf *leaf,
-                       XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen)
+                       XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                       unsigned int ulen)
 {
     struct param_hypfs *p;
     char *buf;
@@ -439,13 +442,15 @@ int hypfs_write_custom(struct hypfs_entry_leaf *leaf,
 }
 
 int hypfs_write_deny(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen)
+                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                     unsigned int ulen)
 {
     return -EACCES;
 }
 
 static int hypfs_write(struct hypfs_entry *entry,
-                       XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned long ulen)
+                       XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                       unsigned long ulen)
 {
     struct hypfs_entry_leaf *l;
 
@@ -497,7 +502,7 @@ long do_hypfs_op(unsigned int cmd,
         break;
 
     case XEN_HYPFS_OP_write_contents:
-        ret = hypfs_write(entry, arg3, arg4);
+        ret = hypfs_write(entry, guest_handle_const_cast(arg3, void), arg4);
         break;
 
     default:

@@ -38,7 +38,7 @@ struct hypfs_funcs {
     int (*read)(const struct hypfs_entry *entry,
                 XEN_GUEST_HANDLE_PARAM(void) uaddr);
     int (*write)(struct hypfs_entry_leaf *leaf,
-                 XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
+                 XEN_GUEST_HANDLE_PARAM(const_void) uaddr, unsigned int ulen);
     unsigned int (*getsize)(const struct hypfs_entry *entry);
     struct hypfs_entry *(*findentry)(const struct hypfs_entry_dir *dir,
                                      const char *name, unsigned int name_len);
@@ -154,13 +154,17 @@ int hypfs_read_dir(const struct hypfs_entry *entry,
 int hypfs_read_leaf(const struct hypfs_entry *entry,
                     XEN_GUEST_HANDLE_PARAM(void) uaddr);
 int hypfs_write_deny(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
+                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                     unsigned int ulen);
 int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
+                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                     unsigned int ulen);
 int hypfs_write_bool(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
+                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                     unsigned int ulen);
 int hypfs_write_custom(struct hypfs_entry_leaf *leaf,
-                       XEN_GUEST_HANDLE_PARAM(void) uaddr, unsigned int ulen);
+                       XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                       unsigned int ulen);
 unsigned int hypfs_getsize(const struct hypfs_entry *entry);
 struct hypfs_entry *hypfs_leaf_findentry(const struct hypfs_entry_dir *dir,
                                          const char *name,

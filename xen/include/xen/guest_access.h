@@ -26,6 +26,11 @@
     type *_x = (hnd).p;                         \
     (XEN_GUEST_HANDLE_PARAM(type)) { _x };      \
 })
+/* Same for casting to a const type. */
+#define guest_handle_const_cast(hnd, type) ({      \
+    const type *p_ = (hnd).p;                      \
+    (XEN_GUEST_HANDLE_PARAM(const_##type)) { p_ }; \
+})
 
 /* Cast a XEN_GUEST_HANDLE to XEN_GUEST_HANDLE_PARAM */
 #define guest_handle_to_param(hnd, type) ({                  \
