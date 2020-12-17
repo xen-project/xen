@@ -25,30 +25,40 @@ CHECK_hypfs_dirlistentry;
      ROUNDUP((name_len) + 1, alignof(struct xen_hypfs_direntry)))
 
 const struct hypfs_funcs hypfs_dir_funcs = {
+    .enter = hypfs_node_enter,
+    .exit = hypfs_node_exit,
     .read = hypfs_read_dir,
     .write = hypfs_write_deny,
     .getsize = hypfs_getsize,
     .findentry = hypfs_dir_findentry,
 };
 const struct hypfs_funcs hypfs_leaf_ro_funcs = {
+    .enter = hypfs_node_enter,
+    .exit = hypfs_node_exit,
     .read = hypfs_read_leaf,
     .write = hypfs_write_deny,
     .getsize = hypfs_getsize,
     .findentry = hypfs_leaf_findentry,
 };
 const struct hypfs_funcs hypfs_leaf_wr_funcs = {
+    .enter = hypfs_node_enter,
+    .exit = hypfs_node_exit,
     .read = hypfs_read_leaf,
     .write = hypfs_write_leaf,
     .getsize = hypfs_getsize,
     .findentry = hypfs_leaf_findentry,
 };
 const struct hypfs_funcs hypfs_bool_wr_funcs = {
+    .enter = hypfs_node_enter,
+    .exit = hypfs_node_exit,
     .read = hypfs_read_leaf,
     .write = hypfs_write_bool,
     .getsize = hypfs_getsize,
     .findentry = hypfs_leaf_findentry,
 };
 const struct hypfs_funcs hypfs_custom_wr_funcs = {
+    .enter = hypfs_node_enter,
+    .exit = hypfs_node_exit,
     .read = hypfs_read_leaf,
     .write = hypfs_write_custom,
     .getsize = hypfs_getsize,
@@ -62,6 +72,8 @@ enum hypfs_lock_state {
     hypfs_write_locked
 };
 static DEFINE_PER_CPU(enum hypfs_lock_state, hypfs_locked);
+
+static DEFINE_PER_CPU(const struct hypfs_entry *, hypfs_last_node_entered);
 
 HYPFS_DIR_INIT(hypfs_root, "");
 
@@ -100,11 +112,56 @@ static void hypfs_unlock(void)
     }
 }
 
+const struct hypfs_entry *hypfs_node_enter(const struct hypfs_entry *entry)
+{
+    return entry;
+}
+
+void hypfs_node_exit(const struct hypfs_entry *entry)
+{
+}
+
+static int node_enter(const struct hypfs_entry *entry)
+{
+    const struct hypfs_entry **last = &this_cpu(hypfs_last_node_entered);
+
+    entry = entry->funcs->enter(entry);
+    if ( IS_ERR(entry) )
+        return PTR_ERR(entry);
+
+    ASSERT(entry);
+    ASSERT(!*last || *last == entry->parent);
+
+    *last = entry;
+
+    return 0;
+}
+
+static void node_exit(const struct hypfs_entry *entry)
+{
+    const struct hypfs_entry **last = &this_cpu(hypfs_last_node_entered);
+
+    ASSERT(*last == entry);
+    *last = entry->parent;
+
+    entry->funcs->exit(entry);
+}
+
+static void node_exit_all(void)
+{
+    const struct hypfs_entry **last = &this_cpu(hypfs_last_node_entered);
+
+    while ( *last )
+        node_exit(*last);
+}
+
 static int add_entry(struct hypfs_entry_dir *parent, struct hypfs_entry *new)
 {
     int ret = -ENOENT;
     struct hypfs_entry *e;
 
+    ASSERT(new->funcs->enter);
+    ASSERT(new->funcs->exit);
     ASSERT(new->funcs->read);
     ASSERT(new->funcs->write);
     ASSERT(new->funcs->getsize);
@@ -140,6 +197,7 @@ static int add_entry(struct hypfs_entry_dir *parent, struct hypfs_entry *new)
         unsigned int sz = strlen(new->name);
 
         parent->e.size += DIRENTRY_SIZE(sz);
+        new->parent = &parent->e;
     }
 
     hypfs_unlock();
@@ -221,6 +279,7 @@ static struct hypfs_entry *hypfs_get_entry_rel(struct hypfs_entry_dir *dir,
     const char *end;
     struct hypfs_entry *entry;
     unsigned int name_len;
+    int ret;
 
     for ( ; ; )
     {
@@ -234,6 +293,10 @@ static struct hypfs_entry *hypfs_get_entry_rel(struct hypfs_entry_dir *dir,
         if ( !end )
             end = strchr(path, '\0');
         name_len = end - path;
+
+        ret = node_enter(&dir->e);
+        if ( ret )
+            return ERR_PTR(ret);
 
         entry = dir->e.funcs->findentry(dir, path, name_len);
         if ( IS_ERR(entry) || !*end )
@@ -265,6 +328,7 @@ int hypfs_read_dir(const struct hypfs_entry *entry,
     const struct hypfs_entry_dir *d;
     const struct hypfs_entry *e;
     unsigned int size = entry->funcs->getsize(entry);
+    int ret;
 
     ASSERT(this_cpu(hypfs_locked) != hypfs_unlocked);
 
@@ -276,12 +340,19 @@ int hypfs_read_dir(const struct hypfs_entry *entry,
         unsigned int e_namelen = strlen(e->name);
         unsigned int e_len = DIRENTRY_SIZE(e_namelen);
 
+        ret = node_enter(e);
+        if ( ret )
+            return ret;
+
         direntry.e.pad = 0;
         direntry.e.type = e->type;
         direntry.e.encoding = e->encoding;
         direntry.e.content_len = e->funcs->getsize(e);
         direntry.e.max_write_len = e->max_size;
         direntry.off_next = list_is_last(&e->list, &d->dirlist) ? 0 : e_len;
+
+        node_exit(e);
+
         if ( copy_to_guest(uaddr, &direntry, 1) )
             return -EFAULT;
 
@@ -495,6 +566,10 @@ long do_hypfs_op(unsigned int cmd,
         goto out;
     }
 
+    ret = node_enter(entry);
+    if ( ret )
+        goto out;
+
     switch ( cmd )
     {
     case XEN_HYPFS_OP_read:
@@ -511,6 +586,8 @@ long do_hypfs_op(unsigned int cmd,
     }
 
  out:
+    node_exit_all();
+
     hypfs_unlock();
 
     return ret;

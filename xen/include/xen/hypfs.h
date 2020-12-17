@@ -35,6 +35,8 @@ struct hypfs_entry;
  * "/a/b/c" findentry() will be called for "/", "/a", and "/a/b").
  */
 struct hypfs_funcs {
+    const struct hypfs_entry *(*enter)(const struct hypfs_entry *entry);
+    void (*exit)(const struct hypfs_entry *entry);
     int (*read)(const struct hypfs_entry *entry,
                 XEN_GUEST_HANDLE_PARAM(void) uaddr);
     int (*write)(struct hypfs_entry_leaf *leaf,
@@ -56,6 +58,7 @@ struct hypfs_entry {
     unsigned int size;
     unsigned int max_size;
     const char *name;
+    struct hypfs_entry *parent;
     struct list_head list;
     const struct hypfs_funcs *funcs;
 };
@@ -149,6 +152,8 @@ int hypfs_add_dir(struct hypfs_entry_dir *parent,
                   struct hypfs_entry_dir *dir, bool nofault);
 int hypfs_add_leaf(struct hypfs_entry_dir *parent,
                    struct hypfs_entry_leaf *leaf, bool nofault);
+const struct hypfs_entry *hypfs_node_enter(const struct hypfs_entry *entry);
+void hypfs_node_exit(const struct hypfs_entry *entry);
 int hypfs_read_dir(const struct hypfs_entry *entry,
                    XEN_GUEST_HANDLE_PARAM(void) uaddr);
 int hypfs_read_leaf(const struct hypfs_entry *entry,
