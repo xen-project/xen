@@ -41,12 +41,16 @@ ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 ALL_OBJS-$(CONFIG_CRYPTO)   += $(BASEDIR)/crypto/built_in.o
 
+ALL_LIBS-y               := $(BASEDIR)/lib/lib.a
+
 # Initialise some variables
+lib-y :=
 targets :=
 CFLAGS-y :=
 AFLAGS-y :=
 
 ALL_OBJS := $(ALL_OBJS-y)
+ALL_LIBS := $(ALL_LIBS-y)
 
 SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
                                             $(foreach w,1 2 4, \
@@ -60,7 +64,14 @@ include Makefile
 # ---------------------------------------------------------------------------
 
 quiet_cmd_ld = LD      $@
-cmd_ld = $(LD) $(XEN_LDFLAGS) -r -o $@ $(real-prereqs)
+cmd_ld = $(LD) $(XEN_LDFLAGS) -r -o $@ $(filter-out %.a,$(real-prereqs)) \
+               --start-group $(filter %.a,$(real-prereqs)) --end-group
+
+# Archive
+# ---------------------------------------------------------------------------
+
+quiet_cmd_ar = AR      $@
+cmd_ar = rm -f $@; $(AR) cPrs $@ $(real-prereqs)
 
 # Objcopy
 # ---------------------------------------------------------------------------
@@ -85,6 +96,10 @@ obj-y    := $(patsubst %/, %/built_in.o, $(obj-y))
 # $(subdir-obj-y) is the list of objects in $(obj-y) which uses dir/ to
 # tell kbuild to descend
 subdir-obj-y := $(filter %/built_in.o, $(obj-y))
+
+# Libraries are always collected in one lib file.
+# Filter out objects already built-in
+lib-y := $(filter-out $(obj-y), $(sort $(lib-y)))
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS-y += -DINIT_SECTIONS_ONLY
 
@@ -129,7 +144,7 @@ include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 c_flags += $(CFLAGS-y)
 a_flags += $(CFLAGS-y) $(AFLAGS-y)
 
-built_in.o: $(obj-y) $(extra-y)
+built_in.o: $(obj-y) $(if $(strip $(lib-y)),lib.a) $(extra-y)
 ifeq ($(strip $(obj-y)),)
 	$(CC) $(c_flags) -c -x c /dev/null -o $@
 else
@@ -140,8 +155,14 @@ else
 endif
 endif
 
+lib.a: $(lib-y) FORCE
+	$(call if_changed,ar)
+
 targets += built_in.o
-targets += $(filter-out $(subdir-obj-y), $(obj-y)) $(extra-y)
+ifneq ($(strip $(lib-y)),)
+targets += lib.a
+endif
+targets += $(filter-out $(subdir-obj-y), $(obj-y) $(lib-y)) $(extra-y)
 targets += $(MAKECMDGOALS)
 
 built_in_bin.o: $(obj-bin-y) $(extra-y)
@@ -155,7 +176,7 @@ endif
 PHONY += FORCE
 FORCE:
 
-%/built_in.o: FORCE
+%/built_in.o %/lib.a: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o
 
 %/built_in_bin.o: FORCE
