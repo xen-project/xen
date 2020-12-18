@@ -12,6 +12,7 @@
 
 #define inline        __inline__
 #define always_inline __inline__ __attribute__ ((__always_inline__))
+#define gnu_inline    __inline__ __attribute__ ((__gnu_inline__))
 #define noinline      __attribute__((__noinline__))
 
 #define noreturn      __attribute__((__noreturn__))

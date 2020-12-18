@@ -1,6 +1,5 @@
 obj-$(CONFIG_ARGO) += argo.o
 obj-y += bitmap.o
-obj-y += bsearch.o
 obj-$(CONFIG_HYPFS_CONFIG) += config_data.o
 obj-$(CONFIG_CORE_PARKING) += core_parking.o
 obj-y += cpu.o
