@@ -1,6 +1,5 @@
 #include <xen/lib.h>
 #include <xen/types.h>
-#include <xen/init.h>
 #include <asm/byteorder.h>
 
 /*
@@ -421,19 +420,6 @@ uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
     res.l.low = (((rh % c) << 32) + (rl & 0xffffffff)) / c;
     return res.ll;
 #endif
-}
-
-typedef void (*ctor_func_t)(void);
-extern const ctor_func_t __ctors_start[], __ctors_end[];
-
-void __init init_constructors(void)
-{
-    const ctor_func_t *f;
-    for ( f = __ctors_start; f < __ctors_end; ++f )
-        (*f)();
-
-    /* Putting this here seems as good (or bad) as any other place. */
-    BUILD_BUG_ON(sizeof(size_t) != sizeof(ssize_t));
 }
 
 /*
