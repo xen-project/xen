@@ -2565,9 +2565,6 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     int rc;
     struct domain *fdom;
 
-    ASSERT(tdom);
-    if ( foreigndom == DOMID_SELF )
-        return -EINVAL;
     /*
      * hvm fixme: until support is added to p2m teardown code to cleanup any
      * foreign entries, limit this to hardware domain only.
@@ -2578,13 +2575,15 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     if ( foreigndom == DOMID_XEN )
         fdom = rcu_lock_domain(dom_xen);
     else
-        fdom = rcu_lock_domain_by_id(foreigndom);
-    if ( fdom == NULL )
-        return -ESRCH;
+    {
+        rc = rcu_lock_remote_domain_by_id(foreigndom, &fdom);
+        if ( rc )
+            return rc;
 
-    rc = -EINVAL;
-    if ( tdom == fdom )
-        goto out;
+        rc = -EINVAL;
+        if ( tdom == fdom )
+            goto out;
+    }
 
     rc = xsm_map_gmfn_foreign(XSM_TARGET, tdom, fdom);
     if ( rc )
@@ -2598,10 +2597,8 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     if ( !page ||
          !p2m_is_ram(p2mt) || p2m_is_shared(p2mt) || p2m_is_hole(p2mt) )
     {
-        if ( page )
-            put_page(page);
         rc = -EINVAL;
-        goto out;
+        goto put_one;
     }
     mfn = page_to_mfn(page);
 
@@ -2630,8 +2627,6 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
                  gpfn, mfn_x(mfn), fgfn, tdom->domain_id, fdom->domain_id);
 
  put_both:
-    put_page(page);
-
     /*
      * This put_gfn for the above get_gfn for prev_mfn.  We must do this
      * after set_foreign_p2m_entry so another cpu doesn't populate the gpfn
@@ -2639,9 +2634,13 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
      */
     put_gfn(tdom, gpfn);
 
-out:
+ put_one:
+    put_page(page);
+
+ out:
     if ( fdom )
         rcu_unlock_domain(fdom);
+
     return rc;
 }
 
