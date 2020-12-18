@@ -1,11 +1,17 @@
 
 config NR_CPUS
-	int "Maximum number of physical CPUs"
+	int "Maximum number of CPUs"
 	range 1 4095
 	default "256" if X86
 	default "8" if ARM && RCAR3
 	default "4" if ARM && QEMU
 	default "4" if ARM && MPSOC
 	default "128" if ARM
-	---help---
-	  Specifies the maximum number of physical CPUs which Xen will support.
+	help
+	  Controls the build-time size of various arrays and bitmaps
+	  associated with multiple-cpu management.  It is the upper bound of
+	  the number of logical entities the scheduler can run code on.
+
+	  For CPU cores which support Simultaneous Multi-Threading or similar
+	  technologies, this the number of logical threads which Xen will
+	  support.
