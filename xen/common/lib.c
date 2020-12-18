@@ -423,45 +423,6 @@ uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
 #endif
 }
 
-unsigned long long parse_size_and_unit(const char *s, const char **ps)
-{
-    unsigned long long ret;
-    const char *s1;
-
-    ret = simple_strtoull(s, &s1, 0);
-
-    switch ( *s1 )
-    {
-    case 'T': case 't':
-        ret <<= 10;
-        /* fallthrough */
-    case 'G': case 'g':
-        ret <<= 10;
-        /* fallthrough */
-    case 'M': case 'm':
-        ret <<= 10;
-        /* fallthrough */
-    case 'K': case 'k':
-        ret <<= 10;
-        /* fallthrough */
-    case 'B': case 'b':
-        s1++;
-        break;
-    case '%':
-        if ( ps )
-            break;
-        /* fallthrough */
-    default:
-        ret <<= 10; /* default to kB */
-        break;
-    }
-
-    if ( ps != NULL )
-        *ps = s1;
-
-    return ret;
-}
-
 typedef void (*ctor_func_t)(void);
 extern const ctor_func_t __ctors_start[], __ctors_end[];
 
