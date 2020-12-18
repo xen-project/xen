@@ -23,7 +23,13 @@
 #include <asm/bug.h>
 
 #define BUG_ON(p)  do { if (unlikely(p)) BUG();  } while (0)
-#define WARN_ON(p) do { if (unlikely(p)) WARN(); } while (0)
+#define WARN_ON(p)  ({                  \
+    bool ret_warn_on_ = (p);            \
+                                        \
+    if ( unlikely(ret_warn_on_) )       \
+        WARN();                         \
+    unlikely(ret_warn_on_);             \
+})
 
 /* All clang versions supported by Xen have _Static_assert. */
 #if defined(__clang__) || \
