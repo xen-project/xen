@@ -331,7 +331,7 @@ sub output_index () {
 <h2>Starting points</h2>
 <ul>
 END
-    foreach my $ic (sort { $a->{Seq} <=> $b->{Seq} } @incontents) {
+    foreach my $ic (sort { $a->{Seq} <=> $b->{Seq} or $a->{Title} cmp $b->{Title} } @incontents) {
         $o .= "<li><a href=\"$ic->{Href}\">$ic->{Title}</a></li>\n";
     }
     $o .= "</ul>\n";
