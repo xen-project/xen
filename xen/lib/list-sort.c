@@ -15,7 +15,6 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/lib.h>
 #include <xen/list.h>
 
 #define MAX_LIST_LENGTH_BITS 20
@@ -154,4 +153,3 @@ void list_sort(void *priv, struct list_head *head,
 
 	merge_and_restore_back_links(priv, cmp, head, part[max_lev], list);
 }
-EXPORT_SYMBOL(list_sort);

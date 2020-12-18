@@ -56,9 +56,7 @@ config HVM
         def_bool y
 
 config NEW_VGIC
-	bool
-	prompt "Use new VGIC implementation"
-	select NEEDS_LIST_SORT
+	bool "Use new VGIC implementation"
 	---help---
 
 	This is an alternative implementation of the ARM GIC interrupt

@@ -66,9 +66,6 @@ config MEM_ACCESS
 config NEEDS_LIBELF
 	bool
 
-config NEEDS_LIST_SORT
-	bool
-
 menu "Speculative hardening"
 
 config SPECULATIVE_HARDEN_ARRAY
