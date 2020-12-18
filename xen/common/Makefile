@@ -33,7 +33,6 @@ obj-y += preempt.o
 obj-y += random.o
 obj-y += rangeset.o
 obj-y += radix-tree.o
-obj-y += rbtree.o
 obj-y += rcupdate.o
 obj-y += rwlock.o
 obj-y += shutdown.o
