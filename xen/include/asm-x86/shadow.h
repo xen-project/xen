@@ -99,6 +99,7 @@ int shadow_set_allocation(struct domain *d, unsigned int pages,
 
 #else /* !CONFIG_SHADOW_PAGING */
 
+#define shadow_vcpu_teardown(v) ASSERT(is_pv_vcpu(v))
 #define shadow_teardown(d, p) ASSERT(is_pv_domain(d))
 #define shadow_final_teardown(d) ASSERT(is_pv_domain(d))
 #define shadow_enable(d, mode) \
