@@ -184,6 +184,12 @@ EFI_LDFLAGS += --major-image-version=$(XEN_VERSION)
 EFI_LDFLAGS += --minor-image-version=$(XEN_SUBVERSION)
 EFI_LDFLAGS += --major-os-version=2 --minor-os-version=0
 EFI_LDFLAGS += --major-subsystem-version=2 --minor-subsystem-version=0
+# It seems ld unfortunately can't set a custom timestamp, so add a zero value
+# for the timestamp (option --no-insert-timestamp) if SOURCE_DATE_EPOCH is
+# defined to make reproducible builds possible.
+ifdef SOURCE_DATE_EPOCH
+EFI_LDFLAGS += --no-insert-timestamp
+endif
 
 $(TARGET).efi: VIRT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A VIRT_START$$,,p')
 $(TARGET).efi: ALT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A ALT_START$$,,p')
