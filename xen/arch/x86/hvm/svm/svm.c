@@ -63,7 +63,7 @@
 #include <asm/monitor.h>
 #include <asm/xstate.h>
 
-void svm_asm_do_resume(void);
+void noreturn svm_asm_do_resume(void);
 
 u32 svm_feature_flags;
 

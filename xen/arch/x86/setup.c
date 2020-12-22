@@ -619,7 +619,7 @@ static inline bool using_2M_mapping(void)
            !l1_table_offset((unsigned long)__2M_rwdata_end);
 }
 
-static void noinline init_done(void)
+static void noreturn init_done(void)
 {
     void *va;
     unsigned long start, end;

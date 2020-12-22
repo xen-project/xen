@@ -43,8 +43,10 @@ static inline struct cpu_info *get_cpu_info(void)
 
 #define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
 
-#define switch_stack_and_jump(stack, fn)                                \
-    asm volatile ("mov sp,%0; b " STR(fn) : : "r" (stack) : "memory" )
+#define switch_stack_and_jump(stack, fn) do {                           \
+    asm volatile ("mov sp,%0; b " STR(fn) : : "r" (stack) : "memory" ); \
+    unreachable();                                                      \
+} while ( false )
 
 #define reset_stack_and_jump(fn) switch_stack_and_jump(get_cpu_info(), fn)
 

@@ -1850,6 +1850,8 @@ void vmx_vmentry_failure(void)
     domain_crash(curr->domain);
 }
 
+void noreturn vmx_asm_do_vmentry(void);
+
 void vmx_do_resume(void)
 {
     struct vcpu *v = current;

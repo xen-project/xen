@@ -736,7 +736,7 @@ void sched_context_switched(struct vcpu *prev, struct vcpu *vnext);
 void continue_running(
     struct vcpu *same);
 
-void startup_cpu_idle_loop(void);
+void noreturn startup_cpu_idle_loop(void);
 extern void (*pm_idle) (void);
 extern void (*dead_idle) (void);
 

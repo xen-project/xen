@@ -163,9 +163,18 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 # define SHADOW_STACK_WORK ""
 #endif
 
+#if __GNUC__ >= 9
+# define ssaj_has_attr_noreturn(fn) __builtin_has_attribute(fn, __noreturn__)
+#else
+/* Simply can't check the property with older gcc. */
+# define ssaj_has_attr_noreturn(fn) true
+#endif
+
 #define switch_stack_and_jump(fn, instr, constr)                        \
     ({                                                                  \
         unsigned int tmp;                                               \
+        (void)((fn) == (void (*)(void))NULL);                           \
+        BUILD_BUG_ON(!ssaj_has_attr_noreturn(fn));                      \
         __asm__ __volatile__ (                                          \
             SHADOW_STACK_WORK                                           \
             "mov %[stk], %%rsp;"                                        \
