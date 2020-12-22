@@ -2776,6 +2776,8 @@ static const struct lbr_info *last_branch_msr_get(void)
         case 0x7a:
         /* Ice Lake */
         case 0x7d: case 0x7e:
+        /* Tiger Lake */
+        case 0x8c: case 0x8d:
         /* Tremont */
         case 0x86:
         /* Kaby Lake */
