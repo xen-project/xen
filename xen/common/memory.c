@@ -818,7 +818,11 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
     union add_to_physmap_extra extra = {};
     struct page_info *pages[16];
 
-    ASSERT(paging_mode_translate(d));
+    if ( !paging_mode_translate(d) )
+    {
+        ASSERT_UNREACHABLE();
+        return -EACCES;
+    }
 
     if ( xatp->space == XENMAPSPACE_gmfn_foreign )
         extra.foreign_domid = DOMID_INVALID;
