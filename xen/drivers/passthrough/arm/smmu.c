@@ -405,7 +405,7 @@ static struct iommu_group *iommu_group_get(struct device *dev)
 #define ID0_NUMSMRG_SHIFT		0
 #define ID0_NUMSMRG_MASK		0xff
 
-#define ID1_PAGESIZE			(1 << 31)
+#define ID1_PAGESIZE			(1U << 31)
 #define ID1_NUMPAGENDXB_SHIFT		28
 #define ID1_NUMPAGENDXB_MASK		7
 #define ID1_NUMS2CB_SHIFT		16
@@ -438,7 +438,7 @@ static struct iommu_group *iommu_group_get(struct device *dev)
 
 /* Stream mapping registers */
 #define ARM_SMMU_GR0_SMR(n)		(0x800 + ((n) << 2))
-#define SMR_VALID			(1 << 31)
+#define SMR_VALID			(1U << 31)
 #define SMR_MASK_SHIFT			16
 #define SMR_MASK_MASK			0x7fff
 #define SMR_ID_SHIFT			0
@@ -506,7 +506,7 @@ static struct iommu_group *iommu_group_get(struct device *dev)
 #define RESUME_RETRY			(0 << 0)
 #define RESUME_TERMINATE		(1 << 0)
 
-#define TTBCR_EAE			(1 << 31)
+#define TTBCR_EAE			(1U << 31)
 
 #define TTBCR_PASIZE_SHIFT		16
 #define TTBCR_PASIZE_MASK		0x7
@@ -562,7 +562,7 @@ static struct iommu_group *iommu_group_get(struct device *dev)
 #define MAIR_ATTR_IDX_CACHE		1
 #define MAIR_ATTR_IDX_DEV		2
 
-#define FSR_MULTI			(1 << 31)
+#define FSR_MULTI			(1U << 31)
 #define FSR_SS				(1 << 30)
 #define FSR_UUT				(1 << 8)
 #define FSR_ASF				(1 << 7)
