@@ -286,8 +286,8 @@ static struct uart_driver __read_mostly scif_uart_driver = {
 
 static const struct dt_device_match scif_uart_dt_match[] __initconst =
 {
-    { .compatible = "renesas,scif",  .data = (void *)SCIF_PORT },
-    { .compatible = "renesas,scifa", .data = (void *)SCIFA_PORT },
+    { .compatible = "renesas,scif",  .data = &port_params[SCIF_PORT] },
+    { .compatible = "renesas,scifa", .data = &port_params[SCIFA_PORT] },
     { /* sentinel */ },
 };
 
@@ -330,7 +330,7 @@ static int __init scif_uart_init(struct dt_device_node *dev,
 
     match = dt_match_node(scif_uart_dt_match, dev);
     ASSERT( match );
-    uart->params = &port_params[(enum port_types)match->data];
+    uart->params = match->data;
 
     uart->vuart.base_addr  = addr;
     uart->vuart.size       = size;
