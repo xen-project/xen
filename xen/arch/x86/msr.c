@@ -176,7 +176,16 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     switch ( msr )
     {
     case MSR_IA32_FEATURE_CONTROL:
-        if ( !cp->basic.vmx && !vmce_has_lmce(v) )
+        /*
+         * Architecturally, availability of this MSR is enumerated by the
+         * visibility of any sub-feature.  However, Win10 in at some
+         * configurations performs a read before setting up a #GP handler.
+         *
+         * The MSR has existed on all Intel parts since before the 64bit days,
+         * and is implemented by other vendors.
+         */
+        if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR |
+                                 X86_VENDOR_SHANGHAI)) )
             goto gp_fault;
 
         *val = IA32_FEATURE_CONTROL_LOCK;
