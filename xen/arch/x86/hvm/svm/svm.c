@@ -1586,7 +1586,7 @@ static int _svm_cpu_up(bool bsp)
 
     /* Check whether SVM feature is disabled in BIOS */
     rdmsrl(MSR_K8_VM_CR, msr_content);
-    if ( msr_content & K8_VMCR_SVME_DISABLE )
+    if ( msr_content & VM_CR_SVM_DISABLE )
     {
         printk("CPU%d: AMD SVM Extension is disabled in BIOS.\n", cpu);
         return -EINVAL;

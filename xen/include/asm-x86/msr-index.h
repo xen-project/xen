@@ -116,6 +116,9 @@
 #define  PASID_PASID_MASK                   0x000fffff
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
 
+#define MSR_K8_VM_CR                        0xc0010114
+#define  VM_CR_SVM_DISABLE                  (_AC(1, ULL) <<  4)
+
 /*
  * Legacy MSR constants in need of cleanup.  No new MSRs below this comment.
  */
@@ -297,7 +300,6 @@
 #define MSR_K8_PSTATE6			0xc001006A
 #define MSR_K8_PSTATE7			0xc001006B
 #define MSR_K8_ENABLE_C1E		0xc0010055
-#define MSR_K8_VM_CR			0xc0010114
 #define MSR_K8_VM_HSAVE_PA		0xc0010117
 
 #define MSR_AMD_FAM15H_EVNTSEL0		0xc0010200
@@ -317,10 +319,6 @@
 #define MSR_AMD_THRM_FEATURE_MASK	0xc0011003
 #define MSR_K8_FEATURE_MASK		0xc0011004
 #define MSR_K8_EXT_FEATURE_MASK		0xc0011005
-
-/* MSR_K8_VM_CR bits: */
-#define _K8_VMCR_SVME_DISABLE		4
-#define K8_VMCR_SVME_DISABLE		(1 << _K8_VMCR_SVME_DISABLE)
 
 /* AMD64 MSRs */
 #define MSR_AMD64_NB_CFG		0xc001001f
