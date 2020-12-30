@@ -71,7 +71,7 @@ cmd_ld = $(LD) $(XEN_LDFLAGS) -r -o $@ $(filter-out %.a,$(real-prereqs)) \
 # ---------------------------------------------------------------------------
 
 quiet_cmd_ar = AR      $@
-cmd_ar = rm -f $@; $(AR) cPrs $@ $(real-prereqs)
+cmd_ar = rm -f $@; $(AR) cr $@ $(real-prereqs)
 
 # Objcopy
 # ---------------------------------------------------------------------------
