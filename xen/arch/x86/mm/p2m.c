@@ -1784,6 +1784,7 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
     if ( is_hvm_vcpu(v) && paging_mode_hap(v->domain) && nestedhvm_is_n2(v) )
     {
         unsigned long l2_gfn, l1_gfn;
+        paddr_t l1_gpa;
         struct p2m_domain *p2m;
         const struct paging_mode *mode;
         uint8_t l1_p2ma;
@@ -1798,14 +1799,16 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
         if ( l2_gfn == gfn_x(INVALID_GFN) )
             return gfn_x(INVALID_GFN);
 
-        /* translate l2 guest gfn into l1 guest gfn */
-        rv = nestedhap_walk_L1_p2m(v, l2_gfn, &l1_gfn, &l1_page_order, &l1_p2ma,
+        rv = nestedhap_walk_L1_p2m(v, pfn_to_paddr(l2_gfn), &l1_gpa,
+                                   &l1_page_order, &l1_p2ma,
                                    1,
                                    !!(*pfec & PFEC_write_access),
                                    !!(*pfec & PFEC_insn_fetch));
 
         if ( rv != NESTEDHVM_PAGEFAULT_DONE )
             return gfn_x(INVALID_GFN);
+
+        l1_gfn = paddr_to_pfn(l1_gpa);
 
         /*
          * Sanity check that l1_gfn can be used properly as a 4K mapping, even
