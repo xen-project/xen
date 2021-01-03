@@ -29,7 +29,7 @@
 
 #include "xen.h"
 
-#define VM_EVENT_INTERFACE_VERSION 0x00000006
+#define VM_EVENT_INTERFACE_VERSION 0x00000007
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
@@ -119,6 +119,10 @@
  * which singlestep gets automatically disabled.
  */
 #define VM_EVENT_FLAG_FAST_SINGLESTEP    (1 << 11)
+/*
+ * Set if the event comes from a nested VM and thus npt_base is valid.
+ */
+#define VM_EVENT_FLAG_NESTED_P2M         (1 << 12)
 
 /*
  * Reasons for the vm event request
@@ -208,6 +212,17 @@ struct vm_event_regs_x86 {
     uint64_t msr_star;
     uint64_t msr_lstar;
     uint64_t gdtr_base;
+
+    /*
+     * When VM_EVENT_FLAG_NESTED_P2M is set, this event comes from a nested
+     * VM.  npt_base is the guest physical address of the L1 hypervisors
+     * EPT/NPT tables for the nested guest.
+     *
+     * All bits outside of architectural address ranges are reserved for
+     * future metadata.
+     */
+    uint64_t npt_base;
+
     uint32_t cs_base;
     uint32_t ss_base;
     uint32_t ds_base;

@@ -26,12 +26,22 @@
 #include <xen/mem_access.h>
 #include <xen/monitor.h>
 #include <asm/hvm/monitor.h>
+#include <asm/hvm/nestedhvm.h>
 #include <asm/altp2m.h>
 #include <asm/monitor.h>
 #include <asm/p2m.h>
 #include <asm/paging.h>
 #include <asm/vm_event.h>
 #include <public/vm_event.h>
+
+static void set_npt_base(struct vcpu *v, vm_event_request_t *req)
+{
+    if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
+    {
+        req->flags |= VM_EVENT_FLAG_NESTED_P2M;
+        req->data.regs.x86.npt_base = nhvm_vcpu_p2m_base(v);
+    }
+}
 
 bool hvm_monitor_cr(unsigned int index, unsigned long value, unsigned long old)
 {
@@ -53,6 +63,8 @@ bool hvm_monitor_cr(unsigned int index, unsigned long value, unsigned long old)
             .u.write_ctrlreg.old_value = old
         };
 
+        set_npt_base(curr, &req);
+
         return monitor_traps(curr, sync, &req) >= 0 &&
                curr->domain->arch.monitor.control_register_values;
     }
@@ -73,6 +85,8 @@ bool hvm_monitor_emul_unimplemented(void)
         .vcpu_id  = curr->vcpu_id,
     };
 
+    set_npt_base(curr, &req);
+
     return curr->domain->arch.monitor.emul_unimplemented_enabled &&
         monitor_traps(curr, true, &req) == 1;
 }
@@ -92,6 +106,8 @@ bool hvm_monitor_msr(unsigned int msr, uint64_t new_value, uint64_t old_value)
             .u.mov_to_msr.old_value = old_value
         };
 
+        set_npt_base(curr, &req);
+
         return monitor_traps(curr, 1, &req) >= 0 &&
                curr->domain->arch.monitor.control_register_values;
     }
@@ -103,6 +119,7 @@ void hvm_monitor_descriptor_access(uint64_t exit_info,
                                    uint64_t vmx_exit_qualification,
                                    uint8_t descriptor, bool is_write)
 {
+    struct vcpu *curr = current;
     vm_event_request_t req = {
         .reason = VM_EVENT_REASON_DESCRIPTOR_ACCESS,
         .u.desc_access.descriptor = descriptor,
@@ -115,7 +132,9 @@ void hvm_monitor_descriptor_access(uint64_t exit_info,
         req.u.desc_access.arch.vmx.exit_qualification = vmx_exit_qualification;
     }
 
-    monitor_traps(current, true, &req);
+    set_npt_base(curr, &req);
+
+    monitor_traps(curr, true, &req);
 }
 
 static inline unsigned long gfn_of_rip(unsigned long rip)
@@ -189,6 +208,8 @@ int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
         return -EOPNOTSUPP;
     }
 
+    set_npt_base(curr, &req);
+
     return monitor_traps(curr, sync, &req);
 }
 
@@ -207,12 +228,15 @@ int hvm_monitor_cpuid(unsigned long insn_length, unsigned int leaf,
     req.u.cpuid.leaf = leaf;
     req.u.cpuid.subleaf = subleaf;
 
+    set_npt_base(curr, &req);
+
     return monitor_traps(curr, 1, &req);
 }
 
 void hvm_monitor_interrupt(unsigned int vector, unsigned int type,
                            unsigned int err, uint64_t cr2)
 {
+    struct vcpu *curr = current;
     vm_event_request_t req = {
         .reason = VM_EVENT_REASON_INTERRUPT,
         .u.interrupt.x86.vector = vector,
@@ -221,7 +245,9 @@ void hvm_monitor_interrupt(unsigned int vector, unsigned int type,
         .u.interrupt.x86.cr2 = cr2,
     };
 
-    monitor_traps(current, 1, &req);
+    set_npt_base(curr, &req);
+
+    monitor_traps(curr, 1, &req);
 }
 
 /*
@@ -296,6 +322,8 @@ bool hvm_monitor_check_p2m(unsigned long gla, gfn_t gfn, uint32_t pfec,
     req.u.mem_access.gfn = gfn_x(gfn);
     req.u.mem_access.gla = gla;
     req.u.mem_access.offset = gpa & ~PAGE_MASK;
+
+    set_npt_base(curr, &req);
 
     return monitor_traps(curr, true, &req) >= 0;
 }
