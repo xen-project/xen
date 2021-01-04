@@ -2601,8 +2601,13 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
      *     ram_rw | ram_logdirty | ram_ro | paging_out.
      */
     page = get_page_from_gfn(fdom, fgfn, &p2mt, P2M_ALLOC);
-    if ( !page ||
-         !p2m_is_ram(p2mt) || p2m_is_shared(p2mt) || p2m_is_hole(p2mt) )
+    if ( !page )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    if ( !p2m_is_ram(p2mt) || p2m_is_shared(p2mt) || p2m_is_hole(p2mt) )
     {
         rc = -EINVAL;
         goto put_one;
