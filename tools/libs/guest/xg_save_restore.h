@@ -49,16 +49,6 @@
 #define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
 #define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
 
-#define UNFOLD_CR3(_c)                                                  \
-  ((uint64_t)((dinfo->guest_width == 8)                                 \
-              ? ((_c) >> 12)                                            \
-              : (((uint32_t)(_c) >> 12) | ((uint32_t)(_c) << 20))))
-
-#define FOLD_CR3(_c)                                                    \
-  ((uint64_t)((dinfo->guest_width == 8)                                 \
-              ? ((uint64_t)(_c)) << 12                                  \
-              : (((uint32_t)(_c) << 12) | ((uint32_t)(_c) >> 20))))
-
 #define MEMCPY_FIELD(_d, _s, _f, _w) do {                          \
     if ((_w) == 8)                                                 \
         memcpy(&(_d)->x64._f, &(_s)->x64._f,sizeof((_d)->x64._f)); \
