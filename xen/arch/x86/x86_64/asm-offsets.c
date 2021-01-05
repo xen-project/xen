@@ -5,11 +5,13 @@
  */
 #define COMPILE_OFFSETS
 
+#ifdef CONFIG_PERF_COUNTERS
 #include <xen/perfc.h>
+#endif
 #include <xen/sched.h>
-#include <xen/bitops.h>
+#ifdef CONFIG_PV
 #include <compat/xen.h>
-#include <asm/fixmap.h>
+#endif
 #include <asm/hardirq.h>
 #include <xen/multiboot.h>
 #include <xen/multiboot2.h>
@@ -101,7 +103,6 @@ void __dummy__(void)
 #ifdef CONFIG_PV
     OFFSET(DOMAIN_is_32bit_pv, struct domain, arch.pv.is_32bit);
     BLANK();
-#endif
 
     OFFSET(VCPUINFO_upcall_pending, struct vcpu_info, evtchn_upcall_pending);
     OFFSET(VCPUINFO_upcall_mask, struct vcpu_info, evtchn_upcall_mask);
@@ -110,6 +111,7 @@ void __dummy__(void)
     OFFSET(COMPAT_VCPUINFO_upcall_pending, struct compat_vcpu_info, evtchn_upcall_pending);
     OFFSET(COMPAT_VCPUINFO_upcall_mask, struct compat_vcpu_info, evtchn_upcall_mask);
     BLANK();
+#endif
 
     OFFSET(CPUINFO_guest_cpu_user_regs, struct cpu_info, guest_cpu_user_regs);
     OFFSET(CPUINFO_verw_sel, struct cpu_info, verw_sel);
