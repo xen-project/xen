@@ -442,6 +442,7 @@ static int init_msix(struct pci_dev *pdev)
     uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
     unsigned int msix_offset, i, max_entries;
     uint16_t control;
+    struct vpci_msix *msix;
     int rc;
 
     msix_offset = pci_find_cap_offset(pdev->seg, pdev->bus, slot, func,
@@ -453,34 +454,37 @@ static int init_msix(struct pci_dev *pdev)
 
     max_entries = msix_table_size(control);
 
-    pdev->vpci->msix = xzalloc_flex_struct(struct vpci_msix, entries,
-                                           max_entries);
-    if ( !pdev->vpci->msix )
+    msix = xzalloc_flex_struct(struct vpci_msix, entries, max_entries);
+    if ( !msix )
         return -ENOMEM;
 
-    pdev->vpci->msix->max_entries = max_entries;
-    pdev->vpci->msix->pdev = pdev;
-
-    pdev->vpci->msix->tables[VPCI_MSIX_TABLE] =
-        pci_conf_read32(pdev->sbdf, msix_table_offset_reg(msix_offset));
-    pdev->vpci->msix->tables[VPCI_MSIX_PBA] =
-        pci_conf_read32(pdev->sbdf, msix_pba_offset_reg(msix_offset));
-
-    for ( i = 0; i < pdev->vpci->msix->max_entries; i++)
+    rc = vpci_add_register(pdev->vpci, control_read, control_write,
+                           msix_control_reg(msix_offset), 2, msix);
+    if ( rc )
     {
-        pdev->vpci->msix->entries[i].masked = true;
-        vpci_msix_arch_init_entry(&pdev->vpci->msix->entries[i]);
+        xfree(msix);
+        return rc;
     }
 
-    rc = vpci_add_register(pdev->vpci, control_read, control_write,
-                           msix_control_reg(msix_offset), 2, pdev->vpci->msix);
-    if ( rc )
-        return rc;
+    msix->max_entries = max_entries;
+    msix->pdev = pdev;
+
+    msix->tables[VPCI_MSIX_TABLE] =
+        pci_conf_read32(pdev->sbdf, msix_table_offset_reg(msix_offset));
+    msix->tables[VPCI_MSIX_PBA] =
+        pci_conf_read32(pdev->sbdf, msix_pba_offset_reg(msix_offset));
+
+    for ( i = 0; i < max_entries; i++)
+    {
+        msix->entries[i].masked = true;
+        vpci_msix_arch_init_entry(&msix->entries[i]);
+    }
 
     if ( list_empty(&d->arch.hvm.msix_tables) )
         register_mmio_handler(d, &vpci_msix_table_ops);
 
-    list_add(&pdev->vpci->msix->next, &d->arch.hvm.msix_tables);
+    pdev->vpci->msix = msix;
+    list_add(&msix->next, &d->arch.hvm.msix_tables);
 
     return 0;
 }
