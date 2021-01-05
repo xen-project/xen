@@ -36,8 +36,9 @@
  * Shift/mask fields for msi address
  */
 
-#define MSI_ADDR_BASE_HI	    	0
-#define MSI_ADDR_BASE_LO	    	0xfee00000
+#define MSI_ADDR_BASE_HI            0
+#define MSI_ADDR_BASE_LO            0xfee00000
+#define MSI_ADDR_BASE_MASK          (~0xfffff)
 #define MSI_ADDR_HEADER             MSI_ADDR_BASE_LO
 
 #define MSI_ADDR_DESTMODE_SHIFT     2
