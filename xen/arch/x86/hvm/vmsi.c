@@ -840,8 +840,8 @@ void vpci_msi_arch_print(const struct vpci_msi *msi)
 void vpci_msix_arch_mask_entry(struct vpci_msix_entry *entry,
                                const struct pci_dev *pdev, bool mask)
 {
-    ASSERT(entry->arch.pirq != INVALID_PIRQ);
-    vpci_mask_pirq(pdev->domain, entry->arch.pirq, mask);
+    if ( entry->arch.pirq != INVALID_PIRQ )
+        vpci_mask_pirq(pdev->domain, entry->arch.pirq, mask);
 }
 
 int vpci_msix_arch_enable_entry(struct vpci_msix_entry *entry,
