@@ -23,8 +23,6 @@
 #include <asm/msi.h>
 #include <asm/p2m.h>
 
-#define VMSIX_SIZE(num) offsetof(struct vpci_msix, entries[num])
-
 #define VMSIX_ADDR_IN_RANGE(addr, vpci, nr)                               \
     ((addr) >= vmsix_table_addr(vpci, nr) &&                              \
      (addr) < vmsix_table_addr(vpci, nr) + vmsix_table_size(vpci, nr))
@@ -455,7 +453,8 @@ static int init_msix(struct pci_dev *pdev)
 
     max_entries = msix_table_size(control);
 
-    pdev->vpci->msix = xzalloc_bytes(VMSIX_SIZE(max_entries));
+    pdev->vpci->msix = xzalloc_flex_struct(struct vpci_msix, entries,
+                                           max_entries);
     if ( !pdev->vpci->msix )
         return -ENOMEM;
 
