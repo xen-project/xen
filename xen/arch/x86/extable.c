@@ -37,8 +37,7 @@ static int init_or_livepatch cmp_ex(const void *a, const void *b)
 	return 0;
 }
 
-#ifndef swap_ex
-static void init_or_livepatch swap_ex(void *a, void *b, int size)
+static void init_or_livepatch swap_ex(void *a, void *b, size_t size)
 {
 	struct exception_table_entry *l = a, *r = b, tmp;
 	long delta = b - a;
@@ -49,7 +48,6 @@ static void init_or_livepatch swap_ex(void *a, void *b, int size)
 	r->addr = tmp.addr - delta;
 	r->cont = tmp.cont - delta;
 }
-#endif
 
 void init_or_livepatch sort_exception_table(struct exception_table_entry *start,
                                  const struct exception_table_entry *stop)

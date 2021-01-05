@@ -5,6 +5,6 @@
 
 void sort(void *base, size_t num, size_t size,
           int (*cmp)(const void *, const void *),
-          void (*swap)(void *, void *, int));
+          void (*swap)(void *, void *, size_t));
 
 #endif /* __XEN_SORT_H__ */

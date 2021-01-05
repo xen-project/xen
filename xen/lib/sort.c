@@ -6,14 +6,15 @@
 
 #include <xen/types.h>
 
-static void u32_swap(void *a, void *b, int size)
+static void u32_swap(void *a, void *b, size_t size)
 {
-    u32 t = *(u32 *)a;
-    *(u32 *)a = *(u32 *)b;
-    *(u32 *)b = t;
+    uint32_t t = *(uint32_t *)a;
+
+    *(uint32_t *)a = *(uint32_t *)b;
+    *(uint32_t *)b = t;
 }
 
-static void generic_swap(void *a, void *b, int size)
+static void generic_swap(void *a, void *b, size_t size)
 {
     char t;
 
@@ -43,18 +44,18 @@ static void generic_swap(void *a, void *b, int size)
 
 void sort(void *base, size_t num, size_t size,
           int (*cmp)(const void *, const void *),
-          void (*swap)(void *, void *, int size))
+          void (*swap)(void *, void *, size_t size))
 {
     /* pre-scale counters for performance */
-    int i = (num / 2 - 1) * size, n = num * size, c, r;
+    size_t i = (num / 2) * size, n = num * size, c, r;
 
     if ( !swap )
         swap = (size == 4 ? u32_swap : generic_swap);
 
     /* heapify */
-    for ( ; i >= 0; i -= size )
+    while ( i > 0 )
     {
-        for ( r = i; r * 2 + size < n; r  = c )
+        for ( r = i -= size; r * 2 + size < n; r = c )
         {
             c = r * 2 + size;
             if ( (c < n - size) && (cmp(base + c, base + c + size) < 0) )
@@ -66,8 +67,9 @@ void sort(void *base, size_t num, size_t size,
     }
 
     /* sort */
-    for ( i = n - size; i >= 0; i -= size )
+    for ( i = n; i > 0; )
     {
+        i -= size;
         swap(base, base + i, size);
         for ( r = 0; r * 2 + size < i; r = c )
         {
