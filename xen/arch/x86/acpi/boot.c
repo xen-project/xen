@@ -443,6 +443,11 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 			"FACS is shorter than ACPI spec allow: %#x",
 			facs->length);
 
+	if (facs_pa % 64)
+		printk(KERN_WARNING PREFIX
+			"FACS is not 64-byte aligned: %#lx",
+			facs_pa);
+
 	acpi_sinfo.wakeup_vector = facs_pa + 
 		offsetof(struct acpi_table_facs, firmware_waking_vector);
 	acpi_sinfo.vector_width = 32;

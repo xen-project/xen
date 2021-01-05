@@ -174,17 +174,20 @@ static void acpi_sleep_prepare(u32 state)
     if ( state != ACPI_STATE_S3 )
         return;
 
-    wakeup_vector_va = __acpi_map_table(
-        acpi_sinfo.wakeup_vector, sizeof(uint64_t));
-
     /* TBoot will set resume vector itself (when it is safe to do so). */
     if ( tboot_in_measured_env() )
         return;
+
+    set_fixmap(FIX_ACPI_END, acpi_sinfo.wakeup_vector);
+    wakeup_vector_va = fix_to_virt(FIX_ACPI_END) +
+                       PAGE_OFFSET(acpi_sinfo.wakeup_vector);
 
     if ( acpi_sinfo.vector_width == 32 )
         *(uint32_t *)wakeup_vector_va = bootsym_phys(wakeup_start);
     else
         *(uint64_t *)wakeup_vector_va = bootsym_phys(wakeup_start);
+
+    clear_fixmap(FIX_ACPI_END);
 }
 
 static void acpi_sleep_post(u32 state) {}
@@ -331,6 +334,12 @@ static long enter_state_helper(void *data)
  */
 int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
 {
+    if ( sleep->sleep_state == ACPI_STATE_S3 &&
+         (!acpi_sinfo.wakeup_vector || !acpi_sinfo.vector_width ||
+          (PAGE_OFFSET(acpi_sinfo.wakeup_vector) >
+           PAGE_SIZE - acpi_sinfo.vector_width / 8)) )
+        return -EOPNOTSUPP;
+
     if ( sleep->flags & XENPF_ACPI_SLEEP_EXTENDED )
     {
         if ( !acpi_sinfo.sleep_control.address ||
