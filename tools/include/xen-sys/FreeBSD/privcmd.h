@@ -56,9 +56,23 @@ typedef struct privcmd_mmap_entry {
 	unsigned long npages;
 } privcmd_mmap_entry_t;
 
+struct ioctl_privcmd_mmapresource {
+	domid_t dom; /* target domain */
+	unsigned int type; /* type of resource to map */
+	unsigned int id; /* type-specific resource identifier */
+	unsigned int idx; /* the index of the initial frame to be mapped */
+	unsigned long num; /* number of frames of the resource to be mapped */
+	unsigned long addr; /* physical address to map into */
+};
+typedef struct ioctl_privcmd_mmapresource privcmd_mmap_resource_t;
+
 #define IOCTL_PRIVCMD_HYPERCALL					\
 	_IOWR('E', 0, struct ioctl_privcmd_hypercall)
 #define IOCTL_PRIVCMD_MMAPBATCH					\
 	_IOWR('E', 1, struct ioctl_privcmd_mmapbatch)
+#define IOCTL_PRIVCMD_MMAP_RESOURCE				\
+	_IOW('E', 2, struct ioctl_privcmd_mmapresource)
+#define IOCTL_PRIVCMD_RESTRICT					\
+	_IOW('E', 4, domid_t)
 
 #endif /* !__XEN_PRIVCMD_H__ */
