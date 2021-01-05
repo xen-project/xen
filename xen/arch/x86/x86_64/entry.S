@@ -985,8 +985,10 @@ autogen_stubs: /* Automatically generated stubs. */
         .rept X86_NR_VECTORS
 
         /* Common interrupts, heading towards do_IRQ(). */
-#ifdef CONFIG_PV
+#if defined(CONFIG_PV32)
         .if vec >= FIRST_IRQ_VECTOR && vec != HYPERCALL_VECTOR && vec != LEGACY_SYSCALL_VECTOR
+#elif defined(CONFIG_PV)
+        .if vec >= FIRST_IRQ_VECTOR && vec != LEGACY_SYSCALL_VECTOR
 #else
         .if vec >= FIRST_IRQ_VECTOR
 #endif

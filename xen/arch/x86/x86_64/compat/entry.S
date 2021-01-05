@@ -11,6 +11,8 @@
 #include <public/xen.h>
 #include <irq_vectors.h>
 
+#ifdef CONFIG_PV32
+
 ENTRY(entry_int82)
         ASM_CLAC
         pushq $0
@@ -26,6 +28,8 @@ ENTRY(entry_int82)
 
         mov   %rsp, %rdi
         call  do_entry_int82
+
+#endif /* CONFIG_PV32 */
 
 /* %rbx: struct vcpu */
 ENTRY(compat_test_all_events)

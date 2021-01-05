@@ -443,8 +443,12 @@ int __init init_irq_data(void)
         irq_max_guests = 32;
 
 #ifdef CONFIG_PV
-    /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */
+    /* Never allocate the Linux/BSD fast-trap vector. */
     set_bit(LEGACY_SYSCALL_VECTOR, used_vectors);
+#endif
+
+#ifdef CONFIG_PV32
+    /* Never allocate the hypercall vector. */
     set_bit(HYPERCALL_VECTOR, used_vectors);
 #endif
     
