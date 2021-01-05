@@ -438,7 +438,7 @@ struct xenevtchn_handle;
 struct precopy_stats
 {
     unsigned int iteration;
-    unsigned int total_written;
+    unsigned long total_written;
     long dirty_count; /* -1 if unknown */
 };
 
