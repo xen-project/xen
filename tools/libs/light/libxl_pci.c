@@ -58,6 +58,8 @@ static void libxl_create_pci_backend_device(libxl__gc *gc,
     flexarray_append(back, GCSPRINTF(PCI_BDF, pci->domain, pci->bus, pci->dev, pci->func));
     if (pci->vdevfn)
         flexarray_append_pair(back, GCSPRINTF("vdevfn-%d", num), GCSPRINTF("%x", pci->vdevfn));
+    if (pci->name)
+        flexarray_append_pair(back, GCSPRINTF("name-%d", num), GCSPRINTF("%s", pci->name));
     flexarray_append(back, GCSPRINTF("opts-%d", num));
     flexarray_append(back,
               GCSPRINTF("msitranslate=%d,power_mgmt=%d,permissive=%d,rdm_policy=%s",
@@ -282,6 +284,7 @@ retry_transaction2:
     xs_rm(ctx->xsh, t, GCSPRINTF("%s/vdev-%d", be_path, i));
     xs_rm(ctx->xsh, t, GCSPRINTF("%s/opts-%d", be_path, i));
     xs_rm(ctx->xsh, t, GCSPRINTF("%s/vdevfn-%d", be_path, i));
+    xs_rm(ctx->xsh, t, GCSPRINTF("%s/name-%d", be_path, i));
     libxl__xs_printf(gc, t, num_devs_path, "%d", num - 1);
     for (j = i + 1; j < num; j++) {
         tmppath = GCSPRINTF("%s/state-%d", be_path, j);
@@ -312,6 +315,12 @@ retry_transaction2:
         tmp = libxl__xs_read(gc, t, tmppath);
         if (tmp) {
             xs_write(ctx->xsh, t, GCSPRINTF("%s/vdevfn-%d", be_path, j - 1), tmp, strlen(tmp));
+            xs_rm(ctx->xsh, t, tmppath);
+        }
+        tmppath = GCSPRINTF("%s/name-%d", be_path, j);
+        tmp = libxl__xs_read(gc, t, tmppath);
+        if (tmp) {
+            xs_write(ctx->xsh, t, GCSPRINTF("%s/name-%d", be_path, j - 1), tmp, strlen(tmp));
             xs_rm(ctx->xsh, t, tmppath);
         }
     }
@@ -1589,6 +1598,12 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
     libxl_device_pci_copy(CTX, &pas->pci, pci);
     pci = &pas->pci;
 
+    /* If the device is named then we need to look up the BDF */
+    if (pci->name) {
+        rc = name2bdf(gc, pci);
+        if (rc) goto out;
+    }
+
     pas->starting = starting;
     pas->callback = device_pci_add_stubdom_done;
 
@@ -1739,11 +1754,19 @@ static void device_pci_add_done(libxl__egc *egc,
     libxl_device_pci *pci = &pas->pci;
 
     if (rc) {
-        LOGD(ERROR, domid,
-             "libxl__device_pci_add  failed for "
-             "PCI device %x:%x:%x.%x (rc %d)",
-             pci->domain, pci->bus, pci->dev, pci->func,
-             rc);
+        if (pci->name) {
+            LOGD(ERROR, domid,
+                 "libxl__device_pci_add failed for "
+                 "PCI device '%s' (rc %d)",
+                 pci->name,
+                 rc);
+        } else {
+            LOGD(ERROR, domid,
+                 "libxl__device_pci_add failed for "
+                 "PCI device %x:%x:%x.%x (rc %d)",
+                 pci->domain, pci->bus, pci->dev, pci->func,
+                 rc);
+        }
         pci_info_xs_remove(gc, pci, "domid");
     }
     libxl_device_pci_dispose(pci);
@@ -2250,6 +2273,12 @@ static void libxl__device_pci_remove_common(libxl__egc *egc,
     libxl_device_pci_copy(CTX, &prs->pci, pci);
     pci = &prs->pci;
 
+    /* If the device is named then we need to look up the BDF */
+    if (pci->name) {
+        rc = name2bdf(gc, pci);
+        if (rc) goto out;
+    }
+
     prs->force = force;
     libxl__xswait_init(&prs->xswait);
     libxl__ev_qmp_init(&prs->qmp);
@@ -2371,6 +2400,10 @@ static int libxl__device_pci_from_xs_be(libxl__gc *gc,
     s = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/vdevfn-%d", be_path, nr));
     if (s)
         pci->vdevfn = strtol(s, (char **) NULL, 16);
+
+    s = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/name-%d", be_path, nr));
+    if (s)
+        pci->name = strdup(s);
 
     s = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/opts-%d", be_path, nr));
     if (s) {
