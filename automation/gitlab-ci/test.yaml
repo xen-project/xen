@@ -33,6 +33,7 @@ qemu-alpine-arm64-gcc:
     - alpine-3.12-gcc-arm64
     - alpine-3.12-arm64-rootfs-export
     - kernel-5.9.9-arm64-export
+    - qemu-system-aarch64-5.2.0-arm64-export
   artifacts:
     paths:
       - smoke.serial
@@ -56,6 +57,7 @@ qemu-smoke-arm64-gcc:
   dependencies:
     - debian-unstable-gcc-arm64
     - kernel-5.9.9-arm64-export
+    - qemu-system-aarch64-5.2.0-arm64-export
   artifacts:
     paths:
       - smoke.serial
