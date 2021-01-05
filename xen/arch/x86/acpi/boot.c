@@ -420,22 +420,22 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 		facs_pa = (uint64_t)fadt->facs;
 	}
 	if (!facs_pa)
-		goto bad;
+		return;
 
 	facs = acpi_os_map_memory(facs_pa, sizeof(*facs));
 	if (!facs)
-		goto bad;
+		return;
 
 	if (strncmp(facs->signature, "FACS", 4)) {
 		printk(KERN_ERR PREFIX "Invalid FACS signature %.4s\n",
 			facs->signature);
-		goto bad;
+		goto done;
 	}
 
 	if (facs->length < 24) {
 		printk(KERN_ERR PREFIX "Invalid FACS table length: %#x",
 			facs->length);
-		goto bad;
+		goto done;
 	}
 
 	if (facs->length < 64)
@@ -452,6 +452,7 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 		offsetof(struct acpi_table_facs, firmware_waking_vector);
 	acpi_sinfo.vector_width = 32;
 
+ done:
 	acpi_os_unmap_memory(facs, sizeof(*facs));
 
 	printk(KERN_INFO PREFIX
