@@ -39,16 +39,6 @@
 #define PFN_TO_KB(_pfn) ((_pfn) << (PAGE_SHIFT - 10))
 
 
-/*
-** The M2P is made up of some number of 'chunks' of at least 2MB in size.
-** The below definitions and utility function(s) deal with mapping the M2P
-** regarldess of the underlying machine memory size or architecture.
-*/
-#define M2P_SHIFT       L2_PAGETABLE_SHIFT_PAE
-#define M2P_CHUNK_SIZE  (1 << M2P_SHIFT)
-#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
-#define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
-
 #define MEMCPY_FIELD(_d, _s, _f, _w) do {                          \
     if ((_w) == 8)                                                 \
         memcpy(&(_d)->x64._f, &(_s)->x64._f,sizeof((_d)->x64._f)); \

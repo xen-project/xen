@@ -135,4 +135,14 @@ static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
 int pin_table(xc_interface *xch, unsigned int type, unsigned long mfn,
               uint32_t dom);
 
+/*
+ * The M2P is made up of some number of 'chunks' of at least 2MB in size.
+ * The below definitions and utility function(s) deal with mapping the M2P
+ * regarldess of the underlying machine memory size or architecture.
+ */
+#define M2P_SHIFT       L2_PAGETABLE_SHIFT_PAE
+#define M2P_CHUNK_SIZE  (1 << M2P_SHIFT)
+#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
+#define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
+
 #endif /* XG_PRIVATE_H */
