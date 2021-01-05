@@ -5,17 +5,16 @@ set -ex
 # Install QEMU
 export DEBIAN_FRONTENT=noninteractive
 apt-get -qy update
-apt-get -qy install --no-install-recommends qemu-system-aarch64 \
-                                            u-boot-qemu \
+apt-get -qy install --no-install-recommends u-boot-qemu \
                                             u-boot-tools \
                                             device-tree-compiler \
                                             busybox-static \
-                                            cpio
+                                            cpio \
+                                            curl
 
-# XXX Silly workaround to get the following QEMU command to work
-# QEMU looks for "efi-virtio.rom" even if it is unneeded
-cp /usr/share/qemu/pvh.bin /usr/share/qemu/efi-virtio.rom
-qemu-system-aarch64 \
+# XXX QEMU looks for "efi-virtio.rom" even if it is unneeded
+curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
+./binaries/qemu-system-aarch64 \
    -machine virtualization=true \
    -cpu cortex-a57 -machine type=virt \
    -m 1024 -display none \
@@ -79,7 +78,7 @@ rm -f smoke.serial
 set +e
 echo "  virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"| \
 timeout -k 1 240 \
-qemu-system-aarch64 \
+./binaries/qemu-system-aarch64 \
     -machine virtualization=true \
     -cpu cortex-a57 -machine type=virt \
     -m 1024 -monitor none -serial stdio \
