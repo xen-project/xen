@@ -39,13 +39,12 @@ static unsigned int pci_encode_bdf(libxl_device_pci *pci)
 
 static void pci_struct_fill(libxl_device_pci *pci, unsigned int domain,
                             unsigned int bus, unsigned int dev,
-                            unsigned int func, unsigned int vdevfn)
+                            unsigned int func)
 {
     pci->domain = domain;
     pci->bus = bus;
     pci->dev = dev;
     pci->func = func;
-    pci->vdevfn = vdevfn;
 }
 
 static void libxl_create_pci_backend_device(libxl__gc *gc,
@@ -451,7 +450,7 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
         new = pcis + *num;
 
         libxl_device_pci_init(new);
-        pci_struct_fill(new, dom, bus, dev, func, 0);
+        pci_struct_fill(new, dom, bus, dev, func);
 
         if (pci_info_xs_read(gc, new, "domid")) /* already assigned */
             continue;
@@ -2288,17 +2287,19 @@ static int libxl__device_pci_from_xs_be(libxl__gc *gc,
                                         libxl_devid nr, void *data)
 {
     char *s;
-    unsigned int domain = 0, bus = 0, dev = 0, func = 0, vdevfn = 0;
+    unsigned int domain = 0, bus = 0, dev = 0, func = 0;
     libxl_device_pci *pci = data;
+
+    libxl_device_pci_init(pci);
 
     s = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/dev-%d", be_path, nr));
     sscanf(s, PCI_BDF, &domain, &bus, &dev, &func);
 
+    pci_struct_fill(pci, domain, bus, dev, func);
+
     s = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/vdevfn-%d", be_path, nr));
     if (s)
-        vdevfn = strtol(s, (char **) NULL, 16);
-
-    pci_struct_fill(pci, domain, bus, dev, func, vdevfn);
+        pci->vdevfn = strtol(s, (char **) NULL, 16);
 
     s = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/opts-%d", be_path, nr));
     if (s) {
