@@ -67,7 +67,7 @@ int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
     }
     _di.guest_width = minfo->guest_width;
 
-    /* Get page table levels (see get_platform_info() in xg_save_restore.h */
+    /* Get page table levels */
     if ( xc_version(xch, XENVER_capabilities, &xen_caps) )
     {
         PERROR("Could not get Xen capabilities (for page table levels)");
