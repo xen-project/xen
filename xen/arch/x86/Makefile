@@ -241,7 +241,8 @@ efi/buildid.o efi/relocs-dummy.o: $(BASEDIR)/arch/x86/efi/built_in.o
 efi/buildid.o efi/relocs-dummy.o: ;
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(BASEDIR)/include/asm-x86/asm-macros.h
-	$(CC) $(filter-out -Wa$(comma)% -flto,$(c_flags)) -S -o $@ $<
+	$(CC) $(filter-out -Wa$(comma)% -flto,$(c_flags)) -S -g0 -o $@.new $<
+	$(call move-if-changed,$@.new,$@)
 
 asm-macros.i: CFLAGS-y += -D__ASSEMBLY__ -P
 
@@ -268,7 +269,7 @@ efi/mkreloc: efi/mkreloc.c
 
 .PHONY: clean
 clean::
-	rm -f asm-offsets.s *.lds boot/*.o boot/*~ boot/core boot/mkelf32
+	rm -f asm-offsets.s *.lds *.new boot/*.o boot/*~ boot/core boot/mkelf32
 	rm -f asm-macros.i $(BASEDIR)/include/asm-x86/asm-macros.*
 	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d $(BASEDIR)/.xen.elf32
 	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.efi efi/mkreloc
