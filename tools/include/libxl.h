@@ -464,6 +464,12 @@
 #define LIBXL_HAVE_DEVICE_PCI_ASSIGNABLE_LIST_FREE 1
 
 /*
+ * LIBXL_HAVE_DEVICE_PCI_NAME indicates that the libxl_device_pci type
+ * has a name field.
+ */
+#define LIBXL_HAVE_DEVICE_PCI_NAME 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

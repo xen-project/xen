@@ -438,7 +438,9 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
     }
 
     while((de = readdir(dir))) {
-        unsigned dom, bus, dev, func;
+        unsigned int dom, bus, dev, func;
+        char *name;
+
         if (sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4)
             continue;
 
@@ -454,6 +456,9 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
 
         if (pci_info_xs_read(gc, new, "domid")) /* already assigned */
             continue;
+
+        name = pci_info_xs_read(gc, new, "name");
+        if (name) new->name = strdup(name);
 
         (*num)++;
     }
@@ -742,6 +747,7 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned dom, bus, dev, func;
     char *spath, *driver_path = NULL;
+    const char *name;
     int rc;
     struct stat st;
 
@@ -750,6 +756,24 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
     bus = pci->bus;
     dev = pci->dev;
     func = pci->func;
+    name = pci->name;
+
+    /* Sanitise any name that is set */
+    if (name) {
+        unsigned int i, n = strlen(name);
+
+        if (n > 64) { /* Reasonable upper bound on name length */
+            LOG(ERROR, "Name too long");
+            return ERROR_FAIL;
+        }
+
+        for (i = 0; i < n; i++) {
+            if (!isgraph(name[i])) {
+                LOG(ERROR, "Names may only include printable characters");
+                return ERROR_FAIL;
+            }
+        }
+    }
 
     /* See if the device exists */
     spath = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF, dom, bus, dev, func);
@@ -765,7 +789,7 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
     }
     if ( rc ) {
         LOG(WARN, PCI_BDF" already assigned to pciback", dom, bus, dev, func);
-        goto quarantine;
+        goto name;
     }
 
     /* Check to see if there's already a driver that we need to unbind from */
@@ -796,7 +820,12 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
         return ERROR_FAIL;
     }
 
-quarantine:
+name:
+    if (name)
+        pci_info_xs_write(gc, pci, "name", name);
+    else
+        pci_info_xs_remove(gc, pci, "name");
+
     /*
      * DOMID_IO is just a sentinel domain, without any actual mappings,
      * so always pass XEN_DOMCTL_DEV_RDM_RELAXED to avoid assignment being
@@ -812,6 +841,40 @@ quarantine:
     return 0;
 }
 
+static int name2bdf(libxl__gc *gc, libxl_device_pci *pci)
+{
+    char **bdfs;
+    unsigned int i, n;
+    int rc = ERROR_NOTFOUND;
+
+    bdfs = libxl__xs_directory(gc, XBT_NULL, PCI_INFO_PATH, &n);
+    if (!n)
+        goto out;
+
+    for (i = 0; i < n; i++) {
+        unsigned dom, bus, dev, func;
+        char *name;
+
+        if (sscanf(bdfs[i], PCI_BDF_XSPATH, &dom, &bus, &dev, &func) != 4)
+            continue;
+
+        pci_struct_fill(pci, dom, bus, dev, func);
+
+        name = pci_info_xs_read(gc, pci, "name");
+        if (name && !strcmp(name, pci->name)) {
+            rc = 0;
+            break;
+        }
+    }
+
+out:
+    if (!rc)
+        LOG(DETAIL, "'%s' -> " PCI_BDF, pci->name, pci->domain,
+            pci->bus, pci->dev, pci->func);
+
+    return rc;
+}
+
 static int libxl__device_pci_assignable_remove(libxl__gc *gc,
                                                libxl_device_pci *pci,
                                                int rebind)
@@ -819,6 +882,12 @@ static int libxl__device_pci_assignable_remove(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int rc;
     char *driver_path;
+
+    /* If the device is named then we need to look up the BDF */
+    if (pci->name) {
+        rc = name2bdf(gc, pci);
+        if (rc) return rc;
+    }
 
     /* De-quarantine */
     rc = xc_deassign_device(ctx->xch, DOMID_IO, pci_encode_bdf(pci));
@@ -859,6 +928,8 @@ static int libxl__device_pci_assignable_remove(libxl__gc *gc,
                 "Couldn't find path for original driver; not rebinding");
         }
     }
+
+    pci_info_xs_remove(gc, pci, "name");
 
     return 0;
 }
