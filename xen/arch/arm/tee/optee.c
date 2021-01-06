@@ -1643,7 +1643,11 @@ static bool optee_handle_call(struct cpu_user_regs *regs)
     if ( !ctx )
         return false;
 
-    switch ( get_user_reg(regs, 0) )
+    /*
+     * The function identifier is always stored in the least significant
+     * 32-bit (see section ARM DEN 0028D).
+     */
+    switch ( (uint32_t)get_user_reg(regs, 0) )
     {
     case OPTEE_SMC_CALLS_COUNT:
         set_user_reg(regs, 0, OPTEE_MEDIATOR_SMC_COUNT);
