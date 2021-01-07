@@ -4,8 +4,6 @@
 #define E820_BIOS_MAX 128
 
 get_memory_map:
-
-.Lmeme820:
         xorl    %ebx, %ebx                      # continuation counter
         movw    $bootsym(bios_e820map), %di     # point into the whitelist
                                                 # so we can have the bios
@@ -17,14 +15,14 @@ get_memory_map:
         pushw   %ds                             # data record.
         popw    %es
         int     $0x15
-        jc      .Lmem88
+        jc      .Ldone
 
         cmpl    $SMAP,%eax                      # check the return is `SMAP'
-        jne     .Lmem88
+        jne     .Ldone
 
         incw    bootsym(bios_e820nr)
         cmpw    $E820_BIOS_MAX, bootsym(bios_e820nr) # up to this many entries
-        jae     .Lmem88
+        jae     .Ldone
 
         movw    %di,%ax
         addw    $20,%ax
@@ -32,46 +30,11 @@ get_memory_map:
         testl   %ebx,%ebx                       # check to see if
         jnz     1b                              # %ebx is set to EOF
 
-.Lmem88:
-        movb    $0x88, %ah
-        int     $0x15
-        movw    %ax,bootsym(highmem_kb)
-
-.Lmeme801:
-        stc                                     # fix to work around buggy
-        xorw    %cx,%cx                         # BIOSes which don't clear/set
-        xorw    %dx,%dx                         # carry on pass/error of
-                                                # e801h memory size call
-                                                # or merely pass cx,dx though
-                                                # without changing them.
-        movw    $0xe801, %ax
-        int     $0x15
-        jc      .Lint12
-
-        testw   %cx, %cx                        # Kludge to handle BIOSes
-        jnz     1f                              # which report their extended
-        testw   %dx, %dx                        # memory in AX/BX rather than
-        jnz     1f                              # CX/DX.  The spec I have read
-        movw    %ax, %cx                        # seems to indicate AX/BX 
-        movw    %bx, %dx                        # are more reasonable anyway...
-1:      movzwl  %dx, %edx
-        shll    $6,%edx                         # and go from 64k to 1k chunks
-        movzwl  %cx, %ecx
-        addl    %ecx, %edx                      # add in lower memory
-        movl    %edx,bootsym(highmem_kb)        # store extended memory size
-
-.Lint12:
-        int     $0x12
-        movw    %ax,bootsym(lowmem_kb)
-
+.Ldone:
         ret
 
         .align  4
 GLOBAL(bios_e820map)
         .fill   E820_BIOS_MAX*20,1,0
 GLOBAL(bios_e820nr)
-        .long   0
-GLOBAL(lowmem_kb)
-        .long   0
-GLOBAL(highmem_kb)
         .long   0
