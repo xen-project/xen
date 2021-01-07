@@ -537,7 +537,7 @@ static int audit(void)
             p2m_type_t t;
             mfn_t o_mfn;
 
-            d = get_domain_by_id(g->domain);
+            d = rcu_lock_domain_by_id(g->domain);
             if ( d == NULL )
             {
                 gdprintk(XENLOG_ERR,
@@ -562,7 +562,7 @@ static int audit(void)
                          d, g->gfn, mfn_x(mfn), p2m_ram_shared, t);
                 errors++;
             }
-            put_domain(d);
+            rcu_unlock_domain(d);
             nr_gfns++;
         }
         /* The type count has an extra ref because we have locked the page */
@@ -1043,10 +1043,10 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
         rmap_del(gfn, cpage, 0);
         rmap_add(gfn, spage);
         put_count++;
-        d = get_domain_by_id(gfn->domain);
+        d = rcu_lock_domain_by_id(gfn->domain);
         BUG_ON(!d);
         BUG_ON(set_shared_p2m_entry(d, gfn->gfn, smfn));
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     ASSERT(list_empty(&cpage->sharing->gfns));
     BUG_ON(!put_count);
