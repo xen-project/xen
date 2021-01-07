@@ -37,8 +37,8 @@ static uint32_t control_read(const struct pci_dev *pdev, unsigned int reg,
            (msix->masked ? PCI_MSIX_FLAGS_MASKALL : 0);
 }
 
-static int update_entry(struct vpci_msix_entry *entry,
-                        const struct pci_dev *pdev, unsigned int nr)
+static void update_entry(struct vpci_msix_entry *entry,
+                         const struct pci_dev *pdev, unsigned int nr)
 {
     int rc = vpci_msix_arch_disable_entry(entry, pdev);
 
@@ -48,7 +48,7 @@ static int update_entry(struct vpci_msix_entry *entry,
         gprintk(XENLOG_WARNING,
                 "%pp: unable to disable entry %u for update: %d\n",
                 &pdev->sbdf, nr, rc);
-        return rc;
+        return;
     }
 
     rc = vpci_msix_arch_enable_entry(entry, pdev,
@@ -59,10 +59,10 @@ static int update_entry(struct vpci_msix_entry *entry,
         gprintk(XENLOG_WARNING, "%pp: unable to enable entry %u: %d\n",
                 &pdev->sbdf, nr, rc);
         /* Entry is likely not properly configured. */
-        return rc;
+        return;
     }
 
-    return 0;
+    entry->updated = false;
 }
 
 static void control_write(const struct pci_dev *pdev, unsigned int reg,
@@ -90,13 +90,8 @@ static void control_write(const struct pci_dev *pdev, unsigned int reg,
     if ( new_enabled && !new_masked && (!msix->enabled || msix->masked) )
     {
         for ( i = 0; i < msix->max_entries; i++ )
-        {
-            if ( msix->entries[i].masked || !msix->entries[i].updated ||
-                 update_entry(&msix->entries[i], pdev, i) )
-                continue;
-
-            msix->entries[i].updated = false;
-        }
+            if ( !msix->entries[i].masked && msix->entries[i].updated )
+                update_entry(&msix->entries[i], pdev, i);
     }
     else if ( !new_enabled && msix->enabled )
     {
@@ -363,10 +358,7 @@ static int msix_write(struct vcpu *v, unsigned long addr, unsigned int len,
              * data fields Xen needs to disable and enable the entry in order
              * to pick up the changes.
              */
-            if ( update_entry(entry, pdev, vmsix_entry_nr(msix, entry)) )
-                break;
-
-            entry->updated = false;
+            update_entry(entry, pdev, vmsix_entry_nr(msix, entry));
         }
         else
             vpci_msix_arch_mask_entry(entry, pdev, entry->masked);
