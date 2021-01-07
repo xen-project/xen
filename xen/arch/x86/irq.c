@@ -323,7 +323,7 @@ void destroy_irq(unsigned int irq)
 
     if ( desc->arch.creator_domid != DOMID_INVALID )
     {
-        struct domain *d = get_domain_by_id(desc->arch.creator_domid);
+        struct domain *d = rcu_lock_domain_by_id(desc->arch.creator_domid);
 
         if ( d )
         {
@@ -334,7 +334,7 @@ void destroy_irq(unsigned int irq)
                        "Could not revoke %pd access to IRQ%u (error %d)\n",
                        d, irq, err);
 
-            put_domain(d);
+            rcu_unlock_domain(d);
         }
 
         desc->arch.creator_domid = DOMID_INVALID;

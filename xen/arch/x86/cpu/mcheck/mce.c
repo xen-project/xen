@@ -1497,7 +1497,6 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
         if ( mc_msrinject->mcinj_flags & MC_MSRINJ_F_GPADDR )
         {
-            domid_t domid;
             struct domain *d;
             struct mcinfo_msr *msr;
             unsigned int i;
@@ -1505,17 +1504,17 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             unsigned long gfn, mfn;
             p2m_type_t t;
 
-            domid = (mc_msrinject->mcinj_domid == DOMID_SELF) ?
-                    current->domain->domain_id : mc_msrinject->mcinj_domid;
-            if ( domid >= DOMID_FIRST_RESERVED )
-                return x86_mcerr("do_mca inject: incompatible flag "
-                                 "MC_MSRINJ_F_GPADDR with domain %d",
-                                 -EINVAL, domid);
-
-            d = get_domain_by_id(domid);
+            d = rcu_lock_domain_by_any_id(mc_msrinject->mcinj_domid);
             if ( d == NULL )
+            {
+                if ( mc_msrinject->mcinj_domid >= DOMID_FIRST_RESERVED )
+                    return x86_mcerr("do_mca inject: incompatible flag "
+                                     "MC_MSRINJ_F_GPADDR with domain %d",
+                                     -EINVAL, domid);
+
                 return x86_mcerr("do_mca inject: bad domain id %d",
                                  -EINVAL, domid);
+            }
 
             for ( i = 0, msr = &mc_msrinject->mcinj_msr[0];
                   i < mc_msrinject->mcinj_count;
@@ -1528,7 +1527,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                 if ( mfn == mfn_x(INVALID_MFN) )
                 {
                     put_gfn(d, gfn);
-                    put_domain(d);
+                    rcu_unlock_domain(d);
                     return x86_mcerr("do_mca inject: bad gfn %#lx of domain %d",
                                      -EINVAL, gfn, domid);
                 }
@@ -1538,7 +1537,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                 put_gfn(d, gfn);
             }
 
-            put_domain(d);
+            rcu_unlock_domain(d);
         }
 
         if ( !x86_mc_msrinject_verify(mc_msrinject) )

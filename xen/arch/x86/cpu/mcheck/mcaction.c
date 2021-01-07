@@ -87,7 +87,7 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
             BUG_ON( bank->mc_domid == DOMID_COW );
             if ( bank->mc_domid != DOMID_XEN )
             {
-                d = get_domain_by_id(bank->mc_domid);
+                d = rcu_lock_domain_by_id(bank->mc_domid);
                 ASSERT(d);
                 gfn = get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
 
@@ -132,6 +132,8 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
                     goto vmce_failed;
                 }
 
+                rcu_unlock_domain(d);
+
                 /*
                  * Impacted domain go on with domain's recovery job
                  * if the domain has its own MCA handler.
@@ -139,12 +141,11 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
                  * its own recovery job.
                  */
                 *result = MCER_RECOVERED;
-                put_domain(d);
 
                 return;
 vmce_failed:
-                put_domain(d);
                 domain_crash(d);
+                rcu_unlock_domain(d);
             }
         }
     }

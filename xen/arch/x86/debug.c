@@ -164,13 +164,13 @@ unsigned int dbg_rw_mem(void * __user addr, void * __user buf,
                         unsigned int len, domid_t domid, bool toaddr,
                         uint64_t pgd3)
 {
-        struct domain *d = get_domain_by_id(domid);
+    struct domain *d = rcu_lock_domain_by_id(domid);
 
     if ( d )
     {
         if ( !d->is_dying )
             len = dbg_rw_guest_mem(d, addr, buf, len, toaddr, pgd3);
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
 
     return len;
