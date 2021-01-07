@@ -76,20 +76,20 @@ static always_inline int xsm_default_action(
     case XSM_HOOK:
         return 0;
     case XSM_TARGET:
-        if ( src == target )
+        if ( evaluate_nospec(src == target) )
         {
             return 0;
     case XSM_XS_PRIV:
-            if ( is_xenstore_domain(src) )
+            if ( evaluate_nospec(is_xenstore_domain(src)) )
                 return 0;
         }
         /* fall through */
     case XSM_DM_PRIV:
-        if ( target && src->target == target )
+        if ( target && evaluate_nospec(src->target == target) )
             return 0;
         /* fall through */
     case XSM_PRIV:
-        if ( src->is_privileged )
+        if ( is_control_domain(src) )
             return 0;
         return -EPERM;
     default:
@@ -656,7 +656,7 @@ static XSM_INLINE int xsm_mmu_update(XSM_DEFAULT_ARG struct domain *d, struct do
     XSM_ASSERT_ACTION(XSM_TARGET);
     if ( f != dom_io )
         rc = xsm_default_action(action, d, f);
-    if ( t && !rc )
+    if ( evaluate_nospec(t) && !rc )
         rc = xsm_default_action(action, d, t);
     return rc;
 }
@@ -750,6 +750,7 @@ static XSM_INLINE int xsm_xen_version (XSM_DEFAULT_ARG uint32_t op)
     case XENVER_platform_parameters:
     case XENVER_get_features:
         /* These sub-ops ignore the permission checks and return data. */
+        block_speculation();
         return 0;
     case XENVER_extraversion:
     case XENVER_compile_info:
