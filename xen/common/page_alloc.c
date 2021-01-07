@@ -2568,12 +2568,6 @@ struct domain *get_pg_owner(domid_t domid)
 {
     struct domain *pg_owner = NULL, *curr = current->domain;
 
-    if ( likely(domid == DOMID_SELF) )
-    {
-        pg_owner = rcu_lock_current_domain();
-        goto out;
-    }
-
     if ( unlikely(domid == curr->domain_id) )
     {
         gdprintk(XENLOG_WARNING, "Cannot specify itself as foreign domain\n");
@@ -2591,7 +2585,7 @@ struct domain *get_pg_owner(domid_t domid)
         break;
 
     default:
-        if ( (pg_owner = rcu_lock_domain_by_id(domid)) == NULL )
+        if ( (pg_owner = rcu_lock_domain_by_any_id(domid)) == NULL )
             gdprintk(XENLOG_WARNING, "Unknown domain d%d\n", domid);
         break;
     }

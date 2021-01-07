@@ -349,10 +349,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     domid_t        rdom = bind->remote_dom;
     long           rc;
 
-    if ( rdom == DOMID_SELF )
-        rdom = current->domain->domain_id;
-
-    if ( (rd = rcu_lock_domain_by_id(rdom)) == NULL )
+    if ( (rd = rcu_lock_domain_by_any_id(rdom)) == NULL )
         return -ESRCH;
 
     /* Avoid deadlock by first acquiring lock of domain with smaller id. */
