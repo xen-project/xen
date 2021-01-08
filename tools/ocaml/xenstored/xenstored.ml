@@ -141,9 +141,12 @@ exception Bad_format of string
 
 let dump_format_header = "$xenstored-dump-format"
 
-let from_channel_f chan domain_f watch_f store_f =
+let from_channel_f chan global_f socket_f domain_f watch_f store_f =
 	let unhexify s = Utils.unhexify s in
-	let getpath s = Store.Path.of_string (Utils.unhexify s) in
+	let getpath s =
+		let u = Utils.unhexify s in
+		debug "Path: %s" u;
+		Store.Path.of_string u in
 	let header = input_line chan in
 	if header <> dump_format_header then
 		raise (Bad_format "header");
@@ -155,6 +158,12 @@ let from_channel_f chan domain_f watch_f store_f =
 			let l = String.split ',' line in
 			try
 				match l with
+				| "global" :: rw :: _ ->
+					(* there might be more parameters here,
+					   e.g. a RO socket from a previous version: ignore it *)
+					global_f ~rw
+				| "socket" :: fd :: [] ->
+					socket_f ~fd:(int_of_string fd)
 				| "dom" :: domid :: mfn :: port :: []->
 					domain_f (int_of_string domid)
 					         (Nativeint.of_string mfn)
@@ -175,12 +184,28 @@ let from_channel_f chan domain_f watch_f store_f =
 		with End_of_file ->
 			quit := true
 	done;
-	()
+	info "Completed loading xenstore dump"
 
 let from_channel store cons doms chan =
 	(* don't let the permission get on our way, full perm ! *)
 	let op = Store.get_ops store Perms.Connection.full_rights in
-
+	let rwro = ref (None) in
+	let global_f ~rw =
+		let get_listen_sock sockfd =
+			let fd = sockfd |> int_of_string |> Utils.FD.of_int in
+			Unix.listen fd 1;
+			Some fd
+		in
+		rwro := get_listen_sock rw
+	in
+	let socket_f ~fd =
+		let ufd = Utils.FD.of_int fd in
+		let is_valid = try (Unix.fstat ufd).Unix.st_kind = Unix.S_SOCK with _ -> false in
+		if is_valid then
+			Connections.add_anonymous cons ufd
+		else
+			warn "Ignoring invalid socket FD %d" fd
+	in
 	let domain_f domid mfn port =
 		let ndom =
 			if domid > 0 then
@@ -190,28 +215,38 @@ let from_channel store cons doms chan =
 			in
 		Connections.add_domain cons ndom;
 		in
-	let watch_f domid path token =
-		let con = Connections.find_domain cons domid in
-		ignore (Connections.add_watch cons con path token)
+	let get_con id =
+		if id < 0 then Connections.find cons (Utils.FD.of_int (-id))
+		else Connections.find_domain cons id
+	in
+	let watch_f id path token =
+		ignore (Connections.add_watch cons (get_con id) path token)
 		in
 	let store_f path perms value =
 		op.Store.write path value;
 		op.Store.setperms path perms
 		in
-	from_channel_f chan domain_f watch_f store_f
+	from_channel_f chan global_f socket_f domain_f watch_f store_f;
+	!rwro
 
 let from_file store cons doms file =
+	info "Loading xenstore dump from %s" file;
 	let channel = open_in file in
 	finally (fun () -> from_channel store doms cons channel)
 	        (fun () -> close_in channel)
 
-let to_channel store cons chan =
+let to_channel store cons rw chan =
 	let hexify s = Utils.hexify s in
 
 	fprintf chan "%s\n" dump_format_header;
+	let fdopt = function None -> -1 | Some fd ->
+		(* systemd and utils.ml sets it close on exec *)
+		Unix.clear_close_on_exec fd;
+		Utils.FD.to_int fd in
+	fprintf chan "global,%d\n" (fdopt rw);
 
-	(* dump connections related to domains; domid, mfn, eventchn port, watches *)
-	Connections.iter_domains cons (fun con -> Connection.dump con chan);
+	(* dump connections related to domains: domid, mfn, eventchn port/ sockets, and watches *)
+	Connections.iter cons (fun con -> Connection.dump con chan);
 
 	(* dump the store *)
 	Store.dump_fct store (fun path node ->
@@ -224,9 +259,9 @@ let to_channel store cons chan =
 	()
 
 
-let to_file store cons file =
+let to_file store cons fds file =
 	let channel = open_out_gen [ Open_wronly; Open_creat; Open_trunc; ] 0o600 file in
-	finally (fun () -> to_channel store cons channel)
+	finally (fun () -> to_channel store cons fds channel)
 	        (fun () -> close_out channel)
 end
 
@@ -246,13 +281,13 @@ let _ =
 	);
 
 	let rw_sock =
-		if cf.disable_socket then
+		if cf.disable_socket || cf.live_reload then
 			None
 		else
 			Some (Unix.handle_unix_error Utils.create_unix_socket Define.xs_daemon_socket)
 		in
 
-	if cf.daemonize then
+	if cf.daemonize && not cf.live_reload then
 		Unixext.daemonize ()
 	else
 		printf "Xen Storage Daemon, version %d.%d\n%!"
@@ -292,10 +327,15 @@ let _ =
 	List.iter (fun path ->
 		Store.write store Perms.Connection.full_rights path "") Store.Path.specials;
 
+	let rw_sock =
 	if cf.restart && Sys.file_exists Disk.xs_daemon_database then (
-		DB.from_file store domains cons Disk.xs_daemon_database;
-		Event.bind_dom_exc_virq eventchn
+		let rwro = DB.from_file store domains cons Disk.xs_daemon_database in
+		info "Live reload: database loaded";
+		Event.bind_dom_exc_virq eventchn;
+		Process.LiveUpdate.completed ();
+		rwro
 	) else (
+		info "No live reload: regular startup";
 		if !Disk.enable then (
 			info "reading store from disk";
 			Disk.read store
@@ -309,7 +349,8 @@ let _ =
 			Connections.add_domain cons (Domains.create0 domains);
 			Event.bind_dom_exc_virq eventchn
 		);
-	);
+		rw_sock
+	) in
 
 	Sys.set_signal Sys.sighup (Sys.Signal_handle sighup_handler);
 	Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -319,7 +360,7 @@ let _ =
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
 	if cf.activate_access_log then begin
-		let post_rotate () = DB.to_file store cons Disk.xs_daemon_database in
+		let post_rotate () = DB.to_file store cons (None) Disk.xs_daemon_database in
 		Logging.init_access_log post_rotate
 	end;
 
@@ -362,6 +403,7 @@ let _ =
 	let ring_scan_checker dom =
 		(* no need to scan domains already marked as for processing *)
 		if not (Domain.get_io_credit dom > 0) then
+			debug "Looking up domid %d" (Domain.get_id dom);
 			let con = Connections.find_domain cons (Domain.get_id dom) in
 			if not (Connection.has_more_work con) then (
 				Process.do_output store cons domains con;
@@ -491,7 +533,7 @@ let _ =
 			live_update := Process.LiveUpdate.should_run cons;
 			if !live_update || !quit then begin
 				(* don't initiate live update if saving state fails *)
-				DB.to_file store cons Disk.xs_daemon_database;
+				DB.to_file store cons (rw_sock) Disk.xs_daemon_database;
 				quit := true;
 			end
 		with exc ->

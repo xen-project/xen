@@ -115,3 +115,15 @@ let path_validate path connection_path =
 	if len > !Define.path_max then raise Define.Invalid_path;
 
 	abs_path
+
+module FD : sig
+	type t = Unix.file_descr
+	val of_int: int -> t
+	val to_int : t -> int
+end = struct
+	type t = Unix.file_descr
+	(* This is like Obj.magic but just for these types,
+	   and relies on Unix.file_descr = int *)
+	external to_int : t -> int = "%identity"
+	external of_int : int -> t = "%identity"
+end

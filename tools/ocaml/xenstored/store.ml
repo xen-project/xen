@@ -366,7 +366,7 @@ let traversal root_node f =
 	let rec _traversal path node =
 		f path node;
 		let node_path = Path.of_path_and_name path (Symbol.to_string node.Node.name) in
-		List.iter (_traversal node_path) node.Node.children
+		List.iter (_traversal node_path) (List.rev node.Node.children)
 		in
 	_traversal [] root_node
 

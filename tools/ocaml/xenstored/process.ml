@@ -91,18 +91,23 @@ type t =
 	; cmdline: string list
 	; deadline: float
 	; force: bool
+	; result: string list
 	; pending: bool }
 
 let state = ref
 	{ binary= Sys.executable_name
-	; cmdline= []
+	; cmdline= (Sys.argv |> Array.to_list |> List.tl)
 	; deadline= 0.
 	; force= false
+	; result = []
 	; pending= false }
 
 let debug = Printf.eprintf
 
-let args_of_t t = (t.binary, "--restart" :: t.cmdline)
+let forced_args = ["--live"; "--restart"]
+let args_of_t t =
+	let filtered = List.filter (fun x -> not @@ List.mem x forced_args) t.cmdline in
+	(t.binary, forced_args @ filtered)
 
 let string_of_t t =
 	let executable, rest = args_of_t t in
@@ -116,11 +121,11 @@ let launch_exn t =
 
 let validate_exn t =
 	(* --help must be last to check validity of earlier arguments *)
-	let t = {t with cmdline= t.cmdline @ ["--help"]} in
-	let cmd = string_of_t t in
+	let t' = {t with cmdline= t.cmdline @ ["--help"]} in
+	let cmd = string_of_t t' in
 	debug "Executing %s" cmd ;
 	match Unix.fork () with
-	| 0 ->   ( try launch_exn t with _ -> exit 2 )
+	| 0 ->   ( try launch_exn t' with _ -> exit 2 )
 	| pid -> (
 		match Unix.waitpid [] pid with
 			| _, Unix.WEXITED 0 ->
@@ -142,10 +147,14 @@ let parse_live_update args =
 			validate_exn {!state with binary= file}
 		| ["-a"] ->
 			debug "Live update aborted" ;
-			{!state with pending= false}
+			{!state with pending= false; result = []}
 		| "-c" :: cmdline ->
-			validate_exn {!state with cmdline}
+			validate_exn {!state with cmdline = !state.cmdline @ cmdline}
 		| "-s" :: _ ->
+			(match !state.pending, !state.result with
+			| true, _ -> !state (* no change to state, avoid resetting timeout *)
+			| false, _ :: _ -> !state (* we got a pending result to deliver *)
+			| false, [] ->
 			let timeout = ref 60 in
 			let force = ref false in
 			Arg.parse_argv ~current:(ref 0) (Array.of_list args)
@@ -162,10 +171,16 @@ let parse_live_update args =
 			"live-update -s" ;
 			debug "Live update process queued" ;
 				{!state with deadline = Unix.gettimeofday () +. float !timeout
-				; force= !force; pending= true}
+				; force= !force; pending= true})
 		| _ ->
 			invalid_arg ("Unknown arguments: " ^ String.concat "," args)) ;
-	None
+		match !state.pending, !state.result with
+		| true, _ -> Some "BUSY"
+		| false, (_ :: _ as result) ->
+			(* xenstore-control has read the result, clear it *)
+			state := { !state with result = [] };
+			Some (String.concat "\n" result)
+		| false, [] -> None
 	with
 	| Arg.Bad s | Arg.Help s | Invalid_argument s ->
 		Some s
@@ -179,17 +194,27 @@ let parse_live_update args =
 			| [] -> true
 			| _ when Unix.gettimeofday () < t.deadline -> false
 			| l ->
-				info "Live update timeout reached: %d active connections" (List.length l);
-				List.iter (fun con -> warn "%s prevents live update" (Connection.get_domstr con)) l;
+				warn "timeout reached: have to wait, migrate or shutdown %d domains:" (List.length l);
+				let msgs = List.rev_map (fun con -> Printf.sprintf "%s: %d tx, in: %b, out: %b, perm: %s"
+					(Connection.get_domstr con)
+					(Connection.number_of_transactions con)
+					(Connection.has_input con)
+					(Connection.has_output con)
+					(Connection.get_perm con |> Perms.Connection.to_string)
+					) l in
+				List.iter (warn "Live-update: %s") msgs;
 				if t.force then begin
 					warn "Live update forced, some domain connections may break!";
 					true
 				end else begin
-					warn "Live update aborted, try migrating or shutting down the domains/toolstack";
-					state := { t with pending = false };
+					warn "Live update aborted (see above for domains preventing it)";
+					state := { t with pending = false; result = msgs};
 					false
 				end
 		end else false
+
+	let completed () =
+		state := { !state with result = ["OK"] }
 end
 
 (* packets *)
