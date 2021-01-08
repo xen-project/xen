@@ -702,7 +702,7 @@ let do_input store cons doms con =
 			Connection.do_input con
 		with Xenbus.Xb.Reconnect ->
 			info "%s requests a reconnect" (Connection.get_domstr con);
-			Connection.reconnect con;
+			History.reconnect con;
 			info "%s reconnection complete" (Connection.get_domstr con);
 			false
 		| Failure exp ->
@@ -741,7 +741,7 @@ let do_output _store _cons _doms con =
 			ignore (Connection.do_output con)
 		with Xenbus.Xb.Reconnect ->
 			info "%s requests a reconnect" (Connection.get_domstr con);
-			Connection.reconnect con;
+			History.reconnect con;
 			info "%s reconnection complete" (Connection.get_domstr con)
 	)
 

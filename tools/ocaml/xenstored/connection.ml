@@ -47,7 +47,7 @@ let mark_as_bad con =
 
 let initial_next_tid = 1
 
-let reconnect con =
+let do_reconnect con =
 	Xenbus.Xb.reconnect con.xb;
 	(* dom is the same *)
 	Hashtbl.clear con.transactions;
