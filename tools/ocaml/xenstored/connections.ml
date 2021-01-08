@@ -21,7 +21,7 @@ type t = {
 	anonymous: (Unix.file_descr, Connection.t) Hashtbl.t;
 	domains: (int, Connection.t) Hashtbl.t;
 	ports: (Xeneventchn.t, Connection.t) Hashtbl.t;
-	mutable watches: (string, Connection.watch list) Trie.t;
+	mutable watches: Connection.watch list Trie.t;
 }
 
 let create () = {

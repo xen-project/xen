@@ -31,9 +31,9 @@ let equal a b =
   (* compare using physical equality, both members have to be part of the above weak table *)
   a == b
 
-let compare a b =
-  if equal a b then 0
-  else -(String.compare a b)
+(* the sort order is reversed here, so that Map.fold constructs a list
+   in ascending order *)
+let compare a b = String.compare b a
 
 let stats () =
   let len, entries, _, _, _, _ = WeakTable.stats tbl in

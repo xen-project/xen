@@ -15,24 +15,26 @@
 
 open Stdext
 
+module StringMap = Map.Make(String)
+
 module Node =
 struct
-	type ('a,'b) t =  {
-		key: 'a;
-		value: 'b option;
-		children: ('a,'b) t list;
+	type 'a t =  {
+		key: string;
+		value: 'a option;
+		children: 'a t StringMap.t;
 	}
 
 	let _create key value = {
 		key = key;
 		value = Some value;
-		children = [];
+		children = StringMap.empty;
 	}
 
 	let empty key = {
 		key = key;
 		value = None;
-		children = []
+		children = StringMap.empty;
 	}
 
 	let _get_key node = node.key
@@ -49,41 +51,31 @@ struct
 		{ node with children = children }
 
 	let _add_child node child =
-		{ node with children = child :: node.children }
+		{ node with children = StringMap.add child.key child node.children }
 end
 
-type ('a,'b) t = ('a,'b) Node.t list
+type 'a t = 'a Node.t StringMap.t
 
 let mem_node nodes key =
-	List.exists (fun n -> n.Node.key = key) nodes
+	StringMap.mem key nodes
 
 let find_node nodes key =
-	List.find (fun n -> n.Node.key = key) nodes
+	StringMap.find key nodes
 
 let replace_node nodes key node =
-	let rec aux = function
-		| []                            -> []
-		| h :: tl when h.Node.key = key -> node :: tl
-		| h :: tl                       -> h :: aux tl
-	in
-	aux nodes
+	StringMap.update key (function None -> None | Some _ -> Some node) nodes
 
 let remove_node nodes key =
-	let rec aux = function
-		| []                            -> raise Not_found
-		| h :: tl when h.Node.key = key -> tl
-		| h :: tl                       -> h :: aux tl
-	in
-	aux nodes
+	StringMap.update key (function None -> raise Not_found | Some _ -> None) nodes
 
-let create () = []
+let create () = StringMap.empty
 
 let rec iter f tree =
-	let aux node =
-		f node.Node.key node.Node.value;
+	let aux key node =
+		f key node.Node.value;
 		iter f node.Node.children
 	in
-	List.iter aux tree
+	StringMap.iter aux tree
 
 let rec map f tree =
 	let aux node =
@@ -94,13 +86,14 @@ let rec map f tree =
 		in
 		{ node with Node.value = value; Node.children = map f node.Node.children }
 	in
-	List.filter (fun n -> n.Node.value <> None || n.Node.children <> []) (List.map aux tree)
+	tree |> StringMap.map aux
+	|> StringMap.filter (fun _ n -> n.Node.value <> None || not (StringMap.is_empty n.Node.children))
 
 let rec fold f tree acc =
-	let aux accu node =
-		fold f node.Node.children (f node.Node.key node.Node.value accu)
+	let aux key node accu =
+		fold f node.Node.children (f key node.Node.value accu)
 	in
-	List.fold_left aux acc tree
+	StringMap.fold aux tree acc
 
 (* return a sub-trie *)
 let rec sub_node tree = function
@@ -117,7 +110,7 @@ let rec sub_node tree = function
 
 let sub tree path =
 	try (sub_node tree path).Node.children
-	with Not_found -> []
+	with Not_found -> StringMap.empty
 
 let find tree path =
 	Node.get_value (sub_node tree path)
@@ -161,7 +154,7 @@ and set tree path value =
 				  replace_node tree h (set_node node t value)
 			  end else begin
 				  let node = Node.empty h in
-				  set_node node t value :: tree
+				  StringMap.add node.Node.key (set_node node t value) tree
 			  end
 
 let rec unset tree = function
@@ -176,7 +169,7 @@ let rec unset tree = function
 				  then Node.set_children (Node.empty h) children
 				  else Node.set_children node children
 			  in
-			  if children = [] && new_node.Node.value = None
+			  if StringMap.is_empty children && new_node.Node.value = None
 			  then remove_node tree h
 			  else replace_node tree h new_node
 		  end else
