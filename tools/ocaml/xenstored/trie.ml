@@ -13,6 +13,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+open Stdext
+
 module Node =
 struct
 	type ('a,'b) t =  {

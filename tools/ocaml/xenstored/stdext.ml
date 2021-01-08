@@ -50,6 +50,25 @@ module Filename = struct
 		cmd :: args |> List.map quote |> String.concat " "
 end
 
+module Map = struct
+	module Make(Ord: Map.OrderedType) = struct
+
+	include Map.Make(Ord)
+
+	let find_opt k t = try Some (find k t) with Not_found -> None
+
+	let update k f t =
+		let r = find_opt k t in
+		let r' = f r in
+		match r, r' with
+		| None, None -> t
+		| Some _, None -> remove k t
+		| Some r, Some r' when r == r' -> t
+		| _, Some r' -> add k r' t
+
+	end
+end
+
 module String = struct include String
 
 let of_char c = String.make 1 c
