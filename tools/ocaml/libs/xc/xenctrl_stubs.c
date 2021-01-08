@@ -175,9 +175,9 @@ static unsigned int ocaml_list_to_c_bitmap(value l)
 	return val;
 }
 
-CAMLprim value stub_xc_domain_create(value xch, value config)
+CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config)
 {
-	CAMLparam2(xch, config);
+	CAMLparam3(xch, wanted_domid, config);
 	CAMLlocal2(l, arch_domconfig);
 
 	/* Mnemonics for the named fields inside domctl_create_config */
@@ -191,7 +191,7 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
 #define VAL_MAX_MAPTRACK_FRAMES Field(config, 7)
 #define VAL_ARCH                Field(config, 8)
 
-	uint32_t domid = 0;
+	uint32_t domid = Int_val(wanted_domid);
 	int result;
 	struct xen_domctl_createdomain cfg = {
 		.ssidref = Int32_val(VAL_SSIDREF),

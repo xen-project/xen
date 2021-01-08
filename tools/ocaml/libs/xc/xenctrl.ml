@@ -179,8 +179,11 @@ let with_intf f =
 		handle := Some h;
 		f h
 
-external domain_create: handle -> domctl_create_config -> domid
+external domain_create_stub: handle -> domid -> domctl_create_config -> domid
        = "stub_xc_domain_create"
+
+let domain_create handle ?(domid=0) config =
+	domain_create_stub handle domid config
 
 external domain_sethandle: handle -> domid -> string -> unit
        = "stub_xc_domain_sethandle"
