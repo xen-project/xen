@@ -135,7 +135,7 @@ static int write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
         paging_lock(d);
 
         if ( p2m->write_p2m_entry_pre && gfn != gfn_x(INVALID_GFN) )
-            p2m->write_p2m_entry_pre(d, gfn, p, new, level);
+            p2m->write_p2m_entry_pre(d, gfn, *p, new, level);
 
         oflags = l1e_get_flags(*p);
         omfn = l1e_get_mfn(*p);

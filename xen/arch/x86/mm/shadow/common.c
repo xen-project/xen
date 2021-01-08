@@ -3086,19 +3086,28 @@ static int shadow_test_disable(struct domain *d)
  */
 
 static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
-                                       l1_pgentry_t *p, l1_pgentry_t new,
+                                       l1_pgentry_t old, l1_pgentry_t new,
                                        unsigned int level)
 {
+    unsigned int oflags = l1e_get_flags(old);
+
+    /*
+     * If there are any shadows, update them.  But if shadow_teardown()
+     * has already been called then it's not safe to try.
+     */
+    if ( unlikely(!d->arch.paging.shadow.total_pages) )
+        return;
+
     /* The following assertion is to make sure we don't step on 1GB host
      * page support of HVM guest. */
-    ASSERT(!(level > 2 && (l1e_get_flags(*p) & _PAGE_PRESENT) &&
-             (l1e_get_flags(*p) & _PAGE_PSE)));
+    ASSERT(!(level > 2 && (oflags & _PAGE_PRESENT) && (oflags & _PAGE_PSE)));
 
     /* If we're removing an MFN from the p2m, remove it from the shadows too */
     if ( level == 1 )
     {
-        mfn_t mfn = l1e_get_mfn(*p);
-        p2m_type_t p2mt = p2m_flags_to_type(l1e_get_flags(*p));
+        mfn_t mfn = l1e_get_mfn(old);
+        p2m_type_t p2mt = p2m_flags_to_type(oflags);
+
         if ( (p2m_is_valid(p2mt) || p2m_is_grant(p2mt)) && mfn_valid(mfn) )
         {
             sh_remove_all_shadows_and_parents(d, mfn);
@@ -3110,15 +3119,15 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
     /* If we're removing a superpage mapping from the p2m, we need to check
      * all the pages covered by it.  If they're still there in the new
      * scheme, that's OK, but otherwise they must be unshadowed. */
-    if ( level == 2 && (l1e_get_flags(*p) & _PAGE_PRESENT) &&
-         (l1e_get_flags(*p) & _PAGE_PSE) )
+    if ( level == 2 && (oflags & _PAGE_PRESENT) && (oflags & _PAGE_PSE) )
     {
         unsigned int i;
         cpumask_t flushmask;
-        mfn_t omfn = l1e_get_mfn(*p);
+        mfn_t omfn = l1e_get_mfn(old);
         mfn_t nmfn = l1e_get_mfn(new);
         l1_pgentry_t *npte = NULL;
-        p2m_type_t p2mt = p2m_flags_to_type(l1e_get_flags(*p));
+        p2m_type_t p2mt = p2m_flags_to_type(oflags);
+
         if ( p2m_is_valid(p2mt) && mfn_valid(omfn) )
         {
             cpumask_clear(&flushmask);
@@ -3152,16 +3161,6 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
     }
 }
 
-static void
-sh_write_p2m_entry_pre(struct domain *d, unsigned long gfn, l1_pgentry_t *p,
-                       l1_pgentry_t new, unsigned int level)
-{
-    /* If there are any shadows, update them.  But if shadow_teardown()
-     * has already been called then it's not safe to try. */
-    if ( likely(d->arch.paging.shadow.total_pages != 0) )
-         sh_unshadow_for_p2m_change(d, gfn, p, new, level);
-}
-
 #if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH)
 static void
 sh_write_p2m_entry_post(struct p2m_domain *p2m, unsigned int oflags)
@@ -3186,7 +3185,7 @@ sh_write_p2m_entry_post(struct p2m_domain *p2m, unsigned int oflags)
 
 void shadow_p2m_init(struct p2m_domain *p2m)
 {
-    p2m->write_p2m_entry_pre  = sh_write_p2m_entry_pre;
+    p2m->write_p2m_entry_pre  = sh_unshadow_for_p2m_change;
     p2m->write_p2m_entry_post = sh_write_p2m_entry_post;
 }
 

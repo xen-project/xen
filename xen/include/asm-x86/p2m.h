@@ -274,7 +274,7 @@ struct p2m_domain {
     void               (*memory_type_changed)(struct p2m_domain *p2m);
     void               (*write_p2m_entry_pre)(struct domain *d,
                                               unsigned long gfn,
-                                              l1_pgentry_t *p,
+                                              l1_pgentry_t old,
                                               l1_pgentry_t new,
                                               unsigned int level);
     void               (*write_p2m_entry_post)(struct p2m_domain *p2m,
