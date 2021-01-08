@@ -44,6 +44,12 @@ let default d v =
 let maybe f v =
 	match v with None -> () | Some x -> f x
 
+module Filename = struct
+	include Filename
+	let quote_command cmd args =
+		cmd :: args |> List.map quote |> String.concat " "
+end
+
 module String = struct include String
 
 let of_char c = String.make 1 c
