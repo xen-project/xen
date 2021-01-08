@@ -2200,9 +2200,8 @@ void activate_debugregs(const struct vcpu *curr)
 void asm_domain_crash_synchronous(unsigned long addr)
 {
     /*
-     * We need clear AC bit here because in entry.S AC is set
-     * by ASM_STAC to temporarily allow accesses to user pages
-     * which is prevented by SMAP by default.
+     * We need to clear the AC bit here because the exception fixup logic
+     * may leave user accesses enabled.
      *
      * For some code paths, where this function is called, clac()
      * is not needed, but adding clac() here instead of each place

@@ -199,16 +199,6 @@ register unsigned long current_stack_pointer asm("rsp");
         UNLIKELY_END_SECTION "\n"          \
         ".Llikely." #tag ".%=:"
 
-#endif
-
-#ifdef __ASSEMBLY__
-.macro ASM_STAC
-    ALTERNATIVE "", stac, X86_FEATURE_XEN_SMAP
-.endm
-.macro ASM_CLAC
-    ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
-.endm
-#else
 static always_inline void clac(void)
 {
     /* Note: a barrier is implicit in alternative() */
@@ -223,18 +213,7 @@ static always_inline void stac(void)
 #endif
 
 #ifdef __ASSEMBLY__
-.macro SAVE_ALL op, compat=0
-.ifeqs "\op", "CLAC"
-        ASM_CLAC
-.else
-.ifeqs "\op", "STAC"
-        ASM_STAC
-.else
-.ifnb \op
-        .err
-.endif
-.endif
-.endif
+.macro SAVE_ALL compat=0
         addq  $-(UREGS_error_code-UREGS_r15), %rsp
         cld
         movq  %rdi,UREGS_rdi(%rsp)
