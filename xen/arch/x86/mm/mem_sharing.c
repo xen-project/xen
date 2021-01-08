@@ -39,6 +39,7 @@
 #include <asm/event.h>
 #include <asm/hap.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hvm/nestedhvm.h>
 #include <xsm/xsm.h>
 
 #include <public/hvm/params.h>
@@ -893,13 +894,11 @@ static int nominate_page(struct domain *d, gfn_t gfn,
         goto out;
 
     /*
-     * Now that the page is validated, we can lock it. There is no
-     * race because we're holding the p2m entry, so no one else
-     * could be nominating this gfn.
+     * Now that the page is validated, we can make it shared. There is no race
+     * because we're holding the p2m entry, so no one else could be nominating
+     * this gfn & and it is evidently not yet shared with any other VM, thus we
+     * don't need to take the mem_sharing_page_lock here.
      */
-    ret = -ENOENT;
-    if ( !mem_sharing_page_lock(page) )
-        goto out;
 
     /* Initialize the shared state */
     ret = -ENOMEM;
@@ -935,7 +934,6 @@ static int nominate_page(struct domain *d, gfn_t gfn,
 
     *phandle = page->sharing->handle;
     audit_add_list(page);
-    mem_sharing_page_unlock(page);
     ret = 0;
 
 out:
@@ -1214,7 +1212,8 @@ int __mem_sharing_unshare_page(struct domain *d,
     p2m_type_t p2mt;
     mfn_t mfn;
     struct page_info *page, *old_page;
-    int last_gfn;
+    bool last_gfn;
+    int rc = 0;
     gfn_info_t *gfn_info = NULL;
 
     mfn = get_gfn(d, gfn, &p2mt);
@@ -1224,6 +1223,15 @@ int __mem_sharing_unshare_page(struct domain *d,
     {
         put_gfn(d, gfn);
         return 0;
+    }
+
+    /* lock nested p2ms to avoid lock-order violation with sharing lock */
+    if ( unlikely(nestedhvm_enabled(d)) )
+    {
+        unsigned int i;
+
+        for ( i = 0; i < MAX_NESTEDP2M; i++ )
+            p2m_lock(d->arch.nested_p2m[i]);
     }
 
     page = __grab_shared_page(mfn);
@@ -1276,9 +1284,7 @@ int __mem_sharing_unshare_page(struct domain *d,
             put_page_alloc_ref(page);
 
         put_page_and_type(page);
-        put_gfn(d, gfn);
-
-        return 0;
+        goto out;
     }
 
     if ( last_gfn )
@@ -1295,12 +1301,12 @@ int __mem_sharing_unshare_page(struct domain *d,
         /* Undo dec of nr_saved_mfns, as the retry will decrease again. */
         atomic_inc(&nr_saved_mfns);
         mem_sharing_page_unlock(old_page);
-        put_gfn(d, gfn);
         /*
          * Caller is responsible for placing an event
          * in the ring.
          */
-        return -ENOMEM;
+        rc = -ENOMEM;
+        goto out;
     }
 
     copy_domain_page(page_to_mfn(page), page_to_mfn(old_page));
@@ -1327,8 +1333,18 @@ int __mem_sharing_unshare_page(struct domain *d,
      */
     paging_mark_dirty(d, page_to_mfn(page));
     /* We do not need to unlock a private page */
+
+ out:
+    if ( unlikely(nestedhvm_enabled(d)) )
+    {
+        unsigned int i;
+
+        for ( i = 0; i < MAX_NESTEDP2M; i++ )
+            p2m_unlock(d->arch.nested_p2m[i]);
+    }
+
     put_gfn(d, gfn);
-    return 0;
+    return rc;
 }
 
 int relinquish_shared_pages(struct domain *d)

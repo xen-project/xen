@@ -1597,9 +1597,17 @@ p2m_flush(struct vcpu *v, struct p2m_domain *p2m)
 void
 p2m_flush_nestedp2m(struct domain *d)
 {
-    int i;
+    unsigned int i;
+
     for ( i = 0; i < MAX_NESTEDP2M; i++ )
-        p2m_flush_table(d->arch.nested_p2m[i]);
+    {
+        struct p2m_domain *p2m = d->arch.nested_p2m[i];
+
+        if ( p2m_locked_by_me(p2m) )
+            p2m_flush_table_locked(p2m);
+        else
+            p2m_flush_table(p2m);
+    }
 }
 
 void np2m_flush_base(struct vcpu *v, unsigned long np2m_base)
