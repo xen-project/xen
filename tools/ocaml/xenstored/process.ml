@@ -111,6 +111,7 @@ let string_of_t t =
 let launch_exn t =
 	let executable, rest = args_of_t t in
 	let args = Array.of_list (executable :: rest) in
+	info "Launching %s, args: %s" executable (String.concat " " rest);
 	Unix.execv args.(0) args
 
 let validate_exn t =
@@ -147,7 +148,7 @@ let parse_live_update args =
 		| "-s" :: _ ->
 			let timeout = ref 60 in
 			let force = ref false in
-			Arg.parse_argv ~current:(ref 1) (Array.of_list args)
+			Arg.parse_argv ~current:(ref 0) (Array.of_list args)
 				[ ( "-t"
 				  , Arg.Set_int timeout
 				  , "timeout in seconds to wait for active transactions to finish"
@@ -197,7 +198,8 @@ let do_debug con t _domains cons data =
 	then None
 	else try match split None '\000' data with
 	| "live-update" :: params ->
-		LiveUpdate.parse_live_update params
+		let dropped_trailing_nul = params |> List.rev |> List.tl |> List.rev in
+		LiveUpdate.parse_live_update dropped_trailing_nul
 	| "print" :: msg :: _ ->
 		Logging.xb_op ~tid:0 ~ty:Xenbus.Xb.Op.Debug ~con:"=======>" msg;
 		None

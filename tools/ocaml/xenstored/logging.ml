@@ -327,6 +327,9 @@ let end_transaction ~tid ~con =
 	if !access_log_transaction_ops && tid <> 0
 	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_end) ~level:Debug
 
+let live_update () =
+	xb_op ~tid:0 ~con:"" ~ty:Xenbus.Xb.Op.Debug "Live update begin"
+
 let xb_answer ~tid ~con ~ty data =
 	let print, level = match ty with
 		| Xenbus.Xb.Op.Error when String.startswith "ENOENT" data -> !access_log_read_ops , Warn
