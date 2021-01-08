@@ -62,6 +62,12 @@ build-xen:
 build-tools: build-tools-public-headers
 	$(MAKE) -C tools build
 
+.PHONY: build-tools-oxenstored
+build-tools-oxenstored: build-tools-public-headers
+	$(MAKE) -s -C tools/ocaml clean
+	$(MAKE) -s -C tools/libs
+	$(MAKE) -C tools/ocaml build-tools-oxenstored
+
 .PHONY: build-stubdom
 build-stubdom: mini-os-dir build-tools-public-headers
 	$(MAKE) -C stubdom build
