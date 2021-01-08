@@ -292,9 +292,8 @@ let _ =
 	List.iter (fun path ->
 		Store.write store Perms.Connection.full_rights path "") Store.Path.specials;
 
-	let filename = Paths.xen_run_stored ^ "/db" in
-	if cf.restart && Sys.file_exists filename then (
-		DB.from_file store domains cons filename;
+	if cf.restart && Sys.file_exists Disk.xs_daemon_database then (
+		DB.from_file store domains cons Disk.xs_daemon_database;
 		Event.bind_dom_exc_virq eventchn
 	) else (
 		if !Disk.enable then (
@@ -320,7 +319,7 @@ let _ =
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
 	if cf.activate_access_log then begin
-		let post_rotate () = DB.to_file store cons (Paths.xen_run_stored ^ "/db") in
+		let post_rotate () = DB.to_file store cons Disk.xs_daemon_database in
 		Logging.init_access_log post_rotate
 	end;
 
@@ -494,5 +493,8 @@ let _ =
 				raise exc
 	done;
 	info "stopping xenstored";
-	DB.to_file store cons (Paths.xen_run_stored ^ "/db");
+	DB.to_file store cons Disk.xs_daemon_database;
+	(* unlink pidfile so that launch-xenstore works again *)
+	Unixext.unlink_safe pidfile;
+	(match cf.pidfile with Some pidfile -> Unixext.unlink_safe pidfile | None -> ());
 	()
