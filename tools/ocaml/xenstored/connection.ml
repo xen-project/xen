@@ -290,6 +290,41 @@ let has_new_output con = Xenbus.Xb.has_new_output con.xb
 let peek_output con = Xenbus.Xb.peek_output con.xb
 let do_output con = Xenbus.Xb.output con.xb
 
+let is_bad con = match con.dom with None -> false | Some dom -> Domain.is_bad_domain dom
+
+(* oxenstored currently only dumps limited information about its state.
+   A live update is only possible if any of the state that is not dumped would be empty.
+   Compared to https://xenbits.xen.org/docs/unstable/designs/xenstore-migration.html:
+     * GLOBAL_DATA: not strictly needed, systemd is giving the socket FDs to us
+     * CONNECTION_DATA: PARTIAL
+       * for domains: PARTIAL, see Connection.dump -> Domain.dump, only if data and tdomid is empty
+       * for sockets (Dom0 toolstack): NO
+     * WATCH_DATA: OK, see Connection.dump
+     * TRANSACTION_DATA: NO
+     * NODE_DATA: OK (except for transactions), see Store.dump_fct and DB.to_channel
+
+   Also xenstored will never talk to a Domain once it is marked as bad,
+   so treat it as idle for live-update.
+
+   Restrictions below can be relaxed once xenstored learns to dump more
+   of its live state in a safe way *)
+let has_extra_connection_data con =
+	let has_in = has_input con in
+	let has_out = has_output con in
+	let has_socket = con.dom = None in
+	let has_nondefault_perms = make_perm con.dom <> con.perm in
+	has_in || has_out
+	|| has_socket (* dom0 sockets not dumped yet *)
+	|| has_nondefault_perms (* set_target not dumped yet *)
+
+let has_transaction_data con =
+	let n = number_of_transactions con in
+	dbg "%s: number of transactions = %d" (get_domstr con) n;
+	n > 0
+
+let prevents_live_update con = not (is_bad con)
+	&& (has_extra_connection_data con || has_transaction_data con)
+
 let has_more_work con =
 	has_more_input con || not (has_old_output con) && has_new_output con
 

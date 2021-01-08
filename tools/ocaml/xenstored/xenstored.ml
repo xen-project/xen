@@ -20,6 +20,7 @@ open Parse_arg
 open Stdext
 
 let error fmt = Logging.error "xenstored" fmt
+let warn fmt = Logging.warn "xenstored" fmt
 let debug fmt = Logging.debug "xenstored" fmt
 let info fmt = Logging.info "xenstored" fmt
 
@@ -312,7 +313,9 @@ let _ =
 	);
 
 	Sys.set_signal Sys.sighup (Sys.Signal_handle sighup_handler);
-	Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ -> quit := true));
+	Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ ->
+		info "Received SIGTERM";
+		quit := true));
 	Sys.set_signal Sys.sigusr1 (Sys.Signal_handle (fun _ -> sigusr1_handler store));
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
@@ -424,6 +427,12 @@ let _ =
 		);
 		let elapsed = Unix.gettimeofday () -. now in
 		debug "periodic_ops took %F seconds." elapsed;
+		if !quit then (
+			match Connections.prevents_quit cons with
+			| [] -> ()
+			| domains -> List.iter (fun con -> warn "%s prevents live update"
+								(Connection.get_domstr con)) domains
+		);
 		delay_next_frequent_ops_by elapsed
 	in
 
@@ -475,7 +484,7 @@ let _ =
 		in
 
 	Systemd.sd_notify_ready ();
-	while not !quit
+	while not (!quit && Connections.prevents_quit cons = [])
 	do
 		try
 			main_loop ()

@@ -194,3 +194,11 @@ let debug cons =
 	let anonymous = Hashtbl.fold (fun _ con accu -> Connection.debug con :: accu) cons.anonymous [] in
 	let domains = Hashtbl.fold (fun _ con accu -> Connection.debug con :: accu) cons.domains [] in
 	String.concat "" (domains @ anonymous)
+
+let filter ~f cons =
+	let fold _ v acc = if f v then v :: acc else acc in
+	[]
+	|> Hashtbl.fold fold cons.anonymous
+	|> Hashtbl.fold fold cons.domains
+
+let prevents_quit cons = filter ~f:Connection.prevents_live_update cons
