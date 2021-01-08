@@ -424,18 +424,6 @@ let _ =
 
 	let periodic_ops now =
 		debug "periodic_ops starting";
-		(* we garbage collect the string->int dictionary after a sizeable amount of operations,
-		 * there's no need to be really fast even if we got loose
-		 * objects since names are often reuse.
-		 *)
-		if Symbol.created () > 1000 || Symbol.used () > 20000
-		then begin
-			Symbol.mark_all_as_unused ();
-			Store.mark_symbols store;
-			Connections.iter cons Connection.mark_symbols;
-			History.mark_symbols ();
-			Symbol.garbage ()
-		end;
 
 		(* scan all the xs rings as a safenet for ill-behaved clients *)
 		if !ring_scan_interval >= 0 && now > (!last_scan_time +. float !ring_scan_interval) then
@@ -453,11 +441,11 @@ let _ =
 			let (lanon, lanon_ops, lanon_watchs,
 			     ldom, ldom_ops, ldom_watchs) = Connections.stats cons in
 			let store_nodes, store_abort, store_coalesce = Store.stats store in
-			let symtbl_len = Symbol.stats () in
+			let symtbl_len, symtbl_entries = Symbol.stats () in
 
 			info "store stat: nodes(%d) t-abort(%d) t-coalesce(%d)"
 			     store_nodes store_abort store_coalesce;
-			info "sytbl stat: %d" symtbl_len;
+			info "sytbl stat: length(%d) entries(%d)" symtbl_len symtbl_entries;
 			info "  con stat: anonymous(%d, %d o, %d w) domains(%d, %d o, %d w)"
 			     lanon lanon_ops lanon_watchs ldom ldom_ops ldom_watchs;
 			info "  mem stat: minor(%.0f) promoted(%.0f) major(%.0f) heap(%d w, %d c) live(%d w, %d b) free(%d w, %d b)"

@@ -14,63 +14,23 @@
  * GNU Lesser General Public License for more details.
  *)
 
-type t = int
+module WeakTable = Weak.Make(struct
+    type t = string
+    let equal (x:string) (y:string) = (x = y)
+    let hash = Hashtbl.hash
+end)
 
-type 'a record = { data: 'a; mutable garbage: bool }
-let int_string_tbl : (int,string record) Hashtbl.t = Hashtbl.create 1024
-let string_int_tbl : (string,int) Hashtbl.t = Hashtbl.create 1024
+type t = string
 
-let created_counter = ref 0
-let used_counter = ref 0
+let tbl = WeakTable.create 1024
 
-let count = ref 0
-let rec fresh () =
-	if Hashtbl.mem int_string_tbl !count
-	then begin
-		incr count;
-		fresh ()
-	end else
-		!count
+let of_string s = WeakTable.merge tbl s
+let to_string s = s
 
-let new_record v = { data=v; garbage=false }
-
-let of_string name =
-	if Hashtbl.mem string_int_tbl name
-	then begin
-		incr used_counter;
-		Hashtbl.find string_int_tbl name
-	end else begin
-		let i = fresh () in
-		incr created_counter;
-		Hashtbl.add string_int_tbl name i;
-		Hashtbl.add int_string_tbl i (new_record name);
-		i
-	end
-
-let to_string i =
-	(Hashtbl.find int_string_tbl i).data
-
-let mark_all_as_unused () =
-	Hashtbl.iter (fun _ v -> v.garbage <- true) int_string_tbl
-
-let mark_as_used symb =
-	let record1 = Hashtbl.find int_string_tbl symb in
-		record1.garbage <- false
-
-let garbage () =
-	let records = Hashtbl.fold (fun symb record accu ->
-		if record.garbage then (symb, record.data) :: accu else accu
-	) int_string_tbl [] in
-	let remove (int,string) =
-		Hashtbl.remove int_string_tbl int;
-		Hashtbl.remove string_int_tbl string
-	in
-	created_counter := 0;
-	used_counter := 0;
-	List.iter remove records
+let equal a b =
+  (* compare using physical equality, both members have to be part of the above weak table *)
+  a == b
 
 let stats () =
-	Hashtbl.length string_int_tbl
-
-let created () = !created_counter
-let used () = !used_counter
+  let len, entries, _, _, _, _ = WeakTable.stats tbl in
+  len, entries

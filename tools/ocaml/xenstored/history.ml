@@ -22,20 +22,6 @@ type history_record = {
 
 let history : history_record list ref = ref []
 
-(* Called from periodic_ops to ensure we don't discard symbols that are still needed. *)
-(* There is scope for optimisation here, since in consecutive commits one commit's `after`
- * is the same thing as the next commit's `before`, but not all commits in history are
- * consecutive. *)
-let mark_symbols () =
-	(* There are gaps where dom0's commits are missing. Otherwise we could assume that
-	 * each element's `before` is the same thing as the next element's `after`
-	 * since the next element is the previous commit *)
-	List.iter (fun hist_rec ->
-			Store.mark_symbols hist_rec.before;
-			Store.mark_symbols hist_rec.after;
-		)
-		!history
-
 (* Keep only enough commit-history to protect the running transactions that we are still tracking *)
 (* There is scope for optimisation here, replacing List.filter with something more efficient,
  * probably on a different list-like structure. *)

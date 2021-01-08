@@ -334,9 +334,6 @@ let has_more_work con =
 
 let incr_ops con = con.stat_nb_ops <- con.stat_nb_ops + 1
 
-let mark_symbols con =
-	Hashtbl.iter (fun _ t -> Store.mark_symbols (Transaction.get_store t)) con.transactions
-
 let stats con =
 	Hashtbl.length con.watches, con.stat_nb_ops
 

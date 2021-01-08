@@ -46,18 +46,18 @@ let add_child node child =
 
 let exists node childname =
 	let childname = Symbol.of_string childname in
-	List.exists (fun n -> n.name = childname) node.children
+	List.exists (fun n -> Symbol.equal n.name childname) node.children
 
 let find node childname =
 	let childname = Symbol.of_string childname in
-	List.find (fun n -> n.name = childname) node.children
+	List.find (fun n -> Symbol.equal n.name childname) node.children
 
 let replace_child node child nchild =
 	(* this is the on-steroid version of the filter one-replace one *)
 	let rec replace_one_in_list l =
 		match l with
 		| []                               -> []
-		| h :: tl when h.name = child.name -> nchild :: tl
+		| h :: tl when Symbol.equal h.name child.name -> nchild :: tl
 		| h :: tl                          -> h :: replace_one_in_list tl
 		in
 	{ node with children = (replace_one_in_list node.children) }
@@ -67,7 +67,7 @@ let del_childname node childname =
 	let rec delete_one_in_list l =
 		match l with
 		| []                        -> raise Not_found
-		| h :: tl when h.name = sym -> tl
+		| h :: tl when Symbol.equal h.name sym -> tl
 		| h :: tl                   -> h :: delete_one_in_list tl
 		in
 	{ node with children = (delete_one_in_list node.children) }
@@ -488,9 +488,6 @@ let copy store = {
 	root = store.root;
 	quota = Quota.copy store.quota;
 }
-
-let mark_symbols store =
-	Node.recurse (fun node -> Symbol.mark_as_used node.Node.name) store.root
 
 let incr_transaction_coalesce store =
 	store.stat_transaction_coalesce <- store.stat_transaction_coalesce + 1

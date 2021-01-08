@@ -29,24 +29,11 @@ val of_string : string -> t
 val to_string : t -> string
 (** Convert a symbol into a string. *)
 
-(** {6 Garbage Collection} *)
-
-(** Symbols need to be regulary garbage collected. The following steps should be followed:
--     mark all the knowns symbols as unused (with [mark_all_as_unused]);
--     mark all the symbols really usefull as used (with [mark_as_used]); and
--     finally, call [garbage] *)
-
-val mark_all_as_unused : unit -> unit
-val mark_as_used : t -> unit
-val garbage : unit -> unit
+val equal: t -> t -> bool
+(** Compare two symbols for equality *)
 
 (** {6 Statistics } *)
 
-val stats : unit -> int
-(** Get the number of used symbols. *)
+val stats : unit -> int * int
+(** Get the table size and number of entries. *)
 
-val created : unit -> int
-(** Returns the number of symbols created since the last GC. *)
-
-val used : unit -> int
-(** Returns the number of existing symbols used since the last GC *)
