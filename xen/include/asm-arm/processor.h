@@ -75,11 +75,11 @@
 
 /* MPIDR Multiprocessor Affinity Register */
 #define _MPIDR_UP           (30)
-#define MPIDR_UP            (_AC(1,U) << _MPIDR_UP)
+#define MPIDR_UP            (_AC(1,UL) << _MPIDR_UP)
 #define _MPIDR_SMP          (31)
-#define MPIDR_SMP           (_AC(1,U) << _MPIDR_SMP)
+#define MPIDR_SMP           (_AC(1,UL) << _MPIDR_SMP)
 #define MPIDR_AFF0_SHIFT    (0)
-#define MPIDR_AFF0_MASK     (_AC(0xff,U) << MPIDR_AFF0_SHIFT)
+#define MPIDR_AFF0_MASK     (_AC(0xff,UL) << MPIDR_AFF0_SHIFT)
 #ifdef CONFIG_ARM_64
 #define MPIDR_HWID_MASK     _AC(0xff00ffffff,UL)
 #else
