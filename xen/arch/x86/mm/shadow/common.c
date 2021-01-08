@@ -3089,7 +3089,9 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                                        l1_pgentry_t old, l1_pgentry_t new,
                                        unsigned int level)
 {
+    mfn_t omfn = l1e_get_mfn(old);
     unsigned int oflags = l1e_get_flags(old);
+    p2m_type_t p2mt = p2m_flags_to_type(oflags);
 
     /*
      * If there are any shadows, update them.  But if shadow_teardown()
@@ -3098,53 +3100,57 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
     if ( unlikely(!d->arch.paging.shadow.total_pages) )
         return;
 
-    /* The following assertion is to make sure we don't step on 1GB host
-     * page support of HVM guest. */
-    ASSERT(!(level > 2 && (oflags & _PAGE_PRESENT) && (oflags & _PAGE_PSE)));
+    switch ( level )
+    {
+    default:
+        /*
+         * The following assertion is to make sure we don't step on 1GB host
+         * page support of HVM guest.
+         */
+        ASSERT(!((oflags & _PAGE_PRESENT) && (oflags & _PAGE_PSE)));
+        break;
 
     /* If we're removing an MFN from the p2m, remove it from the shadows too */
-    if ( level == 1 )
-    {
-        mfn_t mfn = l1e_get_mfn(old);
-        p2m_type_t p2mt = p2m_flags_to_type(oflags);
-
-        if ( (p2m_is_valid(p2mt) || p2m_is_grant(p2mt)) && mfn_valid(mfn) )
+    case 1:
+        if ( (p2m_is_valid(p2mt) || p2m_is_grant(p2mt)) && mfn_valid(omfn) )
         {
-            sh_remove_all_shadows_and_parents(d, mfn);
-            if ( sh_remove_all_mappings(d, mfn, _gfn(gfn)) )
+            sh_remove_all_shadows_and_parents(d, omfn);
+            if ( sh_remove_all_mappings(d, omfn, _gfn(gfn)) )
                 guest_flush_tlb_mask(d, d->dirty_cpumask);
         }
-    }
+        break;
 
-    /* If we're removing a superpage mapping from the p2m, we need to check
+    /*
+     * If we're removing a superpage mapping from the p2m, we need to check
      * all the pages covered by it.  If they're still there in the new
-     * scheme, that's OK, but otherwise they must be unshadowed. */
-    if ( level == 2 && (oflags & _PAGE_PRESENT) && (oflags & _PAGE_PSE) )
-    {
-        unsigned int i;
-        cpumask_t flushmask;
-        mfn_t omfn = l1e_get_mfn(old);
-        mfn_t nmfn = l1e_get_mfn(new);
-        l1_pgentry_t *npte = NULL;
-        p2m_type_t p2mt = p2m_flags_to_type(oflags);
+     * scheme, that's OK, but otherwise they must be unshadowed.
+     */
+    case 2:
+        if ( !(oflags & _PAGE_PRESENT) || !(oflags & _PAGE_PSE) )
+            break;
 
         if ( p2m_is_valid(p2mt) && mfn_valid(omfn) )
         {
+            unsigned int i;
+            cpumask_t flushmask;
+            mfn_t nmfn = l1e_get_mfn(new);
+            l1_pgentry_t *npte = NULL;
+
             cpumask_clear(&flushmask);
 
             /* If we're replacing a superpage with a normal L1 page, map it */
-            if ( (l1e_get_flags(new) & _PAGE_PRESENT)
-                 && !(l1e_get_flags(new) & _PAGE_PSE)
-                 && mfn_valid(nmfn) )
+            if ( (l1e_get_flags(new) & _PAGE_PRESENT) &&
+                 !(l1e_get_flags(new) & _PAGE_PSE) &&
+                 mfn_valid(nmfn) )
                 npte = map_domain_page(nmfn);
 
             gfn &= ~(L1_PAGETABLE_ENTRIES - 1);
 
             for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             {
-                if ( !npte
-                     || !p2m_is_ram(p2m_flags_to_type(l1e_get_flags(npte[i])))
-                     || !mfn_eq(l1e_get_mfn(npte[i]), omfn) )
+                if ( !npte ||
+                     !p2m_is_ram(p2m_flags_to_type(l1e_get_flags(npte[i]))) ||
+                     !mfn_eq(l1e_get_mfn(npte[i]), omfn) )
                 {
                     /* This GFN->MFN mapping has gone away */
                     sh_remove_all_shadows_and_parents(d, omfn);
@@ -3158,6 +3164,8 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
             if ( npte )
                 unmap_domain_page(npte);
         }
+
+        break;
     }
 }
 
