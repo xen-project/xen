@@ -134,7 +134,7 @@ static int write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
 
         paging_lock(d);
 
-        if ( p2m->write_p2m_entry_pre )
+        if ( p2m->write_p2m_entry_pre && gfn != gfn_x(INVALID_GFN) )
             p2m->write_p2m_entry_pre(d, gfn, p, new, level);
 
         oflags = l1e_get_flags(*p);
@@ -290,7 +290,8 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
         {
             new_entry = l1e_from_pfn(pfn | (i << ((level - 1) * PAGETABLE_ORDER)),
                                      flags);
-            rc = write_p2m_entry(p2m, gfn, l1_entry + i, new_entry, level);
+            rc = write_p2m_entry(p2m, gfn_x(INVALID_GFN), l1_entry + i,
+                                 new_entry, level);
             if ( rc )
             {
                 unmap_domain_page(l1_entry);
