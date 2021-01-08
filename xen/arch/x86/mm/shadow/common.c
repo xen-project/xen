@@ -3092,6 +3092,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
     mfn_t omfn = l1e_get_mfn(old);
     unsigned int oflags = l1e_get_flags(old);
     p2m_type_t p2mt = p2m_flags_to_type(oflags);
+    bool flush = false;
 
     /*
      * If there are any shadows, update them.  But if shadow_teardown()
@@ -3116,7 +3117,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
         {
             sh_remove_all_shadows_and_parents(d, omfn);
             if ( sh_remove_all_mappings(d, omfn, _gfn(gfn)) )
-                guest_flush_tlb_mask(d, d->dirty_cpumask);
+                flush = true;
         }
         break;
 
@@ -3132,11 +3133,8 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
         if ( p2m_is_valid(p2mt) && mfn_valid(omfn) )
         {
             unsigned int i;
-            cpumask_t flushmask;
             mfn_t nmfn = l1e_get_mfn(new);
             l1_pgentry_t *npte = NULL;
-
-            cpumask_clear(&flushmask);
 
             /* If we're replacing a superpage with a normal L1 page, map it */
             if ( (l1e_get_flags(new) & _PAGE_PRESENT) &&
@@ -3155,11 +3153,10 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                     /* This GFN->MFN mapping has gone away */
                     sh_remove_all_shadows_and_parents(d, omfn);
                     if ( sh_remove_all_mappings(d, omfn, _gfn(gfn + i)) )
-                        cpumask_or(&flushmask, &flushmask, d->dirty_cpumask);
+                        flush = true;
                 }
                 omfn = mfn_add(omfn, 1);
             }
-            guest_flush_tlb_mask(d, &flushmask);
 
             if ( npte )
                 unmap_domain_page(npte);
@@ -3167,6 +3164,9 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
 
         break;
     }
+
+    if ( flush )
+        guest_flush_tlb_mask(d, d->dirty_cpumask);
 }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH)
