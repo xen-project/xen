@@ -13,10 +13,12 @@
 #include <asm/alternative.h>
 
 #ifdef __ASSEMBLY__
+#include <asm/asm-defns.h>
 #ifndef CONFIG_INDIRECT_THUNK
 .equ CONFIG_INDIRECT_THUNK, 0
 #endif
 #else
+#include <asm/asm-macros.h>
 asm ( "\t.equ CONFIG_INDIRECT_THUNK, "
       __stringify(IS_ENABLED(CONFIG_INDIRECT_THUNK)) );
 #endif
@@ -199,33 +201,26 @@ register unsigned long current_stack_pointer asm("rsp");
 
 #endif
 
-/* "Raw" instruction opcodes */
-#define __ASM_CLAC      ".byte 0x0f,0x01,0xca"
-#define __ASM_STAC      ".byte 0x0f,0x01,0xcb"
-
 #ifdef __ASSEMBLY__
 .macro ASM_STAC
-    ALTERNATIVE "", __ASM_STAC, X86_FEATURE_XEN_SMAP
+    ALTERNATIVE "", stac, X86_FEATURE_XEN_SMAP
 .endm
 .macro ASM_CLAC
-    ALTERNATIVE "", __ASM_CLAC, X86_FEATURE_XEN_SMAP
+    ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
 .endm
 #else
 static always_inline void clac(void)
 {
     /* Note: a barrier is implicit in alternative() */
-    alternative("", __ASM_CLAC, X86_FEATURE_XEN_SMAP);
+    alternative("", "clac", X86_FEATURE_XEN_SMAP);
 }
 
 static always_inline void stac(void)
 {
     /* Note: a barrier is implicit in alternative() */
-    alternative("", __ASM_STAC, X86_FEATURE_XEN_SMAP);
+    alternative("", "stac", X86_FEATURE_XEN_SMAP);
 }
 #endif
-
-#undef __ASM_STAC
-#undef __ASM_CLAC
 
 #ifdef __ASSEMBLY__
 .macro SAVE_ALL op, compat=0

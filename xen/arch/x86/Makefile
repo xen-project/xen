@@ -250,7 +250,10 @@ $(BASEDIR)/include/asm-x86/asm-macros.h: asm-macros.i Makefile
 	echo '#if 0' >$@.new
 	echo '.if 0' >>$@.new
 	echo '#endif' >>$@.new
+	echo '#ifndef __ASM_MACROS_H__' >>$@.new
+	echo '#define __ASM_MACROS_H__' >>$@.new
 	echo 'asm ( ".include \"$@\"" );' >>$@.new
+	echo '#endif /* __ASM_MACROS_H__ */' >>$@.new
 	echo '#if 0' >>$@.new
 	echo '.endif' >>$@.new
 	cat $< >>$@.new
