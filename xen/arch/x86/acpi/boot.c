@@ -63,9 +63,8 @@ static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 
 static int __init acpi_parse_madt(struct acpi_table_header *table)
 {
-	struct acpi_table_madt *madt;
-
-	madt = (struct acpi_table_madt *)table;
+	struct acpi_table_madt *madt =
+		container_of(table, struct acpi_table_madt, header);
 
 	if (madt->address) {
 		acpi_lapic_addr = (u64) madt->address;
@@ -277,7 +276,8 @@ acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end
 
 static int __init acpi_parse_hpet(struct acpi_table_header *table)
 {
-	struct acpi_table_hpet *hpet_tbl = (struct acpi_table_hpet *)table;
+	const struct acpi_table_hpet *hpet_tbl =
+		container_of(table, const struct acpi_table_hpet, header);
 
 	if (hpet_tbl->address.space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY) {
 		printk(KERN_WARNING PREFIX "HPET timers must be located in "
@@ -471,7 +471,8 @@ acpi_fadt_parse_sleep_info(const struct acpi_table_fadt *fadt)
 
 static int __init acpi_parse_fadt(struct acpi_table_header *table)
 {
-	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+	const struct acpi_table_fadt *fadt =
+		container_of(table, const struct acpi_table_fadt, header);
 
 #ifdef	CONFIG_ACPI_INTERPRETER
 	/* initialize sci_int early for INT_SRC_OVR MADT parsing */
