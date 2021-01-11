@@ -571,7 +571,7 @@ See the corresponding option of the I<create> subcommand.
 =item B<-N> I<netbufscript>
 
 Use <netbufscript> to setup network buffering instead of the
-default script (/etc/xen/scripts/remus-netbuf-setup).
+default script (@XEN_SCRIPT_DIR@/remus-netbuf-setup).
 
 =item B<-F>
 

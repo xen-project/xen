@@ -9,6 +9,9 @@ AC_CONFIG_FILES([
 ../config/Docs.mk
 man/xl.cfg.5.pod
 man/xl.1.pod
+man/xl-disk-configuration.5.pod
+man/xl-network-configuration.5.pod
+man/xl.conf.5.pod
 ])
 AC_CONFIG_AUX_DIR([../])
 

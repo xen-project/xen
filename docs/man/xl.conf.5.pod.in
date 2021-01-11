@@ -107,7 +107,7 @@ Configures the default hotplug script used by virtual network devices.
 
 The old B<vifscript> option is deprecated and should not be used.
 
-Default: C</etc/xen/scripts/vif-bridge>
+Default: C<@XEN_SCRIPT_DIR@/vif-bridge>
 
 =item B<vif.default.bridge="NAME">
 
@@ -133,13 +133,13 @@ Default: C<None>
 
 Configures the default script used by Remus to setup network buffering.
 
-Default: C</etc/xen/scripts/remus-netbuf-setup>
+Default: C<@XEN_SCRIPT_DIR@/remus-netbuf-setup>
 
 =item B<colo.default.proxyscript="PATH">
 
 Configures the default script used by COLO to setup colo-proxy.
 
-Default: C</etc/xen/scripts/colo-proxy-setup>
+Default: C<@XEN_SCRIPT_DIR@/colo-proxy-setup>
 
 =item B<output_format="json|sxp">
 

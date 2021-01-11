@@ -169,8 +169,8 @@ number. Likewise the default tap name is C<vifDOMID.DEVID-emu>.
 
 Specifies the hotplug script to run to configure this device (e.g. to
 add it to the relevant bridge). Defaults to
-C<XEN_SCRIPT_DIR/vif-bridge> but can be set to any script. Some example
-scripts are installed in C<XEN_SCRIPT_DIR>.
+C<@XEN_SCRIPT_DIR@/vif-bridge> but can be set to any script. Some example
+scripts are installed in C<@XEN_SCRIPT_DIR@>.
 
 Note on NetBSD HVM guests will ignore the script option for tap
 (emulated) interfaces and always use

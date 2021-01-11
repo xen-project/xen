@@ -257,7 +257,7 @@ automatically determine the most suitable backend.
 
 Specifies that B<target> is not a normal host path, but rather
 information to be interpreted by the executable program I<SCRIPT>,
-(looked for in F</etc/xen/scripts>, if it doesn't contain a slash).
+(looked for in F<@XEN_SCRIPT_DIR@>, if it doesn't contain a slash).
 
 These scripts are normally called "block-I<SCRIPT>".
 
