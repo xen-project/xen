@@ -775,9 +775,18 @@ int evtchn_send(struct domain *ld, unsigned int lport)
         rport = lchn->u.interdomain.remote_port;
         rchn  = evtchn_from_port(rd, rport);
         if ( consumer_is_xen(rchn) )
-            xen_notification_fn(rchn)(rd->vcpu[rchn->notify_vcpu_id], rport);
-        else
-            evtchn_port_set_pending(rd, rchn->notify_vcpu_id, rchn);
+        {
+            /* Don't keep holding the lock for the call below. */
+            xen_event_channel_notification_t fn = xen_notification_fn(rchn);
+            struct vcpu *rv = rd->vcpu[rchn->notify_vcpu_id];
+
+            rcu_lock_domain(rd);
+            evtchn_read_unlock(lchn);
+            fn(rv, rport);
+            rcu_unlock_domain(rd);
+            return 0;
+        }
+        evtchn_port_set_pending(rd, rchn->notify_vcpu_id, rchn);
         break;
     case ECS_IPI:
         evtchn_port_set_pending(ld, lchn->notify_vcpu_id, lchn);
