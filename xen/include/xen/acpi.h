@@ -53,6 +53,8 @@
 
 extern acpi_physical_address rsdp_hint;
 
+extern bool opt_acpi_verbose;
+
 enum acpi_interrupt_id {
 	ACPI_INTERRUPT_PMI	= 1,
 	ACPI_INTERRUPT_INIT,

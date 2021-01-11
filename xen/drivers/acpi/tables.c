@@ -36,6 +36,8 @@
 
 #define ACPI_MAX_TABLES		128
 
+bool __initdata opt_acpi_verbose;
+
 static const char *__initdata
 mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };
 static const char *__initdata
@@ -51,6 +53,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 	switch (header->type) {
 
 	case ACPI_MADT_TYPE_LOCAL_APIC:
+		if (opt_acpi_verbose)
 		{
 			struct acpi_madt_local_apic *p =
 			    (struct acpi_madt_local_apic *)header;
@@ -62,6 +65,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 		break;
 
 	case ACPI_MADT_TYPE_LOCAL_X2APIC:
+		if (opt_acpi_verbose)
 		{
 			struct acpi_madt_local_x2apic *p =
 			    (struct acpi_madt_local_x2apic *)header;
@@ -115,6 +119,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 		break;
 
 	case ACPI_MADT_TYPE_LOCAL_APIC_NMI:
+		if (opt_acpi_verbose)
 		{
 			struct acpi_madt_local_apic_nmi *p =
 			    (struct acpi_madt_local_apic_nmi *)header;
@@ -128,6 +133,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 		break;
 
 	case ACPI_MADT_TYPE_LOCAL_X2APIC_NMI:
+		if (opt_acpi_verbose)
 		{
 			u16 polarity, trigger;
 			struct acpi_madt_local_x2apic_nmi *p =
@@ -167,6 +173,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 		break;
 
 	case ACPI_MADT_TYPE_LOCAL_SAPIC:
+		if (opt_acpi_verbose)
 		{
 			struct acpi_madt_local_sapic *p =
 			    (struct acpi_madt_local_sapic *)header;

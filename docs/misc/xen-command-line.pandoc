@@ -75,12 +75,9 @@ of Boolean and String.  These are noted in the relevant sections.
 ## Parameter details
 
 ### acpi
-> `= force | ht | noirq | <boolean>`
+> `= force | ht | noirq | <boolean> | verbose`
 
 **String**, or **Boolean** to disable.
-
-The **acpi** option is used to control a set of four related boolean
-flags; `acpi_force`, `acpi_ht`, `acpi_noirq` and `acpi_disabled`.
 
 By default, Xen will scan the DMI data and blacklist certain systems
 which are known to have broken ACPI setups.  Providing `acpi=force`
@@ -97,12 +94,15 @@ which requires this option to function should be blacklisted.
 Additionally, this will not prevent Xen from finding IO-APIC entries
 from the MP tables.
 
-Finally, any of the boolean false options can be used to disable ACPI
+Further, any of the boolean false options can be used to disable ACPI
 usage entirely.
 
 Because responsibility for ACPI processing is shared between Xen and
 the domain 0 kernel this option is automatically propagated to the
-domain 0 command line
+domain 0 command line.
+
+Finally, `acpi=verbose` will enable per-processor information logging
+which may otherwise be too noisy in particular on large systems.
 
 ### acpi_apic_instance
 > `= <integer>`
