@@ -171,13 +171,6 @@ B<EXAMPLES>
 
 =over 4
 
-=item I<with config file>
-
-  xl create DebianLenny
-
-This creates a domain with the file /etc/xen/DebianLenny, and returns as
-soon as it is run.
-
 =item I<with extra parameters>
 
   xl create hvm.cfg 'cpus="0-3"; pci=["01:05.1","01:05.2"]'
