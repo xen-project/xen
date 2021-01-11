@@ -187,7 +187,7 @@ static DEFINE_SPINLOCK(ipmmu_devices_lock);
 #define IMCAAR               0x0004
 
 #define IMTTBCR                        0x0008
-#define IMTTBCR_EAE                    (1 << 31)
+#define IMTTBCR_EAE                    (1U << 31)
 #define IMTTBCR_PMB                    (1 << 30)
 #define IMTTBCR_SH1_NON_SHAREABLE      (0 << 28)
 #define IMTTBCR_SH1_OUTER_SHAREABLE    (2 << 28)
@@ -251,7 +251,7 @@ static DEFINE_SPINLOCK(ipmmu_devices_lock);
 #define IMUCTR(n)              ((n) < 32 ? IMUCTR0(n) : IMUCTR32(n))
 #define IMUCTR0(n)             (0x0300 + ((n) * 16))
 #define IMUCTR32(n)            (0x0600 + (((n) - 32) * 16))
-#define IMUCTR_FIXADDEN        (1 << 31)
+#define IMUCTR_FIXADDEN        (1U << 31)
 #define IMUCTR_FIXADD_MASK     (0xff << 16)
 #define IMUCTR_FIXADD_SHIFT    16
 #define IMUCTR_TTSEL_MMU(n)    ((n) << 4)
