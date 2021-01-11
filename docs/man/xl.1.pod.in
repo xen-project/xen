@@ -50,7 +50,7 @@ setup the bridge.
 
 If you specify the amount of memory dom0 has, passing B<dom0_mem> to
 Xen, it is highly recommended to disable B<autoballoon>. Edit
-B</etc/xen/xl.conf> and set it to 0.
+B<@XEN_CONFIG_DIR@/xl.conf> and set it to 0.
 
 =item run xl as B<root>
 

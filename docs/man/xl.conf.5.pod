@@ -1,6 +1,6 @@
 =head1 NAME
 
-/etc/xen/xl.conf - XL Global/Host Configuration 
+@XEN_CONFIG_DIR@/xl.conf - XL Global/Host Configuration
 
 =head1 DESCRIPTION
 
