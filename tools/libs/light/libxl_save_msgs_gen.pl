@@ -120,8 +120,8 @@ sub typeid ($) { my ($t) = @_; $t =~ s/\W/_/; return $t; };
 
 $out_body{'callout'} .= <<END;
 static int bytes_get(const unsigned char **msg,
-		     const unsigned char *const endmsg,
-		     void *result, int rlen)
+                     const unsigned char *const endmsg,
+                     void *result, int rlen)
 {
     if (endmsg - *msg < rlen) return 0;
     memcpy(result, *msg, rlen);
@@ -132,11 +132,11 @@ static int bytes_get(const unsigned char **msg,
 END
 $out_body{'helper'} .= <<END;
 static void bytes_put(unsigned char *const buf, int *len,
-		      const void *value, int vlen)
+                      const void *value, int vlen)
 {
     assert(vlen < INT_MAX/2 - *len);
     if (buf)
-	memcpy(buf + *len, value, vlen);
+        memcpy(buf + *len, value, vlen);
     *len += vlen;
 }
 
@@ -155,7 +155,7 @@ static int ${typeid}_get(const unsigned char **msg,
 END
     $out_body{'helper'} .= <<END;
 static void ${typeid}_put(unsigned char *const buf, int *len,
-			 const $simpletype value)
+                          const $simpletype value)
 {
     bytes_put(buf, len, &value, sizeof(value));
 }
@@ -192,15 +192,15 @@ END
 $out_body{'helper'} .= <<END;
 static void BLOCK_put(unsigned char *const buf,
                       int *len,
-		      const uint8_t *bytes, uint32_t size)
+                      const uint8_t *bytes, uint32_t size)
 {
     uint32_t_put(buf, len, size);
     bytes_put(buf, len, bytes, size);
 }
 
 static void STRING_put(unsigned char *const buf,
-		       int *len,
-		       const char *string)
+                       int *len,
+                       const char *string)
 {
     size_t slen = strlen(string);
     assert(slen < INT_MAX / 4);
@@ -216,7 +216,7 @@ foreach my $sr (qw(save restore)) {
            "(void *data)");
 
     f_decl("${receiveds}_${sr}", 'callout', 'int',
-	   "(const unsigned char *msg, uint32_t len, void *user)");
+           "(const unsigned char *msg, uint32_t len, void *user)");
 
     f_decl("${enumcallbacks}_${sr}", 'callout', 'unsigned',
            "(const ".cbtype($sr)." *cbs)");
@@ -301,7 +301,7 @@ END_ALWAYS
 	$c_callback_args .= "$c_args, ";
 	$c_recv.=
             "        if (!${typeid}_get(&msg, endmsg, $c_get_args)) return 0;\n";
-        f_more("${encode}_$name", "	${typeid}_put(buf, &len, $c_args);\n");
+        f_more("${encode}_$name", "        ${typeid}_put(buf, &len, $c_args);\n");
     }
     $f_more_sr->($c_recv);
     $c_decl .= "void *user)";
