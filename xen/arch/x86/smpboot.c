@@ -426,6 +426,13 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
     int maxlvt, timeout, i;
 
     /*
+     * Some versions of tboot might be able to handle the entire wake sequence
+     * on our behalf.
+     */
+    if ( tboot_in_measured_env() && !tboot_wake_ap(phys_apicid, start_eip) )
+        return 0;
+
+    /*
      * Be paranoid about clearing APIC errors.
      */
     apic_write(APIC_ESR, 0);
@@ -570,8 +577,7 @@ static int do_boot_cpu(int apicid, int cpu)
     set_cpu_state(CPU_STATE_INIT);
 
     /* Starting actual IPI sequence... */
-    if ( !tboot_in_measured_env() || tboot_wake_ap(apicid, start_eip) )
-        boot_error = wakeup_secondary_cpu(apicid, start_eip);
+    boot_error = wakeup_secondary_cpu(apicid, start_eip);
 
     if ( !boot_error )
     {
