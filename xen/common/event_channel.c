@@ -606,7 +606,6 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 int evtchn_close(struct domain *d1, int port1, bool guest)
 {
     struct domain *d2 = NULL;
-    struct vcpu   *v;
     struct evtchn *chn1, *chn2;
     int            port2;
     long           rc = 0;
@@ -657,17 +656,19 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
         break;
     }
 
-    case ECS_VIRQ:
-        for_each_vcpu ( d1, v )
-        {
-            unsigned long flags;
+    case ECS_VIRQ: {
+        struct vcpu *v;
+        unsigned long flags;
 
-            write_lock_irqsave(&v->virq_lock, flags);
-            if ( read_atomic(&v->virq_to_evtchn[chn1->u.virq]) == port1 )
-                write_atomic(&v->virq_to_evtchn[chn1->u.virq], 0);
-            write_unlock_irqrestore(&v->virq_lock, flags);
-        }
+        v = d1->vcpu[virq_is_global(chn1->u.virq) ? 0 : chn1->notify_vcpu_id];
+
+        write_lock_irqsave(&v->virq_lock, flags);
+        ASSERT(read_atomic(&v->virq_to_evtchn[chn1->u.virq]) == port1);
+        write_atomic(&v->virq_to_evtchn[chn1->u.virq], 0);
+        write_unlock_irqrestore(&v->virq_lock, flags);
+
         break;
+    }
 
     case ECS_IPI:
         break;
