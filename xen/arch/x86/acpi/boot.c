@@ -37,9 +37,7 @@
 #include <asm/io.h>
 #include <asm/mpspec.h>
 #include <asm/processor.h>
-#ifdef CONFIG_HPET_TIMER
 #include <asm/hpet.h> /* for hpet_address */
-#endif
 #include <mach_apic.h>
 #include <mach_mpparse.h>
 
@@ -272,8 +270,6 @@ acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end
 	return 0;
 }
 
-#ifdef CONFIG_HPET_TIMER
-
 static int __init acpi_parse_hpet(struct acpi_table_header *table)
 {
 	const struct acpi_table_hpet *hpet_tbl =
@@ -309,9 +305,6 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 
 	return 0;
 }
-#else
-#define	acpi_parse_hpet	NULL
-#endif
 
 static int __init acpi_invalidate_bgrt(struct acpi_table_header *table)
 {
@@ -484,7 +477,6 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 	    fadt->force_apic_physical_destination_mode;
 #endif
 
-#ifdef CONFIG_X86_PM_TIMER
 	/* detect the location of the ACPI PM Timer */
 	if (fadt->header.revision >= FADT2_REVISION_ID &&
 	    fadt->xpm_timer_block.space_id == ACPI_ADR_SPACE_SYSTEM_IO) {
@@ -517,7 +509,6 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 	if (pmtmr_ioport)
 		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x (%u bits)\n",
 		       pmtmr_ioport, pmtmr_width);
-#endif
 
 	acpi_smi_cmd       = fadt->smi_command;
 	acpi_enable_value  = fadt->acpi_enable;
