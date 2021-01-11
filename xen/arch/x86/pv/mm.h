@@ -110,8 +110,8 @@ static always_inline l1_pgentry_t adjust_guest_l1e(l1_pgentry_t l1e,
     return l1e;
 }
 
-static inline l2_pgentry_t adjust_guest_l2e(l2_pgentry_t l2e,
-                                            const struct domain *d)
+static always_inline l2_pgentry_t adjust_guest_l2e(l2_pgentry_t l2e,
+                                                   const struct domain *d)
 {
     if ( likely(l2e_get_flags(l2e) & _PAGE_PRESENT) &&
          likely(!is_pv_32bit_domain(d)) )
@@ -130,8 +130,8 @@ static always_inline l3_pgentry_t adjust_guest_l3e(l3_pgentry_t l3e,
     return l3e;
 }
 
-static inline l3_pgentry_t unadjust_guest_l3e(l3_pgentry_t l3e,
-                                              const struct domain *d)
+static always_inline l3_pgentry_t unadjust_guest_l3e(l3_pgentry_t l3e,
+                                                     const struct domain *d)
 {
     if ( unlikely(is_pv_32bit_domain(d)) &&
          likely(l3e_get_flags(l3e) & _PAGE_PRESENT) )
