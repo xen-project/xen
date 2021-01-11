@@ -382,8 +382,14 @@ acpi_fadt_parse_sleep_info(const struct acpi_table_fadt *fadt)
 		}
 	}
 
-	if (fadt->flags & ACPI_FADT_HW_REDUCED)
-		goto bad;
+	if (fadt->flags & ACPI_FADT_HW_REDUCED) {
+		memset(&acpi_sinfo, 0,
+		       offsetof(struct acpi_sleep_info, sleep_control));
+		memset(&acpi_sinfo.sleep_status + 1, 0,
+		       (long)(&acpi_sinfo + 1) -
+		       (long)(&acpi_sinfo.sleep_status + 1));
+		return;
+	}
 
 	acpi_fadt_copy_address(pm1a_cnt, pm1a_control, pm1_control);
 	acpi_fadt_copy_address(pm1b_cnt, pm1b_control, pm1_control);
@@ -451,15 +457,6 @@ acpi_fadt_parse_sleep_info(const struct acpi_table_fadt *fadt)
 	printk(KERN_INFO PREFIX
 	       "            wakeup_vec[%"PRIx64"], vec_size[%x]\n",
 	       acpi_sinfo.wakeup_vector, acpi_sinfo.vector_width);
-	return;
-
- bad:
-	if (facs)
-		acpi_os_unmap_memory(facs, sizeof(*facs));
-	memset(&acpi_sinfo, 0,
-	       offsetof(struct acpi_sleep_info, sleep_control));
-	memset(&acpi_sinfo.sleep_status + 1, 0,
-	       (long)(&acpi_sinfo + 1) - (long)(&acpi_sinfo.sleep_status + 1));
 }
 
 static int __init acpi_parse_fadt(struct acpi_table_header *table)
