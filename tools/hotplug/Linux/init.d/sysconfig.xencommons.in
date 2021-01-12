@@ -87,12 +87,6 @@ XENSTORED_ARGS=
 # Only evaluated if XENSTORETYPE is "domain".
 XENSTORE_DOMAIN_ARGS=
 
-## Type: string
-## Default: Not defined, xenbackendd debug mode off
-#
-# Running xenbackendd in debug mode
-#XENBACKENDD_DEBUG=[yes|on|1]
-
 # qemu path
 #QEMU_XEN=@qemu_xen_path@
 

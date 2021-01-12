@@ -279,8 +279,6 @@ tools/tests/vpci/vpci.[hc]
 tools/tests/vpci/test_vpci
 tools/xcutils/lsevtchn
 tools/xcutils/readnotes
-tools/xenbackendd/_paths.h
-tools/xenbackendd/xenbackendd
 tools/xenmon/xentrace_setmask
 tools/xenmon/xenbaked
 tools/xenpaging/xenpaging

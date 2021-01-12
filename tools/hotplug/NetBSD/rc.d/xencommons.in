@@ -22,8 +22,6 @@ required_files="/kern/xen/privcmd"
 
 XENSTORED_PIDFILE="@XEN_RUN_DIR@/xenstored.pid"
 XENCONSOLED_PIDFILE="@XEN_RUN_DIR@/xenconsoled.pid"
-XENBACKENDD_PIDFILE="@XEN_RUN_DIR@/xenbackendd.pid"
-#XENBACKENDD_DEBUG=1
 #XENCONSOLED_TRACE="@XEN_LOG_DIR@/xenconsole-trace.log"
 #XENSTORED_TRACE="@XEN_LOG_DIR@/xenstore-trace.log"
 

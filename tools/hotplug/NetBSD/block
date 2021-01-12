@@ -1,7 +1,6 @@
 #!/bin/sh -e
 
 # $NetBSD: block-nbsd,v 1.1.1.1 2008/08/07 20:26:57 cegger Exp $
-# Called by xenbackendd
 # Usage: block xsdir_backend_path state
 
 DIR=$(dirname "$0")
