@@ -486,7 +486,7 @@ M:	Tamas K Lengyel <tamas@tklengyel.com>
 R:	Alexandru Isaila <aisaila@bitdefender.com>
 R:	Petre Pircalabu <ppircalabu@bitdefender.com>
 S:	Supported
-F:	tools/tests/xen-access
+F:	tools/misc/xen-access.c
 F:	xen/arch/*/monitor.c
 F:	xen/arch/*/vm_event.c
 F:	xen/arch/arm/mem_access.c

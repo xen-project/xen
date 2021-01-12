@@ -8,7 +8,6 @@ SUBDIRS-y += mem-sharing
 ifneq ($(clang),y)
 SUBDIRS-$(CONFIG_X86) += x86_emulator
 endif
-SUBDIRS-y += xen-access
 SUBDIRS-y += xenstore
 SUBDIRS-y += depriv
 SUBDIRS-$(CONFIG_HAS_PCI) += vpci

@@ -272,7 +272,6 @@ tools/tests/x86_emulator/*sse*.[ch]
 tools/tests/x86_emulator/test_x86_emulator
 tools/tests/x86_emulator/x86_emulate
 tools/tests/x86_emulator/xop*.[ch]
-tools/tests/xen-access/xen-access
 tools/tests/xenstore/xs-test
 tools/tests/mem-sharing/memshrtool
 tools/tests/mce-test/tools/xen-mceinj

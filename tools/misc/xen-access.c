@@ -38,6 +38,7 @@
 #include <sys/mman.h>
 #include <poll.h>
 
+#define XC_WANT_COMPAT_DEVICEMODEL_API
 #include <xenctrl.h>
 #include <xenevtchn.h>
 #include <xen/vm_event.h>
