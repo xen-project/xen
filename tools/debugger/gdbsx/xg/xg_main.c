@@ -126,11 +126,11 @@ xg_init()
     int flags, saved_errno;
 
     XGTRC("E\n");
-    if ((_dom0_fd=open("/dev/xen/privcmd", O_RDWR)) == -1) {
-        if ((_dom0_fd=open("/proc/xen/privcmd", O_RDWR)) == -1) {
-            perror("Failed to open /dev/xen/privcmd or /proc/xen/privcmd\n");
-            return -1;
-        }
+    if ((_dom0_fd=open("/dev/xen/privcmd", O_RDWR)) == -1 &&
+        (_dom0_fd=open("/proc/xen/privcmd", O_RDWR)) == -1 &&
+        (_dom0_fd=open("/kern/xen/privcmd", O_RDWR)) == -1) {
+        perror("Failed to open privcmd\n");
+        return -1;
     }
     /* Although we return the file handle as the 'xc handle' the API
      * does not specify / guarentee that this integer is in fact
