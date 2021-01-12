@@ -49,6 +49,7 @@
 #include <mach_apic.h>
 
 unsigned long __read_mostly trampoline_phys;
+enum ap_boot_method __read_mostly ap_boot_method = AP_BOOT_NORMAL;
 
 /* representing HT siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
@@ -424,7 +425,16 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
     unsigned long send_status = 0, accept_status = 0;
     int maxlvt, timeout, i;
-    bool send_INIT = true;
+
+    /*
+     * Normal AP startup uses an INIT-SIPI-SIPI sequence.
+     *
+     * When using SKINIT for Secure Startup, the INIT IPI must be skipped, so
+     * that SIPI is the first interrupt the AP sees.
+     *
+     * Refer to AMD APM Vol2 15.27 "Secure Startup with SKINIT".
+     */
+    bool send_INIT = ap_boot_method != AP_BOOT_SKINIT;
 
     /*
      * Some versions of tboot might be able to handle the entire wake sequence

@@ -834,6 +834,29 @@ void load_system_tables(void)
 	BUG_ON(system_state != SYS_STATE_early_boot && (stack_bottom & 0xf));
 }
 
+static void skinit_enable_intr(void)
+{
+	uint64_t val;
+
+	/*
+	 * If the platform is performing a Secure Launch via SKINIT
+	 * INIT_REDIRECTION flag will be active.
+	 */
+	if ( !cpu_has_skinit || rdmsr_safe(MSR_K8_VM_CR, val) ||
+	     !(val & VM_CR_INIT_REDIRECTION) )
+		return;
+
+	ap_boot_method = AP_BOOT_SKINIT;
+
+	/*
+	 * We don't yet handle #SX.  Disable INIT_REDIRECTION first, before
+	 * enabling GIF, so a pending INIT resets us, rather than causing a
+	 * panic due to an unknown exception.
+	 */
+	wrmsrl(MSR_K8_VM_CR, val & ~VM_CR_INIT_REDIRECTION);
+	asm volatile ( "stgi" ::: "memory" );
+}
+
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already
  * initialized (naturally) in the bootstrap process, such as the GDT
@@ -864,6 +887,15 @@ void cpu_init(void)
 	write_debugreg(3, 0);
 	write_debugreg(6, X86_DR6_DEFAULT);
 	write_debugreg(7, X86_DR7_DEFAULT);
+
+	/*
+	 * If the platform is performing a Secure Launch via SKINIT, GIF is
+	 * clear to prevent external interrupts interfering with Secure
+	 * Startup.  Re-enable all interrupts now that we are suitably set up.
+	 *
+	 * Refer to AMD APM Vol2 15.27 "Secure Startup with SKINIT".
+	 */
+	skinit_enable_intr();
 
 	/* Enable NMIs.  Our loader (e.g. Tboot) may have left them disabled. */
 	enable_nmis();

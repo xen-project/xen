@@ -117,6 +117,7 @@
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
 
 #define MSR_K8_VM_CR                        0xc0010114
+#define  VM_CR_INIT_REDIRECTION             (_AC(1, ULL) <<  1)
 #define  VM_CR_SVM_DISABLE                  (_AC(1, ULL) <<  4)
 
 /*

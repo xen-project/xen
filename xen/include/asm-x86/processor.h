@@ -631,6 +631,12 @@ static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
 extern int8_t opt_tsx, cpu_has_tsx_ctrl;
 void tsx_init(void);
 
+enum ap_boot_method {
+    AP_BOOT_NORMAL,
+    AP_BOOT_SKINIT,
+};
+extern enum ap_boot_method ap_boot_method;
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_X86_PROCESSOR_H */
