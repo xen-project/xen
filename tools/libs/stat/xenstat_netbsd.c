@@ -55,11 +55,6 @@ get_priv_data(xenstat_handle *handle)
 }
 
 /* Expected format of /proc/net/dev */
-static const char PROCNETDEV_HEADER[] =
-    "Inter-|   Receive                                                |"
-    "  Transmit\n"
-    " face |bytes    packets errs drop fifo frame compressed multicast|"
-    "bytes    packets errs drop fifo colls carrier compressed\n";
 
 /* Collect information about networks */
 int xenstat_collect_networks(xenstat_node * node)
@@ -74,12 +69,6 @@ void xenstat_uninit_networks(xenstat_handle * handle)
 	struct priv_data *priv = get_priv_data(handle);
 	if (priv != NULL && priv->procnetdev != NULL)
 		fclose(priv->procnetdev);
-}
-
-static int read_attributes_vbd(const char *vbd_directory, const char *what, char *ret, int cap)
-{
-	/* XXX implement */
-	return 0;
 }
 
 /* Collect information about VBDs */
