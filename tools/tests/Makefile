@@ -1,9 +1,6 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS  += $(CFLAGS_libxenctrl)
-LDLIBS += $(LDLIBS_libxenctrl)
-
 SUBDIRS-y :=
 SUBDIRS-$(CONFIG_X86) += cpu-policy
 SUBDIRS-$(CONFIG_X86) += mce-test
