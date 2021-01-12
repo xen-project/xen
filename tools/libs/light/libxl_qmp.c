@@ -1249,7 +1249,7 @@ static int qmp_error_class_to_libxl_error_code(libxl__gc *gc,
                 se++;
                 continue;
             }
-            if (tolower(*s) != tolower(*se))
+            if (tolower((unsigned char)*s) != tolower((unsigned char)*se))
                 break;
             s++, se++;
         }

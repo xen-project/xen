@@ -957,7 +957,7 @@ static int parse_cpumask_range(const char *mask_str, xc_cpumap_t map)
 {
     unsigned int a, b;
     int nmaskbits;
-    char c;
+    unsigned char c;
     int in_range;
     const char *s;
 
