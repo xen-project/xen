@@ -5,6 +5,8 @@
 #define cpu_feature64(c, feat)         ((c)->pfr64.feat)
 #define boot_cpu_feature64(feat)       (boot_cpu_data.pfr64.feat)
 
+#define cpu_feature64_has_el0_32(c)    (cpu_feature64(c, el0) == 2)
+
 #define cpu_has_el0_32    (boot_cpu_feature64(el0) == 2)
 #define cpu_has_el0_64    (boot_cpu_feature64(el0) >= 1)
 #define cpu_has_el1_32    (boot_cpu_feature64(el1) == 2)

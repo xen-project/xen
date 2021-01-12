@@ -101,29 +101,35 @@ int enable_nonboot_cpu_caps(const struct arm_cpu_capabilities *caps)
 
 void identify_cpu(struct cpuinfo_arm *c)
 {
-        c->midr.bits = READ_SYSREG(MIDR_EL1);
-        c->mpidr.bits = READ_SYSREG(MPIDR_EL1);
+    bool aarch32_el0 = true;
+
+    c->midr.bits = READ_SYSREG(MIDR_EL1);
+    c->mpidr.bits = READ_SYSREG(MPIDR_EL1);
 
 #ifdef CONFIG_ARM_64
-        c->pfr64.bits[0] = READ_SYSREG(ID_AA64PFR0_EL1);
-        c->pfr64.bits[1] = READ_SYSREG(ID_AA64PFR1_EL1);
+    c->pfr64.bits[0] = READ_SYSREG(ID_AA64PFR0_EL1);
+    c->pfr64.bits[1] = READ_SYSREG(ID_AA64PFR1_EL1);
 
-        c->dbg64.bits[0] = READ_SYSREG(ID_AA64DFR0_EL1);
-        c->dbg64.bits[1] = READ_SYSREG(ID_AA64DFR1_EL1);
+    c->dbg64.bits[0] = READ_SYSREG(ID_AA64DFR0_EL1);
+    c->dbg64.bits[1] = READ_SYSREG(ID_AA64DFR1_EL1);
 
-        c->aux64.bits[0] = READ_SYSREG(ID_AA64AFR0_EL1);
-        c->aux64.bits[1] = READ_SYSREG(ID_AA64AFR1_EL1);
+    c->aux64.bits[0] = READ_SYSREG(ID_AA64AFR0_EL1);
+    c->aux64.bits[1] = READ_SYSREG(ID_AA64AFR1_EL1);
 
-        c->mm64.bits[0]  = READ_SYSREG(ID_AA64MMFR0_EL1);
-        c->mm64.bits[1]  = READ_SYSREG(ID_AA64MMFR1_EL1);
-        c->mm64.bits[2]  = READ_SYSREG(ID_AA64MMFR2_EL1);
+    c->mm64.bits[0]  = READ_SYSREG(ID_AA64MMFR0_EL1);
+    c->mm64.bits[1]  = READ_SYSREG(ID_AA64MMFR1_EL1);
+    c->mm64.bits[2]  = READ_SYSREG(ID_AA64MMFR2_EL1);
 
-        c->isa64.bits[0] = READ_SYSREG(ID_AA64ISAR0_EL1);
-        c->isa64.bits[1] = READ_SYSREG(ID_AA64ISAR1_EL1);
+    c->isa64.bits[0] = READ_SYSREG(ID_AA64ISAR0_EL1);
+    c->isa64.bits[1] = READ_SYSREG(ID_AA64ISAR1_EL1);
 
-        c->zfr64.bits[0] = READ_SYSREG(ID_AA64ZFR0_EL1);
+    c->zfr64.bits[0] = READ_SYSREG(ID_AA64ZFR0_EL1);
+
+    aarch32_el0 = cpu_feature64_has_el0_32(c);
 #endif
 
+    if ( aarch32_el0 )
+    {
         c->pfr32.bits[0] = READ_SYSREG(ID_PFR0_EL1);
         c->pfr32.bits[1] = READ_SYSREG(ID_PFR1_EL1);
         c->pfr32.bits[2] = READ_SYSREG(ID_PFR2_EL1);
@@ -153,6 +159,7 @@ void identify_cpu(struct cpuinfo_arm *c)
 #ifndef MVFR2_MAYBE_UNDEFINED
         c->mvfr.bits[2] = READ_SYSREG(MVFR2_EL1);
 #endif
+    }
 }
 
 /*
