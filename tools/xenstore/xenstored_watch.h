@@ -33,4 +33,6 @@ void conn_delete_all_watches(struct connection *conn);
 const char *dump_state_watches(FILE *fp, struct connection *conn,
 			       unsigned int conn_id);
 
+void read_state_watch(const void *ctx, const void *state);
+
 #endif /* _XENSTORED_WATCH_H */

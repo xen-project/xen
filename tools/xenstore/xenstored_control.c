@@ -35,6 +35,7 @@ Interactive commands for Xen Store Daemon.
 #include "xenstored_core.h"
 #include "xenstored_control.h"
 #include "xenstored_domain.h"
+#include "xenstored_watch.h"
 
 /* Mini-OS only knows about MAP_ANON. */
 #ifndef MAP_ANONYMOUS
@@ -542,6 +543,7 @@ void lu_read_state(void)
 			read_state_connection(ctx, head + 1);
 			break;
 		case XS_STATE_TYPE_WATCH:
+			read_state_watch(ctx, head + 1);
 			break;
 		case XS_STATE_TYPE_TA:
 			xprintf("live-update: ignore transaction record\n");

@@ -205,6 +205,62 @@ static int destroy_watch(void *_watch)
 	return 0;
 }
 
+static int check_watch_path(struct connection *conn, const void *ctx,
+			    char **path, bool *relative)
+{
+	/* Check if valid event. */
+	if (strstarts(*path, "@")) {
+		*relative = false;
+		if (strlen(*path) > XENSTORE_REL_PATH_MAX)
+			goto inval;
+	} else {
+		*relative = !strstarts(*path, "/");
+		*path = canonicalize(conn, ctx, *path);
+		if (!*path)
+			return errno;
+		if (!is_valid_nodename(*path))
+			goto inval;
+	}
+
+	return 0;
+
+ inval:
+	errno = EINVAL;
+	return errno;
+}
+
+static struct watch *add_watch(struct connection *conn, char *path, char *token,
+			       bool relative)
+{
+	struct watch *watch;
+
+	watch = talloc(conn, struct watch);
+	if (!watch)
+		goto nomem;
+	watch->node = talloc_strdup(watch, path);
+	watch->token = talloc_strdup(watch, token);
+	if (!watch->node || !watch->token)
+		goto nomem;
+
+	if (relative)
+		watch->relative_path = get_implicit_path(conn);
+	else
+		watch->relative_path = NULL;
+
+	INIT_LIST_HEAD(&watch->events);
+
+	domain_watch_inc(conn);
+	list_add_tail(&watch->list, &conn->watches);
+	talloc_set_destructor(watch, destroy_watch);
+
+	return watch;
+
+ nomem:
+	talloc_free(watch);
+	errno = ENOMEM;
+	return NULL;
+}
+
 int do_watch(struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
@@ -214,19 +270,9 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return EINVAL;
 
-	if (strstarts(vec[0], "@")) {
-		relative = false;
-		if (strlen(vec[0]) > XENSTORE_REL_PATH_MAX)
-			return EINVAL;
-		/* check if valid event */
-	} else {
-		relative = !strstarts(vec[0], "/");
-		vec[0] = canonicalize(conn, in, vec[0]);
-		if (!vec[0])
-			return ENOMEM;
-		if (!is_valid_nodename(vec[0]))
-			return EINVAL;
-	}
+	errno = check_watch_path(conn, in, &(vec[0]), &relative);
+	if (errno)
+		return errno;
 
 	/* Check for duplicates. */
 	list_for_each_entry(watch, &conn->watches, list) {
@@ -238,26 +284,11 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	if (domain_watch(conn) > quota_nb_watch_per_domain)
 		return E2BIG;
 
-	watch = talloc(conn, struct watch);
+	watch = add_watch(conn, vec[0], vec[1], relative);
 	if (!watch)
-		return ENOMEM;
-	watch->node = talloc_strdup(watch, vec[0]);
-	watch->token = talloc_strdup(watch, vec[1]);
-	if (!watch->node || !watch->token) {
-		talloc_free(watch);
-		return ENOMEM;
-	}
-	if (relative)
-		watch->relative_path = get_implicit_path(conn);
-	else
-		watch->relative_path = NULL;
+		return errno;
 
-	INIT_LIST_HEAD(&watch->events);
-
-	domain_watch_inc(conn);
-	list_add_tail(&watch->list, &conn->watches);
 	trace_create(watch, "watch");
-	talloc_set_destructor(watch, destroy_watch);
 	send_ack(conn, XS_WATCH);
 
 	/* We fire once up front: simplifies clients and restart. */
@@ -336,6 +367,29 @@ const char *dump_state_watches(FILE *fp, struct connection *conn,
 	}
 
 	return ret;
+}
+
+void read_state_watch(const void *ctx, const void *state)
+{
+	const struct xs_state_watch *sw = state;
+	struct connection *conn;
+	char *path, *token;
+	bool relative;
+
+	conn = get_connection_by_id(sw->conn_id);
+	if (!conn)
+		barf("connection not found for read watch");
+
+	path = (char *)sw->data;
+	token = path + sw->path_length;
+
+	/* Don't check success, we want the relative information only. */
+	check_watch_path(conn, ctx, &path, &relative);
+	if (!path)
+		barf("allocation error for read watch");
+
+	if (!add_watch(conn, path, token, relative))
+		barf("error adding watch");
 }
 
 /*
