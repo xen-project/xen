@@ -149,11 +149,41 @@ static int do_control_print(void *ctx, struct connection *conn,
 	return 0;
 }
 
+static int do_control_lu(void *ctx, struct connection *conn,
+			 char **vec, int num)
+{
+	const char *resp;
+
+	resp = talloc_strdup(ctx, "NYI");
+	send_reply(conn, XS_CONTROL, resp, strlen(resp) + 1);
+	return 0;
+}
+
 static int do_control_help(void *, struct connection *, char **, int);
 
 static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
 	{ "log", do_control_log, "on|off" },
+
+	/*
+	 * The parameters are those of the xenstore-control utility!
+	 * Depending on environment (Mini-OS or daemon) the live-update
+	 * sequence is split into several sub-operations:
+	 * 1. Specification of new binary
+	 *    daemon:  -f <filename>
+	 *    Mini-OS: -b <binary-size>
+	 *             -d <size> <data-bytes> (multiple of those)
+	 * 2. New command-line (optional): -c <cmdline>
+	 * 3. Start of update: -s [-F] [-t <timeout>]
+	 * Any sub-operation needs to respond with the string "OK" in case
+	 * of success, any other response indicates failure.
+	 * A started live-update sequence can be aborted via "-a" (not
+	 * needed in case of failure for the first or last live-update
+	 * sub-operation).
+	 */
+	{ "live-update", do_control_lu,
+		"[-c <cmdline>] [-F] [-t <timeout>] <file>\n"
+		"    Default timeout is 60 seconds.", 4 },
 #ifdef __MINIOS__
 	{ "memreport", do_control_memreport, "" },
 #else

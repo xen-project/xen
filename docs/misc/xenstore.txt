@@ -317,6 +317,27 @@ CONTROL			<command>|[<parameters>|]
 	Current commands are:
 	check
 		checks xenstored innards
+	live-update|<params>|+
+		perform a live-update of the Xenstore daemon, only to
+		be used via xenstore-control command.
+		<params> are implementation specific and are used for
+		different steps of the live-update processing. Currently
+		supported <params> are:
+		-f <file>  specify new daemon binary
+		-b <size>  specify size of new stubdom binary
+		-d <chunk-size> <binary-chunk>  transfer chunk of new
+			stubdom binary
+		-c <pars>  specify new command line to use
+		-s [-t <sec>] [-F]  start live update process (-t specifies
+			timeout in seconds to wait for active transactions
+			to finish, default is 60 seconds; -F will force
+			live update to happen even with running transactions
+			after timeout elapsed)
+		-a  abort live update handling
+		All sub-options will return "OK" in case of success or an
+		error string in case of failure. -s can return "BUSY" in case
+		of an active transaction, a retry of -s can be done in that
+		case.
 	log|on
 		turn xenstore logging on
 	log|off
