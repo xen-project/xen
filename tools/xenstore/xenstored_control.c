@@ -25,12 +25,21 @@ Interactive commands for Xen Store Daemon.
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 #include <unistd.h>
+#include <xenctrl.h>
 
 #include "utils.h"
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_control.h"
+#include "xenstored_domain.h"
+
+/* Mini-OS only knows about MAP_ANON. */
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 
 struct live_update {
 	/* For verification the correct connection is acting. */
@@ -40,6 +49,9 @@ struct live_update {
 	void *kernel;
 	unsigned int kernel_size;
 	unsigned int kernel_off;
+
+	void *dump_state;
+	unsigned long dump_size;
 #else
 	char *filename;
 #endif
@@ -56,6 +68,10 @@ static struct live_update *lu_status;
 
 static int lu_destroy(void *data)
 {
+#ifdef __MINIOS__
+	if (lu_status->dump_state)
+		munmap(lu_status->dump_state, lu_status->dump_size);
+#endif
 	lu_status = NULL;
 
 	return 0;
@@ -274,6 +290,31 @@ static const char *lu_arch(const void *ctx, struct connection *conn,
 	errno = EINVAL;
 	return NULL;
 }
+
+static FILE *lu_dump_open(const void *ctx)
+{
+	lu_status->dump_size = ROUNDUP(talloc_total_size(NULL) * 2,
+				       XC_PAGE_SHIFT);
+	lu_status->dump_state = mmap(NULL, lu_status->dump_size,
+				     PROT_READ | PROT_WRITE,
+				     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (lu_status->dump_state == MAP_FAILED)
+		return NULL;
+
+	return fmemopen(lu_status->dump_state, lu_status->dump_size, "w");
+}
+
+static void lu_dump_close(FILE *fp)
+{
+	size_t size;
+
+	size = ftell(fp);
+	size = ROUNDUP(size, XC_PAGE_SHIFT);
+	munmap(lu_status->dump_state + size, lu_status->dump_size - size);
+	lu_status->dump_size = size;
+
+	fclose(fp);
+}
 #else
 static const char *lu_binary(const void *ctx, struct connection *conn,
 			     const char *filename)
@@ -307,6 +348,27 @@ static const char *lu_arch(const void *ctx, struct connection *conn,
 
 	errno = EINVAL;
 	return NULL;
+}
+
+static FILE *lu_dump_open(const void *ctx)
+{
+	char *filename;
+	int fd;
+
+	filename = talloc_asprintf(ctx, "%s/state_dump", xs_daemon_rootdir());
+	if (!filename)
+		return NULL;
+
+	fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	if (fd < 0)
+		return NULL;
+
+	return fdopen(fd, "w");
+}
+
+static void lu_dump_close(FILE *fp)
+{
+	fclose(fp);
 }
 #endif
 
@@ -347,7 +409,45 @@ static const char *lu_reject_reason(const void *ctx)
 
 static const char *lu_dump_state(const void *ctx, struct connection *conn)
 {
-	return NULL;
+	FILE *fp;
+	const char *ret;
+	struct xs_state_record_header end;
+	struct xs_state_preamble pre;
+
+	fp = lu_dump_open(ctx);
+	if (!fp)
+		return "Dump state open error";
+
+	memcpy(pre.ident, XS_STATE_IDENT, sizeof(pre.ident));
+	pre.version = htobe32(XS_STATE_VERSION);
+	pre.flags = XS_STATE_FLAGS;
+	if (fwrite(&pre, sizeof(pre), 1, fp) != 1) {
+		ret = "Dump write error";
+		goto out;
+	}
+
+	ret = dump_state_global(fp);
+	if (ret)
+		goto out;
+	ret = dump_state_connections(fp, conn);
+	if (ret)
+		goto out;
+	ret = dump_state_special_nodes(fp);
+	if (ret)
+		goto out;
+	ret = dump_state_nodes(fp, ctx);
+	if (ret)
+		goto out;
+
+	end.type = XS_STATE_TYPE_END;
+	end.length = 0;
+	if (fwrite(&end, sizeof(end), 1, fp) != 1)
+		ret = "Dump write error";
+
+ out:
+	lu_dump_close(fp);
+
+	return ret;
 }
 
 static const char *lu_activate_binary(const void *ctx)

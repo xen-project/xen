@@ -72,6 +72,19 @@ static bool is_child(const char *child, const char *parent)
 	return child[len] == '/' || child[len] == '\0';
 }
 
+static const char *get_watch_path(const struct watch *watch, const char *name)
+{
+	const char *path = name;
+
+	if (watch->relative_path) {
+		path += strlen(watch->relative_path);
+		if (*path == '/') /* Could be "" */
+			path++;
+	}
+
+	return path;
+}
+
 /*
  * Send a watch event.
  * Temporary memory allocations are done with ctx.
@@ -85,11 +98,7 @@ static void add_event(struct connection *conn,
 	unsigned int len;
 	char *data;
 
-	if (watch->relative_path) {
-		name += strlen(watch->relative_path);
-		if (*name == '/') /* Could be "" */
-			name++;
-	}
+	name = get_watch_path(watch, name);
 
 	len = strlen(name) + 1 + strlen(watch->token) + 1;
 	/* Don't try to send over-long events. */
@@ -289,6 +298,44 @@ void conn_delete_all_watches(struct connection *conn)
 		talloc_free(watch);
 		domain_watch_dec(conn);
 	}
+}
+
+const char *dump_state_watches(FILE *fp, struct connection *conn,
+			       unsigned int conn_id)
+{
+	const char *ret = NULL;
+	struct watch *watch;
+	struct xs_state_watch sw;
+	struct xs_state_record_header head;
+	const char *path;
+
+	head.type = XS_STATE_TYPE_WATCH;
+
+	list_for_each_entry(watch, &conn->watches, list) {
+		head.length = sizeof(sw);
+
+		sw.conn_id = conn_id;
+		path = get_watch_path(watch, watch->node);
+		sw.path_length = strlen(path) + 1;
+		sw.token_length = strlen(watch->token) + 1;
+		head.length += sw.path_length + sw.token_length;
+		head.length = ROUNDUP(head.length, 3);
+		if (fwrite(&head, sizeof(head), 1, fp) != 1)
+			return "Dump watch state error";
+		if (fwrite(&sw, sizeof(sw), 1, fp) != 1)
+			return "Dump watch state error";
+
+		if (fwrite(path, sw.path_length, 1, fp) != 1)
+			return "Dump watch path error";
+		if (fwrite(watch->token, sw.token_length, 1, fp) != 1)
+			return "Dump watch token error";
+
+		ret = dump_state_align(fp);
+		if (ret)
+			return ret;
+	}
+
+	return ret;
 }
 
 /*

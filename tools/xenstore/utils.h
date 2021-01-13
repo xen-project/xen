@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <xen-tools/libs.h>
 
@@ -20,6 +21,11 @@ static inline bool strends(const char *a, const char *b)
 
 	return streq(a + strlen(a) - strlen(b), b);
 }
+
+/*
+ * Write NUL bytes for aligning state data to 8 bytes.
+ */
+const char *dump_state_align(FILE *fp);
 
 void barf(const char *fmt, ...) __attribute__((noreturn));
 void barf_perror(const char *fmt, ...) __attribute__((noreturn));

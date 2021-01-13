@@ -62,3 +62,20 @@ void barf_perror(const char *fmt, ...)
 	}
 	exit(1);
 }
+
+const char *dump_state_align(FILE *fp)
+{
+	long len;
+	static char nul[8] = {};
+
+	len = ftell(fp);
+	if (len < 0)
+		return "Dump state align error";
+	len &= 7;
+	if (!len)
+		return NULL;
+
+	if (fwrite(nul, 8 - len, 1, fp) != 1)
+		return "Dump state align error";
+	return NULL;
+}

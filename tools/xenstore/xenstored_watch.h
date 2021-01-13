@@ -30,4 +30,7 @@ void fire_watches(struct connection *conn, const void *tmp, const char *name,
 
 void conn_delete_all_watches(struct connection *conn);
 
+const char *dump_state_watches(FILE *fp, struct connection *conn,
+			       unsigned int conn_id);
+
 #endif /* _XENSTORED_WATCH_H */

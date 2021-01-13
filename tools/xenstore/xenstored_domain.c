@@ -1143,6 +1143,111 @@ void wrl_apply_debit_trans_commit(struct connection *conn)
 	wrl_apply_debit_actual(conn->domain);
 }
 
+const char *dump_state_connections(FILE *fp, struct connection *conn)
+{
+	const char *ret = NULL;
+	unsigned int conn_id = 1;
+	struct xs_state_connection sc;
+	struct xs_state_record_header head;
+	struct connection *c;
+
+	list_for_each_entry(c, &connections, list) {
+		head.type = XS_STATE_TYPE_CONN;
+		head.length = sizeof(sc);
+
+		sc.conn_id = conn_id++;
+		sc.pad = 0;
+		memset(&sc.spec, 0, sizeof(sc.spec));
+		if (c->domain) {
+			sc.conn_type = XS_STATE_CONN_TYPE_RING;
+			sc.spec.ring.domid = c->id;
+			sc.spec.ring.tdomid = c->target ? c->target->id
+						: DOMID_INVALID;
+			sc.spec.ring.evtchn = c->domain->port;
+		} else {
+			sc.conn_type = XS_STATE_CONN_TYPE_SOCKET;
+			sc.spec.socket_fd = c->fd;
+		}
+
+		ret = dump_state_buffered_data(NULL, c, conn, &sc);
+		if (ret)
+			return ret;
+		head.length += sc.data_in_len + sc.data_out_len;
+		head.length = ROUNDUP(head.length, 3);
+		if (fwrite(&head, sizeof(head), 1, fp) != 1)
+			return "Dump connection state error";
+		if (fwrite(&sc, offsetof(struct xs_state_connection, data),
+			   1, fp) != 1)
+			return "Dump connection state error";
+		ret = dump_state_buffered_data(fp, c, conn, NULL);
+		if (ret)
+			return ret;
+		ret = dump_state_align(fp);
+		if (ret)
+			return ret;
+
+		ret = dump_state_watches(fp, c, sc.conn_id);
+		if (ret)
+			return ret;
+	}
+
+	return ret;
+}
+
+static const char *dump_state_special_node(FILE *fp, const char *name,
+					   const struct node_perms *perms)
+{
+	struct xs_state_record_header head;
+	struct xs_state_node sn;
+	unsigned int pathlen;
+	const char *ret;
+
+	pathlen = strlen(name) + 1;
+
+	head.type = XS_STATE_TYPE_NODE;
+	head.length = sizeof(sn);
+
+	sn.conn_id = 0;
+	sn.ta_id = 0;
+	sn.ta_access = 0;
+	sn.perm_n = perms->num;
+	sn.path_len = pathlen;
+	sn.data_len = 0;
+	head.length += perms->num * sizeof(*sn.perms);
+	head.length += pathlen;
+	head.length = ROUNDUP(head.length, 3);
+	if (fwrite(&head, sizeof(head), 1, fp) != 1)
+		return "Dump special node error";
+	if (fwrite(&sn, sizeof(sn), 1, fp) != 1)
+		return "Dump special node error";
+
+	ret = dump_state_node_perms(fp, &sn, perms->p, perms->num);
+	if (ret)
+		return ret;
+
+	if (fwrite(name, pathlen, 1, fp) != 1)
+		return "Dump special node path error";
+
+	ret = dump_state_align(fp);
+
+	return ret;
+}
+
+const char *dump_state_special_nodes(FILE *fp)
+{
+	const char *ret;
+
+	ret = dump_state_special_node(fp, "@releaseDomain",
+				      &dom_release_perms);
+	if (ret)
+		return ret;
+
+	ret = dump_state_special_node(fp, "@introduceDomain",
+				      &dom_introduce_perms);
+
+	return ret;
+}
+
 /*
  * Local variables:
  *  mode: C

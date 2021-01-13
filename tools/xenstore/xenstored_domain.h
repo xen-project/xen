@@ -97,4 +97,7 @@ void wrl_log_periodic(struct wrl_timestampt now);
 void wrl_apply_debit_direct(struct connection *conn);
 void wrl_apply_debit_trans_commit(struct connection *conn);
 
+const char *dump_state_connections(FILE *fp, struct connection *conn);
+const char *dump_state_special_nodes(FILE *fp);
+
 #endif /* _XENSTORED_DOMAIN_H */

@@ -2279,6 +2279,219 @@ int main(int argc, char *argv[])
 	}
 }
 
+const char *dump_state_global(FILE *fp)
+{
+	struct xs_state_record_header head;
+	struct xs_state_global glb;
+
+	head.type = XS_STATE_TYPE_GLOBAL;
+	head.length = sizeof(glb);
+	if (fwrite(&head, sizeof(head), 1, fp) != 1)
+		return "Dump global state error";
+	glb.socket_fd = sock;
+	glb.evtchn_fd = xenevtchn_fd(xce_handle);
+	if (fwrite(&glb, sizeof(glb), 1, fp) != 1)
+		return "Dump global state error";
+
+	return NULL;
+}
+
+/* Called twice: first with fp == NULL to get length, then for writing data. */
+const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
+				     const struct connection *conn,
+				     struct xs_state_connection *sc)
+{
+	unsigned int len = 0, used;
+	struct buffered_data *out, *in = c->in;
+	bool partial = true;
+
+	if (in && c != conn) {
+		len = in->inhdr ? in->used : sizeof(in->hdr);
+		if (fp && fwrite(&in->hdr, len, 1, fp) != 1)
+			return "Dump read data error";
+		if (!in->inhdr && in->used) {
+			len += in->used;
+			if (fp && fwrite(in->buffer, in->used, 1, fp) != 1)
+				return "Dump read data error";
+		}
+	}
+
+	if (sc) {
+		sc->data_in_len = len;
+		sc->data_resp_len = 0;
+	}
+
+	len = 0;
+
+	list_for_each_entry(out, &c->out_list, list) {
+		used = out->used;
+		if (out->inhdr) {
+			if (!used)
+				partial = false;
+			if (fp && fwrite(out->hdr.raw + out->used,
+				  sizeof(out->hdr) - out->used, 1, fp) != 1)
+				return "Dump buffered data error";
+			len += sizeof(out->hdr) - out->used;
+			used = 0;
+		}
+		if (fp && out->hdr.msg.len &&
+		    fwrite(out->buffer + used, out->hdr.msg.len - used,
+			   1, fp) != 1)
+			return "Dump buffered data error";
+		len += out->hdr.msg.len - used;
+		if (partial && sc)
+			sc->data_resp_len = len;
+		partial = false;
+	}
+
+	/* Add "OK" for live-update command. */
+	if (c == conn) {
+		struct xsd_sockmsg msg = conn->in->hdr.msg;
+
+		msg.len = sizeof("OK");
+		if (fp && fwrite(&msg, sizeof(msg), 1, fp) != 1)
+			return "Dump buffered data error";
+		len += sizeof(msg);
+		if (fp && fwrite("OK", msg.len, 1, fp) != 1)
+
+			return "Dump buffered data error";
+		len += msg.len;
+	}
+
+	if (sc)
+		sc->data_out_len = len;
+
+	return NULL;
+}
+
+const char *dump_state_node_perms(FILE *fp, struct xs_state_node *sn,
+				  const struct xs_permissions *perms,
+				  unsigned int n_perms)
+{
+	unsigned int p;
+
+	for (p = 0; p < n_perms; p++) {
+		switch ((int)perms[p].perms & ~XS_PERM_IGNORE) {
+		case XS_PERM_READ:
+			sn->perms[p].access = XS_STATE_NODE_PERM_READ;
+			break;
+		case XS_PERM_WRITE:
+			sn->perms[p].access = XS_STATE_NODE_PERM_WRITE;
+			break;
+		case XS_PERM_READ | XS_PERM_WRITE:
+			sn->perms[p].access = XS_STATE_NODE_PERM_BOTH;
+			break;
+		default:
+			sn->perms[p].access = XS_STATE_NODE_PERM_NONE;
+			break;
+		}
+		sn->perms[p].flags = (perms[p].perms & XS_PERM_IGNORE)
+				     ? XS_STATE_NODE_PERM_IGNORE : 0;
+		sn->perms[p].domid = perms[p].id;
+	}
+
+	if (fwrite(sn->perms, sizeof(*sn->perms), n_perms, fp) != n_perms)
+		return "Dump node permissions error";
+
+	return NULL;
+}
+
+static const char *dump_state_node_tree(FILE *fp, char *path)
+{
+	unsigned int pathlen, childlen, p = 0;
+	struct xs_state_record_header head;
+	struct xs_state_node sn;
+	TDB_DATA key, data;
+	const struct xs_tdb_record_hdr *hdr;
+	const char *child;
+	const char *ret;
+
+	pathlen = strlen(path) + 1;
+
+	set_tdb_key(path, &key);
+	data = tdb_fetch(tdb_ctx, key);
+	if (data.dptr == NULL)
+		return "Error reading node";
+
+	/* Clean up in case of failure. */
+	talloc_steal(path, data.dptr);
+
+	hdr = (void *)data.dptr;
+
+	head.type = XS_STATE_TYPE_NODE;
+	head.length = sizeof(sn);
+	sn.conn_id = 0;
+	sn.ta_id = 0;
+	sn.ta_access = 0;
+	sn.perm_n = hdr->num_perms;
+	sn.path_len = pathlen;
+	sn.data_len = hdr->datalen;
+	head.length += hdr->num_perms * sizeof(*sn.perms);
+	head.length += pathlen;
+	head.length += hdr->datalen;
+	head.length = ROUNDUP(head.length, 3);
+
+	if (fwrite(&head, sizeof(head), 1, fp) != 1)
+		return "Dump node state error";
+	if (fwrite(&sn, sizeof(sn), 1, fp) != 1)
+		return "Dump node state error";
+
+	ret = dump_state_node_perms(fp, &sn, hdr->perms, hdr->num_perms);
+	if (ret)
+		return ret;
+
+	if (fwrite(path, pathlen, 1, fp) != 1)
+		return "Dump node path error";
+	if (hdr->datalen &&
+	    fwrite(hdr->perms + hdr->num_perms, hdr->datalen, 1, fp) != 1)
+		return "Dump node data error";
+
+	ret = dump_state_align(fp);
+	if (ret)
+		return ret;
+
+	child = (char *)(hdr->perms + hdr->num_perms) + hdr->datalen;
+
+	/*
+	 * Use path for constructing children paths.
+	 * As we don't write out nodes without having written their parent
+	 * already we will never clobber a part of the path we'll need later.
+	 */
+	pathlen--;
+	if (path[pathlen - 1] != '/') {
+		path[pathlen] = '/';
+		pathlen++;
+	}
+	while (p < hdr->childlen) {
+		childlen = strlen(child) + 1;
+		if (pathlen + childlen > XENSTORE_ABS_PATH_MAX)
+			return "Dump node path length error";
+		strcpy(path + pathlen, child);
+		ret = dump_state_node_tree(fp, path);
+		if (ret)
+			return ret;
+		p += childlen;
+		child += childlen;
+	}
+
+	talloc_free(data.dptr);
+
+	return NULL;
+}
+
+const char *dump_state_nodes(FILE *fp, const void *ctx)
+{
+	char *path;
+
+	path = talloc_size(ctx, XENSTORE_ABS_PATH_MAX);
+	if (!path)
+		return "Path buffer allocation error";
+
+	strcpy(path, "/");
+
+	return dump_state_node_tree(fp, path);
+}
+
 /*
  * Local variables:
  *  mode: C

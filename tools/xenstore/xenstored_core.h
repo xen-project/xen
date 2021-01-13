@@ -30,6 +30,7 @@
 #include <errno.h>
 
 #include "xenstore_lib.h"
+#include "xenstore_state.h"
 #include "list.h"
 #include "tdb.h"
 #include "hashtable.h"
@@ -40,6 +41,8 @@
 typedef int32_t wrl_creditt;
 #define WRL_CREDIT_MAX (1000*1000*1000)
 /* ^ satisfies non-overflow condition for wrl_xfer_credit */
+
+struct xs_state_connection;
 
 struct buffered_data
 {
@@ -244,6 +247,15 @@ extern xengnttab_handle **xgt_handle;
 int remember_string(struct hashtable *hash, const char *str);
 
 void set_tdb_key(const char *name, TDB_DATA *key);
+
+const char *dump_state_global(FILE *fp);
+const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
+				     const struct connection *conn,
+				     struct xs_state_connection *sc);
+const char *dump_state_nodes(FILE *fp, const void *ctx);
+const char *dump_state_node_perms(FILE *fp, struct xs_state_node *sn,
+				  const struct xs_permissions *perms,
+				  unsigned int n_perms);
 
 #endif /* _XENSTORED_CORE_H */
 
