@@ -453,6 +453,11 @@ static const char *lu_dump_state(const void *ctx, struct connection *conn)
 	return ret;
 }
 
+void lu_read_state(void)
+{
+	xprintf("live-update: read state\n");
+}
+
 static const char *lu_activate_binary(const void *ctx)
 {
 	return "Not yet implemented.";

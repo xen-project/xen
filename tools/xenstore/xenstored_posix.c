@@ -85,7 +85,6 @@ void finish_daemonize(void)
 	dup2(devnull, STDOUT_FILENO);
 	dup2(devnull, STDERR_FILENO);
 	close(devnull);
-	xprintf = trace;
 }
 
 void init_pipe(int reopen_log_pipe[2])
