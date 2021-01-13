@@ -355,7 +355,7 @@ static struct domain *find_or_alloc_domain(const void *ctx, unsigned int domid)
 	return domain ? : alloc_domain(ctx, domid);
 }
 
-static int new_domain(struct domain *domain, int port)
+static int new_domain(struct domain *domain, int port, bool restore)
 {
 	int rc;
 
@@ -369,11 +369,16 @@ static int new_domain(struct domain *domain, int port)
 
 	wrl_domain_new(domain);
 
-	/* Tell kernel we're interested in this event. */
-	rc = xenevtchn_bind_interdomain(xce_handle, domain->domid, port);
-	if (rc == -1)
-		return errno;
-	domain->port = rc;
+	if (restore)
+		domain->port = port;
+	else {
+		/* Tell kernel we're interested in this event. */
+		rc = xenevtchn_bind_interdomain(xce_handle, domain->domid,
+						port);
+		if (rc == -1)
+			return errno;
+		domain->port = rc;
+	}
 
 	domain->introduced = true;
 
@@ -423,7 +428,7 @@ static void domain_conn_reset(struct domain *domain)
 
 static struct domain *introduce_domain(const void *ctx,
 				       unsigned int domid,
-				       evtchn_port_t port)
+				       evtchn_port_t port, bool restore)
 {
 	struct domain *domain;
 	int rc;
@@ -439,7 +444,7 @@ static struct domain *introduce_domain(const void *ctx,
 					     : map_interface(domid);
 		if (!interface)
 			return NULL;
-		if (new_domain(domain, port)) {
+		if (new_domain(domain, port, restore)) {
 			rc = errno;
 			if (is_master_domain)
 				unmap_xenbus(interface);
@@ -453,7 +458,7 @@ static struct domain *introduce_domain(const void *ctx,
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
 
-		if (!is_master_domain)
+		if (!is_master_domain && !restore)
 			fire_watches(NULL, ctx, "@introduceDomain", NULL,
 				     false, NULL);
 	} else {
@@ -486,7 +491,7 @@ int do_introduce(struct connection *conn, struct buffered_data *in)
 	if (port <= 0)
 		return EINVAL;
 
-	domain = introduce_domain(in, domid, port);
+	domain = introduce_domain(in, domid, port, false);
 	if (!domain)
 		return errno;
 
@@ -715,7 +720,7 @@ void dom0_init(void)
 	if (port == -1)
 		barf_perror("Failed to initialize dom0 port");
 
-	dom0 = introduce_domain(NULL, xenbus_master_domid(), port);
+	dom0 = introduce_domain(NULL, xenbus_master_domid(), port, false);
 	if (!dom0)
 		barf_perror("Failed to initialize dom0");
 
@@ -1259,6 +1264,39 @@ const char *dump_state_special_nodes(FILE *fp)
 				      &dom_introduce_perms);
 
 	return ret;
+}
+
+void read_state_connection(const void *ctx, const void *state)
+{
+	const struct xs_state_connection *sc = state;
+	struct connection *conn;
+	struct domain *domain, *tdomain;
+
+	if (sc->conn_type == XS_STATE_CONN_TYPE_SOCKET) {
+		conn = new_connection(writefd, readfd);
+		if (!conn)
+			barf("error restoring connection");
+		conn->fd = sc->spec.socket_fd;
+	} else {
+		domain = introduce_domain(ctx, sc->spec.ring.domid,
+					  sc->spec.ring.evtchn, true);
+		if (!domain)
+			barf("domain allocation error");
+
+		if (sc->spec.ring.tdomid != DOMID_INVALID) {
+			tdomain = find_or_alloc_domain(ctx,
+						       sc->spec.ring.tdomid);
+			if (!tdomain)
+				barf("target domain allocation error");
+			talloc_reference(domain->conn, tdomain->conn);
+			domain->conn->target = tdomain->conn;
+		}
+		conn = domain->conn;
+	}
+
+	conn->conn_id = sc->conn_id;
+
+	read_state_buffered_data(ctx, conn, sc);
 }
 
 /*

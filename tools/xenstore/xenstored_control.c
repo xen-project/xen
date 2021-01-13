@@ -539,6 +539,7 @@ void lu_read_state(void)
 			read_state_global(ctx, head + 1);
 			break;
 		case XS_STATE_TYPE_CONN:
+			read_state_connection(ctx, head + 1);
 			break;
 		case XS_STATE_TYPE_WATCH:
 			break;

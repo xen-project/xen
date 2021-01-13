@@ -1582,12 +1582,35 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	return new;
 }
 
+struct connection *get_connection_by_id(unsigned int conn_id)
+{
+	struct connection *conn;
+
+	list_for_each_entry(conn, &connections, list)
+		if (conn->conn_id == conn_id)
+			return conn;
+
+	return NULL;
+}
+
 #ifdef NO_SOCKETS
 static void accept_connection(int sock)
 {
 }
+
+int writefd(struct connection *conn, const void *data, unsigned int len)
+{
+	errno = EBADF;
+	return -1;
+}
+
+int readfd(struct connection *conn, void *data, unsigned int len)
+{
+	errno = EBADF;
+	return -1;
+}
 #else
-static int writefd(struct connection *conn, const void *data, unsigned int len)
+int writefd(struct connection *conn, const void *data, unsigned int len)
 {
 	int rc;
 
@@ -1603,7 +1626,7 @@ static int writefd(struct connection *conn, const void *data, unsigned int len)
 	return rc;
 }
 
-static int readfd(struct connection *conn, void *data, unsigned int len)
+int readfd(struct connection *conn, void *data, unsigned int len)
 {
 	int rc;
 
@@ -2519,6 +2542,81 @@ void read_state_global(const void *ctx, const void *state)
 	sock = glb->socket_fd;
 
 	domain_init(glb->evtchn_fd);
+}
+
+static void add_buffered_data(struct buffered_data *bdata,
+			      struct connection *conn, const uint8_t *data,
+			      unsigned int len)
+{
+	bdata->hdr.msg.len = len;
+	if (len <= DEFAULT_BUFFER_SIZE)
+		bdata->buffer = bdata->default_buffer;
+	else
+		bdata->buffer = talloc_array(bdata, char, len);
+	if (!bdata->buffer)
+		barf("error restoring buffered data");
+
+	memcpy(bdata->buffer, data, len);
+
+	/* Queue for later transmission. */
+	list_add_tail(&bdata->list, &conn->out_list);
+}
+
+void read_state_buffered_data(const void *ctx, struct connection *conn,
+			      const struct xs_state_connection *sc)
+{
+	struct buffered_data *bdata;
+	const uint8_t *data;
+	unsigned int len;
+	bool partial = sc->data_resp_len;
+
+	if (sc->data_in_len) {
+		bdata = new_buffer(conn);
+		if (!bdata)
+			barf("error restoring read data");
+		if (sc->data_in_len < sizeof(bdata->hdr)) {
+			bdata->inhdr = true;
+			memcpy(&bdata->hdr, sc->data, sc->data_in_len);
+			bdata->used = sc->data_in_len;
+		} else {
+			bdata->inhdr = false;
+			memcpy(&bdata->hdr, sc->data, sizeof(bdata->hdr));
+			if (bdata->hdr.msg.len <= DEFAULT_BUFFER_SIZE)
+				bdata->buffer = bdata->default_buffer;
+			else
+				bdata->buffer = talloc_array(bdata, char,
+							bdata->hdr.msg.len);
+			if (!bdata->buffer)
+				barf("Error allocating in buffer");
+			bdata->used = sc->data_in_len - sizeof(bdata->hdr);
+			memcpy(bdata->buffer, sc->data + sizeof(bdata->hdr),
+			       bdata->used);
+		}
+
+		conn->in = bdata;
+	}
+
+	for (data = sc->data + sc->data_in_len;
+	     data < sc->data + sc->data_in_len + sc->data_out_len;
+	     data += len) {
+		bdata = new_buffer(conn);
+		if (!bdata)
+			barf("error restoring buffered data");
+		if (partial) {
+			bdata->inhdr = false;
+			/* Make trace look nice. */
+			bdata->hdr.msg.type = XS_INVALID;
+			len = sc->data_resp_len;
+			add_buffered_data(bdata, conn, data, len);
+			partial = false;
+			continue;
+		}
+
+		memcpy(&bdata->hdr, data, sizeof(bdata->hdr));
+		data += sizeof(bdata->hdr);
+		len = bdata->hdr.msg.len;
+		add_buffered_data(bdata, conn, data, len);
+	}
 }
 
 /*

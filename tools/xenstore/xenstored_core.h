@@ -135,6 +135,9 @@ struct connection
 	/* Methods for communicating over this connection: write can be NULL */
 	connwritefn_t *write;
 	connreadfn_t *read;
+
+	/* Support for live update: connection id. */
+	unsigned int conn_id;
 };
 extern struct list_head connections;
 
@@ -195,6 +198,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 		       const char *name);
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
+struct connection *get_connection_by_id(unsigned int conn_id);
 void check_store(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
 enum xs_perm_type perm_for_conn(struct connection *conn,
@@ -250,6 +254,10 @@ void finish_daemonize(void);
 /* Open a pipe for signal handling */
 void init_pipe(int reopen_log_pipe[2]);
 
+int writefd(struct connection *conn, const void *data, unsigned int len);
+int readfd(struct connection *conn, void *data, unsigned int len);
+
+extern struct interface_funcs socket_funcs;
 extern xengnttab_handle **xgt_handle;
 
 int remember_string(struct hashtable *hash, const char *str);
@@ -266,6 +274,8 @@ const char *dump_state_node_perms(FILE *fp, struct xs_state_node *sn,
 				  unsigned int n_perms);
 
 void read_state_global(const void *ctx, const void *state);
+void read_state_buffered_data(const void *ctx, struct connection *conn,
+			      const struct xs_state_connection *sc);
 
 #endif /* _XENSTORED_CORE_H */
 

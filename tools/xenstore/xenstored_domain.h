@@ -101,4 +101,6 @@ void wrl_apply_debit_trans_commit(struct connection *conn);
 const char *dump_state_connections(FILE *fp, struct connection *conn);
 const char *dump_state_special_nodes(FILE *fp);
 
+void read_state_connection(const void *ctx, const void *state);
+
 #endif /* _XENSTORED_DOMAIN_H */
