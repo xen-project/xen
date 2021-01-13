@@ -326,7 +326,7 @@ static struct domain *find_domain_struct(unsigned int domid)
 	return NULL;
 }
 
-static struct domain *alloc_domain(void *context, unsigned int domid)
+static struct domain *alloc_domain(const void *context, unsigned int domid)
 {
 	struct domain *domain;
 
@@ -345,6 +345,14 @@ static struct domain *alloc_domain(void *context, unsigned int domid)
 	list_add(&domain->list, &domains);
 
 	return domain;
+}
+
+static struct domain *find_or_alloc_domain(const void *ctx, unsigned int domid)
+{
+	struct domain *domain;
+
+	domain = find_domain_struct(domid);
+	return domain ? : alloc_domain(ctx, domid);
 }
 
 static int new_domain(struct domain *domain, int port)
@@ -413,6 +421,52 @@ static void domain_conn_reset(struct domain *domain)
 	domain->interface->rsp_cons = domain->interface->rsp_prod = 0;
 }
 
+static struct domain *introduce_domain(const void *ctx,
+				       unsigned int domid,
+				       evtchn_port_t port)
+{
+	struct domain *domain;
+	int rc;
+	struct xenstore_domain_interface *interface;
+	bool is_master_domain = (domid == xenbus_master_domid());
+
+	domain = find_or_alloc_domain(ctx, domid);
+	if (!domain)
+		return NULL;
+
+	if (!domain->introduced) {
+		interface = is_master_domain ? xenbus_map()
+					     : map_interface(domid);
+		if (!interface)
+			return NULL;
+		if (new_domain(domain, port)) {
+			rc = errno;
+			if (is_master_domain)
+				unmap_xenbus(interface);
+			else
+				unmap_interface(interface);
+			errno = rc;
+			return NULL;
+		}
+		domain->interface = interface;
+
+		/* Now domain belongs to its connection. */
+		talloc_steal(domain->conn, domain);
+
+		if (!is_master_domain)
+			fire_watches(NULL, ctx, "@introduceDomain", NULL,
+				     false, NULL);
+	} else {
+		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
+		if (domain->port)
+			xenevtchn_unbind(xce_handle, domain->port);
+		rc = xenevtchn_bind_interdomain(xce_handle, domid, port);
+		domain->port = (rc == -1) ? 0 : rc;
+	}
+
+	return domain;
+}
+
 /* domid, gfn, evtchn, path */
 int do_introduce(struct connection *conn, struct buffered_data *in)
 {
@@ -420,8 +474,6 @@ int do_introduce(struct connection *conn, struct buffered_data *in)
 	char *vec[3];
 	unsigned int domid;
 	evtchn_port_t port;
-	int rc;
-	struct xenstore_domain_interface *interface;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
 		return EINVAL;
@@ -434,38 +486,9 @@ int do_introduce(struct connection *conn, struct buffered_data *in)
 	if (port <= 0)
 		return EINVAL;
 
-	domain = find_domain_struct(domid);
-
-	if (domain == NULL) {
-		/* Hang domain off "in" until we're finished. */
-		domain = alloc_domain(in, domid);
-		if (domain == NULL)
-			return ENOMEM;
-	}
-
-	if (!domain->introduced) {
-		interface = map_interface(domid);
-		if (!interface)
-			return errno;
-		/* Hang domain off "in" until we're finished. */
-		if (new_domain(domain, port)) {
-			rc = errno;
-			unmap_interface(interface);
-			return rc;
-		}
-		domain->interface = interface;
-
-		/* Now domain belongs to its connection. */
-		talloc_steal(domain->conn, domain);
-
-		fire_watches(NULL, in, "@introduceDomain", NULL, false, NULL);
-	} else {
-		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
-		if (domain->port)
-			xenevtchn_unbind(xce_handle, domain->port);
-		rc = xenevtchn_bind_interdomain(xce_handle, domid, port);
-		domain->port = (rc == -1) ? 0 : rc;
-	}
+	domain = introduce_domain(in, domid, port);
+	if (!domain)
+		return errno;
 
 	domain_conn_reset(domain);
 
@@ -692,17 +715,9 @@ static int dom0_init(void)
 	if (port == -1)
 		return -1;
 
-	dom0 = alloc_domain(NULL, xenbus_master_domid());
+	dom0 = introduce_domain(NULL, xenbus_master_domid(), port);
 	if (!dom0)
 		return -1;
-	if (new_domain(dom0, port))
-		return -1;
-
-	dom0->interface = xenbus_map();
-	if (dom0->interface == NULL)
-		return -1;
-
-	talloc_steal(dom0->conn, dom0); 
 
 	xenevtchn_notify(xce_handle, dom0->port);
 
