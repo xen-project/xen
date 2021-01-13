@@ -547,6 +547,7 @@ void lu_read_state(void)
 			xprintf("live-update: ignore transaction record\n");
 			break;
 		case XS_STATE_TYPE_NODE:
+			read_state_node(ctx, head + 1);
 			break;
 		default:
 			xprintf("live-update: unknown state record %08x\n",

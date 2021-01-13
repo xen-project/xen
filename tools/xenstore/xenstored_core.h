@@ -276,6 +276,7 @@ const char *dump_state_node_perms(FILE *fp, struct xs_state_node *sn,
 void read_state_global(const void *ctx, const void *state);
 void read_state_buffered_data(const void *ctx, struct connection *conn,
 			      const struct xs_state_connection *sc);
+void read_state_node(const void *ctx, const void *state);
 
 #endif /* _XENSTORED_CORE_H */
 

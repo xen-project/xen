@@ -979,13 +979,30 @@ static char *basename(const char *name)
 	return strrchr(name, '/') + 1;
 }
 
-static struct node *construct_node(struct connection *conn, const void *ctx,
-				   const char *name)
+static int add_child(const void *ctx, struct node *parent, const char *name)
 {
 	const char *base;
 	unsigned int baselen;
+	char *children;
+
+	base = basename(name);
+	baselen = strlen(base) + 1;
+	children = talloc_array(ctx, char, parent->childlen + baselen);
+	if (!children)
+		return ENOMEM;
+	memcpy(children, parent->children, parent->childlen);
+	memcpy(children + parent->childlen, base, baselen);
+	parent->children = children;
+	parent->childlen += baselen;
+
+	return 0;
+}
+
+static struct node *construct_node(struct connection *conn, const void *ctx,
+				   const char *name)
+{
 	struct node *parent, *node;
-	char *children, *parentname = get_parent(ctx, name);
+	char *parentname = get_parent(ctx, name);
 
 	if (!parentname)
 		return NULL;
@@ -998,15 +1015,8 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 		return NULL;
 
 	/* Add child to parent. */
-	base = basename(name);
-	baselen = strlen(base) + 1;
-	children = talloc_array(ctx, char, parent->childlen + baselen);
-	if (!children)
+	if (add_child(ctx, parent, name))
 		goto nomem;
-	memcpy(children, parent->children, parent->childlen);
-	memcpy(children + parent->childlen, base, baselen);
-	parent->children = children;
-	parent->childlen += baselen;
 
 	/* Allocate node */
 	node = talloc(ctx, struct node);
@@ -2617,6 +2627,79 @@ void read_state_buffered_data(const void *ctx, struct connection *conn,
 		len = bdata->hdr.msg.len;
 		add_buffered_data(bdata, conn, data, len);
 	}
+}
+
+void read_state_node(const void *ctx, const void *state)
+{
+	const struct xs_state_node *sn = state;
+	struct node *node, *parent;
+	TDB_DATA key;
+	char *name, *parentname;
+	unsigned int i;
+	struct connection conn = { .id = priv_domid };
+
+	name = (char *)(sn->perms + sn->perm_n);
+	node = talloc(ctx, struct node);
+	if (!node)
+		barf("allocation error restoring node");
+
+	node->name = name;
+	node->generation = ++generation;
+	node->datalen = sn->data_len;
+	node->data = name + sn->path_len;
+	node->childlen = 0;
+	node->children = NULL;
+	node->perms.num = sn->perm_n;
+	node->perms.p = talloc_array(node, struct xs_permissions,
+				     node->perms.num);
+	if (!node->perms.p)
+		barf("allocation error restoring node");
+	for (i = 0; i < node->perms.num; i++) {
+		switch (sn->perms[i].access) {
+		case 'r':
+			node->perms.p[i].perms = XS_PERM_READ;
+			break;
+		case 'w':
+			node->perms.p[i].perms = XS_PERM_WRITE;
+			break;
+		case 'b':
+			node->perms.p[i].perms = XS_PERM_READ | XS_PERM_WRITE;
+			break;
+		default:
+			node->perms.p[i].perms = XS_PERM_NONE;
+			break;
+		}
+		if (sn->perms[i].flags & XS_STATE_NODE_PERM_IGNORE)
+			node->perms.p[i].perms |= XS_PERM_IGNORE;
+		node->perms.p[i].id = sn->perms[i].domid;
+	}
+
+	if (strstarts(name, "@")) {
+		set_perms_special(&conn, name, &node->perms);
+		talloc_free(node);
+		return;
+	}
+
+	parentname = get_parent(node, name);
+	if (!parentname)
+		barf("allocation error restoring node");
+	parent = read_node(NULL, node, parentname);
+	if (!parent)
+		barf("read parent error restoring node");
+
+	if (add_child(node, parent, name))
+		barf("allocation error restoring node");
+
+	set_tdb_key(parentname, &key);
+	if (write_node_raw(NULL, &key, parent, true))
+		barf("write parent error restoring node");
+
+	set_tdb_key(name, &key);
+	if (write_node_raw(NULL, &key, node, true))
+		barf("write node error restoring node");
+	domain_entry_inc(&conn, node);
+
+	talloc_free(node);
 }
 
 /*
