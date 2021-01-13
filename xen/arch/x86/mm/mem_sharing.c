@@ -1781,7 +1781,7 @@ static int fork(struct domain *cd, struct domain *d)
         domain_pause(d);
         cd->max_pages = d->max_pages;
         *cd->arch.cpuid = *d->arch.cpuid;
-        *cd->arch.msrs = *d->arch.msrs;
+        *cd->arch.msr = *d->arch.msr;
         cd->parent = d;
     }
 
