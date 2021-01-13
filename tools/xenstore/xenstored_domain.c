@@ -220,7 +220,7 @@ static bool get_domain_info(unsigned int domid, xc_dominfo_t *dominfo)
 	       dominfo->domid == domid;
 }
 
-static void domain_cleanup(void)
+void check_domains(bool restore)
 {
 	xc_dominfo_t dominfo;
 	struct domain *domain;
@@ -244,7 +244,14 @@ static void domain_cleanup(void)
 				domain->shutdown = true;
 				notify = 1;
 			}
-			if (!dominfo.dying)
+			/*
+			 * On Restore, we may have been unable to remap the
+			 * interface and the port. As we don't know whether
+			 * this was because of a dying domain, we need to
+			 * check if the interface and port are still valid.
+			 */
+			if (!dominfo.dying && domain->port &&
+			    domain->interface)
 				continue;
 		}
 		if (domain->conn) {
@@ -270,7 +277,7 @@ void handle_event(void)
 		barf_perror("Failed to read from event fd");
 
 	if (port == virq_port)
-		domain_cleanup();
+		check_domains(false);
 
 	if (xenevtchn_unmask(xce_handle, port) == -1)
 		barf_perror("Failed to write to event fd");
@@ -442,14 +449,16 @@ static struct domain *introduce_domain(const void *ctx,
 	if (!domain->introduced) {
 		interface = is_master_domain ? xenbus_map()
 					     : map_interface(domid);
-		if (!interface)
+		if (!interface && !restore)
 			return NULL;
 		if (new_domain(domain, port, restore)) {
 			rc = errno;
-			if (is_master_domain)
-				unmap_xenbus(interface);
-			else
-				unmap_interface(interface);
+			if (interface) {
+				if (is_master_domain)
+					unmap_xenbus(interface);
+				else
+					unmap_interface(interface);
+			}
 			errno = rc;
 			return NULL;
 		}

@@ -21,6 +21,8 @@
 
 void handle_event(void);
 
+void check_domains(bool restore);
+
 /* domid, mfn, eventchn, path */
 int do_introduce(struct connection *conn, struct buffered_data *in);
 

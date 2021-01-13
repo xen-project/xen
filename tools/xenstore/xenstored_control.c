@@ -561,6 +561,13 @@ void lu_read_state(void)
 	lu_close_dump_state(&state);
 
 	talloc_free(ctx);
+
+	/*
+	 * We may have missed the VIRQ_DOM_EXC notification and a domain may
+	 * have died while we were live-updating. So check all the domains are
+	 * still alive.
+	 */
+	check_domains(true);
 }
 
 static const char *lu_activate_binary(const void *ctx)
