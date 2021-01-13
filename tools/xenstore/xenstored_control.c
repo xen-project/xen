@@ -536,6 +536,7 @@ void lu_read_state(void)
 	     head = (void *)head + sizeof(*head) + head->length) {
 		switch (head->type) {
 		case XS_STATE_TYPE_GLOBAL:
+			read_state_global(ctx, head + 1);
 			break;
 		case XS_STATE_TYPE_CONN:
 			break;

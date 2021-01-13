@@ -2512,6 +2512,15 @@ const char *dump_state_nodes(FILE *fp, const void *ctx)
 	return dump_state_node_tree(fp, path);
 }
 
+void read_state_global(const void *ctx, const void *state)
+{
+	const struct xs_state_global *glb = state;
+
+	sock = glb->socket_fd;
+
+	domain_init(glb->evtchn_fd);
+}
+
 /*
  * Local variables:
  *  mode: C

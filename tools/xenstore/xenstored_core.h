@@ -265,6 +265,8 @@ const char *dump_state_node_perms(FILE *fp, struct xs_state_node *sn,
 				  const struct xs_permissions *perms,
 				  unsigned int n_perms);
 
+void read_state_global(const void *ctx, const void *state);
+
 #endif /* _XENSTORED_CORE_H */
 
 /*
