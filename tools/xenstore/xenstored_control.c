@@ -42,6 +42,8 @@ struct live_update {
 #else
 	char *filename;
 #endif
+
+	char *cmdline;
 };
 
 static struct live_update *lu_status;
@@ -210,6 +212,10 @@ static const char *lu_cmdline(const void *ctx, struct connection *conn,
 
 	if (!lu_status || lu_status->conn != conn)
 		return "Not in live-update session.";
+
+	lu_status->cmdline = talloc_strdup(lu_status, cmdline);
+	if (!lu_status->cmdline)
+		return "Allocation failure.";
 
 	return NULL;
 }
