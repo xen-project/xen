@@ -1,5 +1,5 @@
 /*
-    Interactive commands for Xen Store Daemon.
+Interactive commands for Xen Store Daemon.
     Copyright (C) 2017 Juergen Gross, SUSE Linux GmbH
 
     This program is free software; you can redistribute it and/or modify
@@ -22,6 +22,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "utils.h"
 #include "talloc.h"
@@ -31,6 +34,14 @@
 struct live_update {
 	/* For verification the correct connection is acting. */
 	struct connection *conn;
+
+#ifdef __MINIOS__
+	void *kernel;
+	unsigned int kernel_size;
+	unsigned int kernel_off;
+#else
+	char *filename;
+#endif
 };
 
 static struct live_update *lu_status;
@@ -215,6 +226,13 @@ static const char *lu_binary_alloc(const void *ctx, struct connection *conn,
 	if (ret)
 		return ret;
 
+	lu_status->kernel = talloc_size(lu_status, size);
+	if (!lu_status->kernel)
+		return "Allocation failure.";
+
+	lu_status->kernel_size = size;
+	lu_status->kernel_off = 0;
+
 	return NULL;
 }
 
@@ -223,6 +241,12 @@ static const char *lu_binary_save(const void *ctx, struct connection *conn,
 {
 	if (!lu_status || lu_status->conn != conn)
 		return "Not in live-update session.";
+
+	if (lu_status->kernel_off + size > lu_status->kernel_size)
+		return "Too much kernel data.";
+
+	memcpy(lu_status->kernel + lu_status->kernel_off, data, size);
+	lu_status->kernel_off += size;
 
 	return NULL;
 }
@@ -243,12 +267,22 @@ static const char *lu_binary(const void *ctx, struct connection *conn,
 			     const char *filename)
 {
 	const char *ret;
+	struct stat statbuf;
 
 	syslog(LOG_INFO, "live-update: binary %s\n", filename);
+
+	if (stat(filename, &statbuf))
+		return "File not accessible.";
+	if (!(statbuf.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
+		return "File not executable.";
 
 	ret = lu_begin(conn);
 	if (ret)
 		return ret;
+
+	lu_status->filename = talloc_strdup(lu_status, filename);
+	if (!lu_status->filename)
+		return "Allocation failure.";
 
 	return NULL;
 }
@@ -271,6 +305,11 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 
 	if (!lu_status || lu_status->conn != conn)
 		return "Not in live-update session.";
+
+#ifdef __MINIOS__
+	if (lu_status->kernel_size != lu_status->kernel_off)
+		return "Kernel not complete.";
+#endif
 
 	/* Will be replaced by real live-update later. */
 	talloc_free(lu_status);
