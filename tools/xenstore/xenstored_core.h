@@ -222,6 +222,9 @@ void dtrace_io(const struct connection *conn, const struct buffered_data *data, 
 void reopen_log(void);
 void close_log(void);
 
+extern int orig_argc;
+extern char **orig_argv;
+
 extern char *tracefile;
 extern int tracefd;
 
