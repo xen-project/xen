@@ -19,7 +19,9 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 
 #include "utils.h"
 #include "talloc.h"
@@ -149,12 +151,113 @@ static int do_control_print(void *ctx, struct connection *conn,
 	return 0;
 }
 
+static const char *lu_abort(const void *ctx, struct connection *conn)
+{
+	syslog(LOG_INFO, "live-update: abort\n");
+	return NULL;
+}
+
+static const char *lu_cmdline(const void *ctx, struct connection *conn,
+			      const char *cmdline)
+{
+	syslog(LOG_INFO, "live-update: cmdline %s\n", cmdline);
+	return NULL;
+}
+
+#ifdef __MINIOS__
+static const char *lu_binary_alloc(const void *ctx, struct connection *conn,
+				   unsigned long size)
+{
+	syslog(LOG_INFO, "live-update: binary size %lu\n", size);
+	return NULL;
+}
+
+static const char *lu_binary_save(const void *ctx, struct connection *conn,
+				  unsigned int size, const char *data)
+{
+	return NULL;
+}
+
+static const char *lu_arch(const void *ctx, struct connection *conn,
+			   char **vec, int num)
+{
+	if (num == 2 && !strcmp(vec[0], "-b"))
+		return lu_binary_alloc(ctx, conn, atol(vec[1]));
+	if (num > 2 && !strcmp(vec[0], "-d"))
+		return lu_binary_save(ctx, conn, atoi(vec[1]), vec[2]);
+
+	errno = EINVAL;
+	return NULL;
+}
+#else
+static const char *lu_binary(const void *ctx, struct connection *conn,
+			     const char *filename)
+{
+	syslog(LOG_INFO, "live-update: binary %s\n", filename);
+	return NULL;
+}
+
+static const char *lu_arch(const void *ctx, struct connection *conn,
+			   char **vec, int num)
+{
+	if (num == 2 && !strcmp(vec[0], "-f"))
+		return lu_binary(ctx, conn, vec[1]);
+
+	errno = EINVAL;
+	return NULL;
+}
+#endif
+
+static const char *lu_start(const void *ctx, struct connection *conn,
+			    bool force, unsigned int to)
+{
+	syslog(LOG_INFO, "live-update: start, force=%d, to=%u\n", force, to);
+	return NULL;
+}
+
 static int do_control_lu(void *ctx, struct connection *conn,
 			 char **vec, int num)
 {
 	const char *resp;
+	const char *ret = NULL;
+	unsigned int i;
+	bool force = false;
+	unsigned int to = 0;
 
-	resp = talloc_strdup(ctx, "NYI");
+	if (num < 1)
+		return EINVAL;
+
+	if (!strcmp(vec[0], "-a")) {
+		if (num == 1)
+			ret = lu_abort(ctx, conn);
+		else
+			return EINVAL;
+	} else if (!strcmp(vec[0], "-c")) {
+		if (num == 2)
+			ret = lu_cmdline(ctx, conn, vec[1]);
+		else
+			return EINVAL;
+	} else if (!strcmp(vec[0], "-s")) {
+		for (i = 1; i < num; i++) {
+			if (!strcmp(vec[i], "-F"))
+				force = true;
+			else if (!strcmp(vec[i], "-t") && i < num - 1) {
+				i++;
+				to = atoi(vec[i]);
+			} else
+				return EINVAL;
+		}
+		ret = lu_start(ctx, conn, force, to);
+	} else {
+		errno = 0;
+		ret = lu_arch(ctx, conn, vec, num);
+		if (errno)
+			return errno;
+	}
+
+	if (!ret)
+		ret = "OK";
+	resp = talloc_strdup(ctx, ret);
 	send_reply(conn, XS_CONTROL, resp, strlen(resp) + 1);
 	return 0;
 }
