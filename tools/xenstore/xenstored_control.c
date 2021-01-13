@@ -22,6 +22,7 @@ Interactive commands for Xen Store Daemon.
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -44,6 +45,11 @@ struct live_update {
 #endif
 
 	char *cmdline;
+
+	/* Start parameters. */
+	bool force;
+	unsigned int timeout;
+	time_t started_at;
 };
 
 static struct live_update *lu_status;
@@ -304,6 +310,58 @@ static const char *lu_arch(const void *ctx, struct connection *conn,
 }
 #endif
 
+static bool lu_check_lu_allowed(void)
+{
+	return true;
+}
+
+static const char *lu_reject_reason(const void *ctx)
+{
+	return "BUSY";
+}
+
+static const char *lu_dump_state(const void *ctx, struct connection *conn)
+{
+	return NULL;
+}
+
+static const char *lu_activate_binary(const void *ctx)
+{
+	return "Not yet implemented.";
+}
+
+static bool do_lu_start(struct delayed_request *req)
+{
+	time_t now = time(NULL);
+	const char *ret;
+	char *resp;
+
+	if (!lu_check_lu_allowed()) {
+		if (now < lu_status->started_at + lu_status->timeout)
+			return false;
+		if (!lu_status->force) {
+			ret = lu_reject_reason(req);
+			goto out;
+		}
+	}
+
+	/* Dump out internal state, including "OK" for live update. */
+	ret = lu_dump_state(req->in, lu_status->conn);
+	if (!ret) {
+		/* Perform the activation of new binary. */
+		ret = lu_activate_binary(req->in);
+	}
+
+	/* We will reach this point only in case of failure. */
+ out:
+	talloc_free(lu_status);
+
+	resp = talloc_strdup(req->in, ret);
+	send_reply(lu_status->conn, XS_CONTROL, resp, strlen(resp) + 1);
+
+	return true;
+}
+
 static const char *lu_start(const void *ctx, struct connection *conn,
 			    bool force, unsigned int to)
 {
@@ -317,8 +375,11 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 		return "Kernel not complete.";
 #endif
 
-	/* Will be replaced by real live-update later. */
-	talloc_free(lu_status);
+	lu_status->force = force;
+	lu_status->timeout = to;
+	lu_status->started_at = time(NULL);
+
+	errno = delay_request(conn, conn->in, do_lu_start, NULL);
 
 	return NULL;
 }
@@ -356,6 +417,10 @@ static int do_control_lu(void *ctx, struct connection *conn,
 				return EINVAL;
 		}
 		ret = lu_start(ctx, conn, force, to);
+		if (errno)
+			return errno;
+		if (!ret)
+			return 0;
 	} else {
 		errno = 0;
 		ret = lu_arch(ctx, conn, vec, num);
