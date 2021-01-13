@@ -107,6 +107,7 @@ struct connection
 	struct list_head transaction_list;
 	uint32_t next_transaction_id;
 	unsigned int transaction_started;
+	time_t ta_start_time;
 
 	/* List of delayed requests. */
 	struct list_head delayed;

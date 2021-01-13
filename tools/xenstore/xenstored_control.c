@@ -312,12 +312,37 @@ static const char *lu_arch(const void *ctx, struct connection *conn,
 
 static bool lu_check_lu_allowed(void)
 {
-	return true;
+	struct connection *conn;
+	time_t now = time(NULL);
+	unsigned int ta_total = 0, ta_long = 0;
+
+	list_for_each_entry(conn, &connections, list) {
+		if (conn->ta_start_time) {
+			ta_total++;
+			if (conn->ta_start_time - now >= lu_status->timeout)
+				ta_long++;
+		}
+	}
+
+	return ta_total ? (lu_status->force && ta_long == ta_total) : true;
 }
 
 static const char *lu_reject_reason(const void *ctx)
 {
-	return "BUSY";
+	char *ret = NULL;
+	struct connection *conn;
+	time_t now = time(NULL);
+
+	list_for_each_entry(conn, &connections, list) {
+		if (conn->ta_start_time - now >= lu_status->timeout) {
+			ret = talloc_asprintf(ctx, "%s\nDomain %u: %ld s",
+					      ret ? : "Domains with long running transactions:",
+					      conn->id,
+					      conn->ta_start_time - now);
+		}
+	}
+
+	return ret ? (const char *)ret : "Overlapping transactions";
 }
 
 static const char *lu_dump_state(const void *ctx, struct connection *conn)
