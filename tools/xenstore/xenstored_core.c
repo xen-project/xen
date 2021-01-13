@@ -620,8 +620,7 @@ static struct buffered_data *new_buffer(void *ctx)
 /* Return length of string (including nul) at this offset.
  * If there is no nul, returns 0 for failure.
  */
-static unsigned int get_string(const struct buffered_data *data,
-			       unsigned int offset)
+unsigned int get_string(const struct buffered_data *data, unsigned int offset)
 {
 	const char *nul;
 

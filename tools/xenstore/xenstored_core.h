@@ -142,6 +142,7 @@ const char *onearg(struct buffered_data *in);
 /* Break input into vectors, return the number, fill in up to num of them. */
 unsigned int get_strings(struct buffered_data *data,
 			 char *vec[], unsigned int num);
+unsigned int get_string(const struct buffered_data *data, unsigned int offset);
 
 void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		const void *data, unsigned int len);

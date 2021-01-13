@@ -30,6 +30,14 @@ struct cmd_s {
 	char *cmd;
 	int (*func)(void *, struct connection *, char **, int);
 	char *pars;
+	/*
+	 * max_pars can be used to limit the size of the parameter vector,
+	 * e.g. in case of large binary parts in the parameters.
+	 * The command is included in the count, so 1 means just the command
+	 * without any parameter.
+	 * 0 == no limit (the default)
+	 */
+	unsigned int max_pars;
 };
 
 static int do_control_check(void *ctx, struct connection *conn,
@@ -194,25 +202,29 @@ static int do_control_help(void *ctx, struct connection *conn,
 
 int do_control(struct connection *conn, struct buffered_data *in)
 {
-	int num;
-	int cmd;
-	char **vec;
+	unsigned int cmd, num, off;
+	char **vec = NULL;
 
 	if (conn->id != 0)
 		return EACCES;
 
-	num = xs_count_strings(in->buffer, in->used);
-	if (num < 1)
+	off = get_string(in, 0);
+	if (!off)
 		return EINVAL;
+	for (cmd = 0; cmd < ARRAY_SIZE(cmds); cmd++)
+		if (streq(in->buffer, cmds[cmd].cmd))
+			break;
+	if (cmd == ARRAY_SIZE(cmds))
+		return EINVAL;
+
+	num = xs_count_strings(in->buffer, in->used);
+	if (cmds[cmd].max_pars)
+		num = min(num, cmds[cmd].max_pars);
 	vec = talloc_array(in, char *, num);
 	if (!vec)
 		return ENOMEM;
-	if (get_strings(in, vec, num) != num)
+	if (get_strings(in, vec, num) < num)
 		return EIO;
 
-	for (cmd = 0; cmd < ARRAY_SIZE(cmds); cmd++)
-		if (streq(vec[0], cmds[cmd].cmd))
-			return cmds[cmd].func(in, conn, vec + 1, num - 1);
-
-	return EINVAL;
+	return cmds[cmd].func(in, conn, vec + 1, num - 1);
 }
