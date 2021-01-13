@@ -67,6 +67,14 @@ struct live_update {
 
 static struct live_update *lu_status;
 
+struct lu_dump_state {
+	void *buf;
+	unsigned int size;
+#ifndef __MINIOS__
+	int fd;
+#endif
+};
+
 static int lu_destroy(void *data)
 {
 #ifdef __MINIOS__
@@ -318,6 +326,14 @@ static void lu_dump_close(FILE *fp)
 
 	fclose(fp);
 }
+
+static void lu_get_dump_state(struct lu_dump_state *state)
+{
+}
+
+static void lu_close_dump_state(struct lu_dump_state *state)
+{
+}
 #else
 static const char *lu_binary(const void *ctx, struct connection *conn,
 			     const char *filename)
@@ -372,6 +388,50 @@ static FILE *lu_dump_open(const void *ctx)
 static void lu_dump_close(FILE *fp)
 {
 	fclose(fp);
+}
+
+static void lu_get_dump_state(struct lu_dump_state *state)
+{
+	char *filename;
+	struct stat statbuf;
+
+	state->size = 0;
+
+	filename = talloc_asprintf(NULL, "%s/state_dump", xs_daemon_rootdir());
+	if (!filename)
+		barf("Allocation failure");
+
+	state->fd = open(filename, O_RDONLY);
+	talloc_free(filename);
+	if (state->fd < 0)
+		return;
+	if (fstat(state->fd, &statbuf) != 0)
+		goto out_close;
+	state->size = statbuf.st_size;
+
+	state->buf = mmap(NULL, state->size, PROT_READ, MAP_PRIVATE,
+			  state->fd, 0);
+	if (state->buf == MAP_FAILED) {
+		state->size = 0;
+		goto out_close;
+	}
+
+	return;
+
+ out_close:
+	close(state->fd);
+}
+
+static void lu_close_dump_state(struct lu_dump_state *state)
+{
+	char *filename;
+
+	munmap(state->buf, state->size);
+	close(state->fd);
+
+	filename = talloc_asprintf(NULL, "%s/state_dump", xs_daemon_rootdir());
+	unlink(filename);
+	talloc_free(filename);
 }
 #endif
 
@@ -455,7 +515,47 @@ static const char *lu_dump_state(const void *ctx, struct connection *conn)
 
 void lu_read_state(void)
 {
-	xprintf("live-update: read state\n");
+	struct lu_dump_state state;
+	struct xs_state_record_header *head;
+	void *ctx = talloc_new(NULL); /* Work context for subfunctions. */
+	struct xs_state_preamble *pre;
+
+	syslog(LOG_INFO, "live-update: read state\n");
+	lu_get_dump_state(&state);
+	if (state.size == 0)
+		barf_perror("No state found after live-update");
+
+	pre = state.buf;
+	if (memcmp(pre->ident, XS_STATE_IDENT, sizeof(pre->ident)) ||
+	    pre->version != htobe32(XS_STATE_VERSION) ||
+	    pre->flags != XS_STATE_FLAGS)
+		barf("Unknown record identifier");
+	for (head = state.buf + sizeof(*pre);
+	     head->type != XS_STATE_TYPE_END &&
+		(void *)head - state.buf < state.size;
+	     head = (void *)head + sizeof(*head) + head->length) {
+		switch (head->type) {
+		case XS_STATE_TYPE_GLOBAL:
+			break;
+		case XS_STATE_TYPE_CONN:
+			break;
+		case XS_STATE_TYPE_WATCH:
+			break;
+		case XS_STATE_TYPE_TA:
+			xprintf("live-update: ignore transaction record\n");
+			break;
+		case XS_STATE_TYPE_NODE:
+			break;
+		default:
+			xprintf("live-update: unknown state record %08x\n",
+				head->type);
+			break;
+		}
+	}
+
+	lu_close_dump_state(&state);
+
+	talloc_free(ctx);
 }
 
 static const char *lu_activate_binary(const void *ctx)
