@@ -28,6 +28,34 @@
 #include "xenstored_core.h"
 #include "xenstored_control.h"
 
+struct live_update {
+	/* For verification the correct connection is acting. */
+	struct connection *conn;
+};
+
+static struct live_update *lu_status;
+
+static int lu_destroy(void *data)
+{
+	lu_status = NULL;
+
+	return 0;
+}
+
+static const char *lu_begin(struct connection *conn)
+{
+	if (lu_status)
+		return "live-update session already active.";
+
+	lu_status = talloc_zero(conn, struct live_update);
+	if (!lu_status)
+		return "Allocation failure.";
+	lu_status->conn = conn;
+	talloc_set_destructor(lu_status, lu_destroy);
+
+	return NULL;
+}
+
 struct cmd_s {
 	char *cmd;
 	int (*func)(void *, struct connection *, char **, int);
@@ -154,6 +182,13 @@ static int do_control_print(void *ctx, struct connection *conn,
 static const char *lu_abort(const void *ctx, struct connection *conn)
 {
 	syslog(LOG_INFO, "live-update: abort\n");
+
+	if (!lu_status)
+		return "No live-update session active.";
+
+	/* Destructor will do the real abort handling. */
+	talloc_free(lu_status);
+
 	return NULL;
 }
 
@@ -161,6 +196,10 @@ static const char *lu_cmdline(const void *ctx, struct connection *conn,
 			      const char *cmdline)
 {
 	syslog(LOG_INFO, "live-update: cmdline %s\n", cmdline);
+
+	if (!lu_status || lu_status->conn != conn)
+		return "Not in live-update session.";
+
 	return NULL;
 }
 
@@ -168,13 +207,23 @@ static const char *lu_cmdline(const void *ctx, struct connection *conn,
 static const char *lu_binary_alloc(const void *ctx, struct connection *conn,
 				   unsigned long size)
 {
+	const char *ret;
+
 	syslog(LOG_INFO, "live-update: binary size %lu\n", size);
+
+	ret = lu_begin(conn);
+	if (ret)
+		return ret;
+
 	return NULL;
 }
 
 static const char *lu_binary_save(const void *ctx, struct connection *conn,
 				  unsigned int size, const char *data)
 {
+	if (!lu_status || lu_status->conn != conn)
+		return "Not in live-update session.";
+
 	return NULL;
 }
 
@@ -193,7 +242,14 @@ static const char *lu_arch(const void *ctx, struct connection *conn,
 static const char *lu_binary(const void *ctx, struct connection *conn,
 			     const char *filename)
 {
+	const char *ret;
+
 	syslog(LOG_INFO, "live-update: binary %s\n", filename);
+
+	ret = lu_begin(conn);
+	if (ret)
+		return ret;
+
 	return NULL;
 }
 
@@ -212,6 +268,13 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 			    bool force, unsigned int to)
 {
 	syslog(LOG_INFO, "live-update: start, force=%d, to=%u\n", force, to);
+
+	if (!lu_status || lu_status->conn != conn)
+		return "Not in live-update session.";
+
+	/* Will be replaced by real live-update later. */
+	talloc_free(lu_status);
+
 	return NULL;
 }
 
