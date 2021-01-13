@@ -41,6 +41,7 @@ Interactive commands for Xen Store Daemon.
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
+#ifndef NO_LIVE_UPDATE
 struct live_update {
 	/* For verification the correct connection is acting. */
 	struct connection *conn;
@@ -90,6 +91,7 @@ static const char *lu_begin(struct connection *conn)
 
 	return NULL;
 }
+#endif
 
 struct cmd_s {
 	char *cmd;
@@ -214,6 +216,7 @@ static int do_control_print(void *ctx, struct connection *conn,
 	return 0;
 }
 
+#ifndef NO_LIVE_UPDATE
 static const char *lu_abort(const void *ctx, struct connection *conn)
 {
 	syslog(LOG_INFO, "live-update: abort\n");
@@ -559,6 +562,7 @@ static int do_control_lu(void *ctx, struct connection *conn,
 	send_reply(conn, XS_CONTROL, resp, strlen(resp) + 1);
 	return 0;
 }
+#endif
 
 static int do_control_help(void *, struct connection *, char **, int);
 
@@ -566,6 +570,7 @@ static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
 	{ "log", do_control_log, "on|off" },
 
+#ifndef NO_LIVE_UPDATE
 	/*
 	 * The parameters are those of the xenstore-control utility!
 	 * Depending on environment (Mini-OS or daemon) the live-update
@@ -585,6 +590,7 @@ static struct cmd_s cmds[] = {
 	{ "live-update", do_control_lu,
 		"[-c <cmdline>] [-F] [-t <timeout>] <file>\n"
 		"    Default timeout is 60 seconds.", 4 },
+#endif
 #ifdef __MINIOS__
 	{ "memreport", do_control_memreport, "" },
 #else

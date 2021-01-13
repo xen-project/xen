@@ -743,7 +743,7 @@ void domain_init(void)
 
 	talloc_set_destructor(xgt_handle, close_xgt_handle);
 
-	xce_handle = xenevtchn_open(NULL, 0);
+	xce_handle = xenevtchn_open(NULL, XENEVTCHN_NO_CLOEXEC);
 
 	if (xce_handle == NULL)
 		barf_perror("Failed to open evtchn device");

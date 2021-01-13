@@ -35,6 +35,14 @@
 #include "tdb.h"
 #include "hashtable.h"
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+/* O_CLOEXEC support is needed for Live Update in the daemon case. */
+#ifndef __MINIOS__
+#define NO_LIVE_UPDATE
+#endif
+#endif
+
 /* DEFAULT_BUFFER_SIZE should be large enough for each errno string. */
 #define DEFAULT_BUFFER_SIZE 16
 

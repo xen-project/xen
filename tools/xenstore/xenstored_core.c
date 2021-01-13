@@ -198,7 +198,8 @@ void reopen_log(void)
 	if (tracefile) {
 		close_log();
 
-		tracefd = open(tracefile, O_WRONLY|O_CREAT|O_APPEND, 0600);
+		tracefd = open(tracefile,
+			       O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0600);
 
 		if (tracefd < 0)
 			perror("Could not open tracefile");
@@ -1696,7 +1697,8 @@ static void setup_structure(void)
 	if (!(tdb_flags & TDB_INTERNAL))
 		unlink(tdbname);
 
-	tdb_ctx = tdb_open_ex(tdbname, 7919, tdb_flags, O_RDWR|O_CREAT|O_EXCL,
+	tdb_ctx = tdb_open_ex(tdbname, 7919, tdb_flags,
+			      O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC,
 			      0640, &tdb_logger, NULL);
 	if (!tdb_ctx)
 		barf_perror("Could not create tdb file %s", tdbname);
