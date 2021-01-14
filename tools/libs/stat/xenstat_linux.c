@@ -20,6 +20,7 @@
  * Use is subject to license terms.
  */
 
+#define _GNU_SOURCE
 #include <fcntl.h>
 #include <dirent.h>
 #include <sys/types.h>
