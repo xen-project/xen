@@ -69,6 +69,7 @@ static int xce_pollfd_idx = -1;
 static struct pollfd *fds;
 static unsigned int current_array_size;
 static unsigned int nr_fds;
+static unsigned int delayed_requests;
 
 static int sock = -1;
 
@@ -255,6 +256,53 @@ static bool write_messages(struct connection *conn)
 	return true;
 }
 
+static int undelay_request(void *_req)
+{
+	struct delayed_request *req = _req;
+
+	list_del(&req->list);
+	delayed_requests--;
+
+	return 0;
+}
+
+static void call_delayed(struct connection *conn, struct delayed_request *req)
+{
+	assert(conn->in == NULL);
+	conn->in = req->in;
+
+	if (req->func(req)) {
+		undelay_request(req);
+		talloc_set_destructor(req, NULL);
+	}
+
+	conn->in = NULL;
+}
+
+int delay_request(struct connection *conn, struct buffered_data *in,
+		  bool (*func)(struct delayed_request *), void *data)
+{
+	struct delayed_request *req;
+
+	req = talloc(in, struct delayed_request);
+	if (!req)
+		return ENOMEM;
+
+	/* For the case of connection being closed. */
+	talloc_set_destructor(req, undelay_request);
+
+	req->in = in;
+	req->func = func;
+	req->data = data;
+
+	delayed_requests++;
+	list_add(&req->list, &conn->delayed);
+
+	conn->in = NULL;
+
+	return 0;
+}
+
 static int destroy_conn(void *_conn)
 {
 	struct connection *conn = _conn;
@@ -321,7 +369,8 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 		memset(fds, 0, sizeof(struct pollfd) * current_array_size);
 	nr_fds = 0;
 
-	*ptimeout = -1;
+	/* In case of delayed requests pause for max 1 second. */
+	*ptimeout = delayed_requests ? 1000 : -1;
 
 	if (sock != -1)
 		*p_sock_pollfd_idx = set_fd(sock, POLLIN|POLLPRI);
@@ -1524,6 +1573,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);
 	INIT_LIST_HEAD(&new->transaction_list);
+	INIT_LIST_HEAD(&new->delayed);
 
 	list_add_tail(&new->list, &connections);
 	talloc_set_destructor(new, destroy_conn);
@@ -2212,6 +2262,16 @@ int main(int argc, char *argv[])
 					continue;
 
 				conn->pollfd_idx = -1;
+			}
+		}
+
+		if (delayed_requests) {
+			list_for_each_entry(conn, &connections, list) {
+				struct delayed_request *req, *tmp;
+
+				list_for_each_entry_safe(req, tmp,
+							 &conn->delayed, list)
+					call_delayed(conn, req);
 			}
 		}
 

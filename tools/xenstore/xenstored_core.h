@@ -61,6 +61,20 @@ struct buffered_data
 	char default_buffer[DEFAULT_BUFFER_SIZE];
 };
 
+struct delayed_request {
+	/* Next delayed request. */
+	struct list_head list;
+
+	/* The delayed request. */
+	struct buffered_data *in;
+
+	/* Function to call. */
+	bool (*func)(struct delayed_request *req);
+
+	/* Further data. */
+	void *data;
+};
+
 struct connection;
 typedef int connwritefn_t(struct connection *, const void *, unsigned int);
 typedef int connreadfn_t(struct connection *, void *, unsigned int);
@@ -93,6 +107,9 @@ struct connection
 	struct list_head transaction_list;
 	uint32_t next_transaction_id;
 	unsigned int transaction_started;
+
+	/* List of delayed requests. */
+	struct list_head delayed;
 
 	/* The domain I'm associated with, if any. */
 	struct domain *domain;
@@ -176,6 +193,10 @@ bool is_valid_nodename(const char *node);
 
 /* Get name of parent node. */
 char *get_parent(const void *ctx, const char *node);
+
+/* Delay a request. */
+int delay_request(struct connection *conn, struct buffered_data *in,
+		  bool (*func)(struct delayed_request *), void *data);
 
 /* Tracing infrastructure. */
 void trace_create(const void *data, const char *type);
