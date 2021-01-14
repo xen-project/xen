@@ -53,7 +53,7 @@
 enum {
     TPM1_HARDWARE = 1,
     TPM2_HARDWARE,
-} tpm_version;
+};
 
 struct tpm_hardware_version {
     int hw_version;
