@@ -16,6 +16,7 @@ const char *xen_extra_version(void);
 const char *xen_changeset(void);
 const char *xen_banner(void);
 const char *xen_deny(void);
+const char *xen_build_info(void);
 int xen_build_id(const void **p, unsigned int *len);
 
 #ifdef BUILD_ID

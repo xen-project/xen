@@ -70,6 +70,30 @@ const char *xen_deny(void)
     return "<denied>";
 }
 
+static const char build_info[] =
+    "debug="
+#ifdef CONFIG_DEBUG
+    "y"
+#else
+    "n"
+#endif
+#ifdef CONFIG_COVERAGE
+# ifdef __clang__
+    " llvmcov=y"
+# else
+    " gcov=y"
+# endif
+#endif
+#ifdef CONFIG_UBSAN
+    " ubsan=y"
+#endif
+    "";
+
+const char *xen_build_info(void)
+{
+    return build_info;
+}
+
 static const void *build_id_p __read_mostly;
 static unsigned int build_id_len __read_mostly;
 
