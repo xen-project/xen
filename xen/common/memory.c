@@ -858,8 +858,9 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
             ++extra.ppage;
 
         /* Check for continuation if it's not the last iteration. */
-        if ( (++done >= ARRAY_SIZE(pages) && extra.ppage) ||
-             (xatp->size > done && hypercall_preempt_check()) )
+        if ( xatp->size > ++done &&
+             ((done >= ARRAY_SIZE(pages) && extra.ppage) ||
+              hypercall_preempt_check()) )
         {
             rc = start + done;
             break;
