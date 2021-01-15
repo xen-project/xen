@@ -114,8 +114,10 @@ let key_of_path path =
 	"" :: Store.Path.to_string_list path
 
 let add_watch cons con path token =
-	let apath, watch = Connection.add_watch con path token in
+	let apath = Connection.get_watch_path con path in
+	(* fail on invalid paths early by calling key_of_str before adding watch *)
 	let key = key_of_str apath in
+	let watch = Connection.add_watch con (path, apath) token in
 	let watches =
  		if Trie.mem cons.watches key
  		then Trie.find cons.watches key
