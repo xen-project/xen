@@ -30,18 +30,10 @@ static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid)
     return xenevtchn_restrict(xce, domid);
 }
 
-xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned int flags)
+static xenevtchn_handle *xenevtchn_alloc_handle(xentoollog_logger *logger)
 {
-    xenevtchn_handle *xce;
-    int rc;
+    xenevtchn_handle *xce = malloc(sizeof(*xce));
 
-    if ( flags )
-    {
-        errno = EINVAL;
-        return NULL;
-    }
-
-    xce = malloc(sizeof(*xce));
     if ( !xce )
         return NULL;
 
@@ -60,6 +52,28 @@ xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned int flags)
             goto err;
     }
 
+    return xce;
+
+ err:
+    xenevtchn_close(xce);
+    return NULL;
+}
+
+xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned int flags)
+{
+    xenevtchn_handle *xce;
+    int rc;
+
+    if ( flags & ~XENEVTCHN_NO_CLOEXEC )
+    {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    xce = xenevtchn_alloc_handle(logger);
+    if ( !xce )
+        return NULL;
+
     rc = osdep_evtchn_open(xce, flags);
     if ( rc < 0 )
         goto err;
@@ -67,12 +81,28 @@ xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned int flags)
     return xce;
 
  err:
-    xentoolcore__deregister_active_handle(&xce->tc_ah);
-    osdep_evtchn_close(xce);
-    xtl_logger_destroy(xce->logger_tofree);
-    free(xce);
-
+    xenevtchn_close(xce);
     return NULL;
+}
+
+xenevtchn_handle *xenevtchn_fdopen(struct xentoollog_logger *logger,
+                                   int fd, unsigned int flags)
+{
+    xenevtchn_handle *xce;
+
+    if ( flags )
+    {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    xce = xenevtchn_alloc_handle(logger);
+    if ( !xce )
+        return NULL;
+
+    xce->fd = fd;
+
+    return xce;
 }
 
 int xenevtchn_close(xenevtchn_handle *xce)

@@ -42,35 +42,47 @@ struct xentoollog_logger;
  */
 
 /*
- * Return a handle to the event channel driver, or NULL on failure, in
- * which case errno will be set appropriately.
+ * Opens the evtchn device node.  Return a handle to the event channel
+ * driver, or NULL on failure, in which case errno will be set
+ * appropriately.
  *
- * Note: After fork(2) a child process must not use any opened evtchn
- * handle inherited from their parent, nor access any grant mapped
- * areas associated with that handle.
+ * On fork(2):
  *
- * The child must open a new handle if they want to interact with
- * evtchn.
+ *   After fork, a child process must not use any opened evtchn handle
+ *   inherited from their parent.  This includes operations such as
+ *   poll() on the underlying file descriptor.  Calling xenevtchn_close()
+ *   is the only safe operation on a xenevtchn_handle which has been
+ *   inherited.
  *
- * Calling exec(2) in a child will safely (and reliably) reclaim any
- * allocated resources via a xenevtchn_handle in the parent.
+ *   The child must open a new handle if they want to interact with
+ *   evtchn.
  *
- * A child which does not call exec(2) may safely call
- * xenevtchn_close() on a xenevtchn_handle inherited from their
- * parent. This will attempt to reclaim any resources associated with
- * that handle. Note that in some implementations this reclamation may
- * not be completely effective, in this case any affected resources
- * remain allocated.
+ * On exec(2):
  *
- * Calling xenevtchn_close() is the only safe operation on a
- * xenevtchn_handle which has been inherited.
+ *   Wherever possible, the device node will be opened with O_CLOEXEC,
+ *   so it is not inherited by the subsequent program.
+ *
+ *   However the XENEVTCHN_NO_CLOEXEC flag may be used to avoid opening
+ *   the device node with O_CLOEXEC.  This is intended for use by
+ *   daemons which support a self-reexec method of updating themselves.
+ *
+ *   In this case, the updated daemon should pass the underlying file
+ *   descriptor it inherited to xenevtchn_fdopen() to reconstruct the
+ *   library handle.
  */
-/* Currently no flags are defined */
+
+/* Don't set O_CLOEXEC when opening event channel driver node. */
+#define XENEVTCHN_NO_CLOEXEC (1 << 0)
+
 xenevtchn_handle *xenevtchn_open(struct xentoollog_logger *logger,
                                  unsigned int flags);
 
+/* Flag XENEVTCHN_NO_CLOEXEC is rejected by xenevtchn_fdopen(). */
+xenevtchn_handle *xenevtchn_fdopen(struct xentoollog_logger *logger,
+                                    int fd, unsigned open_flags);
+
 /*
- * Close a handle previously allocated with xenevtchn_open().
+ * Close a handle previously allocated with xenevtchn_{,fd}open().
  */
 int xenevtchn_close(xenevtchn_handle *xce);
 

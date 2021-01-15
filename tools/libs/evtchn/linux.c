@@ -36,8 +36,13 @@
 
 int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 {
-    int fd = open("/dev/xen/evtchn", O_RDWR|O_CLOEXEC);
+    int open_flags = O_RDWR;
+    int fd;
 
+    if ( !(flags & XENEVTCHN_NO_CLOEXEC) )
+        open_flags |= O_CLOEXEC;
+
+    fd = open("/dev/xen/evtchn", open_flags);
     if ( fd == -1 )
         return -1;
 

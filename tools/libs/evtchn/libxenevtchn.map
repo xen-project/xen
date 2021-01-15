@@ -21,3 +21,7 @@ VERS_1.1 {
 	global:
 		xenevtchn_restrict;
 } VERS_1.0;
+VERS_1.2 {
+	global:
+		xenevtchn_fdopen;
+} VERS_1.1;

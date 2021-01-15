@@ -69,6 +69,10 @@ static void port_dealloc(struct evtchn_port_info *port_info)
     free(port_info);
 }
 
+/*
+ * XENEVTCHN_NO_CLOEXEC is being ignored, as there is no exec() call supported
+ * in Mini-OS.
+ */
 int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 {
     int fd = alloc_fd(FTYPE_EVTCHN);
