@@ -6,11 +6,11 @@
 #include <xen/lib.h>
 #include <xen/livepatch_elf.h>
 #include <xen/livepatch.h>
+#include <xen/mm.h>
 #include <xen/vmap.h>
 
 #include <asm/cpufeature.h>
 #include <asm/livepatch.h>
-#include <asm/mm.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
