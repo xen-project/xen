@@ -37,9 +37,12 @@
 int osdep_evtchn_open(xenevtchn_handle *xce)
 {
     int fd = open("/dev/xen/evtchn", O_RDWR|O_CLOEXEC);
+
     if ( fd == -1 )
         return -1;
+
     xce->fd = fd;
+
     return 0;
 }
 
@@ -74,7 +77,7 @@ int xenevtchn_notify(xenevtchn_handle *xce, evtchn_port_t port)
 }
 
 xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce,
-                                                   uint32_t domid)
+                                                      uint32_t domid)
 {
     int fd = xce->fd;
     struct ioctl_evtchn_bind_unbound_port bind;
@@ -85,8 +88,8 @@ xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce,
 }
 
 xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce,
-                                                  uint32_t domid,
-                                                  evtchn_port_t remote_port)
+                                                     uint32_t domid,
+                                                     evtchn_port_t remote_port)
 {
     int fd = xce->fd;
     struct ioctl_evtchn_bind_interdomain bind;
@@ -98,7 +101,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce,
 }
 
 xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce,
-                                           unsigned int virq)
+                                              unsigned int virq)
 {
     int fd = xce->fd;
     struct ioctl_evtchn_bind_virq bind;
@@ -135,6 +138,7 @@ int xenevtchn_unmask(xenevtchn_handle *xce, evtchn_port_t port)
 
     if ( write(fd, &port, sizeof(port)) != sizeof(port) )
         return -1;
+
     return 0;
 }
 

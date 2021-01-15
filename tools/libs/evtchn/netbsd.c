@@ -34,9 +34,12 @@
 int osdep_evtchn_open(xenevtchn_handle *xce)
 {
     int fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
+
     if ( fd == -1 )
         return -1;
+
     xce->fd = fd;
+
     return 0;
 }
 
@@ -51,6 +54,7 @@ int osdep_evtchn_close(xenevtchn_handle *xce)
 int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid)
 {
     errno = -EOPNOTSUPP;
+
     return -1;
 }
 
@@ -69,7 +73,8 @@ int xenevtchn_notify(xenevtchn_handle *xce, evtchn_port_t port)
     return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
-xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle * xce, uint32_t domid)
+xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce,
+                                                      uint32_t domid)
 {
     int fd = xce->fd;
     struct ioctl_evtchn_bind_unbound_port bind;
@@ -78,14 +83,15 @@ xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle * xce, ui
     bind.remote_domain = domid;
 
     ret = ioctl(fd, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
-    if (ret == 0)
+    if ( ret == 0 )
         return bind.port;
     else
         return -1;
 }
 
-xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_t domid,
-                                                  evtchn_port_t remote_port)
+xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce,
+                                                     uint32_t domid,
+                                                     evtchn_port_t remote_port)
 {
     int fd = xce->fd;
     struct ioctl_evtchn_bind_interdomain bind;
@@ -95,7 +101,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint
     bind.remote_port = remote_port;
 
     ret = ioctl(fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
-    if (ret == 0)
+    if ( ret == 0 )
         return bind.port;
     else
         return -1;
@@ -111,7 +117,8 @@ int xenevtchn_unbind(xenevtchn_handle *xce, evtchn_port_t port)
     return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int virq)
+xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce,
+                                              unsigned int virq)
 {
     int fd = xce->fd;
     struct ioctl_evtchn_bind_virq bind;
@@ -120,7 +127,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned in
     bind.virq = virq;
 
     err = ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
-    if (err)
+    if ( err )
         return -1;
     else
         return bind.port;
@@ -140,6 +147,7 @@ xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
 int xenevtchn_unmask(xenevtchn_handle *xce, evtchn_port_t port)
 {
     int fd = xce->fd;
+
     return write_exact(fd, (char *)&port, sizeof(port));
 }
 
