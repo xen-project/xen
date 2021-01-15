@@ -32,6 +32,7 @@
 #include <caml/fail.h>
 #include <caml/callback.h>
 
+#include <sys/mman.h>
 #include "mmap_stubs.h"
 
 #define GET_C_STRUCT(a) ((struct mmap_interface *) a)
@@ -166,6 +167,8 @@ CAMLprim value ml_interface_set_server_features(value interface, value v)
 {
 	CAMLparam2(interface, v);
 	struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
+	if (intf == (void*)MAP_FAILED)
+		caml_failwith("Interface closed");
 
 	intf->server_features = Int_val(v);
 
