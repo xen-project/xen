@@ -19,14 +19,13 @@
 #ifndef _IOMMU_H_
 #define _IOMMU_H_
 
+#include <xen/mm-frame.h>
 #include <xen/init.h>
 #include <xen/page-defs.h>
-#include <xen/spinlock.h>
 #include <xen/pci.h>
-#include <xen/typesafe.h>
-#include <xen/mm.h>
-#include <public/hvm/ioreq.h>
+#include <xen/spinlock.h>
 #include <public/domctl.h>
+#include <public/hvm/ioreq.h>
 #include <asm/device.h>
 
 TYPE_SAFE(uint64_t, dfn);

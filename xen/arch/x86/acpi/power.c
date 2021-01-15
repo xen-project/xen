@@ -10,7 +10,6 @@
  * Slimmed with Xen specific support.
  */
 
-#include <asm/io.h>
 #include <xen/acpi.h>
 #include <xen/errno.h>
 #include <xen/iocap.h>

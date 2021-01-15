@@ -23,7 +23,7 @@
 #ifndef __XEN_GRANT_TABLE_H__
 #define __XEN_GRANT_TABLE_H__
 
-#include <xen/mm.h>
+#include <xen/mm-frame.h>
 #include <xen/rwlock.h>
 #include <public/grant_table.h>
 #include <asm/grant_table.h>

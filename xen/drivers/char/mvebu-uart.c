@@ -18,7 +18,9 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/errno.h>
 #include <xen/irq.h>
+#include <xen/mm.h>
 #include <xen/serial.h>
 #include <xen/vmap.h>
 #include <asm/io.h>

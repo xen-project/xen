@@ -49,6 +49,7 @@ __OUT(l,,int)
 
 /* Function pointer used to handle platform specific I/O port emulation. */
 #define IOEMUL_QUIRK_STUB_BYTES 9
+struct cpu_user_regs;
 extern unsigned int (*ioemul_handle_quirk)(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 

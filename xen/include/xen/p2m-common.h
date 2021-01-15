@@ -1,7 +1,7 @@
 #ifndef _XEN_P2M_COMMON_H
 #define _XEN_P2M_COMMON_H
 
-#include <xen/mm.h>
+#include <xen/mm-frame.h>
 
 /* Remove a page from a domain's p2m table */
 int __must_check
