@@ -419,6 +419,7 @@ let mkdir store perm path =
 	(* It's upt to the mkdir logic to decide what to do with existing path *)
 	if not (existing || (Perms.Connection.is_dom0 perm)) then Quota.check store.quota owner 0;
 	store.root <- path_mkdir store perm path;
+	if not existing then
 	Quota.add_entry store.quota owner
 
 let rm store perm path =
