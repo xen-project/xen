@@ -165,7 +165,7 @@ let write t perm path value =
 
 let mkdir ?(with_watch=true) t perm path =
 	Store.mkdir t.store perm path;
-	set_write_lowpath t path;
+	set_write_lowpath t (Store.Path.get_parent path);
 	if with_watch then
 		add_wop t Xenbus.Xb.Op.Mkdir path
 
