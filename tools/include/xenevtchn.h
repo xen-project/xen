@@ -67,7 +67,7 @@ struct xentoollog_logger;
  */
 /* Currently no flags are defined */
 xenevtchn_handle *xenevtchn_open(struct xentoollog_logger *logger,
-                                 unsigned open_flags);
+                                 unsigned int flags);
 
 /*
  * Close a handle previously allocated with xenevtchn_open().

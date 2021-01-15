@@ -29,7 +29,7 @@ static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid)
     return xenevtchn_restrict(xce, domid);
 }
 
-xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned open_flags)
+xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned int flags)
 {
     xenevtchn_handle *xce = malloc(sizeof(*xce));
     int rc;
