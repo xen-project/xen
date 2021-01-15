@@ -6,6 +6,7 @@
 #include <xen/spinlock.h>
 #include <xen/rwlock.h>
 #include <asm/io.h>
+#include <asm/page.h>
 #include <asm/uaccess.h>
 #include <asm/x86_emulate.h>
 

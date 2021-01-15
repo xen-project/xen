@@ -20,12 +20,12 @@
 #define __X86_HYPERV_HCALL_H__
 
 #include <xen/lib.h>
+#include <xen/page-size.h>
 #include <xen/types.h>
 
 #include <asm/asm_defns.h>
 #include <asm/fixmap.h>
 #include <asm/guest/hyperv-tlfs.h>
-#include <asm/page.h>
 
 static inline uint64_t hv_do_hypercall(uint64_t control, paddr_t input_addr,
                                        paddr_t output_addr)

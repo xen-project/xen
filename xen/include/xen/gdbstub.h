@@ -20,8 +20,8 @@
 #ifndef __XEN_GDBSTUB_H__
 #define __XEN_GDBSTUB_H__
 
+#include <xen/page-size.h>
 #include <asm/atomic.h>
-#include <asm/page.h>
 
 #ifdef CONFIG_CRASH_DEBUG
 

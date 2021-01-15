@@ -1,0 +1,26 @@
+#ifndef __X86_PAGE_SHIFT_H__
+#define __X86_PAGE_SHIFT_H__
+
+#define L1_PAGETABLE_SHIFT      12
+#define L2_PAGETABLE_SHIFT      21
+#define L3_PAGETABLE_SHIFT      30
+#define L4_PAGETABLE_SHIFT      39
+#define PAGE_SHIFT              L1_PAGETABLE_SHIFT
+#define SUPERPAGE_SHIFT         L2_PAGETABLE_SHIFT
+#define ROOT_PAGETABLE_SHIFT    L4_PAGETABLE_SHIFT
+
+#define PAGETABLE_ORDER         9
+#define L1_PAGETABLE_ENTRIES    (1 << PAGETABLE_ORDER)
+#define L2_PAGETABLE_ENTRIES    (1 << PAGETABLE_ORDER)
+#define L3_PAGETABLE_ENTRIES    (1 << PAGETABLE_ORDER)
+#define L4_PAGETABLE_ENTRIES    (1 << PAGETABLE_ORDER)
+#define ROOT_PAGETABLE_ENTRIES  L4_PAGETABLE_ENTRIES
+
+#define SUPERPAGE_ORDER         PAGETABLE_ORDER
+#define SUPERPAGE_PAGES         (1 << SUPERPAGE_ORDER)
+
+/* These are architectural limits. */
+#define PADDR_BITS              52
+#define VADDR_BITS              48
+
+#endif /* __X86_PAGE_SHIFT_H__ */

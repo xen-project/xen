@@ -6,7 +6,6 @@
 #include <xen/errno.h>
 #include <xen/prefetch.h>
 #include <asm/asm_defns.h>
-#include <asm/page.h>
 
 #include <asm/x86_64/uaccess.h>
 

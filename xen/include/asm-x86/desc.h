@@ -1,6 +1,8 @@
 #ifndef __ARCH_DESC_H
 #define __ARCH_DESC_H
 
+#include <asm/page.h>
+
 /*
  * Xen reserves a memory page of GDT entries.
  * No guest GDT entries exist beyond the Xen reserved area.

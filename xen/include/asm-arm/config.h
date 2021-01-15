@@ -176,11 +176,6 @@
 #define FIXMAP_ACPI_BEGIN  2  /* Start mappings of ACPI tables */
 #define FIXMAP_ACPI_END    (FIXMAP_ACPI_BEGIN + NUM_FIXMAP_ACPI_PAGES - 1)  /* End mappings of ACPI tables */
 
-#define PAGE_SHIFT              12
-#define PAGE_SIZE           (_AC(1,L) << PAGE_SHIFT)
-#define PAGE_MASK           (~(PAGE_SIZE-1))
-#define PAGE_FLAG_MASK      (~0)
-
 #define NR_hypercalls 64
 
 #define STACK_ORDER 3

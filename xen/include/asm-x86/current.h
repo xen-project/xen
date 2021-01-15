@@ -8,8 +8,8 @@
 #define __X86_CURRENT_H__
 
 #include <xen/percpu.h>
+#include <xen/page-size.h>
 #include <public/xen.h>
-#include <asm/page.h>
 
 /*
  * Xen's cpu stacks are 8 pages (8-page aligned), arranged as:

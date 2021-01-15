@@ -10,8 +10,8 @@
 #define _ASM_X86_HYPERV_TLFS_H
 
 #include <xen/bitops.h>
+#include <xen/page-size.h>
 #include <xen/types.h>
-#include <asm/page.h>
 
 /*
  * While not explicitly listed in the TLFS, Hyper-V always runs with a page size

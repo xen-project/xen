@@ -26,7 +26,6 @@
 #include <xen/mm.h>
 #include <xen/rwlock.h>
 #include <public/grant_table.h>
-#include <asm/page.h>
 #include <asm/grant_table.h>
 
 #ifdef CONFIG_GRANT_TABLE

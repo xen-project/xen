@@ -3,7 +3,6 @@
 
 #include <xen/vmap.h>
 #include <xen/types.h>
-#include <asm/page.h>
 
 #define readb(x) (*(volatile uint8_t  *)(x))
 #define readw(x) (*(volatile uint16_t *)(x))

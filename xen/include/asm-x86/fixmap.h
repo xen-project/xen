@@ -12,7 +12,7 @@
 #ifndef _ASM_FIXMAP_H
 #define _ASM_FIXMAP_H
 
-#include <asm/page.h>
+#include <xen/page-size.h>
 
 #define FIXADDR_TOP (VMAP_VIRT_END - PAGE_SIZE)
 #define FIXADDR_X_TOP (XEN_VIRT_END - PAGE_SIZE)

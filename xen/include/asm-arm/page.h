@@ -2,20 +2,10 @@
 #define __ARM_PAGE_H__
 
 #include <public/xen.h>
+#include <xen/page-size.h>
 #include <asm/processor.h>
 #include <asm/lpae.h>
 #include <asm/sysregs.h>
-
-#ifdef CONFIG_ARM_64
-#define PADDR_BITS              48
-#else
-#define PADDR_BITS              40
-#endif
-#define PADDR_MASK              ((1ULL << PADDR_BITS)-1)
-#define PAGE_OFFSET(ptr)        ((vaddr_t)(ptr) & ~PAGE_MASK)
-
-#define VADDR_BITS              32
-#define VADDR_MASK              (~0UL)
 
 /* Shareability values for the LPAE entries */
 #define LPAE_SH_NON_SHAREABLE 0x0
