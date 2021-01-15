@@ -31,7 +31,7 @@
 
 #define EVTCHN_DEV_NAME  "/dev/xenevt"
 
-int osdep_evtchn_open(xenevtchn_handle *xce)
+int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 {
     int fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
 

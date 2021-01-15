@@ -34,7 +34,7 @@
 #define O_CLOEXEC 0
 #endif
 
-int osdep_evtchn_open(xenevtchn_handle *xce)
+int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 {
     int fd = open("/dev/xen/evtchn", O_RDWR|O_CLOEXEC);
 

@@ -14,7 +14,7 @@ struct xenevtchn_handle {
     Xentoolcore__Active_Handle tc_ah;
 };
 
-int osdep_evtchn_open(xenevtchn_handle *xce);
+int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags);
 int osdep_evtchn_close(xenevtchn_handle *xce);
 int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid);
 

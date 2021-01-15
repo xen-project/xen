@@ -69,7 +69,7 @@ static void port_dealloc(struct evtchn_port_info *port_info)
     free(port_info);
 }
 
-int osdep_evtchn_open(xenevtchn_handle *xce)
+int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 {
     int fd = alloc_fd(FTYPE_EVTCHN);
 

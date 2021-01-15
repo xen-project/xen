@@ -60,7 +60,7 @@ xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned int flags)
             goto err;
     }
 
-    rc = osdep_evtchn_open(xce);
+    rc = osdep_evtchn_open(xce, flags);
     if ( rc < 0 )
         goto err;
 

@@ -31,7 +31,7 @@
 
 #define EVTCHN_DEV      "/dev/xen/evtchn"
 
-int osdep_evtchn_open(xenevtchn_handle *xce)
+int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 {
     int fd = open(EVTCHN_DEV, O_RDWR|O_CLOEXEC);
 
