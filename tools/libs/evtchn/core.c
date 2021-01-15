@@ -13,6 +13,7 @@
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 
@@ -31,9 +32,16 @@ static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid)
 
 xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned int flags)
 {
-    xenevtchn_handle *xce = malloc(sizeof(*xce));
+    xenevtchn_handle *xce;
     int rc;
 
+    if ( flags )
+    {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    xce = malloc(sizeof(*xce));
     if ( !xce )
         return NULL;
 
