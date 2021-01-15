@@ -158,18 +158,17 @@ let get_children_watches con path =
 let is_dom0 con =
 	Perms.Connection.is_dom0 (get_perm con)
 
-let add_watch con path token =
+let add_watch con (path, apath) token =
 	if !Quota.activate && !Define.maxwatch > 0 &&
 	   not (is_dom0 con) && con.nb_watches > !Define.maxwatch then
 		raise Quota.Limit_reached;
-	let apath = get_watch_path con path in
 	let l = get_watches con apath in
 	if List.exists (fun w -> w.token = token) l then
 		raise Define.Already_exist;
 	let watch = watch_create ~con ~token ~path in
 	Hashtbl.replace con.watches apath (watch :: l);
 	con.nb_watches <- con.nb_watches + 1;
-	apath, watch
+	watch
 
 let del_watch con path token =
 	let apath = get_watch_path con path in
