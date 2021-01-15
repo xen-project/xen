@@ -2480,8 +2480,8 @@ void __init create_domUs(void)
             .arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE,
             .flags = XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap,
             .max_evtchn_port = -1,
-            .max_grant_frames = 64,
-            .max_maptrack_frames = 1024,
+            .max_grant_frames = -1,
+            .max_maptrack_frames = -1,
         };
 
         if ( !dt_device_is_compatible(node, "xen,domain") )
