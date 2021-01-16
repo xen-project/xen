@@ -123,9 +123,7 @@ void __init setup_virtual_regions(const struct exception_table_entry *start,
         __stop_bug_frames_0,
         __stop_bug_frames_1,
         __stop_bug_frames_2,
-#ifdef CONFIG_X86
         __stop_bug_frames_3,
-#endif
         NULL
     };
 

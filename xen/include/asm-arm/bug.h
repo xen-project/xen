@@ -26,16 +26,17 @@ struct bug_frame {
 #define bug_line(b) ((b)->line)
 #define bug_msg(b) ((const char *)(b) + (b)->msg_disp)
 
-#define BUGFRAME_warn   0
-#define BUGFRAME_bug    1
-#define BUGFRAME_assert 2
+#define BUGFRAME_run_fn 0
+#define BUGFRAME_warn   1
+#define BUGFRAME_bug    2
+#define BUGFRAME_assert 3
 
-#define BUGFRAME_NR     3
+#define BUGFRAME_NR     4
 
 /* Many versions of GCC doesn't support the asm %c parameter which would
  * be preferable to this unpleasantness. We use mergeable string
  * sections to avoid multiple copies of the string appearing in the
- * Xen image.
+ * Xen image. BUGFRAME_run_fn needs to be handled separately.
  */
 #define BUG_FRAME(type, line, file, has_msg, msg) do {                      \
     BUILD_BUG_ON((line) >> 16);                                             \
@@ -58,6 +59,24 @@ struct bug_frame {
          ".popsection");                                                    \
 } while (0)
 
+/*
+ * GCC will not allow to use "i"  when PIE is enabled (Xen doesn't set the
+ * flag but instead rely on the default value from the compiler). So the
+ * easiest way to implement run_in_exception_handler() is to pass the to
+ * be called function in a fixed register.
+ */
+#define  run_in_exception_handler(fn) do {                                  \
+    asm ("mov " __stringify(BUG_FN_REG) ", %0\n"                            \
+         "1:"BUG_INSTR"\n"                                                  \
+         ".pushsection .bug_frames." __stringify(BUGFRAME_run_fn) ","       \
+         "             \"a\", %%progbits\n"                                 \
+         "2:\n"                                                             \
+         ".p2align 2\n"                                                     \
+         ".long (1b - 2b)\n"                                                \
+         ".long 0, 0, 0\n"                                                  \
+         ".popsection" :: "r" (fn) : __stringify(BUG_FN_REG) );             \
+} while (0)
+
 #define WARN() BUG_FRAME(BUGFRAME_warn, __LINE__, __FILE__, 0, "")
 
 #define BUG() do {                                              \
@@ -73,7 +92,8 @@ struct bug_frame {
 extern const struct bug_frame __start_bug_frames[],
                               __stop_bug_frames_0[],
                               __stop_bug_frames_1[],
-                              __stop_bug_frames_2[];
+                              __stop_bug_frames_2[],
+                              __stop_bug_frames_3[];
 
 #endif /* __ARM_BUG_H__ */
 /*
