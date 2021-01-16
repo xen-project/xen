@@ -48,4 +48,14 @@ void register_irq_keyhandler(unsigned char key,
 /* Inject a keypress into the key-handling subsystem. */
 extern void handle_keypress(unsigned char key, struct cpu_user_regs *regs);
 
+enum crash_reason {
+    CRASHREASON_PANIC,
+    CRASHREASON_HWDOM,
+    CRASHREASON_WATCHDOG,
+    CRASHREASON_KEXECCMD,
+    CRASHREASON_DEBUGKEY,
+};
+
+void keyhandler_crash_action(enum crash_reason reason);
+
 #endif /* __XEN_KEYHANDLER_H__ */

@@ -574,6 +574,47 @@ reduction of features at Xen's disposal to manage guests.
 ### cpuinfo (x86)
 > `= <boolean>`
 
+### crash-debug-debugkey
+### crash-debug-hwdom
+### crash-debug-kexeccmd
+### crash-debug-panic
+### crash-debug-watchdog
+> `= <string>`
+
+> Can be modified at runtime
+
+Specify debug-key actions in cases of crashes. Each of the parameters applies
+to a different crash reason. The `<string>` is a sequence of debug key
+characters, with `+` having the special meaning of a 10 millisecond pause.
+
+`crash-debug-debugkey` will be used for crashes induced by the `C` debug
+key (i.e. manually induced crash).
+
+`crash-debug-hwdom` denotes a crash of dom0.
+
+`crash-debug-kexeccmd` is an explicit request of dom0 to continue with the
+kdump kernel via kexec. Only available on hypervisors built with CONFIG_KEXEC.
+
+`crash-debug-panic` is a crash of the hypervisor.
+
+`crash-debug-watchdog` is a crash due to the watchdog timer expiring.
+
+It should be noted that dumping diagnosis data to the console can fail in
+multiple ways (missing data, hanging system, ...) depending on the reason
+of the crash, which might have left the hypervisor in a bad state. In case
+a debug-key action leads to another crash recursion will be avoided, so no
+additional debug-key actions will be performed in this case. A crash in the
+early boot phase will not result in any debug-key action, as the system
+might not yet be in a state where the handlers can work.
+
+So e.g. `crash-debug-watchdog=0+0r` would dump dom0 state twice with 10
+milliseconds between the two state dumps, followed by the run queues of the
+hypervisor, if the system crashes due to a watchdog timeout.
+
+Depending on the reason of the system crash it might happen that triggering
+some debug key action will result in a hang instead of dumping data and then
+doing a reboot or crash dump.
+
 ### crashinfo_maxaddr
 > `= <size>`
 

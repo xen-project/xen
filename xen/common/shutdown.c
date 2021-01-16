@@ -43,7 +43,7 @@ void hwdom_shutdown(u8 reason)
     case SHUTDOWN_crash:
         debugger_trap_immediate();
         printk("Hardware Dom%u crashed: ", hardware_domain->domain_id);
-        kexec_crash();
+        kexec_crash(CRASHREASON_HWDOM);
         maybe_reboot();
         break; /* not reached */
 
@@ -56,7 +56,7 @@ void hwdom_shutdown(u8 reason)
     case SHUTDOWN_watchdog:
         printk("Hardware Dom%u shutdown: watchdog rebooting machine\n",
                hardware_domain->domain_id);
-        kexec_crash();
+        kexec_crash(CRASHREASON_WATCHDOG);
         machine_restart(0);
         break; /* not reached */
 
