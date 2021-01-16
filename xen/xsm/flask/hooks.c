@@ -307,19 +307,25 @@ static int flask_evtchn_reset(struct domain *d1, struct domain *d2)
     return domain_has_perm(d1, d2, SECCLASS_EVENT, EVENT__RESET);
 }
 
-static int flask_alloc_security_evtchn(struct evtchn *chn)
+static int flask_alloc_security_evtchns(struct evtchn chn[], unsigned int nr)
 {
-    chn->ssid.flask_sid = SECINITSID_UNLABELED;
+    unsigned int i;
 
-    return 0;    
+    for ( i = 0; i < nr; ++i )
+        chn[i].ssid.flask_sid = SECINITSID_UNLABELED;
+
+    return 0;
 }
 
-static void flask_free_security_evtchn(struct evtchn *chn)
+static void flask_free_security_evtchns(struct evtchn chn[], unsigned int nr)
 {
+    unsigned int i;
+
     if ( !chn )
         return;
 
-    chn->ssid.flask_sid = SECINITSID_UNLABELED;
+    for ( i = 0; i < nr; ++i )
+        chn[i].ssid.flask_sid = SECINITSID_UNLABELED;
 }
 
 static char *flask_show_security_evtchn(struct domain *d, const struct evtchn *chn)
@@ -1766,8 +1772,8 @@ static struct xsm_operations flask_ops = {
 
     .alloc_security_domain = flask_domain_alloc_security,
     .free_security_domain = flask_domain_free_security,
-    .alloc_security_evtchn = flask_alloc_security_evtchn,
-    .free_security_evtchn = flask_free_security_evtchn,
+    .alloc_security_evtchns = flask_alloc_security_evtchns,
+    .free_security_evtchns = flask_free_security_evtchns,
     .show_security_evtchn = flask_show_security_evtchn,
     .init_hardware_domain = flask_init_hardware_domain,
 

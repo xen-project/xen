@@ -72,8 +72,8 @@ struct xsm_operations {
 
     int (*alloc_security_domain) (struct domain *d);
     void (*free_security_domain) (struct domain *d);
-    int (*alloc_security_evtchn) (struct evtchn *chn);
-    void (*free_security_evtchn) (struct evtchn *chn);
+    int (*alloc_security_evtchns) (struct evtchn chn[], unsigned int nr);
+    void (*free_security_evtchns) (struct evtchn chn[], unsigned int nr);
     char *(*show_security_evtchn) (struct domain *d, const struct evtchn *chn);
     int (*init_hardware_domain) (struct domain *d);
 
@@ -314,14 +314,16 @@ static inline void xsm_free_security_domain (struct domain *d)
     xsm_ops->free_security_domain(d);
 }
 
-static inline int xsm_alloc_security_evtchn (struct evtchn *chn)
+static inline int xsm_alloc_security_evtchns(
+    struct evtchn chn[], unsigned int nr)
 {
-    return xsm_ops->alloc_security_evtchn(chn);
+    return xsm_ops->alloc_security_evtchns(chn, nr);
 }
 
-static inline void xsm_free_security_evtchn (struct evtchn *chn)
+static inline void xsm_free_security_evtchns(
+    struct evtchn chn[], unsigned int nr)
 {
-    (void)xsm_ops->free_security_evtchn(chn);
+    xsm_ops->free_security_evtchns(chn, nr);
 }
 
 static inline char *xsm_show_security_evtchn (struct domain *d, const struct evtchn *chn)

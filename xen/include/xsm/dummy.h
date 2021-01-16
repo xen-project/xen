@@ -309,12 +309,14 @@ static XSM_INLINE int xsm_evtchn_reset(XSM_DEFAULT_ARG struct domain *d1, struct
     return xsm_default_action(action, d1, d2);
 }
 
-static XSM_INLINE int xsm_alloc_security_evtchn(struct evtchn *chn)
+static XSM_INLINE int xsm_alloc_security_evtchns(
+    struct evtchn chn[], unsigned int nr)
 {
     return 0;
 }
 
-static XSM_INLINE void xsm_free_security_evtchn(struct evtchn *chn)
+static XSM_INLINE void xsm_free_security_evtchns(
+    struct evtchn chn[], unsigned int nr)
 {
     return;
 }

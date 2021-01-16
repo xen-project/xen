@@ -147,6 +147,14 @@ static bool virq_is_global(unsigned int virq)
     return true;
 }
 
+static void free_evtchn_bucket(struct domain *d, struct evtchn *bucket)
+{
+    if ( !bucket )
+        return;
+
+    xsm_free_security_evtchns(bucket, EVTCHNS_PER_BUCKET);
+    xfree(bucket);
+}
 
 static struct evtchn *alloc_evtchn_bucket(struct domain *d, unsigned int port)
 {
@@ -155,34 +163,22 @@ static struct evtchn *alloc_evtchn_bucket(struct domain *d, unsigned int port)
 
     chn = xzalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
     if ( !chn )
-        return NULL;
+        goto err;
+
+    if ( xsm_alloc_security_evtchns(chn, EVTCHNS_PER_BUCKET) )
+        goto err;
 
     for ( i = 0; i < EVTCHNS_PER_BUCKET; i++ )
     {
-        if ( xsm_alloc_security_evtchn(&chn[i]) )
-        {
-            while ( i-- )
-                xsm_free_security_evtchn(&chn[i]);
-            xfree(chn);
-            return NULL;
-        }
         chn[i].port = port + i;
         rwlock_init(&chn[i].lock);
     }
+
     return chn;
-}
 
-static void free_evtchn_bucket(struct domain *d, struct evtchn *bucket)
-{
-    unsigned int i;
-
-    if ( !bucket )
-        return;
-
-    for ( i = 0; i < EVTCHNS_PER_BUCKET; i++ )
-        xsm_free_security_evtchn(bucket + i);
-
-    xfree(bucket);
+ err:
+    free_evtchn_bucket(d, chn);
+    return NULL;
 }
 
 int evtchn_allocate_port(struct domain *d, evtchn_port_t port)
