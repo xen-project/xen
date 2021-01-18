@@ -61,6 +61,12 @@ typedef unsigned long size_t;
 #endif
 typedef signed long ssize_t;
 
+#if defined(__PTRDIFF_TYPE__)
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
+#else
+typedef signed long ptrdiff_t;
+#endif
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ARM_TYPES_H__ */

@@ -31,7 +31,7 @@ typedef int decompress_fn(unsigned char *inbuf, unsigned int len,
  * dependent).
  */
 
-decompress_fn bunzip2, unxz, unlzma, unlzo, unlz4;
+decompress_fn bunzip2, unxz, unlzma, unlzo, unlz4, unzstd;
 
 int decompress(void *inbuf, unsigned int len, void *outbuf);
 
