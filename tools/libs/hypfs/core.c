@@ -146,12 +146,13 @@ static void *xenhypfs_inflate(void *in_data, size_t *sz)
             break;
 
         out_sz = z.next_out - workbuf;
-        content = realloc(content, *sz + out_sz);
+        content = realloc(content, *sz + out_sz + 1);
         if (!content) {
             ret = Z_MEM_ERROR;
             break;
         }
         memcpy(content + *sz, workbuf, out_sz);
+        *(char *)(content + *sz + out_sz) = 0;
     }
 
     inflateEnd(&z);
