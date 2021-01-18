@@ -15,8 +15,6 @@
  * but they are bigger and use more memory for the lookup table.
  */
 
-#include "private.h"
-
 XZ_EXTERN uint32_t INITDATA xz_crc32_table[256];
 
 XZ_EXTERN void INIT xz_crc32_init(void)

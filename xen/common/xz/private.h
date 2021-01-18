@@ -13,33 +13,22 @@
 #ifdef __XEN__
 #include <xen/kernel.h>
 #include <asm/byteorder.h>
-#endif
+#include <asm/unaligned.h>
+#else
 
-#define get_le32(p) le32_to_cpup((const uint32_t *)(p))
-
-#if 1 /* ndef CONFIG_??? */
-static inline u32 INIT get_unaligned_le32(void *p)
+static inline u32 get_unaligned_le32(const void *p)
 {
 	return le32_to_cpup(p);
 }
 
-static inline void INIT put_unaligned_le32(u32 val, void *p)
+static inline void put_unaligned_le32(u32 val, void *p)
 {
 	*(__force __le32*)p = cpu_to_le32(val);
 }
-#else
-#include <asm/unaligned.h>
 
-static inline u32 INIT get_unaligned_le32(void *p)
-{
-	return le32_to_cpu(__get_unaligned(p, 4));
-}
-
-static inline void INIT put_unaligned_le32(u32 val, void *p)
-{
-	__put_unaligned(cpu_to_le32(val), p, 4);
-}
 #endif
+
+#define get_le32(p) le32_to_cpup((const uint32_t *)(p))
 
 #define false 0
 #define true 1

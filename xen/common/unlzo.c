@@ -34,30 +34,19 @@
 
 #ifdef __XEN__
 #include <asm/byteorder.h>
-#endif
+#include <asm/unaligned.h>
+#else
 
-#if 1 /* ndef CONFIG_??? */
-static inline u16 INIT get_unaligned_be16(void *p)
+static inline u16 get_unaligned_be16(const void *p)
 {
 	return be16_to_cpup(p);
 }
 
-static inline u32 INIT get_unaligned_be32(void *p)
+static inline u32 get_unaligned_be32(const void *p)
 {
 	return be32_to_cpup(p);
 }
-#else
-#include <asm/unaligned.h>
 
-static inline u16 INIT get_unaligned_be16(void *p)
-{
-	return be16_to_cpu(__get_unaligned(p, 2));
-}
-
-static inline u32 INIT get_unaligned_be32(void *p)
-{
-	return be32_to_cpu(__get_unaligned(p, 4));
-}
 #endif
 
 static const unsigned char lzop_magic[] = {
