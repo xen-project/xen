@@ -1644,7 +1644,7 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
 static int fork_hap_allocation(struct domain *cd, struct domain *d)
 {
     int rc;
-    bool preempted;
+    bool preempted = false;
     unsigned long mb = hap_get_allocation(d);
 
     if ( mb == hap_get_allocation(cd) )
