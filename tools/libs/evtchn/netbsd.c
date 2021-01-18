@@ -25,9 +25,9 @@
 
 #include <sys/ioctl.h>
 
-#include <xen/sys/evtchn.h>
-
 #include "private.h"
+
+#include <xen/xenio3.h>
 
 #define EVTCHN_DEV_NAME  "/dev/xenevt"
 
@@ -138,7 +138,7 @@ xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
     int fd = xce->fd;
     evtchn_port_t port;
 
-    if ( read_exact(fd, (char *)&port, sizeof(port)) == -1 )
+    if ( read(fd, (char *)&port, sizeof(port)) == -1 )
         return -1;
 
     return port;
@@ -148,7 +148,7 @@ int xenevtchn_unmask(xenevtchn_handle *xce, evtchn_port_t port)
 {
     int fd = xce->fd;
 
-    return write_exact(fd, (char *)&port, sizeof(port));
+    return write(fd, (char *)&port, sizeof(port));
 }
 
 /*
