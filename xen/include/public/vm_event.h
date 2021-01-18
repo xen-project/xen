@@ -223,6 +223,13 @@ struct vm_event_regs_x86 {
      */
     uint64_t npt_base;
 
+    /*
+     * Current position in the vmtrace buffer, or ~0 if vmtrace is not active.
+     *
+     * For Intel Processor Trace, it is the upper half of MSR_RTIT_OUTPUT_MASK.
+     */
+    uint64_t vmtrace_pos;
+
     uint32_t cs_base;
     uint32_t ss_base;
     uint32_t ds_base;

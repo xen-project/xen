@@ -251,6 +251,9 @@ void vm_event_fill_regs(vm_event_request_t *req)
 
     req->data.regs.x86.shadow_gs = ctxt.shadow_gs;
     req->data.regs.x86.dr6 = ctxt.dr6;
+
+    if ( hvm_vmtrace_output_position(curr, &req->data.regs.x86.vmtrace_pos) != 1 )
+        req->data.regs.x86.vmtrace_pos = ~0;
 #endif
 }
 
