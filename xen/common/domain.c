@@ -421,13 +421,14 @@ struct domain *domain_create(domid_t domid,
     if ( (d = alloc_domain_struct()) == NULL )
         return ERR_PTR(-ENOMEM);
 
-    d->options = config ? config->flags : 0;
-
     /* Sort out our idea of is_system_domain(). */
     d->domain_id = domid;
 
     /* Debug sanity. */
     ASSERT(is_system_domain(d) ? config == NULL : config != NULL);
+
+    if ( config )
+        d->options = config->flags;
 
     /* Sort out our idea of is_control_domain(). */
     d->is_privileged = is_priv;
