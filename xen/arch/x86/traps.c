@@ -1049,11 +1049,17 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
             res->a |= XEN_HVM_CPUID_X2APIC_VIRT;
 
         /*
-         * Indicate that memory mapped from other domains (either grants or
-         * foreign pages) has valid IOMMU entries.
+         * 1) Xen 4.10 and older was broken WRT grant maps requesting a DMA
+         * mapping, and forgot to honour the guest's request.
+         * 2) 4.11 (and presumably backports) fixed the bug, so the map
+         * hypercall actually did what the guest asked.
+         * 3) To work around the bug, guests must bounce buffer all DMA that
+         * would otherwise use a grant map, because it doesn't know whether the
+         * DMA is originating from an emulated or a real device.
+         * 4) This flag tells guests it is safe not to bounce-buffer all DMA to
+         * work around the bug.
          */
-        if ( is_iommu_enabled(d) )
-            res->a |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
+        res->a |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
 
         /* Indicate presence of vcpu id and set it in ebx */
         res->a |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
