@@ -1920,7 +1920,11 @@ int grant_table_init(struct domain *d, int max_grant_frames,
     if ( max_grant_frames < INITIAL_NR_GRANT_FRAMES ||
          max_grant_frames > opt_max_grant_frames ||
          max_maptrack_frames > opt_max_maptrack_frames )
+    {
+        dprintk(XENLOG_INFO, "Bad grant table sizes: grant %u, maptrack %u\n",
+                max_grant_frames, max_maptrack_frames);
         return -EINVAL;
+    }
 
     if ( (gt = xzalloc(struct grant_table)) == NULL )
         return -ENOMEM;
