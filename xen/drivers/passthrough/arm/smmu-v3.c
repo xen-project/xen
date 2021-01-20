@@ -682,7 +682,7 @@ static void parse_driver_options(struct arm_smmu_device *smmu)
 	int i = 0;
 
 	do {
-		if (of_property_read_bool(smmu->dev->of_node,
+		if (dt_property_read_bool(smmu->dev->of_node,
 						arm_smmu_options[i].prop)) {
 			smmu->options |= arm_smmu_options[i].opt;
 			dev_notice(smmu->dev, "option %s\n",
@@ -754,17 +754,17 @@ static void queue_inc_prod(struct arm_smmu_ll_queue *q)
  */
 static int queue_poll_cons(struct arm_smmu_queue *q, bool sync, bool wfe)
 {
-	ktime_t timeout;
+	s_time_t timeout;
 	unsigned int delay = 1, spin_cnt = 0;
 
 	/* Wait longer if it's a CMD_SYNC */
-	timeout = ktime_add_us(ktime_get(), sync ?
+	timeout = NOW() + MICROSECS(sync ?
 					    ARM_SMMU_CMDQ_SYNC_TIMEOUT_US :
 					    ARM_SMMU_POLL_TIMEOUT_US);
 
 	while (queue_sync_cons_in(q),
 	      (sync ? !queue_empty(&q->llq) : queue_full(&q->llq))) {
-		if (ktime_compare(ktime_get(), timeout) > 0)
+		if ((NOW() > timeout) > 0)
 			return -ETIMEDOUT;
 
 		if (wfe) {
@@ -990,13 +990,13 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
  */
 static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
 {
-	ktime_t timeout;
+	s_time_t timeout;
 	u32 val;
 
-	timeout = ktime_add_us(ktime_get(), ARM_SMMU_CMDQ_SYNC_TIMEOUT_US);
+	timeout = NOW() + MICROSECS(ARM_SMMU_CMDQ_SYNC_TIMEOUT_US);
 	val = smp_cond_load_acquire(&smmu->sync_count,
 				    (int)(VAL - sync_idx) >= 0 ||
-				    !ktime_before(ktime_get(), timeout));
+				    !(NOW() < timeout));
 
 	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
 }
@@ -2649,7 +2649,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
 	u32 cells;
 	int ret = -EINVAL;
 
-	if (of_property_read_u32(dev->of_node, "#iommu-cells", &cells))
+	if (!dt_property_read_u32(dev->of_node, "#iommu-cells", &cells))
 		dev_err(dev, "missing #iommu-cells property\n");
 	else if (cells != 1)
 		dev_err(dev, "invalid #iommu-cells value (%d)\n", cells);
