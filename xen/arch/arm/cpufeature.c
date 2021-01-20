@@ -187,6 +187,12 @@ static int __init create_guest_cpuinfo(void)
 
     /* Hide MTE support as Xen does not support it */
     guest_cpuinfo.pfr64.mte = 0;
+
+    /* Hide PAC support as Xen does not support it */
+    guest_cpuinfo.isa64.apa = 0;
+    guest_cpuinfo.isa64.api = 0;
+    guest_cpuinfo.isa64.gpa = 0;
+    guest_cpuinfo.isa64.gpi = 0;
 #endif
 
     /* Hide AMU support */

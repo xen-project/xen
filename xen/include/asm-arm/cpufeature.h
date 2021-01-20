@@ -212,8 +212,44 @@ struct cpuinfo_arm {
         };
     } mm64;
 
-    struct {
+    union {
         uint64_t bits[2];
+        struct {
+            /* ISAR0 */
+            unsigned long __res0:4;
+            unsigned long aes:4;
+            unsigned long sha1:4;
+            unsigned long sha2:4;
+            unsigned long crc32:4;
+            unsigned long atomic:4;
+            unsigned long __res1:4;
+            unsigned long rdm:4;
+            unsigned long sha3:4;
+            unsigned long sm3:4;
+            unsigned long sm4:4;
+            unsigned long dp:4;
+            unsigned long fhm:4;
+            unsigned long ts:4;
+            unsigned long tlb:4;
+            unsigned long rndr:4;
+
+            /* ISAR1 */
+            unsigned long dpb:4;
+            unsigned long apa:4;
+            unsigned long api:4;
+            unsigned long jscvt:4;
+            unsigned long fcma:4;
+            unsigned long lrcpc:4;
+            unsigned long gpa:4;
+            unsigned long gpi:4;
+            unsigned long frintts:4;
+            unsigned long sb:4;
+            unsigned long specres:4;
+            unsigned long bf16:4;
+            unsigned long dgh:4;
+            unsigned long i8mm:4;
+            unsigned long __res2:8;
+        };
     } isa64;
 
     struct {
