@@ -401,6 +401,18 @@ int dt_property_read_string(const struct dt_device_node *np,
                             const char *propname, const char **out_string);
 
 /**
+ * dt_property_match_string() - Find string in a list and return index
+ * @np: pointer to node containing string list property
+ * @propname: string list property name
+ * @string: pointer to string to search for in string list
+ *
+ * This function searches a string list property and returns the index
+ * of a specific string value.
+ */
+int dt_property_match_string(const struct dt_device_node *np,
+                             const char *propname, const char *string);
+
+/**
  * Checks if the given "compat" string matches one of the strings in
  * the device's "compatible" property
  */

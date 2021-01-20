@@ -208,6 +208,33 @@ int dt_property_read_string(const struct dt_device_node *np,
     return 0;
 }
 
+int dt_property_match_string(const struct dt_device_node *np,
+                             const char *propname, const char *string)
+{
+    const struct dt_property *dtprop = dt_find_property(np, propname, NULL);
+    size_t l;
+    int i;
+    const char *p, *end;
+
+    if ( !dtprop )
+        return -EINVAL;
+    if ( !dtprop->value )
+        return -ENODATA;
+
+    p = dtprop->value;
+    end = p + dtprop->length;
+
+    for ( i = 0; p < end; i++, p += l )
+    {
+        l = strnlen(p, end - p) + 1;
+        if ( p + l > end )
+            return -EILSEQ;
+        if ( strcmp(string, p) == 0 )
+            return i; /* Found it; return index */
+    }
+    return -ENODATA;
+}
+
 bool_t dt_device_is_compatible(const struct dt_device_node *device,
                                const char *compat)
 {
