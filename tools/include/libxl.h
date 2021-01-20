@@ -482,6 +482,13 @@
 #define LIBXL_HAVE_DEVICE_PCI_NAME 1
 
 /*
+ * LIBXL_HAVE_PHYSINFO_CAP_VMTRACE indicates that libxl_physinfo has a
+ * cap_vmtrace field, which indicates the availability of platform tracing
+ * functionality.
+ */
+#define LIBXL_HAVE_PHYSINFO_CAP_VMTRACE 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

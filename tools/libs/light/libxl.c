@@ -402,6 +402,8 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
         !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_shadow);
     physinfo->cap_iommu_hap_pt_share =
         !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_iommu_hap_pt_share);
+    physinfo->cap_vmtrace =
+        !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_vmtrace);
 
     GC_FREE;
     return 0;

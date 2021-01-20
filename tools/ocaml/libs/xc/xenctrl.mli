@@ -101,6 +101,7 @@ type physinfo_cap_flag =
   | CAP_HAP
   | CAP_Shadow
   | CAP_IOMMU_HAP_PT_SHARE
+  | CAP_Vmtrace
 
 type physinfo = {
   threads_per_core : int;

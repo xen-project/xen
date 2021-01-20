@@ -131,4 +131,6 @@ void vnuma_destroy(struct vnuma_info *vnuma);
 static inline void vnuma_destroy(struct vnuma_info *vnuma) { ASSERT(!vnuma); }
 #endif
 
+extern bool vmtrace_available;
+
 #endif /* __XEN_DOMAIN_H__ */

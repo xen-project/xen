@@ -3348,6 +3348,7 @@ x.CapHvmDirectio = bool(xc.cap_hvm_directio)
 x.CapHap = bool(xc.cap_hap)
 x.CapShadow = bool(xc.cap_shadow)
 x.CapIommuHapPtShare = bool(xc.cap_iommu_hap_pt_share)
+x.CapVmtrace = bool(xc.cap_vmtrace)
 
  return nil}
 
@@ -3378,6 +3379,7 @@ xc.cap_hvm_directio = C.bool(x.CapHvmDirectio)
 xc.cap_hap = C.bool(x.CapHap)
 xc.cap_shadow = C.bool(x.CapShadow)
 xc.cap_iommu_hap_pt_share = C.bool(x.CapIommuHapPtShare)
+xc.cap_vmtrace = C.bool(x.CapVmtrace)
 
  return nil
  }

@@ -277,6 +277,8 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
             if ( iommu_hap_pt_share )
                 pi->capabilities |= XEN_SYSCTL_PHYSCAP_iommu_hap_pt_share;
         }
+        if ( vmtrace_available )
+            pi->capabilities |= XEN_SYSCTL_PHYSCAP_vmtrace;
 
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;

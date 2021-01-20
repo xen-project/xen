@@ -1000,6 +1000,7 @@ CapHvmDirectio bool
 CapHap bool
 CapShadow bool
 CapIommuHapPtShare bool
+CapVmtrace bool
 }
 
 type Connectorinfo struct {

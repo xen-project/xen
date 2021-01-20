@@ -82,6 +82,8 @@ struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
 vcpu_info_t dummy_vcpu_info;
 
+bool __read_mostly vmtrace_available;
+
 static void __domain_finalise_shutdown(struct domain *d)
 {
     struct vcpu *v;

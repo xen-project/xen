@@ -1053,6 +1053,7 @@ libxl_physinfo = Struct("physinfo", [
     ("cap_hap", bool),
     ("cap_shadow", bool),
     ("cap_iommu_hap_pt_share", bool),
+    ("cap_vmtrace", bool),
     ], dir=DIR_OUT)
 
 libxl_connectorinfo = Struct("connectorinfo", [
