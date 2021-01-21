@@ -47,9 +47,7 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
     ARGS(xen_version, 2),
     ARGS(console_io, 3),
     ARGS(physdev_op_compat, 1),
-#ifdef CONFIG_GRANT_TABLE
     ARGS(grant_table_op, 3),
-#endif
     ARGS(vm_assist, 2),
     COMP(update_va_mapping_otherdomain, 4, 5),
     ARGS(vcpu_op, 3),
@@ -65,17 +63,11 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
     ARGS(sysctl, 1),
     ARGS(domctl, 1),
     ARGS(kexec_op, 2),
-#ifdef CONFIG_ARGO
     ARGS(argo_op, 5),
-#endif
     ARGS(xenpmu_op, 2),
-#ifdef CONFIG_HVM
     ARGS(hvm_op, 2),
     ARGS(dm_op, 3),
-#endif
-#ifdef CONFIG_HYPFS
     ARGS(hypfs_op, 5),
-#endif
     ARGS(mca, 1),
     ARGS(arch_1, 1),
 };
