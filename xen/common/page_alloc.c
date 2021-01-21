@@ -1032,16 +1032,12 @@ static struct page_info *alloc_heap_pages(
     {
         for ( i = 0; i < (1U << order); i++ )
         {
-            if ( test_bit(_PGC_need_scrub, &pg[i].count_info) )
+            if ( test_and_clear_bit(_PGC_need_scrub, &pg[i].count_info) )
             {
                 if ( !(memflags & MEMF_no_scrub) )
                     scrub_one_page(&pg[i]);
 
                 dirty_cnt++;
-
-                spin_lock(&heap_lock);
-                pg[i].count_info &= ~PGC_need_scrub;
-                spin_unlock(&heap_lock);
             }
             else if ( !(memflags & MEMF_no_scrub) )
                 check_one_page(&pg[i]);
