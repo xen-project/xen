@@ -1036,6 +1036,10 @@ static int pci_clean_dpci_irq(struct domain *d,
 {
     struct dev_intx_gsi_link *digl, *tmp;
 
+    if ( !pirq_dpci->flags )
+        /* Already processed. */
+        return 0;
+
     pirq_guest_unbind(d, dpci_pirq(pirq_dpci));
 
     if ( pt_irq_need_timer(pirq_dpci->flags) )
@@ -1046,15 +1050,10 @@ static int pci_clean_dpci_irq(struct domain *d,
         list_del(&digl->list);
         xfree(digl);
     }
+    /* Note the pirq is now unbound. */
+    pirq_dpci->flags = 0;
 
-    radix_tree_delete(&d->pirq_tree, dpci_pirq(pirq_dpci)->pirq);
-
-    if ( !pt_pirq_softirq_active(pirq_dpci) )
-        return 0;
-
-    domain_get_irq_dpci(d)->pending_pirq_dpci = pirq_dpci;
-
-    return -ERESTART;
+    return pt_pirq_softirq_active(pirq_dpci) ? -ERESTART : 0;
 }
 
 int arch_pci_clean_pirqs(struct domain *d)
@@ -1071,18 +1070,8 @@ int arch_pci_clean_pirqs(struct domain *d)
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
     {
-        int ret = 0;
+        int ret = pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
 
-        if ( hvm_irq_dpci->pending_pirq_dpci )
-        {
-            if ( pt_pirq_softirq_active(hvm_irq_dpci->pending_pirq_dpci) )
-                 ret = -ERESTART;
-            else
-                 hvm_irq_dpci->pending_pirq_dpci = NULL;
-        }
-
-        if ( !ret )
-            ret = pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
         if ( ret )
         {
             spin_unlock(&d->event_lock);
