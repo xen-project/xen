@@ -769,7 +769,7 @@ u64 __init hpet_setup(void)
 {
     static u64 __initdata hpet_rate;
     u32 hpet_id, hpet_period;
-    unsigned int last;
+    unsigned int last, rem;
 
     if ( hpet_rate )
         return hpet_rate;
@@ -799,9 +799,11 @@ u64 __init hpet_setup(void)
     hpet_resume(hpet_boot_cfg);
 
     hpet_rate = 1000000000000000ULL; /* 10^15 */
-    last = do_div(hpet_rate, hpet_period);
+    rem = do_div(hpet_rate, hpet_period);
+    if ( (rem * 2) > hpet_period )
+        hpet_rate++;
 
-    return hpet_rate + (last * 2 > hpet_period);
+    return hpet_rate;
 }
 
 void hpet_resume(u32 *boot_cfg)
