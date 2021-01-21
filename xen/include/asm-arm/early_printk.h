@@ -10,6 +10,7 @@
 #ifndef __ARM_EARLY_PRINTK_H__
 #define __ARM_EARLY_PRINTK_H__
 
+#include <xen/page-size.h>
 
 #ifdef CONFIG_EARLY_PRINTK
 
