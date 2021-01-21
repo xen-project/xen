@@ -349,7 +349,7 @@ static int __init acpi_invalidate_bgrt(struct acpi_table_header *table)
 
 /* Get pm1x_cnt and pm1x_evt information for ACPI sleep */
 static void __init
-acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
+acpi_fadt_parse_sleep_info(const struct acpi_table_fadt *fadt)
 {
 	struct acpi_table_facs *facs = NULL;
 	uint64_t facs_pa;
@@ -362,10 +362,10 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 		printk(KERN_INFO PREFIX
 		       "v5 SLEEP INFO: control[%d:%"PRIx64"],"
 		       " status[%d:%"PRIx64"]\n",
-		       acpi_sinfo.sleep_control.space_id,
-		       acpi_sinfo.sleep_control.address,
-		       acpi_sinfo.sleep_status.space_id,
-		       acpi_sinfo.sleep_status.address);
+		       fadt->sleep_control.space_id,
+		       fadt->sleep_control.address,
+		       fadt->sleep_status.space_id,
+		       fadt->sleep_status.address);
 
 		if ((fadt->sleep_control.address &&
 		     (fadt->sleep_control.bit_offset ||
@@ -384,8 +384,8 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 			       fadt->sleep_status.bit_offset,
 			       fadt->sleep_status.bit_width,
 			       fadt->sleep_status.access_width);
-			fadt->sleep_control.address = 0;
-			fadt->sleep_status.address = 0;
+			acpi_sinfo.sleep_control.address = 0;
+			acpi_sinfo.sleep_status.address = 0;
 		}
 	}
 
