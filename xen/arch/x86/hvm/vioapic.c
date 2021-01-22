@@ -526,7 +526,7 @@ void vioapic_update_EOI(struct domain *d, u8 vector)
             }
 
             if ( (ent->fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
-                 !ent->fields.mask &&
+                 !ent->fields.mask && !ent->fields.remote_irr &&
                  hvm_irq->gsi_assert_count[vioapic->base_gsi + pin] )
             {
                 ent->fields.remote_irr = 1;
