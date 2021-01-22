@@ -72,6 +72,7 @@ enum hypfs_lock_state {
     hypfs_write_locked
 };
 static DEFINE_PER_CPU(enum hypfs_lock_state, hypfs_locked);
+static DEFINE_PER_CPU(struct hypfs_dyndata *, hypfs_dyndata);
 
 static DEFINE_PER_CPU(const struct hypfs_entry *, hypfs_last_node_entered);
 
@@ -155,6 +156,36 @@ static void node_exit_all(void)
         node_exit(*last);
 }
 
+#undef hypfs_alloc_dyndata
+void *hypfs_alloc_dyndata(unsigned long size)
+{
+    unsigned int cpu = smp_processor_id();
+    struct hypfs_dyndata **dyndata = &per_cpu(hypfs_dyndata, cpu);
+
+    ASSERT(per_cpu(hypfs_locked, cpu) != hypfs_unlocked);
+    ASSERT(*dyndata == NULL);
+
+    *dyndata = xzalloc_bytes(size);
+
+    return *dyndata;
+}
+
+void *hypfs_get_dyndata(void)
+{
+    struct hypfs_dyndata *dyndata = this_cpu(hypfs_dyndata);
+
+    ASSERT(dyndata);
+
+    return dyndata;
+}
+
+void hypfs_free_dyndata(void)
+{
+    struct hypfs_dyndata **dyndata = &this_cpu(hypfs_dyndata);
+
+    XFREE(*dyndata);
+}
+
 static int add_entry(struct hypfs_entry_dir *parent, struct hypfs_entry *new)
 {
     int ret = -ENOENT;
@@ -214,6 +245,18 @@ int hypfs_add_dir(struct hypfs_entry_dir *parent,
     BUG_ON(nofault && ret);
 
     return ret;
+}
+
+void hypfs_add_dyndir(struct hypfs_entry_dir *parent,
+                      struct hypfs_entry_dir *template)
+{
+    /*
+     * As the template is only a placeholder for possibly multiple dynamically
+     * generated directories, the link up to its parent can be static, while
+     * the "real" children of the parent are to be found via the parent's
+     * findentry function only.
+     */
+    template->e.parent = &parent->e;
 }
 
 int hypfs_add_leaf(struct hypfs_entry_dir *parent,
