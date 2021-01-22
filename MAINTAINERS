@@ -249,6 +249,12 @@ F:	xen/include/asm-arm/
 F:	xen/include/public/arch-arm/
 F:	xen/include/public/arch-arm.h
 
+ARM SMMUv3
+M:	Bertrand Marquis <bertrand.marquis@arm.com>
+M:	Rahul Singh <rahul.singh@arm.com>
+S:	Supported
+F:	xen/drivers/passthrough/arm/smmu-v3.c
+
 Change Log
 M:	Paul Durrant <paul@xen.org>
 R:	Community Manager <community.manager@xenproject.org>

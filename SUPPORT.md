@@ -67,6 +67,7 @@ For the Cortex A57 r0p0 - r1p1, see Errata 832075.
     Status, Intel VT-d: Supported
     Status, ARM SMMUv1: Supported, not security supported
     Status, ARM SMMUv2: Supported, not security supported
+    Status, ARM SMMUv3: Tech Preview
     Status, Renesas IPMMU-VMSA: Supported, not security supported
 
 ### ARM/GICv3 ITS
