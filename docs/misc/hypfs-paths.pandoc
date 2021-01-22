@@ -184,6 +184,10 @@ A directory of all current cpupools.
 The individual cpupools. Each entry is a directory with the name being the
 cpupool-id (e.g. /cpupool/0/).
 
+#### /cpupool/*/sched-gran = ("cpu" | "core" | "socket")
+
+The scheduling granularity of a cpupool.
+
 #### /params/
 
 A directory of runtime parameters.
