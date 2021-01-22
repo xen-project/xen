@@ -2025,6 +2025,7 @@ x.PowerMgmt = bool(xc.power_mgmt)
 x.Permissive = bool(xc.permissive)
 x.Seize = bool(xc.seize)
 x.RdmPolicy = RdmReservePolicy(xc.rdm_policy)
+x.Name = C.GoString(xc.name)
 
  return nil}
 
@@ -2044,6 +2045,8 @@ xc.power_mgmt = C.bool(x.PowerMgmt)
 xc.permissive = C.bool(x.Permissive)
 xc.seize = C.bool(x.Seize)
 xc.rdm_policy = C.libxl_rdm_reserve_policy(x.RdmPolicy)
+if x.Name != "" {
+xc.name = C.CString(x.Name)}
 
  return nil
  }

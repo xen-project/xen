@@ -210,6 +210,7 @@ ViridianEnlightenmentCrashCtl ViridianEnlightenment = 6
 ViridianEnlightenmentSynic ViridianEnlightenment = 7
 ViridianEnlightenmentStimer ViridianEnlightenment = 8
 ViridianEnlightenmentHcallIpi ViridianEnlightenment = 9
+ViridianEnlightenmentExProcessorMasks ViridianEnlightenment = 10
 )
 
 type Hdtype int
@@ -719,6 +720,7 @@ PowerMgmt bool
 Permissive bool
 Seize bool
 RdmPolicy RdmReservePolicy
+Name string
 }
 
 type DeviceRdm struct {
