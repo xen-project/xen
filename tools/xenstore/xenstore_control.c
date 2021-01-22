@@ -313,8 +313,8 @@ int main(int argc, char **argv)
     struct xs_handle *xsh;
     char *par = NULL;
     char *ret;
-    unsigned int p, len = 0;
-    int rc = 0;
+    unsigned int p;
+    int rc = 0, len = 0;
 
     if (argc < 2) {
         fprintf(stderr, "Usage:\n"
