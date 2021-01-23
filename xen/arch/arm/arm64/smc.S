@@ -13,9 +13,6 @@
  * GNU General Public License for more details.
  */
 
-#include <asm/asm_defns.h>
-#include <asm/macros.h>
-
 /*
  * void __arm_smccc_1_0_smc(register_t a0, register_t a1, register_t a2,
  *                          register_t a3, register_t a4, register_t a5,

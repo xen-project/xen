@@ -16,8 +16,6 @@
  * GNU General Public License for more details.
  */
 
-#include <asm/asm_defns.h>
-
 /*
  * PL011 UART initialization
  * xb: register which containts the UART base address

@@ -134,7 +134,7 @@ asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
 	$(CC) $(filter-out -flto,$(c_flags)) -S -o $@ $<
 
 xen.lds: xen.lds.S
-	$(CPP) -P $(a_flags) -MQ $@ -o $@ $<
+	$(CPP) -P $(a_flags) -D__LINKER__ -MQ $@ -o $@ $<
 
 dtb.o: $(patsubst "%",%,$(CONFIG_DTB_FILE))
 

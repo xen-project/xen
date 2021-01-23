@@ -18,7 +18,6 @@
  */
 
 #include <asm/page.h>
-#include <asm/asm_defns.h>
 #include <asm/early_printk.h>
 
 #define ZIMAGE_MAGIC_NUMBER 0x016f2818

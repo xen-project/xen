@@ -69,6 +69,7 @@
 #endif
 
 #include <xen/const.h>
+#include <xen/page-size.h>
 
 /*
  * Common ARM32 and ARM64 layout:
@@ -189,6 +190,11 @@ extern unsigned long frametable_virt_end;
 
 #define watchdog_disable() ((void)0)
 #define watchdog_enable()  ((void)0)
+
+#if defined(__ASSEMBLY__) && !defined(__LINKER__)
+#include <asm/asm_defns.h>
+#include <asm/macros.h>
+#endif
 
 #endif /* __ARM_CONFIG_H__ */
 /*
