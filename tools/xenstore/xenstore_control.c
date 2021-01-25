@@ -43,7 +43,12 @@ static int live_update_start(struct xs_handle *xsh, bool force, unsigned int to)
     if (len < 0)
         return 1;
 
+    ret = strdup("BUSY");
+    if (!ret)
+        return 1;
+
     for (time_start = time(NULL); time(NULL) - time_start < to;) {
+        free(ret);
         ret = xs_control_command(xsh, "live-update", buf, len);
         if (!ret)
             goto err;
