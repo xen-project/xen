@@ -2309,8 +2309,6 @@ _hidden char *libxl__json_object_to_json(libxl__gc *gc,
   /* Based on /local/domain/$domid/dm-version xenstore key
    * default is qemu xen traditional */
 _hidden int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
-  /* Return the system-wide default device model */
-_hidden libxl_device_model_version libxl__default_device_model(libxl__gc *gc);
 
 static inline
 bool libxl__stubdomain_is_linux_running(libxl__gc *gc, uint32_t domid)

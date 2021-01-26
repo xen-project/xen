@@ -241,11 +241,6 @@ out:
     return rc;
 }
 
-libxl_device_model_version libxl__default_device_model(libxl__gc *gc)
-{
-    return LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
-}
-
 int libxl__pci_numdevs(libxl__gc *gc)
 {
     DIR *dir;
