@@ -409,7 +409,7 @@ static int xc_try_lzo1x_decode(
     int ret;
     const unsigned char *cur = dom->kernel_blob;
     unsigned char *out_buf = NULL;
-    size_t left = dom->kernel_size;
+    size_t left = dom->kernel_size, outsize;
     const char *msg;
     unsigned version;
     static const unsigned char magic[] = {
@@ -471,7 +471,7 @@ static int xc_try_lzo1x_decode(
     cur += ret;
     left -= ret;
 
-    for ( *size = 0; ; )
+    for ( outsize = 0; ; )
     {
         lzo_uint src_len, dst_len, out_len;
         unsigned char *tmp_buf;
@@ -484,8 +484,14 @@ static int xc_try_lzo1x_decode(
         if ( !dst_len )
         {
             msg = "Error registering stream output";
-            if ( xc_dom_register_external(dom, out_buf, *size) )
+            if ( xc_dom_register_external(dom, out_buf, outsize) )
                 break;
+
+            DOMPRINTF("%s: LZO decompress OK, 0x%zx -> 0x%zx",
+                      __FUNCTION__, *size, outsize);
+
+            *blob = out_buf;
+            *size = outsize;
 
             return 0;
         }
@@ -508,15 +514,15 @@ static int xc_try_lzo1x_decode(
             break;
 
         msg = "Output buffer overflow";
-        if ( *size > SIZE_MAX - dst_len )
+        if ( outsize > SIZE_MAX - dst_len )
             break;
 
         msg = "Decompressed image too large";
-        if ( xc_dom_kernel_check_size(dom, *size + dst_len) )
+        if ( xc_dom_kernel_check_size(dom, outsize + dst_len) )
             break;
 
         msg = "Failed to (re)alloc memory";
-        tmp_buf = realloc(out_buf, *size + dst_len);
+        tmp_buf = realloc(out_buf, outsize + dst_len);
         if ( tmp_buf == NULL )
             break;
 
@@ -524,7 +530,7 @@ static int xc_try_lzo1x_decode(
         out_len = dst_len;
 
         ret = lzo1x_decompress_safe(cur, src_len,
-                                    out_buf + *size, &out_len, NULL);
+                                    out_buf + outsize, &out_len, NULL);
         switch ( ret )
         {
         case LZO_E_OK:
@@ -532,8 +538,7 @@ static int xc_try_lzo1x_decode(
             if ( out_len != dst_len )
                 break;
 
-            *blob = out_buf;
-            *size += out_len;
+            outsize += out_len;
             cur += src_len;
             left -= src_len;
             continue;
