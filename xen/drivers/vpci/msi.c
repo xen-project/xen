@@ -85,8 +85,7 @@ static void update_msi(const struct pci_dev *pdev, struct vpci_msi *msi)
     if ( !msi->enabled )
         return;
 
-    if ( vpci_msi_arch_update(msi, pdev) )
-        msi->enabled = false;
+    vpci_msi_arch_update(msi, pdev);
 }
 
 /* Handlers for the address field (32bit or low part of a 64bit address). */

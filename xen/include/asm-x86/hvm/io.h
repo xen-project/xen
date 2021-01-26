@@ -130,6 +130,7 @@ static inline void msixtbl_init(struct domain *d) {}
 /* Arch-specific MSI data for vPCI. */
 struct vpci_arch_msi {
     int pirq;
+    bool bound;
 };
 
 /* Arch-specific MSI-X entry data for vPCI. */
