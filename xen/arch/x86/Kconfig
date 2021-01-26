@@ -103,7 +103,7 @@ config HVM
 	  If unsure, say Y.
 
 config XEN_SHSTK
-	bool "Supervisor Shadow Stacks"
+	bool "Supervisor Shadow Stacks (EXPERT)"
 	depends on HAS_AS_CET_SS && EXPERT
 	default y
 	---help---
