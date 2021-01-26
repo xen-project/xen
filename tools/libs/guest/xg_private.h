@@ -62,6 +62,15 @@ char *xc_inflate_buffer(xc_interface *xch,
                         unsigned long in_size,
                         unsigned long *out_size);
 
+#if !defined(__MINIOS__) || defined(XG_NEED_UNALIGNED)
+
+static inline unsigned int get_unaligned_le32(const uint8_t *buf)
+{
+    return ((unsigned int)buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
+}
+
+#endif /* !__MINIOS__ || XG_NEED_UNALIGNED */
+
 unsigned long csum_page (void * page);
 
 #define _PAGE_PRESENT   0x001

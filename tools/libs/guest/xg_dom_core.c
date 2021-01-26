@@ -31,6 +31,7 @@
 #include <zlib.h>
 #include <assert.h>
 
+#define XG_NEED_UNALIGNED
 #include "xg_private.h"
 #include "_paths.h"
 
@@ -325,7 +326,6 @@ int xc_dom_kernel_check_size(struct xc_dom_image *dom, size_t sz)
 
 size_t xc_dom_check_gzip(xc_interface *xch, void *blob, size_t ziplen)
 {
-    unsigned char *gzlen;
     size_t unziplen;
 
     if ( ziplen < 6 )
@@ -337,8 +337,7 @@ size_t xc_dom_check_gzip(xc_interface *xch, void *blob, size_t ziplen)
         /* not gzipped */
         return 0;
 
-    gzlen = blob + ziplen - 4;
-    unziplen = (size_t)gzlen[3] << 24 | gzlen[2] << 16 | gzlen[1] << 8 | gzlen[0];
+    unziplen = get_unaligned_le32(blob + ziplen - 4);
     if ( unziplen > XC_DOM_DECOMPRESS_MAX )
     {
         xc_dom_printf

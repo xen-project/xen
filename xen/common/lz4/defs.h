@@ -18,11 +18,6 @@ static inline u16 get_unaligned_le16(const void *p)
 	return le16_to_cpup(p);
 }
 
-static inline u32 get_unaligned_le32(const void *p)
-{
-	return le32_to_cpup(p);
-}
-
 #endif
 
 /*

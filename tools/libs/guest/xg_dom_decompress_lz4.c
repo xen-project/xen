@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stdint.h>
 
+#define XG_NEED_UNALIGNED
 #include "xg_private.h"
 #include "xg_dom_decompress.h"
 
