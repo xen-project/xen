@@ -124,3 +124,9 @@ int libxl__local_dm_preexec_restrict(libxl__gc *gc)
 {
     return 0;
 }
+
+int libxl__setresuid(uid_t ruid, uid_t euid, uid_t suid)
+{
+    assert(!"setresuid is not available on NetBSD, and dm restrction is not supported, so this code path should not have been reached");
+    return -1;
+}

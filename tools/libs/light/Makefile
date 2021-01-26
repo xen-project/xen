@@ -64,8 +64,8 @@ SRCS-$(CONFIG_ARM) += libxl_arm_no_acpi.c
 endif
 
 SRCS-OS-$(CONFIG_NetBSD) = libxl_netbsd.c
-SRCS-OS-$(CONFIG_Linux) = libxl_linux.c
-SRCS-OS-$(CONFIG_FreeBSD) = libxl_freebsd.c
+SRCS-OS-$(CONFIG_Linux) = libxl_linux.c libxl_setresuid.c
+SRCS-OS-$(CONFIG_FreeBSD) = libxl_freebsd.c libxl_setresuid.c
 ifeq ($(SRCS-OS-y),)
 $(error Your Operating System is not supported by libxenlight, \
 please check libxl_linux.c and libxl_netbsd.c to see how to get it ported)

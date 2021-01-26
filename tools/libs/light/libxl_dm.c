@@ -3649,7 +3649,7 @@ static int kill_device_model_uid_child(libxl__destroy_devicemodel_state *ddms,
 
     LOGD(DEBUG, domid, "DM reaper: calling setresuid(%d, %d, 0)",
          reaper_uid, dm_kill_uid);
-    r = setresuid(reaper_uid, dm_kill_uid, 0);
+    r = libxl__setresuid(reaper_uid, dm_kill_uid, 0);
     if (r) {
         LOGED(ERROR, domid, "setresuid to (%d, %d, 0)",
               reaper_uid, dm_kill_uid);
