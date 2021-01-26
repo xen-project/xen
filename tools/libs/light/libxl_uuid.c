@@ -82,7 +82,6 @@ void libxl_uuid_generate(libxl_uuid *uuid)
     uuid_enc_be(uuid->uuid, &nat_uuid);
 }
 
-#ifdef __FreeBSD__
 int libxl_uuid_from_string(libxl_uuid *uuid, const char *in)
 {
     uint32_t status;
@@ -95,19 +94,6 @@ int libxl_uuid_from_string(libxl_uuid *uuid, const char *in)
 
     return 0;
 }
-#else
-#define LIBXL__UUID_PTRS(uuid) &uuid[0], &uuid[1], &uuid[2], &uuid[3], \
-                               &uuid[4], &uuid[5], &uuid[6], &uuid[7], \
-                               &uuid[8], &uuid[9], &uuid[10],&uuid[11], \
-                               &uuid[12],&uuid[13],&uuid[14],&uuid[15]
-int libxl_uuid_from_string(libxl_uuid *uuid, const char *in)
-{
-    if ( sscanf(in, LIBXL_UUID_FMT, LIBXL__UUID_PTRS(uuid->uuid)) != sizeof(uuid->uuid) )
-        return -1;
-    return 0;
-}
-#undef LIBXL__UUID_PTRS
-#endif
 
 void libxl_uuid_copy(libxl_ctx *ctx_opt, libxl_uuid *dst,
                      const libxl_uuid *src)
@@ -120,7 +106,6 @@ void libxl_uuid_clear(libxl_uuid *uuid)
     memset(&uuid->uuid, 0, sizeof(uuid->uuid));
 }
 
-#ifdef __FreeBSD__
 int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2)
 {
     uuid_t nat_uuid1, nat_uuid2;
@@ -130,12 +115,6 @@ int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2)
 
     return uuid_compare(&nat_uuid1, &nat_uuid2, NULL);
 }
-#else
-int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2)
-{
-     return memcmp(uuid1->uuid, uuid2->uuid, sizeof(uuid1->uuid));
-}
-#endif
 
 const uint8_t *libxl_uuid_bytearray_const(const libxl_uuid *uuid)
 {
