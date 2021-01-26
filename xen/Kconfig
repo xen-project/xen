@@ -35,7 +35,7 @@ config DEFCONFIG_LIST
 	default ARCH_DEFCONFIG
 
 config EXPERT
-	bool "Configure standard Xen features (expert users)"
+	bool "Configure EXPERT features"
 	help
 	  This option allows certain base Xen options and settings
 	  to be disabled or tweaked. This is for specialized environments
@@ -44,6 +44,15 @@ config EXPERT
 	  Xen binaries built with this option enabled are not security
 	  supported.
 	default n
+
+config UNSUPPORTED
+	bool "Configure UNSUPPORTED features"
+	default EXPERT
+	help
+	  This option allows certain unsupported Xen options to be changed,
+	  which includes non-security-supported, experimental, and tech
+	  preview features as defined by SUPPORT.md. (Note that if an option
+	  doesn't depend on UNSUPPORTED it doesn't imply that is supported.)
 
 config LTO
 	bool "Link Time Optimisation"
