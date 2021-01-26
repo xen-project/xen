@@ -31,6 +31,8 @@ else
 PKG_CONFIG_REMOVE += -ldl
 endif
 
+-include $(DEPS_INCLUDE)
+
 .PHONY: install
 install: install-headers
 
