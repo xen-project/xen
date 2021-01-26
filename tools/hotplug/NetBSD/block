@@ -5,6 +5,7 @@
 
 DIR=$(dirname "$0")
 . "${DIR}/hotplugpath.sh"
+. "${DIR}/locking.sh"
 
 PATH=${bindir}:${sbindir}:${LIBEXEC_BIN}:/bin:/usr/bin:/sbin:/usr/sbin
 export PATH
@@ -61,6 +62,7 @@ case $xstatus in
 			available_disks="$available_disks $disk"
 			eval $disk=free
 		done
+		claim_lock block
 		# Mark the used vnd(4) devices as ``used''.
 		for disk in `sysctl hw.disknames`; do
 			case $disk in
@@ -76,6 +78,7 @@ case $xstatus in
 				break	
 			fi
 		done
+		release_lock block
 		if [ x$device = x ] ; then
 			error "no available vnd device"
 		fi
@@ -85,7 +88,7 @@ case $xstatus in
 		device=$xparams
 		;;
 	esac
-	physical_device=$(stat -f '%r' "$device")
+	physical_device=$(stat -L -f '%r' "$device")
 	xenstore-write $xpath/physical-device $physical_device
 	xenstore-write $xpath/hotplug-status connected
 	exit 0
