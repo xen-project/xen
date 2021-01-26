@@ -19,11 +19,6 @@
 #ifndef ERROR_H_MODULE
 #define ERROR_H_MODULE
 
-/* ****************************************
-*  Dependencies
-******************************************/
-#include <xen/types.h> /* size_t */
-
 /**
  * enum ZSTD_ErrorCode - zstd error codes
  *

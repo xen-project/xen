@@ -40,9 +40,6 @@
 #ifndef HUF_H_298734234
 #define HUF_H_298734234
 
-/* *** Dependencies *** */
-#include <xen/types.h> /* size_t */
-
 /* ***   Tool functions *** */
 #define HUF_BLOCKSIZE_MAX (128 * 1024) /**< maximum input size for a single block compressed with HUF_compress */
 size_t HUF_compressBound(size_t size); /**< maximum compressed size (worst case) */

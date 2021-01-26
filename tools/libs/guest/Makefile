@@ -64,6 +64,7 @@ SRCS-y                 += xg_dom_decompress_unsafe_bzip2.c
 SRCS-y                 += xg_dom_decompress_unsafe_lzma.c
 SRCS-y                 += xg_dom_decompress_unsafe_lzo1x.c
 SRCS-y                 += xg_dom_decompress_unsafe_xz.c
+SRCS-y                 += xg_dom_decompress_unsafe_zstd.c
 endif
 
 -include $(XEN_TARGET_ARCH)/Makefile

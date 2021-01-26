@@ -16,3 +16,5 @@ int xc_try_lzo1x_decode(struct xc_dom_image *dom, void **blob, size_t *size)
     __attribute__((visibility("internal")));
 int xc_try_xz_decode(struct xc_dom_image *dom, void **blob, size_t *size)
     __attribute__((visibility("internal")));
+int xc_try_zstd_decode(struct xc_dom_image *dom, void **blob, size_t *size)
+    __attribute__((visibility("internal")));

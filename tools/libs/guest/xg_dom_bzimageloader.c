@@ -589,6 +589,85 @@ static int xc_try_lzo1x_decode(
 
 #endif
 
+#if defined(HAVE_ZSTD)
+
+#include <zstd.h>
+
+static int xc_try_zstd_decode(
+    struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    size_t outsize, insize, actual;
+    unsigned char *outbuf;
+
+    /* Magic, descriptor byte, and trailing size field. */
+    if ( *size <= 9 )
+    {
+        DOMPRINTF("ZSTD: insufficient input data");
+        return -1;
+    }
+
+    insize = *size - 4;
+    outsize = get_unaligned_le32(*blob + insize);
+
+    if ( xc_dom_kernel_check_size(dom, outsize) )
+    {
+        DOMPRINTF("ZSTD: output too large");
+        return -1;
+    }
+
+    outbuf = malloc(outsize);
+    if ( !outbuf )
+    {
+        DOMPRINTF("ZSTD: failed to alloc memory");
+        return -1;
+    }
+
+    actual = ZSTD_decompress(outbuf, outsize, *blob, insize);
+
+    if ( ZSTD_isError(actual) )
+    {
+        DOMPRINTF("ZSTD: error: %s", ZSTD_getErrorName(actual));
+        free(outbuf);
+        return -1;
+    }
+
+    if ( actual != outsize )
+    {
+        DOMPRINTF("ZSTD: got 0x%zx bytes instead of 0x%zx",
+                  actual, outsize);
+        free(outbuf);
+        return -1;
+    }
+
+    if ( xc_dom_register_external(dom, outbuf, outsize) )
+    {
+        DOMPRINTF("ZSTD: error registering stream output");
+        free(outbuf);
+        return -1;
+    }
+
+    DOMPRINTF("%s: ZSTD decompress OK, 0x%zx -> 0x%zx",
+              __FUNCTION__, insize, outsize);
+
+    *blob = outbuf;
+    *size = outsize;
+
+    return 0;
+}
+
+#else /* !defined(HAVE_ZSTD) */
+
+static int xc_try_zstd_decode(
+    struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                 "%s: ZSTD decompress support unavailable\n",
+                 __FUNCTION__);
+    return -1;
+}
+
+#endif
+
 #else /* __MINIOS__ */
 
 int xc_try_bzip2_decode(struct xc_dom_image *dom, void **blob, size_t *size);
@@ -732,6 +811,17 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
         {
             xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
                          "%s unable to XZ decompress kernel",
+                         __FUNCTION__);
+            return -EINVAL;
+        }
+    }
+    else if ( check_magic(dom, "\x28\xb5\x2f\xfd", 4) )
+    {
+        ret = xc_try_zstd_decode(dom, &dom->kernel_blob, &dom->kernel_size);
+        if ( ret < 0 )
+        {
+            xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                         "%s unable to ZSTD decompress kernel",
                          __FUNCTION__);
             return -EINVAL;
         }

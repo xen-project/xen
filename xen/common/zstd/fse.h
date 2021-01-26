@@ -41,11 +41,6 @@
 #define FSE_H
 
 /*-*****************************************
-*  Dependencies
-******************************************/
-#include <xen/types.h> /* size_t, ptrdiff_t */
-
-/*-*****************************************
 *  FSE_PUBLIC_API : control library symbols visibility
 ******************************************/
 #define FSE_PUBLIC_API

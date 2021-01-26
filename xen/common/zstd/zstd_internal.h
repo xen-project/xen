@@ -28,8 +28,10 @@
 ***************************************/
 #include "error_private.h"
 #include "mem.h"
+#ifdef __XEN__
 #include <xen/compiler.h>
 #include <xen/xxhash.h>
+#endif
 
 #define ALIGN(x, a) ((x + (a) - 1) & ~((a) - 1))
 #define PTR_ALIGN(p, a) ((typeof(p))ALIGN((unsigned long)(p), (a)))
@@ -95,8 +97,10 @@ typedef struct ZSTD_DStream_s ZSTD_DStream;
 /*-*************************************
 *  shared macros
 ***************************************/
+#ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 #define CHECK_F(f)                       \
 	{                                \
 		size_t const errcod = f; \

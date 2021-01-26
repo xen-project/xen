@@ -38,11 +38,13 @@
  * - xxHash source repository: https://github.com/Cyan4973/xxHash
  */
 
+#ifdef __XEN__
 #include <xen/compiler.h>
 #include <xen/errno.h>
 #include <xen/string.h>
 #include <xen/xxhash.h>
 #include <asm/unaligned.h>
+#endif
 
 /*-*************************************
  * Macros

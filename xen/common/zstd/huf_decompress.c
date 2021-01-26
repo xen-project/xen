@@ -48,8 +48,6 @@
 #include "bitstream.h" /* BIT_* */
 #include "fse.h"       /* header compression */
 #include "huf.h"
-#include <xen/compiler.h>
-#include <xen/string.h> /* memcpy, memset */
 
 /* **************************************************************
 *  Error Management

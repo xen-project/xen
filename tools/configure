@@ -643,6 +643,8 @@ PTHREAD_CFLAGS
 EXTFS_LIBS
 system_aio
 zlib
+libzstd_LIBS
+libzstd_CFLAGS
 FETCHER
 FTP
 FALSE
@@ -857,6 +859,8 @@ glib_CFLAGS
 glib_LIBS
 pixman_CFLAGS
 pixman_LIBS
+libzstd_CFLAGS
+libzstd_LIBS
 LIBNL3_CFLAGS
 LIBNL3_LIBS
 SYSTEMD_CFLAGS
@@ -1605,6 +1609,10 @@ Some influential environment variables:
   pixman_CFLAGS
               C compiler flags for pixman, overriding pkg-config
   pixman_LIBS linker flags for pixman, overriding pkg-config
+  libzstd_CFLAGS
+              C compiler flags for libzstd, overriding pkg-config
+  libzstd_LIBS
+              linker flags for libzstd, overriding pkg-config
   LIBNL3_CFLAGS
               C compiler flags for LIBNL3, overriding pkg-config
   LIBNL3_LIBS linker flags for LIBNL3, overriding pkg-config
@@ -8743,6 +8751,77 @@ fi
 fi
 
 
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libzstd" >&5
+$as_echo_n "checking for libzstd... " >&6; }
+
+if test -n "$libzstd_CFLAGS"; then
+    pkg_cv_libzstd_CFLAGS="$libzstd_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libzstd\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libzstd") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_libzstd_CFLAGS=`$PKG_CONFIG --cflags "libzstd" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$libzstd_LIBS"; then
+    pkg_cv_libzstd_LIBS="$libzstd_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libzstd\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libzstd") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_libzstd_LIBS=`$PKG_CONFIG --libs "libzstd" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        libzstd_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libzstd" 2>&1`
+        else
+	        libzstd_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libzstd" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$libzstd_PKG_ERRORS" >&5
+
+	true
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	true
+else
+	libzstd_CFLAGS=$pkg_cv_libzstd_CFLAGS
+	libzstd_LIBS=$pkg_cv_libzstd_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	zlib="$zlib -DHAVE_ZSTD $libzstd_CFLAGS $libzstd_LIBS"
+fi
 
 
 

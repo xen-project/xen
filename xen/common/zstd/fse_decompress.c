@@ -48,8 +48,6 @@
 #include "bitstream.h"
 #include "fse.h"
 #include "zstd_internal.h"
-#include <xen/compiler.h>
-#include <xen/string.h> /* memcpy, memset */
 
 /* **************************************************************
 *  Error Management
