@@ -22,11 +22,6 @@ static inline uint_fast16_t le16_to_cpup(const unsigned char *buf)
     return buf[0] | (buf[1] << 8);
 }
 
-static inline uint_fast32_t le32_to_cpup(const unsigned char *buf)
-{
-    return le16_to_cpup(buf) | ((uint32_t)le16_to_cpup(buf + 2) << 16);
-}
-
 #include "../../xen/include/xen/lz4.h"
 #include "../../xen/common/decompress.h"
 
