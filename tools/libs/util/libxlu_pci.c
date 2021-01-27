@@ -155,9 +155,10 @@ int xlu_pci_parse_spec_string(XLU_Config *cfg, libxl_device_pci *pci,
     if (!ret) {
         bdf_present = true;
 
-        /* Check whether 'vslot' if present */
+        /* Check whether 'vslot' is present */
         if (*ptr == '@') {
-            ret = parse_vslot(&pci->vdevfn, ++ptr, &ptr);
+            ++ptr;
+            ret = parse_vslot(&pci->vdevfn, ptr, &ptr);
             if (ret)
                 return ret;
         }
