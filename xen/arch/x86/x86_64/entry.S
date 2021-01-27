@@ -42,7 +42,7 @@ ENTRY(switch_to_kernel)
 UNLIKELY_START(z, syscall_no_callback) /* TB_eip == 0 => #UD */
         mov   VCPU_trap_ctxt(%rbx), %rdi
         movl  $X86_EXC_UD, UREGS_entry_vector(%rsp)
-        subl  $2, UREGS_rip(%rsp)
+        subq  $2, UREGS_rip(%rsp)
         mov   X86_EXC_UD * TRAPINFO_sizeof + TRAPINFO_eip(%rdi), %rax
         testb $4, X86_EXC_UD * TRAPINFO_sizeof + TRAPINFO_flags(%rdi)
         setnz %cl
