@@ -363,8 +363,8 @@ M:	Ian Jackson <iwj@xenproject.org>
 M:	Wei Liu <wl@xen.org>
 M:	Anthony PERARD <anthony.perard@citrix.com>
 S:	Supported
-F:	tools/libs/guest/
 F:	tools/libs/light/
+F:	tools/libs/util/
 F:	tools/xl/
 
 LIVEPATCH
