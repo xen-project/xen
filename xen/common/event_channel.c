@@ -678,9 +678,8 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
         {
             d2 = chn1->u.interdomain.remote_dom;
 
-            /* If we unlock d1 then we could lose d2. Must get a reference. */
-            if ( unlikely(!get_domain(d2)) )
-                BUG();
+            /* If we unlock d1 then we could lose d2. */
+            rcu_lock_domain(d2);
 
             if ( d1 < d2 )
             {
@@ -737,7 +736,7 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     {
         if ( d1 != d2 )
             spin_unlock(&d2->event_lock);
-        put_domain(d2);
+        rcu_unlock_domain(d2);
     }
 
     spin_unlock(&d1->event_lock);
