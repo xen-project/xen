@@ -2061,7 +2061,9 @@ static struct option options[] = {
 	{ "internal-db", 0, NULL, 'I' },
 	{ "verbose", 0, NULL, 'V' },
 	{ "watch-nb", 1, NULL, 'W' },
+#ifndef NO_LIVE_UPDATE
 	{ "live-update", 0, NULL, 'U' },
+#endif
 	{ NULL, 0, NULL, 0 } };
 
 extern void dump_conn(struct connection *conn); 
@@ -2141,9 +2143,11 @@ int main(int argc, char *argv[])
 		case 'p':
 			priv_domid = strtol(optarg, NULL, 10);
 			break;
+#ifndef NO_LIVE_UPDATE
 		case 'U':
 			live_update = true;
 			break;
+#endif
 		}
 	}
 	if (optind != argc)
@@ -2206,9 +2210,11 @@ int main(int argc, char *argv[])
 	if (tracefile)
 		tracefile = talloc_strdup(NULL, tracefile);
 
+#ifndef NO_LIVE_UPDATE
 	/* Read state in case of live update. */
 	if (live_update)
 		lu_read_state();
+#endif
 
 	/* Get ready to listen to the tools. */
 	initialize_fds(&sock_pollfd_idx, &timeout);
