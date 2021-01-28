@@ -90,7 +90,7 @@ bool vcpu_ioreq_handle_completion(struct vcpu *v);
 bool is_ioreq_server_page(struct domain *d, const struct page_info *page);
 
 int ioreq_server_get_frame(struct domain *d, ioservid_t id,
-                           unsigned long idx, mfn_t *mfn);
+                           unsigned int idx, mfn_t *mfn);
 int ioreq_server_map_mem_type(struct domain *d, ioservid_t id,
                               uint32_t type, uint32_t flags);
 

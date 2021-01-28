@@ -1055,7 +1055,7 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
 }
 
 static int acquire_grant_table(struct domain *d, unsigned int id,
-                               unsigned long frame,
+                               unsigned int frame,
                                unsigned int nr_frames,
                                xen_pfn_t mfn_list[])
 {
@@ -1094,7 +1094,7 @@ static int acquire_grant_table(struct domain *d, unsigned int id,
 
 static int acquire_ioreq_server(struct domain *d,
                                 unsigned int id,
-                                unsigned long frame,
+                                unsigned int frame,
                                 unsigned int nr_frames,
                                 xen_pfn_t mfn_list[])
 {
@@ -1163,6 +1163,19 @@ static int acquire_resource(
 
     if ( xmar.nr_frames > ARRAY_SIZE(mfn_list) )
         return -E2BIG;
+
+    /*
+     * The ABI is rather unfortunate.  nr_frames (and therefore the total size
+     * of the resource) is 32bit, while frame (the offset within the resource
+     * we'd like to start at) is 64bit.
+     *
+     * Reject values oustide the of the range of nr_frames, as well as
+     * combinations of frame and nr_frame which overflow, to simplify the rest
+     * of the logic.
+     */
+    if ( (xmar.frame >> 32) ||
+         ((xmar.frame + xmar.nr_frames) >> 32) )
+        return -EINVAL;
 
     rc = rcu_lock_remote_domain_by_id(xmar.domid, &d);
     if ( rc )

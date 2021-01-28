@@ -3918,7 +3918,7 @@ int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
 
 /* caller must hold write lock */
 static int gnttab_get_status_frame_mfn(struct domain *d,
-                                       unsigned long idx, mfn_t *mfn)
+                                       unsigned int idx, mfn_t *mfn)
 {
     const struct grant_table *gt = d->grant_table;
 
@@ -3929,8 +3929,8 @@ static int gnttab_get_status_frame_mfn(struct domain *d,
 
     if ( idx >= nr_status_frames(gt) )
     {
-        unsigned long nr_status;
-        unsigned long nr_grant;
+        unsigned int nr_status;
+        unsigned int nr_grant;
 
         nr_status = idx + 1; /* sufficient frames to make idx valid */
 
@@ -3958,7 +3958,7 @@ static int gnttab_get_status_frame_mfn(struct domain *d,
 
 /* caller must hold write lock */
 static int gnttab_get_shared_frame_mfn(struct domain *d,
-                                       unsigned long idx, mfn_t *mfn)
+                                       unsigned int idx, mfn_t *mfn)
 {
     const struct grant_table *gt = d->grant_table;
 
@@ -3966,7 +3966,7 @@ static int gnttab_get_shared_frame_mfn(struct domain *d,
 
     if ( idx >= nr_grant_frames(gt) )
     {
-        unsigned long nr_grant;
+        unsigned int nr_grant;
 
         nr_grant = idx + 1; /* sufficient frames to make idx valid */
 
@@ -4021,7 +4021,7 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
     return rc;
 }
 
-int gnttab_get_shared_frame(struct domain *d, unsigned long idx,
+int gnttab_get_shared_frame(struct domain *d, unsigned int idx,
                             mfn_t *mfn)
 {
     struct grant_table *gt = d->grant_table;
@@ -4034,7 +4034,7 @@ int gnttab_get_shared_frame(struct domain *d, unsigned long idx,
     return rc;
 }
 
-int gnttab_get_status_frame(struct domain *d, unsigned long idx,
+int gnttab_get_status_frame(struct domain *d, unsigned int idx,
                             mfn_t *mfn)
 {
     struct grant_table *gt = d->grant_table;

@@ -771,7 +771,7 @@ static int ioreq_server_get_info(struct domain *d, ioservid_t id,
 }
 
 int ioreq_server_get_frame(struct domain *d, ioservid_t id,
-                           unsigned long idx, mfn_t *mfn)
+                           unsigned int idx, mfn_t *mfn)
 {
     struct ioreq_server *s;
     int rc;

@@ -55,9 +55,9 @@ int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
 
 int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
                      mfn_t *mfn);
-int gnttab_get_shared_frame(struct domain *d, unsigned long idx,
+int gnttab_get_shared_frame(struct domain *d, unsigned int idx,
                             mfn_t *mfn);
-int gnttab_get_status_frame(struct domain *d, unsigned long idx,
+int gnttab_get_status_frame(struct domain *d, unsigned int idx,
                             mfn_t *mfn);
 
 #else
@@ -92,13 +92,13 @@ static inline int gnttab_map_frame(struct domain *d, unsigned long idx,
     return -EINVAL;
 }
 
-static inline int gnttab_get_shared_frame(struct domain *d, unsigned long idx,
+static inline int gnttab_get_shared_frame(struct domain *d, unsigned int idx,
                                           mfn_t *mfn)
 {
     return -EINVAL;
 }
 
-static inline int gnttab_get_status_frame(struct domain *d, unsigned long idx,
+static inline int gnttab_get_status_frame(struct domain *d, unsigned int idx,
                                           mfn_t *mfn)
 {
     return -EINVAL;
