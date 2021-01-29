@@ -27,6 +27,7 @@
 #include <xen/vm_event.h>
 #include <xen/event.h>
 #include <xen/trace.h>
+#include <public/hvm/dm_op.h>
 #include <public/vm_event.h>
 #include <asm/altp2m.h>
 #include <asm/domain.h>

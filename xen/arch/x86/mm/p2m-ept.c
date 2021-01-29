@@ -17,6 +17,7 @@
 
 #include <xen/domain_page.h>
 #include <xen/sched.h>
+#include <public/hvm/dm_op.h>
 #include <asm/altp2m.h>
 #include <asm/current.h>
 #include <asm/paging.h>
