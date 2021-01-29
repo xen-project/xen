@@ -54,7 +54,7 @@ struct xenforeignmemory_resource_handle {
     int flags;
 };
 
-#ifdef __sun__
+#if defined(__sun__) || defined(__MINIOS__)
 static inline int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
                                                   domid_t domid)
 {
