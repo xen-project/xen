@@ -80,6 +80,22 @@ static ioreq_t *get_ioreq(struct ioreq_server *s, struct vcpu *v)
     return &p->vcpu_ioreq[v->vcpu_id];
 }
 
+/*
+ * This should only be used when d == current->domain or when they're
+ * distinct and d is paused. Otherwise the result is stale before
+ * the caller can inspect it.
+ */
+bool domain_has_ioreq_server(const struct domain *d)
+{
+    const struct ioreq_server *s;
+    unsigned int id;
+
+    FOR_EACH_IOREQ_SERVER(d, id, s)
+        return true;
+
+    return false;
+}
+
 static struct ioreq_vcpu *get_pending_vcpu(const struct vcpu *v,
                                            struct ioreq_server **srvp)
 {
