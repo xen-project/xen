@@ -1266,7 +1266,7 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
          * Delay the injection because this would result in delivering
          * an interrupt *within* the execution of an instruction.
          */
-        if ( v->arch.hvm.hvm_io.io_req.state != STATE_IOREQ_NONE )
+        if ( v->io.req.state != STATE_IOREQ_NONE )
             return hvm_intblk_shadow;
 
         if ( !nv->nv_vmexit_pending && n2vmcb->exit_int_info.v )

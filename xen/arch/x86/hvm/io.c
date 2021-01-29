@@ -85,7 +85,7 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate, const char *descr)
 
     hvm_emulate_init_once(&ctxt, validate, guest_cpu_user_regs());
 
-    switch ( rc = hvm_emulate_one(&ctxt, HVMIO_no_completion) )
+    switch ( rc = hvm_emulate_one(&ctxt, VIO_no_completion) )
     {
     case X86EMUL_UNHANDLEABLE:
         hvm_dump_emulation_state(XENLOG_G_WARNING, descr, &ctxt, rc);
@@ -109,20 +109,20 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate, const char *descr)
 bool handle_mmio_with_translation(unsigned long gla, unsigned long gpfn,
                                   struct npfec access)
 {
-    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
+    struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
 
-    vio->mmio_access = access.gla_valid &&
-                       access.kind == npfec_kind_with_gla
-                       ? access : (struct npfec){};
-    vio->mmio_gla = gla & PAGE_MASK;
-    vio->mmio_gpfn = gpfn;
+    hvio->mmio_access = access.gla_valid &&
+                        access.kind == npfec_kind_with_gla
+                        ? access : (struct npfec){};
+    hvio->mmio_gla = gla & PAGE_MASK;
+    hvio->mmio_gpfn = gpfn;
     return handle_mmio();
 }
 
 bool handle_pio(uint16_t port, unsigned int size, int dir)
 {
     struct vcpu *curr = current;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
+    struct vcpu_io *vio = &curr->io;
     unsigned int data;
     int rc;
 
@@ -135,8 +135,8 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
 
     rc = hvmemul_do_pio_buffer(port, size, dir, &data);
 
-    if ( ioreq_needs_completion(&vio->io_req) )
-        vio->io_completion = HVMIO_pio_completion;
+    if ( ioreq_needs_completion(&vio->req) )
+        vio->completion = VIO_pio_completion;
 
     switch ( rc )
     {
@@ -175,7 +175,7 @@ static bool_t g2m_portio_accept(const struct hvm_io_handler *handler,
 {
     struct vcpu *curr = current;
     const struct hvm_domain *hvm = &curr->domain->arch.hvm;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
+    struct hvm_vcpu_io *hvio = &curr->arch.hvm.hvm_io;
     struct g2m_ioport *g2m_ioport;
     unsigned int start, end;
 
@@ -185,7 +185,7 @@ static bool_t g2m_portio_accept(const struct hvm_io_handler *handler,
         end = start + g2m_ioport->np;
         if ( (p->addr >= start) && (p->addr + p->size <= end) )
         {
-            vio->g2m_ioport = g2m_ioport;
+            hvio->g2m_ioport = g2m_ioport;
             return 1;
         }
     }
@@ -196,8 +196,8 @@ static bool_t g2m_portio_accept(const struct hvm_io_handler *handler,
 static int g2m_portio_read(const struct hvm_io_handler *handler,
                            uint64_t addr, uint32_t size, uint64_t *data)
 {
-    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
-    const struct g2m_ioport *g2m_ioport = vio->g2m_ioport;
+    struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
+    const struct g2m_ioport *g2m_ioport = hvio->g2m_ioport;
     unsigned int mport = (addr - g2m_ioport->gport) + g2m_ioport->mport;
 
     switch ( size )
@@ -221,8 +221,8 @@ static int g2m_portio_read(const struct hvm_io_handler *handler,
 static int g2m_portio_write(const struct hvm_io_handler *handler,
                             uint64_t addr, uint32_t size, uint64_t data)
 {
-    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
-    const struct g2m_ioport *g2m_ioport = vio->g2m_ioport;
+    struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
+    const struct g2m_ioport *g2m_ioport = hvio->g2m_ioport;
     unsigned int mport = (addr - g2m_ioport->gport) + g2m_ioport->mport;
 
     switch ( size )

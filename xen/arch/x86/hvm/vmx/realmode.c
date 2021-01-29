@@ -101,7 +101,7 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
 
     perfc_incr(realmode_emulations);
 
-    rc = hvm_emulate_one(hvmemul_ctxt, HVMIO_realmode_completion);
+    rc = hvm_emulate_one(hvmemul_ctxt, VIO_realmode_completion);
 
     if ( rc == X86EMUL_UNHANDLEABLE )
     {
@@ -153,7 +153,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     struct vcpu *curr = current;
     struct hvm_emulate_ctxt hvmemul_ctxt;
     struct segment_register *sreg;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
+    struct hvm_vcpu_io *hvio = &curr->arch.hvm.hvm_io;
     unsigned long intr_info;
     unsigned int emulations = 0;
 
@@ -188,7 +188,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
 
         vmx_realmode_emulate_one(&hvmemul_ctxt);
 
-        if ( vio->io_req.state != STATE_IOREQ_NONE || vio->mmio_retry )
+        if ( curr->io.req.state != STATE_IOREQ_NONE || hvio->mmio_retry )
             break;
 
         /* Stop emulating unless our segment state is not safe */
@@ -202,7 +202,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     }
 
     /* Need to emulate next time if we've started an IO operation */
-    if ( vio->io_req.state != STATE_IOREQ_NONE )
+    if ( curr->io.req.state != STATE_IOREQ_NONE )
         curr->arch.hvm.vmx.vmx_emulate = 1;
 
     if ( !curr->arch.hvm.vmx.vmx_emulate && !curr->arch.hvm.vmx.vmx_realmode )

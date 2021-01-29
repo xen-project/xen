@@ -65,7 +65,7 @@ bool __nonnull(1, 2) hvm_emulate_one_insn(
     const char *descr);
 int hvm_emulate_one(
     struct hvm_emulate_ctxt *hvmemul_ctxt,
-    enum hvm_io_completion completion);
+    enum vio_completion completion);
 void hvm_emulate_one_vm_event(enum emul_kind kind,
     unsigned int trapnr,
     unsigned int errcode);

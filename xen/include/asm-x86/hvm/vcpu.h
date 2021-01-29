@@ -28,13 +28,6 @@
 #include <asm/mtrr.h>
 #include <public/hvm/ioreq.h>
 
-enum hvm_io_completion {
-    HVMIO_no_completion,
-    HVMIO_mmio_completion,
-    HVMIO_pio_completion,
-    HVMIO_realmode_completion
-};
-
 struct hvm_vcpu_asid {
     uint64_t generation;
     uint32_t asid;
@@ -52,10 +45,6 @@ struct hvm_mmio_cache {
 };
 
 struct hvm_vcpu_io {
-    /* I/O request in flight to device model. */
-    enum hvm_io_completion io_completion;
-    ioreq_t                io_req;
-
     /*
      * HVM emulation:
      *  Linear address @mmio_gla maps to MMIO physical frame @mmio_gpfn.
