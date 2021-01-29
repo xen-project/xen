@@ -444,6 +444,11 @@ struct domain
      * unpaused for the first time by the systemcontroller.
      */
     bool             creation_finished;
+    /*
+     * Indicates that mapcache invalidation request should be sent to
+     * the device emulator.
+     */
+    bool             mapcache_invalidate;
 
     /* Which guest this guest has privileges on */
     struct domain   *target;

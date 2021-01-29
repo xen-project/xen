@@ -103,6 +103,7 @@ struct ioreq_server *ioreq_server_select(struct domain *d,
 int ioreq_send(struct ioreq_server *s, ioreq_t *proto_p,
                bool buffered);
 unsigned int ioreq_broadcast(ioreq_t *p, bool buffered);
+void ioreq_signal_mapcache_invalidate(void);
 
 void ioreq_domain_init(struct domain *d);
 
