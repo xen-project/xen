@@ -458,6 +458,12 @@
 #define LIBXL_HAVE_VIRIDIAN_NO_VP_LIMIT 1
 
 /*
+ * LIBXL_HAVE_VIRIDIAN_CPU_HOTPLUG indicates that the 'cpu_hotplug' value
+ * is present in the viridian enlightenment enumeration.
+ */
+#define LIBXL_HAVE_VIRIDIAN_CPU_HOTPLUG 1
+
+/*
  * LIBXL_HAVE_DEVICE_PCI_LIST_FREE indicates that the
  * libxl_device_pci_list_free() function is defined.
  */

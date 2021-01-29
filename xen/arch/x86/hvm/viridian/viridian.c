@@ -76,6 +76,7 @@ typedef union _HV_CRASH_CTL_REG_CONTENTS
 } HV_CRASH_CTL_REG_CONTENTS;
 
 /* Viridian CPUID leaf 3, Hypervisor Feature Indication */
+#define CPUID3D_CPU_DYNAMIC_PARTITIONING (1 << 3)
 #define CPUID3D_CRASH_MSRS (1 << 10)
 #define CPUID3D_SINT_POLLING (1 << 17)
 
@@ -179,8 +180,10 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
         res->a = u.lo;
         res->b = u.hi;
 
+        if ( viridian_feature_mask(d) & HVMPV_cpu_hotplug )
+           res->d = CPUID3D_CPU_DYNAMIC_PARTITIONING;
         if ( viridian_feature_mask(d) & HVMPV_crash_ctl )
-            res->d = CPUID3D_CRASH_MSRS;
+            res->d |= CPUID3D_CRASH_MSRS;
         if ( viridian_feature_mask(d) & HVMPV_synic )
             res->d |= CPUID3D_SINT_POLLING;
 

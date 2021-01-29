@@ -2267,11 +2267,16 @@ explicitly have any limits on the number of Virtual processors a guest
 is allowed to bring up. It is strongly recommended to keep this enabled
 for guests with more than 64 vCPUs.
 
+=item B<cpu_hotplug>
+
+This set enables dynamic changes to Virtual processor states in Windows
+guests effectively allowing vCPU hotplug.
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which
 is currently the B<base>, B<freq>, B<time_ref_count>, B<apic_assist>,
-B<crash_ctl>, B<stimer> and B<no_vp_limit> groups.
+B<crash_ctl>, B<stimer>, B<no_vp_limit> and B<cpu_hotplug> groups.
 
 =item B<all>
 

@@ -172,6 +172,10 @@
 #define _HVMPV_no_vp_limit 11
 #define HVMPV_no_vp_limit (1 << _HVMPV_no_vp_limit)
 
+/* Enable vCPU hotplug */
+#define _HVMPV_cpu_hotplug 12
+#define HVMPV_cpu_hotplug (1 << _HVMPV_cpu_hotplug)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
@@ -184,7 +188,8 @@
          HVMPV_stimer | \
          HVMPV_hcall_ipi | \
          HVMPV_ex_processor_masks | \
-         HVMPV_no_vp_limit)
+         HVMPV_no_vp_limit | \
+         HVMPV_cpu_hotplug)
 
 #endif
 
