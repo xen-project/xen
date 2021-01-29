@@ -94,7 +94,8 @@ static inline register_t sign_extend(const struct hsr_dabt dabt, register_t r)
      * Note that we expect the read handler to have zeroed the bits
      * outside the requested access size.
      */
-    if ( dabt.sign && (r & (1UL << (size - 1))) )
+    if ( dabt.sign && (size < sizeof(register_t) * 8) &&
+         (r & (1UL << (size - 1))) )
     {
         /*
          * We are relying on register_t using the same as
