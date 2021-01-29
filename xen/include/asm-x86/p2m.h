@@ -382,6 +382,17 @@ struct p2m_domain {
 #endif
 #include <xen/p2m-common.h>
 
+static inline bool arch_acquire_resource_check(struct domain *d)
+{
+    /*
+     * FIXME: Until foreign pages inserted into the P2M are properly
+     * reference counted, it is unsafe to allow mapping of
+     * resource pages unless the caller is the hardware domain
+     * (see set_foreign_p2m_entry()).
+     */
+    return !paging_mode_translate(d) || is_hardware_domain(d);
+}
+
 /*
  * Updates vCPU's n2pm to match its np2m_base in VMCx12 and returns that np2m.
  */
@@ -646,9 +657,6 @@ int p2m_finish_type_change(struct domain *d,
 
 int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
                           unsigned long end);
-
-/* Set foreign entry in the p2m table (for priv-mapping) */
-int set_foreign_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 
 /* Set mmio addresses in the p2m table (for pass-through) */
 int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
