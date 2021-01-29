@@ -1,5 +1,8 @@
 /*
- * hvm.h: Hardware virtual machine assist interface definitions.
+ * ioreq.h: Hardware virtual machine assist interface definitions.
+ *
+ * This is a wrapper which purpose is to not include arch HVM specific header
+ * from the common code.
  *
  * Copyright (c) 2016 Citrix Systems Inc.
  *
@@ -16,15 +19,14 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __ASM_X86_HVM_IOREQ_H__
-#define __ASM_X86_HVM_IOREQ_H__
+#ifndef __ASM_X86_IOREQ_H__
+#define __ASM_X86_IOREQ_H__
 
-/* This correlation must not be altered */
-#define IOREQ_STATUS_HANDLED     X86EMUL_OKAY
-#define IOREQ_STATUS_UNHANDLED   X86EMUL_UNHANDLEABLE
-#define IOREQ_STATUS_RETRY       X86EMUL_RETRY
+#ifdef CONFIG_HVM
+#include <asm/hvm/ioreq.h>
+#endif
 
-#endif /* __ASM_X86_HVM_IOREQ_H__ */
+#endif /* __ASM_X86_IOREQ_H__ */
 
 /*
  * Local variables:

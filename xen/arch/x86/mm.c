@@ -100,6 +100,7 @@
  */
 
 #include <xen/init.h>
+#include <xen/ioreq.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
@@ -140,7 +141,6 @@
 #include <asm/io_apic.h>
 #include <asm/pci.h>
 #include <asm/guest.h>
-#include <asm/hvm/ioreq.h>
 #include <asm/pv/domain.h>
 #include <asm/pv/mm.h>
 
