@@ -8,6 +8,18 @@
 .endm
 #endif
 
+.macro vmrun
+    .byte 0x0f, 0x01, 0xd8
+.endm
+
+.macro stgi
+    .byte 0x0f, 0x01, 0xdc
+.endm
+
+.macro clgi
+    .byte 0x0f, 0x01, 0xdd
+.endm
+
 .macro INDIRECT_BRANCH insn:req arg:req
 /*
  * Create an indirect branch.  insn is one of call/jmp, arg is a single

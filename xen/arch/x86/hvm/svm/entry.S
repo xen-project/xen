@@ -22,10 +22,6 @@
 #include <asm/asm_defns.h>
 #include <asm/page.h>
 
-#define VMRUN  .byte 0x0F,0x01,0xD8
-#define STGI   .byte 0x0F,0x01,0xDC
-#define CLGI   .byte 0x0F,0x01,0xDD
-
 ENTRY(svm_asm_do_resume)
         GET_CURRENT(bx)
 .Lsvm_do_resume:
@@ -82,9 +78,9 @@ __UNLIKELY_END(nsvm_hap)
         pop  %rsi
         pop  %rdi
 
-        CLGI
+        clgi
         sti
-        VMRUN
+        vmrun
 
         SAVE_ALL
 
@@ -93,7 +89,7 @@ __UNLIKELY_END(nsvm_hap)
         SPEC_CTRL_ENTRY_FROM_HVM    /* Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
-        STGI
+        stgi
 GLOBAL(svm_stgi_label)
         mov  %rsp,%rdi
         call svm_vmexit_handler
