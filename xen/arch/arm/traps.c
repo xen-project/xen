@@ -1393,6 +1393,9 @@ static arm_hypercall_t arm_hypercall_table[] = {
 #ifdef CONFIG_HYPFS
     HYPERCALL(hypfs_op, 5),
 #endif
+#ifdef CONFIG_IOREQ_SERVER
+    HYPERCALL(dm_op, 3),
+#endif
 };
 
 #ifndef NDEBUG
@@ -1963,6 +1966,9 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
                 goto inject_abt;
             case IO_HANDLED:
                 advance_pc(regs, hsr);
+                return;
+            case IO_RETRY:
+                /* finish later */
                 return;
             case IO_UNHANDLED:
                 /* IO unhandled, try another way to handle it. */

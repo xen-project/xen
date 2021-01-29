@@ -16,12 +16,14 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/ioreq.h>
 #include <xen/lib.h>
 #include <xen/spinlock.h>
 #include <xen/sched.h>
 #include <xen/sort.h>
 #include <asm/cpuerrata.h>
 #include <asm/current.h>
+#include <asm/ioreq.h>
 #include <asm/mmio.h>
 
 #include "decode.h"
@@ -123,7 +125,15 @@ enum io_state try_handle_mmio(struct cpu_user_regs *regs,
 
     handler = find_mmio_handler(v->domain, info.gpa);
     if ( !handler )
-        return IO_UNHANDLED;
+    {
+        int rc;
+
+        rc = try_fwd_ioserv(regs, v, &info);
+        if ( rc == IO_HANDLED )
+            return handle_ioserv(regs, v);
+
+        return rc;
+    }
 
     /* All the instructions used on emulated MMIO region should be valid */
     if ( !dabt.valid )
