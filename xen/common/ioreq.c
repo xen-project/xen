@@ -629,6 +629,9 @@ static int ioreq_server_create(struct domain *d, int bufioreq_handling,
     unsigned int i;
     int rc;
 
+    if ( !IS_ENABLED(CONFIG_X86) && bufioreq_handling )
+        return -EINVAL;
+
     if ( bufioreq_handling > HVM_IOREQSRV_BUFIOREQ_ATOMIC )
         return -EINVAL;
 
