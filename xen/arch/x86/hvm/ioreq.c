@@ -36,6 +36,11 @@
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 
+bool arch_ioreq_complete_mmio(void)
+{
+    return handle_mmio();
+}
+
 static void set_ioreq_server(struct domain *d, unsigned int id,
                              struct hvm_ioreq_server *s)
 {
@@ -226,7 +231,7 @@ bool handle_hvm_io_completion(struct vcpu *v)
         break;
 
     case HVMIO_mmio_completion:
-        return handle_mmio();
+        return arch_ioreq_complete_mmio();
 
     case HVMIO_pio_completion:
         return handle_pio(vio->io_req.addr, vio->io_req.size,
