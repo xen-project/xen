@@ -2260,11 +2260,18 @@ mask. Hence this enlightenment must be specified for guests with more
 than 64 vCPUs if B<hcall_remote_tlb_flush> and/or B<hcall_ipi> are also
 specified.
 
+=item B<no_vp_limit>
+
+This group when set indicates to a guest that the hypervisor does not
+explicitly have any limits on the number of Virtual processors a guest
+is allowed to bring up. It is strongly recommended to keep this enabled
+for guests with more than 64 vCPUs.
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which
 is currently the B<base>, B<freq>, B<time_ref_count>, B<apic_assist>,
-B<crash_ctl> and B<stimer> groups.
+B<crash_ctl>, B<stimer> and B<no_vp_limit> groups.
 
 =item B<all>
 

@@ -168,6 +168,10 @@
 #define _HVMPV_ex_processor_masks 10
 #define HVMPV_ex_processor_masks (1 << _HVMPV_ex_processor_masks)
 
+/* Allow more than 64 VPs */
+#define _HVMPV_no_vp_limit 11
+#define HVMPV_no_vp_limit (1 << _HVMPV_no_vp_limit)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
@@ -179,7 +183,8 @@
          HVMPV_synic | \
          HVMPV_stimer | \
          HVMPV_hcall_ipi | \
-         HVMPV_ex_processor_masks)
+         HVMPV_ex_processor_masks | \
+         HVMPV_no_vp_limit)
 
 #endif
 

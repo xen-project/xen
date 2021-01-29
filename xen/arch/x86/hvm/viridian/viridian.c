@@ -209,6 +209,29 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
         res->b = viridian_spinlock_retry_count;
         break;
 
+    case 5:
+        /*
+         * From "Requirements for Implementing the Microsoft Hypervisor
+         *  Interface":
+         *
+         * "On Windows operating systems versions through Windows Server
+         * 2008 R2, reporting the HV#1 hypervisor interface limits
+         * the Windows virtual machine to a maximum of 64 VPs, regardless of
+         * what is reported via CPUID.40000005.EAX.
+         *
+         * Starting with Windows Server 2012 and Windows 8, if
+         * CPUID.40000005.EAX containsa value of -1, Windows assumes that
+         * the hypervisor imposes no specific limit to the number of VPs.
+         * In this case, Windows Server 2012 guest VMs may use more than 64
+         * VPs, up to the maximum supported number of processors applicable
+         * to the specific Windows version being used."
+         *
+         * For compatibility we hide it behind an option.
+         */
+        if ( viridian_feature_mask(d) & HVMPV_no_vp_limit )
+            res->a = -1;
+        break;
+
     case 6:
         /* Detected and in use hardware features. */
         if ( cpu_has_vmx_virtualize_apic_accesses )

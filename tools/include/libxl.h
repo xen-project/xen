@@ -452,6 +452,12 @@
 #define LIBXL_HAVE_VIRIDIAN_EX_PROCESSOR_MASKS 1
 
 /*
+ * LIBXL_HAVE_VIRIDIAN_NO_VP_LIMIT indicates that the 'no_vp_limit' value
+ * is present in the viridian enlightenment enumeration.
+ */
+#define LIBXL_HAVE_VIRIDIAN_NO_VP_LIMIT 1
+
+/*
  * LIBXL_HAVE_DEVICE_PCI_LIST_FREE indicates that the
  * libxl_device_pci_list_free() function is defined.
  */
