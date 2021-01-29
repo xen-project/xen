@@ -137,7 +137,13 @@ config HYPFS_CONFIG
 	  want to hide the .config contents from dom0.
 
 config IOREQ_SERVER
-	bool
+	bool "IOREQ support (EXPERT)" if EXPERT && !X86
+	default X86
+	depends on HVM
+	---help---
+	  Enables generic mechanism for providing emulated devices to the guests.
+
+	  If unsure, say N.
 
 config KEXEC
 	bool "kexec support"
