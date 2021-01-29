@@ -61,8 +61,6 @@ struct hvm_pi_ops {
     void (*vcpu_block)(struct vcpu *);
 };
 
-#define MAX_NR_IOREQ_SERVERS 8
-
 struct hvm_domain {
     /* Guest page range used for non-default ioreq servers */
     struct {
@@ -70,12 +68,6 @@ struct hvm_domain {
         unsigned long mask; /* indexed by GFN minus base */
         unsigned long legacy_mask; /* indexed by HVM param number */
     } ioreq_gfn;
-
-    /* Lock protects all other values in the sub-struct and the default */
-    struct {
-        spinlock_t              lock;
-        struct ioreq_server     *server[MAX_NR_IOREQ_SERVERS];
-    } ioreq_server;
 
     /* Cached CF8 for guest PCI config cycles */
     uint32_t                pci_cf8;
