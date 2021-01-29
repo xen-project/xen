@@ -612,13 +612,4 @@ static inline void put_page_alloc_ref(struct page_info *page)
     }
 }
 
-#ifndef CONFIG_ARCH_ACQUIRE_RESOURCE
-static inline int arch_acquire_resource(
-    struct domain *d, unsigned int type, unsigned int id, unsigned long frame,
-    unsigned int nr_frames, xen_pfn_t mfn_list[])
-{
-    return -EOPNOTSUPP;
-}
-#endif /* !CONFIG_ARCH_ACQUIRE_RESOURCE */
-
 #endif /* __XEN_MM_H__ */
