@@ -20,6 +20,8 @@
 #include <xen/ioreq.h>
 #include <xen/nospec.h>
 
+#include <asm/vgic.h>
+
 int dm_op(const struct dmop_args *op_args)
 {
     struct domain *d;
@@ -35,6 +37,7 @@ int dm_op(const struct dmop_args *op_args)
         [XEN_DMOP_unmap_io_range_from_ioreq_server] = sizeof(struct xen_dm_op_ioreq_server_range),
         [XEN_DMOP_set_ioreq_server_state]           = sizeof(struct xen_dm_op_set_ioreq_server_state),
         [XEN_DMOP_destroy_ioreq_server]             = sizeof(struct xen_dm_op_destroy_ioreq_server),
+        [XEN_DMOP_set_irq_level]                    = sizeof(struct xen_dm_op_set_irq_level),
     };
 
     rc = rcu_lock_remote_domain_by_id(op_args->domid, &d);
@@ -73,7 +76,56 @@ int dm_op(const struct dmop_args *op_args)
     if ( op.pad )
         goto out;
 
-    rc = ioreq_server_dm_op(&op, d, &const_op);
+    switch ( op.op )
+    {
+    case XEN_DMOP_set_irq_level:
+    {
+        const struct xen_dm_op_set_irq_level *data =
+            &op.u.set_irq_level;
+        unsigned int i;
+
+        /* Only SPIs are supported */
+        if ( (data->irq < NR_LOCAL_IRQS) || (data->irq >= vgic_num_irqs(d)) )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        if ( data->level != 0 && data->level != 1 )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        /* Check that padding is always 0 */
+        for ( i = 0; i < sizeof(data->pad); i++ )
+        {
+            if ( data->pad[i] )
+            {
+                rc = -EINVAL;
+                break;
+            }
+        }
+
+        /*
+         * Allow to set the logical level of a line for non-allocated
+         * interrupts only.
+         */
+        if ( test_bit(data->irq, d->arch.vgic.allocated_irqs) )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        vgic_inject_irq(d, NULL, data->irq, data->level);
+        rc = 0;
+        break;
+    }
+
+    default:
+        rc = ioreq_server_dm_op(&op, d, &const_op);
+        break;
+    }
 
     if ( (!rc || rc == -ERESTART) &&
          !const_op && copy_to_guest_offset(op_args->buf[0].h, offset,
