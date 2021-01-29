@@ -83,26 +83,26 @@ static inline bool ioreq_needs_completion(const ioreq_t *ioreq)
 #define HANDLE_BUFIOREQ(s) \
     ((s)->bufioreq_handling != HVM_IOREQSRV_BUFIOREQ_OFF)
 
-bool hvm_io_pending(struct vcpu *v);
-bool handle_hvm_io_completion(struct vcpu *v);
+bool vcpu_ioreq_pending(struct vcpu *v);
+bool vcpu_ioreq_handle_completion(struct vcpu *v);
 bool is_ioreq_server_page(struct domain *d, const struct page_info *page);
 
-int hvm_get_ioreq_server_frame(struct domain *d, ioservid_t id,
-                               unsigned long idx, mfn_t *mfn);
+int ioreq_server_get_frame(struct domain *d, ioservid_t id,
+                           unsigned long idx, mfn_t *mfn);
 int ioreq_server_map_mem_type(struct domain *d, ioservid_t id,
                               uint32_t type, uint32_t flags);
 
-int hvm_all_ioreq_servers_add_vcpu(struct domain *d, struct vcpu *v);
-void hvm_all_ioreq_servers_remove_vcpu(struct domain *d, struct vcpu *v);
-void hvm_destroy_all_ioreq_servers(struct domain *d);
+int ioreq_server_add_vcpu_all(struct domain *d, struct vcpu *v);
+void ioreq_server_remove_vcpu_all(struct domain *d, struct vcpu *v);
+void ioreq_server_destroy_all(struct domain *d);
 
-struct ioreq_server *hvm_select_ioreq_server(struct domain *d,
-                                             ioreq_t *p);
-int hvm_send_ioreq(struct ioreq_server *s, ioreq_t *proto_p,
-                   bool buffered);
-unsigned int hvm_broadcast_ioreq(ioreq_t *p, bool buffered);
+struct ioreq_server *ioreq_server_select(struct domain *d,
+                                         ioreq_t *p);
+int ioreq_send(struct ioreq_server *s, ioreq_t *proto_p,
+               bool buffered);
+unsigned int ioreq_broadcast(ioreq_t *p, bool buffered);
 
-void hvm_ioreq_init(struct domain *d);
+void ioreq_domain_init(struct domain *d);
 
 int ioreq_server_dm_op(struct xen_dm_op *op, struct domain *d, bool *const_op);
 

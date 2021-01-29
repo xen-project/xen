@@ -261,7 +261,7 @@ static int hvmemul_do_io(
          * an ioreq server that can handle it.
          *
          * Rules:
-         * A> PIO or MMIO accesses run through hvm_select_ioreq_server() to
+         * A> PIO or MMIO accesses run through ioreq_server_select() to
          * choose the ioreq server by range. If no server is found, the access
          * is ignored.
          *
@@ -323,7 +323,7 @@ static int hvmemul_do_io(
         }
 
         if ( !s )
-            s = hvm_select_ioreq_server(currd, &p);
+            s = ioreq_server_select(currd, &p);
 
         /* If there is no suitable backing DM, just ignore accesses */
         if ( !s )
@@ -333,7 +333,7 @@ static int hvmemul_do_io(
         }
         else
         {
-            rc = hvm_send_ioreq(s, &p, 0);
+            rc = ioreq_send(s, &p, 0);
             if ( rc != X86EMUL_RETRY || currd->is_shutting_down )
                 vio->req.state = STATE_IOREQ_NONE;
             else if ( !ioreq_needs_completion(&vio->req) )

@@ -507,11 +507,11 @@ static int stdvga_mem_write(const struct hvm_io_handler *handler,
     }
 
  done:
-    srv = hvm_select_ioreq_server(current->domain, &p);
+    srv = ioreq_server_select(current->domain, &p);
     if ( !srv )
         return X86EMUL_UNHANDLEABLE;
 
-    return hvm_send_ioreq(srv, &p, 1);
+    return ioreq_send(srv, &p, 1);
 }
 
 static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,

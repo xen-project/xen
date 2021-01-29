@@ -60,7 +60,7 @@ void send_timeoffset_req(unsigned long timeoff)
     if ( timeoff == 0 )
         return;
 
-    if ( hvm_broadcast_ioreq(&p, true) != 0 )
+    if ( ioreq_broadcast(&p, true) != 0 )
         gprintk(XENLOG_ERR, "Unsuccessful timeoffset update\n");
 }
 
@@ -74,7 +74,7 @@ void send_invalidate_req(void)
         .data = ~0UL, /* flush all */
     };
 
-    if ( hvm_broadcast_ioreq(&p, false) != 0 )
+    if ( ioreq_broadcast(&p, false) != 0 )
         gprintk(XENLOG_ERR, "Unsuccessful map-cache invalidate\n");
 }
 
@@ -155,7 +155,7 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
          * We should not advance RIP/EIP if the domain is shutting down or
          * if X86EMUL_RETRY has been returned by an internal handler.
          */
-        if ( curr->domain->is_shutting_down || !hvm_io_pending(curr) )
+        if ( curr->domain->is_shutting_down || !vcpu_ioreq_pending(curr) )
             return false;
         break;
 

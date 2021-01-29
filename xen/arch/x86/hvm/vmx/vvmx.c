@@ -1517,7 +1517,7 @@ void nvmx_switch_guest(void)
      * don't want to continue as this setup is not implemented nor supported
      * as of right now.
      */
-    if ( hvm_io_pending(v) )
+    if ( vcpu_ioreq_pending(v) )
         return;
     /*
      * a softirq may interrupt us between a virtual vmentry is
