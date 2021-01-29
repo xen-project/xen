@@ -223,7 +223,7 @@ static int hvm_alloc_ioreq_mfn(struct ioreq_server *s, bool buf)
     {
         /*
          * If a guest frame has already been mapped (which may happen
-         * on demand if hvm_get_ioreq_server_info() is called), then
+         * on demand if ioreq_server_get_info() is called), then
          * allocating a page is not permitted.
          */
         if ( !gfn_eq(iorp->gfn, INVALID_GFN) )
@@ -591,8 +591,8 @@ static void hvm_ioreq_server_deinit(struct ioreq_server *s)
     put_domain(s->emulator);
 }
 
-int hvm_create_ioreq_server(struct domain *d, int bufioreq_handling,
-                            ioservid_t *id)
+static int ioreq_server_create(struct domain *d, int bufioreq_handling,
+                               ioservid_t *id)
 {
     struct ioreq_server *s;
     unsigned int i;
@@ -647,7 +647,7 @@ int hvm_create_ioreq_server(struct domain *d, int bufioreq_handling,
     return rc;
 }
 
-int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id)
+static int ioreq_server_destroy(struct domain *d, ioservid_t id)
 {
     struct ioreq_server *s;
     int rc;
@@ -689,10 +689,10 @@ int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id)
     return rc;
 }
 
-int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
-                              unsigned long *ioreq_gfn,
-                              unsigned long *bufioreq_gfn,
-                              evtchn_port_t *bufioreq_port)
+static int ioreq_server_get_info(struct domain *d, ioservid_t id,
+                                 unsigned long *ioreq_gfn,
+                                 unsigned long *bufioreq_gfn,
+                                 evtchn_port_t *bufioreq_port)
 {
     struct ioreq_server *s;
     int rc;
@@ -787,7 +787,7 @@ int hvm_get_ioreq_server_frame(struct domain *d, ioservid_t id,
     return rc;
 }
 
-int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
+static int ioreq_server_map_io_range(struct domain *d, ioservid_t id,
                                      uint32_t type, uint64_t start,
                                      uint64_t end)
 {
@@ -839,9 +839,9 @@ int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
     return rc;
 }
 
-int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
-                                         uint32_t type, uint64_t start,
-                                         uint64_t end)
+static int ioreq_server_unmap_io_range(struct domain *d, ioservid_t id,
+                                       uint32_t type, uint64_t start,
+                                       uint64_t end)
 {
     struct ioreq_server *s;
     struct rangeset *r;
@@ -899,8 +899,8 @@ int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
  * Support for the emulation of read operations can be added when an ioreq
  * server has such requirement in the future.
  */
-int hvm_map_mem_type_to_ioreq_server(struct domain *d, ioservid_t id,
-                                     uint32_t type, uint32_t flags)
+int ioreq_server_map_mem_type(struct domain *d, ioservid_t id,
+                              uint32_t type, uint32_t flags)
 {
     struct ioreq_server *s;
     int rc;
@@ -934,8 +934,8 @@ int hvm_map_mem_type_to_ioreq_server(struct domain *d, ioservid_t id,
     return rc;
 }
 
-int hvm_set_ioreq_server_state(struct domain *d, ioservid_t id,
-                               bool enabled)
+static int ioreq_server_set_state(struct domain *d, ioservid_t id,
+                                  bool enabled)
 {
     struct ioreq_server *s;
     int rc;
@@ -1277,6 +1277,111 @@ void hvm_ioreq_init(struct domain *d)
     spin_lock_init(&d->ioreq_server.lock);
 
     arch_ioreq_domain_init(d);
+}
+
+int ioreq_server_dm_op(struct xen_dm_op *op, struct domain *d, bool *const_op)
+{
+    long rc;
+
+    switch ( op->op )
+    {
+    case XEN_DMOP_create_ioreq_server:
+    {
+        struct xen_dm_op_create_ioreq_server *data =
+            &op->u.create_ioreq_server;
+
+        *const_op = false;
+
+        rc = -EINVAL;
+        if ( data->pad[0] || data->pad[1] || data->pad[2] )
+            break;
+
+        rc = ioreq_server_create(d, data->handle_bufioreq,
+                                 &data->id);
+        break;
+    }
+
+    case XEN_DMOP_get_ioreq_server_info:
+    {
+        struct xen_dm_op_get_ioreq_server_info *data =
+            &op->u.get_ioreq_server_info;
+        const uint16_t valid_flags = XEN_DMOP_no_gfns;
+
+        *const_op = false;
+
+        rc = -EINVAL;
+        if ( data->flags & ~valid_flags )
+            break;
+
+        rc = ioreq_server_get_info(d, data->id,
+                                   (data->flags & XEN_DMOP_no_gfns) ?
+                                   NULL : (unsigned long *)&data->ioreq_gfn,
+                                   (data->flags & XEN_DMOP_no_gfns) ?
+                                   NULL : (unsigned long *)&data->bufioreq_gfn,
+                                   &data->bufioreq_port);
+        break;
+    }
+
+    case XEN_DMOP_map_io_range_to_ioreq_server:
+    {
+        const struct xen_dm_op_ioreq_server_range *data =
+            &op->u.map_io_range_to_ioreq_server;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = ioreq_server_map_io_range(d, data->id, data->type,
+                                       data->start, data->end);
+        break;
+    }
+
+    case XEN_DMOP_unmap_io_range_from_ioreq_server:
+    {
+        const struct xen_dm_op_ioreq_server_range *data =
+            &op->u.unmap_io_range_from_ioreq_server;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = ioreq_server_unmap_io_range(d, data->id, data->type,
+                                         data->start, data->end);
+        break;
+    }
+
+    case XEN_DMOP_set_ioreq_server_state:
+    {
+        const struct xen_dm_op_set_ioreq_server_state *data =
+            &op->u.set_ioreq_server_state;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = ioreq_server_set_state(d, data->id, !!data->enabled);
+        break;
+    }
+
+    case XEN_DMOP_destroy_ioreq_server:
+    {
+        const struct xen_dm_op_destroy_ioreq_server *data =
+            &op->u.destroy_ioreq_server;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = ioreq_server_destroy(d, data->id);
+        break;
+    }
+
+    default:
+        rc = -EOPNOTSUPP;
+        break;
+    }
+
+    return rc;
 }
 
 /*
