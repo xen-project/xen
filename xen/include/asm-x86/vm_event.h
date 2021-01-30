@@ -54,4 +54,6 @@ void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp);
 
 void vm_event_sync_event(struct vcpu *v, bool value);
 
+void vm_event_reset_vmtrace(struct vcpu *v);
+
 #endif /* __ASM_X86_VM_EVENT_H__ */

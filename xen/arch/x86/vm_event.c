@@ -300,6 +300,13 @@ void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp)
     };
 }
 
+void vm_event_reset_vmtrace(struct vcpu *v)
+{
+#ifdef CONFIG_HVM
+    hvm_vmtrace_reset(v);
+#endif
+}
+
 /*
  * Local variables:
  * mode: C

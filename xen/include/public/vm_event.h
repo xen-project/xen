@@ -123,6 +123,10 @@
  * Set if the event comes from a nested VM and thus npt_base is valid.
  */
 #define VM_EVENT_FLAG_NESTED_P2M         (1 << 12)
+/*
+ * Reset the vmtrace buffer (if vmtrace is enabled)
+ */
+#define VM_EVENT_FLAG_RESET_VMTRACE      (1 << 13)
 
 /*
  * Reasons for the vm event request
