@@ -122,7 +122,7 @@ FILE *get_next_battery_file(DIR *battery_dir,
         if (ret < 0)
             continue;
         file = fopen(file_name, "r");
-	free(file_name);
+        free(file_name);
     } while ( !file );
 
     return file;
