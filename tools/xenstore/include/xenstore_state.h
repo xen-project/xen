@@ -21,7 +21,11 @@
 #ifndef XENSTORE_STATE_H
 #define XENSTORE_STATE_H
 
+#if defined(__FreeBSD__) || defined(__NetBSD__)
+#include <sys/endian.h>
+#else
 #include <endian.h>
+#endif
 #include <sys/types.h>
 
 #ifndef htobe32
