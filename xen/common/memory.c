@@ -904,6 +904,17 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
 {
     union add_to_physmap_extra extra = {};
 
+    /*
+     * In some configurations, (!HVM, COVERAGE), the xenmem_add_to_physmap_one()
+     * call doesn't succumb to dead-code-elimination. Duplicate the short-circut
+     * from xatp_permission_check() to try and help the compiler out.
+     */
+    if ( !paging_mode_translate(d) )
+    {
+        ASSERT_UNREACHABLE();
+        return -EACCES;
+    }
+
     if ( unlikely(xatpb->size < extent) )
         return -EILSEQ;
 
