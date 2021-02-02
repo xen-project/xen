@@ -21,7 +21,7 @@
 #ifndef XENSTORE_STATE_H
 #define XENSTORE_STATE_H
 
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #include <sys/endian.h>
 #else
 #include <endian.h>
