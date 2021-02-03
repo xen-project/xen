@@ -453,8 +453,10 @@ static int hvm_set_conf_params(libxl__gc *gc, uint32_t domid,
     return ret;
 }
 
-int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
-        uint32_t domid)
+int libxl__arch_domain_create(libxl__gc *gc,
+                              libxl_domain_config *d_config,
+                              libxl__domain_build_state *state,
+                              uint32_t domid)
 {
     const libxl_domain_build_info *info = &d_config->b_info;
     int ret = 0;

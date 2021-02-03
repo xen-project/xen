@@ -126,7 +126,9 @@ int libxl__arch_domain_save_config(libxl__gc *gc,
     return 0;
 }
 
-int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
+int libxl__arch_domain_create(libxl__gc *gc,
+                              libxl_domain_config *d_config,
+                              ibxl__domain_build_state *state,
                               uint32_t domid)
 {
     return 0;
