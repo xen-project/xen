@@ -468,7 +468,10 @@ int libxl__arch_domain_create(libxl__gc *gc,
         (ret = hvm_set_conf_params(gc, domid, info)) != 0)
         goto out;
 
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM &&
+    /* Viridian flags are already a part of the migration stream so set
+     * them here only for brand new domains. */
+    if (!state->restore &&
+        info->type == LIBXL_DOMAIN_TYPE_HVM &&
         (ret = hvm_set_viridian_features(gc, domid, info)) != 0)
         goto out;
 
