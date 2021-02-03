@@ -1,0 +1,9 @@
+#!/bin/sh
+
+#called by qemu when a HVM domU is started.
+# first parameter is tap interface, second is the bridge name
+# environement variable $XEN_DOMAIN_ID contains the domU's ID,
+# which can be used to retrieve extra parameters from the xenstore.
+
+ifconfig $1 up
+exec /sbin/brconfig $2 add $1
