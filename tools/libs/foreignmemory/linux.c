@@ -171,10 +171,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
     addr = mmap(addr, num << PAGE_SHIFT, prot, flags | MAP_SHARED,
                 fd, 0);
     if ( addr == MAP_FAILED )
-    {
-        PERROR("mmap failed");
         return NULL;
-    }
 
     ioctlx.num = num;
     ioctlx.dom = dom;
@@ -273,7 +270,6 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
     {
         int saved_errno = errno;
 
-        PERROR("ioctl failed");
         (void)munmap(addr, num << PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
@@ -330,7 +326,7 @@ int osdep_xenforeignmemory_map_resource(
         int saved_errno;
 
         if ( errno != fmem->unimpl_errno && errno != EOPNOTSUPP )
-            PERROR("ioctl failed");
+            ;
         else
             errno = EOPNOTSUPP;
 

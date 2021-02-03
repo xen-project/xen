@@ -83,7 +83,7 @@ void *osdep_map_foreign_batch(xenforeignmem_handle *fmem, uint32_t dom,
     if ( ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
     {
         int saved_errno = errno;
-        PERROR("XXXXXXXX");
+
         (void)munmap(addr, num*XC_PAGE_SIZE);
         errno = saved_errno;
         return NULL;

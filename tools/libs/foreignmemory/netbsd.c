@@ -147,8 +147,6 @@ int osdep_xenforeignmemory_map_resource(
     rc = ioctl(fmem->fd, IOCTL_PRIVCMD_MMAP_RESOURCE, &mr);
     if ( rc )
     {
-        PERROR("ioctl failed");
-
         if ( fres->addr )
         {
             int saved_errno = errno;
