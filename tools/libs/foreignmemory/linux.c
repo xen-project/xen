@@ -325,9 +325,7 @@ int osdep_xenforeignmemory_map_resource(
     {
         int saved_errno;
 
-        if ( errno != fmem->unimpl_errno && errno != EOPNOTSUPP )
-            ;
-        else
+        if ( errno == fmem->unimpl_errno )
             errno = EOPNOTSUPP;
 
         if ( fres->addr )

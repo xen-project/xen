@@ -147,6 +147,9 @@ int osdep_xenforeignmemory_map_resource(
     rc = ioctl(fmem->fd, IOCTL_PRIVCMD_MMAP_RESOURCE, &mr);
     if ( rc )
     {
+        if ( errno == ENOSYS )
+            errno = EOPNOTSUPP;
+
         if ( fres->addr )
         {
             int saved_errno = errno;

@@ -133,9 +133,7 @@ int osdep_xenforeignmemory_map_resource(xenforeignmemory_handle *fmem,
     {
         int saved_errno;
 
-        if ( errno != ENOSYS )
-            ;
-        else
+        if ( errno == ENOSYS )
             errno = EOPNOTSUPP;
 
         if ( fres->addr )
