@@ -232,7 +232,8 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
          */
     case MSR_IA32_PERF_STATUS:
     case MSR_IA32_PERF_CTL:
-        if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR)) )
+        if ( cp->x86_vendor != X86_VENDOR_INTEL &&
+             cp->x86_vendor != X86_VENDOR_CENTAUR )
             goto gp_fault;
 
         *val = 0;
