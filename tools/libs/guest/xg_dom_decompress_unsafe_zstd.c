@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <endian.h>
+#include INCLUDE_ENDIAN_H
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>

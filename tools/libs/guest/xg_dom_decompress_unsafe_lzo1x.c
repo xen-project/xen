@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
-#include <endian.h>
+#include INCLUDE_ENDIAN_H
 #include <stdint.h>
 
 #include "xg_private.h"

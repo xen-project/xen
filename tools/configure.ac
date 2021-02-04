@@ -74,6 +74,7 @@ m4_include([../m4/ax_compare_version.m4])
 m4_include([../m4/paths.m4])
 m4_include([../m4/systemd.m4])
 m4_include([../m4/golang.m4])
+m4_include([../m4/header.m4])
 
 AX_XEN_EXPAND_CONFIG()
 
@@ -516,5 +517,7 @@ AC_ARG_ENABLE([pvshim],
     esac
 ])
 AC_SUBST(pvshim)
+
+AX_FIND_HEADER([INCLUDE_ENDIAN_H], [endian.h sys/endian.h])
 
 AC_OUTPUT()
