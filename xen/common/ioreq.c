@@ -213,9 +213,9 @@ bool vcpu_ioreq_handle_completion(struct vcpu *v)
         return false;
     }
 
-    sv = get_pending_vcpu(v, &s);
-    if ( sv && !wait_for_io(sv, get_ioreq(s, v)) )
-        return false;
+    while ( (sv = get_pending_vcpu(v, &s)) != NULL )
+        if ( !wait_for_io(sv, get_ioreq(s, v)) )
+            return false;
 
     vio->req.state = ioreq_needs_completion(&vio->req) ?
         STATE_IORESP_READY : STATE_IOREQ_NONE;
