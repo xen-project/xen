@@ -1,6 +1,5 @@
 #include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
