@@ -441,7 +441,8 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
          * a cpufreq controller dom0 which has full access.
          */
     case MSR_IA32_PERF_CTL:
-        if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR)) )
+        if ( cp->x86_vendor != X86_VENDOR_INTEL &&
+             cp->x86_vendor != X86_VENDOR_CENTAUR )
             goto gp_fault;
 
         if ( likely(!is_cpufreq_controller(d)) || wrmsr_safe(msr, val) == 0 )
