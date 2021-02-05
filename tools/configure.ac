@@ -309,7 +309,6 @@ AC_ARG_VAR([AWK], [Path to awk tool])
 AC_PROG_CC
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
-AC_PATH_PROG([BISON], [bison])
 AC_PATH_PROG([FLEX], [flex])
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
 AX_PATH_PROG_OR_FAIL([AWK], [awk])
@@ -517,6 +516,11 @@ AC_ARG_ENABLE([pvshim],
     esac
 ])
 AC_SUBST(pvshim)
+AS_IF([test "x$pvshim" = "xy"], [
+    AX_PATH_PROG_OR_FAIL([BISON], [bison])
+], [
+    AC_PATH_PROG([BISON], [bison])
+])
 
 AX_FIND_HEADER([INCLUDE_ENDIAN_H], [endian.h sys/endian.h])
 
