@@ -48,7 +48,10 @@ dist/*
 docs/tmp.*
 docs/html/
 docs/man/xl.cfg.5.pod
+docs/man/xl-disk-configuration.5.pod
+docs/man/xl-network-configuration.5.pod
 docs/man/xl.1.pod
+docs/man/xl.conf.5.pod
 docs/man1/
 docs/man5/
 docs/man7/
