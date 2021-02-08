@@ -89,7 +89,7 @@ int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
     (((i) >= nr_status_frames(t)) ? INVALID_GFN : (t)->arch.status_gfn[i])
 
 #define gnttab_need_iommu_mapping(d)                    \
-    (is_domain_direct_mapped(d) && need_iommu_pt_sync(d))
+    (is_domain_direct_mapped(d) && is_iommu_enabled(d))
 
 #endif /* __ASM_GRANT_TABLE_H__ */
 /*
