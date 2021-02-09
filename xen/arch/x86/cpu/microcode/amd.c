@@ -349,8 +349,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
             if ( size < sizeof(*mc) ||
                  (mc = buf)->type != UCODE_UCODE_TYPE ||
                  size - sizeof(*mc) < mc->len ||
-                 mc->len < sizeof(struct microcode_patch) ||
-                 (!skip_ucode && !verify_patch_size(mc->len)) )
+                 mc->len < sizeof(struct microcode_patch) )
             {
                 printk(XENLOG_ERR "microcode: Bad microcode data\n");
                 error = -EINVAL;
@@ -359,6 +358,19 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
 
             if ( skip_ucode )
                 goto skip;
+
+            if ( !verify_patch_size(mc->len) )
+            {
+                printk(XENLOG_WARNING
+                       "microcode: Bad microcode length 0x%08x for cpu 0x%04x\n",
+                       mc->len, mc->patch->processor_rev_id);
+                /*
+                 * If the blob size sanity check fails, trust the container
+                 * length which has already been checked to be at least
+                 * plausible at this point.
+                 */
+                goto skip;
+            }
 
             /*
              * If the new ucode covers current CPU, compare ucodes and store the
@@ -383,6 +395,14 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
             if ( size >= 4 && *(const uint32_t *)buf == UCODE_MAGIC )
                 break;
         }
+
+        /*
+         * Any error means we didn't get cleanly to the end of the microcode
+         * container.  There isn't an overall length field, so we've got no
+         * way of skipping to the next container in the stream.
+         */
+        if ( error )
+            break;
     }
 
     if ( saved )
