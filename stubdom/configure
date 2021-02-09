@@ -690,7 +690,7 @@ enable_c_stubdom
 enable_caml_stubdom
 enable_pv_grub
 enable_xenstore_stubdom
-enable_xenstore_pvh_stubdom
+enable_xenstorepvh_stubdom
 enable_vtpm_stubdom
 enable_vtpmmgr_stubdom
 enable_qemu_traditional
@@ -2184,8 +2184,8 @@ fi
 
 
 # Check whether --enable-xenstorepvh-stubdom was given.
-if test "${enable_xenstore_pvh_stubdom+set}" = set; then :
-  enableval=$enable_xenstore_pvh_stubdom;
+if test "${enable_xenstorepvh_stubdom+set}" = set; then :
+  enableval=$enable_xenstorepvh_stubdom;
 
 if test "x$enableval" = "xyes"; then :
 

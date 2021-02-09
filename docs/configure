@@ -1749,7 +1749,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files ../config/Docs.mk man/xl.cfg.5.pod man/xl.1.pod"
+ac_config_files="$ac_config_files ../config/Docs.mk man/xl.cfg.5.pod man/xl.1.pod man/xl-disk-configuration.5.pod man/xl-network-configuration.5.pod man/xl.conf.5.pod"
 
 ac_aux_dir=
 for ac_dir in ../ "$srcdir"/../; do
@@ -1959,7 +1959,7 @@ XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
 
 case "$host_os" in
 *freebsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
-*netbsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
+*netbsd*) XEN_LOCK_DIR=$rundir_path ;;
 *) XEN_LOCK_DIR=$localstatedir/lock ;;
 esac
 
@@ -2976,6 +2976,9 @@ do
     "../config/Docs.mk") CONFIG_FILES="$CONFIG_FILES ../config/Docs.mk" ;;
     "man/xl.cfg.5.pod") CONFIG_FILES="$CONFIG_FILES man/xl.cfg.5.pod" ;;
     "man/xl.1.pod") CONFIG_FILES="$CONFIG_FILES man/xl.1.pod" ;;
+    "man/xl-disk-configuration.5.pod") CONFIG_FILES="$CONFIG_FILES man/xl-disk-configuration.5.pod" ;;
+    "man/xl-network-configuration.5.pod") CONFIG_FILES="$CONFIG_FILES man/xl-network-configuration.5.pod" ;;
+    "man/xl.conf.5.pod") CONFIG_FILES="$CONFIG_FILES man/xl.conf.5.pod" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
