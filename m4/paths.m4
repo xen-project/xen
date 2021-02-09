@@ -34,6 +34,12 @@ if test "x$sysconfdir" = 'x${prefix}/etc' ; then
     esac
 fi
 
+CONFIG_DIR=$sysconfdir
+AC_SUBST(CONFIG_DIR)
+
+XEN_CONFIG_DIR=$CONFIG_DIR/xen
+AC_SUBST(XEN_CONFIG_DIR)
+
 AC_ARG_WITH([initddir],
     AS_HELP_STRING([--with-initddir=DIR],
     [Path to directory with sysv runlevel scripts. [SYSCONFDIR/init.d]]),
@@ -128,14 +134,8 @@ AC_SUBST(XEN_LIB_DIR)
 SHAREDIR=$prefix/share
 AC_SUBST(SHAREDIR)
 
-CONFIG_DIR=$sysconfdir
-AC_SUBST(CONFIG_DIR)
-
 INITD_DIR=$initddir_path
 AC_SUBST(INITD_DIR)
-
-XEN_CONFIG_DIR=$CONFIG_DIR/xen
-AC_SUBST(XEN_CONFIG_DIR)
 
 XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
 AC_SUBST(XEN_SCRIPT_DIR)
