@@ -597,7 +597,6 @@ DEBUG_DIR
 XEN_DUMP_DIR
 XEN_PAGING_DIR
 XEN_LOCK_DIR
-XEN_SCRIPT_DIR
 INITD_DIR
 SHAREDIR
 XEN_LIB_DIR
@@ -610,6 +609,7 @@ LIBEXEC_INC
 LIBEXEC_LIB
 LIBEXEC_BIN
 LIBEXEC
+XEN_SCRIPT_DIR
 CONFIG_LEAF_DIR
 XEN_CONFIG_DIR
 CONFIG_DIR
@@ -660,6 +660,7 @@ enable_option_checking
 with_initddir
 with_sysconfig_leaf_dir
 with_libexec_leaf_dir
+with_xen_scriptdir
 with_xen_dumpdir
 with_rundir
 with_debugdir
@@ -1301,6 +1302,9 @@ Optional Packages:
                           "default". [sysconfig]
   --with-libexec-leaf-dir=SUBDIR
                           Name of subdirectory in libexecdir to use.
+  --with-xen-scriptdir=DIR
+                          Path to directory for dom0 hotplug scripts.
+                          [SYSCONFDIR/xen/scripts]
   --with-xen-dumpdir=DIR  Path to directory for domU crash dumps.
                           [LOCALSTATEDIR/lib/xen/dump]
   --with-rundir=DIR       Path to directory for runtime data.
@@ -1887,6 +1891,17 @@ fi
 
 
 
+# Check whether --with-xen-scriptdir was given.
+if test "${with_xen_scriptdir+set}" = set; then :
+  withval=$with_xen_scriptdir; xen_scriptdir_path=$withval
+else
+  xen_scriptdir_path=$XEN_CONFIG_DIR/scripts
+fi
+
+XEN_SCRIPT_DIR=$xen_scriptdir_path
+
+
+
 # Check whether --with-xen-dumpdir was given.
 if test "${with_xen_dumpdir+set}" = set; then :
   withval=$with_xen_dumpdir; xen_dumpdir_path=$withval
@@ -1952,9 +1967,6 @@ SHAREDIR=$prefix/share
 
 
 INITD_DIR=$initddir_path
-
-
-XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
 
 
 case "$host_os" in

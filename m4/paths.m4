@@ -76,6 +76,14 @@ AC_ARG_WITH([libexec-leaf-dir],
     [libexec_subdir=$withval],
     [libexec_subdir=$PACKAGE_TARNAME])
 
+AC_ARG_WITH([xen-scriptdir],
+    AS_HELP_STRING([--with-xen-scriptdir=DIR],
+    [Path to directory for dom0 hotplug scripts. [SYSCONFDIR/xen/scripts]]),
+    [xen_scriptdir_path=$withval],
+    [xen_scriptdir_path=$XEN_CONFIG_DIR/scripts])
+XEN_SCRIPT_DIR=$xen_scriptdir_path
+AC_SUBST(XEN_SCRIPT_DIR)
+
 AC_ARG_WITH([xen-dumpdir],
     AS_HELP_STRING([--with-xen-dumpdir=DIR],
     [Path to directory for domU crash dumps. [LOCALSTATEDIR/lib/xen/dump]]),
@@ -136,9 +144,6 @@ AC_SUBST(SHAREDIR)
 
 INITD_DIR=$initddir_path
 AC_SUBST(INITD_DIR)
-
-XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
-AC_SUBST(XEN_SCRIPT_DIR)
 
 case "$host_os" in
 *freebsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
