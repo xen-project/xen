@@ -111,7 +111,7 @@ static bool verify_patch_size(uint32_t patch_size)
 #define F15H_MPB_MAX_SIZE 4096
 #define F16H_MPB_MAX_SIZE 3458
 #define F17H_MPB_MAX_SIZE 3200
-#define F19H_MPB_MAX_SIZE 4800
+#define F19H_MPB_MAX_SIZE 5568
 
     switch ( boot_cpu_data.x86 )
     {
