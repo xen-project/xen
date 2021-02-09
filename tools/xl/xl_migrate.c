@@ -592,9 +592,10 @@ int main_migrate(int argc, char **argv)
         } else {
             verbose_len = (minmsglevel_default - minmsglevel) + 2;
         }
-        xasprintf(&rune, "exec %s %s xl%s%.*s migrate-receive%s%s%s",
+        xasprintf(&rune, "exec %s %s xl%s%s%.*s migrate-receive%s%s%s",
                   ssh_command, host,
                   pass_tty_arg ? " -t" : "",
+                  timestamps ? " -T" : "",
                   verbose_len, verbose_buf,
                   daemonize ? "" : " -e",
                   debug ? " -d" : "",

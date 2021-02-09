@@ -269,6 +269,7 @@ extern int run_hotplug_scripts;
 extern int dryrun_only;
 extern int claim_mode;
 extern bool progress_use_cr;
+extern bool timestamps;
 extern xentoollog_level minmsglevel;
 #define minmsglevel_default XTL_PROGRESS
 extern char *lockfile;

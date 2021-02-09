@@ -86,6 +86,10 @@ Always use carriage-return-based overwriting for displaying progress
 messages without scrolling the screen.  Without -t, this is done only
 if stderr is a tty.
 
+=item B<-T>
+
+Include timestamps and pid of the xl process in output.
+
 =back
 
 =head1 DOMAIN SUBCOMMANDS
