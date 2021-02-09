@@ -349,6 +349,7 @@ static struct microcode_patch *cpu_request_microcode(const void *buf, size_t siz
             if ( size < sizeof(*mc) ||
                  (mc = buf)->type != UCODE_UCODE_TYPE ||
                  size - sizeof(*mc) < mc->len ||
+                 mc->len < sizeof(struct microcode_patch) ||
                  (!skip_ucode && !verify_patch_size(mc->len)) )
             {
                 printk(XENLOG_ERR "microcode: Bad microcode data\n");
