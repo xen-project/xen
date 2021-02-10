@@ -73,6 +73,7 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
         libxl_uuid_generate(&uuid);
         r = libxl_uuid_bytearray(&uuid);
 
+        /* Generate a random MAC address, with Xen's OUI (00:16:3e) */
         nic->mac[0] = 0x00;
         nic->mac[1] = 0x16;
         nic->mac[2] = 0x3e;
