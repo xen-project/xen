@@ -84,6 +84,9 @@
 /* Define curses header to use */
 #undef INCLUDE_CURSES_H
 
+/* Header path for INCLUDE_ENDIAN_H */
+#undef INCLUDE_ENDIAN_H
+
 /* Define extfs header to use */
 #undef INCLUDE_EXTFS_H
 
