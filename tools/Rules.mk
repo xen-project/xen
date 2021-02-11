@@ -106,8 +106,9 @@ endif
 CFLAGS_libxenlight += $(CFLAGS_libxenctrl)
 
 ifeq ($(debug),y)
-# Disable optimizations
-CFLAGS += -O0 -fno-omit-frame-pointer
+# Use -Og if available, -O0 otherwise
+dbg_opt_level := $(call cc-option,$(CC),-Og,-O0)
+CFLAGS += $(dbg_opt_level) -fno-omit-frame-pointer
 # But allow an override to -O0 in case Python enforces -D_FORTIFY_SOURCE=<n>.
 PY_CFLAGS += $(PY_NOOPT_CFLAGS)
 else
