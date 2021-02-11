@@ -76,6 +76,10 @@ endif
 
 headers.chk: $(AUTOINCS)
 
+headers.lst: FORCE
+	@{ set -e; $(foreach h,$(LIBHEADERS),echo $(h);) } > $@.tmp
+	@$(call move-if-changed,$@.tmp,$@)
+
 libxen$(LIBNAME).map:
 	echo 'VERS_$(MAJOR).$(MINOR) { global: *; };' >$@
 
@@ -118,9 +122,12 @@ TAGS:
 clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS_RM) $(LIB_OBJS) $(PIC_OBJS)
 	rm -f lib$(LIB_FILE_NAME).so.$(MAJOR).$(MINOR) lib$(LIB_FILE_NAME).so.$(MAJOR)
-	rm -f headers.chk
+	rm -f headers.chk headers.lst
 	rm -f $(PKG_CONFIG)
 	rm -f _paths.h
 
 .PHONY: distclean
 distclean: clean
+
+.PHONY: FORCE
+FORCE:
