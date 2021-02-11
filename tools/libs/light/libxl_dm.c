@@ -2101,7 +2101,7 @@ static int libxl__write_stub_dmargs(libxl__gc *gc,
 {
     struct xs_permissions roperm[2];
     xs_transaction_t t = XBT_NULL;
-    char *dmargs;
+    char *dmargs = NULL;
     int rc;
 
     roperm[0].id = 0;
