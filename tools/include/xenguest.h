@@ -145,6 +145,7 @@ struct xc_dom_image {
      * eventually copied into guest context.
      */
     xen_pfn_t *pv_p2m;
+    xen_pfn_t p2m_size;         /* number of pfns covered by pv_p2m */
 
     /* physical memory
      *
@@ -154,12 +155,10 @@ struct xc_dom_image {
      *
      * An ARM guest has GUEST_RAM_BANKS regions of RAM, with
      * rambank_size[i] pages in each. The lowest RAM address
-     * (corresponding to the base of the p2m arrays above) is stored
-     * in rambase_pfn.
+     * is stored in rambase_pfn.
      */
     xen_pfn_t rambase_pfn;
     xen_pfn_t total_pages;
-    xen_pfn_t p2m_size;         /* number of pfns covered by p2m */
     struct xc_dom_phys *phys_pages;
 #if defined (__arm__) || defined(__aarch64__)
     xen_pfn_t rambank_size[GUEST_RAM_BANKS];

@@ -373,7 +373,6 @@ static int meminit(struct xc_dom_image *dom)
     const uint64_t modsize = dtb_size + ramdisk_size;
     const uint64_t ram128mb = bankbase[0] + (128<<20);
 
-    xen_pfn_t p2m_size;
     uint64_t bank0end;
 
     assert(dom->rambase_pfn << XC_PAGE_SHIFT == bankbase[0]);
@@ -409,15 +408,11 @@ static int meminit(struct xc_dom_image *dom)
 
         ramsize -= banksize;
 
-        p2m_size = ( bankbase[i] + banksize - bankbase[0] ) >> XC_PAGE_SHIFT;
-
         dom->rambank_size[i] = banksize >> XC_PAGE_SHIFT;
     }
 
     assert(dom->rambank_size[0] != 0);
     assert(ramsize == 0); /* Too much RAM is rejected above */
-
-    dom->p2m_size = p2m_size;
 
     /* setup initial p2m and allocate guest memory */
     for ( i = 0; i < GUEST_RAM_BANKS && dom->rambank_size[i]; i++ )
