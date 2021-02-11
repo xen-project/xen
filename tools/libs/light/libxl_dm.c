@@ -152,13 +152,16 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
     user = b_info->device_model_user;
     if (user) {
         rc = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
-        if (rc)
+        if (rc) {
+            kill_by_uid = false;
             goto out;
+        }
 
         if (!user_base) {
             LOGD(ERROR, guest_domid, "Couldn't find device_model_user %s",
                  user);
             rc = ERROR_INVAL;
+            kill_by_uid = false;
             goto out;
         }
 
@@ -187,22 +190,29 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
      */
     rc = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
                                          &user_pwbuf, &user_base);
-    if (rc)
+    if (rc) {
+        kill_by_uid = false;
         goto out;
+    }
+
     if (user_base) {
         struct passwd *user_clash, user_clash_pwbuf;
 
         intended_uid = user_base->pw_uid + guest_domid;
         rc = userlookup_helper_getpwuid(gc, intended_uid,
                                          &user_clash_pwbuf, &user_clash);
-        if (rc)
+        if (rc) {
+            kill_by_uid = false;
             goto out;
+        }
+
         if (user_clash) {
             LOGD(ERROR, guest_domid,
                  "wanted to use uid %ld (%s + %d) but that is user %s !",
                  (long)intended_uid, LIBXL_QEMU_USER_RANGE_BASE,
                  guest_domid, user_clash->pw_name);
             rc = ERROR_INVAL;
+            kill_by_uid = false;
             goto out;
         }
 
@@ -221,8 +231,11 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
      */
     user = LIBXL_QEMU_USER_SHARED;
     rc = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
-    if (rc)
+    if (rc) {
+        kill_by_uid = false;
         goto out;
+    }
+
     if (user_base) {
         LOGD(WARN, guest_domid, "Could not find user %s, falling back to %s",
              LIBXL_QEMU_USER_RANGE_BASE, LIBXL_QEMU_USER_SHARED);
@@ -240,6 +253,7 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
          "Could not find user %s or range base pseudo-user %s, cannot restrict",
          LIBXL_QEMU_USER_SHARED, LIBXL_QEMU_USER_RANGE_BASE);
     rc = ERROR_INVAL;
+    kill_by_uid = false;
 
 out:
     /* First, do a root check if appropriate */
