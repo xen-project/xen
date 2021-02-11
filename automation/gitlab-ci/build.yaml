@@ -390,6 +390,26 @@ ubuntu-bionic-gcc-debug:
   variables:
     CONTAINER: ubuntu:bionic
 
+ubuntu-focal-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:focal
+
+ubuntu-focal-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:focal
+
+ubuntu-focal-clang:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:focal
+
+ubuntu-focal-clang-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:focal
+
 opensuse-leap-clang:
   extends: .clang-x86-64-build
   variables:
