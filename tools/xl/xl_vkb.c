@@ -64,7 +64,7 @@ int main_vkbattach(int argc, char **argv)
         char *json = libxl_device_vkb_to_json(ctx, &vkb);
         printf("vkb: %s\n", json);
         free(json);
-        goto out;
+        goto done;
     }
 
     if (libxl_device_vkb_add(ctx, domid, &vkb, 0)) {
@@ -72,6 +72,7 @@ int main_vkbattach(int argc, char **argv)
         rc = ERROR_FAIL; goto out;
     }
 
+done:
     rc = 0;
 
 out:
