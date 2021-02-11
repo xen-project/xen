@@ -83,7 +83,13 @@ int write_x86_cpu_policy_records(struct xc_sr_context *ctx)
 
     msrs.length = nr_msrs * sizeof(xen_msr_entry_t);
     if ( msrs.length )
+    {
         rc = write_record(ctx, &msrs);
+        if ( rc )
+            goto out;
+    }
+
+    rc = 0;
 
  out:
     free(cpuid.data);
