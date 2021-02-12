@@ -19,6 +19,7 @@ BCC                 := @BCC@
 IASL                := @IASL@
 AWK                 := @AWK@
 FETCHER             := @FETCHER@
+ABI_DUMPER          := @ABI_DUMPER@
 
 # Extra folder for libs/includes
 PREPEND_INCLUDES    := @PREPEND_INCLUDES@
