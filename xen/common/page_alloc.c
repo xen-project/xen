@@ -923,6 +923,7 @@ static struct page_info *alloc_heap_pages(
     bool need_tlbflush = false;
     uint32_t tlbflush_timestamp = 0;
     unsigned int dirty_cnt = 0;
+    mfn_t mfn;
 
     /* Make sure there are enough bits in memflags for nodeID. */
     BUILD_BUG_ON((_MEMF_bits - _MEMF_node) < (8 * sizeof(nodeid_t)));
@@ -1021,11 +1022,6 @@ static struct page_info *alloc_heap_pages(
         pg[i].u.inuse.type_info = 0;
         page_set_owner(&pg[i], NULL);
 
-        /* Ensure cache and RAM are consistent for platforms where the
-         * guest can control its own visibility of/through the cache.
-         */
-        flush_page_to_ram(mfn_x(page_to_mfn(&pg[i])),
-                          !(memflags & MEMF_no_icache_flush));
     }
 
     spin_unlock(&heap_lock);
@@ -1060,6 +1056,14 @@ static struct page_info *alloc_heap_pages(
 
     if ( need_tlbflush )
         filtered_flush_tlb_mask(tlbflush_timestamp);
+
+    /*
+     * Ensure cache and RAM are consistent for platforms where the guest
+     * can control its own visibility of/through the cache.
+     */
+    mfn = page_to_mfn(pg);
+    for ( i = 0; i < (1U << order); i++ )
+        flush_page_to_ram(mfn_x(mfn) + i, !(memflags & MEMF_no_icache_flush));
 
     return pg;
 }
