@@ -415,7 +415,8 @@ Guest-side driver capable of speaking the Xen PV Framebuffer protocol
 
 Guest-side driver capable of speaking the Xen PV display protocol
 
-    Status, Linux: Supported
+    Status, Linux: Supported (outside of "backend allocation" mode)
+    Status, Linux: Experimental (in "backend allocation" mode)
 
 ### PV Console (frontend)
 
