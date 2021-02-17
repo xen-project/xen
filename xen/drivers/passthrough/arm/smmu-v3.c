@@ -2207,24 +2207,6 @@ static int arm_smmu_add_device(u8 devfn, struct device *dev)
 	 */
 	arm_smmu_enable_pasid(master);
 
-	return 0;
-
-err_free_master:
-	xfree(master);
-	dev_iommu_priv_set(dev, NULL);
-	return ret;
-}
-
-static int arm_smmu_dt_xlate(struct device *dev,
-				const struct dt_phandle_args *args)
-{
-	int ret;
-	struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
-
-	ret = iommu_fwspec_add_ids(dev, args->args, 1);
-	if (ret)
-		return ret;
-
 	if (dt_device_is_protected(dev_to_dt(dev))) {
 		dev_err(dev, "Already added to SMMUv3\n");
 		return -EEXIST;
@@ -2237,6 +2219,17 @@ static int arm_smmu_dt_xlate(struct device *dev,
 			dev_name(fwspec->iommu_dev), fwspec->num_ids);
 
 	return 0;
+
+err_free_master:
+	xfree(master);
+	dev_iommu_priv_set(dev, NULL);
+	return ret;
+}
+
+static int arm_smmu_dt_xlate(struct device *dev,
+				const struct dt_phandle_args *args)
+{
+	return iommu_fwspec_add_ids(dev, args->args, 1);
 }
 
 /* Probing and initialisation functions */
