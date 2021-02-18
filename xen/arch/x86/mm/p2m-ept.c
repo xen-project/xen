@@ -53,12 +53,7 @@ static int atomic_write_ept_entry(ept_entry_t *entryptr, ept_entry_t new,
     bool_t check_foreign = (new.mfn != entryptr->mfn ||
                             new.sa_p2mt != entryptr->sa_p2mt);
 
-    if ( level )
-    {
-        ASSERT(!is_epte_superpage(&new) || !p2m_is_foreign(new.sa_p2mt));
-        write_atomic(&entryptr->epte, new.epte);
-        return 0;
-    }
+    ASSERT(!level || !is_epte_superpage(&new) || !p2m_is_foreign(new.sa_p2mt));
 
     if ( unlikely(p2m_is_foreign(new.sa_p2mt)) )
     {
