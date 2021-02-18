@@ -1243,7 +1243,14 @@ map_grant_ref(
         goto undo_out;
     }
 
-    need_iommu = gnttab_need_iommu_mapping(ld);
+    /*
+     * This is deliberately not checking the page's owner: get_paged_frame()
+     * explicitly rejects foreign pages, and all success paths above yield
+     * either owner == rd or owner == dom_io (the dom_cow case is irrelevant
+     * as mem-sharing and IOMMU use are incompatible). The dom_io case would
+     * need checking separately if we compared against owner here.
+     */
+    need_iommu = ld != rd && gnttab_need_iommu_mapping(ld);
     if ( need_iommu )
     {
         unsigned int kind;
@@ -1493,7 +1500,8 @@ unmap_common(
     if ( put_handle )
         put_maptrack_handle(lgt, op->handle);
 
-    if ( rc == GNTST_okay && gnttab_need_iommu_mapping(ld) )
+    /* See the respective comment in map_grant_ref(). */
+    if ( rc == GNTST_okay && ld != rd && gnttab_need_iommu_mapping(ld) )
     {
         unsigned int kind;
         int err = 0;
