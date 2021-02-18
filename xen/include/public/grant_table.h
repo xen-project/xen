@@ -166,11 +166,13 @@ typedef struct grant_entry_v1 grant_entry_v1_t;
 #define GTF_type_mask       (3U<<0)
 
 /*
- * Subflags for GTF_permit_access.
+ * Subflags for GTF_permit_access and GTF_transitive.
  *  GTF_readonly: Restrict @domid to read-only mappings and accesses. [GST]
  *  GTF_reading: Grant entry is currently mapped for reading by @domid. [XEN]
  *  GTF_writing: Grant entry is currently mapped for writing by @domid. [XEN]
- *  GTF_PAT, GTF_PWT, GTF_PCD: (x86) cache attribute flags for the grant [GST]
+ * Further subflags for GTF_permit_access only.
+ *  GTF_PAT, GTF_PWT, GTF_PCD: (x86) cache attribute flags to be used for
+ *                             mappings of the grant [GST]
  *  GTF_sub_page: Grant access to only a subrange of the page.  @domid
  *                will only be allowed to copy from the grant, and not
  *                map it. [GST]
