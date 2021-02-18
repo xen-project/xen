@@ -759,10 +759,9 @@ static void p2m_free_entry(struct p2m_domain *p2m,
          * has failed (error case).
          * So, at worst, the spurious mapcache invalidation might be sent.
          */
-        if ( (p2m->domain == current->domain) &&
-              domain_has_ioreq_server(p2m->domain) &&
-              p2m_is_ram(entry.p2m.type) )
-            p2m->domain->mapcache_invalidate = true;
+        if ( p2m_is_ram(entry.p2m.type) &&
+             domain_has_ioreq_server(p2m->domain) )
+            ioreq_request_mapcache_invalidate(p2m->domain);
 #endif
 
         p2m->stats.mappings[level]--;

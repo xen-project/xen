@@ -20,6 +20,7 @@
  */
 
 #include <xen/event.h>
+#include <xen/ioreq.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/trace.h>
@@ -647,6 +648,8 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
                 set_gpfn_from_mfn(mfn_x(mfn), INVALID_M2P_ENTRY);
             p2m_pod_cache_add(p2m, page, cur_order);
 
+            ioreq_request_mapcache_invalidate(d);
+
             steal_for_cache =  ( p2m->pod.entry_count > p2m->pod.count );
 
             ram -= n;
@@ -835,6 +838,8 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, gfn_t gfn)
     p2m_pod_cache_add(p2m, mfn_to_page(mfn0), PAGE_ORDER_2M);
     p2m->pod.entry_count += SUPERPAGE_PAGES;
 
+    ioreq_request_mapcache_invalidate(d);
+
     ret = SUPERPAGE_PAGES;
 
 out_reset:
@@ -997,6 +1002,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
             /* Add to cache, and account for the new p2m PoD entry */
             p2m_pod_cache_add(p2m, mfn_to_page(mfns[i]), PAGE_ORDER_4K);
             p2m->pod.entry_count++;
+
+            ioreq_request_mapcache_invalidate(d);
         }
     }
 
@@ -1315,6 +1322,8 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn_l,
         p2m->pod.entry_count -= pod_count;
         BUG_ON(p2m->pod.entry_count < 0);
         pod_unlock(p2m);
+
+        ioreq_request_mapcache_invalidate(d);
     }
 
 out:

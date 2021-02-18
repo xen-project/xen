@@ -225,6 +225,14 @@ struct vcpu
     bool             hcall_compat;
 #endif
 
+#ifdef CONFIG_IOREQ_SERVER
+    /*
+     * Indicates that mapcache invalidation request should be sent to
+     * the device emulator.
+     */
+    bool             mapcache_invalidate;
+#endif
+
     /* The CPU, if any, which is holding onto this VCPU's state. */
 #define VCPU_CPU_CLEAN (~0u)
     unsigned int     dirty_cpu;
@@ -448,11 +456,6 @@ struct domain
      * unpaused for the first time by the systemcontroller.
      */
     bool             creation_finished;
-    /*
-     * Indicates that mapcache invalidation request should be sent to
-     * the device emulator.
-     */
-    bool             mapcache_invalidate;
 
     /* Which guest this guest has privileges on */
     struct domain   *target;

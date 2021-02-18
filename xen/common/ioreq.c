@@ -35,6 +35,17 @@
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 
+void ioreq_request_mapcache_invalidate(const struct domain *d)
+{
+    struct vcpu *v = current;
+
+    if ( d == v->domain )
+        v->mapcache_invalidate = true;
+    else if ( d->creation_finished )
+        for_each_vcpu ( d, v )
+            v->mapcache_invalidate = true;
+}
+
 /* Ask ioemu mapcache to invalidate mappings. */
 void ioreq_signal_mapcache_invalidate(void)
 {
@@ -206,6 +217,7 @@ bool vcpu_ioreq_handle_completion(struct vcpu *v)
     struct ioreq_server *s;
     struct ioreq_vcpu *sv;
     enum vio_completion completion;
+    bool res = true;
 
     if ( has_vpci(d) && vpci_process_pending(v) )
     {
@@ -232,17 +244,27 @@ bool vcpu_ioreq_handle_completion(struct vcpu *v)
         break;
 
     case VIO_mmio_completion:
-        return arch_ioreq_complete_mmio();
+        res = arch_ioreq_complete_mmio();
+        break;
 
     case VIO_pio_completion:
-        return handle_pio(vio->req.addr, vio->req.size,
-                          vio->req.dir);
+        res = handle_pio(vio->req.addr, vio->req.size,
+                         vio->req.dir);
+        break;
 
     default:
-        return arch_vcpu_ioreq_completion(completion);
+        res = arch_vcpu_ioreq_completion(completion);
+        break;
     }
 
-    return true;
+    if ( res && unlikely(v->mapcache_invalidate) )
+    {
+        v->mapcache_invalidate = false;
+        ioreq_signal_mapcache_invalidate();
+        res = false;
+    }
+
+    return res;
 }
 
 static int ioreq_server_alloc_mfn(struct ioreq_server *s, bool buf)

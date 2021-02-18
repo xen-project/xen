@@ -32,7 +32,6 @@
 
 static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
-    const struct vcpu *curr = current;
     long rc;
 
     switch ( cmd & MEMOP_CMD_MASK )
@@ -42,13 +41,10 @@ static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         return -ENOSYS;
     }
 
-    if ( !curr->hcall_compat )
+    if ( !current->hcall_compat )
         rc = do_memory_op(cmd, arg);
     else
         rc = compat_memory_op(cmd, arg);
-
-    if ( (cmd & MEMOP_CMD_MASK) == XENMEM_decrease_reservation )
-        curr->domain->mapcache_invalidate = true;
 
     return rc;
 }
@@ -327,9 +323,11 @@ int hvm_hypercall(struct cpu_user_regs *regs)
 
     HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu -> %lx", eax, regs->rax);
 
-    if ( unlikely(currd->mapcache_invalidate) &&
-         test_and_clear_bool(currd->mapcache_invalidate) )
+    if ( unlikely(curr->mapcache_invalidate) )
+    {
+        curr->mapcache_invalidate = false;
         ioreq_signal_mapcache_invalidate();
+    }
 
     return curr->hcall_preempted ? HVM_HCALL_preempted : HVM_HCALL_completed;
 }

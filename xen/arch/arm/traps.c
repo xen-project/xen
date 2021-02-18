@@ -1509,8 +1509,8 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
      * Note that sending the invalidation request causes the vCPU to block
      * until all the IOREQ servers have acknowledged the invalidation.
      */
-    if ( unlikely(curr->domain->mapcache_invalidate) &&
-         test_and_clear_bool(curr->domain->mapcache_invalidate) )
+    if ( unlikely(curr->mapcache_invalidate) &&
+         test_and_clear_bool(curr->mapcache_invalidate) )
         ioreq_signal_mapcache_invalidate();
 #endif
 }

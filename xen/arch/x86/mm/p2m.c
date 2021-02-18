@@ -28,6 +28,7 @@
 #include <xen/vm_event.h>
 #include <xen/event.h>
 #include <xen/grant_table.h>
+#include <xen/ioreq.h>
 #include <xen/param.h>
 #include <public/vm_event.h>
 #include <asm/domain.h>
@@ -815,6 +816,8 @@ p2m_remove_page(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
         }
     }
 
+    ioreq_request_mapcache_invalidate(p2m->domain);
+
     return p2m_set_entry(p2m, gfn, INVALID_MFN, page_order, p2m_invalid,
                          p2m->default_access);
 }
@@ -1301,6 +1304,8 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
             ASSERT(mfn_valid(mfn_add(omfn, i)));
             set_gpfn_from_mfn(mfn_x(omfn) + i, INVALID_M2P_ENTRY);
         }
+
+        ioreq_request_mapcache_invalidate(d);
     }
 
     P2M_DEBUG("set %d %lx %lx\n", gfn_p2mt, gfn_l, mfn_x(mfn));
