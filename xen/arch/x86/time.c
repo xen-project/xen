@@ -1662,11 +1662,12 @@ struct calibration_rendezvous {
 };
 
 static void
-time_calibration_rendezvous_tail(const struct calibration_rendezvous *r)
+time_calibration_rendezvous_tail(const struct calibration_rendezvous *r,
+                                 uint64_t tsc)
 {
     struct cpu_time_stamp *c = &this_cpu(cpu_calibration);
 
-    c->local_tsc    = rdtsc_ordered();
+    c->local_tsc    = tsc;
     c->local_stime  = get_s_time_fixed(c->local_tsc);
     c->master_stime = r->master_stime;
 
@@ -1691,11 +1692,11 @@ static void time_calibration_tsc_rendezvous(void *_r)
             while ( atomic_read(&r->semaphore) != (total_cpus - 1) )
                 cpu_relax();
 
-            if ( r->master_stime == 0 )
-            {
-                r->master_stime = read_platform_stime(NULL);
+            if ( r->master_tsc_stamp == 0 )
                 r->master_tsc_stamp = rdtsc_ordered();
-            }
+            else if ( i == 0 )
+                r->master_stime = read_platform_stime(NULL);
+
             atomic_inc(&r->semaphore);
 
             if ( i == 0 )
@@ -1720,7 +1721,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
         }
     }
 
-    time_calibration_rendezvous_tail(r);
+    time_calibration_rendezvous_tail(r, r->master_tsc_stamp);
 }
 
 /* Ordinary rendezvous function which does not modify TSC values. */
@@ -1745,7 +1746,7 @@ static void time_calibration_std_rendezvous(void *_r)
         smp_rmb(); /* receive signal /then/ read r->master_stime */
     }
 
-    time_calibration_rendezvous_tail(r);
+    time_calibration_rendezvous_tail(r, rdtsc_ordered());
 }
 
 /*
