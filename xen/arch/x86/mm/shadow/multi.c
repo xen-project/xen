@@ -2614,7 +2614,7 @@ static int sh_page_fault(struct vcpu *v,
         {
             shadow_l2e_t sl2e;
             mfn_t gl1mfn;
-            if ( (__copy_from_user(&sl2e,
+            if ( (copy_from_unsafe(&sl2e,
                                    (sh_linear_l2_table(v)
                                     + shadow_l2_linear_offset(va)),
                                    sizeof(sl2e)) != 0)
@@ -2633,7 +2633,7 @@ static int sh_page_fault(struct vcpu *v,
 #endif /* SHOPT_OUT_OF_SYNC */
         /* The only reasons for reserved bits to be set in shadow entries
          * are the two "magic" shadow_l1e entries. */
-        if ( likely((__copy_from_user(&sl1e,
+        if ( likely((copy_from_unsafe(&sl1e,
                                       (sh_linear_l1_table(v)
                                        + shadow_l1_linear_offset(va)),
                                       sizeof(sl1e)) == 0)
@@ -3308,10 +3308,10 @@ static bool sh_invlpg(struct vcpu *v, unsigned long linear)
                    sh_linear_l4_table(v)[shadow_l4_linear_offset(linear)])
                & _PAGE_PRESENT) )
             return false;
-        /* This must still be a copy-from-user because we don't have the
+        /* This must still be a copy-from-unsafe because we don't have the
          * paging lock, and the higher-level shadows might disappear
          * under our feet. */
-        if ( __copy_from_user(&sl3e, (sh_linear_l3_table(v)
+        if ( copy_from_unsafe(&sl3e, (sh_linear_l3_table(v)
                                       + shadow_l3_linear_offset(linear)),
                               sizeof (sl3e)) != 0 )
         {
@@ -3330,9 +3330,9 @@ static bool sh_invlpg(struct vcpu *v, unsigned long linear)
         return false;
 #endif
 
-    /* This must still be a copy-from-user because we don't have the shadow
+    /* This must still be a copy-from-unsafe because we don't have the shadow
      * lock, and the higher-level shadows might disappear under our feet. */
-    if ( __copy_from_user(&sl2e,
+    if ( copy_from_unsafe(&sl2e,
                           sh_linear_l2_table(v) + shadow_l2_linear_offset(linear),
                           sizeof (sl2e)) != 0 )
     {
@@ -3371,11 +3371,11 @@ static bool sh_invlpg(struct vcpu *v, unsigned long linear)
              * hold the paging lock yet.  Check again with the lock held. */
             paging_lock(d);
 
-            /* This must still be a copy-from-user because we didn't
+            /* This must still be a copy-from-unsafe because we didn't
              * have the paging lock last time we checked, and the
              * higher-level shadows might have disappeared under our
              * feet. */
-            if ( __copy_from_user(&sl2e,
+            if ( copy_from_unsafe(&sl2e,
                                   sh_linear_l2_table(v)
                                   + shadow_l2_linear_offset(linear),
                                   sizeof (sl2e)) != 0 )

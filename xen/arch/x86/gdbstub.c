@@ -33,13 +33,13 @@ gdb_arch_signal_num(struct cpu_user_regs *regs, unsigned long cookie)
 unsigned int
 gdb_arch_copy_from_user(void *dest, const void *src, unsigned len)
 {
-    return __copy_from_user(dest, src, len);
+    return copy_from_unsafe(dest, src, len);
 }
 
 unsigned int 
 gdb_arch_copy_to_user(void *dest, const void *src, unsigned len)
 {
-    return __copy_to_user(dest, src, len);
+    return copy_to_unsafe(dest, src, len);
 }
 
 void

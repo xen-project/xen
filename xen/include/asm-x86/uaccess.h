@@ -196,21 +196,20 @@ do {                                                                       \
 #define get_guest_size get_unsafe_size
 
 /**
- * __copy_to_user: - Copy a block of data into user space, with less checking
- * @to:   Destination address, in user space.
- * @from: Source address, in kernel space.
+ * __copy_to_guest_pv: - Copy a block of data into guest space, with less
+ *                       checking
+ * @to:   Destination address, in guest space.
+ * @from: Source address, in hypervisor space.
  * @n:    Number of bytes to copy.
  *
- * Context: User context only.  This function may sleep.
- *
- * Copy data from kernel space to user space.  Caller must check
+ * Copy data from hypervisor space to guest space.  Caller must check
  * the specified block with access_ok() before calling this function.
  *
  * Returns number of bytes that could not be copied.
  * On success, this will be zero.
  */
 static always_inline unsigned long
-__copy_to_user(void __user *to, const void *from, unsigned long n)
+__copy_to_guest_pv(void __user *to, const void *from, unsigned long n)
 {
     if (__builtin_constant_p(n)) {
         unsigned long ret;
@@ -232,16 +231,16 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
     }
     return __copy_to_user_ll(to, from, n);
 }
+#define copy_to_unsafe __copy_to_guest_pv
 
 /**
- * __copy_from_user: - Copy a block of data from user space, with less checking
- * @to:   Destination address, in kernel space.
- * @from: Source address, in user space.
+ * __copy_from_guest_pv: - Copy a block of data from guest space, with less
+ *                         checking
+ * @to:   Destination address, in hypervisor space.
+ * @from: Source address, in guest space.
  * @n:    Number of bytes to copy.
  *
- * Context: User context only.  This function may sleep.
- *
- * Copy data from user space to kernel space.  Caller must check
+ * Copy data from guest space to hypervisor space.  Caller must check
  * the specified block with access_ok() before calling this function.
  *
  * Returns number of bytes that could not be copied.
@@ -251,7 +250,7 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
  * data to the requested size using zero bytes.
  */
 static always_inline unsigned long
-__copy_from_user(void *to, const void __user *from, unsigned long n)
+__copy_from_guest_pv(void *to, const void __user *from, unsigned long n)
 {
     if (__builtin_constant_p(n)) {
         unsigned long ret;
@@ -273,6 +272,7 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
     }
     return __copy_from_user_ll(to, from, n);
 }
+#define copy_from_unsafe __copy_from_guest_pv
 
 /*
  * The exception table consists of pairs of addresses: the first is the

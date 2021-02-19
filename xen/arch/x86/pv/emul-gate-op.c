@@ -149,12 +149,12 @@ static int read_mem(enum x86_segment seg, unsigned long offset, void *p_data,
 
     addr = (uint32_t)addr;
 
-    if ( (rc = __copy_from_user(p_data, (void *)addr, bytes)) )
+    if ( (rc = __copy_from_guest_pv(p_data, (void __user *)addr, bytes)) )
     {
         /*
          * TODO: This should report PFEC_insn_fetch when goc->insn_fetch &&
          * cpu_has_nx, but we'd then need a "fetch" variant of
-         * __copy_from_user() respecting NX, SMEP, and protection keys.
+         * __copy_from_guest_pv() respecting NX, SMEP, and protection keys.
          */
         x86_emul_pagefault(0, addr + bytes - rc, ctxt);
         return X86EMUL_EXCEPTION;

@@ -43,7 +43,7 @@ static int ptwr_emulated_read(enum x86_segment seg, unsigned long offset,
     unsigned long addr = offset;
 
     if ( !__addr_ok(addr) ||
-         (rc = __copy_from_user(p_data, (void *)addr, bytes)) )
+         (rc = __copy_from_guest_pv(p_data, (void *)addr, bytes)) )
     {
         x86_emul_pagefault(0, addr + bytes - rc, ctxt);  /* Read fault. */
         return X86EMUL_EXCEPTION;

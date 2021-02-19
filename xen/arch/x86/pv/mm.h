@@ -22,7 +22,7 @@ static inline l1_pgentry_t guest_get_eff_kern_l1e(unsigned long linear)
         toggle_guest_pt(curr);
 
     if ( unlikely(!__addr_ok(linear)) ||
-         __copy_from_user(&l1e,
+         copy_from_unsafe(&l1e,
                           &__linear_l1_table[l1_linear_offset(linear)],
                           sizeof(l1_pgentry_t)) )
         l1e = l1e_empty();

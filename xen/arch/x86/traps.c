@@ -1103,7 +1103,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     }
 
     if ( !is_active_kernel_text(regs->rip) ||
-         __copy_from_user(bug_insn, eip, sizeof(bug_insn)) ||
+         copy_from_unsafe(bug_insn, eip, sizeof(bug_insn)) ||
          memcmp(bug_insn, "\xf\xb", sizeof(bug_insn)) )
         goto die;
 

@@ -649,7 +649,8 @@ static int rep_ins(uint16_t port,
         if ( rc != X86EMUL_OKAY )
             return rc;
 
-        if ( (rc = __copy_to_user((void *)addr, &data, bytes_per_rep)) != 0 )
+        if ( (rc = __copy_to_guest_pv((void __user *)addr, &data,
+                                      bytes_per_rep)) != 0 )
         {
             x86_emul_pagefault(PFEC_write_access,
                                addr + bytes_per_rep - rc, ctxt);
@@ -716,7 +717,8 @@ static int rep_outs(enum x86_segment seg, unsigned long offset,
         if ( rc != X86EMUL_OKAY )
             return rc;
 
-        if ( (rc = __copy_from_user(&data, (void *)addr, bytes_per_rep)) != 0 )
+        if ( (rc = __copy_from_guest_pv(&data, (void __user *)addr,
+                                        bytes_per_rep)) != 0 )
         {
             x86_emul_pagefault(0, addr + bytes_per_rep - rc, ctxt);
             return X86EMUL_EXCEPTION;
@@ -1253,12 +1255,12 @@ static int insn_fetch(enum x86_segment seg,
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    if ( (rc = __copy_from_user(p_data, (void *)addr, bytes)) != 0 )
+    if ( (rc = __copy_from_guest_pv(p_data, (void __user *)addr, bytes)) != 0 )
     {
         /*
          * TODO: This should report PFEC_insn_fetch when goc->insn_fetch &&
          * cpu_has_nx, but we'd then need a "fetch" variant of
-         * __copy_from_user() respecting NX, SMEP, and protection keys.
+         * __copy_from_guest_pv() respecting NX, SMEP, and protection keys.
          */
         x86_emul_pagefault(0, addr + bytes - rc, ctxt);
         return X86EMUL_EXCEPTION;

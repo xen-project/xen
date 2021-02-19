@@ -110,7 +110,7 @@ unsigned __copy_from_user_ll(void *to, const void __user *from, unsigned n)
 unsigned copy_to_user(void __user *to, const void *from, unsigned n)
 {
     if ( access_ok(to, n) )
-        n = __copy_to_user(to, from, n);
+        n = __copy_to_guest_pv(to, from, n);
     return n;
 }
 
@@ -168,7 +168,7 @@ unsigned clear_user(void __user *to, unsigned n)
 unsigned copy_from_user(void *to, const void __user *from, unsigned n)
 {
     if ( access_ok(from, n) )
-        n = __copy_from_user(to, from, n);
+        n = __copy_from_guest_pv(to, from, n);
     else
         memset(to, 0, n);
     return n;
