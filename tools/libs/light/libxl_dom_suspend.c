@@ -630,12 +630,13 @@ void libxl__domain_resume(libxl__egc *egc,
         goto out;
     }
 
+    dmrs->suspend_cancel = suspend_cancel;
+
     if (type != LIBXL_DOMAIN_TYPE_HVM) {
         rc = 0;
         goto out;
     }
 
-    dmrs->suspend_cancel = suspend_cancel;
     dmrs->dm_resumed_callback = domain_resume_done;
     libxl__dm_resume(egc, dmrs); /* must be last */
     return;
