@@ -854,9 +854,7 @@ static void resume_platform_timer(void)
 
 static void __init reset_platform_timer(void)
 {
-    /* Deactivate any timers running */
     kill_timer(&plt_overflow_timer);
-    kill_timer(&calibration_timer);
 
     /* Reset counters and stamps */
     spin_lock_irq(&platform_timer_lock);
@@ -1956,19 +1954,13 @@ static void __init reset_percpu_time(void *unused)
     t->stamp.master_stime = t->stamp.local_stime;
 }
 
-static void __init try_platform_timer_tail(bool late)
+static void __init try_platform_timer_tail(void)
 {
     init_timer(&plt_overflow_timer, plt_overflow, NULL, 0);
     plt_overflow(NULL);
 
     platform_timer_stamp = plt_stamp64;
     stime_platform_stamp = NOW();
-
-    if ( !late )
-        init_percpu_time();
-
-    init_timer(&calibration_timer, time_calibration, NULL, 0);
-    set_timer(&calibration_timer, NOW() + EPOCH);
 }
 
 /* Late init function, after all cpus have booted */
@@ -2009,10 +2001,13 @@ static int __init verify_tsc_reliability(void)
             time_calibration_rendezvous_fn = time_calibration_nop_rendezvous;
 
             /* Finish platform timer switch. */
-            try_platform_timer_tail(true);
+            try_platform_timer_tail();
 
             printk("Switched to Platform timer %s TSC\n",
                    freq_string(plt_src.frequency));
+
+            time_calibration(NULL);
+
             return 0;
         }
     }
@@ -2033,6 +2028,8 @@ static int __init verify_tsc_reliability(void)
          !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
         time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;
 
+    time_calibration(NULL);
+
     return 0;
 }
 __initcall(verify_tsc_reliability);
@@ -2048,7 +2045,11 @@ int __init init_xen_time(void)
     do_settime(get_wallclock_time(), 0, NOW());
 
     /* Finish platform timer initialization. */
-    try_platform_timer_tail(false);
+    try_platform_timer_tail();
+
+    init_percpu_time();
+
+    init_timer(&calibration_timer, time_calibration, NULL, 0);
 
     /*
      * Setup space to track per-socket TSC_ADJUST values. Don't fiddle with
