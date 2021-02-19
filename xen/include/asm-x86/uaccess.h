@@ -59,13 +59,11 @@ extern void __put_user_bad(void);
   __put_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
 /**
- * __get_user: - Get a simple variable from user space, with less checking.
+ * __get_guest: - Get a simple variable from guest space, with less checking.
  * @x:   Variable to store result.
- * @ptr: Source address, in user space.
+ * @ptr: Source address, in guest space.
  *
- * Context: User context only.  This function may sleep.
- *
- * This macro copies a single simple variable from user space to kernel
+ * This macro copies a single simple variable from guest space to hypervisor
  * space.  It supports simple types like char and int, but not larger
  * data types like structures or arrays.
  *
@@ -78,17 +76,15 @@ extern void __put_user_bad(void);
  * Returns zero on success, or -EFAULT on error.
  * On error, the variable @x is set to zero.
  */
-#define __get_user(x,ptr) \
-  __get_user_nocheck((x),(ptr),sizeof(*(ptr)))
+#define __get_guest(x, ptr) get_guest_nocheck(x, ptr, sizeof(*(ptr)))
+#define get_unsafe __get_guest
 
 /**
- * __put_user: - Write a simple value into user space, with less checking.
- * @x:   Value to copy to user space.
- * @ptr: Destination address, in user space.
+ * __put_guest: - Write a simple value into guest space, with less checking.
+ * @x:   Value to store in guest space.
+ * @ptr: Destination address, in guest space.
  *
- * Context: User context only.  This function may sleep.
- *
- * This macro copies a single simple value from kernel space to user
+ * This macro copies a single simple value from hypervisor space to guest
  * space.  It supports simple types like char and int, but not larger
  * data types like structures or arrays.
  *
@@ -100,13 +96,14 @@ extern void __put_user_bad(void);
  *
  * Returns zero on success, or -EFAULT on error.
  */
-#define __put_user(x,ptr) \
-  __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+#define __put_guest(x, ptr) \
+    put_guest_nocheck((__typeof__(*(ptr)))(x), ptr, sizeof(*(ptr)))
+#define put_unsafe __put_guest
 
-#define __put_user_nocheck(x, ptr, size)				\
+#define put_guest_nocheck(x, ptr, size)					\
 ({									\
 	int err_; 							\
-	__put_user_size(x, ptr, size, err_, -EFAULT);			\
+	put_guest_size(x, ptr, size, err_, -EFAULT);			\
 	err_;								\
 })
 
@@ -114,14 +111,14 @@ extern void __put_user_bad(void);
 ({									\
 	__typeof__(*(ptr)) __user *ptr_ = (ptr);			\
 	__typeof__(size) size_ = (size);				\
-	access_ok(ptr_, size_) ? __put_user_nocheck(x, ptr_, size_)	\
+	access_ok(ptr_, size_) ? put_guest_nocheck(x, ptr_, size_)	\
 			       : -EFAULT;				\
 })
 
-#define __get_user_nocheck(x, ptr, size)				\
+#define get_guest_nocheck(x, ptr, size)					\
 ({									\
 	int err_; 							\
-	__get_user_size(x, ptr, size, err_, -EFAULT);			\
+	get_guest_size(x, ptr, size, err_, -EFAULT);			\
 	err_;								\
 })
 
@@ -129,7 +126,7 @@ extern void __put_user_bad(void);
 ({									\
 	__typeof__(*(ptr)) __user *ptr_ = (ptr);			\
 	__typeof__(size) size_ = (size);				\
-	access_ok(ptr_, size_) ? __get_user_nocheck(x, ptr_, size_)	\
+	access_ok(ptr_, size_) ? get_guest_nocheck(x, ptr_, size_)	\
 			       : -EFAULT;				\
 })
 
@@ -141,7 +138,7 @@ struct __large_struct { unsigned long buf[100]; };
  * we do not write to any memory gcc knows about, so there are no
  * aliasing issues.
  */
-#define __put_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
+#define put_unsafe_asm(x, addr, err, itype, rtype, ltype, errret)	\
 	stac();								\
 	__asm__ __volatile__(						\
 		"1:	mov"itype" %"rtype"1,%2\n"			\
@@ -155,7 +152,7 @@ struct __large_struct { unsigned long buf[100]; };
 		: ltype (x), "m"(__m(addr)), "i"(errret), "0"(err));	\
 	clac()
 
-#define __get_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
+#define get_unsafe_asm(x, addr, err, itype, rtype, ltype, errret)	\
 	stac();								\
 	__asm__ __volatile__(						\
 		"1:	mov"itype" %2,%"rtype"1\n"			\
@@ -169,6 +166,34 @@ struct __large_struct { unsigned long buf[100]; };
 		: "=r"(err), ltype (x)					\
 		: "m"(__m(addr)), "i"(errret), "0"(err));		\
 	clac()
+
+#define put_unsafe_size(x, ptr, size, retval, errret)                      \
+do {                                                                       \
+    retval = 0;                                                            \
+    switch ( size )                                                        \
+    {                                                                      \
+    case 1: put_unsafe_asm(x, ptr, retval, "b", "b", "iq", errret); break; \
+    case 2: put_unsafe_asm(x, ptr, retval, "w", "w", "ir", errret); break; \
+    case 4: put_unsafe_asm(x, ptr, retval, "l", "k", "ir", errret); break; \
+    case 8: put_unsafe_asm(x, ptr, retval, "q",  "", "ir", errret); break; \
+    default: __put_user_bad();                                             \
+    }                                                                      \
+} while ( false )
+#define put_guest_size put_unsafe_size
+
+#define get_unsafe_size(x, ptr, size, retval, errret)                      \
+do {                                                                       \
+    retval = 0;                                                            \
+    switch ( size )                                                        \
+    {                                                                      \
+    case 1: get_unsafe_asm(x, ptr, retval, "b", "b", "=q", errret); break; \
+    case 2: get_unsafe_asm(x, ptr, retval, "w", "w", "=r", errret); break; \
+    case 4: get_unsafe_asm(x, ptr, retval, "l", "k", "=r", errret); break; \
+    case 8: get_unsafe_asm(x, ptr, retval, "q",  "", "=r", errret); break; \
+    default: __get_user_bad();                                             \
+    }                                                                      \
+} while ( false )
+#define get_guest_size get_unsafe_size
 
 /**
  * __copy_to_user: - Copy a block of data into user space, with less checking
@@ -192,16 +217,16 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 
         switch (n) {
         case 1:
-            __put_user_size(*(const u8 *)from, (u8 __user *)to, 1, ret, 1);
+            put_guest_size(*(const uint8_t *)from, to, 1, ret, 1);
             return ret;
         case 2:
-            __put_user_size(*(const u16 *)from, (u16 __user *)to, 2, ret, 2);
+            put_guest_size(*(const uint16_t *)from, to, 2, ret, 2);
             return ret;
         case 4:
-            __put_user_size(*(const u32 *)from, (u32 __user *)to, 4, ret, 4);
+            put_guest_size(*(const uint32_t *)from, to, 4, ret, 4);
             return ret;
         case 8:
-            __put_user_size(*(const u64 *)from, (u64 __user *)to, 8, ret, 8);
+            put_guest_size(*(const uint64_t *)from, to, 8, ret, 8);
             return ret;
         }
     }
@@ -233,16 +258,16 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 
         switch (n) {
         case 1:
-            __get_user_size(*(u8 *)to, from, 1, ret, 1);
+            get_guest_size(*(uint8_t *)to, from, 1, ret, 1);
             return ret;
         case 2:
-            __get_user_size(*(u16 *)to, from, 2, ret, 2);
+            get_guest_size(*(uint16_t *)to, from, 2, ret, 2);
             return ret;
         case 4:
-            __get_user_size(*(u32 *)to, from, 4, ret, 4);
+            get_guest_size(*(uint32_t *)to, from, 4, ret, 4);
             return ret;
         case 8:
-            __get_user_size(*(u64*)to, from, 8, ret, 8);
+            get_guest_size(*(uint64_t *)to, from, 8, ret, 8);
             return ret;
         }
     }

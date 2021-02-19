@@ -114,15 +114,15 @@ unsigned int compat_iret(void)
     regs->rsp = (u32)regs->rsp;
 
     /* Restore EAX (clobbered by hypercall). */
-    if ( unlikely(__get_user(regs->eax, (u32 *)regs->rsp)) )
+    if ( unlikely(__get_guest(regs->eax, (u32 *)regs->rsp)) )
     {
         domain_crash(v->domain);
         return 0;
     }
 
     /* Restore CS and EIP. */
-    if ( unlikely(__get_user(regs->eip, (u32 *)regs->rsp + 1)) ||
-        unlikely(__get_user(regs->cs, (u32 *)regs->rsp + 2)) )
+    if ( unlikely(__get_guest(regs->eip, (u32 *)regs->rsp + 1)) ||
+        unlikely(__get_guest(regs->cs, (u32 *)regs->rsp + 2)) )
     {
         domain_crash(v->domain);
         return 0;
@@ -132,7 +132,7 @@ unsigned int compat_iret(void)
      * Fix up and restore EFLAGS. We fix up in a local staging area
      * to avoid firing the BUG_ON(IOPL) check in arch_get_info_guest.
      */
-    if ( unlikely(__get_user(eflags, (u32 *)regs->rsp + 3)) )
+    if ( unlikely(__get_guest(eflags, (u32 *)regs->rsp + 3)) )
     {
         domain_crash(v->domain);
         return 0;
@@ -164,16 +164,16 @@ unsigned int compat_iret(void)
         {
             for (i = 1; i < 10; ++i)
             {
-                rc |= __get_user(x, (u32 *)regs->rsp + i);
-                rc |= __put_user(x, (u32 *)(unsigned long)ksp + i);
+                rc |= __get_guest(x, (u32 *)regs->rsp + i);
+                rc |= __put_guest(x, (u32 *)(unsigned long)ksp + i);
             }
         }
         else if ( ksp > regs->esp )
         {
             for ( i = 9; i > 0; --i )
             {
-                rc |= __get_user(x, (u32 *)regs->rsp + i);
-                rc |= __put_user(x, (u32 *)(unsigned long)ksp + i);
+                rc |= __get_guest(x, (u32 *)regs->rsp + i);
+                rc |= __put_guest(x, (u32 *)(unsigned long)ksp + i);
             }
         }
         if ( rc )
@@ -189,7 +189,7 @@ unsigned int compat_iret(void)
             eflags &= ~X86_EFLAGS_IF;
         regs->eflags &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|
                           X86_EFLAGS_NT|X86_EFLAGS_TF);
-        if ( unlikely(__put_user(0, (u32 *)regs->rsp)) )
+        if ( unlikely(__put_guest(0, (u32 *)regs->rsp)) )
         {
             domain_crash(v->domain);
             return 0;
@@ -205,8 +205,8 @@ unsigned int compat_iret(void)
     else if ( ring_1(regs) )
         regs->esp += 16;
     /* Return to ring 2/3: restore ESP and SS. */
-    else if ( __get_user(regs->ss, (u32 *)regs->rsp + 5) ||
-              __get_user(regs->esp, (u32 *)regs->rsp + 4) )
+    else if ( __get_guest(regs->ss, (u32 *)regs->rsp + 5) ||
+              __get_guest(regs->esp, (u32 *)regs->rsp + 4) )
     {
         domain_crash(v->domain);
         return 0;

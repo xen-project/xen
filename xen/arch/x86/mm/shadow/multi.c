@@ -776,9 +776,9 @@ shadow_write_entries(void *d, void *s, int entries, mfn_t mfn)
     /* Because we mirror access rights at all levels in the shadow, an
      * l2 (or higher) entry with the RW bit cleared will leave us with
      * no write access through the linear map.
-     * We detect that by writing to the shadow with __put_user() and
+     * We detect that by writing to the shadow with put_unsafe() and
      * using map_domain_page() to get a writeable mapping if we need to. */
-    if ( __put_user(*dst, dst) )
+    if ( put_unsafe(*dst, dst) )
     {
         perfc_incr(shadow_linear_map_failed);
         map = map_domain_page(mfn);

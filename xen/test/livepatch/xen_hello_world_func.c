@@ -26,7 +26,7 @@ const char *xen_hello_world(void)
      * Any BUG, or WARN_ON will contain symbol and payload name. Furthermore
      * exceptions will be caught and processed properly.
      */
-    rc = __get_user(tmp, non_canonical_addr);
+    rc = get_unsafe(tmp, non_canonical_addr);
     BUG_ON(rc != -EFAULT);
 #endif
 #if defined(CONFIG_ARM)
