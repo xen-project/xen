@@ -56,3 +56,23 @@
 .macro INDIRECT_JMP arg:req
     INDIRECT_BRANCH jmp \arg
 .endm
+
+.macro guest_access_mask_ptr ptr:req, scratch1:req, scratch2:req
+#if defined(CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS)
+    /*
+     * Here we want
+     *
+     * ptr &= ~0ull >> (ptr < HYPERVISOR_VIRT_END);
+     *
+     * but guaranteed without any conditional branches (hence in assembly).
+     */
+    mov $(HYPERVISOR_VIRT_END - 1), \scratch1
+    mov $~0, \scratch2
+    cmp \ptr, \scratch1
+    rcr $1, \scratch2
+    and \scratch2, \ptr
+#elif defined(CONFIG_DEBUG) && defined(CONFIG_PV)
+    xor $~\@, \scratch1
+    xor $~\@, \scratch2
+#endif
+.endm

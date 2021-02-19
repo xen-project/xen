@@ -458,6 +458,8 @@ UNLIKELY_START(g, create_bounce_frame_bad_sp)
         jmp   asm_domain_crash_synchronous  /* Does not return */
 __UNLIKELY_END(create_bounce_frame_bad_sp)
 
+        guest_access_mask_ptr %rsi, %rax, %rcx
+
 #define STORE_GUEST_STACK(reg, n) \
 0:      movq  %reg,(n)*8(%rsi); \
         _ASM_EXTABLE(0b, domain_crash_page_fault_ ## n ## x8)

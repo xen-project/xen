@@ -10,12 +10,19 @@
 #include <xen/sched.h>
 #include <asm/uaccess.h>
 
-unsigned __copy_to_user_ll(void __user *to, const void *from, unsigned n)
+#ifndef GUARD
+# define GUARD UA_KEEP
+#endif
+
+unsigned int copy_to_guest_ll(void __user *to, const void *from, unsigned int n)
 {
     unsigned dummy;
 
     stac();
     asm volatile (
+        GUARD(
+        "    guest_access_mask_ptr %[to], %q[scratch1], %q[scratch2]\n"
+        )
         "    cmp  $"STR(2*BYTES_PER_LONG-1)", %[cnt]\n"
         "    jbe  1f\n"
         "    mov  %k[to], %[cnt]\n"
@@ -42,6 +49,7 @@ unsigned __copy_to_user_ll(void __user *to, const void *from, unsigned n)
         _ASM_EXTABLE(1b, 2b)
         : [cnt] "+c" (n), [to] "+D" (to), [from] "+S" (from),
           [aux] "=&r" (dummy)
+          GUARD(, [scratch1] "=&r" (dummy), [scratch2] "=&r" (dummy))
         : "[aux]" (n)
         : "memory" );
     clac();
@@ -49,12 +57,15 @@ unsigned __copy_to_user_ll(void __user *to, const void *from, unsigned n)
     return n;
 }
 
-unsigned __copy_from_user_ll(void *to, const void __user *from, unsigned n)
+unsigned int copy_from_guest_ll(void *to, const void __user *from, unsigned int n)
 {
     unsigned dummy;
 
     stac();
     asm volatile (
+        GUARD(
+        "    guest_access_mask_ptr %[from], %q[scratch1], %q[scratch2]\n"
+        )
         "    cmp  $"STR(2*BYTES_PER_LONG-1)", %[cnt]\n"
         "    jbe  1f\n"
         "    mov  %k[to], %[cnt]\n"
@@ -87,12 +98,15 @@ unsigned __copy_from_user_ll(void *to, const void __user *from, unsigned n)
         _ASM_EXTABLE(1b, 6b)
         : [cnt] "+c" (n), [to] "+D" (to), [from] "+S" (from),
           [aux] "=&r" (dummy)
+          GUARD(, [scratch1] "=&r" (dummy), [scratch2] "=&r" (dummy))
         : "[aux]" (n)
         : "memory" );
     clac();
 
     return n;
 }
+
+#if GUARD(1) + 0
 
 /**
  * copy_to_user: - Copy a block of data into user space.
@@ -128,8 +142,11 @@ unsigned clear_user(void __user *to, unsigned n)
 {
     if ( access_ok(to, n) )
     {
+        long dummy;
+
         stac();
         asm volatile (
+            "    guest_access_mask_ptr %[to], %[scratch1], %[scratch2]\n"
             "0:  rep stos"__OS"\n"
             "    mov  %[bytes], %[cnt]\n"
             "1:  rep stosb\n"
@@ -140,7 +157,8 @@ unsigned clear_user(void __user *to, unsigned n)
             ".previous\n"
             _ASM_EXTABLE(0b,3b)
             _ASM_EXTABLE(1b,2b)
-            : [cnt] "=&c" (n), [to] "+D" (to)
+            : [cnt] "=&c" (n), [to] "+D" (to), [scratch1] "=&r" (dummy),
+              [scratch2] "=&r" (dummy)
             : [bytes] "r" (n & (BYTES_PER_LONG - 1)),
               [longs] "0" (n / BYTES_PER_LONG), "a" (0) );
         clac();
@@ -173,6 +191,16 @@ unsigned copy_from_user(void *to, const void __user *from, unsigned n)
         memset(to, 0, n);
     return n;
 }
+
+# undef GUARD
+# define GUARD UA_DROP
+# define copy_to_guest_ll copy_to_unsafe_ll
+# define copy_from_guest_ll copy_from_unsafe_ll
+# undef __user
+# define __user
+# include __FILE__
+
+#endif /* GUARD(1) */
 
 /*
  * Local variables:

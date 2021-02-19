@@ -12,12 +12,18 @@
 unsigned copy_to_user(void *to, const void *from, unsigned len);
 unsigned clear_user(void *to, unsigned len);
 unsigned copy_from_user(void *to, const void *from, unsigned len);
+
 /* Handles exceptions in both to and from, but doesn't do access_ok */
-unsigned __copy_to_user_ll(void __user*to, const void *from, unsigned n);
-unsigned __copy_from_user_ll(void *to, const void __user *from, unsigned n);
+unsigned int copy_to_guest_ll(void __user*to, const void *from, unsigned int n);
+unsigned int copy_from_guest_ll(void *to, const void __user *from, unsigned int n);
+unsigned int copy_to_unsafe_ll(void *to, const void *from, unsigned int n);
+unsigned int copy_from_unsafe_ll(void *to, const void *from, unsigned int n);
 
 extern long __get_user_bad(void);
 extern void __put_user_bad(void);
+
+#define UA_KEEP(args...) args
+#define UA_DROP(args...)
 
 /**
  * get_user: - Get a simple variable from user space.
@@ -77,7 +83,6 @@ extern void __put_user_bad(void);
  * On error, the variable @x is set to zero.
  */
 #define __get_guest(x, ptr) get_guest_nocheck(x, ptr, sizeof(*(ptr)))
-#define get_unsafe __get_guest
 
 /**
  * __put_guest: - Write a simple value into guest space, with less checking.
@@ -98,7 +103,13 @@ extern void __put_user_bad(void);
  */
 #define __put_guest(x, ptr) \
     put_guest_nocheck((__typeof__(*(ptr)))(x), ptr, sizeof(*(ptr)))
-#define put_unsafe __put_guest
+
+#define put_unsafe(x, ptr)						\
+({									\
+	int err_; 							\
+	put_unsafe_size(x, ptr, sizeof(*(ptr)), UA_DROP, err_, -EFAULT);\
+	err_;								\
+})
 
 #define put_guest_nocheck(x, ptr, size)					\
 ({									\
@@ -113,6 +124,13 @@ extern void __put_user_bad(void);
 	__typeof__(size) size_ = (size);				\
 	access_ok(ptr_, size_) ? put_guest_nocheck(x, ptr_, size_)	\
 			       : -EFAULT;				\
+})
+
+#define get_unsafe(x, ptr)						\
+({									\
+	int err_; 							\
+	get_unsafe_size(x, ptr, sizeof(*(ptr)), UA_DROP, err_, -EFAULT);\
+	err_;								\
 })
 
 #define get_guest_nocheck(x, ptr, size)					\
@@ -138,62 +156,87 @@ struct __large_struct { unsigned long buf[100]; };
  * we do not write to any memory gcc knows about, so there are no
  * aliasing issues.
  */
-#define put_unsafe_asm(x, addr, err, itype, rtype, ltype, errret)	\
+#define put_unsafe_asm(x, addr, GUARD, err, itype, rtype, ltype, errret) \
 	stac();								\
 	__asm__ __volatile__(						\
-		"1:	mov"itype" %"rtype"1,%2\n"			\
+		GUARD(							\
+		"	guest_access_mask_ptr %[ptr], %[scr1], %[scr2]\n" \
+		)							\
+		"1:	mov"itype" %"rtype"[val], (%[ptr])\n"		\
 		"2:\n"							\
 		".section .fixup,\"ax\"\n"				\
-		"3:	mov %3,%0\n"					\
+		"3:	mov %[errno], %[ret]\n"				\
 		"	jmp 2b\n"					\
 		".previous\n"						\
 		_ASM_EXTABLE(1b, 3b)					\
-		: "=r"(err)						\
-		: ltype (x), "m"(__m(addr)), "i"(errret), "0"(err));	\
+		: [ret] "+r" (err), [ptr] "=&r" (dummy_)		\
+		  GUARD(, [scr1] "=&r" (dummy_), [scr2] "=&r" (dummy_))	\
+		: [val] ltype (x), "m" (__m(addr)),			\
+		  "[ptr]" (addr), [errno] "i" (errret));		\
 	clac()
 
-#define get_unsafe_asm(x, addr, err, itype, rtype, ltype, errret)	\
+#define get_unsafe_asm(x, addr, GUARD, err, rtype, ltype, errret)	\
 	stac();								\
 	__asm__ __volatile__(						\
-		"1:	mov"itype" %2,%"rtype"1\n"			\
+		GUARD(							\
+		"	guest_access_mask_ptr %[ptr], %[scr1], %[scr2]\n" \
+		)							\
+		"1:	mov (%[ptr]), %"rtype"[val]\n"			\
 		"2:\n"							\
 		".section .fixup,\"ax\"\n"				\
-		"3:	mov %3,%0\n"					\
-		"	xor"itype" %"rtype"1,%"rtype"1\n"		\
+		"3:	mov %[errno], %[ret]\n"				\
+		"	xor %k[val], %k[val]\n"				\
 		"	jmp 2b\n"					\
 		".previous\n"						\
 		_ASM_EXTABLE(1b, 3b)					\
-		: "=r"(err), ltype (x)					\
-		: "m"(__m(addr)), "i"(errret), "0"(err));		\
+		: [ret] "+r" (err), [val] ltype (x),			\
+		  [ptr] "=&r" (dummy_)					\
+		  GUARD(, [scr1] "=&r" (dummy_), [scr2] "=&r" (dummy_))	\
+		: "m" (__m(addr)), "[ptr]" (addr),			\
+		  [errno] "i" (errret));				\
 	clac()
 
-#define put_unsafe_size(x, ptr, size, retval, errret)                      \
+#define put_unsafe_size(x, ptr, size, grd, retval, errret)                 \
 do {                                                                       \
     retval = 0;                                                            \
     switch ( size )                                                        \
     {                                                                      \
-    case 1: put_unsafe_asm(x, ptr, retval, "b", "b", "iq", errret); break; \
-    case 2: put_unsafe_asm(x, ptr, retval, "w", "w", "ir", errret); break; \
-    case 4: put_unsafe_asm(x, ptr, retval, "l", "k", "ir", errret); break; \
-    case 8: put_unsafe_asm(x, ptr, retval, "q",  "", "ir", errret); break; \
+    long dummy_;                                                           \
+    case 1:                                                                \
+        put_unsafe_asm(x, ptr, grd, retval, "b", "b", "iq", errret);       \
+        break;                                                             \
+    case 2:                                                                \
+        put_unsafe_asm(x, ptr, grd, retval, "w", "w", "ir", errret);       \
+        break;                                                             \
+    case 4:                                                                \
+        put_unsafe_asm(x, ptr, grd, retval, "l", "k", "ir", errret);       \
+        break;                                                             \
+    case 8:                                                                \
+        put_unsafe_asm(x, ptr, grd, retval, "q",  "", "ir", errret);       \
+        break;                                                             \
     default: __put_user_bad();                                             \
     }                                                                      \
 } while ( false )
-#define put_guest_size put_unsafe_size
 
-#define get_unsafe_size(x, ptr, size, retval, errret)                      \
+#define put_guest_size(x, ptr, size, retval, errret) \
+    put_unsafe_size(x, ptr, size, UA_KEEP, retval, errret)
+
+#define get_unsafe_size(x, ptr, size, grd, retval, errret)                 \
 do {                                                                       \
     retval = 0;                                                            \
     switch ( size )                                                        \
     {                                                                      \
-    case 1: get_unsafe_asm(x, ptr, retval, "b", "b", "=q", errret); break; \
-    case 2: get_unsafe_asm(x, ptr, retval, "w", "w", "=r", errret); break; \
-    case 4: get_unsafe_asm(x, ptr, retval, "l", "k", "=r", errret); break; \
-    case 8: get_unsafe_asm(x, ptr, retval, "q",  "", "=r", errret); break; \
+    long dummy_;                                                           \
+    case 1: get_unsafe_asm(x, ptr, grd, retval, "b", "=q", errret); break; \
+    case 2: get_unsafe_asm(x, ptr, grd, retval, "w", "=r", errret); break; \
+    case 4: get_unsafe_asm(x, ptr, grd, retval, "k", "=r", errret); break; \
+    case 8: get_unsafe_asm(x, ptr, grd, retval,  "", "=r", errret); break; \
     default: __get_user_bad();                                             \
     }                                                                      \
 } while ( false )
-#define get_guest_size get_unsafe_size
+
+#define get_guest_size(x, ptr, size, retval, errret)                       \
+    get_unsafe_size(x, ptr, size, UA_KEEP, retval, errret)
 
 /**
  * __copy_to_guest_pv: - Copy a block of data into guest space, with less
@@ -229,9 +272,8 @@ __copy_to_guest_pv(void __user *to, const void *from, unsigned long n)
             return ret;
         }
     }
-    return __copy_to_user_ll(to, from, n);
+    return copy_to_guest_ll(to, from, n);
 }
-#define copy_to_unsafe __copy_to_guest_pv
 
 /**
  * __copy_from_guest_pv: - Copy a block of data from guest space, with less
@@ -270,9 +312,87 @@ __copy_from_guest_pv(void *to, const void __user *from, unsigned long n)
             return ret;
         }
     }
-    return __copy_from_user_ll(to, from, n);
+    return copy_from_guest_ll(to, from, n);
 }
-#define copy_from_unsafe __copy_from_guest_pv
+
+/**
+ * copy_to_unsafe: - Copy a block of data to unsafe space, with exception
+ *                   checking
+ * @to:   Unsafe destination address.
+ * @from: Safe source address, in hypervisor space.
+ * @n:    Number of bytes to copy.
+ *
+ * Copy data from hypervisor space to a potentially unmapped area.
+ *
+ * Returns number of bytes that could not be copied.
+ * On success, this will be zero.
+ */
+static always_inline unsigned int
+copy_to_unsafe(void __user *to, const void *from, unsigned int n)
+{
+    if (__builtin_constant_p(n)) {
+        unsigned long ret;
+
+        switch (n) {
+        case 1:
+            put_unsafe_size(*(const uint8_t *)from, to, 1, UA_DROP, ret, 1);
+            return ret;
+        case 2:
+            put_unsafe_size(*(const uint16_t *)from, to, 2, UA_DROP, ret, 2);
+            return ret;
+        case 4:
+            put_unsafe_size(*(const uint32_t *)from, to, 4, UA_DROP, ret, 4);
+            return ret;
+        case 8:
+            put_unsafe_size(*(const uint64_t *)from, to, 8, UA_DROP, ret, 8);
+            return ret;
+        }
+    }
+
+    return copy_to_unsafe_ll(to, from, n);
+}
+
+/**
+ * copy_from_unsafe: - Copy a block of data from unsafe space, with exception
+ *                     checking
+ * @to:   Safe destination address, in hypervisor space.
+ * @from: Unsafe source address.
+ * @n:    Number of bytes to copy.
+ *
+ * Copy data from a potentially unmapped area space to hypervisor space.
+ *
+ * Returns number of bytes that could not be copied.
+ * On success, this will be zero.
+ *
+ * If some data could not be copied, this function will pad the copied
+ * data to the requested size using zero bytes.
+ */
+static always_inline unsigned int
+copy_from_unsafe(void *to, const void __user *from, unsigned int n)
+{
+    if ( __builtin_constant_p(n) )
+    {
+        unsigned long ret;
+
+        switch ( n )
+        {
+        case 1:
+            get_unsafe_size(*(uint8_t *)to, from, 1, UA_DROP, ret, 1);
+            return ret;
+        case 2:
+            get_unsafe_size(*(uint16_t *)to, from, 2, UA_DROP, ret, 2);
+            return ret;
+        case 4:
+            get_unsafe_size(*(uint32_t *)to, from, 4, UA_DROP, ret, 4);
+            return ret;
+        case 8:
+            get_unsafe_size(*(uint64_t *)to, from, 8, UA_DROP, ret, 8);
+            return ret;
+        }
+    }
+
+    return copy_from_unsafe_ll(to, from, n);
+}
 
 /*
  * The exception table consists of pairs of addresses: the first is the

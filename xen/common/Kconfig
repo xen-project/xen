@@ -111,6 +111,24 @@ config SPECULATIVE_HARDEN_BRANCH
 
 	  If unsure, say Y.
 
+config SPECULATIVE_HARDEN_GUEST_ACCESS
+	bool "Speculative PV Guest Memory Access Hardening"
+	default y
+	depends on PV
+	help
+	  Contemporary processors may use speculative execution as a
+	  performance optimisation, but this can potentially be abused by an
+	  attacker to leak data via speculative sidechannels.
+
+	  One source of data leakage is via speculative accesses to hypervisor
+	  memory through guest controlled values used to access guest memory.
+
+	  When enabled, code paths accessing PV guest memory will have guest
+	  controlled addresses massaged such that memory accesses through them
+	  won't touch hypervisor address space.
+
+	  If unsure, say Y.
+
 endmenu
 
 config HYPFS
