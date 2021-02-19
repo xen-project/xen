@@ -1658,17 +1658,17 @@ struct calibration_rendezvous {
     cpumask_t cpu_calibration_map;
     atomic_t semaphore;
     s_time_t master_stime;
-    u64 master_tsc_stamp;
+    uint64_t master_tsc_stamp, max_tsc_stamp;
 };
 
 static void
 time_calibration_rendezvous_tail(const struct calibration_rendezvous *r,
-                                 uint64_t tsc)
+                                 uint64_t old_tsc, uint64_t new_tsc)
 {
     struct cpu_time_stamp *c = &this_cpu(cpu_calibration);
 
-    c->local_tsc    = tsc;
-    c->local_stime  = get_s_time_fixed(c->local_tsc);
+    c->local_tsc    = new_tsc;
+    c->local_stime  = get_s_time_fixed(old_tsc ?: new_tsc);
     c->master_stime = r->master_stime;
 
     raise_softirq(TIME_CALIBRATE_SOFTIRQ);
@@ -1683,6 +1683,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
     int i;
     struct calibration_rendezvous *r = _r;
     unsigned int total_cpus = cpumask_weight(&r->cpu_calibration_map);
+    uint64_t tsc = 0;
 
     /* Loop to get rid of cache effects on TSC skew. */
     for ( i = 4; i >= 0; i-- )
@@ -1692,8 +1693,15 @@ static void time_calibration_tsc_rendezvous(void *_r)
             while ( atomic_read(&r->semaphore) != (total_cpus - 1) )
                 cpu_relax();
 
-            if ( r->master_tsc_stamp == 0 )
-                r->master_tsc_stamp = rdtsc_ordered();
+            if ( tsc == 0 )
+                r->master_tsc_stamp = tsc = rdtsc_ordered();
+            else if ( r->master_tsc_stamp < r->max_tsc_stamp )
+                /*
+                 * We want to avoid moving the TSC backwards for any CPU.
+                 * Use the largest value observed anywhere on the first
+                 * iteration.
+                 */
+                r->master_tsc_stamp = r->max_tsc_stamp;
             else if ( i == 0 )
                 r->master_stime = read_platform_stime(NULL);
 
@@ -1712,6 +1720,15 @@ static void time_calibration_tsc_rendezvous(void *_r)
             while ( atomic_read(&r->semaphore) < total_cpus )
                 cpu_relax();
 
+            if ( tsc == 0 )
+            {
+                uint64_t cur = ACCESS_ONCE(r->max_tsc_stamp);
+
+                tsc = rdtsc_ordered();
+                while ( tsc > cur )
+                    cur = cmpxchg(&r->max_tsc_stamp, cur, tsc);
+            }
+
             if ( i == 0 )
                 write_tsc(r->master_tsc_stamp);
 
@@ -1719,9 +1736,12 @@ static void time_calibration_tsc_rendezvous(void *_r)
             while ( atomic_read(&r->semaphore) > total_cpus )
                 cpu_relax();
         }
+
+        /* Just in case a read above ended up reading zero. */
+        tsc += !tsc;
     }
 
-    time_calibration_rendezvous_tail(r, r->master_tsc_stamp);
+    time_calibration_rendezvous_tail(r, tsc, r->master_tsc_stamp);
 }
 
 /* Ordinary rendezvous function which does not modify TSC values. */
@@ -1746,7 +1766,7 @@ static void time_calibration_std_rendezvous(void *_r)
         smp_rmb(); /* receive signal /then/ read r->master_stime */
     }
 
-    time_calibration_rendezvous_tail(r, rdtsc_ordered());
+    time_calibration_rendezvous_tail(r, 0, rdtsc_ordered());
 }
 
 /*
