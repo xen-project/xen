@@ -4060,7 +4060,7 @@ static int hvm_allow_set_param(struct domain *d,
                                uint32_t index,
                                uint64_t new_value)
 {
-    uint64_t value = d->arch.hvm.params[index];
+    uint64_t value;
     int rc;
 
     rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_set_param);
@@ -4108,6 +4108,10 @@ static int hvm_allow_set_param(struct domain *d,
     if ( rc )
         return rc;
 
+    /* Make sure we evaluate permissions before loading data of domains. */
+    block_speculation();
+
+    value = d->arch.hvm.params[index];
     switch ( index )
     {
     /* The following parameters should only be changed once. */
@@ -4134,12 +4138,12 @@ static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
     struct vcpu *v;
     int rc;
 
-    if ( index >= HVM_NR_PARAMS )
-        return -EINVAL;
-
     rc = hvm_allow_set_param(d, index, value);
     if ( rc )
         return rc;
+
+    /* Make sure we evaluate permissions before loading data of domains. */
+    block_speculation();
 
     switch ( index )
     {
@@ -4305,7 +4309,7 @@ static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
     return rc;
 }
 
-int hvmop_set_param(
+static int hvmop_set_param(
     XEN_GUEST_HANDLE_PARAM(xen_hvm_param_t) arg)
 {
     struct xen_hvm_param a;
@@ -4317,9 +4321,6 @@ int hvmop_set_param(
 
     if ( a.index >= HVM_NR_PARAMS )
         return -EINVAL;
-
-    /* Make sure the above bound check is not bypassed during speculation. */
-    block_speculation();
 
     d = rcu_lock_domain_by_any_id(a.domid);
     if ( d == NULL )
@@ -4388,6 +4389,9 @@ int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value)
     if ( rc )
         return rc;
 
+    /* Make sure the above domain permissions check is respected. */
+    block_speculation();
+
     switch ( index )
     {
     case HVM_PARAM_ACPI_S_STATE:
@@ -4427,9 +4431,6 @@ static int hvmop_get_param(
 
     if ( a.index >= HVM_NR_PARAMS )
         return -EINVAL;
-
-    /* Make sure the above bound check is not bypassed during speculation. */
-    block_speculation();
 
     d = rcu_lock_domain_by_any_id(a.domid);
     if ( d == NULL )
