@@ -1418,6 +1418,8 @@ void vcpu_block(void)
 
     set_bit(_VPF_blocked, &v->pause_flags);
 
+    smp_mb__after_atomic();
+
     arch_vcpu_block(v);
 
     /* Check for events /after/ blocking: avoids wakeup waiting race. */
