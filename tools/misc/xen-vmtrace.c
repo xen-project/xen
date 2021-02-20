@@ -119,7 +119,7 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    if ( xc_vmtrace_enable(xch, domid, vcpu) )
+    if ( xc_vmtrace_reset_and_enable(xch, domid, vcpu) )
     {
         perror("xc_vmtrace_enable()");
         goto out;
