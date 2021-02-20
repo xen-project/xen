@@ -808,10 +808,12 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
 
     case VRANGE32(GICD_ISPENDR, GICD_ISPENDRN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
-        printk(XENLOG_G_ERR
-               "%pv: %s: unhandled word write %#"PRIregister" to ISPENDR%d\n",
-               v, name, r, reg - GICD_ISPENDR);
-        return 0;
+        rank = vgic_rank_offset(v, 1, reg - GICD_ISPENDR, DABT_WORD);
+        if ( rank == NULL ) goto write_ignore;
+
+        vgic_set_irqs_pending(v, r, rank->index);
+
+        return 1;
 
     case VRANGE32(GICD_ICPENDR, GICD_ICPENDRN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -975,19 +977,13 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
     case VREG32(GICR_ICACTIVER0):
     case VREG32(GICR_ICFGR1):
     case VRANGE32(GICR_IPRIORITYR0, GICR_IPRIORITYR7):
+    case VREG32(GICR_ISPENDR0):
          /*
           * Above registers offset are common with GICD.
           * So handle common with GICD handling
           */
         return __vgic_v3_distr_common_mmio_write("vGICR: SGI", v,
                                                  info, gicr_reg, r);
-
-    case VREG32(GICR_ISPENDR0):
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        printk(XENLOG_G_ERR
-               "%pv: vGICR: SGI: unhandled word write %#"PRIregister" to ISPENDR0\n",
-               v, r);
-        return 0;
 
     case VREG32(GICR_ICPENDR0):
         if ( dabt.size != DABT_WORD ) goto bad_width;

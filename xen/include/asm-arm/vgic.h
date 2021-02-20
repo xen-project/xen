@@ -288,6 +288,8 @@ extern struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n, int 
 extern struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq);
 extern void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n);
+extern void vgic_set_irqs_pending(struct vcpu *v, uint32_t r,
+                                  unsigned int rank);
 extern void register_vgic_ops(struct domain *d, const struct vgic_ops *ops);
 int vgic_v2_init(struct domain *d, int *mmio_count);
 int vgic_v3_init(struct domain *d, int *mmio_count);

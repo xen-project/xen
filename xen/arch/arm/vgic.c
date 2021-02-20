@@ -423,6 +423,53 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     }
 }
 
+void vgic_set_irqs_pending(struct vcpu *v, uint32_t r, unsigned int rank)
+{
+    const unsigned long mask = r;
+    unsigned int i;
+    /* The first rank is always per-vCPU */
+    bool private = rank == 0;
+
+    /* LPIs will never be set pending via this function */
+    ASSERT(!is_lpi(32 * rank + 31));
+
+    for_each_set_bit( i, &mask, 32 )
+    {
+        unsigned int irq = i + 32 * rank;
+
+        if ( !private )
+        {
+            struct pending_irq *p = spi_to_pending(v->domain, irq);
+
+            /*
+             * When the domain sets the pending state for a HW interrupt on
+             * the virtual distributor, we set the pending state on the
+             * physical distributor.
+             *
+             * XXX: Investigate whether we would be able to set the
+             * physical interrupt active and save an interruption. (This
+             * is what the new vGIC does).
+             */
+            if ( p->desc != NULL )
+            {
+                unsigned long flags;
+
+                spin_lock_irqsave(&p->desc->lock, flags);
+                gic_set_pending_state(p->desc, true);
+                spin_unlock_irqrestore(&p->desc->lock, flags);
+                continue;
+            }
+        }
+
+        /*
+         * If the interrupt is per-vCPU, then we want to inject the vIRQ
+         * to v, otherwise we should let the function figuring out the
+         * correct vCPU.
+         */
+        vgic_inject_irq(v->domain, private ? v : NULL, irq, true);
+    }
+}
+
 bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
                  int virq, const struct sgi_target *target)
 {
