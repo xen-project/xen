@@ -529,7 +529,7 @@ void flush_page_to_ram(unsigned long mfn, bool sync_icache)
 {
     void *v = map_domain_page(_mfn(mfn));
 
-    clean_and_invalidate_dcache_va_range(v, PAGE_SIZE);
+    clean_dcache_va_range(v, PAGE_SIZE);
     unmap_domain_page(v);
 
     /*
