@@ -441,7 +441,7 @@ mfn_t __init alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 #define MEMZONE_XEN 0
 #define NR_ZONES    (PADDR_BITS - PAGE_SHIFT + 1)
 
-#define bits_to_zone(b) (((b) < (PAGE_SHIFT + 1)) ? 1 : ((b) - PAGE_SHIFT))
+#define bits_to_zone(b) (((b) < (PAGE_SHIFT + 1)) ? 1U : ((b) - PAGE_SHIFT))
 #define page_to_zone(pg) (is_xen_heap_page(pg) ? MEMZONE_XEN :  \
                           (flsl(mfn_x(page_to_mfn(pg))) ? : 1))
 
@@ -2336,8 +2336,9 @@ struct page_info *alloc_domheap_pages(
 
     bits = domain_clamp_alloc_bitsize(memflags & MEMF_no_owner ? NULL : d,
                                       bits ? : (BITS_PER_LONG+PAGE_SHIFT));
-    if ( (zone_hi = min_t(unsigned int, bits_to_zone(bits), zone_hi)) == 0 )
-        return NULL;
+
+    zone_hi = min(bits_to_zone(bits), zone_hi);
+    ASSERT(zone_hi != 0);
 
     if ( memflags & MEMF_no_owner )
         memflags |= MEMF_no_refcount;
