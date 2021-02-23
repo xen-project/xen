@@ -1,0 +1,26 @@
+# https://cirrus-ci.org/guide/tips-and-tricks/#sharing-configuration-between-tasks
+freebsd_template: &FREEBSD_TEMPLATE
+  environment:
+    APPEND_LIB: /usr/local/lib
+    APPEND_INCLUDES: /usr/local/include
+
+  install_script: pkg install -y seabios markdown gettext-tools gmake
+                                 pkgconf python libiconv bison perl5
+                                 yajl lzo2 pixman argp-standalone
+                                 libxml2 glib git
+
+  build_script:
+    - ./configure --with-system-seabios=/usr/local/share/seabios/bios.bin
+    - gmake -j`sysctl -n hw.ncpu` clang=y
+
+task:
+  name: 'FreeBSD 12'
+  freebsd_instance:
+    image_family: freebsd-12-2
+  << : *FREEBSD_TEMPLATE
+
+task:
+  name: 'FreeBSD 13'
+  freebsd_instance:
+    image_family: freebsd-13-0
+  << : *FREEBSD_TEMPLATE
