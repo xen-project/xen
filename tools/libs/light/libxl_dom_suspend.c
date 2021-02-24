@@ -67,6 +67,16 @@ out:
     return rc;
 }
 
+void libxl__domain_suspend_dispose(libxl__gc *gc,
+                                   libxl__domain_suspend_state  *dsps)
+{
+    libxl__xswait_stop(gc, &dsps->pvcontrol);
+    libxl__ev_evtchn_cancel(gc, &dsps->guest_evtchn);
+    libxl__ev_xswatch_deregister(gc, &dsps->guest_watch);
+    libxl__ev_time_deregister(gc, &dsps->guest_timeout);
+    libxl__ev_qmp_dispose(gc, &dsps->qmp);
+}
+
 /*----- callbacks, called by xc_domain_save -----*/
 
 void libxl__domain_suspend_device_model(libxl__egc *egc,
@@ -388,10 +398,7 @@ static void domain_suspend_common_done(libxl__egc *egc,
 {
     EGC_GC;
     assert(!libxl__xswait_inuse(&dsps->pvcontrol));
-    libxl__ev_evtchn_cancel(gc, &dsps->guest_evtchn);
-    libxl__ev_xswatch_deregister(gc, &dsps->guest_watch);
-    libxl__ev_time_deregister(gc, &dsps->guest_timeout);
-    libxl__ev_qmp_dispose(gc, &dsps->qmp);
+    libxl__domain_suspend_dispose(gc, dsps);
     dsps->callback_common_done(egc, dsps, rc);
 }
 
