@@ -1783,7 +1783,7 @@ int query_page_offline(mfn_t mfn, uint32_t *status)
 
 /*
  * This function should only be called with valid pages from the same NUMA
- * node.
+ * node and zone.
  */
 static void _init_heap_pages(const struct page_info *pg,
                              unsigned long nr_pages,
@@ -1810,8 +1810,22 @@ static void _init_heap_pages(const struct page_info *pg,
 
     while ( s < e )
     {
-        free_heap_pages(mfn_to_page(_mfn(s)), 0, need_scrub);
-        s += 1UL;
+        /*
+         * For s == 0, we simply use the largest increment by checking the
+         * MSB of the region size. For s != 0, we also need to ensure that the
+         * chunk is properly sized to end at power-of-two alignment. We do this
+         * by checking the LSB of the start address and use its index as
+         * the increment. Both cases need to be bounded by MAX_ORDER.
+         *
+         * Note that the value of ffsl() and flsl() starts from 1 so we need
+         * to decrement it by 1.
+         */
+        unsigned int inc_order = min(MAX_ORDER, flsl(e - s) - 1);
+
+        if ( s )
+            inc_order = min(inc_order, ffsl(s) - 1U);
+        free_heap_pages(mfn_to_page(_mfn(s)), inc_order, need_scrub);
+        s += (1UL << inc_order);
     }
 }
 
@@ -1848,6 +1862,9 @@ static void init_heap_pages(
 
     for ( i = 0; i < nr_pages; )
     {
+#ifdef CONFIG_SEPARATE_XENHEAP
+        unsigned int zone = page_to_zone(pg);
+#endif
         unsigned int nid = phys_to_nid(page_to_maddr(pg));
         unsigned long left = nr_pages - i;
         unsigned long contig_pages;
@@ -1860,6 +1877,18 @@ static void init_heap_pages(
          */
         for ( contig_pages = 1; contig_pages < left; contig_pages++ )
         {
+            /*
+             * No need to check for the zone when !CONFIG_SEPARATE_XENHEAP
+             * because free_heap_pages() can only take power-of-two ranges
+             * which never cross zone boundaries. But for separate xenheap
+             * which is manually defined, it is possible for power-of-two
+             * range to cross zones.
+             */
+#ifdef CONFIG_SEPARATE_XENHEAP
+            if ( zone != page_to_zone(pg) )
+                break;
+#endif
+
             if ( nid != (phys_to_nid(page_to_maddr(pg))) )
                 break;
         }
