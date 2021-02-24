@@ -21,7 +21,7 @@
  */
 
 #include <inttypes.h>
-#include <elf.h>
+#include <xen/libelf/elfstructs.h>
 #ifdef __sun__
 #include <sys/machelf.h>
 #endif
