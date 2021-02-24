@@ -436,6 +436,13 @@ typedef struct {
 #define R_AARCH64_MOVW_PREL_G2_NC	292
 #define R_AARCH64_MOVW_PREL_G3		293
 
+/*
+ * Relocation definitions required by the rombios hvmloader relocation
+ * code.
+ */
+#define R_386_32           1            /* Direct 32 bit  */
+#define R_386_PC32         2            /* PC relative 32 bit */
+
 /* Program Header */
 typedef struct {
 	Elf32_Word	p_type;		/* segment type */
