@@ -44,8 +44,10 @@ static int live_update_start(struct xs_handle *xsh, bool force, unsigned int to)
         return 1;
 
     ret = strdup("BUSY");
-    if (!ret)
+    if (!ret) {
+        free(buf);
         return 1;
+    }
 
     for (time_start = time(NULL); time(NULL) - time_start < to;) {
         free(ret);
