@@ -22,9 +22,6 @@
 
 #include <inttypes.h>
 #include <xen/libelf/elfstructs.h>
-#ifdef __sun__
-#include <sys/machelf.h>
-#endif
 
 #include "util.h"
 #include "config.h"
