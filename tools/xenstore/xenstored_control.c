@@ -691,7 +691,6 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 static int do_control_lu(void *ctx, struct connection *conn,
 			 char **vec, int num)
 {
-	const char *resp;
 	const char *ret = NULL;
 	unsigned int i;
 	bool force = false;
@@ -734,8 +733,7 @@ static int do_control_lu(void *ctx, struct connection *conn,
 
 	if (!ret)
 		ret = "OK";
-	resp = talloc_strdup(ctx, ret);
-	send_reply(conn, XS_CONTROL, resp, strlen(resp) + 1);
+	send_reply(conn, XS_CONTROL, ret, strlen(ret) + 1);
 	return 0;
 }
 #endif
