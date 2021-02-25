@@ -20,6 +20,7 @@ RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
         iasl \
         inetutils \
         iproute \
+        # lib32-glibc for Xen < 4.15
         lib32-glibc \
         libaio \
         libcacard \

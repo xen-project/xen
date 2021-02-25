@@ -26,6 +26,7 @@ RUN zypper install -y --no-recommends \
         git \
         glib2-devel \
         glibc-devel \
+        # glibc-devel-32bit for Xen < 4.15
         glibc-devel-32bit \
         gzip \
         hostname \
