@@ -108,12 +108,11 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
 }
 
 /* Returns: number of bytes remaining to be copied */
-static unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
-                                     void * __user buf, unsigned int len,
-                                     bool toaddr, uint64_t pgd3)
+static unsigned int dbg_rw_guest_mem(struct domain *dp, unsigned long addr,
+                                     XEN_GUEST_HANDLE_PARAM(void) buf,
+                                     unsigned int len, bool toaddr,
+                                     uint64_t pgd3)
 {
-    unsigned long addr = (unsigned long)gaddr;
-
     while ( len > 0 )
     {
         char *va;
@@ -134,20 +133,18 @@ static unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
 
         if ( toaddr )
         {
-            copy_from_user(va, buf, pagecnt);    /* va = buf */
+            copy_from_guest(va, buf, pagecnt);
             paging_mark_dirty(dp, mfn);
         }
         else
-        {
-            copy_to_user(buf, va, pagecnt);    /* buf = va */
-        }
+            copy_to_guest(buf, va, pagecnt);
 
         unmap_domain_page(va);
         if ( !gfn_eq(gfn, INVALID_GFN) )
             put_gfn(dp, gfn_x(gfn));
 
         addr += pagecnt;
-        buf += pagecnt;
+        guest_handle_add_offset(buf, pagecnt);
         len -= pagecnt;
     }
 
@@ -161,7 +158,7 @@ static unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
  * pgd3: value of init_mm.pgd[3] in guest. see above.
  * Returns: number of bytes remaining to be copied.
  */
-unsigned int dbg_rw_mem(void * __user addr, void * __user buf,
+unsigned int dbg_rw_mem(unsigned long gva, XEN_GUEST_HANDLE_PARAM(void) buf,
                         unsigned int len, domid_t domid, bool toaddr,
                         uint64_t pgd3)
 {
@@ -170,7 +167,7 @@ unsigned int dbg_rw_mem(void * __user addr, void * __user buf,
     if ( d )
     {
         if ( !d->is_dying )
-            len = dbg_rw_guest_mem(d, addr, buf, len, toaddr, pgd3);
+            len = dbg_rw_guest_mem(d, gva, buf, len, toaddr, pgd3);
         rcu_unlock_domain(d);
     }
 
