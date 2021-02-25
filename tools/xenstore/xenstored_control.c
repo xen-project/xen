@@ -16,6 +16,7 @@ Interactive commands for Xen Store Daemon.
     along with this program; If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -74,6 +75,7 @@ struct lu_dump_state {
 	unsigned int size;
 #ifndef __MINIOS__
 	int fd;
+	char *filename;
 #endif
 };
 
@@ -399,17 +401,16 @@ static void lu_dump_close(FILE *fp)
 
 static void lu_get_dump_state(struct lu_dump_state *state)
 {
-	char *filename;
 	struct stat statbuf;
 
 	state->size = 0;
 
-	filename = talloc_asprintf(NULL, "%s/state_dump", xs_daemon_rootdir());
-	if (!filename)
+	state->filename = talloc_asprintf(NULL, "%s/state_dump",
+					  xs_daemon_rootdir());
+	if (!state->filename)
 		barf("Allocation failure");
 
-	state->fd = open(filename, O_RDONLY);
-	talloc_free(filename);
+	state->fd = open(state->filename, O_RDONLY);
 	if (state->fd < 0)
 		return;
 	if (fstat(state->fd, &statbuf) != 0)
@@ -431,14 +432,13 @@ static void lu_get_dump_state(struct lu_dump_state *state)
 
 static void lu_close_dump_state(struct lu_dump_state *state)
 {
-	char *filename;
+	assert(state->filename != NULL);
 
 	munmap(state->buf, state->size);
 	close(state->fd);
 
-	filename = talloc_asprintf(NULL, "%s/state_dump", xs_daemon_rootdir());
-	unlink(filename);
-	talloc_free(filename);
+	unlink(state->filename);
+	talloc_free(state->filename);
 }
 
 static char *lu_exec(const void *ctx, int argc, char **argv)
