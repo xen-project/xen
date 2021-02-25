@@ -54,8 +54,8 @@ unsigned long do_iret(void)
     struct iret_context iret_saved;
     struct vcpu *v = current;
 
-    if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp,
-                                 sizeof(iret_saved))) )
+    if ( unlikely(copy_from_guest_pv(&iret_saved, (void __user *)regs->rsp,
+                                     sizeof(iret_saved))) )
     {
         gprintk(XENLOG_ERR,
                 "Fault while reading IRET context from guest stack\n");

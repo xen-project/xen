@@ -33,7 +33,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     eip = regs->rip;
 
     /* Check for forced emulation signature: ud2 ; .ascii "xen". */
-    if ( (rc = copy_from_user(sig, (char *)eip, sizeof(sig))) != 0 )
+    if ( (rc = copy_from_guest_pv(sig, (char __user *)eip, sizeof(sig))) != 0 )
     {
         pv_inject_page_fault(0, eip + sizeof(sig) - rc);
         return EXCRET_fault_fixed;
@@ -43,7 +43,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     eip += sizeof(sig);
 
     /* We only emulate CPUID. */
-    if ( ( rc = copy_from_user(instr, (char *)eip, sizeof(instr))) != 0 )
+    if ( (rc = copy_from_guest_pv(instr, (char __user *)eip,
+                                  sizeof(instr))) != 0 )
     {
         pv_inject_page_fault(0, eip + sizeof(instr) - rc);
         return EXCRET_fault_fixed;

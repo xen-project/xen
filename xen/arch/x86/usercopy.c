@@ -109,19 +109,17 @@ unsigned int copy_from_guest_ll(void *to, const void __user *from, unsigned int 
 #if GUARD(1) + 0
 
 /**
- * copy_to_user: - Copy a block of data into user space.
- * @to:   Destination address, in user space.
- * @from: Source address, in kernel space.
+ * copy_to_guest_pv: - Copy a block of data into PV guest space.
+ * @to:   Destination address, in PV guest space.
+ * @from: Source address, in hypervisor space.
  * @n:    Number of bytes to copy.
  *
- * Context: User context only.  This function may sleep.
- *
- * Copy data from kernel space to user space.
+ * Copy data from hypervisor space to PV guest space.
  *
  * Returns number of bytes that could not be copied.
  * On success, this will be zero.
  */
-unsigned copy_to_user(void __user *to, const void *from, unsigned n)
+unsigned int copy_to_guest_pv(void __user *to, const void *from, unsigned int n)
 {
     if ( access_ok(to, n) )
         n = __copy_to_guest_pv(to, from, n);
@@ -129,16 +127,16 @@ unsigned copy_to_user(void __user *to, const void *from, unsigned n)
 }
 
 /**
- * clear_user: - Zero a block of memory in user space.
- * @to:   Destination address, in user space.
+ * clear_guest_pv: - Zero a block of memory in PV guest space.
+ * @to:   Destination address, in PV guest space.
  * @n:    Number of bytes to zero.
  *
- * Zero a block of memory in user space.
+ * Zero a block of memory in PV guest space.
  *
  * Returns number of bytes that could not be cleared.
  * On success, this will be zero.
  */
-unsigned clear_user(void __user *to, unsigned n)
+unsigned int clear_guest_pv(void __user *to, unsigned int n)
 {
     if ( access_ok(to, n) )
     {
@@ -168,14 +166,12 @@ unsigned clear_user(void __user *to, unsigned n)
 }
 
 /**
- * copy_from_user: - Copy a block of data from user space.
- * @to:   Destination address, in kernel space.
- * @from: Source address, in user space.
+ * copy_from_guest_pv: - Copy a block of data from PV guest space.
+ * @to:   Destination address, in hypervisor space.
+ * @from: Source address, in PV guest space.
  * @n:    Number of bytes to copy.
  *
- * Context: User context only.  This function may sleep.
- *
- * Copy data from user space to kernel space.
+ * Copy data from PV guest space to hypervisor space.
  *
  * Returns number of bytes that could not be copied.
  * On success, this will be zero.
@@ -183,7 +179,8 @@ unsigned clear_user(void __user *to, unsigned n)
  * If some data could not be copied, this function will pad the copied
  * data to the requested size using zero bytes.
  */
-unsigned copy_from_user(void *to, const void __user *from, unsigned n)
+unsigned int copy_from_guest_pv(void *to, const void __user *from,
+                                unsigned int n)
 {
     if ( access_ok(from, n) )
         n = __copy_from_guest_pv(to, from, n);

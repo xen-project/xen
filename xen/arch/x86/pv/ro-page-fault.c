@@ -90,7 +90,8 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
 
         /* Align address; read full word. */
         addr &= ~(sizeof(full) - 1);
-        if ( (rc = copy_from_user(&full, (void *)addr, sizeof(full))) != 0 )
+        if ( (rc = copy_from_guest_pv(&full, (void __user *)addr,
+                                      sizeof(full))) != 0 )
         {
             x86_emul_pagefault(0, /* Read fault. */
                                addr + sizeof(full) - rc,

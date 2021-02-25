@@ -9,9 +9,11 @@
 
 #include <asm/x86_64/uaccess.h>
 
-unsigned copy_to_user(void *to, const void *from, unsigned len);
-unsigned clear_user(void *to, unsigned len);
-unsigned copy_from_user(void *to, const void *from, unsigned len);
+unsigned int copy_to_guest_pv(void __user *to, const void *from,
+                              unsigned int len);
+unsigned int clear_guest_pv(void __user *to, unsigned int len);
+unsigned int copy_from_guest_pv(void *to, const void __user *from,
+                                unsigned int len);
 
 /* Handles exceptions in both to and from, but doesn't do access_ok */
 unsigned int copy_to_guest_ll(void __user*to, const void *from, unsigned int n);
