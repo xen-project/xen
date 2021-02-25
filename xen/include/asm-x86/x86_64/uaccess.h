@@ -1,7 +1,17 @@
 #ifndef __X86_64_UACCESS_H
 #define __X86_64_UACCESS_H
 
-#define COMPAT_ARG_XLAT_VIRT_BASE ((void *)ARG_XLAT_START(current))
+/*
+ * With CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS (apparent) PV guest accesses
+ * are prohibited to touch the Xen private VA range.  The compat argument
+ * translation area, therefore, can't live within this range.  Domains
+ * (potentially) in need of argument translation (32-bit PV, possibly HVM) get
+ * a secondary mapping installed, which needs to be used for such accesses in
+ * the PV case, and will also be used for HVM to avoid extra conditionals.
+ */
+#define COMPAT_ARG_XLAT_VIRT_BASE ((void *)ARG_XLAT_START(current) + \
+                                   (PERDOMAIN_ALT_VIRT_START - \
+                                    PERDOMAIN_VIRT_START))
 #define COMPAT_ARG_XLAT_SIZE      (2*PAGE_SIZE)
 struct vcpu;
 int setup_compat_arg_xlat(struct vcpu *v);

@@ -1691,6 +1691,13 @@ void init_xen_l4_slots(l4_pgentry_t *l4t, mfn_t l4mfn,
     l4t[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
 
+    /* Slot 4: Per-domain mappings mirror. */
+    BUILD_BUG_ON(IS_ENABLED(CONFIG_PV32) &&
+                 !l4_table_offset(PERDOMAIN_ALT_VIRT_START));
+    if ( !is_pv_64bit_domain(d) )
+        l4t[l4_table_offset(PERDOMAIN_ALT_VIRT_START)] =
+            l4t[l4_table_offset(PERDOMAIN_VIRT_START)];
+
     /* Slot 261-: text/data/bss, RW M2P, vmap, frametable, directmap. */
 #ifndef NDEBUG
     if ( short_directmap &&

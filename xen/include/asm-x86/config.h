@@ -170,7 +170,11 @@ extern unsigned char boot_edid_info[128];
  *    Guest-defined use.
  *  0x00000000f5800000 - 0x00000000ffffffff [168MB,             PML4:0]
  *    Read-only machine-to-phys translation table (GUEST ACCESSIBLE).
- *  0x0000000100000000 - 0x00007fffffffffff [128TB-4GB,         PML4:0-255]
+ *  0x0000000100000000 - 0x000001ffffffffff [2TB-4GB,           PML4:0-3]
+ *    Unused / Reserved for future use.
+ *  0x0000020000000000 - 0x0000027fffffffff [512GB, 2^39 bytes, PML4:4]
+ *    Mirror of per-domain mappings (for argument translation area; also HVM).
+ *  0x0000028000000000 - 0x00007fffffffffff [125.5TB,           PML4:5-255]
  *    Unused / Reserved for future use.
  */
 
@@ -207,6 +211,8 @@ extern unsigned char boot_edid_info[128];
 #define PERDOMAIN_SLOTS         3
 #define PERDOMAIN_VIRT_SLOT(s)  (PERDOMAIN_VIRT_START + (s) * \
                                  (PERDOMAIN_SLOT_MBYTES << 20))
+/* Slot 4: mirror of per-domain mappings (for compat xlat area accesses). */
+#define PERDOMAIN_ALT_VIRT_START PML4_ADDR(4)
 /* Slot 261: machine-to-phys conversion table (256GB). */
 #define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
 #define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + MPT_VIRT_SIZE)
