@@ -41,9 +41,7 @@ l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn)
         return NULL;
 
     /* Find this l1e and its enclosing l1mfn in the linear map. */
-    if ( copy_from_unsafe(&l2e,
-                          &__linear_l2_table[l2_linear_offset(linear)],
-                          sizeof(l2_pgentry_t)) )
+    if ( get_unsafe(l2e, &__linear_l2_table[l2_linear_offset(linear)]) )
         return NULL;
 
     /* Check flags that it will be safe to read the l1e. */
