@@ -58,7 +58,6 @@ addons:
             - acpica-tools
             - bin86
             - bcc
-            - libc6-dev-i386
             - libnl-3-dev
             - ocaml-nox
             - libfindlib-ocaml-dev

@@ -20,7 +20,7 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <inttypes.h>
+#include <stdint.h>
 #include <xen/libelf/elfstructs.h>
 
 #include "util.h"
