@@ -154,7 +154,6 @@ struct __large_struct { unsigned long buf[100]; };
  * aliasing issues.
  */
 #define put_unsafe_asm(x, addr, GUARD, err, itype, rtype, ltype, errret) \
-	stac();								\
 	__asm__ __volatile__(						\
 		GUARD(							\
 		"	guest_access_mask_ptr %[ptr], %[scr1], %[scr2]\n" \
@@ -169,11 +168,9 @@ struct __large_struct { unsigned long buf[100]; };
 		: [ret] "+r" (err), [ptr] "=&r" (dummy_)		\
 		  GUARD(, [scr1] "=&r" (dummy_), [scr2] "=&r" (dummy_))	\
 		: [val] ltype (x), "m" (__m(addr)),			\
-		  "[ptr]" (addr), [errno] "i" (errret));		\
-	clac()
+		  "[ptr]" (addr), [errno] "i" (errret))
 
 #define get_unsafe_asm(x, addr, GUARD, err, rtype, ltype, errret)	\
-	stac();								\
 	__asm__ __volatile__(						\
 		GUARD(							\
 		"	guest_access_mask_ptr %[ptr], %[scr1], %[scr2]\n" \
@@ -190,12 +187,12 @@ struct __large_struct { unsigned long buf[100]; };
 		  [ptr] "=&r" (dummy_)					\
 		  GUARD(, [scr1] "=&r" (dummy_), [scr2] "=&r" (dummy_))	\
 		: "m" (__m(addr)), "[ptr]" (addr),			\
-		  [errno] "i" (errret));				\
-	clac()
+		  [errno] "i" (errret))
 
 #define put_unsafe_size(x, ptr, size, grd, retval, errret)                 \
 do {                                                                       \
     retval = 0;                                                            \
+    stac();                                                                \
     switch ( size )                                                        \
     {                                                                      \
     long dummy_;                                                           \
@@ -213,6 +210,7 @@ do {                                                                       \
         break;                                                             \
     default: __put_user_bad();                                             \
     }                                                                      \
+    clac();                                                                \
 } while ( false )
 
 #define put_guest_size(x, ptr, size, retval, errret) \
@@ -221,6 +219,7 @@ do {                                                                       \
 #define get_unsafe_size(x, ptr, size, grd, retval, errret)                 \
 do {                                                                       \
     retval = 0;                                                            \
+    stac();                                                                \
     switch ( size )                                                        \
     {                                                                      \
     long dummy_;                                                           \
@@ -230,6 +229,7 @@ do {                                                                       \
     case 8: get_unsafe_asm(x, ptr, grd, retval,  "", "=r", errret); break; \
     default: __get_user_bad();                                             \
     }                                                                      \
+    clac();                                                                \
 } while ( false )
 
 #define get_guest_size(x, ptr, size, retval, errret)                       \
