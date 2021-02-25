@@ -26,14 +26,12 @@ extern void __put_user_bad(void);
 #define UA_DROP(args...)
 
 /**
- * get_user: - Get a simple variable from user space.
+ * get_guest: - Get a simple variable from guest space.
  * @x:   Variable to store result.
- * @ptr: Source address, in user space.
+ * @ptr: Source address, in guest space.
  *
- * Context: User context only.  This function may sleep.
- *
- * This macro copies a single simple variable from user space to kernel
- * space.  It supports simple types like char and int, but not larger
+ * This macro load a single simple variable from guest space.
+ * It supports simple types like char and int, but not larger
  * data types like structures or arrays.
  *
  * @ptr must have pointer-to-simple-variable type, and the result of
@@ -42,18 +40,15 @@ extern void __put_user_bad(void);
  * Returns zero on success, or -EFAULT on error.
  * On error, the variable @x is set to zero.
  */
-#define get_user(x,ptr)	\
-  __get_user_check((x),(ptr),sizeof(*(ptr)))
+#define get_guest(x, ptr) get_guest_check(x, ptr, sizeof(*(ptr)))
 
 /**
- * put_user: - Write a simple value into user space.
- * @x:   Value to copy to user space.
- * @ptr: Destination address, in user space.
+ * put_guest: - Write a simple value into guest space.
+ * @x:   Value to store in guest space.
+ * @ptr: Destination address, in guest space.
  *
- * Context: User context only.  This function may sleep.
- *
- * This macro copies a single simple value from kernel space to user
- * space.  It supports simple types like char and int, but not larger
+ * This macro stores a single simple value from to guest space.
+ * It supports simple types like char and int, but not larger
  * data types like structures or arrays.
  *
  * @ptr must have pointer-to-simple-variable type, and @x must be assignable
@@ -61,8 +56,8 @@ extern void __put_user_bad(void);
  *
  * Returns zero on success, or -EFAULT on error.
  */
-#define put_user(x,ptr)							\
-  __put_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+#define put_guest(x, ptr) \
+    put_guest_check((__typeof__(*(ptr)))(x), ptr, sizeof(*(ptr)))
 
 /**
  * __get_guest: - Get a simple variable from guest space, with less checking.
@@ -118,7 +113,7 @@ extern void __put_user_bad(void);
 	err_;								\
 })
 
-#define __put_user_check(x, ptr, size)					\
+#define put_guest_check(x, ptr, size)					\
 ({									\
 	__typeof__(*(ptr)) __user *ptr_ = (ptr);			\
 	__typeof__(size) size_ = (size);				\
@@ -140,7 +135,7 @@ extern void __put_user_bad(void);
 	err_;								\
 })
 
-#define __get_user_check(x, ptr, size)					\
+#define get_guest_check(x, ptr, size)					\
 ({									\
 	__typeof__(*(ptr)) __user *ptr_ = (ptr);			\
 	__typeof__(size) size_ = (size);				\

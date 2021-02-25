@@ -1649,19 +1649,19 @@ static void load_segments(struct vcpu *n)
 
             if ( !ring_1(regs) )
             {
-                ret  = put_user(regs->ss,       esp-1);
-                ret |= put_user(regs->esp,      esp-2);
+                ret  = put_guest(regs->ss,  esp - 1);
+                ret |= put_guest(regs->esp, esp - 2);
                 esp -= 2;
             }
 
             if ( ret |
-                 put_user(rflags,              esp-1) |
-                 put_user(cs_and_mask,         esp-2) |
-                 put_user(regs->eip,           esp-3) |
-                 put_user(uregs->gs,           esp-4) |
-                 put_user(uregs->fs,           esp-5) |
-                 put_user(uregs->es,           esp-6) |
-                 put_user(uregs->ds,           esp-7) )
+                 put_guest(rflags,      esp - 1) |
+                 put_guest(cs_and_mask, esp - 2) |
+                 put_guest(regs->eip,   esp - 3) |
+                 put_guest(uregs->gs,   esp - 4) |
+                 put_guest(uregs->fs,   esp - 5) |
+                 put_guest(uregs->es,   esp - 6) |
+                 put_guest(uregs->ds,   esp - 7) )
             {
                 gprintk(XENLOG_ERR,
                         "error while creating compat failsafe callback frame\n");
@@ -1690,17 +1690,17 @@ static void load_segments(struct vcpu *n)
         cs_and_mask = (unsigned long)regs->cs |
             ((unsigned long)vcpu_info(n, evtchn_upcall_mask) << 32);
 
-        if ( put_user(regs->ss,            rsp- 1) |
-             put_user(regs->rsp,           rsp- 2) |
-             put_user(rflags,              rsp- 3) |
-             put_user(cs_and_mask,         rsp- 4) |
-             put_user(regs->rip,           rsp- 5) |
-             put_user(uregs->gs,           rsp- 6) |
-             put_user(uregs->fs,           rsp- 7) |
-             put_user(uregs->es,           rsp- 8) |
-             put_user(uregs->ds,           rsp- 9) |
-             put_user(regs->r11,           rsp-10) |
-             put_user(regs->rcx,           rsp-11) )
+        if ( put_guest(regs->ss,    rsp -  1) |
+             put_guest(regs->rsp,   rsp -  2) |
+             put_guest(rflags,      rsp -  3) |
+             put_guest(cs_and_mask, rsp -  4) |
+             put_guest(regs->rip,   rsp -  5) |
+             put_guest(uregs->gs,   rsp -  6) |
+             put_guest(uregs->fs,   rsp -  7) |
+             put_guest(uregs->es,   rsp -  8) |
+             put_guest(uregs->ds,   rsp -  9) |
+             put_guest(regs->r11,   rsp - 10) |
+             put_guest(regs->rcx,   rsp - 11) )
         {
             gprintk(XENLOG_ERR,
                     "error while creating failsafe callback frame\n");
