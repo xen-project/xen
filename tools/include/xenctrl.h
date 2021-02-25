@@ -1644,7 +1644,7 @@ int xc_vmtrace_get_option(xc_interface *xch, uint32_t domid,
                           uint32_t vcpu, uint64_t key, uint64_t *value);
 
 /**
- * Set platform specific vntvmtrace options.
+ * Set platform specific vmtrace options.
  *
  * @parm xch a handle to an open hypervisor interface
  * @parm domid domain identifier
