@@ -638,7 +638,6 @@ static bool do_lu_start(struct delayed_request *req)
 {
 	time_t now = time(NULL);
 	const char *ret;
-	char *resp;
 
 	if (!lu_check_lu_allowed()) {
 		if (now < lu_status->started_at + lu_status->timeout)
@@ -660,8 +659,7 @@ static bool do_lu_start(struct delayed_request *req)
  out:
 	talloc_free(lu_status);
 
-	resp = talloc_strdup(req->in, ret);
-	send_reply(lu_status->conn, XS_CONTROL, resp, strlen(resp) + 1);
+	send_reply(lu_status->conn, XS_CONTROL, ret, strlen(ret) + 1);
 
 	return true;
 }
