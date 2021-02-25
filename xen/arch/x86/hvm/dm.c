@@ -359,6 +359,7 @@ int dm_op(const struct dmop_args *op_args)
         [XEN_DMOP_remote_shutdown]                  = sizeof(struct xen_dm_op_remote_shutdown),
         [XEN_DMOP_relocate_memory]                  = sizeof(struct xen_dm_op_relocate_memory),
         [XEN_DMOP_pin_memory_cacheattr]             = sizeof(struct xen_dm_op_pin_memory_cacheattr),
+        [XEN_DMOP_nr_vcpus]                         = sizeof(struct xen_dm_op_nr_vcpus),
     };
 
     rc = rcu_lock_remote_domain_by_id(op_args->domid, &d);
@@ -606,6 +607,15 @@ int dm_op(const struct dmop_args *op_args)
         break;
     }
 
+    case XEN_DMOP_nr_vcpus:
+    {
+        struct xen_dm_op_nr_vcpus *data = &op.u.nr_vcpus;
+
+        data->vcpus = d->max_vcpus;
+        rc = 0;
+        break;
+    }
+
     default:
         rc = ioreq_server_dm_op(&op, d, &const_op);
         break;
@@ -641,6 +651,7 @@ CHECK_dm_op_map_mem_type_to_ioreq_server;
 CHECK_dm_op_remote_shutdown;
 CHECK_dm_op_relocate_memory;
 CHECK_dm_op_pin_memory_cacheattr;
+CHECK_dm_op_nr_vcpus;
 
 int compat_dm_op(domid_t domid,
                  unsigned int nr_bufs,

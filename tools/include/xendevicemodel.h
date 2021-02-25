@@ -358,6 +358,16 @@ int xendevicemodel_pin_memory_cacheattr(
     uint32_t type);
 
 /**
+ * Query for the number of vCPUs that a domain has.
+ * @parm dmod a handle to an open devicemodel interface.
+ * @parm domid the domain id to be serviced.
+ * @parm vcpus Number of vcpus.
+ * @return 0 on success and fills @p vcpus, or -1 on failure.
+ */
+int xendevicemodel_nr_vcpus(
+    xendevicemodel_handle *dmod, domid_t domid, unsigned int *vcpus);
+
+/**
  * This function restricts the use of this handle to the specified
  * domain.
  *

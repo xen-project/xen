@@ -42,4 +42,5 @@ VERS_1.3 {
 VERS_1.4 {
 	global:
 		xendevicemodel_set_irq_level;
+		xendevicemodel_nr_vcpus;
 } VERS_1.3;

@@ -38,6 +38,7 @@ int dm_op(const struct dmop_args *op_args)
         [XEN_DMOP_set_ioreq_server_state]           = sizeof(struct xen_dm_op_set_ioreq_server_state),
         [XEN_DMOP_destroy_ioreq_server]             = sizeof(struct xen_dm_op_destroy_ioreq_server),
         [XEN_DMOP_set_irq_level]                    = sizeof(struct xen_dm_op_set_irq_level),
+        [XEN_DMOP_nr_vcpus]                         = sizeof(struct xen_dm_op_nr_vcpus),
     };
 
     rc = rcu_lock_remote_domain_by_id(op_args->domid, &d);
@@ -118,6 +119,15 @@ int dm_op(const struct dmop_args *op_args)
         }
 
         vgic_inject_irq(d, NULL, data->irq, data->level);
+        rc = 0;
+        break;
+    }
+
+    case XEN_DMOP_nr_vcpus:
+    {
+        struct xen_dm_op_nr_vcpus *data = &op.u.nr_vcpus;
+
+        data->vcpus = d->max_vcpus;
         rc = 0;
         break;
     }

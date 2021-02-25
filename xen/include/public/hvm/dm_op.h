@@ -449,6 +449,21 @@ struct xen_dm_op_set_irq_level {
 };
 typedef struct xen_dm_op_set_irq_level xen_dm_op_set_irq_level_t;
 
+/*
+ * XEN_DMOP_nr_vcpus: Query the number of vCPUs a domain has.
+ *
+ * This is the number of vcpu objects allocated in Xen for the domain, and is
+ * fixed from creation time.  This bound is applicable to e.g. the vcpuid
+ * parameter of XEN_DMOP_inject_event, or number of struct ioreq objects
+ * mapped via XENMEM_acquire_resource.
+ */
+#define XEN_DMOP_nr_vcpus 20
+
+struct xen_dm_op_nr_vcpus {
+    uint32_t vcpus; /* OUT */
+};
+typedef struct xen_dm_op_nr_vcpus xen_dm_op_nr_vcpus_t;
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -472,6 +487,7 @@ struct xen_dm_op {
         xen_dm_op_remote_shutdown_t remote_shutdown;
         xen_dm_op_relocate_memory_t relocate_memory;
         xen_dm_op_pin_memory_cacheattr_t pin_memory_cacheattr;
+        xen_dm_op_nr_vcpus_t nr_vcpus;
     } u;
 };
 

@@ -630,6 +630,21 @@ int xendevicemodel_pin_memory_cacheattr(
     return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
 }
 
+int xendevicemodel_nr_vcpus(
+    xendevicemodel_handle *dmod, domid_t domid, unsigned int *vcpus)
+{
+    struct xen_dm_op op = {
+        .op = XEN_DMOP_nr_vcpus,
+    };
+
+    int rc = xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
+    if ( rc )
+        return rc;
+
+    *vcpus = op.u.nr_vcpus.vcpus;
+    return 0;
+}
+
 int xendevicemodel_restrict(xendevicemodel_handle *dmod, domid_t domid)
 {
     return osdep_xendevicemodel_restrict(dmod, domid);
