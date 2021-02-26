@@ -272,6 +272,7 @@ struct iommu_ops {
 
     int (*adjust_irq_affinities)(void);
     void (*sync_cache)(const void *addr, unsigned int size);
+    void (*clear_root_pgtable)(struct domain *d);
 #endif /* CONFIG_X86 */
 
     int __must_check (*suspend)(void);

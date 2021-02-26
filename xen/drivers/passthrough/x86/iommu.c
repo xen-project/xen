@@ -149,6 +149,13 @@ int arch_iommu_domain_init(struct domain *d)
 
 void arch_iommu_domain_destroy(struct domain *d)
 {
+    /*
+     * There should be not page-tables left allocated by the time the
+     * domain is destroyed. Note that arch_iommu_domain_destroy() is
+     * called unconditionally, so pgtables may be uninitialized.
+     */
+    ASSERT(!dom_iommu(d)->platform_ops ||
+           page_list_empty(&dom_iommu(d)->arch.pgtables.list));
 }
 
 static bool __hwdom_init hwdom_iommu_map(const struct domain *d,
@@ -272,6 +279,12 @@ int iommu_free_pgtables(struct domain *d)
 
     /* After this barrier, no new IOMMU mappings can be inserted. */
     spin_barrier(&hd->arch.mapping_lock);
+
+    /*
+     * Pages will be moved to the free list below. So we want to
+     * clear the root page-table to avoid any potential use after-free.
+     */
+    hd->platform_ops->clear_root_pgtable(d);
 
     while ( (pg = page_list_remove_head(&hd->arch.pgtables.list)) )
     {

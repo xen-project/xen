@@ -1726,6 +1726,15 @@ out:
     return ret;
 }
 
+static void iommu_clear_root_pgtable(struct domain *d)
+{
+    struct domain_iommu *hd = dom_iommu(d);
+
+    spin_lock(&hd->arch.mapping_lock);
+    hd->arch.vtd.pgd_maddr = 0;
+    spin_unlock(&hd->arch.mapping_lock);
+}
+
 static void iommu_domain_teardown(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
@@ -1740,7 +1749,7 @@ static void iommu_domain_teardown(struct domain *d)
         xfree(mrmrr);
     }
 
-    hd->arch.vtd.pgd_maddr = 0;
+    ASSERT(!hd->arch.vtd.pgd_maddr);
 }
 
 static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,
@@ -2731,6 +2740,7 @@ static struct iommu_ops __initdata vtd_ops = {
     .remove_device = intel_iommu_remove_device,
     .assign_device  = intel_iommu_assign_device,
     .teardown = iommu_domain_teardown,
+    .clear_root_pgtable = iommu_clear_root_pgtable,
     .map_page = intel_iommu_map_page,
     .unmap_page = intel_iommu_unmap_page,
     .lookup_page = intel_iommu_lookup_page,

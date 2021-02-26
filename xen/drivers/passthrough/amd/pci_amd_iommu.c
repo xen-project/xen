@@ -381,9 +381,18 @@ static int amd_iommu_assign_device(struct domain *d, u8 devfn,
     return reassign_device(pdev->domain, d, devfn, pdev);
 }
 
+static void amd_iommu_clear_root_pgtable(struct domain *d)
+{
+    struct domain_iommu *hd = dom_iommu(d);
+
+    spin_lock(&hd->arch.mapping_lock);
+    hd->arch.amd.root_table = NULL;
+    spin_unlock(&hd->arch.mapping_lock);
+}
+
 static void amd_iommu_domain_destroy(struct domain *d)
 {
-    dom_iommu(d)->arch.amd.root_table = NULL;
+    ASSERT(!dom_iommu(d)->arch.amd.root_table);
 }
 
 static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
@@ -565,6 +574,7 @@ static const struct iommu_ops __initconstrel _iommu_ops = {
     .remove_device = amd_iommu_remove_device,
     .assign_device  = amd_iommu_assign_device,
     .teardown = amd_iommu_domain_destroy,
+    .clear_root_pgtable = amd_iommu_clear_root_pgtable,
     .map_page = amd_iommu_map_page,
     .unmap_page = amd_iommu_unmap_page,
     .iotlb_flush = amd_iommu_flush_iotlb_pages,
