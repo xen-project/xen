@@ -270,6 +270,9 @@ int iommu_free_pgtables(struct domain *d)
     if ( !is_iommu_enabled(d) )
         return 0;
 
+    /* After this barrier, no new IOMMU mappings can be inserted. */
+    spin_barrier(&hd->arch.mapping_lock);
+
     while ( (pg = page_list_remove_head(&hd->arch.pgtables.list)) )
     {
         free_domheap_page(pg);

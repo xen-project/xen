@@ -1762,6 +1762,18 @@ static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,
 
     spin_lock(&hd->arch.mapping_lock);
 
+    /*
+     * IOMMU mapping request can be safely ignored when the domain is dying.
+     *
+     * hd->arch.mapping_lock guarantees that d->is_dying will be observed
+     * before any page tables are freed (see iommu_free_pgtables())
+     */
+    if ( d->is_dying )
+    {
+        spin_unlock(&hd->arch.mapping_lock);
+        return 0;
+    }
+
     pg_maddr = addr_to_dma_page_maddr(d, dfn_to_daddr(dfn), 1);
     if ( !pg_maddr )
     {
