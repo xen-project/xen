@@ -1160,6 +1160,8 @@ static int do_mkdir(struct connection *conn, struct buffered_data *in)
 		/* No permissions? */
 		if (errno != ENOENT)
 			return errno;
+		if (!name)
+			return ENOMEM;
 		node = create_node(conn, in, name, NULL, 0);
 		if (!node)
 			return errno;
@@ -1274,6 +1276,8 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
+			if (!name)
+				return ENOMEM;
 			parentname = get_parent(in, name);
 			if (!parentname)
 				return errno;
