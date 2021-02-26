@@ -1818,6 +1818,10 @@ static int check_store_(const char *name, struct hashtable *reachable)
 
 		struct hashtable * children =
 			create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+		if (!children) {
+			log("check_store create table: ENOMEM");
+			return ENOMEM;
+		}
 
 		if (!remember_string(reachable, name)) {
 			hashtable_destroy(children, 0);
