@@ -657,9 +657,8 @@ static bool do_lu_start(struct delayed_request *req)
 
 	/* We will reach this point only in case of failure. */
  out:
-	talloc_free(lu_status);
-
 	send_reply(lu_status->conn, XS_CONTROL, ret, strlen(ret) + 1);
+	talloc_free(lu_status);
 
 	return true;
 }
