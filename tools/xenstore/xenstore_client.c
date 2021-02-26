@@ -382,11 +382,14 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
                 /* Copy path, because we can't modify argv because we will need it
                    again if xs_transaction_end gives us EAGAIN. */
                 char *p = malloc(strlen(path) + 1);
+                if (!p)
+                    return 1;
                 strcpy(p, path);
                 path = p;
 
             again:
                 if (do_rm(path, xsh, xth)) {
+                    free(path);
                     return 1;
                 }
 
