@@ -1180,7 +1180,12 @@ bool xs_path_is_subpath(const char *parent, const char *child)
 bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid)
 {
 	char *domain = single_with_domid(h, XS_IS_DOMAIN_INTRODUCED, domid);
-	int rc = strcmp("F", domain);
+	bool rc = false;
+
+	if (!domain)
+		return rc;
+
+	rc = strcmp("F", domain) != 0;
 
 	free(domain);
 	return rc;
