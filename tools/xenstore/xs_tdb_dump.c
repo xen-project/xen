@@ -59,8 +59,8 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "%.*s: BAD truncated\n",
 				(int)key.dsize, key.dptr);
 		else if (data.dsize != total_size(hdr))
-			fprintf(stderr, "%.*s: BAD length %i for %i/%i/%i (%i)\n",
-				(int)key.dsize, key.dptr, (int)data.dsize,
+			fprintf(stderr, "%.*s: BAD length %zu for %u/%u/%u (%u)\n",
+				(int)key.dsize, key.dptr, data.dsize,
 				hdr->num_perms, hdr->datalen,
 				hdr->childlen, total_size(hdr));
 		else {
@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 
 			printf("%.*s: ", (int)key.dsize, key.dptr);
 			for (i = 0; i < hdr->num_perms; i++)
-				printf("%s%c%i",
+				printf("%s%c%u",
 				       i == 0 ? "" : ",",
 				       perm_to_char(hdr->perms[i].perms),
 				       hdr->perms[i].id);
