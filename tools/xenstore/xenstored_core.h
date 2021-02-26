@@ -217,7 +217,7 @@ int delay_request(struct connection *conn, struct buffered_data *in,
 /* Tracing infrastructure. */
 void trace_create(const void *data, const char *type);
 void trace_destroy(const void *data, const char *type);
-void trace(const char *fmt, ...);
+void trace(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void dtrace_io(const struct connection *conn, const struct buffered_data *data, int out);
 void reopen_log(void);
 void close_log(void);
