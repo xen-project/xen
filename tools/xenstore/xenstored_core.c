@@ -2005,6 +2005,9 @@ static void init_sockets(void)
 	struct sockaddr_un addr;
 	const char *soc_str = xs_daemon_socket();
 
+	if (!soc_str)
+		barf_perror("Failed to obtain xs domain socket");
+
 	/* Create sockets for them to listen to. */
 	atexit(destroy_fds);
 	sock = socket(PF_UNIX, SOCK_STREAM, 0);
