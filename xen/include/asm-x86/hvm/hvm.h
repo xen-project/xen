@@ -106,6 +106,7 @@ struct hvm_function_table {
      * Initialise/destroy HVM domain/vcpu resources
      */
     int  (*domain_initialise)(struct domain *d);
+    void (*domain_creation_finished)(struct domain *d);
     void (*domain_relinquish_resources)(struct domain *d);
     void (*domain_destroy)(struct domain *d);
     int  (*vcpu_initialise)(struct vcpu *v);
@@ -388,6 +389,12 @@ int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value);
 static inline bool hvm_has_set_descriptor_access_exiting(void)
 {
     return hvm_funcs.set_descriptor_access_exiting;
+}
+
+static inline void hvm_domain_creation_finished(struct domain *d)
+{
+    if ( hvm_funcs.domain_creation_finished )
+        alternative_vcall(hvm_funcs.domain_creation_finished, d);
 }
 
 static inline int
@@ -762,6 +769,11 @@ static inline void hvm_cpu_down(void) {}
 static inline void hvm_flush_guest_tlbs(void) {}
 
 static inline void hvm_invlpg(const struct vcpu *v, unsigned long linear)
+{
+    ASSERT_UNREACHABLE();
+}
+
+static inline void hvm_domain_creation_finished(struct domain *d)
 {
     ASSERT_UNREACHABLE();
 }

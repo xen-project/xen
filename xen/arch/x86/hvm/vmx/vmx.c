@@ -428,6 +428,14 @@ static void vmx_domain_relinquish_resources(struct domain *d)
     vmx_free_vlapic_mapping(d);
 }
 
+static void domain_creation_finished(struct domain *d)
+{
+    if ( has_vlapic(d) && !mfn_eq(d->arch.hvm.vmx.apic_access_mfn, _mfn(0)) &&
+         set_mmio_p2m_entry(d, gaddr_to_gfn(APIC_DEFAULT_PHYS_BASE),
+                            d->arch.hvm.vmx.apic_access_mfn, PAGE_ORDER_4K) )
+        domain_crash(d);
+}
+
 static void vmx_init_ipt(struct vcpu *v)
 {
     unsigned int size = v->domain->vmtrace_size;
@@ -2408,6 +2416,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .cpu_dead             = vmx_cpu_dead,
     .domain_initialise    = vmx_domain_initialise,
     .domain_relinquish_resources = vmx_domain_relinquish_resources,
+    .domain_creation_finished = domain_creation_finished,
     .vcpu_initialise      = vmx_vcpu_initialise,
     .vcpu_destroy         = vmx_vcpu_destroy,
     .save_cpu_ctxt        = vmx_save_vmcs_ctxt,
@@ -3234,8 +3243,7 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     clear_domain_page(mfn);
     d->arch.hvm.vmx.apic_access_mfn = mfn;
 
-    return set_mmio_p2m_entry(d, gaddr_to_gfn(APIC_DEFAULT_PHYS_BASE), mfn,
-                              PAGE_ORDER_4K);
+    return 0;
 }
 
 static void vmx_free_vlapic_mapping(struct domain *d)

@@ -1007,6 +1007,8 @@ int arch_domain_soft_reset(struct domain *d)
 
 void arch_domain_creation_finished(struct domain *d)
 {
+    if ( is_hvm_domain(d) )
+        hvm_domain_creation_finished(d);
 }
 
 #define xen_vcpu_guest_context vcpu_guest_context
