@@ -31,9 +31,8 @@ fi
 if ! test -z "$(ldd /bin/ls|grep musl|head -1)"; then
     # disable --disable-werror for QEMUU when building with MUSL
     cfgargs+=("--with-extra-qemuu-configure-args=\"--disable-werror\"")
-    # hvmloader doesn't build on MUSL systems
-    cfgargs+=("--disable-seabios")
-    cfgargs+=("--disable-rombios")
+    # SeaBIOS doesn't build on MUSL systems
+    cfgargs+=("--with-system-seabios=/bin/false")
 fi
 
 # Qemu requires Python 3.5 or later
