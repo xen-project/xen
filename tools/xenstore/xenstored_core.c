@@ -504,6 +504,11 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	}
 
 	data.dptr = talloc_size(node, data.dsize);
+	if (!data.dptr) {
+		errno = ENOMEM;
+		return errno;
+	}
+
 	hdr = (void *)data.dptr;
 	hdr->generation = node->generation;
 	hdr->num_perms = node->perms.num;
