@@ -21,6 +21,7 @@ RUN \
   apk add curl-dev && \
   apk add dev86 && \
   apk add gcc  && \
+  apk add g++ && \
   apk add clang  && \
   apk add gettext && \
   apk add git && \
