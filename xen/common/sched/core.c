@@ -2768,6 +2768,12 @@ static int cpu_schedule_up(unsigned int cpu)
     if ( cpu == 0 )
         return 0;
 
+    /*
+     * Guard in particular against the compiler suspecting out-of-bounds
+     * array accesses below when NR_CPUS=1.
+     */
+    BUG_ON(cpu >= NR_CPUS);
+
     if ( idle_vcpu[cpu] == NULL )
         vcpu_create(idle_vcpu[0]->domain, cpu);
     else
