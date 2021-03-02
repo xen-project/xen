@@ -802,9 +802,7 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
     struct domain *owner;
 
     ASSERT(!sh_l1e_is_magic(sl1e));
-
-    if ( !shadow_mode_refcounts(d) )
-        return 1;
+    ASSERT(shadow_mode_refcounts(d));
 
     res = get_page_from_l1e(sl1e, d, d);
 
