@@ -459,11 +459,18 @@ static bool lu_check_lu_allowed(void)
 	list_for_each_entry(conn, &connections, list) {
 		if (conn->ta_start_time) {
 			ta_total++;
-			if (conn->ta_start_time - now >= lu_status->timeout)
+			if (now - conn->ta_start_time >= lu_status->timeout)
 				ta_long++;
 		}
 	}
 
+	/*
+	 * Allow LiveUpdate if one of the following conditions is met:
+	 *	- There is no active transactions
+	 *	- All transactions are long running (e.g. they have been
+	 *	active for more than lu_status->timeout sec) and the admin as
+	 *	requested to force the operation.
+	 */
 	return ta_total ? (lu_status->force && ta_long == ta_total) : true;
 }
 
@@ -474,11 +481,12 @@ static const char *lu_reject_reason(const void *ctx)
 	time_t now = time(NULL);
 
 	list_for_each_entry(conn, &connections, list) {
-		if (conn->ta_start_time - now >= lu_status->timeout) {
+		if (conn->ta_start_time &&
+		    (now - conn->ta_start_time >= lu_status->timeout)) {
 			ret = talloc_asprintf(ctx, "%s\nDomain %u: %ld s",
 					      ret ? : "Domains with long running transactions:",
 					      conn->id,
-					      conn->ta_start_time - now);
+					      now - conn->ta_start_time);
 		}
 	}
 
