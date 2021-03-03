@@ -114,11 +114,16 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
     window = (unsigned char *)output;
 
     free_mem_ptr = (unsigned long)alloc_xenheap_pages(HEAPORDER, 0);
+    if ( !free_mem_ptr )
+        return -ENOMEM;
+
     free_mem_end_ptr = free_mem_ptr + (PAGE_SIZE << HEAPORDER);
+    init_allocator();
 
     inbuf = (unsigned char *)image;
     insize = image_len;
     inptr = 0;
+    bytes_out = 0;
 
     makecrc();
 

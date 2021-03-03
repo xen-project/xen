@@ -238,6 +238,12 @@ STATIC const ush mask_bits[] = {
 static unsigned long INITDATA malloc_ptr;
 static int INITDATA malloc_count;
 
+static void init_allocator(void)
+{
+    malloc_ptr = free_mem_ptr;
+    malloc_count = 0;
+}
+
 static void *INIT malloc(int size)
 {
     void *p;
