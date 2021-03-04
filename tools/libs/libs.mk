@@ -76,7 +76,7 @@ else
 .PHONY: headers.chk
 endif
 
-headers.chk: $(AUTOINCS)
+headers.chk: $(LIBHEADERS) $(AUTOINCS)
 
 headers.lst: FORCE
 	@{ set -e; $(foreach h,$(LIBHEADERS),echo $(h);) } > $@.tmp
