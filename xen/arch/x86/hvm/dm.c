@@ -612,6 +612,7 @@ int dm_op(const struct dmop_args *op_args)
         struct xen_dm_op_nr_vcpus *data = &op.u.nr_vcpus;
 
         data->vcpus = d->max_vcpus;
+        const_op = false;
         rc = 0;
         break;
     }
