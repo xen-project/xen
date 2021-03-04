@@ -1,8 +1,6 @@
 #ifndef XENDEVICEMODEL_PRIVATE_H
 #define XENDEVICEMODEL_PRIVATE_H
 
-#define __XEN_TOOLS__ 1
-
 #include <xentoollog.h>
 #include <xendevicemodel.h>
 #include <xencall.h>

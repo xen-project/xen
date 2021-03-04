@@ -4,9 +4,15 @@ DMOP
 Introduction
 ------------
 
-The aim of DMOP is to prevent a compromised device model from compromising
-domains other than the one it is providing emulation for (which is therefore
-likely already compromised).
+The DMOP hypercall has a new ABI design to solve problems in the Xen
+ecosystem.  First, the ABI is fully stable, to reduce the coupling between
+device models and the version of Xen.  Specifically, device model software
+using DMOP (be it user, stub domain or kernel software) need not be recompiled
+to match the version of the running hypervisor.
+
+Secondly, for device models in userspace, the ABI is designed specifically to
+allow a kernel to audit the memory ranges used, without having to know the
+internal structure of sub-ops.
 
 The problem occurs when you a device model issues an hypercall that
 includes references to user memory other than the operation structure

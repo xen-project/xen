@@ -25,9 +25,6 @@
 #define __XEN_PUBLIC_HVM_DM_OP_H__
 
 #include "../xen.h"
-
-#if defined(__XEN__) || defined(__XEN_TOOLS__)
-
 #include "../event_channel.h"
 
 #ifndef uint64_aligned_t
@@ -490,8 +487,6 @@ struct xen_dm_op {
         xen_dm_op_nr_vcpus_t nr_vcpus;
     } u;
 };
-
-#endif /* __XEN__ || __XEN_TOOLS__ */
 
 struct xen_dm_op_buf {
     XEN_GUEST_HANDLE(void) h;
