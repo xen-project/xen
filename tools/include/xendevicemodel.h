@@ -17,8 +17,6 @@
 #ifndef XENDEVICEMODEL_H
 #define XENDEVICEMODEL_H
 
-#ifdef __XEN_TOOLS__
-
 #include <stdint.h>
 
 #include <xen/xen.h>
@@ -376,8 +374,6 @@ int xendevicemodel_nr_vcpus(
  * @return 0 on success, -1 on failure.
  */
 int xendevicemodel_restrict(xendevicemodel_handle *dmod, domid_t domid);
-
-#endif /* __XEN_TOOLS__ */
 
 #endif /* XENDEVICEMODEL_H */
 
