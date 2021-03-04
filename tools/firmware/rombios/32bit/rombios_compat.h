@@ -8,9 +8,7 @@
 
 #define ADDR_FROM_SEG_OFF(seg, off)  (void *)((((uint32_t)(seg)) << 4) + (off))
 
-typedef unsigned char uint8_t;
-typedef unsigned short int uint16_t;
-typedef unsigned int uint32_t;
+#include <stdint.h>
 
 typedef uint8_t  Bit8u;
 typedef uint16_t Bit16u;
