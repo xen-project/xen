@@ -29,10 +29,13 @@ const char *dump_state_align(FILE *fp);
 
 #define PRINTF_ATTRIBUTE(a1, a2) __attribute__((format (printf, a1, a2)))
 
-void barf(const char *fmt, ...) __attribute__((noreturn));
-void barf_perror(const char *fmt, ...) __attribute__((noreturn));
+#define __noreturn __attribute__((noreturn))
 
-extern void (*xprintf)(const char *fmt, ...);
+void barf(const char *fmt, ...) __noreturn PRINTF_ATTRIBUTE(1, 2);
+void barf_perror(const char *fmt, ...) __noreturn PRINTF_ATTRIBUTE(1, 2);
+
+/* Function pointer as xprintf() can be configured at runtime. */
+extern void (*xprintf)(const char *fmt, ...) PRINTF_ATTRIBUTE(1, 2);
 
 #define eprintf(_fmt, _args...) xprintf("[ERR] %s" _fmt, __FUNCTION__, ##_args)
 
