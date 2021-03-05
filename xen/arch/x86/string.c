@@ -43,7 +43,8 @@ void *(memmove)(void *dest, const void *src, size_t n)
         return dest;
 
     if ( dest < src )
-        return memcpy(dest, src, n);
+        /* Depends on Xen's implementation operating forwards. */
+        return (memcpy)(dest, src, n);
 
     asm volatile (
         "   std         ; "
