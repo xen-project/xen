@@ -158,10 +158,11 @@ static unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
                                      void * __user buf, unsigned int len,
                                      bool toaddr, uint64_t pgd3)
 {
+    unsigned long addr = (unsigned long)gaddr;
+
     while ( len > 0 )
     {
         char *va;
-        unsigned long addr = (unsigned long)gaddr;
         mfn_t mfn;
         gfn_t gfn = INVALID_GFN;
         unsigned long pagecnt;
