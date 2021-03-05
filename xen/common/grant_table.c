@@ -795,9 +795,10 @@ static int _set_status_v2(const grant_entry_header_t *shah,
         mask |= GTF_sub_page;
 
     /* If not already pinned, check the grant domid and type. */
-    if ( !act->pin && ((((scombo.flags & mask) != GTF_permit_access) &&
-                        ((scombo.flags & mask) != GTF_transitive)) ||
-                       (scombo.domid != ldomid)) )
+    if ( !act->pin &&
+         ((((scombo.flags & mask) != GTF_permit_access) &&
+           (mapflag || ((scombo.flags & mask) != GTF_transitive))) ||
+          (scombo.domid != ldomid)) )
         PIN_FAIL(done, GNTST_general_error,
                  "Bad flags (%x) or dom (%d); expected d%d, flags %x\n",
                  scombo.flags, scombo.domid, ldomid, mask);
@@ -823,7 +824,7 @@ static int _set_status_v2(const grant_entry_header_t *shah,
     if ( !act->pin )
     {
         if ( (((scombo.flags & mask) != GTF_permit_access) &&
-              ((scombo.flags & mask) != GTF_transitive)) ||
+              (mapflag || ((scombo.flags & mask) != GTF_transitive))) ||
              (scombo.domid != ldomid) ||
              (!readonly && (scombo.flags & GTF_readonly)) )
         {
