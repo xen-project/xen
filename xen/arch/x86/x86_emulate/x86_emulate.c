@@ -5926,6 +5926,10 @@ x86_emulate(
              (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) )
             goto done;
 
+        if ( ctxt->lma )
+            /* In particular mode_64bit() needs to return true from here on. */
+            ctxt->addr_size = ctxt->sp_size = 64;
+
         /*
          * SYSCALL (unlike most instructions) evaluates its singlestep action
          * based on the resulting EFLAGS.TF, not the starting EFLAGS.TF.
@@ -6594,6 +6598,10 @@ x86_emulate(
                                  &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
         _regs.r(sp) = ctxt->lma ? msr_val : (uint32_t)msr_val;
+
+        if ( ctxt->lma )
+            /* In particular mode_64bit() needs to return true from here on. */
+            ctxt->addr_size = ctxt->sp_size = 64;
 
         singlestep = _regs.eflags & X86_EFLAGS_TF;
         break;
@@ -11195,8 +11203,12 @@ int x86_emulate_wrapper(
     unsigned long orig_ip = ctxt->regs->r(ip);
     int rc;
 
+#ifdef __x86_64__
     if ( mode_64bit() )
         ASSERT(ctxt->lma);
+#else
+    ASSERT(!ctxt->lma && !mode_64bit());
+#endif
 
     rc = x86_emulate(ctxt, ops);
 
