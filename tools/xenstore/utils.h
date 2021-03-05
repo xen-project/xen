@@ -27,6 +27,8 @@ static inline bool strends(const char *a, const char *b)
  */
 const char *dump_state_align(FILE *fp);
 
+#define PRINTF_ATTRIBUTE(a1, a2) __attribute__((format (printf, a1, a2)))
+
 void barf(const char *fmt, ...) __attribute__((noreturn));
 void barf_perror(const char *fmt, ...) __attribute__((noreturn));
 

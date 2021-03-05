@@ -1,6 +1,8 @@
 #ifndef __TDB_H__
 #define __TDB_H__
 
+#include "utils.h"
+
 /* 
    Unix SMB/CIFS implementation.
 
@@ -83,10 +85,6 @@ struct tdb_traverse_lock {
 	uint32_t off;
 	uint32_t hash;
 };
-
-#ifndef PRINTF_ATTRIBUTE
-#define PRINTF_ATTRIBUTE(a,b)
-#endif
 
 /* this is the context structure that is returned from a db open */
 typedef struct tdb_context {

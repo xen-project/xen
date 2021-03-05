@@ -26,6 +26,8 @@
 
 #include <sys/types.h>
 
+#include "utils.h"
+
 /* this is only needed for compatibility with the old talloc */
 typedef void TALLOC_CTX;
 
@@ -83,19 +85,6 @@ typedef void TALLOC_CTX;
 #define talloc_realloc_p(ctx, p, type, count) talloc_realloc(ctx, p, type, count)
 #define talloc_destroy(ctx) talloc_free(ctx)
 #endif
-
-#ifndef PRINTF_ATTRIBUTE
-#if (__GNUC__ >= 3)
-/** Use gcc attribute to check printf fns.  a1 is the 1-based index of
- * the parameter containing the format, and a2 the index of the first
- * argument. Note that some gcc 2.x versions don't handle this
- * properly **/
-#define PRINTF_ATTRIBUTE(a1, a2) __attribute__ ((format (__printf__, a1, a2)))
-#else
-#define PRINTF_ATTRIBUTE(a1, a2)
-#endif
-#endif
-
 
 /* The following definitions come from talloc.c  */
 void *_talloc(const void *context, size_t size);
