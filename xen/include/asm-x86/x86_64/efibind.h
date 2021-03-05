@@ -172,7 +172,7 @@ typedef uint64_t   UINTN;
 #ifndef EFIAPI                  // Forces EFI calling conventions reguardless of compiler options
     #ifdef _MSC_EXTENSIONS
         #define EFIAPI __cdecl  // Force C calling convention for Microsoft C compiler
-    #elif __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
+    #elif __clang__ || __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
         #define EFIAPI __attribute__((__ms_abi__))  // Force Microsoft ABI
     #else
         #define EFIAPI          // Substitute expresion to force C calling convention
