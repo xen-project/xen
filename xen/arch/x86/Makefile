@@ -173,8 +173,13 @@ EFI_LDFLAGS += --major-subsystem-version=2 --minor-subsystem-version=0
 # Check if the compiler supports the MS ABI.
 export XEN_BUILD_EFI := $(shell $(CC) $(filter-out $(CFLAGS-y) .%.d,$(CFLAGS)) -c efi/check.c -o efi/check.o 2>/dev/null && echo y)
 # Check if the linker supports PE.
-XEN_BUILD_PE := $(if $(XEN_BUILD_EFI),$(shell $(LD) -mi386pep --subsystem=10 -S -o efi/check.efi efi/check.o 2>/dev/null && echo y))
+XEN_BUILD_PE := $(if $(XEN_BUILD_EFI),$(shell $(LD) $(call EFI_LDFLAGS,0x100000000) -o efi/check.efi efi/check.o 2>/dev/null && echo y))
 CFLAGS-$(XEN_BUILD_EFI) += -DXEN_BUILD_EFI
+# Check if the linker produces fixups in PE by default (we need to disable it doing so for now).
+XEN_NO_PE_FIXUPS := $(if $(XEN_BUILD_EFI), \
+                         $(shell $(LD) $(call EFI_LDFLAGS,0x100000000) --disable-reloc-section -o efi/check.efi efi/check.o 2>/dev/null && \
+                                 echo --disable-reloc-section))
+EFI_LDFLAGS += $(XEN_NO_PE_FIXUPS)
 
 $(TARGET).efi: VIRT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A VIRT_START$$,,p')
 $(TARGET).efi: ALT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A ALT_START$$,,p')
