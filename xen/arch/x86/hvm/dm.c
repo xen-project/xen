@@ -368,6 +368,7 @@ static int dm_op(const struct dmop_args *op_args)
     if ( rc )
         return rc;
 
+    rc = -EINVAL;
     if ( !is_hvm_domain(d) )
         goto out;
 
