@@ -1327,9 +1327,11 @@ bool scrub_free_pages(void)
                      * Scrub a few (8) pages before becoming eligible for
                      * preemption. But also count non-scrubbing loop iterations
                      * so that we don't get stuck here with an almost clean
-                     * heap.
+                     * heap. Consider the CPU no longer being seen as online as
+                     * a request to preempt immediately, to not unduly delay
+                     * its offlining.
                      */
-                    if ( cnt > 800 && softirq_pending(cpu) )
+                    if ( !cpu_online(cpu) || (cnt > 800 && softirq_pending(cpu)) )
                     {
                         preempt = true;
                         break;
