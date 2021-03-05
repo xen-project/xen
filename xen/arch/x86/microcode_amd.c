@@ -292,7 +292,8 @@ static int get_ucode_from_buffer_amd(
         return -EINVAL;
     }
 
-    if ( (*offset + mpbuf->len) > bufsize )
+    if ( (*offset + mpbuf->len) > bufsize ||
+         mpbuf->len < sizeof(struct microcode_header_amd) )
     {
         printk(KERN_ERR "microcode: Bad data in microcode data file\n");
         return -EINVAL;
