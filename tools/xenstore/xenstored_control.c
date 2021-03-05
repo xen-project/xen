@@ -768,7 +768,7 @@ static struct cmd_s cmds[] = {
 	 */
 	{ "live-update", do_control_lu,
 		"[-c <cmdline>] [-F] [-t <timeout>] <file>\n"
-		"    Default timeout is 60 seconds.", 4 },
+		"    Default timeout is 60 seconds.", 5 },
 #endif
 #ifdef __MINIOS__
 	{ "memreport", do_control_memreport, "" },
