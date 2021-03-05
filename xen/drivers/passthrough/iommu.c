@@ -228,6 +228,13 @@ static void iommu_teardown(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
+    /*
+     * During early domain creation failure, we may reach here with the
+     * ops not yet initialized.
+     */
+    if ( !hd->platform_ops )
+        return;
+
     hd->platform_ops->teardown(d);
     tasklet_schedule(&iommu_pt_cleanup_tasklet);
 }
