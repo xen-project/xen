@@ -42,8 +42,11 @@ provided by your OS distributor:
         - GNU Binutils 2.16.91.0.5 or later
         or
         - Clang/LLVM 3.5 or later
-      - For ARM:
-        - GCC 4.8 or later
+      - For ARM 32-bit:
+        - GCC 4.9 or later
+        - GNU Binutils 2.24 or later
+      - For ARM 64-bit:
+        - GCC 5.1 or later
         - GNU Binutils 2.24 or later
     * Development install of zlib (e.g., zlib-dev)
     * Development install of Python 2.6 or later (e.g., python-dev)
