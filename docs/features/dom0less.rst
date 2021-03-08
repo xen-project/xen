@@ -1,3 +1,4 @@
+========
 Dom0less
 ========
 
@@ -6,8 +7,9 @@ system without an control domain (often referred to as "dom0"). Each
 feature can be used independently from the others, unless otherwise
 stated.
 
+*****************************************
 Booting Multiple Domains from Device Tree
------------------------------------------
+*****************************************
 
 This feature enables Xen to create a set of DomUs at boot time.
 Information about the DomUs to be created by Xen is passed to the
@@ -23,15 +25,17 @@ booted and the Xen tools to become available, domains created by Xen
 this way are started right away in parallel. Hence, their boot time is
 typically much shorter.
 
-
 Configuration
--------------
+~~~~~~~~~~~~~
 
-### Loading binaries into memory ###
+Loading Binaries into Memory
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 U-Boot needs to load not just Xen, the device tree binary, the dom0 kernel and
 ramdisk. It also needs to load the kernel and ramdisk of any additional domains
 to boot. For example if this is the bootcmd for Xen and Dom0:
+
+.. code-block::
 
     tftpb 0x1280000 xen.dtb
     tftpb 0x0x80000 xen-Image
@@ -42,6 +46,8 @@ to boot. For example if this is the bootcmd for Xen and Dom0:
 
 If we want to add one DomU with Image-DomU as the DomU kernel
 and ramdisk-DomU as DomU ramdisk:
+
+.. code-block::
 
     tftpb 0x1280000 xen.dtb
     tftpb 0x80000 xen-Image
@@ -54,11 +60,14 @@ and ramdisk-DomU as DomU ramdisk:
     bootm 0x1400000 0x9000000 0x1280000
 
 
-### Device Tree configuration ###
+Device Tree Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In addition to loading the necessary binaries, we also need to advertise
 the presence of the additional VM and its configuration. It is done via
 device tree adding a node under /chosen as follows:
+
+.. code-block::
 
     domU1 {
         #address-cells = <1>;
@@ -90,7 +99,7 @@ Otherwise, they may be unusable in Xen (for instance if they are compressed).
 See docs/misc/arm/device-tree/booting.txt for more information.
 
 Limitations
------------
+~~~~~~~~~~~
 
 Domains started by Xen at boot time currently have the following
 limitations:
@@ -118,9 +127,9 @@ limitations:
   configured.
 
 Notes
------
+~~~~~
 
-- 'xl console' command will not attach to the domain's console in case
+- `xl console` command will not attach to the domain's console in case
   of dom0less. DomU are domains created by Xen (similar to Dom0) and
   therefore they are all managed by Xen and some of the commands may not work.
 

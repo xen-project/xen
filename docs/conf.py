@@ -20,7 +20,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = u'Xen'
+project = u'The Xen Project'
 copyright = u'2019, The Xen development community'
 author = u'The Xen development community'
 
