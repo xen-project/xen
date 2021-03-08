@@ -2,12 +2,6 @@
 Installation
 ************
 
-=============
-Prerequisites
-=============
-
-
-
 =============================================
 Installing the Xen Project Software on Distro
 =============================================
