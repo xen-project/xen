@@ -82,12 +82,12 @@ struct hvm_save_descriptor {
     struct __HVM_SAVE_TYPE_##_x { _type t; char c[_code]; char cpt[1];}
 #endif
 
-#define HVM_SAVE_TYPE(_x) typeof (((struct __HVM_SAVE_TYPE_##_x *)(0))->t)
+#define HVM_SAVE_TYPE(_x) __typeof__ (((struct __HVM_SAVE_TYPE_##_x *)(0))->t)
 #define HVM_SAVE_LENGTH(_x) (sizeof (HVM_SAVE_TYPE(_x)))
 #define HVM_SAVE_CODE(_x) (sizeof (((struct __HVM_SAVE_TYPE_##_x *)(0))->c))
 
 #ifdef __XEN__
-# define HVM_SAVE_TYPE_COMPAT(_x) typeof (((struct __HVM_SAVE_TYPE_COMPAT_##_x *)(0))->t)
+# define HVM_SAVE_TYPE_COMPAT(_x) __typeof__ (((struct __HVM_SAVE_TYPE_COMPAT_##_x *)(0))->t)
 # define HVM_SAVE_LENGTH_COMPAT(_x) (sizeof (HVM_SAVE_TYPE_COMPAT(_x)))
 
 # define HVM_SAVE_HAS_COMPAT(_x) (sizeof (((struct __HVM_SAVE_TYPE_##_x *)(0))->cpt)-1)

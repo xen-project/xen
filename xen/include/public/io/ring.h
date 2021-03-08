@@ -242,7 +242,7 @@ typedef struct __name##_back_ring __name##_back_ring_t
  */
 #define RING_COPY_REQUEST(_r, _idx, _req) do {				\
 	/* Use volatile to force the copy into _req. */			\
-	*(_req) = *(volatile typeof(_req))RING_GET_REQUEST(_r, _idx);	\
+	*(_req) = *(volatile __typeof__(_req))RING_GET_REQUEST(_r, _idx);	\
 } while (0)
 
 #define RING_GET_RESPONSE(_r, _idx)                                     \

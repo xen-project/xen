@@ -191,7 +191,7 @@
 #define XEN_GUEST_HANDLE_PARAM(name)    __guest_handle_ ## name
 #define set_xen_guest_handle_raw(hnd, val)                  \
     do {                                                    \
-        typeof(&(hnd)) _sxghr_tmp = &(hnd);                 \
+        __typeof__(&(hnd)) _sxghr_tmp = &(hnd);             \
         _sxghr_tmp->q = 0;                                  \
         _sxghr_tmp->p = val;                                \
     } while ( 0 )
