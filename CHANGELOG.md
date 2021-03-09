@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [4.15.0 UNRELEASED](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.15.0) - TBD
 
+## Added / support upgraded
+ - ARM IOREQ servers (device emulation etc.) (Tech Preview)
+ - Renesas IPMMU-VMSA (Supported, not security supported; was Tech Preview)
+ - ARM SMMUv3 (Tech Preview)
+
+## Removed / support downgraded
+
+ - qemu-xen-traditional as host process device model, now "No security
+   support, not recommended".  (Use as stub domain device model is still
+   supported - see SUPPORT.md.)
+
 ## [4.14.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.14.0) - 2020-07-23
 
 ### Added
