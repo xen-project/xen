@@ -84,7 +84,16 @@ Traditional Xen PV guest
 
 No hardware requirements
 
-    Status: Supported
+    Status, x86_64: Supported
+    Status, x86_32, shim: Supported
+    Status, x86_32, without shim: Supported, with caveats
+
+Due to architectural limitations,
+32-bit PV guests must be assumed to be able to read arbitrary host memory
+using speculative execution attacks.
+Advisories will continue to be issued
+for new vulnerabilities related to un-shimmed 32-bit PV guests
+enabling denial-of-service attacks or privilege escalation attacks.
 
 ### x86/HVM
 
