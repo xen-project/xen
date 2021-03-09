@@ -256,7 +256,7 @@ S:	Supported
 F:	xen/drivers/passthrough/arm/smmu-v3.c
 
 Change Log
-M:	Paul Durrant <paul@xen.org>
+M:	Ian Jackson <iwj@xenproject.org>
 R:	Community Manager <community.manager@xenproject.org>
 S:	Maintained
 F:	CHANGELOG.md
