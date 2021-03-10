@@ -56,6 +56,8 @@ t=RELEASE-$r
 * change SUPPORT.md heading version number; -unstable or -rc tag
 *     (empty in stable branches after .0 release).
 * SUPPORT.md: insert correct version number in release-notes link
+* CHANGELOG.md: set section heading to delete UNRELEASED and add date;
+#               in unstable branches set to X.Y.0 and RELEASE-X.YY.0
 * change xen-unstable xen/Makefile XEN_EXTRAVERSION
 # if main version number has changed (eg 4.7 -> 4.8) rerun ./autogen.sh
 * rerun ./autogen.sh to update version number in configure
