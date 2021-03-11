@@ -97,6 +97,8 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
     BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX(9, /* Default emul stub */
                                          5 + IOEMUL_QUIRK_STUB_BYTES));
 
+    block_speculation(); /* SCSB */
+
     /* Handy function-typed pointer to the stub. */
     return (void *)stub_va;
 }
