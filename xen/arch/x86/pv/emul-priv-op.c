@@ -138,6 +138,8 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
     /* Runtime confirmation that we haven't clobbered an adjacent stub. */
     BUG_ON(STUB_BUF_SIZE / 2 < (p - ctxt->io_emul_stub));
 
+    block_speculation(); /* SCSB */
+
     /* Handy function-typed pointer to the stub. */
     return (void *)stub_va;
 
