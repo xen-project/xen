@@ -1008,6 +1008,7 @@ static inline int mkec(uint8_t e, int32_t ec, ...)
 # define invoke_stub(pre, post, constraints...) do {                    \
     stub_exn.info = (union stub_exception_token) { .raw = ~0 };         \
     stub_exn.line = __LINE__; /* Utility outweighs livepatching cost */ \
+    asm volatile ( "lfence" ::: "memory" ); /* SCSB */                  \
     asm volatile ( pre "\n\tINDIRECT_CALL %[stub]\n\t" post "\n"        \
                    ".Lret%=:\n\t"                                       \
                    ".pushsection .fixup,\"ax\"\n"                       \
