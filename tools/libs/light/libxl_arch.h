@@ -85,6 +85,11 @@ int libxl__arch_extra_memory(libxl__gc *gc,
                              const libxl_domain_build_info *info,
                              uint64_t *out);
 
+_hidden
+void libxl__arch_update_domain_config(libxl__gc *gc,
+                                      libxl_domain_config *dst,
+                                      const libxl_domain_config *src);
+
 #if defined(__i386__) || defined(__x86_64__)
 
 #define LAPIC_BASE_ADDRESS  0xfee00000

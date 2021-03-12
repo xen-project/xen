@@ -256,6 +256,7 @@ bool __initdata opt_dom0_shadow;
 #endif
 bool __initdata opt_dom0_pvh = !IS_ENABLED(CONFIG_PV);
 bool __initdata opt_dom0_verbose = IS_ENABLED(CONFIG_VERBOSE_DEBUG);
+bool __initdata opt_dom0_msr_relaxed;
 
 static int __init parse_dom0_param(const char *s)
 {
@@ -282,6 +283,8 @@ static int __init parse_dom0_param(const char *s)
         else if ( IS_ENABLED(CONFIG_PV) &&
                   (val = parse_boolean("cpuid-faulting", s, ss)) >= 0 )
             opt_dom0_cpuid_faulting = val;
+        else if ( (val = parse_boolean("msr-relaxed", s, ss)) >= 0 )
+            opt_dom0_msr_relaxed = val;
         else
             rc = -EINVAL;
 

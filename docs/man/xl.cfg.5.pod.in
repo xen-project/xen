@@ -2861,6 +2861,20 @@ No MCA capabilities in above list are enabled.
 
 =back
 
+=item B<msr_relaxed=BOOLEAN>
+
+The "msr_relaxed" boolean is an interim option, and defaults to false.
+
+In Xen 4.15, the default behaviour for unhandled MSRs has been changed,
+to avoid leaking host data into guests, and to avoid breaking guest
+logic which uses #GP probing to identify the availability of MSRs.
+
+However, this new stricter behaviour has the possibility to break
+guests, and a more 4.14-like behaviour can be selected by setting this
+option.
+
+If using this option is necessary to fix an issue, please report a bug.
+
 =back
 
 =head1 SEE ALSO

@@ -740,7 +740,7 @@ Specify the bit width of the DMA heap.
 
 ### dom0
     = List of [ pv | pvh, shadow=<bool>, verbose=<bool>,
-                cpuid-faulting=<bool> ]
+                cpuid-faulting=<bool>, msr-relaxed=<bool> ]
 
     Applicability: x86
 
@@ -788,6 +788,18 @@ Controls for how dom0 is constructed on x86 systems.
     is a chance that further dependencies exist.  This boolean can be used to
     restore the pre-4.13 behaviour.  If specifying `no-cpuid-faulting` fixes
     an issue in dom0, please report a bug.
+
+*   The `msr-relaxed` boolean is an interim option, and defaults to false.
+
+    In Xen 4.15, the default behaviour for unhandled MSRs has been changed,
+    to avoid leaking host data into guests, and to avoid breaking guest
+    logic which uses \#GP probing to identify the availability of MSRs.
+
+    However, this new stricter behaviour has the possibility to break
+    guests, and a more 4.14-like behaviour can be selected by specifying
+    `dom0=msr-relaxed`.
+
+    If using this option is necessary to fix an issue, please report a bug.
 
 ### dom0-iommu
     = List of [ passthrough=<bool>, strict=<bool>, map-inclusive=<bool>,

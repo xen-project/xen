@@ -2741,6 +2741,13 @@ skip_usbdev:
     xlu_cfg_get_defbool(config, "xend_suspend_evtchn_compat",
                         &c_info->xend_suspend_evtchn_compat, 0);
 
+    if (!xlu_cfg_get_defbool(config, "msr_relaxed",
+                             &b_info->arch_x86.msr_relaxed, 0))
+            fprintf(stderr,
+                    "WARNING: msr_relaxed will be removed in future versions.\n"
+                    "If it fixes an issue you are having please report to "
+                    "xen-devel@lists.xenproject.org.\n");
+
     xlu_cfg_destroy(config);
 }
 

@@ -683,6 +683,13 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         }
     }
 
+    if ( config->arch.misc_flags & ~XEN_X86_MSR_RELAXED )
+    {
+        dprintk(XENLOG_INFO, "Invalid arch misc flags %#x\n",
+                config->arch.misc_flags);
+        return -EINVAL;
+    }
+
     return 0;
 }
 
@@ -851,6 +858,8 @@ int arch_domain_create(struct domain *d,
     d->arch.x87_fip_width = cpu_has_fpu_sel ? 0 : 8;
 
     domain_cpu_policy_changed(d);
+
+    d->arch.msr_relaxed = config->arch.misc_flags & XEN_X86_MSR_RELAXED;
 
     return 0;
 

@@ -2287,6 +2287,13 @@ int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
         unset_disk_colo_restore(d_config);
     }
 
+    /*
+     * When restoring (either from a save file or for a migration domain) set
+     * the MSR relaxed mode for compatibility with older Xen versions if the
+     * option is not set as part of the original configuration.
+     */
+    libxl_defbool_setdefault(&d_config->b_info.arch_x86.msr_relaxed, true);
+
     return do_domain_create(ctx, d_config, domid, restore_fd, send_back_fd,
                             params, ao_how, aop_console_how);
 }

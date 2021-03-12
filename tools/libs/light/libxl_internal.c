@@ -16,6 +16,7 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
+#include "libxl_arch.h"
 
 void libxl__alloc_failed(libxl_ctx *ctx, const char *func,
                          size_t nmemb, size_t size) {
@@ -594,6 +595,8 @@ void libxl__update_domain_configuration(libxl__gc *gc,
 
     /* video ram */
     dst->b_info.video_memkb = src->b_info.video_memkb;
+
+    libxl__arch_update_domain_config(gc, dst, src);
 }
 
 static void ev_slowlock_init_internal(libxl__ev_slowlock *lock,

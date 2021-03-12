@@ -19,6 +19,10 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
         abort();
     }
 
+    config->arch.misc_flags = 0;
+    if (libxl_defbool_val(d_config->b_info.arch_x86.msr_relaxed))
+        config->arch.misc_flags |= XEN_X86_MSR_RELAXED;
+
     return 0;
 }
 
@@ -809,6 +813,7 @@ void libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
                                               libxl_domain_build_info *b_info)
 {
     libxl_defbool_setdefault(&b_info->acpi, true);
+    libxl_defbool_setdefault(&b_info->arch_x86.msr_relaxed, false);
 }
 
 int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
@@ -851,6 +856,21 @@ int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
     return rc;
 }
 
+void libxl__arch_update_domain_config(libxl__gc *gc,
+                                      libxl_domain_config *dst,
+                                      const libxl_domain_config *src)
+{
+    /*
+     * Force MSR relaxed to be set (either to true or false) so it's part of
+     * the domain configuration when saving or performing a live-migration.
+     *
+     * Doing so allows the recovery side to figure out whether the flag should
+     * be set to true in order to keep backwards compatibility with already
+     * started domains.
+     */
+    libxl_defbool_setdefault(&dst->b_info.arch_x86.msr_relaxed,
+                    libxl_defbool_val(src->b_info.arch_x86.msr_relaxed));
+}
 
 /*
  * Local variables:

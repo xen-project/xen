@@ -749,6 +749,9 @@ static struct domain *__init create_dom0(const module_t *image,
         .max_grant_frames = -1,
         .max_maptrack_frames = -1,
         .max_vcpus = dom0_max_vcpus(),
+        .arch = {
+            .misc_flags = opt_dom0_msr_relaxed ? XEN_X86_MSR_RELAXED : 0,
+        },
     };
     struct domain *d;
     char *cmdline;

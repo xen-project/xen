@@ -3123,6 +3123,7 @@ static int is_last_branch_msr(u32 ecx)
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
     struct vcpu *curr = current;
+    uint64_t tmp;
 
     HVM_DBG_LOG(DBG_LEVEL_MSR, "ecx=%#x", msr);
 
@@ -3199,6 +3200,12 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             break;
 
         if ( is_last_branch_msr(msr) )
+        {
+            *msr_content = 0;
+            break;
+        }
+
+        if ( curr->domain->arch.msr_relaxed && !rdmsr_safe(msr, tmp) )
         {
             *msr_content = 0;
             break;
@@ -3503,6 +3510,9 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
         if ( vmx_write_guest_msr(v, msr, msr_content) == 0 ||
              is_last_branch_msr(msr) )
+            break;
+
+        if ( v->domain->arch.msr_relaxed && !rdmsr_safe(msr, msr_content) )
             break;
 
         gdprintk(XENLOG_WARNING,

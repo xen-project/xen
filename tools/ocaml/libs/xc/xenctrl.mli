@@ -42,8 +42,12 @@ type x86_arch_emulation_flags =
   | X86_EMU_USE_PIRQ
   | X86_EMU_VPCI
 
+type x86_arch_misc_flags =
+  | X86_MSR_RELAXED
+
 type xen_x86_arch_domainconfig = {
   emulation_flags: x86_arch_emulation_flags list;
+  misc_flags: x86_arch_misc_flags list;
 }
 
 type arch_domainconfig =

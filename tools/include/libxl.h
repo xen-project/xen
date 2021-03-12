@@ -496,6 +496,13 @@
 #define LIBXL_HAVE_VMTRACE_BUF_KB 1
 
 /*
+ * LIBXL_HAVE_X86_MSR_RELAXED indicates the toolstack has support for switching
+ * the MSR access handling in the hypervisor to relaxed mode. This is done by
+ * setting the libxl_domain_build_info arch_x86.msr_relaxed field.
+ */
+#define LIBXL_HAVE_X86_MSR_RELAXED 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
