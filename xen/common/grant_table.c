@@ -4026,7 +4026,7 @@ int gnttab_acquire_resource(
     struct grant_table *gt = d->grant_table;
     unsigned int i, final_frame;
     mfn_t tmp;
-    void **vaddrs;
+    void **vaddrs = NULL;
     int rc = -EINVAL;
 
     if ( !nr_frames )
@@ -4053,6 +4053,17 @@ int gnttab_acquire_resource(
         vaddrs = (void **)gt->status;
         rc = gnttab_get_status_frame_mfn(d, final_frame, &tmp);
         break;
+    }
+
+    /*
+     * Some older toolchains can't spot that vaddrs won't remain uninitialized
+     * on non-error paths, and hence it needs setting to NULL at the top of the
+     * function.  Leave some runtime safety.
+     */
+    if ( !vaddrs )
+    {
+        ASSERT_UNREACHABLE();
+        rc = -ENODATA;
     }
 
     /* Any errors?  Bad id, or from growing the table? */
