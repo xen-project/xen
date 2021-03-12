@@ -874,7 +874,7 @@ static int read_msr(unsigned int reg, uint64_t *val,
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
     const struct cpuid_policy *cp = currd->arch.cpuid;
-    bool vpmu_msr = false;
+    bool vpmu_msr = false, warn = false;
     uint64_t tmp;
     int ret;
 
@@ -883,7 +883,7 @@ static int read_msr(unsigned int reg, uint64_t *val,
         if ( ret == X86EMUL_EXCEPTION )
             x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
 
-        return ret;
+        goto done;
     }
 
     switch ( reg )
@@ -993,7 +993,7 @@ static int read_msr(unsigned int reg, uint64_t *val,
             return X86EMUL_OKAY;
         }
 
-        gdprintk(XENLOG_WARNING, "RDMSR 0x%08x unimplemented\n", reg);
+        warn = true;
         break;
 
     normal:
@@ -1002,7 +1002,19 @@ static int read_msr(unsigned int reg, uint64_t *val,
         return X86EMUL_OKAY;
     }
 
-    return X86EMUL_UNHANDLEABLE;
+ done:
+    if ( ret != X86EMUL_OKAY && !curr->arch.pv.trap_ctxt[X86_EXC_GP].address &&
+         (reg >> 16) != 0x4000 && !rdmsr_safe(reg, tmp) )
+    {
+        gprintk(XENLOG_WARNING, "faking RDMSR 0x%08x\n", reg);
+        *val = 0;
+        x86_emul_reset_event(ctxt);
+        ret = X86EMUL_OKAY;
+    }
+    else if ( warn )
+        gdprintk(XENLOG_WARNING, "RDMSR 0x%08x unimplemented\n", reg);
+
+    return ret;
 }
 
 static int write_msr(unsigned int reg, uint64_t val,
