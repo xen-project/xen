@@ -434,25 +434,21 @@ alpine-3.12-gcc:
   extends: .gcc-x86-64-build
   variables:
     CONTAINER: alpine:3.12
-  allow_failure: true
 
 alpine-3.12-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
     CONTAINER: alpine:3.12
-  allow_failure: true
 
 alpine-3.12-clang:
   extends: .clang-x86-64-build
   variables:
     CONTAINER: alpine:3.12
-  allow_failure: true
 
 alpine-3.12-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
     CONTAINER: alpine:3.12
-  allow_failure: true
 
 
 # Arm builds
