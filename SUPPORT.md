@@ -177,6 +177,14 @@ Support for running qemu-xen device model in a linux stubdomain.
 
     Status: Tech Preview
 
+## Liveupdate of C xenstored daemon
+
+    Status: Tech Preview
+
+## Liveupdate of OCaml xenstored daemon
+
+    Status: Tech Preview
+
 ## Toolstack/3rd party
 
 ### libvirt driver for xl
