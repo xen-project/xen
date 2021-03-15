@@ -116,8 +116,8 @@ static void __init processor_id(void)
         printk("Huh, cpu architecture %x, expected 0xf (defined by cpuid)\n",
                c->midr.architecture);
 
-    printk("Processor: %08"PRIx32": \"%s\", variant: 0x%x, part 0x%03x, rev 0x%x\n",
-           c->midr.bits, implementer,
+    printk("Processor: %"PRIregister": \"%s\", variant: 0x%x, part 0x%03x,"
+           "rev 0x%x\n", c->midr.bits, implementer,
            c->midr.variant, c->midr.part_number, c->midr.revision);
 
 #if defined(CONFIG_ARM_64)
@@ -163,7 +163,7 @@ static void __init processor_id(void)
     if ( cpu_has_aarch32 )
     {
         printk("32-bit Execution:\n");
-        printk("  Processor Features: %08"PRIx32":%08"PRIx32"\n",
+        printk("  Processor Features: %"PRIregister":%"PRIregister"\n",
                boot_cpu_data.pfr32.bits[0], boot_cpu_data.pfr32.bits[1]);
         printk("    Instruction Sets:%s%s%s%s%s%s\n",
                cpu_has_aarch32 ? " AArch32" : "",
@@ -176,15 +176,16 @@ static void __init processor_id(void)
                cpu_has_gentimer ? " GenericTimer" : "",
                cpu_has_security ? " Security" : "");
 
-        printk("  Debug Features: %08"PRIx32"\n",
+        printk("  Debug Features: %"PRIregister"\n",
                boot_cpu_data.dbg32.bits[0]);
-        printk("  Auxiliary Features: %08"PRIx32"\n",
+        printk("  Auxiliary Features: %"PRIregister"\n",
                boot_cpu_data.aux32.bits[0]);
-        printk("  Memory Model Features: "
-               "%08"PRIx32" %08"PRIx32" %08"PRIx32" %08"PRIx32"\n",
+        printk("  Memory Model Features: %"PRIregister" %"PRIregister"\n"
+               "                         %"PRIregister" %"PRIregister"\n",
                boot_cpu_data.mm32.bits[0], boot_cpu_data.mm32.bits[1],
                boot_cpu_data.mm32.bits[2], boot_cpu_data.mm32.bits[3]);
-        printk(" ISA Features: %08x %08x %08x %08x %08x %08x\n",
+        printk("  ISA Features: %"PRIregister" %"PRIregister" %"PRIregister"\n"
+               "                %"PRIregister" %"PRIregister" %"PRIregister"\n",
                boot_cpu_data.isa32.bits[0], boot_cpu_data.isa32.bits[1],
                boot_cpu_data.isa32.bits[2], boot_cpu_data.isa32.bits[3],
                boot_cpu_data.isa32.bits[4], boot_cpu_data.isa32.bits[5]);

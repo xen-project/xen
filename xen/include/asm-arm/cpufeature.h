@@ -118,13 +118,16 @@ int enable_nonboot_cpu_caps(const struct arm_cpu_capabilities *caps);
  */
 struct cpuinfo_arm {
     union {
-        uint32_t bits;
+        register_t bits;
         struct {
             unsigned long revision:4;
             unsigned long part_number:12;
             unsigned long architecture:4;
             unsigned long variant:4;
             unsigned long implementer:8;
+#ifdef CONFIG_ARM_64
+            unsigned long _res0:32;
+#endif
         };
     } midr;
     union {
@@ -148,7 +151,7 @@ struct cpuinfo_arm {
 #ifdef CONFIG_ARM_64
     /* 64-bit CPUID registers. */
     union {
-        uint64_t bits[2];
+        register_t bits[2];
         struct {
             /* PFR0 */
             unsigned long el0:4;
@@ -179,15 +182,15 @@ struct cpuinfo_arm {
     } pfr64;
 
     struct {
-        uint64_t bits[2];
+        register_t bits[2];
     } dbg64;
 
     struct {
-        uint64_t bits[2];
+        register_t bits[2];
     } aux64;
 
     union {
-        uint64_t bits[3];
+        register_t bits[3];
         struct {
             unsigned long pa_range:4;
             unsigned long asid_bits:4;
@@ -213,7 +216,7 @@ struct cpuinfo_arm {
     } mm64;
 
     union {
-        uint64_t bits[2];
+        register_t bits[2];
         struct {
             /* ISAR0 */
             unsigned long __res0:4;
@@ -263,7 +266,7 @@ struct cpuinfo_arm {
      * when running in 32-bit mode.
      */
     union {
-        uint32_t bits[3];
+        register_t bits[3];
         struct {
             /* PFR0 */
             unsigned long arm:4;
@@ -274,6 +277,9 @@ struct cpuinfo_arm {
             unsigned long amu:4;
             unsigned long dit:4;
             unsigned long ras:4;
+#ifdef CONFIG_ARM_64
+            unsigned long __res0:32;
+#endif
 
             /* PFR1 */
             unsigned long progmodel:4;
@@ -284,29 +290,35 @@ struct cpuinfo_arm {
             unsigned long sec_frac:4;
             unsigned long virt_frac:4;
             unsigned long gic:4;
+#ifdef CONFIG_ARM_64
+            unsigned long __res1:32;
+#endif
 
             /* PFR2 */
             unsigned long csv3:4;
             unsigned long ssbs:4;
             unsigned long ras_frac:4;
             unsigned long __res2:20;
+#ifdef CONFIG_ARM_64
+            unsigned long __res3:32;
+#endif
         };
     } pfr32;
 
     struct {
-        uint32_t bits[2];
+        register_t bits[2];
     } dbg32;
 
     struct {
-        uint32_t bits[1];
+        register_t bits[1];
     } aux32;
 
     struct {
-        uint32_t bits[6];
+        register_t bits[6];
     } mm32;
 
     struct {
-        uint32_t bits[7];
+        register_t bits[7];
     } isa32;
 
     struct {

@@ -321,8 +321,9 @@ void start_secondary(void)
     if ( !opt_hmp_unsafe &&
          current_cpu_data.midr.bits != boot_cpu_data.midr.bits )
     {
-        printk(XENLOG_ERR "CPU%u MIDR (0x%x) does not match boot CPU MIDR (0x%x),\n"
-               "disable cpu (see big.LITTLE.txt under docs/).\n",
+        printk(XENLOG_ERR
+               "CPU%u MIDR (0x%"PRIregister") does not match boot CPU MIDR (0x%"PRIregister"),\n"
+               XENLOG_ERR "disable cpu (see big.LITTLE.txt under docs/).\n",
                smp_processor_id(), current_cpu_data.midr.bits,
                boot_cpu_data.midr.bits);
         stop_cpu();
