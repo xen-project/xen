@@ -19,8 +19,8 @@ xen-foreign:
 	$(MAKE) -C xen-foreign
 
 xen-dir:
-	@rm -rf xen acpi
 	mkdir -p xen/libelf acpi
+	find xen/ acpi/ -type l -exec rm '{}' +
 	ln -s $(XEN_ROOT)/xen/include/public/COPYING xen/
 	ln -s $(XEN_ROOT)/xen/include/public/*.h xen/
 	ln -s $(XEN_ROOT)/xen/include/public/*/ xen/
