@@ -2590,6 +2590,12 @@ int xc_psr_get_domain_data(xc_interface *xch, uint32_t domid,
 int xc_psr_get_hw_info(xc_interface *xch, uint32_t socket,
                        xc_psr_feat_type type, xc_psr_hw_info *hw_info);
 
+typedef struct xc_cpu_policy *xc_cpu_policy_t;
+
+/* Create and free a xc_cpu_policy object. */
+xc_cpu_policy_t xc_cpu_policy_init(void);
+void xc_cpu_policy_destroy(xc_cpu_policy_t policy);
+
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
                           uint32_t *nr_features, uint32_t *featureset);

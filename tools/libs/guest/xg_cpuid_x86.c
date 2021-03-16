@@ -39,6 +39,13 @@ enum {
 #define bitmaskof(idx)      (1u << ((idx) & 31))
 #define featureword_of(idx) ((idx) >> 5)
 
+struct xc_cpu_policy {
+    struct cpuid_policy cpuid;
+    struct msr_policy msr;
+    xen_cpuid_leaf_t leaves[CPUID_MAX_SERIALISED_LEAVES];
+    xen_msr_entry_t entries[MSR_MAX_SERIALISED_ENTRIES];
+};
+
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
 {
     DECLARE_SYSCTL;
@@ -664,4 +671,15 @@ out:
     free(leaves);
 
     return rc;
+}
+
+xc_cpu_policy_t xc_cpu_policy_init(void)
+{
+    return calloc(1, sizeof(struct xc_cpu_policy));
+}
+
+void xc_cpu_policy_destroy(xc_cpu_policy_t policy)
+{
+    if ( policy )
+        free(policy);
 }
