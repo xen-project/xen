@@ -737,3 +737,28 @@ int xc_cpu_policy_get_system(xc_interface *xch, unsigned int policy_idx,
 
     return rc;
 }
+
+int xc_cpu_policy_get_domain(xc_interface *xch, uint32_t domid,
+                             xc_cpu_policy_t policy)
+{
+    unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
+    unsigned int nr_entries = ARRAY_SIZE(policy->entries);
+    int rc;
+
+    rc = xc_get_domain_cpu_policy(xch, domid, &nr_leaves, policy->leaves,
+                                  &nr_entries, policy->entries);
+    if ( rc )
+    {
+        PERROR("Failed to obtain domain %u policy", domid);
+        return rc;
+    }
+
+    rc = deserialize_policy(xch, policy, nr_leaves, nr_entries);
+    if ( rc )
+    {
+        errno = -rc;
+        rc = -1;
+    }
+
+    return rc;
+}
