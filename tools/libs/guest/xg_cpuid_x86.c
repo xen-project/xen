@@ -822,3 +822,23 @@ int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t p,
     errno = 0;
     return 0;
 }
+
+int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t policy,
+                               const xen_cpuid_leaf_t *leaves,
+                               uint32_t nr)
+{
+    unsigned int err_leaf = -1, err_subleaf = -1;
+    int rc = x86_cpuid_copy_from_buffer(&policy->cpuid, leaves, nr,
+                                        &err_leaf, &err_subleaf);
+
+    if ( rc )
+    {
+        if ( err_leaf != -1 )
+            ERROR("Failed to update CPUID (err leaf %#x, subleaf %#x) (%d = %s)",
+                  err_leaf, err_subleaf, -rc, strerror(-rc));
+        errno = -rc;
+        rc = -1;
+    }
+
+    return rc;
+}
