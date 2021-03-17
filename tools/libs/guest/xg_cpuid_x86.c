@@ -762,3 +762,35 @@ int xc_cpu_policy_get_domain(xc_interface *xch, uint32_t domid,
 
     return rc;
 }
+
+int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t p,
+                            xen_cpuid_leaf_t *leaves, uint32_t *nr_leaves,
+                            xen_msr_entry_t *msrs, uint32_t *nr_msrs)
+{
+    int rc;
+
+    if ( leaves )
+    {
+        rc = x86_cpuid_copy_to_buffer(&p->cpuid, leaves, nr_leaves);
+        if ( rc )
+        {
+            ERROR("Failed to serialize CPUID policy");
+            errno = -rc;
+            return -1;
+        }
+    }
+
+    if ( msrs )
+    {
+        rc = x86_msr_copy_to_buffer(&p->msr, msrs, nr_msrs);
+        if ( rc )
+        {
+            ERROR("Failed to serialize MSR policy");
+            errno = -rc;
+            return -1;
+        }
+    }
+
+    errno = 0;
+    return 0;
+}
