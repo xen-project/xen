@@ -842,3 +842,21 @@ int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t policy,
 
     return rc;
 }
+
+int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t policy,
+                              const xen_msr_entry_t *msrs, uint32_t nr)
+{
+    unsigned int err_msr = -1;
+    int rc = x86_msr_copy_from_buffer(&policy->msr, msrs, nr, &err_msr);
+
+    if ( rc )
+    {
+        if ( err_msr != -1 )
+            ERROR("Failed to deserialise MSRS (err index %#x) (%d = %s)",
+                  err_msr, -rc, strerror(-rc));
+        errno = -rc;
+        rc = -1;
+    }
+
+    return rc;
+}
