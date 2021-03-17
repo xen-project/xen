@@ -2596,6 +2596,10 @@ typedef struct xc_cpu_policy *xc_cpu_policy_t;
 xc_cpu_policy_t xc_cpu_policy_init(void);
 void xc_cpu_policy_destroy(xc_cpu_policy_t policy);
 
+/* Retrieve a system policy, or get/set a domains policy. */
+int xc_cpu_policy_get_system(xc_interface *xch, unsigned int policy_idx,
+                             xc_cpu_policy_t policy);
+
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
                           uint32_t *nr_features, uint32_t *featureset);

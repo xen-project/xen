@@ -683,3 +683,57 @@ void xc_cpu_policy_destroy(xc_cpu_policy_t policy)
     if ( policy )
         free(policy);
 }
+
+static int deserialize_policy(xc_interface *xch, xc_cpu_policy_t policy,
+                              unsigned int nr_leaves, unsigned int nr_entries)
+{
+    uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
+    int rc;
+
+    rc = x86_cpuid_copy_from_buffer(&policy->cpuid, policy->leaves,
+                                    nr_leaves, &err_leaf, &err_subleaf);
+    if ( rc )
+    {
+        if ( err_leaf != -1 )
+            ERROR("Failed to deserialise CPUID (err leaf %#x, subleaf %#x) (%d = %s)",
+                  err_leaf, err_subleaf, -rc, strerror(-rc));
+        return rc;
+    }
+
+    rc = x86_msr_copy_from_buffer(&policy->msr, policy->entries,
+                                  nr_entries, &err_msr);
+    if ( rc )
+    {
+        if ( err_msr != -1 )
+            ERROR("Failed to deserialise MSR (err MSR %#x) (%d = %s)",
+                  err_msr, -rc, strerror(-rc));
+        return rc;
+    }
+
+    return 0;
+}
+
+int xc_cpu_policy_get_system(xc_interface *xch, unsigned int policy_idx,
+                             xc_cpu_policy_t policy)
+{
+    unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
+    unsigned int nr_entries = ARRAY_SIZE(policy->entries);
+    int rc;
+
+    rc = xc_get_system_cpu_policy(xch, policy_idx, &nr_leaves, policy->leaves,
+                                  &nr_entries, policy->entries);
+    if ( rc )
+    {
+        PERROR("Failed to obtain %u policy", policy_idx);
+        return rc;
+    }
+
+    rc = deserialize_policy(xch, policy, nr_leaves, nr_entries);
+    if ( rc )
+    {
+        errno = -rc;
+        rc = -1;
+    }
+
+    return rc;
+}
