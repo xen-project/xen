@@ -2601,6 +2601,8 @@ int xc_cpu_policy_get_system(xc_interface *xch, unsigned int policy_idx,
                              xc_cpu_policy_t policy);
 int xc_cpu_policy_get_domain(xc_interface *xch, uint32_t domid,
                              xc_cpu_policy_t policy);
+int xc_cpu_policy_set_domain(xc_interface *xch, uint32_t domid,
+                             const xc_cpu_policy_t policy);
 
 /* Manipulate a policy via architectural representations. */
 int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t policy,

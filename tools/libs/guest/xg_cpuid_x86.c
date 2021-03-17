@@ -762,6 +762,35 @@ int xc_cpu_policy_get_domain(xc_interface *xch, uint32_t domid,
     return rc;
 }
 
+int xc_cpu_policy_set_domain(xc_interface *xch, uint32_t domid,
+                             const xc_cpu_policy_t policy)
+{
+    uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
+    unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
+    unsigned int nr_entries = ARRAY_SIZE(policy->entries);
+    int rc;
+
+    rc = xc_cpu_policy_serialise(xch, policy, policy->leaves, &nr_leaves,
+                                 policy->entries, &nr_entries);
+    if ( rc )
+        return rc;
+
+    rc = xc_set_domain_cpu_policy(xch, domid, nr_leaves, policy->leaves,
+                                  nr_entries, policy->entries,
+                                  &err_leaf, &err_subleaf, &err_msr);
+    if ( rc )
+    {
+        ERROR("Failed to set domain %u policy (%d = %s)", domid, -rc,
+              strerror(-rc));
+        if ( err_leaf != -1 )
+            ERROR("CPUID leaf %u subleaf %u", err_leaf, err_subleaf);
+        if ( err_msr != -1 )
+            ERROR("MSR index %#x\n", err_msr);
+    }
+
+    return rc;
+}
+
 int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t p,
                             xen_cpuid_leaf_t *leaves, uint32_t *nr_leaves,
                             xen_msr_entry_t *msrs, uint32_t *nr_msrs)
