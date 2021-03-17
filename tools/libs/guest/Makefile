@@ -40,7 +40,7 @@ $(patsubst %.c,%.opic,$(ELF_SRCS-y)): CFLAGS += -Wno-pointer-sign
 ifeq ($(CONFIG_X86),y) # Add libx86 to the build
 vpath %.c ../../../xen/lib/x86
 
-SRCS-y                 += cpuid.c msr.c
+SRCS-y                 += cpuid.c msr.c policy.c
 endif
 
 # new domain builder

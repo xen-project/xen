@@ -2614,6 +2614,10 @@ int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t policy,
 int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t policy,
                               const xen_msr_entry_t *msrs, uint32_t nr);
 
+/* Compatibility calculations. */
+bool xc_cpu_policy_is_compatible(xc_interface *xch, const xc_cpu_policy_t host,
+                                 const xc_cpu_policy_t guest);
+
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
                           uint32_t *nr_features, uint32_t *featureset);

@@ -860,3 +860,22 @@ int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t policy,
 
     return rc;
 }
+
+bool xc_cpu_policy_is_compatible(xc_interface *xch, const xc_cpu_policy_t host,
+                                 const xc_cpu_policy_t guest)
+{
+    struct cpu_policy_errors err = INIT_CPU_POLICY_ERRORS;
+    struct cpu_policy h = { &host->cpuid, &host->msr };
+    struct cpu_policy g = { &guest->cpuid, &guest->msr };
+    int rc = x86_cpu_policies_are_compatible(&h, &g, &err);
+
+    if ( !rc )
+        return true;
+
+    if ( err.leaf != -1 )
+        ERROR("Leaf %#x subleaf %#x is not compatible", err.leaf, err.subleaf);
+    if ( err.msr != -1 )
+        ERROR("MSR index %#x is not compatible", err.msr);
+
+    return false;
+}
