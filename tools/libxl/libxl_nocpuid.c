@@ -34,9 +34,10 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
     return 0;
 }
 
-void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
-                         libxl_domain_build_info *info)
+int libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
+                        libxl_domain_build_info *info)
 {
+    return 0;
 }
 
 yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,

@@ -1403,6 +1403,7 @@ typedef struct {
     /* Whether this domain is being migrated/restored, or booting fresh.  Only
      * applicable to the primary domain, not support domains (e.g. stub QEMU). */
     bool restore;
+    bool soft_reset;
 } libxl__domain_build_state;
 
 _hidden void libxl__domain_build_state_init(libxl__domain_build_state *s);
@@ -2056,8 +2057,8 @@ typedef yajl_gen_status (*libxl__gen_json_callback)(yajl_gen hand, void *);
 _hidden char *libxl__object_to_json(libxl_ctx *ctx, const char *type,
                                     libxl__gen_json_callback gen, void *p);
 
-_hidden void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool retore,
-                                 libxl_domain_build_info *info);
+_hidden int libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool retore,
+                                libxl_domain_build_info *info);
 
 /* Calls poll() again - useful to check whether a signaled condition
  * is still true.  Cannot fail.  Returns currently-true revents. */

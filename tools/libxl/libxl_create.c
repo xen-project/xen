@@ -1438,6 +1438,7 @@ int libxl__srm_callout_callback_static_data_done(unsigned int missing,
 
     libxl_domain_config *d_config = dcs->guest_config;
     libxl_domain_build_info *info = &d_config->b_info;
+    int rc = 0;
 
     /*
      * CPUID/MSR information is not present in pre Xen-4.14 streams.
@@ -1447,9 +1448,9 @@ int libxl__srm_callout_callback_static_data_done(unsigned int missing,
      * stream doesn't contain any CPUID data.
      */
     if (missing & XGR_SDD_MISSING_CPUID)
-        libxl__cpuid_legacy(ctx, dcs->guest_domid, true, info);
+        rc = libxl__cpuid_legacy(ctx, dcs->guest_domid, true, info);
 
-    return 0;
+    return rc;
 }
 
 void libxl__srm_callout_callback_restore_results(xen_pfn_t store_mfn,
@@ -2140,6 +2141,8 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     libxl__ao_progress_gethow(&srs->cdcs.dcs.aop_console_how,
                               aop_console_how);
     cdcs->domid_out = &domid_out;
+
+    state->soft_reset = true;
 
     dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) {
