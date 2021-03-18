@@ -435,11 +435,13 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
     return 0;
 }
 
-void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
-                         libxl_domain_build_info *info)
+int libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
+                        libxl_domain_build_info *info)
 {
+    GC_INIT(ctx);
     bool pae = true;
     bool itsc;
+    int r;
 
     /*
      * Gross hack.  Using libxl_defbool_val() here causes libvirt to crash in
@@ -478,8 +480,13 @@ void libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
     itsc = (libxl_defbool_val(info->disable_migrate) ||
             info->tsc_mode == LIBXL_TSC_MODE_ALWAYS_EMULATE);
 
-    xc_cpuid_apply_policy(ctx->xch, domid, restore, NULL, 0,
-                          pae, itsc, nested_virt, info->cpuid);
+    r = xc_cpuid_apply_policy(ctx->xch, domid, restore, NULL, 0,
+                              pae, itsc, nested_virt, info->cpuid);
+    if (r)
+        LOGEVD(ERROR, -r, domid, "Failed to apply CPUID policy");
+
+    GC_FREE;
+    return r ? ERROR_FAIL : 0;
 }
 
 static const char *input_names[2] = { "leaf", "subleaf" };
