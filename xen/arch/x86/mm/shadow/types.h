@@ -290,24 +290,41 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn);
  * pagetables.
  *
  * This is only feasible for PAE and 64bit Xen: 32-bit non-PAE PTEs don't
- * have reserved bits that we can use for this.
+ * have reserved bits that we can use for this.  And even there it can only
+ * be used if we can be certain the processor doesn't use all 52 address bits.
  */
 
 #define SH_L1E_MAGIC 0xffffffff00000001ULL
+
+static inline bool sh_have_pte_rsvd_bits(void)
+{
+    return paddr_bits < PADDR_BITS && !cpu_has_hypervisor;
+}
+
 static inline bool sh_l1e_is_magic(shadow_l1e_t sl1e)
 {
     return (sl1e.l1 & SH_L1E_MAGIC) == SH_L1E_MAGIC;
 }
 
 /* Guest not present: a single magic value */
-static inline shadow_l1e_t sh_l1e_gnp(void)
+static inline shadow_l1e_t sh_l1e_gnp_raw(void)
 {
     return (shadow_l1e_t){ -1ULL };
 }
 
+static inline shadow_l1e_t sh_l1e_gnp(void)
+{
+    /*
+     * On systems with no reserved physical address bits we can't engage the
+     * fast fault path.
+     */
+    return sh_have_pte_rsvd_bits() ? sh_l1e_gnp_raw()
+                                   : shadow_l1e_empty();
+}
+
 static inline bool sh_l1e_is_gnp(shadow_l1e_t sl1e)
 {
-    return sl1e.l1 == sh_l1e_gnp().l1;
+    return sl1e.l1 == sh_l1e_gnp_raw().l1;
 }
 
 /*
@@ -322,9 +339,14 @@ static inline bool sh_l1e_is_gnp(shadow_l1e_t sl1e)
 
 static inline shadow_l1e_t sh_l1e_mmio(gfn_t gfn, u32 gflags)
 {
-    return (shadow_l1e_t) { (SH_L1E_MMIO_MAGIC
-                             | MASK_INSR(gfn_x(gfn), SH_L1E_MMIO_GFN_MASK)
-                             | (gflags & (_PAGE_USER|_PAGE_RW))) };
+    unsigned long gfn_val = MASK_INSR(gfn_x(gfn), SH_L1E_MMIO_GFN_MASK);
+
+    if ( !sh_have_pte_rsvd_bits() ||
+         gfn_x(gfn) != MASK_EXTR(gfn_val, SH_L1E_MMIO_GFN_MASK) )
+        return shadow_l1e_empty();
+
+    return (shadow_l1e_t) { (SH_L1E_MMIO_MAGIC | gfn_val |
+                             (gflags & (_PAGE_USER | _PAGE_RW))) };
 }
 
 static inline bool sh_l1e_is_mmio(shadow_l1e_t sl1e)
