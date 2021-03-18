@@ -368,15 +368,10 @@ static inline void free_cpumask_var(cpumask_var_t mask)
 #define FREE_CPUMASK_VAR(m) free_cpumask_var(m)
 #endif
 
-#if NR_CPUS > 1
 #define for_each_cpu(cpu, mask)			\
 	for ((cpu) = cpumask_first(mask);	\
 	     (cpu) < nr_cpu_ids;		\
 	     (cpu) = cpumask_next(cpu, mask))
-#else /* NR_CPUS == 1 */
-#define for_each_cpu(cpu, mask)			\
-	for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)(mask))
-#endif /* NR_CPUS */
 
 /*
  * The following particular system cpumasks and operations manage
