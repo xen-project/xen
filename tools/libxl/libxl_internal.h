@@ -3569,6 +3569,8 @@ struct libxl__domain_suspend_state {
 int libxl__domain_suspend_init(libxl__egc *egc,
                                libxl__domain_suspend_state *dsps,
                                libxl_domain_type type);
+void libxl__domain_suspend_dispose(libxl__gc *gc,
+                                   libxl__domain_suspend_state  *dsps);
 
 /* calls dsps->callback_device_model_done when done
  * may synchronously calls this callback */

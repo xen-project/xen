@@ -1974,9 +1974,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     state->console_tty = libxl__strdup(gc, console_tty);
 
     dss->ao = ao;
-    dss->domid = dss->dsps.domid = domid_soft_reset;
-    dss->dsps.dm_savefile = GCSPRINTF(LIBXL_DEVICE_MODEL_SAVE_FILE".%d",
-                                      domid_soft_reset);
+    dss->domid = domid_soft_reset;
 
     rc = libxl__save_emulator_xenstore_data(dss, &srs->toolstack_buf,
                                             &srs->toolstack_len);
@@ -1986,6 +1984,11 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     }
 
     dss->dsps.ao = ao;
+    dss->dsps.domid = domid_soft_reset;
+    dss->dsps.live = false;
+    rc = libxl__domain_suspend_init(egc, &dss->dsps, d_config->b_info.type);
+    if (rc)
+        goto out;
     dss->dsps.callback_device_model_done = soft_reset_dm_suspended;
     libxl__domain_suspend_device_model(egc, &dss->dsps); /* must be last */
 
@@ -2003,6 +2006,8 @@ static void soft_reset_dm_suspended(libxl__egc *egc,
     libxl__domain_soft_reset_state *srs =
         CONTAINER_OF(dsps, *srs, dss.dsps);
     libxl__app_domain_create_state *cdcs = &srs->cdcs;
+
+    libxl__domain_suspend_dispose(gc, dsps);
 
     /*
      * Ask all backends to disconnect by removing the domain from
