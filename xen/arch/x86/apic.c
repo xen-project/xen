@@ -46,7 +46,7 @@ static bool __read_mostly tdt_enabled;
 static bool __initdata tdt_enable = true;
 boolean_param("tdt", tdt_enable);
 
-static bool __read_mostly iommu_x2apic_enabled;
+bool __read_mostly iommu_x2apic_enabled;
 
 static struct {
     int active;

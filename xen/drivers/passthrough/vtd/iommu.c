@@ -2121,7 +2121,7 @@ static int __must_check init_vtd_hw(void)
     u32 sts;
 
     /*
-     * Basic VT-d HW init: set VT-d interrupt, clear VT-d faults.  
+     * Basic VT-d HW init: set VT-d interrupt, clear VT-d faults, etc.
      */
     for_each_drhd_unit ( drhd )
     {
@@ -2130,6 +2130,16 @@ static int __must_check init_vtd_hw(void)
         iommu = drhd->iommu;
 
         clear_fault_bits(iommu);
+
+        /*
+         * Disable interrupt remapping and queued invalidation if
+         * already enabled by BIOS in case we've not initialized it yet.
+         */
+        if ( !iommu_x2apic_enabled )
+        {
+            disable_intremap(iommu);
+            disable_qinval(iommu);
+        }
 
         spin_lock_irqsave(&iommu->register_lock, flags);
         sts = dmar_readl(iommu->reg, DMAR_FECTL_REG);

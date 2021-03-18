@@ -24,6 +24,7 @@ enum apic_mode {
     APIC_MODE_X2APIC    /* x2APIC mode - common for large MP machines */
 };
 
+extern bool iommu_x2apic_enabled;
 extern u8 apic_verbosity;
 extern bool directed_eoi_enabled;
 
