@@ -384,7 +384,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
      * being migrated-in/restored have CPUID handled during the
      * static_data_done() callback. */
     if (!state->restore)
-        libxl__cpuid_legacy(ctx, domid, false, info);
+        rc = libxl__cpuid_legacy(ctx, domid, false, info);
 
     return rc;
 }
