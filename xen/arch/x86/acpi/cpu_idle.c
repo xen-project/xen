@@ -1405,6 +1405,7 @@ static void amd_cpuidle_init(struct acpi_processor_power *power)
 
     switch ( c->x86 )
     {
+    case 0x19:
     case 0x18:
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_HYGON )
         {

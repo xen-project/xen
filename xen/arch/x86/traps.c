@@ -1927,7 +1927,7 @@ static unsigned int calc_ler_msr(void)
         switch ( boot_cpu_data.x86 )
         {
         case 6:
-        case 0xf ... 0x17:
+        case 0xf ... 0x19:
             return MSR_IA32_LASTINTFROMIP;
         }
         break;

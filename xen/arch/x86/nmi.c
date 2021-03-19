@@ -398,7 +398,7 @@ void setup_apic_nmi_watchdog(void)
     case X86_VENDOR_AMD:
         switch (boot_cpu_data.x86) {
         case 6:
-        case 0xf ... 0x17:
+        case 0xf ... 0x19:
             setup_k7_watchdog();
             break;
         default:
