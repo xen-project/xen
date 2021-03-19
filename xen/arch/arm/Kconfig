@@ -188,6 +188,25 @@ config ARM64_ERRATUM_819472
 
 	  If unsure, say Y.
 
+config ARM64_ERRATUM_843419
+	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+	default y
+	depends on ARM_64
+	help
+	  This option adds an alternative code sequence to work around ARM
+	  erratum 843419 on Cortex-A53 parts up to r0p4.
+
+	  When executing in AArch64 state, a load or store instruction which uses
+	  the result of an ADRP instruction as a base register, or which uses a
+	  base register written by an instruction immediately after an ADRP to the
+	  same register, might access an incorrect address.
+
+	  The workaround enables the linker to check if the affected sequence is
+	  produced and it will fix it with an alternative not affected sequence
+	  that produce the same behavior.
+
+	  If unsure, say Y.
+
 config ARM64_ERRATUM_832075
 	bool "Cortex-A57: 832075: possible deadlock on mixing exclusive memory accesses with device loads"
 	default y

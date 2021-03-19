@@ -102,6 +102,14 @@ prelink.o: $(ALL_OBJS)
 	$(LD) $(LDFLAGS) -r -o $@ $^
 endif
 
+ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
+    ifeq ($(call ld-option, --fix-cortex-a53-843419),n)
+        $(warning ld does not support --fix-cortex-a53-843419; xen may be susceptible to erratum)
+    else
+        LDFLAGS += --fix-cortex-a53-843419
+    endif
+endif
+
 $(TARGET)-syms: prelink.o xen.lds
 	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
 	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0

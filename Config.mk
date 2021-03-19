@@ -130,6 +130,18 @@ define cc-ver-check-closure
     endif
 endef
 
+# $(if-success,<command>,<then>,<else>)
+# Return <then> if <command> exits with 0, <else> otherwise.
+if-success = $(shell { $(1); } >/dev/null 2>&1 && echo "$(2)" || echo "$(3)")
+
+# $(success,<command>)
+# Return y if <command> exits with 0, n otherwise
+success = $(call if-success,$(1),y,n)
+
+# $(ld-option,<flag>)
+# Return y if the linker supports <flag>, n otherwise
+ld-option = $(call success,$(LD) -v $(1))
+
 # cc-ifversion: Check compiler version and take branch accordingly
 # Usage $(call cc-ifversion,lt,0x040700,string_if_y,string_if_n)
 cc-ifversion = $(shell [ $(call cc-ver,$(CC),$(1),$(2)) = "y" ] \
