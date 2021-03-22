@@ -50,7 +50,7 @@ int write_x86_cpu_policy_records(struct xc_sr_context *ctx)
     uint32_t nr_leaves = 0, nr_msrs = 0;
     int rc;
 
-    if ( xc_get_cpu_policy_size(xch, &nr_leaves, &nr_msrs) < 0 )
+    if ( xc_cpu_policy_get_size(xch, &nr_leaves, &nr_msrs) < 0 )
     {
         PERROR("Unable to get CPU Policy size");
         return -1;

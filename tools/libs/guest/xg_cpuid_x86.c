@@ -109,7 +109,7 @@ const uint32_t *xc_get_static_cpu_featuremask(
     return masks[mask];
 }
 
-int xc_get_cpu_policy_size(xc_interface *xch, uint32_t *nr_leaves,
+int xc_cpu_policy_get_size(xc_interface *xch, uint32_t *nr_leaves,
                            uint32_t *nr_msrs)
 {
     struct xen_sysctl sysctl = {};
@@ -302,7 +302,7 @@ static int xc_cpuid_xend_policy(
         goto fail;
     }
 
-    rc = xc_get_cpu_policy_size(xch, &nr_leaves, &nr_msrs);
+    rc = xc_cpu_policy_get_size(xch, &nr_leaves, &nr_msrs);
     if ( rc )
     {
         PERROR("Failed to obtain policy info size");
@@ -448,7 +448,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         goto out;
     }
 
-    rc = xc_get_cpu_policy_size(xch, &nr_leaves, &nr_msrs);
+    rc = xc_cpu_policy_get_size(xch, &nr_leaves, &nr_msrs);
     if ( rc )
     {
         PERROR("Failed to obtain policy info size");

@@ -472,7 +472,7 @@ int main(int argc, char **argv)
         if ( !xch )
             err(1, "xc_interface_open");
 
-        if ( xc_get_cpu_policy_size(xch, &max_leaves, &max_msrs) )
+        if ( xc_cpu_policy_get_size(xch, &max_leaves, &max_msrs) )
             err(1, "xc_get_cpu_policy_size(...)");
         if ( domid == -1 )
             printf("Xen reports there are maximum %u leaves and %u MSRs\n",
