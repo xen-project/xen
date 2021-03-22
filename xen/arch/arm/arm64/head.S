@@ -296,9 +296,9 @@ real_start_efi:
         sub   x20, x19, x0           /* x20 := phys-offset */
 
         /* Using the DTB in the .dtb section? */
-#ifdef CONFIG_DTB_FILE
+.ifnes CONFIG_DTB_FILE,""
         load_paddr x21, _sdtb
-#endif
+.endif
 
         /* Initialize the UART if earlyprintk has been enabled. */
 #ifdef CONFIG_EARLY_PRINTK
