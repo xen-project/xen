@@ -48,6 +48,7 @@ int write_x86_cpu_policy_records(struct xc_sr_context *ctx)
     struct xc_sr_record cpuid = { .type = REC_TYPE_X86_CPUID_POLICY, };
     struct xc_sr_record msrs  = { .type = REC_TYPE_X86_MSR_POLICY, };
     uint32_t nr_leaves = 0, nr_msrs = 0;
+    xc_cpu_policy_t policy = NULL;
     int rc;
 
     if ( xc_cpu_policy_get_size(xch, &nr_leaves, &nr_msrs) < 0 )
@@ -58,17 +59,24 @@ int write_x86_cpu_policy_records(struct xc_sr_context *ctx)
 
     cpuid.data = malloc(nr_leaves * sizeof(xen_cpuid_leaf_t));
     msrs.data  = malloc(nr_msrs   * sizeof(xen_msr_entry_t));
-    if ( !cpuid.data || !msrs.data )
+    policy = xc_cpu_policy_init();
+    if ( !cpuid.data || !msrs.data || !policy )
     {
         ERROR("Cannot allocate memory for CPU Policy");
         rc = -1;
         goto out;
     }
 
-    if ( xc_get_domain_cpu_policy(xch, ctx->domid, &nr_leaves, cpuid.data,
-                                  &nr_msrs, msrs.data) )
+    if ( xc_cpu_policy_get_domain(xch, ctx->domid, policy) )
     {
         PERROR("Unable to get d%d CPU Policy", ctx->domid);
+        rc = -1;
+        goto out;
+    }
+    if ( xc_cpu_policy_serialise(xch, policy, cpuid.data, &nr_leaves,
+                                 msrs.data, &nr_msrs) )
+    {
+        PERROR("Unable to serialize d%d CPU Policy", ctx->domid);
         rc = -1;
         goto out;
     }
@@ -94,6 +102,7 @@ int write_x86_cpu_policy_records(struct xc_sr_context *ctx)
  out:
     free(cpuid.data);
     free(msrs.data);
+    xc_cpu_policy_destroy(policy);
 
     return rc;
 }

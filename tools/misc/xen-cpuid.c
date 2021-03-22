@@ -468,9 +468,12 @@ int main(int argc, char **argv)
         uint32_t i, max_leaves, max_msrs;
 
         xc_interface *xch = xc_interface_open(0, 0, 0);
+        xc_cpu_policy_t policy = xc_cpu_policy_init();
 
         if ( !xch )
             err(1, "xc_interface_open");
+        if ( !policy )
+            err(1, "xc_cpu_policy_init");
 
         if ( xc_cpu_policy_get_size(xch, &max_leaves, &max_msrs) )
             err(1, "xc_get_cpu_policy_size(...)");
@@ -491,10 +494,11 @@ int main(int argc, char **argv)
             uint32_t nr_leaves = max_leaves;
             uint32_t nr_msrs = max_msrs;
 
-            if ( xc_get_domain_cpu_policy(xch, domid, &nr_leaves, leaves,
-                                          &nr_msrs, msrs) )
-                err(1, "xc_get_domain_cpu_policy(, %d, %d,, %d,)",
-                    domid, nr_leaves, nr_msrs);
+            if ( xc_cpu_policy_get_domain(xch, domid, policy) )
+                err(1, "xc_cpu_policy_get_domain(, %d, )", domid);
+            if ( xc_cpu_policy_serialise(xch, policy, leaves, &nr_leaves,
+                                         msrs, &nr_msrs) )
+                err(1, "xc_cpu_policy_serialise");
 
             snprintf(name, sizeof(name), "Domain %d", domid);
             print_policy(name, leaves, nr_leaves, msrs, nr_msrs);
@@ -507,8 +511,7 @@ int main(int argc, char **argv)
                 uint32_t nr_leaves = max_leaves;
                 uint32_t nr_msrs = max_msrs;
 
-                if ( xc_get_system_cpu_policy(xch, i, &nr_leaves, leaves,
-                                              &nr_msrs, msrs) )
+                if ( xc_cpu_policy_get_system(xch, i, policy) )
                 {
                     if ( errno == EOPNOTSUPP )
                     {
@@ -517,14 +520,18 @@ int main(int argc, char **argv)
                         continue;
                     }
 
-                    err(1, "xc_get_system_cpu_policy(, %s,,)", sys_policies[i]);
+                    err(1, "xc_cpu_policy_get_system(, %s, )", sys_policies[i]);
                 }
+                if ( xc_cpu_policy_serialise(xch, policy, leaves, &nr_leaves,
+                                             msrs, &nr_msrs) )
+                    err(1, "xc_cpu_policy_serialise");
 
                 print_policy(sys_policies[i], leaves, nr_leaves,
                              msrs, nr_msrs);
             }
         }
 
+        xc_cpu_policy_destroy(policy);
         free(leaves);
         free(msrs);
         xc_interface_close(xch);
