@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Switched MSR accesses to deny by default policy.
  - Intel Processor Trace support (Tech Preview)
  - Named PCI devices for xl/libxl
+ - Support for zstd-compressed dom0 (x86) and domU kernels
 
 ### Removed / support downgraded
 
