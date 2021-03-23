@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Renesas IPMMU-VMSA (Supported, not security supported; was Tech Preview)
  - ARM SMMUv3 (Tech Preview)
  - Switched MSR accesses to deny by default policy.
+ - Intel Processor Trace support (Tech Preview)
 
 ### Removed / support downgraded
 
