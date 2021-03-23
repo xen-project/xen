@@ -247,6 +247,13 @@ Export hypervisor coverage data suitable for analysis by gcov or lcov.
 
     Status: Supported, Not security supported
 
+### Processor trace support
+
+Support for using Intel Processor Trace technology to trace guests
+from dom0.
+
+    Status, x86: Tech Preview
+
 ## Memory Management
 
 ### Dynamic memory control
