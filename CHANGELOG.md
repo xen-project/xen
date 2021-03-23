@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Intel Processor Trace support (Tech Preview)
  - Named PCI devices for xl/libxl
  - Support for zstd-compressed dom0 (x86) and domU kernels
+ - Library improvements from NetBSD ports upstreamed
 
 ### Removed / support downgraded
 
