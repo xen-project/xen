@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - CI loop: Add qemu-based dom0 / domU test for ARM
  - CI loop: Add dom0less aarch64 smoke test
  - x86: Allow domains to use AVX-VNNI instructions
+ - Factored out HVM-specific shadow code, improving code clarity and reducing the size of PV-only hypervisor builds
 
 ### Removed / support downgraded
 
