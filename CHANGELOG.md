@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Named PCI devices for xl/libxl
  - Support for zstd-compressed dom0 (x86) and domU kernels
  - Library improvements from NetBSD ports upstreamed
+ - CI loop: Add Alpine Linux, Ubuntu Focal targets; drop CentOS 6
+ - CI loop: Add qemu-based dom0 / domU test for ARM
+ - CI loop: Add dom0less aarch64 smoke test
 
 ### Removed / support downgraded
 
