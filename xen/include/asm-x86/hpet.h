@@ -73,6 +73,12 @@ void hpet_disable(void);
 int hpet_legacy_irq_tick(void);
 
 /*
+ * Try to enable HPET Legacy Replacement mode.  Returns a boolean indicating
+ * whether the HPET configuration was changed.
+ */
+bool hpet_enable_legacy_replacement_mode(void);
+
+/*
  * Temporarily use an HPET event counter for timer interrupt handling,
  * rather than using the LAPIC timer. Used for Cx state entry.
  */
