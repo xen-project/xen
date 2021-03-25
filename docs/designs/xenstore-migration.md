@@ -216,8 +216,10 @@ For `shared ring` connections it is as follows:
 |           | by xenstored to communicate with `domid`          |
 |           |                                                   |
 
-Since the ABI guarantees that entry 1 in `domid`'s grant table will always
-contain the GFN of the shared page.
+The GFN of the shared page is not preserved because the ABI reserves
+entry 1 in `domid`'s grant table to point to the xenstore shared page.
+Note there is no guarantee the page will still be valid at the time of
+the restore because a domain can revoke the permission.
 
 For `socket` connections it is as follows:
 
@@ -398,7 +400,7 @@ A node permission specifier has the following format:
 |         |                                                     |
 | `domid` | The domain-id to which the permission relates       |
 
-Note that perm1 defines the domain owning the code. See [4] for more
+Note that perm1 defines the domain owning the node. See [4] for more
 explanation of node permissions.
 
 * * *
