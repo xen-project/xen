@@ -685,7 +685,6 @@ INSTALL_PROGRAM
 SET_MAKE
 AWK
 IASL
-XGETTEXT
 BASH
 FLEX
 BISON
@@ -844,7 +843,6 @@ PERL
 BISON
 FLEX
 BASH
-XGETTEXT
 AS86
 LD86
 BCC
@@ -1590,7 +1588,6 @@ Some influential environment variables:
   BISON       Path to Bison parser generator
   FLEX        Path to Flex lexical analyser generator
   BASH        Path to bash shell
-  XGETTEXT    Path to xgetttext tool
   AS86        Path to as86 tool
   LD86        Path to ld86 tool
   BCC         Path to bcc tool
@@ -4718,7 +4715,6 @@ LDFLAGS="$PREPEND_LDFLAGS $LDFLAGS $APPEND_LDFLAGS"
 
 
 
-
 # Checks for programs.
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -7826,51 +7822,6 @@ fi
 
 if ! $rump; then
 
-# Extract the first word of "xgettext", so it can be a program name with args.
-set dummy xgettext; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_XGETTEXT+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $XGETTEXT in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_XGETTEXT="$XGETTEXT" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_XGETTEXT="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_XGETTEXT" && ac_cv_path_XGETTEXT="no"
-  ;;
-esac
-fi
-XGETTEXT=$ac_cv_path_XGETTEXT
-if test -n "$XGETTEXT"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $XGETTEXT" >&5
-$as_echo "$XGETTEXT" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-if test x"${XGETTEXT}" = x"no"
-then
-    as_fn_error $? "Unable to find xgettext, please install xgettext" "$LINENO" 5
-fi
 case "$host_cpu" in
 i[3456]86|x86_64|aarch64)
     # Extract the first word of "iasl", so it can be a program name with args.

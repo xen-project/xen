@@ -60,7 +60,6 @@ provided by your OS distributor:
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
     * GNU bison and GNU flex
-    * GNU gettext
     * ACPI ASL compiler (iasl)
     * Libc multiarch package (e.g. libc6-dev-i386 / glibc-devel.i686).
       Required when building on a 64-bit platform to build
