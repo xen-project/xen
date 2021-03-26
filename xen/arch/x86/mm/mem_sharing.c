@@ -1761,6 +1761,7 @@ static int copy_settings(struct domain *cd, struct domain *d)
         return rc;
 
     copy_tsc(cd, d);
+    p2m_get_hostp2m(cd)->max_mapped_pfn = p2m_get_hostp2m(d)->max_mapped_pfn;
 
     return rc;
 }
