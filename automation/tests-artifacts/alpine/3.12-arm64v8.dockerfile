@@ -19,6 +19,7 @@ RUN \
   apk add dbus && \
   apk add bash && \
   apk add python2 && \
+  # gettext for Xen < 4.13
   apk add gettext && \
   apk add zlib && \
   apk add ncurses && \

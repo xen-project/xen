@@ -26,6 +26,7 @@ RUN rpm --rebuilddb && \
         python-devel \
         libuuid-devel \
         pkgconfig \
+        # gettext for Xen < 4.13
         gettext \
         flex \
         bison \

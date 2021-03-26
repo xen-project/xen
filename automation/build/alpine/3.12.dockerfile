@@ -23,6 +23,7 @@ RUN \
   apk add gcc  && \
   apk add g++ && \
   apk add clang  && \
+  # gettext for Xen < 4.13
   apk add gettext && \
   apk add git && \
   apk add iasl && \
