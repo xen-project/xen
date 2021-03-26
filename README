@@ -63,7 +63,6 @@ provided by your OS distributor:
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
     * GNU bison and GNU flex
-    * GNU gettext
     * ACPI ASL compiler (iasl)
 
 In addition to the above there are a number of optional build
