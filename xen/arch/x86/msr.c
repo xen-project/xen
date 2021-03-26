@@ -175,6 +175,30 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
 
     switch ( msr )
     {
+        /* Write-only */
+    case MSR_AMD_PATCHLOADER:
+    case MSR_IA32_UCODE_WRITE:
+    case MSR_PRED_CMD:
+    case MSR_FLUSH_CMD:
+
+        /* Not offered to guests. */
+    case MSR_TEST_CTRL:
+    case MSR_CORE_CAPABILITIES:
+    case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
+    case MSR_MCU_OPT_CTRL:
+    case MSR_RTIT_OUTPUT_BASE ... MSR_RTIT_ADDR_B(7):
+    case MSR_U_CET:
+    case MSR_S_CET:
+    case MSR_PL0_SSP ... MSR_INTERRUPT_SSP_TABLE:
+    case MSR_AMD64_LWP_CFG:
+    case MSR_AMD64_LWP_CBADDR:
+    case MSR_PPIN_CTL:
+    case MSR_PPIN:
+    case MSR_AMD_PPIN_CTL:
+    case MSR_AMD_PPIN:
+        goto gp_fault;
+
     case MSR_IA32_FEATURE_CONTROL:
         /*
          * Architecturally, availability of this MSR is enumerated by the
@@ -381,6 +405,30 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     switch ( msr )
     {
         uint64_t rsvd;
+
+        /* Read-only */
+    case MSR_IA32_PLATFORM_ID:
+    case MSR_CORE_CAPABILITIES:
+    case MSR_INTEL_CORE_THREAD_COUNT:
+    case MSR_INTEL_PLATFORM_INFO:
+    case MSR_ARCH_CAPABILITIES:
+
+        /* Not offered to guests. */
+    case MSR_TEST_CTRL:
+    case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
+    case MSR_MCU_OPT_CTRL:
+    case MSR_RTIT_OUTPUT_BASE ... MSR_RTIT_ADDR_B(7):
+    case MSR_U_CET:
+    case MSR_S_CET:
+    case MSR_PL0_SSP ... MSR_INTERRUPT_SSP_TABLE:
+    case MSR_AMD64_LWP_CFG:
+    case MSR_AMD64_LWP_CBADDR:
+    case MSR_PPIN_CTL:
+    case MSR_PPIN:
+    case MSR_AMD_PPIN_CTL:
+    case MSR_AMD_PPIN:
+        goto gp_fault;
 
     case MSR_AMD_PATCHLEVEL:
         BUILD_BUG_ON(MSR_IA32_UCODE_REV != MSR_AMD_PATCHLEVEL);
