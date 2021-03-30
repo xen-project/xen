@@ -2594,6 +2594,21 @@ static void vtd_resume(void)
     if ( !iommu_enabled )
         return;
 
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        i = iommu->index;
+
+        spin_lock_irqsave(&iommu->register_lock, flags);
+        dmar_writel(iommu->reg, DMAR_FEDATA_REG,
+                    iommu_state[i][DMAR_FEDATA_REG]);
+        dmar_writel(iommu->reg, DMAR_FEADDR_REG,
+                    iommu_state[i][DMAR_FEADDR_REG]);
+        dmar_writel(iommu->reg, DMAR_FEUADDR_REG,
+                    iommu_state[i][DMAR_FEUADDR_REG]);
+        spin_unlock_irqrestore(&iommu->register_lock, flags);
+    }
+
     if ( init_vtd_hw(true) != 0 && force_iommu )
          panic("IOMMU setup failed, crash Xen for security purpose\n");
 
@@ -2605,12 +2620,6 @@ static void vtd_resume(void)
         spin_lock_irqsave(&iommu->register_lock, flags);
         dmar_writel(iommu->reg, DMAR_FECTL_REG,
                     (u32) iommu_state[i][DMAR_FECTL_REG]);
-        dmar_writel(iommu->reg, DMAR_FEDATA_REG,
-                    (u32) iommu_state[i][DMAR_FEDATA_REG]);
-        dmar_writel(iommu->reg, DMAR_FEADDR_REG,
-                    (u32) iommu_state[i][DMAR_FEADDR_REG]);
-        dmar_writel(iommu->reg, DMAR_FEUADDR_REG,
-                    (u32) iommu_state[i][DMAR_FEUADDR_REG]);
         spin_unlock_irqrestore(&iommu->register_lock, flags);
 
         iommu_enable_translation(drhd);
