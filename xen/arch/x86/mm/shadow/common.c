@@ -1623,6 +1623,13 @@ void shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
 typedef int (*hash_vcpu_callback_t)(struct vcpu *v, mfn_t smfn, mfn_t other_mfn);
 typedef int (*hash_domain_callback_t)(struct domain *d, mfn_t smfn, mfn_t other_mfn);
 
+#ifndef __clang__ /* At least some versions dislike some of the uses. */
+#define HASH_CALLBACKS_CHECK(mask) \
+    BUILD_BUG_ON((mask) > (1U << ARRAY_SIZE(callbacks)) - 1)
+#else
+#define HASH_CALLBACKS_CHECK(mask) ((void)(mask))
+#endif
+
 static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
                               const hash_vcpu_callback_t callbacks[],
                               mfn_t callback_mfn)
@@ -1658,7 +1665,7 @@ static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
         {
             if ( callback_mask & (1 << x->u.sh.type) )
             {
-                ASSERT(x->u.sh.type <= 15);
+                ASSERT(x->u.sh.type < SH_type_unused);
                 ASSERT(callbacks[x->u.sh.type] != NULL);
                 done = callbacks[x->u.sh.type](v, page_to_mfn(x),
                                                callback_mfn);
@@ -1705,7 +1712,7 @@ static void hash_domain_foreach(struct domain *d,
         {
             if ( callback_mask & (1 << x->u.sh.type) )
             {
-                ASSERT(x->u.sh.type <= 15);
+                ASSERT(x->u.sh.type < SH_type_unused);
                 ASSERT(callbacks[x->u.sh.type] != NULL);
                 done = callbacks[x->u.sh.type](d, page_to_mfn(x),
                                                callback_mfn);
@@ -2009,6 +2016,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
         perfc_incr(shadow_writeable_bf_1);
     else
         perfc_incr(shadow_writeable_bf);
+    HASH_CALLBACKS_CHECK(callback_mask);
     hash_domain_foreach(d, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, then there's some non-pagetable
@@ -2080,6 +2088,7 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
 
     /* Brute-force search of all the shadows, by walking the hash */
     perfc_incr(shadow_mappings_bf);
+    HASH_CALLBACKS_CHECK(callback_mask);
     hash_domain_foreach(d, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, something is very wrong */
@@ -2246,10 +2255,12 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     /* Search for this shadow in all appropriate shadows */
     perfc_incr(shadow_unshadow);
 
-    /* Lower-level shadows need to be excised from upper-level shadows.
-     * This call to hash_vcpu_foreach() looks dangerous but is in fact OK: each
+    /*
+     * Lower-level shadows need to be excised from upper-level shadows. This
+     * call to hash_domain_foreach() looks dangerous but is in fact OK: each
      * call will remove at most one shadow, and terminate immediately when
-     * it does remove it, so we never walk the hash after doing a deletion.  */
+     * it does remove it, so we never walk the hash after doing a deletion.
+     */
 #define DO_UNSHADOW(_type) do {                                         \
     t = (_type);                                                        \
     if( !(pg->count_info & PGC_page_table)                              \
@@ -2270,6 +2281,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     if( !fast                                                           \
         && (pg->count_info & PGC_page_table)                            \
         && (pg->shadow_flags & (1 << t)) )                              \
+        HASH_CALLBACKS_CHECK(SHF_page_type_mask);                       \
         hash_domain_foreach(d, masks[t], callbacks, smfn);              \
 } while (0)
 
@@ -2370,6 +2382,7 @@ void sh_reset_l3_up_pointers(struct vcpu *v)
     };
     static const unsigned int callback_mask = SHF_L3_64;
 
+    HASH_CALLBACKS_CHECK(callback_mask);
     hash_vcpu_foreach(v, callback_mask, callbacks, INVALID_MFN);
 }
 
@@ -3420,6 +3433,7 @@ void shadow_audit_tables(struct vcpu *v)
         }
     }
 
+    HASH_CALLBACKS_CHECK(SHF_page_type_mask);
     hash_vcpu_foreach(v, mask, callbacks, INVALID_MFN);
 }
 
