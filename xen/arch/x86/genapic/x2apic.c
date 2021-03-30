@@ -54,7 +54,17 @@ static void init_apic_ldr_x2apic_cluster(void)
     per_cpu(cluster_cpus, this_cpu) = cluster_cpus_spare;
     for_each_online_cpu ( cpu )
     {
-        if (this_cpu == cpu || x2apic_cluster(this_cpu) != x2apic_cluster(cpu))
+        if ( this_cpu == cpu )
+            continue;
+        /*
+         * Guard in particular against the compiler suspecting out-of-bounds
+         * array accesses below when NR_CPUS=1 (oddly enough with gcc 10 it
+         * is the 1st of these alone which actually helps, not the 2nd, nor
+         * are both required together there).
+         */
+        BUG_ON(this_cpu >= NR_CPUS);
+        BUG_ON(cpu >= NR_CPUS);
+        if ( x2apic_cluster(this_cpu) != x2apic_cluster(cpu) )
             continue;
         per_cpu(cluster_cpus, this_cpu) = per_cpu(cluster_cpus, cpu);
         break;
