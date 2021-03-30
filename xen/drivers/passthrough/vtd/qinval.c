@@ -462,4 +462,7 @@ void disable_qinval(struct vtd_iommu *iommu)
                   !(sts & DMA_GSTS_QIES), sts);
 out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
+
+    iommu->flush.context = vtd_flush_context_reg;
+    iommu->flush.iotlb   = vtd_flush_iotlb_reg;
 }

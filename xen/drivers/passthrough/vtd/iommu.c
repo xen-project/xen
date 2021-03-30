@@ -380,10 +380,9 @@ static void iommu_flush_write_buffer(struct vtd_iommu *iommu)
 }
 
 /* return value determine if we need a write buffer flush */
-static int __must_check flush_context_reg(struct vtd_iommu *iommu, u16 did,
-                                          u16 source_id, u8 function_mask,
-                                          u64 type,
-                                          bool flush_non_present_entry)
+int vtd_flush_context_reg(struct vtd_iommu *iommu, uint16_t did,
+                          uint16_t source_id, uint8_t function_mask,
+                          uint64_t type, bool flush_non_present_entry)
 {
     u64 val = 0;
     unsigned long flags;
@@ -449,11 +448,9 @@ static int __must_check iommu_flush_context_device(struct vtd_iommu *iommu,
 }
 
 /* return value determine if we need a write buffer flush */
-static int __must_check flush_iotlb_reg(struct vtd_iommu *iommu, u16 did,
-                                        u64 addr,
-                                        unsigned int size_order, u64 type,
-                                        bool flush_non_present_entry,
-                                        bool flush_dev_iotlb)
+int vtd_flush_iotlb_reg(struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
+                        unsigned int size_order, uint64_t type,
+                        bool flush_non_present_entry, bool flush_dev_iotlb)
 {
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
     u64 val = 0;
@@ -2144,8 +2141,8 @@ static int __must_check init_vtd_hw(bool resume)
          */
         if ( enable_qinval(iommu) != 0 )
         {
-            iommu->flush.context = flush_context_reg;
-            iommu->flush.iotlb   = flush_iotlb_reg;
+            iommu->flush.context = vtd_flush_context_reg;
+            iommu->flush.iotlb   = vtd_flush_iotlb_reg;
         }
     }
 
