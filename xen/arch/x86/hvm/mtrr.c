@@ -851,10 +851,8 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( gmtrr_mtype == -EADDRNOTAVAIL )
         return -1;
 
-    gmtrr_mtype = is_hvm_domain(d) && v ?
-                  get_mtrr_type(&v->arch.hvm.mtrr,
-                                gfn << PAGE_SHIFT, order) :
-                  MTRR_TYPE_WRBACK;
+    gmtrr_mtype = v ? get_mtrr_type(&v->arch.hvm.mtrr, gfn << PAGE_SHIFT, order)
+                    : MTRR_TYPE_WRBACK;
     hmtrr_mtype = get_mtrr_type(&mtrr_state, mfn_x(mfn) << PAGE_SHIFT, order);
     if ( gmtrr_mtype < 0 || hmtrr_mtype < 0 )
         return -1;
