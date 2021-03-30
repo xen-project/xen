@@ -142,12 +142,11 @@ out:
 	return err;
 }
 
-STATIC int INIT unzstd(unsigned char *in_buf, unsigned int in_len,
-		       int (*fill)(void*, unsigned int),
-		       int (*flush)(void*, unsigned int),
-		       unsigned char *out_buf,
-		       unsigned int *in_pos,
-		       void (*error)(const char *x))
+int INIT unzstd(unsigned char *in_buf, unsigned int in_len,
+	        int (*fill)(void*, unsigned int),
+	        int (*flush)(void*, unsigned int),
+	        unsigned char *out_buf, unsigned int *in_pos,
+	        void (*error)(const char *x))
 {
 	ZSTD_inBuffer in;
 	ZSTD_outBuffer out;

@@ -114,11 +114,11 @@ static int INIT parse_header(u8 *input, int *skip, int in_len)
 	return 1;
 }
 
-STATIC int INIT unlzo(u8 *input, unsigned int in_len,
-		      int (*fill) (void *, unsigned int),
-		      int (*flush) (void *, unsigned int),
-		      u8 *output, unsigned int *posp,
-		      void (*error) (const char *x))
+int INIT unlzo(unsigned char *input, unsigned int in_len,
+	       int (*fill) (void *, unsigned int),
+	       int (*flush) (void *, unsigned int),
+	       unsigned char *output, unsigned int *posp,
+	       void (*error) (const char *x))
 {
 	u8 r = 0;
 	int skip = 0;

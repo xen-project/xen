@@ -7,7 +7,7 @@
 #include <xen/types.h>
 #include <xen/xmalloc.h>
 
-#define STATIC
+#define STATIC static
 #define INIT __init
 #define INITDATA __initdata
 

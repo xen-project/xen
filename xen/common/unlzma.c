@@ -528,13 +528,11 @@ static inline int INIT process_bit1(struct writer *wr, struct rc *rc,
 
 
 
-STATIC int INIT unlzma(unsigned char *buf, unsigned int in_len,
-		       int(*fill)(void*, unsigned int),
-		       int(*flush)(void*, unsigned int),
-		       unsigned char *output,
-		       unsigned int *posp,
-		       void(*error)(const char *x)
-	)
+int INIT unlzma(unsigned char *buf, unsigned int in_len,
+	        int(*fill)(void*, unsigned int),
+	        int(*flush)(void*, unsigned int),
+	        unsigned char *output, unsigned int *posp,
+	        void(*error)(const char *x))
 {
 	struct lzma_header header;
 	int lc, pb, lp;
