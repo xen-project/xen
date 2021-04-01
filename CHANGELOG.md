@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Factored out HVM-specific shadow code, improving code clarity and reducing the size of PV-only hypervisor builds
  - Added XEN_SCRIPT_DIR configuration option to specify location for Xen scripts, rather than hard-coding /etc/xen/scripts
  - xennet: Documented a way for the backend (or toolstack) to specify MTU to the frontend
+ - Some additional affordances in various xl subcommands.
 
 ### Removed / support downgraded
 
