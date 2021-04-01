@@ -219,6 +219,7 @@ static void vioapic_write_redirent(
     struct domain *d = vioapic_domain(vioapic);
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     union vioapic_redir_entry *pent, ent;
+    bool prev_level;
     int unmasked = 0;
     unsigned int gsi;
 
@@ -234,6 +235,7 @@ static void vioapic_write_redirent(
 
     pent = &vioapic->redirtbl[idx];
     ent  = *pent;
+    prev_level = ent.fields.trig_mode == VIOAPIC_LEVEL_TRIG;
 
     if ( top_word )
     {
@@ -269,6 +271,21 @@ static void vioapic_write_redirent(
     }
 
     spin_unlock(&d->arch.hvm.irq_lock);
+
+    if ( ent.fields.trig_mode == VIOAPIC_EDGE_TRIG &&
+         ent.fields.remote_irr && is_iommu_enabled(d) )
+    {
+            /*
+             * Since IRR has been cleared and further interrupts can be
+             * injected also attempt to deassert any virtual line of passed
+             * through devices using this pin. Switching a pin from level to
+             * edge trigger mode can be used as a way to EOI an interrupt at
+             * the IO-APIC level.
+             */
+            ASSERT(prev_level);
+            ASSERT(!top_word);
+            hvm_dpci_eoi(d, gsi);
+    }
 
     if ( is_hardware_domain(d) && unmasked )
     {
