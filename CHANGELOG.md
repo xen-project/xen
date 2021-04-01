@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Some additional affordances in various xl subcommands.
  - Added workarounds for the following ARM errata: Cortex A53 #843419, Cortex A55 #1530923, Cortex A72 #853709, Cortex A73 #858921, Cortex A76 #1286807, Neoverse-N1 #1165522
  - On detecting a host crash, some debug key handlers can automatically triggered to aid in debugging
+ - Increase the maximum number of guests which can share a single IRQ from 7 to 16, and make this configurable with irq-max-guests
 
 ### Removed / support downgraded
 
