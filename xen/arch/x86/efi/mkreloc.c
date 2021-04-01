@@ -346,9 +346,7 @@ int main(int argc, char *argv[])
          * Don't generate relocations for sections that definitely
          * aren't used by the boot loader code.
          */
-        if ( memcmp(sec1[i].name, ".initcal", sizeof(sec1[i].name)) == 0 ||
-             memcmp(sec1[i].name, ".init.se", sizeof(sec1[i].name)) == 0 ||
-             memcmp(sec1[i].name, ".buildid", sizeof(sec1[i].name)) == 0 ||
+        if ( memcmp(sec1[i].name, ".buildid", sizeof(sec1[i].name)) == 0 ||
              memcmp(sec1[i].name, ".lockpro", sizeof(sec1[i].name)) == 0 )
             continue;
 
