@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - CI loop: Add dom0less aarch64 smoke test
  - x86: Allow domains to use AVX-VNNI instructions
  - Factored out HVM-specific shadow code, improving code clarity and reducing the size of PV-only hypervisor builds
+ - Added XEN_SCRIPT_DIR configuration option to specify location for Xen scripts, rather than hard-coding /etc/xen/scripts
+
 
 ### Removed / support downgraded
 
