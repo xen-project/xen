@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Named PCI devices for xl/libxl
  - Improved documentation for xl PCI configuration format
  - Support for zstd-compressed dom0 (x86) and domU kernels
+ - EFI: Enable booting unified hypervisor/kernel/initrd/DT images
+ - Reduce ACPI verbosity by default
+ - Add ucode=allow-same option to test late microcode loading path
  - Library improvements from NetBSD ports upstreamed
  - CI loop: Add Alpine Linux, Ubuntu Focal targets; drop CentOS 6
  - CI loop: Add qemu-based dom0 / domU test for ARM
