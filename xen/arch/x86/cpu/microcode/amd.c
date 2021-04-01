@@ -33,7 +33,9 @@ struct equiv_cpu_entry {
 };
 
 struct microcode_patch {
-    uint32_t data_code;
+    uint16_t year;
+    uint8_t  day;
+    uint8_t  month;
     uint32_t patch_id;
     uint8_t  mc_patch_data_id[2];
     uint8_t  mc_patch_data_len;
@@ -251,8 +253,9 @@ static int apply_microcode(const struct microcode_patch *patch)
         return -EIO;
     }
 
-    printk(XENLOG_WARNING "microcode: CPU%u updated from revision %#x to %#x\n",
-           cpu, old_rev, rev);
+    printk(XENLOG_WARNING
+           "microcode: CPU%u updated from revision %#x to %#x, date = %04x-%02x-%02x\n",
+           cpu, old_rev, rev, patch->year, patch->month, patch->day);
 
     return 0;
 }
