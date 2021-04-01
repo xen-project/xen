@@ -262,6 +262,8 @@ static void vioapic_write_redirent(
               !ent.fields.remote_irr &&
               hvm_irq->gsi_assert_count[gsi] )
     {
+        /* A top word write should never trigger an interrupt injection. */
+        ASSERT(!top_word);
         pent->fields.remote_irr = 1;
         vioapic_deliver(vioapic, idx);
     }
