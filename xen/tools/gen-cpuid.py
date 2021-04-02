@@ -242,7 +242,9 @@ def crunch_numbers(state):
         # CX16 is only encodable in Long Mode.  LAHF_LM indicates that the
         # SAHF/LAHF instructions are reintroduced in Long Mode.  1GB
         # superpages, PCID and PKU are only available in 4 level paging.
-        LM: [CX16, PCID, LAHF_LM, PAGE1GB, PKU],
+        # NO_LMSL indicates the absense of Long Mode Segment Limits, which
+        # have been dropped in hardware.
+        LM: [CX16, PCID, LAHF_LM, PAGE1GB, PKU, NO_LMSL],
 
         # AMD K6-2+ and K6-III processors shipped with 3DNow+, beyond the
         # standard 3DNow in the earlier K6 processors.

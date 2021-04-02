@@ -152,6 +152,7 @@ static const char *const str_e8b[32] =
 
     [12] = "ibpb",
 
+    [20] = "no-lmsl",
     /* [22] */                 [23] = "ppin",
 };
 

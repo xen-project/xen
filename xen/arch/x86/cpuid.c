@@ -456,6 +456,12 @@ static void __init calculate_hvm_max_policy(void)
     __set_bit(X86_FEATURE_X2APIC, hvm_featureset);
 
     /*
+     * We don't support EFER.LMSLE at all.  AMD has dropped the feature from
+     * hardware and allocated a CPUID bit to indicate its absence.
+     */
+    __set_bit(X86_FEATURE_NO_LMSL, hvm_featureset);
+
+    /*
      * On AMD, PV guests are entirely unable to use SYSENTER as Xen runs in
      * long mode (and init_amd() has cleared it out of host capabilities), but
      * HVM guests are able if running in protected mode.
