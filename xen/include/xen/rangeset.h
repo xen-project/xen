@@ -36,7 +36,7 @@ void rangeset_domain_destroy(
  * rangeset_destroy(r).
  */
 struct rangeset *rangeset_new(
-    struct domain *d, char *name, unsigned int flags);
+    struct domain *d, const char *name, unsigned int flags);
 void rangeset_destroy(
     struct rangeset *r);
 

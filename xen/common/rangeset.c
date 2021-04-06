@@ -421,7 +421,7 @@ bool_t rangeset_is_empty(
 }
 
 struct rangeset *rangeset_new(
-    struct domain *d, char *name, unsigned int flags)
+    struct domain *d, const char *name, unsigned int flags)
 {
     struct rangeset *r;
 
