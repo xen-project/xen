@@ -436,14 +436,7 @@ struct rangeset *rangeset_new(
     BUG_ON(flags & ~RANGESETF_prettyprint_hex);
     r->flags = flags;
 
-    if ( name != NULL )
-    {
-        safe_strcpy(r->name, name);
-    }
-    else
-    {
-        snprintf(r->name, sizeof(r->name), "(no name)");
-    }
+    safe_strcpy(r->name, name ?: "(no name)");
 
     if ( (r->domain = d) != NULL )
     {
