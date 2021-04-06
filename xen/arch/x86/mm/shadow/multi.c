@@ -4290,8 +4290,8 @@ static void sh_pagetable_dying(paddr_t gpa)
     done = 1;                                                           \
 } while (0)
 
-static char * sh_audit_flags(struct vcpu *v, int level,
-                              int gflags, int sflags)
+static const char *sh_audit_flags(struct vcpu *v, int level,
+                                  int gflags, int sflags)
 /* Common code for auditing flag bits */
 {
     if ( (sflags & _PAGE_PRESENT) && !(gflags & _PAGE_PRESENT) )
@@ -4324,7 +4324,7 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     mfn_t mfn, gmfn, gl1mfn;
     gfn_t gfn;
     p2m_type_t p2mt;
-    char *s;
+    const char *s;
     int done = 0;
 
     /* Follow the backpointer */
@@ -4419,7 +4419,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
     mfn_t mfn, gmfn, gl2mfn;
     gfn_t gfn;
     p2m_type_t p2mt;
-    char *s;
+    const char *s;
     int done = 0;
 
     /* Follow the backpointer */
@@ -4471,7 +4471,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
     mfn_t mfn, gmfn, gl3mfn;
     gfn_t gfn;
     p2m_type_t p2mt;
-    char *s;
+    const char *s;
     int done = 0;
 
     /* Follow the backpointer */
@@ -4521,7 +4521,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
     mfn_t mfn, gmfn, gl4mfn;
     gfn_t gfn;
     p2m_type_t p2mt;
-    char *s;
+    const char *s;
     int done = 0;
 
     /* Follow the backpointer */
