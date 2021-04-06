@@ -302,7 +302,7 @@ static void read_symbol_table(const char *symtab)
 
 #if defined(__i386__) || defined(__x86_64__)
 #define CR0_PE  0x1
-char *flag_values[22][2] =
+const char *flag_values[22][2] =
 {/*  clear,     set,       bit# */
     { NULL,     "c"    }, // 0        Carry
     { NULL,     NULL   }, // 1
@@ -334,7 +334,7 @@ static void print_flags(uint64_t flags)
 
     printf("\nflags: %08" PRIx64, flags);
     for (i = 21; i >= 0; i--) {
-        char *s = flag_values[i][(flags >> i) & 1];
+        const char *s = flag_values[i][(flags >> i) & 1];
         if (s != NULL)
             printf(" %s", s);
     }
