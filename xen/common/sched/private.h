@@ -272,8 +272,8 @@ static inline spinlock_t *pcpu_schedule_trylock(unsigned int cpu)
 }
 
 struct scheduler {
-    char *name;             /* full name for this scheduler      */
-    char *opt_name;         /* option name for this scheduler    */
+    const char *name;       /* full name for this scheduler      */
+    const char *opt_name;   /* option name for this scheduler    */
     unsigned int sched_id;  /* ID for this scheduler             */
     void *sched_data;       /* global data pointer               */
     struct cpupool *cpupool;/* points to this scheduler's pool   */
