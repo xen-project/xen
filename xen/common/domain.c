@@ -1427,17 +1427,18 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     struct page_info *page;
     unsigned int align;
 
-    if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
-        return -EINVAL;
+    if ( offset > (PAGE_SIZE - sizeof(*new_info)) )
+        return -ENXIO;
 
 #ifdef CONFIG_COMPAT
+    BUILD_BUG_ON(sizeof(*new_info) != sizeof(new_info->compat));
     if ( has_32bit_shinfo(d) )
         align = alignof(new_info->compat);
     else
 #endif
         align = alignof(*new_info);
     if ( offset & (align - 1) )
-        return -EINVAL;
+        return -ENXIO;
 
     if ( !mfn_eq(v->vcpu_info_mfn, INVALID_MFN) )
         return -EINVAL;
