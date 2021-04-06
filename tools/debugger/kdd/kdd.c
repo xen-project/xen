@@ -67,7 +67,7 @@ typedef struct {
     uint32_t build;             
     int w64;
     int mp;
-    char *name;
+    const char *name;
     uint64_t base;              /* KernBase: start looking here */
     uint32_t range;             /* |         and search an area this size */
     uint32_t version;           /* +-> NtBuildNumber */
@@ -237,7 +237,7 @@ static size_t blocking_write(int fd, const void *buf, size_t count)
 }
 
 /* Dump the contents of a complete serial packet into a log file. */
-static void kdd_log_pkt(kdd_state *s, char *name, kdd_pkt *p)
+static void kdd_log_pkt(kdd_state *s, const char *name, kdd_pkt *p)
 {
     uint32_t sum = 0;
     unsigned int i, j;
@@ -504,8 +504,8 @@ static int check_os(kdd_state *s)
  * @return -1 on failure to find the section name
  * @return 0 on success
  */
-static int get_pe64_sections(kdd_state *s, uint64_t filebase, char *sectname,
-        uint64_t *vaddr, uint32_t *vsize)
+static int get_pe64_sections(kdd_state *s, uint64_t filebase,
+        const char *sectname, uint64_t *vaddr, uint32_t *vsize)
 {
     uint64_t pe_hdr = 0;
     uint64_t sect_start = 0;
@@ -781,7 +781,7 @@ static void kdd_send_cmd(kdd_state *s, uint32_t subtype, size_t extra)
 }
 
 /* Cause the client to print a string */
-static void kdd_send_string(kdd_state *s, char *fmt, ...)
+static void kdd_send_string(kdd_state *s, const char *fmt, ...)
 {
     uint32_t len = 0xffff - sizeof (kdd_msg);
     char *buf = (char *) s->txb + sizeof (kdd_hdr) + sizeof (kdd_msg);
