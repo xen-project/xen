@@ -722,14 +722,14 @@ static void __attribute__((noreturn)) crash(void)
         asm volatile ( "hlt" );
 }
 
-void __assert_failed(char *assertion, char *file, int line)
+void __assert_failed(const char *assertion, const char *file, int line)
 {
     printf("*** HVMLoader assertion '%s' failed at %s:%d\n",
            assertion, file, line);
     crash();
 }
 
-void __bug(char *file, int line)
+void __bug(const char *file, int line)
 {
     printf("*** HVMLoader bug at %s:%d\n", file, line);
     crash();
