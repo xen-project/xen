@@ -98,7 +98,6 @@ struct hvm_irq {
 #define hvm_pci_intx_link(dev, intx) \
     (((dev) + (intx)) & 3)
 #define hvm_domain_irq(d) ((d)->arch.hvm.irq)
-#define hvm_irq_size(cnt) offsetof(struct hvm_irq, gsi_assert_count[cnt])
 
 #define hvm_isa_irq_to_gsi(isa_irq) ((isa_irq) ? : 2)
 

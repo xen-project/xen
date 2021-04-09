@@ -642,7 +642,8 @@ int hvm_domain_initialise(struct domain *d)
     d->arch.hvm.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
     d->arch.hvm.io_handler = xzalloc_array(struct hvm_io_handler,
                                            NR_IO_HANDLERS);
-    d->arch.hvm.irq = xzalloc_bytes(hvm_irq_size(nr_gsis));
+    d->arch.hvm.irq = xzalloc_flex_struct(struct hvm_irq,
+                                          gsi_assert_count, nr_gsis);
 
     rc = -ENOMEM;
     if ( !d->arch.hvm.pl_time || !d->arch.hvm.irq ||
