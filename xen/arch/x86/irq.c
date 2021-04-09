@@ -2305,7 +2305,6 @@ done:
 /* The pirq should have been unbound before this call. */
 int unmap_domain_pirq(struct domain *d, int pirq)
 {
-    unsigned long flags;
     struct irq_desc *desc;
     int irq, ret = 0, rc;
     unsigned int i, nr = 1;
@@ -2356,11 +2355,23 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( msi_desc != NULL )
         pci_disable_msi(msi_desc);
 
-    spin_lock_irqsave(&desc->lock, flags);
-
-    for ( i = 0; ; )
+    for ( i = 0; i < nr; i++, info = pirq_info(d, pirq + i) )
     {
+        unsigned long flags;
+
+        if ( !info || info->arch.irq <= 0 )
+        {
+            printk(XENLOG_G_ERR "%pd: MSI pirq %d not mapped\n",
+                   d, pirq + i);
+            continue;
+        }
+        irq = info->arch.irq;
+        desc = irq_to_desc(irq);
+
+        spin_lock_irqsave(&desc->lock, flags);
+
         BUG_ON(irq != domain_pirq_to_irq(d, pirq + i));
+        BUG_ON(desc->msi_desc != msi_desc + i);
 
         if ( !forced_unbind )
             clear_domain_irq_pirq(d, irq, info);
@@ -2378,45 +2389,6 @@ int unmap_domain_pirq(struct domain *d, int pirq)
             desc->msi_desc = NULL;
         }
 
-        if ( ++i == nr )
-            break;
-
-        spin_unlock_irqrestore(&desc->lock, flags);
-
-        if ( !forced_unbind )
-           cleanup_domain_irq_pirq(d, irq, info);
-
-        rc = irq_deny_access(d, irq);
-        if ( rc )
-        {
-            printk(XENLOG_G_ERR
-                   "dom%d: could not deny access to IRQ%d (pirq %d)\n",
-                   d->domain_id, irq, pirq + i);
-            ret = rc;
-        }
-
-        do {
-            info = pirq_info(d, pirq + i);
-            if ( info && (irq = info->arch.irq) > 0 )
-                break;
-            printk(XENLOG_G_ERR "dom%d: MSI pirq %d not mapped\n",
-                   d->domain_id, pirq + i);
-        } while ( ++i < nr );
-
-        if ( i == nr )
-        {
-            desc = NULL;
-            break;
-        }
-
-        desc = irq_to_desc(irq);
-        BUG_ON(desc->msi_desc != msi_desc + i);
-
-        spin_lock_irqsave(&desc->lock, flags);
-    }
-
-    if ( desc )
-    {
         spin_unlock_irqrestore(&desc->lock, flags);
 
         if ( !forced_unbind )
@@ -2427,7 +2399,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
         {
             printk(XENLOG_G_ERR
                    "dom%d: could not deny access to IRQ%d (pirq %d)\n",
-                   d->domain_id, irq, pirq + nr - 1);
+                   d->domain_id, irq, pirq + i);
             ret = rc;
         }
     }
