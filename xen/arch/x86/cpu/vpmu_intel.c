@@ -461,10 +461,10 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
             goto out_err;
     }
 
-    core2_vpmu_cxt = xzalloc_bytes(sizeof(*core2_vpmu_cxt) +
-                                   sizeof(uint64_t) * fixed_pmc_cnt +
-                                   sizeof(struct xen_pmu_cntr_pair) *
-                                   arch_pmc_cnt);
+    core2_vpmu_cxt = xzalloc_flex_struct(struct xen_pmu_intel_ctxt, regs,
+                                         fixed_pmc_cnt + arch_pmc_cnt *
+                                         (sizeof(struct xen_pmu_cntr_pair) /
+                                          sizeof(*core2_vpmu_cxt->regs)));
     p = xzalloc(uint64_t);
     if ( !core2_vpmu_cxt || !p )
         goto out_err;
