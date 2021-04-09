@@ -308,6 +308,15 @@ M:     Nick Rosbrook <rosbrookn@ainfosec.com>
 S:	Maintained
 F:	tools/golang
 
+HYPFS
+M:	Juergen Gross <jgross@suse.com>
+S:	Supported
+F:	tools/include/xenhypfs.h
+F:	tools/libs/hypfs/
+F:	tools/misc/xenhypfs.c
+F:	xen/common/hypfs.c
+F:	xen/include/xen/hypfs.h
+
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 R:	Lukasz Hawrylko <lukasz.hawrylko@linux.intel.com>
 S:	Odd Fixes
