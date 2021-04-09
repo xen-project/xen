@@ -16,7 +16,7 @@
 #include <xen/sched.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
-#include "../ats.h"
+#include "ats.h"
 
 bool_t __read_mostly ats_enabled = 0;
 boolean_param("ats", ats_enabled);
