@@ -592,7 +592,7 @@ static void pt_adjust_vcpu(struct periodic_time *pt, struct vcpu *v)
     if ( pt->vcpu == NULL )
         return;
 
-    write_lock(&pt->vcpu->domain->arch.hvm.pl_time->pt_migrate);
+    write_lock(&v->domain->arch.hvm.pl_time->pt_migrate);
 
     if ( pt->vcpu == v )
         goto out;
@@ -613,7 +613,7 @@ static void pt_adjust_vcpu(struct periodic_time *pt, struct vcpu *v)
     pt_vcpu_unlock(v);
 
  out:
-    write_unlock(&pt->vcpu->domain->arch.hvm.pl_time->pt_migrate);
+    write_unlock(&v->domain->arch.hvm.pl_time->pt_migrate);
 }
 
 void pt_adjust_global_vcpu_target(struct vcpu *v)
