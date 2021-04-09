@@ -288,11 +288,11 @@ static int xc_cpuid_xend_policy(
     unsigned int nr_leaves, nr_msrs;
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
     /*
-     * Three full policies.  The host, domain max, and domain current for the
-     * domain type.
+     * Three full policies.  The host, default for the domain type,
+     * and domain current.
      */
-    xen_cpuid_leaf_t *host = NULL, *max = NULL, *cur = NULL;
-    unsigned int nr_host, nr_max, nr_cur;
+    xen_cpuid_leaf_t *host = NULL, *def = NULL, *cur = NULL;
+    unsigned int nr_host, nr_def, nr_cur;
 
     if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
          di.domid != domid )
@@ -312,7 +312,7 @@ static int xc_cpuid_xend_policy(
 
     rc = -ENOMEM;
     if ( (host = calloc(nr_leaves, sizeof(*host))) == NULL ||
-         (max  = calloc(nr_leaves, sizeof(*max)))  == NULL ||
+         (def  = calloc(nr_leaves, sizeof(*def)))  == NULL ||
          (cur  = calloc(nr_leaves, sizeof(*cur)))  == NULL )
     {
         ERROR("Unable to allocate memory for %u CPUID leaves", nr_leaves);
@@ -330,15 +330,16 @@ static int xc_cpuid_xend_policy(
         goto fail;
     }
 
-    /* Get the domain's max policy. */
+    /* Get the domain type's default policy. */
     nr_msrs = 0;
-    nr_max = nr_leaves;
-    rc = xc_get_system_cpu_policy(xch, di.hvm ? XEN_SYSCTL_cpu_policy_hvm_max
-                                              : XEN_SYSCTL_cpu_policy_pv_max,
-                                  &nr_max, max, &nr_msrs, NULL);
+    nr_def = nr_leaves;
+    rc = xc_get_system_cpu_policy(xch,
+                                  di.hvm ? XEN_SYSCTL_cpu_policy_hvm_default
+                                         : XEN_SYSCTL_cpu_policy_pv_default,
+                                  &nr_def, def, &nr_msrs, NULL);
     if ( rc )
     {
-        PERROR("Failed to obtain %s max policy", di.hvm ? "hvm" : "pv");
+        PERROR("Failed to obtain %s def policy", di.hvm ? "hvm" : "pv");
         rc = -errno;
         goto fail;
     }
@@ -359,10 +360,10 @@ static int xc_cpuid_xend_policy(
     for ( ; xend->leaf != XEN_CPUID_INPUT_UNUSED; ++xend )
     {
         xen_cpuid_leaf_t *cur_leaf = find_leaf(cur, nr_cur, xend);
-        const xen_cpuid_leaf_t *max_leaf = find_leaf(max, nr_max, xend);
+        const xen_cpuid_leaf_t *def_leaf = find_leaf(def, nr_def, xend);
         const xen_cpuid_leaf_t *host_leaf = find_leaf(host, nr_host, xend);
 
-        if ( cur_leaf == NULL || max_leaf == NULL || host_leaf == NULL )
+        if ( cur_leaf == NULL || def_leaf == NULL || host_leaf == NULL )
         {
             ERROR("Missing leaf %#x, subleaf %#x", xend->leaf, xend->subleaf);
             goto fail;
@@ -371,7 +372,7 @@ static int xc_cpuid_xend_policy(
         for ( unsigned int i = 0; i < ARRAY_SIZE(xend->policy); i++ )
         {
             uint32_t *cur_reg = &cur_leaf->a + i;
-            const uint32_t *max_reg = &max_leaf->a + i;
+            const uint32_t *def_reg = &def_leaf->a + i;
             const uint32_t *host_reg = &host_leaf->a + i;
 
             if ( xend->policy[i] == NULL )
@@ -386,7 +387,7 @@ static int xc_cpuid_xend_policy(
                 else if ( xend->policy[i][j] == '0' )
                     val = false;
                 else if ( xend->policy[i][j] == 'x' )
-                    val = test_bit(31 - j, max_reg);
+                    val = test_bit(31 - j, def_reg);
                 else if ( xend->policy[i][j] == 'k' ||
                           xend->policy[i][j] == 's' )
                     val = test_bit(31 - j, host_reg);
@@ -419,7 +420,7 @@ static int xc_cpuid_xend_policy(
 
  fail:
     free(cur);
-    free(max);
+    free(def);
     free(host);
 
     return rc;
