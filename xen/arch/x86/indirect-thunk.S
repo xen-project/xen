@@ -11,9 +11,6 @@
 
 #include <asm/asm_defns.h>
 
-/* Don't transform the "ret" further down. */
-.purgem ret
-
 .macro IND_THUNK_RETPOLINE reg:req
         call 2f
 1:

@@ -145,10 +145,7 @@ t2 = $(call as-insn,$(CC) -I$(BASEDIR)/include,".include \"asm-x86/asm-defns.h\"
 # https://bugs.llvm.org/show_bug.cgi?id=36110
 t3 = $(call as-insn,$(CC),".macro FOO;.endm"$(close); asm volatile $(open)".macro FOO;.endm",-no-integrated-as)
 
-# Check whether macros can override insn mnemonics in inline assembly.
-t4 = $(call as-insn,$(CC),".macro ret; .error; .endm; .macro retq; .error; .endm",-no-integrated-as)
-
-CLANG_FLAGS += $(call or,$(t1),$(t2),$(t3),$(t4))
+CLANG_FLAGS += $(call or,$(t1),$(t2),$(t3))
 endif
 
 CLANG_FLAGS += -Werror=unknown-warning-option
