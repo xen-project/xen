@@ -262,7 +262,7 @@ long arch_do_domctl(
 
         for ( i = 0; i < num; ++i )
         {
-            unsigned long gfn = 0, type = 0;
+            unsigned long gfn = 0, type = XEN_DOMCTL_PFINFO_NOTAB;
             struct page_info *page;
             p2m_type_t t;
 
@@ -302,6 +302,8 @@ long arch_do_domctl(
 
                 if ( page->u.inuse.type_info & PGT_pinned )
                     type |= XEN_DOMCTL_PFINFO_LPINTAB;
+                else if ( !(page->u.inuse.type_info & PGT_validated) )
+                    type = XEN_DOMCTL_PFINFO_NOTAB;
 
                 if ( page->count_info & PGC_broken )
                     type = XEN_DOMCTL_PFINFO_BROKEN;
