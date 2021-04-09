@@ -57,6 +57,22 @@
     INDIRECT_BRANCH jmp \arg
 .endm
 
+/*
+ * To guard against speculation past RET, insert a breakpoint insn
+ * immediately after them.
+ */
+.macro ret operand:vararg
+    retq \operand
+.endm
+.macro retq operand:vararg
+    .ifb \operand
+    .byte 0xc3
+    .else
+    .byte 0xc2
+    .word \operand
+    .endif
+.endm
+
 .macro guest_access_mask_ptr ptr:req, scratch1:req, scratch2:req
 #if defined(CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS)
     /*
