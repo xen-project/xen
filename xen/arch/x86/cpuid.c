@@ -16,12 +16,15 @@
 const uint32_t known_features[] = INIT_KNOWN_FEATURES;
 const uint32_t special_features[] = INIT_SPECIAL_FEATURES;
 
-static const uint32_t pv_max_featuremask[] = INIT_PV_MAX_FEATURES;
+static const uint32_t __initconst pv_max_featuremask[] = INIT_PV_MAX_FEATURES;
 static const uint32_t hvm_shadow_max_featuremask[] = INIT_HVM_SHADOW_MAX_FEATURES;
-static const uint32_t hvm_hap_max_featuremask[] = INIT_HVM_HAP_MAX_FEATURES;
-static const uint32_t pv_def_featuremask[] = INIT_PV_DEF_FEATURES;
-static const uint32_t hvm_shadow_def_featuremask[] = INIT_HVM_SHADOW_DEF_FEATURES;
-static const uint32_t hvm_hap_def_featuremask[] = INIT_HVM_HAP_DEF_FEATURES;
+static const uint32_t __initconst hvm_hap_max_featuremask[] =
+    INIT_HVM_HAP_MAX_FEATURES;
+static const uint32_t __initconst pv_def_featuremask[] = INIT_PV_DEF_FEATURES;
+static const uint32_t __initconst hvm_shadow_def_featuremask[] =
+    INIT_HVM_SHADOW_DEF_FEATURES;
+static const uint32_t __initconst hvm_hap_def_featuremask[] =
+    INIT_HVM_HAP_DEF_FEATURES;
 static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 
 static int __init parse_xen_cpuid(const char *s)
