@@ -72,7 +72,7 @@ enum hypfs_lock_state {
     hypfs_write_locked
 };
 static DEFINE_PER_CPU(enum hypfs_lock_state, hypfs_locked);
-static DEFINE_PER_CPU(struct hypfs_dyndata *, hypfs_dyndata);
+static DEFINE_PER_CPU(void *, hypfs_dyndata);
 
 static DEFINE_PER_CPU(const struct hypfs_entry *, hypfs_last_node_entered);
 
@@ -160,19 +160,19 @@ static void node_exit_all(void)
 void *hypfs_alloc_dyndata(unsigned long size)
 {
     unsigned int cpu = smp_processor_id();
-    struct hypfs_dyndata **dyndata = &per_cpu(hypfs_dyndata, cpu);
+    void **dyndata = &per_cpu(hypfs_dyndata, cpu);
 
     ASSERT(per_cpu(hypfs_locked, cpu) != hypfs_unlocked);
     ASSERT(*dyndata == NULL);
 
-    *dyndata = xzalloc_bytes(size);
+    *dyndata = xzalloc_array(unsigned char, size);
 
     return *dyndata;
 }
 
 void *hypfs_get_dyndata(void)
 {
-    struct hypfs_dyndata *dyndata = this_cpu(hypfs_dyndata);
+    void *dyndata = this_cpu(hypfs_dyndata);
 
     ASSERT(dyndata);
 
@@ -181,7 +181,7 @@ void *hypfs_get_dyndata(void)
 
 void hypfs_free_dyndata(void)
 {
-    struct hypfs_dyndata **dyndata = &this_cpu(hypfs_dyndata);
+    void **dyndata = &this_cpu(hypfs_dyndata);
 
     XFREE(*dyndata);
 }
