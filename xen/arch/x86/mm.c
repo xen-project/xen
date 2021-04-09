@@ -2143,6 +2143,18 @@ static void l3t_unlock(struct page_info *page)
     (_PAGE_NX_BIT | _PAGE_AVAIL_HIGH | _PAGE_AVAIL | _PAGE_GLOBAL | \
      _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_USER)
 
+/*
+ * PDE flags that a guest may change without re-validating the PDE.
+ * All other bits affect translation, caching, or Xen's safety. When guest
+ * created linear page tables aren't allowed, intermediate page tables may
+ * have _PAGE_RW altered without this requiring re-validation.
+ */
+#ifndef CONFIG_PV_LINEAR_PT
+# define FASTPATH_PDE_FLAG_WHITELIST (FASTPATH_FLAG_WHITELIST | _PAGE_RW)
+#else
+# define FASTPATH_PDE_FLAG_WHITELIST FASTPATH_FLAG_WHITELIST
+#endif
+
 /* Update the L1 entry at pl1e to new value nl1e. */
 static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
                         mfn_t gl1mfn, unsigned int cmd,
@@ -2285,7 +2297,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         nl2e = adjust_guest_l2e(nl2e, d);
 
         /* Fast path for sufficiently-similar mappings. */
-        if ( !l2e_has_changed(ol2e, nl2e, ~FASTPATH_FLAG_WHITELIST) )
+        if ( !l2e_has_changed(ol2e, nl2e, ~FASTPATH_PDE_FLAG_WHITELIST) )
         {
             if ( UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, mfn, vcpu, preserve_ad) )
                 return 0;
@@ -2347,7 +2359,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         nl3e = adjust_guest_l3e(nl3e, d);
 
         /* Fast path for sufficiently-similar mappings. */
-        if ( !l3e_has_changed(ol3e, nl3e, ~FASTPATH_FLAG_WHITELIST) )
+        if ( !l3e_has_changed(ol3e, nl3e, ~FASTPATH_PDE_FLAG_WHITELIST) )
         {
             rc = UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, mfn, vcpu, preserve_ad);
             return rc ? 0 : -EFAULT;
@@ -2409,7 +2421,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         nl4e = adjust_guest_l4e(nl4e, d);
 
         /* Fast path for sufficiently-similar mappings. */
-        if ( !l4e_has_changed(ol4e, nl4e, ~FASTPATH_FLAG_WHITELIST) )
+        if ( !l4e_has_changed(ol4e, nl4e, ~FASTPATH_PDE_FLAG_WHITELIST) )
         {
             rc = UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, mfn, vcpu, preserve_ad);
             return rc ? 0 : -EFAULT;
