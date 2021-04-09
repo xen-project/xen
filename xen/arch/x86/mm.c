@@ -4069,7 +4069,8 @@ long do_mmu_update(
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                     if ( !rc &&
                          (page->u.inuse.type_info & PGT_count_mask) >
-                         1 + !!(page->u.inuse.type_info & PGT_pinned) )
+                         1 + !!(page->u.inuse.type_info & PGT_pinned) &&
+                         !is_pv_32bit_domain(pt_owner) )
                         flush_linear_pt = true;
                     break;
 
