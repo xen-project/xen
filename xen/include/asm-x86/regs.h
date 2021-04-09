@@ -10,9 +10,10 @@
     /* Frame pointer must point into current CPU stack. */                    \
     ASSERT(diff < STACK_SIZE);                                                \
     /* If not a guest frame, it must be a hypervisor frame. */                \
-    ASSERT((diff == 0) || (r->cs == __HYPERVISOR_CS));                        \
+    if ( diff < PRIMARY_STACK_SIZE )                                          \
+        ASSERT(!diff || ((r)->cs == __HYPERVISOR_CS));                        \
     /* Return TRUE if it's a guest frame. */                                  \
-    (diff == 0);                                                              \
+    !diff || ((r)->cs != __HYPERVISOR_CS);                                    \
 })
 
 #define read_sreg(name) ({                           \
