@@ -11,6 +11,9 @@
 
 #include <asm/asm_defns.h>
 
+/* Don't transform the "ret" further down. */
+.purgem ret
+
 .macro IND_THUNK_RETPOLINE reg:req
         call 2f
 1:
@@ -24,12 +27,10 @@
 .macro IND_THUNK_LFENCE reg:req
         lfence
         jmp *%\reg
-        int3 /* Halt straight-line speculation */
 .endm
 
 .macro IND_THUNK_JMP reg:req
         jmp *%\reg
-        int3 /* Halt straight-line speculation */
 .endm
 
 /*
@@ -43,6 +44,8 @@ ENTRY(__x86_indirect_thunk_\reg)
         ALTERNATIVE_2 __stringify(IND_THUNK_RETPOLINE \reg),              \
         __stringify(IND_THUNK_LFENCE \reg), X86_FEATURE_IND_THUNK_LFENCE, \
         __stringify(IND_THUNK_JMP \reg),    X86_FEATURE_IND_THUNK_JMP
+
+        int3 /* Halt straight-line speculation */
 
         .size __x86_indirect_thunk_\reg, . - __x86_indirect_thunk_\reg
         .type __x86_indirect_thunk_\reg, @function
