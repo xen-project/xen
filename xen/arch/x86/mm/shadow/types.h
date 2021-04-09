@@ -283,9 +283,18 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
  * This is only feasible for PAE and 64bit Xen: 32-bit non-PAE PTEs don't
  * have reserved bits that we can use for this.  And even there it can only
  * be used if we can be certain the processor doesn't use all 52 address bits.
+ *
+ * For the MMIO encoding (see below) we need the bottom 4 bits for
+ * identifying the kind of entry and a full GFN's worth of bits to encode
+ * the originating frame number.  Set all remaining bits to trigger
+ * reserved bit faults, if (see above) the hardware permits triggering such.
  */
 
-#define SH_L1E_MAGIC 0xffffffff00000001ULL
+#ifdef CONFIG_BIGMEM
+# define SH_L1E_MAGIC_MASK (0xfffff00000000000UL | _PAGE_PRESENT)
+#else
+# define SH_L1E_MAGIC_MASK (0xfffffff000000000UL | _PAGE_PRESENT)
+#endif
 
 static inline bool sh_have_pte_rsvd_bits(void)
 {
@@ -294,7 +303,8 @@ static inline bool sh_have_pte_rsvd_bits(void)
 
 static inline bool sh_l1e_is_magic(shadow_l1e_t sl1e)
 {
-    return (sl1e.l1 & SH_L1E_MAGIC) == SH_L1E_MAGIC;
+    BUILD_BUG_ON(!(PADDR_MASK & PAGE_MASK & SH_L1E_MAGIC_MASK));
+    return (sl1e.l1 & SH_L1E_MAGIC_MASK) == SH_L1E_MAGIC_MASK;
 }
 
 /* Guest not present: a single magic value */
@@ -320,24 +330,30 @@ static inline bool sh_l1e_is_gnp(shadow_l1e_t sl1e)
 
 /*
  * MMIO: an invalid PTE that contains the GFN of the equivalent guest l1e.
- * We store 28 bits of GFN in bits 4:32 of the entry.
+ * We store the GFN in bits 4:35 (BIGMEM: 4:43) of the entry.
  * The present bit is set, and the U/S and R/W bits are taken from the guest.
  * Bit 3 is always 0, to differentiate from gnp above.
  */
-#define SH_L1E_MMIO_MAGIC       0xffffffff00000001ULL
-#define SH_L1E_MMIO_MAGIC_MASK  0xffffffff00000009ULL
-#define SH_L1E_MMIO_GFN_MASK    0x00000000fffffff0ULL
+#define SH_L1E_MMIO_MAGIC       SH_L1E_MAGIC_MASK
+#define SH_L1E_MMIO_MAGIC_BIT   8
+#define SH_L1E_MMIO_MAGIC_MASK  (SH_L1E_MMIO_MAGIC | SH_L1E_MMIO_MAGIC_BIT)
+#define SH_L1E_MMIO_GFN_MASK    ~(SH_L1E_MMIO_MAGIC_MASK | _PAGE_RW | _PAGE_USER)
 
 static inline shadow_l1e_t sh_l1e_mmio(gfn_t gfn, u32 gflags)
 {
     unsigned long gfn_val = MASK_INSR(gfn_x(gfn), SH_L1E_MMIO_GFN_MASK);
+    shadow_l1e_t sl1e = { (SH_L1E_MMIO_MAGIC | gfn_val |
+                           (gflags & (_PAGE_USER | _PAGE_RW))) };
+
+    BUILD_BUG_ON(SH_L1E_MMIO_MAGIC_BIT <= _PAGE_RW);
+    BUILD_BUG_ON(SH_L1E_MMIO_MAGIC_BIT <= _PAGE_USER);
 
     if ( !sh_have_pte_rsvd_bits() ||
-         gfn_x(gfn) != MASK_EXTR(gfn_val, SH_L1E_MMIO_GFN_MASK) )
-        return shadow_l1e_empty();
+         (cpu_has_bug_l1tf &&
+          !is_l1tf_safe_maddr(shadow_l1e_get_paddr(sl1e))) )
+        sl1e = shadow_l1e_empty();
 
-    return (shadow_l1e_t) { (SH_L1E_MMIO_MAGIC | gfn_val |
-                             (gflags & (_PAGE_USER | _PAGE_RW))) };
+    return sl1e;
 }
 
 static inline bool sh_l1e_is_mmio(shadow_l1e_t sl1e)

@@ -45,6 +45,7 @@ extern uint8_t default_spec_ctrl_flags;
 
 extern int8_t opt_xpti_hwdom, opt_xpti_domu;
 
+extern bool cpu_has_bug_l1tf;
 extern int8_t opt_pv_l1tf_hwdom, opt_pv_l1tf_domu;
 
 /*

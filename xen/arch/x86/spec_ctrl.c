@@ -59,7 +59,7 @@ uint8_t __read_mostly default_xen_spec_ctrl;
 uint8_t __read_mostly default_spec_ctrl_flags;
 
 paddr_t __read_mostly l1tf_addr_mask, __read_mostly l1tf_safe_maddr;
-static bool __initdata cpu_has_bug_l1tf;
+bool __read_mostly cpu_has_bug_l1tf;
 static unsigned int __initdata l1d_maxphysaddr;
 
 static bool __initdata cpu_has_bug_msbds_only; /* => minimal HT impact. */
