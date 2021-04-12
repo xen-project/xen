@@ -1834,14 +1834,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
         NULL  /* unused  */
     };
 
-    static const unsigned int callback_mask =
-          SHF_L1_32
-        | SHF_FL1_32
-        | SHF_L1_PAE
-        | SHF_FL1_PAE
-        | SHF_L1_64
-        | SHF_FL1_64
-        ;
+    static const unsigned int callback_mask = SHF_L1_ANY | SHF_FL1_ANY;
     struct page_info *pg = mfn_to_page(gmfn);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     struct vcpu *curr = current;
@@ -2065,14 +2058,7 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
         NULL  /* unused  */
     };
 
-    static const unsigned int callback_mask =
-          SHF_L1_32
-        | SHF_FL1_32
-        | SHF_L1_PAE
-        | SHF_FL1_PAE
-        | SHF_L1_64
-        | SHF_FL1_64
-        ;
+    static const unsigned int callback_mask = SHF_L1_ANY | SHF_FL1_ANY;
 
     perfc_incr(shadow_mappings);
     if ( sh_check_page_has_no_refs(page) )
@@ -3424,11 +3410,9 @@ void shadow_audit_tables(struct vcpu *v)
         /* Audit only the current mode's tables */
         switch ( v->arch.paging.mode->guest_levels )
         {
-        case 2: mask = (SHF_L1_32|SHF_FL1_32|SHF_L2_32); break;
-        case 3: mask = (SHF_L1_PAE|SHF_FL1_PAE|SHF_L2_PAE
-                        |SHF_L2H_PAE); break;
-        case 4: mask = (SHF_L1_64|SHF_FL1_64|SHF_L2_64
-                        |SHF_L3_64|SHF_L4_64); break;
+        case 2: mask = SHF_32; break;
+        case 3: mask = SHF_PAE; break;
+        case 4: mask = SHF_64; break;
         default: BUG();
         }
     }
