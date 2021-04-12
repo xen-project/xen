@@ -171,6 +171,7 @@ extern void shadow_audit_tables(struct vcpu *v);
 /* Shadow type codes */
 #define SH_type_none           (0U) /* on the shadow free list */
 #define SH_type_min_shadow     (1U)
+#ifdef CONFIG_HVM
 #define SH_type_l1_32_shadow   (1U) /* shadowing a 32-bit L1 guest page */
 #define SH_type_fl1_32_shadow  (2U) /* L1 shadow for a 32b 4M superpage */
 #define SH_type_l2_32_shadow   (3U) /* shadowing a 32-bit L2 guest page */
@@ -188,6 +189,25 @@ extern void shadow_audit_tables(struct vcpu *v);
 #define SH_type_monitor_table (14U) /* in use as a monitor table */
 #define SH_type_oos_snapshot  (15U) /* in use as OOS snapshot */
 #define SH_type_unused        (16U)
+#else
+#define SH_type_l1_32_shadow   SH_type_unused
+#define SH_type_fl1_32_shadow  SH_type_unused
+#define SH_type_l2_32_shadow   SH_type_unused
+#define SH_type_l1_pae_shadow  SH_type_unused
+#define SH_type_fl1_pae_shadow SH_type_unused
+#define SH_type_l2_pae_shadow  SH_type_unused
+#define SH_type_l1_64_shadow   1U /* shadowing a 64-bit L1 page */
+#define SH_type_fl1_64_shadow  2U /* L1 shadow for 64-bit 2M superpg */
+#define SH_type_l2_64_shadow   3U /* shadowing a 64-bit L2 page */
+#define SH_type_l2h_64_shadow  4U /* shadowing a compat PAE L2 high page */
+#define SH_type_l3_64_shadow   5U /* shadowing a 64-bit L3 page */
+#define SH_type_l4_64_shadow   6U /* shadowing a 64-bit L4 page */
+#define SH_type_max_shadow     6U
+#define SH_type_p2m_table      7U /* in use as the p2m table */
+#define SH_type_monitor_table  8U /* in use as a monitor table */
+#define SH_type_oos_snapshot   9U /* in use as OOS snapshot */
+#define SH_type_unused        10U
+#endif
 
 /*
  * What counts as a pinnable shadow?
@@ -248,12 +268,21 @@ static inline void sh_terminate_list(struct page_list_head *tmp_list)
     (((1u << (SH_type_max_shadow + 1u)) - 1u) - \
      ((1u << SH_type_min_shadow) - 1u))
 
+#ifdef CONFIG_HVM
 #define SHF_L1_32   (1u << SH_type_l1_32_shadow)
 #define SHF_FL1_32  (1u << SH_type_fl1_32_shadow)
 #define SHF_L2_32   (1u << SH_type_l2_32_shadow)
 #define SHF_L1_PAE  (1u << SH_type_l1_pae_shadow)
 #define SHF_FL1_PAE (1u << SH_type_fl1_pae_shadow)
 #define SHF_L2_PAE  (1u << SH_type_l2_pae_shadow)
+#else
+#define SHF_L1_32   0
+#define SHF_FL1_32  0
+#define SHF_L2_32   0
+#define SHF_L1_PAE  0
+#define SHF_FL1_PAE 0
+#define SHF_L2_PAE  0
+#endif
 #define SHF_L1_64   (1u << SH_type_l1_64_shadow)
 #define SHF_FL1_64  (1u << SH_type_fl1_64_shadow)
 #define SHF_L2_64   (1u << SH_type_l2_64_shadow)
@@ -329,8 +358,13 @@ extern const u8 sh_type_to_size[SH_type_unused];
 static inline unsigned int
 shadow_size(unsigned int shadow_type)
 {
+#ifdef CONFIG_HVM
     ASSERT(shadow_type < ARRAY_SIZE(sh_type_to_size));
     return sh_type_to_size[shadow_type];
+#else
+    ASSERT(shadow_type < SH_type_unused);
+    return 1;
+#endif
 }
 
 /******************************************************************************
@@ -488,8 +522,10 @@ static inline unsigned long __backpointer(const struct page_info *sp)
 {
     switch (sp->u.sh.type)
     {
+#ifdef CONFIG_HVM
     case SH_type_fl1_32_shadow:
     case SH_type_fl1_pae_shadow:
+#endif
     case SH_type_fl1_64_shadow:
         return sp->v.sh.back;
     }
