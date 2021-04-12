@@ -195,7 +195,6 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define SH_type_l1_shadow  SH_type_l1_pae_shadow
 #define SH_type_fl1_shadow SH_type_fl1_pae_shadow
 #define SH_type_l2_shadow  SH_type_l2_pae_shadow
-#define SH_type_l2h_shadow SH_type_l2h_pae_shadow
 #elif GUEST_PAGING_LEVELS == 4
 #define SH_type_l1_shadow  SH_type_l1_64_shadow
 #define SH_type_fl1_shadow SH_type_fl1_64_shadow

@@ -334,7 +334,7 @@ static void sh_audit_gw(struct vcpu *v, const walk_t *gw)
         if ( mfn_valid((smfn = get_shadow_status(d, gw->l2mfn,
                                                  SH_type_l2_shadow))) )
             (void) sh_audit_l2_table(v, smfn, INVALID_MFN);
-#if GUEST_PAGING_LEVELS == 3
+#if GUEST_PAGING_LEVELS >= 4 /* 32-bit PV only */
         if ( mfn_valid((smfn = get_shadow_status(d, gw->l2mfn,
                                                  SH_type_l2h_shadow))) )
             (void) sh_audit_l2_table(v, smfn, INVALID_MFN);
@@ -938,7 +938,8 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
         /* Lower-level shadow, not yet linked form a higher level */
         mfn_to_page(smfn)->up = 0;
 
-#if GUEST_PAGING_LEVELS == 4
+#if GUEST_PAGING_LEVELS >= 4
+
 #if (SHADOW_OPTIMIZATIONS & SHOPT_LINUX_L3_TOPLEVEL)
     if ( shadow_type == SH_type_l4_64_shadow &&
          unlikely(d->arch.paging.shadow.opt_flags & SHOPT_LINUX_L3_TOPLEVEL) )
@@ -970,14 +971,12 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
         }
     }
 #endif
-#endif
 
     // Create the Xen mappings...
     if ( !shadow_mode_external(d) )
     {
         switch (shadow_type)
         {
-#if GUEST_PAGING_LEVELS == 4
         case SH_type_l4_shadow:
         {
             shadow_l4e_t *l4t = map_domain_page(smfn);
@@ -989,8 +988,7 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
             unmap_domain_page(l4t);
         }
         break;
-#endif
-#if GUEST_PAGING_LEVELS >= 3
+
         case SH_type_l2h_shadow:
             BUILD_BUG_ON(sizeof(l2_pgentry_t) != sizeof(shadow_l2e_t));
             if ( is_pv_32bit_domain(d) )
@@ -1001,10 +999,11 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
                 unmap_domain_page(l2t);
             }
             break;
-#endif
         default: /* Do nothing */ break;
         }
     }
+
+#endif /* GUEST_PAGING_LEVELS >= 4 */
 
     shadow_promote(d, gmfn, shadow_type);
     set_shadow_status(d, gmfn, shadow_type, smfn);
@@ -1335,7 +1334,7 @@ void sh_destroy_l2_shadow(struct domain *d, mfn_t smfn)
 
     SHADOW_DEBUG(DESTROY_SHADOW, "%"PRI_mfn"\n", mfn_x(smfn));
 
-#if GUEST_PAGING_LEVELS >= 3
+#if GUEST_PAGING_LEVELS >= 4
     ASSERT(t == SH_type_l2_shadow || t == SH_type_l2h_shadow);
 #else
     ASSERT(t == SH_type_l2_shadow);
@@ -1859,7 +1858,7 @@ int
 sh_map_and_validate_gl2he(struct vcpu *v, mfn_t gl2mfn,
                            void *new_gl2p, u32 size)
 {
-#if GUEST_PAGING_LEVELS >= 3
+#if GUEST_PAGING_LEVELS >= 4
     return sh_map_and_validate(v, gl2mfn, new_gl2p, size,
                                 SH_type_l2h_shadow,
                                 shadow_l2_index,
@@ -3360,9 +3359,7 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
                 gl2gfn = guest_l3e_get_gfn(gl3e[i]);
                 gl2mfn = get_gfn_query_unlocked(d, gfn_x(gl2gfn), &p2mt);
                 if ( p2m_is_ram(p2mt) )
-                    sh_set_toplevel_shadow(v, i, gl2mfn, (i == 3)
-                                           ? SH_type_l2h_shadow
-                                           : SH_type_l2_shadow,
+                    sh_set_toplevel_shadow(v, i, gl2mfn, SH_type_l2_shadow,
                                            sh_make_shadow);
                 else
                     sh_set_toplevel_shadow(v, i, INVALID_MFN, 0,
@@ -3664,7 +3661,7 @@ void sh_clear_shadow_entry(struct domain *d, void *ep, mfn_t smfn)
         (void) shadow_set_l1e(d, ep, shadow_l1e_empty(), p2m_invalid, smfn);
         break;
     case SH_type_l2_shadow:
-#if GUEST_PAGING_LEVELS >= 3
+#if GUEST_PAGING_LEVELS >= 4
     case SH_type_l2h_shadow:
 #endif
         (void) shadow_set_l2e(d, ep, shadow_l2e_empty(), smfn);
@@ -4116,10 +4113,8 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
             mfn = shadow_l3e_get_mfn(*sl3e);
             gmfn = get_shadow_status(d, get_gfn_query_unlocked(
                                         d, gfn_x(gfn), &p2mt),
-                                     ((GUEST_PAGING_LEVELS == 3 ||
-                                       is_pv_32bit_domain(d))
-                                      && !shadow_mode_external(d)
-                                      && (guest_index(gl3e) % 4) == 3)
+                                     (is_pv_32bit_domain(d) &&
+                                      guest_index(gl3e) == 3)
                                      ? SH_type_l2h_shadow
                                      : SH_type_l2_shadow);
             if ( !mfn_eq(gmfn, mfn) )
