@@ -22,16 +22,12 @@ static unsigned __initdata inptr;
 static unsigned __initdata outcnt;
 
 #define OF(args)        args
-#define STATIC          static
 
 #define memzero(s, n)   memset((s), 0, (n))
 
 typedef unsigned char   uch;
 typedef unsigned short  ush;
 typedef unsigned long   ulg;
-
-#define INIT            __init
-#define INITDATA        __initdata
 
 #define get_byte()      (inptr < insize ? inbuf[inptr++] : fill_inbuf())
 

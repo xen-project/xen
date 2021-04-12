@@ -107,7 +107,7 @@
 static char rcsid[] = "#Id: inflate.c,v 0.14 1993/06/10 13:27:04 jloup Exp #";
 #endif
 
-#ifndef STATIC
+#ifndef __XEN__
 
 #if defined(STDC_HEADERS) || defined(HAVE_STDLIB_H)
 #  include <sys/types.h>
@@ -115,14 +115,9 @@ static char rcsid[] = "#Id: inflate.c,v 0.14 1993/06/10 13:27:04 jloup Exp #";
 #endif
 
 #include "gzip.h"
-#define STATIC
-#endif /* !STATIC */
 
-#ifndef INIT
-#define INIT
-#define INITDATA
-#endif
- 
+#endif /* !__XEN__ */
+
 #define slide window
 
 /* Huffman code lookup table entry--this entry is four bytes for machines
@@ -143,15 +138,15 @@ struct huft {
 
 
 /* Function prototypes */
-STATIC int INIT huft_build OF((unsigned *, unsigned, unsigned, 
-                               const ush *, const ush *, struct huft **, int *));
-STATIC int INIT huft_free OF((struct huft *));
-STATIC int INIT inflate_codes OF((struct huft *, struct huft *, int, int));
-STATIC int INIT inflate_stored OF((void));
-STATIC int INIT inflate_fixed OF((void));
-STATIC int INIT inflate_dynamic OF((void));
-STATIC int INIT inflate_block OF((int *));
-STATIC int INIT inflate OF((void));
+static int huft_build OF((unsigned *, unsigned, unsigned,
+                          const ush *, const ush *, struct huft **, int *));
+static int huft_free OF((struct huft *));
+static int inflate_codes OF((struct huft *, struct huft *, int, int));
+static int inflate_stored OF((void));
+static int inflate_fixed OF((void));
+static int inflate_dynamic OF((void));
+static int inflate_block OF((int *));
+static int inflate OF((void));
 
 
 /* The inflate algorithm uses a sliding 32 K byte window on the uncompressed
@@ -217,10 +212,10 @@ static const ush cpdext[] = {         /* Extra bits for distance codes */
    the stream.
  */
 
-STATIC ulg INITDATA bb;                /* bit buffer */
-STATIC unsigned INITDATA bk;           /* bits in bit buffer */
+static ulg __initdata bb;                /* bit buffer */
+static unsigned __initdata bk;           /* bits in bit buffer */
 
-STATIC const ush mask_bits[] = {
+static const ush mask_bits[] = {
     0x0000,
     0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f, 0x00ff,
     0x01ff, 0x03ff, 0x07ff, 0x0fff, 0x1fff, 0x3fff, 0x7fff, 0xffff
@@ -235,16 +230,16 @@ STATIC const ush mask_bits[] = {
  *  malloc by Hannu Savolainen 1993 and Matthias Urlichs 1994
  */
 
-static unsigned long INITDATA malloc_ptr;
-static int INITDATA malloc_count;
+static unsigned long __initdata malloc_ptr;
+static int __initdata malloc_count;
 
-static void INIT init_allocator(void)
+static void __init init_allocator(void)
 {
     malloc_ptr = free_mem_ptr;
     malloc_count = 0;
 }
 
-static void *INIT malloc(int size)
+static void *__init malloc(int size)
 {
     void *p;
 
@@ -265,7 +260,7 @@ static void *INIT malloc(int size)
     return p;
 }
 
-static void INIT free(void *where)
+static void __init free(void *where)
 {
     malloc_count--;
     if (!malloc_count)
@@ -309,8 +304,8 @@ static void INIT free(void *where)
  */
 
 
-STATIC const int lbits = 9;          /* bits in base literal/length lookup table */
-STATIC const int dbits = 6;          /* bits in base distance lookup table */
+static const int lbits = 9;          /* bits in base literal/length lookup table */
+static const int dbits = 6;          /* bits in base distance lookup table */
 
 
 /* If BMAX needs to be larger than 16, then h and x[] should be ulg. */
@@ -318,10 +313,10 @@ STATIC const int dbits = 6;          /* bits in base distance lookup table */
 #define N_MAX 288       /* maximum number of codes in any set */
 
 
-STATIC unsigned INITDATA hufts;      /* track memory usage */
+static unsigned __initdata hufts;      /* track memory usage */
 
 
-STATIC int INIT huft_build(
+static int __init huft_build(
     unsigned *b,            /* code lengths in bits (all assumed <= BMAX) */
     unsigned n,             /* number of codes (assumed <= N_MAX) */
     unsigned s,             /* number of simple-valued codes (0..s-1) */
@@ -566,7 +561,7 @@ STATIC int INIT huft_build(
 
 
 
-STATIC int INIT huft_free(
+static int __init huft_free(
     struct huft *t         /* table to free */
     )
 /* Free the malloc'ed tables built by huft_build(), which makes a linked
@@ -588,7 +583,7 @@ STATIC int INIT huft_free(
 }
 
 
-STATIC int INIT inflate_codes(
+static int __init inflate_codes(
     struct huft *tl,    /* literal/length decoder tables */
     struct huft *td,    /* distance decoder tables */
     int bl,             /* number of bits decoded by tl[] */
@@ -703,7 +698,7 @@ STATIC int INIT inflate_codes(
 
 
 
-STATIC int INIT inflate_stored(void)
+static int __init inflate_stored(void)
 /* "decompress" an inflated type 0 (stored) block. */
 {
     unsigned n;           /* number of bytes in block */
@@ -764,7 +759,7 @@ STATIC int INIT inflate_stored(void)
 /*
  * We use `noinline' here to prevent gcc-3.5 from using too much stack space
  */
-STATIC int noinline INIT inflate_fixed(void)
+static int noinline __init inflate_fixed(void)
 /* decompress an inflated type 1 (fixed Huffman codes) block.  We should
    either replace this with a custom decoder, or at least precompute the
    Huffman tables. */
@@ -828,7 +823,7 @@ STATIC int noinline INIT inflate_fixed(void)
 /*
  * We use `noinline' here to prevent gcc-3.5 from using too much stack space
  */
-STATIC int noinline INIT inflate_dynamic(void)
+static int noinline __init inflate_dynamic(void)
 /* decompress an inflated type 2 (dynamic Huffman codes) block. */
 {
     int i;                /* temporary variables */
@@ -1033,7 +1028,7 @@ goto out;
 
 
 
-STATIC int INIT inflate_block(
+static int __init inflate_block(
 int *e                  /* last block flag */
 )
 /* decompress an inflated block */
@@ -1084,7 +1079,7 @@ NEEDBITS(1)
 
 
 
-STATIC int INIT inflate(void)
+static int __init inflate(void)
 /* decompress an inflated entry */
 {
     int e;                /* last block flag */
@@ -1136,8 +1131,8 @@ STATIC int INIT inflate(void)
  *
  **********************************************************************/
 
-static ulg INITDATA crc_32_tab[256];
-static ulg INITDATA crc;  /* initialized in makecrc() so it'll reside in bss */
+static ulg __initdata crc_32_tab[256];
+static ulg __initdata crc;  /* initialized in makecrc() so it'll reside in bss */
 #define CRC_VALUE (crc ^ 0xffffffffUL)
 
 /*
@@ -1145,7 +1140,7 @@ static ulg INITDATA crc;  /* initialized in makecrc() so it'll reside in bss */
  * gzip-1.0.3/makecrc.c.
  */
 
-static void INIT
+static void __init
 makecrc(void)
 {
 /* Not copyrighted 1990 Mark Adler */
@@ -1193,7 +1188,7 @@ makecrc(void)
 /*
  * Do the uncompression!
  */
-static int INIT gunzip(void)
+static int __init gunzip(void)
 {
     uch flags;
     unsigned char magic[2]; /* magic header */
