@@ -747,50 +747,50 @@ l1e_propagate_from_guest(struct vcpu *v,
  * functions which ever write (non-zero) data onto a shadow page.
  */
 
-static inline void safe_write_entry(void *dst, void *src)
-/* Copy one PTE safely when processors might be running on the
- * destination pagetable.   This does *not* give safety against
- * concurrent writes (that's what the paging lock is for), just
- * stops the hardware picking up partially written entries. */
-{
-    volatile unsigned long *d = dst;
-    unsigned long *s = src;
-    ASSERT(!((unsigned long) d & (sizeof (shadow_l1e_t) - 1)));
-    /* In 64-bit, sizeof(pte) == sizeof(ulong) == 1 word,
-     * which will be an atomic write, since the entry is aligned. */
-    BUILD_BUG_ON(sizeof (shadow_l1e_t) != sizeof (unsigned long));
-    *d = *s;
-}
-
-
 static inline void
-shadow_write_entries(void *d, void *s, int entries, mfn_t mfn)
-/* This function does the actual writes to shadow pages.
+shadow_write_entries(void *d, const void *s, unsigned int entries, mfn_t mfn)
+/*
+ * This function does the actual writes to shadow pages.
  * It must not be called directly, since it doesn't do the bookkeeping
- * that shadow_set_l*e() functions do. */
+ * that shadow_set_l*e() functions do.
+ *
+ * Copy PTEs safely when processors might be running on the
+ * destination pagetable.  This does *not* give safety against
+ * concurrent writes (that's what the paging lock is for), just
+ * stops the hardware picking up partially written entries.
+ */
 {
     shadow_l1e_t *dst = d;
-    shadow_l1e_t *src = s;
+    const shadow_l1e_t *src = s;
     void *map = NULL;
-    int i;
+    unsigned int i = 0;
 
-    /* Because we mirror access rights at all levels in the shadow, an
+    /*
+     * Because we mirror access rights at all levels in the shadow, an
      * l2 (or higher) entry with the RW bit cleared will leave us with
      * no write access through the linear map.
      * We detect that by writing to the shadow with put_unsafe() and
-     * using map_domain_page() to get a writeable mapping if we need to. */
-    if ( put_unsafe(*dst, dst) )
+     * using map_domain_page() to get a writeable mapping if we need to.
+     */
+    if ( put_unsafe(*src, dst) )
     {
         perfc_incr(shadow_linear_map_failed);
         map = map_domain_page(mfn);
-        dst = map + ((unsigned long)dst & (PAGE_SIZE - 1));
+        dst = map + PAGE_OFFSET(dst);
+    }
+    else
+    {
+        ++src;
+        ++dst;
+        i = 1;
     }
 
+    ASSERT(IS_ALIGNED((unsigned long)dst, sizeof(*dst)));
 
-    for ( i = 0; i < entries; i++ )
-        safe_write_entry(dst++, src++);
+    for ( ; i < entries; i++ )
+        write_atomic(&dst++->l1, src++->l1);
 
-    if ( map != NULL ) unmap_domain_page(map);
+    unmap_domain_page(map);
 }
 
 /* type is only used to distinguish grant map pages from ordinary RAM
