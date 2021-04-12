@@ -27,7 +27,7 @@ int shadow_domain_init(struct domain *d)
     };
 
     paging_log_dirty_init(d, &sh_none_ops);
-    return is_pv_domain(d) ? 0 : -EOPNOTSUPP;
+    return is_hvm_domain(d) ? -EOPNOTSUPP : 0;
 }
 
 static int _page_fault(struct vcpu *v, unsigned long va,

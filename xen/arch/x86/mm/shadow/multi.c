@@ -667,8 +667,8 @@ _sh_propagate(struct vcpu *v,
     // PV guests in 64-bit mode use two different page tables for user vs
     // supervisor permissions, making the guest's _PAGE_USER bit irrelevant.
     // It is always shadowed as present...
-    if ( (GUEST_PAGING_LEVELS == 4) && !is_pv_32bit_domain(d)
-         && is_pv_domain(d) )
+    if ( (GUEST_PAGING_LEVELS == 4) && !is_hvm_domain(d) &&
+         !is_pv_32bit_domain(d) )
     {
         sflags |= _PAGE_USER;
     }
@@ -1120,7 +1120,7 @@ static shadow_l2e_t * shadow_get_and_create_l2e(struct vcpu *v,
         unsigned int t = SH_type_l2_shadow;
 
         /* Tag compat L2 containing hypervisor (m2p) mappings */
-        if ( is_pv_32bit_vcpu(v) &&
+        if ( is_pv_32bit_domain(d) &&
              guest_l4_table_offset(gw->va) == 0 &&
              guest_l3_table_offset(gw->va) == 3 )
             t = SH_type_l2h_shadow;
@@ -2314,7 +2314,7 @@ static int sh_page_fault(struct vcpu *v,
         return 0;
     }
 
-    cpl = is_pv_vcpu(v) ? (regs->ss & 3) : hvm_get_cpl(v);
+    cpl = is_hvm_domain(d) ? hvm_get_cpl(v) : (regs->ss & 3);
 
  rewalk:
 
@@ -3237,7 +3237,7 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 #endif
 
     /* Don't do anything on an uninitialised vcpu */
-    if ( is_pv_domain(d) && !v->is_initialised )
+    if ( !is_hvm_domain(d) && !v->is_initialised )
     {
         ASSERT(v->arch.cr3 == 0);
         return;

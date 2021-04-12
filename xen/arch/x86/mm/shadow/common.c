@@ -674,7 +674,7 @@ int sh_unsync(struct vcpu *v, mfn_t gmfn)
     if ( pg->shadow_flags &
          ((SHF_page_type_mask & ~SHF_L1_ANY) | SHF_out_of_sync)
          || sh_page_has_multiple_shadows(pg)
-         || is_pv_vcpu(v)
+         || !is_hvm_vcpu(v)
          || !v->domain->arch.paging.shadow.oos_active )
         return 0;
 
@@ -2432,7 +2432,7 @@ static void sh_update_paging_modes(struct vcpu *v)
         v->arch.paging.mode->shadow.detach_old_tables(v);
 
 #ifdef CONFIG_HVM
-    if ( !is_pv_domain(d) )
+    if ( is_hvm_domain(d) )
     {
         const struct paging_mode *old_mode = v->arch.paging.mode;
 
