@@ -792,9 +792,6 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
     if ( page->shadow_flags & SHF_L2_PAE )
         result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl2e, 3)
             (v, gmfn, entry, size);
-    if ( page->shadow_flags & SHF_L2H_PAE )
-        result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl2he, 3)
-            (v, gmfn, entry, size);
 
     if ( page->shadow_flags & SHF_L1_64 )
         result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl1e, 4)
@@ -859,7 +856,6 @@ const u8 sh_type_to_size[] = {
     1, /* SH_type_l1_pae_shadow  */
     1, /* SH_type_fl1_pae_shadow */
     1, /* SH_type_l2_pae_shadow  */
-    1, /* SH_type_l2h_pae_shadow */
     1, /* SH_type_l1_64_shadow   */
     1, /* SH_type_fl1_64_shadow  */
     1, /* SH_type_l2_64_shadow   */
@@ -900,7 +896,6 @@ void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only)
         SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, 2)(d, smfn, user_only);
         break;
     case SH_type_l2_pae_shadow:
-    case SH_type_l2h_pae_shadow:
         SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, 3)(d, smfn, user_only);
         break;
     case SH_type_l4_64_shadow:
@@ -1764,7 +1759,6 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn)
         SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 3)(d, smfn);
         break;
     case SH_type_l2_pae_shadow:
-    case SH_type_l2h_pae_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 3)(d, smfn);
         break;
 
@@ -1823,7 +1817,6 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 3), /* l1_pae  */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 3), /* fl1_pae */
         NULL, /* l2_pae  */
-        NULL, /* l2h_pae */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 4), /* l1_64   */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 4), /* fl1_64  */
         NULL, /* l2_64   */
@@ -2047,7 +2040,6 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3), /* l1_pae  */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3), /* fl1_pae */
         NULL, /* l2_pae  */
-        NULL, /* l2h_pae */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4), /* l1_64   */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4), /* fl1_64  */
         NULL, /* l2_64   */
@@ -2145,7 +2137,6 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
         break;
     case SH_type_l1_pae_shadow:
     case SH_type_l2_pae_shadow:
-    case SH_type_l2h_pae_shadow:
         SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, 3)(d, vaddr, pmfn);
         break;
     case SH_type_l1_64_shadow:
@@ -2190,7 +2181,6 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
         NULL, /* l1_pae  */
         NULL, /* fl1_pae */
         SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 3), /* l2_pae  */
-        SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 3), /* l2h_pae */
         NULL, /* l1_64   */
         NULL, /* fl1_64  */
         SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 4), /* l2_64   */
@@ -2207,10 +2197,9 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
         SHF_L2_32, /* l1_32   */
         0, /* fl1_32  */
         0, /* l2_32   */
-        SHF_L2H_PAE | SHF_L2_PAE, /* l1_pae  */
+        SHF_L2_PAE, /* l1_pae  */
         0, /* fl1_pae */
         0, /* l2_pae  */
-        0, /* l2h_pae  */
         SHF_L2H_64 | SHF_L2_64, /* l1_64   */
         0, /* fl1_64  */
         SHF_L3_64, /* l2_64   */
@@ -2273,7 +2262,6 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 
     DO_UNSHADOW(SH_type_l2_32_shadow);
     DO_UNSHADOW(SH_type_l1_32_shadow);
-    DO_UNSHADOW(SH_type_l2h_pae_shadow);
     DO_UNSHADOW(SH_type_l2_pae_shadow);
     DO_UNSHADOW(SH_type_l1_pae_shadow);
     DO_UNSHADOW(SH_type_l4_64_shadow);
@@ -2356,7 +2344,6 @@ void sh_reset_l3_up_pointers(struct vcpu *v)
         NULL, /* l1_pae  */
         NULL, /* fl1_pae */
         NULL, /* l2_pae  */
-        NULL, /* l2h_pae */
         NULL, /* l1_64   */
         NULL, /* fl1_64  */
         NULL, /* l2_64   */
@@ -3381,7 +3368,6 @@ void shadow_audit_tables(struct vcpu *v)
         SHADOW_INTERNAL_NAME(sh_audit_l1_table, 3),  /* l1_pae  */
         SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 3), /* fl1_pae */
         SHADOW_INTERNAL_NAME(sh_audit_l2_table, 3),  /* l2_pae  */
-        SHADOW_INTERNAL_NAME(sh_audit_l2_table, 3),  /* l2h_pae */
         SHADOW_INTERNAL_NAME(sh_audit_l1_table, 4),  /* l1_64   */
         SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 4), /* fl1_64  */
         SHADOW_INTERNAL_NAME(sh_audit_l2_table, 4),  /* l2_64   */

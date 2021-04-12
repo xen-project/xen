@@ -838,8 +838,7 @@ do {                                                                       \
     int _i;                                                                \
     shadow_l2e_t *_sp = map_domain_page((_sl2mfn));                        \
     ASSERT(shadow_mode_external(_dom));                                    \
-    ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_pae_shadow        \
-           || mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2h_pae_shadow);  \
+    ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_pae_shadow);      \
     for ( _i = 0; _i < SHADOW_L2_PAGETABLE_ENTRIES; _i++ )                 \
     {                                                                      \
         (_sl2e) = _sp + _i;                                                \

@@ -568,7 +568,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
          && sh_mfn_is_a_page_table(gmfn)
          && (!d->arch.paging.shadow.pagetable_dying_op ||
              !(mfn_to_page(gmfn)->shadow_flags
-               & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64))) )
+               & (SHF_L2_32|SHF_L2_PAE|SHF_L4_64))) )
     {
         perfc_incr(shadow_early_unshadow);
         sh_remove_shadows(d, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
