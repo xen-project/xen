@@ -2613,10 +2613,9 @@ static int sh_page_fault(struct vcpu *v,
         {
             shadow_l2e_t sl2e;
             mfn_t gl1mfn;
-            if ( (copy_from_unsafe(&sl2e,
-                                   (sh_linear_l2_table(v)
-                                    + shadow_l2_linear_offset(va)),
-                                   sizeof(sl2e)) != 0)
+            if ( (get_unsafe(sl2e,
+                             (sh_linear_l2_table(v) +
+                              shadow_l2_linear_offset(va))) != 0)
                  || !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT)
                  || !mfn_valid(gl1mfn = backpointer(mfn_to_page(
                                   shadow_l2e_get_mfn(sl2e))))
@@ -2632,10 +2631,9 @@ static int sh_page_fault(struct vcpu *v,
 #endif /* SHOPT_OUT_OF_SYNC */
         /* The only reasons for reserved bits to be set in shadow entries
          * are the two "magic" shadow_l1e entries. */
-        if ( likely((copy_from_unsafe(&sl1e,
-                                      (sh_linear_l1_table(v)
-                                       + shadow_l1_linear_offset(va)),
-                                      sizeof(sl1e)) == 0)
+        if ( likely((get_unsafe(sl1e,
+                                (sh_linear_l1_table(v) +
+                                 shadow_l1_linear_offset(va))) == 0)
                     && sh_l1e_is_magic(sl1e)) )
         {
 
@@ -3310,9 +3308,9 @@ static bool sh_invlpg(struct vcpu *v, unsigned long linear)
         /* This must still be a copy-from-unsafe because we don't have the
          * paging lock, and the higher-level shadows might disappear
          * under our feet. */
-        if ( copy_from_unsafe(&sl3e, (sh_linear_l3_table(v)
-                                      + shadow_l3_linear_offset(linear)),
-                              sizeof (sl3e)) != 0 )
+        if ( get_unsafe(sl3e,
+                        (sh_linear_l3_table(v) +
+                         shadow_l3_linear_offset(linear))) != 0 )
         {
             perfc_incr(shadow_invlpg_fault);
             return false;
@@ -3331,9 +3329,9 @@ static bool sh_invlpg(struct vcpu *v, unsigned long linear)
 
     /* This must still be a copy-from-unsafe because we don't have the shadow
      * lock, and the higher-level shadows might disappear under our feet. */
-    if ( copy_from_unsafe(&sl2e,
-                          sh_linear_l2_table(v) + shadow_l2_linear_offset(linear),
-                          sizeof (sl2e)) != 0 )
+    if ( get_unsafe(sl2e,
+                    (sh_linear_l2_table(v) +
+                     shadow_l2_linear_offset(linear))) != 0 )
     {
         perfc_incr(shadow_invlpg_fault);
         return false;
@@ -3374,10 +3372,9 @@ static bool sh_invlpg(struct vcpu *v, unsigned long linear)
              * have the paging lock last time we checked, and the
              * higher-level shadows might have disappeared under our
              * feet. */
-            if ( copy_from_unsafe(&sl2e,
-                                  sh_linear_l2_table(v)
-                                  + shadow_l2_linear_offset(linear),
-                                  sizeof (sl2e)) != 0 )
+            if ( get_unsafe(sl2e,
+                            (sh_linear_l2_table(v) +
+                             shadow_l2_linear_offset(linear))) != 0 )
             {
                 perfc_incr(shadow_invlpg_fault);
                 paging_unlock(d);
