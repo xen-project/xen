@@ -1,5 +1,5 @@
 ifeq ($(CONFIG_SHADOW_PAGING),y)
-obj-y += common.o guest_2.o guest_3.o guest_4.o
+obj-y += common.o guest_2.o guest_3.o guest_4.o set.o
 obj-$(CONFIG_HVM) += hvm.o
 obj-$(CONFIG_PV) += pv.o
 else
