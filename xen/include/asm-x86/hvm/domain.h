@@ -113,14 +113,14 @@ struct hvm_domain {
      * mtrr/pat between vcpus is not the same, set is_in_uc_mode
      */
     spinlock_t             uc_lock;
-    bool_t                 is_in_uc_mode;
+    bool                   is_in_uc_mode;
+
+    bool                   is_s3_suspended;
 
     /* hypervisor intercepted msix table */
     struct list_head       msixtbl_list;
 
     struct viridian_domain *viridian;
-
-    bool_t                 is_s3_suspended;
 
     /*
      * TSC value that VCPUs use to calculate their tsc_offset value.
