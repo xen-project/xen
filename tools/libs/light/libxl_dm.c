@@ -2311,7 +2311,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     dm_config->b_info.target_memkb = dm_config->b_info.max_memkb;
 
     dm_config->b_info.max_grant_frames = guest_config->b_info.max_grant_frames;
-    dm_config->b_info.max_maptrack_frames = 0;
+    dm_config->b_info.max_maptrack_frames = guest_config->b_info.max_maptrack_frames;
 
     dm_config->b_info.u.pv.features = "";
 
