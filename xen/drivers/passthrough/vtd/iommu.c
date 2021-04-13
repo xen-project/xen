@@ -990,8 +990,7 @@ static void __do_iommu_page_fault(struct vtd_iommu *iommu)
     }
 clear_overflow:
     /* clear primary fault overflow */
-    fault_status = readl(iommu->reg + DMAR_FSTS_REG);
-    if ( fault_status & DMA_FSTS_PFO )
+    if ( dmar_readl(iommu->reg, DMAR_FSTS_REG) & DMA_FSTS_PFO )
     {
         spin_lock_irqsave(&iommu->register_lock, flags);
         dmar_writel(iommu->reg, DMAR_FSTS_REG, DMA_FSTS_PFO);
