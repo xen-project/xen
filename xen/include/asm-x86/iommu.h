@@ -22,7 +22,6 @@
 #include <asm/hvm/vmx/vmcs.h>
 
 #define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
-#define MAX_IOMMUS 32
 
 struct g2m_ioport {
     struct list_head list;
