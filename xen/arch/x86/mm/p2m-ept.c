@@ -677,8 +677,6 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     unsigned long fn_mask = !mfn_eq(mfn, INVALID_MFN) ? (gfn | mfn_x(mfn)) : gfn;
     int ret, rc = 0;
     bool_t entry_written = 0;
-    bool_t direct_mmio = (p2mt == p2m_mmio_direct);
-    uint8_t ipat = 0;
     bool_t need_modify_vtd_table = 1;
     bool_t vtd_pte_present = 0;
     unsigned int iommu_flags = p2m_get_iommu_flags(p2mt, mfn);
@@ -790,8 +788,10 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
 
     if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
     {
+        uint8_t ipat = 0;
         int emt = epte_get_entry_emt(p2m->domain, gfn, mfn,
-                                     i * EPT_TABLE_ORDER, &ipat, direct_mmio);
+                                     i * EPT_TABLE_ORDER, &ipat,
+                                     p2mt == p2m_mmio_direct);
 
         if ( emt >= 0 )
             new_entry.emt = emt;
