@@ -33,18 +33,11 @@
 
 static int __must_check invalidate_sync(struct vtd_iommu *iommu);
 
-static void print_qi_regs(struct vtd_iommu *iommu)
+static void print_qi_regs(const struct vtd_iommu *iommu)
 {
-    u64 val;
-
-    val = dmar_readq(iommu->reg, DMAR_IQA_REG);
-    printk("DMAR_IQA_REG = %"PRIx64"\n", val);
-
-    val = dmar_readq(iommu->reg, DMAR_IQH_REG);
-    printk("DMAR_IQH_REG = %"PRIx64"\n", val);
-
-    val = dmar_readq(iommu->reg, DMAR_IQT_REG);
-    printk("DMAR_IQT_REG = %"PRIx64"\n", val);
+    printk(" IQA = %"PRIx64"\n", dmar_readq(iommu->reg, DMAR_IQA_REG));
+    printk(" IQH = %"PRIx64"\n", dmar_readq(iommu->reg, DMAR_IQH_REG));
+    printk(" IQT = %"PRIx64"\n", dmar_readq(iommu->reg, DMAR_IQT_REG));
 }
 
 static unsigned int qinval_next_index(struct vtd_iommu *iommu)
