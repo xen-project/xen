@@ -471,25 +471,11 @@ struct qinval_entry {
 /* Queue invalidation head/tail shift */
 #define QINVAL_INDEX_SHIFT 4
 
-#define qinval_present(v) ((v).lo & 1)
-#define qinval_fault_disable(v) (((v).lo >> 1) & 1)
-
-#define qinval_set_present(v) do {(v).lo |= 1;} while(0)
-#define qinval_clear_present(v) do {(v).lo &= ~1;} while(0)
-
-#define RESERVED_VAL        0
-
 #define TYPE_INVAL_CONTEXT      0x1
 #define TYPE_INVAL_IOTLB        0x2
 #define TYPE_INVAL_DEVICE_IOTLB 0x3
 #define TYPE_INVAL_IEC          0x4
 #define TYPE_INVAL_WAIT         0x5
-
-#define NOTIFY_TYPE_POLL        1
-#define NOTIFY_TYPE_INTR        1
-#define INTERRUTP_FLAG          1
-#define STATUS_WRITE            1
-#define FENCE_FLAG              1
 
 #define IEC_GLOBAL_INVL         0
 #define IEC_INDEX_INVL          1
