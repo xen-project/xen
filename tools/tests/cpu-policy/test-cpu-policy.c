@@ -89,6 +89,16 @@ static bool leaves_are_sorted(const xen_cpuid_leaf_t *leaves, unsigned int nr)
     return true;
 }
 
+static bool msrs_are_sorted(const xen_msr_entry_t *entries, unsigned int nr)
+{
+    for ( unsigned int i = 1; i < nr; ++i )
+        /* MSR index went backwards => not sorted. */
+        if ( entries[i - 1].idx > entries[i].idx )
+            return false;
+
+    return true;
+}
+
 static void test_cpuid_current(void)
 {
     struct cpuid_policy p;
@@ -270,6 +280,13 @@ static void test_msr_serialise_success(void)
         {
             fail("  Test %s, expected %u msrs, got %u\n",
                  t->name, t->nr_msrs, nr);
+            goto test_done;
+        }
+
+        if ( !msrs_are_sorted(msrs, nr) )
+        {
+            fail("  Test %s, MSR entries not sorted\n",
+                 t->name);
             goto test_done;
         }
 
