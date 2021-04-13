@@ -42,14 +42,13 @@ static void print_qi_regs(const struct vtd_iommu *iommu)
 
 static unsigned int qinval_next_index(struct vtd_iommu *iommu)
 {
-    u64 tail;
+    unsigned int tail = dmar_readl(iommu->reg, DMAR_IQT_REG);
 
-    tail = dmar_readq(iommu->reg, DMAR_IQT_REG);
     tail >>= QINVAL_INDEX_SHIFT;
 
     /* (tail+1 == head) indicates a full queue, wait for HW */
-    while ( ( tail + 1 ) % QINVAL_ENTRY_NR ==
-            ( dmar_readq(iommu->reg, DMAR_IQH_REG) >> QINVAL_INDEX_SHIFT ) )
+    while ( (tail + 1) % QINVAL_ENTRY_NR ==
+            (dmar_readl(iommu->reg, DMAR_IQH_REG) >> QINVAL_INDEX_SHIFT) )
         cpu_relax();
 
     return tail;
@@ -57,12 +56,12 @@ static unsigned int qinval_next_index(struct vtd_iommu *iommu)
 
 static void qinval_update_qtail(struct vtd_iommu *iommu, unsigned int index)
 {
-    u64 val;
+    unsigned int val;
 
     /* Need hold register lock when update tail */
     ASSERT( spin_is_locked(&iommu->register_lock) );
     val = (index + 1) % QINVAL_ENTRY_NR;
-    dmar_writeq(iommu->reg, DMAR_IQT_REG, (val << QINVAL_INDEX_SHIFT));
+    dmar_writel(iommu->reg, DMAR_IQT_REG, val << QINVAL_INDEX_SHIFT);
 }
 
 static int __must_check queue_invalidate_context_sync(struct vtd_iommu *iommu,
