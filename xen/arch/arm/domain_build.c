@@ -21,6 +21,7 @@
 #include <asm/device.h>
 #include <asm/kernel.h>
 #include <asm/setup.h>
+#include <asm/tee/tee.h>
 #include <asm/platform.h>
 #include <asm/psci.h>
 #include <asm/setup.h>
@@ -2520,7 +2521,7 @@ void __init create_domUs(void)
     }
 }
 
-int __init construct_dom0(struct domain *d)
+static int __init construct_dom0(struct domain *d)
 {
     struct kernel_info kinfo = {};
     int rc;
@@ -2576,6 +2577,41 @@ int __init construct_dom0(struct domain *d)
         return rc;
 
     return construct_domain(d, &kinfo);
+}
+
+struct domain* __init create_dom0(void)
+{
+    struct domain *dom0;
+    struct xen_domctl_createdomain dom0_cfg = {
+        .flags = XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap,
+        .max_evtchn_port = -1,
+        .max_grant_frames = gnttab_dom0_frames(),
+        .max_maptrack_frames = -1,
+    };
+
+    /* The vGIC for DOM0 is exactly emulating the hardware GIC */
+    dom0_cfg.arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
+    /*
+     * Xen vGIC supports a maximum of 992 interrupt lines.
+     * 32 are substracted to cover local IRQs.
+     */
+    dom0_cfg.arch.nr_spis = min(gic_number_lines(), (unsigned int) 992) - 32;
+    if ( gic_number_lines() > 992 )
+        printk(XENLOG_WARNING "Maximum number of vGIC IRQs exceeded.\n");
+    dom0_cfg.arch.tee_type = tee_get_type();
+    dom0_cfg.max_vcpus = dom0_max_vcpus();
+
+    if ( iommu_enabled )
+        dom0_cfg.flags |= XEN_DOMCTL_CDF_iommu;
+
+    dom0 = domain_create(0, &dom0_cfg, true);
+    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
+        panic("Error creating domain 0\n");
+
+    if ( construct_dom0(dom0) != 0)
+        panic("Could not set up DOM0 guest OS\n");
+
+    return dom0;
 }
 
 /*
