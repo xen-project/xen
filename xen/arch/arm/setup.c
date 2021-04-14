@@ -794,6 +794,38 @@ static void __init setup_mm(void)
 }
 #endif
 
+static bool __init is_dom0less_mode(void)
+{
+    struct bootmodules *mods = &bootinfo.modules;
+    struct bootmodule *mod;
+    unsigned int i;
+    bool dom0found = false;
+    bool domUfound = false;
+
+    /* Look into the bootmodules */
+    for ( i = 0 ; i < mods->nr_mods ; i++ )
+    {
+        mod = &mods->module[i];
+        /* Find if dom0 and domU kernels are present */
+        if ( mod->kind == BOOTMOD_KERNEL )
+        {
+            if ( mod->domU == false )
+            {
+                dom0found = true;
+                break;
+            }
+            else
+                domUfound = true;
+        }
+    }
+
+    /*
+     * If there is no dom0 kernel but at least one domU, then we are in
+     * dom0less mode
+     */
+    return ( !dom0found && domUfound );
+}
+
 size_t __read_mostly dcache_line_bytes;
 
 /* C entry point for boot CPU */
@@ -804,7 +836,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     int cpus, i;
     const char *cmdline;
     struct bootmodule *xen_bootmodule;
-    struct domain *dom0;
+    struct domain *dom0 = NULL;
     int rc;
 
     dcache_line_bytes = read_dcache_line_bytes();
@@ -959,7 +991,10 @@ void __init start_xen(unsigned long boot_phys_offset,
     enable_errata_workarounds();
 
     /* Create initial domain 0. */
-    dom0 = create_dom0();
+    if ( !is_dom0less_mode() )
+        dom0 = create_dom0();
+    else
+        printk(XENLOG_INFO "Xen dom0less mode detected\n");
 
     heap_init_late();
 
@@ -977,7 +1012,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     if ( acpi_disabled )
         create_domUs();
 
-    domain_unpause_by_systemcontroller(dom0);
+    if ( dom0 )
+        domain_unpause_by_systemcontroller(dom0);
 
     /* Switch on to the dynamically allocated stack for the idle vcpu
      * since the static one we're running on is about to be freed. */

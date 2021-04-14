@@ -16,9 +16,10 @@ Multiboot specification has been extended to allow for multiple domains
 to be passed to Xen. See docs/misc/arm/device-tree/booting.txt for more
 information about the Multiboot specification and how to use it.
 
-Currently, a control domain ("dom0") is still required, but in the
-future it will become unnecessary when all domains are created
-directly from Xen. Instead of waiting for the control domain to be fully
+Currently, a control domain ("dom0") is still required to manage the DomU
+domains, but the system can start also without dom0 if the Device Tree
+doesn't specify the dom0 kernel and it declares one or more domUs.
+Instead of waiting for the control domain (when declared) to be fully
 booted and the Xen tools to become available, domains created by Xen
 this way are started right away in parallel. Hence, their boot time is
 typically much shorter.
