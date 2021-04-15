@@ -16,6 +16,11 @@ else
     make -j$(nproc) -C xen defconfig
 fi
 
+# arm32 only cross-compiles the hypervisor
+if [[ "${XEN_TARGET_ARCH}" = "arm32" ]]; then
+    hypervisor_only="y"
+fi
+
 # build up our configure options
 cfgargs=()
 cfgargs+=("--enable-docs")

@@ -117,6 +117,33 @@
   variables:
     <<: *clang
 
+.arm32-cross-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: arm32
+  tags:
+    - x86_64
+
+.arm32-cross-build:
+  extends: .arm32-cross-build-tmpl
+  variables:
+    debug: n
+
+.arm32-cross-build-debug:
+  extends: .arm32-cross-build-tmpl
+  variables:
+    debug: y
+
+.gcc-arm32-cross-build:
+  extends: .arm32-cross-build
+  variables:
+    <<: *gcc
+
+.gcc-arm32-cross-build-debug:
+  extends: .arm32-cross-build-debug
+  variables:
+    <<: *gcc
+
 .arm64-build-tmpl:
   <<: *build
   variables:
@@ -450,6 +477,29 @@ alpine-3.12-clang-debug:
   variables:
     CONTAINER: alpine:3.12
 
+# Arm32 cross-build
+
+debian-unstable-gcc-arm32:
+  extends: .gcc-arm32-cross-build
+  variables:
+    CONTAINER: debian:unstable-arm32-gcc
+
+debian-unstable-gcc-arm32-debug:
+  extends: .gcc-arm32-cross-build-debug
+  variables:
+    CONTAINER: debian:unstable-arm32-gcc
+
+debian-unstable-gcc-arm32-randconfig:
+  extends: .gcc-arm32-cross-build
+  variables:
+    CONTAINER: debian:unstable-arm32-gcc
+    RANDCONFIG: y
+
+debian-unstable-gcc-arm32-debug-randconfig:
+  extends: .gcc-arm32-cross-build-debug
+  variables:
+    CONTAINER: debian:unstable-arm32-gcc
+    RANDCONFIG: y
 
 # Arm builds
 
