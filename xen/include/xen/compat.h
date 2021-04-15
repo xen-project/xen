@@ -227,9 +227,6 @@ void xlat_start_info(struct start_info *, enum XLAT_start_info_console);
 struct vcpu_runstate_info;
 void xlat_vcpu_runstate_info(struct vcpu_runstate_info *);
 
-struct domain;
-int switch_compat(struct domain *);
-
 #else
 
 #define compat_handle_is_null(hnd) 0

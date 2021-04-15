@@ -19,12 +19,11 @@
 #include <xen/event.h>
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
-#include <compat/callback.h>
-#include <compat/nmi.h>
 
 #include <asm/shared.h>
 
 #include <public/callback.h>
+#include <public/nmi.h>
 
 static int register_guest_nmi_callback(unsigned long address)
 {
@@ -203,6 +202,11 @@ long do_set_callbacks(unsigned long event_address,
     return 0;
 }
 
+#ifdef CONFIG_PV32
+
+#include <compat/callback.h>
+#include <compat/nmi.h>
+
 static long compat_register_guest_callback(struct compat_callback_register *reg)
 {
     long ret = 0;
@@ -343,6 +347,8 @@ long compat_set_callbacks(unsigned long event_selector,
     return 0;
 }
 
+#endif /* CONFIG_PV32 */
+
 long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
 {
     struct trap_info cur;
@@ -388,6 +394,7 @@ long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
     return rc;
 }
 
+#ifdef CONFIG_PV32
 int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
 {
     struct vcpu *curr = current;
@@ -429,6 +436,7 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
 
     return rc;
 }
+#endif
 
 long do_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -455,6 +463,7 @@ long do_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
+#ifdef CONFIG_PV32
 int compat_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct compat_nmi_callback cb;
@@ -479,6 +488,7 @@ int compat_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     return rc;
 }
+#endif
 
 /*
  * Local variables:

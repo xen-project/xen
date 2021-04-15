@@ -255,12 +255,16 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
      */
     rw_pv_hypercall_table = __va(__pa(pv_hypercall_table));
     rw_pv_hypercall_table[__HYPERVISOR_event_channel_op].native =
-        rw_pv_hypercall_table[__HYPERVISOR_event_channel_op].compat =
         (hypercall_fn_t *)pv_shim_event_channel_op;
-
     rw_pv_hypercall_table[__HYPERVISOR_grant_table_op].native =
-        rw_pv_hypercall_table[__HYPERVISOR_grant_table_op].compat =
         (hypercall_fn_t *)pv_shim_grant_table_op;
+
+#ifdef CONFIG_PV32
+    rw_pv_hypercall_table[__HYPERVISOR_event_channel_op].compat =
+        (hypercall_fn_t *)pv_shim_event_channel_op;
+    rw_pv_hypercall_table[__HYPERVISOR_grant_table_op].compat =
+        (hypercall_fn_t *)pv_shim_grant_table_op;
+#endif
 
     guest = d;
 

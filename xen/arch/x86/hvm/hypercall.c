@@ -121,7 +121,9 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 #define do_arch_1             paging_domctl_continuation
 
-static const hypercall_table_t hvm_hypercall_table[] = {
+static const struct {
+    hypercall_fn_t *native, *compat;
+} hvm_hypercall_table[] = {
     HVM_CALL(memory_op),
 #ifdef CONFIG_GRANT_TABLE
     HVM_CALL(grant_table_op),

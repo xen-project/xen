@@ -212,6 +212,7 @@ unsigned long pv_make_cr4(const struct vcpu *v)
     return cr4;
 }
 
+#ifdef CONFIG_PV32
 int switch_compat(struct domain *d)
 {
     struct vcpu *v;
@@ -256,6 +257,7 @@ int switch_compat(struct domain *d)
 
     return rc;
 }
+#endif
 
 static int pv_create_gdt_ldt_l1tab(struct vcpu *v)
 {

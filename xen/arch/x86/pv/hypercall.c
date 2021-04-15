@@ -25,12 +25,18 @@
 #include <xen/trace.h>
 #include <irq_vectors.h>
 
+#ifdef CONFIG_PV32
 #define HYPERCALL(x)                                                \
     [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,         \
                                (hypercall_fn_t *) do_ ## x }
 #define COMPAT_CALL(x)                                              \
     [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,         \
                                (hypercall_fn_t *) compat_ ## x }
+#else
+#define HYPERCALL(x)                                                \
+    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x }
+#define COMPAT_CALL(x) HYPERCALL(x)
+#endif
 
 #define do_arch_1             paging_domctl_continuation
 
@@ -176,6 +182,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
         }
 #endif
     }
+#ifdef CONFIG_PV32
     else
     {
         unsigned int ebx = regs->ebx;
@@ -225,6 +232,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
         }
 #endif
     }
+#endif /* CONFIG_PV32 */
 
     /*
      * PV guests use SYSCALL or INT $0x82 to make a hypercall, both of which
@@ -255,7 +263,7 @@ enum mc_disposition arch_do_multicall_call(struct mc_state *state)
         else
             call->result = -ENOSYS;
     }
-#ifdef CONFIG_COMPAT
+#ifdef CONFIG_PV32
     else
     {
         struct compat_multicall_entry *call = &state->compat_call;

@@ -149,6 +149,8 @@ long do_set_gdt(XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
     return ret;
 }
 
+#ifdef CONFIG_PV32
+
 int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list,
                    unsigned int entries)
 {
@@ -184,6 +186,18 @@ int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list,
 
     return ret;
 }
+
+int compat_update_descriptor(uint32_t pa_lo, uint32_t pa_hi,
+                             uint32_t desc_lo, uint32_t desc_hi)
+{
+    seg_desc_t d;
+
+    d.raw = ((uint64_t)desc_hi << 32) | desc_lo;
+
+    return do_update_descriptor(pa_lo | ((uint64_t)pa_hi << 32), d);
+}
+
+#endif /* CONFIG_PV32 */
 
 static bool check_descriptor(const struct domain *dom, seg_desc_t *d)
 {
@@ -332,16 +346,6 @@ long do_update_descriptor(uint64_t gaddr, seg_desc_t d)
     put_page(page);
 
     return ret;
-}
-
-int compat_update_descriptor(uint32_t pa_lo, uint32_t pa_hi,
-                             uint32_t desc_lo, uint32_t desc_hi)
-{
-    seg_desc_t d;
-
-    d.raw = ((uint64_t)desc_hi << 32) | desc_lo;
-
-    return do_update_descriptor(pa_lo | ((uint64_t)pa_hi << 32), d);
 }
 
 /*

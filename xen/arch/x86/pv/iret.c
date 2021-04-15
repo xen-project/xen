@@ -104,6 +104,7 @@ unsigned long do_iret(void)
     return 0;
 }
 
+#ifdef CONFIG_PV32
 unsigned int compat_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -223,6 +224,7 @@ unsigned int compat_iret(void)
      */
     return regs->eax;
 }
+#endif
 
 /*
  * Local variables:

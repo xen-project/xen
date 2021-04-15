@@ -4512,7 +4512,9 @@ long do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
 
     return rc;
 }
+#endif /* CONFIG_PV */
 
+#ifdef CONFIG_PV32
 int compat_update_va_mapping(unsigned int va, uint32_t lo, uint32_t hi,
                              unsigned int flags)
 {
@@ -4547,7 +4549,7 @@ int compat_update_va_mapping_otherdomain(unsigned int va,
 
     return rc;
 }
-#endif /* CONFIG_PV */
+#endif /* CONFIG_PV32 */
 
 typedef struct e820entry e820entry_t;
 DEFINE_XEN_GUEST_HANDLE(e820entry_t);

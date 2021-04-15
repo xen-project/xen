@@ -16,7 +16,10 @@ typedef unsigned long hypercall_fn_t(
     unsigned long, unsigned long, unsigned long);
 
 typedef struct {
-    hypercall_fn_t *native, *compat;
+    hypercall_fn_t *native;
+#ifdef CONFIG_PV32
+    hypercall_fn_t *compat;
+#endif
 } hypercall_table_t;
 
 typedef struct {
