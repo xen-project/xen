@@ -642,6 +642,38 @@ void early_init_amd(struct cpuinfo_x86 *c)
 	ctxt_switch_levelling(NULL);
 }
 
+void amd_init_lfence(struct cpuinfo_x86 *c)
+{
+	uint64_t value;
+
+	/*
+	 * Attempt to set lfence to be Dispatch Serialising.  This MSR almost
+	 * certainly isn't virtualised (and Xen at least will leak the real
+	 * value in but silently discard writes), as well as being per-core
+	 * rather than per-thread, so do a full safe read/write/readback cycle
+	 * in the worst case.
+	 */
+	if (rdmsr_safe(MSR_AMD64_DE_CFG, value))
+		/* Unable to read.  Assume the safer default. */
+		__clear_bit(X86_FEATURE_LFENCE_DISPATCH,
+			    c->x86_capability);
+	else if (value & AMD64_DE_CFG_LFENCE_SERIALISE)
+		/* Already dispatch serialising. */
+		__set_bit(X86_FEATURE_LFENCE_DISPATCH,
+			  c->x86_capability);
+	else if (wrmsr_safe(MSR_AMD64_DE_CFG,
+			    value | AMD64_DE_CFG_LFENCE_SERIALISE) ||
+		 rdmsr_safe(MSR_AMD64_DE_CFG, value) ||
+		 !(value & AMD64_DE_CFG_LFENCE_SERIALISE))
+		/* Attempt to set failed.  Assume the safer default. */
+		__clear_bit(X86_FEATURE_LFENCE_DISPATCH,
+			    c->x86_capability);
+	else
+		/* Successfully enabled! */
+		__set_bit(X86_FEATURE_LFENCE_DISPATCH,
+			  c->x86_capability);
+}
+
 /*
  * Refer to the AMD Speculative Store Bypass whitepaper:
  * https://developer.amd.com/wp-content/resources/124441_AMD64_SpeculativeStoreBypassDisable_Whitepaper_final.pdf
@@ -736,37 +768,11 @@ static void init_amd(struct cpuinfo_x86 *c)
 	if (c == &boot_cpu_data && !cpu_has(c, X86_FEATURE_RSTR_FP_ERR_PTRS))
 		setup_force_cpu_cap(X86_BUG_FPU_PTRS);
 
-	/*
-	 * Attempt to set lfence to be Dispatch Serialising.  This MSR almost
-	 * certainly isn't virtualised (and Xen at least will leak the real
-	 * value in but silently discard writes), as well as being per-core
-	 * rather than per-thread, so do a full safe read/write/readback cycle
-	 * in the worst case.
-	 */
 	if (c->x86 == 0x0f || c->x86 == 0x11)
 		/* Always dispatch serialising on this hardare. */
 		__set_bit(X86_FEATURE_LFENCE_DISPATCH, c->x86_capability);
-	else /* Implicily "== 0x10 || >= 0x12" by being 64bit. */ {
-		if (rdmsr_safe(MSR_AMD64_DE_CFG, value))
-			/* Unable to read.  Assume the safer default. */
-			__clear_bit(X86_FEATURE_LFENCE_DISPATCH,
-				    c->x86_capability);
-		else if (value & AMD64_DE_CFG_LFENCE_SERIALISE)
-			/* Already dispatch serialising. */
-			__set_bit(X86_FEATURE_LFENCE_DISPATCH,
-				  c->x86_capability);
-		else if (wrmsr_safe(MSR_AMD64_DE_CFG,
-				    value | AMD64_DE_CFG_LFENCE_SERIALISE) ||
-			 rdmsr_safe(MSR_AMD64_DE_CFG, value) ||
-			 !(value & AMD64_DE_CFG_LFENCE_SERIALISE))
-			/* Attempt to set failed.  Assume the safer default. */
-			__clear_bit(X86_FEATURE_LFENCE_DISPATCH,
-				    c->x86_capability);
-		else
-			/* Successfully enabled! */
-			__set_bit(X86_FEATURE_LFENCE_DISPATCH,
-				  c->x86_capability);
-	}
+	else /* Implicily "== 0x10 || >= 0x12" by being 64bit. */
+		amd_init_lfence(c);
 
 	amd_init_ssbd(c);
 
