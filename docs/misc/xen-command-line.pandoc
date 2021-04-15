@@ -1274,25 +1274,8 @@ supported. See docs/misc/arm/big.LITTLE.txt for more information.
 When the hmp-unsafe option is disabled (default), CPUs that are not
 identical to the boot CPU will be parked and not used by Xen.
 
-### hpet (x86)
-> `= List of [ <boolean> | broadcast | legacy-replacement ]`
-
-> Default : `true`, `no-broadcast`, 'no-legacy-replacement`
-
-Controls Xen's use of the system's High Precision Event Timer.  The boolean
-allows to turn off use altogether.
-
-`broadcast` forces Xen to keep using the broadcast for CPUs in deep C-states
-even when an RTC interrupt got enabled.
-
-`legacy-replacement` is intended to be used on platforms where the timer
-interrupt doesn't get raised by the legacy PIT.  This then also affects
-raising of the RTC interrupt.
-
 ### hpetbroadcast (x86)
 > `= <boolean>`
-
-Deprecated alternative of `hpet=broadcast`.
 
 ### hvm_debug (x86)
 > `= <integer>`
