@@ -40,7 +40,7 @@
 
 #define do_arch_1             paging_domctl_continuation
 
-const hypercall_table_t pv_hypercall_table[] = {
+const pv_hypercall_table_t pv_hypercall_table[] = {
     COMPAT_CALL(set_trap_table),
     HYPERCALL(mmu_update),
     COMPAT_CALL(set_gdt),

@@ -20,7 +20,7 @@ typedef struct {
 #ifdef CONFIG_PV32
     hypercall_fn_t *compat;
 #endif
-} hypercall_table_t;
+} pv_hypercall_table_t;
 
 typedef struct {
     uint8_t native;
@@ -32,7 +32,7 @@ typedef struct {
 extern const hypercall_args_t hypercall_args_table[NR_hypercalls];
 
 #ifdef CONFIG_PV
-extern const hypercall_table_t pv_hypercall_table[];
+extern const pv_hypercall_table_t pv_hypercall_table[];
 void pv_hypercall(struct cpu_user_regs *regs);
 #endif
 
