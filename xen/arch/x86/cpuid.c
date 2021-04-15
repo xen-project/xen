@@ -311,6 +311,7 @@ static void __init calculate_raw_policy(void)
 static void __init calculate_host_policy(void)
 {
     struct cpuid_policy *p = &host_cpuid_policy;
+    unsigned int max_extd_leaf;
 
     *p = raw_cpuid_policy;
 
@@ -318,7 +319,19 @@ static void __init calculate_host_policy(void)
         min_t(uint32_t, p->basic.max_leaf,   ARRAY_SIZE(p->basic.raw) - 1);
     p->feat.max_subleaf =
         min_t(uint32_t, p->feat.max_subleaf, ARRAY_SIZE(p->feat.raw) - 1);
-    p->extd.max_leaf = 0x80000000 | min_t(uint32_t, p->extd.max_leaf & 0xffff,
+
+    max_extd_leaf = p->extd.max_leaf;
+
+    /*
+     * For AMD/Hygon hardware before Zen3, we unilaterally modify LFENCE to be
+     * dispatch serialising for Spectre mitigations.  Extend max_extd_leaf
+     * beyond what hardware supports, to include the feature leaf containing
+     * this information.
+     */
+    if ( cpu_has_lfence_dispatch )
+        max_extd_leaf = max(max_extd_leaf, 0x80000021);
+
+    p->extd.max_leaf = 0x80000000 | min_t(uint32_t, max_extd_leaf & 0xffff,
                                           ARRAY_SIZE(p->extd.raw) - 1);
 
     cpuid_featureset_to_policy(boot_cpu_data.x86_capability, p);

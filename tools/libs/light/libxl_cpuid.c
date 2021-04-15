@@ -288,6 +288,8 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"svm_decode",   0x8000000a, NA, CPUID_REG_EDX,  7,  1},
         {"svm_pausefilt",0x8000000a, NA, CPUID_REG_EDX, 10,  1},
 
+        {"lfence+",      0x80000021, NA, CPUID_REG_EAX,  2,  1},
+
         {"maxhvleaf",    0x40000000, NA, CPUID_REG_EAX,  0,  8},
 
         {NULL, 0, NA, CPUID_REG_INV, 0, 0}

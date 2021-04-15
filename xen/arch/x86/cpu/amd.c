@@ -647,6 +647,13 @@ void amd_init_lfence(struct cpuinfo_x86 *c)
 	uint64_t value;
 
 	/*
+	 * Some hardware has LFENCE dispatch serialising always enabled,
+	 * nothing to do on that case.
+	 */
+	if (test_bit(X86_FEATURE_LFENCE_DISPATCH, c->x86_capability))
+		return;
+
+	/*
 	 * Attempt to set lfence to be Dispatch Serialising.  This MSR almost
 	 * certainly isn't virtualised (and Xen at least will leak the real
 	 * value in but silently discard writes), as well as being per-core
