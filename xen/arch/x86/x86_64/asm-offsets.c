@@ -9,7 +9,7 @@
 #include <xen/perfc.h>
 #endif
 #include <xen/sched.h>
-#ifdef CONFIG_PV
+#ifdef CONFIG_PV32
 #include <compat/xen.h>
 #endif
 #include <asm/hardirq.h>
@@ -102,16 +102,18 @@ void __dummy__(void)
     BLANK();
 #endif
 
-#ifdef CONFIG_PV
+#ifdef CONFIG_PV32
     OFFSET(DOMAIN_is_32bit_pv, struct domain, arch.pv.is_32bit);
-    BLANK();
-
-    OFFSET(VCPUINFO_upcall_pending, struct vcpu_info, evtchn_upcall_pending);
-    OFFSET(VCPUINFO_upcall_mask, struct vcpu_info, evtchn_upcall_mask);
     BLANK();
 
     OFFSET(COMPAT_VCPUINFO_upcall_pending, struct compat_vcpu_info, evtchn_upcall_pending);
     OFFSET(COMPAT_VCPUINFO_upcall_mask, struct compat_vcpu_info, evtchn_upcall_mask);
+    BLANK();
+#endif
+
+#ifdef CONFIG_PV
+    OFFSET(VCPUINFO_upcall_pending, struct vcpu_info, evtchn_upcall_pending);
+    OFFSET(VCPUINFO_upcall_mask, struct vcpu_info, evtchn_upcall_mask);
     BLANK();
 #endif
 

@@ -11,8 +11,6 @@
 #include <public/xen.h>
 #include <irq_vectors.h>
 
-#ifdef CONFIG_PV32
-
 ENTRY(entry_int82)
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $0
@@ -28,8 +26,6 @@ ENTRY(entry_int82)
 
         mov   %rsp, %rdi
         call  do_entry_int82
-
-#endif /* CONFIG_PV32 */
 
 /* %rbx: struct vcpu */
 ENTRY(compat_test_all_events)
@@ -197,43 +193,7 @@ ENTRY(cr4_pv32_restore)
         xor   %eax, %eax
         ret
 
-        .section .text.entry, "ax", @progbits
-
-/* See lstar_enter for entry register state. */
-ENTRY(cstar_enter)
-#ifdef CONFIG_XEN_SHSTK
-        ALTERNATIVE "", "setssbsy", X86_FEATURE_XEN_SHSTK
-#endif
-        /* sti could live here when we don't switch page tables below. */
-        CR4_PV32_RESTORE
-        movq  8(%rsp),%rax /* Restore %rax. */
-        movq  $FLAT_USER_SS32, 8(%rsp) /* Assume a 64bit domain.  Compat handled lower. */
-        pushq %r11
-        pushq $FLAT_USER_CS32
-        pushq %rcx
-        pushq $0
-        movl  $TRAP_syscall, 4(%rsp)
-        SAVE_ALL
-
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, Clob: acd */
-        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
-
-        GET_STACK_END(bx)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
-        test  %rcx, %rcx
-        jz    .Lcstar_cr3_okay
-        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
-        mov   %rcx, %cr3
-        /* %r12 is still zero at this point. */
-        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
-.Lcstar_cr3_okay:
-        sti
-
-        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
-        movq  VCPU_domain(%rbx),%rcx
-        cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
-        je    switch_to_kernel
-
+ENTRY(compat_syscall)
         /* Fix up reported %cs/%ss for compat domains. */
         movl  $FLAT_COMPAT_USER_SS, UREGS_ss(%rsp)
         movl  $FLAT_COMPAT_USER_CS, UREGS_cs(%rsp)
@@ -261,8 +221,6 @@ UNLIKELY_END(compat_syscall_gpf)
         movw  %si,TRAPBOUNCE_cs(%rdx)
         movb  %cl,TRAPBOUNCE_flags(%rdx)
         jmp   .Lcompat_bounce_exception
-
-        .text
 
 ENTRY(compat_sysenter)
         CR4_PV32_RESTORE
