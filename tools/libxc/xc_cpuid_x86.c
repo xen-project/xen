@@ -497,12 +497,22 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         goto out;
     }
 
-    /*
-     * Account for feature which have been disabled by default since Xen 4.13,
-     * so migrated-in VM's don't risk seeing features disappearing.
-     */
     if ( restore )
     {
+        /*
+         * Xen 4.14 introduced support to move the guest's CPUID data in the
+         * migration stream.  Previously, the destination side would invent a
+         * policy out of thin air in the hopes that it was ok.
+         *
+         * This restore path is used for incoming VMs with no CPUID data
+         * i.e. originated on Xen 4.13 or earlier.  We must invent a policy
+         * compatible with what Xen 4.13 would have done on the same hardware.
+         *
+         * Specifically:
+         * - Clamp max leaves.
+         * - Re-enable features which have become (possibly) off by default.
+         */
+
         p->basic.rdrand = test_bit(X86_FEATURE_RDRAND, host_featureset);
         p->feat.hle = test_bit(X86_FEATURE_HLE, host_featureset);
         p->feat.rtm = test_bit(X86_FEATURE_RTM, host_featureset);
@@ -511,6 +521,10 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         {
             p->feat.mpx = test_bit(X86_FEATURE_MPX, host_featureset);
         }
+
+        p->basic.max_leaf = min(p->basic.max_leaf, 0xdu);
+        p->feat.max_subleaf = 0;
+        p->extd.max_leaf = min(p->extd.max_leaf, 0x8000001c);
     }
 
     if ( featureset )
