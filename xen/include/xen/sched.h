@@ -1047,7 +1047,6 @@ static always_inline bool is_pv_vcpu(const struct vcpu *v)
     return is_pv_domain(v->domain);
 }
 
-#ifdef CONFIG_COMPAT
 static always_inline bool is_pv_32bit_domain(const struct domain *d)
 {
 #ifdef CONFIG_PV32
@@ -1078,7 +1077,7 @@ static always_inline bool is_pv_64bit_vcpu(const struct vcpu *v)
 {
     return is_pv_64bit_domain(v->domain);
 }
-#endif
+
 static always_inline bool is_hvm_domain(const struct domain *d)
 {
     return IS_ENABLED(CONFIG_HVM) &&

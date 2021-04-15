@@ -877,9 +877,11 @@ int __init dom0_construct_pv(struct domain *d,
         pv_shim_setup_dom(d, l4start, v_start, vxenstore_start, vconsole_start,
                           vphysmap_start, si);
 
+#ifdef CONFIG_COMPAT
     if ( is_pv_32bit_domain(d) )
         xlat_start_info(si, pv_shim ? XLAT_start_info_console_domU
                                     : XLAT_start_info_console_dom0);
+#endif
 
     /* Return to idle domain's page tables. */
     mapcache_override_current(NULL);

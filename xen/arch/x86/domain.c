@@ -64,7 +64,9 @@
 #include <asm/amd.h>
 #include <xen/numa.h>
 #include <xen/iommu.h>
+#ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
+#endif
 #include <asm/psr.h>
 #include <asm/pv/domain.h>
 #include <asm/pv/mm.h>
@@ -1020,11 +1022,13 @@ void arch_domain_creation_finished(struct domain *d)
         hvm_domain_creation_finished(d);
 }
 
+#ifdef CONFIG_COMPAT
 #define xen_vcpu_guest_context vcpu_guest_context
 #define fpu_ctxt fpu_ctxt.x
 CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
 #undef fpu_ctxt
 #undef xen_vcpu_guest_context
+#endif
 
 /* Called by XEN_DOMCTL_setvcpucontext and VCPUOP_initialise. */
 int arch_set_info_guest(
@@ -1045,7 +1049,11 @@ int arch_set_info_guest(
      * we expect the tools to DTRT even in compat-mode callers. */
     compat = is_pv_32bit_domain(d);
 
+#ifdef CONFIG_COMPAT
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
+#else
+#define c(fld) (c.nat->fld)
+#endif
     flags = c(flags);
 
     if ( is_pv_domain(d) )
@@ -1078,6 +1086,7 @@ int arch_set_info_guest(
             if ( !__addr_ok(c.nat->ldt_base) )
                 return -EINVAL;
         }
+#ifdef CONFIG_COMPAT
         else
         {
             fixup_guest_stack_selector(d, c.cmp->user_regs.ss);
@@ -1089,6 +1098,7 @@ int arch_set_info_guest(
             for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); i++ )
                 fixup_guest_code_selector(d, c.cmp->trap_ctxt[i].cs);
         }
+#endif
 
         /* LDT safety checks. */
         if ( ((c(ldt_base) & (PAGE_SIZE - 1)) != 0) ||
@@ -1119,6 +1129,7 @@ int arch_set_info_guest(
             memcpy(v->arch.pv.trap_ctxt, c.nat->trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
+#ifdef CONFIG_COMPAT
     else
     {
         XLAT_cpu_user_regs(&v->arch.user_regs, &c.cmp->user_regs);
@@ -1129,6 +1140,7 @@ int arch_set_info_guest(
                                c.cmp->trap_ctxt + i);
         }
     }
+#endif
 
     if ( v->vcpu_id == 0 && (c(vm_assist) & ~arch_vm_assist_valid_mask(d)) )
         return -EINVAL;
@@ -1184,13 +1196,17 @@ int arch_set_info_guest(
                 pfn = pagetable_get_pfn(v->arch.guest_table_user);
                 fail |= xen_pfn_to_cr3(pfn) != c.nat->ctrlreg[1];
             }
-        } else {
+        }
+#ifdef CONFIG_COMPAT
+        else
+        {
             l4_pgentry_t *l4tab = map_domain_page(_mfn(pfn));
 
             pfn = l4e_get_pfn(*l4tab);
             unmap_domain_page(l4tab);
             fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
         }
+#endif
 
         fail |= v->arch.pv.gdt_ents != c(gdt_ents);
         for ( i = 0; !fail && i < nr_gdt_frames; ++i )
@@ -1293,6 +1309,7 @@ int arch_set_info_guest(
 
     if ( !compat )
         rc = pv_set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
+#ifdef CONFIG_COMPAT
     else
     {
         unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv.gdt_frames)];
@@ -1302,6 +1319,7 @@ int arch_set_info_guest(
 
         rc = pv_set_gdt(v, gdt_frames, c.cmp->gdt_ents);
     }
+#endif
     if ( rc != 0 )
         return rc;
 
@@ -1309,8 +1327,10 @@ int arch_set_info_guest(
 
     if ( !compat )
         cr3_mfn = _mfn(xen_cr3_to_pfn(c.nat->ctrlreg[3]));
+#ifdef CONFIG_COMPAT
     else
         cr3_mfn = _mfn(compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
+#endif
     cr3_page = get_page_from_mfn(cr3_mfn, d);
 
     if ( !cr3_page )
@@ -1817,9 +1837,13 @@ bool update_runstate_area(struct vcpu *v)
 
     if ( VM_ASSIST(v->domain, runstate_update_flag) )
     {
+#ifdef CONFIG_COMPAT
         guest_handle = has_32bit_shinfo(v->domain)
             ? &v->runstate_guest.compat.p->state_entry_time + 1
             : &v->runstate_guest.native.p->state_entry_time + 1;
+#else
+        guest_handle = &v->runstate_guest.p->state_entry_time + 1;
+#endif
         guest_handle--;
         runstate.state_entry_time |= XEN_RUNSTATE_UPDATE;
         __raw_copy_to_guest(guest_handle,
@@ -1827,6 +1851,7 @@ bool update_runstate_area(struct vcpu *v)
         smp_wmb();
     }
 
+#ifdef CONFIG_COMPAT
     if ( has_32bit_shinfo(v->domain) )
     {
         struct compat_vcpu_runstate_info info;
@@ -1836,6 +1861,7 @@ bool update_runstate_area(struct vcpu *v)
         rc = true;
     }
     else
+#endif
         rc = __copy_to_guest(runstate_guest(v), &runstate, 1) !=
              sizeof(runstate);
 

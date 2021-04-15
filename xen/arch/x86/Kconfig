@@ -6,9 +6,9 @@ config X86
 	select ACPI
 	select ACPI_LEGACY_TABLES_LOOKUP
 	select ARCH_SUPPORTS_INT128
-	select COMPAT
 	select CORE_PARKING
 	select HAS_ALTERNATIVE
+	select HAS_COMPAT
 	select HAS_CPUFREQ
 	select HAS_EHCI
 	select HAS_EX_TABLE
@@ -57,6 +57,7 @@ config PV32
 	bool "Support for 32bit PV guests"
 	depends on PV
 	default y
+	select COMPAT
 	---help---
 	  The 32bit PV ABI uses Ring1, an area of the x86 architecture which
 	  was deprecated and mostly removed in the AMD64 spec.  As a result,
@@ -91,6 +92,7 @@ config PV_LINEAR_PT
 
 config HVM
 	def_bool !PV_SHIM_EXCLUSIVE
+	select COMPAT
 	select IOREQ_SERVER
 	prompt "HVM support"
 	---help---

@@ -39,10 +39,12 @@
 #include <public/pmu.h>
 #include <xsm/xsm.h>
 
+#ifdef CONFIG_COMPAT
 #include <compat/pmu.h>
 CHECK_pmu_cntr_pair;
 CHECK_pmu_data;
 CHECK_pmu_params;
+#endif
 
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
@@ -232,6 +234,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
             domid = sampled->domain->domain_id;
 
         /* Store appropriate registers in xenpmu_data */
+#ifdef CONFIG_COMPAT
         /* FIXME: 32-bit PVH should go here as well */
         if ( is_pv_32bit_vcpu(sampling) )
         {
@@ -254,6 +257,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
                 *flags |= PMU_SAMPLE_USER;
         }
         else
+#endif
         {
             struct xen_pmu_regs *r = &vpmu->xenpmu_data->pmu.r.regs;
 
@@ -448,7 +452,9 @@ static int vpmu_arch_initialise(struct vcpu *v)
     BUILD_BUG_ON(sizeof(struct xen_pmu_intel_ctxt) > XENPMU_CTXT_PAD_SZ);
     BUILD_BUG_ON(sizeof(struct xen_pmu_amd_ctxt) > XENPMU_CTXT_PAD_SZ);
     BUILD_BUG_ON(sizeof(struct xen_pmu_regs) > XENPMU_REGS_PAD_SZ);
+#ifdef CONFIG_COMPAT
     BUILD_BUG_ON(sizeof(struct compat_pmu_regs) > XENPMU_REGS_PAD_SZ);
+#endif
 
     ASSERT(!(vpmu->flags & ~VPMU_AVAILABLE) && !vpmu->context);
 

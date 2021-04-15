@@ -25,6 +25,9 @@ config GRANT_TABLE
 config HAS_ALTERNATIVE
 	bool
 
+config HAS_COMPAT
+	bool
+
 config HAS_DEVICE_TREE
 	bool
 

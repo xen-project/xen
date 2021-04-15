@@ -1347,7 +1347,9 @@ void set_gpfn_from_mfn(unsigned long mfn, unsigned long pfn)
     machine_to_phys_mapping[mfn] = entry;
 }
 
+#ifdef CONFIG_COMPAT
 #include "compat/mm.c"
+#endif
 
 /*
  * Local variables:

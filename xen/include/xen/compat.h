@@ -5,10 +5,13 @@
 #ifndef __XEN_COMPAT_H__
 #define __XEN_COMPAT_H__
 
+#include <xen/types.h>
+#ifdef CONFIG_HAS_COMPAT
+#include <asm/compat.h>
+#endif
+
 #ifdef CONFIG_COMPAT
 
-#include <xen/types.h>
-#include <asm/compat.h>
 #include <compat/xlat.h>
 
 #define __DEFINE_COMPAT_HANDLE(name, type) \

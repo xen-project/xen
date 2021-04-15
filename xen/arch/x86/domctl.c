@@ -1386,18 +1386,24 @@ long arch_do_domctl(
     return ret;
 }
 
+#ifdef CONFIG_COMPAT
 #define xen_vcpu_guest_context vcpu_guest_context
 #define fpu_ctxt fpu_ctxt.x
 CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
 #undef fpu_ctxt
 #undef xen_vcpu_guest_context
+#endif
 
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
     unsigned int i;
     const struct domain *d = v->domain;
     bool compat = is_pv_32bit_domain(d);
+#ifdef CONFIG_COMPAT
 #define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
+#else
+#define c(fld) (c.nat->fld)
+#endif
 
     memcpy(&c.nat->fpu_ctxt, v->arch.fpu_ctxt, sizeof(c.nat->fpu_ctxt));
     if ( is_pv_domain(d) )
@@ -1415,6 +1421,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             memcpy(c.nat->trap_ctxt, v->arch.pv.trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
+#ifdef CONFIG_COMPAT
     else
     {
         XLAT_cpu_user_regs(&c.cmp->user_regs, &v->arch.user_regs);
@@ -1425,6 +1432,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
                                v->arch.pv.trap_ctxt + i);
         }
     }
+#endif
 
     for ( i = 0; i < ARRAY_SIZE(v->arch.dr); ++i )
         c(debugreg[i] = v->arch.dr[i]);
@@ -1470,8 +1478,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c(ldt_ents = v->arch.pv.ldt_ents);
         for ( i = 0; i < ARRAY_SIZE(v->arch.pv.gdt_frames); ++i )
             c(gdt_frames[i] = v->arch.pv.gdt_frames[i]);
+#ifdef CONFIG_COMPAT
         BUILD_BUG_ON(ARRAY_SIZE(c.nat->gdt_frames) !=
                      ARRAY_SIZE(c.cmp->gdt_frames));
+#endif
         for ( ; i < ARRAY_SIZE(c.nat->gdt_frames); ++i )
             c(gdt_frames[i] = 0);
         c(gdt_ents = v->arch.pv.gdt_ents);
@@ -1506,6 +1516,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
                 pagetable_is_null(v->arch.guest_table_user) ? 0
                 : xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table_user));
         }
+#ifdef CONFIG_COMPAT
         else
         {
             const l4_pgentry_t *l4e =
@@ -1514,6 +1525,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c.cmp->ctrlreg[3] = compat_pfn_to_cr3(l4e_get_pfn(*l4e));
             unmap_domain_page(l4e);
         }
+#endif
 
         if ( guest_kernel_mode(v, &v->arch.user_regs) )
             c(flags |= VGCF_in_kernel);

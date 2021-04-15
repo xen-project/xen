@@ -8,9 +8,9 @@ obj-y += acpi_mmcfg.o
 obj-y += mmconf-fam10h.o
 obj-y += mmconfig_64.o
 obj-y += mmconfig-shared.o
-obj-y += domain.o
-obj-y += cpu_idle.o
-obj-y += cpufreq.o
+obj-$(CONFIG_COMPAT) += domain.o
+obj-$(CONFIG_COMPAT) += cpu_idle.o
+obj-$(CONFIG_COMPAT) += cpufreq.o
 obj-bin-$(CONFIG_KEXEC) += kexec_reloc.o
 
 obj-$(CONFIG_CRASH_DEBUG)   += gdbstub.o

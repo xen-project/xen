@@ -21,10 +21,15 @@
 
 #include <xen/hypercall.h>
 
+#ifdef CONFIG_COMPAT
 #define ARGS(x, n)                              \
     [ __HYPERVISOR_ ## x ] = { n, n }
 #define COMP(x, n, c)                           \
     [ __HYPERVISOR_ ## x ] = { n, c }
+#else
+#define ARGS(x, n)    [ __HYPERVISOR_ ## x ] = { n }
+#define COMP(x, n, c) ARGS(x, n)
+#endif
 
 const hypercall_args_t hypercall_args_table[NR_hypercalls] =
 {
@@ -113,7 +118,11 @@ unsigned long hypercall_create_continuation(
 
         regs->rax = op;
 
+#ifdef CONFIG_COMPAT
         if ( !curr->hcall_compat )
+#else
+        if ( true )
+#endif
         {
             for ( i = 0; *p != '\0'; i++ )
             {

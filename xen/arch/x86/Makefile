@@ -50,7 +50,8 @@ obj-y += nmi.o
 obj-y += numa.o
 obj-y += pci.o
 obj-y += percpu.o
-obj-y += physdev.o x86_64/physdev.o
+obj-y += physdev.o
+obj-$(CONFIG_COMPAT) += x86_64/physdev.o
 obj-y += psr.o
 obj-y += setup.o
 obj-y += shutdown.o
@@ -72,7 +73,8 @@ obj-y += xstate.o
 
 ifneq ($(CONFIG_PV_SHIM_EXCLUSIVE),y)
 obj-y += domctl.o
-obj-y += platform_hypercall.o x86_64/platform_hypercall.o
+obj-y += platform_hypercall.o
+obj-$(CONFIG_COMPAT) += x86_64/platform_hypercall.o
 obj-y += sysctl.o
 endif
 

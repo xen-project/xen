@@ -23,7 +23,10 @@ typedef struct {
 } hypercall_table_t;
 
 typedef struct {
-    uint8_t native, compat;
+    uint8_t native;
+#ifdef CONFIG_COMPAT
+    uint8_t compat;
+#endif
 } hypercall_args_t;
 
 extern const hypercall_args_t hypercall_args_table[NR_hypercalls];

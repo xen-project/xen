@@ -27,7 +27,6 @@ struct __packed frame_head_32bit {
     uint32_t ret;
 };
 typedef struct frame_head_32bit frame_head32_t;
-DEFINE_COMPAT_HANDLE(frame_head32_t);
 
 static struct frame_head *
 dump_hypervisor_backtrace(struct vcpu *vcpu, const struct frame_head *head,
@@ -58,8 +57,10 @@ dump_guest_backtrace(struct vcpu *vcpu, const struct frame_head *head,
 {
     frame_head_t bufhead;
 
+#ifdef CONFIG_COMPAT
     if ( is_32bit_vcpu(vcpu) )
     {
+        DEFINE_COMPAT_HANDLE(frame_head32_t);
         __compat_handle_const_frame_head32_t guest_head =
             { .c = (unsigned long)head };
         frame_head32_t bufhead32;
@@ -73,6 +74,7 @@ dump_guest_backtrace(struct vcpu *vcpu, const struct frame_head *head,
         bufhead.ret = bufhead32.ret;
     }
     else
+#endif
     {
         XEN_GUEST_HANDLE_PARAM(const_frame_head_t) guest_head =
             const_guest_handle_from_ptr(head, frame_head_t);

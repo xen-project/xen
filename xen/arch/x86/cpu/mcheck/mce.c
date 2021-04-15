@@ -1291,6 +1291,8 @@ static void x86_mc_mceinject(void *data)
 #error BITS_PER_LONG definition absent
 #endif
 
+# ifdef CONFIG_COMPAT
+
 # include <compat/arch-x86/xen-mca.h>
 
 # define xen_mcinfo_msr              mcinfo_msr
@@ -1343,6 +1345,11 @@ CHECK_mcinfo_recovery;
 # undef xen_page_offline_action
 # undef xen_mcinfo_recovery
 
+# else
+#  define compat_handle_is_null(h) true
+#  define copy_to_compat(h, p, n)  true /* really (-EFAULT), but gcc chokes */
+# endif /* CONFIG_COMPAT */
+
 /* Machine Check Architecture Hypercall */
 long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 {
@@ -1351,11 +1358,15 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
     struct vcpu *v = current;
     union {
         struct xen_mc_fetch *nat;
+#ifdef CONFIG_COMPAT
         struct compat_mc_fetch *cmp;
+#endif
     } mc_fetch;
     union {
         struct xen_mc_physcpuinfo *nat;
+#ifdef CONFIG_COMPAT
         struct compat_mc_physcpuinfo *cmp;
+#endif
     } mc_physcpuinfo;
     uint32_t flags, cmdflags;
     int nlcpu;
