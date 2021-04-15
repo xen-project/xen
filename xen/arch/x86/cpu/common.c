@@ -419,6 +419,9 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	if (c->extended_cpuid_level >= 0x80000008)
 		c->x86_capability[cpufeat_word(X86_FEATURE_CLZERO)]
 			= cpuid_ebx(0x80000008);
+	if (c->extended_cpuid_level >= 0x80000021)
+		c->x86_capability[cpufeat_word(X86_FEATURE_LFENCE_DISPATCH)]
+			= cpuid_eax(0x80000021);
 
 	/* Intel-defined flags: level 0x00000007 */
 	if ( c->cpuid_level >= 0x00000007 ) {
