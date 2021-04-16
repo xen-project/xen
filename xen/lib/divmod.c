@@ -40,7 +40,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#if BITS_PER_LONG == 32
 
 /*
  * Depending on the desired operation, we view a `long long' (aka quad_t) in
@@ -391,7 +390,6 @@ s64 __ldivmod_helper(s64 a, s64 b, s64 *r)
     else
         return quot;
 }
-#endif /* BITS_PER_LONG == 32 */
 
 /*
  * Local variables:
