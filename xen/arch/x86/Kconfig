@@ -122,6 +122,7 @@ config XEN_SHSTK
 config SHADOW_PAGING
 	bool "Shadow Paging"
 	default !PV_SHIM_EXCLUSIVE
+	depends on PV || HVM
 	---help---
 
           Shadow paging is a software alternative to hardware paging support
