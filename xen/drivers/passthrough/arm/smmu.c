@@ -597,7 +597,6 @@ enum arm_smmu_arch_version {
 };
 
 struct arm_smmu_s2cr {
-	struct iommu_group		*group;
 	int				count;
 	enum arm_smmu_s2cr_type		type;
 	enum arm_smmu_s2cr_privcfg	privcfg;
@@ -1498,7 +1497,6 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 	struct arm_smmu_master_cfg *cfg = find_smmu_master_cfg(dev);
 	struct arm_smmu_device *smmu = cfg->smmu;
 	struct arm_smmu_smr *smrs = smmu->smrs;
-	struct iommu_group *group;
 	int i, idx, ret;
 
 	spin_lock(&smmu->stream_map_lock);
@@ -1523,19 +1521,9 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 		cfg->smendx[i] = (s16)idx;
 	}
 
-	group = iommu_group_get(dev);
-	if (!group)
-		group = ERR_PTR(-ENOMEM);
-	if (IS_ERR(group)) {
-		ret = PTR_ERR(group);
-		goto out_err;
-	}
-	iommu_group_put(group);
-
 	/* It worked! Now, poke the actual hardware */
 	for_each_cfg_sme(cfg, i, idx) {
 		arm_smmu_write_sme(smmu, idx);
-		smmu->s2crs[idx].group = group;
 	}
 
 	spin_unlock(&smmu->stream_map_lock);
@@ -1966,27 +1954,6 @@ static void __arm_smmu_release_pci_iommudata(void *data)
 	kfree(data);
 }
 
-static struct iommu_group *arm_smmu_device_group(struct
-						arm_smmu_master_cfg *cfg)
-{
-	struct arm_smmu_device *smmu = cfg->smmu;
-	struct iommu_group *group = NULL;
-	int i, idx;
-
-	for_each_cfg_sme(cfg, i, idx) {
-		if (group && smmu->s2crs[idx].group &&
-		    group != smmu->s2crs[idx].group)
-			return ERR_PTR(-EINVAL);
-
-		group = smmu->s2crs[idx].group;
-	}
-
-	if (group)
-		return group;
-
-	return NULL;
-}
-
 static int arm_smmu_add_device(struct device *dev)
 {
 	struct arm_smmu_device *smmu;
@@ -2027,13 +1994,10 @@ static int arm_smmu_add_device(struct device *dev)
 		cfg->smmu = smmu;
 	}
 
-	group = arm_smmu_device_group(cfg);
-	if (!group) {
-		group = iommu_group_alloc();
-		if (IS_ERR(group)) {
-			dev_err(dev, "Failed to allocate IOMMU group\n");
-			return PTR_ERR(group);
-		}
+	group = iommu_group_alloc();
+	if (IS_ERR(group)) {
+		dev_err(dev, "Failed to allocate IOMMU group\n");
+		return PTR_ERR(group);
 	}
 
 	iommu_group_set_iommudata(group, cfg, releasefn);
