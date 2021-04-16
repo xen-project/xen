@@ -46,8 +46,8 @@ static const int8_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
 
 #if defined(__XEN__) || defined(__MINIOS__)
 
-static int INIT lz4_uncompress(const unsigned char *source, unsigned char *dest,
-			       int osize)
+static int __init lz4_uncompress(const unsigned char *source, unsigned char *dest,
+				 int osize)
 {
 	const BYTE *ip = (const BYTE *) source;
 	const BYTE *ref;
@@ -302,8 +302,8 @@ _output_error:
 
 #if defined(__XEN__) || defined(__MINIOS__)
 
-int INIT lz4_decompress(const unsigned char *src, size_t *src_len,
-		unsigned char *dest, size_t actual_dest_len)
+int __init lz4_decompress(const unsigned char *src, size_t *src_len,
+			  unsigned char *dest, size_t actual_dest_len)
 {
 	int ret = -1;
 	int input_len = 0;

@@ -22,11 +22,11 @@
 #define LZ4_DEFAULT_UNCOMPRESSED_CHUNK_SIZE (8 << 20)
 #define ARCHIVE_MAGICNUMBER 0x184C2102
 
-int INIT unlz4(unsigned char *input, unsigned int in_len,
-	       int (*fill)(void *, unsigned int),
-	       int (*flush)(void *, unsigned int),
-	       unsigned char *output, unsigned int *posp,
-	       void (*error)(const char *x))
+int __init unlz4(unsigned char *input, unsigned int in_len,
+		 int (*fill)(void *, unsigned int),
+		 int (*flush)(void *, unsigned int),
+		 unsigned char *output, unsigned int *posp,
+		 void (*error)(const char *x))
 {
 	int ret = -1;
 	size_t chunksize = 0;
