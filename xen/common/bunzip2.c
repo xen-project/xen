@@ -104,7 +104,7 @@ struct bunzip_data {
 
 /* Return the next nnn bits of input.  All reads from the compressed input
    are done through this function.  All reads are big endian */
-static unsigned int INIT get_bits(struct bunzip_data *bd, char bits_wanted)
+static unsigned int __init get_bits(struct bunzip_data *bd, char bits_wanted)
 {
 	unsigned int bits = 0;
 
@@ -144,7 +144,7 @@ static unsigned int INIT get_bits(struct bunzip_data *bd, char bits_wanted)
 
 /* Unpacks the next block and sets up for the inverse burrows-wheeler step. */
 
-static int INIT get_next_block(struct bunzip_data *bd)
+static int __init get_next_block(struct bunzip_data *bd)
 {
 	struct group_data *hufGroup = NULL;
 	int *base = NULL;
@@ -509,7 +509,7 @@ got_huff_bits:
    are ignored, data is written to out_fd and return is RETVAL_OK or error.
 */
 
-static int INIT read_bunzip(struct bunzip_data *bd, unsigned char *outbuf, int len)
+static int __init read_bunzip(struct bunzip_data *bd, unsigned char *outbuf, int len)
 {
 	const unsigned int *dbuf;
 	int pos, xcurrent, previous, gotcount;
@@ -607,7 +607,7 @@ decode_next_byte:
 	goto decode_next_byte;
 }
 
-static int INIT nofill(void *buf, unsigned int len)
+static int __init nofill(void *buf, unsigned int len)
 {
 	return -1;
 }
@@ -615,8 +615,8 @@ static int INIT nofill(void *buf, unsigned int len)
 /* Allocate the structure, read file header.  If in_fd ==-1, inbuf must contain
    a complete bunzip file (len bytes long).  If in_fd!=-1, inbuf and len are
    ignored, and data is read from file handle into temporary buffer. */
-static int INIT start_bunzip(struct bunzip_data **bdp, void *inbuf, int len,
-			     int (*fill)(void*, unsigned int))
+static int __init start_bunzip(struct bunzip_data **bdp, void *inbuf, int len,
+			       int (*fill)(void*, unsigned int))
 {
 	struct bunzip_data *bd;
 	unsigned int i, j, c;
@@ -665,11 +665,11 @@ static int INIT start_bunzip(struct bunzip_data **bdp, void *inbuf, int len,
 
 /* Example usage: decompress src_fd to dst_fd.  (Stops at end of bzip2 data,
    not end of file.) */
-int INIT bunzip2(unsigned char *buf, unsigned int len,
-		 int(*fill)(void*, unsigned int),
-		 int(*flush)(void*, unsigned int),
-		 unsigned char *outbuf, unsigned int *pos,
-		 void(*error)(const char *x))
+int __init bunzip2(unsigned char *buf, unsigned int len,
+		   int(*fill)(void*, unsigned int),
+		   int(*flush)(void*, unsigned int),
+		   unsigned char *outbuf, unsigned int *pos,
+		   void(*error)(const char *x))
 {
 	struct bunzip_data *bd;
 	int i = -1;

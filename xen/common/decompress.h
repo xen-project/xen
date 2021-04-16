@@ -23,6 +23,10 @@
 #define INIT
 #define INITDATA
 
+#undef __init /* tools/libs/guest/xg_private.h has its own one */
+#define __init
+#define __initdata
+
 #define large_malloc malloc
 #define large_free free
 
