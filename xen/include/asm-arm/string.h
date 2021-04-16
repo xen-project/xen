@@ -8,41 +8,21 @@
  */
 
 #define __HAVE_ARCH_STRRCHR
-char *strrchr(const char *s, int c);
-
 #define __HAVE_ARCH_STRCHR
-char *strchr(const char *s, int c);
-
 #if defined(CONFIG_ARM_64)
 #define __HAVE_ARCH_STRCMP
-int strcmp(const char *, const char *);
-
 #define __HAVE_ARCH_STRNCMP
-int strncmp(const char *, const char *, size_t);
-
 #define __HAVE_ARCH_STRLEN
-size_t strlen(const char *);
-
 #define __HAVE_ARCH_STRNLEN
-size_t strnlen(const char *, size_t);
 #endif
 
 #define __HAVE_ARCH_MEMCPY
-void *memcpy(void *, const void *, size_t);
-
 #if defined(CONFIG_ARM_64)
 #define __HAVE_ARCH_MEMCMP
-int memcmp(const void *, const void *, size_t);
 #endif
-
 #define __HAVE_ARCH_MEMMOVE
-void *memmove(void *dest, const void *src, size_t n);
-
 #define __HAVE_ARCH_MEMSET
-void *memset(void *, int, size_t);
-
 #define __HAVE_ARCH_MEMCHR
-void *memchr(const void *, int, size_t);
 
 #if defined(CONFIG_ARM_32)
 
