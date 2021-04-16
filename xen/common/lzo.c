@@ -135,8 +135,8 @@
  */
 #define MAX_255_COUNT      ((((size_t)~0) / 255) - 2)
 
-int INIT lzo1x_decompress_safe(const unsigned char *in, size_t in_len,
-                               unsigned char *out, size_t *out_len)
+int __init lzo1x_decompress_safe(const unsigned char *in, size_t in_len,
+                                 unsigned char *out, size_t *out_len)
 {
     unsigned char *op;
     const unsigned char *ip;
