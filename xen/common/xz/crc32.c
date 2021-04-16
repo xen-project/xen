@@ -15,9 +15,9 @@
  * but they are bigger and use more memory for the lookup table.
  */
 
-XZ_EXTERN uint32_t INITDATA xz_crc32_table[256];
+XZ_EXTERN uint32_t __initdata xz_crc32_table[256];
 
-XZ_EXTERN void INIT xz_crc32_init(void)
+XZ_EXTERN void __init xz_crc32_init(void)
 {
 	const uint32_t poly = 0xEDB88320;
 
@@ -36,7 +36,7 @@ XZ_EXTERN void INIT xz_crc32_init(void)
 	return;
 }
 
-XZ_EXTERN uint32_t INIT xz_crc32(const uint8_t *buf, size_t size, uint32_t crc)
+XZ_EXTERN uint32_t __init xz_crc32(const uint8_t *buf, size_t size, uint32_t crc)
 {
 	crc = ~crc;
 

@@ -95,7 +95,7 @@
 
 #include "decompress.h"
 
-#define XZ_EXTERN STATIC
+#define XZ_EXTERN static
 
 /*
  * For boot time use, we enable only the BCJ filter of the current
@@ -157,11 +157,11 @@
  * both input and output buffers are available as a single chunk, i.e. when
  * fill() and flush() won't be used.
  */
-int INIT unxz(unsigned char *in, unsigned int in_size,
-	      int (*fill)(void *dest, unsigned int size),
-	      int (*flush)(void *src, unsigned int size),
-	      unsigned char *out, unsigned int *in_used,
-	      void (*error)(const char *x))
+int __init unxz(unsigned char *in, unsigned int in_size,
+		int (*fill)(void *dest, unsigned int size),
+		int (*flush)(void *src, unsigned int size),
+		unsigned char *out, unsigned int *in_used,
+		void (*error)(const char *x))
 {
 	struct xz_buf b;
 	struct xz_dec *s;

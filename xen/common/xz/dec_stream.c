@@ -154,7 +154,7 @@ static const uint8_t check_sizes[16] = {
  * to copy into s->temp.buf. Return true once s->temp.pos has reached
  * s->temp.size.
  */
-static bool_t INIT fill_temp(struct xz_dec *s, struct xz_buf *b)
+static bool_t __init fill_temp(struct xz_dec *s, struct xz_buf *b)
 {
 	size_t copy_size = min_t(size_t,
 			b->in_size - b->in_pos, s->temp.size - s->temp.pos);
@@ -172,8 +172,8 @@ static bool_t INIT fill_temp(struct xz_dec *s, struct xz_buf *b)
 }
 
 /* Decode a variable-length integer (little-endian base-128 encoding) */
-static enum xz_ret INIT dec_vli(struct xz_dec *s, const uint8_t *in,
-				size_t *in_pos, size_t in_size)
+static enum xz_ret __init dec_vli(struct xz_dec *s, const uint8_t *in,
+				  size_t *in_pos, size_t in_size)
 {
 	uint8_t byte;
 
@@ -215,7 +215,7 @@ static enum xz_ret INIT dec_vli(struct xz_dec *s, const uint8_t *in,
  * the sizes possibly stored in the Block Header. Update the hash and
  * Block count, which are later used to validate the Index field.
  */
-static enum xz_ret INIT dec_block(struct xz_dec *s, struct xz_buf *b)
+static enum xz_ret __init dec_block(struct xz_dec *s, struct xz_buf *b)
 {
 	enum xz_ret ret;
 
@@ -278,7 +278,7 @@ static enum xz_ret INIT dec_block(struct xz_dec *s, struct xz_buf *b)
 }
 
 /* Update the Index size and the CRC32 value. */
-static void INIT index_update(struct xz_dec *s, const struct xz_buf *b)
+static void __init index_update(struct xz_dec *s, const struct xz_buf *b)
 {
 	size_t in_used = b->in_pos - s->in_start;
 	s->index.size += in_used;
@@ -293,7 +293,7 @@ static void INIT index_update(struct xz_dec *s, const struct xz_buf *b)
  * This can return XZ_OK (more input needed), XZ_STREAM_END (everything
  * successfully decoded), or XZ_DATA_ERROR (input is corrupt).
  */
-static enum xz_ret INIT dec_index(struct xz_dec *s, struct xz_buf *b)
+static enum xz_ret __init dec_index(struct xz_dec *s, struct xz_buf *b)
 {
 	enum xz_ret ret;
 
@@ -343,7 +343,7 @@ static enum xz_ret INIT dec_index(struct xz_dec *s, struct xz_buf *b)
  * Validate that the next four input bytes match the value of s->crc32.
  * s->pos must be zero when starting to validate the first byte.
  */
-static enum xz_ret INIT crc32_validate(struct xz_dec *s, struct xz_buf *b)
+static enum xz_ret __init crc32_validate(struct xz_dec *s, struct xz_buf *b)
 {
 	do {
 		if (b->in_pos == b->in_size)
@@ -367,7 +367,7 @@ static enum xz_ret INIT crc32_validate(struct xz_dec *s, struct xz_buf *b)
  * Skip over the Check field when the Check ID is not supported.
  * Returns true once the whole Check field has been skipped over.
  */
-static bool_t INIT check_skip(struct xz_dec *s, struct xz_buf *b)
+static bool_t __init check_skip(struct xz_dec *s, struct xz_buf *b)
 {
 	while (s->pos < check_sizes[s->check_type]) {
 		if (b->in_pos == b->in_size)
@@ -384,7 +384,7 @@ static bool_t INIT check_skip(struct xz_dec *s, struct xz_buf *b)
 #endif
 
 /* Decode the Stream Header field (the first 12 bytes of the .xz Stream). */
-static enum xz_ret INIT dec_stream_header(struct xz_dec *s)
+static enum xz_ret __init dec_stream_header(struct xz_dec *s)
 {
 	if (!memeq(s->temp.buf, HEADER_MAGIC, HEADER_MAGIC_SIZE))
 		return XZ_FORMAT_ERROR;
@@ -419,7 +419,7 @@ static enum xz_ret INIT dec_stream_header(struct xz_dec *s)
 }
 
 /* Decode the Stream Footer field (the last 12 bytes of the .xz Stream) */
-static enum xz_ret INIT dec_stream_footer(struct xz_dec *s)
+static enum xz_ret __init dec_stream_footer(struct xz_dec *s)
 {
 	if (!memeq(s->temp.buf + 10, FOOTER_MAGIC, FOOTER_MAGIC_SIZE))
 		return XZ_DATA_ERROR;
@@ -446,7 +446,7 @@ static enum xz_ret INIT dec_stream_footer(struct xz_dec *s)
 }
 
 /* Decode the Block Header and initialize the filter chain. */
-static enum xz_ret INIT dec_block_header(struct xz_dec *s)
+static enum xz_ret __init dec_block_header(struct xz_dec *s)
 {
 	enum xz_ret ret;
 
@@ -546,7 +546,7 @@ static enum xz_ret INIT dec_block_header(struct xz_dec *s)
 	return XZ_OK;
 }
 
-static enum xz_ret INIT dec_main(struct xz_dec *s, struct xz_buf *b)
+static enum xz_ret __init dec_main(struct xz_dec *s, struct xz_buf *b)
 {
 	enum xz_ret ret;
 
@@ -706,7 +706,7 @@ static enum xz_ret INIT dec_main(struct xz_dec *s, struct xz_buf *b)
 	/* Never reached */
 }
 
-XZ_EXTERN void INIT xz_dec_reset(struct xz_dec *s)
+XZ_EXTERN void __init xz_dec_reset(struct xz_dec *s)
 {
 	s->sequence = SEQ_STREAM_HEADER;
 	s->allow_buf_error = false;
@@ -743,7 +743,7 @@ XZ_EXTERN void INIT xz_dec_reset(struct xz_dec *s)
  * actually succeeds (that's the price to pay of using the output buffer as
  * the workspace).
  */
-XZ_EXTERN enum xz_ret INIT xz_dec_run(struct xz_dec *s, struct xz_buf *b)
+XZ_EXTERN enum xz_ret __init xz_dec_run(struct xz_dec *s, struct xz_buf *b)
 {
 	size_t in_start;
 	size_t out_start;
@@ -779,7 +779,7 @@ XZ_EXTERN enum xz_ret INIT xz_dec_run(struct xz_dec *s, struct xz_buf *b)
 	return ret;
 }
 
-XZ_EXTERN struct xz_dec *INIT xz_dec_init(enum xz_mode mode, uint32_t dict_max)
+XZ_EXTERN struct xz_dec *__init xz_dec_init(enum xz_mode mode, uint32_t dict_max)
 {
 	struct xz_dec *s = malloc(sizeof(*s));
 	if (s == NULL)
@@ -809,7 +809,7 @@ error_bcj:
 	return NULL;
 }
 
-XZ_EXTERN void INIT xz_dec_end(struct xz_dec *s)
+XZ_EXTERN void __init xz_dec_end(struct xz_dec *s)
 {
 	if (s != NULL) {
 		xz_dec_lzma2_end(s->lzma2);

@@ -80,12 +80,12 @@ struct xz_dec_bcj {
  * This is used to test the most significant byte of a memory address
  * in an x86 instruction.
  */
-static inline int INIT bcj_x86_test_msbyte(uint8_t b)
+static inline int __init bcj_x86_test_msbyte(uint8_t b)
 {
 	return b == 0x00 || b == 0xFF;
 }
 
-static size_t INIT bcj_x86(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
+static size_t __init bcj_x86(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
 	static const bool_t mask_to_allowed_status[8]
 		= { true, true, true, false, true, false, false, false };
@@ -157,7 +157,7 @@ static size_t INIT bcj_x86(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 #endif
 
 #ifdef XZ_DEC_POWERPC
-static size_t INIT bcj_powerpc(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
+static size_t __init bcj_powerpc(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
 	size_t i;
 	uint32_t instr;
@@ -178,7 +178,7 @@ static size_t INIT bcj_powerpc(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 #endif
 
 #ifdef XZ_DEC_IA64
-static size_t INIT bcj_ia64(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
+static size_t __init bcj_ia64(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
 	static const uint8_t branch_table[32] = {
 		0, 0, 0, 0, 0, 0, 0, 0,
@@ -262,7 +262,7 @@ static size_t INIT bcj_ia64(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 #endif
 
 #ifdef XZ_DEC_ARM
-static size_t INIT bcj_arm(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
+static size_t __init bcj_arm(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
 	size_t i;
 	uint32_t addr;
@@ -285,7 +285,7 @@ static size_t INIT bcj_arm(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 #endif
 
 #ifdef XZ_DEC_ARMTHUMB
-static size_t INIT bcj_armthumb(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
+static size_t __init bcj_armthumb(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
 	size_t i;
 	uint32_t addr;
@@ -313,7 +313,7 @@ static size_t INIT bcj_armthumb(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 #endif
 
 #ifdef XZ_DEC_SPARC
-static size_t INIT bcj_sparc(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
+static size_t __init bcj_sparc(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
 	size_t i;
 	uint32_t instr;
@@ -342,8 +342,8 @@ static size_t INIT bcj_sparc(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
  * pointers, which could be problematic in the kernel boot code, which must
  * avoid pointers to static data (at least on x86).
  */
-static void INIT bcj_apply(struct xz_dec_bcj *s,
-			   uint8_t *buf, size_t *pos, size_t size)
+static void __init bcj_apply(struct xz_dec_bcj *s,
+			     uint8_t *buf, size_t *pos, size_t size)
 {
 	size_t filtered;
 
@@ -396,7 +396,7 @@ static void INIT bcj_apply(struct xz_dec_bcj *s,
  * Move the remaining mixture of possibly filtered and unfiltered
  * data to the beginning of temp.
  */
-static void INIT bcj_flush(struct xz_dec_bcj *s, struct xz_buf *b)
+static void __init bcj_flush(struct xz_dec_bcj *s, struct xz_buf *b)
 {
 	size_t copy_size;
 
@@ -414,9 +414,9 @@ static void INIT bcj_flush(struct xz_dec_bcj *s, struct xz_buf *b)
  * data in chunks of 1-16 bytes. To hide this issue, this function does
  * some buffering.
  */
-XZ_EXTERN enum xz_ret INIT xz_dec_bcj_run(struct xz_dec_bcj *s,
-					  struct xz_dec_lzma2 *lzma2,
-					  struct xz_buf *b)
+XZ_EXTERN enum xz_ret __init xz_dec_bcj_run(struct xz_dec_bcj *s,
+					    struct xz_dec_lzma2 *lzma2,
+					    struct xz_buf *b)
 {
 	size_t out_start;
 
@@ -524,7 +524,7 @@ XZ_EXTERN enum xz_ret INIT xz_dec_bcj_run(struct xz_dec_bcj *s,
 	return s->ret;
 }
 
-XZ_EXTERN struct xz_dec_bcj *INIT xz_dec_bcj_create(bool_t single_call)
+XZ_EXTERN struct xz_dec_bcj *__init xz_dec_bcj_create(bool_t single_call)
 {
 	struct xz_dec_bcj *s = malloc(sizeof(*s));
 	if (s != NULL)
@@ -533,7 +533,7 @@ XZ_EXTERN struct xz_dec_bcj *INIT xz_dec_bcj_create(bool_t single_call)
 	return s;
 }
 
-XZ_EXTERN enum xz_ret INIT xz_dec_bcj_reset(struct xz_dec_bcj *s, uint8_t id)
+XZ_EXTERN enum xz_ret __init xz_dec_bcj_reset(struct xz_dec_bcj *s, uint8_t id)
 {
 	switch (id) {
 #ifdef XZ_DEC_X86

@@ -61,7 +61,7 @@ enum lzma_state {
 #define LIT_STATES 7
 
 /* Indicate that the latest symbol was a literal. */
-static inline void INIT lzma_state_literal(enum lzma_state *state)
+static inline void __init lzma_state_literal(enum lzma_state *state)
 {
 	if (*state <= STATE_SHORTREP_LIT_LIT)
 		*state = STATE_LIT_LIT;
@@ -72,25 +72,25 @@ static inline void INIT lzma_state_literal(enum lzma_state *state)
 }
 
 /* Indicate that the latest symbol was a match. */
-static inline void INIT lzma_state_match(enum lzma_state *state)
+static inline void __init lzma_state_match(enum lzma_state *state)
 {
 	*state = *state < LIT_STATES ? STATE_LIT_MATCH : STATE_NONLIT_MATCH;
 }
 
 /* Indicate that the latest state was a long repeated match. */
-static inline void INIT lzma_state_long_rep(enum lzma_state *state)
+static inline void __init lzma_state_long_rep(enum lzma_state *state)
 {
 	*state = *state < LIT_STATES ? STATE_LIT_LONGREP : STATE_NONLIT_REP;
 }
 
 /* Indicate that the latest symbol was a short match. */
-static inline void INIT lzma_state_short_rep(enum lzma_state *state)
+static inline void __init lzma_state_short_rep(enum lzma_state *state)
 {
 	*state = *state < LIT_STATES ? STATE_LIT_SHORTREP : STATE_NONLIT_REP;
 }
 
 /* Test if the previous symbol was a literal. */
-static inline bool_t INIT lzma_state_is_literal(enum lzma_state state)
+static inline bool_t __init lzma_state_is_literal(enum lzma_state state)
 {
 	return state < LIT_STATES;
 }
@@ -144,7 +144,7 @@ static inline bool_t INIT lzma_state_is_literal(enum lzma_state state)
  * Get the index of the appropriate probability array for decoding
  * the distance slot.
  */
-static inline uint32_t INIT lzma_get_dist_state(uint32_t len)
+static inline uint32_t __init lzma_get_dist_state(uint32_t len)
 {
 	return len < DIST_STATES + MATCH_LEN_MIN
 			? len - MATCH_LEN_MIN : DIST_STATES - 1;

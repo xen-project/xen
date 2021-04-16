@@ -9,7 +9,6 @@
 
 #define STATIC static
 #define INIT __init
-#define INITDATA __initdata
 
 #define malloc xmalloc_bytes
 #define free xfree
@@ -21,7 +20,6 @@
 
 #define STATIC static
 #define INIT
-#define INITDATA
 
 #undef __init /* tools/libs/guest/xg_private.h has its own one */
 #define __init
