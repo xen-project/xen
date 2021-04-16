@@ -12,7 +12,6 @@ PYTHON              := @PYTHON@
 PYTHON_PATH         := @PYTHONPATH@
 PY_NOOPT_CFLAGS     := @PY_NOOPT_CFLAGS@
 PERL                := @PERL@
-XGETTTEXT           := @XGETTEXT@
 AS86                := @AS86@
 LD86                := @LD86@
 BCC                 := @BCC@
