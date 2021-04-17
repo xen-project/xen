@@ -73,7 +73,6 @@ static __used void init_done(void)
     /* Must be done past setting system_state. */
     unregister_init_virtual_region();
 
-    discard_initial_modules();
     free_init_memory();
     startup_cpu_idle_loop();
 }
@@ -903,6 +902,12 @@ void __init start_xen(unsigned long boot_phys_offset,
         panic("Could not set up DOM0 guest OS\n");
 
     create_domUs();
+
+    /*
+     * This needs to be called **before** heap_init_late() so modules
+     * will be scrubbed (unless suppressed).
+     */
+    discard_initial_modules();
 
     heap_init_late();
 
