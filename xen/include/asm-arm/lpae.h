@@ -160,63 +160,35 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 #define lpae_set_mfn(pte, mfn)  ((pte).walk.base = mfn_x(mfn))
 
 /*
- * AArch64 supports pages with different sizes (4K, 16K, and 64K). To enable
- * page table walks for various configurations, the following helpers enable
- * walking the translation table with varying page size granularities.
+ * AArch64 supports pages with different sizes (4K, 16K, and 64K).
+ * Provide a set of generic helpers that will compute various
+ * information based on the page granularity.
+ *
+ * Note the parameter 'gs' is the page shift of the granularity used.
+ * Some macro will evaluate 'gs' twice rather than storing in a
+ * variable. This is to allow using the macros in assembly.
  */
 
-#define LPAE_SHIFT_4K           (9)
-#define LPAE_SHIFT_16K          (11)
-#define LPAE_SHIFT_64K          (13)
+/*
+ * Granularity | PAGE_SHIFT | LPAE_SHIFT
+ * -------------------------------------
+ * 4K          | 12         | 9
+ * 16K         | 14         | 11
+ * 64K         | 16         | 13
+ *
+ * This is equivalent to LPAE_SHIFT = PAGE_SHIFT - 3
+ */
+#define LPAE_SHIFT_GS(gs)         ((gs) - 3)
+#define LPAE_ENTRIES_GS(gs)       (_AC(1, U) << LPAE_SHIFT_GS(gs))
+#define LPAE_ENTRIES_MASK_GS(gs)  (LPAE_ENTRIES_GS(gs) - 1)
 
-#define lpae_entries(gran)      (_AC(1,U) << LPAE_SHIFT_##gran)
-#define lpae_entry_mask(gran)   (lpae_entries(gran) - 1)
+#define LEVEL_ORDER_GS(gs, lvl)   ((3 - (lvl)) * LPAE_SHIFT_GS(gs))
+#define LEVEL_SHIFT_GS(gs, lvl)   (LEVEL_ORDER_GS(gs, lvl) + (gs))
+#define LEVEL_SIZE_GS(gs, lvl)    (_AT(paddr_t, 1) << LEVEL_SHIFT_GS(gs, lvl))
 
-#define third_shift(gran)       (PAGE_SHIFT_##gran)
-#define third_size(gran)        ((paddr_t)1 << third_shift(gran))
-
-#define second_shift(gran)      (third_shift(gran) + LPAE_SHIFT_##gran)
-#define second_size(gran)       ((paddr_t)1 << second_shift(gran))
-
-#define first_shift(gran)       (second_shift(gran) + LPAE_SHIFT_##gran)
-#define first_size(gran)        ((paddr_t)1 << first_shift(gran))
-
-/* Note that there is no zeroeth lookup level with a 64K granule size. */
-#define zeroeth_shift(gran)     (first_shift(gran) + LPAE_SHIFT_##gran)
-#define zeroeth_size(gran)      ((paddr_t)1 << zeroeth_shift(gran))
-
-#define TABLE_OFFSET(offs, gran)      (offs & lpae_entry_mask(gran))
-#define TABLE_OFFSET_HELPERS(gran)                                          \
-static inline paddr_t third_table_offset_##gran##K(paddr_t va)              \
-{                                                                           \
-    return TABLE_OFFSET((va >> third_shift(gran##K)), gran##K);             \
-}                                                                           \
-                                                                            \
-static inline paddr_t second_table_offset_##gran##K(paddr_t va)             \
-{                                                                           \
-    return TABLE_OFFSET((va >> second_shift(gran##K)), gran##K);            \
-}                                                                           \
-                                                                            \
-static inline paddr_t first_table_offset_##gran##K(paddr_t va)              \
-{                                                                           \
-    return TABLE_OFFSET((va >> first_shift(gran##K)), gran##K);             \
-}                                                                           \
-                                                                            \
-static inline paddr_t zeroeth_table_offset_##gran##K(paddr_t va)            \
-{                                                                           \
-    /* Note that there is no zeroeth lookup level with 64K granule sizes. */\
-    if ( gran == 64 )                                                       \
-        return 0;                                                           \
-    else                                                                    \
-        return TABLE_OFFSET((va >> zeroeth_shift(gran##K)), gran##K);       \
-}                                                                           \
-
-TABLE_OFFSET_HELPERS(4);
-TABLE_OFFSET_HELPERS(16);
-TABLE_OFFSET_HELPERS(64);
-
-#undef TABLE_OFFSET
-#undef TABLE_OFFSET_HELPERS
+/* Offset in the table at level 'lvl' */
+#define LPAE_TABLE_INDEX_GS(gs, lvl, addr)   \
+    (((addr) >> LEVEL_SHIFT_GS(gs, lvl)) & LPAE_ENTRIES_MASK_GS(gs))
 
 /* Generate an array @var containing the offset for each level from @addr */
 #define DECLARE_OFFSETS(var, addr)          \

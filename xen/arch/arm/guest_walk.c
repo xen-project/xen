@@ -372,38 +372,6 @@ static bool guest_walk_ld(const struct vcpu *v,
     register_t tcr = READ_SYSREG(TCR_EL1);
     struct domain *d = v->domain;
 
-#define OFFSETS(gva, gran)              \
-{                                       \
-    zeroeth_table_offset_##gran(gva),   \
-    first_table_offset_##gran(gva),     \
-    second_table_offset_##gran(gva),    \
-    third_table_offset_##gran(gva)      \
-}
-
-    const paddr_t offsets[3][4] = {
-        OFFSETS(gva, 4K),
-        OFFSETS(gva, 16K),
-        OFFSETS(gva, 64K)
-    };
-
-#undef OFFSETS
-
-#define MASKS(gran)                     \
-{                                       \
-    zeroeth_size(gran) - 1,             \
-    first_size(gran) - 1,               \
-    second_size(gran) - 1,              \
-    third_size(gran) - 1                \
-}
-
-    static const paddr_t masks[3][4] = {
-        MASKS(4K),
-        MASKS(16K),
-        MASKS(64K)
-    };
-
-#undef MASKS
-
     static const unsigned int grainsizes[3] = {
         PAGE_SHIFT_4K,
         PAGE_SHIFT_16K,
@@ -519,7 +487,7 @@ static bool guest_walk_ld(const struct vcpu *v,
          * Add offset given by the GVA to the translation table base address.
          * Shift the offset by 3 as it is 8-byte aligned.
          */
-        paddr |= offsets[gran][level] << 3;
+        paddr |= LPAE_TABLE_INDEX_GS(grainsizes[gran], level, gva) << 3;
 
         /* Access the guest's memory to read only one PTE. */
         ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(lpae_t), false);
@@ -572,7 +540,8 @@ static bool guest_walk_ld(const struct vcpu *v,
 
     /* Make sure that the lower bits of the PTE's base address are zero. */
     mask = GENMASK_ULL(47, grainsizes[gran]);
-    *ipa = (pfn_to_paddr(pte.walk.base) & mask) | (gva & masks[gran][level]);
+    *ipa = (pfn_to_paddr(pte.walk.base) & mask) |
+        (gva & (LEVEL_SIZE_GS(grainsizes[gran], level) - 1));
 
     /*
      * Set permissions so that the caller can check the flags by herself. Note
