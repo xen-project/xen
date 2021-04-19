@@ -1115,7 +1115,7 @@ int arch_set_info_guest(
           * update_cr3(), sh_update_cr3(), sh_walk_guest_tables(), and
           * shadow_one_bit_disable() for why that is.
           */
-         !is_hvm_domain(d) && !is_pv_32bit_domain(d) )
+         is_pv_64bit_domain(d) )
         v->arch.flags &= ~TF_kernel_mode;
 
     vcpu_setup_fpu(v, v->arch.xsave_area,
@@ -1267,7 +1267,7 @@ int arch_set_info_guest(
          * correct initial RO_MPT_VIRT_{START,END} L4 entry).
          */
         if ( d != current->domain && !VM_ASSIST(d, m2p_strict) &&
-             is_pv_domain(d) && !is_pv_32bit_domain(d) &&
+             is_pv_64bit_domain(d) &&
              test_bit(VMASST_TYPE_m2p_strict, &c.nat->vm_assist) &&
              atomic_read(&d->arch.pv.nr_l4_pages) )
         {
@@ -2002,8 +2002,7 @@ static void __context_switch(void)
 
 #if defined(CONFIG_PV) && defined(CONFIG_HVM)
     /* Prefetch the VMCB if we expect to use it later in the context switch */
-    if ( cpu_has_svm && is_pv_domain(nd) && !is_pv_32bit_domain(nd) &&
-         !is_idle_domain(nd) )
+    if ( cpu_has_svm && is_pv_64bit_domain(nd) && !is_idle_domain(nd) )
         svm_load_segs_prefetch();
 #endif
 
