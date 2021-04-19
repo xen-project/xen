@@ -1565,7 +1565,7 @@ void shadow_hash_insert(struct domain *d, unsigned long n, unsigned int t,
 
     ASSERT(paging_locked_by_me(d));
     ASSERT(d->arch.paging.shadow.hash_table);
-    ASSERT(t);
+    ASSERT(t >= SH_type_min_shadow && t <= SH_type_max_shadow);
 
     sh_hash_audit(d);
 
@@ -1590,7 +1590,7 @@ void shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
 
     ASSERT(paging_locked_by_me(d));
     ASSERT(d->arch.paging.shadow.hash_table);
-    ASSERT(t);
+    ASSERT(t >= SH_type_min_shadow && t <= SH_type_max_shadow);
 
     sh_hash_audit(d);
 
@@ -1668,7 +1668,7 @@ static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
         {
             if ( callback_mask & (1 << x->u.sh.type) )
             {
-                ASSERT(x->u.sh.type < SH_type_unused);
+                ASSERT(x->u.sh.type <= SH_type_max_shadow);
                 ASSERT(callbacks[x->u.sh.type] != NULL);
                 done = callbacks[x->u.sh.type](v, page_to_mfn(x),
                                                callback_mfn);
@@ -1715,7 +1715,7 @@ static void hash_domain_foreach(struct domain *d,
         {
             if ( callback_mask & (1 << x->u.sh.type) )
             {
-                ASSERT(x->u.sh.type < SH_type_unused);
+                ASSERT(x->u.sh.type <= SH_type_max_shadow);
                 ASSERT(callbacks[x->u.sh.type] != NULL);
                 done = callbacks[x->u.sh.type](d, page_to_mfn(x),
                                                callback_mfn);
@@ -1820,25 +1820,15 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
 {
     /* Dispatch table for getting per-type functions */
     static const hash_domain_callback_t callbacks[SH_type_unused] = {
-        NULL, /* none    */
 #ifdef CONFIG_HVM
-        SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2), /* l1_32   */
-        SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2), /* fl1_32  */
-        NULL, /* l2_32   */
-        SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 3), /* l1_pae  */
-        SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 3), /* fl1_pae */
-        NULL, /* l2_pae  */
+        [SH_type_l1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2),
+        [SH_type_fl1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2),
+        [SH_type_l1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 3),
+        [SH_type_fl1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 3),
 #endif
-        SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 4), /* l1_64   */
-        SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 4), /* fl1_64  */
-        NULL, /* l2_64   */
-        NULL, /* l2h_64  */
-        NULL, /* l3_64   */
-        NULL, /* l4_64   */
-        NULL, /* p2m     */
-        NULL  /* unused  */
+        [SH_type_l1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 4),
+        [SH_type_fl1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 4),
     };
-
     static const unsigned int callback_mask = SHF_L1_ANY | SHF_FL1_ANY;
     struct page_info *pg = mfn_to_page(gmfn);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
@@ -2045,25 +2035,15 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
 
     /* Dispatch table for getting per-type functions */
     static const hash_domain_callback_t callbacks[SH_type_unused] = {
-        NULL, /* none    */
 #ifdef CONFIG_HVM
-        SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2), /* l1_32   */
-        SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2), /* fl1_32  */
-        NULL, /* l2_32   */
-        SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3), /* l1_pae  */
-        SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3), /* fl1_pae */
-        NULL, /* l2_pae  */
+        [SH_type_l1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2),
+        [SH_type_fl1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2),
+        [SH_type_l1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3),
+        [SH_type_fl1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3),
 #endif
-        SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4), /* l1_64   */
-        SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4), /* fl1_64  */
-        NULL, /* l2_64   */
-        NULL, /* l2h_64  */
-        NULL, /* l3_64   */
-        NULL, /* l4_64   */
-        NULL, /* p2m     */
-        NULL  /* unused  */
+        [SH_type_l1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4),
+        [SH_type_fl1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4),
     };
-
     static const unsigned int callback_mask = SHF_L1_ANY | SHF_FL1_ANY;
 
     perfc_incr(shadow_mappings);
@@ -2190,44 +2170,26 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     /* Dispatch table for getting per-type functions: each level must
      * be called with the function to remove a lower-level shadow. */
     static const hash_domain_callback_t callbacks[SH_type_unused] = {
-        NULL, /* none    */
 #ifdef CONFIG_HVM
-        NULL, /* l1_32   */
-        NULL, /* fl1_32  */
-        SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 2), /* l2_32   */
-        NULL, /* l1_pae  */
-        NULL, /* fl1_pae */
-        SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 3), /* l2_pae  */
+        [SH_type_l2_32_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 2),
+        [SH_type_l2_pae_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 3),
 #endif
-        NULL, /* l1_64   */
-        NULL, /* fl1_64  */
-        SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 4), /* l2_64   */
-        SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 4), /* l2h_64  */
-        SHADOW_INTERNAL_NAME(sh_remove_l2_shadow, 4), /* l3_64   */
-        SHADOW_INTERNAL_NAME(sh_remove_l3_shadow, 4), /* l4_64   */
-        NULL, /* p2m     */
-        NULL  /* unused  */
+        [SH_type_l2_64_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 4),
+        [SH_type_l2h_64_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 4),
+        [SH_type_l3_64_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l2_shadow, 4),
+        [SH_type_l4_64_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l3_shadow, 4),
     };
 
     /* Another lookup table, for choosing which mask to use */
     static const unsigned int masks[SH_type_unused] = {
-        0, /* none    */
 #ifdef CONFIG_HVM
-        SHF_L2_32, /* l1_32   */
-        0, /* fl1_32  */
-        0, /* l2_32   */
-        SHF_L2_PAE, /* l1_pae  */
-        0, /* fl1_pae */
-        0, /* l2_pae  */
+        [SH_type_l1_32_shadow] = SHF_L2_32,
+        [SH_type_l1_pae_shadow] = SHF_L2_PAE,
 #endif
-        SHF_L2H_64 | SHF_L2_64, /* l1_64   */
-        0, /* fl1_64  */
-        SHF_L3_64, /* l2_64   */
-        SHF_L3_64, /* l2h_64  */
-        SHF_L4_64, /* l3_64   */
-        0, /* l4_64   */
-        0, /* p2m     */
-        0  /* unused  */
+        [SH_type_l1_64_shadow] = SHF_L2H_64 | SHF_L2_64,
+        [SH_type_l2_64_shadow] = SHF_L3_64,
+        [SH_type_l2h_64_shadow] = SHF_L3_64,
+        [SH_type_l3_64_shadow] = SHF_L4_64,
     };
 
     ASSERT(!(all && fast));
@@ -2357,23 +2319,7 @@ static int sh_clear_up_pointer(struct vcpu *v, mfn_t smfn, mfn_t unused)
 void sh_reset_l3_up_pointers(struct vcpu *v)
 {
     static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
-        NULL, /* none    */
-#ifdef CONFIG_HVM
-        NULL, /* l1_32   */
-        NULL, /* fl1_32  */
-        NULL, /* l2_32   */
-        NULL, /* l1_pae  */
-        NULL, /* fl1_pae */
-        NULL, /* l2_pae  */
-#endif
-        NULL, /* l1_64   */
-        NULL, /* fl1_64  */
-        NULL, /* l2_64   */
-        NULL, /* l2h_64  */
-        sh_clear_up_pointer, /* l3_64   */
-        NULL, /* l4_64   */
-        NULL, /* p2m     */
-        NULL  /* unused  */
+        [SH_type_l3_64_shadow] = sh_clear_up_pointer,
     };
     static const unsigned int callback_mask = SHF_L3_64;
 
@@ -3382,24 +3328,22 @@ void shadow_audit_tables(struct vcpu *v)
 {
     /* Dispatch table for getting per-type functions */
     static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
-        NULL, /* none    */
 #if SHADOW_AUDIT & (SHADOW_AUDIT_ENTRIES | SHADOW_AUDIT_ENTRIES_FULL)
 # ifdef CONFIG_HVM
-        SHADOW_INTERNAL_NAME(sh_audit_l1_table, 2),  /* l1_32   */
-        SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 2), /* fl1_32  */
-        SHADOW_INTERNAL_NAME(sh_audit_l2_table, 2),  /* l2_32   */
-        SHADOW_INTERNAL_NAME(sh_audit_l1_table, 3),  /* l1_pae  */
-        SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 3), /* fl1_pae */
-        SHADOW_INTERNAL_NAME(sh_audit_l2_table, 3),  /* l2_pae  */
+        [SH_type_l1_32_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l1_table, 2),
+        [SH_type_fl1_32_shadow] = SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 2),
+        [SH_type_l2_32_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l2_table, 2),
+        [SH_type_l1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l1_table, 3),
+        [SH_type_fl1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 3),
+        [SH_type_l2_pae_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l2_table, 3),
 # endif
-        SHADOW_INTERNAL_NAME(sh_audit_l1_table, 4),  /* l1_64   */
-        SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 4), /* fl1_64  */
-        SHADOW_INTERNAL_NAME(sh_audit_l2_table, 4),  /* l2_64   */
-        SHADOW_INTERNAL_NAME(sh_audit_l2_table, 4),  /* l2h_64   */
-        SHADOW_INTERNAL_NAME(sh_audit_l3_table, 4),  /* l3_64   */
-        SHADOW_INTERNAL_NAME(sh_audit_l4_table, 4),  /* l4_64   */
+        [SH_type_l1_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l1_table, 4),
+        [SH_type_fl1_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 4),
+        [SH_type_l2_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l2_table, 4),
+        [SH_type_l2h_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l2_table, 4),
+        [SH_type_l3_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l3_table, 4),
+        [SH_type_l4_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l4_table, 4),
 #endif
-        NULL  /* All the rest */
     };
     unsigned int mask;
 
@@ -3427,7 +3371,9 @@ void shadow_audit_tables(struct vcpu *v)
         }
     }
 
-    HASH_CALLBACKS_CHECK(SHF_page_type_mask);
+    HASH_CALLBACKS_CHECK(SHADOW_AUDIT & (SHADOW_AUDIT_ENTRIES |
+                                         SHADOW_AUDIT_ENTRIES_FULL)
+                         ? SHF_page_type_mask : 0);
     hash_vcpu_foreach(v, mask, callbacks, INVALID_MFN);
 }
 
