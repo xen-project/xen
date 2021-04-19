@@ -16,7 +16,6 @@ config X86
 	select HAS_FAST_MULTIPLY
 	select HAS_IOPORTS
 	select HAS_KEXEC
-	select MEM_ACCESS_ALWAYS_ON
 	select HAS_MEM_PAGING
 	select HAS_NS16550
 	select HAS_PASSTHROUGH
@@ -95,6 +94,7 @@ config HVM
 	def_bool !PV_SHIM_EXCLUSIVE
 	select COMPAT
 	select IOREQ_SERVER
+	select MEM_ACCESS_ALWAYS_ON
 	prompt "HVM support"
 	---help---
 	  Interfaces to support HVM domains.  HVM domains require hardware

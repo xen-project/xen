@@ -61,6 +61,7 @@ config MEM_ACCESS_ALWAYS_ON
 config MEM_ACCESS
 	def_bool MEM_ACCESS_ALWAYS_ON
 	prompt "Memory Access and VM events" if !MEM_ACCESS_ALWAYS_ON
+	depends on HVM
 	---help---
 
 	  Framework to configure memory access types for guests and receive
