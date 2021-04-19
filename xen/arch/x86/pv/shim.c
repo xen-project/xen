@@ -280,12 +280,12 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
 static void write_start_info(struct domain *d)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    start_info_t *si = map_domain_page(_mfn(is_pv_32bit_domain(d) ? regs->edx
-                                                                  : regs->rdx));
+    bool compat = is_pv_32bit_domain(d);
+    start_info_t *si = map_domain_page(_mfn(compat ? regs->edx : regs->rdx));
     uint64_t param;
 
     snprintf(si->magic, sizeof(si->magic), "xen-3.0-x86_%s",
-             is_pv_32bit_domain(d) ? "32p" : "64");
+             compat ? "32p" : "64");
     si->nr_pages = domain_tot_pages(d);
     si->shared_info = virt_to_maddr(d->shared_info);
     si->flags = 0;
@@ -300,7 +300,7 @@ static void write_start_info(struct domain *d)
                                           &si->console.domU.mfn) )
         BUG();
 
-    if ( is_pv_32bit_domain(d) )
+    if ( compat )
         xlat_start_info(si, XLAT_start_info_console_domU);
 
     unmap_domain_page(si);
