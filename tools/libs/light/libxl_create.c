@@ -578,7 +578,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
                        uint32_t *domid, bool soft_reset)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int ret, rc, nb_vm;
+    int ret, rc;
     const char *dom_type;
     char *uuid_string;
     char *dom_path, *vm_path, *libxl_path;
@@ -586,7 +586,6 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     struct xs_permissions rwperm[1];
     struct xs_permissions noperm[1];
     xs_transaction_t t = 0;
-    libxl_vminfo *vm_list;
 
     /* convenience aliases */
     libxl_domain_create_info *info = &d_config->c_info;
@@ -868,14 +867,6 @@ retry_transaction:
         libxl__xs_mknod(gc, t, GCSPRINTF("%s/device-model", dom_path), rwperm,
                         ARRAY_SIZE(rwperm));
     }
-
-    vm_list = libxl_list_vm(ctx, &nb_vm);
-    if (!vm_list) {
-        LOGD(ERROR, *domid, "cannot get number of running guests");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-    libxl_vminfo_list_free(vm_list, nb_vm);
 
     xs_write(ctx->xsh, t, GCSPRINTF("%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, GCSPRINTF("%s/name", vm_path), info->name, strlen(info->name));
