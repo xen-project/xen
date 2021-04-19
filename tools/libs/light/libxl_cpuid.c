@@ -215,6 +215,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
 
         {"avx512-4vnniw",0x00000007,  0, CPUID_REG_EDX,  2,  1},
         {"avx512-4fmaps",0x00000007,  0, CPUID_REG_EDX,  3,  1},
+        {"fsrm",         0x00000007,  0, CPUID_REG_EDX,  4,  1},
         {"avx512-vp2intersect",0x00000007,0,CPUID_REG_EDX,8, 1},
         {"srbds-ctrl",   0x00000007,  0, CPUID_REG_EDX,  9,  1},
         {"md-clear",     0x00000007,  0, CPUID_REG_EDX, 10,  1},
@@ -229,6 +230,9 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
 
         {"avx-vnni",     0x00000007,  1, CPUID_REG_EAX,  4,  1},
         {"avx512-bf16",  0x00000007,  1, CPUID_REG_EAX,  5,  1},
+        {"fzrm",         0x00000007,  1, CPUID_REG_EAX, 10,  1},
+        {"fsrs",         0x00000007,  1, CPUID_REG_EAX, 11,  1},
+        {"fsrcs",        0x00000007,  1, CPUID_REG_EAX, 12,  1},
 
         {"lahfsahf",     0x80000001, NA, CPUID_REG_ECX,  0,  1},
         {"cmplegacy",    0x80000001, NA, CPUID_REG_ECX,  1,  1},
