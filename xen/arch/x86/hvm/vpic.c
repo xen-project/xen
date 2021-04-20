@@ -101,11 +101,14 @@ static void vpic_update_int_output(struct hvm_hw_vpic *vpic)
     irq = vpic_get_highest_priority_irq(vpic);
     TRACE_3D(TRC_HVM_EMUL_PIC_INT_OUTPUT, vpic->int_output, vpic->is_master,
              irq);
-    if ( vpic->int_output == (irq >= 0) )
+    if ( vpic->int_output == (!vpic->init_state && irq >= 0) )
         return;
 
-    /* INT line transition L->H or H->L. */
-    vpic->int_output = !vpic->int_output;
+    /*
+     * INT line transition L->H or H->L.
+     * Force line status to L when in init mode.
+     */
+    vpic->int_output = !vpic->init_state && !vpic->int_output;
 
     if ( vpic->int_output )
     {
