@@ -36,10 +36,7 @@ static int _hvm_dpci_isairq_eoi(struct domain *d,
         {
             hvm_pci_intx_deassert(d, digl->device, digl->intx);
             if ( --pirq_dpci->pending == 0 )
-            {
-                stop_timer(&pirq_dpci->timer);
                 pirq_guest_eoi(dpci_pirq(pirq_dpci));
-            }
         }
     }
 

@@ -183,11 +183,6 @@ int pt_irq_destroy_bind(struct domain *, const struct xen_domctl_bind_pt_irq *);
 void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq);
 struct hvm_irq_dpci *domain_get_irq_dpci(const struct domain *);
 void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci);
-#ifdef CONFIG_HVM
-bool pt_irq_need_timer(uint32_t flags);
-#else
-static inline bool pt_irq_need_timer(unsigned int flags) { return false; }
-#endif
 
 struct msi_desc;
 struct msi_msg;

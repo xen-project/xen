@@ -116,7 +116,6 @@ struct dev_intx_gsi_link {
 #define _HVM_IRQ_DPCI_MACH_PCI_SHIFT            0
 #define _HVM_IRQ_DPCI_MACH_MSI_SHIFT            1
 #define _HVM_IRQ_DPCI_MAPPED_SHIFT              2
-#define _HVM_IRQ_DPCI_EOI_LATCH_SHIFT           3
 #define _HVM_IRQ_DPCI_GUEST_PCI_SHIFT           4
 #define _HVM_IRQ_DPCI_GUEST_MSI_SHIFT           5
 #define _HVM_IRQ_DPCI_IDENTITY_GSI_SHIFT        6
@@ -125,7 +124,6 @@ struct dev_intx_gsi_link {
 #define HVM_IRQ_DPCI_MACH_PCI        (1u << _HVM_IRQ_DPCI_MACH_PCI_SHIFT)
 #define HVM_IRQ_DPCI_MACH_MSI        (1u << _HVM_IRQ_DPCI_MACH_MSI_SHIFT)
 #define HVM_IRQ_DPCI_MAPPED          (1u << _HVM_IRQ_DPCI_MAPPED_SHIFT)
-#define HVM_IRQ_DPCI_EOI_LATCH       (1u << _HVM_IRQ_DPCI_EOI_LATCH_SHIFT)
 #define HVM_IRQ_DPCI_GUEST_PCI       (1u << _HVM_IRQ_DPCI_GUEST_PCI_SHIFT)
 #define HVM_IRQ_DPCI_GUEST_MSI       (1u << _HVM_IRQ_DPCI_GUEST_MSI_SHIFT)
 #define HVM_IRQ_DPCI_IDENTITY_GSI    (1u << _HVM_IRQ_DPCI_IDENTITY_GSI_SHIFT)
@@ -170,7 +168,6 @@ struct hvm_pirq_dpci {
     struct list_head digl_list;
     struct domain *dom;
     struct hvm_gmsi_info gmsi;
-    struct timer timer;
     struct list_head softirq_list;
 };
 

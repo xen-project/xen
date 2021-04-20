@@ -136,77 +136,6 @@ static void pt_pirq_softirq_reset(struct hvm_pirq_dpci *pirq_dpci)
     pirq_dpci->masked = 0;
 }
 
-bool pt_irq_need_timer(uint32_t flags)
-{
-    return !(flags & (HVM_IRQ_DPCI_GUEST_MSI | HVM_IRQ_DPCI_TRANSLATE |
-                      HVM_IRQ_DPCI_NO_EOI));
-}
-
-static int pt_irq_guest_eoi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
-                            void *arg)
-{
-    if ( __test_and_clear_bit(_HVM_IRQ_DPCI_EOI_LATCH_SHIFT,
-                              &pirq_dpci->flags) )
-    {
-        pirq_dpci->masked = 0;
-        pirq_dpci->pending = 0;
-        pirq_guest_eoi(dpci_pirq(pirq_dpci));
-    }
-
-    return 0;
-}
-
-static void pt_irq_time_out(void *data)
-{
-    struct hvm_pirq_dpci *irq_map = data;
-    const struct hvm_irq_dpci *dpci;
-    const struct dev_intx_gsi_link *digl;
-
-    spin_lock(&irq_map->dom->event_lock);
-
-    if ( irq_map->flags & HVM_IRQ_DPCI_IDENTITY_GSI )
-    {
-        ASSERT(is_hardware_domain(irq_map->dom));
-        /*
-         * Identity mapped, no need to iterate over the guest GSI list to find
-         * other pirqs sharing the same guest GSI.
-         *
-         * In the identity mapped case the EOI can also be done now, this way
-         * the iteration over the list of domain pirqs is avoided.
-         */
-        hvm_gsi_deassert(irq_map->dom, dpci_pirq(irq_map)->pirq);
-        irq_map->flags |= HVM_IRQ_DPCI_EOI_LATCH;
-        pt_irq_guest_eoi(irq_map->dom, irq_map, NULL);
-        spin_unlock(&irq_map->dom->event_lock);
-        return;
-    }
-
-    dpci = domain_get_irq_dpci(irq_map->dom);
-    if ( unlikely(!dpci) )
-    {
-        ASSERT_UNREACHABLE();
-        spin_unlock(&irq_map->dom->event_lock);
-        return;
-    }
-    list_for_each_entry ( digl, &irq_map->digl_list, list )
-    {
-        unsigned int guest_gsi = hvm_pci_intx_gsi(digl->device, digl->intx);
-        const struct hvm_girq_dpci_mapping *girq;
-
-        list_for_each_entry ( girq, &dpci->girq[guest_gsi], list )
-        {
-            struct pirq *pirq = pirq_info(irq_map->dom, girq->machine_gsi);
-
-            pirq_dpci(pirq)->flags |= HVM_IRQ_DPCI_EOI_LATCH;
-        }
-        hvm_pci_intx_deassert(irq_map->dom, digl->device, digl->intx);
-    }
-
-    pt_pirq_iterate(irq_map->dom, pt_irq_guest_eoi, NULL);
-
-    spin_unlock(&irq_map->dom->event_lock);
-}
-
 struct hvm_irq_dpci *domain_get_irq_dpci(const struct domain *d)
 {
     if ( !d || !is_hvm_domain(d) )
@@ -568,15 +497,10 @@ int pt_irq_create_bind(
                 }
             }
 
-            /* Init timer before binding */
-            if ( pt_irq_need_timer(pirq_dpci->flags) )
-                init_timer(&pirq_dpci->timer, pt_irq_time_out, pirq_dpci, 0);
             /* Deal with gsi for legacy devices */
             rc = pirq_guest_bind(d->vcpu[0], info, share);
             if ( unlikely(rc) )
             {
-                if ( pt_irq_need_timer(pirq_dpci->flags) )
-                    kill_timer(&pirq_dpci->timer);
                 /*
                  * There is no path for __do_IRQ to schedule softirq as
                  * IRQ_GUEST is not set. As such we can reset 'dom' directly.
@@ -743,8 +667,6 @@ int pt_irq_destroy_bind(
     {
         pirq_guest_unbind(d, pirq);
         msixtbl_pt_unregister(d, pirq);
-        if ( pt_irq_need_timer(pirq_dpci->flags) )
-            kill_timer(&pirq_dpci->timer);
         pirq_dpci->flags = 0;
         /*
          * See comment in pt_irq_create_bind's PT_IRQ_TYPE_MSI before the
@@ -934,16 +856,6 @@ static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
             __msi_pirq_eoi(pirq_dpci);
             goto out;
         }
-
-        /*
-         * Set a timer to see if the guest can finish the interrupt or not. For
-         * example, the guest OS may unmask the PIC during boot, before the
-         * guest driver is loaded. hvm_pci_intx_assert() may succeed, but the
-         * guest will never deal with the irq, then the physical interrupt line
-         * will never be deasserted.
-         */
-        ASSERT(pt_irq_need_timer(pirq_dpci->flags));
-        set_timer(&pirq_dpci->timer, NOW() + PT_IRQ_TIME_OUT);
     }
 
  out:
@@ -967,10 +879,10 @@ static void hvm_pirq_eoi(struct pirq *pirq)
      * since interrupt is still not EOIed
      */
     if ( --pirq_dpci->pending ||
-         !pt_irq_need_timer(pirq_dpci->flags) )
+         /* When the interrupt source is MSI no Ack should be performed. */
+         (pirq_dpci->flags & HVM_IRQ_DPCI_TRANSLATE) )
         return;
 
-    stop_timer(&pirq_dpci->timer);
     pirq_guest_eoi(pirq);
 }
 
@@ -1041,9 +953,6 @@ static int pci_clean_dpci_irq(struct domain *d,
         return 0;
 
     pirq_guest_unbind(d, dpci_pirq(pirq_dpci));
-
-    if ( pt_irq_need_timer(pirq_dpci->flags) )
-        kill_timer(&pirq_dpci->timer);
 
     list_for_each_entry_safe ( digl, tmp, &pirq_dpci->digl_list, list )
     {
