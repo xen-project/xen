@@ -188,7 +188,8 @@ static void vpic_ioport_write(
     struct hvm_hw_vpic *vpic, uint32_t addr, uint32_t val)
 {
     int priority, cmd;
-    uint8_t mask, unmasked = 0;
+    uint8_t mask;
+    bool unmasked = false;
 
     vpic_lock(vpic);
 
@@ -200,7 +201,6 @@ static void vpic_ioport_write(
             /* Clear edge-sensing logic. */
             vpic->irr &= vpic->elcr;
 
-            unmasked = vpic->imr;
             /* No interrupts masked or in service. */
             vpic->imr = vpic->isr = 0;
 
@@ -294,13 +294,17 @@ static void vpic_ioport_write(
             /* ICW3 */
             vpic->init_state++;
             if ( !(vpic->init_state & 4) )
+            {
                 vpic->init_state = 0; /* No ICW4: init done */
+                unmasked = true;
+            }
             break;
         case 3:
             /* ICW4 */
             vpic->special_fully_nested_mode = (val >> 4) & 1;
             vpic->auto_eoi = (val >> 1) & 1;
             vpic->init_state = 0;
+            unmasked = true;
             break;
         }
     }
