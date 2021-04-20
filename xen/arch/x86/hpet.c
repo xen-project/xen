@@ -52,8 +52,6 @@ static unsigned int __read_mostly num_hpets_used;
 DEFINE_PER_CPU(struct hpet_event_channel *, cpu_bc_channel);
 
 unsigned long __initdata hpet_address;
-static bool __initdata opt_hpet = true;
-static bool __initdata opt_legacy_replacement;
 u8 __initdata hpet_blockid;
 u8 __initdata hpet_flags;
 
@@ -64,32 +62,6 @@ u8 __initdata hpet_flags;
  */
 static bool __initdata force_hpet_broadcast;
 boolean_param("hpetbroadcast", force_hpet_broadcast);
-
-static int __init parse_hpet_param(const char *s)
-{
-    const char *ss;
-    int val, rc = 0;
-
-    do {
-        ss = strchr(s, ',');
-        if ( !ss )
-            ss = strchr(s, '\0');
-
-        if ( (val = parse_bool(s, ss)) >= 0 )
-            opt_hpet = val;
-        else if ( (val = parse_boolean("broadcast", s, ss)) >= 0 )
-            force_hpet_broadcast = val;
-        else if ( (val = parse_boolean("legacy-replacement", s, ss)) >= 0 )
-            opt_legacy_replacement = val;
-        else
-            rc = -EINVAL;
-
-        s = ss + 1;
-    } while ( *ss );
-
-    return rc;
-}
-custom_param("hpet", parse_hpet_param);
 
 /*
  * Calculate a multiplication factor for scaled math, which is used to convert
@@ -789,8 +761,11 @@ u64 __init hpet_setup(void)
     unsigned int hpet_id, hpet_period, hpet_cfg;
     unsigned int last, rem;
 
-    if ( hpet_rate || !hpet_address || !opt_hpet )
+    if ( hpet_rate )
         return hpet_rate;
+
+    if ( hpet_address == 0 )
+        return 0;
 
     set_fixmap_nocache(FIX_HPET_BASE, hpet_address);
 
@@ -828,9 +803,9 @@ u64 __init hpet_setup(void)
      * IRQ routing is configured.
      *
      * Reconfigure the HPET into legacy mode to re-establish the timer
-     * interrupt, if available and if so requested.
+     * interrupt.
      */
-    if ( opt_legacy_replacement && (hpet_id & HPET_ID_LEGSUP) &&
+    if ( hpet_id & HPET_ID_LEGSUP &&
          !((hpet_cfg = hpet_read32(HPET_CFG)) & HPET_CFG_LEGACY) )
     {
         unsigned int c0_cfg, ticks, count;
