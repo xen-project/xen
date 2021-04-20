@@ -2085,7 +2085,6 @@ static struct option options[] = {
 #endif
 	{ NULL, 0, NULL, 0 } };
 
-extern void dump_conn(struct connection *conn); 
 int dom0_domid = 0;
 int dom0_event = 0;
 int priv_domid = 0;
