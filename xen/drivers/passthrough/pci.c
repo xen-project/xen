@@ -842,10 +842,10 @@ int pci_remove_device(u16 seg, u8 bus, u8 devfn)
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
+            pci_cleanup_msi(pdev);
             ret = iommu_remove_device(pdev);
             if ( pdev->domain )
                 list_del(&pdev->domain_list);
-            pci_cleanup_msi(pdev);
             free_pdev(pseg, pdev);
             printk(XENLOG_DEBUG "PCI remove device %04x:%02x:%02x.%u\n",
                    seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
