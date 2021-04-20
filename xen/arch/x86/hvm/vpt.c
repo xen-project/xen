@@ -153,32 +153,43 @@ static int pt_irq_masked(struct periodic_time *pt)
     return 1;
 }
 
+/*
+ * Functions which read (maybe write) all periodic_time instances
+ * attached to a particular vCPU use pt_vcpu_{un}lock locking helpers.
+ *
+ * Such users are explicitly forbidden from changing the value of the
+ * pt->vcpu field, because another thread holding the pt_migrate lock
+ * may already be spinning waiting for your vcpu lock.
+ */
 static void pt_vcpu_lock(struct vcpu *v)
 {
-    read_lock(&v->domain->arch.hvm.pl_time->pt_migrate);
     spin_lock(&v->arch.hvm.tm_lock);
 }
 
 static void pt_vcpu_unlock(struct vcpu *v)
 {
     spin_unlock(&v->arch.hvm.tm_lock);
-    read_unlock(&v->domain->arch.hvm.pl_time->pt_migrate);
 }
 
+/*
+ * Functions which want to modify a particular periodic_time object
+ * use pt_{un}lock locking helpers.
+ *
+ * These users lock whichever vCPU the periodic_time is attached to,
+ * but since the vCPU could be modified without holding any lock, they
+ * need to take an additional lock that protects against pt->vcpu
+ * changing.
+ */
 static void pt_lock(struct periodic_time *pt)
 {
-    /*
-     * We cannot use pt_vcpu_lock here, because we need to acquire the
-     * per-domain lock first and then (re-)fetch the value of pt->vcpu, or
-     * else we might be using a stale value of pt->vcpu.
-     */
     read_lock(&pt->vcpu->domain->arch.hvm.pl_time->pt_migrate);
     spin_lock(&pt->vcpu->arch.hvm.tm_lock);
 }
 
 static void pt_unlock(struct periodic_time *pt)
 {
-    pt_vcpu_unlock(pt->vcpu);
+    spin_unlock(&pt->vcpu->arch.hvm.tm_lock);
+    read_unlock(&pt->vcpu->domain->arch.hvm.pl_time->pt_migrate);
 }
 
 static void pt_process_missed_ticks(struct periodic_time *pt)
@@ -543,8 +554,10 @@ void create_periodic_time(
     pt->cb = cb;
     pt->priv = data;
 
+    pt_vcpu_lock(v);
     pt->on_list = 1;
     list_add(&pt->list, &v->arch.hvm.tm_list);
+    pt_vcpu_unlock(v);
 
     init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
     set_timer(&pt->timer, pt->scheduled);
@@ -580,13 +593,26 @@ static void pt_adjust_vcpu(struct periodic_time *pt, struct vcpu *v)
         return;
 
     write_lock(&pt->vcpu->domain->arch.hvm.pl_time->pt_migrate);
+
+    if ( pt->vcpu == v )
+        goto out;
+
+    pt_vcpu_lock(pt->vcpu);
+    if ( pt->on_list )
+        list_del(&pt->list);
+    pt_vcpu_unlock(pt->vcpu);
+
     pt->vcpu = v;
+
+    pt_vcpu_lock(v);
     if ( pt->on_list )
     {
-        list_del(&pt->list);
         list_add(&pt->list, &v->arch.hvm.tm_list);
         migrate_timer(&pt->timer, v->processor);
     }
+    pt_vcpu_unlock(v);
+
+ out:
     write_unlock(&pt->vcpu->domain->arch.hvm.pl_time->pt_migrate);
 }
 
