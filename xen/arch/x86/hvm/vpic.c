@@ -197,6 +197,8 @@ static void vpic_ioport_write(
     {
         if ( val & 0x10 )
         {
+            unsigned int pending = vpic->isr | (vpic->irr & ~vpic->elcr);
+
             /* ICW1 */
             /* Clear edge-sensing logic. */
             vpic->irr &= vpic->elcr;
@@ -220,6 +222,24 @@ static void vpic_ioport_write(
             }
 
             vpic->init_state = ((val & 3) << 2) | 1;
+            vpic_update_int_output(vpic);
+            vpic_unlock(vpic);
+
+            /*
+             * Forward the EOI of any pending or in service interrupt that has
+             * been cleared from IRR or ISR, or else the dpci logic will get
+             * out of sync with the state of the interrupt controller.
+             */
+            while ( pending )
+            {
+                unsigned int pin = __scanbit(pending, 8);
+
+                ASSERT(pin < 8);
+                hvm_dpci_eoi(current->domain,
+                             hvm_isa_irq_to_gsi((addr >> 7) ? (pin | 8) : pin));
+                __clear_bit(pin, &pending);
+            }
+            return;
         }
         else if ( val & 0x08 )
         {
