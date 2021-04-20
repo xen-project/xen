@@ -763,11 +763,70 @@ int hpet_legacy_irq_tick(void)
 }
 
 static u32 *hpet_boot_cfg;
+static uint64_t __initdata hpet_rate;
+
+bool __init hpet_enable_legacy_replacement_mode(void)
+{
+    unsigned int cfg, c0_cfg, ticks, count;
+
+    if ( !hpet_rate ||
+         !(hpet_read32(HPET_ID) & HPET_ID_LEGSUP) ||
+         ((cfg = hpet_read32(HPET_CFG)) & HPET_CFG_LEGACY) )
+        return false;
+
+    /* Stop the main counter. */
+    hpet_write32(cfg & ~HPET_CFG_ENABLE, HPET_CFG);
+
+    /* Reconfigure channel 0 to be 32bit periodic. */
+    c0_cfg = hpet_read32(HPET_Tn_CFG(0));
+    c0_cfg |= (HPET_TN_ENABLE | HPET_TN_PERIODIC | HPET_TN_SETVAL |
+               HPET_TN_32BIT);
+    hpet_write32(c0_cfg, HPET_Tn_CFG(0));
+
+    /*
+     * The exact period doesn't have to match a legacy PIT.  All we need
+     * is an interrupt queued up via the IO-APIC to check routing.
+     *
+     * Use HZ as the frequency.
+     */
+    ticks = ((SECONDS(1) / HZ) * div_sc(hpet_rate, SECONDS(1), 32)) >> 32;
+
+    count = hpet_read32(HPET_COUNTER);
+
+    /*
+     * HPET_TN_SETVAL above is atrociously documented in the spec.
+     *
+     * Periodic HPET channels have a main comparator register, and
+     * separate "accumulator" register.  Despite being named accumulator
+     * in the spec, this is not an accurate description of its behaviour
+     * or purpose.
+     *
+     * Each time an interrupt is generated, the "accumulator" register is
+     * re-added to the comparator set up the new period.
+     *
+     * Normally, writes to the CMP register update both registers.
+     * However, under these semantics, it is impossible to set up a
+     * periodic timer correctly without the main HPET counter being at 0.
+     *
+     * Instead, HPET_TN_SETVAL is a self-clearing control bit which we can
+     * use for periodic timers to mean that the second write to CMP
+     * updates the accumulator only, and not the absolute comparator
+     * value.
+     *
+     * This lets us set a period when the main counter isn't at 0.
+     */
+    hpet_write32(count + ticks, HPET_Tn_CMP(0));
+    hpet_write32(ticks,         HPET_Tn_CMP(0));
+
+    /* Restart the main counter, and legacy mode. */
+    hpet_write32(cfg | HPET_CFG_ENABLE | HPET_CFG_LEGACY, HPET_CFG);
+
+    return true;
+}
 
 u64 __init hpet_setup(void)
 {
-    static u64 __initdata hpet_rate;
-    unsigned int hpet_id, hpet_period, hpet_cfg;
+    unsigned int hpet_id, hpet_period;
     unsigned int last;
 
     if ( hpet_rate )
@@ -812,58 +871,7 @@ u64 __init hpet_setup(void)
      * Reconfigure the HPET into legacy mode to re-establish the timer
      * interrupt.
      */
-    if ( hpet_id & HPET_ID_LEGSUP &&
-         !((hpet_cfg = hpet_read32(HPET_CFG)) & HPET_CFG_LEGACY) )
-    {
-        unsigned int c0_cfg, ticks, count;
-
-        /* Stop the main counter. */
-        hpet_write32(hpet_cfg & ~HPET_CFG_ENABLE, HPET_CFG);
-
-        /* Reconfigure channel 0 to be 32bit periodic. */
-        c0_cfg = hpet_read32(HPET_Tn_CFG(0));
-        c0_cfg |= (HPET_TN_ENABLE | HPET_TN_PERIODIC | HPET_TN_SETVAL |
-                   HPET_TN_32BIT);
-        hpet_write32(c0_cfg, HPET_Tn_CFG(0));
-
-        /*
-         * The exact period doesn't have to match a legacy PIT.  All we need
-         * is an interrupt queued up via the IO-APIC to check routing.
-         *
-         * Use HZ as the frequency.
-         */
-        ticks = ((SECONDS(1) / HZ) * div_sc(hpet_rate, SECONDS(1), 32)) >> 32;
-
-        count = hpet_read32(HPET_COUNTER);
-
-        /*
-         * HPET_TN_SETVAL above is atrociously documented in the spec.
-         *
-         * Periodic HPET channels have a main comparator register, and
-         * separate "accumulator" register.  Despite being named accumulator
-         * in the spec, this is not an accurate description of its behaviour
-         * or purpose.
-         *
-         * Each time an interrupt is generated, the "accumulator" register is
-         * re-added to the comparator set up the new period.
-         *
-         * Normally, writes to the CMP register update both registers.
-         * However, under these semantics, it is impossible to set up a
-         * periodic timer correctly without the main HPET counter being at 0.
-         *
-         * Instead, HPET_TN_SETVAL is a self-clearing control bit which we can
-         * use for periodic timers to mean that the second write to CMP
-         * updates the accumulator only, and not the absolute comparator
-         * value.
-         *
-         * This lets us set a period when the main counter isn't at 0.
-         */
-        hpet_write32(count + ticks, HPET_Tn_CMP(0));
-        hpet_write32(ticks,         HPET_Tn_CMP(0));
-
-        /* Restart the main counter, and legacy mode. */
-        hpet_write32(hpet_cfg | HPET_CFG_ENABLE | HPET_CFG_LEGACY, HPET_CFG);
-    }
+    hpet_enable_legacy_replacement_mode();
 
     return hpet_rate;
 }
