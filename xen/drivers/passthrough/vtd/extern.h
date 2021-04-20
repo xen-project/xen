@@ -49,6 +49,16 @@ int iommu_flush_iec_global(struct vtd_iommu *iommu);
 int iommu_flush_iec_index(struct vtd_iommu *iommu, u8 im, u16 iidx);
 void clear_fault_bits(struct vtd_iommu *iommu);
 
+int __must_check vtd_flush_context_reg(struct vtd_iommu *iommu, uint16_t did,
+                                       uint16_t source_id,
+                                       uint8_t function_mask, uint64_t type,
+                                       bool flush_non_present_entry);
+int __must_check vtd_flush_iotlb_reg(struct vtd_iommu *iommu, uint16_t did,
+                                     uint64_t addr, unsigned int size_order,
+                                     uint64_t type,
+                                     bool flush_non_present_entry,
+                                     bool flush_dev_iotlb);
+
 struct vtd_iommu *ioapic_to_iommu(unsigned int apic_id);
 struct vtd_iommu *hpet_to_iommu(unsigned int hpet_id);
 struct acpi_drhd_unit *ioapic_to_drhd(unsigned int apic_id);
