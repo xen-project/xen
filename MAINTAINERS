@@ -195,7 +195,6 @@ S:	Supported
 F:	.gitlab-ci.yml
 F:	.travis.yml
 F:	automation/
-F:	scripts/travis-build
 
 CPU POOLS
 M:	Juergen Gross <jgross@suse.com>
