@@ -2148,6 +2148,7 @@ int main(int argc, char *argv[])
 		case 'A':
 			quota_nb_perms_per_node = strtol(optarg, NULL, 10);
 			break;
+		case 'M':
 			quota_max_path_len = strtol(optarg, NULL, 10);
 			quota_max_path_len = min(XENSTORE_REL_PATH_MAX,
 						 quota_max_path_len);
