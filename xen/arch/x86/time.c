@@ -1708,7 +1708,14 @@ static void time_calibration_tsc_rendezvous(void *_r)
             atomic_inc(&r->semaphore);
 
             if ( i == 0 )
+            {
                 write_tsc(master_tsc);
+                /*
+                 * Try to give our hyperthread(s), if any, a chance to do
+                 * the same as instantly as possible.
+                 */
+                cpu_relax();
+            }
 
             while ( atomic_read(&r->semaphore) != (2*total_cpus - 1) )
                 cpu_relax();
@@ -1730,7 +1737,14 @@ static void time_calibration_tsc_rendezvous(void *_r)
             }
 
             if ( i == 0 )
+            {
                 write_tsc(master_tsc);
+                /*
+                 * Try to give our hyperthread(s), if any, a chance to do
+                 * the same as instantly as possible.
+                 */
+                cpu_relax();
+            }
 
             atomic_inc(&r->semaphore);
             while ( atomic_read(&r->semaphore) > total_cpus )
