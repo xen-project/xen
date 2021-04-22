@@ -1683,7 +1683,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
     int i;
     struct calibration_rendezvous *r = _r;
     unsigned int total_cpus = cpumask_weight(&r->cpu_calibration_map);
-    uint64_t tsc = 0;
+    uint64_t tsc = 0, master_tsc = 0;
 
     /* Loop to get rid of cache effects on TSC skew. */
     for ( i = 4; i >= 0; i-- )
@@ -1708,7 +1708,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
             atomic_inc(&r->semaphore);
 
             if ( i == 0 )
-                write_tsc(r->master_tsc_stamp);
+                write_tsc(master_tsc);
 
             while ( atomic_read(&r->semaphore) != (2*total_cpus - 1) )
                 cpu_relax();
@@ -1730,7 +1730,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
             }
 
             if ( i == 0 )
-                write_tsc(r->master_tsc_stamp);
+                write_tsc(master_tsc);
 
             atomic_inc(&r->semaphore);
             while ( atomic_read(&r->semaphore) > total_cpus )
@@ -1739,9 +1739,17 @@ static void time_calibration_tsc_rendezvous(void *_r)
 
         /* Just in case a read above ended up reading zero. */
         tsc += !tsc;
+
+        /*
+         * To reduce latency of the TSC write on the last iteration,
+         * fetch the value to be written into a local variable. To avoid
+         * introducing yet another conditional branch (which the CPU may
+         * have difficulty predicting well) do this on all iterations.
+         */
+        master_tsc = r->master_tsc_stamp;
     }
 
-    time_calibration_rendezvous_tail(r, tsc, r->master_tsc_stamp);
+    time_calibration_rendezvous_tail(r, tsc, master_tsc);
 }
 
 /* Ordinary rendezvous function which does not modify TSC values. */
