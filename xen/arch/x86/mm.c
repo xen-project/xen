@@ -5532,7 +5532,6 @@ int map_pages_to_xen(
 
  out:
     L3T_UNLOCK(current_l3page);
-    unmap_domain_page(pl2e);
     unmap_domain_page(pl3e);
     unmap_domain_page(pl2e);
     return rc;
@@ -5830,6 +5829,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
  out:
     L3T_UNLOCK(current_l3page);
     unmap_domain_page(pl3e);
+    unmap_domain_page(pl2e);
     return rc;
 }
 
