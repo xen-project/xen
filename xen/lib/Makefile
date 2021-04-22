@@ -23,6 +23,7 @@ lib-y += strlen.o
 lib-y += strncasecmp.o
 lib-y += strncmp.o
 lib-y += strnlen.o
+lib-y += strpbrk.o
 lib-y += strrchr.o
 lib-y += strspn.o
 lib-y += strstr.o
