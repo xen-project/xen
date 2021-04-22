@@ -14,6 +14,7 @@ lib-y += muldiv64.o
 lib-y += parse-size.o
 lib-y += rbtree.o
 lib-y += sort.o
+lib-y += strcasecmp.o
 lib-y += strchr.o
 lib-y += strcmp.o
 lib-y += strlcat.o
