@@ -311,26 +311,6 @@ char *(strstr)(const char *s1, const char *s2)
 }
 #endif
 
-#ifndef __HAVE_ARCH_MEMSET
-/**
- * memset - Fill a region of memory with the given value
- * @s: Pointer to the start of the area.
- * @c: The byte to fill the area with
- * @count: The size of the area.
- *
- * Do not use memset() to access IO space, use memset_io() instead.
- */
-void *(memset)(void *s, int c, size_t count)
-{
-	char *xs = (char *) s;
-
-	while (count--)
-		*xs++ = c;
-
-	return s;
-}
-#endif
-
 #ifndef __HAVE_ARCH_MEMCPY
 /**
  * memcpy - Copy one area of memory to another
