@@ -111,25 +111,6 @@ size_t strlcat(char *dest, const char *src, size_t size)
 EXPORT_SYMBOL(strlcat);
 #endif
 
-#ifndef __HAVE_ARCH_STRCMP
-/**
- * strcmp - Compare two strings
- * @cs: One string
- * @ct: Another string
- */
-int (strcmp)(const char *cs, const char *ct)
-{
-	register signed char __res;
-
-	while (1) {
-		if ((__res = *cs - *ct++) != 0 || !*cs++)
-			break;
-	}
-
-	return __res;
-}
-#endif
-
 #ifndef __HAVE_ARCH_STRNCMP
 /**
  * strncmp - Compare two length-limited strings

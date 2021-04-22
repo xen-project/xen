@@ -14,6 +14,7 @@ lib-y += muldiv64.o
 lib-y += parse-size.o
 lib-y += rbtree.o
 lib-y += sort.o
+lib-y += strcmp.o
 lib-y += strlen.o
 lib-y += strnlen.o
 lib-$(CONFIG_X86) += xxhash32.o
