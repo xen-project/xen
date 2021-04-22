@@ -311,36 +311,6 @@ char *(strstr)(const char *s1, const char *s2)
 }
 #endif
 
-#ifndef __HAVE_ARCH_MEMMOVE
-/**
- * memmove - Copy one area of memory to another
- * @dest: Where to copy to
- * @src: Where to copy from
- * @count: The size of the area.
- *
- * Unlike memcpy(), memmove() copes with overlapping areas.
- */
-void *(memmove)(void *dest, const void *src, size_t count)
-{
-	char *tmp, *s;
-
-	if (dest <= src) {
-		tmp = (char *) dest;
-		s = (char *) src;
-		while (count--)
-			*tmp++ = *s++;
-		}
-	else {
-		tmp = (char *) dest + count;
-		s = (char *) src + count;
-		while (count--)
-			*--tmp = *--s;
-		}
-
-	return dest;
-}
-#endif
-
 #ifndef __HAVE_ARCH_MEMCMP
 /**
  * memcmp - Compare two areas of memory
