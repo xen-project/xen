@@ -15,6 +15,7 @@ lib-y += parse-size.o
 lib-y += rbtree.o
 lib-y += sort.o
 lib-y += strcmp.o
+lib-y += strlcat.o
 lib-y += strlcpy.o
 lib-y += strlen.o
 lib-y += strncmp.o
