@@ -1,14 +1,9 @@
 /*
- *  linux/lib/string.c
- *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <xen/types.h>
 #include <xen/string.h>
-#include <xen/ctype.h>
 
-#ifndef __HAVE_ARCH_STRSEP
 /**
  * strsep - Split a string into tokens
  * @s: The string to be searched
@@ -20,7 +15,7 @@
  * of that name. In fact, it was stolen from glibc2 and de-fancy-fied.
  * Same semantics, slimmer shape. ;)
  */
-char * strsep(char **s, const char *ct)
+char *strsep(char **s, const char *ct)
 {
 	char *sbegin = *s, *end;
 
@@ -34,7 +29,6 @@ char * strsep(char **s, const char *ct)
 
 	return sbegin;
 }
-#endif
 
 /*
  * Local variables:

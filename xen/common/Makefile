@@ -40,7 +40,6 @@ obj-y += softirq.o
 obj-y += smp.o
 obj-y += spinlock.o
 obj-y += stop_machine.o
-obj-y += string.o
 obj-y += symbols.o
 obj-y += tasklet.o
 obj-y += time.o
