@@ -123,17 +123,36 @@ $(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
 	mv $(TMP) $(TARGET)
 
 ifneq ($(efi-y),)
+
 # Check if the compiler supports the MS ABI.
 export XEN_BUILD_EFI := $(shell $(CC) $(XEN_CFLAGS) -c efi/check.c -o efi/check.o 2>/dev/null && echo y)
+CFLAGS-$(XEN_BUILD_EFI) += -DXEN_BUILD_EFI
+
 # Check if the linker supports PE.
 EFI_LDFLAGS = $(patsubst -m%,-mi386pep,$(XEN_LDFLAGS)) --subsystem=10 --strip-debug
 XEN_BUILD_PE := $(if $(XEN_BUILD_EFI),$(shell $(LD) $(EFI_LDFLAGS) -o efi/check.efi efi/check.o 2>/dev/null && echo y))
-CFLAGS-$(XEN_BUILD_EFI) += -DXEN_BUILD_EFI
-# Check if the linker produces fixups in PE by default (we need to disable it doing so for now).
-XEN_NO_PE_FIXUPS := $(if $(XEN_BUILD_EFI), \
-                         $(shell $(LD) $(EFI_LDFLAGS) --disable-reloc-section -o efi/check.efi efi/check.o 2>/dev/null && \
-                                 echo --disable-reloc-section))
+
+ifeq ($(XEN_BUILD_PE),y)
+
+# Check if the linker produces fixups in PE by default
+nr-fixups := $(shell $(OBJDUMP) -p efi/check.efi | grep '^[[:blank:]]*reloc[[:blank:]]*[0-9][[:blank:]].*DIR64$$' | wc -l)
+ifeq ($(nr-fixups),2)
+MKRELOC := :
+relocs-dummy :=
+else
+MKRELOC := efi/mkreloc
+relocs-dummy := efi/relocs-dummy.o
+# If the linker produced fixups but not precisely two of them, we need to
+# disable it doing so.  But if it didn't produce any fixups, it also wouldn't
+# recognize the option.
+ifneq ($(nr-fixups),0)
+EFI_LDFLAGS += --disable-reloc-section
 endif
+endif
+
+endif # $(XEN_BUILD_PE)
+
+endif # $(efi-y)
 
 ALL_OBJS := $(BASEDIR)/arch/x86/boot/built_in.o $(BASEDIR)/arch/x86/efi/built_in.o $(ALL_OBJS)
 
@@ -178,7 +197,7 @@ note.o: $(TARGET)-syms
 		--rename-section=.data=.note.gnu.build-id -S $@.bin $@
 	rm -f $@.bin
 
-EFI_LDFLAGS += --image-base=$(1) --stack=0,0 --heap=0,0 $(XEN_NO_PE_FIXUPS)
+EFI_LDFLAGS += --image-base=$(1) --stack=0,0 --heap=0,0
 EFI_LDFLAGS += --section-alignment=0x200000 --file-alignment=0x20
 EFI_LDFLAGS += --major-image-version=$(XEN_VERSION)
 EFI_LDFLAGS += --minor-image-version=$(XEN_SUBVERSION)
@@ -192,7 +211,11 @@ EFI_LDFLAGS += --no-insert-timestamp
 endif
 
 $(TARGET).efi: VIRT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A VIRT_START$$,,p')
+ifeq ($(MKRELOC),:)
+$(TARGET).efi: ALT_BASE :=
+else
 $(TARGET).efi: ALT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A ALT_START$$,,p')
+endif
 
 ifneq ($(build_id_linker),)
 ifeq ($(call ld-ver-build-id,$(LD) $(filter -m%,$(EFI_LDFLAGS))),y)
@@ -213,16 +236,16 @@ note_file_option ?= $(note_file)
 ifeq ($(XEN_BUILD_PE),y)
 $(TARGET).efi: prelink.o $(note_file) efi.lds efi/relocs-dummy.o efi/mkreloc
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
-	          $(LD) $(call EFI_LDFLAGS,$(base)) -T efi.lds -N $< efi/relocs-dummy.o \
+	          $(LD) $(call EFI_LDFLAGS,$(base)) -T efi.lds -N $< $(relocs-dummy) \
 	                $(BASEDIR)/common/symbols-dummy.o $(note_file_option) -o $(@D)/.$(@F).$(base).0 &&) :
-	efi/mkreloc $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(@D)/.$(@F).$(base).0) >$(@D)/.$(@F).0r.S
+	$(MKRELOC) $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(@D)/.$(@F).$(base).0) >$(@D)/.$(@F).0r.S
 	$(NM) -pa --format=sysv $(@D)/.$(@F).$(VIRT_BASE).0 \
 		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).0s.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0r.o $(@D)/.$(@F).0s.o
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
 	          $(LD) $(call EFI_LDFLAGS,$(base)) -T efi.lds -N $< \
 	                $(@D)/.$(@F).0r.o $(@D)/.$(@F).0s.o $(note_file_option) -o $(@D)/.$(@F).$(base).1 &&) :
-	efi/mkreloc $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(@D)/.$(@F).$(base).1) >$(@D)/.$(@F).1r.S
+	$(MKRELOC) $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(@D)/.$(@F).$(base).1) >$(@D)/.$(@F).1r.S
 	$(NM) -pa --format=sysv $(@D)/.$(@F).$(VIRT_BASE).1 \
 		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).1s.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o

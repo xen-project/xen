@@ -86,10 +86,12 @@ static void __init efi_arch_relocate_image(unsigned long delta)
                 }
                 break;
             case PE_BASE_RELOC_DIR64:
-                if ( in_page_tables(addr) )
-                    blexit(L"Unexpected relocation type");
                 if ( delta )
+                {
                     *(u64 *)addr += delta;
+                    if ( in_page_tables(addr) )
+                        *(u64 *)addr += xen_phys_start;
+                }
                 break;
             default:
                 blexit(L"Unsupported relocation type");
