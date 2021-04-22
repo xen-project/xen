@@ -170,18 +170,6 @@ SECTIONS
 #endif
 #endif
 
-/*
- * ELF builds are linked to a fixed virtual address, and in principle
- * shouldn't have a .reloc section.  However, due to the way EFI support is
- * currently implemented, retaining the .reloc section is necessary.
- */
-#if defined(XEN_BUILD_EFI) && !defined(EFI)
-  . = ALIGN(4);
-  DECL_SECTION(.reloc) {
-    *(.reloc)
-  } PHDR(text)
-#endif
-
   _erodata = .;
 
   . = ALIGN(SECTION_ALIGN);
@@ -319,18 +307,27 @@ SECTIONS
   __2M_rwdata_end = .;
 
 #ifdef EFI
-  . = ALIGN(4);
-  DECL_SECTION(.reloc) {
+  .reloc ALIGN(4) : {
+    __base_relocs_start = .;
     *(.reloc)
+    __base_relocs_end = .;
   }
   /* Trick the linker into setting the image size to exactly 16Mb. */
   . = ALIGN(__section_alignment__);
   DECL_SECTION(.pad) {
     . = ALIGN(MB(16));
   }
-#endif
-
-#ifndef XEN_BUILD_EFI
+#elif defined(XEN_BUILD_EFI)
+  /*
+   * Due to the way EFI support is currently implemented, these two symbols
+   * need to be defined.  Their precise values shouldn't matter (the consuming
+   * function doesn't get called), but to be on the safe side both values would
+   * better match.  Of course the need to be reachable by the relocations
+   * referencing them.
+   */
+  PROVIDE(__base_relocs_start = .);
+  PROVIDE(__base_relocs_end = .);
+#else
   efi = .;
 #endif
 
