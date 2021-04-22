@@ -56,24 +56,6 @@ int (strcasecmp)(const char *s1, const char *s2)
 }
 #endif
 
-#ifndef __HAVE_ARCH_STRRCHR
-/**
- * strrchr - Find the last occurrence of a character in a string
- * @s: The string to be searched
- * @c: The character to search for
- */
-char *(strrchr)(const char *s, int c)
-{
-	const char *p = s + strlen(s);
-
-	for (; *p != (char)c; --p)
-		if (p == s)
-			return NULL;
-
-	return (char *)p;
-}
-#endif
-
 #ifndef __HAVE_ARCH_STRSPN
 /**
  * strspn - Calculate the length of the initial substring of @s which only
