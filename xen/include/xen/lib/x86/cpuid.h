@@ -351,6 +351,13 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p);
  */
 void x86_cpuid_policy_clear_out_of_range_leaves(struct cpuid_policy *p);
 
+/**
+ * Shrink max leaf/subleaf values such that the last respective valid entry
+ * isn't all blank.  While permitted by the spec, such extraneous leaves may
+ * provide undue "hints" to guests.
+ */
+void x86_cpuid_policy_shrink_max_leaves(struct cpuid_policy *p);
+
 #ifdef __XEN__
 #include <public/arch-x86/xen.h>
 typedef XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_leaf_buffer_t;

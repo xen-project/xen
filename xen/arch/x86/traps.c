@@ -964,13 +964,15 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
     uint32_t base = is_viridian_domain(d) ? 0x40000100 : 0x40000000;
     uint32_t idx  = leaf - base;
     unsigned int limit = is_viridian_domain(d) ? p->hv2_limit : p->hv_limit;
+    unsigned int dflt = is_pv_domain(d) ? XEN_CPUID_MAX_PV_NUM_LEAVES
+                                        : XEN_CPUID_MAX_HVM_NUM_LEAVES;
 
     if ( limit == 0 )
         /* Default number of leaves */
-        limit = XEN_CPUID_MAX_NUM_LEAVES;
+        limit = dflt;
     else
         /* Clamp toolstack value between 2 and MAX_NUM_LEAVES. */
-        limit = min(max(limit, 2u), XEN_CPUID_MAX_NUM_LEAVES + 0u);
+        limit = min(max(limit, 2u), dflt);
 
     if ( idx > limit )
         return;

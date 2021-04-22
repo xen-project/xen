@@ -113,6 +113,10 @@
 /* Max. address width in bits taking memory hotplug into account. */
 #define XEN_CPUID_MACHINE_ADDRESS_WIDTH_MASK (0xffu << 0)
 
-#define XEN_CPUID_MAX_NUM_LEAVES 5
+#define XEN_CPUID_MAX_PV_NUM_LEAVES 5
+#define XEN_CPUID_MAX_HVM_NUM_LEAVES 4
+#define XEN_CPUID_MAX_NUM_LEAVES \
+    (XEN_CPUID_MAX_PV_NUM_LEAVES > XEN_CPUID_MAX_HVM_NUM_LEAVES ? \
+     XEN_CPUID_MAX_PV_NUM_LEAVES : XEN_CPUID_MAX_HVM_NUM_LEAVES)
 
 #endif /* __XEN_PUBLIC_ARCH_X86_CPUID_H__ */

@@ -341,6 +341,8 @@ static void __init calculate_host_policy(void)
         p->extd.raw[0xa].d |= ((1u << SVM_FEATURE_VMCBCLEAN) |
                                (1u << SVM_FEATURE_TSCRATEMSR));
     }
+
+    x86_cpuid_policy_shrink_max_leaves(p);
 }
 
 static void __init guest_common_default_feature_adjustments(uint32_t *fs)
@@ -410,6 +412,8 @@ static void __init calculate_pv_max_policy(void)
     recalculate_xstate(p);
 
     p->extd.raw[0xa] = EMPTY_LEAF; /* No SVM for PV guests. */
+
+    x86_cpuid_policy_shrink_max_leaves(p);
 }
 
 static void __init calculate_pv_def_policy(void)
@@ -430,6 +434,8 @@ static void __init calculate_pv_def_policy(void)
     sanitise_featureset(pv_featureset);
     cpuid_featureset_to_policy(pv_featureset, p);
     recalculate_xstate(p);
+
+    x86_cpuid_policy_shrink_max_leaves(p);
 }
 
 static void __init calculate_hvm_max_policy(void)
@@ -495,6 +501,8 @@ static void __init calculate_hvm_max_policy(void)
     sanitise_featureset(hvm_featureset);
     cpuid_featureset_to_policy(hvm_featureset, p);
     recalculate_xstate(p);
+
+    x86_cpuid_policy_shrink_max_leaves(p);
 }
 
 static void __init calculate_hvm_def_policy(void)
@@ -519,6 +527,8 @@ static void __init calculate_hvm_def_policy(void)
     sanitise_featureset(hvm_featureset);
     cpuid_featureset_to_policy(hvm_featureset, p);
     recalculate_xstate(p);
+
+    x86_cpuid_policy_shrink_max_leaves(p);
 }
 
 void __init init_guest_cpuid(void)
@@ -699,6 +709,8 @@ void recalculate_cpuid_policy(struct domain *d)
 
     if ( !p->extd.page1gb )
         p->extd.raw[0x19] = EMPTY_LEAF;
+
+    x86_cpuid_policy_shrink_max_leaves(p);
 }
 
 int init_domain_cpuid_policy(struct domain *d)
