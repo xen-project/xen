@@ -5,6 +5,7 @@ lib-y += ctors.o
 lib-y += ctype.o
 lib-y += list-sort.o
 lib-y += memchr.o
+lib-y += memchr_inv.o
 lib-y += memcmp.o
 lib-y += memcpy.o
 lib-y += memmove.o
