@@ -34,13 +34,19 @@ OUTPUT_FORMAT(FORMAT, FORMAT, FORMAT)
 
 OUTPUT_ARCH(i386:x86-64)
 
+#ifndef EFI
 PHDRS
 {
   text PT_LOAD ;
-#if (defined(BUILD_ID) || defined (CONFIG_PVH_GUEST)) && !defined(EFI)
+#if defined(BUILD_ID) || defined(CONFIG_PVH_GUEST)
   note PT_NOTE ;
 #endif
 }
+#define PHDR(x) :x
+#else
+#define PHDR(x)
+#endif
+
 SECTIONS
 {
 #if !defined(EFI)
@@ -83,7 +89,7 @@ SECTIONS
        *(.text.kexec)
        *(.gnu.warning)
        _etext = .;             /* End of text section */
-  } :text = 0x9090
+  } PHDR(text) = 0x9090
 
   . = ALIGN(SECTION_ALIGN);
   __2M_text_end = .;
@@ -134,12 +140,12 @@ SECTIONS
        *(SORT(.data.vpci.*))
        __end_vpci_array = .;
 #endif
-  } :text
+  } PHDR(text)
 
 #if defined(CONFIG_PVH_GUEST) && !defined(EFI)
   DECL_SECTION(.note.Xen) {
       *(.note.Xen)
-  } :note :text
+  } PHDR(note) PHDR(text)
 #endif
 
 #if defined(BUILD_ID)
@@ -154,13 +160,13 @@ SECTIONS
        __note_gnu_build_id_start = .;
        *(.note.gnu.build-id)
        __note_gnu_build_id_end = .;
-  } :note :text
+  } PHDR(note) PHDR(text)
 #elif defined(BUILD_ID_EFI)
   DECL_SECTION(.buildid) {
        __note_gnu_build_id_start = .;
        *(.buildid)
        __note_gnu_build_id_end = .;
-  } :text
+  }
 #endif
 #endif
 
@@ -173,7 +179,7 @@ SECTIONS
   . = ALIGN(4);
   DECL_SECTION(.reloc) {
     *(.reloc)
-  } :text
+  } PHDR(text)
 #endif
 
   _erodata = .;
@@ -202,7 +208,7 @@ SECTIONS
 #ifdef EFI /* EFI wants to merge all of .init.*  ELF doesn't. */
        . = ALIGN(SMP_CACHE_BYTES);
 #else
-  } :text
+  } PHDR(text)
   DECL_SECTION(.init.data) {
 #endif
 
@@ -260,7 +266,7 @@ SECTIONS
        *(SORT(.data.vpci.*))
        __end_vpci_array = .;
 #endif
-  } :text
+  } PHDR(text)
 
   . = ALIGN(SECTION_ALIGN);
   __init_end = .;
@@ -281,7 +287,7 @@ SECTIONS
        *(.data.paramhypfs)
        __paramhypfs_end = .;
 #endif
-  } :text
+  } PHDR(text)
 
   DECL_SECTION(.data) {
        *(.data.page_aligned)
@@ -289,7 +295,7 @@ SECTIONS
        *(.data.rel)
        *(.data.rel.*)
        CONSTRUCTORS
-  } :text
+  } PHDR(text)
 
   DECL_SECTION(.bss) {
        __bss_start = .;
@@ -306,7 +312,7 @@ SECTIONS
        *(.bss)
        . = ALIGN(POINTER_ALIGN);
        __bss_end = .;
-  } :text
+  } PHDR(text)
   _end = . ;
 
   . = ALIGN(SECTION_ALIGN);
@@ -316,12 +322,12 @@ SECTIONS
   . = ALIGN(4);
   DECL_SECTION(.reloc) {
     *(.reloc)
-  } :text
+  }
   /* Trick the linker into setting the image size to exactly 16Mb. */
   . = ALIGN(__section_alignment__);
   DECL_SECTION(.pad) {
     . = ALIGN(MB(16));
-  } :text
+  }
 #endif
 
 #ifndef XEN_BUILD_EFI
