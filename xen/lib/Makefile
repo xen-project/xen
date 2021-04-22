@@ -20,6 +20,7 @@ lib-y += strcmp.o
 lib-y += strlcat.o
 lib-y += strlcpy.o
 lib-y += strlen.o
+lib-y += strncasecmp.o
 lib-y += strncmp.o
 lib-y += strnlen.o
 lib-y += strrchr.o

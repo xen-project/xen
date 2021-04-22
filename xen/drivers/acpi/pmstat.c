@@ -275,14 +275,14 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
         strlcpy(op->u.get_para.scaling_governor, "Unknown", CPUFREQ_NAME_LEN);
 
     /* governor specific para */
-    if ( !strnicmp(op->u.get_para.scaling_governor, 
-                   "userspace", CPUFREQ_NAME_LEN) )
+    if ( !strncasecmp(op->u.get_para.scaling_governor,
+                      "userspace", CPUFREQ_NAME_LEN) )
     {
         op->u.get_para.u.userspace.scaling_setspeed = policy->cur;
     }
 
-    if ( !strnicmp(op->u.get_para.scaling_governor, 
-                   "ondemand", CPUFREQ_NAME_LEN) )
+    if ( !strncasecmp(op->u.get_para.scaling_governor,
+                      "ondemand", CPUFREQ_NAME_LEN) )
     {
         ret = get_cpufreq_ondemand_para(
             &op->u.get_para.u.ondemand.sampling_rate_max,
@@ -350,8 +350,8 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
     {
         unsigned int freq =op->u.set_para.ctrl_value;
 
-        if ( !strnicmp(policy->governor->name,
-                       "userspace", CPUFREQ_NAME_LEN) )
+        if ( !strncasecmp(policy->governor->name,
+                          "userspace", CPUFREQ_NAME_LEN) )
             ret = write_userspace_scaling_setspeed(op->cpuid, freq);
         else
             ret = -EINVAL;
@@ -363,8 +363,8 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
     {
         unsigned int sampling_rate = op->u.set_para.ctrl_value;
 
-        if ( !strnicmp(policy->governor->name,
-                       "ondemand", CPUFREQ_NAME_LEN) )
+        if ( !strncasecmp(policy->governor->name,
+                          "ondemand", CPUFREQ_NAME_LEN) )
             ret = write_ondemand_sampling_rate(sampling_rate);
         else
             ret = -EINVAL;
@@ -376,8 +376,8 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
     {
         unsigned int up_threshold = op->u.set_para.ctrl_value;
 
-        if ( !strnicmp(policy->governor->name,
-                       "ondemand", CPUFREQ_NAME_LEN) )
+        if ( !strncasecmp(policy->governor->name,
+                          "ondemand", CPUFREQ_NAME_LEN) )
             ret = write_ondemand_up_threshold(up_threshold);
         else
             ret = -EINVAL;

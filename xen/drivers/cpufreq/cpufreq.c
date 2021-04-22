@@ -111,7 +111,7 @@ struct cpufreq_governor *__find_governor(const char *governor)
         return NULL;
 
     list_for_each_entry(t, &cpufreq_governor_list, governor_list)
-        if (!strnicmp(governor, t->name, CPUFREQ_NAME_LEN))
+        if (!strncasecmp(governor, t->name, CPUFREQ_NAME_LEN))
             return t;
 
     return NULL;

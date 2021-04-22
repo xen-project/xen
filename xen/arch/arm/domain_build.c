@@ -1224,8 +1224,8 @@ static int __init map_range_to_domain(const struct dt_device_node *dev,
      * They are not MMIO and therefore a domain should not be able to
      * manage them via the IOMEM interface.
      */
-    if ( strnicmp(dt_node_full_name(dev), "/reserved-memory/",
-         strlen("/reserved-memory/")) != 0 )
+    if ( strncasecmp(dt_node_full_name(dev), "/reserved-memory/",
+                     strlen("/reserved-memory/")) != 0 )
     {
         res = iomem_permit_access(d, paddr_to_pfn(addr),
                 paddr_to_pfn(PAGE_ALIGN(addr + len - 1)));

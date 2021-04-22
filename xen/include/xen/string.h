@@ -16,8 +16,8 @@ size_t strlcpy(char *, const char *, size_t);
 size_t strlcat(char *, const char *, size_t);
 int strcmp(const char *, const char *);
 int strncmp(const char *, const char *, size_t);
-int strnicmp(const char *, const char *, size_t);
 int strcasecmp(const char *, const char *);
+int strncasecmp(const char *, const char *, size_t);
 char *strchr(const char *, int);
 char *strrchr(const char *, int);
 char *strstr(const char *, const char *);
@@ -46,6 +46,10 @@ void *memchr_inv(const void *, int, size_t);
 
 #ifndef __HAVE_ARCH_STRCASECMP
 #define strcasecmp(s1, s2) __builtin_strcasecmp(s1, s2)
+#endif
+
+#ifndef __HAVE_ARCH_STRCASECMP
+#define strncasecmp(s1, s2, n) __builtin_strncasecmp(s1, s2, n)
 #endif
 
 #ifndef __HAVE_ARCH_STRCHR
