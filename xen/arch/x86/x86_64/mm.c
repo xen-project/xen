@@ -640,7 +640,7 @@ void __init paging_init(void)
     /* Create user-accessible L2 directory to map the MPT for compat guests. */
     if ( opt_pv32 )
     {
-        mfn = alloc_xen_pagetable_new();
+        mfn = alloc_xen_pagetable();
         if ( mfn_eq(mfn, INVALID_MFN) )
             goto nomem;
         compat_idle_pg_table_l2 = map_domain_page_global(mfn);
