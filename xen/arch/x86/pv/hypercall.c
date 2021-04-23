@@ -250,21 +250,8 @@ enum mc_disposition arch_do_multicall_call(struct mc_state *state)
     struct vcpu *curr = current;
     unsigned long op;
 
-    if ( !is_pv_32bit_vcpu(curr) )
-    {
-        struct multicall_entry *call = &state->call;
-
-        op = call->op;
-        if ( (op < ARRAY_SIZE(pv_hypercall_table)) &&
-             pv_hypercall_table[op].native )
-            call->result = pv_hypercall_table[op].native(
-                call->args[0], call->args[1], call->args[2],
-                call->args[3], call->args[4], call->args[5]);
-        else
-            call->result = -ENOSYS;
-    }
 #ifdef CONFIG_PV32
-    else
+    if ( is_pv_32bit_vcpu(curr) )
     {
         struct compat_multicall_entry *call = &state->compat_call;
 
@@ -277,7 +264,20 @@ enum mc_disposition arch_do_multicall_call(struct mc_state *state)
         else
             call->result = -ENOSYS;
     }
+    else
 #endif
+    {
+        struct multicall_entry *call = &state->call;
+
+        op = call->op;
+        if ( (op < ARRAY_SIZE(pv_hypercall_table)) &&
+             pv_hypercall_table[op].native )
+            call->result = pv_hypercall_table[op].native(
+                call->args[0], call->args[1], call->args[2],
+                call->args[3], call->args[4], call->args[5]);
+        else
+            call->result = -ENOSYS;
+    }
 
     return unlikely(op == __HYPERVISOR_iret)
            ? mc_exit
