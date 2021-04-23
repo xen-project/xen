@@ -64,6 +64,58 @@ DEFINE_RCU_READ_LOCK(domlist_read_lock);
 static struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 
+/*
+ * Insert a domain into the domlist/hash.  This allows the domain to be looked
+ * up by domid, and therefore to be the subject of hypercalls/etc.
+ */
+static void domlist_insert(struct domain *d)
+{
+    struct domain **pd, *bucket;
+
+    spin_lock(&domlist_update_lock);
+
+    /* domain_list is maintained in domid order. */
+    for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
+        if ( (*pd)->domain_id > d->domain_id )
+            break;
+
+    bucket = domain_hash[DOMAIN_HASH(d->domain_id)];
+
+    d->next_in_list = *pd;
+    d->next_in_hashbucket = bucket;
+    rcu_assign_pointer(*pd, d);
+    rcu_assign_pointer(bucket, d);
+
+    spin_unlock(&domlist_update_lock);
+}
+
+/*
+ * Remove a domain from the domlist/hash.  This means the domain can no longer
+ * be looked up by domid, and therefore can no longer be the subject of
+ * *subsequent* hypercalls/etc.  In-progress hypercalls/etc can still operate
+ * on the domain.
+ */
+static void domlist_remove(struct domain *d)
+{
+    struct domain **pd;
+
+    spin_lock(&domlist_update_lock);
+
+    pd = &domain_list;
+    while ( *pd != d )
+        pd = &(*pd)->next_in_list;
+
+    rcu_assign_pointer(*pd, d->next_in_list);
+
+    pd = &domain_hash[DOMAIN_HASH(d->domain_id)];
+    while ( *pd != d )
+        pd = &(*pd)->next_in_hashbucket;
+
+    rcu_assign_pointer(*pd, d->next_in_hashbucket);
+
+    spin_unlock(&domlist_update_lock);
+}
+
 struct domain *hardware_domain __read_mostly;
 
 #ifdef CONFIG_LATE_HWDOM
@@ -589,7 +641,7 @@ struct domain *domain_create(domid_t domid,
                              struct xen_domctl_createdomain *config,
                              unsigned int flags)
 {
-    struct domain *d, **pd, *old_hwdom = NULL;
+    struct domain *d, *old_hwdom = NULL;
     enum { INIT_watchdog = 1u<<1,
            INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
     int err, init_status = 0;
@@ -758,17 +810,7 @@ struct domain *domain_create(domid_t domid,
      * Must not fail beyond this point, as our caller doesn't know whether
      * the domain has been entered into domain_list or not.
      */
-
-    spin_lock(&domlist_update_lock);
-    pd = &domain_list; /* NB. domain_list maintained in order of domid. */
-    for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
-        if ( (*pd)->domain_id > d->domain_id )
-            break;
-    d->next_in_list = *pd;
-    d->next_in_hashbucket = domain_hash[DOMAIN_HASH(domid)];
-    rcu_assign_pointer(*pd, d);
-    rcu_assign_pointer(domain_hash[DOMAIN_HASH(domid)], d);
-    spin_unlock(&domlist_update_lock);
+    domlist_insert(d);
 
     memcpy(d->handle, config->handle, sizeof(d->handle));
 
@@ -1232,8 +1274,6 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
 /* Release resources belonging to task @p. */
 void domain_destroy(struct domain *d)
 {
-    struct domain **pd;
-
     BUG_ON(!d->is_dying);
 
     /* May be already destroyed, or get_domain() can race us. */
@@ -1242,17 +1282,8 @@ void domain_destroy(struct domain *d)
 
     TRACE_TIME(TRC_DOM0_DOM_REM, d->domain_id);
 
-    /* Delete from task list and task hashtable. */
-    spin_lock(&domlist_update_lock);
-    pd = &domain_list;
-    while ( *pd != d ) 
-        pd = &(*pd)->next_in_list;
-    rcu_assign_pointer(*pd, d->next_in_list);
-    pd = &domain_hash[DOMAIN_HASH(d->domain_id)];
-    while ( *pd != d ) 
-        pd = &(*pd)->next_in_hashbucket;
-    rcu_assign_pointer(*pd, d->next_in_hashbucket);
-    spin_unlock(&domlist_update_lock);
+    /* Remove from the domlist/hash. */
+    domlist_remove(d);
 
     /* Schedule RCU asynchronous completion of domain destroy. */
     call_rcu(&d->rcu, complete_domain_destroy);
