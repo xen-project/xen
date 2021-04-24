@@ -1,0 +1,242 @@
+***********************
+Booting Xen from U-Boot
+***********************
+
+Booting Xen from U-Boot requires:
+
+- Loading all the required binaries, manually specifying the loading address for each of them making sure they do not overlap
+    - Xen, Dom0 kernel, Dom0 ramdisk, device tree binary, any Dom0-less DomUs kernels, ramdisk and partial dtbs for passthrough
+- Adding relevant nodes to device tree
+    - the Dom0 kernel and ramdisk loading addresses need to be specified in device tree under `/chosen`
+
+===============================
+Dom0 kernel and ramdisk modules
+================================
+    
+Xen is passed the dom0 kernel and initrd via a reference in the `/chosen` node of the device tree.
+    
+Each node contains the following properties:
+    
+- compatible
+    Must always include at least the generic compatiblity string:
+    
+            "multiboot,module"
+    
+        Optionally a more specific compatible string may be used in addition to the above. One of:
+    
+        - "multiboot,kernel"	-- the dom0 kernel
+        - "multiboot,ramdisk"	-- the dom0 ramdisk
+        - "xen,xsm-policy"	-- XSM policy blob
+    
+        It is normally recommended to include a more specific compatible string (if one applies) in addition to the generic string (which must always be present).
+    
+        Xen will assume that the first module which lacks a more specific compatible string is a "multiboot,kernel".
+    
+        Xen will examine each module, starting from the second module that lacks a specific compatible string.  Xen will check each such module for the XSM Magic number:
+    
+        - For a module which has the XSM Magic number: it will be treated by Xen as if its compatible string was "xen,xsm-policy";
+    
+        - For a module which does not have the XSM Magic: the second module lacking a compatible string will be treated by Xen as if its compatible string was "multiboot,ramdisk"; for the third and subsequent modules which lack a specific compatible string, Xen will not apply any special treatment.
+    
+        This means if the ramdisk module is present and does not have the compatible string "multiboot,ramdisk", then it must always be the second module.
+    
+        .. note:: This XSM Magic detection behavior was introduced by Xen 4.7. Xen 4.6 (and downwards) still requires the XSM module to have the compatible string "xen,xsm-policy".
+    
+        Xen 4.4 supported a different set of legacy compatible strings which remain supported such that systems supporting both 4.4
+        and later can use a single DTB.
+    
+        - "xen,multiboot-module" equivalent to "multiboot,module"
+        - "xen,linux-zimage"     equivalent to "multiboot,kernel"
+        - "xen,linux-initrd"     equivalent to "multiboot,ramdisk"
+    
+        For compatibility with Xen 4.4 the more specific "xen,linux-*" names are non-optional and must be included.
+    
+- reg
+    Specifies the physical address of the module in RAM and the length of the module.
+    
+- bootargs (optional)
+    
+    Command line associated with this module. See below for the priority of this field vs. other mechanisms of specifying the bootargs for the kernel.
+    
+Examples
+~~~~~~~~
+    
+A boot module of unspecified type:
+    
+.. code-block::
+
+        module@0xc0000000 {
+            compatible = "multiboot,module";
+            reg = <0xc0000000 0x1234>;
+            bootargs = "...";
+        };
+    
+A boot module containing a ramdisk:
+
+.. code-block::
+    
+        module@0xd0000000 {
+            compatible = "multiboot,ramdisk", "multiboot,module";
+            reg = <0xd0000000 0x5678>;
+        };
+    
+The previous examples are compatible with Xen 4.5+ only.
+    
+To be compatible with Xen 4.4 as well use the legacy names:
+
+.. code-block::
+    
+        module@0xd0000000 {
+            compatible = "xen,linux-initrd", "xen,multiboot-module";
+            reg = <0xd0000000 0x5678>;
+        };
+    
+Command Lines
+~~~~~~~~~~~~~
+
+    
+Xen also checks for properties directly under /chosen to find suitable command lines for Xen and Dom0. The logic is the following:
+    
+- If xen,xen-bootargs is present, it will be used for Xen.
+- If xen,dom0-bootargs is present, it will be used for Dom0.
+- If xen,xen-bootargs is _not_ present, but xen,dom0-bootargs is, bootargs will be used for Xen.
+- If a kernel boot module is present and has a bootargs property then the top-level bootargs will used for Xen.
+- If no Xen specific properties are present, bootargs is for Dom0.
+- If xen,xen-bootargs is present, but xen,dom0-bootargs is missing, bootargs will be used for Dom0.
+    
+Most of these cases is to make booting with Xen-unaware bootloaders easier. For those you would hardcode the Xen commandline in the DTB under `/chosen/xen,xen-bootargs` and would let the bootloader set the Dom0 command line by writing bootargs (as for native Linux).
+
+A Xen-aware bootloader would set xen,xen-bootargs for Xen, xen,dom0-bootargs for Dom0 and bootargs for native Linux.
+    
+===========================================
+Creating Multiple Domains directly from Xen
+===========================================
+    
+It is possible to have Xen create other domains, in addition to dom0, out of the information provided via device tree. A kernel and initrd (optional) need to be specified for each guest.
+    
+For each domain to be created there needs to be one node under `/chosen` with the following properties:
+    
+- compatible
+    
+    For domUs: "xen,domain"
+    
+- memory
+    
+    A 64-bit integer specifying the amount of kilobytes of RAM to allocate to the guest.
+    
+- cpus
+    
+    An integer specifying the number of vcpus to allocate to the guest.
+    
+- vpl011
+    
+    An empty property to enable/disable a virtual pl011 for the guest to use. The virtual pl011 uses SPI number 0 (see GUEST_VPL011_SPI). Please note that the SPI used for the virtual pl011 could clash with the physical SPI of a physical device assigned to the guest.
+    
+- nr_spis
+    
+    Optional. A 32-bit integer specifying the number of SPIs (Shared Peripheral Interrupts) to allocate for the domain. If nr_spis is missing, the max number of SPIs supported by the physical GIC is used, or GUEST_VPL011_SPI+1 if vpl011 is enabled, whichever is greater.
+    
+- #address-cells and #size-cells
+    
+    Both #address-cells and #size-cells need to be specified because both sub-nodes (described shortly) have reg properties.
+    
+    Under the "xen,domain" compatible node, one or more sub-nodes are present
+    for the DomU kernel and ramdisk.
+    
+The kernel sub-node has the following properties:
+    
+- compatible
+    
+    "multiboot,kernel", "multiboot,module"
+    
+- reg
+    
+    Specifies the physical address of the kernel in RAM and its length.
+    
+- bootargs (optional)
+    
+    Command line parameters for the guest kernel.
+    
+The ramdisk sub-node has the following properties:
+    
+- compatible
+    
+    "multiboot,ramdisk", "multiboot,module"
+    
+- reg
+    
+    Specifies the physical address of the ramdisk in RAM and its length.
+    
+    
+Example
+~~~~~~~
+
+.. code-block::
+    
+    chosen {
+        domU1 {
+            compatible = "xen,domain";
+            #address-cells = <0x2>;
+            #size-cells = <0x1>;
+            memory = <0 131072>;
+            cpus = <2>;
+            vpl011;
+    
+            module@0x4a000000 {
+                compatible = "multiboot,kernel", "multiboot,module";
+                reg = <0x0 0x4a000000 0xffffff>;
+                bootargs = "console=ttyAMA0 init=/bin/sh";
+            };
+    
+            module@0x4b000000 {
+                compatible = "multiboot,ramdisk", "multiboot,module";
+                reg = <0x0 0x4b000000 0xffffff>;
+            };
+        };
+    
+        domU2 {
+            compatible = "xen,domain";
+            #address-cells = <0x2>;
+            #size-cells = <0x1>;
+            memory = <0 65536>;
+            cpus = <1>;
+    
+            module@0x4c000000 {
+                compatible = "multiboot,kernel", "multiboot,module";
+                reg = <0x0 0x4c000000 0xffffff>;
+                bootargs = "console=ttyAMA0 init=/bin/sh";
+            };
+    
+            module@0x4d000000 {
+                compatible = "multiboot,ramdisk", "multiboot,module";
+                reg = <0x0 0x4d000000 0xffffff>;
+            };
+        };
+    };
+    
+    
+Device Assignment
+~~~~~~~~~~~~~~~~~
+    
+Device Assignment (Passthrough) is supported by adding another module, alongside the kernel and ramdisk, with the device tree fragment corresponding to the device node to assign to the guest.
+    
+The dtb sub-node should have the following properties:
+    
+- compatible
+    
+    "multiboot,device-tree" and "multiboot,module"
+    
+- reg
+    
+    Specifies the physical address of the device tree binary fragment RAM and its length.
+    
+    As an example:
+
+    .. code-block::
+    
+            module@0xc000000 {
+                compatible = "multiboot,device-tree", "multiboot,module";
+                reg = <0x0 0xc000000 0xffffff>;
+            };
+    
+The DTB fragment is loaded at 0xc000000 in the example above. It should follow the convention explained in `docs/misc/arm/passthrough.txt`. The DTB fragment will be added to the guest device tree, so that the guest kernel will be able to discover the device.
