@@ -10,7 +10,7 @@ Booting Xen from U-Boot requires:
     - the Dom0 kernel and ramdisk loading addresses need to be specified in device tree under `/chosen`
 
 ===============================
-Dom0 kernel and ramdisk modules
+Dom0 Kernel and ramdisk Modules
 ================================
     
 Xen is passed the dom0 kernel and initrd via a reference in the `/chosen` node of the device tree.

@@ -1,5 +1,5 @@
 **********************************************
-Xen ARM with Virtualization Extensions/Arndale
+Xen Arm with Virtualization Extensions/Arndale
 **********************************************
 
 The Arndale board is now supported in Xen upstream.
