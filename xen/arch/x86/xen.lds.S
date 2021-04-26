@@ -312,10 +312,70 @@ SECTIONS
     *(.reloc)
     __base_relocs_end = .;
   }
-  /* Trick the linker into setting the image size to exactly 16Mb. */
-  . = ALIGN(__section_alignment__);
-  DECL_SECTION(.pad) {
-    . = ALIGN(MB(16));
+  /*
+   * Explicitly list debug section for the PE output so that they don't end
+   * up at VA 0 which is below image base and thus invalid. Also use the
+   * NOLOAD directive, despite currently ignored by ld for PE output, in
+   * order to record that we'd prefer these sections to not be loaded into
+   * memory.
+   *
+   * Note that we're past _end here, so if these sections get loaded they'll
+   * be discarded at runtime anyway.
+   */
+  .debug_abbrev ALIGN(1) (NOLOAD) : {
+     *(.debug_abbrev)
+  }
+  .debug_info ALIGN(1) (NOLOAD) : {
+    *(.debug_info)
+    *(.gnu.linkonce.wi.*)
+  }
+  .debug_types ALIGN(1) (NOLOAD) : {
+    *(.debug_types)
+  }
+  .debug_str ALIGN(1) (NOLOAD) : {
+    *(.debug_str)
+  }
+  .debug_line ALIGN(1) (NOLOAD) : {
+    *(.debug_line)
+    *(.debug_line.*)
+  }
+  .debug_line_str ALIGN(1) (NOLOAD) : {
+    *(.debug_line_str)
+  }
+  .debug_names ALIGN(4) (NOLOAD) : {
+    *(.debug_names)
+  }
+  .debug_frame ALIGN(4) (NOLOAD) : {
+    *(.debug_frame)
+  }
+  .debug_loc ALIGN(1) (NOLOAD) : {
+    *(.debug_loc)
+  }
+  .debug_loclists ALIGN(4) (NOLOAD) : {
+    *(.debug_loclists)
+  }
+  .debug_ranges ALIGN(8) (NOLOAD) : {
+    *(.debug_ranges)
+  }
+  .debug_rnglists ALIGN(4) (NOLOAD) : {
+    *(.debug_rnglists)
+  }
+  .debug_addr ALIGN(8) (NOLOAD) : {
+    *(.debug_addr)
+  }
+  .debug_aranges ALIGN(1) (NOLOAD) : {
+    *(.debug_aranges)
+  }
+  .debug_pubnames ALIGN(1) (NOLOAD) : {
+    *(.debug_pubnames)
+  }
+  .debug_pubtypes ALIGN(1) (NOLOAD) : {
+    *(.debug_pubtypes)
+  }
+  /* Trick the linker into setting the image size to no less than 16Mb. */
+  __image_end__ = .;
+  .pad ALIGN(__section_alignment__) : {
+    . = __image_end__ < __image_base__ + MB(16) ? ALIGN(MB(16)) : .;
   }
 #elif defined(XEN_BUILD_EFI)
   /*
