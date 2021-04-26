@@ -434,6 +434,23 @@ int enable_qinval(struct vtd_iommu *iommu)
     return 0;
 }
 
+static int vtd_flush_context_noop(struct vtd_iommu *iommu, uint16_t did,
+                                  uint16_t source_id, uint8_t function_mask,
+                                  uint64_t type, bool flush_non_present_entry)
+{
+    WARN();
+    return -EIO;
+}
+
+static int vtd_flush_iotlb_noop(struct vtd_iommu *iommu, uint16_t did,
+                                uint64_t addr, unsigned int size_order,
+                                uint64_t type, bool flush_non_present_entry,
+                                bool flush_dev_iotlb)
+{
+    WARN();
+    return -EIO;
+}
+
 void disable_qinval(struct vtd_iommu *iommu)
 {
     u32 sts;
@@ -455,6 +472,18 @@ void disable_qinval(struct vtd_iommu *iommu)
 out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 
-    iommu->flush.context = vtd_flush_context_reg;
-    iommu->flush.iotlb   = vtd_flush_iotlb_reg;
+    /*
+     * Assign callbacks to noop to catch errors if register-based invalidation
+     * isn't supported.
+     */
+    if ( has_register_based_invalidation(iommu) )
+    {
+        iommu->flush.context = vtd_flush_context_reg;
+        iommu->flush.iotlb   = vtd_flush_iotlb_reg;
+    }
+    else
+    {
+        iommu->flush.context = vtd_flush_context_noop;
+        iommu->flush.iotlb   = vtd_flush_iotlb_noop;
+    }
 }
