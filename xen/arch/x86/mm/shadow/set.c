@@ -88,19 +88,25 @@ static int inline
 shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
 {
     int res;
-    mfn_t mfn;
-    struct domain *owner;
+    mfn_t mfn = shadow_l1e_get_mfn(sl1e);
+    const struct page_info *pg = NULL;
+    struct domain *owner = NULL;
 
     ASSERT(!sh_l1e_is_magic(sl1e));
     ASSERT(shadow_mode_refcounts(d));
+
+    if ( mfn_valid(mfn) )
+    {
+        pg = mfn_to_page(mfn);
+        owner = page_get_owner(pg);
+    }
 
     /*
      * Check whether refcounting is suppressed on this page. For example,
      * VMX'es APIC access MFN is just a surrogate page.  It doesn't actually
      * get accessed, and hence there's no need to refcount it.
      */
-    mfn = shadow_l1e_get_mfn(sl1e);
-    if ( mfn_valid(mfn) && page_refcounting_suppressed(mfn_to_page(mfn)) )
+    if ( pg && page_refcounting_suppressed(pg) )
         return 0;
 
     res = get_page_from_l1e(sl1e, d, d);
@@ -111,9 +117,7 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
      */
     if ( unlikely(res < 0) &&
          !shadow_mode_translate(d) &&
-         mfn_valid(mfn = shadow_l1e_get_mfn(sl1e)) &&
-         (owner = page_get_owner(mfn_to_page(mfn))) &&
-         (d != owner) )
+         owner && (d != owner) )
     {
         res = xsm_priv_mapping(XSM_TARGET, d, owner);
         if ( !res )
@@ -136,9 +140,8 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
          * already have checked that we're supposed to have access, so
          * we can just grab a reference directly.
          */
-        mfn = shadow_l1e_get_mfn(sl1e);
-        if ( mfn_valid(mfn) )
-            res = get_page_from_l1e(sl1e, d, page_get_owner(mfn_to_page(mfn)));
+        if ( owner )
+            res = get_page_from_l1e(sl1e, d, owner);
     }
 
     if ( unlikely(res < 0) )
