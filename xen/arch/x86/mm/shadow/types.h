@@ -276,7 +276,14 @@ int shadow_set_l4e(struct domain *d, shadow_l4e_t *sl4e,
 static void inline
 shadow_put_page_from_l1e(shadow_l1e_t sl1e, struct domain *d)
 {
+    mfn_t mfn = shadow_l1e_get_mfn(sl1e);
+
     if ( !shadow_mode_refcounts(d) )
+        return;
+
+    if ( mfn_valid(mfn) &&
+         /* See the respective comment in shadow_get_page_from_l1e(). */
+         page_refcounting_suppressed(mfn_to_page(mfn)) )
         return;
 
     put_page_from_l1e(sl1e, d);
