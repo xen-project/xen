@@ -109,40 +109,36 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
     if ( pg && page_refcounting_suppressed(pg) )
         return 0;
 
-    res = get_page_from_l1e(sl1e, d, d);
+    if ( owner == dom_io )
+        owner = NULL;
 
     /*
      * If a privileged domain is attempting to install a map of a page it does
      * not own, we let it succeed anyway.
      */
-    if ( unlikely(res < 0) &&
-         !shadow_mode_translate(d) &&
-         owner && (d != owner) )
+    if ( owner && (d != owner) &&
+         !(res = xsm_priv_mapping(XSM_TARGET, d, owner)) )
     {
-        res = xsm_priv_mapping(XSM_TARGET, d, owner);
-        if ( !res )
-        {
-            res = get_page_from_l1e(sl1e, d, owner);
-            SHADOW_PRINTK("privileged %pd installs map of mfn %"PRI_mfn" owned by %pd: %s\n",
-                           d, mfn_x(mfn), owner,
-                           res >= 0 ? "success" : "failed");
-        }
+        res = get_page_from_l1e(sl1e, d, owner);
+        SHADOW_PRINTK("privileged %pd installs map of %pd's mfn %"PRI_mfn": %s\n",
+                      d, owner, mfn_x(mfn),
+                      res >= 0 ? "success" : "failed");
     }
-
     /* Okay, it might still be a grant mapping PTE.  Try it. */
-    if ( unlikely(res < 0) &&
-         (type == p2m_grant_map_rw ||
-          (type == p2m_grant_map_ro &&
-           !(shadow_l1e_get_flags(sl1e) & _PAGE_RW))) )
+    else if ( owner &&
+              (type == p2m_grant_map_rw ||
+               (type == p2m_grant_map_ro &&
+                !(shadow_l1e_get_flags(sl1e) & _PAGE_RW))) )
     {
         /*
          * It's a grant mapping.  The grant table implementation will
          * already have checked that we're supposed to have access, so
          * we can just grab a reference directly.
          */
-        if ( owner )
-            res = get_page_from_l1e(sl1e, d, owner);
+        res = get_page_from_l1e(sl1e, d, owner);
     }
+    else
+        res = get_page_from_l1e(sl1e, d, d);
 
     if ( unlikely(res < 0) )
     {
