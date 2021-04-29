@@ -498,18 +498,23 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         goto out;
     }
 
-    /*
-     * Account for feature which have been disabled by default since Xen 4.13,
-     * so migrated-in VM's don't risk seeing features disappearing.
-     */
     if ( restore )
     {
+        /*
+         * Account for feature which have been disabled by default since Xen 4.13,
+         * so migrated-in VM's don't risk seeing features disappearing.
+         */
         p->basic.rdrand = test_bit(X86_FEATURE_RDRAND, host_featureset);
 
         if ( di.hvm )
         {
             p->feat.mpx = test_bit(X86_FEATURE_MPX, host_featureset);
         }
+
+        /* Clamp maximum leaves to the ones supported on 4.12. */
+        p->basic.max_leaf = min(p->basic.max_leaf, 0xdu);
+        p->feat.max_subleaf = 0;
+        p->extd.max_leaf = min(p->extd.max_leaf, 0x1cu);
     }
 
     if ( featureset )
