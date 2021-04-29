@@ -182,7 +182,21 @@ unsigned long pv_make_cr4(const struct vcpu *v)
 {
     const struct domain *d = v->domain;
     unsigned long cr4 = mmu_cr4_features &
-        ~(X86_CR4_PCIDE | X86_CR4_PGE | X86_CR4_TSD);
+        ~(X86_CR4_PCIDE | X86_CR4_PGE | X86_CR4_TSD | X86_CR4_PKE);
+
+    /*
+     * We want CR4.PKE set in HVM context when available, but don't support it
+     * in PV context at all.
+     *
+     * _PAGE_PKEY_BITS where previously software available PTE bits.  In
+     * principle, we could let an aware PV guest enable PKE.
+     *
+     * However, Xen uses _PAGE_GNTTAB in debug builds which overlaps with
+     * _PAGE_PKEY_BITS, and the ownership of (and eligibility to move)
+     * software PTE bits is not considered in the PV ABI at all.  For now,
+     * punt the problem to whichever unluckly person finds a compelling
+     * usecase for PKRU in PV guests.
+     */
 
     /*
      * PCIDE or PGE depends on the PCID/XPTI settings, but must not both be

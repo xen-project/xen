@@ -367,20 +367,12 @@ static always_inline void set_in_cr4 (unsigned long mask)
     write_cr4(read_cr4() | mask);
 }
 
-static inline unsigned int read_pkru(void)
+static inline unsigned int rdpkru(void)
 {
     unsigned int pkru;
-    unsigned long cr4 = read_cr4();
 
-    /*
-     * _PAGE_PKEY_BITS have a conflict with _PAGE_GNTTAB used by PV guests,
-     * so that X86_CR4_PKE  is disabled on hypervisor. To use RDPKRU, CR4.PKE
-     * gets temporarily enabled.
-     */
-    write_cr4(cr4 | X86_CR4_PKE);
     asm volatile (".byte 0x0f,0x01,0xee"
         : "=a" (pkru) : "c" (0) : "dx");
-    write_cr4(cr4);
 
     return pkru;
 }

@@ -416,7 +416,7 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
          guest_pku_enabled(v) )
     {
         unsigned int pkey = guest_l1e_get_pkey(gw->l1e);
-        unsigned int pkru = read_pkru();
+        unsigned int pkru = rdpkru();
 
         if ( read_pkru_ad(pkru, pkey) ||
              ((walk & PFEC_write_access) && read_pkru_wd(pkru, pkey) &&

@@ -1790,6 +1790,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( boot_cpu_has(X86_FEATURE_FSGSBASE) )
         set_in_cr4(X86_CR4_FSGSBASE);
 
+    if ( boot_cpu_has(X86_FEATURE_PKU) )
+        set_in_cr4(X86_CR4_PKE);
+
     if ( opt_invpcid && cpu_has_invpcid )
         use_invpcid = true;
 
