@@ -20,7 +20,6 @@ struct __packed frame_head {
     unsigned long ret;
 };
 typedef struct frame_head frame_head_t;
-DEFINE_XEN_GUEST_HANDLE(frame_head_t);
 
 struct __packed frame_head_32bit {
     uint32_t ebp;
@@ -43,7 +42,6 @@ dump_hypervisor_backtrace(struct vcpu *vcpu, const struct frame_head *head,
     return head->ebp;
 }
 
-#ifdef CONFIG_COMPAT
 static inline int is_32bit_vcpu(struct vcpu *vcpu)
 {
     if (is_hvm_vcpu(vcpu))
@@ -51,52 +49,35 @@ static inline int is_32bit_vcpu(struct vcpu *vcpu)
     else
         return is_pv_32bit_vcpu(vcpu);
 }
-#endif
 
 static struct frame_head *
 dump_guest_backtrace(struct vcpu *vcpu, const struct frame_head *head,
                      int mode)
 {
-    frame_head_t bufhead;
+    /* Also check accessibility of one struct frame_head beyond. */
+    frame_head_t bufhead[2];
 
-#ifdef CONFIG_COMPAT
     if ( is_32bit_vcpu(vcpu) )
     {
-        DEFINE_COMPAT_HANDLE(frame_head32_t);
-        __compat_handle_const_frame_head32_t guest_head =
-            { .c = (unsigned long)head };
-        frame_head32_t bufhead32;
+        frame_head32_t bufhead32[2];
 
-        /* Also check accessibility of one struct frame_head beyond */
-        if (!compat_handle_okay(guest_head, 2))
+        if ( raw_copy_from_guest(bufhead32, head, sizeof(bufhead32)) )
             return 0;
-        if (__copy_from_compat(&bufhead32, guest_head, 1))
-            return 0;
-        bufhead.ebp = (struct frame_head *)(unsigned long)bufhead32.ebp;
-        bufhead.ret = bufhead32.ret;
+        bufhead[0].ebp = (struct frame_head *)(unsigned long)bufhead32[0].ebp;
+        bufhead[0].ret = bufhead32[0].ret;
     }
-    else
-#endif
-    {
-        XEN_GUEST_HANDLE_PARAM(const_frame_head_t) guest_head =
-            const_guest_handle_from_ptr(head, frame_head_t);
-
-        /* Also check accessibility of one struct frame_head beyond */
-        if (!guest_handle_okay(guest_head, 2))
-            return 0;
-        if (__copy_from_guest(&bufhead, guest_head, 1))
-            return 0;
-    }
+    else if ( raw_copy_from_guest(bufhead, head, sizeof(bufhead)) )
+        return 0;
     
-    if (!xenoprof_add_trace(vcpu, bufhead.ret, mode))
+    if ( !xenoprof_add_trace(vcpu, bufhead[0].ret, mode) )
         return 0;
     
     /* frame pointers should strictly progress back up the stack
      * (towards higher addresses) */
-    if (head >= bufhead.ebp)
+    if ( head >= bufhead[0].ebp )
         return NULL;
     
-    return bufhead.ebp;
+    return bufhead[0].ebp;
 }
 
 /*
