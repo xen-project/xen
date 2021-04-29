@@ -194,8 +194,7 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
     /*
      * The scan order should be from start to end. A later scanned
      * alternative code can overwrite a previous scanned alternative code.
-     * Some kernel functions (e.g. memcpy, memset, etc) use this order to
-     * patch code.
+     * Some code (e.g. ALTERNATIVE_2()) relies on this order of patching.
      *
      * So be careful if you want to change the scan order to any other
      * order.
