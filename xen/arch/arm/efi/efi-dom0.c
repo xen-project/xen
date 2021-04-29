@@ -28,7 +28,7 @@
 #include <asm/setup.h>
 #include <asm/acpi.h>
 #include "../../../common/decompress.h"
-#define XZ_EXTERN STATIC
+#define XZ_EXTERN static
 #include "../../../common/xz/crc32.c"
 
 /* Constant to indicate "Xen" in unicode u16 format */
