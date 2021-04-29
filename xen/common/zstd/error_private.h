@@ -67,9 +67,9 @@ typedef ZSTD_ErrorCode ERR_enum;
 ******************************************/
 #define ERROR(name) ((size_t)-PREFIX(name))
 
-ERR_STATIC unsigned INIT ERR_isError(size_t code) { return (code > ERROR(maxCode)); }
+ERR_STATIC unsigned __init ERR_isError(size_t code) { return (code > ERROR(maxCode)); }
 
-ERR_STATIC ERR_enum INIT ERR_getErrorCode(size_t code)
+ERR_STATIC ERR_enum __init ERR_getErrorCode(size_t code)
 {
 	if (!ERR_isError(code))
 		return (ERR_enum)0;
@@ -82,7 +82,7 @@ ERR_STATIC ERR_enum INIT ERR_getErrorCode(size_t code)
  *
  * Return: Non-zero iff the code is an error.
  */
-static __attribute__((unused)) unsigned int INIT ZSTD_isError(size_t code)
+static __attribute__((unused)) unsigned int __init ZSTD_isError(size_t code)
 {
 	return code > (size_t)-ZSTD_error_maxCode;
 }
@@ -94,7 +94,7 @@ static __attribute__((unused)) unsigned int INIT ZSTD_isError(size_t code)
  * Return:          The ZSTD_ErrorCode corresponding to the functionResult or 0
  *                  if the functionResult isn't an error.
  */
-static __attribute__((unused)) ZSTD_ErrorCode INIT ZSTD_getErrorCode(
+static __attribute__((unused)) ZSTD_ErrorCode __init ZSTD_getErrorCode(
 	size_t functionResult)
 {
 	if (!ZSTD_isError(functionResult))

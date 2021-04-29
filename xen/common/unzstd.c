@@ -71,7 +71,7 @@
  */
 #define ZSTD_IOBUF_SIZE		(1 << 17)
 
-static int INIT handle_zstd_error(size_t ret, void (*error)(const char *x))
+static int __init handle_zstd_error(size_t ret, void (*error)(const char *x))
 {
 	const int err = ZSTD_getErrorCode(ret);
 
@@ -102,9 +102,9 @@ static int INIT handle_zstd_error(size_t ret, void (*error)(const char *x))
  * We can allocate less memory (no circular buffer for the sliding window),
  * and avoid some memcpy() calls.
  */
-static int INIT decompress_single(const u8 *in_buf, long in_len, u8 *out_buf,
-				  long out_len, unsigned int *in_pos,
-				  void (*error)(const char *x))
+static int __init decompress_single(const u8 *in_buf, long in_len, u8 *out_buf,
+				    long out_len, unsigned int *in_pos,
+				    void (*error)(const char *x))
 {
 	const size_t wksp_size = ZSTD_DCtxWorkspaceBound();
 	void *wksp = large_malloc(wksp_size);
@@ -142,11 +142,11 @@ out:
 	return err;
 }
 
-int INIT unzstd(unsigned char *in_buf, unsigned int in_len,
-	        int (*fill)(void*, unsigned int),
-	        int (*flush)(void*, unsigned int),
-	        unsigned char *out_buf, unsigned int *in_pos,
-	        void (*error)(const char *x))
+int __init unzstd(unsigned char *in_buf, unsigned int in_len,
+		  int (*fill)(void*, unsigned int),
+		  int (*flush)(void*, unsigned int),
+		  unsigned char *out_buf, unsigned int *in_pos,
+		  void (*error)(const char *x))
 {
 	ZSTD_inBuffer in;
 	ZSTD_outBuffer out;

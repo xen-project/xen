@@ -21,7 +21,7 @@
 *  Compiler specifics
 *********************************************************/
 #define FORCE_INLINE static always_inline
-#define FORCE_NOINLINE static noinline INIT
+#define FORCE_NOINLINE static noinline __init
 
 /*-*************************************
 *  Dependencies

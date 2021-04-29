@@ -46,17 +46,17 @@
 #include "mem.h"
 
 /*===   Version   ===*/
-unsigned INIT FSE_versionNumber(void) { return FSE_VERSION_NUMBER; }
+unsigned __init FSE_versionNumber(void) { return FSE_VERSION_NUMBER; }
 
 /*===   Error Management   ===*/
-unsigned INIT FSE_isError(size_t code) { return ERR_isError(code); }
+unsigned __init FSE_isError(size_t code) { return ERR_isError(code); }
 
-unsigned INIT HUF_isError(size_t code) { return ERR_isError(code); }
+unsigned __init HUF_isError(size_t code) { return ERR_isError(code); }
 
 /*-**************************************************************
 *  FSE NCount encoding-decoding
 ****************************************************************/
-size_t INIT FSE_readNCount(short *normalizedCounter, unsigned *maxSVPtr, unsigned *tableLogPtr, const void *headerBuffer, size_t hbSize)
+size_t __init FSE_readNCount(short *normalizedCounter, unsigned *maxSVPtr, unsigned *tableLogPtr, const void *headerBuffer, size_t hbSize)
 {
 	const BYTE *const istart = (const BYTE *)headerBuffer;
 	const BYTE *const iend = istart + hbSize;
@@ -164,7 +164,7 @@ size_t INIT FSE_readNCount(short *normalizedCounter, unsigned *maxSVPtr, unsigne
 	@return : size read from `src` , or an error Code .
 	Note : Needed by HUF_readCTable() and HUF_readDTableX?() .
 */
-size_t INIT HUF_readStats_wksp(BYTE *huffWeight, size_t hwSize, U32 *rankStats, U32 *nbSymbolsPtr, U32 *tableLogPtr, const void *src, size_t srcSize, void *workspace, size_t workspaceSize)
+size_t __init HUF_readStats_wksp(BYTE *huffWeight, size_t hwSize, U32 *rankStats, U32 *nbSymbolsPtr, U32 *tableLogPtr, const void *src, size_t srcSize, void *workspace, size_t workspaceSize)
 {
 	U32 weightTotal;
 	const BYTE *ip = (const BYTE *)src;

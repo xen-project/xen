@@ -82,7 +82,7 @@
 
 /* Function templates */
 
-size_t INIT FSE_buildDTable_wksp(FSE_DTable *dt, const short *normalizedCounter, unsigned maxSymbolValue, unsigned tableLog, void *workspace, size_t workspaceSize)
+size_t __init FSE_buildDTable_wksp(FSE_DTable *dt, const short *normalizedCounter, unsigned maxSymbolValue, unsigned tableLog, void *workspace, size_t workspaceSize)
 {
 	void *const tdPtr = dt + 1; /* because *dt is unsigned, 32-bits aligned on 32-bits */
 	FSE_DECODE_TYPE *const tableDecode = (FSE_DECODE_TYPE *)(tdPtr);
@@ -157,7 +157,7 @@ size_t INIT FSE_buildDTable_wksp(FSE_DTable *dt, const short *normalizedCounter,
 /*-*******************************************************
 *  Decompression (Byte symbols)
 *********************************************************/
-size_t INIT FSE_buildDTable_rle(FSE_DTable *dt, BYTE symbolValue)
+size_t __init FSE_buildDTable_rle(FSE_DTable *dt, BYTE symbolValue)
 {
 	void *ptr = dt;
 	FSE_DTableHeader *const DTableH = (FSE_DTableHeader *)ptr;
@@ -174,7 +174,7 @@ size_t INIT FSE_buildDTable_rle(FSE_DTable *dt, BYTE symbolValue)
 	return 0;
 }
 
-size_t INIT FSE_buildDTable_raw(FSE_DTable *dt, unsigned nbBits)
+size_t __init FSE_buildDTable_raw(FSE_DTable *dt, unsigned nbBits)
 {
 	void *ptr = dt;
 	FSE_DTableHeader *const DTableH = (FSE_DTableHeader *)ptr;
@@ -269,7 +269,7 @@ FORCE_INLINE size_t FSE_decompress_usingDTable_generic(void *dst, size_t maxDstS
 	return op - ostart;
 }
 
-size_t INIT FSE_decompress_usingDTable(void *dst, size_t originalSize, const void *cSrc, size_t cSrcSize, const FSE_DTable *dt)
+size_t __init FSE_decompress_usingDTable(void *dst, size_t originalSize, const void *cSrc, size_t cSrcSize, const FSE_DTable *dt)
 {
 	const void *ptr = dt;
 	const FSE_DTableHeader *DTableH = (const FSE_DTableHeader *)ptr;
@@ -281,7 +281,7 @@ size_t INIT FSE_decompress_usingDTable(void *dst, size_t originalSize, const voi
 	return FSE_decompress_usingDTable_generic(dst, originalSize, cSrc, cSrcSize, dt, 0);
 }
 
-size_t INIT FSE_decompress_wksp(void *dst, size_t dstCapacity, const void *cSrc, size_t cSrcSize, unsigned maxLog, void *workspace, size_t workspaceSize)
+size_t __init FSE_decompress_wksp(void *dst, size_t dstCapacity, const void *cSrc, size_t cSrcSize, unsigned maxLog, void *workspace, size_t workspaceSize)
 {
 	const BYTE *const istart = (const BYTE *)cSrc;
 	const BYTE *ip = istart;
