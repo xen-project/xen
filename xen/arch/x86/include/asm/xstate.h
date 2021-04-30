@@ -29,8 +29,8 @@ extern uint32_t mxcsr_mask;
 #define XSAVE_HDR_OFFSET          FXSAVE_SIZE
 #define XSTATE_AREA_MIN_SIZE      (FXSAVE_SIZE + XSAVE_HDR_SIZE)
 
-#define XSTATE_FP_SSE  (X86_XCR0_FP | X86_XCR0_SSE)
-#define XCNTXT_MASK    (X86_XCR0_FP | X86_XCR0_SSE | X86_XCR0_YMM | \
+#define XSTATE_FP_SSE  (X86_XCR0_X87 | X86_XCR0_SSE)
+#define XCNTXT_MASK    (X86_XCR0_X87 | X86_XCR0_SSE | X86_XCR0_YMM | \
                         X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM | \
                         XSTATE_NONLAZY)
 

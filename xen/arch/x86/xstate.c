@@ -313,7 +313,7 @@ void xsave(struct vcpu *v, uint64_t mask)
                            "=m" (*ptr), \
                            "a" (lmask), "d" (hmask), "D" (ptr))
 
-    if ( fip_width == 8 || !(mask & X86_XCR0_FP) )
+    if ( fip_width == 8 || !(mask & X86_XCR0_X87) )
     {
         XSAVE("0x48,");
     }
@@ -366,7 +366,7 @@ void xsave(struct vcpu *v, uint64_t mask)
             fip_width = 8;
     }
 #undef XSAVE
-    if ( mask & X86_XCR0_FP )
+    if ( mask & X86_XCR0_X87 )
         ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] = fip_width;
 }
 
@@ -558,7 +558,7 @@ void xstate_free_save_area(struct vcpu *v)
 static bool valid_xcr0(uint64_t xcr0)
 {
     /* FP must be unconditionally set. */
-    if ( !(xcr0 & X86_XCR0_FP) )
+    if ( !(xcr0 & X86_XCR0_X87) )
         return false;
 
     /* YMM depends on SSE. */
@@ -597,7 +597,7 @@ unsigned int xstate_uncompressed_size(uint64_t xcr0)
     if ( xcr0 == 0 )
         return 0;
 
-    if ( xcr0 <= (X86_XCR0_SSE | X86_XCR0_FP) )
+    if ( xcr0 <= (X86_XCR0_SSE | X86_XCR0_X87) )
         return size;
 
     /*
@@ -605,7 +605,7 @@ unsigned int xstate_uncompressed_size(uint64_t xcr0)
      * maximum offset+size.  Some states (e.g. LWP, APX_F) are out-of-order
      * with respect their index.
      */
-    xcr0 &= ~(X86_XCR0_SSE | X86_XCR0_FP);
+    xcr0 &= ~(X86_XCR0_SSE | X86_XCR0_X87);
     for_each_set_bit ( i, &xcr0, 63 )
     {
         const struct xstate_component *c = &raw_cpu_policy.xstate.comp[i];
@@ -626,14 +626,14 @@ unsigned int xstate_compressed_size(uint64_t xstates)
     if ( xstates == 0 )
         return 0;
 
-    if ( xstates <= (X86_XCR0_SSE | X86_XCR0_FP) )
+    if ( xstates <= (X86_XCR0_SSE | X86_XCR0_X87) )
         return size;
 
     /*
      * For the compressed size, every non-legacy component matters.  Some
      * componenets require aligning to 64 first.
      */
-    xstates &= ~(X86_XCR0_SSE | X86_XCR0_FP);
+    xstates &= ~(X86_XCR0_SSE | X86_XCR0_X87);
     for_each_set_bit ( i, &xstates, 63 )
     {
         const struct xstate_component *c = &raw_cpu_policy.xstate.comp[i];
@@ -779,7 +779,7 @@ static void __init noinline xstate_check_sizes(void)
      * layout compatibility with Intel and having a knock-on effect on all
      * subsequent states.
      */
-    check_new_xstate(&s, X86_XCR0_SSE | X86_XCR0_FP);
+    check_new_xstate(&s, X86_XCR0_SSE | X86_XCR0_X87);
 
     if ( cpu_has_avx )
         check_new_xstate(&s, X86_XCR0_YMM);
@@ -1026,7 +1026,7 @@ uint64_t read_bndcfgu(void)
               : "=m" (*xstate)
               : "a" (X86_XCR0_BNDCSR), "d" (0), "D" (xstate) );
 
-        bndcsr = (void *)xstate + xstate_offsets[X86_XCR0_BNDCSR_POS];
+        bndcsr = (void *)xstate + xstate_offsets[ilog2(X86_XCR0_BNDCSR)];
     }
 
     if ( cr0 & X86_CR0_TS )

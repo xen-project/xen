@@ -369,7 +369,7 @@ void vcpu_setup_fpu(struct vcpu *v, struct xsave_struct *xsave_area,
         {
             v->arch.xsave_area->xsave_hdr.xstate_bv &= ~XSTATE_FP_SSE;
             if ( fcw_default != FCW_DEFAULT )
-                v->arch.xsave_area->xsave_hdr.xstate_bv |= X86_XCR0_FP;
+                v->arch.xsave_area->xsave_hdr.xstate_bv |= X86_XCR0_X87;
         }
     }
 

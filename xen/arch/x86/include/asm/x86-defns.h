@@ -79,25 +79,16 @@
 /*
  * XSTATE component flags in XCR0 | MSR_XSS
  */
-#define X86_XCR0_FP_POS           0
-#define X86_XCR0_FP               (1ULL << X86_XCR0_FP_POS)
-#define X86_XCR0_SSE_POS          1
-#define X86_XCR0_SSE              (1ULL << X86_XCR0_SSE_POS)
-#define X86_XCR0_YMM_POS          2
-#define X86_XCR0_YMM              (1ULL << X86_XCR0_YMM_POS)
-#define X86_XCR0_BNDREGS_POS      3
-#define X86_XCR0_BNDREGS          (1ULL << X86_XCR0_BNDREGS_POS)
-#define X86_XCR0_BNDCSR_POS       4
-#define X86_XCR0_BNDCSR           (1ULL << X86_XCR0_BNDCSR_POS)
-#define X86_XCR0_OPMASK_POS       5
-#define X86_XCR0_OPMASK           (1ULL << X86_XCR0_OPMASK_POS)
-#define X86_XCR0_ZMM_POS          6
-#define X86_XCR0_ZMM              (1ULL << X86_XCR0_ZMM_POS)
-#define X86_XCR0_HI_ZMM_POS       7
-#define X86_XCR0_HI_ZMM           (1ULL << X86_XCR0_HI_ZMM_POS)
+#define X86_XCR0_X87              (_AC(1, ULL) <<  0)
+#define X86_XCR0_SSE              (_AC(1, ULL) <<  1)
+#define X86_XCR0_YMM              (_AC(1, ULL) <<  2)
+#define X86_XCR0_BNDREGS          (_AC(1, ULL) <<  3)
+#define X86_XCR0_BNDCSR           (_AC(1, ULL) <<  4)
+#define X86_XCR0_OPMASK           (_AC(1, ULL) <<  5)
+#define X86_XCR0_ZMM              (_AC(1, ULL) <<  6)
+#define X86_XCR0_HI_ZMM           (_AC(1, ULL) <<  7)
 #define X86_XSS_PROC_TRACE        (_AC(1, ULL) <<  8)
-#define X86_XCR0_PKRU_POS         9
-#define X86_XCR0_PKRU             (1ULL << X86_XCR0_PKRU_POS)
+#define X86_XCR0_PKRU             (_AC(1, ULL) <<  9)
 #define X86_XSS_PASID             (_AC(1, ULL) << 10)
 #define X86_XSS_CET_U             (_AC(1, ULL) << 11)
 #define X86_XSS_CET_S             (_AC(1, ULL) << 12)
@@ -107,11 +98,10 @@
 #define X86_XSS_HWP               (_AC(1, ULL) << 16)
 #define X86_XCR0_TILE_CFG         (_AC(1, ULL) << 17)
 #define X86_XCR0_TILE_DATA        (_AC(1, ULL) << 18)
-#define X86_XCR0_LWP_POS          62
-#define X86_XCR0_LWP              (1ULL << X86_XCR0_LWP_POS)
+#define X86_XCR0_LWP              (_AC(1, ULL) << 62)
 
 #define X86_XCR0_STATES                                                 \
-    (X86_XCR0_FP | X86_XCR0_SSE | X86_XCR0_YMM | X86_XCR0_BNDREGS |     \
+    (X86_XCR0_X87 | X86_XCR0_SSE | X86_XCR0_YMM | X86_XCR0_BNDREGS |    \
      X86_XCR0_BNDCSR | X86_XCR0_OPMASK | X86_XCR0_ZMM |                 \
      X86_XCR0_HI_ZMM | X86_XCR0_PKRU | X86_XCR0_TILE_CFG |              \
      X86_XCR0_TILE_DATA |                                               \
