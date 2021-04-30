@@ -55,11 +55,18 @@ static inline bool xsetbv(u32 index, u64 xfeatures)
     return lo != 0;
 }
 
-bool set_xcr0(u64 xfeatures)
+bool set_xcr0(u64 val)
 {
-    if ( !xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures) )
-        return false;
-    this_cpu(xcr0) = xfeatures;
+    uint64_t *this_xcr0 = &this_cpu(xcr0);
+
+    if ( *this_xcr0 != val )
+    {
+        if ( !xsetbv(XCR_XFEATURE_ENABLED_MASK, val) )
+            return false;
+
+        *this_xcr0 = val;
+    }
+
     return true;
 }
 

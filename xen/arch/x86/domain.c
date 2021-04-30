@@ -1977,9 +1977,7 @@ static void __context_switch(void)
         memcpy(stack_regs, &n->arch.user_regs, CTXT_SWITCH_STACK_BYTES);
         if ( cpu_has_xsave )
         {
-            u64 xcr0 = n->arch.xcr0 ?: XSTATE_FP_SSE;
-
-            if ( xcr0 != get_xcr0() && !set_xcr0(xcr0) )
+            if ( !set_xcr0(n->arch.xcr0 ?: XSTATE_FP_SSE) )
                 BUG();
 
             if ( cpu_has_xsaves && is_hvm_vcpu(n) )
