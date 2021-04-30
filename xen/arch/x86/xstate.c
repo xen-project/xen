@@ -554,19 +554,18 @@ void xstate_free_save_area(struct vcpu *v)
     v->arch.xsave_area = NULL;
 }
 
-static unsigned int _xstate_ctxt_size(u64 xcr0)
+static unsigned int hw_uncompressed_size(uint64_t xcr0)
 {
     u64 act_xcr0 = get_xcr0();
-    u32 eax, ebx = 0, ecx, edx;
+    unsigned int size;
     bool ok = set_xcr0(xcr0);
 
     ASSERT(ok);
-    cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
-    ASSERT(ebx <= ecx);
+    size = cpuid_count_ebx(XSTATE_CPUID, 0);
     ok = set_xcr0(act_xcr0);
     ASSERT(ok);
 
-    return ebx;
+    return size;
 }
 
 /* Fastpath for common xstate size requests, avoiding reloads of xcr0. */
@@ -578,7 +577,7 @@ unsigned int xstate_ctxt_size(u64 xcr0)
     if ( xcr0 == 0 )
         return 0;
 
-    return _xstate_ctxt_size(xcr0);
+    return hw_uncompressed_size(xcr0);
 }
 
 static bool valid_xcr0(uint64_t xcr0)
@@ -662,14 +661,14 @@ void xstate_init(struct cpuinfo_x86 *c)
          * xsave_cntxt_size is the max size required by enabled features.
          * We know FP/SSE and YMM about eax, and nothing about edx at present.
          */
-        xsave_cntxt_size = _xstate_ctxt_size(feature_mask);
+        xsave_cntxt_size = hw_uncompressed_size(feature_mask);
         printk("xstate: size: %#x and states: %#"PRIx64"\n",
                xsave_cntxt_size, xfeature_mask);
     }
     else
     {
         BUG_ON(xfeature_mask != feature_mask);
-        BUG_ON(xsave_cntxt_size != _xstate_ctxt_size(feature_mask));
+        BUG_ON(xsave_cntxt_size != hw_uncompressed_size(feature_mask));
     }
 
     if ( setup_xstate_features(bsp) && bsp )
