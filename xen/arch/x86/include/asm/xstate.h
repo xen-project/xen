@@ -40,6 +40,7 @@ extern uint32_t mxcsr_mask;
 #define XSTATE_XSAVES_ONLY         0
 #define XSTATE_COMPACTION_ENABLED  (1ULL << 63)
 
+#define XSTATE_XSS     (1U << 0)
 #define XSTATE_ALIGN64 (1U << 1)
 
 extern u64 xfeature_mask;
