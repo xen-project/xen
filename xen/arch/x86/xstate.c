@@ -619,6 +619,36 @@ unsigned int xstate_uncompressed_size(uint64_t xcr0)
     return size;
 }
 
+unsigned int xstate_compressed_size(uint64_t xstates)
+{
+    unsigned int i, size = XSTATE_AREA_MIN_SIZE;
+
+    if ( xstates == 0 )
+        return 0;
+
+    if ( xstates <= (X86_XCR0_SSE | X86_XCR0_FP) )
+        return size;
+
+    /*
+     * For the compressed size, every non-legacy component matters.  Some
+     * componenets require aligning to 64 first.
+     */
+    xstates &= ~(X86_XCR0_SSE | X86_XCR0_FP);
+    for_each_set_bit ( i, &xstates, 63 )
+    {
+        const struct xstate_component *c = &raw_cpu_policy.xstate.comp[i];
+
+        ASSERT(c->size);
+
+        if ( c->align )
+            size = ROUNDUP(size, 64);
+
+        size += c->size;
+    }
+
+    return size;
+}
+
 struct xcheck_state {
     uint64_t states;
     uint32_t uncomp_size;
@@ -701,6 +731,15 @@ static void __init check_new_xstate(struct xcheck_state *s, uint64_t new)
                   s->states, &new, hw_size, s->comp_size);
 
         s->comp_size = hw_size;
+
+        /*
+         * Again, check that Xen's calculation always matches hardware's.
+         */
+        xen_size = xstate_compressed_size(s->states);
+
+        if ( xen_size != hw_size )
+            panic("XSTATE 0x%016"PRIx64", compressed hw size %#x != xen size %#x\n",
+                  s->states, hw_size, xen_size);
     }
     else if ( hw_size ) /* Compressed size reported, but no XSAVEC ? */
     {

@@ -109,6 +109,7 @@ void xstate_free_save_area(struct vcpu *v);
 int xstate_alloc_save_area(struct vcpu *v);
 void xstate_init(struct cpuinfo_x86 *c);
 unsigned int xstate_uncompressed_size(uint64_t xcr0);
+unsigned int xstate_compressed_size(uint64_t xstates);
 
 static inline uint64_t xgetbv(unsigned int index)
 {
