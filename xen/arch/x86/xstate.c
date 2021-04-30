@@ -8,6 +8,8 @@
 #include <xen/param.h>
 #include <xen/percpu.h>
 #include <xen/sched.h>
+
+#include <asm/cpu-policy.h>
 #include <asm/current.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
@@ -183,7 +185,7 @@ void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
     /* Check there is state to serialise (i.e. at least an XSAVE_HDR) */
     BUG_ON(!v->arch.xcr0_accum);
     /* Check there is the correct room to decompress into. */
-    BUG_ON(size != xstate_ctxt_size(v->arch.xcr0_accum));
+    BUG_ON(size != xstate_uncompressed_size(v->arch.xcr0_accum));
 
     if ( !(xstate->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED) )
     {
@@ -245,7 +247,7 @@ void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
     u64 xstate_bv, valid;
 
     BUG_ON(!v->arch.xcr0_accum);
-    BUG_ON(size != xstate_ctxt_size(v->arch.xcr0_accum));
+    BUG_ON(size != xstate_uncompressed_size(v->arch.xcr0_accum));
     ASSERT(!xsave_area_compressed(src));
 
     xstate_bv = ((const struct xsave_struct *)src)->xsave_hdr.xstate_bv;
@@ -553,32 +555,6 @@ void xstate_free_save_area(struct vcpu *v)
     v->arch.xsave_area = NULL;
 }
 
-static unsigned int hw_uncompressed_size(uint64_t xcr0)
-{
-    u64 act_xcr0 = get_xcr0();
-    unsigned int size;
-    bool ok = set_xcr0(xcr0);
-
-    ASSERT(ok);
-    size = cpuid_count_ebx(XSTATE_CPUID, 0);
-    ok = set_xcr0(act_xcr0);
-    ASSERT(ok);
-
-    return size;
-}
-
-/* Fastpath for common xstate size requests, avoiding reloads of xcr0. */
-unsigned int xstate_ctxt_size(u64 xcr0)
-{
-    if ( xcr0 == xfeature_mask )
-        return xsave_cntxt_size;
-
-    if ( xcr0 == 0 ) /* TODO: clean up paths passing 0 in here. */
-        return 0;
-
-    return hw_uncompressed_size(xcr0);
-}
-
 static bool valid_xcr0(uint64_t xcr0)
 {
     /* FP must be unconditionally set. */
@@ -611,6 +587,38 @@ static bool valid_xcr0(uint64_t xcr0)
     return true;
 }
 
+unsigned int xstate_uncompressed_size(uint64_t xcr0)
+{
+    unsigned int size = XSTATE_AREA_MIN_SIZE, i;
+
+    /* Non-XCR0 states don't exist in an uncompressed image. */
+    ASSERT((xcr0 & ~X86_XCR0_STATES) == 0);
+
+    if ( xcr0 == 0 )
+        return 0;
+
+    if ( xcr0 <= (X86_XCR0_SSE | X86_XCR0_FP) )
+        return size;
+
+    /*
+     * For the non-legacy states, search all activate states and find the
+     * maximum offset+size.  Some states (e.g. LWP, APX_F) are out-of-order
+     * with respect their index.
+     */
+    xcr0 &= ~(X86_XCR0_SSE | X86_XCR0_FP);
+    for_each_set_bit ( i, &xcr0, 63 )
+    {
+        const struct xstate_component *c = &raw_cpu_policy.xstate.comp[i];
+        unsigned int s = c->offset + c->size;
+
+        ASSERT(c->offset && c->size);
+
+        size = max(size, s);
+    }
+
+    return size;
+}
+
 struct xcheck_state {
     uint64_t states;
     uint32_t uncomp_size;
@@ -619,7 +627,7 @@ struct xcheck_state {
 
 static void __init check_new_xstate(struct xcheck_state *s, uint64_t new)
 {
-    uint32_t hw_size;
+    uint32_t hw_size, xen_size;
 
     BUILD_BUG_ON(X86_XCR0_STATES & X86_XSS_STATES);
 
@@ -666,6 +674,15 @@ static void __init check_new_xstate(struct xcheck_state *s, uint64_t new)
     }
 
     s->uncomp_size = hw_size;
+
+    /*
+     * Second, check that Xen's calculation always matches hardware's.
+     */
+    xen_size = xstate_uncompressed_size(s->states & X86_XCR0_STATES);
+
+    if ( xen_size != hw_size )
+        panic("XSTATE 0x%016"PRIx64", uncompressed hw size %#x != xen size %#x\n",
+              s->states, hw_size, xen_size);
 
     /*
      * Check the compressed size, if available.
@@ -838,14 +855,14 @@ void xstate_init(struct cpuinfo_x86 *c)
          * xsave_cntxt_size is the max size required by enabled features.
          * We know FP/SSE and YMM about eax, and nothing about edx at present.
          */
-        xsave_cntxt_size = hw_uncompressed_size(feature_mask);
+        xsave_cntxt_size = cpuid_count_ebx(0xd, 0);
         printk("xstate: size: %#x and states: %#"PRIx64"\n",
                xsave_cntxt_size, xfeature_mask);
     }
     else
     {
         BUG_ON(xfeature_mask != feature_mask);
-        BUG_ON(xsave_cntxt_size != hw_uncompressed_size(feature_mask));
+        BUG_ON(xsave_cntxt_size != cpuid_count_ebx(0xd, 0));
     }
 
     if ( setup_xstate_features(bsp) && bsp )

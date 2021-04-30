@@ -248,7 +248,7 @@ struct cpu_policy
         };
 
         /* Per-component common state.  Valid for i >= 2. */
-        struct {
+        struct xstate_component {
             uint32_t size, offset;
             bool xss:1, align:1;
             uint32_t _res_d;
