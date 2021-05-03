@@ -369,8 +369,6 @@ void p2m_memory_type_changed(struct domain *d)
     p2m_unlock(hostp2m);
 }
 
-#endif /* CONFIG_HVM */
-
 int p2m_set_ioreq_server(struct domain *d,
                          unsigned int flags,
                          struct ioreq_server *s)
@@ -463,6 +461,8 @@ void p2m_flush_hardware_cached_dirty(struct domain *d)
         p2m_unlock(p2m);
     }
 }
+
+#endif /* CONFIG_HVM */
 
 /*
  * Force a synchronous P2M TLB flush if a deferred flush is pending.
