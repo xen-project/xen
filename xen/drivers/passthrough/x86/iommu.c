@@ -23,6 +23,7 @@
 
 #include <asm/hvm/io.h>
 #include <asm/io_apic.h>
+#include <asm/mem_paging.h>
 #include <asm/setup.h>
 
 const struct iommu_init_ops *__initdata iommu_init_ops;
@@ -336,7 +337,7 @@ bool arch_iommu_use_permitted(const struct domain *d)
      */
     return d == dom_io ||
            (likely(!mem_sharing_enabled(d)) &&
-            likely(!vm_event_check_ring(d->vm_event_paging)) &&
+            likely(!mem_paging_enabled(d)) &&
             likely(!p2m_get_hostp2m(d)->global_logdirty));
 }
 

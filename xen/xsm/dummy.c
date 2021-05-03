@@ -124,7 +124,7 @@ void __init xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, mem_access);
 #endif
 
-#ifdef CONFIG_HAS_MEM_PAGING
+#ifdef CONFIG_MEM_PAGING
     set_to_dummy_if_null(ops, mem_paging);
 #endif
 

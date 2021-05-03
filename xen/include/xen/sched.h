@@ -530,7 +530,7 @@ struct domain
     struct domain *parent; /* VM fork parent */
 #endif
     /* Memory paging support */
-#ifdef CONFIG_HAS_MEM_PAGING
+#ifdef CONFIG_MEM_PAGING
     struct vm_event_domain *vm_event_paging;
 #endif
     /* VM event monitor support */

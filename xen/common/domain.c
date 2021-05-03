@@ -1096,7 +1096,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     free_xenoprof_pages(d);
 #endif
 
-#ifdef CONFIG_HAS_MEM_PAGING
+#ifdef CONFIG_MEM_PAGING
     xfree(d->vm_event_paging);
 #endif
     xfree(d->vm_event_monitor);

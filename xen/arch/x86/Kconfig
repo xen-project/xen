@@ -16,7 +16,6 @@ config X86
 	select HAS_FAST_MULTIPLY
 	select HAS_IOPORTS
 	select HAS_KEXEC
-	select HAS_MEM_PAGING
 	select HAS_NS16550
 	select HAS_PASSTHROUGH
 	select HAS_PCI
@@ -254,6 +253,10 @@ config HYPERV_GUEST
 	  If unsure, say N.
 
 endif
+
+config MEM_PAGING
+	bool "Xen memory paging support (UNSUPPORTED)" if UNSUPPORTED
+	depends on HVM
 
 config MEM_SHARING
 	bool "Xen memory sharing support (UNSUPPORTED)" if UNSUPPORTED

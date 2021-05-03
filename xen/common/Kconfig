@@ -43,9 +43,6 @@ config HAS_IOPORTS
 config HAS_KEXEC
 	bool
 
-config HAS_MEM_PAGING
-	bool
-
 config HAS_PDX
 	bool
 

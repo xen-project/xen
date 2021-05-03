@@ -136,11 +136,16 @@ typedef unsigned int p2m_query_t;
 #define P2M_PAGEABLE_TYPES (p2m_to_mask(p2m_ram_rw) \
                             | p2m_to_mask(p2m_ram_logdirty) )
 
+#ifdef CONFIG_MEM_PAGING
 #define P2M_PAGING_TYPES (p2m_to_mask(p2m_ram_paging_out)        \
                           | p2m_to_mask(p2m_ram_paged)           \
                           | p2m_to_mask(p2m_ram_paging_in))
 
 #define P2M_PAGED_TYPES (p2m_to_mask(p2m_ram_paged))
+#else
+#define P2M_PAGING_TYPES 0
+#define P2M_PAGED_TYPES 0
+#endif
 
 /* Shared types */
 /* XXX: Sharable types could include p2m_ram_ro too, but we would need to

@@ -1934,9 +1934,11 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         goto out_put_gfn;
     }
 
+#ifdef CONFIG_MEM_PAGING
     /* Check if the page has been paged out */
     if ( p2m_is_paged(p2mt) || (p2mt == p2m_ram_paging_out) )
         paged = 1;
+#endif
 
 #ifdef CONFIG_MEM_SHARING
     /* Mem sharing: if still shared on write access then its enomem */

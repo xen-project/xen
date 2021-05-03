@@ -1856,7 +1856,7 @@ int check_get_page_from_gfn(struct domain *d, gfn_t gfn, bool readonly,
 
     page = get_page_from_gfn(d, gfn_x(gfn), &p2mt, q);
 
-#ifdef CONFIG_HAS_MEM_PAGING
+#ifdef CONFIG_MEM_PAGING
     if ( p2m_is_paging(p2mt) )
     {
         if ( page )

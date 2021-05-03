@@ -1008,8 +1008,10 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENMEM_get_sharing_shared_pages:
         return mem_sharing_get_nr_shared_mfns();
 
+#ifdef CONFIG_MEM_PAGING
     case XENMEM_paging_op:
         return mem_paging_memop(guest_handle_cast(arg, xen_mem_paging_op_t));
+#endif
 
 #ifdef CONFIG_MEM_SHARING
     case XENMEM_sharing_op:
