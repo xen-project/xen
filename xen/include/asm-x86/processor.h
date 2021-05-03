@@ -377,6 +377,12 @@ static inline unsigned int rdpkru(void)
     return pkru;
 }
 
+static inline void wrpkru(unsigned int pkru)
+{
+    asm volatile ( ".byte 0x0f, 0x01, 0xef"
+                   :: "a" (pkru), "d" (0), "c" (0) );
+}
+
 /* Macros for PKRU domain */
 #define PKRU_READ  (0)
 #define PKRU_WRITE (1)

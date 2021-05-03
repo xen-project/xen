@@ -5815,6 +5815,39 @@ x86_emulate(
             }
             break;
 
+        case 0xee:
+            switch ( vex.pfx )
+            {
+            case vex_none: /* rdpkru */
+                if ( !ops->read_cr ||
+                     ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
+                    cr4 = 0;
+                generate_exception_if(!(cr4 & X86_CR4_PKE), EXC_UD);
+                generate_exception_if(_regs.ecx, EXC_GP, 0);
+                _regs.r(ax) = rdpkru();
+                _regs.r(dx) = 0;
+                break;
+            default:
+                goto unimplemented_insn;
+            }
+            break;
+
+        case 0xef:
+            switch ( vex.pfx )
+            {
+            case vex_none: /* wrpkru */
+                if ( !ops->read_cr ||
+                     ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
+                    cr4 = 0;
+                generate_exception_if(!(cr4 & X86_CR4_PKE), EXC_UD);
+                generate_exception_if(_regs.ecx | _regs.edx, EXC_GP, 0);
+                wrpkru(_regs.eax);
+                break;
+            default:
+                goto unimplemented_insn;
+            }
+            break;
+
         case 0xf8: /* swapgs */
             generate_exception_if(!mode_64bit(), EXC_UD);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);

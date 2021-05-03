@@ -2399,6 +2399,23 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing rdpkru / wrpkru...");
+    instr[0] = 0x0f; instr[1] = 0x01;
+    regs.ecx = 0;
+    for ( i = 0, j = (uint32_t)-__LINE__; i < 3; ++i )
+    {
+        instr[2] = 0xee | (i & 1);
+        regs.eax = i < 2 ? j : 0;
+        regs.edx = i & 1 ? 0 : j;
+        regs.eip = (unsigned long)&instr[0];
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (!(i & 1) && (regs.eax != (i ? j : 0) || regs.edx)) ||
+             (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
+    }
+    printf("okay\n");
+
     printf("%-40s", "Testing movdiri %edx,(%ecx)...");
     if ( stack_exec && cpu_has_movdiri )
     {
