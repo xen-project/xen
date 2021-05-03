@@ -127,6 +127,7 @@ struct paging_mode {
                                             struct cpu_user_regs *regs);
     bool          (*invlpg                )(struct vcpu *v,
                                             unsigned long linear);
+#ifdef CONFIG_HVM
     unsigned long (*gva_to_gfn            )(struct vcpu *v,
                                             struct p2m_domain *p2m,
                                             unsigned long va,
@@ -136,6 +137,7 @@ struct paging_mode {
                                             unsigned long cr3,
                                             paddr_t ga, uint32_t *pfec,
                                             unsigned int *page_order);
+#endif
     void          (*update_cr3            )(struct vcpu *v, int do_locking,
                                             bool noflush);
     void          (*update_paging_modes   )(struct vcpu *v);
@@ -287,6 +289,8 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
                                 unsigned long va,
                                 uint32_t *pfec);
 
+#ifdef CONFIG_HVM
+
 /* Translate a guest address using a particular CR3 value.  This is used
  * to by nested HAP code, to walk the guest-supplied NPT tables as if
  * they were pagetables.
@@ -304,6 +308,8 @@ static inline unsigned long paging_ga_to_gfn_cr3(struct vcpu *v,
     return paging_get_hostmode(v)->p2m_ga_to_gfn(v, p2m, cr3, ga, pfec,
         page_order);
 }
+
+#endif /* CONFIG_HVM */
 
 /* Update all the things that are derived from the guest's CR3.
  * Called when the guest changes CR3; the caller can then use v->arch.cr3

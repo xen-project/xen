@@ -43,12 +43,14 @@ static bool _invlpg(struct vcpu *v, unsigned long linear)
     return true;
 }
 
+#ifdef CONFIG_HVM
 static unsigned long _gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
                                  unsigned long va, uint32_t *pfec)
 {
     ASSERT_UNREACHABLE();
     return gfn_x(INVALID_GFN);
 }
+#endif
 
 static void _update_cr3(struct vcpu *v, int do_locking, bool noflush)
 {
@@ -63,7 +65,9 @@ static void _update_paging_modes(struct vcpu *v)
 static const struct paging_mode sh_paging_none = {
     .page_fault                    = _page_fault,
     .invlpg                        = _invlpg,
+#ifdef CONFIG_HVM
     .gva_to_gfn                    = _gva_to_gfn,
+#endif
     .update_cr3                    = _update_cr3,
     .update_paging_modes           = _update_paging_modes,
 };

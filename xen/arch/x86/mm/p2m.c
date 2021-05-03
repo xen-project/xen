@@ -1793,7 +1793,6 @@ void np2m_schedule(int dir)
         p2m_unlock(p2m);
     }
 }
-#endif
 
 unsigned long paging_gva_to_gfn(struct vcpu *v,
                                 unsigned long va,
@@ -1843,6 +1842,8 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
 
     return hostmode->gva_to_gfn(v, hostp2m, va, pfec);
 }
+
+#endif /* CONFIG_HVM */
 
 /*
  * If the map is non-NULL, we leave this function having acquired an extra ref

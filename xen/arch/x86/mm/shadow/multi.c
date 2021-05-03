@@ -3030,6 +3030,7 @@ static bool sh_invlpg(struct vcpu *v, unsigned long linear)
     return true;
 }
 
+#ifdef CONFIG_HVM
 
 static unsigned long
 sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
@@ -3063,6 +3064,7 @@ sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
     return gfn_x(gfn);
 }
 
+#endif /* CONFIG_HVM */
 
 static inline void
 sh_update_linear_entries(struct vcpu *v)
@@ -4183,7 +4185,9 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
 const struct paging_mode sh_paging_mode = {
     .page_fault                    = sh_page_fault,
     .invlpg                        = sh_invlpg,
+#ifdef CONFIG_HVM
     .gva_to_gfn                    = sh_gva_to_gfn,
+#endif
     .update_cr3                    = sh_update_cr3,
     .update_paging_modes           = shadow_update_paging_modes,
     .flush_tlb                     = shadow_flush_tlb,
