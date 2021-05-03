@@ -216,20 +216,15 @@ struct p2m_domain {
 
     p2m_class_t       p2m_class; /* host/nested/alternate */
 
-#ifdef CONFIG_HVM
-    /* Nested p2ms only: nested p2m base value that this p2m shadows.
-     * This can be cleared to P2M_BASE_EADDR under the per-p2m lock but
-     * needs both the per-p2m lock and the per-domain nestedp2m lock
-     * to set it to any other value. */
-#define P2M_BASE_EADDR     (~0ULL)
-    uint64_t           np2m_base;
-    uint64_t           np2m_generation;
+    /*
+     * Default P2M access type for each page in the the domain: new pages,
+     * swapped in pages, cleared pages, and pages that are ambiguously
+     * retyped get this access type.  See definition of p2m_access_t.
+     */
+    p2m_access_t default_access;
 
-    /* Nested p2ms: linked list of n2pms allocated to this domain. 
-     * The host p2m hasolds the head of the list and the np2ms are 
-     * threaded on in LRU order. */
-    struct list_head   np2m_list;
-#endif
+    /* Pages used to construct the p2m */
+    struct page_list_head pages;
 
     /* Host p2m: Log-dirty ranges registered for the domain. */
     struct rangeset   *logdirty_ranges;
@@ -237,21 +232,10 @@ struct p2m_domain {
     /* Host p2m: Global log-dirty mode enabled for the domain. */
     bool               global_logdirty;
 
-    /* Host p2m: when this flag is set, don't flush all the nested-p2m 
-     * tables on every host-p2m change.  The setter of this flag 
-     * is responsible for performing the full flush before releasing the
-     * host p2m's lock. */
-    int                defer_nested_flush;
-
 #ifdef CONFIG_HVM
     /* Alternate p2m: count of vcpu's currently using this p2m. */
     atomic_t           active_vcpus;
-#endif
 
-    /* Pages used to construct the p2m */
-    struct page_list_head pages;
-
-#ifdef CONFIG_HVM
     int                (*set_entry)(struct p2m_domain *p2m,
                                     gfn_t gfn,
                                     mfn_t mfn, unsigned int page_order,
@@ -306,11 +290,6 @@ struct p2m_domain {
     unsigned int defer_flush;
     bool_t need_flush;
 
-    /* Default P2M access type for each page in the the domain: new pages,
-     * swapped in pages, cleared pages, and pages that are ambiguously
-     * retyped get this access type.  See definition of p2m_access_t. */
-    p2m_access_t default_access;
-
     /* If true, and an access fault comes in and there is no vm_event listener, 
      * pause domain.  Otherwise, remove access restrictions. */
     bool_t       access_required;
@@ -357,6 +336,31 @@ struct p2m_domain {
         mm_lock_t        lock;         /* Locking of private pod structs,   *
                                         * not relying on the p2m lock.      */
     } pod;
+
+    /*
+     * Host p2m: when this flag is set, don't flush all the nested-p2m
+     * tables on every host-p2m change.  The setter of this flag
+     * is responsible for performing the full flush before releasing the
+     * host p2m's lock.
+     */
+    bool               defer_nested_flush;
+
+    /*
+     * Nested p2ms only: nested p2m base value that this p2m shadows.
+     * This can be cleared to P2M_BASE_EADDR under the per-p2m lock but
+     * needs both the per-p2m lock and the per-domain nestedp2m lock
+     * to set it to any other value.
+     */
+#define P2M_BASE_EADDR     (~0ULL)
+    uint64_t           np2m_base;
+    uint64_t           np2m_generation;
+
+    /*
+     * Nested p2ms: linked list of n2pms allocated to this domain.
+     * The host p2m hasolds the head of the list and the np2ms are
+     * threaded on in LRU order.
+     */
+    struct list_head   np2m_list;
 #endif
 
     union {

@@ -1167,7 +1167,7 @@ void p2m_change_type_range(struct domain *d,
     ASSERT(p2m_is_changeable(ot) && p2m_is_changeable(nt));
 
     p2m_lock(hostp2m);
-    hostp2m->defer_nested_flush = 1;
+    hostp2m->defer_nested_flush = true;
 
     change_type_range(hostp2m, start, end, ot, nt);
 
@@ -1185,7 +1185,7 @@ void p2m_change_type_range(struct domain *d,
                 p2m_unlock(altp2m);
             }
     }
-    hostp2m->defer_nested_flush = 0;
+    hostp2m->defer_nested_flush = false;
     if ( nestedhvm_enabled(d) )
         p2m_flush_nestedp2m(d);
 
