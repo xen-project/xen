@@ -278,7 +278,6 @@ struct p2m_domain {
                                                   unsigned long first_gfn,
                                                   unsigned long last_gfn);
     void               (*memory_type_changed)(struct p2m_domain *p2m);
-#endif
     void               (*write_p2m_entry_pre)(struct domain *d,
                                               unsigned long gfn,
                                               l1_pgentry_t old,
@@ -286,6 +285,7 @@ struct p2m_domain {
                                               unsigned int level);
     void               (*write_p2m_entry_post)(struct p2m_domain *p2m,
                                                unsigned int oflags);
+#endif
 #if P2M_AUDIT
     long               (*audit_p2m)(struct p2m_domain *p2m);
 #endif
@@ -796,8 +796,6 @@ int __must_check p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
 #if defined(CONFIG_HVM)
 /* Set up function pointers for PT implementation: only for use by p2m code */
 extern void p2m_pt_init(struct p2m_domain *p2m);
-#elif defined(CONFIG_SHADOW_PAGING)
-# define p2m_pt_init shadow_p2m_init
 #else
 static inline void p2m_pt_init(struct p2m_domain *p2m) {}
 #endif
