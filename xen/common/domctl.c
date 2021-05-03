@@ -750,6 +750,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( ret )
             break;
 
+        if ( !paging_mode_translate(d) )
+            break;
+
         if ( add )
         {
             printk(XENLOG_G_DEBUG

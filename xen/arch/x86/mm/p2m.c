@@ -1352,52 +1352,6 @@ int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                                p2m_get_hostp2m(d)->default_access);
 }
 
-#endif /* CONFIG_HVM */
-
-int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
-                           p2m_access_t p2ma, unsigned int flag)
-{
-    p2m_type_t p2mt;
-    p2m_access_t a;
-    gfn_t gfn = _gfn(gfn_l);
-    mfn_t mfn;
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    int ret;
-
-    if ( !paging_mode_translate(p2m->domain) )
-    {
-        if ( !is_iommu_enabled(d) )
-            return 0;
-        return iommu_legacy_map(d, _dfn(gfn_l), _mfn(gfn_l),
-                                1ul << PAGE_ORDER_4K,
-                                IOMMUF_readable | IOMMUF_writable);
-    }
-
-    gfn_lock(p2m, gfn, 0);
-
-    mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL, NULL);
-
-    if ( p2mt == p2m_invalid || p2mt == p2m_mmio_dm )
-        ret = p2m_set_entry(p2m, gfn, _mfn(gfn_l), PAGE_ORDER_4K,
-                            p2m_mmio_direct, p2ma);
-    else if ( mfn_x(mfn) == gfn_l && p2mt == p2m_mmio_direct && a == p2ma )
-        ret = 0;
-    else
-    {
-        if ( flag & XEN_DOMCTL_DEV_RDM_RELAXED )
-            ret = 0;
-        else
-            ret = -EBUSY;
-        printk(XENLOG_G_WARNING
-               "Cannot setup identity map d%d:%lx,"
-               " gfn already mapped to %lx.\n",
-               d->domain_id, gfn_l, mfn_x(mfn));
-    }
-
-    gfn_unlock(p2m, gfn, 0);
-    return ret;
-}
-
 /*
  * Returns:
  *    0        for success
@@ -1445,6 +1399,52 @@ int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn,
     gfn_unlock(p2m, gfn, order);
 
     return rc;
+}
+
+#endif /* CONFIG_HVM */
+
+int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
+                           p2m_access_t p2ma, unsigned int flag)
+{
+    p2m_type_t p2mt;
+    p2m_access_t a;
+    gfn_t gfn = _gfn(gfn_l);
+    mfn_t mfn;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int ret;
+
+    if ( !paging_mode_translate(p2m->domain) )
+    {
+        if ( !is_iommu_enabled(d) )
+            return 0;
+        return iommu_legacy_map(d, _dfn(gfn_l), _mfn(gfn_l),
+                                1ul << PAGE_ORDER_4K,
+                                IOMMUF_readable | IOMMUF_writable);
+    }
+
+    gfn_lock(p2m, gfn, 0);
+
+    mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL, NULL);
+
+    if ( p2mt == p2m_invalid || p2mt == p2m_mmio_dm )
+        ret = p2m_set_entry(p2m, gfn, _mfn(gfn_l), PAGE_ORDER_4K,
+                            p2m_mmio_direct, p2ma);
+    else if ( mfn_x(mfn) == gfn_l && p2mt == p2m_mmio_direct && a == p2ma )
+        ret = 0;
+    else
+    {
+        if ( flag & XEN_DOMCTL_DEV_RDM_RELAXED )
+            ret = 0;
+        else
+            ret = -EBUSY;
+        printk(XENLOG_G_WARNING
+               "Cannot setup identity map d%d:%lx,"
+               " gfn already mapped to %lx.\n",
+               d->domain_id, gfn_l, mfn_x(mfn));
+    }
+
+    gfn_unlock(p2m, gfn, 0);
+    return ret;
 }
 
 int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
@@ -1892,6 +1892,8 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
     return map_domain_page(*mfn);
 }
 
+#ifdef CONFIG_HVM
+
 static unsigned int mmio_order(const struct domain *d,
                                unsigned long start_fn, unsigned long nr)
 {
@@ -1932,7 +1934,10 @@ int map_mmio_regions(struct domain *d,
     unsigned int iter, order;
 
     if ( !paging_mode_translate(d) )
-        return 0;
+    {
+        ASSERT_UNREACHABLE();
+        return -EOPNOTSUPP;
+    }
 
     for ( iter = i = 0; i < nr && iter < MAP_MMIO_MAX_ITER;
           i += 1UL << order, ++iter )
@@ -1964,7 +1969,10 @@ int unmap_mmio_regions(struct domain *d,
     unsigned int iter, order;
 
     if ( !paging_mode_translate(d) )
-        return 0;
+    {
+        ASSERT_UNREACHABLE();
+        return -EOPNOTSUPP;
+    }
 
     for ( iter = i = 0; i < nr && iter < MAP_MMIO_MAX_ITER;
           i += 1UL << order, ++iter )
@@ -1985,8 +1993,6 @@ int unmap_mmio_regions(struct domain *d,
 
     return i == nr ? 0 : i ?: ret;
 }
-
-#ifdef CONFIG_HVM
 
 int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
                                p2m_type_t *t, p2m_access_t *a,

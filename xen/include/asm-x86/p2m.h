@@ -658,11 +658,19 @@ int p2m_finish_type_change(struct domain *d,
 int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
                           unsigned long end);
 
+#ifdef CONFIG_HVM
 /* Set mmio addresses in the p2m table (for pass-through) */
 int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                        unsigned int order);
 int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                          unsigned int order);
+#else
+static inline int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn,
+                                       mfn_t mfn, unsigned int order)
+{
+    return -EIO;
+}
+#endif
 
 /* Set identity addresses in the p2m table (for pass-through) */
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
