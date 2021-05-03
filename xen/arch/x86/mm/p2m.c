@@ -1260,6 +1260,8 @@ int p2m_finish_type_change(struct domain *d,
     return rc;
 }
 
+#ifdef CONFIG_HVM
+
 /*
  * Returns:
  *    0              for success
@@ -1280,7 +1282,10 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if ( !paging_mode_translate(d) )
+    {
+        ASSERT_UNREACHABLE();
         return -EIO;
+    }
 
     gfn_lock(p2m, gfn, order);
     omfn = p2m->get_entry(p2m, gfn, &ot, &a, 0, &cur_order, NULL);
@@ -1313,7 +1318,6 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
     if ( rc )
         gdprintk(XENLOG_ERR, "p2m_set_entry: %#lx:%u -> %d (0x%"PRI_mfn")\n",
                  gfn_l, order, rc, mfn_x(mfn));
-#ifdef CONFIG_HVM
     else if ( p2m_is_pod(ot) )
     {
         pod_lock(p2m);
@@ -1321,7 +1325,6 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
         BUG_ON(p2m->pod.entry_count < 0);
         pod_unlock(p2m);
     }
-#endif
     gfn_unlock(p2m, gfn, order);
 
     return rc;
@@ -1348,6 +1351,8 @@ int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     return set_typed_p2m_entry(d, gfn_x(gfn), mfn, order, p2m_mmio_direct,
                                p2m_get_hostp2m(d)->default_access);
 }
+
+#endif /* CONFIG_HVM */
 
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
                            p2m_access_t p2ma, unsigned int flag)
