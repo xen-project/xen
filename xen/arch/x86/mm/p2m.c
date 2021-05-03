@@ -1182,8 +1182,6 @@ void p2m_change_type_range(struct domain *d,
     p2m_unlock(hostp2m);
 }
 
-#endif /* CONFIG_HVM */
-
 /*
  * Finish p2m type change for gfns which are marked as need_recalc in a range.
  * Uses the current p2m's max_mapped_pfn to further clip the invalidation
@@ -1234,7 +1232,6 @@ int p2m_finish_type_change(struct domain *d,
     if ( rc < 0 )
         goto out;
 
-#ifdef CONFIG_HVM
     if ( unlikely(altp2m_active(d)) )
     {
         unsigned int i;
@@ -1252,15 +1249,12 @@ int p2m_finish_type_change(struct domain *d,
                     goto out;
             }
     }
-#endif
 
  out:
     p2m_unlock(hostp2m);
 
     return rc;
 }
-
-#ifdef CONFIG_HVM
 
 /*
  * Returns:

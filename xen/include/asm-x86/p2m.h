@@ -259,9 +259,9 @@ struct p2m_domain {
                                     p2m_query_t q,
                                     unsigned int *page_order,
                                     bool_t *sve);
+#ifdef CONFIG_HVM
     int                (*recalc)(struct p2m_domain *p2m,
                                  unsigned long gfn);
-#ifdef CONFIG_HVM
     void               (*enable_hardware_log_dirty)(struct p2m_domain *p2m);
     void               (*disable_hardware_log_dirty)(struct p2m_domain *p2m);
     void               (*flush_hardware_cached_dirty)(struct p2m_domain *p2m);

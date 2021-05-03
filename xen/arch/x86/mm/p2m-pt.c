@@ -1173,8 +1173,8 @@ void p2m_pt_init(struct p2m_domain *p2m)
 {
     p2m->set_entry = p2m_pt_set_entry;
     p2m->get_entry = p2m_pt_get_entry;
-    p2m->recalc = do_recalc;
 #ifdef CONFIG_HVM
+    p2m->recalc = do_recalc;
     p2m->change_entry_type_global = p2m_pt_change_entry_type_global;
     p2m->change_entry_type_range = p2m_pt_change_entry_type_range;
 #endif
