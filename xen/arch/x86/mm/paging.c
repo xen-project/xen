@@ -588,6 +588,7 @@ static int paging_log_dirty_op(struct domain *d,
     return rv;
 }
 
+#ifdef CONFIG_HVM
 void paging_log_dirty_range(struct domain *d,
                            unsigned long begin_pfn,
                            unsigned long nr,
@@ -617,6 +618,7 @@ void paging_log_dirty_range(struct domain *d,
 
     guest_flush_tlb_mask(d, d->dirty_cpumask);
 }
+#endif
 
 /*
  * Callers must supply log_dirty_ops for the log dirty code to call. This

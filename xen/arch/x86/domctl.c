@@ -1080,9 +1080,12 @@ long arch_do_domctl(
     {
         p2m_type_t pt;
         unsigned long pfn = domctl->u.set_broken_page_p2m.pfn;
-        mfn_t mfn = get_gfn_query(d, pfn, &pt);
 
-        if ( unlikely(!mfn_valid(mfn)) || unlikely(!p2m_is_ram(pt)) )
+        if ( !is_hvm_domain(d) )
+            return -EINVAL;
+
+        if ( unlikely(!mfn_valid(get_gfn_query(d, pfn, &pt))) ||
+             unlikely(!p2m_is_ram(pt)) )
             ret = -EINVAL;
         else
             ret = p2m_change_type_one(d, pfn, pt, p2m_ram_broken);

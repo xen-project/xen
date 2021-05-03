@@ -264,6 +264,7 @@ struct p2m_domain {
     void               (*enable_hardware_log_dirty)(struct p2m_domain *p2m);
     void               (*disable_hardware_log_dirty)(struct p2m_domain *p2m);
     void               (*flush_hardware_cached_dirty)(struct p2m_domain *p2m);
+#ifdef CONFIG_HVM
     void               (*change_entry_type_global)(struct p2m_domain *p2m,
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
@@ -272,6 +273,7 @@ struct p2m_domain {
                                                   unsigned long first_gfn,
                                                   unsigned long last_gfn);
     void               (*memory_type_changed)(struct p2m_domain *p2m);
+#endif
     void               (*write_p2m_entry_pre)(struct domain *d,
                                               unsigned long gfn,
                                               l1_pgentry_t old,

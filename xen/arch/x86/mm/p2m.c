@@ -292,6 +292,8 @@ int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
     return 0;
 }
 
+#ifdef CONFIG_HVM
+
 static void change_entry_type_global(struct p2m_domain *p2m,
                                      p2m_type_t ot, p2m_type_t nt)
 {
@@ -316,7 +318,6 @@ void p2m_change_entry_type_global(struct domain *d,
 
     change_entry_type_global(hostp2m, ot, nt);
 
-#ifdef CONFIG_HVM
     if ( unlikely(altp2m_active(d)) )
     {
         unsigned int i;
@@ -331,12 +332,10 @@ void p2m_change_entry_type_global(struct domain *d,
                 p2m_unlock(altp2m);
             }
     }
-#endif
 
     p2m_unlock(hostp2m);
 }
 
-#ifdef CONFIG_HVM
 /* There's already a memory_type_changed() in asm/mtrr.h. */
 static void _memory_type_changed(struct p2m_domain *p2m)
 {
@@ -369,7 +368,8 @@ void p2m_memory_type_changed(struct domain *d)
 
     p2m_unlock(hostp2m);
 }
-#endif
+
+#endif /* CONFIG_HVM */
 
 int p2m_set_ioreq_server(struct domain *d,
                          unsigned int flags,
@@ -876,6 +876,7 @@ guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
 }
 
 #ifdef CONFIG_HVM
+
 int
 guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                         unsigned int page_order, p2m_type_t t)
@@ -1024,7 +1025,6 @@ out:
 
     return rc;
 }
-#endif
 
 /*
  * Modify the p2m type of a single gfn from ot to nt.
@@ -1161,7 +1161,6 @@ void p2m_change_type_range(struct domain *d,
 
     change_type_range(hostp2m, start, end, ot, nt);
 
-#ifdef CONFIG_HVM
     if ( unlikely(altp2m_active(d)) )
     {
         unsigned int i;
@@ -1176,13 +1175,14 @@ void p2m_change_type_range(struct domain *d,
                 p2m_unlock(altp2m);
             }
     }
-#endif
     hostp2m->defer_nested_flush = 0;
     if ( nestedhvm_enabled(d) )
         p2m_flush_nestedp2m(d);
 
     p2m_unlock(hostp2m);
 }
+
+#endif /* CONFIG_HVM */
 
 /*
  * Finish p2m type change for gfns which are marked as need_recalc in a range.
