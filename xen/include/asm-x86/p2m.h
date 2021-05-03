@@ -251,6 +251,7 @@ struct p2m_domain {
     /* Pages used to construct the p2m */
     struct page_list_head pages;
 
+#ifdef CONFIG_HVM
     int                (*set_entry)(struct p2m_domain *p2m,
                                     gfn_t gfn,
                                     mfn_t mfn, unsigned int page_order,
@@ -264,7 +265,6 @@ struct p2m_domain {
                                     p2m_query_t q,
                                     unsigned int *page_order,
                                     bool_t *sve);
-#ifdef CONFIG_HVM
     int                (*recalc)(struct p2m_domain *p2m,
                                  unsigned long gfn);
     void               (*enable_hardware_log_dirty)(struct p2m_domain *p2m);
@@ -793,8 +793,14 @@ int __must_check p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                                unsigned int page_order, p2m_type_t p2mt,
                                p2m_access_t p2ma);
 
+#if defined(CONFIG_HVM)
 /* Set up function pointers for PT implementation: only for use by p2m code */
 extern void p2m_pt_init(struct p2m_domain *p2m);
+#elif defined(CONFIG_SHADOW_PAGING)
+# define p2m_pt_init shadow_p2m_init
+#else
+static inline void p2m_pt_init(struct p2m_domain *p2m) {}
+#endif
 
 void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
                      p2m_query_t q, uint32_t *pfec);

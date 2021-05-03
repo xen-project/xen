@@ -324,7 +324,6 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
     return rc;
 }
 
-#ifdef CONFIG_HVM
 /*
  * Mark (via clearing the U flag) as needing P2M type re-calculation all valid
  * present entries at the targeted level for the passed in GFN range, which is
@@ -393,7 +392,6 @@ static int p2m_pt_set_recalc_range(struct p2m_domain *p2m,
 
     return err;
 }
-#endif /* CONFIG_HVM */
 
 /*
  * Handle possibly necessary P2M type re-calculation (U flag clear for a
@@ -932,8 +930,6 @@ pod_retry_l1:
     return (p2m_is_valid(*t) || p2m_is_any_ram(*t)) ? mfn : INVALID_MFN;
 }
 
-#ifdef CONFIG_HVM
-
 static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
                                             p2m_type_t ot, p2m_type_t nt)
 {
@@ -1014,8 +1010,6 @@ static int p2m_pt_change_entry_type_range(struct p2m_domain *p2m,
 
     return err;
 }
-
-#endif /* CONFIG_HVM */
 
 #if P2M_AUDIT
 static long p2m_pt_audit_p2m(struct p2m_domain *p2m)
@@ -1173,11 +1167,9 @@ void p2m_pt_init(struct p2m_domain *p2m)
 {
     p2m->set_entry = p2m_pt_set_entry;
     p2m->get_entry = p2m_pt_get_entry;
-#ifdef CONFIG_HVM
     p2m->recalc = do_recalc;
     p2m->change_entry_type_global = p2m_pt_change_entry_type_global;
     p2m->change_entry_type_range = p2m_pt_change_entry_type_range;
-#endif
 
     /* Still too early to use paging_mode_hap(). */
     if ( hap_enabled(p2m->domain) )

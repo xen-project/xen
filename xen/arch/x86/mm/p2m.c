@@ -494,8 +494,10 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
                     unsigned int *page_order, bool_t locked)
 {
+#ifdef CONFIG_HVM
     mfn_t mfn;
     gfn_t gfn = _gfn(gfn_l);
+#endif
 
     /* Unshare makes no sense withuot populate. */
     if ( q & P2M_UNSHARE )
@@ -509,6 +511,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
         return _mfn(gfn_l);
     }
 
+#ifdef CONFIG_HVM
     if ( locked )
         /* Grab the lock here, don't release until put_gfn */
         gfn_lock(p2m, gfn, 0);
@@ -542,6 +545,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
     }
 
     return mfn;
+#endif
 }
 
 void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
@@ -620,6 +624,7 @@ struct page_info *p2m_get_page_from_gfn(
     return page;
 }
 
+#ifdef CONFIG_HVM
 /* Returns: 0 for success, -errno for failure */
 int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
@@ -659,6 +664,7 @@ int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
 
     return rc;
 }
+#endif
 
 mfn_t p2m_alloc_ptp(struct p2m_domain *p2m, unsigned int level)
 {
@@ -777,6 +783,8 @@ void p2m_final_teardown(struct domain *d)
     p2m_teardown_hostp2m(d);
 }
 
+#ifdef CONFIG_HVM
+
 static int __must_check
 p2m_remove_page(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                 unsigned int page_order)
@@ -784,10 +792,6 @@ p2m_remove_page(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
     unsigned long i;
     p2m_type_t t;
     p2m_access_t a;
-
-    /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
-    if ( !paging_mode_translate(p2m->domain) )
-        return 0;
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn_x(gfn), mfn_x(mfn));
@@ -829,12 +833,18 @@ guest_physmap_remove_page(struct domain *d, gfn_t gfn,
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc;
 
+    /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
+    if ( !paging_mode_translate(d) )
+        return 0;
+
     gfn_lock(p2m, gfn, page_order);
     rc = p2m_remove_page(p2m, gfn, mfn, page_order);
     gfn_unlock(p2m, gfn, page_order);
 
     return rc;
 }
+
+#endif /* CONFIG_HVM */
 
 int
 guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
@@ -1400,14 +1410,16 @@ int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn,
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
                            p2m_access_t p2ma, unsigned int flag)
 {
+#ifdef CONFIG_HVM
     p2m_type_t p2mt;
     p2m_access_t a;
     gfn_t gfn = _gfn(gfn_l);
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret;
+#endif
 
-    if ( !paging_mode_translate(p2m->domain) )
+    if ( !paging_mode_translate(d) )
     {
         if ( !is_iommu_enabled(d) )
             return 0;
@@ -1416,6 +1428,7 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
                                 IOMMUF_readable | IOMMUF_writable);
     }
 
+#ifdef CONFIG_HVM
     gfn_lock(p2m, gfn, 0);
 
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL, NULL);
@@ -1439,16 +1452,19 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
 
     gfn_unlock(p2m, gfn, 0);
     return ret;
+#endif
 }
 
 int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
 {
+#ifdef CONFIG_HVM
     p2m_type_t p2mt;
     p2m_access_t a;
     gfn_t gfn = _gfn(gfn_l);
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret;
+#endif
 
     if ( !paging_mode_translate(d) )
     {
@@ -1457,6 +1473,7 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
         return iommu_legacy_unmap(d, _dfn(gfn_l), 1ul << PAGE_ORDER_4K);
     }
 
+#ifdef CONFIG_HVM
     gfn_lock(p2m, gfn, 0);
 
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL, NULL);
@@ -1476,6 +1493,7 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
     }
 
     return ret;
+#endif
 }
 
 #ifdef CONFIG_MEM_SHARING
