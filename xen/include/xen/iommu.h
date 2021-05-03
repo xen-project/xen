@@ -187,8 +187,6 @@ void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci);
 struct msi_desc;
 struct msi_msg;
 
-int iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
-
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #endif /* HAS_PCI */
 
@@ -238,7 +236,6 @@ struct iommu_ops {
                            u8 devfn, device_t *dev);
 #ifdef CONFIG_HAS_PCI
     int (*get_device_group_id)(u16 seg, u8 bus, u8 devfn);
-    int (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
 #endif /* HAS_PCI */
 
     void (*teardown)(struct domain *d);
@@ -267,6 +264,7 @@ struct iommu_ops {
     int (*adjust_irq_affinities)(void);
     void (*sync_cache)(const void *addr, unsigned int size);
     void (*clear_root_pgtable)(struct domain *d);
+    int (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
 #endif /* CONFIG_X86 */
 
     int __must_check (*suspend)(void);
@@ -373,6 +371,15 @@ extern struct spinlock iommu_pt_cleanup_lock;
 extern struct page_list_head iommu_pt_cleanup_list;
 
 bool arch_iommu_use_permitted(const struct domain *d);
+
+#ifdef CONFIG_X86
+static inline int iommu_update_ire_from_msi(
+    struct msi_desc *msi_desc, struct msi_msg *msg)
+{
+    return iommu_intremap
+           ? iommu_call(&iommu_ops, update_ire_from_msi, msi_desc, msg) : 0;
+}
+#endif
 
 #endif /* _IOMMU_H_ */
 
