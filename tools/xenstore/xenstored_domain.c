@@ -1132,10 +1132,10 @@ void wrl_apply_debit_actual(struct domain *domain)
 	if (domain->wrl_credit < 0) {
 		if (!domain->wrl_delay_logged) {
 			domain->wrl_delay_logged = true;
-			WRL_LOG(now, "domain %ld is affected",
+			WRL_LOG(now, "domain %ld is affected\n",
 				(long)domain->domid);
 		} else if (!wrl_log_last_warning) {
-			WRL_LOG(now, "rate limiting restarts");
+			WRL_LOG(now, "rate limiting restarts\n");
 		}
 		wrl_log_last_warning = now.sec;
 	}
@@ -1145,7 +1145,7 @@ void wrl_log_periodic(struct wrl_timestampt now)
 {
 	if (wrl_log_last_warning &&
 	    (now.sec - wrl_log_last_warning) > WRL_LOGEVERY) {
-		WRL_LOG(now, "not in force recently");
+		WRL_LOG(now, "not in force recently\n");
 		wrl_log_last_warning = 0;
 	}
 }
