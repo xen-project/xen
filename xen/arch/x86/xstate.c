@@ -574,6 +574,34 @@ unsigned int xstate_ctxt_size(u64 xcr0)
     return _xstate_ctxt_size(xcr0);
 }
 
+static bool valid_xcr0(uint64_t xcr0)
+{
+    /* FP must be unconditionally set. */
+    if ( !(xcr0 & X86_XCR0_FP) )
+        return false;
+
+    /* YMM depends on SSE. */
+    if ( (xcr0 & X86_XCR0_YMM) && !(xcr0 & X86_XCR0_SSE) )
+        return false;
+
+    if ( xcr0 & (X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM) )
+    {
+        /* OPMASK, ZMM, and HI_ZMM require YMM. */
+        if ( !(xcr0 & X86_XCR0_YMM) )
+            return false;
+
+        /* OPMASK, ZMM, and HI_ZMM must be the same. */
+        if ( ~xcr0 & (X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM) )
+            return false;
+    }
+
+    /* BNDREGS and BNDCSR must be the same. */
+    if ( !(xcr0 & X86_XCR0_BNDREGS) != !(xcr0 & X86_XCR0_BNDCSR) )
+        return false;
+
+    return true;
+}
+
 /* Collect the information of processor's extended state */
 void xstate_init(struct cpuinfo_x86 *c)
 {
@@ -609,10 +637,9 @@ void xstate_init(struct cpuinfo_x86 *c)
     }
 
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
-
-    BUG_ON((eax & XSTATE_FP_SSE) != XSTATE_FP_SSE);
-    BUG_ON((eax & X86_XCR0_YMM) && !(eax & X86_XCR0_SSE));
     feature_mask = (((u64)edx << 32) | eax) & XCNTXT_MASK;
+    BUG_ON(!valid_xcr0(feature_mask));
+    BUG_ON(!(feature_mask & X86_XCR0_SSE));
 
     /*
      * Set CR4_OSXSAVE and run "cpuid" to get xsave_cntxt_size.
@@ -640,31 +667,6 @@ void xstate_init(struct cpuinfo_x86 *c)
 
     if ( setup_xstate_features(bsp) && bsp )
         BUG();
-}
-
-static bool valid_xcr0(u64 xcr0)
-{
-    /* FP must be unconditionally set. */
-    if ( !(xcr0 & X86_XCR0_FP) )
-        return false;
-
-    /* YMM depends on SSE. */
-    if ( (xcr0 & X86_XCR0_YMM) && !(xcr0 & X86_XCR0_SSE) )
-        return false;
-
-    if ( xcr0 & (X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM) )
-    {
-        /* OPMASK, ZMM, and HI_ZMM require YMM. */
-        if ( !(xcr0 & X86_XCR0_YMM) )
-            return false;
-
-        /* OPMASK, ZMM, and HI_ZMM must be the same. */
-        if ( ~xcr0 & (X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM) )
-            return false;
-    }
-
-    /* BNDREGS and BNDCSR must be the same. */
-    return !(xcr0 & X86_XCR0_BNDREGS) == !(xcr0 & X86_XCR0_BNDCSR);
 }
 
 int validate_xstate(const struct domain *d, uint64_t xcr0, uint64_t xcr0_accum,
