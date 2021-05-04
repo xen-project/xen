@@ -52,6 +52,7 @@ unsigned long pit0_ticks;
 struct cpu_time_stamp {
     u64 local_tsc;
     s_time_t local_stime;
+    /* Next field unconditionally valid only when !CONSTANT_TSC. */
     s_time_t master_stime;
 };
 
@@ -1702,7 +1703,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
                  * iteration.
                  */
                 r->master_tsc_stamp = r->max_tsc_stamp;
-            else if ( i == 0 )
+            else if ( !boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && i == 0 )
                 r->master_stime = read_platform_stime(NULL);
 
             atomic_inc(&r->semaphore);
@@ -1776,8 +1777,11 @@ static void time_calibration_std_rendezvous(void *_r)
     {
         while ( atomic_read(&r->semaphore) != (total_cpus - 1) )
             cpu_relax();
-        r->master_stime = read_platform_stime(NULL);
-        smp_wmb(); /* write r->master_stime /then/ signal */
+        if ( !boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+        {
+            r->master_stime = read_platform_stime(NULL);
+            smp_wmb(); /* write r->master_stime /then/ signal */
+        }
         atomic_inc(&r->semaphore);
     }
     else
