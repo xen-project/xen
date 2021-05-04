@@ -2590,33 +2590,33 @@ int xc_psr_get_domain_data(xc_interface *xch, uint32_t domid,
 int xc_psr_get_hw_info(xc_interface *xch, uint32_t socket,
                        xc_psr_feat_type type, xc_psr_hw_info *hw_info);
 
-typedef struct xc_cpu_policy *xc_cpu_policy_t;
+typedef struct xc_cpu_policy xc_cpu_policy_t;
 
 /* Create and free a xc_cpu_policy object. */
-xc_cpu_policy_t xc_cpu_policy_init(void);
-void xc_cpu_policy_destroy(xc_cpu_policy_t policy);
+xc_cpu_policy_t *xc_cpu_policy_init(void);
+void xc_cpu_policy_destroy(xc_cpu_policy_t *policy);
 
 /* Retrieve a system policy, or get/set a domains policy. */
 int xc_cpu_policy_get_system(xc_interface *xch, unsigned int policy_idx,
-                             xc_cpu_policy_t policy);
+                             xc_cpu_policy_t *policy);
 int xc_cpu_policy_get_domain(xc_interface *xch, uint32_t domid,
-                             xc_cpu_policy_t policy);
+                             xc_cpu_policy_t *policy);
 int xc_cpu_policy_set_domain(xc_interface *xch, uint32_t domid,
-                             const xc_cpu_policy_t policy);
+                             xc_cpu_policy_t *policy);
 
 /* Manipulate a policy via architectural representations. */
-int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t policy,
+int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t *policy,
                             xen_cpuid_leaf_t *leaves, uint32_t *nr_leaves,
                             xen_msr_entry_t *msrs, uint32_t *nr_msrs);
-int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t policy,
+int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t *policy,
                                const xen_cpuid_leaf_t *leaves,
                                uint32_t nr);
-int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t policy,
+int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t *policy,
                               const xen_msr_entry_t *msrs, uint32_t nr);
 
 /* Compatibility calculations. */
-bool xc_cpu_policy_is_compatible(xc_interface *xch, const xc_cpu_policy_t host,
-                                 const xc_cpu_policy_t guest);
+bool xc_cpu_policy_is_compatible(xc_interface *xch, xc_cpu_policy_t *host,
+                                 xc_cpu_policy_t *guest);
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,

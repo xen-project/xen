@@ -672,18 +672,18 @@ out:
     return rc;
 }
 
-xc_cpu_policy_t xc_cpu_policy_init(void)
+xc_cpu_policy_t *xc_cpu_policy_init(void)
 {
     return calloc(1, sizeof(struct xc_cpu_policy));
 }
 
-void xc_cpu_policy_destroy(xc_cpu_policy_t policy)
+void xc_cpu_policy_destroy(xc_cpu_policy_t *policy)
 {
     if ( policy )
         free(policy);
 }
 
-static int deserialize_policy(xc_interface *xch, xc_cpu_policy_t policy,
+static int deserialize_policy(xc_interface *xch, xc_cpu_policy_t *policy,
                               unsigned int nr_leaves, unsigned int nr_entries)
 {
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
@@ -713,7 +713,7 @@ static int deserialize_policy(xc_interface *xch, xc_cpu_policy_t policy,
 }
 
 int xc_cpu_policy_get_system(xc_interface *xch, unsigned int policy_idx,
-                             xc_cpu_policy_t policy)
+                             xc_cpu_policy_t *policy)
 {
     unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
     unsigned int nr_entries = ARRAY_SIZE(policy->entries);
@@ -738,7 +738,7 @@ int xc_cpu_policy_get_system(xc_interface *xch, unsigned int policy_idx,
 }
 
 int xc_cpu_policy_get_domain(xc_interface *xch, uint32_t domid,
-                             xc_cpu_policy_t policy)
+                             xc_cpu_policy_t *policy)
 {
     unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
     unsigned int nr_entries = ARRAY_SIZE(policy->entries);
@@ -763,7 +763,7 @@ int xc_cpu_policy_get_domain(xc_interface *xch, uint32_t domid,
 }
 
 int xc_cpu_policy_set_domain(xc_interface *xch, uint32_t domid,
-                             const xc_cpu_policy_t policy)
+                             xc_cpu_policy_t *policy)
 {
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
     unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
@@ -791,7 +791,7 @@ int xc_cpu_policy_set_domain(xc_interface *xch, uint32_t domid,
     return rc;
 }
 
-int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t p,
+int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t *p,
                             xen_cpuid_leaf_t *leaves, uint32_t *nr_leaves,
                             xen_msr_entry_t *msrs, uint32_t *nr_msrs)
 {
@@ -823,7 +823,7 @@ int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t p,
     return 0;
 }
 
-int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t policy,
+int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t *policy,
                                const xen_cpuid_leaf_t *leaves,
                                uint32_t nr)
 {
@@ -843,7 +843,7 @@ int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t policy,
     return rc;
 }
 
-int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t policy,
+int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t *policy,
                               const xen_msr_entry_t *msrs, uint32_t nr)
 {
     unsigned int err_msr = -1;
@@ -861,8 +861,8 @@ int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t policy,
     return rc;
 }
 
-bool xc_cpu_policy_is_compatible(xc_interface *xch, const xc_cpu_policy_t host,
-                                 const xc_cpu_policy_t guest)
+bool xc_cpu_policy_is_compatible(xc_interface *xch, xc_cpu_policy_t *host,
+                                 xc_cpu_policy_t *guest)
 {
     struct cpu_policy_errors err = INIT_CPU_POLICY_ERRORS;
     struct cpu_policy h = { &host->cpuid, &host->msr };

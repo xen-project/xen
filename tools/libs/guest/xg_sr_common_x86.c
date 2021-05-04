@@ -48,7 +48,7 @@ int write_x86_cpu_policy_records(struct xc_sr_context *ctx)
     struct xc_sr_record cpuid = { .type = REC_TYPE_X86_CPUID_POLICY, };
     struct xc_sr_record msrs  = { .type = REC_TYPE_X86_MSR_POLICY, };
     uint32_t nr_leaves = 0, nr_msrs = 0;
-    xc_cpu_policy_t policy = NULL;
+    xc_cpu_policy_t *policy = NULL;
     int rc;
 
     if ( xc_cpu_policy_get_size(xch, &nr_leaves, &nr_msrs) < 0 )

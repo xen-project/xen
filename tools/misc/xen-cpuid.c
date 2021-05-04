@@ -468,7 +468,7 @@ int main(int argc, char **argv)
         uint32_t i, max_leaves, max_msrs;
 
         xc_interface *xch = xc_interface_open(0, 0, 0);
-        xc_cpu_policy_t policy = xc_cpu_policy_init();
+        xc_cpu_policy_t *policy = xc_cpu_policy_init();
 
         if ( !xch )
             err(1, "xc_interface_open");
