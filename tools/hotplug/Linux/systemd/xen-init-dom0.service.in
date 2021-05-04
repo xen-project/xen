@@ -7,7 +7,7 @@ ConditionPathExists=/proc/xen/capabilities
 [Service]
 Type=oneshot
 RemainAfterExit=true
-EnvironmentFile=@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
+EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
 ExecStart=@LIBEXEC_BIN@/xen-init-dom0 $XEN_DOM0_UUID
 
