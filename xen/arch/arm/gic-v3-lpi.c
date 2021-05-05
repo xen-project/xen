@@ -178,7 +178,7 @@ void gicv3_do_LPI(unsigned int lpi)
     irq_enter();
 
     /* EOI the LPI already. */
-    WRITE_SYSREG32(lpi, ICC_EOIR1_EL1);
+    WRITE_SYSREG(lpi, ICC_EOIR1_EL1);
 
     /* Find out if a guest mapped something to this physical LPI. */
     hlpip = gic_get_host_lpi(lpi);

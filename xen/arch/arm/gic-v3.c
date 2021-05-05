@@ -246,12 +246,12 @@ static void gicv3_ich_write_lr(int lr, uint64_t val)
  */
 static void gicv3_enable_sre(void)
 {
-    uint32_t val;
+    register_t val;
 
-    val = READ_SYSREG32(ICC_SRE_EL2);
+    val = READ_SYSREG(ICC_SRE_EL2);
     val |= GICC_SRE_EL2_SRE;
 
-    WRITE_SYSREG32(val, ICC_SRE_EL2);
+    WRITE_SYSREG(val, ICC_SRE_EL2);
     isb();
 }
 
@@ -315,16 +315,16 @@ static void restore_aprn_regs(const union gic_state_data *d)
     switch ( gicv3.nr_priorities )
     {
     case 7:
-        WRITE_SYSREG32(d->v3.apr0[2], ICH_AP0R2_EL2);
-        WRITE_SYSREG32(d->v3.apr1[2], ICH_AP1R2_EL2);
+        WRITE_SYSREG(d->v3.apr0[2], ICH_AP0R2_EL2);
+        WRITE_SYSREG(d->v3.apr1[2], ICH_AP1R2_EL2);
         /* Fall through */
     case 6:
-        WRITE_SYSREG32(d->v3.apr0[1], ICH_AP0R1_EL2);
-        WRITE_SYSREG32(d->v3.apr1[1], ICH_AP1R1_EL2);
+        WRITE_SYSREG(d->v3.apr0[1], ICH_AP0R1_EL2);
+        WRITE_SYSREG(d->v3.apr1[1], ICH_AP1R1_EL2);
         /* Fall through */
     case 5:
-        WRITE_SYSREG32(d->v3.apr0[0], ICH_AP0R0_EL2);
-        WRITE_SYSREG32(d->v3.apr1[0], ICH_AP1R0_EL2);
+        WRITE_SYSREG(d->v3.apr0[0], ICH_AP0R0_EL2);
+        WRITE_SYSREG(d->v3.apr1[0], ICH_AP1R0_EL2);
         break;
     default:
         BUG();
@@ -338,16 +338,16 @@ static void save_aprn_regs(union gic_state_data *d)
     switch ( gicv3.nr_priorities )
     {
     case 7:
-        d->v3.apr0[2] = READ_SYSREG32(ICH_AP0R2_EL2);
-        d->v3.apr1[2] = READ_SYSREG32(ICH_AP1R2_EL2);
+        d->v3.apr0[2] = READ_SYSREG(ICH_AP0R2_EL2);
+        d->v3.apr1[2] = READ_SYSREG(ICH_AP1R2_EL2);
         /* Fall through */
     case 6:
-        d->v3.apr0[1] = READ_SYSREG32(ICH_AP0R1_EL2);
-        d->v3.apr1[1] = READ_SYSREG32(ICH_AP1R1_EL2);
+        d->v3.apr0[1] = READ_SYSREG(ICH_AP0R1_EL2);
+        d->v3.apr1[1] = READ_SYSREG(ICH_AP1R1_EL2);
         /* Fall through */
     case 5:
-        d->v3.apr0[0] = READ_SYSREG32(ICH_AP0R0_EL2);
-        d->v3.apr1[0] = READ_SYSREG32(ICH_AP1R0_EL2);
+        d->v3.apr0[0] = READ_SYSREG(ICH_AP0R0_EL2);
+        d->v3.apr1[0] = READ_SYSREG(ICH_AP1R0_EL2);
         break;
     default:
         BUG();
@@ -371,15 +371,15 @@ static void gicv3_save_state(struct vcpu *v)
     dsb(sy);
     gicv3_save_lrs(v);
     save_aprn_regs(&v->arch.gic);
-    v->arch.gic.v3.vmcr = READ_SYSREG32(ICH_VMCR_EL2);
-    v->arch.gic.v3.sre_el1 = READ_SYSREG32(ICC_SRE_EL1);
+    v->arch.gic.v3.vmcr = READ_SYSREG(ICH_VMCR_EL2);
+    v->arch.gic.v3.sre_el1 = READ_SYSREG(ICC_SRE_EL1);
 }
 
 static void gicv3_restore_state(const struct vcpu *v)
 {
-    uint32_t val;
+    register_t val;
 
-    val = READ_SYSREG32(ICC_SRE_EL2);
+    val = READ_SYSREG(ICC_SRE_EL2);
     /*
      * Don't give access to system registers when the guest is using
      * GICv2
@@ -388,7 +388,7 @@ static void gicv3_restore_state(const struct vcpu *v)
         val &= ~GICC_SRE_EL2_ENEL1;
     else
         val |= GICC_SRE_EL2_ENEL1;
-    WRITE_SYSREG32(val, ICC_SRE_EL2);
+    WRITE_SYSREG(val, ICC_SRE_EL2);
 
     /*
      * VFIQEn is RES1 if ICC_SRE_EL1.SRE is 1. This causes a Group0
@@ -398,9 +398,9 @@ static void gicv3_restore_state(const struct vcpu *v)
      * want before starting to mess with the rest of the GIC, and
      * VMCR_EL1 in particular.
      */
-    WRITE_SYSREG32(v->arch.gic.v3.sre_el1, ICC_SRE_EL1);
+    WRITE_SYSREG(v->arch.gic.v3.sre_el1, ICC_SRE_EL1);
     isb();
-    WRITE_SYSREG32(v->arch.gic.v3.vmcr, ICH_VMCR_EL2);
+    WRITE_SYSREG(v->arch.gic.v3.vmcr, ICH_VMCR_EL2);
     restore_aprn_regs(&v->arch.gic);
     gicv3_restore_lrs(v);
 
@@ -468,24 +468,25 @@ static void gicv3_mask_irq(struct irq_desc *irqd)
 static void gicv3_eoi_irq(struct irq_desc *irqd)
 {
     /* Lower the priority */
-    WRITE_SYSREG32(irqd->irq, ICC_EOIR1_EL1);
+    WRITE_SYSREG(irqd->irq, ICC_EOIR1_EL1);
     isb();
 }
 
 static void gicv3_dir_irq(struct irq_desc *irqd)
 {
     /* Deactivate */
-    WRITE_SYSREG32(irqd->irq, ICC_DIR_EL1);
+    WRITE_SYSREG(irqd->irq, ICC_DIR_EL1);
     isb();
 }
 
 static unsigned int gicv3_read_irq(void)
 {
-    unsigned int irq = READ_SYSREG32(ICC_IAR1_EL1);
+    register_t irq = READ_SYSREG(ICC_IAR1_EL1);
 
     dsb(sy);
 
-    return irq;
+    /* IRQs are encoded using 23bit. */
+    return (irq & GICC_IAR_INTID_MASK);
 }
 
 /*
@@ -857,16 +858,16 @@ static int gicv3_cpu_init(void)
     gicv3_enable_sre();
 
     /* No priority grouping */
-    WRITE_SYSREG32(0, ICC_BPR1_EL1);
+    WRITE_SYSREG(0, ICC_BPR1_EL1);
 
     /* Set priority mask register */
-    WRITE_SYSREG32(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
+    WRITE_SYSREG(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
 
     /* EOI drops priority, DIR deactivates the interrupt (mode 1) */
-    WRITE_SYSREG32(GICC_CTLR_EL1_EOImode_drop, ICC_CTLR_EL1);
+    WRITE_SYSREG(GICC_CTLR_EL1_EOImode_drop, ICC_CTLR_EL1);
 
     /* Enable Group1 interrupts */
-    WRITE_SYSREG32(1, ICC_IGRPEN1_EL1);
+    WRITE_SYSREG(1, ICC_IGRPEN1_EL1);
 
     /* Sync at once at the end of cpu interface configuration */
     isb();
@@ -876,15 +877,15 @@ static int gicv3_cpu_init(void)
 
 static void gicv3_cpu_disable(void)
 {
-    WRITE_SYSREG32(0, ICC_CTLR_EL1);
+    WRITE_SYSREG(0, ICC_CTLR_EL1);
     isb();
 }
 
 static void gicv3_hyp_init(void)
 {
-    uint32_t vtr;
+    register_t vtr;
 
-    vtr = READ_SYSREG32(ICH_VTR_EL2);
+    vtr = READ_SYSREG(ICH_VTR_EL2);
     gicv3_info.nr_lrs  = (vtr & ICH_VTR_NRLRGS) + 1;
     gicv3.nr_priorities = ((vtr >> ICH_VTR_PRIBITS_SHIFT) &
                           ICH_VTR_PRIBITS_MASK) + 1;
@@ -892,8 +893,8 @@ static void gicv3_hyp_init(void)
     if ( !((gicv3.nr_priorities > 4) && (gicv3.nr_priorities < 8)) )
         panic("GICv3: Invalid number of priority bits\n");
 
-    WRITE_SYSREG32(ICH_VMCR_EOI | ICH_VMCR_VENG1, ICH_VMCR_EL2);
-    WRITE_SYSREG32(GICH_HCR_EN, ICH_HCR_EL2);
+    WRITE_SYSREG(ICH_VMCR_EOI | ICH_VMCR_VENG1, ICH_VMCR_EL2);
+    WRITE_SYSREG(GICH_HCR_EN, ICH_HCR_EL2);
 }
 
 /* Set up the per-CPU parts of the GIC for a secondary CPU */
@@ -917,11 +918,11 @@ out:
 
 static void gicv3_hyp_disable(void)
 {
-    uint32_t hcr;
+    register_t hcr;
 
-    hcr = READ_SYSREG32(ICH_HCR_EL2);
+    hcr = READ_SYSREG(ICH_HCR_EL2);
     hcr &= ~GICH_HCR_EN;
-    WRITE_SYSREG32(hcr, ICH_HCR_EL2);
+    WRITE_SYSREG(hcr, ICH_HCR_EL2);
     isb();
 }
 
@@ -1140,39 +1141,44 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
 
 static void gicv3_hcr_status(uint32_t flag, bool status)
 {
-    uint32_t hcr;
+    register_t hcr;
 
-    hcr = READ_SYSREG32(ICH_HCR_EL2);
+    hcr = READ_SYSREG(ICH_HCR_EL2);
     if ( status )
-        WRITE_SYSREG32(hcr | flag, ICH_HCR_EL2);
+        WRITE_SYSREG(hcr | flag, ICH_HCR_EL2);
     else
-        WRITE_SYSREG32(hcr & (~flag), ICH_HCR_EL2);
+        WRITE_SYSREG(hcr & (~flag), ICH_HCR_EL2);
     isb();
 }
 
 static unsigned int gicv3_read_vmcr_priority(void)
 {
-   return ((READ_SYSREG32(ICH_VMCR_EL2) >> ICH_VMCR_PRIORITY_SHIFT) &
+   return ((READ_SYSREG(ICH_VMCR_EL2) >> ICH_VMCR_PRIORITY_SHIFT) &
             ICH_VMCR_PRIORITY_MASK);
 }
 
 /* Only support reading GRP1 APRn registers */
 static unsigned int gicv3_read_apr(int apr_reg)
 {
+    register_t apr;
+
     switch ( apr_reg )
     {
     case 0:
         ASSERT(gicv3.nr_priorities > 4 && gicv3.nr_priorities < 8);
-        return READ_SYSREG32(ICH_AP1R0_EL2);
+        apr = READ_SYSREG(ICH_AP1R0_EL2);
     case 1:
         ASSERT(gicv3.nr_priorities > 5 && gicv3.nr_priorities < 8);
-        return READ_SYSREG32(ICH_AP1R1_EL2);
+        apr = READ_SYSREG(ICH_AP1R1_EL2);
     case 2:
         ASSERT(gicv3.nr_priorities > 6 && gicv3.nr_priorities < 8);
-        return READ_SYSREG32(ICH_AP1R2_EL2);
+        apr = READ_SYSREG(ICH_AP1R2_EL2);
     default:
         BUG();
     }
+
+    /* Number of priority levels do not exceed 32bit. */
+    return apr;
 }
 
 static bool gicv3_read_pending_state(struct irq_desc *irqd)
