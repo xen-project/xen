@@ -156,7 +156,7 @@ struct arch_vcpu
 
     /* Control Registers */
     register_t sctlr;
-    uint32_t actlr;
+    register_t actlr;
     uint32_t cpacr;
 
     uint32_t contextidr;
