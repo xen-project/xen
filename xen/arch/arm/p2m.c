@@ -1973,11 +1973,11 @@ void __init p2m_restrict_ipa_bits(unsigned int ipa_bits)
 }
 
 /* VTCR value to be configured by all CPUs. Set only once by the boot CPU */
-static uint32_t __read_mostly vtcr;
+static register_t __read_mostly vtcr;
 
 static void setup_virt_paging_one(void *data)
 {
-    WRITE_SYSREG32(vtcr, VTCR_EL2);
+    WRITE_SYSREG(vtcr, VTCR_EL2);
 
     /*
      * ARM64_WORKAROUND_AT_SPECULATE: We want to keep the TLBs free from
@@ -2000,7 +2000,7 @@ static void setup_virt_paging_one(void *data)
 void __init setup_virt_paging(void)
 {
     /* Setup Stage 2 address translation */
-    unsigned long val = VTCR_RES1|VTCR_SH0_IS|VTCR_ORGN0_WBWA|VTCR_IRGN0_WBWA;
+    register_t val = VTCR_RES1|VTCR_SH0_IS|VTCR_ORGN0_WBWA|VTCR_IRGN0_WBWA;
 
 #ifdef CONFIG_ARM_32
     if ( p2m_ipa_bits < 40 )
@@ -2089,7 +2089,7 @@ void __init setup_virt_paging(void)
            pa_range_info[pa_range].pabits,
            ( MAX_VMID == MAX_VMID_16_BIT ) ? 16 : 8);
 #endif
-    printk("P2M: %d levels with order-%d root, VTCR 0x%lx\n",
+    printk("P2M: %d levels with order-%d root, VTCR 0x%"PRIregister"\n",
            4 - P2M_ROOT_LEVEL, P2M_ROOT_ORDER, val);
 
     p2m_vmid_allocator_init();
