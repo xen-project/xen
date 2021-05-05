@@ -329,7 +329,7 @@ static void schedule_tail(struct vcpu *prev)
 
 static void continue_new_vcpu(struct vcpu *prev)
 {
-    current->arch.actlr = READ_SYSREG32(ACTLR_EL1);
+    current->arch.actlr = READ_SYSREG(ACTLR_EL1);
     processor_vcpu_initialise(current);
 
     schedule_tail(prev);
