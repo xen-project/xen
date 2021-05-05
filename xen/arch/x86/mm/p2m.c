@@ -497,21 +497,23 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
 #ifdef CONFIG_HVM
     mfn_t mfn;
     gfn_t gfn = _gfn(gfn_l);
-#endif
-
-    /* Unshare makes no sense withuot populate. */
-    if ( q & P2M_UNSHARE )
-        q |= P2M_ALLOC;
 
     if ( !p2m || !paging_mode_translate(p2m->domain) )
     {
-        /* Not necessarily true, but for non-translated guests, we claim
-         * it's the most generic kind of memory */
+#endif
+        /*
+         * Not necessarily true, but for non-translated guests we claim
+         * it's the most generic kind of memory.
+         */
         *t = p2m_ram_rw;
         return _mfn(gfn_l);
+#ifdef CONFIG_HVM
     }
 
-#ifdef CONFIG_HVM
+    /* Unshare makes no sense without populate. */
+    if ( q & P2M_UNSHARE )
+        q |= P2M_ALLOC;
+
     if ( locked )
         /* Grab the lock here, don't release until put_gfn */
         gfn_lock(p2m, gfn, 0);
@@ -1417,18 +1419,18 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret;
-#endif
 
     if ( !paging_mode_translate(d) )
     {
+#endif
         if ( !is_iommu_enabled(d) )
             return 0;
         return iommu_legacy_map(d, _dfn(gfn_l), _mfn(gfn_l),
                                 1ul << PAGE_ORDER_4K,
                                 IOMMUF_readable | IOMMUF_writable);
+#ifdef CONFIG_HVM
     }
 
-#ifdef CONFIG_HVM
     gfn_lock(p2m, gfn, 0);
 
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL, NULL);
@@ -1464,16 +1466,16 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret;
-#endif
 
     if ( !paging_mode_translate(d) )
     {
+#endif
         if ( !is_iommu_enabled(d) )
             return 0;
         return iommu_legacy_unmap(d, _dfn(gfn_l), 1ul << PAGE_ORDER_4K);
+#ifdef CONFIG_HVM
     }
 
-#ifdef CONFIG_HVM
     gfn_lock(p2m, gfn, 0);
 
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL, NULL);
