@@ -171,7 +171,7 @@
  * GICv3 registers that needs to be saved/restored
  */
 struct gic_v3 {
-    uint32_t hcr, vmcr, sre_el1;
+    uint32_t vmcr, sre_el1;
     uint32_t apr0[4];
     uint32_t apr1[4];
     uint64_t lr[16];
