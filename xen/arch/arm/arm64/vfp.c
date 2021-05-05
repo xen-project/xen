@@ -26,10 +26,10 @@ void vfp_save_state(struct vcpu *v)
                  "stp q30, q31, [%1, #16 * 30]\n\t"
                  : "=Q" (*v->arch.vfp.fpregs) : "r" (v->arch.vfp.fpregs));
 
-    v->arch.vfp.fpsr = READ_SYSREG32(FPSR);
-    v->arch.vfp.fpcr = READ_SYSREG32(FPCR);
+    v->arch.vfp.fpsr = READ_SYSREG(FPSR);
+    v->arch.vfp.fpcr = READ_SYSREG(FPCR);
     if ( is_32bit_domain(v->domain) )
-        v->arch.vfp.fpexc32_el2 = READ_SYSREG32(FPEXC32_EL2);
+        v->arch.vfp.fpexc32_el2 = READ_SYSREG(FPEXC32_EL2);
 }
 
 void vfp_restore_state(struct vcpu *v)
@@ -55,8 +55,8 @@ void vfp_restore_state(struct vcpu *v)
                  "ldp q30, q31, [%1, #16 * 30]\n\t"
                  : : "Q" (*v->arch.vfp.fpregs), "r" (v->arch.vfp.fpregs));
 
-    WRITE_SYSREG32(v->arch.vfp.fpsr, FPSR);
-    WRITE_SYSREG32(v->arch.vfp.fpcr, FPCR);
+    WRITE_SYSREG(v->arch.vfp.fpsr, FPSR);
+    WRITE_SYSREG(v->arch.vfp.fpcr, FPCR);
     if ( is_32bit_domain(v->domain) )
-        WRITE_SYSREG32(v->arch.vfp.fpexc32_el2, FPEXC32_EL2);
+        WRITE_SYSREG(v->arch.vfp.fpexc32_el2, FPEXC32_EL2);
 }
