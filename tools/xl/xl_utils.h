@@ -123,7 +123,7 @@ int def_getopt(int argc, char * const argv[],
                const struct option *longopts,
                const char* helpstr, int reqargs);
 
-void dolog(const char *file, int line, const char *func, char *fmt, ...)
+void dolog(const char *file, int line, const char *func, const char *fmt, ...)
 	__attribute__((format(printf,4,5)));
 
 void xvasprintf(char **strp, const char *fmt, va_list ap)
@@ -143,7 +143,7 @@ uint32_t find_domain(const char *p) __attribute__((warn_unused_result));
 
 void print_bitmap(uint8_t *map, int maplen, FILE *stream);
 
-int do_daemonize(char *name, const char *pidfile);
+int do_daemonize(const char *name, const char *pidfile);
 #endif /* XL_UTILS_H */
 
 /*

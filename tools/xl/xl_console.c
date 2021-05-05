@@ -27,7 +27,7 @@ int main_console(int argc, char **argv)
     uint32_t domid;
     int opt = 0, num = 0;
     libxl_console_type type = 0;
-    char *console_names = "pv, serial, vuart";
+    const char *console_names = "pv, serial, vuart";
 
     SWITCH_FOREACH_OPT(opt, "n:t:", NULL, "console", 1) {
     case 't':

@@ -21,13 +21,13 @@
 #include <xentoollog.h>
 
 struct cmd_spec {
-    char *cmd_name;
+    const char *cmd_name;
     int (*cmd_impl)(int argc, char **argv);
     int can_dryrun;
     int modifies;
-    char *cmd_desc;
-    char *cmd_usage;
-    char *cmd_option;
+    const char *cmd_desc;
+    const char *cmd_usage;
+    const char *cmd_option;
 };
 
 struct domain_create {

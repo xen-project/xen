@@ -27,7 +27,7 @@
 #include "xl.h"
 #include "xl_utils.h"
 
-void dolog(const char *file, int line, const char *func, char *fmt, ...)
+void dolog(const char *file, int line, const char *func, const char *fmt, ...)
 {
     va_list ap;
     char *s = NULL;
@@ -248,7 +248,7 @@ void print_bitmap(uint8_t *map, int maplen, FILE *stream)
     }
 }
 
-int do_daemonize(char *name, const char *pidfile)
+int do_daemonize(const char *name, const char *pidfile)
 {
     char *fullname;
     pid_t child1;
