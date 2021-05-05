@@ -16,6 +16,10 @@ else
     make -j$(nproc) -C xen defconfig
 fi
 
+# Save the config file before building because build failure causes the script
+# to exit early -- bash is invoked with -e.
+cp xen/.config xen-config
+
 # arm32 only cross-compiles the hypervisor
 if [[ "${XEN_TARGET_ARCH}" = "arm32" ]]; then
     hypervisor_only="y"
@@ -59,7 +63,6 @@ else
 fi
 
 # Extract artifacts to avoid getting rewritten by customised builds
-cp xen/.config xen-config
 mkdir binaries
 if [[ "${XEN_TARGET_ARCH}" != "x86_32" ]]; then
     cp xen/xen binaries/xen
