@@ -113,13 +113,13 @@ static void ctxt_switch_from(struct vcpu *p)
     p->arch.tpidr_el1 = READ_SYSREG(TPIDR_EL1);
 
     /* Arch timer */
-    p->arch.cntkctl = READ_SYSREG32(CNTKCTL_EL1);
+    p->arch.cntkctl = READ_SYSREG(CNTKCTL_EL1);
     virt_timer_save(p);
 
     if ( is_32bit_domain(p->domain) && cpu_has_thumbee )
     {
-        p->arch.teecr = READ_SYSREG32(TEECR32_EL1);
-        p->arch.teehbr = READ_SYSREG32(TEEHBR32_EL1);
+        p->arch.teecr = READ_SYSREG(TEECR32_EL1);
+        p->arch.teehbr = READ_SYSREG(TEEHBR32_EL1);
     }
 
 #ifdef CONFIG_ARM_32
@@ -175,7 +175,7 @@ static void ctxt_switch_from(struct vcpu *p)
 
 static void ctxt_switch_to(struct vcpu *n)
 {
-    uint32_t vpidr;
+    register_t vpidr;
 
     /* When the idle VCPU is running, Xen will always stay in hypervisor
      * mode. Therefore we don't need to restore the context of an idle VCPU.
@@ -183,8 +183,8 @@ static void ctxt_switch_to(struct vcpu *n)
     if ( is_idle_vcpu(n) )
         return;
 
-    vpidr = READ_SYSREG32(MIDR_EL1);
-    WRITE_SYSREG32(vpidr, VPIDR_EL2);
+    vpidr = READ_SYSREG(MIDR_EL1);
+    WRITE_SYSREG(vpidr, VPIDR_EL2);
     WRITE_SYSREG(n->arch.vmpidr, VMPIDR_EL2);
 
     /* VGIC */
@@ -257,8 +257,8 @@ static void ctxt_switch_to(struct vcpu *n)
 
     if ( is_32bit_domain(n->domain) && cpu_has_thumbee )
     {
-        WRITE_SYSREG32(n->arch.teecr, TEECR32_EL1);
-        WRITE_SYSREG32(n->arch.teehbr, TEEHBR32_EL1);
+        WRITE_SYSREG(n->arch.teecr, TEECR32_EL1);
+        WRITE_SYSREG(n->arch.teehbr, TEEHBR32_EL1);
     }
 
 #ifdef CONFIG_ARM_32
@@ -274,7 +274,7 @@ static void ctxt_switch_to(struct vcpu *n)
 
     /* This is could trigger an hardware interrupt from the virtual
      * timer. The interrupt needs to be injected into the guest. */
-    WRITE_SYSREG32(n->arch.cntkctl, CNTKCTL_EL1);
+    WRITE_SYSREG(n->arch.cntkctl, CNTKCTL_EL1);
     virt_timer_restore(n);
 }
 

@@ -190,7 +190,7 @@ struct arch_vcpu
     struct vgic_cpu vgic;
 
     /* Timer registers  */
-    uint32_t cntkctl;
+    register_t cntkctl;
 
     struct vtimer phys_timer;
     struct vtimer virt_timer;
