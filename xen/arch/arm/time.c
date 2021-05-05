@@ -145,7 +145,7 @@ void __init preinit_xen_time(void)
         preinit_acpi_xen_time();
 
     if ( !cpu_khz )
-        cpu_khz = READ_SYSREG32(CNTFRQ_EL0) / 1000;
+        cpu_khz = (READ_SYSREG(CNTFRQ_EL0) & CNTFRQ_MASK) / 1000;
 
     res = platform_init_time();
     if ( res )
@@ -205,13 +205,13 @@ int reprogram_timer(s_time_t timeout)
 
     if ( timeout == 0 )
     {
-        WRITE_SYSREG32(0, CNTHP_CTL_EL2);
+        WRITE_SYSREG(0, CNTHP_CTL_EL2);
         return 1;
     }
 
     deadline = ns_to_ticks(timeout) + boot_count;
     WRITE_SYSREG64(deadline, CNTHP_CVAL_EL2);
-    WRITE_SYSREG32(CNTx_CTL_ENABLE, CNTHP_CTL_EL2);
+    WRITE_SYSREG(CNTx_CTL_ENABLE, CNTHP_CTL_EL2);
     isb();
 
     /* No need to check for timers in the past; the Generic Timer fires
@@ -223,23 +223,23 @@ int reprogram_timer(s_time_t timeout)
 static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     if ( irq == (timer_irq[TIMER_HYP_PPI]) &&
-         READ_SYSREG32(CNTHP_CTL_EL2) & CNTx_CTL_PENDING )
+         READ_SYSREG(CNTHP_CTL_EL2) & CNTx_CTL_PENDING )
     {
         perfc_incr(hyp_timer_irqs);
         /* Signal the generic timer code to do its work */
         raise_softirq(TIMER_SOFTIRQ);
         /* Disable the timer to avoid more interrupts */
-        WRITE_SYSREG32(0, CNTHP_CTL_EL2);
+        WRITE_SYSREG(0, CNTHP_CTL_EL2);
     }
 
     if ( irq == (timer_irq[TIMER_PHYS_NONSECURE_PPI]) &&
-         READ_SYSREG32(CNTP_CTL_EL0) & CNTx_CTL_PENDING )
+         READ_SYSREG(CNTP_CTL_EL0) & CNTx_CTL_PENDING )
     {
         perfc_incr(phys_timer_irqs);
         /* Signal the generic timer code to do its work */
         raise_softirq(TIMER_SOFTIRQ);
         /* Disable the timer to avoid more interrupts */
-        WRITE_SYSREG32(0, CNTP_CTL_EL0);
+        WRITE_SYSREG(0, CNTP_CTL_EL0);
     }
 }
 
@@ -260,8 +260,8 @@ static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 
     perfc_incr(virt_timer_irqs);
 
-    current->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
-    WRITE_SYSREG32(current->arch.virt_timer.ctl | CNTx_CTL_MASK, CNTV_CTL_EL0);
+    current->arch.virt_timer.ctl = READ_SYSREG(CNTV_CTL_EL0);
+    WRITE_SYSREG(current->arch.virt_timer.ctl | CNTx_CTL_MASK, CNTV_CTL_EL0);
     vgic_inject_irq(current->domain, current, current->arch.virt_timer.irq, true);
 }
 
@@ -297,9 +297,9 @@ void init_timer_interrupt(void)
     /* Sensible defaults */
     WRITE_SYSREG64(0, CNTVOFF_EL2);     /* No VM-specific offset */
     /* Do not let the VMs program the physical timer, only read the physical counter */
-    WRITE_SYSREG32(CNTHCTL_EL2_EL1PCTEN, CNTHCTL_EL2);
-    WRITE_SYSREG32(0, CNTP_CTL_EL0);    /* Physical timer disabled */
-    WRITE_SYSREG32(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
+    WRITE_SYSREG(CNTHCTL_EL2_EL1PCTEN, CNTHCTL_EL2);
+    WRITE_SYSREG(0, CNTP_CTL_EL0);    /* Physical timer disabled */
+    WRITE_SYSREG(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
     isb();
 
     request_irq(timer_irq[TIMER_HYP_PPI], 0, timer_interrupt,
@@ -320,8 +320,8 @@ void init_timer_interrupt(void)
  */
 static void deinit_timer_interrupt(void)
 {
-    WRITE_SYSREG32(0, CNTP_CTL_EL0);    /* Disable physical timer */
-    WRITE_SYSREG32(0, CNTHP_CTL_EL2);   /* Disable hypervisor's timer */
+    WRITE_SYSREG(0, CNTP_CTL_EL0);    /* Disable physical timer */
+    WRITE_SYSREG(0, CNTHP_CTL_EL2);   /* Disable hypervisor's timer */
     isb();
 
     release_irq(timer_irq[TIMER_HYP_PPI], NULL);

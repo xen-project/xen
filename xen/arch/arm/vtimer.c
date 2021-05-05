@@ -138,8 +138,8 @@ void virt_timer_save(struct vcpu *v)
 {
     ASSERT(!is_idle_vcpu(v));
 
-    v->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
-    WRITE_SYSREG32(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL_EL0);
+    v->arch.virt_timer.ctl = READ_SYSREG(CNTV_CTL_EL0);
+    WRITE_SYSREG(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL_EL0);
     v->arch.virt_timer.cval = READ_SYSREG64(CNTV_CVAL_EL0);
     if ( (v->arch.virt_timer.ctl & CNTx_CTL_ENABLE) &&
          !(v->arch.virt_timer.ctl & CNTx_CTL_MASK))
@@ -159,7 +159,7 @@ void virt_timer_restore(struct vcpu *v)
 
     WRITE_SYSREG64(v->domain->arch.virt_timer_base.offset, CNTVOFF_EL2);
     WRITE_SYSREG64(v->arch.virt_timer.cval, CNTV_CVAL_EL0);
-    WRITE_SYSREG32(v->arch.virt_timer.ctl, CNTV_CTL_EL0);
+    WRITE_SYSREG(v->arch.virt_timer.ctl, CNTV_CTL_EL0);
 }
 
 static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, bool read)
@@ -347,7 +347,7 @@ bool vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr)
 }
 
 static void vtimer_update_irq(struct vcpu *v, struct vtimer *vtimer,
-                              uint32_t vtimer_ctl)
+                              register_t vtimer_ctl)
 {
     bool level;
 
@@ -389,7 +389,7 @@ void vtimer_update_irqs(struct vcpu *v)
      * but this requires reworking the arch timer to implement this.
      */
     vtimer_update_irq(v, &v->arch.virt_timer,
-                      READ_SYSREG32(CNTV_CTL_EL0) & ~CNTx_CTL_MASK);
+                      READ_SYSREG(CNTV_CTL_EL0) & ~CNTx_CTL_MASK);
 
     /* For the physical timer we rely on our emulated state. */
     vtimer_update_irq(v, &v->arch.phys_timer, v->arch.phys_timer.ctl);

@@ -485,8 +485,11 @@ extern register_t __cpu_logical_map[];
 
 /* Timer control registers */
 #define CNTx_CTL_ENABLE   (1u<<0)  /* Enable timer */
-#define CNTx_CTL_MASK     (1u<<1)  /* Mask IRQ */
+#define CNTx_CTL_MASK     (1ul<<1)  /* Mask IRQ */
 #define CNTx_CTL_PENDING  (1u<<2)  /* IRQ pending */
+
+/* Timer frequency mask */
+#define CNTFRQ_MASK       GENMASK(31, 0)
 
 /* Exception Vector offsets */
 /* ... ARM32 */

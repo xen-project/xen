@@ -36,7 +36,7 @@ struct vtimer {
     struct vcpu *v;
     int irq;
     struct timer timer;
-    uint32_t ctl;
+    register_t ctl;
     uint64_t cval;
 };
 
