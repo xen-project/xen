@@ -792,6 +792,14 @@ void vtpmmgr_shutdown(void)
    /* Close tpmback */
    shutdown_tpmback();
 
+    if (hw_is_tpm2()) {
+        /* Blow away all stale handles left in the tpm*/
+        if (flush_tpm2() != TPM_SUCCESS) {
+            vtpmlogerror(VTPM_LOG_TPM,
+                         "TPM2_FlushResources failed, continuing shutdown..\n");
+        }
+    }
+
    /* Close tpmfront/tpm_tis */
    close(vtpm_globals.tpm_fd);
 
