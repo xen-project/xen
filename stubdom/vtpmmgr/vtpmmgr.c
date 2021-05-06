@@ -67,11 +67,21 @@ int hw_is_tpm2(void)
     return (hardware_version.hw_version == TPM2_HARDWARE) ? 1 : 0;
 }
 
+static int do_shutdown;
+
+void app_shutdown(unsigned int reason)
+{
+    printk("Shutdown requested: %d\n", reason);
+    do_shutdown = 1;
+
+    shutdown_tpmback();
+}
+
 void main_loop(void) {
    tpmcmd_t* tpmcmd;
    uint8_t respbuf[TCPA_MAX_BUFFER_LENGTH];
 
-   while(1) {
+   while (!do_shutdown) {
       /* Wait for requests from a vtpm */
       vtpmloginfo(VTPM_LOG_VTPM, "Waiting for commands from vTPM's:\n");
       if((tpmcmd = tpmback_req_any()) == NULL) {
