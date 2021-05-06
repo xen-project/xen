@@ -656,7 +656,7 @@ static TPM_RC flush_tpm2(void)
 {
     int i;
 
-    for (i = TRANSIENT_FIRST; i < TRANSIENT_LAST; i++)
+    for (i = TRANSIENT_FIRST; i <= TRANSIENT_LAST; i++)
          TPM2_FlushContext(i);
 
     return TPM_SUCCESS;
