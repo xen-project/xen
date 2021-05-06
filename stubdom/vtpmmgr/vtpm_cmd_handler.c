@@ -840,6 +840,12 @@ TPM_RESULT vtpmmgr_handle_cmd(
 	UINT32 size;
 	TPM_COMMAND_CODE ord;
 
+	if (tpmcmd->req_len < sizeof_TPM_RQU_HEADER(tpmcmd->req)) {
+		status = TPM_BAD_PARAMETER;
+		tag = TPM_TAG_RQU_COMMAND;
+		goto abort_egress;
+	}
+
 	unpack_TPM_RQU_HEADER(tpmcmd->req,
 			&tag, &size, &ord);
 
