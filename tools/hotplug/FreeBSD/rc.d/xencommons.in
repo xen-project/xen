@@ -42,11 +42,6 @@ xen_startcmd()
 
 	xenstored_pid=$(check_pidfile ${XENSTORED_PIDFILE} ${XENSTORED})
 	if test -z "$xenstored_pid"; then
-		printf "Cleaning xenstore database.\n"
-		if [ -z "${XENSTORED_ROOTDIR}" ]; then
-			XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
-		fi
-		rm -f ${XENSTORED_ROOTDIR}/tdb* >/dev/null 2>&1
 		printf "Starting xenservices: xenstored, xenconsoled."
 		XENSTORED_ARGS=" --pid-file ${XENSTORED_PIDFILE}"
 		if [ -n "${XENSTORED_TRACE}" ]; then

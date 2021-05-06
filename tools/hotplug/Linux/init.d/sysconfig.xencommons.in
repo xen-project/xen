@@ -49,13 +49,6 @@ XENSTORED_ARGS=
 #XENSTORED_TRACE=[yes|on|1]
 
 ## Type: string
-## Default: "@XEN_LIB_STORED@"
-#
-# Running xenstored on XENSTORED_ROOTDIR
-# Only evaluated if XENSTORETYPE is "daemon".
-#XENSTORED_ROOTDIR=@XEN_LIB_STORED@
-
-## Type: string
 ## Default: @LIBEXEC@/boot/xenstore-stubdom.gz
 #
 # xenstore domain kernel.
