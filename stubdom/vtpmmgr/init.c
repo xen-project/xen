@@ -289,16 +289,16 @@ int parse_cmdline_opts(int argc, char** argv, struct Opts* opts)
    memcpy(vtpm_globals.srk_auth, WELLKNOWN_AUTH, sizeof(TPM_AUTHDATA));
 
    for(i = 1; i < argc; ++i) {
-      if(!strncmp(argv[i], "owner_auth:", 10)) {
-         if((rc = parse_auth_string(argv[i] + 10, vtpm_globals.owner_auth)) < 0) {
+      if(!strncmp(argv[i], "owner_auth=", 11)) {
+         if((rc = parse_auth_string(argv[i] + 11, vtpm_globals.owner_auth)) < 0) {
             goto err_invalid;
          }
          if(rc == 1) {
             opts->gen_owner_auth = 1;
          }
       }
-      else if(!strncmp(argv[i], "srk_auth:", 8)) {
-         if((rc = parse_auth_string(argv[i] + 8, vtpm_globals.srk_auth)) != 0) {
+      else if(!strncmp(argv[i], "srk_auth=", 9)) {
+         if((rc = parse_auth_string(argv[i] + 9, vtpm_globals.srk_auth)) != 0) {
             goto err_invalid;
          }
       }
