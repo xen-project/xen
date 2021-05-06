@@ -92,6 +92,13 @@ Valid arguments:
 
 =over 4
 
+=item srk_handle=<HANDLE>
+
+Specify a srk_handle for TPM 2.0.  TPM 2.0 uses a key hierarchy, and
+this allow specifying the parent handle for vtpmmgr to create its own
+key under.  Using this option bypasses vtpmmgr trying to take ownership
+of the TPM.
+
 =item owner_auth=<AUTHSPEC>
 
 =item srk_auth=<AUTHSPEC>

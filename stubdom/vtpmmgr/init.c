@@ -302,6 +302,11 @@ int parse_cmdline_opts(int argc, char** argv, struct Opts* opts)
             goto err_invalid;
          }
       }
+      else if(!strncmp(argv[i], "srk_handle=", 11)) {
+         if(sscanf(argv[i] + 11, "%x", &vtpm_globals.srk_handle) != 1) {
+            goto err_invalid;
+         }
+      }
       else if(!strncmp(argv[i], "tpmdriver=", 10)) {
          if(!strcmp(argv[i] + 10, "tpm_tis")) {
             opts->tpmdriver = TPMDRV_TPM_TIS;
@@ -572,7 +577,11 @@ TPM_RESULT vtpmmgr2_create(void)
 {
     TPM_RESULT status = TPM_SUCCESS;
 
-    TPMTRYRETURN(tpm2_take_ownership());
+    if ( vtpm_globals.srk_handle == 0 ) {
+        TPMTRYRETURN(tpm2_take_ownership());
+    } else {
+        tpm2_AuthArea_ctor(NULL, 0, &vtpm_globals.srk_auth_area);
+    }
 
    /* create SK */
     TPM2_Create_Params_out out;
