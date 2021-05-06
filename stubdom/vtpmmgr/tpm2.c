@@ -126,7 +126,7 @@
     ptr = unpack_TPM_RSP_HEADER(ptr, \
           &(tag), &(paramSize), &(status));\
     if ((status) != TPM_SUCCESS){ \
-        vtpmlogerror(VTPM_LOG_TPM, "Failed with return code %s\n", tpm_get_error_name(status));\
+        vtpmlogerror(VTPM_LOG_TPM, "Failed with return code %s (%x)\n", tpm_get_error_name(status), (status));\
         goto abort_egress;\
     }\
 } while(0)

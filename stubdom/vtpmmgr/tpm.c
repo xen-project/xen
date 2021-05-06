@@ -109,7 +109,7 @@
 			UINT32 rsp_status; \
 			UNPACK_OUT(TPM_RSP_HEADER, &rsp_tag, &rsp_len, &rsp_status); \
 			if (rsp_status != TPM_SUCCESS) { \
-				vtpmlogerror(VTPM_LOG_TPM, "Failed with return code %s\n", tpm_get_error_name(rsp_status)); \
+				vtpmlogerror(VTPM_LOG_TPM, "Failed with return code %s (%x)\n", tpm_get_error_name(rsp_status), rsp_status); \
 				status = rsp_status; \
 				goto abort_egress; \
 			} \
