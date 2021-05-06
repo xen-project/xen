@@ -1,0 +1,52 @@
+From 5a510e0afd7c288e3f0fb3523ec749ba1366ad61 Mon Sep 17 00:00:00 2001
+From: Jason Andryuk <jandryuk@gmail.com>
+Date: Sun, 14 Mar 2021 12:42:10 -0400
+Subject: [PATCH 1/2] Use microseconds for timeouts and durations
+
+The timeout and duration fields should be in microseconds according to
+the spec.
+
+TPM_CAP_PROP_TIS_TIMEOUT:
+A 4 element array of UINT32 values each denoting the timeout value in
+microseconds for the following in this order:
+
+TPM_CAP_PROP_DURATION:
+A 3 element array of UINT32 values each denoting the duration value in
+microseconds of the duration of the three classes of commands:
+
+Linux will scale the timeouts up by 1000, but not the durations.  Change
+the units for both sets as appropriate.
+
+Signed-off-by: Jason Andryuk <jandryuk@gmail.com>
+---
+ tpm/tpm_data.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/tpm/tpm_data.c b/tpm/tpm_data.c
+index a3a79ef..bebaf10 100644
+--- a/tpm/tpm_data.c
++++ b/tpm/tpm_data.c
+@@ -67,13 +67,13 @@ static void init_nv_storage(void)
+ static void init_timeouts(void)
+ {
+   /* for the timeouts we use the PC platform defaults */
+-  tpmData.permanent.data.tis_timeouts[0] = 750;
+-  tpmData.permanent.data.tis_timeouts[1] = 2000;
+-  tpmData.permanent.data.tis_timeouts[2] = 750;
+-  tpmData.permanent.data.tis_timeouts[3] = 750;
+-  tpmData.permanent.data.cmd_durations[0] = 1;
+-  tpmData.permanent.data.cmd_durations[1] = 10;
+-  tpmData.permanent.data.cmd_durations[2] = 1000;
++  tpmData.permanent.data.tis_timeouts[0] = 750000;
++  tpmData.permanent.data.tis_timeouts[1] = 2000000;
++  tpmData.permanent.data.tis_timeouts[2] = 750000;
++  tpmData.permanent.data.tis_timeouts[3] = 750000;
++  tpmData.permanent.data.cmd_durations[0] = 1000;
++  tpmData.permanent.data.cmd_durations[1] = 10000;
++  tpmData.permanent.data.cmd_durations[2] = 1000000;
+ }
+ 
+ void tpm_init_data(void)
+-- 
+2.30.2
+

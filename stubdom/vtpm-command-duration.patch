@@ -1,0 +1,52 @@
+From e7c976b5864e7d2649292d90ea60d5aea091a990 Mon Sep 17 00:00:00 2001
+From: Jason Andryuk <jandryuk@gmail.com>
+Date: Sun, 14 Mar 2021 12:46:34 -0400
+Subject: [PATCH 2/2] Increase command durations
+
+Wth Linux 5.4 xen-tpmfront and a Xen vtpm-stubdom, xen-tpmfront was
+failing commands with -ETIME:
+tpm tpm0: tpm_try_transmit: send(): error-62
+
+The vtpm was returning the data, but it was after the duration timeout
+in vtpm_send.  Linux may have started being more stringent about timing?
+
+The vtpm-stubdom has a little delay since it writes its disk before
+returning the response.
+
+Anyway, the durations are rather low.  When they were 1/10/1000 before
+converting to microseconds, Linux showed all three durations rounded to
+10000.  Update them with values from a physical TPM1.2.  These were
+taken from a WEC which was software downgraded from a TPM2 to a TPM1.2.
+They might be excessive, but I'd rather have a command succeed than
+return -ETIME.
+
+An IFX physical TPM1.2 uses:
+1000000
+1500000
+150000000
+
+Signed-off-by: Jason Andryuk <jandryuk@gmail.com>
+---
+ tpm/tpm_data.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tpm/tpm_data.c b/tpm/tpm_data.c
+index bebaf10..844afca 100644
+--- a/tpm/tpm_data.c
++++ b/tpm/tpm_data.c
+@@ -71,9 +71,9 @@ static void init_timeouts(void)
+   tpmData.permanent.data.tis_timeouts[1] = 2000000;
+   tpmData.permanent.data.tis_timeouts[2] = 750000;
+   tpmData.permanent.data.tis_timeouts[3] = 750000;
+-  tpmData.permanent.data.cmd_durations[0] = 1000;
+-  tpmData.permanent.data.cmd_durations[1] = 10000;
+-  tpmData.permanent.data.cmd_durations[2] = 1000000;
++  tpmData.permanent.data.cmd_durations[0] = 3000000;
++  tpmData.permanent.data.cmd_durations[1] = 3000000;
++  tpmData.permanent.data.cmd_durations[2] = 600000000;
+ }
+ 
+ void tpm_init_data(void)
+-- 
+2.30.2
+
