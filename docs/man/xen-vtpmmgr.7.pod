@@ -222,6 +222,17 @@ XSM label, not the kernel.
 
 =head1 Appendix B: vtpmmgr on TPM 2.0
 
+=head2 WARNING: Incomplete - cannot persist data
+
+TPM 2.0 support for vTPM manager is incomplete.  There is no support for
+persisting an encryption key, so vTPM manager regenerates primary and secondary
+key handles each boot.
+
+Also, the vTPM manger group command implementation hardcodes TPM 1.2 commands.
+This means running manage-vtpmmgr.pl fails when the TPM 2.0 hardware rejects
+the TPM 1.2 commands.  vTPM manager with TPM 2.0 cannot create groups and
+therefore cannot persist vTPM contents.
+
 =head2 Manager disk image setup:
 
 The vTPM Manager requires a disk image to store its encrypted data. The image
