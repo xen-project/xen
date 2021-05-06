@@ -498,20 +498,6 @@ egress:
    return status;
 }
 
-void vtpmmgr_shutdown(void)
-{
-   /* Cleanup TPM resources */
-   TPM_TerminateHandle(vtpm_globals.oiap.AuthHandle);
-
-   /* Close tpmback */
-   shutdown_tpmback();
-
-   /* Close tpmfront/tpm_tis */
-   close(vtpm_globals.tpm_fd);
-
-   vtpmloginfo(VTPM_LOG_VTPM, "VTPM Manager stopped.\n");
-}
-
 /* TPM 2.0 */
 
 static void tpm2_AuthArea_ctor(const char *authValue, UINT32 authLen,
@@ -787,4 +773,18 @@ TPM_RC tpm2_pcr_read(int index, uint8_t *buf)
 abort_egress:
 egress:
     return status;
+}
+
+void vtpmmgr_shutdown(void)
+{
+   /* Cleanup TPM resources */
+   TPM_TerminateHandle(vtpm_globals.oiap.AuthHandle);
+
+   /* Close tpmback */
+   shutdown_tpmback();
+
+   /* Close tpmfront/tpm_tis */
+   close(vtpm_globals.tpm_fd);
+
+   vtpmloginfo(VTPM_LOG_VTPM, "VTPM Manager stopped.\n");
 }
