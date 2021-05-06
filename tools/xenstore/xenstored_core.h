@@ -271,8 +271,7 @@ const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
 				     const struct connection *conn,
 				     struct xs_state_connection *sc);
 const char *dump_state_nodes(FILE *fp, const void *ctx);
-const char *dump_state_node_perms(FILE *fp, struct xs_state_node *sn,
-				  const struct xs_permissions *perms,
+const char *dump_state_node_perms(FILE *fp, const struct xs_permissions *perms,
 				  unsigned int n_perms);
 
 void read_state_global(const void *ctx, const void *state);

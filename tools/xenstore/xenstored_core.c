@@ -2447,34 +2447,36 @@ const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
 	return NULL;
 }
 
-const char *dump_state_node_perms(FILE *fp, struct xs_state_node *sn,
-				  const struct xs_permissions *perms,
+const char *dump_state_node_perms(FILE *fp, const struct xs_permissions *perms,
 				  unsigned int n_perms)
 {
 	unsigned int p;
 
 	for (p = 0; p < n_perms; p++) {
+		struct xs_state_node_perm sp;
+
 		switch ((int)perms[p].perms & ~XS_PERM_IGNORE) {
 		case XS_PERM_READ:
-			sn->perms[p].access = XS_STATE_NODE_PERM_READ;
+			sp.access = XS_STATE_NODE_PERM_READ;
 			break;
 		case XS_PERM_WRITE:
-			sn->perms[p].access = XS_STATE_NODE_PERM_WRITE;
+			sp.access = XS_STATE_NODE_PERM_WRITE;
 			break;
 		case XS_PERM_READ | XS_PERM_WRITE:
-			sn->perms[p].access = XS_STATE_NODE_PERM_BOTH;
+			sp.access = XS_STATE_NODE_PERM_BOTH;
 			break;
 		default:
-			sn->perms[p].access = XS_STATE_NODE_PERM_NONE;
+			sp.access = XS_STATE_NODE_PERM_NONE;
 			break;
 		}
-		sn->perms[p].flags = (perms[p].perms & XS_PERM_IGNORE)
+		sp.flags = (perms[p].perms & XS_PERM_IGNORE)
 				     ? XS_STATE_NODE_PERM_IGNORE : 0;
-		sn->perms[p].domid = perms[p].id;
-	}
+		sp.domid = perms[p].id;
 
-	if (fwrite(sn->perms, sizeof(*sn->perms), n_perms, fp) != n_perms)
-		return "Dump node permissions error";
+		if (fwrite(&sp, sizeof(sp), 1, fp) != 1)
+			return "Dump node permission error";
+
+	}
 
 	return NULL;
 }
@@ -2519,7 +2521,7 @@ static const char *dump_state_node_tree(FILE *fp, char *path)
 	if (fwrite(&sn, sizeof(sn), 1, fp) != 1)
 		return "Dump node state error";
 
-	ret = dump_state_node_perms(fp, &sn, hdr->perms, hdr->num_perms);
+	ret = dump_state_node_perms(fp, hdr->perms, hdr->num_perms);
 	if (ret)
 		return ret;
 

@@ -1254,7 +1254,7 @@ static const char *dump_state_special_node(FILE *fp, const char *name,
 	if (fwrite(&sn, sizeof(sn), 1, fp) != 1)
 		return "Dump special node error";
 
-	ret = dump_state_node_perms(fp, &sn, perms->p, perms->num);
+	ret = dump_state_node_perms(fp, perms->p, perms->num);
 	if (ret)
 		return ret;
 
