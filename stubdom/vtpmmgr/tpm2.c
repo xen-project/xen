@@ -427,15 +427,22 @@ abort_egress:
 
 TPM_RC TPM2_GetRandom(UINT32 * bytesRequested, BYTE * randomBytes)
 {
+    UINT16 bytesReq;
     TPM_BEGIN(TPM_ST_NO_SESSIONS, TPM_CC_GetRandom);
 
-    ptr = pack_UINT16(ptr, (UINT16)*bytesRequested);
+    if (*bytesRequested > UINT16_MAX)
+        bytesReq = UINT16_MAX;
+    else
+        bytesReq = *bytesRequested;
+
+    ptr = pack_UINT16(ptr, bytesReq);
 
     TPM_TRANSMIT();
     TPM_UNPACK_VERIFY();
 
-    ptr = unpack_UINT16(ptr, (UINT16 *)bytesRequested);
-    ptr = unpack_TPM_BUFFER(ptr, randomBytes, *bytesRequested);
+    ptr = unpack_UINT16(ptr, &bytesReq);
+    *bytesRequested = bytesReq;
+    ptr = unpack_TPM_BUFFER(ptr, randomBytes, bytesReq);
 
 abort_egress:
     return status;
