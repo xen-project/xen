@@ -529,8 +529,7 @@ static struct optee_shm_buf *allocate_optee_shm_buf(struct optee_domain *ctx,
     while ( unlikely(old != atomic_cmpxchg(&ctx->optee_shm_buf_pages,
                                            old, new)) );
 
-    optee_shm_buf = xzalloc_bytes(sizeof(struct optee_shm_buf) +
-                                  pages_cnt * sizeof(struct page *));
+    optee_shm_buf = xzalloc_flex_struct(struct optee_shm_buf, pages, pages_cnt);
     if ( !optee_shm_buf )
     {
         err_code = -ENOMEM;
