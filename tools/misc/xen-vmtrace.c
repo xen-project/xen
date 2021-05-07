@@ -44,7 +44,7 @@ static size_t size;
 static char *buf;
 
 static sig_atomic_t interrupted;
-static void int_handler(int signum)
+static void close_handler(int signum)
 {
     interrupted = 1;
 }
@@ -78,8 +78,14 @@ int main(int argc, char **argv)
     int rc, exit = 1;
     xenforeignmemory_resource_handle *fres = NULL;
 
-    if ( signal(SIGINT, int_handler) == SIG_ERR )
-        err(1, "Failed to register signal handler\n");
+    struct sigaction act;
+    act.sa_handler = close_handler;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGHUP,  &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGINT,  &act, NULL);
+    sigaction(SIGALRM, &act, NULL);
 
     if ( argc != 3 )
     {

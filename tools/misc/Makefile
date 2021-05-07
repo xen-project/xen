@@ -25,6 +25,7 @@ INSTALL_SBIN-$(CONFIG_X86)     += xen-lowmemd
 INSTALL_SBIN-$(CONFIG_X86)     += xen-memshare
 INSTALL_SBIN-$(CONFIG_X86)     += xen-mfndump
 INSTALL_SBIN-$(CONFIG_X86)     += xen-ucode
+INSTALL_SBIN-$(CONFIG_X86)     += xen-vmtrace
 INSTALL_SBIN                   += xencov
 INSTALL_SBIN                   += xenhypfs
 INSTALL_SBIN                   += xenlockprof
@@ -51,7 +52,6 @@ TARGETS_COPY += xenpvnetboot
 TARGETS_BUILD := $(filter-out $(TARGETS_COPY),$(TARGETS_ALL))
 
 # ... including build-only targets
-TARGETS_BUILD-$(CONFIG_X86)    += xen-vmtrace
 TARGETS_BUILD += $(TARGETS_BUILD-y)
 
 .PHONY: all build
