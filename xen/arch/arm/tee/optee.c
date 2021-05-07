@@ -96,7 +96,8 @@
 #define OPTEE_KNOWN_NSEC_CAPS OPTEE_SMC_NSEC_CAP_UNIPROCESSOR
 #define OPTEE_KNOWN_SEC_CAPS (OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM | \
                               OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM | \
-                              OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
+                              OPTEE_SMC_SEC_CAP_DYNAMIC_SHM | \
+                              OPTEE_SMC_SEC_CAP_MEMREF_NULL)
 
 enum optee_call_state {
     OPTEE_CALL_NORMAL,
