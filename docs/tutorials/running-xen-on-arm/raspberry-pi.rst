@@ -3,64 +3,64 @@
 Hacking Xen on Raspberry Pi4
 ****************************
 
-If you intend to hack Xen on Arm&trade; and would like to use the Raspberry Pi4 (RPi4) to do it, here is what you need to do to get Xen up and running using U-Boot and TFTP. I like to use TFTP because it makes it extremely fast to update any binary during development. 
+If you intend to hack Xen on Arm&reg; and would like to use the Raspberry Pi4 (RPi4) to do it, follow these steps to get Xen up and running using U-Boot and TFTP. I like to use TFTP because it makes it extremely fast to update any binary during development. 
 
-This `tutorial <https://help.ubuntu.com/community/TFTP>`__ shows you how to set up and configure a TFTP server. To configure a UART connection to get early output from Xen and Linux, see this tutorial `<https://lancesimms.com/RaspberryPi/HackingRaspberryPi4WithYocto_Part1.html>`__.
+.. note:: This `tutorial <https://help.ubuntu.com/community/TFTP>`__ shows you how to set up and configure a TFTP server. To configure a UART connection to get early output from Xen and Linux, see this tutorial `<https://lancesimms.com/RaspberryPi/HackingRaspberryPi4WithYocto_Part1.html>`__.
 
-Use the `rpi-imager` to format an SD card with the regular default Raspberry Pi OS. Mount the first SD card partition and edit `config.txt`. Make sure to add the following:
+1. Use the `rpi-imager` to format an SD card with the regular default Raspberry Pi OS. Mount the first SD card partition and edit `config.txt`. Make sure to add the following:
 
-.. code-block::
+    .. code-block::
 
-    kernel=u-boot.bin
+        kernel=u-boot.bin
 
-    enable_uart=1
+        enable_uart=1
 
-    arm_64bit=1
+        arm_64bit=1
 
-Download a suitable U-Boot binary for RPi4 (`u-boot.bin`) from any distro, for instance OpenSUSE. Download the JeOS image, then open it and save `u-boot.bin`:
+2. Download a suitable U-Boot binary for RPi4 (`u-boot.bin`) from any distro, for instance OpenSUSE. Download the JeOS image, then open it and save `u-boot.bin`:
 
-.. code-block::
+    .. code-block::
 
-        xz -d 
-    openSUSE-Tumbleweed-ARM-JeOS-raspberrypi4.aarch64.raw.xz
+            xz -d 
+        openSUSE-Tumbleweed-ARM-JeOS-raspberrypi4.aarch64.raw.xz
 
-        kpartx -a 
-    ./openSUSE-Tumbleweed-ARM-JeOS-raspberrypi4.aarch64.raw
+            kpartx -a 
+        ./openSUSE-Tumbleweed-ARM-JeOS-raspberrypi4.aarch64.raw
 
-    mount /dev/mapper/loop0p1 /mnt
-    cp /mnt/u-boot.bin /tmp
+        mount /dev/mapper/loop0p1 /mnt
+        cp /mnt/u-boot.bin /tmp
 
-Place the `u-boot.bin` in the first SD card partition together with `config.txt`. Next time the system boots, you will get a U-Boot prompt that allows you to load Xen, the Linux kernel for Dom0, the Dom0 rootfs, and the device tree from a TFTP server over the network. I automated the loading steps by placing a U-Boot `boot.scr` script on the SD card:
+3. Place the `u-boot.bin` in the first SD card partition together with `config.txt`. Next time the system boots, you will get a U-Boot prompt that allows you to load Xen, the Linux kernel for Dom0, the Dom0 rootfs, and the device tree from a TFTP server over the network. I automated the loading steps by placing a U-Boot `boot.scr` script on the SD card:
 
-.. code-block::
+    .. code-block::
 
-    setenv serverip 192.168.0.1
+        setenv serverip 192.168.0.1
 
-    setenv ipaddr 192.168.0.2
+        setenv ipaddr 192.168.0.2
 
-    tftpb 0xC00000 boot2.scr
+        tftpb 0xC00000 boot2.scr
 
-    source 0xC00000
+        source 0xC00000
 
-Where:
+    Where:
 
-– serverip is the IP of your TFTP server
+    – serverip is the IP of your TFTP server
 
-– ipaddr is the IP of the RPi4
+    – ipaddr is the IP of the RPi4
 
-Use `mkimage` to generate `boot.scr` and place it next to `config.txt` and `u-boot.bin`:
+4. Use `mkimage` to generate `boot.scr` and place it next to `config.txt` and `u-boot.bin`:
 
-.. code-block::
+    .. code-block::
 
-       mkimage -T script -A arm64 -C none -a 0x2400000 -e 0x2400000 -d boot.source boot.scr
+        mkimage -T script -A arm64 -C none -a 0x2400000 -e 0x2400000 -d boot.source boot.scr
 
-Where:
+    Where:
 
-– `boot.source` is the input
+    – `boot.source` is the input
 
-– `boot.scr` is the output
+    – `boot.scr` is the output
 
-U-Boot will automatically execute the provided `boot.sc`r`, which sets up the network and fetches a second script (`boot2.scr`) from the TFTP server. `boot2.scr` should come with all the instructions to load Xen and the other required binaries. You can generate `b`oot2.scr` using `ImageBuilder <https://wiki.xenproject.org/wiki/ImageBuilder>`__.
+    U-Boot will automatically execute the provided `boot.sc`r`, which sets up the network and fetches a second script (`boot2.scr`) from the TFTP server. `boot2.scr` should come with all the instructions to load Xen and the other required binaries. You can generate `b`oot2.scr` using `ImageBuilder <https://wiki.xenproject.org/wiki/ImageBuilder>`__.
 
 .. important:: 
 
