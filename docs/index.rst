@@ -31,12 +31,7 @@ introduction to a Xen system.
 
    tutorials/configure-networking
    tutorials/reduce-latency
-   running-xen-on-arm/requirements
-   running-xen-on-arm/building-xen-arm
-   running-xen-on-arm/qemu
-   running-xen-on-arm/arndale
-   running-xen-on-arm/odroid
-   running-xen-on-arm/midway
+   tutorials/running-xen-on-arm/index
 
 
 .. toctree::
