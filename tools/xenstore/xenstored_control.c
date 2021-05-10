@@ -1,5 +1,5 @@
 /*
-Interactive commands for Xen Store Daemon.
+    Interactive commands for Xen Store Daemon.
     Copyright (C) 2017 Juergen Gross, SUSE Linux GmbH
 
     This program is free software; you can redistribute it and/or modify
