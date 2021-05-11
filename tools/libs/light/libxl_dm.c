@@ -1913,6 +1913,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             }
 
             if (disks[i].is_cdrom) {
+                const char *drive_id;
                 if (disk > 4) {
                     LOGD(WARN, guest_domid, "Emulated CDROM can be only one of the first 4 disks.\n"
                          "Disk %s will be available via PV drivers but not as an "
@@ -1920,13 +1921,22 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                          disks[i].vdev);
                     continue;
                 }
-                drive = libxl__sprintf(gc,
-                         "if=ide,index=%d,readonly=on,media=cdrom,id=ide-%i",
-                         disk, dev_number);
+
+                drive_id = GCSPRINTF("ide-%i", dev_number);
+                drive = GCSPRINTF("if=none,readonly=on,id=%s", drive_id);
 
                 if (target_path)
                     drive = libxl__sprintf(gc, "%s,file=%s,format=%s",
                                            drive, target_path, format);
+
+                flexarray_vappend(dm_args,
+                    "-drive", drive,
+                    "-device",
+                    GCSPRINTF("ide-cd,id=%s,drive=%s,bus=ide.%u,unit=%u",
+                              drive_id, drive_id,
+                              disk / 2, disk % 2),
+                    NULL);
+                continue;
             } else {
                 /*
                  * Explicit sd disks are passed through as is.
