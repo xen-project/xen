@@ -962,12 +962,26 @@ static void cdrom_insert_addfd_cb(libxl__egc *egc,
     fdset = libxl__json_object_get_integer(o);
 
     devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
-    QMP_PARAMETERS_SPRINTF(&args, "device", "ide-%i", devid);
-    QMP_PARAMETERS_SPRINTF(&args, "target", "/dev/fdset/%d", fdset);
-    libxl__qmp_param_add_string(gc, &args, "arg",
-        libxl__qemu_disk_format_string(disk->format));
     qmp->callback = cdrom_insert_inserted;
-    rc = libxl__ev_qmp_send(egc, qmp, "change", args);
+
+    /* "change" is deprecated since QEMU 2.5 and the `device` parameter for
+     * for "blockdev-change-medium" is deprecated in QEMU 2.8.
+     * But `id` is only available in 2.8 we'll start using the new command
+     * with `id` with QEMU 2.8.
+     */
+    if (libxl__qmp_ev_qemu_compare_version(qmp, 2, 8, 0) >= 0) {
+        QMP_PARAMETERS_SPRINTF(&args, "id", "ide-%i", devid);
+        QMP_PARAMETERS_SPRINTF(&args, "filename", "/dev/fdset/%d", fdset);
+        libxl__qmp_param_add_string(gc, &args, "format",
+            libxl__qemu_disk_format_string(disk->format));
+        rc = libxl__ev_qmp_send(egc, qmp, "blockdev-change-medium", args);
+    } else {
+        QMP_PARAMETERS_SPRINTF(&args, "device", "ide-%i", devid);
+        QMP_PARAMETERS_SPRINTF(&args, "target", "/dev/fdset/%d", fdset);
+        libxl__qmp_param_add_string(gc, &args, "arg",
+            libxl__qemu_disk_format_string(disk->format));
+        rc = libxl__ev_qmp_send(egc, qmp, "change", args);
+    }
 out:
     if (rc)
         cdrom_insert_done(egc, cis, rc); /* must be last */
