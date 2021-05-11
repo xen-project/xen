@@ -977,14 +977,14 @@ static char *dm_spice_options(libxl__gc *gc,
     if (spice->host)
         opt = GCSPRINTF("%s,addr=%s", opt, spice->host);
     if (libxl_defbool_val(spice->disable_ticketing))
-        opt = GCSPRINTF("%s,disable-ticketing", opt);
+        opt = GCSPRINTF("%s,disable-ticketing=on", opt);
     else
         opt = GCSPRINTF("%s,password=%s", opt, spice->passwd);
     opt = GCSPRINTF("%s,agent-mouse=%s", opt,
                     libxl_defbool_val(spice->agent_mouse) ? "on" : "off");
 
     if (!libxl_defbool_val(spice->clipboard_sharing))
-        opt = GCSPRINTF("%s,disable-copy-paste", opt);
+        opt = GCSPRINTF("%s,disable-copy-paste=on", opt);
 
     if (spice->image_compression)
         opt = GCSPRINTF("%s,image-compression=%s", opt,
@@ -1224,7 +1224,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, "-chardev");
         if (state->dm_monitor_fd >= 0) {
             flexarray_append(dm_args,
-                GCSPRINTF("socket,id=libxl-cmd,fd=%d,server,nowait",
+                GCSPRINTF("socket,id=libxl-cmd,fd=%d,server=on,wait=off",
                           state->dm_monitor_fd));
 
             /*
@@ -1237,7 +1237,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         } else {
             flexarray_append(dm_args,
                              GCSPRINTF("socket,id=libxl-cmd,"
-                                       "path=%s,server,nowait",
+                                       "path=%s,server=on,wait=off",
                                        libxl__qemu_qmp_path(gc, guest_domid)));
         }
 
@@ -1247,7 +1247,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, "-chardev");
         flexarray_append(dm_args,
                          GCSPRINTF("socket,id=libxenstat-cmd,"
-                                        "path=%s/qmp-libxenstat-%d,server,nowait",
+                                        "path=%s/qmp-libxenstat-%d,server=on,wait=off",
                                         libxl__run_dir_path(), guest_domid));
 
         flexarray_append(dm_args, "-mon");
@@ -1264,7 +1264,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             case LIBXL_CHANNEL_CONNECTION_SOCKET:
                 path = guest_config->channels[i].u.socket.path;
                 chardev = GCSPRINTF("socket,id=libxl-channel%d,path=%s,"
-                                    "server,nowait", devid, path);
+                                    "server=on,wait=off", devid, path);
                 break;
             default:
                 /* We've forgotten to add the clause */
@@ -1577,7 +1577,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         nics[i].colo_##sock_port) {                                         \
         flexarray_append(dm_args, "-chardev");                              \
         flexarray_append(dm_args,                                           \
-            GCSPRINTF("socket,id=%s,host=%s,port=%s,server,nowait",         \
+            GCSPRINTF("socket,id=%s,host=%s,port=%s,server=on,wait=off",    \
                       nics[i].colo_##sock_id,                               \
                       nics[i].colo_##sock_ip,                               \
                       nics[i].colo_##sock_port));                           \
