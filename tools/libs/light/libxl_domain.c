@@ -1805,6 +1805,7 @@ typedef struct set_vcpuonline_state {
     libxl_dominfo info;
     libxl_bitmap final_map;
     int index; /* for loop on final_map */
+    const char *cpu_driver;
 } set_vcpuonline_state;
 
 static void set_vcpuonline_qmp_cpus_fast_queried(libxl__egc *,
@@ -1814,6 +1815,10 @@ static void set_vcpuonline_qmp_cpus_queried(libxl__egc *,
 static void set_vcpuonline_qmp_query_cpus_parse(libxl__egc *,
     libxl__ev_qmp *qmp, const libxl__json_object *,
     bool query_cpus_fast, int rc);
+static void set_vcpuonline_qmp_query_hotpluggable_cpus(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
+static void set_vcpuonline_qmp_device_add_cpu(libxl__egc *,
+    libxl__ev_qmp *, const libxl__json_object *response, int rc);
 static void set_vcpuonline_qmp_add_cpu(libxl__egc *,
     libxl__ev_qmp *, const libxl__json_object *response, int rc);
 static void set_vcpuonline_timeout(libxl__egc *egc,
@@ -1951,14 +1956,94 @@ static void set_vcpuonline_qmp_query_cpus_parse(libxl__egc *egc,
         libxl_bitmap_reset(final_map, i);
     }
 
+    qmp->callback = set_vcpuonline_qmp_query_hotpluggable_cpus;
+    rc = libxl__ev_qmp_send(egc, qmp, "query-hotpluggable-cpus", NULL);
+
 out:
     libxl_bitmap_dispose(&current_map);
-    svos->index = -1;
-    set_vcpuonline_qmp_add_cpu(egc, qmp, NULL, rc); /* must be last */
+    if (rc)
+        set_vcpuonline_done(egc, svos, rc); /* must be last */
 }
 
-static void set_vcpuonline_qmp_add_cpu(libxl__egc *egc,
+static void set_vcpuonline_qmp_query_hotpluggable_cpus(libxl__egc *egc,
     libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    set_vcpuonline_state *svos = CONTAINER_OF(qmp, *svos, qmp);
+    const libxl__json_object *cpu;
+    const libxl__json_object *cpu_driver;
+
+    if (rc == ERROR_QMP_COMMAND_NOT_FOUND) {
+        /* We are probably connected to a version of QEMU older than 2.7,
+         * let's fallback to using "cpu-add" command. */
+        svos->index = -1;
+        set_vcpuonline_qmp_add_cpu(egc, qmp, NULL, 0); /* must be last */
+        return;
+    }
+
+    if (rc) goto out;
+
+    /* Parse response to QMP command "query-hotpluggable-cpus"
+     * [ { 'type': 'str', ... ]
+     *
+     * We are looking for the driver name for CPU to be hotplug. We'll
+     * assume that cpus property are core-id=0, thread-id=0 and
+     * socket-id=$cpu_index, as we start qemu with "-smp %d,maxcpus=%d", so
+     * we don't parse the properties listed for each hotpluggable cpus.
+     */
+
+    cpu = libxl__json_array_get(response, 0);
+    cpu_driver = libxl__json_map_get("type", cpu, JSON_STRING);
+    svos->cpu_driver = libxl__json_object_get_string(cpu_driver);
+
+    if (!svos->cpu_driver)
+        rc = ERROR_QEMU_API;
+
+out:
+    svos->index = -1;
+    set_vcpuonline_qmp_device_add_cpu(egc, qmp, NULL, rc); /* must be last */
+}
+
+static void set_vcpuonline_qmp_device_add_cpu(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    STATE_AO_GC(qmp->ao);
+    set_vcpuonline_state *svos = CONTAINER_OF(qmp, *svos, qmp);
+    libxl__json_object *args = NULL;
+
+    /* Convenience aliases */
+    libxl_bitmap *map = &svos->final_map;
+
+    if (rc) goto out;
+
+    while (libxl_bitmap_cpu_valid(map, ++svos->index)) {
+        if (libxl_bitmap_test(map, svos->index)) {
+            qmp->callback = set_vcpuonline_qmp_device_add_cpu;
+            libxl__qmp_param_add_string(gc, &args, "id", GCSPRINTF("cpu-%d", svos->index));
+            libxl__qmp_param_add_string(gc, &args, "driver", svos->cpu_driver);
+            /* We'll assume that we start QEMU with -smp %d,maxcpus=%d, so
+             * that "core-id" and "thread-id" are always 0 so that
+             * "socket-id" correspond the cpu index.
+             * Those properties are otherwise listed by
+             * "query-hotpluggable-cpus". */
+            libxl__qmp_param_add_integer(gc, &args, "socket-id", svos->index);
+            libxl__qmp_param_add_integer(gc, &args, "core-id", 0);
+            libxl__qmp_param_add_integer(gc, &args, "thread-id", 0);
+            rc = libxl__ev_qmp_send(egc, qmp, "device_add", args);
+            if (rc) goto out;
+            return;
+        }
+    }
+
+out:
+    set_vcpuonline_done(egc, svos, rc);
+}
+
+/* Fallback function for QEMU older than 2.7, when
+ * 'query-hotpluggable-cpus' wasn't available and vcpu object couldn't be
+ * added with 'device_add'. */
+static void set_vcpuonline_qmp_add_cpu(libxl__egc *egc, libxl__ev_qmp *qmp,
+                                       const libxl__json_object *response,
+                                       int rc)
 {
     STATE_AO_GC(qmp->ao);
     set_vcpuonline_state *svos = CONTAINER_OF(qmp, *svos, qmp);
