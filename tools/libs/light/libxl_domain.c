@@ -1740,6 +1740,35 @@ out:
     return rc;
 }
 
+static int qmp_parse_query_cpus_fast(libxl__gc *gc,
+                                     libxl_domid domid,
+                                     const libxl__json_object *response,
+                                     libxl_bitmap *const map)
+{
+    int i;
+    const libxl__json_object *cpu;
+
+    libxl_bitmap_set_none(map);
+    /* Parse response to QMP command "query-cpus-fast":
+     * [ { 'cpu-index': 'int',...} ]
+     */
+    for (i = 0; (cpu = libxl__json_array_get(response, i)); i++) {
+        unsigned int cpu_index;
+        const libxl__json_object *o;
+
+        o = libxl__json_map_get("cpu-index", cpu, JSON_INTEGER);
+        if (!o) {
+            LOGD(ERROR, domid, "Failed to retrieve CPU index.");
+            return ERROR_QEMU_API;
+        }
+
+        cpu_index = libxl__json_object_get_integer(o);
+        libxl_bitmap_set(map, cpu_index);
+    }
+
+    return 0;
+}
+
 static int qmp_parse_query_cpus(libxl__gc *gc,
                                 libxl_domid domid,
                                 const libxl__json_object *response,
@@ -1778,8 +1807,13 @@ typedef struct set_vcpuonline_state {
     int index; /* for loop on final_map */
 } set_vcpuonline_state;
 
+static void set_vcpuonline_qmp_cpus_fast_queried(libxl__egc *,
+    libxl__ev_qmp *, const libxl__json_object *, int rc);
 static void set_vcpuonline_qmp_cpus_queried(libxl__egc *,
     libxl__ev_qmp *, const libxl__json_object *, int rc);
+static void set_vcpuonline_qmp_query_cpus_parse(libxl__egc *,
+    libxl__ev_qmp *qmp, const libxl__json_object *,
+    bool query_cpus_fast, int rc);
 static void set_vcpuonline_qmp_add_cpu(libxl__egc *,
     libxl__ev_qmp *, const libxl__json_object *response, int rc);
 static void set_vcpuonline_timeout(libxl__egc *egc,
@@ -1840,8 +1874,8 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid,
                                              set_vcpuonline_timeout,
                                              LIBXL_QMP_CMD_TIMEOUT * 1000);
             if (rc) goto out;
-            qmp->callback = set_vcpuonline_qmp_cpus_queried;
-            rc = libxl__ev_qmp_send(egc, qmp, "query-cpus", NULL);
+            qmp->callback = set_vcpuonline_qmp_cpus_fast_queried;
+            rc = libxl__ev_qmp_send(egc, qmp, "query-cpus-fast", NULL);
             if (rc) goto out;
             return AO_INPROGRESS;
         default:
@@ -1860,8 +1894,36 @@ out:
     return AO_INPROGRESS;
 }
 
+static void set_vcpuonline_qmp_cpus_fast_queried(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    set_vcpuonline_state *svos = CONTAINER_OF(qmp, *svos, qmp);
+
+    if (rc == ERROR_QMP_COMMAND_NOT_FOUND) {
+        /* Try again, we probably talking to a QEMU older than 2.12 */
+        qmp->callback = set_vcpuonline_qmp_cpus_queried;
+        rc = libxl__ev_qmp_send(egc, qmp, "query-cpus", NULL);
+        if (rc) goto out;
+        return;
+    }
+
+out:
+    set_vcpuonline_qmp_query_cpus_parse(egc, qmp, response, true, rc);
+}
+
 static void set_vcpuonline_qmp_cpus_queried(libxl__egc *egc,
     libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    set_vcpuonline_state *svos = CONTAINER_OF(qmp, *svos, qmp);
+
+    set_vcpuonline_qmp_query_cpus_parse(egc, qmp, response, false, rc);
+}
+
+static void set_vcpuonline_qmp_query_cpus_parse(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response,
+    bool query_cpus_fast, int rc)
 {
     EGC_GC;
     set_vcpuonline_state *svos = CONTAINER_OF(qmp, *svos, qmp);
@@ -1876,7 +1938,11 @@ static void set_vcpuonline_qmp_cpus_queried(libxl__egc *egc,
     if (rc) goto out;
 
     libxl_bitmap_alloc(CTX, &current_map, svos->info.vcpu_max_id + 1);
-    rc = qmp_parse_query_cpus(gc, qmp->domid, response, &current_map);
+    if (query_cpus_fast) {
+        rc = qmp_parse_query_cpus_fast(gc, qmp->domid, response, &current_map);
+    } else {
+        rc = qmp_parse_query_cpus(gc, qmp->domid, response, &current_map);
+    }
     if (rc) goto out;
 
     libxl_bitmap_copy_alloc(CTX, final_map, svos->cpumap);
@@ -2121,6 +2187,9 @@ typedef struct {
 
 static void retrieve_domain_configuration_lock_acquired(
     libxl__egc *egc, libxl__ev_slowlock *, int rc);
+static void retrieve_domain_configuration_cpu_fast_queried(
+    libxl__egc *egc, libxl__ev_qmp *qmp,
+    const libxl__json_object *response, int rc);
 static void retrieve_domain_configuration_cpu_queried(
     libxl__egc *egc, libxl__ev_qmp *qmp,
     const libxl__json_object *response, int rc);
@@ -2198,8 +2267,8 @@ static void retrieve_domain_configuration_lock_acquired(
         if (rc) goto out;
         libxl_bitmap_alloc(CTX, &rdcs->qemuu_cpus,
                            d_config->b_info.max_vcpus);
-        rdcs->qmp.callback = retrieve_domain_configuration_cpu_queried;
-        rc = libxl__ev_qmp_send(egc, &rdcs->qmp, "query-cpus", NULL);
+        rdcs->qmp.callback = retrieve_domain_configuration_cpu_fast_queried;
+        rc = libxl__ev_qmp_send(egc, &rdcs->qmp, "query-cpus-fast", NULL);
         if (rc) goto out;
         has_callback = true;
     }
@@ -2208,6 +2277,30 @@ out:
     if (lock) libxl__unlock_file(lock);
     if (!has_callback)
         retrieve_domain_configuration_end(egc, rdcs, rc);
+}
+
+static void retrieve_domain_configuration_cpu_fast_queried(
+    libxl__egc *egc, libxl__ev_qmp *qmp,
+    const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    retrieve_domain_configuration_state *rdcs =
+        CONTAINER_OF(qmp, *rdcs, qmp);
+
+    if (rc == ERROR_QMP_COMMAND_NOT_FOUND) {
+        /* Try again, we probably talking to a QEMU older than 2.12 */
+        rdcs->qmp.callback = retrieve_domain_configuration_cpu_queried;
+        rc = libxl__ev_qmp_send(egc, &rdcs->qmp, "query-cpus", NULL);
+        if (rc) goto out;
+        return;
+    }
+
+    if (rc) goto out;
+
+    rc = qmp_parse_query_cpus_fast(gc, qmp->domid, response, &rdcs->qemuu_cpus);
+
+out:
+    retrieve_domain_configuration_end(egc, rdcs, rc);
 }
 
 static void retrieve_domain_configuration_cpu_queried(
