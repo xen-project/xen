@@ -292,6 +292,8 @@ static int qmp_handle_response(libxl__gc *gc, libxl__qmp_handler *qmp,
 static int qmp_ev_qemu_compare_version(libxl__ev_qmp *ev, int major,
                                        int minor, int micro)
 {
+    assert(ev->state == qmp_state_connected);
+
 #define CHECK_VERSION(level) do { \
     if (ev->qemu_version.level > (level)) return +1; \
     if (ev->qemu_version.level < (level)) return -1; \
