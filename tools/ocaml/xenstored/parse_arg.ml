@@ -26,7 +26,13 @@ type config =
     restart: bool;
     live_reload: bool;
     disable_socket: bool;
+    config_test: bool;
   }
+
+let get_config_filename config_file =
+  match config_file with
+  | Some name -> name
+  | None      -> Define.default_config_dir ^ "/oxenstored.conf"
 
 let do_argv =
   let pidfile = ref "" and tracefile = ref "" (* old xenstored compatibility *)
@@ -38,6 +44,8 @@ let do_argv =
   and restart = ref false
   and live_reload = ref false
   and disable_socket = ref false
+  and config_test = ref false
+  and help = ref false
   in
 
   let speclist =
@@ -55,10 +63,27 @@ let do_argv =
       ("-T", Arg.Set_string tracefile, ""); (* for compatibility *)
       ("--restart", Arg.Set restart, "Read database on starting");
       ("--live", Arg.Set live_reload, "Read live dump on startup");
+      ("--config-test", Arg.Set config_test, "Test validity of config file");
       ("--disable-socket", Arg.Unit (fun () -> disable_socket := true), "Disable socket");
+      ("--help", Arg.Set help, "Display this list of options")
     ] in
   let usage_msg = "usage : xenstored [--config-file <filename>] [--no-domain-init] [--help] [--no-fork] [--reraise-top-level] [--restart] [--disable-socket]" in
   Arg.parse speclist (fun _ -> ()) usage_msg;
+  let () =
+    if !help then begin
+      if !live_reload then
+        (*
+          Transform --live --help into --config-test for backward compat with
+          running code during live update.
+          Caller will validate config and exit
+        *)
+        config_test := true
+      else begin
+        Arg.usage_string speclist usage_msg |> print_endline;
+        exit 0
+      end
+    end
+  in
   {
     domain_init = !domain_init;
     activate_access_log = !activate_access_log;
@@ -70,4 +95,5 @@ let do_argv =
     restart = !restart;
     live_reload = !live_reload;
     disable_socket = !disable_socket;
+    config_test = !config_test;
   }

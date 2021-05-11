@@ -88,7 +88,7 @@ let default_pidfile = Paths.xen_run_dir ^ "/xenstored.pid"
 
 let ring_scan_interval = ref 20
 
-let parse_config filename =
+let parse_config ?(strict=false) filename =
   let pidfile = ref default_pidfile in
   let options = [
     ("merge-activate", Config.Set_bool Transaction.do_coalesce);
@@ -129,11 +129,12 @@ let parse_config filename =
     ("xenstored-port", Config.Set_string Domains.xenstored_port); ] in
   begin try Config.read filename options (fun _ _ -> raise Not_found)
     with
-    | Config.Error err -> List.iter (fun (k, e) ->
+    | Config.Error err as e -> List.iter (fun (k, e) ->
         match e with
         | "unknown key" -> eprintf "config: unknown key %s\n" k
         | _             -> eprintf "config: %s: %s\n" k e
       ) err;
+      if strict then raise e
     | Sys_error m -> eprintf "error: config: %s\n" m;
   end;
   !pidfile
@@ -358,6 +359,12 @@ let tweak_gc () =
 let () =
   Printexc.set_uncaught_exception_handler Logging.fallback_exception_handler;
   let cf = do_argv in
+  if cf.config_test then begin
+    let path = config_filename cf in
+    let _pidfile:string = parse_config ~strict:true path in
+    Printf.printf "Configuration valid at %s\n%!" path;
+    exit 0
+  end;
   let pidfile =
     if Sys.file_exists (config_filename cf) then
       parse_config (config_filename cf)
