@@ -492,6 +492,14 @@ _hidden int libxl__ev_qmp_send(libxl__egc *egc, libxl__ev_qmp *ev,
                                const char *cmd, libxl__json_object *args);
 _hidden void libxl__ev_qmp_dispose(libxl__gc *gc, libxl__ev_qmp *ev);
 
+/* return values:
+ *   < 0  if qemu's version <  asked version
+ *   = 0  if qemu's version == asked version
+ *   > 0  if qemu's version >  asked version
+ */
+_hidden int libxl__qmp_ev_qemu_compare_version(libxl__ev_qmp *ev, int major,
+                                               int minor, int micro);
+
 typedef enum {
     /* initial state */
     qmp_state_disconnected = 1,

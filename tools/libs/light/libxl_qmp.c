@@ -289,7 +289,7 @@ static int qmp_handle_response(libxl__gc *gc, libxl__qmp_handler *qmp,
  *   = 0  if qemu's version == asked version
  *   > 0  if qemu's version >  asked version
  */
-static int qmp_ev_qemu_compare_version(libxl__ev_qmp *ev, int major,
+int libxl__qmp_ev_qemu_compare_version(libxl__ev_qmp *ev, int major,
                                        int minor, int micro)
 {
     assert(ev->state == qmp_state_connected);
@@ -1073,7 +1073,7 @@ static void dm_state_save_to_fdset(libxl__egc *egc, libxl__ev_qmp *ev, int fdset
     /* The `live` parameter was added to QEMU 2.11. It signals QEMU that
      * the save operation is for a live migration rather than for taking a
      * snapshot. */
-    if (qmp_ev_qemu_compare_version(ev, 2, 11, 0) >= 0)
+    if (libxl__qmp_ev_qemu_compare_version(ev, 2, 11, 0) >= 0)
         libxl__qmp_param_add_bool(gc, &args, "live", dsps->live);
     QMP_PARAMETERS_SPRINTF(&args, "filename", "/dev/fdset/%d", fdset);
     rc = libxl__ev_qmp_send(egc, ev, "xen-save-devices-state", args);
