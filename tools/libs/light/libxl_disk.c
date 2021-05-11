@@ -656,6 +656,8 @@ typedef struct {
 
 static void cdrom_insert_lock_acquired(libxl__egc *, libxl__ev_slowlock *,
                                        int rc);
+static void cdrom_insert_qmp_connected(libxl__egc *, libxl__ev_qmp *,
+                                       const libxl__json_object *, int rc);
 static void cdrom_insert_ejected(libxl__egc *egc, libxl__ev_qmp *,
                                  const libxl__json_object *, int rc);
 static void cdrom_insert_addfd_cb(libxl__egc *egc, libxl__ev_qmp *,
@@ -770,19 +772,46 @@ static void cdrom_insert_lock_acquired(libxl__egc *egc,
      */
 
     if (cis->dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-        libxl__json_object *args = NULL;
-        int devid = libxl__device_disk_dev_number(cis->disk->vdev,
-                                                  NULL, NULL);
-
-        QMP_PARAMETERS_SPRINTF(&args, "device", "ide-%i", devid);
-        cis->qmp.callback = cdrom_insert_ejected;
-        rc = libxl__ev_qmp_send(egc, &cis->qmp, "eject", args);
+        /* Before running the "eject" command, we need to know QEMU's
+         * version to find out which command to issue.
+         * cis->qmp isn't in Connected state yet, so run a dummy command
+         * to have QEMU's version available. */
+        cis->qmp.callback = cdrom_insert_qmp_connected;
+        rc = libxl__ev_qmp_send(egc, &cis->qmp, "query-version", NULL);
         if (rc) goto out;
     } else {
         cdrom_insert_ejected(egc, &cis->qmp, NULL, 0); /* must be last */
     }
     return;
 
+out:
+    cdrom_insert_done(egc, cis, rc); /* must be last */
+}
+
+static void cdrom_insert_qmp_connected(libxl__egc *egc, libxl__ev_qmp *qmp,
+                                       const libxl__json_object *response,
+                                       int rc)
+{
+    libxl__cdrom_insert_state *cis = CONTAINER_OF(qmp, *cis, qmp);
+    STATE_AO_GC(cis->ao);
+    libxl__json_object *args = NULL;
+    int devid = libxl__device_disk_dev_number(cis->disk->vdev,
+                                              NULL, NULL);
+
+    if (rc) goto out;
+
+    /* Using `device` parameter is deprecated since QEMU 2.8, we should
+     * use `id` now. They both have different meaning but we set the
+     * same `id` on -drive and -device on the command line.
+     */
+    if (libxl__qmp_ev_qemu_compare_version(qmp, 2, 8, 0) >= 0)
+        QMP_PARAMETERS_SPRINTF(&args, "id", "ide-%i", devid);
+    else
+        QMP_PARAMETERS_SPRINTF(&args, "device", "ide-%i", devid);
+    qmp->callback = cdrom_insert_ejected;
+    rc = libxl__ev_qmp_send(egc, qmp, "eject", args);
+    if (rc) goto out;
+    return;
 out:
     cdrom_insert_done(egc, cis, rc); /* must be last */
 }
