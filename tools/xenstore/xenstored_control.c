@@ -34,6 +34,7 @@
 
 #include "utils.h"
 #include "talloc.h"
+#include "xs_lib.h"
 #include "xenstored_core.h"
 #include "xenstored_control.h"
 #include "xenstored_domain.h"

@@ -46,7 +46,7 @@
 #include "utils.h"
 #include "list.h"
 #include "talloc.h"
-#include "xenstore_lib.h"
+#include "xs_lib.h"
 #include "xenstored_core.h"
 #include "xenstored_watch.h"
 #include "xenstored_transaction.h"
@@ -542,11 +542,11 @@ static int write_node(struct connection *conn, struct node *node,
 	return write_node_raw(conn, &key, node, no_quota_check);
 }
 
-enum xs_perm_type perm_for_conn(struct connection *conn,
-				const struct node_perms *perms)
+unsigned int perm_for_conn(struct connection *conn,
+			   const struct node_perms *perms)
 {
 	unsigned int i;
-	enum xs_perm_type mask = XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER;
+	unsigned int mask = XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER;
 
 	/* Owners and tools get it all... */
 	if (!domain_is_unprivileged(conn) || perms->p[0].id == conn->id
@@ -584,7 +584,7 @@ char *get_parent(const void *ctx, const char *node)
  * Temporary memory allocations are done with ctx.
  */
 static int ask_parents(struct connection *conn, const void *ctx,
-		       const char *name, enum xs_perm_type *perm)
+		       const char *name, unsigned int *perm)
 {
 	struct node *node;
 
@@ -618,10 +618,9 @@ static int ask_parents(struct connection *conn, const void *ctx,
  * Temporary memory allocations are done with ctx.
  */
 static int errno_from_parents(struct connection *conn, const void *ctx,
-			      const char *node, int errnum,
-			      enum xs_perm_type perm)
+			      const char *node, int errnum, unsigned int perm)
 {
-	enum xs_perm_type parent_perm = XS_PERM_NONE;
+	unsigned int parent_perm = XS_PERM_NONE;
 
 	/* We always tell them about memory failures. */
 	if (errnum == ENOMEM)
@@ -641,7 +640,7 @@ static int errno_from_parents(struct connection *conn, const void *ctx,
 static struct node *get_node(struct connection *conn,
 			     const void *ctx,
 			     const char *name,
-			     enum xs_perm_type perm)
+			     unsigned int perm)
 {
 	struct node *node;
 
@@ -873,7 +872,7 @@ static struct node *get_node_canonicalized(struct connection *conn,
 					   const void *ctx,
 					   const char *name,
 					   char **canonical_name,
-					   enum xs_perm_type perm)
+					   unsigned int perm)
 {
 	char *tmp_name;
 

@@ -17,7 +17,7 @@ static uint32_t total_size(struct xs_tdb_record_hdr *hdr)
 		+ hdr->datalen + hdr->childlen;
 }
 
-static char perm_to_char(enum xs_perm_type perm)
+static char perm_to_char(unsigned int perm)
 {
 	return perm == XS_PERM_READ ? 'r' :
 		perm == XS_PERM_WRITE ? 'w' :

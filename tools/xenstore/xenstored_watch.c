@@ -124,7 +124,7 @@ static bool watch_permitted(struct connection *conn, const void *ctx,
 			    const char *name, struct node *node,
 			    struct node_perms *perms)
 {
-	enum xs_perm_type perm;
+	unsigned int perm;
 	struct node *parent;
 	char *parent_name;
 

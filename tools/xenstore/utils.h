@@ -7,6 +7,17 @@
 
 #include <xen-tools/libs.h>
 
+#include "xenstore_lib.h"
+
+/* Header of the node record in tdb. */
+struct xs_tdb_record_hdr {
+	uint64_t generation;
+	uint32_t num_perms;
+	uint32_t datalen;
+	uint32_t childlen;
+	struct xs_permissions perms[0];
+};
+
 /* Is A == B ? */
 #define streq(a,b) (strcmp((a),(b)) == 0)
 

@@ -1,4 +1,4 @@
-VERS_3.0.3 {
+VERS_4.0 {
 	global:
 		xs_open;
 		xs_close;
@@ -32,18 +32,10 @@ VERS_3.0.3 {
 		xs_control_command;
 		xs_debug_command;
 		xs_suspend_evtchn_port;
-		xs_daemon_rootdir;
 		xs_daemon_rundir;
 		xs_daemon_socket;
 		xs_daemon_socket_ro;
-		xs_domain_dev;
-		xs_daemon_tdb;
 		xs_write_all;
 		xs_strings_to_perms;
-		xs_perm_to_string;
-		xs_count_strings;
-		expanding_buffer_ensure;
-		sanitise_value;
-		unsanitise_value;
 	local: *; /* Do not expose anything by default */
 };

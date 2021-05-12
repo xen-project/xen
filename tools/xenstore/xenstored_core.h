@@ -189,8 +189,8 @@ void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
 char *canonicalize(struct connection *conn, const void *ctx, const char *node);
 
 /* Get access permissions. */
-enum xs_perm_type perm_for_conn(struct connection *conn,
-				const struct node_perms *perms);
+unsigned int perm_for_conn(struct connection *conn,
+			   const struct node_perms *perms);
 
 /* Write a node to the tdb data base. */
 int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
@@ -204,8 +204,6 @@ struct connection *new_connection(const struct interface_funcs *funcs);
 struct connection *get_connection_by_id(unsigned int conn_id);
 void check_store(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
-enum xs_perm_type perm_for_conn(struct connection *conn,
-				const struct node_perms *perms);
 
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);

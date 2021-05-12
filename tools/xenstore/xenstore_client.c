@@ -22,6 +22,8 @@
 
 #include <sys/ioctl.h>
 
+#include "xs_lib.h"
+
 #define PATH_SEP '/'
 #define MAX_PATH_LEN 256
 
