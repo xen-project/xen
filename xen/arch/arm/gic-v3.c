@@ -1167,12 +1167,15 @@ static unsigned int gicv3_read_apr(int apr_reg)
     case 0:
         ASSERT(gicv3.nr_priorities > 4 && gicv3.nr_priorities < 8);
         apr = READ_SYSREG(ICH_AP1R0_EL2);
+        break;
     case 1:
         ASSERT(gicv3.nr_priorities > 5 && gicv3.nr_priorities < 8);
         apr = READ_SYSREG(ICH_AP1R1_EL2);
+        break;
     case 2:
         ASSERT(gicv3.nr_priorities > 6 && gicv3.nr_priorities < 8);
         apr = READ_SYSREG(ICH_AP1R2_EL2);
+        break;
     default:
         BUG();
     }
