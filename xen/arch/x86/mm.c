@@ -3906,7 +3906,8 @@ long do_mmu_update(
     struct vcpu *curr = current, *v = curr;
     struct domain *d = v->domain, *pt_owner = d, *pg_owner;
     mfn_t map_mfn = INVALID_MFN, mfn;
-    bool flush_linear_pt = false, flush_root_pt_others = false;
+    bool flush_linear_pt = false, flush_root_pt_local = false,
+        flush_root_pt_others = false;
     uint32_t xsm_needed = 0;
     uint32_t xsm_checked = 0;
     int rc = put_old_guest_table(curr);
@@ -4056,9 +4057,7 @@ long do_mmu_update(
                         break;
                     rc = mod_l2_entry(va, l2e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    if ( !rc &&
-                         (page->u.inuse.type_info & PGT_count_mask) >
-                         1 + !!(page->u.inuse.type_info & PGT_pinned) )
+                    if ( !rc )
                         flush_linear_pt = true;
                     break;
 
@@ -4067,10 +4066,7 @@ long do_mmu_update(
                         break;
                     rc = mod_l3_entry(va, l3e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    if ( !rc &&
-                         (page->u.inuse.type_info & PGT_count_mask) >
-                         1 + !!(page->u.inuse.type_info & PGT_pinned) &&
-                         !is_pv_32bit_domain(pt_owner) )
+                    if ( !rc )
                         flush_linear_pt = true;
                     break;
 
@@ -4079,9 +4075,7 @@ long do_mmu_update(
                         break;
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    if ( !rc &&
-                         (page->u.inuse.type_info & PGT_count_mask) >
-                         1 + !!(page->u.inuse.type_info & PGT_pinned) )
+                    if ( !rc )
                         flush_linear_pt = true;
                     if ( !rc && pt_owner->arch.pv.xpti )
                     {
@@ -4091,7 +4085,7 @@ long do_mmu_update(
                                     mfn) )
                         {
                             local_in_use = true;
-                            get_cpu_info()->root_pgt_changed = true;
+                            flush_root_pt_local = true;
                         }
 
                         /*
@@ -4209,7 +4203,7 @@ long do_mmu_update(
      * Perform required TLB maintenance.
      *
      * This logic currently depends on flush_linear_pt being a superset of the
-     * flush_root_pt_others condition.
+     * flush_root_pt_* conditions.
      *
      * pt_owner may not be current->domain.  This may occur during
      * construction of 32bit PV guests, or debugging of PV guests.  The
@@ -4228,7 +4222,7 @@ long do_mmu_update(
      * pt_owner->dirty_cpumask), and/or all *other* dirty CPUs as there are
      * references we can't account for locally.
      */
-    if ( flush_linear_pt /* || flush_root_pt_others */ )
+    if ( flush_linear_pt /* || flush_root_pt_local || flush_root_pt_others */ )
     {
         unsigned int cpu = smp_processor_id();
         cpumask_t *mask = pt_owner->dirty_cpumask;
@@ -4245,8 +4239,12 @@ long do_mmu_update(
             cpumask_copy(mask, pt_owner->dirty_cpumask);
             __cpumask_clear_cpu(cpu, mask);
 
-            flush_local(FLUSH_TLB);
+            flush_local(FLUSH_TLB |
+                        (flush_root_pt_local ? FLUSH_ROOT_PGTBL : 0));
         }
+        else
+            /* Sanity check.  flush_root_pt_local implies local cpu is dirty. */
+            ASSERT(!flush_root_pt_local);
 
         /* Flush the remote dirty CPUs.  Does not include the local CPU. */
         if ( !cpumask_empty(mask) )
@@ -4254,8 +4252,8 @@ long do_mmu_update(
                        (flush_root_pt_others ? FLUSH_ROOT_PGTBL : 0));
     }
     else
-        /* Sanity check.  flush_root_pt_others implies flush_linear_pt. */
-        ASSERT(!flush_root_pt_others);
+        /* Sanity check.  flush_root_pt_* implies flush_linear_pt. */
+        ASSERT(!flush_root_pt_local && !flush_root_pt_others);
 
     perfc_add(num_page_updates, i);
 
