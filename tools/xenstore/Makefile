@@ -90,7 +90,7 @@ xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 .PHONY: clean
 clean:
 	rm -f *.a *.o xenstored_probes.h
-	rm -f xenstored xs_random xs_stress xs_crashme
+	rm -f xenstored
 	rm -f xs_tdb_dump xenstore-control init-xenstore-domain
 	rm -f xenstore $(CLIENTS)
 	$(RM) $(DEPS_RM)

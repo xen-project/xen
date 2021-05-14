@@ -288,15 +288,15 @@ tools/xenpaging/xenpaging
 tools/xenpmd/xenpmd
 tools/xenstore/xenstore
 tools/xenstore/xenstore-chmod
+tools/xenstore/xenstore-control
 tools/xenstore/xenstore-exists
 tools/xenstore/xenstore-list
+tools/xenstore/xenstore-ls
 tools/xenstore/xenstore-read
 tools/xenstore/xenstore-rm
+tools/xenstore/xenstore-watch
 tools/xenstore/xenstore-write
-tools/xenstore/xenstore-control
-tools/xenstore/xenstore-ls
 tools/xenstore/xenstored
-tools/xenstore/xenstored_test
 tools/xenstore/xs_tdb_dump
 tools/xentop/xentop
 tools/xentrace/xentrace_setsize
@@ -428,7 +428,6 @@ tools/firmware/etherboot/ipxe.tar.gz
 tools/firmware/etherboot/ipxe/
 tools/python/xen/lowlevel/xl/_pyxl_types.c
 tools/python/xen/lowlevel/xl/_pyxl_types.h
-tools/xenstore/xenstore-watch
 tools/xl/_paths.h
 tools/xl/xl
 
