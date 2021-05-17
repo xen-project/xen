@@ -34,8 +34,6 @@
 #include <public/arch-x86/cpuid.h>
 #include <public/hvm/params.h>
 
-#include <compat/grant_table.h>
-
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
 
@@ -300,8 +298,10 @@ static void write_start_info(struct domain *d)
                                           &si->console.domU.mfn) )
         BUG();
 
+#ifdef CONFIG_PV32
     if ( compat )
         xlat_start_info(si, XLAT_start_info_console_domU);
+#endif
 
     unmap_domain_page(si);
 }
@@ -675,6 +675,13 @@ void pv_shim_inject_evtchn(unsigned int port)
     }
 }
 
+#ifdef CONFIG_PV32
+# include <compat/grant_table.h>
+#else
+# define compat_gnttab_setup_table gnttab_setup_table
+# define compat_handle_okay guest_handle_okay
+#endif
+
 static long pv_shim_grant_table_op(unsigned int cmd,
                                    XEN_GUEST_HANDLE_PARAM(void) uop,
                                    unsigned int count)
@@ -704,10 +711,13 @@ static long pv_shim_grant_table_op(unsigned int cmd,
             rc = -EFAULT;
             break;
         }
+
+#ifdef CONFIG_PV32
         if ( compat )
 #define XLAT_gnttab_setup_table_HNDL_frame_list(d, s)
             XLAT_gnttab_setup_table(&nat, &cmp);
 #undef XLAT_gnttab_setup_table_HNDL_frame_list
+#endif
 
         nat.status = GNTST_okay;
 
@@ -778,6 +788,7 @@ static long pv_shim_grant_table_op(unsigned int cmd,
             }
 
             ASSERT(grant_frames[i]);
+#ifdef CONFIG_PV32
             if ( compat )
             {
                 compat_pfn_t pfn = grant_frames[i];
@@ -789,8 +800,10 @@ static long pv_shim_grant_table_op(unsigned int cmd,
                     break;
                 }
             }
-            else if ( __copy_to_guest_offset(nat.frame_list, i,
-                                             &grant_frames[i], 1) )
+            else
+#endif
+            if ( __copy_to_guest_offset(nat.frame_list, i,
+                                        &grant_frames[i], 1) )
             {
                 nat.status = GNTST_bad_virt_addr;
                 rc = -EFAULT;
@@ -799,10 +812,12 @@ static long pv_shim_grant_table_op(unsigned int cmd,
         }
         spin_unlock(&grant_lock);
 
+#ifdef CONFIG_PV32
         if ( compat )
 #define XLAT_gnttab_setup_table_HNDL_frame_list(d, s)
             XLAT_gnttab_setup_table(&cmp, &nat);
 #undef XLAT_gnttab_setup_table_HNDL_frame_list
+#endif
 
         if ( unlikely(compat ? __copy_to_guest(uop, &cmp, 1)
                              : __copy_to_guest(uop, &nat, 1)) )
