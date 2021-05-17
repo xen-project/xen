@@ -836,7 +836,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     int cpus, i;
     const char *cmdline;
     struct bootmodule *xen_bootmodule;
-    struct domain *dom0 = NULL;
+    struct domain *d;
     int rc;
 
     dcache_line_bytes = read_dcache_line_bytes();
@@ -992,9 +992,12 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     /* Create initial domain 0. */
     if ( !is_dom0less_mode() )
-        dom0 = create_dom0();
+        create_dom0();
     else
         printk(XENLOG_INFO "Xen dom0less mode detected\n");
+
+    if ( acpi_disabled )
+        create_domUs();
 
     heap_init_late();
 
@@ -1009,11 +1012,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     system_state = SYS_STATE_active;
 
-    if ( acpi_disabled )
-        create_domUs();
-
-    if ( dom0 )
-        domain_unpause_by_systemcontroller(dom0);
+    for_each_domain( d )
+        domain_unpause_by_systemcontroller(d);
 
     /* Switch on to the dynamically allocated stack for the idle vcpu
      * since the static one we're running on is about to be freed. */

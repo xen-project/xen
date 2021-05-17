@@ -94,7 +94,7 @@ void acpi_create_efi_mmap_table(struct domain *d,
 int acpi_make_efi_nodes(void *fdt, struct membank tbl_add[]);
 
 void create_domUs(void);
-struct domain* create_dom0(void);
+void create_dom0(void);
 
 void discard_initial_modules(void);
 void fw_unreserved_regions(paddr_t s, paddr_t e,

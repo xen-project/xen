@@ -2521,8 +2521,6 @@ void __init create_domUs(void)
 
         if ( construct_domU(d, node) != 0 )
             panic("Could not set up domain %s\n", dt_node_name(node));
-
-        domain_unpause_by_systemcontroller(d);
     }
 }
 
@@ -2584,7 +2582,7 @@ static int __init construct_dom0(struct domain *d)
     return construct_domain(d, &kinfo);
 }
 
-struct domain* __init create_dom0(void)
+void __init create_dom0(void)
 {
     struct domain *dom0;
     struct xen_domctl_createdomain dom0_cfg = {
@@ -2615,8 +2613,6 @@ struct domain* __init create_dom0(void)
 
     if ( construct_dom0(dom0) != 0)
         panic("Could not set up DOM0 guest OS\n");
-
-    return dom0;
 }
 
 /*
