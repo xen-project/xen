@@ -736,7 +736,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     int cpus, i;
     const char *cmdline;
     struct bootmodule *xen_bootmodule;
-    struct domain *dom0;
+    struct domain *dom0, *d;
     struct xen_domctl_createdomain dom0_cfg = {
         .flags = XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap,
         .max_evtchn_port = -1,
@@ -902,6 +902,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     if ( construct_dom0(dom0) != 0)
         panic("Could not set up DOM0 guest OS\n");
 
+    create_domUs();
+
     heap_init_late();
 
     init_trace_bufs();
@@ -915,9 +917,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     system_state = SYS_STATE_active;
 
-    create_domUs();
-
-    domain_unpause_by_systemcontroller(dom0);
+    for_each_domain( d )
+        domain_unpause_by_systemcontroller(d);
 
     /* Switch on to the dynamically allocated stack for the idle vcpu
      * since the static one we're running on is about to be freed. */

@@ -2092,8 +2092,6 @@ void __init create_domUs(void)
 
         if ( construct_domU(d, node) != 0 )
             panic("Could not set up domain %s\n", dt_node_name(node));
-
-        domain_unpause_by_systemcontroller(d);
     }
 }
 
