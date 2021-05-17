@@ -341,7 +341,7 @@ _clean: delete-unfresh-files
 	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" \
 		-o -name "*.gcno" -o -name ".*.cmd" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map *~ core
-	rm -f include/asm-*/asm-offsets.h
+	rm -f asm-offsets.s include/asm-*/asm-offsets.h
 	rm -f .banner
 
 .PHONY: _distclean
@@ -362,7 +362,7 @@ $(TARGET): delete-unfresh-files
 		done; \
 		true
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C include
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) asm-offsets.s
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) include
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/asm-$(TARGET_ARCH)/asm-offsets.h
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $@
 
@@ -399,7 +399,11 @@ include/xen/compile.h: include/xen/compile.h.in .banner
 	@sed -rf tools/process-banner.sed < .banner >> $@.new
 	@mv -f $@.new $@
 
-include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
+asm-offsets.s: arch/$(TARGET_ARCH)/$(TARGET_SUBARCH)/asm-offsets.c
+	$(CC) $(filter-out -Wa$(comma)% -flto,$(c_flags)) -S -g0 -o $@.new -MQ $@ $<
+	$(call move-if-changed,$@.new,$@)
+
+include/asm-$(TARGET_ARCH)/asm-offsets.h: asm-offsets.s
 	@(set -e; \
 	  echo "/*"; \
 	  echo " * DO NOT MODIFY."; \

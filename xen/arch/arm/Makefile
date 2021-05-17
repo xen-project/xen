@@ -130,8 +130,8 @@ $(TARGET)-syms: prelink.o xen.lds
 		>$(@D)/$(@F).map
 	rm -f $(@D)/.$(@F).[0-9]*
 
-asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
-	$(CC) $(filter-out -flto,$(c_flags)) -S -o $@ $<
+.PHONY: include
+include:
 
 xen.lds: xen.lds.S
 	$(CPP) -P $(a_flags) -D__LINKER__ -MQ $@ -o $@ $<
@@ -140,6 +140,6 @@ dtb.o: $(patsubst "%",%,$(CONFIG_DTB_FILE))
 
 .PHONY: clean
 clean::
-	rm -f asm-offsets.s xen.lds
+	rm -f xen.lds
 	rm -f $(BASEDIR)/.xen-syms.[0-9]*
 	rm -f $(TARGET).efi
