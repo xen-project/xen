@@ -240,28 +240,41 @@ int get_model_name(struct cpuinfo_x86 *c)
 
 void display_cacheinfo(struct cpuinfo_x86 *c)
 {
-	unsigned int dummy, ecx, edx, l2size;
+	unsigned int dummy, ecx, edx, size;
 
 	if (c->extended_cpuid_level >= 0x80000005) {
 		cpuid(0x80000005, &dummy, &dummy, &ecx, &edx);
-		if (opt_cpu_info)
-			printk("CPU: L1 I cache %dK (%d bytes/line),"
-			              " D cache %dK (%d bytes/line)\n",
-			       edx>>24, edx&0xFF, ecx>>24, ecx&0xFF);
-		c->x86_cache_size=(ecx>>24)+(edx>>24);	
+		if ((edx | ecx) >> 24) {
+			if (opt_cpu_info)
+				printk("CPU: L1 I cache %uK (%u bytes/line),"
+				              " D cache %uK (%u bytes/line)\n",
+				       edx >> 24, edx & 0xFF, ecx >> 24, ecx & 0xFF);
+			c->x86_cache_size = (ecx >> 24) + (edx >> 24);
+		}
 	}
 
 	if (c->extended_cpuid_level < 0x80000006)	/* Some chips just has a large L1. */
 		return;
 
-	ecx = cpuid_ecx(0x80000006);
-	l2size = ecx >> 16;
-	
-	c->x86_cache_size = l2size;
+	cpuid(0x80000006, &dummy, &dummy, &ecx, &edx);
 
-	if (opt_cpu_info)
-		printk("CPU: L2 Cache: %dK (%d bytes/line)\n",
-		       l2size, ecx & 0xFF);
+	size = ecx >> 16;
+	if (size) {
+		c->x86_cache_size = size;
+
+		if (opt_cpu_info)
+			printk("CPU: L2 Cache: %uK (%u bytes/line)\n",
+			       size, ecx & 0xFF);
+	}
+
+	size = edx >> 18;
+	if (size) {
+		c->x86_cache_size = size * 512;
+
+		if (opt_cpu_info)
+			printk("CPU: L3 Cache: %uM (%u bytes/line)\n",
+			       (size + (size & 1)) >> 1, edx & 0xFF);
+	}
 }
 
 static inline u32 _phys_pkg_id(u32 cpuid_apic, int index_msb)
