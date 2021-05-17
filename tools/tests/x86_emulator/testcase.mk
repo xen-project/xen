@@ -12,11 +12,11 @@ all: $(TESTCASE).bin
 %.bin: %.c
 	$(CC) $(filter-out -M% .%,$(CFLAGS)) -c $<
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext 0x100000 -o $*.tmp $*.o
-	$(OBJCOPY) -O binary $*.tmp $@
+	$(OBJCOPY) -O binary -R .note.gnu.property $*.tmp $@
 	rm -f $*.tmp
 
 %-opmask.bin: opmask.S
 	$(CC) $(filter-out -M% .%,$(CFLAGS)) -c $< -o $(basename $@).o
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext 0x100000 -o $(basename $@).tmp $(basename $@).o
-	$(OBJCOPY) -O binary $(basename $@).tmp $@
+	$(OBJCOPY) -O binary -R .note.gnu.property $(basename $@).tmp $@
 	rm -f $(basename $@).tmp
