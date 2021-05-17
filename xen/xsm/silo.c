@@ -81,12 +81,35 @@ static int silo_grant_copy(struct domain *d1, struct domain *d2)
     return -EPERM;
 }
 
+#ifdef CONFIG_ARGO
+
+static int silo_argo_register_single_source(const struct domain *d1,
+                                            const struct domain *d2)
+{
+    if ( silo_mode_dom_check(d1, d2) )
+        return xsm_argo_register_single_source(d1, d2);
+    return -EPERM;
+}
+
+static int silo_argo_send(const struct domain *d1, const struct domain *d2)
+{
+    if ( silo_mode_dom_check(d1, d2) )
+        return xsm_argo_send(d1, d2);
+    return -EPERM;
+}
+
+#endif
+
 static struct xsm_operations silo_xsm_ops = {
     .evtchn_unbound = silo_evtchn_unbound,
     .evtchn_interdomain = silo_evtchn_interdomain,
     .grant_mapref = silo_grant_mapref,
     .grant_transfer = silo_grant_transfer,
     .grant_copy = silo_grant_copy,
+#ifdef CONFIG_ARGO
+    .argo_register_single_source = silo_argo_register_single_source,
+    .argo_send = silo_argo_send,
+#endif
 };
 
 void __init silo_init(void)
