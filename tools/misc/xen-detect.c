@@ -44,7 +44,7 @@ enum guest_type {
     XEN_NONE = 3
 };
 
-static char *type;
+static const char *type;
 static char *ver;
 
 static void cpuid(uint32_t idx, uint32_t *regs, int pv_context)

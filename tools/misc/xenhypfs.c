@@ -81,9 +81,9 @@ static int xenhypfs_wr(char *path, char *val)
     return ret;
 }
 
-static char *xenhypfs_type(struct xenhypfs_dirent *ent)
+static const char *xenhypfs_type(struct xenhypfs_dirent *ent)
 {
-    char *res;
+    const char *res;
 
     switch (ent->type) {
     case xenhypfs_type_dir:
@@ -134,7 +134,7 @@ static int xenhypfs_ls(char *path)
     return ret;
 }
 
-static int xenhypfs_tree_sub(char *path, unsigned int depth)
+static int xenhypfs_tree_sub(const char *path, unsigned int depth)
 {
     struct xenhypfs_dirent *ent;
     unsigned int n, i;
