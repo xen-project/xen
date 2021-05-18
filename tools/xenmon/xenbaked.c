@@ -182,7 +182,7 @@ typedef struct
 {
     int event_count;
     int event_id;
-    char *text;
+    const char *text;
 } stat_map_t;
 
 stat_map_t stat_map[] = {
