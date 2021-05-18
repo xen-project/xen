@@ -90,6 +90,8 @@ struct connection;
 struct interface_funcs {
 	int (*write)(struct connection *, const void *, unsigned int);
 	int (*read)(struct connection *, void *, unsigned int);
+	bool (*can_write)(struct connection *);
+	bool (*can_read)(struct connection *);
 };
 
 struct connection

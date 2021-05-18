@@ -175,6 +175,8 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 static const struct interface_funcs domain_funcs = {
 	.write = writechn,
 	.read = readchn,
+	.can_write = domain_can_write,
+	.can_read = domain_can_read,
 };
 
 static void *map_interface(domid_t domid)
