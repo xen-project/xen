@@ -195,7 +195,7 @@ static int vcpu_arm64(struct xc_dom_image *dom)
 
 /* ------------------------------------------------------------------------ */
 
-static int set_mode(xc_interface *xch, uint32_t domid, char *guest_type)
+static int set_mode(xc_interface *xch, uint32_t domid, const char *guest_type)
 {
     static const struct {
         char           *guest;
