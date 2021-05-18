@@ -2573,7 +2573,7 @@ static bool __init has_if_pschange_mc(void)
     if ( cpu_has_hypervisor )
         return false;
 
-    if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+    if ( cpu_has_arch_caps )
         rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
     if ( caps & ARCH_CAPS_IF_PSCHANGE_MC_NO )
