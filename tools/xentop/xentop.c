@@ -81,8 +81,8 @@ static int current_row(void);
 static int lines(void);
 static void print(const char *, ...) __attribute__((format(printf,1,2)));
 static void attr_addstr(int attr, const char *str);
-static void set_delay(char *value);
-static void set_prompt(char *new_prompt, void (*func)(char *));
+static void set_delay(const char *value);
+static void set_prompt(const char *new_prompt, void (*func)(const char *));
 static int handle_key(int);
 static int compare(unsigned long long, unsigned long long);
 static int compare_domains(xenstat_domain **, xenstat_domain **);
@@ -212,10 +212,10 @@ int show_vbds = 0;
 int repeat_header = 0;
 int show_full_name = 0;
 #define PROMPT_VAL_LEN 80
-char *prompt = NULL;
+const char *prompt = NULL;
 char prompt_val[PROMPT_VAL_LEN];
 int prompt_val_len = 0;
-void (*prompt_complete_func)(char *);
+void (*prompt_complete_func)(const char *);
 
 static WINDOW *cwin;
 
@@ -331,7 +331,7 @@ static void attr_addstr(int attr, const char *str)
 }
 
 /* Handle setting the delay from the user-supplied value in prompt_val */
-static void set_delay(char *value)
+static void set_delay(const char *value)
 {
 	int new_delay;
 	new_delay = atoi(value);
@@ -341,7 +341,7 @@ static void set_delay(char *value)
 
 /* Enable prompting mode with the given prompt string; call the given function
  * when a value is available. */
-static void set_prompt(char *new_prompt, void (*func)(char *))
+static void set_prompt(const char *new_prompt, void (*func)(const char *))
 {
 	prompt = new_prompt;
 	prompt_val[0] = '\0';
