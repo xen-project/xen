@@ -226,8 +226,8 @@ static bool write_messages(struct connection *conn)
 				sockmsg_string(out->hdr.msg.type),
 				out->hdr.msg.len,
 				out->buffer, conn);
-		ret = conn->write(conn, out->hdr.raw + out->used,
-				  sizeof(out->hdr) - out->used);
+		ret = conn->funcs->write(conn, out->hdr.raw + out->used,
+					 sizeof(out->hdr) - out->used);
 		if (ret < 0)
 			return false;
 
@@ -243,8 +243,8 @@ static bool write_messages(struct connection *conn)
 			return true;
 	}
 
-	ret = conn->write(conn, out->buffer + out->used,
-			  out->hdr.msg.len - out->used);
+	ret = conn->funcs->write(conn, out->buffer + out->used,
+				 out->hdr.msg.len - out->used);
 	if (ret < 0)
 		return false;
 
@@ -1532,8 +1532,8 @@ static void handle_input(struct connection *conn)
 	/* Not finished header yet? */
 	if (in->inhdr) {
 		if (in->used != sizeof(in->hdr)) {
-			bytes = conn->read(conn, in->hdr.raw + in->used,
-					   sizeof(in->hdr) - in->used);
+			bytes = conn->funcs->read(conn, in->hdr.raw + in->used,
+						  sizeof(in->hdr) - in->used);
 			if (bytes < 0)
 				goto bad_client;
 			in->used += bytes;
@@ -1558,8 +1558,8 @@ static void handle_input(struct connection *conn)
 		in->inhdr = false;
 	}
 
-	bytes = conn->read(conn, in->buffer + in->used,
-			   in->hdr.msg.len - in->used);
+	bytes = conn->funcs->read(conn, in->buffer + in->used,
+				  in->hdr.msg.len - in->used);
 	if (bytes < 0)
 		goto bad_client;
 
@@ -1582,7 +1582,7 @@ static void handle_output(struct connection *conn)
 		ignore_connection(conn);
 }
 
-struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
+struct connection *new_connection(const struct interface_funcs *funcs)
 {
 	struct connection *new;
 
@@ -1592,8 +1592,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 
 	new->fd = -1;
 	new->pollfd_idx = -1;
-	new->write = write;
-	new->read = read;
+	new->funcs = funcs;
 	new->is_ignored = false;
 	new->transaction_started = 0;
 	INIT_LIST_HEAD(&new->out_list);
@@ -1622,20 +1621,8 @@ struct connection *get_connection_by_id(unsigned int conn_id)
 static void accept_connection(int sock)
 {
 }
-
-int writefd(struct connection *conn, const void *data, unsigned int len)
-{
-	errno = EBADF;
-	return -1;
-}
-
-int readfd(struct connection *conn, void *data, unsigned int len)
-{
-	errno = EBADF;
-	return -1;
-}
 #else
-int writefd(struct connection *conn, const void *data, unsigned int len)
+static int writefd(struct connection *conn, const void *data, unsigned int len)
 {
 	int rc;
 
@@ -1651,7 +1638,7 @@ int writefd(struct connection *conn, const void *data, unsigned int len)
 	return rc;
 }
 
-int readfd(struct connection *conn, void *data, unsigned int len)
+static int readfd(struct connection *conn, void *data, unsigned int len)
 {
 	int rc;
 
@@ -1673,6 +1660,11 @@ int readfd(struct connection *conn, void *data, unsigned int len)
 	return rc;
 }
 
+const struct interface_funcs socket_funcs = {
+	.write = writefd,
+	.read = readfd,
+};
+
 static void accept_connection(int sock)
 {
 	int fd;
@@ -1682,7 +1674,7 @@ static void accept_connection(int sock)
 	if (fd < 0)
 		return;
 
-	conn = new_connection(writefd, readfd);
+	conn = new_connection(&socket_funcs);
 	if (conn)
 		conn->fd = fd;
 	else
