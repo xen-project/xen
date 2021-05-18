@@ -45,6 +45,7 @@ RUN zypper install -y --no-recommends \
         libtasn1-devel \
         libuuid-devel \
         libyajl-devel \
+        libzstd-devel \
         lzo-devel \
         make \
         nasm \
@@ -56,9 +57,7 @@ RUN zypper install -y --no-recommends \
         pandoc \
         patch \
         pkg-config \
-        python \
         python-devel \
-        python3 \
         python3-devel \
         systemd-devel \
         tar \
