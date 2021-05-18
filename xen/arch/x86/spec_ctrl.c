@@ -885,7 +885,7 @@ void __init init_speculation_mitigations(void)
     bool cpu_has_bug_taa;
     uint64_t caps = 0;
 
-    if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+    if ( cpu_has_arch_caps )
         rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
     hw_smt_enabled = check_smt_enabled();

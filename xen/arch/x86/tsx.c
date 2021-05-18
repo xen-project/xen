@@ -34,15 +34,18 @@ void tsx_init(void)
 {
     /*
      * This function is first called between microcode being loaded, and CPUID
-     * being scanned generally.  Calculate from raw data whether MSR_TSX_CTRL
-     * is available.
+     * being scanned generally.  Read into boot_cpu_data.x86_capability[] for
+     * the cpu_has_* bits we care about using here.
      */
     if ( unlikely(cpu_has_tsx_ctrl < 0) )
     {
         uint64_t caps = 0;
 
-        if ( boot_cpu_data.cpuid_level >= 7 &&
-             (cpuid_count_edx(7, 0) & cpufeat_mask(X86_FEATURE_ARCH_CAPS)) )
+        if ( boot_cpu_data.cpuid_level >= 7 )
+            boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_ARCH_CAPS)]
+                = cpuid_count_edx(7, 0);
+
+        if ( cpu_has_arch_caps )
             rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
         cpu_has_tsx_ctrl = !!(caps & ARCH_CAPS_TSX_CTRL);
@@ -74,18 +77,18 @@ void tsx_init(void)
 
     if ( cpu_has_tsx_ctrl )
     {
-        uint64_t val;
+        uint32_t hi, lo;
 
-        rdmsrl(MSR_TSX_CTRL, val);
+        rdmsr(MSR_TSX_CTRL, lo, hi);
 
         /* Check bottom bit only.  Higher bits are various sentinels. */
         rtm_disabled = !(opt_tsx & 1);
 
-        val &= ~(TSX_CTRL_RTM_DISABLE | TSX_CTRL_CPUID_CLEAR);
+        lo &= ~(TSX_CTRL_RTM_DISABLE | TSX_CTRL_CPUID_CLEAR);
         if ( rtm_disabled )
-            val |= TSX_CTRL_RTM_DISABLE | TSX_CTRL_CPUID_CLEAR;
+            lo |= TSX_CTRL_RTM_DISABLE | TSX_CTRL_CPUID_CLEAR;
 
-        wrmsrl(MSR_TSX_CTRL, val);
+        wrmsr(MSR_TSX_CTRL, lo, hi);
     }
     else if ( opt_tsx >= 0 )
         printk_once(XENLOG_WARNING

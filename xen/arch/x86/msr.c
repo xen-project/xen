@@ -136,7 +136,7 @@ int init_domain_msr_policy(struct domain *d)
      * so dom0 can turn off workarounds as appropriate.  Temporary, until the
      * domain policy logic gains a better understanding of MSRs.
      */
-    if ( is_hardware_domain(d) && boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+    if ( is_hardware_domain(d) && cpu_has_arch_caps )
     {
         uint64_t val;
 
