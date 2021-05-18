@@ -66,7 +66,7 @@ static const char PROCNETDEV_HEADER[] =
 
 /* We need to get the name of the bridge interface for use with bonding interfaces */
 /* Use excludeName parameter to avoid adding bridges we don't care about, eg. virbr0 */
-static void getBridge(char *excludeName, char *result, size_t resultLen)
+static void getBridge(const char *excludeName, char *result, size_t resultLen)
 {
 	struct dirent *de;
 	DIR *d;
@@ -113,7 +113,7 @@ static int parseNetDevLine(char *line, char *iface, unsigned long long *rxBytes,
 	int num = 19;
 
 	/* Regular exception to parse all the information from /proc/net/dev line */
-	char *regex = "([^:]*):([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)"
+	const char *regex = "([^:]*):([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)"
 			"[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*"
 			"([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)[ ]*([^ ]*)";
 

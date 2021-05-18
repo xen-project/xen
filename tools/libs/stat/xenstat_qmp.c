@@ -38,7 +38,7 @@
 
 #include <yajl/yajl_tree.h>
 
-static unsigned char *qmp_query(int, char *);
+static unsigned char *qmp_query(int, const char *);
 
 enum query_blockstats {
     QMP_STATS_RETURN  = 0,
@@ -80,7 +80,7 @@ enum query_block {
 static char *qmp_get_block_image(xenstat_node *node, char *qmp_devname, int qfd)
 {
 	char *tmp, *file = NULL;
-	char *query_block_cmd = "{ \"execute\": \"query-block\" }";
+	const char *query_block_cmd = "{ \"execute\": \"query-block\" }";
 	static const char *const qblock[] = {
 		[ QMP_BLOCK_RETURN  ] = "return",
 		[ QMP_BLOCK_DEVICE  ] = "device",
@@ -264,7 +264,7 @@ done:
 }
 
 /* Write a command via the QMP. Returns number of bytes written */
-static size_t qmp_write(int qfd, char *cmd, size_t cmd_len)
+static size_t qmp_write(int qfd, const char *cmd, size_t cmd_len)
 {
 	size_t pos = 0;
 	ssize_t res;
@@ -317,7 +317,7 @@ static int qmp_read(int qfd, unsigned char **qstats)
 }
 
 /* With the given cmd, query QMP for requested data. Returns allocated buffer containing data or NULL */
-static unsigned char *qmp_query(int qfd, char *cmd)
+static unsigned char *qmp_query(int qfd, const char *cmd)
 {
 	unsigned char *qstats = NULL;
 	int n;
@@ -385,8 +385,8 @@ static int qmp_connect(char *path)
 */
 static void read_attributes_qdisk_dom(xenstat_node *node, domid_t domain)
 {
-	char *cmd_mode = "{ \"execute\": \"qmp_capabilities\" }";
-	char *query_blockstats_cmd = "{ \"execute\": \"query-blockstats\" }";
+	const char *cmd_mode = "{ \"execute\": \"qmp_capabilities\" }";
+	const char *query_blockstats_cmd = "{ \"execute\": \"query-blockstats\" }";
 	unsigned char *qmp_stats, *val;
 	char path[80];
 	int qfd;
