@@ -1148,10 +1148,11 @@ static int vcpu_hvm(struct xc_dom_image *dom)
 
 /* ------------------------------------------------------------------------ */
 
-static int x86_compat(xc_interface *xch, uint32_t domid, char *guest_type)
+static int x86_compat(xc_interface *xch, uint32_t domid,
+                      const char *guest_type)
 {
     static const struct {
-        char           *guest;
+        const char      *guest;
         uint32_t        size;
     } types[] = {
         { "xen-3.0-x86_32p", 32 },
@@ -1664,7 +1665,7 @@ static int bootearly(struct xc_dom_image *dom)
 static int bootlate_pv(struct xc_dom_image *dom)
 {
     static const struct {
-        char *guest;
+        const char *guest;
         unsigned long pgd_type;
     } types[] = {
         { "xen-3.0-x86_32",  MMUEXT_PIN_L2_TABLE},

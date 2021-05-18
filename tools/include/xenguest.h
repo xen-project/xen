@@ -108,7 +108,7 @@ struct xc_dom_image {
 
     /* info from (elf) kernel image */
     struct elf_dom_parms *parms;
-    char *guest_type;
+    const char *guest_type;
 
     /* memory layout */
     struct xc_dom_seg kernel_seg;
@@ -266,8 +266,8 @@ struct xc_dom_arch {
     /* arch-specific memory initialization. */
     int (*meminit) (struct xc_dom_image * dom);
 
-    char *guest_type;
-    char *native_protocol;
+    const char *guest_type;
+    const char *native_protocol;
     int page_shift;
     int sizeof_pfn;
     int p2m_base_supported;
@@ -374,9 +374,9 @@ char *xc_dom_strdup(struct xc_dom_image *dom, const char *str);
 
 /* --- alloc memory pool ------------------------------------------- */
 
-xen_pfn_t xc_dom_alloc_page(struct xc_dom_image *dom, char *name);
+xen_pfn_t xc_dom_alloc_page(struct xc_dom_image *dom, const char *name);
 int xc_dom_alloc_segment(struct xc_dom_image *dom,
-                         struct xc_dom_seg *seg, char *name,
+                         struct xc_dom_seg *seg, const char *name,
                          xen_vaddr_t start, xen_vaddr_t size);
 
 /* --- misc bits --------------------------------------------------- */

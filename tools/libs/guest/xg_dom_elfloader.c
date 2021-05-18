@@ -50,8 +50,8 @@ void xc_elf_set_logfile(xc_interface *xch, struct elf_binary *elf,
 
 /* ------------------------------------------------------------------------ */
 
-static char *xc_dom_guest_type(struct xc_dom_image *dom,
-                               struct elf_binary *elf)
+static const char *xc_dom_guest_type(struct xc_dom_image *dom,
+                                     struct elf_binary *elf)
 {
     uint64_t machine = elf_uval(elf, elf->ehdr, e_machine);
 

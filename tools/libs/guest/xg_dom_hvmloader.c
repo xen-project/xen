@@ -130,7 +130,7 @@ static elf_errorstatus xc_dom_parse_hvm_kernel(struct xc_dom_image *dom)
 
 static int module_init_one(struct xc_dom_image *dom,
                            struct xc_hvm_firmware_module *module,
-                           char *name)
+                           const char *name)
 {
     struct xc_dom_seg seg;
     void *dest;

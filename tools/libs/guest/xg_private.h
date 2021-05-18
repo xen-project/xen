@@ -43,7 +43,7 @@
 #endif
 
 struct xc_dom_loader {
-    char *name;
+    const char *name;
     /* Sadly the error returns from these functions are not consistent: */
     elf_negerrnoval (*probe) (struct xc_dom_image * dom);
     elf_negerrnoval (*parser) (struct xc_dom_image * dom);

@@ -422,7 +422,7 @@ void *xc_dom_pfn_to_ptr_retcount(struct xc_dom_image *dom, xen_pfn_t pfn,
     struct xc_dom_phys *phys;
     xen_pfn_t offset;
     unsigned int page_shift = XC_DOM_PAGE_SHIFT(dom);
-    char *mode = "unset";
+    const char *mode = "unset";
 
     *count_out = 0;
 
@@ -525,7 +525,7 @@ void *xc_dom_pfn_to_ptr_retcount(struct xc_dom_image *dom, xen_pfn_t pfn,
     return phys->ptr;
 }
 
-static int xc_dom_chk_alloc_pages(struct xc_dom_image *dom, char *name,
+static int xc_dom_chk_alloc_pages(struct xc_dom_image *dom, const char *name,
                                   xen_pfn_t pages)
 {
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
@@ -576,7 +576,7 @@ static int xc_dom_alloc_pad(struct xc_dom_image *dom, xen_vaddr_t boundary)
 }
 
 int xc_dom_alloc_segment(struct xc_dom_image *dom,
-                         struct xc_dom_seg *seg, char *name,
+                         struct xc_dom_seg *seg, const char *name,
                          xen_vaddr_t start, xen_vaddr_t size)
 {
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
@@ -611,7 +611,7 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
     return 0;
 }
 
-xen_pfn_t xc_dom_alloc_page(struct xc_dom_image *dom, char *name)
+xen_pfn_t xc_dom_alloc_page(struct xc_dom_image *dom, const char *name)
 {
     xen_vaddr_t start;
     xen_pfn_t pfn;
