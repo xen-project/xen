@@ -54,8 +54,6 @@ extern int8_t opt_pv_l1tf_hwdom, opt_pv_l1tf_domu;
  */
 extern paddr_t l1tf_addr_mask, l1tf_safe_maddr;
 
-extern uint64_t default_xen_mcu_opt_ctrl;
-
 static inline void init_shadow_spec_ctrl_state(void)
 {
     struct cpu_info *info = get_cpu_info();

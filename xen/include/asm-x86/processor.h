@@ -630,6 +630,9 @@ extern int8_t opt_tsx, cpu_has_tsx_ctrl;
 extern bool rtm_disabled;
 void tsx_init(void);
 
+void update_mcu_opt_ctrl(void);
+void set_in_mcu_opt_ctrl(uint32_t mask, uint32_t val);
+
 enum ap_boot_method {
     AP_BOOT_NORMAL,
     AP_BOOT_SKINIT,

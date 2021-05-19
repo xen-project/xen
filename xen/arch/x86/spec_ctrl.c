@@ -67,7 +67,6 @@ static bool __initdata cpu_has_bug_msbds_only; /* => minimal HT impact. */
 static bool __initdata cpu_has_bug_mds; /* Any other M{LP,SB,FB}DS combination. */
 
 static int8_t __initdata opt_srb_lock = -1;
-uint64_t __read_mostly default_xen_mcu_opt_ctrl;
 
 static int __init parse_spec_ctrl(const char *s)
 {
@@ -376,7 +375,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            !(caps & ARCH_CAPS_TSX_CTRL)              ? "" :
            (opt_tsx & 1)                             ? " TSX+" : " TSX-",
-           !boot_cpu_has(X86_FEATURE_SRBDS_CTRL)     ? "" :
+           !cpu_has_srbds_ctrl                       ? "" :
            opt_srb_lock                              ? " SRB_LOCK+" : " SRB_LOCK-",
            opt_ibpb                                  ? " IBPB"  : "",
            opt_l1d_flush                             ? " L1D_FLUSH" : "",
@@ -1251,32 +1250,24 @@ void __init init_speculation_mitigations(void)
         tsx_init();
     }
 
-    /* Calculate suitable defaults for MSR_MCU_OPT_CTRL */
-    if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
+    /*
+     * On some SRBDS-affected hardware, it may be safe to relax srb-lock by
+     * default.
+     *
+     * On parts which enumerate MDS_NO and not TAA_NO, TSX is the only known
+     * way to access the Fill Buffer.  If TSX isn't available (inc. SKU
+     * reasons on some models), or TSX is explicitly disabled, then there is
+     * no need for the extra overhead to protect RDRAND/RDSEED.
+     */
+    if ( cpu_has_srbds_ctrl )
     {
-        uint64_t val;
-
-        rdmsrl(MSR_MCU_OPT_CTRL, val);
-
-        /*
-         * On some SRBDS-affected hardware, it may be safe to relax srb-lock
-         * by default.
-         *
-         * On parts which enumerate MDS_NO and not TAA_NO, TSX is the only way
-         * to access the Fill Buffer.  If TSX isn't available (inc. SKU
-         * reasons on some models), or TSX is explicitly disabled, then there
-         * is no need for the extra overhead to protect RDRAND/RDSEED.
-         */
         if ( opt_srb_lock == -1 &&
              (caps & (ARCH_CAPS_MDS_NO|ARCH_CAPS_TAA_NO)) == ARCH_CAPS_MDS_NO &&
              (!cpu_has_hle || ((caps & ARCH_CAPS_TSX_CTRL) && rtm_disabled)) )
             opt_srb_lock = 0;
 
-        val &= ~MCU_OPT_CTRL_RNGDS_MITG_DIS;
-        if ( !opt_srb_lock )
-            val |= MCU_OPT_CTRL_RNGDS_MITG_DIS;
-
-        default_xen_mcu_opt_ctrl = val;
+        set_in_mcu_opt_ctrl(MCU_OPT_CTRL_RNGDS_MITG_DIS,
+                            opt_srb_lock ? 0 : MCU_OPT_CTRL_RNGDS_MITG_DIS);
     }
 
     print_details(thunk, caps);
@@ -1314,9 +1305,6 @@ void __init init_speculation_mitigations(void)
         wrmsrl(MSR_SPEC_CTRL, val);
         info->last_spec_ctrl = val;
     }
-
-    if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
-        wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
 }
 
 static void __init __maybe_unused build_assertions(void)
