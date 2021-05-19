@@ -385,8 +385,7 @@ void start_secondary(void *unused)
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
         info->last_spec_ctrl = default_xen_spec_ctrl;
     }
-    if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
-        wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
+    update_mcu_opt_ctrl();
 
     tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
 
