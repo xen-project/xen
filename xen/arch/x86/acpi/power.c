@@ -299,8 +299,7 @@ static int enter_state(u32 state)
         ci->last_spec_ctrl = default_xen_spec_ctrl;
     }
 
-    if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
-        wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
+    update_mcu_opt_ctrl();
 
     /* (re)initialise SYSCALL/SYSENTER state, amongst other things. */
     percpu_traps_init();
