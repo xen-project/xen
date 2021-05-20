@@ -2231,14 +2231,21 @@ pages) must also be specified via the tbuf_size parameter.
 
 Controls for the use of Transactional Synchronization eXtensions.
 
-On Intel parts released in Q3 2019 (with updated microcode), and future parts,
-a control has been introduced which allows TSX to be turned off.
+Several microcode updates are relevant:
 
-On systems with the ability to turn TSX off, this boolean offers system wide
+ * March 2019, fixing the TSX memory ordering errata on all TSX-enabled CPUs
+   to date.  Introduced MSR_TSX_FORCE_ABORT on SKL/SKX/KBL/WHL/CFL parts.  The
+   errata workaround uses Performance Counter 3, so the user can select
+   between working TSX and working perfcounters.
+
+ * November 2019, fixing the TSX Async Abort speculative vulnerability.
+   Introduced MSR_TSX_CTRL on all TSX-enabled MDS_NO parts to date,
+   CLX/WHL-R/CFL-R, with the controls becoming architectural moving forward
+   and formally retiring HLE from the architecture.  The user can disable TSX
+   to mitigate TAA, and elect to hide the HLE/RTM CPUID bits.
+
+On systems with the ability to configure TSX, this boolean offers system wide
 control of whether TSX is enabled or disabled.
-
-On parts vulnerable to CVE-2019-11135 / TSX Asynchronous Abort, the following
-logic applies:
 
  * An explicit `tsx=` choice is honoured, even if it is `true` and would
    result in a vulnerable system.
@@ -2246,9 +2253,13 @@ logic applies:
  * When no explicit `tsx=` choice is given, parts vulnerable to TAA will be
    mitigated by disabling TSX, as this is the lowest overhead option.
 
- * If the use of TSX is important, the more expensive TAA mitigations can be
+   If the use of TSX is important, the more expensive TAA mitigations can be
    opted in to with `smt=0 spec-ctrl=md-clear`, at which point TSX will remain
    active by default.
+
+ * When no explicit `tsx=` option is given, parts susceptible to the memory
+   ordering errata default to `true` to enable working TSX.  Alternatively,
+   selecting `tsx=0` will disable TSX and restore PCR3 to a working state.
 
 ### ucode
 > `= List of [ <integer> | scan=<bool>, nmi=<bool> ]`
@@ -2386,20 +2397,7 @@ provide access to a wealth of low level processor information.
 
 *   The `arch` option allows access to the pre-defined architectural events.
 
-*   The `rtm-abort` boolean controls a trade-off between working Restricted
-    Transactional Memory, and working performance counters.
-
-    All processors released to date (Q1 2019) supporting Transactional Memory
-    Extensions suffer an erratum which has been addressed in microcode.
-
-    Processors based on the Skylake microarchitecture with up-to-date
-    microcode internally use performance counter 3 to work around the erratum.
-    A consequence is that the counter gets reprogrammed whenever an `XBEGIN`
-    instruction is executed.
-
-    An alternative mode exists where PCR3 behaves as before, at the cost of
-    `XBEGIN` unconditionally aborting.  Enabling `rtm-abort` mode will
-    activate this alternative mode.
+*   The `rtm-abort` boolean has been superseded.  Use `tsx=0` instead.
 
 *Warning:*
 As the virtualisation is not 100% safe, don't use the vpmu flag on
