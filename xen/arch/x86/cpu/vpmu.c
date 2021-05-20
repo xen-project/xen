@@ -49,7 +49,6 @@ CHECK_pmu_params;
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
 unsigned int __read_mostly vpmu_features = 0;
-bool __read_mostly opt_rtm_abort;
 
 static DEFINE_SPINLOCK(vpmu_lock);
 static unsigned vpmu_count;
@@ -79,7 +78,8 @@ static int __init parse_vpmu_params(const char *s)
         else if ( !cmdline_strcmp(s, "arch") )
             vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
         else if ( (val = parse_boolean("rtm-abort", s, ss)) >= 0 )
-            opt_rtm_abort = val;
+            printk(XENLOG_WARNING
+                   "'rtm-abort=<bool>' superseded.  Use 'tsx=<bool>' instead\n");
         else
             rc = -EINVAL;
 

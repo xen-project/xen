@@ -356,9 +356,6 @@ static void Intel_errata_workarounds(struct cpuinfo_x86 *c)
 	    (c->x86_model == 29 || c->x86_model == 46 || c->x86_model == 47))
 		__set_bit(X86_FEATURE_CLFLUSH_MONITOR, c->x86_capability);
 
-	if (cpu_has_tsx_force_abort && opt_rtm_abort)
-		wrmsrl(MSR_TSX_FORCE_ABORT, TSX_FORCE_ABORT_RTM);
-
 	probe_c3_errata(c);
 }
 
