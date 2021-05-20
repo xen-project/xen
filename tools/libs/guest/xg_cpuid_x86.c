@@ -511,6 +511,8 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
          * so migrated-in VM's don't risk seeing features disappearing.
          */
         p->basic.rdrand = test_bit(X86_FEATURE_RDRAND, host_featureset);
+        p->feat.hle = test_bit(X86_FEATURE_HLE, host_featureset);
+        p->feat.rtm = test_bit(X86_FEATURE_RTM, host_featureset);
 
         if ( di.hvm )
         {
