@@ -259,6 +259,8 @@ static int enter_state(u32 state)
 
     microcode_resume_cpu(0);
 
+    tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
+
     if ( !recheck_cpu_features(0) )
         panic("Missing previously available feature(s)\n");
 
