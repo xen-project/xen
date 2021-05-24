@@ -583,7 +583,7 @@ func SchedulerFromString(name string) (s Scheduler, err error) {
 
 	ret := C.libxl_scheduler_from_string(cname, &cs)
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -622,7 +622,7 @@ func (ctx *Context) CpupoolInfo(Poolid uint32) (pool Cpupoolinfo, err error) {
 
 	ret := C.libxl_cpupool_info(ctx.ctx, &c_cpupool, C.uint32_t(Poolid))
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 	defer C.libxl_cpupoolinfo_dispose(&c_cpupool)
@@ -656,7 +656,7 @@ func (ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitma
 	ret := C.libxl_cpupool_create(ctx.ctx, name, C.libxl_scheduler(Scheduler),
 		cbm, &uuid, &poolid)
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -669,7 +669,7 @@ func (ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitma
 func (ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
 	ret := C.libxl_cpupool_destroy(ctx.ctx, C.uint32_t(Poolid))
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -680,7 +680,7 @@ func (ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
 func (ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
 	ret := C.libxl_cpupool_cpuadd(ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -698,7 +698,7 @@ func (ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error
 
 	ret := C.libxl_cpupool_cpuadd_cpumap(ctx.ctx, C.uint32_t(Poolid), &cbm)
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -709,7 +709,7 @@ func (ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error
 func (ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
 	ret := C.libxl_cpupool_cpuremove(ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -727,7 +727,7 @@ func (ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err er
 
 	ret := C.libxl_cpupool_cpuremove_cpumap(ctx.ctx, C.uint32_t(Poolid), &cbm)
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -741,7 +741,7 @@ func (ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
 
 	ret := C.libxl_cpupool_rename(ctx.ctx, name, C.uint32_t(Poolid))
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -754,7 +754,7 @@ func (ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err er
 
 	ret := C.libxl_cpupool_cpuadd_node(ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -769,7 +769,7 @@ func (ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err
 
 	ret := C.libxl_cpupool_cpuremove_node(ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -782,7 +782,7 @@ func (ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err
 func (ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
 	ret := C.libxl_cpupool_movedomain(ctx.ctx, C.uint32_t(Poolid), C.uint32_t(Id))
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -943,7 +943,7 @@ func (bm Bitmap) String() (s string) {
 func (ctx *Context) GetMaxCpus() (maxCpus int, err error) {
 	ret := C.libxl_get_max_cpus(ctx.ctx)
 	if ret < 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 	maxCpus = int(ret)
@@ -954,7 +954,7 @@ func (ctx *Context) GetMaxCpus() (maxCpus int, err error) {
 func (ctx *Context) GetOnlineCpus() (onCpus int, err error) {
 	ret := C.libxl_get_online_cpus(ctx.ctx)
 	if ret < 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 	onCpus = int(ret)
@@ -965,7 +965,7 @@ func (ctx *Context) GetOnlineCpus() (onCpus int, err error) {
 func (ctx *Context) GetMaxNodes() (maxNodes int, err error) {
 	ret := C.libxl_get_max_nodes(ctx.ctx)
 	if ret < 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 	maxNodes = int(ret)
@@ -978,7 +978,7 @@ func (ctx *Context) GetFreeMemory() (memkb uint64, err error) {
 	ret := C.libxl_get_free_memory(ctx.ctx, &cmem)
 
 	if ret < 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -1023,7 +1023,7 @@ func (ctx *Context) DomainInfo(Id Domid) (di *Dominfo, err error) {
 	ret := C.libxl_domain_info(ctx.ctx, &cdi, C.uint32_t(Id))
 
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 
@@ -1036,7 +1036,7 @@ func (ctx *Context) DomainUnpause(Id Domid) (err error) {
 	ret := C.libxl_domain_unpause(ctx.ctx, C.uint32_t(Id), nil)
 
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 	}
 	return
 }
@@ -1046,7 +1046,7 @@ func (ctx *Context) DomainPause(id Domid) (err error) {
 	ret := C.libxl_domain_pause(ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 	}
 	return
 }
@@ -1056,7 +1056,7 @@ func (ctx *Context) DomainShutdown(id Domid) (err error) {
 	ret := C.libxl_domain_shutdown(ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 	}
 	return
 }
@@ -1066,7 +1066,7 @@ func (ctx *Context) DomainReboot(id Domid) (err error) {
 	ret := C.libxl_domain_reboot(ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 	}
 	return
 }
@@ -1129,7 +1129,7 @@ func (ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (p
 	var cpath *C.char
 	ret := C.libxl_console_get_tty(ctx.ctx, C.uint32_t(id), C.int(consNum), C.libxl_console_type(conType), &cpath)
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 	defer C.free(unsafe.Pointer(cpath))
@@ -1144,7 +1144,7 @@ func (ctx *Context) PrimaryConsoleGetTty(domid uint32) (path string, err error) 
 	var cpath *C.char
 	ret := C.libxl_primary_console_get_tty(ctx.ctx, C.uint32_t(domid), &cpath)
 	if ret != 0 {
-		err = Error(-ret)
+		err = Error(ret)
 		return
 	}
 	defer C.free(unsafe.Pointer(cpath))
