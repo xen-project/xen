@@ -159,7 +159,7 @@ def xenlight_golang_define_union(ty = None, struct_name = '', union_name = ''):
     extras = []
 
     interface_name = '{0}_{1}_union'.format(struct_name, ty.keyvar.name)
-    interface_name = xenlight_golang_fmt_name(interface_name, exported=False)
+    interface_name = xenlight_golang_fmt_name(interface_name)
 
     s += 'type {0} interface {{\n'.format(interface_name)
     s += 'is{0}()\n'.format(interface_name)
@@ -341,7 +341,7 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
     field_name = xenlight_golang_fmt_name('{0}_union'.format(keyname))
 
     interface_name = '{0}_{1}_union'.format(struct_name, keyname)
-    interface_name = xenlight_golang_fmt_name(interface_name, exported=False)
+    interface_name = xenlight_golang_fmt_name(interface_name)
 
     cgo_keyname = keyname
     if cgo_keyname in go_keywords:
@@ -545,7 +545,7 @@ def xenlight_golang_union_to_C(ty = None, union_name = '',
     gokeytype = xenlight_golang_fmt_name(keytype)
 
     interface_name = '{0}_{1}_union'.format(struct_name, keyname)
-    interface_name = xenlight_golang_fmt_name(interface_name, exported=False)
+    interface_name = xenlight_golang_fmt_name(interface_name)
 
     cgo_keyname = keyname
     if cgo_keyname in go_keywords:

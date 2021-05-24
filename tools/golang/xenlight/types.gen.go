@@ -337,18 +337,18 @@ State int
 Evtch int
 Rref int
 Connection ChannelConnection
-ConnectionUnion channelinfoConnectionUnion
+ConnectionUnion ChannelinfoConnectionUnion
 }
 
-type channelinfoConnectionUnion interface {
-ischannelinfoConnectionUnion()
+type ChannelinfoConnectionUnion interface {
+isChannelinfoConnectionUnion()
 }
 
 type ChannelinfoConnectionUnionPty struct {
 Path string
 }
 
-func (x ChannelinfoConnectionUnionPty) ischannelinfoConnectionUnion(){}
+func (x ChannelinfoConnectionUnionPty) isChannelinfoConnectionUnion(){}
 
 type Vminfo struct {
 Uuid Uuid
@@ -510,7 +510,7 @@ Apic Defbool
 DmRestrict Defbool
 Tee TeeType
 Type DomainType
-TypeUnion domainBuildInfoTypeUnion
+TypeUnion DomainBuildInfoTypeUnion
 ArchArm struct {
 GicVersion GicVersion
 Vuart VuartType
@@ -522,8 +522,8 @@ Altp2M Altp2MMode
 VmtraceBufKb int
 }
 
-type domainBuildInfoTypeUnion interface {
-isdomainBuildInfoTypeUnion()
+type DomainBuildInfoTypeUnion interface {
+isDomainBuildInfoTypeUnion()
 }
 
 type DomainBuildInfoTypeUnionHvm struct {
@@ -575,7 +575,7 @@ RdmMemBoundaryMemkb uint64
 McaCaps uint64
 }
 
-func (x DomainBuildInfoTypeUnionHvm) isdomainBuildInfoTypeUnion(){}
+func (x DomainBuildInfoTypeUnionHvm) isDomainBuildInfoTypeUnion(){}
 
 type DomainBuildInfoTypeUnionPv struct {
 Kernel string
@@ -588,7 +588,7 @@ Features string
 E820Host Defbool
 }
 
-func (x DomainBuildInfoTypeUnionPv) isdomainBuildInfoTypeUnion(){}
+func (x DomainBuildInfoTypeUnionPv) isDomainBuildInfoTypeUnion(){}
 
 type DomainBuildInfoTypeUnionPvh struct {
 Pvshim Defbool
@@ -597,7 +597,7 @@ PvshimCmdline string
 PvshimExtra string
 }
 
-func (x DomainBuildInfoTypeUnionPvh) isdomainBuildInfoTypeUnion(){}
+func (x DomainBuildInfoTypeUnionPvh) isDomainBuildInfoTypeUnion(){}
 
 type DeviceVfb struct {
 BackendDomid Domid
@@ -761,11 +761,11 @@ type DeviceUsbdev struct {
 Ctrl Devid
 Port int
 Type UsbdevType
-TypeUnion deviceUsbdevTypeUnion
+TypeUnion DeviceUsbdevTypeUnion
 }
 
-type deviceUsbdevTypeUnion interface {
-isdeviceUsbdevTypeUnion()
+type DeviceUsbdevTypeUnion interface {
+isDeviceUsbdevTypeUnion()
 }
 
 type DeviceUsbdevTypeUnionHostdev struct {
@@ -773,7 +773,7 @@ Hostbus byte
 Hostaddr byte
 }
 
-func (x DeviceUsbdevTypeUnionHostdev) isdeviceUsbdevTypeUnion(){}
+func (x DeviceUsbdevTypeUnionHostdev) isDeviceUsbdevTypeUnion(){}
 
 type DeviceDtdev struct {
 Path string
@@ -807,18 +807,18 @@ BackendDomname string
 Devid Devid
 Name string
 Connection ChannelConnection
-ConnectionUnion deviceChannelConnectionUnion
+ConnectionUnion DeviceChannelConnectionUnion
 }
 
-type deviceChannelConnectionUnion interface {
-isdeviceChannelConnectionUnion()
+type DeviceChannelConnectionUnion interface {
+isDeviceChannelConnectionUnion()
 }
 
 type DeviceChannelConnectionUnionSocket struct {
 Path string
 }
 
-func (x DeviceChannelConnectionUnionSocket) isdeviceChannelConnectionUnion(){}
+func (x DeviceChannelConnectionUnionSocket) isDeviceChannelConnectionUnion(){}
 
 type ConnectorParam struct {
 UniqueId string
@@ -1116,31 +1116,31 @@ Domid Domid
 Domuuid Uuid
 ForUser uint64
 Type EventType
-TypeUnion eventTypeUnion
+TypeUnion EventTypeUnion
 }
 
-type eventTypeUnion interface {
-iseventTypeUnion()
+type EventTypeUnion interface {
+isEventTypeUnion()
 }
 
 type EventTypeUnionDomainShutdown struct {
 ShutdownReason byte
 }
 
-func (x EventTypeUnionDomainShutdown) iseventTypeUnion(){}
+func (x EventTypeUnionDomainShutdown) isEventTypeUnion(){}
 
 type EventTypeUnionDiskEject struct {
 Vdev string
 Disk DeviceDisk
 }
 
-func (x EventTypeUnionDiskEject) iseventTypeUnion(){}
+func (x EventTypeUnionDiskEject) isEventTypeUnion(){}
 
 type EventTypeUnionOperationComplete struct {
 Rc int
 }
 
-func (x EventTypeUnionOperationComplete) iseventTypeUnion(){}
+func (x EventTypeUnionOperationComplete) isEventTypeUnion(){}
 
 type PsrCmtType int
 const(
@@ -1175,11 +1175,11 @@ PsrFeatTypeMba PsrFeatType = 2
 type PsrHwInfo struct {
 Id uint32
 Type PsrFeatType
-TypeUnion psrHwInfoTypeUnion
+TypeUnion PsrHwInfoTypeUnion
 }
 
-type psrHwInfoTypeUnion interface {
-ispsrHwInfoTypeUnion()
+type PsrHwInfoTypeUnion interface {
+isPsrHwInfoTypeUnion()
 }
 
 type PsrHwInfoTypeUnionCat struct {
@@ -1188,7 +1188,7 @@ CbmLen uint32
 CdpEnabled bool
 }
 
-func (x PsrHwInfoTypeUnionCat) ispsrHwInfoTypeUnion(){}
+func (x PsrHwInfoTypeUnionCat) isPsrHwInfoTypeUnion(){}
 
 type PsrHwInfoTypeUnionMba struct {
 CosMax uint32
@@ -1196,5 +1196,5 @@ ThrtlMax uint32
 Linear bool
 }
 
-func (x PsrHwInfoTypeUnionMba) ispsrHwInfoTypeUnion(){}
+func (x PsrHwInfoTypeUnionMba) isPsrHwInfoTypeUnion(){}
 
