@@ -404,7 +404,7 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
         s += 'if err := {0}.fromC(xc);'.format(goname)
         s += 'err != nil {{\n return fmt.Errorf("converting field {0}: %v", err)\n}}\n'.format(goname)
 
-        s += 'x.{0} = {1}\n'.format(field_name, goname)
+        s += 'x.{0} = &{1}\n'.format(field_name, goname)
 
     # End switch statement
     s += 'default:\n'
@@ -570,7 +570,7 @@ def xenlight_golang_union_to_C(ty = None, union_name = '',
         gotype  = xenlight_golang_fmt_name(cgotype)
 
         field_name = xenlight_golang_fmt_name('{0}_union'.format(keyname))
-        s += 'tmp, ok := x.{0}.({1})\n'.format(field_name,gotype)
+        s += 'tmp, ok := x.{0}.(*{1})\n'.format(field_name,gotype)
         s += 'if !ok {\n'
         s += 'return errors.New("wrong type for union key {0}")\n'.format(keyname)
         s += '}\n'
