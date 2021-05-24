@@ -1272,3 +1272,13 @@ func (ctx *Context) DomainCreateNew(config *DomainConfig) (Domid, error) {
 
 	return Domid(cdomid), nil
 }
+
+// DomainDestroy destroys a domain given a domid.
+func (ctx *Context) DomainDestroy(domid Domid) error {
+	ret := C.libxl_domain_destroy(ctx.ctx, C.uint32_t(domid), nil)
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
