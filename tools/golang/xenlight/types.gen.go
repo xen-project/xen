@@ -211,6 +211,8 @@ ViridianEnlightenmentSynic ViridianEnlightenment = 7
 ViridianEnlightenmentStimer ViridianEnlightenment = 8
 ViridianEnlightenmentHcallIpi ViridianEnlightenment = 9
 ViridianEnlightenmentExProcessorMasks ViridianEnlightenment = 10
+ViridianEnlightenmentNoVpLimit ViridianEnlightenment = 11
+ViridianEnlightenmentCpuHotplug ViridianEnlightenment = 12
 )
 
 type Hdtype int
@@ -512,6 +514,9 @@ TypeUnion domainBuildInfoTypeUnion
 ArchArm struct {
 GicVersion GicVersion
 Vuart VuartType
+}
+ArchX86 struct {
+MsrRelaxed Defbool
 }
 Altp2M Altp2MMode
 VmtraceBufKb int
