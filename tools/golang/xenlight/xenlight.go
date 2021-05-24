@@ -1282,3 +1282,14 @@ func (ctx *Context) DomainDestroy(domid Domid) error {
 
 	return nil
 }
+
+// SendTrigger sends a Trigger to the domain specified by domid.
+func (ctx *Context) SendTrigger(domid Domid, trigger Trigger, vcpuid int) error {
+	ret := C.libxl_send_trigger(ctx.ctx, C.uint32_t(domid),
+		C.libxl_trigger(trigger), C.uint32_t(vcpuid), nil)
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
+}
