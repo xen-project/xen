@@ -491,13 +491,14 @@ func (sl *StringList) fromC(csl *C.libxl_string_list) error {
 
 func (sl StringList) toC(csl *C.libxl_string_list) error {
 	var char *C.char
-	size := len(sl)
+	size := len(sl) + 1
 	*csl = (C.libxl_string_list)(C.malloc(C.ulong(size) * C.ulong(unsafe.Sizeof(char))))
-	clist := (*[1 << 30]*C.char)(unsafe.Pointer(csl))[:size:size]
+	clist := (*[1 << 30]*C.char)(unsafe.Pointer(*csl))[:size:size]
 
 	for i, v := range sl {
 		clist[i] = C.CString(v)
 	}
+	clist[len(clist)-1] = nil
 
 	return nil
 }
