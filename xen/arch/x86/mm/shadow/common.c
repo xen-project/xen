@@ -2220,8 +2220,8 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
      */
 #define DO_UNSHADOW(_type) do {                                         \
     t = (_type);                                                        \
-    if( !(pg->count_info & PGC_page_table)                              \
-        || !(pg->shadow_flags & (1 << t)) )                             \
+    if ( !(pg->count_info & PGC_page_table) ||                          \
+         !(pg->shadow_flags & (1 << t)) )                               \
         break;                                                          \
     smfn = shadow_hash_lookup(d, mfn_x(gmfn), t);                       \
     if ( unlikely(!mfn_valid(smfn)) )                                   \
@@ -2235,11 +2235,13 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
         sh_unpin(d, smfn);                                              \
     else if ( sh_type_has_up_pointer(d, t) )                            \
         sh_remove_shadow_via_pointer(d, smfn);                          \
-    if( !fast                                                           \
-        && (pg->count_info & PGC_page_table)                            \
-        && (pg->shadow_flags & (1 << t)) )                              \
+    if ( !fast &&                                                       \
+         (pg->count_info & PGC_page_table) &&                           \
+         (pg->shadow_flags & (1 << t)) )                                \
+    {                                                                   \
         HASH_CALLBACKS_CHECK(SHF_page_type_mask);                       \
         hash_domain_foreach(d, masks[t], callbacks, smfn);              \
+    }                                                                   \
 } while (0)
 
     DO_UNSHADOW(SH_type_l2_32_shadow);
