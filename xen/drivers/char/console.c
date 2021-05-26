@@ -168,10 +168,11 @@ static int parse_guest_loglvl(const char *s);
 static char xenlog_val[LOGLVL_VAL_SZ];
 static char xenlog_guest_val[LOGLVL_VAL_SZ];
 
-static char *lvl2opt[] = { "none", "error", "warning", "info", "all" };
-
 static void xenlog_update_val(int lower, int upper, char *val)
 {
+    static const char * const lvl2opt[] =
+        { "none", "error", "warning", "info", "all" };
+
     snprintf(val, LOGLVL_VAL_SZ, "%s/%s", lvl2opt[lower], lvl2opt[upper]);
 }
 
@@ -262,7 +263,7 @@ static int parse_guest_loglvl(const char *s)
     return ret;
 }
 
-static char *loglvl_str(int lvl)
+static const char *loglvl_str(int lvl)
 {
     switch ( lvl )
     {
