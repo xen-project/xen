@@ -74,10 +74,10 @@ $(D): linkfarm.stamp
 	$(MAKE) -C $(D)/xen distclean
 
 $(D)/xen/.config: $(D)
-	$(MAKE) -C $(@D) KBUILD_DEFCONFIG=pvshim_defconfig XEN_CONFIG_EXPERT=y defconfig
+	$(MAKE) -C $(@D) KBUILD_DEFCONFIG=pvshim_defconfig defconfig
 
 xen-shim: $(D)/xen/.config
-	$(MAKE) -C $(<D) build XEN_CONFIG_EXPERT=y
+	$(MAKE) -C $(<D) build
 	ln -sf $(D)/xen/xen $@
 	ln -sf $(D)/xen/xen-syms $@-syms
 
