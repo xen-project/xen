@@ -589,7 +589,7 @@ void lu_read_state(void)
 	 * have died while we were live-updating. So check all the domains are
 	 * still alive.
 	 */
-	check_domains(true);
+	check_domains();
 }
 
 static const char *lu_activate_binary(const void *ctx)
