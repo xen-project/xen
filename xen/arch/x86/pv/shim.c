@@ -679,6 +679,7 @@ void pv_shim_inject_evtchn(unsigned int port)
 # include <compat/grant_table.h>
 #else
 # define compat_gnttab_setup_table gnttab_setup_table
+# undef compat_handle_okay
 # define compat_handle_okay guest_handle_okay
 #endif
 
