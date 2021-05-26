@@ -325,7 +325,7 @@ int main(int argc, char **argv)
 {
 	struct termios attr;
 	int domid;
-	char *sopt = "hn:";
+	const char *sopt = "hn:";
 	int ch;
 	unsigned int num = 0;
 	int opt_ind=0;
@@ -345,7 +345,7 @@ int main(int argc, char **argv)
 	char *end;
 	console_type type = CONSOLE_INVAL;
 	bool interactive = 0;
-	char *console_names = "serial, pv, vuart";
+	const char *console_names = "serial, pv, vuart";
 
 	while((ch = getopt_long(argc, argv, sopt, lopt, &opt_ind)) != -1) {
 		switch(ch) {

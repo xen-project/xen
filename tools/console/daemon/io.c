@@ -87,14 +87,14 @@ struct buffer {
 };
 
 struct console {
-	char *ttyname;
+	const char *ttyname;
 	int master_fd;
 	int master_pollfd_idx;
 	int slave_fd;
 	int log_fd;
 	struct buffer buffer;
 	char *xspath;
-	char *log_suffix;
+	const char *log_suffix;
 	int ring_ref;
 	xenevtchn_handle *xce_handle;
 	int xce_pollfd_idx;
@@ -109,9 +109,9 @@ struct console {
 };
 
 struct console_type {
-	char *xsname;
-	char *ttyname;
-	char *log_suffix;
+	const char *xsname;
+	const char *ttyname;
+	const char *log_suffix;
 	bool optional;
 	bool use_gnttab;
 };
@@ -813,7 +813,8 @@ static int console_init(struct console *con, struct domain *dom, void **data)
 	int err = -1;
 	struct timespec ts;
 	struct console_type **con_type = (struct console_type **)data;
-	char *xsname, *xspath;
+	const char *xsname;
+	char *xspath;
 
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0) {
 		dolog(LOG_ERR, "Cannot get time of day %s:%s:L%d",
@@ -835,7 +836,7 @@ static int console_init(struct console *con, struct domain *dom, void **data)
 	con->log_suffix = (*con_type)->log_suffix;
 	con->optional = (*con_type)->optional;
 	con->use_gnttab = (*con_type)->use_gnttab;
-	xsname = (char *)(*con_type)->xsname;
+	xsname = (*con_type)->xsname;
 	xspath = xs_get_domain_path(xs, dom->domid);
 	s = realloc(xspath, strlen(xspath) +
 		    strlen(xsname) + 1);
