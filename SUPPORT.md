@@ -351,9 +351,10 @@ Currently only single-vcpu domains are supported.
 A very simple, very static scheduling policy
 that always schedules the same vCPU(s) on the same pCPU(s).
 It is designed for maximum determinism and minimum overhead
-on embedded platforms.
+on embedded platforms and the x86 PV shim.
 
     Status: Experimental
+    Status, x86/shim: Supported
 
 ### NUMA scheduler affinity
 

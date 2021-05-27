@@ -6,7 +6,6 @@ CONFIG_PV_SHIM=y
 CONFIG_PV_SHIM_EXCLUSIVE=y
 CONFIG_NR_CPUS=32
 CONFIG_EXPERT=y
-CONFIG_SCHED_NULL=y
 # Disable features not used by the PV shim
 # CONFIG_XEN_SHSTK is not set
 # CONFIG_GRANT_TABLE is not set
@@ -15,7 +14,7 @@ CONFIG_SCHED_NULL=y
 # CONFIG_KEXEC is not set
 # CONFIG_XENOPROF is not set
 # CONFIG_XSM is not set
-# CONFIG_ARGO is not set
+# CONFIG_UNSUPPORTED is not set
 # CONFIG_SCHED_CREDIT is not set
 # CONFIG_SCHED_CREDIT2 is not set
 # CONFIG_SCHED_RTDS is not set

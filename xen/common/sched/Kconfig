@@ -16,7 +16,7 @@ config SCHED_CREDIT2
 
 config SCHED_RTDS
 	bool "RTDS scheduler support (UNSUPPORTED)" if UNSUPPORTED
-	default y
+	default DEBUG
 	---help---
 	  The RTDS scheduler is a soft and firm real-time scheduler for
 	  multicore, targeted for embedded, automotive, graphics and gaming
@@ -31,7 +31,7 @@ config SCHED_ARINC653
 
 config SCHED_NULL
 	bool "Null scheduler support (UNSUPPORTED)" if UNSUPPORTED
-	default y
+	default PV_SHIM || DEBUG
 	---help---
 	  The null scheduler is a static, zero overhead scheduler,
 	  for when there always are less vCPUs than pCPUs, typically
@@ -39,6 +39,7 @@ config SCHED_NULL
 
 choice
 	prompt "Default Scheduler?"
+	default SCHED_NULL_DEFAULT if PV_SHIM_EXCLUSIVE
 	default SCHED_CREDIT2_DEFAULT
 
 	config SCHED_CREDIT_DEFAULT
