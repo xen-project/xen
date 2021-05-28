@@ -499,7 +499,7 @@ static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
 /* glue it all together ...                                                 */
 
 elf_errorstatus elf_xen_parse(struct elf_binary *elf,
-                  struct elf_dom_parms *parms)
+                  struct elf_dom_parms *parms, bool hvm)
 {
     ELF_HANDLE_DECL(elf_shdr) shdr;
     ELF_HANDLE_DECL(elf_phdr) phdr;
@@ -577,10 +577,8 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
 
     }
 
-    /*
-     * Finally fall back to the __xen_guest section.
-     */
-    if ( xen_elfnotes == 0 )
+    /* Finally fall back to the __xen_guest section for PV guests only. */
+    if ( xen_elfnotes == 0 && !hvm )
     {
         shdr = elf_shdr_by_name(elf, "__xen_guest");
         if ( ELF_HANDLE_VALID(shdr) )

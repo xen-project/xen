@@ -454,7 +454,7 @@ int elf_xen_parse_note(struct elf_binary *elf,
 int elf_xen_parse_guest_info(struct elf_binary *elf,
                              struct elf_dom_parms *parms);
 int elf_xen_parse(struct elf_binary *elf,
-                  struct elf_dom_parms *parms);
+                  struct elf_dom_parms *parms, bool hvm);
 
 static inline void *elf_memcpy_unchecked(void *dest, const void *src, size_t n)
     { return memcpy(dest, src, n); }

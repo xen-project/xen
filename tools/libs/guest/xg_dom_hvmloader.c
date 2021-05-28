@@ -73,7 +73,7 @@ static elf_negerrnoval xc_dom_probe_hvm_kernel(struct xc_dom_image *dom)
      * else we might be trying to load a PV kernel.
      */
     elf_parse_binary(&elf);
-    rc = elf_xen_parse(&elf, dom->parms);
+    rc = elf_xen_parse(&elf, dom->parms, true);
     if ( rc == 0 )
         return -EINVAL;
 

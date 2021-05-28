@@ -135,7 +135,8 @@ static elf_negerrnoval xc_dom_probe_elf_kernel(struct xc_dom_image *dom)
      * or else we might be trying to load a plain ELF.
      */
     elf_parse_binary(&elf);
-    rc = elf_xen_parse(&elf, dom->parms);
+    rc = elf_xen_parse(&elf, dom->parms,
+                       dom->container_type == XC_DOM_HVM_CONTAINER);
     if ( rc != 0 )
         return rc;
 
@@ -166,7 +167,8 @@ static elf_negerrnoval xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
 
     /* parse binary and get xen meta info */
     elf_parse_binary(elf);
-    if ( elf_xen_parse(elf, dom->parms) != 0 )
+    if ( elf_xen_parse(elf, dom->parms,
+                       dom->container_type == XC_DOM_HVM_CONTAINER) != 0 )
     {
         rc = -EINVAL;
         goto out;

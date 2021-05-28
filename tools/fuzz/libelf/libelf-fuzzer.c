@@ -17,7 +17,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         return -1;
 
     elf_parse_binary(elf);
-    elf_xen_parse(elf, &parms);
+    elf_xen_parse(elf, &parms, false);
+    elf_xen_parse(elf, &parms, true);
 
     return 0;
 }
