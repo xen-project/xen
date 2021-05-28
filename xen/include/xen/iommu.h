@@ -51,8 +51,12 @@ static inline bool_t dfn_eq(dfn_t x, dfn_t y)
     return dfn_x(x) == dfn_x(y);
 }
 
+#ifdef CONFIG_HAS_PASSTHROUGH
 extern bool_t iommu_enable, iommu_enabled;
 extern bool force_iommu, iommu_quarantine, iommu_verbose;
+#else
+#define iommu_enabled false
+#endif
 
 #ifdef CONFIG_X86
 extern enum __packed iommu_intremap {
