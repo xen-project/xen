@@ -360,7 +360,7 @@ elf_errorstatus elf_xen_parse_guest_info(struct elf_binary *elf,
 /* sanity checks                                                            */
 
 static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
-                              struct elf_dom_parms *parms)
+                              struct elf_dom_parms *parms, bool hvm)
 {
     if ( (ELF_PTRVAL_INVALID(parms->elf_note_start)) &&
          (ELF_PTRVAL_INVALID(parms->guest_info)) )
@@ -382,7 +382,7 @@ static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
     }
 
     /* PVH only requires one ELF note to be set */
-    if ( parms->phys_entry != UNSET_ADDR32 )
+    if ( parms->phys_entry != UNSET_ADDR32 && hvm )
     {
         elf_msg(elf, "ELF: Found PVH image\n");
         return 0;
@@ -414,7 +414,7 @@ static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
 }
 
 static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
-                                   struct elf_dom_parms *parms)
+                                   struct elf_dom_parms *parms, bool hvm)
 {
     uint64_t virt_offset;
 
@@ -425,12 +425,15 @@ static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
         return -1;
     }
 
-    /* Initial guess for virt_base is 0 if it is not explicitly defined. */
-    if ( parms->virt_base == UNSET_ADDR )
+    /*
+     * Initial guess for virt_base is 0 if it is not explicitly defined in the
+     * PV case. For PVH virt_base is forced to 0 because paging is disabled.
+     */
+    if ( parms->virt_base == UNSET_ADDR || hvm )
     {
         parms->virt_base = 0;
-        elf_msg(elf, "ELF: VIRT_BASE unset, using %#" PRIx64 "\n",
-                parms->virt_base);
+        if ( !hvm )
+            elf_msg(elf, "ELF: VIRT_BASE unset, using 0\n");
     }
 
     /*
@@ -441,23 +444,31 @@ static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
      *
      * If we are using the modern ELF notes interface then the default
      * is 0.
+     *
+     * For PVH this is forced to 0, as it's already a legacy option for PV.
      */
-    if ( parms->elf_paddr_offset == UNSET_ADDR )
+    if ( parms->elf_paddr_offset == UNSET_ADDR || hvm )
     {
-        if ( parms->elf_note_start )
+        if ( parms->elf_note_start || hvm )
             parms->elf_paddr_offset = 0;
         else
             parms->elf_paddr_offset = parms->virt_base;
-        elf_msg(elf, "ELF_PADDR_OFFSET unset, using %#" PRIx64 "\n",
-                parms->elf_paddr_offset);
+        if ( !hvm )
+            elf_msg(elf, "ELF_PADDR_OFFSET unset, using %#" PRIx64 "\n",
+                    parms->elf_paddr_offset);
     }
 
     virt_offset = parms->virt_base - parms->elf_paddr_offset;
     parms->virt_kstart = elf->pstart + virt_offset;
     parms->virt_kend   = elf->pend   + virt_offset;
 
-    if ( parms->virt_entry == UNSET_ADDR )
-        parms->virt_entry = elf_uval(elf, elf->ehdr, e_entry);
+    if ( parms->virt_entry == UNSET_ADDR || hvm )
+    {
+        if ( parms->phys_entry != UNSET_ADDR32 && hvm )
+            parms->virt_entry = parms->phys_entry;
+        else
+            parms->virt_entry = elf_uval(elf, elf->ehdr, e_entry);
+    }
 
     if ( parms->bsd_symtab )
     {
@@ -592,9 +603,9 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
         }
     }
 
-    if ( elf_xen_note_check(elf, parms) != 0 )
+    if ( elf_xen_note_check(elf, parms, hvm) != 0 )
         return -1;
-    if ( elf_xen_addr_calc_check(elf, parms) != 0 )
+    if ( elf_xen_addr_calc_check(elf, parms, hvm) != 0 )
         return -1;
     return 0;
 }
