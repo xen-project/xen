@@ -27,8 +27,6 @@ static vmac_t domain_mac;     /* MAC for all domains during S3 */
 static vmac_t xenheap_mac;    /* MAC for xen heap during S3 */
 static vmac_t frametable_mac; /* MAC for frame table during S3 */
 
-static const uuid_t tboot_shared_uuid = TBOOT_SHARED_UUID;
-
 /* used by tboot_protect_mem_regions() and/or tboot_parse_dmar_table() */
 static uint64_t __initdata txt_heap_base, __initdata txt_heap_size;
 static uint64_t __initdata sinit_base, __initdata sinit_size;
@@ -93,6 +91,7 @@ static void __init tboot_copy_memory(unsigned char *va, uint32_t size,
 void __init tboot_probe(void)
 {
     tboot_shared_t *tboot_shared;
+    static const uuid_t __initconst tboot_shared_uuid = TBOOT_SHARED_UUID;
 
     /* Look for valid page-aligned address for shared page. */
     if ( !opt_tboot_pa || (opt_tboot_pa & ~PAGE_MASK) )
@@ -101,9 +100,7 @@ void __init tboot_probe(void)
     /* Map and check for tboot UUID. */
     set_fixmap(FIX_TBOOT_SHARED_BASE, opt_tboot_pa);
     tboot_shared = fix_to_virt(FIX_TBOOT_SHARED_BASE);
-    if ( tboot_shared == NULL )
-        return;
-    if ( memcmp(&tboot_shared_uuid, (uuid_t *)tboot_shared, sizeof(uuid_t)) )
+    if ( memcmp(&tboot_shared_uuid, &tboot_shared->uuid, sizeof(uuid_t)) )
         return;
 
     /* new tboot_shared (w/ GAS support, integrity, etc.) is not backwards
