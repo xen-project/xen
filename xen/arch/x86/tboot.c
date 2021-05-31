@@ -323,12 +323,12 @@ static void tboot_gen_frametable_integrity(const uint8_t key[TB_KEY_SIZE],
         if ( nidx >= max_idx )
             break;
         vmac_update((uint8_t *)pdx_to_page(sidx * PDX_GROUP_COUNT),
-                       pdx_to_page(eidx * PDX_GROUP_COUNT)
-                       - pdx_to_page(sidx * PDX_GROUP_COUNT), &ctx);
+                    (eidx - sidx) * PDX_GROUP_COUNT * sizeof(*frame_table),
+                    &ctx);
     }
     vmac_update((uint8_t *)pdx_to_page(sidx * PDX_GROUP_COUNT),
-                   pdx_to_page(max_pdx - 1) + 1
-                   - pdx_to_page(sidx * PDX_GROUP_COUNT), &ctx);
+                (max_pdx - sidx * PDX_GROUP_COUNT) * sizeof(*frame_table),
+                &ctx);
 
     *mac = vmac(NULL, 0, nonce, NULL, &ctx);
 
