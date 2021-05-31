@@ -78,8 +78,6 @@ extern u32 get_pat_flags(struct vcpu *v, u32 gl1e_flags, paddr_t gpaddr,
 extern int epte_get_entry_emt(struct domain *, unsigned long gfn, mfn_t mfn,
                               unsigned int order, uint8_t *ipat,
                               bool_t direct_mmio);
-extern void ept_change_entry_emt_with_range(
-    struct domain *d, unsigned long start_gfn, unsigned long end_gfn);
 extern unsigned char pat_type_2_pte_flags(unsigned char pat_type);
 extern int hold_mtrr_updates_on_aps;
 extern void mtrr_aps_sync_begin(void);
