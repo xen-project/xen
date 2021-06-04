@@ -20,6 +20,7 @@
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/params.h>
+#include "xc_core.h"
 
 static int modify_returncode(xc_interface *xch, uint32_t domid)
 {
@@ -137,12 +138,10 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
     struct domain_info_context _dinfo = { .guest_width = 0,
                                           .p2m_size = 0 };
     struct domain_info_context *dinfo = &_dinfo;
-    unsigned long mfn;
+    xen_pfn_t mfn, store_mfn, console_mfn;
     vcpu_guest_context_any_t ctxt;
-    start_info_t *start_info;
-    shared_info_t *shinfo = NULL;
-    xen_pfn_t *p2m_frame_list_list = NULL;
-    xen_pfn_t *p2m_frame_list = NULL;
+    start_info_any_t *start_info;
+    shared_info_any_t *shinfo = NULL;
     xen_pfn_t *p2m = NULL;
 #endif
 
@@ -164,11 +163,6 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
         PERROR("Could not get domain width");
         return rc;
     }
-    if ( dinfo->guest_width != sizeof(long) )
-    {
-        ERROR("Cannot resume uncooperative cross-address-size guests");
-        return rc;
-    }
 
     /* Map the shared info frame */
     shinfo = xc_map_foreign_range(xch, domid, PAGE_SIZE,
@@ -179,34 +173,8 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
         goto out;
     }
 
-    dinfo->p2m_size = shinfo->arch.max_pfn;
-
-    p2m_frame_list_list =
-        xc_map_foreign_range(xch, domid, PAGE_SIZE, PROT_READ,
-                             shinfo->arch.pfn_to_mfn_frame_list_list);
-    if ( p2m_frame_list_list == NULL )
-    {
-        ERROR("Couldn't map p2m_frame_list_list");
-        goto out;
-    }
-
-    p2m_frame_list = xc_map_foreign_pages(xch, domid, PROT_READ,
-                                          p2m_frame_list_list,
-                                          P2M_FLL_ENTRIES);
-    if ( p2m_frame_list == NULL )
-    {
-        ERROR("Couldn't map p2m_frame_list");
-        goto out;
-    }
-
-    /* Map all the frames of the pfn->mfn table. For migrate to succeed,
-       the guest must not change which frames are used for this purpose.
-       (its not clear why it would want to change them, and we'll be OK
-       from a safety POV anyhow. */
-    p2m = xc_map_foreign_pages(xch, domid, PROT_READ,
-                               p2m_frame_list,
-                               P2M_FL_ENTRIES);
-    if ( p2m == NULL )
+    /* Map the p2m list */
+    if ( xc_core_arch_map_p2m(xch, dinfo, &info, shinfo, &p2m) )
     {
         ERROR("Couldn't map p2m table");
         goto out;
@@ -228,8 +196,20 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
         goto out;
     }
 
-    start_info->store_mfn        = p2m[start_info->store_mfn];
-    start_info->console.domU.mfn = p2m[start_info->console.domU.mfn];
+    store_mfn = GET_FIELD(start_info, store_mfn, dinfo->guest_width);
+    console_mfn = GET_FIELD(start_info, console.domU.mfn, dinfo->guest_width);
+    if ( dinfo->guest_width == 4 )
+    {
+        store_mfn = ((uint32_t *)p2m)[store_mfn];
+        console_mfn = ((uint32_t *)p2m)[console_mfn];
+    }
+    else
+    {
+        store_mfn = ((uint64_t *)p2m)[store_mfn];
+        console_mfn = ((uint64_t *)p2m)[console_mfn];
+    }
+    SET_FIELD(start_info, store_mfn, store_mfn, dinfo->guest_width);
+    SET_FIELD(start_info, console.domU.mfn, console_mfn, dinfo->guest_width);
 
     munmap(start_info, PAGE_SIZE);
 #endif /* defined(__i386__) || defined(__x86_64__) */
@@ -250,11 +230,7 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
 out:
 #if defined(__i386__) || defined(__x86_64__)
     if (p2m)
-        munmap(p2m, P2M_FL_ENTRIES*PAGE_SIZE);
-    if (p2m_frame_list)
-        munmap(p2m_frame_list, P2M_FLL_ENTRIES*PAGE_SIZE);
-    if (p2m_frame_list_list)
-        munmap(p2m_frame_list_list, PAGE_SIZE);
+        munmap(p2m, dinfo->p2m_frames * PAGE_SIZE);
     if (shinfo)
         munmap(shinfo, PAGE_SIZE);
 #endif
