@@ -22,6 +22,7 @@
 #include <asm/hvm/trace.h>
 #include <asm/current.h>
 #include <asm/hpet.h>
+#include <asm/mc146818rtc.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/trace.h>
@@ -289,7 +290,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
         /* if LegacyReplacementRoute bit is set, HPET specification requires
            timer0 be routed to IRQ0 in NON-APIC or IRQ2 in the I/O APIC,
            timer1 be routed to IRQ8 in NON-APIC or IRQ8 in the I/O APIC. */
-        irq = (tn == 0) ? 0 : 8;
+        irq = (tn == 0) ? 0 : RTC_IRQ;
         h->pt[tn].source = PTSRC_isa;
     }
     else
@@ -317,7 +318,8 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
                          hpet_tick_to_ns(h, diff),
                          oneshot ? 0 : hpet_tick_to_ns(h, h->hpet.period[tn]),
                          irq, timer_level(h, tn) ? hpet_timer_fired : NULL,
-                         (void *)(unsigned long)tn, timer_level(h, tn));
+                         timer_level(h, tn) ? (void *)(unsigned long)tn : NULL,
+                         timer_level(h, tn));
 }
 
 static inline uint64_t hpet_fixup_reg(
