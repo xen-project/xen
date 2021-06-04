@@ -19,7 +19,7 @@ extern u64 pdx_region_mask(u64 base, u64 len);
 extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
 
 #define page_to_pdx(pg)  ((pg) - frame_table)
-#define pdx_to_page(pdx) (frame_table + (pdx))
+#define pdx_to_page(pdx) gcc11_wrap(frame_table + (pdx))
 
 bool __mfn_valid(unsigned long mfn);
 

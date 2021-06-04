@@ -78,7 +78,7 @@ extern void __set_fixmap(
 
 #define clear_fixmap(idx) __set_fixmap(idx, 0, 0)
 
-#define __fix_to_virt(x) (FIXADDR_TOP - ((x) << PAGE_SHIFT))
+#define __fix_to_virt(x) gcc11_wrap(FIXADDR_TOP - ((x) << PAGE_SHIFT))
 #define __virt_to_fix(x) ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
 
 #define fix_to_virt(x)   ((void *)__fix_to_virt(x))
