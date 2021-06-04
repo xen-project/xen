@@ -540,6 +540,7 @@ struct vtd_iommu {
     struct list_head ats_devices;
     unsigned long *domid_bitmap;  /* domain id bitmap */
     u16 *domid_map;               /* domain id mapping array */
+    uint32_t version;
 };
 
 #define INTEL_IOMMU_DEBUG(fmt, args...) \
@@ -548,5 +549,11 @@ struct vtd_iommu {
         if ( iommu_debug )  \
             dprintk(XENLOG_WARNING VTDPREFIX, fmt, ## args);    \
     } while(0)
+
+/* Register-based invalidation isn't supported by VT-d version 6 and beyond. */
+static inline bool has_register_based_invalidation(const struct vtd_iommu *vtd)
+{
+    return VER_MAJOR(vtd->version) < 6;
+}
 
 #endif

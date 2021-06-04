@@ -1370,7 +1370,9 @@ The following options are specific to Intel VT-d hardware:
 *   The `qinval` boolean controls the Queued Invalidation sub-feature, and is
     active by default on compatible hardware.  Queued Invalidation is a
     feature in second-generation IOMMUs and is a functional prerequisite for
-    Interrupt Remapping.
+    Interrupt Remapping. Note that Xen disregards this setting for Intel VT-d
+    version 6 and greater as Registered-Based Invalidation isn't supported
+    by them.
 
 *   The `igfx` boolean is active by default, and controls whether the IOMMU in
     front of an Intel Graphics Device is enabled or not.
