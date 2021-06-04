@@ -689,6 +689,68 @@ int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
 
 int xc_exchange_page(xc_interface *xch, uint32_t domid, xen_pfn_t mfn);
 
+/**
+ * This function resumes a suspended domain. The domain should have
+ * been previously suspended.
+ *
+ * Note that there are 'xc_domain_suspend' as suspending a domain
+ * is quite the endeavour.
+ *
+ * For the purpose of this explanation there are three guests:
+ * PV (using hypercalls for privilgied operations), HVM
+ * (fully hardware virtualized guests using emulated devices for everything),
+ * and PVHVM (PV aware with hardware virtualisation).
+ *
+ * HVM guest are the simplest - they suspend via S3 / S4 and resume from
+ * S3 / S4. Upon resume they have to re-negotiate with the emulated devices.
+ *
+ * PV and PVHVM communicate via hypercalls for suspend (and resume).
+ * For suspend the toolstack initiates the process by writing an value
+ * in XenBus "control/shutdown" with the string "suspend".
+ *
+ * The PV guest stashes anything it deems neccessary in 'struct
+ * start_info' in case of failure (PVHVM may ignore this) and calls
+ * the SCHEDOP_shutdown::SHUTDOWN_suspend hypercall (for PV as
+ * argument it passes the MFN to 'struct start_info').
+ *
+ * And then the guest is suspended.
+ *
+ * The checkpointing or notifying a guest that the suspend failed or
+ * cancelled (in case of checkpoint) is by having the
+ * SCHEDOP_shutdown::SHUTDOWN_suspend hypercall return a non-zero
+ * value.
+ *
+ * The PV and PVHVM resume path are similar. For PV it would be
+ * similar to bootup - figure out where the 'struct start_info' is (or
+ * if the suspend was cancelled aka checkpointed - reuse the saved
+ * values).
+ *
+ * From here on they differ depending whether the guest is PV or PVHVM
+ * in specifics but follow overall the same path:
+ *  - PV: Bringing up the vCPUS,
+ *  - PVHVM: Setup vector callback,
+ *  - Bring up vCPU runstates,
+ *  - Remap the grant tables if checkpointing or setup from scratch,
+ *
+ *
+ * If the resume was not checkpointing (or if suspend was succesful) we would
+ * setup the PV timers and the different PV events. Lastly the PV drivers
+ * re-negotiate with the backend.
+ *
+ * This function would return before the guest started resuming. That is
+ * the guest would be in non-running state and its vCPU context would be
+ * in the the SCHEDOP_shutdown::SHUTDOWN_suspend hypercall return path
+ * (for PV and PVHVM). For HVM it would be in would be in QEMU emulated
+ * BIOS handling S3 suspend.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid the domain id to resume
+ * @parm fast use cooperative resume (guest must support this)
+ * return 0 on success, -1 on failure
+ */
+int xc_domain_resume(xc_interface *xch,
+                     uint32_t domid,
+                     int fast);
 
 /**
  * Memory related information, such as PFN types, the P2M table,

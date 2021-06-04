@@ -20,7 +20,6 @@ SRCS-y       += xc_rt.c
 SRCS-y       += xc_tbuf.c
 SRCS-y       += xc_pm.c
 SRCS-y       += xc_cpu_hotplug.c
-SRCS-y       += xc_resume.c
 SRCS-y       += xc_vm_event.c
 SRCS-y       += xc_vmtrace.c
 SRCS-y       += xc_monitor.c

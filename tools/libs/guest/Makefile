@@ -9,6 +9,7 @@ endif
 SRCS-y += xg_private.c
 SRCS-y += xg_domain.c
 SRCS-y += xg_suspend.c
+SRCS-y += xg_resume.c
 ifeq ($(CONFIG_MIGRATE),y)
 SRCS-y += xg_sr_common.c
 SRCS-$(CONFIG_X86) += xg_sr_common_x86.c
