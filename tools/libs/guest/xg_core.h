@@ -21,7 +21,7 @@
 #define XC_CORE_H
 
 #include "xen/version.h"
-#include "xc_private.h"
+#include "xg_private.h"
 #include "xen/libelf/elfstructs.h"
 
 /* section names */

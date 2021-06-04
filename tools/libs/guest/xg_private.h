@@ -42,6 +42,21 @@
 #endif
 #endif
 
+#define GET_FIELD(_p, _f, _w) (((_w) == 8) ? ((_p)->x64._f) : ((_p)->x32._f))
+
+#define SET_FIELD(_p, _f, _v, _w) do {          \
+    if ((_w) == 8)                              \
+        (_p)->x64._f = (_v);                    \
+    else                                        \
+        (_p)->x32._f = (_v);                    \
+} while (0)
+
+struct domain_info_context {
+    unsigned int guest_width;
+    unsigned int p2m_frames;
+    unsigned long p2m_size;
+};
+
 struct xc_dom_loader {
     const char *name;
     /* Sadly the error returns from these functions are not consistent: */
@@ -139,7 +154,6 @@ static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
 /* Masks for PTE<->PFN conversions */
 #define MADDR_BITS_X86  ((dinfo->guest_width == 8) ? 52 : 44)
 #define MFN_MASK_X86    ((1ULL << (MADDR_BITS_X86 - PAGE_SHIFT_X86)) - 1)
-#define MADDR_MASK_X86  (MFN_MASK_X86 << PAGE_SHIFT_X86)
 
 int pin_table(xc_interface *xch, unsigned int type, unsigned long mfn,
               uint32_t dom);

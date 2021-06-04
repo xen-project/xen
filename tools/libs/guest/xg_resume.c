@@ -13,7 +13,7 @@
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "xc_private.h"
+#include "xg_private.h"
 #include "xenguest.h"
 
 #if defined(__i386__) || defined(__x86_64__)

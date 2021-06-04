@@ -18,9 +18,23 @@
  */
 
 #include <inttypes.h>
-#include "xc_private.h"
+#include "xg_private.h"
 #include "xg_core.h"
 #include <xen/hvm/e820.h>
+
+/* Number of xen_pfn_t in a page */
+#define FPP             (PAGE_SIZE/(dinfo->guest_width))
+
+/* Number of entries in the pfn_to_mfn_frame_list_list */
+#define P2M_FLL_ENTRIES (((dinfo->p2m_size)+(FPP*FPP)-1)/(FPP*FPP))
+
+/* Number of entries in the pfn_to_mfn_frame_list */
+#define P2M_FL_ENTRIES  (((dinfo->p2m_size)+FPP-1)/FPP)
+
+/* Size in bytes of the pfn_to_mfn_frame_list     */
+#define P2M_GUEST_FL_SIZE ((P2M_FL_ENTRIES) * (dinfo->guest_width))
+#define P2M_TOOLS_FL_SIZE ((P2M_FL_ENTRIES) * \
+                           max_t(size_t, sizeof(xen_pfn_t), dinfo->guest_width))
 
 int
 xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
