@@ -1188,6 +1188,14 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
     iommu->ecap = dmar_readq(iommu->reg, DMAR_ECAP_REG);
+    iommu->version = dmar_readl(iommu->reg, DMAR_VER_REG);
+
+    if ( !iommu_qinval && !has_register_based_invalidation(iommu) )
+    {
+        printk(XENLOG_WARNING VTDPREFIX "IOMMU %d: cannot disable Queued Invalidation\n",
+               iommu->index);
+        iommu_qinval = true;
+    }
 
     if ( iommu_verbose )
     {
@@ -2161,6 +2169,10 @@ static int __must_check init_vtd_hw(bool resume)
          */
         if ( enable_qinval(iommu) != 0 )
         {
+            /* Ensure register-based invalidation is available */
+            if ( !has_register_based_invalidation(iommu) )
+                return -EIO;
+
             iommu->flush.context = vtd_flush_context_reg;
             iommu->flush.iotlb   = vtd_flush_iotlb_reg;
         }
@@ -2251,6 +2263,7 @@ static int __init vtd_setup(void)
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
     int ret;
+    bool reg_inval_supported = true;
 
     if ( list_empty(&acpi_drhd_units) )
     {
@@ -2272,8 +2285,8 @@ static int __init vtd_setup(void)
     }
 
     /* We enable the following features only if they are supported by all VT-d
-     * engines: Snoop Control, DMA passthrough, Queued Invalidation, Interrupt
-     * Remapping, and Posted Interrupt
+     * engines: Snoop Control, DMA passthrough, Register-based Invalidation,
+     * Queued Invalidation, Interrupt Remapping, and Posted Interrupt.
      */
     for_each_drhd_unit ( drhd )
     {
@@ -2294,6 +2307,9 @@ static int __init vtd_setup(void)
 
         if ( iommu_qinval && !ecap_queued_inval(iommu->ecap) )
             iommu_qinval = 0;
+
+        if ( !has_register_based_invalidation(iommu) )
+            reg_inval_supported = false;
 
         if ( iommu_intremap && !ecap_intr_remap(iommu->ecap) )
             iommu_intremap = iommu_intremap_off;
@@ -2320,6 +2336,13 @@ static int __init vtd_setup(void)
     }
 
     softirq_tasklet_init(&vtd_fault_tasklet, do_iommu_page_fault, NULL);
+
+    if ( !iommu_qinval && !reg_inval_supported )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX, "No available invalidation interface\n");
+        ret = -ENODEV;
+        goto error;
+    }
 
     if ( !iommu_qinval && iommu_intremap )
     {
