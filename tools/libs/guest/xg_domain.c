@@ -20,7 +20,7 @@
  */
 
 #include "xg_private.h"
-#include "xc_core.h"
+#include "xg_core.h"
 
 int xc_unmap_domain_meminfo(xc_interface *xch, struct xc_domain_meminfo *minfo)
 {

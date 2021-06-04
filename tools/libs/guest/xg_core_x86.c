@@ -19,7 +19,7 @@
 
 #include <inttypes.h>
 #include "xc_private.h"
-#include "xc_core.h"
+#include "xg_core.h"
 #include <xen/hvm/e820.h>
 
 int
@@ -31,12 +31,6 @@ xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
             && pfn < (1ULL<<32) >> PAGE_SHIFT)) /* MMIO */
         return 0;
     return 1;
-}
-
-int
-xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
-{
-    return info->hvm;
 }
 
 int

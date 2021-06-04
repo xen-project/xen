@@ -20,8 +20,6 @@
  */
 
 #include "xc_private.h"
-#include "xc_core.h"
-#include "xc_private.h"
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
 

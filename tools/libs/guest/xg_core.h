@@ -131,7 +131,6 @@ struct xc_core_memory_map {
     uint64_t    size;
 };
 typedef struct xc_core_memory_map xc_core_memory_map_t;
-int xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info);
 struct xc_core_arch_context;
 int xc_core_arch_memory_map_get(xc_interface *xch,
                                 struct xc_core_arch_context *arch_ctxt,
@@ -152,9 +151,9 @@ int xc_core_arch_get_scratch_gpfn(xc_interface *xch, uint32_t domid,
 
 
 #if defined (__i386__) || defined (__x86_64__)
-# include "xc_core_x86.h"
+# include "xg_core_x86.h"
 #elif defined (__arm__) || defined(__aarch64__)
-# include "xc_core_arm.h"
+# include "xg_core_arm.h"
 #else
 # error "unsupported architecture"
 #endif

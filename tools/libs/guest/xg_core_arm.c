@@ -17,7 +17,7 @@
  */
 
 #include "xc_private.h"
-#include "xc_core.h"
+#include "xg_core.h"
 
 #include <xen-tools/libs.h>
 
@@ -29,12 +29,6 @@ xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
     if (pfn >= 0x80000 && pfn < 0x88000)
         return 1;
     return 0;
-}
-
-int
-xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
-{
-    return 1;
 }
 
 int

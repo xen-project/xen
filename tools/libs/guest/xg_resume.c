@@ -21,7 +21,7 @@
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/params.h>
-#include "xc_core.h"
+#include "xg_core.h"
 
 static int modify_returncode(xc_interface *xch, uint32_t domid)
 {

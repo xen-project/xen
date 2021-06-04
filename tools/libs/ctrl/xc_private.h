@@ -467,6 +467,18 @@ void *xc_vm_event_enable(xc_interface *xch, uint32_t domain_id, int param,
 
 int do_dm_op(xc_interface *xch, uint32_t domid, unsigned int nr_bufs, ...);
 
+#if defined (__i386__) || defined (__x86_64__)
+static inline int xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
+{
+    return info->hvm;
+}
+#elif defined (__arm__) || defined(__aarch64__)
+static inline int xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
+{
+    return 1;
+}
+#endif
+
 #endif /* __XC_PRIVATE_H__ */
 
 /*

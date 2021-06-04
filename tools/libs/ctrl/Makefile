@@ -2,9 +2,6 @@ XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SRCS-y       += xc_altp2m.c
-SRCS-y       += xc_core.c
-SRCS-$(CONFIG_X86) += xc_core_x86.c
-SRCS-$(CONFIG_ARM) += xc_core_arm.c
 SRCS-y       += xc_cpupool.c
 SRCS-y       += xc_domain.c
 SRCS-y       += xc_evtchn.c

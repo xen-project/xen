@@ -61,7 +61,7 @@
  */
 
 #include "xc_private.h"
-#include "xc_core.h"
+#include "xg_core.h"
 #include <stdlib.h>
 #include <unistd.h>
 
