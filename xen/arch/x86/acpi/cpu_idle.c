@@ -183,6 +183,9 @@ static void do_get_hw_residencies(void *arg)
     /* Ice Lake */
     case 0x7D:
     case 0x7E:
+    /* Tiger Lake */
+    case 0x8C:
+    case 0x8D:
     /* Kaby Lake */
     case 0x8E:
     case 0x9E:
