@@ -616,15 +616,21 @@
 #define NUM_MSR_C2_LASTBRANCH_FROM_TO	4
 #define NUM_MSR_ATOM_LASTBRANCH_FROM_TO	8
 
+/* Nehalem (and newer) last-branch recording */
+#define MSR_NHL_LBR_SELECT		0x000001c8
+#define MSR_NHL_LASTBRANCH_TOS		0x000001c9
+
 /* Skylake (and newer) last-branch recording */
-#define MSR_SKL_LASTBRANCH_TOS		0x000001c9
 #define MSR_SKL_LASTBRANCH_0_FROM_IP	0x00000680
 #define MSR_SKL_LASTBRANCH_0_TO_IP	0x000006c0
 #define MSR_SKL_LASTBRANCH_0_INFO	0x00000dc0
 #define NUM_MSR_SKL_LASTBRANCH		32
 
+/* Silvermont (and newer) last-branch recording */
+#define MSR_SM_LBR_SELECT		0x000001c8
+#define MSR_SM_LASTBRANCH_TOS		0x000001c9
+
 /* Goldmont last-branch recording */
-#define MSR_GM_LASTBRANCH_TOS		0x000001c9
 #define MSR_GM_LASTBRANCH_0_FROM_IP	0x00000680
 #define MSR_GM_LASTBRANCH_0_TO_IP	0x000006c0
 #define NUM_MSR_GM_LASTBRANCH_FROM_TO	32
