@@ -357,6 +357,16 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
          boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 0x3a &&
          cpu_has_rdrand && !is_forced_cpu_cap(X86_FEATURE_RDRAND) )
         __clear_bit(X86_FEATURE_RDRAND, fs);
+
+    /*
+     * On certain hardware, speculative or errata workarounds can result in
+     * TSX being placed in "force-abort" mode, where it doesn't actually
+     * function as expected, but is technically compatible with the ISA.
+     *
+     * Do not advertise RTM to guests by default if it won't actually work.
+     */
+    if ( rtm_disabled )
+        __clear_bit(X86_FEATURE_RTM, fs);
 }
 
 static void __init guest_common_feature_adjustments(uint32_t *fs)
@@ -618,20 +628,6 @@ void recalculate_cpuid_policy(struct domain *d)
         __clear_bit(X86_FEATURE_LM, max_fs);
         if ( !(boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
             __clear_bit(X86_FEATURE_SYSCALL, max_fs);
-    }
-
-    /*
-     * On hardware with MSR_TSX_CTRL, the admin may have elected to disable
-     * TSX and hide the feature bits.  Migrating-in VMs may have been booted
-     * pre-mitigation when the TSX features were visbile.
-     *
-     * This situation is compatible (albeit with a perf hit to any TSX code in
-     * the guest), so allow the feature bits to remain set.
-     */
-    if ( cpu_has_tsx_ctrl )
-    {
-        __set_bit(X86_FEATURE_HLE, max_fs);
-        __set_bit(X86_FEATURE_RTM, max_fs);
     }
 
     /* Clamp the toolstacks choices to reality. */

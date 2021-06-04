@@ -1158,9 +1158,6 @@ void __init init_speculation_mitigations(void)
          ((hw_smt_enabled && opt_smt) ||
           !boot_cpu_has(X86_FEATURE_SC_VERW_IDLE)) )
     {
-        setup_clear_cpu_cap(X86_FEATURE_HLE);
-        setup_clear_cpu_cap(X86_FEATURE_RTM);
-
         opt_tsx = 0;
         tsx_init();
     }

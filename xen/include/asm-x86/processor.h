@@ -629,6 +629,7 @@ static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
 }
 
 extern int8_t opt_tsx, cpu_has_tsx_ctrl;
+extern bool rtm_disabled;
 void tsx_init(void);
 
 enum ap_boot_method {
