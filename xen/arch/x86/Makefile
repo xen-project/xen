@@ -269,5 +269,5 @@ clean::
 # Suppress loading of DEPS files for internal, temporary target files.  This
 # then also suppresses re-generation of the respective .*.d2 files.
 ifeq ($(filter-out .xen%.o,$(notdir $(MAKECMDGOALS))),)
-DEPS:=
+DEPS_INCLUDE:=
 endif
