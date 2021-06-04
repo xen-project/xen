@@ -574,8 +574,7 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
             goto out;
         }
 
-        sts = xc_core_arch_map_p2m(xch, dinfo->guest_width, &info, live_shinfo,
-                                   &p2m, &dinfo->p2m_size);
+        sts = xc_core_arch_map_p2m(xch, dinfo, &info, live_shinfo, &p2m);
         if ( sts != 0 )
             goto out;
 
@@ -945,7 +944,7 @@ out:
     if ( memory_map != NULL )
         free(memory_map);
     if ( p2m != NULL )
-        munmap(p2m, PAGE_SIZE * P2M_FL_ENTRIES);
+        munmap(p2m, PAGE_SIZE * dinfo->p2m_frames);
     if ( p2m_array != NULL )
         free(p2m_array);
     if ( pfn_array != NULL )

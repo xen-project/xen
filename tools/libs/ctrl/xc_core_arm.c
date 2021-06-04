@@ -66,33 +66,24 @@ xc_core_arch_memory_map_get(xc_interface *xch, struct xc_core_arch_context *unus
 
 static int
 xc_core_arch_map_p2m_rw(xc_interface *xch, struct domain_info_context *dinfo, xc_dominfo_t *info,
-                        shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
-                        unsigned long *pfnp, int rw)
+                        shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m, int rw)
 {
     errno = ENOSYS;
     return -1;
 }
 
 int
-xc_core_arch_map_p2m(xc_interface *xch, unsigned int guest_width, xc_dominfo_t *info,
-                        shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
-                        unsigned long *pfnp)
+xc_core_arch_map_p2m(xc_interface *xch, struct domain_info_context *dinfo, xc_dominfo_t *info,
+                        shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m)
 {
-    struct domain_info_context _dinfo = { .guest_width = guest_width };
-    struct domain_info_context *dinfo = &_dinfo;
-    return xc_core_arch_map_p2m_rw(xch, dinfo, info,
-                                   live_shinfo, live_p2m, pfnp, 0);
+    return xc_core_arch_map_p2m_rw(xch, dinfo, info, live_shinfo, live_p2m, 0);
 }
 
 int
-xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width, xc_dominfo_t *info,
-                              shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
-                              unsigned long *pfnp)
+xc_core_arch_map_p2m_writable(xc_interface *xch, struct domain_info_context *dinfo, xc_dominfo_t *info,
+                              shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m)
 {
-    struct domain_info_context _dinfo = { .guest_width = guest_width };
-    struct domain_info_context *dinfo = &_dinfo;
-    return xc_core_arch_map_p2m_rw(xch, dinfo, info,
-                                   live_shinfo, live_p2m, pfnp, 1);
+    return xc_core_arch_map_p2m_rw(xch, dinfo, info, live_shinfo, live_p2m, 1);
 }
 
 int

@@ -79,6 +79,7 @@ struct iovec {
 
 struct domain_info_context {
     unsigned int guest_width;
+    unsigned int p2m_frames;
     unsigned long p2m_size;
 };
 
