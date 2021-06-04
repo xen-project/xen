@@ -44,6 +44,30 @@ void tsx_init(void)
             rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
         cpu_has_tsx_ctrl = !!(caps & ARCH_CAPS_TSX_CTRL);
+
+        /*
+         * The TSX features (HLE/RTM) are handled specially.  They both
+         * enumerate features but, on certain parts, have mechanisms to be
+         * hidden without disrupting running software.
+         *
+         * At the moment, we're running in an unknown context (WRT hiding -
+         * particularly if another fully fledged kernel ran before us) and
+         * depending on user settings, may elect to continue hiding them from
+         * native CPUID instructions.
+         *
+         * Xen doesn't use TSX itself, but use cpu_has_{hle,rtm} for various
+         * system reasons, mostly errata detection, so the meaning is more
+         * useful as "TSX infrastructure available", as opposed to "features
+         * advertised and working".
+         *
+         * Force the features to be visible in Xen's view if we see any of the
+         * infrastructure capable of hiding them.
+         */
+        if ( cpu_has_tsx_ctrl )
+        {
+            setup_force_cpu_cap(X86_FEATURE_HLE);
+            setup_force_cpu_cap(X86_FEATURE_RTM);
+        }
     }
 
     if ( cpu_has_tsx_ctrl )
