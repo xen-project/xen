@@ -14,7 +14,6 @@
 #include <public/sysctl.h>
 
 extern const uint32_t known_features[FSCAPINTS];
-extern const uint32_t special_features[FSCAPINTS];
 
 void init_guest_cpuid(void);
 
