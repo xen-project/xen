@@ -53,6 +53,7 @@ t=RELEASE-$r
 #   QEMU_UPSTREAM_REVISION,
 #   QEMU_TRADITIONAL_REVISION
 #   MINIOS_UPSTREAM_REVISION
+#     (drop any references to the specific commits, e.g. date or title)
 * change SUPPORT.md heading version number; -unstable or -rc tag
 *     (empty in stable branches after .0 release).
 * SUPPORT.md: insert correct version number in release-notes link
