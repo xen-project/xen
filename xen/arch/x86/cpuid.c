@@ -648,9 +648,11 @@ void recalculate_cpuid_policy(struct domain *d)
     sanitise_featureset(fs);
 
     /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
-    fs[FEATURESET_7b0] &= ~special_features[FEATURESET_7b0];
+    fs[FEATURESET_7b0] &= ~(cpufeat_mask(X86_FEATURE_FDP_EXCP_ONLY) |
+                            cpufeat_mask(X86_FEATURE_NO_FPU_SEL));
     fs[FEATURESET_7b0] |= (host_cpuid_policy.feat._7b0 &
-                           special_features[FEATURESET_7b0]);
+                           (cpufeat_mask(X86_FEATURE_FDP_EXCP_ONLY) |
+                            cpufeat_mask(X86_FEATURE_NO_FPU_SEL)));
 
     cpuid_featureset_to_policy(fs, p);
 
