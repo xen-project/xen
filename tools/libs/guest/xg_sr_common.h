@@ -325,7 +325,7 @@ struct xc_sr_context
                 xen_pfn_t max_mfn;
                 /* Read-only machine to phys map */
                 xen_pfn_t *m2p;
-                /* first mfn of the compat m2p (Only needed for 32bit PV guests) */
+                /* first mfn of the compat m2p (Only set for 32bit PV guests) */
                 xen_pfn_t compat_m2p_mfn0;
                 /* Number of m2p frames mapped */
                 unsigned long nr_m2p_frames;

@@ -149,12 +149,13 @@ int x86_pv_map_m2p(struct xc_sr_context *ctx)
 
     ctx->x86.pv.nr_m2p_frames = (M2P_CHUNK_SIZE >> PAGE_SHIFT) * m2p_chunks;
 
-#ifdef __i386__
-    /* 32 bit toolstacks automatically get the compat m2p */
-    ctx->x86.pv.compat_m2p_mfn0 = entries[0].mfn;
-#else
-    /* 64 bit toolstacks need to ask Xen specially for it */
+    if ( ctx->x86.pv.levels == 3 )
     {
+#ifdef __i386__
+        /* 32 bit toolstacks automatically get the compat m2p */
+        ctx->x86.pv.compat_m2p_mfn0 = entries[0].mfn;
+#else
+        /* 64 bit toolstacks need to ask Xen specially for it */
         struct xen_machphys_mfn_list xmml = {
             .max_extents = 1,
             .extent_start = { &ctx->x86.pv.compat_m2p_mfn0 },
@@ -168,8 +169,10 @@ int x86_pv_map_m2p(struct xc_sr_context *ctx)
             rc = -1;
             goto err;
         }
-    }
 #endif
+    }
+    else
+        ctx->x86.pv.compat_m2p_mfn0 = INVALID_MFN;
 
     /* All Done */
     rc = 0;
