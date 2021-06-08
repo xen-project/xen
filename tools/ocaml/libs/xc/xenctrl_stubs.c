@@ -37,14 +37,12 @@
 
 #include "mmap_stubs.h"
 
-#define PAGE_SHIFT		12
-#define PAGE_SIZE               (1UL << PAGE_SHIFT)
-#define PAGE_MASK               (~(PAGE_SIZE-1))
-
 #define _H(__h) ((xc_interface *)(__h))
 #define _D(__d) ((uint32_t)Int_val(__d))
 
+#ifndef Val_none
 #define Val_none (Val_int(0))
+#endif
 
 #define string_of_option_array(array, index) \
 	((Field(array, index) == Val_none) ? NULL : String_val(Field(Field(array, index), 0)))
@@ -819,7 +817,7 @@ CAMLprim value stub_xc_domain_memory_increase_reservation(value xch,
 	CAMLparam3(xch, domid, mem_kb);
 	int retval;
 
-	unsigned long nr_extents = ((unsigned long)(Int64_val(mem_kb))) >> (PAGE_SHIFT - 10);
+	unsigned long nr_extents = ((unsigned long)(Int64_val(mem_kb))) >> (XC_PAGE_SHIFT - 10);
 
 	uint32_t c_domid = _D(domid);
 	caml_enter_blocking_section();
@@ -925,7 +923,7 @@ CAMLprim value stub_pages_to_kib(value pages)
 {
 	CAMLparam1(pages);
 
-	CAMLreturn(caml_copy_int64(Int64_val(pages) << (PAGE_SHIFT - 10)));
+	CAMLreturn(caml_copy_int64(Int64_val(pages) << (XC_PAGE_SHIFT - 10)));
 }
 
 

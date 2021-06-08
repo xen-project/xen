@@ -227,8 +227,12 @@ static value Val_string_list(libxl_string_list *c_val)
 }
 
 /* Option type support as per http://www.linux-nantes.org/~fmonnier/ocaml/ocaml-wrapping-c.php */
+#ifndef Val_none
 #define Val_none Val_int(0)
+#endif
+#ifndef Some_val
 #define Some_val(v) Field(v,0)
+#endif
 
 static value Val_some(value v)
 {
