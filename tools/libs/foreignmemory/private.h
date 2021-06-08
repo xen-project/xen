@@ -1,6 +1,7 @@
 #ifndef XENFOREIGNMEMORY_PRIVATE_H
 #define XENFOREIGNMEMORY_PRIVATE_H
 
+#include <xenctrl.h>
 #include <xentoollog.h>
 
 #include <xenforeignmemory.h>
@@ -9,14 +10,6 @@
 
 #include <xen/xen.h>
 #include <xen/sys/privcmd.h>
-
-#ifndef PAGE_SHIFT /* Mini-os, Yukk */
-#define PAGE_SHIFT           12
-#endif
-#ifndef __MINIOS__ /* Yukk */
-#define PAGE_SIZE            (1UL << PAGE_SHIFT)
-#define PAGE_MASK            (~(PAGE_SIZE-1))
-#endif
 
 struct xenforeignmemory_handle {
     xentoollog_logger *logger, *logger_tofree;

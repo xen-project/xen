@@ -202,7 +202,7 @@ int xenforeignmemory_resource_size(
     if ( rc )
         return rc;
 
-    *size = fres.nr_frames << PAGE_SHIFT;
+    *size = fres.nr_frames << XC_PAGE_SHIFT;
     return 0;
 }
 

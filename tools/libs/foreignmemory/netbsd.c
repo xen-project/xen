@@ -76,7 +76,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
 {
     int fd = fmem->fd;
     privcmd_mmapbatch_v2_t ioctlx;
-    addr = mmap(addr, num * PAGE_SIZE, prot,
+    addr = mmap(addr, num * XC_PAGE_SIZE, prot,
                 flags | MAP_ANON | MAP_SHARED, -1, 0);
     if ( addr == MAP_FAILED ) {
         PERROR("osdep_xenforeignmemory_map: mmap failed");
@@ -93,7 +93,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
     {
         int saved_errno = errno;
         PERROR("osdep_xenforeignmemory_map: ioctl failed");
-        munmap(addr, num * PAGE_SIZE);
+        munmap(addr, num * XC_PAGE_SIZE);
         errno = saved_errno;
         return NULL;
     }
@@ -104,7 +104,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
                                  void *addr, size_t num)
 {
-    return munmap(addr, num * PAGE_SIZE);
+    return munmap(addr, num * XC_PAGE_SIZE);
 }
 
 int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
@@ -117,7 +117,7 @@ int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
 int osdep_xenforeignmemory_unmap_resource(
     xenforeignmemory_handle *fmem, xenforeignmemory_resource_handle *fres)
 {
-    return fres ? munmap(fres->addr, fres->nr_frames << PAGE_SHIFT) : 0;
+    return fres ? munmap(fres->addr, fres->nr_frames << XC_PAGE_SHIFT) : 0;
 }
 
 int osdep_xenforeignmemory_map_resource(
@@ -136,7 +136,7 @@ int osdep_xenforeignmemory_map_resource(
         /* Request for resource size.  Skip mmap(). */
         goto skip_mmap;
 
-    fres->addr = mmap(fres->addr, fres->nr_frames << PAGE_SHIFT,
+    fres->addr = mmap(fres->addr, fres->nr_frames << XC_PAGE_SHIFT,
                       fres->prot, fres->flags | MAP_ANON | MAP_SHARED, -1, 0);
     if ( fres->addr == MAP_FAILED )
         return -1;

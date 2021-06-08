@@ -134,7 +134,7 @@ static int retry_paged(int fd, uint32_t dom, void *addr,
         /* At least one gfn is still in paging state */
         ioctlx.num = 1;
         ioctlx.dom = dom;
-        ioctlx.addr = (unsigned long)addr + (i<<PAGE_SHIFT);
+        ioctlx.addr = (unsigned long)addr + (i<<XC_PAGE_SHIFT);
         ioctlx.arr = arr + i;
         ioctlx.err = err + i;
 
@@ -168,7 +168,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
     size_t i;
     int rc;
 
-    addr = mmap(addr, num << PAGE_SHIFT, prot, flags | MAP_SHARED,
+    addr = mmap(addr, num << XC_PAGE_SHIFT, prot, flags | MAP_SHARED,
                 fd, 0);
     if ( addr == MAP_FAILED )
         return NULL;
@@ -198,9 +198,10 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
          */
         privcmd_mmapbatch_t ioctlx;
         xen_pfn_t *pfn;
-        unsigned int pfn_arr_size = ROUNDUP((num * sizeof(*pfn)), PAGE_SHIFT);
+        unsigned int pfn_arr_size = ROUNDUP((num * sizeof(*pfn)), XC_PAGE_SHIFT);
+        int os_page_size = sysconf(_SC_PAGESIZE);
 
-        if ( pfn_arr_size <= PAGE_SIZE )
+        if ( pfn_arr_size <= os_page_size )
             pfn = alloca(num * sizeof(*pfn));
         else
         {
@@ -209,7 +210,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
             if ( pfn == MAP_FAILED )
             {
                 PERROR("mmap of pfn array failed");
-                (void)munmap(addr, num << PAGE_SHIFT);
+                (void)munmap(addr, num << XC_PAGE_SHIFT);
                 return NULL;
             }
         }
@@ -242,7 +243,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
                     continue;
                 }
                 rc = map_foreign_batch_single(fd, dom, pfn + i,
-                        (unsigned long)addr + (i<<PAGE_SHIFT));
+                        (unsigned long)addr + (i<<XC_PAGE_SHIFT));
                 if ( rc < 0 )
                 {
                     rc = -errno;
@@ -254,7 +255,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
             break;
         }
 
-        if ( pfn_arr_size > PAGE_SIZE )
+        if ( pfn_arr_size > os_page_size )
             munmap(pfn, pfn_arr_size);
 
         if ( rc == -ENOENT && i == num )
@@ -270,7 +271,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
     {
         int saved_errno = errno;
 
-        (void)munmap(addr, num << PAGE_SHIFT);
+        (void)munmap(addr, num << XC_PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
     }
@@ -281,7 +282,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
                                  void *addr, size_t num)
 {
-    return munmap(addr, num << PAGE_SHIFT);
+    return munmap(addr, num << XC_PAGE_SHIFT);
 }
 
 int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
@@ -293,7 +294,7 @@ int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
 int osdep_xenforeignmemory_unmap_resource(
     xenforeignmemory_handle *fmem, xenforeignmemory_resource_handle *fres)
 {
-    return fres ? munmap(fres->addr, fres->nr_frames << PAGE_SHIFT) : 0;
+    return fres ? munmap(fres->addr, fres->nr_frames << XC_PAGE_SHIFT) : 0;
 }
 
 int osdep_xenforeignmemory_map_resource(
@@ -312,7 +313,7 @@ int osdep_xenforeignmemory_map_resource(
         /* Request for resource size.  Skip mmap(). */
         goto skip_mmap;
 
-    fres->addr = mmap(fres->addr, fres->nr_frames << PAGE_SHIFT,
+    fres->addr = mmap(fres->addr, fres->nr_frames << XC_PAGE_SHIFT,
                       fres->prot, fres->flags | MAP_SHARED, fmem->fd, 0);
     if ( fres->addr == MAP_FAILED )
         return -1;
