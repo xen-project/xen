@@ -22,46 +22,34 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include "../ats.h"
 
-static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
+static void send_iommu_command(struct amd_iommu *iommu,
+                               const uint32_t cmd[4])
 {
-    uint32_t tail, head;
+    uint32_t tail;
 
     tail = iommu->cmd_buffer.tail;
     if ( ++tail == iommu->cmd_buffer.entries )
         tail = 0;
 
-    head = iommu_get_rb_pointer(readl(iommu->mmio_base +
-                                      IOMMU_CMD_BUFFER_HEAD_OFFSET));
-    if ( head != tail )
+    while ( tail == iommu_get_rb_pointer(readl(iommu->mmio_base +
+                                               IOMMU_CMD_BUFFER_HEAD_OFFSET)) )
     {
-        memcpy(iommu->cmd_buffer.buffer +
-               (iommu->cmd_buffer.tail * sizeof(cmd_entry_t)),
-               cmd, sizeof(cmd_entry_t));
-
-        iommu->cmd_buffer.tail = tail;
-        return 1;
+        printk_once(XENLOG_ERR
+                    "AMD IOMMU %04x:%02x:%02x.%u: no cmd slot available\n",
+                    iommu->seg, PCI_BUS(iommu->bdf),
+                    PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf));
+        cpu_relax();
     }
 
-    return 0;
-}
+    memcpy(iommu->cmd_buffer.buffer +
+           (iommu->cmd_buffer.tail * sizeof(cmd_entry_t)),
+           cmd, sizeof(cmd_entry_t));
 
-static void commit_iommu_command_buffer(struct amd_iommu *iommu)
-{
-    u32 tail = 0;
+    iommu->cmd_buffer.tail = tail;
 
+    tail = 0;
     iommu_set_rb_pointer(&tail, iommu->cmd_buffer.tail);
     writel(tail, iommu->mmio_base+IOMMU_CMD_BUFFER_TAIL_OFFSET);
-}
-
-int send_iommu_command(struct amd_iommu *iommu, u32 cmd[])
-{
-    if ( queue_iommu_command(iommu, cmd) )
-    {
-        commit_iommu_command_buffer(iommu);
-        return 1;
-    }
-
-    return 0;
 }
 
 static void flush_command_buffer(struct amd_iommu *iommu)
