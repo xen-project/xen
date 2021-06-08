@@ -48,9 +48,6 @@
 
 #define MAPSIZE 4093 /* Prime */
 
-#define PAGE_SHIFT 12
-#define PAGE_SIZE (1U << PAGE_SHIFT)
-
 struct kdd_guest {
     struct xentoollog_logger xc_log; /* Must be first for xc log callbacks */
     xc_interface *xc_handle;
@@ -72,7 +69,7 @@ static void flush_maps(kdd_guest *g)
     int i;
     for (i = 0; i < MAPSIZE; i++) {
         if (g->maps[i] != NULL)
-            munmap(g->maps[i], PAGE_SIZE);
+            munmap(g->maps[i], KDD_PAGE_SIZE);
         g->maps[i] = NULL;
     }
 }
@@ -490,13 +487,13 @@ static uint32_t kdd_access_physical_page(kdd_guest *g, uint64_t addr,
     uint32_t map_pfn, map_offset;
     uint8_t *map;
 
-    map_pfn = (addr >> PAGE_SHIFT);
-    map_offset = addr & (PAGE_SIZE - 1);
+    map_pfn = (addr >> KDD_PAGE_SHIFT);
+    map_offset = addr & (KDD_PAGE_SIZE - 1);
 
     /* Evict any mapping of the wrong frame from our slot */ 
     if (g->pfns[map_pfn % MAPSIZE] != map_pfn
         && g->maps[map_pfn % MAPSIZE] != NULL) {
-        munmap(g->maps[map_pfn % MAPSIZE], PAGE_SIZE);
+        munmap(g->maps[map_pfn % MAPSIZE], KDD_PAGE_SIZE);
         g->maps[map_pfn % MAPSIZE] = NULL;
     }
     g->pfns[map_pfn % MAPSIZE] = map_pfn;
@@ -507,7 +504,7 @@ static uint32_t kdd_access_physical_page(kdd_guest *g, uint64_t addr,
     else {
         map = xc_map_foreign_range(g->xc_handle,
                                    g->domid,
-                                   PAGE_SIZE,
+                                   KDD_PAGE_SIZE,
                                    PROT_READ|PROT_WRITE,
                                    map_pfn);
 
@@ -533,7 +530,7 @@ uint32_t kdd_access_physical(kdd_guest *g, uint64_t addr,
 {
     uint32_t chunk, rv, done = 0;
     while (len > 0) {
-        chunk = PAGE_SIZE - (addr & (PAGE_SIZE - 1));
+        chunk = KDD_PAGE_SIZE - (addr & (KDD_PAGE_SIZE - 1));
         if (chunk > len) 
             chunk = len;
         rv = kdd_access_physical_page(g, addr, chunk, buf, write);

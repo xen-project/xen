@@ -39,6 +39,13 @@
 
 #define PACKED __attribute__((packed))
 
+/* We define our page related constants here in order to specifically
+ * avoid using the Xen page macros (this is a restriction for the code
+ * in kdd.c which should not include any Xen headers) and to add
+ * consistency for code in both kdd.c and kdd-xen.c. */
+#define KDD_PAGE_SHIFT 12
+#define KDD_PAGE_SIZE (1U << KDD_PAGE_SHIFT)
+
 /*****************************************************************************
  * Serial line protocol: Sender sends a 16-byte header with an optional
  * payload following it.  Receiver responds to each packet with an

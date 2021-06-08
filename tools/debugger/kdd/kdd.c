@@ -288,9 +288,6 @@ static void kdd_log_pkt(kdd_state *s, const char *name, kdd_pkt *p)
  *  Memory access: virtual addresses and syntactic sugar.
  */
 
-#define PAGE_SHIFT (12)
-#define PAGE_SIZE (1ULL << PAGE_SHIFT) 
-
 static uint32_t kdd_read_physical(kdd_state *s, uint64_t addr, 
                                   uint32_t len, void *buf)
 {
@@ -352,7 +349,7 @@ static uint64_t v2p(kdd_state *s, int cpuid, uint64_t va)
 
     /* Walk the appropriate number of levels */
     for (i = levels; i > 0; i--) {
-        shift = PAGE_SHIFT + bits * (i-1);
+        shift = KDD_PAGE_SHIFT + bits * (i-1);
         mask = ((1ULL << bits) - 1) << shift;
         offset = ((va & mask) >> shift) * width;
         KDD_DEBUG(s, "level %i: mask 0x%16.16"PRIx64" pa 0x%16.16"PRIx64
@@ -364,12 +361,12 @@ static uint64_t v2p(kdd_state *s, int cpuid, uint64_t va)
             return -1ULL; // Not present
         pa = entry & 0x000ffffffffff000ULL;
         if (pse && (i == 2) && (entry & 0x80)) { // Superpage
-            mask = ((1ULL << (PAGE_SHIFT + bits)) - 1);
+            mask = ((1ULL << (KDD_PAGE_SHIFT + bits)) - 1);
             return (pa & ~mask) + (va & mask);
         }
     }
 
-    return pa + (va & (PAGE_SIZE - 1));
+    return pa + (va & (KDD_PAGE_SIZE - 1));
 }
 
 static uint32_t kdd_access_virtual(kdd_state *s, int cpuid, uint64_t addr,
@@ -380,7 +377,7 @@ static uint32_t kdd_access_virtual(kdd_state *s, int cpuid, uint64_t addr,
     
     /* Process one page at a time */
     while (len > 0) {
-        chunk = PAGE_SIZE - (addr & (PAGE_SIZE - 1));
+        chunk = KDD_PAGE_SIZE - (addr & (KDD_PAGE_SIZE - 1));
         if (chunk > len) 
             chunk = len;
         pa = v2p(s, cpuid, addr);
@@ -591,7 +588,7 @@ static void get_os_info_64(kdd_state *s)
     uint64_t dbgkd_addr;
     DBGKD_GET_VERSION64 dbgkd_get_version64;
     /* Maybe 1GB is too big for the limit to search? */
-    uint32_t search_limit = (1024 * 1024 * 1024) / PAGE_SIZE; /*1GB/PageSize*/
+    uint32_t search_limit = (1024 * 1024 * 1024) / KDD_PAGE_SIZE; /*1GB/PageSize*/
     uint64_t efer;
 
     /* if we are not in 64-bit mode, fail */
@@ -620,7 +617,7 @@ static void get_os_info_64(kdd_state *s)
      * in 1GB range above the current page base address
      */
 
-    base = idt0_addr & ~(PAGE_SIZE - 1);
+    base = idt0_addr & ~(KDD_PAGE_SIZE - 1);
 
     while (search_limit) {
         uint16_t val;
@@ -633,7 +630,7 @@ static void get_os_info_64(kdd_state *s)
         if (val == MZ_HEADER) // MZ
             break;
 
-        base -= PAGE_SIZE;
+        base -= KDD_PAGE_SIZE;
         search_limit -= 1;
     }
 
@@ -720,7 +717,7 @@ static void find_os(kdd_state *s)
         /* Try each page in the potential range of kernel load addresses */
         for (limit = s->os.base + s->os.range;
              s->os.base <= limit;
-             s->os.base += PAGE_SIZE)
+             s->os.base += KDD_PAGE_SIZE)
             if (check_os(s))
                 return;
     }
