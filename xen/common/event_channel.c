@@ -147,6 +147,12 @@ static bool virq_is_global(unsigned int virq)
     return true;
 }
 
+static struct evtchn *_evtchn_from_port(const struct domain *d,
+                                        evtchn_port_t port)
+{
+    return port_is_valid(d, port) ? evtchn_from_port(d, port) : NULL;
+}
+
 static void free_evtchn_bucket(struct domain *d, struct evtchn *bucket)
 {
     if ( !bucket )
@@ -319,7 +325,6 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     return rc;
 }
 
-
 static void double_evtchn_lock(struct evtchn *lchn, struct evtchn *rchn)
 {
     ASSERT(lchn != rchn);
@@ -365,9 +370,9 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         ERROR_EXIT(lport);
     lchn = evtchn_from_port(ld, lport);
 
-    if ( !port_is_valid(rd, rport) )
+    rchn = _evtchn_from_port(rd, rport);
+    if ( !rchn )
         ERROR_EXIT_DOM(-EINVAL, rd);
-    rchn = evtchn_from_port(rd, rport);
     if ( (rchn->state != ECS_UNBOUND) ||
          (rchn->u.unbound.remote_domid != ld->domain_id) )
         ERROR_EXIT_DOM(-EINVAL, rd);
@@ -602,14 +607,11 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 int evtchn_close(struct domain *d1, int port1, bool guest)
 {
     struct domain *d2 = NULL;
-    struct evtchn *chn1, *chn2;
-    int            port2;
+    struct evtchn *chn1 = _evtchn_from_port(d1, port1), *chn2;
     long           rc = 0;
 
-    if ( !port_is_valid(d1, port1) )
+    if ( !chn1 )
         return -EINVAL;
-
-    chn1 = evtchn_from_port(d1, port1);
 
  again:
     spin_lock(&d1->event_lock);
@@ -698,10 +700,8 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
             goto out;
         }
 
-        port2 = chn1->u.interdomain.remote_port;
-        BUG_ON(!port_is_valid(d2, port2));
-
-        chn2 = evtchn_from_port(d2, port2);
+        chn2 = _evtchn_from_port(d2, chn1->u.interdomain.remote_port);
+        BUG_ON(!chn2);
         BUG_ON(chn2->state != ECS_INTERDOMAIN);
         BUG_ON(chn2->u.interdomain.remote_dom != d1);
 
@@ -739,14 +739,12 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
 
 int evtchn_send(struct domain *ld, unsigned int lport)
 {
-    struct evtchn *lchn, *rchn;
+    struct evtchn *lchn = _evtchn_from_port(ld, lport), *rchn;
     struct domain *rd;
     int            rport, ret = 0;
 
-    if ( !port_is_valid(ld, lport) )
+    if ( !lchn )
         return -EINVAL;
-
-    lchn = evtchn_from_port(ld, lport);
 
     evtchn_read_lock(lchn);
 
@@ -967,15 +965,15 @@ int evtchn_status(evtchn_status_t *status)
     if ( d == NULL )
         return -ESRCH;
 
-    spin_lock(&d->event_lock);
-
-    if ( !port_is_valid(d, port) )
+    chn = _evtchn_from_port(d, port);
+    if ( !chn )
     {
-        rc = -EINVAL;
-        goto out;
+        rcu_unlock_domain(d);
+        return -EINVAL;
     }
 
-    chn = evtchn_from_port(d, port);
+    spin_lock(&d->event_lock);
+
     if ( consumer_is_xen(chn) )
     {
         rc = -EACCES;
@@ -1038,10 +1036,9 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     if ( (v = domain_vcpu(d, vcpu_id)) == NULL )
         return -ENOENT;
 
-    if ( !port_is_valid(d, port) )
+    chn = _evtchn_from_port(d, port);
+    if ( !chn )
         return -EINVAL;
-
-    chn = evtchn_from_port(d, port);
 
     spin_lock(&d->event_lock);
 
@@ -1088,12 +1085,10 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
 int evtchn_unmask(unsigned int port)
 {
     struct domain *d = current->domain;
-    struct evtchn *evtchn;
+    struct evtchn *evtchn = _evtchn_from_port(d, port);
 
-    if ( unlikely(!port_is_valid(d, port)) )
+    if ( unlikely(!evtchn) )
         return -EINVAL;
-
-    evtchn = evtchn_from_port(d, port);
 
     evtchn_read_lock(evtchn);
 
@@ -1177,13 +1172,11 @@ static long evtchn_set_priority(const struct evtchn_set_priority *set_priority)
 {
     struct domain *d = current->domain;
     unsigned int port = set_priority->port;
-    struct evtchn *chn;
+    struct evtchn *chn = _evtchn_from_port(d, port);
     long ret;
 
-    if ( !port_is_valid(d, port) )
+    if ( !chn )
         return -EINVAL;
-
-    chn = evtchn_from_port(d, port);
 
     evtchn_read_lock(chn);
 
@@ -1410,10 +1403,10 @@ void free_xen_event_channel(struct domain *d, int port)
 
 void notify_via_xen_event_channel(struct domain *ld, int lport)
 {
-    struct evtchn *lchn, *rchn;
+    struct evtchn *lchn = _evtchn_from_port(ld, lport), *rchn;
     struct domain *rd;
 
-    if ( !port_is_valid(ld, lport) )
+    if ( !lchn )
     {
         /*
          * Make sure ->is_dying is read /after/ ->valid_evtchns, pairing
@@ -1423,8 +1416,6 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
         ASSERT(ld->is_dying);
         return;
     }
-
-    lchn = evtchn_from_port(ld, lport);
 
     if ( !evtchn_read_trylock(lchn) )
         return;
@@ -1580,12 +1571,14 @@ static void domain_dump_evtchn_info(struct domain *d)
 
     spin_lock(&d->event_lock);
 
-    for ( port = 1; port_is_valid(d, port); ++port )
+    for ( port = 1; ; ++port )
     {
-        const struct evtchn *chn;
+        const struct evtchn *chn = _evtchn_from_port(d, port);
         char *ssid;
 
-        chn = evtchn_from_port(d, port);
+        if ( !chn )
+            break;
+
         if ( chn->state == ECS_FREE )
             continue;
 

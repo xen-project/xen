@@ -130,7 +130,7 @@ static inline void evtchn_read_unlock(struct evtchn *evtchn)
  * cannot be looked up anymore and hence calls here can't occur any longer
  * in the first place.
  */
-static inline bool_t port_is_valid(struct domain *d, unsigned int p)
+static inline bool port_is_valid(const struct domain *d, evtchn_port_t p)
 {
     if ( p >= read_atomic(&d->valid_evtchns) )
         return false;
@@ -145,7 +145,8 @@ static inline bool_t port_is_valid(struct domain *d, unsigned int p)
     return true;
 }
 
-static inline struct evtchn *evtchn_from_port(struct domain *d, unsigned int p)
+static inline struct evtchn *evtchn_from_port(const struct domain *d,
+                                              evtchn_port_t p)
 {
     if ( p < EVTCHNS_PER_BUCKET )
         return &d->evtchn[array_index_nospec(p, EVTCHNS_PER_BUCKET)];
