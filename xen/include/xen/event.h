@@ -120,6 +120,16 @@ static inline void evtchn_read_unlock(struct evtchn *evtchn)
     read_unlock(&evtchn->lock);
 }
 
+/*
+ * While calling the function is okay without holding a suitable lock yet
+ * (see the comment ahead of struct evtchn_port_ops for which ones those
+ * are), for a dying domain it may start returning false at any point - see
+ * evtchn_destroy(). This is not a fundamental problem though, as the
+ * struct evtchn instance won't disappear (and will continue to hold valid
+ * data) until final cleanup of the domain, at which point the domain itself
+ * cannot be looked up anymore and hence calls here can't occur any longer
+ * in the first place.
+ */
 static inline bool_t port_is_valid(struct domain *d, unsigned int p)
 {
     if ( p >= read_atomic(&d->valid_evtchns) )

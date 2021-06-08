@@ -606,16 +606,13 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     int            port2;
     long           rc = 0;
 
- again:
-    spin_lock(&d1->event_lock);
-
     if ( !port_is_valid(d1, port1) )
-    {
-        rc = -EINVAL;
-        goto out;
-    }
+        return -EINVAL;
 
     chn1 = evtchn_from_port(d1, port1);
+
+ again:
+    spin_lock(&d1->event_lock);
 
     /* Guest cannot close a Xen-attached event channel. */
     if ( unlikely(consumer_is_xen(chn1)) && guest )
@@ -1041,15 +1038,12 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     if ( (v = domain_vcpu(d, vcpu_id)) == NULL )
         return -ENOENT;
 
-    spin_lock(&d->event_lock);
-
     if ( !port_is_valid(d, port) )
-    {
-        rc = -EINVAL;
-        goto out;
-    }
+        return -EINVAL;
 
     chn = evtchn_from_port(d, port);
+
+    spin_lock(&d->event_lock);
 
     /* Guest cannot re-bind a Xen-attached event channel. */
     if ( unlikely(consumer_is_xen(chn)) )
