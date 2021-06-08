@@ -52,10 +52,12 @@ static void send_iommu_command(struct amd_iommu *iommu,
     writel(tail, iommu->mmio_base+IOMMU_CMD_BUFFER_TAIL_OFFSET);
 }
 
-static void flush_command_buffer(struct amd_iommu *iommu)
+static void flush_command_buffer(struct amd_iommu *iommu,
+                                 unsigned int timeout_base)
 {
-    u32 cmd[4], status;
-    int loop_count, comp_wait;
+    uint32_t cmd[4];
+    s_time_t start, timeout;
+    static unsigned int __read_mostly threshold = 1;
 
     /* RW1C 'ComWaitInt' in status register */
     writel(IOMMU_STATUS_COMP_WAIT_INT_MASK,
@@ -71,24 +73,31 @@ static void flush_command_buffer(struct amd_iommu *iommu)
                          IOMMU_COMP_WAIT_I_FLAG_SHIFT, &cmd[0]);
     send_iommu_command(iommu, cmd);
 
-    /* Make loop_count long enough for polling completion wait bit */
-    loop_count = 1000;
-    do {
-        status = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-        comp_wait = get_field_from_reg_u32(status,
-                                           IOMMU_STATUS_COMP_WAIT_INT_MASK,
-                                           IOMMU_STATUS_COMP_WAIT_INT_SHIFT);
-        --loop_count;
-    } while ( !comp_wait && loop_count );
-
-    if ( comp_wait )
+    start = NOW();
+    timeout = start + (timeout_base ?: 100) * MILLISECS(threshold);
+    while ( !(readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET) &
+              IOMMU_STATUS_COMP_WAIT_INT_MASK) )
     {
-        /* RW1C 'ComWaitInt' in status register */
-        writel(IOMMU_STATUS_COMP_WAIT_INT_MASK,
-               iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-        return;
+        if ( timeout && NOW() > timeout )
+        {
+            threshold |= threshold << 1;
+            printk(XENLOG_WARNING
+                   "AMD IOMMU %04x:%02x:%02x.%u: %scompletion wait taking too long\n",
+                   iommu->seg, PCI_BUS(iommu->bdf),
+                   PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf),
+                   timeout_base ? "iotlb " : "");
+            timeout = 0;
+        }
+        cpu_relax();
     }
-    AMD_IOMMU_DEBUG("Warning: ComWaitInt bit did not assert!\n");
+
+    if ( !timeout )
+        printk(XENLOG_WARNING
+               "AMD IOMMU %04x:%02x:%02x.%u: %scompletion wait took %lums\n",
+               iommu->seg, PCI_BUS(iommu->bdf),
+               PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf),
+               timeout_base ? "iotlb " : "",
+               (NOW() - start) / 10000000);
 }
 
 /* Build low level iommu command messages */
@@ -300,7 +309,7 @@ void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
     /* send INVALIDATE_IOTLB_PAGES command */
     spin_lock_irqsave(&iommu->lock, flags);
     invalidate_iotlb_pages(iommu, maxpend, 0, queueid, daddr, req_id, order);
-    flush_command_buffer(iommu);
+    flush_command_buffer(iommu, iommu_dev_iotlb_timeout);
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
@@ -337,7 +346,7 @@ static void _amd_iommu_flush_pages(struct domain *d,
     {
         spin_lock_irqsave(&iommu->lock, flags);
         invalidate_iommu_pages(iommu, daddr, dom_id, order);
-        flush_command_buffer(iommu);
+        flush_command_buffer(iommu, 0);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
 
@@ -361,7 +370,7 @@ void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf)
     ASSERT( spin_is_locked(&iommu->lock) );
 
     invalidate_dev_table_entry(iommu, bdf);
-    flush_command_buffer(iommu);
+    flush_command_buffer(iommu, 0);
 }
 
 void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf)
@@ -369,7 +378,7 @@ void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf)
     ASSERT( spin_is_locked(&iommu->lock) );
 
     invalidate_interrupt_table(iommu, bdf);
-    flush_command_buffer(iommu);
+    flush_command_buffer(iommu, 0);
 }
 
 void amd_iommu_flush_all_caches(struct amd_iommu *iommu)
@@ -377,7 +386,7 @@ void amd_iommu_flush_all_caches(struct amd_iommu *iommu)
     ASSERT( spin_is_locked(&iommu->lock) );
 
     invalidate_iommu_all(iommu);
-    flush_command_buffer(iommu);
+    flush_command_buffer(iommu, 0);
 }
 
 void amd_iommu_send_guest_cmd(struct amd_iommu *iommu, u32 cmd[])
@@ -387,7 +396,8 @@ void amd_iommu_send_guest_cmd(struct amd_iommu *iommu, u32 cmd[])
     spin_lock_irqsave(&iommu->lock, flags);
 
     send_iommu_command(iommu, cmd);
-    flush_command_buffer(iommu);
+    /* TBD: Timeout selection may require peeking into cmd[]. */
+    flush_command_buffer(iommu, 0);
 
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
