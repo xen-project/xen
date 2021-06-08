@@ -54,7 +54,7 @@ void send_guest_pirq(struct domain *, const struct pirq *);
 int evtchn_send(struct domain *d, unsigned int lport);
 
 /* Bind a local event-channel port to the specified VCPU. */
-long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id);
+int evtchn_bind_vcpu(evtchn_port_t port, unsigned int vcpu_id);
 
 /* Bind a VIRQ. */
 int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port);

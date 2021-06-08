@@ -284,13 +284,12 @@ void evtchn_free(struct domain *d, struct evtchn *chn)
     xsm_evtchn_close_post(chn);
 }
 
-static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
+static int evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 {
     struct evtchn *chn;
     struct domain *d;
-    int            port;
+    int            port, rc;
     domid_t        dom = alloc->dom;
-    long           rc;
 
     d = rcu_lock_domain_by_any_id(dom);
     if ( d == NULL )
@@ -342,13 +341,13 @@ static void double_evtchn_unlock(struct evtchn *lchn, struct evtchn *rchn)
     evtchn_write_unlock(rchn);
 }
 
-static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
+static int evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 {
     struct evtchn *lchn, *rchn;
     struct domain *ld = current->domain, *rd;
-    int            lport, rport = bind->remote_port;
+    int            lport, rc;
+    evtchn_port_t  rport = bind->remote_port;
     domid_t        rdom = bind->remote_dom;
-    long           rc;
 
     if ( (rd = rcu_lock_domain_by_any_id(rdom)) == NULL )
         return -ESRCH;
@@ -484,12 +483,12 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
 }
 
 
-static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
+static int evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
 {
     struct evtchn *chn;
     struct domain *d = current->domain;
-    int            port, vcpu = bind->vcpu;
-    long           rc = 0;
+    int            port, rc = 0;
+    unsigned int   vcpu = bind->vcpu;
 
     if ( domain_vcpu(d, vcpu) == NULL )
         return -ENOENT;
@@ -543,16 +542,16 @@ static void unlink_pirq_port(struct evtchn *chn, struct vcpu *v)
 }
 
 
-static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
+static int evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 {
     struct evtchn *chn;
     struct domain *d = current->domain;
     struct vcpu   *v = d->vcpu[0];
     struct pirq   *info;
-    int            port = 0, pirq = bind->pirq;
-    long           rc;
+    int            port = 0, rc;
+    unsigned int   pirq = bind->pirq;
 
-    if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
+    if ( pirq >= d->nr_pirqs )
         return -EINVAL;
 
     if ( !is_hvm_domain(d) && !pirq_access_permitted(d, pirq) )
@@ -608,7 +607,7 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
 {
     struct domain *d2 = NULL;
     struct evtchn *chn1 = _evtchn_from_port(d1, port1), *chn2;
-    long           rc = 0;
+    int            rc = 0;
 
     if ( !chn1 )
         return -EINVAL;
@@ -959,7 +958,7 @@ int evtchn_status(evtchn_status_t *status)
     domid_t          dom = status->dom;
     int              port = status->port;
     struct evtchn   *chn;
-    long             rc = 0;
+    int              rc = 0;
 
     d = rcu_lock_domain_by_any_id(dom);
     if ( d == NULL )
@@ -1025,11 +1024,11 @@ int evtchn_status(evtchn_status_t *status)
 }
 
 
-long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
+int evtchn_bind_vcpu(evtchn_port_t port, unsigned int vcpu_id)
 {
     struct domain *d = current->domain;
     struct evtchn *chn;
-    long           rc = 0;
+    int            rc = 0;
     struct vcpu   *v;
 
     /* Use the vcpu info to prevent speculative out-of-bound accesses */
@@ -1168,12 +1167,11 @@ int evtchn_reset(struct domain *d, bool resuming)
     return rc;
 }
 
-static long evtchn_set_priority(const struct evtchn_set_priority *set_priority)
+static int evtchn_set_priority(const struct evtchn_set_priority *set_priority)
 {
     struct domain *d = current->domain;
-    unsigned int port = set_priority->port;
-    struct evtchn *chn = _evtchn_from_port(d, port);
-    long ret;
+    struct evtchn *chn = _evtchn_from_port(d, set_priority->port);
+    int ret;
 
     if ( !chn )
         return -EINVAL;
@@ -1189,7 +1187,7 @@ static long evtchn_set_priority(const struct evtchn_set_priority *set_priority)
 
 long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
-    long rc;
+    int rc;
 
     switch ( cmd )
     {
