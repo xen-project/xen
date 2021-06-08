@@ -24,7 +24,7 @@ static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
 {
     uint32_t tail, head;
 
-    tail = iommu->cmd_buffer.tail + IOMMU_CMD_BUFFER_ENTRY_SIZE;
+    tail = iommu->cmd_buffer.tail + sizeof(cmd_entry_t);
     if ( tail == iommu->cmd_buffer.size )
         tail = 0;
 
@@ -33,7 +33,7 @@ static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
     if ( head != tail )
     {
         memcpy(iommu->cmd_buffer.buffer + iommu->cmd_buffer.tail,
-               cmd, IOMMU_CMD_BUFFER_ENTRY_SIZE);
+               cmd, sizeof(cmd_entry_t));
 
         iommu->cmd_buffer.tail = tail;
         return 1;
