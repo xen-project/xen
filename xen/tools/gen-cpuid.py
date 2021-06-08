@@ -362,6 +362,8 @@ def write_results(state):
 
 #define INIT_KNOWN_FEATURES { \\\n%s\n}
 
+#define INIT_SPECIAL_FEATURES { \\\n%s\n}
+
 #define INIT_PV_DEF_FEATURES { \\\n%s\n}
 
 #define INIT_PV_MAX_FEATURES { \\\n%s\n}
@@ -382,6 +384,7 @@ def write_results(state):
 """ % (state.nr_entries,
        next(featureset_to_uint32s(state.common_1d, 1)),
        format_uint32s(state, state.names.keys(), 4),
+       format_uint32s(state, state.raw['!'], 4),
        format_uint32s(state, state.pv_def, 4),
        format_uint32s(state, state.pv_max, 4),
        format_uint32s(state, state.hvm_shadow_def, 4),
