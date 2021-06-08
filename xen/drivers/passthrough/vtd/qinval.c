@@ -29,8 +29,6 @@
 #include "extern.h"
 #include "../ats.h"
 
-#define VTD_QI_TIMEOUT	1
-
 static unsigned int __read_mostly qi_pg_order;
 static unsigned int __read_mostly qi_entry_nr;
 
@@ -60,7 +58,11 @@ static unsigned int qinval_next_index(struct iommu *iommu)
     /* (tail+1 == head) indicates a full queue, wait for HW */
     while ( ((tail + 1) & (qi_entry_nr - 1)) ==
             ( dmar_readq(iommu->reg, DMAR_IQH_REG) >> QINVAL_INDEX_SHIFT ) )
+    {
+        printk_once(XENLOG_ERR VTDPREFIX " IOMMU#%u: no QI slot available\n",
+                    iommu->index);
         cpu_relax();
+    }
 
     return tail;
 }
@@ -180,23 +182,32 @@ static int __must_check queue_invalidate_wait(struct iommu *iommu,
     /* Now we don't support interrupt method */
     if ( sw )
     {
-        s_time_t timeout;
-
-        /* In case all wait descriptor writes to same addr with same data */
-        timeout = NOW() + MILLISECS(flush_dev_iotlb ?
-                                    iommu_dev_iotlb_timeout : VTD_QI_TIMEOUT);
+        static unsigned int __read_mostly threshold = 1;
+        s_time_t start = NOW();
+        s_time_t timeout = start + (flush_dev_iotlb
+                                    ? iommu_dev_iotlb_timeout
+                                    : 100) * MILLISECS(threshold);
 
         while ( ACCESS_ONCE(*this_poll_slot) != QINVAL_STAT_DONE )
         {
-            if ( NOW() > timeout )
+            if ( timeout && NOW() > timeout )
             {
-                print_qi_regs(iommu);
+                threshold |= threshold << 1;
                 printk(XENLOG_WARNING VTDPREFIX
-                       " Queue invalidate wait descriptor timed out\n");
-                return -ETIMEDOUT;
+                       " IOMMU#%u: QI%s wait descriptor taking too long\n",
+                       iommu->index, flush_dev_iotlb ? " dev" : "");
+                print_qi_regs(iommu);
+                timeout = 0;
             }
             cpu_relax();
         }
+
+        if ( !timeout )
+            printk(XENLOG_WARNING VTDPREFIX
+                   " IOMMU#%u: QI%s wait descriptor took %lums\n",
+                   iommu->index, flush_dev_iotlb ? " dev" : "",
+                   (NOW() - start) / 10000000);
+
         return 0;
     }
 

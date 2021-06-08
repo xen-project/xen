@@ -357,8 +357,8 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, val | DMA_GCMD_WBF);
 
     /* Make sure hardware complete it */
-    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
-                  !(val & DMA_GSTS_WBFS), val);
+    IOMMU_FLUSH_WAIT("write buffer", iommu, DMAR_GSTS_REG, dmar_readl,
+                     !(val & DMA_GSTS_WBFS), val);
 
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
@@ -408,8 +408,8 @@ static int __must_check flush_context_reg(void *_iommu, u16 did, u16 source_id,
     dmar_writeq(iommu->reg, DMAR_CCMD_REG, val);
 
     /* Make sure hardware complete it */
-    IOMMU_WAIT_OP(iommu, DMAR_CCMD_REG, dmar_readq,
-                  !(val & DMA_CCMD_ICC), val);
+    IOMMU_FLUSH_WAIT("context", iommu, DMAR_CCMD_REG, dmar_readq,
+                     !(val & DMA_CCMD_ICC), val);
 
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     /* flush context entry will implicitly flush write buffer */
@@ -491,8 +491,8 @@ static int __must_check flush_iotlb_reg(void *_iommu, u16 did, u64 addr,
     dmar_writeq(iommu->reg, tlb_offset + 8, val);
 
     /* Make sure hardware complete it */
-    IOMMU_WAIT_OP(iommu, (tlb_offset + 8), dmar_readq,
-                  !(val & DMA_TLB_IVT), val);
+    IOMMU_FLUSH_WAIT("iotlb", iommu, (tlb_offset + 8), dmar_readq,
+                     !(val & DMA_TLB_IVT), val);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     /* check IOTLB invalidation granularity */
