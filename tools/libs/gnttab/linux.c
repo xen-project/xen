@@ -32,13 +32,10 @@
 #include <xen/sys/gntdev.h>
 #include <xen/sys/gntalloc.h>
 
+#include <xenctrl.h>
 #include <xen-tools/libs.h>
 
 #include "private.h"
-
-#define PAGE_SHIFT           12
-#define PAGE_SIZE            (1UL << PAGE_SHIFT)
-#define PAGE_MASK            (~(PAGE_SIZE-1))
 
 #define DEVXEN "/dev/xen/"
 
@@ -92,6 +89,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     int fd = xgt->fd;
     struct ioctl_gntdev_map_grant_ref *map;
     unsigned int map_size = sizeof(*map) + (count - 1) * sizeof(map->refs[0]);
+    int os_page_size = sysconf(_SC_PAGESIZE);
     void *addr = NULL;
     int domids_stride = 1;
     int i;
@@ -99,11 +97,11 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     if (flags & XENGNTTAB_GRANT_MAP_SINGLE_DOMAIN)
         domids_stride = 0;
 
-    if ( map_size <= PAGE_SIZE )
+    if ( map_size <= os_page_size )
         map = alloca(map_size);
     else
     {
-        map_size = ROUNDUP(map_size, PAGE_SHIFT);
+        map_size = ROUNDUP(map_size, XC_PAGE_SHIFT);
         map = mmap(NULL, map_size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANON | MAP_POPULATE, -1, 0);
         if ( map == MAP_FAILED )
@@ -127,7 +125,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     }
 
  retry:
-    addr = mmap(NULL, PAGE_SIZE * count, prot, MAP_SHARED, fd,
+    addr = mmap(NULL, XC_PAGE_SIZE * count, prot, MAP_SHARED, fd,
                 map->index);
 
     if (addr == MAP_FAILED && errno == EAGAIN)
@@ -152,7 +150,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
         struct ioctl_gntdev_unmap_notify notify;
         notify.index = map->index;
         notify.action = 0;
-        if (notify_offset < PAGE_SIZE * count) {
+        if (notify_offset < XC_PAGE_SIZE * count) {
             notify.index += notify_offset;
             notify.action |= UNMAP_NOTIFY_CLEAR_BYTE;
         }
@@ -164,7 +162,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
             rv = ioctl(fd, IOCTL_GNTDEV_SET_UNMAP_NOTIFY, &notify);
         if (rv) {
             GTERROR(xgt->logger, "ioctl SET_UNMAP_NOTIFY failed");
-            munmap(addr, count * PAGE_SIZE);
+            munmap(addr, count * XC_PAGE_SIZE);
             addr = MAP_FAILED;
         }
     }
@@ -184,7 +182,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     }
 
  out:
-    if ( map_size > PAGE_SIZE )
+    if ( map_size > os_page_size )
         munmap(map, map_size);
 
     return addr;
@@ -220,7 +218,7 @@ int osdep_gnttab_unmap(xengnttab_handle *xgt,
     }
 
     /* Next, unmap the memory. */
-    if ( (rc = munmap(start_address, count * PAGE_SIZE)) )
+    if ( (rc = munmap(start_address, count * XC_PAGE_SIZE)) )
         return rc;
 
     /* Finally, unmap the driver slots used to store the grant information. */
@@ -466,7 +464,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
         goto out;
     }
 
-    area = mmap(NULL, count * PAGE_SIZE, PROT_READ | PROT_WRITE,
+    area = mmap(NULL, count * XC_PAGE_SIZE, PROT_READ | PROT_WRITE,
         MAP_SHARED, fd, gref_info->index);
 
     if (area == MAP_FAILED) {
@@ -477,7 +475,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
 
     notify.index = gref_info->index;
     notify.action = 0;
-    if (notify_offset < PAGE_SIZE * count) {
+    if (notify_offset < XC_PAGE_SIZE * count) {
         notify.index += notify_offset;
         notify.action |= UNMAP_NOTIFY_CLEAR_BYTE;
     }
@@ -489,7 +487,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
         err = ioctl(fd, IOCTL_GNTALLOC_SET_UNMAP_NOTIFY, &notify);
     if (err) {
         GSERROR(xgs->logger, "ioctl SET_UNMAP_NOTIFY failed");
-        munmap(area, count * PAGE_SIZE);
+        munmap(area, count * XC_PAGE_SIZE);
         area = NULL;
     }
 
@@ -510,7 +508,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
 int osdep_gntshr_unshare(xengntshr_handle *xgs,
                          void *start_address, uint32_t count)
 {
-    return munmap(start_address, count * PAGE_SIZE);
+    return munmap(start_address, count * XC_PAGE_SIZE);
 }
 
 /*

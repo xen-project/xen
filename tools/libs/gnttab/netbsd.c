@@ -28,14 +28,11 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
+#include <xenctrl.h>
 #include <xen/xen.h>
 #include <xen/xenio.h>
 
 #include "private.h"
-
-#define PAGE_SHIFT           12
-#define PAGE_SIZE            (1UL << PAGE_SHIFT)
-#define PAGE_MASK            (~(PAGE_SIZE-1))
 
 #define DEVXEN "/kern/xen/privcmd"
 
@@ -87,19 +84,19 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     }
 
     map.count = count;
-    addr = mmap(NULL, count * PAGE_SIZE,
+    addr = mmap(NULL, count * XC_PAGE_SIZE,
                 prot, flags | MAP_ANON | MAP_SHARED, -1, 0);
     if ( map.va == MAP_FAILED )
     {
         GTERROR(xgt->logger, "osdep_gnttab_grant_map: mmap failed");
-        munmap((void *)map.va, count * PAGE_SIZE);
+        munmap((void *)map.va, count * XC_PAGE_SIZE);
         addr = MAP_FAILED;
     }
     map.va = addr;
 
     map.notify.offset = 0;
     map.notify.action = 0;
-    if ( notify_offset < PAGE_SIZE * count )
+    if ( notify_offset < XC_PAGE_SIZE * count )
     {
         map.notify.offset = notify_offset;
         map.notify.action |= UNMAP_NOTIFY_CLEAR_BYTE;
@@ -115,7 +112,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     {
         GTERROR(xgt->logger,
             "ioctl IOCTL_GNTDEV_MMAP_GRANT_REF failed: %d", rv);
-        munmap(addr, count * PAGE_SIZE);
+        munmap(addr, count * XC_PAGE_SIZE);
         addr = MAP_FAILED;
     }
 
@@ -136,7 +133,7 @@ int osdep_gnttab_unmap(xengnttab_handle *xgt,
     }
 
     /* Next, unmap the memory. */
-    rc = munmap(start_address, count * PAGE_SIZE);
+    rc = munmap(start_address, count * XC_PAGE_SIZE);
 
     return rc;
 }
@@ -187,7 +184,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
     alloc.domid = domid;
     alloc.flags = writable ? GNTDEV_ALLOC_FLAG_WRITABLE : 0;
     alloc.count = count;
-    area = mmap(NULL, count * PAGE_SIZE,
+    area = mmap(NULL, count * XC_PAGE_SIZE,
                 PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
 
     if ( area == MAP_FAILED )
@@ -200,7 +197,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
 
     alloc.notify.offset = 0;
     alloc.notify.action = 0;
-    if ( notify_offset < PAGE_SIZE * count )
+    if ( notify_offset < XC_PAGE_SIZE * count )
     {
         alloc.notify.offset = notify_offset;
         alloc.notify.action |= UNMAP_NOTIFY_CLEAR_BYTE;
@@ -215,7 +212,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
     if ( err )
     {
         GSERROR(xgs->logger, "IOCTL_GNTDEV_ALLOC_GRANT_REF failed");
-        munmap(area, count * PAGE_SIZE);
+        munmap(area, count * XC_PAGE_SIZE);
         area = MAP_FAILED;
         goto out;
     }
@@ -230,7 +227,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
 int osdep_gntshr_unshare(xengntshr_handle *xgs,
                          void *start_address, uint32_t count)
 {
-    return munmap(start_address, count * PAGE_SIZE);
+    return munmap(start_address, count * XC_PAGE_SIZE);
 }
 
 /*
