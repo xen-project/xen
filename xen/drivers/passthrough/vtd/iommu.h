@@ -447,17 +447,9 @@ struct qinval_entry {
     }q;
 };
 
-/* Order of queue invalidation pages(max is 8) */
-#define QINVAL_PAGE_ORDER   2
-
-#define QINVAL_ARCH_PAGE_ORDER  (QINVAL_PAGE_ORDER + PAGE_SHIFT_4K - PAGE_SHIFT)
-#define QINVAL_ARCH_PAGE_NR     ( QINVAL_ARCH_PAGE_ORDER < 0 ?  \
-                                1 :                             \
-                                1 << QINVAL_ARCH_PAGE_ORDER )
-
 /* Each entry is 16 bytes, so 2^8 entries per page */
 #define QINVAL_ENTRY_ORDER  ( PAGE_SHIFT - 4 )
-#define QINVAL_ENTRY_NR     (1 << (QINVAL_PAGE_ORDER + 8))
+#define QINVAL_MAX_ENTRY_NR (1u << (7 + QINVAL_ENTRY_ORDER))
 
 /* Status data flag */
 #define QINVAL_STAT_INIT  0
