@@ -125,7 +125,7 @@ static void register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
     writel(entry, iommu->mmio_base + IOMMU_CMD_BUFFER_BASE_LOW_OFFSET);
 
     power_of2_entries = get_order_from_bytes(iommu->cmd_buffer.alloc_size) +
-        IOMMU_CMD_BUFFER_POWER_OF2_ENTRIES_PER_PAGE;
+        PAGE_SHIFT - IOMMU_CMD_BUFFER_ENTRY_ORDER;
 
     entry = 0;
     iommu_set_addr_hi_to_reg(&entry, addr_hi);
@@ -1050,9 +1050,31 @@ static void *__init allocate_ring_buffer(struct ring_buffer *ring_buf,
 static void * __init allocate_cmd_buffer(struct amd_iommu *iommu)
 {
     /* allocate 'command buffer' in power of 2 increments of 4K */
+    static unsigned int __read_mostly nr_ents;
+
+    if ( !nr_ents )
+    {
+        unsigned int order;
+
+        /*
+         * With the present synchronous model, we need two slots for every
+         * operation (the operation itself and a wait command).  There can be
+         * one such pair of requests pending per CPU.  One extra entry is
+         * needed as the ring is considered full when there's only one entry
+         * left.
+         */
+        BUILD_BUG_ON(CONFIG_NR_CPUS * 2 >= IOMMU_CMD_BUFFER_MAX_ENTRIES);
+        order = get_order_from_bytes((num_present_cpus() * 2 + 1) <<
+                                     IOMMU_CMD_BUFFER_ENTRY_ORDER);
+        nr_ents = 1u << (order + PAGE_SHIFT - IOMMU_CMD_BUFFER_ENTRY_ORDER);
+
+        AMD_IOMMU_DEBUG("using %u-entry cmd ring(s)\n", nr_ents);
+    }
+
+    BUILD_BUG_ON(sizeof(cmd_entry_t) != (1u << IOMMU_CMD_BUFFER_ENTRY_ORDER));
+
     return allocate_ring_buffer(&iommu->cmd_buffer, sizeof(cmd_entry_t),
-                                IOMMU_CMD_BUFFER_DEFAULT_ENTRIES,
-                                "Command Buffer", false);
+                                nr_ents, "Command Buffer", false);
 }
 
 static void * __init allocate_event_log(struct amd_iommu *iommu)
