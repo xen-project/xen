@@ -20,9 +20,6 @@
 #ifndef _ASM_X86_64_AMD_IOMMU_DEFS_H
 #define _ASM_X86_64_AMD_IOMMU_DEFS_H
 
-/* IOMMU Command Buffer entries: in power of 2 increments, minimum of 256 */
-#define IOMMU_CMD_BUFFER_DEFAULT_ENTRIES	512
-
 /* IOMMU Event Log entries: in power of 2 increments, minimum of 256 */
 #define IOMMU_EVENT_LOG_DEFAULT_ENTRIES     512
 
@@ -185,9 +182,8 @@
 #define IOMMU_CMD_BUFFER_LENGTH_MASK		0x0F000000
 #define IOMMU_CMD_BUFFER_LENGTH_SHIFT		24
 
-#define IOMMU_CMD_BUFFER_ENTRY_SIZE			16
-#define IOMMU_CMD_BUFFER_POWER_OF2_ENTRIES_PER_PAGE	8
-#define IOMMU_CMD_BUFFER_U32_PER_ENTRY 	(IOMMU_CMD_BUFFER_ENTRY_SIZE / 4)
+#define IOMMU_CMD_BUFFER_ENTRY_ORDER            4
+#define IOMMU_CMD_BUFFER_MAX_ENTRIES            (1u << 15)
 
 #define IOMMU_CMD_OPCODE_MASK			0xF0000000
 #define IOMMU_CMD_OPCODE_SHIFT			28
