@@ -127,6 +127,34 @@ do {                                                \
     }                                                           \
 } while (0)
 
+#define IOMMU_FLUSH_WAIT(what, iommu, offset, op, cond, sts)       \
+do {                                                               \
+    static unsigned int __read_mostly threshold = 1;               \
+    s_time_t start = NOW();                                        \
+    s_time_t timeout = start + DMAR_OPERATION_TIMEOUT * threshold; \
+                                                                   \
+    for ( ; ; )                                                    \
+    {                                                              \
+        sts = op(iommu->reg, offset);                              \
+        if ( cond )                                                \
+            break;                                                 \
+        if ( timeout && NOW() > timeout )                          \
+        {                                                          \
+            threshold |= threshold << 1;                           \
+            printk(XENLOG_WARNING VTDPREFIX                        \
+                   " IOMMU#%u: %s flush taking too long\n",        \
+                   iommu->index, what);                            \
+            timeout = 0;                                           \
+        }                                                          \
+        cpu_relax();                                               \
+    }                                                              \
+                                                                   \
+    if ( !timeout )                                                \
+        printk(XENLOG_WARNING VTDPREFIX                            \
+               " IOMMU#%u: %s flush took %lums\n",                 \
+               iommu->index, what, (NOW() - start) / 10000000);    \
+} while ( false )
+
 int vtd_hw_check(void);
 void disable_pmr(struct vtd_iommu *iommu);
 int is_igd_drhd(struct acpi_drhd_unit *drhd);
