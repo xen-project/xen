@@ -456,6 +456,15 @@ F:	tools/libs/light/libxl_nonetbuffer.c
 F:	tools/hotplug/Linux/remus-netbuf-setup
 F:	tools/hotplug/Linux/block-drbd-probe
 
+RISCV
+M:	Bob Eshleman <bobbyeshleman@gmail.com>
+M:	Alistair Francis <alistair.francis@wdc.com>
+R:	Connor Davis <connojdavis@gmail.com>
+S:	Supported
+F:	config/riscv64.mk
+F:	xen/arch/riscv/
+F:	xen/include/asm-riscv/
+
 RTDS SCHEDULER
 M:	Dario Faggioli <dfaggioli@suse.com>
 M:	Meng Xu <mengxu@cis.upenn.edu>

@@ -1,0 +1,48 @@
+config RISCV
+	def_bool y
+
+config RISCV_64
+	def_bool y
+	select 64BIT
+
+config ARCH_DEFCONFIG
+	string
+	default "arch/riscv/configs/tiny64_defconfig"
+
+menu "Architecture Features"
+
+source "arch/Kconfig"
+
+endmenu
+
+menu "ISA Selection"
+
+choice
+	prompt "Base ISA"
+	default RISCV_ISA_RV64IMA if RISCV_64
+	help
+	  This selects the base ISA extensions that Xen will target.
+
+config RISCV_ISA_RV64IMA
+	bool "RV64IMA"
+	help
+	  Use the RV64I base ISA, plus the "M" and "A" extensions
+	  for integer multiply/divide and atomic instructions, respectively.
+
+endchoice
+
+config RISCV_ISA_C
+	bool "Compressed extension"
+	default y
+	help
+	  Add "C" to the ISA subsets that the toolchain is allowed to
+	  emit when building Xen, which results in compressed instructions
+	  in the Xen binary.
+
+	  If unsure, say Y.
+
+endmenu
+
+source "common/Kconfig"
+
+source "drivers/Kconfig"
