@@ -591,7 +591,9 @@ F:	xen/arch/x86/mm/mem_sharing.c
 F:	tools/tests/mem-sharing/
 
 X86 SHADOW PAGETABLES
-M:	Tim Deegan <tim@xen.org>
+M:	Jan Beulich <jbeulich@suse.com>
+M:	Andrew Cooper <andrew.cooper3@citrix.com>
+R:	Tim Deegan <tim@xen.org>
 S:	Maintained
 F:	xen/arch/x86/mm/shadow/
 
