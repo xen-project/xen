@@ -171,7 +171,7 @@ ENDPROC(prepare_context_from_guest)
         mrc     CP32(r11, HSR)                 /* Save exception syndrome */
         str     r11, [sp, #UREGS_hsr]
 
-        mrs     r11, SPSR_hyp
+        mrs     r11, SPSR
         str     r11, [sp, #UREGS_cpsr]
 
         /*
@@ -396,7 +396,7 @@ return_to_hypervisor:
         ldr r11, [sp, #UREGS_pc]
         msr ELR_hyp, r11
         ldr r11, [sp, #UREGS_cpsr]
-        msr SPSR_hyp, r11
+        msr SPSR, r11
 #ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
         /*
          * Hardening branch predictor may require to setup a different
