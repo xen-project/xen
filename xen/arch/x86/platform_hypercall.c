@@ -80,6 +80,9 @@ static bool msr_read_allowed(unsigned int msr)
 
     case MSR_TSX_CTRL:
         return cpu_has_tsx_ctrl;
+
+    case MSR_MCU_OPT_CTRL:
+        return cpu_has_srbds_ctrl;
     }
 
     if ( ppin_msr && msr == ppin_msr )
