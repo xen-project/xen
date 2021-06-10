@@ -1558,7 +1558,7 @@ static void psr_cpu_init(void)
     struct cpuid_leaf regs;
     uint32_t feat_mask;
 
-    if ( !psr_alloc_feat_enabled() || !boot_cpu_has(X86_FEATURE_PQE) )
+    if ( !psr_alloc_feat_enabled() || !cpu_has_pqe )
         goto assoc_init;
 
     if ( boot_cpu_data.cpuid_level < PSR_CPUID_LEVEL_CAT )

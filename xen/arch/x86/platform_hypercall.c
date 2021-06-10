@@ -64,15 +64,31 @@ long cpu_frequency_change_helper(void *data)
     return cpu_frequency_change((uint64_t)data);
 }
 
-static bool allow_access_msr(unsigned int msr)
+static bool msr_read_allowed(unsigned int msr)
 {
     switch ( msr )
     {
-    /* MSR for CMT, refer to chapter 17.14 of Intel SDM. */
     case MSR_IA32_CMT_EVTSEL:
     case MSR_IA32_CMT_CTR:
+        return cpu_has_pqe;
+
     case MSR_IA32_TSC:
         return true;
+    }
+
+    if ( ppin_msr && msr == ppin_msr )
+        return true;
+
+    return false;
+}
+
+static bool msr_write_allowed(unsigned int msr)
+{
+    switch ( msr )
+    {
+    case MSR_IA32_CMT_EVTSEL:
+    case MSR_IA32_CMT_CTR:
+        return cpu_has_pqe;
     }
 
     return false;
@@ -96,15 +112,19 @@ void check_resource_access(struct resource_access *ra)
         switch ( entry->u.cmd )
         {
         case XEN_RESOURCE_OP_MSR_READ:
-            if ( ppin_msr && entry->idx == ppin_msr )
-                break;
-            /* fall through */
+            if ( entry->idx >> 32 )
+                ret = -EINVAL;
+            else if ( !msr_read_allowed(entry->idx) )
+                ret = -EPERM;
+            break;
+
         case XEN_RESOURCE_OP_MSR_WRITE:
             if ( entry->idx >> 32 )
                 ret = -EINVAL;
-            else if ( !allow_access_msr(entry->idx) )
-                ret = -EACCES;
+            else if ( !msr_write_allowed(entry->idx) )
+                ret = -EPERM;
             break;
+
         default:
             ret = -EOPNOTSUPP;
             break;
@@ -163,12 +183,11 @@ void resource_access(void *info)
                 }
             }
             break;
+
         case XEN_RESOURCE_OP_MSR_WRITE:
-            if ( unlikely(entry->idx == MSR_IA32_TSC) )
-                ret = -EPERM;
-            else
-                ret = wrmsr_safe(entry->idx, entry->val);
+            ret = wrmsr_safe(entry->idx, entry->val);
             break;
+
         default:
             BUG();
             break;

@@ -94,6 +94,7 @@
 #define cpu_has_bmi2            boot_cpu_has(X86_FEATURE_BMI2)
 #define cpu_has_invpcid         boot_cpu_has(X86_FEATURE_INVPCID)
 #define cpu_has_rtm             boot_cpu_has(X86_FEATURE_RTM)
+#define cpu_has_pqe             boot_cpu_has(X86_FEATURE_PQE)
 #define cpu_has_fpu_sel         (!boot_cpu_has(X86_FEATURE_NO_FPU_SEL))
 #define cpu_has_mpx             boot_cpu_has(X86_FEATURE_MPX)
 #define cpu_has_avx512f         boot_cpu_has(X86_FEATURE_AVX512F)
