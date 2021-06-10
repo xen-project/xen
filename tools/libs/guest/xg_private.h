@@ -168,4 +168,15 @@ int pin_table(xc_interface *xch, unsigned int type, unsigned long mfn,
 #define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
 #define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
 
+#if defined(__x86_64__) || defined(__i386__)
+#include <xen/lib/x86/cpu-policy.h>
+
+struct xc_cpu_policy {
+    struct cpuid_policy cpuid;
+    struct msr_policy msr;
+    xen_cpuid_leaf_t leaves[CPUID_MAX_SERIALISED_LEAVES];
+    xen_msr_entry_t entries[MSR_MAX_SERIALISED_ENTRIES];
+};
+#endif /* x86 */
+
 #endif /* XG_PRIVATE_H */

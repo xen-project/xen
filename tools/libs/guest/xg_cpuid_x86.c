@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <limits.h>
-#include "xc_private.h"
+#include "xg_private.h"
 #include "xc_bitops.h"
 #include <xen/hvm/params.h>
 #include <xen-tools/libs.h>
@@ -34,17 +34,8 @@ enum {
 
 #include <xen/asm/x86-vendors.h>
 
-#include <xen/lib/x86/cpu-policy.h>
-
 #define bitmaskof(idx)      (1u << ((idx) & 31))
 #define featureword_of(idx) ((idx) >> 5)
-
-struct xc_cpu_policy {
-    struct cpuid_policy cpuid;
-    struct msr_policy msr;
-    xen_cpuid_leaf_t leaves[CPUID_MAX_SERIALISED_LEAVES];
-    xen_msr_entry_t entries[MSR_MAX_SERIALISED_ENTRIES];
-};
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
 {
