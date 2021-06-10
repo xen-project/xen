@@ -42,6 +42,7 @@ enum {
 #define  ARCH_CAPS_TSX_CTRL                 (1 <<  7)
 #define MSR_TSX_FORCE_ABORT                 0x0000010f
 #define MSR_TSX_CTRL                        0x00000122
+#define MSR_MCU_OPT_CTRL                    0x00000123
 
 static unsigned int nr_failures;
 #define fail(fmt, ...)                          \
@@ -155,6 +156,10 @@ static void test_tsx_msrs(void)
     printf("Testing MSR_TSX_CTRL consistency\n");
     test_tsx_msr_consistency(
         MSR_TSX_CTRL, host.msr.arch_caps.tsx_ctrl);
+
+    printf("Testing MSR_MCU_OPT_CTRL consistency\n");
+    test_tsx_msr_consistency(
+        MSR_MCU_OPT_CTRL, host.cpuid.feat.srbds_ctrl);
 }
 
 /*
@@ -313,7 +318,8 @@ static void test_guest_policies(const struct xc_cpu_policy *max,
 
     if ( ((cm->feat.raw[0].d | cd->feat.raw[0].d) &
           (bitmaskof(X86_FEATURE_TSX_FORCE_ABORT) |
-           bitmaskof(X86_FEATURE_RTM_ALWAYS_ABORT))) ||
+           bitmaskof(X86_FEATURE_RTM_ALWAYS_ABORT) |
+           bitmaskof(X86_FEATURE_SRBDS_CTRL))) ||
          ((mm->arch_caps.raw | md->arch_caps.raw) & ARCH_CAPS_TSX_CTRL) )
         fail("  Xen-only TSX controls offered to guest\n");
 
@@ -388,6 +394,7 @@ static void test_guest(struct xen_domctl_createdomain *c)
     if ( guest_policy.cpuid.feat.hle ||
          guest_policy.cpuid.feat.tsx_force_abort ||
          guest_policy.cpuid.feat.rtm_always_abort ||
+         guest_policy.cpuid.feat.srbds_ctrl ||
          guest_policy.msr.arch_caps.tsx_ctrl )
         fail("  Unexpected features advertised\n");
 
