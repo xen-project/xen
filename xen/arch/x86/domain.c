@@ -1186,7 +1186,17 @@ int arch_set_info_guest(
         unsigned long pfn = pagetable_get_pfn(v->arch.guest_table);
         bool fail;
 
-        if ( !compat )
+#ifdef CONFIG_COMPAT
+        if ( compat )
+        {
+            l4_pgentry_t *l4tab = map_domain_page(_mfn(pfn));
+
+            pfn = l4e_get_pfn(*l4tab);
+            unmap_domain_page(l4tab);
+            fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
+        }
+        else
+#endif
         {
             fail = xen_pfn_to_cr3(pfn) != c.nat->ctrlreg[3];
             if ( pagetable_is_null(v->arch.guest_table_user) )
@@ -1197,16 +1207,6 @@ int arch_set_info_guest(
                 fail |= xen_pfn_to_cr3(pfn) != c.nat->ctrlreg[1];
             }
         }
-#ifdef CONFIG_COMPAT
-        else
-        {
-            l4_pgentry_t *l4tab = map_domain_page(_mfn(pfn));
-
-            pfn = l4e_get_pfn(*l4tab);
-            unmap_domain_page(l4tab);
-            fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
-        }
-#endif
 
         fail |= v->arch.pv.gdt_ents != c(gdt_ents);
         for ( i = 0; !fail && i < nr_gdt_frames; ++i )
@@ -1325,12 +1325,12 @@ int arch_set_info_guest(
 
     set_bit(_VPF_in_reset, &v->pause_flags);
 
-    if ( !compat )
-        cr3_mfn = _mfn(xen_cr3_to_pfn(c.nat->ctrlreg[3]));
 #ifdef CONFIG_COMPAT
-    else
+    if ( compat )
         cr3_mfn = _mfn(compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
+    else
 #endif
+        cr3_mfn = _mfn(xen_cr3_to_pfn(c.nat->ctrlreg[3]));
     cr3_page = get_page_from_mfn(cr3_mfn, d);
 
     if ( !cr3_page )
