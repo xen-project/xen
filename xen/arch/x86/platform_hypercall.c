@@ -74,6 +74,12 @@ static bool msr_read_allowed(unsigned int msr)
 
     case MSR_IA32_TSC:
         return true;
+
+    case MSR_TSX_FORCE_ABORT:
+        return cpu_has_tsx_force_abort;
+
+    case MSR_TSX_CTRL:
+        return cpu_has_tsx_ctrl;
     }
 
     if ( ppin_msr && msr == ppin_msr )
