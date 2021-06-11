@@ -47,8 +47,13 @@ struct msr_policy __read_mostly hvm_def_msr_policy;
 
 static void __init calculate_raw_policy(void)
 {
+    struct msr_policy *mp = &raw_msr_policy;
+
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     /* Was already added by probe_cpuid_faulting() */
+
+    if ( cpu_has_arch_caps )
+        rdmsrl(MSR_ARCH_CAPABILITIES, mp->arch_caps.raw);
 }
 
 static void __init calculate_host_policy(void)
@@ -60,6 +65,12 @@ static void __init calculate_host_policy(void)
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     /* probe_cpuid_faulting() sanity checks presence of MISC_FEATURES_ENABLES */
     mp->platform_info.cpuid_faulting = cpu_has_cpuid_faulting;
+
+    /* Temporary, until we have known_features[] for feature bits in MSRs. */
+    mp->arch_caps.raw &=
+        (ARCH_CAPS_RDCL_NO | ARCH_CAPS_IBRS_ALL | ARCH_CAPS_RSBA |
+         ARCH_CAPS_SKIP_L1DFL | ARCH_CAPS_SSB_NO | ARCH_CAPS_MDS_NO |
+         ARCH_CAPS_IF_PSCHANGE_MC_NO | ARCH_CAPS_TSX_CTRL | ARCH_CAPS_TAA_NO);
 }
 
 static void __init calculate_pv_max_policy(void)
@@ -67,6 +78,8 @@ static void __init calculate_pv_max_policy(void)
     struct msr_policy *mp = &pv_max_msr_policy;
 
     *mp = host_msr_policy;
+
+    mp->arch_caps.raw = 0; /* Not supported yet. */
 }
 
 static void __init calculate_pv_def_policy(void)
@@ -84,6 +97,8 @@ static void __init calculate_hvm_max_policy(void)
 
     /* It's always possible to emulate CPUID faulting for HVM guests */
     mp->platform_info.cpuid_faulting = true;
+
+    mp->arch_caps.raw = 0; /* Not supported yet. */
 }
 
 static void __init calculate_hvm_def_policy(void)
