@@ -1316,6 +1316,7 @@ static const struct dt_device_match ipmmu_dt_match[] __initconst =
     DT_MATCH_COMPATIBLE("renesas,ipmmu-r8a7795"),
     DT_MATCH_COMPATIBLE("renesas,ipmmu-r8a77965"),
     DT_MATCH_COMPATIBLE("renesas,ipmmu-r8a7796"),
+    DT_MATCH_COMPATIBLE("renesas,ipmmu-r8a77961"),
     { /* sentinel */ },
 };
 
