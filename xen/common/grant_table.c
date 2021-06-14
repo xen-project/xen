@@ -543,33 +543,27 @@ double_gt_unlock(struct grant_table *lgt, struct grant_table *rgt)
 static inline grant_handle_t
 _get_maptrack_handle(struct grant_table *t, struct vcpu *v)
 {
-    unsigned int head, next, prev_head;
+    unsigned int head, next;
 
     spin_lock(&v->maptrack_freelist_lock);
 
-    do {
-        /* No maptrack pages allocated for this VCPU yet? */
-        head = read_atomic(&v->maptrack_head);
-        if ( unlikely(head == MAPTRACK_TAIL) )
-        {
-            spin_unlock(&v->maptrack_freelist_lock);
-            return INVALID_MAPTRACK_HANDLE;
-        }
+    /* No maptrack pages allocated for this VCPU yet? */
+    head = v->maptrack_head;
+    if ( unlikely(head == MAPTRACK_TAIL) )
+    {
+        spin_unlock(&v->maptrack_freelist_lock);
+        return INVALID_MAPTRACK_HANDLE;
+    }
 
-        /*
-         * Always keep one entry in the free list to make it easier to
-         * add free entries to the tail.
-         */
-        next = read_atomic(&maptrack_entry(t, head).ref);
-        if ( unlikely(next == MAPTRACK_TAIL) )
-        {
-            spin_unlock(&v->maptrack_freelist_lock);
-            return INVALID_MAPTRACK_HANDLE;
-        }
-
-        prev_head = head;
-        head = cmpxchg(&v->maptrack_head, prev_head, next);
-    } while ( head != prev_head );
+    /*
+     * Always keep one entry in the free list to make it easier to
+     * add free entries to the tail.
+     */
+    next = maptrack_entry(t, head).ref;
+    if ( unlikely(next == MAPTRACK_TAIL) )
+        head = INVALID_MAPTRACK_HANDLE;
+    else
+        v->maptrack_head = next;
 
     spin_unlock(&v->maptrack_freelist_lock);
 
@@ -623,7 +617,7 @@ put_maptrack_handle(
 {
     struct domain *currd = current->domain;
     struct vcpu *v;
-    unsigned int prev_tail, cur_tail;
+    unsigned int tail;
 
     /* 1. Set entry to be a tail. */
     maptrack_entry(t, handle).ref = MAPTRACK_TAIL;
@@ -633,14 +627,11 @@ put_maptrack_handle(
 
     spin_lock(&v->maptrack_freelist_lock);
 
-    cur_tail = read_atomic(&v->maptrack_tail);
-    do {
-        prev_tail = cur_tail;
-        cur_tail = cmpxchg(&v->maptrack_tail, prev_tail, handle);
-    } while ( cur_tail != prev_tail );
+    tail = v->maptrack_tail;
+    v->maptrack_tail = handle;
 
     /* 3. Update the old tail entry to point to the new entry. */
-    write_atomic(&maptrack_entry(t, prev_tail).ref, handle);
+    maptrack_entry(t, tail).ref = handle;
 
     spin_unlock(&v->maptrack_freelist_lock);
 }
@@ -650,7 +641,7 @@ get_maptrack_handle(
     struct grant_table *lgt)
 {
     struct vcpu          *curr = current;
-    unsigned int          i, head;
+    unsigned int          i;
     grant_handle_t        handle;
     struct grant_mapping *new_mt = NULL;
 
@@ -686,7 +677,7 @@ get_maptrack_handle(
             maptrack_entry(lgt, handle).ref = MAPTRACK_TAIL;
             curr->maptrack_tail = handle;
             if ( curr->maptrack_head == MAPTRACK_TAIL )
-                write_atomic(&curr->maptrack_head, handle);
+                curr->maptrack_head = handle;
             spin_unlock(&curr->maptrack_freelist_lock);
         }
         return steal_maptrack_handle(lgt, curr);
@@ -707,7 +698,7 @@ get_maptrack_handle(
         new_mt[i].vcpu = curr->vcpu_id;
     }
 
-    /* Set tail directly if this is the first page for this VCPU. */
+    /* Set tail directly if this is the first page for the local vCPU. */
     if ( curr->maptrack_tail == MAPTRACK_TAIL )
         curr->maptrack_tail = handle + MAPTRACK_PER_PAGE - 1;
 
@@ -716,13 +707,10 @@ get_maptrack_handle(
     lgt->maptrack_limit += MAPTRACK_PER_PAGE;
 
     spin_unlock(&lgt->maptrack_lock);
+
     spin_lock(&curr->maptrack_freelist_lock);
-
-    do {
-        new_mt[i - 1].ref = read_atomic(&curr->maptrack_head);
-        head = cmpxchg(&curr->maptrack_head, new_mt[i - 1].ref, handle + 1);
-    } while ( head != new_mt[i - 1].ref );
-
+    new_mt[i - 1].ref = curr->maptrack_head;
+    curr->maptrack_head = handle + 1;
     spin_unlock(&curr->maptrack_freelist_lock);
 
     return handle;

@@ -255,7 +255,13 @@ struct vcpu
     /* VCPU paused by system controller. */
     int              controller_pause_count;
 
-    /* Grant table map tracking. */
+    /*
+     * Grant table map tracking. The lock maptrack_freelist_lock
+     * protects:
+     *  - entries in the freelist
+     *  - maptrack_head
+     *  - maptrack_tail
+     */
     spinlock_t       maptrack_freelist_lock;
     unsigned int     maptrack_head;
     unsigned int     maptrack_tail;
