@@ -185,13 +185,13 @@ SECTIONS
 #endif
        _sinittext = .;
        *(.init.text)
+       _einittext = .;
        /*
         * Here are the replacement instructions. The linker sticks them
         * as binary blobs. The .altinstructions has enough data to get
         * the address and the length of them to patch the kernel safely.
         */
        *(.altinstr_replacement)
-       _einittext = .;
 
 #ifdef EFI /* EFI wants to merge all of .init.*  ELF doesn't. */
        . = ALIGN(SMP_CACHE_BYTES);
