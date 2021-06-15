@@ -1,11 +1,7 @@
 XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS += -Werror
-
-CFLAGS += $(CFLAGS_libxenstore)
-
-TARGETS-y := xs-test
+TARGETS-y := test-xenstore
 TARGETS := $(TARGETS-y)
 
 .PHONY: all
@@ -16,14 +12,31 @@ build: $(TARGETS)
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(TARGETS) *~ $(DEPS_RM)
+	$(RM) -- *.o $(TARGETS) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean
+	$(RM) -- *~
 
-xs-test: xs-test.o Makefile
-	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenstore)
+.PHONY: install
+install: all
+	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
+	$(if $(TARGETS),$(INSTALL_PROG) $(TARGETS) $(DESTDIR)$(LIBEXEC_BIN))
 
-install uninstall:
+.PHONY: uninstall
+uninstall:
+	$(RM) -- $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/,$(TARGETS))
+
+CFLAGS += -Werror
+CFLAGS += $(CFLAGS_libxenstore)
+CFLAGS += $(APPEND_CFLAGS)
+
+LDFLAGS += $(LDLIBS_libxenstore)
+LDFLAGS += $(APPEND_LDFLAGS)
+
+%.o: Makefile
+
+test-xenstore: test-xenstore.o
+	$(CC) -o $@ $< $(LDFLAGS)
 
 -include $(DEPS_INCLUDE)

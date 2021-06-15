@@ -20,6 +20,7 @@
  */
 
 #define _GNU_SOURCE
+#include <err.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -483,11 +484,14 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    asprintf(&path, "%s/%u", TEST_PATH, getpid());
+    if ( asprintf(&path, "%s/%u", TEST_PATH, getpid()) < 0 )
+        err(2, "asprintf() malloc failure\n");
+
     for ( t = 0; t < WRITE_BUFFERS_N; t++ )
     {
         memset(write_buffers[t], 'a' + t, WRITE_BUFFERS_SIZE);
-        asprintf(&paths[t], "%s/%c", path, 'a' + t);
+        if ( asprintf(&paths[t], "%s/%c", path, 'a' + t) < 0 )
+            err(2, "asprintf() malloc failure\n");
     }
 
     xsh = xs_open(0);
