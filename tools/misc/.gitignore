@@ -1,4 +1,5 @@
 xen-access
+xen-mceinj
 xen-memshare
 xen-ucode
 xen-vmtrace

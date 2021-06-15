@@ -137,7 +137,7 @@ static void err(xc_interface *xc_handle, const char *fmt, ...)
     va_list args;
 
     va_start(args, fmt);
-    if (vasprintf(&buf, fmt, args) < 0)
+    if ( vasprintf(&buf, fmt, args) < 0 )
         abort();
     perror(buf);
     va_end(args);
@@ -173,7 +173,7 @@ static unsigned int mca_cpuinfo(xc_interface *xc_handle)
     mc.cmd = XEN_MC_physcpuinfo;
     mc.interface_version = XEN_MCA_INTERFACE_VERSION;
 
-    if (!xc_mca_op(xc_handle, &mc))
+    if ( !xc_mca_op(xc_handle, &mc) )
         return mc.u.mc_physcpuinfo.ncpus;
     else
         return 0;
@@ -187,9 +187,9 @@ static int inject_cmci(xc_interface *xc_handle, unsigned int cpu_nr)
     memset(&mc, 0, sizeof(struct xen_mc));
 
     nr_cpus = mca_cpuinfo(xc_handle);
-    if (!nr_cpus)
+    if ( !nr_cpus )
         err(xc_handle, "Failed to get mca_cpuinfo");
-    if (cpu_nr >= nr_cpus)
+    if ( cpu_nr >= nr_cpus )
         err(xc_handle, "-c %u is larger than %u", cpu_nr, nr_cpus - 1);
 
     mc.cmd = XEN_MC_inject_v2;
@@ -284,7 +284,7 @@ static int add_msr_intpose(xc_interface *xc_handle,
         flush_msr_inj(xc_handle);
         init_msr_inj();
     }
-    count= msr_inj.mcinj_count;
+    count = msr_inj.mcinj_count;
 
     if ( !count )
     {
@@ -422,7 +422,7 @@ static long xs_get_dom_mem(int domid)
     if (!memstr || !plen)
         return -1;
 
-    mem = atoll(memstr)*1024;
+    mem = atoll(memstr) * 1024;
     free(memstr);
 
     return mem;
@@ -474,17 +474,20 @@ int main(int argc, char *argv[])
     cpu_nr = 0;
 
     init_msr_inj();
-    xc_handle = xc_interface_open(0, 0, 0);
-    if ( !xc_handle ) {
+    xc_handle = xc_interface_open(NULL, NULL, 0);
+    if ( !xc_handle )
+    {
         Lprintf("Failed to get xc interface");
         exit(EXIT_FAILURE);
     }
 
-    while ( 1 ) {
+    while ( 1 )
+    {
         c = getopt_long(argc, argv, "c:Dd:t:hp:l", opts, &opt_index);
         if ( c == -1 )
             break;
-        switch ( c ) {
+        switch ( c )
+        {
         case 'D':
             dump=1;
             break;
@@ -516,7 +519,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    if ( domid != DOMID_XEN ) {
+    if ( domid != DOMID_XEN )
+    {
         max_gpa = xs_get_dom_mem(domid);
         Lprintf("get domain %d max gpa is: 0x%lx", domid, max_gpa);
         if ( gaddr >= max_gpa )
@@ -524,7 +528,8 @@ int main(int argc, char *argv[])
     }
     Lprintf("get gaddr of error inject is: 0x%lx", gaddr);
 
-    if ( dump ) {
+    if ( dump )
+    {
         if ( domid == DOMID_XEN )
             Lprintf("Xen: gaddr=0x%lx", gaddr);
         else
@@ -532,7 +537,8 @@ int main(int argc, char *argv[])
         goto out;
     }
 
-    if ( type < 0 || type >= MCE_TABLE_SIZE ) {
+    if ( type < 0 || type >= MCE_TABLE_SIZE )
+    {
         err(xc_handle, "Unsupported error type");
         goto out;
     }

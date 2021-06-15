@@ -276,7 +276,6 @@ tools/tests/x86_emulator/test_x86_emulator
 tools/tests/x86_emulator/x86_emulate
 tools/tests/x86_emulator/xop*.[ch]
 tools/tests/xenstore/xs-test
-tools/tests/mce-test/tools/xen-mceinj
 tools/tests/vpci/list.h
 tools/tests/vpci/vpci.[hc]
 tools/tests/vpci/test_vpci
