@@ -194,8 +194,7 @@ void hvm_vcpu_cacheattr_destroy(struct vcpu *v)
  * May return a negative value when order > 0, indicating to the caller
  * that the respective mapping needs splitting.
  */
-static int get_mtrr_type(const struct mtrr_state *m,
-                         paddr_t pa, unsigned int order)
+int mtrr_get_type(const struct mtrr_state *m, paddr_t pa, unsigned int order)
 {
    uint8_t     overlap_mtrr = 0;
    uint8_t     overlap_mtrr_pos = 0;
@@ -323,7 +322,7 @@ static uint8_t effective_mm_type(struct mtrr_state *m,
      * just use it
      */ 
     if ( gmtrr_mtype == NO_HARDCODE_MEM_TYPE )
-        mtrr_mtype = get_mtrr_type(m, gpa, 0);
+        mtrr_mtype = mtrr_get_type(m, gpa, 0);
     else
         mtrr_mtype = gmtrr_mtype;
 
@@ -350,7 +349,7 @@ uint32_t get_pat_flags(struct vcpu *v,
     guest_eff_mm_type = effective_mm_type(g, pat, gpaddr, 
                                           gl1e_flags, gmtrr_mtype);
     /* 2. Get the memory type of host physical address, with MTRR */
-    shadow_mtrr_type = get_mtrr_type(&mtrr_state, spaddr, 0);
+    shadow_mtrr_type = mtrr_get_type(&mtrr_state, spaddr, 0);
 
     /* 3. Find the memory type in PAT, with host MTRR memory type
      * and guest effective memory type.
@@ -787,106 +786,6 @@ void memory_type_changed(struct domain *d)
         p2m_memory_type_changed(d);
         flush_all(FLUSH_CACHE);
     }
-}
-
-int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
-                       unsigned int order, uint8_t *ipat, bool_t direct_mmio)
-{
-    int gmtrr_mtype, hmtrr_mtype;
-    struct vcpu *v = current;
-    unsigned long i;
-
-    *ipat = 0;
-
-    if ( v->domain != d )
-        v = d->vcpu ? d->vcpu[0] : NULL;
-
-    /* Mask, not add, for order so it works with INVALID_MFN on unmapping */
-    if ( rangeset_overlaps_range(mmio_ro_ranges, mfn_x(mfn),
-                                 mfn_x(mfn) | ((1UL << order) - 1)) )
-    {
-        if ( !order || rangeset_contains_range(mmio_ro_ranges, mfn_x(mfn),
-                                               mfn_x(mfn) | ((1UL << order) - 1)) )
-        {
-            *ipat = 1;
-            return MTRR_TYPE_UNCACHABLE;
-        }
-        /* Force invalid memory type so resolve_misconfig() will split it */
-        return -1;
-    }
-
-    if ( !mfn_valid(mfn) )
-    {
-        *ipat = 1;
-        return MTRR_TYPE_UNCACHABLE;
-    }
-
-    if ( !direct_mmio && !is_iommu_enabled(d) && !cache_flush_permitted(d) )
-    {
-        *ipat = 1;
-        return MTRR_TYPE_WRBACK;
-    }
-
-    for ( i = 0; i < (1ul << order); i++ )
-    {
-        if ( is_special_page(mfn_to_page(mfn_add(mfn, i))) )
-        {
-            if ( order )
-                return -1;
-            *ipat = 1;
-            return MTRR_TYPE_WRBACK;
-        }
-    }
-
-    if ( direct_mmio )
-        return MTRR_TYPE_UNCACHABLE;
-
-    gmtrr_mtype = hvm_get_mem_pinned_cacheattr(d, _gfn(gfn), order);
-    if ( gmtrr_mtype >= 0 )
-    {
-        *ipat = 1;
-        return gmtrr_mtype != PAT_TYPE_UC_MINUS ? gmtrr_mtype
-                                                : MTRR_TYPE_UNCACHABLE;
-    }
-    if ( gmtrr_mtype == -EADDRNOTAVAIL )
-        return -1;
-
-    gmtrr_mtype = v ? get_mtrr_type(&v->arch.hvm.mtrr, gfn << PAGE_SHIFT, order)
-                    : MTRR_TYPE_WRBACK;
-    hmtrr_mtype = get_mtrr_type(&mtrr_state, mfn_x(mfn) << PAGE_SHIFT, order);
-    if ( gmtrr_mtype < 0 || hmtrr_mtype < 0 )
-        return -1;
-
-    /* If both types match we're fine. */
-    if ( likely(gmtrr_mtype == hmtrr_mtype) )
-        return hmtrr_mtype;
-
-    /* If either type is UC, we have to go with that one. */
-    if ( gmtrr_mtype == MTRR_TYPE_UNCACHABLE ||
-         hmtrr_mtype == MTRR_TYPE_UNCACHABLE )
-        return MTRR_TYPE_UNCACHABLE;
-
-    /* If either type is WB, we have to go with the other one. */
-    if ( gmtrr_mtype == MTRR_TYPE_WRBACK )
-        return hmtrr_mtype;
-    if ( hmtrr_mtype == MTRR_TYPE_WRBACK )
-        return gmtrr_mtype;
-
-    /*
-     * At this point we have disagreeing WC, WT, or WP types. The only
-     * combination that can be cleanly resolved is WT:WP. The ones involving
-     * WC need to be converted to UC, both due to the memory ordering
-     * differences and because WC disallows reads to be cached (WT and WP
-     * permit this), while WT and WP require writes to go straight to memory
-     * (WC can buffer them).
-     */
-    if ( (gmtrr_mtype == MTRR_TYPE_WRTHROUGH &&
-          hmtrr_mtype == MTRR_TYPE_WRPROT) ||
-         (gmtrr_mtype == MTRR_TYPE_WRPROT &&
-          hmtrr_mtype == MTRR_TYPE_WRTHROUGH) )
-        return MTRR_TYPE_WRPROT;
-
-    return MTRR_TYPE_UNCACHABLE;
 }
 
 /*

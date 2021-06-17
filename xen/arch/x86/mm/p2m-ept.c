@@ -20,6 +20,7 @@
 #include <public/hvm/dm_op.h>
 #include <asm/altp2m.h>
 #include <asm/current.h>
+#include <asm/iocap.h>
 #include <asm/paging.h>
 #include <asm/types.h>
 #include <asm/domain.h>
@@ -485,6 +486,108 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
     return rc;
 }
 
+int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
+                       unsigned int order, bool *ipat, bool direct_mmio)
+{
+    int gmtrr_mtype, hmtrr_mtype;
+    struct vcpu *v = current;
+    unsigned long i;
+
+    *ipat = false;
+
+    if ( v->domain != d )
+        v = d->vcpu ? d->vcpu[0] : NULL;
+
+    /* Mask, not add, for order so it works with INVALID_MFN on unmapping */
+    if ( rangeset_overlaps_range(mmio_ro_ranges, mfn_x(mfn),
+                                 mfn_x(mfn) | ((1UL << order) - 1)) )
+    {
+        if ( !order || rangeset_contains_range(mmio_ro_ranges, mfn_x(mfn),
+                                               mfn_x(mfn) | ((1UL << order) - 1)) )
+        {
+            *ipat = true;
+            return MTRR_TYPE_UNCACHABLE;
+        }
+        /* Force invalid memory type so resolve_misconfig() will split it */
+        return -1;
+    }
+
+    if ( !mfn_valid(mfn) )
+    {
+        *ipat = true;
+        return MTRR_TYPE_UNCACHABLE;
+    }
+
+    if ( !direct_mmio && !is_iommu_enabled(d) && !cache_flush_permitted(d) )
+    {
+        *ipat = true;
+        return MTRR_TYPE_WRBACK;
+    }
+
+    for ( i = 0; i < (1ul << order); i++ )
+    {
+        if ( is_special_page(mfn_to_page(mfn_add(mfn, i))) )
+        {
+            if ( order )
+                return -1;
+            *ipat = true;
+            return MTRR_TYPE_WRBACK;
+        }
+    }
+
+    if ( direct_mmio )
+        return MTRR_TYPE_UNCACHABLE;
+
+    gmtrr_mtype = hvm_get_mem_pinned_cacheattr(d, gfn, order);
+    if ( gmtrr_mtype >= 0 )
+    {
+        *ipat = true;
+        return gmtrr_mtype != PAT_TYPE_UC_MINUS ? gmtrr_mtype
+                                                : MTRR_TYPE_UNCACHABLE;
+    }
+    if ( gmtrr_mtype == -EADDRNOTAVAIL )
+        return -1;
+
+    gmtrr_mtype = v ? mtrr_get_type(&v->arch.hvm.mtrr,
+                                    gfn_x(gfn) << PAGE_SHIFT, order)
+                    : MTRR_TYPE_WRBACK;
+    hmtrr_mtype = mtrr_get_type(&mtrr_state, mfn_x(mfn) << PAGE_SHIFT,
+                                order);
+    if ( gmtrr_mtype < 0 || hmtrr_mtype < 0 )
+        return -1;
+
+    /* If both types match we're fine. */
+    if ( likely(gmtrr_mtype == hmtrr_mtype) )
+        return hmtrr_mtype;
+
+    /* If either type is UC, we have to go with that one. */
+    if ( gmtrr_mtype == MTRR_TYPE_UNCACHABLE ||
+         hmtrr_mtype == MTRR_TYPE_UNCACHABLE )
+        return MTRR_TYPE_UNCACHABLE;
+
+    /* If either type is WB, we have to go with the other one. */
+    if ( gmtrr_mtype == MTRR_TYPE_WRBACK )
+        return hmtrr_mtype;
+    if ( hmtrr_mtype == MTRR_TYPE_WRBACK )
+        return gmtrr_mtype;
+
+    /*
+     * At this point we have disagreeing WC, WT, or WP types. The only
+     * combination that can be cleanly resolved is WT:WP. The ones involving
+     * WC need to be converted to UC, both due to the memory ordering
+     * differences and because WC disallows reads to be cached (WT and WP
+     * permit this), while WT and WP require writes to go straight to memory
+     * (WC can buffer them).
+     */
+    if ( (gmtrr_mtype == MTRR_TYPE_WRTHROUGH &&
+          hmtrr_mtype == MTRR_TYPE_WRPROT) ||
+         (gmtrr_mtype == MTRR_TYPE_WRPROT &&
+          hmtrr_mtype == MTRR_TYPE_WRTHROUGH) )
+        return MTRR_TYPE_WRPROT;
+
+    return MTRR_TYPE_UNCACHABLE;
+}
+
 /*
  * Resolve deliberately mis-configured (EMT field set to an invalid value)
  * entries in the page table hierarchy for the given GFN:
@@ -519,7 +622,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
 
         if ( level == 0 || is_epte_superpage(&e) )
         {
-            uint8_t ipat = 0;
+            bool ipat;
 
             if ( e.emt != MTRR_NUM_TYPES )
                 break;
@@ -535,7 +638,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                         e.emt = 0;
                     if ( !is_epte_valid(&e) || !is_epte_present(&e) )
                         continue;
-                    e.emt = epte_get_entry_emt(p2m->domain, gfn + i,
+                    e.emt = epte_get_entry_emt(p2m->domain, _gfn(gfn + i),
                                                _mfn(e.mfn), 0, &ipat,
                                                e.sa_p2mt == p2m_mmio_direct);
                     e.ipat = ipat;
@@ -553,7 +656,8 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
             }
             else
             {
-                int emt = epte_get_entry_emt(p2m->domain, gfn, _mfn(e.mfn),
+                int emt = epte_get_entry_emt(p2m->domain, _gfn(gfn),
+                                             _mfn(e.mfn),
                                              level * EPT_TABLE_ORDER, &ipat,
                                              e.sa_p2mt == p2m_mmio_direct);
                 bool_t recalc = e.recalc;
@@ -788,8 +892,8 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
 
     if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
     {
-        uint8_t ipat = 0;
-        int emt = epte_get_entry_emt(p2m->domain, gfn, mfn,
+        bool ipat;
+        int emt = epte_get_entry_emt(p2m->domain, _gfn(gfn), mfn,
                                      i * EPT_TABLE_ORDER, &ipat,
                                      p2mt == p2m_mmio_direct);
 

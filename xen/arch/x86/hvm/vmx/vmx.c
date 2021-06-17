@@ -417,12 +417,12 @@ static int vmx_domain_initialise(struct domain *d)
 static void domain_creation_finished(struct domain *d)
 {
     gfn_t gfn = gaddr_to_gfn(APIC_DEFAULT_PHYS_BASE);
-    uint8_t ipat;
+    bool ipat;
 
     if ( !has_vlapic(d) || mfn_eq(apic_access_mfn, INVALID_MFN) )
         return;
 
-    ASSERT(epte_get_entry_emt(d, gfn_x(gfn), apic_access_mfn, 0, &ipat,
+    ASSERT(epte_get_entry_emt(d, gfn, apic_access_mfn, 0, &ipat,
                               true) == MTRR_TYPE_WRBACK);
     ASSERT(ipat);
 
