@@ -487,7 +487,7 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
 }
 
 int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
-                       unsigned int order, bool *ipat, bool direct_mmio)
+                       unsigned int order, bool *ipat, p2m_type_t type)
 {
     int gmtrr_mtype, hmtrr_mtype;
     struct vcpu *v = current;
@@ -518,7 +518,8 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
         return MTRR_TYPE_UNCACHABLE;
     }
 
-    if ( !direct_mmio && !is_iommu_enabled(d) && !cache_flush_permitted(d) )
+    if ( type != p2m_mmio_direct && !is_iommu_enabled(d) &&
+         !cache_flush_permitted(d) )
     {
         *ipat = true;
         return MTRR_TYPE_WRBACK;
@@ -535,8 +536,32 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
         }
     }
 
-    if ( direct_mmio )
+    switch ( type )
+    {
+    case p2m_mmio_direct:
         return MTRR_TYPE_UNCACHABLE;
+
+    case p2m_grant_map_ro:
+    case p2m_grant_map_rw:
+    case p2m_map_foreign:
+        /*
+         * Force WB type for grants and foreign pages. Those are usually mapped
+         * over unpopulated physical ranges in the p2m, and those would usually
+         * be UC in the MTRR state, which is unlikely to be the correct cache
+         * attribute. It's also cumbersome (or even impossible) for the guest
+         * to be setting the MTRR type for all those mappings as WB, as MTRR
+         * ranges are finite.
+         *
+         * Note that on AMD we cannot force a cache attribute because of the
+         * lack of ignore PAT equivalent, so the behavior here slightly
+         * diverges. See p2m_type_to_flags for the AMD attributes.
+         */
+        *ipat = true;
+        return MTRR_TYPE_WRBACK;
+
+    default:
+        break;
+    }
 
     gmtrr_mtype = hvm_get_mem_pinned_cacheattr(d, gfn, order);
     if ( gmtrr_mtype >= 0 )
@@ -640,7 +665,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                         continue;
                     e.emt = epte_get_entry_emt(p2m->domain, _gfn(gfn + i),
                                                _mfn(e.mfn), 0, &ipat,
-                                               e.sa_p2mt == p2m_mmio_direct);
+                                               e.sa_p2mt);
                     e.ipat = ipat;
 
                     nt = p2m_recalc_type(e.recalc, e.sa_p2mt, p2m, gfn + i);
@@ -659,7 +684,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                 int emt = epte_get_entry_emt(p2m->domain, _gfn(gfn),
                                              _mfn(e.mfn),
                                              level * EPT_TABLE_ORDER, &ipat,
-                                             e.sa_p2mt == p2m_mmio_direct);
+                                             e.sa_p2mt);
                 bool_t recalc = e.recalc;
 
                 if ( recalc && p2m_is_changeable(e.sa_p2mt) )
@@ -895,7 +920,7 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
         bool ipat;
         int emt = epte_get_entry_emt(p2m->domain, _gfn(gfn), mfn,
                                      i * EPT_TABLE_ORDER, &ipat,
-                                     p2mt == p2m_mmio_direct);
+                                     p2mt);
 
         if ( emt >= 0 )
             new_entry.emt = emt;
