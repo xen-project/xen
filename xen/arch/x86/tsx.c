@@ -42,6 +42,7 @@ void tsx_init(void)
     if ( unlikely(cpu_has_tsx_ctrl < 0) )
     {
         uint64_t caps = 0;
+        bool has_rtm_always_abort;
 
         if ( boot_cpu_data.cpuid_level >= 7 )
             boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_ARCH_CAPS)]
@@ -51,6 +52,7 @@ void tsx_init(void)
             rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
         cpu_has_tsx_ctrl = !!(caps & ARCH_CAPS_TSX_CTRL);
+        has_rtm_always_abort = cpu_has_rtm_always_abort;
 
         if ( cpu_has_tsx_force_abort )
         {
@@ -67,11 +69,7 @@ void tsx_init(void)
              * RTM_ALWAYS_ABORT enumerates the new functionality, but is also
              * read as zero if TSX_FORCE_ABORT.ENABLE_RTM has been set before
              * we run.
-             *
-             * Undo this behaviour in Xen's view of the world.
              */
-            bool has_rtm_always_abort = cpu_has_rtm_always_abort;
-
             if ( !has_rtm_always_abort )
             {
                 uint64_t val;
@@ -81,15 +79,6 @@ void tsx_init(void)
                 if ( val & TSX_ENABLE_RTM )
                     has_rtm_always_abort = true;
             }
-
-            /*
-             * Always force RTM_ALWAYS_ABORT, even if it currently visible.
-             * If the user explicitly opts to enable TSX, we'll set
-             * TSX_FORCE_ABORT.ENABLE_RTM and cause RTM_ALWAYS_ABORT to be
-             * hidden from the general CPUID scan later.
-             */
-            if ( has_rtm_always_abort )
-                setup_force_cpu_cap(X86_FEATURE_RTM_ALWAYS_ABORT);
 
             /*
              * If no explicit tsx= option is provided, pick a default.
@@ -108,8 +97,17 @@ void tsx_init(void)
              * With RTM_ALWAYS_ABORT, disable TSX.
              */
             if ( opt_tsx < 0 )
-                opt_tsx = !cpu_has_rtm_always_abort;
+                opt_tsx = !has_rtm_always_abort;
         }
+
+        /*
+         * Always force RTM_ALWAYS_ABORT, even if it currently visible.  If
+         * the user explicitly opts to enable TSX, we'll set the appropriate
+         * RTM_ENABLE bit and cause RTM_ALWAYS_ABORT to be hidden from the
+         * general CPUID scan later.
+         */
+        if ( has_rtm_always_abort )
+            setup_force_cpu_cap(X86_FEATURE_RTM_ALWAYS_ABORT);
 
         /*
          * The TSX features (HLE/RTM) are handled specially.  They both
