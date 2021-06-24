@@ -451,17 +451,6 @@ struct qinval_entry {
     }q;
 };
 
-/* Each entry is 16 bytes, so 2^8 entries per page */
-#define QINVAL_ENTRY_ORDER  ( PAGE_SHIFT - 4 )
-#define QINVAL_MAX_ENTRY_NR (1u << (7 + QINVAL_ENTRY_ORDER))
-
-/* Status data flag */
-#define QINVAL_STAT_INIT  0
-#define QINVAL_STAT_DONE  1
-
-/* Queue invalidation head/tail shift */
-#define QINVAL_INDEX_SHIFT 4
-
 #define TYPE_INVAL_CONTEXT      0x1
 #define TYPE_INVAL_IOTLB        0x2
 #define TYPE_INVAL_DEVICE_IOTLB 0x3

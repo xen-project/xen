@@ -29,6 +29,13 @@
 #include "extern.h"
 #include "../ats.h"
 
+/* Each entry is 16 bytes, and there can be up to 2^7 pages. */
+#define QINVAL_MAX_ENTRY_NR (1u << (7 + PAGE_SHIFT_4K - 4))
+
+/* Status data flag */
+#define QINVAL_STAT_INIT  0
+#define QINVAL_STAT_DONE  1
+
 static unsigned int __read_mostly qi_pg_order;
 static unsigned int __read_mostly qi_entry_nr;
 
@@ -45,11 +52,11 @@ static unsigned int qinval_next_index(struct vtd_iommu *iommu)
 {
     unsigned int tail = dmar_readl(iommu->reg, DMAR_IQT_REG);
 
-    tail >>= QINVAL_INDEX_SHIFT;
+    tail /= sizeof(struct qinval_entry);
 
     /* (tail+1 == head) indicates a full queue, wait for HW */
     while ( ((tail + 1) & (qi_entry_nr - 1)) ==
-            (dmar_readl(iommu->reg, DMAR_IQH_REG) >> QINVAL_INDEX_SHIFT) )
+            (dmar_readl(iommu->reg, DMAR_IQH_REG) / sizeof(struct qinval_entry)) )
     {
         printk_once(XENLOG_ERR VTDPREFIX " IOMMU#%u: no QI slot available\n",
                     iommu->index);
@@ -66,7 +73,7 @@ static void qinval_update_qtail(struct vtd_iommu *iommu, unsigned int index)
     /* Need hold register lock when update tail */
     ASSERT( spin_is_locked(&iommu->register_lock) );
     val = (index + 1) & (qi_entry_nr - 1);
-    dmar_writel(iommu->reg, DMAR_IQT_REG, val << QINVAL_INDEX_SHIFT);
+    dmar_writel(iommu->reg, DMAR_IQT_REG, val * sizeof(struct qinval_entry));
 }
 
 static struct qinval_entry *qi_map_entry(const struct vtd_iommu *iommu,
@@ -413,17 +420,18 @@ int enable_qinval(struct vtd_iommu *iommu)
              * only one entry left.
              */
             BUILD_BUG_ON(CONFIG_NR_CPUS * 2 >= QINVAL_MAX_ENTRY_NR);
-            qi_pg_order = get_order_from_bytes((num_present_cpus() * 2 + 1) <<
-                                               (PAGE_SHIFT -
-                                                QINVAL_ENTRY_ORDER));
-            qi_entry_nr = 1u << (qi_pg_order + QINVAL_ENTRY_ORDER);
+            qi_pg_order = get_order_from_bytes((num_present_cpus() * 2 + 1) *
+                                               sizeof(struct qinval_entry));
+            qi_entry_nr = (PAGE_SIZE << qi_pg_order) /
+                          sizeof(struct qinval_entry);
 
             dprintk(XENLOG_INFO VTDPREFIX,
                     "QI: using %u-entry ring(s)\n", qi_entry_nr);
         }
 
         iommu->qinval_maddr =
-            alloc_pgtable_maddr(qi_entry_nr >> QINVAL_ENTRY_ORDER,
+            alloc_pgtable_maddr(PFN_DOWN(qi_entry_nr *
+                                         sizeof(struct qinval_entry)),
                                 iommu->node);
         if ( iommu->qinval_maddr == 0 )
         {
