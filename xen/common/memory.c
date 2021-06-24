@@ -1351,7 +1351,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     long rc;
     struct xen_memory_reservation reservation;
     struct memop_args args;
-    domid_t domid;
     unsigned long start_extent = cmd >> MEMOP_EXTENT_SHIFT;
     int op = cmd & MEMOP_CMD_MASK;
 
@@ -1452,13 +1451,16 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
+    {
+        struct xen_memory_domain domain;
+
         if ( unlikely(start_extent) )
             return -EINVAL;
 
-        if ( copy_from_guest(&domid, arg, 1) )
+        if ( copy_from_guest(&domain, arg, 1) )
             return -EFAULT;
 
-        d = rcu_lock_domain_by_any_id(domid);
+        d = rcu_lock_domain_by_any_id(domain.domid);
         if ( d == NULL )
             return -ESRCH;
 
@@ -1486,6 +1488,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         rcu_unlock_domain(d);
 
         break;
+    }
 
     case XENMEM_add_to_physmap:
     {

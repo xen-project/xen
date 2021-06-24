@@ -148,16 +148,23 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_exchange_t);
  */
 #define XENMEM_maximum_ram_page     2
 
+struct xen_memory_domain {
+    /* [IN] Domain information is being queried for. */
+    domid_t domid;
+};
+
 /*
  * Returns the current or maximum memory reservation, in pages, of the
  * specified domain (may be DOMID_SELF). Returns -ve errcode on failure.
- * arg == addr of domid_t.
+ * arg == addr of struct xen_memory_domain.
  */
 #define XENMEM_current_reservation  3
 #define XENMEM_maximum_reservation  4
 
 /*
- * Returns the maximum GPFN in use by the guest, or -ve errcode on failure.
+ * Returns the maximum GFN in use by the specified domain (may be DOMID_SELF).
+ * Returns -ve errcode on failure.
+ * arg == addr of struct xen_memory_domain.
  */
 #define XENMEM_maximum_gpfn         14
 

@@ -856,7 +856,8 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 
 int xc_domain_maximum_gpfn(xc_interface *xch, uint32_t domid, xen_pfn_t *gpfns)
 {
-    long rc = do_memory_op(xch, XENMEM_maximum_gpfn, &domid, sizeof(domid));
+    struct xen_memory_domain dom = { .domid = domid };
+    long rc = do_memory_op(xch, XENMEM_maximum_gpfn, &dom, sizeof(dom));
 
     if ( rc >= 0 )
     {
