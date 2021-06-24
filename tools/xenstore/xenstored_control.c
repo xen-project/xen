@@ -737,7 +737,7 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 	lu_status->timeout = to;
 	lu_status->started_at = time(NULL);
 
-	errno = delay_request(conn, conn->in, do_lu_start, NULL);
+	errno = delay_request(conn, conn->in, do_lu_start, NULL, false);
 
 	return NULL;
 }

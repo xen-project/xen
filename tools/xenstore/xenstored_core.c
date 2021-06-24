@@ -279,9 +279,18 @@ static void call_delayed(struct delayed_request *req)
 }
 
 int delay_request(struct connection *conn, struct buffered_data *in,
-		  bool (*func)(struct delayed_request *), void *data)
+		  bool (*func)(struct delayed_request *), void *data,
+		  bool no_quota_check)
 {
 	struct delayed_request *req;
+
+	/*
+	 * Only allow one request can be delayed for an unprivileged
+	 * connection.
+	 */
+	if (!no_quota_check && domain_is_unprivileged(conn) &&
+	    !list_empty(&conn->delayed))
+		return ENOSPC;
 
 	req = talloc(in, struct delayed_request);
 	if (!req)

@@ -213,7 +213,8 @@ char *get_parent(const void *ctx, const char *node);
 
 /* Delay a request. */
 int delay_request(struct connection *conn, struct buffered_data *in,
-		  bool (*func)(struct delayed_request *), void *data);
+		  bool (*func)(struct delayed_request *), void *data,
+		  bool no_quota_check);
 
 /* Tracing infrastructure. */
 void trace_create(const void *data, const char *type);
