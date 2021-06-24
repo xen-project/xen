@@ -1752,7 +1752,7 @@ static bool socket_can_process(struct connection *conn, int mask)
 		return false;
 	}
 
-	return (fds[conn->pollfd_idx].revents & mask) && !conn->is_ignored;
+	return (fds[conn->pollfd_idx].revents & mask);
 }
 
 static bool socket_can_write(struct connection *conn)
