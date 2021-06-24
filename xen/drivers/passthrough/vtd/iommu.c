@@ -2094,13 +2094,23 @@ static int __hwdom_init setup_hwdom_device(u8 devfn, struct pci_dev *pdev)
 
 void clear_fault_bits(struct vtd_iommu *iommu)
 {
-    u64 val;
     unsigned long flags;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
-    val = dmar_readq(iommu->reg, cap_fault_reg_offset(iommu->cap) + 8);
-    dmar_writeq(iommu->reg, cap_fault_reg_offset(iommu->cap) + 8, val);
+
+    if ( dmar_readl(iommu->reg, DMAR_FSTS_REG) & DMA_FSTS_PPF )
+    {
+        unsigned int reg = cap_fault_reg_offset(iommu->cap);
+        unsigned int end = reg + cap_num_fault_regs(iommu->cap);
+
+        do {
+           dmar_writel(iommu->reg, reg + 12, DMA_FRCD_F);
+           reg += PRIMARY_FAULT_REG_LEN;
+        } while ( reg < end );
+    }
+
     dmar_writel(iommu->reg, DMAR_FSTS_REG, DMA_FSTS_FAULTS);
+
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 

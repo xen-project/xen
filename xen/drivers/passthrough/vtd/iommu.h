@@ -174,9 +174,8 @@
 #define DMA_FSTS_IQE (1u << 4)
 #define DMA_FSTS_ICE (1u << 5)
 #define DMA_FSTS_ITE (1u << 6)
-#define DMA_FSTS_FAULTS (DMA_FSTS_PFO | DMA_FSTS_PPF | DMA_FSTS_AFO | \
-                         DMA_FSTS_APF | DMA_FSTS_IQE | DMA_FSTS_ICE | \
-                         DMA_FSTS_ITE)
+#define DMA_FSTS_FAULTS (DMA_FSTS_PFO | DMA_FSTS_AFO | DMA_FSTS_APF | \
+                         DMA_FSTS_IQE | DMA_FSTS_ICE | DMA_FSTS_ITE)
 #define dma_fsts_fault_record_index(s) (((s) >> 8) & 0xff)
 
 /* FRCD_REG, 32 bits access */
