@@ -9,7 +9,6 @@ VERS_1.0 {
 		xencall3;
 		xencall4;
 		xencall5;
-		xencall6;
 
 		xencall_alloc_buffer;
 		xencall_free_buffer;
