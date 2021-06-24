@@ -62,7 +62,7 @@ int osdep_xencall_close(xencall_handle *xcall)
     return close(fd);
 }
 
-int osdep_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall)
+long osdep_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall)
 {
     int fd = xcall->fd;
     int ret;

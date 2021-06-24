@@ -96,7 +96,7 @@ void osdep_free_pages(xencall_handle *xcall, void *ptr, size_t npages)
     free(ptr);
 }
 
-int osdep_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall)
+long osdep_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall)
 {
     int fd = xcall->fd;
     int error = ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
