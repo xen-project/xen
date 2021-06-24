@@ -20,6 +20,7 @@
  */
 
 #include <xen/hypercall.h>
+#include <asm/multicall.h>
 
 #define ARGS(x, n)                              \
     [ __HYPERVISOR_ ## x ] = { n, n }
@@ -264,13 +265,18 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
     return rc;
 }
 
-#ifndef CONFIG_PV
-/* Stub for arch_do_multicall_call */
-enum mc_disposition arch_do_multicall_call(struct mc_state *mc)
+enum mc_disposition arch_do_multicall_call(struct mc_state *state)
 {
+    const struct domain *currd = current->domain;
+
+    if ( is_pv_domain(currd) )
+        return pv_do_multicall_call(state);
+
+    if ( is_hvm_domain(currd) )
+        return hvm_do_multicall_call(state);
+
     return mc_exit;
 }
-#endif
 
 /*
  * Local variables:
