@@ -55,7 +55,7 @@ struct xencall_handle {
 int osdep_xencall_open(xencall_handle *xcall);
 int osdep_xencall_close(xencall_handle *xcall);
 
-int osdep_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall);
+long osdep_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall);
 
 void *osdep_alloc_pages(xencall_handle *xcall, size_t nr_pages);
 void osdep_free_pages(xencall_handle *xcall, void *p, size_t nr_pages);

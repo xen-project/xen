@@ -80,7 +80,7 @@ void osdep_free_hypercall_buffer(xencall_handle *xcall, void *ptr,
     free(ptr);
 }
 
-int do_xen_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall)
+long osdep_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall)
 {
     int fd = xcall->fd;
     return ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
