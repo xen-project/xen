@@ -337,8 +337,47 @@ long do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
         goto out1;
     }
 
-    ret = xencall2(xch->xcall, __HYPERVISOR_memory_op,
-                   cmd, HYPERCALL_BUFFER_AS_ARG(arg));
+#if defined(__linux__) || defined(__sun__)
+    /*
+     * Some sub-ops return values which don't fit in "int". On platforms
+     * without a specific hypercall return value field in the privcmd
+     * interface structure, issue the request as a single-element multicall,
+     * to be able to capture the full return value.
+     */
+    if ( sizeof(long) > sizeof(int) )
+    {
+        multicall_entry_t multicall = {
+            .op = __HYPERVISOR_memory_op,
+            .args[0] = cmd,
+            .args[1] = HYPERCALL_BUFFER_AS_ARG(arg),
+        }, *call = &multicall;
+        DECLARE_HYPERCALL_BOUNCE(call, sizeof(*call),
+                                 XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+
+        if ( xc_hypercall_bounce_pre(xch, call) )
+        {
+            PERROR("Could not bounce buffer for memory_op hypercall");
+            goto out1;
+        }
+
+        ret = do_multicall_op(xch, HYPERCALL_BUFFER(call), 1);
+
+        xc_hypercall_bounce_post(xch, call);
+
+        if ( !ret )
+        {
+            ret = multicall.result;
+            if ( multicall.result > ~0xfffUL )
+            {
+                errno = -ret;
+                ret = -1;
+            }
+        }
+    }
+    else
+#endif
+        ret = xencall2L(xch->xcall, __HYPERVISOR_memory_op,
+                        cmd, HYPERCALL_BUFFER_AS_ARG(arg));
 
     xc_hypercall_bounce_post(xch, arg);
  out1:
