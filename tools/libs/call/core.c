@@ -127,6 +127,17 @@ int xencall2(xencall_handle *xcall, unsigned int op,
     return osdep_hypercall(xcall, &call);
 }
 
+long xencall2L(xencall_handle *xcall, unsigned int op,
+               uint64_t arg1, uint64_t arg2)
+{
+    privcmd_hypercall_t call = {
+        .op = op,
+        .arg = { arg1, arg2 },
+    };
+
+    return osdep_hypercall(xcall, &call);
+}
+
 int xencall3(xencall_handle *xcall, unsigned int op,
              uint64_t arg1, uint64_t arg2, uint64_t arg3)
 {

@@ -27,3 +27,8 @@ VERS_1.2 {
 	global:
 		xencall_fd;
 } VERS_1.1;
+
+VERS_1.3 {
+	global:
+		xencall2L;
+} VERS_1.2;
