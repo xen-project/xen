@@ -270,17 +270,12 @@ static int undelay_request(void *_req)
 	return 0;
 }
 
-static void call_delayed(struct connection *conn, struct delayed_request *req)
+static void call_delayed(struct delayed_request *req)
 {
-	assert(conn->in == NULL);
-	conn->in = req->in;
-
 	if (req->func(req)) {
 		undelay_request(req);
 		talloc_set_destructor(req, NULL);
 	}
-
-	conn->in = NULL;
 }
 
 int delay_request(struct connection *conn, struct buffered_data *in,
@@ -2342,7 +2337,7 @@ int main(int argc, char *argv[])
 
 				list_for_each_entry_safe(req, tmp,
 							 &conn->delayed, list)
-					call_delayed(conn, req);
+					call_delayed(req);
 			}
 		}
 
@@ -2375,7 +2370,7 @@ const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
 	struct buffered_data *out, *in = c->in;
 	bool partial = true;
 
-	if (in && c != lu_get_connection()) {
+	if (in) {
 		len = in->inhdr ? in->used : sizeof(in->hdr);
 		if (fp && fwrite(&in->hdr, len, 1, fp) != 1)
 			return "Dump read data error";
@@ -2416,16 +2411,12 @@ const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
 
 	/* Add "OK" for live-update command. */
 	if (c == lu_get_connection()) {
-		struct xsd_sockmsg msg = c->in->hdr.msg;
+		unsigned int rc = lu_write_response(fp);
 
-		msg.len = sizeof("OK");
-		if (fp && fwrite(&msg, sizeof(msg), 1, fp) != 1)
+		if (!rc)
 			return "Dump buffered data error";
-		len += sizeof(msg);
-		if (fp && fwrite("OK", msg.len, 1, fp) != 1)
 
-			return "Dump buffered data error";
-		len += msg.len;
+		len += rc;
 	}
 
 	if (sc)

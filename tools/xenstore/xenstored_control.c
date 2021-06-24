@@ -50,6 +50,9 @@ struct live_update {
 	/* For verification the correct connection is acting. */
 	struct connection *conn;
 
+	/* Pointer to the command used to request LU */
+	struct buffered_data *in;
+
 #ifdef __MINIOS__
 	void *kernel;
 	unsigned int kernel_size;
@@ -100,6 +103,7 @@ static const char *lu_begin(struct connection *conn)
 	if (!lu_status)
 		return "Allocation failure.";
 	lu_status->conn = conn;
+	lu_status->in = conn->in;
 	talloc_set_destructor(lu_status, lu_destroy);
 
 	return NULL;
@@ -110,10 +114,33 @@ struct connection *lu_get_connection(void)
 	return lu_status ? lu_status->conn : NULL;
 }
 
+unsigned int lu_write_response(FILE *fp)
+{
+	struct xsd_sockmsg msg;
+
+	assert(lu_status);
+
+	msg = lu_status->in->hdr.msg;
+
+	msg.len = sizeof("OK");
+	if (fp && fwrite(&msg, sizeof(msg), 1, fp) != 1)
+		return 0;
+	if (fp && fwrite("OK", msg.len, 1, fp) != 1)
+		return 0;
+
+	return sizeof(msg) + msg.len;
+}
+
 #else
 struct connection *lu_get_connection(void)
 {
 	return NULL;
+}
+
+unsigned int lu_write_response(FILE *fp)
+{
+	/* Unsupported */
+	return 0;
 }
 #endif
 
@@ -658,6 +685,8 @@ static bool do_lu_start(struct delayed_request *req)
 {
 	time_t now = time(NULL);
 	const char *ret;
+	struct buffered_data *saved_in;
+	struct connection *conn = lu_status->conn;
 
 	if (!lu_check_lu_allowed()) {
 		if (now < lu_status->started_at + lu_status->timeout)
@@ -668,8 +697,9 @@ static bool do_lu_start(struct delayed_request *req)
 		}
 	}
 
+	assert(req->in == lu_status->in);
 	/* Dump out internal state, including "OK" for live update. */
-	ret = lu_dump_state(req->in, lu_status->conn);
+	ret = lu_dump_state(req->in, conn);
 	if (!ret) {
 		/* Perform the activation of new binary. */
 		ret = lu_activate_binary(req->in);
@@ -677,7 +707,14 @@ static bool do_lu_start(struct delayed_request *req)
 
 	/* We will reach this point only in case of failure. */
  out:
-	send_reply(lu_status->conn, XS_CONTROL, ret, strlen(ret) + 1);
+	/*
+	 * send_reply() will send the response for conn->in. Save the current
+	 * conn->in and restore it afterwards.
+	 */
+	saved_in = conn->in;
+	conn->in = req->in;
+	send_reply(conn, XS_CONTROL, ret, strlen(ret) + 1);
+	conn->in = saved_in;
 	talloc_free(lu_status);
 
 	return true;

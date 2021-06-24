@@ -20,3 +20,6 @@ int do_control(struct connection *conn, struct buffered_data *in);
 void lu_read_state(void);
 
 struct connection *lu_get_connection(void);
+
+/* Write the "OK" response for the live-update command */
+unsigned int lu_write_response(FILE *fp);
