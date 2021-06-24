@@ -269,7 +269,6 @@ void set_tdb_key(const char *name, TDB_DATA *key);
 
 const char *dump_state_global(FILE *fp);
 const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
-				     const struct connection *conn,
 				     struct xs_state_connection *sc);
 const char *dump_state_nodes(FILE *fp, const void *ctx);
 const char *dump_state_node_perms(FILE *fp, const struct xs_permissions *perms,

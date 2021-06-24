@@ -104,6 +104,17 @@ static const char *lu_begin(struct connection *conn)
 
 	return NULL;
 }
+
+struct connection *lu_get_connection(void)
+{
+	return lu_status ? lu_status->conn : NULL;
+}
+
+#else
+struct connection *lu_get_connection(void)
+{
+	return NULL;
+}
 #endif
 
 struct cmd_s {
@@ -516,7 +527,7 @@ static const char *lu_dump_state(const void *ctx, struct connection *conn)
 	ret = dump_state_global(fp);
 	if (ret)
 		goto out;
-	ret = dump_state_connections(fp, conn);
+	ret = dump_state_connections(fp);
 	if (ret)
 		goto out;
 	ret = dump_state_special_nodes(fp);

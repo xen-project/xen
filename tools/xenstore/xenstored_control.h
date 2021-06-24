@@ -18,3 +18,5 @@
 
 int do_control(struct connection *conn, struct buffered_data *in);
 void lu_read_state(void);
+
+struct connection *lu_get_connection(void);

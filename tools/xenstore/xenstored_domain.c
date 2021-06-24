@@ -1183,7 +1183,7 @@ void wrl_apply_debit_trans_commit(struct connection *conn)
 	wrl_apply_debit_actual(conn->domain);
 }
 
-const char *dump_state_connections(FILE *fp, struct connection *conn)
+const char *dump_state_connections(FILE *fp)
 {
 	const char *ret = NULL;
 	unsigned int conn_id = 1;
@@ -1209,7 +1209,7 @@ const char *dump_state_connections(FILE *fp, struct connection *conn)
 			sc.spec.socket_fd = c->fd;
 		}
 
-		ret = dump_state_buffered_data(NULL, c, conn, &sc);
+		ret = dump_state_buffered_data(NULL, c, &sc);
 		if (ret)
 			return ret;
 		head.length += sc.data_in_len + sc.data_out_len;
@@ -1219,7 +1219,7 @@ const char *dump_state_connections(FILE *fp, struct connection *conn)
 		if (fwrite(&sc, offsetof(struct xs_state_connection, data),
 			   1, fp) != 1)
 			return "Dump connection state error";
-		ret = dump_state_buffered_data(fp, c, conn, NULL);
+		ret = dump_state_buffered_data(fp, c, NULL);
 		if (ret)
 			return ret;
 		ret = dump_state_align(fp);

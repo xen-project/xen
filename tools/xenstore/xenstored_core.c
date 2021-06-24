@@ -2369,14 +2369,13 @@ const char *dump_state_global(FILE *fp)
 
 /* Called twice: first with fp == NULL to get length, then for writing data. */
 const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
-				     const struct connection *conn,
 				     struct xs_state_connection *sc)
 {
 	unsigned int len = 0, used;
 	struct buffered_data *out, *in = c->in;
 	bool partial = true;
 
-	if (in && c != conn) {
+	if (in && c != lu_get_connection()) {
 		len = in->inhdr ? in->used : sizeof(in->hdr);
 		if (fp && fwrite(&in->hdr, len, 1, fp) != 1)
 			return "Dump read data error";
@@ -2416,8 +2415,8 @@ const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
 	}
 
 	/* Add "OK" for live-update command. */
-	if (c == conn) {
-		struct xsd_sockmsg msg = conn->in->hdr.msg;
+	if (c == lu_get_connection()) {
+		struct xsd_sockmsg msg = c->in->hdr.msg;
 
 		msg.len = sizeof("OK");
 		if (fp && fwrite(&msg, sizeof(msg), 1, fp) != 1)
