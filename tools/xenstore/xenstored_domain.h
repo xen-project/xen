@@ -51,10 +51,6 @@ void domain_deinit(void);
 /* Returns the implicit path of a connection (only domains have this) */
 const char *get_implicit_path(const struct connection *conn);
 
-/* Can connection attached to domain read/write. */
-bool domain_can_read(struct connection *conn);
-bool domain_can_write(struct connection *conn);
-
 bool domain_is_unprivileged(struct connection *conn);
 
 /* Remove node permissions for no longer existing domains. */

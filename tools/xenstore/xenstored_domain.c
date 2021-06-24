@@ -172,6 +172,23 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 	return len;
 }
 
+static bool domain_can_write(struct connection *conn)
+{
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+
+	return ((intf->rsp_prod - intf->rsp_cons) != XENSTORE_RING_SIZE);
+}
+
+static bool domain_can_read(struct connection *conn)
+{
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+
+	if (domain_is_unprivileged(conn) && conn->domain->wrl_credit < 0)
+		return false;
+
+	return (intf->req_cons != intf->req_prod);
+}
+
 static const struct interface_funcs domain_funcs = {
 	.write = writechn,
 	.read = readchn,
@@ -290,19 +307,6 @@ void handle_event(void)
 		barf_perror("Failed to write to event fd");
 }
 
-bool domain_can_read(struct connection *conn)
-{
-	struct xenstore_domain_interface *intf = conn->domain->interface;
-
-	if (domain_is_unprivileged(conn) && conn->domain->wrl_credit < 0)
-		return false;
-
-	if (conn->is_ignored)
-		return false;
-
-	return (intf->req_cons != intf->req_prod);
-}
-
 static bool domid_is_unprivileged(unsigned int domid)
 {
 	return domid != 0 && domid != priv_domid;
@@ -312,16 +316,6 @@ bool domain_is_unprivileged(struct connection *conn)
 {
 	return conn && conn->domain &&
 	       domid_is_unprivileged(conn->domain->domid);
-}
-
-bool domain_can_write(struct connection *conn)
-{
-	struct xenstore_domain_interface *intf = conn->domain->interface;
-
-	if (conn->is_ignored)
-		return false;
-
-	return ((intf->rsp_prod - intf->rsp_cons) != XENSTORE_RING_SIZE);
 }
 
 static char *talloc_domain_path(void *context, unsigned int domid)

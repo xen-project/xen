@@ -334,6 +334,16 @@ static int destroy_conn(void *_conn)
 	return 0;
 }
 
+static bool conn_can_read(struct connection *conn)
+{
+	return conn->funcs->can_read(conn) && !conn->is_ignored;
+}
+
+static bool conn_can_write(struct connection *conn)
+{
+	return conn->funcs->can_write(conn) && !conn->is_ignored;
+}
+
 /* This function returns index inside the array if succeed, -1 if fail */
 static int set_fd(int fd, short events)
 {
@@ -396,8 +406,8 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	list_for_each_entry(conn, &connections, list) {
 		if (conn->domain) {
 			wrl_check_timeout(conn->domain, now, ptimeout);
-			if (domain_can_read(conn) ||
-			    (domain_can_write(conn) &&
+			if (conn_can_read(conn) ||
+			    (conn_can_write(conn) &&
 			     !list_empty(&conn->out_list)))
 				*ptimeout = 0;
 		} else {
@@ -2325,14 +2335,14 @@ int main(int argc, char *argv[])
 			if (&next->list != &connections)
 				talloc_increase_ref_count(next);
 
-			if (conn->funcs->can_read(conn))
+			if (conn_can_read(conn))
 				handle_input(conn);
 			if (talloc_free(conn) == 0)
 				continue;
 
 			talloc_increase_ref_count(conn);
 
-			if (conn->funcs->can_write(conn))
+			if (conn_can_write(conn))
 				handle_output(conn);
 			if (talloc_free(conn) == 0)
 				continue;
