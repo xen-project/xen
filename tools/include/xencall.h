@@ -113,6 +113,10 @@ int xencall5(xencall_handle *xcall, unsigned int op,
              uint64_t arg1, uint64_t arg2, uint64_t arg3,
              uint64_t arg4, uint64_t arg5);
 
+/* Variant(s) of the above, as needed, returning "long" instead of "int". */
+long xencall2L(xencall_handle *xcall, unsigned int op,
+               uint64_t arg1, uint64_t arg2);
+
 /*
  * Allocate and free memory which is suitable for use as a pointer
  * argument to a hypercall.
