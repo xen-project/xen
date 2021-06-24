@@ -628,6 +628,7 @@ XENSTORE
 M:	Ian Jackson <iwj@xenproject.org>
 M:	Wei Liu <wl@xen.org>
 M:	Juergen Gross <jgross@suse.com>
+R:	Julien Grall <julien@xen.org>
 S:	Supported
 F:	tools/xenstore/
 
