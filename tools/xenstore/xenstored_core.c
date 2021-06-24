@@ -2403,24 +2403,51 @@ const char *dump_state_global(FILE *fp)
 	return NULL;
 }
 
+static const char *dump_input_buffered_data(FILE *fp,
+					    const struct buffered_data *in,
+					    unsigned int *total_len)
+{
+	unsigned int hlen = in->inhdr ? in->used : sizeof(in->hdr);
+
+	*total_len += hlen;
+	if (fp && fwrite(&in->hdr, hlen, 1, fp) != 1)
+		return "Dump read data error";
+	if (!in->inhdr && in->used) {
+		*total_len += in->used;
+		if (fp && fwrite(in->buffer, in->used, 1, fp) != 1)
+			return "Dump read data error";
+	}
+
+	return NULL;
+}
+
 /* Called twice: first with fp == NULL to get length, then for writing data. */
 const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
 				     struct xs_state_connection *sc)
 {
 	unsigned int len = 0, used;
-	struct buffered_data *out, *in = c->in;
+	struct buffered_data *out;
 	bool partial = true;
+	struct delayed_request *req;
+	const char *ret;
 
-	if (in) {
-		len = in->inhdr ? in->used : sizeof(in->hdr);
-		if (fp && fwrite(&in->hdr, len, 1, fp) != 1)
-			return "Dump read data error";
-		if (!in->inhdr && in->used) {
-			len += in->used;
-			if (fp && fwrite(in->buffer, in->used, 1, fp) != 1)
-				return "Dump read data error";
-		}
+	/* Dump any command that was delayed */
+	list_for_each_entry(req, &c->delayed, list) {
+		/*
+		 * We only want to preserve commands that weren't processed at
+		 * all. All the other delayed requests (such as do_lu_start())
+		 * must be processed before Live-Update.
+		 */
+		if (req->func != process_delayed_message)
+			continue;
+
+		assert(!req->in->inhdr);
+		if ((ret = dump_input_buffered_data(fp, req->in, &len)))
+			return ret;
 	}
+
+	if (c->in && (ret = dump_input_buffered_data(fp, c->in, &len)))
+		return ret;
 
 	if (sc) {
 		sc->data_in_len = len;
