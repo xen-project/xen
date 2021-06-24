@@ -696,7 +696,18 @@ static bool do_lu_start(struct delayed_request *req)
 	time_t now = time(NULL);
 	const char *ret;
 	struct buffered_data *saved_in;
-	struct connection *conn = lu_status->conn;
+	struct connection *conn = req->data;
+
+	/*
+	 * Cancellation may have been requested asynchronously. In this
+	 * case, lu_status will be NULL.
+	 */
+	if (!lu_status) {
+		ret = "Cancellation was requested";
+		goto out;
+	}
+
+	assert(lu_status->conn == conn);
 
 	if (!lu_check_lu_allowed()) {
 		if (now < lu_status->started_at + lu_status->timeout)
@@ -747,7 +758,7 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 	lu_status->timeout = to;
 	lu_status->started_at = time(NULL);
 
-	errno = delay_request(conn, conn->in, do_lu_start, NULL, false);
+	errno = delay_request(conn, conn->in, do_lu_start, conn, false);
 
 	return NULL;
 }
