@@ -1486,6 +1486,10 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	enum xsd_sockmsg_type type = in->hdr.msg.type;
 	int ret;
 
+	/* At least send_error() and send_reply() expects conn->in == in */
+	assert(conn->in == in);
+	trace_io(conn, in, 0);
+
 	if ((unsigned int)type >= XS_TYPE_COUNT || !wire_funcs[type].func) {
 		eprintf("Client unknown operation %i", type);
 		send_error(conn, ENOSYS);
@@ -1513,6 +1517,23 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		send_error(conn, ret);
 
 	conn->transaction = NULL;
+}
+
+static bool process_delayed_message(struct delayed_request *req)
+{
+	struct connection *conn = req->data;
+	struct buffered_data *saved_in = conn->in;
+
+	/*
+	 * Part of process_message() expects conn->in to contains the
+	 * processed response. So save the current conn->in and restore it
+	 * afterwards.
+	 */
+	conn->in = req->in;
+	process_message(req->data, req->in);
+	conn->in = saved_in;
+
+	return true;
 }
 
 static void consider_message(struct connection *conn)
@@ -1582,7 +1603,6 @@ static void handle_input(struct connection *conn)
 	if (in->used != in->hdr.msg.len)
 		return;
 
-	trace_io(conn, in, 0);
 	consider_message(conn);
 	return;
 
@@ -2611,14 +2631,20 @@ void read_state_buffered_data(const void *ctx, struct connection *conn,
 	unsigned int len;
 	bool partial = sc->data_resp_len;
 
-	if (sc->data_in_len) {
+	for (data = sc->data; data < sc->data + sc->data_in_len; data += len) {
 		bdata = new_buffer(conn);
 		if (!bdata)
 			barf("error restoring read data");
-		if (sc->data_in_len < sizeof(bdata->hdr)) {
+
+		/*
+		 * We don't know yet if there is more than one message
+		 * to process. So the len is the size of the leftover data.
+		 */
+		len = sc->data_in_len - (data - sc->data);
+		if (len < sizeof(bdata->hdr)) {
 			bdata->inhdr = true;
-			memcpy(&bdata->hdr, sc->data, sc->data_in_len);
-			bdata->used = sc->data_in_len;
+			memcpy(&bdata->hdr, sc->data, len);
+			bdata->used = len;
 		} else {
 			bdata->inhdr = false;
 			memcpy(&bdata->hdr, sc->data, sizeof(bdata->hdr));
@@ -2629,12 +2655,26 @@ void read_state_buffered_data(const void *ctx, struct connection *conn,
 							bdata->hdr.msg.len);
 			if (!bdata->buffer)
 				barf("Error allocating in buffer");
-			bdata->used = sc->data_in_len - sizeof(bdata->hdr);
-			memcpy(bdata->buffer, sc->data + sizeof(bdata->hdr),
+			bdata->used = min_t(unsigned int,
+					    len - sizeof(bdata->hdr),
+					    bdata->hdr.msg.len);
+			memcpy(bdata->buffer, data + sizeof(bdata->hdr),
 			       bdata->used);
+			/* Update len to match the size of the message. */
+			len = bdata->used + sizeof(bdata->hdr);
 		}
 
-		conn->in = bdata;
+		/*
+		 * If the message is not complete, then it means this was
+		 * the current processed message. All the other messages
+		 * will be queued to be handled after restoring.
+		 */
+		if (bdata->inhdr || bdata->used != bdata->hdr.msg.len) {
+			assert(conn->in == NULL);
+			conn->in = bdata;
+		} else if (delay_request(conn, bdata, process_delayed_message,
+					 conn, true))
+			barf("Unable to delay the request");
 	}
 
 	for (data = sc->data + sc->data_in_len;
