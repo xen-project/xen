@@ -338,7 +338,20 @@ static int destroy_conn(void *_conn)
 
 static bool conn_can_read(struct connection *conn)
 {
-	return conn->funcs->can_read(conn) && !conn->is_ignored;
+	if (!conn->funcs->can_read(conn))
+		return false;
+
+	if (conn->is_ignored)
+		return false;
+
+	/*
+	 * For stalled connection, we want to process the pending
+	 * command as soon as live-update has aborted.
+	 */
+	if (conn->is_stalled)
+		return !lu_is_pending();
+
+	return true;
 }
 
 static bool conn_can_write(struct connection *conn)
@@ -417,6 +430,12 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 			if (!list_empty(&conn->out_list))
 				events |= POLLOUT;
 			conn->pollfd_idx = set_fd(conn->fd, events);
+			/*
+			 * For stalled connection, we want to process the
+			 * pending command as soon as live-update has aborted.
+			 */
+			if (conn->is_stalled && !lu_is_pending())
+				*ptimeout = 0;
 		}
 	}
 }
@@ -1524,6 +1543,9 @@ static bool process_delayed_message(struct delayed_request *req)
 	struct connection *conn = req->data;
 	struct buffered_data *saved_in = conn->in;
 
+	if (lu_is_pending())
+		return false;
+
 	/*
 	 * Part of process_message() expects conn->in to contains the
 	 * processed response. So save the current conn->in and restore it
@@ -1542,6 +1564,30 @@ static void consider_message(struct connection *conn)
 		xprintf("Got message %s len %i from %p\n",
 			sockmsg_string(conn->in->hdr.msg.type),
 			conn->in->hdr.msg.len, conn);
+
+	conn->is_stalled = false;
+	/*
+	 * Currently, Live-Update is not supported if there is active
+	 * transactions. In order to reduce the number of retry, delay
+	 * any new request to start a transaction if Live-Update is pending
+	 * and there are no transactions in-flight.
+	 *
+	 * If we can't delay the request, then mark the connection as
+	 * stalled. This will ignore new requests until Live-Update happened
+	 * or it was aborted.
+	 */
+	if (lu_is_pending() && conn->transaction_started == 0 &&
+	    conn->in->hdr.msg.type == XS_TRANSACTION_START) {
+		trace("Delaying transaction start for connection %p req_id %u\n",
+		      conn, conn->in->hdr.msg.req_id);
+
+		if (delay_request(conn, conn->in, process_delayed_message,
+				  conn, false) != 0) {
+			trace("Stalling connection %p\n", conn);
+			conn->is_stalled = true;
+		}
+		return;
+	}
 
 	process_message(conn, conn->in);
 
@@ -1629,6 +1675,7 @@ struct connection *new_connection(const struct interface_funcs *funcs)
 	new->pollfd_idx = -1;
 	new->funcs = funcs;
 	new->is_ignored = false;
+	new->is_stalled = false;
 	new->transaction_started = 0;
 	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);

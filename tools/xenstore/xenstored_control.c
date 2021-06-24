@@ -131,6 +131,11 @@ unsigned int lu_write_response(FILE *fp)
 	return sizeof(msg) + msg.len;
 }
 
+bool lu_is_pending(void)
+{
+	return lu_status != NULL;
+}
+
 #else
 struct connection *lu_get_connection(void)
 {
@@ -141,6 +146,11 @@ unsigned int lu_write_response(FILE *fp)
 {
 	/* Unsupported */
 	return 0;
+}
+
+bool lu_is_pending(void)
+{
+	return false;
 }
 #endif
 

@@ -110,6 +110,9 @@ struct connection
 	/* Is this connection ignored? */
 	bool is_ignored;
 
+	/* Is the connection stalled? */
+	bool is_stalled;
+
 	/* Buffered incoming data. */
 	struct buffered_data *in;
 
