@@ -23,6 +23,7 @@
 #include <xen/hypercall.h>
 #include <xen/nospec.h>
 #include <xen/trace.h>
+#include <asm/multicall.h>
 #include <irq_vectors.h>
 
 #ifdef CONFIG_PV32
@@ -245,7 +246,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
     perfc_incr(hypercalls);
 }
 
-enum mc_disposition arch_do_multicall_call(struct mc_state *state)
+enum mc_disposition pv_do_multicall_call(struct mc_state *state)
 {
     struct vcpu *curr = current;
     unsigned long op;

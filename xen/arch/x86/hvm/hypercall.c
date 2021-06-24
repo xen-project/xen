@@ -26,6 +26,7 @@
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/viridian.h>
+#include <asm/multicall.h>
 
 #include <public/hvm/hvm_op.h>
 #include <public/hvm/params.h>
@@ -125,6 +126,7 @@ static const struct {
     hypercall_fn_t *native, *compat;
 } hvm_hypercall_table[] = {
     HVM_CALL(memory_op),
+    COMPAT_CALL(multicall),
 #ifdef CONFIG_GRANT_TABLE
     HVM_CALL(grant_table_op),
 #endif
@@ -332,6 +334,39 @@ int hvm_hypercall(struct cpu_user_regs *regs)
     }
 
     return curr->hcall_preempted ? HVM_HCALL_preempted : HVM_HCALL_completed;
+}
+
+enum mc_disposition hvm_do_multicall_call(struct mc_state *state)
+{
+    struct vcpu *curr = current;
+    hypercall_fn_t *func = NULL;
+
+    if ( hvm_guest_x86_mode(curr) == 8 )
+    {
+        struct multicall_entry *call = &state->call;
+
+        if ( call->op < ARRAY_SIZE(hvm_hypercall_table) )
+            func = array_access_nospec(hvm_hypercall_table, call->op).native;
+        if ( func )
+            call->result = func(call->args[0], call->args[1], call->args[2],
+                                call->args[3], call->args[4], call->args[5]);
+        else
+            call->result = -ENOSYS;
+    }
+    else
+    {
+        struct compat_multicall_entry *call = &state->compat_call;
+
+        if ( call->op < ARRAY_SIZE(hvm_hypercall_table) )
+            func = array_access_nospec(hvm_hypercall_table, call->op).compat;
+        if ( func )
+            call->result = func(call->args[0], call->args[1], call->args[2],
+                                call->args[3], call->args[4], call->args[5]);
+        else
+            call->result = -ENOSYS;
+    }
+
+    return !hvm_get_cpl(curr) ? mc_continue : mc_preempt;
 }
 
 /*
