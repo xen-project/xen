@@ -643,7 +643,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
     struct vtd_iommu *iommu;
     bool_t flush_dev_iotlb;
     int iommu_domid;
-    int rc = 0;
+    int ret = 0;
 
     /*
      * No need pcideves_lock here because we have flush
@@ -651,6 +651,8 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
      */
     for_each_drhd_unit ( drhd )
     {
+        int rc;
+
         iommu = drhd->iommu;
 
         if ( !test_bit(iommu->index, &hd->arch.vtd.iommu_bitmap) )
@@ -673,13 +675,12 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
                                        flush_dev_iotlb);
 
         if ( rc > 0 )
-        {
             iommu_flush_write_buffer(iommu);
-            rc = 0;
-        }
+        else if ( !ret )
+            ret = rc;
     }
 
-    return rc;
+    return ret;
 }
 
 static int __must_check iommu_flush_iotlb_pages(struct domain *d,
