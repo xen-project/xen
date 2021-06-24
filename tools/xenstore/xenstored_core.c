@@ -306,7 +306,9 @@ int delay_request(struct connection *conn, struct buffered_data *in,
 	delayed_requests++;
 	list_add(&req->list, &conn->delayed);
 
-	conn->in = NULL;
+	/* Unlink the request from conn if this is the current one */
+	if (conn->in == in)
+		conn->in = NULL;
 
 	return 0;
 }
