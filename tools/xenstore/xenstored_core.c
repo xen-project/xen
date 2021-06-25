@@ -2717,11 +2717,11 @@ void read_state_buffered_data(const void *ctx, struct connection *conn,
 		len = sc->data_in_len - (data - sc->data);
 		if (len < sizeof(bdata->hdr)) {
 			bdata->inhdr = true;
-			memcpy(&bdata->hdr, sc->data, len);
+			memcpy(&bdata->hdr, data, len);
 			bdata->used = len;
 		} else {
 			bdata->inhdr = false;
-			memcpy(&bdata->hdr, sc->data, sizeof(bdata->hdr));
+			memcpy(&bdata->hdr, data, sizeof(bdata->hdr));
 			if (bdata->hdr.msg.len <= DEFAULT_BUFFER_SIZE)
 				bdata->buffer = bdata->default_buffer;
 			else
