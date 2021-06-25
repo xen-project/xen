@@ -149,6 +149,7 @@ typedef enum irqreturn irqreturn_t;
 #define kzalloc(size, flags)		_xzalloc(size, sizeof(void *))
 #define devm_kzalloc(dev, size, flags)	_xzalloc(size, sizeof(void *))
 #define kmalloc_array(size, n, flags)	_xmalloc_array(size, sizeof(void *), n)
+#define kzalloc_array(size, n, flags)	_xzalloc_array(size, sizeof(void *), n)
 
 static void __iomem *devm_ioremap_resource(struct device *dev,
 					   struct resource *res)
@@ -2221,7 +2222,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 		smmu->smr_mask_mask = smr >> SMR_MASK_SHIFT;
 
 		/* Zero-initialised to mark as invalid */
-		smmu->smrs = devm_kzalloc(smmu->dev, sizeof(*smmu->smrs), GFP_KERNEL);
+		smmu->smrs = kzalloc_array(sizeof(*smmu->smrs), size, GFP_KERNEL);
 		if (!smmu->smrs)
 			return -ENOMEM;
 
