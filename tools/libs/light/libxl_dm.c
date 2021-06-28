@@ -1324,7 +1324,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             vncarg = GCSPRINTF("127.0.0.1:%d", vnc->display);
 
         if (vnc->passwd && vnc->passwd[0]) {
-            vncarg = GCSPRINTF("%s,password", vncarg);
+            vncarg = GCSPRINTF("%s,password=on", vncarg);
         }
 
         if (libxl_defbool_val(vnc->findunused)) {
