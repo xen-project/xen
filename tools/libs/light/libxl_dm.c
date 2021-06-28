@@ -1972,7 +1972,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                                         &drive_id),
                     flexarray_vappend(dm_args,
                         "-drive", drive,
-                        "-device", GCSPRINTF("scsi-disk,drive=%s,scsi-id=%d",
+                        "-device", GCSPRINTF("scsi-hd,drive=%s,scsi-id=%d",
                                              drive_id, disk),
                         NULL);
                     continue;
