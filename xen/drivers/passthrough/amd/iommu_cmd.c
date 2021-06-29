@@ -20,6 +20,9 @@
 #include "iommu.h"
 #include "../ats.h"
 
+#define CMD_COMPLETION_INIT 0
+#define CMD_COMPLETION_DONE 1
+
 static void send_iommu_command(struct amd_iommu *iommu,
                                const uint32_t cmd[4])
 {
@@ -49,28 +52,27 @@ static void send_iommu_command(struct amd_iommu *iommu,
 static void flush_command_buffer(struct amd_iommu *iommu,
                                  unsigned int timeout_base)
 {
-    uint32_t cmd[4];
+    static DEFINE_PER_CPU(uint64_t, poll_slot);
+    uint64_t *this_poll_slot = &this_cpu(poll_slot);
+    paddr_t addr = virt_to_maddr(this_poll_slot);
+    /* send a COMPLETION_WAIT command to flush command buffer */
+    uint32_t cmd[4] = {
+        addr | MASK_INSR(IOMMU_CONTROL_ENABLED,
+                         IOMMU_COMP_WAIT_S_FLAG_MASK),
+        (addr >> 32) | MASK_INSR(IOMMU_CMD_COMPLETION_WAIT,
+                                 IOMMU_CMD_OPCODE_MASK),
+        CMD_COMPLETION_DONE
+    };
     s_time_t start, timeout;
     static unsigned int __read_mostly threshold = 1;
 
-    /* RW1C 'ComWaitInt' in status register */
-    writel(IOMMU_STATUS_COMP_WAIT_INT,
-           iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+    ACCESS_ONCE(*this_poll_slot) = CMD_COMPLETION_INIT;
 
-    /* send an empty COMPLETION_WAIT command to flush command buffer */
-    cmd[3] = cmd[2] = 0;
-    set_field_in_reg_u32(IOMMU_CMD_COMPLETION_WAIT, 0,
-                         IOMMU_CMD_OPCODE_MASK,
-                         IOMMU_CMD_OPCODE_SHIFT, &cmd[1]);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, 0,
-                         IOMMU_COMP_WAIT_I_FLAG_MASK,
-                         IOMMU_COMP_WAIT_I_FLAG_SHIFT, &cmd[0]);
     send_iommu_command(iommu, cmd);
 
     start = NOW();
     timeout = start + (timeout_base ?: 100) * MILLISECS(threshold);
-    while ( !(readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET) &
-              IOMMU_STATUS_COMP_WAIT_INT) )
+    while ( ACCESS_ONCE(*this_poll_slot) != CMD_COMPLETION_DONE )
     {
         if ( timeout && NOW() > timeout )
         {
