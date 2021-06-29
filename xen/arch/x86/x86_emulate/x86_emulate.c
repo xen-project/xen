@@ -6864,7 +6864,8 @@ x86_emulate(
         }
         opc[2] = 0xc3;
 
-        invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),
+        _regs.eflags &= ~EFLAGS_MASK;
+        invoke_stub("",
                     _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),
                     [eflags] "+g" (_regs.eflags),
                     [tmp] "=&r" (dummy), "+m" (*mmvalp)
@@ -8112,7 +8113,8 @@ x86_emulate(
         opc[2] = 0xc3;
 
         copy_VEX(opc, vex);
-        invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),
+        _regs.eflags &= ~EFLAGS_MASK;
+        invoke_stub("",
                     _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),
                     [eflags] "+g" (_regs.eflags),
                     "=a" (dst.val), [tmp] "=&r" (dummy)
@@ -11699,13 +11701,14 @@ int x86_emul_rmw(
         break;
 
     case rmw_xadd:
+        *eflags &= ~EFLAGS_MASK;
         switch ( state->op_bytes )
         {
             unsigned long dummy;
 
 #define XADD(sz, cst, mod) \
         case sz: \
-            asm ( _PRE_EFLAGS("[efl]", "[msk]", "[tmp]") \
+            asm ( "" \
                   COND_LOCK(xadd) " %"#mod"[reg], %[mem]; " \
                   _POST_EFLAGS("[efl]", "[msk]", "[tmp]") \
                   : [reg] "+" #cst (state->ea.val), \
