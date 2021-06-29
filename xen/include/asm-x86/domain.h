@@ -190,8 +190,8 @@ struct log_dirty_domain {
     unsigned int   failed_allocs;
 
     /* log-dirty mode stats */
-    unsigned int   fault_count;
-    unsigned int   dirty_count;
+    unsigned long  fault_count;
+    unsigned long  dirty_count;
 
     /* functions which are paging mode specific */
     const struct log_dirty_ops {

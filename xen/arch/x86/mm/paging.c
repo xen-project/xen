@@ -446,14 +446,16 @@ static int paging_log_dirty_op(struct domain *d,
 
     clean = (sc->op == XEN_DOMCTL_SHADOW_OP_CLEAN);
 
-    PAGING_DEBUG(LOGDIRTY, "log-dirty %s: dom %u faults=%u dirty=%u\n",
+    PAGING_DEBUG(LOGDIRTY, "log-dirty %s: dom %u faults=%lu dirty=%lu\n",
                  (clean) ? "clean" : "peek",
                  d->domain_id,
                  d->arch.paging.log_dirty.fault_count,
                  d->arch.paging.log_dirty.dirty_count);
 
-    sc->stats.fault_count = d->arch.paging.log_dirty.fault_count;
-    sc->stats.dirty_count = d->arch.paging.log_dirty.dirty_count;
+    sc->stats.fault_count = min(d->arch.paging.log_dirty.fault_count,
+                                UINT32_MAX + 0UL);
+    sc->stats.dirty_count = min(d->arch.paging.log_dirty.dirty_count,
+                                UINT32_MAX + 0UL);
 
     if ( guest_handle_is_null(sc->dirty_bitmap) )
         /* caller may have wanted just to clean the state or access stats. */
