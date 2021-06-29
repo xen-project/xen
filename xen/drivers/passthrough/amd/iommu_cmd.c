@@ -27,6 +27,9 @@ static void send_iommu_command(struct amd_iommu *iommu,
                                const uint32_t cmd[4])
 {
     uint32_t tail;
+    unsigned long flags;
+
+    spin_lock_irqsave(&iommu->lock, flags);
 
     tail = iommu->cmd_buffer.tail + sizeof(cmd_entry_t);
     if ( tail == iommu->cmd_buffer.size )
@@ -47,6 +50,8 @@ static void send_iommu_command(struct amd_iommu *iommu,
     iommu->cmd_buffer.tail = tail;
 
     writel(tail, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
+
+    spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
 static void flush_command_buffer(struct amd_iommu *iommu,
@@ -273,7 +278,6 @@ static void invalidate_iommu_all(struct amd_iommu *iommu)
 void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
                            daddr_t daddr, unsigned int order)
 {
-    unsigned long flags;
     struct amd_iommu *iommu;
     unsigned int req_id, queueid, maxpend;
 
@@ -300,10 +304,8 @@ void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
     maxpend = pdev->ats.queue_depth & 0xff;
 
     /* send INVALIDATE_IOTLB_PAGES command */
-    spin_lock_irqsave(&iommu->lock, flags);
     invalidate_iotlb_pages(iommu, maxpend, 0, queueid, daddr, req_id, order);
     flush_command_buffer(iommu, iommu_dev_iotlb_timeout);
-    spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
 static void amd_iommu_flush_all_iotlbs(struct domain *d, daddr_t daddr,
@@ -330,17 +332,14 @@ static void amd_iommu_flush_all_iotlbs(struct domain *d, daddr_t daddr,
 static void _amd_iommu_flush_pages(struct domain *d,
                                    daddr_t daddr, unsigned int order)
 {
-    unsigned long flags;
     struct amd_iommu *iommu;
     unsigned int dom_id = d->domain_id;
 
     /* send INVALIDATE_IOMMU_PAGES command */
     for_each_amd_iommu ( iommu )
     {
-        spin_lock_irqsave(&iommu->lock, flags);
         invalidate_iommu_pages(iommu, daddr, dom_id, order);
         flush_command_buffer(iommu, 0);
-        spin_unlock_irqrestore(&iommu->lock, flags);
     }
 
     if ( ats_enabled )
@@ -360,37 +359,25 @@ void amd_iommu_flush_pages(struct domain *d,
 
 void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf)
 {
-    ASSERT( spin_is_locked(&iommu->lock) );
-
     invalidate_dev_table_entry(iommu, bdf);
     flush_command_buffer(iommu, 0);
 }
 
 void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf)
 {
-    ASSERT( spin_is_locked(&iommu->lock) );
-
     invalidate_interrupt_table(iommu, bdf);
     flush_command_buffer(iommu, 0);
 }
 
 void amd_iommu_flush_all_caches(struct amd_iommu *iommu)
 {
-    ASSERT( spin_is_locked(&iommu->lock) );
-
     invalidate_iommu_all(iommu);
     flush_command_buffer(iommu, 0);
 }
 
 void amd_iommu_send_guest_cmd(struct amd_iommu *iommu, u32 cmd[])
 {
-    unsigned long flags;
-
-    spin_lock_irqsave(&iommu->lock, flags);
-
     send_iommu_command(iommu, cmd);
     /* TBD: Timeout selection may require peeking into cmd[]. */
     flush_command_buffer(iommu, 0);
-
-    spin_unlock_irqrestore(&iommu->lock, flags);
 }

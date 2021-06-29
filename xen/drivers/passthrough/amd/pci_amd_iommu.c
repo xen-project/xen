@@ -129,6 +129,8 @@ static void amd_iommu_setup_domain_device(
              iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
             dte->i = ats_enabled;
 
+        spin_unlock_irqrestore(&iommu->lock, flags);
+
         amd_iommu_flush_device(iommu, req_id);
 
         AMD_IOMMU_DEBUG("Setup I/O page table: device id = %#x, type = %#x, "
@@ -138,8 +140,8 @@ static void amd_iommu_setup_domain_device(
                         page_to_maddr(hd->arch.amd.root_table),
                         domain->domain_id, hd->arch.amd.paging_mode);
     }
-
-    spin_unlock_irqrestore(&iommu->lock, flags);
+    else
+        spin_unlock_irqrestore(&iommu->lock, flags);
 
     ASSERT(pcidevs_locked());
 
@@ -307,6 +309,8 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
         smp_wmb();
         dte->v = true;
 
+        spin_unlock_irqrestore(&iommu->lock, flags);
+
         amd_iommu_flush_device(iommu, req_id);
 
         AMD_IOMMU_DEBUG("Disable: device id = %#x, "
@@ -314,7 +318,8 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
                         req_id,  domain->domain_id,
                         dom_iommu(domain)->arch.amd.paging_mode);
     }
-    spin_unlock_irqrestore(&iommu->lock, flags);
+    else
+        spin_unlock_irqrestore(&iommu->lock, flags);
 
     ASSERT(pcidevs_locked());
 
@@ -455,9 +460,9 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
             iommu->dev_table.buffer + (bdf * IOMMU_DEV_TABLE_ENTRY_SIZE),
             ivrs_mappings[bdf].intremap_table, iommu, iommu_intremap);
 
-        amd_iommu_flush_device(iommu, bdf);
-
         spin_unlock_irqrestore(&iommu->lock, flags);
+
+        amd_iommu_flush_device(iommu, bdf);
     }
 
     amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);

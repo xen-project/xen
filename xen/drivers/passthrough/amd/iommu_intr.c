@@ -310,9 +310,7 @@ static int update_intremap_entry_from_ioapic(
         entry.ptr32->flds.remap_en = false;
         spin_unlock(lock);
 
-        spin_lock(&iommu->lock);
         amd_iommu_flush_intremap(iommu, req_id);
-        spin_unlock(&iommu->lock);
 
         spin_lock(lock);
     }
@@ -527,11 +525,9 @@ static int update_intremap_entry_from_msi_msg(
 
         if ( iommu->enabled )
         {
-            spin_lock_irqsave(&iommu->lock, flags);
             amd_iommu_flush_intremap(iommu, req_id);
             if ( alias_id != req_id )
                 amd_iommu_flush_intremap(iommu, alias_id);
-            spin_unlock_irqrestore(&iommu->lock, flags);
         }
 
         return 0;
@@ -567,11 +563,9 @@ static int update_intremap_entry_from_msi_msg(
         entry.ptr32->flds.remap_en = false;
         spin_unlock(lock);
 
-        spin_lock(&iommu->lock);
         amd_iommu_flush_intremap(iommu, req_id);
         if ( alias_id != req_id )
             amd_iommu_flush_intremap(iommu, alias_id);
-        spin_unlock(&iommu->lock);
 
         spin_lock(lock);
     }

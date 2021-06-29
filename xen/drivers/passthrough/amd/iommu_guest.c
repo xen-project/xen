@@ -449,8 +449,9 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     spin_lock_irqsave(&iommu->lock, flags);
     dte_set_gcr3_table(mdte, hdom_id, gcr3_mfn << PAGE_SHIFT, gv, glx);
 
-    amd_iommu_flush_device(iommu, req_id);
     spin_unlock_irqrestore(&iommu->lock, flags);
+
+    amd_iommu_flush_device(iommu, req_id);
 
     return 0;
 }

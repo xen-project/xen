@@ -871,7 +871,10 @@ static void enable_iommu(struct amd_iommu *iommu)
     spin_lock_irqsave(&iommu->lock, flags);
 
     if ( unlikely(iommu->enabled) )
-        goto out;
+    {
+        spin_unlock_irqrestore(&iommu->lock, flags);
+        return;
+    }
 
     amd_iommu_erratum_746_workaround(iommu);
 
@@ -921,13 +924,12 @@ static void enable_iommu(struct amd_iommu *iommu)
 
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
 
-    if ( iommu->features.flds.ia_sup )
-        amd_iommu_flush_all_caches(iommu);
-
     iommu->enabled = 1;
 
- out:
     spin_unlock_irqrestore(&iommu->lock, flags);
+
+    if ( iommu->features.flds.ia_sup )
+        amd_iommu_flush_all_caches(iommu);
 }
 
 static void disable_iommu(struct amd_iommu *iommu)
@@ -1544,7 +1546,6 @@ static int _invalidate_all_devices(
 {
     unsigned int bdf; 
     u16 req_id;
-    unsigned long flags;
     struct amd_iommu *iommu;
 
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
@@ -1553,10 +1554,8 @@ static int _invalidate_all_devices(
         req_id = ivrs_mappings[bdf].dte_requestor_id;
         if ( iommu )
         {
-            spin_lock_irqsave(&iommu->lock, flags);
             amd_iommu_flush_device(iommu, req_id);
             amd_iommu_flush_intremap(iommu, req_id);
-            spin_unlock_irqrestore(&iommu->lock, flags);
         }
     }
 
