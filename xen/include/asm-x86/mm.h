@@ -527,11 +527,6 @@ extern struct rangeset *mmio_ro_ranges;
 
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
-#define mfn_to_gmfn(_d, mfn)                            \
-    ( (paging_mode_translate(_d))                       \
-      ? get_gpfn_from_mfn(mfn)                          \
-      : (mfn) )
-
 #define compat_pfn_to_cr3(pfn) (((unsigned)(pfn) << 12) | ((unsigned)(pfn) >> 20))
 #define compat_cr3_to_pfn(cr3) (((unsigned)(cr3) >> 12) | ((unsigned)(cr3) << 20))
 

@@ -714,13 +714,13 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
          */
         while ( (page = page_list_remove_head(&in_chunk_list)) )
         {
-            unsigned long gfn;
+            gfn_t gfn;
 
             mfn = page_to_mfn(page);
-            gfn = mfn_to_gmfn(d, mfn_x(mfn));
+            gfn = mfn_to_gfn(d, mfn);
             /* Pages were unshared above */
-            BUG_ON(SHARED_M2P(gfn));
-            if ( guest_physmap_remove_page(d, _gfn(gfn), mfn, 0) )
+            BUG_ON(SHARED_M2P(gfn_x(gfn)));
+            if ( guest_physmap_remove_page(d, gfn, mfn, 0) )
                 domain_crash(d);
             free_domheap_page(page);
         }
