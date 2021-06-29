@@ -2756,6 +2756,15 @@ int xenmem_add_to_physmap_one(
         goto put_both;
     }
 
+    /* XENMAPSPACE_gmfn: Check if the MFN is associated with another GFN. */
+    old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
+    ASSERT(!SHARED_M2P(old_gpfn));
+    if ( space == XENMAPSPACE_gmfn && old_gpfn != gfn )
+    {
+        rc = -EXDEV;
+        goto put_both;
+    }
+
     /* Remove previously mapped page if it was present. */
     prev_mfn = get_gfn(d, gfn_x(gpfn), &p2mt);
     if ( mfn_valid(prev_mfn) )
@@ -2774,13 +2783,6 @@ int xenmem_add_to_physmap_one(
         goto put_both;
 
     /* Unmap from old location, if any. */
-    old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
-    ASSERT(!SHARED_M2P(old_gpfn));
-    if ( space == XENMAPSPACE_gmfn && old_gpfn != gfn )
-    {
-        rc = -EXDEV;
-        goto put_both;
-    }
     if ( old_gpfn != INVALID_M2P_ENTRY )
         rc = guest_physmap_remove_page(d, _gfn(old_gpfn), mfn, PAGE_ORDER_4K);
 
