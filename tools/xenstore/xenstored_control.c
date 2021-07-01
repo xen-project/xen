@@ -103,7 +103,6 @@ static const char *lu_begin(struct connection *conn)
 	if (!lu_status)
 		return "Allocation failure.";
 	lu_status->conn = conn;
-	lu_status->in = conn->in;
 	talloc_set_destructor(lu_status, lu_destroy);
 
 	return NULL;
@@ -757,6 +756,7 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 	lu_status->force = force;
 	lu_status->timeout = to;
 	lu_status->started_at = time(NULL);
+	lu_status->in = conn->in;
 
 	errno = delay_request(conn, conn->in, do_lu_start, conn, false);
 
