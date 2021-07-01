@@ -6,6 +6,7 @@ Convert a legacy migration stream to a v2 stream.
 """
 
 from __future__ import print_function
+from __future__ import division
 
 import sys
 import os, os.path
@@ -163,7 +164,7 @@ def write_libxc_hvm_params(params):
         raise RuntimeError("Expected even length list of hvm parameters")
 
     write_record(libxc.REC_TYPE_hvm_params,
-                 pack(libxc.HVM_PARAMS_FORMAT, len(params) / 2, 0),
+                 pack(libxc.HVM_PARAMS_FORMAT, len(params) // 2, 0),
                  pack("Q" * len(params), *params))
 
 def write_libxc_static_data_end():
@@ -264,8 +265,8 @@ def read_pv_extended_info(vm):
                           (so_far - total_length, ))
 
 def read_pv_p2m_frames(vm):
-    fpp = 4096 / vm.width
-    p2m_frame_len = (vm.p2m_size - 1) / fpp + 1
+    fpp = 4096 // vm.width
+    p2m_frame_len = (vm.p2m_size - 1) // fpp + 1
 
     info("P2M frames: fpp %d, p2m_frame_len %d" % (fpp, p2m_frame_len))
     write_libxc_pv_p2m_frames(vm, unpack_ulongs(p2m_frame_len))
@@ -405,7 +406,7 @@ def read_chunks(vm):
                                   (max_id, legacy.MAX_VCPU_ID))
 
             vm.max_vcpu_id = max_id
-            bitmap = unpack_exact("Q" * ((max_id/64) + 1))
+            bitmap = unpack_exact("Q" * ((max_id // 64) + 1))
 
             for idx, word in enumerate(bitmap):
                 bit_idx = 0
