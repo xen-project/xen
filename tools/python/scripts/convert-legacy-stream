@@ -346,9 +346,9 @@ def read_libxl_toolstack(vm, data):
         if bytearray(name)[-1] != 0:
             raise StreamError("physmap name not NUL terminated")
 
-        root = b"physmap/%x" % (phys, )
-        kv = [root + b"/start_addr", b"%x" % (start, ),
-              root + b"/size",       b"%x" % (size, ),
+        root = ("physmap/%x" % (phys, )).encode('ascii')
+        kv = [root + b"/start_addr", ("%x" % (start, )).encode('ascii'),
+              root + b"/size",       ("%x" % (size, )).encode('ascii'),
               root + b"/name",       name[:-1]]
 
         for key, val in zip(kv[0::2], kv[1::2]):
