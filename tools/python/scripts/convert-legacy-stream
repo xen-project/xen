@@ -343,7 +343,7 @@ def read_libxl_toolstack(vm, data):
         if twidth == 64:
             name = name[:-4]
 
-        if name[-1] != b'\x00':
+        if bytearray(name)[-1] != 0:
             raise StreamError("physmap name not NUL terminated")
 
         root = b"physmap/%x" % (phys, )
