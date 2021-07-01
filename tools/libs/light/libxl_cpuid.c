@@ -465,7 +465,7 @@ int libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
      * isn't going to migrate, then the current hardware is all that matters.
      *
      * Alternatively, an internal property of vTSC is that the values read are
-     * invariant.  Advertise ITSC when we know the domain will have emualted
+     * invariant.  Advertise ITSC when we know the domain will have emulated
      * TSC everywhere it goes.
      */
     itsc = (libxl_defbool_val(info->disable_migrate) ||
