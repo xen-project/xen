@@ -406,10 +406,9 @@ static int handle_page_data(struct xc_sr_context *ctx, struct xc_sr_record *rec)
         }
 
         type = (pages->pfn[i] & PAGE_DATA_TYPE_MASK) >> 32;
-        if ( ((type >> XEN_DOMCTL_PFINFO_LTAB_SHIFT) >= 5) &&
-             ((type >> XEN_DOMCTL_PFINFO_LTAB_SHIFT) <= 8) )
+        if ( !is_known_page_type(type) )
         {
-            ERROR("Invalid type %#"PRIx32" for pfn %#"PRIpfn" (index %u)",
+            ERROR("Unknown type %#"PRIx32" for pfn %#"PRIpfn" (index %u)",
                   type, pfn, i);
             goto err;
         }
