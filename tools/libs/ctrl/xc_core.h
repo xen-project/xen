@@ -138,14 +138,14 @@ int xc_core_arch_memory_map_get(xc_interface *xch,
                                 xc_dominfo_t *info, shared_info_any_t *live_shinfo,
                                 xc_core_memory_map_t **mapp,
                                 unsigned int *nr_entries);
-int xc_core_arch_map_p2m(xc_interface *xch, unsigned int guest_width,
+int xc_core_arch_map_p2m(xc_interface *xch, struct domain_info_context *dinfo,
                          xc_dominfo_t *info, shared_info_any_t *live_shinfo,
-                         xen_pfn_t **live_p2m, unsigned long *pfnp);
+                         xen_pfn_t **live_p2m);
 
-int xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width,
+int xc_core_arch_map_p2m_writable(xc_interface *xch, struct domain_info_context *dinfo,
                                   xc_dominfo_t *info,
                                   shared_info_any_t *live_shinfo,
-                                  xen_pfn_t **live_p2m, unsigned long *pfnp);
+                                  xen_pfn_t **live_p2m);
 
 int xc_core_arch_get_scratch_gpfn(xc_interface *xch, uint32_t domid,
                                   xen_pfn_t *gpfn);

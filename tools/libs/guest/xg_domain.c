@@ -24,13 +24,9 @@
 
 int xc_unmap_domain_meminfo(xc_interface *xch, struct xc_domain_meminfo *minfo)
 {
-    struct domain_info_context _di = { .guest_width = minfo->guest_width,
-                                       .p2m_size = minfo->p2m_size};
-    struct domain_info_context *dinfo = &_di;
-
     free(minfo->pfn_type);
     if ( minfo->p2m_table )
-        munmap(minfo->p2m_table, P2M_FL_ENTRIES * PAGE_SIZE);
+        munmap(minfo->p2m_table, minfo->p2m_frames * PAGE_SIZE);
     minfo->p2m_table = NULL;
 
     return 0;
@@ -40,7 +36,6 @@ int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
                           struct xc_domain_meminfo *minfo)
 {
     struct domain_info_context _di;
-    struct domain_info_context *dinfo = &_di;
 
     xc_dominfo_t info;
     shared_info_any_t *live_shinfo;
@@ -96,16 +91,16 @@ int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
         return -1;
     }
 
-    if ( xc_core_arch_map_p2m_writable(xch, minfo->guest_width, &info,
-                                       live_shinfo, &minfo->p2m_table,
-                                       &minfo->p2m_size) )
+    if ( xc_core_arch_map_p2m_writable(xch, &_di, &info,
+                                       live_shinfo, &minfo->p2m_table) )
     {
         PERROR("Could not map the P2M table");
         munmap(live_shinfo, PAGE_SIZE);
         return -1;
     }
     munmap(live_shinfo, PAGE_SIZE);
-    _di.p2m_size = minfo->p2m_size;
+    minfo->p2m_size = _di.p2m_size;
+    minfo->p2m_frames = _di.p2m_frames;
 
     /* Make space and prepare for getting the PFN types */
     minfo->pfn_type = calloc(sizeof(*minfo->pfn_type), minfo->p2m_size);
@@ -141,7 +136,7 @@ failed:
     }
     if ( minfo->p2m_table )
     {
-        munmap(minfo->p2m_table, P2M_FL_ENTRIES * PAGE_SIZE);
+        munmap(minfo->p2m_table, minfo->p2m_frames * PAGE_SIZE);
         minfo->p2m_table = NULL;
     }
 

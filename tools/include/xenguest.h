@@ -700,8 +700,10 @@ struct xc_domain_meminfo {
     xen_pfn_t *pfn_type;
     xen_pfn_t *p2m_table;
     unsigned long p2m_size;
+    unsigned int p2m_frames;
 };
 
+#define xc_map_domain_meminfo xc_map_domain_meminfo_mod
 int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
                           struct xc_domain_meminfo *minfo);
 
