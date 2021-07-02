@@ -752,7 +752,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    if ( ctx->save.debug && ctx->stream_type != XC_STREAM_PLAIN )
+    if ( ctx->save.debug && ctx->stream_type == XC_STREAM_PLAIN )
     {
         rc = verify_frames(ctx);
         if ( rc )
