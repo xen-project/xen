@@ -513,7 +513,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         /* Clamp maximum leaves to the ones supported on 4.12. */
         p->basic.max_leaf = min(p->basic.max_leaf, 0xdu);
         p->feat.max_subleaf = 0;
-        p->extd.max_leaf = min(p->extd.max_leaf, 0x1cu);
+        p->extd.max_leaf = min(p->extd.max_leaf, 0x8000001c);
     }
 
     if ( featureset )
