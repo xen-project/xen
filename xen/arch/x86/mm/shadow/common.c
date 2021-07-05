@@ -1626,12 +1626,8 @@ void shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
 typedef int (*hash_vcpu_callback_t)(struct vcpu *v, mfn_t smfn, mfn_t other_mfn);
 typedef int (*hash_domain_callback_t)(struct domain *d, mfn_t smfn, mfn_t other_mfn);
 
-#ifndef __clang__ /* At least some versions dislike some of the uses. */
 #define HASH_CALLBACKS_CHECK(mask) \
     BUILD_BUG_ON((mask) > (1U << ARRAY_SIZE(callbacks)) - 1)
-#else
-#define HASH_CALLBACKS_CHECK(mask) ((void)(mask))
-#endif
 
 static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
                               const hash_vcpu_callback_t callbacks[],
@@ -1829,7 +1825,6 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
         [SH_type_l1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 4),
         [SH_type_fl1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 4),
     };
-    static const unsigned int callback_mask = SHF_L1_ANY | SHF_FL1_ANY;
     struct page_info *pg = mfn_to_page(gmfn);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     struct vcpu *curr = current;
@@ -2004,8 +1999,8 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
         perfc_incr(shadow_writeable_bf_1);
     else
         perfc_incr(shadow_writeable_bf);
-    HASH_CALLBACKS_CHECK(callback_mask);
-    hash_domain_foreach(d, callback_mask, callbacks, gmfn);
+    HASH_CALLBACKS_CHECK(SHF_L1_ANY | SHF_FL1_ANY);
+    hash_domain_foreach(d, SHF_L1_ANY | SHF_FL1_ANY, callbacks, gmfn);
 
     /* If that didn't catch the mapping, then there's some non-pagetable
      * mapping -- ioreq page, grant mapping, &c. */
@@ -2044,7 +2039,6 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
         [SH_type_l1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4),
         [SH_type_fl1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4),
     };
-    static const unsigned int callback_mask = SHF_L1_ANY | SHF_FL1_ANY;
 
     perfc_incr(shadow_mappings);
     if ( sh_check_page_has_no_refs(page) )
@@ -2060,8 +2054,8 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
 
     /* Brute-force search of all the shadows, by walking the hash */
     perfc_incr(shadow_mappings_bf);
-    HASH_CALLBACKS_CHECK(callback_mask);
-    hash_domain_foreach(d, callback_mask, callbacks, gmfn);
+    HASH_CALLBACKS_CHECK(SHF_L1_ANY | SHF_FL1_ANY);
+    hash_domain_foreach(d, SHF_L1_ANY | SHF_FL1_ANY, callbacks, gmfn);
 
     /* If that didn't catch the mapping, something is very wrong */
     if ( !sh_check_page_has_no_refs(page) )
@@ -2307,10 +2301,9 @@ void sh_reset_l3_up_pointers(struct vcpu *v)
     static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
         [SH_type_l3_64_shadow] = sh_clear_up_pointer,
     };
-    static const unsigned int callback_mask = SHF_L3_64;
 
-    HASH_CALLBACKS_CHECK(callback_mask);
-    hash_vcpu_foreach(v, callback_mask, callbacks, INVALID_MFN);
+    HASH_CALLBACKS_CHECK(SHF_L3_64);
+    hash_vcpu_foreach(v, SHF_L3_64, callbacks, INVALID_MFN);
 }
 
 
