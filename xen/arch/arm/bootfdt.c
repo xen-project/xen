@@ -13,6 +13,7 @@
 #include <xen/init.h>
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
+#include <xen/sort.h>
 #include <xsm/xsm.h>
 #include <asm/setup.h>
 
@@ -394,6 +395,21 @@ static void __init early_print_info(void)
     printk("\n");
 }
 
+/* This function assumes that memory regions are not overlapped */
+static int __init cmp_memory_node(const void *key, const void *elem)
+{
+    const struct membank *handler0 = key;
+    const struct membank *handler1 = elem;
+
+    if ( handler0->start < handler1->start )
+        return -1;
+
+    if ( handler0->start >= (handler1->start + handler1->size) )
+        return 1;
+
+    return 0;
+}
+
 /**
  * boot_fdt_info - initialize bootinfo from a DTB
  * @fdt: flattened device tree binary
@@ -411,6 +427,15 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
     add_boot_module(BOOTMOD_FDT, paddr, fdt_totalsize(fdt), false);
 
     device_tree_for_each_node((void *)fdt, 0, early_scan_node, NULL);
+
+    /*
+     * On Arm64 setup_xenheap_mappings() expects to be called with the lowest
+     * bank in memory first. There is no requirement that the DT will provide
+     * the banks sorted in ascending order. So sort them through.
+     */
+    sort(bootinfo.mem.bank, bootinfo.mem.nr_banks, sizeof(struct membank),
+         cmp_memory_node, NULL);
+
     early_print_info();
 
     return fdt_totalsize(fdt);
