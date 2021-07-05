@@ -845,7 +845,7 @@ static int is_guest_pv32_psr(uint32_t psr)
 
 
 #ifdef CONFIG_ARM_64
-static int is_guest_pv64_psr(uint32_t psr)
+static int is_guest_pv64_psr(uint64_t psr)
 {
     if ( psr & PSR_MODE_BIT )
         return 0;

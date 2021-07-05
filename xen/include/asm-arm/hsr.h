@@ -16,7 +16,7 @@ enum dabt_size {
 };
 
 union hsr {
-    uint32_t bits;
+    register_t bits;
     struct {
         unsigned long iss:25;  /* Instruction Specific Syndrome */
         unsigned long len:1;   /* Instruction length */

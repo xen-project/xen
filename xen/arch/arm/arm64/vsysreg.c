@@ -368,7 +368,8 @@ void do_sysreg(struct cpu_user_regs *regs,
                      sysreg.op2,
                      sysreg.read ? "=>" : "<=",
                      sysreg.reg, regs->pc);
-            gdprintk(XENLOG_ERR, "unhandled 64-bit sysreg access %#x\n",
+            gdprintk(XENLOG_ERR,
+                     "unhandled 64-bit sysreg access %#"PRIregister"\n",
                      hsr.bits & HSR_SYSREG_REGS_MASK);
             inject_undef_exception(regs, hsr);
             return;

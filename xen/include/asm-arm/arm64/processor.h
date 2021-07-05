@@ -63,17 +63,18 @@ struct cpu_user_regs
 
     /* Return address and mode */
     __DECL_REG(pc,           pc32);             /* ELR_EL2 */
-    uint32_t cpsr;                              /* SPSR_EL2 */
-    uint32_t hsr;                               /* ESR_EL2 */
+    uint64_t cpsr;                              /* SPSR_EL2 */
+    uint64_t hsr;                               /* ESR_EL2 */
+
+    /* The kernel frame should be 16-byte aligned. */
+    uint64_t pad0;
 
     /* Outer guest frame only from here on... */
 
     union {
-        uint32_t spsr_el1;       /* AArch64 */
+        uint64_t spsr_el1;       /* AArch64 */
         uint32_t spsr_svc;       /* AArch32 */
     };
-
-    uint32_t pad1; /* Doubleword-align the user half of the frame */
 
     /* AArch32 guests only */
     uint32_t spsr_fiq, spsr_irq, spsr_und, spsr_abt;

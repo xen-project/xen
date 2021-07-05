@@ -546,7 +546,7 @@ void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
         PSR_IRQ_MASK | PSR_DBG_MASK;
     regs->pc = handler;
 
-    WRITE_SYSREG32(esr.bits, ESR_EL1);
+    WRITE_SYSREG(esr.bits, ESR_EL1);
 }
 
 /* Inject an abort exception into a 64 bit guest */
@@ -580,7 +580,7 @@ static void inject_abt64_exception(struct cpu_user_regs *regs,
     regs->pc = handler;
 
     WRITE_SYSREG(addr, FAR_EL1);
-    WRITE_SYSREG32(esr.bits, ESR_EL1);
+    WRITE_SYSREG(esr.bits, ESR_EL1);
 }
 
 static void inject_dabt64_exception(struct cpu_user_regs *regs,
@@ -717,7 +717,7 @@ struct reg_ctxt {
     uint64_t vttbr_el2;
 };
 
-static const char *mode_string(uint32_t cpsr)
+static const char *mode_string(register_t cpsr)
 {
     uint32_t mode;
     static const char *mode_strings[] = {
@@ -762,7 +762,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
         printk(" %pS", _p(regs->pc));
     printk("\n");
 #endif
-    printk("CPSR:   %08"PRIx32" MODE:%s\n", regs->cpsr,
+    printk("CPSR:   %"PRIregister" MODE:%s\n", regs->cpsr,
            mode_string(regs->cpsr));
     printk("     R0: %08"PRIx32" R1: %08"PRIx32" R2: %08"PRIx32" R3: %08"PRIx32"\n",
            regs->r0, regs->r1, regs->r2, regs->r3);
@@ -846,7 +846,7 @@ static void show_registers_64(const struct cpu_user_regs *regs,
     {
         printk("SP:     %016"PRIx64"\n", regs->sp);
     }
-    printk("CPSR:   %08"PRIx32" MODE:%s\n", regs->cpsr,
+    printk("CPSR:   %016"PRIx64" MODE:%s\n", regs->cpsr,
            mode_string(regs->cpsr));
     printk("     X0: %016"PRIx64"  X1: %016"PRIx64"  X2: %016"PRIx64"\n",
            regs->x0, regs->x1, regs->x2);
@@ -919,7 +919,7 @@ static void _show_registers(const struct cpu_user_regs *regs,
     printk("   HCR_EL2: %"PRIregister"\n", READ_SYSREG(HCR_EL2));
     printk(" TTBR0_EL2: %016"PRIx64"\n", READ_SYSREG64(TTBR0_EL2));
     printk("\n");
-    printk("   ESR_EL2: %08"PRIx32"\n", regs->hsr);
+    printk("   ESR_EL2: %"PRIregister"\n", regs->hsr);
     printk(" HPFAR_EL2: %"PRIregister"\n", READ_SYSREG(HPFAR_EL2));
 
 #ifdef CONFIG_ARM_32
@@ -1599,7 +1599,7 @@ static const unsigned short cc_map[16] = {
 
 int check_conditional_instr(struct cpu_user_regs *regs, const union hsr hsr)
 {
-    unsigned long cpsr, cpsr_cond;
+    register_t cpsr, cpsr_cond;
     int cond;
 
     /*
@@ -1661,7 +1661,7 @@ int check_conditional_instr(struct cpu_user_regs *regs, const union hsr hsr)
 
 void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
 {
-    unsigned long itbits, cond, cpsr = regs->cpsr;
+    register_t itbits, cond, cpsr = regs->cpsr;
     bool is_thumb = psr_mode_is_32bit(regs) && (cpsr & PSR_THUMB);
 
     if ( is_thumb && (cpsr & PSR_IT_MASK) )
@@ -2004,13 +2004,15 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
 
         break;
     default:
-        gprintk(XENLOG_WARNING, "Unsupported FSC: HSR=%#x DFSC=%#x\n",
+        gprintk(XENLOG_WARNING,
+                "Unsupported FSC: HSR=%#"PRIregister" DFSC=%#x\n",
                 hsr.bits, xabt.fsc);
     }
 
 inject_abt:
-    gdprintk(XENLOG_DEBUG, "HSR=0x%x pc=%#"PRIregister" gva=%#"PRIvaddr
-             " gpa=%#"PRIpaddr"\n", hsr.bits, regs->pc, gva, gpa);
+    gdprintk(XENLOG_DEBUG,
+             "HSR=%#"PRIregister" pc=%#"PRIregister" gva=%#"PRIvaddr" gpa=%#"PRIpaddr"\n",
+             hsr.bits, regs->pc, gva, gpa);
     if ( is_data )
         inject_dabt_exception(regs, gva, hsr.len);
     else
@@ -2204,7 +2206,7 @@ void do_trap_guest_sync(struct cpu_user_regs *regs)
 
     default:
         gprintk(XENLOG_WARNING,
-                "Unknown Guest Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
+                "Unknown Guest Trap. HSR=%#"PRIregister" EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
                 hsr.bits, hsr.ec, hsr.len, hsr.iss);
         inject_undef_exception(regs, hsr);
     }
@@ -2242,7 +2244,7 @@ void do_trap_hyp_sync(struct cpu_user_regs *regs)
         break;
     }
     default:
-        printk("Hypervisor Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
+        printk("Hypervisor Trap. HSR=%#"PRIregister" EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
                hsr.bits, hsr.ec, hsr.len, hsr.iss);
         do_unexpected_trap("Hypervisor", regs);
     }

@@ -155,7 +155,7 @@
         add     x21, sp, #UREGS_CPSR
         mrs     x22, spsr_el2
         mrs     x23, esr_el2
-        stp     w22, w23, [x21]
+        stp     x22, x23, [x21]
 
         .endm
 
@@ -432,7 +432,7 @@ return_from_trap:
         msr     daifset, #IFLAGS___I_ /* Mask interrupts */
 
         ldr     x21, [sp, #UREGS_PC]            /* load ELR */
-        ldr     w22, [sp, #UREGS_CPSR]          /* load SPSR */
+        ldr     x22, [sp, #UREGS_CPSR]          /* load SPSR */
 
         pop     x0, x1
         pop     x2, x3

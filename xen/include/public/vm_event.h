@@ -266,8 +266,7 @@ struct vm_event_regs_arm {
     uint64_t ttbr1;
     uint64_t ttbcr;
     uint64_t pc;
-    uint32_t cpsr;
-    uint32_t _pad;
+    uint64_t cpsr;
 };
 
 /*

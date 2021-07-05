@@ -267,10 +267,10 @@ struct vcpu_guest_core_regs
 
     /* Return address and mode */
     __DECL_REG(pc64,         pc32);             /* ELR_EL2 */
-    uint32_t cpsr;                              /* SPSR_EL2 */
+    uint64_t cpsr;                              /* SPSR_EL2 */
 
     union {
-        uint32_t spsr_el1;       /* AArch64 */
+        uint64_t spsr_el1;       /* AArch64 */
         uint32_t spsr_svc;       /* AArch32 */
     };
 
