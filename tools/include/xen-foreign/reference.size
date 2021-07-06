@@ -4,8 +4,8 @@ structs                   |   arm32   arm64  x86_32  x86_64
 start_info                |       -       -    1112    1168
 trap_info                 |       -       -       8      16
 cpu_user_regs             |       -       -      68     200
-vcpu_guest_core_regs      |     304     304       -       -
-vcpu_guest_context        |     344     344    2800    5168
+vcpu_guest_core_regs      |     312     312       -       -
+vcpu_guest_context        |     352     352    2800    5168
 arch_vcpu_info            |       0       0      24      16
 vcpu_time_info            |      32      32      32      32
 vcpu_info                 |      48      48      64      64
