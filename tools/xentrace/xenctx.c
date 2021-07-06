@@ -556,7 +556,7 @@ static void print_ctx_32(vcpu_guest_context_t *ctx)
     printf("PC:       %08"PRIx32, regs->pc32);
     print_symbol(regs->pc32, KERNEL_TEXT_ADDR);
     printf("\n");
-    printf("CPSR:     %08"PRIx32"\n", regs->cpsr);
+    printf("CPSR:     %08"PRIx64"\n", regs->cpsr);
     printf("USR:               SP:%08"PRIx32" LR:%08"PRIx32"\n",
            regs->sp_usr, regs->lr_usr);
     printf("SVC: SPSR:%08"PRIx32" SP:%08"PRIx32" LR:%08"PRIx32"\n",
@@ -614,8 +614,8 @@ static void print_ctx_64(vcpu_guest_context_t *ctx)
     printf("LR:       %016"PRIx64"\n", regs->x30);
     printf("ELR_EL1:  %016"PRIx64"\n", regs->elr_el1);
 
-    printf("CPSR:     %08"PRIx32"\n", regs->cpsr);
-    printf("SPSR_EL1: %08"PRIx32"\n", regs->spsr_el1);
+    printf("CPSR:     %08"PRIx64"\n", regs->cpsr);
+    printf("SPSR_EL1: %08"PRIx64"\n", regs->spsr_el1);
 
     printf("SP_EL0:   %016"PRIx64"\n", regs->sp_el0);
     printf("SP_EL1:   %016"PRIx64"\n", regs->sp_el1);

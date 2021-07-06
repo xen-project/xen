@@ -140,7 +140,7 @@ static int vcpu_arm32(struct xc_dom_image *dom)
 
     ctxt->flags = VGCF_online;
 
-    DOMPRINTF("Initial state CPSR %#"PRIx32" PC %#"PRIx32,
+    DOMPRINTF("Initial state CPSR %#"PRIx64" PC %#"PRIx32,
            ctxt->user_regs.cpsr, ctxt->user_regs.pc32);
 
     rc = xc_vcpu_setcontext(dom->xch, dom->guest_domid, 0, &any_ctx);
@@ -182,7 +182,7 @@ static int vcpu_arm64(struct xc_dom_image *dom)
 
     ctxt->flags = VGCF_online;
 
-    DOMPRINTF("Initial state CPSR %#"PRIx32" PC %#"PRIx64,
+    DOMPRINTF("Initial state CPSR %#"PRIx64" PC %#"PRIx64,
            ctxt->user_regs.cpsr, ctxt->user_regs.pc64);
 
     rc = xc_vcpu_setcontext(dom->xch, dom->guest_domid, 0, &any_ctx);
