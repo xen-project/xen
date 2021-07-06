@@ -305,6 +305,9 @@ static int make_chosen_node(libxl__gc *gc, void *fdt, bool ramdisk,
 {
     int res;
 
+    /* 1024 bit enough to mix Linux CRNG state several times */
+    uint8_t seed[128];
+
     /* See linux Documentation/devicetree/... */
     res = fdt_begin_node(fdt, "chosen");
     if (res) return res;
@@ -342,6 +345,11 @@ static int make_chosen_node(libxl__gc *gc, void *fdt, bool ramdisk,
         res = fdt_end_node(fdt);
         if (res) return res;
     }
+
+    res = libxl__random_bytes(gc, seed, sizeof(seed));
+    if (res) return res;
+    res = fdt_property(fdt, "rng-seed", seed, sizeof(seed));
+    if (res) return res;
 
     res = fdt_end_node(fdt);
     if (res) return res;
