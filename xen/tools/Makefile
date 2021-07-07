@@ -2,8 +2,7 @@
 include $(XEN_ROOT)/Config.mk
 
 .PHONY: default
-default:
-	$(MAKE) symbols
+default: symbols
 
 .PHONY: clean
 clean:
