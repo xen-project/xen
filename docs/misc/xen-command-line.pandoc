@@ -1364,7 +1364,7 @@ detection of systems known to misbehave upon accesses to that port.
 > Default: `new` unless directed-EOI is supported
 
 ### iommu
-    = List of [ <bool>, verbose, debug, force, required, quarantine,
+    = List of [ <bool>, verbose, debug, force, required, quarantine[=scratch-page],
                 sharept, intremap, intpost, crash-disable,
                 snoop, qinval, igfx, amd-iommu-perdev-intremap,
                 dom0-{passthrough,strict} ]
@@ -1402,11 +1402,32 @@ boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
     will prevent Xen from booting if IOMMUs aren't discovered and enabled
     successfully.
 
-*   The `quarantine` boolean can be used to control Xen's behavior when
-    de-assigning devices from guests.  If enabled (the default), Xen always
+*   The `quarantine` option can be used to control Xen's behavior when
+    de-assigning devices from guests.
+
+    When a PCI device is assigned to an untrusted domain, it is possible
+    for that domain to program the device to DMA to an arbitrary address.
+    The IOMMU is used to protect the host from malicious DMA by making
+    sure that the device addresses can only target memory assigned to the
+    guest.  However, when the guest domain is torn down, assigning the
+    device back to the hardware domain would allow any in-flight DMA to
+    potentially target critical host data.  To avoid this, quarantining
+    should be enabled.  Quarantining can be done in two ways: In its basic
+    form, all in-flight DMA will simply be forced to encounter IOMMU
+    faults.  Since there are systems where doing so can cause host lockup,
+    an alternative form is available where writes to memory will be made
+    fault, but reads will be directed to a scratch page.  The implication
+    here is that such reads will go unnoticed, i.e. an admin may not
+    become aware of the underlying problem.
+
+    Therefore, if this option is set to true (the default), Xen always
     quarantines such devices; they must be explicitly assigned back to Dom0
-    before they can be used there again.  If disabled, Xen will only
-    quarantine devices the toolstack hass arranged for getting quarantined.
+    before they can be used there again.  If set to "scratch-page", still
+    active DMA reads will additionally be directed to a "scratch" page.  If
+    set to false, Xen will only quarantine devices the toolstack has arranged
+    for getting quarantined, and only in the "basic" form.
+
+    This option is only valid on builds supporting PCI.
 
 *   The `sharept` boolean controls whether the IOMMU pagetables are shared
     with the CPU-side HAP pagetables, or allocated separately.  Sharing

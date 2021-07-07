@@ -39,3 +39,31 @@ endif
 
 config IOMMU_FORCE_PT_SHARE
 	bool
+
+choice
+	prompt "IOMMU device quarantining default behavior"
+	depends on HAS_PCI
+	default IOMMU_QUARANTINE_BASIC
+	---help---
+	  When a PCI device is assigned to an untrusted domain, it is possible
+	  for that domain to program the device to DMA to an arbitrary address.
+	  The IOMMU is used to protect the host from malicious DMA by making
+	  sure that the device addresses can only target memory assigned to the
+	  guest.  However, when the guest domain is torn down, assigning the
+	  device back to the hardware domain would allow any in-flight DMA to
+	  potentially target critical host data.  To avoid this, quarantining
+	  should be enabled.  Quarantining can be done in two ways: In its basic
+	  form, all in-flight DMA will simply be forced to encounter IOMMU
+	  faults.  Since there are systems where doing so can cause host lockup,
+	  an alternative form is available where writes to memory will be made
+	  fault, but reads will be directed to a scratch page.  The implication
+	  here is that such reads will go unnoticed, i.e. an admin may not
+	  become aware of the underlying problem.
+
+	config IOMMU_QUARANTINE_NONE
+		bool "none"
+	config IOMMU_QUARANTINE_BASIC
+		bool "basic"
+	config IOMMU_QUARANTINE_SCRATCH_PAGE
+		bool "scratch page"
+endchoice

@@ -25,6 +25,9 @@
 #include "iommu.h"
 #include "../ats.h"
 
+/* dom_io is used as a sentinel for quarantined devices */
+#define QUARANTINE_SKIP(d) ((d) == dom_io && !dom_iommu(d)->arch.amd.root_table)
+
 static bool_t __read_mostly init_done;
 
 static const struct iommu_init_ops _iommu_init_ops;
@@ -81,19 +84,36 @@ int get_dma_requestor_id(uint16_t seg, uint16_t bdf)
     return req_id;
 }
 
-static void amd_iommu_setup_domain_device(
+static int __must_check allocate_domain_resources(struct domain *d)
+{
+    struct domain_iommu *hd = dom_iommu(d);
+    int rc;
+
+    spin_lock(&hd->arch.mapping_lock);
+    rc = amd_iommu_alloc_root(d);
+    spin_unlock(&hd->arch.mapping_lock);
+
+    return rc;
+}
+
+static int __must_check amd_iommu_setup_domain_device(
     struct domain *domain, struct amd_iommu *iommu,
     uint8_t devfn, struct pci_dev *pdev)
 {
     struct amd_iommu_dte *table, *dte;
     unsigned long flags;
-    int req_id, valid = 1;
+    int req_id, valid = 1, rc;
     u8 bus = pdev->bus;
-    const struct domain_iommu *hd = dom_iommu(domain);
+    struct domain_iommu *hd = dom_iommu(domain);
 
-    BUG_ON( !hd->arch.amd.root_table ||
-            !hd->arch.amd.paging_mode ||
-            !iommu->dev_table.buffer );
+    if ( QUARANTINE_SKIP(domain) )
+        return 0;
+
+    BUG_ON(!hd->arch.amd.paging_mode || !iommu->dev_table.buffer);
+
+    rc = allocate_domain_resources(domain);
+    if ( rc )
+        return rc;
 
     if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
         valid = 0;
@@ -153,6 +173,8 @@ static void amd_iommu_setup_domain_device(
 
         amd_iommu_flush_iotlb(devfn, pdev, INV_IOMMU_ALL_PAGES_ADDRESS, 0);
     }
+
+    return 0;
 }
 
 int __init acpi_ivrs_init(void)
@@ -224,18 +246,6 @@ int amd_iommu_alloc_root(struct domain *d)
     return 0;
 }
 
-static int __must_check allocate_domain_resources(struct domain *d)
-{
-    struct domain_iommu *hd = dom_iommu(d);
-    int rc;
-
-    spin_lock(&hd->arch.mapping_lock);
-    rc = amd_iommu_alloc_root(d);
-    spin_unlock(&hd->arch.mapping_lock);
-
-    return rc;
-}
-
 static int amd_iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
@@ -284,6 +294,9 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
     unsigned long flags;
     int req_id;
     u8 bus = pdev->bus;
+
+    if ( QUARANTINE_SKIP(domain) )
+        return;
 
     BUG_ON ( iommu->dev_table.buffer == NULL );
     req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
@@ -354,11 +367,10 @@ static int reassign_device(struct domain *source, struct domain *target,
         pdev->domain = target;
     }
 
-    rc = allocate_domain_resources(target);
+    rc = amd_iommu_setup_domain_device(target, iommu, devfn, pdev);
     if ( rc )
         return rc;
 
-    amd_iommu_setup_domain_device(target, iommu, devfn, pdev);
     AMD_IOMMU_DEBUG("Re-assign %pp from dom%d to dom%d\n",
                     &pdev->sbdf, source->domain_id, target->domain_id);
 
@@ -465,8 +477,7 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
         amd_iommu_flush_device(iommu, bdf);
     }
 
-    amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
-    return 0;
+    return amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
 }
 
 static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)

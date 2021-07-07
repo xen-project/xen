@@ -42,6 +42,9 @@
 #include "vtd.h"
 #include "../ats.h"
 
+/* dom_io is used as a sentinel for quarantined devices */
+#define QUARANTINE_SKIP(d) ((d) == dom_io && !dom_iommu(d)->arch.vtd.pgd_maddr)
+
 struct mapped_rmrr {
     struct list_head list;
     u64 base, end;
@@ -1342,6 +1345,9 @@ int domain_context_mapping_one(
     int rc, ret;
     bool_t flush_dev_iotlb;
 
+    if ( QUARANTINE_SKIP(domain) )
+        return 0;
+
     ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
     maddr = bus_to_context_maddr(iommu, bus);
@@ -1584,6 +1590,9 @@ int domain_context_unmap_one(
     int iommu_domid, rc, ret;
     bool_t flush_dev_iotlb;
 
+    if ( QUARANTINE_SKIP(domain) )
+        return 0;
+
     ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
 
@@ -1658,7 +1667,7 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
 {
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
-    int ret = 0;
+    int ret;
     u8 seg = pdev->seg, bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
     int found = 0;
 
@@ -1673,14 +1682,12 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:Hostbridge: skip %pp unmap\n",
                    domain, &PCI_SBDF3(seg, bus, devfn));
-        if ( !is_hardware_domain(domain) )
-            return -EPERM;
-        goto out;
+        return is_hardware_domain(domain) ? 0 : -EPERM;
 
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
     case DEV_TYPE_LEGACY_PCI_BRIDGE:
-        goto out;
+        return 0;
 
     case DEV_TYPE_PCIe_ENDPOINT:
         if ( iommu_debug )
@@ -1734,12 +1741,11 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
     default:
         dprintk(XENLOG_ERR VTDPREFIX, "%pd:unknown(%u): %pp\n",
                 domain, pdev->type, &PCI_SBDF3(seg, bus, devfn));
-        ret = -EINVAL;
-        goto out;
+        return -EINVAL;
     }
 
-    if ( ret )
-        goto out;
+    if ( ret || QUARANTINE_SKIP(domain) )
+        return ret;
 
     /*
      * if no other devices under the same iommu owned by this domain,
@@ -1764,8 +1770,7 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
         cleanup_domid_map(domain, iommu);
     }
 
-out:
-    return ret;
+    return 0;
 }
 
 static void iommu_clear_root_pgtable(struct domain *d)

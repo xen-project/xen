@@ -31,8 +31,23 @@ bool_t __initdata iommu_enable = 1;
 bool_t __read_mostly iommu_enabled;
 bool_t __read_mostly force_iommu;
 bool_t __read_mostly iommu_verbose;
-bool __read_mostly iommu_quarantine = true;
 bool_t __read_mostly iommu_crash_disable;
+
+#define IOMMU_quarantine_none         0 /* aka false */
+#define IOMMU_quarantine_basic        1 /* aka true */
+#define IOMMU_quarantine_scratch_page 2
+#ifdef CONFIG_HAS_PCI
+uint8_t __read_mostly iommu_quarantine =
+# if defined(CONFIG_IOMMU_QUARANTINE_NONE)
+    IOMMU_quarantine_none;
+# elif defined(CONFIG_IOMMU_QUARANTINE_BASIC)
+    IOMMU_quarantine_basic;
+# elif defined(CONFIG_IOMMU_QUARANTINE_SCRATCH_PAGE)
+    IOMMU_quarantine_scratch_page;
+# endif
+#else
+# define iommu_quarantine IOMMU_quarantine_none
+#endif /* CONFIG_HAS_PCI */
 
 static bool __hwdom_initdata iommu_hwdom_none;
 bool __hwdom_initdata iommu_hwdom_strict;
@@ -64,8 +79,12 @@ static int __init parse_iommu_param(const char *s)
         else if ( (val = parse_boolean("force", s, ss)) >= 0 ||
                   (val = parse_boolean("required", s, ss)) >= 0 )
             force_iommu = val;
+#ifdef CONFIG_HAS_PCI
         else if ( (val = parse_boolean("quarantine", s, ss)) >= 0 )
             iommu_quarantine = val;
+        else if ( ss == s + 15 && !strncmp(s, "quarantine=scratch-page", 23) )
+            iommu_quarantine = IOMMU_quarantine_scratch_page;
+#endif
 #ifdef CONFIG_X86
         else if ( (val = parse_boolean("igfx", s, ss)) >= 0 )
             iommu_igfx = val;
@@ -432,7 +451,7 @@ static int __init iommu_quarantine_init(void)
     dom_io->options |= XEN_DOMCTL_CDF_iommu;
 
     rc = iommu_domain_init(dom_io, 0);
-    if ( rc )
+    if ( rc || iommu_quarantine < IOMMU_quarantine_scratch_page )
         return rc;
 
     if ( !hd->platform_ops->quarantine_init )

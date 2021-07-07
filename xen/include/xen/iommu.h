@@ -53,7 +53,9 @@ static inline bool_t dfn_eq(dfn_t x, dfn_t y)
 
 #ifdef CONFIG_HAS_PASSTHROUGH
 extern bool_t iommu_enable, iommu_enabled;
-extern bool force_iommu, iommu_quarantine, iommu_verbose;
+extern bool force_iommu, iommu_verbose;
+/* Boolean except for the specific purposes of drivers/passthrough/iommu.c. */
+extern uint8_t iommu_quarantine;
 #else
 #define iommu_enabled false
 #endif
