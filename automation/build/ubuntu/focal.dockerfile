@@ -44,6 +44,8 @@ RUN apt-get update && \
         wget \
         git \
         nasm \
+        # QEMU
+        ninja-build \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

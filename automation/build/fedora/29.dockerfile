@@ -2,9 +2,6 @@ FROM fedora:29
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
-RUN mkdir /build
-WORKDIR /build
-
 # install Xen depends
 RUN dnf -y install \
         clang \
@@ -43,5 +40,11 @@ RUN dnf -y install \
         ocaml \
         ocaml-findlib \
         golang \
+        # QEMU
+        ninja-build \
     && dnf clean all && \
     rm -rf /var/cache/dnf
+
+RUN useradd --create-home user
+USER user
+WORKDIR /build

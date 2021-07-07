@@ -67,5 +67,7 @@ RUN zypper install -y --no-recommends \
         which \
         xz-devel \
         zlib-devel \
+        # QEMU
+        ninja \
         && \
         zypper clean -a

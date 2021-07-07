@@ -47,6 +47,7 @@ RUN \
   apk add glib-dev && \
   apk add libattr && \
   apk add libcap-ng-dev && \
+  apk add ninja && \
   apk add pixman-dev && \
   \
   # cleanup
