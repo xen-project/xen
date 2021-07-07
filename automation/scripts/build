@@ -45,8 +45,9 @@ if ! test -z "$(ldd /bin/ls|grep musl|head -1)"; then
     cfgargs+=("--with-system-seabios=/bin/false")
 fi
 
-# Qemu requires Python 3.5 or later
-if ! type python3 || python3 -c "import sys; res = sys.version_info < (3, 5); exit(not(res))"; then
+# Qemu requires Python 3.5 or later, and ninja
+if ! type python3 || python3 -c "import sys; res = sys.version_info < (3, 5); exit(not(res))" \
+        || ! type ninja; then
     cfgargs+=("--with-system-qemu=/bin/false")
 fi
 
