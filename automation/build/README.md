@@ -91,5 +91,17 @@ you have access to do so and have your Docker logged into the registry.
 To login you must run `docker login registry.gitlab.com`. For more
 information see the [registry help].
 
+This example shows how to refresh a container for a rolling release
+such as openSUSE Tumbleweed. Login with the gitlab.com credentials.
+
+```
+docker login registry.gitlab.com/xen-project/xen
+make -C automation/build suse/opensuse-tumbleweed
+env CONTAINER_NO_PULL=1 \
+  CONTAINER=tumbleweed \
+  automation/scripts/containerize bash -exc './configure && make'
+make -C automation/build suse/opensuse-tumbleweed PUSH=1
+```
+
 [registry]: https://gitlab.com/xen-project/xen/container_registry
 [registry help]: https://gitlab.com/help/user/project/container_registry
