@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+test -f /etc/os-release && cat "$_"
+
 $CC --version
 
 # Express the compiler version as an integer.  e.g. GCC 4.9.2 => 0x040902
