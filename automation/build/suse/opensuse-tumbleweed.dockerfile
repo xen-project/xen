@@ -7,7 +7,7 @@ ENV USER root
 RUN mkdir /build
 WORKDIR /build
 
-RUN zypper ref && zypper up -y --no-recommends
+RUN zypper ref && zypper dup -y --no-recommends
 RUN zypper install -y --no-recommends \
         acpica \
         bc \
