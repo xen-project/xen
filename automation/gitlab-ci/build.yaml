@@ -8,6 +8,7 @@
       - binaries/
       - xen-config
       - '*.log'
+      - '*/*.log'
     when: always
   except:
     - master
