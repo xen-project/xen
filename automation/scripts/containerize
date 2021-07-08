@@ -47,10 +47,10 @@ case "_${CONTAINER_UID0}" in
 esac
 
 # Save the commands for future use
-cmd=$@
+cmd=("$@")
 
 # If no command was specified, just drop us into a shell if we're interactive
-[ $# -eq 0 ] && tty -s && cmd="/bin/bash"
+[ $# -eq 0 ] && tty -s && cmd=("/bin/bash")
 
 # Are we in an interactive terminal?
 tty -s && termint=t
@@ -104,4 +104,4 @@ exec ${docker_cmd} run \
     ${CONTAINER_ARGS} \
     -${termint}i --rm -- \
     ${CONTAINER} \
-    ${cmd}
+    "${cmd[@]}"
