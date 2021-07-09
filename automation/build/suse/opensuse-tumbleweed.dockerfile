@@ -58,6 +58,7 @@ RUN zypper install -y --no-recommends \
         pandoc \
         patch \
         pkg-config \
+        'pkgconfig(libpci)' \
         'pkgconfig(sdl)' \
         'pkgconfig(sdl2)' \
         python-devel \
