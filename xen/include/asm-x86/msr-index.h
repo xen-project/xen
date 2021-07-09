@@ -118,6 +118,21 @@
 #define  PASID_PASID_MASK                   0x000fffff
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
 
+#define MSR_K8_SYSCFG                       0xc0010010
+#define  SYSCFG_MTRR_FIX_DRAM_EN            (_AC(1, ULL) << 18)
+#define  SYSCFG_MTRR_FIX_DRAM_MOD_EN        (_AC(1, ULL) << 19)
+#define  SYSCFG_MTRR_VAR_DRAM_EN            (_AC(1, ULL) << 20)
+#define  SYSCFG_MTRR_TOM2_EN                (_AC(1, ULL) << 21)
+#define  SYSCFG_TOM2_FORCE_WB               (_AC(1, ULL) << 22)
+
+#define MSR_K8_IORR_BASE0                   0xc0010016
+#define MSR_K8_IORR_MASK0                   0xc0010017
+#define MSR_K8_IORR_BASE1                   0xc0010018
+#define MSR_K8_IORR_MASK1                   0xc0010019
+
+#define MSR_K8_TSEG_BASE                    0xc0010112 /* AMD doc: SMMAddr */
+#define MSR_K8_TSEG_MASK                    0xc0010113 /* AMD doc: SMMMask */
+
 #define MSR_K8_VM_CR                        0xc0010114
 #define  VM_CR_INIT_REDIRECTION             (_AC(1, ULL) <<  1)
 #define  VM_CR_SVM_DISABLE                  (_AC(1, ULL) <<  4)
@@ -281,11 +296,6 @@
 #define MSR_K8_TOP_MEM1			0xc001001a
 #define MSR_K7_CLK_CTL			0xc001001b
 #define MSR_K8_TOP_MEM2			0xc001001d
-#define MSR_K8_SYSCFG			0xc0010010
-
-#define K8_MTRRFIXRANGE_DRAM_ENABLE	0x00040000 /* MtrrFixDramEn bit    */
-#define K8_MTRRFIXRANGE_DRAM_MODIFY	0x00080000 /* MtrrFixDramModEn bit */
-#define K8_MTRR_RDMEM_WRMEM_MASK	0x18181818 /* Mask: RdMem|WrMem    */
 
 #define MSR_K7_HWCR			0xc0010015
 #define MSR_K8_HWCR			0xc0010015

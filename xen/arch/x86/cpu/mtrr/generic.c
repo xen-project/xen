@@ -224,7 +224,7 @@ static void __init print_mtrr_state(const char *level)
 		uint64_t syscfg, tom2;
 
 		rdmsrl(MSR_K8_SYSCFG, syscfg);
-		if (syscfg & (1 << 21)) {
+		if (syscfg & SYSCFG_MTRR_TOM2_EN) {
 			rdmsrl(MSR_K8_TOP_MEM2, tom2);
 			printk("%sTOM2: %012"PRIx64"%s\n", level, tom2,
 			       syscfg & (1 << 22) ? " (WB)" : "");

@@ -354,6 +354,25 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         *val = msrs->tsc_aux;
         break;
 
+    case MSR_K8_SYSCFG:
+    case MSR_K8_TOP_MEM1:
+    case MSR_K8_TOP_MEM2:
+    case MSR_K8_IORR_BASE0:
+    case MSR_K8_IORR_MASK0:
+    case MSR_K8_IORR_BASE1:
+    case MSR_K8_IORR_MASK1:
+    case MSR_K8_TSEG_BASE:
+    case MSR_K8_TSEG_MASK:
+        if ( !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+            goto gp_fault;
+        if ( !is_hardware_domain(d) )
+            return X86EMUL_UNHANDLEABLE;
+        rdmsrl(msr, *val);
+        if ( msr == MSR_K8_SYSCFG )
+            *val &= (SYSCFG_TOM2_FORCE_WB | SYSCFG_MTRR_TOM2_EN |
+                     SYSCFG_MTRR_VAR_DRAM_EN | SYSCFG_MTRR_FIX_DRAM_EN);
+        break;
+
     case MSR_K8_HWCR:
         if ( !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
             goto gp_fault;

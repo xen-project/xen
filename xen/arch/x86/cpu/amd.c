@@ -468,14 +468,14 @@ static void check_syscfg_dram_mod_en(void)
 		return;
 
 	rdmsrl(MSR_K8_SYSCFG, syscfg);
-	if (!(syscfg & K8_MTRRFIXRANGE_DRAM_MODIFY))
+	if (!(syscfg & SYSCFG_MTRR_FIX_DRAM_MOD_EN))
 		return;
 
 	if (!test_and_set_bool(printed))
 		printk(KERN_ERR "MTRR: SYSCFG[MtrrFixDramModEn] not "
 			"cleared by BIOS, clearing this bit\n");
 
-	syscfg &= ~K8_MTRRFIXRANGE_DRAM_MODIFY;
+	syscfg &= ~SYSCFG_MTRR_FIX_DRAM_MOD_EN;
 	wrmsrl(MSR_K8_SYSCFG, syscfg);
 }
 

@@ -69,7 +69,7 @@ static void __init get_fam10h_pci_mmconf_base(void)
 	rdmsrl(address, val);
 
 	/* TOP_MEM2 is not enabled? */
-	if (!(val & (1<<21))) {
+	if (!(val & SYSCFG_MTRR_TOM2_EN)) {
 		tom2 = 1ULL << 32;
 	} else {
 		/* TOP_MEM2 */
