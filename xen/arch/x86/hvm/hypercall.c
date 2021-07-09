@@ -248,11 +248,11 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         /* Deliberately corrupt parameter regs not used by this hypercall. */
         switch ( hypercall_args_table[eax].native )
         {
-        case 0: rdi = 0xdeadbeefdeadf00dUL;
-        case 1: rsi = 0xdeadbeefdeadf00dUL;
-        case 2: rdx = 0xdeadbeefdeadf00dUL;
-        case 3: r10 = 0xdeadbeefdeadf00dUL;
-        case 4: r8 = 0xdeadbeefdeadf00dUL;
+        case 0: rdi = 0xdeadbeefdeadf00dUL; fallthrough;
+        case 1: rsi = 0xdeadbeefdeadf00dUL; fallthrough;
+        case 2: rdx = 0xdeadbeefdeadf00dUL; fallthrough;
+        case 3: r10 = 0xdeadbeefdeadf00dUL; fallthrough;
+        case 4: r8 = 0xdeadbeefdeadf00dUL; fallthrough;
         case 5: r9 = 0xdeadbeefdeadf00dUL;
         }
 #endif
@@ -266,11 +266,11 @@ int hvm_hypercall(struct cpu_user_regs *regs)
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].native )
             {
-            case 6: regs->r9  = 0xdeadbeefdeadf00dUL;
-            case 5: regs->r8  = 0xdeadbeefdeadf00dUL;
-            case 4: regs->r10 = 0xdeadbeefdeadf00dUL;
-            case 3: regs->rdx = 0xdeadbeefdeadf00dUL;
-            case 2: regs->rsi = 0xdeadbeefdeadf00dUL;
+            case 6: regs->r9  = 0xdeadbeefdeadf00dUL; fallthrough;
+            case 5: regs->r8  = 0xdeadbeefdeadf00dUL; fallthrough;
+            case 4: regs->r10 = 0xdeadbeefdeadf00dUL; fallthrough;
+            case 3: regs->rdx = 0xdeadbeefdeadf00dUL; fallthrough;
+            case 2: regs->rsi = 0xdeadbeefdeadf00dUL; fallthrough;
             case 1: regs->rdi = 0xdeadbeefdeadf00dUL;
             }
         }
