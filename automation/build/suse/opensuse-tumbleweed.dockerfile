@@ -31,7 +31,6 @@ RUN zypper install -y --no-recommends \
         glibc-devel-32bit \
         gzip \
         hostname \
-        libSDL2-devel \
         libaio-devel \
         libbz2-devel \
         libext2fs-devel \
@@ -59,6 +58,8 @@ RUN zypper install -y --no-recommends \
         pandoc \
         patch \
         pkg-config \
+        'pkgconfig(sdl)' \
+        'pkgconfig(sdl2)' \
         python-devel \
         python3-devel \
         systemd-devel \
