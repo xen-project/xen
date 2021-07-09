@@ -474,7 +474,7 @@ int xenstat_collect_vbds(xenstat_node * node)
 				(read_attributes_vbd(dp->d_name, "statistics/wr_req", buf, 256)<=0) ||
 				((ret = sscanf(buf, "%llu", &vbd.wr_reqs)) != 1) ||
 				(read_attributes_vbd(dp->d_name, "statistics/rd_sect", buf, 256)<=0) ||
-				((ret = sscanf(buf, "%llu", &vbd.wr_sects)) != 1) ||
+				((ret = sscanf(buf, "%llu", &vbd.rd_sects)) != 1) ||
 				(read_attributes_vbd(dp->d_name, "statistics/wr_sect", buf, 256)<=0) ||
 				((ret = sscanf(buf, "%llu", &vbd.wr_sects)) != 1))
 			{
