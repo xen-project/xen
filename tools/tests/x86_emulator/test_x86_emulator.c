@@ -5181,6 +5181,8 @@ int main(int argc, char **argv)
 
     for ( j = 0; j < ARRAY_SIZE(blobs); j++ )
     {
+        unsigned int nr;
+
         if ( blobs[j].check_cpu && !blobs[j].check_cpu() )
             continue;
 
@@ -5196,7 +5198,8 @@ int main(int argc, char **argv)
 
         if ( ctxt.addr_size == sizeof(void *) * CHAR_BIT )
         {
-            i = printf("Testing %s native execution...", blobs[j].name);
+            nr = printf("Testing %s native execution...", blobs[j].name);
+
             if ( blobs[j].set_regs )
                 blobs[j].set_regs(&regs);
             asm volatile (
@@ -5212,11 +5215,13 @@ int main(int argc, char **argv)
             );
             if ( !blobs[j].check_regs(&regs) )
                 goto fail;
-            printf("%*sokay\n", i < 40 ? 40 - i : 0, "");
+
+            printf("%*sokay\n", nr < 40 ? 40 - nr : 0, "");
         }
 
-        printf("Testing %s %u-bit code sequence",
-               blobs[j].name, ctxt.addr_size);
+        nr = printf("Testing %s %u-bit code sequence",
+                    blobs[j].name, ctxt.addr_size);
+
         if ( blobs[j].set_regs )
             blobs[j].set_regs(&regs);
         regs.eip = (unsigned long)res;
@@ -5233,7 +5238,10 @@ int main(int argc, char **argv)
                 regs.eip < (unsigned long)res + blobs[j].size )
         {
             if ( (i++ & 8191) == 0 )
+            {
                 printf(".");
+                ++nr;
+            }
             rc = x86_emulate(&ctxt, &emulops);
             if ( rc != X86EMUL_OKAY )
             {
@@ -5242,13 +5250,17 @@ int main(int argc, char **argv)
                 return 1;
             }
         }
-        for ( ; i < 2 * 8192; i += 8192 )
+        for ( ; i < 2 * 8192; i += 8192 ) {
             printf(".");
+            ++nr;
+        }
+
         if ( (regs.eip != 0x12345678) ||
              (regs.esp != ((unsigned long)res + MMAP_SZ)) ||
              !blobs[j].check_regs(&regs) )
             goto fail;
-        printf("okay\n");
+
+        printf("%*sokay\n", nr < 40 ? 40 - nr : 0, "");
     }
 
     return 0;
