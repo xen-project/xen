@@ -48,8 +48,10 @@ RUN zypper install -y --no-recommends \
         libzstd-devel \
         lzo-devel \
         make \
+        meson \
         nasm \
         ncurses-devel \
+        ninja \
         ocaml \
         ocaml-findlib-devel \
         ocaml-ocamlbuild \
