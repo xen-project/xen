@@ -70,9 +70,9 @@ static void init_hygon(struct cpuinfo_x86 *c)
 		__set_bit(X86_FEATURE_ARAT, c->x86_capability);
 
 	if (cpu_has(c, X86_FEATURE_EFRO)) {
-		rdmsrl(MSR_K7_HWCR, value);
+		rdmsrl(MSR_K8_HWCR, value);
 		value |= (1 << 27); /* Enable read-only APERF/MPERF bit */
-		wrmsrl(MSR_K7_HWCR, value);
+		wrmsrl(MSR_K8_HWCR, value);
 	}
 
 	amd_log_freq(c);

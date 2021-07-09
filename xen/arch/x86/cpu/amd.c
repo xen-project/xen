@@ -694,9 +694,9 @@ static void init_amd(struct cpuinfo_x86 *c)
 	 * Errata 122 for all steppings (F+ have it disabled by default)
 	 */
 	if (c->x86 == 15) {
-		rdmsrl(MSR_K7_HWCR, value);
+		rdmsrl(MSR_K8_HWCR, value);
 		value |= 1 << 6;
-		wrmsrl(MSR_K7_HWCR, value);
+		wrmsrl(MSR_K8_HWCR, value);
 	}
 
 	/*
@@ -928,9 +928,9 @@ static void init_amd(struct cpuinfo_x86 *c)
 	}
 
 	if (cpu_has(c, X86_FEATURE_EFRO)) {
-		rdmsr(MSR_K7_HWCR, l, h);
+		rdmsr(MSR_K8_HWCR, l, h);
 		l |= (1 << 27); /* Enable read-only APERF/MPERF bit */
-		wrmsr(MSR_K7_HWCR, l, h);
+		wrmsr(MSR_K8_HWCR, l, h);
 	}
 
 	/* Prevent TSC drift in non single-processor, single-core platforms. */

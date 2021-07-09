@@ -297,7 +297,6 @@
 #define MSR_K7_CLK_CTL			0xc001001b
 #define MSR_K8_TOP_MEM2			0xc001001d
 
-#define MSR_K7_HWCR			0xc0010015
 #define MSR_K8_HWCR			0xc0010015
 #define K8_HWCR_TSC_FREQ_SEL		(1ULL << 24)
 
