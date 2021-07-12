@@ -47,6 +47,16 @@
  *
  */
 
+#ifdef CONFIG_ARM_64
+#define WRITE_SYSREG_SZ(sz, val, sysreg) WRITE_SYSREG((uint##sz##_t)val, sysreg)
+#else
+/*
+ * WRITE_SYSREG{32/64} on arm32 is defined as variadic macro which imposes
+ * on the below macro to be defined like that as well.
+ */
+#define WRITE_SYSREG_SZ(sz, val, sysreg...)  WRITE_SYSREG##sz(val, sysreg)
+#endif
+
 /* The name is passed from the upper macro to workaround macro expansion. */
 #define TVM_REG(sz, func, reg...)                                           \
 static bool func(struct cpu_user_regs *regs, uint##sz##_t *r, bool read)    \
@@ -55,7 +65,7 @@ static bool func(struct cpu_user_regs *regs, uint##sz##_t *r, bool read)    \
     bool cache_enabled = vcpu_has_cache_enabled(v);                         \
                                                                             \
     GUEST_BUG_ON(read);                                                     \
-    WRITE_SYSREG##sz(*r, reg);                                              \
+    WRITE_SYSREG_SZ(sz, *r, reg);                                           \
                                                                             \
     p2m_toggle_cache(v, cache_enabled);                                     \
                                                                             \
