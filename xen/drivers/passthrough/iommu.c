@@ -82,7 +82,7 @@ static int __init parse_iommu_param(const char *s)
 #ifdef CONFIG_HAS_PCI
         else if ( (val = parse_boolean("quarantine", s, ss)) >= 0 )
             iommu_quarantine = val;
-        else if ( ss == s + 15 && !strncmp(s, "quarantine=scratch-page", 23) )
+        else if ( ss == s + 23 && !strncmp(s, "quarantine=scratch-page", 23) )
             iommu_quarantine = IOMMU_quarantine_scratch_page;
 #endif
 #ifdef CONFIG_X86
