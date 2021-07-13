@@ -1385,8 +1385,8 @@ int xc_vcpu_setcontext(xc_interface *xch,
 
 int xc_domain_irq_permission(xc_interface *xch,
                              uint32_t domid,
-                             uint8_t pirq,
-                             uint8_t allow_access)
+                             uint32_t pirq,
+                             bool allow_access)
 {
     DECLARE_DOMCTL;
 

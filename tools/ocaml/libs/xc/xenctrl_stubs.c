@@ -1075,8 +1075,8 @@ CAMLprim value stub_xc_domain_irq_permission(value xch, value domid,
 					     value pirq, value allow)
 {
 	CAMLparam4(xch, domid, pirq, allow);
-	uint8_t c_pirq;
-	uint8_t c_allow;
+	uint32_t c_pirq;
+	bool c_allow;
 	int ret;
 
 	c_pirq = Int_val(pirq);

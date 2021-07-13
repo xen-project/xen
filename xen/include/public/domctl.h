@@ -441,8 +441,9 @@ struct xen_domctl_setdebugging {
 
 /* XEN_DOMCTL_irq_permission */
 struct xen_domctl_irq_permission {
-    uint8_t pirq;
+    uint32_t pirq;
     uint8_t allow_access;    /* flag to specify enable/disable of IRQ access */
+    uint8_t pad[3];
 };
 
 

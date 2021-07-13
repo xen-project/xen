@@ -1385,8 +1385,8 @@ int xc_domain_ioport_permission(xc_interface *xch,
 
 int xc_domain_irq_permission(xc_interface *xch,
                              uint32_t domid,
-                             uint8_t pirq,
-                             uint8_t allow_access);
+                             uint32_t pirq,
+                             bool allow_access);
 
 int xc_domain_iomem_permission(xc_interface *xch,
                                uint32_t domid,
