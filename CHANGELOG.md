@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - XENSTORED_ROOTDIR environment variable from configuartion files and
    initscripts, due to being unused.
 
+### Changed
+ - Quarantining of passed-through PCI devices no longer defaults to directing I/O to a scratch
+   page, matching original post-XSA-302 behavior (albeit the change was also backported, first
+   appearing in 4.12.2 and 4.11.4). Prior (4.13...4.15-like) behavior can be arranged for
+   either by enabling the IOMMU_QUARANTINE_SCRATCH_PAGE setting at build (configuration) time
+   or by passing "iommu=quarantine=scratch-page" on the hypervisor command line.
+
 ## [4.15.0 UNRELEASED](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.15.0) - TBD
 
 ### Added / support upgraded
