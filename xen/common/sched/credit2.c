@@ -3649,6 +3649,8 @@ static void csched2_schedule(
             runq_remove(snext);
             __set_bit(__CSFLAG_scheduled, &snext->flags);
         }
+        else
+            update_load(ops, rqd, snext, 0, now);
 
         /* Clear the idle mask if necessary */
         if ( cpumask_test_cpu(sched_cpu, &rqd->idle) )
