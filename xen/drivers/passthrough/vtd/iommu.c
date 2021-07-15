@@ -1463,8 +1463,14 @@ int domain_context_mapping_one(
     if ( !seg && !rc )
         rc = me_wifi_quirk(domain, bus, devfn, MAP_ME_PHANTOM_FUNC);
 
+    if ( rc )
+        domain_context_unmap_one(domain, iommu, bus, devfn);
+
     return rc;
 }
+
+static int domain_context_unmap(struct domain *d, uint8_t devfn,
+                                struct pci_dev *pdev);
 
 static int domain_context_mapping(struct domain *domain, u8 devfn,
                                   struct pci_dev *pdev)
@@ -1529,16 +1535,21 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
         if ( ret )
             break;
 
-        if ( find_upstream_bridge(seg, &bus, &devfn, &secbus) < 1 )
-            break;
+        if ( (ret = find_upstream_bridge(seg, &bus, &devfn, &secbus)) < 1 )
+        {
+            if ( !ret )
+                break;
+            ret = -ENXIO;
+        }
 
         /*
          * Mapping a bridge should, if anything, pass the struct pci_dev of
          * that bridge. Since bridges don't normally get assigned to guests,
          * their owner would be the wrong one. Pass NULL instead.
          */
-        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn,
-                                         NULL);
+        if ( ret >= 0 )
+            ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn,
+                                             NULL);
 
         /*
          * Devices behind PCIe-to-PCI/PCIx bridge may generate different
@@ -1554,6 +1565,9 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
              (secbus != pdev->bus || pdev->devfn != 0) )
             ret = domain_context_mapping_one(domain, drhd->iommu, secbus, 0,
                                              NULL);
+
+        if ( ret )
+            domain_context_unmap(domain, devfn, pdev);
 
         break;
 
@@ -1634,6 +1648,19 @@ int domain_context_unmap_one(
     if ( !iommu->drhd->segment && !rc )
         rc = me_wifi_quirk(domain, bus, devfn, UNMAP_ME_PHANTOM_FUNC);
 
+    if ( rc && !is_hardware_domain(domain) && domain != dom_io )
+    {
+        if ( domain->is_dying )
+        {
+            printk(XENLOG_ERR "%pd: error %d unmapping %04x:%02x:%02x.%u\n",
+                   domain, rc, iommu->drhd->segment, bus,
+                   PCI_SLOT(devfn), PCI_FUNC(devfn));
+            rc = 0; /* Make upper layers continue in a best effort manner. */
+        }
+        else
+            domain_crash(domain);
+    }
+
     return rc;
 }
 
@@ -1688,17 +1715,29 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
 
         tmp_bus = bus;
         tmp_devfn = devfn;
-        if ( find_upstream_bridge(seg, &tmp_bus, &tmp_devfn, &secbus) < 1 )
+        if ( (ret = find_upstream_bridge(seg, &tmp_bus, &tmp_devfn,
+                                         &secbus)) < 1 )
+        {
+            if ( ret )
+            {
+                ret = -ENXIO;
+                if ( !domain->is_dying &&
+                     !is_hardware_domain(domain) && domain != dom_io )
+                {
+                    domain_crash(domain);
+                    /* Make upper layers continue in a best effort manner. */
+                    ret = 0;
+                }
+            }
             break;
+        }
 
         /* PCIe to PCI/PCIx bridge */
         if ( pdev_type(seg, tmp_bus, tmp_devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
         {
             ret = domain_context_unmap_one(domain, iommu, tmp_bus, tmp_devfn);
-            if ( ret )
-                return ret;
-
-            ret = domain_context_unmap_one(domain, iommu, secbus, 0);
+            if ( !ret )
+                ret = domain_context_unmap_one(domain, iommu, secbus, 0);
         }
         else /* Legacy PCI bridge */
             ret = domain_context_unmap_one(domain, iommu, tmp_bus, tmp_devfn);
