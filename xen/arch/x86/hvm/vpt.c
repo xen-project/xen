@@ -553,13 +553,13 @@ void create_periodic_time(
     pt->cb = cb;
     pt->priv = data;
 
+    init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
+    set_timer(&pt->timer, pt->scheduled);
+
     pt_vcpu_lock(v);
     pt->on_list = 1;
     list_add(&pt->list, &v->arch.hvm.tm_list);
     pt_vcpu_unlock(v);
-
-    init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
-    set_timer(&pt->timer, pt->scheduled);
 
     write_unlock(&v->domain->arch.hvm.pl_time->pt_migrate);
 }
