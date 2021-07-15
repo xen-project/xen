@@ -3368,6 +3368,10 @@ runq_candidate(struct csched2_runqueue_data *rqd,
                         (unsigned char *)&d);
         }
 
+        /* Skip non runnable units that we (temporarily) have in the runq */
+        if ( unlikely(!unit_runnable_state(svc->unit)) )
+            continue;
+
         /* Only consider vcpus that are allowed to run on this processor. */
         if ( !cpumask_test_cpu(cpu, svc->unit->cpu_hard_affinity) )
             continue;
@@ -3401,8 +3405,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
          * some budget, then choose it.
          */
         if ( (yield || svc->credit > snext->credit) &&
-             (!has_cap(svc) || unit_grab_budget(svc)) &&
-             unit_runnable_state(svc->unit) )
+             (!has_cap(svc) || unit_grab_budget(svc)) )
             snext = svc;
 
         /* In any case, if we got this far, break. */
