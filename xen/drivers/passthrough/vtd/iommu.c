@@ -80,9 +80,11 @@ static int domain_iommu_domid(struct domain *d,
         i = find_next_bit(iommu->domid_bitmap, nr_dom, i+1);
     }
 
-    dprintk(XENLOG_ERR VTDPREFIX,
-            "Cannot get valid iommu domid: domid=%d iommu->index=%d\n",
-            d->domain_id, iommu->index);
+    if ( !d->is_dying )
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "Cannot get valid iommu %u domid: %pd\n",
+                iommu->index, d);
+
     return -1;
 }
 
@@ -145,6 +147,17 @@ static int context_get_domain_id(struct context_entry *context,
                     dom_index, nr_dom);
     }
     return domid;
+}
+
+static void cleanup_domid_map(struct domain *domain, struct vtd_iommu *iommu)
+{
+    int iommu_domid = domain_iommu_domid(domain, iommu);
+
+    if ( iommu_domid >= 0 )
+    {
+        clear_bit(iommu_domid, iommu->domid_bitmap);
+        iommu->domid_map[iommu_domid] = 0;
+    }
 }
 
 static void sync_cache(const void *addr, unsigned int size)
@@ -1732,6 +1745,9 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
         goto out;
     }
 
+    if ( ret )
+        goto out;
+
     /*
      * if no other devices under the same iommu owned by this domain,
      * clear iommu in iommu_bitmap and clear domain_id in domid_bitmp
@@ -1751,19 +1767,8 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
 
     if ( found == 0 )
     {
-        int iommu_domid;
-
         clear_bit(iommu->index, &dom_iommu(domain)->arch.vtd.iommu_bitmap);
-
-        iommu_domid = domain_iommu_domid(domain, iommu);
-        if ( iommu_domid == -1 )
-        {
-            ret = -EINVAL;
-            goto out;
-        }
-
-        clear_bit(iommu_domid, iommu->domid_bitmap);
-        iommu->domid_map[iommu_domid] = 0;
+        cleanup_domid_map(domain, iommu);
     }
 
 out:
@@ -1783,6 +1788,7 @@ static void iommu_domain_teardown(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct mapped_rmrr *mrmrr, *tmp;
+    const struct acpi_drhd_unit *drhd;
 
     if ( list_empty(&acpi_drhd_units) )
         return;
@@ -1794,6 +1800,9 @@ static void iommu_domain_teardown(struct domain *d)
     }
 
     ASSERT(!hd->arch.vtd.pgd_maddr);
+
+    for_each_drhd_unit ( drhd )
+        cleanup_domid_map(d, drhd->iommu);
 }
 
 static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,
