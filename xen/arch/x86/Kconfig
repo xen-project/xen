@@ -56,7 +56,7 @@ config PV
 config PV32
 	bool "Support for 32bit PV guests"
 	depends on PV
-	default y
+	default PV_SHIM
 	---help---
 	  The 32bit PV ABI uses Ring1, an area of the x86 architecture which
 	  was deprecated and mostly removed in the AMD64 spec.  As a result,
@@ -67,7 +67,10 @@ config PV32
 	  reduction, or performance reasons.  Backwards compatibility can be
 	  provided via the PV Shim mechanism.
 
-	  If unsure, say Y.
+	  Note that outside of PV Shim, 32-bit PV guests are not security
+	  supported anymore.
+
+	  If unsure, use the default setting.
 
 config PV_LINEAR_PT
        bool "Support for PV linear pagetables"
