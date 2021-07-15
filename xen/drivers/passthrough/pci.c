@@ -968,7 +968,7 @@ static int deassign_device(struct domain *d, uint16_t seg, uint8_t bus,
 
 int pci_release_devices(struct domain *d)
 {
-    struct pci_dev *pdev;
+    struct pci_dev *pdev, *tmp;
     u8 bus, devfn;
     int ret;
 
@@ -979,18 +979,15 @@ int pci_release_devices(struct domain *d)
         pcidevs_unlock();
         return ret;
     }
-    while ( (pdev = pci_get_pdev_by_domain(d, -1, -1, -1)) )
+    list_for_each_entry_safe ( pdev, tmp, &d->pdev_list, domain_list )
     {
         bus = pdev->bus;
         devfn = pdev->devfn;
-        if ( deassign_device(d, pdev->seg, bus, devfn) )
-            printk("domain %d: deassign device (%04x:%02x:%02x.%u) failed!\n",
-                   d->domain_id, pdev->seg, bus,
-                   PCI_SLOT(devfn), PCI_FUNC(devfn));
+        ret = deassign_device(d, pdev->seg, bus, devfn) ?: ret;
     }
     pcidevs_unlock();
 
-    return 0;
+    return ret;
 }
 
 #define PCI_CLASS_BRIDGE_HOST    0x0600
