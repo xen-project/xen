@@ -552,7 +552,7 @@ do {                                                    \
     dest ## _t   = (source ## t)   ?: &scratch_t;       \
 } while (0)
 
-    if ( (rd->domain_id <= ld->domain_id) ||
+    if ( (rd->domain_id < ld->domain_id) ||
          ((rd == ld) && (gfn_x(rgfn) <= gfn_x(lgfn))) )
     {
         assign_pointers(first, r);
