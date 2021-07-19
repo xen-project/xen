@@ -345,10 +345,20 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         xc_domain_set_time_offset(ctx->xch, domid, rtc_timeoffset);
 
     if (d_config->b_info.type != LIBXL_DOMAIN_TYPE_PV) {
-        unsigned long shadow = DIV_ROUNDUP(d_config->b_info.shadow_memkb,
-                                           1024);
-        xc_shadow_control(ctx->xch, domid, XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION,
-                          NULL, 0, &shadow, 0, NULL);
+        unsigned long shadow_mb = DIV_ROUNDUP(d_config->b_info.shadow_memkb,
+                                              1024);
+        int r = xc_shadow_control(ctx->xch, domid,
+                                  XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION,
+                                  NULL, 0, &shadow_mb, 0, NULL);
+
+        if (r) {
+            LOGED(ERROR, domid,
+                  "Failed to set %lu MiB %s allocation",
+                  shadow_mb,
+                  libxl_defbool_val(d_config->c_info.hap) ? "HAP" : "shadow");
+            ret = ERROR_FAIL;
+            goto out;
+        }
     }
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
