@@ -367,7 +367,8 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
             goto gp_fault;
         if ( !is_hardware_domain(d) )
             return X86EMUL_UNHANDLEABLE;
-        rdmsrl(msr, *val);
+        if ( rdmsr_safe(msr, *val) )
+            goto gp_fault;
         if ( msr == MSR_K8_SYSCFG )
             *val &= (SYSCFG_TOM2_FORCE_WB | SYSCFG_MTRR_TOM2_EN |
                      SYSCFG_MTRR_VAR_DRAM_EN | SYSCFG_MTRR_FIX_DRAM_EN);
