@@ -430,7 +430,7 @@ static int vpic_load(struct domain *d, hvm_domain_context_t *h)
 
     /* Which PIC is this? */
     if ( inst > 1 )
-        return -EINVAL;
+        return -ENOENT;
     s = &d->arch.hvm.vpic[inst];
 
     /* Load the state */
