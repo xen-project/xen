@@ -2742,6 +2742,10 @@ In case of B<qemu-xen-traditional> it is expected to be MiniOS-based stubdomain
 image, in case of B<qemu-xen> it is expected to be Linux-based stubdomain
 kernel.
 
+=item B<stubdomain_cmdline="STRING">
+
+Set the device-model stubdomain kernel command line to B<STRING>.
+
 =item B<stubdomain_ramdisk="PATH">
 
 Override the path to the ramdisk image used as device-model stubdomain.

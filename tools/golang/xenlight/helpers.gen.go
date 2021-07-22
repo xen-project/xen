@@ -1018,6 +1018,7 @@ return fmt.Errorf("converting field DeviceModelStubdomain: %v", err)
 }
 x.StubdomainMemkb = uint64(xc.stubdomain_memkb)
 x.StubdomainKernel = C.GoString(xc.stubdomain_kernel)
+x.StubdomainCmdline = C.GoString(xc.stubdomain_cmdline)
 x.StubdomainRamdisk = C.GoString(xc.stubdomain_ramdisk)
 x.DeviceModel = C.GoString(xc.device_model)
 x.DeviceModelSsidref = uint32(xc.device_model_ssidref)
@@ -1344,6 +1345,8 @@ return fmt.Errorf("converting field DeviceModelStubdomain: %v", err)
 xc.stubdomain_memkb = C.uint64_t(x.StubdomainMemkb)
 if x.StubdomainKernel != "" {
 xc.stubdomain_kernel = C.CString(x.StubdomainKernel)}
+if x.StubdomainCmdline != "" {
+xc.stubdomain_cmdline = C.CString(x.StubdomainCmdline)}
 if x.StubdomainRamdisk != "" {
 xc.stubdomain_ramdisk = C.CString(x.StubdomainRamdisk)}
 if x.DeviceModel != "" {

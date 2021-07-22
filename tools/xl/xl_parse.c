@@ -2533,6 +2533,8 @@ skip_usbdev:
 
     xlu_cfg_replace_string (config, "stubdomain_kernel",
                             &b_info->stubdomain_kernel, 0);
+    xlu_cfg_replace_string (config, "stubdomain_cmdline",
+                            &b_info->stubdomain_cmdline, 0);
     xlu_cfg_replace_string (config, "stubdomain_ramdisk",
                             &b_info->stubdomain_ramdisk, 0);
     if (!xlu_cfg_get_long (config, "stubdomain_memory", &l, 0))

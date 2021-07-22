@@ -1031,6 +1031,18 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_BUILDINFO_KERNEL 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_DEVICE_MODEL_STUBDOMAIN
+ *
+ * If this is defined, then the libxl_domain_build_info structure will contain
+ * the following fields that specify options for device model stubdomains:
+ *  - stubdomain_memkb:   integer indicating stubdomain RAM size
+ *  - stubdomain_kernel:  string indicating stubdomain kernel image location
+ *  - stubdomain_cmdline: string of parameters to pass to the stubdomain kernel
+ *  - stubdomain_ramdisk: string indicating stubdomain ramdisk location
+ */
+#define LIBXL_HAVE_BUILDINFO_DEVICE_MODEL_STUBDOMAIN 1
+
+/*
  * LIBXL_HAVE_DEVICE_CHANNEL
  *
  * If this is defined, then the libxl_device_channel struct exists

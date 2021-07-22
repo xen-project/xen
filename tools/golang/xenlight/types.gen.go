@@ -483,6 +483,7 @@ DeviceModelVersion DeviceModelVersion
 DeviceModelStubdomain Defbool
 StubdomainMemkb uint64
 StubdomainKernel string
+StubdomainCmdline string
 StubdomainRamdisk string
 DeviceModel string
 DeviceModelSsidref uint32
