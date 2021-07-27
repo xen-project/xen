@@ -12,15 +12,17 @@
  */
 int (strncmp)(const char *cs, const char *ct, size_t count)
 {
-	register signed char __res = 0;
+	unsigned char *csu = (unsigned char *)cs;
+	unsigned char *ctu = (unsigned char *)ct;
+	int res = 0;
 
 	while (count) {
-		if ((__res = *cs - *ct++) != 0 || !*cs++)
+		if ((res = *csu - *ctu++) != 0 || !*csu++)
 			break;
 		count--;
 	}
 
-	return __res;
+	return res;
 }
 
 /*
