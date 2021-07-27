@@ -1893,8 +1893,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 if (format == NULL) {
                     LOGD(WARN, guest_domid,
                          "Unable to determine disk image format: %s\n"
-                         "Disk will be available via PV drivers but not as an"
-                         "emulated disk.",
+                         "Disk will be available via PV drivers but not as an emulated disk.",
                          disks[i].vdev);
                     continue;
                 }
@@ -1905,8 +1904,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
                 if (!target_path) {
                     LOGD(WARN, guest_domid, "No way to get local access disk to image: %s\n"
-                         "Disk will be available via PV drivers but not as an"
-                         "emulated disk.",
+                         "Disk will be available via PV drivers but not as an emulated disk.",
                          disks[i].vdev);
                     continue;
                 }
