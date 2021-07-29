@@ -64,7 +64,7 @@ TVM_REG(CONTEXTIDR_EL1)
     {                                                                   \
         bool res;                                                       \
                                                                         \
-        res = vreg_emulate_sysreg64(regs, hsr, vreg_emulate_##reg);     \
+        res = vreg_emulate_sysreg(regs, hsr, vreg_emulate_##reg);       \
         ASSERT(res);                                                    \
         break;                                                          \
     }

@@ -1531,7 +1531,7 @@ static bool vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
     case HSR_SYSREG_ICC_SGI1R_EL1:
-        return vreg_emulate_sysreg64(regs, hsr, vgic_v3_emulate_sgi1r);
+        return vreg_emulate_sysreg(regs, hsr, vgic_v3_emulate_sgi1r);
 
     default:
         return false;

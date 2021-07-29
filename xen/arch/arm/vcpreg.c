@@ -57,9 +57,17 @@
 #define WRITE_SYSREG_SZ(sz, val, sysreg...)  WRITE_SYSREG##sz(val, sysreg)
 #endif
 
+/*
+ * type32_t is defined as register_t due to the vreg_emulate_cp32 and
+ * vreg_emulate_sysreg taking function pointer with register_t type used for
+ * passing register's value.
+ */
+typedef register_t type32_t;
+typedef uint64_t type64_t;
+
 /* The name is passed from the upper macro to workaround macro expansion. */
 #define TVM_REG(sz, func, reg...)                                           \
-static bool func(struct cpu_user_regs *regs, uint##sz##_t *r, bool read)    \
+static bool func(struct cpu_user_regs *regs, type##sz##_t *r, bool read)    \
 {                                                                           \
     struct vcpu *v = current;                                               \
     bool cache_enabled = vcpu_has_cache_enabled(v);                         \
@@ -83,7 +91,7 @@ static bool func(struct cpu_user_regs *regs, uint##sz##_t *r, bool read)    \
 
 #else /* CONFIG_ARM_64 */
 #define TVM_REG32_COMBINED(lowreg, hireg, xreg)                             \
-static bool vreg_emulate_##xreg(struct cpu_user_regs *regs, uint32_t *r,    \
+static bool vreg_emulate_##xreg(struct cpu_user_regs *regs, register_t *r,  \
                                 bool read, bool hi)                         \
 {                                                                           \
     struct vcpu *v = current;                                               \
@@ -108,13 +116,13 @@ static bool vreg_emulate_##xreg(struct cpu_user_regs *regs, uint32_t *r,    \
     return true;                                                            \
 }                                                                           \
                                                                             \
-static bool vreg_emulate_##lowreg(struct cpu_user_regs *regs, uint32_t *r,  \
+static bool vreg_emulate_##lowreg(struct cpu_user_regs *regs, register_t *r,\
                                   bool read)                                \
 {                                                                           \
     return vreg_emulate_##xreg(regs, r, read, false);                       \
 }                                                                           \
                                                                             \
-static bool vreg_emulate_##hireg(struct cpu_user_regs *regs, uint32_t *r,   \
+static bool vreg_emulate_##hireg(struct cpu_user_regs *regs, register_t *r, \
                                  bool read)                                 \
 {                                                                           \
     return vreg_emulate_##xreg(regs, r, read, true);                        \

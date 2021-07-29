@@ -484,9 +484,9 @@ extern register_t __cpu_logical_map[];
 #define CNTKCTL_EL1_EL0PTEN  (1u<<9) /* Expose phys timer registers to EL0 */
 
 /* Timer control registers */
-#define CNTx_CTL_ENABLE   (1u<<0)  /* Enable timer */
+#define CNTx_CTL_ENABLE   (1ul<<0)  /* Enable timer */
 #define CNTx_CTL_MASK     (1ul<<1)  /* Mask IRQ */
-#define CNTx_CTL_PENDING  (1u<<2)  /* IRQ pending */
+#define CNTx_CTL_PENDING  (1ul<<2)  /* IRQ pending */
 
 /* Timer frequency mask */
 #define CNTFRQ_MASK       GENMASK(31, 0)

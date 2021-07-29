@@ -4,13 +4,13 @@
 #ifndef __ASM_ARM_VREG__
 #define __ASM_ARM_VREG__
 
-typedef bool (*vreg_reg32_fn_t)(struct cpu_user_regs *regs, uint32_t *r,
-                                   bool read);
 typedef bool (*vreg_reg64_fn_t)(struct cpu_user_regs *regs, uint64_t *r,
+                                   bool read);
+typedef bool (*vreg_reg_fn_t)(struct cpu_user_regs *regs, register_t *r,
                                    bool read);
 
 static inline bool vreg_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr,
-                                     vreg_reg32_fn_t fn)
+                                     vreg_reg_fn_t fn)
 {
     struct hsr_cp32 cp32 = hsr.cp32;
     /*
@@ -18,7 +18,7 @@ static inline bool vreg_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr,
      * implementation error in the emulation (such as not correctly
      * setting r).
      */
-    uint32_t r = 0;
+    register_t r = 0;
     bool ret;
 
     if ( !cp32.read )
@@ -64,11 +64,11 @@ static inline bool vreg_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr,
 }
 
 #ifdef CONFIG_ARM_64
-static inline bool vreg_emulate_sysreg32(struct cpu_user_regs *regs, union hsr hsr,
-                                         vreg_reg32_fn_t fn)
+static inline bool vreg_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr,
+                                         vreg_reg_fn_t fn)
 {
     struct hsr_sysreg sysreg = hsr.sysreg;
-    uint32_t r = 0;
+    register_t r = 0;
     bool ret;
 
     if ( !sysreg.read )
@@ -81,30 +81,6 @@ static inline bool vreg_emulate_sysreg32(struct cpu_user_regs *regs, union hsr h
 
     return ret;
 }
-
-static inline bool vreg_emulate_sysreg64(struct cpu_user_regs *regs, union hsr hsr,
-                                         vreg_reg64_fn_t fn)
-{
-    struct hsr_sysreg sysreg = hsr.sysreg;
-    /*
-     * Initialize to zero to avoid leaking data if there is an
-     * implementation error in the emulation (such as not correctly
-     * setting x).
-     */
-    uint64_t x = 0;
-    bool ret;
-
-    if ( !sysreg.read )
-        x = get_user_reg(regs, sysreg.reg);
-
-    ret = fn(regs, &x, sysreg.read);
-
-    if ( ret && sysreg.read )
-        set_user_reg(regs, sysreg.reg, x);
-
-    return ret;
-}
-
 #endif
 
 #define VREG_REG_MASK(size) ((~0UL) >> (BITS_PER_LONG - ((1 << (size)) * 8)))

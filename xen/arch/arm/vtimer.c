@@ -162,7 +162,8 @@ void virt_timer_restore(struct vcpu *v)
     WRITE_SYSREG(v->arch.virt_timer.ctl, CNTV_CTL_EL0);
 }
 
-static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, bool read)
+static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, register_t *r,
+                            bool read)
 {
     struct vcpu *v = current;
     s_time_t expires;
@@ -197,7 +198,7 @@ static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, bool read)
     return true;
 }
 
-static bool vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r,
+static bool vtimer_cntp_tval(struct cpu_user_regs *regs, register_t *r,
                              bool read)
 {
     struct vcpu *v = current;
@@ -316,11 +317,11 @@ static bool vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
     case HSR_SYSREG_CNTP_CTL_EL0:
-        return vreg_emulate_sysreg32(regs, hsr, vtimer_cntp_ctl);
+        return vreg_emulate_sysreg(regs, hsr, vtimer_cntp_ctl);
     case HSR_SYSREG_CNTP_TVAL_EL0:
-        return vreg_emulate_sysreg32(regs, hsr, vtimer_cntp_tval);
+        return vreg_emulate_sysreg(regs, hsr, vtimer_cntp_tval);
     case HSR_SYSREG_CNTP_CVAL_EL0:
-        return vreg_emulate_sysreg64(regs, hsr, vtimer_cntp_cval);
+        return vreg_emulate_sysreg(regs, hsr, vtimer_cntp_cval);
 
     default:
         return false;
