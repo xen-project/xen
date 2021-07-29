@@ -2574,7 +2574,8 @@ const char *dump_state_node_perms(FILE *fp, const struct xs_permissions *perms,
 	return NULL;
 }
 
-static const char *dump_state_node_tree(FILE *fp, char *path)
+static const char *dump_state_node_tree(FILE *fp, char *path,
+					unsigned int path_max_len)
 {
 	unsigned int pathlen, childlen, p = 0;
 	struct xs_state_record_header head;
@@ -2642,10 +2643,10 @@ static const char *dump_state_node_tree(FILE *fp, char *path)
 	}
 	while (p < hdr->childlen) {
 		childlen = strlen(child) + 1;
-		if (pathlen + childlen > XENSTORE_ABS_PATH_MAX)
+		if (pathlen + childlen > path_max_len)
 			return "Dump node path length error";
 		strcpy(path + pathlen, child);
-		ret = dump_state_node_tree(fp, path);
+		ret = dump_state_node_tree(fp, path, path_max_len);
 		if (ret)
 			return ret;
 		p += childlen;
@@ -2661,13 +2662,13 @@ const char *dump_state_nodes(FILE *fp, const void *ctx)
 {
 	char *path;
 
-	path = talloc_size(ctx, XENSTORE_ABS_PATH_MAX);
+	path = talloc_size(ctx, XENSTORE_ABS_PATH_MAX + 1);
 	if (!path)
 		return "Path buffer allocation error";
 
 	strcpy(path, "/");
 
-	return dump_state_node_tree(fp, path);
+	return dump_state_node_tree(fp, path, XENSTORE_ABS_PATH_MAX + 1);
 }
 
 void read_state_global(const void *ctx, const void *state)
