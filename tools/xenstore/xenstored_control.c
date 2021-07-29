@@ -795,10 +795,8 @@ static int do_control_lu(void *ctx, struct connection *conn,
 				return EINVAL;
 		}
 		ret = lu_start(ctx, conn, force, to);
-		if (errno)
-			return errno;
 		if (!ret)
-			return 0;
+			return errno;
 	} else {
 		errno = 0;
 		ret = lu_arch(ctx, conn, vec, num);
