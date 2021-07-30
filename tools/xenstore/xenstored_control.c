@@ -324,6 +324,7 @@ static const char *lu_binary_alloc(const void *ctx, struct connection *conn,
 	lu_status->kernel_size = size;
 	lu_status->kernel_off = 0;
 
+	errno = 0;
 	return NULL;
 }
 
@@ -339,6 +340,7 @@ static const char *lu_binary_save(const void *ctx, struct connection *conn,
 	memcpy(lu_status->kernel + lu_status->kernel_off, data, size);
 	lu_status->kernel_off += size;
 
+	errno = 0;
 	return NULL;
 }
 
@@ -413,6 +415,7 @@ static const char *lu_binary(const void *ctx, struct connection *conn,
 	if (!lu_status->filename)
 		return "Allocation failure.";
 
+	errno = 0;
 	return NULL;
 }
 
@@ -798,9 +801,8 @@ static int do_control_lu(void *ctx, struct connection *conn,
 		if (!ret)
 			return errno;
 	} else {
-		errno = 0;
 		ret = lu_arch(ctx, conn, vec, num);
-		if (errno)
+		if (!ret && errno)
 			return errno;
 	}
 
