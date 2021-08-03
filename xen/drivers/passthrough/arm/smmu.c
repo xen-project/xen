@@ -32,6 +32,9 @@
  *	- 4k and 64k pages, with contiguous pte hints.
  *	- Up to 48-bit addressing (dependent on VA_BITS)
  *	- Context fault reporting
+ *
+ * Changes compared to Linux driver:
+ *	- support for fwspec
  */
 
 
@@ -49,6 +52,7 @@
 #include <asm/atomic.h>
 #include <asm/device.h>
 #include <asm/io.h>
+#include <asm/iommu_fwspec.h>
 #include <asm/platform.h>
 
 /* Xen: The below defines are redefined within the file. Undef it */
@@ -617,13 +621,11 @@ struct arm_smmu_smr {
 
 struct arm_smmu_master_cfg {
 	struct arm_smmu_device		*smmu;
-	int				num_streamids;
-	u16				streamids[MAX_MASTER_STREAMIDS];
 	s16				smendx[MAX_MASTER_STREAMIDS];
 };
 #define INVALID_SMENDX			-1
-#define for_each_cfg_sme(cfg, i, idx) \
-	for (i = 0; idx = cfg->smendx[i], i < cfg->num_streamids; ++i)
+#define for_each_cfg_sme(cfg, i, idx, num) \
+	for (i = 0; idx = cfg->smendx[i], i < num; ++i)
 
 struct arm_smmu_master {
 	struct device_node		*of_node;
@@ -712,6 +714,14 @@ static struct arm_smmu_option_prop arm_smmu_options[] = {
 	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "calxeda,smmu-secure-config-access" },
 	{ 0, NULL},
 };
+
+static inline struct iommu_fwspec *
+arm_smmu_get_fwspec(struct arm_smmu_master_cfg *cfg)
+{
+	struct arm_smmu_master *master = container_of(cfg,
+			                                      struct arm_smmu_master, cfg);
+	return dev_iommu_fwspec_get(&master->of_node->dev);
+}
 
 static void parse_driver_options(struct arm_smmu_device *smmu)
 {
@@ -806,8 +816,9 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
 				struct device *dev,
 				struct of_phandle_args *masterspec)
 {
-	int i;
+	int i, ret = 0;
 	struct arm_smmu_master *master;
+	struct iommu_fwspec *fwspec;
 
 	master = find_smmu_master(smmu, masterspec->np);
 	if (master) {
@@ -817,24 +828,30 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
 		return -EBUSY;
 	}
 
-	if (masterspec->args_count > MAX_MASTER_STREAMIDS) {
-		dev_err(dev,
-			"reached maximum number (%d) of stream IDs for master device %s\n",
-			MAX_MASTER_STREAMIDS, masterspec->np->name);
-		return -ENOSPC;
-	}
-
 	master = devm_kzalloc(dev, sizeof(*master), GFP_KERNEL);
 	if (!master)
 		return -ENOMEM;
+	master->of_node = masterspec->np;
 
-	master->of_node			= masterspec->np;
-	master->cfg.num_streamids	= masterspec->args_count;
+	ret = iommu_fwspec_init(&master->of_node->dev, smmu->dev);
+	if (ret) {
+		kfree(master);
+		return ret;
+	}
+
+	/* adding the ids here */
+	ret = iommu_fwspec_add_ids(&masterspec->np->dev,
+				   masterspec->args,
+				   masterspec->args_count);
+	if (ret)
+		return ret;
+
+	fwspec = dev_iommu_fwspec_get(dev);
 
 	/* Xen: Let Xen know that the device is protected by an SMMU */
 	dt_device_set_protected(masterspec->np);
 
-	for (i = 0; i < master->cfg.num_streamids; ++i) {
+	for (i = 0; i < fwspec->num_ids; ++i) {
 		u16 streamid = masterspec->args[i];
 
 		if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) &&
@@ -844,7 +861,6 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
 				masterspec->np->name, smmu->num_mapping_groups);
 			return -ERANGE;
 		}
-		master->cfg.streamids[i] = streamid;
 		master->cfg.smendx[i] = INVALID_SMENDX;
 	}
 	return insert_smmu_master(smmu, master);
@@ -1500,22 +1516,23 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 	struct arm_smmu_device *smmu = cfg->smmu;
 	struct arm_smmu_smr *smrs = smmu->smrs;
 	int i, idx, ret;
+	struct iommu_fwspec *fwspec = arm_smmu_get_fwspec(cfg);
 
 	spin_lock(&smmu->stream_map_lock);
 	/* Figure out a viable stream map entry allocation */
-	for_each_cfg_sme(cfg, i, idx) {
+	for_each_cfg_sme(cfg, i, idx, fwspec->num_ids) {
 		if (idx != INVALID_SMENDX) {
 			ret = -EEXIST;
 			goto out_err;
 		}
 
-		ret = arm_smmu_find_sme(smmu, cfg->streamids[i], 0);
+		ret = arm_smmu_find_sme(smmu, fwspec->ids[i], 0);
 		if (ret < 0)
 			goto out_err;
 
 		idx = ret;
 		if (smrs && smmu->s2crs[idx].count == 0) {
-			smrs[idx].id = cfg->streamids[i];
+			smrs[idx].id = fwspec->ids[i];
 			smrs[idx].mask = 0; /* We don't currently share SMRs */
 			smrs[idx].valid = true;
 		}
@@ -1524,7 +1541,7 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 	}
 
 	/* It worked! Now, poke the actual hardware */
-	for_each_cfg_sme(cfg, i, idx) {
+	for_each_cfg_sme(cfg, i, idx, fwspec->num_ids) {
 		arm_smmu_write_sme(smmu, idx);
 	}
 
@@ -1544,9 +1561,10 @@ static void arm_smmu_master_free_smes(struct arm_smmu_master_cfg *cfg)
 {
     struct arm_smmu_device *smmu = cfg->smmu;
 	int i, idx;
+	struct iommu_fwspec *fwspec = arm_smmu_get_fwspec(cfg);
 
 	spin_lock(&smmu->stream_map_lock);
-	for_each_cfg_sme(cfg, i, idx) {
+	for_each_cfg_sme(cfg, i, idx, fwspec->num_ids) {
 		if (arm_smmu_free_sme(smmu, idx))
 			arm_smmu_write_sme(smmu, idx);
 		cfg->smendx[i] = INVALID_SMENDX;
@@ -1562,8 +1580,9 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
 	enum arm_smmu_s2cr_type type = S2CR_TYPE_TRANS;
 	u8 cbndx = smmu_domain->cfg.cbndx;
 	int i, idx;
+	struct iommu_fwspec *fwspec = arm_smmu_get_fwspec(cfg);
 
-	for_each_cfg_sme(cfg, i, idx) {
+	for_each_cfg_sme(cfg, i, idx, fwspec->num_ids) {
 		if (type == s2cr[idx].type && cbndx == s2cr[idx].cbndx)
 			continue;
 
@@ -1962,6 +1981,7 @@ static int arm_smmu_add_device(struct device *dev)
 	struct arm_smmu_master_cfg *cfg;
 	struct iommu_group *group;
 	void (*releasefn)(void *) = NULL;
+	int ret;
 
 	smmu = find_smmu_for_device(dev);
 	if (!smmu)
@@ -1969,19 +1989,26 @@ static int arm_smmu_add_device(struct device *dev)
 
 	if (dev_is_pci(dev)) {
 		struct pci_dev *pdev = to_pci_dev(dev);
+		struct iommu_fwspec *fwspec;
 
 		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
 		if (!cfg) {
 			return -ENOMEM;
 		}
 
-		cfg->num_streamids = 1;
+		ret = iommu_fwspec_init(dev, smmu->dev);
+		if (ret) {
+			kfree(cfg);
+			return ret;
+		}
+		fwspec = dev_iommu_fwspec_get(dev);
+
 		/*
 		 * Assume Stream ID == Requester ID for now.
 		 * We need a way to describe the ID mappings in FDT.
 		 */
 		pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
-				       &cfg->streamids[0]);
+				       &fwspec->ids[0]);
 		releasefn = __arm_smmu_release_pci_iommudata;
 		cfg->smmu = smmu;
 	} else {
