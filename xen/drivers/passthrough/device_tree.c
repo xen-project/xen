@@ -140,8 +140,12 @@ int iommu_add_dt_device(struct dt_device_node *np)
     if ( !ops )
         return -EINVAL;
 
+    /*
+     * The device may already have been registered. As there is no harm in
+     * it just return success early.
+     */
     if ( dev_iommu_fwspec_get(dev) )
-        return -EEXIST;
+        return 0;
 
     /*
      * According to the Documentation/devicetree/bindings/iommu/iommu.txt
@@ -249,12 +253,7 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
             return -EINVAL;
 
         ret = iommu_add_dt_device(dev);
-        /*
-         * Ignore "-EEXIST" error code as it would mean that the device is
-         * already added to the IOMMU (positive result). Such happens after
-         * re-creating guest domain.
-         */
-        if ( ret < 0 && ret != -EEXIST )
+        if ( ret < 0 )
         {
             printk(XENLOG_G_ERR "Failed to add %s to the IOMMU\n",
                    dt_node_full_name(dev));
