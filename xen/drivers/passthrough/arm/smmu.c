@@ -812,58 +812,64 @@ static int insert_smmu_master(struct arm_smmu_device *smmu,
 	return 0;
 }
 
-static int register_smmu_master(struct arm_smmu_device *smmu,
-				struct device *dev,
-				struct of_phandle_args *masterspec)
+static int arm_smmu_dt_add_device_legacy(struct arm_smmu_device *smmu,
+					 struct device *dev,
+					 struct iommu_fwspec *fwspec)
 {
-	int i, ret = 0;
+	int i;
 	struct arm_smmu_master *master;
-	struct iommu_fwspec *fwspec;
+	struct device_node *dev_node = dev_get_dev_node(dev);
 
-	master = find_smmu_master(smmu, masterspec->np);
+	master = find_smmu_master(smmu, dev_node);
 	if (master) {
 		dev_err(dev,
 			"rejecting multiple registrations for master device %s\n",
-			masterspec->np->name);
+			dev_node->name);
 		return -EBUSY;
 	}
 
 	master = devm_kzalloc(dev, sizeof(*master), GFP_KERNEL);
 	if (!master)
 		return -ENOMEM;
-	master->of_node = masterspec->np;
+	master->of_node = dev_node;
 
-	ret = iommu_fwspec_init(&master->of_node->dev, smmu->dev);
-	if (ret) {
-		kfree(master);
-		return ret;
+	/* Xen: Let Xen know that the device is protected by an SMMU */
+	dt_device_set_protected(dev_node);
+
+	for (i = 0; i < fwspec->num_ids; ++i) {
+		if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) &&
+		     (fwspec->ids[i] >= smmu->num_mapping_groups)) {
+			dev_err(dev,
+				"stream ID for master device %s greater than maximum allowed (%d)\n",
+				dev_node->name, smmu->num_mapping_groups);
+			return -ERANGE;
+		}
+		master->cfg.smendx[i] = INVALID_SMENDX;
 	}
+	return insert_smmu_master(smmu, master);
+}
 
-	/* adding the ids here */
+static int register_smmu_master(struct arm_smmu_device *smmu,
+				struct device *dev,
+				struct of_phandle_args *masterspec)
+{
+	int ret = 0;
+	struct iommu_fwspec *fwspec;
+
+	ret = iommu_fwspec_init(&masterspec->np->dev, smmu->dev);
+	if (ret)
+		return ret;
+
 	ret = iommu_fwspec_add_ids(&masterspec->np->dev,
 				   masterspec->args,
 				   masterspec->args_count);
 	if (ret)
 		return ret;
 
-	fwspec = dev_iommu_fwspec_get(dev);
-
-	/* Xen: Let Xen know that the device is protected by an SMMU */
-	dt_device_set_protected(masterspec->np);
-
-	for (i = 0; i < fwspec->num_ids; ++i) {
-		u16 streamid = masterspec->args[i];
-
-		if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) &&
-		     (streamid >= smmu->num_mapping_groups)) {
-			dev_err(dev,
-				"stream ID for master device %s greater than maximum allowed (%d)\n",
-				masterspec->np->name, smmu->num_mapping_groups);
-			return -ERANGE;
-		}
-		master->cfg.smendx[i] = INVALID_SMENDX;
-	}
-	return insert_smmu_master(smmu, master);
+	fwspec = dev_iommu_fwspec_get(&masterspec->np->dev);
+	return arm_smmu_dt_add_device_legacy(smmu,
+					     &masterspec->np->dev,
+					     fwspec);
 }
 
 static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
