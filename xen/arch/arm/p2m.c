@@ -11,6 +11,7 @@
 #include <asm/flushtlb.h>
 #include <asm/guest_walk.h>
 #include <asm/page.h>
+#include <asm/traps.h>
 
 #define MAX_VMID_8_BIT  (1UL << 8)
 #define MAX_VMID_16_BIT (1UL << 16)
@@ -1166,10 +1167,15 @@ static void p2m_invalidate_table(struct p2m_domain *p2m, mfn_t mfn)
 /*
  * Invalidate all entries in the root page-tables. This is
  * useful to get fault on entry and do an action.
+ *
+ * p2m_invalid_root() should not be called when the P2M is shared with
+ * the IOMMU because it will cause IOMMU fault.
  */
 void p2m_invalidate_root(struct p2m_domain *p2m)
 {
     unsigned int i;
+
+    ASSERT(!iommu_use_hap_pt(p2m->domain));
 
     p2m_write_lock(p2m);
 
@@ -1815,10 +1821,19 @@ void p2m_flush_vm(struct vcpu *v)
  *
  *  - Once the caches are enabled, we stop trapping VM ops.
  */
-void p2m_set_way_flush(struct vcpu *v)
+void p2m_set_way_flush(struct vcpu *v, struct cpu_user_regs *regs,
+                       const union hsr hsr)
 {
     /* This function can only work with the current vCPU. */
     ASSERT(v == current);
+
+    if ( iommu_use_hap_pt(current->domain) )
+    {
+        gprintk(XENLOG_ERR,
+                "The cache should be flushed by VA rather than by set/way.\n");
+        inject_undef_exception(regs, hsr);
+        return;
+    }
 
     if ( !(v->arch.hcr_el2 & HCR_TVM) )
     {
