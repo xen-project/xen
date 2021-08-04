@@ -98,7 +98,7 @@ void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_DCCSW:
     case HSR_SYSREG_DCCISW:
         if ( !hsr.sysreg.read )
-            p2m_set_way_flush(current);
+            p2m_set_way_flush(current, regs, hsr);
         break;
 
     /*

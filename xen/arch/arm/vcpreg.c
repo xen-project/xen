@@ -204,7 +204,7 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(DCCSW):
     case HSR_CPREG32(DCCISW):
         if ( !cp32.read )
-            p2m_set_way_flush(current);
+            p2m_set_way_flush(current, regs, hsr);
         break;
 
     /*

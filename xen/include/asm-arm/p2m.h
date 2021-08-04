@@ -7,6 +7,7 @@
 #include <xen/mem_access.h>
 
 #include <asm/current.h>
+#include <asm/hsr.h>
 
 #define paddr_bits PADDR_BITS
 
@@ -263,7 +264,8 @@ void p2m_invalidate_root(struct p2m_domain *p2m);
  */
 int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end);
 
-void p2m_set_way_flush(struct vcpu *v);
+void p2m_set_way_flush(struct vcpu *v, struct cpu_user_regs *regs,
+                       const union hsr hsr);
 
 void p2m_toggle_cache(struct vcpu *v, bool was_enabled);
 
