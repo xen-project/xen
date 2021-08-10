@@ -378,13 +378,19 @@ delete-unfresh-files:
 		rm -f include/xen/compile.h; \
 	fi
 
-.banner: Makefile
-	@if which figlet >/dev/null 2>&1 ; then \
-		echo " Xen $(XEN_FULLVERSION)" | figlet -f tools/xen.flf > $@.tmp; \
-	else \
-		echo " Xen $(XEN_FULLVERSION)" > $@.tmp; \
-	fi
-	@mv -f $@.tmp $@
+quiet_cmd_banner = BANNER  $@
+define cmd_banner
+    if which figlet >/dev/null 2>&1 ; then \
+	echo " Xen $(XEN_FULLVERSION)" | figlet -f $< > $@.tmp; \
+    else \
+	echo " Xen $(XEN_FULLVERSION)" > $@.tmp; \
+    fi; \
+    mv -f $@.tmp $@
+endef
+
+.banner: tools/xen.flf FORCE
+	$(call if_changed,banner)
+targets += .banner
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
 include/xen/compile.h: include/xen/compile.h.in .banner
