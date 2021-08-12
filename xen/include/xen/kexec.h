@@ -17,7 +17,7 @@ typedef struct xen_kexec_reserve {
 extern xen_kexec_reserve_t kexec_crash_area;
 extern paddr_t kexec_crash_area_limit;
 
-extern bool_t kexecing;
+extern bool kexecing;
 
 void set_kexec_crash_area_size(u64 system_ram);
 
@@ -81,7 +81,7 @@ void vmcoreinfo_append_str(const char *fmt, ...)
 #else /* !CONFIG_KEXEC */
 
 #define crashinfo_maxaddr_bits 0
-#define kexecing 0
+#define kexecing false
 
 static inline void kexec_early_calculations(void) {}
 static inline void kexec_crash(enum crash_reason reason)

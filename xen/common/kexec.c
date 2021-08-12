@@ -35,7 +35,7 @@
 #include <compat/kexec.h>
 #endif
 
-bool_t kexecing = FALSE;
+bool __read_mostly kexecing;
 
 /* Memory regions to store the per cpu register state etc. on a crash. */
 typedef struct { Elf_Note * start; size_t size; } crash_note_range_t;
@@ -383,7 +383,7 @@ void kexec_crash(enum crash_reason reason)
     if ( !test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
         return;
 
-    kexecing = TRUE;
+    kexecing = true;
 
     if ( kexec_common_shutdown() != 0 )
         return;
@@ -399,7 +399,7 @@ static long kexec_reboot(void *_image)
 {
     struct kexec_image *image = _image;
 
-    kexecing = TRUE;
+    kexecing = true;
 
     kexec_common_shutdown();
     machine_reboot_kexec(image);
