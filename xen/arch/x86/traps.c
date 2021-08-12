@@ -777,13 +777,15 @@ static void do_reserved_trap(struct cpu_user_regs *regs)
           trapnr, vec_name(trapnr), regs->error_code);
 }
 
-static void extable_shstk_fixup(struct cpu_user_regs *regs, unsigned long fixup)
+static void fixup_exception_return(struct cpu_user_regs *regs,
+                                   unsigned long fixup)
 {
+#ifdef CONFIG_XEN_SHSTK
     unsigned long ssp, *ptr, *base;
 
     asm ( "rdsspq %0" : "=r" (ssp) : "0" (1) );
     if ( ssp == 1 )
-        return;
+        goto shstk_done;
 
     ptr = _p(ssp);
     base = _p(get_shstk_bottom(ssp));
@@ -814,7 +816,7 @@ static void extable_shstk_fixup(struct cpu_user_regs *regs, unsigned long fixup)
             asm ( "wrssq %[fix], %[stk]"
                   : [stk] "=m" (ptr[0])
                   : [fix] "r" (fixup) );
-            return;
+            goto shstk_done;
         }
     }
 
@@ -824,6 +826,12 @@ static void extable_shstk_fixup(struct cpu_user_regs *regs, unsigned long fixup)
      * executing the interrupted context.
      */
     BUG();
+
+ shstk_done:
+#endif /* CONFIG_XEN_SHSTK */
+
+    /* Fixup the regular stack. */
+    regs->rip = fixup;
 }
 
 static bool extable_fixup(struct cpu_user_regs *regs, bool print)
@@ -842,10 +850,7 @@ static bool extable_fixup(struct cpu_user_regs *regs, bool print)
                vec_name(regs->entry_vector), regs->error_code,
                _p(regs->rip), _p(regs->rip), _p(fixup));
 
-    if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
-        extable_shstk_fixup(regs, fixup);
-
-    regs->rip = fixup;
+    fixup_exception_return(regs, fixup);
     this_cpu(last_extable_addr) = regs->rip;
 
     return true;
@@ -1138,7 +1143,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
         void (*fn)(struct cpu_user_regs *) = bug_ptr(bug);
 
         fn(regs);
-        regs->rip = (unsigned long)eip;
+        fixup_exception_return(regs, (unsigned long)eip);
         return;
     }
 
@@ -1159,7 +1164,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     case BUGFRAME_warn:
         printk("Xen WARN at %s%s:%d\n", prefix, filename, lineno);
         show_execution_state(regs);
-        regs->rip = (unsigned long)eip;
+        fixup_exception_return(regs, (unsigned long)eip);
         return;
 
     case BUGFRAME_bug:
