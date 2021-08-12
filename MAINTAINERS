@@ -370,7 +370,7 @@ KEXEC
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
 S:	Supported
 F:	xen/common/{kexec,kimage}.c
-F:	xen/include/{kexec,kimage}.h
+F:	xen/include/xen/{kexec,kimage}.h
 F:	xen/arch/x86/machine_kexec.c
 F:	xen/arch/x86/x86_64/kexec_reloc.S
 
