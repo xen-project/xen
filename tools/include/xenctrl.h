@@ -247,13 +247,10 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
 /*
  * Returns the hypercall_buffer associated with a variable.
  */
-#define HYPERCALL_BUFFER(_name)                                 \
-    ({  xc_hypercall_buffer_t _hcbuf_buf1;                      \
-        typeof(XC__HYPERCALL_BUFFER_NAME(_name)) *_hcbuf_buf2 = \
-                &XC__HYPERCALL_BUFFER_NAME(_name);              \
-        (void)(&_hcbuf_buf1 == _hcbuf_buf2);                    \
-        (_hcbuf_buf2)->param_shadow ?                           \
-                (_hcbuf_buf2)->param_shadow : (_hcbuf_buf2);    \
+#define HYPERCALL_BUFFER(_name)                                \
+    ({  xc_hypercall_buffer_t *_hcbuf_buf =                    \
+                &XC__HYPERCALL_BUFFER_NAME(_name);             \
+        _hcbuf_buf->param_shadow ?: _hcbuf_buf;                \
      })
 
 #define HYPERCALL_BUFFER_INIT_NO_BOUNCE .dir = 0, .sz = 0, .ubuf = (void *)-1
