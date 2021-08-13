@@ -40,7 +40,7 @@ int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
     xc_dominfo_t info;
     shared_info_any_t *live_shinfo;
     xen_capabilities_info_t xen_caps = "";
-    int i;
+    unsigned long i;
 
     /* Only be initialized once */
     if ( minfo->pfn_type || minfo->p2m_table )
@@ -116,12 +116,11 @@ int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
     /* Retrieve PFN types in batches */
     for ( i = 0; i < minfo->p2m_size ; i+=1024 )
     {
-        int count = ((minfo->p2m_size - i ) > 1024 ) ?
-                        1024: (minfo->p2m_size - i);
+        unsigned int count = min(minfo->p2m_size - i, 1024UL);
 
         if ( xc_get_pfn_type_batch(xch, domid, count, minfo->pfn_type + i) )
         {
-            PERROR("Could not get %d-eth batch of PFN types", (i+1)/1024);
+            PERROR("Could not get batch %lu of PFN types", (i + 1) / 1024);
             goto failed;
         }
     }
