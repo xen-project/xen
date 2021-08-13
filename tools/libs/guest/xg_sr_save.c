@@ -614,7 +614,7 @@ static int colo_merge_secondary_dirty_bitmap(struct xc_sr_context *ctx)
     for ( i = 0; i < count; i++ )
     {
         pfn = pfns[i];
-        if ( pfn > ctx->save.p2m_size )
+        if ( pfn >= ctx->save.p2m_size )
         {
             PERROR("Invalid pfn 0x%" PRIx64, pfn);
             rc = -1;
