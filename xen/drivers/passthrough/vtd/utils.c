@@ -281,7 +281,7 @@ void vtd_dump_iommu_info(unsigned char key)
             for ( i = 0; i <= reg_01.bits.entries; i++ )
             {
                 struct IO_APIC_route_entry rte =
-                    __ioapic_read_entry(apic, i, TRUE);
+                    __ioapic_read_entry(apic, i, true);
 
                 remap = (struct IO_APIC_route_remap_entry *) &rte;
                 if ( !remap->format )
