@@ -362,9 +362,9 @@ int __init dom0_construct_pv(struct domain *d,
     compatible = false;
     machine = elf_uval(&elf, elf.ehdr, e_machine);
 
-#ifdef CONFIG_PV32
     if ( elf_32bit(&elf) )
     {
+#ifdef CONFIG_PV32
         if ( parms.pae == XEN_PAE_BIMODAL )
             parms.pae = XEN_PAE_EXTCR3;
         if ( parms.pae && machine == EM_386 )
@@ -377,8 +377,11 @@ int __init dom0_construct_pv(struct domain *d,
 
             compatible = true;
         }
-    }
+#else
+        printk("Found 32-bit PV kernel, but CONFIG_PV32 missing\n");
+        return -EOPNOTSUPP;
 #endif
+    }
 
     compat = is_pv_32bit_domain(d);
 
