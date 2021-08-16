@@ -400,8 +400,7 @@ int __init dom0_construct_pv(struct domain *d,
     if ( !compatible )
     {
         printk("Mismatch between Xen and DOM0 kernel\n");
-        rc = -EINVAL;
-        goto out;
+        return -EINVAL;
     }
 
     if ( parms.elf_notes[XEN_ELFNOTE_SUPPORTED_FEATURES].type != XEN_ENT_NONE )
@@ -409,8 +408,7 @@ int __init dom0_construct_pv(struct domain *d,
         if ( !pv_shim && !test_bit(XENFEAT_dom0, parms.f_supported) )
         {
             printk("Kernel does not support Dom0 operation\n");
-            rc = -EINVAL;
-            goto out;
+            return -EINVAL;
         }
     }
 
@@ -607,8 +605,7 @@ int __init dom0_construct_pv(struct domain *d,
          : (v_start < HYPERVISOR_VIRT_END) && (v_end > HYPERVISOR_VIRT_START) )
     {
         printk("DOM0 image overlaps with Xen private area.\n");
-        rc = -EINVAL;
-        goto out;
+        return -EINVAL;
     }
 
     if ( compat )
@@ -753,8 +750,7 @@ int __init dom0_construct_pv(struct domain *d,
             mapcache_override_current(NULL);
             switch_cr3_cr4(current->arch.cr3, read_cr4());
             printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
-            rc = -EINVAL;
-            goto out;
+            return -EINVAL;
         }
         init_hypercall_page(d, _p(parms.virt_hypercall));
     }
