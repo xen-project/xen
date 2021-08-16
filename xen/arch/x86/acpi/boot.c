@@ -432,19 +432,19 @@ acpi_fadt_parse_sleep_info(const struct acpi_table_fadt *fadt)
 	}
 
 	if (facs->length < 24) {
-		printk(KERN_ERR PREFIX "Invalid FACS table length: %#x",
+		printk(KERN_ERR PREFIX "Invalid FACS table length: %#x\n",
 			facs->length);
 		goto done;
 	}
 
 	if (facs->length < 64)
 		printk(KERN_WARNING PREFIX
-			"FACS is shorter than ACPI spec allow: %#x",
+			"FACS is shorter than ACPI spec allow: %#x\n",
 			facs->length);
 
 	if (facs_pa % 64)
 		printk(KERN_WARNING PREFIX
-			"FACS is not 64-byte aligned: %#lx",
+			"FACS is not 64-byte aligned: %#lx\n",
 			facs_pa);
 
 	acpi_sinfo.wakeup_vector = facs_pa + 
