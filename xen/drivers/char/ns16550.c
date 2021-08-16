@@ -357,7 +357,8 @@ static void __init ns16550_init_preirq(struct serial_port *port)
     ns16550_setup_preirq(uart);
 
     /* Check this really is a 16550+. Otherwise we have no FIFOs. */
-    if ( ((ns_read_reg(uart, UART_IIR) & 0xc0) == 0xc0) &&
+    if ( uart->fifo_size <= 1 &&
+         ((ns_read_reg(uart, UART_IIR) & 0xc0) == 0xc0) &&
          ((ns_read_reg(uart, UART_FCR) & UART_FCR_TRG14) == UART_FCR_TRG14) )
         uart->fifo_size = 16;
 }
