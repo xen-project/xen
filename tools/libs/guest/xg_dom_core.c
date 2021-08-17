@@ -922,6 +922,10 @@ int xc_dom_parse_image(struct xc_dom_image *dom)
         goto err;
     }
 
+    /* Check guest ABI */
+    if ( !xc_dom_compat_check(dom) )
+        return -1;
+
     /* check features */
     for ( i = 0; i < XENFEAT_NR_SUBMAPS; i++ )
     {

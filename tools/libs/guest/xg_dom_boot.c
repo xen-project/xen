@@ -191,10 +191,6 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     }
     dom->shared_info_mfn = info.shared_info_frame;
 
-    /* sanity checks */
-    if ( !xc_dom_compat_check(dom) )
-        return -1;
-
     /* initial mm setup */
     if ( dom->arch_hooks->setup_pgtables &&
          (rc = dom->arch_hooks->setup_pgtables(dom)) != 0 )
