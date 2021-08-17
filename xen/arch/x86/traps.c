@@ -780,55 +780,56 @@ static void do_reserved_trap(struct cpu_user_regs *regs)
 static void fixup_exception_return(struct cpu_user_regs *regs,
                                    unsigned long fixup)
 {
-#ifdef CONFIG_XEN_SHSTK
-    unsigned long ssp, *ptr, *base;
-
-    asm ( "rdsspq %0" : "=r" (ssp) : "0" (1) );
-    if ( ssp == 1 )
-        goto shstk_done;
-
-    ptr = _p(ssp);
-    base = _p(get_shstk_bottom(ssp));
-
-    for ( ; ptr < base; ++ptr )
+    if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
     {
-        /*
-         * Search for %rip.  The shstk currently looks like this:
-         *
-         *   ...  [Likely pointed to by SSP]
-         *   %cs  [== regs->cs]
-         *   %rip [== regs->rip]
-         *   SSP  [Likely points to 3 slots higher, above %cs]
-         *   ...  [call tree to this function, likely 2/3 slots]
-         *
-         * and we want to overwrite %rip with fixup.  There are two
-         * complications:
-         *   1) We cant depend on SSP values, because they won't differ by 3
-         *      slots if the exception is taken on an IST stack.
-         *   2) There are synthetic (unrealistic but not impossible) scenarios
-         *      where %rip can end up in the call tree to this function, so we
-         *      can't check against regs->rip alone.
-         *
-         * Check for both regs->rip and regs->cs matching.
-         */
-        if ( ptr[0] == regs->rip && ptr[1] == regs->cs )
-        {
-            asm ( "wrssq %[fix], %[stk]"
-                  : [stk] "=m" (ptr[0])
-                  : [fix] "r" (fixup) );
+        unsigned long ssp, *ptr, *base;
+
+        asm ( "rdsspq %0" : "=r" (ssp) : "0" (1) );
+        if ( ssp == 1 )
             goto shstk_done;
+
+        ptr = _p(ssp);
+        base = _p(get_shstk_bottom(ssp));
+
+        for ( ; ptr < base; ++ptr )
+        {
+            /*
+             * Search for %rip.  The shstk currently looks like this:
+             *
+             *   ...  [Likely pointed to by SSP]
+             *   %cs  [== regs->cs]
+             *   %rip [== regs->rip]
+             *   SSP  [Likely points to 3 slots higher, above %cs]
+             *   ...  [call tree to this function, likely 2/3 slots]
+             *
+             * and we want to overwrite %rip with fixup.  There are two
+             * complications:
+             *   1) We cant depend on SSP values, because they won't differ by
+             *      3 slots if the exception is taken on an IST stack.
+             *   2) There are synthetic (unrealistic but not impossible)
+             *      scenarios where %rip can end up in the call tree to this
+             *      function, so we can't check against regs->rip alone.
+             *
+             * Check for both regs->rip and regs->cs matching.
+             */
+            if ( ptr[0] == regs->rip && ptr[1] == regs->cs )
+            {
+                asm ( "wrssq %[fix], %[stk]"
+                      : [stk] "=m" (ptr[0])
+                      : [fix] "r" (fixup) );
+                goto shstk_done;
+            }
         }
+
+        /*
+         * We failed to locate and fix up the shadow IRET frame.  This could
+         * be due to shadow stack corruption, or bad logic above.  We cannot
+         * continue executing the interrupted context.
+         */
+        BUG();
+
     }
-
-    /*
-     * We failed to locate and fix up the shadow IRET frame.  This could be
-     * due to shadow stack corruption, or bad logic above.  We cannot continue
-     * executing the interrupted context.
-     */
-    BUG();
-
  shstk_done:
-#endif /* CONFIG_XEN_SHSTK */
 
     /* Fixup the regular stack. */
     regs->rip = fixup;
