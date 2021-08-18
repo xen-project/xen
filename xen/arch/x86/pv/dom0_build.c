@@ -575,25 +575,21 @@ int __init dom0_construct_pv(struct domain *d,
         printk("\n Init. ramdisk: %"PRIpaddr"->%"PRIpaddr,
                mpt_alloc, mpt_alloc + initrd_len);
     }
-    printk("\nVIRTUAL MEMORY ARRANGEMENT:\n"
-           " Loaded kernel: %p->%p\n"
-           " Init. ramdisk: %p->%p\n"
-           " Phys-Mach map: %p->%p\n"
-           " Start info:    %p->%p\n"
-           " Xenstore ring: %p->%p\n"
-           " Console ring:  %p->%p\n"
-           " Page tables:   %p->%p\n"
-           " Boot stack:    %p->%p\n"
-           " TOTAL:         %p->%p\n",
-           _p(vkern_start), _p(vkern_end),
-           _p(vinitrd_start), _p(vinitrd_end),
-           _p(vphysmap_start), _p(vphysmap_end),
-           _p(vstartinfo_start), _p(vstartinfo_end),
-           _p(vxenstore_start), _p(vxenstore_end),
-           _p(vconsole_start), _p(vconsole_end),
-           _p(vpt_start), _p(vpt_end),
-           _p(vstack_start), _p(vstack_end),
-           _p(v_start), _p(v_end));
+
+    printk("\nVIRTUAL MEMORY ARRANGEMENT:\n");
+    printk(" Loaded kernel: %p->%p\n", _p(vkern_start), _p(vkern_end));
+    if ( vinitrd_end > vinitrd_start )
+        printk(" Init. ramdisk: %p->%p\n", _p(vinitrd_start), _p(vinitrd_end));
+    printk(" Phys-Mach map: %p->%p\n", _p(vphysmap_start), _p(vphysmap_end));
+    printk(" Start info:    %p->%p\n", _p(vstartinfo_start), _p(vstartinfo_end));
+    if ( pv_shim )
+    {
+        printk(" Xenstore ring: %p->%p\n", _p(vxenstore_start), _p(vxenstore_end));
+        printk(" Console ring:  %p->%p\n", _p(vconsole_start), _p(vconsole_end));
+    }
+    printk(" Page tables:   %p->%p\n", _p(vpt_start), _p(vpt_end));
+    printk(" Boot stack:    %p->%p\n", _p(vstack_start), _p(vstack_end));
+    printk(" TOTAL:         %p->%p\n", _p(v_start), _p(v_end));
     printk(" ENTRY ADDRESS: %p\n", _p(parms.virt_entry));
 
     process_pending_softirqs();
