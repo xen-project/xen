@@ -2768,6 +2768,7 @@ static int arm_smmu_assign_dev(struct domain *d, u8 devfn,
 			arm_smmu_destroy_iommu_domain(domain);
 	} else {
 		atomic_inc(&domain->ref);
+		dev_iommu_domain(dev) = domain;
 	}
 
 out:
@@ -2791,6 +2792,7 @@ static int arm_smmu_deassign_dev(struct domain *d, struct device *dev)
 	spin_lock(&xen_domain->lock);
 
 	arm_smmu_detach_dev(domain, dev);
+	dev_iommu_domain(dev) = NULL;
 	atomic_dec(&domain->ref);
 
 	if (domain->ref.counter == 0)
