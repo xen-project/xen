@@ -1893,7 +1893,7 @@ static bool try_map_mmio(gfn_t gfn)
         return false;
 
     /* The hardware domain can only map permitted MMIO regions */
-    if ( !iomem_access_permitted(d, mfn_x(mfn), mfn_x(mfn) + 1) )
+    if ( !iomem_access_permitted(d, mfn_x(mfn), mfn_x(mfn)) )
         return false;
 
     return !map_regions_p2mt(d, gfn, 1, mfn, p2m_mmio_direct_c);
