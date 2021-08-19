@@ -337,7 +337,7 @@ uint64_t get_cpu_idle_time(unsigned int cpu)
     struct vcpu_runstate_info state = { 0 };
     const struct vcpu *v = idle_vcpu[cpu];
 
-    if ( cpu_online(cpu) && v )
+    if ( cpu_online(cpu) && get_sched_res(cpu) )
         vcpu_runstate_get(v, &state);
 
     return state.time[RUNSTATE_running];
