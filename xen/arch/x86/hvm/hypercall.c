@@ -292,11 +292,11 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         /* Deliberately corrupt parameter regs not used by this hypercall. */
         switch ( hypercall_args_table[eax].compat )
         {
-        case 0: ebx = 0xdeadf00d;
-        case 1: ecx = 0xdeadf00d;
-        case 2: edx = 0xdeadf00d;
-        case 3: esi = 0xdeadf00d;
-        case 4: edi = 0xdeadf00d;
+        case 0: ebx = 0xdeadf00d; fallthrough;
+        case 1: ecx = 0xdeadf00d; fallthrough;
+        case 2: edx = 0xdeadf00d; fallthrough;
+        case 3: esi = 0xdeadf00d; fallthrough;
+        case 4: edi = 0xdeadf00d; fallthrough;
         case 5: ebp = 0xdeadf00d;
         }
 #endif
@@ -312,11 +312,11 @@ int hvm_hypercall(struct cpu_user_regs *regs)
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].compat )
             {
-            case 6: regs->rbp = 0xdeadf00d;
-            case 5: regs->rdi = 0xdeadf00d;
-            case 4: regs->rsi = 0xdeadf00d;
-            case 3: regs->rdx = 0xdeadf00d;
-            case 2: regs->rcx = 0xdeadf00d;
+            case 6: regs->rbp = 0xdeadf00d; fallthrough;
+            case 5: regs->rdi = 0xdeadf00d; fallthrough;
+            case 4: regs->rsi = 0xdeadf00d; fallthrough;
+            case 3: regs->rdx = 0xdeadf00d; fallthrough;
+            case 2: regs->rcx = 0xdeadf00d; fallthrough;
             case 1: regs->rbx = 0xdeadf00d;
             }
         }
