@@ -108,7 +108,7 @@ struct ns16550_config_param {
 
 static void ns16550_delayed_resume(void *data);
 
-static u8 ns_read_reg(struct ns16550 *uart, unsigned int reg)
+static u8 ns_read_reg(const struct ns16550 *uart, unsigned int reg)
 {
     void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
 #ifdef CONFIG_HAS_IOPORTS
@@ -126,7 +126,7 @@ static u8 ns_read_reg(struct ns16550 *uart, unsigned int reg)
     }
 }
 
-static void ns_write_reg(struct ns16550 *uart, unsigned int reg, u8 c)
+static void ns_write_reg(const struct ns16550 *uart, unsigned int reg, u8 c)
 {
     void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
 #ifdef CONFIG_HAS_IOPORTS
