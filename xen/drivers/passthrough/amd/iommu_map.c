@@ -231,7 +231,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
             next_table_mfn = mfn_x(page_to_mfn(table));
 
             set_iommu_ptes_present(next_table_mfn, pfn, mfn, PTE_PER_TABLE_SIZE,
-                                   next_level, true, true);
+                                   next_level, pde->iw, pde->ir);
             smp_wmb();
             set_iommu_pde_present(pde, next_table_mfn, next_level, true,
                                   true);
