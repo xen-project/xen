@@ -308,7 +308,7 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
     /* Handle the DesignWare 8250 'busy-detect' quirk. */
     handle_dw_usr_busy_quirk(uart);
 
-#ifdef CONFIG_HAS_PCI
+#ifdef NS16550_PCI
     /* Enable Exar "Enhanced function bits" */
     enable_exar_enhanced_bits(uart);
 #endif
