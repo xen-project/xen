@@ -61,13 +61,14 @@ static __init void mark_pv_pt_pages_rdonly(struct domain *d,
 
         /*
          * Verify that
-         * - all pages have a valid L1...Ln page table type and
+         * - all pages have a valid L1...Ln page table type (including the PAE
+         *   sub-flavor of L2) and
          * - no other bits are set, in particular the type refcount is still
          *   zero.
          */
         ASSERT((page->u.inuse.type_info & PGT_type_mask) >= PGT_l1_page_table);
         ASSERT((page->u.inuse.type_info & PGT_type_mask) <= PGT_root_page_table);
-        ASSERT(!(page->u.inuse.type_info & ~PGT_type_mask));
+        ASSERT(!(page->u.inuse.type_info & ~(PGT_type_mask | PGT_pae_xen_l2)));
 
         /* Read-only mapping + PGC_allocated + page-table page. */
         page->count_info         = PGC_allocated | 3;
