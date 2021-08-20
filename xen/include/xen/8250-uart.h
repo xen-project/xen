@@ -35,6 +35,7 @@
 #define UART_USR          0x1f    /* Status register (DW) */
 #define UART_DLL          0x00    /* divisor latch (ls) (DLAB=1) */
 #define UART_DLM          0x01    /* divisor latch (ms) (DLAB=1) */
+#define UART_XR_EFR       0x09    /* Enhanced function register (Exar) */
 
 /* Interrupt Enable Register */
 #define UART_IER_ERDAI    0x01    /* rx data recv'd       */
@@ -120,6 +121,9 @@
 
 /* Frequency of external clock source. This definition assumes PC platform. */
 #define UART_CLOCK_HZ     1843200
+
+/* Bits in Exar specific UART_XR_EFR register */
+#define UART_EFR_ECB      0x10
 
 /* Resume retry settings */
 #define RESUME_DELAY      MILLISECS(10)

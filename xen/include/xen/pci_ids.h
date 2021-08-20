@@ -4,6 +4,8 @@
 
 #define PCI_VENDOR_ID_PERICOM            0x12d8
 
+#define PCI_VENDOR_ID_EXAR               0x13a8
+
 #define PCI_VENDOR_ID_OXSEMI             0x1415
 
 #define PCI_VENDOR_ID_BROADCOM           0x14e4
