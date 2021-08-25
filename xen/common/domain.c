@@ -412,11 +412,18 @@ static int domain_teardown(struct domain *d)
         v = d->teardown.vcpu
 
         enum {
-            PROG_vcpu_teardown = 1,
+            PROG_none,
+            PROG_gnttab_mappings,
+            PROG_vcpu_teardown,
             PROG_done,
         };
 
-    case 0:
+    case PROG_none:
+        rc = gnttab_release_mappings(d);
+        if ( rc )
+            return rc;
+
+    PROGRESS(gnttab_mappings):
         for_each_vcpu ( d, v )
         {
             PROGRESS_VCPU(teardown);
@@ -908,7 +915,6 @@ int domain_kill(struct domain *d)
             return domain_kill(d);
         d->is_dying = DOMDYING_dying;
         argo_destroy(d);
-        gnttab_release_mappings(d);
         vnuma_destroy(d->vnuma);
         domain_set_outstanding_pages(d, 0);
         /* fallthrough */
