@@ -50,14 +50,14 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
     {
         printk(XENLOG_G_ERR "HVM%d restore: bad magic number %#"PRIx32"\n",
                d->domain_id, hdr->magic);
-        return -1;
+        return -EINVAL;
     }
 
     if ( hdr->version != HVM_FILE_VERSION )
     {
         printk(XENLOG_G_ERR "HVM%d restore: unsupported version %u\n",
                d->domain_id, hdr->version);
-        return -1;
+        return -EINVAL;
     }
 
     cpuid(1, &eax, &ebx, &ecx, &edx);
@@ -291,16 +291,18 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
     struct hvm_save_descriptor *desc;
     hvm_load_handler handler;
     struct vcpu *v;
+    int rc;
 
     if ( d->is_dying )
         return -EINVAL;
 
     /* Read the save header, which must be first */
     if ( hvm_load_entry(HEADER, h, &hdr) != 0 )
-        return -1;
+        return -ENODATA;
 
-    if ( arch_hvm_load(d, &hdr) )
-        return -1;
+    rc = arch_hvm_load(d, &hdr);
+    if ( rc )
+        return rc;
 
     /* Down all the vcpus: we only re-enable the ones that had state saved. */
     for_each_vcpu(d, v)
@@ -315,7 +317,7 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
             printk(XENLOG_G_ERR
                    "HVM%d restore: save did not end with a null entry\n",
                    d->domain_id);
-            return -1;
+            return -ENODATA;
         }
 
         /* Read the typecode of the next entry  and check for the end-marker */
@@ -329,17 +331,18 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
         {
             printk(XENLOG_G_ERR "HVM%d restore: unknown entry typecode %u\n",
                    d->domain_id, desc->typecode);
-            return -1;
+            return -EINVAL;
         }
 
         /* Load the entry */
         printk(XENLOG_G_INFO "HVM%d restore: %s %"PRIu16"\n", d->domain_id,
                hvm_sr_handlers[desc->typecode].name, desc->instance);
-        if ( handler(d, h) != 0 )
+        rc = handler(d, h);
+        if ( rc )
         {
-            printk(XENLOG_G_ERR "HVM%d restore: failed to load entry %u/%u\n",
-                   d->domain_id, desc->typecode, desc->instance);
-            return -1;
+            printk(XENLOG_G_ERR "HVM%d restore: failed to load entry %u/%u rc %d\n",
+                   d->domain_id, desc->typecode, desc->instance, rc);
+            return rc;
         }
     }
 

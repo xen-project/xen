@@ -412,7 +412,7 @@ static int pit_save(struct vcpu *v, hvm_domain_context_t *h)
 static int pit_load(struct domain *d, hvm_domain_context_t *h)
 {
     PITState *pit = domain_vpit(d);
-    int i;
+    int i, rc = 0;
 
     if ( !has_vpit(d) )
         return -ENODEV;
@@ -421,8 +421,8 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
 
     if ( hvm_load_entry(PIT, h, &pit->hw) )
     {
-        spin_unlock(&pit->lock);
-        return 1;
+        rc = -ENODATA;
+        goto out;
     }
     
     /*
@@ -434,9 +434,10 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
     for ( i = 0; i < 3; i++ )
         pit_load_count(pit, i, pit->hw.channels[i].count);
 
+ out:
     spin_unlock(&pit->lock);
 
-    return 0;
+    return rc;
 }
 
 HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_load, 1, HVMSR_PER_DOM);
