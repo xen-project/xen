@@ -18,7 +18,7 @@ ENTRY(efi_start)
 #else /* !EFI */
 
 #define FORMAT "elf64-x86-64"
-#define DECL_SECTION(x) x : AT(ADDR(x) - __XEN_VIRT_START)
+#define DECL_SECTION(x) x : AT(ADDR(#x) - __XEN_VIRT_START)
 
 ENTRY(start_pa)
 
