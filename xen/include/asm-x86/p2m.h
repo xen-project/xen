@@ -839,7 +839,8 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 /*
  * p2m type to IOMMU flags
  */
-static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt, mfn_t mfn)
+static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt,
+                                               p2m_access_t p2ma, mfn_t mfn)
 {
     unsigned int flags;
 
