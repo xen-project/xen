@@ -307,6 +307,7 @@ static int reassign_device(struct domain *source, struct domain *target,
     struct amd_iommu *iommu;
     int bdf, rc;
     struct domain_iommu *t = dom_iommu(target);
+    const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
 
     bdf = PCI_BDF2(pdev->bus, pdev->devfn);
     iommu = find_iommu_for_device(pdev->seg, bdf);
@@ -321,10 +322,24 @@ static int reassign_device(struct domain *source, struct domain *target,
 
     amd_iommu_disable_domain_device(source, iommu, devfn, pdev);
 
-    if ( devfn == pdev->devfn )
+    /*
+     * If the device belongs to the hardware domain, and it has a unity mapping,
+     * don't remove it from the hardware domain, because BIOS may reference that
+     * mapping.
+     */
+    if ( !is_hardware_domain(source) )
     {
-        list_move(&pdev->domain_list, &target->arch.pdev_list);
-        pdev->domain = target;
+        rc = amd_iommu_reserve_domain_unity_unmap(
+                 source,
+                 ivrs_mappings[get_dma_requestor_id(pdev->seg, bdf)].unity_map);
+        if ( rc )
+            return rc;
+    }
+
+    if ( devfn == pdev->devfn && pdev->domain != dom_io )
+    {
+        list_move(&pdev->domain_list, &dom_io->arch.pdev_list);
+        pdev->domain = dom_io;
     }
 
     rc = allocate_domain_resources(t);
@@ -336,6 +351,12 @@ static int reassign_device(struct domain *source, struct domain *target,
                     pdev->seg, pdev->bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                     source->domain_id, target->domain_id);
 
+    if ( devfn == pdev->devfn && pdev->domain != target )
+    {
+        list_move(&pdev->domain_list, &target->arch.pdev_list);
+        pdev->domain = target;
+    }
+
     return 0;
 }
 
@@ -346,20 +367,28 @@ static int amd_iommu_assign_device(struct domain *d, u8 devfn,
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
     int bdf = PCI_BDF2(pdev->bus, devfn);
     int req_id = get_dma_requestor_id(pdev->seg, bdf);
-    const struct ivrs_unity_map *unity_map;
+    int rc = amd_iommu_reserve_domain_unity_map(
+                 d, ivrs_mappings[req_id].unity_map, flag);
 
-    for ( unity_map = ivrs_mappings[req_id].unity_map; unity_map;
-          unity_map = unity_map->next )
+    if ( !rc )
+        rc = reassign_device(pdev->domain, d, devfn, pdev);
+
+    if ( rc && !is_hardware_domain(d) )
     {
-        int rc = amd_iommu_reserve_domain_unity_map(
-                     d, unity_map->addr, unity_map->length,
-                     unity_map->write, unity_map->read);
+        int ret = amd_iommu_reserve_domain_unity_unmap(
+                      d, ivrs_mappings[req_id].unity_map);
 
-        if ( rc )
-            return rc;
+        if ( ret )
+        {
+            printk(XENLOG_ERR "AMD-Vi: "
+                   "unity-unmap for %pd/%04x:%02x:%02x.%u failed (%d)\n",
+                   d, pdev->seg, pdev->bus,
+                   PCI_SLOT(devfn), PCI_FUNC(devfn), ret);
+            domain_crash(d);
+        }
     }
 
-    return reassign_device(pdev->domain, d, devfn, pdev);
+    return rc;
 }
 
 static void deallocate_next_page_table(struct page_info *pg, int level)
@@ -425,6 +454,7 @@ static void deallocate_iommu_page_tables(struct domain *d)
 
 static void amd_iommu_domain_destroy(struct domain *d)
 {
+    iommu_identity_map_teardown(d);
     deallocate_iommu_page_tables(d);
     amd_iommu_flush_all_pages(d);
 }
