@@ -775,53 +775,62 @@ static void do_reserved_trap(struct cpu_user_regs *regs)
           trapnr, vec_name(trapnr), regs->error_code);
 }
 
-static void extable_shstk_fixup(struct cpu_user_regs *regs, unsigned long fixup)
+static void fixup_exception_return(struct cpu_user_regs *regs,
+                                   unsigned long fixup)
 {
-    unsigned long ssp, *ptr, *base;
-
-    asm ( "rdsspq %0" : "=r" (ssp) : "0" (1) );
-    if ( ssp == 1 )
-        return;
-
-    ptr = _p(ssp);
-    base = _p(get_shstk_bottom(ssp));
-
-    for ( ; ptr < base; ++ptr )
+    if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
     {
-        /*
-         * Search for %rip.  The shstk currently looks like this:
-         *
-         *   ...  [Likely pointed to by SSP]
-         *   %cs  [== regs->cs]
-         *   %rip [== regs->rip]
-         *   SSP  [Likely points to 3 slots higher, above %cs]
-         *   ...  [call tree to this function, likely 2/3 slots]
-         *
-         * and we want to overwrite %rip with fixup.  There are two
-         * complications:
-         *   1) We cant depend on SSP values, because they won't differ by 3
-         *      slots if the exception is taken on an IST stack.
-         *   2) There are synthetic (unrealistic but not impossible) scenarios
-         *      where %rip can end up in the call tree to this function, so we
-         *      can't check against regs->rip alone.
-         *
-         * Check for both regs->rip and regs->cs matching.
-         */
-        if ( ptr[0] == regs->rip && ptr[1] == regs->cs )
-        {
-            asm ( "wrssq %[fix], %[stk]"
-                  : [stk] "=m" (ptr[0])
-                  : [fix] "r" (fixup) );
-            return;
-        }
-    }
+        unsigned long ssp, *ptr, *base;
 
-    /*
-     * We failed to locate and fix up the shadow IRET frame.  This could be
-     * due to shadow stack corruption, or bad logic above.  We cannot continue
-     * executing the interrupted context.
-     */
-    BUG();
+        asm ( "rdsspq %0" : "=r" (ssp) : "0" (1) );
+        if ( ssp == 1 )
+            goto shstk_done;
+
+        ptr = _p(ssp);
+        base = _p(get_shstk_bottom(ssp));
+
+        for ( ; ptr < base; ++ptr )
+        {
+            /*
+             * Search for %rip.  The shstk currently looks like this:
+             *
+             *   ...  [Likely pointed to by SSP]
+             *   %cs  [== regs->cs]
+             *   %rip [== regs->rip]
+             *   SSP  [Likely points to 3 slots higher, above %cs]
+             *   ...  [call tree to this function, likely 2/3 slots]
+             *
+             * and we want to overwrite %rip with fixup.  There are two
+             * complications:
+             *   1) We cant depend on SSP values, because they won't differ by
+             *      3 slots if the exception is taken on an IST stack.
+             *   2) There are synthetic (unrealistic but not impossible)
+             *      scenarios where %rip can end up in the call tree to this
+             *      function, so we can't check against regs->rip alone.
+             *
+             * Check for both regs->rip and regs->cs matching.
+             */
+            if ( ptr[0] == regs->rip && ptr[1] == regs->cs )
+            {
+                asm ( "wrssq %[fix], %[stk]"
+                      : [stk] "=m" (ptr[0])
+                      : [fix] "r" (fixup) );
+                goto shstk_done;
+            }
+        }
+
+        /*
+         * We failed to locate and fix up the shadow IRET frame.  This could
+         * be due to shadow stack corruption, or bad logic above.  We cannot
+         * continue executing the interrupted context.
+         */
+        BUG();
+
+    }
+ shstk_done:
+
+    /* Fixup the regular stack. */
+    regs->rip = fixup;
 }
 
 static bool extable_fixup(struct cpu_user_regs *regs, bool print)
@@ -840,10 +849,7 @@ static bool extable_fixup(struct cpu_user_regs *regs, bool print)
                vec_name(regs->entry_vector), regs->error_code,
                _p(regs->rip), _p(regs->rip), _p(fixup));
 
-    if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
-        extable_shstk_fixup(regs, fixup);
-
-    regs->rip = fixup;
+    fixup_exception_return(regs, fixup);
     this_cpu(last_extable_addr) = regs->rip;
 
     return true;
@@ -1127,7 +1133,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
         void (*fn)(struct cpu_user_regs *) = bug_ptr(bug);
 
         fn(regs);
-        regs->rip = (unsigned long)eip;
+        fixup_exception_return(regs, (unsigned long)eip);
         return;
     }
 
@@ -1148,7 +1154,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     case BUGFRAME_warn:
         printk("Xen WARN at %s%s:%d\n", prefix, filename, lineno);
         show_execution_state(regs);
-        regs->rip = (unsigned long)eip;
+        fixup_exception_return(regs, (unsigned long)eip);
         return;
 
     case BUGFRAME_bug:
