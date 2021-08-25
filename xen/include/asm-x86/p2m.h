@@ -142,6 +142,10 @@ typedef unsigned int p2m_query_t;
                             | p2m_to_mask(p2m_ram_logdirty) )
 #define P2M_SHARED_TYPES   (p2m_to_mask(p2m_ram_shared))
 
+/* Types established/cleaned up via special accessors. */
+#define P2M_SPECIAL_TYPES (P2M_GRANT_TYPES | \
+                           p2m_to_mask(p2m_map_foreign))
+
 /* Valid types not necessarily associated with a (valid) MFN. */
 #define P2M_INVALID_MFN_TYPES (P2M_POD_TYPES                  \
                                | p2m_to_mask(p2m_mmio_direct) \
@@ -170,6 +174,7 @@ typedef unsigned int p2m_query_t;
 #define p2m_is_paged(_t)    (p2m_to_mask(_t) & P2M_PAGED_TYPES)
 #define p2m_is_sharable(_t) (p2m_to_mask(_t) & P2M_SHARABLE_TYPES)
 #define p2m_is_shared(_t)   (p2m_to_mask(_t) & P2M_SHARED_TYPES)
+#define p2m_is_special(_t)  (p2m_to_mask(_t) & P2M_SPECIAL_TYPES)
 #define p2m_is_broken(_t)   (p2m_to_mask(_t) & P2M_BROKEN_TYPES)
 #define p2m_is_foreign(_t)  (p2m_to_mask(_t) & p2m_to_mask(p2m_map_foreign))
 
