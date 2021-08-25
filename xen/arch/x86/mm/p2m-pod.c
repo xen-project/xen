@@ -1297,16 +1297,16 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn_l,
 
         p2m->get_entry(p2m, gfn_add(gfn, i), &ot, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
-        if ( p2m_is_ram(ot) )
+        if ( ot == p2m_populate_on_demand )
+        {
+            /* Count how many PoD entries we'll be replacing if successful */
+            pod_count += n;
+        }
+        else if ( ot != p2m_invalid && ot != p2m_mmio_dm )
         {
             P2M_DEBUG("gfn_to_mfn returned type %d!\n", ot);
             rc = -EBUSY;
             goto out;
-        }
-        else if ( ot == p2m_populate_on_demand )
-        {
-            /* Count how man PoD entries we'll be replacing if successful */
-            pod_count += n;
         }
     }
 
