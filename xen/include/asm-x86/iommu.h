@@ -16,6 +16,7 @@
 
 #include <xen/errno.h>
 #include <xen/list.h>
+#include <xen/mem_access.h>
 #include <xen/spinlock.h>
 #include <asm/apicdef.h>
 #include <asm/processor.h>
@@ -49,7 +50,7 @@ struct arch_iommu
     spinlock_t mapping_lock;            /* io page table lock */
     int agaw;     /* adjusted guest address width, 0 is level 2 30-bit */
     u64 iommu_bitmap;              /* bitmap of iommu(s) that the domain uses */
-    struct list_head mapped_rmrrs;
+    struct list_head identity_maps;
 
     /* amd iommu support */
     int paging_mode;
@@ -111,6 +112,11 @@ static inline void iommu_disable_x2apic(void)
     if ( x2apic_enabled && iommu_ops.disable_x2apic )
         iommu_ops.disable_x2apic();
 }
+
+int iommu_identity_mapping(struct domain *d, p2m_access_t p2ma,
+                           paddr_t base, paddr_t end,
+                           unsigned int flag);
+void iommu_identity_map_teardown(struct domain *d);
 
 extern bool untrusted_msi;
 
