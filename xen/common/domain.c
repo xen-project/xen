@@ -721,11 +721,13 @@ int domain_kill(struct domain *d)
             return domain_kill(d);
         d->is_dying = DOMDYING_dying;
         argo_destroy(d);
-        gnttab_release_mappings(d);
         vnuma_destroy(d->vnuma);
         domain_set_outstanding_pages(d, 0);
         /* fallthrough */
     case DOMDYING_dying:
+        rc = gnttab_release_mappings(d);
+        if ( rc )
+            break;
         rc = evtchn_destroy(d);
         if ( rc )
             break;
