@@ -21,7 +21,7 @@ ENTRY(efi_start)
 
 #define FORMAT "elf64-x86-64"
 #define SECTION_ALIGN PAGE_SIZE
-#define DECL_SECTION(x) x : AT(ADDR(x) - __XEN_VIRT_START)
+#define DECL_SECTION(x) x : AT(ADDR(#x) - __XEN_VIRT_START)
 
 ENTRY(start_pa)
 
