@@ -512,6 +512,16 @@ int p2m_pt_handle_deferred_changes(uint64_t gpa)
     return rc;
 }
 
+/* Reconstruct a fake p2m_access_t from stored PTE flags. */
+static p2m_access_t p2m_flags_to_access(unsigned int flags)
+{
+    if ( flags & _PAGE_PRESENT )
+        return p2m_access_n;
+
+    /* No need to look at _PAGE_NX for now. */
+    return flags & _PAGE_RW ? p2m_access_rw : p2m_access_r;
+}
+
 /* Checks only applicable to entries with order > PAGE_ORDER_4K */
 static void check_entry(mfn_t mfn, p2m_type_t new, p2m_type_t old,
                         unsigned int order)
@@ -546,7 +556,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     l2_pgentry_t l2e_content;
     l3_pgentry_t l3e_content;
     int rc;
-    unsigned int iommu_pte_flags = p2m_get_iommu_flags(p2mt, mfn);
+    unsigned int iommu_pte_flags = p2m_get_iommu_flags(p2mt, p2ma, mfn);
     /*
      * old_mfn and iommu_old_flags control possible flush/update needs on the
      * IOMMU: We need to flush when MFN or flags (i.e. permissions) change.
@@ -609,6 +619,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
                 old_mfn = l1e_get_pfn(*p2m_entry);
                 iommu_old_flags =
                     p2m_get_iommu_flags(p2m_flags_to_type(flags),
+                                        p2m_flags_to_access(flags),
                                         _mfn(old_mfn));
             }
             else
@@ -654,9 +665,10 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
                                    0, L1_PAGETABLE_ENTRIES);
         ASSERT(p2m_entry);
         old_mfn = l1e_get_pfn(*p2m_entry);
+        flags = l1e_get_flags(*p2m_entry);
         iommu_old_flags =
-            p2m_get_iommu_flags(p2m_flags_to_type(l1e_get_flags(*p2m_entry)),
-                                _mfn(old_mfn));
+            p2m_get_iommu_flags(p2m_flags_to_type(flags),
+                                p2m_flags_to_access(flags), _mfn(old_mfn));
 
         if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
             entry_content = p2m_l1e_from_pfn(mfn_x(mfn),
@@ -687,6 +699,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
                 old_mfn = l1e_get_pfn(*p2m_entry);
                 iommu_old_flags =
                     p2m_get_iommu_flags(p2m_flags_to_type(flags),
+                                        p2m_flags_to_access(flags),
                                         _mfn(old_mfn));
             }
             else
