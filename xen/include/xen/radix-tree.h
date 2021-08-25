@@ -190,6 +190,25 @@ static inline int radix_tree_ptr_to_int(void *ptr)
     return (int)((long)ptr >> 2);
 }
 
+/**
+ * radix_tree_{ulong_to_ptr,ptr_to_ulong}:
+ *
+ * Same for unsigned long values. Beware though that only BITS_PER_LONG-2
+ * bits are actually usable for the value.
+ */
+static inline void *radix_tree_ulong_to_ptr(unsigned long val)
+{
+    unsigned long ptr = (val << 2) | 0x2;
+    ASSERT((ptr >> 2) == val);
+    return (void *)ptr;
+}
+
+static inline unsigned long radix_tree_ptr_to_ulong(void *ptr)
+{
+    ASSERT(((unsigned long)ptr & 0x3) == 0x2);
+    return (unsigned long)ptr >> 2;
+}
+
 int radix_tree_insert(struct radix_tree_root *, unsigned long, void *);
 void *radix_tree_lookup(struct radix_tree_root *, unsigned long);
 void **radix_tree_lookup_slot(struct radix_tree_root *, unsigned long);
