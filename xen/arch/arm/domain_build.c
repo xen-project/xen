@@ -2440,7 +2440,8 @@ static int __init construct_domU(struct domain *d,
 
     if ( vcpu_create(d, 0) == NULL )
         return -ENOMEM;
-    d->max_pages = ~0U;
+
+    d->max_pages = ((paddr_t)mem * SZ_1K) >> PAGE_SHIFT;
 
     kinfo.d = d;
 
@@ -2546,7 +2547,7 @@ static int __init construct_dom0(struct domain *d)
 
     iommu_hwdom_init(d);
 
-    d->max_pages = ~0U;
+    d->max_pages = dom0_mem >> PAGE_SHIFT;
 
     kinfo.unassigned_mem = dom0_mem;
     kinfo.d = d;
