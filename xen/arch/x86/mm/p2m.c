@@ -796,7 +796,8 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
                                           &cur_order, NULL);
 
         if ( p2m_is_valid(t) &&
-             (!mfn_valid(_mfn(mfn)) || mfn + i != mfn_x(mfn_return)) )
+             (!mfn_valid(_mfn(mfn)) || t == p2m_mmio_direct ||
+              mfn + i != mfn_x(mfn_return)) )
             return -EILSEQ;
 
         i += (1UL << cur_order) - ((gfn_l + i) & ((1UL << cur_order) - 1));
@@ -890,7 +891,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     if ( p2m_is_foreign(t) )
         return -EINVAL;
 
-    if ( !mfn_valid(mfn) )
+    if ( !mfn_valid(mfn) || t == p2m_mmio_direct )
     {
         ASSERT_UNREACHABLE();
         return -EINVAL;
@@ -936,7 +937,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
         }
         if ( p2m_is_special(ot) )
         {
-            /* Don't permit unmapping grant/foreign this way. */
+            /* Don't permit unmapping grant/foreign/direct-MMIO this way. */
             domain_crash(d);
             p2m_unlock(p2m);
             
@@ -1385,8 +1386,8 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
  *    order+1  for caller to retry with order (guaranteed smaller than
  *             the order value passed in)
  */
-int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn,
-                         unsigned int order)
+static int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn_l,
+                                mfn_t mfn, unsigned int order)
 {
     int rc = -EINVAL;
     gfn_t gfn = _gfn(gfn_l);
