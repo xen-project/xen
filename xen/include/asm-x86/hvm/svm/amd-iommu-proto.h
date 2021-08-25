@@ -60,8 +60,10 @@ int __must_check amd_iommu_unmap_page(struct domain *d, unsigned long gfn);
 u64 amd_iommu_get_next_table_from_pte(u32 *entry);
 int __must_check amd_iommu_alloc_root(struct domain_iommu *hd);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
-                                       u64 phys_addr, unsigned long size,
-                                       int iw, int ir);
+                                       const struct ivrs_unity_map *map,
+                                       unsigned int flag);
+int amd_iommu_reserve_domain_unity_unmap(struct domain *d,
+                                         const struct ivrs_unity_map *map);
 
 /* Share p2m table with iommu */
 void amd_iommu_share_p2m(struct domain *d);

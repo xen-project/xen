@@ -716,27 +716,49 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     return 0;
 }
 
-int amd_iommu_reserve_domain_unity_map(struct domain *domain,
-                                       u64 phys_addr,
-                                       unsigned long size, int iw, int ir)
+int amd_iommu_reserve_domain_unity_map(struct domain *d,
+                                       const struct ivrs_unity_map *map,
+                                       unsigned int flag)
 {
-    unsigned long npages, i;
-    unsigned long gfn;
-    unsigned int flags = !!ir;
-    int rt = 0;
+    int rc;
 
-    if ( iw )
-        flags |= IOMMUF_writable;
+    if ( d == dom_io )
+        return 0;
 
-    npages = region_to_pages(phys_addr, size);
-    gfn = phys_addr >> PAGE_SHIFT;
-    for ( i = 0; i < npages; i++ )
+    for ( rc = 0; !rc && map; map = map->next )
     {
-        rt = amd_iommu_map_page(domain, gfn +i, gfn +i, flags);
-        if ( rt != 0 )
-            return rt;
+        p2m_access_t p2ma = p2m_access_n;
+
+        if ( map->read )
+            p2ma |= p2m_access_r;
+        if ( map->write )
+            p2ma |= p2m_access_w;
+
+        rc = iommu_identity_mapping(d, p2ma, map->addr,
+                                    map->addr + map->length - 1, flag);
     }
-    return 0;
+
+    return rc;
+}
+
+int amd_iommu_reserve_domain_unity_unmap(struct domain *d,
+                                         const struct ivrs_unity_map *map)
+{
+    int rc;
+
+    if ( d == dom_io )
+        return 0;
+
+    for ( rc = 0; map; map = map->next )
+    {
+        int ret = iommu_identity_mapping(d, p2m_access_x, map->addr,
+                                         map->addr + map->length - 1, 0);
+
+        if ( ret && ret != -ENOENT && !rc )
+            rc = ret;
+    }
+
+    return rc;
 }
 
 /* Share p2m table with iommu. */
