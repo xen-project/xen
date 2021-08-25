@@ -119,14 +119,16 @@ EXPORT_SYMBOL(strlcat);
  */
 int (strcmp)(const char *cs, const char *ct)
 {
-	register signed char __res;
+	unsigned char *csu = (unsigned char *)cs;
+	unsigned char *ctu = (unsigned char *)ct;
+	int res;
 
 	while (1) {
-		if ((__res = *cs - *ct++) != 0 || !*cs++)
+		if ((res = *csu - *ctu++) != 0 || !*csu++)
 			break;
 	}
 
-	return __res;
+	return res;
 }
 #endif
 
@@ -139,15 +141,17 @@ int (strcmp)(const char *cs, const char *ct)
  */
 int (strncmp)(const char *cs, const char *ct, size_t count)
 {
-	register signed char __res = 0;
+	unsigned char *csu = (unsigned char *)cs;
+	unsigned char *ctu = (unsigned char *)ct;
+	int res = 0;
 
 	while (count) {
-		if ((__res = *cs - *ct++) != 0 || !*cs++)
+		if ((res = *csu - *ctu++) != 0 || !*csu++)
 			break;
 		count--;
 	}
 
-	return __res;
+	return res;
 }
 #endif
 
