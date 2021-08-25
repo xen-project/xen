@@ -646,13 +646,15 @@ int domain_kill(struct domain *d)
         if ( d->is_dying != DOMDYING_alive )
             return domain_kill(d);
         d->is_dying = DOMDYING_dying;
-        gnttab_release_mappings(d);
         tmem_destroy(d->tmem_client);
         vnuma_destroy(d->vnuma);
         domain_set_outstanding_pages(d, 0);
         d->tmem_client = NULL;
         /* fallthrough */
     case DOMDYING_dying:
+        rc = gnttab_release_mappings(d);
+        if ( rc )
+            break;
         rc = evtchn_destroy(d);
         if ( rc )
             break;
