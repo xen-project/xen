@@ -1341,7 +1341,7 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
         if ( !has_iommu_pt(d) )
             return 0;
         return iommu_legacy_map(d, _dfn(gfn_l), _mfn(gfn_l), PAGE_ORDER_4K,
-                                IOMMUF_readable | IOMMUF_writable);
+                                p2m_access_to_iommu_flags(p2ma));
     }
 
     gfn_lock(p2m, gfn, 0);
