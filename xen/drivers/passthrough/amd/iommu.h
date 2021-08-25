@@ -304,6 +304,8 @@ extern struct hpet_sbdf {
     } init;
 } hpet_sbdf;
 
+extern int amd_iommu_min_paging_mode;
+
 extern void *shared_intremap_table;
 extern unsigned long *shared_intremap_inuse;
 

@@ -246,6 +246,8 @@ int amd_iommu_alloc_root(struct domain *d)
     return 0;
 }
 
+int __read_mostly amd_iommu_min_paging_mode = 1;
+
 static int amd_iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
@@ -257,11 +259,13 @@ static int amd_iommu_domain_init(struct domain *d)
      * - HVM could in principle use 3 or 4 depending on how much guest
      *   physical address space we give it, but this isn't known yet so use 4
      *   unilaterally.
+     * - Unity maps may require an even higher number.
      */
-    hd->arch.amd.paging_mode = amd_iommu_get_paging_mode(
-        is_hvm_domain(d)
-        ? 1ul << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT)
-        : get_upper_mfn_bound() + 1);
+    hd->arch.amd.paging_mode = max(amd_iommu_get_paging_mode(
+            is_hvm_domain(d)
+            ? 1ul << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT)
+            : get_upper_mfn_bound() + 1),
+        amd_iommu_min_paging_mode);
 
     return 0;
 }
