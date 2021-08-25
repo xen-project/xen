@@ -64,7 +64,13 @@ struct grant_table {
     unsigned int          nr_grant_frames;
     /* Number of grant status frames shared with guest (for version 2) */
     unsigned int          nr_status_frames;
-    /* Number of available maptrack entries. */
+    /*
+     * Number of available maptrack entries.  For cleanup purposes it is
+     * important to realize that this field and @maptrack further down will
+     * only ever be accessed by the local domain.  Thus it is okay to clean
+     * up early, and to shrink the limit for the purpose of tracking cleanup
+     * progress.
+     */
     unsigned int          maptrack_limit;
     /* Shared grant table (see include/public/grant_table.h). */
     union {
@@ -3679,9 +3685,7 @@ do_grant_table_op(
 #include "compat/grant_table.c"
 #endif
 
-void
-gnttab_release_mappings(
-    struct domain *d)
+int gnttab_release_mappings(struct domain *d)
 {
     struct grant_table   *gt = d->grant_table, *rgt;
     struct grant_mapping *map;
@@ -3695,8 +3699,32 @@ gnttab_release_mappings(
 
     BUG_ON(!d->is_dying);
 
-    for ( handle = 0; handle < gt->maptrack_limit; handle++ )
+    if ( !gt || !gt->maptrack )
+        return 0;
+
+    for ( handle = gt->maptrack_limit; handle; )
     {
+        /*
+         * Deal with full pages such that their freeing (in the body of the
+         * if()) remains simple.
+         */
+        if ( handle < gt->maptrack_limit && !(handle % MAPTRACK_PER_PAGE) )
+        {
+            /*
+             * Changing maptrack_limit alters nr_maptrack_frames()'es return
+             * value. Free the then excess trailing page right here, rather
+             * than leaving it to grant_table_destroy() (and in turn requiring
+             * to leave gt->maptrack_limit unaltered).
+             */
+            gt->maptrack_limit = handle;
+            FREE_XENHEAP_PAGE(gt->maptrack[nr_maptrack_frames(gt)]);
+
+            if ( hypercall_preempt_check() )
+                return -ERESTART;
+        }
+
+        --handle;
+
         map = &maptrack_entry(gt, handle);
         if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) )
             continue;
@@ -3780,6 +3808,11 @@ gnttab_release_mappings(
 
         map->flags = 0;
     }
+
+    gt->maptrack_limit = 0;
+    FREE_XENHEAP_PAGE(gt->maptrack[0]);
+
+    return 0;
 }
 
 void grant_table_warn_active_grants(struct domain *d)
@@ -3843,8 +3876,7 @@ grant_table_destroy(
         free_xenheap_page(t->shared_raw[i]);
     xfree(t->shared_raw);
 
-    for ( i = 0; i < nr_maptrack_frames(t); i++ )
-        free_xenheap_page(t->maptrack[i]);
+    ASSERT(!t->maptrack_limit);
     vfree(t->maptrack);
 
     for ( i = 0; i < nr_active_grant_frames(t); i++ )
