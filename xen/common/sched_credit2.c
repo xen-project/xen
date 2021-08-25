@@ -3368,6 +3368,15 @@ runq_candidate(struct csched2_runqueue_data *rqd,
                         (unsigned char *)&d);
         }
 
+        /*
+         * If the unit in the runqueue has more credits than current (or than
+         * idle, if current is not runnable) or if current is yielding, we may
+         * want to pick it up. Otherwise, there's no need to keep scanning the
+         * runqueue any further.
+         */
+        if ( !yield && svc->credit <= snext->credit )
+            break;
+
         /* Skip non runnable units that we (temporarily) have in the runq */
         if ( unlikely(!unit_runnable_state(svc->unit)) )
             continue;
@@ -3399,16 +3408,25 @@ runq_candidate(struct csched2_runqueue_data *rqd,
         }
 
         /*
-         * If the one in the runqueue has more credit than current (or idle,
-         * if current is not runnable), or if current is yielding, and also
-         * if the one in runqueue either is not capped, or is capped but has
-         * some budget, then choose it.
+         * If we are here, we are almost sure we want to pick the unit in
+         * the runqueue. Last thing we need to check is that it either is
+         * not capped or, if it is, it has some budget.
+         *
+         * Note that budget availability must be the very last check that
+         * we do in this loop, due to the side effects that unit_grab_budget()
+         * causes.
+         *
+         * In fact, if there is budget available in the unit's domain's
+         * budget pool, the function will pick some for running this unit.
+         * And we clearly want to do that only if we're otherwise sure that
+         * the unit will actually run, consume it, and return the leftover
+         * (if any) in the usual way.
          */
-        if ( (yield || svc->credit > snext->credit) &&
-             (!has_cap(svc) || unit_grab_budget(svc)) )
-            snext = svc;
+        if ( has_cap(svc) && !unit_grab_budget(svc) )
+            continue;
 
         /* In any case, if we got this far, break. */
+        snext = svc;
         break;
     }
 
