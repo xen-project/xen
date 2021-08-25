@@ -805,7 +805,8 @@ p2m_remove_page(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                                           &cur_order, NULL);
 
         if ( p2m_is_valid(t) &&
-             (!mfn_valid(mfn) || !mfn_eq(mfn_add(mfn, i), mfn_return)) )
+             (!mfn_valid(mfn) || t == p2m_mmio_direct ||
+              !mfn_eq(mfn_add(mfn, i), mfn_return)) )
             return -EILSEQ;
 
         i += (1UL << cur_order) -
@@ -912,7 +913,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     if ( p2m_is_foreign(t) )
         return -EINVAL;
 
-    if ( !mfn_valid(mfn) )
+    if ( !mfn_valid(mfn) || t == p2m_mmio_direct )
     {
         ASSERT_UNREACHABLE();
         return -EINVAL;
@@ -956,7 +957,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
         }
         if ( p2m_is_special(ot) )
         {
-            /* Don't permit unmapping grant/foreign this way. */
+            /* Don't permit unmapping grant/foreign/direct-MMIO this way. */
             domain_crash(d);
             p2m_unlock(p2m);
             
@@ -1364,8 +1365,8 @@ int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
  *    order+1  for caller to retry with order (guaranteed smaller than
  *             the order value passed in)
  */
-int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn,
-                         unsigned int order)
+static int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn_l,
+                                mfn_t mfn, unsigned int order)
 {
     int rc = -EINVAL;
     gfn_t gfn = _gfn(gfn_l);
@@ -2766,7 +2767,9 @@ int xenmem_add_to_physmap_one(
 
     /* Remove previously mapped page if it was present. */
     prev_mfn = get_gfn(d, gfn_x(gpfn), &p2mt);
-    if ( mfn_valid(prev_mfn) )
+    if ( p2mt == p2m_mmio_direct )
+        rc = -EPERM;
+    else if ( mfn_valid(prev_mfn) )
     {
         if ( is_special_page(mfn_to_page(prev_mfn)) )
             /* Special pages are simply unhooked from this phys slot. */

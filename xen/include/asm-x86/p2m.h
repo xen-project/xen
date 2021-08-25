@@ -156,7 +156,8 @@ typedef unsigned int p2m_query_t;
 
 /* Types established/cleaned up via special accessors. */
 #define P2M_SPECIAL_TYPES (P2M_GRANT_TYPES | \
-                           p2m_to_mask(p2m_map_foreign))
+                           p2m_to_mask(p2m_map_foreign) | \
+                           p2m_to_mask(p2m_mmio_direct))
 
 /* Valid types not necessarily associated with a (valid) MFN. */
 #define P2M_INVALID_MFN_TYPES (P2M_POD_TYPES                  \
@@ -627,19 +628,9 @@ int p2m_finish_type_change(struct domain *d,
 int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
                           unsigned long end);
 
-#ifdef CONFIG_HVM
 /* Set mmio addresses in the p2m table (for pass-through) */
 int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                        unsigned int order);
-int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
-                         unsigned int order);
-#else
-static inline int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn,
-                                       mfn_t mfn, unsigned int order)
-{
-    return -EIO;
-}
-#endif
 
 /* Set identity addresses in the p2m table (for pass-through) */
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
