@@ -806,7 +806,7 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
         for ( i = 0; i < (1UL << page_order); i++ )
         {
             p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, NULL, NULL);
-            if ( !p2m_is_grant(t) && !p2m_is_shared(t) && !p2m_is_foreign(t) )
+            if ( !p2m_is_special(t) && !p2m_is_shared(t) )
                 set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
         }
     }
@@ -917,13 +917,13 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                                   &ot, &a, 0, NULL, NULL);
             ASSERT(!p2m_is_shared(ot));
         }
-        if ( p2m_is_grant(ot) || p2m_is_foreign(ot) )
+        if ( p2m_is_special(ot) )
         {
-            /* Really shouldn't be unmapping grant/foreign maps this way */
+            /* Don't permit unmapping grant/foreign this way. */
             domain_crash(d);
             p2m_unlock(p2m);
             
-            return -EINVAL;
+            return -EPERM;
         }
         else if ( p2m_is_ram(ot) && !p2m_is_paged(ot) )
         {
@@ -1018,8 +1018,7 @@ int p2m_change_type_one(struct domain *d, unsigned long gfn_l,
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc;
 
-    BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
-    BUG_ON(p2m_is_foreign(ot) || p2m_is_foreign(nt));
+    BUG_ON(p2m_is_special(ot) || p2m_is_special(nt));
 
     gfn_lock(p2m, gfn, 0);
 
@@ -1272,11 +1271,11 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
         gfn_unlock(p2m, gfn, order);
         return cur_order + 1;
     }
-    if ( p2m_is_grant(ot) || p2m_is_foreign(ot) )
+    if ( p2m_is_special(ot) )
     {
         gfn_unlock(p2m, gfn, order);
         domain_crash(d);
-        return -ENOENT;
+        return -EPERM;
     }
     else if ( p2m_is_ram(ot) )
     {
