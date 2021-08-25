@@ -708,7 +708,6 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
 {
     unsigned long i;
     gfn_t gfn = _gfn(gfn_l);
-    mfn_t mfn_return;
     p2m_type_t t;
     p2m_access_t a;
 
@@ -719,15 +718,26 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
     ASSERT(gfn_locked_by_me(p2m, gfn));
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn_l, mfn);
 
+    for ( i = 0; i < (1UL << page_order); )
+    {
+        unsigned int cur_order;
+        mfn_t mfn_return = p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0,
+                                          &cur_order, NULL);
+
+        if ( p2m_is_valid(t) &&
+             (!mfn_valid(_mfn(mfn)) || mfn + i != mfn_x(mfn_return)) )
+            return -EILSEQ;
+
+        i += (1UL << cur_order) - ((gfn_l + i) & ((1UL << cur_order) - 1));
+    }
+
     if ( mfn_valid(_mfn(mfn)) )
     {
         for ( i = 0; i < (1UL << page_order); i++ )
         {
-            mfn_return = p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0,
-                                        NULL, NULL);
+            p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, NULL, NULL);
             if ( !p2m_is_grant(t) && !p2m_is_shared(t) && !p2m_is_foreign(t) )
                 set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
-            ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
         }
     }
     return p2m_set_entry(p2m, gfn, INVALID_MFN, page_order, p2m_invalid,
