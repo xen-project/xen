@@ -145,32 +145,48 @@ static int __init reserve_iommu_exclusion_range(
     return 0;
 }
 
-static void __init reserve_unity_map_for_device(
-    u16 seg, u16 bdf, unsigned long base,
-    unsigned long length, u8 iw, u8 ir)
+static int __init reserve_unity_map_for_device(
+    uint16_t seg, uint16_t bdf, unsigned long base,
+    unsigned long length, bool iw, bool ir)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
-    unsigned long old_top, new_top;
+    struct ivrs_unity_map *unity_map = ivrs_mappings[bdf].unity_map;
 
-    /* need to extend unity-mapped range? */
-    if ( ivrs_mappings[bdf].unity_map_enable )
+    /* Check for overlaps. */
+    for ( ; unity_map; unity_map = unity_map->next )
     {
-        old_top = ivrs_mappings[bdf].addr_range_start +
-            ivrs_mappings[bdf].addr_range_length;
-        new_top = base + length;
-        if ( old_top > new_top )
-            new_top = old_top;
-        if ( ivrs_mappings[bdf].addr_range_start < base )
-            base = ivrs_mappings[bdf].addr_range_start;
-        length = new_top - base;
+        /*
+         * Exact matches are okay. This can in particular happen when
+         * register_exclusion_range_for_device() calls here twice for the
+         * same (s,b,d,f).
+         */
+        if ( base == unity_map->addr && length == unity_map->length &&
+             ir == unity_map->read && iw == unity_map->write )
+            return 0;
+
+        if ( unity_map->addr + unity_map->length > base &&
+             base + length > unity_map->addr )
+        {
+            AMD_IOMMU_DEBUG("IVMD Error: overlap [%lx,%lx) vs [%lx,%lx)\n",
+                            base, base + length, unity_map->addr,
+                            unity_map->addr + unity_map->length);
+            return -EPERM;
+        }
     }
 
-    /* extend r/w permissioms and keep aggregate */
-    ivrs_mappings[bdf].write_permission = iw;
-    ivrs_mappings[bdf].read_permission = ir;
-    ivrs_mappings[bdf].unity_map_enable = true;
-    ivrs_mappings[bdf].addr_range_start = base;
-    ivrs_mappings[bdf].addr_range_length = length;
+    /* Populate and insert a new unity map. */
+    unity_map = xmalloc(struct ivrs_unity_map);
+    if ( !unity_map )
+        return -ENOMEM;
+
+    unity_map->read = ir;
+    unity_map->write = iw;
+    unity_map->addr = base;
+    unity_map->length = length;
+    unity_map->next = ivrs_mappings[bdf].unity_map;
+    ivrs_mappings[bdf].unity_map = unity_map;
+
+    return 0;
 }
 
 static int __init register_exclusion_range_for_all_devices(
@@ -193,13 +209,13 @@ static int __init register_exclusion_range_for_all_devices(
         length = range_top - base;
         /* reserve r/w unity-mapped page entries for devices */
         /* note: these entries are part of the exclusion range */
-        for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
-            reserve_unity_map_for_device(seg, bdf, base, length, iw, ir);
+        for ( bdf = 0; !rc && bdf < ivrs_bdf_entries; bdf++ )
+            rc = reserve_unity_map_for_device(seg, bdf, base, length, iw, ir);
         /* push 'base' just outside of virtual address space */
         base = iommu_top;
     }
     /* register IOMMU exclusion range settings */
-    if ( limit >= iommu_top )
+    if ( !rc && limit >= iommu_top )
     {
         for_each_amd_iommu( iommu )
         {
@@ -241,15 +257,15 @@ static int __init register_exclusion_range_for_device(
         length = range_top - base;
         /* reserve unity-mapped page entries for device */
         /* note: these entries are part of the exclusion range */
-        reserve_unity_map_for_device(seg, bdf, base, length, iw, ir);
-        reserve_unity_map_for_device(seg, req, base, length, iw, ir);
+        rc = reserve_unity_map_for_device(seg, bdf, base, length, iw, ir) ?:
+             reserve_unity_map_for_device(seg, req, base, length, iw, ir);
 
         /* push 'base' just outside of virtual address space */
         base = iommu_top;
     }
 
     /* register IOMMU exclusion range settings for device */
-    if ( limit >= iommu_top  )
+    if ( !rc && limit >= iommu_top  )
     {
         rc = reserve_iommu_exclusion_range(iommu, base, limit,
                                            false /* all */, iw, ir);
@@ -280,15 +296,15 @@ static int __init register_exclusion_range_for_iommu_devices(
         length = range_top - base;
         /* reserve r/w unity-mapped page entries for devices */
         /* note: these entries are part of the exclusion range */
-        for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
+        for ( bdf = 0; !rc && bdf < ivrs_bdf_entries; bdf++ )
         {
             if ( iommu == find_iommu_for_device(iommu->seg, bdf) )
             {
-                reserve_unity_map_for_device(iommu->seg, bdf, base, length,
-                                             iw, ir);
                 req = get_ivrs_mappings(iommu->seg)[bdf].dte_requestor_id;
-                reserve_unity_map_for_device(iommu->seg, req, base, length,
-                                             iw, ir);
+                rc = reserve_unity_map_for_device(iommu->seg, bdf, base, length,
+                                                  iw, ir) ?:
+                     reserve_unity_map_for_device(iommu->seg, req, base, length,
+                                                  iw, ir);
             }
         }
 
@@ -297,7 +313,7 @@ static int __init register_exclusion_range_for_iommu_devices(
     }
 
     /* register IOMMU exclusion range settings */
-    if ( limit >= iommu_top )
+    if ( !rc && limit >= iommu_top )
         rc = reserve_iommu_exclusion_range(iommu, base, limit,
                                            true /* all */, iw, ir);
 
