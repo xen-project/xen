@@ -4650,8 +4650,20 @@ int xenmem_add_to_physmap_one(
         goto put_both;
     }
 
-    /* Remove previously mapped page if it was present. */
+    /*
+     * Note that we're (ab)using GFN locking (to really be locking of the
+     * entire P2M) here in (at least) two ways: Finer grained locking would
+     * expose lock order violations in the XENMAPSPACE_gmfn case (due to the
+     * earlier get_gfn_unshare() above). Plus at the very least for the grant
+     * table v2 status page case we need to guarantee that the same page can
+     * only appear at a single GFN. While this is a property we want in
+     * general, for pages which can subsequently be freed this imperative:
+     * Upon freeing we wouldn't be able to find other mappings in the P2M
+     * (unless we did a brute force search).
+     */
     prev_mfn = get_gfn(d, gfn_x(gpfn), &p2mt);
+
+    /* Remove previously mapped page if it was present. */
     if ( p2mt == p2m_mmio_direct )
         rc = -EPERM;
     else if ( mfn_valid(prev_mfn) )
@@ -4663,26 +4675,20 @@ int xenmem_add_to_physmap_one(
             /* Normal domain memory is freed, to avoid leaking memory. */
             rc = guest_remove_page(d, gfn_x(gpfn));
     }
-    /* In the XENMAPSPACE_gmfn case we still hold a ref on the old page. */
-    put_gfn(d, gfn_x(gpfn));
-
-    if ( rc )
-        goto put_both;
 
     /* Unmap from old location, if any. */
     old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
     ASSERT(!SHARED_M2P(old_gpfn));
     if ( space == XENMAPSPACE_gmfn && old_gpfn != gfn )
-    {
         rc = -EXDEV;
-        goto put_both;
-    }
-    if ( old_gpfn != INVALID_M2P_ENTRY )
+    else if ( !rc && old_gpfn != INVALID_M2P_ENTRY )
         rc = guest_physmap_remove_page(d, _gfn(old_gpfn), mfn, PAGE_ORDER_4K);
 
     /* Map at new location. */
     if ( !rc )
         rc = guest_physmap_add_page(d, gpfn, mfn, PAGE_ORDER_4K);
+
+    put_gfn(d, gfn_x(gpfn));
 
  put_both:
     /*
