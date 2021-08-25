@@ -47,9 +47,7 @@ void grant_table_init_vcpu(struct vcpu *v);
 void grant_table_warn_active_grants(struct domain *d);
 
 /* Domain death release of granted mappings of other domains' memory. */
-void
-gnttab_release_mappings(
-    struct domain *d);
+int gnttab_release_mappings(struct domain *d);
 
 int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
                             gfn_t *gfn, uint16_t *status);
@@ -78,7 +76,7 @@ static inline void grant_table_init_vcpu(struct vcpu *v) {}
 
 static inline void grant_table_warn_active_grants(struct domain *d) {}
 
-static inline void gnttab_release_mappings(struct domain *d) {}
+static inline int gnttab_release_mappings(struct domain *d) { return 0; }
 
 static inline int mem_sharing_gref_to_gfn(struct grant_table *gt,
                                           grant_ref_t ref,
