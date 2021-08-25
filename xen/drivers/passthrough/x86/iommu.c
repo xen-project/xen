@@ -143,6 +143,7 @@ int arch_iommu_domain_init(struct domain *d)
 
     INIT_PAGE_LIST_HEAD(&hd->arch.pgtables.list);
     spin_lock_init(&hd->arch.pgtables.lock);
+    INIT_LIST_HEAD(&hd->arch.identity_maps);
 
     return 0;
 }
@@ -156,6 +157,99 @@ void arch_iommu_domain_destroy(struct domain *d)
      */
     ASSERT(!dom_iommu(d)->platform_ops ||
            page_list_empty(&dom_iommu(d)->arch.pgtables.list));
+}
+
+struct identity_map {
+    struct list_head list;
+    paddr_t base, end;
+    p2m_access_t access;
+    unsigned int count;
+};
+
+int iommu_identity_mapping(struct domain *d, p2m_access_t p2ma,
+                           paddr_t base, paddr_t end,
+                           unsigned int flag)
+{
+    unsigned long base_pfn = base >> PAGE_SHIFT_4K;
+    unsigned long end_pfn = PAGE_ALIGN_4K(end) >> PAGE_SHIFT_4K;
+    struct identity_map *map;
+    struct domain_iommu *hd = dom_iommu(d);
+
+    ASSERT(pcidevs_locked());
+    ASSERT(base < end);
+
+    /*
+     * No need to acquire hd->arch.mapping_lock: Both insertion and removal
+     * get done while holding pcidevs_lock.
+     */
+    list_for_each_entry( map, &hd->arch.identity_maps, list )
+    {
+        if ( map->base == base && map->end == end )
+        {
+            int ret = 0;
+
+            if ( p2ma != p2m_access_x )
+            {
+                if ( map->access != p2ma )
+                    return -EADDRINUSE;
+                ++map->count;
+                return 0;
+            }
+
+            if ( --map->count )
+                return 0;
+
+            while ( base_pfn < end_pfn )
+            {
+                if ( clear_identity_p2m_entry(d, base_pfn) )
+                    ret = -ENXIO;
+                base_pfn++;
+            }
+
+            list_del(&map->list);
+            xfree(map);
+
+            return ret;
+        }
+
+        if ( end >= map->base && map->end >= base )
+            return -EADDRINUSE;
+    }
+
+    if ( p2ma == p2m_access_x )
+        return -ENOENT;
+
+    while ( base_pfn < end_pfn )
+    {
+        int err = set_identity_p2m_entry(d, base_pfn, p2ma, flag);
+
+        if ( err )
+            return err;
+        base_pfn++;
+    }
+
+    map = xmalloc(struct identity_map);
+    if ( !map )
+        return -ENOMEM;
+    map->base = base;
+    map->end = end;
+    map->access = p2ma;
+    map->count = 1;
+    list_add_tail(&map->list, &hd->arch.identity_maps);
+
+    return 0;
+}
+
+void iommu_identity_map_teardown(struct domain *d)
+{
+    struct domain_iommu *hd = dom_iommu(d);
+    struct identity_map *map, *tmp;
+
+    list_for_each_entry_safe ( map, tmp, &hd->arch.identity_maps, list )
+    {
+        list_del(&map->list);
+        xfree(map);
+    }
 }
 
 static bool __hwdom_init hwdom_iommu_map(const struct domain *d,

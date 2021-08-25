@@ -42,12 +42,6 @@
 #include "vtd.h"
 #include "../ats.h"
 
-struct mapped_rmrr {
-    struct list_head list;
-    u64 base, end;
-    unsigned int count;
-};
-
 /* Possible unfiltered LAPIC/MSI messages from untrusted sources? */
 bool __read_mostly untrusted_msi;
 
@@ -1311,7 +1305,6 @@ static int intel_iommu_domain_init(struct domain *d)
     struct domain_iommu *hd = dom_iommu(d);
 
     hd->arch.vtd.agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
-    INIT_LIST_HEAD(&hd->arch.vtd.mapped_rmrrs);
 
     return 0;
 }
@@ -1788,17 +1781,12 @@ static void iommu_clear_root_pgtable(struct domain *d)
 static void iommu_domain_teardown(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
-    struct mapped_rmrr *mrmrr, *tmp;
     const struct acpi_drhd_unit *drhd;
 
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    list_for_each_entry_safe ( mrmrr, tmp, &hd->arch.vtd.mapped_rmrrs, list )
-    {
-        list_del(&mrmrr->list);
-        xfree(mrmrr);
-    }
+    iommu_identity_map_teardown(d);
 
     ASSERT(!hd->arch.vtd.pgd_maddr);
 
@@ -1946,74 +1934,6 @@ static int __init vtd_ept_page_compatible(struct vtd_iommu *iommu)
            (ept_has_1gb(ept_cap) && opt_hap_1gb) <= cap_sps_1gb(vtd_cap);
 }
 
-static int rmrr_identity_mapping(struct domain *d, bool_t map,
-                                 const struct acpi_rmrr_unit *rmrr,
-                                 u32 flag)
-{
-    unsigned long base_pfn = rmrr->base_address >> PAGE_SHIFT_4K;
-    unsigned long end_pfn = PAGE_ALIGN_4K(rmrr->end_address) >> PAGE_SHIFT_4K;
-    struct mapped_rmrr *mrmrr;
-    struct domain_iommu *hd = dom_iommu(d);
-
-    ASSERT(pcidevs_locked());
-    ASSERT(rmrr->base_address < rmrr->end_address);
-
-    /*
-     * No need to acquire hd->arch.mapping_lock: Both insertion and removal
-     * get done while holding pcidevs_lock.
-     */
-    list_for_each_entry( mrmrr, &hd->arch.vtd.mapped_rmrrs, list )
-    {
-        if ( mrmrr->base == rmrr->base_address &&
-             mrmrr->end == rmrr->end_address )
-        {
-            int ret = 0;
-
-            if ( map )
-            {
-                ++mrmrr->count;
-                return 0;
-            }
-
-            if ( --mrmrr->count )
-                return 0;
-
-            while ( base_pfn < end_pfn )
-            {
-                if ( clear_identity_p2m_entry(d, base_pfn) )
-                    ret = -ENXIO;
-                base_pfn++;
-            }
-
-            list_del(&mrmrr->list);
-            xfree(mrmrr);
-            return ret;
-        }
-    }
-
-    if ( !map )
-        return -ENOENT;
-
-    while ( base_pfn < end_pfn )
-    {
-        int err = set_identity_p2m_entry(d, base_pfn, p2m_access_rw, flag);
-
-        if ( err )
-            return err;
-        base_pfn++;
-    }
-
-    mrmrr = xmalloc(struct mapped_rmrr);
-    if ( !mrmrr )
-        return -ENOMEM;
-    mrmrr->base = rmrr->base_address;
-    mrmrr->end = rmrr->end_address;
-    mrmrr->count = 1;
-    list_add_tail(&mrmrr->list, &hd->arch.vtd.mapped_rmrrs);
-
-    return 0;
-}
-
 static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
 {
     struct acpi_rmrr_unit *rmrr;
@@ -2045,7 +1965,9 @@ static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
              * Since RMRRs are always reserved in the e820 map for the hardware
              * domain, there shouldn't be a conflict.
              */
-            ret = rmrr_identity_mapping(pdev->domain, 1, rmrr, 0);
+            ret = iommu_identity_mapping(pdev->domain, p2m_access_rw,
+                                         rmrr->base_address, rmrr->end_address,
+                                         0);
             if ( ret )
                 dprintk(XENLOG_ERR VTDPREFIX, "d%d: RMRR mapping failed\n",
                         pdev->domain->domain_id);
@@ -2090,7 +2012,8 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
          * Any flag is nothing to clear these mappings but here
          * its always safe and strict to set 0.
          */
-        rmrr_identity_mapping(pdev->domain, 0, rmrr, 0);
+        iommu_identity_mapping(pdev->domain, p2m_access_x, rmrr->base_address,
+                               rmrr->end_address, 0);
     }
 
     return domain_context_unmap(pdev->domain, devfn, pdev);
@@ -2289,7 +2212,8 @@ static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
          * domain, there shouldn't be a conflict. So its always safe and
          * strict to set 0.
          */
-        ret = rmrr_identity_mapping(d, 1, rmrr, 0);
+        ret = iommu_identity_mapping(d, p2m_access_rw, rmrr->base_address,
+                                     rmrr->end_address, 0);
         if ( ret )
             dprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
@@ -2460,7 +2384,9 @@ static int reassign_device_ownership(
                  * Any RMRR flag is always ignored when remove a device,
                  * but its always safe and strict to set 0.
                  */
-                ret = rmrr_identity_mapping(source, 0, rmrr, 0);
+                ret = iommu_identity_mapping(source, p2m_access_x,
+                                             rmrr->base_address,
+                                             rmrr->end_address, 0);
                 if ( ret != -ENOENT )
                     return ret;
             }
@@ -2556,7 +2482,8 @@ static int intel_iommu_assign_device(
              PCI_BUS(bdf) == bus &&
              PCI_DEVFN2(bdf) == devfn )
         {
-            ret = rmrr_identity_mapping(d, 1, rmrr, flag);
+            ret = iommu_identity_mapping(d, p2m_access_rw, rmrr->base_address,
+                                         rmrr->end_address, flag);
             if ( ret )
             {
                 int rc;
