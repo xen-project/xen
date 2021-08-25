@@ -864,6 +864,12 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     if ( p2m_is_foreign(t) )
         return -EINVAL;
 
+    if ( !mfn_valid(mfn) )
+    {
+        ASSERT_UNREACHABLE();
+        return -EINVAL;
+    }
+
     p2m_lock(p2m);
 
     P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn_x(gfn), mfn_x(mfn));
@@ -963,12 +969,15 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     }
 
     /* Now, actually do the two-way mapping */
-    if ( mfn_valid(mfn) )
+    rc = p2m_set_entry(p2m, gfn, mfn, page_order, t, p2m->default_access);
+    if ( rc == 0 )
     {
-        rc = p2m_set_entry(p2m, gfn, mfn, page_order, t,
-                           p2m->default_access);
-        if ( rc )
-            goto out; /* Failed to update p2m, bail without updating m2p. */
+#ifdef CONFIG_HVM
+        pod_lock(p2m);
+        p2m->pod.entry_count -= pod_count;
+        BUG_ON(p2m->pod.entry_count < 0);
+        pod_unlock(p2m);
+#endif
 
         if ( !p2m_is_grant(t) )
         {
@@ -977,24 +986,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                                   gfn_x(gfn_add(gfn, i)));
         }
     }
-    else
-    {
-        gdprintk(XENLOG_WARNING, "Adding bad mfn to p2m map (%#lx -> %#lx)\n",
-                 gfn_x(gfn), mfn_x(mfn));
-        rc = p2m_set_entry(p2m, gfn, INVALID_MFN, page_order,
-                           p2m_invalid, p2m->default_access);
-#ifdef CONFIG_HVM
-        if ( rc == 0 )
-        {
-            pod_lock(p2m);
-            p2m->pod.entry_count -= pod_count;
-            BUG_ON(p2m->pod.entry_count < 0);
-            pod_unlock(p2m);
-        }
-#endif
-    }
 
-out:
     p2m_unlock(p2m);
 
     return rc;
