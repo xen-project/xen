@@ -335,7 +335,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     }
     if ( p2mt == p2m_mmio_direct )
     {
-        rc = clear_mmio_p2m_entry(d, gmfn, mfn, PAGE_ORDER_4K);
+        rc = -EPERM;
         goto out_put_gfn;
     }
 #else
@@ -1649,6 +1649,15 @@ int prepare_ring_for_helper(
         if ( page )
             put_page(page);
         return -ENOENT;
+    }
+#endif
+#ifdef CONFIG_X86
+    if ( p2mt == p2m_mmio_direct )
+    {
+        if ( page )
+            put_page(page);
+
+        return -EPERM;
     }
 #endif
 

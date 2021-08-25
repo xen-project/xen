@@ -4783,7 +4783,9 @@ int xenmem_add_to_physmap_one(
 
     /* Remove previously mapped page if it was present. */
     prev_mfn = mfn_x(get_gfn(d, gfn_x(gpfn), &p2mt));
-    if ( mfn_valid(_mfn(prev_mfn)) )
+    if ( p2mt == p2m_mmio_direct )
+        rc = -EPERM;
+    else if ( mfn_valid(_mfn(prev_mfn)) )
     {
         if ( is_xen_heap_mfn(prev_mfn) )
             /* Xen heap frames are simply unhooked from this phys slot. */
