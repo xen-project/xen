@@ -232,8 +232,10 @@ int __must_check amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
                                       unsigned int *flush_flags);
 int __must_check amd_iommu_alloc_root(struct domain_iommu *hd);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
-                                       paddr_t phys_addr, unsigned long size,
-                                       int iw, int ir);
+                                       const struct ivrs_unity_map *map,
+                                       unsigned int flag);
+int amd_iommu_reserve_domain_unity_unmap(struct domain *d,
+                                         const struct ivrs_unity_map *map);
 int __must_check amd_iommu_flush_iotlb_pages(struct domain *d, dfn_t dfn,
                                              unsigned int page_count,
                                              unsigned int flush_flags);
