@@ -99,6 +99,12 @@
     __asm__ ("" : "=r"(__ptr) : "0"(ptr));      \
     (typeof(ptr)) (__ptr + (off)); })
 
+#if __GNUC__ >= 11 /* See gcc bug 100680. */
+# define gcc11_wrap(x) RELOC_HIDE(x, 0)
+#else
+# define gcc11_wrap(x) (x)
+#endif
+
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
 # define ASM_FLAG_OUT(yes, no) yes
 #else

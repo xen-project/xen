@@ -644,7 +644,7 @@ union vex {
 #define copy_VEX(ptr, vex) ({ \
     if ( !mode_64bit() ) \
         (vex).reg |= 8; \
-    (ptr)[0 - PFX_BYTES] = ext < ext_8f08 ? 0xc4 : 0x8f; \
+    gcc11_wrap(ptr)[0 - PFX_BYTES] = ext < ext_8f08 ? 0xc4 : 0x8f; \
     (ptr)[1 - PFX_BYTES] = (vex).raw[0]; \
     (ptr)[2 - PFX_BYTES] = (vex).raw[1]; \
     container_of((ptr) + 1 - PFX_BYTES, typeof(vex), raw[0]); \
