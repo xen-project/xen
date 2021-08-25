@@ -3283,12 +3283,11 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
         goto unlock;
     }
 
-    if ( unlikely(limit_max < grant_to_status_frames(op.nr_frames)) )
+    if ( unlikely(limit_max < op.nr_frames) )
     {
         gdprintk(XENLOG_WARNING,
-                 "grant_to_status_frames(%u) for d%d is too large (%u,%u)\n",
-                 op.nr_frames, d->domain_id,
-                 grant_to_status_frames(op.nr_frames), limit_max);
+                 "nr_status_frames for %pd is too large (%u,%u)\n",
+                 d, op.nr_frames, limit_max);
         op.status = GNTST_general_error;
         goto unlock;
     }
