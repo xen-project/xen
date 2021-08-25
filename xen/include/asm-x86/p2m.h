@@ -915,7 +915,8 @@ static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx) {}
 /*
  * p2m type to IOMMU flags
  */
-static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt, mfn_t mfn)
+static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt,
+                                               p2m_access_t p2ma, mfn_t mfn)
 {
     unsigned int flags;
 
