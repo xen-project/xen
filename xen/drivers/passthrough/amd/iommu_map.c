@@ -256,7 +256,10 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
         else if ( !pde->pr )
         {
             if ( !map )
+            {
+                unmap_domain_page(next_table_vaddr);
                 return 0;
+            }
 
             if ( next_table_mfn == 0 )
             {
