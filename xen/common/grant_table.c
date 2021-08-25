@@ -36,6 +36,7 @@
 #include <xen/iommu.h>
 #include <xen/paging.h>
 #include <xen/keyhandler.h>
+#include <xen/radix-tree.h>
 #include <xen/vmap.h>
 #include <xsm/xsm.h>
 #include <asm/flushtlb.h>
@@ -80,8 +81,13 @@ struct grant_table {
     grant_status_t       **status;
     /* Active grant table. */
     struct active_grant_entry **active;
-    /* Mapping tracking table per vcpu. */
+    /* Handle-indexed tracking table of mappings. */
     struct grant_mapping **maptrack;
+    /*
+     * MFN-indexed tracking tree of mappings, if needed.  Note that this is
+     * protected by @lock, not @maptrack_lock.
+     */
+    struct radix_tree_root maptrack_tree;
 
     /* Domain to which this struct grant_table belongs. */
     const struct domain *domain;
@@ -419,34 +425,6 @@ static int get_paged_frame(unsigned long gfn, mfn_t *frame,
     *frame = page_to_mfn(*page);
 
     return rc;
-}
-
-static inline void
-double_gt_lock(struct grant_table *lgt, struct grant_table *rgt)
-{
-    /*
-     * See mapkind() for why the write lock is also required for the
-     * remote domain.
-     */
-    if ( lgt < rgt )
-    {
-        grant_write_lock(lgt);
-        grant_write_lock(rgt);
-    }
-    else
-    {
-        if ( lgt != rgt )
-            grant_write_lock(rgt);
-        grant_write_lock(lgt);
-    }
-}
-
-static inline void
-double_gt_unlock(struct grant_table *lgt, struct grant_table *rgt)
-{
-    grant_write_unlock(lgt);
-    if ( lgt != rgt )
-        grant_write_unlock(rgt);
 }
 
 #define INVALID_MAPTRACK_HANDLE UINT_MAX
@@ -871,41 +849,17 @@ static struct active_grant_entry *grant_map_exists(const struct domain *ld,
     return ERR_PTR(-EINVAL);
 }
 
-#define MAPKIND_READ 1
-#define MAPKIND_WRITE 2
-static unsigned int mapkind(
-    struct grant_table *lgt, const struct domain *rd, mfn_t mfn)
-{
-    struct grant_mapping *map;
-    grant_handle_t handle, limit = lgt->maptrack_limit;
-    unsigned int kind = 0;
-
-    /*
-     * Must have the local domain's grant table write lock when
-     * iterating over its maptrack entries.
-     */
-    ASSERT(percpu_rw_is_write_locked(&lgt->lock));
-    /*
-     * Must have the remote domain's grant table write lock while
-     * counting its active entries.
-     */
-    ASSERT(percpu_rw_is_write_locked(&rd->grant_table->lock));
-
-    smp_rmb();
-
-    for ( handle = 0; !(kind & MAPKIND_WRITE) && handle < limit; handle++ )
-    {
-        map = &maptrack_entry(lgt, handle);
-        if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) ||
-             map->domid != rd->domain_id )
-            continue;
-        if ( mfn_eq(_active_entry(rd->grant_table, map->ref).frame, mfn) )
-            kind |= map->flags & GNTMAP_readonly ?
-                    MAPKIND_READ : MAPKIND_WRITE;
-    }
-
-    return kind;
-}
+union maptrack_node {
+    struct {
+        /* Radix tree slot pointers use two of the bits. */
+#ifdef __BIG_ENDIAN_BITFIELD
+        unsigned long    : 2;
+#endif
+        unsigned long rd : BITS_PER_LONG / 2 - 1;
+        unsigned long wr : BITS_PER_LONG / 2 - 1;
+    } cnt;
+    unsigned long raw;
+};
 
 /*
  * Returns 0 if TLB flush / invalidate required by caller.
@@ -931,7 +885,6 @@ map_grant_ref(
     struct grant_mapping *mt;
     grant_entry_header_t *shah;
     uint16_t *status;
-    bool_t need_iommu;
 
     led = current;
     ld = led->domain;
@@ -1139,31 +1092,75 @@ map_grant_ref(
         goto undo_out;
     }
 
-    need_iommu = gnttab_need_iommu_mapping(ld);
-    if ( need_iommu )
+    if ( gnttab_need_iommu_mapping(ld) )
     {
+        union maptrack_node node = {
+            .cnt.rd = !!(op->flags & GNTMAP_readonly),
+            .cnt.wr = !(op->flags & GNTMAP_readonly),
+        };
+        int err;
+        void **slot = NULL;
         unsigned int kind;
 
-        double_gt_lock(lgt, rgt);
+        grant_write_lock(lgt);
+
+        err = radix_tree_insert(&lgt->maptrack_tree, mfn_x(frame),
+                                radix_tree_ulong_to_ptr(node.raw));
+        if ( err == -EEXIST )
+        {
+            slot = radix_tree_lookup_slot(&lgt->maptrack_tree, mfn_x(frame));
+            if ( likely(slot) )
+            {
+                node.raw = radix_tree_ptr_to_ulong(*slot);
+                err = -EBUSY;
+
+                /* Update node only when refcount doesn't overflow. */
+                if ( op->flags & GNTMAP_readonly ? ++node.cnt.rd
+                                                 : ++node.cnt.wr )
+                {
+                    radix_tree_replace_slot(slot,
+                                            radix_tree_ulong_to_ptr(node.raw));
+                    err = 0;
+                }
+            }
+            else
+                ASSERT_UNREACHABLE();
+        }
 
         /*
          * We're not translated, so we know that dfns and mfns are
          * the same things, so the IOMMU entry is always 1-to-1.
          */
-        kind = mapkind(lgt, rd, frame);
-        if ( !(op->flags & GNTMAP_readonly) &&
-             !(kind & MAPKIND_WRITE) )
+        if ( !(op->flags & GNTMAP_readonly) && node.cnt.wr == 1 )
             kind = IOMMUF_readable | IOMMUF_writable;
-        else if ( !kind )
+        else if ( (op->flags & GNTMAP_readonly) &&
+                  node.cnt.rd == 1 && !node.cnt.wr )
             kind = IOMMUF_readable;
         else
             kind = 0;
-        if ( kind && iommu_map_page(ld, mfn_x(frame), mfn_x(frame), kind) )
+        if ( err ||
+             (kind && iommu_map_page(ld, mfn_x(frame), mfn_x(frame), kind)) )
         {
-            double_gt_unlock(lgt, rgt);
+            if ( !err )
+            {
+                if ( slot )
+                {
+                    op->flags & GNTMAP_readonly ? node.cnt.rd--
+                                                : node.cnt.wr--;
+                    radix_tree_replace_slot(slot,
+                                            radix_tree_ulong_to_ptr(node.raw));
+                }
+                else
+                    radix_tree_delete(&lgt->maptrack_tree, mfn_x(frame));
+            }
+
             rc = GNTST_general_error;
-            goto undo_out;
         }
+
+        grant_write_unlock(lgt);
+
+        if ( rc != GNTST_okay )
+            goto undo_out;
     }
 
     TRACE_1D(TRC_MEM_PAGE_GRANT_MAP, op->dom);
@@ -1171,19 +1168,12 @@ map_grant_ref(
     /*
      * All maptrack entry users check mt->flags first before using the
      * other fields so just ensure the flags field is stored last.
-     *
-     * However, if gnttab_need_iommu_mapping() then this would race
-     * with a concurrent mapkind() call (on an unmap, for example)
-     * and a lock is required.
      */
     mt = &maptrack_entry(lgt, handle);
     mt->domid = op->dom;
     mt->ref   = op->ref;
     smp_wmb();
     write_atomic(&mt->flags, op->flags);
-
-    if ( need_iommu )
-        double_gt_unlock(lgt, rgt);
 
     op->dev_bus_addr = mfn_to_maddr(frame);
     op->handle       = handle;
@@ -1411,19 +1401,34 @@ unmap_common(
 
     if ( rc == GNTST_okay && gnttab_need_iommu_mapping(ld) )
     {
-        unsigned int kind;
+        void **slot;
+        union maptrack_node node;
         int err = 0;
 
-        double_gt_lock(lgt, rgt);
+        grant_write_lock(lgt);
+        slot = radix_tree_lookup_slot(&lgt->maptrack_tree, mfn_x(op->frame));
+        node.raw = likely(slot) ? radix_tree_ptr_to_ulong(*slot) : 0;
 
-        kind = mapkind(lgt, rd, op->frame);
-        if ( !kind )
+        /* Refcount must not underflow. */
+        if ( !(flags & GNTMAP_readonly ? node.cnt.rd--
+                                       : node.cnt.wr--) )
+            BUG();
+
+        if ( !node.raw )
             err = iommu_unmap_page(ld, mfn_x(op->frame));
-        else if ( !(kind & MAPKIND_WRITE) )
+        else if ( !(flags & GNTMAP_readonly) && !node.cnt.wr )
             err = iommu_map_page(ld, mfn_x(op->frame),
                                  mfn_x(op->frame), IOMMUF_readable);
 
-        double_gt_unlock(lgt, rgt);
+        if ( err )
+            ;
+        else if ( !node.raw )
+            radix_tree_delete(&lgt->maptrack_tree, mfn_x(op->frame));
+        else
+            radix_tree_replace_slot(slot,
+                                    radix_tree_ulong_to_ptr(node.raw));
+
+        grant_write_unlock(lgt);
 
         if ( err )
             rc = GNTST_general_error;
@@ -1854,6 +1859,8 @@ grant_table_init(struct domain *d, struct grant_table *gt,
         gt->maptrack = vzalloc(gt->max_maptrack_frames * sizeof(*gt->maptrack));
         if ( gt->maptrack == NULL )
             goto out;
+
+        radix_tree_init(&gt->maptrack_tree);
     }
 
     /* Shared grant table. */
@@ -3643,6 +3650,8 @@ int gnttab_release_mappings(struct domain *d)
 
     for ( handle = gt->maptrack_limit; handle; )
     {
+        mfn_t mfn;
+
         /*
          * Deal with full pages such that their freeing (in the body of the
          * if()) remains simple.
@@ -3744,16 +3753,30 @@ int gnttab_release_mappings(struct domain *d)
         if ( act->pin == 0 )
             gnttab_clear_flag(rd, _GTF_reading, status);
 
+        mfn = act->frame;
+
         active_entry_release(act);
         grant_read_unlock(rgt);
 
         rcu_unlock_domain(rd);
 
         map->flags = 0;
+
+        /*
+         * This is excessive in that a single such call would suffice per
+         * mapped MFN (or none at all, if no entry was ever inserted). But it
+         * should be the common case for an MFN to be mapped just once, and
+         * this way we don't need to further maintain the counters. We also
+         * don't want to leave cleaning up of the tree as a whole to the end
+         * of the function, as this could take quite some time.
+         */
+        radix_tree_delete(&gt->maptrack_tree, mfn_x(mfn));
     }
 
     gt->maptrack_limit = 0;
     FREE_XENHEAP_PAGE(gt->maptrack[0]);
+
+    radix_tree_destroy(&gt->maptrack_tree, NULL);
 
     return 0;
 }
