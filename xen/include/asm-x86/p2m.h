@@ -905,6 +905,34 @@ struct p2m_domain *p2m_get_altp2m(struct vcpu *v);
 static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx) {}
 #endif
 
+/* p2m access to IOMMU flags */
+static inline unsigned int p2m_access_to_iommu_flags(p2m_access_t p2ma)
+{
+    switch ( p2ma )
+    {
+    case p2m_access_rw:
+    case p2m_access_rwx:
+        return IOMMUF_readable | IOMMUF_writable;
+
+    case p2m_access_r:
+    case p2m_access_rx:
+    case p2m_access_rx2rw:
+        return IOMMUF_readable;
+
+    case p2m_access_w:
+    case p2m_access_wx:
+        return IOMMUF_writable;
+
+    case p2m_access_n:
+    case p2m_access_x:
+    case p2m_access_n2rwx:
+        return 0;
+    }
+
+    ASSERT_UNREACHABLE();
+    return 0;
+}
+
 /*
  * p2m type to IOMMU flags
  */
@@ -926,9 +954,10 @@ static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt,
         flags = IOMMUF_readable;
         break;
     case p2m_mmio_direct:
-        flags = IOMMUF_readable;
-        if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
-            flags |= IOMMUF_writable;
+        flags = p2m_access_to_iommu_flags(p2ma);
+        if ( (flags & IOMMUF_writable) &&
+             rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
+            flags &= ~IOMMUF_writable;
         break;
     default:
         flags = 0;
