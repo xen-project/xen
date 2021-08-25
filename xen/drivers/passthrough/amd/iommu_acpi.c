@@ -117,12 +117,21 @@ static struct amd_iommu * __init find_iommu_from_bdf_cap(
     return NULL;
 }
 
-static void __init reserve_iommu_exclusion_range(
-    struct amd_iommu *iommu, uint64_t base, uint64_t limit)
+static int __init reserve_iommu_exclusion_range(
+    struct amd_iommu *iommu, uint64_t base, uint64_t limit,
+    bool all, bool iw, bool ir)
 {
+    if ( !ir || !iw )
+        return -EPERM;
+
     /* need to extend exclusion range? */
     if ( iommu->exclusion_enable )
     {
+        if ( iommu->exclusion_limit + PAGE_SIZE < base ||
+             limit + PAGE_SIZE < iommu->exclusion_base ||
+             iommu->exclusion_allow_all != all )
+            return -EBUSY;
+
         if ( iommu->exclusion_base < base )
             base = iommu->exclusion_base;
         if ( iommu->exclusion_limit > limit )
@@ -130,16 +139,11 @@ static void __init reserve_iommu_exclusion_range(
     }
 
     iommu->exclusion_enable = IOMMU_CONTROL_ENABLED;
+    iommu->exclusion_allow_all = all;
     iommu->exclusion_base = base;
     iommu->exclusion_limit = limit;
-}
 
-static void __init reserve_iommu_exclusion_range_all(
-    struct amd_iommu *iommu,
-    unsigned long base, unsigned long limit)
-{
-    reserve_iommu_exclusion_range(iommu, base, limit);
-    iommu->exclusion_allow_all = IOMMU_CONTROL_ENABLED;
+    return 0;
 }
 
 static void __init reserve_unity_map_for_device(
@@ -177,6 +181,7 @@ static int __init register_exclusion_range_for_all_devices(
     unsigned long range_top, iommu_top, length;
     struct amd_iommu *iommu;
     unsigned int bdf;
+    int rc = 0;
 
     /* is part of exclusion range inside of IOMMU virtual address space? */
     /* note: 'limit' parameter is assumed to be page-aligned */
@@ -198,10 +203,15 @@ static int __init register_exclusion_range_for_all_devices(
     if ( limit >= iommu_top )
     {
         for_each_amd_iommu( iommu )
-            reserve_iommu_exclusion_range_all(iommu, base, limit);
+        {
+            rc = reserve_iommu_exclusion_range(iommu, base, limit,
+                                               true /* all */, iw, ir);
+            if ( rc )
+                break;
+        }
     }
 
-    return 0;
+    return rc;
 }
 
 static int __init register_exclusion_range_for_device(
@@ -212,6 +222,7 @@ static int __init register_exclusion_range_for_device(
     unsigned long range_top, iommu_top, length;
     struct amd_iommu *iommu;
     u16 req;
+    int rc = 0;
 
     iommu = find_iommu_for_device(seg, bdf);
     if ( !iommu )
@@ -241,12 +252,13 @@ static int __init register_exclusion_range_for_device(
     /* register IOMMU exclusion range settings for device */
     if ( limit >= iommu_top  )
     {
-        reserve_iommu_exclusion_range(iommu, base, limit);
+        rc = reserve_iommu_exclusion_range(iommu, base, limit,
+                                           false /* all */, iw, ir);
         ivrs_mappings[bdf].dte_allow_exclusion = true;
         ivrs_mappings[req].dte_allow_exclusion = true;
     }
 
-    return 0;
+    return rc;
 }
 
 static int __init register_exclusion_range_for_iommu_devices(
@@ -256,6 +268,7 @@ static int __init register_exclusion_range_for_iommu_devices(
     unsigned long range_top, iommu_top, length;
     unsigned int bdf;
     u16 req;
+    int rc = 0;
 
     /* is part of exclusion range inside of IOMMU virtual address space? */
     /* note: 'limit' parameter is assumed to be page-aligned */
@@ -286,8 +299,10 @@ static int __init register_exclusion_range_for_iommu_devices(
 
     /* register IOMMU exclusion range settings */
     if ( limit >= iommu_top )
-        reserve_iommu_exclusion_range_all(iommu, base, limit);
-    return 0;
+        rc = reserve_iommu_exclusion_range(iommu, base, limit,
+                                           true /* all */, iw, ir);
+
+    return rc;
 }
 
 static int __init parse_ivmd_device_select(
