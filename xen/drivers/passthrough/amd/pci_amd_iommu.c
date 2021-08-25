@@ -366,15 +366,17 @@ static int amd_iommu_assign_device(struct domain *d, u8 devfn,
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
     int bdf = PCI_BDF2(pdev->bus, devfn);
     int req_id = get_dma_requestor_id(pdev->seg, bdf);
+    const struct ivrs_unity_map *unity_map;
 
-    if ( ivrs_mappings[req_id].unity_map_enable )
+    for ( unity_map = ivrs_mappings[req_id].unity_map; unity_map;
+          unity_map = unity_map->next )
     {
-        amd_iommu_reserve_domain_unity_map(
-            d,
-            ivrs_mappings[req_id].addr_range_start,
-            ivrs_mappings[req_id].addr_range_length,
-            ivrs_mappings[req_id].write_permission,
-            ivrs_mappings[req_id].read_permission);
+        int rc = amd_iommu_reserve_domain_unity_map(
+                     d, unity_map->addr, unity_map->length,
+                     unity_map->write, unity_map->read);
+
+        if ( rc )
+            return rc;
     }
 
     return reassign_device(pdev->domain, d, devfn, pdev);
