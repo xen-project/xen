@@ -108,15 +108,19 @@ struct amd_iommu {
     struct list_head ats_devices;
 };
 
+struct ivrs_unity_map {
+    bool read:1;
+    bool write:1;
+    paddr_t addr;
+    unsigned long length;
+    struct ivrs_unity_map *next;
+};
+
 struct ivrs_mappings {
     u16 dte_requestor_id;
     u8 dte_allow_exclusion;
-    u8 unity_map_enable;
-    u8 write_permission;
-    u8 read_permission;
-    unsigned long addr_range_start;
-    unsigned long addr_range_length;
     struct amd_iommu *iommu;
+    struct ivrs_unity_map *unity_map;
 
     /* per device interrupt remapping table */
     void *intremap_table;

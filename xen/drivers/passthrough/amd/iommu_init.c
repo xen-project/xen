@@ -1189,7 +1189,6 @@ static int __init alloc_ivrs_mappings(u16 seg)
     {
         ivrs_mappings[bdf].dte_requestor_id = bdf;
         ivrs_mappings[bdf].dte_allow_exclusion = IOMMU_CONTROL_DISABLED;
-        ivrs_mappings[bdf].unity_map_enable = IOMMU_CONTROL_DISABLED;
         ivrs_mappings[bdf].iommu = NULL;
 
         ivrs_mappings[bdf].intremap_table = NULL;
