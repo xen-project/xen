@@ -267,26 +267,42 @@ static int __init parse_snb_timeout(const char *s)
 }
 custom_param("snb_igd_quirk", parse_snb_timeout);
 
-/* 5500/5520/X58 Chipset Interrupt remapping errata, for stepping B-3.
- * Fixed in stepping C-2. */
+/*
+ * 5500/5520/X58 chipset interrupt remapping errata, for steppings B2 and B3.
+ * Fixed in stepping C2 except on X58.
+ */
 static void __init tylersburg_intremap_quirk(void)
 {
-    uint32_t bus, device;
+    unsigned int bus;
     uint8_t rev;
 
     for ( bus = 0; bus < 0x100; bus++ )
     {
-        /* Match on System Management Registers on Device 20 Function 0 */
-        device = pci_conf_read32(PCI_SBDF(0, bus, 20, 0), PCI_VENDOR_ID);
-        rev = pci_conf_read8(PCI_SBDF(0, bus, 20, 0), PCI_REVISION_ID);
+        /* Match on DMI port (Device 0 Function 0) */
+        rev = pci_conf_read8(PCI_SBDF(0, bus, 0, 0), PCI_REVISION_ID);
 
-        if ( rev == 0x13 && device == 0x342e8086 )
+        switch ( pci_conf_read32(PCI_SBDF(0, bus, 0, 0), PCI_VENDOR_ID) )
         {
+        default:
+            continue;
+
+        case 0x34038086: case 0x34068086:
+            if ( rev >= 0x22 )
+                continue;
             printk(XENLOG_WARNING VTDPREFIX
-                   "Disabling IOMMU due to Intel 5500/5520/X58 Chipset errata #47, #53\n");
-            iommu_enable = 0;
+                   "Disabling IOMMU due to Intel 5500/5520 chipset errata #47 and #53\n");
+            iommu_enable = false;
+            break;
+
+        case 0x34058086:
+            printk(XENLOG_WARNING VTDPREFIX
+                   "Disabling IOMMU due to Intel X58 chipset %s\n",
+                   rev < 0x22 ? "errata #62 and #69" : "erratum #69");
+            iommu_enable = false;
             break;
         }
+
+        break;
     }
 }
 
