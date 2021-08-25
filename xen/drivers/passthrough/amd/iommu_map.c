@@ -419,38 +419,49 @@ int amd_iommu_flush_iotlb_all(struct domain *d)
     return 0;
 }
 
-int amd_iommu_reserve_domain_unity_map(struct domain *domain,
-                                       paddr_t phys_addr,
-                                       unsigned long size, int iw, int ir)
+int amd_iommu_reserve_domain_unity_map(struct domain *d,
+                                       const struct ivrs_unity_map *map,
+                                       unsigned int flag)
 {
-    unsigned long npages, i;
-    unsigned long gfn;
-    unsigned int flags = !!ir;
-    unsigned int flush_flags = 0;
-    int rt = 0;
+    int rc;
 
-    if ( iw )
-        flags |= IOMMUF_writable;
+    if ( d == dom_io )
+        return 0;
 
-    npages = region_to_pages(phys_addr, size);
-    gfn = phys_addr >> PAGE_SHIFT;
-    for ( i = 0; i < npages; i++ )
+    for ( rc = 0; !rc && map; map = map->next )
     {
-        unsigned long frame = gfn + i;
+        p2m_access_t p2ma = p2m_access_n;
 
-        rt = amd_iommu_map_page(domain, _dfn(frame), _mfn(frame), flags,
-                                &flush_flags);
-        if ( rt != 0 )
-            break;
+        if ( map->read )
+            p2ma |= p2m_access_r;
+        if ( map->write )
+            p2ma |= p2m_access_w;
+
+        rc = iommu_identity_mapping(d, p2ma, map->addr,
+                                    map->addr + map->length - 1, flag);
     }
 
-    /* Use while-break to avoid compiler warning */
-    while ( flush_flags &&
-            amd_iommu_flush_iotlb_pages(domain, _dfn(gfn),
-                                        npages, flush_flags) )
-        break;
+    return rc;
+}
 
-    return rt;
+int amd_iommu_reserve_domain_unity_unmap(struct domain *d,
+                                         const struct ivrs_unity_map *map)
+{
+    int rc;
+
+    if ( d == dom_io )
+        return 0;
+
+    for ( rc = 0; map; map = map->next )
+    {
+        int ret = iommu_identity_mapping(d, p2m_access_x, map->addr,
+                                         map->addr + map->length - 1, 0);
+
+        if ( ret && ret != -ENOENT && !rc )
+            rc = ret;
+    }
+
+    return rc;
 }
 
 int __init amd_iommu_quarantine_init(struct domain *d)
