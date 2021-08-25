@@ -81,11 +81,11 @@ int vmce_restore_vcpu(struct vcpu *v, const struct hvm_vmce_vcpu *ctxt)
 
     if ( ctxt->caps & ~guest_mcg_cap & ~MCG_CAP_COUNT & ~MCG_CTL_P )
     {
-        dprintk(XENLOG_G_ERR, "%s restore: unsupported MCA capabilities"
-                " %#" PRIx64 " for %pv (supported: %#Lx)\n",
+        printk(XENLOG_G_ERR
+               "%s restore: unsupported MCA capabilities %#"PRIx64" for %pv (supported: %#Lx)\n",
                 is_hvm_vcpu(v) ? "HVM" : "PV", ctxt->caps,
                 v, guest_mcg_cap & ~MCG_CAP_COUNT);
-        return -EPERM;
+        return -EINVAL;
     }
 
     v->arch.vmce.mcg_cap = ctxt->caps;

@@ -772,9 +772,9 @@ static int irq_load_link(struct domain *d, hvm_domain_context_t *h)
     for ( link = 0; link < 4; link++ )
         if ( hvm_irq->pci_link.route[link] > 15 )
         {
-            gdprintk(XENLOG_ERR, 
-                     "HVM restore: PCI-ISA link %u out of range (%u)\n",
-                     link, hvm_irq->pci_link.route[link]);
+            printk(XENLOG_G_ERR
+                   "HVM restore: PCI-ISA link %u out of range (%u)\n",
+                   link, hvm_irq->pci_link.route[link]);
             return -EINVAL;
         }
 
