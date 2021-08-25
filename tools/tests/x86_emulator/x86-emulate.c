@@ -2,6 +2,13 @@
 
 #include <sys/mman.h>
 
+/* See gcc bug 100680, but here don't bother making this version dependent. */
+#define gcc11_wrap(x) ({                  \
+    unsigned long x_;                     \
+    __asm__ ( "" : "=g" (x_) : "0" (x) ); \
+    (typeof(x))x_;                        \
+})
+
 #define cpu_has_amd_erratum(nr) 0
 #define cpu_has_mpx false
 #define read_bndcfgu() 0
