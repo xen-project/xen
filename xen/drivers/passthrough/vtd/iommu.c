@@ -468,17 +468,10 @@ int vtd_flush_iotlb_reg(struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
-     * non-present entry we do nothing and if hardware cache non-present
-     * entry, we flush entries of domain 0 (the domain id is used to cache
-     * any non-present entries)
+     * non-present entries we do nothing.
      */
-    if ( flush_non_present_entry )
-    {
-        if ( !cap_caching_mode(iommu->cap) )
-            return 1;
-        else
-            did = 0;
-    }
+    if ( flush_non_present_entry && !cap_caching_mode(iommu->cap) )
+        return 1;
 
     /* use register invalidation */
     switch ( type )
