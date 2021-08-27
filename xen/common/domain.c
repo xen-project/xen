@@ -419,11 +419,13 @@ static int domain_teardown(struct domain *d)
         };
 
     case PROG_none:
+        BUILD_BUG_ON(PROG_none != 0);
+
+    PROGRESS(gnttab_mappings):
         rc = gnttab_release_mappings(d);
         if ( rc )
             return rc;
 
-    PROGRESS(gnttab_mappings):
         for_each_vcpu ( d, v )
         {
             PROGRESS_VCPU(teardown);
