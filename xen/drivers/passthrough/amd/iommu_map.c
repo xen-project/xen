@@ -178,7 +178,7 @@ void __init iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
  * page tables.
  */
 static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
-                              unsigned long pt_mfn[], bool map)
+                              unsigned long *pt_mfn, bool map)
 {
     union amd_iommu_pte *pde, *next_table_vaddr;
     unsigned long  next_table_mfn;
@@ -203,7 +203,6 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     while ( level > 1 )
     {
         unsigned int next_level = level - 1;
-        pt_mfn[level] = next_table_mfn;
 
         next_table_vaddr = map_domain_page(_mfn(next_table_mfn));
         pde = &next_table_vaddr[pfn_to_pde_idx(dfn, level)];
@@ -273,7 +272,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     }
 
     /* mfn of level 1 page table */
-    pt_mfn[level] = next_table_mfn;
+    *pt_mfn = next_table_mfn;
     return 0;
 }
 
@@ -282,9 +281,7 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
 {
     struct domain_iommu *hd = dom_iommu(d);
     int rc;
-    unsigned long pt_mfn[7];
-
-    memset(pt_mfn, 0, sizeof(pt_mfn));
+    unsigned long pt_mfn = 0;
 
     spin_lock(&hd->arch.mapping_lock);
 
@@ -310,7 +307,7 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
         return rc;
     }
 
-    if ( iommu_pde_from_dfn(d, dfn_x(dfn), pt_mfn, true) || (pt_mfn[1] == 0) )
+    if ( iommu_pde_from_dfn(d, dfn_x(dfn), &pt_mfn, true) || !pt_mfn )
     {
         spin_unlock(&hd->arch.mapping_lock);
         AMD_IOMMU_DEBUG("Invalid IO pagetable entry dfn = %"PRI_dfn"\n",
@@ -320,7 +317,7 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     }
 
     /* Install 4k mapping */
-    *flush_flags |= set_iommu_ptes_present(pt_mfn[1], dfn_x(dfn), mfn_x(mfn),
+    *flush_flags |= set_iommu_ptes_present(pt_mfn, dfn_x(dfn), mfn_x(mfn),
                                            1, 1, (flags & IOMMUF_writable),
                                            (flags & IOMMUF_readable));
 
@@ -332,10 +329,8 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
 int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
                          unsigned int *flush_flags)
 {
-    unsigned long pt_mfn[7];
+    unsigned long pt_mfn = 0;
     struct domain_iommu *hd = dom_iommu(d);
-
-    memset(pt_mfn, 0, sizeof(pt_mfn));
 
     spin_lock(&hd->arch.mapping_lock);
 
@@ -345,7 +340,7 @@ int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
         return 0;
     }
 
-    if ( iommu_pde_from_dfn(d, dfn_x(dfn), pt_mfn, false) )
+    if ( iommu_pde_from_dfn(d, dfn_x(dfn), &pt_mfn, false) )
     {
         spin_unlock(&hd->arch.mapping_lock);
         AMD_IOMMU_DEBUG("Invalid IO pagetable entry dfn = %"PRI_dfn"\n",
@@ -354,10 +349,10 @@ int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
         return -EFAULT;
     }
 
-    if ( pt_mfn[1] )
+    if ( pt_mfn )
     {
         /* Mark PTE as 'page not present'. */
-        *flush_flags |= clear_iommu_pte_present(pt_mfn[1], dfn_x(dfn));
+        *flush_flags |= clear_iommu_pte_present(pt_mfn, dfn_x(dfn));
     }
 
     spin_unlock(&hd->arch.mapping_lock);
