@@ -1444,7 +1444,7 @@ static int libxl__mark_domid_recent(libxl__gc *gc, uint32_t domid)
         }
     }
 
-    r = fprintf(nf, "%lu %u\n", ctxt.ts.tv_sec, domid);
+    r = fprintf(nf, "%jd %u\n", (intmax_t)ctxt.ts.tv_sec, domid);
     if (r < 0) {
         LOGED(ERROR, domid, "failed to write to '%s'", new);
         goto out;
