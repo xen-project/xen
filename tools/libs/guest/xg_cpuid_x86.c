@@ -594,7 +594,9 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
          * Update to reflect vLAPIC_ID = vCPU_ID * 2, but make sure to avoid
          * overflow.
          */
-        if ( !(p->basic.lppp & 0x80) )
+        if ( !p->basic.lppp )
+            p->basic.lppp = 2;
+        else if ( !(p->basic.lppp & 0x80) )
             p->basic.lppp *= 2;
 
         switch ( p->x86_vendor )
