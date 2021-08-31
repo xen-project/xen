@@ -46,8 +46,7 @@ typedef union {
         mfn         :   40, /* bits 51:12 - Machine physical frame number */
         sa_p2mt     :   6,  /* bits 57:52 - Software available 2 */
         access      :   4,  /* bits 61:58 - p2m_access_t */
-        tm          :   1,  /* bit 62 - VT-d transient-mapping hint in
-                               shared EPT/VT-d usage */
+        _rsvd       :   1,  /* bit 62 - reserved */
         suppress_ve :   1;  /* bit 63 - suppress #VE */
     };
     u64 epte;
