@@ -430,17 +430,6 @@ static int __init pvh_populate_p2m(struct domain *d)
     int rc;
 #define MB1_PAGES PFN_DOWN(MB(1))
 
-    /*
-     * Memory below 1MB is identity mapped initially. RAM regions are
-     * populated and copied below, replacing the respective mappings.
-     */
-    rc = modify_identity_mmio(d, 0, MB1_PAGES, true);
-    if ( rc )
-    {
-        printk("Failed to identity map low 1MB: %d\n", rc);
-        return rc;
-    }
-
     /* Populate memory map. */
     for ( i = 0; i < d->arch.nr_e820; i++ )
     {
@@ -469,6 +458,23 @@ static int __init pvh_populate_p2m(struct domain *d)
             if ( res != HVMTRANS_okay )
                 printk("Failed to copy [%#lx, %#lx): %d\n",
                        addr, addr + size, res);
+        }
+    }
+
+    /* Non-RAM regions of space below 1MB get identity mapped. */
+    for ( i = rc = 0; i < MB1_PAGES; ++i )
+    {
+        p2m_type_t p2mt;
+
+        if ( mfn_eq(get_gfn_query(d, i, &p2mt), INVALID_MFN) )
+            rc = set_mmio_p2m_entry(d, _gfn(i), _mfn(i), PAGE_ORDER_4K);
+        else
+            ASSERT(p2mt == p2m_ram_rw);
+        put_gfn(d, i);
+        if ( rc )
+        {
+            printk("Failed to identity map PFN %x: %d\n", i, rc);
+            return rc;
         }
     }
 
@@ -1094,6 +1100,17 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
         pfn = PFN_DOWN(d->arch.e820[i].addr);
         nr_pages = PFN_UP((d->arch.e820[i].addr & ~PAGE_MASK) +
                           d->arch.e820[i].size);
+
+        /* Memory below 1MB has been dealt with by pvh_populate_p2m(). */
+        if ( pfn < PFN_DOWN(MB(1)) )
+        {
+            if ( pfn + nr_pages <= PFN_DOWN(MB(1)) )
+                continue;
+
+            /* This shouldn't happen, but is easy to deal with. */
+            nr_pages -= PFN_DOWN(MB(1)) - pfn;
+            pfn = PFN_DOWN(MB(1));
+        }
 
         rc = modify_identity_mmio(d, pfn, nr_pages, true);
         if ( rc )

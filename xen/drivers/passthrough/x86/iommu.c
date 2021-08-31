@@ -337,7 +337,13 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
     max_pfn = (GB(4) >> PAGE_SHIFT) - 1;
     top = max(max_pdx, pfn_to_pdx(max_pfn) + 1);
 
-    for ( i = 0; i < top; i++ )
+    /*
+     * First Mb will get mapped in one go by pvh_populate_p2m(). Avoid
+     * setting up potentially conflicting mappings here.
+     */
+    i = paging_mode_translate(d) ? PFN_DOWN(MB(1)) : 0;
+
+    for ( ; i < top; i++ )
     {
         unsigned long pfn = pdx_to_pfn(i);
         int rc;
