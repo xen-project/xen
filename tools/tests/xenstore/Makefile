@@ -33,6 +33,9 @@ CFLAGS += $(APPEND_CFLAGS)
 
 LDFLAGS += $(LDLIBS_libxenstore)
 LDFLAGS += $(APPEND_LDFLAGS)
+ifeq ($(CONFIG_Linux),y)
+LDFLAGS += -Wl,--as-needed -lc -lrt
+endif
 
 %.o: Makefile
 
