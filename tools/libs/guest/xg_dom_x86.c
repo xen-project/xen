@@ -678,7 +678,7 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     {
         if ( dom->cmdline )
         {
-            dom->cmdline_size = ROUNDUP(strlen(dom->cmdline) + 1, 8);
+            dom->cmdline_size = ROUNDUP(strlen(dom->cmdline) + 1, 3);
             start_info_size += dom->cmdline_size;
         }
     }
