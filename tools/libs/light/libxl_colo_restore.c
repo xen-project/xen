@@ -62,7 +62,7 @@ static void colo_enable_logdirty(libxl__colo_restore_state *crs, libxl__egc *egc
     /* we need to know which pages are dirty to restore the guest */
     if (xc_shadow_control(CTX->xch, domid,
                           XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
-                          NULL, 0, NULL, 0, NULL) < 0) {
+                          NULL, 0) < 0) {
         LOGD(ERROR, domid, "cannot enable secondary vm's logdirty");
         lds->callback(egc, lds, ERROR_FAIL);
         return;
@@ -90,7 +90,7 @@ static void colo_disable_logdirty(libxl__colo_restore_state *crs,
 
     /* we need to know which pages are dirty to restore the guest */
     if (xc_shadow_control(CTX->xch, domid, XEN_DOMCTL_SHADOW_OP_OFF,
-                          NULL, 0, NULL, 0, NULL) < 0)
+                          NULL, 0) < 0)
         LOGD(WARN, domid, "cannot disable secondary vm's logdirty");
 
     if (crs->hvm) {

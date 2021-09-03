@@ -995,13 +995,13 @@ CAMLprim value stub_shadow_allocation_get(value xch, value domid)
 {
 	CAMLparam2(xch, domid);
 	CAMLlocal1(mb);
-	unsigned long c_mb;
+	unsigned int c_mb;
 	int ret;
 
 	caml_enter_blocking_section();
 	ret = xc_shadow_control(_H(xch), _D(domid),
 				XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION,
-				NULL, 0, &c_mb, 0, NULL);
+				&c_mb, 0);
 	caml_leave_blocking_section();
 	if (ret != 0)
 		failwith_xc(_H(xch));
@@ -1014,14 +1014,14 @@ CAMLprim value stub_shadow_allocation_set(value xch, value domid,
 					  value mb)
 {
 	CAMLparam3(xch, domid, mb);
-	unsigned long c_mb;
+	unsigned int c_mb;
 	int ret;
 
 	c_mb = Int_val(mb);
 	caml_enter_blocking_section();
 	ret = xc_shadow_control(_H(xch), _D(domid),
 				XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION,
-				NULL, 0, &c_mb, 0, NULL);
+				&c_mb, 0);
 	caml_leave_blocking_section();
 	if (ret != 0)
 		failwith_xc(_H(xch));

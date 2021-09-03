@@ -650,25 +650,49 @@ int xc_watchdog(xc_interface *xch,
 int xc_shadow_control(xc_interface *xch,
                       uint32_t domid,
                       unsigned int sop,
-                      xc_hypercall_buffer_t *dirty_bitmap,
-                      unsigned long pages,
-                      unsigned long *mb,
-                      uint32_t mode,
-                      xc_shadow_op_stats_t *stats)
+                      unsigned int *mb,
+                      unsigned int mode)
 {
     int rc;
     DECLARE_DOMCTL;
-    DECLARE_HYPERCALL_BUFFER_ARGUMENT(dirty_bitmap);
 
     memset(&domctl, 0, sizeof(domctl));
 
     domctl.cmd = XEN_DOMCTL_shadow_op;
     domctl.domain = domid;
     domctl.u.shadow_op.op     = sop;
-    domctl.u.shadow_op.pages  = pages;
     domctl.u.shadow_op.mb     = mb ? *mb : 0;
     domctl.u.shadow_op.mode   = mode;
-    if (dirty_bitmap != NULL)
+
+    rc = do_domctl(xch, &domctl);
+
+    if ( mb )
+        *mb = domctl.u.shadow_op.mb;
+
+    return rc;
+}
+
+long long xc_logdirty_control(xc_interface *xch,
+                              uint32_t domid,
+                              unsigned int sop,
+                              xc_hypercall_buffer_t *dirty_bitmap,
+                              unsigned long pages,
+                              unsigned int mode,
+                              xc_shadow_op_stats_t *stats)
+{
+    int rc;
+    struct xen_domctl domctl = {
+        .cmd         = XEN_DOMCTL_shadow_op,
+        .domain      = domid,
+        .u.shadow_op = {
+            .op    = sop,
+            .pages = pages,
+            .mode  = mode,
+        }
+    };
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(dirty_bitmap);
+
+    if ( dirty_bitmap )
         set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap,
                                 dirty_bitmap);
 
@@ -678,9 +702,6 @@ int xc_shadow_control(xc_interface *xch,
         memcpy(stats, &domctl.u.shadow_op.stats,
                sizeof(xc_shadow_op_stats_t));
     
-    if ( mb ) 
-        *mb = domctl.u.shadow_op.mb;
-
     return (rc == 0) ? domctl.u.shadow_op.pages : rc;
 }
 

@@ -424,18 +424,18 @@ static int enable_logdirty(struct xc_sr_context *ctx)
     /* This juggling is required if logdirty is enabled for VRAM tracking. */
     rc = xc_shadow_control(xch, ctx->domid,
                            XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
-                           NULL, 0, NULL, 0, NULL);
+                           NULL, 0);
     if ( rc < 0 )
     {
         on1 = errno;
         rc = xc_shadow_control(xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_OFF,
-                               NULL, 0, NULL, 0, NULL);
+                               NULL, 0);
         if ( rc < 0 )
             off = errno;
         else {
             rc = xc_shadow_control(xch, ctx->domid,
                                    XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
-                                   NULL, 0, NULL, 0, NULL);
+                                   NULL, 0);
             if ( rc < 0 )
                 on2 = errno;
         }
@@ -552,10 +552,10 @@ static int send_memory_live(struct xc_sr_context *ctx)
         if ( policy_decision != XGS_POLICY_CONTINUE_PRECOPY )
             break;
 
-        if ( xc_shadow_control(
+        if ( xc_logdirty_control(
                  xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
                  &ctx->save.dirty_bitmap_hbuf, ctx->save.p2m_size,
-                 NULL, 0, &stats) != ctx->save.p2m_size )
+                 0, &stats) != ctx->save.p2m_size )
         {
             PERROR("Failed to retrieve logdirty bitmap");
             rc = -1;
@@ -649,10 +649,10 @@ static int suspend_and_send_dirty(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    if ( xc_shadow_control(
+    if ( xc_logdirty_control(
              xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
              HYPERCALL_BUFFER(dirty_bitmap), ctx->save.p2m_size,
-             NULL, XEN_DOMCTL_SHADOW_LOGDIRTY_FINAL, &stats) !=
+             XEN_DOMCTL_SHADOW_LOGDIRTY_FINAL, &stats) !=
          ctx->save.p2m_size )
     {
         PERROR("Failed to retrieve logdirty bitmap");
@@ -712,10 +712,10 @@ static int verify_frames(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    if ( xc_shadow_control(
+    if ( xc_logdirty_control(
              xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_PEEK,
              &ctx->save.dirty_bitmap_hbuf, ctx->save.p2m_size,
-             NULL, 0, &stats) != ctx->save.p2m_size )
+             0, &stats) != ctx->save.p2m_size )
     {
         PERROR("Failed to retrieve logdirty bitmap");
         rc = -1;
@@ -830,7 +830,7 @@ static void cleanup(struct xc_sr_context *ctx)
 
 
     xc_shadow_control(xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_OFF,
-                      NULL, 0, NULL, 0, NULL);
+                      NULL, 0);
 
     if ( ctx->save.ops.cleanup(ctx) )
         PERROR("Failed to clean up");

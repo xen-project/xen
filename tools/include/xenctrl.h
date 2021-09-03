@@ -882,11 +882,15 @@ typedef struct xen_domctl_shadow_op_stats xc_shadow_op_stats_t;
 int xc_shadow_control(xc_interface *xch,
                       uint32_t domid,
                       unsigned int sop,
-                      xc_hypercall_buffer_t *dirty_bitmap,
-                      unsigned long pages,
-                      unsigned long *mb,
-                      uint32_t mode,
-                      xc_shadow_op_stats_t *stats);
+                      unsigned int *mb,
+                      unsigned int mode);
+long long xc_logdirty_control(xc_interface *xch,
+                              uint32_t domid,
+                              unsigned int sop,
+                              xc_hypercall_buffer_t *dirty_bitmap,
+                              unsigned long pages,
+                              unsigned int mode,
+                              xc_shadow_op_stats_t *stats);
 
 int xc_sched_credit_domain_set(xc_interface *xch,
                                uint32_t domid,

@@ -1192,8 +1192,7 @@ static PyObject *pyxc_shadow_control(PyObject *self,
                                       &dom, &op) )
         return NULL;
     
-    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, NULL, 0, NULL) 
-         < 0 )
+    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0) < 0 )
         return pyxc_error_to_exception(xc->xc_handle);
     
     Py_INCREF(zero);
@@ -1208,7 +1207,7 @@ static PyObject *pyxc_shadow_mem_control(PyObject *self,
     int op;
     uint32_t dom;
     int mbarg = -1;
-    unsigned long mb;
+    unsigned int mb;
 
     static char *kwd_list[] = { "dom", "mb", NULL };
 
@@ -1223,7 +1222,7 @@ static PyObject *pyxc_shadow_mem_control(PyObject *self,
         mb = mbarg;
         op = XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION;
     }
-    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, &mb, 0, NULL) < 0 )
+    if ( xc_shadow_control(xc->xc_handle, dom, op, &mb, 0) < 0 )
         return pyxc_error_to_exception(xc->xc_handle);
     
     mbarg = mb;
