@@ -410,7 +410,7 @@ static struct shm_rpc *allocate_and_pin_shm_rpc(struct optee_domain *ctx,
     if ( !shm_rpc )
         return ERR_PTR(-ENOMEM);
 
-    shm_rpc->xen_arg_pg = alloc_domheap_page(current->domain, 0);
+    shm_rpc->xen_arg_pg = alloc_domheap_page(NULL, 0);
     if ( !shm_rpc->xen_arg_pg )
     {
         xfree(shm_rpc);
@@ -774,7 +774,7 @@ static int translate_noncontig(struct optee_domain *ctx,
      * - There is a plan to implement preemption in the code below, which
      *   will allow use to increase default MAX_SHM_BUFFER_PG value.
      */
-    xen_pgs = alloc_domheap_pages(current->domain, order, 0);
+    xen_pgs = alloc_domheap_pages(NULL, order, 0);
     if ( !xen_pgs )
         return -ENOMEM;
 
@@ -942,7 +942,7 @@ static bool copy_std_request(struct cpu_user_regs *regs,
 
     BUILD_BUG_ON(OPTEE_MSG_NONCONTIG_PAGE_SIZE > PAGE_SIZE);
 
-    call->xen_arg_pg = alloc_domheap_page(current->domain, 0);
+    call->xen_arg_pg = alloc_domheap_page(NULL, 0);
     if ( !call->xen_arg_pg )
     {
         set_user_reg(regs, 0, OPTEE_SMC_RETURN_ENOMEM);
