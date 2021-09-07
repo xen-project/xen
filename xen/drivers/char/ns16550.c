@@ -421,8 +421,8 @@ static void __init ns16550_init_postirq(struct serial_port *port)
     if ( uart->bar || uart->ps_bdf_enable )
     {
         if ( uart->param && uart->param->mmio &&
-             rangeset_add_range(mmio_ro_ranges, uart->io_base,
-                                uart->io_base + uart->io_size - 1) )
+             rangeset_add_range(mmio_ro_ranges, PFN_DOWN(uart->io_base),
+                                PFN_UP(uart->io_base + uart->io_size) - 1) )
             printk(XENLOG_INFO "Error while adding MMIO range of device to mmio_ro_ranges\n");
 
         if ( pci_ro_device(0, uart->ps_bdf[0],
