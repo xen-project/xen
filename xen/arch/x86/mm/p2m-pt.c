@@ -548,7 +548,7 @@ int p2m_pt_handle_deferred_changes(uint64_t gpa)
 /* Reconstruct a fake p2m_access_t from stored PTE flags. */
 static p2m_access_t p2m_flags_to_access(unsigned int flags)
 {
-    if ( flags & _PAGE_PRESENT )
+    if ( !(flags & _PAGE_PRESENT) )
         return p2m_access_n;
 
     /* No need to look at _PAGE_NX for now. */
