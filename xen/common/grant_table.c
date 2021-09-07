@@ -1027,7 +1027,7 @@ map_grant_ref(
     {
         rcu_unlock_domain(rd);
         gdprintk(XENLOG_INFO, "Failed to obtain maptrack handle\n");
-        op->status = GNTST_no_device_space;
+        op->status = GNTST_no_space;
         return;
     }
 
