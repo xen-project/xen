@@ -46,14 +46,7 @@ public-$(CONFIG_ARM) := $(wildcard public/arch-arm/*.h public/arch-arm/*/*.h)
 all: $(headers-y)
 
 compat/%.h: compat/%.i Makefile $(BASEDIR)/tools/compat-build-header.py
-	set -e; id=_$$(echo $@ | tr '[:lower:]-/.' '[:upper:]___'); \
-	echo "#ifndef $$id" >$@.new; \
-	echo "#define $$id" >>$@.new; \
-	echo "#include <xen/compat.h>" >>$@.new; \
-	$(if $(filter-out compat/arch-%.h,$@),echo "#include <$(patsubst compat/%,public/%,$@)>" >>$@.new;) \
-	grep -v '^# [0-9]' $< | \
-	$(PYTHON) $(BASEDIR)/tools/compat-build-header.py | uniq >>$@.new; \
-	echo "#endif /* $$id */" >>$@.new
+	$(PYTHON) $(BASEDIR)/tools/compat-build-header.py <$< $@ >>$@.new; \
 	mv -f $@.new $@
 
 compat/%.i: compat/%.c Makefile
