@@ -1450,9 +1450,9 @@ unmap_common(
 
     op->mfn = act->mfn;
 
-    if ( op->dev_bus_addr &&
+    if ( op->dev_bus_addr && (flags & GNTMAP_device_map) &&
          unlikely(op->dev_bus_addr != mfn_to_maddr(act->mfn)) )
-        PIN_FAIL(act_release_out, GNTST_general_error,
+        PIN_FAIL(act_release_out, GNTST_bad_dev_addr,
                  "Bus address doesn't match gntref (%"PRIx64" != %"PRIpaddr")\n",
                  op->dev_bus_addr, mfn_to_maddr(act->mfn));
 
