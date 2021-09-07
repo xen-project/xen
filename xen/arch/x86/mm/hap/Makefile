@@ -9,7 +9,7 @@ guest_walk_%level.o: guest_walk.c Makefile
 	$(CC) $(c_flags) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
 
 guest_walk_%level.i: guest_walk.c Makefile
-	$(CPP) $(filter-out -Wa$(comma)%,$(c_flags)) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
+	$(CPP) $(call cpp_flags,$(c_flags)) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
 
 guest_walk_%level.s: guest_walk.c Makefile
 	$(CC) $(filter-out -Wa$(comma)%,$(c_flags)) -DGUEST_PAGING_LEVELS=$* -S $< -o $@

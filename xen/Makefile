@@ -410,7 +410,7 @@ include/xen/compile.h: include/xen/compile.h.in .banner
 	@mv -f $@.new $@
 
 asm-offsets.s: arch/$(TARGET_ARCH)/$(TARGET_SUBARCH)/asm-offsets.c
-	$(CC) $(filter-out -Wa$(comma)% -flto,$(c_flags)) -S -g0 -o $@.new -MQ $@ $<
+	$(CC) $(call cpp_flags,$(c_flags)) -S -g0 -o $@.new -MQ $@ $<
 	$(call move-if-changed,$@.new,$@)
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: asm-offsets.s
