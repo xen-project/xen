@@ -12,19 +12,18 @@ include Makefile
 # Figure out what we need to clean from the various variables
 # ==========================================================================
 subdir-all := $(subdir-y) $(subdir-n) $(subdir-) \
-              $(filter %/, $(obj-y) $(obj-n) $(obj-))
+              $(patsubst %/,%, $(filter %/, $(obj-y) $(obj-n) $(obj-)))
 
 DEPS_RM = $(DEPS) $(DEPS_INCLUDE)
 .PHONY: clean
-clean:: $(addprefix _clean_, $(subdir-all))
+clean:: $(subdir-all)
 	rm -f *.o .*.o.tmp *~ core $(DEPS_RM)
 
 # Descending
 # ---------------------------------------------------------------------------
 
-_clean_%/: FORCE
-	$(MAKE) $(clean) $*
+PHONY += $(subdir-all)
+$(subdir-all):
+	$(MAKE) $(clean) $@
 
-# Force execution of pattern rules (for which PHONY cannot be directly used).
-.PHONY: FORCE
-FORCE:
+.PHONY: $(PHONY)
