@@ -13,7 +13,11 @@ pats = [
  [ r"XEN_GUEST_HANDLE", r"COMPAT_HANDLE" ],
 ];
 
-xlatf = open('xlat.lst', 'r')
+try:
+    xlatf = open(sys.argv[1], 'r')
+except IndexError:
+    print('missing path to xlat.lst argument')
+    sys.exit(1)
 for line in xlatf.readlines():
     match = re.subn(r"^\s*\?\s+(\w*)\s.*", r"\1", line.rstrip())
     if match[1]:
@@ -25,6 +29,8 @@ for pat in pats:
     pat[0] = re.compile(pat[0])
 
 for line in sys.stdin.readlines():
+    if 'DEFINE_XEN_GUEST_HANDLE(long)' in line:
+        continue
     for pat in pats:
         line = re.sub(pat[0], pat[1], line)
     print(line.rstrip())
