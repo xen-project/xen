@@ -147,16 +147,21 @@ include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 c_flags += $(CFLAGS-y)
 a_flags += $(CFLAGS-y) $(AFLAGS-y)
 
-built_in.o: $(obj-y) $(if $(strip $(lib-y)),lib.a) $(extra-y)
-ifeq ($(strip $(obj-y)),)
-	$(CC) $(c_flags) -c -x c /dev/null -o $@
-else
+quiet_cmd_cc_builtin = CC      $@
+cmd_cc_builtin = \
+    $(CC) $(XEN_CFLAGS) -c -x c /dev/null -o $@
+
+quiet_cmd_ld_builtin = LD      $@
 ifeq ($(CONFIG_LTO),y)
-	$(LD_LTO) -r -o $@ $(filter $(obj-y),$^)
+cmd_ld_builtin = \
+    $(LD_LTO) -r -o $@ $(filter $(obj-y),$(real-prereqs))
 else
-	$(LD) $(XEN_LDFLAGS) -r -o $@ $(filter $(obj-y),$^)
+cmd_ld_builtin = \
+    $(LD) $(XEN_LDFLAGS) -r -o $@ $(filter $(obj-y),$(real-prereqs))
 endif
-endif
+
+built_in.o: $(obj-y) $(if $(strip $(lib-y)),lib.a) $(extra-y) FORCE
+	$(call if_changed,$(if $(strip $(obj-y)),ld_builtin,cc_builtin))
 
 lib.a: $(lib-y) FORCE
 	$(call if_changed,ar)
