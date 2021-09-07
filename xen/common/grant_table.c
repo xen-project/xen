@@ -3801,9 +3801,7 @@ int gnttab_release_mappings(struct domain *d)
                 if ( gnttab_release_host_mappings(d) &&
                      !is_iomem_page(act->mfn) )
                 {
-                    if ( gnttab_host_mapping_get_page_type((map->flags &
-                                                            GNTMAP_readonly),
-                                                           d, rd) )
+                    if ( gnttab_host_mapping_get_page_type(false, d, rd) )
                         put_page_type(pg);
                     put_page(pg);
                 }
