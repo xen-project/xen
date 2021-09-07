@@ -1562,11 +1562,11 @@ unmap_common_complete(struct gnttab_unmap_common *op)
     else
         status = &status_entry(rgt, op->ref);
 
-    pg = mfn_to_page(op->mfn);
+    pg = !is_iomem_page(act->mfn) ? mfn_to_page(op->mfn) : NULL;
 
     if ( op->done & GNTMAP_device_map )
     {
-        if ( !is_iomem_page(act->mfn) )
+        if ( pg )
         {
             if ( op->done & GNTMAP_readonly )
                 put_page(pg);
@@ -1583,7 +1583,7 @@ unmap_common_complete(struct gnttab_unmap_common *op)
 
     if ( op->done & GNTMAP_host_map )
     {
-        if ( !is_iomem_page(op->mfn) )
+        if ( pg )
         {
             if ( gnttab_host_mapping_get_page_type(op->done & GNTMAP_readonly,
                                                    ld, rd) )
@@ -3763,7 +3763,7 @@ int gnttab_release_mappings(struct domain *d)
         else
             status = &status_entry(rgt, ref);
 
-        pg = mfn_to_page(act->mfn);
+        pg = !is_iomem_page(act->mfn) ? mfn_to_page(act->mfn) : NULL;
 
         if ( map->flags & GNTMAP_readonly )
         {
@@ -3771,7 +3771,7 @@ int gnttab_release_mappings(struct domain *d)
             {
                 BUG_ON(!(act->pin & GNTPIN_devr_mask));
                 act->pin -= GNTPIN_devr_inc;
-                if ( !is_iomem_page(act->mfn) )
+                if ( pg )
                     put_page(pg);
             }
 
@@ -3779,8 +3779,7 @@ int gnttab_release_mappings(struct domain *d)
             {
                 BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
-                if ( gnttab_release_host_mappings(d) &&
-                     !is_iomem_page(act->mfn) )
+                if ( pg && gnttab_release_host_mappings(d) )
                     put_page(pg);
             }
         }
@@ -3790,7 +3789,7 @@ int gnttab_release_mappings(struct domain *d)
             {
                 BUG_ON(!(act->pin & GNTPIN_devw_mask));
                 act->pin -= GNTPIN_devw_inc;
-                if ( !is_iomem_page(act->mfn) )
+                if ( pg )
                     put_page_and_type(pg);
             }
 
@@ -3798,8 +3797,7 @@ int gnttab_release_mappings(struct domain *d)
             {
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
-                if ( gnttab_release_host_mappings(d) &&
-                     !is_iomem_page(act->mfn) )
+                if ( pg && gnttab_release_host_mappings(d) )
                 {
                     if ( gnttab_host_mapping_get_page_type(false, d, rd) )
                         put_page_type(pg);
