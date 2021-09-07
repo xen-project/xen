@@ -958,9 +958,13 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
         if ( p2m_is_special(ot) )
         {
             /* Don't permit unmapping grant/foreign/direct-MMIO this way. */
-            domain_crash(d);
             p2m_unlock(p2m);
-            
+            printk(XENLOG_G_ERR
+                   "%pd: GFN %#lx (%#lx,%u,%u) -> (%#lx,%u,%u) not permitted\n",
+                   d, gfn_x(gfn) + i,
+                   mfn_x(omfn), ot, a,
+                   mfn_x(mfn) + i, t, p2m->default_access);
+            domain_crash(d);
             return -EPERM;
         }
         else if ( p2m_is_ram(ot) && !p2m_is_paged(ot) )
@@ -1302,9 +1306,24 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
     }
     if ( p2m_is_special(ot) )
     {
-        gfn_unlock(p2m, gfn, order);
-        domain_crash(d);
-        return -EPERM;
+        /* Special-case (almost) identical mappings. */
+        if ( !mfn_eq(mfn, omfn) || gfn_p2mt != ot )
+        {
+            gfn_unlock(p2m, gfn, order);
+            printk(XENLOG_G_ERR
+                   "%pd: GFN %#lx (%#lx,%u,%u,%u) -> (%#lx,%u,%u,%u) not permitted\n",
+                   d, gfn_l,
+                   mfn_x(omfn), cur_order, ot, a,
+                   mfn_x(mfn), order, gfn_p2mt, access);
+            domain_crash(d);
+            return -EPERM;
+        }
+
+        if ( access == a )
+        {
+            gfn_unlock(p2m, gfn, order);
+            return 0;
+        }
     }
     else if ( p2m_is_ram(ot) )
     {
