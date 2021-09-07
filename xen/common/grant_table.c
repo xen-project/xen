@@ -3229,6 +3229,9 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
         return -EFAULT;
     }
 
+    if ( !guest_handle_okay(op.frame_list, op.nr_frames) )
+        return -EFAULT;
+
     d = rcu_lock_domain_by_any_id(op.dom);
     if ( d == NULL )
     {
@@ -3269,7 +3272,7 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
     for ( i = 0; i < op.nr_frames; i++ )
     {
         gmfn = gfn_x(gnttab_status_gfn(d, gt, i));
-        if ( copy_to_guest_offset(op.frame_list, i, &gmfn, 1) )
+        if ( __copy_to_guest_offset(op.frame_list, i, &gmfn, 1) )
             op.status = GNTST_bad_virt_addr;
     }
 
