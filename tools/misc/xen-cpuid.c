@@ -185,6 +185,7 @@ static const char *const str_7a1[32] =
 static const char *const str_e21a[32] =
 {
     [ 2] = "lfence+",
+    [ 6] = "nscb",
 };
 
 static const struct {
