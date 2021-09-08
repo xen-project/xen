@@ -401,13 +401,13 @@ static int domain_teardown(struct domain *d)
          */
 #define PROGRESS(x)                             \
         d->teardown.val = PROG_ ## x;           \
-        /* Fallthrough */                       \
+        fallthrough;                            \
     case PROG_ ## x
 
 #define PROGRESS_VCPU(x)                        \
         d->teardown.val = PROG_vcpu_ ## x;      \
         d->teardown.vcpu = v;                   \
-        /* Fallthrough */                       \
+        fallthrough;                            \
     case PROG_vcpu_ ## x:                       \
         v = d->teardown.vcpu
 
