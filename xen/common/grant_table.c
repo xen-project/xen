@@ -889,10 +889,13 @@ union maptrack_node {
     struct {
         /* Radix tree slot pointers use two of the bits. */
 #ifdef __BIG_ENDIAN_BITFIELD
-        unsigned long    : 2;
+        unsigned long _0 : 2;
 #endif
         unsigned long rd : BITS_PER_LONG / 2 - 1;
         unsigned long wr : BITS_PER_LONG / 2 - 1;
+#ifndef __BIG_ENDIAN_BITFIELD
+        unsigned long _0 : 2;
+#endif
     } cnt;
     unsigned long raw;
 };
