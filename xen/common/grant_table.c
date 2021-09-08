@@ -3986,7 +3986,16 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
     }
 
     if ( !rc )
-        gnttab_set_frame_gfn(gt, status, idx, gfn);
+    {
+        /*
+         * Make sure gnttab_unpopulate_status_frames() won't (successfully)
+         * free the page until our caller has completed its operation.
+         */
+        if ( get_page(mfn_to_page(*mfn), d) )
+            gnttab_set_frame_gfn(gt, status, idx, gfn);
+        else
+            rc = -EBUSY;
+    }
 
     grant_write_unlock(gt);
 
