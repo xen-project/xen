@@ -681,6 +681,19 @@ void amd_init_lfence(struct cpuinfo_x86 *c)
 			  c->x86_capability);
 }
 
+void __init detect_zen2_null_seg_behaviour(void)
+{
+	uint64_t base;
+
+	wrmsrl(MSR_FS_BASE, 1);
+	asm volatile ( "mov %0, %%fs" :: "rm" (0) );
+	rdmsrl(MSR_FS_BASE, base);
+
+	if (base == 0)
+		setup_force_cpu_cap(X86_FEATURE_NSCB);
+
+}
+
 static void init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -730,6 +743,11 @@ static void init_amd(struct cpuinfo_x86 *c)
 		__set_bit(X86_FEATURE_LFENCE_DISPATCH, c->x86_capability);
 	else /* Implicily "== 0x10 || >= 0x12" by being 64bit. */
 		amd_init_lfence(c);
+
+	/* Probe for NSCB on Zen2 CPUs when not virtualised */
+	if (!cpu_has_hypervisor && !cpu_has_nscb && c == &boot_cpu_data &&
+	    c->x86 == 0x17)
+		detect_zen2_null_seg_behaviour();
 
 	/*
 	 * If the user has explicitly chosen to disable Memory Disambiguation
