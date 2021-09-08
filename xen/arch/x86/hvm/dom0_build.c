@@ -467,7 +467,7 @@ static int __init pvh_populate_p2m(struct domain *d)
         p2m_type_t p2mt;
 
         if ( mfn_eq(get_gfn_query(d, i, &p2mt), INVALID_MFN) )
-            rc = set_mmio_p2m_entry(d, _gfn(i), _mfn(i), PAGE_ORDER_4K,
+            rc = set_mmio_p2m_entry(d, i, _mfn(i), PAGE_ORDER_4K,
                                     p2m_get_hostp2m(d)->default_access);
         else
             ASSERT(p2mt == p2m_ram_rw);
