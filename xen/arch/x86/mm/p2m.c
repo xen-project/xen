@@ -2719,6 +2719,8 @@ int xenmem_add_to_physmap_one(
         rc = gnttab_map_frame(d, idx, gpfn, &mfn);
         if ( rc )
             return rc;
+        /* Need to take care of the reference obtained in gnttab_map_frame(). */
+        page = mfn_to_page(mfn);
         break;
 
     case XENMAPSPACE_gmfn:

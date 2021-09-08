@@ -1420,6 +1420,8 @@ int xenmem_add_to_physmap_one(
         if ( rc )
             return rc;
 
+        /* Need to take care of the reference obtained in gnttab_map_frame(). */
+        page = mfn_to_page(mfn);
         t = p2m_ram_rw;
 
         break;
@@ -1487,9 +1489,12 @@ int xenmem_add_to_physmap_one(
     /* Map at new location. */
     rc = guest_physmap_add_entry(d, gfn, mfn, 0, t);
 
-    /* If we fail to add the mapping, we need to drop the reference we
-     * took earlier on foreign pages */
-    if ( rc && space == XENMAPSPACE_gmfn_foreign )
+    /*
+     * For XENMAPSPACE_gmfn_foreign if we failed to add the mapping, we need
+     * to drop the reference we took earlier. In all other cases we need to
+     * drop any reference we took earlier (perhaps indirectly).
+     */
+    if ( space == XENMAPSPACE_gmfn_foreign ? rc : page != NULL )
     {
         ASSERT(page != NULL);
         put_page(page);
