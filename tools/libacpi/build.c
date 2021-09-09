@@ -532,7 +532,7 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
      * Fill in high-memory data structures, starting at @buf.
      */
 
-    facs = ctxt->mem_ops.alloc(ctxt, sizeof(struct acpi_20_facs), 16);
+    facs = ctxt->mem_ops.alloc(ctxt, sizeof(struct acpi_20_facs), 64);
     if (!facs) goto oom;
     memcpy(facs, &Facs, sizeof(struct acpi_20_facs));
 
