@@ -6,6 +6,11 @@ all:
 -include $(XEN_ROOT)/config/Tools.mk
 include $(XEN_ROOT)/Config.mk
 
+XEN_FULLVERSION=$(shell env \
+    XEN_EXTRAVERSION=$(XEN_EXTRAVERSION) \
+    XEN_VENDORVERSION=$(XEN_VENDORVERSION) \
+    $(SHELL) $(XEN_ROOT)/version.sh --full $(XEN_ROOT)/xen/Makefile)
+
 export _INSTALL := $(INSTALL)
 INSTALL = $(XEN_ROOT)/tools/cross-install
 
