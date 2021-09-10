@@ -161,7 +161,6 @@ struct xsm_operations {
     int (*shadow_control) (struct domain *d, uint32_t op);
     int (*mem_sharing_op) (struct domain *d, struct domain *cd, int op);
     int (*apic) (struct domain *d, int cmd);
-    int (*memtype) (uint32_t access);
     int (*machine_memory_map) (void);
     int (*domain_memory_map) (struct domain *d);
 #define XSM_MMU_UPDATE_READ      1
@@ -630,11 +629,6 @@ static inline int xsm_mem_sharing_op (xsm_default_t def, struct domain *d, struc
 static inline int xsm_apic (xsm_default_t def, struct domain *d, int cmd)
 {
     return xsm_ops->apic(d, cmd);
-}
-
-static inline int xsm_memtype (xsm_default_t def, uint32_t access)
-{
-    return xsm_ops->memtype(access);
 }
 
 static inline int xsm_machine_memory_map(xsm_default_t def)
