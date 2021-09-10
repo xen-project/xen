@@ -70,6 +70,19 @@ config MEM_ACCESS
 config NEEDS_LIBELF
 	bool
 
+config STATIC_MEMORY
+	bool "Static Allocation Support (UNSUPPORTED)" if UNSUPPORTED
+	depends on ARM
+	help
+	  Static Allocation refers to system or sub-system(domains) for
+	  which memory areas are pre-defined by configuration using physical
+	  address ranges.
+
+	  When enabled, memory can be statically allocated to a domain using
+	  the property "xen,static-mem" defined in the domain configuration.
+
+	  If unsure, say N.
+
 menu "Speculative hardening"
 
 config SPECULATIVE_HARDEN_ARRAY
