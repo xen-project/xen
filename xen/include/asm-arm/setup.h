@@ -24,6 +24,7 @@ typedef enum {
 struct membank {
     paddr_t start;
     paddr_t size;
+    bool xen_domain; /* whether the memory bank is bound to a Xen domain. */
 };
 
 struct meminfo {
