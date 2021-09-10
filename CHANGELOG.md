@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    appearing in 4.12.2 and 4.11.4). Prior (4.13...4.15-like) behavior can be arranged for
    either by enabling the IOMMU_QUARANTINE_SCRATCH_PAGE setting at build (configuration) time
    or by passing "iommu=quarantine=scratch-page" on the hypervisor command line.
+ - pv-grub stubdoms will no longer be built per default. In order to be able to use pv-grub
+   configure needs to be called with "--enable-pv-grub" as parameter.
 
 ## [4.15.0 UNRELEASED](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.15.0) - TBD
 
