@@ -300,6 +300,9 @@ int map_dev_mmio_region(struct domain *d,
                         unsigned long nr,
                         mfn_t mfn);
 
+int p2m_insert_mapping(struct domain *d, gfn_t start_gfn, unsigned long nr,
+                       mfn_t mfn, p2m_type_t t);
+
 int guest_physmap_add_entry(struct domain *d,
                             gfn_t gfn,
                             mfn_t mfn,
@@ -313,6 +316,14 @@ static inline int guest_physmap_add_page(struct domain *d,
                                          unsigned int page_order)
 {
     return guest_physmap_add_entry(d, gfn, mfn, page_order, p2m_ram_rw);
+}
+
+static inline int guest_physmap_add_pages(struct domain *d,
+                                          gfn_t gfn,
+                                          mfn_t mfn,
+                                          unsigned int nr_pages)
+{
+    return p2m_insert_mapping(d, gfn, nr_pages, mfn, p2m_ram_rw);
 }
 
 mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn);

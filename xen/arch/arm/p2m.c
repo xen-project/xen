@@ -1293,11 +1293,8 @@ out:
     return resolved;
 }
 
-static inline int p2m_insert_mapping(struct domain *d,
-                                     gfn_t start_gfn,
-                                     unsigned long nr,
-                                     mfn_t mfn,
-                                     p2m_type_t t)
+int p2m_insert_mapping(struct domain *d, gfn_t start_gfn, unsigned long nr,
+                       mfn_t mfn, p2m_type_t t)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc;
