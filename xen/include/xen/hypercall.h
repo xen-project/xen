@@ -127,7 +127,7 @@ do_kexec_op(
 
 extern long
 do_xsm_op(
-    XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_xsm_op);
+    XEN_GUEST_HANDLE_PARAM(void) u_xsm_op);
 
 #ifdef CONFIG_ARGO
 extern long do_argo_op(
@@ -198,7 +198,7 @@ compat_set_timer_op(
     s32 hi);
 
 extern int compat_xsm_op(
-    XEN_GUEST_HANDLE_PARAM(xsm_op_t) op);
+    XEN_GUEST_HANDLE_PARAM(void) op);
 
 extern int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg);
 

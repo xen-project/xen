@@ -1742,8 +1742,8 @@ static int flask_argo_send(const struct domain *d, const struct domain *t)
 
 #endif
 
-long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
-int compat_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
+long do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op);
+int compat_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op);
 
 static struct xsm_operations flask_ops = {
     .security_domaininfo = flask_security_domaininfo,

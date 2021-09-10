@@ -213,13 +213,13 @@ int __init register_xsm(struct xsm_operations *ops)
 
 #endif
 
-long do_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
+long do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
 {
     return xsm_do_xsm_op(op);
 }
 
 #ifdef CONFIG_COMPAT
-int compat_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
+int compat_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
 {
     return xsm_do_compat_op(op);
 }
