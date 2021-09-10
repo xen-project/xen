@@ -132,9 +132,15 @@ int query_page_offline(mfn_t mfn, uint32_t *status);
 void heap_init_late(void);
 
 int assign_pages(
+    struct page_info *pg,
+    unsigned int nr,
     struct domain *d,
+    unsigned int memflags);
+
+int assign_page(
     struct page_info *pg,
     unsigned int order,
+    struct domain *d,
     unsigned int memflags);
 
 /* Dump info to serial console */

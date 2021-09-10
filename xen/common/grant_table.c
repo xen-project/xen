@@ -2358,7 +2358,7 @@ gnttab_transfer(
          * is respected and speculative execution is blocked accordingly
          */
         if ( unlikely(!evaluate_nospec(okay)) ||
-            unlikely(assign_pages(e, page, 0, MEMF_no_refcount)) )
+            unlikely(assign_pages(page, 1, e, MEMF_no_refcount)) )
         {
             bool drop_dom_ref;
 
