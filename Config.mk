@@ -245,17 +245,15 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= a3741780fe3535e19e02efa869a7cac481891129
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.15.0
-MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.15.0
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.15.1
+MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.15.1
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.14.0
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.15.0
-# Wed Jul 15 10:01:40 2020 +0100
-# qemu-trad: remove Xen path dependencies
+QEMU_TRADITIONAL_REVISION ?= xen-4.15.1
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
