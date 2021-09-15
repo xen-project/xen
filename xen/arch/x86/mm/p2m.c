@@ -2813,7 +2813,7 @@ int xenmem_add_to_physmap_one(
     }
 
     /* Unmap from old location, if any. */
-    if ( !rc && old_gpfn != INVALID_M2P_ENTRY )
+    if ( !rc && old_gpfn != INVALID_M2P_ENTRY && !gfn_eq(_gfn(old_gpfn), gpfn) )
         rc = guest_physmap_remove_page(d, _gfn(old_gpfn), mfn, PAGE_ORDER_4K);
 
     /* Map at new location. */
