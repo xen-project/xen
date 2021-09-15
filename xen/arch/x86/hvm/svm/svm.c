@@ -1052,7 +1052,7 @@ void svm_vmenter_helper(const struct cpu_user_regs *regs)
     if ( unlikely(tb_init_done) )
         HVMTRACE_ND(VMENTRY,
                     nestedhvm_vcpu_in_guestmode(curr) ? TRC_HVM_NESTEDFLAG : 0,
-                    1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
+                    1/*cycles*/);
 
     svm_sync_vmcb(curr, vmcb_needs_vmsave);
 
@@ -2565,12 +2565,10 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     if ( hvm_long_mode_active(v) )
         HVMTRACE_ND(VMEXIT64, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
-                    1/*cycles*/, 3, exit_reason,
-                    regs->eip, regs->rip >> 32, 0, 0, 0);
+                    1/*cycles*/, exit_reason, TRC_PAR_LONG(regs->rip));
     else
         HVMTRACE_ND(VMEXIT, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
-                    1/*cycles*/, 2, exit_reason,
-                    regs->eip, 0, 0, 0, 0);
+                    1/*cycles*/, exit_reason, regs->eip);
 
     if ( vcpu_guestmode )
     {
