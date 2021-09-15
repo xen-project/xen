@@ -858,7 +858,8 @@ struct acpi_madt_generic_translator {
 
 /* MADT Local APIC flags */
 
-#define ACPI_MADT_ENABLED           (1)	/* 00: Processor is usable if set */
+#define ACPI_MADT_ENABLED           (1 << 0)	/* 00: Processor is usable if set */
+#define ACPI_MADT_ONLINE_CAPABLE    (1 << 1)	/* 01: Processor can be onlined */
 
 /* MADT MPS INTI flags (inti_flags) */
 
