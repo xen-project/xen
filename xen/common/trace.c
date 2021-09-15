@@ -75,10 +75,6 @@ static cpumask_t tb_cpu_mask;
 /* which tracing events are enabled */
 static u32 tb_event_mask = TRC_ALL;
 
-/* Return the number of elements _type necessary to store at least _x bytes of data
- * i.e., sizeof(_type) * ans >= _x. */
-#define fit_to_type(_type, _x) (((_x)+sizeof(_type)-1) / sizeof(_type))
-
 static int cf_check cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
@@ -96,8 +92,8 @@ static struct notifier_block cpu_nfb = {
 
 static uint32_t calc_tinfo_first_offset(void)
 {
-    int offset_in_bytes = offsetof(struct t_info, mfn_offset[NR_CPUS]);
-    return fit_to_type(uint32_t, offset_in_bytes);
+    return DIV_ROUND_UP(offsetof(struct t_info, mfn_offset[NR_CPUS]),
+                        sizeof(uint32_t));
 }
 
 /**
@@ -148,7 +144,7 @@ static int calculate_tbuf_size(unsigned int pages, uint16_t t_info_first_offset)
         pages = max_pages;
     }
 
-    /* 
+    /*
      * NB this calculation is correct, because t_info_first_offset is
      * in words, not bytes
      */
@@ -167,7 +163,7 @@ static int calculate_tbuf_size(unsigned int pages, uint16_t t_info_first_offset)
  * trace buffers.  The trace buffers are then available for debugging use, via
  * the %TRACE_xD macros exported in <xen/trace.h>.
  *
- * This function may also be called later when enabling trace buffers 
+ * This function may also be called later when enabling trace buffers
  * via the SET_SIZE hypercall.
  */
 static int alloc_trace_bufs(unsigned int pages)
@@ -401,7 +397,7 @@ int tb_control(struct xen_sysctl_tbuf_op *tbc)
         break;
     case XEN_SYSCTL_TBUFOP_enable:
         /* Enable trace buffers. Check buffers are already allocated. */
-        if ( opt_tbuf_size == 0 ) 
+        if ( opt_tbuf_size == 0 )
             rc = -EINVAL;
         else
             tb_init_done = 1;
@@ -438,7 +434,7 @@ int tb_control(struct xen_sysctl_tbuf_op *tbc)
     return rc;
 }
 
-static inline unsigned int calc_rec_size(bool_t cycles, unsigned int extra) 
+static inline unsigned int calc_rec_size(bool_t cycles, unsigned int extra)
 {
     unsigned int rec_size = 4;
 
@@ -597,7 +593,7 @@ static inline void __insert_record(struct t_buf *buf,
         rec->u.cycles.cycles_lo = (uint32_t)tsc;
         rec->u.cycles.cycles_hi = (uint32_t)(tsc >> 32);
         dst = rec->u.cycles.extra_u32;
-    } 
+    }
 
     if ( extra_data && extra )
         memcpy(dst, extra_data, extra);
@@ -717,9 +713,6 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
     if ( !cpumask_test_cpu(smp_processor_id(), &tb_cpu_mask) )
         return;
 
-    /* Read tb_init_done /before/ t_bufs. */
-    smp_rmb();
-
     spin_lock_irqsave(&this_cpu(t_lock), flags);
 
     buf = this_cpu(t_bufs);
@@ -735,14 +728,14 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
 
     /* Calculate the record size */
     rec_size = calc_rec_size(cycles, extra);
- 
+
     /* How many bytes are available in the buffer? */
     bytes_to_tail = calc_bytes_avail(buf);
-    
+
     /* How many bytes until the next wrap-around? */
     bytes_to_wrap = calc_bytes_to_wrap(buf);
-    
-    /* 
+
+    /*
      * Calculate expected total size to commit this record by
      * doing a dry-run.
      */
@@ -756,7 +749,7 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
         {
             total_size += bytes_to_wrap;
             bytes_to_wrap = data_size;
-        } 
+        }
         total_size += LOST_REC_SIZE;
         bytes_to_wrap -= LOST_REC_SIZE;
 
@@ -768,7 +761,7 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
     if ( rec_size > bytes_to_wrap )
     {
         total_size += bytes_to_wrap;
-    } 
+    }
     total_size += rec_size;
 
     /* Do we have enough space for everything? */
@@ -781,7 +774,7 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
     }
 
     /*
-     * Now, actually write information 
+     * Now, actually write information
      */
     bytes_to_wrap = calc_bytes_to_wrap(buf);
 
@@ -791,7 +784,7 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
         {
             insert_wrap_record(buf, LOST_REC_SIZE);
             bytes_to_wrap = data_size;
-        } 
+        }
         insert_lost_records(buf);
         bytes_to_wrap -= LOST_REC_SIZE;
 
