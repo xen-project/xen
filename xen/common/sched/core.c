@@ -651,7 +651,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     struct scheduler *old_ops = dom_scheduler(d);
     void *old_domdata;
     unsigned int gran = cpupool_get_granularity(c);
-    unsigned int n_units = DIV_ROUND_UP(d->max_vcpus, gran);
+    unsigned int n_units = d->vcpu[0] ? DIV_ROUND_UP(d->max_vcpus, gran) : 0;
     int ret = 0;
 
     for_each_vcpu ( d, v )
