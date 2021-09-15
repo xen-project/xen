@@ -692,7 +692,7 @@ static void __init noreturn reinit_bsp_stack(void)
  * has options that are only used during the very initial boot process,
  * so they can be ignored now.
  */
-ignore_param("no-real-mode");
+ignore_param("real-mode");
 ignore_param("edd");
 ignore_param("edid");
 
