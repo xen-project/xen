@@ -8121,7 +8121,7 @@ void mem_pod_zero_reclaim_process(struct pcpu_info *p)
 
     struct {
         uint64_t gfn, mfn;
-        int d:16,order:16;
+        uint32_t d, order;
     } *r = (typeof(r))ri->d;
 
     if ( v && v->hvm.vmexit_valid )
@@ -8171,7 +8171,7 @@ void mem_pod_populate_process(struct pcpu_info *p)
 
     struct {
         uint64_t gfn, mfn;
-        int d:16,order:16;
+        uint32_t d, order;
     } *r = (typeof(r))ri->d;
 
     if ( opt.dump_all )
@@ -8204,14 +8204,14 @@ void mem_pod_superpage_splinter_process(struct pcpu_info *p)
 
     struct {
         uint64_t gfn;
-        int d:16;
+        uint32_t d, order;
     } *r = (typeof(r))ri->d;
 
     if ( opt.dump_all )
     {
-        printf(" %s pod_spage_splinter d%d g %llx\n",
+        printf(" %s pod_spage_splinter d%d o%d g %"PRIx64"\n",
                ri->dump_header,
-               r->d, (unsigned long long)r->gfn);
+               r->d, r->order, r->gfn);
     }
 }
 
@@ -8255,7 +8255,7 @@ void mem_decrease_reservation_process(struct pcpu_info *p)
 
     struct {
         uint64_t gfn;
-        int d:16,order:16;
+        uint32_t d, order;
     } *r = (typeof(r))ri->d;
 
     if ( opt.dump_all )

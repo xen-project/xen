@@ -868,8 +868,8 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, gfn_t gfn)
     if ( tb_init_done )
     {
         struct {
-            u64 gfn, mfn;
-            int d:16,order:16;
+            uint64_t gfn, mfn;
+            uint32_t d, order;
         } t;
 
         t.gfn = gfn_x(gfn);
@@ -1036,8 +1036,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
             if ( tb_init_done )
             {
                 struct {
-                    u64 gfn, mfn;
-                    int d:16,order:16;
+                    uint64_t gfn, mfn;
+                    uint32_t d, order;
                 } t;
 
                 t.gfn = gfn_x(gfns[i]);
@@ -1276,8 +1276,8 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
     if ( tb_init_done )
     {
         struct {
-            u64 gfn, mfn;
-            int d:16,order:16;
+            uint64_t gfn, mfn;
+            uint32_t d, order;
         } t;
 
         t.gfn = gfn_x(gfn);
@@ -1322,12 +1322,13 @@ remap_and_retry:
     if ( tb_init_done )
     {
         struct {
-            u64 gfn;
-            int d:16;
+            uint64_t gfn;
+            uint32_t d, order;
         } t;
 
         t.gfn = gfn_x(gfn);
         t.d = d->domain_id;
+        t.order = order;
 
         __trace_var(TRC_MEM_POD_SUPERPAGE_SPLINTER, 0, sizeof(t), &t);
     }

@@ -136,6 +136,10 @@
 0x0010f001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  page_grant_map      [ domid = %(1)d ]
 0x0010f002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  page_grant_unmap    [ domid = %(1)d ]
 0x0010f003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  page_grant_transfer [ domid = %(1)d ]
+0x0010f005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  decrease_reservation   [ d%(3)d gfn 0x%(2)08x%(1)08x, order %(4)u ]
+0x0010f010  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  pod_populate           [ d%(5)d gfn 0x%(2)08x%(1)08x => mfn 0x%(4)08x%(3)08x, order %(6)u ]
+0x0010f011  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  pod_zero_reclaim       [ d%(5)d gfn 0x%(2)08x%(1)08x => mfn 0x%(4)08x%(3)08x, order %(6)u ]
+0x0010f012  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  pod_superpage_splinter [ d%(3)d gfn 0x%(2)08x%(1)08x, order %(4)u ]
 
 0x00201001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  hypercall  [ eip = 0x%(1)08x, eax = 0x%(2)08x ]
 0x00201101  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  hypercall  [ rip = 0x%(2)08x%(1)08x, eax = 0x%(3)08x ]

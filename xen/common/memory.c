@@ -474,8 +474,8 @@ static void decrease_reservation(struct memop_args *a)
         if ( tb_init_done )
         {
             struct {
-                u64 gfn;
-                int d:16,order:16;
+                uint64_t gfn;
+                uint32_t d, order;
             } t;
 
             t.gfn = gmfn;
