@@ -1111,12 +1111,14 @@ _runq_assign(struct csched2_unit *svc, struct csched2_runqueue_data *rqd)
     if ( unlikely(tb_init_done) )
     {
         struct {
-            unsigned unit:16, dom:16;
-            unsigned rqi:16;
-        } d;
-        d.dom = svc->unit->domain->domain_id;
-        d.unit = svc->unit->unit_id;
-        d.rqi=rqd->id;
+            uint16_t unit, dom;
+            uint16_t rqi, _pad;
+        } d = {
+            .unit = svc->unit->unit_id,
+            .dom  = svc->unit->domain->domain_id,
+            .rqi  = rqd->id,
+        };
+
         __trace_var(TRC_CSCHED2_RUNQ_ASSIGN, 1,
                     sizeof(d),
                     (unsigned char *)&d);
@@ -1341,13 +1343,17 @@ update_runq_load(const struct scheduler *ops,
     {
         struct {
             uint64_t rq_avgload, b_avgload;
-            unsigned rq_load:16, rq_id:8, shift:8;
-        } d;
-        d.rq_id = rqd->id;
-        d.rq_load = rqd->load;
-        d.rq_avgload = rqd->avgload;
-        d.b_avgload = rqd->b_avgload;
-        d.shift = P;
+            uint16_t rq_load;
+            uint8_t  rq_id, shift;
+            uint32_t _pad;
+        } d = {
+            .rq_avgload = rqd->avgload,
+            .b_avgload  = rqd->b_avgload,
+            .rq_load    = rqd->load,
+            .rq_id      = rqd->id,
+            .shift      = P,
+        };
+
         __trace_var(TRC_CSCHED2_UPDATE_RUNQ_LOAD, 1,
                     sizeof(d),
                     (unsigned char *)&d);
@@ -2804,12 +2810,15 @@ retry:
     {
         struct {
             uint64_t lb_avgload, ob_avgload;
-            unsigned lrq_id:16, orq_id:16;
-        } d;
-        d.lrq_id = st.lrqd->id;
-        d.lb_avgload = st.lrqd->b_avgload;
-        d.orq_id = st.orqd->id;
-        d.ob_avgload = st.orqd->b_avgload;
+            uint16_t lrq_id, orq_id;
+            uint32_t _pad;
+        } d = {
+            .lb_avgload = st.lrqd->b_avgload,
+            .ob_avgload = st.orqd->b_avgload,
+            .lrq_id     = st.lrqd->id,
+            .orq_id     = st.orqd->id,
+        };
+
         __trace_var(TRC_CSCHED2_LOAD_BALANCE, 1,
                     sizeof(d),
                     (unsigned char *)&d);
