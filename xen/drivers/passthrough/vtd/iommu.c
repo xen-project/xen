@@ -1733,7 +1733,7 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
         return -EINVAL;
     }
 
-    if ( ret || QUARANTINE_SKIP(domain) )
+    if ( ret || QUARANTINE_SKIP(domain) || pdev->devfn != devfn )
         return ret;
 
     /*
