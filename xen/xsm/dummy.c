@@ -13,15 +13,13 @@
 #define XSM_NO_WRAPPERS
 #include <xsm/dummy.h>
 
-struct xsm_operations dummy_xsm_ops;
-
 #define set_to_dummy_if_null(ops, function)                            \
     do {                                                               \
         if ( !ops->function )                                          \
             ops->function = xsm_##function;                            \
     } while (0)
 
-void __init xsm_fixup_ops (struct xsm_operations *ops)
+void __init xsm_fixup_ops (struct xsm_ops *ops)
 {
     set_to_dummy_if_null(ops, security_domaininfo);
     set_to_dummy_if_null(ops, domain_create);

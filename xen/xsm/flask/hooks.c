@@ -1745,7 +1745,7 @@ static int flask_argo_send(const struct domain *d, const struct domain *t)
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op);
 int compat_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op);
 
-static struct xsm_operations flask_ops = {
+static const struct xsm_ops __initconstrel flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
     .domain_create = flask_domain_create,
     .getdomaininfo = flask_getdomaininfo,
@@ -1883,7 +1883,8 @@ static struct xsm_operations flask_ops = {
 #endif
 };
 
-void __init flask_init(const void *policy_buffer, size_t policy_size)
+const struct xsm_ops *__init flask_init(const void *policy_buffer,
+                                        size_t policy_size)
 {
     int ret = -ENOENT;
 
@@ -1891,7 +1892,7 @@ void __init flask_init(const void *policy_buffer, size_t policy_size)
     {
     case FLASK_BOOTPARAM_DISABLED:
         printk(XENLOG_INFO "Flask: Disabled at boot.\n");
-        return;
+        return NULL;
 
     case FLASK_BOOTPARAM_PERMISSIVE:
         flask_enforcing = 0;
@@ -1908,9 +1909,6 @@ void __init flask_init(const void *policy_buffer, size_t policy_size)
 
     avc_init();
 
-    if ( register_xsm(&flask_ops) )
-        panic("Flask: Unable to register with XSM\n");
-
     if ( policy_size && flask_bootparam != FLASK_BOOTPARAM_LATELOAD )
         ret = security_load_policy(policy_buffer, policy_size);
 
@@ -1923,6 +1921,8 @@ void __init flask_init(const void *policy_buffer, size_t policy_size)
         printk(XENLOG_INFO "Flask:  Starting in enforcing mode.\n");
     else
         printk(XENLOG_INFO "Flask:  Starting in permissive mode.\n");
+
+    return &flask_ops;
 }
 
 /*

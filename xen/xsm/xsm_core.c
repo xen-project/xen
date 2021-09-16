@@ -28,9 +28,17 @@
 #include <asm/setup.h>
 #endif
 
-#define XSM_FRAMEWORK_VERSION    "1.0.0"
+#define XSM_FRAMEWORK_VERSION    "1.0.1"
 
-struct xsm_operations *xsm_ops;
+struct xsm_ops __read_mostly xsm_ops;
+
+enum xsm_ops_state {
+    XSM_OPS_UNREGISTERED,
+    XSM_OPS_REG_FAILED,
+    XSM_OPS_REGISTERED,
+};
+
+static enum xsm_ops_state __initdata xsm_ops_registered = XSM_OPS_UNREGISTERED;
 
 enum xsm_bootparam {
     XSM_BOOTPARAM_DUMMY,
@@ -68,17 +76,10 @@ static int __init parse_xsm_param(const char *s)
 }
 custom_param("xsm", parse_xsm_param);
 
-static inline int verify(struct xsm_operations *ops)
-{
-    /* verify the security_operations structure exists */
-    if ( !ops )
-        return -EINVAL;
-    xsm_fixup_ops(ops);
-    return 0;
-}
-
 static int __init xsm_core_init(const void *policy_buffer, size_t policy_size)
 {
+    const struct xsm_ops *ops = NULL;
+
 #ifdef CONFIG_XSM_FLASK_POLICY
     if ( policy_size == 0 )
     {
@@ -87,30 +88,51 @@ static int __init xsm_core_init(const void *policy_buffer, size_t policy_size)
     }
 #endif
 
-    if ( verify(&dummy_xsm_ops) )
+    if ( xsm_ops_registered != XSM_OPS_UNREGISTERED )
     {
-        printk(XENLOG_ERR "Could not verify dummy_xsm_ops structure\n");
+        printk(XENLOG_ERR
+               "Could not init XSM, xsm_ops register already attempted\n");
         return -EIO;
     }
-
-    xsm_ops = &dummy_xsm_ops;
 
     switch ( xsm_bootparam )
     {
     case XSM_BOOTPARAM_DUMMY:
+        xsm_ops_registered = XSM_OPS_REGISTERED;
         break;
 
     case XSM_BOOTPARAM_FLASK:
-        flask_init(policy_buffer, policy_size);
+        ops = flask_init(policy_buffer, policy_size);
         break;
 
     case XSM_BOOTPARAM_SILO:
-        silo_init();
+        ops = silo_init();
         break;
 
     default:
         ASSERT_UNREACHABLE();
         break;
+    }
+
+    if ( ops )
+    {
+        xsm_ops_registered = XSM_OPS_REGISTERED;
+        xsm_ops = *ops;
+    }
+    /*
+     * This handles three cases,
+     *   - dummy policy module was selected
+     *   - a policy module does not provide all handlers
+     *   - a policy module failed to init
+     */
+    xsm_fixup_ops(&xsm_ops);
+
+    if ( xsm_ops_registered != XSM_OPS_REGISTERED )
+    {
+        xsm_ops_registered = XSM_OPS_REG_FAILED;
+        printk(XENLOG_ERR
+               "Could not init XSM, xsm_ops register failed\n");
+        return -EFAULT;
     }
 
     return 0;
@@ -194,22 +216,6 @@ bool __init has_xsm_magic(paddr_t start)
     return false;
 }
 #endif
-
-int __init register_xsm(struct xsm_operations *ops)
-{
-    if ( verify(ops) )
-    {
-        printk(XENLOG_ERR "Could not verify xsm_operations structure\n");
-        return -EINVAL;
-    }
-
-    if ( xsm_ops != &dummy_xsm_ops )
-        return -EAGAIN;
-
-    xsm_ops = ops;
-
-    return 0;
-}
 
 #endif
 

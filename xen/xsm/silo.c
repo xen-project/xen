@@ -100,7 +100,7 @@ static int silo_argo_send(const struct domain *d1, const struct domain *d2)
 
 #endif
 
-static struct xsm_operations silo_xsm_ops = {
+static const struct xsm_ops __initconstrel silo_xsm_ops = {
     .evtchn_unbound = silo_evtchn_unbound,
     .evtchn_interdomain = silo_evtchn_interdomain,
     .grant_mapref = silo_grant_mapref,
@@ -112,12 +112,11 @@ static struct xsm_operations silo_xsm_ops = {
 #endif
 };
 
-void __init silo_init(void)
+const struct xsm_ops *__init silo_init(void)
 {
     printk("Initialising XSM SILO mode\n");
 
-    if ( register_xsm(&silo_xsm_ops) )
-        panic("SILO: Unable to register with XSM\n");
+    return &silo_xsm_ops;
 }
 
 /*
