@@ -7,9 +7,21 @@
 #include <public/arch-arm.h>
 
 /* CTR Cache Type Register */
-#define CTR_L1Ip_MASK       0x3
-#define CTR_L1Ip_SHIFT      14
-#define CTR_L1Ip_AIVIVT     0x1
+#define CTR_L1IP_MASK       0x3
+#define CTR_L1IP_SHIFT      14
+#define CTR_DMINLINE_SHIFT  16
+#define CTR_IMINLINE_SHIFT  0
+#define CTR_IMINLINE_MASK   0xf
+#define CTR_ERG_SHIFT       20
+#define CTR_CWG_SHIFT       24
+#define CTR_CWG_MASK        15
+#define CTR_IDC_SHIFT       28
+#define CTR_DIC_SHIFT       29
+
+#define ICACHE_POLICY_VPIPT  0
+#define ICACHE_POLICY_AIVIVT 1
+#define ICACHE_POLICY_VIPT   2
+#define ICACHE_POLICY_PIPT   3
 
 /* MIDR Main ID Register */
 #define MIDR_REVISION_MASK      0xf

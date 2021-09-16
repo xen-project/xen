@@ -267,6 +267,14 @@ struct cpuinfo_arm {
         register_t bits[1];
     } dczid;
 
+    /*
+     * CTR is only used to check for different cache types or policies and
+     * taint Xen in this case
+     */
+    struct {
+        register_t bits[1];
+    } ctr;
+
 #endif
 
     /*

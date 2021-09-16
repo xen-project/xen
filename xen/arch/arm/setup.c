@@ -650,7 +650,7 @@ static void __init setup_mm(void)
         panic("No memory bank\n");
 
     /* We only supports instruction caches implementing the IVIPT extension. */
-    if ( ((ctr >> CTR_L1Ip_SHIFT) & CTR_L1Ip_MASK) == CTR_L1Ip_AIVIVT )
+    if ( ((ctr >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK) == ICACHE_POLICY_AIVIVT )
         panic("AIVIVT instruction cache not supported\n");
 
     init_pdx();
