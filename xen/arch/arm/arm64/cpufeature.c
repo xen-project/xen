@@ -329,14 +329,11 @@ static const struct arm64_ftr_bits ftr_mvfr2[] = {
 	ARM64_FTR_END,
 };
 
-#if 0
-/* TODO: handle this when sanitizing cache related registers */
 static const struct arm64_ftr_bits ftr_dczid[] = {
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, DCZID_DZP_SHIFT, 1, 1),
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, DCZID_BS_SHIFT, 4, 0),
 	ARM64_FTR_END,
 };
-#endif
 
 static const struct arm64_ftr_bits ftr_id_isar0[] = {
 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR0_DIVIDE_SHIFT, 4, 0),
@@ -597,6 +594,17 @@ void update_system_features(const struct cpuinfo_arm *new)
 	SANITIZE_ID_REG(isa64, 1, aa64isar1);
 
 	SANITIZE_ID_REG(zfr64, 0, aa64zfr0);
+
+	/*
+	 * Comment from Linux:
+	 * Userspace may perform DC ZVA instructions. Mismatched block sizes
+	 * could result in too much or too little memory being zeroed if a
+	 * process is preempted and migrated between CPUs.
+	 *
+	 * ftr_dczid is using STRICT comparison so we will taint Xen if different
+	 * values are found.
+	 */
+	SANITIZE_REG(dczid, 0, dczid);
 
 	if ( cpu_feature64_has_el0_32(&system_cpuinfo) )
 	{

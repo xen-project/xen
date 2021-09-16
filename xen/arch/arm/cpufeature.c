@@ -125,6 +125,8 @@ void identify_cpu(struct cpuinfo_arm *c)
 
     c->zfr64.bits[0] = READ_SYSREG(ID_AA64ZFR0_EL1);
 
+    c->dczid.bits[0] = READ_SYSREG(DCZID_EL0);
+
     aarch32_el0 = cpu_feature64_has_el0_32(c);
 #endif
 

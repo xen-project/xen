@@ -259,6 +259,14 @@ struct cpuinfo_arm {
         register_t bits[1];
     } zfr64;
 
+    /*
+     * DCZID is only used to check for incoherent values between cores
+     * and taint Xen in this case
+     */
+    struct {
+        register_t bits[1];
+    } dczid;
+
 #endif
 
     /*
