@@ -566,12 +566,6 @@ static void amd_dump_page_table_level(struct page_info *pg, int level,
         return;
 
     table_vaddr = __map_domain_page(pg);
-    if ( table_vaddr == NULL )
-    {
-        printk("AMD IOMMU failed to map domain page %"PRIpaddr"\n",
-                page_to_maddr(pg));
-        return;
-    }
 
     for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
     {

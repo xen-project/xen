@@ -2633,12 +2633,6 @@ static void vtd_dump_page_table_level(paddr_t pt_maddr, int level, paddr_t gpa,
         return;
 
     pt_vaddr = map_vtd_domain_page(pt_maddr);
-    if ( pt_vaddr == NULL )
-    {
-        printk(VTDPREFIX " failed to map domain page %"PRIpaddr"\n",
-               pt_maddr);
-        return;
-    }
 
     next_level = level - 1;
     for ( i = 0; i < PTE_NUM; i++ )

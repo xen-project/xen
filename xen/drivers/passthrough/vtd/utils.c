@@ -106,11 +106,6 @@ void print_vtd_entries(struct vtd_iommu *iommu, int bus, int devfn, u64 gmfn)
     }
 
     root_entry = (struct root_entry *)map_vtd_domain_page(iommu->root_maddr);
-    if ( root_entry == NULL )
-    {
-        printk("    root_entry == NULL\n");
-        return;
-    }
 
     printk("    root_entry[%02x] = %"PRIx64"\n", bus, root_entry[bus].val);
     if ( !root_present(root_entry[bus]) )
@@ -123,11 +118,6 @@ void print_vtd_entries(struct vtd_iommu *iommu, int bus, int devfn, u64 gmfn)
     val = root_entry[bus].val;
     unmap_vtd_domain_page(root_entry);
     ctxt_entry = map_vtd_domain_page(val);
-    if ( ctxt_entry == NULL )
-    {
-        printk("    ctxt_entry == NULL\n");
-        return;
-    }
 
     val = ctxt_entry[devfn].lo;
     printk("    context[%02x] = %"PRIx64"_%"PRIx64"\n",
@@ -151,11 +141,6 @@ void print_vtd_entries(struct vtd_iommu *iommu, int bus, int devfn, u64 gmfn)
     do
     {
         l = map_vtd_domain_page(val);
-        if ( l == NULL )
-        {
-            printk("    l%u == NULL\n", level);
-            break;
-        }
         l_index = get_level_index(gmfn, level);
         pte.val = l[l_index];
         unmap_vtd_domain_page(l);
