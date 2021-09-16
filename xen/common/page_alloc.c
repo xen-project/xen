@@ -2714,7 +2714,7 @@ static struct page_info * __init acquire_staticmem_pages(mfn_t smfn,
  * then assign them to one specific domain #d.
  */
 int __init acquire_domstatic_pages(struct domain *d, mfn_t smfn,
-                                   unsigned long nr_mfns, unsigned int memflags)
+                                   unsigned int nr_mfns, unsigned int memflags)
 {
     struct page_info *pg;
 
