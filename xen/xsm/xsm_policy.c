@@ -30,10 +30,9 @@
 #endif
 
 #ifdef CONFIG_MULTIBOOT
-int __init xsm_multiboot_policy_init(unsigned long *module_map,
-                                     const multiboot_info_t *mbi,
-                                     void **policy_buffer,
-                                     size_t *policy_size)
+int __init xsm_multiboot_policy_init(
+    unsigned long *module_map, const multiboot_info_t *mbi,
+    void **policy_buffer, size_t *policy_size)
 {
     int i;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
