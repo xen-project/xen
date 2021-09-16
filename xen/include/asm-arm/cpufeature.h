@@ -3,7 +3,7 @@
 
 #ifdef CONFIG_ARM_64
 #define cpu_feature64(c, feat)         ((c)->pfr64.feat)
-#define boot_cpu_feature64(feat)       (boot_cpu_data.pfr64.feat)
+#define boot_cpu_feature64(feat)       (system_cpuinfo.pfr64.feat)
 
 #define cpu_feature64_has_el0_32(c)    (cpu_feature64(c, el0) == 2)
 
@@ -21,7 +21,7 @@
 #endif
 
 #define cpu_feature32(c, feat)         ((c)->pfr32.feat)
-#define boot_cpu_feature32(feat)       (boot_cpu_data.pfr32.feat)
+#define boot_cpu_feature32(feat)       (system_cpuinfo.pfr32.feat)
 
 #define cpu_has_arm       (boot_cpu_feature32(arm) == 1)
 #define cpu_has_thumb     (boot_cpu_feature32(thumb) >= 1)
@@ -326,7 +326,7 @@ struct cpuinfo_arm {
     } mvfr;
 };
 
-extern struct cpuinfo_arm boot_cpu_data;
+extern struct cpuinfo_arm system_cpuinfo;
 
 extern void identify_cpu(struct cpuinfo_arm *);
 

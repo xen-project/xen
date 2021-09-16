@@ -124,7 +124,7 @@ static void __init dt_smp_init_cpus(void)
     bool bootcpu_valid = false;
     int rc;
 
-    mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
+    mpidr = system_cpuinfo.mpidr.bits & MPIDR_HWID_MASK;
 
     if ( !cpus )
     {
@@ -319,13 +319,13 @@ void start_secondary(void)
      * now.
      */
     if ( !opt_hmp_unsafe &&
-         current_cpu_data.midr.bits != boot_cpu_data.midr.bits )
+         current_cpu_data.midr.bits != system_cpuinfo.midr.bits )
     {
         printk(XENLOG_ERR
                "CPU%u MIDR (0x%"PRIregister") does not match boot CPU MIDR (0x%"PRIregister"),\n"
                XENLOG_ERR "disable cpu (see big.LITTLE.txt under docs/).\n",
                smp_processor_id(), current_cpu_data.midr.bits,
-               boot_cpu_data.midr.bits);
+               system_cpuinfo.midr.bits);
         stop_cpu();
     }
 

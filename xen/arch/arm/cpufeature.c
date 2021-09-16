@@ -169,12 +169,8 @@ void identify_cpu(struct cpuinfo_arm *c)
  */
 static int __init create_guest_cpuinfo(void)
 {
-    /*
-     * TODO: The code is currently using only the features detected on the boot
-     * core. In the long term we should try to compute values containing only
-     * features supported by all cores.
-     */
-    guest_cpuinfo = boot_cpu_data;
+    /* Use the sanitized cpuinfo as initial guest cpuinfo */
+    guest_cpuinfo = system_cpuinfo;
 
 #ifdef CONFIG_ARM_64
     /* Hide MPAM support as xen does not support it */
