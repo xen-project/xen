@@ -2655,10 +2655,12 @@ static void vtd_dump_page_table_level(paddr_t pt_maddr, int level, paddr_t gpa,
             vtd_dump_page_table_level(dma_pte_addr(*pte), next_level,
                                       address, indent + 1);
         else
-            printk("%*sdfn: %08lx mfn: %08lx\n",
+            printk("%*sdfn: %08lx mfn: %08lx %c%c\n",
                    indent, "",
                    (unsigned long)(address >> PAGE_SHIFT_4K),
-                   (unsigned long)(dma_pte_addr(*pte) >> PAGE_SHIFT_4K));
+                   (unsigned long)(dma_pte_addr(*pte) >> PAGE_SHIFT_4K),
+                   dma_pte_read(*pte) ? 'r' : '-',
+                   dma_pte_write(*pte) ? 'w' : '-');
     }
 
     unmap_vtd_domain_page(pt_vaddr);
