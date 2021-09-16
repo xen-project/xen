@@ -1,6 +1,7 @@
 obj-y += lib/
 
 obj-y += cache.o
+obj-y += cpufeature.o
 obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR) += bpi.o
 obj-$(CONFIG_EARLY_PRINTK) += debug.o
 obj-y += domctl.o

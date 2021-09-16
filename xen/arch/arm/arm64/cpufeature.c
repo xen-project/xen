@@ -275,6 +275,9 @@ static const struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
 	ARM64_FTR_END,
 };
 
+#if 0
+/* TODO: use this to sanitize the cache line size among cores */
+
 static const struct arm64_ftr_bits ftr_ctr[] = {
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, 31, 1, 1), /* RES1 */
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_DIC_SHIFT, 1, 1),
@@ -291,6 +294,7 @@ static const struct arm64_ftr_bits ftr_ctr[] = {
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_IMINLINE_SHIFT, 4, 0),
 	ARM64_FTR_END,
 };
+#endif
 
 static const struct arm64_ftr_bits ftr_id_mmfr0[] = {
 	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_MMFR0_INNERSHR_SHIFT, 4, 0xf),
@@ -325,11 +329,14 @@ static const struct arm64_ftr_bits ftr_mvfr2[] = {
 	ARM64_FTR_END,
 };
 
+#if 0
+/* TODO: handle this when sanitizing cache related registers */
 static const struct arm64_ftr_bits ftr_dczid[] = {
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, DCZID_DZP_SHIFT, 1, 1),
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, DCZID_BS_SHIFT, 4, 0),
 	ARM64_FTR_END,
 };
+#endif
 
 static const struct arm64_ftr_bits ftr_id_isar0[] = {
 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR0_DIVIDE_SHIFT, 4, 0),
@@ -444,11 +451,15 @@ static const struct arm64_ftr_bits ftr_id_dfr1[] = {
 	ARM64_FTR_END,
 };
 
+#if 0
+/* TODO: use this to sanitize SVE once we support it */
+
 static const struct arm64_ftr_bits ftr_zcr[] = {
 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE,
 		ZCR_ELx_LEN_SHIFT, ZCR_ELx_LEN_SIZE, 0),	/* LEN */
 	ARM64_FTR_END,
 };
+#endif
 
 /*
  * Common ftr bits for a 32bit register with all hidden, strict
@@ -512,3 +523,109 @@ static s64 arm64_ftr_safe_value(const struct arm64_ftr_bits *ftrp, s64 new,
  * End of imported linux structures and code
  */
 
+static void sanitize_reg(u64 *cur_reg, u64 new_reg, const char *reg_name,
+						const struct arm64_ftr_bits *ftrp)
+{
+	int taint = 0;
+	u64 old_reg = *cur_reg;
+
+	for (;ftrp->width != 0;ftrp++)
+	{
+		s64 cur_field = arm64_ftr_value(ftrp, *cur_reg);
+		s64 new_field = arm64_ftr_value(ftrp, new_reg);
+
+		if (cur_field == new_field)
+			continue;
+
+		if (ftrp->strict)
+			taint = 1;
+
+		*cur_reg = arm64_ftr_set_value(ftrp, *cur_reg,
+							arm64_ftr_safe_value(ftrp, new_field, cur_field));
+	}
+
+	if (old_reg != new_reg)
+		printk(XENLOG_DEBUG "SANITY DIF: %s 0x%"PRIx64" -> 0x%"PRIx64"\n",
+				reg_name, old_reg, new_reg);
+	if (old_reg != *cur_reg)
+		printk(XENLOG_DEBUG "SANITY FIX: %s 0x%"PRIx64" -> 0x%"PRIx64"\n",
+				reg_name, old_reg, *cur_reg);
+
+	if (taint)
+	{
+		printk(XENLOG_WARNING "SANITY CHECK: Unexpected variation in %s.\n",
+				reg_name);
+		add_taint(TAINT_CPU_OUT_OF_SPEC);
+	}
+}
+
+
+/*
+ * This function should be called on secondary cores to sanitize the boot cpu
+ * cpuinfo.
+ */
+void update_system_features(const struct cpuinfo_arm *new)
+{
+
+#define SANITIZE_REG(field, num, reg)  \
+	sanitize_reg(&system_cpuinfo.field.bits[num], new->field.bits[num], \
+				 #reg, ftr_##reg)
+
+#define SANITIZE_ID_REG(field, num, reg)  \
+	sanitize_reg(&system_cpuinfo.field.bits[num], new->field.bits[num], \
+				#reg, ftr_id_##reg)
+
+#define SANITIZE_RAZ_REG(field, num, reg)  \
+	sanitize_reg(&system_cpuinfo.field.bits[num], new->field.bits[num], \
+				#reg, ftr_raz)
+
+#define SANITIZE_GENERIC_REG(field, num, reg)  \
+	sanitize_reg(&system_cpuinfo.field.bits[num], new->field.bits[num], \
+				#reg, ftr_generic_32bits)
+
+	SANITIZE_ID_REG(pfr64, 0, aa64pfr0);
+	SANITIZE_ID_REG(pfr64, 1, aa64pfr1);
+
+	SANITIZE_ID_REG(dbg64, 0, aa64dfr0);
+	SANITIZE_RAZ_REG(dbg64, 1, aa64dfr1);
+
+	SANITIZE_ID_REG(mm64, 0, aa64mmfr0);
+	SANITIZE_ID_REG(mm64, 1, aa64mmfr1);
+	SANITIZE_ID_REG(mm64, 2, aa64mmfr2);
+
+	SANITIZE_ID_REG(isa64, 0, aa64isar0);
+	SANITIZE_ID_REG(isa64, 1, aa64isar1);
+
+	SANITIZE_ID_REG(zfr64, 0, aa64zfr0);
+
+	if ( cpu_feature64_has_el0_32(&system_cpuinfo) )
+	{
+		SANITIZE_ID_REG(pfr32, 0, pfr0);
+		SANITIZE_ID_REG(pfr32, 1, pfr1);
+		SANITIZE_ID_REG(pfr32, 2, pfr2);
+
+		SANITIZE_ID_REG(dbg32, 0, dfr0);
+		SANITIZE_ID_REG(dbg32, 1, dfr1);
+
+		SANITIZE_ID_REG(mm32, 0, mmfr0);
+		SANITIZE_GENERIC_REG(mm32, 1, mmfr1);
+		SANITIZE_GENERIC_REG(mm32, 2, mmfr2);
+		SANITIZE_GENERIC_REG(mm32, 3, mmfr3);
+		SANITIZE_ID_REG(mm32, 4, mmfr4);
+		SANITIZE_ID_REG(mm32, 5, mmfr5);
+
+		SANITIZE_ID_REG(isa32, 0, isar0);
+		SANITIZE_GENERIC_REG(isa32, 1, isar1);
+		SANITIZE_GENERIC_REG(isa32, 2, isar2);
+		SANITIZE_GENERIC_REG(isa32, 3, isar3);
+		SANITIZE_ID_REG(isa32, 4, isar4);
+		SANITIZE_ID_REG(isa32, 5, isar5);
+		SANITIZE_ID_REG(isa32, 6, isar6);
+
+		SANITIZE_GENERIC_REG(mvfr, 0, mvfr0);
+		SANITIZE_GENERIC_REG(mvfr, 1, mvfr1);
+#ifndef MVFR2_MAYBE_UNDEFINED
+		SANITIZE_REG(mvfr, 2, mvfr2);
+#endif
+	}
+}

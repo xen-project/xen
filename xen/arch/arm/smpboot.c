@@ -318,15 +318,26 @@ void start_secondary(void)
      * is manually specified for all domains). Better to park them for
      * now.
      */
-    if ( !opt_hmp_unsafe &&
-         current_cpu_data.midr.bits != system_cpuinfo.midr.bits )
+    if ( current_cpu_data.midr.bits != system_cpuinfo.midr.bits )
     {
-        printk(XENLOG_ERR
-               "CPU%u MIDR (0x%"PRIregister") does not match boot CPU MIDR (0x%"PRIregister"),\n"
-               XENLOG_ERR "disable cpu (see big.LITTLE.txt under docs/).\n",
-               smp_processor_id(), current_cpu_data.midr.bits,
-               system_cpuinfo.midr.bits);
-        stop_cpu();
+        if ( !opt_hmp_unsafe )
+        {
+            printk(XENLOG_ERR
+                   "CPU%u MIDR (0x%"PRIregister") does not match boot CPU MIDR (0x%"PRIregister"),\n"
+                   XENLOG_ERR "disable cpu (see big.LITTLE.txt under docs/).\n",
+                   smp_processor_id(), current_cpu_data.midr.bits,
+                   system_cpuinfo.midr.bits);
+            stop_cpu();
+        }
+        else
+        {
+            printk(XENLOG_ERR
+                   "CPU%u MIDR (0x%"PRIregister") does not match boot CPU MIDR (0x%"PRIregister"),\n"
+                   XENLOG_ERR "hmp-unsafe turned on so tainting Xen and keep core on!!\n",
+                   smp_processor_id(), current_cpu_data.midr.bits,
+                   system_cpuinfo.midr.bits);
+            add_taint(TAINT_CPU_OUT_OF_SPEC);
+         }
     }
 
     if ( dcache_line_bytes != read_dcache_line_bytes() )
@@ -336,6 +347,13 @@ void start_secondary(void)
                dcache_line_bytes);
         stop_cpu();
     }
+
+    /*
+     * system features must be updated only if we do not stop the core or
+     * we might disable features due to a non used core (for example when
+     * booting on big cores on a big.LITTLE system with hmp_unsafe)
+     */
+    update_system_features(&current_cpu_data);
 
     mmu_init_secondary_cpu();
 

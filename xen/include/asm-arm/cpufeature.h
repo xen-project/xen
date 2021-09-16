@@ -330,6 +330,15 @@ extern struct cpuinfo_arm system_cpuinfo;
 
 extern void identify_cpu(struct cpuinfo_arm *);
 
+#ifdef CONFIG_ARM_64
+extern void update_system_features(const struct cpuinfo_arm *);
+#else
+static inline void update_system_features(const struct cpuinfo_arm *cpuinfo)
+{
+    /* Not supported on arm32 */
+}
+#endif
+
 extern struct cpuinfo_arm cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
