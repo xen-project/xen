@@ -1460,13 +1460,9 @@ static int domain_context_unmap(struct domain *d, uint8_t devfn,
 static int domain_context_mapping(struct domain *domain, u8 devfn,
                                   struct pci_dev *pdev)
 {
-    struct acpi_drhd_unit *drhd;
+    const struct acpi_drhd_unit *drhd = acpi_find_matched_drhd_unit(pdev);
     int ret = 0;
     u8 seg = pdev->seg, bus = pdev->bus, secbus;
-
-    drhd = acpi_find_matched_drhd_unit(pdev);
-    if ( !drhd )
-        return -ENODEV;
 
     /*
      * Generally we assume only devices from one node to get assigned to a
@@ -1476,7 +1472,7 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
      * this or other devices may be penalized then, but some would also be
      * if we left other than NUMA_NO_NODE untouched here.
      */
-    if ( drhd->iommu->node != NUMA_NO_NODE )
+    if ( drhd && drhd->iommu->node != NUMA_NO_NODE )
         dom_iommu(domain)->node = drhd->iommu->node;
 
     ASSERT(pcidevs_locked());
@@ -1497,6 +1493,9 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
+        if ( !drhd )
+            return -ENODEV;
+
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:PCIe: map %pp\n",
                    domain, &PCI_SBDF3(seg, bus, devfn));
@@ -1508,6 +1507,9 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
         break;
 
     case DEV_TYPE_PCI:
+        if ( !drhd )
+            return -ENODEV;
+
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:PCI: map %pp\n",
                    domain, &PCI_SBDF3(seg, bus, devfn));
@@ -1651,16 +1653,11 @@ int domain_context_unmap_one(
 static int domain_context_unmap(struct domain *domain, u8 devfn,
                                 struct pci_dev *pdev)
 {
-    struct acpi_drhd_unit *drhd;
-    struct vtd_iommu *iommu;
+    const struct acpi_drhd_unit *drhd = acpi_find_matched_drhd_unit(pdev);
+    struct vtd_iommu *iommu = drhd ? drhd->iommu : NULL;
     int ret;
     u8 seg = pdev->seg, bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
     int found = 0;
-
-    drhd = acpi_find_matched_drhd_unit(pdev);
-    if ( !drhd )
-        return -ENODEV;
-    iommu = drhd->iommu;
 
     switch ( pdev->type )
     {
@@ -1676,6 +1673,9 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
         return 0;
 
     case DEV_TYPE_PCIe_ENDPOINT:
+        if ( !iommu )
+            return -ENODEV;
+
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:PCIe: unmap %pp\n",
                    domain, &PCI_SBDF3(seg, bus, devfn));
@@ -1686,6 +1686,9 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
         break;
 
     case DEV_TYPE_PCI:
+        if ( !iommu )
+            return -ENODEV;
+
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:PCI: unmap %pp\n",
                    domain, &PCI_SBDF3(seg, bus, devfn));
