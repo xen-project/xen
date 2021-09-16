@@ -587,11 +587,8 @@ bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature)
 static void iommu_dump_page_tables(unsigned char key)
 {
     struct domain *d;
-    const struct iommu_ops *ops;
 
     ASSERT(iommu_enabled);
-
-    ops = iommu_get_ops();
 
     rcu_read_lock(&domlist_read_lock);
 
@@ -600,7 +597,13 @@ static void iommu_dump_page_tables(unsigned char key)
         if ( is_hardware_domain(d) || !is_iommu_enabled(d) )
             continue;
 
-        ops->dump_page_tables(d);
+        if ( iommu_use_hap_pt(d) )
+        {
+            printk("%pd sharing page tables\n", d);
+            continue;
+        }
+
+        dom_iommu(d)->platform_ops->dump_page_tables(d);
     }
 
     rcu_read_unlock(&domlist_read_lock);

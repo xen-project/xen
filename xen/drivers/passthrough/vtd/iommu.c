@@ -2668,12 +2668,6 @@ static void vtd_dump_page_tables(struct domain *d)
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
-    if ( iommu_use_hap_pt(d) )
-    {
-        printk(VTDPREFIX " %pd sharing EPT table\n", d);
-        return;
-    }
-
     printk(VTDPREFIX" %pd table has %d levels\n", d,
            agaw_to_level(hd->arch.vtd.agaw));
     vtd_dump_page_table_level(hd->arch.vtd.pgd_maddr,
