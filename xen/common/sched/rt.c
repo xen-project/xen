@@ -989,18 +989,20 @@ burn_budget(const struct scheduler *ops, struct rt_unit *svc, s_time_t now)
     /* TRACE */
     {
         struct __packed {
-            unsigned unit:16, dom:16;
+            uint16_t unit, dom;
             uint64_t cur_budget;
-            int delta;
-            unsigned priority_level;
-            bool has_extratime;
-        } d;
-        d.dom = svc->unit->domain->domain_id;
-        d.unit = svc->unit->unit_id;
-        d.cur_budget = (uint64_t) svc->cur_budget;
-        d.delta = delta;
-        d.priority_level = svc->priority_level;
-        d.has_extratime = svc->flags & RTDS_extratime;
+            uint32_t delta;
+            uint32_t priority_level;
+            uint32_t has_extratime;
+        } d = {
+            .unit           = svc->unit->unit_id,
+            .dom            = svc->unit->domain->domain_id,
+            .cur_budget     = svc->cur_budget,
+            .delta          = delta, /* TODO: truncation? */
+            .priority_level = svc->priority_level,
+            .has_extratime  = !!(svc->flags & RTDS_extratime),
+        };
+
         trace_var(TRC_RTDS_BUDGET_BURN, 1,
                   sizeof(d),
                   (unsigned char *) &d);

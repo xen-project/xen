@@ -5112,8 +5112,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&tr, arg, 1 ) )
             return -EFAULT;
 
-        if ( tr.extra_bytes > sizeof(tr.extra)
-             || (tr.event & ~((1u<<TRC_SUBCLS_SHIFT)-1)) )
+        if ( tr.extra_bytes % sizeof(uint32_t) ||
+             tr.extra_bytes > sizeof(tr.extra) ||
+             tr.event >> TRC_SUBCLS_SHIFT )
             return -EINVAL;
 
         /* Cycles will be taken at the vmexit and vmenter */

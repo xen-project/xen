@@ -686,22 +686,21 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
     unsigned long flags;
     u32 bytes_to_tail, bytes_to_wrap;
     unsigned int rec_size, total_size;
-    unsigned int extra_word;
     bool_t started_below_highwater;
 
     if( !tb_init_done )
         return;
 
-    /* Convert byte count into word count, rounding up */
-    extra_word = (extra / sizeof(u32));
-    if ( (extra % sizeof(u32)) != 0 )
-        extra_word++;
-    
-    ASSERT(extra_word <= TRACE_EXTRA_MAX);
-    extra_word = min_t(int, extra_word, TRACE_EXTRA_MAX);
-
-    /* Round size up to nearest word */
-    extra = extra_word * sizeof(u32);
+    /*
+     * extra data needs to be an exact multiple of uint32_t to prevent the
+     * later logic over-reading the object.  Reject out-of-spec records.  Any
+     * failure here is an error in the caller.
+     */
+    if ( extra % sizeof(uint32_t) ||
+         extra / sizeof(uint32_t) > TRACE_EXTRA_MAX )
+        return printk_once(XENLOG_WARNING
+                           "Trace event %#x bad size %u, discarding\n",
+                           event, extra);
 
     if ( (tb_event_mask & event) == 0 )
         return;
