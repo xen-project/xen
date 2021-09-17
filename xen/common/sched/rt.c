@@ -455,21 +455,21 @@ rt_update_deadline(s_time_t now, struct rt_unit *svc)
     svc->cur_budget = svc->budget;
     svc->priority_level = 0;
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
-        struct __packed {
-            unsigned unit:16, dom:16;
-            unsigned priority_level;
+        struct {
+            uint16_t unit, dom;
+            uint32_t priority_level;
             uint64_t cur_deadline, cur_budget;
-        } d;
-        d.dom = svc->unit->domain->domain_id;
-        d.unit = svc->unit->unit_id;
-        d.priority_level = svc->priority_level;
-        d.cur_deadline = (uint64_t) svc->cur_deadline;
-        d.cur_budget = (uint64_t) svc->cur_budget;
-        trace_var(TRC_RTDS_BUDGET_REPLENISH, 1,
-                  sizeof(d),
-                  (unsigned char *) &d);
+        } d = {
+            .dom            = svc->unit->domain->domain_id,
+            .unit           = svc->unit->unit_id,
+            .priority_level = svc->priority_level,
+            .cur_deadline   = svc->cur_deadline,
+            .cur_budget     = svc->cur_budget,
+        };
+
+        trace_time(TRC_RTDS_BUDGET_REPLENISH, sizeof(d), &d);
     }
 
     return;
@@ -986,7 +986,7 @@ burn_budget(const struct scheduler *ops, struct rt_unit *svc, s_time_t now)
         }
     }
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct __packed {
             uint16_t unit, dom;
@@ -1003,9 +1003,7 @@ burn_budget(const struct scheduler *ops, struct rt_unit *svc, s_time_t now)
             .has_extratime  = !!(svc->flags & RTDS_extratime),
         };
 
-        trace_var(TRC_RTDS_BUDGET_BURN, 1,
-                  sizeof(d),
-                  (unsigned char *) &d);
+        trace_time(TRC_RTDS_BUDGET_BURN, sizeof(d), &d);
     }
 }
 
@@ -1040,22 +1038,19 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask, unsigned int cpu)
         break;
     }
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) && svc )
     {
-        if( svc != NULL )
-        {
-            struct __packed {
-                unsigned unit:16, dom:16;
-                uint64_t cur_deadline, cur_budget;
-            } d;
-            d.dom = svc->unit->domain->domain_id;
-            d.unit = svc->unit->unit_id;
-            d.cur_deadline = (uint64_t) svc->cur_deadline;
-            d.cur_budget = (uint64_t) svc->cur_budget;
-            trace_var(TRC_RTDS_RUNQ_PICK, 1,
-                      sizeof(d),
-                      (unsigned char *) &d);
-        }
+        struct __packed {
+            uint16_t unit, dom;
+            uint64_t cur_deadline, cur_budget;
+        } d = {
+            .unit         = svc->unit->unit_id,
+            .dom          = svc->unit->domain->domain_id,
+            .cur_deadline = svc->cur_deadline,
+            .cur_budget   = svc->cur_budget,
+        };
+
+        trace_time(TRC_RTDS_RUNQ_PICK, sizeof(d), &d);
     }
 
     return svc;
@@ -1076,18 +1071,19 @@ rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
     struct rt_unit *snext = NULL;
     bool migrated = false;
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
-        struct __packed {
-            unsigned cpu:16, tasklet:8, tickled:4, idle:4;
-        } d;
-        d.cpu = cur_cpu;
-        d.tasklet = tasklet_work_scheduled;
-        d.tickled = cpumask_test_cpu(sched_cpu, &prv->tickled);
-        d.idle = is_idle_unit(currunit);
-        trace_var(TRC_RTDS_SCHEDULE, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        struct {
+            uint16_t cpu;
+            uint8_t tasklet, tickled:4, idle:4;
+        } d = {
+            .cpu     = cur_cpu,
+            .tasklet = tasklet_work_scheduled,
+            .tickled = cpumask_test_cpu(sched_cpu, &prv->tickled),
+            .idle    = is_idle_unit(currunit),
+        };
+
+        trace_time(TRC_RTDS_SCHEDULE, sizeof(d), &d);
     }
 
     /* clear ticked bit now that we've been scheduled */
@@ -1098,7 +1094,7 @@ rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
 
     if ( tasklet_work_scheduled )
     {
-        trace_var(TRC_RTDS_SCHED_TASKLET, 1, 0,  NULL);
+        TRACE_TIME(TRC_RTDS_SCHED_TASKLET);
         snext = rt_unit(sched_idle_unit(sched_cpu));
     }
     else
@@ -1250,16 +1246,15 @@ runq_tickle(const struct scheduler *ops, const struct rt_unit *new)
     SCHED_STAT_CRANK(tickled_no_cpu);
     return;
  out:
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct {
-            unsigned cpu:16, pad:16;
-        } d;
-        d.cpu = cpu_to_tickle;
-        d.pad = 0;
-        trace_var(TRC_RTDS_TICKLE, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+            uint16_t cpu, _pad;
+        } d = {
+            .cpu = cpu_to_tickle,
+        };
+
+        trace_time(TRC_RTDS_TICKLE, sizeof(d), &d);
     }
 
     cpumask_set_cpu(cpu_to_tickle, &prv->tickled);
