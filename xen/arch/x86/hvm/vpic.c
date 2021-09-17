@@ -512,14 +512,15 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
 
 int vpic_ack_pending_irq(struct vcpu *v)
 {
-    int irq;
+    int irq, accept;
     struct hvm_hw_vpic *vpic = &v->domain->arch.hvm.vpic[0];
 
     ASSERT(has_vpic(v->domain));
 
-    TRACE_2D(TRC_HVM_EMUL_PIC_PEND_IRQ_CALL, vlapic_accept_pic_intr(v),
-             vpic->int_output);
-    if ( !vlapic_accept_pic_intr(v) || !vpic->int_output )
+    accept = vlapic_accept_pic_intr(v);
+
+    TRACE_2D(TRC_HVM_EMUL_PIC_PEND_IRQ_CALL, accept, vpic->int_output);
+    if ( !accept || !vpic->int_output )
         return -1;
 
     irq = vpic_intack(vpic);

@@ -240,6 +240,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
     uint64_t tn_cmp, cur_tick, diff;
     unsigned int irq;
     unsigned int oneshot;
+    s_time_t diff_ns, period_ns = 0;
 
     ASSERT(tn < HPET_TIMER_NUM);
     ASSERT(rw_is_write_locked(&h->lock));
@@ -311,13 +312,14 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
      * status register) before another interrupt can be delivered.
      */
     oneshot = !timer_is_periodic(h, tn) || timer_level(h, tn);
+    diff_ns = hpet_tick_to_ns(h, diff);
+    if ( !oneshot )
+        period_ns = hpet_tick_to_ns(h, h->hpet.period[tn]);
+
     TRACE_2_LONG_4D(TRC_HVM_EMUL_HPET_START_TIMER, tn, irq,
-                    TRC_PAR_LONG(hpet_tick_to_ns(h, diff)),
-                    TRC_PAR_LONG(oneshot ? 0LL :
-                                 hpet_tick_to_ns(h, h->hpet.period[tn])));
-    create_periodic_time(vhpet_vcpu(h), &h->pt[tn],
-                         hpet_tick_to_ns(h, diff),
-                         oneshot ? 0 : hpet_tick_to_ns(h, h->hpet.period[tn]),
+                    TRC_PAR_LONG(diff_ns), TRC_PAR_LONG(period_ns));
+
+    create_periodic_time(vhpet_vcpu(h), &h->pt[tn], diff_ns, period_ns,
                          irq, timer_level(h, tn) ? hpet_timer_fired : NULL,
                          timer_level(h, tn) ? (void *)(unsigned long)tn : NULL,
                          timer_level(h, tn));
