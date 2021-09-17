@@ -229,7 +229,7 @@ static void _clear_irq_vector(struct irq_desc *desc)
         for_each_cpu(cpu, tmp_mask)
         {
             ASSERT(per_cpu(vector_irq, cpu)[old_vector] == irq);
-            TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
+            TRACE_TIME(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
             per_cpu(vector_irq, cpu)[old_vector] = ~irq;
         }
 
@@ -796,13 +796,11 @@ void cf_check irq_move_cleanup_interrupt(void)
                 goto unlock;
             }
             send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
-            TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP_DELAY,
-                     irq, vector, smp_processor_id());
+            TRACE_TIME(TRC_HW_IRQ_MOVE_CLEANUP_DELAY, irq, vector, me);
             goto unlock;
         }
 
-        TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP,
-                 irq, vector, smp_processor_id());
+        TRACE_TIME(TRC_HW_IRQ_MOVE_CLEANUP, irq, vector, me);
 
         per_cpu(vector_irq, me)[vector] = ~irq;
         desc->arch.move_cleanup_count--;
@@ -1943,7 +1941,7 @@ void do_IRQ(struct cpu_user_regs *regs)
                     spin_unlock(&desc->lock);
                 }
             }
-            TRACE_1D(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
+            TRACE_TIME(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
         }
         goto out_no_unlock;
     }
@@ -1984,7 +1982,7 @@ void do_IRQ(struct cpu_user_regs *regs)
 
         tsc_in = tb_init_done ? get_cycles() : 0;
         do_IRQ_guest(desc, vector);
-        TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
+        TRACE_TIME(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
         goto out_no_end;
     }
 
@@ -2008,7 +2006,7 @@ void do_IRQ(struct cpu_user_regs *regs)
 
         tsc_in = tb_init_done ? get_cycles() : 0;
         action->handler(irq, action->dev_id);
-        TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
+        TRACE_TIME(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
 
         spin_lock_irq(&desc->lock);
     }

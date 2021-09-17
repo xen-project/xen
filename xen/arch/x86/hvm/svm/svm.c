@@ -1019,10 +1019,8 @@ void asmlinkage svm_vmenter_helper(void)
 
     svm_asid_handle_vmrun();
 
-    if ( unlikely(tb_init_done) )
-        HVMTRACE_ND(VMENTRY,
-                    nestedhvm_vcpu_in_guestmode(curr) ? TRC_HVM_NESTEDFLAG : 0,
-                    1/*cycles*/);
+    TRACE_TIME(TRC_HVM_VMENTRY |
+               (nestedhvm_vcpu_in_guestmode(curr) ? TRC_HVM_NESTEDFLAG : 0));
 
     svm_sync_vmcb(curr, vmcb_needs_vmsave);
 
@@ -1394,10 +1392,10 @@ static void cf_check svm_inject_event(const struct x86_event *event)
 
     if ( _event.vector == X86_EXC_PF &&
          _event.type == X86_EVENTTYPE_HW_EXCEPTION )
-        HVMTRACE_LONG_2D(PF_INJECT, _event.error_code,
-                         TRC_PAR_LONG(_event.cr2));
+        TRACE(TRC_HVM_PF_INJECT64, _event.error_code,
+              _event.cr2, _event.cr2 >> 32);
     else
-        HVMTRACE_2D(INJ_EXC, _event.vector, _event.error_code);
+        TRACE(TRC_HVM_INJ_EXC, _event.vector, _event.error_code);
 }
 
 static bool cf_check svm_event_pending(const struct vcpu *v)
@@ -1704,7 +1702,7 @@ static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
 
-    HVMTRACE_0D(DR_WRITE);
+    TRACE(TRC_HVM_DR_WRITE);
     __restore_debug_registers(vmcb, v);
 }
 
@@ -2345,7 +2343,7 @@ static void svm_invlpga_intercept(
 
 static void svm_invlpg_intercept(unsigned long linear)
 {
-    HVMTRACE_LONG_2D(INVLPG, 0, TRC_PAR_LONG(linear));
+    TRACE(TRC_HVM_INVLPG64, 0, linear, linear >> 32);
     paging_invlpg(current, linear);
 }
 
@@ -2574,11 +2572,11 @@ void asmlinkage svm_vmexit_handler(void)
     exit_reason = vmcb->exitcode;
 
     if ( hvm_long_mode_active(v) )
-        HVMTRACE_ND(VMEXIT64, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
-                    1/*cycles*/, exit_reason, TRC_PAR_LONG(regs->rip));
+        TRACE_TIME(TRC_HVM_VMEXIT64 | (vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0),
+                   exit_reason, regs->rip, regs->rip >> 32);
     else
-        HVMTRACE_ND(VMEXIT, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
-                    1/*cycles*/, exit_reason, regs->eip);
+        TRACE_TIME(TRC_HVM_VMEXIT | (vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0),
+                   exit_reason, regs->eip);
 
     if ( vcpu_guestmode )
     {
@@ -2673,17 +2671,17 @@ void asmlinkage svm_vmexit_handler(void)
     {
     case VMEXIT_INTR:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
-        HVMTRACE_0D(INTR);
+        TRACE(TRC_HVM_INTR);
         break;
 
     case VMEXIT_NMI:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
-        HVMTRACE_0D(NMI);
+        TRACE(TRC_HVM_NMI);
         break;
 
     case VMEXIT_SMI:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
-        HVMTRACE_0D(SMI);
+        TRACE(TRC_HVM_SMI);
         break;
 
     case VMEXIT_ICEBP:
@@ -2771,9 +2769,9 @@ void asmlinkage svm_vmexit_handler(void)
             if ( trace_will_trace_event(TRC_SHADOW) )
                 break;
             if ( hvm_long_mode_active(v) )
-                HVMTRACE_LONG_2D(PF_XEN, regs->error_code, TRC_PAR_LONG(va));
+                TRACE(TRC_HVM_PF_XEN64, regs->error_code, va, va >> 32);
             else
-                HVMTRACE_2D(PF_XEN, regs->error_code, va);
+                TRACE(TRC_HVM_PF_XEN, regs->error_code, va);
             break;
         }
 
@@ -2782,7 +2780,7 @@ void asmlinkage svm_vmexit_handler(void)
     }
 
     case VMEXIT_EXCEPTION_AC:
-        HVMTRACE_1D(TRAP, X86_EXC_AC);
+        TRACE(TRC_HVM_TRAP, X86_EXC_AC);
         hvm_inject_hw_exception(X86_EXC_AC, vmcb->ei.exc.ec);
         break;
 
@@ -2792,7 +2790,7 @@ void asmlinkage svm_vmexit_handler(void)
 
     /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
     case VMEXIT_EXCEPTION_MC:
-        HVMTRACE_0D(MCE);
+        TRACE(TRC_HVM_MCE);
         svm_vmexit_mce_intercept(v, regs);
         break;
 
@@ -2938,7 +2936,7 @@ void asmlinkage svm_vmexit_handler(void)
         if ( (insn_len = svm_get_insn_len(v, INSTR_VMCALL)) == 0 )
             break;
         BUG_ON(vcpu_guestmode);
-        HVMTRACE_1D(VMMCALL, regs->eax);
+        TRACE(TRC_HVM_VMMCALL, regs->eax);
 
         if ( hvm_hypercall(regs) == HVM_HCALL_completed )
             __update_guest_eip(regs, insn_len);

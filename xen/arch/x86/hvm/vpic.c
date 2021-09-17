@@ -99,8 +99,7 @@ static void vpic_update_int_output(struct hvm_hw_vpic *vpic)
     ASSERT(vpic_is_locked(vpic));
 
     irq = vpic_get_highest_priority_irq(vpic);
-    TRACE_3D(TRC_HVM_EMUL_PIC_INT_OUTPUT, vpic->int_output, vpic->is_master,
-             irq);
+    TRACE_TIME(TRC_HVM_EMUL_PIC_INT_OUTPUT, vpic->int_output, vpic->is_master, irq);
     if ( vpic->int_output == (!vpic->init_state && irq >= 0) )
         return;
 
@@ -119,7 +118,7 @@ static void vpic_update_int_output(struct hvm_hw_vpic *vpic)
 
             if ( v != NULL )
             {
-                TRACE_1D(TRC_HVM_EMUL_PIC_KICK, irq);
+                TRACE_TIME(TRC_HVM_EMUL_PIC_KICK, irq);
                 vcpu_kick(v);
             }
         }
@@ -144,7 +143,7 @@ static void __vpic_intack(struct hvm_hw_vpic *vpic, int irq)
 
     ASSERT(vpic_is_locked(vpic));
 
-    TRACE_2D(TRC_HVM_EMUL_PIC_INTACK, vpic->is_master, irq);
+    TRACE_TIME(TRC_HVM_EMUL_PIC_INTACK, vpic->is_master, irq);
     /* Edge-triggered: clear the IRR (forget the edge). */
     if ( !(vpic->elcr & mask) )
         vpic->irr &= ~mask;
@@ -526,7 +525,7 @@ void vpic_irq_positive_edge(struct domain *d, int irq)
     ASSERT(irq <= 15);
     ASSERT(vpic_is_locked(vpic));
 
-    TRACE_1D(TRC_HVM_EMUL_PIC_POSEDGE, irq);
+    TRACE_TIME(TRC_HVM_EMUL_PIC_POSEDGE, irq);
     if ( irq == 2 )
         return;
 
@@ -544,7 +543,7 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
     ASSERT(irq <= 15);
     ASSERT(vpic_is_locked(vpic));
 
-    TRACE_1D(TRC_HVM_EMUL_PIC_NEGEDGE, irq);
+    TRACE_TIME(TRC_HVM_EMUL_PIC_NEGEDGE, irq);
     if ( irq == 2 )
         return;
 
@@ -562,7 +561,7 @@ int vpic_ack_pending_irq(struct vcpu *v)
 
     accept = vlapic_accept_pic_intr(v);
 
-    TRACE_2D(TRC_HVM_EMUL_PIC_PEND_IRQ_CALL, accept, vpic->int_output);
+    TRACE_TIME(TRC_HVM_EMUL_PIC_PEND_IRQ_CALL, accept, vpic->int_output);
     if ( !accept || !vpic->int_output )
         return -1;
 

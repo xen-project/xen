@@ -682,7 +682,7 @@ int guest_rdmsr_x2apic(const struct vcpu *v, uint32_t msr, uint64_t *val)
 
 static void cf_check vlapic_pt_cb(struct vcpu *v, void *data)
 {
-    TRACE_0D(TRC_HVM_EMUL_LAPIC_TIMER_CB);
+    TRACE_TIME(TRC_HVM_EMUL_LAPIC_TIMER_CB);
     *(s_time_t *)data = hvm_get_guest_time(v);
 }
 
@@ -729,6 +729,8 @@ static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
 
     if ( delta && (is_oneshot || is_periodic) )
     {
+        uint64_t timer_period = 0;
+
         if ( vlapic->hw.timer_divisor != old_divisor )
         {
             period = (uint64_t)vlapic_get_reg(vlapic, APIC_TMICT)
@@ -736,12 +738,14 @@ static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
             delta = delta * vlapic->hw.timer_divisor / old_divisor;
         }
 
-        TRACE_2_LONG_3D(TRC_HVM_EMUL_LAPIC_START_TIMER, TRC_PAR_LONG(delta),
-                        TRC_PAR_LONG(is_periodic ? period : 0),
-                        vlapic->pt.irq);
+        if ( is_periodic )
+            timer_period = period;
+
+        TRACE_TIME(TRC_HVM_EMUL_LAPIC_START_TIMER, delta, delta >> 32,
+                   timer_period, timer_period >> 32, vlapic->pt.irq);
 
         create_periodic_time(current, &vlapic->pt, delta,
-                             is_periodic ? period : 0, vlapic->pt.irq,
+                             timer_period, vlapic->pt.irq,
                              is_periodic ? vlapic_pt_cb : NULL,
                              &vlapic->timer_last_update, false);
 
@@ -758,7 +762,7 @@ static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
     }
     else
     {
-        TRACE_0D(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
+        TRACE_TIME(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
         destroy_periodic_time(&vlapic->pt);
         /*
          * From now, TMCCT should return 0 until TMICT is set again.
@@ -1208,8 +1212,8 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
 
         vlapic->hw.tdt_msr = value;
         /* .... reprogram tdt timer */
-        TRACE_2_LONG_3D(TRC_HVM_EMUL_LAPIC_START_TIMER, TRC_PAR_LONG(delta),
-                        TRC_PAR_LONG(0LL), vlapic->pt.irq);
+        TRACE_TIME(TRC_HVM_EMUL_LAPIC_START_TIMER, delta, delta >> 32,
+                   0, 0, vlapic->pt.irq);
         create_periodic_time(v, &vlapic->pt, delta, 0,
                              vlapic->pt.irq, vlapic_tdt_pt_cb,
                              &vlapic->timer_last_update, false);
@@ -1222,8 +1226,8 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
         /* trigger a timer event if needed */
         if ( value > 0 )
         {
-            TRACE_2_LONG_3D(TRC_HVM_EMUL_LAPIC_START_TIMER, TRC_PAR_LONG(0LL),
-                            TRC_PAR_LONG(0LL), vlapic->pt.irq);
+            TRACE_TIME(TRC_HVM_EMUL_LAPIC_START_TIMER, 0, 0,
+                       0, 0, vlapic->pt.irq);
             create_periodic_time(v, &vlapic->pt, 0, 0,
                                  vlapic->pt.irq, vlapic_tdt_pt_cb,
                                  &vlapic->timer_last_update, false);
@@ -1232,7 +1236,7 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
         else
         {
             /* .... stop tdt timer */
-            TRACE_0D(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
+            TRACE_TIME(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
             destroy_periodic_time(&vlapic->pt);
         }
 
@@ -1282,7 +1286,7 @@ int vlapic_accept_pic_intr(struct vcpu *v)
     if ( target )
         accept = __vlapic_accept_pic_intr(v);
 
-    TRACE_2D(TRC_HVM_EMUL_LAPIC_PIC_INTR, target, accept);
+    TRACE_TIME(TRC_HVM_EMUL_LAPIC_PIC_INTR, target, accept);
 
     return target && accept;
 }
@@ -1433,7 +1437,7 @@ static void vlapic_do_init(struct vlapic *vlapic)
     vlapic_set_reg(vlapic, APIC_SPIV, 0xff);
     vlapic->hw.disabled |= VLAPIC_SW_DISABLED;
 
-    TRACE_0D(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
+    TRACE_TIME(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
     destroy_periodic_time(&vlapic->pt);
 }
 
@@ -1457,7 +1461,7 @@ void vlapic_reset(struct vlapic *vlapic)
 static void lapic_rearm(struct vlapic *s)
 {
     unsigned long tmict;
-    uint64_t period, tdt_msr;
+    uint64_t period, timer_period = 0, tdt_msr;
     bool is_periodic;
 
     s->pt.irq = vlapic_get_reg(s, APIC_LVTT) & APIC_VECTOR_MASK;
@@ -1476,11 +1480,14 @@ static void lapic_rearm(struct vlapic *s)
               (uint32_t)tmict * s->hw.timer_divisor);
     is_periodic = vlapic_lvtt_period(s);
 
-    TRACE_2_LONG_3D(TRC_HVM_EMUL_LAPIC_START_TIMER, TRC_PAR_LONG(period),
-             TRC_PAR_LONG(is_periodic ? period : 0LL), s->pt.irq);
+    if ( is_periodic )
+        timer_period = period;
+
+    TRACE_TIME(TRC_HVM_EMUL_LAPIC_START_TIMER, period, period >> 32,
+               timer_period, timer_period >> 32, s->pt.irq);
 
     create_periodic_time(vlapic_vcpu(s), &s->pt, period,
-                         is_periodic ? period : 0,
+                         timer_period,
                          s->pt.irq,
                          is_periodic ? vlapic_pt_cb : NULL,
                          &s->timer_last_update, false);
@@ -1669,7 +1676,7 @@ void vlapic_destroy(struct vcpu *v)
         return;
 
     tasklet_kill(&vlapic->init_sipi.tasklet);
-    TRACE_0D(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
+    TRACE_TIME(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
     destroy_periodic_time(&vlapic->pt);
     unmap_domain_page_global(vlapic->regs);
     free_domheap_page(vlapic->regs_page);

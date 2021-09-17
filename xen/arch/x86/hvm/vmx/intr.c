@@ -67,8 +67,8 @@ static void vmx_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
         unsigned long intr;
 
         __vmread(VM_ENTRY_INTR_INFO, &intr);
-        HVMTRACE_3D(INTR_WINDOW, intack.vector, intack.source,
-                    (intr & INTR_INFO_VALID_MASK) ? intr & 0xff : -1);
+        TRACE(TRC_HVM_INTR_WINDOW, intack.vector, intack.source,
+              (intr & INTR_INFO_VALID_MASK) ? intr & 0xff : -1);
     }
 
     if ( (intack.source == hvm_intsrc_nmi) && cpu_has_vmx_vnmi )
@@ -390,7 +390,7 @@ void asmlinkage vmx_intr_assist(void)
     }
     else
     {
-        HVMTRACE_2D(INJ_VIRQ, intack.vector, /*fake=*/ 0);
+        TRACE(TRC_HVM_INJ_VIRQ, intack.vector, /*fake=*/ 0);
         vmx_inject_extint(intack.vector, intack.source);
         pt_intr_post(v, intack);
     }

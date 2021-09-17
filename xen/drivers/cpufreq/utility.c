@@ -365,7 +365,7 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
         retval = alternative_call(cpufreq_driver.target,
                                   policy, target_freq, relation);
         if ( retval == 0 )
-            TRACE_2D(TRC_PM_FREQ_CHANGE, prev_freq/1000, policy->cur/1000);
+            TRACE_TIME(TRC_PM_FREQ_CHANGE, prev_freq / 1000, policy->cur / 1000);
     }
 
     return retval;

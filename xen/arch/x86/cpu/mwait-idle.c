@@ -962,7 +962,7 @@ static void cf_check mwait_idle(void)
 		lapic_timer_off();
 
 	before = alternative_call(cpuidle_get_tick);
-	TRACE_4D(TRC_PM_IDLE_ENTRY, cx->type, before, exp, pred);
+	TRACE_TIME(TRC_PM_IDLE_ENTRY, cx->type, before, exp, pred);
 
 	update_last_cx_stat(power, cx, before);
 
@@ -986,8 +986,8 @@ static void cf_check mwait_idle(void)
 
 	local_irq_enable();
 
-	TRACE_6D(TRC_PM_IDLE_EXIT, cx->type, after,
-		irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
+	TRACE_TIME(TRC_PM_IDLE_EXIT, cx->type, after,
+		   irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
 
 	if (!(lapic_timer_reliable_states & (1 << cx->type)))
 		lapic_timer_on();

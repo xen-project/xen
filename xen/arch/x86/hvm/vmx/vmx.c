@@ -2112,10 +2112,10 @@ static void cf_check vmx_inject_event(const struct x86_event *event)
 
     if ( (_event.vector == X86_EXC_PF) &&
          (_event.type == X86_EVENTTYPE_HW_EXCEPTION) )
-        HVMTRACE_LONG_2D(PF_INJECT, _event.error_code,
-                         TRC_PAR_LONG(curr->arch.hvm.guest_cr[2]));
+        TRACE(TRC_HVM_PF_INJECT64, _event.error_code,
+              curr->arch.hvm.guest_cr[2], curr->arch.hvm.guest_cr[2] >> 32);
     else
-        HVMTRACE_2D(INJ_EXC, _event.vector, _event.error_code);
+        TRACE(TRC_HVM_INJ_EXC, _event.vector, _event.error_code);
 }
 
 static bool cf_check vmx_event_pending(const struct vcpu *v)
@@ -3125,7 +3125,7 @@ static void vmx_dr_access(unsigned long exit_qualification,
 {
     struct vcpu *v = current;
 
-    HVMTRACE_0D(DR_WRITE);
+    TRACE(TRC_HVM_DR_WRITE);
 
     if ( !v->arch.hvm.flag_dr_dirty )
         __restore_debug_registers(v);
@@ -3137,7 +3137,7 @@ static void vmx_dr_access(unsigned long exit_qualification,
 
 static void vmx_invlpg_intercept(unsigned long linear)
 {
-    HVMTRACE_LONG_2D(INVLPG, /*invlpga=*/ 0, TRC_PAR_LONG(linear));
+    TRACE(TRC_HVM_INVLPG64, /*invlpga=*/ 0, linear, linear >> 32);
     paging_invlpg(current, linear);
 }
 
@@ -3185,7 +3185,7 @@ static int vmx_cr_access(cr_access_qual_t qual)
         hvm_monitor_crX(CR0, value, old);
         curr->arch.hvm.guest_cr[0] = value;
         vmx_update_guest_cr(curr, 0, 0);
-        HVMTRACE_0D(CLTS);
+        TRACE(TRC_HVM_CLTS);
         break;
     }
 
@@ -3198,7 +3198,7 @@ static int vmx_cr_access(cr_access_qual_t qual)
         value = (value & ~(X86_CR0_MP|X86_CR0_EM|X86_CR0_TS)) |
                 (qual.lmsw_data &
                  (X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS));
-        HVMTRACE_LONG_1D(LMSW, value);
+        TRACE(TRC_HVM_LMSW64, value, value >> 32);
 
         if ( (rc = hvm_set_cr0(value, true)) == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(X86_EXC_GP, 0);
@@ -3751,7 +3751,7 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     BUG_ON(!(vector & INTR_INFO_VALID_MASK));
 
     vector &= INTR_INFO_VECTOR_MASK;
-    HVMTRACE_1D(INTR, vector);
+    TRACE(TRC_HVM_INTR, vector);
 
     regs->entry_vector = vector;
     do_IRQ(regs);
@@ -3891,7 +3891,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
 
     case EXIT_REASON_MCE_DURING_VMENTRY:
         printk("MCE\n");
-        HVMTRACE_0D(MCE);
+        TRACE(TRC_HVM_MCE);
         /* Already handled. */
         break;
 
@@ -3932,7 +3932,7 @@ static int vmx_handle_eoi_write(void)
     {
         update_guest_eip(); /* Safe: APIC data write */
         vlapic_EOI_set(vcpu_vlapic(current));
-        HVMTRACE_0D(VLAPIC);
+        TRACE(TRC_HVM_VLAPIC);
         return 1;
     }
 
@@ -4106,10 +4106,9 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(VM_EXIT_REASON, &exit_reason);
 
     if ( hvm_long_mode_active(v) )
-        HVMTRACE_ND(VMEXIT64, 0, 1/*cycles*/, exit_reason,
-                    TRC_PAR_LONG(regs->rip));
+        TRACE_TIME(TRC_HVM_VMEXIT64, exit_reason, regs->rip, regs->rip >> 32);
     else
-        HVMTRACE_ND(VMEXIT, 0, 1/*cycles*/, exit_reason, regs->eip);
+        TRACE_TIME(TRC_HVM_VMEXIT, exit_reason, regs->eip);
 
     perfc_incra(vmexits, (uint16_t)exit_reason);
 
@@ -4226,7 +4225,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         default:
                 perfc_incr(realmode_exits);
                 v->arch.hvm.vmx.vmx_emulate = 1;
-                HVMTRACE_0D(REALMODE_EMULATE);
+                TRACE(TRC_HVM_REALMODE_EMULATE);
                 return;
             }
         case EXIT_REASON_EXTERNAL_INTERRUPT:
@@ -4283,7 +4282,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
              * Table 23-1, "Exit Qualification for Debug Exceptions").
              */
             __vmread(EXIT_QUALIFICATION, &exit_qualification);
-            HVMTRACE_1D(TRAP_DEBUG, exit_qualification);
+            TRACE(TRC_HVM_TRAP_DEBUG, exit_qualification);
             __restore_debug_registers(v);
             write_debugreg(6, exit_qualification | DR_STATUS_RESERVED_ONE);
 
@@ -4345,7 +4344,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
                 domain_pause_for_debugger();
             break;
         case X86_EXC_BP:
-            HVMTRACE_1D(TRAP, vector);
+            TRACE(TRC_HVM_TRAP, vector);
             if ( !v->domain->debugger_attached )
             {
                 unsigned long insn_len;
@@ -4370,7 +4369,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
             }
             break;
         case X86_EXC_NM:
-            HVMTRACE_1D(TRAP, vector);
+            TRACE(TRC_HVM_TRAP, vector);
             vmx_fpu_dirty_intercept();
             break;
         case X86_EXC_PF:
@@ -4388,37 +4387,36 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
                 if ( trace_will_trace_event(TRC_SHADOW) )
                     break;
                 if ( hvm_long_mode_active(v) )
-                    HVMTRACE_LONG_2D(PF_XEN, regs->error_code,
-                                     TRC_PAR_LONG(exit_qualification) );
+                    TRACE(TRC_HVM_PF_XEN64, regs->error_code,
+                          exit_qualification, exit_qualification >> 32);
                 else
-                    HVMTRACE_2D(PF_XEN,
-                                regs->error_code, exit_qualification );
+                    TRACE(TRC_HVM_PF_XEN, regs->error_code, exit_qualification);
                 break;
             }
 
             hvm_inject_page_fault(regs->error_code, exit_qualification);
             break;
         case X86_EXC_AC:
-            HVMTRACE_1D(TRAP, vector);
+            TRACE(TRC_HVM_TRAP, vector);
             vmx_propagate_intr(intr_info);
             break;
         case X86_EXC_NMI:
             if ( MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK) !=
                  X86_EVENTTYPE_NMI )
                 goto exit_and_crash;
-            HVMTRACE_0D(NMI);
+            TRACE(TRC_HVM_NMI);
             /* Already handled above. */
             break;
         case X86_EXC_MC:
-            HVMTRACE_0D(MCE);
+            TRACE(TRC_HVM_MCE);
             /* Already handled above. */
             break;
         case X86_EXC_UD:
-            HVMTRACE_1D(TRAP, vector);
+            TRACE(TRC_HVM_TRAP, vector);
             hvm_ud_intercept(regs);
             break;
         default:
-            HVMTRACE_1D(TRAP, vector);
+            TRACE(TRC_HVM_TRAP, vector);
             goto exit_and_crash;
         }
         break;
@@ -4504,7 +4502,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_VMCALL:
-        HVMTRACE_1D(VMMCALL, regs->eax);
+        TRACE(TRC_HVM_VMMCALL, regs->eax);
 
         if ( hvm_hypercall(regs) == HVM_HCALL_completed )
             update_guest_eip(); /* Safe: VMCALL */
@@ -4912,7 +4910,7 @@ bool asmlinkage vmx_vmenter_helper(const struct cpu_user_regs *regs)
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();
 
-    HVMTRACE_ND(VMENTRY, 0, 1/*cycles*/);
+    TRACE_TIME(TRC_HVM_VMENTRY);
 
     __vmwrite(GUEST_RIP,    regs->rip);
     __vmwrite(GUEST_RSP,    regs->rsp);

@@ -37,8 +37,8 @@ long do_sched_op_compat(int cmd, unsigned long arg)
         return do_sched_op(cmd, guest_handle_from_ptr(NULL, void));
 
     case SCHEDOP_shutdown:
-        TRACE_3D(TRC_SCHED_SHUTDOWN,
-                 current->domain->domain_id, current->vcpu_id, arg);
+        TRACE_TIME(TRC_SCHED_SHUTDOWN,
+                   current->domain->domain_id, current->vcpu_id, arg);
         domain_shutdown(current->domain, (u8)arg);
         break;
 

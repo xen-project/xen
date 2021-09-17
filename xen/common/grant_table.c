@@ -1307,7 +1307,7 @@ map_grant_ref(
             goto undo_out;
     }
 
-    TRACE_1D(TRC_MEM_PAGE_GRANT_MAP, op->dom);
+    TRACE_TIME(TRC_MEM_PAGE_GRANT_MAP, op->dom);
 
     /*
      * All maptrack entry users check mt->flags first before using the
@@ -1434,7 +1434,7 @@ unmap_common(
         return;
     }
 
-    TRACE_1D(TRC_MEM_PAGE_GRANT_UNMAP, dom);
+    TRACE_TIME(TRC_MEM_PAGE_GRANT_UNMAP, dom);
 
     rgt = rd->grant_table;
 
@@ -2445,7 +2445,7 @@ gnttab_transfer(
         put_gfn(d, gop.mfn);
 #endif
 
-        TRACE_1D(TRC_MEM_PAGE_GRANT_TRANSFER, e->domain_id);
+        TRACE_TIME(TRC_MEM_PAGE_GRANT_TRANSFER, e->domain_id);
 
         /* Tell the guest about its new page frame. */
         grant_read_lock(e->grant_table);

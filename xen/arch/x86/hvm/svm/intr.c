@@ -90,8 +90,8 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
         }
     }
 
-    HVMTRACE_3D(INTR_WINDOW, intack.vector, intack.source,
-                vmcb->event_inj.v ? vmcb->event_inj.vector : -1);
+    TRACE(TRC_HVM_INTR_WINDOW, intack.vector, intack.source,
+          vmcb->event_inj.v ? vmcb->event_inj.vector : -1);
 
     /*
      * Create a dummy virtual interrupt to intercept as soon as the
@@ -206,7 +206,7 @@ void asmlinkage svm_intr_assist(void)
     }
     else
     {
-        HVMTRACE_2D(INJ_VIRQ, intack.vector, /*fake=*/ 0);
+        TRACE(TRC_HVM_INJ_VIRQ, intack.vector, /*fake=*/ 0);
         svm_inject_extint(v, intack.vector);
         pt_intr_post(v, intack);
     }

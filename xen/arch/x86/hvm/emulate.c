@@ -2181,7 +2181,7 @@ static int cf_check hvmemul_read_cr(
     case 3:
     case 4:
         *val = current->arch.hvm.guest_cr[reg];
-        HVMTRACE_LONG_2D(CR_READ, reg, TRC_PAR_LONG(*val));
+        TRACE(TRC_HVM_CR_READ64, reg, *val, *val >> 32);
         return X86EMUL_OKAY;
     default:
         break;
@@ -2197,7 +2197,7 @@ static int cf_check hvmemul_write_cr(
 {
     int rc;
 
-    HVMTRACE_LONG_2D(CR_WRITE, reg, TRC_PAR_LONG(val));
+    TRACE(TRC_HVM_CR_WRITE64, reg, val, val >> 32);
     switch ( reg )
     {
     case 0:
@@ -2242,7 +2242,7 @@ static int cf_check hvmemul_read_xcr(
     int rc = x86emul_read_xcr(reg, val, ctxt);
 
     if ( rc == X86EMUL_OKAY )
-        HVMTRACE_LONG_2D(XCR_READ, reg, TRC_PAR_LONG(*val));
+        TRACE(TRC_HVM_XCR_READ64, reg, *val, *val >> 32);
 
     return rc;
 }
@@ -2252,7 +2252,7 @@ static int cf_check hvmemul_write_xcr(
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {
-    HVMTRACE_LONG_2D(XCR_WRITE, reg, TRC_PAR_LONG(val));
+    TRACE(TRC_HVM_XCR_WRITE64, reg, val, val >> 32);
 
     return x86emul_write_xcr(reg, val, ctxt);
 }

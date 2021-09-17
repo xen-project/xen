@@ -1899,7 +1899,7 @@ void asmlinkage do_device_not_available(struct cpu_user_regs *regs)
         curr->arch.pv.ctrlreg[0] &= ~X86_CR0_TS;
     }
     else
-        TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
+        TRACE_TIME(TRC_PV_MATH_STATE_RESTORE);
 #else
     ASSERT_UNREACHABLE();
 #endif

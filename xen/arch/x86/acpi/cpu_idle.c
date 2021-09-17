@@ -767,7 +767,7 @@ static void cf_check acpi_processor_idle(void)
             /* Get start time (ticks) */
             t1 = alternative_call(cpuidle_get_tick);
             /* Trace cpu idle entry */
-            TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
+            TRACE_TIME(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
 
             update_last_cx_stat(power, cx, t1);
 
@@ -777,8 +777,8 @@ static void cf_check acpi_processor_idle(void)
             t2 = alternative_call(cpuidle_get_tick);
             trace_exit_reason(irq_traced);
             /* Trace cpu idle exit */
-            TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
-                     irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
+            TRACE_TIME(TRC_PM_IDLE_EXIT, cx->idx, t2,
+                       irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
             /* Update statistics */
             update_idle_stats(power, cx, t1, t2);
             /* Re-enable interrupts */
@@ -798,7 +798,7 @@ static void cf_check acpi_processor_idle(void)
         /* Get start time (ticks) */
         t1 = alternative_call(cpuidle_get_tick);
         /* Trace cpu idle entry */
-        TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
+        TRACE_TIME(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
 
         update_last_cx_stat(power, cx, t1);
 
@@ -853,8 +853,8 @@ static void cf_check acpi_processor_idle(void)
         cstate_restore_tsc();
         trace_exit_reason(irq_traced);
         /* Trace cpu idle exit */
-        TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
-                 irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
+        TRACE_TIME(TRC_PM_IDLE_EXIT, cx->idx, t2,
+                   irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
 
         /* Update statistics */
         update_idle_stats(power, cx, t1, t2);

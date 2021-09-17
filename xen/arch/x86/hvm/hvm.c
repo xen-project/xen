@@ -1705,7 +1705,7 @@ void hvm_hlt(unsigned int eflags)
 
     do_sched_op(SCHEDOP_block, guest_handle_from_ptr(NULL, void));
 
-    HVMTRACE_1D(HLT, /* pending = */ vcpu_runnable(curr));
+    TRACE(TRC_HVM_HLT, /* pending = */ vcpu_runnable(curr));
 }
 
 void hvm_triple_fault(void)
@@ -2159,7 +2159,7 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
     unsigned long val = *decode_gpr(guest_cpu_user_regs(), gpr);
     int rc;
 
-    HVMTRACE_LONG_2D(CR_WRITE, cr, TRC_PAR_LONG(val));
+    TRACE(TRC_HVM_CR_WRITE64, cr, val, val >> 32);
     HVM_DBG_LOG(DBG_LEVEL_1, "CR%u, value = %lx", cr, val);
 
     switch ( cr )
@@ -2224,7 +2224,7 @@ int hvm_mov_from_cr(unsigned int cr, unsigned int gpr)
     }
 
     *reg = val;
-    HVMTRACE_LONG_2D(CR_READ, cr, TRC_PAR_LONG(val));
+    TRACE(TRC_HVM_CR_READ64, cr, val, val >> 32);
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR%u, value = %lx", cr, val);
 
     return X86EMUL_OKAY;
@@ -3514,7 +3514,7 @@ int hvm_vmexit_cpuid(struct cpu_user_regs *regs, unsigned int inst_len)
     }
 
     guest_cpuid(curr, leaf, subleaf, &res);
-    HVMTRACE_6D(CPUID, leaf, subleaf, res.a, res.b, res.c, res.d);
+    TRACE(TRC_HVM_CPUID, leaf, subleaf, res.a, res.b, res.c, res.d);
 
     regs->rax = res.a;
     regs->rbx = res.b;
@@ -3528,7 +3528,7 @@ void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
 {
     msr_split(regs, hvm_get_guest_tsc(current));
 
-    HVMTRACE_2D(RDTSC, regs->eax, regs->edx);
+    TRACE(TRC_HVM_RDTSC, regs->eax, regs->edx);
 }
 
 int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
@@ -3635,8 +3635,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     }
 
  out:
-    HVMTRACE_3D(MSR_READ, msr,
-                (uint32_t)*msr_content, (uint32_t)(*msr_content >> 32));
+    TRACE(TRC_HVM_MSR_READ, msr, *msr_content, *msr_content >> 32);
     return ret;
 
  gp_fault:
@@ -3652,8 +3651,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
     struct domain *d = v->domain;
     int ret;
 
-    HVMTRACE_3D(MSR_WRITE, msr,
-               (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
+    TRACE(TRC_HVM_MSR_WRITE, msr, msr_content, msr_content >> 32);
 
     if ( may_defer && unlikely(monitored_msr(v->domain, msr)) )
     {

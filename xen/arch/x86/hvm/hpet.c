@@ -201,7 +201,7 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn,
 {
     ASSERT(tn < HPET_TIMER_NUM);
     ASSERT(rw_is_write_locked(&h->lock));
-    TRACE_1D(TRC_HVM_EMUL_HPET_STOP_TIMER, tn);
+    TRACE_TIME(TRC_HVM_EMUL_HPET_STOP_TIMER, tn);
     destroy_periodic_time(&h->pt[tn]);
     /* read the comparator to get it updated so a read while stopped will
      * return the expected value. */
@@ -305,8 +305,8 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
     if ( !oneshot )
         period_ns = hpet_tick_to_ns(h, h->hpet.period[tn]);
 
-    TRACE_2_LONG_4D(TRC_HVM_EMUL_HPET_START_TIMER, tn, irq,
-                    TRC_PAR_LONG(diff_ns), TRC_PAR_LONG(period_ns));
+    TRACE_TIME(TRC_HVM_EMUL_HPET_START_TIMER, tn, irq,
+               diff_ns, diff_ns >> 32, period_ns, period_ns >> 32);
 
     create_periodic_time(vhpet_vcpu(h), &h->pt[tn], diff_ns, period_ns,
                          irq, timer_level(h, tn) ? hpet_timer_fired : NULL,
