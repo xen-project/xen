@@ -205,7 +205,7 @@ static inline struct scheduler *vcpu_scheduler(const struct vcpu *v)
 
 static inline void trace_runstate_change(const struct vcpu *v, int new_state)
 {
-    struct { uint32_t vcpu:16, domain:16; } d;
+    struct { uint16_t vcpu, domain; } d;
     uint32_t event;
 
     if ( likely(!tb_init_done) )
@@ -218,12 +218,12 @@ static inline void trace_runstate_change(const struct vcpu *v, int new_state)
     event |= ( v->runstate.state & 0x3 ) << 8;
     event |= ( new_state & 0x3 ) << 4;
 
-    __trace_var(event, 1/*tsc*/, sizeof(d), &d);
+    trace_time(event, sizeof(d), &d);
 }
 
 static inline void trace_continue_running(const struct vcpu *v)
 {
-    struct { uint32_t vcpu:16, domain:16; } d;
+    struct { uint16_t vcpu, domain; } d;
 
     if ( likely(!tb_init_done) )
         return;
@@ -231,7 +231,7 @@ static inline void trace_continue_running(const struct vcpu *v)
     d.vcpu = v->vcpu_id;
     d.domain = v->domain->domain_id;
 
-    __trace_var(TRC_SCHED_CONTINUE_RUNNING, 1/*tsc*/, sizeof(d), &d);
+    trace_time(TRC_SCHED_CONTINUE_RUNNING, sizeof(d), &d);
 }
 
 static inline void vcpu_urgent_count_update(struct vcpu *v)
@@ -872,7 +872,7 @@ int sched_init_domain(struct domain *d, unsigned int poolid)
         return ret;
 
     SCHED_STAT_CRANK(dom_init);
-    TRACE_1D(TRC_SCHED_DOM_ADD, d->domain_id);
+    TRACE_TIME(TRC_SCHED_DOM_ADD, d->domain_id);
 
     rcu_read_lock(&sched_res_rculock);
 
@@ -895,7 +895,7 @@ void sched_destroy_domain(struct domain *d)
     if ( d->cpupool )
     {
         SCHED_STAT_CRANK(dom_destroy);
-        TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
+        TRACE_TIME(TRC_SCHED_DOM_REM, d->domain_id);
 
         rcu_read_lock(&sched_res_rculock);
 
@@ -936,7 +936,7 @@ void vcpu_sleep_nosync(struct vcpu *v)
     unsigned long flags;
     spinlock_t *lock;
 
-    TRACE_2D(TRC_SCHED_SLEEP, v->domain->domain_id, v->vcpu_id);
+    TRACE_TIME(TRC_SCHED_SLEEP, v->domain->domain_id, v->vcpu_id);
 
     rcu_read_lock(&sched_res_rculock);
 
@@ -965,7 +965,7 @@ void vcpu_wake(struct vcpu *v)
     spinlock_t *lock;
     struct sched_unit *unit = v->sched_unit;
 
-    TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
+    TRACE_TIME(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
 
     rcu_read_lock(&sched_res_rculock);
 
@@ -1425,7 +1425,7 @@ void vcpu_block(void)
     }
     else
     {
-        TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
+        TRACE_TIME(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
         raise_softirq(SCHEDULE_SOFTIRQ);
     }
 }
@@ -1498,7 +1498,7 @@ static long do_poll(const struct sched_poll *sched_poll)
     if ( sched_poll->timeout != 0 )
         set_timer(&v->poll_timer, sched_poll->timeout);
 
-    TRACE_2D(TRC_SCHED_BLOCK, d->domain_id, v->vcpu_id);
+    TRACE_TIME(TRC_SCHED_BLOCK, d->domain_id, v->vcpu_id);
     raise_softirq(SCHEDULE_SOFTIRQ);
 
     return 0;
@@ -1526,7 +1526,7 @@ long vcpu_yield(void)
 
     SCHED_STAT_CRANK(vcpu_yield);
 
-    TRACE_2D(TRC_SCHED_YIELD, current->domain->domain_id, current->vcpu_id);
+    TRACE_TIME(TRC_SCHED_YIELD, current->domain->domain_id, current->vcpu_id);
     raise_softirq(SCHEDULE_SOFTIRQ);
     return 0;
 }
@@ -1904,9 +1904,8 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&sched_shutdown, arg, 1) )
             break;
 
-        TRACE_3D(TRC_SCHED_SHUTDOWN,
-                 current->domain->domain_id, current->vcpu_id,
-                 sched_shutdown.reason);
+        TRACE_TIME(TRC_SCHED_SHUTDOWN, current->domain->domain_id,
+                   current->vcpu_id, sched_shutdown.reason);
         ret = domain_shutdown(current->domain, (u8)sched_shutdown.reason);
 
         break;
@@ -1921,8 +1920,8 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&sched_shutdown, arg, 1) )
             break;
 
-        TRACE_3D(TRC_SCHED_SHUTDOWN_CODE,
-                 d->domain_id, current->vcpu_id, sched_shutdown.reason);
+        TRACE_TIME(TRC_SCHED_SHUTDOWN_CODE, d->domain_id, current->vcpu_id,
+                   sched_shutdown.reason);
 
         spin_lock(&d->shutdown_lock);
         if ( d->shutdown_code == SHUTDOWN_CODE_INVALID )
@@ -2086,7 +2085,7 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
     rcu_read_lock(&sched_res_rculock);
 
     if ( (ret = sched_adjust_dom(dom_scheduler(d), d, op)) == 0 )
-        TRACE_1D(TRC_SCHED_ADJDOM, d->domain_id);
+        TRACE_TIME(TRC_SCHED_ADJDOM, d->domain_id);
 
     rcu_read_unlock(&sched_res_rculock);
 
@@ -2181,14 +2180,13 @@ static void sched_switch_units(struct sched_resource *sr,
         sr->curr = next;
         sr->prev = prev;
 
-        TRACE_3D(TRC_SCHED_SWITCH_INFPREV, prev->domain->domain_id,
-                 prev->unit_id, now - prev->state_entry_time);
-        TRACE_4D(TRC_SCHED_SWITCH_INFNEXT, next->domain->domain_id,
-                 next->unit_id,
-                 (next->vcpu_list->runstate.state == RUNSTATE_runnable) ?
-                 (now - next->state_entry_time) : 0, prev->next_time);
-        TRACE_4D(TRC_SCHED_SWITCH, prev->domain->domain_id, prev->unit_id,
-                 next->domain->domain_id, next->unit_id);
+        TRACE_TIME(TRC_SCHED_SWITCH_INFPREV, prev->domain->domain_id,
+                   prev->unit_id, now - prev->state_entry_time);
+        TRACE_TIME(TRC_SCHED_SWITCH_INFNEXT, next->domain->domain_id, next->unit_id,
+                   (next->vcpu_list->runstate.state == RUNSTATE_runnable) ?
+                   (now - next->state_entry_time) : 0, prev->next_time);
+        TRACE_TIME(TRC_SCHED_SWITCH, prev->domain->domain_id, prev->unit_id,
+                   next->domain->domain_id, next->unit_id);
 
         ASSERT(!unit_running(next));
 
@@ -2379,10 +2377,10 @@ static void sched_context_switch(struct vcpu *vprev, struct vcpu *vnext,
 {
     if ( unlikely(vprev == vnext) )
     {
-        TRACE_4D(TRC_SCHED_SWITCH_INFCONT,
-                 vnext->domain->domain_id, vnext->sched_unit->unit_id,
-                 now - vprev->runstate.state_entry_time,
-                 vprev->sched_unit->next_time);
+        TRACE_TIME(TRC_SCHED_SWITCH_INFCONT,
+                   vnext->domain->domain_id, vnext->sched_unit->unit_id,
+                   now - vprev->runstate.state_entry_time,
+                   vprev->sched_unit->next_time);
         sched_context_switched(vprev, vnext);
 
         /*

@@ -493,7 +493,7 @@ static inline void __runq_tickle(const struct csched_unit *new)
         {
             /* Avoid TRACE_*: saves checking !tb_init_done each step */
             for_each_cpu(cpu, &mask)
-                __trace_var(TRC_CSCHED_TICKLE, 1, sizeof(cpu), &cpu);
+                trace_time(TRC_CSCHED_TICKLE, sizeof(cpu), &cpu);
         }
 
         /*
@@ -862,8 +862,7 @@ _csched_cpu_pick(const struct scheduler *ops, const struct sched_unit *unit,
     if ( commit && spc )
        spc->idle_bias = cpu;
 
-    TRACE_3D(TRC_CSCHED_PICKED_CPU, unit->domain->domain_id, unit->unit_id,
-             cpu);
+    TRACE_TIME(TRC_CSCHED_PICKED_CPU, unit->domain->domain_id, unit->unit_id, cpu);
 
     return cpu;
 }
@@ -907,8 +906,8 @@ __csched_unit_acct_start(struct csched_private *prv, struct csched_unit *svc)
         }
     }
 
-    TRACE_3D(TRC_CSCHED_ACCOUNT_START, sdom->dom->domain_id,
-             svc->unit->unit_id, sdom->active_unit_count);
+    TRACE_TIME(TRC_CSCHED_ACCOUNT_START, sdom->dom->domain_id,
+               svc->unit->unit_id, sdom->active_unit_count);
 
     spin_unlock_irqrestore(&prv->lock, flags);
 }
@@ -933,8 +932,8 @@ __csched_unit_acct_stop_locked(struct csched_private *prv,
         list_del_init(&sdom->active_sdom_elem);
     }
 
-    TRACE_3D(TRC_CSCHED_ACCOUNT_STOP, sdom->dom->domain_id,
-             svc->unit->unit_id, sdom->active_unit_count);
+    TRACE_TIME(TRC_CSCHED_ACCOUNT_STOP, sdom->dom->domain_id,
+               svc->unit->unit_id, sdom->active_unit_count);
 }
 
 static void
@@ -957,8 +956,8 @@ csched_unit_acct(struct csched_private *prv, unsigned int cpu)
     if ( svc->pri == CSCHED_PRI_TS_BOOST )
     {
         svc->pri = CSCHED_PRI_TS_UNDER;
-        TRACE_2D(TRC_CSCHED_BOOST_END, svc->sdom->dom->domain_id,
-                 svc->unit->unit_id);
+        TRACE_TIME(TRC_CSCHED_BOOST_END, svc->sdom->dom->domain_id,
+                   svc->unit->unit_id);
     }
 
     /*
@@ -1164,8 +1163,7 @@ csched_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
     if ( !migrating && svc->pri == CSCHED_PRI_TS_UNDER &&
          !test_bit(CSCHED_FLAG_UNIT_PARKED, &svc->flags) )
     {
-        TRACE_2D(TRC_CSCHED_BOOST_START, unit->domain->domain_id,
-                 unit->unit_id);
+        TRACE_TIME(TRC_CSCHED_BOOST_START, unit->domain->domain_id, unit->unit_id);
         SCHED_STAT_CRANK(unit_boost);
         svc->pri = CSCHED_PRI_TS_BOOST;
     }
@@ -1671,8 +1669,8 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
         if ( __csched_unit_is_migrateable(prv, unit, cpu, cpumask_scratch) )
         {
             /* We got a candidate. Grab it! */
-            TRACE_3D(TRC_CSCHED_STOLEN_UNIT, peer_cpu,
-                     unit->domain->domain_id, unit->unit_id);
+            TRACE_TIME(TRC_CSCHED_STOLEN_UNIT, peer_cpu,
+                       unit->domain->domain_id, unit->unit_id);
             SCHED_UNIT_STAT_CRANK(speer, migrate_q);
             SCHED_STAT_CRANK(migrate_queued);
             runq_remove(speer);
@@ -1783,7 +1781,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
                  */
                 if ( CSCHED_PCPU(peer_cpu)->nr_runnable <= 1 )
                 {
-                    TRACE_2D(TRC_CSCHED_STEAL_CHECK, peer_cpu, /* skipp'n */ 0);
+                    TRACE_TIME(TRC_CSCHED_STEAL_CHECK, peer_cpu, /* skipp'n */ 0);
                     goto next_cpu;
                 }
 
@@ -1799,11 +1797,11 @@ csched_load_balance(struct csched_private *prv, int cpu,
                 if ( !lock )
                 {
                     SCHED_STAT_CRANK(steal_trylock_failed);
-                    TRACE_2D(TRC_CSCHED_STEAL_CHECK, peer_cpu, /* skip */ 0);
+                    TRACE_TIME(TRC_CSCHED_STEAL_CHECK, peer_cpu, /* skip */ 0);
                     goto next_cpu;
                 }
 
-                TRACE_2D(TRC_CSCHED_STEAL_CHECK, peer_cpu, /* checked */ 1);
+                TRACE_TIME(TRC_CSCHED_STEAL_CHECK, peer_cpu, /* checked */ 1);
 
                 /* Any work over there to steal? */
                 speer = cpumask_test_cpu(peer_cpu, online) ?
@@ -1860,21 +1858,18 @@ static void cf_check csched_schedule(
     SCHED_STAT_CRANK(schedule);
     CSCHED_UNIT_CHECK(unit);
 
-    /*
-     * Here in Credit1 code, we usually just call TRACE_nD() helpers, and
-     * don't care about packing. But scheduling happens very often, so it
-     * actually is important that the record is as small as possible.
-     */
     if ( unlikely(tb_init_done) )
     {
         struct {
-            unsigned cpu:16, tasklet:8, idle:8;
-        } d;
-        d.cpu = cur_cpu;
-        d.tasklet = tasklet_work_scheduled;
-        d.idle = is_idle_unit(unit);
-        __trace_var(TRC_CSCHED_SCHEDULE, 1, sizeof(d),
-                    (unsigned char *)&d);
+            uint16_t cpu;
+            uint8_t tasklet, idle;
+        } d = {
+            .cpu     = cur_cpu,
+            .tasklet = tasklet_work_scheduled,
+            .idle    = is_idle_unit(unit),
+        };
+
+        trace_time(TRC_CSCHED_SCHEDULE, sizeof(d), &d);
     }
 
     runtime = now - unit->state_entry_time;
@@ -1936,14 +1931,15 @@ static void cf_check csched_schedule(
         if ( unlikely(tb_init_done) )
         {
             struct {
-                unsigned unit:16, dom:16;
-                unsigned runtime;
-            } d;
-            d.dom = unit->domain->domain_id;
-            d.unit = unit->unit_id;
-            d.runtime = runtime;
-            __trace_var(TRC_CSCHED_RATELIMIT, 1, sizeof(d),
-                        (unsigned char *)&d);
+                uint16_t unit, dom;
+                uint32_t runtime;
+            } d = {
+                .dom     = unit->domain->domain_id,
+                .unit    = unit->unit_id,
+                .runtime = runtime,
+            };
+
+            trace_time(TRC_CSCHED_RATELIMIT, sizeof(d), &d);
         }
 
         goto out;
@@ -1968,7 +1964,7 @@ static void cf_check csched_schedule(
         /* Tasklet work (which runs in idle UNIT context) overrides all else. */
         if ( tasklet_work_scheduled )
         {
-            TRACE_0D(TRC_CSCHED_SCHED_TASKLET);
+            TRACE_TIME(TRC_CSCHED_SCHED_TASKLET);
             snext = CSCHED_UNIT(sched_idle_unit(sched_cpu));
             snext->pri = CSCHED_PRI_TS_BOOST;
         }

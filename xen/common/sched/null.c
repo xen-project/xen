@@ -331,11 +331,13 @@ pick_res(const struct null_private *prv, const struct sched_unit *unit)
         struct {
             uint16_t unit, dom;
             uint32_t new_cpu;
-        } d;
-        d.dom = unit->domain->domain_id;
-        d.unit = unit->unit_id;
-        d.new_cpu = new_cpu;
-        __trace_var(TRC_SNULL_PICKED_CPU, 1, sizeof(d), &d);
+        } d = {
+            .unit    = unit->unit_id,
+            .dom     = unit->domain->domain_id,
+            .new_cpu = new_cpu,
+        };
+
+        trace_time(TRC_SNULL_PICKED_CPU, sizeof(d), &d);
     }
 
     return get_sched_res(new_cpu);
@@ -359,11 +361,13 @@ static void unit_assign(struct null_private *prv, struct sched_unit *unit,
         struct {
             uint16_t unit, dom;
             uint32_t cpu;
-        } d;
-        d.dom = unit->domain->domain_id;
-        d.unit = unit->unit_id;
-        d.cpu = cpu;
-        __trace_var(TRC_SNULL_UNIT_ASSIGN, 1, sizeof(d), &d);
+        } d = {
+            .unit = unit->unit_id,
+            .dom  = unit->domain->domain_id,
+            .cpu  = cpu,
+        };
+
+        trace_time(TRC_SNULL_UNIT_ASSIGN, sizeof(d), &d);
     }
 }
 
@@ -390,11 +394,13 @@ static bool unit_deassign(struct null_private *prv, const struct sched_unit *uni
         struct {
             uint16_t unit, dom;
             uint32_t cpu;
-        } d;
-        d.dom = unit->domain->domain_id;
-        d.unit = unit->unit_id;
-        d.cpu = cpu;
-        __trace_var(TRC_SNULL_UNIT_DEASSIGN, 1, sizeof(d), &d);
+        } d = {
+            .unit = unit->unit_id,
+            .dom  = unit->domain->domain_id,
+            .cpu  = cpu,
+        };
+
+        trace_time(TRC_SNULL_UNIT_DEASSIGN, sizeof(d), &d);
     }
 
     spin_lock(&prv->waitq_lock);
@@ -695,12 +701,14 @@ static void cf_check null_unit_migrate(
         struct {
             uint16_t unit, dom;
             uint16_t cpu, new_cpu;
-        } d;
-        d.dom = unit->domain->domain_id;
-        d.unit = unit->unit_id;
-        d.cpu = sched_unit_master(unit);
-        d.new_cpu = new_cpu;
-        __trace_var(TRC_SNULL_MIGRATE, 1, sizeof(d), &d);
+        } d = {
+            .unit    = unit->unit_id,
+            .dom     = unit->domain->domain_id,
+            .cpu     = sched_unit_master(unit),
+            .new_cpu = new_cpu,
+        };
+
+        trace_time(TRC_SNULL_MIGRATE, sizeof(d), &d);
     }
 
     /*
@@ -824,9 +832,11 @@ static void cf_check null_schedule(
         struct {
             uint16_t tasklet, cpu;
             int16_t unit, dom;
-        } d;
-        d.cpu = cur_cpu;
-        d.tasklet = tasklet_work_scheduled;
+        } d = {
+            .tasklet = tasklet_work_scheduled,
+            .cpu     = cur_cpu,
+        };
+
         if ( npc->unit == NULL )
         {
             d.unit = d.dom = -1;
@@ -836,12 +846,13 @@ static void cf_check null_schedule(
             d.unit = npc->unit->unit_id;
             d.dom = npc->unit->domain->domain_id;
         }
-        __trace_var(TRC_SNULL_SCHEDULE, 1, sizeof(d), &d);
+
+        trace_time(TRC_SNULL_SCHEDULE, sizeof(d), &d);
     }
 
     if ( tasklet_work_scheduled )
     {
-        trace_var(TRC_SNULL_TASKLET, 1, 0, NULL);
+        TRACE_TIME(TRC_SNULL_TASKLET);
         prev->next_task = sched_idle_unit(sched_cpu);
     }
     else
