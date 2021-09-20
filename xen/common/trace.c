@@ -808,6 +808,11 @@ unlock:
         tasklet_schedule(&trace_notify_dom0_tasklet);
 }
 
+void trace(uint32_t event, unsigned int extra, const void *extra_data)
+{
+    __trace_var(event, event & TRC_HD_CYCLE_FLAG, extra, extra_data);
+}
+
 void __trace_hypercall(uint32_t event, unsigned long op,
                        const xen_ulong_t *args)
 {

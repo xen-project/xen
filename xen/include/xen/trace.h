@@ -37,6 +37,9 @@ int tb_control(struct xen_sysctl_tbuf_op *tbc);
 
 int trace_will_trace_event(u32 event);
 
+/* Create a trace record, with pre-constructed additional parameters. */
+void trace(uint32_t event, unsigned int extra, const void *extra_data);
+
 void __trace_var(uint32_t event, bool cycles, unsigned int extra, const void *);
 
 static inline void trace_var(uint32_t event, bool cycles, unsigned int extra,
@@ -66,6 +69,9 @@ static inline int trace_will_trace_event(uint32_t event)
     return 0;
 }
 
+static inline void trace(
+    uint32_t event, unsigned int extra, const void *extra_data) {}
+
 static inline void trace_var(uint32_t event, bool cycles, unsigned int extra,
                              const void *extra_data) {}
 static inline void __trace_var(uint32_t event, bool cycles, unsigned int extra,
@@ -73,6 +79,30 @@ static inline void __trace_var(uint32_t event, bool cycles, unsigned int extra,
 static inline void __trace_hypercall(uint32_t event, unsigned long op,
                                      const xen_ulong_t *args) {}
 #endif /* CONFIG_TRACEBUFFER */
+
+/* Create a trace record with time included. */
+static inline void trace_time(
+    uint32_t event, unsigned int extra, const void *extra_data)
+{
+    trace(event | TRC_HD_CYCLE_FLAG, extra, extra_data);
+}
+
+/*
+ * Create a trace record, packaging up to 7 additional parameters into a
+ * uint32_t array.
+ */
+#define TRACE(_e, ...)                                          \
+    do {                                                        \
+        if ( unlikely(tb_init_done) )                           \
+        {                                                       \
+            uint32_t _d[] = { __VA_ARGS__ };                    \
+            BUILD_BUG_ON(ARRAY_SIZE(_d) > TRACE_EXTRA_MAX);     \
+            trace(_e, sizeof(_d), sizeof(_d) ? _d : NULL);      \
+        }                                                       \
+    } while ( 0 )
+
+/* Create a trace record with time included. */
+#define TRACE_TIME(_e, ...) TRACE((_e) | TRC_HD_CYCLE_FLAG, ## __VA_ARGS__)
 
 /* Convenience macros for calling the trace function. */
 #define TRACE_0D(_e)                            \
