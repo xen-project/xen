@@ -67,7 +67,7 @@ static DEFINE_PER_CPU(unsigned long, lost_records_first_tsc);
 
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
-int tb_init_done __read_mostly;
+bool __read_mostly tb_init_done;
 
 /* which CPUs tracing is enabled on */
 static cpumask_t tb_cpu_mask;

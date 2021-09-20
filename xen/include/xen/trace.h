@@ -21,19 +21,14 @@
 #ifndef __XEN_TRACE_H__
 #define __XEN_TRACE_H__
 
-/* Put 'tb_init_done' here because 'asm/trace.h' may use it */
-#ifdef CONFIG_TRACEBUFFER
-extern int tb_init_done;
-#else
-#define tb_init_done false
-#endif
-
 #include <xen/types.h>
 #include <public/sysctl.h>
 #include <public/trace.h>
-#include <asm/trace.h>
 
 #ifdef CONFIG_TRACEBUFFER
+
+extern bool tb_init_done;
+
 /* Used to initialise trace buffer functionality */
 void init_trace_bufs(void);
 
@@ -57,6 +52,8 @@ void __trace_hypercall(uint32_t event, unsigned long op,
 #else /* CONFIG_TRACEBUFFER */
 
 #include <xen/errno.h>
+
+#define tb_init_done false
 
 static inline void init_trace_bufs(void) {}
 static inline int tb_control(struct xen_sysctl_tbuf_op *tbc)
