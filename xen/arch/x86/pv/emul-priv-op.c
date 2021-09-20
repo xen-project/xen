@@ -30,6 +30,7 @@
 #include <asm/hypercall.h>
 #include <asm/mc146818rtc.h>
 #include <asm/pv/domain.h>
+#include <asm/pv/trace.h>
 #include <asm/shared.h>
 
 #include <xsm/xsm.h>

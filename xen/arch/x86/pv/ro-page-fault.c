@@ -20,7 +20,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/trace.h>
+#include <asm/pv/trace.h>
 #include <asm/shadow.h>
 
 #include "emulate.h"

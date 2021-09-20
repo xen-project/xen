@@ -1,9 +1,6 @@
-#include <xen/init.h>
-#include <xen/kernel.h>
-#include <xen/lib.h>
-#include <xen/domain.h>
 #include <xen/sched.h>
-#include <xen/trace.h>
+
+#include <asm/pv/trace.h>
 
 void __trace_pv_trap(int trapnr, unsigned long eip,
                      int use_error_code, unsigned error_code)
@@ -21,7 +18,7 @@ void __trace_pv_trap(int trapnr, unsigned long eip,
         d.trapnr = trapnr;
         d.error_code = error_code;
         d.use_error_code=!!use_error_code;
-                
+
         __trace_var(TRC_PV_TRAP, 1, sizeof(d), &d);
     }
     else
@@ -38,7 +35,7 @@ void __trace_pv_trap(int trapnr, unsigned long eip,
         d.trapnr = trapnr;
         d.error_code = error_code;
         d.use_error_code=!!use_error_code;
-                
+
         event = TRC_PV_TRAP;
         event |= TRC_64_FLAG;
         __trace_var(event, 1, sizeof(d), &d);
@@ -58,7 +55,7 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
         d.eip = eip;
         d.addr = addr;
         d.error_code = error_code;
-                
+
         __trace_var(TRC_PV_PAGE_FAULT, 1, sizeof(d), &d);
     }
     else

@@ -22,10 +22,10 @@
 #include <xen/event.h>
 #include <xen/hypercall.h>
 #include <xen/lib.h>
-#include <xen/trace.h>
 #include <xen/softirq.h>
 
 #include <asm/apic.h>
+#include <asm/pv/trace.h>
 #include <asm/shared.h>
 #include <asm/traps.h>
 #include <irq_vectors.h>

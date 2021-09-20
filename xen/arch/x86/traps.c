@@ -82,6 +82,7 @@
 #include <xsm/xsm.h>
 #include <asm/mach-default/irq_vectors.h>
 #include <asm/pv/traps.h>
+#include <asm/pv/trace.h>
 #include <asm/pv/mm.h>
 
 /*
@@ -1480,7 +1481,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     {
         int ret = paging_fault(addr, regs);
 
-        if ( ret == EXCRET_fault_fixed )
+        if ( IS_ENABLED(CONFIG_PV) && ret == EXCRET_fault_fixed )
             trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->rip, addr);
         return ret;
     }

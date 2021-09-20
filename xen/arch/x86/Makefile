@@ -61,7 +61,6 @@ obj-y += spec_ctrl.o
 obj-y += srat.o
 obj-y += string.o
 obj-y += time.o
-obj-y += trace.o
 obj-y += traps.o
 obj-y += tsx.o
 obj-y += usercopy.o
