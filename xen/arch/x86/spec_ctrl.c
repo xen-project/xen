@@ -323,7 +323,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
      * Hardware read-only information, stating immunity to certain issues, or
      * suggestions of which mitigation to use.
      */
-    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (caps & ARCH_CAPS_RDCL_NO)                        ? " RDCL_NO"        : "",
            (caps & ARCH_CAPS_IBRS_ALL)                       ? " IBRS_ALL"       : "",
            (caps & ARCH_CAPS_RSBA)                           ? " RSBA"           : "",
@@ -332,13 +332,16 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (caps & ARCH_CAPS_SSB_NO)                         ? " SSB_NO"         : "",
            (caps & ARCH_CAPS_MDS_NO)                         ? " MDS_NO"         : "",
            (caps & ARCH_CAPS_TAA_NO)                         ? " TAA_NO"         : "",
+           (caps & ARCH_CAPS_SBDR_SSDP_NO)                   ? " SBDR_SSDP_NO"   : "",
+           (caps & ARCH_CAPS_FBSDP_NO)                       ? " FBSDP_NO"       : "",
+           (caps & ARCH_CAPS_PSDP_NO)                        ? " PSDP_NO"        : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS_ALWAYS))    ? " IBRS_ALWAYS"    : "",
            (e8b  & cpufeat_mask(X86_FEATURE_STIBP_ALWAYS))   ? " STIBP_ALWAYS"   : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS_FAST))      ? " IBRS_FAST"      : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS_SAME_MODE)) ? " IBRS_SAME_MODE" : "");
 
     /* Hardware features which need driving to mitigate issues. */
-    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB)) ||
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB))          ? " IBPB"           : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS)) ||
@@ -353,7 +356,9 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (_7d0 & cpufeat_mask(X86_FEATURE_MD_CLEAR))       ? " MD_CLEAR"       : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_SRBDS_CTRL))     ? " SRBDS_CTRL"     : "",
            (e8b  & cpufeat_mask(X86_FEATURE_VIRT_SSBD))      ? " VIRT_SSBD"      : "",
-           (caps & ARCH_CAPS_TSX_CTRL)                       ? " TSX_CTRL"       : "");
+           (caps & ARCH_CAPS_TSX_CTRL)                       ? " TSX_CTRL"       : "",
+           (caps & ARCH_CAPS_FB_CLEAR)                       ? " FB_CLEAR"       : "",
+           (caps & ARCH_CAPS_FB_CLEAR_CTRL)                  ? " FB_CLEAR_CTRL"  : "");
 
     /* Compiled-in support which pertains to mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) )
