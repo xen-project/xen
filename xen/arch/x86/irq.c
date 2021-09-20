@@ -130,8 +130,8 @@ static void _trace_irq_mask(uint32_t event, int irq, int vector,
                             const cpumask_t *mask)
 {
     struct {
-        unsigned int irq:16, vec:16;
-        unsigned int mask[6];
+        uint16_t irq, vec;
+        uint32_t mask[6];
     } d = {
        .irq = irq,
        .vec = vector,

@@ -609,9 +609,9 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     if ( tb_init_done )
     {
         struct {
-            u64 gfn, mfn;
-            int p2mt;
-            int d:16,order:16;
+            uint64_t gfn, mfn;
+            uint32_t p2mt;
+            uint16_t d, order;
         } t;
 
         t.gfn = gfn;

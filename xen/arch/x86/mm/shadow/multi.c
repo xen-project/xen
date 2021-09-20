@@ -2118,7 +2118,7 @@ static inline void trace_shadow_emulate(guest_l1e_t gl1e, unsigned long va)
                so put it first for alignment sake. */
             guest_l1e_t gl1e, write_val;
             guest_va_t va;
-            unsigned flags:29, emulation_count:3;
+            uint32_t flags:29, emulation_count:3;
         } d;
         u32 event;
 
