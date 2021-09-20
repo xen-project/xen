@@ -15,7 +15,6 @@
 #include <asm/processor.h>
 #include <asm/p2m.h>
 #include <asm/i387.h>
-#include <asm/hvm/trace.h>
 #include <asm/hvm/vmx/vmcs.h>
 
 extern int8_t opt_ept_exec_sp;

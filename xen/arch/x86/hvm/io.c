@@ -28,7 +28,6 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
-#include <asm/hvm/trace.h>
 #include <asm/hvm/emulate.h>
 #include <public/sched.h>
 #include <xen/iocap.h>

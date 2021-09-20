@@ -40,15 +40,6 @@ int trace_will_trace_event(u32 event);
 /* Create a trace record, with pre-constructed additional parameters. */
 void trace(uint32_t event, unsigned int extra, const void *extra_data);
 
-void __trace_var(uint32_t event, bool cycles, unsigned int extra, const void *);
-
-static inline void trace_var(uint32_t event, bool cycles, unsigned int extra,
-                             const void *extra_data)
-{
-    if ( unlikely(tb_init_done) )
-        __trace_var(event, cycles, extra, extra_data);
-}
-
 void __trace_hypercall(uint32_t event, unsigned long op,
                        const xen_ulong_t *args);
 
@@ -72,10 +63,6 @@ static inline int trace_will_trace_event(uint32_t event)
 static inline void trace(
     uint32_t event, unsigned int extra, const void *extra_data) {}
 
-static inline void trace_var(uint32_t event, bool cycles, unsigned int extra,
-                             const void *extra_data) {}
-static inline void __trace_var(uint32_t event, bool cycles, unsigned int extra,
-                               const void *extra_data) {}
 static inline void __trace_hypercall(uint32_t event, unsigned long op,
                                      const xen_ulong_t *args) {}
 #endif /* CONFIG_TRACEBUFFER */
@@ -103,39 +90,5 @@ static inline void trace_time(
 
 /* Create a trace record with time included. */
 #define TRACE_TIME(_e, ...) TRACE((_e) | TRC_HD_CYCLE_FLAG, ## __VA_ARGS__)
-
-/* Convenience macros for calling the trace function. */
-#define TRACE_0D(_e)                            \
-    do {                                        \
-        trace_var(_e, 1, 0, NULL);              \
-    } while ( 0 )
-
-/* Common helper for TRACE_{1..6}D() below. */
-#define TRACE_varD(_e, ...)                             \
-    do {                                                \
-        if ( unlikely(tb_init_done) )                   \
-        {                                               \
-            uint32_t _d[] = { __VA_ARGS__ };            \
-            __trace_var(_e, true, sizeof(_d), _d);      \
-        }                                               \
-    } while ( 0 )
-
-#define TRACE_1D(_e, d1) \
-    TRACE_varD(_e, d1)
-
-#define TRACE_2D(_e, d1, d2) \
-    TRACE_varD(_e, d1, d2)
-
-#define TRACE_3D(_e, d1, d2, d3) \
-    TRACE_varD(_e, d1, d2, d3)
-
-#define TRACE_4D(_e, d1, d2, d3, d4) \
-    TRACE_varD(_e, d1, d2, d3, d4)
-
-#define TRACE_5D(_e, d1, d2, d3, d4, d5) \
-    TRACE_varD(_e, d1, d2, d3, d4, d5)
-
-#define TRACE_6D(_e, d1, d2, d3, d4, d5, d6) \
-    TRACE_varD(_e, d1, d2, d3, d4, d5, d6)
 
 #endif /* __XEN_TRACE_H__ */

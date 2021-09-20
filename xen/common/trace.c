@@ -666,22 +666,21 @@ static DECLARE_SOFTIRQ_TASKLET(trace_notify_dom0_tasklet,
                                trace_notify_dom0, NULL);
 
 /**
- * __trace_var - Enters a trace tuple into the trace buffer for the current CPU.
+ * trace - Enters a trace tuple into the trace buffer for the current CPU.
  * @event: the event type being logged
- * @cycles: include tsc timestamp into trace record
  * @extra: size of additional trace data in bytes
  * @extra_data: pointer to additional trace data
  *
  * Logs a trace record into the appropriate buffer.
  */
-void __trace_var(u32 event, bool cycles, unsigned int extra,
-                 const void *extra_data)
+void trace(uint32_t event, unsigned int extra, const void *extra_data)
 {
     struct t_buf *buf;
     unsigned long flags;
     u32 bytes_to_tail, bytes_to_wrap;
     unsigned int rec_size, total_size;
     bool started_below_highwater;
+    bool cycles = event & TRC_HD_CYCLE_FLAG;
 
     if( !tb_init_done )
         return;
@@ -806,11 +805,6 @@ unlock:
          && started_below_highwater
          && (calc_unconsumed_bytes(buf) >= t_buf_highwater) )
         tasklet_schedule(&trace_notify_dom0_tasklet);
-}
-
-void trace(uint32_t event, unsigned int extra, const void *extra_data)
-{
-    __trace_var(event, event & TRC_HD_CYCLE_FLAG, extra, extra_data);
 }
 
 void __trace_hypercall(uint32_t event, unsigned long op,

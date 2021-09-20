@@ -24,7 +24,6 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/nestedhvm.h>
 #include <public/hvm/ioreq.h>
-#include <asm/hvm/trace.h>
 #include <asm/vm_event.h>
 
 /*

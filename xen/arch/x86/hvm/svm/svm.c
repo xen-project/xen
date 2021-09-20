@@ -28,7 +28,6 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/svmdebug.h>
 #include <asm/hvm/svm/vmcb.h>
-#include <asm/hvm/trace.h>
 #include <asm/iocap.h>
 #include <asm/i387.h>
 #include <asm/monitor.h>

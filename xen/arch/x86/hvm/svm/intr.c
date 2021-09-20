@@ -24,7 +24,6 @@
 #include <xen/kernel.h>
 #include <public/hvm/ioreq.h>
 #include <xen/domain_page.h>
-#include <asm/hvm/trace.h>
 
 #include "nestedhvm.h"
 
