@@ -318,7 +318,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
     printk("Speculative mitigation facilities:\n");
 
     /* Hardware features which pertain to speculative mitigations. */
-    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ? " IBRS/IBPB" : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_STIBP)) ? " STIBP"     : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_L1D_FLUSH)) ? " L1D_FLUSH" : "",
@@ -333,7 +333,12 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (caps & ARCH_CAPS_SSB_NO)                ? " SSB_NO"    : "",
            (caps & ARCH_CAPS_MDS_NO)                ? " MDS_NO"    : "",
            (caps & ARCH_CAPS_TSX_CTRL)              ? " TSX_CTRL"  : "",
-           (caps & ARCH_CAPS_TAA_NO)                ? " TAA_NO"    : "");
+           (caps & ARCH_CAPS_TAA_NO)                ? " TAA_NO"    : "",
+           (caps & ARCH_CAPS_SBDR_SSDP_NO)          ? " SBDR_SSDP_NO" : "",
+           (caps & ARCH_CAPS_FBSDP_NO)              ? " FBSDP_NO"  : "",
+           (caps & ARCH_CAPS_PSDP_NO)               ? " PSDP_NO"   : "",
+           (caps & ARCH_CAPS_FB_CLEAR)              ? " FB_CLEAR"  : "",
+           (caps & ARCH_CAPS_FB_CLEAR_CTRL)         ? " FB_CLEAR_CTRL" : "");
 
     /* Compiled-in support which pertains to mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) )

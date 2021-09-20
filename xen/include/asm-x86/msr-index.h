@@ -55,6 +55,11 @@
 #define ARCH_CAPS_IF_PSCHANGE_MC_NO	(_AC(1, ULL) << 6)
 #define ARCH_CAPS_TSX_CTRL		(_AC(1, ULL) << 7)
 #define ARCH_CAPS_TAA_NO		(_AC(1, ULL) << 8)
+#define ARCH_CAPS_SBDR_SSDP_NO		(_AC(1, ULL) << 13)
+#define ARCH_CAPS_FBSDP_NO		(_AC(1, ULL) << 14)
+#define ARCH_CAPS_PSDP_NO		(_AC(1, ULL) << 15)
+#define ARCH_CAPS_FB_CLEAR		(_AC(1, ULL) << 17)
+#define ARCH_CAPS_FB_CLEAR_CTRL		(_AC(1, ULL) << 18)
 
 #define MSR_FLUSH_CMD			0x0000010b
 #define FLUSH_CMD_L1D			(_AC(1, ULL) << 0)
