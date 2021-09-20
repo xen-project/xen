@@ -1462,7 +1462,8 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
 {
     const struct acpi_drhd_unit *drhd = acpi_find_matched_drhd_unit(pdev);
     int ret = 0;
-    u8 seg = pdev->seg, bus = pdev->bus, secbus;
+    uint16_t seg = pdev->seg;
+    uint8_t bus = pdev->bus, secbus;
 
     /*
      * Generally we assume only devices from one node to get assigned to a
@@ -1677,7 +1678,8 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
     const struct acpi_drhd_unit *drhd = acpi_find_matched_drhd_unit(pdev);
     struct vtd_iommu *iommu = drhd ? drhd->iommu : NULL;
     int ret;
-    u8 seg = pdev->seg, bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
+    uint16_t seg = pdev->seg;
+    uint8_t bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
     bool found;
 
     switch ( pdev->type )
