@@ -868,7 +868,7 @@ void __trace_hypercall(uint32_t event, unsigned long op,
         break;
     }
 
-    __trace_var(event, 1, sizeof(uint32_t) * (1 + (a - d.args)), &d);
+    trace_time(event, sizeof(uint32_t) * (1 + (a - d.args)), &d);
 }
 
 /*

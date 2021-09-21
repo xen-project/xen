@@ -19,7 +19,7 @@ void __trace_pv_trap(int trapnr, unsigned long eip,
             .error_code     = error_code,
         };
 
-        __trace_var(TRC_PV_TRAP, 1, sizeof(d), &d);
+        trace_time(TRC_PV_TRAP, sizeof(d), &d);
     }
     else
     {
@@ -35,7 +35,7 @@ void __trace_pv_trap(int trapnr, unsigned long eip,
             .error_code     = error_code,
         };
 
-        __trace_var(TRC_PV_TRAP | TRC_64_FLAG, 1, sizeof(d), &d);
+        trace_time(TRC_PV_TRAP | TRC_64_FLAG, sizeof(d), &d);
     }
 }
 
@@ -53,7 +53,7 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
             .error_code = error_code,
         };
 
-        __trace_var(TRC_PV_PAGE_FAULT, 1, sizeof(d), &d);
+        trace_time(TRC_PV_PAGE_FAULT, sizeof(d), &d);
     }
     else
     {
@@ -66,7 +66,7 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
             .error_code = error_code,
         };
 
-        __trace_var(TRC_PV_PAGE_FAULT | TRC_64_FLAG, 1, sizeof(d), &d);
+        trace_time(TRC_PV_PAGE_FAULT | TRC_64_FLAG, sizeof(d), &d);
     }
 }
 
@@ -75,10 +75,11 @@ void __trace_trap_one_addr(unsigned event, unsigned long va)
     if ( is_pv_32bit_vcpu(current) )
     {
         u32 d = va;
-        __trace_var(event, 1, sizeof(d), &d);
+
+        trace_time(event, sizeof(d), &d);
     }
     else
-        __trace_var(event | TRC_64_FLAG, 1, sizeof(va), &va);
+        trace_time(event | TRC_64_FLAG, sizeof(va), &va);
 }
 
 void __trace_trap_two_addr(unsigned event, unsigned long va1,
@@ -93,7 +94,7 @@ void __trace_trap_two_addr(unsigned event, unsigned long va1,
             .va2 = va2,
         };
 
-        __trace_var(event, 1, sizeof(d), &d);
+        trace_time(event, sizeof(d), &d);
     }
     else
     {
@@ -104,7 +105,7 @@ void __trace_trap_two_addr(unsigned event, unsigned long va1,
             .va2 = va2,
         };
 
-        __trace_var(event | TRC_64_FLAG, 1, sizeof(d), &d);
+        trace_time(event | TRC_64_FLAG, sizeof(d), &d);
     }
 }
 
@@ -123,7 +124,7 @@ void __trace_ptwr_emulation(unsigned long addr, l1_pgentry_t npte)
             .eip  = eip,
         };
 
-        __trace_var(TRC_PV_PTWR_EMULATION_PAE, 1, sizeof(d), &d);
+        trace_time(TRC_PV_PTWR_EMULATION_PAE, sizeof(d), &d);
     }
     else
     {
@@ -136,6 +137,6 @@ void __trace_ptwr_emulation(unsigned long addr, l1_pgentry_t npte)
             .rip  = eip,
         };
 
-        __trace_var(TRC_PV_PTWR_EMULATION | TRC_64_FLAG, 1, sizeof(d), &d);
+        trace_time(TRC_PV_PTWR_EMULATION | TRC_64_FLAG, sizeof(d), &d);
     }
 }

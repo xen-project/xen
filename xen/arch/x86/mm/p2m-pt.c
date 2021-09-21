@@ -608,7 +608,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
         t.d = d->domain_id;
         t.order = page_order;
 
-        __trace_var(TRC_MEM_SET_P2M_ENTRY, 0, sizeof(t), &t);
+        trace(TRC_MEM_SET_P2M_ENTRY, sizeof(t), &t);
     }
 
     /* Carry out any eventually pending earlier changes first. */

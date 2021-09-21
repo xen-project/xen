@@ -1979,7 +1979,7 @@ static inline void trace_shadow_gen(u32 event, guest_va_t va)
     if ( tb_init_done )
     {
         event |= (GUEST_PAGING_LEVELS-2)<<8;
-        __trace_var(event, 0/*!tsc*/, sizeof(va), &va);
+        trace(event, sizeof(va), &va);
     }
 }
 
@@ -2003,7 +2003,7 @@ static inline void trace_shadow_fixup(guest_l1e_t gl1e,
         d.va = va;
         d.flags = this_cpu(trace_shadow_path_flags);
 
-        __trace_var(event, 0/*!tsc*/, sizeof(d), &d);
+        trace(event, sizeof(d), &d);
     }
 }
 
@@ -2027,7 +2027,7 @@ static inline void trace_not_shadow_fault(guest_l1e_t gl1e,
         d.va = va;
         d.flags = this_cpu(trace_shadow_path_flags);
 
-        __trace_var(event, 0/*!tsc*/, sizeof(d), &d);
+        trace(event, sizeof(d), &d);
     }
 }
 
@@ -2053,7 +2053,7 @@ static inline void trace_shadow_emulate_other(u32 event,
         d.gfn=gfn_x(gfn);
         d.va = va;
 
-        __trace_var(event, 0/*!tsc*/, sizeof(d), &d);
+        trace(event, sizeof(d), &d);
     }
 }
 
@@ -2106,7 +2106,7 @@ static inline void trace_shadow_emulate(guest_l1e_t gl1e, unsigned long va)
 #endif
         d.flags = this_cpu(trace_shadow_path_flags);
 
-        __trace_var(event, 0/*!tsc*/, sizeof(d), &d);
+        trace(event, sizeof(d), &d);
     }
 }
 #endif /* CONFIG_HVM */

@@ -3807,7 +3807,7 @@ static void ept_handle_violation(ept_qual_t q, paddr_t gpa)
         _d.qualification = q.raw;
         _d.mfn = mfn_x(get_gfn_query_unlocked(d, gfn, &_d.p2mt));
 
-        __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
+        trace(TRC_HVM_NPF, sizeof(_d), &_d);
     }
 
     if ( q.gla_valid )

@@ -854,7 +854,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, gfn_t gfn)
         t.d = d->domain_id;
         t.order = 9;
 
-        __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), &t);
+        trace(TRC_MEM_POD_ZERO_RECLAIM, sizeof(t), &t);
     }
 
     /*
@@ -1022,7 +1022,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
                 t.d = d->domain_id;
                 t.order = 0;
 
-                __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), &t);
+                trace(TRC_MEM_POD_ZERO_RECLAIM, sizeof(t), &t);
             }
 
             /* Add to cache, and account for the new p2m PoD entry */
@@ -1262,7 +1262,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
         t.d = d->domain_id;
         t.order = order;
 
-        __trace_var(TRC_MEM_POD_POPULATE, 0, sizeof(t), &t);
+        trace(TRC_MEM_POD_POPULATE, sizeof(t), &t);
     }
 
     pod_unlock_and_flush(p2m);
@@ -1307,7 +1307,7 @@ remap_and_retry:
         t.d = d->domain_id;
         t.order = order;
 
-        __trace_var(TRC_MEM_POD_SUPERPAGE_SPLINTER, 0, sizeof(t), &t);
+        trace(TRC_MEM_POD_SUPERPAGE_SPLINTER, sizeof(t), &t);
     }
 
     return true;

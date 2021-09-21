@@ -67,7 +67,7 @@ static void hvmtrace_io_assist(const ioreq_t *p)
         size *= 2;
     }
 
-    trace_var(event, 0/*!cycles*/, size, buffer);
+    trace(event, size, buffer);
 }
 
 static int cf_check null_read(

@@ -1634,7 +1634,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
         _d.mfn = mfn_x(mfn);
         _d.p2mt = p2mt;
 
-        __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
+        trace(TRC_HVM_NPF, sizeof(_d), &_d);
     }
 
     switch ( ret )

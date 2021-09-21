@@ -135,7 +135,7 @@ static void _trace_irq_mask(uint32_t event, int irq, int vector,
 
     memcpy(d.mask, mask,
            min(sizeof(d.mask), BITS_TO_LONGS(nr_cpu_ids) * sizeof(long)));
-    trace_var(event, 1, sizeof(d), &d);
+    trace_time(event, sizeof(d), &d);
 }
 
 static void trace_irq_mask(uint32_t event, int irq, int vector,
