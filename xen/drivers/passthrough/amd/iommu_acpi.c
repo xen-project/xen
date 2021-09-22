@@ -143,7 +143,7 @@ static int __init reserve_iommu_exclusion_range(
 
 static int __init reserve_unity_map_for_device(
     uint16_t seg, uint16_t bdf, unsigned long base,
-    unsigned long length, bool iw, bool ir)
+    unsigned long length, bool iw, bool ir, bool global)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
     struct ivrs_unity_map *unity_map = ivrs_mappings[bdf].unity_map;
@@ -162,7 +162,11 @@ static int __init reserve_unity_map_for_device(
          */
         if ( base == unity_map->addr && length == unity_map->length &&
              ir == unity_map->read && iw == unity_map->write )
+        {
+            if ( global )
+                unity_map->global = true;
             return 0;
+        }
 
         if ( unity_map->addr + unity_map->length > base &&
              base + length > unity_map->addr )
@@ -181,6 +185,7 @@ static int __init reserve_unity_map_for_device(
 
     unity_map->read = ir;
     unity_map->write = iw;
+    unity_map->global = global;
     unity_map->addr = base;
     unity_map->length = length;
     unity_map->next = ivrs_mappings[bdf].unity_map;
@@ -220,7 +225,8 @@ static int __init register_range_for_all_devices(
 
         /* reserve r/w unity-mapped page entries for devices */
         for ( bdf = rc = 0; !rc && bdf < ivrs_bdf_entries; bdf++ )
-            rc = reserve_unity_map_for_device(seg, bdf, base, length, iw, ir);
+            rc = reserve_unity_map_for_device(seg, bdf, base, length, iw, ir,
+                                              true);
     }
 
     return rc;
@@ -253,8 +259,10 @@ static int __init register_range_for_device(
         paddr_t length = limit + PAGE_SIZE - base;
 
         /* reserve unity-mapped page entries for device */
-        rc = reserve_unity_map_for_device(seg, bdf, base, length, iw, ir) ?:
-             reserve_unity_map_for_device(seg, req, base, length, iw, ir);
+        rc = reserve_unity_map_for_device(seg, bdf, base, length, iw, ir,
+                                          false) ?:
+             reserve_unity_map_for_device(seg, req, base, length, iw, ir,
+                                          false);
     }
     else
     {
@@ -290,9 +298,9 @@ static int __init register_range_for_iommu_devices(
 
         req = get_ivrs_mappings(iommu->seg)[bdf].dte_requestor_id;
         rc = reserve_unity_map_for_device(iommu->seg, bdf, base, length,
-                                          iw, ir) ?:
+                                          iw, ir, false) ?:
              reserve_unity_map_for_device(iommu->seg, req, base, length,
-                                          iw, ir);
+                                          iw, ir, false);
     }
 
     return rc;

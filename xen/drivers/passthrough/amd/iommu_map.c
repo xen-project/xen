@@ -462,6 +462,81 @@ int amd_iommu_reserve_domain_unity_unmap(struct domain *d,
     return rc;
 }
 
+int amd_iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
+{
+    unsigned int seg = 0 /* XXX */, bdf;
+    const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
+    /* At least for global entries, avoid reporting them multiple times. */
+    enum { pending, processing, done } global = pending;
+
+    for ( bdf = 0; bdf < ivrs_bdf_entries; ++bdf )
+    {
+        pci_sbdf_t sbdf = PCI_SBDF2(seg, bdf);
+        const struct ivrs_unity_map *um = ivrs_mappings[bdf].unity_map;
+        unsigned int req = ivrs_mappings[bdf].dte_requestor_id;
+        const struct amd_iommu *iommu = ivrs_mappings[bdf].iommu;
+        int rc;
+
+        if ( !iommu )
+        {
+            /* May need to trigger the workaround in find_iommu_for_device(). */
+            const struct pci_dev *pdev;
+
+            pcidevs_lock();
+            pdev = pci_get_pdev(seg, sbdf.bus, sbdf.devfn);
+            pcidevs_unlock();
+
+            if ( pdev )
+                iommu = find_iommu_for_device(seg, bdf);
+            if ( !iommu )
+                continue;
+        }
+
+        if ( func(0, 0, sbdf.sbdf, ctxt) )
+        {
+            /*
+             * When the caller processes a XENMEM_RDM_ALL request, don't report
+             * multiple times the same range(s) for perhaps many devices with
+             * the same alias ID.
+             */
+            if ( bdf != req && ivrs_mappings[req].iommu &&
+                 func(0, 0, PCI_SBDF2(seg, req).sbdf, ctxt) )
+                continue;
+
+            if ( global == pending )
+                global = processing;
+        }
+
+        if ( iommu->exclusion_enable &&
+             (iommu->exclusion_allow_all ?
+              global == processing :
+              ivrs_mappings[bdf].dte_allow_exclusion) )
+        {
+            rc = func(PFN_DOWN(iommu->exclusion_base),
+                      PFN_UP(iommu->exclusion_limit | 1) -
+                      PFN_DOWN(iommu->exclusion_base), sbdf.sbdf, ctxt);
+            if ( unlikely(rc < 0) )
+                return rc;
+        }
+
+        for ( ; um; um = um->next )
+        {
+            if ( um->global && global != processing )
+                continue;
+
+            rc = func(PFN_DOWN(um->addr), PFN_DOWN(um->length),
+                      sbdf.sbdf, ctxt);
+            if ( unlikely(rc < 0) )
+                return rc;
+        }
+
+        if ( global == processing )
+            global = done;
+    }
+
+    return 0;
+}
+
 int __init amd_iommu_quarantine_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);

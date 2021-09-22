@@ -110,6 +110,7 @@ struct amd_iommu {
 struct ivrs_unity_map {
     bool read:1;
     bool write:1;
+    bool global:1;
     paddr_t addr;
     unsigned long length;
     struct ivrs_unity_map *next;
@@ -236,6 +237,7 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
                                        unsigned int flag);
 int amd_iommu_reserve_domain_unity_unmap(struct domain *d,
                                          const struct ivrs_unity_map *map);
+int amd_iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt);
 int __must_check amd_iommu_flush_iotlb_pages(struct domain *d, dfn_t dfn,
                                              unsigned long page_count,
                                              unsigned int flush_flags);
