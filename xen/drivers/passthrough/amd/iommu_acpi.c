@@ -384,6 +384,38 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
     AMD_IOMMU_DEBUG("IVMD Block: type %#x phys %#lx len %#lx\n",
                     ivmd_block->header.type, start_addr, mem_length);
 
+    if ( !e820_all_mapped(base, limit + PAGE_SIZE, E820_RESERVED) )
+    {
+        paddr_t addr;
+
+        AMD_IOMMU_DEBUG("IVMD: [%lx,%lx) is not (entirely) in reserved memory\n",
+                        base, limit + PAGE_SIZE);
+
+        for ( addr = base; addr <= limit; addr += PAGE_SIZE )
+        {
+            unsigned int type = page_get_ram_type(maddr_to_mfn(addr));
+
+            if ( type == RAM_TYPE_UNKNOWN )
+            {
+                if ( e820_add_range(&e820, addr, addr + PAGE_SIZE,
+                                    E820_RESERVED) )
+                    continue;
+                AMD_IOMMU_DEBUG("IVMD Error: Page at %lx couldn't be reserved\n",
+                                addr);
+                return -EIO;
+            }
+
+            /* Types which won't be handed out are considered good enough. */
+            if ( !(type & (RAM_TYPE_RESERVED | RAM_TYPE_ACPI |
+                           RAM_TYPE_UNUSABLE)) )
+                continue;
+
+            AMD_IOMMU_DEBUG("IVMD Error: Page at %lx can't be converted\n",
+                            addr);
+            return -EIO;
+        }
+    }
+
     if ( ivmd_block->header.flags & ACPI_IVMD_EXCLUSION_RANGE )
         exclusion = true;
     else if ( ivmd_block->header.flags & ACPI_IVMD_UNITY )
