@@ -821,7 +821,6 @@ int __init dom0_construct_pv(struct domain *d,
     page_list_for_each ( page, &d->page_list )
     {
         mfn = mfn_x(page_to_mfn(page));
-        BUG_ON(SHARED_M2P(get_gpfn_from_mfn(mfn)));
         if ( get_gpfn_from_mfn(mfn) >= count )
         {
             BUG_ON(compat);
