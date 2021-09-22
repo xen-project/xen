@@ -1380,8 +1380,10 @@ bool scrub_free_pages(void)
     return node_to_scrub(false) != NUMA_NO_NODE;
 }
 
-static void mark_page_free(struct page_info *pg, mfn_t mfn)
+static bool mark_page_free(struct page_info *pg, mfn_t mfn)
 {
+    bool pg_offlined = false;
+
     ASSERT(mfn_x(mfn) == mfn_x(page_to_mfn(pg)));
 
     /*
@@ -1405,7 +1407,7 @@ static void mark_page_free(struct page_info *pg, mfn_t mfn)
     case PGC_state_offlining:
         pg->count_info = (pg->count_info & PGC_broken) |
                          PGC_state_offlined;
-        tainted = 1;
+        pg_offlined = true;
         break;
 
     default:
@@ -1425,6 +1427,8 @@ static void mark_page_free(struct page_info *pg, mfn_t mfn)
     /* This page is not a guest frame any more. */
     page_set_owner(pg, NULL); /* set_gpfn_from_mfn snoops pg owner */
     set_gpfn_from_mfn(mfn_x(mfn), INVALID_M2P_ENTRY);
+
+    return pg_offlined;
 }
 
 /* Free 2^@order set of pages. */
@@ -1433,7 +1437,7 @@ static void free_heap_pages(
 {
     unsigned long mask;
     mfn_t mfn = page_to_mfn(pg);
-    unsigned int i, node = phys_to_nid(mfn_to_maddr(mfn)), tainted = 0;
+    unsigned int i, node = phys_to_nid(mfn_to_maddr(mfn)), pg_offlined = 0;
     unsigned int zone = page_to_zone(pg);
 
     ASSERT(order <= MAX_ORDER);
@@ -1443,7 +1447,8 @@ static void free_heap_pages(
 
     for ( i = 0; i < (1 << order); i++ )
     {
-        mark_page_free(&pg[i], mfn_add(mfn, i));
+        if ( mark_page_free(&pg[i], mfn_add(mfn, i)) )
+            pg_offlined = 1;
 
         if ( need_scrub )
         {
@@ -1517,7 +1522,7 @@ static void free_heap_pages(
 
     page_list_add_scrub(pg, node, zone, order, pg->u.free.first_dirty);
 
-    if ( tainted )
+    if ( pg_offlined )
         reserve_offlined_page(pg);
 
     spin_unlock(&heap_lock);
