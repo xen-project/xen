@@ -1861,9 +1861,9 @@ static int fork(struct domain *cd, struct domain *d)
  done:
     if ( rc && rc != -ERESTART )
     {
+        cd->parent = NULL;
         domain_unpause(d);
         put_domain(d);
-        cd->parent = NULL;
     }
 
     return rc;
@@ -1879,9 +1879,10 @@ static int fork(struct domain *cd, struct domain *d)
  * footprints the hypercall continuation should be implemented (or if this
  * feature needs to be become "stable").
  */
-static int mem_sharing_fork_reset(struct domain *d, struct domain *pd)
+static int mem_sharing_fork_reset(struct domain *d)
 {
     int rc;
+    struct domain *pd = d->parent;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     struct page_info *page, *tmp;
 
@@ -2226,8 +2227,6 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
 
     case XENMEM_sharing_op_fork_reset:
     {
-        struct domain *pd;
-
         rc = -EINVAL;
         if ( mso.u.fork.pad || mso.u.fork.flags )
             goto out;
@@ -2236,13 +2235,7 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
         if ( !d->parent )
             goto out;
 
-        rc = rcu_lock_live_remote_domain_by_id(d->parent->domain_id, &pd);
-        if ( rc )
-            goto out;
-
-        rc = mem_sharing_fork_reset(d, pd);
-
-        rcu_unlock_domain(pd);
+        rc = mem_sharing_fork_reset(d);
         break;
     }
 
