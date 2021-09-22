@@ -513,6 +513,14 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
         amd_iommu_flush_device(iommu, bdf);
     }
 
+    if ( amd_iommu_reserve_domain_unity_map(
+             pdev->domain,
+             ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map,
+             0) )
+        AMD_IOMMU_DEBUG("%pd: unity mapping failed for %04x:%02x:%02x.%u\n",
+                        pdev->domain, pdev->seg, pdev->bus, PCI_SLOT(devfn),
+                        PCI_FUNC(devfn));
+
     return amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
 }
 
@@ -538,6 +546,14 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
 
     ivrs_mappings = get_ivrs_mappings(pdev->seg);
     bdf = PCI_BDF2(pdev->bus, devfn);
+
+    if ( amd_iommu_reserve_domain_unity_unmap(
+             pdev->domain,
+             ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map) )
+        AMD_IOMMU_DEBUG("%pd: unity unmapping failed for %04x:%02x:%02x.%u\n",
+                        pdev->domain, pdev->seg, pdev->bus, PCI_SLOT(devfn),
+                        PCI_FUNC(devfn));
+
     if ( amd_iommu_perdev_intremap &&
          ivrs_mappings[bdf].dte_requestor_id == bdf &&
          ivrs_mappings[bdf].intremap_table )
