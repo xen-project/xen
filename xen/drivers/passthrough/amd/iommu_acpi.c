@@ -1049,6 +1049,9 @@ static void __init dump_acpi_table_header(struct acpi_table_header *table)
 
 }
 
+static struct acpi_ivrs_memory __initdata user_ivmds[8];
+static unsigned int __initdata nr_ivmd;
+
 #define to_ivhd_block(hdr) \
     container_of(hdr, const struct acpi_ivrs_hardware, header)
 #define to_ivmd_block(hdr) \
@@ -1072,7 +1075,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
 {
     const struct acpi_ivrs_header *ivrs_block;
     unsigned long length;
-    unsigned int apic;
+    unsigned int apic, i;
     bool_t sb_ioapic = !iommu_intremap;
     int error = 0;
 
@@ -1106,6 +1109,12 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
             error = parse_ivmd_block(to_ivmd_block(ivrs_block));
         length += ivrs_block->length;
     }
+
+    /* Add command line specified IVMD-equivalents. */
+    if ( nr_ivmd )
+        AMD_IOMMU_DEBUG("IVMD: %u command line provided entries\n", nr_ivmd);
+    for ( i = 0; !error && i < nr_ivmd; ++i )
+        error = parse_ivmd_block(user_ivmds + i);
 
     /* Each IO-APIC must have been mentioned in the table. */
     for ( apic = 0; !error && iommu_intremap && apic < nr_ioapics; ++apic )
@@ -1348,3 +1357,80 @@ int __init amd_iommu_get_supported_ivhd_type(void)
 {
     return acpi_table_parse(ACPI_SIG_IVRS, get_supported_ivhd_type);
 }
+
+/*
+ * Parse "ivmd" command line option to later add the parsed devices / regions
+ * into unity mapping lists, just like IVMDs parsed from ACPI.
+ * Format:
+ * ivmd=<start>[-<end>][=<bdf1>[-<bdf1>'][,<bdf2>[-<bdf2>'][,...]]][;<start>...]
+ */
+static int __init parse_ivmd_param(const char *s)
+{
+    do {
+        unsigned long start, end;
+        const char *cur;
+
+        if ( nr_ivmd >= ARRAY_SIZE(user_ivmds) )
+            return -E2BIG;
+
+        start = simple_strtoul(cur = s, &s, 16);
+        if ( cur == s )
+            return -EINVAL;
+
+        if ( *s == '-' )
+        {
+            end = simple_strtoul(cur = s + 1, &s, 16);
+            if ( cur == s || end < start )
+                return -EINVAL;
+        }
+        else
+            end = start;
+
+        if ( *s != '=' )
+        {
+            user_ivmds[nr_ivmd].start_address = start << PAGE_SHIFT;
+            user_ivmds[nr_ivmd].memory_length = (end - start + 1) << PAGE_SHIFT;
+            user_ivmds[nr_ivmd].header.flags = ACPI_IVMD_UNITY |
+                                               ACPI_IVMD_READ | ACPI_IVMD_WRITE;
+            user_ivmds[nr_ivmd].header.length = sizeof(*user_ivmds);
+            user_ivmds[nr_ivmd].header.type = ACPI_IVRS_TYPE_MEMORY_ALL;
+            ++nr_ivmd;
+            continue;
+        }
+
+        do {
+            unsigned int seg, bus, dev, func;
+
+            if ( nr_ivmd >= ARRAY_SIZE(user_ivmds) )
+                return -E2BIG;
+
+            s = parse_pci(s + 1, &seg, &bus, &dev, &func);
+            if ( !s || seg )
+                return -EINVAL;
+
+            user_ivmds[nr_ivmd].start_address = start << PAGE_SHIFT;
+            user_ivmds[nr_ivmd].memory_length = (end - start + 1) << PAGE_SHIFT;
+            user_ivmds[nr_ivmd].header.flags = ACPI_IVMD_UNITY |
+                                               ACPI_IVMD_READ | ACPI_IVMD_WRITE;
+            user_ivmds[nr_ivmd].header.length = sizeof(*user_ivmds);
+            user_ivmds[nr_ivmd].header.device_id = PCI_BDF(bus, dev, func);
+            user_ivmds[nr_ivmd].header.type = ACPI_IVRS_TYPE_MEMORY_ONE;
+
+            if ( *s == '-' )
+            {
+                s = parse_pci(s + 1, &seg, &bus, &dev, &func);
+                if ( !s || seg )
+                    return -EINVAL;
+
+                user_ivmds[nr_ivmd].aux_data = PCI_BDF(bus, dev, func);
+                if ( user_ivmds[nr_ivmd].aux_data <
+                     user_ivmds[nr_ivmd].header.device_id )
+                    return -EINVAL;
+                user_ivmds[nr_ivmd].header.type = ACPI_IVRS_TYPE_MEMORY_RANGE;
+            }
+        } while ( ++nr_ivmd, *s == ',' );
+    } while ( *s++ == ';' );
+
+    return s[-1] ? -EINVAL : 0;
+}
+custom_param("ivmd", parse_ivmd_param);

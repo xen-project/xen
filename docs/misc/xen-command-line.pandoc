@@ -836,12 +836,12 @@ Controls for the dom0 IOMMU setup.
 
     Typically, some devices in a system use bits of RAM for communication, and
     these areas should be listed as reserved in the E820 table and identified
-    via RMRR or IVMD entries in the APCI tables, so Xen can ensure that they
+    via RMRR or IVMD entries in the ACPI tables, so Xen can ensure that they
     are identity-mapped in the IOMMU.  However, some firmware makes mistakes,
     and this option is a coarse-grain workaround for those errors.
 
     Where possible, finer grain corrections should be made with the `rmrr=`,
-    `ivrs_hpet=` or `ivrs_ioapic=` command line options.
+    `ivmd=`, `ivrs_hpet[]=`, or `ivrs_ioapic[]=` command line options.
 
     This option is disabled by default, and deprecated and intended for
     removal in future versions of Xen.  If specifying `map-inclusive` is the
@@ -1523,6 +1523,31 @@ _dom0-iommu=map-inclusive_ - using both options in combination is undefined.**
 > `= <integer>`
 
 ### irq_vector_map (x86)
+
+### ivmd (x86)
+> `= <start>[-<end>][=<bdf1>[-<bdf1'>][,<bdf2>[-<bdf2'>][,...]]][;<start>...]`
+
+Define IVMD-like ranges that are missing from ACPI tables along with the
+device(s) they belong to, and use them for 1:1 mapping.  End addresses can be
+omitted when exactly one page is meant.  The ranges are inclusive when start
+and end are specified.  Note that only PCI segment 0 is supported at this time,
+but it is fine to specify it explicitly.
+
+'start' and 'end' values are page numbers (not full physical addresses),
+in hexadecimal format (can optionally be preceded by "0x").
+
+Omitting the optional (range of) BDF spcifiers signals that the range is to
+be applied to all devices.
+
+Usage example: If device 0:0:1d.0 requires one page (0xd5d45) to be
+reserved, and devices 0:0:1a.0...0:0:1a.3 collectively require three pages
+(0xd5d46 thru 0xd5d48) to be reserved, one usage would be:
+
+ivmd=d5d45=0:1d.0;0xd5d46-0xd5d48=0:1a.0-0:1a.3
+
+Note: grub2 requires to escape or quote special characters, like ';' when
+multiple ranges are specified - refer to the grub2 documentation.
+
 ### ivrs_hpet[`<hpet>`] (AMD)
 > `=[<seg>:]<bus>:<device>.<func>`
 
