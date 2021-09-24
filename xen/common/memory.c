@@ -268,7 +268,8 @@ static void populate_physmap(struct memop_args *a)
                 mfn = page_to_mfn(page);
             }
 
-            guest_physmap_add_page(d, _gfn(gpfn), mfn, a->extent_order);
+            if ( guest_physmap_add_page(d, _gfn(gpfn), mfn, a->extent_order) )
+                goto out;
 
             if ( !paging_mode_translate(d) &&
                  /* Inform the domain of the new page's machine address. */
@@ -765,8 +766,8 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
             }
 
             mfn = page_to_mfn(page);
-            guest_physmap_add_page(d, _gfn(gpfn), mfn,
-                                   exch.out.extent_order);
+            rc = guest_physmap_add_page(d, _gfn(gpfn), mfn,
+                                        exch.out.extent_order) ?: rc;
 
             if ( !paging_mode_translate(d) &&
                  __copy_mfn_to_guest_offset(exch.out.extent_start,

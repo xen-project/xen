@@ -310,10 +310,9 @@ int guest_physmap_add_entry(struct domain *d,
                             p2m_type_t t);
 
 /* Untyped version for RAM only, for compatibility */
-static inline int guest_physmap_add_page(struct domain *d,
-                                         gfn_t gfn,
-                                         mfn_t mfn,
-                                         unsigned int page_order)
+static inline int __must_check
+guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                       unsigned int page_order)
 {
     return guest_physmap_add_entry(d, gfn, mfn, page_order, p2m_ram_rw);
 }

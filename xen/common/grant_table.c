@@ -2394,7 +2394,7 @@ gnttab_transfer(
         {
             grant_entry_v1_t *sha = &shared_entry_v1(e->grant_table, gop.ref);
 
-            guest_physmap_add_page(e, _gfn(sha->frame), mfn, 0);
+            rc = guest_physmap_add_page(e, _gfn(sha->frame), mfn, 0);
             if ( !paging_mode_translate(e) )
                 sha->frame = mfn_x(mfn);
         }
@@ -2402,7 +2402,7 @@ gnttab_transfer(
         {
             grant_entry_v2_t *sha = &shared_entry_v2(e->grant_table, gop.ref);
 
-            guest_physmap_add_page(e, _gfn(sha->full_page.frame), mfn, 0);
+            rc = guest_physmap_add_page(e, _gfn(sha->full_page.frame), mfn, 0);
             if ( !paging_mode_translate(e) )
                 sha->full_page.frame = mfn_x(mfn);
         }
@@ -2415,7 +2415,7 @@ gnttab_transfer(
 
         rcu_unlock_domain(e);
 
-        gop.status = GNTST_okay;
+        gop.status = rc ? GNTST_general_error : GNTST_okay;
 
     copyback:
         if ( unlikely(__copy_field_to_guest(uop, &gop, status)) )

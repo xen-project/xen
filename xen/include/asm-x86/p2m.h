@@ -583,8 +583,8 @@ int guest_physmap_add_entry(struct domain *d, gfn_t gfn,
                             p2m_type_t t);
 
 /* Untyped version for RAM only, for compatibility and PV. */
-int guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
-                           unsigned int page_order);
+int __must_check guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                                        unsigned int page_order);
 
 /* Set a p2m range as populate-on-demand */
 int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
