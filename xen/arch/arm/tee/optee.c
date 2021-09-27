@@ -1692,7 +1692,7 @@ static bool optee_handle_call(struct cpu_user_regs *regs)
         return true;
 
     case OPTEE_SMC_DISABLE_SHM_CACHE:
-        arm_smccc_smc(OPTEE_SMC_ENABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
+        arm_smccc_smc(OPTEE_SMC_DISABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
                       OPTEE_CLIENT_ID(current->domain), &resp);
         set_user_reg(regs, 0, resp.a0);
         if ( resp.a0 == OPTEE_SMC_RETURN_OK ) {
