@@ -18,7 +18,7 @@
 #include <xen/mm.h>
 #include <xen/domain_page.h>
 #include <xen/guest_access.h>
-#include <asm/debugger.h>
+#include <asm/gdbsx.h>
 #include <asm/p2m.h>
 
 typedef unsigned long dbgva_t;
@@ -150,21 +150,18 @@ static unsigned int dbg_rw_guest_mem(struct domain *dp, unsigned long addr,
     return len;
 }
 
-/*
- * addr is guest addr
- * buf is debugger buffer.
- * if toaddr, then addr = buf (write to addr), else buf = addr (rd from guest)
- * pgd3: value of init_mm.pgd[3] in guest. see above.
- * Returns: number of bytes remaining to be copied.
- */
-unsigned int dbg_rw_mem(unsigned long gva, XEN_GUEST_HANDLE_PARAM(void) buf,
-                        unsigned int len, struct domain *d, bool toaddr,
-                        uint64_t pgd3)
+int gdbsx_guest_mem_io(struct domain *d, struct xen_domctl_gdbsx_memio *iop)
 {
     if ( d && !d->is_dying )
-        len = dbg_rw_guest_mem(d, gva, buf, len, toaddr, pgd3);
+    {
+        iop->remain = dbg_rw_guest_mem(
+            d, iop->gva, guest_handle_from_ptr(iop->uva, void),
+            iop->len, iop->gwr, iop->pgd3val);
+    }
+    else
+        iop->remain = iop->len;
 
-    return len;
+    return iop->remain ? -EFAULT : 0;
 }
 
 /*

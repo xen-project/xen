@@ -54,10 +54,4 @@ static inline bool debugger_trap_fatal(
 
 #endif
 
-#ifdef CONFIG_GDBSX
-unsigned int dbg_rw_mem(unsigned long gva, XEN_GUEST_HANDLE_PARAM(void) buf,
-                        unsigned int len, struct domain *d, bool toaddr,
-                        uint64_t pgd3);
-#endif
-
 #endif /* __X86_DEBUGGER_H__ */

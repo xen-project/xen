@@ -20,6 +20,8 @@
 #include <xen/console.h>
 #include <xen/iocap.h>
 #include <xen/paging.h>
+
+#include <asm/gdbsx.h>
 #include <asm/irq.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
@@ -33,19 +35,8 @@
 #include <public/vm_event.h>
 #include <asm/mem_sharing.h>
 #include <asm/xstate.h>
-#include <asm/debugger.h>
 #include <asm/psr.h>
 #include <asm/cpuid.h>
-
-#ifdef CONFIG_GDBSX
-static int gdbsx_guest_mem_io(struct domain *d, struct xen_domctl_gdbsx_memio *iop)
-{
-    iop->remain = dbg_rw_mem(iop->gva, guest_handle_from_ptr(iop->uva, void),
-                             iop->len, d, iop->gwr, iop->pgd3val);
-
-    return iop->remain ? -EFAULT : 0;
-}
-#endif
 
 static int update_domain_cpu_policy(struct domain *d,
                                     xen_domctl_cpu_policy_t *xdpc)
@@ -827,7 +818,6 @@ long arch_do_domctl(
 
 #ifdef CONFIG_GDBSX
     case XEN_DOMCTL_gdbsx_guestmemio:
-        domctl->u.gdbsx_guest_memio.remain = domctl->u.gdbsx_guest_memio.len;
         ret = gdbsx_guest_mem_io(d, &domctl->u.gdbsx_guest_memio);
         if ( !ret )
            copyback = true;
