@@ -2183,6 +2183,18 @@ void __init dt_unflatten_host_device_tree(void)
     dt_alias_scan();
 }
 
+int dt_get_pci_domain_nr(struct dt_device_node *node)
+{
+    u32 domain;
+    int error;
+
+    error = dt_property_read_u32(node, "linux,pci-domain", &domain);
+    if ( !error )
+        return -EINVAL;
+
+    return (u16)domain;
+}
+
 /*
  * Local variables:
  * mode: C

@@ -832,6 +832,23 @@ int dt_count_phandle_with_args(const struct dt_device_node *np,
                                const char *list_name,
                                const char *cells_name);
 
+/**
+ * dt_get_pci_domain_nr - Find the host bridge domain number
+ *            of the given device node.
+ * @node: Device tree node with the domain information.
+ *
+ * This function will try to obtain the host bridge domain number by finding
+ * a property called "linux,pci-domain" of the given device node.
+ *
+ * Return:
+ * * > 0    - On success, an associated domain number.
+ * * -EINVAL    - The property "linux,pci-domain" does not exist.
+ *
+ * Returns the associated domain number from DT in the range [0-0xffff], or
+ * a negative value if the required property is not found.
+ */
+int dt_get_pci_domain_nr(struct dt_device_node *node);
+
 #ifdef CONFIG_DEVICE_TREE_DEBUG
 #define dt_dprintk(fmt, args...)  \
     printk(XENLOG_DEBUG fmt, ## args)
