@@ -366,6 +366,32 @@ bool_t dt_property_read_u32(const struct dt_device_node *np,
 bool_t dt_property_read_u64(const struct dt_device_node *np,
                             const char *name, u64 *out_value);
 
+
+/**
+ * dt_property_read_variable_u32_array - Find and read an array of 32 bit
+ * integers from a property, with bounds on the minimum and maximum array size.
+ *
+ * @np:     device node from which the property value is to be read.
+ * @propname:   name of the property to be searched.
+ * @out_values: pointer to return found values.
+ * @sz_min: minimum number of array elements to read
+ * @sz_max: maximum number of array elements to read, if zero there is no
+ *      upper limit on the number of elements in the dts entry but only
+ *      sz_min will be read.
+ *
+ * Search for a property in a device node and read 32-bit value(s) from
+ * it.
+ *
+ * Return: The number of elements read on success, -EINVAL if the property
+ * does not exist, -ENODATA if property does not have a value, and -EOVERFLOW
+ * if the property data is smaller than sz_min or longer than sz_max.
+ *
+ * The out_values is modified only if a valid u32 value can be decoded.
+ */
+int dt_property_read_variable_u32_array(const struct dt_device_node *np,
+                                        const char *propname, u32 *out_values,
+                                        size_t sz_min, size_t sz_max);
+
 /**
  * dt_property_read_bool - Check if a property exists
  * @np: node to get the value

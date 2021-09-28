@@ -208,6 +208,67 @@ int dt_property_read_string(const struct dt_device_node *np,
     return 0;
 }
 
+/**
+ * dt_find_property_value_of_size
+ *
+ * @np:     device node from which the property value is to be read.
+ * @propname:   name of the property to be searched.
+ * @min:    minimum allowed length of property value
+ * @max:    maximum allowed length of property value (0 means unlimited)
+ * @len:    if !=NULL, actual length is written to here
+ *
+ * Search for a property in a device node and valid the requested size.
+ *
+ * Return: The property value on success, -EINVAL if the property does not
+ * exist, -ENODATA if property does not have a value, and -EOVERFLOW if the
+ * property data is too small or too large.
+ */
+static void *dt_find_property_value_of_size(const struct dt_device_node *np,
+                                            const char *propname, u32 min,
+                                            u32 max, size_t *len)
+{
+    const struct dt_property *prop = dt_find_property(np, propname, NULL);
+
+    if ( !prop )
+        return ERR_PTR(-EINVAL);
+    if ( !prop->value )
+        return ERR_PTR(-ENODATA);
+    if ( prop->length < min )
+        return ERR_PTR(-EOVERFLOW);
+    if ( max && prop->length > max )
+        return ERR_PTR(-EOVERFLOW);
+
+    if ( len )
+        *len = prop->length;
+
+    return prop->value;
+}
+
+int dt_property_read_variable_u32_array(const struct dt_device_node *np,
+                                        const char *propname, u32 *out_values,
+                                        size_t sz_min, size_t sz_max)
+{
+    size_t sz, count;
+    const __be32 *val = dt_find_property_value_of_size(np, propname,
+                        (sz_min * sizeof(*out_values)),
+                        (sz_max * sizeof(*out_values)),
+                        &sz);
+
+    if ( IS_ERR(val) )
+        return PTR_ERR(val);
+
+    if ( !sz_max )
+        sz = sz_min;
+    else
+        sz /= sizeof(*out_values);
+
+    count = sz;
+    while ( count-- )
+        *out_values++ = be32_to_cpup(val++);
+
+    return sz;
+}
+
 int dt_property_match_string(const struct dt_device_node *np,
                              const char *propname, const char *string)
 {
