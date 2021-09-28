@@ -946,9 +946,6 @@ void do_trap(struct cpu_user_regs *regs)
     if ( regs->error_code & X86_XEC_EXT )
         goto hardware_trap;
 
-    if ( debugger_trap_entry(trapnr, regs) )
-        return;
-
     ASSERT(trapnr < 32);
 
     if ( guest_mode(regs) )
@@ -1177,9 +1174,6 @@ void do_invalid_op(struct cpu_user_regs *regs)
     int id = -1, lineno;
     const struct virtual_region *region;
 
-    if ( debugger_trap_entry(TRAP_invalid_op, regs) )
-        return;
-
     if ( likely(guest_mode(regs)) )
     {
         if ( pv_emulate_invalid_op(regs) )
@@ -1284,8 +1278,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
 
 void do_int3(struct cpu_user_regs *regs)
 {
-    if ( debugger_trap_entry(TRAP_int3, regs) )
-        return;
+    struct vcpu *curr = current;
 
     if ( !guest_mode(regs) )
     {
@@ -1296,6 +1289,13 @@ void do_int3(struct cpu_user_regs *regs)
             printk(XENLOG_DEBUG "Hit embedded breakpoint at %p [%ps]\n",
                    _p(regs->rip), _p(regs->rip));
 
+        return;
+    }
+
+    if ( guest_kernel_mode(curr, regs) && curr->domain->debugger_attached )
+    {
+        curr->arch.gdbsx_vcpu_event = TRAP_int3;
+        domain_pause_for_debugger();
         return;
     }
 
@@ -1575,9 +1575,6 @@ void do_page_fault(struct cpu_user_regs *regs)
     /* fixup_page_fault() might change regs->error_code, so cache it here. */
     error_code = regs->error_code;
 
-    if ( debugger_trap_entry(TRAP_page_fault, regs) )
-        return;
-
     perfc_incr(page_faults);
 
     /* Any shadow stack access fault is a bug in Xen. */
@@ -1675,9 +1672,6 @@ void do_general_protection(struct cpu_user_regs *regs)
 #ifdef CONFIG_PV
     struct vcpu *v = current;
 #endif
-
-    if ( debugger_trap_entry(TRAP_gp_fault, regs) )
-        return;
 
     if ( regs->error_code & X86_XEC_EXT )
         goto hardware_gp;
@@ -1971,9 +1965,6 @@ void do_debug(struct cpu_user_regs *regs)
     /* Stash dr6 as early as possible. */
     dr6 = read_debugreg(6);
 
-    if ( debugger_trap_entry(TRAP_debug, regs) )
-        return;
-
     /*
      * At the time of writing (March 2018), on the subject of %dr6:
      *
@@ -2082,6 +2073,12 @@ void do_debug(struct cpu_user_regs *regs)
     v->arch.dr6 |= (dr6 & ~X86_DR6_DEFAULT);
     v->arch.dr6 &= (dr6 | ~X86_DR6_DEFAULT);
 
+    if ( guest_kernel_mode(v, regs) && v->domain->debugger_attached )
+    {
+        domain_pause_for_debugger();
+        return;
+    }
+
     pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 }
 
@@ -2096,9 +2093,6 @@ void do_entry_CP(struct cpu_user_regs *regs)
     };
     const char *err = "??";
     unsigned int ec = regs->error_code;
-
-    if ( debugger_trap_entry(X86_EXC_CP, regs) )
-        return;
 
     /* Decode ec if possible */
     if ( ec < ARRAY_SIZE(errors) && errors[ec][0] )
