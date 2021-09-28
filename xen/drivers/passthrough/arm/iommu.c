@@ -135,3 +135,12 @@ void arch_iommu_domain_destroy(struct domain *d)
 void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 {
 }
+
+/*
+ * Unlike x86, Arm doesn't support mem-sharing, mem-paging and log-dirty (yet).
+ * So there is no restriction to use the IOMMU.
+ */
+bool arch_iommu_use_permitted(const struct domain *d)
+{
+    return true;
+}

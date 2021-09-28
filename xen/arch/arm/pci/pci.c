@@ -12,21 +12,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __ARM_PCI_H__
-#define __ARM_PCI_H__
+#include <xen/pci.h>
 
-#ifdef CONFIG_HAS_PCI
+/*
+ * PIRQ event channels are not supported on Arm, so nothing to do.
+ */
+int arch_pci_clean_pirqs(struct domain *d)
+{
+    return 0;
+}
 
-#define pci_to_dev(pcidev) (&(pcidev)->arch.dev)
-
-/* Arch pci dev struct */
-struct arch_pci_dev {
-    struct device dev;
-};
-
-#else   /*!CONFIG_HAS_PCI*/
-
-struct arch_pci_dev { };
-
-#endif  /*!CONFIG_HAS_PCI*/
-#endif /* __ARM_PCI_H__ */
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
