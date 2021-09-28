@@ -1,3 +1,7 @@
 
 config HAS_PCI
 	bool
+
+config HAS_PCI_MSI
+	bool
+	depends on HAS_PCI

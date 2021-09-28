@@ -32,8 +32,8 @@
 #include <xen/softirq.h>
 #include <xen/tasklet.h>
 #include <xen/vpci.h>
+#include <xen/msi.h>
 #include <xsm/xsm.h>
-#include <asm/msi.h>
 #include "ats.h"
 
 struct pci_seg {
@@ -314,6 +314,7 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
     unsigned int pos;
+    int rc;
 
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
@@ -327,35 +328,12 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     *((u8*) &pdev->bus) = bus;
     *((u8*) &pdev->devfn) = devfn;
     pdev->domain = NULL;
-    INIT_LIST_HEAD(&pdev->msi_list);
 
-    pos = pci_find_cap_offset(pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                              PCI_CAP_ID_MSI);
-    if ( pos )
+    rc = pdev_msi_init(pdev);
+    if ( rc )
     {
-        uint16_t ctrl = pci_conf_read16(pdev->sbdf, msi_control_reg(pos));
-
-        pdev->msi_maxvec = multi_msi_capable(ctrl);
-    }
-
-    pos = pci_find_cap_offset(pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                              PCI_CAP_ID_MSIX);
-    if ( pos )
-    {
-        struct arch_msix *msix = xzalloc(struct arch_msix);
-        uint16_t ctrl;
-
-        if ( !msix )
-        {
-            xfree(pdev);
-            return NULL;
-        }
-        spin_lock_init(&msix->table_lock);
-
-        ctrl = pci_conf_read16(pdev->sbdf, msix_control_reg(pos));
-        msix->nr_entries = msix_table_size(ctrl);
-
-        pdev->msix = msix;
+        xfree(pdev);
+        return NULL;
     }
 
     list_add(&pdev->alldevs_list, &pseg->alldevs_list);
@@ -448,7 +426,7 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
     }
 
     list_del(&pdev->alldevs_list);
-    xfree(pdev->msix);
+    pdev_msi_deinit(pdev);
     xfree(pdev);
 }
 
@@ -1270,18 +1248,16 @@ bool_t pcie_aer_get_firmware_first(const struct pci_dev *pdev)
 static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
 {
     struct pci_dev *pdev;
-    struct msi_desc *msi;
 
     printk("==== segment %04x ====\n", pseg->nr);
 
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
     {
-        printk("%pp - %pd - node %-3d - MSIs < ",
+        printk("%pp - %pd - node %-3d",
                &pdev->sbdf, pdev->domain,
                (pdev->node != NUMA_NO_NODE) ? pdev->node : -1);
-        list_for_each_entry ( msi, &pdev->msi_list, list )
-               printk("%d ", msi->irq);
-        printk(">\n");
+        pdev_dump_msi(pdev);
+        printk("\n");
     }
 
     return 0;
@@ -1421,13 +1397,9 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     ASSERT(pdev && (pdev->domain == hardware_domain ||
                     pdev->domain == dom_io));
 
-    if ( pdev->msix )
-    {
-        rc = pci_reset_msix_state(pdev);
-        if ( rc )
-            goto done;
-        msixtbl_init(d);
-    }
+    rc = pdev_msix_assign(d, pdev);
+    if ( rc )
+        goto done;
 
     pdev->fault.count = 0;
 

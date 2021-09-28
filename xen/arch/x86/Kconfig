@@ -20,6 +20,7 @@ config X86
 	select HAS_NS16550
 	select HAS_PASSTHROUGH
 	select HAS_PCI
+	select HAS_PCI_MSI
 	select HAS_PDX
 	select HAS_SCHED_GRANULARITY
 	select HAS_UBSAN
