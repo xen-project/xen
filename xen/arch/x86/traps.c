@@ -632,6 +632,12 @@ void vcpu_show_execution_state(struct vcpu *v)
 {
     unsigned long flags;
 
+    if ( test_bit(_VPF_down, &v->pause_flags) )
+    {
+        printk("*** %pv is offline ***\n", v);
+        return;
+    }
+
     printk("*** Dumping Dom%d vcpu#%d state: ***\n",
            v->domain->domain_id, v->vcpu_id);
 
@@ -643,6 +649,21 @@ void vcpu_show_execution_state(struct vcpu *v)
 
     vcpu_pause(v); /* acceptably dangerous */
 
+#ifdef CONFIG_HVM
+    /*
+     * For VMX special care is needed: Reading some of the register state will
+     * require VMCS accesses. Engaging foreign VMCSes involves acquiring of a
+     * lock, which check_lock() would object to when done from an IRQs-disabled
+     * region. Despite this being a layering violation, engage the VMCS right
+     * here. This then also avoids doing so several times in close succession.
+     */
+    if ( cpu_has_vmx && is_hvm_vcpu(v) )
+    {
+        ASSERT(!in_irq());
+        vmx_vmcs_enter(v);
+    }
+#endif
+
     /* Prevent interleaving of output. */
     flags = console_lock_recursive_irqsave();
 
@@ -651,6 +672,11 @@ void vcpu_show_execution_state(struct vcpu *v)
         show_guest_stack(v, &v->arch.user_regs);
 
     console_unlock_recursive_irqrestore(flags);
+
+#ifdef CONFIG_HVM
+    if ( cpu_has_vmx && is_hvm_vcpu(v) )
+        vmx_vmcs_exit(v);
+#endif
 
     vcpu_unpause(v);
 }

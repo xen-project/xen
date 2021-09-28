@@ -49,6 +49,39 @@ static void read_registers(struct cpu_user_regs *regs, unsigned long crs[8])
     crs[7] = read_gs_shadow();
 }
 
+static void get_hvm_registers(struct vcpu *v, struct cpu_user_regs *regs,
+                              unsigned long crs[8])
+{
+    struct segment_register sreg;
+
+    crs[0] = v->arch.hvm.guest_cr[0];
+    crs[2] = v->arch.hvm.guest_cr[2];
+    crs[3] = v->arch.hvm.guest_cr[3];
+    crs[4] = v->arch.hvm.guest_cr[4];
+
+    hvm_get_segment_register(v, x86_seg_cs, &sreg);
+    regs->cs = sreg.sel;
+
+    hvm_get_segment_register(v, x86_seg_ds, &sreg);
+    regs->ds = sreg.sel;
+
+    hvm_get_segment_register(v, x86_seg_es, &sreg);
+    regs->es = sreg.sel;
+
+    hvm_get_segment_register(v, x86_seg_fs, &sreg);
+    regs->fs = sreg.sel;
+    crs[5] = sreg.base;
+
+    hvm_get_segment_register(v, x86_seg_gs, &sreg);
+    regs->gs = sreg.sel;
+    crs[6] = sreg.base;
+
+    hvm_get_segment_register(v, x86_seg_ss, &sreg);
+    regs->ss = sreg.sel;
+
+    crs[7] = hvm_get_shadow_gs_base(v);
+}
+
 static void _show_registers(
     const struct cpu_user_regs *regs, unsigned long crs[8],
     enum context context, const struct vcpu *v)
@@ -99,27 +132,8 @@ void show_registers(const struct cpu_user_regs *regs)
 
     if ( guest_mode(regs) && is_hvm_vcpu(v) )
     {
-        struct segment_register sreg;
+        get_hvm_registers(v, &fault_regs, fault_crs);
         context = CTXT_hvm_guest;
-        fault_crs[0] = v->arch.hvm.guest_cr[0];
-        fault_crs[2] = v->arch.hvm.guest_cr[2];
-        fault_crs[3] = v->arch.hvm.guest_cr[3];
-        fault_crs[4] = v->arch.hvm.guest_cr[4];
-        hvm_get_segment_register(v, x86_seg_cs, &sreg);
-        fault_regs.cs = sreg.sel;
-        hvm_get_segment_register(v, x86_seg_ds, &sreg);
-        fault_regs.ds = sreg.sel;
-        hvm_get_segment_register(v, x86_seg_es, &sreg);
-        fault_regs.es = sreg.sel;
-        hvm_get_segment_register(v, x86_seg_fs, &sreg);
-        fault_regs.fs = sreg.sel;
-        fault_crs[5] = sreg.base;
-        hvm_get_segment_register(v, x86_seg_gs, &sreg);
-        fault_regs.gs = sreg.sel;
-        fault_crs[6] = sreg.base;
-        hvm_get_segment_register(v, x86_seg_ss, &sreg);
-        fault_regs.ss = sreg.sel;
-        fault_crs[7] = hvm_get_shadow_gs_base(v);
     }
     else
     {
@@ -159,24 +173,35 @@ void show_registers(const struct cpu_user_regs *regs)
 void vcpu_show_registers(const struct vcpu *v)
 {
     const struct cpu_user_regs *regs = &v->arch.user_regs;
-    bool kernel = guest_kernel_mode(v, regs);
+    struct cpu_user_regs aux_regs;
+    enum context context;
     unsigned long crs[8];
 
-    /* Only handle PV guests for now */
-    if ( !is_pv_vcpu(v) )
-        return;
+    if ( is_hvm_vcpu(v) )
+    {
+        aux_regs = *regs;
+        get_hvm_registers(v->domain->vcpu[v->vcpu_id], &aux_regs, crs);
+        regs = &aux_regs;
+        context = CTXT_hvm_guest;
+    }
+    else
+    {
+        bool kernel = guest_kernel_mode(v, regs);
 
-    crs[0] = v->arch.pv.ctrlreg[0];
-    crs[2] = arch_get_cr2(v);
-    crs[3] = pagetable_get_paddr(kernel ?
-                                 v->arch.guest_table :
-                                 v->arch.guest_table_user);
-    crs[4] = v->arch.pv.ctrlreg[4];
-    crs[5] = v->arch.pv.fs_base;
-    crs[6 + !kernel] = v->arch.pv.gs_base_kernel;
-    crs[7 - !kernel] = v->arch.pv.gs_base_user;
+        crs[0] = v->arch.pv.ctrlreg[0];
+        crs[2] = arch_get_cr2(v);
+        crs[3] = pagetable_get_paddr(kernel ?
+                                     v->arch.guest_table :
+                                     v->arch.guest_table_user);
+        crs[4] = v->arch.pv.ctrlreg[4];
+        crs[5] = v->arch.pv.fs_base;
+        crs[6 + !kernel] = v->arch.pv.gs_base_kernel;
+        crs[7 - !kernel] = v->arch.pv.gs_base_user;
 
-    _show_registers(regs, crs, CTXT_pv_guest, v);
+        context = CTXT_pv_guest;
+    }
+
+    _show_registers(regs, crs, context, v);
 }
 
 void show_page_walk(unsigned long addr)
