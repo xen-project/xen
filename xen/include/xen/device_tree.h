@@ -393,6 +393,36 @@ int dt_property_read_variable_u32_array(const struct dt_device_node *np,
                                         size_t sz_min, size_t sz_max);
 
 /**
+ * dt_property_read_u32_array - Find and read an array of 32 bit integers
+ * from a property.
+ *
+ * @np:     device node from which the property value is to be read.
+ * @propname:   name of the property to be searched.
+ * @out_values: pointer to return value, modified only if return value is 0.
+ * @sz:     number of array elements to read
+ *
+ * Search for a property in a device node and read 32-bit value(s) from
+ * it.
+ *
+ * Return: 0 on success, -EINVAL if the property does not exist,
+ * -ENODATA if property does not have a value, and -EOVERFLOW if the
+ * property data isn't large enough.
+ *
+ * The out_values is modified only if a valid u32 value can be decoded.
+ */
+static inline int dt_property_read_u32_array(const struct dt_device_node *np,
+                                             const char *propname,
+                                             u32 *out_values, size_t sz)
+{
+    int ret = dt_property_read_variable_u32_array(np, propname, out_values,
+                              sz, 0);
+    if ( ret >= 0 )
+        return 0;
+    else
+        return ret;
+}
+
+/**
  * dt_property_read_bool - Check if a property exists
  * @np: node to get the value
  * @name: name of the property
