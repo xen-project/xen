@@ -17,6 +17,8 @@ export XEN_BUILD_HOST	?= $(shell hostname)
 PYTHON_INTERPRETER	:= $(word 1,$(shell which python3 python python2 2>/dev/null) python)
 export PYTHON		?= $(PYTHON_INTERPRETER)
 
+export CHECKPOLICY	?= checkpolicy
+
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
 
@@ -178,6 +180,8 @@ CFLAGS += $(CLANG_FLAGS)
 export CLANG_FLAGS
 endif
 
+export XEN_HAS_CHECKPOLICY := $(call success,$(CHECKPOLICY) -h 2>&1 | grep -q xen)
+
 export root-make-done := y
 endif # root-make-done
 
@@ -189,14 +193,24 @@ ifeq ($(config-build),y)
 # *config targets only - make sure prerequisites are updated, and descend
 # in tools/kconfig to make the *config target
 
+# Create a file for KCONFIG_ALLCONFIG which depends on the environment.
+# This will be use by kconfig targets allyesconfig/allmodconfig/allnoconfig/randconfig
+filechk_kconfig_allconfig = \
+    $(if $(findstring n,$(XEN_HAS_CHECKPOLICY)), echo 'CONFIG_XSM_FLASK_POLICY=n';) \
+    $(if $(KCONFIG_ALLCONFIG), cat $(KCONFIG_ALLCONFIG);) \
+    :
+
+.allconfig.tmp: FORCE
+	set -e; { $(call filechk_kconfig_allconfig); } > $@
+
 config: FORCE
 	$(MAKE) $(kconfig) $@
 
 # Config.mk tries to include .config file, don't try to remake it
 %/.config: ;
 
-%config: FORCE
-	$(MAKE) $(kconfig) $@
+%config: .allconfig.tmp FORCE
+	$(MAKE) $(kconfig) KCONFIG_ALLCONFIG=$< $@
 
 else # !config-build
 
@@ -368,7 +382,7 @@ _clean: delete-unfresh-files
 		-o -name "*.gcno" -o -name ".*.cmd" -o -name "lib.a" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map *~ core
 	rm -f asm-offsets.s include/asm-*/asm-offsets.h
-	rm -f .banner
+	rm -f .banner .allconfig.tmp
 
 .PHONY: _distclean
 _distclean: clean
