@@ -2526,7 +2526,8 @@ int hvm_set_cr4(unsigned long value, bool may_defer)
     return X86EMUL_OKAY;
 }
 
-bool_t hvm_virtual_to_linear_addr(
+bool hvm_vcpu_virtual_to_linear(
+    struct vcpu *v,
     enum x86_segment seg,
     const struct segment_register *reg,
     unsigned long offset,
@@ -2535,9 +2536,12 @@ bool_t hvm_virtual_to_linear_addr(
     const struct segment_register *active_cs,
     unsigned long *linear_addr)
 {
-    const struct vcpu *curr = current;
     unsigned long addr = offset, last_byte;
-    bool_t okay = 0;
+    const struct cpu_user_regs *regs = v == current ? guest_cpu_user_regs()
+                                                    : &v->arch.user_regs;
+    bool okay = false;
+
+    ASSERT(v == current || !vcpu_runnable(v));
 
     /*
      * These checks are for a memory access through an active segment.
@@ -2547,7 +2551,7 @@ bool_t hvm_virtual_to_linear_addr(
      */
     ASSERT(seg < x86_seg_none);
 
-    if ( !(curr->arch.hvm.guest_cr[0] & X86_CR0_PE) )
+    if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_PE) )
     {
         /*
          * REAL MODE: Don't bother with segment access checks.
@@ -2555,7 +2559,7 @@ bool_t hvm_virtual_to_linear_addr(
          */
         addr = (uint32_t)(addr + reg->base);
     }
-    else if ( (guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) &&
+    else if ( (regs->eflags & X86_EFLAGS_VM) &&
               is_x86_user_segment(seg) )
     {
         /* VM86 MODE: Fixed 64k limits on all user segments. */
@@ -2564,7 +2568,7 @@ bool_t hvm_virtual_to_linear_addr(
         if ( max(offset, last_byte) >> 16 )
             goto out;
     }
-    else if ( hvm_long_mode_active(curr) &&
+    else if ( hvm_long_mode_active(v) &&
               (is_x86_system_segment(seg) || active_cs->l) )
     {
         /*
@@ -2636,12 +2640,12 @@ bool_t hvm_virtual_to_linear_addr(
         else if ( last_byte > reg->limit )
             goto out; /* last byte is beyond limit */
         else if ( last_byte < offset &&
-                  curr->domain->arch.cpuid->x86_vendor == X86_VENDOR_AMD )
+                  v->domain->arch.cpuid->x86_vendor == X86_VENDOR_AMD )
             goto out; /* access wraps */
     }
 
     /* All checks ok. */
-    okay = 1;
+    okay = true;
 
  out:
     /*

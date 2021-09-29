@@ -314,7 +314,9 @@ enum hvm_access_type {
     hvm_access_read,
     hvm_access_write
 };
-bool_t hvm_virtual_to_linear_addr(
+
+bool hvm_vcpu_virtual_to_linear(
+    struct vcpu *v,
     enum x86_segment seg,
     const struct segment_register *reg,
     unsigned long offset,
@@ -322,6 +324,19 @@ bool_t hvm_virtual_to_linear_addr(
     enum hvm_access_type access_type,
     const struct segment_register *active_cs,
     unsigned long *linear_addr);
+
+static inline bool hvm_virtual_to_linear_addr(
+    enum x86_segment seg,
+    const struct segment_register *reg,
+    unsigned long offset,
+    unsigned int bytes,
+    enum hvm_access_type access_type,
+    const struct segment_register *active_cs,
+    unsigned long *linear)
+{
+    return hvm_vcpu_virtual_to_linear(current, seg, reg, offset, bytes,
+                                      access_type, active_cs, linear);
+}
 
 void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
                              bool_t *writable);
