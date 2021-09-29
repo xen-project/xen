@@ -365,6 +365,71 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     printk("\n");
 }
 
+static void show_hvm_stack(struct vcpu *v, const struct cpu_user_regs *regs)
+{
+#ifdef CONFIG_HVM
+    unsigned long sp = regs->rsp, addr;
+    unsigned int i, bytes, words_per_line, pfec = PFEC_page_present;
+    struct segment_register ss, cs;
+
+    hvm_get_segment_register(v, x86_seg_ss, &ss);
+    hvm_get_segment_register(v, x86_seg_cs, &cs);
+
+    if ( hvm_long_mode_active(v) && cs.l )
+        i = 16, bytes = 8;
+    else
+    {
+        sp = ss.db ? (uint32_t)sp : (uint16_t)sp;
+        i = ss.db ? 8 : 4;
+        bytes = cs.db ? 4 : 2;
+    }
+
+    if ( bytes == 8 || (ss.db && !ss.base) )
+        printk("Guest stack trace from sp=%0*lx:", i, sp);
+    else
+        printk("Guest stack trace from ss:sp=%04x:%0*lx:", ss.sel, i, sp);
+
+    if ( !hvm_vcpu_virtual_to_linear(v, x86_seg_ss, &ss, sp, bytes,
+                                     hvm_access_read, &cs, &addr) )
+    {
+        printk(" Guest-inaccessible memory\n");
+        return;
+    }
+
+    if ( ss.dpl == 3 )
+        pfec |= PFEC_user_mode;
+
+    words_per_line = stack_words_per_line * (sizeof(void *) / bytes);
+    for ( i = 0; i < debug_stack_lines * words_per_line; )
+    {
+        unsigned long val = 0;
+
+        if ( (addr ^ (addr + bytes - 1)) & PAGE_SIZE )
+            break;
+
+        if ( !(i++ % words_per_line) )
+            printk("\n  ");
+
+        if ( hvm_copy_from_vcpu_linear(&val, addr, bytes, v,
+                                       pfec) != HVMTRANS_okay )
+        {
+            printk(" Fault while accessing guest memory.");
+            break;
+        }
+
+        printk(" %0*lx", 2 * bytes, val);
+
+        addr += bytes;
+        if ( !(addr & (PAGE_SIZE - 1)) )
+            break;
+    }
+
+    if ( !i )
+        printk(" Stack empty.");
+    printk("\n");
+#endif
+}
+
 /*
  * Notes for get_{stack,shstk}*_bottom() helpers
  *
@@ -630,7 +695,7 @@ void show_execution_state(const struct cpu_user_regs *regs)
 
 void vcpu_show_execution_state(struct vcpu *v)
 {
-    unsigned long flags;
+    unsigned long flags = 0;
 
     if ( test_bit(_VPF_down, &v->pause_flags) )
     {
@@ -668,10 +733,24 @@ void vcpu_show_execution_state(struct vcpu *v)
     flags = console_lock_recursive_irqsave();
 
     vcpu_show_registers(v);
-    if ( guest_kernel_mode(v, &v->arch.user_regs) )
-        show_guest_stack(v, &v->arch.user_regs);
 
-    console_unlock_recursive_irqrestore(flags);
+    if ( is_hvm_vcpu(v) )
+    {
+        /*
+         * Stop interleaving prevention: The necessary P2M lookups involve
+         * locking, which has to occur with IRQs enabled.
+         */
+        console_unlock_recursive_irqrestore(flags);
+
+        show_hvm_stack(v, &v->arch.user_regs);
+    }
+    else
+    {
+        if ( guest_kernel_mode(v, &v->arch.user_regs) )
+            show_guest_stack(v, &v->arch.user_regs);
+
+        console_unlock_recursive_irqrestore(flags);
+    }
 
 #ifdef CONFIG_HVM
     if ( cpu_has_vmx && is_hvm_vcpu(v) )

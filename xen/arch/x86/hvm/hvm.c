@@ -3410,6 +3410,15 @@ enum hvm_translation_result hvm_copy_from_guest_linear(
                       PFEC_page_present | pfec, pfinfo);
 }
 
+enum hvm_translation_result hvm_copy_from_vcpu_linear(
+    void *buf, unsigned long addr, unsigned int size, struct vcpu *v,
+    unsigned int pfec)
+{
+    return __hvm_copy(buf, addr, size, v,
+                      HVMCOPY_from_guest | HVMCOPY_linear,
+                      PFEC_page_present | pfec, NULL);
+}
+
 unsigned int copy_to_user_hvm(void *to, const void *from, unsigned int len)
 {
     int rc;
