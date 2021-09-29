@@ -34,6 +34,10 @@
 static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
+/* If true, the extended regions support is enabled for dom0 */
+static bool __initdata opt_ext_regions = true;
+boolean_param("ext_regions", opt_ext_regions);
+
 static u64 __initdata dom0_mem;
 static bool __initdata dom0_mem_set;
 
@@ -886,6 +890,232 @@ static int __init make_memory_node(const struct domain *d,
     return res;
 }
 
+static int __init add_ext_regions(unsigned long s, unsigned long e, void *data)
+{
+    struct meminfo *ext_regions = data;
+    paddr_t start, size;
+
+    if ( ext_regions->nr_banks >= ARRAY_SIZE(ext_regions->bank) )
+        return 0;
+
+    /* Both start and size of the extended region should be 2MB aligned */
+    start = (s + SZ_2M - 1) & ~(SZ_2M - 1);
+    if ( start > e )
+        return 0;
+
+    /*
+     * e is actually "end-1" because it is called by rangeset functions
+     * which are inclusive of the last address.
+     */
+    e += 1;
+    size = (e - start) & ~(SZ_2M - 1);
+    if ( size < MB(64) )
+        return 0;
+
+    ext_regions->bank[ext_regions->nr_banks].start = start;
+    ext_regions->bank[ext_regions->nr_banks].size = size;
+    ext_regions->nr_banks++;
+
+    return 0;
+}
+
+static int __init find_unallocated_memory(const struct kernel_info *kinfo,
+                                          struct meminfo *ext_regions)
+{
+    const struct meminfo *assign_mem = &kinfo->mem;
+    struct rangeset *unalloc_mem;
+    paddr_t start, end;
+    unsigned int i;
+    int res;
+
+    dt_dprintk("Find unallocated memory for extended regions\n");
+
+    unalloc_mem = rangeset_new(NULL, NULL, 0);
+    if ( !unalloc_mem )
+        return -ENOMEM;
+
+    /* Start with all available RAM */
+    for ( i = 0; i < bootinfo.mem.nr_banks; i++ )
+    {
+        start = bootinfo.mem.bank[i].start;
+        end = bootinfo.mem.bank[i].start + bootinfo.mem.bank[i].size;
+        res = rangeset_add_range(unalloc_mem, start, end - 1);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Failed to add: %#"PRIx64"->%#"PRIx64"\n",
+                   start, end);
+            goto out;
+        }
+    }
+
+    /* Remove RAM assigned to Dom0 */
+    for ( i = 0; i < assign_mem->nr_banks; i++ )
+    {
+        start = assign_mem->bank[i].start;
+        end = assign_mem->bank[i].start + assign_mem->bank[i].size;
+        res = rangeset_remove_range(unalloc_mem, start, end - 1);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+                   start, end);
+            goto out;
+        }
+    }
+
+    /* Remove reserved-memory regions */
+    for ( i = 0; i < bootinfo.reserved_mem.nr_banks; i++ )
+    {
+        start = bootinfo.reserved_mem.bank[i].start;
+        end = bootinfo.reserved_mem.bank[i].start +
+            bootinfo.reserved_mem.bank[i].size;
+        res = rangeset_remove_range(unalloc_mem, start, end - 1);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+                   start, end);
+            goto out;
+        }
+    }
+
+    /* Remove grant table region */
+    start = kinfo->gnttab_start;
+    end = kinfo->gnttab_start + kinfo->gnttab_size;
+    res = rangeset_remove_range(unalloc_mem, start, end - 1);
+    if ( res )
+    {
+        printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+               start, end);
+        goto out;
+    }
+
+    start = 0;
+    end = (1ULL << p2m_ipa_bits) - 1;
+    res = rangeset_report_ranges(unalloc_mem, start, end,
+                                 add_ext_regions, ext_regions);
+    if ( res )
+        ext_regions->nr_banks = 0;
+    else if ( !ext_regions->nr_banks )
+        res = -ENOENT;
+
+out:
+    rangeset_destroy(unalloc_mem);
+
+    return res;
+}
+
+static int __init find_memory_holes(const struct kernel_info *kinfo,
+                                    struct meminfo *ext_regions)
+{
+    struct dt_device_node *np;
+    struct rangeset *mem_holes;
+    paddr_t start, end;
+    unsigned int i;
+    int res;
+
+    dt_dprintk("Find memory holes for extended regions\n");
+
+    mem_holes = rangeset_new(NULL, NULL, 0);
+    if ( !mem_holes )
+        return -ENOMEM;
+
+    /* Start with maximum possible addressable physical memory range */
+    start = 0;
+    end = (1ULL << p2m_ipa_bits) - 1;
+    res = rangeset_add_range(mem_holes, start, end);
+    if ( res )
+    {
+        printk(XENLOG_ERR "Failed to add: %#"PRIx64"->%#"PRIx64"\n",
+               start, end);
+        goto out;
+    }
+
+    /*
+     * Remove regions described by "reg" and "ranges" properties where
+     * the memory is addressable (MMIO, RAM, PCI BAR, etc).
+     */
+    dt_for_each_device_node( dt_host, np )
+    {
+        unsigned int naddr;
+        u64 addr, size;
+
+        naddr = dt_number_of_address(np);
+
+        for ( i = 0; i < naddr; i++ )
+        {
+            res = dt_device_get_address(np, i, &addr, &size);
+            if ( res )
+            {
+                printk(XENLOG_ERR "Unable to retrieve address %u for %s\n",
+                       i, dt_node_full_name(np));
+                goto out;
+            }
+
+            start = addr & PAGE_MASK;
+            end = PAGE_ALIGN(addr + size);
+            res = rangeset_remove_range(mem_holes, start, end - 1);
+            if ( res )
+            {
+                printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+                       start, end);
+                goto out;
+            }
+        }
+
+        if ( dt_device_type_is_equal(np, "pci" ) )
+        {
+            unsigned int range_size, nr_ranges;
+            int na, ns, pna;
+            const __be32 *ranges;
+            u32 len;
+
+            /*
+             * Looking for non-empty ranges property which in this context
+             * describes the PCI host bridge aperture.
+             */
+            ranges = dt_get_property(np, "ranges", &len);
+            if ( !ranges || !len )
+                continue;
+
+            pna = dt_n_addr_cells(np);
+            na = dt_child_n_addr_cells(np);
+            ns = dt_child_n_size_cells(np);
+            range_size = pna + na + ns;
+            nr_ranges = len / sizeof(__be32) / range_size;
+
+            for ( i = 0; i < nr_ranges; i++, ranges += range_size )
+            {
+                /* Skip the child address and get the parent (CPU) address */
+                addr = dt_read_number(ranges + na, pna);
+                size = dt_read_number(ranges + na + pna, ns);
+
+                start = addr & PAGE_MASK;
+                end = PAGE_ALIGN(addr + size);
+                res = rangeset_remove_range(mem_holes, start, end - 1);
+                if ( res )
+                {
+                    printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+                           start, end);
+                    goto out;
+                }
+            }
+        }
+    }
+
+    start = 0;
+    end = (1ULL << p2m_ipa_bits) - 1;
+    res = rangeset_report_ranges(mem_holes, start, end,
+                                 add_ext_regions,  ext_regions);
+    if ( res )
+        ext_regions->nr_banks = 0;
+    else if ( !ext_regions->nr_banks )
+        res = -ENOENT;
+
+out:
+    rangeset_destroy(mem_holes);
+
+    return res;
+}
+
 static int __init make_hypervisor_node(struct domain *d,
                                        const struct kernel_info *kinfo,
                                        int addrcells, int sizecells)
@@ -893,11 +1123,12 @@ static int __init make_hypervisor_node(struct domain *d,
     const char compat[] =
         "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
         "xen,xen";
-    __be32 reg[4];
+    __be32 *reg, *cells;
     gic_interrupt_t intr;
-    __be32 *cells;
     int res;
     void *fdt = kinfo->fdt;
+    struct meminfo *ext_regions = NULL;
+    unsigned int i, nr_ext_regions;
 
     dt_dprintk("Create hypervisor node\n");
 
@@ -919,12 +1150,61 @@ static int __init make_hypervisor_node(struct domain *d,
     if ( res )
         return res;
 
+    if ( !opt_ext_regions )
+    {
+        printk(XENLOG_DEBUG "The extended regions support is disabled\n");
+        nr_ext_regions = 0;
+    }
+    else if ( is_32bit_domain(d) )
+    {
+        printk(XENLOG_DEBUG "The extended regions are only supported for 64-bit guest currently\n");
+        nr_ext_regions = 0;
+    }
+    else
+    {
+        ext_regions = xzalloc(struct meminfo);
+        if ( !ext_regions )
+            return -ENOMEM;
+
+        if ( !is_iommu_enabled(d) )
+            res = find_unallocated_memory(kinfo, ext_regions);
+        else
+            res = find_memory_holes(kinfo, ext_regions);
+
+        if ( res )
+            printk(XENLOG_WARNING "Failed to allocate extended regions\n");
+        nr_ext_regions = ext_regions->nr_banks;
+    }
+
+    reg = xzalloc_array(__be32, (nr_ext_regions + 1) * (addrcells + sizecells));
+    if ( !reg )
+    {
+        xfree(ext_regions);
+        return -ENOMEM;
+    }
+
     /* reg 0 is grant table space */
     cells = &reg[0];
     dt_child_set_range(&cells, addrcells, sizecells,
                        kinfo->gnttab_start, kinfo->gnttab_size);
+    /* reg 1...N are extended regions */
+    for ( i = 0; i < nr_ext_regions; i++ )
+    {
+        u64 start = ext_regions->bank[i].start;
+        u64 size = ext_regions->bank[i].size;
+
+        dt_dprintk("Extended region %d: %#"PRIx64"->%#"PRIx64"\n",
+                   i, start, start + size);
+
+        dt_child_set_range(&cells, addrcells, sizecells, start, size);
+    }
+
     res = fdt_property(fdt, "reg", reg,
-                       dt_cells_to_size(addrcells + sizecells));
+                       dt_cells_to_size(addrcells + sizecells) *
+                       (nr_ext_regions + 1));
+    xfree(ext_regions);
+    xfree(reg);
+
     if ( res )
         return res;
 
