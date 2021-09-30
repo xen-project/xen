@@ -121,6 +121,14 @@ A Xen-aware bootloader would set xen,xen-bootargs for Xen, xen,dom0-bootargs
 for Dom0 and bootargs for native Linux.
 
 
+UEFI boot and DT
+================
+
+When Xen is booted using UEFI, it doesn't read the configuration file if any
+multiboot module is specified. To force Xen to load the configuration file, the
+boolean property xen,uefi-cfg-load must be declared in the /chosen node.
+
+
 Creating Multiple Domains directly from Xen
 ===========================================
 

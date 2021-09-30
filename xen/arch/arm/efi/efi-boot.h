@@ -581,22 +581,40 @@ static void __init efi_arch_load_addr_check(EFI_LOADED_IMAGE *loaded_image)
 
 static bool __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
 {
+    bool load_cfg_file = true;
     /*
      * For arm, we may get a device tree from GRUB (or other bootloader)
      * that contains modules that have already been loaded into memory.  In
-     * this case, we do not use a configuration file, and rely on the
-     * bootloader to have loaded all required modules and appropriate
-     * options.
+     * this case, we search for the property xen,uefi-cfg-load in the /chosen
+     * node to decide whether to skip the UEFI Xen configuration file or not.
      */
 
     fdt = lookup_fdt_config_table(SystemTable);
     dtbfile.ptr = fdt;
     dtbfile.need_to_free = false; /* Config table memory can't be freed. */
-    if ( !fdt || fdt_node_offset_by_compatible(fdt, 0, "multiboot,module") < 0 )
+
+    if ( fdt_node_offset_by_compatible(fdt, 0, "multiboot,module") > 0 )
+    {
+        /* Locate chosen node */
+        int node = fdt_subnode_offset(fdt, 0, "chosen");
+        const void *cfg_load_prop;
+        int cfg_load_len;
+
+        if ( node > 0 )
+        {
+            /* Check if xen,uefi-cfg-load property exists */
+            cfg_load_prop = fdt_getprop(fdt, node, "xen,uefi-cfg-load",
+                                        &cfg_load_len);
+            if ( !cfg_load_prop )
+                load_cfg_file = false;
+        }
+    }
+
+    if ( !fdt || load_cfg_file )
     {
         /*
          * We either have no FDT, or one without modules, so we must have a
-         * Xen EFI configuration file to specify modules.  (dom0 required)
+         * Xen EFI configuration file to specify modules.
          */
         return true;
     }

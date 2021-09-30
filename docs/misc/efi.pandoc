@@ -14,6 +14,8 @@ loaded the modules and describes them in the device tree provided to Xen.  If a
 bootloader provides a device tree containing modules then any configuration
 files are ignored, and the bootloader is responsible for populating all
 relevant device tree nodes.
+The property "xen,uefi-cfg-load" can be specified in the /chosen node to force
+Xen to load the configuration file even if multiboot modules are found.
 
 Once built, `make install-xen` will place the resulting binary directly into
 the EFI boot partition, provided `EFI_VENDOR` is set in the environment (and
