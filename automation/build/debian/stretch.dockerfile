@@ -47,6 +47,8 @@ RUN apt-get update && \
         nasm \
         gnupg \
         apt-transport-https \
+        # for test phase, qemu-smoke-* jobs
+        qemu-system-x86 \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

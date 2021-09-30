@@ -5,11 +5,6 @@ set -ex
 # variant should be either pv or pvh
 variant=$1
 
-# Install QEMU
-export DEBIAN_FRONTENT=noninteractive
-apt-get -qy update
-apt-get -qy install qemu-system-x86
-
 # Clone and build XTF
 git clone https://xenbits.xen.org/git-http/xtf.git
 cd xtf && make -j$(nproc) && cd -
