@@ -15,8 +15,8 @@ git clone https://xenbits.xen.org/git-http/xtf.git
 cd xtf && make -j$(nproc) && cd -
 
 case $variant in
-    pvh) k=test-hvm32pae-example extra="dom0-iommu=none dom0=pvh" ;;
-    *)   k=test-pv32pae-example  extra= ;;
+    pvh) k=test-hvm64-example    extra="dom0-iommu=none dom0=pvh" ;;
+    *)   k=test-pv64-example     extra= ;;
 esac
 
 rm -f smoke.serial
