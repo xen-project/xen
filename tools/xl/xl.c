@@ -80,14 +80,20 @@ static int auto_autoballoon(void)
     if (!info)
         return 1; /* default to on */
 
+#define SIZE_PATTERN "-?[0-9]+[bBkKmMgGtT]?"
+
     ret = regcomp(&regex,
-                  "(^| )dom0_mem=((|min:|max:)[0-9]+[bBkKmMgG]?,?)+($| )",
+                  "(^| )dom0_mem=((|min:|max:)(" SIZE_PATTERN "|(" SIZE_PATTERN "\\+)?[0-9]{1,2}%),?)+($| )",
                   REG_NOSUB | REG_EXTENDED);
+
+#undef SIZE_PATTERN
+
     if (ret)
         return 1;
 
     ret = regexec(&regex, info->commandline, 0, NULL, 0);
     regfree(&regex);
+
     return ret == REG_NOMATCH;
 }
 
