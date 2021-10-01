@@ -221,6 +221,13 @@ struct usbif_urb_response {
 	uint16_t id; /* request id */
 	uint16_t start_frame;  /* start frame (ISO) */
 	int32_t status; /* status (non-ISO) */
+#define USBIF_STATUS_OK		0
+#define USBIF_STATUS_NODEV	(-19)
+#define USBIF_STATUS_INVAL	(-22)
+#define USBIF_STATUS_STALL	(-32)
+#define USBIF_STATUS_IOERROR	(-71)
+#define USBIF_STATUS_BABBLE	(-75)
+#define USBIF_STATUS_SHUTDOWN	(-108)
 	int32_t actual_length; /* actual transfer length */
 	int32_t error_count; /* number of ISO errors */
 };
