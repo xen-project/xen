@@ -2408,7 +2408,7 @@ static int reassign_device_ownership(
                 ret = iommu_identity_mapping(source, p2m_access_x,
                                              rmrr->base_address,
                                              rmrr->end_address, 0);
-                if ( ret != -ENOENT )
+                if ( ret && ret != -ENOENT )
                     return ret;
             }
     }
