@@ -12,6 +12,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/acpi.h>
+#include <xen/device_tree.h>
+#include <xen/errno.h>
+#include <xen/init.h>
 #include <xen/pci.h>
 
 /*
@@ -21,6 +25,53 @@ int arch_pci_clean_pirqs(struct domain *d)
 {
     return 0;
 }
+
+static int __init dt_pci_init(void)
+{
+    struct dt_device_node *np;
+    int rc;
+
+    dt_for_each_device_node(dt_host, np)
+    {
+        rc = device_init(np, DEVICE_PCI, NULL);
+        /*
+         * Ignore the following error codes:
+         *   - EBADF: Indicate the current device is not a pci device.
+         *   - ENODEV: The pci device is not present or cannot be used by
+         *     Xen.
+         */
+        if( !rc || rc == -EBADF || rc == -ENODEV )
+            continue;
+
+        return rc;
+    }
+
+    return 0;
+}
+
+#ifdef CONFIG_ACPI
+static int __init acpi_pci_init(void)
+{
+    printk(XENLOG_ERR "ACPI pci init not supported \n");
+    return -EOPNOTSUPP;
+}
+#else
+static int __init acpi_pci_init(void)
+{
+    return -EINVAL;
+}
+#endif
+
+static int __init pci_init(void)
+{
+    pci_segments_init();
+
+    if ( acpi_disabled )
+        return dt_pci_init();
+    else
+        return acpi_pci_init();
+}
+__initcall(pci_init);
 
 /*
  * Local variables:
