@@ -52,7 +52,7 @@ bool __read_mostly opt_ibpb = true;
 bool __read_mostly opt_ssbd = false;
 int8_t __read_mostly opt_eager_fpu = -1;
 int8_t __read_mostly opt_l1d_flush = -1;
-bool __read_mostly opt_branch_harden = true;
+static bool __initdata opt_branch_harden = true;
 
 bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
@@ -1121,8 +1121,9 @@ void __init init_speculation_mitigations(void)
     else if ( opt_l1d_flush == -1 )
         opt_l1d_flush = cpu_has_bug_l1tf && !(caps & ARCH_CAPS_SKIP_L1DFL);
 
-    if ( opt_branch_harden )
-        setup_force_cpu_cap(X86_FEATURE_SC_BRANCH_HARDEN);
+    /* We compile lfence's in by default, and nop them out if requested. */
+    if ( !opt_branch_harden )
+        setup_force_cpu_cap(X86_FEATURE_SC_NO_BRANCH_HARDEN);
 
     /*
      * We do not disable HT by default on affected hardware.
