@@ -24,21 +24,10 @@
 #include <xen/lib.h>
 #include <xen/softirq.h>
 
-#include <asm/apic.h>
 #include <asm/pv/trace.h>
 #include <asm/shared.h>
 #include <asm/traps.h>
 #include <irq_vectors.h>
-
-#ifdef CONFIG_PV32
-void do_entry_int82(struct cpu_user_regs *regs)
-{
-    if ( unlikely(untrusted_msi) )
-        check_for_unexpected_msi((uint8_t)regs->entry_vector);
-
-    pv_hypercall(regs);
-}
-#endif
 
 void pv_inject_event(const struct x86_event *event)
 {
