@@ -15,7 +15,6 @@
 #include <xen/pfn.h>
 #include <asm/device.h>
 #include <asm/numa.h>
-#include <asm/pci.h>
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -61,6 +60,8 @@ typedef union {
         uint16_t                seg;
     };
 } pci_sbdf_t;
+
+#include <asm/pci.h>
 
 struct pci_dev_info {
     /*
