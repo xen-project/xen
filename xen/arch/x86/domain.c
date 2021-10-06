@@ -662,6 +662,12 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( config->flags & XEN_DOMCTL_CDF_vpci )
+    {
+        dprintk(XENLOG_INFO, "vPCI cannot be enabled yet\n");
+        return -EINVAL;
+    }
+
     if ( config->vmtrace_size )
     {
         unsigned int size = config->vmtrace_size;
