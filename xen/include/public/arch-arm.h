@@ -107,7 +107,9 @@
  *   All generic sub-operations
  *
  *  HYPERVISOR_physdev_op
- *   No sub-operations are currenty supported
+ *   Exactly these sub-operations are supported:
+ *   PHYSDEVOP_pci_device_add
+ *   PHYSDEVOP_pci_device_remove
  *
  *  HYPERVISOR_sysctl
  *   All generic sub-operations, with the exception of:

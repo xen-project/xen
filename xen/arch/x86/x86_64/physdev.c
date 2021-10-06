@@ -9,7 +9,7 @@ EMIT_FILE;
 #include <compat/xen.h>
 #include <compat/event_channel.h>
 #include <compat/physdev.h>
-#include <asm/hypercall.h>
+#include <xen/hypercall.h>
 
 #define do_physdev_op compat_physdev_op
 

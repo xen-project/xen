@@ -45,6 +45,10 @@ extern long
 do_platform_op(
     XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op);
 
+extern long
+pci_physdev_op(
+    int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
+
 /*
  * To allow safe resume of do_memory_op() after preemption, we need to know
  * at what point in the page list to resume. For this purpose I steal the

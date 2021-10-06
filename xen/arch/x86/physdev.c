@@ -12,7 +12,7 @@
 #include <asm/io_apic.h>
 #include <asm/msi.h>
 #include <asm/hvm/irq.h>
-#include <asm/hypercall.h>
+#include <xen/hypercall.h>
 #include <public/xen.h>
 #include <public/physdev.h>
 #include <xsm/xsm.h>
@@ -480,54 +480,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
-    case PHYSDEVOP_pci_device_add: {
-        struct physdev_pci_device_add add;
-        struct pci_dev_info pdev_info;
-        nodeid_t node;
-
-        ret = -EFAULT;
-        if ( copy_from_guest(&add, arg, 1) != 0 )
-            break;
-
-        pdev_info.is_extfn = !!(add.flags & XEN_PCI_DEV_EXTFN);
-        if ( add.flags & XEN_PCI_DEV_VIRTFN )
-        {
-            pdev_info.is_virtfn = 1;
-            pdev_info.physfn.bus = add.physfn.bus;
-            pdev_info.physfn.devfn = add.physfn.devfn;
-        }
-        else
-            pdev_info.is_virtfn = 0;
-
-        if ( add.flags & XEN_PCI_DEV_PXM )
-        {
-            uint32_t pxm;
-            size_t optarr_off = offsetof(struct physdev_pci_device_add, optarr) /
-                                sizeof(add.optarr[0]);
-
-            if ( copy_from_guest_offset(&pxm, arg, optarr_off, 1) )
-                break;
-
-            node = pxm_to_node(pxm);
-        }
-        else
-            node = NUMA_NO_NODE;
-
-        ret = pci_add_device(add.seg, add.bus, add.devfn, &pdev_info, node);
-        break;
-    }
-
-    case PHYSDEVOP_pci_device_remove: {
-        struct physdev_pci_device dev;
-
-        ret = -EFAULT;
-        if ( copy_from_guest(&dev, arg, 1) != 0 )
-            break;
-
-        ret = pci_remove_device(dev.seg, dev.bus, dev.devfn);
-        break;
-    }
-
     case PHYSDEVOP_prepare_msix:
     case PHYSDEVOP_release_msix: {
         struct physdev_pci_device dev;
@@ -663,7 +615,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     default:
-        ret = -ENOSYS;
+        ret = pci_physdev_op(cmd, arg);
         break;
     }
 
