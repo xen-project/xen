@@ -1819,6 +1819,13 @@ All numbers specified must be hexadecimal ones.
 
 This option can be specified more than once (up to 8 times at present).
 
+### pci-passthrough (arm)
+> `= <boolean>`
+
+> Default: `false`
+
+Flag to enable or disable support for PCI passthrough
+
 ### pcid (x86)
 > `= <boolean> | xpti=<bool>`
 

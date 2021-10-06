@@ -32,4 +32,10 @@ bool_t pci_ro_mmcfg_decode(unsigned long mfn, unsigned int *seg,
 extern int pci_mmcfg_config_num;
 extern struct acpi_mcfg_allocation *pci_mmcfg_config;
 
+/* Unlike ARM, PCI passthrough is always enabled for x86. */
+static always_inline bool is_pci_passthrough_enabled(void)
+{
+    return true;
+}
+
 #endif /* __X86_PCI_H__ */

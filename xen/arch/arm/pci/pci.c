@@ -16,6 +16,7 @@
 #include <xen/device_tree.h>
 #include <xen/errno.h>
 #include <xen/init.h>
+#include <xen/param.h>
 #include <xen/pci.h>
 
 /*
@@ -62,8 +63,19 @@ static int __init acpi_pci_init(void)
 }
 #endif
 
+/* By default pci passthrough is disabled. */
+bool __read_mostly pci_passthrough_enabled;
+boolean_param("pci-passthrough", pci_passthrough_enabled);
+
 static int __init pci_init(void)
 {
+    /*
+     * Enable PCI passthrough when has been enabled explicitly
+     * (pci-passthrough=on).
+     */
+    if ( !pci_passthrough_enabled )
+        return 0;
+
     pci_segments_init();
 
     if ( acpi_disabled )

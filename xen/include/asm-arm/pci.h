@@ -19,14 +19,25 @@
 
 #define pci_to_dev(pcidev) (&(pcidev)->arch.dev)
 
+extern bool pci_passthrough_enabled;
+
 /* Arch pci dev struct */
 struct arch_pci_dev {
     struct device dev;
 };
 
+static always_inline bool is_pci_passthrough_enabled(void)
+{
+    return pci_passthrough_enabled;
+}
 #else   /*!CONFIG_HAS_PCI*/
 
 struct arch_pci_dev { };
+
+static always_inline bool is_pci_passthrough_enabled(void)
+{
+    return false;
+}
 
 #endif  /*!CONFIG_HAS_PCI*/
 #endif /* __ARM_PCI_H__ */
