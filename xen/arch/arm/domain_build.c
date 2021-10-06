@@ -898,7 +898,10 @@ static int __init add_ext_regions(unsigned long s, unsigned long e, void *data)
     if ( ext_regions->nr_banks >= ARRAY_SIZE(ext_regions->bank) )
         return 0;
 
-    /* Both start and size of the extended region should be 2MB aligned */
+    /*
+     * Both start and size of the extended region should be 2MB aligned to
+     * potentially allow superpage mapping.
+     */
     start = (s + SZ_2M - 1) & ~(SZ_2M - 1);
     if ( start > e )
         return 0;
@@ -909,6 +912,12 @@ static int __init add_ext_regions(unsigned long s, unsigned long e, void *data)
      */
     e += 1;
     size = (e - start) & ~(SZ_2M - 1);
+
+    /*
+     * Reasonable size. Not too little to pick up small ranges which are
+     * not quite useful but increase bookkeeping and not too large
+     * to skip a large proportion of unused address space.
+     */
     if ( size < MB(64) )
         return 0;
 
@@ -919,6 +928,14 @@ static int __init add_ext_regions(unsigned long s, unsigned long e, void *data)
     return 0;
 }
 
+/*
+ * Find unused regions of Host address space which can be exposed to Dom0
+ * as extended regions for the special memory mappings. In order to calculate
+ * regions we exclude every region assigned to Dom0 from the Host RAM:
+ * - domain RAM
+ * - reserved-memory
+ * - grant table space
+ */
 static int __init find_unallocated_memory(const struct kernel_info *kinfo,
                                           struct meminfo *ext_regions)
 {
@@ -942,7 +959,7 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
         res = rangeset_add_range(unalloc_mem, start, end - 1);
         if ( res )
         {
-            printk(XENLOG_ERR "Failed to add: %#"PRIx64"->%#"PRIx64"\n",
+            printk(XENLOG_ERR "Failed to add: %#"PRIpaddr"->%#"PRIpaddr"\n",
                    start, end);
             goto out;
         }
@@ -956,7 +973,7 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
         res = rangeset_remove_range(unalloc_mem, start, end - 1);
         if ( res )
         {
-            printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+            printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
                    start, end);
             goto out;
         }
@@ -971,7 +988,7 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
         res = rangeset_remove_range(unalloc_mem, start, end - 1);
         if ( res )
         {
-            printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+            printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
                    start, end);
             goto out;
         }
@@ -983,7 +1000,7 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
     res = rangeset_remove_range(unalloc_mem, start, end - 1);
     if ( res )
     {
-        printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+        printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
                start, end);
         goto out;
     }
@@ -1003,6 +1020,35 @@ out:
     return res;
 }
 
+static int __init handle_pci_range(const struct dt_device_node *dev,
+                                   u64 addr, u64 len, void *data)
+{
+    struct rangeset *mem_holes = data;
+    paddr_t start, end;
+    int res;
+
+    start = addr & PAGE_MASK;
+    end = PAGE_ALIGN(addr + len);
+    res = rangeset_remove_range(mem_holes, start, end - 1);
+    if ( res )
+    {
+        printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
+               start, end);
+        return res;
+    }
+
+    return 0;
+}
+
+/*
+ * Find the holes in the Host DT which can be exposed to Dom0 as extended
+ * regions for the special memory mappings. In order to calculate regions
+ * we exclude every addressable memory region described by "reg" and "ranges"
+ * properties from the maximum possible addressable physical memory range:
+ * - MMIO
+ * - Host RAM
+ * - PCI aperture
+ */
 static int __init find_memory_holes(const struct kernel_info *kinfo,
                                     struct meminfo *ext_regions)
 {
@@ -1024,7 +1070,7 @@ static int __init find_memory_holes(const struct kernel_info *kinfo,
     res = rangeset_add_range(mem_holes, start, end);
     if ( res )
     {
-        printk(XENLOG_ERR "Failed to add: %#"PRIx64"->%#"PRIx64"\n",
+        printk(XENLOG_ERR "Failed to add: %#"PRIpaddr"->%#"PRIpaddr"\n",
                start, end);
         goto out;
     }
@@ -1055,49 +1101,25 @@ static int __init find_memory_holes(const struct kernel_info *kinfo,
             res = rangeset_remove_range(mem_holes, start, end - 1);
             if ( res )
             {
-                printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
+                printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
                        start, end);
                 goto out;
             }
         }
 
-        if ( dt_device_type_is_equal(np, "pci" ) )
+        if ( dt_device_type_is_equal(np, "pci") )
         {
-            unsigned int range_size, nr_ranges;
-            int na, ns, pna;
-            const __be32 *ranges;
-            u32 len;
-
             /*
-             * Looking for non-empty ranges property which in this context
-             * describes the PCI host bridge aperture.
+             * The ranges property in this context describes the PCI host
+             * bridge aperture. It shall be absent if no addresses are mapped
+             * through the bridge.
              */
-            ranges = dt_get_property(np, "ranges", &len);
-            if ( !ranges || !len )
+            if ( !dt_get_property(np, "ranges", NULL) )
                 continue;
 
-            pna = dt_n_addr_cells(np);
-            na = dt_child_n_addr_cells(np);
-            ns = dt_child_n_size_cells(np);
-            range_size = pna + na + ns;
-            nr_ranges = len / sizeof(__be32) / range_size;
-
-            for ( i = 0; i < nr_ranges; i++, ranges += range_size )
-            {
-                /* Skip the child address and get the parent (CPU) address */
-                addr = dt_read_number(ranges + na, pna);
-                size = dt_read_number(ranges + na + pna, ns);
-
-                start = addr & PAGE_MASK;
-                end = PAGE_ALIGN(addr + size);
-                res = rangeset_remove_range(mem_holes, start, end - 1);
-                if ( res )
-                {
-                    printk(XENLOG_ERR "Failed to remove: %#"PRIx64"->%#"PRIx64"\n",
-                           start, end);
-                    goto out;
-                }
-            }
+            res = dt_for_each_range(np, &handle_pci_range, mem_holes);
+            if ( res )
+                goto out;
         }
     }
 
@@ -1152,12 +1174,12 @@ static int __init make_hypervisor_node(struct domain *d,
 
     if ( !opt_ext_regions )
     {
-        printk(XENLOG_DEBUG "The extended regions support is disabled\n");
+        printk(XENLOG_INFO "The extended regions support is disabled\n");
         nr_ext_regions = 0;
     }
     else if ( is_32bit_domain(d) )
     {
-        printk(XENLOG_DEBUG "The extended regions are only supported for 64-bit guest currently\n");
+        printk(XENLOG_WARNING "The extended regions are only supported for 64-bit guest currently\n");
         nr_ext_regions = 0;
     }
     else
@@ -1193,8 +1215,8 @@ static int __init make_hypervisor_node(struct domain *d,
         u64 start = ext_regions->bank[i].start;
         u64 size = ext_regions->bank[i].size;
 
-        dt_dprintk("Extended region %d: %#"PRIx64"->%#"PRIx64"\n",
-                   i, start, start + size);
+        printk("Extended region %d: %#"PRIx64"->%#"PRIx64"\n",
+               i, start, start + size);
 
         dt_child_set_range(&cells, addrcells, sizecells, start, size);
     }
