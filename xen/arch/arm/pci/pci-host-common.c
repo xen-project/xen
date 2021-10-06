@@ -237,6 +237,25 @@ err_exit:
 }
 
 /*
+ * This function will lookup an hostbridge based on the segment and bus
+ * number.
+ */
+struct pci_host_bridge *pci_find_host_bridge(uint16_t segment, uint8_t bus)
+{
+    struct pci_host_bridge *bridge;
+
+    list_for_each_entry( bridge, &pci_host_bridges, node )
+    {
+        if ( bridge->segment != segment )
+            continue;
+        if ( (bus < bridge->cfg->busn_start) || (bus > bridge->cfg->busn_end) )
+            continue;
+        return bridge;
+    }
+
+    return NULL;
+}
+/*
  * Local variables:
  * mode: C
  * c-file-style: "BSD"
