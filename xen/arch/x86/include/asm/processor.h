@@ -505,9 +505,6 @@ extern void mtrr_bp_init(void);
 
 void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
 
-/* Dispatch table for exceptions */
-extern void (* const exception_table[TRAP_nr])(struct cpu_user_regs *regs);
-
 #define DECLARE_TRAP_HANDLER(_name)                    \
     void _name(void);                                  \
     void do_ ## _name(struct cpu_user_regs *regs)

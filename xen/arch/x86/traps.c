@@ -135,36 +135,6 @@ const unsigned int nmi_cpu;
 #define stack_words_per_line 4
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 
-static void do_trap(struct cpu_user_regs *regs);
-static void do_reserved_trap(struct cpu_user_regs *regs);
-
-void (* const exception_table[TRAP_nr])(struct cpu_user_regs *regs) = {
-    [TRAP_divide_error]                 = do_trap,
-    [TRAP_debug]                        = do_debug,
-    [TRAP_nmi]                          = (void *)do_nmi,
-    [TRAP_int3]                         = do_int3,
-    [TRAP_overflow]                     = do_trap,
-    [TRAP_bounds]                       = do_trap,
-    [TRAP_invalid_op]                   = do_invalid_op,
-    [TRAP_no_device]                    = do_device_not_available,
-    [TRAP_double_fault]                 = do_reserved_trap,
-    [TRAP_copro_seg]                    = do_reserved_trap,
-    [TRAP_invalid_tss]                  = do_trap,
-    [TRAP_no_segment]                   = do_trap,
-    [TRAP_stack_error]                  = do_trap,
-    [TRAP_gp_fault]                     = do_general_protection,
-    [TRAP_page_fault]                   = do_page_fault,
-    [TRAP_spurious_int]                 = do_reserved_trap,
-    [TRAP_copro_error]                  = do_trap,
-    [TRAP_alignment_check]              = do_trap,
-    [TRAP_machine_check]                = (void *)do_machine_check,
-    [TRAP_simd_error]                   = do_trap,
-    [TRAP_virtualisation]               = do_reserved_trap,
-    [X86_EXC_CP]                        = do_entry_CP,
-    [X86_EXC_CP + 1 ...
-     (ARRAY_SIZE(exception_table) - 1)] = do_reserved_trap,
-};
-
 void show_code(const struct cpu_user_regs *regs)
 {
     unsigned char insns_before[8] = {}, insns_after[16] = {};
@@ -889,7 +859,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
           (regs->eflags & X86_EFLAGS_IF) ? "" : " IN INTERRUPT CONTEXT");
 }
 
-static void do_reserved_trap(struct cpu_user_regs *regs)
+void do_unhandled_trap(struct cpu_user_regs *regs)
 {
     unsigned int trapnr = regs->entry_vector;
 
@@ -981,7 +951,7 @@ static bool extable_fixup(struct cpu_user_regs *regs, bool print)
     return true;
 }
 
-static void do_trap(struct cpu_user_regs *regs)
+void do_trap(struct cpu_user_regs *regs)
 {
     unsigned int trapnr = regs->entry_vector;
 
