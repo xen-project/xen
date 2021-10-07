@@ -36,10 +36,8 @@ static unsigned int crashing_cpu;
 static DEFINE_PER_CPU_READ_MOSTLY(bool, crash_save_done);
 
 /* This becomes the NMI handler for non-crashing CPUs, when Xen is crashing. */
-static void noreturn do_nmi_crash(const struct cpu_user_regs *regs)
+static int noreturn do_nmi_crash(const struct cpu_user_regs *regs, int cpu)
 {
-    unsigned int cpu = smp_processor_id();
-
     stac();
 
     /* nmi_shootdown_cpus() should ensure that this assertion is correct. */
@@ -136,16 +134,7 @@ static void nmi_shootdown_cpus(void)
                     SYS_DESC_irq_gate, 0, &trap_nop);
     set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
 
-    /*
-     * Ideally would be:
-     *   exception_table[TRAP_nmi] = &do_nmi_crash;
-     *
-     * but the exception_table is read only.  Access it via its directmap
-     * mappings.
-     */
-    write_atomic((unsigned long *)__va(__pa(&exception_table[TRAP_nmi])),
-                 (unsigned long)&do_nmi_crash);
-
+    set_nmi_callback(do_nmi_crash);
     smp_send_nmi_allbutself();
 
     msecs = 1000; /* Wait at most a second for the other cpus to stop */

@@ -3887,7 +3887,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
              ((intr_info & INTR_INFO_INTR_TYPE_MASK) ==
               MASK_INSR(X86_EVENTTYPE_NMI, INTR_INFO_INTR_TYPE_MASK)) )
         {
-            exception_table[TRAP_nmi](regs);
+            do_nmi(regs);
             enable_nmis();
         }
         break;
