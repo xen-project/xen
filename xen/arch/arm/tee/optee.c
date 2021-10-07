@@ -781,7 +781,10 @@ static int translate_noncontig(struct optee_domain *ctx,
     optee_shm_buf = allocate_optee_shm_buf(ctx, param->u.tmem.shm_ref,
                                            pg_count, xen_pgs, order);
     if ( IS_ERR(optee_shm_buf) )
+    {
+        free_domheap_pages(xen_pgs, order);
         return PTR_ERR(optee_shm_buf);
+    }
 
     gfn = gaddr_to_gfn(param->u.tmem.buf_ptr &
                        ~(OPTEE_MSG_NONCONTIG_PAGE_SIZE - 1));
@@ -807,7 +810,7 @@ static int translate_noncontig(struct optee_domain *ctx,
         {
             guest_pg = get_domain_ram_page(gfn);
             if ( !guest_pg )
-                return -EINVAL;
+                goto free_shm_buf;
 
             guest_data = __map_domain_page(guest_pg);
             xen_data = __map_domain_page(xen_pgs);
@@ -854,6 +857,7 @@ err_unmap:
     unmap_domain_page(guest_data);
     unmap_domain_page(xen_data);
     put_page(guest_pg);
+free_shm_buf:
     free_optee_shm_buf(ctx, optee_shm_buf->cookie);
 
     return -EINVAL;
