@@ -57,6 +57,11 @@ cmd_ar = rm -f $@; $(AR) cr $@ $(real-prereqs)
 quiet_cmd_objcopy = OBJCOPY $@
 cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
+# binfile
+# use e.g. $(call if_changed,binfile,binary-file varname)
+quiet_cmd_binfile = BINFILE $@
+cmd_binfile = $(SHELL) $(BASEDIR)/tools/binfile $(BINFILE_FLAGS) $@ $(2)
+
 define gendep
     ifneq ($(1),$(subst /,:,$(1)))
         DEPS += $(dir $(1)).$(notdir $(1)).d

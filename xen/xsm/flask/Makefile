@@ -35,8 +35,10 @@ $(subst include/,%/,$(AV_H_FILES)): $(AV_H_DEPEND) $(mkaccess) FORCE
 obj-bin-$(CONFIG_XSM_FLASK_POLICY) += flask-policy.o
 flask-policy.o: policy.bin
 
-flask-policy.S: $(BASEDIR)/tools/binfile
-	$(SHELL) $(BASEDIR)/tools/binfile -i $@ policy.bin xsm_flask_init_policy
+flask-policy.S: BINFILE_FLAGS := -i
+flask-policy.S: $(BASEDIR)/tools/binfile FORCE
+	$(call if_changed,binfile,policy.bin xsm_flask_init_policy)
+targets += flask-policy.S
 
 FLASK_BUILD_DIR := $(CURDIR)
 POLICY_SRC := $(FLASK_BUILD_DIR)/xenpolicy-$(XEN_FULLVERSION)

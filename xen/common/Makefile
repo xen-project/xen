@@ -80,8 +80,9 @@ config.gz: $(CONF_FILE)
 
 config_data.o: config.gz
 
-config_data.S: $(BASEDIR)/tools/binfile
-	$(SHELL) $(BASEDIR)/tools/binfile $@ config.gz xen_config_data
+config_data.S: $(BASEDIR)/tools/binfile FORCE
+	$(call if_changed,binfile,config.gz xen_config_data)
+targets += config_data.S
 
 clean::
 	rm -f config_data.S config.gz 2>/dev/null
