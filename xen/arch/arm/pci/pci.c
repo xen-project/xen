@@ -34,6 +34,11 @@ struct pci_dev *dev_to_pci(struct device *dev)
     return container_of(dev, struct pci_dev, arch.dev);
 }
 
+void arch_pci_init_pdev(struct pci_dev *pdev)
+{
+    pci_to_dev(pdev)->type = DEV_PCI;
+}
+
 static int __init dt_pci_init(void)
 {
     struct dt_device_node *np;

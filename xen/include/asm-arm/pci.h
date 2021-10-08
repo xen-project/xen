@@ -95,6 +95,9 @@ static always_inline bool is_pci_passthrough_enabled(void)
 {
     return pci_passthrough_enabled;
 }
+
+void arch_pci_init_pdev(struct pci_dev *pdev);
+
 #else   /*!CONFIG_HAS_PCI*/
 
 struct arch_pci_dev { };
@@ -103,6 +106,10 @@ static always_inline bool is_pci_passthrough_enabled(void)
 {
     return false;
 }
+
+struct pci_dev;
+
+static inline void arch_pci_init_pdev(struct pci_dev *pdev) {}
 
 #endif  /*!CONFIG_HAS_PCI*/
 #endif /* __ARM_PCI_H__ */

@@ -38,4 +38,6 @@ static always_inline bool is_pci_passthrough_enabled(void)
     return true;
 }
 
+static inline void arch_pci_init_pdev(struct pci_dev *pdev) {}
+
 #endif /* __X86_PCI_H__ */

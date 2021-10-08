@@ -329,6 +329,8 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     *((u8*) &pdev->devfn) = devfn;
     pdev->domain = NULL;
 
+    arch_pci_init_pdev(pdev);
+
     rc = pdev_msi_init(pdev);
     if ( rc )
     {
