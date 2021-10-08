@@ -1869,29 +1869,23 @@ static void unknown_nmi_error(const struct cpu_user_regs *regs,
     }
 }
 
-static int dummy_nmi_callback(const struct cpu_user_regs *regs, int cpu)
-{
-    return 0;
-}
-
-static nmi_callback_t *nmi_callback = dummy_nmi_callback;
+static nmi_callback_t *__read_mostly nmi_callback;
 
 DEFINE_PER_CPU(unsigned int, nmi_count);
 
 void do_nmi(const struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
+    nmi_callback_t *callback;
     unsigned char reason = 0;
     bool handle_unknown = false;
 
     this_cpu(nmi_count)++;
     nmi_enter();
 
-    if ( nmi_callback(regs, cpu) )
-    {
-        nmi_exit();
-        return;
-    }
+    callback = ACCESS_ONCE(nmi_callback);
+    if ( unlikely(callback) && callback(regs, cpu) )
+        goto out;
 
     /*
      * Accessing port 0x61 may trap to SMM which has been actually
@@ -1918,6 +1912,7 @@ void do_nmi(const struct cpu_user_regs *regs)
             unknown_nmi_error(regs, reason);
     }
 
+ out:
     nmi_exit();
 }
 
@@ -1932,7 +1927,7 @@ nmi_callback_t *set_nmi_callback(nmi_callback_t *callback)
 
 void unset_nmi_callback(void)
 {
-    nmi_callback = dummy_nmi_callback;
+    nmi_callback = NULL;
 }
 
 bool nmi_check_continuation(void)
