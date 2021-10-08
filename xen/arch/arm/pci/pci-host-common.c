@@ -237,6 +237,22 @@ err_exit:
 }
 
 /*
+ * Get host bridge node given a device attached to it.
+ */
+struct dt_device_node *pci_find_host_bridge_node(struct device *dev)
+{
+    struct pci_host_bridge *bridge;
+    struct pci_dev *pdev = dev_to_pci(dev);
+
+    bridge = pci_find_host_bridge(pdev->seg, pdev->bus);
+    if ( unlikely(!bridge) )
+    {
+        printk(XENLOG_ERR "Unable to find PCI bridge for %pp\n", &pdev->sbdf);
+        return NULL;
+    }
+    return bridge->dt_node;
+}
+/*
  * This function will lookup an hostbridge based on the segment and bus
  * number.
  */

@@ -89,6 +89,7 @@ int pci_generic_config_write(struct pci_host_bridge *bridge, pci_sbdf_t sbdf,
 void __iomem *pci_ecam_map_bus(struct pci_host_bridge *bridge,
                                pci_sbdf_t sbdf, uint32_t where);
 struct pci_host_bridge *pci_find_host_bridge(uint16_t segment, uint8_t bus);
+struct dt_device_node *pci_find_host_bridge_node(struct device *dev);
 
 static always_inline bool is_pci_passthrough_enabled(void)
 {
