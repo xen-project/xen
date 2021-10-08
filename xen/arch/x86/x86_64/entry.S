@@ -1005,6 +1005,13 @@ handle_ist_exception:
 #endif
         movq  %rsp,%rdi
         movzbl UREGS_entry_vector(%rsp),%eax
+
+#ifdef CONFIG_PERF_COUNTERS
+        lea   per_cpu__perfcounters(%rip), %rcx
+        add   STACK_CPUINFO_FIELD(per_cpu_offset)(%r14), %rcx
+        incl  ASM_PERFC_exceptions * 4(%rcx, %rax, 4)
+#endif
+
         leaq  exception_table(%rip),%rdx
         mov   (%rdx, %rax, 8), %rdx
         INDIRECT_CALL %rdx
