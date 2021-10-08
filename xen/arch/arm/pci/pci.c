@@ -27,6 +27,13 @@ int arch_pci_clean_pirqs(struct domain *d)
     return 0;
 }
 
+struct pci_dev *dev_to_pci(struct device *dev)
+{
+    ASSERT(dev->type == DEV_PCI);
+
+    return container_of(dev, struct pci_dev, arch.dev);
+}
+
 static int __init dt_pci_init(void)
 {
     struct dt_device_node *np;
