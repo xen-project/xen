@@ -981,7 +981,8 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
  * function which may return -ERESTART.
  */
 enum {
-    PROG_tee = 1,
+    PROG_pci = 1,
+    PROG_tee,
     PROG_xen,
     PROG_page,
     PROG_mapping,
@@ -1017,6 +1018,12 @@ int domain_relinquish_resources(struct domain *d)
 
 #ifdef CONFIG_IOREQ_SERVER
         ioreq_server_destroy_all(d);
+#endif
+#ifdef CONFIG_HAS_PCI
+    PROGRESS(pci):
+        ret = pci_release_devices(d);
+        if ( ret )
+            return ret;
 #endif
 
     PROGRESS(tee):
