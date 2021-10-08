@@ -19,7 +19,7 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
-const char *trapstr(unsigned int trapnr);
+const char *vector_name(unsigned int vec);
 
 #endif /* ASM_TRAP_H */
 

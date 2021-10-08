@@ -124,6 +124,8 @@ search_exception_table(const struct cpu_user_regs *regs)
 }
 
 #ifndef NDEBUG
+#include <asm/traps.h>
+
 static int __init stub_selftest(void)
 {
     static const struct {
@@ -172,10 +174,10 @@ static int __init stub_selftest(void)
         if ( res.raw != tests[i].res.raw )
         {
             printk("Selftest %u failed: Opc %*ph "
-                   "expected %u[%04x], got %u[%04x]\n",
+                   "expected %s[%04x], got %s[%04x]\n",
                    i, (int)ARRAY_SIZE(tests[i].opc), tests[i].opc,
-                   tests[i].res.fields.trapnr, tests[i].res.fields.ec,
-                   res.fields.trapnr, res.fields.ec);
+                   vector_name(tests[i].res.fields.trapnr), tests[i].res.fields.ec,
+                   vector_name(res.fields.trapnr), res.fields.ec);
 
             fail = true;
         }

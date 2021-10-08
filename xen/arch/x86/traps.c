@@ -767,21 +767,7 @@ static int nmi_show_execution_state(const struct cpu_user_regs *regs, int cpu)
     return 1;
 }
 
-const char *trapstr(unsigned int trapnr)
-{
-    static const char * const strings[] = {
-        "divide error", "debug", "nmi", "bkpt", "overflow", "bounds",
-        "invalid opcode", "device not available", "double fault",
-        "coprocessor segment", "invalid tss", "segment not found",
-        "stack error", "general protection fault", "page fault",
-        "spurious interrupt", "coprocessor error", "alignment check",
-        "machine check", "simd error", "virtualisation exception"
-    };
-
-    return trapnr < ARRAY_SIZE(strings) ? strings[trapnr] : "???";
-}
-
-static const char *vec_name(unsigned int vec)
+const char *vector_name(unsigned int vec)
 {
     static const char names[][4] = {
 #define P(x) [X86_EXC_ ## x] = "#" #x
@@ -855,7 +841,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
     }
 
     panic("FATAL TRAP: vec %u, %s[%04x]%s\n",
-          trapnr, vec_name(trapnr), regs->error_code,
+          trapnr, vector_name(trapnr), regs->error_code,
           (regs->eflags & X86_EFLAGS_IF) ? "" : " IN INTERRUPT CONTEXT");
 }
 
@@ -866,9 +852,7 @@ void do_unhandled_trap(struct cpu_user_regs *regs)
     if ( debugger_trap_fatal(trapnr, regs) )
         return;
 
-    show_execution_state(regs);
-    panic("FATAL RESERVED TRAP: vec %u, %s[%04x]\n",
-          trapnr, vec_name(trapnr), regs->error_code);
+    fatal_trap(regs, false);
 }
 
 static void fixup_exception_return(struct cpu_user_regs *regs,
@@ -942,7 +926,7 @@ static bool extable_fixup(struct cpu_user_regs *regs, bool print)
      */
     if ( IS_ENABLED(CONFIG_DEBUG) && print )
         printk(XENLOG_GUEST XENLOG_WARNING "Fixup %s[%04x]: %p [%ps] -> %p\n",
-               vec_name(regs->entry_vector), regs->error_code,
+               vector_name(regs->entry_vector), regs->error_code,
                _p(regs->rip), _p(regs->rip), _p(fixup));
 
     fixup_exception_return(regs, fixup);
@@ -978,10 +962,7 @@ void do_trap(struct cpu_user_regs *regs)
     if ( debugger_trap_fatal(trapnr, regs) )
         return;
 
-    show_execution_state(regs);
-    panic("FATAL TRAP: vector = %d (%s)\n"
-          "[error_code=%04x]\n",
-          trapnr, trapstr(trapnr), regs->error_code);
+    fatal_trap(regs, false);
 }
 
 int guest_rdmsr_xen(const struct vcpu *v, uint32_t idx, uint64_t *val)
