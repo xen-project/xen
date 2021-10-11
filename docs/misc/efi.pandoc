@@ -167,6 +167,28 @@ sbsign \
 	--output xen.signed.efi \
 	xen.unified.efi
 ```
+## UEFI boot and Dom0 modules on ARM
+
+When booting using UEFI on ARM, it is possible to specify the Dom0 modules
+directly from the device tree without using the Xen configuration file, here an
+example:
+
+chosen {
+	#size-cells = <0x1>;
+	#address-cells = <0x1>;
+	xen,xen-bootargs = "[Xen boot arguments]"
+
+	module@1 {
+		compatible = "multiboot,kernel", "multiboot,module";
+		xen,uefi-binary = "vmlinuz-3.0.31-0.4-xen";
+		bootargs = "[domain 0 command line options]";
+	};
+
+	module@2 {
+		compatible = "multiboot,ramdisk", "multiboot,module";
+		xen,uefi-binary = "initrd-3.0.31-0.4-xen";
+	};
+}
 
 ## UEFI boot and dom0less on ARM
 
@@ -326,10 +348,10 @@ chosen {
 ### Boot Xen, Dom0 and DomU(s)
 
 This configuration is a mix of the two configuration above, to boot this one
-the configuration file must be processed so the /chosen node must have the
-"xen,uefi-cfg-load" property.
+the configuration file can be processed or the Dom0 modules can be read from
+the device tree.
 
-Here an example:
+Here the first example:
 
 Xen configuration file:
 
@@ -369,4 +391,40 @@ chosen {
 };
 ```
 
+Here the second example:
 
+Device tree:
+
+```
+chosen {
+	#size-cells = <0x1>;
+	#address-cells = <0x1>;
+	xen,xen-bootargs = "[Xen boot arguments]"
+
+	module@1 {
+		compatible = "multiboot,kernel", "multiboot,module";
+		xen,uefi-binary = "vmlinuz-3.0.31-0.4-xen";
+		bootargs = "[domain 0 command line options]";
+	};
+
+	module@2 {
+		compatible = "multiboot,ramdisk", "multiboot,module";
+		xen,uefi-binary = "initrd-3.0.31-0.4-xen";
+	};
+
+	domU1 {
+		#size-cells = <0x1>;
+		#address-cells = <0x1>;
+		compatible = "xen,domain";
+		cpus = <0x1>;
+		memory = <0x0 0xc0000>;
+		vpl011;
+
+		module@1 {
+			compatible = "multiboot,kernel", "multiboot,module";
+			xen,uefi-binary = "Image-domu1.bin";
+			bootargs = "console=ttyAMA0 root=/dev/ram0 rw";
+		};
+	};
+};
+```

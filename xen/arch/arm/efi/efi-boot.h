@@ -32,8 +32,12 @@ static unsigned int __initdata modules_idx;
 #define ERROR_RENAME_MODULE_NAME    (-4)
 #define ERROR_SET_REG_PROPERTY      (-5)
 #define ERROR_CHECK_MODULE_COMPAT   (-6)
+#define ERROR_DOM0_ALREADY_FOUND    (-7)
+#define ERROR_DOM0_RAMDISK_FOUND    (-8)
+#define ERROR_XSM_ALREADY_FOUND     (-9)
 #define ERROR_DT_MODULE_DOMU        (-1)
 #define ERROR_DT_CHOSEN_NODE        (-2)
+#define ERROR_DT_MODULE_DOM0        (-3)
 
 void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
 void __flush_dcache_area(const void *vaddr, unsigned long size);
@@ -46,7 +50,8 @@ static int allocate_module_file(EFI_FILE_HANDLE dir_handle,
 static int handle_module_node(EFI_FILE_HANDLE dir_handle,
                               int module_node_offset,
                               int reg_addr_cells,
-                              int reg_size_cells);
+                              int reg_size_cells,
+                              bool is_domu_module);
 static int handle_dom0less_domain_node(EFI_FILE_HANDLE dir_handle,
                                        int domain_node);
 static int efi_check_dt_boot(EFI_FILE_HANDLE dir_handle);
@@ -701,7 +706,8 @@ static int __init allocate_module_file(EFI_FILE_HANDLE dir_handle,
 static int __init handle_module_node(EFI_FILE_HANDLE dir_handle,
                                      int module_node_offset,
                                      int reg_addr_cells,
-                                     int reg_size_cells)
+                                     int reg_size_cells,
+                                     bool is_domu_module)
 {
     const void *uefi_name_prop;
     char mod_string[24]; /* Placeholder for module@ + a 64-bit number + \0 */
@@ -754,6 +760,41 @@ static int __init handle_module_node(EFI_FILE_HANDLE dir_handle,
         return ERROR_SET_REG_PROPERTY;
     }
 
+    if ( !is_domu_module )
+    {
+        if ( (fdt_node_check_compatible(fdt, module_node_offset,
+                                    "multiboot,kernel") == 0) )
+        {
+            /*
+            * This is the Dom0 kernel, wire it to the kernel variable because it
+            * will be verified by the shim lock protocol later in the common
+            * code.
+            */
+            if ( kernel.addr )
+            {
+                PrintMessage(L"Dom0 kernel already found in cfg file.");
+                return ERROR_DOM0_ALREADY_FOUND;
+            }
+            kernel.need_to_free = false; /* Freed using the module array */
+            kernel.addr = file->addr;
+            kernel.size = file->size;
+        }
+        else if ( ramdisk.addr &&
+                  (fdt_node_check_compatible(fdt, module_node_offset,
+                                             "multiboot,ramdisk") == 0) )
+        {
+            PrintMessage(L"Dom0 ramdisk already found in cfg file.");
+            return ERROR_DOM0_RAMDISK_FOUND;
+        }
+        else if ( xsm.addr &&
+                  (fdt_node_check_compatible(fdt, module_node_offset,
+                                             "xen,xsm-policy") == 0) )
+        {
+            PrintMessage(L"XSM policy already found in cfg file.");
+            return ERROR_XSM_ALREADY_FOUND;
+        }
+    }
+
     return 0;
 }
 
@@ -793,7 +834,7 @@ static int __init handle_dom0less_domain_node(EFI_FILE_HANDLE dir_handle,
           module_node = fdt_next_subnode(fdt, module_node) )
     {
         int ret = handle_module_node(dir_handle, module_node, addr_cells,
-                                        size_cells);
+                                     size_cells, true);
         if ( ret < 0 )
             return ret;
     }
@@ -803,7 +844,7 @@ static int __init handle_dom0less_domain_node(EFI_FILE_HANDLE dir_handle,
 
 /*
  * This function checks for xen domain nodes under the /chosen node for possible
- * domU guests to be loaded.
+ * dom0 and domU guests to be loaded.
  * Returns the number of modules loaded or a negative number for error.
  */
 static int __init efi_check_dt_boot(EFI_FILE_HANDLE dir_handle)
@@ -830,6 +871,9 @@ static int __init efi_check_dt_boot(EFI_FILE_HANDLE dir_handle)
             if ( handle_dom0less_domain_node(dir_handle, node) < 0 )
                 return ERROR_DT_MODULE_DOMU;
         }
+        else if ( handle_module_node(dir_handle, node, addr_len, size_len,
+                                     false) < 0 )
+                 return ERROR_DT_MODULE_DOM0;
     }
 
     /* Free boot modules file names if any */
