@@ -26,6 +26,14 @@ struct arch_pci_dev {
     struct device dev;
 };
 
+/* Arch-specific MSI data for vPCI. */
+struct vpci_arch_msi {
+};
+
+/* Arch-specific MSI-X entry data for vPCI. */
+struct vpci_arch_msix_entry {
+};
+
 /*
  * Because of the header cross-dependencies, e.g. we need both
  * struct pci_dev and struct arch_pci_dev at the same time, this cannot be
