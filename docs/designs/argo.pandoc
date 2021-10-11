@@ -439,6 +439,51 @@ that teardown of any domain will not interfere with any Argo hypercall
 operation. It enables introducing granular locking without complex or
 error-prone lock acquisition logic.
 
+# Related Material
+
+## Enabling Argo in Xen
+
+To enable Argo in a build of the Xen hypervisor, please ensure that
+CONFIG_ARGO is enabled in the Xen hypervisor build configuration file.
+
+To make Argo available for use at runtime on a Xen system, please see the
+Argo settings in the Xen command line documentation.
+
+## Linux Argo drivers
+
+A Linux kernel device driver for Argo and corresponding Linux userspace
+software, libargo, that utilizes it for interdomain communication between
+application level software is available and maintained by the OpenXT Project,
+at:
+
+https://github.com/OpenXT/linux-xen-argo
+
+The repository contains the primary Linux kernel Argo driver, which is derived
+from the original XenClient v4v driver. The document at the following link
+describes planning and design notes from OpenXT community discussion for
+improvements to the driver:
+
+https://openxt.atlassian.net/wiki/spaces/DC/pages/775389197/New+Linux+Driver+for+Argo
+
+An alternative Linux Argo driver is also available in the same repository,
+implemented to explore a different approach for Linux to use the Argo
+primitives under the Vsock address family to allow socket communication between
+Xen domains.
+
+## v4v drivers
+
+A Windows driver for v4v has previously been used in XenClient and OpenXT
+which could be ported to Argo. It may require update for compatibility with
+recent versions of Windows software.
+
+https://github.com/OpenXT/xc-windows/tree/master/xenv4v
+
+The Linux, Windows and OSX guest tools for the Open Source HP uxen hypervisor
+contain drivers for v4v which are relevant as code bases of interest for
+porting or developing new guest OS drivers for Argo.
+
+https://github.com/uxen-virt/uxen/tree/ascara/vm-support
+
 # Future Work
 
 - Performance measurement and optimization
