@@ -138,7 +138,7 @@ static const struct {
     HYPERCALL(event_channel_op),
     COMPAT_CALL(sched_op),
     COMPAT_CALL(set_timer_op),
-    HYPERCALL(xsm_op),
+    COMPAT_CALL(xsm_op),
     HYPERCALL(hvm_op),
     HYPERCALL(sysctl),
     HYPERCALL(domctl),
