@@ -593,7 +593,8 @@ static bool __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
     dtbfile.ptr = fdt;
     dtbfile.need_to_free = false; /* Config table memory can't be freed. */
 
-    if ( fdt_node_offset_by_compatible(fdt, 0, "multiboot,module") > 0 )
+    if ( fdt &&
+         (fdt_node_offset_by_compatible(fdt, 0, "multiboot,module") > 0) )
     {
         /* Locate chosen node */
         int node = fdt_subnode_offset(fdt, 0, "chosen");
