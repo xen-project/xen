@@ -167,3 +167,206 @@ sbsign \
 	--output xen.signed.efi \
 	xen.unified.efi
 ```
+
+## UEFI boot and dom0less on ARM
+
+Dom0less feature is supported by ARM and it is possible to use it when Xen is
+started as an EFI application.
+The way to specify the domU domains is by Device Tree as specified in the
+[dom0less](dom0less.html) documentation page under the "Device Tree
+configuration" section, but instead of declaring the reg property in the boot
+module, the user must specify the "xen,uefi-binary" property containing the name
+of the binary file that has to be loaded in memory.
+The UEFI stub will load the binary in memory and it will add the reg property
+accordingly.
+
+An example here:
+
+domU1 {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	compatible = "xen,domain";
+	memory = <0 0x20000>;
+	cpus = <1>;
+	vpl011;
+
+	module@1 {
+		compatible = "multiboot,kernel", "multiboot,module";
+		xen,uefi-binary = "vmlinuz-3.0.31-0.4-xen";
+		bootargs = "console=ttyAMA0";
+	};
+	module@2 {
+		compatible = "multiboot,ramdisk", "multiboot,module";
+		xen,uefi-binary = "initrd-3.0.31-0.4-xen";
+	};
+	module@3 {
+		compatible = "multiboot,ramdisk", "multiboot,module";
+		xen,uefi-binary = "passthrough.dtb";
+	};
+};
+
+## How to boot different Xen setup using UEFI
+
+These are the different ways to boot a Xen system from UEFI:
+
+ - Boot Xen and Dom0 (minimum required)
+ - Boot Xen and DomU(s) (true dom0less, only on ARM)
+ - Boot Xen, Dom0 and DomU(s) (only on ARM)
+
+### Boot Xen and Dom0
+
+This configuration can be started using the Xen configuration file in the
+example above.
+
+### Boot Xen and DomU(s)
+
+This configuration needs the domU domain(s) specified in the /chosen node,
+examples of how to do that are provided by the documentation about dom0less
+and the example above shows how to use the "xen,uefi-binary" property to use the
+UEFI stub for module loading.
+When adding DomU modules to device tree, also add the property
+xen,uefi-cfg-load under chosen for Xen to load the Xen config file.
+Otherwise, Xen will skip the config file and rely on device tree alone.
+
+Example 1 of how to boot a true dom0less configuration:
+
+Xen configuration file: skipped.
+
+Device tree:
+
+```
+chosen {
+	#size-cells = <0x1>;
+	#address-cells = <0x1>;
+	xen,xen-bootargs = "<Xen command line>"
+
+	domU1 {
+		#size-cells = <0x1>;
+		#address-cells = <0x1>;
+		compatible = "xen,domain";
+		cpus = <0x1>;
+		memory = <0x0 0xc0000>;
+		vpl011;
+
+		module@1 {
+			compatible = "multiboot,kernel", "multiboot,module";
+			xen,uefi-binary = "Image-domu1.bin";
+			bootargs = "console=ttyAMA0 root=/dev/ram0 rw";
+		};
+	};
+	domU2 {
+		#size-cells = <0x1>;
+		#address-cells = <0x1>;
+		compatible = "xen,domain";
+		cpus = <0x1>;
+		memory = <0x0 0x100000>;
+		vpl011;
+
+		module@2 {
+			compatible = "multiboot,kernel", "multiboot,module";
+			xen,uefi-binary = "Image-domu2.bin";
+			bootargs = "console=ttyAMA0 root=/dev/ram0 rw";
+		};
+	};
+};
+```
+
+Example 2 of how to boot a true dom0less configuration:
+
+Xen configuration file:
+
+```
+[global]
+default=xen
+
+[xen]
+options=<Xen command line>
+dtb=<optional DTB>
+```
+
+Device tree:
+
+```
+chosen {
+	#size-cells = <0x1>;
+	#address-cells = <0x1>;
+	xen,uefi-cfg-load;
+
+	domU1 {
+		#size-cells = <0x1>;
+		#address-cells = <0x1>;
+		compatible = "xen,domain";
+		cpus = <0x1>;
+		memory = <0x0 0xc0000>;
+		vpl011;
+
+		module@1 {
+			compatible = "multiboot,kernel", "multiboot,module";
+			xen,uefi-binary = "Image-domu1.bin";
+			bootargs = "console=ttyAMA0 root=/dev/ram0 rw";
+		};
+	};
+	domU2 {
+		#size-cells = <0x1>;
+		#address-cells = <0x1>;
+		compatible = "xen,domain";
+		cpus = <0x1>;
+		memory = <0x0 0x100000>;
+		vpl011;
+
+		module@2 {
+			compatible = "multiboot,kernel", "multiboot,module";
+			xen,uefi-binary = "Image-domu2.bin";
+			bootargs = "console=ttyAMA0 root=/dev/ram0 rw";
+		};
+	};
+};
+```
+
+### Boot Xen, Dom0 and DomU(s)
+
+This configuration is a mix of the two configuration above, to boot this one
+the configuration file must be processed so the /chosen node must have the
+"xen,uefi-cfg-load" property.
+
+Here an example:
+
+Xen configuration file:
+
+```
+[global]
+default=xen
+
+[xen]
+options=<Xen command line>
+kernel=vmlinuz-3.0.31-0.4-xen [domain 0 command line options]
+ramdisk=initrd-3.0.31-0.4-xen
+dtb=<optional DTB>
+```
+
+Device tree:
+
+```
+chosen {
+	#size-cells = <0x1>;
+	#address-cells = <0x1>;
+	xen,uefi-cfg-load;
+
+	domU1 {
+		#size-cells = <0x1>;
+		#address-cells = <0x1>;
+		compatible = "xen,domain";
+		cpus = <0x1>;
+		memory = <0x0 0xc0000>;
+		vpl011;
+
+		module@1 {
+			compatible = "multiboot,kernel", "multiboot,module";
+			xen,uefi-binary = "Image-domu1.bin";
+			bootargs = "console=ttyAMA0 root=/dev/ram0 rw";
+		};
+	};
+};
+```
+
+

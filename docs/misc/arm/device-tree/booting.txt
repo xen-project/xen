@@ -190,6 +190,13 @@ The kernel sub-node has the following properties:
 
     Command line parameters for the guest kernel.
 
+- xen,uefi-binary (UEFI boot only)
+
+    String property that specifies the file name to be loaded by the UEFI boot
+    for this module. If this is specified, there is no need to specify the reg
+    property because it will be created by the UEFI stub on boot.
+    This option is needed only when UEFI boot is used.
+
 The ramdisk sub-node has the following properties:
 
 - compatible
@@ -200,6 +207,13 @@ The ramdisk sub-node has the following properties:
 
     Specifies the physical address of the ramdisk in RAM and its
     length.
+
+- xen,uefi-binary (UEFI boot only)
+
+    String property that specifies the file name to be loaded by the UEFI boot
+    for this module. If this is specified, there is no need to specify the reg
+    property because it will be created by the UEFI stub on boot.
+    This option is needed only when UEFI boot is used.
 
 
 Example
@@ -264,6 +278,13 @@ The dtb sub-node should have the following properties:
 
     Specifies the physical address of the device tree binary fragment
     RAM and its length.
+
+- xen,uefi-binary (UEFI boot only)
+
+    String property that specifies the file name to be loaded by the UEFI boot
+    for this module. If this is specified, there is no need to specify the reg
+    property because it will be created by the UEFI stub on boot.
+    This option is needed only when UEFI boot is used.
 
 As an example:
 
