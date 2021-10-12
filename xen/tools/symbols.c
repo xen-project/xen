@@ -84,7 +84,6 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 {
 	char str[500], type[20] = "";
 	char *sym, stype;
-	static enum { symbol, single_source, multi_source } last;
 	static char *filename;
 	int rc = -1;
 
@@ -118,24 +117,11 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	      */
 	     input_format == fmt_sysv && !*type && stype == '?' && sym &&
 	     sym[1] && strchr("cSsoh", sym[1]) && !sym[2])) {
-		/*
-		 * gas prior to binutils commit fbdf9406b0 (expected to appear
-		 * in 2.27) outputs symbol table entries resulting from .file
-		 * in reverse order. If we get two consecutive file symbols,
-		 * prefer the first one if that names an object file or has a
-		 * directory component (to cover multiply compiled files).
-		 */
-		bool multi = strchr(str, '/') || (sym && sym[1] == 'o');
-
-		if (multi || last != multi_source) {
-			free(filename);
-			filename = *str ? strdup(str) : NULL;
-		}
-		last = multi ? multi_source : single_source;
+		free(filename);
+		filename = *str ? strdup(str) : NULL;
 		goto skip_tail;
 	}
 
-	last = symbol;
 	rc = -1;
 
 	sym = str;

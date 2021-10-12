@@ -21,9 +21,6 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Allow uniquely identifying static symbols in the 3 generated objects. */
-asm(".file \"" __OBJECT_FILE__ "\"");
-
 #include <xen/types.h>
 #include <xen/mm.h>
 #include <xen/paging.h>

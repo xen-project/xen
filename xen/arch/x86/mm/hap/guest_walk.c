@@ -18,9 +18,6 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Allow uniquely identifying static symbols in the 3 generated objects. */
-asm(".file \"" __OBJECT_FILE__ "\"");
-
 #include <xen/domain_page.h>
 #include <xen/paging.h>
 #include <xen/sched.h>

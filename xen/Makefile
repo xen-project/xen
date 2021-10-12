@@ -518,17 +518,6 @@ _MAP:
 %/: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o built_in_bin.o
 
-build-intermediate = $(eval $(call build-intermediate-closure,$(1)))
-define build-intermediate-closure
-$(1): FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $$(@D) $$(@F)
-endef
-
-$(foreach base,arch/x86/mm/guest_walk_% \
-               arch/x86/mm/hap/guest_walk_%level \
-               arch/x86/mm/shadow/guest_%, \
-    $(foreach ext,o i s,$(call build-intermediate,$(base).$(ext))))
-
 .PHONY: cloc
 cloc:
 	$(eval tmpfile := $(shell mktemp))
