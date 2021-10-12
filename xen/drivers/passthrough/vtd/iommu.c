@@ -751,7 +751,7 @@ static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
     unsigned long flags;
     struct vtd_iommu *iommu = drhd->iommu;
 
-    if ( is_igd_drhd(drhd) )
+    if ( drhd->gfx_only )
     {
         if ( !iommu_igfx )
         {

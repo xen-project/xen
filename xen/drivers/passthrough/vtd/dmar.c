@@ -315,6 +315,7 @@ static int __init acpi_parse_dev_scope(
     struct acpi_drhd_unit *drhd = type == DMAR_TYPE ?
         container_of(scope, struct acpi_drhd_unit, scope) : NULL;
     int depth, cnt, didx = 0, ret;
+    bool gfx_only = false;
 
     if ( (cnt = scope_device_count(start, end)) < 0 )
         return cnt;
@@ -324,6 +325,8 @@ static int __init acpi_parse_dev_scope(
         scope->devices = xzalloc_array(u16, cnt);
         if ( !scope->devices )
             return -ENOMEM;
+
+        gfx_only = drhd && !drhd->include_all;
     }
     scope->devices_cnt = cnt;
 
@@ -354,6 +357,7 @@ static int __init acpi_parse_dev_scope(
                        acpi_scope->bus, sec_bus, sub_bus);
 
             dmar_scope_add_buses(scope, sec_bus, sub_bus);
+            gfx_only = false;
             break;
 
         case ACPI_DMAR_SCOPE_TYPE_HPET:
@@ -374,6 +378,8 @@ static int __init acpi_parse_dev_scope(
                 acpi_hpet_unit->dev = path->dev;
                 acpi_hpet_unit->func = path->fn;
                 list_add(&acpi_hpet_unit->list, &drhd->hpet_list);
+
+                gfx_only = false;
             }
 
             break;
@@ -388,6 +394,12 @@ static int __init acpi_parse_dev_scope(
                 if ( (seg == 0) && (bus == 0) && (path->dev == 2) &&
                      (path->fn == 0) )
                     igd_drhd_address = drhd->address;
+
+                if ( gfx_only &&
+                     pci_conf_read8(PCI_SBDF(seg, bus, path->dev, path->fn),
+                                    PCI_CLASS_DEVICE + 1) != 0x03
+                                    /* PCI_BASE_CLASS_DISPLAY */ )
+                    gfx_only = false;
             }
 
             break;
@@ -408,6 +420,8 @@ static int __init acpi_parse_dev_scope(
                 acpi_ioapic_unit->ioapic.bdf.dev = path->dev;
                 acpi_ioapic_unit->ioapic.bdf.func = path->fn;
                 list_add(&acpi_ioapic_unit->list, &drhd->ioapic_list);
+
+                gfx_only = false;
             }
 
             break;
@@ -417,11 +431,15 @@ static int __init acpi_parse_dev_scope(
                 printk(XENLOG_WARNING VTDPREFIX "Unknown scope type %#x\n",
                        acpi_scope->entry_type);
             start += acpi_scope->length;
+            gfx_only = false;
             continue;
         }
         scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
         start += acpi_scope->length;
-   }
+    }
+
+    if ( drhd && gfx_only )
+        drhd->gfx_only = true;
 
     ret = 0;
 

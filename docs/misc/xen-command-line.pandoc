@@ -1494,8 +1494,8 @@ The following options are specific to Intel VT-d hardware:
     version 6 and greater as Registered-Based Invalidation isn't supported
     by them.
 
-*   The `igfx` boolean is active by default, and controls whether the IOMMU in
-    front of an Intel Graphics Device is enabled or not.
+*   The `igfx` boolean is active by default, and controls whether IOMMUs in
+    front of solely graphics devices get enabled or not.
 
     It is intended as a debugging mechanism for graphics issues, and to be
     similar to Linux's `intel_iommu=igfx_off` option.  If specifying `no-igfx`

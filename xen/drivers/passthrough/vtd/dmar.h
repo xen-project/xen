@@ -62,7 +62,8 @@ struct acpi_drhd_unit {
     struct list_head list;
     u64    address;                     /* register base address of the unit */
     u16    segment;
-    u8     include_all:1;
+    bool   include_all:1;
+    bool   gfx_only:1;
     struct vtd_iommu *iommu;
     struct list_head ioapic_list;
     struct list_head hpet_list;
