@@ -4,6 +4,7 @@
 #ifdef CONFIG_ARM_64
 #define cpu_feature64(c, feat)         ((c)->pfr64.feat)
 #define boot_cpu_feature64(feat)       (system_cpuinfo.pfr64.feat)
+#define boot_dbg_feature64(feat)       (system_cpuinfo.dbg64.feat)
 
 #define cpu_feature64_has_el0_32(c)    (cpu_feature64(c, el0) == 2)
 
@@ -22,6 +23,7 @@
 
 #define cpu_feature32(c, feat)         ((c)->pfr32.feat)
 #define boot_cpu_feature32(feat)       (system_cpuinfo.pfr32.feat)
+#define boot_dbg_feature32(feat)       (system_cpuinfo.dbg32.feat)
 
 #define cpu_has_arm       (boot_cpu_feature32(arm) == 1)
 #define cpu_has_thumb     (boot_cpu_feature32(thumb) >= 1)
@@ -32,8 +34,20 @@
 
 #ifdef CONFIG_ARM_32
 #define cpu_has_gentimer  (boot_cpu_feature32(gentimer) == 1)
+/*
+ * On Armv7, the value 0 is used to indicate that PMUv2 is not
+ * supported. IOW this doesn't tell us whether the PMU is not supported
+ * (a processor may implement PMUv1).
+ *
+ * For convenience, we treat 0 as not supported which matches the
+ * meaning on Armv8
+ */
+#define cpu_has_pmu       ((boot_dbg_feature32(perfmon) >= 1) && \
+                           (boot_dbg_feature32(perfmon) < 15))
 #else
 #define cpu_has_gentimer  (1)
+#define cpu_has_pmu       ((boot_dbg_feature64(pmu_ver) >= 1) && \
+                           (boot_dbg_feature64(pmu_ver) < 15))
 #endif
 #define cpu_has_security  (boot_cpu_feature32(security) > 0)
 
@@ -181,8 +195,28 @@ struct cpuinfo_arm {
         };
     } pfr64;
 
-    struct {
+    union {
         register_t bits[2];
+        struct {
+            /* DFR0 */
+            unsigned long debug_ver:4;
+            unsigned long trace_ver:4;
+            unsigned long pmu_ver:4;
+            unsigned long brps:4;
+            unsigned long __res0:4;
+            unsigned long wrps:4;
+            unsigned long __res1:4;
+            unsigned long ctx_cmps:4;
+            unsigned long pms_ver:4;
+            unsigned long double_lock:4;
+            unsigned long trace_filt:4;
+            unsigned long __res2:4;
+            unsigned long mtpmu:4;
+            unsigned long __res3:12;
+
+            /* DFR1 */
+            unsigned long __res4:64;
+        };
     } dbg64;
 
     struct {
@@ -321,8 +355,29 @@ struct cpuinfo_arm {
         };
     } pfr32;
 
-    struct {
+    union {
         register_t bits[2];
+        struct {
+            /* DFR0 */
+            unsigned long copdbg:4;
+            unsigned long copsdbg:4;
+            unsigned long mmapdbg:4;
+            unsigned long coptrc:4;
+            unsigned long mmaptrc:4;
+            unsigned long mprofdbg:4;
+            unsigned long perfmon:4;
+            unsigned long tracefilt:4;
+#ifdef CONFIG_ARM_64
+            unsigned long __res0:32;
+#endif
+
+            /* DFR1 */
+            unsigned long mtpmu:4;
+            unsigned long __res1:28;
+#ifdef CONFIG_ARM_64
+            unsigned long __res2:32;
+#endif
+        };
     } dbg32;
 
     struct {
