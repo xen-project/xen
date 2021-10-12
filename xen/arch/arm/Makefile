@@ -103,14 +103,6 @@ prelink.o: $(ALL_OBJS) $(ALL_LIBS) FORCE
 	$(call if_changed,ld)
 endif
 
-ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
-    ifeq ($(call ld-option, --fix-cortex-a53-843419),n)
-        $(warning ld does not support --fix-cortex-a53-843419; xen may be susceptible to erratum)
-    else
-        XEN_LDFLAGS += --fix-cortex-a53-843419
-    endif
-endif
-
 targets += prelink.o
 
 $(TARGET)-syms: prelink.o xen.lds
