@@ -280,6 +280,9 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         if ( vmtrace_available )
             pi->capabilities |= XEN_SYSCTL_PHYSCAP_vmtrace;
 
+        if ( vpmu_is_available )
+            pi->capabilities |= XEN_SYSCTL_PHYSCAP_vpmu;
+
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
     }

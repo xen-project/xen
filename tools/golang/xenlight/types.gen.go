@@ -1008,6 +1008,7 @@ CapHap bool
 CapShadow bool
 CapIommuHapPtShare bool
 CapVmtrace bool
+CapVpmu bool
 }
 
 type Connectorinfo struct {

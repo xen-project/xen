@@ -133,4 +133,6 @@ static inline void vnuma_destroy(struct vnuma_info *vnuma) { ASSERT(!vnuma); }
 
 extern bool vmtrace_available;
 
+extern bool vpmu_is_available;
+
 #endif /* __XEN_DOMAIN_H__ */

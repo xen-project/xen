@@ -503,6 +503,12 @@
 #define LIBXL_HAVE_X86_MSR_RELAXED 1
 
 /*
+ * LIBXL_HAVE_PHYSINFO_CAP_VPMU indicates that libxl_physinfo has a cap_vpmu
+ * field, which indicates the availability of vPMU functionality.
+ */
+#define LIBXL_HAVE_PHYSINFO_CAP_VPMU 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
