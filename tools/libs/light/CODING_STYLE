@@ -121,6 +121,16 @@ permitted exceptions to the usual libxl code formatting rules.
 
 
 
+ARCHITECTURE-SPECIFIC CODE, CONDITIONAL COMPILATION
+---------------------------------------------------
+
+Architecture-specific code should be isolated in libxl_<arch>.c,
+with a function call interface, wherever possible.
+
+#ifdefs should be avoided, and in any case not interspersed through
+the primary functional code.
+
+
 IDEMPOTENT DATA STRUCTURE CONSTRUCTION/DESTRUCTION
 --------------------------------------------------
 
