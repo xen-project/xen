@@ -100,6 +100,7 @@ int msi_msg_write_remap_rte(struct msi_desc *, struct msi_msg *);
 int intel_setup_hpet_msi(struct msi_desc *);
 
 int is_igd_vt_enabled_quirk(void);
+bool is_azalia_tlb_enabled(const struct acpi_drhd_unit *);
 void platform_quirks_init(void);
 void vtd_ops_preamble_quirk(struct vtd_iommu *iommu);
 void vtd_ops_postamble_quirk(struct vtd_iommu *iommu);

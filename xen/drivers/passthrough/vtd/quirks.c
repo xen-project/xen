@@ -100,6 +100,69 @@ static void __init cantiga_b3_errata_init(void)
         is_cantiga_b3 = 1;
 }
 
+/*
+ * QUIRK to work around certain BIOSes enabling the ISOCH DMAR unit for the
+ * Azalia sound device, but not giving it any TLB entries, causing it to
+ * deadlock.
+ */
+bool is_azalia_tlb_enabled(const struct acpi_drhd_unit *drhd)
+{
+    pci_sbdf_t sbdf;
+    unsigned int vtisochctrl;
+
+    /* Only dedicated units are of interest. */
+    if ( drhd->include_all || drhd->scope.devices_cnt != 1 )
+        return true;
+
+    /* Check for the specific device. */
+    sbdf = PCI_SBDF2(drhd->segment, drhd->scope.devices[0]);
+    if ( pci_conf_read16(sbdf, PCI_VENDOR_ID) != PCI_VENDOR_ID_INTEL ||
+         pci_conf_read16(sbdf, PCI_DEVICE_ID) != 0x3a3e )
+        return true;
+
+    /* Check for the corresponding System Management Registers device. */
+    sbdf = PCI_SBDF(drhd->segment, 0, 0x14, 0);
+    if ( pci_conf_read16(sbdf, PCI_VENDOR_ID) != PCI_VENDOR_ID_INTEL ||
+         pci_conf_read16(sbdf, PCI_DEVICE_ID) != 0x342e )
+        return true;
+
+    vtisochctrl = pci_conf_read32(sbdf, 0x188);
+    if ( vtisochctrl == 0xffffffff )
+    {
+        printk(XENLOG_WARNING VTDPREFIX
+               " Cannot access VTISOCHCTRL at this time\n");
+        return true;
+    }
+
+    /*
+     * If Azalia DMA is routed to the non-isoch DMAR unit, that's fine in
+     * principle, but not consistent with the ACPI tables.
+     */
+    if ( vtisochctrl & 1 )
+    {
+        printk(XENLOG_WARNING VTDPREFIX
+               " Inconsistency between chipset registers and ACPI tables\n");
+        return true;
+    }
+
+    /* Drop all bits other than the number of TLB entries. */
+    vtisochctrl &= 0x1c;
+
+    /* If we have at least the recommended number of TLB entries, fine. */
+    if ( vtisochctrl >= 16 )
+        return true;
+
+    /* Zero TLB entries? */
+    if ( !vtisochctrl )
+        return false;
+
+    printk(XENLOG_WARNING VTDPREFIX
+           " Recommended TLB entries for ISOCH unit is 16; firmware set %u\n",
+           vtisochctrl);
+
+    return true;
+}
+
 /* check for Sandybridge IGD device ID's */
 static void __init snb_errata_init(void)
 {

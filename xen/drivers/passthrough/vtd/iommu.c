@@ -750,25 +750,41 @@ static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
     u32 sts;
     unsigned long flags;
     struct vtd_iommu *iommu = drhd->iommu;
+    static const char crash_fmt[] = "%s; crash Xen for security purpose\n";
 
     if ( drhd->gfx_only )
     {
+        static const char disable_fmt[] = XENLOG_WARNING VTDPREFIX
+                                          " %s; disabling IGD VT-d engine\n";
+
         if ( !iommu_igfx )
         {
-            printk(XENLOG_INFO VTDPREFIX
-                   "Passed iommu=no-igfx option.  Disabling IGD VT-d engine.\n");
+            printk(disable_fmt, "passed iommu=no-igfx option");
             return;
         }
 
         if ( !is_igd_vt_enabled_quirk() )
         {
-            if ( force_iommu )
-                panic("BIOS did not enable IGD for VT properly, crash Xen for security purpose\n");
+            static const char msg[] = "firmware did not enable IGD for VT properly";
 
-            printk(XENLOG_WARNING VTDPREFIX
-                   "BIOS did not enable IGD for VT properly.  Disabling IGD VT-d engine.\n");
+            if ( force_iommu )
+                panic(crash_fmt, msg);
+
+            printk(disable_fmt, msg);
             return;
         }
+    }
+
+    if ( !is_azalia_tlb_enabled(drhd) )
+    {
+        static const char msg[] = "firmware did not enable TLB for sound device";
+
+        if ( force_iommu )
+            panic(crash_fmt, msg);
+
+        printk(XENLOG_WARNING VTDPREFIX " %s; disabling ISOCH VT-d engine\n",
+               msg);
+        return;
     }
 
     /* apply platform specific errata workarounds */
