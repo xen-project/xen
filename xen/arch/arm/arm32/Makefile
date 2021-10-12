@@ -11,3 +11,4 @@ obj-y += smpboot.o
 obj-y += traps.o
 obj-y += vfp.o
 
+extra-y += head.o

@@ -65,7 +65,6 @@ obj-$(CONFIG_SBSA_VUART_CONSOLE) += vpl011.o
 obj-y += vsmc.o
 obj-y += vpsci.o
 obj-y += vuart.o
-extra-y += $(TARGET_SUBARCH)/head.o
 
 #obj-bin-y += ....o
 
@@ -74,6 +73,12 @@ obj-y += dtb.o
 endif
 
 ALL_OBJS := $(TARGET_SUBARCH)/head.o $(ALL_OBJS)
+
+# head.o is built by descending into the sub-directory, depends on the part of
+# $(ALL_OBJS) that will eventually recurse into $(TARGET_SUBARCH)/ and build
+# head.o
+$(TARGET_SUBARCH)/head.o: $(BASEDIR)/arch/arm/built_in.o
+$(TARGET_SUBARCH)/head.o: ;
 
 ifdef CONFIG_LIVEPATCH
 all_symbols = --all-symbols
