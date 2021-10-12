@@ -48,6 +48,15 @@ XENSTORED_ARGS=
 # Only evaluated if XENSTORETYPE is "daemon".
 #XENSTORED_TRACE=[yes|on|1]
 
+## Type: integer
+## Default: 50
+#
+# Percentage of dom0 memory size the xenstore daemon can use before the
+# OOM killer is allowed to kill it.
+# The specified value is multiplied by -10 and echoed to
+# /proc/PID/oom_score_adj.
+#XENSTORED_OOM_MEM_THRESHOLD=50
+
 ## Type: string
 ## Default: @LIBEXEC@/boot/xenstore-stubdom.gz
 #
