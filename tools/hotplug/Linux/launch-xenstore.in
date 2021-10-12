@@ -54,6 +54,7 @@ test -f @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons && . @CONFIG_DIR@/@CONFIG_LEAF
 
 [ "$XENSTORETYPE" = "daemon" ] && {
 	[ -z "$XENSTORED_TRACE" ] || XENSTORED_ARGS="$XENSTORED_ARGS -T @XEN_LOG_DIR@/xenstored-trace.log"
+	[ -z "$XENSTORED_MAX_OPEN_FDS" ] && XENSTORED_MAX_OPEN_FDS=unlimited
 	[ -z "$XENSTORED" ] && XENSTORED=@XENSTORED@
 	[ -x "$XENSTORED" ] || {
 		echo "No xenstored found"
@@ -62,10 +63,28 @@ test -f @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons && . @CONFIG_DIR@/@CONFIG_LEAF
 	[ -z "$XENSTORED_OOM_MEM_THRESHOLD" ] || XENSTORED_OOM_MEM_THRESHOLD=50
 	XS_OOM_SCORE=-$(($XENSTORED_OOM_MEM_THRESHOLD * 10))
 
+	[ "$XENSTORED_MAX_OPEN_FDS" = "unlimited" ] || {
+		[ -z "${XENSTORED_MAX_OPEN_FDS//[0-9]}" ] &&
+		[ -n "$XENSTORED_MAX_OPEN_FDS" ] || {
+			echo "XENSTORED_MAX_OPEN_FDS=$XENSTORED_MAX_OPEN_FDS invalid"
+			echo "Setting to default \"unlimited\"."
+			XENSTORED_MAX_OPEN_FDS=unlimited
+		}
+	}
+	[ -r /proc/sys/fs/nr_open ] && {
+		MAX_FDS=`cat /proc/sys/fs/nr_open`
+		[ "$XENSTORED_MAX_OPEN_FDS" = "unlimited" ] && XENSTORED_MAX_OPEN_FDS=$MAX_FDS
+		[ $XENSTORED_MAX_OPEN_FDS -gt $MAX_FDS ] && {
+			echo "XENSTORED_MAX_OPEN_FDS exceeds system limit."
+			echo "Setting to \"$MAX_FDS\"."
+			XENSTORED_MAX_OPEN_FDS=$MAX_FDS
+		}
+	}
+
 	rm -f @XEN_RUN_DIR@/xenstored.pid
 
 	echo -n Starting $XENSTORED...
-	$XENSTORED --pid-file @XEN_RUN_DIR@/xenstored.pid $XENSTORED_ARGS
+	prlimit --nofile=$XENSTORED_MAX_OPEN_FDS $XENSTORED --pid-file @XEN_RUN_DIR@/xenstored.pid $XENSTORED_ARGS
 
 	systemd-notify --booted 2>/dev/null || timeout_xenstore $XENSTORED || exit 1
 	XS_PID=`cat @XEN_RUN_DIR@/xenstored.pid`

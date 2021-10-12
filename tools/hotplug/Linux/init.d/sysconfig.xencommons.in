@@ -33,6 +33,19 @@
 #XENSTORED=@XENSTORED@
 
 ## Type: string
+## Default: unlimited
+#
+# Select maximum number of file descriptors xenstored is allowed to have
+# opened at one time.
+# For each HVM domain xenstored might need up to 5 open file descriptors,
+# PVH and PV domains will require up to 3 open file descriptors. Additionally
+# 20-30 file descriptors will be opened for internal uses.
+# The specified value (including "unlimited") will be capped by the contents
+# of /proc/sys/fs/nr_open if existing.
+# Only evaluated if XENSTORETYPE is "daemon".
+#XENSTORED_MAX_OPEN_FDS=unlimited
+
+## Type: string
 ## Default: ""
 #
 # Additional commandline arguments to start xenstored,
