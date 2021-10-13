@@ -98,6 +98,8 @@ void __iomem *pci_ecam_map_bus(struct pci_host_bridge *bridge,
                                pci_sbdf_t sbdf, uint32_t where);
 struct pci_host_bridge *pci_find_host_bridge(uint16_t segment, uint8_t bus);
 struct dt_device_node *pci_find_host_bridge_node(struct device *dev);
+int pci_get_host_bridge_segment(const struct dt_device_node *node,
+                                uint16_t *segment);
 
 static always_inline bool is_pci_passthrough_enabled(void)
 {
@@ -118,6 +120,13 @@ static always_inline bool is_pci_passthrough_enabled(void)
 struct pci_dev;
 
 static inline void arch_pci_init_pdev(struct pci_dev *pdev) {}
+
+static inline int pci_get_host_bridge_segment(const struct dt_device_node *node,
+                                              uint16_t *segment)
+{
+    ASSERT_UNREACHABLE();
+    return -EINVAL;
+}
 
 #endif  /*!CONFIG_HAS_PCI*/
 #endif /* __ARM_PCI_H__ */
