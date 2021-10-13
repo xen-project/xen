@@ -999,6 +999,9 @@ void __init start_xen(unsigned long boot_phys_offset,
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     /* TODO: smp_cpus_done(); */
 
+    /* This should be done in a vpmu driver but we do not have one yet. */
+    vpmu_is_available = cpu_has_pmu;
+
     /*
      * The IOMMU subsystem must be initialized before P2M as we need
      * to gather requirements regarding the maximum IPA bits supported by

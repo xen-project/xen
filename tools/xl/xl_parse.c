@@ -2750,6 +2750,8 @@ skip_usbdev:
                     "If it fixes an issue you are having please report to "
                     "xen-devel@lists.xenproject.org.\n");
 
+    xlu_cfg_get_defbool(config, "vpmu", &b_info->vpmu, 0);
+
     xlu_cfg_destroy(config);
 }
 

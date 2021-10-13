@@ -1119,6 +1119,9 @@ return fmt.Errorf("converting field ArchX86.MsrRelaxed: %v", err)
 }
 x.Altp2M = Altp2MMode(xc.altp2m)
 x.VmtraceBufKb = int(xc.vmtrace_buf_kb)
+if err := x.Vpmu.fromC(&xc.vpmu);err != nil {
+return fmt.Errorf("converting field Vpmu: %v", err)
+}
 
  return nil}
 
@@ -1600,6 +1603,9 @@ return fmt.Errorf("converting field ArchX86.MsrRelaxed: %v", err)
 }
 xc.altp2m = C.libxl_altp2m_mode(x.Altp2M)
 xc.vmtrace_buf_kb = C.int(x.VmtraceBufKb)
+if err := x.Vpmu.toC(&xc.vpmu); err != nil {
+return fmt.Errorf("converting field Vpmu: %v", err)
+}
 
  return nil
  }

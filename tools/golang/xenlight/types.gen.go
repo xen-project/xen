@@ -521,6 +521,7 @@ MsrRelaxed Defbool
 }
 Altp2M Altp2MMode
 VmtraceBufKb int
+Vpmu Defbool
 }
 
 type DomainBuildInfoTypeUnion interface {

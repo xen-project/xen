@@ -690,6 +690,23 @@ default.
 B<NOTE>: Acceptable values are platform specific.  For Intel Processor
 Trace, this value must be a power of 2 between 4k and 16M.
 
+=item B<vpmu=BOOLEAN>
+
+Currently ARM only.
+
+Specifies whether to enable the access to PMU registers by disabling
+the PMU traps.
+
+The PMU registers are not virtualized and the physical registers are directly
+accessible when this parameter is enabled. There is no interrupt support and
+Xen will not save/restore the register values on context switches.
+
+vPMU, by design and purpose, exposes system level performance
+information to the guest. Only to be used by sufficiently privileged
+domains. This feature is currently in experimental state.
+
+If this option is not specified then it will default to B<false>.
+
 =back
 
 =head2 Devices

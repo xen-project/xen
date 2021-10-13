@@ -166,6 +166,7 @@ struct arch_vcpu
 
     /* HYP configuration */
     register_t hcr_el2;
+    register_t mdcr_el2;
 
     uint32_t teecr, teehbr; /* ThumbEE, 32-bit guests only */
 #ifdef CONFIG_ARM_32

@@ -509,6 +509,12 @@
 #define LIBXL_HAVE_PHYSINFO_CAP_VPMU 1
 
 /*
+ * LIBXL_HAVE_VPMU indicates that libxl_domain_build_info has a vpmu parameter,
+ * which allows to enable the access to PMU registers.
+ */
+#define LIBXL_HAVE_VPMU 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

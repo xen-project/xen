@@ -671,11 +671,19 @@ such as KVM, Hyper-V, Bromium, and so on as guests.
 
 ### vPMU
 
-Virtual Performance Management Unit for HVM guests
+Virtual Performance Management Unit
 
-    Status, x86: Supported, Not security supported
+    Status, x86 HVM: Supported, Not security supported
+    Status, ARM: Experimental
 
-Disabled by default (enable with hypervisor command line option).
+On ARM, support for accessing PMU registers from the guests.
+There is no interrupt support and Xen will not save/restore
+the register values on context switches.
+
+Disabled by default.
+On ARM, enable with guest parameter.
+On x86, enable with hypervisor command line option.
+
 This feature is not security supported: see https://xenbits.xen.org/xsa/advisory-163.html
 
 ### Argo: Inter-domain message delivery by hypercall

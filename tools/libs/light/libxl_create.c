@@ -91,6 +91,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     }
 
     libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
+    libxl_defbool_setdefault(&b_info->vpmu, false);
 
     if (libxl_defbool_val(b_info->device_model_stubdomain) &&
         !b_info->device_model_ssidref)
@@ -621,6 +622,9 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
             if ( libxl_defbool_val(b_info->nested_hvm) )
                 create.flags |= XEN_DOMCTL_CDF_nested_virt;
         }
+
+        if (libxl_defbool_val(b_info->vpmu))
+            create.flags |= XEN_DOMCTL_CDF_vpmu;
 
         assert(info->passthrough != LIBXL_PASSTHROUGH_DEFAULT);
         LOG(DETAIL, "passthrough: %s",
@@ -1196,6 +1200,12 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         pod_enabled) {
         ret = ERROR_INVAL;
         LOGD(ERROR, domid, "Cannot enable PoD and ALTP2M at the same time");
+        goto error_out;
+    }
+
+    if (libxl_defbool_val(d_config->b_info.vpmu) && !physinfo.cap_vpmu) {
+        ret = ERROR_INVAL;
+        LOGD(ERROR, domid, "vPMU not supported on this platform");
         goto error_out;
     }
 

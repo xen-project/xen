@@ -480,12 +480,14 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
     bool hvm = config->flags & XEN_DOMCTL_CDF_hvm;
     bool hap = config->flags & XEN_DOMCTL_CDF_hap;
     bool iommu = config->flags & XEN_DOMCTL_CDF_iommu;
+    bool vpmu = config->flags & XEN_DOMCTL_CDF_vpmu;
 
     if ( config->flags &
          ~(XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap |
            XEN_DOMCTL_CDF_s3_integrity | XEN_DOMCTL_CDF_oos_off |
            XEN_DOMCTL_CDF_xs_domain | XEN_DOMCTL_CDF_iommu |
-           XEN_DOMCTL_CDF_nested_virt | XEN_DOMCTL_CDF_vpci) )
+           XEN_DOMCTL_CDF_nested_virt | XEN_DOMCTL_CDF_vpci |
+           XEN_DOMCTL_CDF_vpmu) )
     {
         dprintk(XENLOG_INFO, "Unknown CDF flags %#x\n", config->flags);
         return -EINVAL;
@@ -531,6 +533,12 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
     if ( config->vmtrace_size && !vmtrace_available )
     {
         dprintk(XENLOG_INFO, "vmtrace requested but not available\n");
+        return -EINVAL;
+    }
+
+    if ( vpmu && !vpmu_is_available )
+    {
+        dprintk(XENLOG_INFO, "vpmu requested but cannot be enabled this way\n");
         return -EINVAL;
     }
 

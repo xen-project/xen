@@ -276,6 +276,8 @@ static void ctxt_switch_to(struct vcpu *n)
      * timer. The interrupt needs to be injected into the guest. */
     WRITE_SYSREG(n->arch.cntkctl, CNTKCTL_EL1);
     virt_timer_restore(n);
+
+    WRITE_SYSREG(n->arch.mdcr_el2, MDCR_EL2);
 }
 
 /* Update per-VCPU guest runstate shared memory area (if registered). */
@@ -586,6 +588,10 @@ int arch_vcpu_create(struct vcpu *v)
 
     v->arch.hcr_el2 = get_default_hcr_flags();
 
+    v->arch.mdcr_el2 = HDCR_TDRA | HDCR_TDOSA | HDCR_TDA;
+    if ( !(v->domain->options & XEN_DOMCTL_CDF_vpmu) )
+        v->arch.mdcr_el2 |= HDCR_TPM | HDCR_TPMCR;
+
     if ( (rc = vcpu_vgic_init(v)) != 0 )
         goto fail;
 
@@ -621,10 +627,11 @@ void vcpu_switch_to_aarch64_mode(struct vcpu *v)
 int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
     unsigned int max_vcpus;
+    unsigned int flags_required = (XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap);
+    unsigned int flags_optional = (XEN_DOMCTL_CDF_iommu | XEN_DOMCTL_CDF_vpci |
+                                   XEN_DOMCTL_CDF_vpmu);
 
-    /* HVM and HAP must be set. IOMMU and VPCI may or may not be */
-    if ( (config->flags & ~XEN_DOMCTL_CDF_iommu & ~XEN_DOMCTL_CDF_vpci) !=
-         (XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap) )
+    if ( (config->flags & ~flags_optional) != flags_required )
     {
         dprintk(XENLOG_INFO, "Unsupported configuration %#x\n",
                 config->flags);
