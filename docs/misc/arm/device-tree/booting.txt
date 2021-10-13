@@ -51,6 +51,8 @@ Each node contains the following properties:
 	Xen 4.4 supported a different set of legacy compatible strings
 	which remain supported such that systems supporting both 4.4
 	and later can use a single DTB.
+	However when booting Xen using UEFI, the legacy compatible
+	strings are not supported.
 
 	- "xen,multiboot-module" equivalent to "multiboot,module"
 	- "xen,linux-zimage"     equivalent to "multiboot,kernel"
