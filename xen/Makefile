@@ -379,6 +379,7 @@ _clean: delete-unfresh-files
 	$(MAKE) $(clean) test
 	$(MAKE) $(kconfig) clean
 	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" \
+		-o -name ".*.o.tmp" -o -name "*~" -o -name "core" \
 		-o -name "*.gcno" -o -name ".*.cmd" -o -name "lib.a" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map *~ core
 	rm -f asm-offsets.s include/asm-*/asm-offsets.h

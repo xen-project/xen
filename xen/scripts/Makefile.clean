@@ -14,10 +14,8 @@ include Makefile
 subdir-all := $(subdir-y) $(subdir-n) $(subdir-) \
               $(patsubst %/,%, $(filter %/, $(obj-y) $(obj-n) $(obj-)))
 
-DEPS_RM = $(DEPS) $(DEPS_INCLUDE)
 .PHONY: clean
-clean:: $(subdir-all)
-	rm -f *.o .*.o.tmp *~ core $(DEPS_RM)
+clean:: $(subdir-all) ;
 
 # Descending
 # ---------------------------------------------------------------------------
