@@ -269,6 +269,21 @@ static int fdt_property_regs(libxl__gc *gc, void *fdt,
     return fdt_property(fdt, "reg", regs, sizeof(regs));
 }
 
+static int fdt_property_reg_placeholder(libxl__gc *gc, void *fdt,
+                                        unsigned int addr_cells,
+                                        unsigned int size_cells,
+                                        unsigned int num_regs)
+{
+    uint32_t regs[num_regs * (addr_cells + size_cells)];
+    be32 *cells = &regs[0];
+    unsigned int i;
+
+    for (i = 0; i < num_regs; i++)
+        set_range(&cells, addr_cells, size_cells, 0, 0);
+
+    return fdt_property(fdt, "reg", regs, sizeof(regs));
+}
+
 static int make_root_properties(libxl__gc *gc,
                                 const libxl_version_info *vers,
                                 void *fdt)
@@ -615,9 +630,13 @@ static int make_hypervisor_node(libxl__gc *gc, void *fdt,
                               "xen,xen");
     if (res) return res;
 
-    /* reg 0 is grant table space */
-    res = fdt_property_regs(gc, fdt, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
-                            1,GUEST_GNTTAB_BASE, GUEST_GNTTAB_SIZE);
+    /*
+     * reg 0 is a placeholder for grant table space, reg 1...N are
+     * the placeholders for extended regions.
+     */
+    res = fdt_property_reg_placeholder(gc, fdt, GUEST_ROOT_ADDRESS_CELLS,
+                                       GUEST_ROOT_SIZE_CELLS,
+                                       GUEST_RAM_BANKS + 1);
     if (res) return res;
 
     /*
@@ -1069,20 +1088,93 @@ static void finalise_one_node(libxl__gc *gc, void *fdt, const char *uname,
     }
 }
 
+#define ALIGN_UP_TO_2MB(x)   (((x) + MB(2) - 1) & (~(MB(2) - 1)))
+
+#define EXT_REGION_MIN_SIZE   xen_mk_ullong(0x0004000000) /* 64MB */
+
+static int finalize_hypervisor_node(libxl__gc *gc, struct xc_dom_image *dom)
+{
+    void *fdt = dom->devicetree_blob;
+    uint64_t region_size[GUEST_RAM_BANKS] = {0}, region_base[GUEST_RAM_BANKS],
+        bankend[GUEST_RAM_BANKS];
+    uint32_t regs[(GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS) *
+                  (GUEST_RAM_BANKS + 1)];
+    be32 *cells = &regs[0];
+    const uint64_t bankbase[] = GUEST_RAM_BANK_BASES;
+    const uint64_t banksize[] = GUEST_RAM_BANK_SIZES;
+    unsigned int i, len, nr_regions = 0;
+    libxl_dominfo info;
+    int offset, rc;
+
+    offset = fdt_path_offset(fdt, "/hypervisor");
+    if (offset < 0)
+        return offset;
+
+    rc = libxl_domain_info(CTX, &info, dom->guest_domid);
+    if (rc)
+        return rc;
+
+    if (info.gpaddr_bits > 64)
+        return ERROR_INVAL;
+
+    /*
+     * Try to allocate separate 2MB-aligned extended regions from the first
+     * and second RAM banks taking into the account the maximum supported
+     * guest physical address space size and the amount of memory assigned
+     * to the guest.
+     */
+    for (i = 0; i < GUEST_RAM_BANKS; i++) {
+        region_base[i] = bankbase[i] +
+            ALIGN_UP_TO_2MB((uint64_t)dom->rambank_size[i] << XC_PAGE_SHIFT);
+
+        bankend[i] = ~0ULL >> (64 - info.gpaddr_bits);
+        bankend[i] = min(bankend[i], bankbase[i] + banksize[i] - 1);
+        if (bankend[i] > region_base[i])
+            region_size[i] = bankend[i] - region_base[i] + 1;
+    }
+
+    /*
+     * The region 0 for grant table space must be always present. If we managed
+     * to allocate the extended regions then insert them as regions 1...N.
+     */
+    set_range(&cells, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
+              GUEST_GNTTAB_BASE, GUEST_GNTTAB_SIZE);
+
+    for (i = 0; i < GUEST_RAM_BANKS; i++) {
+        if (region_size[i] < EXT_REGION_MIN_SIZE)
+            continue;
+
+        LOG(DEBUG, "Extended region %u: %#"PRIx64"->%#"PRIx64"",
+            nr_regions, region_base[i], region_base[i] + region_size[i]);
+
+        set_range(&cells, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
+                  region_base[i], region_size[i]);
+        nr_regions++;
+    }
+
+    if (!nr_regions)
+        LOG(WARN, "The extended regions cannot be allocated, not enough space");
+
+    len = sizeof(regs[0]) * (GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS) *
+        (nr_regions + 1);
+
+    return fdt_setprop(fdt, offset, "reg", regs, len);
+}
+
 int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
                                                uint32_t domid,
                                                libxl_domain_config *d_config,
                                                struct xc_dom_image *dom)
 {
     void *fdt = dom->devicetree_blob;
-    int i;
+    int i, res;
     const uint64_t bankbase[] = GUEST_RAM_BANK_BASES;
 
     const struct xc_dom_seg *ramdisk = dom->modules[0].blob ?
         &dom->modules[0].seg : NULL;
 
     if (ramdisk) {
-        int chosen, res;
+        int chosen;
         uint64_t val;
 
         /* Neither the fdt_path_offset() nor either of the
@@ -1108,6 +1200,10 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
         assert(!res);
 
     }
+
+    res = finalize_hypervisor_node(gc, dom);
+    if (res)
+        return res;
 
     for (i = 0; i < GUEST_RAM_BANKS; i++) {
         const uint64_t size = (uint64_t)dom->rambank_size[i] << XC_PAGE_SHIFT;

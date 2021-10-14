@@ -438,6 +438,11 @@ typedef uint64_t xen_callback_t;
 
 #define GUEST_RAM_BANKS   2
 
+/*
+ * The way to find the extended regions (to be exposed to the guest as unused
+ * address space) relies on the fact that the regions reserved for the RAM
+ * below are big enough to also accommodate such regions.
+ */
 #define GUEST_RAM0_BASE   xen_mk_ullong(0x40000000) /* 3GB of low RAM @ 1GB */
 #define GUEST_RAM0_SIZE   xen_mk_ullong(0xc0000000)
 
