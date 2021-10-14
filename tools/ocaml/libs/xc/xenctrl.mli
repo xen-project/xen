@@ -62,7 +62,6 @@ type domain_create_flag =
   | CDF_XS_DOMAIN
   | CDF_IOMMU
   | CDF_NESTED_VIRT
-  | CDF_VPCI
   | CDF_VPMU
 
 type domain_create_iommu_opts =
