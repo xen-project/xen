@@ -27,7 +27,7 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 		done
 	$(OBJCOPY) -O binary -R .got.plt $< $@
 
-%.lnk: %.o
+%.lnk: %.o build32.lds
 	$(LD) $(LDFLAGS_DIRECT) -N -T build32.lds -o $@ $<
 
 %.o: %.c
