@@ -306,6 +306,7 @@ void libxl__xcinfo2xlinfo(libxl_ctx *ctx,
     xlinfo->vcpu_max_id = xcinfo->max_vcpu_id;
     xlinfo->vcpu_online = xcinfo->nr_online_vcpus;
     xlinfo->cpupool = xcinfo->cpupool;
+    xlinfo->gpaddr_bits = xcinfo->gpaddr_bits;
     xlinfo->domain_type = (xcinfo->flags & XEN_DOMINF_hvm_guest) ?
         LIBXL_DOMAIN_TYPE_HVM : LIBXL_DOMAIN_TYPE_PV;
 }

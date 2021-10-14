@@ -151,6 +151,7 @@ void arch_get_domain_info(const struct domain *d,
         info->flags |= XEN_DOMINF_hap;
 
     info->arch_config.emulation_flags = d->arch.emulation_flags;
+    info->gpaddr_bits = hap_paddr_bits;
 }
 
 static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,

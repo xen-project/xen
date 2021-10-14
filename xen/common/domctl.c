@@ -69,10 +69,10 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     int flags = XEN_DOMINF_blocked;
     struct vcpu_runstate_info runstate;
 
+    memset(info, 0, sizeof(*info));
+
     info->domain = d->domain_id;
     info->max_vcpu_id = XEN_INVALID_MAX_VCPU_ID;
-    info->nr_online_vcpus = 0;
-    info->ssidref = 0;
 
     /*
      * - domain is marked as blocked only if all its vcpus are blocked

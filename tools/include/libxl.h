@@ -886,6 +886,14 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_DOMINFO_NEVER_STOP 1
 
 /*
+ * LIBXL_HAVE_DOMINFO_GPADDR_BITS
+ *
+ * If this is defined, libxl_dominfo will contain an uint8 field called
+ * gpaddr_bits, containing the guest physical address space size.
+ */
+#define LIBXL_HAVE_DOMINFO_GPADDR_BITS 1
+
+/*
  * LIBXL_HAVE_QXL
  *
  * If defined, then the libxl_vga_interface_type will contain another value:

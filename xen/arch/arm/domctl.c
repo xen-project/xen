@@ -20,6 +20,8 @@ void arch_get_domain_info(const struct domain *d,
 {
     /* All ARM domains use hardware assisted paging. */
     info->flags |= XEN_DOMINF_hap;
+
+    info->gpaddr_bits = p2m_ipa_bits;
 }
 
 static int handle_vuart_init(struct domain *d, 
