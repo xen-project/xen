@@ -433,6 +433,11 @@ typedef uint64_t xen_callback_t;
 #define GUEST_PL011_BASE    xen_mk_ullong(0x22000000)
 #define GUEST_PL011_SIZE    xen_mk_ullong(0x00001000)
 
+/* Guest PCI-PCIe memory space where config space and BAR will be available.*/
+#define GUEST_VPCI_ADDR_TYPE_MEM            xen_mk_ullong(0x02000000)
+#define GUEST_VPCI_MEM_ADDR                 xen_mk_ullong(0x23000000)
+#define GUEST_VPCI_MEM_SIZE                 xen_mk_ullong(0x10000000)
+
 /*
  * 16MB == 4096 pages reserved for guest to use as a region to map its
  * grant table in.
@@ -452,6 +457,11 @@ typedef uint64_t xen_callback_t;
  */
 #define GUEST_RAM0_BASE   xen_mk_ullong(0x40000000) /* 3GB of low RAM @ 1GB */
 #define GUEST_RAM0_SIZE   xen_mk_ullong(0xc0000000)
+
+/* 4GB @ 4GB Prefetch Memory for VPCI */
+#define GUEST_VPCI_ADDR_TYPE_PREFETCH_MEM   xen_mk_ullong(0x42000000)
+#define GUEST_VPCI_PREFETCH_MEM_ADDR        xen_mk_ullong(0x100000000)
+#define GUEST_VPCI_PREFETCH_MEM_SIZE        xen_mk_ullong(0x100000000)
 
 #define GUEST_RAM1_BASE   xen_mk_ullong(0x0200000000) /* 1016GB of RAM @ 8GB */
 #define GUEST_RAM1_SIZE   xen_mk_ullong(0xfe00000000)

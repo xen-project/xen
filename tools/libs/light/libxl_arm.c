@@ -284,6 +284,59 @@ static int fdt_property_reg_placeholder(libxl__gc *gc, void *fdt,
     return fdt_property(fdt, "reg", regs, sizeof(regs));
 }
 
+static int fdt_property_values(libxl__gc *gc, void *fdt,
+                               const char *name,
+                               unsigned num_cells, ...)
+{
+    uint32_t prop[num_cells];
+    be32 *cells = &prop[0];
+    int i;
+    va_list ap;
+    uint32_t arg;
+
+    va_start(ap, num_cells);
+    for (i = 0 ; i < num_cells; i++) {
+        arg = va_arg(ap, uint32_t);
+        set_cell(&cells, 1, arg);
+    }
+    va_end(ap);
+
+    return fdt_property(fdt, name, prop, sizeof(prop));
+}
+
+static int fdt_property_vpci_ranges(libxl__gc *gc, void *fdt,
+                                    unsigned addr_cells,
+                                    unsigned size_cells,
+                                    unsigned num_regs, ...)
+{
+    uint32_t regs[num_regs*((addr_cells*2)+size_cells+1)];
+    be32 *cells = &regs[0];
+    int i;
+    va_list ap;
+    uint64_t arg;
+
+    va_start(ap, num_regs);
+    for (i = 0 ; i < num_regs; i++) {
+        /* Set the memory bit field */
+        arg = va_arg(ap, uint32_t);
+        set_cell(&cells, 1, arg);
+
+        /* Set the vpci bus address */
+        arg = addr_cells ? va_arg(ap, uint64_t) : 0;
+        set_cell(&cells, addr_cells , arg);
+
+        /* Set the cpu bus address where vpci address is mapped */
+        set_cell(&cells, addr_cells, arg);
+
+        /* Set the vpci size requested */
+        arg = size_cells ? va_arg(ap, uint64_t) : 0;
+        set_cell(&cells, size_cells, arg);
+    }
+    va_end(ap);
+
+    return fdt_property(fdt, "ranges", regs, sizeof(regs));
+}
+
 static int make_root_properties(libxl__gc *gc,
                                 const libxl_version_info *vers,
                                 void *fdt)
@@ -687,6 +740,53 @@ static int make_vpl011_uart_node(libxl__gc *gc, void *fdt,
     return 0;
 }
 
+static int make_vpci_node(libxl__gc *gc, void *fdt,
+                          const struct arch_info *ainfo,
+                          struct xc_dom_image *dom)
+{
+    int res;
+    const uint64_t vpci_ecam_base = GUEST_VPCI_ECAM_BASE;
+    const uint64_t vpci_ecam_size = GUEST_VPCI_ECAM_SIZE;
+    const char *name = GCSPRINTF("pcie@%"PRIx64, vpci_ecam_base);
+
+    res = fdt_begin_node(fdt, name);
+    if (res) return res;
+
+    res = fdt_property_compat(gc, fdt, 1, "pci-host-ecam-generic");
+    if (res) return res;
+
+    res = fdt_property_string(fdt, "device_type", "pci");
+    if (res) return res;
+
+    res = fdt_property_regs(gc, fdt, GUEST_ROOT_ADDRESS_CELLS,
+            GUEST_ROOT_SIZE_CELLS, 1, vpci_ecam_base, vpci_ecam_size);
+    if (res) return res;
+
+    res = fdt_property_values(gc, fdt, "bus-range", 2, 0, 255);
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "#address-cells", 3);
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "#size-cells", 2);
+    if (res) return res;
+
+    res = fdt_property_string(fdt, "status", "okay");
+    if (res) return res;
+
+    res = fdt_property_vpci_ranges(gc, fdt, GUEST_ROOT_ADDRESS_CELLS,
+        GUEST_ROOT_SIZE_CELLS, 2,
+        GUEST_VPCI_ADDR_TYPE_MEM, GUEST_VPCI_MEM_ADDR, GUEST_VPCI_MEM_SIZE,
+        GUEST_VPCI_ADDR_TYPE_PREFETCH_MEM, GUEST_VPCI_PREFETCH_MEM_ADDR,
+        GUEST_VPCI_PREFETCH_MEM_SIZE);
+    if (res) return res;
+
+    res = fdt_end_node(fdt);
+    if (res) return res;
+
+    return 0;
+}
+
 static const struct arch_info *get_arch_info(libxl__gc *gc,
                                              const struct xc_dom_image *dom)
 {
@@ -990,6 +1090,9 @@ next_resize:
 
         if (info->tee == LIBXL_TEE_TYPE_OPTEE)
             FDT( make_optee_node(gc, fdt) );
+
+        if (d_config->num_pcidevs)
+            FDT( make_vpci_node(gc, fdt, ainfo, dom) );
 
         if (pfdt)
             FDT( copy_partial_fdt(gc, fdt, pfdt) );

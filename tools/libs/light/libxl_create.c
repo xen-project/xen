@@ -1096,6 +1096,11 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         goto error_out;
     }
 
+    /*
+     * Note: libxl_arm directly examines num_pcidevs to decide whether
+     * to create a vPCI DT node, rather than using c_info->passthrough.
+     * This will be insufficient if and when ARM does PCI hotplug.
+     */
     bool need_pt = d_config->num_pcidevs || d_config->num_dtdevs;
     if (c_info->passthrough == LIBXL_PASSTHROUGH_DEFAULT) {
         c_info->passthrough = need_pt
