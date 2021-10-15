@@ -120,6 +120,7 @@ struct ivrs_mappings {
     uint16_t dte_requestor_id;
     bool valid:1;
     bool dte_allow_exclusion:1;
+    bool block_ats:1;
 
     /* ivhd device data settings */
     uint8_t device_flags;

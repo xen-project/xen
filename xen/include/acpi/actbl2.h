@@ -851,7 +851,7 @@ struct acpi_ivrs_device8b {
 
 /* Values for extended_data above */
 
-#define ACPI_IVHD_ATS_DISABLED      (1<<31)
+#define ACPI_IVHD_ATS_DISABLED      (1u << 31)
 
 /* Type 72: 8-byte device entry */
 

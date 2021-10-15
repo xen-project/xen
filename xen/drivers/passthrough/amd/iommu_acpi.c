@@ -55,8 +55,8 @@ union acpi_ivhd_device {
 };
 
 static void __init add_ivrs_mapping_entry(
-    uint16_t bdf, uint16_t alias_id, uint8_t flags, bool alloc_irt,
-    struct amd_iommu *iommu)
+    uint16_t bdf, uint16_t alias_id, uint8_t flags, unsigned int ext_flags,
+    bool alloc_irt, struct amd_iommu *iommu)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(iommu->seg);
 
@@ -66,6 +66,7 @@ static void __init add_ivrs_mapping_entry(
     ivrs_mappings[bdf].dte_requestor_id = alias_id;
 
     /* override flags for range of devices */
+    ivrs_mappings[bdf].block_ats = ext_flags & ACPI_IVHD_ATS_DISABLED;
     ivrs_mappings[bdf].device_flags = flags;
 
     /* Don't map an IOMMU by itself. */
@@ -499,7 +500,7 @@ static u16 __init parse_ivhd_device_select(
         return 0;
     }
 
-    add_ivrs_mapping_entry(bdf, bdf, select->header.data_setting, false,
+    add_ivrs_mapping_entry(bdf, bdf, select->header.data_setting, 0, false,
                            iommu);
 
     return sizeof(*select);
@@ -545,7 +546,7 @@ static u16 __init parse_ivhd_device_range(
     AMD_IOMMU_DEBUG(" Dev_Id Range: %#x -> %#x\n", first_bdf, last_bdf);
 
     for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
-        add_ivrs_mapping_entry(bdf, bdf, range->start.header.data_setting,
+        add_ivrs_mapping_entry(bdf, bdf, range->start.header.data_setting, 0,
                                false, iommu);
 
     return dev_length;
@@ -580,7 +581,7 @@ static u16 __init parse_ivhd_device_alias(
 
     AMD_IOMMU_DEBUG(" Dev_Id Alias: %#x\n", alias_id);
 
-    add_ivrs_mapping_entry(bdf, alias_id, alias->header.data_setting, true,
+    add_ivrs_mapping_entry(bdf, alias_id, alias->header.data_setting, 0, true,
                            iommu);
 
     return dev_length;
@@ -636,7 +637,7 @@ static u16 __init parse_ivhd_device_alias_range(
 
     for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
         add_ivrs_mapping_entry(bdf, alias_id, range->alias.header.data_setting,
-                               true, iommu);
+                               0, true, iommu);
 
     return dev_length;
 }
@@ -661,7 +662,8 @@ static u16 __init parse_ivhd_device_extended(
         return 0;
     }
 
-    add_ivrs_mapping_entry(bdf, bdf, ext->header.data_setting, false, iommu);
+    add_ivrs_mapping_entry(bdf, bdf, ext->header.data_setting,
+                           ext->extended_data, false, iommu);
 
     return dev_length;
 }
@@ -708,7 +710,7 @@ static u16 __init parse_ivhd_device_extended_range(
 
     for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
         add_ivrs_mapping_entry(bdf, bdf, range->extended.header.data_setting,
-                               false, iommu);
+                               range->extended.extended_data, false, iommu);
 
     return dev_length;
 }
@@ -800,7 +802,7 @@ static u16 __init parse_ivhd_device_special(
 
     AMD_IOMMU_DEBUG("IVHD Special: %pp variety %#x handle %#x\n",
                     &PCI_SBDF2(seg, bdf), special->variety, special->handle);
-    add_ivrs_mapping_entry(bdf, bdf, special->header.data_setting, true,
+    add_ivrs_mapping_entry(bdf, bdf, special->header.data_setting, 0, true,
                            iommu);
 
     switch ( special->variety )
