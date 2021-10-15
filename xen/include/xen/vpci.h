@@ -19,6 +19,8 @@ typedef int vpci_register_init_t(struct pci_dev *dev);
 #define VPCI_PRIORITY_MIDDLE    "5"
 #define VPCI_PRIORITY_LOW       "9"
 
+#define VPCI_ECAM_BDF(addr)     (((addr) & 0x0ffff000) >> 12)
+
 #define REGISTER_VPCI_INIT(x, p)                \
   static vpci_register_init_t *const x##_entry  \
                __used_section(".data.vpci." p) = x
@@ -208,6 +210,16 @@ static inline unsigned int vmsix_entry_nr(const struct vpci_msix *msix,
 {
     return entry - msix->entries;
 }
+
+bool vpci_access_allowed(unsigned int reg, unsigned int len);
+
+/* ECAM mmio read/write helpers */
+bool vpci_ecam_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int len,
+                     unsigned long data);
+
+bool vpci_ecam_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int len,
+                    unsigned long *data);
+
 #endif /* __XEN__ */
 
 #else /* !CONFIG_HAS_VPCI */
