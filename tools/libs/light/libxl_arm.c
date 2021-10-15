@@ -878,7 +878,7 @@ static int copy_partial_fdt(libxl__gc *gc, void *fdt, void *pfdt)
 
 #define FDT_MAX_SIZE (1<<20)
 
-static int libxl__prepare_dtb(libxl__gc *gc, libxl_domain_build_info *info,
+static int libxl__prepare_dtb(libxl__gc *gc, libxl_domain_config *d_config,
                               libxl__domain_build_state *state,
                               struct xc_dom_image *dom)
 {
@@ -887,6 +887,7 @@ static int libxl__prepare_dtb(libxl__gc *gc, libxl_domain_build_info *info,
     int rc, res;
     size_t fdt_size = 0;
     int pfdt_size = 0;
+    libxl_domain_build_info *const info = &d_config->b_info;
 
     const libxl_version_info *vers;
     const struct arch_info *ainfo;
@@ -1042,7 +1043,7 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
     if (rc)
         return rc;
 
-    rc = libxl__prepare_dtb(gc, info, state, dom);
+    rc = libxl__prepare_dtb(gc, d_config, state, dom);
     if (rc) goto out;
 
     if (!libxl_defbool_val(info->acpi)) {
