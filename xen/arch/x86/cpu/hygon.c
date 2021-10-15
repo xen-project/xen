@@ -59,14 +59,7 @@ static void init_hygon(struct cpuinfo_x86 *c)
 		__set_bit(X86_FEATURE_LFENCE_DISPATCH,
 			  c->x86_capability);
 
-	/*
-	 * If the user has explicitly chosen to disable Memory Disambiguation
-	 * to mitigiate Speculative Store Bypass, poke the appropriate MSR.
-	 */
-	if (opt_ssbd && !rdmsr_safe(MSR_AMD64_LS_CFG, value)) {
-		value |= 1ull << 10;
-		wrmsr_safe(MSR_AMD64_LS_CFG, value);
-	}
+	amd_init_ssbd(c);
 
 	/* MFENCE stops RDTSC speculation */
 	if (!cpu_has_lfence_dispatch)
