@@ -304,13 +304,10 @@ void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void amd_iommu_flush_all_iotlbs(struct domain *d, daddr_t daddr,
+static void amd_iommu_flush_all_iotlbs(const struct domain *d, daddr_t daddr,
                                        unsigned int order)
 {
     struct pci_dev *pdev;
-
-    if ( !ats_enabled )
-        return;
 
     for_each_pdev( d, pdev )
     {
@@ -342,7 +339,16 @@ static void _amd_iommu_flush_pages(struct domain *d,
     }
 
     if ( ats_enabled )
+    {
         amd_iommu_flush_all_iotlbs(d, daddr, order);
+
+        /*
+         * Hidden devices are associated with DomXEN but usable by the
+         * hardware domain. Hence they need dealing with here as well.
+         */
+        if ( is_hardware_domain(d) )
+            amd_iommu_flush_all_iotlbs(dom_xen, daddr, order);
+    }
 }
 
 void amd_iommu_flush_all_pages(struct domain *d)
