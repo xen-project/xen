@@ -148,11 +148,17 @@ static const char *const str_e8b[32] =
     [ 0] = "clzero",
     [ 2] = "rstr-fp-err-ptrs",
 
-    /* [ 8] */            [ 9] = "wbnoinvd",
+    /* [ 8] */                 [ 9] = "wbnoinvd",
 
     [12] = "ibpb",
+    [14] = "ibrs",             [15] = "amd-stibp",
+    [16] = "ibrs-always",      [17] = "stibp-always",
+    [18] = "ibrs-fast",        [19] = "ibrs-same-mode",
 
     /* [22] */                 [23] = "ppin",
+    [24] = "amd-ssbd",         [25] = "virt-ssbd",
+    [26] = "ssb-no",
+    [28] = "psfd",
 };
 
 static const char *const str_7d0[32] =

@@ -74,6 +74,7 @@ extern u32 svm_feature_flags;
 #define SVM_FEATURE_PAUSETHRESH   12 /* Pause intercept filter support */
 #define SVM_FEATURE_VLOADSAVE     15 /* virtual vmload/vmsave */
 #define SVM_FEATURE_VGIF          16 /* Virtual GIF */
+#define SVM_FEATURE_SPEC_CTRL     20 /* MSR_SPEC_CTRL virtualisation */
 
 #define cpu_has_svm_feature(f) (svm_feature_flags & (1u << (f)))
 #define cpu_has_svm_npt       cpu_has_svm_feature(SVM_FEATURE_NPT)
@@ -88,6 +89,7 @@ extern u32 svm_feature_flags;
 #define cpu_has_pause_thresh  cpu_has_svm_feature(SVM_FEATURE_PAUSETHRESH)
 #define cpu_has_tsc_ratio     cpu_has_svm_feature(SVM_FEATURE_TSCRATEMSR)
 #define cpu_has_svm_vloadsave cpu_has_svm_feature(SVM_FEATURE_VLOADSAVE)
+#define cpu_has_svm_spec_ctrl cpu_has_svm_feature(SVM_FEATURE_SPEC_CTRL)
 
 #define SVM_PAUSEFILTER_INIT    4000
 #define SVM_PAUSETHRESH_INIT    1000

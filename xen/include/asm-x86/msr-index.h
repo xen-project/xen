@@ -33,6 +33,7 @@
 #define  SPEC_CTRL_IBRS                     (_AC(1, ULL) <<  0)
 #define  SPEC_CTRL_STIBP                    (_AC(1, ULL) <<  1)
 #define  SPEC_CTRL_SSBD                     (_AC(1, ULL) <<  2)
+#define  SPEC_CTRL_PSFD                     (_AC(1, ULL) <<  7)
 
 #define MSR_PRED_CMD                        0x00000049
 #define  PRED_CMD_IBPB                      (_AC(1, ULL) <<  0)
@@ -128,6 +129,8 @@
 
 #define MSR_F15H_CU_POWER                   0xc001007a
 #define MSR_F15H_CU_MAX_POWER               0xc001007b
+
+#define MSR_VIRT_SPEC_CTRL                  0xc001011f /* Layout matches MSR_SPEC_CTRL */
 
 #define MSR_AMD_RAPL_POWER_UNIT             0xc0010299
 #define MSR_AMD_CORE_ENERGY_STATUS          0xc001029a

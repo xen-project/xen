@@ -254,7 +254,17 @@ XEN_CPUFEATURE(CLZERO,        8*32+ 0) /*A  CLZERO instruction */
 XEN_CPUFEATURE(RSTR_FP_ERR_PTRS, 8*32+ 2) /*A  (F)X{SAVE,RSTOR} always saves/restores FPU Error pointers */
 XEN_CPUFEATURE(WBNOINVD,      8*32+ 9) /*   WBNOINVD instruction */
 XEN_CPUFEATURE(IBPB,          8*32+12) /*A  IBPB support only (no IBRS, used by AMD) */
+XEN_CPUFEATURE(IBRS,          8*32+14) /*   MSR_SPEC_CTRL.IBRS */
+XEN_CPUFEATURE(AMD_STIBP,     8*32+15) /*   MSR_SPEC_CTRL.STIBP */
+XEN_CPUFEATURE(IBRS_ALWAYS,   8*32+16) /*   IBRS preferred always on */
+XEN_CPUFEATURE(STIBP_ALWAYS,  8*32+17) /*   STIBP preferred always on */
+XEN_CPUFEATURE(IBRS_FAST,     8*32+18) /*   IBRS preferred over software options */
+XEN_CPUFEATURE(IBRS_SAME_MODE, 8*32+19) /*   IBRS provides same-mode protection */
 XEN_CPUFEATURE(AMD_PPIN,      8*32+23) /*   Protected Processor Inventory Number */
+XEN_CPUFEATURE(AMD_SSBD,      8*32+24) /*   MSR_SPEC_CTRL.SSBD available */
+XEN_CPUFEATURE(VIRT_SSBD,     8*32+25) /*   MSR_VIRT_SPEC_CTRL.SSBD */
+XEN_CPUFEATURE(SSB_NO,        8*32+26) /*   Hardware not vulnerable to SSB */
+XEN_CPUFEATURE(PSFD,          8*32+28) /*   MSR_SPEC_CTRL.PSFD */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0.edx, word 9 */
 XEN_CPUFEATURE(AVX512_4VNNIW, 9*32+ 2) /*A  AVX512 Neural Network Instructions */

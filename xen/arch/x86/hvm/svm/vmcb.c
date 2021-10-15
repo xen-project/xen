@@ -271,6 +271,7 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(offsetof(typeof(vmcb), rsp)                  != 0x5d8);
     BUILD_BUG_ON(offsetof(typeof(vmcb), rax)                  != 0x5f8);
     BUILD_BUG_ON(offsetof(typeof(vmcb), _g_pat)               != 0x668);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), spec_ctrl)            != 0x6e0);
 
     /* Check struct segment_register against the VMCB segment layout. */
     BUILD_BUG_ON(sizeof(vmcb.es)       != 16);
