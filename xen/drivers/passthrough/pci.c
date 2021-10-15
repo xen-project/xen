@@ -375,8 +375,7 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     /* update bus2bridge */
     switch ( pdev->type = pdev_type(pseg->nr, bus, devfn) )
     {
-        u16 cap;
-        u8 sec_bus, sub_bus;
+        unsigned int cap, sec_bus, sub_bus;
 
         case DEV_TYPE_PCIe2PCI_BRIDGE:
         case DEV_TYPE_LEGACY_PCI_BRIDGE:
@@ -443,7 +442,7 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
     /* update bus2bridge */
     switch ( pdev->type )
     {
-        uint8_t sec_bus, sub_bus;
+        unsigned int sec_bus, sub_bus;
 
         case DEV_TYPE_PCIe2PCI_BRIDGE:
         case DEV_TYPE_LEGACY_PCI_BRIDGE:
