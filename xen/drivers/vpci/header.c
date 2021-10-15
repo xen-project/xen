@@ -373,7 +373,7 @@ static void bar_write(const struct pci_dev *pdev, unsigned int reg,
         /* If the value written is the current one avoid printing a warning. */
         if ( val != (uint32_t)(bar->addr >> (hi ? 32 : 0)) )
             gprintk(XENLOG_WARNING,
-                    "%pp: ignored BAR %lu write with memory decoding enabled\n",
+                    "%pp: ignored BAR %zu write with memory decoding enabled\n",
                     &pdev->sbdf, bar - pdev->vpci->header.bars + hi);
         return;
     }

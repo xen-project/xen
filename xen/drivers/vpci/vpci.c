@@ -485,6 +485,12 @@ bool vpci_access_allowed(unsigned int reg, unsigned int len)
     if ( len != 1 && len != 2 && len != 4 && len != 8 )
         return false;
 
+#ifndef CONFIG_64BIT
+    /* Prevent 64bit accesses on 32bit */
+    if ( len == 8 )
+        return false;
+#endif
+
     /* Check that access is size aligned. */
     if ( (reg & (len - 1)) )
         return false;
@@ -500,8 +506,10 @@ bool vpci_ecam_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int len,
         return false;
 
     vpci_write(sbdf, reg, min(4u, len), data);
+#ifdef CONFIG_64BIT
     if ( len == 8 )
         vpci_write(sbdf, reg + 4, 4, data >> 32);
+#endif
 
     return true;
 }
@@ -526,8 +534,10 @@ bool vpci_ecam_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int len,
      *  4byte accesses.
      */
     *data = vpci_read(sbdf, reg, min(4u, len));
+#ifdef CONFIG_64BIT
     if ( len == 8 )
         *data |= (uint64_t)vpci_read(sbdf, reg + 4, 4) << 32;
+#endif
 
     return true;
 }

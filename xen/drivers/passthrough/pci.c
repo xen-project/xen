@@ -756,6 +756,19 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     if ( !pdev->domain )
     {
         pdev->domain = hardware_domain;
+#ifdef CONFIG_ARM
+        /*
+         * On ARM PCI devices discovery will be done by Dom0. Add vpci handler
+         * when Dom0 inform XEN to add the PCI devices in XEN.
+         */
+        ret = vpci_add_handlers(pdev);
+        if ( ret )
+        {
+            printk(XENLOG_ERR "Setup of vPCI failed: %d\n", ret);
+            pdev->domain = NULL;
+            goto out;
+        }
+#endif
         ret = iommu_add_device(pdev);
         if ( ret )
         {
