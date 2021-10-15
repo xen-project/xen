@@ -67,6 +67,9 @@ void __init get_iommu_features(struct amd_iommu *iommu)
 
         iommu->features.raw =
             readq(iommu->mmio_base + IOMMU_EXT_FEATURE_MMIO_OFFSET);
+
+        if ( 4 + iommu->features.flds.hats < amd_iommu_max_paging_mode )
+            amd_iommu_max_paging_mode = 4 + iommu->features.flds.hats;
     }
 
     /* Don't log the same set of features over and over. */
@@ -199,6 +202,10 @@ int __init amd_iommu_detect_one_acpi(
     }
     else if ( list_empty(&amd_iommu_head) )
         AMD_IOMMU_DEBUG("EFRSup not set in ACPI table; will fall back to hardware\n");
+
+    if ( (amd_iommu_acpi_info & ACPI_IVRS_EFR_SUP) &&
+         4 + iommu->features.flds.hats < amd_iommu_max_paging_mode )
+        amd_iommu_max_paging_mode = 4 + iommu->features.flds.hats;
 
     /* override IOMMU HT flags */
     iommu->ht_flags = ivhd_block->header.flags;

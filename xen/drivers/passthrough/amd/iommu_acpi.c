@@ -378,6 +378,7 @@ static int __init parse_ivmd_device_iommu(
 static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
 {
     unsigned long start_addr, mem_length, base, limit;
+    unsigned int addr_bits;
     bool iw = true, ir = true, exclusion = false;
 
     if ( ivmd_block->header.length < sizeof(*ivmd_block) )
@@ -393,6 +394,17 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
 
     AMD_IOMMU_DEBUG("IVMD Block: type %#x phys %#lx len %#lx\n",
                     ivmd_block->header.type, start_addr, mem_length);
+
+    addr_bits = min(MASK_EXTR(amd_iommu_acpi_info, ACPI_IVRS_PHYSICAL_SIZE),
+                    MASK_EXTR(amd_iommu_acpi_info, ACPI_IVRS_VIRTUAL_SIZE));
+    if ( amd_iommu_get_paging_mode(PFN_UP(start_addr + mem_length)) < 0 ||
+         (addr_bits < BITS_PER_LONG &&
+          ((start_addr + mem_length - 1) >> addr_bits)) )
+    {
+        AMD_IOMMU_DEBUG("IVMD: [%lx,%lx) is not IOMMU addressable\n",
+                        start_addr, start_addr + mem_length);
+        return 0;
+    }
 
     if ( !e820_all_mapped(base, limit + PAGE_SIZE, E820_RESERVED) )
     {

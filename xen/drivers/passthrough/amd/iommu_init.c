@@ -1376,6 +1376,13 @@ static int __init amd_iommu_prepare_one(struct amd_iommu *iommu)
 
     get_iommu_features(iommu);
 
+    /*
+     * Late extended feature determination may cause previously mappable
+     * IVMD ranges to become unmappable.
+     */
+    if ( amd_iommu_max_paging_mode < amd_iommu_min_paging_mode )
+        return -ERANGE;
+
     return 0;
 }
 
