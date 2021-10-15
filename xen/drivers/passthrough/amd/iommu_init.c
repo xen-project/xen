@@ -386,8 +386,8 @@ static void iommu_reset_log(struct amd_iommu *iommu,
 
     if ( log_run )
     {
-        AMD_IOMMU_DEBUG("Warning: Log Run bit %d is not cleared"
-                        "before reset!\n", run_bit);
+        AMD_IOMMU_WARN("Log Run bit %d is not cleared before reset\n",
+                       run_bit);
         return;
     }
 
@@ -754,8 +754,8 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
     pcidevs_unlock();
     if ( !iommu->msi.dev )
     {
-        AMD_IOMMU_DEBUG("IOMMU: no pdev for %pp\n",
-                        &PCI_SBDF2(iommu->seg, iommu->bdf));
+        AMD_IOMMU_WARN("no pdev for %pp\n",
+                       &PCI_SBDF2(iommu->seg, iommu->bdf));
         return 0;
     }
 
@@ -799,7 +799,7 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
     if ( ret )
     {
         destroy_irq(irq);
-        AMD_IOMMU_DEBUG("can't request irq\n");
+        AMD_IOMMU_ERROR("can't request irq\n");
         return 0;
     }
 
@@ -992,7 +992,7 @@ static void *__init allocate_buffer(unsigned long alloc_size,
 
     if ( buffer == NULL )
     {
-        AMD_IOMMU_DEBUG("Error allocating %s\n", name);
+        AMD_IOMMU_ERROR("cannot allocate %s\n", name);
         return NULL;
     }
 
@@ -1224,7 +1224,7 @@ static int __init alloc_ivrs_mappings(u16 seg)
     ivrs_mappings = xzalloc_array(struct ivrs_mappings, ivrs_bdf_entries + 1);
     if ( ivrs_mappings == NULL )
     {
-        AMD_IOMMU_DEBUG("Error allocating IVRS Mappings table\n");
+        AMD_IOMMU_ERROR("cannot allocate IVRS Mappings table\n");
         return -ENOMEM;
     }
     IVRS_MAPPINGS_SEG(ivrs_mappings) = seg;

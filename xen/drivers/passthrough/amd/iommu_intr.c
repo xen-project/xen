@@ -377,8 +377,8 @@ void amd_iommu_ioapic_update_ire(
     iommu = find_iommu_for_device(seg, bdf);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("Fail to find iommu for ioapic device id ="
-                        " %04x:%04x\n", seg, bdf);
+        AMD_IOMMU_WARN("failed to find IOMMU for IO-APIC @ %04x:%04x\n",
+                       seg, bdf);
         __io_apic_write(apic, reg, value);
         return;
     }
@@ -747,8 +747,8 @@ bool __init iov_supports_xt(void)
         if ( !find_iommu_for_device(ioapic_sbdf[idx].seg,
                                     ioapic_sbdf[idx].bdf) )
         {
-            AMD_IOMMU_DEBUG("No IOMMU for IO-APIC %#x (ID %x)\n",
-                            apic, IO_APIC_ID(apic));
+            AMD_IOMMU_WARN("no IOMMU for IO-APIC %#x (ID %x)\n",
+                           apic, IO_APIC_ID(apic));
             return false;
         }
     }
@@ -765,14 +765,12 @@ int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
 
     if ( hpet_sbdf.init == HPET_NONE )
     {
-        AMD_IOMMU_DEBUG("Failed to setup HPET MSI remapping."
-                        " Missing IVRS HPET info.\n");
+        AMD_IOMMU_ERROR("failed to setup HPET MSI remapping: missing IVRS HPET info\n");
         return -ENODEV;
     }
     if ( msi_desc->hpet_id != hpet_sbdf.id )
     {
-        AMD_IOMMU_DEBUG("Failed to setup HPET MSI remapping."
-                        " Wrong HPET.\n");
+        AMD_IOMMU_ERROR("failed to setup HPET MSI remapping: wrong HPET\n");
         return -ENODEV;
     }
 

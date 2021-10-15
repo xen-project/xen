@@ -203,6 +203,18 @@ struct acpi_ivrs_hardware;
 
 #define DMA_32BIT_MASK  0x00000000ffffffffULL
 
+#define AMD_IOMMU_ERROR(fmt, args...) \
+    printk(XENLOG_ERR "AMD-Vi: Error: " fmt, ## args)
+
+#define AMD_IOMMU_WARN(fmt, args...) \
+    printk(XENLOG_WARNING "AMD-Vi: Warning: " fmt, ## args)
+
+#define AMD_IOMMU_VERBOSE(fmt, args...) \
+    do { \
+        if ( iommu_verbose ) \
+            printk(XENLOG_INFO "AMD-Vi: " fmt, ## args); \
+    } while ( false )
+
 #define AMD_IOMMU_DEBUG(fmt, args...) \
     do  \
     {   \

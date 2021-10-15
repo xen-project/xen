@@ -174,7 +174,7 @@ static int __init reserve_unity_map_for_device(
         if ( unity_map->addr + unity_map->length > base &&
              base + length > unity_map->addr )
         {
-            AMD_IOMMU_DEBUG("IVMD Error: overlap [%lx,%lx) vs [%lx,%lx)\n",
+            AMD_IOMMU_ERROR("IVMD: overlap [%lx,%lx) vs [%lx,%lx)\n",
                             base, base + length, unity_map->addr,
                             unity_map->addr + unity_map->length);
             return -EPERM;
@@ -248,7 +248,7 @@ static int __init register_range_for_device(
     iommu = find_iommu_for_device(seg, bdf);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("IVMD Error: No IOMMU for Dev_Id %#x!\n", bdf);
+        AMD_IOMMU_ERROR("IVMD: no IOMMU for Dev_Id %#x\n", bdf);
         return -ENODEV;
     }
     req = ivrs_mappings[bdf].dte_requestor_id;
@@ -318,7 +318,7 @@ static int __init parse_ivmd_device_select(
     bdf = ivmd_block->header.device_id;
     if ( bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVMD Error: Invalid Dev_Id %#x\n", bdf);
+        AMD_IOMMU_ERROR("IVMD: invalid Dev_Id %#x\n", bdf);
         return -ENODEV;
     }
 
@@ -335,16 +335,14 @@ static int __init parse_ivmd_device_range(
     first_bdf = ivmd_block->header.device_id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVMD Error: "
-                        "Invalid Range_First Dev_Id %#x\n", first_bdf);
+        AMD_IOMMU_ERROR("IVMD: invalid Range_First Dev_Id %#x\n", first_bdf);
         return -ENODEV;
     }
 
     last_bdf = ivmd_block->aux_data;
     if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
-        AMD_IOMMU_DEBUG("IVMD Error: "
-                        "Invalid Range_Last Dev_Id %#x\n", last_bdf);
+        AMD_IOMMU_ERROR("IVMD: invalid Range_Last Dev_Id %#x\n", last_bdf);
         return -ENODEV;
     }
 
@@ -367,7 +365,7 @@ static int __init parse_ivmd_device_iommu(
                                     ivmd_block->aux_data);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("IVMD Error: No IOMMU for Dev_Id %#x Cap %#x\n",
+        AMD_IOMMU_ERROR("IVMD: no IOMMU for Dev_Id %#x Cap %#x\n",
                         ivmd_block->header.device_id, ivmd_block->aux_data);
         return -ENODEV;
     }
@@ -384,7 +382,7 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
 
     if ( ivmd_block->header.length < sizeof(*ivmd_block) )
     {
-        AMD_IOMMU_DEBUG("IVMD Error: Invalid Block Length!\n");
+        AMD_IOMMU_ERROR("IVMD: invalid block length\n");
         return -ENODEV;
     }
 
@@ -402,8 +400,8 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
          (addr_bits < BITS_PER_LONG &&
           ((start_addr + mem_length - 1) >> addr_bits)) )
     {
-        AMD_IOMMU_DEBUG("IVMD: [%lx,%lx) is not IOMMU addressable\n",
-                        start_addr, start_addr + mem_length);
+        AMD_IOMMU_WARN("IVMD: [%lx,%lx) is not IOMMU addressable\n",
+                       start_addr, start_addr + mem_length);
         return 0;
     }
 
@@ -411,8 +409,8 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
     {
         paddr_t addr;
 
-        AMD_IOMMU_DEBUG("IVMD: [%lx,%lx) is not (entirely) in reserved memory\n",
-                        base, limit + PAGE_SIZE);
+        AMD_IOMMU_WARN("IVMD: [%lx,%lx) is not (entirely) in reserved memory\n",
+                       base, limit + PAGE_SIZE);
 
         for ( addr = base; addr <= limit; addr += PAGE_SIZE )
         {
@@ -423,7 +421,7 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
                 if ( e820_add_range(&e820, addr, addr + PAGE_SIZE,
                                     E820_RESERVED) )
                     continue;
-                AMD_IOMMU_DEBUG("IVMD Error: Page at %lx couldn't be reserved\n",
+                AMD_IOMMU_ERROR("IVMD: page at %lx couldn't be reserved\n",
                                 addr);
                 return -EIO;
             }
@@ -433,8 +431,7 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
                            RAM_TYPE_UNUSABLE)) )
                 continue;
 
-            AMD_IOMMU_DEBUG("IVMD Error: Page at %lx can't be converted\n",
-                            addr);
+            AMD_IOMMU_ERROR("IVMD: page at %lx can't be converted\n", addr);
             return -EIO;
         }
     }
@@ -448,7 +445,7 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
     }
     else
     {
-        AMD_IOMMU_DEBUG("IVMD Error: Invalid Flag Field!\n");
+        AMD_IOMMU_ERROR("IVMD: invalid flag field\n");
         return -ENODEV;
     }
 
@@ -471,7 +468,8 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
                                        iw, ir, exclusion);
 
     default:
-        AMD_IOMMU_DEBUG("IVMD Error: Invalid Block Type!\n");
+        AMD_IOMMU_ERROR("IVMD: unknown block type %#x\n",
+                        ivmd_block->header.type);
         return -ENODEV;
     }
 }
@@ -481,7 +479,7 @@ static u16 __init parse_ivhd_device_padding(
 {
     if ( header_length < (block_length + pad_length) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry length\n");
         return 0;
     }
 
@@ -496,7 +494,7 @@ static u16 __init parse_ivhd_device_select(
     bdf = select->header.id;
     if ( bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Dev_Id %#x\n", bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry Dev_Id %#x\n", bdf);
         return 0;
     }
 
@@ -515,14 +513,13 @@ static u16 __init parse_ivhd_device_range(
     dev_length = sizeof(*range);
     if ( header_length < (block_length + dev_length) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry length\n");
         return 0;
     }
 
     if ( range->end.header.type != ACPI_IVRS_TYPE_END )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: "
-                        "Invalid Range: End_Type %#x\n",
+        AMD_IOMMU_ERROR("IVHD: invalid range: End_Type %#x\n",
                         range->end.header.type);
         return 0;
     }
@@ -530,16 +527,14 @@ static u16 __init parse_ivhd_device_range(
     first_bdf = range->start.header.id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: "
-                        "Invalid Range: First Dev_Id %#x\n", first_bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid range: First Dev_Id %#x\n", first_bdf);
         return 0;
     }
 
     last_bdf = range->end.header.id;
     if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: "
-                        "Invalid Range: Last Dev_Id %#x\n", last_bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid range: Last Dev_Id %#x\n", last_bdf);
         return 0;
     }
 
@@ -561,21 +556,21 @@ static u16 __init parse_ivhd_device_alias(
     dev_length = sizeof(*alias);
     if ( header_length < (block_length + dev_length) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry length\n");
         return 0;
     }
 
     bdf = alias->header.id;
     if ( bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Dev_Id %#x\n", bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry Dev_Id %#x\n", bdf);
         return 0;
     }
 
     alias_id = alias->used_id;
     if ( alias_id >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Alias Dev_Id %#x\n", alias_id);
+        AMD_IOMMU_ERROR("IVHD: invalid Alias Dev_Id %#x\n", alias_id);
         return 0;
     }
 
@@ -597,14 +592,13 @@ static u16 __init parse_ivhd_device_alias_range(
     dev_length = sizeof(*range);
     if ( header_length < (block_length + dev_length) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry length\n");
         return 0;
     }
 
     if ( range->end.header.type != ACPI_IVRS_TYPE_END )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: "
-                        "Invalid Range: End_Type %#x\n",
+        AMD_IOMMU_ERROR("IVHD: invalid range: End_Type %#x\n",
                         range->end.header.type);
         return 0;
     }
@@ -612,16 +606,14 @@ static u16 __init parse_ivhd_device_alias_range(
     first_bdf = range->alias.header.id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: "
-                        "Invalid Range: First Dev_Id %#x\n", first_bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid range: First Dev_Id %#x\n", first_bdf);
         return 0;
     }
 
     last_bdf = range->end.header.id;
     if ( last_bdf >= ivrs_bdf_entries || last_bdf <= first_bdf )
     {
-        AMD_IOMMU_DEBUG(
-            "IVHD Error: Invalid Range: Last Dev_Id %#x\n", last_bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid range: Last Dev_Id %#x\n", last_bdf);
         return 0;
     }
 
@@ -651,14 +643,14 @@ static u16 __init parse_ivhd_device_extended(
     dev_length = sizeof(*ext);
     if ( header_length < (block_length + dev_length) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry length\n");
         return 0;
     }
 
     bdf = ext->header.id;
     if ( bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Dev_Id %#x\n", bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry Dev_Id %#x\n", bdf);
         return 0;
     }
 
@@ -677,14 +669,13 @@ static u16 __init parse_ivhd_device_extended_range(
     dev_length = sizeof(*range);
     if ( header_length < (block_length + dev_length) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry length\n");
         return 0;
     }
 
     if ( range->end.header.type != ACPI_IVRS_TYPE_END )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: "
-                        "Invalid Range: End_Type %#x\n",
+        AMD_IOMMU_ERROR("IVHD: invalid range: End_Type %#x\n",
                         range->end.header.type);
         return 0;
     }
@@ -692,16 +683,14 @@ static u16 __init parse_ivhd_device_extended_range(
     first_bdf = range->extended.header.id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: "
-                        "Invalid Range: First Dev_Id %#x\n", first_bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid range: First Dev_Id %#x\n", first_bdf);
         return 0;
     }
 
     last_bdf = range->end.header.id;
     if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: "
-                        "Invalid Range: Last Dev_Id %#x\n", last_bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid range: Last Dev_Id %#x\n", last_bdf);
         return 0;
     }
 
@@ -789,14 +778,14 @@ static u16 __init parse_ivhd_device_special(
     dev_length = sizeof(*special);
     if ( header_length < (block_length + dev_length) )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry length\n");
         return 0;
     }
 
     bdf = special->used_id;
     if ( bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Device_Entry Dev_Id %#x\n", bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry Dev_Id %#x\n", bdf);
         return 0;
     }
 
@@ -844,12 +833,12 @@ static u16 __init parse_ivhd_device_special(
             {
                 if ( ioapic_sbdf[idx].bdf == bdf &&
                      ioapic_sbdf[idx].seg == seg )
-                    AMD_IOMMU_DEBUG("IVHD Warning: Duplicate IO-APIC %#x entries\n",
+                    AMD_IOMMU_WARN("IVHD: duplicate IO-APIC %#x entries\n",
                                     special->handle);
                 else
                 {
-                    printk(XENLOG_ERR "IVHD Error: Conflicting IO-APIC %#x entries\n",
-                           special->handle);
+                    AMD_IOMMU_ERROR("IVHD: conflicting IO-APIC %#x entries\n",
+                                    special->handle);
                     if ( amd_iommu_perdev_intremap )
                         return 0;
                 }
@@ -944,7 +933,7 @@ static int __init parse_ivhd_block(const struct acpi_ivrs_hardware *ivhd_block)
 
     if ( ivhd_block->header.length < hdr_size )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Block Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid block length\n");
         return -ENODEV;
     }
 
@@ -953,7 +942,7 @@ static int __init parse_ivhd_block(const struct acpi_ivrs_hardware *ivhd_block)
                                     ivhd_block->capability_offset);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: No IOMMU for Dev_Id %#x Cap %#x\n",
+        AMD_IOMMU_ERROR("IVHD: no IOMMU for Dev_Id %#x Cap %#x\n",
                         ivhd_block->header.device_id,
                         ivhd_block->capability_offset);
         return -ENODEV;
@@ -1016,7 +1005,8 @@ static int __init parse_ivhd_block(const struct acpi_ivrs_hardware *ivhd_block)
                 ivhd_block->header.length, block_length, iommu);
             break;
         default:
-            AMD_IOMMU_DEBUG("IVHD Error: Invalid Device Type!\n");
+            AMD_IOMMU_WARN("IVHD: unknown device type %#x\n",
+                           ivhd_device->header.type);
             dev_length = 0;
             break;
         }
@@ -1113,8 +1103,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
 
         if ( table->length < (length + ivrs_block->length) )
         {
-            AMD_IOMMU_DEBUG("IVRS Error: "
-                            "Table Length Exceeded: %#x -> %#lx\n",
+            AMD_IOMMU_ERROR("IVRS: table length exceeded: %#x -> %#lx\n",
                             table->length,
                             (length + ivrs_block->length));
             return -ENODEV;
@@ -1214,7 +1203,7 @@ static int __init get_last_bdf_ivhd(
 
     if ( ivhd_block->header.length < hdr_size )
     {
-        AMD_IOMMU_DEBUG("IVHD Error: Invalid Block Length!\n");
+        AMD_IOMMU_ERROR("IVHD: invalid block length\n");
         return -ENODEV;
     }
 
@@ -1261,7 +1250,8 @@ static int __init get_last_bdf_ivhd(
             dev_length = sizeof(ivhd_device->special);
             break;
         default:
-            AMD_IOMMU_DEBUG("IVHD Error: Invalid Device Type!\n");
+            AMD_IOMMU_WARN("IVHD: unknown device type %#x\n",
+                           ivhd_device->header.type);
             dev_length = 0;
             break;
         }
@@ -1327,7 +1317,7 @@ get_supported_ivhd_type(struct acpi_table_header *table)
     checksum = acpi_tb_checksum(ACPI_CAST_PTR(uint8_t, table), table->length);
     if ( checksum )
     {
-        AMD_IOMMU_DEBUG("IVRS Error: Invalid Checksum %#x\n", checksum);
+        AMD_IOMMU_ERROR("IVRS: invalid checksum %#x\n", checksum);
         return -ENODEV;
     }
 
@@ -1340,8 +1330,7 @@ get_supported_ivhd_type(struct acpi_table_header *table)
 
         if ( table->length < (length + ivrs_block->length) )
         {
-            AMD_IOMMU_DEBUG("IVRS Error: "
-                            "Table Length Exceeded: %#x -> %#lx\n",
+            AMD_IOMMU_ERROR("IVRS: table length exceeded: %#x -> %#lx\n",
                             table->length,
                             (length + ivrs_block->length));
             return -ENODEV;

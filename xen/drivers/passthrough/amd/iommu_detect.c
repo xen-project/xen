@@ -141,21 +141,21 @@ int __init amd_iommu_detect_one_acpi(
 
     if ( ivhd_block->header.length < sizeof(*ivhd_block) )
     {
-        AMD_IOMMU_DEBUG("Invalid IVHD Block Length!\n");
+        AMD_IOMMU_ERROR("invalid IVHD block length\n");
         return -ENODEV;
     }
 
     if ( !ivhd_block->header.device_id ||
         !ivhd_block->capability_offset || !ivhd_block->base_address)
     {
-        AMD_IOMMU_DEBUG("Invalid IVHD Block!\n");
+        AMD_IOMMU_ERROR("invalid IVHD block\n");
         return -ENODEV;
     }
 
     iommu = xzalloc(struct amd_iommu);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("Error allocating amd_iommu\n");
+        AMD_IOMMU_ERROR("cannot allocate amd_iommu\n");
         return -ENOMEM;
     }
 

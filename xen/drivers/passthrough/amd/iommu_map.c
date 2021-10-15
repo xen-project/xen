@@ -222,7 +222,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
             table = iommu_alloc_pgtable(d);
             if ( table == NULL )
             {
-                AMD_IOMMU_DEBUG("Cannot allocate I/O page table\n");
+                AMD_IOMMU_ERROR("cannot allocate I/O page table\n");
                 unmap_domain_page(next_table_vaddr);
                 return 1;
             }
@@ -252,7 +252,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
                 table = iommu_alloc_pgtable(d);
                 if ( table == NULL )
                 {
-                    AMD_IOMMU_DEBUG("Cannot allocate I/O page table\n");
+                    AMD_IOMMU_ERROR("cannot allocate I/O page table\n");
                     unmap_domain_page(next_table_vaddr);
                     return 1;
                 }
@@ -301,7 +301,7 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     if ( rc )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        AMD_IOMMU_DEBUG("Root table alloc failed, dfn = %"PRI_dfn"\n",
+        AMD_IOMMU_ERROR("root table alloc failed, dfn = %"PRI_dfn"\n",
                         dfn_x(dfn));
         domain_crash(d);
         return rc;
@@ -310,7 +310,7 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     if ( iommu_pde_from_dfn(d, dfn_x(dfn), &pt_mfn, true) || !pt_mfn )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        AMD_IOMMU_DEBUG("Invalid IO pagetable entry dfn = %"PRI_dfn"\n",
+        AMD_IOMMU_ERROR("invalid IO pagetable entry dfn = %"PRI_dfn"\n",
                         dfn_x(dfn));
         domain_crash(d);
         return -EFAULT;
@@ -343,7 +343,7 @@ int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
     if ( iommu_pde_from_dfn(d, dfn_x(dfn), &pt_mfn, false) )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        AMD_IOMMU_DEBUG("Invalid IO pagetable entry dfn = %"PRI_dfn"\n",
+        AMD_IOMMU_ERROR("invalid IO pagetable entry dfn = %"PRI_dfn"\n",
                         dfn_x(dfn));
         domain_crash(d);
         return -EFAULT;

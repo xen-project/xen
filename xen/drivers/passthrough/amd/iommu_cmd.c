@@ -291,8 +291,7 @@ void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
 
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("%s: Can't find iommu for %pp\n",
-                        __func__, &pdev->sbdf);
+        AMD_IOMMU_WARN("can't find IOMMU for %pp\n", &pdev->sbdf);
         return;
     }
 

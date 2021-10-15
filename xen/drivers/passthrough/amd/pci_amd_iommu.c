@@ -367,10 +367,8 @@ static int reassign_device(struct domain *source, struct domain *target,
     iommu = find_iommu_for_device(pdev->seg, bdf);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("Fail to find iommu."
-                        " %04x:%02x:%x02.%x cannot be assigned to dom%d\n",
-                        pdev->seg, pdev->bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                        target->domain_id);
+        AMD_IOMMU_WARN("failed to find IOMMU: %pp cannot be assigned to %pd\n",
+                       &pdev->sbdf, target);
         return -ENODEV;
     }
 
@@ -484,8 +482,8 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
             return 0;
         }
 
-        AMD_IOMMU_DEBUG("No iommu for %pp; cannot be handed to d%d\n",
-                        &pdev->sbdf, pdev->domain->domain_id);
+        AMD_IOMMU_WARN("no IOMMU for %pp; cannot be handed to %pd\n",
+                        &pdev->sbdf, pdev->domain);
         return -ENODEV;
     }
 
@@ -527,9 +525,8 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
              pdev->domain,
              ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map,
              0) )
-        AMD_IOMMU_DEBUG("%pd: unity mapping failed for %04x:%02x:%02x.%u\n",
-                        pdev->domain, pdev->seg, pdev->bus, PCI_SLOT(devfn),
-                        PCI_FUNC(devfn));
+        AMD_IOMMU_WARN("%pd: unity mapping failed for %pp\n",
+                       pdev->domain, &pdev->sbdf);
 
     return amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
 }
@@ -547,7 +544,7 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     iommu = find_iommu_for_device(pdev->seg, bdf);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("Fail to find iommu. %pp cannot be removed from %pd\n",
+        AMD_IOMMU_WARN("failed to find IOMMU: %pp cannot be removed from %pd\n",
                         &pdev->sbdf, pdev->domain);
         return -ENODEV;
     }
@@ -560,9 +557,8 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     if ( amd_iommu_reserve_domain_unity_unmap(
              pdev->domain,
              ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map) )
-        AMD_IOMMU_DEBUG("%pd: unity unmapping failed for %04x:%02x:%02x.%u\n",
-                        pdev->domain, pdev->seg, pdev->bus, PCI_SLOT(devfn),
-                        PCI_FUNC(devfn));
+        AMD_IOMMU_WARN("%pd: unity unmapping failed for %pp\n",
+                       pdev->domain, &pdev->sbdf);
 
     if ( amd_iommu_perdev_intremap &&
          ivrs_mappings[bdf].dte_requestor_id == bdf &&
