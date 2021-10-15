@@ -1486,7 +1486,8 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
 {
     struct acpi_drhd_unit *drhd;
     int ret = 0;
-    u8 seg = pdev->seg, bus = pdev->bus, secbus;
+    uint16_t seg = pdev->seg;
+    uint8_t bus = pdev->bus, secbus;
 
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
@@ -1700,7 +1701,8 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
     int ret = 0;
-    u8 seg = pdev->seg, bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
+    uint16_t seg = pdev->seg;
+    uint8_t bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
     bool found;
 
     drhd = acpi_find_matched_drhd_unit(pdev);
