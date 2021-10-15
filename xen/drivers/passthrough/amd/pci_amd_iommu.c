@@ -313,6 +313,12 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
     if ( QUARANTINE_SKIP(domain) )
         return;
 
+    ASSERT(pcidevs_locked());
+
+    if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
+         pci_ats_enabled(iommu->seg, bus, pdev->devfn) )
+        disable_ats_device(pdev);
+
     BUG_ON ( iommu->dev_table.buffer == NULL );
     req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
     table = iommu->dev_table.buffer;
@@ -348,13 +354,6 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
     }
     else
         spin_unlock_irqrestore(&iommu->lock, flags);
-
-    ASSERT(pcidevs_locked());
-
-    if ( devfn == pdev->devfn &&
-         pci_ats_device(iommu->seg, bus, devfn) &&
-         pci_ats_enabled(iommu->seg, bus, devfn) )
-        disable_ats_device(pdev);
 }
 
 static int reassign_device(struct domain *source, struct domain *target,
