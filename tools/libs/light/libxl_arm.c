@@ -1016,12 +1016,13 @@ out:
 }
 
 int libxl__arch_domain_init_hw_description(libxl__gc *gc,
-                                           libxl_domain_build_info *info,
+                                           libxl_domain_config *d_config,
                                            libxl__domain_build_state *state,
                                            struct xc_dom_image *dom)
 {
     int rc;
     uint64_t val;
+    libxl_domain_build_info *const info = &d_config->b_info;
 
     if (info->type != LIBXL_DOMAIN_TYPE_PVH) {
         LOG(ERROR, "Unsupported Arm guest type %s",

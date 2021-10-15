@@ -38,7 +38,7 @@ int libxl__arch_domain_create(libxl__gc *gc,
 /* setup arch specific hardware description, i.e. DTB on ARM */
 _hidden
 int libxl__arch_domain_init_hw_description(libxl__gc *gc,
-                                           libxl_domain_build_info *info,
+                                           libxl_domain_config *d_config,
                                            libxl__domain_build_state *state,
                                            struct xc_dom_image *dom);
 /* finalize arch specific hardware description. */

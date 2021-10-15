@@ -571,7 +571,7 @@ static int libxl__build_dom(libxl__gc *gc, uint32_t domid,
         LOG(ERROR, "xc_dom_parse_image failed");
         goto out;
     }
-    if ( (ret = libxl__arch_domain_init_hw_description(gc, info, state, dom)) != 0 ) {
+    if ( (ret = libxl__arch_domain_init_hw_description(gc, d_config, state, dom)) != 0 ) {
         LOGE(ERROR, "libxl__arch_domain_init_hw_description failed");
         goto out;
     }
