@@ -1416,7 +1416,7 @@ void sh_unhook_32b_mappings(struct domain *d, mfn_t sl2mfn, int user_only)
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
         if ( !user_only || (sl2e->l2 & _PAGE_USER) )
-            (void) shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
+            shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
     });
 }
 
@@ -1428,7 +1428,7 @@ void sh_unhook_pae_mappings(struct domain *d, mfn_t sl2mfn, int user_only)
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
         if ( !user_only || (sl2e->l2 & _PAGE_USER) )
-            (void) shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
+            shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
     });
 }
 
@@ -1439,7 +1439,7 @@ void sh_unhook_64b_mappings(struct domain *d, mfn_t sl4mfn, int user_only)
     shadow_l4e_t *sl4e;
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, d, {
         if ( !user_only || (sl4e->l4 & _PAGE_USER) )
-            (void) shadow_set_l4e(d, sl4e, shadow_l4e_empty(), sl4mfn);
+            shadow_set_l4e(d, sl4e, shadow_l4e_empty(), sl4mfn);
     });
 }
 
@@ -1969,7 +1969,7 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
 
         /* Propagate the entry.  */
         l1e_propagate_from_guest(v, gl1e, gmfn, &sl1e, ft_prefetch, p2mt);
-        (void) shadow_set_l1e(d, ptr_sl1e + i, sl1e, p2mt, sl1mfn);
+        shadow_set_l1e(d, ptr_sl1e + i, sl1e, p2mt, sl1mfn);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
         if ( snpl1p != NULL )
@@ -2534,7 +2534,7 @@ static int sh_page_fault(struct vcpu *v,
 
     /* Calculate the shadow entry and write it */
     l1e_propagate_from_guest(v, gw.l1e, gmfn, &sl1e, ft, p2mt);
-    r = shadow_set_l1e(d, ptr_sl1e, sl1e, p2mt, sl1mfn);
+    shadow_set_l1e(d, ptr_sl1e, sl1e, p2mt, sl1mfn);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     if ( mfn_valid(gw.l1mfn)
@@ -3014,8 +3014,7 @@ static bool sh_invlpg(struct vcpu *v, unsigned long linear)
                 shadow_l1e_t *sl1;
                 sl1 = sh_linear_l1_table(v) + shadow_l1_linear_offset(linear);
                 /* Remove the shadow entry that maps this VA */
-                (void) shadow_set_l1e(d, sl1, shadow_l1e_empty(),
-                                      p2m_invalid, sl1mfn);
+                shadow_set_l1e(d, sl1, shadow_l1e_empty(), p2m_invalid, sl1mfn);
             }
             paging_unlock(d);
             /* Need the invlpg, to pick up the disappeareance of the sl1e */
@@ -3608,7 +3607,8 @@ int sh_rm_write_access_from_l1(struct domain *d, mfn_t sl1mfn,
              && (mfn_x(shadow_l1e_get_mfn(*sl1e)) == mfn_x(readonly_mfn)) )
         {
             shadow_l1e_t ro_sl1e = shadow_l1e_remove_flags(*sl1e, _PAGE_RW);
-            (void) shadow_set_l1e(d, sl1e, ro_sl1e, p2m_ram_rw, sl1mfn);
+
+            shadow_set_l1e(d, sl1e, ro_sl1e, p2m_ram_rw, sl1mfn);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
             /* Remember the last shadow that we shot a writeable mapping in */
             if ( curr->domain == d )
@@ -3637,8 +3637,7 @@ int sh_rm_mappings_from_l1(struct domain *d, mfn_t sl1mfn, mfn_t target_mfn)
         if ( (flags & _PAGE_PRESENT)
              && (mfn_x(shadow_l1e_get_mfn(*sl1e)) == mfn_x(target_mfn)) )
         {
-            (void) shadow_set_l1e(d, sl1e, shadow_l1e_empty(),
-                                  p2m_invalid, sl1mfn);
+            shadow_set_l1e(d, sl1e, shadow_l1e_empty(), p2m_invalid, sl1mfn);
             if ( sh_check_page_has_no_refs(mfn_to_page(target_mfn)) )
                 /* This breaks us cleanly out of the FOREACH macro */
                 done = 1;
@@ -3656,20 +3655,20 @@ void sh_clear_shadow_entry(struct domain *d, void *ep, mfn_t smfn)
     switch ( mfn_to_page(smfn)->u.sh.type )
     {
     case SH_type_l1_shadow:
-        (void) shadow_set_l1e(d, ep, shadow_l1e_empty(), p2m_invalid, smfn);
+        shadow_set_l1e(d, ep, shadow_l1e_empty(), p2m_invalid, smfn);
         break;
     case SH_type_l2_shadow:
 #if GUEST_PAGING_LEVELS >= 4
     case SH_type_l2h_shadow:
 #endif
-        (void) shadow_set_l2e(d, ep, shadow_l2e_empty(), smfn);
+        shadow_set_l2e(d, ep, shadow_l2e_empty(), smfn);
         break;
 #if GUEST_PAGING_LEVELS >= 4
     case SH_type_l3_shadow:
-        (void) shadow_set_l3e(d, ep, shadow_l3e_empty(), smfn);
+        shadow_set_l3e(d, ep, shadow_l3e_empty(), smfn);
         break;
     case SH_type_l4_shadow:
-        (void) shadow_set_l4e(d, ep, shadow_l4e_empty(), smfn);
+        shadow_set_l4e(d, ep, shadow_l4e_empty(), smfn);
         break;
 #endif
     default: BUG(); /* Called with the wrong kind of shadow. */
@@ -3689,7 +3688,7 @@ int sh_remove_l1_shadow(struct domain *d, mfn_t sl2mfn, mfn_t sl1mfn)
         if ( (flags & _PAGE_PRESENT)
              && (mfn_x(shadow_l2e_get_mfn(*sl2e)) == mfn_x(sl1mfn)) )
         {
-            (void) shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
+            shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
             if ( mfn_to_page(sl1mfn)->u.sh.type == 0 )
                 /* This breaks us cleanly out of the FOREACH macro */
                 done = 1;
@@ -3712,7 +3711,7 @@ int sh_remove_l2_shadow(struct domain *d, mfn_t sl3mfn, mfn_t sl2mfn)
         if ( (flags & _PAGE_PRESENT)
              && (mfn_x(shadow_l3e_get_mfn(*sl3e)) == mfn_x(sl2mfn)) )
         {
-            (void) shadow_set_l3e(d, sl3e, shadow_l3e_empty(), sl3mfn);
+            shadow_set_l3e(d, sl3e, shadow_l3e_empty(), sl3mfn);
             if ( mfn_to_page(sl2mfn)->u.sh.type == 0 )
                 /* This breaks us cleanly out of the FOREACH macro */
                 done = 1;
@@ -3734,7 +3733,7 @@ int sh_remove_l3_shadow(struct domain *d, mfn_t sl4mfn, mfn_t sl3mfn)
         if ( (flags & _PAGE_PRESENT)
              && (mfn_x(shadow_l4e_get_mfn(*sl4e)) == mfn_x(sl3mfn)) )
         {
-            (void) shadow_set_l4e(d, sl4e, shadow_l4e_empty(), sl4mfn);
+            shadow_set_l4e(d, sl4e, shadow_l4e_empty(), sl4mfn);
             if ( mfn_to_page(sl3mfn)->u.sh.type == 0 )
                 /* This breaks us cleanly out of the FOREACH macro */
                 done = 1;
