@@ -794,8 +794,7 @@ do {                                                                    \
                          ({ (__done = _done); }), _code);               \
     _sl1mfn = sh_next_page(_sl1mfn);                                    \
     if ( !__done )                                                      \
-        _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p,                      \
-                             ({ (__done = _done); }), _code);           \
+        _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code);       \
 } while (0)
 #else /* Everything else; l1 shadows are only one page */
 #define SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code)         \
@@ -808,10 +807,10 @@ do {                                                                    \
 /* 32-bit l2 on PAE/64: four pages, touch every second entry */
 #define SHADOW_FOREACH_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)     \
 do {                                                                      \
-    int _i, _j, __done = 0;                                               \
+    int _i, _j;                                                           \
     ASSERT(shadow_mode_external(_dom));                                   \
     ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_32_shadow);      \
-    for ( _j = 0; _j < 4 && !__done; _j++ )                               \
+    for ( _j = 0; _j < 4; _j++ )                                          \
     {                                                                     \
         shadow_l2e_t *_sp = map_domain_page(_sl2mfn);                     \
         for ( _i = 0; _i < SHADOW_L2_PAGETABLE_ENTRIES; _i += 2 )         \
@@ -819,11 +818,12 @@ do {                                                                      \
             (_sl2e) = _sp + _i;                                           \
             if ( shadow_l2e_get_flags(*(_sl2e)) & _PAGE_PRESENT )         \
                 {_code}                                                   \
-            if ( (__done = (_done)) ) break;                              \
+            if ( _done ) break;                                           \
             increment_ptr_to_guest_entry(_gl2p);                          \
         }                                                                 \
         unmap_domain_page(_sp);                                           \
         if ( _j < 3 ) _sl2mfn = sh_next_page(_sl2mfn);                    \
+        if ( _i < SHADOW_L2_PAGETABLE_ENTRIES ) break;                    \
     }                                                                     \
 } while (0)
 
