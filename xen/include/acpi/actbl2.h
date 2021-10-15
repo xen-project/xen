@@ -716,6 +716,9 @@ struct acpi_table_ivrs {
 
 /* Values for Info field above */
 
+#define ACPI_IVRS_EFR_SUP           0x00000001	/* extended feature support */
+#define ACPI_IVRS_PREBOOT_DMA_REMAP 0x00000002	/* pre-boot DMA remapping in use */
+#define ACPI_IVRS_GVA_SIZE          0x000000E0	/* 3 bits, guest VA size */
 #define ACPI_IVRS_PHYSICAL_SIZE     0x00007F00	/* 7 bits, physical address size */
 #define ACPI_IVRS_VIRTUAL_SIZE      0x003F8000	/* 7 bits, virtual address size */
 #define ACPI_IVRS_ATS_RESERVED      0x00400000	/* ATS address translation range reserved */

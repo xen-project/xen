@@ -29,6 +29,7 @@ static bool __initdata pci_init;
 static void do_amd_iommu_irq(void *data);
 static DECLARE_SOFTIRQ_TASKLET(amd_iommu_irq_tasklet, do_amd_iommu_irq, NULL);
 
+unsigned int __read_mostly amd_iommu_acpi_info;
 unsigned int __read_mostly ivrs_bdf_entries;
 u8 __read_mostly ivhd_type;
 static struct radix_tree_root ivrs_maps;
@@ -1375,9 +1376,6 @@ static int __init amd_iommu_prepare_one(struct amd_iommu *iommu)
 
     get_iommu_features(iommu);
 
-    if ( iommu->features.raw )
-        iommuv2_enabled = true;
-
     return 0;
 }
 
@@ -1418,6 +1416,9 @@ int __init amd_iommu_prepare(bool xt)
         if ( !iommu->features.flds.ga_sup || !iommu->features.flds.xt_sup )
             has_xt = false;
     }
+
+    if ( ivhd_type != ACPI_IVRS_TYPE_HARDWARE )
+        iommuv2_enabled = true;
 
     for_each_amd_iommu ( iommu )
     {

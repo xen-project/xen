@@ -1062,7 +1062,8 @@ static unsigned int __initdata nr_ivmd;
 static inline bool_t is_ivhd_block(u8 type)
 {
     return (type == ACPI_IVRS_TYPE_HARDWARE ||
-            type == ACPI_IVRS_TYPE_HARDWARE_11H);
+            ((amd_iommu_acpi_info & ACPI_IVRS_EFR_SUP) &&
+             type == ACPI_IVRS_TYPE_HARDWARE_11H));
 }
 
 static inline bool_t is_ivmd_block(u8 type)
@@ -1176,7 +1177,7 @@ static int __init detect_iommu_acpi(struct acpi_table_header *table)
         ivrs_block = (struct acpi_ivrs_header *)((u8 *)table + length);
         if ( table->length < (length + ivrs_block->length) )
             return -ENODEV;
-        if ( ivrs_block->type == ACPI_IVRS_TYPE_HARDWARE &&
+        if ( ivrs_block->type == ivhd_type &&
              amd_iommu_detect_one_acpi(to_ivhd_block(ivrs_block)) != 0 )
             return -ENODEV;
         length += ivrs_block->length;
@@ -1315,6 +1316,9 @@ get_supported_ivhd_type(struct acpi_table_header *table)
         AMD_IOMMU_DEBUG("IVRS Error: Invalid Checksum %#x\n", checksum);
         return -ENODEV;
     }
+
+    amd_iommu_acpi_info = container_of(table, const struct acpi_table_ivrs,
+                                       header)->info;
 
     while ( table->length > (length + sizeof(*ivrs_block)) )
     {
