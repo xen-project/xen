@@ -22,6 +22,8 @@
 
 #include <asm/io_apic.h>
 
+#include <acpi/actables.h>
+
 #include "iommu.h"
 
 /* Some helper structures, particularly to deal with ranges. */
@@ -1167,20 +1169,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
 static int __init detect_iommu_acpi(struct acpi_table_header *table)
 {
     const struct acpi_ivrs_header *ivrs_block;
-    unsigned long i;
     unsigned long length = sizeof(struct acpi_table_ivrs);
-    u8 checksum, *raw_table;
-
-    /* validate checksum: sum of entire table == 0 */
-    checksum = 0;
-    raw_table = (u8 *)table;
-    for ( i = 0; i < table->length; i++ )
-        checksum += raw_table[i];
-    if ( checksum )
-    {
-        AMD_IOMMU_DEBUG("IVRS Error: Invalid Checksum %#x\n", checksum);
-        return -ENODEV;
-    }
 
     while ( table->length > (length + sizeof(*ivrs_block)) )
     {
@@ -1317,6 +1306,15 @@ get_supported_ivhd_type(struct acpi_table_header *table)
 {
     size_t length = sizeof(struct acpi_table_ivrs);
     const struct acpi_ivrs_header *ivrs_block, *blk = NULL;
+    uint8_t checksum;
+
+    /* Validate checksum: Sum of entire table == 0. */
+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(uint8_t, table), table->length);
+    if ( checksum )
+    {
+        AMD_IOMMU_DEBUG("IVRS Error: Invalid Checksum %#x\n", checksum);
+        return -ENODEV;
+    }
 
     while ( table->length > (length + sizeof(*ivrs_block)) )
     {

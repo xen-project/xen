@@ -1398,14 +1398,8 @@ int __init amd_iommu_prepare(bool xt)
         goto error_out;
 
     /* Have we been here before? */
-    if ( ivhd_type )
+    if ( ivrs_bdf_entries )
         return 0;
-
-    rc = amd_iommu_get_supported_ivhd_type();
-    if ( rc < 0 )
-        goto error_out;
-    BUG_ON(!rc);
-    ivhd_type = rc;
 
     rc = amd_iommu_get_ivrs_dev_entries();
     if ( !rc )

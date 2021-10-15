@@ -179,8 +179,16 @@ static int __must_check amd_iommu_setup_domain_device(
 
 int __init acpi_ivrs_init(void)
 {
+    int rc;
+
     if ( !iommu_enable && !iommu_intremap )
         return 0;
+
+    rc = amd_iommu_get_supported_ivhd_type();
+    if ( rc < 0 )
+        return rc;
+    BUG_ON(!rc);
+    ivhd_type = rc;
 
     if ( (amd_iommu_detect_acpi() !=0) || (iommu_found() == 0) )
     {
