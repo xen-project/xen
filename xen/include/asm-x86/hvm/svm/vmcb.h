@@ -494,7 +494,9 @@ struct vmcb_struct {
     u64 _lastbranchtoip;        /* cleanbit 10 */
     u64 _lastintfromip;         /* cleanbit 10 */
     u64 _lastinttoip;           /* cleanbit 10 */
-    u64 res17[301];
+    u64 res17[9];
+    u64 spec_ctrl;
+    u64 res18[291];
 };
 
 struct svm_domain {
