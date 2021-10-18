@@ -90,8 +90,8 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
         0xc3,       /* ret       */
     };
 
-    struct stubs *this_stubs = &this_cpu(stubs);
-    unsigned long stub_va = this_stubs->addr + STUB_BUF_SIZE / 2;
+    const struct stubs *this_stubs = &this_cpu(stubs);
+    const void *stub_va = (void *)this_stubs->addr + STUB_BUF_SIZE / 2;
     unsigned int quirk_bytes = 0;
     char *p;
 
@@ -99,7 +99,7 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
 #define APPEND_BUFF(b) ({ memcpy(p, b, sizeof(b)); p += sizeof(b); })
 #define APPEND_CALL(f)                                                  \
     ({                                                                  \
-        long disp = (long)(f) - (stub_va + p - ctxt->io_emul_stub + 5); \
+        long disp = (void *)(f) - (stub_va + (p - ctxt->io_emul_stub) + 5); \
         BUG_ON((int32_t)disp != disp);                                  \
         *p++ = 0xe8;                                                    \
         *(int32_t *)p = disp; p += 4;                                   \
@@ -107,7 +107,7 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
 
     if ( !ctxt->io_emul_stub )
         ctxt->io_emul_stub =
-            map_domain_page(_mfn(this_stubs->mfn)) + (stub_va & ~PAGE_MASK);
+            map_domain_page(_mfn(this_stubs->mfn)) + PAGE_OFFSET(stub_va);
 
     p = ctxt->io_emul_stub;
 
@@ -142,7 +142,7 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
     block_speculation(); /* SCSB */
 
     /* Handy function-typed pointer to the stub. */
-    return (void *)stub_va;
+    return stub_va;
 
 #undef APPEND_CALL
 #undef APPEND_BUFF
