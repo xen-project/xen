@@ -2155,8 +2155,8 @@ static int sh_page_fault(struct vcpu *v,
 #ifdef CONFIG_HVM
     struct sh_emulate_ctxt emul_ctxt;
     const struct x86_emulate_ops *emul_ops;
-#endif
     int r;
+#endif
     p2m_type_t p2mt;
     uint32_t rc, error_code;
     bool walk_ok;
