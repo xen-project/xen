@@ -1583,7 +1583,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     rc = viridian_vcpu_init(v);
     if ( rc )
-        goto fail5;
+        goto fail6;
 
     rc = ioreq_server_add_vcpu_all(d, v);
     if ( rc != 0 )
