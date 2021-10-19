@@ -254,7 +254,6 @@ static void compat_show_guest_stack(struct vcpu *v,
         struct vcpu *vcpu;
         unsigned long mfn;
 
-        ASSERT(guest_kernel_mode(v, regs));
         mfn = read_cr3() >> PAGE_SHIFT;
         for_each_vcpu( v->domain, vcpu )
             if ( pagetable_get_pfn(vcpu->arch.guest_table) == mfn )
@@ -269,6 +268,8 @@ static void compat_show_guest_stack(struct vcpu *v,
             }
             mask = PAGE_SIZE;
         }
+        else if ( !guest_kernel_mode(v, regs) )
+            mask = PAGE_SIZE;
     }
 
     for ( i = 0; i < debug_stack_lines * 8; i++ )
@@ -328,7 +329,12 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     {
         struct vcpu *vcpu;
 
-        ASSERT(guest_kernel_mode(v, regs));
+        if ( !guest_kernel_mode(v, regs) )
+        {
+            printk("User mode stack\n");
+            return;
+        }
+
         vcpu = maddr_get_owner(read_cr3()) == v->domain ? v : NULL;
         if ( !vcpu )
         {
