@@ -275,7 +275,9 @@ static void compat_show_guest_stack(struct vcpu *v,
     {
         if ( (((long)stack - 1) ^ ((long)(stack + 1) - 1)) & mask )
             break;
-        if ( __get_guest(addr, stack) )
+        if ( stack_page )
+            addr = *stack;
+        else if ( __get_guest(addr, stack) )
         {
             if ( i != 0 )
                 printk("\n    ");
@@ -344,7 +346,9 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     {
         if ( (((long)stack - 1) ^ ((long)(stack + 1) - 1)) & mask )
             break;
-        if ( __get_guest(addr, stack) )
+        if ( stack_page )
+            addr = *stack;
+        else if ( __get_guest(addr, stack) )
         {
             if ( i != 0 )
                 printk("\n    ");
