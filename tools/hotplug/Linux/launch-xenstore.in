@@ -60,8 +60,7 @@ test -f @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons && . @CONFIG_DIR@/@CONFIG_LEAF
 		echo "No xenstored found"
 		exit 1
 	}
-	[ -z "$XENSTORED_OOM_MEM_THRESHOLD" ] || XENSTORED_OOM_MEM_THRESHOLD=50
-	XS_OOM_SCORE=-$(($XENSTORED_OOM_MEM_THRESHOLD * 10))
+	XS_OOM_SCORE=-$((${XENSTORED_OOM_MEM_THRESHOLD:-50} * 10))
 
 	[ "$XENSTORED_MAX_OPEN_FDS" = "unlimited" ] || {
 		[ -z "${XENSTORED_MAX_OPEN_FDS//[0-9]}" ] &&
