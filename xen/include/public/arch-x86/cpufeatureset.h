@@ -291,6 +291,7 @@ XEN_CPUFEATURE(LFENCE_DISPATCH,    11*32+ 2) /*A  LFENCE always serializing */
 /* Intel-defined CPU features, CPUID level 0x00000007:1.ebx, word 12 */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:2.edx, word 13 */
+XEN_CPUFEATURE(INTEL_PSFD,         13*32+ 0) /*A  MSR_SPEC_CTRL.PSFD */
 
 #endif /* XEN_CPUFEATURE */
 

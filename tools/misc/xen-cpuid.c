@@ -194,6 +194,7 @@ static const char *const str_7b1[32] =
 
 static const char *const str_7d2[32] =
 {
+    [ 0] = "intel-psfd",
 };
 
 static const struct {
