@@ -4622,6 +4622,8 @@ static int do_altp2m_op(
             if ( ostate )
                 p2m_flush_altp2m(d);
         }
+        else if ( rc )
+            d->arch.altp2m_active = false;
 
         domain_unpause_except_self(d);
         break;
