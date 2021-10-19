@@ -10076,15 +10076,36 @@ x86_emulate(
 
         for ( i = 0; op_mask; ++i )
         {
-            long idx = b & 1 ? index.qw[i] : index.dw[i];
+            long idx = (b & 1 ? index.qw[i]
+                              : index.dw[i]) * (1 << state->sib_scale);
+            unsigned long offs = truncate_ea(ea.mem.off + idx);
+            unsigned int j, slot;
 
             if ( !(op_mask & (1 << i)) )
                 continue;
 
-            rc = ops->write(ea.mem.seg,
-                            truncate_ea(ea.mem.off +
-                                        idx * (1 << state->sib_scale)),
-                            (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
+            /*
+             * hvmemul_linear_mmio_access() will find a cache slot based on
+             * linear address.  hvmemul_phys_mmio_access() will crash the
+             * domain if observing varying data getting written to the same
+             * cache slot.  Utilize that squashing earlier writes to fully
+             * overlapping addresses is permitted by the spec.  We can't,
+             * however, drop the writes altogether, to maintain correct
+             * faulting behavior.  Instead write the data from the last of
+             * the fully overlapping slots multiple times.
+             */
+            for ( j = (slot = i) + 1; j < n; ++j )
+            {
+                long idx2 = (b & 1 ? index.qw[j]
+                                   : index.dw[j]) * (1 << state->sib_scale);
+
+                if ( (op_mask & (1 << j)) &&
+                     truncate_ea(ea.mem.off + idx2) == offs )
+                    slot = j;
+            }
+
+            rc = ops->write(ea.mem.seg, offs,
+                            (void *)mmvalp + slot * op_bytes, op_bytes, ctxt);
             if ( rc != X86EMUL_OKAY )
             {
                 /* See comment in gather emulation. */
