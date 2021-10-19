@@ -307,11 +307,13 @@ custom_param("pv-l1tf", parse_pv_l1tf);
 
 static void __init print_details(enum ind_thunk thunk, uint64_t caps)
 {
-    unsigned int _7d0 = 0, e8b = 0, tmp;
+    unsigned int _7d0 = 0, _7d2 = 0, e8b = 0, max = 0, tmp;
 
     /* Collect diagnostics about available mitigations. */
     if ( boot_cpu_data.cpuid_level >= 7 )
-        cpuid_count(7, 0, &tmp, &tmp, &tmp, &_7d0);
+        cpuid_count(7, 0, &max, &tmp, &tmp, &_7d0);
+    if ( max >= 2 )
+        cpuid_count(7, 2, &tmp, &tmp, &tmp, &_7d2);
     if ( boot_cpu_data.extended_cpuid_level >= 0x80000008 )
         cpuid(0x80000008, &tmp, &e8b, &tmp, &tmp);
 
@@ -345,6 +347,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (_7d0 & cpufeat_mask(X86_FEATURE_STIBP))          ? " STIBP"          : "",
            (e8b  & cpufeat_mask(X86_FEATURE_AMD_SSBD)) ||
            (_7d0 & cpufeat_mask(X86_FEATURE_SSBD))           ? " SSBD"           : "",
+           (_7d2 & cpufeat_mask(X86_FEATURE_INTEL_PSFD)) ||
            (e8b  & cpufeat_mask(X86_FEATURE_PSFD))           ? " PSFD"           : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_L1D_FLUSH))      ? " L1D_FLUSH"      : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_MD_CLEAR))       ? " MD_CLEAR"       : "",

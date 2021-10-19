@@ -300,6 +300,7 @@ XEN_CPUFEATURE(NSCB,               11*32+ 6) /*A  Null Selector Clears Base (and
 /* Intel-defined CPU features, CPUID level 0x00000007:1.ebx, word 12 */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:2.edx, word 13 */
+XEN_CPUFEATURE(INTEL_PSFD,         13*32+ 0) /*A  MSR_SPEC_CTRL.PSFD */
 
 #endif /* XEN_CPUFEATURE */
 

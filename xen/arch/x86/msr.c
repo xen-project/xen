@@ -443,7 +443,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
 uint64_t msr_spec_ctrl_valid_bits(const struct cpuid_policy *cp)
 {
     bool ssbd = cp->feat.ssbd || cp->extd.amd_ssbd;
-    bool psfd = cp->extd.psfd;
+    bool psfd = cp->feat.intel_psfd || cp->extd.psfd;
 
     /*
      * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
