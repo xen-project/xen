@@ -756,27 +756,28 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     if ( !pdev->domain )
     {
         pdev->domain = hardware_domain;
-#ifdef CONFIG_ARM
+        list_add(&pdev->domain_list, &hardware_domain->pdev_list);
+
         /*
-         * On ARM PCI devices discovery will be done by Dom0. Add vpci handler
-         * when Dom0 inform XEN to add the PCI devices in XEN.
+         * For devices not discovered by Xen during boot, add vPCI handlers
+         * when Dom0 first informs Xen about such devices.
          */
         ret = vpci_add_handlers(pdev);
         if ( ret )
         {
             printk(XENLOG_ERR "Setup of vPCI failed: %d\n", ret);
+            list_del(&pdev->domain_list);
             pdev->domain = NULL;
             goto out;
         }
-#endif
         ret = iommu_add_device(pdev);
         if ( ret )
         {
+            vpci_remove_device(pdev);
+            list_del(&pdev->domain_list);
             pdev->domain = NULL;
             goto out;
         }
-
-        list_add(&pdev->domain_list, &hardware_domain->pdev_list);
     }
     else
         iommu_enable_device(pdev);
@@ -819,6 +820,7 @@ int pci_remove_device(u16 seg, u8 bus, u8 devfn)
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
+            vpci_remove_device(pdev);
             pci_cleanup_msi(pdev);
             ret = iommu_remove_device(pdev);
             if ( pdev->domain )

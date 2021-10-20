@@ -37,6 +37,9 @@ extern vpci_register_init_t *const __end_vpci_array[];
 
 void vpci_remove_device(struct pci_dev *pdev)
 {
+    if ( !has_vpci(pdev->domain) )
+        return;
+
     spin_lock(&pdev->vpci->lock);
     while ( !list_empty(&pdev->vpci->handlers) )
     {
@@ -54,13 +57,16 @@ void vpci_remove_device(struct pci_dev *pdev)
     pdev->vpci = NULL;
 }
 
-int __hwdom_init vpci_add_handlers(struct pci_dev *pdev)
+int vpci_add_handlers(struct pci_dev *pdev)
 {
     unsigned int i;
     int rc = 0;
 
     if ( !has_vpci(pdev->domain) )
         return 0;
+
+    /* We should not get here twice for the same device. */
+    ASSERT(!pdev->vpci);
 
     pdev->vpci = xzalloc(struct vpci);
     if ( !pdev->vpci )
