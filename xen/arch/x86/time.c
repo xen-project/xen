@@ -34,6 +34,7 @@
 #include <asm/fixmap.h>
 #include <asm/guest.h>
 #include <asm/mc146818rtc.h>
+#include <asm/mwait.h>
 #include <asm/div64.h>
 #include <asm/acpi.h>
 #include <asm/hpet.h>
@@ -395,14 +396,43 @@ static int64_t __init init_hpet(struct platform_timesource *pts)
             }
 
         /*
-         * Some Coffee Lake platforms have a skewed HPET timer once the SoCs
-         * entered PC10.
+         * Some Coffee Lake and later platforms have a skewed HPET timer once
+         * they entered PC10.
+         *
+         * Check whether the system supports PC10. If so force disable HPET as
+         * that stops counting in PC10. This check is overbroad as it does not
+         * take any of the following into account:
+         *
+         *	- ACPI tables
+         *	- Enablement of mwait-idle
+         *	- Command line arguments which limit mwait-idle C-state support
+         *
+         * That's perfectly fine. HPET is a piece of hardware designed by
+         * committee and the only reasons why it is still in use on modern
+         * systems is the fact that it is impossible to reliably query TSC and
+         * CPU frequency via CPUID or firmware.
+         *
+         * If HPET is functional it is useful for calibrating TSC, but this can
+         * be done via PMTIMER as well which seems to be the last remaining
+         * timer on X86/INTEL platforms that has not been completely wreckaged
+         * by feature creep.
+         *
+         * In theory HPET support should be removed altogether, but there are
+         * older systems out there which depend on it because TSC and APIC timer
+         * are dysfunctional in deeper C-states.
          */
-        if ( pci_conf_read16(PCI_SBDF(0, 0, 0, 0),
-                             PCI_VENDOR_ID) == PCI_VENDOR_ID_INTEL &&
-             pci_conf_read16(PCI_SBDF(0, 0, 0, 0),
-                             PCI_DEVICE_ID) == 0x3ec4 )
-            hpet_address = 0;
+        if ( mwait_pc10_supported() )
+        {
+            uint64_t pcfg;
+
+            rdmsrl(MSR_PKG_CST_CONFIG_CONTROL, pcfg);
+            if ( (pcfg & 0xf) < 8 )
+                /* nothing */;
+            else if ( !strcmp(opt_clocksource, pts->id) )
+                printk("HPET use requested via command line, but dysfunctional in PC10\n");
+            else
+                hpet_address = 0;
+        }
 
         if ( !hpet_address )
             printk("Disabling HPET for being unreliable\n");

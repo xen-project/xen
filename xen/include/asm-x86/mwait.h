@@ -1,6 +1,8 @@
 #ifndef __ASM_X86_MWAIT_H__
 #define __ASM_X86_MWAIT_H__
 
+#include <xen/types.h>
+
 #define MWAIT_SUBSTATE_MASK		0xf
 #define MWAIT_CSTATE_MASK		0xf
 #define MWAIT_SUBSTATE_SIZE		4
@@ -12,5 +14,6 @@
 #define MWAIT_ECX_INTERRUPT_BREAK	0x1
 
 void mwait_idle_with_hints(unsigned int eax, unsigned int ecx);
+bool mwait_pc10_supported(void);
 
 #endif /* __ASM_X86_MWAIT_H__ */

@@ -46,6 +46,13 @@
 #define MSR_CORE_CAPABILITIES               0x000000cf
 #define  CORE_CAPS_SPLITLOCK_DETECT         (_AC(1, ULL) <<  5)
 
+#define MSR_PKG_CST_CONFIG_CONTROL          0x000000e2
+#define  NHM_C3_AUTO_DEMOTE                 (_AC(1, ULL) << 25)
+#define  NHM_C1_AUTO_DEMOTE                 (_AC(1, ULL) << 26)
+#define  ATM_LNC_C6_AUTO_DEMOTE             (_AC(1, ULL) << 25)
+#define  SNB_C3_AUTO_UNDEMOTE               (_AC(1, ULL) << 27)
+#define  SNB_C1_AUTO_UNDEMOTE               (_AC(1, ULL) << 28)
+
 #define MSR_ARCH_CAPABILITIES               0x0000010a
 #define  ARCH_CAPS_RDCL_NO                  (_AC(1, ULL) <<  0)
 #define  ARCH_CAPS_IBRS_ALL                 (_AC(1, ULL) <<  1)
@@ -178,11 +185,6 @@
 #define MSR_IA32_PERFCTR0		0x000000c1
 #define MSR_IA32_A_PERFCTR0		0x000004c1
 #define MSR_FSB_FREQ			0x000000cd
-
-#define MSR_NHM_SNB_PKG_CST_CFG_CTL	0x000000e2
-#define NHM_C3_AUTO_DEMOTE		(1UL << 25)
-#define NHM_C1_AUTO_DEMOTE		(1UL << 26)
-#define ATM_LNC_C6_AUTO_DEMOTE		(1UL << 25)
 
 #define MSR_MTRRcap			0x000000fe
 #define MTRRcap_VCNT			0x000000ff
