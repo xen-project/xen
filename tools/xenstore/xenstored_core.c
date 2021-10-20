@@ -338,10 +338,10 @@ static int destroy_conn(void *_conn)
 
 static bool conn_can_read(struct connection *conn)
 {
-	if (!conn->funcs->can_read(conn))
+	if (conn->is_ignored)
 		return false;
 
-	if (conn->is_ignored)
+	if (!conn->funcs->can_read(conn))
 		return false;
 
 	/*
@@ -356,7 +356,7 @@ static bool conn_can_read(struct connection *conn)
 
 static bool conn_can_write(struct connection *conn)
 {
-	return conn->funcs->can_write(conn) && !conn->is_ignored;
+	return !conn->is_ignored && conn->funcs->can_write(conn);
 }
 
 /* This function returns index inside the array if succeed, -1 if fail */
@@ -1466,7 +1466,7 @@ static struct {
  *
  * All watches, transactions, buffers will be freed.
  */
-static void ignore_connection(struct connection *conn)
+void ignore_connection(struct connection *conn)
 {
 	struct buffered_data *out, *tmp;
 

@@ -206,6 +206,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 
 struct connection *new_connection(const struct interface_funcs *funcs);
 struct connection *get_connection_by_id(unsigned int conn_id);
+void ignore_connection(struct connection *conn);
 void check_store(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
 

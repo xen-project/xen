@@ -268,14 +268,7 @@ void check_domains(void)
 				domain->shutdown = true;
 				notify = 1;
 			}
-			/*
-			 * On Restore, we may have been unable to remap the
-			 * interface and the port. As we don't know whether
-			 * this was because of a dying domain, we need to
-			 * check if the interface and port are still valid.
-			 */
-			if (!dominfo.dying && domain->port &&
-			    domain->interface)
+			if (!dominfo.dying)
 				continue;
 		}
 		if (domain->conn) {
@@ -1303,6 +1296,17 @@ void read_state_connection(const void *ctx, const void *state)
 		if (!domain)
 			barf("domain allocation error");
 
+		conn = domain->conn;
+
+		/*
+		 * We may not have been able to restore the domain (for
+		 * instance because it revoked the Xenstore grant). We need
+		 * to keep it around to send @releaseDomain when it is
+		 * dead. So mark it as ignored.
+		 */
+		if (!domain->port || !domain->interface)
+			ignore_connection(conn);
+
 		if (sc->spec.ring.tdomid != DOMID_INVALID) {
 			tdomain = find_or_alloc_domain(ctx,
 						       sc->spec.ring.tdomid);
@@ -1311,7 +1315,6 @@ void read_state_connection(const void *ctx, const void *state)
 			talloc_reference(domain->conn, tdomain->conn);
 			domain->conn->target = tdomain->conn;
 		}
-		conn = domain->conn;
 	}
 
 	conn->conn_id = sc->conn_id;
