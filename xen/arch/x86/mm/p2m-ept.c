@@ -1253,7 +1253,7 @@ static void ept_sync_domain_prepare(struct p2m_domain *p2m)
     {
         if ( p2m_is_nestedp2m(p2m) )
             ept = &p2m_get_hostp2m(d)->ept;
-        else
+        else if ( !p2m->defer_nested_flush )
             p2m_flush_nestedp2m(d);
     }
 
