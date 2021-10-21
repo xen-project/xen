@@ -50,4 +50,10 @@ asm ( "\t.include \"asm/indirect_thunk_asm.h\"" );
     INDIRECT_BRANCH jmp \arg
 .endm
 
+#ifdef CONFIG_XEN_IBT
+# define ENDBR64 endbr64
+#else
+# define ENDBR64
+#endif
+
 #endif

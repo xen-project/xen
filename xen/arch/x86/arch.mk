@@ -45,6 +45,15 @@ CFLAGS-$(CONFIG_INDIRECT_THUNK) += -mindirect-branch=thunk-extern
 CFLAGS-$(CONFIG_INDIRECT_THUNK) += -mindirect-branch-register
 CFLAGS-$(CONFIG_INDIRECT_THUNK) += -fno-jump-tables
 
+ifdef CONFIG_XEN_IBT
+# Force -fno-jump-tables to work around
+#   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104816
+#   https://github.com/llvm/llvm-project/issues/54247
+CFLAGS += -fcf-protection=branch -fno-jump-tables
+else
+$(call cc-option-add,CFLAGS,CC,-fcf-protection=none)
+endif
+
 # If supported by the compiler, reduce stack alignment to 8 bytes. But allow
 # this to be overridden elsewhere.
 $(call cc-option-add,CFLAGS-stack-boundary,CC,-mpreferred-stack-boundary=3)

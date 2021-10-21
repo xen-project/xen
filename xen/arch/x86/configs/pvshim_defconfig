@@ -10,6 +10,7 @@ CONFIG_SCHED_NULL=y
 # Disable features not used by the PV shim
 # CONFIG_HVM is not set
 # CONFIG_XEN_SHSTK is not set
+# CONFIG_XEN_IBT is not set
 # CONFIG_HYPFS is not set
 # CONFIG_SHADOW_PAGING is not set
 # CONFIG_BIGMEM is not set
