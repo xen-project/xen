@@ -726,6 +726,34 @@ unsigned int vgic_max_vcpus(unsigned int domctl_vgic_version)
     }
 }
 
+void vgic_check_inflight_irqs_pending(struct domain *d, struct vcpu *v,
+                                      unsigned int rank, uint32_t r)
+{
+    const unsigned long mask = r;
+    unsigned int i;
+
+    for_each_set_bit( i, &mask, 32 )
+    {
+        struct pending_irq *p;
+        struct vcpu *v_target;
+        unsigned long flags;
+        unsigned int irq = i + 32 * rank;
+
+        v_target = vgic_get_target_vcpu(v, irq);
+
+        spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
+
+        p = irq_to_pending(v_target, irq);
+
+        if ( p && !list_empty(&p->inflight) )
+            printk(XENLOG_G_WARNING
+                   "%pv trying to clear pending interrupt %u.\n",
+                   v, irq);
+
+        spin_unlock_irqrestore(&v_target->arch.vgic.lock, flags);
+    }
+}
+
 /*
  * Local variables:
  * mode: C

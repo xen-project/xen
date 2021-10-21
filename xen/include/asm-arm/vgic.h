@@ -298,6 +298,8 @@ extern bool vgic_to_sgi(struct vcpu *v, register_t sgir,
                         enum gic_sgi_mode irqmode, int virq,
                         const struct sgi_target *target);
 extern bool vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq);
+extern void vgic_check_inflight_irqs_pending(struct domain *d, struct vcpu *v,
+                                             unsigned int rank, uint32_t r);
 
 #endif /* !CONFIG_NEW_VGIC */
 

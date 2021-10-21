@@ -481,10 +481,12 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     case VRANGE32(GICD_ICPENDR, GICD_ICPENDRN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
-        printk(XENLOG_G_ERR
-               "%pv: vGICD: unhandled word write %#"PRIregister" to ICPENDR%d\n",
-               v, r, gicd_reg - GICD_ICPENDR);
-        return 0;
+        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICPENDR, DABT_WORD);
+        if ( rank == NULL ) goto write_ignore;
+
+        vgic_check_inflight_irqs_pending(v->domain, v, rank->index, r);
+
+        goto write_ignore;
 
     case VRANGE32(GICD_ISACTIVER, GICD_ISACTIVERN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
