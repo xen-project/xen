@@ -57,6 +57,12 @@
     INDIRECT_BRANCH jmp \arg
 .endm
 
+#ifdef CONFIG_XEN_IBT
+# define ENDBR64 endbr64
+#else
+# define ENDBR64
+#endif
+
 .macro guest_access_mask_ptr ptr:req, scratch1:req, scratch2:req
 #if defined(CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS)
     /*
