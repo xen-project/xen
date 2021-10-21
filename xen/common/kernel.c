@@ -451,7 +451,7 @@ static int __init param_init(void)
 __initcall(param_init);
 #endif
 
-# define DO(fn) long do_##fn
+# define DO(fn) long cf_check do_##fn
 
 #endif
 

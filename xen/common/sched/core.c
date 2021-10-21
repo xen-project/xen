@@ -1862,7 +1862,7 @@ typedef long ret_t;
 
 #endif /* !COMPAT */
 
-ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+ret_t cf_check do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     ret_t ret = 0;
 
@@ -1999,7 +1999,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 #ifndef COMPAT
 
 /* Per-vcpu oneshot-timer hypercall. */
-long do_set_timer_op(s_time_t timeout)
+long cf_check do_set_timer_op(s_time_t timeout)
 {
     struct vcpu *v = current;
     s_time_t offset = timeout - NOW();

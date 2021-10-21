@@ -1570,7 +1570,8 @@ int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
-long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
+long cf_check do_vcpu_op(
+    int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d = current->domain;
     struct vcpu *v;
@@ -1757,7 +1758,7 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 }
 
 #ifdef arch_vm_assist_valid_mask
-long do_vm_assist(unsigned int cmd, unsigned int type)
+long cf_check do_vm_assist(unsigned int cmd, unsigned int type)
 {
     struct domain *currd = current->domain;
     const unsigned long valid = arch_vm_assist_valid_mask(currd);

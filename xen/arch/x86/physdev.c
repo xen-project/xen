@@ -174,7 +174,7 @@ int physdev_unmap_pirq(domid_t domid, int pirq)
 }
 #endif /* COMPAT */
 
-ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+ret_t cf_check do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int irq;
     ret_t ret;

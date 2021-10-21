@@ -2069,7 +2069,7 @@ sendv(struct domain *src_d, xen_argo_addr_t *src_addr,
     return ( ret < 0 ) ? ret : len;
 }
 
-long
+long cf_check
 do_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
            XEN_GUEST_HANDLE_PARAM(void) arg2, unsigned long raw_arg3,
            unsigned long raw_arg4)
@@ -2207,7 +2207,7 @@ do_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
 }
 
 #ifdef CONFIG_COMPAT
-long
+long cf_check
 compat_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
                XEN_GUEST_HANDLE_PARAM(void) arg2, unsigned long arg3,
                unsigned long arg4)

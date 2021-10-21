@@ -23,12 +23,12 @@
 
 #include <asm/debugreg.h>
 
-long do_set_debugreg(int reg, unsigned long value)
+long cf_check do_set_debugreg(int reg, unsigned long value)
 {
     return set_debugreg(current, reg, value);
 }
 
-unsigned long do_get_debugreg(int reg)
+unsigned long cf_check do_get_debugreg(int reg)
 {
     unsigned long val;
     int res = x86emul_read_dr(reg, &val, NULL);
@@ -36,7 +36,7 @@ unsigned long do_get_debugreg(int reg)
     return res == X86EMUL_OKAY ? val : -ENODEV;
 }
 
-long do_fpu_taskswitch(int set)
+long cf_check do_fpu_taskswitch(int set)
 {
     struct vcpu *v = current;
 
@@ -171,7 +171,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
     return 0;
 }
 
-long do_stack_switch(unsigned long ss, unsigned long esp)
+long cf_check do_stack_switch(unsigned long ss, unsigned long esp)
 {
     fixup_guest_stack_selector(current->domain, ss);
     current->arch.pv.kernel_ss = ss;
@@ -180,7 +180,7 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     return 0;
 }
 
-long do_set_segment_base(unsigned int which, unsigned long base)
+long cf_check do_set_segment_base(unsigned int which, unsigned long base)
 {
     struct vcpu *v = current;
     long ret = 0;

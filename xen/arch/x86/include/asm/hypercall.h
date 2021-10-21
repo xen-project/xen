@@ -38,97 +38,97 @@ void pv_ring3_init_hypercall_page(void *ptr);
  */
 #define MMU_UPDATE_PREEMPTED          (~(~0U>>1))
 
-extern long
+extern long cf_check
 do_event_channel_op_compat(
     XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop);
 
 /* Legacy hypercall (as of 0x00030202). */
-extern long do_physdev_op_compat(
+extern long cf_check do_physdev_op_compat(
     XEN_GUEST_HANDLE(physdev_op_t) uop);
 
 /* Legacy hypercall (as of 0x00030101). */
-extern long do_sched_op_compat(
+extern long cf_check do_sched_op_compat(
     int cmd, unsigned long arg);
 
-extern long
+extern long cf_check
 do_set_trap_table(
     XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps);
 
-extern long
+extern long cf_check
 do_mmu_update(
     XEN_GUEST_HANDLE_PARAM(mmu_update_t) ureqs,
     unsigned int count,
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom);
 
-extern long
+extern long cf_check
 do_set_gdt(
     XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
     unsigned int entries);
 
-extern long
+extern long cf_check
 do_stack_switch(
     unsigned long ss,
     unsigned long esp);
 
-extern long
+extern long cf_check
 do_fpu_taskswitch(
     int set);
 
-extern long
+extern long cf_check
 do_set_debugreg(
     int reg,
     unsigned long value);
 
-extern unsigned long
+extern unsigned long cf_check
 do_get_debugreg(
     int reg);
 
-extern long
+extern long cf_check
 do_update_descriptor(
     uint64_t gaddr, seg_desc_t desc);
 
-extern long
+extern long cf_check
 do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc);
 
-extern long
+extern long cf_check
 do_update_va_mapping(
     unsigned long va,
     u64 val64,
     unsigned long flags);
 
-extern long
+extern long cf_check
 do_physdev_op(
     int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_update_va_mapping_otherdomain(
     unsigned long va,
     u64 val64,
     unsigned long flags,
     domid_t domid);
 
-extern long
+extern long cf_check
 do_mmuext_op(
     XEN_GUEST_HANDLE_PARAM(mmuext_op_t) uops,
     unsigned int count,
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom);
 
-extern long do_callback_op(
+extern long cf_check do_callback_op(
     int cmd, XEN_GUEST_HANDLE_PARAM(const_void) arg);
 
-extern unsigned long
+extern unsigned long cf_check
 do_iret(
     void);
 
-extern long
+extern long cf_check
 do_set_callbacks(
     unsigned long event_address,
     unsigned long failsafe_address,
     unsigned long syscall_address);
 
-extern long
+extern long cf_check
 do_set_segment_base(
     unsigned int which,
     unsigned long base);
@@ -139,7 +139,7 @@ do_set_segment_base(
 #include <compat/physdev.h>
 #include <compat/platform.h>
 
-extern int
+extern int cf_check
 compat_physdev_op(
     int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
@@ -148,44 +148,47 @@ extern int
 arch_compat_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern int compat_mmuext_op(
+extern int cf_check compat_mmuext_op(
     XEN_GUEST_HANDLE_PARAM(void) arg,
     unsigned int count,
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom);
 
 DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
-extern int compat_platform_op(
+extern int cf_check compat_platform_op(
     XEN_GUEST_HANDLE_PARAM(compat_platform_op_t) u_xenpf_op);
 
-extern long compat_callback_op(
+extern long cf_check compat_callback_op(
     int cmd, XEN_GUEST_HANDLE(void) arg);
 
-extern int compat_update_va_mapping(
+extern int cf_check compat_update_va_mapping(
     unsigned int va, u32 lo, u32 hi, unsigned int flags);
 
-extern int compat_update_va_mapping_otherdomain(
+extern int cf_check compat_update_va_mapping_otherdomain(
     unsigned int va, u32 lo, u32 hi, unsigned int flags, domid_t domid);
 
 DEFINE_XEN_GUEST_HANDLE(trap_info_compat_t);
-extern int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps);
+extern int cf_check compat_set_trap_table(
+    XEN_GUEST_HANDLE(trap_info_compat_t) traps);
 
-extern int compat_set_gdt(
+extern int cf_check compat_set_gdt(
     XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries);
 
-extern int compat_update_descriptor(
+extern int cf_check compat_update_descriptor(
     u32 pa_lo, u32 pa_hi, u32 desc_lo, u32 desc_hi);
 
-extern unsigned int compat_iret(void);
+extern unsigned int cf_check compat_iret(void);
 
-extern int compat_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
+extern int cf_check compat_nmi_op(
+    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long compat_set_callbacks(
+extern long cf_check compat_set_callbacks(
     unsigned long event_selector, unsigned long event_address,
     unsigned long failsafe_selector, unsigned long failsafe_address);
 
 DEFINE_XEN_GUEST_HANDLE(physdev_op_compat_t);
-extern int compat_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_compat_t) uop);
+extern int cf_check compat_physdev_op_compat(
+    XEN_GUEST_HANDLE(physdev_op_compat_t) uop);
 
 #endif /* CONFIG_COMPAT */
 

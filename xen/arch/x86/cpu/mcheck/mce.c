@@ -1351,7 +1351,7 @@ CHECK_mcinfo_recovery;
 # endif /* CONFIG_COMPAT */
 
 /* Machine Check Architecture Hypercall */
-long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
+long cf_check do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 {
     long ret = 0;
     struct xen_mc curop, *op = &curop;

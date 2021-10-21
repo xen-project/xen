@@ -3377,7 +3377,7 @@ static int vcpumask_to_pcpumask(
     }
 }
 
-long do_mmuext_op(
+long cf_check do_mmuext_op(
     XEN_GUEST_HANDLE_PARAM(mmuext_op_t) uops,
     unsigned int count,
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
@@ -3916,7 +3916,7 @@ long do_mmuext_op(
     return rc;
 }
 
-long do_mmu_update(
+long cf_check do_mmu_update(
     XEN_GUEST_HANDLE_PARAM(mmu_update_t) ureqs,
     unsigned int count,
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
@@ -4501,8 +4501,8 @@ static int __do_update_va_mapping(
     return rc;
 }
 
-long do_update_va_mapping(unsigned long va, u64 val64,
-                          unsigned long flags)
+long cf_check do_update_va_mapping(
+    unsigned long va, u64 val64, unsigned long flags)
 {
     int rc = __do_update_va_mapping(va, val64, flags, current->domain);
 
@@ -4513,9 +4513,8 @@ long do_update_va_mapping(unsigned long va, u64 val64,
     return rc;
 }
 
-long do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
-                                      unsigned long flags,
-                                      domid_t domid)
+long cf_check do_update_va_mapping_otherdomain(
+    unsigned long va, u64 val64, unsigned long flags, domid_t domid)
 {
     struct domain *pg_owner;
     int rc;
@@ -4537,8 +4536,8 @@ long do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
 #endif /* CONFIG_PV */
 
 #ifdef CONFIG_PV32
-int compat_update_va_mapping(unsigned int va, uint32_t lo, uint32_t hi,
-                             unsigned int flags)
+int cf_check compat_update_va_mapping(
+    unsigned int va, uint32_t lo, uint32_t hi, unsigned int flags)
 {
     int rc = __do_update_va_mapping(va, ((uint64_t)hi << 32) | lo,
                                     flags, current->domain);
@@ -4550,9 +4549,9 @@ int compat_update_va_mapping(unsigned int va, uint32_t lo, uint32_t hi,
     return rc;
 }
 
-int compat_update_va_mapping_otherdomain(unsigned int va,
-                                         uint32_t lo, uint32_t hi,
-                                         unsigned int flags, domid_t domid)
+int cf_check compat_update_va_mapping_otherdomain(
+    unsigned int va, uint32_t lo, uint32_t hi, unsigned int flags,
+    domid_t domid)
 {
     struct domain *pg_owner;
     int rc;

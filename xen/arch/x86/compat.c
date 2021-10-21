@@ -15,7 +15,7 @@ typedef long ret_t;
 #endif
 
 /* Legacy hypercall (as of 0x00030202). */
-ret_t do_physdev_op_compat(XEN_GUEST_HANDLE_PARAM(physdev_op_t) uop)
+ret_t cf_check do_physdev_op_compat(XEN_GUEST_HANDLE_PARAM(physdev_op_t) uop)
 {
     struct physdev_op op;
 
@@ -28,7 +28,7 @@ ret_t do_physdev_op_compat(XEN_GUEST_HANDLE_PARAM(physdev_op_t) uop)
 #ifndef COMPAT
 
 /* Legacy hypercall (as of 0x00030101). */
-long do_sched_op_compat(int cmd, unsigned long arg)
+long cf_check do_sched_op_compat(int cmd, unsigned long arg)
 {
     switch ( cmd )
     {
@@ -50,7 +50,8 @@ long do_sched_op_compat(int cmd, unsigned long arg)
 }
 
 /* Legacy hypercall (as of 0x00030202). */
-long do_event_channel_op_compat(XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop)
+long cf_check do_event_channel_op_compat(
+    XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop)
 {
     struct evtchn_op op;
 

@@ -38,7 +38,8 @@ CHECK_vcpu_hvm_context;
 
 #endif
 
-int compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
+int cf_check compat_vcpu_op(
+    int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d = current->domain;
     struct vcpu *v;

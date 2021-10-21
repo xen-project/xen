@@ -671,9 +671,9 @@ static int hypfs_write(struct hypfs_entry *entry,
     return entry->funcs->write(l, uaddr, ulen);
 }
 
-long do_hypfs_op(unsigned int cmd,
-                 XEN_GUEST_HANDLE_PARAM(const_char) arg1, unsigned long arg2,
-                 XEN_GUEST_HANDLE_PARAM(void) arg3, unsigned long arg4)
+long cf_check do_hypfs_op(
+    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(const_char) arg1,
+    unsigned long arg2, XEN_GUEST_HANDLE_PARAM(void) arg3, unsigned long arg4)
 {
     int ret;
     struct hypfs_entry *entry;

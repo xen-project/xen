@@ -53,7 +53,8 @@ static int get_reserved_device_memory(xen_pfn_t start, xen_ulong_t nr,
 }
 #endif
 
-int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
+int cf_check compat_memory_op(
+    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;

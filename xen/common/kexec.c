@@ -1265,13 +1265,13 @@ static int do_kexec_op_internal(unsigned long op,
     return ret;
 }
 
-long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
+long cf_check do_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     return do_kexec_op_internal(op, uarg, 0);
 }
 
 #ifdef CONFIG_COMPAT
-int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
+int cf_check compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     return do_kexec_op_internal(op, uarg, 1);
 }

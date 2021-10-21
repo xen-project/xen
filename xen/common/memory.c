@@ -1367,7 +1367,7 @@ static int acquire_resource(
     return rc;
 }
 
-long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+long cf_check do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d, *curr_d = current->domain;
     long rc;

@@ -721,7 +721,7 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE_PARAM(void) arg)
                       || (op == XENOPROF_disable_virq)  \
                       || (op == XENOPROF_get_buffer))
  
-ret_t do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
+ret_t cf_check do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int ret = 0;
     

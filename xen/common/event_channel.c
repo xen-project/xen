@@ -1189,7 +1189,7 @@ static int evtchn_set_priority(const struct evtchn_set_priority *set_priority)
     return ret;
 }
 
-long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+long cf_check do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;
 

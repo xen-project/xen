@@ -18,12 +18,12 @@
 #include <asm/hypercall.h>
 #include <xsm/xsm.h>
 
-extern long
+extern long cf_check
 do_sched_op(
     int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_domctl(
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 
@@ -32,7 +32,7 @@ arch_do_domctl(
     struct xen_domctl *domctl, struct domain *d,
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 
-extern long
+extern long cf_check
 do_sysctl(
     XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl);
 
@@ -41,7 +41,7 @@ arch_do_sysctl(
     struct xen_sysctl *sysctl,
     XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl);
 
-extern long
+extern long cf_check
 do_platform_op(
     XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op);
 
@@ -62,47 +62,47 @@ pci_physdev_op(
 #define MEMOP_EXTENT_SHIFT 6 /* cmd[:6] == start_extent */
 #define MEMOP_CMD_MASK     ((1 << MEMOP_EXTENT_SHIFT) - 1)
 
-extern long
+extern long cf_check
 do_memory_op(
     unsigned long cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_multicall(
     XEN_GUEST_HANDLE_PARAM(multicall_entry_t) call_list,
     unsigned int nr_calls);
 
-extern long
+extern long cf_check
 do_set_timer_op(
     s_time_t timeout);
 
-extern long
+extern long cf_check
 do_event_channel_op(
     int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_xen_version(
     int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_console_io(
     unsigned int cmd,
     unsigned int count,
     XEN_GUEST_HANDLE_PARAM(char) buffer);
 
-extern long
+extern long cf_check
 do_grant_table_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE_PARAM(void) uop,
     unsigned int count);
 
-extern long
+extern long cf_check
 do_vm_assist(
     unsigned int cmd,
     unsigned int type);
 
-extern long
+extern long cf_check
 do_vcpu_op(
     int cmd,
     unsigned int vcpuid,
@@ -114,27 +114,27 @@ arch_do_vcpu_op(int cmd,
     struct vcpu *v,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_nmi_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_hvm_op(
     unsigned long op,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_kexec_op(
     unsigned long op,
     XEN_GUEST_HANDLE_PARAM(void) uarg);
 
-extern long
+extern long cf_check
 do_xsm_op(
     XEN_GUEST_HANDLE_PARAM(void) u_xsm_op);
 
 #ifdef CONFIG_ARGO
-extern long do_argo_op(
+extern long cf_check do_argo_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg1,
     XEN_GUEST_HANDLE_PARAM(void) arg2,
@@ -142,20 +142,20 @@ extern long do_argo_op(
     unsigned long arg4);
 #endif
 
-extern long
+extern long cf_check
 do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long
+extern long cf_check
 do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg);
 
-extern long
+extern long cf_check
 do_dm_op(
     domid_t domid,
     unsigned int nr_bufs,
     XEN_GUEST_HANDLE_PARAM(xen_dm_op_buf_t) bufs);
 
 #ifdef CONFIG_HYPFS
-extern long
+extern long cf_check
 do_hypfs_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE_PARAM(const_char) arg1,
@@ -166,53 +166,54 @@ do_hypfs_op(
 
 #ifdef CONFIG_COMPAT
 
-extern int
+extern int cf_check
 compat_memory_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern int
+extern int cf_check
 compat_grant_table_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE_PARAM(void) uop,
     unsigned int count);
 
-extern int
+extern int cf_check
 compat_vcpu_op(
     int cmd,
     unsigned int vcpuid,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern int
+extern int cf_check
 compat_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern int
+extern int cf_check
 compat_xen_version(
     int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern int
+extern int cf_check
 compat_sched_op(
     int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern int
+extern int cf_check
 compat_set_timer_op(
     u32 lo,
     s32 hi);
 
-extern int compat_xsm_op(
+extern int cf_check compat_xsm_op(
     XEN_GUEST_HANDLE_PARAM(void) op);
 
-extern int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg);
+extern int cf_check compat_kexec_op(
+    unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg);
 
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_compat_t);
-extern int compat_multicall(
+extern int cf_check compat_multicall(
     XEN_GUEST_HANDLE_PARAM(multicall_entry_compat_t) call_list,
     uint32_t nr_calls);
 
 #ifdef CONFIG_ARGO
-extern long compat_argo_op(
+extern long cf_check compat_argo_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg1,
     XEN_GUEST_HANDLE_PARAM(void) arg2,
@@ -220,7 +221,7 @@ extern long compat_argo_op(
     unsigned long arg4);
 #endif
 
-extern int
+extern int cf_check
 compat_dm_op(
     domid_t domid,
     unsigned int nr_bufs,

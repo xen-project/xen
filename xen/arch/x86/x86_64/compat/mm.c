@@ -176,10 +176,9 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 #ifdef CONFIG_PV
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_compat_t);
 
-int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(void) arg,
-                     unsigned int count,
-                     XEN_GUEST_HANDLE_PARAM(uint) pdone,
-                     unsigned int foreigndom)
+int cf_check compat_mmuext_op(
+    XEN_GUEST_HANDLE_PARAM(void) arg, unsigned int count,
+    XEN_GUEST_HANDLE_PARAM(uint) pdone, unsigned int foreigndom)
 {
     unsigned int i, preempt_mask;
     int rc = 0;
