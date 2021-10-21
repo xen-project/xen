@@ -8,6 +8,7 @@ CONFIG_NR_CPUS=32
 CONFIG_EXPERT=y
 # Disable features not used by the PV shim
 # CONFIG_XEN_SHSTK is not set
+# CONFIG_XEN_IBT is not set
 # CONFIG_GRANT_TABLE is not set
 # CONFIG_HYPFS is not set
 # CONFIG_BIGMEM is not set

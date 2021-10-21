@@ -40,6 +40,11 @@ config HAS_AS_CET_SS
 	# binutils >= 2.29 or LLVM >= 6
 	def_bool $(as-instr,wrssq %rax$(comma)0;setssbsy)
 
+config HAS_CC_CET_IBT
+	# GCC >= 9 and binutils >= 2.29
+	# Retpoline check to work around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=93654
+	def_bool $(cc-option,-fcf-protection=branch -mmanual-endbr -mindirect-branch=thunk-extern) && $(as-instr,endbr64)
+
 menu "Architecture Features"
 
 source "arch/Kconfig"
@@ -124,6 +129,18 @@ config XEN_SHSTK
 	  This option arranges for Xen to use CET-SS for its own protection.
 	  When CET-SS is active, 32bit PV guests cannot be used.  Backwards
 	  compatiblity can be provided via the PV Shim mechanism.
+
+config XEN_IBT
+	bool "Supervisor Indirect Branch Tracking"
+	depends on HAS_CC_CET_IBT
+	default y
+	help
+	  Control-flow Enforcement Technology (CET) is a set of features in
+	  hardware designed to combat Return-oriented Programming (ROP, also
+	  call/jump COP/JOP) attacks.  Indirect Branch Tracking is one CET
+	  feature designed to provide function pointer protection.
+
+	  This option arranges for Xen to use CET-IBT for its own protection.
 
 config SHADOW_PAGING
 	bool "Shadow Paging"

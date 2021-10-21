@@ -54,6 +54,8 @@
 #define likely(x)   __builtin_expect(!!(x), true)
 #define unlikely(x) __builtin_expect(!!(x), false)
 
+#define cf_check /* No Control Flow Integriy checking */
+
 #define container_of(ptr, type, member) ({             \
     typeof(((type *)0)->member) *mptr__ = (ptr);       \
     (type *)((char *)mptr__ - offsetof(type, member)); \

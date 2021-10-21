@@ -52,6 +52,12 @@ CFLAGS-$(CONFIG_CC_IS_GCC) += -fno-jump-tables
 CFLAGS-$(CONFIG_CC_IS_CLANG) += -mretpoline-external-thunk
 endif
 
+ifdef CONFIG_XEN_IBT
+CFLAGS += -fcf-protection=branch -mmanual-endbr
+else
+$(call cc-option-add,CFLAGS,CC,-fcf-protection=none)
+endif
+
 # If supported by the compiler, reduce stack alignment to 8 bytes. But allow
 # this to be overridden elsewhere.
 $(call cc-option-add,CFLAGS_stack_boundary,CC,-mpreferred-stack-boundary=3)

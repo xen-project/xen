@@ -8,6 +8,8 @@ typedef int decompress_fn(unsigned char *inbuf, unsigned int len,
                           void (*error)(const char *x));
 #endif
 
+#define cf_check /* No Control Flow Integriy checking */
+
 int xc_dom_decompress_unsafe(
     decompress_fn fn, struct xc_dom_image *dom, void **blob, size_t *size)
     __attribute__((visibility("internal")));
