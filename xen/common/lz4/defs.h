@@ -16,9 +16,13 @@
 #include <xen/unaligned.h>
 #else
 
-static inline u16 get_unaligned_le16(const void *p)
+static inline uint16_t get_unaligned_le16(const void *p)
 {
-	return le16_to_cpup(p);
+	uint16_t v;
+
+	memcpy(&v, p, sizeof(v));
+
+	return le16_to_cpu(v);
 }
 
 #endif

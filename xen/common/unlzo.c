@@ -37,14 +37,22 @@
 #include <xen/unaligned.h>
 #else
 
-static inline u16 get_unaligned_be16(const void *p)
+static inline uint16_t get_unaligned_be16(const void *p)
 {
-	return be16_to_cpup(p);
+	uint16_t v;
+
+	memcpy(&v, p, sizeof(v));
+
+	return be16_to_cpu(v);
 }
 
-static inline u32 get_unaligned_be32(const void *p)
+static inline uint32_t get_unaligned_be32(const void *p)
 {
-	return be32_to_cpup(p);
+	uint32_t v;
+
+	memcpy(&v, p, sizeof(v));
+
+	return be32_to_cpu(v);
 }
 
 #endif

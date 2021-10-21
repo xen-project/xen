@@ -16,21 +16,22 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint32_t __le32;
 
-static inline u32 cpu_to_le32(const u32 v)
+static inline uint32_t cpu_to_le32(const uint32_t v)
 {
 #if BYTE_ORDER == BIG_ENDIAN
-	return (((v & 0x000000ffUL) << 24) |
-	        ((v & 0x0000ff00UL) <<  8) |
-	        ((v & 0x00ff0000UL) >>  8) |
-	        ((v & 0xff000000UL) >> 24));
+	return __builtin_bswap32(v);
 #else
 	return v;
 #endif
 }
 
-static inline u32 le32_to_cpup(const u32 *p)
+static inline uint32_t le32_to_cpu(const uint32_t p)
 {
-	return cpu_to_le32(*p);
+#if BYTE_ORDER == BIG_ENDIAN
+	return __builtin_bswap32(v);
+#else
+	return v;
+#endif
 }
 
 #define __force

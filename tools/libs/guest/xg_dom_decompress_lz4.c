@@ -3,6 +3,8 @@
 #include <inttypes.h>
 #include <stdint.h>
 
+#include INCLUDE_ENDIAN_H
+
 #define XG_NEED_UNALIGNED
 #include "xg_private.h"
 #include "xg_dom_decompress.h"
@@ -17,9 +19,13 @@ typedef uint64_t u64;
 #define likely(a) a
 #define unlikely(a) a
 
-static inline uint_fast16_t le16_to_cpup(const unsigned char *buf)
+static inline uint16_t le16_to_cpu(uint16_t v)
 {
-    return buf[0] | (buf[1] << 8);
+#if BYTE_ORDER == BIG_ENDIAN
+    return __builtin_bswap16(v);
+#else
+    return v;
+#endif
 }
 
 #include "../../xen/include/xen/lz4.h"

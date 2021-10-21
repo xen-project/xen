@@ -16,25 +16,10 @@ typedef uint64_t u64;
 #define noinline
 #define unlikely(a) a
 
-static inline u16 be16_to_cpup(const u16 *p)
+static inline uint16_t be16_to_cpu(const uint16_t v)
 {
-	u16 v = *p;
 #if BYTE_ORDER == LITTLE_ENDIAN
-	return (((v & 0x00ffU) << 8) |
-                ((v & 0xff00U) >> 8));
-#else
-	return v;
-#endif
-}
-
-static inline u32 be32_to_cpup(const u32 *p)
-{
-	u32 v = *p;
-#if BYTE_ORDER == LITTLE_ENDIAN
-	return (((v & 0x000000ffUL) << 24) |
-                ((v & 0x0000ff00UL) <<  8) |
-                ((v & 0x00ff0000UL) >>  8) |
-                ((v & 0xff000000UL) >> 24));
+	return __builtin_bswap16(v);
 #else
 	return v;
 #endif

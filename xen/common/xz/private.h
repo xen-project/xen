@@ -16,19 +16,25 @@
 #include <xen/unaligned.h>
 #else
 
-static inline u32 get_unaligned_le32(const void *p)
+static inline uint32_t get_unaligned_le32(const void *p)
 {
-	return le32_to_cpup(p);
+	uint32_t v;
+
+	memcpy(&v, p, sizeof(v));
+
+	return le32_to_cpu(v);
 }
 
-static inline void put_unaligned_le32(u32 val, void *p)
+static inline void put_unaligned_le32(uint32_t val, void *p)
 {
-	*(__force __le32*)p = cpu_to_le32(val);
+	uint32_t v = cpu_to_le32(val);
+
+	memcpy(p, &v, sizeof(v));
 }
 
 #endif
 
-#define get_le32(p) le32_to_cpup((const uint32_t *)(p))
+#define get_le32(p) le32_to_cpu(*(const uint32_t *)(p))
 
 #define false 0
 #define true 1
