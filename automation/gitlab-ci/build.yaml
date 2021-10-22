@@ -596,3 +596,16 @@ qemu-system-aarch64-5.2.0-arm64-export:
   tags:
     - arm64
 
+
+# x86_64 test artifacts
+
+alpine-3.12-rootfs-export:
+  stage: build
+  image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.12
+  script:
+    - mkdir binaries && cp /initrd.tar.gz binaries/initrd.tar.gz
+  artifacts:
+    paths:
+      - binaries/initrd.tar.gz
+  tags:
+    - x86_64
