@@ -429,12 +429,12 @@ ubuntu-focal-gcc-debug:
     CONTAINER: ubuntu:focal
 
 ubuntu-focal-clang:
-  extends: .gcc-x86-64-build
+  extends: .clang-x86-64-build
   variables:
     CONTAINER: ubuntu:focal
 
 ubuntu-focal-clang-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .clang-x86-64-build-debug
   variables:
     CONTAINER: ubuntu:focal
 
