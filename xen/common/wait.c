@@ -144,18 +144,16 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         "push %%r8;  push %%r9;  push %%r10; push %%r11;"
         "push %%r12; push %%r13; push %%r14; push %%r15;"
 
-        "call 1f;"
-        "1: addq $2f-1b,(%%rsp);"
         "sub %%esp,%%ecx;"
         "cmp %3,%%ecx;"
-        "ja 3f;"
+        "ja .L_skip;"
         "mov %%rsp,%%rsi;"
 
         /* check_wakeup_from_wait() longjmp()'s to this point. */
-        "2: rep movsb;"
+        ".L_wq_resume: rep movsb;"
         "mov %%rsp,%%rsi;"
-        "3: pop %%rax;"
 
+        ".L_skip:"
         "pop %%r15; pop %%r14; pop %%r13; pop %%r12;"
         "pop %%r11; pop %%r10; pop %%r9;  pop %%r8;"
         "pop %%rbp; pop %%rdx; pop %%rbx; pop %%rax"
@@ -204,15 +202,14 @@ void check_wakeup_from_wait(void)
     }
 
     /*
-     * Hand-rolled longjmp().  Returns to the pointer on the top of
-     * wqv->stack, and lands on a `rep movs` instruction.  All other GPRs are
-     * restored from the stack, so are available for use here.
+     * Hand-rolled longjmp().  Returns to __prepare_to_wait(), and lands on a
+     * `rep movs` instruction.  All other GPRs are restored from the stack, so
+     * are available for use here.
      */
     asm volatile (
-        "mov %1,%%"__OP"sp; INDIRECT_JMP %[ip]"
+        "mov %1,%%"__OP"sp; jmp .L_wq_resume;"
         : : "S" (wqv->stack), "D" (wqv->esp),
-          "c" ((char *)get_cpu_info() - (char *)wqv->esp),
-          [ip] "r" (*(unsigned long *)wqv->stack)
+          "c" ((char *)get_cpu_info() - (char *)wqv->esp)
         : "memory" );
     unreachable();
 }
