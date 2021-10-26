@@ -379,6 +379,12 @@ static int64_t __init init_hpet(struct platform_timesource *pts)
 {
     uint64_t hpet_rate, start;
     uint32_t count, target;
+    /*
+     * Allow HPET to be setup, but report a frequency of 0 so it's not selected
+     * as a timer source. This is required so it can be used in legacy
+     * replacement mode in check_timer.
+     */
+    bool disable_hpet = false;
 
     if ( hpet_address && strcmp(opt_clocksource, pts->id) &&
          cpuidle_using_deep_cstate() )
@@ -391,7 +397,7 @@ static int64_t __init init_hpet(struct platform_timesource *pts)
             case 0x0f1c:
             /* HPET on Cherry Trail platforms will halt in deep C states. */
             case 0x229c:
-                hpet_address = 0;
+                disable_hpet = true;
                 break;
             }
 
@@ -431,14 +437,14 @@ static int64_t __init init_hpet(struct platform_timesource *pts)
             else if ( !strcmp(opt_clocksource, pts->id) )
                 printk("HPET use requested via command line, but dysfunctional in PC10\n");
             else
-                hpet_address = 0;
+                disable_hpet = true;
         }
 
-        if ( !hpet_address )
+        if ( disable_hpet )
             printk("Disabling HPET for being unreliable\n");
     }
 
-    if ( (hpet_rate = hpet_setup()) == 0 )
+    if ( (hpet_rate = hpet_setup()) == 0 || disable_hpet )
         return 0;
 
     pts->frequency = hpet_rate;
