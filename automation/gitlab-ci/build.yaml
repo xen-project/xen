@@ -609,3 +609,14 @@ alpine-3.12-rootfs-export:
       - binaries/initrd.tar.gz
   tags:
     - x86_64
+
+kernel-5.10.74-export:
+  stage: build
+  image: registry.gitlab.com/xen-project/xen/tests-artifacts/kernel:5.10.74
+  script:
+    - mkdir binaries && cp /bzImage binaries/bzImage
+  artifacts:
+    paths:
+      - binaries/bzImage
+  tags:
+    - x86_64
