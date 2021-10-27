@@ -38,7 +38,7 @@ static bool debugtrace_buf_empty = true;
 static bool debugtrace_used;
 static DEFINE_SPINLOCK(debugtrace_lock);
 
-static int __init debugtrace_parse_param(const char *s)
+static int __init cf_check debugtrace_parse_param(const char *s)
 {
     unsigned long bytes;
 

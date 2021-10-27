@@ -704,7 +704,7 @@ static u16 __init parse_ivhd_device_extended_range(
     return dev_length;
 }
 
-static int __init parse_ivrs_ioapic(const char *str)
+static int __init cf_check parse_ivrs_ioapic(const char *str)
 {
     const char *s = str;
     unsigned long id;
@@ -742,7 +742,7 @@ static int __init parse_ivrs_ioapic(const char *str)
 }
 custom_param("ivrs_ioapic[", parse_ivrs_ioapic);
 
-static int __init parse_ivrs_hpet(const char *str)
+static int __init cf_check parse_ivrs_hpet(const char *str)
 {
     const char *s = str;
     unsigned long id;
@@ -1369,7 +1369,7 @@ int __init amd_iommu_get_supported_ivhd_type(void)
  * Format:
  * ivmd=<start>[-<end>][=<bdf1>[-<bdf1>'][,<bdf2>[-<bdf2>'][,...]]][;<start>...]
  */
-static int __init parse_ivmd_param(const char *s)
+static int __init cf_check parse_ivmd_param(const char *s)
 {
     do {
         unsigned long start, end;

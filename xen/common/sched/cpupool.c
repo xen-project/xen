@@ -93,7 +93,7 @@ static int sched_gran_get(const char *str, enum sched_gran *mode)
     return -EINVAL;
 }
 
-static int __init sched_select_granularity(const char *str)
+static int __init cf_check sched_select_granularity(const char *str)
 {
     return sched_gran_get(str, &opt_sched_granularity);
 }

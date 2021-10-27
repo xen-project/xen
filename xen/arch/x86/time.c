@@ -2354,7 +2354,7 @@ int hwdom_pit_access(struct ioreq *ioreq)
  * tsc=skewed: Assume TSCs are individually reliable, but skewed across CPUs.
  * tsc=stable:socket: Assume TSCs are reliable across sockets.
  */
-static int __init tsc_parse(const char *s)
+static int __init cf_check tsc_parse(const char *s)
 {
     if ( !strcmp(s, "unstable") )
     {

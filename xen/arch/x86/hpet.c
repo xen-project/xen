@@ -65,7 +65,7 @@ u8 __initdata hpet_flags;
 static bool __initdata force_hpet_broadcast;
 boolean_param("hpetbroadcast", force_hpet_broadcast);
 
-static int __init parse_hpet_param(const char *s)
+static int __init cf_check parse_hpet_param(const char *s)
 {
     const char *ss;
     int val, rc = 0;

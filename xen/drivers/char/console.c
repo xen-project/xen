@@ -88,7 +88,7 @@ static const char con_timestamp_mode_2_string[][7] = {
     [TSM_RAW] = "raw",
 };
 
-static void con_timestamp_mode_upd(struct param_hypfs *par)
+static void cf_check con_timestamp_mode_upd(struct param_hypfs *par)
 {
     const char *val = con_timestamp_mode_2_string[opt_con_timestamp_mode];
 
@@ -98,7 +98,7 @@ static void con_timestamp_mode_upd(struct param_hypfs *par)
 #define con_timestamp_mode_upd(par)
 #endif
 
-static int parse_console_timestamps(const char *s);
+static int cf_check parse_console_timestamps(const char *s);
 custom_runtime_param("console_timestamps", parse_console_timestamps,
                      con_timestamp_mode_upd);
 
@@ -160,8 +160,8 @@ static int __read_mostly xenlog_guest_upper_thresh =
 static int __read_mostly xenlog_guest_lower_thresh =
     XENLOG_GUEST_LOWER_THRESHOLD;
 
-static int parse_loglvl(const char *s);
-static int parse_guest_loglvl(const char *s);
+static int cf_check parse_loglvl(const char *s);
+static int cf_check parse_guest_loglvl(const char *s);
 
 #ifdef CONFIG_HYPFS
 #define LOGLVL_VAL_SZ 16
@@ -176,13 +176,13 @@ static void xenlog_update_val(int lower, int upper, char *val)
     snprintf(val, LOGLVL_VAL_SZ, "%s/%s", lvl2opt[lower], lvl2opt[upper]);
 }
 
-static void __init xenlog_init(struct param_hypfs *par)
+static void __init cf_check xenlog_init(struct param_hypfs *par)
 {
     xenlog_update_val(xenlog_lower_thresh, xenlog_upper_thresh, xenlog_val);
     custom_runtime_set_var(par, xenlog_val);
 }
 
-static void __init xenlog_guest_init(struct param_hypfs *par)
+static void __init cf_check xenlog_guest_init(struct param_hypfs *par)
 {
     xenlog_update_val(xenlog_guest_lower_thresh, xenlog_guest_upper_thresh,
                       xenlog_guest_val);
@@ -240,7 +240,7 @@ static int _parse_loglvl(const char *s, int *lower, int *upper, char *val)
     return *s ? -EINVAL : 0;
 }
 
-static int parse_loglvl(const char *s)
+static int cf_check parse_loglvl(const char *s)
 {
     int ret;
 
@@ -251,7 +251,7 @@ static int parse_loglvl(const char *s)
     return ret;
 }
 
-static int parse_guest_loglvl(const char *s)
+static int cf_check parse_guest_loglvl(const char *s)
 {
     int ret;
 
@@ -793,7 +793,7 @@ static int printk_prefix_check(char *p, char **pp)
             ((loglvl < upper_thresh) && printk_ratelimit()));
 } 
 
-static int parse_console_timestamps(const char *s)
+static int cf_check parse_console_timestamps(const char *s)
 {
     switch ( parse_bool(s, NULL) )
     {

@@ -78,7 +78,7 @@ DEFINE_COMPAT_HANDLE(compat_argo_iov_t);
 static bool __read_mostly opt_argo;
 static bool __read_mostly opt_argo_mac_permissive;
 
-static int __init parse_argo(const char *s)
+static int __init cf_check parse_argo(const char *s)
 {
     const char *ss;
     int val, rc = 0;

@@ -56,7 +56,7 @@ static unsigned vpmu_count;
 
 static DEFINE_PER_CPU(struct vcpu *, last_vcpu);
 
-static int __init parse_vpmu_params(const char *s)
+static int __init cf_check parse_vpmu_params(const char *s)
 {
     const char *ss;
     int rc = 0, val;

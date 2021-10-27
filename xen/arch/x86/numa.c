@@ -19,9 +19,6 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 
-static int numa_setup(const char *s);
-custom_param("numa", numa_setup);
-
 #ifndef Dprintk
 #define Dprintk(x...)
 #endif
@@ -294,7 +291,7 @@ void numa_set_node(int cpu, nodeid_t node)
 }
 
 /* [numa=off] */
-static __init int numa_setup(const char *opt)
+static int __init cf_check numa_setup(const char *opt)
 {
     if ( !strncmp(opt,"off",3) )
         numa_off = true;
@@ -321,6 +318,7 @@ static __init int numa_setup(const char *opt)
 
     return 0;
 } 
+custom_param("numa", numa_setup);
 
 /*
  * Setup early cpu_to_node.

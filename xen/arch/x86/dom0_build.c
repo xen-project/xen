@@ -115,7 +115,7 @@ static int __init parse_amt(const char *s, const char **ps, struct memsize *sz)
     return 0;
 }
 
-static int __init parse_dom0_mem(const char *s)
+static int __init cf_check parse_dom0_mem(const char *s)
 {
     int ret;
 
@@ -144,7 +144,7 @@ custom_param("dom0_mem", parse_dom0_mem);
 static unsigned int __initdata opt_dom0_max_vcpus_min = 1;
 static unsigned int __initdata opt_dom0_max_vcpus_max = UINT_MAX;
 
-static int __init parse_dom0_max_vcpus(const char *s)
+static int __init cf_check parse_dom0_max_vcpus(const char *s)
 {
     if ( *s == '-' )                   /* -M */
         opt_dom0_max_vcpus_max = simple_strtoul(s + 1, &s, 0);
@@ -168,7 +168,7 @@ static __initdata unsigned int dom0_pxms[MAX_NUMNODES] =
     { [0 ... MAX_NUMNODES - 1] = ~0 };
 bool __initdata dom0_affinity_relaxed;
 
-static int __init parse_dom0_nodes(const char *s)
+static int __init cf_check parse_dom0_nodes(const char *s)
 {
     const char *ss;
     int rc = 0;
@@ -266,7 +266,7 @@ bool __initdata opt_dom0_pvh = !IS_ENABLED(CONFIG_PV);
 bool __initdata opt_dom0_verbose = IS_ENABLED(CONFIG_VERBOSE_DEBUG);
 bool __initdata opt_dom0_msr_relaxed;
 
-static int __init parse_dom0_param(const char *s)
+static int __init cf_check parse_dom0_param(const char *s)
 {
     const char *ss;
     int rc = 0;

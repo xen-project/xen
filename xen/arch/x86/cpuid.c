@@ -101,7 +101,7 @@ static int __init always_inline parse_cpuid(
     return rc;
 }
 
-static void __init _parse_xen_cpuid(unsigned int feat, bool val)
+static void __init cf_check _parse_xen_cpuid(unsigned int feat, bool val)
 {
     if ( !val )
         setup_clear_cpu_cap(feat);
@@ -110,7 +110,7 @@ static void __init _parse_xen_cpuid(unsigned int feat, bool val)
         setup_force_cpu_cap(X86_FEATURE_RDRAND);
 }
 
-static int __init parse_xen_cpuid(const char *s)
+static int __init cf_check parse_xen_cpuid(const char *s)
 {
     return parse_cpuid(s, _parse_xen_cpuid);
 }
@@ -120,13 +120,13 @@ static bool __initdata dom0_cpuid_cmdline;
 static uint32_t __initdata dom0_enable_feat[FSCAPINTS];
 static uint32_t __initdata dom0_disable_feat[FSCAPINTS];
 
-static void __init _parse_dom0_cpuid(unsigned int feat, bool val)
+static void __init cf_check _parse_dom0_cpuid(unsigned int feat, bool val)
 {
     __set_bit  (feat, val ? dom0_enable_feat  : dom0_disable_feat);
     __clear_bit(feat, val ? dom0_disable_feat : dom0_enable_feat );
 }
 
-static int __init parse_dom0_cpuid(const char *s)
+static int __init cf_check parse_dom0_cpuid(const char *s)
 {
     dom0_cpuid_cmdline = true;
 

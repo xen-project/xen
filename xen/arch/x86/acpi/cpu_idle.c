@@ -106,7 +106,7 @@ void (*__read_mostly pm_idle_save)(void);
 unsigned int max_cstate __read_mostly = UINT_MAX;
 unsigned int max_csubstate __read_mostly = UINT_MAX;
 
-static int __init parse_cstate(const char *s)
+static int __init cf_check parse_cstate(const char *s)
 {
     max_cstate = simple_strtoul(s, &s, 0);
     if ( *s == ',' )

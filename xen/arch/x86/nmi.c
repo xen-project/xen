@@ -48,7 +48,7 @@ bool __initdata opt_watchdog;
 /* watchdog_force: If true, process unknown NMIs when running the watchdog. */
 bool watchdog_force;
 
-static int __init parse_watchdog(const char *s)
+static int __init cf_check parse_watchdog(const char *s)
 {
     if ( !*s )
     {
@@ -78,7 +78,7 @@ custom_param("watchdog", parse_watchdog);
 /* opt_watchdog_timeout: Number of seconds to wait before panic. */
 static unsigned int opt_watchdog_timeout = 5;
 
-static int parse_watchdog_timeout(const char *s)
+static int __init cf_check parse_watchdog_timeout(const char *s)
 {
     const char *q;
 

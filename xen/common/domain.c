@@ -354,7 +354,7 @@ static int late_hwdom_init(struct domain *d)
 static unsigned int __read_mostly extra_hwdom_irqs;
 static unsigned int __read_mostly extra_domU_irqs = 32;
 
-static int __init parse_extra_guest_irqs(const char *s)
+static int __init cf_check parse_extra_guest_irqs(const char *s)
 {
     if ( isdigit(*s) )
         extra_domU_irqs = simple_strtoul(s, &s, 0);

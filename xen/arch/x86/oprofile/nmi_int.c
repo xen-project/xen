@@ -340,7 +340,7 @@ static int __init p4_init(char ** cpu_type)
 
 static int force_arch_perfmon;
 
-static int force_cpu_type(const char *str)
+static int __init cf_check force_cpu_type(const char *str)
 {
 	if (!strcmp(str, "arch_perfmon")) {
 		force_arch_perfmon = 1;

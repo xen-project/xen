@@ -117,12 +117,12 @@ static void update_gnttab_par(unsigned int val, struct param_hypfs *par,
     custom_runtime_set_var_sz(par, parval, GRANT_CUSTOM_VAL_SZ);
 }
 
-static void __init gnttab_max_frames_init(struct param_hypfs *par)
+static void __init cf_check gnttab_max_frames_init(struct param_hypfs *par)
 {
     update_gnttab_par(opt_max_grant_frames, par, opt_max_grant_frames_val);
 }
 
-static void __init max_maptrack_frames_init(struct param_hypfs *par)
+static void __init cf_check max_maptrack_frames_init(struct param_hypfs *par)
 {
     update_gnttab_par(opt_max_maptrack_frames, par,
                       opt_max_maptrack_frames_val);
@@ -156,23 +156,23 @@ static int parse_gnttab_limit(const char *arg, unsigned int *valp,
     return 0;
 }
 
-static int parse_gnttab_max_frames(const char *arg);
+static int cf_check parse_gnttab_max_frames(const char *arg);
 custom_runtime_param("gnttab_max_frames", parse_gnttab_max_frames,
                      gnttab_max_frames_init);
 
-static int parse_gnttab_max_frames(const char *arg)
+static int cf_check parse_gnttab_max_frames(const char *arg)
 {
     return parse_gnttab_limit(arg, &opt_max_grant_frames,
                               param_2_parfs(parse_gnttab_max_frames),
                               opt_max_grant_frames_val);
 }
 
-static int parse_gnttab_max_maptrack_frames(const char *arg);
+static int cf_check parse_gnttab_max_maptrack_frames(const char *arg);
 custom_runtime_param("gnttab_max_maptrack_frames",
                      parse_gnttab_max_maptrack_frames,
                      max_maptrack_frames_init);
 
-static int parse_gnttab_max_maptrack_frames(const char *arg)
+static int cf_check parse_gnttab_max_maptrack_frames(const char *arg)
 {
     return parse_gnttab_limit(arg, &opt_max_maptrack_frames,
                               param_2_parfs(parse_gnttab_max_maptrack_frames),
@@ -191,7 +191,7 @@ static bool __ro_after_init opt_grant_transfer = true;
 #define opt_grant_transfer false
 #endif
 
-static int __init parse_gnttab(const char *s)
+static int __init cf_check parse_gnttab(const char *s)
 {
     const char *ss, *e;
     int val, rc = 0;

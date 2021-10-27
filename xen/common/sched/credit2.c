@@ -456,7 +456,7 @@ static const char *const opt_runqueue_str[] = {
 };
 static int __read_mostly opt_runqueue = OPT_RUNQUEUE_SOCKET;
 
-static int __init parse_credit2_runqueue(const char *s)
+static int __init cf_check parse_credit2_runqueue(const char *s)
 {
     unsigned int i;
 

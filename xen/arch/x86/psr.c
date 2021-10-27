@@ -573,7 +573,7 @@ static bool __init parse_psr_bool(const char *s, const char *delim,
     return false;
 }
 
-static int __init parse_psr_param(const char *s)
+static int __init cf_check parse_psr_param(const char *s)
 {
     const char *ss, *val_delim;
     const char *q;

@@ -22,7 +22,7 @@ int8_t __read_mostly opt_tsx = -1;
 int8_t __read_mostly cpu_has_tsx_ctrl = -1;
 bool __read_mostly rtm_disabled;
 
-static int __init parse_tsx(const char *s)
+static int __init cf_check parse_tsx(const char *s)
 {
     int rc = 0, val = parse_bool(s, NULL);
 

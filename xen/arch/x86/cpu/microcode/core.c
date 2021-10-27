@@ -111,7 +111,7 @@ void __init microcode_set_module(unsigned int idx)
  * optional. If the EFI has forced which of the multiboot payloads is to be
  * used, only nmi=<bool> is parsed.
  */
-static int __init parse_ucode(const char *s)
+static int __init cf_check parse_ucode(const char *s)
 {
     const char *ss;
     int val, rc = 0;

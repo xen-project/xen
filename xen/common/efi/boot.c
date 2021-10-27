@@ -1417,7 +1417,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
 static bool __initdata efi_map_uc;
 
-static int __init parse_efi_param(const char *s)
+static int __init cf_check parse_efi_param(const char *s)
 {
     const char *ss;
     int rc = 0, val;

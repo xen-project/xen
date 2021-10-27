@@ -40,7 +40,7 @@ static enum core_parking_controller {
     PERFORMANCE_FIRST
 } core_parking_controller __initdata = POWER_FIRST;
 
-static int __init setup_core_parking_option(const char *str)
+static int __init cf_check setup_core_parking_option(const char *str)
 {
     if ( !strcmp(str, "power") )
         core_parking_controller = POWER_FIRST;

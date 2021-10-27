@@ -65,7 +65,7 @@ enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
 
 static int __init cpufreq_cmdline_parse(const char *s);
 
-static int __init setup_cpufreq_option(const char *str)
+static int __init cf_check setup_cpufreq_option(const char *str)
 {
     const char *arg = strpbrk(str, ",:");
     int choice;

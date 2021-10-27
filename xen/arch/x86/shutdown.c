@@ -56,7 +56,7 @@ static int reboot_mode;
  */
 static enum reboot_type reboot_type = BOOT_INVALID;
 
-static int __init set_reboot_type(const char *str)
+static int __init cf_check set_reboot_type(const char *str)
 {
     int rc = 0;
 

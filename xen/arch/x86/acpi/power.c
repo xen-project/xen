@@ -35,7 +35,7 @@
 
 uint32_t system_reset_counter = 1;
 
-static int __init parse_acpi_sleep(const char *s)
+static int __init cf_check parse_acpi_sleep(const char *s)
 {
     const char *ss;
     unsigned int flag = 0;

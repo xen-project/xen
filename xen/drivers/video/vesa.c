@@ -29,7 +29,7 @@ integer_param("vesa-ram", vram_total);
 static unsigned int __initdata vram_remap;
 
 static unsigned int __initdata font_height;
-static int __init parse_font_height(const char *s)
+static int __init cf_check parse_font_height(const char *s)
 {
     if ( simple_strtoul(s, &s, 10) == 8 && (*s++ == 'x') )
         font_height = simple_strtoul(s, &s, 10);

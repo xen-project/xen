@@ -28,8 +28,6 @@
 #include <irq_vectors.h>
 #include <public/physdev.h>
 
-static int parse_irq_vector_map_param(const char *s);
-
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 bool __read_mostly opt_noirqbalance;
 boolean_param("noirqbalance", opt_noirqbalance);
@@ -40,7 +38,6 @@ integer_param("nr_irqs", nr_irqs);
 
 /* This default may be changed by the AMD IOMMU code */
 int __read_mostly opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_DEFAULT;
-custom_param("irq_vector_map", parse_irq_vector_map_param);
 
 /* Max number of guests IRQ could be shared with */
 static unsigned char __read_mostly irq_max_guests;
@@ -66,7 +63,7 @@ static struct timer irq_ratelimit_timer;
 static unsigned int __read_mostly irq_ratelimit_threshold = 10000;
 integer_param("irq_ratelimit", irq_ratelimit_threshold);
 
-static int __init parse_irq_vector_map_param(const char *s)
+static int __init cf_check parse_irq_vector_map_param(const char *s)
 {
     const char *ss;
     int rc = 0;
@@ -90,6 +87,7 @@ static int __init parse_irq_vector_map_param(const char *s)
 
     return rc;
 }
+custom_param("irq_vector_map", parse_irq_vector_map_param);
 
 /* Must be called when irq disabled */
 void lock_vector_lock(void)

@@ -29,7 +29,7 @@
 
 unsigned int pci_probe = PCI_PROBE_CONF1 | PCI_PROBE_MMCONF;
 
-static int __init parse_mmcfg(const char *s)
+static int __init cf_check parse_mmcfg(const char *s)
 {
     const char *ss;
     int rc = 0;

@@ -43,7 +43,7 @@ void __init generic_bigsmp_probe(void)
 		}
 }
 
-static int __init genapic_apic_force(const char *str)
+static int __init cf_check genapic_apic_force(const char *str)
 {
 	int i, rc = -EINVAL;
 

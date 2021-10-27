@@ -104,7 +104,7 @@ static void *crash_heap_current = NULL, *crash_heap_end = NULL;
  * < and below are synonyomous, the latter being useful for grub2 systems
  * which would otherwise require escaping of the < option
  */
-static int __init parse_crashkernel(const char *str)
+static int __init cf_check parse_crashkernel(const char *str)
 {
     const char *cur;
     int rc = 0;
@@ -201,7 +201,7 @@ custom_param("crashkernel", parse_crashkernel);
  * - all will allocate additional structures such as domain and vcpu structs
  *       low so the crash kernel can perform an extended analysis of state.
  */
-static int __init parse_low_crashinfo(const char *str)
+static int __init cf_check parse_low_crashinfo(const char *str)
 {
 
     if ( !strlen(str) )
@@ -230,7 +230,7 @@ custom_param("low_crashinfo", parse_low_crashinfo);
  *
  * <addr> will be rounded down to the nearest power of two.  Defaults to 64G
  */
-static int __init parse_crashinfo_maxaddr(const char *str)
+static int __init cf_check parse_crashinfo_maxaddr(const char *str)
 {
     u64 addr;
     const char *q;

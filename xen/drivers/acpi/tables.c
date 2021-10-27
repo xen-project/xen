@@ -472,7 +472,7 @@ int __init acpi_table_init(void)
 	return 0;
 }
 
-static int __init acpi_parse_apic_instance(const char *str)
+static int __init cf_check acpi_parse_apic_instance(const char *str)
 {
 	const char *q;
 
