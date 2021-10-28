@@ -3242,7 +3242,7 @@ void shadow_audit_tables(struct vcpu *v)
 
 #ifdef CONFIG_PV
 
-void pv_l1tf_tasklet(void *data)
+void cf_check pv_l1tf_tasklet(void *data)
 {
     struct domain *d = data;
 

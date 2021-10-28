@@ -141,7 +141,7 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     return ret;
 }
 
-static void stopmachine_action(void *data)
+static void cf_check stopmachine_action(void *data)
 {
     unsigned int cpu = (unsigned long)data;
     enum stopmachine_state state = STOPMACHINE_START;

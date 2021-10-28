@@ -1528,6 +1528,11 @@ static int __init cf_check hvm_register_CPU_save_and_restore(void)
 }
 __initcall(hvm_register_CPU_save_and_restore);
 
+static void cf_check hvm_assert_evtchn_irq_tasklet(void *v)
+{
+    hvm_assert_evtchn_irq(v);
+}
+
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
@@ -1552,7 +1557,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         goto fail3;
 
     softirq_tasklet_init(&v->arch.hvm.assert_evtchn_irq_tasklet,
-                         (void (*)(void *))hvm_assert_evtchn_irq, v);
+                         hvm_assert_evtchn_irq_tasklet, v);
 
     v->arch.hvm.inject_event.vector = HVM_EVENT_VECTOR_UNSET;
 

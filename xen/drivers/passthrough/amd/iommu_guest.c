@@ -456,7 +456,7 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     return 0;
 }
 
-static void guest_iommu_process_command(void *data)
+static void cf_check guest_iommu_process_command(void *data)
 {
     unsigned long opcode, tail, head, cmd_mfn;
     cmd_entry_t *cmd;

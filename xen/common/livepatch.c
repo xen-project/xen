@@ -1591,7 +1591,7 @@ static int schedule_work(struct payload *data, uint32_t cmd, uint32_t timeout)
     return 0;
 }
 
-static void tasklet_fn(void *unused)
+static void cf_check tasklet_fn(void *unused)
 {
     this_cpu(work_to_do) = 1;
 }

@@ -663,7 +663,7 @@ static inline void insert_lost_records(struct t_buf *buf)
  * Notification is performed in qtasklet to avoid deadlocks with contexts
  * which __trace_var() may be called from (e.g., scheduler critical regions).
  */
-static void trace_notify_dom0(void *unused)
+static void cf_check trace_notify_dom0(void *unused)
 {
     send_global_virq(VIRQ_TBUF);
 }

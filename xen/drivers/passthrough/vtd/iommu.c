@@ -1049,7 +1049,7 @@ clear_overflow:
     }
 }
 
-static void do_iommu_page_fault(void *unused)
+static void cf_check do_iommu_page_fault(void *unused)
 {
     struct acpi_drhd_unit *drhd;
 

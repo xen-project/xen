@@ -1820,7 +1820,7 @@ struct migrate_info {
 
 static DEFINE_PER_CPU(struct migrate_info *, continue_info);
 
-static void continue_hypercall_tasklet_handler(void *data)
+static void cf_check continue_hypercall_tasklet_handler(void *data)
 {
     struct migrate_info *info = data;
     struct vcpu *v = info->vcpu;

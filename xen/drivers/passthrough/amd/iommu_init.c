@@ -26,7 +26,7 @@
 static int __initdata nr_amd_iommus;
 static bool __initdata pci_init;
 
-static void do_amd_iommu_irq(void *data);
+static void cf_check do_amd_iommu_irq(void *data);
 static DECLARE_SOFTIRQ_TASKLET(amd_iommu_irq_tasklet, do_amd_iommu_irq, NULL);
 
 unsigned int __read_mostly amd_iommu_acpi_info;
@@ -692,7 +692,7 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void do_amd_iommu_irq(void *unused)
+static void cf_check do_amd_iommu_irq(void *unused)
 {
     struct amd_iommu *iommu;
 

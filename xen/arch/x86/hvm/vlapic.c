@@ -312,7 +312,7 @@ static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
     vcpu_unpause(target);
 }
 
-static void vlapic_init_sipi_action(void *data)
+static void cf_check vlapic_init_sipi_action(void *data)
 {
     struct vcpu *origin = data;
     uint32_t icr = vcpu_vlapic(origin)->init_sipi.icr;

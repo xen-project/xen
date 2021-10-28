@@ -574,7 +574,7 @@ static void serial_rx(char c, struct cpu_user_regs *regs)
     __serial_rx(c, regs);
 }
 
-static void notify_dom0_con_ring(void *unused)
+static void cf_check notify_dom0_con_ring(void *unused)
 {
     send_global_virq(VIRQ_CON_RING);
 }

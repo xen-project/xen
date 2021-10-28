@@ -73,7 +73,7 @@ static struct keyhandler {
 #undef KEYHANDLER
 };
 
-static void keypress_action(void *unused)
+static void cf_check keypress_action(void *unused)
 {
     handle_keypress(keypress_key, NULL);
 }
@@ -206,7 +206,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 
 static DECLARE_TASKLET(dump_hwdom_tasklet, NULL, NULL);
 
-static void dump_hwdom_action(void *data)
+static void cf_check dump_hwdom_action(void *data)
 {
     struct vcpu *v = data;
 
@@ -437,7 +437,7 @@ static void read_clocks(unsigned char key)
            maxdif_cycles, sumdif_cycles/count, count, dif_cycles);
 }
 
-static void run_all_nonirq_keyhandlers(void *unused)
+static void cf_check run_all_nonirq_keyhandlers(void *unused)
 {
     /* Fire all the non-IRQ-context diagnostic keyhandlers */
     struct keyhandler *h;
