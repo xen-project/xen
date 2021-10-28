@@ -23,7 +23,7 @@ static inline unsigned long ex_cont(const struct exception_table_entry *x)
 	return EX_FIELD(x, cont);
 }
 
-static int init_or_livepatch cmp_ex(const void *a, const void *b)
+static int init_or_livepatch cf_check cmp_ex(const void *a, const void *b)
 {
 	const struct exception_table_entry *l = a, *r = b;
 	unsigned long lip = ex_addr(l);
@@ -37,7 +37,7 @@ static int init_or_livepatch cmp_ex(const void *a, const void *b)
 	return 0;
 }
 
-static void init_or_livepatch swap_ex(void *a, void *b, size_t size)
+static void init_or_livepatch cf_check swap_ex(void *a, void *b, size_t size)
 {
 	struct exception_table_entry *l = a, *r = b, tmp;
 	long delta = b - a;

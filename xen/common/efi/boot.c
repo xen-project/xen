@@ -1497,7 +1497,7 @@ static __init void copy_mapping(unsigned long mfn, unsigned long end,
     unmap_domain_page(l3dst);
 }
 
-static bool __init ram_range_valid(unsigned long smfn, unsigned long emfn)
+static bool __init cf_check ram_range_valid(unsigned long smfn, unsigned long emfn)
 {
     unsigned long sz = pfn_to_pdx(emfn - 1) / PDX_GROUP_COUNT + 1;
 
@@ -1506,7 +1506,7 @@ static bool __init ram_range_valid(unsigned long smfn, unsigned long emfn)
                          pfn_to_pdx(smfn) / PDX_GROUP_COUNT) < sz;
 }
 
-static bool __init rt_range_valid(unsigned long smfn, unsigned long emfn)
+static bool __init cf_check rt_range_valid(unsigned long smfn, unsigned long emfn)
 {
     return true;
 }
