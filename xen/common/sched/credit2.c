@@ -2072,7 +2072,7 @@ static inline void do_replenish(struct csched2_dom *sdom)
     sdom->budget += sdom->tot_budget;
 }
 
-static void replenish_domain_budget(void* data)
+static void cf_check replenish_domain_budget(void *data)
 {
     struct csched2_dom *sdom = data;
     unsigned long flags;

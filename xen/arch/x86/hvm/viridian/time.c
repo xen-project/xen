@@ -126,7 +126,7 @@ static void stop_stimer(struct viridian_stimer *vs)
     vs->started = false;
 }
 
-static void stimer_expire(void *data)
+static void cf_check stimer_expire(void *data)
 {
     struct viridian_stimer *vs = data;
     struct vcpu *v = vs->v;

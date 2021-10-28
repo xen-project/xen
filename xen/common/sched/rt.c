@@ -173,7 +173,7 @@
 #define TRC_RTDS_SCHED_TASKLET    TRC_SCHED_CLASS_EVT(RTDS, 5)
 #define TRC_RTDS_SCHEDULE         TRC_SCHED_CLASS_EVT(RTDS, 6)
 
-static void repl_timer_handler(void *data);
+static void cf_check repl_timer_handler(void *data);
 
 /*
  * System-wide private data, include global RunQueue/DepletedQ
@@ -1452,7 +1452,8 @@ rt_dom_cntl(
  * The replenishment timer handler picks units
  * from the replq and does the actual replenishment.
  */
-static void repl_timer_handler(void *data){
+static void cf_check repl_timer_handler(void *data)
+{
     s_time_t now;
     const struct scheduler *ops = data;
     struct rt_private *prv = rt_priv(ops);

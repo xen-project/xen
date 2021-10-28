@@ -271,7 +271,7 @@ void pt_restore_timer(struct vcpu *v)
     pt_vcpu_unlock(v);
 }
 
-static void pt_timer_fn(void *data)
+static void cf_check pt_timer_fn(void *data)
 {
     struct periodic_time *pt = data;
 

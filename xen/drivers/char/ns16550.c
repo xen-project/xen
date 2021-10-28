@@ -111,7 +111,7 @@ struct ns16550_config_param {
 static void enable_exar_enhanced_bits(const struct ns16550 *uart);
 #endif
 
-static void ns16550_delayed_resume(void *data);
+static void cf_check ns16550_delayed_resume(void *data);
 
 static u8 ns_read_reg(const struct ns16550 *uart, unsigned int reg)
 {
@@ -229,7 +229,7 @@ out:
     set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
 }
 
-static void ns16550_poll(void *data)
+static void cf_check ns16550_poll(void *data)
 {
     this_cpu(poll_port) = data;
 #ifdef run_in_exception_handler
@@ -532,7 +532,7 @@ static void _ns16550_resume(struct serial_port *port)
 }
 
 static int delayed_resume_tries;
-static void ns16550_delayed_resume(void *data)
+static void cf_check ns16550_delayed_resume(void *data)
 {
     struct serial_port *port = data;
     struct ns16550 *uart = port->uart;

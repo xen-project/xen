@@ -172,7 +172,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
     }
 }
 
-static void do_dbs_timer(void *dbs)
+static void cf_check do_dbs_timer(void *dbs)
 {
     struct cpu_dbs_info_s *dbs_info = (struct cpu_dbs_info_s *)dbs;
 

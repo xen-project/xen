@@ -211,7 +211,7 @@ void __init check_nmi_watchdog(void)
     return;
 }
 
-static void nmi_timer_fn(void *unused)
+static void cf_check nmi_timer_fn(void *unused)
 {
     this_cpu(nmi_timer_ticks)++;
     set_timer(&this_cpu(nmi_timer), NOW() + MILLISECS(1000));

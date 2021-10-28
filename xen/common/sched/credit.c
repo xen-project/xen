@@ -230,8 +230,8 @@ struct csched_private {
     struct timer master_ticker;
 };
 
-static void csched_tick(void *_cpu);
-static void csched_acct(void *dummy);
+static void cf_check csched_tick(void *_cpu);
+static void cf_check csched_acct(void *dummy);
 
 static inline int
 __unit_on_runq(const struct csched_unit *svc)
@@ -1356,8 +1356,7 @@ csched_runq_sort(struct csched_private *prv, unsigned int cpu)
     pcpu_schedule_unlock_irqrestore(lock, flags, cpu);
 }
 
-static void
-csched_acct(void* dummy)
+static void cf_check csched_acct(void* dummy)
 {
     struct csched_private *prv = dummy;
     unsigned long flags;
@@ -1563,8 +1562,7 @@ out:
     set_timer( &prv->master_ticker, NOW() + prv->tslice);
 }
 
-static void
-csched_tick(void *_cpu)
+static void cf_check csched_tick(void *_cpu)
 {
     unsigned int cpu = (unsigned long)_cpu;
     const struct sched_resource *sr = get_sched_res(cpu);

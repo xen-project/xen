@@ -124,7 +124,7 @@ static void pmt_update_time(PMTState *s)
 /* This function should be called soon after each time the MSB of the
  * pmtimer register rolls over, to make sure we update the status
  * registers and SCI at least once per rollover */
-static void pmt_timer_callback(void *opaque)
+static void cf_check pmt_timer_callback(void *opaque)
 {
     PMTState *s = opaque;
     uint32_t pmt_cycles_until_flip;

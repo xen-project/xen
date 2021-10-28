@@ -814,7 +814,7 @@ static s_time_t __read_platform_stime(u64 platform_time)
     return (stime_platform_stamp + scale_delta(diff, &plt_scale));
 }
 
-static void plt_overflow(void *unused)
+static void cf_check plt_overflow(void *unused)
 {
     int i;
     u64 count;
@@ -1854,7 +1854,7 @@ static void time_calibration_nop_rendezvous(void *rv)
 static void (*time_calibration_rendezvous_fn)(void *) =
     time_calibration_std_rendezvous;
 
-static void time_calibration(void *unused)
+static void cf_check time_calibration(void *unused)
 {
     struct calibration_rendezvous r = {
         .semaphore = ATOMIC_INIT(0)

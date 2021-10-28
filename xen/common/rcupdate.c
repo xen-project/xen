@@ -575,7 +575,7 @@ static void rcu_idle_timer_stop(void)
         stop_timer(&rdp->idle_timer);
 }
 
-static void rcu_idle_timer_handler(void* data)
+static void cf_check rcu_idle_timer_handler(void* data)
 {
     perfc_incr(rcu_idle_timer);
 

@@ -71,10 +71,10 @@ cpumask_t sched_res_mask;
 static DEFINE_SPINLOCK(sched_free_cpu_lock);
 
 /* Various timer handlers. */
-static void s_timer_fn(void *unused);
-static void vcpu_periodic_timer_fn(void *data);
-static void vcpu_singleshot_timer_fn(void *data);
-static void poll_timer_fn(void *data);
+static void cf_check s_timer_fn(void *unused);
+static void cf_check vcpu_periodic_timer_fn(void *data);
+static void cf_check vcpu_singleshot_timer_fn(void *data);
+static void cf_check poll_timer_fn(void *data);
 
 /* This is global for now so that private implementations can reach it */
 DEFINE_PER_CPU_READ_MOSTLY(struct sched_resource *, sched_res);
@@ -1535,7 +1535,7 @@ long vcpu_yield(void)
     return 0;
 }
 
-static void domain_watchdog_timeout(void *data)
+static void cf_check domain_watchdog_timeout(void *data)
 {
     struct domain *d = data;
 
@@ -2697,28 +2697,28 @@ static void schedule(void)
 }
 
 /* The scheduler timer: force a run through the scheduler */
-static void s_timer_fn(void *unused)
+static void cf_check s_timer_fn(void *unused)
 {
     raise_softirq(SCHEDULE_SOFTIRQ);
     SCHED_STAT_CRANK(sched_irq);
 }
 
 /* Per-VCPU periodic timer function: sends a virtual timer interrupt. */
-static void vcpu_periodic_timer_fn(void *data)
+static void cf_check vcpu_periodic_timer_fn(void *data)
 {
     struct vcpu *v = data;
     vcpu_periodic_timer_work(v);
 }
 
 /* Per-VCPU single-shot timer function: sends a virtual timer interrupt. */
-static void vcpu_singleshot_timer_fn(void *data)
+static void cf_check vcpu_singleshot_timer_fn(void *data)
 {
     struct vcpu *v = data;
     send_timer_event(v);
 }
 
 /* SCHEDOP_poll timeout callback. */
-static void poll_timer_fn(void *data)
+static void cf_check poll_timer_fn(void *data)
 {
     struct vcpu *v = data;
 

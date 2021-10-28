@@ -1289,7 +1289,7 @@ static void _ehci_dbgp_poll(struct cpu_user_regs *regs)
     set_timer(&dbgp->timer, NOW() + timeout);
 }
 
-static void ehci_dbgp_poll(void *data)
+static void cf_check ehci_dbgp_poll(void *data)
 {
     poll_port = data;
 #ifdef run_in_exception_handler

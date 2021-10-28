@@ -935,7 +935,7 @@ void alloc_direct_apic_vector(
     spin_unlock(&lock);
 }
 
-static void irq_ratelimit_timer_fn(void *data)
+static void cf_check irq_ratelimit_timer_fn(void *data)
 {
     struct irq_desc *desc, *tmp;
     unsigned long flags;
@@ -1129,7 +1129,7 @@ static inline void clear_pirq_eoi(struct domain *d, unsigned int irq)
 
 static void set_eoi_ready(void *data);
 
-static void irq_guest_eoi_timer_fn(void *data)
+static void cf_check irq_guest_eoi_timer_fn(void *data)
 {
     struct irq_desc *desc = data;
     unsigned int i, irq = desc - irq_desc;

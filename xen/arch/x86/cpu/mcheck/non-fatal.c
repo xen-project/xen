@@ -67,7 +67,7 @@ static void mce_checkregs (void *info)
 	}
 }
 
-static void mce_work_fn(void *data)
+static void cf_check mce_work_fn(void *data)
 { 
 	on_each_cpu(mce_checkregs, NULL, 1);
 

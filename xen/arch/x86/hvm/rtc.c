@@ -217,7 +217,7 @@ static void check_update_timer(RTCState *s)
         s->use_timer = 0;
 }
 
-static void rtc_update_timer(void *opaque)
+static void cf_check rtc_update_timer(void *opaque)
 {
     RTCState *s = opaque;
 
@@ -230,7 +230,7 @@ static void rtc_update_timer(void *opaque)
     spin_unlock(&s->lock);
 }
 
-static void rtc_update_timer2(void *opaque)
+static void cf_check rtc_update_timer2(void *opaque)
 {
     RTCState *s = opaque;
 
@@ -421,7 +421,7 @@ static void alarm_timer_update(RTCState *s)
     }
 }
 
-static void rtc_alarm_cb(void *opaque)
+static void cf_check rtc_alarm_cb(void *opaque)
 {
     RTCState *s = opaque;
 
