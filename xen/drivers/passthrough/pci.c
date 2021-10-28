@@ -1287,7 +1287,8 @@ static bool_t hest_source_is_pcie_aer(const struct acpi_hest_header *hest_hdr)
     return 0;
 }
 
-static int aer_hest_parse(const struct acpi_hest_header *hest_hdr, void *data)
+static int cf_check aer_hest_parse(
+    const struct acpi_hest_header *hest_hdr, void *data)
 {
     struct aer_hest_parse_info *info = data;
     const struct acpi_hest_aer_common *p;

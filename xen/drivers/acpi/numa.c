@@ -112,14 +112,14 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 	}
 }
 
-static int __init acpi_parse_slit(struct acpi_table_header *table)
+static int __init cf_check acpi_parse_slit(struct acpi_table_header *table)
 {
 	acpi_numa_slit_init((struct acpi_table_slit *)table);
 
 	return 0;
 }
 
-static int __init
+static int __init cf_check
 acpi_parse_x2apic_affinity(struct acpi_subtable_header *header,
 			   const unsigned long end)
 {
@@ -138,7 +138,7 @@ acpi_parse_x2apic_affinity(struct acpi_subtable_header *header,
 	return 0;
 }
 
-static int __init
+static int __init cf_check
 acpi_parse_processor_affinity(struct acpi_subtable_header *header,
 			      const unsigned long end)
 {
@@ -156,7 +156,7 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
 	return 0;
 }
 
-static int __init
+static int __init cf_check
 acpi_parse_memory_affinity(struct acpi_subtable_header *header,
 			   const unsigned long end)
 {
@@ -174,7 +174,7 @@ acpi_parse_memory_affinity(struct acpi_subtable_header *header,
 	return 0;
 }
 
-int __init acpi_parse_srat(struct acpi_table_header *table)
+int __init cf_check acpi_parse_srat(struct acpi_table_header *table)
 {
 	if (!table)
 		return -EINVAL;

@@ -68,7 +68,7 @@ static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
     return -EINVAL;
 }
 
-int __init acpi_parse_mcfg(struct acpi_table_header *header)
+int __init cf_check acpi_parse_mcfg(struct acpi_table_header *header)
 {
     struct acpi_table_mcfg *mcfg;
     unsigned long i;

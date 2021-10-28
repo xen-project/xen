@@ -1078,7 +1078,7 @@ static inline bool_t is_ivmd_block(u8 type)
             type == ACPI_IVRS_TYPE_MEMORY_IOMMU);
 }
 
-static int __init parse_ivrs_table(struct acpi_table_header *table)
+static int __init cf_check parse_ivrs_table(struct acpi_table_header *table)
 {
     const struct acpi_ivrs_header *ivrs_block;
     unsigned long length;
@@ -1170,7 +1170,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
     return error;
 }
 
-static int __init detect_iommu_acpi(struct acpi_table_header *table)
+static int __init cf_check detect_iommu_acpi(struct acpi_table_header *table)
 {
     const struct acpi_ivrs_header *ivrs_block;
     unsigned long length = sizeof(struct acpi_table_ivrs);
@@ -1264,7 +1264,8 @@ static int __init get_last_bdf_ivhd(
     return last_bdf;
 }
 
-static int __init get_last_bdf_acpi(struct acpi_table_header *table)
+static int __init cf_check cf_check get_last_bdf_acpi(
+    struct acpi_table_header *table)
 {
     const struct acpi_ivrs_header *ivrs_block;
     unsigned long length = sizeof(struct acpi_table_ivrs);
@@ -1306,7 +1307,7 @@ int __init amd_iommu_update_ivrs_mapping_acpi(void)
     return acpi_table_parse(ACPI_SIG_IVRS, parse_ivrs_table);
 }
 
-static int __init
+static int __init cf_check
 get_supported_ivhd_type(struct acpi_table_header *table)
 {
     size_t length = sizeof(struct acpi_table_ivrs);

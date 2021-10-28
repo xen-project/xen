@@ -767,7 +767,7 @@ acpi_parse_one_rhsa(struct acpi_dmar_header *header)
     return ret;
 }
 
-static int __init acpi_parse_dmar(struct acpi_table_header *table)
+static int __init cf_check acpi_parse_dmar(struct acpi_table_header *table)
 {
     struct acpi_table_dmar *dmar;
     struct acpi_dmar_header *entry_header;

@@ -450,7 +450,7 @@ int __init tboot_protect_mem_regions(void)
     return 1;
 }
 
-int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
+int __init cf_check tboot_parse_dmar_table(acpi_table_handler dmar_handler)
 {
     int rc;
     uint64_t size;

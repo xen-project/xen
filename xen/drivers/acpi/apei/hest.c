@@ -128,8 +128,8 @@ int apei_hest_parse(apei_hest_func_t func, void *data)
  * Check if firmware advertises firmware first mode. We need FF bit to be set
  * along with a set of MC banks which work in FF mode.
  */
-static int __init hest_parse_cmc(const struct acpi_hest_header *hest_hdr,
-				 void *data)
+static int __init cf_check hest_parse_cmc(
+	const struct acpi_hest_header *hest_hdr, void *data)
 {
 #ifdef CONFIG_X86_MCE
 	unsigned int i;

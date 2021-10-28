@@ -91,7 +91,7 @@ struct acpi_subtable_header *acpi_table_get_entry_madt(enum acpi_madt_type id,
 int acpi_table_parse_madt(enum acpi_madt_type id, acpi_table_entry_handler handler, unsigned int max_entries);
 int acpi_table_parse_srat(int id, acpi_madt_entry_handler handler,
 	unsigned int max_entries);
-int acpi_parse_srat(struct acpi_table_header *);
+int cf_check acpi_parse_srat(struct acpi_table_header *);
 void acpi_table_print (struct acpi_table_header *header, unsigned long phys_addr);
 void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
 void acpi_table_print_srat_entry (struct acpi_subtable_header *srat);

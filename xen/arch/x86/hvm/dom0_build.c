@@ -745,15 +745,15 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
     return 0;
 }
 
-static int __init acpi_count_intr_ovr(struct acpi_subtable_header *header,
-                                     const unsigned long end)
+static int __init cf_check acpi_count_intr_ovr(
+    struct acpi_subtable_header *header, const unsigned long end)
 {
     acpi_intr_overrides++;
     return 0;
 }
 
-static int __init acpi_set_intr_ovr(struct acpi_subtable_header *header,
-                                    const unsigned long end)
+static int __init cf_check acpi_set_intr_ovr(
+    struct acpi_subtable_header *header, const unsigned long end)
 {
     const struct acpi_madt_interrupt_override *intr =
         container_of(header, struct acpi_madt_interrupt_override, header);
@@ -764,15 +764,15 @@ static int __init acpi_set_intr_ovr(struct acpi_subtable_header *header,
     return 0;
 }
 
-static int __init acpi_count_nmi_src(struct acpi_subtable_header *header,
-                                     const unsigned long end)
+static int __init cf_check acpi_count_nmi_src(
+    struct acpi_subtable_header *header, const unsigned long end)
 {
     acpi_nmi_sources++;
     return 0;
 }
 
-static int __init acpi_set_nmi_src(struct acpi_subtable_header *header,
-                                   const unsigned long end)
+static int __init cf_check acpi_set_nmi_src(
+    struct acpi_subtable_header *header, const unsigned long end)
 {
     const struct acpi_madt_nmi_source *src =
         container_of(header, struct acpi_madt_nmi_source, header);

@@ -124,7 +124,7 @@ void tboot_probe(void);
 void tboot_shutdown(uint32_t shutdown_type);
 int tboot_in_measured_env(void);
 int tboot_protect_mem_regions(void);
-int tboot_parse_dmar_table(acpi_table_handler dmar_handler);
+int cf_check tboot_parse_dmar_table(acpi_table_handler dmar_handler);
 int tboot_s3_resume(void);
 void tboot_s3_error(int error);
 int tboot_wake_ap(int apicid, unsigned long sipi_vec);

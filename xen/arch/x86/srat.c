@@ -407,8 +407,8 @@ void __init acpi_numa_arch_fixup(void) {}
 
 static uint64_t __initdata srat_region_mask;
 
-static int __init srat_parse_region(struct acpi_subtable_header *header,
-				    const unsigned long end)
+static int __init cf_check srat_parse_region(
+    struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_srat_mem_affinity *ma;
 
