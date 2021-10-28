@@ -920,26 +920,21 @@ static inline bool vcpu_cpu_dirty(const struct vcpu *v)
 
 void vcpu_block(void);
 void vcpu_unblock(struct vcpu *v);
+
 void vcpu_pause(struct vcpu *v);
 void vcpu_pause_nosync(struct vcpu *v);
 void vcpu_unpause(struct vcpu *v);
+
 int vcpu_pause_by_systemcontroller(struct vcpu *v);
 int vcpu_unpause_by_systemcontroller(struct vcpu *v);
 
 void domain_pause(struct domain *d);
 void domain_pause_nosync(struct domain *d);
 void domain_unpause(struct domain *d);
+
+int domain_pause_by_systemcontroller(struct domain *d);
+int domain_pause_by_systemcontroller_nosync(struct domain *d);
 int domain_unpause_by_systemcontroller(struct domain *d);
-int __domain_pause_by_systemcontroller(struct domain *d,
-                                       void (*pause_fn)(struct domain *d));
-static inline int domain_pause_by_systemcontroller(struct domain *d)
-{
-    return __domain_pause_by_systemcontroller(d, domain_pause);
-}
-static inline int domain_pause_by_systemcontroller_nosync(struct domain *d)
-{
-    return __domain_pause_by_systemcontroller(d, domain_pause_nosync);
-}
 
 /* domain_pause() but safe against trying to pause current. */
 int __must_check domain_pause_except_self(struct domain *d);

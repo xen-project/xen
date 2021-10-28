@@ -1226,15 +1226,18 @@ int vcpu_unpause_by_systemcontroller(struct vcpu *v)
     return 0;
 }
 
-static void do_domain_pause(struct domain *d,
-                            void (*sleep_fn)(struct vcpu *v))
+static void _domain_pause(struct domain *d, bool sync)
 {
     struct vcpu *v;
 
     atomic_inc(&d->pause_count);
 
-    for_each_vcpu( d, v )
-        sleep_fn(v);
+    if ( sync )
+        for_each_vcpu ( d, v )
+            vcpu_sleep_sync(v);
+    else
+        for_each_vcpu ( d, v )
+            vcpu_sleep_nosync(v);
 
     arch_domain_pause(d);
 }
@@ -1242,12 +1245,12 @@ static void do_domain_pause(struct domain *d,
 void domain_pause(struct domain *d)
 {
     ASSERT(d != current->domain);
-    do_domain_pause(d, vcpu_sleep_sync);
+    _domain_pause(d, true /* sync */);
 }
 
 void domain_pause_nosync(struct domain *d)
 {
-    do_domain_pause(d, vcpu_sleep_nosync);
+    _domain_pause(d, false /* nosync */);
 }
 
 void domain_unpause(struct domain *d)
@@ -1261,8 +1264,7 @@ void domain_unpause(struct domain *d)
             vcpu_wake(v);
 }
 
-int __domain_pause_by_systemcontroller(struct domain *d,
-                                       void (*pause_fn)(struct domain *d))
+static int _domain_pause_by_systemcontroller(struct domain *d, bool sync)
 {
     int old, new, prev = d->controller_pause_count;
 
@@ -1281,9 +1283,19 @@ int __domain_pause_by_systemcontroller(struct domain *d,
         prev = cmpxchg(&d->controller_pause_count, old, new);
     } while ( prev != old );
 
-    pause_fn(d);
+    _domain_pause(d, sync);
 
     return 0;
+}
+
+int domain_pause_by_systemcontroller(struct domain *d)
+{
+    return _domain_pause_by_systemcontroller(d, true /* sync */);
+}
+
+int domain_pause_by_systemcontroller_nosync(struct domain *d)
+{
+    return _domain_pause_by_systemcontroller(d, false /* nosync */);
 }
 
 int domain_unpause_by_systemcontroller(struct domain *d)
