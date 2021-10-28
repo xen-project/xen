@@ -167,7 +167,7 @@ static int rsinterval = 1000;
 static atomic_t cpu_count = ATOMIC_INIT(0);
 static atomic_t pending_count = ATOMIC_INIT(0);
 
-static void rcu_barrier_callback(struct rcu_head *head)
+static void cf_check rcu_barrier_callback(struct rcu_head *head)
 {
     /*
      * We need a barrier making all previous writes visible to other cpus

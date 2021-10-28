@@ -441,7 +441,7 @@ static void add_msixtbl_entry(struct domain *d,
     list_add_rcu(&entry->list, &d->arch.hvm.msixtbl_list);
 }
 
-static void free_msixtbl_entry(struct rcu_head *rcu)
+static void cf_check free_msixtbl_entry(struct rcu_head *rcu)
 {
     struct msixtbl_entry *entry;
 

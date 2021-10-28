@@ -45,7 +45,7 @@ struct free_info {
 };
 static DEFINE_PER_CPU(struct free_info, free_info);
 
-static void _free_percpu_area(struct rcu_head *head)
+static void cf_check _free_percpu_area(struct rcu_head *head)
 {
     struct free_info *info = container_of(head, struct free_info, rcu);
     unsigned int cpu = info->cpu;

@@ -1075,7 +1075,7 @@ void vcpu_end_shutdown_deferral(struct vcpu *v)
 }
 
 /* Complete domain destroy after RCU readers are not holding old references. */
-static void complete_domain_destroy(struct rcu_head *head)
+static void cf_check complete_domain_destroy(struct rcu_head *head)
 {
     struct domain *d = container_of(head, struct domain, rcu);
     struct vcpu *v;
@@ -1798,7 +1798,7 @@ struct pirq *pirq_get_info(struct domain *d, int pirq)
     return info;
 }
 
-static void _free_pirq_struct(struct rcu_head *head)
+static void cf_check _free_pirq_struct(struct rcu_head *head)
 {
     xfree(container_of(head, struct pirq, rcu_head));
 }

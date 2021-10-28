@@ -276,7 +276,7 @@ int avc_get_hash_stats(struct xen_flask_hash_stats *arg)
     return 0;
 }
 
-static void avc_node_free(struct rcu_head *rhead)
+static void cf_check avc_node_free(struct rcu_head *rhead)
 {
     struct avc_node *node = container_of(rhead, struct avc_node, rhead);
     xfree(node);

@@ -586,7 +586,7 @@ int hvm_get_mem_pinned_cacheattr(struct domain *d, gfn_t gfn,
     return rc;
 }
 
-static void free_pinned_cacheattr_entry(struct rcu_head *rcu)
+static void cf_check free_pinned_cacheattr_entry(struct rcu_head *rcu)
 {
     xfree(container_of(rcu, struct hvm_mem_pinned_cacheattr_range, rcu));
 }

@@ -58,7 +58,7 @@ static struct radix_tree_node *rcu_node_alloc(void *arg)
 	return rcu_node ? &rcu_node->node : NULL;
 }
 
-static void _rcu_node_free(struct rcu_head *head)
+static void cf_check _rcu_node_free(struct rcu_head *head)
 {
 	struct rcu_node *rcu_node =
 		container_of(head, struct rcu_node, rcu_head);

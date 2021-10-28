@@ -2798,7 +2798,7 @@ static int cpu_schedule_up(unsigned int cpu)
     return 0;
 }
 
-static void sched_res_free(struct rcu_head *head)
+static void cf_check sched_res_free(struct rcu_head *head)
 {
     struct sched_resource *sr = container_of(head, struct sched_resource, rcu);
 

@@ -75,7 +75,7 @@ static DEFINE_SPINLOCK(shr_audit_lock);
 static DEFINE_RCU_READ_LOCK(shr_audit_read_lock);
 
 /* RCU delayed free of audit list entry */
-static void _free_pg_shared_info(struct rcu_head *head)
+static void cf_check _free_pg_shared_info(struct rcu_head *head)
 {
     xfree(container_of(head, struct page_sharing_info, rcu_head));
 }
