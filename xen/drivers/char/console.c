@@ -552,7 +552,7 @@ static void __serial_rx(char c, struct cpu_user_regs *regs)
 #endif
 }
 
-static void serial_rx(char c, struct cpu_user_regs *regs)
+static void cf_check serial_rx(char c, struct cpu_user_regs *regs)
 {
     static int switch_code_count = 0;
 
@@ -1286,7 +1286,7 @@ void panic(const char *fmt, ...)
  * **************************************************************
  */
 
-static void suspend_steal_fn(const char *str, size_t nr) { }
+static void cf_check suspend_steal_fn(const char *str, size_t nr) { }
 static int suspend_steal_id;
 
 int console_suspend(void)

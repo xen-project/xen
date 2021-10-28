@@ -1000,13 +1000,15 @@ err:
 
 typedef void (*set_debug_port_t)(struct ehci_dbgp *, unsigned int);
 
-static void default_set_debug_port(struct ehci_dbgp *dbgp, unsigned int port)
+static void cf_check default_set_debug_port(
+    struct ehci_dbgp *dbgp, unsigned int port)
 {
 }
 
 static set_debug_port_t __read_mostly set_debug_port = default_set_debug_port;
 
-static void nvidia_set_debug_port(struct ehci_dbgp *dbgp, unsigned int port)
+static void cf_check nvidia_set_debug_port(
+    struct ehci_dbgp *dbgp, unsigned int port)
 {
     uint32_t dword = pci_conf_read32(PCI_SBDF(0, dbgp->bus, dbgp->slot,
                                               dbgp->func), 0x74);
@@ -1167,7 +1169,7 @@ static inline void _ehci_dbgp_flush(struct ehci_dbgp *dbgp)
     dbgp->out.chunk = 0;
 }
 
-static void ehci_dbgp_flush(struct serial_port *port)
+static void cf_check ehci_dbgp_flush(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
     s_time_t goal;
@@ -1196,7 +1198,7 @@ static void ehci_dbgp_flush(struct serial_port *port)
        set_timer(&dbgp->timer, goal);
 }
 
-static void ehci_dbgp_putc(struct serial_port *port, char c)
+static void cf_check ehci_dbgp_putc(struct serial_port *port, char c)
 {
     struct ehci_dbgp *dbgp = port->uart;
 
@@ -1209,7 +1211,7 @@ static void ehci_dbgp_putc(struct serial_port *port, char c)
         ehci_dbgp_flush(port);
 }
 
-static int ehci_dbgp_tx_ready(struct serial_port *port)
+static int cf_check ehci_dbgp_tx_ready(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
 
@@ -1228,7 +1230,7 @@ static int ehci_dbgp_tx_ready(struct serial_port *port)
            (dbgp->state == dbgp_idle) * DBGP_MAX_PACKET;
 }
 
-static int ehci_dbgp_getc(struct serial_port *port, char *pc)
+static int cf_check ehci_dbgp_getc(struct serial_port *port, char *pc)
 {
     struct ehci_dbgp *dbgp = port->uart;
 
@@ -1309,7 +1311,7 @@ static bool_t ehci_dbgp_setup_preirq(struct ehci_dbgp *dbgp)
     return 0;
 }
 
-static void __init ehci_dbgp_init_preirq(struct serial_port *port)
+static void __init cf_check ehci_dbgp_init_preirq(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
     u32 debug_port, offset;
@@ -1358,7 +1360,7 @@ static void ehci_dbgp_setup_postirq(struct ehci_dbgp *dbgp)
     set_timer(&dbgp->timer, NOW() + MILLISECS(1));
 }
 
-static void __init ehci_dbgp_init_postirq(struct serial_port *port)
+static void __init cf_check ehci_dbgp_init_postirq(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
 
@@ -1409,12 +1411,12 @@ static int ehci_dbgp_check_release(struct ehci_dbgp *dbgp)
     return 0;
 }
 
-static void __init ehci_dbgp_endboot(struct serial_port *port)
+static void __init cf_check ehci_dbgp_endboot(struct serial_port *port)
 {
     ehci_dbgp_check_release(port->uart);
 }
 
-static void ehci_dbgp_suspend(struct serial_port *port)
+static void cf_check ehci_dbgp_suspend(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
 
@@ -1431,7 +1433,7 @@ static void ehci_dbgp_suspend(struct serial_port *port)
     dbgp->state = dbgp_unsafe;
 }
 
-static void ehci_dbgp_resume(struct serial_port *port)
+static void cf_check ehci_dbgp_resume(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
 

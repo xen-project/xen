@@ -174,7 +174,7 @@ static void handle_dw_usr_busy_quirk(struct ns16550 *uart)
     }
 }
 
-static void ns16550_interrupt(
+static void cf_check ns16550_interrupt(
     int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     struct serial_port *port = dev_id;
@@ -239,7 +239,7 @@ static void cf_check ns16550_poll(void *data)
 #endif
 }
 
-static int ns16550_tx_ready(struct serial_port *port)
+static int cf_check ns16550_tx_ready(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
@@ -250,13 +250,13 @@ static int ns16550_tx_ready(struct serial_port *port)
               uart->lsr_mask ) == uart->lsr_mask ) ? uart->fifo_size : 0;
 }
 
-static void ns16550_putc(struct serial_port *port, char c)
+static void cf_check ns16550_putc(struct serial_port *port, char c)
 {
     struct ns16550 *uart = port->uart;
     ns_write_reg(uart, UART_THR, c);
 }
 
-static int ns16550_getc(struct serial_port *port, char *pc)
+static int cf_check ns16550_getc(struct serial_port *port, char *pc)
 {
     struct ns16550 *uart = port->uart;
 
@@ -344,7 +344,7 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
                  UART_FCR_ENABLE | UART_FCR_CLRX | UART_FCR_CLTX | UART_FCR_TRG14);
 }
 
-static void __init ns16550_init_preirq(struct serial_port *port)
+static void __init cf_check ns16550_init_preirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
@@ -373,7 +373,7 @@ static void __init ns16550_init_preirq(struct serial_port *port)
         uart->fifo_size = 16;
 }
 
-static void __init ns16550_init_irq(struct serial_port *port)
+static void __init cf_check ns16550_init_irq(struct serial_port *port)
 {
 #ifdef NS16550_PCI
     struct ns16550 *uart = port->uart;
@@ -399,7 +399,7 @@ static void ns16550_setup_postirq(struct ns16550 *uart)
         set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
 }
 
-static void __init ns16550_init_postirq(struct serial_port *port)
+static void __init cf_check ns16550_init_postirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     int rc, bits;
@@ -491,7 +491,7 @@ static void __init ns16550_init_postirq(struct serial_port *port)
     ns16550_setup_postirq(uart);
 }
 
-static void ns16550_suspend(struct serial_port *port)
+static void cf_check ns16550_suspend(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
@@ -543,7 +543,7 @@ static void cf_check ns16550_delayed_resume(void *data)
         _ns16550_resume(port);
 }
 
-static void ns16550_resume(struct serial_port *port)
+static void cf_check ns16550_resume(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
@@ -569,7 +569,7 @@ static void ns16550_resume(struct serial_port *port)
         _ns16550_resume(port);
 }
 
-static void __init ns16550_endboot(struct serial_port *port)
+static void __init cf_check ns16550_endboot(struct serial_port *port)
 {
 #ifdef CONFIG_HAS_IOPORTS
     struct ns16550 *uart = port->uart;
@@ -583,13 +583,13 @@ static void __init ns16550_endboot(struct serial_port *port)
 #endif
 }
 
-static int __init ns16550_irq(struct serial_port *port)
+static int __init cf_check ns16550_irq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     return ((uart->irq > 0) ? uart->irq : -1);
 }
 
-static void ns16550_start_tx(struct serial_port *port)
+static void cf_check ns16550_start_tx(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     u8 ier = ns_read_reg(uart, UART_IER);
@@ -599,7 +599,7 @@ static void ns16550_start_tx(struct serial_port *port)
         ns_write_reg(uart, UART_IER, ier | UART_IER_ETHREI);
 }
 
-static void ns16550_stop_tx(struct serial_port *port)
+static void cf_check ns16550_stop_tx(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     u8 ier = ns_read_reg(uart, UART_IER);
