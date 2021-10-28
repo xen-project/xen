@@ -53,7 +53,7 @@ static int __init cf_check setup_core_parking_option(const char *str)
 }
 custom_param("core_parking", setup_core_parking_option);
 
-static unsigned int core_parking_performance(unsigned int event)
+static unsigned int cf_check core_parking_performance(unsigned int event)
 {
     unsigned int cpu = -1;
 
@@ -111,7 +111,7 @@ static unsigned int core_parking_performance(unsigned int event)
     return cpu;
 }
 
-static unsigned int core_parking_power(unsigned int event)
+static unsigned int cf_check core_parking_power(unsigned int event)
 {
     unsigned int cpu = -1;
 

@@ -67,8 +67,8 @@ static void cf_check update_cpb(void *data)
     }
 }
 
-static int powernow_cpufreq_update (int cpuid,
-				     struct cpufreq_policy *policy)
+static int cf_check powernow_cpufreq_update(
+    int cpuid, struct cpufreq_policy *policy)
 {
     if (!cpumask_test_cpu(cpuid, &cpu_online_map))
         return -EINVAL;
@@ -78,8 +78,9 @@ static int powernow_cpufreq_update (int cpuid,
     return 0;
 }
 
-static int powernow_cpufreq_target(struct cpufreq_policy *policy,
-                               unsigned int target_freq, unsigned int relation)
+static int cf_check powernow_cpufreq_target(
+    struct cpufreq_policy *policy,
+    unsigned int target_freq, unsigned int relation)
 {
     struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
     struct processor_performance *perf;
@@ -180,7 +181,7 @@ static void cf_check get_cpu_data(void *arg)
         amd_fixup_frequency(&perf->states[i]);
 }
 
-static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
+static int cf_check powernow_cpufreq_verify(struct cpufreq_policy *policy)
 {
     struct acpi_cpufreq_data *data;
     struct processor_performance *perf;
@@ -197,7 +198,7 @@ static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
     return cpufreq_frequency_table_verify(policy, data->freq_table);
 }
 
-static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
+static int cf_check powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
     unsigned int i;
     unsigned int valid_states = 0;
@@ -303,7 +304,7 @@ err_unreg:
     return result;
 }
 
-static int powernow_cpufreq_cpu_exit(struct cpufreq_policy *policy)
+static int cf_check powernow_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
     struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
 

@@ -215,7 +215,8 @@ static void dbs_timer_exit(struct cpu_dbs_info_s *dbs_info)
     kill_timer(&per_cpu(dbs_timer, dbs_info->cpu));
 }
 
-int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
+static int cf_check cpufreq_governor_dbs(
+    struct cpufreq_policy *policy, unsigned int event)
 {
     unsigned int cpu = policy->cpu;
     struct cpu_dbs_info_s *this_dbs_info;
@@ -307,7 +308,8 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
     return 0;
 }
 
-static bool_t __init cpufreq_dbs_handle_option(const char *name, const char *val)
+static bool __init cf_check cpufreq_dbs_handle_option(
+    const char *name, const char *val)
 {
     if ( !strcmp(name, "rate") && val )
     {

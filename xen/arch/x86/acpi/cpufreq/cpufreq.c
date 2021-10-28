@@ -320,7 +320,7 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     return policy->cpuinfo.max_freq * perf_percent / 100;
 }
 
-static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
+static unsigned int cf_check get_cur_freq_on_cpu(unsigned int cpu)
 {
     struct cpufreq_policy *policy;
     struct acpi_cpufreq_data *data;
@@ -369,8 +369,9 @@ static unsigned int check_freqs(const cpumask_t *mask, unsigned int freq,
     return 0;
 }
 
-static int acpi_cpufreq_target(struct cpufreq_policy *policy,
-                               unsigned int target_freq, unsigned int relation)
+static int cf_check acpi_cpufreq_target(
+    struct cpufreq_policy *policy,
+    unsigned int target_freq, unsigned int relation)
 {
     struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
     struct processor_performance *perf;
@@ -449,7 +450,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     return result;
 }
 
-static int acpi_cpufreq_verify(struct cpufreq_policy *policy)
+static int cf_check acpi_cpufreq_verify(struct cpufreq_policy *policy)
 {
     struct acpi_cpufreq_data *data;
     struct processor_performance *perf;
@@ -494,8 +495,7 @@ acpi_cpufreq_guess_freq(struct acpi_cpufreq_data *data, unsigned int cpu)
     }
 }
 
-static int 
-acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
+static int cf_check acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
     unsigned int i;
     unsigned int valid_states = 0;
@@ -609,7 +609,7 @@ err_unreg:
     return result;
 }
 
-static int acpi_cpufreq_cpu_exit(struct cpufreq_policy *policy)
+static int cf_check acpi_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
     struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
 
