@@ -91,8 +91,8 @@ void hpet_disable_legacy_replacement_mode(void);
  */
 void hpet_broadcast_init(void);
 void hpet_broadcast_resume(void);
-void hpet_broadcast_enter(void);
-void hpet_broadcast_exit(void);
+void cf_check hpet_broadcast_enter(void);
+void cf_check hpet_broadcast_exit(void);
 int hpet_broadcast_is_available(void);
 void hpet_disable_legacy_broadcast(void);
 

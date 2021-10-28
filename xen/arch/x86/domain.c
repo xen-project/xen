@@ -74,11 +74,11 @@
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
-static void default_idle(void);
+static void cf_check default_idle(void);
 void (*pm_idle) (void) __read_mostly = default_idle;
 void (*dead_idle) (void) __read_mostly = default_dead_idle;
 
-static void default_idle(void)
+static void cf_check default_idle(void)
 {
     struct cpu_info *info = get_cpu_info();
 
@@ -93,7 +93,7 @@ static void default_idle(void)
         local_irq_enable();
 }
 
-void default_dead_idle(void)
+void cf_check default_dead_idle(void)
 {
     /*
      * When going into S3, without flushing caches modified data may be

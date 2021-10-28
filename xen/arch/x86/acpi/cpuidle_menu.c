@@ -185,7 +185,7 @@ static unsigned int get_sleep_length_us(void)
     return (us >> 32) ? (unsigned int)-2000 : (unsigned int)us;
 }
 
-static int menu_select(struct acpi_processor_power *power)
+static int cf_check menu_select(struct acpi_processor_power *power)
 {
     struct menu_device *data = &this_cpu(menu_devices);
     int i;
@@ -237,7 +237,7 @@ static int menu_select(struct acpi_processor_power *power)
     return data->last_state_idx;
 }
 
-static void menu_reflect(struct acpi_processor_power *power)
+static void cf_check menu_reflect(struct acpi_processor_power *power)
 {
     struct menu_device *data = &this_cpu(menu_devices);
     u64 new_factor;
@@ -275,7 +275,7 @@ static void menu_reflect(struct acpi_processor_power *power)
     data->correction_factor[data->bucket] = new_factor;
 }
 
-static int menu_enable_device(struct acpi_processor_power *power)
+static int cf_check menu_enable_device(struct acpi_processor_power *power)
 {
     memset(&per_cpu(menu_devices, power->cpu), 0, sizeof(struct menu_device));
 

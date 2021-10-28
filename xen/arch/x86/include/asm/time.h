@@ -43,11 +43,11 @@ int hwdom_pit_access(struct ioreq *ioreq);
 
 int cpu_frequency_change(u64 freq);
 
-void pit_broadcast_enter(void);
-void pit_broadcast_exit(void);
+void cf_check pit_broadcast_enter(void);
+void cf_check pit_broadcast_exit(void);
 int pit_broadcast_is_available(void);
 
-uint64_t acpi_pm_tick_to_ns(uint64_t ticks);
+uint64_t cf_check acpi_pm_tick_to_ns(uint64_t ticks);
 
 uint64_t tsc_ticks2ns(uint64_t ticks);
 

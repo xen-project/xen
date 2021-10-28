@@ -75,7 +75,7 @@
 #define GET_CC7_RES(val)  GET_HW_RES_IN_NS(0x3FE, val) /* SNB onwards */
 #define PHI_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FF, val) /* Xeon Phi only */
 
-static void lapic_timer_nop(void) { }
+static void cf_check lapic_timer_nop(void) { }
 void (*__read_mostly lapic_timer_off)(void);
 void (*__read_mostly lapic_timer_on)(void);
 
@@ -310,12 +310,27 @@ static char* acpi_cstate_method_name[] =
     "HALT"
 };
 
-static uint64_t get_stime_tick(void) { return (uint64_t)NOW(); }
-static uint64_t stime_ticks_elapsed(uint64_t t1, uint64_t t2) { return t2 - t1; }
-static uint64_t stime_tick_to_ns(uint64_t ticks) { return ticks; }
+static uint64_t cf_check get_stime_tick(void)
+{
+    return NOW();
+}
 
-static uint64_t get_acpi_pm_tick(void) { return (uint64_t)inl(pmtmr_ioport); }
-static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
+static uint64_t cf_check stime_ticks_elapsed(uint64_t t1, uint64_t t2)
+{
+    return t2 - t1;
+}
+
+static uint64_t cf_check stime_tick_to_ns(uint64_t ticks)
+{
+    return ticks;
+}
+
+static uint64_t cf_check get_acpi_pm_tick(void)
+{
+    return inl(pmtmr_ioport);
+}
+
+static uint64_t cf_check acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
 {
     if ( t2 >= t1 )
         return (t2 - t1);
@@ -664,7 +679,7 @@ void update_idle_stats(struct acpi_processor_power *power,
     spin_unlock(&power->stat_lock);
 }
 
-static void acpi_processor_idle(void)
+static void cf_check acpi_processor_idle(void)
 {
     unsigned int cpu = smp_processor_id();
     struct acpi_processor_power *power = processor_powers[cpu];
@@ -869,7 +884,7 @@ static void acpi_processor_idle(void)
         cpuidle_current_governor->reflect(power);
 }
 
-void acpi_dead_idle(void)
+void cf_check acpi_dead_idle(void)
 {
     struct acpi_processor_power *power;
     struct acpi_processor_cx *cx;

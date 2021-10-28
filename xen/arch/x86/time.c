@@ -545,7 +545,7 @@ static __init int cf_check init_pmtmr_scale(void)
 }
 __initcall(init_pmtmr_scale);
 
-uint64_t acpi_pm_tick_to_ns(uint64_t ticks)
+uint64_t cf_check acpi_pm_tick_to_ns(uint64_t ticks)
 {
     return scale_delta(ticks, &pmt_scale);
 }
@@ -2235,12 +2235,12 @@ static int __init cf_check disable_pit_irq(void)
 }
 __initcall(disable_pit_irq);
 
-void pit_broadcast_enter(void)
+void cf_check pit_broadcast_enter(void)
 {
     cpumask_set_cpu(smp_processor_id(), &pit_broadcast_mask);
 }
 
-void pit_broadcast_exit(void)
+void cf_check pit_broadcast_exit(void)
 {
     int cpu = smp_processor_id();
 

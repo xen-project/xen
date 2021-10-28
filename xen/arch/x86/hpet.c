@@ -706,7 +706,7 @@ void hpet_disable_legacy_broadcast(void)
     smp_send_event_check_mask(&cpu_online_map);
 }
 
-void hpet_broadcast_enter(void)
+void cf_check hpet_broadcast_enter(void)
 {
     unsigned int cpu = smp_processor_id();
     struct hpet_event_channel *ch = per_cpu(cpu_bc_channel, cpu);
@@ -737,7 +737,7 @@ void hpet_broadcast_enter(void)
     spin_unlock(&ch->lock);
 }
 
-void hpet_broadcast_exit(void)
+void cf_check hpet_broadcast_exit(void)
 {
     unsigned int cpu = smp_processor_id();
     struct hpet_event_channel *ch = per_cpu(cpu_bc_channel, cpu);

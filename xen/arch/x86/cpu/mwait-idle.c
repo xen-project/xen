@@ -773,7 +773,7 @@ static const struct cpuidle_state snr_cstates[] = {
 	{}
 };
 
-static void mwait_idle(void)
+static void cf_check mwait_idle(void)
 {
 	unsigned int cpu = smp_processor_id();
 	struct acpi_processor_power *power = processor_powers[cpu];
