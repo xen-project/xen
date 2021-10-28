@@ -98,13 +98,13 @@ static bool scheduler_active;
 static void sched_set_affinity(
     struct sched_unit *unit, const cpumask_t *hard, const cpumask_t *soft);
 
-static struct sched_resource *
+static struct sched_resource *cf_check
 sched_idle_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
 {
     return unit->res;
 }
 
-static void *
+static void *cf_check
 sched_idle_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
                        void *dd)
 {
@@ -112,12 +112,12 @@ sched_idle_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
     return ZERO_BLOCK_PTR;
 }
 
-static void
+static void cf_check
 sched_idle_free_udata(const struct scheduler *ops, void *priv)
 {
 }
 
-static void sched_idle_schedule(
+static void cf_check sched_idle_schedule(
     const struct scheduler *ops, struct sched_unit *unit, s_time_t now,
     bool tasklet_work_scheduled)
 {

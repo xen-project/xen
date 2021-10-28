@@ -343,7 +343,7 @@ arinc653_sched_get(
  *                  <li> !0 = error
  *                  </ul>
  */
-static int
+static int cf_check
 a653sched_init(struct scheduler *ops)
 {
     a653sched_priv_t *prv;
@@ -366,7 +366,7 @@ a653sched_init(struct scheduler *ops)
  *
  * @param ops       Pointer to this instance of the scheduler structure
  */
-static void
+static void cf_check
 a653sched_deinit(struct scheduler *ops)
 {
     xfree(SCHED_PRIV(ops));
@@ -381,7 +381,7 @@ a653sched_deinit(struct scheduler *ops)
  *
  * @return          Pointer to the allocated data
  */
-static void *
+static void *cf_check
 a653sched_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
                       void *dd)
 {
@@ -442,7 +442,7 @@ a653sched_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
  *
  * @param ops       Pointer to this instance of the scheduler structure
  */
-static void
+static void cf_check
 a653sched_free_udata(const struct scheduler *ops, void *priv)
 {
     a653sched_priv_t *sched_priv = SCHED_PRIV(ops);
@@ -469,7 +469,7 @@ a653sched_free_udata(const struct scheduler *ops, void *priv)
  * @param ops       Pointer to this instance of the scheduler structure
  * @param unit      Pointer to struct sched_unit
  */
-static void
+static void cf_check
 a653sched_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 {
     if ( AUNIT(unit) != NULL )
@@ -489,7 +489,7 @@ a653sched_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
  * @param ops       Pointer to this instance of the scheduler structure
  * @param unit      Pointer to struct sched_unit
  */
-static void
+static void cf_check
 a653sched_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 {
     if ( AUNIT(unit) != NULL )
@@ -505,7 +505,7 @@ a653sched_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
  * @param ops       Pointer to this instance of the scheduler structure
  * @param now       Current time
  */
-static void
+static void cf_check
 a653sched_do_schedule(
     const struct scheduler *ops,
     struct sched_unit *prev,
@@ -604,7 +604,7 @@ a653sched_do_schedule(
  *
  * @return          Scheduler resource to run on
  */
-static struct sched_resource *
+static struct sched_resource *cf_check
 a653sched_pick_resource(const struct scheduler *ops,
                         const struct sched_unit *unit)
 {
@@ -634,7 +634,7 @@ a653sched_pick_resource(const struct scheduler *ops,
  * @param pdata     scheduler specific PCPU data (we don't have any)
  * @param vdata     scheduler specific UNIT data of the idle unit
  */
-static spinlock_t *
+static spinlock_t *cf_check
 a653_switch_sched(struct scheduler *new_ops, unsigned int cpu,
                   void *pdata, void *vdata)
 {
@@ -656,7 +656,7 @@ a653_switch_sched(struct scheduler *new_ops, unsigned int cpu,
  * @param ops       Pointer to this instance of the scheduler structure
  * @param sc        Pointer to the scheduler operation specified by Domain 0
  */
-static int
+static int cf_check
 a653sched_adjust_global(const struct scheduler *ops,
                         struct xen_sysctl_scheduler_op *sc)
 {

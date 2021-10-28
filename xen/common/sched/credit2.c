@@ -2164,7 +2164,7 @@ csched2_unit_check(const struct sched_unit *unit)
 #define CSCHED2_UNIT_CHECK(unit)
 #endif
 
-static void *
+static void *cf_check
 csched2_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
                     void *dd)
 {
@@ -2208,7 +2208,7 @@ csched2_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
     return svc;
 }
 
-static void
+static void cf_check
 csched2_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct csched2_unit * const svc = csched2_unit(unit);
@@ -2230,7 +2230,7 @@ csched2_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
         __clear_bit(__CSFLAG_delayed_runq_add, &svc->flags);
 }
 
-static void
+static void cf_check
 csched2_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct csched2_unit * const svc = csched2_unit(unit);
@@ -2285,7 +2285,7 @@ out:
     return;
 }
 
-static void
+static void cf_check
 csched2_unit_yield(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct csched2_unit * const svc = csched2_unit(unit);
@@ -2293,7 +2293,7 @@ csched2_unit_yield(const struct scheduler *ops, struct sched_unit *unit)
     __set_bit(__CSFLAG_unit_yield, &svc->flags);
 }
 
-static void
+static void cf_check
 csched2_context_saved(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct csched2_unit * const svc = csched2_unit(unit);
@@ -2335,7 +2335,7 @@ csched2_context_saved(const struct scheduler *ops, struct sched_unit *unit)
 }
 
 #define MAX_LOAD (STIME_MAX)
-static struct sched_resource *
+static struct sched_resource *cf_check
 csched2_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
 {
     struct csched2_private *prv = csched2_priv(ops);
@@ -2867,8 +2867,7 @@ retry:
     return;
 }
 
-static void
-csched2_unit_migrate(
+static void cf_check csched2_unit_migrate(
     const struct scheduler *ops, struct sched_unit *unit, unsigned int new_cpu)
 {
     struct csched2_unit * const svc = csched2_unit(unit);
@@ -2894,7 +2893,7 @@ csched2_unit_migrate(
         sched_set_res(unit, get_sched_res(new_cpu));
 }
 
-static int
+static int cf_check
 csched2_dom_cntl(
     const struct scheduler *ops,
     struct domain *d,
@@ -3100,7 +3099,7 @@ csched2_dom_cntl(
     return rc;
 }
 
-static void
+static void cf_check
 csched2_aff_cntl(const struct scheduler *ops, struct sched_unit *unit,
                  const cpumask_t *hard, const cpumask_t *soft)
 {
@@ -3116,8 +3115,8 @@ csched2_aff_cntl(const struct scheduler *ops, struct sched_unit *unit,
         __clear_bit(__CSFLAG_pinned, &svc->flags);
 }
 
-static int csched2_sys_cntl(const struct scheduler *ops,
-                            struct xen_sysctl_scheduler_op *sc)
+static int cf_check csched2_sys_cntl(
+    const struct scheduler *ops, struct xen_sysctl_scheduler_op *sc)
 {
     struct xen_sysctl_credit2_schedule *params = &sc->u.sched_credit2;
     struct csched2_private *prv = csched2_priv(ops);
@@ -3148,7 +3147,7 @@ static int csched2_sys_cntl(const struct scheduler *ops,
     return 0;
 }
 
-static void *
+static void *cf_check
 csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 {
     struct csched2_private *prv = csched2_priv(ops);
@@ -3180,7 +3179,7 @@ csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     return sdom;
 }
 
-static void
+static void cf_check
 csched2_free_domdata(const struct scheduler *ops, void *data)
 {
     struct csched2_dom *sdom = data;
@@ -3200,7 +3199,7 @@ csched2_free_domdata(const struct scheduler *ops, void *data)
     }
 }
 
-static void
+static void cf_check
 csched2_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 {
     const struct csched2_unit *svc = unit->priv;
@@ -3231,7 +3230,7 @@ csched2_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
     CSCHED2_UNIT_CHECK(unit);
 }
 
-static void
+static void cf_check
 csched2_free_udata(const struct scheduler *ops, void *priv)
 {
     struct csched2_unit *svc = priv;
@@ -3239,7 +3238,7 @@ csched2_free_udata(const struct scheduler *ops, void *priv)
     xfree(svc);
 }
 
-static void
+static void cf_check
 csched2_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct csched2_unit * const svc = csched2_unit(unit);
@@ -3558,7 +3557,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
  * This function is in the critical path. It is designed to be simple and
  * fast for the common case.
  */
-static void csched2_schedule(
+static void cf_check csched2_schedule(
     const struct scheduler *ops, struct sched_unit *currunit, s_time_t now,
     bool tasklet_work_scheduled)
 {
@@ -3790,7 +3789,7 @@ dump_pcpu(const struct scheduler *ops, int cpu)
     }
 }
 
-static void
+static void cf_check
 csched2_dump(const struct scheduler *ops)
 {
     struct list_head *iter_sdom;
@@ -3898,7 +3897,7 @@ csched2_dump(const struct scheduler *ops)
     read_unlock_irqrestore(&prv->lock, flags);
 }
 
-static void *
+static void *cf_check
 csched2_alloc_pdata(const struct scheduler *ops, int cpu)
 {
     struct csched2_pcpu *spc;
@@ -3988,7 +3987,7 @@ init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
 }
 
 /* Change the scheduler of cpu to us (Credit2). */
-static spinlock_t *
+static spinlock_t *cf_check
 csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
                      void *pdata, void *vdata)
 {
@@ -4026,7 +4025,7 @@ csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     return &rqd->lock;
 }
 
-static void
+static void cf_check
 csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     unsigned long flags;
@@ -4086,7 +4085,7 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     return;
 }
 
-static void
+static void cf_check
 csched2_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     struct csched2_private *prv = csched2_priv(ops);
@@ -4115,7 +4114,7 @@ csched2_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     xfree(pcpu);
 }
 
-static int __init
+static int __init cf_check
 csched2_global_init(void)
 {
     if ( opt_load_precision_shift < LOADAVG_PRECISION_SHIFT_MIN )
@@ -4142,7 +4141,7 @@ csched2_global_init(void)
     return 0;
 }
 
-static int
+static int cf_check
 csched2_init(struct scheduler *ops)
 {
     struct csched2_private *prv;
@@ -4190,7 +4189,7 @@ csched2_init(struct scheduler *ops)
     return 0;
 }
 
-static void
+static void cf_check
 csched2_deinit(struct scheduler *ops)
 {
     struct csched2_private *prv;

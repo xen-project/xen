@@ -269,13 +269,13 @@ unit_on_q(const struct rt_unit *svc)
    return !list_empty(&svc->q_elem);
 }
 
-static struct rt_unit *
+static struct rt_unit *cf_check
 q_elem(struct list_head *elem)
 {
     return list_entry(elem, struct rt_unit, q_elem);
 }
 
-static struct rt_unit *
+static struct rt_unit *cf_check
 replq_elem(struct list_head *elem)
 {
     return list_entry(elem, struct rt_unit, replq_elem);
@@ -348,7 +348,7 @@ rt_dump_unit(const struct scheduler *ops, const struct rt_unit *svc)
             svc->flags, CPUMASK_PR(mask));
 }
 
-static void
+static void cf_check
 rt_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct rt_private *prv = rt_priv(ops);
@@ -366,7 +366,7 @@ rt_dump_pcpu(const struct scheduler *ops, int cpu)
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 
-static void
+static void cf_check
 rt_dump(const struct scheduler *ops)
 {
     struct list_head *runq, *depletedq, *replq, *iter;
@@ -636,7 +636,7 @@ replq_reinsert(const struct scheduler *ops, struct rt_unit *svc)
  * Valid resource of an unit is intesection of unit's affinity
  * and available resources
  */
-static struct sched_resource *
+static struct sched_resource *cf_check
 rt_res_pick_locked(const struct sched_unit *unit, unsigned int locked_cpu)
 {
     cpumask_t *cpus = cpumask_scratch_cpu(locked_cpu);
@@ -659,7 +659,7 @@ rt_res_pick_locked(const struct sched_unit *unit, unsigned int locked_cpu)
  * Valid resource of an unit is intesection of unit's affinity
  * and available resources
  */
-static struct sched_resource *
+static struct sched_resource *cf_check
 rt_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
 {
     struct sched_resource *res;
@@ -672,7 +672,7 @@ rt_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
 /*
  * Init/Free related code
  */
-static int
+static int cf_check
 rt_init(struct scheduler *ops)
 {
     int rc = -ENOMEM;
@@ -701,7 +701,7 @@ rt_init(struct scheduler *ops)
     return rc;
 }
 
-static void
+static void cf_check
 rt_deinit(struct scheduler *ops)
 {
     struct rt_private *prv = rt_priv(ops);
@@ -714,7 +714,7 @@ rt_deinit(struct scheduler *ops)
 }
 
 /* Change the scheduler of cpu to us (RTDS). */
-static spinlock_t *
+static spinlock_t *cf_check
 rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
                 void *pdata, void *vdata)
 {
@@ -750,7 +750,7 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     return &prv->lock;
 }
 
-static void
+static void cf_check
 rt_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     unsigned long flags;
@@ -782,7 +782,7 @@ rt_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 
-static void *
+static void *cf_check
 rt_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 {
     unsigned long flags;
@@ -804,7 +804,7 @@ rt_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     return sdom;
 }
 
-static void
+static void cf_check
 rt_free_domdata(const struct scheduler *ops, void *data)
 {
     struct rt_dom *sdom = data;
@@ -822,7 +822,7 @@ rt_free_domdata(const struct scheduler *ops, void *data)
     }
 }
 
-static void *
+static void * cf_check
 rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
 {
     struct rt_unit *svc;
@@ -850,7 +850,7 @@ rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
     return svc;
 }
 
-static void
+static void cf_check
 rt_free_udata(const struct scheduler *ops, void *priv)
 {
     struct rt_unit *svc = priv;
@@ -865,7 +865,7 @@ rt_free_udata(const struct scheduler *ops, void *priv)
  * It inserts units of moving domain to the scheduler's RunQ in
  * dest. cpupool.
  */
-static void
+static void cf_check
 rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct rt_unit *svc = rt_unit(unit);
@@ -901,7 +901,7 @@ rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 /*
  * Remove rt_unit svc from the old scheduler in source cpupool.
  */
-static void
+static void cf_check
 rt_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct rt_unit * const svc = rt_unit(unit);
@@ -1042,7 +1042,7 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask, unsigned int cpu)
  * schedule function for rt scheduler.
  * The lock is already grabbed in schedule.c, no need to lock here
  */
-static void
+static void cf_check
 rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
             s_time_t now, bool tasklet_work_scheduled)
 {
@@ -1129,7 +1129,7 @@ rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
  * Remove UNIT from RunQ
  * The lock is already grabbed in schedule.c, no need to lock here
  */
-static void
+static void cf_check
 rt_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct rt_unit * const svc = rt_unit(unit);
@@ -1244,7 +1244,7 @@ runq_tickle(const struct scheduler *ops, const struct rt_unit *new)
  * The lock is already grabbed in schedule.c, no need to lock here
  * TODO: what if these two units belongs to the same domain?
  */
-static void
+static void cf_check
 rt_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct rt_unit * const svc = rt_unit(unit);
@@ -1314,7 +1314,7 @@ rt_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
  * scurr has finished context switch, insert it back to the RunQ,
  * and then pick the highest priority unit from runq to run
  */
-static void
+static void cf_check
 rt_context_saved(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct rt_unit *svc = rt_unit(unit);
@@ -1341,7 +1341,7 @@ out:
 /*
  * set/get each unit info of each domain
  */
-static int
+static int cf_check
 rt_dom_cntl(
     const struct scheduler *ops,
     struct domain *d,
