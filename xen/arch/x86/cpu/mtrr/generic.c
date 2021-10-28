@@ -287,7 +287,8 @@ static void set_fixed_range(int msr, bool *changed, unsigned int *msrwords)
 	}
 }
 
-int generic_get_free_region(unsigned long base, unsigned long size, int replace_reg)
+int cf_check generic_get_free_region(
+    unsigned long base, unsigned long size, int replace_reg)
 /*  [SUMMARY] Get a free MTRR.
     <base> The starting (base) address of the region.
     <size> The size (in bytes) of the region.
@@ -309,8 +310,8 @@ int generic_get_free_region(unsigned long base, unsigned long size, int replace_
 	return -ENOSPC;
 }
 
-static void generic_get_mtrr(unsigned int reg, unsigned long *base,
-			     unsigned long *size, mtrr_type *type)
+static void cf_check generic_get_mtrr(
+    unsigned int reg, unsigned long *base, unsigned long *size, mtrr_type *type)
 {
 	uint64_t _mask, _base;
 
@@ -499,7 +500,7 @@ static void post_set(bool pge)
 	spin_unlock(&set_atomicity_lock);
 }
 
-static void generic_set_all(void)
+static void cf_check generic_set_all(void)
 {
 	unsigned long mask, count;
 	unsigned long flags;
@@ -522,8 +523,8 @@ static void generic_set_all(void)
 	}
 }
 
-static void generic_set_mtrr(unsigned int reg, unsigned long base,
-			     unsigned long size, mtrr_type type)
+static void cf_check generic_set_mtrr(
+    unsigned int reg, unsigned long base, unsigned long size, mtrr_type type)
 /*  [SUMMARY] Set variable MTRR register on the local CPU.
     <reg> The register to set.
     <base> The base address of the region.
@@ -566,7 +567,8 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
 	local_irq_restore(flags);
 }
 
-int generic_validate_add_page(unsigned long base, unsigned long size, unsigned int type)
+int cf_check generic_validate_add_page(
+    unsigned long base, unsigned long size, unsigned int type)
 {
 	unsigned long lbase, last;
 
@@ -584,7 +586,7 @@ int generic_validate_add_page(unsigned long base, unsigned long size, unsigned i
 }
 
 
-static int generic_have_wrcomb(void)
+static int cf_check generic_have_wrcomb(void)
 {
 	unsigned long config;
 	rdmsrl(MSR_MTRRcap, config);

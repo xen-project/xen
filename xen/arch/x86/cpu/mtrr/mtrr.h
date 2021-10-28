@@ -24,10 +24,10 @@ struct mtrr_ops {
 	int	(*have_wrcomb)(void);
 };
 
-extern int generic_get_free_region(unsigned long base, unsigned long size,
-				   int replace_reg);
-extern int generic_validate_add_page(unsigned long base, unsigned long size,
-				     unsigned int type);
+int cf_check generic_get_free_region(
+    unsigned long base, unsigned long size, int replace_reg);
+int cf_check generic_validate_add_page(
+    unsigned long base, unsigned long size, unsigned int type);
 
 extern const struct mtrr_ops generic_mtrr_ops;
 
