@@ -38,7 +38,7 @@ static inline u32 x2apic_cluster(unsigned int cpu)
     return per_cpu(cpu_2_logical_apicid, cpu) >> 16;
 }
 
-static void init_apic_ldr_x2apic_cluster(void)
+static void cf_check init_apic_ldr_x2apic_cluster(void)
 {
     unsigned int cpu, this_cpu = smp_processor_id();
 
@@ -74,12 +74,14 @@ static void init_apic_ldr_x2apic_cluster(void)
     cpumask_set_cpu(this_cpu, per_cpu(cluster_cpus, this_cpu));
 }
 
-static const cpumask_t *vector_allocation_cpumask_x2apic_cluster(int cpu)
+static const cpumask_t *cf_check vector_allocation_cpumask_x2apic_cluster(
+    int cpu)
 {
     return per_cpu(cluster_cpus, cpu);
 }
 
-static unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
+static unsigned int cf_check cpu_mask_to_apicid_x2apic_cluster(
+    const cpumask_t *cpumask)
 {
     unsigned int cpu = cpumask_any(cpumask);
     unsigned int dest = per_cpu(cpu_2_logical_apicid, cpu);
@@ -92,12 +94,13 @@ static unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
     return dest;
 }
 
-static void send_IPI_self_x2apic(uint8_t vector)
+static void cf_check send_IPI_self_x2apic(uint8_t vector)
 {
     apic_wrmsr(APIC_SELF_IPI, vector);
 }
 
-static void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
+static void cf_check send_IPI_mask_x2apic_phys(
+    const cpumask_t *cpumask, int vector)
 {
     unsigned int cpu;
     unsigned long flags;
@@ -130,7 +133,8 @@ static void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
     local_irq_restore(flags);
 }
 
-static void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
+static void cf_check send_IPI_mask_x2apic_cluster(
+    const cpumask_t *cpumask, int vector)
 {
     unsigned int cpu = smp_processor_id();
     cpumask_t *ipimask = per_cpu(scratch_mask, cpu);

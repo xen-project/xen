@@ -161,13 +161,13 @@ void send_IPI_self(int vector)
  * The following functions deal with sending IPIs between CPUs.
  */
 
-void send_IPI_self_legacy(uint8_t vector)
+void cf_check send_IPI_self_legacy(uint8_t vector)
 {
     /* NMI continuation handling relies on using a shorthand here. */
     send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
 }
 
-void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
+void cf_check send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
 {
     unsigned long mask = cpumask_bits(cpumask)[0];
     unsigned long cfg;
@@ -204,7 +204,7 @@ void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
     local_irq_restore(flags);
 }
 
-void send_IPI_mask_phys(const cpumask_t *mask, int vector)
+void cf_check send_IPI_mask_phys(const cpumask_t *mask, int vector)
 {
     unsigned long cfg, flags;
     unsigned int query_cpu;

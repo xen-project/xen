@@ -9,7 +9,7 @@
  * LOGICAL FLAT DELIVERY MODE (multicast via bitmask to <= 8 logical APIC IDs).
  */
 
-void init_apic_ldr_flat(void)
+void cf_check init_apic_ldr_flat(void)
 {
 	unsigned long val;
 
@@ -19,12 +19,12 @@ void init_apic_ldr_flat(void)
 	apic_write(APIC_LDR, val);
 }
 
-const cpumask_t *vector_allocation_cpumask_flat(int cpu)
+const cpumask_t *cf_check vector_allocation_cpumask_flat(int cpu)
 {
 	return &cpu_online_map;
 } 
 
-unsigned int cpu_mask_to_apicid_flat(const cpumask_t *cpumask)
+unsigned int cf_check cpu_mask_to_apicid_flat(const cpumask_t *cpumask)
 {
 	return cpumask_bits(cpumask)[0]&0xFF;
 }
@@ -33,17 +33,17 @@ unsigned int cpu_mask_to_apicid_flat(const cpumask_t *cpumask)
  * PHYSICAL DELIVERY MODE (unicast to physical APIC IDs).
  */
 
-void init_apic_ldr_phys(void)
+void cf_check init_apic_ldr_phys(void)
 {
 	/* We only deliver in phys mode - no setup needed. */
 }
 
-const cpumask_t *vector_allocation_cpumask_phys(int cpu)
+const cpumask_t *cf_check vector_allocation_cpumask_phys(int cpu)
 {
 	return cpumask_of(cpu);
 }
 
-unsigned int cpu_mask_to_apicid_phys(const cpumask_t *cpumask)
+unsigned int cf_check cpu_mask_to_apicid_phys(const cpumask_t *cpumask)
 {
 	/* As we are using single CPU as destination, pick only one CPU here */
 	return cpu_physical_id(cpumask_any(cpumask));

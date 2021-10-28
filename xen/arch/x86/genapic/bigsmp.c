@@ -10,7 +10,7 @@
 #include <xen/dmi.h>
 #include <asm/io_apic.h>
 
-static __init int force_bigsmp(const struct dmi_system_id *d)
+static int __init cf_check force_bigsmp(const struct dmi_system_id *d)
 {
 	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp\n", d->ident);
 	def_to_bigsmp = true;
@@ -27,7 +27,7 @@ static const struct dmi_system_id __initconstrel bigsmp_dmi_table[] = {
 };
 
 
-static __init int probe_bigsmp(void)
+static int __init cf_check probe_bigsmp(void)
 { 
 	/*
 	 * We don't implement cluster mode, so force use of
