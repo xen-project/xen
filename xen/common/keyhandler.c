@@ -26,10 +26,11 @@
 static unsigned char keypress_key;
 static bool_t alt_key_handling;
 
-static keyhandler_fn_t show_handlers, dump_hwdom_registers,
-    dump_domains, read_clocks;
-static irq_keyhandler_fn_t do_toggle_alt_key, dump_registers,
-    reboot_machine, run_all_keyhandlers, do_debug_key;
+static keyhandler_fn_t cf_check show_handlers, cf_check dump_hwdom_registers,
+    cf_check dump_domains, cf_check read_clocks;
+static irq_keyhandler_fn_t cf_check do_toggle_alt_key, cf_check dump_registers,
+    cf_check reboot_machine, cf_check run_all_keyhandlers,
+    cf_check do_debug_key;
 
 static struct keyhandler {
     union {
@@ -43,10 +44,10 @@ static struct keyhandler {
 } key_table[128] __read_mostly =
 {
 #define KEYHANDLER(k, f, desc, diag)            \
-    [k] = { { (f) }, desc, 0, diag }
+    [k] = { { .fn = (f) }, desc, 0, diag }
 
 #define IRQ_KEYHANDLER(k, f, desc, diag)        \
-    [k] = { { (keyhandler_fn_t *)(f) }, desc, 1, diag }
+    [k] = { { .irq_fn = (f) }, desc, 1, diag }
 
     IRQ_KEYHANDLER('A', do_toggle_alt_key, "toggle alternative key handling", 0),
     IRQ_KEYHANDLER('d', dump_registers, "dump registers", 1),
@@ -124,7 +125,7 @@ void register_irq_keyhandler(unsigned char key, irq_keyhandler_fn_t fn,
     key_table[key].diagnostic = diagnostic;
 }
 
-static void show_handlers(unsigned char key)
+static void cf_check show_handlers(unsigned char key)
 {
     unsigned int i;
 
@@ -170,7 +171,8 @@ void dump_execstate(struct cpu_user_regs *regs)
     watchdog_enable();
 }
 
-static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check dump_registers(
+    unsigned char key, struct cpu_user_regs *regs)
 {
     unsigned int cpu;
 
@@ -224,7 +226,7 @@ static void cf_check dump_hwdom_action(void *data)
     }
 }
 
-static void dump_hwdom_registers(unsigned char key)
+static void cf_check dump_hwdom_registers(unsigned char key)
 {
     struct vcpu *v;
 
@@ -246,13 +248,14 @@ static void dump_hwdom_registers(unsigned char key)
     }
 }
 
-static void reboot_machine(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check reboot_machine(
+    unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> rebooting machine\n", key);
     machine_restart(0);
 }
 
-static void dump_domains(unsigned char key)
+static void cf_check dump_domains(unsigned char key)
 {
     struct domain *d;
     const struct sched_unit *unit;
@@ -372,7 +375,7 @@ static void cf_check read_clocks_slave(void *unused)
     local_irq_enable();
 }
 
-static void read_clocks(unsigned char key)
+static void cf_check read_clocks(unsigned char key)
 {
     unsigned int cpu = smp_processor_id(), min_stime_cpu, max_stime_cpu;
     unsigned int min_cycles_cpu, max_cycles_cpu;
@@ -461,7 +464,8 @@ static void cf_check run_all_nonirq_keyhandlers(void *unused)
 static DECLARE_TASKLET(run_all_keyhandlers_tasklet,
                        run_all_nonirq_keyhandlers, NULL);
 
-static void run_all_keyhandlers(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check run_all_keyhandlers(
+    unsigned char key, struct cpu_user_regs *regs)
 {
     struct keyhandler *h;
     unsigned int k;
@@ -494,7 +498,7 @@ static void do_debugger_trap_fatal(struct cpu_user_regs *regs)
     barrier();
 }
 
-static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check do_debug_key(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> trapping into debugger\n", key);
     if ( regs )
@@ -503,7 +507,8 @@ static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
         run_in_exception_handler(do_debugger_trap_fatal);
 }
 
-static void do_toggle_alt_key(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check do_toggle_alt_key(
+    unsigned char key, struct cpu_user_regs *regs)
 {
     alt_key_handling = !alt_key_handling;
     printk("'%c' pressed -> using %s key handling\n", key,

@@ -369,7 +369,7 @@ unsigned int __init arch_get_dma_bitsize(void)
                  + PAGE_SHIFT, 32);
 }
 
-static void dump_numa(unsigned char key)
+static void cf_check dump_numa(unsigned char key)
 {
     s_time_t now = NOW();
     unsigned int i, j, n;

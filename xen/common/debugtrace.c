@@ -233,7 +233,7 @@ void debugtrace_printk(const char *fmt, ...)
     spin_unlock_irqrestore(&debugtrace_lock, flags);
 }
 
-static void debugtrace_key(unsigned char key)
+static void cf_check debugtrace_key(unsigned char key)
 {
     debugtrace_toggle();
 }

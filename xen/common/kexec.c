@@ -408,7 +408,7 @@ static long cf_check kexec_reboot(void *_image)
     return 0;
 }
 
-static void do_crashdump_trigger(unsigned char key)
+static void cf_check do_crashdump_trigger(unsigned char key)
 {
     printk("'%c' pressed -> triggering crashdump\n", key);
     kexec_crash(CRASHREASON_DEBUGKEY);

@@ -844,7 +844,7 @@ static int dump_intremap_mapping(const struct amd_iommu *iommu,
     return 0;
 }
 
-void amd_iommu_dump_intremap_tables(unsigned char key)
+void cf_check amd_iommu_dump_intremap_tables(unsigned char key)
 {
     if ( !shared_intremap_table )
     {

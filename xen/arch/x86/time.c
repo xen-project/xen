@@ -2539,7 +2539,7 @@ int tsc_set_info(struct domain *d,
 }
 
 /* vtsc may incur measurable performance degradation, diagnose with this */
-static void dump_softtsc(unsigned char key)
+static void cf_check dump_softtsc(unsigned char key)
 {
     struct domain *d;
     int domcnt = 0;

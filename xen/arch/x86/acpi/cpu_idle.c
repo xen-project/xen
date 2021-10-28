@@ -377,7 +377,7 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     print_hw_residencies(cpu);
 }
 
-static void dump_cx(unsigned char key)
+static void cf_check dump_cx(unsigned char key)
 {
     unsigned int cpu;
 

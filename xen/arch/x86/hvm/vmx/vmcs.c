@@ -2117,7 +2117,7 @@ void vmcs_dump_vcpu(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-static void vmcs_dump(unsigned char ch)
+static void cf_check vmcs_dump(unsigned char ch)
 {
     struct domain *d;
     struct vcpu *v;

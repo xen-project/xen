@@ -22,8 +22,6 @@
 #include <xen/keyhandler.h>
 #include <xsm/xsm.h>
 
-static void iommu_dump_page_tables(unsigned char key);
-
 unsigned int __read_mostly iommu_dev_iotlb_timeout = 1000;
 integer_param("iommu_dev_iotlb_timeout", iommu_dev_iotlb_timeout);
 
@@ -222,6 +220,31 @@ int iommu_domain_init(struct domain *d, unsigned int opts)
     ASSERT(!(hd->need_sync && hd->hap_pt_share));
 
     return 0;
+}
+
+static void cf_check iommu_dump_page_tables(unsigned char key)
+{
+    struct domain *d;
+
+    ASSERT(iommu_enabled);
+
+    rcu_read_lock(&domlist_read_lock);
+
+    for_each_domain(d)
+    {
+        if ( is_hardware_domain(d) || !is_iommu_enabled(d) )
+            continue;
+
+        if ( iommu_use_hap_pt(d) )
+        {
+            printk("%pd sharing page tables\n", d);
+            continue;
+        }
+
+        iommu_vcall(dom_iommu(d)->platform_ops, dump_page_tables, d);
+    }
+
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 void __hwdom_init iommu_hwdom_init(struct domain *d)
@@ -582,31 +605,6 @@ int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
 bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature)
 {
     return is_iommu_enabled(d) && test_bit(feature, dom_iommu(d)->features);
-}
-
-static void iommu_dump_page_tables(unsigned char key)
-{
-    struct domain *d;
-
-    ASSERT(iommu_enabled);
-
-    rcu_read_lock(&domlist_read_lock);
-
-    for_each_domain(d)
-    {
-        if ( is_hardware_domain(d) || !is_iommu_enabled(d) )
-            continue;
-
-        if ( iommu_use_hap_pt(d) )
-        {
-            printk("%pd sharing page tables\n", d);
-            continue;
-        }
-
-        iommu_vcall(dom_iommu(d)->platform_ops, dump_page_tables, d);
-    }
-
-    rcu_read_unlock(&domlist_read_lock);
 }
 
 /*

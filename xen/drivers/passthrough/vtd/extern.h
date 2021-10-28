@@ -31,7 +31,7 @@ extern const struct iommu_init_ops intel_iommu_init_ops;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
 void print_vtd_entries(struct vtd_iommu *iommu, int bus, int devfn, u64 gmfn);
-keyhandler_fn_t vtd_dump_iommu_info;
+keyhandler_fn_t cf_check vtd_dump_iommu_info;
 
 bool intel_iommu_supports_eim(void);
 int intel_iommu_enable_eim(void);

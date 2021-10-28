@@ -956,7 +956,7 @@ const cpumask_t *cpupool_valid_cpus(const struct cpupool *pool)
     return pool->cpu_valid;
 }
 
-void dump_runq(unsigned char key)
+void cf_check dump_runq(unsigned char key)
 {
     s_time_t         now = NOW();
     struct cpupool *c;

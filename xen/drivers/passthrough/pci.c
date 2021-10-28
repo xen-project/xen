@@ -1351,7 +1351,7 @@ static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
     return 0;
 }
 
-static void dump_pci_devices(unsigned char ch)
+static void cf_check dump_pci_devices(unsigned char ch)
 {
     printk("==== PCI devices ====\n");
     pcidevs_lock();

@@ -2522,7 +2522,7 @@ unsigned long avail_node_heap_pages(unsigned int nodeid)
 }
 
 
-static void pagealloc_info(unsigned char key)
+static void cf_check pagealloc_info(unsigned char key)
 {
     unsigned int zone = MEMZONE_XEN;
     unsigned long n, total = 0;
@@ -2572,7 +2572,7 @@ void scrub_one_page(struct page_info *pg)
 #endif
 }
 
-static void dump_heap(unsigned char key)
+static void cf_check dump_heap(unsigned char key)
 {
     s_time_t      now = NOW();
     int           i, j;

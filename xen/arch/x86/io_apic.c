@@ -1268,7 +1268,7 @@ static void __init print_IO_APIC(void)
         __print_IO_APIC(1);
 }
 
-static void _print_IO_APIC_keyhandler(unsigned char key)
+static void cf_check _print_IO_APIC_keyhandler(unsigned char key)
 {
     __print_IO_APIC(0);
 }

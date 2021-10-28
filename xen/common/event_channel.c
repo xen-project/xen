@@ -1629,7 +1629,7 @@ static void domain_dump_evtchn_info(struct domain *d)
     spin_unlock(&d->event_lock);
 }
 
-static void dump_evtchn_info(unsigned char key)
+static void cf_check dump_evtchn_info(unsigned char key)
 {
     struct domain *d;
 

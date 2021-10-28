@@ -577,13 +577,13 @@ void self_nmi(void)
     local_irq_restore(flags);
 }
 
-static void do_nmi_trigger(unsigned char key)
+static void cf_check do_nmi_trigger(unsigned char key)
 {
     printk("Triggering NMI on APIC ID %x\n", get_apic_id());
     self_nmi();
 }
 
-static void do_nmi_stats(unsigned char key)
+static void cf_check do_nmi_stats(unsigned char key)
 {
     const struct vcpu *v;
     unsigned int cpu;

@@ -635,7 +635,7 @@ static void irq_dump(struct domain *d)
            hvm_irq->callback_via_asserted ? "" : " not");
 }
 
-static void dump_irq_info(unsigned char key)
+static void cf_check dump_irq_info(unsigned char key)
 {
     struct domain *d;
 

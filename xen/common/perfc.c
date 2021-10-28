@@ -28,7 +28,7 @@ static const struct {
 
 DEFINE_PER_CPU(perfc_t[NUM_PERFCOUNTERS], perfcounters);
 
-void perfc_printall(unsigned char key)
+void cf_check perfc_printall(unsigned char key)
 {
     unsigned int i, j;
     s_time_t now = NOW();
@@ -115,7 +115,7 @@ void perfc_printall(unsigned char key)
     }
 }
 
-void perfc_reset(unsigned char key)
+void cf_check perfc_reset(unsigned char key)
 {
     unsigned int i, j;
     s_time_t now = NOW();

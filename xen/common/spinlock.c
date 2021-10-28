@@ -393,7 +393,7 @@ static void spinlock_profile_print_elem(struct lock_profile *data,
            data->lock_cnt, data->time_hold, data->block_cnt, data->time_block);
 }
 
-void spinlock_profile_printall(unsigned char key)
+void cf_check spinlock_profile_printall(unsigned char key)
 {
     s_time_t now = NOW();
     s_time_t diff;
@@ -413,7 +413,7 @@ static void spinlock_profile_reset_elem(struct lock_profile *data,
     data->time_block = 0;
 }
 
-void spinlock_profile_reset(unsigned char key)
+void cf_check spinlock_profile_reset(unsigned char key)
 {
     s_time_t now = NOW();
 

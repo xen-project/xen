@@ -98,7 +98,7 @@ void shadow_vcpu_init(struct vcpu *v)
 #if SHADOW_AUDIT
 int shadow_audit_enable = 0;
 
-static void shadow_audit_key(unsigned char key)
+static void cf_check shadow_audit_key(unsigned char key)
 {
     shadow_audit_enable = !shadow_audit_enable;
     printk("%s shadow_audit_enable=%d\n",
@@ -1046,7 +1046,7 @@ void shadow_blow_tables_per_domain(struct domain *d)
 /* Blow all shadows of all shadowed domains: this can be used to cause the
  * guest's pagetables to be re-shadowed if we suspect that the shadows
  * have somehow got out of sync */
-static void shadow_blow_all_tables(unsigned char c)
+static void cf_check shadow_blow_all_tables(unsigned char c)
 {
     struct domain *d;
     printk("'%c' pressed -> blowing all shadow tables\n", c);

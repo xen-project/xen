@@ -2424,7 +2424,7 @@ void free_domain_pirqs(struct domain *d)
     pcidevs_unlock();
 }
 
-static void dump_irqs(unsigned char key)
+static void cf_check dump_irqs(unsigned char key)
 {
     int i, irq, pirq;
     struct irq_desc *desc;

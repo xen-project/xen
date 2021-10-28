@@ -546,7 +546,7 @@ static void dump_timer(struct timer *t, s_time_t now)
            (t->expires - now) / 1000, t, t->function, t->data);
 }
 
-static void dump_timerq(unsigned char key)
+static void cf_check dump_timerq(unsigned char key)
 {
     struct timer  *t;
     struct timers *ts;

@@ -2068,7 +2068,7 @@ static const char *state2str(unsigned int state)
     return names[state];
 }
 
-static void livepatch_printall(unsigned char key)
+static void cf_check livepatch_printall(unsigned char key)
 {
     struct payload *data;
     const void *binary_id = NULL;

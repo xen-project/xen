@@ -1411,7 +1411,7 @@ void __init early_msi_init(void)
         return;
 }
 
-static void dump_msi(unsigned char key)
+static void cf_check dump_msi(unsigned char key)
 {
     unsigned int irq;
 

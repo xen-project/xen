@@ -280,7 +280,7 @@ static int *__read_mostly upper_thresh_adj = &xenlog_upper_thresh;
 static int *__read_mostly lower_thresh_adj = &xenlog_lower_thresh;
 static const char *__read_mostly thresh_adj = "standard";
 
-static void do_toggle_guest(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check do_toggle_guest(unsigned char key, struct cpu_user_regs *regs)
 {
     if ( upper_thresh_adj == &xenlog_upper_thresh )
     {
@@ -307,13 +307,13 @@ static void do_adj_thresh(unsigned char key)
            loglvl_str(*upper_thresh_adj));
 }
 
-static void do_inc_thresh(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check do_inc_thresh(unsigned char key, struct cpu_user_regs *regs)
 {
     ++*lower_thresh_adj;
     do_adj_thresh(key);
 }
 
-static void do_dec_thresh(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check do_dec_thresh(unsigned char key, struct cpu_user_regs *regs)
 {
     if ( *lower_thresh_adj )
         --*lower_thresh_adj;
@@ -424,7 +424,7 @@ void console_serial_puts(const char *s, size_t nr)
     pv_console_puts(s, nr);
 }
 
-static void dump_console_ring_key(unsigned char key)
+static void cf_check dump_console_ring_key(unsigned char key)
 {
     uint32_t idx, len, sofar, c;
     unsigned int order;

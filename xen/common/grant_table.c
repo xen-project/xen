@@ -4275,7 +4275,7 @@ static void gnttab_usage_print(struct domain *rd)
         printk("no active grant table entries\n");
 }
 
-static void gnttab_usage_print_all(unsigned char key)
+static void cf_check gnttab_usage_print_all(unsigned char key)
 {
     struct domain *d;
 
