@@ -1127,7 +1127,7 @@ static inline void clear_pirq_eoi(struct domain *d, unsigned int irq)
     }
 }
 
-static void set_eoi_ready(void *data);
+static void cf_check set_eoi_ready(void *data);
 
 static void cf_check irq_guest_eoi_timer_fn(void *data)
 {
@@ -1398,7 +1398,7 @@ static void __set_eoi_ready(const struct irq_desc *desc)
 }
 
 /* Mark specified IRQ as ready-for-EOI (if it really is) and attempt to EOI. */
-static void set_eoi_ready(void *data)
+static void cf_check set_eoi_ready(void *data)
 {
     struct irq_desc *desc = data;
 

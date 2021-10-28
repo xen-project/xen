@@ -877,7 +877,7 @@ static void mwait_idle(void)
 		cpuidle_current_governor->reflect(power);
 }
 
-static void auto_demotion_disable(void *dummy)
+static void cf_check auto_demotion_disable(void *dummy)
 {
 	u64 msr_bits;
 
@@ -886,13 +886,13 @@ static void auto_demotion_disable(void *dummy)
 	wrmsrl(MSR_PKG_CST_CONFIG_CONTROL, msr_bits);
 }
 
-static void byt_auto_demotion_disable(void *dummy)
+static void cf_check byt_auto_demotion_disable(void *dummy)
 {
 	wrmsrl(MSR_CC6_DEMOTION_POLICY_CONFIG, 0);
 	wrmsrl(MSR_MC6_DEMOTION_POLICY_CONFIG, 0);
 }
 
-static void c1e_promotion_disable(void *dummy)
+static void cf_check c1e_promotion_disable(void *dummy)
 {
 	u64 msr_bits;
 

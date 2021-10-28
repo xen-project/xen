@@ -118,7 +118,7 @@ static inline void kb_wait(void)
             break;
 }
 
-static void noreturn __machine_halt(void *unused)
+static void noreturn cf_check __machine_halt(void *unused)
 {
     local_irq_disable();
 
@@ -548,7 +548,7 @@ static int __init cf_check reboot_init(void)
 }
 __initcall(reboot_init);
 
-static void noreturn __machine_restart(void *pdelay)
+static void cf_check noreturn __machine_restart(void *pdelay)
 {
     machine_restart(*(unsigned int *)pdelay);
 }

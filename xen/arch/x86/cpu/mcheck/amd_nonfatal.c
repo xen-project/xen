@@ -79,7 +79,7 @@ static int variable_period = 1;
  * Collects information of correctable errors and notifies
  * Dom0 via an event.
  */
-static void mce_amd_checkregs(void *info)
+static void cf_check mce_amd_checkregs(void *info)
 {
 	mctelem_cookie_t mctc;
 	struct mca_summary bs;

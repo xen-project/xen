@@ -84,13 +84,13 @@ static int cpu_notifier_call_chain(unsigned int cpu, unsigned long action,
     return ret;
 }
 
-static void _take_cpu_down(void *unused)
+static void cf_check _take_cpu_down(void *unused)
 {
     cpu_notifier_call_chain(smp_processor_id(), CPU_DYING, NULL, true);
     __cpu_disable();
 }
 
-static int take_cpu_down(void *arg)
+static int cf_check take_cpu_down(void *arg)
 {
     _take_cpu_down(arg);
     return 0;

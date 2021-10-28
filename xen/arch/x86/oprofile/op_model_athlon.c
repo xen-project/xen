@@ -436,7 +436,7 @@ static void athlon_stop(struct op_msrs const * const msrs)
 #define APIC_EILVT_MSG_NMI              0x4
 #define APIC_EILVT_LVTOFF_IBS           1
 #define APIC_EILVTn(n)                  (0x500 + 0x10 * n)
-static inline void __init init_ibs_nmi_per_cpu(void *arg)
+static inline void __init cf_check init_ibs_nmi_per_cpu(void *arg)
 {
 	unsigned long reg;
 

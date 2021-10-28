@@ -44,12 +44,12 @@
 
 #define ARCH_CPU_FLAG_RESUME	1
 
-static void transition_pstate(void *pstate)
+static void cf_check transition_pstate(void *pstate)
 {
     wrmsrl(MSR_PSTATE_CTRL, *(unsigned int *)pstate);
 }
 
-static void update_cpb(void *data)
+static void cf_check update_cpb(void *data)
 {
     struct cpufreq_policy *policy = data;
 
@@ -165,7 +165,7 @@ struct amd_cpu_data {
     u32 max_hw_pstate;
 };
 
-static void get_cpu_data(void *arg)
+static void cf_check get_cpu_data(void *arg)
 {
     struct amd_cpu_data *data = arg;
     struct processor_performance *perf = data->perf;

@@ -149,7 +149,7 @@ int nmi_active;
     (P4_CCCR_OVF_PMI0|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT| \
      P4_CCCR_COMPARE|P4_CCCR_REQUIRED|P4_CCCR_ESCR_SELECT(4)|P4_CCCR_ENABLE)
 
-static void __init wait_for_nmis(void *p)
+static void __init cf_check wait_for_nmis(void *p)
 {
     unsigned int start_count = this_cpu(nmi_count);
     unsigned long ticks = 10 * 1000 * cpu_khz / nmi_hz;

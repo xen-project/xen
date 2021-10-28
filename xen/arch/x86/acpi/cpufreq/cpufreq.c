@@ -129,7 +129,7 @@ struct drv_cmd {
     u32 val;
 };
 
-static void do_drv_read(void *drvcmd)
+static void cf_check do_drv_read(void *drvcmd)
 {
     struct drv_cmd *cmd;
 
@@ -148,7 +148,7 @@ static void do_drv_read(void *drvcmd)
     }
 }
 
-static void do_drv_write(void *drvcmd)
+static void cf_check do_drv_write(void *drvcmd)
 {
     struct drv_cmd *cmd;
     uint64_t msr_content;
@@ -244,7 +244,7 @@ struct perf_pair {
 static DEFINE_PER_CPU(struct perf_pair, gov_perf_pair);
 static DEFINE_PER_CPU(struct perf_pair, usr_perf_pair);
 
-static void read_measured_perf_ctrs(void *_readin)
+static void cf_check read_measured_perf_ctrs(void *_readin)
 {
     struct perf_pair *readin = _readin;
 
@@ -340,7 +340,7 @@ static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
     return extract_freq(get_cur_val(cpumask_of(cpu)), data);
 }
 
-static void feature_detect(void *info)
+static void cf_check feature_detect(void *info)
 {
     struct cpufreq_policy *policy = info;
     unsigned int eax;

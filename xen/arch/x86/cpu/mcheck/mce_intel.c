@@ -599,7 +599,7 @@ static void mce_set_owner(void)
     cmci_discover();
 }
 
-static void __cpu_mcheck_distribute_cmci(void *unused)
+static void cf_check __cpu_mcheck_distribute_cmci(void *unused)
 {
     cmci_discover();
 }

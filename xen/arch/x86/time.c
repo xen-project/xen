@@ -1660,7 +1660,7 @@ static void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
 static unsigned long tsc_max_warp, tsc_check_count;
 static cpumask_t tsc_check_cpumask;
 
-static void tsc_check_slave(void *unused)
+static void cf_check tsc_check_slave(void *unused)
 {
     unsigned int cpu = smp_processor_id();
     local_irq_disable();
@@ -1808,7 +1808,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
 }
 
 /* Ordinary rendezvous function which does not modify TSC values. */
-static void time_calibration_std_rendezvous(void *_r)
+static void cf_check time_calibration_std_rendezvous(void *_r)
 {
     struct calibration_rendezvous *r = _r;
     unsigned int total_cpus = cpumask_weight(&r->cpu_calibration_map);
@@ -1839,7 +1839,7 @@ static void time_calibration_std_rendezvous(void *_r)
  * Rendezvous function used when clocksource is TSC and
  * no CPU hotplug will be performed.
  */
-static void time_calibration_nop_rendezvous(void *rv)
+static void cf_check time_calibration_nop_rendezvous(void *rv)
 {
     const struct calibration_rendezvous *r = rv;
     struct cpu_time_stamp *c = &this_cpu(cpu_calibration);
@@ -2031,7 +2031,7 @@ static void __init tsc_check_writability(void)
     disable_tsc_sync = true;
 }
 
-static void __init reset_percpu_time(void *unused)
+static void __init cf_check reset_percpu_time(void *unused)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
 

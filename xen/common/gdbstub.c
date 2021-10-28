@@ -660,7 +660,7 @@ static int __init cf_check initialise_gdb(void)
 }
 presmp_initcall(initialise_gdb);
 
-static void gdb_pause_this_cpu(void *unused)
+static void cf_check gdb_pause_this_cpu(void *unused)
 {
     unsigned long flags;
 

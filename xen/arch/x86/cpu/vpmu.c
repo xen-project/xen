@@ -335,7 +335,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
 #endif
 }
 
-static void vpmu_save_force(void *arg)
+static void cf_check vpmu_save_force(void *arg)
 {
     struct vcpu *v = arg;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -528,7 +528,7 @@ void vpmu_initialise(struct vcpu *v)
         put_vpmu(v);
 }
 
-static void vpmu_clear_last(void *arg)
+static void cf_check vpmu_clear_last(void *arg)
 {
     if ( this_cpu(last_vcpu) == arg )
         this_cpu(last_vcpu) = NULL;

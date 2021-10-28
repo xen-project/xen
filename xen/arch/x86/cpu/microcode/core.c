@@ -533,7 +533,7 @@ static int control_thread_fn(const struct microcode_patch *patch)
     return ret;
 }
 
-static int do_microcode_update(void *patch)
+static int cf_check do_microcode_update(void *patch)
 {
     unsigned int cpu = smp_processor_id();
     int ret;

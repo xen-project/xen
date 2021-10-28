@@ -430,7 +430,7 @@ static void disable_c1_ramping(void)
 	}
 }
 
-static void disable_c1e(void *unused)
+static void cf_check disable_c1e(void *unused)
 {
 	uint64_t msr_content;
 

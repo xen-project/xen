@@ -1898,7 +1898,7 @@ void __init end_boot_allocator(void)
     printk("\n");
 }
 
-static void __init smp_scrub_heap_pages(void *data)
+static void __init cf_check smp_scrub_heap_pages(void *data)
 {
     unsigned long mfn, start, end;
     struct page_info *pg;

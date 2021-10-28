@@ -84,7 +84,7 @@ bool is_var_mtrr_overlapped(const struct mtrr_state *m)
     return false;
 }
 
-void mtrr_save_fixed_ranges(void *info)
+void cf_check mtrr_save_fixed_ranges(void *info)
 {
 	get_fixed_ranges(mtrr_state.fixed_ranges);
 }

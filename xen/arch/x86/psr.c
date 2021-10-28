@@ -1247,7 +1247,7 @@ struct cos_write_info
     const uint32_t *val;
 };
 
-static void do_write_psr_msrs(void *data)
+static void cf_check do_write_psr_msrs(void *data)
 {
     const struct cos_write_info *info = data;
     unsigned int i, index, cos = info->cos;

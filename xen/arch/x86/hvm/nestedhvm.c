@@ -82,8 +82,7 @@ nestedhvm_vcpu_destroy(struct vcpu *v)
     alternative_vcall(hvm_funcs.nhvm_vcpu_destroy, v);
 }
 
-static void
-nestedhvm_flushtlb_ipi(void *info)
+static void cf_check nestedhvm_flushtlb_ipi(void *info)
 {
     struct vcpu *v = current;
     struct domain *d = info;

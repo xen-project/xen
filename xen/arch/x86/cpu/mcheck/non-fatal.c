@@ -32,7 +32,7 @@ static uint64_t period = MCE_PERIOD;
 static int adjust = 0;
 static int variable_period = 1;
 
-static void mce_checkregs (void *info)
+static void cf_check mce_checkregs(void *info)
 {
 	mctelem_cookie_t mctc;
 	struct mca_summary bs;

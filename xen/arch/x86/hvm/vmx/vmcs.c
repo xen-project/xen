@@ -589,7 +589,7 @@ static void vmx_free_vmcs(paddr_t pa)
     free_domheap_page(maddr_to_page(pa));
 }
 
-static void __vmx_clear_vmcs(void *info)
+static void cf_check __vmx_clear_vmcs(void *info)
 {
     struct vcpu *v = info;
     struct vmx_vcpu *vmx = &v->arch.hvm.vmx;

@@ -69,7 +69,7 @@ struct l3_cache_info {
     unsigned long size;
 };
 
-static void l3_cache_get(void *arg)
+static void cf_check l3_cache_get(void *arg)
 {
     struct cpuid4_info info;
     struct l3_cache_info *l3_info = arg;

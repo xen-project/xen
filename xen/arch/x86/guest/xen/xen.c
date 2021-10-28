@@ -289,7 +289,7 @@ int xg_free_unused_page(mfn_t mfn)
     return rangeset_remove_range(mem, mfn_x(mfn), mfn_x(mfn));
 }
 
-static void ap_resume(void *unused)
+static void cf_check ap_resume(void *unused)
 {
     BUG_ON(map_vcpuinfo());
     BUG_ON(init_evtchn());

@@ -131,7 +131,7 @@ static void nmi_cpu_save_registers(struct op_msrs *msrs)
 }
 
 
-static void nmi_save_registers(void * dummy)
+static void cf_check nmi_save_registers(void *dummy)
 {
 	int cpu = smp_processor_id();
 	struct op_msrs * msrs = &cpu_msrs[cpu];
@@ -179,7 +179,7 @@ static int allocate_msrs(void)
 }
 
 
-static void nmi_cpu_setup(void * dummy)
+static void cf_check nmi_cpu_setup(void *dummy)
 {
 	int cpu = smp_processor_id();
 	struct op_msrs * msrs = &cpu_msrs[cpu];
@@ -245,7 +245,7 @@ static void nmi_restore_registers(struct op_msrs * msrs)
 }
 
 
-static void nmi_cpu_shutdown(void * dummy)
+static void cf_check nmi_cpu_shutdown(void *dummy)
 {
 	int cpu = smp_processor_id();
 	struct op_msrs * msrs = &cpu_msrs[cpu];
@@ -261,7 +261,7 @@ void nmi_release_counters(void)
 }
 
 
-static void nmi_cpu_start(void * dummy)
+static void cf_check nmi_cpu_start(void *dummy)
 {
 	int cpu = smp_processor_id();
 	struct op_msrs const * msrs = &cpu_msrs[cpu];
@@ -278,7 +278,7 @@ int nmi_start(void)
 }
 
 
-static void nmi_cpu_stop(void * dummy)
+static void cf_check nmi_cpu_stop(void *dummy)
 {
 	unsigned int v;
 	int cpu = smp_processor_id();

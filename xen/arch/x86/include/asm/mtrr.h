@@ -64,7 +64,7 @@ struct mtrr_state {
 };
 extern struct mtrr_state mtrr_state;
 
-extern void mtrr_save_fixed_ranges(void *);
+extern void cf_check mtrr_save_fixed_ranges(void *);
 extern void mtrr_save_state(void);
 extern int mtrr_add(unsigned long base, unsigned long size,
                     unsigned int type, char increment);

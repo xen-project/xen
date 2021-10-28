@@ -360,7 +360,7 @@ static cpumask_t read_clocks_cpumask;
 static DEFINE_PER_CPU(s_time_t, read_clocks_time);
 static DEFINE_PER_CPU(u64, read_cycles_time);
 
-static void read_clocks_slave(void *unused)
+static void cf_check read_clocks_slave(void *unused)
 {
     unsigned int cpu = smp_processor_id();
     local_irq_disable();

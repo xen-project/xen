@@ -99,7 +99,7 @@ unsigned int acpi_get_processor_id(unsigned int cpu)
 	return INVALID_ACPIID;
 }
 
-static void get_mwait_ecx(void *info)
+static void cf_check get_mwait_ecx(void *info)
 {
 	*(u32 *)info = cpuid_ecx(CPUID_MWAIT_LEAF);
 }

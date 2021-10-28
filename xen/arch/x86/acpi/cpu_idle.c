@@ -145,7 +145,7 @@ struct hw_residencies
     uint64_t cc7;
 };
 
-static void do_get_hw_residencies(void *arg)
+static void cf_check do_get_hw_residencies(void *arg)
 {
     struct cpuinfo_x86 *c = &current_cpu_data;
     struct hw_residencies *hw_res = arg;

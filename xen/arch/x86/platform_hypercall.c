@@ -47,7 +47,7 @@ struct resource_access {
 
 long cf_check cpu_frequency_change_helper(void *);
 void check_resource_access(struct resource_access *);
-void resource_access(void *);
+void cf_check resource_access(void *);
 
 #ifndef COMPAT
 typedef long ret_t;
@@ -149,7 +149,7 @@ void check_resource_access(struct resource_access *ra)
     ra->nr_done = i;
 }
 
-void resource_access(void *info)
+void cf_check resource_access(void *info)
 {
     struct resource_access *ra = info;
     unsigned int i;

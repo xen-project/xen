@@ -961,7 +961,7 @@ void x86_mcinfo_dump(struct mc_info *mi)
     } while ( 1 );
 }
 
-static void do_mc_get_cpu_info(void *v)
+static void cf_check do_mc_get_cpu_info(void *v)
 {
     int cpu = smp_processor_id();
     int cindex, cpn;
@@ -1242,7 +1242,7 @@ static void x86_mc_hwcr_wren_restore(uint64_t hwcr)
         wrmsrl(MSR_K8_HWCR, hwcr);
 }
 
-static void x86_mc_msrinject(void *data)
+static void cf_check x86_mc_msrinject(void *data)
 {
     struct xen_mc_msrinject *mci = data;
     struct mcinfo_msr *msr;
@@ -1274,7 +1274,7 @@ static void x86_mc_msrinject(void *data)
 }
 
 /*ARGSUSED*/
-static void x86_mc_mceinject(void *data)
+static void cf_check x86_mc_mceinject(void *data)
 {
     printk("Simulating #MC on cpu %d\n", smp_processor_id());
     __asm__ __volatile__("int $0x12");
