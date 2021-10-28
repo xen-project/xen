@@ -86,7 +86,7 @@ static void mce_work_fn(void *data)
 	adjust = 0;
 }
 
-static int __init init_nonfatal_mce_checker(void)
+static int __init cf_check init_nonfatal_mce_checker(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 

@@ -630,7 +630,7 @@ static const struct cpufreq_driver __initconstrel acpi_cpufreq_driver = {
     .exit   = acpi_cpufreq_cpu_exit,
 };
 
-static int __init cpufreq_driver_init(void)
+static int __init cf_check cpufreq_driver_init(void)
 {
     int ret = 0;
 

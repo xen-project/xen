@@ -632,7 +632,7 @@ void mtrr_bp_restore(void)
 	mtrr_if->set_all();
 }
 
-static int __init mtrr_init_finialize(void)
+static int __init cf_check mtrr_init_finialize(void)
 {
 	if (!mtrr_if)
 		return 0;

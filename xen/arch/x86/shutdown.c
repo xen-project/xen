@@ -533,7 +533,7 @@ static const struct dmi_system_id __initconstrel reboot_dmi_table[] = {
     { }
 };
 
-static int __init reboot_init(void)
+static int __init cf_check reboot_init(void)
 {
     /*
      * Only do the DMI check if reboot_type hasn't been overridden

@@ -1218,7 +1218,7 @@ static void cpupool_hypfs_init(void)
 
 #endif /* CONFIG_HYPFS */
 
-static int __init cpupool_init(void)
+static int __init cf_check cpupool_init(void)
 {
     unsigned int cpu;
 

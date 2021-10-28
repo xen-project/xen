@@ -164,7 +164,7 @@ static bool __init hap_supported(struct hvm_function_table *fns)
     return true;
 }
 
-static int __init hvm_enable(void)
+static int __init cf_check hvm_enable(void)
 {
     const struct hvm_function_table *fns = NULL;
 
@@ -1506,7 +1506,7 @@ static int hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
 /* We need variable length data chunks for XSAVE area and MSRs, hence
  * a custom declaration rather than HVM_REGISTER_SAVE_RESTORE.
  */
-static int __init hvm_register_CPU_save_and_restore(void)
+static int __init cf_check hvm_register_CPU_save_and_restore(void)
 {
     hvm_register_savevm(CPU_XSAVE_CODE,
                         "CPU_XSAVE",

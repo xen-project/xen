@@ -125,8 +125,7 @@ nestedhvm_vmcx_flushtlb(struct p2m_domain *p2m)
  * iomap[2]      set        set
  */
 
-static int __init
-nestedhvm_setup(void)
+static int __init cf_check nestedhvm_setup(void)
 {
     /* Same format and size as hvm_io_bitmap (Intel needs only 2 pages). */
     unsigned nr = cpu_has_vmx ? 2 : 3;

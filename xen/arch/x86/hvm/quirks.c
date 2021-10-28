@@ -36,7 +36,7 @@ static int __init dmi_hvm_deny_port80(const struct dmi_system_id *id)
     return 0;
 }
 
-static int __init check_port80(void)
+static int __init cf_check check_port80(void)
 {
     /*
      * Quirk table for systems that misbehave (lock up, etc.) if port

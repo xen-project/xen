@@ -393,7 +393,7 @@ static HYPFS_STRING_INIT(extra, "extra");
 static HYPFS_STRING_INIT(config, "config");
 #endif
 
-static int __init buildinfo_init(void)
+static int __init cf_check buildinfo_init(void)
 {
     hypfs_add_dir(&hypfs_root, &buildinfo, true);
 
@@ -431,7 +431,7 @@ __initcall(buildinfo_init);
 
 static HYPFS_DIR_INIT(params, "params");
 
-static int __init param_init(void)
+static int __init cf_check param_init(void)
 {
     struct param_hypfs *param;
 

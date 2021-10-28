@@ -198,7 +198,7 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-static int __init cpu_stopmachine_init(void)
+static int __init cf_check cpu_stopmachine_init(void)
 {
     unsigned int cpu;
     for_each_online_cpu ( cpu )

@@ -4291,7 +4291,7 @@ static void gnttab_usage_print_all(unsigned char key)
     printk("%s ] done\n", __func__);
 }
 
-static int __init gnttab_usage_init(void)
+static int __init cf_check gnttab_usage_init(void)
 {
     register_keyhandler('g', gnttab_usage_print_all,
                         "print grant table usage", 1);

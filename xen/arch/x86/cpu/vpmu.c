@@ -844,7 +844,7 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-static int __init vpmu_init(void)
+static int __init cf_check vpmu_init(void)
 {
     int vendor = current_cpu_data.x86_vendor;
     const struct arch_vpmu_ops *ops = NULL;

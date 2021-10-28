@@ -31,7 +31,7 @@ unsigned int get_random(void)
     return val;
 }
 
-static int __init init_boot_random(void)
+static int __init cf_check init_boot_random(void)
 {
     boot_random = get_random();
     return 0;

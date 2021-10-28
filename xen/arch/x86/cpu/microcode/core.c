@@ -696,7 +696,7 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
                                      microcode_update_helper, buffer);
 }
 
-static int __init microcode_init(void)
+static int __init cf_check microcode_init(void)
 {
     /*
      * At this point, all CPUs should have updated their microcode

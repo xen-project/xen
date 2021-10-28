@@ -2533,7 +2533,7 @@ static void vcpu_kick_softirq(void)
      */
 }
 
-static int __init init_vcpu_kick_softirq(void)
+static int __init cf_check init_vcpu_kick_softirq(void)
 {
     open_softirq(VCPU_KICK_SOFTIRQ, vcpu_kick_softirq);
     return 0;

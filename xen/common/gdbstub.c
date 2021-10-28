@@ -640,7 +640,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
     return rc;
 }
 
-static int __init initialise_gdb(void)
+static int __init cf_check initialise_gdb(void)
 {
     if ( *opt_gdb == '\0' )
         return 0;

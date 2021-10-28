@@ -1642,7 +1642,7 @@ static void dump_evtchn_info(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 }
 
-static int __init dump_evtchn_info_key_init(void)
+static int __init cf_check dump_evtchn_info_key_init(void)
 {
     register_keyhandler('e', dump_evtchn_info, "dump evtchn info", 1);
     return 0;

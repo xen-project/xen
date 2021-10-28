@@ -808,7 +808,7 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
     return 1;
 }
 
-int iov_adjust_irq_affinities(void)
+int cf_check iov_adjust_irq_affinities(void)
 {
     const struct amd_iommu *iommu;
 

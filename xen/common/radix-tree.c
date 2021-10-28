@@ -744,7 +744,7 @@ static __init unsigned long __maxindex(unsigned int height)
 	return ~0UL >> shift;
 }
 
-static __init int radix_tree_init_maxindex(void)
+static int __init cf_check radix_tree_init_maxindex(void)
 {
 	unsigned int i;
 

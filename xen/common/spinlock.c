@@ -508,7 +508,7 @@ void _lock_profile_deregister_struct(
     spin_unlock(&lock_profile_lock);
 }
 
-static int __init lock_prof_init(void)
+static int __init cf_check lock_prof_init(void)
 {
     struct lock_profile **q;
 

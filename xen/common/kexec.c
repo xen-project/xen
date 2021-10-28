@@ -570,7 +570,7 @@ void __init kexec_early_calculations(void)
         crashinfo_maxaddr_bits = fls64(crashinfo_maxaddr) - 1;
 }
 
-static int __init kexec_init(void)
+static int __init cf_check kexec_init(void)
 {
     void *cpu = (void *)(unsigned long)smp_processor_id();
 

@@ -258,7 +258,7 @@ static int __init register_core_parking_policy(const struct cp_policy *policy)
     return 0;
 }
 
-static int __init core_parking_init(void)
+static int __init cf_check core_parking_init(void)
 {
     int ret = 0;
 

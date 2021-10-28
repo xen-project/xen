@@ -105,7 +105,7 @@ static void shadow_audit_key(unsigned char key)
            __func__, shadow_audit_enable);
 }
 
-static int __init shadow_audit_key_init(void)
+static int __init cf_check shadow_audit_key_init(void)
 {
     register_keyhandler('O', shadow_audit_key, "toggle shadow audits", 0);
     return 0;
@@ -1057,7 +1057,7 @@ static void shadow_blow_all_tables(unsigned char c)
 }
 
 /* Register this function in the Xen console keypress table */
-static __init int shadow_blow_tables_keyhandler_init(void)
+static int __init cf_check shadow_blow_tables_keyhandler_init(void)
 {
     register_keyhandler('S', shadow_blow_all_tables, "reset shadow pagetables", 1);
     return 0;

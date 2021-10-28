@@ -504,7 +504,7 @@ static void dump_numa(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 }
 
-static __init int register_numa_trigger(void)
+static int __init cf_check register_numa_trigger(void)
 {
     register_keyhandler('u', dump_numa, "dump NUMA info", 1);
     return 0;

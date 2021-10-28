@@ -410,7 +410,7 @@ static void dump_cx(unsigned char key)
     }
 }
 
-static int __init cpu_idle_key_init(void)
+static int __init cf_check cpu_idle_key_init(void)
 {
     register_keyhandler('c', dump_cx, "dump ACPI Cx structures", 1);
     return 0;
@@ -1655,7 +1655,7 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-static int __init cpuidle_presmp_init(void)
+static int __init cf_check cpuidle_presmp_init(void)
 {
     void *cpu = (void *)(long)smp_processor_id();
 

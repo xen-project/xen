@@ -1675,7 +1675,7 @@ static struct notifier_block cpu_nfb = {
     .priority = -1
 };
 
-static int __init psr_presmp_init(void)
+static int __init cf_check psr_presmp_init(void)
 {
     if ( (opt_psr & PSR_CMT) && opt_rmid_max )
         init_psr_cmt(opt_rmid_max);

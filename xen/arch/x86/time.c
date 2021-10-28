@@ -537,7 +537,7 @@ static struct platform_timesource __initdata plt_pmtimer =
 
 static struct time_scale __read_mostly pmt_scale;
 
-static __init int init_pmtmr_scale(void)
+static __init int cf_check init_pmtmr_scale(void)
 {
     set_time_scale(&pmt_scale, ACPI_PM_FREQUENCY);
     return 0;
@@ -2051,7 +2051,7 @@ static void __init try_platform_timer_tail(void)
 }
 
 /* Late init function, after all cpus have booted */
-static int __init verify_tsc_reliability(void)
+static int __init cf_check verify_tsc_reliability(void)
 {
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
     {
@@ -2221,7 +2221,7 @@ static int _disable_pit_irq(void(*hpet_broadcast_setup)(void))
     return ret;
 }
 
-static int __init disable_pit_irq(void)
+static int __init cf_check disable_pit_irq(void)
 {
     if ( !_disable_pit_irq(hpet_broadcast_init) )
     {
@@ -2584,7 +2584,7 @@ static void dump_softtsc(unsigned char key)
             printk("No domains have emulated TSC\n");
 }
 
-static int __init setup_dump_softtsc(void)
+static int __init cf_check setup_dump_softtsc(void)
 {
     register_keyhandler('s', dump_softtsc, "dump softtsc stats", 1);
     return 0;

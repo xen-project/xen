@@ -356,7 +356,7 @@ struct cpufreq_governor cpufreq_gov_dbs = {
     .handle_option = cpufreq_dbs_handle_option
 };
 
-static int __init cpufreq_gov_dbs_init(void)
+static int __init cf_check cpufreq_gov_dbs_init(void)
 {
     return cpufreq_register_governor(&cpufreq_gov_dbs);
 }

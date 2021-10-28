@@ -954,7 +954,7 @@ static void irq_ratelimit_timer_fn(void *data)
     spin_unlock_irqrestore(&irq_ratelimit_lock, flags);
 }
 
-static int __init irq_ratelimit_init(void)
+static int __init cf_check irq_ratelimit_init(void)
 {
     if ( irq_ratelimit_threshold )
         init_timer(&irq_ratelimit_timer, irq_ratelimit_timer_fn, NULL, 0);
@@ -2504,7 +2504,7 @@ static void dump_irqs(unsigned char key)
     dump_ioapic_irq_info();
 }
 
-static int __init setup_dump_irqs(void)
+static int __init cf_check setup_dump_irqs(void)
 {
     /* In lieu of being able to live in init_irq_data(). */
     BUILD_BUG_ON(sizeof(irq_max_guests) >

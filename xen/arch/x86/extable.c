@@ -126,7 +126,7 @@ search_exception_table(const struct cpu_user_regs *regs)
 #ifndef NDEBUG
 #include <asm/traps.h>
 
-static int __init stub_selftest(void)
+static int __init cf_check stub_selftest(void)
 {
     static const struct {
         uint8_t opc[4];

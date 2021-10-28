@@ -2106,7 +2106,7 @@ static void adjust_irq_affinity(struct acpi_drhd_unit *drhd)
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-static int adjust_vtd_irq_affinities(void)
+static int cf_check adjust_vtd_irq_affinities(void)
 {
     struct acpi_drhd_unit *drhd;
 

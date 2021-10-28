@@ -605,7 +605,7 @@ static void do_nmi_stats(unsigned char key)
         printk("%pv: NMI neither pending nor masked\n", v);
 }
 
-static __init int register_nmi_trigger(void)
+static int __init cf_check register_nmi_trigger(void)
 {
     register_keyhandler('N', do_nmi_trigger, "trigger an NMI", 0);
     register_keyhandler('n', do_nmi_stats, "NMI statistics", 1);

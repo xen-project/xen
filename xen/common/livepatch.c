@@ -2139,7 +2139,7 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-static int __init livepatch_init(void)
+static int __init cf_check livepatch_init(void)
 {
     unsigned int cpu;
 

@@ -2549,7 +2549,7 @@ static void pagealloc_info(unsigned char key)
     printk("    Dom heap: %lukB free\n", total << (PAGE_SHIFT-10));
 }
 
-static __init int pagealloc_keyhandler_init(void)
+static __init int cf_check pagealloc_keyhandler_init(void)
 {
     register_keyhandler('m', pagealloc_info, "memory info", 1);
     return 0;
@@ -2597,7 +2597,7 @@ static void dump_heap(unsigned char key)
     }
 }
 
-static __init int register_heap_trigger(void)
+static __init int cf_check register_heap_trigger(void)
 {
     register_keyhandler('H', dump_heap, "dump heap info", 1);
     return 0;

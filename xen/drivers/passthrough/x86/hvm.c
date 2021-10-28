@@ -1076,7 +1076,7 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback,
 };
 
-static int __init setup_dpci_softirq(void)
+static int __init cf_check setup_dpci_softirq(void)
 {
     unsigned int cpu;
 

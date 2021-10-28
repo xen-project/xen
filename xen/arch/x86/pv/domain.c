@@ -167,7 +167,7 @@ unsigned long pv_fixup_guest_cr4(const struct vcpu *v, unsigned long cr4)
 static int8_t __read_mostly opt_global_pages = -1;
 boolean_runtime_param("global-pages", opt_global_pages);
 
-static int __init pge_init(void)
+static int __init cf_check pge_init(void)
 {
     if ( opt_global_pages == -1 )
         opt_global_pages = !cpu_has_hypervisor ||

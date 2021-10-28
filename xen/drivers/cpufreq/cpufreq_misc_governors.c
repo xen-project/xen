@@ -116,7 +116,7 @@ struct cpufreq_governor cpufreq_gov_userspace = {
     .handle_option = cpufreq_userspace_handle_option
 };
 
-static int __init cpufreq_gov_userspace_init(void)
+static int __init cf_check cpufreq_gov_userspace_init(void)
 {
     unsigned int cpu;
 
@@ -160,7 +160,7 @@ struct cpufreq_governor cpufreq_gov_performance = {
     .governor = cpufreq_governor_performance,
 };
 
-static int __init cpufreq_gov_performance_init(void)
+static int __init cf_check cpufreq_gov_performance_init(void)
 {
     return cpufreq_register_governor(&cpufreq_gov_performance);
 }
@@ -199,7 +199,7 @@ struct cpufreq_governor cpufreq_gov_powersave = {
     .governor = cpufreq_governor_powersave,
 };
 
-static int __init cpufreq_gov_powersave_init(void)
+static int __init cf_check cpufreq_gov_powersave_init(void)
 {
     return cpufreq_register_governor(&cpufreq_gov_powersave);
 }

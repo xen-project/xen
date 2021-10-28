@@ -279,7 +279,7 @@ static struct notifier_block debugtrace_nfb = {
     .notifier_call = debugtrace_cpu_callback
 };
 
-static int __init debugtrace_init(void)
+static int __init cf_check debugtrace_init(void)
 {
     unsigned int cpu;
 

@@ -11,7 +11,7 @@
 unsigned int (*__read_mostly ioemul_handle_quirk)(
     uint8_t opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
-static unsigned int ioemul_handle_proliant_quirk(
+static unsigned int cf_check ioemul_handle_proliant_quirk(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs)
 {
     static const char stub[] = {
@@ -100,7 +100,7 @@ static const struct dmi_system_id __initconstrel ioport_quirks_tbl[] = {
     { }
 };
 
-static int __init ioport_quirks_init(void)
+static int __init cf_check ioport_quirks_init(void)
 {
     if ( dmi_check_system(ioport_quirks_tbl) )
         ioemul_handle_quirk = ioemul_handle_proliant_quirk;

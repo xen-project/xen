@@ -1485,7 +1485,7 @@ static void dump_msi(unsigned char key)
     vpci_dump_msi();
 }
 
-static int __init msi_setup_keyhandler(void)
+static int __init cf_check msi_setup_keyhandler(void)
 {
     register_keyhandler('M', dump_msi, "dump MSI state", 1);
     return 0;

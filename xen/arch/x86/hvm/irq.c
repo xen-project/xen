@@ -650,7 +650,7 @@ static void dump_irq_info(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 }
 
-static int __init dump_irq_info_key_init(void)
+static int __init cf_check dump_irq_info_key_init(void)
 {
     register_keyhandler('I', dump_irq_info, "dump HVM irq info", 1);
     return 0;

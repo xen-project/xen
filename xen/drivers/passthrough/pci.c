@@ -1358,7 +1358,7 @@ static void dump_pci_devices(unsigned char ch)
     pcidevs_unlock();
 }
 
-static int __init setup_dump_pcidevs(void)
+static int __init cf_check setup_dump_pcidevs(void)
 {
     register_keyhandler('Q', dump_pci_devices, "dump PCI devices", 1);
     return 0;

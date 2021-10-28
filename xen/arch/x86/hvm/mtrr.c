@@ -75,7 +75,7 @@ static uint8_t __read_mostly mtrr_epat_tbl[MTRR_NUM_TYPES][MEMORY_NUM_TYPES] =
 static uint8_t __read_mostly pat_entry_tbl[PAT_TYPE_NUMS] =
     { [0 ... PAT_TYPE_NUMS-1] = INVALID_MEM_TYPE };
 
-static int __init hvm_mtrr_pat_init(void)
+static int __init cf_check hvm_mtrr_pat_init(void)
 {
     unsigned int i, j;
 

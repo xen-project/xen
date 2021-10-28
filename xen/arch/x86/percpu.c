@@ -94,7 +94,7 @@ static struct notifier_block cpu_percpu_nfb = {
     .priority = 100 /* highest priority */
 };
 
-static int __init percpu_presmp_init(void)
+static int __init cf_check percpu_presmp_init(void)
 {
     register_cpu_notifier(&cpu_percpu_nfb);
 

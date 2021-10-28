@@ -388,7 +388,7 @@ static int __init arch_perfmon_init(char **cpu_type)
 	return 1;
 }
 
-static int __init nmi_init(void)
+static int __init cf_check nmi_init(void)
 {
 	__u8 vendor = current_cpu_data.x86_vendor;
 	__u8 family = current_cpu_data.x86;

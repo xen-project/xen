@@ -657,7 +657,7 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-static int __init cpufreq_presmp_init(void)
+static int __init cf_check cpufreq_presmp_init(void)
 {
     register_cpu_notifier(&cpu_nfb);
     return 0;
