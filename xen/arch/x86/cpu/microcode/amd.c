@@ -91,7 +91,7 @@ static struct {
     uint16_t id;
 } equiv __read_mostly;
 
-static void collect_cpu_info(void)
+static void cf_check collect_cpu_info(void)
 {
     struct cpu_signature *csig = &this_cpu(cpu_sig);
 
@@ -204,7 +204,7 @@ static enum microcode_match_result compare_header(
     return compare_revisions(old->patch_id, new->patch_id);
 }
 
-static enum microcode_match_result compare_patch(
+static enum microcode_match_result cf_check compare_patch(
     const struct microcode_patch *new, const struct microcode_patch *old)
 {
     /* Both patches to compare are supposed to be applicable to local CPU. */
@@ -214,7 +214,7 @@ static enum microcode_match_result compare_patch(
     return compare_header(new, old);
 }
 
-static int apply_microcode(const struct microcode_patch *patch)
+static int cf_check apply_microcode(const struct microcode_patch *patch)
 {
     int hw_err;
     unsigned int cpu = smp_processor_id();
@@ -299,7 +299,8 @@ static int scan_equiv_cpu_table(const struct container_equiv_table *et)
     return -ESRCH;
 }
 
-static struct microcode_patch *cpu_request_microcode(const void *buf, size_t size)
+static struct microcode_patch *cf_check cpu_request_microcode(
+    const void *buf, size_t size)
 {
     const struct microcode_patch *saved = NULL;
     struct microcode_patch *patch = NULL;

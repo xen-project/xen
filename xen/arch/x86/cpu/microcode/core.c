@@ -291,12 +291,12 @@ static int wait_for_condition(bool (*func)(unsigned int data),
     return 0;
 }
 
-static bool wait_cpu_callin(unsigned int nr)
+static bool cf_check wait_cpu_callin(unsigned int nr)
 {
     return cpumask_weight(&cpu_callin_map) >= nr;
 }
 
-static bool wait_cpu_callout(unsigned int nr)
+static bool cf_check wait_cpu_callout(unsigned int nr)
 {
     return atomic_read(&cpu_out) >= nr;
 }

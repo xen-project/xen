@@ -116,7 +116,7 @@ static bool signature_matches(const struct cpu_signature *cpu_sig,
     return cpu_sig->pf & ucode_pf;
 }
 
-static void collect_cpu_info(void)
+static void cf_check collect_cpu_info(void)
 {
     struct cpu_signature *csig = &this_cpu(cpu_sig);
     uint64_t msr_content;
@@ -271,7 +271,7 @@ static enum microcode_match_result microcode_update_match(
     return compare_revisions(cpu_sig->rev, mc->rev);
 }
 
-static enum microcode_match_result compare_patch(
+static enum microcode_match_result cf_check compare_patch(
     const struct microcode_patch *new, const struct microcode_patch *old)
 {
     /*
@@ -284,7 +284,7 @@ static enum microcode_match_result compare_patch(
     return compare_revisions(old->rev, new->rev);
 }
 
-static int apply_microcode(const struct microcode_patch *patch)
+static int cf_check apply_microcode(const struct microcode_patch *patch)
 {
     uint64_t msr_content;
     unsigned int cpu = smp_processor_id();
@@ -323,8 +323,8 @@ static int apply_microcode(const struct microcode_patch *patch)
     return 0;
 }
 
-static struct microcode_patch *cpu_request_microcode(const void *buf,
-                                                     size_t size)
+static struct microcode_patch *cf_check cpu_request_microcode(
+    const void *buf, size_t size)
 {
     int error = 0;
     const struct microcode_patch *saved = NULL;
