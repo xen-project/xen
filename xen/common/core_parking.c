@@ -169,7 +169,7 @@ static unsigned int core_parking_power(unsigned int event)
     return cpu;
 }
 
-long core_parking_helper(void *data)
+long cf_check core_parking_helper(void *data)
 {
     uint32_t idle_nums = (unsigned long)data;
     unsigned int cpu;

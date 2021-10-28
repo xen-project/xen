@@ -558,7 +558,7 @@ struct ucode_buf {
     char buffer[];
 };
 
-static long microcode_update_helper(void *data)
+static long cf_check microcode_update_helper(void *data)
 {
     int ret;
     struct ucode_buf *buffer = data;

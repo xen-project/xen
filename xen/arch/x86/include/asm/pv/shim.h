@@ -38,8 +38,8 @@ void pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
                        start_info_t *si);
 int pv_shim_shutdown(uint8_t reason);
 void pv_shim_inject_evtchn(unsigned int port);
-long pv_shim_cpu_up(void *data);
-long pv_shim_cpu_down(void *data);
+long cf_check pv_shim_cpu_up(void *data);
+long cf_check pv_shim_cpu_down(void *data);
 void pv_shim_online_memory(unsigned int nr, unsigned int order);
 void pv_shim_offline_memory(unsigned int nr, unsigned int order);
 domid_t get_initial_domain_id(void);
@@ -69,12 +69,12 @@ static inline void pv_shim_inject_evtchn(unsigned int port)
 {
     ASSERT_UNREACHABLE();
 }
-static inline long pv_shim_cpu_up(void *data)
+static inline long cf_check pv_shim_cpu_up(void *data)
 {
     ASSERT_UNREACHABLE();
     return 0;
 }
-static inline long pv_shim_cpu_down(void *data)
+static inline long cf_check pv_shim_cpu_down(void *data)
 {
     ASSERT_UNREACHABLE();
     return 0;

@@ -326,7 +326,7 @@ static int enter_state(u32 state)
     return error;
 }
 
-static long enter_state_helper(void *data)
+static long cf_check enter_state_helper(void *data)
 {
     struct acpi_sleep_info *sinfo = (struct acpi_sleep_info *)data;
     return enter_state(sinfo->sleep_state);

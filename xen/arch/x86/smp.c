@@ -399,7 +399,7 @@ void call_function_interrupt(struct cpu_user_regs *regs)
     smp_call_function_interrupt();
 }
 
-long cpu_up_helper(void *data)
+long cf_check cpu_up_helper(void *data)
 {
     unsigned int cpu = (unsigned long)data;
     int ret = cpu_up(cpu);
@@ -422,7 +422,7 @@ long cpu_up_helper(void *data)
     return ret;
 }
 
-long cpu_down_helper(void *data)
+long cf_check cpu_down_helper(void *data)
 {
     int cpu = (unsigned long)data;
     int ret = cpu_down(cpu);
