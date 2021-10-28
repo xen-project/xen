@@ -86,12 +86,11 @@ ENTRY(kexec_reloc)
         movq    %rax, (compat_mode_gdt_desc + 2)(%rip)
         lgdt    compat_mode_gdt_desc(%rip)
 
-        /* Relocate compatibility mode entry point address. */
-        leal    compatibility_mode(%rip), %eax
-        movl    %eax, compatibility_mode_far(%rip)
-
         /* Enter compatibility mode. */
-        ljmp    *compatibility_mode_far(%rip)
+        lea     compatibility_mode(%rip), %rax
+        push    $0x10
+        push    %rax
+        lretq
 
 relocate_pages:
         /* %rdi - indirection page maddr */
@@ -171,13 +170,6 @@ compatibility_mode:
         ud2
 
         .align 4
-compatibility_mode_far:
-        .long 0x00000000             /* set in call_32_bit above */
-        .word 0x0010
-
-        .type compatibility_mode_far, @object
-        .size compatibility_mode_far, . - compatibility_mode_far
-
 compat_mode_gdt_desc:
         .word .Lcompat_mode_gdt_end - compat_mode_gdt -1
         .quad 0x0000000000000000     /* set in call_32_bit above */
