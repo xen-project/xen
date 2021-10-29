@@ -820,8 +820,8 @@ void np2m_flush_base(struct vcpu *v, unsigned long np2m_base);
 void hap_p2m_init(struct p2m_domain *p2m);
 void shadow_p2m_init(struct p2m_domain *p2m);
 
-void nestedp2m_write_p2m_entry_post(struct p2m_domain *p2m,
-                                    unsigned int oflags);
+void cf_check nestedp2m_write_p2m_entry_post(
+    struct p2m_domain *p2m, unsigned int oflags);
 
 /*
  * Alternate p2m: shadow p2m tables used for alternate memory views

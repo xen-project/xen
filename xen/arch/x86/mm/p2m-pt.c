@@ -399,7 +399,7 @@ static int p2m_pt_set_recalc_range(struct p2m_domain *p2m,
  * GFN. Propagate the re-calculation flag down to the next page table level
  * for entries not involved in the translation of the given GFN.
  */
-static int do_recalc(struct p2m_domain *p2m, unsigned long gfn)
+static int cf_check do_recalc(struct p2m_domain *p2m, unsigned long gfn)
 {
     void *table;
     unsigned long gfn_remainder = gfn;
@@ -573,7 +573,7 @@ static void check_entry(mfn_t mfn, p2m_type_t new, p2m_type_t old,
 }
 
 /* Returns: 0 for success, -errno for failure */
-static int
+static int cf_check
 p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
                  unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma,
                  int sve)
@@ -774,7 +774,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     return rc;
 }
 
-static mfn_t
+static mfn_t cf_check
 p2m_pt_get_entry(struct p2m_domain *p2m, gfn_t gfn_,
                  p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
                  unsigned int *page_order, bool_t *sve)
@@ -943,8 +943,8 @@ pod_retry_l1:
     return (p2m_is_valid(*t) || p2m_is_any_ram(*t)) ? mfn : INVALID_MFN;
 }
 
-static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
-                                            p2m_type_t ot, p2m_type_t nt)
+static void cf_check p2m_pt_change_entry_type_global(
+    struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt)
 {
     l1_pgentry_t *tab;
     unsigned long gfn = 0;
@@ -983,10 +983,9 @@ static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
          guest_flush_tlb_mask(d, d->dirty_cpumask);
 }
 
-static int p2m_pt_change_entry_type_range(struct p2m_domain *p2m,
-                                          p2m_type_t ot, p2m_type_t nt,
-                                          unsigned long first_gfn,
-                                          unsigned long last_gfn)
+static int cf_check p2m_pt_change_entry_type_range(
+    struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt,
+    unsigned long first_gfn, unsigned long last_gfn)
 {
     unsigned long mask = (1 << PAGETABLE_ORDER) - 1;
     unsigned int i;
@@ -1025,7 +1024,7 @@ static int p2m_pt_change_entry_type_range(struct p2m_domain *p2m,
 }
 
 #if P2M_AUDIT
-static long p2m_pt_audit_p2m(struct p2m_domain *p2m)
+static long cf_check p2m_pt_audit_p2m(struct p2m_domain *p2m)
 {
     unsigned long entry_count = 0, pmbad = 0;
     unsigned long mfn, gfn, m2pfn;

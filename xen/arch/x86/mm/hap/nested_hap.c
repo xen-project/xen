@@ -71,7 +71,7 @@
 /*        NESTED VIRT P2M FUNCTIONS         */
 /********************************************/
 
-void
+void cf_check
 nestedp2m_write_p2m_entry_post(struct p2m_domain *p2m, unsigned int oflags)
 {
     if ( oflags & _PAGE_PRESENT )

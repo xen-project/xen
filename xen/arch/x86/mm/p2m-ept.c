@@ -624,7 +624,7 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
  * - zero if no adjustment was done,
  * - a positive value if at least one adjustment was done.
  */
-static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
+static int cf_check resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
 {
     struct ept_data *ept = &p2m->ept;
     unsigned int level = ept->wl;
@@ -793,7 +793,7 @@ bool_t ept_handle_misconfig(uint64_t gpa)
  *
  * Returns: 0 for success, -errno for failure
  */
-static int
+static int cf_check
 ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
               unsigned int order, p2m_type_t p2mt, p2m_access_t p2ma,
               int sve)
@@ -1002,10 +1002,9 @@ out:
 }
 
 /* Read ept p2m entries */
-static mfn_t ept_get_entry(struct p2m_domain *p2m,
-                           gfn_t gfn_, p2m_type_t *t, p2m_access_t* a,
-                           p2m_query_t q, unsigned int *page_order,
-                           bool_t *sve)
+static mfn_t cf_check ept_get_entry(
+    struct p2m_domain *p2m, gfn_t gfn_, p2m_type_t *t, p2m_access_t *a,
+    p2m_query_t q, unsigned int *page_order, bool *sve)
 {
     ept_entry_t *table =
         map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
@@ -1165,8 +1164,8 @@ out:
     return;
 }
 
-static void ept_change_entry_type_global(struct p2m_domain *p2m,
-                                         p2m_type_t ot, p2m_type_t nt)
+static void cf_check ept_change_entry_type_global(
+    struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt)
 {
     unsigned long mfn = p2m->ept.mfn;
 
@@ -1177,10 +1176,9 @@ static void ept_change_entry_type_global(struct p2m_domain *p2m,
         ept_sync_domain(p2m);
 }
 
-static int ept_change_entry_type_range(struct p2m_domain *p2m,
-                                       p2m_type_t ot, p2m_type_t nt,
-                                       unsigned long first_gfn,
-                                       unsigned long last_gfn)
+static int cf_check ept_change_entry_type_range(
+    struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt,
+    unsigned long first_gfn, unsigned long last_gfn)
 {
     unsigned int i, wl = p2m->ept.wl;
     unsigned long mask = (1 << EPT_TABLE_ORDER) - 1;
@@ -1224,7 +1222,7 @@ static int ept_change_entry_type_range(struct p2m_domain *p2m,
     return rc < 0 ? rc : 0;
 }
 
-static void ept_memory_type_changed(struct p2m_domain *p2m)
+static void cf_check ept_memory_type_changed(struct p2m_domain *p2m)
 {
     unsigned long mfn = p2m->ept.mfn;
 
@@ -1283,7 +1281,7 @@ void ept_sync_domain(struct p2m_domain *p2m)
     ept_sync_domain_mask(p2m, d->dirty_cpumask);
 }
 
-static void ept_tlb_flush(struct p2m_domain *p2m)
+static void cf_check ept_tlb_flush(struct p2m_domain *p2m)
 {
     ept_sync_domain_mask(p2m, p2m->domain->dirty_cpumask);
 }
@@ -1346,7 +1344,7 @@ static void ept_disable_pml(struct p2m_domain *p2m)
     vmx_domain_update_eptp(p2m->domain);
 }
 
-static void ept_enable_hardware_log_dirty(struct p2m_domain *p2m)
+static void cf_check ept_enable_hardware_log_dirty(struct p2m_domain *p2m)
 {
     struct p2m_domain *hostp2m = p2m_get_hostp2m(p2m->domain);
 
@@ -1355,7 +1353,7 @@ static void ept_enable_hardware_log_dirty(struct p2m_domain *p2m)
     p2m_unlock(hostp2m);
 }
 
-static void ept_disable_hardware_log_dirty(struct p2m_domain *p2m)
+static void cf_check ept_disable_hardware_log_dirty(struct p2m_domain *p2m)
 {
     struct p2m_domain *hostp2m = p2m_get_hostp2m(p2m->domain);
 
@@ -1364,7 +1362,7 @@ static void ept_disable_hardware_log_dirty(struct p2m_domain *p2m)
     p2m_unlock(hostp2m);
 }
 
-static void ept_flush_pml_buffers(struct p2m_domain *p2m)
+static void cf_check ept_flush_pml_buffers(struct p2m_domain *p2m)
 {
     /* Domain must have been paused */
     ASSERT(atomic_read(&p2m->domain->pause_count));
