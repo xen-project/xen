@@ -33,8 +33,8 @@ static bool silo_mode_dom_check(const struct domain *ldom,
             is_control_domain(rdom) || ldom == rdom);
 }
 
-static int silo_evtchn_unbound(struct domain *d1, struct evtchn *chn,
-                               domid_t id2)
+static int cf_check silo_evtchn_unbound(
+    struct domain *d1, struct evtchn *chn, domid_t id2)
 {
     int rc = -EPERM;
     struct domain *d2 = rcu_lock_domain_by_any_id(id2);
@@ -51,30 +51,31 @@ static int silo_evtchn_unbound(struct domain *d1, struct evtchn *chn,
     return rc;
 }
 
-static int silo_evtchn_interdomain(struct domain *d1, struct evtchn *chan1,
-                                   struct domain *d2, struct evtchn *chan2)
+static int cf_check silo_evtchn_interdomain(
+    struct domain *d1, struct evtchn *chan1,
+    struct domain *d2, struct evtchn *chan2)
 {
     if ( silo_mode_dom_check(d1, d2) )
         return xsm_evtchn_interdomain(d1, chan1, d2, chan2);
     return -EPERM;
 }
 
-static int silo_grant_mapref(struct domain *d1, struct domain *d2,
-                             uint32_t flags)
+static int cf_check silo_grant_mapref(
+    struct domain *d1, struct domain *d2, uint32_t flags)
 {
     if ( silo_mode_dom_check(d1, d2) )
         return xsm_grant_mapref(d1, d2, flags);
     return -EPERM;
 }
 
-static int silo_grant_transfer(struct domain *d1, struct domain *d2)
+static int cf_check silo_grant_transfer(struct domain *d1, struct domain *d2)
 {
     if ( silo_mode_dom_check(d1, d2) )
         return xsm_grant_transfer(d1, d2);
     return -EPERM;
 }
 
-static int silo_grant_copy(struct domain *d1, struct domain *d2)
+static int cf_check silo_grant_copy(struct domain *d1, struct domain *d2)
 {
     if ( silo_mode_dom_check(d1, d2) )
         return xsm_grant_copy(d1, d2);
@@ -83,15 +84,16 @@ static int silo_grant_copy(struct domain *d1, struct domain *d2)
 
 #ifdef CONFIG_ARGO
 
-static int silo_argo_register_single_source(const struct domain *d1,
-                                            const struct domain *d2)
+static int cf_check silo_argo_register_single_source(
+    const struct domain *d1, const struct domain *d2)
 {
     if ( silo_mode_dom_check(d1, d2) )
         return xsm_argo_register_single_source(d1, d2);
     return -EPERM;
 }
 
-static int silo_argo_send(const struct domain *d1, const struct domain *d2)
+static int cf_check silo_argo_send(
+    const struct domain *d1, const struct domain *d2)
 {
     if ( silo_mode_dom_check(d1, d2) )
         return xsm_argo_send(d1, d2);
