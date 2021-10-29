@@ -268,7 +268,7 @@ static void hap_free(struct domain *d, mfn_t mfn)
     page_list_add_tail(pg, &d->arch.paging.hap.freelist);
 }
 
-static struct page_info *hap_alloc_p2m_page(struct domain *d)
+static struct page_info *cf_check hap_alloc_p2m_page(struct domain *d)
 {
     struct page_info *pg;
 
@@ -294,7 +294,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
     return pg;
 }
 
-static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
+static void cf_check hap_free_p2m_page(struct domain *d, struct page_info *pg)
 {
     struct domain *owner = page_get_owner(pg);
 
@@ -662,8 +662,8 @@ void hap_vcpu_init(struct vcpu *v)
  * HAP guests can handle page faults (in the guest page tables) without
  * needing any action from Xen, so we should not be intercepting them.
  */
-static int hap_page_fault(struct vcpu *v, unsigned long va,
-                          struct cpu_user_regs *regs)
+static int cf_check hap_page_fault(
+    struct vcpu *v, unsigned long va, struct cpu_user_regs *regs)
 {
     struct domain *d = v->domain;
 
@@ -677,7 +677,7 @@ static int hap_page_fault(struct vcpu *v, unsigned long va,
  * should not be intercepting it.  However, we need to correctly handle
  * getting here from instruction emulation.
  */
-static bool_t hap_invlpg(struct vcpu *v, unsigned long linear)
+static bool cf_check hap_invlpg(struct vcpu *v, unsigned long linear)
 {
     /*
      * Emulate INVLPGA:
@@ -690,7 +690,8 @@ static bool_t hap_invlpg(struct vcpu *v, unsigned long linear)
     return 1;
 }
 
-static void hap_update_cr3(struct vcpu *v, int do_locking, bool noflush)
+static void cf_check hap_update_cr3(
+    struct vcpu *v, int do_locking, bool noflush)
 {
     v->arch.hvm.hw_cr[3] = v->arch.hvm.guest_cr[3];
     hvm_update_guest_cr3(v, noflush);
@@ -702,7 +703,7 @@ static bool flush_vcpu(const struct vcpu *v, const unsigned long *vcpu_bitmap)
 }
 
 /* Flush TLB of selected vCPUs.  NULL for all. */
-static bool flush_tlb(const unsigned long *vcpu_bitmap)
+static bool cf_check flush_tlb(const unsigned long *vcpu_bitmap)
 {
     static DEFINE_PER_CPU(cpumask_t, flush_cpumask);
     cpumask_t *mask = &this_cpu(flush_cpumask);
@@ -747,7 +748,7 @@ hap_paging_get_mode(struct vcpu *v)
                                       &hap_paging_protected_mode);
 }
 
-static void hap_update_paging_modes(struct vcpu *v)
+static void cf_check hap_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
     unsigned long cr3_gfn = v->arch.hvm.guest_cr[3] >> PAGE_SHIFT;
@@ -791,13 +792,13 @@ void hap_p2m_init(struct p2m_domain *p2m)
     p2m->write_p2m_entry_post = hap_write_p2m_entry_post;
 }
 
-static unsigned long hap_gva_to_gfn_real_mode(
+static unsigned long cf_check hap_gva_to_gfn_real_mode(
     struct vcpu *v, struct p2m_domain *p2m, unsigned long gva, uint32_t *pfec)
 {
     return ((paddr_t)gva >> PAGE_SHIFT);
 }
 
-static unsigned long hap_p2m_ga_to_gfn_real_mode(
+static unsigned long cf_check hap_p2m_ga_to_gfn_real_mode(
     struct vcpu *v, struct p2m_domain *p2m, unsigned long cr3,
     paddr_t ga, uint32_t *pfec, unsigned int *page_order)
 {
