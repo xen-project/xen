@@ -52,7 +52,7 @@ struct rcu_node {
 	struct rcu_head rcu_head;
 };
 
-static struct radix_tree_node *rcu_node_alloc(void *arg)
+static struct radix_tree_node *cf_check rcu_node_alloc(void *arg)
 {
 	struct rcu_node *rcu_node = xmalloc(struct rcu_node);
 	return rcu_node ? &rcu_node->node : NULL;
@@ -65,7 +65,7 @@ static void cf_check _rcu_node_free(struct rcu_head *head)
 	xfree(rcu_node);
 }
 
-static void rcu_node_free(struct radix_tree_node *node, void *arg)
+static void cf_check rcu_node_free(struct radix_tree_node *node, void *arg)
 {
 	struct rcu_node *rcu_node = container_of(node, struct rcu_node, node);
 	call_rcu(&rcu_node->rcu_head, _rcu_node_free);

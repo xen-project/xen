@@ -94,18 +94,19 @@ extern uint64_t __stop___llvm_prf_cnts[];
 #define START_COUNTERS  ((void *)__start___llvm_prf_cnts)
 #define END_COUNTERS    ((void *)__stop___llvm_prf_cnts)
 
-static void reset_counters(void)
+static void cf_check reset_counters(void)
 {
     memset(START_COUNTERS, 0, END_COUNTERS - START_COUNTERS);
 }
 
-static uint32_t get_size(void)
+static uint32_t cf_check get_size(void)
 {
     return ROUNDUP(sizeof(struct llvm_profile_header) + END_DATA - START_DATA +
                    END_COUNTERS - START_COUNTERS + END_NAMES - START_NAMES, 8);
 }
 
-static int dump(XEN_GUEST_HANDLE_PARAM(char) buffer, uint32_t *buf_size)
+static int cf_check dump(
+    XEN_GUEST_HANDLE_PARAM(char) buffer, uint32_t *buf_size)
 {
     struct llvm_profile_header header = {
         .magic = LLVM_PROFILE_MAGIC,

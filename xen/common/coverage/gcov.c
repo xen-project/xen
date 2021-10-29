@@ -120,7 +120,7 @@ static int gcov_info_dump_payload(const struct gcov_info *info,
 
 }
 
-static uint32_t gcov_get_size(void)
+static uint32_t cf_check gcov_get_size(void)
 {
     uint32_t total_size = sizeof(uint32_t); /* Magic number XCOV */
     struct gcov_info *info = NULL;
@@ -140,7 +140,7 @@ static uint32_t gcov_get_size(void)
     return total_size;
 }
 
-static void gcov_reset_all_counters(void)
+static void cf_check gcov_reset_all_counters(void)
 {
     struct gcov_info *info = NULL;
 
@@ -172,8 +172,8 @@ static int gcov_dump_one_record(const struct gcov_info *info,
     return gcov_info_dump_payload(info, buffer, off);
 }
 
-static int gcov_dump_all(XEN_GUEST_HANDLE_PARAM(char) buffer,
-                         uint32_t *buffer_size)
+static int cf_check gcov_dump_all(
+    XEN_GUEST_HANDLE_PARAM(char) buffer, uint32_t *buffer_size)
 {
     uint32_t off;
     uint32_t magic = XEN_GCOV_FORMAT_MAGIC;

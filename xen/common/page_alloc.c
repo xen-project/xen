@@ -1238,7 +1238,7 @@ struct scrub_wait_state {
     bool drop;
 };
 
-static void scrub_continue(void *data)
+static void cf_check scrub_continue(void *data)
 {
     struct scrub_wait_state *st = data;
 

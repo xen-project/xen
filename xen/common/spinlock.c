@@ -375,7 +375,7 @@ static void spinlock_profile_iterate(lock_profile_subfunc *sub, void *par)
     spin_unlock(&lock_profile_lock);
 }
 
-static void spinlock_profile_print_elem(struct lock_profile *data,
+static void cf_check spinlock_profile_print_elem(struct lock_profile *data,
     int32_t type, int32_t idx, void *par)
 {
     struct spinlock *lock = data->lock;
@@ -404,7 +404,7 @@ void cf_check spinlock_profile_printall(unsigned char key)
     spinlock_profile_iterate(spinlock_profile_print_elem, NULL);
 }
 
-static void spinlock_profile_reset_elem(struct lock_profile *data,
+static void cf_check spinlock_profile_reset_elem(struct lock_profile *data,
     int32_t type, int32_t idx, void *par)
 {
     data->lock_cnt = 0;
@@ -428,7 +428,7 @@ typedef struct {
     int                      rc;
 } spinlock_profile_ucopy_t;
 
-static void spinlock_profile_ucopy_elem(struct lock_profile *data,
+static void cf_check spinlock_profile_ucopy_elem(struct lock_profile *data,
     int32_t type, int32_t idx, void *par)
 {
     spinlock_profile_ucopy_t *p = par;

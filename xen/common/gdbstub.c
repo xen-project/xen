@@ -69,7 +69,7 @@ static void gdb_smp_resume(void);
 static char __initdata opt_gdb[30];
 string_param("gdb", opt_gdb);
 
-static void gdbstub_console_puts(const char *str, size_t nr);
+static void cf_check gdbstub_console_puts(const char *str, size_t nr);
 
 /* value <-> char (de)serialzers */
 static char
@@ -546,8 +546,7 @@ __gdb_ctx = {
 };
 static struct gdb_context *gdb_ctx = &__gdb_ctx;
 
-static void
-gdbstub_console_puts(const char *str, size_t nr)
+static void cf_check gdbstub_console_puts(const char *str, size_t nr)
 {
     const char *p;
 

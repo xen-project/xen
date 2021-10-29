@@ -1803,7 +1803,7 @@ static void cf_check _free_pirq_struct(struct rcu_head *head)
     xfree(container_of(head, struct pirq, rcu_head));
 }
 
-void free_pirq_struct(void *ptr)
+void cf_check free_pirq_struct(void *ptr)
 {
     struct pirq *pirq = ptr;
 

@@ -384,7 +384,7 @@ int rangeset_consume_ranges(struct rangeset *r,
     return rc;
 }
 
-static int merge(unsigned long s, unsigned long e, void *data)
+static int cf_check merge(unsigned long s, unsigned long e, void *data)
 {
     struct rangeset *r = data;
 

@@ -512,13 +512,13 @@ int xmem_pool_maxalloc(struct xmem_pool *pool)
 
 static struct xmem_pool *xenpool;
 
-static void *xmalloc_pool_get(unsigned long size)
+static void *cf_check xmalloc_pool_get(unsigned long size)
 {
     ASSERT(size == PAGE_SIZE);
     return alloc_xenheap_page();
 }
 
-static void xmalloc_pool_put(void *p)
+static void cf_check xmalloc_pool_put(void *p)
 {
     free_xenheap_page(p);
 }
