@@ -715,8 +715,8 @@ static void cf_check do_amd_iommu_irq(void *unused)
     }
 }
 
-static void iommu_interrupt_handler(int irq, void *dev_id,
-                                    struct cpu_user_regs *regs)
+static void cf_check iommu_interrupt_handler(
+    int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     unsigned long flags;
     struct amd_iommu *iommu = dev_id;

@@ -93,14 +93,14 @@ static inline struct cpu_user_regs *set_irq_regs(struct cpu_user_regs *new_regs)
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 
-void event_check_interrupt(struct cpu_user_regs *regs);
-void invalidate_interrupt(struct cpu_user_regs *regs);
-void call_function_interrupt(struct cpu_user_regs *regs);
-void apic_timer_interrupt(struct cpu_user_regs *regs);
-void error_interrupt(struct cpu_user_regs *regs);
-void pmu_apic_interrupt(struct cpu_user_regs *regs);
-void spurious_interrupt(struct cpu_user_regs *regs);
-void irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
+void cf_check event_check_interrupt(struct cpu_user_regs *regs);
+void cf_check invalidate_interrupt(struct cpu_user_regs *regs);
+void cf_check call_function_interrupt(struct cpu_user_regs *regs);
+void cf_check apic_timer_interrupt(struct cpu_user_regs *regs);
+void cf_check error_interrupt(struct cpu_user_regs *regs);
+void cf_check pmu_apic_interrupt(struct cpu_user_regs *regs);
+void cf_check spurious_interrupt(struct cpu_user_regs *regs);
+void cf_check irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
 
 uint8_t alloc_hipriority_vector(void);
 

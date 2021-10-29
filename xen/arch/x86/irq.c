@@ -744,7 +744,7 @@ void move_native_irq(struct irq_desc *desc)
     desc->handler->enable(desc);
 }
 
-void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
+void cf_check irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
 {
     unsigned vector, me;
 

@@ -246,7 +246,7 @@ static cpumask_t flush_cpumask;
 static const void *flush_va;
 static unsigned int flush_flags;
 
-void invalidate_interrupt(struct cpu_user_regs *regs)
+void cf_check invalidate_interrupt(struct cpu_user_regs *regs)
 {
     unsigned int flags = flush_flags;
     ack_APIC_irq();
@@ -385,14 +385,14 @@ void smp_send_nmi_allbutself(void)
     send_IPI_mask(&cpu_online_map, APIC_DM_NMI);
 }
 
-void event_check_interrupt(struct cpu_user_regs *regs)
+void cf_check event_check_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
     perfc_incr(ipis);
     this_cpu(irq_count)++;
 }
 
-void call_function_interrupt(struct cpu_user_regs *regs)
+void cf_check call_function_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
     perfc_incr(ipis);
