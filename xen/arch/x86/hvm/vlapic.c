@@ -1482,7 +1482,7 @@ static void lapic_rearm(struct vlapic *s)
     s->timer_last_update = s->pt.last_plt_gtime;
 }
 
-static int lapic_save_hidden(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check lapic_save_hidden(struct vcpu *v, hvm_domain_context_t *h)
 {
     if ( !has_vlapic(v->domain) )
         return 0;
@@ -1490,7 +1490,7 @@ static int lapic_save_hidden(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(LAPIC, v->vcpu_id, h, &vcpu_vlapic(v)->hw);
 }
 
-static int lapic_save_regs(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check lapic_save_regs(struct vcpu *v, hvm_domain_context_t *h)
 {
     if ( !has_vlapic(v->domain) )
         return 0;
@@ -1529,7 +1529,7 @@ static void lapic_load_fixup(struct vlapic *vlapic)
     }
 }
 
-static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
+static int cf_check lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
@@ -1563,7 +1563,7 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
+static int cf_check lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;

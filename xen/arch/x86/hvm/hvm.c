@@ -756,7 +756,7 @@ void hvm_domain_destroy(struct domain *d)
     destroy_vpci_mmcfg(d);
 }
 
-static int hvm_save_tsc_adjust(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check hvm_save_tsc_adjust(struct vcpu *v, hvm_domain_context_t *h)
 {
     struct hvm_tsc_adjust ctxt = {
         .tsc_adjust = v->arch.hvm.msr_tsc_adjust,
@@ -765,7 +765,7 @@ static int hvm_save_tsc_adjust(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(TSC_ADJUST, v->vcpu_id, h, &ctxt);
 }
 
-static int hvm_load_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
+static int cf_check hvm_load_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
@@ -788,7 +788,7 @@ static int hvm_load_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(TSC_ADJUST, hvm_save_tsc_adjust,
                           hvm_load_tsc_adjust, 1, HVMSR_PER_VCPU);
 
-static int hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
 {
     struct segment_register seg;
     struct hvm_hw_cpu ctxt = {
@@ -971,7 +971,7 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d)
             (cet              ? X86_CR4_CET               : 0));
 }
 
-static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
@@ -1172,7 +1172,8 @@ HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt, 1,
                                            save_area) + \
                                   xstate_ctxt_size(xcr0))
 
-static int hvm_save_cpu_xsave_states(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check hvm_save_cpu_xsave_states(
+    struct vcpu *v, hvm_domain_context_t *h)
 {
     struct hvm_hw_cpu_xsave *ctxt;
     unsigned int size = HVM_CPU_XSAVE_SIZE(v->arch.xcr0_accum);
@@ -1210,7 +1211,8 @@ CHECK_FIELD_(struct, xsave_hdr, reserved);
 #undef compat_xsave_hdr
 #undef xen_xsave_hdr
 
-static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
+static int cf_check hvm_load_cpu_xsave_states(
+    struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid, size;
     int err;
@@ -1338,7 +1340,7 @@ static const uint32_t msrs_to_send[] = {
     MSR_AMD64_DR3_ADDRESS_MASK,
 };
 
-static int hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
 {
     const struct domain *d = v->domain;
     struct hvm_save_descriptor *desc = _p(&h->data[h->cur]);
@@ -1418,7 +1420,7 @@ static int hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
     return 0;
 }
 
-static int hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
+static int cf_check hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int i, vcpuid = hvm_load_instance(h);
     struct vcpu *v;

@@ -687,7 +687,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
     return 0;
 }
 
-static int hvm_save_mtrr_msr(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check hvm_save_mtrr_msr(struct vcpu *v, hvm_domain_context_t *h)
 {
     const struct mtrr_state *mtrr_state = &v->arch.hvm.mtrr;
     struct hvm_hw_mtrr hw_mtrr = {
@@ -725,7 +725,7 @@ static int hvm_save_mtrr_msr(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(MTRR, v->vcpu_id, h, &hw_mtrr);
 }
 
-static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
+static int cf_check hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid, i;
     struct vcpu *v;

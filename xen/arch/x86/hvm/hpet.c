@@ -582,7 +582,7 @@ static const struct hvm_mmio_ops hpet_mmio_ops = {
 };
 
 
-static int hpet_save(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check hpet_save(struct vcpu *v, hvm_domain_context_t *h)
 {
     const struct domain *d = v->domain;
     HPETState *hp = domain_vhpet(d);
@@ -645,7 +645,7 @@ static int hpet_save(struct vcpu *v, hvm_domain_context_t *h)
     return rc;
 }
 
-static int hpet_load(struct domain *d, hvm_domain_context_t *h)
+static int cf_check hpet_load(struct domain *d, hvm_domain_context_t *h)
 {
     HPETState *hp = domain_vhpet(d);
     struct hvm_hw_hpet *rec;

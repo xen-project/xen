@@ -657,7 +657,7 @@ static int __init cf_check dump_irq_info_key_init(void)
 }
 __initcall(dump_irq_info_key_init);
 
-static int irq_save_pci(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check irq_save_pci(struct vcpu *v, hvm_domain_context_t *h)
 {
     struct domain *d = v->domain;
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
@@ -690,7 +690,7 @@ static int irq_save_pci(struct vcpu *v, hvm_domain_context_t *h)
     return rc;
 }
 
-static int irq_save_isa(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check irq_save_isa(struct vcpu *v, hvm_domain_context_t *h)
 {
     const struct domain *d = v->domain;
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
@@ -699,7 +699,7 @@ static int irq_save_isa(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(ISA_IRQ, 0, h, &hvm_irq->isa_irq);
 }
 
-static int irq_save_link(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check irq_save_link(struct vcpu *v, hvm_domain_context_t *h)
 {
     const struct domain *d = v->domain;
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
@@ -708,7 +708,7 @@ static int irq_save_link(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(PCI_LINK, 0, h, &hvm_irq->pci_link);
 }
 
-static int irq_load_pci(struct domain *d, hvm_domain_context_t *h)
+static int cf_check irq_load_pci(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     int link, dev, intx, gsi;
@@ -741,7 +741,7 @@ static int irq_load_pci(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-static int irq_load_isa(struct domain *d, hvm_domain_context_t *h)
+static int cf_check irq_load_isa(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     int irq;
@@ -760,7 +760,7 @@ static int irq_load_isa(struct domain *d, hvm_domain_context_t *h)
 }
 
 
-static int irq_load_link(struct domain *d, hvm_domain_context_t *h)
+static int cf_check irq_load_link(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     int link, gsi;

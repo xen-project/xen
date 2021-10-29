@@ -738,7 +738,7 @@ void rtc_migrate_timers(struct vcpu *v)
 }
 
 /* Save RTC hardware state */
-static int rtc_save(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check rtc_save(struct vcpu *v, hvm_domain_context_t *h)
 {
     const struct domain *d = v->domain;
     RTCState *s = domain_vrtc(d);
@@ -756,7 +756,7 @@ static int rtc_save(struct vcpu *v, hvm_domain_context_t *h)
 }
 
 /* Reload the hardware state from a saved domain */
-static int rtc_load(struct domain *d, hvm_domain_context_t *h)
+static int cf_check rtc_load(struct domain *d, hvm_domain_context_t *h)
 {
     RTCState *s = domain_vrtc(d);
 

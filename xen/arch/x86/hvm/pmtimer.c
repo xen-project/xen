@@ -249,7 +249,7 @@ static int cf_check handle_pmt_io(
     return X86EMUL_OKAY;
 }
 
-static int acpi_save(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check acpi_save(struct vcpu *v, hvm_domain_context_t *h)
 {
     struct domain *d = v->domain;
     struct hvm_hw_acpi *acpi = &d->arch.hvm.acpi;
@@ -281,7 +281,7 @@ static int acpi_save(struct vcpu *v, hvm_domain_context_t *h)
     return rc;
 }
 
-static int acpi_load(struct domain *d, hvm_domain_context_t *h)
+static int cf_check acpi_load(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_acpi *acpi = &d->arch.hvm.acpi;
     PMTState *s = &d->arch.hvm.pl_time->vpmt;

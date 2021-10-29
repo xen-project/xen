@@ -1104,8 +1104,8 @@ void viridian_unmap_guest_page(struct viridian_page *vp)
     put_page_and_type(page);
 }
 
-static int viridian_save_domain_ctxt(struct vcpu *v,
-                                     hvm_domain_context_t *h)
+static int cf_check viridian_save_domain_ctxt(
+    struct vcpu *v, hvm_domain_context_t *h)
 {
     const struct domain *d = v->domain;
     const struct viridian_domain *vd = d->arch.hvm.viridian;
@@ -1123,8 +1123,8 @@ static int viridian_save_domain_ctxt(struct vcpu *v,
     return (hvm_save_entry(VIRIDIAN_DOMAIN, 0, h, &ctxt) != 0);
 }
 
-static int viridian_load_domain_ctxt(struct domain *d,
-                                     hvm_domain_context_t *h)
+static int cf_check viridian_load_domain_ctxt(
+    struct domain *d, hvm_domain_context_t *h)
 {
     struct viridian_domain *vd = d->arch.hvm.viridian;
     struct hvm_viridian_domain_context ctxt;
@@ -1144,7 +1144,8 @@ static int viridian_load_domain_ctxt(struct domain *d,
 HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_DOMAIN, viridian_save_domain_ctxt,
                           viridian_load_domain_ctxt, 1, HVMSR_PER_DOM);
 
-static int viridian_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check viridian_save_vcpu_ctxt(
+    struct vcpu *v, hvm_domain_context_t *h)
 {
     struct hvm_viridian_vcpu_context ctxt = {};
 
@@ -1157,8 +1158,8 @@ static int viridian_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt);
 }
 
-static int viridian_load_vcpu_ctxt(struct domain *d,
-                                   hvm_domain_context_t *h)
+static int cf_check viridian_load_vcpu_ctxt(
+    struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;

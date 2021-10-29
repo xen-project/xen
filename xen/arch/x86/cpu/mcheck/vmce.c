@@ -353,7 +353,7 @@ int vmce_wrmsr(uint32_t msr, uint64_t val)
 }
 
 #if CONFIG_HVM
-static int vmce_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
+static int cf_check vmce_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
 {
     struct hvm_vmce_vcpu ctxt = {
         .caps = v->arch.vmce.mcg_cap,
@@ -365,7 +365,7 @@ static int vmce_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(VMCE_VCPU, v->vcpu_id, h, &ctxt);
 }
 
-static int vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+static int cf_check vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
