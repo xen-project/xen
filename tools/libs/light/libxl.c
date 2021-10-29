@@ -405,6 +405,10 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->cap_vmtrace =
         !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_vmtrace);
     physinfo->cap_vpmu = !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_vpmu);
+    physinfo->cap_gnttab_v1 =
+        !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_gnttab_v1);
+    physinfo->cap_gnttab_v2 =
+        !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_gnttab_v2);
 
     GC_FREE;
     return 0;

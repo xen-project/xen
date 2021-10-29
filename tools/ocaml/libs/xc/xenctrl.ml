@@ -123,6 +123,8 @@ type physinfo_cap_flag =
 	| CAP_IOMMU_HAP_PT_SHARE
 	| CAP_Vmtrace
 	| CAP_Vpmu
+	| CAP_Gnttab_v1
+	| CAP_Gnttab_v2
 
 type physinfo =
 {

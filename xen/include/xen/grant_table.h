@@ -32,6 +32,7 @@ struct grant_table;
 
 #ifdef CONFIG_GRANT_TABLE
 
+extern unsigned int opt_gnttab_max_version;
 extern unsigned int opt_max_grant_frames;
 
 /* Create/destroy per-domain grant table context. */
@@ -63,6 +64,7 @@ int gnttab_acquire_resource(
 
 #else
 
+#define opt_gnttab_max_version 0
 #define opt_max_grant_frames 0
 
 static inline int grant_table_init(struct domain *d,

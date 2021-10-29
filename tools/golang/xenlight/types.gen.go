@@ -1010,6 +1010,8 @@ CapShadow bool
 CapIommuHapPtShare bool
 CapVmtrace bool
 CapVpmu bool
+CapGnttabV1 bool
+CapGnttabV2 bool
 }
 
 type Connectorinfo struct {

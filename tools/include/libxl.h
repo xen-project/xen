@@ -515,6 +515,12 @@
 #define LIBXL_HAVE_VPMU 1
 
 /*
+ * LIBXL_HAVE_PHYSINFO_CAP_GNTTAB indicates that libxl_physinfo has a
+ * cap_gnttab_v1/2 fields, which indicates the available grant table ABIs.
+ */
+#define LIBXL_HAVE_PHYSINFO_CAP_GNTTAB 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

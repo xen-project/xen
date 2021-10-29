@@ -178,7 +178,7 @@ static int parse_gnttab_max_maptrack_frames(const char *arg)
 #define GNTTAB_MAX_VERSION 2
 #endif
 
-static unsigned int __read_mostly opt_gnttab_max_version = GNTTAB_MAX_VERSION;
+unsigned int __read_mostly opt_gnttab_max_version = GNTTAB_MAX_VERSION;
 static bool __read_mostly opt_transitive_grants = true;
 
 static int __init parse_gnttab(const char *s)

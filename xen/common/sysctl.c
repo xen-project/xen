@@ -12,6 +12,7 @@
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/event.h>
+#include <xen/grant_table.h>
 #include <xen/domain_page.h>
 #include <xen/trace.h>
 #include <xen/console.h>
@@ -282,6 +283,11 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
         if ( vpmu_is_available )
             pi->capabilities |= XEN_SYSCTL_PHYSCAP_vpmu;
+
+        if ( opt_gnttab_max_version >= 1 )
+            pi->capabilities |= XEN_SYSCTL_PHYSCAP_gnttab_v1;
+        if ( opt_gnttab_max_version >= 2 )
+            pi->capabilities |= XEN_SYSCTL_PHYSCAP_gnttab_v2;
 
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
