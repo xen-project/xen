@@ -47,6 +47,30 @@ qemu-alpine-arm64-gcc:
     - /^coverity-tested\/.*/
     - /^stable-.*/
 
+qemu-alpine-x86_64-gcc:
+  stage: test
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  variables:
+    CONTAINER: debian:stretch
+  script:
+    - ./automation/scripts/qemu-alpine-x86_64.sh 2>&1 | tee qemu-smoke-x86_64.log
+  dependencies:
+    - alpine-3.12-gcc
+    - alpine-3.12-rootfs-export
+    - kernel-5.10.74-export
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  tags:
+    - x86_64
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
+
 qemu-smoke-arm64-gcc:
   stage: test
   image: registry.gitlab.com/xen-project/xen/${CONTAINER}
