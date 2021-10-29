@@ -283,7 +283,7 @@ mls_ops:
  * security_dump_masked_av - dumps masked permissions during
  * security_compute_av due to RBAC, MLS/Constraint and Type bounds.
  */
-static int dump_masked_av_helper(void *k, void *d, void *args)
+static int cf_check dump_masked_av_helper(void *k, void *d, void *args)
 {
     struct perm_datum *pdatum = d;
     char **permission_names = args;
@@ -1240,7 +1240,7 @@ static int validate_classes(struct policydb *p)
 }
 
 /* Clone the SID into the new SID table. */
-static int clone_sid(u32 sid, struct context *context, void *arg)
+static int cf_check clone_sid(u32 sid, struct context *context, void *arg)
 {
     struct sidtab *s = arg;
 
@@ -1277,7 +1277,7 @@ struct convert_context_args {
  * in the policy `p->newp'.  Verify that the
  * context is valid under the new policy.
  */
-static int convert_context(u32 key, struct context *c, void *p)
+static int cf_check convert_context(u32 key, struct context *c, void *p)
 {
     struct convert_context_args *args;
     struct context oldc;

@@ -482,8 +482,8 @@ int avtab_read_item(struct avtab *a, void *fp, struct policydb *pol,
     return insertf(a, &key, &datum, p);
 }
 
-static int avtab_insertf(struct avtab *a, struct avtab_key *k,
-                                                struct avtab_datum *d, void *p)
+static int cf_check avtab_insertf(
+    struct avtab *a, struct avtab_key *k, struct avtab_datum *d, void *p)
 {
     return avtab_insert(a, k, d);
 }

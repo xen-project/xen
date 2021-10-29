@@ -257,12 +257,12 @@ out_free_symtab:
  * of a class, role, or user are needed.
  */
 
-static int common_index(void *key, void *datum, void *datap)
+static int cf_check common_index(void *key, void *datum, void *datap)
 {
     return 0;
 }
 
-static int class_index(void *key, void *datum, void *datap)
+static int cf_check class_index(void *key, void *datum, void *datap)
 {
     struct policydb *p;
     struct class_datum *cladatum;
@@ -276,7 +276,7 @@ static int class_index(void *key, void *datum, void *datap)
     return 0;
 }
 
-static int role_index(void *key, void *datum, void *datap)
+static int cf_check role_index(void *key, void *datum, void *datap)
 {
     struct policydb *p;
     struct role_datum *role;
@@ -292,7 +292,7 @@ static int role_index(void *key, void *datum, void *datap)
     return 0;
 }
 
-static int type_index(void *key, void *datum, void *datap)
+static int cf_check type_index(void *key, void *datum, void *datap)
 {
     struct policydb *p;
     struct type_datum *typdatum;
@@ -313,7 +313,7 @@ static int type_index(void *key, void *datum, void *datap)
     return 0;
 }
 
-static int user_index(void *key, void *datum, void *datap)
+static int cf_check user_index(void *key, void *datum, void *datap)
 {
     struct policydb *p;
     struct user_datum *usrdatum;
@@ -329,7 +329,7 @@ static int user_index(void *key, void *datum, void *datap)
     return 0;
 }
 
-static int sens_index(void *key, void *datum, void *datap)
+static int cf_check sens_index(void *key, void *datum, void *datap)
 {
     struct policydb *p;
     struct level_datum *levdatum;
@@ -348,7 +348,7 @@ static int sens_index(void *key, void *datum, void *datap)
     return 0;
 }
 
-static int cat_index(void *key, void *datum, void *datap)
+static int cf_check cat_index(void *key, void *datum, void *datap)
 {
     struct policydb *p;
     struct cat_datum *catdatum;
@@ -506,14 +506,14 @@ out:
  * symbol data in the policy database.
  */
 
-static int perm_destroy(void *key, void *datum, void *p)
+static int cf_check perm_destroy(void *key, void *datum, void *p)
 {
     xfree(key);
     xfree(datum);
     return 0;
 }
 
-static int common_destroy(void *key, void *datum, void *p)
+static int cf_check common_destroy(void *key, void *datum, void *p)
 {
     struct common_datum *comdatum;
 
@@ -525,7 +525,7 @@ static int common_destroy(void *key, void *datum, void *p)
     return 0;
 }
 
-static int class_destroy(void *key, void *datum, void *p)
+static int cf_check class_destroy(void *key, void *datum, void *p)
 {
     struct class_datum *cladatum;
     struct constraint_node *constraint, *ctemp;
@@ -572,7 +572,7 @@ static int class_destroy(void *key, void *datum, void *p)
     return 0;
 }
 
-static int role_destroy(void *key, void *datum, void *p)
+static int cf_check role_destroy(void *key, void *datum, void *p)
 {
     struct role_datum *role;
 
@@ -584,14 +584,14 @@ static int role_destroy(void *key, void *datum, void *p)
     return 0;
 }
 
-static int type_destroy(void *key, void *datum, void *p)
+static int cf_check type_destroy(void *key, void *datum, void *p)
 {
     xfree(key);
     xfree(datum);
     return 0;
 }
 
-static int user_destroy(void *key, void *datum, void *p)
+static int cf_check user_destroy(void *key, void *datum, void *p)
 {
     struct user_datum *usrdatum;
 
@@ -605,7 +605,7 @@ static int user_destroy(void *key, void *datum, void *p)
     return 0;
 }
 
-static int sens_destroy(void *key, void *datum, void *p)
+static int cf_check sens_destroy(void *key, void *datum, void *p)
 {
     struct level_datum *levdatum;
 
@@ -617,7 +617,7 @@ static int sens_destroy(void *key, void *datum, void *p)
     return 0;
 }
 
-static int cat_destroy(void *key, void *datum, void *p)
+static int cf_check cat_destroy(void *key, void *datum, void *p)
 {
     xfree(key);
     xfree(datum);
@@ -989,7 +989,7 @@ bad:
     goto out;
 }
 
-static int common_read(struct policydb *p, struct hashtab *h, void *fp)
+static int cf_check common_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct common_datum *comdatum;
@@ -1151,7 +1151,7 @@ static int read_cons_helper(struct policydb *p, struct constraint_node **nodep,
     return 0;
 }
 
-static int class_read(struct policydb *p, struct hashtab *h, void *fp)
+static int cf_check class_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct class_datum *cladatum;
@@ -1250,7 +1250,7 @@ bad:
     goto out;
 }
 
-static int role_read(struct policydb *p, struct hashtab *h, void *fp)
+static int cf_check role_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct role_datum *role;
@@ -1321,7 +1321,7 @@ bad:
     goto out;
 }
 
-static int type_read(struct policydb *p, struct hashtab *h, void *fp)
+static int cf_check type_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct type_datum *typdatum;
@@ -1415,7 +1415,7 @@ bad:
     return -EINVAL;
 }
 
-static int user_read(struct policydb *p, struct hashtab *h, void *fp)
+static int cf_check user_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct user_datum *usrdatum;
@@ -1479,7 +1479,7 @@ bad:
     goto out;
 }
 
-static int sens_read(struct policydb *p, struct hashtab *h, void *fp)
+static int cf_check sens_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct level_datum *levdatum;
@@ -1534,7 +1534,7 @@ bad:
     goto out;
 }
 
-static int cat_read(struct policydb *p, struct hashtab *h, void *fp)
+static int cf_check cat_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct cat_datum *catdatum;
@@ -1591,7 +1591,8 @@ static int (*read_f[SYM_NUM]) (struct policydb *p, struct hashtab *h, void *fp) 
     cat_read,
 };
 
-static int user_bounds_sanity_check(void *key, void *datum, void *datap)
+static int cf_check user_bounds_sanity_check(
+    void *key, void *datum, void *datap)
 {
     struct user_datum *upper, *user;
     struct policydb *p = datap;
@@ -1631,7 +1632,8 @@ static int user_bounds_sanity_check(void *key, void *datum, void *datap)
     return 0;
 }
 
-static int role_bounds_sanity_check(void *key, void *datum, void *datap)
+static int cf_check role_bounds_sanity_check(
+    void *key, void *datum, void *datap)
 {
     struct role_datum *upper, *role;
     struct policydb *p = datap;
@@ -1671,7 +1673,8 @@ static int role_bounds_sanity_check(void *key, void *datum, void *datap)
     return 0;
 }
 
-static int type_bounds_sanity_check(void *key, void *datum, void *datap)
+static int cf_check type_bounds_sanity_check(
+    void *key, void *datum, void *datap)
 {
     struct type_datum *upper, *type;
     struct policydb *p = datap;
