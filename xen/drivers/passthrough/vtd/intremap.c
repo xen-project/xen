@@ -142,7 +142,7 @@ static void set_hpet_source_id(unsigned int id, struct iremap_entry *ire)
     set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_13_IGNORE_3, hpetid_to_bdf(id));
 }
 
-bool __init intel_iommu_supports_eim(void)
+bool __init cf_check intel_iommu_supports_eim(void)
 {
     struct acpi_drhd_unit *drhd;
     unsigned int apic;
@@ -414,7 +414,7 @@ static int ioapic_rte_to_remap_entry(struct vtd_iommu *iommu,
     return 0;
 }
 
-unsigned int io_apic_read_remap_rte(
+unsigned int cf_check io_apic_read_remap_rte(
     unsigned int apic, unsigned int reg)
 {
     unsigned int ioapic_pin = (reg - 0x10) / 2;
@@ -438,7 +438,7 @@ unsigned int io_apic_read_remap_rte(
         return (*(((u32 *)&old_rte) + 0));
 }
 
-void io_apic_write_remap_rte(
+void cf_check io_apic_write_remap_rte(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
     unsigned int ioapic_pin = (reg - 0x10) / 2;
@@ -639,7 +639,7 @@ static int msi_msg_to_remap_entry(
     return 0;
 }
 
-int msi_msg_write_remap_rte(
+int cf_check msi_msg_write_remap_rte(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct pci_dev *pdev = msi_desc->dev;
@@ -651,7 +651,7 @@ int msi_msg_write_remap_rte(
                 : -EINVAL;
 }
 
-int __init intel_setup_hpet_msi(struct msi_desc *msi_desc)
+int __init cf_check intel_setup_hpet_msi(struct msi_desc *msi_desc)
 {
     struct vtd_iommu *iommu = hpet_to_iommu(msi_desc->hpet_id);
     unsigned long flags;
@@ -802,7 +802,7 @@ out:
  * This function is used to enable Interrupt remapping when
  * enable x2apic
  */
-int intel_iommu_enable_eim(void)
+int cf_check intel_iommu_enable_eim(void)
 {
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
@@ -856,7 +856,7 @@ int intel_iommu_enable_eim(void)
  * This function is used to disable Interrupt remapping when
  * suspend local apic
  */
-void intel_iommu_disable_eim(void)
+void cf_check intel_iommu_disable_eim(void)
 {
     struct acpi_drhd_unit *drhd;
 

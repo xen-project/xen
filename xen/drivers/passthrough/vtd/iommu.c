@@ -59,7 +59,7 @@ static unsigned int __read_mostly nr_iommus;
 static struct iommu_ops vtd_ops;
 static struct tasklet vtd_fault_tasklet;
 
-static int setup_hwdom_device(u8 devfn, struct pci_dev *);
+static int cf_check setup_hwdom_device(u8 devfn, struct pci_dev *);
 static void setup_hwdom_rmrr(struct domain *d);
 
 static bool domid_mapping(const struct vtd_iommu *iommu)
@@ -426,9 +426,9 @@ static void iommu_flush_write_buffer(struct vtd_iommu *iommu)
 }
 
 /* return value determine if we need a write buffer flush */
-int vtd_flush_context_reg(struct vtd_iommu *iommu, uint16_t did,
-                          uint16_t source_id, uint8_t function_mask,
-                          uint64_t type, bool flush_non_present_entry)
+int cf_check vtd_flush_context_reg(
+    struct vtd_iommu *iommu, uint16_t did, uint16_t source_id,
+    uint8_t function_mask, uint64_t type, bool flush_non_present_entry)
 {
     unsigned long flags;
 
@@ -493,9 +493,10 @@ static int __must_check iommu_flush_context_device(struct vtd_iommu *iommu,
 }
 
 /* return value determine if we need a write buffer flush */
-int vtd_flush_iotlb_reg(struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
-                        unsigned int size_order, uint64_t type,
-                        bool flush_non_present_entry, bool flush_dev_iotlb)
+int cf_check vtd_flush_iotlb_reg(
+    struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
+    unsigned int size_order, uint64_t type, bool flush_non_present_entry,
+    bool flush_dev_iotlb)
 {
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
     uint64_t val = type | DMA_TLB_IVT;
@@ -704,10 +705,9 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
     return ret;
 }
 
-static int __must_check iommu_flush_iotlb_pages(struct domain *d,
-                                                dfn_t dfn,
-                                                unsigned long page_count,
-                                                unsigned int flush_flags)
+static int __must_check cf_check iommu_flush_iotlb_pages(
+    struct domain *d, dfn_t dfn, unsigned long page_count,
+    unsigned int flush_flags)
 {
     ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
     ASSERT(flush_flags);
@@ -716,7 +716,7 @@ static int __must_check iommu_flush_iotlb_pages(struct domain *d,
                              page_count);
 }
 
-static int __must_check iommu_flush_iotlb_all(struct domain *d)
+static int __must_check cf_check iommu_flush_iotlb_all(struct domain *d)
 {
     return iommu_flush_iotlb(d, INVALID_DFN, 0, 0);
 }
@@ -1345,7 +1345,7 @@ void __init iommu_free(struct acpi_drhd_unit *drhd)
         agaw = 64;                              \
     agaw; })
 
-static int intel_iommu_domain_init(struct domain *d)
+static int cf_check intel_iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
@@ -1359,7 +1359,7 @@ static int intel_iommu_domain_init(struct domain *d)
     return 0;
 }
 
-static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
+static void __hwdom_init cf_check intel_iommu_hwdom_init(struct domain *d)
 {
     struct acpi_drhd_unit *drhd;
 
@@ -1808,7 +1808,7 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
     return ret;
 }
 
-static void iommu_clear_root_pgtable(struct domain *d)
+static void cf_check iommu_clear_root_pgtable(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
@@ -1817,7 +1817,7 @@ static void iommu_clear_root_pgtable(struct domain *d)
     spin_unlock(&hd->arch.mapping_lock);
 }
 
-static void iommu_domain_teardown(struct domain *d)
+static void cf_check iommu_domain_teardown(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
     const struct acpi_drhd_unit *drhd;
@@ -1835,9 +1835,9 @@ static void iommu_domain_teardown(struct domain *d)
     XFREE(hd->arch.vtd.iommu_bitmap);
 }
 
-static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,
-                                             mfn_t mfn, unsigned int flags,
-                                             unsigned int *flush_flags)
+static int __must_check cf_check intel_iommu_map_page(
+    struct domain *d, dfn_t dfn, mfn_t mfn, unsigned int flags,
+    unsigned int *flush_flags)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct dma_pte *page, *pte, old, new = {};
@@ -1906,8 +1906,8 @@ static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,
     return rc;
 }
 
-static int __must_check intel_iommu_unmap_page(struct domain *d, dfn_t dfn,
-                                               unsigned int *flush_flags)
+static int __must_check cf_check intel_iommu_unmap_page(
+    struct domain *d, dfn_t dfn, unsigned int *flush_flags)
 {
     /* Do nothing if VT-d shares EPT page table */
     if ( iommu_use_hap_pt(d) )
@@ -1922,8 +1922,8 @@ static int __must_check intel_iommu_unmap_page(struct domain *d, dfn_t dfn,
     return 0;
 }
 
-static int intel_iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
-                                   unsigned int *flags)
+static int cf_check intel_iommu_lookup_page(
+    struct domain *d, dfn_t dfn, mfn_t *mfn, unsigned int *flags)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct dma_pte *page, val;
@@ -1975,7 +1975,7 @@ static int __init vtd_ept_page_compatible(struct vtd_iommu *iommu)
            (ept_has_1gb(ept_cap) && opt_hap_1gb) <= cap_sps_1gb(vtd_cap);
 }
 
-static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
+static int cf_check intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
 {
     struct acpi_rmrr_unit *rmrr;
     u16 bdf;
@@ -2018,7 +2018,7 @@ static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
     return 0;
 }
 
-static int intel_iommu_enable_device(struct pci_dev *pdev)
+static int cf_check intel_iommu_enable_device(struct pci_dev *pdev)
 {
     struct acpi_drhd_unit *drhd = acpi_find_matched_drhd_unit(pdev);
     int ret = drhd ? ats_device(pdev, drhd) : -ENODEV;
@@ -2033,7 +2033,7 @@ static int intel_iommu_enable_device(struct pci_dev *pdev)
     return ret >= 0 ? 0 : ret;
 }
 
-static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
+static int cf_check intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
 {
     struct acpi_rmrr_unit *rmrr;
     u16 bdf;
@@ -2060,7 +2060,8 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     return domain_context_unmap(pdev->domain, devfn, pdev);
 }
 
-static int __hwdom_init setup_hwdom_device(u8 devfn, struct pci_dev *pdev)
+static int __hwdom_init cf_check setup_hwdom_device(
+    u8 devfn, struct pci_dev *pdev)
 {
     return domain_context_mapping(pdev->domain, devfn, pdev);
 }
@@ -2266,7 +2267,7 @@ static struct iommu_state {
     uint32_t fectl;
 } *__read_mostly iommu_state;
 
-static int __init vtd_setup(void)
+static int __init cf_check vtd_setup(void)
 {
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
@@ -2401,7 +2402,7 @@ static int __init vtd_setup(void)
     return ret;
 }
 
-static int reassign_device_ownership(
+static int cf_check reassign_device_ownership(
     struct domain *source,
     struct domain *target,
     u8 devfn, struct pci_dev *pdev)
@@ -2479,7 +2480,7 @@ static int reassign_device_ownership(
     return ret;
 }
 
-static int intel_iommu_assign_device(
+static int cf_check intel_iommu_assign_device(
     struct domain *d, u8 devfn, struct pci_dev *pdev, u32 flag)
 {
     struct domain *s = pdev->domain;
@@ -2561,7 +2562,7 @@ static int intel_iommu_assign_device(
     return ret;
 }
 
-static int intel_iommu_group_id(u16 seg, u8 bus, u8 devfn)
+static int cf_check intel_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 {
     u8 secbus;
 
@@ -2571,7 +2572,7 @@ static int intel_iommu_group_id(u16 seg, u8 bus, u8 devfn)
     return PCI_BDF2(bus, devfn);
 }
 
-static int __must_check vtd_suspend(void)
+static int __must_check cf_check vtd_suspend(void)
 {
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
@@ -2614,7 +2615,7 @@ static int __must_check vtd_suspend(void)
     return 0;
 }
 
-static void vtd_crash_shutdown(void)
+static void cf_check vtd_crash_shutdown(void)
 {
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
@@ -2635,7 +2636,7 @@ static void vtd_crash_shutdown(void)
     }
 }
 
-static void vtd_resume(void)
+static void cf_check vtd_resume(void)
 {
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
@@ -2713,7 +2714,7 @@ static void vtd_dump_page_table_level(paddr_t pt_maddr, int level, paddr_t gpa,
     unmap_vtd_domain_page(pt_vaddr);
 }
 
-static void vtd_dump_page_tables(struct domain *d)
+static void cf_check vtd_dump_page_tables(struct domain *d)
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
@@ -2723,7 +2724,7 @@ static void vtd_dump_page_tables(struct domain *d)
                               agaw_to_level(hd->arch.vtd.agaw), 0, 0);
 }
 
-static int __init intel_iommu_quarantine_init(struct domain *d)
+static int __init cf_check intel_iommu_quarantine_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct page_info *pg;

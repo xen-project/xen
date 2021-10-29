@@ -349,7 +349,7 @@ static int update_intremap_entry_from_ioapic(
     return 0;
 }
 
-void amd_iommu_ioapic_update_ire(
+void cf_check amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
     struct IO_APIC_route_entry old_rte = { 0 };
@@ -455,7 +455,7 @@ void amd_iommu_ioapic_update_ire(
     }
 }
 
-unsigned int amd_iommu_read_ioapic_from_ire(
+unsigned int cf_check amd_iommu_read_ioapic_from_ire(
     unsigned int apic, unsigned int reg)
 {
     unsigned int idx;
@@ -608,7 +608,7 @@ static struct amd_iommu *_find_iommu_for_device(int seg, int bdf)
     return ERR_PTR(-EINVAL);
 }
 
-int amd_iommu_msi_msg_update_ire(
+int cf_check amd_iommu_msi_msg_update_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct pci_dev *pdev = msi_desc->dev;
@@ -653,7 +653,7 @@ int amd_iommu_msi_msg_update_ire(
     return rc;
 }
 
-int amd_iommu_free_intremap_table(
+int cf_check amd_iommu_free_intremap_table(
     const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping,
     uint16_t bdf)
 {
@@ -727,7 +727,7 @@ void *amd_iommu_alloc_intremap_table(
     return tb;
 }
 
-bool __init iov_supports_xt(void)
+bool __init cf_check iov_supports_xt(void)
 {
     unsigned int apic;
 
@@ -756,7 +756,7 @@ bool __init iov_supports_xt(void)
     return true;
 }
 
-int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
+int __init cf_check amd_setup_hpet_msi(struct msi_desc *msi_desc)
 {
     const struct amd_iommu *iommu;
     spinlock_t *lock;
@@ -826,9 +826,9 @@ static void dump_intremap_table(const struct amd_iommu *iommu,
     }
 }
 
-static int dump_intremap_mapping(const struct amd_iommu *iommu,
-                                 struct ivrs_mappings *ivrs_mapping,
-                                 uint16_t unused)
+static int cf_check dump_intremap_mapping(
+    const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping,
+    uint16_t unused)
 {
     unsigned long flags;
 

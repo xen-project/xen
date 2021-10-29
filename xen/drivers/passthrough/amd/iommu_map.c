@@ -276,8 +276,9 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     return 0;
 }
 
-int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
-                       unsigned int flags, unsigned int *flush_flags)
+int cf_check amd_iommu_map_page(
+    struct domain *d, dfn_t dfn, mfn_t mfn, unsigned int flags,
+    unsigned int *flush_flags)
 {
     struct domain_iommu *hd = dom_iommu(d);
     int rc;
@@ -326,8 +327,8 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     return 0;
 }
 
-int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
-                         unsigned int *flush_flags)
+int cf_check amd_iommu_unmap_page(
+    struct domain *d, dfn_t dfn, unsigned int *flush_flags)
 {
     unsigned long pt_mfn = 0;
     struct domain_iommu *hd = dom_iommu(d);
@@ -370,9 +371,9 @@ static unsigned long flush_count(unsigned long dfn, unsigned long page_count,
     return end - start;
 }
 
-int amd_iommu_flush_iotlb_pages(struct domain *d, dfn_t dfn,
-                                unsigned long page_count,
-                                unsigned int flush_flags)
+int cf_check amd_iommu_flush_iotlb_pages(
+    struct domain *d, dfn_t dfn, unsigned long page_count,
+    unsigned int flush_flags)
 {
     unsigned long dfn_l = dfn_x(dfn);
 
@@ -410,7 +411,7 @@ int amd_iommu_flush_iotlb_pages(struct domain *d, dfn_t dfn,
     return 0;
 }
 
-int amd_iommu_flush_iotlb_all(struct domain *d)
+int cf_check amd_iommu_flush_iotlb_all(struct domain *d)
 {
     amd_iommu_flush_all_pages(d);
 
@@ -462,7 +463,8 @@ int amd_iommu_reserve_domain_unity_unmap(struct domain *d,
     return rc;
 }
 
-int amd_iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
+int cf_check amd_iommu_get_reserved_device_memory(
+    iommu_grdm_t *func, void *ctxt)
 {
     unsigned int seg = 0 /* XXX */, bdf;
     const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
@@ -537,7 +539,7 @@ int amd_iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
     return 0;
 }
 
-int __init amd_iommu_quarantine_init(struct domain *d)
+int __init cf_check amd_iommu_quarantine_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
     unsigned long end_gfn =
