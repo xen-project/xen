@@ -351,8 +351,8 @@ typedef struct {
 ZSTD_customMem ZSTD_initStack(void *workspace, size_t workspaceSize);
 
 void *ZSTD_stackAllocAll(void *opaque, size_t *size);
-void *ZSTD_stackAlloc(void *opaque, size_t size);
-void ZSTD_stackFree(void *opaque, void *address);
+void *cf_check ZSTD_stackAlloc(void *opaque, size_t size);
+void cf_check ZSTD_stackFree(void *opaque, void *address);
 
 /*======  common function  ======*/
 

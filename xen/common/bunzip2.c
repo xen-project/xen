@@ -607,7 +607,7 @@ decode_next_byte:
 	goto decode_next_byte;
 }
 
-static int __init nofill(void *buf, unsigned int len)
+static int __init cf_check nofill(void *buf, unsigned int len)
 {
 	return -1;
 }

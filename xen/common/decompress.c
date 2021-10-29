@@ -3,7 +3,7 @@
 #include <xen/string.h>
 #include <xen/decompress.h>
 
-static void __init error(const char *msg)
+static void __init cf_check error(const char *msg)
 {
     printk("%s\n", msg);
 }

@@ -76,7 +76,7 @@ struct rc {
 #define RC_MODEL_TOTAL_BITS 11
 
 
-static int __init nofill(void *buffer, unsigned int len)
+static int __init cf_check nofill(void *buffer, unsigned int len)
 {
 	return -1;
 }

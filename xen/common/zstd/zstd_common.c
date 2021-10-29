@@ -54,12 +54,12 @@ void *__init ZSTD_stackAllocAll(void *opaque, size_t *size)
 	return stack_push(stack, *size);
 }
 
-void *__init ZSTD_stackAlloc(void *opaque, size_t size)
+void *__init cf_check ZSTD_stackAlloc(void *opaque, size_t size)
 {
 	ZSTD_stack *stack = (ZSTD_stack *)opaque;
 	return stack_push(stack, size);
 }
-void __init ZSTD_stackFree(void *opaque, void *address)
+void __init cf_check ZSTD_stackFree(void *opaque, void *address)
 {
 	(void)opaque;
 	(void)address;
