@@ -17,7 +17,7 @@
 
 #define vlfb_info    vga_console_info.u.vesa_lfb
 
-static void lfb_flush(void);
+static void cf_check lfb_flush(void);
 
 static unsigned char *__read_mostly lfb;
 static const struct font_desc *__initdata font;
@@ -140,7 +140,7 @@ void __init vesa_init(void)
     video_puts = lfb_redraw_puts;
 }
 
-static void lfb_flush(void)
+static void cf_check lfb_flush(void)
 {
     __asm__ __volatile__ ("sfence" : : : "memory");
 }

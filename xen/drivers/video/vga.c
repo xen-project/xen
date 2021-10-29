@@ -19,8 +19,8 @@ static int vgacon_keep;
 static unsigned int xpos, ypos;
 static unsigned char *video;
 
-static void vga_text_puts(const char *s, size_t nr);
-static void vga_noop_puts(const char *s, size_t nr) {}
+static void cf_check vga_text_puts(const char *s, size_t nr);
+static void cf_check vga_noop_puts(const char *s, size_t nr) {}
 void (*video_puts)(const char *, size_t nr) = vga_noop_puts;
 
 /*
@@ -179,7 +179,7 @@ void __init video_endboot(void)
     }
 }
 
-static void vga_text_puts(const char *s, size_t nr)
+static void cf_check vga_text_puts(const char *s, size_t nr)
 {
     for ( ; nr > 0; nr--, s++ )
     {

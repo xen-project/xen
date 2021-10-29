@@ -53,7 +53,7 @@ static void lfb_show_line(
 }
 
 /* Fast mode which redraws all modified parts of a 2D text buffer. */
-void lfb_redraw_puts(const char *s, size_t nr)
+void cf_check lfb_redraw_puts(const char *s, size_t nr)
 {
     unsigned int i, min_redraw_y = lfb.ypos;
 
@@ -98,7 +98,7 @@ void lfb_redraw_puts(const char *s, size_t nr)
 }
 
 /* Slower line-based scroll mode which interacts better with dom0. */
-void lfb_scroll_puts(const char *s, size_t nr)
+void cf_check lfb_scroll_puts(const char *s, size_t nr)
 {
     unsigned int i;
 
