@@ -476,7 +476,7 @@ static void __init dmi_save_ident(const struct dmi_header *dm, int slot, int str
 #define NO_MATCH	{ DMI_NONE, NULL}
 #define MATCH		DMI_MATCH
 
-static int __init ich10_bios_quirk(const struct dmi_system_id *d)
+static int __init cf_check ich10_bios_quirk(const struct dmi_system_id *d)
 {
     u32 port, smictl;
 
@@ -499,14 +499,14 @@ static int __init ich10_bios_quirk(const struct dmi_system_id *d)
     return 0;
 }
 
-static __init int reset_videomode_after_s3(const struct dmi_blacklist *d)
+static __init int cf_check reset_videomode_after_s3(const struct dmi_blacklist *d)
 {
 	/* See wakeup.S */
 	acpi_video_flags |= 2;
 	return 0;
 }
 
-static __init int dmi_disable_acpi(const struct dmi_blacklist *d)
+static __init int cf_check dmi_disable_acpi(const struct dmi_blacklist *d)
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: acpi off\n",d->ident);
@@ -521,7 +521,7 @@ static __init int dmi_disable_acpi(const struct dmi_blacklist *d)
 /*
  * Limit ACPI to CPU enumeration for HT
  */
-static __init int force_acpi_ht(const struct dmi_blacklist *d)
+static __init int cf_check force_acpi_ht(const struct dmi_blacklist *d)
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: force use of acpi=ht\n", d->ident);
@@ -650,7 +650,7 @@ static const struct dmi_blacklist __initconstrel dmi_blacklist[] = {
  *	out of here.
  */
 
-static void __init dmi_decode(const struct dmi_header *dm)
+static void __init cf_check dmi_decode(const struct dmi_header *dm)
 {
 #ifdef DMI_DEBUG
 	const uint8_t *data = (const void *)dm;

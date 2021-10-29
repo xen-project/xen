@@ -62,7 +62,7 @@ static int __init cf_check parse_mmcfg(const char *s)
 }
 custom_param("mmcfg", parse_mmcfg);
 
-static const char __init *pci_mmcfg_e7520(void)
+static const char *__init cf_check pci_mmcfg_e7520(void)
 {
     u32 win;
     win = pci_conf_read16(PCI_SBDF(0, 0, 0, 0), 0xce);
@@ -84,7 +84,7 @@ static const char __init *pci_mmcfg_e7520(void)
     return "Intel Corporation E7520 Memory Controller Hub";
 }
 
-static const char __init *pci_mmcfg_intel_945(void)
+static const char *__init cf_check pci_mmcfg_intel_945(void)
 {
     u32 pciexbar, mask = 0, len = 0;
 
@@ -137,7 +137,7 @@ static const char __init *pci_mmcfg_intel_945(void)
     return "Intel Corporation 945G/GZ/P/PL Express Memory Controller Hub";
 }
 
-static const char __init *pci_mmcfg_amd_fam10h(void)
+static const char *__init cf_check pci_mmcfg_amd_fam10h(void)
 {
     uint32_t address;
     uint64_t base, msr_content;
@@ -190,7 +190,7 @@ static const char __init *pci_mmcfg_amd_fam10h(void)
     return "AMD Family 10h NB";
 }
 
-static const char __init *pci_mmcfg_nvidia_mcp55(void)
+static const char *__init cf_check pci_mmcfg_nvidia_mcp55(void)
 {
     static bool_t __initdata mcp55_checked;
     int bus, i;

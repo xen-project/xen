@@ -25,7 +25,7 @@
 s8 __read_mostly hvm_port80_allowed = -1;
 boolean_param("hvm_port80", hvm_port80_allowed);
 
-static int __init dmi_hvm_deny_port80(const struct dmi_system_id *id)
+static int __init cf_check dmi_hvm_deny_port80(const struct dmi_system_id *id)
 {
     printk(XENLOG_WARNING "%s: port 0x80 access %s allowed for HVM guests\n",
            id->ident, hvm_port80_allowed > 0 ? "forcibly" : "not");

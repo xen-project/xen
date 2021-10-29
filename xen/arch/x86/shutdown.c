@@ -158,7 +158,7 @@ static void default_reboot_type(void)
         reboot_type = BOOT_ACPI;
 }
 
-static int __init override_reboot(const struct dmi_system_id *d)
+static int __init cf_check override_reboot(const struct dmi_system_id *d)
 {
     enum reboot_type type = (long)d->driver_data;
 
