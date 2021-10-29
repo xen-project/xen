@@ -263,8 +263,8 @@ static void debugtrace_alloc_buffer(struct debugtrace_data **ptr,
     *ptr = data;
 }
 
-static int debugtrace_cpu_callback(struct notifier_block *nfb,
-                                   unsigned long action, void *hcpu)
+static int cf_check debugtrace_cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;
 

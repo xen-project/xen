@@ -214,7 +214,7 @@ void softirq_tasklet_init(struct tasklet *t, void (*func)(void *), void *data)
     t->is_softirq = 1;
 }
 
-static int cpu_callback(
+static int cf_check cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;

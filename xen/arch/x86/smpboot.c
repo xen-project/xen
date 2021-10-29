@@ -1112,7 +1112,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     return rc;
 }
 
-static int cpu_smpboot_callback(
+static int cf_check cpu_smpboot_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;

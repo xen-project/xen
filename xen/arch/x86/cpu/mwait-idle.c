@@ -1275,8 +1275,8 @@ static int __init mwait_idle_probe(void)
 	return 0;
 }
 
-static int mwait_idle_cpu_init(struct notifier_block *nfb,
-			       unsigned long action, void *hcpu)
+static int cf_check mwait_idle_cpu_init(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu, cstate;
 	struct acpi_processor_power *dev = processor_powers[cpu];

@@ -91,7 +91,7 @@ cpufreq_userspace_handle_option(const char *name, const char *val)
     return 0;
 }
 
-static int cpufreq_userspace_cpu_callback(
+static int cf_check cpufreq_userspace_cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;

@@ -1642,7 +1642,7 @@ static void psr_cpu_fini(unsigned int cpu)
         free_socket_resources(socket);
 }
 
-static int cpu_callback(
+static int cf_check cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     int rc = 0;

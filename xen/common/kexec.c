@@ -531,7 +531,7 @@ static int kexec_init_cpu_notes(const unsigned long cpu)
     return ret;
 }
 
-static int cpu_callback(
+static int cf_check cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned long cpu = (unsigned long)hcpu;

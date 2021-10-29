@@ -63,7 +63,7 @@ static void free_percpu_area(unsigned int cpu)
     call_rcu(&info->rcu, _free_percpu_area);
 }
 
-static int cpu_percpu_callback(
+static int cf_check cpu_percpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;

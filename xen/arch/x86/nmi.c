@@ -427,7 +427,7 @@ void setup_apic_nmi_watchdog(void)
     nmi_active = 1;
 }
 
-static int cpu_nmi_callback(
+static int cf_check cpu_nmi_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;

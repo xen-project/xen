@@ -1622,7 +1622,7 @@ bool cpuidle_using_deep_cstate(void)
                                                                : ACPI_STATE_C1);
 }
 
-static int cpu_callback(
+static int cf_check cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;
