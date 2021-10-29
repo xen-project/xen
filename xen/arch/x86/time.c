@@ -1454,7 +1454,7 @@ int cpu_frequency_change(u64 freq)
 static DEFINE_PER_CPU(struct cpu_time_stamp, cpu_calibration);
 
 /* Softirq handler for per-CPU time calibration. */
-static void local_time_calibration(void)
+static void cf_check local_time_calibration(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
     const struct cpu_time_stamp *c = &this_cpu(cpu_calibration);

@@ -1003,7 +1003,7 @@ int arch_pci_clean_pirqs(struct domain *d)
  * Note: 'pt_pirq_softirq_reset' can clear the STATE_SCHED before we get to
  * doing it. If that is the case we let 'pt_pirq_softirq_reset' do ref-counting.
  */
-static void dpci_softirq(void)
+static void cf_check dpci_softirq(void)
 {
     unsigned int cpu = smp_processor_id();
     LIST_HEAD(our_list);

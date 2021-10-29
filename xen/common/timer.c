@@ -450,7 +450,7 @@ static void execute_timer(struct timers *ts, struct timer *t)
 }
 
 
-static void timer_softirq_action(void)
+static void cf_check timer_softirq_action(void)
 {
     struct timer  *t, **heap, *next;
     struct timers *ts;

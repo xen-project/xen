@@ -135,7 +135,7 @@ void do_tasklet(void)
 }
 
 /* Softirq context work */
-static void tasklet_softirq_action(void)
+static void cf_check tasklet_softirq_action(void)
 {
     unsigned int cpu = smp_processor_id();
     struct list_head *list = &per_cpu(softirq_tasklet_list, cpu);

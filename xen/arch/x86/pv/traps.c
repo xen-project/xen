@@ -130,7 +130,7 @@ bool set_guest_nmi_trapbounce(void)
 
 static DEFINE_PER_CPU(struct vcpu *, softirq_nmi_vcpu);
 
-static void nmi_softirq(void)
+static void cf_check nmi_softirq(void)
 {
     struct vcpu **v_ptr = &this_cpu(softirq_nmi_vcpu);
 

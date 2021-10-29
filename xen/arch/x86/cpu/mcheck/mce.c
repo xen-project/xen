@@ -1837,7 +1837,7 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
 }
 
 /* Softirq Handler for this MCE# processing */
-static void mce_softirq(void)
+static void cf_check mce_softirq(void)
 {
     static DEFINE_MCE_BARRIER(mce_inside_bar);
     static DEFINE_MCE_BARRIER(mce_severity_bar);

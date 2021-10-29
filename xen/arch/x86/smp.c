@@ -290,7 +290,7 @@ void flush_area_mask(const cpumask_t *mask, const void *va, unsigned int flags)
 }
 
 /* Call with no locks held and interrupts enabled (e.g., softirq context). */
-void new_tlbflush_clock_period(void)
+void cf_check new_tlbflush_clock_period(void)
 {
     cpumask_t allbutself;
 

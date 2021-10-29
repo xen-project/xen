@@ -2568,7 +2568,7 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
     return prev->next_task;
 }
 
-static void sched_slave(void)
+static void cf_check sched_slave(void)
 {
     struct vcpu          *v, *vprev = current;
     struct sched_unit    *prev = vprev->sched_unit, *next;
@@ -2632,7 +2632,7 @@ static void sched_slave(void)
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
  */
-static void schedule(void)
+static void cf_check schedule(void)
 {
     struct vcpu          *vnext, *vprev = current;
     struct sched_unit    *prev = vprev->sched_unit, *next = NULL;
@@ -2928,7 +2928,7 @@ const cpumask_t *sched_get_opt_cpumask(enum sched_gran opt, unsigned int cpu)
     return mask;
 }
 
-static void schedule_dummy(void)
+static void cf_check schedule_dummy(void)
 {
     sched_tasklet_check_cpu(smp_processor_id());
 }

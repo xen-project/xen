@@ -466,7 +466,7 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
         rcu_do_batch(rdp);
 }
 
-static void rcu_process_callbacks(void)
+static void cf_check rcu_process_callbacks(void)
 {
     struct rcu_data *rdp = &this_cpu(rcu_data);
 

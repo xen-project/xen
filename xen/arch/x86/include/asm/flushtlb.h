@@ -87,7 +87,7 @@ static inline void tlbflush_filter(cpumask_t *mask, uint32_t page_timestamp)
             __cpumask_clear_cpu(cpu, mask);
 }
 
-void new_tlbflush_clock_period(void);
+void cf_check new_tlbflush_clock_period(void);
 
 /* Read pagetable base. */
 static inline unsigned long read_cr3(void)

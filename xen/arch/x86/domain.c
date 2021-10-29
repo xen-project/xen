@@ -2524,7 +2524,7 @@ void vcpu_mark_events_pending(struct vcpu *v)
         vcpu_kick(v);
 }
 
-static void vcpu_kick_softirq(void)
+static void cf_check vcpu_kick_softirq(void)
 {
     /*
      * Nothing to do here: we merely prevent notifiers from racing with checks
