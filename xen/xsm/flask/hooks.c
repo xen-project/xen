@@ -1816,7 +1816,6 @@ static const struct xsm_ops __initconstrel flask_ops = {
     .page_offline = flask_page_offline,
     .hypfs_op = flask_hypfs_op,
     .hvm_param = flask_hvm_param,
-    .hvm_control = flask_hvm_param,
     .hvm_param_altp2mhvm = flask_hvm_param_altp2mhvm,
     .hvm_altp2mhvm_op = flask_hvm_altp2mhvm_op,
 
