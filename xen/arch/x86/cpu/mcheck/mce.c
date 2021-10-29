@@ -75,7 +75,7 @@ static int __init cf_check mce_set_verbosity(const char *str)
 custom_param("mce_verbosity", mce_set_verbosity);
 
 /* Handle unconfigured int18 (should never happen) */
-static void unexpected_machine_check(const struct cpu_user_regs *regs)
+static void cf_check unexpected_machine_check(const struct cpu_user_regs *regs)
 {
     console_force_unlock();
     printk("Unexpected Machine Check Exception\n");
@@ -469,7 +469,7 @@ static int mce_urgent_action(const struct cpu_user_regs *regs,
 }
 
 /* Shared #MC handler. */
-void mcheck_cmn_handler(const struct cpu_user_regs *regs)
+void cf_check mcheck_cmn_handler(const struct cpu_user_regs *regs)
 {
     static DEFINE_MCE_BARRIER(mce_trap_bar);
     static atomic_t severity_cpu = ATOMIC_INIT(-1);
@@ -1684,7 +1684,7 @@ long cf_check do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 }
 
 int mcinfo_dumpped;
-static int x86_mcinfo_dump_panic(mctelem_cookie_t mctc)
+static int cf_check x86_mcinfo_dump_panic(mctelem_cookie_t mctc)
 {
     struct mc_info *mcip = mctelem_dataptr(mctc);
 
@@ -1801,7 +1801,7 @@ static enum mce_result mce_action(const struct cpu_user_regs *regs,
  * should be committed for dom0 consumption, 0 if it should be
  * dismissed.
  */
-static int mce_delayed_action(mctelem_cookie_t mctc)
+static int cf_check mce_delayed_action(mctelem_cookie_t mctc)
 {
     enum mce_result result;
     int ret = 0;

@@ -271,12 +271,13 @@ static void intel_memerr_dhandler(
     mc_memerr_dhandler(binfo, result, regs);
 }
 
-static bool intel_srar_check(uint64_t status)
+static bool cf_check intel_srar_check(uint64_t status)
 {
     return (intel_check_mce_type(status) == intel_mce_ucr_srar);
 }
 
-static bool intel_checkaddr(uint64_t status, uint64_t misc, int addrtype)
+static bool cf_check intel_checkaddr(
+    uint64_t status, uint64_t misc, int addrtype)
 {
     if ( !(status & MCi_STATUS_ADDRV) ||
          !(status & MCi_STATUS_MISCV) ||
@@ -287,10 +288,9 @@ static bool intel_checkaddr(uint64_t status, uint64_t misc, int addrtype)
     return (addrtype == MC_ADDR_PHYSICAL);
 }
 
-static void intel_srar_dhandler(
-             struct mca_binfo *binfo,
-             enum mce_result *result,
-             const struct cpu_user_regs *regs)
+static void cf_check intel_srar_dhandler(
+    struct mca_binfo *binfo, enum mce_result *result,
+    const struct cpu_user_regs *regs)
 {
     uint64_t status = binfo->mib->mc_status;
 
@@ -306,15 +306,14 @@ static void intel_srar_dhandler(
     }
 }
 
-static bool intel_srao_check(uint64_t status)
+static bool cf_check intel_srao_check(uint64_t status)
 {
     return (intel_check_mce_type(status) == intel_mce_ucr_srao);
 }
 
-static void intel_srao_dhandler(
-             struct mca_binfo *binfo,
-             enum mce_result *result,
-             const struct cpu_user_regs *regs)
+static void cf_check intel_srao_dhandler(
+    struct mca_binfo *binfo, enum mce_result *result,
+    const struct cpu_user_regs *regs)
 {
     uint64_t status = binfo->mib->mc_status;
 
@@ -333,15 +332,14 @@ static void intel_srao_dhandler(
     }
 }
 
-static bool intel_default_check(uint64_t status)
+static bool cf_check intel_default_check(uint64_t status)
 {
     return true;
 }
 
-static void intel_default_mce_dhandler(
-             struct mca_binfo *binfo,
-             enum mce_result *result,
-             const struct cpu_user_regs * regs)
+static void cf_check intel_default_mce_dhandler(
+    struct mca_binfo *binfo, enum mce_result *result,
+    const struct cpu_user_regs * regs)
 {
     uint64_t status = binfo->mib->mc_status;
     enum intel_mce_type type;
@@ -360,10 +358,9 @@ static const struct mca_error_handler intel_mce_dhandlers[] = {
     {intel_default_check, intel_default_mce_dhandler}
 };
 
-static void intel_default_mce_uhandler(
-             struct mca_binfo *binfo,
-             enum mce_result *result,
-             const struct cpu_user_regs *regs)
+static void cf_check intel_default_mce_uhandler(
+    struct mca_binfo *binfo, enum mce_result *result,
+    const struct cpu_user_regs *regs)
 {
     uint64_t status = binfo->mib->mc_status;
     enum intel_mce_type type;
@@ -396,7 +393,7 @@ static const struct mca_error_handler intel_mce_uhandlers[] = {
  * 3) ser_support = 1, SRAO, UC = 1, S = 1, AR = 0, [EN = 1]
  */
 
-static bool intel_need_clearbank_scan(enum mca_source who, u64 status)
+static bool cf_check intel_need_clearbank_scan(enum mca_source who, u64 status)
 {
     if ( who == MCA_CMCI_HANDLER )
     {
@@ -453,7 +450,7 @@ static bool intel_need_clearbank_scan(enum mca_source who, u64 status)
  * 4) SRAO ser_support = 1, PCC = 0, S = 1, AR = 0, EN = 1 [UC = 1]
  * 5) UCNA ser_support = 1, OVER = 0, EN = 1, PCC = 0, S = 0, AR = 0, [UC = 1]
  */
-static bool intel_recoverable_scan(uint64_t status)
+static bool cf_check intel_recoverable_scan(uint64_t status)
 {
 
     if ( !(status & MCi_STATUS_UC ) )

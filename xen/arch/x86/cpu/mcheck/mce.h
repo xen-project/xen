@@ -70,7 +70,7 @@ extern void x86_mce_vector_register(x86_mce_vector_t);
  * Common generic MCE handler that implementations may nominate
  * via x86_mce_vector_register.
  */
-extern void mcheck_cmn_handler(const struct cpu_user_regs *regs);
+void cf_check mcheck_cmn_handler(const struct cpu_user_regs *regs);
 
 /* Register a handler for judging whether mce is recoverable. */
 typedef bool (*mce_recoverable_t)(uint64_t status);

@@ -113,7 +113,7 @@ mc_ec2type(uint16_t errorcode)
     return 0;
 }
 
-bool mc_amd_recoverable_scan(uint64_t status)
+bool cf_check mc_amd_recoverable_scan(uint64_t status)
 {
     bool ret = false;
     enum mc_ec_type ectype;
@@ -143,7 +143,7 @@ bool mc_amd_recoverable_scan(uint64_t status)
     return ret;
 }
 
-bool mc_amd_addrcheck(uint64_t status, uint64_t misc, int addrtype)
+bool cf_check mc_amd_addrcheck(uint64_t status, uint64_t misc, int addrtype)
 {
     enum mc_ec_type ectype;
     uint16_t errorcode;
@@ -216,7 +216,7 @@ static void mcequirk_amd_apply(enum mcequirk_amd_flags flags)
     }
 }
 
-static struct mcinfo_extended *
+static struct mcinfo_extended *cf_check
 amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 {
     struct mcinfo_extended *mc_ext;
@@ -252,7 +252,8 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
     return mc_ext;
 }
 
-static bool amd_need_clearbank_scan(enum mca_source who, uint64_t status)
+static bool cf_check amd_need_clearbank_scan(
+    enum mca_source who, uint64_t status)
 {
     if ( who != MCA_MCE_SCAN )
         return true;
