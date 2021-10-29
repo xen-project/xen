@@ -351,7 +351,7 @@ void pv_domain_destroy(struct domain *d)
     FREE_XENHEAP_PAGE(d->arch.pv.gdt_ldt_l1tab);
 }
 
-void noreturn continue_pv_domain(void);
+void noreturn cf_check continue_pv_domain(void);
 
 int pv_domain_initialise(struct domain *d)
 {

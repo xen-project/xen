@@ -173,7 +173,6 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 #define switch_stack_and_jump(fn, instr, constr)                        \
     ({                                                                  \
         unsigned int tmp;                                               \
-        (void)((fn) == (void (*)(void))NULL);                           \
         BUILD_BUG_ON(!ssaj_has_attr_noreturn(fn));                      \
         __asm__ __volatile__ (                                          \
             SHADOW_STACK_WORK                                           \
@@ -198,7 +197,10 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 
 /* The constraint may only specify non-call-clobbered registers. */
 #define reset_stack_and_jump_ind(fn)                                    \
-    switch_stack_and_jump(fn, "INDIRECT_JMP %", "b")
+    ({                                                                  \
+        (void)((fn) == (void (*)(void))NULL);                           \
+        switch_stack_and_jump(fn, "INDIRECT_JMP %", "b");               \
+    })
 
 /*
  * Which VCPU's state is currently running on each CPU?

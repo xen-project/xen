@@ -625,6 +625,7 @@ ENTRY(dom_crash_sync_extable)
 /* No special register assumptions. */
 #ifdef CONFIG_PV
 ENTRY(continue_pv_domain)
+        ENDBR64
         call  check_wakeup_from_wait
 ret_from_intr:
         GET_CURRENT(bx)

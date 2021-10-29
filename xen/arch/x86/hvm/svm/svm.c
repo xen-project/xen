@@ -944,7 +944,7 @@ static inline void svm_tsc_ratio_load(struct vcpu *v)
         wrmsrl(MSR_AMD64_TSC_RATIO, hvm_tsc_scaling_ratio(v->domain));
 }
 
-static void svm_ctxt_switch_from(struct vcpu *v)
+static void cf_check svm_ctxt_switch_from(struct vcpu *v)
 {
     int cpu = smp_processor_id();
 
@@ -969,7 +969,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     enable_each_ist(idt_tables[cpu]);
 }
 
-static void svm_ctxt_switch_to(struct vcpu *v)
+static void cf_check svm_ctxt_switch_to(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     int cpu = smp_processor_id();
@@ -996,7 +996,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
         wrmsr_tsc_aux(v->arch.msrs->tsc_aux);
 }
 
-static void noreturn svm_do_resume(void)
+static void noreturn cf_check svm_do_resume(void)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;

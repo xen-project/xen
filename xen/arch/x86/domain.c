@@ -132,7 +132,7 @@ void play_dead(void)
         dead_idle();
 }
 
-static void noreturn idle_loop(void)
+static void noreturn cf_check idle_loop(void)
 {
     unsigned int cpu = smp_processor_id();
     /*
@@ -1791,7 +1791,7 @@ static void save_segments(struct vcpu *v)
     }
 }
 
-void paravirt_ctxt_switch_from(struct vcpu *v)
+void cf_check paravirt_ctxt_switch_from(struct vcpu *v)
 {
     save_segments(v);
 
@@ -1805,7 +1805,7 @@ void paravirt_ctxt_switch_from(struct vcpu *v)
         write_debugreg(7, 0);
 }
 
-void paravirt_ctxt_switch_to(struct vcpu *v)
+void cf_check paravirt_ctxt_switch_to(struct vcpu *v)
 {
     root_pgentry_t *root_pgt = this_cpu(root_pgt);
 

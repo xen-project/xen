@@ -63,8 +63,8 @@
 static bool_t __initdata opt_force_ept;
 boolean_param("force-ept", opt_force_ept);
 
-static void vmx_ctxt_switch_from(struct vcpu *v);
-static void vmx_ctxt_switch_to(struct vcpu *v);
+static void cf_check vmx_ctxt_switch_from(struct vcpu *v);
+static void cf_check vmx_ctxt_switch_to(struct vcpu *v);
 
 static int alloc_vlapic_mapping(void);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
@@ -907,7 +907,7 @@ static void cf_check vmx_fpu_leave(struct vcpu *v)
     }
 }
 
-static void vmx_ctxt_switch_from(struct vcpu *v)
+static void cf_check vmx_ctxt_switch_from(struct vcpu *v)
 {
     /*
      * Return early if trying to do a context switch without VMX enabled,
@@ -939,7 +939,7 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
         vmx_pi_switch_from(v);
 }
 
-static void vmx_ctxt_switch_to(struct vcpu *v)
+static void cf_check vmx_ctxt_switch_to(struct vcpu *v)
 {
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);

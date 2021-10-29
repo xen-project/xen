@@ -118,8 +118,8 @@ static inline void pv_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 
 #endif	/* CONFIG_PV */
 
-void paravirt_ctxt_switch_from(struct vcpu *v);
-void paravirt_ctxt_switch_to(struct vcpu *v);
+void cf_check paravirt_ctxt_switch_from(struct vcpu *v);
+void cf_check paravirt_ctxt_switch_to(struct vcpu *v);
 
 #endif	/* __X86_PV_DOMAIN_H__ */
 
