@@ -53,8 +53,8 @@
 
 #include "x86_emulate/x86_emulate.c"
 
-int x86emul_read_xcr(unsigned int reg, uint64_t *val,
-                     struct x86_emulate_ctxt *ctxt)
+int cf_check x86emul_read_xcr(
+    unsigned int reg, uint64_t *val, struct x86_emulate_ctxt *ctxt)
 {
     switch ( reg )
     {
@@ -77,8 +77,8 @@ int x86emul_read_xcr(unsigned int reg, uint64_t *val,
 }
 
 /* Note: May be called with ctxt=NULL. */
-int x86emul_write_xcr(unsigned int reg, uint64_t val,
-                      struct x86_emulate_ctxt *ctxt)
+int cf_check x86emul_write_xcr(
+    unsigned int reg, uint64_t val, struct x86_emulate_ctxt *ctxt)
 {
     switch ( reg )
     {
@@ -100,8 +100,8 @@ int x86emul_write_xcr(unsigned int reg, uint64_t val,
 
 #ifdef CONFIG_PV
 /* Called with NULL ctxt in hypercall context. */
-int x86emul_read_dr(unsigned int reg, unsigned long *val,
-                    struct x86_emulate_ctxt *ctxt)
+int cf_check x86emul_read_dr(
+    unsigned int reg, unsigned long *val, struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
 
@@ -143,8 +143,8 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
     return X86EMUL_OKAY;
 }
 
-int x86emul_write_dr(unsigned int reg, unsigned long val,
-                     struct x86_emulate_ctxt *ctxt)
+int cf_check x86emul_write_dr(
+    unsigned int reg, unsigned long val, struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
 
@@ -167,8 +167,9 @@ int x86emul_write_dr(unsigned int reg, unsigned long val,
 }
 #endif /* CONFIG_PV */
 
-int x86emul_cpuid(uint32_t leaf, uint32_t subleaf,
-                  struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt)
+int cf_check x86emul_cpuid(
+    uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res,
+    struct x86_emulate_ctxt *ctxt)
 {
     guest_cpuid(current, leaf, subleaf, res);
 

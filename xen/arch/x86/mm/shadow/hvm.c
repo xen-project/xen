@@ -148,7 +148,7 @@ hvm_read(enum x86_segment seg,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int
+static int cf_check
 hvm_emulate_read(enum x86_segment seg,
                  unsigned long offset,
                  void *p_data,
@@ -161,7 +161,7 @@ hvm_emulate_read(enum x86_segment seg,
                     container_of(ctxt, struct sh_emulate_ctxt, ctxt));
 }
 
-static int
+static int cf_check
 hvm_emulate_insn_fetch(unsigned long offset,
                        void *p_data,
                        unsigned int bytes,
@@ -181,7 +181,7 @@ hvm_emulate_insn_fetch(unsigned long offset,
     return X86EMUL_OKAY;
 }
 
-static int
+static int cf_check
 hvm_emulate_write(enum x86_segment seg,
                   unsigned long offset,
                   void *p_data,
@@ -234,7 +234,7 @@ hvm_emulate_write(enum x86_segment seg,
     return X86EMUL_OKAY;
 }
 
-static int
+static int cf_check
 hvm_emulate_cmpxchg(enum x86_segment seg,
                     unsigned long offset,
                     void *p_old,

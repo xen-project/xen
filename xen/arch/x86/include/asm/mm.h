@@ -538,16 +538,12 @@ struct mmio_ro_emulate_ctxt {
         unsigned int seg, bdf;
 };
 
-extern int mmio_ro_emulated_write(enum x86_segment seg,
-                                  unsigned long offset,
-                                  void *p_data,
-                                  unsigned int bytes,
-                                  struct x86_emulate_ctxt *ctxt);
-extern int mmcfg_intercept_write(enum x86_segment seg,
-                                 unsigned long offset,
-                                 void *p_data,
-                                 unsigned int bytes,
-                                 struct x86_emulate_ctxt *ctxt);
+int cf_check mmio_ro_emulated_write(
+    enum x86_segment seg, unsigned long offset, void *p_data,
+    unsigned int bytes, struct x86_emulate_ctxt *ctxt);
+int cf_check mmcfg_intercept_write(
+    enum x86_segment seg, unsigned long offset, void *p_data,
+    unsigned int bytes, struct x86_emulate_ctxt *ctxt);
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 

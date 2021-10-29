@@ -92,10 +92,10 @@ static inline bool handle_mmio(void)
     return hvm_emulate_one_insn(x86_insn_is_mem_access, "MMIO");
 }
 
-int hvmemul_insn_fetch(unsigned long offset,
-                       void *p_data,
-                       unsigned int bytes,
-                       struct x86_emulate_ctxt *ctxt);
+int cf_check hvmemul_insn_fetch(
+    unsigned long offset, void *p_data, unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt);
+
 int hvmemul_do_pio_buffer(uint16_t port,
                           unsigned int size,
                           uint8_t dir,

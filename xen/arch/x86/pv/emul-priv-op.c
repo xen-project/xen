@@ -358,8 +358,9 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
     return match;
 }
 
-static int read_io(unsigned int port, unsigned int bytes,
-                   unsigned long *val, struct x86_emulate_ctxt *ctxt)
+static int cf_check read_io(
+    unsigned int port, unsigned int bytes, unsigned long *val,
+    struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
@@ -462,8 +463,9 @@ static void guest_io_write(unsigned int port, unsigned int bytes,
     }
 }
 
-static int write_io(unsigned int port, unsigned int bytes,
-                    unsigned long val, struct x86_emulate_ctxt *ctxt)
+static int cf_check write_io(
+    unsigned int port, unsigned int bytes, unsigned long val,
+    struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
@@ -493,9 +495,9 @@ static int write_io(unsigned int port, unsigned int bytes,
     return X86EMUL_OKAY;
 }
 
-static int read_segment(enum x86_segment seg,
-                        struct segment_register *reg,
-                        struct x86_emulate_ctxt *ctxt)
+static int cf_check read_segment(
+    enum x86_segment seg, struct segment_register *reg,
+    struct x86_emulate_ctxt *ctxt)
 {
     /* Check if this is an attempt to access the I/O bitmap. */
     if ( seg == x86_seg_tr )
@@ -607,10 +609,10 @@ static int pv_emul_virt_to_linear(unsigned long base, unsigned long offset,
     return rc;
 }
 
-static int rep_ins(uint16_t port,
-                   enum x86_segment seg, unsigned long offset,
-                   unsigned int bytes_per_rep, unsigned long *reps,
-                   struct x86_emulate_ctxt *ctxt)
+static int cf_check rep_ins(
+    uint16_t port, enum x86_segment seg, unsigned long offset,
+    unsigned int bytes_per_rep, unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
@@ -675,10 +677,10 @@ static int rep_ins(uint16_t port,
     return X86EMUL_OKAY;
 }
 
-static int rep_outs(enum x86_segment seg, unsigned long offset,
-                    uint16_t port,
-                    unsigned int bytes_per_rep, unsigned long *reps,
-                    struct x86_emulate_ctxt *ctxt)
+static int cf_check rep_outs(
+    enum x86_segment seg, unsigned long offset, uint16_t port,
+    unsigned int bytes_per_rep, unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
@@ -744,8 +746,8 @@ static int rep_outs(enum x86_segment seg, unsigned long offset,
     return X86EMUL_OKAY;
 }
 
-static int read_cr(unsigned int reg, unsigned long *val,
-                   struct x86_emulate_ctxt *ctxt)
+static int cf_check read_cr(
+    unsigned int reg, unsigned long *val, struct x86_emulate_ctxt *ctxt)
 {
     const struct vcpu *curr = current;
 
@@ -787,8 +789,8 @@ static int read_cr(unsigned int reg, unsigned long *val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int write_cr(unsigned int reg, unsigned long val,
-                    struct x86_emulate_ctxt *ctxt)
+static int cf_check write_cr(
+    unsigned int reg, unsigned long val, struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
 
@@ -871,8 +873,8 @@ static uint64_t guest_efer(const struct domain *d)
     return val;
 }
 
-static int read_msr(unsigned int reg, uint64_t *val,
-                    struct x86_emulate_ctxt *ctxt)
+static int cf_check read_msr(
+    unsigned int reg, uint64_t *val, struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
@@ -1020,8 +1022,8 @@ static int read_msr(unsigned int reg, uint64_t *val,
     return ret;
 }
 
-static int write_msr(unsigned int reg, uint64_t val,
-                     struct x86_emulate_ctxt *ctxt)
+static int cf_check write_msr(
+    unsigned int reg, uint64_t val, struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
@@ -1188,8 +1190,9 @@ static int write_msr(unsigned int reg, uint64_t val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int cache_op(enum x86emul_cache_op op, enum x86_segment seg,
-                    unsigned long offset, struct x86_emulate_ctxt *ctxt)
+static int cf_check cache_op(
+    enum x86emul_cache_op op, enum x86_segment seg,
+    unsigned long offset, struct x86_emulate_ctxt *ctxt)
 {
     ASSERT(op == x86emul_wbinvd || op == x86emul_wbnoinvd);
 
@@ -1208,8 +1211,8 @@ static int cache_op(enum x86emul_cache_op op, enum x86_segment seg,
     return X86EMUL_OKAY;
 }
 
-static int validate(const struct x86_emulate_state *state,
-                    struct x86_emulate_ctxt *ctxt)
+static int cf_check validate(
+    const struct x86_emulate_state *state, struct x86_emulate_ctxt *ctxt)
 {
     switch ( ctxt->opcode )
     {
@@ -1258,10 +1261,9 @@ static int validate(const struct x86_emulate_state *state,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int insn_fetch(unsigned long offset,
-                      void *p_data,
-                      unsigned int bytes,
-                      struct x86_emulate_ctxt *ctxt)
+static int cf_check insn_fetch(
+    unsigned long offset, void *p_data, unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
 {
     const struct priv_op_ctxt *poc =
         container_of(ctxt, struct priv_op_ctxt, ctxt);

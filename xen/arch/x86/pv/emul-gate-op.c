@@ -96,8 +96,9 @@ struct gate_op_ctxt {
     bool insn_fetch;
 };
 
-static int read_mem(enum x86_segment seg, unsigned long offset, void *p_data,
-                    unsigned int bytes, struct x86_emulate_ctxt *ctxt)
+static int cf_check read_mem(
+    enum x86_segment seg, unsigned long offset, void *p_data,
+    unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
     const struct gate_op_ctxt *goc =
         container_of(ctxt, struct gate_op_ctxt, ctxt);
@@ -163,8 +164,8 @@ static int read_mem(enum x86_segment seg, unsigned long offset, void *p_data,
     return X86EMUL_OKAY;
 }
 
-static int fetch(unsigned long offset, void *p_data,
-                 unsigned int bytes, struct x86_emulate_ctxt *ctxt)
+static int cf_check fetch(unsigned long offset, void *p_data,
+                          unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
     return read_mem(x86_seg_cs, offset, p_data, bytes, ctxt);
 }

@@ -26,6 +26,13 @@
 #include "emulate.h"
 #include "mm.h"
 
+static int cf_check pv_emul_is_mem_write(
+    const struct x86_emulate_state *state, struct x86_emulate_ctxt *ctxt)
+{
+    return x86_insn_is_mem_write(state, ctxt) ? X86EMUL_OKAY
+                                              : X86EMUL_UNHANDLEABLE;
+}
+
 /*********************
  * Writable Pagetables
  */
@@ -35,9 +42,9 @@ struct ptwr_emulate_ctxt {
     l1_pgentry_t  pte;
 };
 
-static int ptwr_emulated_read(enum x86_segment seg, unsigned long offset,
-                              void *p_data, unsigned int bytes,
-                              struct x86_emulate_ctxt *ctxt)
+static int cf_check ptwr_emulated_read(
+    enum x86_segment seg, unsigned long offset, void *p_data,
+    unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
     unsigned int rc = bytes;
     unsigned long addr = offset;
@@ -52,9 +59,9 @@ static int ptwr_emulated_read(enum x86_segment seg, unsigned long offset,
     return X86EMUL_OKAY;
 }
 
-static int ptwr_emulated_insn_fetch(unsigned long offset,
-                                    void *p_data, unsigned int bytes,
-                                    struct x86_emulate_ctxt *ctxt)
+static int cf_check ptwr_emulated_insn_fetch(
+    unsigned long offset, void *p_data, unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
 {
     unsigned int rc = copy_from_guest_pv(p_data, (void *)offset, bytes);
 
@@ -218,9 +225,9 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
     return X86EMUL_OKAY;
 }
 
-static int ptwr_emulated_write(enum x86_segment seg, unsigned long offset,
-                               void *p_data, unsigned int bytes,
-                               struct x86_emulate_ctxt *ctxt)
+static int cf_check ptwr_emulated_write(
+    enum x86_segment seg, unsigned long offset, void *p_data,
+    unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
     intpte_t val = 0;
 
@@ -236,9 +243,9 @@ static int ptwr_emulated_write(enum x86_segment seg, unsigned long offset,
     return ptwr_emulated_update(offset, NULL, val, bytes, ctxt);
 }
 
-static int ptwr_emulated_cmpxchg(enum x86_segment seg, unsigned long offset,
-                                 void *p_old, void *p_new, unsigned int bytes,
-                                 bool lock, struct x86_emulate_ctxt *ctxt)
+static int cf_check ptwr_emulated_cmpxchg(
+    enum x86_segment seg, unsigned long offset, void *p_old, void *p_new,
+    unsigned int bytes, bool lock, struct x86_emulate_ctxt *ctxt)
 {
     intpte_t old = 0, new = 0;
     int rc;
