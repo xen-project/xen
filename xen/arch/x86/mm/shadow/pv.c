@@ -28,7 +28,7 @@
  * Write a new value into the guest pagetable, and update the shadows
  * appropriately.
  */
-void
+void cf_check
 sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
 {
     paging_lock(v->domain);
@@ -42,7 +42,7 @@ sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
  * appropriately.  Returns the previous entry found, which the caller is
  * expected to check to see if the cmpxchg was successful.
  */
-intpte_t
+intpte_t cf_check
 sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t old,
                        intpte_t new, mfn_t gmfn)
 {

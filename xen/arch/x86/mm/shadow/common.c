@@ -1215,7 +1215,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
  * This action is irreversible: the p2m mapping only ever grows.
  * That's OK because the p2m table only exists for translated domains,
  * and those domains can't ever turn off shadow mode. */
-static struct page_info *
+static struct page_info *cf_check
 shadow_alloc_p2m_page(struct domain *d)
 {
     struct page_info *pg;
@@ -1251,7 +1251,7 @@ shadow_alloc_p2m_page(struct domain *d)
     return pg;
 }
 
-static void
+static void cf_check
 shadow_free_p2m_page(struct domain *d, struct page_info *pg)
 {
     struct domain *owner = page_get_owner(pg);
@@ -2290,7 +2290,8 @@ void shadow_prepare_page_type_change(struct domain *d, struct page_info *page,
 /* Reset the up-pointers of every L3 shadow to 0.
  * This is called when l3 shadows stop being pinnable, to clear out all
  * the list-head bits so the up-pointer field is properly inititalised. */
-static int sh_clear_up_pointer(struct vcpu *v, mfn_t smfn, mfn_t unused)
+static int cf_check sh_clear_up_pointer(
+    struct vcpu *v, mfn_t smfn, mfn_t unused)
 {
     mfn_to_page(smfn)->up = 0;
     return 0;
@@ -2490,7 +2491,7 @@ static void sh_update_paging_modes(struct vcpu *v)
     v->arch.paging.mode->update_cr3(v, 0, false);
 }
 
-void shadow_update_paging_modes(struct vcpu *v)
+void cf_check shadow_update_paging_modes(struct vcpu *v)
 {
     paging_lock(v->domain);
     sh_update_paging_modes(v);
@@ -3075,7 +3076,7 @@ static bool flush_vcpu(const struct vcpu *v, const unsigned long *vcpu_bitmap)
 }
 
 /* Flush TLB of selected vCPUs.  NULL for all. */
-bool shadow_flush_tlb(const unsigned long *vcpu_bitmap)
+bool cf_check shadow_flush_tlb(const unsigned long *vcpu_bitmap)
 {
     static DEFINE_PER_CPU(cpumask_t, flush_cpumask);
     cpumask_t *mask = &this_cpu(flush_cpumask);

@@ -59,10 +59,10 @@ extern void
 SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, GUEST_LEVELS)
     (struct domain *d, mfn_t sl4mfn, int user_only);
 
-extern int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, GUEST_LEVELS)
     (struct domain *d, mfn_t sl1mfn, mfn_t readonly_mfn);
-extern int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, GUEST_LEVELS)
     (struct domain *d, mfn_t sl1mfn, mfn_t target_mfn);
 
@@ -70,30 +70,30 @@ extern void
 SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, GUEST_LEVELS)
     (struct domain *d, void *ep, mfn_t smfn);
 
-extern int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, GUEST_LEVELS)
     (struct domain *d, mfn_t sl2mfn, mfn_t sl1mfn);
-extern int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_remove_l2_shadow, GUEST_LEVELS)
     (struct domain *d, mfn_t sl3mfn, mfn_t sl2mfn);
-extern int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_remove_l3_shadow, GUEST_LEVELS)
     (struct domain *d, mfn_t sl4mfn, mfn_t sl3mfn);
 
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
-int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_l1_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl1mfn, mfn_t x);
-int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_fl1_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl1mfn, mfn_t x);
-int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_l2_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl2mfn, mfn_t x);
-int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_l3_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl3mfn, mfn_t x);
-int
+int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_l4_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl4mfn, mfn_t x);
 #endif

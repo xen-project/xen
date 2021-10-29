@@ -30,34 +30,34 @@ int shadow_domain_init(struct domain *d)
     return is_hvm_domain(d) ? -EOPNOTSUPP : 0;
 }
 
-static int _page_fault(struct vcpu *v, unsigned long va,
-                       struct cpu_user_regs *regs)
+static int cf_check _page_fault(
+    struct vcpu *v, unsigned long va, struct cpu_user_regs *regs)
 {
     ASSERT_UNREACHABLE();
     return 0;
 }
 
-static bool _invlpg(struct vcpu *v, unsigned long linear)
+static bool cf_check _invlpg(struct vcpu *v, unsigned long linear)
 {
     ASSERT_UNREACHABLE();
     return true;
 }
 
 #ifdef CONFIG_HVM
-static unsigned long _gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
-                                 unsigned long va, uint32_t *pfec)
+static unsigned long cf_check _gva_to_gfn(
+    struct vcpu *v, struct p2m_domain *p2m, unsigned long va, uint32_t *pfec)
 {
     ASSERT_UNREACHABLE();
     return gfn_x(INVALID_GFN);
 }
 #endif
 
-static void _update_cr3(struct vcpu *v, int do_locking, bool noflush)
+static void cf_check _update_cr3(struct vcpu *v, int do_locking, bool noflush)
 {
     ASSERT_UNREACHABLE();
 }
 
-static void _update_paging_modes(struct vcpu *v)
+static void cf_check _update_paging_modes(struct vcpu *v)
 {
     ASSERT_UNREACHABLE();
 }

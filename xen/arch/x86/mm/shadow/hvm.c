@@ -794,9 +794,9 @@ sh_remove_all_shadows_and_parents(struct domain *d, mfn_t gmfn)
      * It means extra emulated writes and slows down removal of mappings. */
 }
 
-static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
-                                       l1_pgentry_t old, l1_pgentry_t new,
-                                       unsigned int level)
+static void cf_check sh_unshadow_for_p2m_change(
+    struct domain *d, unsigned long gfn, l1_pgentry_t old, l1_pgentry_t new,
+    unsigned int level)
 {
     mfn_t omfn = l1e_get_mfn(old);
     unsigned int oflags = l1e_get_flags(old);
@@ -879,7 +879,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
 }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH)
-static void
+static void cf_check
 sh_write_p2m_entry_post(struct p2m_domain *p2m, unsigned int oflags)
 {
     struct domain *d = p2m->domain;
