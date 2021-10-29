@@ -282,7 +282,7 @@ static enum psr_feat_type psr_type_to_feat_type(enum psr_type type)
 }
 
 /* Implementation of allocation features' functions. */
-static bool cat_check_cbm(const struct feat_node *feat, uint32_t *val)
+static bool cf_check cat_check_cbm(const struct feat_node *feat, uint32_t *val)
 {
     unsigned int first_bit, zero_bit;
     unsigned int cbm_len = feat->cat.cbm_len;
@@ -417,8 +417,8 @@ static bool mba_init_feature(const struct cpuid_leaf *regs,
     return true;
 }
 
-static bool cat_get_feat_info(const struct feat_node *feat,
-                              uint32_t data[], unsigned int array_len)
+static bool cf_check cat_get_feat_info(
+    const struct feat_node *feat, uint32_t data[], unsigned int array_len)
 {
     if ( array_len != PSR_INFO_ARRAY_SIZE )
         return false;
@@ -431,8 +431,8 @@ static bool cat_get_feat_info(const struct feat_node *feat,
 }
 
 /* L3 CAT props */
-static void l3_cat_write_msr(unsigned int cos, uint32_t val,
-                             enum psr_type type)
+static void cf_check l3_cat_write_msr(
+    unsigned int cos, uint32_t val, enum psr_type type)
 {
     wrmsrl(MSR_IA32_PSR_L3_MASK(cos), val);
 }
@@ -447,8 +447,8 @@ static const struct feat_props l3_cat_props = {
 };
 
 /* L3 CDP props */
-static bool l3_cdp_get_feat_info(const struct feat_node *feat,
-                                 uint32_t data[], uint32_t array_len)
+static bool cf_check l3_cdp_get_feat_info(
+    const struct feat_node *feat, uint32_t data[], uint32_t array_len)
 {
     if ( !cat_get_feat_info(feat, data, array_len) )
         return false;
@@ -458,8 +458,8 @@ static bool l3_cdp_get_feat_info(const struct feat_node *feat,
     return true;
 }
 
-static void l3_cdp_write_msr(unsigned int cos, uint32_t val,
-                             enum psr_type type)
+static void cf_check l3_cdp_write_msr(
+    unsigned int cos, uint32_t val, enum psr_type type)
 {
     wrmsrl(((type == PSR_TYPE_L3_DATA) ?
             MSR_IA32_PSR_L3_MASK_DATA(cos) :
@@ -478,8 +478,8 @@ static const struct feat_props l3_cdp_props = {
 };
 
 /* L2 CAT props */
-static void l2_cat_write_msr(unsigned int cos, uint32_t val,
-                             enum psr_type type)
+static void cf_check l2_cat_write_msr(
+    unsigned int cos, uint32_t val, enum psr_type type)
 {
     wrmsrl(MSR_IA32_PSR_L2_MASK(cos), val);
 }
@@ -494,8 +494,8 @@ static const struct feat_props l2_cat_props = {
 };
 
 /* MBA props */
-static bool mba_get_feat_info(const struct feat_node *feat,
-                              uint32_t data[], unsigned int array_len)
+static bool cf_check mba_get_feat_info(
+    const struct feat_node *feat, uint32_t data[], unsigned int array_len)
 {
     ASSERT(array_len == PSR_INFO_ARRAY_SIZE);
 
@@ -508,13 +508,14 @@ static bool mba_get_feat_info(const struct feat_node *feat,
     return true;
 }
 
-static void mba_write_msr(unsigned int cos, uint32_t val,
-                          enum psr_type type)
+static void cf_check mba_write_msr(
+    unsigned int cos, uint32_t val, enum psr_type type)
 {
     wrmsrl(MSR_IA32_PSR_MBA_MASK(cos), val);
 }
 
-static bool mba_sanitize_thrtl(const struct feat_node *feat, uint32_t *thrtl)
+static bool cf_check mba_sanitize_thrtl(
+    const struct feat_node *feat, uint32_t *thrtl)
 {
     /*
      * Per SDM (chapter "Memory Bandwidth Allocation Configuration"):
