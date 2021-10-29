@@ -615,8 +615,9 @@ static uint32_t vlapic_read_aligned(const struct vlapic *vlapic,
     return 0;
 }
 
-static int vlapic_mmio_read(struct vcpu *v, unsigned long address,
-                            unsigned int len, unsigned long *pval)
+static int cf_check vlapic_mmio_read(
+    struct vcpu *v, unsigned long address, unsigned int len,
+    unsigned long *pval)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic_base_address(vlapic);
@@ -898,8 +899,8 @@ void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
     }
 }
 
-static int vlapic_mmio_write(struct vcpu *v, unsigned long address,
-                             unsigned int len, unsigned long val)
+static int cf_check vlapic_mmio_write(
+    struct vcpu *v, unsigned long address, unsigned int len, unsigned long val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic_base_address(vlapic);
@@ -1052,7 +1053,7 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t msr_content)
     return X86EMUL_OKAY;
 }
 
-static int vlapic_range(struct vcpu *v, unsigned long addr)
+static int cf_check vlapic_range(struct vcpu *v, unsigned long addr)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned long offset  = addr - vlapic_base_address(vlapic);

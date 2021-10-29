@@ -319,7 +319,7 @@ bool arch_ioreq_server_get_type_addr(const struct domain *d,
     return true;
 }
 
-static int hvm_access_cf8(
+static int cf_check hvm_access_cf8(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct domain *d = current->domain;

@@ -543,7 +543,7 @@ void hvm_do_resume(struct vcpu *v)
     }
 }
 
-static int hvm_print_line(
+static int cf_check hvm_print_line(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct domain *cd = current->domain;

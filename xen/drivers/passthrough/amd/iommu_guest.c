@@ -645,8 +645,8 @@ static uint64_t iommu_mmio_read64(struct guest_iommu *iommu,
     return val;
 }
 
-static int guest_iommu_mmio_read(struct vcpu *v, unsigned long addr,
-                                 unsigned int len, unsigned long *pval)
+static int cf_check guest_iommu_mmio_read(
+    struct vcpu *v, unsigned long addr, unsigned int len, unsigned long *pval)
 {
     struct guest_iommu *iommu = vcpu_iommu(v);
     unsigned long offset;
@@ -735,8 +735,8 @@ static void guest_iommu_mmio_write64(struct guest_iommu *iommu,
     }
 }
 
-static int guest_iommu_mmio_write(struct vcpu *v, unsigned long addr,
-                                  unsigned int len, unsigned long val)
+static int cf_check guest_iommu_mmio_write(
+    struct vcpu *v, unsigned long addr, unsigned int len, unsigned long val)
 {
     struct guest_iommu *iommu = vcpu_iommu(v);
     unsigned long offset;
@@ -819,7 +819,7 @@ static void guest_iommu_reg_init(struct guest_iommu *iommu)
     iommu->reg_ext_feature = ef;
 }
 
-static int guest_iommu_mmio_range(struct vcpu *v, unsigned long addr)
+static int cf_check guest_iommu_mmio_range(struct vcpu *v, unsigned long addr)
 {
     struct guest_iommu *iommu = vcpu_iommu(v);
 

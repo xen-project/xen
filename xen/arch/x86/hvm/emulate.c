@@ -71,19 +71,17 @@ static void hvmtrace_io_assist(const ioreq_t *p)
     trace_var(event, 0/*!cycles*/, size, buffer);
 }
 
-static int null_read(const struct hvm_io_handler *io_handler,
-                     uint64_t addr,
-                     uint32_t size,
-                     uint64_t *data)
+static int cf_check null_read(
+    const struct hvm_io_handler *io_handler, uint64_t addr, uint32_t size,
+    uint64_t *data)
 {
     *data = ~0ul;
     return X86EMUL_OKAY;
 }
 
-static int null_write(const struct hvm_io_handler *handler,
-                      uint64_t addr,
-                      uint32_t size,
-                      uint64_t data)
+static int cf_check null_write(
+    const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
+    uint64_t data)
 {
     return X86EMUL_OKAY;
 }
@@ -114,10 +112,9 @@ static const struct hvm_io_handler null_handler = {
     .ops = &null_ops
 };
 
-static int ioreq_server_read(const struct hvm_io_handler *io_handler,
-                    uint64_t addr,
-                    uint32_t size,
-                    uint64_t *data)
+static int cf_check ioreq_server_read(
+    const struct hvm_io_handler *io_handler, uint64_t addr, uint32_t size,
+    uint64_t *data)
 {
     if ( hvm_copy_from_guest_phys(data, addr, size) != HVMTRANS_okay )
         return X86EMUL_UNHANDLEABLE;

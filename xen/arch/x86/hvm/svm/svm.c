@@ -1133,8 +1133,8 @@ static void svm_host_osvw_init(void)
     spin_unlock(&osvw_lock);
 }
 
-static int acpi_c1e_quirk(int dir, unsigned int port, unsigned int bytes,
-                          uint32_t *val)
+static int cf_check acpi_c1e_quirk(
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     ASSERT(bytes == 1 && port == acpi_smi_cmd);
 

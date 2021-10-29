@@ -199,7 +199,7 @@ static void stdvga_out(uint32_t port, uint32_t bytes, uint32_t val)
     }
 }
 
-static int stdvga_intercept_pio(
+static int cf_check stdvga_intercept_pio(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
@@ -302,8 +302,9 @@ static uint8_t stdvga_mem_readb(uint64_t addr)
     return ret;
 }
 
-static int stdvga_mem_read(const struct hvm_io_handler *handler,
-                           uint64_t addr, uint32_t size, uint64_t *p_data)
+static int cf_check stdvga_mem_read(
+    const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
+    uint64_t *p_data)
 {
     uint64_t data = ~0ul;
 
@@ -453,9 +454,9 @@ static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
     }
 }
 
-static int stdvga_mem_write(const struct hvm_io_handler *handler,
-                            uint64_t addr, uint32_t size,
-                            uint64_t data)
+static int cf_check stdvga_mem_write(
+    const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
+    uint64_t data)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
     ioreq_t p = {
@@ -514,8 +515,8 @@ static int stdvga_mem_write(const struct hvm_io_handler *handler,
     return ioreq_send(srv, &p, 1);
 }
 
-static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
-                                const ioreq_t *p)
+static bool cf_check stdvga_mem_accept(
+    const struct hvm_io_handler *handler, const ioreq_t *p)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
 
@@ -558,7 +559,7 @@ static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
     return 0;
 }
 
-static void stdvga_mem_complete(const struct hvm_io_handler *handler)
+static void cf_check stdvga_mem_complete(const struct hvm_io_handler *handler)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
 

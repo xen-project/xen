@@ -162,7 +162,7 @@ static inline int hpet_check_access_length(
     return 0;
 }
 
-static int hpet_read(
+static int cf_check hpet_read(
     struct vcpu *v, unsigned long addr, unsigned int length,
     unsigned long *pval)
 {
@@ -351,7 +351,7 @@ static void timer_sanitize_int_route(HPETState *h, unsigned int tn)
                   HPET_TN_ROUTE);
 }
 
-static int hpet_write(
+static int cf_check hpet_write(
     struct vcpu *v, unsigned long addr,
     unsigned int length, unsigned long val)
 {
@@ -569,7 +569,7 @@ static int hpet_write(
     return X86EMUL_OKAY;
 }
 
-static int hpet_range(struct vcpu *v, unsigned long addr)
+static int cf_check hpet_range(struct vcpu *v, unsigned long addr)
 {
     return ( (addr >= HPET_BASE_ADDRESS) &&
              (addr < (HPET_BASE_ADDRESS + HPET_MMAP_SIZE)) );

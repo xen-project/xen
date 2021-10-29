@@ -152,7 +152,7 @@ static void cf_check pmt_timer_callback(void *opaque)
 }
 
 /* Handle port I/O to the PM1a_STS and PM1a_EN registers */
-static int handle_evt_io(
+static int cf_check handle_evt_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct vcpu *v = current;
@@ -216,7 +216,7 @@ static int handle_evt_io(
 
 
 /* Handle port I/O to the TMR_VAL register */
-static int handle_pmt_io(
+static int cf_check handle_pmt_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct vcpu *v = current;

@@ -211,8 +211,9 @@ static struct msi_desc *msixtbl_addr_to_desc(
     return NULL;
 }
 
-static int msixtbl_read(const struct hvm_io_handler *handler,
-                        uint64_t address, uint32_t len, uint64_t *pval)
+static int cf_check msixtbl_read(
+    const struct hvm_io_handler *handler, uint64_t address, uint32_t len,
+    uint64_t *pval)
 {
     unsigned long offset;
     struct msixtbl_entry *entry;
@@ -350,14 +351,15 @@ out:
     return r;
 }
 
-static int _msixtbl_write(const struct hvm_io_handler *handler,
-                          uint64_t address, uint32_t len, uint64_t val)
+static int cf_check _msixtbl_write(
+    const struct hvm_io_handler *handler, uint64_t address, uint32_t len,
+    uint64_t val)
 {
     return msixtbl_write(current, address, len, val);
 }
 
-static bool_t msixtbl_range(const struct hvm_io_handler *handler,
-                            const ioreq_t *r)
+static bool cf_check msixtbl_range(
+    const struct hvm_io_handler *handler, const ioreq_t *r)
 {
     struct vcpu *curr = current;
     unsigned long addr = r->addr;

@@ -351,7 +351,7 @@ static uint32_t vpic_ioport_read(struct hvm_hw_vpic *vpic, uint32_t addr)
     return vpic->imr;
 }
 
-static int vpic_intercept_pic_io(
+static int cf_check vpic_intercept_pic_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct hvm_hw_vpic *vpic;
@@ -373,7 +373,7 @@ static int vpic_intercept_pic_io(
     return X86EMUL_OKAY;
 }
 
-static int vpic_intercept_elcr_io(
+static int cf_check vpic_intercept_elcr_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct hvm_hw_vpic *vpic;

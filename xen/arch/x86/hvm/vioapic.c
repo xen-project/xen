@@ -135,7 +135,7 @@ static uint32_t vioapic_read_indirect(const struct hvm_vioapic *vioapic)
     return result;
 }
 
-static int vioapic_read(
+static int cf_check vioapic_read(
     struct vcpu *v, unsigned long addr,
     unsigned int length, unsigned long *pval)
 {
@@ -351,7 +351,7 @@ static void vioapic_write_indirect(
     }
 }
 
-static int vioapic_write(
+static int cf_check vioapic_write(
     struct vcpu *v, unsigned long addr,
     unsigned int length, unsigned long val)
 {
@@ -383,7 +383,7 @@ static int vioapic_write(
     return X86EMUL_OKAY;
 }
 
-static int vioapic_range(struct vcpu *v, unsigned long addr)
+static int cf_check vioapic_range(struct vcpu *v, unsigned long addr)
 {
     return !!addr_vioapic(v->domain, addr);
 }
@@ -568,7 +568,7 @@ int vioapic_get_mask(const struct domain *d, unsigned int gsi)
     return vioapic->redirtbl[pin].fields.mask;
 }
 
-int vioapic_get_vector(const struct domain *d, unsigned int gsi)
+int cf_check vioapic_get_vector(const struct domain *d, unsigned int gsi)
 {
     unsigned int pin = 0; /* See gsi_vioapic */
     const struct hvm_vioapic *vioapic = gsi_vioapic(d, gsi, &pin);

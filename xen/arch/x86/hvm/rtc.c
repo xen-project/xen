@@ -696,7 +696,7 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
     return ret;
 }
 
-static int handle_rtc_io(
+static int cf_check handle_rtc_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct RTCState *vrtc = vcpu_vrtc(current);
@@ -809,8 +809,8 @@ void rtc_reset(struct domain *d)
 }
 
 /* RTC mediator for HVM hardware domain. */
-static int hw_rtc_io(int dir, unsigned int port, unsigned int size,
-                     uint32_t *val)
+static int cf_check hw_rtc_io(
+    int dir, unsigned int port, unsigned int size, uint32_t *val)
 {
     if ( dir == IOREQ_READ )
         *val = ~0;
