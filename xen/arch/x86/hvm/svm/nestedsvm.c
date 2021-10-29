@@ -80,7 +80,7 @@ int nestedsvm_vmcb_map(struct vcpu *v, uint64_t vmcbaddr)
 }
 
 /* Interface methods */
-int nsvm_vcpu_initialise(struct vcpu *v)
+int cf_check nsvm_vcpu_initialise(struct vcpu *v)
 {
     void *msrpm;
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
@@ -110,7 +110,7 @@ int nsvm_vcpu_initialise(struct vcpu *v)
     return -ENOMEM;
 }
 
-void nsvm_vcpu_destroy(struct vcpu *v)
+void cf_check nsvm_vcpu_destroy(struct vcpu *v)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
@@ -150,7 +150,7 @@ void nsvm_vcpu_destroy(struct vcpu *v)
     svm->ns_iomap = NULL;
 }
 
-int nsvm_vcpu_reset(struct vcpu *v)
+int cf_check nsvm_vcpu_reset(struct vcpu *v)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
 
@@ -855,8 +855,8 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     return 0;
 }
 
-int
-nsvm_vcpu_vmexit_event(struct vcpu *v, const struct x86_event *trap)
+int cf_check nsvm_vcpu_vmexit_event(
+    struct vcpu *v, const struct x86_event *trap)
 {
     ASSERT(vcpu_nestedhvm(v).nv_vvmcx != NULL);
 
@@ -865,7 +865,7 @@ nsvm_vcpu_vmexit_event(struct vcpu *v, const struct x86_event *trap)
     return NESTEDHVM_VMEXIT_DONE;
 }
 
-uint64_t nsvm_vcpu_hostcr3(struct vcpu *v)
+uint64_t cf_check nsvm_vcpu_hostcr3(struct vcpu *v)
 {
     return vcpu_nestedsvm(v).ns_vmcb_hostcr3;
 }
@@ -1030,8 +1030,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
     return 1;
 }
 
-bool_t
-nsvm_vmcb_guest_intercepts_event(
+bool cf_check nsvm_vmcb_guest_intercepts_event(
     struct vcpu *v, unsigned int vector, int errcode)
 {
     return nsvm_vmcb_guest_intercepts_exitcode(v,
@@ -1206,8 +1205,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     return 0;
 }
 
-bool_t
-nsvm_vmcb_hap_enabled(struct vcpu *v)
+bool cf_check nsvm_vmcb_hap_enabled(struct vcpu *v)
 {
     return vcpu_nestedsvm(v).ns_hap_enabled;
 }
@@ -1216,7 +1214,7 @@ nsvm_vmcb_hap_enabled(struct vcpu *v)
  * walk is successful, the translated value is returned in
  * L1_gpa. The result value tells what to do next.
  */
-int nsvm_hap_walk_L1_p2m(
+int cf_check nsvm_hap_walk_L1_p2m(
     struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
     uint8_t *p2m_acc, struct npfec npfec)
 {
@@ -1241,7 +1239,7 @@ int nsvm_hap_walk_L1_p2m(
     return NESTEDHVM_PAGEFAULT_DONE;
 }
 
-enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
+enum hvm_intblk cf_check nsvm_intr_blocked(struct vcpu *v)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);

@@ -84,23 +84,23 @@ union vmx_inst_info {
     u32 word;
 };
 
-int nvmx_vcpu_initialise(struct vcpu *v);
-void nvmx_vcpu_destroy(struct vcpu *v);
-int nvmx_vcpu_reset(struct vcpu *v);
-uint64_t nvmx_vcpu_eptp_base(struct vcpu *v);
-enum hvm_intblk nvmx_intr_blocked(struct vcpu *v);
-bool_t nvmx_intercepts_exception(
+int cf_check nvmx_vcpu_initialise(struct vcpu *v);
+void cf_check nvmx_vcpu_destroy(struct vcpu *v);
+int cf_check nvmx_vcpu_reset(struct vcpu *v);
+uint64_t cf_check nvmx_vcpu_eptp_base(struct vcpu *v);
+enum hvm_intblk cf_check nvmx_intr_blocked(struct vcpu *v);
+bool cf_check nvmx_intercepts_exception(
     struct vcpu *v, unsigned int vector, int error_code);
-void nvmx_domain_relinquish_resources(struct domain *d);
+void cf_check nvmx_domain_relinquish_resources(struct domain *d);
 
-bool_t nvmx_ept_enabled(struct vcpu *v);
+bool cf_check nvmx_ept_enabled(struct vcpu *v);
 
 #define EPT_TRANSLATE_SUCCEED       0
 #define EPT_TRANSLATE_VIOLATION     1
 #define EPT_TRANSLATE_MISCONFIG     2
 #define EPT_TRANSLATE_RETRY         3
 
-int nvmx_hap_walk_L1_p2m(
+int cf_check nvmx_hap_walk_L1_p2m(
     struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
     uint8_t *p2m_acc, struct npfec npfec);
 

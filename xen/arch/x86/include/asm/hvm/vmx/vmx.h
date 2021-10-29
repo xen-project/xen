@@ -588,7 +588,7 @@ static inline int __vmxon(u64 addr)
     return rc;
 }
 
-int vmx_guest_x86_mode(struct vcpu *v);
+int cf_check vmx_guest_x86_mode(struct vcpu *v);
 unsigned int vmx_get_cpl(void);
 
 void vmx_inject_extint(int trap, uint8_t source);

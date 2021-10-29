@@ -655,7 +655,7 @@ void vmx_vmcs_reload(struct vcpu *v)
     vmx_load_vmcs(v);
 }
 
-int vmx_cpu_up_prepare(unsigned int cpu)
+int cf_check vmx_cpu_up_prepare(unsigned int cpu)
 {
     /*
      * If nvmx_cpu_up_prepare() failed, do not return failure and just fallback
@@ -676,7 +676,7 @@ int vmx_cpu_up_prepare(unsigned int cpu)
     return -ENOMEM;
 }
 
-void vmx_cpu_dead(unsigned int cpu)
+void cf_check vmx_cpu_dead(unsigned int cpu)
 {
     vmx_free_vmcs(per_cpu(vmxon_region, cpu));
     per_cpu(vmxon_region, cpu) = 0;
@@ -774,12 +774,12 @@ static int _vmx_cpu_up(bool bsp)
     return 0;
 }
 
-int vmx_cpu_up()
+int cf_check vmx_cpu_up()
 {
     return _vmx_cpu_up(false);
 }
 
-void vmx_cpu_down(void)
+void cf_check vmx_cpu_down(void)
 {
     struct list_head *active_vmcs_list = &this_cpu(active_vmcs_list);
     unsigned long flags;

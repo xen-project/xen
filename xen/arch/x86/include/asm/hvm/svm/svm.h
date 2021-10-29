@@ -50,7 +50,6 @@ struct vcpu;
 
 unsigned long *svm_msrbit(unsigned long *msr_bitmap, uint32_t msr);
 void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len);
-void svm_update_guest_cr(struct vcpu *, unsigned int cr, unsigned int flags);
 
 /*
  * PV context switch helpers.  Prefetching the VMCB area itself has been shown

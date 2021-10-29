@@ -62,7 +62,7 @@ void nvmx_cpu_dead(unsigned int cpu)
     XFREE(per_cpu(vvmcs_buf, cpu));
 }
 
-int nvmx_vcpu_initialise(struct vcpu *v)
+int cf_check nvmx_vcpu_initialise(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
@@ -150,7 +150,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
     return 0;
 }
  
-void nvmx_vcpu_destroy(struct vcpu *v)
+void cf_check nvmx_vcpu_destroy(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
@@ -199,7 +199,7 @@ static void vcpu_relinquish_resources(struct vcpu *v)
     FREE_XENHEAP_PAGE(nvmx->msr_merged);
 }
 
-void nvmx_domain_relinquish_resources(struct domain *d)
+void cf_check nvmx_domain_relinquish_resources(struct domain *d)
 {
     struct vcpu *v;
 
@@ -210,17 +210,17 @@ void nvmx_domain_relinquish_resources(struct domain *d)
     }
 }
 
-int nvmx_vcpu_reset(struct vcpu *v)
+int cf_check nvmx_vcpu_reset(struct vcpu *v)
 {
     return 0;
 }
 
-uint64_t nvmx_vcpu_eptp_base(struct vcpu *v)
+uint64_t cf_check nvmx_vcpu_eptp_base(struct vcpu *v)
 {
     return get_vvmcs(v, EPT_POINTER) & PAGE_MASK;
 }
 
-bool_t nvmx_ept_enabled(struct vcpu *v)
+bool cf_check nvmx_ept_enabled(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
@@ -514,7 +514,7 @@ static void vmfail(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
         vmfail_invalid(regs);
 }
 
-bool_t nvmx_intercepts_exception(
+bool cf_check nvmx_intercepts_exception(
     struct vcpu *v, unsigned int vector, int error_code)
 {
     u32 exception_bitmap, pfec_match=0, pfec_mask=0;
@@ -2346,7 +2346,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
  * walk is successful, the translated value is returned in
  * L1_gpa. The result value tells what to do next.
  */
-int nvmx_hap_walk_L1_p2m(
+int cf_check nvmx_hap_walk_L1_p2m(
     struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
     uint8_t *p2m_acc, struct npfec npfec)
 {

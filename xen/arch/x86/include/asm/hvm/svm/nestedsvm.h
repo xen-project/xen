@@ -107,22 +107,22 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
 void svm_nested_features_on_efer_update(struct vcpu *v);
 
 /* Interface methods */
-void nsvm_vcpu_destroy(struct vcpu *v);
-int nsvm_vcpu_initialise(struct vcpu *v);
-int nsvm_vcpu_reset(struct vcpu *v);
+void cf_check nsvm_vcpu_destroy(struct vcpu *v);
+int cf_check nsvm_vcpu_initialise(struct vcpu *v);
+int cf_check nsvm_vcpu_reset(struct vcpu *v);
 int nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs);
-int nsvm_vcpu_vmexit_event(struct vcpu *v, const struct x86_event *event);
-uint64_t nsvm_vcpu_hostcr3(struct vcpu *v);
-bool_t nsvm_vmcb_guest_intercepts_event(
+int cf_check nsvm_vcpu_vmexit_event(struct vcpu *v, const struct x86_event *event);
+uint64_t cf_check nsvm_vcpu_hostcr3(struct vcpu *v);
+bool cf_check nsvm_vmcb_guest_intercepts_event(
     struct vcpu *v, unsigned int vector, int errcode);
-bool_t nsvm_vmcb_hap_enabled(struct vcpu *v);
-enum hvm_intblk nsvm_intr_blocked(struct vcpu *v);
+bool cf_check nsvm_vmcb_hap_enabled(struct vcpu *v);
+enum hvm_intblk cf_check nsvm_intr_blocked(struct vcpu *v);
 
 /* Interrupts, vGIF */
 void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v);
 void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v);
 bool_t nestedsvm_gif_isset(struct vcpu *v);
-int nsvm_hap_walk_L1_p2m(
+int cf_check nsvm_hap_walk_L1_p2m(
     struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
     uint8_t *p2m_acc, struct npfec npfec);
 

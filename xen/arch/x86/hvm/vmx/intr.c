@@ -147,7 +147,7 @@ static void vmx_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
  *         used but may have negative impact on interrupt performance.
  */
 
-enum hvm_intblk nvmx_intr_blocked(struct vcpu *v)
+enum hvm_intblk cf_check nvmx_intr_blocked(struct vcpu *v)
 {
     int r = hvm_intblk_none;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
