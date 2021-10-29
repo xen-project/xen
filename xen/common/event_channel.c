@@ -99,7 +99,8 @@ static xen_event_channel_notification_t __read_mostly
     xen_consumers[NR_XEN_CONSUMERS];
 
 /* Default notification action: wake up from wait_on_xen_event_channel(). */
-static void default_xen_notification_fn(struct vcpu *v, unsigned int port)
+static void cf_check default_xen_notification_fn(
+    struct vcpu *v, unsigned int port)
 {
     /* Consumer needs notification only if blocked. */
     if ( test_and_clear_bit(_VPF_blocked_in_xen, &v->pause_flags) )
