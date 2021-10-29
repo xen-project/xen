@@ -114,40 +114,40 @@ static int erst_timedout(u64 *t, u64 spin_unit)
 	return 0;
 }
 
-static int erst_exec_load_var1(struct apei_exec_context *ctx,
-			       struct acpi_whea_header *entry)
+static int cf_check erst_exec_load_var1(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	return __apei_exec_read_register(entry, &ctx->var1);
 }
 
-static int erst_exec_load_var2(struct apei_exec_context *ctx,
-			       struct acpi_whea_header *entry)
+static int cf_check erst_exec_load_var2(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	return __apei_exec_read_register(entry, &ctx->var2);
 }
 
-static int erst_exec_store_var1(struct apei_exec_context *ctx,
-				struct acpi_whea_header *entry)
+static int cf_check erst_exec_store_var1(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	return __apei_exec_write_register(entry, ctx->var1);
 }
 
-static int erst_exec_add(struct apei_exec_context *ctx,
-			 struct acpi_whea_header *entry)
+static int cf_check erst_exec_add(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	ctx->var1 += ctx->var2;
 	return 0;
 }
 
-static int erst_exec_subtract(struct apei_exec_context *ctx,
-			      struct acpi_whea_header *entry)
+static int cf_check erst_exec_subtract(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	ctx->var1 -= ctx->var2;
 	return 0;
 }
 
-static int erst_exec_add_value(struct apei_exec_context *ctx,
-			       struct acpi_whea_header *entry)
+static int cf_check erst_exec_add_value(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	int rc;
 	u64 val;
@@ -160,8 +160,8 @@ static int erst_exec_add_value(struct apei_exec_context *ctx,
 	return rc;
 }
 
-static int erst_exec_subtract_value(struct apei_exec_context *ctx,
-				    struct acpi_whea_header *entry)
+static int cf_check erst_exec_subtract_value(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	int rc;
 	u64 val;
@@ -174,8 +174,8 @@ static int erst_exec_subtract_value(struct apei_exec_context *ctx,
 	return rc;
 }
 
-static int erst_exec_stall(struct apei_exec_context *ctx,
-			   struct acpi_whea_header *entry)
+static int cf_check erst_exec_stall(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	udelay((ctx->var1 > FIRMWARE_MAX_STALL) ? 
 			FIRMWARE_MAX_STALL : 
@@ -183,8 +183,8 @@ static int erst_exec_stall(struct apei_exec_context *ctx,
 	return 0;
 }
 
-static int erst_exec_stall_while_true(struct apei_exec_context *ctx,
-				      struct acpi_whea_header *entry)
+static int cf_check erst_exec_stall_while_true(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	int rc;
 	u64 val;
@@ -205,9 +205,8 @@ static int erst_exec_stall_while_true(struct apei_exec_context *ctx,
 	return 0;
 }
 
-static int erst_exec_skip_next_instruction_if_true(
-	struct apei_exec_context *ctx,
-	struct acpi_whea_header *entry)
+static int cf_check erst_exec_skip_next_instruction_if_true(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	int rc;
 	u64 val;
@@ -223,27 +222,27 @@ static int erst_exec_skip_next_instruction_if_true(
 	return 0;
 }
 
-static int erst_exec_goto(struct apei_exec_context *ctx,
-			  struct acpi_whea_header *entry)
+static int cf_check erst_exec_goto(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	ctx->ip = ctx->value;
 	return APEI_EXEC_SET_IP;
 }
 
-static int erst_exec_set_src_address_base(struct apei_exec_context *ctx,
-					  struct acpi_whea_header *entry)
+static int cf_check erst_exec_set_src_address_base(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	return __apei_exec_read_register(entry, &ctx->src_base);
 }
 
-static int erst_exec_set_dst_address_base(struct apei_exec_context *ctx,
-					  struct acpi_whea_header *entry)
+static int cf_check erst_exec_set_dst_address_base(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	return __apei_exec_read_register(entry, &ctx->dst_base);
 }
 
-static int erst_exec_move_data(struct apei_exec_context *ctx,
-			       struct acpi_whea_header *entry)
+static int cf_check erst_exec_move_data(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	int rc;
 	u64 offset;

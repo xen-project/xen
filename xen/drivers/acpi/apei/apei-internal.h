@@ -68,16 +68,16 @@ static inline int apei_exec_run_optional(struct apei_exec_context *ctx, u8 actio
 
 int __apei_exec_read_register(struct acpi_whea_header *entry, u64 *val);
 int __apei_exec_write_register(struct acpi_whea_header *entry, u64 val);
-int apei_exec_read_register(struct apei_exec_context *ctx,
-			    struct acpi_whea_header *entry);
-int apei_exec_read_register_value(struct apei_exec_context *ctx,
-				  struct acpi_whea_header *entry);
-int apei_exec_write_register(struct apei_exec_context *ctx,
-			     struct acpi_whea_header *entry);
-int apei_exec_write_register_value(struct apei_exec_context *ctx,
-				   struct acpi_whea_header *entry);
-int apei_exec_noop(struct apei_exec_context *ctx,
-		   struct acpi_whea_header *entry);
+int cf_check apei_exec_read_register(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry);
+int cf_check apei_exec_read_register_value(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry);
+int cf_check apei_exec_write_register(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry);
+int cf_check apei_exec_write_register_value(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry);
+int cf_check apei_exec_noop(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry);
 int apei_exec_pre_map_gars(struct apei_exec_context *ctx);
 int apei_exec_post_unmap_gars(struct apei_exec_context *ctx);
 

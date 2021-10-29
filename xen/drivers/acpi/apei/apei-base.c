@@ -80,8 +80,8 @@ int __apei_exec_read_register(struct acpi_whea_header *entry, u64 *val)
 	return 0;
 }
 
-int apei_exec_read_register(struct apei_exec_context *ctx,
-			    struct acpi_whea_header *entry)
+int cf_check apei_exec_read_register(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	int rc;
 	u64 val = 0;
@@ -94,8 +94,8 @@ int apei_exec_read_register(struct apei_exec_context *ctx,
 	return 0;
 }
 
-int apei_exec_read_register_value(struct apei_exec_context *ctx,
-				  struct acpi_whea_header *entry)
+int cf_check apei_exec_read_register_value(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	int rc;
 
@@ -126,14 +126,14 @@ int __apei_exec_write_register(struct acpi_whea_header *entry, u64 val)
 	return rc;
 }
 
-int apei_exec_write_register(struct apei_exec_context *ctx,
-			     struct acpi_whea_header *entry)
+int cf_check apei_exec_write_register(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	return __apei_exec_write_register(entry, ctx->value);
 }
 
-int apei_exec_write_register_value(struct apei_exec_context *ctx,
-				   struct acpi_whea_header *entry)
+int cf_check apei_exec_write_register_value(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	int rc;
 
@@ -143,8 +143,8 @@ int apei_exec_write_register_value(struct apei_exec_context *ctx,
 	return rc;
 }
 
-int apei_exec_noop(struct apei_exec_context *ctx,
-		   struct acpi_whea_header *entry)
+int cf_check apei_exec_noop(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry)
 {
 	return 0;
 }
@@ -230,9 +230,9 @@ static int __init apei_exec_for_each_entry(struct apei_exec_context *ctx,
 	return 0;
 }
 
-static int __init pre_map_gar_callback(struct apei_exec_context *ctx,
-				       struct acpi_whea_header *entry,
-				       void *data)
+static int __init cf_check pre_map_gar_callback(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry,
+	void *data)
 {
 	u8 ins = entry->instruction;
 
@@ -259,9 +259,9 @@ int __init apei_exec_pre_map_gars(struct apei_exec_context *ctx)
 	return rc;
 }
 
-static int __init post_unmap_gar_callback(struct apei_exec_context *ctx,
-					  struct acpi_whea_header *entry,
-					  void *data)
+static int __init cf_check post_unmap_gar_callback(
+	struct apei_exec_context *ctx, struct acpi_whea_header *entry,
+	void *data)
 {
 	u8 ins = entry->instruction;
 
