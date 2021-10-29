@@ -36,6 +36,7 @@
 #include <avc_ss.h>
 #include <objsec.h>
 #include <conditional.h>
+#include "private.h"
 
 static u32 domain_sid(const struct domain *dom)
 {
@@ -1741,9 +1742,6 @@ static int flask_argo_send(const struct domain *d, const struct domain *t)
 }
 
 #endif
-
-long do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op);
-int compat_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op);
 
 static const struct xsm_ops __initconstrel flask_ops = {
     .security_domaininfo = flask_security_domaininfo,

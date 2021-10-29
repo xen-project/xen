@@ -21,6 +21,7 @@
 #include <avc_ss.h>
 #include <objsec.h>
 #include <conditional.h>
+#include "private.h"
 
 #define ret_t long
 #define _copy_to_guest copy_to_guest
