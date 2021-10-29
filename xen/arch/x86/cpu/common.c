@@ -104,7 +104,7 @@ bool __init is_forced_cpu_cap(unsigned int cap)
 	return test_bit(cap, forced_caps);
 }
 
-static void default_init(struct cpuinfo_x86 * c)
+static void cf_check default_init(struct cpuinfo_x86 * c)
 {
 	/* Not much we can do here... */
 	/* Check if at least it has cpuid */

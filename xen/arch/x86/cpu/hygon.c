@@ -28,7 +28,7 @@ static void hygon_get_topology(struct cpuinfo_x86 *c)
 	                        c->phys_proc_id, c->cpu_core_id);
 }
 
-static void init_hygon(struct cpuinfo_x86 *c)
+static void cf_check init_hygon(struct cpuinfo_x86 *c)
 {
 	unsigned long long value;
 

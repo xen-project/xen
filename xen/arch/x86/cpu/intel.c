@@ -176,7 +176,7 @@ static void __init probe_masking_msrs(void)
  * parameter of NULL is used to context switch to the default host state (by
  * the cpu bringup-code, crash path, etc).
  */
-static void intel_ctxt_switch_masking(const struct vcpu *next)
+static void cf_check intel_ctxt_switch_masking(const struct vcpu *next)
 {
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
 	const struct domain *nextd = next ? next->domain : NULL;
@@ -286,7 +286,7 @@ static void __init noinline intel_init_levelling(void)
 		ctxt_switch_masking = intel_ctxt_switch_masking;
 }
 
-static void early_init_intel(struct cpuinfo_x86 *c)
+static void cf_check early_init_intel(struct cpuinfo_x86 *c)
 {
 	u64 misc_enable, disable;
 
@@ -518,7 +518,7 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
     printk("%u MHz\n", (factor * max_ratio + 50) / 100);
 }
 
-static void init_intel(struct cpuinfo_x86 *c)
+static void cf_check init_intel(struct cpuinfo_x86 *c)
 {
 	/* Detect the extended topology information if available */
 	detect_extended_topology(c);

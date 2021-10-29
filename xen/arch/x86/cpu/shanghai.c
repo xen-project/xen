@@ -3,7 +3,7 @@
 #include <asm/processor.h>
 #include "cpu.h"
 
-static void init_shanghai(struct cpuinfo_x86 *c)
+static void cf_check init_shanghai(struct cpuinfo_x86 *c)
 {
     if ( cpu_has(c, X86_FEATURE_ITSC) )
     {

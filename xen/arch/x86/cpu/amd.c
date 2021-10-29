@@ -208,7 +208,7 @@ static void __init noinline probe_masking_msrs(void)
  * parameter of NULL is used to context switch to the default host state (by
  * the cpu bringup-code, crash path, etc).
  */
-static void amd_ctxt_switch_masking(const struct vcpu *next)
+static void cf_check amd_ctxt_switch_masking(const struct vcpu *next)
 {
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
 	const struct domain *nextd = next ? next->domain : NULL;
@@ -634,7 +634,7 @@ void amd_log_freq(const struct cpuinfo_x86 *c)
 #undef FREQ
 }
 
-void early_init_amd(struct cpuinfo_x86 *c)
+void cf_check early_init_amd(struct cpuinfo_x86 *c)
 {
 	if (c == &boot_cpu_data)
 		amd_init_levelling();
@@ -744,7 +744,7 @@ void __init detect_zen2_null_seg_behaviour(void)
 
 }
 
-static void init_amd(struct cpuinfo_x86 *c)
+static void cf_check init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
 

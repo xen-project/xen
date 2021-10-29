@@ -48,7 +48,7 @@ static void init_c3(struct cpuinfo_x86 *c)
 	display_cacheinfo(c);
 }
 
-static void init_centaur(struct cpuinfo_x86 *c)
+static void cf_check init_centaur(struct cpuinfo_x86 *c)
 {
 	if (c->x86 == 6)
 		init_c3(c);
