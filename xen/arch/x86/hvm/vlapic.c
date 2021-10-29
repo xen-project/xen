@@ -691,13 +691,13 @@ int guest_rdmsr_x2apic(const struct vcpu *v, uint32_t msr, uint64_t *val)
     return X86EMUL_OKAY;
 }
 
-static void vlapic_pt_cb(struct vcpu *v, void *data)
+static void cf_check vlapic_pt_cb(struct vcpu *v, void *data)
 {
     TRACE_0D(TRC_HVM_EMUL_LAPIC_TIMER_CB);
     *(s_time_t *)data = hvm_get_guest_time(v);
 }
 
-static void vlapic_tdt_pt_cb(struct vcpu *v, void *data)
+static void cf_check vlapic_tdt_pt_cb(struct vcpu *v, void *data)
 {
     *(s_time_t *)data = hvm_get_guest_time(v);
     vcpu_vlapic(v)->hw.tdt_msr = 0;

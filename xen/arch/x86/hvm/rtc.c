@@ -81,7 +81,7 @@ static void rtc_update_irq(RTCState *s)
 
 /* Called by the VPT code after it's injected a PF interrupt for us.
  * Fix up the register state to reflect what happened. */
-static void rtc_pf_callback(struct vcpu *v, void *opaque)
+static void cf_check rtc_pf_callback(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
 

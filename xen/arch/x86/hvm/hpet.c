@@ -219,7 +219,7 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn,
     hpet_get_comparator(h, tn, guest_time);
 }
 
-static void hpet_timer_fired(struct vcpu *v, void *data)
+static void cf_check hpet_timer_fired(struct vcpu *v, void *data)
 {
     unsigned int tn = (unsigned long)data;
     HPETState *h = vcpu_vhpet(v);

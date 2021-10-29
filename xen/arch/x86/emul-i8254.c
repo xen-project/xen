@@ -156,7 +156,7 @@ static int pit_get_gate(PITState *pit, int channel)
     return pit->hw.channels[channel].gate;
 }
 
-static void pit_time_fired(struct vcpu *v, void *priv)
+static void cf_check pit_time_fired(struct vcpu *v, void *priv)
 {
     uint64_t *count_load_time = priv;
     TRACE_0D(TRC_HVM_EMUL_PIT_TIMER_CB);
