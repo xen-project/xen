@@ -474,8 +474,8 @@ void hvm_migrate_pirq(struct hvm_pirq_dpci *pirq_dpci, const struct vcpu *v)
     }
 }
 
-static int migrate_pirq(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
-                        void *arg)
+static int cf_check migrate_pirq(
+    struct domain *d, struct hvm_pirq_dpci *pirq_dpci, void *arg)
 {
     hvm_migrate_pirq(pirq_dpci, arg);
 

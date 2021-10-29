@@ -777,8 +777,8 @@ static void __msi_pirq_eoi(struct hvm_pirq_dpci *pirq_dpci)
     }
 }
 
-static int _hvm_dpci_msi_eoi(struct domain *d,
-                             struct hvm_pirq_dpci *pirq_dpci, void *arg)
+static int cf_check _hvm_dpci_msi_eoi(
+    struct domain *d, struct hvm_pirq_dpci *pirq_dpci, void *arg)
 {
     int vector = (long)arg;
 
@@ -947,8 +947,8 @@ unlock:
     spin_unlock(&d->event_lock);
 }
 
-static int pci_clean_dpci_irq(struct domain *d,
-                              struct hvm_pirq_dpci *pirq_dpci, void *arg)
+static int cf_check pci_clean_dpci_irq(
+    struct domain *d, struct hvm_pirq_dpci *pirq_dpci, void *arg)
 {
     struct dev_intx_gsi_link *digl, *tmp;
 

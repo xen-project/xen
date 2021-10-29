@@ -21,8 +21,8 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 
-static int _hvm_dpci_isairq_eoi(struct domain *d,
-                                struct hvm_pirq_dpci *pirq_dpci, void *arg)
+static int cf_check _hvm_dpci_isairq_eoi(
+    struct domain *d, struct hvm_pirq_dpci *pirq_dpci, void *arg)
 {
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int isairq = (long)arg;
