@@ -175,7 +175,7 @@ static int setup_vp_assist(void)
     return 0;
 }
 
-static void __init setup(void)
+static void __init cf_check setup(void)
 {
     ASM_CONSTANT(HV_HCALL_PAGE, __fix_x_to_virt(FIX_X_HYPERV_HCALL));
 
@@ -188,7 +188,7 @@ static void __init setup(void)
         panic("VP assist page setup failed\n");
 }
 
-static int ap_setup(void)
+static int cf_check ap_setup(void)
 {
     int rc;
 
@@ -199,7 +199,7 @@ static int ap_setup(void)
     return setup_vp_assist();
 }
 
-static void __init e820_fixup(struct e820map *e820)
+static void __init cf_check e820_fixup(struct e820map *e820)
 {
     uint64_t s = HV_HCALL_MFN << PAGE_SHIFT;
 
@@ -207,8 +207,8 @@ static void __init e820_fixup(struct e820map *e820)
         panic("Unable to reserve Hyper-V hypercall range\n");
 }
 
-static int flush_tlb(const cpumask_t *mask, const void *va,
-                     unsigned int flags)
+static int cf_check flush_tlb(
+    const cpumask_t *mask, const void *va, unsigned int flags)
 {
     if ( !(ms_hyperv.hints & HV_X64_REMOTE_TLB_FLUSH_RECOMMENDED) )
         return -EOPNOTSUPP;

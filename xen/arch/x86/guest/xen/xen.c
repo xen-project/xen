@@ -237,7 +237,7 @@ static int init_evtchn(void)
     return rc;
 }
 
-static void __init setup(void)
+static void __init cf_check setup(void)
 {
     init_memmap();
 
@@ -265,7 +265,7 @@ static void __init setup(void)
     BUG_ON(init_evtchn());
 }
 
-static int ap_setup(void)
+static int cf_check ap_setup(void)
 {
     set_vcpu_id();
 
@@ -295,7 +295,7 @@ static void cf_check ap_resume(void *unused)
     BUG_ON(init_evtchn());
 }
 
-static void resume(void)
+static void cf_check resume(void)
 {
     /* Reset shared info page. */
     map_shared_info();
@@ -318,13 +318,14 @@ static void resume(void)
         pv_console_init();
 }
 
-static void __init e820_fixup(struct e820map *e820)
+static void __init cf_check e820_fixup(struct e820map *e820)
 {
     if ( pv_shim )
         pv_shim_fixup_e820(e820);
 }
 
-static int flush_tlb(const cpumask_t *mask, const void *va, unsigned int flags)
+static int cf_check flush_tlb(
+    const cpumask_t *mask, const void *va, unsigned int flags)
 {
     return xen_hypercall_hvm_op(HVMOP_flush_tlbs, NULL);
 }
