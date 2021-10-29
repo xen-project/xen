@@ -309,7 +309,7 @@ static uint64_t adjust_elapsed(uint64_t elapsed, uint32_t actual,
  * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
  */
 
-static u64 read_pit_count(void)
+static u64 cf_check read_pit_count(void)
 {
     u16 count16;
     u32 count32;
@@ -328,7 +328,7 @@ static u64 read_pit_count(void)
     return count32;
 }
 
-static s64 __init init_pit(struct platform_timesource *pts)
+static s64 __init cf_check init_pit(struct platform_timesource *pts)
 {
     u8 portb = inb(0x61);
     u64 start, end;
@@ -366,7 +366,7 @@ static s64 __init init_pit(struct platform_timesource *pts)
     return (end - start) * CALIBRATE_FRAC;
 }
 
-static void resume_pit(struct platform_timesource *pts)
+static void cf_check resume_pit(struct platform_timesource *pts)
 {
     /* Set CTC channel 2 to mode 0 again; initial value does not matter. */
     outb(0xb0, PIT_MODE); /* binary, mode 0, LSB/MSB, Ch 2 */
@@ -389,12 +389,12 @@ static struct platform_timesource __initdata plt_pit =
  * PLATFORM TIMER 2: HIGH PRECISION EVENT TIMER (HPET)
  */
 
-static u64 read_hpet_count(void)
+static u64 cf_check read_hpet_count(void)
 {
     return hpet_read32(HPET_COUNTER);
 }
 
-static int64_t __init init_hpet(struct platform_timesource *pts)
+static int64_t __init cf_check init_hpet(struct platform_timesource *pts)
 {
     uint64_t hpet_rate, start;
     uint32_t count, target, elapsed;
@@ -477,7 +477,7 @@ static int64_t __init init_hpet(struct platform_timesource *pts)
     return adjust_elapsed(rdtsc_ordered() - start, elapsed, target);
 }
 
-static void resume_hpet(struct platform_timesource *pts)
+static void cf_check resume_hpet(struct platform_timesource *pts)
 {
     hpet_resume(NULL);
 }
@@ -502,12 +502,12 @@ unsigned int __initdata pmtmr_width;
 /* ACPI PM timer ticks at 3.579545 MHz. */
 #define ACPI_PM_FREQUENCY 3579545
 
-static u64 read_pmtimer_count(void)
+static u64 cf_check read_pmtimer_count(void)
 {
     return inl(pmtmr_ioport);
 }
 
-static s64 __init init_pmtimer(struct platform_timesource *pts)
+static s64 __init cf_check init_pmtimer(struct platform_timesource *pts)
 {
     uint64_t start;
     uint32_t count, target, mask, elapsed;
@@ -562,7 +562,7 @@ static unsigned int __initdata tsc_flags;
  * Called in verify_tsc_reliability() under reliable TSC conditions
  * thus reusing all the checks already performed there.
  */
-static s64 __init init_tsc(struct platform_timesource *pts)
+static s64 __init cf_check init_tsc(struct platform_timesource *pts)
 {
     u64 ret = pts->frequency;
 
@@ -584,7 +584,7 @@ static s64 __init init_tsc(struct platform_timesource *pts)
     return ret;
 }
 
-static u64 read_tsc(void)
+static u64 cf_check read_tsc(void)
 {
     return rdtsc_ordered();
 }
@@ -625,7 +625,7 @@ static uint64_t xen_timer_cpu_frequency(void)
     return freq;
 }
 
-static int64_t __init init_xen_timer(struct platform_timesource *pts)
+static int64_t __init cf_check init_xen_timer(struct platform_timesource *pts)
 {
     if ( !xen_guest )
         return 0;
@@ -646,7 +646,7 @@ static always_inline uint64_t read_cycle(const struct vcpu_time_info *info,
     return info->system_time + offset;
 }
 
-static uint64_t read_xen_timer(void)
+static uint64_t cf_check read_xen_timer(void)
 {
     struct vcpu_time_info *info = &this_cpu(vcpu_info)->time;
     uint32_t version;
@@ -675,7 +675,7 @@ static uint64_t read_xen_timer(void)
     return ret;
 }
 
-static void resume_xen_timer(struct platform_timesource *pts)
+static void cf_check resume_xen_timer(struct platform_timesource *pts)
 {
     write_atomic(&xen_timer_last, 0);
 }
@@ -701,7 +701,8 @@ static struct platform_timesource __initdata plt_xen_timer =
 static struct ms_hyperv_tsc_page *hyperv_tsc;
 static struct page_info *hyperv_tsc_page;
 
-static int64_t __init init_hyperv_timer(struct platform_timesource *pts)
+static int64_t __init cf_check init_hyperv_timer(
+    struct platform_timesource *pts)
 {
     paddr_t maddr;
     uint64_t tsc_msr, freq;
@@ -744,7 +745,7 @@ static int64_t __init init_hyperv_timer(struct platform_timesource *pts)
     return freq;
 }
 
-static uint64_t read_hyperv_timer(void)
+static uint64_t cf_check read_hyperv_timer(void)
 {
     uint64_t scale, ret, tsc;
     int64_t offset;
@@ -1720,7 +1721,7 @@ time_calibration_rendezvous_tail(const struct calibration_rendezvous *r,
  * Keep TSCs in sync when they run at the same rate, but may stop in
  * deep-sleep C states.
  */
-static void time_calibration_tsc_rendezvous(void *_r)
+static void cf_check time_calibration_tsc_rendezvous(void *_r)
 {
     int i;
     struct calibration_rendezvous *r = _r;

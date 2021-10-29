@@ -193,7 +193,7 @@ static void evt_do_broadcast(cpumask_t *mask)
        cpumask_raise_softirq(mask, TIMER_SOFTIRQ);
 }
 
-static void handle_hpet_broadcast(struct hpet_event_channel *ch)
+static void cf_check handle_hpet_broadcast(struct hpet_event_channel *ch)
 {
     cpumask_t mask;
     s_time_t now, next_event;
@@ -550,7 +550,7 @@ static void hpet_detach_channel(unsigned int cpu,
 
 void (*__read_mostly pv_rtc_handler)(uint8_t index, uint8_t value);
 
-static void handle_rtc_once(uint8_t index, uint8_t value)
+static void cf_check handle_rtc_once(uint8_t index, uint8_t value)
 {
     if ( index != RTC_REG_B )
         return;
@@ -563,7 +563,7 @@ static void handle_rtc_once(uint8_t index, uint8_t value)
     }
 }
 
-void __init hpet_broadcast_init(void)
+void __init cf_check hpet_broadcast_init(void)
 {
     u64 hpet_rate = hpet_setup();
     u32 hpet_id, cfg;
@@ -634,7 +634,7 @@ void __init hpet_broadcast_init(void)
         hpet_events->flags = HPET_EVT_LEGACY;
 }
 
-void hpet_broadcast_resume(void)
+void cf_check hpet_broadcast_resume(void)
 {
     u32 cfg;
     unsigned int i, n;

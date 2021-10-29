@@ -89,8 +89,8 @@ void hpet_disable_legacy_replacement_mode(void);
  * Temporarily use an HPET event counter for timer interrupt handling,
  * rather than using the LAPIC timer. Used for Cx state entry.
  */
-void hpet_broadcast_init(void);
-void hpet_broadcast_resume(void);
+void cf_check hpet_broadcast_init(void);
+void cf_check hpet_broadcast_resume(void);
 void cf_check hpet_broadcast_enter(void);
 void cf_check hpet_broadcast_exit(void);
 int hpet_broadcast_is_available(void);
