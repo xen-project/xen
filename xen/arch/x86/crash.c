@@ -36,7 +36,8 @@ static unsigned int crashing_cpu;
 static DEFINE_PER_CPU_READ_MOSTLY(bool, crash_save_done);
 
 /* This becomes the NMI handler for non-crashing CPUs, when Xen is crashing. */
-static int noreturn do_nmi_crash(const struct cpu_user_regs *regs, int cpu)
+static int noreturn cf_check do_nmi_crash(
+    const struct cpu_user_regs *regs, int cpu)
 {
     stac();
 

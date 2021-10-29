@@ -324,8 +324,8 @@ static unsigned int __initdata alt_done;
  * condition where an NMI hits while we are midway though patching some
  * instructions in the NMI path.
  */
-static int __init nmi_apply_alternatives(const struct cpu_user_regs *regs,
-                                         int cpu)
+static int __init cf_check nmi_apply_alternatives(
+    const struct cpu_user_regs *regs, int cpu)
 {
     /*
      * More than one NMI may occur between the two set_nmi_callback() below.

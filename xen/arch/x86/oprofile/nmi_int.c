@@ -95,7 +95,7 @@ bool nmi_oprofile_send_virq(void)
 	return v;
 }
 
-static int nmi_callback(const struct cpu_user_regs *regs, int cpu)
+static int cf_check nmi_callback(const struct cpu_user_regs *regs, int cpu)
 {
 	int xen_mode, ovf;
 

@@ -175,7 +175,7 @@ static nmi_callback_t *saved_nmi_callback;
  * Note that because of this NOP code the do_nmi is not safely patchable.
  * Also if we do receive 'real' NMIs we have lost them.
  */
-static int mask_nmi_callback(const struct cpu_user_regs *regs, int cpu)
+static int cf_check mask_nmi_callback(const struct cpu_user_regs *regs, int cpu)
 {
     /* TODO: Handle missing NMI/MCE.*/
     return 1;

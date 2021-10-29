@@ -376,7 +376,8 @@ static int primary_thread_work(const struct microcode_patch *patch)
     return ret;
 }
 
-static int microcode_nmi_callback(const struct cpu_user_regs *regs, int cpu)
+static int cf_check microcode_nmi_callback(
+    const struct cpu_user_regs *regs, int cpu)
 {
     unsigned int primary = cpumask_first(this_cpu(cpu_sibling_mask));
     int ret;

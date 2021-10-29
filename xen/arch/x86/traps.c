@@ -752,7 +752,8 @@ static cpumask_t show_state_mask;
 static bool opt_show_all;
 boolean_param("async-show-all", opt_show_all);
 
-static int nmi_show_execution_state(const struct cpu_user_regs *regs, int cpu)
+static int cf_check nmi_show_execution_state(
+    const struct cpu_user_regs *regs, int cpu)
 {
     if ( !cpumask_test_cpu(cpu, &show_state_mask) )
         return 0;
