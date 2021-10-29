@@ -468,7 +468,7 @@ int __init init_irq_data(void)
     return 0;
 }
 
-static void ack_none(struct irq_desc *desc)
+static void cf_check ack_none(struct irq_desc *desc)
 {
     ack_bad_irq(desc->irq);
 }
@@ -832,7 +832,7 @@ static void send_cleanup_vector(struct irq_desc *desc)
     desc->arch.move_in_progress = 0;
 }
 
-void irq_complete_move(struct irq_desc *desc)
+void cf_check irq_complete_move(struct irq_desc *desc)
 {
     unsigned vector, me;
 
@@ -1086,7 +1086,7 @@ bool cpu_has_pending_apic_eoi(void)
     return pending_eoi_sp(this_cpu(pending_eoi)) != 0;
 }
 
-void end_nonmaskable_irq(struct irq_desc *desc, uint8_t vector)
+void cf_check end_nonmaskable_irq(struct irq_desc *desc, uint8_t vector)
 {
     struct pending_eoi *peoi = this_cpu(pending_eoi);
     unsigned int sp = pending_eoi_sp(peoi);

@@ -410,7 +410,7 @@ static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
                      PCI_FUNC(iommu->bdf), iommu->msi.msi_attrib.pos, flag);
 }
 
-static void iommu_msi_unmask(struct irq_desc *desc)
+static void cf_check iommu_msi_unmask(struct irq_desc *desc)
 {
     unsigned long flags;
     struct amd_iommu *iommu = desc->action->dev_id;
@@ -421,7 +421,7 @@ static void iommu_msi_unmask(struct irq_desc *desc)
     iommu->msi.msi_attrib.host_masked = 0;
 }
 
-static void iommu_msi_mask(struct irq_desc *desc)
+static void cf_check iommu_msi_mask(struct irq_desc *desc)
 {
     unsigned long flags;
     struct amd_iommu *iommu = desc->action->dev_id;
@@ -434,13 +434,13 @@ static void iommu_msi_mask(struct irq_desc *desc)
     iommu->msi.msi_attrib.host_masked = 1;
 }
 
-static unsigned int iommu_msi_startup(struct irq_desc *desc)
+static unsigned int cf_check iommu_msi_startup(struct irq_desc *desc)
 {
     iommu_msi_unmask(desc);
     return 0;
 }
 
-static void iommu_msi_end(struct irq_desc *desc, u8 vector)
+static void cf_check iommu_msi_end(struct irq_desc *desc, u8 vector)
 {
     iommu_msi_unmask(desc);
     end_nonmaskable_irq(desc, vector);
@@ -458,14 +458,14 @@ static hw_irq_controller iommu_msi_type = {
     .set_affinity = set_msi_affinity,
 };
 
-static unsigned int iommu_maskable_msi_startup(struct irq_desc *desc)
+static unsigned int cf_check iommu_maskable_msi_startup(struct irq_desc *desc)
 {
     iommu_msi_unmask(desc);
     unmask_msi_irq(desc);
     return 0;
 }
 
-static void iommu_maskable_msi_shutdown(struct irq_desc *desc)
+static void cf_check iommu_maskable_msi_shutdown(struct irq_desc *desc)
 {
     mask_msi_irq(desc);
     iommu_msi_mask(desc);
@@ -489,7 +489,8 @@ static hw_irq_controller iommu_maskable_msi_type = {
     .set_affinity = set_msi_affinity,
 };
 
-static void set_x2apic_affinity(struct irq_desc *desc, const cpumask_t *mask)
+static void cf_check set_x2apic_affinity(
+    struct irq_desc *desc, const cpumask_t *mask)
 {
     struct amd_iommu *iommu = desc->action->dev_id;
     unsigned int dest = set_desc_affinity(desc, mask);

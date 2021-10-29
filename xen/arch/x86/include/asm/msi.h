@@ -247,10 +247,10 @@ void early_msi_init(void);
 void msi_compose_msg(unsigned vector, const cpumask_t *mask,
                      struct msi_msg *msg);
 void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable);
-void mask_msi_irq(struct irq_desc *);
-void unmask_msi_irq(struct irq_desc *);
+void cf_check mask_msi_irq(struct irq_desc *);
+void cf_check unmask_msi_irq(struct irq_desc *);
 void guest_mask_msi_irq(struct irq_desc *, bool mask);
-void ack_nonmaskable_msi_irq(struct irq_desc *);
-void set_msi_affinity(struct irq_desc *, const cpumask_t *);
+void cf_check ack_nonmaskable_msi_irq(struct irq_desc *);
+void cf_check set_msi_affinity(struct irq_desc *, const cpumask_t *);
 
 #endif /* __ASM_MSI_H */

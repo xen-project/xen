@@ -111,8 +111,8 @@ void alloc_direct_apic_vector(
 
 void do_IRQ(struct cpu_user_regs *regs);
 
-void disable_8259A_irq(struct irq_desc *);
-void enable_8259A_irq(struct irq_desc *);
+void cf_check disable_8259A_irq(struct irq_desc *);
+void cf_check enable_8259A_irq(struct irq_desc *);
 int i8259A_irq_pending(unsigned int irq);
 void mask_8259A(void);
 void unmask_8259A(void);
@@ -173,7 +173,7 @@ int create_irq(nodeid_t node, bool grant_access);
 void destroy_irq(unsigned int irq);
 int assign_irq_vector(int irq, const cpumask_t *);
 
-extern void irq_complete_move(struct irq_desc *);
+void cf_check irq_complete_move(struct irq_desc *);
 
 extern struct irq_desc *irq_desc;
 
@@ -187,7 +187,7 @@ void move_masked_irq(struct irq_desc *);
 
 int bind_irq_vector(int irq, int vector, const cpumask_t *);
 
-void end_nonmaskable_irq(struct irq_desc *, uint8_t vector);
+void cf_check end_nonmaskable_irq(struct irq_desc *, uint8_t vector);
 void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
 
 int init_domain_irq_mapping(struct domain *);

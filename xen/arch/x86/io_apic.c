@@ -473,7 +473,7 @@ static void __level_IO_APIC_irq (unsigned int irq)
     modify_IO_APIC_irq(irq, IO_APIC_REDIR_LEVEL_TRIGGER, 0);
 }
 
-static void mask_IO_APIC_irq(struct irq_desc *desc)
+static void cf_check mask_IO_APIC_irq(struct irq_desc *desc)
 {
     unsigned long flags;
 
@@ -482,7 +482,7 @@ static void mask_IO_APIC_irq(struct irq_desc *desc)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-static void unmask_IO_APIC_irq(struct irq_desc *desc)
+static void cf_check unmask_IO_APIC_irq(struct irq_desc *desc)
 {
     unsigned long flags;
 
@@ -567,7 +567,7 @@ static void clear_IO_APIC (void)
     }
 }
 
-static void
+static void cf_check
 set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
 {
     unsigned int dest;
@@ -1547,7 +1547,7 @@ static int __init timer_irq_works(void)
  * This is not complete - we should be able to fake
  * an edge even if it isn't on the 8259A...
  */
-static unsigned int startup_edge_ioapic_irq(struct irq_desc *desc)
+static unsigned int cf_check startup_edge_ioapic_irq(struct irq_desc *desc)
 {
     int was_pending = 0;
     unsigned long flags;
@@ -1569,7 +1569,7 @@ static unsigned int startup_edge_ioapic_irq(struct irq_desc *desc)
  * interrupt for real. This prevents IRQ storms from unhandled
  * devices.
  */
-static void ack_edge_ioapic_irq(struct irq_desc *desc)
+static void cf_check ack_edge_ioapic_irq(struct irq_desc *desc)
 {
     irq_complete_move(desc);
     move_native_irq(desc);
@@ -1594,7 +1594,7 @@ static void ack_edge_ioapic_irq(struct irq_desc *desc)
  * generic IRQ layer and by the fact that an unacked local
  * APIC does not accept IRQs.
  */
-static unsigned int startup_level_ioapic_irq(struct irq_desc *desc)
+static unsigned int cf_check startup_level_ioapic_irq(struct irq_desc *desc)
 {
     unmask_IO_APIC_irq(desc);
 
@@ -1652,7 +1652,7 @@ static bool io_apic_level_ack_pending(unsigned int irq)
     return 0;
 }
 
-static void mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
+static void cf_check mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
 {
     unsigned long v;
     int i;
@@ -1702,7 +1702,7 @@ static void mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
     }
 }
 
-static void end_level_ioapic_irq_old(struct irq_desc *desc, u8 vector)
+static void cf_check end_level_ioapic_irq_old(struct irq_desc *desc, u8 vector)
 {
     if ( directed_eoi_enabled )
     {
@@ -1723,7 +1723,7 @@ static void end_level_ioapic_irq_old(struct irq_desc *desc, u8 vector)
         unmask_IO_APIC_irq(desc);
 }
 
-static void end_level_ioapic_irq_new(struct irq_desc *desc, u8 vector)
+static void cf_check end_level_ioapic_irq_new(struct irq_desc *desc, u8 vector)
 {
 /*
  * It appears there is an erratum which affects at least version 0x11
@@ -1807,7 +1807,7 @@ static inline void init_IO_APIC_traps(void)
             make_8259A_irq(irq);
 }
 
-static void enable_lapic_irq(struct irq_desc *desc)
+static void cf_check enable_lapic_irq(struct irq_desc *desc)
 {
     unsigned long v;
 
@@ -1815,7 +1815,7 @@ static void enable_lapic_irq(struct irq_desc *desc)
     apic_write(APIC_LVT0, v & ~APIC_LVT_MASKED);
 }
 
-static void disable_lapic_irq(struct irq_desc *desc)
+static void cf_check disable_lapic_irq(struct irq_desc *desc)
 {
     unsigned long v;
 
@@ -1823,7 +1823,7 @@ static void disable_lapic_irq(struct irq_desc *desc)
     apic_write(APIC_LVT0, v | APIC_LVT_MASKED);
 }
 
-static void ack_lapic_irq(struct irq_desc *desc)
+static void cf_check ack_lapic_irq(struct irq_desc *desc)
 {
     ack_APIC_irq();
 }

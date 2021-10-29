@@ -40,18 +40,18 @@ bool bogus_8259A_irq(unsigned int irq)
     return _mask_and_ack_8259A_irq(irq);
 }
 
-static void mask_and_ack_8259A_irq(struct irq_desc *desc)
+static void cf_check mask_and_ack_8259A_irq(struct irq_desc *desc)
 {
     _mask_and_ack_8259A_irq(desc->irq);
 }
 
-static unsigned int startup_8259A_irq(struct irq_desc *desc)
+static unsigned int cf_check startup_8259A_irq(struct irq_desc *desc)
 {
     enable_8259A_irq(desc);
     return 0; /* never anything pending */
 }
 
-static void end_8259A_irq(struct irq_desc *desc, u8 vector)
+static void cf_check end_8259A_irq(struct irq_desc *desc, u8 vector)
 {
     if (!(desc->status & (IRQ_DISABLED|IRQ_INPROGRESS)))
         enable_8259A_irq(desc);
@@ -108,12 +108,12 @@ static void _disable_8259A_irq(unsigned int irq)
     spin_unlock_irqrestore(&i8259A_lock, flags);
 }
 
-void disable_8259A_irq(struct irq_desc *desc)
+void cf_check disable_8259A_irq(struct irq_desc *desc)
 {
     _disable_8259A_irq(desc->irq);
 }
 
-void enable_8259A_irq(struct irq_desc *desc)
+void cf_check enable_8259A_irq(struct irq_desc *desc)
 {
     unsigned int mask = ~(1 << desc->irq);
     unsigned long flags;

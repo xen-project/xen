@@ -1080,7 +1080,7 @@ static void cf_check iommu_page_fault(
     tasklet_schedule(&vtd_fault_tasklet);
 }
 
-static void dma_msi_unmask(struct irq_desc *desc)
+static void cf_check dma_msi_unmask(struct irq_desc *desc)
 {
     struct vtd_iommu *iommu = desc->action->dev_id;
     unsigned long flags;
@@ -1095,7 +1095,7 @@ static void dma_msi_unmask(struct irq_desc *desc)
     iommu->msi.msi_attrib.host_masked = 0;
 }
 
-static void dma_msi_mask(struct irq_desc *desc)
+static void cf_check dma_msi_mask(struct irq_desc *desc)
 {
     unsigned long flags;
     struct vtd_iommu *iommu = desc->action->dev_id;
@@ -1110,26 +1110,27 @@ static void dma_msi_mask(struct irq_desc *desc)
     iommu->msi.msi_attrib.host_masked = 1;
 }
 
-static unsigned int dma_msi_startup(struct irq_desc *desc)
+static unsigned int cf_check dma_msi_startup(struct irq_desc *desc)
 {
     dma_msi_unmask(desc);
     return 0;
 }
 
-static void dma_msi_ack(struct irq_desc *desc)
+static void cf_check dma_msi_ack(struct irq_desc *desc)
 {
     irq_complete_move(desc);
     dma_msi_mask(desc);
     move_masked_irq(desc);
 }
 
-static void dma_msi_end(struct irq_desc *desc, u8 vector)
+static void cf_check dma_msi_end(struct irq_desc *desc, u8 vector)
 {
     dma_msi_unmask(desc);
     end_nonmaskable_irq(desc, vector);
 }
 
-static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
+static void cf_check dma_msi_set_affinity(
+    struct irq_desc *desc, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;

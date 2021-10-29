@@ -116,9 +116,9 @@ extern int request_irq(unsigned int irq, unsigned int irqflags,
                const char * devname, void *dev_id);
 
 extern hw_irq_controller no_irq_type;
-extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);
-extern unsigned int irq_startup_none(struct irq_desc *);
-extern void irq_actor_none(struct irq_desc *);
+void cf_check no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);
+unsigned int cf_check irq_startup_none(struct irq_desc *);
+void cf_check irq_actor_none(struct irq_desc *);
 #define irq_shutdown_none irq_actor_none
 #define irq_disable_none irq_actor_none
 #define irq_enable_none irq_actor_none

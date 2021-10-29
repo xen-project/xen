@@ -241,7 +241,7 @@ static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     return 0;
 }
 
-void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
+void cf_check set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;
@@ -416,14 +416,14 @@ static int msi_get_mask_bit(const struct msi_desc *entry)
     return -1;
 }
 
-void mask_msi_irq(struct irq_desc *desc)
+void cf_check mask_msi_irq(struct irq_desc *desc)
 {
     if ( unlikely(!msi_set_mask_bit(desc, 1,
                                     desc->msi_desc->msi_attrib.guest_masked)) )
         BUG_ON(!(desc->status & IRQ_DISABLED));
 }
 
-void unmask_msi_irq(struct irq_desc *desc)
+void cf_check unmask_msi_irq(struct irq_desc *desc)
 {
     if ( unlikely(!msi_set_mask_bit(desc, 0,
                                     desc->msi_desc->msi_attrib.guest_masked)) )
@@ -435,26 +435,26 @@ void guest_mask_msi_irq(struct irq_desc *desc, bool mask)
     msi_set_mask_bit(desc, desc->msi_desc->msi_attrib.host_masked, mask);
 }
 
-static unsigned int startup_msi_irq(struct irq_desc *desc)
+static unsigned int cf_check startup_msi_irq(struct irq_desc *desc)
 {
     if ( unlikely(!msi_set_mask_bit(desc, 0, !!(desc->status & IRQ_GUEST))) )
         WARN();
     return 0;
 }
 
-static void shutdown_msi_irq(struct irq_desc *desc)
+static void cf_check shutdown_msi_irq(struct irq_desc *desc)
 {
     if ( unlikely(!msi_set_mask_bit(desc, 1, 1)) )
         BUG_ON(!(desc->status & IRQ_DISABLED));
 }
 
-void ack_nonmaskable_msi_irq(struct irq_desc *desc)
+void cf_check ack_nonmaskable_msi_irq(struct irq_desc *desc)
 {
     irq_complete_move(desc);
     move_native_irq(desc);
 }
 
-static void ack_maskable_msi_irq(struct irq_desc *desc)
+static void cf_check ack_maskable_msi_irq(struct irq_desc *desc)
 {
     ack_nonmaskable_msi_irq(desc);
     ack_APIC_irq(); /* ACKTYPE_NONE */
