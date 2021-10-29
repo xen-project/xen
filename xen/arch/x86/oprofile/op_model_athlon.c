@@ -164,7 +164,7 @@ static inline u64 op_amd_randomize_ibs_op(u64 val)
     return val;
 }
 
-static void athlon_fill_in_addresses(struct op_msrs * const msrs)
+static void cf_check athlon_fill_in_addresses(struct op_msrs * const msrs)
 {
 	msrs->counters[0].addr = MSR_K7_PERFCTR0;
 	msrs->counters[1].addr = MSR_K7_PERFCTR1;
@@ -177,7 +177,7 @@ static void athlon_fill_in_addresses(struct op_msrs * const msrs)
 	msrs->controls[3].addr = MSR_K7_EVNTSEL3;
 }
 
-static void fam15h_fill_in_addresses(struct op_msrs * const msrs)
+static void cf_check fam15h_fill_in_addresses(struct op_msrs * const msrs)
 {
 	msrs->counters[0].addr = MSR_AMD_FAM15H_PERFCTR0;
 	msrs->counters[1].addr = MSR_AMD_FAM15H_PERFCTR1;
@@ -194,7 +194,7 @@ static void fam15h_fill_in_addresses(struct op_msrs * const msrs)
 	msrs->controls[5].addr = MSR_AMD_FAM15H_EVNTSEL5;
 }
 
-static void athlon_setup_ctrs(struct op_msrs const * const msrs)
+static void cf_check athlon_setup_ctrs(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
@@ -308,9 +308,9 @@ static inline int handle_ibs(int mode, struct cpu_user_regs const * const regs)
     return 1;
 }
 
-static int athlon_check_ctrs(unsigned int const cpu,
-			     struct op_msrs const * const msrs,
-			     struct cpu_user_regs const * const regs)
+static int cf_check athlon_check_ctrs(
+	unsigned int const cpu, struct op_msrs const * const msrs,
+	struct cpu_user_regs const * const regs)
 
 {
 	uint64_t msr_content;
@@ -386,7 +386,7 @@ static inline void start_ibs(void)
 	}
 }
  
-static void athlon_start(struct op_msrs const * const msrs)
+static void cf_check athlon_start(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
@@ -415,7 +415,7 @@ static void stop_ibs(void)
 		wrmsrl(MSR_AMD64_IBSOPCTL, 0);
 }
 
-static void athlon_stop(struct op_msrs const * const msrs)
+static void cf_check athlon_stop(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;

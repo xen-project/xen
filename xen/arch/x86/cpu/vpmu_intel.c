@@ -288,7 +288,7 @@ static inline void __core2_vpmu_save(struct vcpu *v)
         rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, core2_vpmu_cxt->global_status);
 }
 
-static int core2_vpmu_save(struct vcpu *v, bool_t to_guest)
+static int cf_check core2_vpmu_save(struct vcpu *v, bool to_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
@@ -407,7 +407,7 @@ static int core2_vpmu_verify(struct vcpu *v)
     return 0;
 }
 
-static int core2_vpmu_load(struct vcpu *v, bool_t from_guest)
+static int cf_check core2_vpmu_load(struct vcpu *v, bool from_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
@@ -522,7 +522,7 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
     return 1;
 }
 
-static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
+static int cf_check core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
     int i, tmp;
     int type = -1, index = -1;
@@ -690,7 +690,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     return 0;
 }
 
-static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
+static int cf_check core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
     int type = -1, index = -1;
     struct vcpu *v = current;
@@ -730,7 +730,7 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 }
 
 /* Dump vpmu info on console, called in the context of keyhandler 'q'. */
-static void core2_vpmu_dump(const struct vcpu *v)
+static void cf_check core2_vpmu_dump(const struct vcpu *v)
 {
     const struct vpmu_struct *vpmu = vcpu_vpmu(v);
     unsigned int i;
@@ -775,7 +775,7 @@ static void core2_vpmu_dump(const struct vcpu *v)
     }
 }
 
-static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
+static int cf_check core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     u64 msr_content;
@@ -802,7 +802,7 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     return 1;
 }
 
-static void core2_vpmu_destroy(struct vcpu *v)
+static void cf_check core2_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
@@ -816,7 +816,7 @@ static void core2_vpmu_destroy(struct vcpu *v)
     vpmu_clear(vpmu);
 }
 
-static int vmx_vpmu_initialise(struct vcpu *v)
+static int cf_check vmx_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     u64 msr_content;

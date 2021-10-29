@@ -390,7 +390,7 @@ static unsigned int get_stagger(void)
 static unsigned long reset_value[NUM_COUNTERS_NON_HT];
 
 
-static void p4_fill_in_addresses(struct op_msrs * const msrs)
+static void cf_check p4_fill_in_addresses(struct op_msrs * const msrs)
 {
 	unsigned int i;
 	unsigned int addr, stag;
@@ -530,7 +530,7 @@ static void pmc_setup_one_p4_counter(unsigned int ctr)
 }
 
 
-static void p4_setup_ctrs(struct op_msrs const * const msrs)
+static void cf_check p4_setup_ctrs(struct op_msrs const * const msrs)
 {
 	unsigned int i;
 	uint64_t msr_content;
@@ -609,9 +609,9 @@ static void p4_setup_ctrs(struct op_msrs const * const msrs)
 	}
 }
 
-static int p4_check_ctrs(unsigned int const cpu,
-                         struct op_msrs const * const msrs,
-                         struct cpu_user_regs const * const regs)
+static int cf_check p4_check_ctrs(
+	unsigned int const cpu, struct op_msrs const * const msrs,
+	struct cpu_user_regs const * const regs)
 {
 	unsigned long ctr, stag, real;
 	uint64_t msr_content;
@@ -665,7 +665,7 @@ static int p4_check_ctrs(unsigned int const cpu,
 }
 
 
-static void p4_start(struct op_msrs const * const msrs)
+static void cf_check p4_start(struct op_msrs const * const msrs)
 {
 	unsigned int stag;
 	uint64_t msr_content;
@@ -683,7 +683,7 @@ static void p4_start(struct op_msrs const * const msrs)
 }
 
 
-static void p4_stop(struct op_msrs const * const msrs)
+static void cf_check p4_stop(struct op_msrs const * const msrs)
 {
 	unsigned int stag;
 	uint64_t msr_content;

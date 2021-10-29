@@ -186,7 +186,7 @@ static void amd_vpmu_unset_msr_bitmap(struct vcpu *v)
     msr_bitmap_off(vpmu);
 }
 
-static int amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
+static int cf_check amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
     return 1;
 }
@@ -206,7 +206,7 @@ static inline void context_load(struct vcpu *v)
     }
 }
 
-static int amd_vpmu_load(struct vcpu *v, bool_t from_guest)
+static int cf_check amd_vpmu_load(struct vcpu *v, bool from_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct xen_pmu_amd_ctxt *ctxt;
@@ -280,7 +280,7 @@ static inline void context_save(struct vcpu *v)
         rdmsrl(counters[i], counter_regs[i]);
 }
 
-static int amd_vpmu_save(struct vcpu *v,  bool_t to_guest)
+static int cf_check amd_vpmu_save(struct vcpu *v,  bool to_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     unsigned int i;
@@ -348,7 +348,7 @@ static void context_update(unsigned int msr, u64 msr_content)
     }
 }
 
-static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
+static int cf_check amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -404,7 +404,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     return 0;
 }
 
-static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
+static int cf_check amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -422,7 +422,7 @@ static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     return 0;
 }
 
-static void amd_vpmu_destroy(struct vcpu *v)
+static void cf_check amd_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
@@ -440,7 +440,7 @@ static void amd_vpmu_destroy(struct vcpu *v)
 }
 
 /* VPMU part of the 'q' keyhandler */
-static void amd_vpmu_dump(const struct vcpu *v)
+static void cf_check amd_vpmu_dump(const struct vcpu *v)
 {
     const struct vpmu_struct *vpmu = vcpu_vpmu(v);
     const struct xen_pmu_amd_ctxt *ctxt = vpmu->context;
@@ -480,7 +480,7 @@ static void amd_vpmu_dump(const struct vcpu *v)
     }
 }
 
-static int svm_vpmu_initialise(struct vcpu *v)
+static int cf_check svm_vpmu_initialise(struct vcpu *v)
 {
     struct xen_pmu_amd_ctxt *ctxt;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);

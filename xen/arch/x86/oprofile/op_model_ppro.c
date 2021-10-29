@@ -63,7 +63,7 @@ static int counter_width = 32;
 static unsigned long reset_value[OP_MAX_COUNTER];
 int ppro_has_global_ctrl = 0;
 
-static void ppro_fill_in_addresses(struct op_msrs * const msrs)
+static void cf_check ppro_fill_in_addresses(struct op_msrs * const msrs)
 {
 	int i;
 
@@ -74,7 +74,7 @@ static void ppro_fill_in_addresses(struct op_msrs * const msrs)
 }
 
 
-static void ppro_setup_ctrs(struct op_msrs const * const msrs)
+static void cf_check ppro_setup_ctrs(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
@@ -128,9 +128,9 @@ static void ppro_setup_ctrs(struct op_msrs const * const msrs)
 	}
 }
 
-static int ppro_check_ctrs(unsigned int const cpu,
-                           struct op_msrs const * const msrs,
-                           struct cpu_user_regs const * const regs)
+static int cf_check ppro_check_ctrs(
+	unsigned int const cpu, struct op_msrs const * const msrs,
+	struct cpu_user_regs const * const regs)
 {
 	u64 val;
 	int i;
@@ -170,7 +170,7 @@ static int ppro_check_ctrs(unsigned int const cpu,
 }
 
 
-static void ppro_start(struct op_msrs const * const msrs)
+static void cf_check ppro_start(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
@@ -190,7 +190,7 @@ static void ppro_start(struct op_msrs const * const msrs)
 }
 
 
-static void ppro_stop(struct op_msrs const * const msrs)
+static void cf_check ppro_stop(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
@@ -206,7 +206,7 @@ static void ppro_stop(struct op_msrs const * const msrs)
         wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0x0ULL);
 }
 
-static int ppro_is_arch_pmu_msr(u64 msr_index, int *type, int *index)
+static int cf_check ppro_is_arch_pmu_msr(u64 msr_index, int *type, int *index)
 {
 	if ( (msr_index >= MSR_IA32_PERFCTR0) &&
             (msr_index < (MSR_IA32_PERFCTR0 + num_counters)) )
@@ -226,7 +226,7 @@ static int ppro_is_arch_pmu_msr(u64 msr_index, int *type, int *index)
         return 0;
 }
 
-static int ppro_allocate_msr(struct vcpu *v)
+static int cf_check ppro_allocate_msr(struct vcpu *v)
 {
 	struct vpmu_struct *vpmu = vcpu_vpmu(v);
 	struct arch_msr_pair *msr_content;
@@ -245,7 +245,7 @@ out:
 	return 0;
 }
 
-static void ppro_free_msr(struct vcpu *v)
+static void cf_check ppro_free_msr(struct vcpu *v)
 {
 	struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
@@ -255,7 +255,8 @@ static void ppro_free_msr(struct vcpu *v)
 	vpmu_reset(vpmu, VPMU_PASSIVE_DOMAIN_ALLOCATED);
 }
 
-static void ppro_load_msr(struct vcpu *v, int type, int index, u64 *msr_content)
+static void cf_check ppro_load_msr(
+	struct vcpu *v, int type, int index, u64 *msr_content)
 {
 	struct arch_msr_pair *msrs = vcpu_vpmu(v)->context;
 	switch ( type )
@@ -269,7 +270,8 @@ static void ppro_load_msr(struct vcpu *v, int type, int index, u64 *msr_content)
 	}
 }
 
-static void ppro_save_msr(struct vcpu *v, int type, int index, u64 msr_content)
+static void cf_check ppro_save_msr(
+	struct vcpu *v, int type, int index, u64 msr_content)
 {
 	struct arch_msr_pair *msrs = vcpu_vpmu(v)->context;
 
