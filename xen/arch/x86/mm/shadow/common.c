@@ -40,9 +40,9 @@
 
 DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
-static int sh_enable_log_dirty(struct domain *, bool log_global);
-static int sh_disable_log_dirty(struct domain *);
-static void sh_clean_dirty_bitmap(struct domain *);
+static int cf_check sh_enable_log_dirty(struct domain *, bool log_global);
+static int cf_check sh_disable_log_dirty(struct domain *);
+static void cf_check sh_clean_dirty_bitmap(struct domain *);
 
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called for every domain from arch_domain_create() */
@@ -3016,7 +3016,7 @@ static int shadow_test_disable(struct domain *d)
 /* Shadow specific code which is called in paging_log_dirty_enable().
  * Return 0 if no problem found.
  */
-static int sh_enable_log_dirty(struct domain *d, bool log_global)
+static int cf_check sh_enable_log_dirty(struct domain *d, bool log_global)
 {
     int ret;
 
@@ -3044,7 +3044,7 @@ static int sh_enable_log_dirty(struct domain *d, bool log_global)
 }
 
 /* shadow specfic code which is called in paging_log_dirty_disable() */
-static int sh_disable_log_dirty(struct domain *d)
+static int cf_check sh_disable_log_dirty(struct domain *d)
 {
     int ret;
 
@@ -3058,7 +3058,7 @@ static int sh_disable_log_dirty(struct domain *d)
 /* This function is called when we CLEAN log dirty bitmap. See
  * paging_log_dirty_op() for details.
  */
-static void sh_clean_dirty_bitmap(struct domain *d)
+static void cf_check sh_clean_dirty_bitmap(struct domain *d)
 {
     paging_lock(d);
     /* Need to revoke write access to the domain's pages again.

@@ -1,19 +1,19 @@
 #include <xen/mm.h>
 #include <asm/shadow.h>
 
-static int _enable_log_dirty(struct domain *d, bool log_global)
+static int cf_check _enable_log_dirty(struct domain *d, bool log_global)
 {
     ASSERT(is_pv_domain(d));
     return -EOPNOTSUPP;
 }
 
-static int _disable_log_dirty(struct domain *d)
+static int cf_check _disable_log_dirty(struct domain *d)
 {
     ASSERT(is_pv_domain(d));
     return -EOPNOTSUPP;
 }
 
-static void _clean_dirty_bitmap(struct domain *d)
+static void cf_check _clean_dirty_bitmap(struct domain *d)
 {
     ASSERT(is_pv_domain(d));
 }
