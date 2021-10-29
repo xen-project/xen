@@ -168,31 +168,30 @@ void hypfs_add_dyndir(struct hypfs_entry_dir *parent,
                       struct hypfs_entry_dir *template);
 int hypfs_add_leaf(struct hypfs_entry_dir *parent,
                    struct hypfs_entry_leaf *leaf, bool nofault);
-const struct hypfs_entry *hypfs_node_enter(const struct hypfs_entry *entry);
-void hypfs_node_exit(const struct hypfs_entry *entry);
-int hypfs_read_dir(const struct hypfs_entry *entry,
-                   XEN_GUEST_HANDLE_PARAM(void) uaddr);
-int hypfs_read_leaf(const struct hypfs_entry *entry,
-                    XEN_GUEST_HANDLE_PARAM(void) uaddr);
-int hypfs_write_deny(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
-                     unsigned int ulen);
-int hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
-                     unsigned int ulen);
-int hypfs_write_bool(struct hypfs_entry_leaf *leaf,
-                     XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
-                     unsigned int ulen);
-int hypfs_write_custom(struct hypfs_entry_leaf *leaf,
-                       XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
-                       unsigned int ulen);
-unsigned int hypfs_getsize(const struct hypfs_entry *entry);
-struct hypfs_entry *hypfs_leaf_findentry(const struct hypfs_entry_dir *dir,
-                                         const char *name,
-                                         unsigned int name_len);
-struct hypfs_entry *hypfs_dir_findentry(const struct hypfs_entry_dir *dir,
-                                        const char *name,
-                                        unsigned int name_len);
+const struct hypfs_entry *cf_check hypfs_node_enter(
+    const struct hypfs_entry *entry);
+void cf_check hypfs_node_exit(const struct hypfs_entry *entry);
+int cf_check hypfs_read_dir(const struct hypfs_entry *entry,
+                            XEN_GUEST_HANDLE_PARAM(void) uaddr);
+int cf_check hypfs_read_leaf(const struct hypfs_entry *entry,
+                             XEN_GUEST_HANDLE_PARAM(void) uaddr);
+int cf_check hypfs_write_deny(struct hypfs_entry_leaf *leaf,
+                              XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                              unsigned int ulen);
+int cf_check hypfs_write_leaf(struct hypfs_entry_leaf *leaf,
+                              XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                              unsigned int ulen);
+int cf_check hypfs_write_bool(struct hypfs_entry_leaf *leaf,
+                              XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                              unsigned int ulen);
+int cf_check hypfs_write_custom(struct hypfs_entry_leaf *leaf,
+                                XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+                                unsigned int ulen);
+unsigned int cf_check hypfs_getsize(const struct hypfs_entry *entry);
+struct hypfs_entry *cf_check hypfs_leaf_findentry(
+    const struct hypfs_entry_dir *dir, const char *name, unsigned int name_len);
+struct hypfs_entry *cf_check hypfs_dir_findentry(
+    const struct hypfs_entry_dir *dir, const char *name, unsigned int name_len);
 void *hypfs_alloc_dyndata(unsigned long size);
 #define hypfs_alloc_dyndata(type) ((type *)hypfs_alloc_dyndata(sizeof(type)))
 void *hypfs_get_dyndata(void);

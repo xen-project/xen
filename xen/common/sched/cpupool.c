@@ -1026,8 +1026,8 @@ static struct notifier_block cpu_nfb = {
 
 static HYPFS_DIR_INIT(cpupool_pooldir, "%u");
 
-static int cpupool_dir_read(const struct hypfs_entry *entry,
-                            XEN_GUEST_HANDLE_PARAM(void) uaddr)
+static int cf_check cpupool_dir_read(
+    const struct hypfs_entry *entry, XEN_GUEST_HANDLE_PARAM(void) uaddr)
 {
     int ret = 0;
     struct cpupool *c;
@@ -1050,7 +1050,8 @@ static int cpupool_dir_read(const struct hypfs_entry *entry,
     return ret;
 }
 
-static unsigned int cpupool_dir_getsize(const struct hypfs_entry *entry)
+static unsigned int cf_check cpupool_dir_getsize(
+    const struct hypfs_entry *entry)
 {
     const struct cpupool *c;
     unsigned int size = 0;
@@ -1061,7 +1062,7 @@ static unsigned int cpupool_dir_getsize(const struct hypfs_entry *entry)
     return size;
 }
 
-static const struct hypfs_entry *cpupool_dir_enter(
+static const struct hypfs_entry *cf_check cpupool_dir_enter(
     const struct hypfs_entry *entry)
 {
     struct hypfs_dyndir_id *data;
@@ -1076,14 +1077,14 @@ static const struct hypfs_entry *cpupool_dir_enter(
     return entry;
 }
 
-static void cpupool_dir_exit(const struct hypfs_entry *entry)
+static void cf_check cpupool_dir_exit(const struct hypfs_entry *entry)
 {
     spin_unlock(&cpupool_lock);
 
     hypfs_free_dyndata();
 }
 
-static struct hypfs_entry *cpupool_dir_findentry(
+static struct hypfs_entry *cf_check cpupool_dir_findentry(
     const struct hypfs_entry_dir *dir, const char *name, unsigned int name_len)
 {
     unsigned long id;
@@ -1102,8 +1103,8 @@ static struct hypfs_entry *cpupool_dir_findentry(
     return hypfs_gen_dyndir_id_entry(&cpupool_pooldir, id, cpupool);
 }
 
-static int cpupool_gran_read(const struct hypfs_entry *entry,
-                             XEN_GUEST_HANDLE_PARAM(void) uaddr)
+static int cf_check cpupool_gran_read(
+    const struct hypfs_entry *entry, XEN_GUEST_HANDLE_PARAM(void) uaddr)
 {
     const struct hypfs_dyndir_id *data;
     const struct cpupool *cpupool;
@@ -1121,7 +1122,7 @@ static int cpupool_gran_read(const struct hypfs_entry *entry,
     return copy_to_guest(uaddr, gran, strlen(gran) + 1) ? -EFAULT : 0;
 }
 
-static unsigned int hypfs_gran_getsize(const struct hypfs_entry *entry)
+static unsigned int cf_check hypfs_gran_getsize(const struct hypfs_entry *entry)
 {
     const struct hypfs_dyndir_id *data;
     const struct cpupool *cpupool;
@@ -1136,9 +1137,9 @@ static unsigned int hypfs_gran_getsize(const struct hypfs_entry *entry)
     return strlen(gran) + 1;
 }
 
-static int cpupool_gran_write(struct hypfs_entry_leaf *leaf,
-                              XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
-                              unsigned int ulen)
+static int cf_check cpupool_gran_write(
+    struct hypfs_entry_leaf *leaf, XEN_GUEST_HANDLE_PARAM(const_void) uaddr,
+    unsigned int ulen)
 {
     const struct hypfs_dyndir_id *data;
     struct cpupool *cpupool;
