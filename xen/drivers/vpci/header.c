@@ -33,8 +33,8 @@ struct map_data {
     bool map;
 };
 
-static int map_range(unsigned long s, unsigned long e, void *data,
-                     unsigned long *c)
+static int cf_check map_range(
+    unsigned long s, unsigned long e, void *data, unsigned long *c)
 {
     const struct map_data *map = data;
     int rc;
@@ -332,8 +332,8 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
     return 0;
 }
 
-static void cmd_write(const struct pci_dev *pdev, unsigned int reg,
-                      uint32_t cmd, void *data)
+static void cf_check cmd_write(
+    const struct pci_dev *pdev, unsigned int reg, uint32_t cmd, void *data)
 {
     uint16_t current_cmd = pci_conf_read16(pdev->sbdf, reg);
 
@@ -353,8 +353,8 @@ static void cmd_write(const struct pci_dev *pdev, unsigned int reg,
         pci_conf_write16(pdev->sbdf, reg, cmd);
 }
 
-static void bar_write(const struct pci_dev *pdev, unsigned int reg,
-                      uint32_t val, void *data)
+static void cf_check bar_write(
+    const struct pci_dev *pdev, unsigned int reg, uint32_t val, void *data)
 {
     struct vpci_bar *bar = data;
     bool hi = false;
@@ -397,8 +397,8 @@ static void bar_write(const struct pci_dev *pdev, unsigned int reg,
     pci_conf_write32(pdev->sbdf, reg, val);
 }
 
-static void rom_write(const struct pci_dev *pdev, unsigned int reg,
-                      uint32_t val, void *data)
+static void cf_check rom_write(
+    const struct pci_dev *pdev, unsigned int reg, uint32_t val, void *data)
 {
     struct vpci_header *header = &pdev->vpci->header;
     struct vpci_bar *rom = data;
@@ -445,7 +445,7 @@ static void rom_write(const struct pci_dev *pdev, unsigned int reg,
         rom->addr = val & PCI_ROM_ADDRESS_MASK;
 }
 
-static int init_bars(struct pci_dev *pdev)
+static int cf_check init_bars(struct pci_dev *pdev)
 {
     uint16_t cmd;
     uint64_t addr, size;

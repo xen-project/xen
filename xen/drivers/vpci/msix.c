@@ -27,8 +27,8 @@
     ((addr) >= vmsix_table_addr(vpci, nr) &&                              \
      (addr) < vmsix_table_addr(vpci, nr) + vmsix_table_size(vpci, nr))
 
-static uint32_t control_read(const struct pci_dev *pdev, unsigned int reg,
-                             void *data)
+static uint32_t cf_check control_read(
+    const struct pci_dev *pdev, unsigned int reg, void *data)
 {
     const struct vpci_msix *msix = data;
 
@@ -65,8 +65,8 @@ static void update_entry(struct vpci_msix_entry *entry,
     entry->updated = false;
 }
 
-static void control_write(const struct pci_dev *pdev, unsigned int reg,
-                          uint32_t val, void *data)
+static void cf_check control_write(
+    const struct pci_dev *pdev, unsigned int reg, uint32_t val, void *data)
 {
     struct vpci_msix *msix = data;
     bool new_masked = val & PCI_MSIX_FLAGS_MASKALL;
@@ -156,7 +156,7 @@ static struct vpci_msix *msix_find(const struct domain *d, unsigned long addr)
     return NULL;
 }
 
-static int msix_accept(struct vcpu *v, unsigned long addr)
+static int cf_check msix_accept(struct vcpu *v, unsigned long addr)
 {
     return !!msix_find(v->domain, addr);
 }
@@ -182,8 +182,8 @@ static struct vpci_msix_entry *get_entry(struct vpci_msix *msix,
     return &msix->entries[(addr - start) / PCI_MSIX_ENTRY_SIZE];
 }
 
-static int msix_read(struct vcpu *v, unsigned long addr, unsigned int len,
-                     unsigned long *data)
+static int cf_check msix_read(
+    struct vcpu *v, unsigned long addr, unsigned int len, unsigned long *data)
 {
     const struct domain *d = v->domain;
     struct vpci_msix *msix = msix_find(d, addr);
@@ -259,8 +259,8 @@ static int msix_read(struct vcpu *v, unsigned long addr, unsigned int len,
     return X86EMUL_OKAY;
 }
 
-static int msix_write(struct vcpu *v, unsigned long addr, unsigned int len,
-                      unsigned long data)
+static int cf_check msix_write(
+    struct vcpu *v, unsigned long addr, unsigned int len, unsigned long data)
 {
     const struct domain *d = v->domain;
     struct vpci_msix *msix = msix_find(d, addr);
@@ -428,7 +428,7 @@ int vpci_make_msix_hole(const struct pci_dev *pdev)
     return 0;
 }
 
-static int init_msix(struct pci_dev *pdev)
+static int cf_check init_msix(struct pci_dev *pdev)
 {
     struct domain *d = pdev->domain;
     uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);

@@ -106,25 +106,25 @@ static int vpci_register_cmp(const struct vpci_register *r1,
 }
 
 /* Dummy hooks, writes are ignored, reads return 1's */
-static uint32_t vpci_ignored_read(const struct pci_dev *pdev, unsigned int reg,
-                                  void *data)
+static uint32_t cf_check vpci_ignored_read(
+    const struct pci_dev *pdev, unsigned int reg, void *data)
 {
     return ~(uint32_t)0;
 }
 
-static void vpci_ignored_write(const struct pci_dev *pdev, unsigned int reg,
-                               uint32_t val, void *data)
+static void cf_check vpci_ignored_write(
+    const struct pci_dev *pdev, unsigned int reg, uint32_t val, void *data)
 {
 }
 
-uint32_t vpci_hw_read16(const struct pci_dev *pdev, unsigned int reg,
-                        void *data)
+uint32_t cf_check vpci_hw_read16(
+    const struct pci_dev *pdev, unsigned int reg, void *data)
 {
     return pci_conf_read16(pdev->sbdf, reg);
 }
 
-uint32_t vpci_hw_read32(const struct pci_dev *pdev, unsigned int reg,
-                        void *data)
+uint32_t cf_check vpci_hw_read32(
+    const struct pci_dev *pdev, unsigned int reg, void *data)
 {
     return pci_conf_read32(pdev->sbdf, reg);
 }
