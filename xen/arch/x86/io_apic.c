@@ -235,11 +235,19 @@ union entry_union {
 struct IO_APIC_route_entry __ioapic_read_entry(
     unsigned int apic, unsigned int pin, bool raw)
 {
-    unsigned int (*read)(unsigned int, unsigned int)
-        = raw ? __io_apic_read : io_apic_read;
     union entry_union eu;
-    eu.w1 = (*read)(apic, 0x10 + 2 * pin);
-    eu.w2 = (*read)(apic, 0x11 + 2 * pin);
+
+    if ( raw )
+    {
+        eu.w1 = __io_apic_read(apic, 0x10 + 2 * pin);
+        eu.w2 = __io_apic_read(apic, 0x11 + 2 * pin);
+    }
+    else
+    {
+        eu.w1 = io_apic_read(apic, 0x10 + 2 * pin);
+        eu.w2 = io_apic_read(apic, 0x11 + 2 * pin);
+    }
+
     return eu.entry;
 }
 
@@ -259,12 +267,18 @@ void __ioapic_write_entry(
     unsigned int apic, unsigned int pin, bool raw,
     struct IO_APIC_route_entry e)
 {
-    void (*write)(unsigned int, unsigned int, unsigned int)
-        = raw ? __io_apic_write : io_apic_write;
     union entry_union eu = { .entry = e };
 
-    (*write)(apic, 0x11 + 2*pin, eu.w2);
-    (*write)(apic, 0x10 + 2*pin, eu.w1);
+    if ( raw )
+    {
+        __io_apic_write(apic, 0x11 + 2 * pin, eu.w2);
+        __io_apic_write(apic, 0x10 + 2 * pin, eu.w1);
+    }
+    else
+    {
+        io_apic_write(apic, 0x11 + 2 * pin, eu.w2);
+        io_apic_write(apic, 0x10 + 2 * pin, eu.w1);
+    }
 }
 
 static void ioapic_write_entry(
