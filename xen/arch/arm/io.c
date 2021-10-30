@@ -80,6 +80,13 @@ static int cmp_mmio_handler(const void *key, const void *elem)
     return 0;
 }
 
+static void swap_mmio_handler(void *_a, void *_b, size_t size)
+{
+    struct mmio_handler *a = _a, *b = _b;
+
+    SWAP(*a, *b);
+}
+
 static const struct mmio_handler *find_mmio_handler(struct domain *d,
                                                     paddr_t gpa)
 {
@@ -170,7 +177,7 @@ void register_mmio_handler(struct domain *d,
 
     /* Sort mmio handlers in ascending order based on base address */
     sort(vmmio->handlers, vmmio->num_entries, sizeof(struct mmio_handler),
-         cmp_mmio_handler, NULL);
+         cmp_mmio_handler, swap_mmio_handler);
 
     write_unlock(&vmmio->lock);
 }
