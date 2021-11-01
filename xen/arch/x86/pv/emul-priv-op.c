@@ -26,6 +26,7 @@
 
 #include <asm/amd.h>
 #include <asm/debugreg.h>
+#include <asm/endbr.h>
 #include <asm/hpet.h>
 #include <asm/hypercall.h>
 #include <asm/mc146818rtc.h>
@@ -109,6 +110,12 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
             map_domain_page(_mfn(this_stubs->mfn)) + (stub_va & ~PAGE_MASK);
 
     p = ctxt->io_emul_stub;
+
+    if ( cpu_has_xen_ibt )
+    {
+        place_endbr64(p);
+        p += 4;
+    }
 
     APPEND_BUFF(prologue);
     APPEND_CALL(load_guest_gprs);
