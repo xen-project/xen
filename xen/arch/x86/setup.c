@@ -851,6 +851,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     /* Full exception support from here on in. */
 
+    rdmsrl(MSR_EFER, this_cpu(efer));
+    asm volatile ( "mov %%cr4,%0" : "=r" (get_cpu_info()->cr4) );
+
     /* Enable NMIs.  Our loader (e.g. Tboot) may have left them disabled. */
     enable_nmis();
 
@@ -896,9 +899,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     hypervisor_name = hypervisor_probe();
 
     parse_video_info();
-
-    rdmsrl(MSR_EFER, this_cpu(efer));
-    asm volatile ( "mov %%cr4,%0" : "=r" (get_cpu_info()->cr4) );
 
     /* We initialise the serial devices very early so we can get debugging. */
     ns16550.io_base = 0x3f8;
