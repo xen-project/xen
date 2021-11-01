@@ -204,9 +204,9 @@ ENTRY(cstar_enter)
 #ifdef CONFIG_XEN_SHSTK
         ALTERNATIVE "", "setssbsy", X86_FEATURE_XEN_SHSTK
 #endif
-        /* sti could live here when we don't switch page tables below. */
+        push  %rax          /* Guest %rsp */
         CR4_PV32_RESTORE
-        movq  8(%rsp),%rax /* Restore %rax. */
+        movq  8(%rsp), %rax /* Restore guest %rax. */
         movq  $FLAT_USER_SS32, 8(%rsp) /* Assume a 64bit domain.  Compat handled lower. */
         pushq %r11
         pushq $FLAT_USER_CS32
