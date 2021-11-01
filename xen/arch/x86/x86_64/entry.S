@@ -333,6 +333,7 @@ UNLIKELY_END(sysenter_gpf)
         jmp   .Lbounce_exception
 
 ENTRY(int80_direct_trap)
+        ENDBR64
         ASM_CLAC
         pushq $0
         movl  $0x80, 4(%rsp)
@@ -559,6 +560,7 @@ ENTRY(dom_crash_sync_extable)
 /* No special register assumptions. */
 ENTRY(ret_from_intr)
 #ifdef CONFIG_PV
+        ENDBR64
         GET_CURRENT(bx)
         testb $3, UREGS_cs(%rsp)
         jz    restore_all_xen
@@ -623,6 +625,7 @@ ENTRY(common_interrupt)
         jmp ret_from_intr
 
 ENTRY(page_fault)
+        ENDBR64
         movl  $TRAP_page_fault,4(%rsp)
 /* No special register assumptions. */
 GLOBAL(handle_exception)
@@ -760,75 +763,91 @@ FATAL_exception_with_ints_disabled:
         BUG   /* fatal_trap() shouldn't return. */
 
 ENTRY(divide_error)
+        ENDBR64
         pushq $0
         movl  $TRAP_divide_error,4(%rsp)
         jmp   handle_exception
 
 ENTRY(coprocessor_error)
+        ENDBR64
         pushq $0
         movl  $TRAP_copro_error,4(%rsp)
         jmp   handle_exception
 
 ENTRY(simd_coprocessor_error)
+        ENDBR64
         pushq $0
         movl  $TRAP_simd_error,4(%rsp)
         jmp   handle_exception
 
 ENTRY(device_not_available)
+        ENDBR64
         pushq $0
         movl  $TRAP_no_device,4(%rsp)
         jmp   handle_exception
 
 ENTRY(debug)
+        ENDBR64
         pushq $0
         movl  $TRAP_debug,4(%rsp)
         jmp   handle_ist_exception
 
 ENTRY(int3)
+        ENDBR64
         pushq $0
         movl  $TRAP_int3,4(%rsp)
         jmp   handle_exception
 
 ENTRY(overflow)
+        ENDBR64
         pushq $0
         movl  $TRAP_overflow,4(%rsp)
         jmp   handle_exception
 
 ENTRY(bounds)
+        ENDBR64
         pushq $0
         movl  $TRAP_bounds,4(%rsp)
         jmp   handle_exception
 
 ENTRY(invalid_op)
+        ENDBR64
         pushq $0
         movl  $TRAP_invalid_op,4(%rsp)
         jmp   handle_exception
 
 ENTRY(invalid_TSS)
+        ENDBR64
         movl  $TRAP_invalid_tss,4(%rsp)
         jmp   handle_exception
 
 ENTRY(segment_not_present)
+        ENDBR64
         movl  $TRAP_no_segment,4(%rsp)
         jmp   handle_exception
 
 ENTRY(stack_segment)
+        ENDBR64
         movl  $TRAP_stack_error,4(%rsp)
         jmp   handle_exception
 
 ENTRY(general_protection)
+        ENDBR64
         movl  $TRAP_gp_fault,4(%rsp)
         jmp   handle_exception
 
 ENTRY(alignment_check)
+        ENDBR64
         movl  $TRAP_alignment_check,4(%rsp)
         jmp   handle_exception
 
 ENTRY(entry_CP)
+        ENDBR64
         movl  $X86_EXC_CP, 4(%rsp)
         jmp   handle_exception
 
 ENTRY(double_fault)
+        ENDBR64
         movl  $TRAP_double_fault,4(%rsp)
         /* Set AC to reduce chance of further SMAP faults */
         SAVE_ALL STAC
@@ -853,6 +872,7 @@ ENTRY(double_fault)
 
         .pushsection .init.text, "ax", @progbits
 ENTRY(early_page_fault)
+        ENDBR64
         movl  $TRAP_page_fault,4(%rsp)
         SAVE_ALL
         movq  %rsp,%rdi
@@ -861,6 +881,7 @@ ENTRY(early_page_fault)
         .popsection
 
 ENTRY(nmi)
+        ENDBR64
         pushq $0
         movl  $TRAP_nmi,4(%rsp)
 handle_ist_exception:
@@ -957,12 +978,14 @@ handle_ist_exception:
 #endif
 
 ENTRY(machine_check)
+        ENDBR64
         pushq $0
         movl  $TRAP_machine_check,4(%rsp)
         jmp   handle_ist_exception
 
 /* No op trap handler.  Required for kexec crash path. */
 GLOBAL(trap_nop)
+        ENDBR64
         iretq
 
 /* Table of automatically generated entry points.  One per vector. */
@@ -989,7 +1012,9 @@ autogen_stubs: /* Automatically generated stubs. */
 #endif
 
         ALIGN
-1:      pushq $0
+1:
+        ENDBR64
+        pushq $0
         movb  $vec,4(%rsp)
         jmp   common_interrupt
 
@@ -999,7 +1024,9 @@ autogen_stubs: /* Automatically generated stubs. */
         .elseif vec == X86_EXC_CSO || vec == X86_EXC_SPV || \
                 vec == X86_EXC_VE  || (vec > X86_EXC_CP && vec < TRAP_nr)
 
-1:      test  $8,%spl        /* 64bit exception frames are 16 byte aligned, but the word */
+1:
+        ENDBR64
+        test  $8,%spl        /* 64bit exception frames are 16 byte aligned, but the word */
         jz    2f             /* size is 8 bytes.  Check whether the processor gave us an */
         pushq $0             /* error code, and insert an empty one if not.              */
 2:      movb  $vec,4(%rsp)

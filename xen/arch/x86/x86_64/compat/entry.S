@@ -12,6 +12,7 @@
 #include <irq_vectors.h>
 
 ENTRY(entry_int82)
+        ENDBR64
         ASM_CLAC
         pushq $0
         movl  $HYPERCALL_VECTOR, 4(%rsp)
