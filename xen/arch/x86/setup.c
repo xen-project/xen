@@ -102,6 +102,12 @@ static bool __initdata opt_xen_shstk = true;
 #define opt_xen_shstk false
 #endif
 
+#ifdef CONFIG_XEN_IBT
+static bool __initdata opt_xen_ibt = true;
+#else
+#define opt_xen_ibt false
+#endif
+
 static int __init cf_check parse_cet(const char *s)
 {
     const char *ss;
@@ -118,6 +124,14 @@ static int __init cf_check parse_cet(const char *s)
             opt_xen_shstk = val;
 #else
             no_config_param("XEN_SHSTK", "cet", s, ss);
+#endif
+        }
+        else if ( (val = parse_boolean("ibt", s, ss)) >= 0 )
+        {
+#ifdef CONFIG_XEN_IBT
+            opt_xen_ibt = val;
+#else
+            no_config_param("XEN_IBT", "cet", s, ss);
 #endif
         }
         else
@@ -1118,11 +1132,33 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         printk("Enabling Supervisor Shadow Stacks\n");
 
         setup_force_cpu_cap(X86_FEATURE_XEN_SHSTK);
+    }
+
+    if ( opt_xen_ibt && boot_cpu_has(X86_FEATURE_CET_IBT) )
+    {
+        printk("Enabling Indirect Branch Tracking\n");
+
+        setup_force_cpu_cap(X86_FEATURE_XEN_IBT);
+
+        if ( efi_enabled(EFI_RS) )
+            printk("  - IBT disabled in UEFI Runtime Services\n");
+
+        /*
+         * Enable IBT now.  Only require the endbr64 on callees, which is
+         * entirely build-time arrangements.
+         */
+        wrmsrl(MSR_S_CET, CET_ENDBR_EN);
+    }
+
+    if ( cpu_has_xen_shstk || cpu_has_xen_ibt )
+    {
+        set_in_cr4(X86_CR4_CET);
+
 #ifdef CONFIG_PV32
         if ( opt_pv32 )
         {
             opt_pv32 = 0;
-            printk("  - Disabling PV32 due to Shadow Stacks\n");
+            printk("  - Disabling PV32 due to CET\n");
         }
 #endif
     }
@@ -1846,10 +1882,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     do_presmp_initcalls();
 
     alternative_branches();
-
-    /* Defer CR4.CET until alternatives have finished playing with CR0.WP */
-    if ( cpu_has_xen_shstk )
-        set_in_cr4(X86_CR4_CET);
 
     /*
      * NB: when running as a PV shim VCPUOP_up/down is wired to the shim
