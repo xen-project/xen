@@ -271,30 +271,39 @@ static unsigned int write_stub_trampoline(
     unsigned char *stub, unsigned long stub_va,
     unsigned long stack_bottom, unsigned long target_va)
 {
+    unsigned char *p = stub;
+
+    /* Store guest %rax into %ss slot */
     /* movabsq %rax, stack_bottom - 8 */
-    stub[0] = 0x48;
-    stub[1] = 0xa3;
-    *(uint64_t *)&stub[2] = stack_bottom - 8;
+    *p++ = 0x48;
+    *p++ = 0xa3;
+    *(uint64_t *)p = stack_bottom - 8;
+    p += 8;
 
+    /* Store guest %rsp in %rax */
     /* movq %rsp, %rax */
-    stub[10] = 0x48;
-    stub[11] = 0x89;
-    stub[12] = 0xe0;
+    *p++ = 0x48;
+    *p++ = 0x89;
+    *p++ = 0xe0;
 
+    /* Switch to Xen stack */
     /* movabsq $stack_bottom - 8, %rsp */
-    stub[13] = 0x48;
-    stub[14] = 0xbc;
-    *(uint64_t *)&stub[15] = stack_bottom - 8;
+    *p++ = 0x48;
+    *p++ = 0xbc;
+    *(uint64_t *)p = stack_bottom - 8;
+    p += 8;
 
+    /* Store guest %rsp into %rsp slot */
     /* pushq %rax */
-    stub[23] = 0x50;
+    *p++ = 0x50;
 
     /* jmp target_va */
-    stub[24] = 0xe9;
-    *(int32_t *)&stub[25] = target_va - (stub_va + 29);
+    *p++ = 0xe9;
+    *(int32_t *)p = target_va - (stub_va + (p - stub) + 4);
+    p += 4;
 
     /* Round up to a multiple of 16 bytes. */
-    return 32;
+    return ROUNDUP(p - stub, 16);
 }
 
 DEFINE_PER_CPU(struct stubs, stubs);
