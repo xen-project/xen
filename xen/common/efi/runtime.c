@@ -21,6 +21,7 @@ struct efi_rs_state {
   * don't strictly need that.
   */
  unsigned long __aligned(32) cr3;
+    unsigned long msr_s_cet;
 #endif
 };
 
@@ -113,6 +114,19 @@ struct efi_rs_state efi_rs_enter(void)
 
     switch_cr3_cr4(virt_to_maddr(efi_l4_pgtable), read_cr4());
 
+    /*
+     * At the time of writing (2022), no UEFI firwmare is CET-IBT compatible.
+     * Work is under way to remedy this.
+     *
+     * Stash MSR_S_CET and clobber ENDBR_EN.  This is necessary because
+     * SHSTK_EN isn't configured until very late on the BSP.
+     */
+    if ( cpu_has_xen_ibt )
+    {
+        rdmsrl(MSR_S_CET, state.msr_s_cet);
+        wrmsrl(MSR_S_CET, state.msr_s_cet & ~CET_ENDBR_EN);
+    }
+
     return state;
 }
 
@@ -122,6 +136,10 @@ void efi_rs_leave(struct efi_rs_state *state)
 
     if ( !state->cr3 )
         return;
+
+    if ( state->msr_s_cet )
+        wrmsrl(MSR_S_CET, state->msr_s_cet);
+
     switch_cr3_cr4(state->cr3, read_cr4());
     if ( is_pv_vcpu(curr) && !is_idle_vcpu(curr) )
     {
