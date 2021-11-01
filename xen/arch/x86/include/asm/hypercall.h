@@ -16,13 +16,6 @@ typedef unsigned long hypercall_fn_t(
     unsigned long, unsigned long);
 
 typedef struct {
-    hypercall_fn_t *native;
-#ifdef CONFIG_PV32
-    hypercall_fn_t *compat;
-#endif
-} pv_hypercall_table_t;
-
-typedef struct {
     uint8_t native;
 #ifdef CONFIG_COMPAT
     uint8_t compat;
@@ -32,7 +25,6 @@ typedef struct {
 extern const hypercall_args_t hypercall_args_table[NR_hypercalls];
 
 #ifdef CONFIG_PV
-extern const pv_hypercall_table_t pv_hypercall_table[];
 void pv_hypercall(struct cpu_user_regs *regs);
 #endif
 
