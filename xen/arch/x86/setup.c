@@ -666,6 +666,7 @@ static void noreturn init_done(void)
 static void __init noreturn reinit_bsp_stack(void)
 {
     unsigned long *stack = (void*)(get_stack_bottom() & ~(STACK_SIZE - 1));
+    int rc;
 
     /* Update TSS and ISTs */
     load_system_tables();
@@ -675,6 +676,10 @@ static void __init noreturn reinit_bsp_stack(void)
 
     stack_base[0] = stack;
     memguard_guard_stack(stack);
+
+    rc = setup_cpu_root_pgt(0);
+    if ( rc )
+        panic("Error %d setting up PV root page table\n", rc);
 
     if ( IS_ENABLED(CONFIG_XEN_SHSTK) && cpu_has_xen_shstk )
     {
