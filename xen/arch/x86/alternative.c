@@ -334,9 +334,13 @@ static int __init nmi_apply_alternatives(const struct cpu_user_regs *regs,
      */
     if ( !(alt_done & alt_todo) )
     {
-        unsigned long cr0;
+        unsigned long cr0, cr4;
 
         cr0 = read_cr0();
+        cr4 = read_cr4();
+
+        if ( cr4 & X86_CR4_CET )
+            write_cr4(cr4 & ~X86_CR4_CET);
 
         /* Disable WP to allow patching read-only pages. */
         write_cr0(cr0 & ~X86_CR0_WP);
@@ -345,6 +349,9 @@ static int __init nmi_apply_alternatives(const struct cpu_user_regs *regs,
                             alt_done);
 
         write_cr0(cr0);
+
+        if ( cr4 & X86_CR4_CET )
+            write_cr4(cr4);
 
         alt_done |= alt_todo;
     }
