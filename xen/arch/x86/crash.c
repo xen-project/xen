@@ -190,8 +190,8 @@ void machine_crash_shutdown(void)
     /* Reset CPUID masking and faulting to the host's default. */
     ctxt_switch_levelling(NULL);
 
-    /* Disable shadow stacks. */
-    if ( cpu_has_xen_shstk )
+    /* Disable CET. */
+    if ( cpu_has_xen_shstk || cpu_has_xen_ibt )
     {
         wrmsrl(MSR_S_CET, 0);
         write_cr4(read_cr4() & ~X86_CR4_CET);
