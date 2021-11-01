@@ -145,6 +145,7 @@ do_set_segment_base(
 
 #include <compat/arch-x86/xen.h>
 #include <compat/physdev.h>
+#include <compat/platform.h>
 
 extern int
 compat_physdev_op(
@@ -161,8 +162,9 @@ extern int compat_mmuext_op(
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom);
 
+DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 extern int compat_platform_op(
-    XEN_GUEST_HANDLE_PARAM(void) u_xenpf_op);
+    XEN_GUEST_HANDLE_PARAM(compat_platform_op_t) u_xenpf_op);
 
 extern long compat_callback_op(
     int cmd, XEN_GUEST_HANDLE(void) arg);

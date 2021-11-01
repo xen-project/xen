@@ -6,8 +6,8 @@ EMIT_FILE;
 
 #include <xen/lib.h>
 #include <compat/platform.h>
+#include <xen/hypercall.h>
 
-DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 #define xen_platform_op     compat_platform_op
 #define xen_platform_op_t   compat_platform_op_t
 #define do_platform_op(x)   compat_platform_op(_##x)

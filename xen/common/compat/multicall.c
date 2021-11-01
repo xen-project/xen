@@ -5,7 +5,7 @@
 EMIT_FILE;
 
 #include <xen/types.h>
-#include <xen/multicall.h>
+#include <xen/hypercall.h>
 #include <xen/trace.h>
 
 #define COMPAT
@@ -19,7 +19,6 @@ static inline void xlat_multicall_entry(struct mc_state *mcs)
         mcs->compat_call.args[i] = mcs->call.args[i];
 }
 
-DEFINE_XEN_GUEST_HANDLE(multicall_entry_compat_t);
 #define multicall_entry      compat_multicall_entry
 #define multicall_entry_t    multicall_entry_compat_t
 #define do_multicall_call    compat_multicall_call

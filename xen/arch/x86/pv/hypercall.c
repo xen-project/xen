@@ -64,7 +64,7 @@ const pv_hypercall_table_t pv_hypercall_table[] = {
     COMPAT_CALL(xen_version),
     HYPERCALL(console_io),
     COMPAT_CALL(physdev_op_compat),
-#ifdef CONFIG_GRANT_TABLE
+#if defined(CONFIG_GRANT_TABLE) || defined(CONFIG_PV_SHIM)
     COMPAT_CALL(grant_table_op),
 #endif
     HYPERCALL(vm_assist),
