@@ -16,6 +16,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/traps.h>
+#include <asm/endbr.h>
 #include <asm/event.h>
 #include <asm/nmi.h>
 #include <asm/msr.h>
@@ -273,6 +274,12 @@ static unsigned int write_stub_trampoline(
 {
     unsigned char *p = stub;
 
+    if ( cpu_has_xen_ibt )
+    {
+        place_endbr64(p);
+        p += 4;
+    }
+
     /* Store guest %rax into %ss slot */
     /* movabsq %rax, stack_bottom - 8 */
     *p++ = 0x48;
@@ -292,10 +299,6 @@ static unsigned int write_stub_trampoline(
     *p++ = 0xbc;
     *(uint64_t *)p = stack_bottom - 8;
     p += 8;
-
-    /* Store guest %rsp into %rsp slot */
-    /* pushq %rax */
-    *p++ = 0x50;
 
     /* jmp target_va */
     *p++ = 0xe9;
