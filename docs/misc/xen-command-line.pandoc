@@ -271,13 +271,17 @@ enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
 ### cet
-    = List of [ shstk=<bool> ]
+    = List of [ shstk=<bool>, ibt=<bool> ]
 
     Applicability: x86
 
 Controls for the use of Control-flow Enforcement Technology.  CET is group a
 of hardware features designed to combat Return-oriented Programming (ROP, also
 call/jmp COP/JOP) attacks.
+
+CET is incompatible with 32bit PV guests.  If any CET sub-options are active,
+they will override the `pv=32` boolean to `false`.  Backwards compatibility
+can be maintained with the pv-shim mechanism.
 
 *   The `shstk=` boolean controls whether Xen uses Shadow Stacks for its own
     protection.
@@ -287,9 +291,13 @@ call/jmp COP/JOP) attacks.
     `cet=no-shstk` will cause Xen not to use Shadow Stacks even when support
     is available in hardware.
 
-    Shadow Stacks are incompatible with 32bit PV guests.  This option will
-    override the `pv=32` boolean to false.  Backwards compatibility can be
-    maintained with the `pv-shim` mechanism.
+*   The `ibt=` boolean controls whether Xen uses Indirect Branch Tracking for
+    its own protection.
+
+    The option is available when `CONFIG_XEN_IBT` is compiled in, and defaults
+    to `true` on hardware supporting CET-IBT.  Specifying `cet=no-ibt` will
+    cause Xen not to use Indirect Branch Tracking even when support is
+    available in hardware.
 
 ### clocksource (x86)
 > `= pit | hpet | acpi | tsc`
