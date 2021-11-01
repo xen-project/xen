@@ -12,6 +12,7 @@
 #include <irq_vectors.h>
 
 ENTRY(entry_int82)
+        ENDBR64
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $0
         movl  $HYPERCALL_VECTOR, 4(%rsp)
