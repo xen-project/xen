@@ -63,7 +63,26 @@ ENTRY(s3_resume)
         pushq   %rax
         lretq
 1:
-#ifdef CONFIG_XEN_SHSTK
+#if defined(CONFIG_XEN_SHSTK) || defined(CONFIG_XEN_IBT)
+        call    xen_msr_s_cet_value
+        test    %eax, %eax
+        jz      .L_cet_done
+
+        /* Set up MSR_S_CET. */
+        mov     $MSR_S_CET, %ecx
+        xor     %edx, %edx
+        wrmsr
+
+        /* Enable CR4.CET. */
+        mov     $XEN_MINIMAL_CR4 | X86_CR4_CET, %ecx
+        mov     %rcx, %cr4
+
+        /* WARNING! call/ret now fatal (iff SHSTK) until SETSSBSY loads SSP */
+
+#if defined(CONFIG_XEN_SHSTK)
+        test    $CET_SHSTK_EN, %al
+        jz      .L_cet_done
+
         /*
          * Restoring SSP is a little complicated, because we are intercepting
          * an in-use shadow stack.  Write a temporary token under the stack,
@@ -71,14 +90,6 @@ ENTRY(s3_resume)
          * reset MSR_PL0_SSP to its usual value and pop the temporary token.
          */
         mov     saved_ssp(%rip), %rdi
-        cmpq    $1, %rdi
-        je      .L_shstk_done
-
-        /* Set up MSR_S_CET. */
-        mov     $MSR_S_CET, %ecx
-        xor     %edx, %edx
-        mov     $CET_SHSTK_EN | CET_WRSS_EN, %eax
-        wrmsr
 
         /* Construct the temporary supervisor token under SSP. */
         sub     $8, %rdi
@@ -89,10 +100,6 @@ ENTRY(s3_resume)
         shr     $32, %rdx
         mov     %edi, %eax
         wrmsr
-
-        /* Enable CET.  MSR_INTERRUPT_SSP_TABLE is set up later in load_system_tables(). */
-        mov     $XEN_MINIMAL_CR4 | X86_CR4_CET, %ebx
-        mov     %rbx, %cr4
 
         /* Write the temporary token onto the shadow stack, and activate it. */
         wrssq   %rdi, (%rdi)
@@ -106,8 +113,9 @@ ENTRY(s3_resume)
         /* Pop the temporary token off the stack. */
         mov     $2, %eax
         incsspd %eax
-.L_shstk_done:
-#endif
+#endif /* CONFIG_XEN_SHSTK */
+.L_cet_done:
+#endif /* CONFIG_XEN_SHSTK || CONFIG_XEN_IBT */
 
         call    load_system_tables
 
