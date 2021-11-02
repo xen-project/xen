@@ -138,7 +138,7 @@ static void cf_check show_handlers(unsigned char key)
 
 static cpumask_t dump_execstate_mask;
 
-void dump_execstate(struct cpu_user_regs *regs)
+void cf_check dump_execstate(struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
 
@@ -490,7 +490,7 @@ static void cf_check run_all_keyhandlers(
     tasklet_schedule(&run_all_keyhandlers_tasklet);
 }
 
-static void do_debugger_trap_fatal(struct cpu_user_regs *regs)
+static void cf_check do_debugger_trap_fatal(struct cpu_user_regs *regs)
 {
     (void)debugger_trap_fatal(0xf001, regs);
 

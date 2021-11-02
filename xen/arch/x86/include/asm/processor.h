@@ -496,7 +496,9 @@ void show_code(const struct cpu_user_regs *regs);
 void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs);
 void show_registers(const struct cpu_user_regs *regs);
 void show_execution_state(const struct cpu_user_regs *regs);
-#define dump_execution_state() run_in_exception_handler(show_execution_state)
+void cf_check show_execution_state_nonconst(struct cpu_user_regs *regs);
+#define dump_execution_state() \
+    run_in_exception_handler(show_execution_state_nonconst)
 void show_page_walk(unsigned long addr);
 void noreturn fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote);
 

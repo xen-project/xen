@@ -65,7 +65,15 @@ struct bug_frame {
     unreachable();                                              \
 } while (0)
 
-#define run_in_exception_handler(fn) BUG_FRAME(BUGFRAME_run_fn, 0, fn, 0, NULL)
+/*
+ * TODO: untangle header dependences, break BUILD_BUG_ON() out of xen/lib.h,
+ * and use a real static inline here to get proper type checking of fn().
+ */
+#define run_in_exception_handler(fn)                            \
+    do {                                                        \
+        (void)((fn) == (void (*)(struct cpu_user_regs *))NULL); \
+        BUG_FRAME(BUGFRAME_run_fn, 0, fn, 0, NULL);             \
+    } while ( 0 )
 
 #define assert_failed(msg) do {                                 \
     BUG_FRAME(BUGFRAME_assert, __LINE__, __FILE__, 1, msg);     \

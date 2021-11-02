@@ -681,6 +681,11 @@ void show_execution_state(const struct cpu_user_regs *regs)
     console_unlock_recursive_irqrestore(flags);
 }
 
+void cf_check show_execution_state_nonconst(struct cpu_user_regs *regs)
+{
+    show_execution_state(regs);
+}
+
 void vcpu_show_execution_state(struct vcpu *v)
 {
     unsigned long flags = 0;

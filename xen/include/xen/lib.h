@@ -199,7 +199,7 @@ extern char *print_tainted(char *str);
 extern void add_taint(unsigned int taint);
 
 struct cpu_user_regs;
-void dump_execstate(struct cpu_user_regs *);
+void cf_check dump_execstate(struct cpu_user_regs *);
 
 void init_constructors(void);
 
