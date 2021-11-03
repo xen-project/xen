@@ -351,6 +351,11 @@ void update_vcpu_system_time(struct vcpu *v)
     /* XXX update shared_info->wc_* */
 }
 
+void force_update_vcpu_system_time(struct vcpu *v)
+{
+    update_vcpu_system_time(v);
+}
+
 void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
 {
     d->time_offset.seconds = time_offset_seconds;

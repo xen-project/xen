@@ -105,6 +105,8 @@ extern uint64_t ns_to_ticks(s_time_t ns);
 
 void preinit_xen_time(void);
 
+void force_update_vcpu_system_time(struct vcpu *v);
+
 #endif /* __ARM_TIME_H__ */
 /*
  * Local variables:
