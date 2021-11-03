@@ -22,10 +22,6 @@
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
 
-#define CPUID_MWAIT_LEAF                5
-#define CPUID5_ECX_EXTENSIONS_SUPPORTED 0x1
-#define CPUID5_ECX_INTERRUPT_BREAK      0x2
-
 #define CPUID_PM_LEAF                    6
 #define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
 

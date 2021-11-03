@@ -24,6 +24,7 @@
 #include <xen/acpi.h>
 #include <asm/apic.h>
 #include <asm/fixmap.h>
+#include <asm/mwait.h>
 
 u32 __read_mostly acpi_smi_cmd;
 u8 __read_mostly acpi_enable_value;
