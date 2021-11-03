@@ -27,7 +27,13 @@ AX_STUBDOM_DEFAULT_ENABLE([xenstorepvh-stubdom], [xenstorepvh])
 AX_STUBDOM_CONDITIONAL([vtpm-stubdom], [vtpm])
 AX_STUBDOM_CONDITIONAL([vtpmmgr-stubdom], [vtpmmgr])
 
-AC_ARG_ENABLE([qemu-traditional])
+AC_ARG_ENABLE([qemu-traditional],,,[
+    case "$host_cpu" in
+        i[[3456]]86|x86_64)
+           enable_qemu_traditional="yes";;
+        *) enable_qemu_traditional="no";;
+    esac
+])
 AS_IF([test "x$enable_qemu_traditional" = "xyes"], [
     qemu_traditional=y],[
     qemu_traditional=n
