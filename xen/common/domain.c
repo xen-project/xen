@@ -492,6 +492,12 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( config->grant_opts & ~XEN_DOMCTL_GRANT_version_mask )
+    {
+        dprintk(XENLOG_INFO, "Unknown grant options %#x\n", config->grant_opts);
+        return -EINVAL;
+    }
+
     if ( config->max_vcpus < 1 )
     {
         dprintk(XENLOG_INFO, "No vCPUS\n");
@@ -678,7 +684,8 @@ struct domain *domain_create(domid_t domid,
         init_status |= INIT_evtchn;
 
         if ( (err = grant_table_init(d, config->max_grant_frames,
-                                     config->max_maptrack_frames)) != 0 )
+                                     config->max_maptrack_frames,
+                                     config->grant_opts)) != 0 )
             goto fail;
         init_status |= INIT_gnttab;
 

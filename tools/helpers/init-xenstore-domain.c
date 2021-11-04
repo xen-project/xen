@@ -85,9 +85,11 @@ static int build(xc_interface *xch)
          * 1 grant frame is enough: we don't need many grants.
          * Mini-OS doesn't like less than 4, though, so use 4.
          * 128 maptrack frames: 256 entries per frame, enough for 32768 domains.
+         * Currently Mini-OS only supports grant v1.
          */
         .max_grant_frames = 4,
         .max_maptrack_frames = 128,
+        .grant_opts = 1,
     };
 
     xs_fd = open("/dev/xen/xenbus_backend", O_RDWR);

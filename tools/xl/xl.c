@@ -55,6 +55,7 @@ bool progress_use_cr = 0;
 bool timestamps = 0;
 int max_grant_frames = -1;
 int max_maptrack_frames = -1;
+int max_grant_version = LIBXL_MAX_GRANT_DEFAULT;
 libxl_domid domid_policy = INVALID_DOMID;
 
 xentoollog_level minmsglevel = minmsglevel_default;
@@ -216,6 +217,13 @@ static void parse_global_config(const char *configfile,
                                   INT_MAX, &l, 1);
     if (!e)
         max_maptrack_frames = l;
+    else if (e != ESRCH)
+        exit(1);
+
+    e = xlu_cfg_get_bounded_long (config, "max_grant_version", 0,
+                                  INT_MAX, &l, 1);
+    if (!e)
+        max_grant_version = l;
     else if (e != ESRCH)
         exit(1);
 

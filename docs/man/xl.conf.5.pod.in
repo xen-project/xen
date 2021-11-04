@@ -101,6 +101,12 @@ Sets the default value for the C<max_maptrack_frames> domain config value.
 Default: value of Xen command line B<gnttab_max_maptrack_frames>
 parameter (or its default value if unspecified).
 
+=item B<max_grant_version=NUMBER>
+
+Sets the default value for the C<max_grant_version> domain config value.
+
+Default: maximum grant version supported by the hypervisor.
+
 =item B<vif.default.script="PATH">
 
 Configures the default hotplug script used by virtual network devices.

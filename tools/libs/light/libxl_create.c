@@ -454,6 +454,28 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->nested_hvm,               false);
     }
 
+    if (b_info->max_grant_version == LIBXL_MAX_GRANT_DEFAULT) {
+        libxl_physinfo info;
+
+        rc = libxl_get_physinfo(CTX, &info);
+        if (rc) {
+            LOG(ERROR, "failed to get hypervisor info");
+            return rc;
+        }
+
+        if (info.cap_gnttab_v2)
+            b_info->max_grant_version = 2;
+        else if (info.cap_gnttab_v1)
+            b_info->max_grant_version = 1;
+        else
+            /* No grant table support reported */
+            b_info->max_grant_version = 0;
+    } else if (b_info->max_grant_version & ~XEN_DOMCTL_GRANT_version_mask) {
+        LOG(ERROR, "max grant version %d out of range",
+            b_info->max_grant_version);
+        return -ERROR_INVAL;
+    }
+
     return 0;
 }
 
@@ -607,6 +629,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
             .max_evtchn_port = b_info->event_channels,
             .max_grant_frames = b_info->max_grant_frames,
             .max_maptrack_frames = b_info->max_maptrack_frames,
+            .grant_opts = b_info->max_grant_version,
             .vmtrace_size = ROUNDUP(b_info->vmtrace_buf_kb << 10, XC_PAGE_SHIFT),
         };
 
