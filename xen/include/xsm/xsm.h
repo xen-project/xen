@@ -579,13 +579,13 @@ static inline int xsm_hypfs_op(xsm_default_t def)
 
 static inline long xsm_do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
 {
-    return xsm_ops.do_xsm_op(op);
+    return alternative_call(xsm_ops.do_xsm_op, op);
 }
 
 #ifdef CONFIG_COMPAT
 static inline int xsm_do_compat_op(XEN_GUEST_HANDLE_PARAM(void) op)
 {
-    return xsm_ops.do_compat_op(op);
+    return alternative_call(xsm_ops.do_compat_op, op);
 }
 #endif
 
@@ -698,7 +698,7 @@ static inline int xsm_mmuext_op(
 static inline int xsm_update_va_mapping(
     xsm_default_t def, struct domain *d, struct domain *f, l1_pgentry_t pte)
 {
-    return xsm_ops.update_va_mapping(d, f, pte);
+    return alternative_call(xsm_ops.update_va_mapping, d, f, pte);
 }
 
 static inline int xsm_priv_mapping(
