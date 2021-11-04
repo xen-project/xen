@@ -223,6 +223,12 @@ SECTIONS
        *(.initcall1.init)
        __initcall_end = .;
 
+       . = ALIGN(POINTER_ALIGN);
+       __initdata_cf_clobber_start = .;
+       *(.init.data.cf_clobber)
+       *(.init.rodata.cf_clobber)
+       __initdata_cf_clobber_end = .;
+
        *(.init.data)
        *(.init.data.rel)
        *(.init.data.rel.*)

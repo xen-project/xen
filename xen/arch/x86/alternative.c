@@ -173,6 +173,9 @@ text_poke(void *addr, const void *opcode, size_t len)
     return memcpy(addr, opcode, len);
 }
 
+extern void *const __initdata_cf_clobber_start[];
+extern void *const __initdata_cf_clobber_end[];
+
 /*
  * Replace instructions with better alternatives for this CPU type.
  * This runs before SMP is initialized to avoid SMP problems with
@@ -329,6 +332,41 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
 
         add_nops(buf + a->repl_len, total_len - a->repl_len);
         text_poke(orig, buf, total_len);
+    }
+
+    /*
+     * Clobber endbr64 instructions now that altcall has finished optimising
+     * all indirect branches to direct ones.
+     */
+    if ( force && cpu_has_xen_ibt )
+    {
+        void *const *val;
+        unsigned int clobbered = 0;
+
+        /*
+         * This is some minor structure (ab)use.  We walk the entire contents
+         * of .init.{ro,}data.cf_clobber as if it were an array of pointers.
+         *
+         * If the pointer points into .text, and at an endbr64 instruction,
+         * nop out the endbr64.  This causes the pointer to no longer be a
+         * legal indirect branch target under CET-IBT.  This is a
+         * defence-in-depth measure, to reduce the options available to an
+         * adversary who has managed to hijack a function pointer.
+         */
+        for ( val = __initdata_cf_clobber_start;
+              val < __initdata_cf_clobber_end;
+              val++ )
+        {
+            void *ptr = *val;
+
+            if ( !is_kernel_text(ptr) || !is_endbr64(ptr) )
+                continue;
+
+            add_nops(ptr, ENDBR64_LEN);
+            clobbered++;
+        }
+
+        printk("altcall: Optimised away %u endbr64 instructions\n", clobbered);
     }
 }
 

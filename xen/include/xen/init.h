@@ -18,6 +18,9 @@
 #define __init_call(lvl)  __used_section(".initcall" lvl ".init")
 #define __exit_call       __used_section(".exitcall.exit")
 
+#define __initdata_cf_clobber  __section(".init.data.cf_clobber")
+#define __initconst_cf_clobber __section(".init.rodata.cf_clobber")
+
 /* These macros are used to mark some functions or 
  * initialized data (doesn't apply to uninitialized data)
  * as `initialization' functions. The kernel can take this
