@@ -132,6 +132,13 @@ static int build(xc_interface *xch)
         }
     }
 
+    rv = xc_dom_boot_xen_init(dom, xch, domid);
+    if ( rv )
+    {
+        fprintf(stderr, "xc_dom_boot_xen_init failed\n");
+        goto err;
+    }
+
     dom->container_type = XC_DOM_HVM_CONTAINER;
     rv = xc_dom_parse_image(dom);
     if ( rv )
@@ -214,16 +221,11 @@ static int build(xc_interface *xch)
     else
         snprintf(cmdline, 512, "--event %d --internal-db", rv);
 
+    dom->guest_domid = domid;
     dom->cmdline = xc_dom_strdup(dom, cmdline);
     dom->xenstore_domid = domid;
     dom->console_evtchn = console_evtchn;
 
-    rv = xc_dom_boot_xen_init(dom, xch, domid);
-    if ( rv )
-    {
-        fprintf(stderr, "xc_dom_boot_xen_init failed\n");
-        goto err;
-    }
     rv = xc_dom_mem_init(dom, memory);
     if ( rv )
     {
