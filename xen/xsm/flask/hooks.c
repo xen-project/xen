@@ -1765,7 +1765,7 @@ static int cf_check flask_argo_send(
 
 #endif
 
-static const struct xsm_ops __initconstrel flask_ops = {
+static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
     .domain_create = flask_domain_create,
     .getdomaininfo = flask_getdomaininfo,

@@ -13,7 +13,7 @@
 #define XSM_NO_WRAPPERS
 #include <xsm/dummy.h>
 
-static const struct xsm_ops __initconstrel dummy_ops = {
+static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
     .security_domaininfo           = xsm_security_domaininfo,
     .domain_create                 = xsm_domain_create,
     .getdomaininfo                 = xsm_getdomaininfo,

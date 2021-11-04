@@ -102,7 +102,7 @@ static int cf_check silo_argo_send(
 
 #endif
 
-static const struct xsm_ops __initconstrel silo_xsm_ops = {
+static const struct xsm_ops __initconst_cf_clobber silo_xsm_ops = {
     .evtchn_unbound = silo_evtchn_unbound,
     .evtchn_interdomain = silo_evtchn_interdomain,
     .grant_mapref = silo_grant_mapref,
