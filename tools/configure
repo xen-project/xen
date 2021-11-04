@@ -698,7 +698,6 @@ APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
 EXTRA_QEMUU_CONFIGURE_ARGS
-ipxe
 qemu_xen_systemd
 qemu_xen_path
 qemu_xen
@@ -706,6 +705,7 @@ rombios
 BCC
 LD86
 AS86
+ipxe
 qemu_traditional
 LINUX_BACKEND_MODULES
 golang
@@ -815,13 +815,13 @@ enable_seabios
 enable_golang
 with_linux_backend_modules
 enable_qemu_traditional
+enable_ipxe
+with_system_ipxe
 enable_rombios
 with_system_qemu
 with_stubdom_qmp_proxy
 with_system_seabios
 with_system_ovmf
-enable_ipxe
-with_system_ipxe
 with_extra_qemuu_configure_args
 with_xenstored
 enable_systemd
@@ -1504,10 +1504,10 @@ Optional Features:
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
                           for Linux or NetBSD x86, otherwise off)
+  --enable-ipxe           Enable in-tree IPXE, (DEFAULT is on for x86,
+                          otherwise off, see also --with-system-ipxe)
   --enable-rombios        Enable ROMBIOS, (DEFAULT is on if qemu-traditional
-                          is enabled, otherwise off)
-  --disable-ipxe          Enable in-tree IPXE, (DEFAULT is on if rombios is
-                          enabled, otherwise off, see also --with-system-ipxe)
+                          or ipxe is enabled, otherwise off)
   --enable-systemd        Enable systemd support (default is DISABLED)
   --enable-9pfs           Explicitly enable 9pfs support in QEMU build
                           (default is to defer to QEMU configure default)
@@ -1538,6 +1538,11 @@ Optional Packages:
   --with-linux-backend-modules="mod1 mod2"
                           List of Linux backend module or modalias names to be
                           autoloaded on startup.
+  --with-system-ipxe[=PATH]
+                          Use system supplied IPXE PATH instead of building
+                          and installing our own version, it takes precedence
+                          over --{en,dis}able-ipxe, --without-system-ipxe is
+                          an error
   --with-system-qemu[=PATH]
                           Use system supplied qemu PATH or qemu (taken from
                           $PATH) as qemu-xen device model instead of building
@@ -1551,12 +1556,6 @@ Optional Packages:
   --with-system-ovmf[=PATH]
                           Use system supplied OVMF PATH instead of building
                           and installing our own version
-  --with-system-ipxe[=PATH]
-                          Use system supplied IPXE PATH instead of building
-                          and installing our own version, it takes precedence
-                          over --{en,dis}able-ipxe and is bound by the
-                          presence of rombios, --without-system-ipxe is an
-                          error
   --with-extra-qemuu-configure-args[="--ARG1 ..."]
                           List of additional configure options for upstream
                           qemu
@@ -4314,13 +4313,54 @@ else
 
 fi
 
+if test "x$enable_ipxe" = "xno"; then :
+  ipxe=n
+else
+  ipxe=y
+fi
+
+# Check whether --enable-ipxe was given.
+if test "${enable_ipxe+set}" = set; then :
+  enableval=$enable_ipxe;
+else
+
+    case "$host_cpu" in
+        i[3456]86|x86_64)
+           enable_ipxe="yes";;
+        *) enable_ipxe="no";;
+    esac
+
+fi
+
+
+# Check whether --with-system-ipxe was given.
+if test "${with_system_ipxe+set}" = set; then :
+  withval=$with_system_ipxe;
+    case $withval in
+        no) as_fn_error $? "--without-system-ipxe has no effect" "$LINENO" 5 ;;
+        /*)  ipxe_path=$withval; ipxe=n ;;
+        *) as_fn_error $? "IPXE specified, but is not an absolute path" "$LINENO" 5 ;;
+    esac
+
+fi
+
+if test "x$ipxe" = "xy" -o -n "$ipxe_path" ; then :
+
+
+cat >>confdefs.h <<_ACEOF
+#define IPXE_PATH "${ipxe_path:-$XENFIRMWAREDIR/ipxe.bin}"
+_ACEOF
+
+
+fi
+
 
 # Check whether --enable-rombios was given.
 if test "${enable_rombios+set}" = set; then :
   enableval=$enable_rombios;
 else
 
-    if test "x$enable_qemu_traditional" = "xyes"; then :
+    if test "x$enable_qemu_traditional" = "xyes" -o "x$enable_ipxe" = "xyes"; then :
 
         enable_rombios="yes"
 
@@ -4634,55 +4674,6 @@ _ACEOF
 
 
 fi
-
-# Check whether --enable-ipxe was given.
-if test "${enable_ipxe+set}" = set; then :
-  enableval=$enable_ipxe;
-     if test "x$enable_ipxe" = "xno"; then :
-  ipxe=n
-else
-  ipxe=y
-fi
-
-else
-
-    if test "x$enable_rombios" = "xno"; then :
-  ipxe=n
-else
-  ipxe=y
-fi
-
-fi
-
-
-# Check whether --with-system-ipxe was given.
-if test "${with_system_ipxe+set}" = set; then :
-  withval=$with_system_ipxe;
-    case $withval in
-        no) as_fn_error $? "--without-system-ipxe has no effect" "$LINENO" 5 ;;
-        /*)  ipxe_path=$withval; ipxe=n ;;
-        *) as_fn_error $? "IPXE specified, but is not an absolute path" "$LINENO" 5 ;;
-    esac
-
-fi
-
-if test "x$ipxe" = "xy" -o -n "$ipxe_path" ; then :
-
-
-    if test "x$enable_rombios" = "xno"; then :
-
-        as_fn_error $? "Rombios is required to use IPXE" "$LINENO" 5
-
-fi
-
-
-cat >>confdefs.h <<_ACEOF
-#define IPXE_PATH "${ipxe_path:-$XENFIRMWAREDIR/ipxe.bin}"
-_ACEOF
-
-
-fi
-
 
 
 # Check whether --with-extra-qemuu-configure-args was given.
