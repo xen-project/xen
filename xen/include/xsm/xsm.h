@@ -42,6 +42,15 @@ enum xsm_default {
 };
 typedef enum xsm_default xsm_default_t;
 
+/*
+ * !!! WARNING !!!
+ *
+ * For simplicity, xsm_fixup_ops() expects that this structure is made
+ * exclusively of function pointers to non-init functions.  Think carefully
+ * before deviating from the pattern.
+ *
+ * !!! WARNING !!!
+ */
 struct xsm_ops {
     void (*security_domaininfo)(struct domain *d,
                                 struct xen_domctl_getdomaininfo *info);
