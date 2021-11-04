@@ -642,6 +642,13 @@ void xstate_init(struct cpuinfo_x86 *c)
         return;
     }
 
+    /*
+     * Zap the cached values to make set_xcr0() and set_msr_xss() really
+     * write it.
+     */
+    this_cpu(xcr0) = 0;
+    this_cpu(xss) = ~0;
+
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
     feature_mask = (((u64)edx << 32) | eax) & XCNTXT_MASK;
     BUG_ON(!valid_xcr0(feature_mask));
