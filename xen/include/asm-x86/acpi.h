@@ -141,15 +141,9 @@ extern u32 x86_acpiid_to_apicid[];
 extern u32 pmtmr_ioport;
 extern unsigned int pmtmr_width;
 
+void acpi_iommu_init(void);
 int acpi_dmar_init(void);
 int acpi_ivrs_init(void);
-
-static inline int acpi_iommu_init(void)
-{
-    int ret = acpi_dmar_init();
-
-    return ret == -ENODEV ? acpi_ivrs_init() : ret;
-}
 
 void acpi_mmcfg_init(void);
 
