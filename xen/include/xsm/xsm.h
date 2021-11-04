@@ -332,13 +332,13 @@ static inline void xsm_free_security_domain(struct domain *d)
 }
 
 static inline int xsm_alloc_security_evtchns(
-    struct evtchn chn[], unsigned int nr)
+    struct evtchn *chn, unsigned int nr)
 {
     return alternative_call(xsm_ops.alloc_security_evtchns, chn, nr);
 }
 
 static inline void xsm_free_security_evtchns(
-    struct evtchn chn[], unsigned int nr)
+    struct evtchn *chn, unsigned int nr)
 {
     alternative_vcall(xsm_ops.free_security_evtchns, chn, nr);
 }
