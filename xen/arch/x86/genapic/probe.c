@@ -24,7 +24,7 @@ static const struct genapic *const __initconstrel apic_probe[] = {
 	NULL,
 };
 
-static bool_t __initdata cmdline_apic;
+static bool __initdata forced_apic;
 
 void __init generic_bigsmp_probe(void)
 {
@@ -35,7 +35,7 @@ void __init generic_bigsmp_probe(void)
 	 * - we find more than 8 CPUs in acpi LAPIC listing with xAPIC support
 	 */
 
-	if (!cmdline_apic && genapic.name == apic_default.name)
+	if (!forced_apic && genapic.name == apic_default.name)
 		if (apic_bigsmp.probe()) {
 			genapic = apic_bigsmp;
 			printk(KERN_INFO "Overriding APIC driver with %s\n",
@@ -65,7 +65,7 @@ void __init generic_apic_probe(void)
 
 	check_x2apic_preenabled();
 
-	cmdline_apic = genapic.name;
+	forced_apic = genapic.name;
 
 	for (i = 0; !genapic.name && apic_probe[i]; i++) {
 		if (!apic_probe[i]->probe || apic_probe[i]->probe())
