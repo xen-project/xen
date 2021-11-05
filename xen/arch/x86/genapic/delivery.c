@@ -19,11 +19,6 @@ void init_apic_ldr_flat(void)
 	apic_write(APIC_LDR, val);
 }
 
-void __init clustered_apic_check_flat(void)
-{
-	printk("Enabling APIC mode:  Flat.  Using %d I/O APICs\n", nr_ioapics);
-}
-
 const cpumask_t *vector_allocation_cpumask_flat(int cpu)
 {
 	return &cpu_online_map;
@@ -41,11 +36,6 @@ unsigned int cpu_mask_to_apicid_flat(const cpumask_t *cpumask)
 void init_apic_ldr_phys(void)
 {
 	/* We only deliver in phys mode - no setup needed. */
-}
-
-void __init clustered_apic_check_phys(void)
-{
-	printk("Enabling APIC mode:  Phys.  Using %d I/O APICs\n", nr_ioapics);
 }
 
 const cpumask_t *vector_allocation_cpumask_phys(int cpu)

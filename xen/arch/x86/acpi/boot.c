@@ -674,9 +674,7 @@ static void __init acpi_process_madt(void)
 			error = acpi_parse_madt_ioapic_entries();
 			if (!error) {
 				acpi_ioapic = true;
-
 				smp_found_config = true;
-				clustered_apic_check();
 			}
 		}
 		if (error == -EINVAL) {

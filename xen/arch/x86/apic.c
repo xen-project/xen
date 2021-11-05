@@ -243,6 +243,12 @@ void __init connect_bsp_APIC(void)
         outb(0x70, 0x22);
         outb(0x01, 0x23);
     }
+
+    printk("Enabling APIC mode:  %s.  Using %d I/O APICs\n",
+           !INT_DEST_MODE ? "Physical"
+                          : init_apic_ldr == init_apic_ldr_flat ? "Flat"
+                                                                : "Clustered",
+           nr_ioapics);
     enable_apic_mode();
 }
 
