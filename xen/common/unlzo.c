@@ -33,7 +33,6 @@
 #include <xen/lzo.h>
 
 #ifdef __XEN__
-#include <asm/byteorder.h>
 #include <xen/unaligned.h>
 #else
 

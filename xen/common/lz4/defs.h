@@ -12,7 +12,6 @@
 #define COMMON_LZ4_DEFS_H
 
 #ifdef __XEN__
-#include <asm/byteorder.h>
 #include <xen/unaligned.h>
 #else
 

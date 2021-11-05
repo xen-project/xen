@@ -30,9 +30,8 @@ typedef uint64_t __be64;
 
 #undef ERROR
 
-#define __BYTEORDER_HAS_U64__
 #define __TYPES_H__ /* xen/types.h guard */
-#include "../../xen/include/xen/byteorder/little_endian.h"
+#include "../../xen/include/xen/byteorder.h"
 #include "../../xen/include/xen/unaligned.h"
 #include "../../xen/include/xen/xxhash.h"
 #include "../../xen/lib/xxhash64.c"

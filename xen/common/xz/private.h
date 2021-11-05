@@ -12,7 +12,6 @@
 
 #ifdef __XEN__
 #include <xen/kernel.h>
-#include <asm/byteorder.h>
 #include <xen/unaligned.h>
 #else
 
