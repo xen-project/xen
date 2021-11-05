@@ -14,12 +14,7 @@
 #include <asm/io_apic.h>
 
 /* should be called last. */
-static __init int probe_default(void)
-{ 
-	return 1;
-} 
-
 const struct genapic __initconstrel apic_default = {
-	APIC_INIT("default", probe_default),
+	APIC_INIT("default", NULL),
 	GENAPIC_FLAT
 };

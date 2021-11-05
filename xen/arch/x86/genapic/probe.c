@@ -18,7 +18,7 @@
 
 struct genapic __read_mostly genapic;
 
-const struct genapic *const __initconstrel apic_probe[] = {
+static const struct genapic *const __initconstrel apic_probe[] = {
 	&apic_bigsmp, 
 	&apic_default,	/* must be last */
 	NULL,
@@ -59,22 +59,20 @@ custom_param("apic", genapic_apic_force);
 
 void __init generic_apic_probe(void) 
 { 
-	bool changed;
 	int i;
 
 	record_boot_APIC_mode();
 
 	check_x2apic_preenabled();
-	cmdline_apic = changed = !!genapic.name;
 
-	for (i = 0; !changed && apic_probe[i]; i++) { 
-		if (apic_probe[i]->probe()) {
-			changed = 1;
+	cmdline_apic = genapic.name;
+
+	for (i = 0; !genapic.name && apic_probe[i]; i++) {
+		if (!apic_probe[i]->probe || apic_probe[i]->probe())
 			genapic = *apic_probe[i];
-		} 
 	}
-	if (!changed) 
-		genapic = apic_default;
+
+	BUG_ON(!genapic.name);
 
 	printk(KERN_INFO "Using APIC driver %s\n", genapic.name);
 } 
