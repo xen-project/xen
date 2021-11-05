@@ -21,13 +21,6 @@ struct genapic {
 	const char *name;
 	int (*probe)(void);
 
-	/* When one of the next two hooks returns 1 the genapic
-	   is switched to this. Essentially they are additional probe 
-	   functions. */
-	int (*mps_oem_check)(struct mp_config_table *mpc, char *oem, 
-			      char *productid);
-	int (*acpi_madt_oem_check)(char *oem_id, char *oem_table_id);
-
 	/* Interrupt delivery parameters ('physical' vs. 'logical flat'). */
 	int int_delivery_mode;
 	int int_dest_mode;
@@ -38,13 +31,9 @@ struct genapic {
     void (*send_IPI_self)(uint8_t vector);
 };
 
-#define APICFUNC(x) .x = x
-
 #define APIC_INIT(aname, aprobe) \
 	.name = aname, \
-	.probe = aprobe, \
-	APICFUNC(mps_oem_check), \
-	APICFUNC(acpi_madt_oem_check)
+	.probe = aprobe
 
 extern struct genapic genapic;
 extern const struct genapic apic_default;

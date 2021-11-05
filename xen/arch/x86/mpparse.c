@@ -30,7 +30,6 @@
 #include <asm/setup.h>
 
 #include <mach_apic.h>
-#include <mach_mpparse.h>
 #include <bios_ebda.h>
 
 /* Have we found an MP table */
@@ -325,8 +324,6 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	memcpy(str,mpc->mpc_productid,12);
 	str[12]=0;
 	printk("Product ID: %s ",str);
-
-	mps_oem_check(mpc, oem, str);
 
 	printk("APIC at: %#x\n", mpc->mpc_lapic);
 

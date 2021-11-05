@@ -27,7 +27,6 @@
 #include <asm/msr.h>
 #include <asm/processor.h>
 #include <xen/smp.h>
-#include <asm/mach-default/mach_mpparse.h>
 
 static DEFINE_PER_CPU_READ_MOSTLY(u32, cpu_2_logical_apicid);
 static DEFINE_PER_CPU_READ_MOSTLY(cpumask_t *, cluster_cpus);

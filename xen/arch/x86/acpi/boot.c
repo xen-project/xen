@@ -39,7 +39,6 @@
 #include <asm/processor.h>
 #include <asm/hpet.h> /* for hpet_address */
 #include <mach_apic.h>
-#include <mach_mpparse.h>
 
 #define PREFIX			"ACPI: "
 
@@ -74,8 +73,6 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 		printk(KERN_DEBUG PREFIX "Local APIC address 0x%08x\n",
 		       madt->address);
 	}
-
-	acpi_madt_oem_check(madt->header.oem_id, madt->header.oem_table_id);
 
 	return 0;
 }
