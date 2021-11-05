@@ -121,6 +121,8 @@ static char *get_value(const struct file *cfg, const char *section,
 static char *split_string(char *s);
 static CHAR16 *s2w(union string *str);
 static char *w2s(const union string *str);
+static EFI_FILE_HANDLE get_parent_handle(EFI_LOADED_IMAGE *loaded_image,
+                                         CHAR16 **leaf);
 static bool read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
                       struct file *file, const char *options);
 static bool read_section(const EFI_LOADED_IMAGE *image, const CHAR16 *name,
@@ -167,7 +169,7 @@ static void __init PrintErr(const CHAR16 *s)
 }
 
 #ifndef CONFIG_HAS_DEVICE_TREE
-static int __init efi_check_dt_boot(EFI_FILE_HANDLE dir_handle)
+static int __init efi_check_dt_boot(EFI_LOADED_IMAGE *loaded_image)
 {
     return 0;
 }
@@ -1144,7 +1146,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     const char *option_str;
     bool use_cfg_file;
     int dt_modules_found;
-    EFI_FILE_HANDLE dir_handle;
 
     __set_bit(EFI_BOOT, &efi_flags);
     __set_bit(EFI_LOADER, &efi_flags);
@@ -1225,11 +1226,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     efi_arch_relocate_image(0);
 
-    /* Get the file system interface. */
-    dir_handle = get_parent_handle(loaded_image, &file_name);
-
     if ( use_cfg_file )
     {
+        EFI_FILE_HANDLE dir_handle;
         UINTN depth, cols, rows, size;
 
         size = cols = rows = depth = 0;
@@ -1239,6 +1238,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             efi_arch_console_init(cols, rows);
 
         gop = efi_get_gop();
+
+        /* Get the file system interface. */
+        dir_handle = get_parent_handle(loaded_image, &file_name);
 
         /* Read and parse the config file. */
         if ( read_section(loaded_image, L"config", &cfg, NULL) )
@@ -1362,14 +1364,14 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
         cfg.addr = 0;
 
+        dir_handle->Close(dir_handle);
+
         if ( gop && !base_video )
             gop_mode = efi_find_gop_mode(gop, cols, rows, depth);
     }
 
     /* Get the number of boot modules specified on the DT or an error (<0) */
-    dt_modules_found = efi_check_dt_boot(dir_handle);
-
-    dir_handle->Close(dir_handle);
+    dt_modules_found = efi_check_dt_boot(loaded_image);
 
     if ( dt_modules_found < 0 )
         /* efi_check_dt_boot throws some error */

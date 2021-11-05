@@ -44,17 +44,17 @@ void __flush_dcache_area(const void *vaddr, unsigned long size);
 
 static int get_module_file_index(const char *name, unsigned int name_len);
 static void PrintMessage(const CHAR16 *s);
-static int allocate_module_file(EFI_FILE_HANDLE dir_handle,
+static int allocate_module_file(EFI_LOADED_IMAGE *loaded_image,
                                 const char *name,
                                 unsigned int name_len);
-static int handle_module_node(EFI_FILE_HANDLE dir_handle,
+static int handle_module_node(EFI_LOADED_IMAGE *loaded_image,
                               int module_node_offset,
                               int reg_addr_cells,
                               int reg_size_cells,
                               bool is_domu_module);
-static int handle_dom0less_domain_node(EFI_FILE_HANDLE dir_handle,
+static int handle_dom0less_domain_node(EFI_LOADED_IMAGE *loaded_image,
                                        int domain_node);
-static int efi_check_dt_boot(EFI_FILE_HANDLE dir_handle);
+static int efi_check_dt_boot(EFI_LOADED_IMAGE *loaded_image);
 
 #define DEVICE_TREE_GUID \
 {0xb1b621d5, 0xf19c, 0x41a5, {0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0}}
@@ -647,11 +647,13 @@ static void __init PrintMessage(const CHAR16 *s)
  * This function allocates a binary and keeps track of its name, it returns the
  * index of the file in the modules array or a negative number on error.
  */
-static int __init allocate_module_file(EFI_FILE_HANDLE dir_handle,
+static int __init allocate_module_file(EFI_LOADED_IMAGE *loaded_image,
                                        const char *name,
                                        unsigned int name_len)
 {
+    EFI_FILE_HANDLE dir_handle;
     module_name *file_name;
+    CHAR16 *fname;
     union string module_name;
     int ret;
 
@@ -683,8 +685,13 @@ static int __init allocate_module_file(EFI_FILE_HANDLE dir_handle,
     strlcpy(file_name->name, name, name_len + 1);
     file_name->name_len = name_len;
 
+    /* Get the file system interface. */
+    dir_handle = get_parent_handle(loaded_image, &fname);
+
     /* Load the binary in memory */
     read_file(dir_handle, s2w(&module_name), &module_binary, NULL);
+
+    dir_handle->Close(dir_handle);
 
     /* Save address and size */
     file_name->addr = module_binary.addr;
@@ -702,8 +709,9 @@ static int __init allocate_module_file(EFI_FILE_HANDLE dir_handle,
  * This function checks for the presence of the xen,uefi-binary property in the
  * module, if found it loads the binary as module and sets the right address
  * for the reg property into the module DT node.
+ * Returns 1 if module is multiboot,module, 0 if not, < 0 on error
  */
-static int __init handle_module_node(EFI_FILE_HANDLE dir_handle,
+static int __init handle_module_node(EFI_LOADED_IMAGE *loaded_image,
                                      int module_node_offset,
                                      int reg_addr_cells,
                                      int reg_size_cells,
@@ -730,13 +738,13 @@ static int __init handle_module_node(EFI_FILE_HANDLE dir_handle,
                                  &uefi_name_len);
 
     if ( !uefi_name_prop )
-        /* Property not found */
-        return 0;
+        /* Property not found, but signal this is a multiboot,module */
+        return 1;
 
     file_idx = get_module_file_index(uefi_name_prop, uefi_name_len);
     if ( file_idx < 0 )
     {
-        file_idx = allocate_module_file(dir_handle, uefi_name_prop,
+        file_idx = allocate_module_file(loaded_image, uefi_name_prop,
                                         uefi_name_len);
         if ( file_idx < 0 )
             return file_idx;
@@ -795,19 +803,20 @@ static int __init handle_module_node(EFI_FILE_HANDLE dir_handle,
         }
     }
 
-    return 0;
+    return 1;
 }
 
 /*
  * This function checks for boot modules under the domU guest domain node
  * in the DT.
- * Returns 0 on success, negative number on error.
+ * Returns number of multiboot,module found or negative number on error.
  */
-static int __init handle_dom0less_domain_node(EFI_FILE_HANDLE dir_handle,
+static int __init handle_dom0less_domain_node(EFI_LOADED_IMAGE *loaded_image,
                                               int domain_node)
 {
     int module_node, addr_cells, size_cells, len;
     const struct fdt_property *prop;
+    unsigned int mb_modules_found = 0;
 
     /* Get #address-cells and #size-cells from domain node */
     prop = fdt_get_property(fdt, domain_node, "#address-cells", &len);
@@ -833,24 +842,26 @@ static int __init handle_dom0less_domain_node(EFI_FILE_HANDLE dir_handle,
           module_node > 0;
           module_node = fdt_next_subnode(fdt, module_node) )
     {
-        int ret = handle_module_node(dir_handle, module_node, addr_cells,
+        int ret = handle_module_node(loaded_image, module_node, addr_cells,
                                      size_cells, true);
         if ( ret < 0 )
             return ret;
+
+        mb_modules_found += ret;
     }
 
-    return 0;
+    return mb_modules_found;
 }
 
 /*
  * This function checks for xen domain nodes under the /chosen node for possible
  * dom0 and domU guests to be loaded.
- * Returns the number of modules loaded or a negative number for error.
+ * Returns the number of multiboot modules found or a negative number for error.
  */
-static int __init efi_check_dt_boot(EFI_FILE_HANDLE dir_handle)
+static int __init efi_check_dt_boot(EFI_LOADED_IMAGE *loaded_image)
 {
     int chosen, node, addr_len, size_len;
-    unsigned int i = 0;
+    unsigned int i = 0, modules_found = 0;
 
     /* Check for the chosen node in the current DTB */
     chosen = setup_chosen_node(fdt, &addr_len, &size_len);
@@ -865,15 +876,23 @@ static int __init efi_check_dt_boot(EFI_FILE_HANDLE dir_handle)
           node > 0;
           node = fdt_next_subnode(fdt, node) )
     {
+        int ret;
+
         if ( !fdt_node_check_compatible(fdt, node, "xen,domain") )
         {
             /* Found a node with compatible xen,domain; handle this node. */
-            if ( handle_dom0less_domain_node(dir_handle, node) < 0 )
+            ret = handle_dom0less_domain_node(loaded_image, node);
+            if ( ret < 0 )
                 return ERROR_DT_MODULE_DOMU;
         }
-        else if ( handle_module_node(dir_handle, node, addr_len, size_len,
-                                     false) < 0 )
+        else
+        {
+            ret = handle_module_node(loaded_image, node, addr_len, size_len,
+                                     false);
+            if ( ret < 0 )
                  return ERROR_DT_MODULE_DOM0;
+        }
+        modules_found += ret;
     }
 
     /* Free boot modules file names if any */
@@ -883,7 +902,7 @@ static int __init efi_check_dt_boot(EFI_FILE_HANDLE dir_handle)
         efi_bs->FreePool(modules[i].name);
     }
 
-    return modules_idx;
+    return modules_found;
 }
 
 static void __init efi_arch_cpu(void)
