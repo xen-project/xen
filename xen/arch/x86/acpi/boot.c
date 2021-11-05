@@ -477,16 +477,6 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 	const struct acpi_table_fadt *fadt =
 		container_of(table, const struct acpi_table_fadt, header);
 
-#ifdef	CONFIG_ACPI_INTERPRETER
-	/* initialize sci_int early for INT_SRC_OVR MADT parsing */
-	acpi_fadt.sci_int = fadt->sci_int;
-
-	/* initialize rev and apic_phys_dest_mode for x86_64 genapic */
-	acpi_fadt.revision = fadt->revision;
-	acpi_fadt.force_apic_physical_destination_mode =
-	    fadt->force_apic_physical_destination_mode;
-#endif
-
 	/* detect the location of the ACPI PM Timer */
 	if (fadt->header.revision >= FADT2_REVISION_ID &&
 	    fadt->xpm_timer_block.space_id == ACPI_ADR_SPACE_SYSTEM_IO) {
