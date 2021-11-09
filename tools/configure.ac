@@ -130,13 +130,13 @@ AC_SUBST(qemu_traditional)
 
 AC_ARG_ENABLE([ipxe],
     AS_HELP_STRING([--enable-ipxe],
-                   [Enable in-tree IPXE, (DEFAULT is on for x86,
-                    otherwise off, see also --with-system-ipxe)]),,[
-    case "$host_cpu" in
-        i[[3456]]86|x86_64)
-           enable_ipxe="yes";;
-        *) enable_ipxe="no";;
-    esac
+                   [Enable in-tree IPXE,
+                    (DEFAULT is off, see also --with-system-ipxe)]),,[
+    AS_IF([test "x$enable_qemu_traditional" = "xyes"], [
+        enable_ipxe="yes"
+    ], [
+        enable_ipxe="no"
+    ])
 ])
 AS_IF([test "x$enable_ipxe" = "xno"], [ipxe=n], [ipxe=y])
 AC_ARG_WITH([system-ipxe],

@@ -1504,8 +1504,8 @@ Optional Features:
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is
                           off)
-  --enable-ipxe           Enable in-tree IPXE, (DEFAULT is on for x86,
-                          otherwise off, see also --with-system-ipxe)
+  --enable-ipxe           Enable in-tree IPXE, (DEFAULT is off, see also
+                          --with-system-ipxe)
   --enable-rombios        Enable ROMBIOS, (DEFAULT is on if qemu-traditional
                           or ipxe is enabled, otherwise off)
   --enable-systemd        Enable systemd support (default is DISABLED)
@@ -4300,25 +4300,29 @@ else
 
 fi
 
-if test "x$enable_ipxe" = "xno"; then :
-  ipxe=n
-else
-  ipxe=y
-fi
 
 # Check whether --enable-ipxe was given.
 if test "${enable_ipxe+set}" = set; then :
   enableval=$enable_ipxe;
 else
 
-    case "$host_cpu" in
-        i[3456]86|x86_64)
-           enable_ipxe="yes";;
-        *) enable_ipxe="no";;
-    esac
+    if test "x$enable_qemu_traditional" = "xyes"; then :
+
+        enable_ipxe="yes"
+
+else
+
+        enable_ipxe="no"
 
 fi
 
+fi
+
+if test "x$enable_ipxe" = "xno"; then :
+  ipxe=n
+else
+  ipxe=y
+fi
 
 # Check whether --with-system-ipxe was given.
 if test "${with_system_ipxe+set}" = set; then :
