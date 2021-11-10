@@ -395,6 +395,14 @@ static bool __init allocate_bank_memory(struct domain *d,
     struct membank *bank;
     unsigned int max_order = ~0;
 
+    /*
+     * allocate_bank_memory can be called with a tot_size of zero for
+     * the second memory bank. It is not an error and we can safely
+     * avoid creating a zero-size memory bank.
+     */
+    if ( tot_size == 0 )
+        return true;
+
     bank = &kinfo->mem.bank[kinfo->mem.nr_banks];
     bank->start = gfn_to_gaddr(sgfn);
     bank->size = tot_size;
