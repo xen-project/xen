@@ -719,8 +719,6 @@ void recalculate_cpuid_policy(struct domain *d)
 
     if ( !p->extd.page1gb )
         p->extd.raw[0x19] = EMPTY_LEAF;
-
-    x86_cpuid_policy_shrink_max_leaves(p);
 }
 
 int init_domain_cpuid_policy(struct domain *d)
