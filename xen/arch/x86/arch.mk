@@ -54,6 +54,7 @@ endif
 
 ifdef CONFIG_XEN_IBT
 CFLAGS += -fcf-protection=branch -mmanual-endbr
+$(call cc-option-add,CFLAGS,CC,-fcf-check-attribute=no)
 else
 $(call cc-option-add,CFLAGS,CC,-fcf-protection=none)
 endif

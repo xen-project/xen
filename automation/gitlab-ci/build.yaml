@@ -294,6 +294,12 @@ debian-stretch-32-gcc-debug:
   variables:
     CONTAINER: debian:stretch-i386
 
+debian-buster-gcc-ibt:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:buster-gcc-ibt
+    RANDCONFIG: y
+
 debian-unstable-clang:
   extends: .clang-x86-64-build
   variables:
