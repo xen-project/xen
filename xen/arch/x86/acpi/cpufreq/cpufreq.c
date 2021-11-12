@@ -640,13 +640,20 @@ static int __init cpufreq_driver_init(void)
 {
     int ret = 0;
 
-    if ((cpufreq_controller == FREQCTL_xen) &&
-        (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL))
-        ret = cpufreq_register_driver(&acpi_cpufreq_driver);
-    else if ((cpufreq_controller == FREQCTL_xen) &&
-        (boot_cpu_data.x86_vendor &
-         (X86_VENDOR_AMD | X86_VENDOR_HYGON)))
-        ret = powernow_register_driver();
+    if ( cpufreq_controller == FREQCTL_xen )
+    {
+        switch ( boot_cpu_data.x86_vendor )
+        {
+        case X86_VENDOR_INTEL:
+            ret = cpufreq_register_driver(&acpi_cpufreq_driver);
+            break;
+
+        case X86_VENDOR_AMD:
+        case X86_VENDOR_HYGON:
+            ret = powernow_register_driver();
+            break;
+        }
+    }
 
     return ret;
 }

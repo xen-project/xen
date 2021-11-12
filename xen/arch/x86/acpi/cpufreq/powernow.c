@@ -24,13 +24,9 @@
 #include <xen/types.h>
 #include <xen/errno.h>
 #include <xen/init.h>
-#include <xen/delay.h>
 #include <xen/cpumask.h>
-#include <xen/timer.h>
 #include <xen/xmalloc.h>
-#include <asm/bug.h>
 #include <asm/msr.h>
-#include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/cpufeature.h>
 #include <acpi/acpi.h>
@@ -353,25 +349,10 @@ static const struct cpufreq_driver __initconstrel powernow_cpufreq_driver = {
     .update = powernow_cpufreq_update
 };
 
-unsigned int __init powernow_register_driver()
+unsigned int __init powernow_register_driver(void)
 {
-    unsigned int i, ret = 0;
+    if ( !(cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES) & USE_HW_PSTATE) )
+        return -ENODEV;
 
-    for_each_online_cpu(i) {
-        struct cpuinfo_x86 *c = &cpu_data[i];
-        if (!(c->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)))
-            ret = -ENODEV;
-        else
-        {
-            u32 eax, ebx, ecx, edx;
-            cpuid(CPUID_FREQ_VOLT_CAPABILITIES, &eax, &ebx, &ecx, &edx);
-            if ((edx & USE_HW_PSTATE) != USE_HW_PSTATE)
-                ret = -ENODEV;
-        }
-        if (ret)
-            return ret;
-    }
-
-    ret = cpufreq_register_driver(&powernow_cpufreq_driver);
-    return ret;
+    return cpufreq_register_driver(&powernow_cpufreq_driver);
 }
