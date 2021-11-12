@@ -6,6 +6,7 @@
 
 #include <xenctrl.h>
 #include <xenforeignmemory.h>
+#include <xengnttab.h>
 #include <xen-tools/libs.h>
 
 static unsigned int nr_failures;
@@ -17,13 +18,17 @@ static unsigned int nr_failures;
 
 static xc_interface *xch;
 static xenforeignmemory_handle *fh;
+static xengnttab_handle *gh;
 
-static void test_gnttab(uint32_t domid, unsigned int nr_frames)
+static void test_gnttab(uint32_t domid, unsigned int nr_frames,
+                        unsigned long gfn)
 {
     xenforeignmemory_resource_handle *res;
-    void *addr = NULL;
+    grant_entry_v1_t *gnttab;
     size_t size;
     int rc;
+    uint32_t refs[nr_frames], domids[nr_frames];
+    void *grants;
 
     printf("  Test grant table\n");
 
@@ -51,18 +56,56 @@ static void test_gnttab(uint32_t domid, unsigned int nr_frames)
     res = xenforeignmemory_map_resource(
         fh, domid, XENMEM_resource_grant_table,
         XENMEM_resource_grant_table_id_shared, 0, size >> XC_PAGE_SHIFT,
-        &addr, PROT_READ | PROT_WRITE, 0);
+        (void **)&gnttab, PROT_READ | PROT_WRITE, 0);
 
     /*
      * Failure here with E2BIG indicates Xen is missing the bugfix to map
      * resources larger than 32 frames.
      */
     if ( !res )
-        return fail("    Fail: Map %d - %s\n", errno, strerror(errno));
+        return fail("    Fail: Map grant table %d - %s\n",
+                    errno, strerror(errno));
 
+    /* Put each gref at a unique offset in its frame. */
+    for ( unsigned int i = 0; i < nr_frames; i++ )
+    {
+        unsigned int gref = i * (XC_PAGE_SIZE / sizeof(*gnttab)) + i;
+
+        refs[i] = gref;
+        domids[i] = domid;
+
+        gnttab[gref].domid = 0;
+        gnttab[gref].frame = gfn;
+        gnttab[gref].flags = GTF_permit_access;
+    }
+
+    /* Map grants. */
+    grants = xengnttab_map_grant_refs(gh, nr_frames, domids, refs,
+                                      PROT_READ | PROT_WRITE);
+
+    /*
+     * Failure here indicates either that the frames were not mapped
+     * in the correct order or xenforeignmemory_map_resource() didn't
+     * give us the frames we asked for to begin with.
+     */
+    if ( grants == NULL )
+    {
+        fail("    Fail: Map grants %d - %s\n", errno, strerror(errno));
+        goto out;
+    }
+
+    /* Unmap grants. */
+    rc = xengnttab_unmap(gh, grants, nr_frames);
+
+    if ( rc )
+        fail("    Fail: Unmap grants %d - %s\n", errno, strerror(errno));
+
+    /* Unmap grant table. */
+ out:
     rc = xenforeignmemory_unmap_resource(fh, res);
     if ( rc )
-        return fail("    Fail: Unmap %d - %s\n", errno, strerror(errno));
+        return fail("    Fail: Unmap grant table %d - %s\n",
+                    errno, strerror(errno));
 }
 
 static void test_domain_configurations(void)
@@ -107,6 +150,7 @@ static void test_domain_configurations(void)
         struct test *t = &tests[i];
         uint32_t domid = 0;
         int rc;
+        xen_pfn_t ram[1] = { 0 };
 
         printf("Test %s\n", t->name);
 
@@ -123,8 +167,26 @@ static void test_domain_configurations(void)
 
         printf("  Created d%u\n", domid);
 
-        test_gnttab(domid, t->create.max_grant_frames);
+        rc = xc_domain_setmaxmem(xch, domid, -1);
+        if ( rc )
+        {
+            fail("  Failed to set max memory for domain: %d - %s\n",
+                 errno, strerror(errno));
+            goto test_done;
+        }
 
+        rc = xc_domain_populate_physmap_exact(
+            xch, domid, ARRAY_SIZE(ram), 0, 0, ram);
+        if ( rc )
+        {
+            fail("  Failed to populate physmap domain: %d - %s\n",
+                 errno, strerror(errno));
+            goto test_done;
+        }
+
+        test_gnttab(domid, t->create.max_grant_frames, ram[0]);
+
+    test_done:
         rc = xc_domain_destroy(xch, domid);
         if ( rc )
             fail("  Failed to destroy domain: %d - %s\n",
@@ -138,13 +200,26 @@ int main(int argc, char **argv)
 
     xch = xc_interface_open(NULL, NULL, 0);
     fh = xenforeignmemory_open(NULL, 0);
+    gh = xengnttab_open(NULL, 0);
 
     if ( !xch )
         err(1, "xc_interface_open");
     if ( !fh )
         err(1, "xenforeignmemory_open");
+    if ( !gh )
+        err(1, "xengnttab_open");
 
     test_domain_configurations();
 
     return !!nr_failures;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

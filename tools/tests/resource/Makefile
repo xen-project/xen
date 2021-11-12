@@ -31,10 +31,12 @@ CFLAGS += -Werror
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_libxenforeginmemory)
+CFLAGS += $(CFLAGS_libxengnttab)
 CFLAGS += $(APPEND_CFLAGS)
 
 LDFLAGS += $(LDLIBS_libxenctrl)
 LDFLAGS += $(LDLIBS_libxenforeignmemory)
+LDFLAGS += $(LDLIBS_libxengnttab)
 LDFLAGS += $(APPEND_LDFLAGS)
 
 %.o: Makefile
