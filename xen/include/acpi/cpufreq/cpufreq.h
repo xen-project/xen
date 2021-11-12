@@ -72,7 +72,6 @@ struct cpufreq_policy {
     s8                  turbo;  /* tristate flag: 0 for unsupported
                                  * -1 for disable, 1 for enabled
                                  * See CPUFREQ_TURBO_* below for defines */
-    bool_t              aperf_mperf; /* CPU has APERF/MPERF MSRs */
 };
 DECLARE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_policy);
 
@@ -162,7 +161,6 @@ struct cpufreq_driver {
                      unsigned int target_freq,
                      unsigned int relation);
     unsigned int    (*get)(unsigned int cpu);
-    unsigned int    (*getavg)(unsigned int cpu, unsigned int flag);
     int    (*exit)(struct cpufreq_policy *policy);
 };
 

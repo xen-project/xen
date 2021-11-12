@@ -275,7 +275,7 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
         return 0;
 
     policy = per_cpu(cpufreq_cpu_policy, cpu);
-    if (!policy || !policy->aperf_mperf)
+    if ( !policy || !cpu_has_aperfmperf )
         return 0;
 
     switch (flag)
@@ -344,12 +344,6 @@ static void feature_detect(void *info)
 {
     struct cpufreq_policy *policy = info;
     unsigned int eax;
-
-    if ( cpu_has_aperfmperf )
-    {
-        policy->aperf_mperf = 1;
-        cpufreq_driver.getavg = get_measured_perf;
-    }
 
     eax = cpuid_eax(6);
     if (eax & 0x2) {

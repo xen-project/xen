@@ -381,12 +381,9 @@ int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag)
     if (!cpu_online(cpu) || !(policy = per_cpu(cpufreq_cpu_policy, cpu)))
         return 0;
 
-    if (cpufreq_driver.getavg)
-    {
-        freq_avg = cpufreq_driver.getavg(cpu, flag);
-        if (freq_avg > 0)
-            return freq_avg;
-    }
+    freq_avg = get_measured_perf(cpu, flag);
+    if ( freq_avg > 0 )
+        return freq_avg;
 
     return policy->cur;
 }

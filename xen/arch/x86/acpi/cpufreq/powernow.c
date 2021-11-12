@@ -205,12 +205,6 @@ static void feature_detect(void *info)
     struct cpufreq_policy *policy = info;
     unsigned int edx;
 
-    if ( cpu_has_aperfmperf )
-    {
-        policy->aperf_mperf = 1;
-        cpufreq_driver.getavg = get_measured_perf;
-    }
-
     edx = cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES);
     if ((edx & CPB_CAPABLE) == CPB_CAPABLE) {
         policy->turbo = CPUFREQ_TURBO_ENABLED;
