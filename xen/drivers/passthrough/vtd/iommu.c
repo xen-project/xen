@@ -54,7 +54,7 @@ bool __read_mostly iommu_qinval = true;
 bool __read_mostly iommu_snoop = true;
 #endif
 
-static unsigned int __initdata nr_iommus;
+static unsigned int __read_mostly nr_iommus;
 
 static struct iommu_ops vtd_ops;
 static struct tasklet vtd_fault_tasklet;
@@ -645,7 +645,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
 
         iommu = drhd->iommu;
 
-        if ( !test_bit(iommu->index, &hd->arch.vtd.iommu_bitmap) )
+        if ( !test_bit(iommu->index, hd->arch.vtd.iommu_bitmap) )
             continue;
 
         flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
@@ -1308,6 +1308,11 @@ static int intel_iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
+    hd->arch.vtd.iommu_bitmap = xzalloc_array(unsigned long,
+                                              BITS_TO_LONGS(nr_iommus));
+    if ( !hd->arch.vtd.iommu_bitmap )
+        return -ENOMEM;
+
     hd->arch.vtd.agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
 
     return 0;
@@ -1457,7 +1462,7 @@ int domain_context_mapping_one(
     if ( rc > 0 )
         rc = 0;
 
-    set_bit(iommu->index, &hd->arch.vtd.iommu_bitmap);
+    set_bit(iommu->index, hd->arch.vtd.iommu_bitmap);
 
     unmap_vtd_domain_page(context_entries);
 
@@ -1789,7 +1794,7 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
 
     if ( !found )
     {
-        clear_bit(iommu->index, &dom_iommu(domain)->arch.vtd.iommu_bitmap);
+        clear_bit(iommu->index, dom_iommu(domain)->arch.vtd.iommu_bitmap);
         cleanup_domid_map(domain, iommu);
     }
 
@@ -1819,6 +1824,8 @@ static void iommu_domain_teardown(struct domain *d)
 
     for_each_drhd_unit ( drhd )
         cleanup_domid_map(d, drhd->iommu);
+
+    XFREE(hd->arch.vtd.iommu_bitmap);
 }
 
 static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,

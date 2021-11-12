@@ -58,7 +58,7 @@ struct arch_iommu
         struct {
             uint64_t pgd_maddr; /* io page directory machine address */
             unsigned int agaw; /* adjusted guest address width, 0 is level 2 30-bit */
-            uint64_t iommu_bitmap; /* bitmap of iommu(s) that the domain uses */
+            unsigned long *iommu_bitmap; /* bitmap of iommu(s) that the domain uses */
         } vtd;
         /* AMD IOMMU */
         struct {
