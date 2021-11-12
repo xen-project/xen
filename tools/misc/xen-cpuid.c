@@ -139,7 +139,8 @@ static const char *const str_7c0[32] =
 
 static const char *const str_e7d[32] =
 {
-    [ 8] = "itsc",
+    /* 6 */                    [ 7] = "hw-pstate",
+    [ 8] = "itsc",             [ 9] = "cpb",
     [10] = "efro",
 };
 

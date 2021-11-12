@@ -32,9 +32,6 @@
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>
 
-#define CPUID_FREQ_VOLT_CAPABILITIES    0x80000007
-#define CPB_CAPABLE             0x00000200
-#define USE_HW_PSTATE           0x00000080
 #define HW_PSTATE_MASK          0x00000007
 #define HW_PSTATE_VALID_MASK    0x80000000
 #define HW_PSTATE_MAX_MASK      0x000000f0
@@ -200,21 +197,6 @@ static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
     return cpufreq_frequency_table_verify(policy, data->freq_table);
 }
 
-static void feature_detect(void *info)
-{
-    struct cpufreq_policy *policy = info;
-    unsigned int edx;
-
-    edx = cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES);
-    if ((edx & CPB_CAPABLE) == CPB_CAPABLE) {
-        policy->turbo = CPUFREQ_TURBO_ENABLED;
-        if (cpufreq_verbose)
-            printk(XENLOG_INFO
-                   "CPU%u: Core Boost/Turbo detected and enabled\n",
-                   smp_processor_id());
-    }
-}
-
 static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
     unsigned int i;
@@ -300,9 +282,9 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     if (result)
         goto err_freqfree;
 
-    if (c->cpuid_level >= 6)
-        on_selected_cpus(cpumask_of(cpu), feature_detect, policy, 1);
-      
+    if ( cpu_has(c, X86_FEATURE_CPB) )
+        policy->turbo = CPUFREQ_TURBO_ENABLED;
+
     /*
      * the first call to ->target() should result in us actually
      * writing something to the appropriate registers.
@@ -345,7 +327,7 @@ static const struct cpufreq_driver __initconstrel powernow_cpufreq_driver = {
 
 unsigned int __init powernow_register_driver(void)
 {
-    if ( !(cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES) & USE_HW_PSTATE) )
+    if ( !cpu_has_hw_pstate )
         return -ENODEV;
 
     return cpufreq_register_driver(&powernow_cpufreq_driver);

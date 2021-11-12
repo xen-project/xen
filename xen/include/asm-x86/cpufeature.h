@@ -122,6 +122,7 @@
 #define cpu_has_enqcmd          boot_cpu_has(X86_FEATURE_ENQCMD)
 
 /* CPUID level 0x80000007.edx */
+#define cpu_has_hw_pstate       boot_cpu_has(X86_FEATURE_HW_PSTATE)
 #define cpu_has_itsc            boot_cpu_has(X86_FEATURE_ITSC)
 
 /* CPUID level 0x80000008.ebx */

@@ -247,7 +247,9 @@ XEN_CPUFEATURE(MOVDIR64B,     6*32+28) /*a  MOVDIR64B instruction */
 XEN_CPUFEATURE(ENQCMD,        6*32+29) /*   ENQCMD{,S} instructions */
 
 /* AMD-defined CPU features, CPUID level 0x80000007.edx, word 7 */
+XEN_CPUFEATURE(HW_PSTATE,     7*32+ 7) /*   Hardware Pstates */
 XEN_CPUFEATURE(ITSC,          7*32+ 8) /*a  Invariant TSC */
+XEN_CPUFEATURE(CPB,           7*32+ 9) /*   Core Performance Boost (Turbo) */
 XEN_CPUFEATURE(EFRO,          7*32+10) /*   APERF/MPERF Read Only interface */
 
 /* AMD-defined CPU features, CPUID level 0x80000008.ebx, word 8 */
