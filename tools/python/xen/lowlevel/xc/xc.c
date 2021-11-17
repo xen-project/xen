@@ -116,7 +116,7 @@ static PyObject *pyxc_domain_create(XcObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
 {
-    uint32_t dom = 0, target = 0;
+    uint32_t dom = 0, target = 0, max_grant_version = 2;
     int      ret;
     size_t   i;
     PyObject *pyhandle = NULL;
@@ -132,12 +132,13 @@ static PyObject *pyxc_domain_create(XcObject *self,
     };
 
     static char *kwd_list[] = { "domid", "ssidref", "handle", "flags",
-                                "target", "max_vcpus", NULL };
+                                "target", "max_vcpus", "max_grant_version",
+                                NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOiii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOiiii", kwd_list,
                                       &dom, &config.ssidref, &pyhandle,
                                       &config.flags, &target,
-                                      &config.max_vcpus) )
+                                      &config.max_vcpus, &max_grant_version) )
         return NULL;
     if ( pyhandle != NULL )
     {
@@ -162,6 +163,7 @@ static PyObject *pyxc_domain_create(XcObject *self,
 #else
 #error Architecture not supported
 #endif
+    config.grant_opts = XEN_DOMCTL_GRANT_version(max_grant_version);
 
     if ( (ret = xc_domain_create(self->xc_handle, &dom, &config)) < 0 )
         return pyxc_error_to_exception(self->xc_handle);
