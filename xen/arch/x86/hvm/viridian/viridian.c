@@ -574,13 +574,6 @@ static void vpmask_fill(struct hypercall_vpmask *vpmask)
     bitmap_fill(vpmask->mask, HVM_MAX_VCPUS);
 }
 
-static bool vpmask_test(const struct hypercall_vpmask *vpmask,
-                        unsigned int vp)
-{
-    ASSERT(vp < HVM_MAX_VCPUS);
-    return test_bit(vp, vpmask->mask);
-}
-
 static unsigned int vpmask_first(const struct hypercall_vpmask *vpmask)
 {
     return find_first_bit(vpmask->mask, HVM_MAX_VCPUS);
@@ -669,17 +662,6 @@ static int hv_vpset_to_vpmask(const struct hv_vpset *set,
 #undef NR_VPS_PER_BANK
 }
 
-/*
- * Windows should not issue the hypercalls requiring this callback in the
- * case where vcpu_id would exceed the size of the mask.
- */
-static bool need_flush(void *ctxt, struct vcpu *v)
-{
-    struct hypercall_vpmask *vpmask = ctxt;
-
-    return vpmask_test(vpmask, v->vcpu_id);
-}
-
 union hypercall_input {
     uint64_t raw;
     struct {
@@ -714,6 +696,7 @@ static int hvcall_flush(const union hypercall_input *input,
         uint64_t flags;
         uint64_t vcpu_mask;
     } input_params;
+    unsigned long *vcpu_bitmap;
 
     /* These hypercalls should never use the fast-call convention. */
     if ( input->fast )
@@ -730,18 +713,19 @@ static int hvcall_flush(const union hypercall_input *input,
      * so err on the safe side.
      */
     if ( input_params.flags & HV_FLUSH_ALL_PROCESSORS )
-        vpmask_fill(vpmask);
+        vcpu_bitmap = NULL;
     else
     {
         vpmask_empty(vpmask);
         vpmask_set(vpmask, 0, input_params.vcpu_mask);
+        vcpu_bitmap = vpmask->mask;
     }
 
     /*
      * A false return means that another vcpu is currently trying
      * a similar operation, so back off.
      */
-    if ( !paging_flush_tlb(need_flush, vpmask) )
+    if ( !paging_flush_tlb(vcpu_bitmap) )
         return -ERESTART;
 
     output->rep_complete = input->rep_count;
@@ -760,6 +744,7 @@ static int hvcall_flush_ex(const union hypercall_input *input,
         uint64_t flags;
         struct hv_vpset set;
     } input_params;
+    unsigned long *vcpu_bitmap;
 
     /* These hypercalls should never use the fast-call convention. */
     if ( input->fast )
@@ -770,8 +755,9 @@ static int hvcall_flush_ex(const union hypercall_input *input,
                                   sizeof(input_params)) != HVMTRANS_okay )
         return -EINVAL;
 
-    if ( input_params.flags & HV_FLUSH_ALL_PROCESSORS )
-        vpmask_fill(vpmask);
+    if ( input_params.flags & HV_FLUSH_ALL_PROCESSORS ||
+         input_params.set.format == HV_GENERIC_SET_ALL )
+        vcpu_bitmap = NULL;
     else
     {
         union hypercall_vpset *vpset = &this_cpu(hypercall_vpset);
@@ -801,13 +787,15 @@ static int hvcall_flush_ex(const union hypercall_input *input,
         rc = hv_vpset_to_vpmask(set, vpmask);
         if ( rc )
             return rc;
+
+        vcpu_bitmap = vpmask->mask;
     }
 
     /*
      * A false return means that another vcpu is currently trying
      * a similar operation, so back off.
      */
-    if ( !paging_flush_tlb(need_flush, vpmask) )
+    if ( !paging_flush_tlb(vcpu_bitmap) )
         return -ERESTART;
 
     output->rep_complete = input->rep_count;

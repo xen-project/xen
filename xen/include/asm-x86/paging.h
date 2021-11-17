@@ -141,9 +141,7 @@ struct paging_mode {
     void          (*update_cr3            )(struct vcpu *v, int do_locking,
                                             bool noflush);
     void          (*update_paging_modes   )(struct vcpu *v);
-    bool          (*flush_tlb             )(bool (*flush_vcpu)(void *ctxt,
-                                                               struct vcpu *v),
-                                            void *ctxt);
+    bool          (*flush_tlb             )(const unsigned long *vcpu_bitmap);
 
     unsigned int guest_levels;
 
@@ -417,11 +415,10 @@ static always_inline unsigned int paging_max_paddr_bits(const struct domain *d)
     return bits;
 }
 
-static inline bool paging_flush_tlb(bool (*flush_vcpu)(void *ctxt,
-                                                       struct vcpu *v),
-                                    void *ctxt)
+/* Flush selected vCPUs TLBs.  NULL for all. */
+static inline bool paging_flush_tlb(const unsigned long *vcpu_bitmap)
 {
-    return paging_get_hostmode(current)->flush_tlb(flush_vcpu, ctxt);
+    return paging_get_hostmode(current)->flush_tlb(vcpu_bitmap);
 }
 
 #endif /* XEN_PAGING_H */
