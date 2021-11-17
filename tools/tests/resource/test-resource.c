@@ -120,6 +120,7 @@ static void test_domain_configurations(void)
             .create = {
                 .max_vcpus = 2,
                 .max_grant_frames = 40,
+                .grant_opts = XEN_DOMCTL_GRANT_version(1),
             },
         },
         {
@@ -128,6 +129,7 @@ static void test_domain_configurations(void)
                 .flags = XEN_DOMCTL_CDF_hvm,
                 .max_vcpus = 2,
                 .max_grant_frames = 40,
+                .grant_opts = XEN_DOMCTL_GRANT_version(1),
                 .arch = {
                     .emulation_flags = XEN_X86_EMU_LAPIC,
                 },
@@ -140,6 +142,7 @@ static void test_domain_configurations(void)
                 .flags = XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap,
                 .max_vcpus = 2,
                 .max_grant_frames = 40,
+                .grant_opts = XEN_DOMCTL_GRANT_version(1),
             },
         },
 #endif
