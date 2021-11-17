@@ -1236,14 +1236,6 @@ static void ept_memory_type_changed(struct p2m_domain *p2m)
         ept_sync_domain(p2m);
 }
 
-static void __ept_sync_domain(void *info)
-{
-    /*
-     * The invalidation will be done before VMENTER (see
-     * vmx_vmenter_helper()).
-     */
-}
-
 static void ept_sync_domain_prepare(struct p2m_domain *p2m)
 {
     struct domain *d = p2m->domain;
@@ -1269,7 +1261,8 @@ static void ept_sync_domain_prepare(struct p2m_domain *p2m)
 
 static void ept_sync_domain_mask(struct p2m_domain *p2m, const cpumask_t *mask)
 {
-    on_selected_cpus(mask, __ept_sync_domain, p2m, 1);
+    /* Invalidation will be done in vmx_vmenter_helper(). */
+    on_selected_cpus(mask, NULL, NULL, 1);
 }
 
 void ept_sync_domain(struct p2m_domain *p2m)

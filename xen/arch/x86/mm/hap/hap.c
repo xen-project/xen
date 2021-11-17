@@ -696,15 +696,6 @@ static void hap_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     hvm_update_guest_cr3(v, noflush);
 }
 
-/*
- * Dummy function to use with on_selected_cpus in order to trigger a vmexit on
- * selected pCPUs. When the VM resumes execution it will get a new ASID/VPID
- * and thus a clean TLB.
- */
-static void dummy_flush(void *data)
-{
-}
-
 static bool flush_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
                       void *ctxt)
 {
@@ -737,7 +728,7 @@ static bool flush_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
      * not currently running will already be flushed when scheduled because of
      * the ASID tickle done in the loop above.
      */
-    on_selected_cpus(mask, dummy_flush, NULL, 0);
+    on_selected_cpus(mask, NULL, NULL, 0);
 
     return true;
 }

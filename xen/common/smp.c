@@ -87,7 +87,11 @@ void smp_call_function_interrupt(void)
 
     irq_enter();
 
-    if ( call_data.wait )
+    if ( unlikely(!func) )
+    {
+        cpumask_clear_cpu(cpu, &call_data.selected);
+    }
+    else if ( call_data.wait )
     {
         (*func)(info);
         smp_mb();
