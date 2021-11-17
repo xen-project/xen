@@ -99,6 +99,7 @@ struct xen_domctl_createdomain {
 
 /* Grant version, use low 4 bits. */
 #define XEN_DOMCTL_GRANT_version_mask    0xf
+#define XEN_DOMCTL_GRANT_version(v)      ((v) & XEN_DOMCTL_GRANT_version_mask)
 
     uint32_t grant_opts;
 
