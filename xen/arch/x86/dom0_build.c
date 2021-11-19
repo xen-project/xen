@@ -521,8 +521,11 @@ int __init dom0_setup_permissions(struct domain *d)
                                          MSI_ADDR_DEST_ID_MASK));
     /* HyperTransport range. */
     if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
-        rc |= iomem_deny_access(d, paddr_to_pfn(0xfdULL << 32),
-                                paddr_to_pfn((1ULL << 40) - 1));
+    {
+        mfn = paddr_to_pfn(1UL <<
+                           (boot_cpu_data.x86 < 0x17 ? 40 : paddr_bits));
+        rc |= iomem_deny_access(d, mfn - paddr_to_pfn(3UL << 32), mfn - 1);
+    }
 
     /* Remove access to E820_UNUSABLE I/O regions above 1MB. */
     for ( i = 0; i < e820.nr_map; i++ )

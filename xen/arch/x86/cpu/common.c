@@ -336,16 +336,23 @@ void __init early_cpu_init(void)
 
 	eax = cpuid_eax(0x80000000);
 	if ((eax >> 16) == 0x8000 && eax >= 0x80000008) {
+		ebx = eax >= 0x8000001f ? cpuid_ebx(0x8000001f) : 0;
 		eax = cpuid_eax(0x80000008);
+
 		paddr_bits = eax & 0xff;
 		if (paddr_bits > PADDR_BITS)
 			paddr_bits = PADDR_BITS;
+
 		vaddr_bits = (eax >> 8) & 0xff;
 		if (vaddr_bits > VADDR_BITS)
 			vaddr_bits = VADDR_BITS;
+
 		hap_paddr_bits = ((eax >> 16) & 0xff) ?: paddr_bits;
 		if (hap_paddr_bits > PADDR_BITS)
 			hap_paddr_bits = PADDR_BITS;
+
+		/* Account for SME's physical address space reduction. */
+		paddr_bits -= (ebx >> 6) & 0x3f;
 	}
 
 	if (!(c->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)))
