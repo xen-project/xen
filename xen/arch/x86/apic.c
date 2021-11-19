@@ -864,6 +864,7 @@ void x2apic_ap_setup(void)
 void __init x2apic_bsp_setup(void)
 {
     struct IO_APIC_route_entry **ioapic_entries = NULL;
+    bool iommu_x2apic;
     const char *orig_name;
 
     if ( !cpu_has_x2apic )
@@ -879,7 +880,8 @@ void __init x2apic_bsp_setup(void)
         printk("x2APIC: Already enabled by BIOS: Ignoring cmdline disable.\n");
     }
 
-    if ( iommu_supports_x2apic() )
+    iommu_x2apic = iommu_supports_x2apic();
+    if ( iommu_x2apic )
     {
         if ( (ioapic_entries = alloc_ioapic_entries()) == NULL )
         {
@@ -932,8 +934,11 @@ void __init x2apic_bsp_setup(void)
         printk("Switched to APIC driver %s\n", genapic.name);
 
 restore_out:
-    /* iommu_x2apic_enabled cannot be used here in the error case. */
-    if ( iommu_supports_x2apic() )
+    /*
+     * iommu_x2apic_enabled and iommu_supports_x2apic() cannot be used here
+     * in the error case.
+     */
+    if ( iommu_x2apic )
     {
         /*
          * NB: do not use raw mode when restoring entries if the iommu has
