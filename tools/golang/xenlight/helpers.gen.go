@@ -323,6 +323,7 @@ x.CpuTime = uint64(xc.cpu_time)
 x.VcpuMaxId = uint32(xc.vcpu_max_id)
 x.VcpuOnline = uint32(xc.vcpu_online)
 x.Cpupool = uint32(xc.cpupool)
+x.GpaddrBits = byte(xc.gpaddr_bits)
 x.DomainType = DomainType(xc.domain_type)
 
  return nil}
@@ -355,6 +356,7 @@ xc.cpu_time = C.uint64_t(x.CpuTime)
 xc.vcpu_max_id = C.uint32_t(x.VcpuMaxId)
 xc.vcpu_online = C.uint32_t(x.VcpuOnline)
 xc.cpupool = C.uint32_t(x.Cpupool)
+xc.gpaddr_bits = C.uint8_t(x.GpaddrBits)
 xc.domain_type = C.libxl_domain_type(x.DomainType)
 
  return nil
@@ -1012,6 +1014,7 @@ return fmt.Errorf("converting field VnumaNodes: %v", err) }
 }
 x.MaxGrantFrames = uint32(xc.max_grant_frames)
 x.MaxMaptrackFrames = uint32(xc.max_maptrack_frames)
+x.MaxGrantVersion = int(xc.max_grant_version)
 x.DeviceModelVersion = DeviceModelVersion(xc.device_model_version)
 if err := x.DeviceModelStubdomain.fromC(&xc.device_model_stubdomain);err != nil {
 return fmt.Errorf("converting field DeviceModelStubdomain: %v", err)
@@ -1341,6 +1344,7 @@ return fmt.Errorf("converting field VnumaNodes: %v", err)
 }
 xc.max_grant_frames = C.uint32_t(x.MaxGrantFrames)
 xc.max_maptrack_frames = C.uint32_t(x.MaxMaptrackFrames)
+xc.max_grant_version = C.int(x.MaxGrantVersion)
 xc.device_model_version = C.libxl_device_model_version(x.DeviceModelVersion)
 if err := x.DeviceModelStubdomain.toC(&xc.device_model_stubdomain); err != nil {
 return fmt.Errorf("converting field DeviceModelStubdomain: %v", err)

@@ -316,6 +316,7 @@ CpuTime uint64
 VcpuMaxId uint32
 VcpuOnline uint32
 Cpupool uint32
+GpaddrBits byte
 DomainType DomainType
 }
 
@@ -479,6 +480,7 @@ BlkdevStart string
 VnumaNodes []VnodeInfo
 MaxGrantFrames uint32
 MaxMaptrackFrames uint32
+MaxGrantVersion int
 DeviceModelVersion DeviceModelVersion
 DeviceModelStubdomain Defbool
 StubdomainMemkb uint64
