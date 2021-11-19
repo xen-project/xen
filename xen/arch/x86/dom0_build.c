@@ -169,30 +169,37 @@ bool __initdata dom0_affinity_relaxed;
 
 static int __init parse_dom0_nodes(const char *s)
 {
+    const char *ss;
+    int rc = 0;
+
     do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
         if ( isdigit(*s) )
         {
-            if ( dom0_nr_pxms >= ARRAY_SIZE(dom0_pxms) )
-                return -E2BIG;
-            dom0_pxms[dom0_nr_pxms] = simple_strtoul(s, &s, 0);
-            if ( !*s || *s == ',' )
-                ++dom0_nr_pxms;
-        }
-        else if ( !strncmp(s, "relaxed", 7) && (!s[7] || s[7] == ',') )
-        {
-            dom0_affinity_relaxed = true;
-            s += 7;
-        }
-        else if ( !strncmp(s, "strict", 6) && (!s[6] || s[6] == ',') )
-        {
-            dom0_affinity_relaxed = false;
-            s += 6;
-        }
-        else
-            return -EINVAL;
-    } while ( *s++ == ',' );
+            const char *endp;
 
-    return s[-1] ? -EINVAL : 0;
+            if ( dom0_nr_pxms >= ARRAY_SIZE(dom0_pxms) )
+                rc = -E2BIG;
+            else if ( (dom0_pxms[dom0_nr_pxms] = simple_strtoul(s, &endp, 0),
+                       endp != ss) )
+                rc = -EINVAL;
+            else
+                dom0_nr_pxms++;
+        }
+        else if ( !cmdline_strcmp(s, "relaxed") )
+            dom0_affinity_relaxed = true;
+        else if ( !cmdline_strcmp(s, "strict") )
+            dom0_affinity_relaxed = false;
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
 }
 custom_param("dom0_nodes", parse_dom0_nodes);
 
