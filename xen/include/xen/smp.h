@@ -70,5 +70,6 @@ int alloc_cpu_id(void);
 extern void *stack_base[NR_CPUS];
 
 void initialize_cpu_data(unsigned int cpu);
+int setup_cpu_root_pgt(unsigned int cpu);
 
 #endif /* __XEN_SMP_H__ */
