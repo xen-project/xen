@@ -805,7 +805,7 @@ static root_pgentry_t common_pgt;
 
 extern const char _stextentry[], _etextentry[];
 
-static int setup_cpu_root_pgt(unsigned int cpu)
+int setup_cpu_root_pgt(unsigned int cpu)
 {
     root_pgentry_t *rpt;
     unsigned int off;
@@ -1122,8 +1122,6 @@ static struct notifier_block cpu_smpboot_nfb = {
 
 void __init smp_prepare_cpus(void)
 {
-    int rc;
-
     register_cpu_notifier(&cpu_smpboot_nfb);
 
     mtrr_aps_sync_begin();
@@ -1137,10 +1135,7 @@ void __init smp_prepare_cpus(void)
 
     stack_base[0] = (void *)((unsigned long)stack_start & ~(STACK_SIZE - 1));
 
-    rc = setup_cpu_root_pgt(0);
-    if ( rc )
-        panic("Error %d setting up PV root page table\n", rc);
-    if ( per_cpu(root_pgt, 0) )
+    if ( opt_xpti_hwdom || opt_xpti_domu )
     {
         get_cpu_info()->pv_cr3 = 0;
 
