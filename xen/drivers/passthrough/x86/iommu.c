@@ -39,6 +39,24 @@ enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
 bool __read_mostly iommu_intpost;
 #endif
 
+void __init acpi_iommu_init(void)
+{
+    int ret;
+
+    if ( !iommu_enable && !iommu_intremap )
+        return;
+
+    ret = acpi_dmar_init();
+    if ( ret == -ENODEV )
+        ret = acpi_ivrs_init();
+
+    if ( ret )
+    {
+        iommu_enable = false;
+        iommu_intremap = iommu_intremap_off;
+    }
+}
+
 int __init iommu_hardware_setup(void)
 {
     struct IO_APIC_route_entry **ioapic_entries = NULL;
