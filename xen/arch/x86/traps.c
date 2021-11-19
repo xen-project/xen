@@ -1975,7 +1975,7 @@ void do_entry_CP(struct cpu_user_regs *regs)
     const char *err = "??";
     unsigned int ec = regs->error_code;
 
-    if ( debugger_trap_entry(TRAP_debug, regs) )
+    if ( debugger_trap_entry(X86_EXC_CP, regs) )
         return;
 
     /* Decode ec if possible */
