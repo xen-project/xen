@@ -340,19 +340,21 @@ static uint64_t domain_pgd_maddr(struct domain *d, unsigned int nr_pt_levels)
     {
         pagetable_t pgt = p2m_get_pagetable(p2m_get_hostp2m(d));
 
-        return pagetable_get_paddr(pgt);
+        pgd_maddr = pagetable_get_paddr(pgt);
     }
-
-    if ( !hd->arch.vtd.pgd_maddr )
+    else
     {
-        /* Ensure we have pagetables allocated down to leaf PTE. */
-        addr_to_dma_page_maddr(d, 0, 1);
-
         if ( !hd->arch.vtd.pgd_maddr )
-            return 0;
-    }
+        {
+            /* Ensure we have pagetables allocated down to leaf PTE. */
+            addr_to_dma_page_maddr(d, 0, 1);
 
-    pgd_maddr = hd->arch.vtd.pgd_maddr;
+            if ( !hd->arch.vtd.pgd_maddr )
+                return 0;
+        }
+
+        pgd_maddr = hd->arch.vtd.pgd_maddr;
+    }
 
     /* Skip top levels of page tables for 2- and 3-level DRHDs. */
     for ( agaw = level_to_agaw(4);
