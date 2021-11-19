@@ -1694,6 +1694,8 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = map_vcpu_info(v, info.mfn, info.offset);
         domain_unlock(d);
 
+        force_update_vcpu_system_time(v);
+
         break;
     }
 
