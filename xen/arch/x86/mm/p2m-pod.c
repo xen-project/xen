@@ -495,7 +495,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, gfn_t gfn);
 
 
 /*
- * This function is needed for two reasons:
+ * This pair of functions is needed for two reasons:
  * + To properly handle clearing of PoD entries
  * + To "steal back" memory being freed for the PoD cache, rather than
  *   releasing it.
@@ -503,8 +503,8 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, gfn_t gfn);
  * Once both of these functions have been completed, we can return and
  * allow decrease_reservation() to handle everything else.
  */
-unsigned long
-p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
+static unsigned long
+decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
 {
     unsigned long ret = 0, i, n;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -551,8 +551,10 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
          * All PoD: Mark the whole region invalid and tell caller
          * we're done.
          */
-        if ( p2m_set_entry(p2m, gfn, INVALID_MFN, order, p2m_invalid,
-                           p2m->default_access) )
+        int rc = p2m_set_entry(p2m, gfn, INVALID_MFN, order, p2m_invalid,
+                               p2m->default_access);
+
+        if ( rc )
         {
             /*
              * If this fails, we can't tell how much of the range was changed.
@@ -560,7 +562,12 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
              * impossible.
              */
             if ( order != 0 )
+            {
+                printk(XENLOG_G_ERR
+                       "%pd: marking GFN %#lx (order %u) as non-PoD failed: %d\n",
+                       d, gfn_x(gfn), order, rc);
                 domain_crash(d);
+            }
             goto out_unlock;
         }
         ret = 1UL << order;
@@ -664,6 +671,22 @@ out_entry_check:
 out_unlock:
     pod_unlock(p2m);
     gfn_unlock(p2m, gfn, order);
+    return ret;
+}
+
+unsigned long
+p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
+{
+    unsigned long left = 1UL << order, ret = 0;
+    unsigned int chunk_order = find_first_set_bit(gfn_x(gfn) | left);
+
+    do {
+        ret += decrease_reservation(d, gfn, chunk_order);
+
+        left -= 1UL << chunk_order;
+        gfn = gfn_add(gfn, 1UL << chunk_order);
+    } while ( left );
+
     return ret;
 }
 
@@ -1266,18 +1289,14 @@ remap_and_retry:
     return true;
 }
 
-
-int
-guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn_l,
-                                      unsigned int order)
+static int
+mark_populate_on_demand(struct domain *d, unsigned long gfn_l,
+                        unsigned int order)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     gfn_t gfn = _gfn(gfn_l);
     unsigned long i, n, pod_count = 0;
     int rc = 0;
-
-    if ( !paging_mode_translate(d) )
-        return -EINVAL;
 
     gfn_lock(p2m, gfn, order);
 
@@ -1316,9 +1335,41 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn_l,
         BUG_ON(p2m->pod.entry_count < 0);
         pod_unlock(p2m);
     }
+    else if ( order )
+    {
+        /*
+         * If this failed, we can't tell how much of the range was changed.
+         * Best to crash the domain.
+         */
+        printk(XENLOG_G_ERR
+               "%pd: marking GFN %#lx (order %u) as PoD failed: %d\n",
+               d, gfn_l, order, rc);
+        domain_crash(d);
+    }
 
 out:
     gfn_unlock(p2m, gfn, order);
+
+    return rc;
+}
+
+int
+guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+                                      unsigned int order)
+{
+    unsigned long left = 1UL << order;
+    unsigned int chunk_order = find_first_set_bit(gfn | left);
+    int rc;
+
+    if ( !paging_mode_translate(d) )
+        return -EINVAL;
+
+    do {
+        rc = mark_populate_on_demand(d, gfn, chunk_order);
+
+        left -= 1UL << chunk_order;
+        gfn += 1UL << chunk_order;
+    } while ( !rc && left );
 
     return rc;
 }
