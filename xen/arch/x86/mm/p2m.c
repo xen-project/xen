@@ -780,6 +780,7 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
     gfn_t gfn = _gfn(gfn_l);
     p2m_type_t t;
     p2m_access_t a;
+    int rc;
 
     /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
     if ( !paging_mode_translate(p2m->domain) )
@@ -811,8 +812,27 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
                 set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
         }
     }
-    return p2m_set_entry(p2m, gfn, INVALID_MFN, page_order, p2m_invalid,
-                         p2m->default_access);
+    rc = p2m_set_entry(p2m, gfn, INVALID_MFN, page_order, p2m_invalid,
+                       p2m->default_access);
+    if ( likely(!rc) || !mfn_valid(_mfn(mfn)) )
+        return rc;
+
+    /*
+     * The operation may have partially succeeded. For the failed part we need
+     * to undo the M2P update and, out of precaution, mark the pages dirty
+     * again.
+     */
+    for ( i = 0; i < (1UL << page_order); ++i )
+    {
+        p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, NULL, NULL);
+        if ( !p2m_is_hole(t) && !p2m_is_special(t) && !p2m_is_shared(t) )
+        {
+            set_gpfn_from_mfn(mfn + i, gfn_l + i);
+            paging_mark_pfn_dirty(p2m->domain, _pfn(gfn_l + i));
+        }
+    }
+
+    return rc;
 }
 
 int
@@ -980,15 +1000,8 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
 
     /* Now, actually do the two-way mapping */
     rc = p2m_set_entry(p2m, gfn, mfn, page_order, t, p2m->default_access);
-    if ( rc == 0 )
+    if ( likely(!rc) )
     {
-#ifdef CONFIG_HVM
-        pod_lock(p2m);
-        p2m->pod.entry_count -= pod_count;
-        BUG_ON(p2m->pod.entry_count < 0);
-        pod_unlock(p2m);
-#endif
-
         if ( !p2m_is_grant(t) )
         {
             for ( i = 0; i < (1UL << page_order); i++ )
@@ -996,6 +1009,44 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                                   gfn_x(gfn_add(gfn, i)));
         }
     }
+    else
+    {
+        /*
+         * The operation may have partially succeeded. For the successful part
+         * we need to update M2P and dirty state, while for the failed part we
+         * may need to adjust PoD stats as well as undo the earlier M2P update.
+         */
+        for ( i = 0; i < (1UL << page_order); ++i )
+        {
+            omfn = p2m->get_entry(p2m, gfn_add(gfn, i), &ot, &a, 0, NULL, NULL);
+            if ( p2m_is_pod(ot) )
+            {
+                BUG_ON(!pod_count);
+                --pod_count;
+            }
+            else if ( mfn_eq(omfn, mfn_add(mfn, i)) && ot == t &&
+                      a == p2m->default_access && !p2m_is_grant(t) )
+            {
+                set_gpfn_from_mfn(mfn_x(omfn), gfn_x(gfn) + i);
+                paging_mark_pfn_dirty(d, _pfn(gfn_x(gfn) + i));
+            }
+            else if ( p2m_is_ram(ot) && !p2m_is_paged(ot) )
+            {
+                ASSERT(mfn_valid(omfn));
+                set_gpfn_from_mfn(mfn_x(omfn), gfn_x(gfn) + i);
+            }
+        }
+    }
+
+#ifdef CONFIG_HVM
+    if ( pod_count )
+    {
+        pod_lock(p2m);
+        p2m->pod.entry_count -= pod_count;
+        BUG_ON(p2m->pod.entry_count < 0);
+        pod_unlock(p2m);
+    }
+#endif
 
  out:
     p2m_unlock(p2m);
@@ -1278,6 +1329,49 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
         domain_crash(d);
         return -EPERM;
     }
+
+    P2M_DEBUG("set %d %lx %lx\n", gfn_p2mt, gfn_l, mfn_x(mfn));
+    rc = p2m_set_entry(p2m, gfn, mfn, order, gfn_p2mt, access);
+    if ( unlikely(rc) )
+    {
+        gdprintk(XENLOG_ERR, "p2m_set_entry: %#lx:%u -> %d (0x%"PRI_mfn")\n",
+                 gfn_l, order, rc, mfn_x(mfn));
+
+        /*
+         * The operation may have partially succeeded. For the successful part
+         * we need to update PoD stats, M2P, and dirty state.
+         */
+        if ( order != PAGE_ORDER_4K )
+        {
+            unsigned long i;
+
+            for ( i = 0; i < (1UL << order); ++i )
+            {
+                p2m_type_t t;
+                mfn_t cmfn = p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0,
+                                            NULL, NULL);
+
+                if ( !mfn_eq(cmfn, mfn_add(mfn, i)) || t != gfn_p2mt ||
+                     a != access )
+                    continue;
+
+                if ( p2m_is_ram(ot) )
+                {
+                    ASSERT(mfn_valid(mfn_add(omfn, i)));
+                    set_gpfn_from_mfn(mfn_x(omfn) + i, INVALID_M2P_ENTRY);
+                }
+#ifdef CONFIG_HVM
+                else if ( p2m_is_pod(ot) )
+                {
+                    pod_lock(p2m);
+                    BUG_ON(!p2m->pod.entry_count);
+                    --p2m->pod.entry_count;
+                    pod_unlock(p2m);
+                }
+#endif
+            }
+        }
+    }
     else if ( p2m_is_ram(ot) )
     {
         unsigned long i;
@@ -1288,12 +1382,6 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
             set_gpfn_from_mfn(mfn_x(omfn) + i, INVALID_M2P_ENTRY);
         }
     }
-
-    P2M_DEBUG("set %d %lx %lx\n", gfn_p2mt, gfn_l, mfn_x(mfn));
-    rc = p2m_set_entry(p2m, gfn, mfn, order, gfn_p2mt, access);
-    if ( rc )
-        gdprintk(XENLOG_ERR, "p2m_set_entry: %#lx:%u -> %d (0x%"PRI_mfn")\n",
-                 gfn_l, order, rc, mfn_x(mfn));
 #ifdef CONFIG_HVM
     else if ( p2m_is_pod(ot) )
     {
