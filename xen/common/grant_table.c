@@ -2319,7 +2319,8 @@ gnttab_transfer(
          * pages when it is dying.
          */
         if ( unlikely(e->is_dying) ||
-             unlikely(domain_tot_pages(e) >= e->max_pages) )
+             unlikely(domain_tot_pages(e) >= e->max_pages) ||
+             unlikely(!(e->tot_pages + 1)) )
         {
             spin_unlock(&e->page_alloc_lock);
 
@@ -2328,8 +2329,8 @@ gnttab_transfer(
                          e->domain_id);
             else
                 gdprintk(XENLOG_INFO,
-                         "Transferee d%d has no headroom (tot %u, max %u)\n",
-                         e->domain_id, domain_tot_pages(e), e->max_pages);
+                         "Transferee %pd has no headroom (tot %u, max %u, ex %u)\n",
+                         e, domain_tot_pages(e), e->max_pages, e->extra_pages);
 
             gop.status = GNTST_general_error;
             goto unlock_and_copyback;

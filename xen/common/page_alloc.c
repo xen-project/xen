@@ -2298,20 +2298,43 @@ int assign_pages(
     }
     else if ( !(memflags & MEMF_no_refcount) )
     {
-        unsigned int tot_pages = domain_tot_pages(d) + (1 << order);
+        unsigned int tot_pages = domain_tot_pages(d), nr = 1u << order;
 
         if ( unlikely(tot_pages > d->max_pages) )
         {
-            gprintk(XENLOG_INFO, "Over-allocation for domain %u: "
-                    "%u > %u\n", d->domain_id, tot_pages, d->max_pages);
+            gprintk(XENLOG_INFO, "Inconsistent allocation for %pd: %u > %u\n",
+                    d, tot_pages, d->max_pages);
+            rc = -EPERM;
+            goto out;
+        }
+
+        if ( unlikely(nr > d->max_pages - tot_pages) )
+        {
+            gprintk(XENLOG_INFO, "Over-allocation for %pd: %Lu > %u\n",
+                    d, tot_pages + 0ull + nr, d->max_pages);
             rc = -E2BIG;
             goto out;
         }
     }
 
-    if ( !(memflags & MEMF_no_refcount) &&
-         unlikely(domain_adjust_tot_pages(d, 1 << order) == (1 << order)) )
-        get_knownalive_domain(d);
+    if ( !(memflags & MEMF_no_refcount) )
+    {
+        unsigned int nr = 1u << order;
+
+        if ( unlikely(d->tot_pages + nr < nr) )
+        {
+            gprintk(XENLOG_INFO,
+                    "Excess allocation for %pd: %Lu (%u extra)\n",
+                    d, d->tot_pages + 0ull + nr, d->extra_pages);
+            if ( pg[0].count_info & PGC_extra )
+                d->extra_pages -= nr;
+            rc = -E2BIG;
+            goto out;
+        }
+
+        if ( unlikely(domain_adjust_tot_pages(d, nr) == nr) )
+            get_knownalive_domain(d);
+    }
 
     for ( i = 0; i < (1 << order); i++ )
     {
