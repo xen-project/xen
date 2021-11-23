@@ -111,15 +111,13 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
     /* Then add to the appropriate populate-on-demand list. */
     switch ( order )
     {
-    case PAGE_ORDER_1G:
-        for ( i = 0; i < (1UL << PAGE_ORDER_1G); i += 1UL << PAGE_ORDER_2M )
+    case PAGE_ORDER_2M ... PAGE_ORDER_1G:
+        for ( i = 0; i < (1UL << order); i += 1UL << PAGE_ORDER_2M )
             page_list_add_tail(page + i, &p2m->pod.super);
         break;
-    case PAGE_ORDER_2M:
-        page_list_add_tail(page, &p2m->pod.super);
-        break;
-    case PAGE_ORDER_4K:
-        page_list_add_tail(page, &p2m->pod.single);
+    case PAGE_ORDER_4K ... PAGE_ORDER_2M - 1:
+        for ( i = 0; i < (1UL << order); i += 1UL << PAGE_ORDER_4K )
+            page_list_add_tail(page + i, &p2m->pod.single);
         break;
     default:
         BUG();
