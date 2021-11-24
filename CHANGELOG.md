@@ -21,6 +21,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - qemu-traditional based device models (both, qemu-traditional and ioemu-stubdom) will
    no longer be built per default. In order to be able to use those, configure needs to
    be called with "--enable-qemu-traditional" as parameter.
+ - Fixes for credit2 scheduler stability in corner case conditions.
+ - Ongoing improvements in the hypervisor build system.
+ - vtpmmgr miscellaneous fixes in preparation for TPM 2.0 support.
+ - 32bit PV guests only supported in shim mode.
+ - Improved PVH dom0 debug key handling.
+ - Fix booting on some Intel systems without a PIT (i8254).
+ - Cleanup of the xenstore library interface.
+ - Fix truncation of return value from xencall2 by introducing a new helper
+   that returns a long instead.
+ - Fix system register accesses on Arm to use the proper 32/64bit access size.
+ - Various fixes for Arm OP-TEE mediator.
+ - Switch to domheap for Xen page tables.
+
+### Added
+ - 32bit Arm builds to the gitlab-ci automated tests.
+ - x86 full system tests to the gitlab-ci automated tests.
+ - Arm limited vPMU support for guests.
+ - Static physical memory allocation for dom0less on arm64.
+ - dom0less EFI support on arm64.
+ - GICD_ICPENDR register handling in vGIC emulation to support Zephyr OS.
+ - CPU feature leveling on arm64 platform with heterogeneous cores.
+ - Report unpopulated memory regions safe to use for external mappings, Arm and
+   device tree only.
+ - Support of generic DT IOMMU bindings for Arm SMMU v2.
+ - Limit grant table version on a per-domain basis.
 
 ## [4.15.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.15.0) - 2021-04-08
 
