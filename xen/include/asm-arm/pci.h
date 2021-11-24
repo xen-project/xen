@@ -63,7 +63,7 @@ struct pci_host_bridge {
     struct list_head node;           /* Node in list of host bridges */
     uint16_t segment;                /* Segment number */
     struct pci_config_window* cfg;   /* Pointer to the bridge config window */
-    struct pci_ops *ops;
+    const struct pci_ops *ops;
 };
 
 struct pci_ops {
@@ -89,7 +89,8 @@ struct pci_ecam_ops {
 /* Default ECAM ops */
 extern const struct pci_ecam_ops pci_generic_ecam_ops;
 
-int pci_host_common_probe(struct dt_device_node *dev, const void *data);
+int pci_host_common_probe(struct dt_device_node *dev,
+                          const struct pci_ecam_ops *ops);
 int pci_generic_config_read(struct pci_host_bridge *bridge, pci_sbdf_t sbdf,
                             uint32_t reg, uint32_t len, uint32_t *value);
 int pci_generic_config_write(struct pci_host_bridge *bridge, pci_sbdf_t sbdf,

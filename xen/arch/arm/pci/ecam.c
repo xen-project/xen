@@ -24,8 +24,8 @@ void __iomem *pci_ecam_map_bus(struct pci_host_bridge *bridge,
                                pci_sbdf_t sbdf, uint32_t where)
 {
     const struct pci_config_window *cfg = bridge->cfg;
-    struct pci_ecam_ops *ops =
-        container_of(bridge->ops, struct pci_ecam_ops, pci_ops);
+    const struct pci_ecam_ops *ops =
+        container_of(bridge->ops, const struct pci_ecam_ops, pci_ops);
     unsigned int devfn_shift = ops->bus_shift - 8;
     void __iomem *base;
 

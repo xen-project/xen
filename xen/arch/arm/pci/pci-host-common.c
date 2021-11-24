@@ -192,17 +192,15 @@ static int pci_bus_find_domain_nr(struct dt_device_node *dev)
     return domain;
 }
 
-int pci_host_common_probe(struct dt_device_node *dev, const void *data)
+int pci_host_common_probe(struct dt_device_node *dev,
+                          const struct pci_ecam_ops *ops)
 {
     struct pci_host_bridge *bridge;
     struct pci_config_window *cfg;
-    struct pci_ecam_ops *ops;
     int err;
 
     if ( dt_device_for_passthrough(dev) )
         return 0;
-
-    ops = (struct pci_ecam_ops *) data;
 
     bridge = pci_alloc_host_bridge();
     if ( !bridge )
