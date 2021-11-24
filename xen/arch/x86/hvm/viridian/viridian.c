@@ -628,8 +628,8 @@ static unsigned int hv_vpset_nr_banks(struct hv_vpset *vpset)
     return hweight64(vpset->valid_bank_mask);
 }
 
-static uint16_t hv_vpset_to_vpmask(const struct hv_vpset *set,
-                                   struct hypercall_vpmask *vpmask)
+static int hv_vpset_to_vpmask(const struct hv_vpset *set,
+                              struct hypercall_vpmask *vpmask)
 {
 #define NR_VPS_PER_BANK (HV_VPSET_BANK_SIZE * 8)
 
@@ -919,10 +919,10 @@ static int hvcall_ipi_ex(const union hypercall_input *input,
          input_params.reserved_zero[0] ||
          input_params.reserved_zero[1] ||
          input_params.reserved_zero[2] )
-        return HV_STATUS_INVALID_PARAMETER;
+        return -EINVAL;
 
     if ( input_params.vector < 0x10 || input_params.vector > 0xff )
-        return HV_STATUS_INVALID_PARAMETER;
+        return -EINVAL;
 
     *set = input_params.set;
     if ( set->format == HV_GENERIC_SET_SPARSE_4K )
