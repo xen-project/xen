@@ -32,7 +32,7 @@ static int __init pci_host_generic_probe(struct dt_device_node *dev,
     return pci_host_common_probe(dev, &pci_generic_ecam_ops);
 }
 
-DT_DEVICE_START(pci_gen, "PCI HOST GENERIC", DEVICE_PCI)
+DT_DEVICE_START(pci_gen, "PCI HOST GENERIC", DEVICE_PCI_HOSTBRIDGE)
 .dt_match = gen_pci_dt_match,
 .init = pci_host_generic_probe,
 DT_DEVICE_END

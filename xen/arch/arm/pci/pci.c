@@ -46,7 +46,7 @@ static int __init dt_pci_init(void)
 
     dt_for_each_device_node(dt_host, np)
     {
-        rc = device_init(np, DEVICE_PCI, NULL);
+        rc = device_init(np, DEVICE_PCI_HOSTBRIDGE, NULL);
         /*
          * Ignore the following error codes:
          *   - EBADF: Indicate the current device is not a pci device.
