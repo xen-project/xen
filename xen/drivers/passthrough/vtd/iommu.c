@@ -1273,7 +1273,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     quirk_iommu_caps(iommu);
 
     if ( cap_fault_reg_offset(iommu->cap) +
-         cap_num_fault_regs(iommu->cap) * PRIMARY_FAULT_REG_LEN >= PAGE_SIZE ||
+         cap_num_fault_regs(iommu->cap) * PRIMARY_FAULT_REG_LEN > PAGE_SIZE ||
          ecap_iotlb_offset(iommu->ecap) >= PAGE_SIZE )
     {
         printk(XENLOG_ERR VTDPREFIX "IOMMU: unsupported\n");
