@@ -301,12 +301,13 @@ tools/xentrace/xentrace_setsize
 tools/xentrace/tbctl
 tools/xentrace/xenctx
 tools/xentrace/xentrace
+xen/**/*.i
+xen/**/*.s
 xen/.banner
 xen/.config
 xen/.config.old
 xen/.xen.elf32
 xen/System.map
-xen/arch/x86/asm-macros.i
 xen/arch/x86/boot/mkelf32
 xen/arch/x86/boot/cmdline.S
 xen/arch/x86/boot/reloc.S
@@ -322,7 +323,6 @@ xen/arch/*/efi/ebmalloc.c
 xen/arch/*/efi/efi.h
 xen/arch/*/efi/pe.c
 xen/arch/*/efi/runtime.c
-xen/asm-offsets.s
 xen/common/config_data.S
 xen/common/config.gz
 xen/include/headers*.chk
