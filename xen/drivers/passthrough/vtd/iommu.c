@@ -2404,14 +2404,6 @@ static int reassign_device_ownership(
     int ret;
 
     /*
-     * Devices assigned to untrusted domains (here assumed to be any domU)
-     * can attempt to send arbitrary LAPIC/MSI messages. We are unprotected
-     * by the root complex unless interrupt remapping is enabled.
-     */
-    if ( (target != hardware_domain) && !iommu_intremap )
-        untrusted_msi = true;
-
-    /*
      * If the device belongs to the hardware domain, and it has RMRR, don't
      * remove it from the hardware domain, because BIOS may use RMRR at
      * booting time.
@@ -2454,6 +2446,15 @@ static int reassign_device_ownership(
 
     if ( !has_arch_pdevs(target) )
         vmx_pi_hooks_assign(target);
+
+    /*
+     * Devices assigned to untrusted domains (here assumed to be any domU)
+     * can attempt to send arbitrary LAPIC/MSI messages. We are unprotected
+     * by the root complex unless interrupt remapping is enabled.
+     */
+    if ( !iommu_intremap && !is_hardware_domain(target) &&
+         !is_system_domain(target) )
+        untrusted_msi = true;
 
     ret = domain_context_mapping(target, devfn, pdev);
     if ( ret )
