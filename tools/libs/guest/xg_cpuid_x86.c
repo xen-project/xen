@@ -638,13 +638,6 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         }
     }
 
-    /*
-     * Do not try to shrink the policy if restoring, as that could cause
-     * guest visible changes in the maximum leaf fields.
-     */
-    if ( !restore )
-        x86_cpuid_policy_shrink_max_leaves(p);
-
     rc = x86_cpuid_copy_to_buffer(p, leaves, &nr_leaves);
     if ( rc )
     {
