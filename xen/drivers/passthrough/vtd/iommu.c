@@ -1259,16 +1259,19 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     if ( !iommu->domid_bitmap )
         return -ENOMEM;
 
-    /*
-     * if Caching mode is set, then invalid translations are tagged with
-     * domain id 0, Hence reserve bit 0 for it
-     */
-    if ( cap_caching_mode(iommu->cap) )
-        __set_bit(0, iommu->domid_bitmap);
-
     iommu->domid_map = xzalloc_array(u16, nr_dom);
     if ( !iommu->domid_map )
         return -ENOMEM;
+
+    /*
+     * If Caching mode is set, then invalid translations are tagged with
+     * domain id 0. Hence reserve bit/slot 0.
+     */
+    if ( cap_caching_mode(iommu->cap) )
+    {
+        iommu->domid_map[0] = DOMID_INVALID;
+        __set_bit(0, iommu->domid_bitmap);
+    }
 
     return 0;
 }
