@@ -776,7 +776,6 @@ static int hvcall_flush_ex(const union hypercall_input *input,
     {
         union hypercall_vpset *vpset = &this_cpu(hypercall_vpset);
         struct hv_vpset *set = &vpset->set;
-        size_t size;
         int rc;
 
         *set = input_params.set;
@@ -784,8 +783,7 @@ static int hvcall_flush_ex(const union hypercall_input *input,
         {
             unsigned long offset = offsetof(typeof(input_params),
                                             set.bank_contents);
-
-            size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
+            size_t size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
 
             if ( offsetof(typeof(*vpset), set.bank_contents[0]) + size >
                  sizeof(*vpset) )
@@ -798,11 +796,7 @@ static int hvcall_flush_ex(const union hypercall_input *input,
                                           input_params_gpa + offset,
                                           size) != HVMTRANS_okay)
                 return -EINVAL;
-
-            size += sizeof(*set);
         }
-        else
-            size = sizeof(*set);
 
         rc = hv_vpset_to_vpmask(set, vpmask);
         if ( rc )
@@ -903,7 +897,6 @@ static int hvcall_ipi_ex(const union hypercall_input *input,
     } input_params;
     union hypercall_vpset *vpset = &this_cpu(hypercall_vpset);
     struct hv_vpset *set = &vpset->set;
-    size_t size;
     int rc;
 
     /* These hypercalls should never use the fast-call convention. */
@@ -929,8 +922,7 @@ static int hvcall_ipi_ex(const union hypercall_input *input,
     {
         unsigned long offset = offsetof(typeof(input_params),
                                         set.bank_contents);
-
-        size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
+        size_t size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
 
         if ( offsetof(typeof(*vpset), set.bank_contents[0]) + size >
              sizeof(*vpset) )
@@ -943,11 +935,7 @@ static int hvcall_ipi_ex(const union hypercall_input *input,
                                       input_params_gpa + offset,
                                       size) != HVMTRANS_okay)
             return -EINVAL;
-
-        size += sizeof(*set);
     }
-    else
-        size = sizeof(*set);
 
     rc = hv_vpset_to_vpmask(set, vpmask);
     if ( rc )
