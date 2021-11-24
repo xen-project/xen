@@ -401,7 +401,7 @@ static uint64_t domain_pgd_maddr(struct domain *d, unsigned int nr_pt_levels)
         pgd_maddr = hd->arch.vtd.pgd_maddr;
     }
 
-    /* Skip top levels of page tables for 2- and 3-level DRHDs. */
+    /* Skip top level(s) of page tables for less-than-maximum level DRHDs. */
     for ( agaw = level_to_agaw(4);
           agaw != level_to_agaw(nr_pt_levels);
           agaw-- )
@@ -1228,8 +1228,7 @@ static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
 int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 {
     struct vtd_iommu *iommu;
-    unsigned long sagaw, nr_dom;
-    int agaw;
+    unsigned int sagaw, agaw = 0, nr_dom;
 
     iommu = xzalloc(struct vtd_iommu);
     if ( iommu == NULL )
@@ -1282,14 +1281,13 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENODEV;
     }
 
-    /* Calculate number of pagetable levels: between 2 and 4. */
+    /* Calculate number of pagetable levels: 3 or 4. */
     sagaw = cap_sagaw(iommu->cap);
-    for ( agaw = level_to_agaw(4); agaw >= 0; agaw-- )
-        if ( test_bit(agaw, &sagaw) )
-            break;
-    if ( agaw < 0 )
+    if ( sagaw & 6 )
+        agaw = find_first_set_bit(sagaw & 6);
+    if ( !agaw )
     {
-        printk(XENLOG_ERR VTDPREFIX "IOMMU: unsupported sagaw %lx\n", sagaw);
+        printk(XENLOG_ERR VTDPREFIX "IOMMU: unsupported sagaw %x\n", sagaw);
         print_iommu_regs(drhd);
         return -ENODEV;
     }
