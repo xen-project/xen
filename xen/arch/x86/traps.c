@@ -327,16 +327,13 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
 
     if ( v != current )
     {
-        struct vcpu *vcpu;
-
         if ( !guest_kernel_mode(v, regs) )
         {
             printk("User mode stack\n");
             return;
         }
 
-        vcpu = maddr_get_owner(read_cr3()) == v->domain ? v : NULL;
-        if ( !vcpu )
+        if ( maddr_get_owner(read_cr3()) != v->domain )
         {
             stack_page = stack = do_page_walk(v, (unsigned long)stack);
             if ( (unsigned long)stack < PAGE_SIZE )
