@@ -157,6 +157,51 @@ static void cleanup_domid_map(struct domain *domain, struct vtd_iommu *iommu)
     }
 }
 
+static bool any_pdev_behind_iommu(const struct domain *d,
+                                  const struct pci_dev *exclude,
+                                  const struct vtd_iommu *iommu)
+{
+    const struct pci_dev *pdev;
+
+    for_each_pdev ( d, pdev )
+    {
+        const struct acpi_drhd_unit *drhd;
+
+        if ( pdev == exclude )
+            continue;
+
+        drhd = acpi_find_matched_drhd_unit(pdev);
+        if ( drhd && drhd->iommu == iommu )
+            return true;
+    }
+
+    return false;
+}
+
+/*
+ * If no other devices under the same iommu owned by this domain,
+ * clear iommu in iommu_bitmap and clear domain_id in domid_bitmap.
+ */
+static void check_cleanup_domid_map(struct domain *d,
+                                    const struct pci_dev *exclude,
+                                    struct vtd_iommu *iommu)
+{
+    bool found = any_pdev_behind_iommu(d, exclude, iommu);
+
+    /*
+     * Hidden devices are associated with DomXEN but usable by the hardware
+     * domain. Hence they need considering here as well.
+     */
+    if ( !found && is_hardware_domain(d) )
+        found = any_pdev_behind_iommu(dom_xen, exclude, iommu);
+
+    if ( !found )
+    {
+        clear_bit(iommu->index, dom_iommu(d)->arch.vtd.iommu_bitmap);
+        cleanup_domid_map(d, iommu);
+    }
+}
+
 static void sync_cache(const void *addr, unsigned int size)
 {
     static unsigned long clflush_size = 0;
@@ -1677,27 +1722,6 @@ int domain_context_unmap_one(
     return rc;
 }
 
-static bool any_pdev_behind_iommu(const struct domain *d,
-                                  const struct pci_dev *exclude,
-                                  const struct vtd_iommu *iommu)
-{
-    const struct pci_dev *pdev;
-
-    for_each_pdev ( d, pdev )
-    {
-        const struct acpi_drhd_unit *drhd;
-
-        if ( pdev == exclude )
-            continue;
-
-        drhd = acpi_find_matched_drhd_unit(pdev);
-        if ( drhd && drhd->iommu == iommu )
-            return true;
-    }
-
-    return false;
-}
-
 static int domain_context_unmap(struct domain *domain, u8 devfn,
                                 struct pci_dev *pdev)
 {
@@ -1706,7 +1730,6 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
     int ret;
     uint16_t seg = pdev->seg;
     uint8_t bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
-    bool found;
 
     switch ( pdev->type )
     {
@@ -1782,28 +1805,10 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
         return -EINVAL;
     }
 
-    if ( ret || QUARANTINE_SKIP(domain) || pdev->devfn != devfn )
-        return ret;
+    if ( !ret && !QUARANTINE_SKIP(domain) && pdev->devfn == devfn )
+        check_cleanup_domid_map(domain, pdev, iommu);
 
-    /*
-     * If no other devices under the same iommu owned by this domain,
-     * clear iommu in iommu_bitmap and clear domain_id in domid_bitmap.
-     */
-    found = any_pdev_behind_iommu(domain, pdev, iommu);
-    /*
-     * Hidden devices are associated with DomXEN but usable by the hardware
-     * domain. Hence they need considering here as well.
-     */
-    if ( !found && is_hardware_domain(domain) )
-        found = any_pdev_behind_iommu(dom_xen, pdev, iommu);
-
-    if ( !found )
-    {
-        clear_bit(iommu->index, dom_iommu(domain)->arch.vtd.iommu_bitmap);
-        cleanup_domid_map(domain, iommu);
-    }
-
-    return 0;
+    return ret;
 }
 
 static void iommu_clear_root_pgtable(struct domain *d)
