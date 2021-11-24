@@ -68,13 +68,8 @@
 #define cap_num_fault_regs(c)  ((((c) >> 40) & 0xff) + 1)
 #define cap_pgsel_inv(c)       (((c) >> 39) & 1)
 
-#define cap_super_page_val(c)  (((c) >> 34) & 0xf)
-#define cap_super_offset(c)    (((find_first_bit(&cap_super_page_val(c), 4)) \
-                                 * OFFSET_STRIDE) + 21)
-#define cap_sps_2mb(c)         ((c >> 34) & 1)
-#define cap_sps_1gb(c)         ((c >> 35) & 1)
-#define cap_sps_512gb(c)       ((c >> 36) & 1)
-#define cap_sps_1tb(c)         ((c >> 37) & 1)
+#define cap_sps_2mb(c)         (((c) >> 34) & 1)
+#define cap_sps_1gb(c)         (((c) >> 35) & 1)
 
 #define cap_fault_reg_offset(c)    ((((c) >> 24) & 0x3ff) * 16)
 
