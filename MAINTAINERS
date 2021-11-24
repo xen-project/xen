@@ -470,8 +470,7 @@ S:	Supported
 T:	git https://xenbits.xenproject.org/git-http/qemu-xen.git
 
 REMUS
-M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
-S:	Maintained
+S:	Orphan
 F:	docs/README.remus
 F:	tools/libs/light/libxl_remus_*
 F:	tools/libs/light/libxl_netbuffer.c
