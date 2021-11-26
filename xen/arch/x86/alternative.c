@@ -18,6 +18,7 @@
 #include <xen/delay.h>
 #include <xen/types.h>
 #include <asm/apic.h>
+#include <asm/endbr.h>
 #include <asm/processor.h>
 #include <asm/alternative.h>
 #include <xen/init.h>
@@ -279,6 +280,28 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
 
                 if ( dest )
                 {
+                    /*
+                     * When building for CET-IBT, all function pointer targets
+                     * should have an endbr64 instruction.
+                     *
+                     * If this is not the case, leave a warning because
+                     * something is probably wrong with the build.  A CET-IBT
+                     * enabled system might have exploded already.
+                     *
+                     * Otherwise, skip the endbr64 instruction.  This is a
+                     * marginal perf improvement which saves on instruction
+                     * decode bandwidth.
+                     */
+                    if ( IS_ENABLED(CONFIG_HAS_CC_CET_IBT) )
+                    {
+                        if ( is_endbr64(dest) )
+                            dest += ENDBR64_LEN;
+                        else
+                            printk(XENLOG_WARNING
+                                   "altcall %ps dest %ps has no endbr64\n",
+                                   orig, dest);
+                    }
+
                     disp = dest - (orig + 5);
                     ASSERT(disp == (int32_t)disp);
                     *(int32_t *)(buf + 1) = disp;
