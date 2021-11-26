@@ -142,6 +142,9 @@ $(TARGET)-syms: $(BASEDIR)/prelink.o $(obj)/xen.lds
 		| $(BASEDIR)/tools/symbols --all-symbols --xensyms --sysv --sort \
 		>$(@D)/$(@F).map
 	rm -f $(@D)/.$(@F).[0-9]* $(@D)/..$(@F).[0-9]*
+ifeq ($(CONFIG_XEN_IBT),y)
+	$(SHELL) $(BASEDIR)/tools/check-endbr.sh $@
+endif
 
 $(obj)/note.o: $(TARGET)-syms
 	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $< $@.bin
@@ -212,6 +215,9 @@ endif
 	$(NM) -pa --format=sysv $(@D)/$(@F) \
 		| $(BASEDIR)/tools/symbols --all-symbols --xensyms --sysv --sort >$(@D)/$(@F).map
 	rm -f $(@D)/.$(@F).[0-9]* $(@D)/..$(@F).[0-9]*
+ifeq ($(CONFIG_XEN_IBT),y)
+	$(SHELL) $(BASEDIR)/tools/check-endbr.sh $@
+endif
 else
 $(TARGET).efi: FORCE
 	rm -f $@
