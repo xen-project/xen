@@ -17,6 +17,7 @@
 #include <asm/fixmap.h>
 #include <asm/nmi.h>
 #include <asm/livepatch.h>
+#include <asm/setup.h>
 
 static bool has_active_waitqueue(const struct vm_event_domain *ved)
 {
@@ -343,7 +344,7 @@ void __init arch_livepatch_init(void)
 {
     void *start, *end;
 
-    start = (void *)xen_virt_end;
+    start = (void *)__2M_rwdata_end;
     end = (void *)(XEN_VIRT_END - FIXADDR_X_SIZE - NR_CPUS * PAGE_SIZE);
 
     BUG_ON(end <= start);

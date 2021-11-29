@@ -136,8 +136,6 @@ cpumask_t __read_mostly cpu_present_map;
 
 unsigned long __read_mostly xen_phys_start;
 
-unsigned long __read_mostly xen_virt_end;
-
 char __section(".bss.stack_aligned") __aligned(STACK_SIZE)
     cpu0_stack[STACK_SIZE];
 
@@ -1572,10 +1570,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                              _mfn(s), e - s, PAGE_HYPERVISOR);
     }
 #endif
-
-    xen_virt_end = ((unsigned long)_end + (1UL << L2_PAGETABLE_SHIFT) - 1) &
-                   ~((1UL << L2_PAGETABLE_SHIFT) - 1);
-    destroy_xen_mappings(xen_virt_end, XEN_VIRT_START + BOOTSTRAP_MAP_BASE);
 
     /*
      * If not using 2M mappings to gain suitable pagetable permissions

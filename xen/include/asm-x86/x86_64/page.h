@@ -23,8 +23,6 @@ static inline unsigned long canonicalise_addr(unsigned long addr)
 
 #include <xen/pdx.h>
 
-extern unsigned long xen_virt_end;
-
 /*
  * Note: These are solely for the use by page_{get,set}_owner(), and
  *       therefore don't need to handle the XEN_VIRT_{START,END} range.

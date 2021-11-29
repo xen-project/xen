@@ -787,7 +787,8 @@ static int update_xen_mappings(unsigned long mfn, unsigned int cacheattr)
 {
     int err = 0;
     bool alias = mfn >= PFN_DOWN(xen_phys_start) &&
-         mfn < PFN_UP(xen_phys_start + xen_virt_end - XEN_VIRT_START);
+                 mfn <  PFN_UP(xen_phys_start + (unsigned long)__2M_rwdata_end -
+                               XEN_VIRT_START);
     unsigned long xen_va =
         XEN_VIRT_START + ((mfn - PFN_DOWN(xen_phys_start)) << PAGE_SHIFT);
 
