@@ -97,6 +97,12 @@ SECTIONS
   __2M_rodata_start = .;       /* Start of 2M superpages, mapped RO. */
   DECL_SECTION(.rodata) {
        _srodata = .;
+
+       __ro_after_init_start = .;
+       *(.data.ro_after_init)
+       . = ALIGN(PAGE_SIZE);
+       __ro_after_init_end = .;
+
        /* Bug frames table */
        __start_bug_frames = .;
        *(.bug_frames.0)

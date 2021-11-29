@@ -5,6 +5,7 @@
 #include <asm/numa.h>
 
 extern const char __2M_text_start[], __2M_text_end[];
+extern const char __ro_after_init_start[], __ro_after_init_end[];
 extern const char __2M_rodata_start[], __2M_rodata_end[];
 extern char __2M_init_start[], __2M_init_end[];
 extern char __2M_rwdata_start[], __2M_rwdata_end[];

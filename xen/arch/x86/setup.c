@@ -663,6 +663,11 @@ static void noreturn init_done(void)
     init_xenheap_pages(__pa(start), __pa(end));
     printk("Freed %lukB init memory\n", (end - start) >> 10);
 
+    /* Mark .rodata/ro_after_init as RO.  Maybe reform the superpage. */
+    modify_xen_mappings((unsigned long)&__2M_rodata_start,
+                        (unsigned long)&__2M_rodata_end,
+                        PAGE_HYPERVISOR_RO);
+
     startup_cpu_idle_loop();
 }
 
@@ -1535,6 +1540,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     /*
      * All Xen mappings are currently RWX 2M superpages.  Restrict to:
      *   text          - RX
+     *   ro_after_init - RW for now, RO later
      *   rodata        - RO
      *   init          - keep RWX, discarded entirely later
      *   data/bss      - RW
@@ -1543,7 +1549,11 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                         (unsigned long)&__2M_text_end,
                         PAGE_HYPERVISOR_RX);
 
-    modify_xen_mappings((unsigned long)&__2M_rodata_start,
+    modify_xen_mappings((unsigned long)&__ro_after_init_start,
+                        (unsigned long)&__ro_after_init_end,
+                        PAGE_HYPERVISOR_RW);
+
+    modify_xen_mappings((unsigned long)&__ro_after_init_end,
                         (unsigned long)&__2M_rodata_end,
                         PAGE_HYPERVISOR_RO);
 
