@@ -1279,16 +1279,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
             /* The only data mappings to be relocated are in the Xen area. */
             pl2e = __va(__pa(l2_xenmap));
-            /*
-             * Undo the temporary-hooking of the l1_directmap.  __2M_text_start
-             * is contained in this PTE.
-             */
+
             BUG_ON(using_2M_mapping() &&
                    l2_table_offset((unsigned long)_erodata) ==
                    l2_table_offset((unsigned long)_stext));
-            *pl2e++ = l2e_from_pfn(xen_phys_start >> PAGE_SHIFT,
-                                   PAGE_HYPERVISOR_RX | _PAGE_PSE);
-            for ( i = 1; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
+
+            for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
             {
                 unsigned int flags;
 
