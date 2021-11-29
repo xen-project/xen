@@ -1245,7 +1245,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             barrier();
             move_memory(e, XEN_IMG_OFFSET, _end - _start, 1);
 
-            /* Walk initial pagetables, relocating page directory entries. */
+            /* Walk idle_pg_table, relocating non-leaf entries. */
             pl4e = __va(__pa(idle_pg_table));
             for ( i = 0 ; i < L4_PAGETABLE_ENTRIES; i++, pl4e++ )
             {
@@ -1277,18 +1277,18 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 }
             }
 
-            /* The only data mappings to be relocated are in the Xen area. */
-            pl2e = __va(__pa(l2_xenmap));
-
             BUG_ON(using_2M_mapping() &&
                    l2_table_offset((unsigned long)_erodata) ==
                    l2_table_offset((unsigned long)_stext));
 
+            /* Walk l2_xenmap[], relocating 2M superpage leaves. */
+            pl2e = __va(__pa(l2_xenmap));
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
             {
                 unsigned int flags;
 
                 if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
+                     !(l2e_get_flags(*pl2e) & _PAGE_PSE) ||
                      (l2e_get_pfn(*pl2e) >= pte_update_limit) )
                     continue;
 
