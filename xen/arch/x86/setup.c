@@ -1281,55 +1281,16 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 }
             }
 
-            BUG_ON(using_2M_mapping() &&
-                   l2_table_offset((unsigned long)_erodata) ==
-                   l2_table_offset((unsigned long)_stext));
-
             /* Walk l2_xenmap[], relocating 2M superpage leaves. */
             pl2e = __va(__pa(l2_xenmap));
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
             {
-                unsigned int flags;
-
                 if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
                      !(l2e_get_flags(*pl2e) & _PAGE_PSE) ||
                      (l2e_get_pfn(*pl2e) >= pte_update_limit) )
                     continue;
 
-                if ( !using_2M_mapping() )
-                {
-                    *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) +
-                                            xen_phys_start);
-                    continue;
-                }
-
-                if ( i < l2_table_offset((unsigned long)&__2M_text_end) )
-                {
-                    flags = PAGE_HYPERVISOR_RX | _PAGE_PSE;
-                }
-                else if ( i >= l2_table_offset((unsigned long)&__2M_rodata_start) &&
-                          i <  l2_table_offset((unsigned long)&__2M_rodata_end) )
-                {
-                    flags = PAGE_HYPERVISOR_RO | _PAGE_PSE;
-                }
-                else if ( i >= l2_table_offset((unsigned long)&__2M_init_start) &&
-                          i <  l2_table_offset((unsigned long)&__2M_init_end) )
-                {
-                    flags = PAGE_HYPERVISOR_RWX | _PAGE_PSE;
-                }
-                else if ( (i >= l2_table_offset((unsigned long)&__2M_rwdata_start) &&
-                           i <  l2_table_offset((unsigned long)&__2M_rwdata_end)) )
-                {
-                    flags = PAGE_HYPERVISOR_RW | _PAGE_PSE;
-                }
-                else
-                {
-                    *pl2e = l2e_empty();
-                    continue;
-                }
-
-                *pl2e = l2e_from_paddr(
-                    l2e_get_paddr(*pl2e) + xen_phys_start, flags);
+                *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) + xen_phys_start);
             }
 
             /* Re-sync the stack and then switch to relocated pagetables. */
@@ -1572,31 +1533,28 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 #endif
 
     /*
-     * If not using 2M mappings to gain suitable pagetable permissions
-     * directly from the relocation above, remap the code/data
-     * sections with decreased permissions.
+     * All Xen mappings are currently RWX 2M superpages.  Restrict to:
+     *   text          - RX
+     *   rodata        - RO
+     *   init          - keep RWX, discarded entirely later
+     *   data/bss      - RW
      */
+    modify_xen_mappings((unsigned long)&_start,
+                        (unsigned long)&__2M_text_end,
+                        PAGE_HYPERVISOR_RX);
+
+    modify_xen_mappings((unsigned long)&__2M_rodata_start,
+                        (unsigned long)&__2M_rodata_end,
+                        PAGE_HYPERVISOR_RO);
+
+    modify_xen_mappings((unsigned long)&__2M_rwdata_start,
+                        (unsigned long)&__2M_rwdata_end,
+                        PAGE_HYPERVISOR_RW);
+
     if ( !using_2M_mapping() )
-    {
-        /* Mark .text as RX (avoiding the first 2M superpage). */
-        modify_xen_mappings(XEN_VIRT_START + MB(2),
-                            (unsigned long)&__2M_text_end,
-                            PAGE_HYPERVISOR_RX);
-
-        /* Mark .rodata as RO. */
-        modify_xen_mappings((unsigned long)&__2M_rodata_start,
-                            (unsigned long)&__2M_rodata_end,
-                            PAGE_HYPERVISOR_RO);
-
-        /* Mark .data and .bss as RW. */
-        modify_xen_mappings((unsigned long)&__2M_rwdata_start,
-                            (unsigned long)&__2M_rwdata_end,
-                            PAGE_HYPERVISOR_RW);
-
         /* Drop the remaining mappings in the shattered superpage. */
         destroy_xen_mappings((unsigned long)&__2M_rwdata_end,
                              ROUNDUP((unsigned long)&__2M_rwdata_end, MB(2)));
-    }
 
     nr_pages = 0;
     for ( i = 0; i < e820.nr_map; i++ )
