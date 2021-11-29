@@ -141,6 +141,12 @@ unsigned long __read_mostly xen_virt_end;
 char __section(".bss.stack_aligned") __aligned(STACK_SIZE)
     cpu0_stack[STACK_SIZE];
 
+/* Used by the BSP/AP paths to find the higher half stack mapping to use. */
+void *stack_start = cpu0_stack + STACK_SIZE - sizeof(struct cpu_info);
+
+/* Used by the boot asm to stash the relocated multiboot info pointer. */
+unsigned int __initdata multiboot_ptr;
+
 struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 unsigned long __read_mostly mmu_cr4_features = XEN_MINIMAL_CR4;

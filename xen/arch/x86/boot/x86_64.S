@@ -67,14 +67,6 @@ ENTRY(__high_start)
         call    __start_xen
         BUG     /* __start_xen() shouldn't return. */
 
-        .data
-        .align 8
-multiboot_ptr:
-        .long   0
-
-GLOBAL(stack_start)
-        .quad   cpu0_stack + STACK_SIZE - CPUINFO_sizeof
-
         .section .data.page_aligned, "aw", @progbits
         .align PAGE_SIZE, 0
 /*
