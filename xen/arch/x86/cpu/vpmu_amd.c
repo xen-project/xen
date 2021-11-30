@@ -518,7 +518,7 @@ static int cf_check svm_vpmu_initialise(struct vcpu *v)
     return 0;
 }
 
-static const struct arch_vpmu_ops __initconstrel amd_vpmu_ops = {
+static const struct arch_vpmu_ops __initconst_cf_clobber amd_vpmu_ops = {
     .initialise = svm_vpmu_initialise,
     .do_wrmsr = amd_vpmu_do_wrmsr,
     .do_rdmsr = amd_vpmu_do_rdmsr,
