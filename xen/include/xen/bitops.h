@@ -4,8 +4,7 @@
 
 /*
  * Create a contiguous bitmask starting at bit position @l and ending at
- * position @h. For example
- * GENMASK(30, 21) gives us the 32bit vector 0x01fe00000.
+ * position @h. For example GENMASK(30, 21) gives us 0x7fe00000ul.
  */
 #define GENMASK(h, l) \
     (((~0UL) << (l)) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
