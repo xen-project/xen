@@ -122,9 +122,9 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v);
 void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v);
 void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v);
 bool_t nestedsvm_gif_isset(struct vcpu *v);
-int nsvm_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                         unsigned int *page_order, uint8_t *p2m_acc,
-                         bool_t access_r, bool_t access_w, bool_t access_x);
+int nsvm_hap_walk_L1_p2m(
+    struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
+    uint8_t *p2m_acc, struct npfec npfec);
 
 #define NSVM_INTR_NOTHANDLED     3
 #define NSVM_INTR_NOTINTERCEPTED 2

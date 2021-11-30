@@ -113,31 +113,13 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
     }
 }
 
-/* This function uses L2_gpa to walk the P2M page table in L1. If the
- * walk is successful, the translated value is returned in
- * L1_gpa. The result value tells what to do next.
- */
-int
-nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                      unsigned int *page_order, uint8_t *p2m_acc,
-                      bool_t access_r, bool_t access_w, bool_t access_x)
-{
-    ASSERT(hvm_funcs.nhvm_hap_walk_L1_p2m);
-
-    return hvm_funcs.nhvm_hap_walk_L1_p2m(v, L2_gpa, L1_gpa, page_order,
-        p2m_acc, access_r, access_w, access_x);
-}
-
-
 /* This function uses L1_gpa to walk the P2M table in L0 hypervisor. If the
  * walk is successful, the translated value is returned in L0_gpa. The return 
  * value tells the upper level what to do.
  */
-static int
-nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
-                      p2m_type_t *p2mt, p2m_access_t *p2ma,
-                      unsigned int *page_order,
-                      bool_t access_r, bool_t access_w, bool_t access_x)
+static int nestedhap_walk_L0_p2m(
+    struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa, p2m_type_t *p2mt,
+    p2m_access_t *p2ma, unsigned int *page_order, struct npfec npfec)
 {
     mfn_t mfn;
     int rc;
@@ -154,7 +136,7 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
         goto out;
 
     rc = NESTEDHVM_PAGEFAULT_L0_ERROR;
-    if ( access_w && p2m_is_readonly(*p2mt) )
+    if ( npfec.write_access && p2m_is_readonly(*p2mt) )
         goto out;
 
     if ( p2m_is_paging(*p2mt) || p2m_is_shared(*p2mt) || !p2m_is_ram(*p2mt) )
@@ -176,9 +158,8 @@ out:
  *
  * Returns:
  */
-int
-nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
-    bool_t access_r, bool_t access_w, bool_t access_x)
+int nestedhvm_hap_nested_page_fault(
+    struct vcpu *v, paddr_t *L2_gpa, struct npfec npfec)
 {
     int rv;
     paddr_t L1_gpa, L0_gpa;
@@ -192,8 +173,8 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
     p2m = p2m_get_hostp2m(d); /* L0 p2m */
 
     /* walk the L1 P2M table */
-    rv = nestedhap_walk_L1_p2m(v, *L2_gpa, &L1_gpa, &page_order_21, &p2ma_21,
-        access_r, access_w, access_x);
+    rv = nhvm_hap_walk_L1_p2m(v, *L2_gpa, &L1_gpa, &page_order_21, &p2ma_21,
+                              npfec);
 
     /* let caller to handle these two cases */
     switch (rv) {
@@ -209,9 +190,8 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
     }
 
     /* ==> we have to walk L0 P2M */
-    rv = nestedhap_walk_L0_p2m(p2m, L1_gpa, &L0_gpa,
-        &p2mt_10, &p2ma_10, &page_order_10,
-        access_r, access_w, access_x);
+    rv = nestedhap_walk_L0_p2m(p2m, L1_gpa, &L0_gpa, &p2mt_10, &p2ma_10,
+                               &page_order_10, npfec);
 
     /* let upper level caller to handle these two cases */
     switch (rv) {

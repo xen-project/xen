@@ -1775,10 +1775,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          * the same as for shadow paging.
          */
 
-         rv = nestedhvm_hap_nested_page_fault(curr, &gpa,
-                                              npfec.read_access,
-                                              npfec.write_access,
-                                              npfec.insn_fetch);
+        rv = nestedhvm_hap_nested_page_fault(curr, &gpa, npfec);
         switch (rv) {
         case NESTEDHVM_PAGEFAULT_DONE:
         case NESTEDHVM_PAGEFAULT_RETRY:

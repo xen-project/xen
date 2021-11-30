@@ -1930,6 +1930,11 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
         const struct paging_mode *mode;
         uint8_t l1_p2ma;
         unsigned int l1_page_order;
+        struct npfec npfec = {
+            .read_access  = 1,
+            .write_access = *pfec & PFEC_write_access,
+            .insn_fetch   = *pfec & PFEC_insn_fetch,
+        };
         int rv;
 
         /* translate l2 guest va into l2 guest gfn */
@@ -1940,11 +1945,8 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
         if ( l2_gfn == gfn_x(INVALID_GFN) )
             return gfn_x(INVALID_GFN);
 
-        rv = nestedhap_walk_L1_p2m(v, pfn_to_paddr(l2_gfn), &l1_gpa,
-                                   &l1_page_order, &l1_p2ma,
-                                   1,
-                                   !!(*pfec & PFEC_write_access),
-                                   !!(*pfec & PFEC_insn_fetch));
+        rv = nhvm_hap_walk_L1_p2m(
+            v, pfn_to_paddr(l2_gfn), &l1_gpa, &l1_page_order, &l1_p2ma, npfec);
 
         if ( rv != NESTEDHVM_PAGEFAULT_DONE )
             return gfn_x(INVALID_GFN);

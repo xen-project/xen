@@ -20,6 +20,8 @@
 #ifndef __ASM_X86_HVM_HVM_H__
 #define __ASM_X86_HVM_HVM_H__
 
+#include <xen/mm.h>
+
 #include <asm/alternative.h>
 #include <asm/asm_defns.h>
 #include <asm/current.h>
@@ -203,8 +205,7 @@ struct hvm_function_table {
     /*Walk nested p2m  */
     int (*nhvm_hap_walk_L1_p2m)(struct vcpu *v, paddr_t L2_gpa,
                                 paddr_t *L1_gpa, unsigned int *page_order,
-                                uint8_t *p2m_acc, bool_t access_r,
-                                bool_t access_w, bool_t access_x);
+                                uint8_t *p2m_acc, struct npfec npfec);
 
     void (*enable_msr_interception)(struct domain *d, uint32_t msr);
     bool_t (*is_singlestep_supported)(void);
@@ -350,7 +351,6 @@ int hvm_debug_op(struct vcpu *v, int32_t op);
 void hvm_toggle_singlestep(struct vcpu *v);
 void hvm_fast_singlestep(struct vcpu *v, uint16_t p2midx);
 
-struct npfec;
 int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                               struct npfec npfec);
 
@@ -629,6 +629,14 @@ static inline bool_t nhvm_vmcx_hap_enabled(struct vcpu *v)
 static inline enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v)
 {
     return hvm_funcs.nhvm_intr_blocked(v);
+}
+
+static inline int nhvm_hap_walk_L1_p2m(
+    struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
+    uint8_t *p2m_acc, struct npfec npfec)
+{
+    return hvm_funcs.nhvm_hap_walk_L1_p2m(
+        v, L2_gpa, L1_gpa, page_order, p2m_acc, npfec);
 }
 
 static inline void hvm_enable_msr_interception(struct domain *d, uint32_t msr)

@@ -1216,10 +1216,9 @@ nsvm_vmcb_hap_enabled(struct vcpu *v)
  * walk is successful, the translated value is returned in
  * L1_gpa. The result value tells what to do next.
  */
-int
-nsvm_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                     unsigned int *page_order, uint8_t *p2m_acc,
-                     bool_t access_r, bool_t access_w, bool_t access_x)
+int nsvm_hap_walk_L1_p2m(
+    struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
+    uint8_t *p2m_acc, struct npfec npfec)
 {
     uint32_t pfec;
     unsigned long nested_cr3, gfn;
@@ -1227,9 +1226,9 @@ nsvm_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
     nested_cr3 = nhvm_vcpu_p2m_base(v);
 
     pfec = PFEC_user_mode | PFEC_page_present;
-    if ( access_w )
+    if ( npfec.write_access )
         pfec |= PFEC_write_access;
-    if ( access_x )
+    if ( npfec.insn_fetch )
         pfec |= PFEC_insn_fetch;
 
     /* Walk the guest-supplied NPT table, just as if it were a pagetable */

@@ -2346,16 +2346,16 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
  * walk is successful, the translated value is returned in
  * L1_gpa. The result value tells what to do next.
  */
-int
-nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                     unsigned int *page_order, uint8_t *p2m_acc,
-                     bool_t access_r, bool_t access_w, bool_t access_x)
+int nvmx_hap_walk_L1_p2m(
+    struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
+    uint8_t *p2m_acc, struct npfec npfec)
 {
     int rc;
     unsigned long gfn;
     uint64_t exit_qual;
     uint32_t exit_reason = EXIT_REASON_EPT_VIOLATION;
-    uint32_t rwx_rights = (access_x << 2) | (access_w << 1) | access_r;
+    uint32_t rwx_rights =
+        (npfec.insn_fetch << 2) | (npfec.write_access << 1) | npfec.read_access;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
     vmx_vmcs_enter(v);
