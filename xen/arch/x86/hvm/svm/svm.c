@@ -2113,7 +2113,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_AMD_FAM15H_EVNTSEL3:
     case MSR_AMD_FAM15H_EVNTSEL4:
     case MSR_AMD_FAM15H_EVNTSEL5:
-        if ( vpmu_do_wrmsr(msr, msr_content, 0) )
+        if ( vpmu_do_wrmsr(msr, msr_content) )
             goto gpf;
         break;
 

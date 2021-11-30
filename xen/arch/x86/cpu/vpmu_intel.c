@@ -522,8 +522,7 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
     return 1;
 }
 
-static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
-                               uint64_t supported)
+static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
     int i, tmp;
     int type = -1, index = -1;
@@ -534,8 +533,6 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
 
     if ( !core2_vpmu_msr_common_check(msr, &type, &index) )
         return -EINVAL;
-
-    ASSERT(!supported);
 
     if ( (type == MSR_TYPE_COUNTER) && (msr_content & fixed_counters_mask) )
         /* Writing unsupported bits to a fixed counter */

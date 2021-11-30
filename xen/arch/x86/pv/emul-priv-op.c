@@ -1163,7 +1163,7 @@ static int write_msr(unsigned int reg, uint64_t val,
                      !is_hardware_domain(currd) )
                     return X86EMUL_OKAY;
 
-                if ( vpmu_do_wrmsr(reg, val, 0) )
+                if ( vpmu_do_wrmsr(reg, val) )
                     break;
                 return X86EMUL_OKAY;
             }

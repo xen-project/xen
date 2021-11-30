@@ -40,8 +40,7 @@
 /* Arch specific operations shared by all vpmus */
 struct arch_vpmu_ops {
     int (*initialise)(struct vcpu *v);
-    int (*do_wrmsr)(unsigned int msr, uint64_t msr_content,
-                    uint64_t supported);
+    int (*do_wrmsr)(unsigned int msr, uint64_t msr_content);
     int (*do_rdmsr)(unsigned int msr, uint64_t *msr_content);
     int (*do_interrupt)(struct cpu_user_regs *regs);
     void (*arch_vpmu_destroy)(struct vcpu *v);
@@ -104,8 +103,7 @@ static inline bool_t vpmu_are_all_set(const struct vpmu_struct *vpmu,
 }
 
 void vpmu_lvtpc_update(uint32_t val);
-int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
-                uint64_t supported, bool_t is_write);
+int vpmu_do_msr(unsigned int msr, uint64_t *msr_content, bool is_write);
 void vpmu_do_interrupt(struct cpu_user_regs *regs);
 void vpmu_initialise(struct vcpu *v);
 void vpmu_destroy(struct vcpu *v);
@@ -113,14 +111,13 @@ void vpmu_save(struct vcpu *v);
 int vpmu_load(struct vcpu *v, bool_t from_guest);
 void vpmu_dump(struct vcpu *v);
 
-static inline int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
-                                uint64_t supported)
+static inline int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
-    return vpmu_do_msr(msr, &msr_content, supported, 1);
+    return vpmu_do_msr(msr, &msr_content, true /* write */);
 }
 static inline int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
-    return vpmu_do_msr(msr, msr_content, 0, 0);
+    return vpmu_do_msr(msr, msr_content, false /* read */);
 }
 
 extern unsigned int vpmu_mode;

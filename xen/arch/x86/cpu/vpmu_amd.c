@@ -348,15 +348,12 @@ static void context_update(unsigned int msr, u64 msr_content)
     }
 }
 
-static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
-                             uint64_t supported)
+static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     unsigned int idx = 0;
     int type = get_pmu_reg_type(msr, &idx);
-
-    ASSERT(!supported);
 
     if ( (type == MSR_TYPE_CTRL ) &&
          ((msr_content & CTRL_RSVD_MASK) != ctrl_rsvd[idx]) )

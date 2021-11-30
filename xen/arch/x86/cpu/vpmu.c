@@ -116,8 +116,7 @@ void vpmu_lvtpc_update(uint32_t val)
         apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
 }
 
-int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
-                uint64_t supported, bool_t is_write)
+int vpmu_do_msr(unsigned int msr, uint64_t *msr_content, bool is_write)
 {
     struct vcpu *curr = current;
     struct vpmu_struct *vpmu;
@@ -137,7 +136,7 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
         goto nop;
 
     if ( is_write )
-        ret = alternative_call(vpmu_ops.do_wrmsr, msr, *msr_content, supported);
+        ret = alternative_call(vpmu_ops.do_wrmsr, msr, *msr_content);
     else
         ret = alternative_call(vpmu_ops.do_rdmsr, msr, msr_content);
 
