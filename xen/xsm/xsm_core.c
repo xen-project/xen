@@ -30,7 +30,7 @@
 
 #define XSM_FRAMEWORK_VERSION    "1.0.1"
 
-struct xsm_ops __read_mostly xsm_ops;
+struct xsm_ops __alt_call_maybe_initdata xsm_ops;
 
 enum xsm_ops_state {
     XSM_OPS_UNREGISTERED,
