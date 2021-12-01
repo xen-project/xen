@@ -789,8 +789,6 @@ int xsm_dt_policy_init(void **policy_buffer, size_t *policy_size);
 bool has_xsm_magic(paddr_t);
 #endif
 
-extern struct xsm_ops dummy_xsm_ops;
-
 void xsm_fixup_ops(struct xsm_ops *ops);
 
 #ifdef CONFIG_XSM_FLASK
