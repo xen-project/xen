@@ -222,7 +222,7 @@ domU1 {
 		xen,uefi-binary = "initrd-3.0.31-0.4-xen";
 	};
 	module@3 {
-		compatible = "multiboot,ramdisk", "multiboot,module";
+		compatible = "multiboot,device-tree", "multiboot,module";
 		xen,uefi-binary = "passthrough.dtb";
 	};
 };
