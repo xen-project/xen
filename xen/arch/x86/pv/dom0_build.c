@@ -21,6 +21,7 @@
 #include <asm/page.h>
 #include <asm/pv/mm.h>
 #include <asm/setup.h>
+#include <asm/shadow.h>
 
 /* Allow ring-3 access in long mode as guest cannot use ring 1 ... */
 #define BASE_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
@@ -928,8 +929,22 @@ int __init dom0_construct_pv(struct domain *d,
     if ( d->domain_id == hardware_domid )
         iommu_hwdom_init(d);
 
-    /* Activate shadow mode, if requested.  Reuse the pv_l1tf tasklet. */
 #ifdef CONFIG_SHADOW_PAGING
+    /* Fill the shadow pool if necessary. */
+    if ( opt_dom0_shadow || opt_pv_l1tf_hwdom )
+    {
+        bool preempted;
+
+        nr_pt_pages = dom0_paging_pages(d, nr_pages);
+
+        do {
+            preempted = false;
+            shadow_set_allocation(d, nr_pt_pages, &preempted);
+            process_pending_softirqs();
+        } while ( preempted );
+    }
+
+    /* Activate shadow mode, if requested.  Reuse the pv_l1tf tasklet. */
     if ( opt_dom0_shadow )
     {
         printk("Switching dom0 to using shadow paging\n");
