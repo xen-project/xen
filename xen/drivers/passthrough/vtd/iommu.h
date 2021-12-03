@@ -500,7 +500,7 @@ struct vtd_iommu {
 
     struct list_head ats_devices;
     unsigned long *domid_bitmap;  /* domain id bitmap */
-    u16 *domid_map;               /* domain id mapping array */
+    domid_t *domid_map;           /* domain id mapping array */
     uint32_t version;
 };
 

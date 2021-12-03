@@ -62,10 +62,10 @@ static struct tasklet vtd_fault_tasklet;
 static int setup_hwdom_device(u8 devfn, struct pci_dev *);
 static void setup_hwdom_rmrr(struct domain *d);
 
-static int domain_iommu_domid(struct domain *d,
-                              struct vtd_iommu *iommu)
+static int domain_iommu_domid(const struct domain *d,
+                              const struct vtd_iommu *iommu)
 {
-    unsigned long nr_dom, i;
+    unsigned int nr_dom, i;
 
     nr_dom = cap_ndoms(iommu->cap);
     i = find_first_bit(iommu->domid_bitmap, nr_dom);
@@ -74,7 +74,7 @@ static int domain_iommu_domid(struct domain *d,
         if ( iommu->domid_map[i] == d->domain_id )
             return i;
 
-        i = find_next_bit(iommu->domid_bitmap, nr_dom, i+1);
+        i = find_next_bit(iommu->domid_bitmap, nr_dom, i + 1);
     }
 
     if ( !d->is_dying )
@@ -88,61 +88,52 @@ static int domain_iommu_domid(struct domain *d,
 #define DID_FIELD_WIDTH 16
 #define DID_HIGH_OFFSET 8
 static int context_set_domain_id(struct context_entry *context,
-                                 struct domain *d,
+                                 const struct domain *d,
                                  struct vtd_iommu *iommu)
 {
-    unsigned long nr_dom, i;
-    int found = 0;
+    unsigned int nr_dom, i;
 
     ASSERT(spin_is_locked(&iommu->lock));
 
     nr_dom = cap_ndoms(iommu->cap);
     i = find_first_bit(iommu->domid_bitmap, nr_dom);
-    while ( i < nr_dom )
-    {
-        if ( iommu->domid_map[i] == d->domain_id )
-        {
-            found = 1;
-            break;
-        }
-        i = find_next_bit(iommu->domid_bitmap, nr_dom, i+1);
-    }
+    while ( i < nr_dom && iommu->domid_map[i] != d->domain_id )
+        i = find_next_bit(iommu->domid_bitmap, nr_dom, i + 1);
 
-    if ( found == 0 )
+    if ( i >= nr_dom )
     {
         i = find_first_zero_bit(iommu->domid_bitmap, nr_dom);
         if ( i >= nr_dom )
         {
             dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no free domain ids\n");
-            return -EFAULT;
+            return -EBUSY;
         }
         iommu->domid_map[i] = d->domain_id;
+        set_bit(i, iommu->domid_bitmap);
     }
 
-    set_bit(i, iommu->domid_bitmap);
     context->hi |= (i & ((1 << DID_FIELD_WIDTH) - 1)) << DID_HIGH_OFFSET;
     return 0;
 }
 
-static int context_get_domain_id(struct context_entry *context,
-                                 struct vtd_iommu *iommu)
+static int context_get_domain_id(const struct context_entry *context,
+                                 const struct vtd_iommu *iommu)
 {
-    unsigned long dom_index, nr_dom;
     int domid = -1;
 
-    if (iommu && context)
+    if ( iommu && context )
     {
-        nr_dom = cap_ndoms(iommu->cap);
-
-        dom_index = context_domain_id(*context);
+        unsigned int nr_dom = cap_ndoms(iommu->cap);
+        unsigned int dom_index = context_domain_id(*context);
 
         if ( dom_index < nr_dom && iommu->domid_map )
             domid = iommu->domid_map[dom_index];
         else
             dprintk(XENLOG_DEBUG VTDPREFIX,
-                    "dom_index %lu exceeds nr_dom %lu or iommu has no domid_map\n",
+                    "dom_index %u exceeds nr_dom %u or iommu has no domid_map\n",
                     dom_index, nr_dom);
     }
+
     return domid;
 }
 
@@ -1303,7 +1294,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     if ( !iommu->domid_bitmap )
         return -ENOMEM;
 
-    iommu->domid_map = xzalloc_array(u16, nr_dom);
+    iommu->domid_map = xzalloc_array(domid_t, nr_dom);
     if ( !iommu->domid_map )
         return -ENOMEM;
 
@@ -1478,11 +1469,12 @@ int domain_context_mapping_one(
         spin_unlock(&hd->arch.mapping_lock);
     }
 
-    if ( context_set_domain_id(context, domain, iommu) )
+    rc = context_set_domain_id(context, domain, iommu);
+    if ( rc )
     {
         spin_unlock(&iommu->lock);
         unmap_vtd_domain_page(context_entries);
-        return -EFAULT;
+        return rc;
     }
 
     context_set_address_width(*context, level_to_agaw(iommu->nr_pt_levels));
