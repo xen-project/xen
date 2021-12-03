@@ -239,10 +239,9 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         unsigned long rdx = regs->rdx;
         unsigned long r10 = regs->r10;
         unsigned long r8 = regs->r8;
-        unsigned long r9 = regs->r9;
 
-        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%lx, %lx, %lx, %lx, %lx, %lx)",
-                    eax, rdi, rsi, rdx, r10, r8, r9);
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%lx, %lx, %lx, %lx, %lx)",
+                    eax, rdi, rsi, rdx, r10, r8);
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
@@ -252,13 +251,11 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         case 1: rsi = 0xdeadbeefdeadf00dUL; fallthrough;
         case 2: rdx = 0xdeadbeefdeadf00dUL; fallthrough;
         case 3: r10 = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 4: r8 = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 5: r9 = 0xdeadbeefdeadf00dUL;
+        case 4: r8 = 0xdeadbeefdeadf00dUL;
         }
 #endif
 
-        regs->rax = hvm_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8,
-                                                    r9);
+        regs->rax = hvm_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8);
 
 #ifndef NDEBUG
         if ( !curr->hcall_preempted )
@@ -266,7 +263,6 @@ int hvm_hypercall(struct cpu_user_regs *regs)
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].native )
             {
-            case 6: regs->r9  = 0xdeadbeefdeadf00dUL; fallthrough;
             case 5: regs->r8  = 0xdeadbeefdeadf00dUL; fallthrough;
             case 4: regs->r10 = 0xdeadbeefdeadf00dUL; fallthrough;
             case 3: regs->rdx = 0xdeadbeefdeadf00dUL; fallthrough;
@@ -283,10 +279,9 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         unsigned int edx = regs->edx;
         unsigned int esi = regs->esi;
         unsigned int edi = regs->edi;
-        unsigned int ebp = regs->ebp;
 
-        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%x, %x, %x, %x, %x, %x)", eax,
-                    ebx, ecx, edx, esi, edi, ebp);
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%x, %x, %x, %x, %x)", eax,
+                    ebx, ecx, edx, esi, edi);
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
@@ -296,14 +291,12 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         case 1: ecx = 0xdeadf00d; fallthrough;
         case 2: edx = 0xdeadf00d; fallthrough;
         case 3: esi = 0xdeadf00d; fallthrough;
-        case 4: edi = 0xdeadf00d; fallthrough;
-        case 5: ebp = 0xdeadf00d;
+        case 4: edi = 0xdeadf00d;
         }
 #endif
 
         curr->hcall_compat = true;
-        regs->rax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi,
-                                                    ebp);
+        regs->rax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi);
         curr->hcall_compat = false;
 
 #ifndef NDEBUG
@@ -312,7 +305,6 @@ int hvm_hypercall(struct cpu_user_regs *regs)
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].compat )
             {
-            case 6: regs->rbp = 0xdeadf00d; fallthrough;
             case 5: regs->rdi = 0xdeadf00d; fallthrough;
             case 4: regs->rsi = 0xdeadf00d; fallthrough;
             case 3: regs->rdx = 0xdeadf00d; fallthrough;
@@ -349,7 +341,7 @@ enum mc_disposition hvm_do_multicall_call(struct mc_state *state)
             func = array_access_nospec(hvm_hypercall_table, call->op).native;
         if ( func )
             call->result = func(call->args[0], call->args[1], call->args[2],
-                                call->args[3], call->args[4], call->args[5]);
+                                call->args[3], call->args[4]);
         else
             call->result = -ENOSYS;
     }
@@ -361,7 +353,7 @@ enum mc_disposition hvm_do_multicall_call(struct mc_state *state)
             func = array_access_nospec(hvm_hypercall_table, call->op).compat;
         if ( func )
             call->result = func(call->args[0], call->args[1], call->args[2],
-                                call->args[3], call->args[4], call->args[5]);
+                                call->args[3], call->args[4]);
         else
             call->result = -ENOSYS;
     }

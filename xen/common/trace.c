@@ -822,7 +822,7 @@ void __trace_hypercall(uint32_t event, unsigned long op,
 {
     struct {
         uint32_t op;
-        uint32_t args[6];
+        uint32_t args[5];
     } d;
     uint32_t *a = d.args;
 

@@ -13,7 +13,7 @@
 
 typedef unsigned long hypercall_fn_t(
     unsigned long, unsigned long, unsigned long,
-    unsigned long, unsigned long, unsigned long);
+    unsigned long, unsigned long);
 
 typedef struct {
     hypercall_fn_t *native;

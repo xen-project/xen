@@ -145,7 +145,6 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         unsigned long rdx = regs->rdx;
         unsigned long r10 = regs->r10;
         unsigned long r8 = regs->r8;
-        unsigned long r9 = regs->r9;
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
@@ -155,18 +154,17 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         case 1: rsi = 0xdeadbeefdeadf00dUL; fallthrough;
         case 2: rdx = 0xdeadbeefdeadf00dUL; fallthrough;
         case 3: r10 = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 4: r8 = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 5: r9 = 0xdeadbeefdeadf00dUL;
+        case 4: r8 = 0xdeadbeefdeadf00dUL;
         }
 #endif
         if ( unlikely(tb_init_done) )
         {
-            unsigned long args[6] = { rdi, rsi, rdx, r10, r8, r9 };
+            unsigned long args[5] = { rdi, rsi, rdx, r10, r8 };
 
             __trace_hypercall(TRC_PV_HYPERCALL_V2, eax, args);
         }
 
-        regs->rax = pv_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8, r9);
+        regs->rax = pv_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8);
 
 #ifndef NDEBUG
         if ( !curr->hcall_preempted )
@@ -174,7 +172,6 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].native )
             {
-            case 6: regs->r9  = 0xdeadbeefdeadf00dUL; fallthrough;
             case 5: regs->r8  = 0xdeadbeefdeadf00dUL; fallthrough;
             case 4: regs->r10 = 0xdeadbeefdeadf00dUL; fallthrough;
             case 3: regs->rdx = 0xdeadbeefdeadf00dUL; fallthrough;
@@ -192,7 +189,6 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         unsigned int edx = regs->edx;
         unsigned int esi = regs->esi;
         unsigned int edi = regs->edi;
-        unsigned int ebp = regs->ebp;
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
@@ -202,20 +198,19 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         case 1: ecx = 0xdeadf00d; fallthrough;
         case 2: edx = 0xdeadf00d; fallthrough;
         case 3: esi = 0xdeadf00d; fallthrough;
-        case 4: edi = 0xdeadf00d; fallthrough;
-        case 5: ebp = 0xdeadf00d;
+        case 4: edi = 0xdeadf00d;
         }
 #endif
 
         if ( unlikely(tb_init_done) )
         {
-            unsigned long args[6] = { ebx, ecx, edx, esi, edi, ebp };
+            unsigned long args[5] = { ebx, ecx, edx, esi, edi };
 
             __trace_hypercall(TRC_PV_HYPERCALL_V2, eax, args);
         }
 
         curr->hcall_compat = true;
-        regs->eax = pv_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi, ebp);
+        regs->eax = pv_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi);
         curr->hcall_compat = false;
 
 #ifndef NDEBUG
@@ -224,7 +219,6 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].compat )
             {
-            case 6: regs->ebp = 0xdeadf00d; fallthrough;
             case 5: regs->edi = 0xdeadf00d; fallthrough;
             case 4: regs->esi = 0xdeadf00d; fallthrough;
             case 3: regs->edx = 0xdeadf00d; fallthrough;
@@ -262,7 +256,7 @@ enum mc_disposition pv_do_multicall_call(struct mc_state *state)
              pv_hypercall_table[op].compat )
             call->result = pv_hypercall_table[op].compat(
                 call->args[0], call->args[1], call->args[2],
-                call->args[3], call->args[4], call->args[5]);
+                call->args[3], call->args[4]);
         else
             call->result = -ENOSYS;
     }
@@ -276,7 +270,7 @@ enum mc_disposition pv_do_multicall_call(struct mc_state *state)
              pv_hypercall_table[op].native )
             call->result = pv_hypercall_table[op].native(
                 call->args[0], call->args[1], call->args[2],
-                call->args[3], call->args[4], call->args[5]);
+                call->args[3], call->args[4]);
         else
             call->result = -ENOSYS;
     }
