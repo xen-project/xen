@@ -464,6 +464,124 @@ static void __init move_memory(
     }
 }
 
+static void __init noinline move_xen(void)
+{
+    l4_pgentry_t *pl4e;
+    l3_pgentry_t *pl3e;
+    l2_pgentry_t *pl2e;
+    unsigned long tmp;
+    unsigned int i, j, k;
+
+    /*
+     * The caller has selected xen_phys_start, ensuring that the old and new
+     * locations do not overlap, and mapped the new location into the
+     * directmap.
+     *
+     * Prevent the compiler from reordering anything across this point.  Such
+     * things will end badly.
+     */
+    barrier();
+
+    /*
+     * Copy out of the current alias, into the directmap at the new location.
+     * This includes a snapshot of the current stack.
+     */
+    memcpy(__va(__pa(_start)), _start, _end - _start);
+
+    /*
+     * We are now in a critical region.  Any write modifying global state
+     * inside the main Xen image via the current alias will get lost when we
+     * switch to the new pagetables.
+     *
+     * This puts printk()'s in a weird position.  Xen's record of the printk()
+     * will get lost (e.g. from the console ring), but messages which properly
+     * escape the system (e.g. through the UART) may be of some use for
+     * debugging purposes.
+     *
+     * Walk the soon-to-be-used pagetables in the new location, relocating all
+     * intermediate (non-leaf) entries to point to their new-location
+     * equivalents.  All writes are via the directmap alias.
+     */
+    pl4e = __va(__pa(idle_pg_table));
+    for ( i = 0 ; i < L4_PAGETABLE_ENTRIES; i++, pl4e++ )
+    {
+        if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
+            continue;
+
+        *pl4e = l4e_from_intpte(l4e_get_intpte(*pl4e) + xen_phys_start);
+        pl3e = __va(l4e_get_paddr(*pl4e));
+        for ( j = 0; j < L3_PAGETABLE_ENTRIES; j++, pl3e++ )
+        {
+            if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) ||
+                 (l3e_get_flags(*pl3e) & _PAGE_PSE) )
+                continue;
+
+            *pl3e = l3e_from_intpte(l3e_get_intpte(*pl3e) + xen_phys_start);
+            pl2e = __va(l3e_get_paddr(*pl3e));
+            for ( k = 0; k < L2_PAGETABLE_ENTRIES; k++, pl2e++ )
+            {
+                if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
+                     (l2e_get_flags(*pl2e) & _PAGE_PSE) )
+                    continue;
+
+                *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) + xen_phys_start);
+            }
+        }
+    }
+
+    /*
+     * Walk the soon-to-be-used l2_xenmap[], relocating all the leaf superpage
+     * mappings so text/data/bss etc refer to the new location in memory.
+     * Non-leaf mappings, e.g. fixmap_x, were relocated above.
+     */
+    pl2e = __va(__pa(l2_xenmap));
+    for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
+    {
+        if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
+             !(l2e_get_flags(*pl2e) & _PAGE_PSE) )
+            continue;
+
+        *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) + xen_phys_start);
+    }
+
+    asm volatile (
+        /*
+         * Resync the local stack frame.  The compiler expects any spilled
+         * expression to retain its value.  This is usually only a few words.
+         */
+        "mov    %%rsp, %%rsi\n\t"       /* SRC = %rsp */
+        "mov    %%esp, %k[tmp]\n\t"
+        "and    %[mask], %k[tmp]\n\t"
+        "add    %[tmp], %%rdi\n\t"      /* DST = cpu0_stack + (%rsp & 0x7fff) */
+        "sub    %%esp, %%ecx\n\t"       /* NR  = frame - %rsp */
+        "rep movsb\n\t"
+
+        /*
+         * Switch to the relocated pagetables, shooting down global mappings.
+         */
+        "mov    %%cr4, %[tmp]\n\t"
+        "andb   $~%c[pge], %b[tmp]\n\t"
+        "mov    %[tmp], %%cr4\n\t"     /* CR4.PGE = 0 */
+        "mov    %[cr3], %%cr3\n\t"     /* CR3 = new pagetables */
+        "orb    %[pge], %b[tmp]\n\t"
+        "mov    %[tmp], %%cr4\n\t"     /* CR4.PGE = 1 */
+        : [tmp]     "=&a" (tmp), /* Could be "r", but "a" makes better asm */
+          [dst]     "=&D" (tmp),
+          [frame]   "=&c" (tmp),
+                    "=&S" (tmp)
+        : [cr3]     "r"   (__pa(idle_pg_table)),
+          [pge]     "i"   (X86_CR4_PGE),
+          [mask]    "i"   (STACK_SIZE - 1),
+          "[dst]"         (__va(__pa(cpu0_stack))),
+          "[frame]"       (__builtin_frame_address(0))
+        : "memory" );
+
+    /*
+     * End of the critical region.  Updates to globals now work as expected.
+     */
+    printk("New Xen image base address: %#lx\n", xen_phys_start);
+}
+
 #undef BOOTSTRAP_MAP_LIMIT
 
 static uint64_t __init consider_modules(
@@ -1292,81 +1410,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
          */
         if ( (end > s) && (end - reloc_size + XEN_IMG_OFFSET >= __pa(_end)) )
         {
-            l4_pgentry_t *pl4e;
-            l3_pgentry_t *pl3e;
-            l2_pgentry_t *pl2e;
-            int i, j, k;
-
             /* Select relocation address. */
             xen_phys_start = end - reloc_size;
             e = xen_phys_start + XEN_IMG_OFFSET;
             bootsym(trampoline_xen_phys_start) = xen_phys_start;
 
-            /*
-             * Perform relocation to new physical address.
-             * Before doing so we must sync static/global data with main memory
-             * with a barrier(). After this we must *not* modify static/global
-             * data until after we have switched to the relocated pagetables!
-             */
-            barrier();
-            memcpy(__va(__pa(_start)), _start, _end - _start);
-
-            /* Walk idle_pg_table, relocating non-leaf entries. */
-            pl4e = __va(__pa(idle_pg_table));
-            for ( i = 0 ; i < L4_PAGETABLE_ENTRIES; i++, pl4e++ )
-            {
-                if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
-                    continue;
-                *pl4e = l4e_from_intpte(l4e_get_intpte(*pl4e) +
-                                        xen_phys_start);
-                pl3e = __va(l4e_get_paddr(*pl4e));
-                for ( j = 0; j < L3_PAGETABLE_ENTRIES; j++, pl3e++ )
-                {
-                    /* Not present, 1GB mapping, or already relocated? */
-                    if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) ||
-                         (l3e_get_flags(*pl3e) & _PAGE_PSE) )
-                        continue;
-                    *pl3e = l3e_from_intpte(l3e_get_intpte(*pl3e) +
-                                            xen_phys_start);
-                    pl2e = __va(l3e_get_paddr(*pl3e));
-                    for ( k = 0; k < L2_PAGETABLE_ENTRIES; k++, pl2e++ )
-                    {
-                        /* Not present, PSE, or already relocated? */
-                        if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
-                             (l2e_get_flags(*pl2e) & _PAGE_PSE) )
-                            continue;
-                        *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) +
-                                                xen_phys_start);
-                    }
-                }
-            }
-
-            /* Walk l2_xenmap[], relocating 2M superpage leaves. */
-            pl2e = __va(__pa(l2_xenmap));
-            for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
-            {
-                if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
-                     !(l2e_get_flags(*pl2e) & _PAGE_PSE) )
-                    continue;
-
-                *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) + xen_phys_start);
-            }
-
-            /* Re-sync the stack and then switch to relocated pagetables. */
-            asm volatile (
-                "rep movsq        ; " /* re-sync the stack */
-                "movq %%cr4,%%rsi ; "
-                "andb $0x7f,%%sil ; "
-                "movq %%rsi,%%cr4 ; " /* CR4.PGE == 0 */
-                "movq %[pg],%%cr3 ; " /* CR3 == new pagetables */
-                "orb $0x80,%%sil  ; "
-                "movq %%rsi,%%cr4   " /* CR4.PGE == 1 */
-                : "=&S" (i), "=&D" (i), "=&c" (i) /* All outputs discarded. */
-                :  [pg] "r" (__pa(idle_pg_table)), "0" (cpu0_stack),
-                   "1" (__va(__pa(cpu0_stack))), "2" (STACK_SIZE / 8)
-                : "memory" );
-
-            printk("New Xen image base address: %#lx\n", xen_phys_start);
+            move_xen();
         }
 
         /* Is the region suitable for relocating the multiboot modules? */
