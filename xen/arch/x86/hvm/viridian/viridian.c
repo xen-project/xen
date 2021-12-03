@@ -621,10 +621,14 @@ static unsigned int hv_vpset_nr_banks(struct hv_vpset *vpset)
     return hweight64(vpset->valid_bank_mask);
 }
 
-static int hv_vpset_to_vpmask(const struct hv_vpset *set,
+static int hv_vpset_to_vpmask(const struct hv_vpset *in, paddr_t bank_gpa,
                               struct hypercall_vpmask *vpmask)
 {
 #define NR_VPS_PER_BANK (HV_VPSET_BANK_SIZE * 8)
+    union hypercall_vpset *vpset = &this_cpu(hypercall_vpset);
+    struct hv_vpset *set = &vpset->set;
+
+    *set = *in;
 
     switch ( set->format )
     {
@@ -636,6 +640,18 @@ static int hv_vpset_to_vpmask(const struct hv_vpset *set,
     {
         uint64_t bank_mask;
         unsigned int vp, bank = 0;
+        size_t size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
+
+        if ( offsetof(typeof(*vpset), set.bank_contents[0]) + size >
+             sizeof(*vpset) )
+        {
+            ASSERT_UNREACHABLE();
+            return -EINVAL;
+        }
+
+        if ( hvm_copy_from_guest_phys(&set->bank_contents, bank_gpa,
+                                      size) != HVMTRANS_okay )
+            return -EINVAL;
 
         vpmask_empty(vpmask);
         for ( vp = 0, bank_mask = set->valid_bank_mask;
@@ -760,31 +776,13 @@ static int hvcall_flush_ex(const union hypercall_input *input,
         vcpu_bitmap = NULL;
     else
     {
-        union hypercall_vpset *vpset = &this_cpu(hypercall_vpset);
-        struct hv_vpset *set = &vpset->set;
+        unsigned int bank_offset = offsetof(typeof(input_params),
+                                            set.bank_contents);
         int rc;
 
-        *set = input_params.set;
-        if ( set->format == HV_GENERIC_SET_SPARSE_4K )
-        {
-            unsigned long offset = offsetof(typeof(input_params),
-                                            set.bank_contents);
-            size_t size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
-
-            if ( offsetof(typeof(*vpset), set.bank_contents[0]) + size >
-                 sizeof(*vpset) )
-            {
-                ASSERT_UNREACHABLE();
-                return -EINVAL;
-            }
-
-            if ( hvm_copy_from_guest_phys(&set->bank_contents[0],
-                                          input_params_gpa + offset,
-                                          size) != HVMTRANS_okay)
-                return -EINVAL;
-        }
-
-        rc = hv_vpset_to_vpmask(set, vpmask);
+        rc = hv_vpset_to_vpmask(&input_params.set,
+                                input_params_gpa + bank_offset,
+                                vpmask);
         if ( rc )
             return rc;
 
@@ -883,8 +881,8 @@ static int hvcall_ipi_ex(const union hypercall_input *input,
         uint8_t reserved_zero[3];
         struct hv_vpset set;
     } input_params;
-    union hypercall_vpset *vpset = &this_cpu(hypercall_vpset);
-    struct hv_vpset *set = &vpset->set;
+    unsigned int bank_offset = offsetof(typeof(input_params),
+                                        set.bank_contents);
     int rc;
 
     /* These hypercalls should never use the fast-call convention. */
@@ -905,27 +903,8 @@ static int hvcall_ipi_ex(const union hypercall_input *input,
     if ( input_params.vector < 0x10 || input_params.vector > 0xff )
         return -EINVAL;
 
-    *set = input_params.set;
-    if ( set->format == HV_GENERIC_SET_SPARSE_4K )
-    {
-        unsigned long offset = offsetof(typeof(input_params),
-                                        set.bank_contents);
-        size_t size = sizeof(*set->bank_contents) * hv_vpset_nr_banks(set);
-
-        if ( offsetof(typeof(*vpset), set.bank_contents[0]) + size >
-             sizeof(*vpset) )
-        {
-            ASSERT_UNREACHABLE();
-            return -EINVAL;
-        }
-
-        if ( hvm_copy_from_guest_phys(&set->bank_contents,
-                                      input_params_gpa + offset,
-                                      size) != HVMTRANS_okay)
-            return -EINVAL;
-    }
-
-    rc = hv_vpset_to_vpmask(set, vpmask);
+    rc = hv_vpset_to_vpmask(&input_params.set, input_params_gpa + bank_offset,
+                            vpmask);
     if ( rc )
         return rc;
 
