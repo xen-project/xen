@@ -218,7 +218,8 @@ extern void alternative_branches(void);
 
 #define alternative_vcall0(func) ({             \
     ALT_CALL_NO_ARG1;                           \
-    ((void)alternative_callN(0, int, func));    \
+    (void)sizeof(func());                       \
+    (void)alternative_callN(0, int, func);      \
 })
 
 #define alternative_call0(func) ({              \
