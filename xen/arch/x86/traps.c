@@ -306,10 +306,6 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     unsigned long mask = STACK_SIZE;
     void *stack_page = NULL;
 
-    /* Avoid HVM as we don't know what the stack looks like. */
-    if ( is_hvm_vcpu(v) )
-        return;
-
     if ( is_pv_32bit_vcpu(v) )
     {
         compat_show_guest_stack(v, regs, debug_stack_lines);
@@ -618,13 +614,10 @@ static void show_trace(const struct cpu_user_regs *regs)
     printk("\n");
 }
 
-void show_stack(const struct cpu_user_regs *regs)
+static void show_stack(const struct cpu_user_regs *regs)
 {
     unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), *stack_bottom, addr;
     int i;
-
-    if ( guest_mode(regs) )
-        return show_guest_stack(current, regs);
 
     printk("Xen stack trace from "__OP"sp=%p:\n  ", stack);
 
@@ -694,8 +687,30 @@ void show_execution_state(const struct cpu_user_regs *regs)
     unsigned long flags = console_lock_recursive_irqsave();
 
     show_registers(regs);
-    show_code(regs);
-    show_stack(regs);
+
+    if ( guest_mode(regs) )
+    {
+        struct vcpu *curr = current;
+
+        if ( is_hvm_vcpu(curr) )
+        {
+            /*
+             * Stop interleaving prevention: The necessary P2M lookups
+             * involve locking, which has to occur with IRQs enabled.
+             */
+            console_unlock_recursive_irqrestore(flags);
+
+            show_hvm_stack(curr, regs);
+            return;
+        }
+
+        show_guest_stack(curr, regs);
+    }
+    else
+    {
+        show_code(regs);
+        show_stack(regs);
+    }
 
     console_unlock_recursive_irqrestore(flags);
 }

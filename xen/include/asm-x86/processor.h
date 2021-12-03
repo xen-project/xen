@@ -493,7 +493,6 @@ static always_inline void rep_nop(void)
 #define cpu_relax() rep_nop()
 
 void show_code(const struct cpu_user_regs *regs);
-void show_stack(const struct cpu_user_regs *regs);
 void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs);
 void show_registers(const struct cpu_user_regs *regs);
 void show_execution_state(const struct cpu_user_regs *regs);
