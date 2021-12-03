@@ -45,6 +45,8 @@ void disable_intremap(struct vtd_iommu *iommu);
 int iommu_alloc(struct acpi_drhd_unit *drhd);
 void iommu_free(struct acpi_drhd_unit *drhd);
 
+domid_t did_to_domain_id(const struct vtd_iommu *iommu, unsigned int did);
+
 int iommu_flush_iec_global(struct vtd_iommu *iommu);
 int iommu_flush_iec_index(struct vtd_iommu *iommu, u8 im, u16 iidx);
 void clear_fault_bits(struct vtd_iommu *iommu);

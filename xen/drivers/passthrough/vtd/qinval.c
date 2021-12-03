@@ -229,10 +229,7 @@ static int __must_check dev_invalidate_sync(struct vtd_iommu *iommu,
     rc = queue_invalidate_wait(iommu, 0, 1, 1, 1);
     if ( rc == -ETIMEDOUT )
     {
-        struct domain *d = NULL;
-
-        if ( test_bit(did, iommu->domid_bitmap) )
-            d = rcu_lock_domain_by_id(iommu->domid_map[did]);
+        struct domain *d = rcu_lock_domain_by_id(did_to_domain_id(iommu, did));
 
         /*
          * In case the domain has been freed or the IOMMU domid bitmap is

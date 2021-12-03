@@ -123,15 +123,16 @@ static int context_get_domain_id(const struct context_entry *context,
 
     if ( iommu && context )
     {
-        unsigned int nr_dom = cap_ndoms(iommu->cap);
         unsigned int dom_index = context_domain_id(*context);
 
-        if ( dom_index < nr_dom && iommu->domid_map )
-            domid = iommu->domid_map[dom_index];
-        else
+        domid = did_to_domain_id(iommu, dom_index);
+        if ( domid == DOMID_INVALID )
+        {
             dprintk(XENLOG_DEBUG VTDPREFIX,
-                    "dom_index %u exceeds nr_dom %u or iommu has no domid_map\n",
-                    dom_index, nr_dom);
+                    "no domid for did %u (nr_dom %u)\n",
+                    dom_index, cap_ndoms(iommu->cap));
+            domid = -1;
+        }
     }
 
     return domid;
@@ -191,6 +192,14 @@ static void check_cleanup_domid_map(struct domain *d,
         clear_bit(iommu->index, dom_iommu(d)->arch.vtd.iommu_bitmap);
         cleanup_domid_map(d, iommu);
     }
+}
+
+domid_t did_to_domain_id(const struct vtd_iommu *iommu, unsigned int did)
+{
+    if ( did >= cap_ndoms(iommu->cap) || !test_bit(did, iommu->domid_bitmap) )
+        return DOMID_INVALID;
+
+    return iommu->domid_map[did];
 }
 
 static void sync_cache(const void *addr, unsigned int size)
