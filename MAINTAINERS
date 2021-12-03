@@ -221,7 +221,6 @@ F:	xen/include/xen/argo.h
 F:	xen/common/argo.c
 
 ARINC653 SCHEDULER
-M:	Josh Whitehead <josh.whitehead@dornerworks.com>
 M:	Stewart Hildebrand <stewart.hildebrand@dornerworks.com>
 S:	Supported
 L:	xen-devel@dornerworks.com
