@@ -17,12 +17,12 @@
  *
  * Author: Haitao Shan <haitao.shan@intel.com>
  */
-#include <xen/sched.h>
-#include <xen/xenoprof.h>
+#include <xen/cpu.h>
+#include <xen/err.h>
+#include <xen/param.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
-#include <xen/cpu.h>
-#include <xen/param.h>
+#include <xen/sched.h>
 #include <asm/regs.h>
 #include <asm/types.h>
 #include <asm/msr.h>
@@ -49,6 +49,7 @@ CHECK_pmu_params;
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
 unsigned int __read_mostly vpmu_features = 0;
+static struct arch_vpmu_ops __read_mostly vpmu_ops;
 
 static DEFINE_SPINLOCK(vpmu_lock);
 static unsigned vpmu_count;
@@ -120,7 +121,6 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
 {
     struct vcpu *curr = current;
     struct vpmu_struct *vpmu;
-    const struct arch_vpmu_ops *ops;
     int ret = 0;
 
     /*
@@ -133,14 +133,13 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
          goto nop;
 
     vpmu = vcpu_vpmu(curr);
-    ops = vpmu->arch_vpmu_ops;
-    if ( !ops )
+    if ( !vpmu_is_set(vpmu, VPMU_INITIALIZED) )
         goto nop;
 
-    if ( is_write && ops->do_wrmsr )
-        ret = ops->do_wrmsr(msr, *msr_content, supported);
-    else if ( !is_write && ops->do_rdmsr )
-        ret = ops->do_rdmsr(msr, msr_content);
+    if ( is_write && vpmu_ops.do_wrmsr )
+        ret = alternative_call(vpmu_ops.do_wrmsr, msr, *msr_content, supported);
+    else if ( !is_write && vpmu_ops.do_rdmsr )
+        ret = alternative_call(vpmu_ops.do_rdmsr, msr, msr_content);
     else
         goto nop;
 
@@ -153,7 +152,7 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
         vpmu_is_set(vpmu, VPMU_CACHED) )
     {
         vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
-        ops->arch_vpmu_save(curr, 0);
+        alternative_vcall(vpmu_ops.arch_vpmu_save, curr, 0);
         vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
     }
 
@@ -202,7 +201,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         sampling = sampled;
 
     vpmu = vcpu_vpmu(sampling);
-    if ( !vpmu->arch_vpmu_ops )
+    if ( !vpmu_is_set(vpmu, VPMU_INITIALIZED) )
         return;
 
     /* PV(H) guest */
@@ -220,7 +219,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
 
         /* PV guest will be reading PMU MSRs from xenpmu_data */
         vpmu_set(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
-        vpmu->arch_vpmu_ops->arch_vpmu_save(sampling, 1);
+        alternative_vcall(vpmu_ops.arch_vpmu_save, sampling, 1);
         vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
 
         if ( is_hvm_vcpu(sampled) )
@@ -321,7 +320,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
     /* We don't support (yet) HVM dom0 */
     ASSERT(sampling == sampled);
 
-    if ( !vpmu->arch_vpmu_ops->do_interrupt(regs) ||
+    if ( !alternative_call(vpmu_ops.do_interrupt, regs) ||
          !is_vlapic_lvtpc_enabled(vlapic) )
         return;
 
@@ -349,8 +348,7 @@ static void vpmu_save_force(void *arg)
 
     vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
 
-    if ( vpmu->arch_vpmu_ops )
-        (void)vpmu->arch_vpmu_ops->arch_vpmu_save(v, 0);
+    alternative_vcall(vpmu_ops.arch_vpmu_save, v, 0);
 
     vpmu_reset(vpmu, VPMU_CONTEXT_SAVE);
 
@@ -368,9 +366,8 @@ void vpmu_save(struct vcpu *v)
     vpmu->last_pcpu = pcpu;
     per_cpu(last_vcpu, pcpu) = v;
 
-    if ( vpmu->arch_vpmu_ops )
-        if ( vpmu->arch_vpmu_ops->arch_vpmu_save(v, 0) )
-            vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
+    if ( alternative_call(vpmu_ops.arch_vpmu_save, v, 0) )
+        vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
 
     apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
 }
@@ -426,13 +423,13 @@ int vpmu_load(struct vcpu *v, bool_t from_guest)
          vpmu_is_set(vpmu, VPMU_CACHED)) )
         return 0;
 
-    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_load )
+    if ( vpmu_ops.arch_vpmu_load )
     {
         int ret;
 
         apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
         /* Arch code needs to set VPMU_CONTEXT_LOADED */
-        ret = vpmu->arch_vpmu_ops->arch_vpmu_load(v, from_guest);
+        ret = alternative_call(vpmu_ops.arch_vpmu_load, v, from_guest);
         if ( ret )
         {
             apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc | APIC_LVT_MASKED);
@@ -572,7 +569,7 @@ static void vpmu_arch_destroy(struct vcpu *v)
         on_selected_cpus(cpumask_of(vpmu->last_pcpu),
                          vpmu_clear_last, v, 1);
 
-    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_destroy )
+    if ( vpmu_ops.arch_vpmu_destroy )
     {
         /*
          * Unload VPMU first if VPMU_CONTEXT_LOADED being set.
@@ -582,7 +579,7 @@ static void vpmu_arch_destroy(struct vcpu *v)
             on_selected_cpus(cpumask_of(vcpu_vpmu(v)->last_pcpu),
                              vpmu_save_force, v, 1);
 
-         vpmu->arch_vpmu_ops->arch_vpmu_destroy(v);
+         alternative_vcall(vpmu_ops.arch_vpmu_destroy, v);
     }
 
     vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);
@@ -689,10 +686,9 @@ static void pvpmu_finish(struct domain *d, xen_pmu_params_t *params)
 /* Dump some vpmu information to console. Used in keyhandler dump_domains(). */
 void vpmu_dump(struct vcpu *v)
 {
-    struct vpmu_struct *vpmu = vcpu_vpmu(v);
-
-    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_dump )
-        vpmu->arch_vpmu_ops->arch_vpmu_dump(v);
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_INITIALIZED) &&
+         vpmu_ops.arch_vpmu_dump )
+        alternative_vcall(vpmu_ops.arch_vpmu_dump, v);
 }
 
 long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
@@ -870,6 +866,7 @@ static struct notifier_block cpu_nfb = {
 static int __init vpmu_init(void)
 {
     int vendor = current_cpu_data.x86_vendor;
+    const struct arch_vpmu_ops *ops = NULL;
 
     if ( !opt_vpmu_enabled )
         return 0;
@@ -886,36 +883,36 @@ static int __init vpmu_init(void)
     switch ( vendor )
     {
     case X86_VENDOR_AMD:
-        if ( amd_vpmu_init() )
-           vpmu_mode = XENPMU_MODE_OFF;
+        ops = amd_vpmu_init();
         break;
 
     case X86_VENDOR_HYGON:
-        if ( hygon_vpmu_init() )
-           vpmu_mode = XENPMU_MODE_OFF;
+        ops = hygon_vpmu_init();
         break;
 
     case X86_VENDOR_INTEL:
-        if ( core2_vpmu_init() )
-           vpmu_mode = XENPMU_MODE_OFF;
+        ops = core2_vpmu_init();
         break;
 
     default:
         printk(XENLOG_WARNING "VPMU: Unknown CPU vendor: %d. "
                "Turning VPMU off.\n", vendor);
-        vpmu_mode = XENPMU_MODE_OFF;
         break;
     }
 
-    if ( vpmu_mode != XENPMU_MODE_OFF )
+    if ( !IS_ERR_OR_NULL(ops) )
     {
+        vpmu_ops = *ops;
         register_cpu_notifier(&cpu_nfb);
         printk(XENLOG_INFO "VPMU: version " __stringify(XENPMU_VER_MAJ) "."
                __stringify(XENPMU_VER_MIN) "\n");
     }
     else
+    {
+        vpmu_mode = XENPMU_MODE_OFF;
         opt_vpmu_enabled = 0;
+    }
 
     return 0;
 }
-__initcall(vpmu_init);
+presmp_initcall(vpmu_init);

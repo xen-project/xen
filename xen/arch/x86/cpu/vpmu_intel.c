@@ -18,9 +18,9 @@
  * Author: Haitao Shan <haitao.shan@intel.com>
  */
 
+#include <xen/err.h>
 #include <xen/sched.h>
 #include <xen/xenoprof.h>
-#include <xen/irq.h>
 #include <asm/system.h>
 #include <asm/regs.h>
 #include <asm/types.h>
@@ -819,7 +819,7 @@ static void core2_vpmu_destroy(struct vcpu *v)
     vpmu_clear(vpmu);
 }
 
-static const struct arch_vpmu_ops core2_vpmu_ops = {
+static const struct arch_vpmu_ops __initconstrel core2_vpmu_ops = {
     .do_wrmsr = core2_vpmu_do_wrmsr,
     .do_rdmsr = core2_vpmu_do_rdmsr,
     .do_interrupt = core2_vpmu_do_interrupt,
@@ -893,12 +893,12 @@ int vmx_vpmu_initialise(struct vcpu *v)
     if ( is_pv_vcpu(v) && !core2_vpmu_alloc_resource(v) )
         return -EIO;
 
-    vpmu->arch_vpmu_ops = &core2_vpmu_ops;
+    vpmu_set(vpmu, VPMU_INITIALIZED);
 
     return 0;
 }
 
-int __init core2_vpmu_init(void)
+const struct arch_vpmu_ops *__init core2_vpmu_init(void)
 {
     unsigned int version = 0;
     unsigned int i;
@@ -921,13 +921,13 @@ int __init core2_vpmu_init(void)
     default:
         printk(XENLOG_WARNING "VPMU: PMU version %u is not supported\n",
                version);
-        return -EINVAL;
+        return ERR_PTR(-EINVAL);
     }
 
     if ( current_cpu_data.x86 != 6 )
     {
         printk(XENLOG_WARNING "VPMU: only family 6 is supported\n");
-        return -EINVAL;
+        return ERR_PTR(-EINVAL);
     }
 
     arch_pmc_cnt = core2_get_arch_pmc_count();
@@ -972,9 +972,9 @@ int __init core2_vpmu_init(void)
         printk(XENLOG_WARNING
                "VPMU: Register bank does not fit into VPMU share page\n");
         arch_pmc_cnt = fixed_pmc_cnt = 0;
-        return -ENOSPC;
+        return ERR_PTR(-ENOSPC);
     }
 
-    return 0;
+    return &core2_vpmu_ops;
 }
 

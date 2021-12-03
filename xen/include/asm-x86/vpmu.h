@@ -49,10 +49,10 @@ struct arch_vpmu_ops {
     void (*arch_vpmu_dump)(const struct vcpu *);
 };
 
-int core2_vpmu_init(void);
+const struct arch_vpmu_ops *core2_vpmu_init(void);
 int vmx_vpmu_initialise(struct vcpu *);
-int amd_vpmu_init(void);
-int hygon_vpmu_init(void);
+const struct arch_vpmu_ops *amd_vpmu_init(void);
+const struct arch_vpmu_ops *hygon_vpmu_init(void);
 int svm_vpmu_initialise(struct vcpu *);
 
 struct vpmu_struct {
@@ -61,25 +61,25 @@ struct vpmu_struct {
     u32 hw_lapic_lvtpc;
     void *context;      /* May be shared with PV guest */
     void *priv_context; /* hypervisor-only */
-    const struct arch_vpmu_ops *arch_vpmu_ops;
     struct xen_pmu_data *xenpmu_data;
     spinlock_t vpmu_lock;
 };
 
 /* VPMU states */
-#define VPMU_CONTEXT_ALLOCATED              0x1
-#define VPMU_CONTEXT_LOADED                 0x2
-#define VPMU_RUNNING                        0x4
-#define VPMU_CONTEXT_SAVE                   0x8   /* Force context save */
-#define VPMU_FROZEN                         0x10  /* Stop counters while VCPU is not running */
-#define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x20
+#define VPMU_INITIALIZED                    0x0001
+#define VPMU_CONTEXT_ALLOCATED              0x0002
+#define VPMU_CONTEXT_LOADED                 0x0004
+#define VPMU_RUNNING                        0x0008
+#define VPMU_CONTEXT_SAVE                   0x0010  /* Force context save */
+#define VPMU_FROZEN                         0x0020  /* Stop counters while VCPU is not running */
+#define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x0040
 /* PV(H) guests: VPMU registers are accessed by guest from shared page */
-#define VPMU_CACHED                         0x40
-#define VPMU_AVAILABLE                      0x80
+#define VPMU_CACHED                         0x0080
+#define VPMU_AVAILABLE                      0x0100
 
 /* Intel-specific VPMU features */
-#define VPMU_CPU_HAS_DS                     0x100 /* Has Debug Store */
-#define VPMU_CPU_HAS_BTS                    0x200 /* Has Branch Trace Store */
+#define VPMU_CPU_HAS_DS                     0x1000 /* Has Debug Store */
+#define VPMU_CPU_HAS_BTS                    0x2000 /* Has Branch Trace Store */
 
 static inline void vpmu_set(struct vpmu_struct *vpmu, const u32 mask)
 {

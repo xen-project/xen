@@ -21,9 +21,9 @@
  *
  */
 
-#include <xen/xenoprof.h>
+#include <xen/err.h>
 #include <xen/sched.h>
-#include <xen/irq.h>
+#include <xen/xenoprof.h>
 #include <asm/apic.h>
 #include <asm/vpmu.h>
 #include <asm/hvm/save.h>
@@ -483,7 +483,7 @@ static void amd_vpmu_dump(const struct vcpu *v)
     }
 }
 
-static const struct arch_vpmu_ops amd_vpmu_ops = {
+static const struct arch_vpmu_ops __initconstrel amd_vpmu_ops = {
     .do_wrmsr = amd_vpmu_do_wrmsr,
     .do_rdmsr = amd_vpmu_do_rdmsr,
     .do_interrupt = amd_vpmu_do_interrupt,
@@ -529,13 +529,12 @@ int svm_vpmu_initialise(struct vcpu *v)
                offsetof(struct xen_pmu_amd_ctxt, regs));
     }
 
-    vpmu->arch_vpmu_ops = &amd_vpmu_ops;
+    vpmu_set(vpmu, VPMU_INITIALIZED | VPMU_CONTEXT_ALLOCATED);
 
-    vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
     return 0;
 }
 
-static int __init common_init(void)
+static const struct arch_vpmu_ops *__init common_init(void)
 {
     unsigned int i;
 
@@ -543,7 +542,7 @@ static int __init common_init(void)
     {
         printk(XENLOG_WARNING "VPMU: Unsupported CPU family %#x\n",
                current_cpu_data.x86);
-        return -EINVAL;
+        return ERR_PTR(-EINVAL);
     }
 
     if ( sizeof(struct xen_pmu_data) +
@@ -553,7 +552,7 @@ static int __init common_init(void)
                "VPMU: Register bank does not fit into VPMU shared page\n");
         counters = ctrls = NULL;
         num_counters = 0;
-        return -ENOSPC;
+        return ERR_PTR(-ENOSPC);
     }
 
     for ( i = 0; i < num_counters; i++ )
@@ -562,10 +561,10 @@ static int __init common_init(void)
         ctrl_rsvd[i] &= CTRL_RSVD_MASK;
     }
 
-    return 0;
+    return &amd_vpmu_ops;
 }
 
-int __init amd_vpmu_init(void)
+const struct arch_vpmu_ops *__init amd_vpmu_init(void)
 {
     switch ( current_cpu_data.x86 )
     {
@@ -592,7 +591,7 @@ int __init amd_vpmu_init(void)
     return common_init();
 }
 
-int __init hygon_vpmu_init(void)
+const struct arch_vpmu_ops *__init hygon_vpmu_init(void)
 {
     switch ( current_cpu_data.x86 )
     {
