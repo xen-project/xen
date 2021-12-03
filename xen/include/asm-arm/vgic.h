@@ -195,7 +195,7 @@ struct vgic_cpu {
      * corresponding LR it is also removed from this list. */
     struct list_head inflight_irqs;
     /* lr_pending is used to queue IRQs (struct pending_irq) that the
-     * vgic tried to inject in the guest (calling gic_set_guest_irq) but
+     * vgic tried to inject in the guest (calling gic_raise_guest_irq) but
      * no LRs were available at the time.
      * As soon as an LR is freed we remove the first IRQ from this
      * list and write it to the LR register.
