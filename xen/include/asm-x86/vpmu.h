@@ -39,6 +39,7 @@
 
 /* Arch specific operations shared by all vpmus */
 struct arch_vpmu_ops {
+    int (*initialise)(struct vcpu *v);
     int (*do_wrmsr)(unsigned int msr, uint64_t msr_content,
                     uint64_t supported);
     int (*do_rdmsr)(unsigned int msr, uint64_t *msr_content);
@@ -50,10 +51,8 @@ struct arch_vpmu_ops {
 };
 
 const struct arch_vpmu_ops *core2_vpmu_init(void);
-int vmx_vpmu_initialise(struct vcpu *);
 const struct arch_vpmu_ops *amd_vpmu_init(void);
 const struct arch_vpmu_ops *hygon_vpmu_init(void);
-int svm_vpmu_initialise(struct vcpu *);
 
 struct vpmu_struct {
     u32 flags;

@@ -455,21 +455,11 @@ static int vpmu_arch_initialise(struct vcpu *v)
 
     ASSERT(!(vpmu->flags & ~VPMU_AVAILABLE) && !vpmu->context);
 
-    if ( !vpmu_available(v) )
+    if ( !vpmu_available(v) || vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
-    switch ( vendor )
+    if ( !vpmu_ops.initialise )
     {
-    case X86_VENDOR_AMD:
-    case X86_VENDOR_HYGON:
-        ret = svm_vpmu_initialise(v);
-        break;
-
-    case X86_VENDOR_INTEL:
-        ret = vmx_vpmu_initialise(v);
-        break;
-
-    default:
         if ( vpmu_mode != XENPMU_MODE_OFF )
         {
             printk(XENLOG_G_WARNING "VPMU: Unknown CPU vendor %d. "
@@ -480,12 +470,17 @@ static int vpmu_arch_initialise(struct vcpu *v)
         return -EINVAL;
     }
 
-    vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | APIC_LVT_MASKED;
-
+    ret = alternative_call(vpmu_ops.initialise, v);
     if ( ret )
+    {
         printk(XENLOG_G_WARNING "VPMU: Initialization failed for %pv\n", v);
+        return ret;
+    }
 
-    return ret;
+    vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | APIC_LVT_MASKED;
+    vpmu_set(vpmu, VPMU_INITIALIZED);
+
+    return 0;
 }
 
 static void get_vpmu(struct vcpu *v)

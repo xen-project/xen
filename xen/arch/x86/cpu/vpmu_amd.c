@@ -483,23 +483,10 @@ static void amd_vpmu_dump(const struct vcpu *v)
     }
 }
 
-static const struct arch_vpmu_ops __initconstrel amd_vpmu_ops = {
-    .do_wrmsr = amd_vpmu_do_wrmsr,
-    .do_rdmsr = amd_vpmu_do_rdmsr,
-    .do_interrupt = amd_vpmu_do_interrupt,
-    .arch_vpmu_destroy = amd_vpmu_destroy,
-    .arch_vpmu_save = amd_vpmu_save,
-    .arch_vpmu_load = amd_vpmu_load,
-    .arch_vpmu_dump = amd_vpmu_dump
-};
-
-int svm_vpmu_initialise(struct vcpu *v)
+static int svm_vpmu_initialise(struct vcpu *v)
 {
     struct xen_pmu_amd_ctxt *ctxt;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-
-    if ( vpmu_mode == XENPMU_MODE_OFF )
-        return 0;
 
     if ( !counters )
         return -EINVAL;
@@ -529,10 +516,21 @@ int svm_vpmu_initialise(struct vcpu *v)
                offsetof(struct xen_pmu_amd_ctxt, regs));
     }
 
-    vpmu_set(vpmu, VPMU_INITIALIZED | VPMU_CONTEXT_ALLOCATED);
+    vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
 
     return 0;
 }
+
+static const struct arch_vpmu_ops __initconstrel amd_vpmu_ops = {
+    .initialise = svm_vpmu_initialise,
+    .do_wrmsr = amd_vpmu_do_wrmsr,
+    .do_rdmsr = amd_vpmu_do_rdmsr,
+    .do_interrupt = amd_vpmu_do_interrupt,
+    .arch_vpmu_destroy = amd_vpmu_destroy,
+    .arch_vpmu_save = amd_vpmu_save,
+    .arch_vpmu_load = amd_vpmu_load,
+    .arch_vpmu_dump = amd_vpmu_dump,
+};
 
 static const struct arch_vpmu_ops *__init common_init(void)
 {

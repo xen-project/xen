@@ -819,24 +819,11 @@ static void core2_vpmu_destroy(struct vcpu *v)
     vpmu_clear(vpmu);
 }
 
-static const struct arch_vpmu_ops __initconstrel core2_vpmu_ops = {
-    .do_wrmsr = core2_vpmu_do_wrmsr,
-    .do_rdmsr = core2_vpmu_do_rdmsr,
-    .do_interrupt = core2_vpmu_do_interrupt,
-    .arch_vpmu_destroy = core2_vpmu_destroy,
-    .arch_vpmu_save = core2_vpmu_save,
-    .arch_vpmu_load = core2_vpmu_load,
-    .arch_vpmu_dump = core2_vpmu_dump
-};
-
-int vmx_vpmu_initialise(struct vcpu *v)
+static int vmx_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     u64 msr_content;
     static bool_t ds_warned;
-
-    if ( vpmu_mode == XENPMU_MODE_OFF )
-        return 0;
 
     if ( v->domain->arch.cpuid->basic.pmu_version <= 1 ||
          v->domain->arch.cpuid->basic.pmu_version >= 6 )
@@ -893,10 +880,19 @@ int vmx_vpmu_initialise(struct vcpu *v)
     if ( is_pv_vcpu(v) && !core2_vpmu_alloc_resource(v) )
         return -EIO;
 
-    vpmu_set(vpmu, VPMU_INITIALIZED);
-
     return 0;
 }
+
+static const struct arch_vpmu_ops __initconstrel core2_vpmu_ops = {
+    .initialise = vmx_vpmu_initialise,
+    .do_wrmsr = core2_vpmu_do_wrmsr,
+    .do_rdmsr = core2_vpmu_do_rdmsr,
+    .do_interrupt = core2_vpmu_do_interrupt,
+    .arch_vpmu_destroy = core2_vpmu_destroy,
+    .arch_vpmu_save = core2_vpmu_save,
+    .arch_vpmu_load = core2_vpmu_load,
+    .arch_vpmu_dump = core2_vpmu_dump,
+};
 
 const struct arch_vpmu_ops *__init core2_vpmu_init(void)
 {
