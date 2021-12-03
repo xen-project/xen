@@ -93,7 +93,7 @@ struct grant_table {
     struct radix_tree_root maptrack_tree;
 
     /* Domain to which this struct grant_table belongs. */
-    const struct domain *domain;
+    struct domain *domain;
 
     struct grant_table_arch arch;
 };
@@ -1796,8 +1796,8 @@ gnttab_unpopulate_status_frames(struct domain *d, struct grant_table *gt)
         {
             int rc = gfn_eq(gfn, INVALID_GFN)
                      ? 0
-                     : guest_physmap_remove_page(d, gfn,
-                                                 page_to_mfn(pg), 0);
+                     : gnttab_set_frame_gfn(gt, true, i, INVALID_GFN,
+                                            page_to_mfn(pg));
 
             if ( rc )
             {
@@ -1807,7 +1807,6 @@ gnttab_unpopulate_status_frames(struct domain *d, struct grant_table *gt)
                 domain_crash(d);
                 return rc;
             }
-            gnttab_set_frame_gfn(gt, true, i, INVALID_GFN);
         }
 
         BUG_ON(page_get_owner(pg) != d);
@@ -4150,6 +4149,9 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
     struct grant_table *gt = d->grant_table;
     bool status = false;
 
+    if ( gfn_eq(gfn, INVALID_GFN) )
+        return -EINVAL;
+
     grant_write_lock(gt);
 
     if ( evaluate_nospec(gt->gt_version == 2) && (idx & XENMAPIDX_grant_table_status) )
@@ -4162,24 +4164,18 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
     else
         rc = gnttab_get_shared_frame_mfn(d, idx, mfn);
 
-    if ( !rc && paging_mode_translate(d) )
-    {
-        gfn_t gfn = gnttab_get_frame_gfn(gt, status, idx);
-
-        if ( !gfn_eq(gfn, INVALID_GFN) )
-            rc = guest_physmap_remove_page(d, gfn, *mfn, 0);
-    }
-
     if ( !rc )
     {
+        struct page_info *pg = mfn_to_page(*mfn);
+
         /*
          * Make sure gnttab_unpopulate_status_frames() won't (successfully)
          * free the page until our caller has completed its operation.
          */
-        if ( get_page(mfn_to_page(*mfn), d) )
-            gnttab_set_frame_gfn(gt, status, idx, gfn);
-        else
+        if ( !get_page(pg, d) )
             rc = -EBUSY;
+        else if ( (rc = gnttab_set_frame_gfn(gt, status, idx, gfn, *mfn)) )
+            put_page(pg);
     }
 
     grant_write_unlock(gt);

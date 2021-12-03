@@ -71,11 +71,17 @@ int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
         XFREE((gt)->arch.status_gfn);                                    \
     } while ( 0 )
 
-#define gnttab_set_frame_gfn(gt, st, idx, gfn)                           \
-    do {                                                                 \
-        ((st) ? (gt)->arch.status_gfn : (gt)->arch.shared_gfn)[idx] =    \
-            (gfn);                                                       \
-    } while ( 0 )
+#define gnttab_set_frame_gfn(gt, st, idx, gfn, mfn)                      \
+    ({                                                                   \
+        int rc_ = 0;                                                     \
+        gfn_t ogfn = gnttab_get_frame_gfn(gt, st, idx);                  \
+        if ( gfn_eq(ogfn, INVALID_GFN) || gfn_eq(ogfn, gfn) ||           \
+             (rc_ = guest_physmap_remove_page((gt)->domain, ogfn, mfn,   \
+                                              0)) == 0 )                 \
+            ((st) ? (gt)->arch.status_gfn                                \
+                  : (gt)->arch.shared_gfn)[idx] = (gfn);                 \
+        rc_;                                                             \
+    })
 
 #define gnttab_get_frame_gfn(gt, st, idx) ({                             \
    (st) ? gnttab_status_gfn(NULL, gt, idx)                               \
