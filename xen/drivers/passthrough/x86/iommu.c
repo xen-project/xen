@@ -43,14 +43,17 @@ bool __read_mostly iommu_intpost;
 
 void __init acpi_iommu_init(void)
 {
-    int ret;
+    int ret = -ENODEV;
 
     if ( !iommu_enable && !iommu_intremap )
         return;
 
-    ret = acpi_dmar_init();
-    if ( ret == -ENODEV )
-        ret = acpi_ivrs_init();
+    if ( !acpi_disabled )
+    {
+        ret = acpi_dmar_init();
+        if ( ret == -ENODEV )
+            ret = acpi_ivrs_init();
+    }
 
     if ( ret )
     {

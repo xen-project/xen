@@ -1664,14 +1664,29 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     dmi_scan_machine();
 
-    generic_apic_probe();
-
     mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
                                   RANGESETF_prettyprint_hex);
 
     xsm_multiboot_init(module_map, mbi);
 
+    /*
+     * IOMMU-related ACPI table parsing may require some of the system domains
+     * to be usable, e.g. for pci_hide_device()'s use of dom_xen.
+     */
     setup_system_domains();
+
+    /*
+     * IOMMU-related ACPI table parsing has to happen before APIC probing, for
+     * check_x2apic_preenabled() to be able to observe respective findings, in
+     * particular iommu_intremap having got turned off.
+     */
+    acpi_iommu_init();
+
+    /*
+     * APIC probing needs to happen before general ACPI table parsing, as e.g.
+     * generic_bigsmp_probe() may occur only afterwards.
+     */
+    generic_apic_probe();
 
     acpi_boot_init();
 
