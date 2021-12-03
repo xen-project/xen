@@ -427,6 +427,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         break;
     case LIBXL_DOMAIN_TYPE_PVH:
         libxl_defbool_setdefault(&b_info->u.pvh.pvshim, false);
+        if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->video_memkb = 0;
         if (libxl_defbool_val(b_info->u.pvh.pvshim)) {
             if (!b_info->u.pvh.pvshim_path)
                 b_info->u.pvh.pvshim_path =
