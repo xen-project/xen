@@ -49,7 +49,7 @@ CHECK_pmu_params;
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
 unsigned int __read_mostly vpmu_features = 0;
-static struct arch_vpmu_ops __read_mostly vpmu_ops;
+static struct arch_vpmu_ops __initdata vpmu_ops;
 
 static DEFINE_SPINLOCK(vpmu_lock);
 static unsigned vpmu_count;
@@ -136,12 +136,10 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
     if ( !vpmu_is_set(vpmu, VPMU_INITIALIZED) )
         goto nop;
 
-    if ( is_write && vpmu_ops.do_wrmsr )
+    if ( is_write )
         ret = alternative_call(vpmu_ops.do_wrmsr, msr, *msr_content, supported);
-    else if ( !is_write && vpmu_ops.do_rdmsr )
-        ret = alternative_call(vpmu_ops.do_rdmsr, msr, msr_content);
     else
-        goto nop;
+        ret = alternative_call(vpmu_ops.do_rdmsr, msr, msr_content);
 
     /*
      * We may have received a PMU interrupt while handling MSR access
@@ -375,7 +373,7 @@ void vpmu_save(struct vcpu *v)
 int vpmu_load(struct vcpu *v, bool_t from_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    int pcpu = smp_processor_id();
+    int pcpu = smp_processor_id(), ret;
     struct vcpu *prev = NULL;
 
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
@@ -423,21 +421,13 @@ int vpmu_load(struct vcpu *v, bool_t from_guest)
          vpmu_is_set(vpmu, VPMU_CACHED)) )
         return 0;
 
-    if ( vpmu_ops.arch_vpmu_load )
-    {
-        int ret;
+    apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
+    /* Arch code needs to set VPMU_CONTEXT_LOADED */
+    ret = alternative_call(vpmu_ops.arch_vpmu_load, v, from_guest);
+    if ( ret )
+        apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc | APIC_LVT_MASKED);
 
-        apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
-        /* Arch code needs to set VPMU_CONTEXT_LOADED */
-        ret = alternative_call(vpmu_ops.arch_vpmu_load, v, from_guest);
-        if ( ret )
-        {
-            apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc | APIC_LVT_MASKED);
-            return ret;
-        }
-    }
-
-    return 0;
+    return ret;
 }
 
 static int vpmu_arch_initialise(struct vcpu *v)
@@ -458,7 +448,7 @@ static int vpmu_arch_initialise(struct vcpu *v)
     if ( !vpmu_available(v) || vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
-    if ( !vpmu_ops.initialise )
+    if ( !opt_vpmu_enabled )
     {
         if ( vpmu_mode != XENPMU_MODE_OFF )
         {
@@ -564,18 +554,15 @@ static void vpmu_arch_destroy(struct vcpu *v)
         on_selected_cpus(cpumask_of(vpmu->last_pcpu),
                          vpmu_clear_last, v, 1);
 
-    if ( vpmu_ops.arch_vpmu_destroy )
-    {
-        /*
-         * Unload VPMU first if VPMU_CONTEXT_LOADED being set.
-         * This will stop counters.
-         */
-        if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
-            on_selected_cpus(cpumask_of(vcpu_vpmu(v)->last_pcpu),
-                             vpmu_save_force, v, 1);
+    /*
+     * Unload VPMU first if VPMU_CONTEXT_LOADED being set.
+     * This will stop counters.
+     */
+    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
+        on_selected_cpus(cpumask_of(vcpu_vpmu(v)->last_pcpu),
+                         vpmu_save_force, v, 1);
 
-         alternative_vcall(vpmu_ops.arch_vpmu_destroy, v);
-    }
+    alternative_vcall(vpmu_ops.arch_vpmu_destroy, v);
 
     vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);
 }
@@ -681,8 +668,7 @@ static void pvpmu_finish(struct domain *d, xen_pmu_params_t *params)
 /* Dump some vpmu information to console. Used in keyhandler dump_domains(). */
 void vpmu_dump(struct vcpu *v)
 {
-    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_INITIALIZED) &&
-         vpmu_ops.arch_vpmu_dump )
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_INITIALIZED) )
         alternative_vcall(vpmu_ops.arch_vpmu_dump, v);
 }
 
