@@ -344,7 +344,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
     {
         int rc;
 
-        if ( e.sa_p2mt == p2m_populate_on_demand )
+        if ( p2m_is_pod(e.sa_p2mt) )
             return GUEST_TABLE_POD_PAGE;
 
         if ( read_only )
@@ -1071,7 +1071,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     index = gfn_remainder >> (i * EPT_TABLE_ORDER);
     ept_entry = table + index;
 
-    if ( ept_entry->sa_p2mt == p2m_populate_on_demand )
+    if ( p2m_is_pod(ept_entry->sa_p2mt) )
     {
         if ( !(q & P2M_ALLOC) )
         {
@@ -1478,7 +1478,7 @@ static void ept_dump_p2m_table(unsigned char key)
             ept_entry = table + (gfn_remainder >> order);
             if ( ret != GUEST_TABLE_MAP_FAILED && is_epte_valid(ept_entry) )
             {
-                if ( ept_entry->sa_p2mt == p2m_populate_on_demand )
+                if ( p2m_is_pod(ept_entry->sa_p2mt) )
                     printk("gfn: %13lx order: %2d PoD\n", gfn, order);
                 else
                     printk("gfn: %13lx order: %2d mfn: %13lx %c%c%c %c%c%c\n",

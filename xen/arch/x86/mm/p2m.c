@@ -992,7 +992,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
             ASSERT(mfn_valid(omfn));
             set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
         }
-        else if ( ot == p2m_populate_on_demand )
+        else if ( p2m_is_pod(ot) )
         {
             /* Count how man PoD entries we'll be replacing if successful */
             pod_count++;

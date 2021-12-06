@@ -540,7 +540,7 @@ decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
 
         p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
-        if ( t == p2m_populate_on_demand )
+        if ( p2m_is_pod(t) )
             pod += n;
         else if ( p2m_is_ram(t) )
             ram += n;
@@ -615,7 +615,7 @@ decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
         if ( order < cur_order )
             cur_order = order;
         n = 1UL << cur_order;
-        if ( t == p2m_populate_on_demand )
+        if ( p2m_is_pod(t) )
         {
             /* This shouldn't be able to fail */
             if ( p2m_set_entry(p2m, gfn_add(gfn, i), INVALID_MFN, cur_order,
@@ -1329,7 +1329,7 @@ mark_populate_on_demand(struct domain *d, unsigned long gfn_l,
 
         p2m->get_entry(p2m, gfn_add(gfn, i), &ot, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
-        if ( ot == p2m_populate_on_demand )
+        if ( p2m_is_pod(ot) )
         {
             /* Count how many PoD entries we'll be replacing if successful */
             pod_count += n;

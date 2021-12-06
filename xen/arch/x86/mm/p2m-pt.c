@@ -841,7 +841,7 @@ pod_retry_l3:
         flags = l3e_get_flags(*l3e);
         if ( !(flags & _PAGE_PRESENT) )
         {
-            if ( p2m_flags_to_type(flags) == p2m_populate_on_demand )
+            if ( p2m_is_pod(p2m_flags_to_type(flags)) )
             {
                 if ( q & P2M_ALLOC )
                 {
@@ -884,7 +884,7 @@ pod_retry_l2:
     if ( !(flags & _PAGE_PRESENT) )
     {
         /* PoD: Try to populate a 2-meg chunk */
-        if ( p2m_flags_to_type(flags) == p2m_populate_on_demand )
+        if ( p2m_is_pod(p2m_flags_to_type(flags)) )
         {
             if ( q & P2M_ALLOC ) {
                 if ( p2m_pod_demand_populate(p2m, gfn_, PAGE_ORDER_2M) )
@@ -923,7 +923,7 @@ pod_retry_l1:
     if ( !(flags & _PAGE_PRESENT) && !p2m_is_paging(l1t) )
     {
         /* PoD: Try to populate */
-        if ( l1t == p2m_populate_on_demand )
+        if ( p2m_is_pod(l1t) )
         {
             if ( q & P2M_ALLOC ) {
                 if ( p2m_pod_demand_populate(p2m, gfn_, PAGE_ORDER_4K) )
@@ -1094,8 +1094,7 @@ static long p2m_pt_audit_p2m(struct p2m_domain *p2m)
                     if ( !(l2e_get_flags(l2e[i2]) & _PAGE_PRESENT) )
                     {
                         if ( (l2e_get_flags(l2e[i2]) & _PAGE_PSE)
-                             && ( p2m_flags_to_type(l2e_get_flags(l2e[i2]))
-                                  == p2m_populate_on_demand ) )
+                             && p2m_is_pod(p2m_flags_to_type(l2e_get_flags(l2e[i2]))) )
                             entry_count+=SUPERPAGE_PAGES;
                         gfn += 1 << (L2_PAGETABLE_SHIFT - PAGE_SHIFT);
                         continue;
@@ -1132,7 +1131,7 @@ static long p2m_pt_audit_p2m(struct p2m_domain *p2m)
                         type = p2m_flags_to_type(l1e_get_flags(l1e[i1]));
                         if ( !(l1e_get_flags(l1e[i1]) & _PAGE_PRESENT) )
                         {
-                            if ( type == p2m_populate_on_demand )
+                            if ( p2m_is_pod(type) )
                                 entry_count++;
                             continue;
                         }
