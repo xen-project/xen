@@ -296,9 +296,6 @@ subdir-uninstall-debugger/kdd: .phony
 subdir-all-debugger/kdd: .phony
 	$(MAKE) -C debugger/kdd all
 
-subdir-distclean-firmware: .phony
-	$(MAKE) -C firmware distclean
-
 subtree-force-update:
 ifeq ($(CONFIG_QEMU_XEN),y)
 	$(MAKE) qemu-xen-dir-force-update

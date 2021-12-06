@@ -85,9 +85,6 @@ clean: subdirs-clean
 .PHONY: distclean
 distclean: subdirs-distclean
 
-subdir-distclean-etherboot: .phony
-	$(MAKE) -C etherboot distclean
-
 subdir-distclean-ovmf-dir: .phony
 	rm -rf ovmf-dir ovmf-dir-remote
 
