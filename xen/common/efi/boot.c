@@ -111,25 +111,10 @@ struct file {
     };
 };
 
-static CHAR16 *FormatDec(UINT64 Val, CHAR16 *Buffer);
-static CHAR16 *FormatHex(UINT64 Val, UINTN Width, CHAR16 *Buffer);
-static void  DisplayUint(UINT64 Val, INTN Width);
-static CHAR16 *wstrcpy(CHAR16 *d, const CHAR16 *s);
-static void PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode);
-static char *get_value(const struct file *cfg, const char *section,
-                              const char *item);
-static char *split_string(char *s);
-static CHAR16 *s2w(union string *str);
-static char *w2s(const union string *str);
-static EFI_FILE_HANDLE get_parent_handle(EFI_LOADED_IMAGE *loaded_image,
-                                         CHAR16 **leaf);
 static bool read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
                       struct file *file, const char *options);
 static bool read_section(const EFI_LOADED_IMAGE *image, const CHAR16 *name,
                          struct file *file, const char *options);
-static size_t wstrlen(const CHAR16 * s);
-static int set_color(u32 mask, int bpp, u8 *pos, u8 *sz);
-static bool match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2);
 
 static void efi_init(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable);
 static void efi_console_set_mode(void);
@@ -167,19 +152,6 @@ static void __init PrintErr(const CHAR16 *s)
 {
     StdErr->OutputString(StdErr, (CHAR16 *)s );
 }
-
-#ifndef CONFIG_HAS_DEVICE_TREE
-static int __init efi_check_dt_boot(EFI_LOADED_IMAGE *loaded_image)
-{
-    return 0;
-}
-#endif
-
-/*
- * Include architecture specific implementation here, which references the
- * static globals defined above.
- */
-#include "efi-boot.h"
 
 static CHAR16 *__init FormatDec(UINT64 Val, CHAR16 *Buffer)
 {
@@ -289,30 +261,6 @@ static bool __init match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2)
            guid1->Data2 == guid2->Data2 &&
            guid1->Data3 == guid2->Data3 &&
            !memcmp(guid1->Data4, guid2->Data4, sizeof(guid1->Data4));
-}
-
-void __init noreturn blexit(const CHAR16 *str)
-{
-    if ( str )
-        PrintStr(str);
-    PrintStr(newline);
-
-    if ( !efi_bs )
-        efi_arch_halt();
-
-    if ( cfg.need_to_free )
-        efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
-    if ( kernel.need_to_free )
-        efi_bs->FreePages(kernel.addr, PFN_UP(kernel.size));
-    if ( ramdisk.need_to_free )
-        efi_bs->FreePages(ramdisk.addr, PFN_UP(ramdisk.size));
-    if ( xsm.need_to_free )
-        efi_bs->FreePages(xsm.addr, PFN_UP(xsm.size));
-
-    efi_arch_blexit();
-
-    efi_bs->Exit(efi_ih, EFI_SUCCESS, 0, NULL);
-    unreachable(); /* not reached */
 }
 
 /* generic routine for printing error messages */
@@ -542,6 +490,7 @@ static CHAR16 *__init point_tail(CHAR16 *fn)
             break;
         }
 }
+
 /*
  * Truncate string at first space, and return pointer
  * to remainder of string, if any/ NULL returned if
@@ -557,6 +506,95 @@ static char * __init split_string(char *s)
         return s + 1;
     }
     return NULL;
+}
+
+static char *__init get_value(const struct file *cfg, const char *section,
+                              const char *item)
+{
+    char *ptr = cfg->str, *end = ptr + cfg->size;
+    size_t slen = section ? strlen(section) : 0, ilen = strlen(item);
+    bool match = !slen;
+
+    for ( ; ptr < end; ++ptr )
+    {
+        switch ( *ptr )
+        {
+        case 0:
+            continue;
+        case '[':
+            if ( !slen )
+                break;
+            if ( match )
+                return NULL;
+            match = strncmp(++ptr, section, slen) == 0 && ptr[slen] == ']';
+            break;
+        default:
+            if ( match && strncmp(ptr, item, ilen) == 0 && ptr[ilen] == '=' )
+            {
+                ptr += ilen + 1;
+                /* strip off any leading spaces */
+                while ( *ptr && isspace(*ptr) )
+                    ptr++;
+                return ptr;
+            }
+            break;
+        }
+        ptr += strlen(ptr);
+    }
+    return NULL;
+}
+
+static int __init __maybe_unused set_color(uint32_t mask, int bpp,
+                                           uint8_t *pos, uint8_t *sz)
+{
+   if ( bpp < 0 )
+       return bpp;
+   if ( !mask )
+       return -EINVAL;
+   for ( *pos = 0; !(mask & 1); ++*pos )
+       mask >>= 1;
+   for ( *sz = 0; mask & 1; ++*sz)
+       mask >>= 1;
+   if ( mask )
+       return -EINVAL;
+   return max(*pos + *sz, bpp);
+}
+
+#ifndef CONFIG_HAS_DEVICE_TREE
+static int __init efi_check_dt_boot(EFI_LOADED_IMAGE *loaded_image)
+{
+    return 0;
+}
+#endif
+
+/*
+ * Include architecture specific implementation here, which references the
+ * static globals defined above.
+ */
+#include "efi-boot.h"
+
+void __init noreturn blexit(const CHAR16 *str)
+{
+    if ( str )
+        PrintStr(str);
+    PrintStr(newline);
+
+    if ( !efi_bs )
+        efi_arch_halt();
+
+    if ( cfg.need_to_free )
+        efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
+    if ( kernel.need_to_free )
+        efi_bs->FreePages(kernel.addr, PFN_UP(kernel.size));
+    if ( ramdisk.need_to_free )
+        efi_bs->FreePages(ramdisk.addr, PFN_UP(ramdisk.size));
+    if ( xsm.need_to_free )
+        efi_bs->FreePages(xsm.addr, PFN_UP(xsm.size));
+
+    efi_arch_blexit();
+
+    efi_bs->Exit(efi_ih, EFI_SUCCESS, 0, NULL);
+    unreachable(); /* not reached */
 }
 
 static void __init handle_file_info(const CHAR16 *name,
@@ -683,42 +721,6 @@ static void __init pre_parse(const struct file *cfg)
     if ( cfg->size && end[-1] )
          PrintStr(L"No newline at end of config file,"
                    " last line will be ignored.\r\n");
-}
-
-static char *__init get_value(const struct file *cfg, const char *section,
-                              const char *item)
-{
-    char *ptr = cfg->str, *end = ptr + cfg->size;
-    size_t slen = section ? strlen(section) : 0, ilen = strlen(item);
-    bool match = !slen;
-
-    for ( ; ptr < end; ++ptr )
-    {
-        switch ( *ptr )
-        {
-        case 0:
-            continue;
-        case '[':
-            if ( !slen )
-                break;
-            if ( match )
-                return NULL;
-            match = strncmp(++ptr, section, slen) == 0 && ptr[slen] == ']';
-            break;
-        default:
-            if ( match && strncmp(ptr, item, ilen) == 0 && ptr[ilen] == '=' )
-            {
-                ptr += ilen + 1;
-                /* strip off any leading spaces */
-                while ( *ptr && isspace(*ptr) )
-                    ptr++;
-                return ptr;
-            }
-            break;
-        }
-        ptr += strlen(ptr);
-    }
-    return NULL;
 }
 
 static void __init efi_init(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
@@ -1112,21 +1114,6 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
     efi_rs = (void *)efi_rs + DIRECTMAP_VIRT_START;
     efi_memmap = (void *)efi_memmap + DIRECTMAP_VIRT_START;
     efi_fw_vendor = (void *)efi_fw_vendor + DIRECTMAP_VIRT_START;
-}
-
-static int __init __maybe_unused set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
-{
-   if ( bpp < 0 )
-       return bpp;
-   if ( !mask )
-       return -EINVAL;
-   for ( *pos = 0; !(mask & 1); ++*pos )
-       mask >>= 1;
-   for ( *sz = 0; mask & 1; ++*sz)
-       mask >>= 1;
-   if ( mask )
-       return -EINVAL;
-   return max(*pos + *sz, bpp);
 }
 
 void EFIAPI __init noreturn
