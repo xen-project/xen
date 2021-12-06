@@ -11,7 +11,7 @@
 XEN_ROOT	= $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-PROGRAMS = readnotes lsevtchn
+TARGETS := readnotes lsevtchn
 
 CFLAGS += -Werror
 
@@ -19,10 +19,7 @@ CFLAGS_readnotes.o  := $(CFLAGS_libxenevtchn) $(CFLAGS_libxenctrl) $(CFLAGS_libx
 CFLAGS_lsevtchn.o   := $(CFLAGS_libxenevtchn) $(CFLAGS_libxenctrl)
 
 .PHONY: all
-all: build
-
-.PHONY: build
-build: $(PROGRAMS)
+all: $(TARGETS)
 
 readnotes: readnotes.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
@@ -31,18 +28,17 @@ lsevtchn: lsevtchn.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 .PHONY: install
-install: build
+install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
-	$(INSTALL_PROG) $(PROGRAMS) $(DESTDIR)$(LIBEXEC_BIN)
+	$(INSTALL_PROG) $(TARGETS) $(DESTDIR)$(LIBEXEC_BIN)
 
 .PHONY: uninstall
 uninstall:
-	rm -f $(addprefix $(DESTDIR)$(LIBEXECDIR)/, $(PROGRAMS))
+	$(RM) $(addprefix $(DESTDIR)$(LIBEXECDIR)/, $(TARGETS))
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(PROGRAMS)
-	$(RM) $(DEPS_RM)
+	$(RM) *.o $(TARGETS) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean
