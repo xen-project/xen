@@ -384,7 +384,6 @@ tools/include/xen-foreign/arm64.h
 .git
 tools/misc/xen-hptool
 tools/misc/xen-mfndump
-tools/libs/toolcore/include/_*.h
 tools/firmware/etherboot/eb-roms.h
 tools/firmware/etherboot/gpxe-git-snapshot.tar.gz
 tools/misc/xenhypfs
