@@ -41,7 +41,6 @@
 
 #include <xenstore.h>
 #include "xenctrl.h"
-#include "_paths.h"
 
 #define ESCAPE_CHARACTER 0x1d
 

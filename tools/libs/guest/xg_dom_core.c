@@ -33,7 +33,6 @@
 
 #define XG_NEED_UNALIGNED
 #include "xg_private.h"
-#include "_paths.h"
 
 /* ------------------------------------------------------------------------ */
 /* debugging                                                                */

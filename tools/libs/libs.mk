@@ -135,7 +135,6 @@ clean:
 	rm -f lib$(LIB_FILE_NAME).so.$(MAJOR).$(MINOR) lib$(LIB_FILE_NAME).so.$(MAJOR)
 	rm -f headers.chk headers.lst
 	rm -f $(PKG_CONFIG)
-	rm -f _paths.h
 
 .PHONY: distclean
 distclean: clean

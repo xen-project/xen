@@ -17,7 +17,6 @@
 
 #include <assert.h>
 
-#include "_paths.h"
 #include <xentoollog.h>
 
 struct cmd_spec {

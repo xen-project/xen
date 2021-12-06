@@ -30,8 +30,6 @@ APPEND_LDFLAGS += $(LDLIBS-y)
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-$(LIB_OBJS) $(PIC_OBJS): _paths.h
-
 PYLIB=bindings/swig/python/_xenstat.so
 PYMOD=bindings/swig/python/xenstat.py
 PYSRC=bindings/swig/python/_xenstat.c
@@ -121,10 +119,7 @@ clean: cleanlocal
 
 .PHONY: cleanlocal
 cleanlocal:
-	rm -f $(BINDINGS) $(BINDINGSRC) $(DEPS_RM) _paths.h
+	rm -f $(BINDINGS) $(BINDINGSRC) $(DEPS_RM)
 	rm -f libxenstat.map
 
 -include $(DEPS_INCLUDE)
-
-genpath-target = $(call buildmakevars2header,_paths.h)
-$(eval $(genpath-target))

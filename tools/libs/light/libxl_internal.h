@@ -73,7 +73,6 @@
 #endif
 
 #include "libxl.h"
-#include "_paths.h"
 #include "_libxl_save_msgs_callout.h"
 
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)

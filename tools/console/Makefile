@@ -22,26 +22,18 @@ all: $(BIN)
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(DEPS_RM)
 	$(RM) client/*.o daemon/*.o
-	$(RM) client/_paths.h
-	$(RM) daemon/_paths.h
 
 .PHONY: distclean
 distclean: clean
 
-daemon/main.o: daemon/_paths.h
+daemon/main.o: CFLAGS += -include $(XEN_ROOT)/tools/config.h
 daemon/io.o: CFLAGS += $(CFLAGS_libxenevtchn) $(CFLAGS_libxengnttab) $(CFLAGS_libxenforeignmemory) $(CONSOLE_CFLAGS-y)
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxenforeignmemory) $(LDLIBS_xenconsoled) $(APPEND_LDFLAGS)
 
-client/main.o: client/_paths.h
+client/main.o: CFLAGS += -include $(XEN_ROOT)/tools/config.h
 xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsole) $(APPEND_LDFLAGS)
-
-genpath-target = $(call buildmakevars2header,client/_paths.h)
-$(eval $(genpath-target))
-
-genpath-target = $(call buildmakevars2header,daemon/_paths.h)
-$(eval $(genpath-target))
 
 .PHONY: install
 install: $(BIN)

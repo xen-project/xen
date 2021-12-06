@@ -39,6 +39,7 @@ AC_SUBST(CONFIG_DIR)
 
 XEN_CONFIG_DIR=$CONFIG_DIR/xen
 AC_SUBST(XEN_CONFIG_DIR)
+AC_DEFINE_UNQUOTED([XEN_CONFIG_DIR], ["$XEN_CONFIG_DIR"], [Xen's config dir])
 
 AC_ARG_WITH([initddir],
     AS_HELP_STRING([--with-initddir=DIR],
@@ -83,6 +84,7 @@ AC_ARG_WITH([xen-scriptdir],
     [xen_scriptdir_path=$XEN_CONFIG_DIR/scripts])
 XEN_SCRIPT_DIR=$xen_scriptdir_path
 AC_SUBST(XEN_SCRIPT_DIR)
+AC_DEFINE_UNQUOTED([XEN_SCRIPT_DIR], ["$XEN_SCRIPT_DIR"], [Xen's script dir])
 
 AC_ARG_WITH([xen-dumpdir],
     AS_HELP_STRING([--with-xen-dumpdir=DIR],
@@ -117,18 +119,22 @@ AC_SUBST(LIBEXEC)
 dnl These variables will be substituted in various .in files
 LIBEXEC_BIN=${LIBEXEC}/bin
 AC_SUBST(LIBEXEC_BIN)
+AC_DEFINE_UNQUOTED([LIBEXEC_BIN], ["$LIBEXEC_BIN"], [Xen's libexec path])
 LIBEXEC_LIB=${LIBEXEC}/lib
 AC_SUBST(LIBEXEC_LIB)
 LIBEXEC_INC=${LIBEXEC}/include
 AC_SUBST(LIBEXEC_INC)
 XENFIRMWAREDIR=${LIBEXEC}/boot
 AC_SUBST(XENFIRMWAREDIR)
+AC_DEFINE_UNQUOTED([XENFIRMWAREDIR], ["$XENFIRMWAREDIR"], [Xen's firmware dir])
 
 XEN_RUN_DIR=$rundir_path/xen
 AC_SUBST(XEN_RUN_DIR)
+AC_DEFINE_UNQUOTED([XEN_RUN_DIR], ["$XEN_RUN_DIR"], [Xen's runstate path])
 
 XEN_LOG_DIR=$localstatedir/log/xen
 AC_SUBST(XEN_LOG_DIR)
+AC_DEFINE_UNQUOTED([XEN_LOG_DIR], ["$XEN_LOG_DIR"], [Xen's log dir])
 
 XEN_LIB_STORED=$localstatedir/lib/xenstored
 AC_SUBST(XEN_LIB_STORED)
@@ -138,6 +144,7 @@ AC_SUBST(XEN_RUN_STORED)
 
 XEN_LIB_DIR=$localstatedir/lib/xen
 AC_SUBST(XEN_LIB_DIR)
+AC_DEFINE_UNQUOTED([XEN_LIB_DIR], ["$XEN_LIB_DIR"], [Xen's lib dir])
 
 SHAREDIR=$prefix/share
 AC_SUBST(SHAREDIR)
@@ -151,12 +158,14 @@ case "$host_os" in
 *) XEN_LOCK_DIR=$localstatedir/lock ;;
 esac
 AC_SUBST(XEN_LOCK_DIR)
+AC_DEFINE_UNQUOTED([XEN_LOCK_DIR], ["$XEN_LOCK_DIR"], [Xen's lock dir])
 
 XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 AC_SUBST(XEN_PAGING_DIR)
 
 XEN_DUMP_DIR=$xen_dumpdir_path
 AC_SUBST(XEN_DUMP_DIR)
+AC_DEFINE_UNQUOTED([XEN_DUMP_DIR], ["$XEN_DUMP_DIR"], [Xen's dump directory])
 
 DEBUG_DIR=$debugdir_path
 AC_SUBST(DEBUG_DIR)

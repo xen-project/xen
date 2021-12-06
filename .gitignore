@@ -123,7 +123,6 @@ tools/libs/foreignmemory/headers.chk
 tools/libs/foreignmemory/xenforeignmemory.pc
 tools/libs/devicemodel/headers.chk
 tools/libs/devicemodel/xendevicemodel.pc
-tools/libs/guest/_*.[ch]
 tools/libs/guest/libxenguest.map
 tools/libs/guest/xenguest.pc
 tools/libs/guest/xc_bitops.h
@@ -146,7 +145,6 @@ tools/libs/light/test_timedereg
 tools/libs/light/test_fdderegrace
 tools/libs/light/tmp.*
 tools/libs/light/xenlight.pc
-tools/libs/stat/_paths.h
 tools/libs/stat/headers.chk
 tools/libs/stat/libxenstat.map
 tools/libs/stat/xenstat.pc
@@ -163,8 +161,6 @@ tools/libs/vchan/libxenvchan.map
 tools/libs/vchan/xenvchan.pc
 tools/console/xenconsole
 tools/console/xenconsoled
-tools/console/client/_paths.h
-tools/console/daemon/_paths.h
 tools/debugger/gdb/gdb-6.2.1-linux-i386-xen/*
 tools/debugger/gdb/gdb-6.2.1/*
 tools/debugger/gdb/gdb-6.2.1.tar.bz2
@@ -207,7 +203,6 @@ tools/fuzz/x86_instruction_emulator/afl-harness-cov
 tools/fuzz/x86_instruction_emulator/wrappers.c
 tools/fuzz/x86_instruction_emulator/x86_emulate
 tools/fuzz/x86_instruction_emulator/x86-emulate.[ch]
-tools/helpers/_paths.h
 tools/helpers/init-xenstore-domain
 tools/helpers/xen-init-dom0
 tools/hotplug/common/hotplugpath.sh
@@ -421,7 +416,6 @@ tools/firmware/etherboot/ipxe.tar.gz
 tools/firmware/etherboot/ipxe/
 tools/python/xen/lowlevel/xl/_pyxl_types.c
 tools/python/xen/lowlevel/xl/_pyxl_types.h
-tools/xl/_paths.h
 tools/xl/xl
 
 docs/txt/misc/*.txt

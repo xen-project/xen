@@ -3926,6 +3926,11 @@ CONFIG_DIR=$sysconfdir
 XEN_CONFIG_DIR=$CONFIG_DIR/xen
 
 
+cat >>confdefs.h <<_ACEOF
+#define XEN_CONFIG_DIR "$XEN_CONFIG_DIR"
+_ACEOF
+
+
 
 # Check whether --with-initddir was given.
 if test "${with_initddir+set}" = set; then :
@@ -3978,6 +3983,11 @@ fi
 XEN_SCRIPT_DIR=$xen_scriptdir_path
 
 
+cat >>confdefs.h <<_ACEOF
+#define XEN_SCRIPT_DIR "$XEN_SCRIPT_DIR"
+_ACEOF
+
+
 
 # Check whether --with-xen-dumpdir was given.
 if test "${with_xen_dumpdir+set}" = set; then :
@@ -4018,6 +4028,11 @@ LIBEXEC=`eval echo $libexecdir/$libexec_subdir`
 
 LIBEXEC_BIN=${LIBEXEC}/bin
 
+
+cat >>confdefs.h <<_ACEOF
+#define LIBEXEC_BIN "$LIBEXEC_BIN"
+_ACEOF
+
 LIBEXEC_LIB=${LIBEXEC}/lib
 
 LIBEXEC_INC=${LIBEXEC}/include
@@ -4025,10 +4040,25 @@ LIBEXEC_INC=${LIBEXEC}/include
 XENFIRMWAREDIR=${LIBEXEC}/boot
 
 
+cat >>confdefs.h <<_ACEOF
+#define XENFIRMWAREDIR "$XENFIRMWAREDIR"
+_ACEOF
+
+
 XEN_RUN_DIR=$rundir_path/xen
 
 
+cat >>confdefs.h <<_ACEOF
+#define XEN_RUN_DIR "$XEN_RUN_DIR"
+_ACEOF
+
+
 XEN_LOG_DIR=$localstatedir/log/xen
+
+
+cat >>confdefs.h <<_ACEOF
+#define XEN_LOG_DIR "$XEN_LOG_DIR"
+_ACEOF
 
 
 XEN_LIB_STORED=$localstatedir/lib/xenstored
@@ -4038,6 +4068,11 @@ XEN_RUN_STORED=$rundir_path/xenstored
 
 
 XEN_LIB_DIR=$localstatedir/lib/xen
+
+
+cat >>confdefs.h <<_ACEOF
+#define XEN_LIB_DIR "$XEN_LIB_DIR"
+_ACEOF
 
 
 SHAREDIR=$prefix/share
@@ -4053,10 +4088,20 @@ case "$host_os" in
 esac
 
 
+cat >>confdefs.h <<_ACEOF
+#define XEN_LOCK_DIR "$XEN_LOCK_DIR"
+_ACEOF
+
+
 XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 
 
 XEN_DUMP_DIR=$xen_dumpdir_path
+
+
+cat >>confdefs.h <<_ACEOF
+#define XEN_DUMP_DIR "$XEN_DUMP_DIR"
+_ACEOF
 
 
 DEBUG_DIR=$debugdir_path

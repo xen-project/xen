@@ -18,7 +18,6 @@
 #include <ctype.h>
 
 #include "libxl_internal.h"
-#include "_paths.h"
 
 #ifndef LIBXL_HAVE_NONCONST_LIBXL_BASENAME_RETURN_VALUE
 const

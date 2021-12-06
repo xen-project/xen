@@ -16,7 +16,6 @@
 #include <xen/io/xenbus.h>
 
 #include "init-dom-json.h"
-#include "_paths.h"
 
 #define LAPIC_BASE_ADDRESS  0xfee00000UL
 #define MB(x)               ((uint64_t)x << 20)

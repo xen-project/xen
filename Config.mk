@@ -167,15 +167,6 @@ define buildmakevars2file-closure
 	$(call move-if-changed,$(1).tmp,$(1))
 endef
 
-buildmakevars2header = $(eval $(call buildmakevars2header-closure,$(1)))
-define buildmakevars2header-closure
-    $(1): .phony
-	rm -f $(1).tmp; \
-	$(foreach var, $(BUILD_MAKE_VARS), \
-	          echo "#define $(var) \"$($(var))\"" >>$(1).tmp;) \
-	$(call move-if-changed,$(1).tmp,$(1))
-endef
-
 CFLAGS += -fno-strict-aliasing
 
 CFLAGS += -std=gnu99

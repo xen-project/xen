@@ -106,11 +106,6 @@ include $(XEN_ROOT)/tools/libs/libs.mk
 libxenguest.so.$(MAJOR).$(MINOR): COMPRESSION_LIBS = $(filter -l%,$(zlib-options))
 libxenguest.so.$(MAJOR).$(MINOR): APPEND_LDFLAGS += $(COMPRESSION_LIBS) -lz
 
-genpath-target = $(call buildmakevars2header,_paths.h)
-$(eval $(genpath-target))
-
-$(LIB_OBJS) $(PIC_OBJS): _paths.h
-
 -include $(DEPS_INCLUDE)
 
 .PHONY: cleanlocal

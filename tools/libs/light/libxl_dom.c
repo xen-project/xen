@@ -24,8 +24,6 @@
 #include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/e820.h>
 
-#include "_paths.h"
-
 //#define DEBUG 1
 
 libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)

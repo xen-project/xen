@@ -31,7 +31,6 @@
 
 #include "utils.h"
 #include "io.h"
-#include "_paths.h"
 
 int log_reload = 0;
 int log_guest = 0;

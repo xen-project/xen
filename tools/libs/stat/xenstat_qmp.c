@@ -23,7 +23,6 @@
 #include <xenctrl.h>
 
 #include "xenstat_priv.h"
-#include "_paths.h"
 
 #ifdef HAVE_YAJL_YAJL_VERSION_H
 #  include <yajl/yajl_version.h>
