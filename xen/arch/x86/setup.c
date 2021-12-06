@@ -1667,6 +1667,16 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         destroy_xen_mappings((unsigned long)&__2M_rwdata_end,
                              ROUNDUP((unsigned long)&__2M_rwdata_end, MB(2)));
 
+    /*
+     * Mark all of .text and .rodata as RO in the directmap - we don't want
+     * these sections writeable via any alias.  The compile-time allocated
+     * pagetables are written via their directmap alias, so data/bss needs to
+     * remain writeable.
+     */
+    modify_xen_mappings((unsigned long)__va(__pa(_start)),
+                        (unsigned long)__va(__pa(__2M_rodata_end)),
+                        PAGE_HYPERVISOR_RO);
+
     nr_pages = 0;
     for ( i = 0; i < e820.nr_map; i++ )
         if ( e820.map[i].type == E820_RAM )
