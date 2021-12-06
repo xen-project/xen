@@ -60,7 +60,7 @@ ROMS += $(ROMBIOS_ROM) $(STDVGA_ROM) $(CIRRUSVGA_ROM)
 endif
 
 .PHONY: all
-all: acpi subdirs-all
+all: acpi
 	$(MAKE) hvmloader
 
 .PHONY: acpi
@@ -104,7 +104,7 @@ endif
 	mv $@.new $@
 
 .PHONY: clean
-clean: subdirs-clean
+clean:
 	rm -f roms.inc roms.inc.new acpi.h
 	rm -f hvmloader hvmloader.tmp *.o $(DEPS_RM)
 	$(MAKE) -C $(ACPI_PATH)  ACPI_BUILD_DIR=$(CURDIR) clean
