@@ -15,7 +15,7 @@
 XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(CFLAGS_xeninclude) -include $(XEN_ROOT)/tools/config.h
+CFLAGS += -include $(XEN_ROOT)/tools/config.h
 
 SRCS-y += xenstat.c
 SRCS-y += xenstat_qmp.c
