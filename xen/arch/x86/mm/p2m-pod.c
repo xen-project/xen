@@ -271,9 +271,6 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
                 goto out;
             }
 
-            if ( test_and_clear_bit(_PGT_pinned, &(page+i)->u.inuse.type_info) )
-                put_page_and_type(page + i);
-
             put_page_alloc_ref(page + i);
             put_page(page + i);
 
