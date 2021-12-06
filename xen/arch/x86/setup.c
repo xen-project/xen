@@ -1264,20 +1264,11 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             l3_pgentry_t *pl3e;
             l2_pgentry_t *pl2e;
             int i, j, k;
-            unsigned long pte_update_limit;
 
             /* Select relocation address. */
             xen_phys_start = end - reloc_size;
             e = xen_phys_start + XEN_IMG_OFFSET;
             bootsym(trampoline_xen_phys_start) = xen_phys_start;
-
-            /*
-             * No PTEs pointing above this address are candidates for relocation.
-             * Due to possibility of partial overlap of the end of source image
-             * and the beginning of region for destination image some PTEs may
-             * point to addresses in range [e, e + XEN_IMG_OFFSET).
-             */
-            pte_update_limit = PFN_DOWN(e);
 
             /*
              * Perform relocation to new physical address.
@@ -1301,8 +1292,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 {
                     /* Not present, 1GB mapping, or already relocated? */
                     if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) ||
-                         (l3e_get_flags(*pl3e) & _PAGE_PSE) ||
-                         (l3e_get_pfn(*pl3e) >= pte_update_limit) )
+                         (l3e_get_flags(*pl3e) & _PAGE_PSE) )
                         continue;
                     *pl3e = l3e_from_intpte(l3e_get_intpte(*pl3e) +
                                             xen_phys_start);
@@ -1311,8 +1301,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                     {
                         /* Not present, PSE, or already relocated? */
                         if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
-                             (l2e_get_flags(*pl2e) & _PAGE_PSE) ||
-                             (l2e_get_pfn(*pl2e) >= pte_update_limit) )
+                             (l2e_get_flags(*pl2e) & _PAGE_PSE) )
                             continue;
                         *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) +
                                                 xen_phys_start);
@@ -1325,8 +1314,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
             {
                 if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
-                     !(l2e_get_flags(*pl2e) & _PAGE_PSE) ||
-                     (l2e_get_pfn(*pl2e) >= pte_update_limit) )
+                     !(l2e_get_flags(*pl2e) & _PAGE_PSE) )
                     continue;
 
                 *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) + xen_phys_start);
