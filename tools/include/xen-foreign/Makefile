@@ -25,28 +25,28 @@ check-headers: checker
 	rm tmp.size
 
 arm32.h: mkheader.py structs.py $(ROOT)/arch-arm.h $(ROOT)/xen.h
-	$(PYTHON) $< $* $@.tmp $(filter %.h,$^)
+	$(PYTHON) $< $(basename $@) $@.tmp $(filter %.h,$^)
 	#Avoid mixing an alignment directive with a uint64_t cast or sizeof expression
 	sed 's/(__align8__ \(uint64_t\))/(\1)/g' < $@.tmp > $@.tmp2
 	rm $@.tmp
 	$(call move-if-changed,$@.tmp2,$@)
 
 arm64.h: mkheader.py structs.py $(ROOT)/arch-arm.h $(ROOT)/xen.h
-	$(PYTHON) $< $* $@.tmp $(filter %.h,$^)
+	$(PYTHON) $< $(basename $@) $@.tmp $(filter %.h,$^)
 	#Avoid mixing an alignment directive with a uint64_t cast or sizeof expression
 	sed 's/(__align8__ \(uint64_t\))/(\1)/g' < $@.tmp > $@.tmp2
 	rm $@.tmp
 	$(call move-if-changed,$@.tmp2,$@)
 
 x86_32.h: mkheader.py structs.py $(ROOT)/arch-x86/xen-x86_32.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
-	$(PYTHON) $< $* $@.tmp $(filter %.h,$^)
+	$(PYTHON) $< $(basename $@) $@.tmp $(filter %.h,$^)
 	#Avoid mixing an alignment directive with a uint64_t cast or sizeof expression
 	sed 's/(__align8__ \(uint64_t\))/(\1)/g' < $@.tmp > $@.tmp2
 	rm $@.tmp
 	$(call move-if-changed,$@.tmp2,$@)
 
 x86_64.h: mkheader.py structs.py $(ROOT)/arch-x86/xen-x86_64.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
-	$(PYTHON) $< $* $@.tmp $(filter %.h,$^)
+	$(PYTHON) $< $(basename $@) $@.tmp $(filter %.h,$^)
 	#Avoid mixing an alignment directive with a uint64_t cast or sizeof expression
 	sed 's/(__align8__ \(uint64_t\))/(\1)/g' < $@.tmp > $@.tmp2
 	rm $@.tmp
