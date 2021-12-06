@@ -184,12 +184,11 @@ $(PKG_CONFIG_DIR)/%.pc: Makefile $(XEN_ROOT)/tools/Rules.mk $(PKG_CONFIG_DIR)
 	echo "prefix=$(PKG_CONFIG_PREFIX)"; \
 	echo "includedir=$(PKG_CONFIG_INCDIR)"; \
 	echo "libdir=$(PKG_CONFIG_LIBDIR)"; \
-	$(foreach var,$(PKG_CONFIG_VARS),echo $(var);) \
 	echo ""; \
 	echo "Name: $(PKG_CONFIG_NAME)"; \
 	echo "Description: $(PKG_CONFIG_DESC)"; \
 	echo "Version: $(PKG_CONFIG_VERSION)"; \
-	echo "Cflags: -I\$${includedir} $(CFLAGS_xeninclude)"; \
+	echo "Cflags: -I\$${includedir}"; \
 	echo "Libs: -L\$${libdir} $(PKG_CONFIG_USELIBS) -l$(PKG_CONFIG_LIB)"; \
 	echo "Libs.private: $(PKG_CONFIG_LIBSPRIV)"; \
 	echo "Requires.private: $(PKG_CONFIG_REQPRIV)"; \
@@ -200,7 +199,6 @@ $(PKG_CONFIG_DIR)/%.pc: Makefile $(XEN_ROOT)/tools/Rules.mk $(PKG_CONFIG_DIR)
 	echo "prefix=$(PKG_CONFIG_PREFIX)"; \
 	echo "includedir=$(PKG_CONFIG_INCDIR)"; \
 	echo "libdir=$(PKG_CONFIG_LIBDIR)"; \
-	$(foreach var,$(PKG_CONFIG_VARS),echo $(var);) \
 	echo ""; \
 	echo "Name: $(PKG_CONFIG_NAME)"; \
 	echo "Description: $(PKG_CONFIG_DESC)"; \
