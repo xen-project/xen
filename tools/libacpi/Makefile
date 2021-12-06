@@ -38,11 +38,10 @@ MKDSDT_CFLAGS-$(CONFIG_X86) = -DCONFIG_X86
 # complete $(ACPI_BUILD_DIR) as path, even if it has '.' symbols.
 TMP_SUFFIX	= tmp
 
-vpath iasl $(PATH)
 all: $(C_SRC) $(H_SRC)
 
-$(H_SRC): $(ACPI_BUILD_DIR)/%.h: %.asl iasl
-	iasl -vs -p $(ACPI_BUILD_DIR)/$*.$(TMP_SUFFIX) -tc $<
+$(H_SRC): $(ACPI_BUILD_DIR)/%.h: %.asl
+	$(IASL) -vs -p $(ACPI_BUILD_DIR)/$*.$(TMP_SUFFIX) -tc $<
 	sed -e 's/AmlCode/$*/g' -e 's/_aml_code//g' $(ACPI_BUILD_DIR)/$*.hex >$@
 	rm -f $(addprefix $(ACPI_BUILD_DIR)/, $*.aml $*.hex)
  
@@ -74,20 +73,12 @@ $(ACPI_BUILD_DIR)/dsdt_anycpu_arm.asl: $(MK_DSDT)
 	$(MK_DSDT) --debug=$(debug) >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 
-$(C_SRC): $(ACPI_BUILD_DIR)/%.c: iasl $(ACPI_BUILD_DIR)/%.asl
-	iasl -vs -p $(ACPI_BUILD_DIR)/$*.$(TMP_SUFFIX) -tc $(ACPI_BUILD_DIR)/$*.asl
+$(C_SRC): $(ACPI_BUILD_DIR)/%.c: $(ACPI_BUILD_DIR)/%.asl
+	$(IASL) -vs -p $(ACPI_BUILD_DIR)/$*.$(TMP_SUFFIX) -tc $<
 	sed -e 's/AmlCode/$*/g' -e 's/_aml_code//g' $(ACPI_BUILD_DIR)/$*.hex > $@.$(TMP_SUFFIX)
 	echo "int $*_len=sizeof($*);" >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 	rm -f $(addprefix $(ACPI_BUILD_DIR)/, $*.aml $*.hex)
-
-iasl:
-	@echo
-	@echo "ACPI ASL compiler (iasl) is needed"
-	@echo "Download and install Intel ACPI CA from"
-	@echo "http://acpica.org/downloads/"
-	@echo 
-	@exit 1
 
 clean:
 	rm -f $(C_SRC) $(H_SRC) $(MK_DSDT) $(C_SRC:=.$(TMP_SUFFIX))

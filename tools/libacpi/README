@@ -24,9 +24,3 @@ In case that the acpi_dsdt.asl need to be updated, please
 Follow the instruction:
 
 # make acpi_dsdt.c
-
-Note:
-DSDT compiler "iasl" is needed. By default, it will be downloaded 
-using wget in Makefile. if it failed, please download manually from 
-http://developer.intel.com/technology/iapc/acpi/downloads.htm. 
-then compile and install iasl
