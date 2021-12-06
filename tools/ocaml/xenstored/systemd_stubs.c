@@ -27,8 +27,6 @@
 
 #include <systemd/sd-daemon.h>
 
-#include "_paths.h"
-
 CAMLprim value ocaml_sd_notify_ready(value ignore)
 {
 	CAMLparam1(ignore);
