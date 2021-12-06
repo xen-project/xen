@@ -100,6 +100,18 @@ SECTIONS
 
        __ro_after_init_start = .;
        *(.data.ro_after_init)
+
+       . = ALIGN(8);
+       /* Exception table */
+       __start___ex_table = .;
+       *(.ex_table)
+       __stop___ex_table = .;
+
+       /* Pre-exception table */
+       __start___pre_ex_table = .;
+       *(.ex_table.pre)
+       __stop___pre_ex_table = .;
+
        . = ALIGN(PAGE_SIZE);
        __ro_after_init_end = .;
 
@@ -129,17 +141,6 @@ SECTIONS
        *(.note.gnu.build-id)
        __note_gnu_build_id_end = .;
 #endif
-       . = ALIGN(8);
-       /* Exception table */
-       __start___ex_table = .;
-       *(.ex_table)
-       __stop___ex_table = .;
-
-       /* Pre-exception table */
-       __start___pre_ex_table = .;
-       *(.ex_table.pre)
-       __stop___pre_ex_table = .;
-
 #ifdef CONFIG_HAS_VPCI
        . = ALIGN(POINTER_ALIGN);
        __start_vpci_array = .;
