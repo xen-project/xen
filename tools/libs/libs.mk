@@ -26,9 +26,6 @@ ifneq ($(nosharedlibs),y)
 LIB += lib$(LIB_FILE_NAME).so
 endif
 
-comma:= ,
-empty:=
-space:= $(empty) $(empty)
 PKG_CONFIG ?= $(LIB_FILE_NAME).pc
 PKG_CONFIG_NAME ?= Xen$(LIBNAME)
 PKG_CONFIG_DESC ?= The $(PKG_CONFIG_NAME) library for Xen hypervisor
