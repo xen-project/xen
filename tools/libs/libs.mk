@@ -138,6 +138,3 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-
-.PHONY: FORCE
-FORCE:

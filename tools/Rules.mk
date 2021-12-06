@@ -210,3 +210,6 @@ $(PKG_CONFIG_DIR)/%.pc: Makefile $(XEN_ROOT)/tools/Rules.mk $(PKG_CONFIG_DIR)
 	echo "Libs.private: $(PKG_CONFIG_LIBSPRIV)"; \
 	echo "Requires.private: $(PKG_CONFIG_REQPRIV)"; \
 	} > $@
+
+.PHONY: FORCE
+FORCE:
