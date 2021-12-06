@@ -27,8 +27,6 @@ CFLAGS += -I $(XEN_ROOT)/tools/xenstore
 xs.opic: CFLAGS += -DUSE_PTHREAD
 ifeq ($(CONFIG_Linux),y)
 xs.opic: CFLAGS += -DUSE_DLSYM
-else
-PKG_CONFIG_REMOVE += -ldl
 endif
 
 -include $(DEPS_INCLUDE)
