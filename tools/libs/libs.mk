@@ -12,7 +12,7 @@ MINOR ?= 0
 SHLIB_LDFLAGS += -Wl,--version-script=libxen$(LIBNAME).map
 
 CFLAGS   += -Werror -Wmissing-prototypes
-CFLAGS   += -I./include $(CFLAGS_xeninclude)
+CFLAGS   += $(CFLAGS_xeninclude)
 CFLAGS   += $(foreach lib, $(USELIBS_$(LIBNAME)), $(CFLAGS_libxen$(lib)))
 
 LDUSELIBS = $(foreach lib, $(USELIBS_$(LIBNAME)), $(LDLIBS_libxen$(lib)))
