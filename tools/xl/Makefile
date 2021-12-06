@@ -7,7 +7,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS += -Werror -Wno-format-zero-length -Wmissing-declarations \
 	-Wno-declaration-after-statement -Wformat-nonliteral
-CFLAGS += -I. -fPIC
+CFLAGS += -fPIC
 
 CFLAGS += $(PTHREAD_CFLAGS)
 LDFLAGS += $(PTHREAD_LDFLAGS)
