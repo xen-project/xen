@@ -71,8 +71,6 @@ SRCS-y                 += xg_dom_decompress_unsafe_xz.c
 SRCS-y                 += xg_dom_decompress_unsafe_zstd.c
 endif
 
--include $(XEN_TARGET_ARCH)/Makefile
-
 CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -I. -I./include $(CFLAGS_xeninclude)
 CFLAGS   += -D__XEN_TOOLS__
