@@ -425,8 +425,8 @@ void *__init bootstrap_map(const module_t *mod)
     return ret;
 }
 
-static void *__init move_memory(
-    uint64_t dst, uint64_t src, unsigned int size, bool keep)
+static void __init move_memory(
+    uint64_t dst, uint64_t src, unsigned int size)
 {
     unsigned int blksz = BOOTSTRAP_MAP_LIMIT - BOOTSTRAP_MAP_BASE;
     unsigned int mask = (1L << L2_PAGETABLE_SHIFT) - 1;
@@ -463,13 +463,8 @@ static void *__init move_memory(
         src += sz;
         size -= sz;
 
-        if ( keep )
-            return size ? NULL : d + doffs;
-
         bootstrap_map(NULL);
     }
-
-    return NULL;
 }
 
 #undef BOOTSTRAP_MAP_LIMIT
@@ -1277,7 +1272,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
              * data until after we have switched to the relocated pagetables!
              */
             barrier();
-            move_memory(e, XEN_IMG_OFFSET, _end - _start, 1);
+            memcpy(__va(__pa(_start)), _start, _end - _start);
 
             /* Walk idle_pg_table, relocating non-leaf entries. */
             pl4e = __va(__pa(idle_pg_table));
@@ -1334,8 +1329,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                    "1" (__va(__pa(cpu0_stack))), "2" (STACK_SIZE / 8)
                 : "memory" );
 
-            bootstrap_map(NULL);
-
             printk("New Xen image base address: %#lx\n", xen_phys_start);
         }
 
@@ -1361,7 +1354,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             {
                 move_memory(end - size + headroom,
                             (uint64_t)mod[j].mod_start << PAGE_SHIFT,
-                            mod[j].mod_end, 0);
+                            mod[j].mod_end);
                 mod[j].mod_start = (end - size) >> PAGE_SHIFT;
                 mod[j].mod_end += headroom;
                 mod[j].reserved = 1;
