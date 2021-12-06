@@ -5,7 +5,7 @@ MAJOR	= 1
 MINOR	= 0
 AUTOINCS := $(XEN_INCLUDE)/_xentoolcore_list.h
 
-LIBHEADER := xentoolcore.h xentoolcore_internal.h
+LIBHEADER := xentoolcore.h
 
 SRCS-y	+= handlereg.c
 
