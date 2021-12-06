@@ -44,7 +44,6 @@ SRCS-$(CONFIG_X86) += $(ACPI_OBJS:.o=.c)
 
 CFLAGS += -Wno-format-zero-length -Wmissing-declarations \
 	-Wno-declaration-after-statement -Wformat-nonliteral
-CFLAGS += -I.
 
 CFLAGS-$(CONFIG_X86) += -DCONFIG_PCI_SUPP_LEGACY_IRQ
 
