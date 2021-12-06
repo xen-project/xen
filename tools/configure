@@ -641,7 +641,6 @@ PTHREAD_LIBS
 PTHREAD_LDFLAGS
 PTHREAD_CFLAGS
 EXTFS_LIBS
-system_aio
 zlib
 libzstd_LIBS
 libzstd_CFLAGS
@@ -8770,7 +8769,6 @@ else
 $as_echo "yes" >&6; }
 	zlib="$zlib -DHAVE_ZSTD $libzstd_CFLAGS $libzstd_LIBS"
 fi
-
 
 
 ac_fn_c_check_header_mongrel "$LINENO" "ext2fs/ext2fs.h" "ac_cv_header_ext2fs_ext2fs_h" "$ac_includes_default"

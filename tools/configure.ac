@@ -402,7 +402,6 @@ AC_CHECK_LIB([lzo2], [lzo1x_decompress], [zlib="$zlib -DHAVE_LZO1X -llzo2"])
 PKG_CHECK_MODULES([libzstd], [libzstd],
     [zlib="$zlib -DHAVE_ZSTD $libzstd_CFLAGS $libzstd_LIBS"], [true])
 AC_SUBST(zlib)
-AC_SUBST(system_aio)
 AX_CHECK_EXTFS
 AX_CHECK_PTHREAD
 AX_CHECK_PTYFUNCS
