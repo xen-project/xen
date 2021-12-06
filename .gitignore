@@ -117,7 +117,6 @@ tools/libs/hypfs/headers.chk
 tools/libs/hypfs/xenhypfs.pc
 tools/libs/call/headers.chk
 tools/libs/call/xencall.pc
-tools/libs/ctrl/_*.[ch]
 tools/libs/ctrl/libxenctrl.map
 tools/libs/ctrl/xencontrol.pc
 tools/libs/foreignmemory/headers.chk
@@ -157,7 +156,6 @@ tools/libs/store/utils.h
 tools/libs/store/xenstore.pc
 tools/libs/store/xs_lib.c
 tools/libs/util/*.pc
-tools/libs/util/_paths.h
 tools/libs/util/libxlu_cfg_y.output
 tools/libs/util/libxenutil.map
 tools/libs/vchan/headers.chk

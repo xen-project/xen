@@ -19,6 +19,7 @@
 #include <xenevtchn.h>
 
 #include "xc_private.h"
+#include "_paths.h"
 #include "xenguest.h"
 
 #define SUSPEND_LOCK_FILE    XEN_RUN_DIR "/suspend-evtchn-%d.lock"

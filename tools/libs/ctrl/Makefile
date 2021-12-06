@@ -54,11 +54,6 @@ NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-genpath-target = $(call buildmakevars2header,_paths.h)
-$(eval $(genpath-target))
-
-$(LIB_OBJS) $(PIC_OBJS): _paths.h
-
 -include $(DEPS_INCLUDE)
 
 clean: cleanlocal

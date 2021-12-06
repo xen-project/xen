@@ -39,7 +39,7 @@ NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-$(LIB_OBJS) $(PIC_OBJS): $(AUTOINCS) _paths.h
+$(LIB_OBJS) $(PIC_OBJS): $(AUTOINCS)
 
 %.c %.h:: %.y
 	@rm -f $*.[ch]
@@ -49,14 +49,10 @@ $(LIB_OBJS) $(PIC_OBJS): $(AUTOINCS) _paths.h
 	@rm -f $*.[ch]
 	$(FLEX) --header-file=$*.h --outfile=$*.c $<
 
-genpath-target = $(call buildmakevars2header,_paths.h)
-$(eval $(genpath-target))
-
 -include $(DEPS_INCLUDE)
 
 clean: cleanlocal
 
 .PHONY: cleanlocal
 cleanlocal:
-	$(RM) -f _*.h
 	$(RM) -f libxlutil.map

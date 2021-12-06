@@ -29,8 +29,6 @@
 #include <limits.h>
 #include <sys/ioctl.h>
 
-#include "_paths.h"
-
 #define XC_WANT_COMPAT_MAP_FOREIGN_API
 #define XC_INTERNAL_COMPAT_MAP_FOREIGN_API
 #include "xenctrl.h"

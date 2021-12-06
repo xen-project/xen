@@ -111,7 +111,7 @@ libxenguest.so.$(MAJOR).$(MINOR): APPEND_LDFLAGS += $(COMPRESSION_LIBS) -lz
 genpath-target = $(call buildmakevars2header,_paths.h)
 $(eval $(genpath-target))
 
-xc_private.h: _paths.h
+$(LIB_OBJS) $(PIC_OBJS): _paths.h
 
 -include $(DEPS_INCLUDE)
 
