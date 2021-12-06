@@ -604,23 +604,6 @@ _sh_propagate(struct vcpu *v,
                   && !(gflags & _PAGE_DIRTY)) )
         sflags &= ~_PAGE_RW;
 
-    // shadow_mode_log_dirty support
-    //
-    // Only allow the guest write access to a page a) on a demand fault,
-    // or b) if the page is already marked as dirty.
-    //
-    // (We handle log-dirty entirely inside the shadow code, without using the
-    // p2m_ram_logdirty p2m type: only HAP uses that.)
-    if ( unlikely((level == 1) && shadow_mode_log_dirty(d)) )
-    {
-        if ( mfn_valid(target_mfn) ) {
-            if ( ft & FETCH_TYPE_WRITE )
-                paging_mark_dirty(d, target_mfn);
-            else if ( !paging_mfn_is_dirty(d, target_mfn) )
-                sflags &= ~_PAGE_RW;
-        }
-    }
-
 #ifdef CONFIG_HVM
     if ( unlikely(level == 1) && is_hvm_domain(d) )
     {
@@ -660,6 +643,25 @@ _sh_propagate(struct vcpu *v,
 #endif /* OOS */
                   ) )
         sflags &= ~_PAGE_RW;
+
+    /*
+     * shadow_mode_log_dirty support
+     *
+     * Only allow the guest write access to a page a) on a demand fault,
+     * or b) if the page is already marked as dirty.
+     *
+     * (We handle log-dirty entirely inside the shadow code, without using the
+     * p2m_ram_logdirty p2m type: only HAP uses that.)
+     */
+    if ( level == 1 && unlikely(shadow_mode_log_dirty(d)) &&
+         mfn_valid(target_mfn) )
+    {
+        if ( ft & FETCH_TYPE_WRITE )
+            paging_mark_dirty(d, target_mfn);
+        else if ( (sflags & _PAGE_RW) &&
+                  !paging_mfn_is_dirty(d, target_mfn) )
+            sflags &= ~_PAGE_RW;
+    }
 
     // PV guests in 64-bit mode use two different page tables for user vs
     // supervisor permissions, making the guest's _PAGE_USER bit irrelevant.
