@@ -723,9 +723,8 @@ out:
 
 static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                                 libxl_domain_build_info *info,
-                                int store_evtchn, unsigned long *store_mfn,
-                                int console_evtchn, unsigned long *console_mfn,
-                                domid_t store_domid, domid_t console_domid)
+                                unsigned long *store_mfn,
+                                unsigned long *console_mfn)
 {
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
@@ -752,8 +751,6 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 
     xc_hvm_param_get(handle, domid, HVM_PARAM_STORE_PFN, &str_mfn);
     xc_hvm_param_get(handle, domid, HVM_PARAM_CONSOLE_PFN, &cons_mfn);
-    xc_hvm_param_set(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
-    xc_hvm_param_set(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
 
     *store_mfn = str_mfn;
     *console_mfn = cons_mfn;
@@ -1123,7 +1120,9 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     dom->vga_hole_size = device_model ? LIBXL_VGA_HOLE_SIZE : 0;
     dom->device_model = device_model;
     dom->max_vcpus = info->max_vcpus;
+    dom->console_evtchn = state->console_port;
     dom->console_domid = state->console_domid;
+    dom->xenstore_evtchn = state->store_port;
     dom->xenstore_domid = state->store_domid;
 
     rc = libxl__domain_device_construct_rdm(gc, d_config,
@@ -1169,10 +1168,8 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     if (rc != 0)
         goto out;
 
-    rc = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
-                               &state->store_mfn, state->console_port,
-                               &state->console_mfn, state->store_domid,
-                               state->console_domid);
+    rc = hvm_build_set_params(ctx->xch, domid, info, &state->store_mfn,
+                              &state->console_mfn);
     if (rc != 0) {
         LOG(ERROR, "hvm build set params failed");
         goto out;

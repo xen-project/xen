@@ -1866,6 +1866,12 @@ static int bootlate_hvm(struct xc_dom_image *dom)
         munmap(hvm_info_page, PAGE_SIZE);
     }
 
+    if ( xc_hvm_param_set(xch, domid, HVM_PARAM_CONSOLE_EVTCHN,
+                          dom->console_evtchn) ||
+         xc_hvm_param_set(xch, domid, HVM_PARAM_STORE_EVTCHN,
+                          dom->xenstore_evtchn) )
+        return -1;
+
     return 0;
 }
 
