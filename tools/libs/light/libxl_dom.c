@@ -722,13 +722,10 @@ out:
 }
 
 static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
-                                libxl_domain_build_info *info,
-                                unsigned long *store_mfn,
-                                unsigned long *console_mfn)
+                                libxl_domain_build_info *info)
 {
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
-    uint64_t str_mfn, cons_mfn;
     int i;
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
@@ -748,12 +745,6 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
         va_hvm->checksum -= sum;
         munmap(va_map, XC_PAGE_SIZE);
     }
-
-    xc_hvm_param_get(handle, domid, HVM_PARAM_STORE_PFN, &str_mfn);
-    xc_hvm_param_get(handle, domid, HVM_PARAM_CONSOLE_PFN, &cons_mfn);
-
-    *store_mfn = str_mfn;
-    *console_mfn = cons_mfn;
 
     return 0;
 }
@@ -1168,12 +1159,14 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     if (rc != 0)
         goto out;
 
-    rc = hvm_build_set_params(ctx->xch, domid, info, &state->store_mfn,
-                              &state->console_mfn);
+    rc = hvm_build_set_params(ctx->xch, domid, info);
     if (rc != 0) {
         LOG(ERROR, "hvm build set params failed");
         goto out;
     }
+
+    state->console_mfn = dom->console_pfn;
+    state->store_mfn = dom->xenstore_pfn;
     state->vuart_gfn = dom->vuart_gfn;
 
     rc = hvm_build_set_xs_values(gc, domid, dom, info);
