@@ -111,6 +111,10 @@ void arch_pci_init_pdev(struct pci_dev *pdev);
 
 int pci_get_new_domain_nr(void);
 
+int pci_host_iterate_bridges_and_count(struct domain *d,
+                                       int (*cb)(struct domain *d,
+                                                 struct pci_host_bridge *bridge));
+
 #else   /*!CONFIG_HAS_PCI*/
 
 struct arch_pci_dev { };
