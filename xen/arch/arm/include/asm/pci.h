@@ -109,6 +109,8 @@ static always_inline bool is_pci_passthrough_enabled(void)
 
 void arch_pci_init_pdev(struct pci_dev *pdev);
 
+int pci_get_new_domain_nr(void);
+
 #else   /*!CONFIG_HAS_PCI*/
 
 struct arch_pci_dev { };
@@ -127,6 +129,12 @@ static inline int pci_get_host_bridge_segment(const struct dt_device_node *node,
 {
     ASSERT_UNREACHABLE();
     return -EINVAL;
+}
+
+static inline int pci_get_new_domain_nr(void)
+{
+    ASSERT_UNREACHABLE();
+    return -1;
 }
 
 #endif  /*!CONFIG_HAS_PCI*/

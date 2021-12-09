@@ -654,6 +654,55 @@ static void __init allocate_static_memory(struct domain *d,
 }
 #endif
 
+/*
+ * When PCI passthrough is available we want to keep the
+ * "linux,pci-domain" in sync for every host bridge.
+ *
+ * Xen may not have a driver for all the host bridges. So we have
+ * to write an heuristic to detect whether a device node describes
+ * a host bridge.
+ *
+ * The current heuristic assumes that a device is a host bridge
+ * if the type is "pci" and then parent type is not "pci".
+ */
+static int handle_linux_pci_domain(struct kernel_info *kinfo,
+                                   const struct dt_device_node *node)
+{
+    uint16_t segment;
+    int res;
+
+    if ( !is_pci_passthrough_enabled() )
+        return 0;
+
+    if ( !dt_device_type_is_equal(node, "pci") )
+        return 0;
+
+    if ( node->parent && dt_device_type_is_equal(node->parent, "pci") )
+        return 0;
+
+    if ( dt_find_property(node, "linux,pci-domain", NULL) )
+        return 0;
+
+    /* Allocate and create the linux,pci-domain */
+    res = pci_get_host_bridge_segment(node, &segment);
+    if ( res < 0 )
+    {
+        res = pci_get_new_domain_nr();
+        if ( res < 0 )
+        {
+            printk(XENLOG_DEBUG "Can't assign PCI segment to %s\n",
+                   node->full_name);
+            return -FDT_ERR_NOTFOUND;
+        }
+
+        segment = res;
+        printk(XENLOG_DEBUG "Assigned segment %d to %s\n",
+               segment, node->full_name);
+    }
+
+    return fdt_property_cell(kinfo->fdt, "linux,pci-domain", segment);
+}
+
 static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
                                    const struct dt_device_node *node)
 {
@@ -755,21 +804,10 @@ static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
             return res;
     }
 
-    if ( is_pci_passthrough_enabled() && dt_device_type_is_equal(node, "pci") )
-    {
-        if ( !dt_find_property(node, "linux,pci-domain", NULL) )
-        {
-            uint16_t segment;
+    res = handle_linux_pci_domain(kinfo, node);
 
-            res = pci_get_host_bridge_segment(node, &segment);
-            if ( res < 0 )
-                return res;
-
-            res = fdt_property_cell(kinfo->fdt, "linux,pci-domain", segment);
-            if ( res )
-                return res;
-        }
-    }
+    if ( res )
+        return res;
 
     /*
      * Override the property "status" to disable the device when it's

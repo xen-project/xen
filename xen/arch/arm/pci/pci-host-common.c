@@ -30,6 +30,8 @@ static LIST_HEAD(pci_host_bridges);
 
 static atomic_t domain_nr = ATOMIC_INIT(-1);
 
+static int use_dt_domains = -1;
+
 static inline void __iomem *pci_remap_cfgspace(paddr_t start, size_t len)
 {
     return ioremap_nocache(start, len);
@@ -137,14 +139,16 @@ void pci_add_host_bridge(struct pci_host_bridge *bridge)
     list_add_tail(&bridge->node, &pci_host_bridges);
 }
 
-static int pci_get_new_domain_nr(void)
+int pci_get_new_domain_nr(void)
 {
+    if ( use_dt_domains )
+        return -1;
+
     return atomic_inc_return(&domain_nr);
 }
 
 static int pci_bus_find_domain_nr(struct dt_device_node *dev)
 {
-    static int use_dt_domains = -1;
     int domain;
 
     domain = dt_get_pci_domain_nr(dev);
