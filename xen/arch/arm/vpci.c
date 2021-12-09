@@ -130,7 +130,11 @@ unsigned int domain_vpci_get_num_mmio_handlers(struct domain *d)
         return ret;
     }
 
-    return 0;
+    /*
+     * For guests each host bridge requires one region to cover the
+     * configuration space. At the moment, we only expose a single host bridge.
+     */
+    return 1;
 }
 
 /*
