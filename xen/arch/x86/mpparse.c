@@ -84,9 +84,14 @@ void __init set_nr_cpu_ids(unsigned int max_cpus)
 	if (!park_offline_cpus)
 		tot_cpus = max_cpus;
 	nr_cpu_ids = min(tot_cpus, NR_CPUS + 0u);
-	if (park_offline_cpus && nr_cpu_ids < num_processors)
-		printk(XENLOG_WARNING "SMP: Cannot bring up %u further CPUs\n",
-		       num_processors - nr_cpu_ids);
+	if (nr_cpu_ids < num_processors)
+	{
+		unaccounted_cpus = true;
+		if (park_offline_cpus)
+			printk(XENLOG_WARNING
+			       "SMP: Cannot bring up %u further CPUs\n",
+			       num_processors - nr_cpu_ids);
+	}
 
 #ifndef nr_cpumask_bits
 	nr_cpumask_bits = ROUNDUP(nr_cpu_ids, BITS_PER_LONG);
