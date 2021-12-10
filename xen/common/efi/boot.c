@@ -389,7 +389,7 @@ static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
     return argc;
 }
 
-static EFI_FILE_HANDLE __init get_parent_handle(EFI_LOADED_IMAGE *loaded_image,
+static EFI_FILE_HANDLE __init get_parent_handle(const EFI_LOADED_IMAGE *loaded_image,
                                                 CHAR16 **leaf)
 {
     static EFI_GUID __initdata fs_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
@@ -561,7 +561,7 @@ static int __init __maybe_unused set_color(uint32_t mask, int bpp,
 }
 
 #ifndef CONFIG_HAS_DEVICE_TREE
-static int __init efi_check_dt_boot(EFI_LOADED_IMAGE *loaded_image)
+static int __init efi_check_dt_boot(const EFI_LOADED_IMAGE *loaded_image)
 {
     return 0;
 }

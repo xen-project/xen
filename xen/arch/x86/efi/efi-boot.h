@@ -709,7 +709,7 @@ static void __init efi_arch_halt(void)
         halt();
 }
 
-static void __init efi_arch_load_addr_check(EFI_LOADED_IMAGE *loaded_image)
+static void __init efi_arch_load_addr_check(const EFI_LOADED_IMAGE *loaded_image)
 {
     xen_phys_start = (UINTN)loaded_image->ImageBase;
     if ( (xen_phys_start + loaded_image->ImageSize - 1) >> 32 )
