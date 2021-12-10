@@ -1546,7 +1546,8 @@ int xc_get_device_group(
 {
     int rc;
     DECLARE_DOMCTL;
-    DECLARE_HYPERCALL_BOUNCE(sdev_array, max_sdevs * sizeof(*sdev_array), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(sdev_array, max_sdevs * sizeof(*sdev_array),
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
 
     if ( xc_hypercall_bounce_pre(xch, sdev_array) )
     {
