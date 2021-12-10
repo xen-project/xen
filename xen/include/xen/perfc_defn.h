@@ -37,6 +37,7 @@ PERFCOUNTER(tickled_busy_cpu,       "sched: tickled_busy_cpu")
 PERFCOUNTER(unit_check,             "sched: unit_check")
 
 /* credit specific counters */
+#ifdef CONFIG_SCHED_CREDIT
 PERFCOUNTER(delay_ms,               "csched: delay")
 PERFCOUNTER(acct_run,               "csched: acct_run")
 PERFCOUNTER(acct_no_work,           "csched: acct_no_work")
@@ -58,8 +59,10 @@ PERFCOUNTER(migrate_queued,         "csched: migrate_queued")
 PERFCOUNTER(migrate_running,        "csched: migrate_running")
 PERFCOUNTER(migrate_kicked_away,    "csched: migrate_kicked_away")
 PERFCOUNTER(unit_hot,               "csched: unit_hot")
+#endif
 
 /* credit2 specific counters */
+#ifdef CONFIG_SCHED_CREDIT2
 PERFCOUNTER(burn_credits_t2c,       "csched2: burn_credits_t2c")
 PERFCOUNTER(acct_load_balance,      "csched2: acct_load_balance")
 PERFCOUNTER(upd_max_weight_quick,   "csched2: update_max_weight_quick")
@@ -77,6 +80,7 @@ PERFCOUNTER(credit_reset,           "csched2: credit_reset")
 PERFCOUNTER(deferred_to_tickled_cpu,"csched2: deferred_to_tickled_cpu")
 PERFCOUNTER(tickled_cpu_overwritten,"csched2: tickled_cpu_overwritten")
 PERFCOUNTER(tickled_cpu_overridden, "csched2: tickled_cpu_overridden")
+#endif
 
 PERFCOUNTER(need_flush_tlb_flush,   "PG_need_flush tlb flushes")
 
