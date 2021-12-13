@@ -503,10 +503,25 @@ static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
 
     if ( cfgfile_options )
     {
+        PrintMessage(L"Using bootargs from Xen configuration file.");
         prop_len += snprintf(buf + prop_len,
                                EFI_PAGE_SIZE - prop_len, " %s", cfgfile_options);
         if ( prop_len >= EFI_PAGE_SIZE )
             blexit(L"FDT string overflow");
+    }
+    else
+    {
+        /* Get xen,xen-bootargs in /chosen if it is specified */
+        const char *dt_bootargs_prop = fdt_getprop(fdt, chosen,
+                                                   "xen,xen-bootargs", NULL);
+        if ( dt_bootargs_prop )
+        {
+            PrintMessage(L"Using bootargs from device tree.");
+            prop_len += snprintf(buf + prop_len, EFI_PAGE_SIZE - prop_len,
+                                 " %s", dt_bootargs_prop);
+            if ( prop_len >= EFI_PAGE_SIZE )
+                blexit(L"FDT string overflow");
+        }
     }
 
     if ( cmdline_options )
