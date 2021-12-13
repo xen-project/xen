@@ -249,6 +249,10 @@ UEFI stub for module loading.
 When adding DomU modules to device tree, also add the property
 xen,uefi-cfg-load under chosen for Xen to load the Xen config file.
 Otherwise, Xen will skip the config file and rely on device tree alone.
+When using the Xen configuration file in conjunction with the device tree, you
+can specify the Xen boot arguments in the configuration file with the "options="
+keyword or in the device tree with the "xen,xen-bootargs" property, but be
+aware that the Xen configuration file value has a precedence over the DT value.
 
 Example 1 of how to boot a true dom0less configuration:
 
