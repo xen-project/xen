@@ -6,7 +6,10 @@
 #   MINOR:   minor version of lib (0 if empty)
 
 LIBNAME := $(notdir $(CURDIR))
-MAJOR ?= $(shell $(XEN_ROOT)/version.sh $(XEN_ROOT)/xen/Makefile)
+
+ifeq ($(origin MAJOR), undefined)
+MAJOR := $(shell $(XEN_ROOT)/version.sh $(XEN_ROOT)/xen/Makefile)
+endif
 MINOR ?= 0
 
 SHLIB_LDFLAGS += -Wl,--version-script=libxen$(LIBNAME).map
