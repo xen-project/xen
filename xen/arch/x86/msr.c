@@ -325,6 +325,11 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         *val = 0;
         break;
 
+    case MSR_PKRS:
+        if ( !cp->feat.pks )
+            goto gp_fault;
+        goto get_reg;
+
     case MSR_X2APIC_FIRST ... MSR_X2APIC_LAST:
         if ( !is_hvm_domain(d) || v != curr )
             goto gp_fault;
@@ -615,6 +620,11 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( likely(!is_cpufreq_controller(d)) || wrmsr_safe(msr, val) == 0 )
             break;
         goto gp_fault;
+
+    case MSR_PKRS:
+        if ( !cp->feat.pks || val != (uint32_t)val )
+            goto gp_fault;
+        goto set_reg;
 
     case MSR_X2APIC_FIRST ... MSR_X2APIC_LAST:
         if ( !is_hvm_domain(d) || v != curr )

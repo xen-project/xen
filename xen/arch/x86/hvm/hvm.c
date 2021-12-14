@@ -1333,6 +1333,7 @@ static int cf_check hvm_load_cpu_xsave_states(
 static const uint32_t msrs_to_send[] = {
     MSR_SPEC_CTRL,
     MSR_INTEL_MISC_FEATURES_ENABLES,
+    MSR_PKRS,
     MSR_IA32_BNDCFGS,
     MSR_IA32_XSS,
     MSR_VIRT_SPEC_CTRL,
@@ -1486,6 +1487,7 @@ static int cf_check hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
 
         case MSR_SPEC_CTRL:
         case MSR_INTEL_MISC_FEATURES_ENABLES:
+        case MSR_PKRS:
         case MSR_IA32_BNDCFGS:
         case MSR_IA32_XSS:
         case MSR_VIRT_SPEC_CTRL:

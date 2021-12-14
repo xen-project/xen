@@ -793,6 +793,11 @@ static void cf_check vmx_cpuid_policy_changed(struct vcpu *v)
     else
         vmx_set_msr_intercept(v, MSR_FLUSH_CMD, VMX_MSR_RW);
 
+    if ( cp->feat.pks )
+        vmx_clear_msr_intercept(v, MSR_PKRS, VMX_MSR_RW);
+    else
+        vmx_set_msr_intercept(v, MSR_PKRS, VMX_MSR_RW);
+
  out:
     vmx_vmcs_exit(v);
 
@@ -2582,6 +2587,7 @@ static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
 {
     const struct vcpu *curr = current;
     struct domain *d = v->domain;
+    const struct vcpu_msrs *msrs = v->arch.msrs;
     uint64_t val = 0;
     int rc;
 
@@ -2597,6 +2603,9 @@ static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
             domain_crash(d);
         }
         return val;
+
+    case MSR_PKRS:
+        return (v == curr) ? rdpkrs() : msrs->pkrs;
 
     case MSR_SHADOW_GS_BASE:
         if ( v != curr )
@@ -2626,6 +2635,8 @@ static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
 
 static void cf_check vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 {
+    const struct vcpu *curr = current;
+    struct vcpu_msrs *msrs = v->arch.msrs;
     struct domain *d = v->domain;
     int rc;
 
@@ -2640,6 +2651,12 @@ static void cf_check vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
                    __func__, v, reg, rc);
             domain_crash(d);
         }
+        return;
+
+    case MSR_PKRS:
+        msrs->pkrs = val;
+        if ( v == curr )
+            wrpkrs(val);
         return;
     }
 
