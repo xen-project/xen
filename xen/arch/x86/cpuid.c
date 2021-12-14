@@ -116,6 +116,24 @@ static int __init parse_xen_cpuid(const char *s)
 }
 custom_param("cpuid", parse_xen_cpuid);
 
+static bool __initdata dom0_cpuid_cmdline;
+static uint32_t __initdata dom0_enable_feat[FSCAPINTS];
+static uint32_t __initdata dom0_disable_feat[FSCAPINTS];
+
+static void __init _parse_dom0_cpuid(unsigned int feat, bool val)
+{
+    __set_bit  (feat, val ? dom0_enable_feat  : dom0_disable_feat);
+    __clear_bit(feat, val ? dom0_disable_feat : dom0_enable_feat );
+}
+
+static int __init parse_dom0_cpuid(const char *s)
+{
+    dom0_cpuid_cmdline = true;
+
+    return parse_cpuid(s, _parse_dom0_cpuid);
+}
+custom_param("dom0-cpuid", parse_dom0_cpuid);
+
 #define EMPTY_LEAF ((struct cpuid_leaf){})
 static void zero_leaves(struct cpuid_leaf *l,
                         unsigned int first, unsigned int last)
@@ -785,6 +803,25 @@ void __init init_dom0_cpuid_policy(struct domain *d)
      */
     if ( cpu_has_arch_caps )
         p->feat.arch_caps = true;
+
+    /* Apply dom0-cpuid= command line settings, if provided. */
+    if ( dom0_cpuid_cmdline )
+    {
+        uint32_t fs[FSCAPINTS];
+        unsigned int i;
+
+        cpuid_policy_to_featureset(p, fs);
+
+        for ( i = 0; i < ARRAY_SIZE(fs); ++i )
+        {
+            fs[i] |=  dom0_enable_feat [i];
+            fs[i] &= ~dom0_disable_feat[i];
+        }
+
+        cpuid_featureset_to_policy(fs, p);
+
+        recalculate_cpuid_policy(d);
+    }
 }
 
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
