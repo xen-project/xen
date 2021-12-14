@@ -113,7 +113,6 @@ do_multicall(
     if ( unlikely(disp == mc_preempt) && i < nr_calls )
         goto preempted;
 
-    perfc_incr(calls_to_multicall);
     perfc_add(calls_from_multicall, i);
     mcs->flags = 0;
     return rc;
