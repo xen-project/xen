@@ -263,7 +263,7 @@ int arch_monitor_domctl_event(struct domain *d,
         if ( unlikely(old_status == requested_status) )
             return -EEXIST;
 
-        if ( !hvm_funcs.set_descriptor_access_exiting )
+        if ( !hvm_has_set_descriptor_access_exiting() )
             return -EOPNOTSUPP;
 
         domain_pause(d);
