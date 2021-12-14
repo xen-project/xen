@@ -12,8 +12,10 @@
 #include <xen/domain_page.h>
 #include <xen/err.h>
 #include <xen/event.h>
+
 #include <asm/x86_emulate.h>
 #include <asm/processor.h> /* current_cpu_info */
+#include <asm/prot-key.h>
 #include <asm/xstate.h>
 #include <asm/amd.h> /* cpu_has_amd_erratum() */
 #include <asm/debugreg.h>

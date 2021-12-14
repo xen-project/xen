@@ -374,44 +374,6 @@ static always_inline void set_in_cr4 (unsigned long mask)
     write_cr4(read_cr4() | mask);
 }
 
-static inline unsigned int rdpkru(void)
-{
-    unsigned int pkru;
-
-    asm volatile (".byte 0x0f,0x01,0xee"
-        : "=a" (pkru) : "c" (0) : "dx");
-
-    return pkru;
-}
-
-static inline void wrpkru(unsigned int pkru)
-{
-    asm volatile ( ".byte 0x0f, 0x01, 0xef"
-                   :: "a" (pkru), "d" (0), "c" (0) );
-}
-
-/* Macros for PKRU domain */
-#define PKRU_READ  (0)
-#define PKRU_WRITE (1)
-#define PKRU_ATTRS (2)
-
-/*
- * PKRU defines 32 bits, there are 16 domains and 2 attribute bits per
- * domain in pkru, pkeys is index to a defined domain, so the value of
- * pte_pkeys * PKRU_ATTRS + R/W is offset of a defined domain attribute.
- */
-static inline bool_t read_pkru_ad(uint32_t pkru, unsigned int pkey)
-{
-    ASSERT(pkey < 16);
-    return (pkru >> (pkey * PKRU_ATTRS + PKRU_READ)) & 1;
-}
-
-static inline bool_t read_pkru_wd(uint32_t pkru, unsigned int pkey)
-{
-    ASSERT(pkey < 16);
-    return (pkru >> (pkey * PKRU_ATTRS + PKRU_WRITE)) & 1;
-}
-
 static always_inline void __monitor(const void *eax, unsigned long ecx,
                                     unsigned long edx)
 {

@@ -26,7 +26,9 @@
 #include <xen/paging.h>
 #include <xen/domain_page.h>
 #include <xen/sched.h>
+
 #include <asm/page.h>
+#include <asm/prot-key.h>
 #include <asm/guest_pt.h>
 #include <asm/hvm/emulate.h>
 
@@ -413,10 +415,11 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
          guest_pku_enabled(v) )
     {
         unsigned int pkey = guest_l1e_get_pkey(gw->l1e);
-        unsigned int pkru = rdpkru();
+        unsigned int pkr = rdpkru();
+        unsigned int pk_ar = (pkr >> (pkey * PKEY_WIDTH)) & (PKEY_AD | PKEY_WD);
 
-        if ( read_pkru_ad(pkru, pkey) ||
-             ((walk & PFEC_write_access) && read_pkru_wd(pkru, pkey) &&
+        if ( (pk_ar & PKEY_AD) ||
+             ((walk & PFEC_write_access) && (pk_ar & PKEY_WD) &&
               ((walk & PFEC_user_mode) || guest_wp_enabled(v))) )
         {
             gw->pfec |= PFEC_prot_key;
