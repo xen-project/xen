@@ -325,6 +325,8 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         ioreq_signal_mapcache_invalidate();
     }
 
+    perfc_incra(hypercalls, eax);
+
     return curr->hcall_preempted ? HVM_HCALL_preempted : HVM_HCALL_completed;
 }
 

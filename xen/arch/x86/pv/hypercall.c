@@ -238,7 +238,7 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
     if ( curr->hcall_preempted )
         regs->rip -= 2;
 
-    perfc_incr(hypercalls);
+    perfc_incra(hypercalls, eax);
 }
 
 enum mc_disposition pv_do_multicall_call(struct mc_state *state)
