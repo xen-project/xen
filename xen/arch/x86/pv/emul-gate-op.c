@@ -163,6 +163,12 @@ static int read_mem(enum x86_segment seg, unsigned long offset, void *p_data,
     return X86EMUL_OKAY;
 }
 
+static int fetch(unsigned long offset, void *p_data,
+                 unsigned int bytes, struct x86_emulate_ctxt *ctxt)
+{
+    return read_mem(x86_seg_cs, offset, p_data, bytes, ctxt);
+}
+
 void pv_emulate_gate_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -205,7 +211,7 @@ void pv_emulate_gate_op(struct cpu_user_regs *regs)
 
     ctxt.ctxt.addr_size = ar & _SEGMENT_DB ? 32 : 16;
     /* Leave zero in ctxt.ctxt.sp_size, as it's not needed for decoding. */
-    state = x86_decode_insn(&ctxt.ctxt, read_mem);
+    state = x86_decode_insn(&ctxt.ctxt, fetch);
     ctxt.insn_fetch = false;
     if ( IS_ERR_OR_NULL(state) )
     {

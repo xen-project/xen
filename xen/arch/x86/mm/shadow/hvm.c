@@ -162,8 +162,7 @@ hvm_emulate_read(enum x86_segment seg,
 }
 
 static int
-hvm_emulate_insn_fetch(enum x86_segment seg,
-                       unsigned long offset,
+hvm_emulate_insn_fetch(unsigned long offset,
                        void *p_data,
                        unsigned int bytes,
                        struct x86_emulate_ctxt *ctxt)
@@ -172,11 +171,9 @@ hvm_emulate_insn_fetch(enum x86_segment seg,
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     unsigned int insn_off = offset - sh_ctxt->insn_buf_eip;
 
-    ASSERT(seg == x86_seg_cs);
-
     /* Fall back if requested bytes are not in the prefetch cache. */
     if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
-        return hvm_read(seg, offset, p_data, bytes,
+        return hvm_read(x86_seg_cs, offset, p_data, bytes,
                         hvm_access_insn_fetch, sh_ctxt);
 
     /* Hit the cache. Simple memcpy. */

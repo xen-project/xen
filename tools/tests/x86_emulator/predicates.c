@@ -2049,8 +2049,7 @@ static void print_insn(const uint8_t *instr, unsigned int len)
 
 void do_test(uint8_t *instr, unsigned int len, unsigned int modrm,
              enum mem_access mem, struct x86_emulate_ctxt *ctxt,
-             int (*fetch)(enum x86_segment seg,
-                          unsigned long offset,
+             int (*fetch)(unsigned long offset,
                           void *p_data,
                           unsigned int bytes,
                           struct x86_emulate_ctxt *ctxt))
@@ -2110,8 +2109,7 @@ void do_test(uint8_t *instr, unsigned int len, unsigned int modrm,
 }
 
 void predicates_test(void *instr, struct x86_emulate_ctxt *ctxt,
-                     int (*fetch)(enum x86_segment seg,
-                                  unsigned long offset,
+                     int (*fetch)(unsigned long offset,
                                   void *p_data,
                                   unsigned int bytes,
                                   struct x86_emulate_ctxt *ctxt))

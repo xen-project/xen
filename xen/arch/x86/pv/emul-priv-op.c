@@ -1258,8 +1258,7 @@ static int validate(const struct x86_emulate_state *state,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int insn_fetch(enum x86_segment seg,
-                      unsigned long offset,
+static int insn_fetch(unsigned long offset,
                       void *p_data,
                       unsigned int bytes,
                       struct x86_emulate_ctxt *ctxt)
@@ -1268,8 +1267,6 @@ static int insn_fetch(enum x86_segment seg,
         container_of(ctxt, struct priv_op_ctxt, ctxt);
     unsigned int rc;
     unsigned long addr = poc->cs.base + offset;
-
-    ASSERT(seg == x86_seg_cs);
 
     /* We don't mean to emulate any branches. */
     if ( !bytes )

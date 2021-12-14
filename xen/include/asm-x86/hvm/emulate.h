@@ -92,8 +92,7 @@ static inline bool handle_mmio(void)
     return hvm_emulate_one_insn(x86_insn_is_mem_access, "MMIO");
 }
 
-int hvmemul_insn_fetch(enum x86_segment seg,
-                       unsigned long offset,
+int hvmemul_insn_fetch(unsigned long offset,
                        void *p_data,
                        unsigned int bytes,
                        struct x86_emulate_ctxt *ctxt);

@@ -594,14 +594,13 @@ static int read(
 }
 
 static int fetch(
-    enum x86_segment seg,
     unsigned long offset,
     void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
     if ( verbose )
-        printf("** %s(%u, %p,, %u,)\n", __func__, seg, (void *)offset, bytes);
+        printf("** %s(CS:%p,, %u,)\n", __func__, (void *)offset, bytes);
 
     memcpy(p_data, (void *)offset, bytes);
     return X86EMUL_OKAY;

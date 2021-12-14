@@ -1295,7 +1295,7 @@ static inline int mkec(uint8_t e, int32_t ec, ...)
    generate_exception_if((uint8_t)(state->ip -                          \
                                    ctxt->regs->r(ip)) > MAX_INST_LEN,   \
                          EXC_GP, 0);                                    \
-   rc = ops->insn_fetch(x86_seg_cs, _ip, &_x, (_size), ctxt);           \
+   rc = ops->insn_fetch(_ip, &_x, _size, ctxt);                         \
    if ( rc ) goto done;                                                 \
    _x;                                                                  \
 })
@@ -1363,7 +1363,7 @@ do {                                                                    \
         ip = (uint16_t)ip;                                              \
     else if ( !mode_64bit() )                                           \
         ip = (uint32_t)ip;                                              \
-    rc = ops->insn_fetch(x86_seg_cs, ip, NULL, 0, ctxt);                \
+    rc = ops->insn_fetch(ip, NULL, 0, ctxt);                            \
     if ( rc ) goto done;                                                \
     _regs.r(ip) = ip;                                                   \
     singlestep = _regs.eflags & X86_EFLAGS_TF;                          \
@@ -4740,7 +4740,7 @@ x86_emulate(
                    ? 8 : op_bytes;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + src.val),
                               &dst.val, op_bytes, ctxt, ops)) != 0 ||
-             (rc = ops->insn_fetch(x86_seg_cs, dst.val, NULL, 0, ctxt)) )
+             (rc = ops->insn_fetch(dst.val, NULL, 0, ctxt)) )
             goto done;
         _regs.r(ip) = dst.val;
         adjust_bnd(ctxt, ops, vex.pfx);
@@ -5628,14 +5628,14 @@ x86_emulate(
             break;
         case 2: /* call (near) */
             dst.val = _regs.r(ip);
-            if ( (rc = ops->insn_fetch(x86_seg_cs, src.val, NULL, 0, ctxt)) )
+            if ( (rc = ops->insn_fetch(src.val, NULL, 0, ctxt)) )
                 goto done;
             _regs.r(ip) = src.val;
             src.val = dst.val;
             adjust_bnd(ctxt, ops, vex.pfx);
             goto push;
         case 4: /* jmp (near) */
-            if ( (rc = ops->insn_fetch(x86_seg_cs, src.val, NULL, 0, ctxt)) )
+            if ( (rc = ops->insn_fetch(src.val, NULL, 0, ctxt)) )
                 goto done;
             _regs.r(ip) = src.val;
             dst.type = OP_NONE;
@@ -12220,8 +12220,7 @@ struct x86_emulate_state *
 x86_decode_insn(
     struct x86_emulate_ctxt *ctxt,
     int (*insn_fetch)(
-        enum x86_segment seg, unsigned long offset,
-        void *p_data, unsigned int bytes,
+        unsigned long offset, void *p_data, unsigned int bytes,
         struct x86_emulate_ctxt *ctxt))
 {
     static DEFINE_PER_CPU(struct x86_emulate_state, state);

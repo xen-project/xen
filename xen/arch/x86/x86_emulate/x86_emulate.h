@@ -254,13 +254,12 @@ struct x86_emulate_ops
 
     /*
      * insn_fetch: Emulate fetch from instruction byte stream.
-     *  Except for @bytes, all parameters are the same as for 'read'.
+     *  Except for @bytes and missing @seg, all parameters are the same as for
+     *  'read'.
      *  @bytes: Access length (0 <= @bytes < 16, with zero meaning
      *  "validate address only").
-     *  @seg is always x86_seg_cs.
      */
     int (*insn_fetch)(
-        enum x86_segment seg,
         unsigned long offset,
         void *p_data,
         unsigned int bytes,
@@ -750,8 +749,7 @@ struct x86_emulate_state *
 x86_decode_insn(
     struct x86_emulate_ctxt *ctxt,
     int (*insn_fetch)(
-        enum x86_segment seg, unsigned long offset,
-        void *p_data, unsigned int bytes,
+        unsigned long offset, void *p_data, unsigned int bytes,
         struct x86_emulate_ctxt *ctxt));
 
 unsigned int

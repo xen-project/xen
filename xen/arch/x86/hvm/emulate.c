@@ -1294,7 +1294,6 @@ static int hvmemul_read(
 }
 
 int hvmemul_insn_fetch(
-    enum x86_segment seg,
     unsigned long offset,
     void *p_data,
     unsigned int bytes,
@@ -1312,7 +1311,7 @@ int hvmemul_insn_fetch(
     if ( !bytes ||
          unlikely((insn_off + bytes) > hvmemul_ctxt->insn_buf_bytes) )
     {
-        int rc = __hvmemul_read(seg, offset, p_data, bytes,
+        int rc = __hvmemul_read(x86_seg_cs, offset, p_data, bytes,
                                 hvm_access_insn_fetch, hvmemul_ctxt);
 
         if ( rc == X86EMUL_OKAY && bytes )
