@@ -969,7 +969,9 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d)
             (p->feat.smep     ? X86_CR4_SMEP              : 0) |
             (p->feat.smap     ? X86_CR4_SMAP              : 0) |
             (p->feat.pku      ? X86_CR4_PKE               : 0) |
-            (cet              ? X86_CR4_CET               : 0));
+            (cet              ? X86_CR4_CET               : 0) |
+            (p->feat.pks      ? X86_CR4_PKS               : 0) |
+            0);
 }
 
 static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)

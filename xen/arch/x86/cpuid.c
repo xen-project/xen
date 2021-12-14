@@ -579,6 +579,15 @@ static void __init calculate_hvm_max_policy(void)
             __clear_bit(X86_FEATURE_XSAVES, hvm_featureset);
     }
 
+    /*
+     * Xen doesn't use PKS, so the guest support for it has opted to not use
+     * the VMCS load/save controls for efficiency reasons.  This depends on
+     * the exact vmentry/exit behaviour, so don't expose PKS in other
+     * situations until someone has cross-checked the behaviour for safety.
+     */
+    if ( !cpu_has_vmx )
+        __clear_bit(X86_FEATURE_PKS, hvm_featureset);
+
     guest_common_feature_adjustments(hvm_featureset);
 
     sanitise_featureset(hvm_featureset);
