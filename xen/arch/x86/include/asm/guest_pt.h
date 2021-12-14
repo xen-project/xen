@@ -282,6 +282,11 @@ static always_inline bool guest_pku_enabled(const struct vcpu *v)
     return !is_pv_vcpu(v) && hvm_pku_enabled(v);
 }
 
+static always_inline bool guest_pks_enabled(const struct vcpu *v)
+{
+    return !is_pv_vcpu(v) && hvm_pks_enabled(v);
+}
+
 /* Helpers for identifying whether guest entries have reserved bits set. */
 
 /* Bits reserved because of maxphysaddr, and (lack of) EFER.NX */

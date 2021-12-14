@@ -407,6 +407,8 @@ int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value);
     ((v)->arch.hvm.guest_efer & EFER_NXE)
 #define hvm_pku_enabled(v) \
     (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_PKE))
+#define hvm_pks_enabled(v) \
+    (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_PKS))
 
 /* Can we use superpages in the HAP p2m table? */
 #define hap_has_1gb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB))
@@ -911,6 +913,7 @@ static inline void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 #define hvm_smap_enabled(v) ((void)(v), false)
 #define hvm_nx_enabled(v) ((void)(v), false)
 #define hvm_pku_enabled(v) ((void)(v), false)
+#define hvm_pks_enabled(v) ((void)(v), false)
 
 #define arch_vcpu_block(v) ((void)(v))
 

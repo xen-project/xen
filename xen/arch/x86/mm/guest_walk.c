@@ -406,16 +406,17 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
     /*
      * If all access checks are thus far ok, check Protection Key for 64bit
-     * data accesses to user mappings.
+     * data accesses.
      *
      * N.B. In the case that the walk ended with a superpage, the fabricated
      * gw->l1e contains the appropriate leaf pkey.
      */
-    if ( (ar & _PAGE_USER) && !(walk & PFEC_insn_fetch) &&
-         guest_pku_enabled(v) )
+    if ( !(walk & PFEC_insn_fetch) &&
+         ((ar & _PAGE_USER) ? guest_pku_enabled(v)
+                            : guest_pks_enabled(v)) )
     {
         unsigned int pkey = guest_l1e_get_pkey(gw->l1e);
-        unsigned int pkr = rdpkru();
+        unsigned int pkr = (ar & _PAGE_USER) ? rdpkru() : rdpkrs();
         unsigned int pk_ar = (pkr >> (pkey * PKEY_WIDTH)) & (PKEY_AD | PKEY_WD);
 
         if ( (pk_ar & PKEY_AD) ||
