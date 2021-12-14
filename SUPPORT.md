@@ -48,6 +48,12 @@ For the Cortex A57 r0p0 - r1p1, see Errata 832075.
 
     Status, x86: Supported
 
+### Physical Memory
+
+    Status: Supported up to 8 TiB
+
+Hosts with more memory are supported, but not security supported.
+
 ### Physical Memory Hotplug
 
     Status, x86: Supported
