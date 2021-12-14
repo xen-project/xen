@@ -134,7 +134,7 @@ static const char *const str_7c0[32] =
     /* 24 */                   [25] = "cldemote",
     /* 26 */                   [27] = "movdiri",
     [28] = "movdir64b",        [29] = "enqcmd",
-    [30] = "sgx-lc",
+    [30] = "sgx-lc",           [31] = "pks",
 };
 
 static const char *const str_e7d[32] =

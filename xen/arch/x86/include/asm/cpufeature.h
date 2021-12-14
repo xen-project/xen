@@ -121,6 +121,7 @@
 #define cpu_has_movdiri         boot_cpu_has(X86_FEATURE_MOVDIRI)
 #define cpu_has_movdir64b       boot_cpu_has(X86_FEATURE_MOVDIR64B)
 #define cpu_has_enqcmd          boot_cpu_has(X86_FEATURE_ENQCMD)
+#define cpu_has_pks             boot_cpu_has(X86_FEATURE_PKS)
 
 /* CPUID level 0x80000007.edx */
 #define cpu_has_hw_pstate       boot_cpu_has(X86_FEATURE_HW_PSTATE)

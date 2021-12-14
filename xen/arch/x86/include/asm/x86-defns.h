@@ -74,6 +74,7 @@
 #define X86_CR4_SMAP       0x00200000 /* enable SMAP */
 #define X86_CR4_PKE        0x00400000 /* enable PKE */
 #define X86_CR4_CET        0x00800000 /* Control-flow Enforcement Technology */
+#define X86_CR4_PKS        0x01000000 /* Protection Key Supervisor */
 
 /*
  * XSTATE component flags in XCR0
