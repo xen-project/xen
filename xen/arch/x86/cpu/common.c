@@ -58,6 +58,8 @@ static unsigned int forced_caps[NCAPINTS];
 
 DEFINE_PER_CPU(bool, full_gdt_loaded);
 
+DEFINE_PER_CPU(uint32_t, pkrs);
+
 void __init setup_clear_cpu_cap(unsigned int cap)
 {
 	const uint32_t *dfs;

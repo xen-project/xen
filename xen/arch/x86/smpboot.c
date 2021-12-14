@@ -42,6 +42,7 @@
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
+#include <asm/prot-key.h>
 #include <asm/setup.h>
 #include <asm/spec_ctrl.h>
 #include <asm/time.h>
@@ -363,6 +364,9 @@ void start_secondary(void *unused)
     load_system_tables();
 
     /* Full exception support from here on in. */
+
+    if ( cpu_has_pks )
+        wrpkrs_and_cache(0); /* Must be before setting CR4.PKS */
 
     /* Safe to enable feature such as CR4.MCE with the IDT set up now. */
     write_cr4(mmu_cr4_features);

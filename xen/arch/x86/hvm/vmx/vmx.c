@@ -58,6 +58,7 @@
 #include <asm/event.h>
 #include <asm/mce.h>
 #include <asm/monitor.h>
+#include <asm/prot-key.h>
 #include <public/arch-x86/cpuid.h>
 
 static bool_t __initdata opt_force_ept;
@@ -672,6 +673,7 @@ static void vmx_restore_host_msrs(void)
 
 static void vmx_save_guest_msrs(struct vcpu *v)
 {
+    const struct cpuid_policy *cp = v->domain->arch.cpuid;
     struct vcpu_msrs *msrs = v->arch.msrs;
 
     /*
@@ -685,10 +687,14 @@ static void vmx_save_guest_msrs(struct vcpu *v)
         rdmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
         rdmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
     }
+
+    if ( cp->feat.pks )
+        msrs->pkrs = rdpkrs_and_cache();
 }
 
 static void vmx_restore_guest_msrs(struct vcpu *v)
 {
+    const struct cpuid_policy *cp = v->domain->arch.cpuid;
     const struct vcpu_msrs *msrs = v->arch.msrs;
 
     write_gs_shadow(v->arch.hvm.vmx.shadow_gs);
@@ -705,6 +711,9 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
         wrmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
         wrmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
     }
+
+    if ( cp->feat.pks )
+        wrpkrs(msrs->pkrs);
 }
 
 void vmx_update_cpu_exec_control(struct vcpu *v)

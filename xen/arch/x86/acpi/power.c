@@ -29,6 +29,7 @@
 #include <asm/apic.h>
 #include <asm/io_apic.h>
 #include <asm/microcode.h>
+#include <asm/prot-key.h>
 #include <asm/spec_ctrl.h>
 #include <acpi/cpufreq/cpufreq.h>
 
@@ -298,6 +299,15 @@ static int enter_state(u32 state)
     }
 
     update_mcu_opt_ctrl();
+
+    /*
+     * This should be before restoring CR4, but that is earlier in asm and
+     * awkward.  Instead, we rely on MSR_PKRS being something sane out of S3
+     * (0, or Xen's previous value) until this point, where we need to become
+     * certain that Xen's cache matches reality.
+     */
+    if ( cpu_has_pks )
+        wrpkrs_and_cache(0);
 
     /* (re)initialise SYSCALL/SYSENTER state, amongst other things. */
     percpu_traps_init();

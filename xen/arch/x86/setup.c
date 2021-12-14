@@ -54,6 +54,7 @@
 #include <asm/spec_ctrl.h>
 #include <asm/guest.h>
 #include <asm/microcode.h>
+#include <asm/prot-key.h>
 #include <asm/pv/domain.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
@@ -1803,6 +1804,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( opt_invpcid && cpu_has_invpcid )
         use_invpcid = true;
+
+    if ( cpu_has_pks )
+        wrpkrs_and_cache(0); /* Must be before setting CR4.PKS */
 
     init_speculation_mitigations();
 

@@ -373,6 +373,15 @@ struct vcpu_msrs
         };
     } rtit;
 
+    /*
+     * 0x000006e1 - MSR_PKRS - Protection Key Supervisor.
+     *
+     * Exposed R/W to guests.  Xen doesn't use PKS yet, so only context
+     * switched per vcpu.  When in current context, live value is in hardware,
+     * and this value is stale.
+     */
+    uint32_t pkrs;
+
     /* 0x00000da0 - MSR_IA32_XSS */
     struct {
         uint64_t raw;
