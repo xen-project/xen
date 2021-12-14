@@ -247,7 +247,7 @@ static inline void vpci_write(pci_sbdf_t sbdf, unsigned int reg,
     ASSERT_UNREACHABLE();
 }
 
-static inline bool vpci_process_pending(struct vcpu *v)
+static inline bool __must_check vpci_process_pending(struct vcpu *v)
 {
     ASSERT_UNREACHABLE();
     return false;
