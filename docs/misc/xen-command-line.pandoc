@@ -801,6 +801,22 @@ Controls for how dom0 is constructed on x86 systems.
 
     If using this option is necessary to fix an issue, please report a bug.
 
+### dom0-cpuid
+    = List of comma separated booleans
+
+    Applicability: x86
+
+This option allows for fine tuning of the facilities dom0 will use, after
+accounting for hardware capabilities and Xen settings as enumerated via CPUID.
+
+Options are accepted in positive and negative form, to enable or disable
+specific features.  All selections via this mechanism are subject to normal
+CPU Policy safety and dependency logic.
+
+This option is intended for developers to opt dom0 into non-default features,
+and is not intended for use in production circumstances.  If using this option
+is necessary to fix an issue, please report a bug.
+
 ### dom0-iommu
     = List of [ passthrough=<bool>, strict=<bool>, map-inclusive=<bool>,
                 map-reserved=<bool>, none ]
