@@ -770,6 +770,7 @@ static struct domain *__init create_dom0(const module_t *image,
     };
     struct domain *d;
     char *cmdline;
+    domid_t domid;
 
     if ( opt_dom0_pvh )
     {
@@ -784,10 +785,16 @@ static struct domain *__init create_dom0(const module_t *image,
     if ( iommu_enabled )
         dom0_cfg.flags |= XEN_DOMCTL_CDF_iommu;
 
-    /* Create initial domain 0. */
-    d = domain_create(get_initial_domain_id(), &dom0_cfg, !pv_shim);
-    if ( IS_ERR(d) || (alloc_dom0_vcpu0(d) == NULL) )
-        panic("Error creating domain 0\n");
+    /* Create initial domain.  Not d0 for pvshim. */
+    domid = get_initial_domain_id();
+    d = domain_create(domid, &dom0_cfg, !pv_shim);
+    if ( IS_ERR(d) )
+        panic("Error creating d%u: %ld\n", domid, PTR_ERR(d));
+
+    init_dom0_cpuid_policy(d);
+
+    if ( alloc_dom0_vcpu0(d) == NULL )
+        panic("Error creating d%uv0\n", domid);
 
     /* Grab the DOM0 command line. */
     cmdline = image->string ? __va(image->string) : NULL;
