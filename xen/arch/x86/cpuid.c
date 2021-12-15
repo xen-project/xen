@@ -736,23 +736,28 @@ int init_domain_cpuid_policy(struct domain *d)
     if ( !p )
         return -ENOMEM;
 
-    /* The hardware domain can't migrate.  Give it ITSC if available. */
-    if ( is_hardware_domain(d) )
-        p->extd.itsc = cpu_has_itsc;
+    d->arch.cpuid = p;
+
+    recalculate_cpuid_policy(d);
+
+    return 0;
+}
+
+void __init init_dom0_cpuid_policy(struct domain *d)
+{
+    struct cpuid_policy *p = d->arch.cpuid;
+
+    /* dom0 can't migrate.  Give it ITSC if available. */
+    if ( cpu_has_itsc )
+        p->extd.itsc = true;
 
     /*
      * Expose the "hardware speculation behaviour" bits of ARCH_CAPS to dom0,
      * so dom0 can turn off workarounds as appropriate.  Temporary, until the
      * domain policy logic gains a better understanding of MSRs.
      */
-    if ( is_hardware_domain(d) && cpu_has_arch_caps )
+    if ( cpu_has_arch_caps )
         p->feat.arch_caps = true;
-
-    d->arch.cpuid = p;
-
-    recalculate_cpuid_policy(d);
-
-    return 0;
 }
 
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
