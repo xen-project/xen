@@ -365,7 +365,7 @@ _debug:
 	$(OBJDUMP) -D -S $(TARGET)-syms > $(TARGET).s
 
 .PHONY: _clean
-_clean: delete-unfresh-files
+_clean:
 	$(MAKE) -C tools clean
 	$(MAKE) $(clean) include
 	$(MAKE) $(clean) common
@@ -383,7 +383,7 @@ _clean: delete-unfresh-files
 		-o -name "*.gcno" -o -name ".*.cmd" -o -name "lib.a" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map *~ core
 	rm -f asm-offsets.s arch/*/include/asm/asm-offsets.h
-	rm -f .banner .allconfig.tmp
+	rm -f .banner .allconfig.tmp include/xen/compile.h
 
 .PHONY: _distclean
 _distclean: clean
@@ -393,7 +393,7 @@ $(TARGET).gz: $(TARGET)
 	gzip -n -f -9 < $< > $@.new
 	mv $@.new $@
 
-$(TARGET): delete-unfresh-files
+$(TARGET): FORCE
 	$(MAKE) -C tools
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/compile.h
 	[ -e arch/$(TARGET_ARCH)/efi ] && for f in $$(cd common/efi; echo *.[ch]); \
@@ -405,14 +405,6 @@ $(TARGET): delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) include
 	$(MAKE) -f $(BASEDIR)/Rules.mk arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $@
-
-# drivers/char/console.o contains static banner/compile info. Blow it away.
-# Don't refresh these files during e.g., 'sudo make install'
-.PHONY: delete-unfresh-files
-delete-unfresh-files:
-	@if [ ! -r include/xen/compile.h -o -O include/xen/compile.h ]; then \
-		rm -f include/xen/compile.h; \
-	fi
 
 quiet_cmd_banner = BANNER  $@
 define cmd_banner
@@ -428,9 +420,11 @@ endef
 	$(call if_changed,banner)
 targets += .banner
 
-# compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
-include/xen/compile.h: include/xen/compile.h.in .banner
-	@sed -e 's/@@date@@/$(XEN_BUILD_DATE)/g' \
+# Don't refresh this files during e.g., 'sudo make install'
+quiet_cmd_compile.h = UPD     $@
+define cmd_compile.h
+    if [ ! -r $@ -o -O $@ ]; then \
+	sed -e 's/@@date@@/$(XEN_BUILD_DATE)/g' \
 	    -e 's/@@time@@/$(XEN_BUILD_TIME)/g' \
 	    -e 's/@@whoami@@/$(XEN_WHOAMI)/g' \
 	    -e 's/@@domain@@/$(XEN_DOMAIN)/g' \
@@ -440,10 +434,17 @@ include/xen/compile.h: include/xen/compile.h.in .banner
 	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
 	    -e 's!@@changeset@@!$(shell tools/scmversion $(XEN_ROOT) || echo "unavailable")!g' \
-	    < include/xen/compile.h.in > $@.new
+	    < $< > $(dot-target).tmp; \
+	sed -rf tools/process-banner.sed < .banner >> $(dot-target).tmp; \
+	mv -f $(dot-target).tmp $@; \
+    fi
+endef
+
+include/xen/compile.h: include/xen/compile.h.in .banner FORCE
 	@cat .banner
-	@sed -rf tools/process-banner.sed < .banner >> $@.new
-	@mv -f $@.new $@
+	$(call if_changed,compile.h)
+
+targets += include/xen/compile.h
 
 asm-offsets.s: arch/$(TARGET_ARCH)/$(TARGET_SUBARCH)/asm-offsets.c
 	$(CC) $(call cpp_flags,$(c_flags)) -S -g0 -o $@.new -MQ $@ $<
