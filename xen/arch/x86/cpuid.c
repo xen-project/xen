@@ -26,17 +26,26 @@ static const uint32_t __initconst hvm_hap_def_featuremask[] =
     INIT_HVM_HAP_DEF_FEATURES;
 static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 
-static int __init parse_xen_cpuid(const char *s)
+static const struct feature_name {
+    const char *name;
+    unsigned int bit;
+} feature_names[] __initconstrel = INIT_FEATURE_NAMES;
+
+/*
+ * Parse a list of cpuid feature names -> bool, calling the callback for any
+ * matches found.
+ *
+ * always_inline, because this is init code only and we really don't want a
+ * function pointer call in the middle of the loop.
+ */
+static int __init always_inline parse_cpuid(
+    const char *s, void (*callback)(unsigned int feat, bool val))
 {
     const char *ss;
     int val, rc = 0;
 
     do {
-        static const struct feature {
-            const char *name;
-            unsigned int bit;
-        } features[] __initconstrel = INIT_FEATURE_NAMES;
-        const struct feature *lhs, *rhs, *mid = NULL /* GCC... */;
+        const struct feature_name *lhs, *rhs, *mid = NULL /* GCC... */;
         const char *feat;
 
         ss = strchr(s, ',');
@@ -49,8 +58,8 @@ static int __init parse_xen_cpuid(const char *s)
             feat += 3;
 
         /* (Re)initalise lhs and rhs for binary search. */
-        lhs = features;
-        rhs = features + ARRAY_SIZE(features);
+        lhs = feature_names;
+        rhs = feature_names + ARRAY_SIZE(feature_names);
 
         while ( lhs < rhs )
         {
@@ -72,11 +81,7 @@ static int __init parse_xen_cpuid(const char *s)
 
             if ( (val = parse_boolean(mid->name, s, ss)) >= 0 )
             {
-                if ( !val )
-                    setup_clear_cpu_cap(mid->bit);
-                else if ( mid->bit == X86_FEATURE_RDRAND &&
-                          (cpuid_ecx(1) & cpufeat_mask(X86_FEATURE_RDRAND)) )
-                    setup_force_cpu_cap(X86_FEATURE_RDRAND);
+                callback(mid->bit, val);
                 mid = NULL;
             }
 
@@ -94,6 +99,20 @@ static int __init parse_xen_cpuid(const char *s)
     } while ( *ss );
 
     return rc;
+}
+
+static void __init _parse_xen_cpuid(unsigned int feat, bool val)
+{
+    if ( !val )
+        setup_clear_cpu_cap(feat);
+    else if ( feat == X86_FEATURE_RDRAND &&
+              (cpuid_ecx(1) & cpufeat_mask(X86_FEATURE_RDRAND)) )
+        setup_force_cpu_cap(X86_FEATURE_RDRAND);
+}
+
+static int __init parse_xen_cpuid(const char *s)
+{
+    return parse_cpuid(s, _parse_xen_cpuid);
 }
 custom_param("cpuid", parse_xen_cpuid);
 
