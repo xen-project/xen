@@ -67,6 +67,8 @@ obj-y += vsmc.o
 obj-y += vpsci.o
 obj-y += vuart.o
 
+extra-y += xen.lds
+
 #obj-bin-y += ....o
 
 ifneq ($(CONFIG_DTB_FILE),"")
@@ -132,8 +134,8 @@ $(TARGET)-syms: prelink.o xen.lds
 .PHONY: include
 include:
 
-xen.lds: xen.lds.S
-	$(CPP) -P $(a_flags) -D__LINKER__ -MQ $@ -o $@ $<
+xen.lds: xen.lds.S FORCE
+	$(call if_changed,cpp_lds_S)
 
 dtb.o: $(patsubst "%",%,$(CONFIG_DTB_FILE))
 

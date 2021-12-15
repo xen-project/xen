@@ -78,6 +78,7 @@ obj-y += sysctl.o
 endif
 
 extra-y += asm-macros.i
+extra-y += xen.lds
 
 ifneq ($(CONFIG_HVM),y)
 x86_emulate.o: CFLAGS-y += -Wno-unused-label
@@ -238,6 +239,7 @@ endif
 note_file_option ?= $(note_file)
 
 ifeq ($(XEN_BUILD_PE),y)
+extra-y += efi.lds
 $(TARGET).efi: prelink.o $(note_file) efi.lds efi/relocs-dummy.o efi/mkreloc
 ifeq ($(CONFIG_DEBUG_INFO),y)
 	$(if $(filter --strip-debug,$(EFI_LDFLAGS)),echo,:) "Will strip debug info from $(@F)"
@@ -290,8 +292,8 @@ $(BASEDIR)/include/asm-x86/asm-macros.h: asm-macros.i Makefile
 	$(call move-if-changed,$@.new,$@)
 
 efi.lds: AFLAGS-y += -DEFI
-xen.lds efi.lds: xen.lds.S
-	$(CPP) -P $(call cpp_flags,$(a_flags)) -MQ $@ -o $@ $<
+xen.lds efi.lds: xen.lds.S FORCE
+	$(call if_changed,cpp_lds_S)
 
 boot/mkelf32: boot/mkelf32.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
