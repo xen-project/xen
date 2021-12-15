@@ -57,10 +57,6 @@
 
 #define NR_hypercalls 64
 
-#ifndef NDEBUG
-#define MEMORY_GUARD
-#endif
-
 #define STACK_ORDER 3
 #define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 

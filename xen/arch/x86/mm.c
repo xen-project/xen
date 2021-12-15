@@ -6109,36 +6109,6 @@ void free_perdomain_mappings(struct domain *d)
     d->arch.perdomain_l3_pg = NULL;
 }
 
-#ifdef MEMORY_GUARD
-
-static void __memguard_change_range(void *p, unsigned long l, int guard)
-{
-    unsigned long _p = (unsigned long)p;
-    unsigned long _l = (unsigned long)l;
-    unsigned int flags = __PAGE_HYPERVISOR_RW | MAP_SMALL_PAGES;
-
-    /* Ensure we are dealing with a page-aligned whole number of pages. */
-    ASSERT(IS_ALIGNED(_p, PAGE_SIZE));
-    ASSERT(IS_ALIGNED(_l, PAGE_SIZE));
-
-    if ( guard )
-        flags &= ~_PAGE_PRESENT;
-
-    map_pages_to_xen(_p, virt_to_mfn(p), PFN_DOWN(_l), flags);
-}
-
-void memguard_guard_range(void *p, unsigned long l)
-{
-    __memguard_change_range(p, l, 1);
-}
-
-void memguard_unguard_range(void *p, unsigned long l)
-{
-    __memguard_change_range(p, l, 0);
-}
-
-#endif
-
 static void write_sss_token(unsigned long *ptr)
 {
     /*

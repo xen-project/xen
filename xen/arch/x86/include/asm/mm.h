@@ -530,14 +530,6 @@ extern struct rangeset *mmio_ro_ranges;
 #define compat_pfn_to_cr3(pfn) (((unsigned)(pfn) << 12) | ((unsigned)(pfn) >> 20))
 #define compat_cr3_to_pfn(cr3) (((unsigned)(cr3) >> 12) | ((unsigned)(cr3) << 20))
 
-#ifdef MEMORY_GUARD
-void memguard_guard_range(void *p, unsigned long l);
-void memguard_unguard_range(void *p, unsigned long l);
-#else
-#define memguard_guard_range(_p,_l)    ((void)0)
-#define memguard_unguard_range(_p,_l)  ((void)0)
-#endif
-
 void memguard_guard_stack(void *p);
 void memguard_unguard_stack(void *p);
 
