@@ -19,6 +19,7 @@
 #include <asm/io_apic.h>
 #include <asm/p2m.h>
 #include <asm/setup.h>
+#include <asm/spec_ctrl.h>
 
 struct memsize {
     long nr_pages;
@@ -321,12 +322,22 @@ unsigned long __init dom0_paging_pages(const struct domain *d,
     return ((memkb + 1023) / 1024) << (20 - PAGE_SHIFT);
 }
 
+
+/*
+ * If allocation isn't specified, reserve 1/16th of available memory for
+ * things like DMA buffers. This reservation is clamped to a maximum of 128MB.
+ */
+static unsigned long __init default_nr_pages(unsigned long avail)
+{
+    return avail - (pv_shim ? pv_shim_mem(avail)
+                            : min(avail / 16, 128UL << (20 - PAGE_SHIFT)));
+}
+
 unsigned long __init dom0_compute_nr_pages(
     struct domain *d, struct elf_dom_parms *parms, unsigned long initrd_len)
 {
     nodeid_t node;
-    unsigned long avail = 0, nr_pages, min_pages, max_pages;
-    bool need_paging;
+    unsigned long avail = 0, nr_pages, min_pages, max_pages, iommu_pages = 0;
 
     /* The ordering of operands is to work around a clang5 issue. */
     if ( CONFIG_DOM0_MEM[0] && !dom0_mem_set )
@@ -344,52 +355,46 @@ unsigned long __init dom0_compute_nr_pages(
         avail -= d->max_vcpus - 1;
 
     /* Reserve memory for iommu_dom0_init() (rough estimate). */
-    if ( is_iommu_enabled(d) )
+    if ( is_iommu_enabled(d) && !iommu_hwdom_passthrough )
     {
         unsigned int s;
 
         for ( s = 9; s < BITS_PER_LONG; s += 9 )
-            avail -= max_pdx >> s;
+            iommu_pages += max_pdx >> s;
+
+        avail -= iommu_pages;
     }
 
-    need_paging = is_hvm_domain(d) &&
-        (!iommu_use_hap_pt(d) || !paging_mode_hap(d));
-    for ( ; ; need_paging = false )
+    if ( paging_mode_enabled(d) || opt_dom0_shadow || opt_pv_l1tf_hwdom )
     {
-        nr_pages = get_memsize(&dom0_size, avail);
-        min_pages = get_memsize(&dom0_min_size, avail);
-        max_pages = get_memsize(&dom0_max_size, avail);
+        unsigned long cpu_pages;
+
+        nr_pages = get_memsize(&dom0_size, avail) ?: default_nr_pages(avail);
 
         /*
-         * If allocation isn't specified, reserve 1/16th of available memory
-         * for things like DMA buffers. This reservation is clamped to a
-         * maximum of 128MB.
+         * Clamp according to min/max limits and available memory
+         * (preliminary).
          */
-        if ( !nr_pages )
-        {
-            nr_pages = avail - (pv_shim ? pv_shim_mem(avail)
-                                 : min(avail / 16, 128UL << (20 - PAGE_SHIFT)));
-            if ( is_hvm_domain(d) && !need_paging )
-                /*
-                 * Temporary workaround message until internal (paging) memory
-                 * accounting required to build a pvh dom0 is improved.
-                 */
-                printk("WARNING: PVH dom0 without dom0_mem set is still unstable. "
-                       "If you get crashes during boot, try adding a dom0_mem parameter\n");
-        }
-
-
-        /* Clamp according to min/max limits and available memory. */
-        nr_pages = max(nr_pages, min_pages);
-        nr_pages = min(nr_pages, max_pages);
+        nr_pages = max(nr_pages, get_memsize(&dom0_min_size, avail));
+        nr_pages = min(nr_pages, get_memsize(&dom0_max_size, avail));
         nr_pages = min(nr_pages, avail);
 
-        if ( !need_paging )
-            break;
+        cpu_pages = dom0_paging_pages(d, nr_pages);
 
-        /* Reserve memory for shadow or HAP. */
-        avail -= dom0_paging_pages(d, nr_pages);
+        if ( !iommu_use_hap_pt(d) )
+            avail -= cpu_pages;
+        else if ( cpu_pages > iommu_pages )
+            avail -= cpu_pages - iommu_pages;
     }
+
+    nr_pages = get_memsize(&dom0_size, avail) ?: default_nr_pages(avail);
+    min_pages = get_memsize(&dom0_min_size, avail);
+    max_pages = get_memsize(&dom0_max_size, avail);
+
+    /* Clamp according to min/max limits and available memory (final). */
+    nr_pages = max(nr_pages, min_pages);
+    nr_pages = min(nr_pages, max_pages);
+    nr_pages = min(nr_pages, avail);
 
     if ( is_pv_domain(d) &&
          (parms->p2m_base == UNSET_ADDR) && !memsize_gt_zero(&dom0_size) &&
