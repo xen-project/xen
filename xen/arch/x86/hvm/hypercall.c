@@ -94,7 +94,10 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case PHYSDEVOP_pci_mmcfg_reserved:
-        if ( !has_vpci(currd) || !is_hardware_domain(currd) )
+    case PHYSDEVOP_pci_device_add:
+    case PHYSDEVOP_pci_device_remove:
+    case PHYSDEVOP_dbgp_op:
+        if ( !is_hardware_domain(currd) )
             return -ENOSYS;
         break;
 
