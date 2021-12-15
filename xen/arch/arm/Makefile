@@ -95,7 +95,7 @@ endif
 $(TARGET): $(TARGET)-syms
 	$(OBJCOPY) -O binary -S $< $@
 ifeq ($(CONFIG_ARM_64),y)
-	ln -sf $(notdir $@)  ../../$(notdir $@).efi
+	ln -sf $(@F) $@.efi
 endif
 
 ifeq ($(CONFIG_LTO),y)
