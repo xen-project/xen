@@ -599,7 +599,7 @@ remove_identity_mapping:
         strd  r2, r3, [r0, r1]
 
 identity_mapping_removed:
-        /* See asm-arm/arm32/flushtlb.h for the explanation of the sequence. */
+        /* See asm/arm32/flushtlb.h for the explanation of the sequence. */
         dsb   nshst
         mcr   CP32(r0, TLBIALLH)
         dsb   nsh

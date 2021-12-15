@@ -12,7 +12,7 @@ struct efi_rs_state {
 #ifdef CONFIG_X86
  /*
   * The way stacks get set up leads to them always being on an 8-byte
-  * boundary not evenly divisible by 16 (see asm-x86/current.h). The EFI ABI,
+  * boundary not evenly divisible by 16 (see asm/current.h). The EFI ABI,
   * just like the CPU one, however requires stacks to be 16-byte aligned
   * before every function call. Since the compiler assumes this (unless
   * passing it -mpreferred-stack-boundary=3), it wouldn't generate code to

@@ -53,7 +53,7 @@ struct cpu_info {
     unsigned long xen_cr3;
     unsigned long pv_cr3;
 
-    /* See asm-x86/spec_ctrl_asm.h for usage. */
+    /* See asm/spec_ctrl_asm.h for usage. */
     unsigned int shadow_spec_ctrl;
     uint8_t      xen_spec_ctrl;
     uint8_t      spec_ctrl_flags;

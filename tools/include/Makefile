@@ -30,7 +30,7 @@ xen-dir:
 	ln -s $(XEN_ROOT)/xen/include/acpi/platform acpi/
 	ln -s $(XEN_ROOT)/xen/include/acpi/ac*.h acpi/
 ifeq ($(CONFIG_X86),y)
-	ln -s $(XEN_ROOT)/xen/include/asm-x86 xen/asm
+	ln -s $(XEN_ROOT)/xen/arch/x86/include/asm xen/
 	mkdir -p xen/lib/x86
 	ln -s $(filter-out %autogen.h,$(wildcard $(XEN_ROOT)/xen/include/xen/lib/x86/*.h)) xen/lib/x86/
 	ln -s $(XEN_ROOT)/xen/include/xen/lib/x86/Makefile xen/lib/x86/

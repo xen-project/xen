@@ -8,19 +8,19 @@ arm64:
 
 bitops: last sync @ v3.16-rc6 (last commit: 8715466b6027)
 
-linux/arch/arm64/include/asm/bitops.h   xen/include/asm-arm/arm64/bitops.h
+linux/arch/arm64/include/asm/bitops.h   xen/arch/arm/include/asm/arm64/bitops.h
 
 ---------------------------------------------------------------------
 
 cmpxchg: last sync @ v3.16-rc6 (last commit: e1dfda9ced9b)
 
-linux/arch/arm64/include/asm/cmpxchg.h  xen/include/asm-arm/arm64/cmpxchg.h
+linux/arch/arm64/include/asm/cmpxchg.h  xen/arch/arm/include/asm/arm64/cmpxchg.h
 
 ---------------------------------------------------------------------
 
 atomics: last sync @ v3.16-rc6 (last commit: 8715466b6027)
 
-linux/arch/arm64/include/asm/atomic.h   xen/include/asm-arm/arm64/atomic.h
+linux/arch/arm64/include/asm/atomic.h   xen/arch/arm/include/asm/arm64/atomic.h
 
 The following functions were taken from Linux:
     atomic_add(), atomic_add_return(), atomic_sub(), atomic_sub_return(),
@@ -76,13 +76,13 @@ diff -u ../linux/arch/arm/lib/findbit.S xen/arch/arm/arm32/lib/findbit.S
 
 cmpxchg: last sync @ v3.16-rc6 (last commit: c32ffce0f66e)
 
-linux/arch/arm/include/asm/cmpxchg.h    xen/include/asm-arm/arm32/cmpxchg.h
+linux/arch/arm/include/asm/cmpxchg.h    xen/arch/arm/include/asm/arm32/cmpxchg.h
 
 ---------------------------------------------------------------------
 
 atomics: last sync @ v3.16-rc6 (last commit: 030d0178bdbd)
 
-linux/arch/arm/include/asm/atomic.h     xen/include/asm-arm/arm32/atomic.h
+linux/arch/arm/include/asm/atomic.h     xen/arch/arm/include/asm/arm32/atomic.h
 
 The following functions were taken from Linux:
     atomic_add(), atomic_add_return(), atomic_sub(), atomic_sub_return(),

@@ -56,11 +56,11 @@
 #define ERROR(a, b...) fprintf(stderr, a "\n", ## b)
 #define PERROR(a, b...) fprintf(stderr, a ": %s\n", ## b, strerror(errno))
 
-/* From xen/include/asm-x86/processor.h */
+/* From xen/arch/x86/include/asm/processor.h */
 #define X86_TRAP_DEBUG  1
 #define X86_TRAP_INT3   3
 
-/* From xen/include/asm-x86/x86-defns.h */
+/* From xen/arch/x86/include/asm/x86-defns.h */
 #define X86_CR4_PGE        0x00000080 /* enable global pages */
 
 typedef struct vm_event {

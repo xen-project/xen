@@ -16,6 +16,6 @@
 #include <xen/lib.h>
 #include <asm/regs.h>
 
-#include "../../arch/x86/x86_emulate/x86_emulate.h"
+#include "../../x86_emulate/x86_emulate.h"
 
 #endif /* __ASM_X86_X86_EMULATE_H__ */

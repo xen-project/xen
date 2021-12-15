@@ -32,7 +32,7 @@ distclean: clean
 .PHONY: install
 install:
 
-hpet.h: $(XEN_ROOT)/xen/include/asm-x86/hpet.h
+hpet.h: $(XEN_ROOT)/xen/arch/x86/include/asm/hpet.h
 	cp $< $@
 
 hpet.c: $(XEN_ROOT)/xen/arch/x86/hvm/hpet.c

@@ -737,7 +737,7 @@ remove_identity_mapping:
         str   xzr, [x0, x1, lsl #3]
 
 identity_mapping_removed:
-        /* See asm-arm/arm64/flushtlb.h for the explanation of the sequence. */
+        /* See asm/arm64/flushtlb.h for the explanation of the sequence. */
         dsb   nshst
         tlbi  alle2
         dsb   nsh

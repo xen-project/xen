@@ -245,7 +245,7 @@ PAGE_LIST_HEAD(page_broken_list);
 
 /*
  * first_valid_mfn is exported because it is use in ARM specific NUMA
- * helpers. See comment in asm-arm/numa.h.
+ * helpers. See comment in arch/arm/include/asm/numa.h.
  */
 mfn_t first_valid_mfn = INVALID_MFN_INITIALIZER;
 

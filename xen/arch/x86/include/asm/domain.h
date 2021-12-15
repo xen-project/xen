@@ -384,7 +384,7 @@ struct arch_domain
     struct PITState vpit;
 
     /* TSC management (emulation, pv, scaling, stats) */
-    int tsc_mode;            /* see include/asm-x86/time.h */
+    int tsc_mode;            /* see asm/time.h */
     bool_t vtsc;             /* tsc is emulated (may change after migrate) */
     s_time_t vtsc_last;      /* previous TSC value (guarantee monotonicity) */
     uint64_t vtsc_offset;    /* adjustment for save/restore/migrate */

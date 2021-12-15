@@ -40,8 +40,9 @@
 #define ACPI_MADT_GET_TRIGGER(inti)	ACPI_MADT_GET_(TRIGGER, inti)
 
 /*
- * Fixmap pages to reserve for ACPI boot-time tables (see asm-x86/fixmap.h or
- * asm-arm/config.h, 64 pages(256KB) is large enough for most cases.)
+ * Fixmap pages to reserve for ACPI boot-time tables (see
+ * arch/x86/include/asm/fixmap.h or arch/arm/include/asm/config.h,
+ * 64 pages(256KB) is large enough for most cases.)
  */
 #define NUM_FIXMAP_ACPI_PAGES  64
 

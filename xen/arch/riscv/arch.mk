@@ -12,3 +12,4 @@ riscv-march-$(CONFIG_RISCV_ISA_C)       := $(riscv-march-y)c
 
 CFLAGS += -march=$(riscv-march-y) -mstrict-align -mcmodel=medany
 CFLAGS += -I$(BASEDIR)/include
+CFLAGS += -I$(BASEDIR)/arch/$(TARGET_ARCH)/include

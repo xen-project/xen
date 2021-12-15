@@ -245,7 +245,6 @@ F:	xen/drivers/char/omap-uart.c
 F:	xen/drivers/char/pl011.c
 F:	xen/drivers/char/scif-uart.c
 F:	xen/drivers/passthrough/arm/
-F:	xen/include/asm-arm/
 F:	xen/include/public/arch-arm/
 F:	xen/include/public/arch-arm.h
 
@@ -290,10 +289,10 @@ EFI
 M:	Jan Beulich <jbeulich@suse.com>
 S:	Supported
 F:	xen/arch/x86/efi/
+F:	xen/arch/x86/include/asm/efi*.h
+F:	xen/arch/x86/include/asm/x86_*/efi*.h
 F:	xen/common/efi/
 F:	xen/include/efi/
-F:	xen/include/asm-x86/efi*.h
-F:	xen/include/asm-x86/x86_*/efi*.h
 
 GDBSX DEBUGGER
 M:	Elena Ufimtseva <elena.ufimtseva@oracle.com>
@@ -319,8 +318,8 @@ F:	xen/include/xen/hypfs.h
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 R:	Lukasz Hawrylko <lukasz.hawrylko@linux.intel.com>
 S:	Odd Fixes
+F:	xen/arch/x86/include/asm/tboot.h
 F:	xen/arch/x86/tboot.c
-F:	xen/include/asm-x86/tboot.h
 
 INTEL(R) VT FOR DIRECTED I/O (VT-D)
 M:	Kevin Tian <kevin.tian@intel.com>
@@ -331,10 +330,10 @@ INTEL(R) VT FOR X86 (VT-X)
 M:	Jun Nakajima <jun.nakajima@intel.com>
 M:	Kevin Tian <kevin.tian@intel.com>
 S:	Supported
-F:	xen/arch/x86/hvm/vmx/
-F:	xen/arch/x86/mm/p2m-ept.c
-F:	xen/include/asm-x86/hvm/vmx/
 F:	xen/arch/x86/cpu/vpmu_intel.c
+F:	xen/arch/x86/hvm/vmx/
+F:	xen/arch/x86/include/asm/hvm/vmx/
+F:	xen/arch/x86/mm/p2m-ept.c
 
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
@@ -401,10 +400,10 @@ M:	Ross Lagerwall <ross.lagerwall@citrix.com>
 S:	Supported
 F:	docs/misc/livepatch.pandoc
 F:	tools/misc/xen-livepatch.c
+F:	xen/arch/*/include/asm/livepatch.h
 F:	xen/arch/*/livepatch*
 F:	xen/arch/*/*/livepatch*
 F:	xen/common/livepatch*
-F:	xen/include/asm-*/livepatch.h
 F:	xen/include/xen/livepatch*
 F:	xen/test/livepatch/*
 
@@ -473,7 +472,6 @@ R:	Connor Davis <connojdavis@gmail.com>
 S:	Supported
 F:	config/riscv64.mk
 F:	xen/arch/riscv/
-F:	xen/include/asm-riscv/
 
 RTDS SCHEDULER
 M:	Dario Faggioli <dfaggioli@suse.com>
@@ -502,8 +500,8 @@ F:	stubdom/
 TEE MEDIATORS
 M:	Volodymyr Babchuk <volodymyr_babchuk@epam.com>
 S:	Supported
+F:	xen/arch/arm/include/asm/tee
 F:	xen/arch/arm/tee/
-F:	xen/include/asm-arm/tee
 
 TOOLSTACK
 M:	Wei Liu <wl@xen.org>
@@ -531,6 +529,8 @@ F:	tools/misc/xen-access.c
 F:	xen/arch/*/monitor.c
 F:	xen/arch/*/vm_event.c
 F:	xen/arch/arm/mem_access.c
+F:	xen/arch/x86/include/asm/hvm/monitor.h
+F:	xen/arch/x86/include/asm/hvm/vm_event.h
 F:	xen/arch/x86/mm/mem_access.c
 F:	xen/arch/x86/hvm/monitor.c
 F:	xen/arch/x86/hvm/vm_event.c
@@ -540,8 +540,6 @@ F:	xen/common/vm_event.c
 F:	xen/include/*/mem_access.h
 F:	xen/include/*/monitor.h
 F:	xen/include/*/vm_event.h
-F:	xen/include/asm-x86/hvm/monitor.h
-F:	xen/include/asm-x86/hvm/vm_event.h
 
 VPCI
 M:	Roger Pau Monné <roger.pau@citrix.com>
@@ -567,7 +565,6 @@ R:	Wei Liu <wl@xen.org>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
 F:	xen/arch/x86/
-F:	xen/include/asm-x86/
 F:	xen/include/public/arch-x86/
 F:	xen/include/xen/lib/x86
 F:	xen/lib/x86
@@ -587,10 +584,10 @@ F:	xen/arch/x86/hvm/emulate.c
 F:	xen/arch/x86/hvm/intercept.c
 F:	xen/arch/x86/hvm/io.c
 F:	xen/arch/x86/hvm/ioreq.c
-F:	xen/include/asm-x86/hvm/emulate.h
-F:	xen/include/asm-x86/hvm/io.h
-F:	xen/include/asm-x86/hvm/ioreq.h
-F:	xen/include/asm-x86/ioreq.h
+F:	xen/arch/x86/include/asm/hvm/emulate.h
+F:	xen/arch/x86/include/asm/hvm/io.h
+F:	xen/arch/x86/include/asm/hvm/ioreq.h
+F:	xen/arch/x86/include/asm/ioreq.h
 
 X86 MEMORY MANAGEMENT
 M:	Jan Beulich <jbeulich@suse.com>
@@ -622,10 +619,10 @@ M:	Wei Liu <wl@xen.org>
 S:	Supported
 F:	xen/arch/x86/guest/hyperv/
 F:	xen/arch/x86/hvm/viridian/
-F:	xen/include/asm-x86/guest/hyperv.h
-F:	xen/include/asm-x86/guest/hyperv-hcall.h
-F:	xen/include/asm-x86/guest/hyperv-tlfs.h
-F:	xen/include/asm-x86/hvm/viridian.h
+F:	xen/arch/x86/include/asm/guest/hyperv.h
+F:	xen/arch/x86/include/asm/guest/hyperv-hcall.h
+F:	xen/arch/x86/include/asm/guest/hyperv-tlfs.h
+F:	xen/arch/x86/include/asm/hvm/viridian.h
 
 XENSTORE
 M:	Wei Liu <wl@xen.org>
