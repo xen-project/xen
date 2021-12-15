@@ -341,10 +341,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 unsigned long domain_get_maximum_gpfn(struct domain *d);
 
-#define memguard_guard_stack(_p)       ((void)0)
-#define memguard_guard_range(_p,_l)    ((void)0)
-#define memguard_unguard_range(_p,_l)  ((void)0)
-
 /* Release all __init and __initdata ranges to be reused */
 void free_init_memory(void);
 

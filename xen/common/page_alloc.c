@@ -2152,8 +2152,6 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
     if ( !is_xen_heap_mfn(maddr_to_mfn(pe)) )
         pe -= PAGE_SIZE;
 
-    memguard_guard_range(maddr_to_virt(ps), pe - ps);
-
     init_heap_pages(maddr_to_page(ps), (pe - ps) >> PAGE_SHIFT);
 }
 
@@ -2169,8 +2167,6 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
     if ( unlikely(pg == NULL) )
         return NULL;
 
-    memguard_unguard_range(page_to_virt(pg), 1 << (order + PAGE_SHIFT));
-
     return page_to_virt(pg);
 }
 
@@ -2181,8 +2177,6 @@ void free_xenheap_pages(void *v, unsigned int order)
 
     if ( v == NULL )
         return;
-
-    memguard_guard_range(v, 1 << (order + PAGE_SHIFT));
 
     free_heap_pages(virt_to_page(v), order, false);
 }
