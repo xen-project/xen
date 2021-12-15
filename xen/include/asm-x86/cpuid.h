@@ -59,6 +59,9 @@ bool recheck_cpu_features(unsigned int cpu);
 /* Allocate and initialise a CPUID policy suitable for the domain. */
 int init_domain_cpuid_policy(struct domain *d);
 
+/* Apply dom0-specific tweaks to the CPUID policy. */
+void init_dom0_cpuid_policy(struct domain *d);
+
 /* Clamp the CPUID policy to reality. */
 void recalculate_cpuid_policy(struct domain *d);
 
