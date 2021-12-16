@@ -468,9 +468,8 @@ arch/$(TARGET_ARCH)/include/asm/asm-offsets.h: asm-offsets.s
 
 SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers lib test
 define all_sources
-    ( find arch/$(TARGET_ARCH)/include -name '*.h' -print; \
-      find include -name '*.h' -print; \
-      find $(SUBDIRS) -name '*.[chS]' -print )
+    ( find include -type f -name '*.h' -print; \
+      find $(SUBDIRS) -type f -name '*.[chS]' -print )
 endef
 
 define set_exuberant_flags
