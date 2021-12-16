@@ -6,7 +6,7 @@
 #define MIN_FDT_ALIGN 8
 #define MAX_FDT_SIZE SZ_2M
 
-#define NR_MEM_BANKS 128
+#define NR_MEM_BANKS 256
 
 #define MAX_MODULES 32 /* Current maximum useful modules */
 
