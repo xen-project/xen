@@ -98,12 +98,12 @@ void cacheattr_init(void)
     {
         uint64_t base = pci_mem_start, size;
 
-        for ( i = 0; !(base >> 32) && (i < nr_var_ranges); i++ )
+        for ( i = 0; (base != pci_mem_end) && (i < nr_var_ranges); i++ )
         {
             size = PAGE_SIZE;
             while ( !(base & size) )
                 size <<= 1;
-            while ( ((base + size) < base) || ((base + size - 1) >> 32) )
+            while ( ((base + size) < base) || ((base + size) > pci_mem_end) )
                 size >>= 1;
 
             wrmsr(MSR_MTRRphysBase(i), base);
