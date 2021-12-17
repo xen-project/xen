@@ -146,10 +146,6 @@ static void trace_io(const struct connection *conn,
 	time_t now;
 	struct tm *tm;
 
-#ifdef HAVE_DTRACE
-	dtrace_io(conn, data, out);
-#endif
-
 	if (tracefd < 0)
 		return;
 
@@ -2336,9 +2332,6 @@ int main(int argc, char *argv[])
 
 	/* Get ready to listen to the tools. */
 	initialize_fds(&sock_pollfd_idx, &timeout);
-
-	/* Tell the kernel we're up and running. */
-	xenbus_notify_running();
 
 #if defined(XEN_SYSTEMD_ENABLED)
 	if (!live_update) {

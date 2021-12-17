@@ -38,10 +38,6 @@ void init_pipe(int reopen_log_pipe[2])
 	reopen_log_pipe[1] = -1;
 }
 
-void xenbus_notify_running(void)
-{
-}
-
 evtchn_port_t xenbus_evtchn(void)
 {
 	return dom0_event;

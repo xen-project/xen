@@ -225,7 +225,6 @@ int delay_request(struct connection *conn, struct buffered_data *in,
 void trace_create(const void *data, const char *type);
 void trace_destroy(const void *data, const char *type);
 void trace(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
-void dtrace_io(const struct connection *conn, const struct buffered_data *data, int out);
 void reopen_log(void);
 void close_log(void);
 
@@ -249,9 +248,6 @@ static inline int xenbus_master_domid(void) { return dom0_domid; }
 
 /* Return the event channel used by xenbus. */
 evtchn_port_t xenbus_evtchn(void);
-
-/* Tell the kernel xenstored is running. */
-void xenbus_notify_running(void);
 
 /* Write out the pidfile */
 void write_pidfile(const char *pidfile);

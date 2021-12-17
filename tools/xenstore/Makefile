@@ -27,7 +27,6 @@ XENSTORED_OBJS += xenstored_transaction.o xenstored_control.o
 XENSTORED_OBJS += xs_lib.o talloc.o utils.o tdb.o hashtable.o
 
 XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_posix.o
-XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o xenstored_posix.o xenstored_probes.o
 XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_posix.o
 XENSTORED_OBJS_$(CONFIG_FreeBSD) = xenstored_posix.o
 XENSTORED_OBJS_$(CONFIG_MiniOS) = xenstored_minios.o
@@ -49,18 +48,6 @@ all: $(ALL_TARGETS)
 
 .PHONY: clients
 clients: xenstore $(CLIENTS) xenstore-control
-
-ifeq ($(CONFIG_SunOS),y)
-xenstored_probes.h: xenstored_probes.d
-	dtrace -C -h -s xenstored_probes.d
-
-xenstored_solaris.o: xenstored_probes.h
-
-xenstored_probes.o: xenstored_solaris.o
-	dtrace -C -G -s xenstored_probes.d xenstored_solaris.o 
-
-CFLAGS += -DHAVE_DTRACE=1
-endif
 
 ifeq ($(CONFIG_SYSTEMD),y)
 $(XENSTORED_OBJS): CFLAGS += $(SYSTEMD_CFLAGS)
@@ -89,7 +76,7 @@ xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 
 .PHONY: clean
 clean:
-	rm -f *.a *.o xenstored_probes.h
+	rm -f *.a *.o
 	rm -f xenstored
 	rm -f xs_tdb_dump xenstore-control init-xenstore-domain
 	rm -f xenstore $(CLIENTS)
