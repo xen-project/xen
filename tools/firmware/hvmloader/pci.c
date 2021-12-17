@@ -29,8 +29,8 @@
 #include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/e820.h>
 
-unsigned long pci_mem_start = HVM_BELOW_4G_MMIO_START;
-unsigned long pci_mem_end = PCI_MEM_END;
+uint32_t pci_mem_start = HVM_BELOW_4G_MMIO_START;
+const uint32_t pci_mem_end = RESERVED_MEMBASE;
 uint64_t pci_hi_mem_start = 0, pci_hi_mem_end = 0;
 
 enum virtual_vga virtual_vga = VGA_none;
@@ -329,7 +329,7 @@ void pci_setup(void)
         else
         {
             pci_mem_start = max_ram_below_4g;
-            printf("pci_mem_start=0x%lx (was 0x%x) for mmio_hole_size=%lu\n",
+            printf("pci_mem_start=0x%x (was 0x%x) for mmio_hole_size=0x%lx\n",
                    pci_mem_start, HVM_BELOW_4G_MMIO_START,
                    (long)mmio_hole_size);
         }
