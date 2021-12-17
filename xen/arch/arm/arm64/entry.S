@@ -102,6 +102,30 @@
         .endif
 
         .endm
+
+/*
+ * Clobber top 32 bits of gp registers when switching from AArch32
+ */
+        .macro clobber_gp_top_halves, compat, save_x0_x1
+
+        .if \compat == 1      /* AArch32 mode */
+
+        /*
+         * At the moment, no-one is using save_x0_x1 == 0 with compat == 1.
+         * So the code is not handling it to simplify the implementation.
+         */
+        .if \save_x0_x1 == 0
+        .error "save_x0_x1 is 0 but compat is 1"
+        .endif
+
+        .irp n,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
+        mov w\n, w\n
+        .endr
+
+        .endif
+
+        .endm
+
 /*
  * Save state on entry to hypervisor, restore on exit
  *
@@ -111,6 +135,11 @@
  */
         .macro  entry, hyp, compat, save_x0_x1=1
         sub     sp, sp, #(UREGS_SPSR_el1 - UREGS_LR) /* CPSR, PC, SP, LR */
+
+        .if \hyp == 0         /* Guest mode */
+        clobber_gp_top_halves compat=\compat, save_x0_x1=\save_x0_x1
+        .endif
+
         push    x28, x29
         push    x26, x27
         push    x24, x25
