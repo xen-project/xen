@@ -307,18 +307,35 @@ static void ipmmu_write(struct ipmmu_vmsa_device *mmu, uint32_t offset,
     writel(data, mmu->base + offset);
 }
 
+static unsigned int ipmmu_ctx_reg(struct ipmmu_vmsa_device *mmu,
+                                  unsigned int context_id, uint32_t reg)
+{
+    return context_id * IM_CTX_SIZE + reg;
+}
+
+static uint32_t ipmmu_ctx_read(struct ipmmu_vmsa_device *mmu,
+                               unsigned int context_id, uint32_t reg)
+{
+    return ipmmu_read(mmu, ipmmu_ctx_reg(mmu, context_id, reg));
+}
+
+static void ipmmu_ctx_write(struct ipmmu_vmsa_device *mmu,
+                            unsigned int context_id, uint32_t reg,
+                            uint32_t data)
+{
+    ipmmu_write(mmu, ipmmu_ctx_reg(mmu, context_id, reg), data);
+}
+
 static uint32_t ipmmu_ctx_read_root(struct ipmmu_vmsa_domain *domain,
                                     uint32_t reg)
 {
-    return ipmmu_read(domain->mmu->root,
-                      domain->context_id * IM_CTX_SIZE + reg);
+    return ipmmu_ctx_read(domain->mmu->root, domain->context_id, reg);
 }
 
 static void ipmmu_ctx_write_root(struct ipmmu_vmsa_domain *domain,
                                  uint32_t reg, uint32_t data)
 {
-    ipmmu_write(domain->mmu->root,
-                domain->context_id * IM_CTX_SIZE + reg, data);
+    ipmmu_ctx_write(domain->mmu->root, domain->context_id, reg, data);
 }
 
 static void ipmmu_ctx_write_cache(struct ipmmu_vmsa_domain *domain,
@@ -329,8 +346,8 @@ static void ipmmu_ctx_write_cache(struct ipmmu_vmsa_domain *domain,
 
     /* Mask fields which are implemented in IPMMU-MM only. */
     if ( !ipmmu_is_root(domain->mmu) )
-        ipmmu_write(domain->mmu, domain->context_id * IM_CTX_SIZE + reg,
-                    data & IMCTR_COMMON_MASK);
+        ipmmu_ctx_write(domain->mmu, domain->context_id, reg,
+                        data & IMCTR_COMMON_MASK);
 }
 
 /*
@@ -693,7 +710,7 @@ static void ipmmu_device_reset(struct ipmmu_vmsa_device *mmu)
 
     /* Disable all contexts. */
     for ( i = 0; i < mmu->num_ctx; ++i )
-        ipmmu_write(mmu, i * IM_CTX_SIZE + IMCTR, 0);
+        ipmmu_ctx_write(mmu, i, IMCTR, 0);
 }
 
 /* R-Car Gen3 SoCs product and cut information. */
