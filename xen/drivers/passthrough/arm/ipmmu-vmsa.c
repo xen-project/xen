@@ -109,6 +109,8 @@ struct ipmmu_vmsa_xen_device {
 struct ipmmu_features {
     unsigned int number_of_contexts;
     unsigned int num_utlbs;
+    unsigned int ctx_offset_base;
+    unsigned int ctx_offset_stride;
 };
 
 /* Root/Cache IPMMU device's information */
@@ -167,8 +169,6 @@ static DEFINE_SPINLOCK(ipmmu_devices_lock);
 #define TLB_LOOP_TIMEOUT    100 /* 100us */
 
 /* Registers Definition */
-#define IM_CTX_SIZE    0x40
-
 #define IMCTR                0x0000
 /*
  * This field is implemented in IPMMU-MM only. So, can be set for
@@ -315,7 +315,8 @@ static void ipmmu_write(struct ipmmu_vmsa_device *mmu, uint32_t offset,
 static unsigned int ipmmu_ctx_reg(struct ipmmu_vmsa_device *mmu,
                                   unsigned int context_id, uint32_t reg)
 {
-    return context_id * IM_CTX_SIZE + reg;
+    return mmu->features->ctx_offset_base +
+        context_id * mmu->features->ctx_offset_stride + reg;
 }
 
 static uint32_t ipmmu_ctx_read(struct ipmmu_vmsa_device *mmu,
@@ -735,6 +736,8 @@ static int ipmmu_init_platform_device(struct device *dev,
 static const struct ipmmu_features ipmmu_features_rcar_gen3 = {
     .number_of_contexts = 8,
     .num_utlbs = 48,
+    .ctx_offset_base = 0,
+    .ctx_offset_stride = 0x40,
 };
 
 static void ipmmu_device_reset(struct ipmmu_vmsa_device *mmu)
