@@ -1,15 +1,15 @@
 /*
  * xen/drivers/passthrough/arm/ipmmu-vmsa.c
  *
- * Driver for the Renesas IPMMU-VMSA found in R-Car Gen3 SoCs.
+ * Driver for the Renesas IPMMU-VMSA found in R-Car Gen3/Gen4 SoCs.
  *
  * The IPMMU-VMSA is VMSA-compatible I/O Memory Management Unit (IOMMU)
  * which provides address translation and access protection functionalities
  * to processing units and interconnect networks.
  *
  * Please note, current driver is supposed to work only with newest
- * R-Car Gen3 SoCs revisions which IPMMU hardware supports stage 2 translation
- * table format and is able to use CPU's P2M table as is.
+ * R-Car Gen3/Gen4 SoCs revisions which IPMMU hardware supports stage 2
+ * translation table format and is able to use CPU's P2M table as is.
  *
  * Based on Linux's IPMMU-VMSA driver from Renesas BSP:
  *    drivers/iommu/ipmmu-vmsa.c
@@ -20,9 +20,9 @@
  * and Xen's SMMU driver:
  *    xen/drivers/passthrough/arm/smmu.c
  *
- * Copyright (C) 2014-2019 Renesas Electronics Corporation
+ * Copyright (C) 2014-2021 Renesas Electronics Corporation
  *
- * Copyright (C) 2016-2019 EPAM Systems Inc.
+ * Copyright (C) 2016-2021 EPAM Systems Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms and conditions of the GNU General Public
@@ -68,12 +68,13 @@
     dev_print(dev, XENLOG_ERR, fmt, ## __VA_ARGS__)
 
 /*
- * R-Car Gen3 SoCs make use of up to 8 IPMMU contexts (sets of page table) and
- * these can be managed independently. Each context is mapped to one Xen domain.
+ * R-Car Gen3/Gen4 SoCs make use of up to 16 IPMMU contexts (sets of page table)
+ * and these can be managed independently. Each context is mapped to one Xen
+ * domain.
  */
-#define IPMMU_CTX_MAX     8U
-/* R-Car Gen3 SoCs make use of up to 48 micro-TLBs per IPMMU device. */
-#define IPMMU_UTLB_MAX    48U
+#define IPMMU_CTX_MAX     16U
+/* R-Car Gen3/Gen4 SoCs make use of up to 64 micro-TLBs per IPMMU device. */
+#define IPMMU_UTLB_MAX    64U
 
 /* IPMMU context supports IPA size up to 40 bit. */
 #define IPMMU_MAX_P2M_IPA_BITS    40
@@ -112,6 +113,8 @@ struct ipmmu_features {
     unsigned int ctx_offset_base;
     unsigned int ctx_offset_stride;
     unsigned int utlb_offset_base;
+    unsigned int control_offset_base;
+    unsigned int imuctr_ttsel_mask;
 };
 
 /* Root/Cache IPMMU device's information */
@@ -211,7 +214,6 @@ static DEFINE_SPINLOCK(ipmmu_devices_lock);
 #define IMUCTR0(n)             (0x0300 + ((n) * 16))
 #define IMUCTR32(n)            (0x0600 + (((n) - 32) * 16))
 #define IMUCTR_TTSEL_MMU(n)    ((n) << 4)
-#define IMUCTR_TTSEL_MASK      (15 << 4)
 #define IMUCTR_TTSEL_SHIFT     4
 #define IMUCTR_FLUSH           (1 << 1)
 #define IMUCTR_MMUEN           (1 << 0)
@@ -316,8 +318,12 @@ static void ipmmu_write(struct ipmmu_vmsa_device *mmu, uint32_t offset,
 static unsigned int ipmmu_ctx_reg(struct ipmmu_vmsa_device *mmu,
                                   unsigned int context_id, uint32_t reg)
 {
-    return mmu->features->ctx_offset_base +
-        context_id * mmu->features->ctx_offset_stride + reg;
+    unsigned int base = mmu->features->ctx_offset_base;
+
+    if ( context_id > 7 )
+        base += 0x800 - 8 * 0x40;
+
+    return base + context_id * mmu->features->ctx_offset_stride + reg;
 }
 
 static uint32_t ipmmu_ctx_read(struct ipmmu_vmsa_device *mmu,
@@ -448,7 +454,8 @@ static int ipmmu_utlb_enable(struct ipmmu_vmsa_domain *domain,
     {
         unsigned int context_id;
 
-        context_id = (imuctr & IMUCTR_TTSEL_MASK) >> IMUCTR_TTSEL_SHIFT;
+        context_id = (imuctr & mmu->features->imuctr_ttsel_mask) >>
+            IMUCTR_TTSEL_SHIFT;
         if ( domain->context_id != context_id )
         {
             dev_err(mmu->dev, "Micro-TLB %u already assigned to IPMMU context %u\n",
@@ -740,6 +747,18 @@ static const struct ipmmu_features ipmmu_features_rcar_gen3 = {
     .ctx_offset_base = 0,
     .ctx_offset_stride = 0x40,
     .utlb_offset_base = 0,
+    .control_offset_base = 0,
+    .imuctr_ttsel_mask = (15 << 4),
+};
+
+static const struct ipmmu_features ipmmu_features_rcar_gen4 = {
+    .number_of_contexts = 16,
+    .num_utlbs = 64,
+    .ctx_offset_base = 0x10000,
+    .ctx_offset_stride = 0x1040,
+    .utlb_offset_base = 0x3000,
+    .control_offset_base = 0x1000,
+    .imuctr_ttsel_mask = (31 << 4),
 };
 
 static void ipmmu_device_reset(struct ipmmu_vmsa_device *mmu)
@@ -751,11 +770,12 @@ static void ipmmu_device_reset(struct ipmmu_vmsa_device *mmu)
         ipmmu_ctx_write(mmu, i, IMCTR, 0);
 }
 
-/* R-Car Gen3 SoCs product and cut information. */
+/* R-Car Gen3/Gen4 SoCs product and cut information. */
 #define RCAR_PRODUCT_MASK    0x00007F00
 #define RCAR_PRODUCT_H3      0x00004F00
 #define RCAR_PRODUCT_M3W     0x00005200
 #define RCAR_PRODUCT_M3N     0x00005500
+#define RCAR_PRODUCT_S4      0x00005A00
 #define RCAR_CUT_MASK        0x000000FF
 #define RCAR_CUT_VER30       0x00000020
 
@@ -803,6 +823,10 @@ static __init bool ipmmu_stage2_supported(void)
         stage2_supported = true;
         break;
 
+    case RCAR_PRODUCT_S4:
+        stage2_supported = true;
+        break;
+
     default:
         printk(XENLOG_ERR "ipmmu: Unsupported SoC version\n");
         break;
@@ -831,6 +855,10 @@ static const struct dt_device_match ipmmu_dt_match[] __initconst =
         .compatible = "renesas,ipmmu-r8a77961",
         .data = &ipmmu_features_rcar_gen3,
     },
+    {
+        .compatible = "renesas,ipmmu-r8a779f0",
+        .data = &ipmmu_features_rcar_gen4,
+    },
     { /* sentinel */ },
 };
 
@@ -845,6 +873,7 @@ static int ipmmu_probe(struct dt_device_node *node)
     const struct dt_device_match *match;
     struct ipmmu_vmsa_device *mmu;
     uint64_t addr, size;
+    uint32_t reg;
     int irq, ret;
 
     mmu = xzalloc(struct ipmmu_vmsa_device);
@@ -930,8 +959,8 @@ static int ipmmu_probe(struct dt_device_node *node)
          * Use stage 2 translation table format when stage 2 translation
          * enabled.
          */
-        ipmmu_write(mmu, IMSAUXCTLR,
-                    ipmmu_read(mmu, IMSAUXCTLR) | IMSAUXCTLR_S2PTE);
+        reg = IMSAUXCTLR + mmu->features->control_offset_base;
+        ipmmu_write(mmu, reg, ipmmu_read(mmu, reg) | IMSAUXCTLR_S2PTE);
 
         dev_info(&node->dev, "IPMMU context 0 is reserved\n");
         set_bit(0, mmu->ctx);

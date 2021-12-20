@@ -25,14 +25,14 @@ config ARM_SMMU_V3
 	 the ARM SMMUv3 architecture.
 
 config IPMMU_VMSA
-	bool "Renesas IPMMU-VMSA found in R-Car Gen3 SoCs"
+	bool "Renesas IPMMU-VMSA found in R-Car Gen3/Gen4 SoCs"
 	depends on ARM_64
 	---help---
 	  Support for implementations of the Renesas IPMMU-VMSA found
-	  in R-Car Gen3 SoCs.
+	  in R-Car Gen3/Gen4 SoCs.
 
 	  Say Y here if you are using newest R-Car Gen3 SoCs revisions
-	  (H3 ES3.0, M3-W+, etc) which IPMMU hardware supports stage 2
+	  (H3 ES3.0, M3-W+, etc) or Gen4 SoCs which IPMMU hardware supports stage 2
 	  translation table format and is able to use CPU's P2M table as is.
 
 endif
