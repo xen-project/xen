@@ -366,6 +366,29 @@ static void ipmmu_ctx_write_all(struct ipmmu_vmsa_domain *domain,
     ipmmu_ctx_write_root(domain, reg, data);
 }
 
+static uint32_t ipmmu_utlb_reg(struct ipmmu_vmsa_device *mmu, uint32_t reg)
+{
+    return reg;
+}
+
+static void ipmmu_imuasid_write(struct ipmmu_vmsa_device *mmu,
+                                unsigned int utlb, uint32_t data)
+{
+    ipmmu_write(mmu, ipmmu_utlb_reg(mmu, IMUASID(utlb)), data);
+}
+
+static void ipmmu_imuctr_write(struct ipmmu_vmsa_device *mmu,
+                               unsigned int utlb, uint32_t data)
+{
+    ipmmu_write(mmu, ipmmu_utlb_reg(mmu, IMUCTR(utlb)), data);
+}
+
+static uint32_t ipmmu_imuctr_read(struct ipmmu_vmsa_device *mmu,
+                                  unsigned int utlb)
+{
+    return ipmmu_read(mmu, ipmmu_utlb_reg(mmu, IMUCTR(utlb)));
+}
+
 /* TLB and micro-TLB Management */
 
 /* Wait for any pending TLB invalidations to complete. */
@@ -413,7 +436,7 @@ static int ipmmu_utlb_enable(struct ipmmu_vmsa_domain *domain,
      * context_id for already enabled micro-TLB and prevent different context
      * bank from being set.
      */
-    imuctr = ipmmu_read(mmu, IMUCTR(utlb));
+    imuctr = ipmmu_imuctr_read(mmu, utlb);
     if ( imuctr & IMUCTR_MMUEN )
     {
         unsigned int context_id;
@@ -431,9 +454,9 @@ static int ipmmu_utlb_enable(struct ipmmu_vmsa_domain *domain,
      * TODO: Reference-count the micro-TLB as several bus masters can be
      * connected to the same micro-TLB.
      */
-    ipmmu_write(mmu, IMUASID(utlb), 0);
-    ipmmu_write(mmu, IMUCTR(utlb), imuctr |
-                IMUCTR_TTSEL_MMU(domain->context_id) | IMUCTR_MMUEN);
+    ipmmu_imuasid_write(mmu, utlb, 0);
+    ipmmu_imuctr_write(mmu, utlb, imuctr |
+                       IMUCTR_TTSEL_MMU(domain->context_id) | IMUCTR_MMUEN);
 
     return 0;
 }
@@ -444,7 +467,7 @@ static void ipmmu_utlb_disable(struct ipmmu_vmsa_domain *domain,
 {
     struct ipmmu_vmsa_device *mmu = domain->mmu;
 
-    ipmmu_write(mmu, IMUCTR(utlb), 0);
+    ipmmu_imuctr_write(mmu, utlb, 0);
 }
 
 /* Domain/Context Management */
