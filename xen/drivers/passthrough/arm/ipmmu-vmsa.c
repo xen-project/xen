@@ -222,6 +222,9 @@ static DEFINE_SPINLOCK(ipmmu_devices_lock);
 #define IMUASID0(n)            (0x0308 + ((n) * 16))
 #define IMUASID32(n)           (0x0608 + (((n) - 32) * 16))
 
+#define IMSCTLR             0x0500
+#define IMSCTLR_USE_SECGRP  (1 << 28)
+
 #define IMSAUXCTLR          0x0504
 #define IMSAUXCTLR_S2PTE    (1 << 3)
 
@@ -965,6 +968,10 @@ static int ipmmu_probe(struct dt_device_node *node)
         dev_info(&node->dev, "IPMMU context 0 is reserved\n");
         set_bit(0, mmu->ctx);
     }
+
+    /* Do not use security group function. */
+    reg = IMSCTLR + mmu->features->control_offset_base;
+    ipmmu_write(mmu, reg, ipmmu_read(mmu, reg) & ~IMSCTLR_USE_SECGRP);
 
     spin_lock(&ipmmu_devices_lock);
     list_add(&mmu->list, &ipmmu_devices);
