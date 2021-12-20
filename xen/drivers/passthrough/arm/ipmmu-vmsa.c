@@ -71,9 +71,9 @@
  * R-Car Gen3 SoCs make use of up to 8 IPMMU contexts (sets of page table) and
  * these can be managed independently. Each context is mapped to one Xen domain.
  */
-#define IPMMU_CTX_MAX     8
+#define IPMMU_CTX_MAX     8U
 /* R-Car Gen3 SoCs make use of up to 48 micro-TLBs per IPMMU device. */
-#define IPMMU_UTLB_MAX    48
+#define IPMMU_UTLB_MAX    48U
 
 /* IPMMU context supports IPA size up to 40 bit. */
 #define IPMMU_MAX_P2M_IPA_BITS    40
@@ -106,17 +106,22 @@ struct ipmmu_vmsa_xen_device {
     struct ipmmu_vmsa_device *mmu;
 };
 
+struct ipmmu_features {
+    unsigned int number_of_contexts;
+    unsigned int num_utlbs;
+};
+
 /* Root/Cache IPMMU device's information */
 struct ipmmu_vmsa_device {
     struct device *dev;
     void __iomem *base;
     struct ipmmu_vmsa_device *root;
     struct list_head list;
-    unsigned int num_utlbs;
     unsigned int num_ctx;
     spinlock_t lock;    /* Protects ctx and domains[] */
     DECLARE_BITMAP(ctx, IPMMU_CTX_MAX);
     struct ipmmu_vmsa_domain *domains[IPMMU_CTX_MAX];
+    const struct ipmmu_features *features;
 };
 
 /*
@@ -727,6 +732,11 @@ static int ipmmu_init_platform_device(struct device *dev,
     return 0;
 }
 
+static const struct ipmmu_features ipmmu_features_rcar_gen3 = {
+    .number_of_contexts = 8,
+    .num_utlbs = 48,
+};
+
 static void ipmmu_device_reset(struct ipmmu_vmsa_device *mmu)
 {
     unsigned int i;
@@ -798,6 +808,27 @@ static __init bool ipmmu_stage2_supported(void)
     return stage2_supported;
 }
 
+static const struct dt_device_match ipmmu_dt_match[] __initconst =
+{
+    {
+        .compatible = "renesas,ipmmu-r8a7795",
+        .data = &ipmmu_features_rcar_gen3,
+    },
+    {
+        .compatible = "renesas,ipmmu-r8a77965",
+        .data = &ipmmu_features_rcar_gen3,
+    },
+    {
+        .compatible = "renesas,ipmmu-r8a7796",
+        .data = &ipmmu_features_rcar_gen3,
+    },
+    {
+        .compatible = "renesas,ipmmu-r8a77961",
+        .data = &ipmmu_features_rcar_gen3,
+    },
+    { /* sentinel */ },
+};
+
 /*
  * This function relies on the fact that Root IPMMU device is being probed
  * the first. If not the case, it denies further Cache IPMMU device probes
@@ -806,6 +837,7 @@ static __init bool ipmmu_stage2_supported(void)
  */
 static int ipmmu_probe(struct dt_device_node *node)
 {
+    const struct dt_device_match *match;
     struct ipmmu_vmsa_device *mmu;
     uint64_t addr, size;
     int irq, ret;
@@ -817,9 +849,12 @@ static int ipmmu_probe(struct dt_device_node *node)
         return -ENOMEM;
     }
 
+    match = dt_match_node(ipmmu_dt_match, node);
+    ASSERT(match);
+    mmu->features = match->data;
+
     mmu->dev = &node->dev;
-    mmu->num_utlbs = IPMMU_UTLB_MAX;
-    mmu->num_ctx = IPMMU_CTX_MAX;
+    mmu->num_ctx = min(IPMMU_CTX_MAX, mmu->features->number_of_contexts);
     spin_lock_init(&mmu->lock);
     bitmap_zero(mmu->ctx, IPMMU_CTX_MAX);
 
@@ -1294,15 +1329,6 @@ static const struct iommu_ops ipmmu_iommu_ops =
     .unmap_page      = arm_iommu_unmap_page,
     .dt_xlate        = ipmmu_dt_xlate,
     .add_device      = ipmmu_add_device,
-};
-
-static const struct dt_device_match ipmmu_dt_match[] __initconst =
-{
-    DT_MATCH_COMPATIBLE("renesas,ipmmu-r8a7795"),
-    DT_MATCH_COMPATIBLE("renesas,ipmmu-r8a77965"),
-    DT_MATCH_COMPATIBLE("renesas,ipmmu-r8a7796"),
-    DT_MATCH_COMPATIBLE("renesas,ipmmu-r8a77961"),
-    { /* sentinel */ },
 };
 
 static __init int ipmmu_init(struct dt_device_node *node, const void *data)
