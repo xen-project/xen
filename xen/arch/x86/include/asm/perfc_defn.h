@@ -4,6 +4,8 @@
 
 PERFCOUNTER_ARRAY(exceptions,           "exceptions", 32)
 
+#ifdef CONFIG_HVM
+
 #define VMX_PERF_EXIT_REASON_SIZE 56
 #define VMX_PERF_VECTOR_SIZE 0x20
 PERFCOUNTER_ARRAY(vmexits,              "vmexits", VMX_PERF_EXIT_REASON_SIZE)
@@ -12,6 +14,8 @@ PERFCOUNTER_ARRAY(cause_vector,         "cause vector", VMX_PERF_VECTOR_SIZE)
 #define VMEXIT_NPF_PERFC 141
 #define SVM_PERF_EXIT_REASON_SIZE (1+141)
 PERFCOUNTER_ARRAY(svmexits,             "SVMexits", SVM_PERF_EXIT_REASON_SIZE)
+
+#endif /* CONFIG_HVM */
 
 PERFCOUNTER(seg_fixups,             "segmentation fixups")
 
@@ -37,6 +41,8 @@ PERFCOUNTER(exception_fixed,        "pre-exception fixed")
 PERFCOUNTER(guest_walk,            "guest pagetable walks")
 
 /* Shadow counters */
+#ifdef CONFIG_SHADOW_PAGING
+
 PERFCOUNTER(shadow_alloc,          "calls to shadow_alloc")
 PERFCOUNTER(shadow_alloc_tlbflush, "shadow_alloc flushed TLBs")
 
@@ -111,6 +117,8 @@ PERFCOUNTER(shadow_oos_fixup_evict,"shadow OOS fixup evictions")
 PERFCOUNTER(shadow_unsync,         "shadow OOS unsyncs")
 PERFCOUNTER(shadow_unsync_evict,   "shadow OOS evictions")
 PERFCOUNTER(shadow_resync,         "shadow OOS resyncs")
+
+#endif /* CONFIG_SHADOW_PAGING */
 
 PERFCOUNTER(realmode_emulations, "realmode instructions emulated")
 PERFCOUNTER(realmode_exits,      "vmexits from realmode")
