@@ -351,7 +351,7 @@ const char *libxl_defbool_to_string(libxl_defbool b)
 /******************************************************************************/
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
 {
-    xc_physinfo_t xcphysinfo = { 0 };
+    xc_physinfo_t xcphysinfo;
     int rc;
     long l;
     GC_INIT(ctx);

@@ -589,7 +589,7 @@ static void set_evt_mask(uint32_t mask)
  */
 static unsigned int get_num_cpus(void)
 {
-    xc_physinfo_t physinfo = { 0 };
+    xc_physinfo_t physinfo;
     int ret;
     
     ret = xc_physinfo(xc_handle, &physinfo);

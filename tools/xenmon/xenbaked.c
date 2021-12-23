@@ -436,7 +436,7 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
  */
 static unsigned int get_num_cpus(void)
 {
-    xc_physinfo_t physinfo = { 0 };
+    xc_physinfo_t physinfo;
     xc_interface *xc_handle = xc_interface_open(0,0,0);
     int ret;
 

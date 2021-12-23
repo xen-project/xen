@@ -1244,7 +1244,7 @@ struct {
 int main(int argc, char *argv[])
 {
     int i, ret = 0;
-    xc_physinfo_t physinfo = { 0 };
+    xc_physinfo_t physinfo;
     int nr_matches = 0;
     int matches_main_options[ARRAY_SIZE(main_options)];
 
