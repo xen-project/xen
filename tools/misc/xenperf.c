@@ -18,7 +18,7 @@
 #include <string.h>
 
 #define X(name) [__HYPERVISOR_##name] = #name
-const char *hypercall_name_table[64] =
+static const char *const hypercall_name_table[64] =
 {
     X(set_trap_table),
     X(mmu_update),
@@ -57,8 +57,18 @@ const char *hypercall_name_table[64] =
     X(sysctl),
     X(domctl),
     X(kexec_op),
+    X(tmem_op),
+    X(argo_op),
+    X(xenpmu_op),
+    X(dm_op),
+    X(hypfs_op),
+#if defined(__i386__) || defined(__x86_64__)
+    X(mca),
+    [__HYPERVISOR_arch_1] = "paging-domctl-continuation",
+#else
     X(arch_0),
     X(arch_1),
+#endif
     X(arch_2),
     X(arch_3),
     X(arch_4),
