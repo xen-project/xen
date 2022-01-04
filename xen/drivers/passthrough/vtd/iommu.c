@@ -584,7 +584,8 @@ int vtd_flush_iotlb_reg(struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
     if ( type == DMA_TLB_PSI_FLUSH )
     {
         /* Note: always flush non-leaf currently. */
-        dmar_writeq(iommu->reg, tlb_offset, size_order | addr);
+        dmar_writeq(iommu->reg, tlb_offset,
+                    size_order | DMA_TLB_IVA_ADDR(addr));
     }
     dmar_writeq(iommu->reg, tlb_offset + 8, val);
 
@@ -644,8 +645,6 @@ static int __must_check iommu_flush_iotlb_psi(struct vtd_iommu *iommu, u16 did,
 {
     int status;
 
-    ASSERT(!(addr & (~PAGE_MASK_4K)));
-
     /* Fallback to domain selective flush if no PSI support */
     if ( !cap_pgsel_inv(iommu->cap) )
         return iommu_flush_iotlb_dsi(iommu, did, flush_non_present_entry,
@@ -655,9 +654,6 @@ static int __must_check iommu_flush_iotlb_psi(struct vtd_iommu *iommu, u16 did,
     if ( order > cap_max_amask_val(iommu->cap) )
         return iommu_flush_iotlb_dsi(iommu, did, flush_non_present_entry,
                                      flush_dev_iotlb);
-
-    addr >>= PAGE_SHIFT_4K + order;
-    addr <<= PAGE_SHIFT_4K + order;
 
     /* apply platform specific errata workarounds */
     vtd_ops_preamble_quirk(iommu);
