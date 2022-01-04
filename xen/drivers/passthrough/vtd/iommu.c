@@ -479,7 +479,6 @@ int vtd_flush_context_reg(struct vtd_iommu *iommu, uint16_t did,
                           uint16_t source_id, uint8_t function_mask,
                           uint64_t type, bool flush_non_present_entry)
 {
-    u64 val = 0;
     unsigned long flags;
 
     /*
@@ -500,26 +499,26 @@ int vtd_flush_context_reg(struct vtd_iommu *iommu, uint16_t did,
     switch ( type )
     {
     case DMA_CCMD_GLOBAL_INVL:
-        val = DMA_CCMD_GLOBAL_INVL;
         break;
-    case DMA_CCMD_DOMAIN_INVL:
-        val = DMA_CCMD_DOMAIN_INVL|DMA_CCMD_DID(did);
-        break;
+
     case DMA_CCMD_DEVICE_INVL:
-        val = DMA_CCMD_DEVICE_INVL|DMA_CCMD_DID(did)
-            |DMA_CCMD_SID(source_id)|DMA_CCMD_FM(function_mask);
+        type |= DMA_CCMD_SID(source_id) | DMA_CCMD_FM(function_mask);
+        fallthrough;
+    case DMA_CCMD_DOMAIN_INVL:
+        type |= DMA_CCMD_DID(did);
         break;
+
     default:
         BUG();
     }
-    val |= DMA_CCMD_ICC;
+    type |= DMA_CCMD_ICC;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
-    dmar_writeq(iommu->reg, DMAR_CCMD_REG, val);
+    dmar_writeq(iommu->reg, DMAR_CCMD_REG, type);
 
     /* Make sure hardware complete it */
     IOMMU_FLUSH_WAIT("context", iommu, DMAR_CCMD_REG, dmar_readq,
-                     !(val & DMA_CCMD_ICC), val);
+                     !(type & DMA_CCMD_ICC), type);
 
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     /* flush context entry will implicitly flush write buffer */
@@ -548,7 +547,7 @@ int vtd_flush_iotlb_reg(struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
                         bool flush_non_present_entry, bool flush_dev_iotlb)
 {
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
-    u64 val = 0;
+    uint64_t val = type | DMA_TLB_IVT;
     unsigned long flags;
 
     /*
@@ -562,14 +561,13 @@ int vtd_flush_iotlb_reg(struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
     switch ( type )
     {
     case DMA_TLB_GLOBAL_FLUSH:
-        val = DMA_TLB_GLOBAL_FLUSH|DMA_TLB_IVT;
         break;
+
     case DMA_TLB_DSI_FLUSH:
-        val = DMA_TLB_DSI_FLUSH|DMA_TLB_IVT|DMA_TLB_DID(did);
-        break;
     case DMA_TLB_PSI_FLUSH:
-        val = DMA_TLB_PSI_FLUSH|DMA_TLB_IVT|DMA_TLB_DID(did);
+        val |= DMA_TLB_DID(did);
         break;
+
     default:
         BUG();
     }
