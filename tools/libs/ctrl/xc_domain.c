@@ -1230,13 +1230,9 @@ static int xc_domain_pod_target(xc_interface *xch,
     err = do_memory_op(xch, op, &pod_target, sizeof(pod_target));
 
     if ( err < 0 )
-    {
         DPRINTF("Failed %s_pod_target dom %d\n",
                 (op==XENMEM_set_pod_target)?"set":"get",
                 domid);
-        errno = -err;
-        err = -1;
-    }
     else
         err = 0;
 
