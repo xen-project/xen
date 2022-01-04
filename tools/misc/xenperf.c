@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
     DECLARE_HYPERCALL_BUFFER(xc_perfc_val_t, pcv);
     xc_perfc_val_t  *val;
     int num_desc, num_val;
-    unsigned int    sum, reset = 0, full = 0, pretty = 0;
+    unsigned int     reset = 0, full = 0, pretty = 0;
     char hypercall_name[36];
 
     if ( argc > 1 )
@@ -168,14 +168,15 @@ int main(int argc, char *argv[])
     val = pcv;
     for ( i = 0; i < num_desc; i++ )
     {
+        unsigned long long sum = 0;
+
         printf ("%-35s ", pcd[i].name);
         
-        sum = 0;
         for ( j = 0; j < pcd[i].nr_vals; j++ )
             sum += val[j];
-        printf ("T=%10u ", (unsigned int)sum);
+        printf("T=%10llu ", sum);
 
-        if ( full || (pcd[i].nr_vals <= 4) )
+        if ( sum && (full || (pcd[i].nr_vals <= 4)) )
         {
             if ( pretty && (strcmp(pcd[i].name, "hypercalls") == 0) )
             {
