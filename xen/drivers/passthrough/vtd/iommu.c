@@ -62,10 +62,31 @@ static struct tasklet vtd_fault_tasklet;
 static int setup_hwdom_device(u8 devfn, struct pci_dev *);
 static void setup_hwdom_rmrr(struct domain *d);
 
+static bool domid_mapping(const struct vtd_iommu *iommu)
+{
+    return (const void *)iommu->domid_bitmap != (const void *)iommu->domid_map;
+}
+
+static domid_t convert_domid(const struct vtd_iommu *iommu, domid_t domid)
+{
+    /*
+     * While we need to avoid DID 0 for caching-mode IOMMUs, maintain
+     * the property of the transformation being the same in either
+     * direction. By clipping to 16 bits we ensure that the resulting
+     * DID will fit in the respective context entry field.
+     */
+    BUILD_BUG_ON(DOMID_MASK >= 0xffff);
+
+    return !cap_caching_mode(iommu->cap) ? domid : ~domid;
+}
+
 static int domain_iommu_domid(const struct domain *d,
                               const struct vtd_iommu *iommu)
 {
     unsigned int nr_dom, i;
+
+    if ( !domid_mapping(iommu) )
+        return convert_domid(iommu, d->domain_id);
 
     nr_dom = cap_ndoms(iommu->cap);
     i = find_first_bit(iommu->domid_bitmap, nr_dom);
@@ -91,26 +112,32 @@ static int context_set_domain_id(struct context_entry *context,
                                  const struct domain *d,
                                  struct vtd_iommu *iommu)
 {
-    unsigned int nr_dom, i;
+    unsigned int i;
 
     ASSERT(spin_is_locked(&iommu->lock));
 
-    nr_dom = cap_ndoms(iommu->cap);
-    i = find_first_bit(iommu->domid_bitmap, nr_dom);
-    while ( i < nr_dom && iommu->domid_map[i] != d->domain_id )
-        i = find_next_bit(iommu->domid_bitmap, nr_dom, i + 1);
-
-    if ( i >= nr_dom )
+    if ( domid_mapping(iommu) )
     {
-        i = find_first_zero_bit(iommu->domid_bitmap, nr_dom);
+        unsigned int nr_dom = cap_ndoms(iommu->cap);
+
+        i = find_first_bit(iommu->domid_bitmap, nr_dom);
+        while ( i < nr_dom && iommu->domid_map[i] != d->domain_id )
+            i = find_next_bit(iommu->domid_bitmap, nr_dom, i + 1);
+
         if ( i >= nr_dom )
         {
-            dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no free domain ids\n");
-            return -EBUSY;
+            i = find_first_zero_bit(iommu->domid_bitmap, nr_dom);
+            if ( i >= nr_dom )
+            {
+                dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no free domain id\n");
+                return -EBUSY;
+            }
+            iommu->domid_map[i] = d->domain_id;
+            set_bit(i, iommu->domid_bitmap);
         }
-        iommu->domid_map[i] = d->domain_id;
-        set_bit(i, iommu->domid_bitmap);
     }
+    else
+        i = convert_domid(iommu, d->domain_id);
 
     context->hi |= (i & ((1 << DID_FIELD_WIDTH) - 1)) << DID_HIGH_OFFSET;
     return 0;
@@ -140,7 +167,12 @@ static int context_get_domain_id(const struct context_entry *context,
 
 static void cleanup_domid_map(struct domain *domain, struct vtd_iommu *iommu)
 {
-    int iommu_domid = domain_iommu_domid(domain, iommu);
+    int iommu_domid;
+
+    if ( !domid_mapping(iommu) )
+        return;
+
+    iommu_domid = domain_iommu_domid(domain, iommu);
 
     if ( iommu_domid >= 0 )
     {
@@ -196,7 +228,13 @@ static void check_cleanup_domid_map(struct domain *d,
 
 domid_t did_to_domain_id(const struct vtd_iommu *iommu, unsigned int did)
 {
-    if ( did >= cap_ndoms(iommu->cap) || !test_bit(did, iommu->domid_bitmap) )
+    if ( did >= min(cap_ndoms(iommu->cap), DOMID_MASK + 1) )
+        return DOMID_INVALID;
+
+    if ( !domid_mapping(iommu) )
+        return convert_domid(iommu, did);
+
+    if ( !test_bit(did, iommu->domid_bitmap) )
         return DOMID_INVALID;
 
     return iommu->domid_map[did];
@@ -1297,24 +1335,32 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     if ( !ecap_coherent(iommu->ecap) )
         vtd_ops.sync_cache = sync_cache;
 
-    /* allocate domain id bitmap */
     nr_dom = cap_ndoms(iommu->cap);
-    iommu->domid_bitmap = xzalloc_array(unsigned long, BITS_TO_LONGS(nr_dom));
-    if ( !iommu->domid_bitmap )
-        return -ENOMEM;
 
-    iommu->domid_map = xzalloc_array(domid_t, nr_dom);
-    if ( !iommu->domid_map )
-        return -ENOMEM;
-
-    /*
-     * If Caching mode is set, then invalid translations are tagged with
-     * domain id 0. Hence reserve bit/slot 0.
-     */
-    if ( cap_caching_mode(iommu->cap) )
+    if ( nr_dom <= DOMID_MASK + cap_caching_mode(iommu->cap) )
     {
-        iommu->domid_map[0] = DOMID_INVALID;
-        __set_bit(0, iommu->domid_bitmap);
+        /* Allocate domain id (bit) maps. */
+        iommu->domid_bitmap = xzalloc_array(unsigned long,
+                                            BITS_TO_LONGS(nr_dom));
+        iommu->domid_map = xzalloc_array(domid_t, nr_dom);
+        if ( !iommu->domid_bitmap || !iommu->domid_map )
+            return -ENOMEM;
+
+        /*
+         * If Caching mode is set, then invalid translations are tagged
+         * with domain id 0. Hence reserve bit/slot 0.
+         */
+        if ( cap_caching_mode(iommu->cap) )
+        {
+            iommu->domid_map[0] = DOMID_INVALID;
+            __set_bit(0, iommu->domid_bitmap);
+        }
+    }
+    else
+    {
+        /* Don't leave dangling NULL pointers. */
+        iommu->domid_bitmap = ZERO_BLOCK_PTR;
+        iommu->domid_map = ZERO_BLOCK_PTR;
     }
 
     return 0;
