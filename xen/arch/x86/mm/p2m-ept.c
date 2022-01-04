@@ -246,8 +246,7 @@ static void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int l
             ept_free_entry(p2m, epte + i, level - 1);
         unmap_domain_page(epte);
     }
-    
-    p2m_tlb_flush_sync(p2m);
+
     p2m_free_ptp(p2m, mfn_to_page(_mfn(ept_entry->mfn)));
 }
 
