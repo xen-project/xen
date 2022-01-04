@@ -1245,7 +1245,7 @@ void __init init_speculation_mitigations(void)
          */
         if ( opt_srb_lock == -1 &&
              (caps & (ARCH_CAPS_MDS_NO|ARCH_CAPS_TAA_NO)) == ARCH_CAPS_MDS_NO &&
-             (!cpu_has_hle || ((caps & ARCH_CAPS_TSX_CTRL) && opt_tsx == 0)) )
+             (!cpu_has_hle || ((caps & ARCH_CAPS_TSX_CTRL) && rtm_disabled)) )
             opt_srb_lock = 0;
 
         val &= ~MCU_OPT_CTRL_RNGDS_MITG_DIS;
