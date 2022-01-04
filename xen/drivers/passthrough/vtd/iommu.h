@@ -90,14 +90,14 @@
 
 #define ecap_niotlb_iunits(e)    ((((e) >> 24) & 0xff) + 1)
 #define ecap_iotlb_offset(e)     ((((e) >> 8) & 0x3ff) * 16)
-#define ecap_coherent(e)         ((e >> 0) & 0x1)
-#define ecap_queued_inval(e)     ((e >> 1) & 0x1)
-#define ecap_dev_iotlb(e)        ((e >> 2) & 0x1)
-#define ecap_intr_remap(e)       ((e >> 3) & 0x1)
-#define ecap_eim(e)              ((e >> 4) & 0x1)
-#define ecap_cache_hints(e)      ((e >> 5) & 0x1)
-#define ecap_pass_thru(e)        ((e >> 6) & 0x1)
-#define ecap_snp_ctl(e)          ((e >> 7) & 0x1)
+#define ecap_coherent(e)         (((e) >> 0) & 1)
+#define ecap_queued_inval(e)     (((e) >> 1) & 1)
+#define ecap_dev_iotlb(e)        (((e) >> 2) & 1)
+#define ecap_intr_remap(e)       (((e) >> 3) & 1)
+#define ecap_eim(e)              (((e) >> 4) & 1)
+#define ecap_cache_hints(e)      (((e) >> 5) & 1)
+#define ecap_pass_thru(e)        (((e) >> 6) & 1)
+#define ecap_snp_ctl(e)          (((e) >> 7) & 1)
 
 /* IOTLB_REG */
 #define DMA_TLB_FLUSH_GRANU_OFFSET  60
@@ -106,14 +106,14 @@
 #define DMA_TLB_PSI_FLUSH (((u64)3) << 60)
 #define DMA_TLB_IIRG(x) (((x) >> 60) & 7) 
 #define DMA_TLB_IAIG(val) (((val) >> 57) & 7)
-#define DMA_TLB_DID(x) (((u64)(x & 0xffff)) << 32)
+#define DMA_TLB_DID(x) (((uint64_t)((x) & 0xffff)) << 32)
 
 #define DMA_TLB_READ_DRAIN (((u64)1) << 49)
 #define DMA_TLB_WRITE_DRAIN (((u64)1) << 48)
 #define DMA_TLB_IVT (((u64)1) << 63)
 
-#define DMA_TLB_IVA_ADDR(x) ((((u64)x) >> 12) << 12)
-#define DMA_TLB_IVA_HINT(x) ((((u64)x) & 1) << 6)
+#define DMA_TLB_IVA_ADDR(x) (((uint64_t)(x) >> 12) << 12)
+#define DMA_TLB_IVA_HINT(x) (((uint64_t)(x) & 1) << 6)
 
 /* GCMD_REG */
 #define DMA_GCMD_TE     (1u << 31)
@@ -144,11 +144,11 @@
 /* CCMD_REG */
 #define DMA_CCMD_INVL_GRANU_OFFSET  61
 #define DMA_CCMD_ICC   (((u64)1) << 63)
-#define DMA_CCMD_GLOBAL_INVL (((u64)1) << 61)
-#define DMA_CCMD_DOMAIN_INVL (((u64)2) << 61)
-#define DMA_CCMD_DEVICE_INVL (((u64)3) << 61)
+#define DMA_CCMD_GLOBAL_INVL ((uint64_t)1 << DMA_CCMD_INVL_GRANU_OFFSET)
+#define DMA_CCMD_DOMAIN_INVL ((uint64_t)2 << DMA_CCMD_INVL_GRANU_OFFSET)
+#define DMA_CCMD_DEVICE_INVL ((uint64_t)3 << DMA_CCMD_INVL_GRANU_OFFSET)
+#define DMA_CCMD_CIRG(x) (((uint64_t)3 << DMA_CCMD_INVL_GRANU_OFFSET) & (x))
 #define DMA_CCMD_FM(m) (((u64)((m) & 0x3)) << 32)
-#define DMA_CCMD_CIRG(x) ((((u64)3) << 61) & x)
 #define DMA_CCMD_MASK_NOBIT 0
 #define DMA_CCMD_MASK_1BIT 1
 #define DMA_CCMD_MASK_2BIT 2
@@ -156,7 +156,7 @@
 #define DMA_CCMD_SID(s) (((u64)((s) & 0xffff)) << 16)
 #define DMA_CCMD_DID(d) ((u64)((d) & 0xffff))
 
-#define DMA_CCMD_CAIG_MASK(x) (((u64)x) & ((u64) 0x3 << 59))
+#define DMA_CCMD_CAIG_MASK(x) ((uint64_t)(x) & ((uint64_t)3 << 59))
 
 /* FECTL_REG */
 #define DMA_FECTL_IM (1u << 31)
@@ -175,10 +175,10 @@
 
 /* FRCD_REG, 32 bits access */
 #define DMA_FRCD_F (1u << 31)
-#define dma_frcd_type(d) ((d >> 30) & 1)
-#define dma_frcd_fault_reason(c) (c & 0xff)
-#define dma_frcd_source_id(c) (c & 0xffff)
-#define dma_frcd_page_addr(d) (d & (((u64)-1) << 12)) /* low 64 bit */
+#define dma_frcd_type(d) (((d) >> 30) & 1)
+#define dma_frcd_fault_reason(c) ((c) & 0xff)
+#define dma_frcd_source_id(c) ((c) & 0xffff)
+#define dma_frcd_page_addr(d) ((d) & ((uint64_t)-1 << 12)) /* low 64 bit */
 
 /*
  * 0: Present
@@ -233,16 +233,16 @@ struct context_entry {
 #define PTE_NUM            (1 << LEVEL_STRIDE)
 #define level_to_agaw(val) ((val) - 2)
 #define agaw_to_level(val) ((val) + 2)
-#define agaw_to_width(val) (30 + val * LEVEL_STRIDE)
-#define width_to_agaw(w)   ((w - 30)/LEVEL_STRIDE)
-#define level_to_offset_bits(l) (12 + (l - 1) * LEVEL_STRIDE)
+#define agaw_to_width(val) (30 + (val) * LEVEL_STRIDE)
+#define width_to_agaw(w)   (((w) - 30)/LEVEL_STRIDE)
+#define level_to_offset_bits(l) (12 + ((l) - 1) * LEVEL_STRIDE)
 #define address_level_offset(addr, level) \
-            ((addr >> level_to_offset_bits(level)) & LEVEL_MASK)
+            (((addr) >> level_to_offset_bits(level)) & LEVEL_MASK)
 #define offset_level_address(offset, level) \
             ((u64)(offset) << level_to_offset_bits(level))
 #define level_mask(l) (((u64)(-1)) << level_to_offset_bits(l))
 #define level_size(l) (1 << level_to_offset_bits(l))
-#define align_to_level(addr, l) ((addr + level_size(l) - 1) & level_mask(l))
+#define align_to_level(addr, l) (((addr) + level_size(l) - 1) & level_mask(l))
 
 /*
  * 0: readable
