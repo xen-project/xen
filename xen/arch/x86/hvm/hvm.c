@@ -1832,7 +1832,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          * altp2m.
          */
         if ( p2m_altp2m_get_or_propagate(p2m, gfn, &mfn, &p2mt,
-                                         &p2ma, page_order) )
+                                         &p2ma, &page_order) )
         {
             /* Entry was copied from host -- retry fault */
             rc = 1;

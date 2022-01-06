@@ -2198,10 +2198,11 @@ bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
  */
 bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
                                  mfn_t *mfn, p2m_type_t *p2mt,
-                                 p2m_access_t *p2ma, unsigned int page_order)
+                                 p2m_access_t *p2ma, unsigned int *page_order)
 {
     p2m_type_t ap2mt;
     p2m_access_t ap2ma;
+    unsigned int cur_order;
     unsigned long mask;
     gfn_t gfn;
     mfn_t amfn;
@@ -2214,7 +2215,10 @@ bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
      */
     p2m_lock(ap2m);
 
-    amfn = get_gfn_type_access(ap2m, gfn_l, &ap2mt, &ap2ma, 0, NULL);
+    amfn = get_gfn_type_access(ap2m, gfn_l, &ap2mt, &ap2ma, 0, &cur_order);
+
+    if ( cur_order > *page_order )
+        cur_order = *page_order;
 
     if ( !mfn_eq(amfn, INVALID_MFN) )
     {
@@ -2222,6 +2226,7 @@ bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
         *mfn  = amfn;
         *p2mt = ap2mt;
         *p2ma = ap2ma;
+        *page_order = cur_order;
         return false;
     }
 
@@ -2229,6 +2234,7 @@ bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
     if ( mfn_eq(*mfn, INVALID_MFN) )
     {
         p2m_unlock(ap2m);
+        *page_order = cur_order;
         return false;
     }
 
@@ -2237,11 +2243,11 @@ bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
      * to the start of the superpage.  NB that we repupose `amfn`
      * here.
      */
-    mask = ~((1UL << page_order) - 1);
+    mask = ~((1UL << cur_order) - 1);
     amfn = _mfn(mfn_x(*mfn) & mask);
     gfn = _gfn(gfn_l & mask);
 
-    rc = p2m_set_entry(ap2m, gfn, amfn, page_order, *p2mt, *p2ma);
+    rc = p2m_set_entry(ap2m, gfn, amfn, cur_order, *p2mt, *p2ma);
     p2m_unlock(ap2m);
 
     if ( rc )
