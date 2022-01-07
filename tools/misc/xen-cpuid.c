@@ -128,7 +128,6 @@ static const char *const str_7c0[32] =
     [10] = "vpclmulqdq",       [11] = "avx512_vnni",
     [12] = "avx512_bitalg",
     [14] = "avx512_vpopcntdq",
-    [16] = "tsxldtrk",
 
     [22] = "rdpid",
     /* 24 */                   [25] = "cldemote",
@@ -170,7 +169,7 @@ static const char *const str_7d0[32] =
     [10] = "md-clear",      [11] = "rtm-always-abort",
     /* 12 */                [13] = "tsx-force-abort",
     [14] = "serialize",
-
+    [16] = "tsxldtrk",
     [18] = "pconfig",
     [20] = "cet-ibt",
 
