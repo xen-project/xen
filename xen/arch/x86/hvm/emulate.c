@@ -2310,7 +2310,9 @@ static int hvmemul_cache_op(
         ASSERT(!is_x86_system_segment(seg));
 
         rc = hvmemul_virtual_to_linear(seg, offset, 0, NULL,
-                                       hvm_access_read, hvmemul_ctxt, &addr);
+                                       op != x86emul_clwb ? hvm_access_none
+                                                          : hvm_access_read,
+                                       hvmemul_ctxt, &addr);
         if ( rc != X86EMUL_OKAY )
             break;
 
