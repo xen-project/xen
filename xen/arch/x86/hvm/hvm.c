@@ -2530,6 +2530,9 @@ bool_t hvm_virtual_to_linear_addr(
      */
     ASSERT(seg < x86_seg_none);
 
+    /* However, check that insn fetches only ever specify CS. */
+    ASSERT(access_type != hvm_access_insn_fetch || seg == x86_seg_cs);
+
     if ( !(curr->arch.hvm.guest_cr[0] & X86_CR0_PE) )
     {
         /*
@@ -2594,10 +2597,17 @@ bool_t hvm_virtual_to_linear_addr(
                 if ( (reg->type & 0xa) == 0x8 )
                     goto out; /* execute-only code segment */
                 break;
+
             case hvm_access_write:
                 if ( (reg->type & 0xa) != 0x2 )
                     goto out; /* not a writable data segment */
                 break;
+
+            case hvm_access_insn_fetch:
+                if ( !(reg->type & 0x8) )
+                    goto out; /* not a code segment */
+                break;
+
             default:
                 break;
             }
