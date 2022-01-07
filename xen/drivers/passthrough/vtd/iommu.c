@@ -1505,7 +1505,12 @@ int domain_context_mapping_one(
         rc = me_wifi_quirk(domain, bus, devfn, MAP_ME_PHANTOM_FUNC);
 
     if ( rc )
-        domain_context_unmap_one(domain, iommu, bus, devfn);
+    {
+        ret = domain_context_unmap_one(domain, iommu, bus, devfn);
+
+        if ( !ret && pdev && pdev->devfn == devfn )
+            check_cleanup_domid_map(domain, pdev, iommu);
+    }
 
     return rc;
 }
