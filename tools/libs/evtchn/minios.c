@@ -112,11 +112,6 @@ void minios_evtchn_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
-int xenevtchn_fd(xenevtchn_handle *xce)
-{
-    return xce->fd;
-}
-
 int xenevtchn_notify(xenevtchn_handle *xce, evtchn_port_t port)
 {
     int ret;

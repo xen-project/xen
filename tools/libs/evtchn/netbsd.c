@@ -58,11 +58,6 @@ int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid)
     return -1;
 }
 
-int xenevtchn_fd(xenevtchn_handle *xce)
-{
-    return xce->fd;
-}
-
 int xenevtchn_notify(xenevtchn_handle *xce, evtchn_port_t port)
 {
     int fd = xce->fd;
