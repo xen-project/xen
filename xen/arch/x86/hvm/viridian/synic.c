@@ -79,11 +79,20 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
     struct domain *d = v->domain;
 
-    ASSERT(v == current || !v->is_running);
+    if ( v != current && v->is_running )
+    {
+        ASSERT_UNREACHABLE();
+        return X86EMUL_EXCEPTION;
+    }
 
     switch ( idx )
     {
     case HV_X64_MSR_EOI:
+        if ( v != current )
+        {
+            ASSERT_UNREACHABLE();
+            return X86EMUL_EXCEPTION;
+        }
         vlapic_EOI_set(vcpu_vlapic(v));
         break;
 
