@@ -417,7 +417,11 @@ Guest-side driver capable of speaking the Xen PV block protocol
     Status, FreeBSD: Supported, Security support external
     Status, NetBSD: Supported, Security support external
     Status, OpenBSD: Supported, Security support external
-    Status, Windows: Supported
+    Status, Windows: Supported, with caveats
+
+Windows frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ### Netfront
 
@@ -427,20 +431,32 @@ Guest-side driver capable of speaking the Xen PV networking protocol
     Status, FreeBSD: Supported, Security support external
     Status, NetBSD: Supported, Security support external
     Status, OpenBSD: Supported, Security support external
-    Status, Windows: Supported
+    Status, Windows: Supported, with caveats
+
+Windows frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ### PV Framebuffer (frontend)
 
 Guest-side driver capable of speaking the Xen PV Framebuffer protocol
 
-    Status, Linux (xen-fbfront): Supported
+    Status, Linux (xen-fbfront): Supported, with caveats
+
+Linux frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ### PV display (frontend)
 
 Guest-side driver capable of speaking the Xen PV display protocol
 
-    Status, Linux: Supported (outside of "backend allocation" mode)
-    Status, Linux: Experimental (in "backend allocation" mode)
+    Status, Linux, outside of "backend allocation" mode: Supported, with caveats
+    Status, Linux, "backend allocation" mode: Experimental
+
+Linux frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ### PV Console (frontend)
 
@@ -449,7 +465,11 @@ Guest-side driver capable of speaking the Xen PV console protocol
     Status, Linux (hvc_xen): Supported
     Status, FreeBSD: Supported, Security support external
     Status, NetBSD: Supported, Security support external
-    Status, Windows: Supported
+    Status, Windows: Supported, with caveats
+
+Windows frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ### PV keyboard (frontend)
 
@@ -457,11 +477,19 @@ Guest-side driver capable of speaking the Xen PV keyboard protocol.
 Note that the "keyboard protocol" includes mouse / pointer /
 multi-touch support as well.
 
-    Status, Linux (xen-kbdfront): Supported
+    Status, Linux (xen-kbdfront): Supported, with caveats
+
+Linux frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ### PV USB (frontend)
 
-    Status, Linux: Supported
+    Status, Linux: Supported, with caveats
+
+Linux frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ### PV SCSI protocol (frontend)
 
@@ -469,6 +497,10 @@ multi-touch support as well.
 
 NB that while the PV SCSI frontend is in Linux and tested regularly,
 there is currently no xl support.
+
+Linux frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ### PV TPM (frontend)
 
@@ -492,7 +524,11 @@ Guest-side driver capable of making pv system calls
 
 Guest-side driver capable of speaking the Xen PV sound protocol
 
-    Status, Linux: Supported
+    Status, Linux: Supported, with caveats
+
+Linux frontend currently trusts the backend;
+bugs in the frontend which allow backend to cause mischief will not be
+considered security vulnerabilities.
 
 ## Virtual device support, host side
 
@@ -993,6 +1029,9 @@ are given the following labels:
 
     This feature is security supported
     by a different organization (not the XenProject).
+    The extent of support is defined by that organization.
+    It might be limited, e.g. like described in **Supported, with caveats**
+    below.
     See **External security support** below.
 
   * **Supported, with caveats**
