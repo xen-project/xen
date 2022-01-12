@@ -28,6 +28,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/viridian.h>
 #include <asm/msr.h>
+#include <asm/pv/domain.h>
 #include <asm/setup.h>
 
 #include <public/hvm/params.h>
@@ -265,8 +266,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_SPEC_CTRL:
         if ( !cp->feat.ibrsb )
             goto gp_fault;
-        *val = msrs->spec_ctrl.raw;
-        break;
+        goto get_reg;
 
     case MSR_INTEL_PLATFORM_INFO:
         *val = mp->platform_info.raw;
@@ -424,6 +424,13 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
 
     return ret;
 
+ get_reg: /* Delegate register access to per-vm-type logic. */
+    if ( is_pv_domain(d) )
+        *val = pv_get_reg(v, msr);
+    else
+        *val = hvm_get_reg(v, msr);
+    return X86EMUL_OKAY;
+
  gp_fault:
     return X86EMUL_EXCEPTION;
 }
@@ -513,9 +520,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
         if ( val & rsvd )
             goto gp_fault; /* Rsvd bit set? */
-
-        msrs->spec_ctrl.raw = val;
-        break;
+        goto set_reg;
 
     case MSR_PRED_CMD:
         if ( !cp->feat.ibrsb && !cp->extd.ibpb )
@@ -662,6 +667,13 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     ASSERT(ret != X86EMUL_UNHANDLEABLE);
 
     return ret;
+
+ set_reg: /* Delegate register access to per-vm-type logic. */
+    if ( is_pv_domain(d) )
+        pv_set_reg(v, msr, val);
+    else
+        hvm_set_reg(v, msr, val);
+    return X86EMUL_OKAY;
 
  gp_fault:
     return X86EMUL_EXCEPTION;
