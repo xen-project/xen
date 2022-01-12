@@ -299,13 +299,13 @@ void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat)
         *guest_pat = v->arch.hvm.pat_cr;
 }
 
-int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
+int hvm_set_guest_pat(struct vcpu *v, uint64_t guest_pat)
 {
-    int i;
-    uint8_t *value = (uint8_t *)&guest_pat;
+    unsigned int i;
+    uint64_t tmp;
 
-    for ( i = 0; i < 8; i++ )
-        switch ( value[i] )
+    for ( i = 0, tmp = guest_pat; i < 8; i++, tmp >>= 8 )
+        switch ( tmp & 0xff )
         {
         case PAT_TYPE_UC_MINUS:
         case PAT_TYPE_UNCACHABLE:
@@ -315,8 +315,6 @@ int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
         case PAT_TYPE_WRTHROUGH:
             break;
         default:
-            HVM_DBG_LOG(DBG_LEVEL_MSR, "invalid guest PAT: %"PRIx64"\n",
-                        guest_pat); 
             return 0;
         }
 
