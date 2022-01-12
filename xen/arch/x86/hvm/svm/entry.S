@@ -59,7 +59,7 @@ __UNLIKELY_END(nsvm_hap)
         mov VCPUMSR_spec_ctrl_raw(%rax), %eax
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        SPEC_CTRL_EXIT_TO_HVM   /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
+        /* SPEC_CTRL_EXIT_TO_SVM   (nothing currently) */
 
         pop  %r15
         pop  %r14
@@ -86,7 +86,8 @@ __UNLIKELY_END(nsvm_hap)
 
         GET_CURRENT(bx)
 
-        SPEC_CTRL_ENTRY_FROM_HVM    /* Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
+        /* SPEC_CTRL_ENTRY_FROM_SVM    Req: b=curr %rsp=regs/cpuinfo, Clob: ac  */
+        ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         stgi
