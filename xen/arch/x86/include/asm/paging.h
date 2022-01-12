@@ -173,7 +173,7 @@ void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn);
 
 /* is this guest page dirty? 
  * This is called from inside paging code, with the paging lock held. */
-int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn);
+bool paging_mfn_is_dirty(const struct domain *d, mfn_t gmfn);
 
 /*
  * Log-dirty radix tree indexing:

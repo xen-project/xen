@@ -40,7 +40,7 @@ static inline void mm_lock_init(mm_lock_t *l)
     l->unlock_level = 0;
 }
 
-static inline int mm_locked_by_me(mm_lock_t *l)
+static inline bool mm_locked_by_me(const mm_lock_t *l)
 {
     return (l->lock.recurse_cpu == current->processor);
 }

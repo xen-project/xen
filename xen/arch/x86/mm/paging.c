@@ -351,14 +351,14 @@ void paging_mark_dirty(struct domain *d, mfn_t gmfn)
     paging_mark_pfn_dirty(d, pfn);
 }
 
-
+#ifdef CONFIG_SHADOW_PAGING
 /* Is this guest page dirty? */
-int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn)
+bool paging_mfn_is_dirty(const struct domain *d, mfn_t gmfn)
 {
     pfn_t pfn;
     mfn_t mfn, *l4, *l3, *l2;
     unsigned long *l1;
-    int rv;
+    bool dirty;
 
     ASSERT(paging_locked_by_me(d));
     ASSERT(paging_mode_log_dirty(d));
@@ -367,36 +367,37 @@ int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn)
     pfn = _pfn(get_gpfn_from_mfn(mfn_x(gmfn)));
     /* Invalid pages can't be dirty. */
     if ( unlikely(!VALID_M2P(pfn_x(pfn))) )
-        return 0;
+        return false;
 
     mfn = d->arch.paging.log_dirty.top;
     if ( !mfn_valid(mfn) )
-        return 0;
+        return false;
 
     l4 = map_domain_page(mfn);
     mfn = l4[L4_LOGDIRTY_IDX(pfn)];
     unmap_domain_page(l4);
     if ( !mfn_valid(mfn) )
-        return 0;
+        return false;
 
     l3 = map_domain_page(mfn);
     mfn = l3[L3_LOGDIRTY_IDX(pfn)];
     unmap_domain_page(l3);
     if ( !mfn_valid(mfn) )
-        return 0;
+        return false;
 
     l2 = map_domain_page(mfn);
     mfn = l2[L2_LOGDIRTY_IDX(pfn)];
     unmap_domain_page(l2);
     if ( !mfn_valid(mfn) )
-        return 0;
+        return false;
 
     l1 = map_domain_page(mfn);
-    rv = test_bit(L1_LOGDIRTY_IDX(pfn), l1);
+    dirty = test_bit(L1_LOGDIRTY_IDX(pfn), l1);
     unmap_domain_page(l1);
-    return rv;
-}
 
+    return dirty;
+}
+#endif
 
 /* Read a domain's log-dirty bitmap and stats.  If the operation is a CLEAN,
  * clear the bitmap and stats as well. */
