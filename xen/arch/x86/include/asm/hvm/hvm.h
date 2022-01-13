@@ -97,6 +97,7 @@ struct hvm_function_table {
 
     /* Necessary hardware support for alternate p2m's? */
     bool altp2m_supported;
+    bool singlestep_supported;
 
     /* Hardware virtual interrupt delivery enable? */
     bool virtual_intr_delivery_enabled;
@@ -208,7 +209,6 @@ struct hvm_function_table {
                                 uint8_t *p2m_acc, struct npfec npfec);
 
     void (*enable_msr_interception)(struct domain *d, uint32_t msr);
-    bool_t (*is_singlestep_supported)(void);
 
     /* Alternate p2m */
     void (*altp2m_vcpu_update_p2m)(struct vcpu *v);
@@ -644,10 +644,9 @@ static inline void hvm_enable_msr_interception(struct domain *d, uint32_t msr)
     alternative_vcall(hvm_funcs.enable_msr_interception, d, msr);
 }
 
-static inline bool_t hvm_is_singlestep_supported(void)
+static inline bool hvm_is_singlestep_supported(void)
 {
-    return (hvm_funcs.is_singlestep_supported &&
-            alternative_call(hvm_funcs.is_singlestep_supported));
+    return hvm_funcs.singlestep_supported;
 }
 
 static inline bool hvm_hap_supported(void)

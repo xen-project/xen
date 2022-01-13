@@ -2120,11 +2120,6 @@ static void vmx_enable_msr_interception(struct domain *d, uint32_t msr)
         vmx_set_msr_intercept(v, msr, VMX_MSR_W);
 }
 
-static bool_t vmx_is_singlestep_supported(void)
-{
-    return !!cpu_has_monitor_trap_flag;
-}
-
 static void vmx_vcpu_update_eptp(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -2454,7 +2449,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .enable_msr_interception = vmx_enable_msr_interception,
-    .is_singlestep_supported = vmx_is_singlestep_supported,
     .altp2m_vcpu_update_p2m = vmx_vcpu_update_eptp,
     .altp2m_vcpu_update_vmfunc_ve = vmx_vcpu_update_vmfunc_ve,
     .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,
@@ -2660,6 +2654,8 @@ const struct hvm_function_table * __init start_vmx(void)
         printk("VMX: failed to initialise.\n");
         return NULL;
     }
+
+    vmx_function_table.singlestep_supported = cpu_has_monitor_trap_flag;
 
     if ( cpu_has_vmx_dt_exiting )
         vmx_function_table.set_descriptor_access_exiting =
