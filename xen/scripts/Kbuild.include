@@ -43,15 +43,15 @@ define as-option-add-closure
     endif
 endef
 
-# $(if-success,<command>,<then>,<else>)
+# $(call if-success,<command>,<then>,<else>)
 # Return <then> if <command> exits with 0, <else> otherwise.
 if-success = $(shell { $(1); } >/dev/null 2>&1 && echo "$(2)" || echo "$(3)")
 
-# $(success,<command>)
+# $(call success,<command>)
 # Return y if <command> exits with 0, n otherwise
 success = $(call if-success,$(1),y,n)
 
-# $(ld-option,<flag>)
+# $(call ld-option,<flag>)
 # Return y if the linker supports <flag>, n otherwise
 ld-option = $(call success,$(LD) -v $(1))
 
