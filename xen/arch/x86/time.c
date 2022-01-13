@@ -287,6 +287,23 @@ static char *freq_string(u64 freq)
     return s;
 }
 
+static uint64_t adjust_elapsed(uint64_t elapsed, uint32_t actual,
+                               uint32_t target)
+{
+    if ( likely(actual > target) )
+    {
+        /*
+         * A (perhaps significant) delay before the last timer read (e.g. due
+         * to a SMI or NMI) can lead to (perhaps severe) inaccuracy if not
+         * accounting for the time elapsed beyond the originally calculated
+         * duration of the calibration interval.
+         */
+        elapsed = muldiv64(elapsed, target, actual);
+    }
+
+    return elapsed * CALIBRATE_FRAC;
+}
+
 /************************************************************
  * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
  */
@@ -455,7 +472,7 @@ static int64_t __init init_hpet(struct platform_timesource *pts)
     while ( (elapsed = hpet_read32(HPET_COUNTER) - count) < target )
         continue;
 
-    return (rdtsc_ordered() - start) * CALIBRATE_FRAC;
+    return adjust_elapsed(rdtsc_ordered() - start, elapsed, target);
 }
 
 static void resume_hpet(struct platform_timesource *pts)
@@ -505,7 +522,7 @@ static s64 __init init_pmtimer(struct platform_timesource *pts)
     while ( (elapsed = (inl(pmtmr_ioport) - count) & mask) < target )
         continue;
 
-    return (rdtsc_ordered() - start) * CALIBRATE_FRAC;
+    return adjust_elapsed(rdtsc_ordered() - start, elapsed, target);
 }
 
 static struct platform_timesource __initdata plt_pmtimer =
