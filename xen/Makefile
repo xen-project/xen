@@ -424,6 +424,7 @@ targets += .banner
 quiet_cmd_compile.h = UPD     $@
 define cmd_compile.h
     if [ ! -r $@ -o -O $@ ]; then \
+	cat .banner; \
 	sed -e 's/@@date@@/$(XEN_BUILD_DATE)/g' \
 	    -e 's/@@time@@/$(XEN_BUILD_TIME)/g' \
 	    -e 's/@@whoami@@/$(XEN_WHOAMI)/g' \
@@ -441,7 +442,7 @@ define cmd_compile.h
 endef
 
 include/xen/compile.h: include/xen/compile.h.in .banner FORCE
-	@cat .banner
+	$(if $(filter-out FORCE,$?),$(Q)rm -fv $@)
 	$(call if_changed,compile.h)
 
 targets += include/xen/compile.h
