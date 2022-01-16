@@ -28,18 +28,55 @@
 #include <sys/mman.h>
 
 #include <errno.h>
+#include <malloc.h>
 #include <unistd.h>
 
 #include "private.h"
 
 void minios_gnttab_close_fd(int fd);
 
+static int gnttab_close_fd(struct file *file)
+{
+    gntmap_fini(file->dev);
+    free(file->dev);
+
+    return 0;
+}
+
+static const struct file_ops gnttab_ops = {
+    .name = "gnttab",
+    .close = gnttab_close_fd,
+};
+
+static unsigned int ftype_gnttab;
+
+__attribute__((constructor))
+static void gnttab_initialize(void)
+{
+    ftype_gnttab = alloc_file_type(&gnttab_ops);
+}
+
 int osdep_gnttab_open(xengnttab_handle *xgt)
 {
-    int fd = alloc_fd(FTYPE_GNTMAP);
-    if ( fd == -1 )
+    int fd;
+    struct file *file;
+    struct gntmap *gntmap;
+
+    gntmap = malloc(sizeof(*gntmap));
+    if ( !gntmap )
         return -1;
-    gntmap_init(&files[fd].gntmap);
+
+    fd = alloc_fd(ftype_gnttab);
+    file = get_file_from_fd(fd);
+
+    if ( !file )
+    {
+        free(gntmap);
+        return -1;
+    }
+
+    file->dev = gntmap;
+    gntmap_init(gntmap);
     xgt->fd = fd;
     return 0;
 }
@@ -54,8 +91,9 @@ int osdep_gnttab_close(xengnttab_handle *xgt)
 
 void minios_gnttab_close_fd(int fd)
 {
-    gntmap_fini(&files[fd].gntmap);
-    files[fd].type = FTYPE_NONE;
+    struct file *file = get_file_from_fd(fd);
+
+    gnttab_close_fd(file);
 }
 
 void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
@@ -64,16 +102,16 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
                              uint32_t notify_offset,
                              evtchn_port_t notify_port)
 {
-    int fd = xgt->fd;
+    struct file *file = get_file_from_fd(xgt->fd);
     int stride = 1;
+
     if (flags & XENGNTTAB_GRANT_MAP_SINGLE_DOMAIN)
         stride = 0;
     if (notify_offset != -1 || notify_port != -1) {
         errno = ENOSYS;
         return NULL;
     }
-    return gntmap_map_grant_refs(&files[fd].gntmap,
-                                 count, domids, stride,
+    return gntmap_map_grant_refs(file->dev, count, domids, stride,
                                  refs, prot & PROT_WRITE);
 }
 
@@ -81,11 +119,10 @@ int osdep_gnttab_unmap(xengnttab_handle *xgt,
                        void *start_address,
                        uint32_t count)
 {
-    int fd = xgt->fd;
+    struct file *file = get_file_from_fd(xgt->fd);
     int ret;
-    ret = gntmap_munmap(&files[fd].gntmap,
-                        (unsigned long) start_address,
-                        count);
+
+    ret = gntmap_munmap(file->dev, (unsigned long) start_address, count);
     if (ret < 0) {
         errno = -ret;
         return -1;
@@ -95,10 +132,10 @@ int osdep_gnttab_unmap(xengnttab_handle *xgt,
 
 int osdep_gnttab_set_max_grants(xengnttab_handle *xgt, uint32_t count)
 {
-    int fd = xgt->fd;
+    struct file *file = get_file_from_fd(xgt->fd);
     int ret;
-    ret = gntmap_set_max_grants(&files[fd].gntmap,
-                                count);
+
+    ret = gntmap_set_max_grants(file->dev, count);
     if (ret < 0) {
         errno = -ret;
         return -1;
