@@ -35,15 +35,6 @@
 
 #include "xc_private.h"
 
-void minios_interface_close_fd(int fd);
-
-extern void minios_interface_close_fd(int fd);
-
-void minios_interface_close_fd(int fd)
-{
-    files[fd].type = FTYPE_NONE;
-}
-
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush)
 {
