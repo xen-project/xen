@@ -394,6 +394,8 @@ static void __init guest_common_feature_adjustments(uint32_t *fs)
      */
     if ( test_bit(X86_FEATURE_IBRSB, fs) )
         __set_bit(X86_FEATURE_STIBP, fs);
+    if ( test_bit(X86_FEATURE_IBRS, fs) )
+        __set_bit(X86_FEATURE_AMD_STIBP, fs);
 
     /*
      * On hardware which supports IBRS/IBPB, we can offer IBPB independently
@@ -417,11 +419,14 @@ static void __init calculate_pv_max_policy(void)
         pv_featureset[i] &= pv_max_featuremask[i];
 
     /*
-     * If Xen isn't virtualising MSR_SPEC_CTRL for PV guests because of
-     * administrator choice, hide the feature.
+     * If Xen isn't virtualising MSR_SPEC_CTRL for PV guests (functional
+     * availability, or admin choice), hide the feature.
      */
     if ( !boot_cpu_has(X86_FEATURE_SC_MSR_PV) )
+    {
         __clear_bit(X86_FEATURE_IBRSB, pv_featureset);
+        __clear_bit(X86_FEATURE_IBRS, pv_featureset);
+    }
 
     guest_common_feature_adjustments(pv_featureset);
 
@@ -485,11 +490,14 @@ static void __init calculate_hvm_max_policy(void)
         __set_bit(X86_FEATURE_SEP, hvm_featureset);
 
     /*
-     * If Xen isn't virtualising MSR_SPEC_CTRL for HVM guests because of
-     * administrator choice, hide the feature.
+     * If Xen isn't virtualising MSR_SPEC_CTRL for HVM guests (functional
+     * availability, or admin choice), hide the feature.
      */
     if ( !boot_cpu_has(X86_FEATURE_SC_MSR_HVM) )
+    {
         __clear_bit(X86_FEATURE_IBRSB, hvm_featureset);
+        __clear_bit(X86_FEATURE_IBRS, hvm_featureset);
+    }
 
     /*
      * With VT-x, some features are only supported by Xen if dedicated
