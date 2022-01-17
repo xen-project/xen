@@ -324,43 +324,6 @@ int hvm_set_guest_pat(struct vcpu *v, uint64_t guest_pat)
     return 1;
 }
 
-bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val)
-{
-    if ( !hvm_funcs.set_guest_bndcfgs ||
-         !is_canonical_address(val) ||
-         (val & IA32_BNDCFGS_RESERVED) )
-        return false;
-
-    /*
-     * While MPX instructions are supposed to be gated on XCR0.BND*, let's
-     * nevertheless force the relevant XCR0 bits on when the feature is being
-     * enabled in BNDCFGS.
-     */
-    if ( (val & IA32_BNDCFGS_ENABLE) &&
-         !(v->arch.xcr0_accum & (X86_XCR0_BNDREGS | X86_XCR0_BNDCSR)) )
-    {
-        uint64_t xcr0 = get_xcr0();
-        int rc;
-
-        if ( v != current )
-            return false;
-
-        rc = handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
-                           xcr0 | X86_XCR0_BNDREGS | X86_XCR0_BNDCSR);
-
-        if ( rc )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Failed to force XCR0.BND*: %d", rc);
-            return false;
-        }
-
-        if ( handle_xsetbv(XCR_XFEATURE_ENABLED_MASK, xcr0) )
-            /* nothing, best effort only */;
-    }
-
-    return alternative_call(hvm_funcs.set_guest_bndcfgs, v, val);
-}
-
 /*
  * Get the ratio to scale host TSC frequency to gtsc_khz. zero will be
  * returned if TSC scaling is unavailable or ratio cannot be handled

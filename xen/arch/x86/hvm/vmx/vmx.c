@@ -1212,28 +1212,6 @@ static int vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
     return 1;
 }
 
-static bool vmx_set_guest_bndcfgs(struct vcpu *v, u64 val)
-{
-    ASSERT(cpu_has_mpx && cpu_has_vmx_mpx);
-
-    vmx_vmcs_enter(v);
-    __vmwrite(GUEST_BNDCFGS, val);
-    vmx_vmcs_exit(v);
-
-    return true;
-}
-
-static bool vmx_get_guest_bndcfgs(struct vcpu *v, u64 *val)
-{
-    ASSERT(cpu_has_mpx && cpu_has_vmx_mpx);
-
-    vmx_vmcs_enter(v);
-    __vmread(GUEST_BNDCFGS, val);
-    vmx_vmcs_exit(v);
-
-    return true;
-}
-
 static void vmx_handle_cd(struct vcpu *v, unsigned long value)
 {
     if ( !paging_mode_hap(v->domain) )
@@ -2427,6 +2405,7 @@ static uint64_t vmx_get_reg(struct vcpu *v, unsigned int reg)
     uint64_t val = 0;
     int rc;
 
+    /* Logic which doesn't require remote VMCS acquisition. */
     switch ( reg )
     {
     case MSR_SPEC_CTRL:
@@ -2438,13 +2417,25 @@ static uint64_t vmx_get_reg(struct vcpu *v, unsigned int reg)
             domain_crash(d);
         }
         return val;
+    }
+
+    /* Logic which maybe requires remote VMCS acquisition. */
+    vmx_vmcs_enter(v);
+    switch ( reg )
+    {
+    case MSR_IA32_BNDCFGS:
+        __vmread(GUEST_BNDCFGS, &val);
+        break;
 
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
                __func__, v, reg);
         domain_crash(d);
-        return 0;
+        break;
     }
+    vmx_vmcs_exit(v);
+
+    return val;
 }
 
 static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
@@ -2452,6 +2443,7 @@ static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
     struct domain *d = v->domain;
     int rc;
 
+    /* Logic which doesn't require remote VMCS acquisition. */
     switch ( reg )
     {
     case MSR_SPEC_CTRL:
@@ -2462,6 +2454,15 @@ static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
                    __func__, v, reg, rc);
             domain_crash(d);
         }
+        return;
+    }
+
+    /* Logic which maybe requires remote VMCS acquisition. */
+    vmx_vmcs_enter(v);
+    switch ( reg )
+    {
+    case MSR_IA32_BNDCFGS:
+        __vmwrite(GUEST_BNDCFGS, val);
         break;
 
     default:
@@ -2469,6 +2470,7 @@ static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
                __func__, v, reg, val);
         domain_crash(d);
     }
+    vmx_vmcs_exit(v);
 }
 
 static struct hvm_function_table __initdata vmx_function_table = {
@@ -2790,12 +2792,6 @@ const struct hvm_function_table * __init start_vmx(void)
     {
         vmx_function_table.tsc_scaling.ratio_frac_bits = 48;
         vmx_function_table.tsc_scaling.setup = vmx_setup_tsc_scaling;
-    }
-
-    if ( cpu_has_mpx && cpu_has_vmx_mpx )
-    {
-        vmx_function_table.set_guest_bndcfgs = vmx_set_guest_bndcfgs;
-        vmx_function_table.get_guest_bndcfgs = vmx_get_guest_bndcfgs;
     }
 
     lbr_tsx_fixup_check();

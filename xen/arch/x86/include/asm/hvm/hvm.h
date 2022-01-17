@@ -149,9 +149,6 @@ struct hvm_function_table {
     int  (*get_guest_pat)(struct vcpu *v, u64 *);
     int  (*set_guest_pat)(struct vcpu *v, u64);
 
-    bool (*get_guest_bndcfgs)(struct vcpu *v, u64 *);
-    bool (*set_guest_bndcfgs)(struct vcpu *v, u64);
-
     void (*set_tsc_offset)(struct vcpu *v, u64 offset, u64 at_tsc);
 
     void (*inject_event)(const struct x86_event *event);
@@ -290,8 +287,6 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
                               struct segment_register *reg);
 
 void hvm_set_info_guest(struct vcpu *v);
-
-bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val);
 
 int hvm_vmexit_cpuid(struct cpu_user_regs *regs, unsigned int inst_len);
 void hvm_migrate_timers(struct vcpu *v);
@@ -477,12 +472,6 @@ hvm_get_cpl(struct vcpu *v)
 static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
 {
     return alternative_call(hvm_funcs.get_shadow_gs_base, v);
-}
-
-static inline bool hvm_get_guest_bndcfgs(struct vcpu *v, u64 *val)
-{
-    return hvm_funcs.get_guest_bndcfgs &&
-           alternative_call(hvm_funcs.get_guest_bndcfgs, v, val);
 }
 
 #define has_hvm_params(d) \
@@ -767,7 +756,6 @@ int hvm_guest_x86_mode(struct vcpu *v);
 unsigned long hvm_get_shadow_gs_base(struct vcpu *v);
 void hvm_cpuid_policy_changed(struct vcpu *v);
 void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset, uint64_t at_tsc);
-bool hvm_get_guest_bndcfgs(struct vcpu *v, uint64_t *val);
 
 /* End of prototype list */
 

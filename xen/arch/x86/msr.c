@@ -30,6 +30,7 @@
 #include <asm/msr.h>
 #include <asm/pv/domain.h>
 #include <asm/setup.h>
+#include <asm/xstate.h>
 
 #include <public/hvm/params.h>
 
@@ -323,10 +324,9 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         break;
 
     case MSR_IA32_BNDCFGS:
-        if ( !cp->feat.mpx || !is_hvm_domain(d) ||
-             !hvm_get_guest_bndcfgs(v, val) )
+        if ( !cp->feat.mpx ) /* Implies Intel HVM only */
             goto gp_fault;
-        break;
+        goto get_reg;
 
     case MSR_IA32_XSS:
         if ( !cp->xstate.xsaves )
@@ -593,11 +593,33 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         ret = guest_wrmsr_x2apic(v, msr, val);
         break;
 
+#ifdef CONFIG_HVM
     case MSR_IA32_BNDCFGS:
-        if ( !cp->feat.mpx || !is_hvm_domain(d) ||
-             !hvm_set_guest_bndcfgs(v, val) )
+        if ( !cp->feat.mpx || /* Implies Intel HVM only */
+             !is_canonical_address(val) || (val & IA32_BNDCFGS_RESERVED) )
             goto gp_fault;
-        break;
+
+        /*
+         * While MPX instructions are supposed to be gated on XCR0.BND*, let's
+         * nevertheless force the relevant XCR0 bits on when the feature is
+         * being enabled in BNDCFGS.
+         */
+        if ( (val & IA32_BNDCFGS_ENABLE) &&
+             !(v->arch.xcr0_accum & (X86_XCR0_BNDREGS | X86_XCR0_BNDCSR)) )
+        {
+            uint64_t xcr0 = get_xcr0();
+
+            if ( v != current ||
+                 handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
+                               xcr0 | X86_XCR0_BNDREGS | X86_XCR0_BNDCSR) )
+                goto gp_fault;
+
+            if ( handle_xsetbv(XCR_XFEATURE_ENABLED_MASK, xcr0) )
+                /* nothing, best effort only */;
+        }
+
+        goto set_reg;
+#endif /* CONFIG_HVM */
 
     case MSR_IA32_XSS:
         if ( !cp->xstate.xsaves )
