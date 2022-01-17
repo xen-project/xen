@@ -236,7 +236,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         break;
 
     case MSR_SPEC_CTRL:
-        if ( !cp->feat.ibrsb )
+        if ( !cp->feat.ibrsb && !cp->extd.ibrs )
             goto gp_fault;
         goto get_reg;
 
@@ -367,7 +367,8 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
  */
 uint64_t msr_spec_ctrl_valid_bits(const struct cpuid_policy *cp)
 {
-    bool ssbd = cp->feat.ssbd;
+    bool ssbd = cp->feat.ssbd || cp->extd.amd_ssbd;
+    bool psfd = cp->extd.psfd;
 
     /*
      * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
@@ -375,6 +376,7 @@ uint64_t msr_spec_ctrl_valid_bits(const struct cpuid_policy *cp)
      */
     return (SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
             (ssbd       ? SPEC_CTRL_SSBD       : 0) |
+            (psfd       ? SPEC_CTRL_PSFD       : 0) |
             0);
 }
 
@@ -460,7 +462,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         break;
 
     case MSR_SPEC_CTRL:
-        if ( !cp->feat.ibrsb ||
+        if ( (!cp->feat.ibrsb && !cp->extd.ibrs) ||
              (val & ~msr_spec_ctrl_valid_bits(cp)) )
             goto gp_fault;
         goto set_reg;
