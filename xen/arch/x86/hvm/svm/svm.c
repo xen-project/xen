@@ -2471,10 +2471,14 @@ static bool svm_get_pending_event(struct vcpu *v, struct x86_event *info)
 
 static uint64_t svm_get_reg(struct vcpu *v, unsigned int reg)
 {
+    const struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct domain *d = v->domain;
 
     switch ( reg )
     {
+    case MSR_SPEC_CTRL:
+        return vmcb->spec_ctrl;
+
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
                __func__, v, reg);
@@ -2485,10 +2489,15 @@ static uint64_t svm_get_reg(struct vcpu *v, unsigned int reg)
 
 static void svm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct domain *d = v->domain;
 
     switch ( reg )
     {
+    case MSR_SPEC_CTRL:
+        vmcb->spec_ctrl = val;
+        break;
+
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x, 0x%016"PRIx64") Bad register\n",
                __func__, v, reg, val);
