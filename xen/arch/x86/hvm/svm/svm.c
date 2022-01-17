@@ -604,6 +604,10 @@ static void svm_cpuid_policy_changed(struct vcpu *v)
 
     vmcb_set_exception_intercepts(vmcb, bitmap);
 
+    /* Give access to MSR_SPEC_CTRL if the guest has been told about it. */
+    svm_intercept_msr(v, MSR_SPEC_CTRL,
+                      cp->extd.ibrs ? MSR_INTERCEPT_NONE : MSR_INTERCEPT_RW);
+
     /* Give access to MSR_PRED_CMD if the guest has been told about it. */
     svm_intercept_msr(v, MSR_PRED_CMD,
                       cp->extd.ibpb ? MSR_INTERCEPT_NONE : MSR_INTERCEPT_RW);
