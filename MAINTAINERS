@@ -302,7 +302,7 @@ F:	tools/debugger/gdbsx/
 
 GOLANG BINDINGS
 M:	George Dunlap <george.dunlap@citrix.com>
-M:     Nick Rosbrook <rosbrookn@ainfosec.com>
+M:	Nick Rosbrook <rosbrookn@gmail.com>
 S:	Maintained
 F:	tools/golang
 
