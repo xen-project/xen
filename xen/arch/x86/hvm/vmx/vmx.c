@@ -2399,6 +2399,33 @@ static int vmtrace_reset(struct vcpu *v)
     return 0;
 }
 
+static uint64_t vmx_get_reg(struct vcpu *v, unsigned int reg)
+{
+    struct domain *d = v->domain;
+
+    switch ( reg )
+    {
+    default:
+        printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
+               __func__, v, reg);
+        domain_crash(d);
+        return 0;
+    }
+}
+
+static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
+{
+    struct domain *d = v->domain;
+
+    switch ( reg )
+    {
+    default:
+        printk(XENLOG_G_ERR "%s(%pv, 0x%08x, 0x%016"PRIx64") Bad register\n",
+               __func__, v, reg, val);
+        domain_crash(d);
+    }
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -2458,6 +2485,10 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .vmtrace_set_option = vmtrace_set_option,
     .vmtrace_get_option = vmtrace_get_option,
     .vmtrace_reset = vmtrace_reset,
+
+    .get_reg = vmx_get_reg,
+    .set_reg = vmx_set_reg,
+
     .tsc_scaling = {
         .max_ratio = VMX_TSC_MULTIPLIER_MAX,
     },
