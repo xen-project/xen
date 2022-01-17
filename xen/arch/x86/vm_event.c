@@ -204,7 +204,7 @@ void vm_event_fill_regs(vm_event_request_t *req)
     ASSERT(is_hvm_vcpu(curr));
 
     /* Architecture-specific vmcs/vmcb bits */
-    hvm_funcs.save_cpu_ctxt(curr, &ctxt);
+    alternative_vcall(hvm_funcs.save_cpu_ctxt, curr, &ctxt);
 
     req->data.regs.x86.rax = regs->rax;
     req->data.regs.x86.rcx = regs->rcx;

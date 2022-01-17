@@ -561,13 +561,12 @@ static inline void hvm_invlpg(struct vcpu *v, unsigned long linear)
 
 static inline int hvm_cpu_up(void)
 {
-    return (hvm_funcs.cpu_up ? hvm_funcs.cpu_up() : 0);
+    return alternative_call(hvm_funcs.cpu_up);
 }
 
 static inline void hvm_cpu_down(void)
 {
-    if ( hvm_funcs.cpu_down )
-        hvm_funcs.cpu_down();
+    alternative_vcall(hvm_funcs.cpu_down);
 }
 
 static inline unsigned int hvm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
@@ -601,7 +600,7 @@ static inline void hvm_invalidate_regs_fields(struct cpu_user_regs *regs)
 static inline int nhvm_vcpu_vmexit_event(
     struct vcpu *v, const struct x86_event *event)
 {
-    return hvm_funcs.nhvm_vcpu_vmexit_event(v, event);
+    return alternative_call(hvm_funcs.nhvm_vcpu_vmexit_event, v, event);
 }
 
 /* returns l1 guest's cr3 that points to the page table used to
@@ -609,45 +608,46 @@ static inline int nhvm_vcpu_vmexit_event(
  */
 static inline uint64_t nhvm_vcpu_p2m_base(struct vcpu *v)
 {
-    return hvm_funcs.nhvm_vcpu_p2m_base(v);
+    return alternative_call(hvm_funcs.nhvm_vcpu_p2m_base, v);
 }
 
 /* returns true, when l1 guest intercepts the specified trap */
 static inline bool_t nhvm_vmcx_guest_intercepts_event(
     struct vcpu *v, unsigned int vector, int errcode)
 {
-    return hvm_funcs.nhvm_vmcx_guest_intercepts_event(v, vector, errcode);
+    return alternative_call(hvm_funcs.nhvm_vmcx_guest_intercepts_event, v,
+                            vector, errcode);
 }
 
 /* returns true when l1 guest wants to use hap to run l2 guest */
 static inline bool_t nhvm_vmcx_hap_enabled(struct vcpu *v)
 {
-    return hvm_funcs.nhvm_vmcx_hap_enabled(v);
+    return alternative_call(hvm_funcs.nhvm_vmcx_hap_enabled, v);
 }
 
 /* interrupt */
 static inline enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v)
 {
-    return hvm_funcs.nhvm_intr_blocked(v);
+    return alternative_call(hvm_funcs.nhvm_intr_blocked, v);
 }
 
 static inline int nhvm_hap_walk_L1_p2m(
     struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa, unsigned int *page_order,
     uint8_t *p2m_acc, struct npfec npfec)
 {
-    return hvm_funcs.nhvm_hap_walk_L1_p2m(
+    return alternative_call(hvm_funcs.nhvm_hap_walk_L1_p2m,
         v, L2_gpa, L1_gpa, page_order, p2m_acc, npfec);
 }
 
 static inline void hvm_enable_msr_interception(struct domain *d, uint32_t msr)
 {
-    hvm_funcs.enable_msr_interception(d, msr);
+    alternative_vcall(hvm_funcs.enable_msr_interception, d, msr);
 }
 
 static inline bool_t hvm_is_singlestep_supported(void)
 {
     return (hvm_funcs.is_singlestep_supported &&
-            hvm_funcs.is_singlestep_supported());
+            alternative_call(hvm_funcs.is_singlestep_supported));
 }
 
 static inline bool hvm_hap_supported(void)
@@ -665,14 +665,14 @@ static inline bool hvm_altp2m_supported(void)
 static inline void altp2m_vcpu_update_p2m(struct vcpu *v)
 {
     if ( hvm_funcs.altp2m_vcpu_update_p2m )
-        hvm_funcs.altp2m_vcpu_update_p2m(v);
+        alternative_vcall(hvm_funcs.altp2m_vcpu_update_p2m, v);
 }
 
 /* updates VMCS fields related to VMFUNC and #VE */
 static inline void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v)
 {
     if ( hvm_funcs.altp2m_vcpu_update_vmfunc_ve )
-        hvm_funcs.altp2m_vcpu_update_vmfunc_ve(v);
+        alternative_vcall(hvm_funcs.altp2m_vcpu_update_vmfunc_ve, v);
 }
 
 /* emulates #VE */
@@ -680,7 +680,7 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
 {
     if ( hvm_funcs.altp2m_vcpu_emulate_ve )
     {
-        hvm_funcs.altp2m_vcpu_emulate_ve(v);
+        alternative_vcall(hvm_funcs.altp2m_vcpu_emulate_ve, v);
         return true;
     }
     return false;
@@ -689,7 +689,7 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
 static inline int hvm_vmtrace_control(struct vcpu *v, bool enable, bool reset)
 {
     if ( hvm_funcs.vmtrace_control )
-        return hvm_funcs.vmtrace_control(v, enable, reset);
+        return alternative_call(hvm_funcs.vmtrace_control, v, enable, reset);
 
     return -EOPNOTSUPP;
 }
@@ -698,7 +698,7 @@ static inline int hvm_vmtrace_control(struct vcpu *v, bool enable, bool reset)
 static inline int hvm_vmtrace_output_position(struct vcpu *v, uint64_t *pos)
 {
     if ( hvm_funcs.vmtrace_output_position )
-        return hvm_funcs.vmtrace_output_position(v, pos);
+        return alternative_call(hvm_funcs.vmtrace_output_position, v, pos);
 
     return -EOPNOTSUPP;
 }
@@ -707,7 +707,7 @@ static inline int hvm_vmtrace_set_option(
     struct vcpu *v, uint64_t key, uint64_t value)
 {
     if ( hvm_funcs.vmtrace_set_option )
-        return hvm_funcs.vmtrace_set_option(v, key, value);
+        return alternative_call(hvm_funcs.vmtrace_set_option, v, key, value);
 
     return -EOPNOTSUPP;
 }
@@ -716,7 +716,7 @@ static inline int hvm_vmtrace_get_option(
     struct vcpu *v, uint64_t key, uint64_t *value)
 {
     if ( hvm_funcs.vmtrace_get_option )
-        return hvm_funcs.vmtrace_get_option(v, key, value);
+        return alternative_call(hvm_funcs.vmtrace_get_option, v, key, value);
 
     return -EOPNOTSUPP;
 }
@@ -724,7 +724,7 @@ static inline int hvm_vmtrace_get_option(
 static inline int hvm_vmtrace_reset(struct vcpu *v)
 {
     if ( hvm_funcs.vmtrace_reset )
-        return hvm_funcs.vmtrace_reset(v);
+        return alternative_call(hvm_funcs.vmtrace_reset, v);
 
     return -EOPNOTSUPP;
 }

@@ -270,7 +270,8 @@ int arch_monitor_domctl_event(struct domain *d,
         ad->monitor.descriptor_access_enabled = requested_status;
 
         for_each_vcpu ( d, v )
-            hvm_funcs.set_descriptor_access_exiting(v, requested_status);
+            alternative_vcall(hvm_funcs.set_descriptor_access_exiting, v,
+                              requested_status);
 
         domain_unpause(d);
         break;

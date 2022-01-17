@@ -126,14 +126,14 @@ static int cpu_callback(
     switch ( action )
     {
     case CPU_UP_PREPARE:
-        rc = hvm_funcs.cpu_up_prepare(cpu);
+        rc = alternative_call(hvm_funcs.cpu_up_prepare, cpu);
         break;
     case CPU_DYING:
         hvm_cpu_down();
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        hvm_funcs.cpu_dead(cpu);
+        alternative_vcall(hvm_funcs.cpu_dead, cpu);
         break;
     default:
         break;
@@ -707,7 +707,7 @@ int hvm_domain_initialise(struct domain *d)
     if ( rc )
         goto fail2;
 
-    rc = hvm_funcs.domain_initialise(d);
+    rc = alternative_call(hvm_funcs.domain_initialise, d);
     if ( rc != 0 )
         goto fail2;
 
@@ -740,7 +740,7 @@ void hvm_domain_relinquish_resources(struct domain *d)
         alternative_vcall(hvm_funcs.domain_relinquish_resources, d);
 
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
-        hvm_funcs.nhvm_domain_relinquish_resources(d);
+        alternative_vcall(hvm_funcs.nhvm_domain_relinquish_resources, d);
 
     viridian_domain_deinit(d);
 
@@ -870,7 +870,7 @@ static int hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
         return 0;
 
     /* Architecture-specific vmcs/vmcb bits */
-    hvm_funcs.save_cpu_ctxt(v, &ctxt);
+    alternative_vcall(hvm_funcs.save_cpu_ctxt, v, &ctxt);
 
     hvm_get_segment_register(v, x86_seg_idtr, &seg);
     ctxt.idtr_limit = seg.limit;
@@ -1093,14 +1093,14 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 #undef UNFOLD_ARBYTES
 
     /* Architecture-specific vmcs/vmcb bits */
-    if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
+    if ( alternative_call(hvm_funcs.load_cpu_ctxt, v, &ctxt) < 0 )
         return -EINVAL;
 
     v->arch.hvm.guest_cr[2] = ctxt.cr2;
     hvm_update_guest_cr(v, 2);
 
     if ( hvm_funcs.tsc_scaling.setup )
-        hvm_funcs.tsc_scaling.setup(v);
+        alternative_vcall(hvm_funcs.tsc_scaling.setup, v);
 
     v->arch.msrs->tsc_aux = ctxt.msr_tsc_aux;
 
@@ -1563,7 +1563,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( rc != 0 ) /* teardown: vlapic_destroy */
         goto fail2;
 
-    if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 ) /* teardown: hvm_funcs.vcpu_destroy */
+    rc = alternative_call(hvm_funcs.vcpu_initialise, v);
+    if ( rc != 0 ) /* teardown: hvm_funcs.vcpu_destroy */
         goto fail3;
 
     softirq_tasklet_init(&v->arch.hvm.assert_evtchn_irq_tasklet,
@@ -1611,7 +1612,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
     free_compat_arg_xlat(v);
  fail4:
     hvmemul_cache_destroy(v);
-    hvm_funcs.vcpu_destroy(v);
+    alternative_vcall(hvm_funcs.vcpu_destroy, v);
  fail3:
     vlapic_destroy(v);
  fail2:
@@ -1635,7 +1636,7 @@ void hvm_vcpu_destroy(struct vcpu *v)
     free_compat_arg_xlat(v);
 
     tasklet_kill(&v->arch.hvm.assert_evtchn_irq_tasklet);
-    hvm_funcs.vcpu_destroy(v);
+    alternative_vcall(hvm_funcs.vcpu_destroy, v);
 
     vlapic_destroy(v);
 
@@ -3874,7 +3875,7 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
          !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
 
-    intr_shadow = hvm_funcs.get_interrupt_shadow(v);
+    intr_shadow = alternative_call(hvm_funcs.get_interrupt_shadow, v);
 
     if ( intr_shadow & (HVM_INTR_SHADOW_STI|HVM_INTR_SHADOW_MOV_SS) )
         return hvm_intblk_shadow;
@@ -3990,7 +3991,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     hvm_set_segment_register(v, x86_seg_idtr, &reg);
 
     if ( hvm_funcs.tsc_scaling.setup )
-        hvm_funcs.tsc_scaling.setup(v);
+        alternative_vcall(hvm_funcs.tsc_scaling.setup, v);
 
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm.cache_tsc_offset =
