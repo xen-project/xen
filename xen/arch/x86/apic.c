@@ -1190,7 +1190,7 @@ static void __init check_deadline_errata(void)
            "please update microcode to version %#x (or later)\n", rev);
 }
 
-static void wait_tick_pvh(void)
+static void __init wait_tick_pvh(void)
 {
     u64 lapse_ns = 1000000000ULL / HZ;
     s_time_t start, curr_time;
