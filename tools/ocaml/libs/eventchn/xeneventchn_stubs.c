@@ -33,7 +33,22 @@
 #include <caml/fail.h>
 #include <caml/signals.h>
 
-#define _H(__h) ((xenevtchn_handle *)(__h))
+#define _H(__h) (*((xenevtchn_handle **)Data_custom_val(__h)))
+
+static void stub_evtchn_finalize(value v)
+{
+	xenevtchn_close(_H(v));
+}
+
+static struct custom_operations xenevtchn_ops = {
+	.identifier  = "xenevtchn",
+	.finalize    = stub_evtchn_finalize,
+	.compare     = custom_compare_default,     /* Can't compare     */
+	.hash        = custom_hash_default,        /* Can't hash        */
+	.serialize   = custom_serialize_default,   /* Can't serialize   */
+	.deserialize = custom_deserialize_default, /* Can't deserialize */
+	.compare_ext = custom_compare_ext_default, /* Can't compare     */
+};
 
 CAMLprim value stub_eventchn_init(void)
 {
@@ -48,7 +63,9 @@ CAMLprim value stub_eventchn_init(void)
 	if (xce == NULL)
 		caml_failwith("open failed");
 
-	result = (value)xce;
+	result = caml_alloc_custom(&xenevtchn_ops, sizeof(xce), 0, 1);
+	_H(result) = xce;
+
 	CAMLreturn(result);
 }
 
