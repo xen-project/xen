@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 
 #include "xc_private.h"
+#include "xc_bitops.h"
 #include "xenguest.h"
 
 #include <xen/memory.h>

@@ -8,6 +8,7 @@
 #include <inttypes.h>
 
 #include <xenctrl.h>
+#include <xenguest.h>
 
 #include <xen-tools/libs.h>
 
