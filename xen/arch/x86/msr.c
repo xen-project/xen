@@ -360,6 +360,24 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     return X86EMUL_EXCEPTION;
 }
 
+/*
+ * Caller to confirm that MSR_SPEC_CTRL is available.  Intel and AMD have
+ * separate CPUID features for this functionality, but only set will be
+ * active.
+ */
+uint64_t msr_spec_ctrl_valid_bits(const struct cpuid_policy *cp)
+{
+    bool ssbd = cp->feat.ssbd;
+
+    /*
+     * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
+     * when STIBP isn't enumerated in hardware.
+     */
+    return (SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
+            (ssbd       ? SPEC_CTRL_SSBD       : 0) |
+            0);
+}
+
 int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
     const struct vcpu *curr = current;
@@ -442,18 +460,9 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         break;
 
     case MSR_SPEC_CTRL:
-        if ( !cp->feat.ibrsb )
-            goto gp_fault; /* MSR available? */
-
-        /*
-         * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
-         * when STIBP isn't enumerated in hardware.
-         */
-        rsvd = ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
-                 (cp->feat.ssbd ? SPEC_CTRL_SSBD : 0));
-
-        if ( val & rsvd )
-            goto gp_fault; /* Rsvd bit set? */
+        if ( !cp->feat.ibrsb ||
+             (val & ~msr_spec_ctrl_valid_bits(cp)) )
+            goto gp_fault;
         goto set_reg;
 
     case MSR_PRED_CMD:
