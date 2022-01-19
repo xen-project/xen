@@ -31,6 +31,10 @@
  *
  * Chipset BM_STS (bus master status) bit is a NOP
  *	for preventing entry into deep C-states
+ *
+ * CPU will flush caches as needed when entering a C-state via MWAIT
+ *	(in contrast to entering ACPI C3, in which case the WBINVD
+ *	instruction needs to be executed to flush the caches)
  */
 
 /*
