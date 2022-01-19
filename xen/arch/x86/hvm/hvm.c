@@ -1373,6 +1373,7 @@ static const uint32_t msrs_to_send[] = {
 
 static int hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
 {
+    const struct domain *d = v->domain;
     struct hvm_save_descriptor *desc = _p(&h->data[h->cur]);
     struct hvm_msr *ctxt;
     unsigned int i;
@@ -1388,7 +1389,8 @@ static int hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
     for ( i = 0; i < ARRAY_SIZE(msrs_to_send); ++i )
     {
         uint64_t val;
-        int rc = guest_rdmsr(v, msrs_to_send[i], &val);
+        unsigned int msr = msrs_to_send[i];
+        int rc = guest_rdmsr(v, msr, &val);
 
         /*
          * It is the programmers responsibility to ensure that
@@ -1408,7 +1410,26 @@ static int hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
         if ( !val )
             continue; /* Skip empty MSRs. */
 
-        ctxt->msr[ctxt->count].index = msrs_to_send[i];
+        /*
+         * Guests are given full access to certain MSRs for performance
+         * reasons.  A consequence is that Xen is unable to enforce that all
+         * bits disallowed by the CPUID policy yield #GP, and an enterprising
+         * guest may be able to set and use a bit it ought to leave alone.
+         *
+         * When migrating from a more capable host to a less capable one, such
+         * bits may be rejected by the destination, and the migration failed.
+         *
+         * Discard such bits here on the source side.  Such bits have reserved
+         * behaviour, and the guest has only itself to blame.
+         */
+        switch ( msr )
+        {
+        case MSR_SPEC_CTRL:
+            val &= msr_spec_ctrl_valid_bits(d->arch.cpuid);
+            break;
+        }
+
+        ctxt->msr[ctxt->count].index = msr;
         ctxt->msr[ctxt->count++].val = val;
     }
 
