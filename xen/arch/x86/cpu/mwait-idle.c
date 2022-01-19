@@ -574,8 +574,8 @@ static const struct cpuidle_state icx_cstates[] = {
        {
                .name = "C6-ICX",
                .flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
-               .exit_latency = 128,
-               .target_residency = 384,
+               .exit_latency = 170,
+               .target_residency = 600,
        },
        {}
 };
