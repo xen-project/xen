@@ -47,10 +47,6 @@ struct port_info {
     bool bound;
 };
 
-extern struct wait_queue_head event_queue;
-
-void minios_evtchn_close_fd(int fd);
-
 /* XXX Note: This is not threadsafe */
 static struct port_info *port_alloc(xenevtchn_handle *xce)
 {
@@ -150,13 +146,6 @@ int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid)
     errno = -EOPNOTSUPP;
 
     return -1;
-}
-
-void minios_evtchn_close_fd(int fd)
-{
-    struct file *file = get_file_from_fd(fd);
-
-    evtchn_close_fd(file);
 }
 
 int xenevtchn_notify(xenevtchn_handle *xce, evtchn_port_t port)

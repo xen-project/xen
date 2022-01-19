@@ -33,8 +33,6 @@
 
 #include "private.h"
 
-void minios_gnttab_close_fd(int fd);
-
 static int gnttab_close_fd(struct file *file)
 {
     gntmap_fini(file->dev);
@@ -87,13 +85,6 @@ int osdep_gnttab_close(xengnttab_handle *xgt)
         return 0;
 
     return close(xgt->fd);
-}
-
-void minios_gnttab_close_fd(int fd)
-{
-    struct file *file = get_file_from_fd(fd);
-
-    gnttab_close_fd(file);
 }
 
 void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
