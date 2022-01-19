@@ -484,7 +484,7 @@ static const struct cpuidle_state bdw_cstates[] = {
 	{}
 };
 
-static struct cpuidle_state skl_cstates[] = {
+static struct cpuidle_state __read_mostly skl_cstates[] = {
 	{
 		.name = "C1-SKL",
 		.flags = MWAIT2flg(0x00),
@@ -536,7 +536,7 @@ static struct cpuidle_state skl_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state skx_cstates[] = {
+static struct cpuidle_state __read_mostly skx_cstates[] = {
 	{
 		.name = "C1-SKX",
 		.flags = MWAIT2flg(0x00),
@@ -674,7 +674,7 @@ static const struct cpuidle_state knl_cstates[] = {
 	{}
 };
 
-static struct cpuidle_state bxt_cstates[] = {
+static struct cpuidle_state __read_mostly bxt_cstates[] = {
 	{
 		.name = "C1-BXT",
 		.flags = MWAIT2flg(0x00),
@@ -1130,6 +1130,36 @@ static void __init sklh_idle_state_table_update(void)
 }
 
 /*
+ * skx_idle_state_table_update - Adjust the Sky Lake/Cascade Lake
+ * idle states table.
+ */
+static void __init skx_idle_state_table_update(void)
+{
+	unsigned long long msr;
+
+	rdmsrl(MSR_PKG_CST_CONFIG_CONTROL, msr);
+
+	/*
+	 * 000b: C0/C1 (no package C-state support)
+	 * 001b: C2
+	 * 010b: C6 (non-retention)
+	 * 011b: C6 (retention)
+	 * 111b: No Package C state limits.
+	 */
+	if ((msr & 0x7) < 2) {
+		/*
+		 * Uses the CC6 + PC0 latency and 3 times of
+		 * latency for target_residency if the PC6
+		 * is disabled in BIOS. This is consistent
+		 * with how intel_idle driver uses _CST
+		 * to set the target_residency.
+		 */
+		skx_cstates[2].exit_latency = 92;
+		skx_cstates[2].target_residency = 276;
+	}
+}
+
+/*
  * mwait_idle_state_table_update()
  *
  * Update the default state_table for this CPU-id
@@ -1146,6 +1176,9 @@ static void __init mwait_idle_state_table_update(void)
 		break;
 	case 0x5e: /* SKL-H */
 		sklh_idle_state_table_update();
+		break;
+	case 0x55: /* SKL-X */
+		skx_idle_state_table_update();
 		break;
  	}
 }
