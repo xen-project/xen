@@ -853,36 +853,23 @@ static struct cmd_s cmds[] = {
 static int do_control_help(void *ctx, struct connection *conn,
 			   char **vec, int num)
 {
-	int cmd, len = 0;
+	int cmd;
 	char *resp;
 
 	if (num)
 		return EINVAL;
 
-	for (cmd = 0; cmd < ARRAY_SIZE(cmds); cmd++) {
-		len += strlen(cmds[cmd].cmd) + 1;
-		len += strlen(cmds[cmd].pars) + 1;
-	}
-	len++;
-
-	resp = talloc_array(ctx, char, len);
+	resp = talloc_asprintf(ctx, "%s", "");
 	if (!resp)
 		return ENOMEM;
-
-	len = 0;
 	for (cmd = 0; cmd < ARRAY_SIZE(cmds); cmd++) {
-		strcpy(resp + len, cmds[cmd].cmd);
-		len += strlen(cmds[cmd].cmd);
-		resp[len] = '\t';
-		len++;
-		strcpy(resp + len, cmds[cmd].pars);
-		len += strlen(cmds[cmd].pars);
-		resp[len] = '\n';
-		len++;
+		resp = talloc_asprintf_append(resp, "%s\t%s\n",
+					      cmds[cmd].cmd, cmds[cmd].pars);
+		if (!resp)
+			return ENOMEM;
 	}
-	resp[len] = 0;
 
-	send_reply(conn, XS_CONTROL, resp, len);
+	send_reply(conn, XS_CONTROL, resp, strlen(resp) + 1);
 	return 0;
 }
 
