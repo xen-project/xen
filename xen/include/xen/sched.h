@@ -766,10 +766,15 @@ void vcpu_end_shutdown_deferral(struct vcpu *v);
  * from any processor.
  */
 void __domain_crash(struct domain *d);
-#define domain_crash(d) do {                                              \
-    printk("domain_crash called from %s:%d\n", __FILE__, __LINE__);       \
-    __domain_crash(d);                                                    \
-} while (0)
+#define domain_crash(d, ...)                                        \
+    do {                                                            \
+        if ( count_args(__VA_ARGS__) == 0 )                         \
+            printk(XENLOG_ERR "domain_crash called from %s:%d\n",   \
+                   __FILE__, __LINE__);                             \
+        else                                                        \
+            printk(XENLOG_ERR __VA_ARGS__);                         \
+        __domain_crash(d);                                          \
+    } while ( 0 )
 
 /*
  * Called from assembly code, with an optional address to help indicate why

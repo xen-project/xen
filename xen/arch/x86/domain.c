@@ -1704,11 +1704,8 @@ static void load_segments(struct vcpu *n)
                  put_guest(uregs->fs,   esp - 5) |
                  put_guest(uregs->es,   esp - 6) |
                  put_guest(uregs->ds,   esp - 7) )
-            {
-                gprintk(XENLOG_ERR,
-                        "error while creating compat failsafe callback frame\n");
-                domain_crash(n->domain);
-            }
+                domain_crash(n->domain,
+                             "Error creating compat failsafe callback frame\n");
 
             if ( n->arch.pv.vgc_flags & VGCF_failsafe_disables_events )
                 vcpu_info(n, evtchn_upcall_mask) = 1;
@@ -1743,11 +1740,8 @@ static void load_segments(struct vcpu *n)
              put_guest(uregs->ds,   rsp -  9) |
              put_guest(regs->r11,   rsp - 10) |
              put_guest(regs->rcx,   rsp - 11) )
-        {
-            gprintk(XENLOG_ERR,
-                    "error while creating failsafe callback frame\n");
-            domain_crash(n->domain);
-        }
+            domain_crash(n->domain,
+                         "Error creating failsafe callback frame\n");
 
         if ( n->arch.pv.vgc_flags & VGCF_failsafe_disables_events )
             vcpu_info(n, evtchn_upcall_mask) = 1;
