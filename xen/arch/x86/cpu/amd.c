@@ -693,7 +693,7 @@ void amd_init_ssbd(const struct cpuinfo_x86 *c)
 		return;
 
 	if (cpu_has_amd_ssbd) {
-		wrmsrl(MSR_SPEC_CTRL, opt_ssbd ? SPEC_CTRL_SSBD : 0);
+		/* Handled by common MSR_SPEC_CTRL logic */
 		return;
 	}
 
