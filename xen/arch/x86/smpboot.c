@@ -380,7 +380,7 @@ void start_secondary(void *unused)
      * settings.  Note: These MSRs may only become available after loading
      * microcode.
      */
-    if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+    if ( boot_cpu_has(X86_FEATURE_IBRSB) || boot_cpu_has(X86_FEATURE_IBRS) )
     {
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
         info->last_spec_ctrl = default_xen_spec_ctrl;
