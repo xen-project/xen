@@ -21,6 +21,7 @@
 #include <xen/lib.h>
 #include <xen/warning.h>
 
+#include <asm/hvm/svm/svm.h>
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
@@ -932,7 +933,8 @@ void __init init_speculation_mitigations(void)
 
     hw_smt_enabled = check_smt_enabled();
 
-    has_spec_ctrl = boot_cpu_has(X86_FEATURE_IBRSB);
+    has_spec_ctrl = (boot_cpu_has(X86_FEATURE_IBRSB) ||
+                     boot_cpu_has(X86_FEATURE_IBRS));
 
     /*
      * Has the user specified any custom BTI mitigations?  If so, follow their
@@ -1013,12 +1015,32 @@ void __init init_speculation_mitigations(void)
         }
     }
 
+    /* AMD hardware: MSR_SPEC_CTRL alternatives setup. */
+    if ( boot_cpu_has(X86_FEATURE_IBRS) )
+    {
+        /*
+         * Virtualising MSR_SPEC_CTRL for guests depends on SVM support, which
+         * on real hardware matches the availability of MSR_SPEC_CTRL in the
+         * first place.
+         *
+         * No need for SCF_ist_wrmsr because Xen's value is restored
+         * atomically WRT NMIs in the VMExit path.
+         *
+         * TODO: Adjust cpu_has_svm_spec_ctrl to be usable earlier on boot.
+         */
+        if ( opt_msr_sc_hvm &&
+             (boot_cpu_data.extended_cpuid_level >= 0x8000000a) &&
+             (cpuid_edx(0x8000000a) & (1u << SVM_FEATURE_SPEC_CTRL)) )
+            setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
+    }
+
     /* If we have IBRS available, see whether we should use it. */
     if ( has_spec_ctrl && ibrs )
         default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
 
     /* If we have SSBD available, see whether we should use it. */
-    if ( boot_cpu_has(X86_FEATURE_SSBD) && opt_ssbd )
+    if ( opt_ssbd && (boot_cpu_has(X86_FEATURE_SSBD) ||
+                      boot_cpu_has(X86_FEATURE_AMD_SSBD)) )
         default_xen_spec_ctrl |= SPEC_CTRL_SSBD;
 
     /*

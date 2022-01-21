@@ -45,6 +45,9 @@ static inline void svm_invlpga(unsigned long linear, uint32_t asid)
         "a" (linear), "c" (asid));
 }
 
+struct cpu_user_regs;
+struct vcpu;
+
 unsigned long *svm_msrbit(unsigned long *msr_bitmap, uint32_t msr);
 void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len);
 void svm_update_guest_cr(struct vcpu *, unsigned int cr, unsigned int flags);
