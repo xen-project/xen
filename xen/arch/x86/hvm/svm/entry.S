@@ -55,11 +55,23 @@ __UNLIKELY_END(nsvm_hap)
         mov  %rsp, %rdi
         call svm_vmenter_helper
 
-        mov VCPU_arch_msrs(%rbx), %rax
-        mov VCPUMSR_spec_ctrl_raw(%rax), %eax
+        clgi
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        /* SPEC_CTRL_EXIT_TO_SVM   (nothing currently) */
+        /* SPEC_CTRL_EXIT_TO_SVM       Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
+        .macro svm_vmentry_spec_ctrl
+            mov    VCPU_arch_msrs(%rbx), %rax
+            movzbl CPUINFO_last_spec_ctrl(%rsp), %edx
+            mov    VCPUMSR_spec_ctrl_raw(%rax), %eax
+            cmp    %edx, %eax
+            je     1f /* Skip write if value is correct. */
+            mov    $MSR_SPEC_CTRL, %ecx
+            xor    %edx, %edx
+            wrmsr
+            mov    %al, CPUINFO_last_spec_ctrl(%rsp)
+1:          /* No Spectre v1 concerns.  Execution will hit VMRUN imminently. */
+        .endm
+        ALTERNATIVE "", svm_vmentry_spec_ctrl, X86_FEATURE_SC_MSR_HVM
 
         pop  %r15
         pop  %r14
@@ -78,7 +90,6 @@ __UNLIKELY_END(nsvm_hap)
         pop  %rsi
         pop  %rdi
 
-        clgi
         sti
         vmrun
 
@@ -86,8 +97,21 @@ __UNLIKELY_END(nsvm_hap)
 
         GET_CURRENT(bx)
 
-        /* SPEC_CTRL_ENTRY_FROM_SVM    Req: b=curr %rsp=regs/cpuinfo, Clob: ac  */
+        /* SPEC_CTRL_ENTRY_FROM_SVM    Req: %rsp=regs/cpuinfo         Clob: acd */
         ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM
+
+        .macro svm_vmexit_spec_ctrl
+            /*
+             * Write to MSR_SPEC_CTRL unconditionally, for the RAS[:32]
+             * flushing side effect.
+             */
+            mov    $MSR_SPEC_CTRL, %ecx
+            movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
+            xor    %edx, %edx
+            wrmsr
+            mov    %al, CPUINFO_last_spec_ctrl(%rsp)
+        .endm
+        ALTERNATIVE "", svm_vmexit_spec_ctrl, X86_FEATURE_SC_MSR_HVM
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         stgi
