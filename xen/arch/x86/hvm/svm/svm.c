@@ -756,11 +756,6 @@ static void cf_check svm_set_segment_register(
     }
 }
 
-static unsigned long cf_check svm_get_shadow_gs_base(struct vcpu *v)
-{
-    return v->arch.hvm.svm.vmcb->kerngsbase;
-}
-
 static int cf_check svm_set_guest_pat(struct vcpu *v, u64 gpat)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
@@ -2479,6 +2474,7 @@ static bool cf_check svm_get_pending_event(
 
 static uint64_t cf_check svm_get_reg(struct vcpu *v, unsigned int reg)
 {
+    struct vcpu *curr = current;
     const struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct domain *d = v->domain;
 
@@ -2486,6 +2482,11 @@ static uint64_t cf_check svm_get_reg(struct vcpu *v, unsigned int reg)
     {
     case MSR_SPEC_CTRL:
         return vmcb->spec_ctrl;
+
+    case MSR_SHADOW_GS_BASE:
+        if ( v == curr )
+            svm_sync_vmcb(v, vmcb_in_sync);
+        return vmcb->kerngsbase;
 
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
@@ -2530,7 +2531,6 @@ static struct hvm_function_table __initdata_cf_clobber svm_function_table = {
     .get_cpl              = svm_get_cpl,
     .get_segment_register = svm_get_segment_register,
     .set_segment_register = svm_set_segment_register,
-    .get_shadow_gs_base   = svm_get_shadow_gs_base,
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
     .cpuid_policy_changed = svm_cpuid_policy_changed,

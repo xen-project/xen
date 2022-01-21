@@ -128,7 +128,6 @@ struct hvm_function_table {
                                  struct segment_register *reg);
     void (*set_segment_register)(struct vcpu *v, enum x86_segment seg,
                                  struct segment_register *reg);
-    unsigned long (*get_shadow_gs_base)(struct vcpu *v);
 
     /* 
      * Re-set the value of CR3 that Xen runs on when handling VM exits.
@@ -469,11 +468,6 @@ hvm_get_cpl(struct vcpu *v)
     return alternative_call(hvm_funcs.get_cpl, v);
 }
 
-static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
-{
-    return alternative_call(hvm_funcs.get_shadow_gs_base, v);
-}
-
 #define has_hvm_params(d) \
     ((d)->arch.hvm.params != NULL)
 
@@ -759,7 +753,6 @@ void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val);
  * needed because DCE will kick in.
  */
 int hvm_guest_x86_mode(struct vcpu *v);
-unsigned long hvm_get_shadow_gs_base(struct vcpu *v);
 void hvm_cpuid_policy_changed(struct vcpu *v);
 void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset, uint64_t at_tsc);
 

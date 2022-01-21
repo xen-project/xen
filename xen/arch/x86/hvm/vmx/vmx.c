@@ -1176,11 +1176,6 @@ static void cf_check vmx_set_segment_register(
     vmx_vmcs_exit(v);
 }
 
-static unsigned long cf_check vmx_get_shadow_gs_base(struct vcpu *v)
-{
-    return v->arch.hvm.vmx.shadow_gs;
-}
-
 static int cf_check vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 {
     if ( !paging_mode_hap(v->domain) ||
@@ -2401,6 +2396,7 @@ static int cf_check vmtrace_reset(struct vcpu *v)
 
 static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
 {
+    const struct vcpu *curr = current;
     struct domain *d = v->domain;
     uint64_t val = 0;
     int rc;
@@ -2416,6 +2412,12 @@ static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
                    __func__, v, reg, rc);
             domain_crash(d);
         }
+        return val;
+
+    case MSR_SHADOW_GS_BASE:
+        if ( v != curr )
+            return v->arch.hvm.vmx.shadow_gs;
+        rdmsrl(MSR_SHADOW_GS_BASE, val);
         return val;
     }
 
@@ -2489,7 +2491,6 @@ static struct hvm_function_table __initdata_cf_clobber vmx_function_table = {
     .get_cpl              = _vmx_get_cpl,
     .get_segment_register = vmx_get_segment_register,
     .set_segment_register = vmx_set_segment_register,
-    .get_shadow_gs_base   = vmx_get_shadow_gs_base,
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,

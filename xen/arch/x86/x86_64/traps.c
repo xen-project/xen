@@ -80,7 +80,7 @@ static void get_hvm_registers(struct vcpu *v, struct cpu_user_regs *regs,
     hvm_get_segment_register(v, x86_seg_ss, &sreg);
     regs->ss = sreg.sel;
 
-    crs[7] = hvm_get_shadow_gs_base(v);
+    crs[7] = hvm_get_reg(v, MSR_SHADOW_GS_BASE);
 }
 
 static void _show_registers(

@@ -1447,6 +1447,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     if ( is_hvm_domain(d) )
     {
         struct segment_register sreg;
+        unsigned long gs_shadow;
 
         c.nat->ctrlreg[0] = v->arch.hvm.guest_cr[0];
         c.nat->ctrlreg[2] = v->arch.hvm.guest_cr[2];
@@ -1465,15 +1466,18 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c.nat->fs_base = sreg.base;
         hvm_get_segment_register(v, x86_seg_gs, &sreg);
         c.nat->user_regs.gs = sreg.sel;
+
+        gs_shadow = hvm_get_reg(v, MSR_SHADOW_GS_BASE);
+
         if ( ring_0(&c.nat->user_regs) )
         {
             c.nat->gs_base_kernel = sreg.base;
-            c.nat->gs_base_user = hvm_get_shadow_gs_base(v);
+            c.nat->gs_base_user = gs_shadow;
         }
         else
         {
             c.nat->gs_base_user = sreg.base;
-            c.nat->gs_base_kernel = hvm_get_shadow_gs_base(v);
+            c.nat->gs_base_kernel = gs_shadow;
         }
     }
     else
