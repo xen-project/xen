@@ -5,62 +5,6 @@
 
 struct hashtable;
 
-/* Example of use:
- *
- *      struct hashtable  *h;
- *      struct some_key   *k;
- *      struct some_value *v;
- *
- *      static unsigned int         hash_from_key_fn( void *k );
- *      static int                  keys_equal_fn ( void *key1, void *key2 );
- *
- *      h = create_hashtable(16, hash_from_key_fn, keys_equal_fn);
- *      k = (struct some_key *)     malloc(sizeof(struct some_key));
- *      v = (struct some_value *)   malloc(sizeof(struct some_value));
- *
- *      (initialise k and v to suitable values)
- * 
- *      if (! hashtable_insert(h,k,v) )
- *      {     exit(-1);               }
- *
- *      if (NULL == (found = hashtable_search(h,k) ))
- *      {    printf("not found!");                  }
- *
- *      if (NULL == (found = hashtable_remove(h,k) ))
- *      {    printf("Not found\n");                 }
- *
- */
-
-/* Macros may be used to define type-safe(r) hashtable access functions, with
- * methods specialized to take known key and value types as parameters.
- * 
- * Example:
- *
- * Insert this at the start of your file:
- *
- * DEFINE_HASHTABLE_INSERT(insert_some, struct some_key, struct some_value);
- * DEFINE_HASHTABLE_SEARCH(search_some, struct some_key, struct some_value);
- * DEFINE_HASHTABLE_REMOVE(remove_some, struct some_key, struct some_value);
- *
- * This defines the functions 'insert_some', 'search_some' and 'remove_some'.
- * These operate just like hashtable_insert etc., with the same parameters,
- * but their function signatures have 'struct some_key *' rather than
- * 'void *', and hence can generate compile time errors if your program is
- * supplying incorrect data as a key (and similarly for value).
- *
- * Note that the hash and key equality functions passed to create_hashtable
- * still take 'void *' parameters instead of 'some key *'. This shouldn't be
- * a difficult issue as they're only defined and passed once, and the other
- * functions will ensure that only valid keys are supplied to them.
- *
- * The cost for this checking is increased code size and runtime overhead
- * - if performance is important, it may be worth switching back to the
- * unsafe methods once your program has been debugged with the safe methods.
- * This just requires switching to some simple alternative defines - eg:
- * #define insert_some hashtable_insert
- *
- */
-
 /*****************************************************************************
  * create_hashtable
    
@@ -98,12 +42,6 @@ create_hashtable(unsigned int minsize,
 int 
 hashtable_insert(struct hashtable *h, void *k, void *v);
 
-#define DEFINE_HASHTABLE_INSERT(fnname, keytype, valuetype) \
-int fnname (struct hashtable *h, keytype *k, valuetype *v) \
-{ \
-    return hashtable_insert(h,k,v); \
-}
-
 /*****************************************************************************
  * hashtable_search
    
@@ -115,12 +53,6 @@ int fnname (struct hashtable *h, keytype *k, valuetype *v) \
 
 void *
 hashtable_search(struct hashtable *h, void *k);
-
-#define DEFINE_HASHTABLE_SEARCH(fnname, keytype, valuetype) \
-valuetype * fnname (struct hashtable *h, keytype *k) \
-{ \
-    return (valuetype *) (hashtable_search(h,k)); \
-}
 
 /*****************************************************************************
  * hashtable_remove
@@ -134,13 +66,6 @@ valuetype * fnname (struct hashtable *h, keytype *k) \
 void * /* returns value */
 hashtable_remove(struct hashtable *h, void *k);
 
-#define DEFINE_HASHTABLE_REMOVE(fnname, keytype, valuetype) \
-valuetype * fnname (struct hashtable *h, keytype *k) \
-{ \
-    return (valuetype *) (hashtable_remove(h,k)); \
-}
-
-
 /*****************************************************************************
  * hashtable_count
    
@@ -150,7 +75,6 @@ valuetype * fnname (struct hashtable *h, keytype *k) \
  */
 unsigned int
 hashtable_count(struct hashtable *h);
-
 
 /*****************************************************************************
  * hashtable_destroy
