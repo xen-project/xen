@@ -2050,13 +2050,17 @@ static void clean_store(struct hashtable *reachable)
 
 void check_store(void)
 {
-	char * root = talloc_strdup(NULL, "/");
-	struct hashtable * reachable =
-		create_hashtable(16, hash_from_key_fn, keys_equal_fn);
- 
-	if (!reachable) {
+	char *root = talloc_strdup(NULL, "/");
+	struct hashtable *reachable;
+
+	if (!root) {
 		log("check_store: ENOMEM");
 		return;
+	}
+	reachable = create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+	if (!reachable) {
+		log("check_store: ENOMEM");
+		goto out_root;
 	}
 
 	log("Checking store ...");
@@ -2067,6 +2071,7 @@ void check_store(void)
 
 	hashtable_destroy(reachable, 0 /* Don't free values (they are all
 					  (void *)1) */);
+ out_root:
 	talloc_free(root);
 }
 
