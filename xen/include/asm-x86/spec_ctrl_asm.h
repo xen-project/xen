@@ -46,6 +46,9 @@
  *   - On VMX by using MSR load/save lists to have vmentry/exit atomically
  *     load/save the guest value.  Xen's value is loaded in regular code, and
  *     there is no need to use the shadow logic (below).
+ *   - On SVM by altering MSR_SPEC_CTRL inside the CLGI/STGI region.  This
+ *     makes the changes atomic with respect to NMIs/etc, so no need for
+ *     shadowing logic.
  *
  * Factor 2 is harder.  We maintain a shadow_spec_ctrl value, and a use_shadow
  * boolean in the per cpu spec_ctrl_flags.  The synchronous use is:

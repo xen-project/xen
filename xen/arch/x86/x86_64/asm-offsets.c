@@ -120,6 +120,7 @@ void __dummy__(void)
     OFFSET(CPUINFO_pv_cr3, struct cpu_info, pv_cr3);
     OFFSET(CPUINFO_shadow_spec_ctrl, struct cpu_info, shadow_spec_ctrl);
     OFFSET(CPUINFO_xen_spec_ctrl, struct cpu_info, xen_spec_ctrl);
+    OFFSET(CPUINFO_last_spec_ctrl, struct cpu_info, last_spec_ctrl);
     OFFSET(CPUINFO_spec_ctrl_flags, struct cpu_info, spec_ctrl_flags);
     OFFSET(CPUINFO_root_pgt_changed, struct cpu_info, root_pgt_changed);
     OFFSET(CPUINFO_use_pv_cr3, struct cpu_info, use_pv_cr3);

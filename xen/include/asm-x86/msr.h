@@ -287,6 +287,15 @@ struct vcpu_msrs
      *
      * For VT-x guests, the guest value is held in the MSR guest load/save
      * list.
+     *
+     * For SVM, the guest value lives in the VMCB, and hardware saves/restores
+     * the host value automatically.  However, guests run with the OR of the
+     * host and guest value, which allows Xen to set protections behind the
+     * guest's back.
+     *
+     * We must clear/restore Xen's value before/after VMRUN to avoid unduly
+     * influencing the guest.  In order to support "behind the guest's back"
+     * protections, we load this value (commonly 0) before VMRUN.
      */
     struct {
         uint32_t raw;
