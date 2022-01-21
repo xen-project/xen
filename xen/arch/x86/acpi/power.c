@@ -293,7 +293,7 @@ static int enter_state(u32 state)
     /* Re-enabled default NMI/#MC use of MSR_SPEC_CTRL. */
     ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_ist_wrmsr);
 
-    if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+    if ( boot_cpu_has(X86_FEATURE_IBRSB) || boot_cpu_has(X86_FEATURE_IBRS) )
     {
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
         ci->last_spec_ctrl = default_xen_spec_ctrl;
