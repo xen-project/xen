@@ -986,6 +986,7 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
     unsigned long attr = 0, sel = 0, limit;
+    unsigned int tmp_seg;
 
     /*
      * We may get here in the context of dump_execstate(), which may have
@@ -1009,34 +1010,34 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
         return;
     }
 
-    switch ( seg )
+    /*
+     * Xen's x86_seg_* enumeration *almost* matches the VMCS encoding order.
+     *
+     * tr and ldtr are reversed, and other areas of code rely on this, so we
+     * can't just re-enumerate.
+     */
+    BUILD_BUG_ON(x86_seg_tr   != 6);
+    BUILD_BUG_ON(x86_seg_ldtr != 7);
+    BUILD_BUG_ON(x86_seg_gdtr != 8);
+    BUILD_BUG_ON(x86_seg_idtr != 9);
+    switch ( tmp_seg = seg )
     {
-    case x86_seg_es ... x86_seg_gs:
-        __vmread(GUEST_SEG_SELECTOR(seg), &sel);
-        __vmread(GUEST_SEG_LIMIT(seg),    &limit);
-        __vmread(GUEST_SEG_BASE(seg),     &reg->base);
-        __vmread(GUEST_SEG_AR_BYTES(seg), &attr);
-        break;
     case x86_seg_tr:
-        __vmread(GUEST_TR_SELECTOR, &sel);
-        __vmread(GUEST_TR_LIMIT,    &limit);
-        __vmread(GUEST_TR_BASE,     &reg->base);
-        __vmread(GUEST_TR_AR_BYTES, &attr);
-        break;
-    case x86_seg_gdtr:
-        __vmread(GUEST_GDTR_LIMIT, &limit);
-        __vmread(GUEST_GDTR_BASE,  &reg->base);
-        break;
-    case x86_seg_idtr:
-        __vmread(GUEST_IDTR_LIMIT, &limit);
-        __vmread(GUEST_IDTR_BASE,  &reg->base);
-        break;
     case x86_seg_ldtr:
-        __vmread(GUEST_LDTR_SELECTOR, &sel);
-        __vmread(GUEST_LDTR_LIMIT,    &limit);
-        __vmread(GUEST_LDTR_BASE,     &reg->base);
-        __vmread(GUEST_LDTR_AR_BYTES, &attr);
+        tmp_seg ^= 1; /* Flip tr and ldtr so GUEST_SEG_*() works. */
+        fallthrough;
+
+    case x86_seg_es ... x86_seg_gs:
+        __vmread(GUEST_SEG_SELECTOR(tmp_seg), &sel);
+        __vmread(GUEST_SEG_AR_BYTES(tmp_seg), &attr);
+        fallthrough;
+
+    case x86_seg_gdtr:
+    case x86_seg_idtr:
+        __vmread(GUEST_SEG_LIMIT(tmp_seg),    &limit);
+        __vmread(GUEST_SEG_BASE(tmp_seg),     &reg->base);
         break;
+
     default:
         BUG();
         return;
@@ -1150,32 +1151,22 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
     switch ( seg )
     {
+    case x86_seg_tr:
+    case x86_seg_ldtr:
+        seg ^= 1; /* Flip tr and ldtr so GUEST_SEG_*() works. */
+        fallthrough;
+
     case x86_seg_es ... x86_seg_gs:
         __vmwrite(GUEST_SEG_SELECTOR(seg), sel);
+        __vmwrite(GUEST_SEG_AR_BYTES(seg), attr);
+        fallthrough;
+
+    case x86_seg_gdtr:
+    case x86_seg_idtr:
         __vmwrite(GUEST_SEG_LIMIT(seg),    limit);
         __vmwrite(GUEST_SEG_BASE(seg),     base);
-        __vmwrite(GUEST_SEG_AR_BYTES(seg), attr);
         break;
-    case x86_seg_tr:
-        __vmwrite(GUEST_TR_SELECTOR, sel);
-        __vmwrite(GUEST_TR_LIMIT, limit);
-        __vmwrite(GUEST_TR_BASE, base);
-        __vmwrite(GUEST_TR_AR_BYTES, attr);
-        break;
-    case x86_seg_gdtr:
-        __vmwrite(GUEST_GDTR_LIMIT, limit);
-        __vmwrite(GUEST_GDTR_BASE, base);
-        break;
-    case x86_seg_idtr:
-        __vmwrite(GUEST_IDTR_LIMIT, limit);
-        __vmwrite(GUEST_IDTR_BASE, base);
-        break;
-    case x86_seg_ldtr:
-        __vmwrite(GUEST_LDTR_SELECTOR, sel);
-        __vmwrite(GUEST_LDTR_LIMIT, limit);
-        __vmwrite(GUEST_LDTR_BASE, base);
-        __vmwrite(GUEST_LDTR_AR_BYTES, attr);
-        break;
+
     default:
         BUG();
     }
