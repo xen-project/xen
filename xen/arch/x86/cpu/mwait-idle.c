@@ -742,6 +742,32 @@ static const struct cpuidle_state dnv_cstates[] = {
 	{}
 };
 
+/*
+ * Note, depending on HW and FW revision, SnowRidge SoC may or may not support
+ * C6, and this is indicated in the CPUID mwait leaf.
+ */
+static const struct cpuidle_state snr_cstates[] = {
+	{
+		.name = "C1",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 2,
+		.target_residency = 2,
+	},
+	{
+		.name = "C1E",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 15,
+		.target_residency = 25,
+	},
+	{
+		.name = "C6",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 130,
+		.target_residency = 500,
+	},
+	{}
+};
+
 static void mwait_idle(void)
 {
 	unsigned int cpu = smp_processor_id();
@@ -954,6 +980,11 @@ static const struct idle_cpu idle_cpu_dnv = {
 	.disable_promotion_to_c1e = true,
 };
 
+static const struct idle_cpu idle_cpu_snr = {
+	.state_table = snr_cstates,
+	.disable_promotion_to_c1e = true,
+};
+
 #define ICPU(model, cpu) \
 	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ALWAYS, &idle_cpu_##cpu}
 
@@ -996,7 +1027,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(0x5c, bxt),
 	ICPU(0x7a, bxt),
 	ICPU(0x5f, dnv),
-	ICPU(0x86, dnv),
+	ICPU(0x86, snr),
 	{}
 };
 
