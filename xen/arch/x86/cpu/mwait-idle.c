@@ -134,25 +134,25 @@ static const struct cpuidle_state {
  */
 static const struct cpuidle_state nehalem_cstates[] = {
 	{
-		.name = "C1-NHM",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 3,
 		.target_residency = 6,
 	},
 	{
-		.name = "C1E-NHM",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C3-NHM",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 20,
 		.target_residency = 80,
 	},
 	{
-		.name = "C6-NHM",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 200,
 		.target_residency = 800,
@@ -162,31 +162,31 @@ static const struct cpuidle_state nehalem_cstates[] = {
 
 static const struct cpuidle_state snb_cstates[] = {
 	{
-		.name = "C1-SNB",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
 	{
-		.name = "C1E-SNB",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C3-SNB",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 80,
 		.target_residency = 211,
 	},
 	{
-		.name = "C6-SNB",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 104,
 		.target_residency = 345,
 	},
 	{
-		.name = "C7-SNB",
+		.name = "C7",
 		.flags = MWAIT2flg(0x30) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 109,
 		.target_residency = 345,
@@ -196,31 +196,31 @@ static const struct cpuidle_state snb_cstates[] = {
 
 static const struct cpuidle_state byt_cstates[] = {
 	{
-		.name = "C1-BYT",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 1,
 	},
 	{
-		.name = "C6N-BYT",
+		.name = "C6N",
 		.flags = MWAIT2flg(0x58) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 300,
 		.target_residency = 275,
 	},
 	{
-		.name = "C6S-BYT",
+		.name = "C6S",
 		.flags = MWAIT2flg(0x52) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 500,
 		.target_residency = 560,
 	},
 	{
-		.name = "C7-BYT",
+		.name = "C7",
 		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 1200,
 		.target_residency = 4000,
 	},
 	{
-		.name = "C7S-BYT",
+		.name = "C7S",
 		.flags = MWAIT2flg(0x64) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 10000,
 		.target_residency = 20000,
@@ -230,31 +230,31 @@ static const struct cpuidle_state byt_cstates[] = {
 
 static const struct cpuidle_state cht_cstates[] = {
 	{
-		.name = "C1-CHT",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 1,
 	},
 	{
-		.name = "C6N-CHT",
+		.name = "C6N",
 		.flags = MWAIT2flg(0x58) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 80,
 		.target_residency = 275,
 	},
 	{
-		.name = "C6S-CHT",
+		.name = "C6S",
 		.flags = MWAIT2flg(0x52) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 200,
 		.target_residency = 560,
 	},
 	{
-		.name = "C7-CHT",
+		.name = "C7",
 		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 1200,
 		.target_residency = 4000,
 	},
 	{
-		.name = "C7S-CHT",
+		.name = "C7S",
 		.flags = MWAIT2flg(0x64) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 10000,
 		.target_residency = 20000,
@@ -264,31 +264,31 @@ static const struct cpuidle_state cht_cstates[] = {
 
 static const struct cpuidle_state ivb_cstates[] = {
 	{
-		.name = "C1-IVB",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 1,
 	},
 	{
-		.name = "C1E-IVB",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C3-IVB",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 59,
 		.target_residency = 156,
 	},
 	{
-		.name = "C6-IVB",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 80,
 		.target_residency = 300,
 	},
 	{
-		.name = "C7-IVB",
+		.name = "C7",
 		.flags = MWAIT2flg(0x30) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 87,
 		.target_residency = 300,
@@ -298,25 +298,25 @@ static const struct cpuidle_state ivb_cstates[] = {
 
 static const struct cpuidle_state ivt_cstates[] = {
 	{
-		.name = "C1-IVT",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 1,
 	},
 	{
-		.name = "C1E-IVT",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 80,
 	},
 	{
-		.name = "C3-IVT",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 59,
 		.target_residency = 156,
 	},
 	{
-		.name = "C6-IVT",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 82,
 		.target_residency = 300,
@@ -326,25 +326,25 @@ static const struct cpuidle_state ivt_cstates[] = {
 
 static const struct cpuidle_state ivt_cstates_4s[] = {
 	{
-		.name = "C1-IVT-4S",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 1,
 	},
 	{
-		.name = "C1E-IVT-4S",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 250,
 	},
 	{
-		.name = "C3-IVT-4S",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 59,
 		.target_residency = 300,
 	},
 	{
-		.name = "C6-IVT-4S",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 84,
 		.target_residency = 400,
@@ -354,25 +354,25 @@ static const struct cpuidle_state ivt_cstates_4s[] = {
 
 static const struct cpuidle_state ivt_cstates_8s[] = {
 	{
-		.name = "C1-IVT-8S",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 1,
 	},
 	{
-		.name = "C1E-IVT-8S",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 500,
 	},
 	{
-		.name = "C3-IVT-8S",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 59,
 		.target_residency = 600,
 	},
 	{
-		.name = "C6-IVT-8S",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 88,
 		.target_residency = 700,
@@ -382,49 +382,49 @@ static const struct cpuidle_state ivt_cstates_8s[] = {
 
 static const struct cpuidle_state hsw_cstates[] = {
 	{
-		.name = "C1-HSW",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
 	{
-		.name = "C1E-HSW",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C3-HSW",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 33,
 		.target_residency = 100,
 	},
 	{
-		.name = "C6-HSW",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 133,
 		.target_residency = 400,
 	},
 	{
-		.name = "C7s-HSW",
+		.name = "C7s",
 		.flags = MWAIT2flg(0x32) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 166,
 		.target_residency = 500,
 	},
  	{
-		.name = "C8-HSW",
+		.name = "C8",
 		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 300,
 		.target_residency = 900,
 	},
 	{
-		.name = "C9-HSW",
+		.name = "C9",
 		.flags = MWAIT2flg(0x50) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 600,
 		.target_residency = 1800,
 	},
 	{
-		.name = "C10-HSW",
+		.name = "C10",
 		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 2600,
 		.target_residency = 7700,
@@ -434,49 +434,49 @@ static const struct cpuidle_state hsw_cstates[] = {
 
 static const struct cpuidle_state bdw_cstates[] = {
 	{
-		.name = "C1-BDW",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
 	{
-		.name = "C1E-BDW",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C3-BDW",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 40,
 		.target_residency = 100,
 	},
 	{
-		.name = "C6-BDW",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 133,
 		.target_residency = 400,
 	},
 	{
-		.name = "C7s-BDW",
+		.name = "C7s",
 		.flags = MWAIT2flg(0x32) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 166,
 		.target_residency = 500,
 	},
 	{
-		.name = "C8-BDW",
+		.name = "C8",
 		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 300,
 		.target_residency = 900,
 	},
 	{
-		.name = "C9-BDW",
+		.name = "C9",
 		.flags = MWAIT2flg(0x50) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 600,
 		.target_residency = 1800,
 	},
 	{
-		.name = "C10-BDW",
+		.name = "C10",
 		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 2600,
 		.target_residency = 7700,
@@ -486,49 +486,49 @@ static const struct cpuidle_state bdw_cstates[] = {
 
 static struct cpuidle_state __read_mostly skl_cstates[] = {
 	{
-		.name = "C1-SKL",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
 	{
-		.name = "C1E-SKL",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C3-SKL",
+		.name = "C3",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 70,
 		.target_residency = 100,
 	},
 	{
-		.name = "C6-SKL",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 85,
 		.target_residency = 200,
 	},
 	{
-		.name = "C7s-SKL",
+		.name = "C7s",
 		.flags = MWAIT2flg(0x33) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 124,
 		.target_residency = 800,
 	},
 	{
-		.name = "C8-SKL",
+		.name = "C8",
 		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 200,
 		.target_residency = 800,
 	},
 	{
-		.name = "C9-SKL",
+		.name = "C9",
 		.flags = MWAIT2flg(0x50) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 480,
 		.target_residency = 5000,
 	},
 	{
-		.name = "C10-SKL",
+		.name = "C10",
 		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 890,
 		.target_residency = 5000,
@@ -538,19 +538,19 @@ static struct cpuidle_state __read_mostly skl_cstates[] = {
 
 static struct cpuidle_state __read_mostly skx_cstates[] = {
 	{
-		.name = "C1-SKX",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
 	{
-		.name = "C1E-SKX",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C6-SKX",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 133,
 		.target_residency = 600,
@@ -560,19 +560,19 @@ static struct cpuidle_state __read_mostly skx_cstates[] = {
 
 static const struct cpuidle_state icx_cstates[] = {
        {
-               .name = "C1-ICX",
+               .name = "C1",
                .flags = MWAIT2flg(0x00),
                .exit_latency = 1,
                .target_residency = 1,
        },
        {
-               .name = "C1E-ICX",
+               .name = "C1E",
                .flags = MWAIT2flg(0x01),
                .exit_latency = 4,
                .target_residency = 4,
        },
        {
-               .name = "C6-ICX",
+               .name = "C6",
                .flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
                .exit_latency = 170,
                .target_residency = 600,
@@ -582,25 +582,25 @@ static const struct cpuidle_state icx_cstates[] = {
 
 static const struct cpuidle_state atom_cstates[] = {
 	{
-		.name = "C1E-ATM",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C2-ATM",
+		.name = "C2",
 		.flags = MWAIT2flg(0x10),
 		.exit_latency = 20,
 		.target_residency = 80,
 	},
 	{
-		.name = "C4-ATM",
+		.name = "C4",
 		.flags = MWAIT2flg(0x30) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 100,
 		.target_residency = 400,
 	},
 	{
-		.name = "C6-ATM",
+		.name = "C6",
 		.flags = MWAIT2flg(0x52) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 140,
 		.target_residency = 560,
@@ -610,31 +610,31 @@ static const struct cpuidle_state atom_cstates[] = {
 
 static const struct cpuidle_state tangier_cstates[] = {
 	{
-		.name = "C1-TNG",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 4,
 	},
 	{
-		.name = "C4-TNG",
+		.name = "C4",
 		.flags = MWAIT2flg(0x30) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 100,
 		.target_residency = 400,
 	},
 	{
-		.name = "C6-TNG",
+		.name = "C6",
 		.flags = MWAIT2flg(0x52) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 140,
 		.target_residency = 560,
 	},
 	{
-		.name = "C7-TNG",
+		.name = "C7",
 		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 1200,
 		.target_residency = 4000,
 	},
 	{
-		.name = "C9-TNG",
+		.name = "C9",
 		.flags = MWAIT2flg(0x64) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 10000,
 		.target_residency = 20000,
@@ -644,13 +644,13 @@ static const struct cpuidle_state tangier_cstates[] = {
 
 static const struct cpuidle_state avn_cstates[] = {
 	{
-		.name = "C1-AVN",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
 	{
-		.name = "C6-AVN",
+		.name = "C6",
 		.flags = MWAIT2flg(0x51) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 15,
 		.target_residency = 45,
@@ -660,13 +660,13 @@ static const struct cpuidle_state avn_cstates[] = {
 
 static const struct cpuidle_state knl_cstates[] = {
 	{
-		.name = "C1-KNL",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 2,
 	},
 	{
-		.name = "C6-KNL",
+		.name = "C6",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 120,
 		.target_residency = 500,
@@ -676,43 +676,43 @@ static const struct cpuidle_state knl_cstates[] = {
 
 static struct cpuidle_state __read_mostly bxt_cstates[] = {
 	{
-		.name = "C1-BXT",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
 	{
-		.name = "C1E-BXT",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C6-BXT",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 133,
 		.target_residency = 133,
 	},
 	{
-		.name = "C7s-BXT",
+		.name = "C7s",
 		.flags = MWAIT2flg(0x31) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 155,
 		.target_residency = 155,
 	},
 	{
-		.name = "C8-BXT",
+		.name = "C8",
 		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 1000,
 		.target_residency = 1000,
 	},
 	{
-		.name = "C9-BXT",
+		.name = "C9",
 		.flags = MWAIT2flg(0x50) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 2000,
 		.target_residency = 2000,
 	},
 	{
-		.name = "C10-BXT",
+		.name = "C10",
 		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 10000,
 		.target_residency = 10000,
@@ -722,19 +722,19 @@ static struct cpuidle_state __read_mostly bxt_cstates[] = {
 
 static const struct cpuidle_state dnv_cstates[] = {
 	{
-		.name = "C1-DNV",
+		.name = "C1",
 		.flags = MWAIT2flg(0x00),
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
 	{
-		.name = "C1E-DNV",
+		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
 		.exit_latency = 10,
 		.target_residency = 20,
 	},
 	{
-		.name = "C6-DNV",
+		.name = "C6",
 		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 50,
 		.target_residency = 500,
