@@ -1292,11 +1292,15 @@ void __init setup_boot_APIC_clock(void)
 
     check_deadline_errata();
 
+    if ( !boot_cpu_has(X86_FEATURE_TSC_DEADLINE) )
+        tdt_enable = false;
+
     local_irq_save(flags);
 
-    calibrate_APIC_clock();
+    if ( !tdt_enable || apic_verbosity )
+        calibrate_APIC_clock();
 
-    if ( tdt_enable && boot_cpu_has(X86_FEATURE_TSC_DEADLINE) )
+    if ( tdt_enable )
     {
         printk(KERN_DEBUG "TSC deadline timer enabled\n");
         tdt_enabled = true;
