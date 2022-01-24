@@ -333,8 +333,6 @@ static s64 __init init_pit(struct platform_timesource *pts)
     u64 start, end;
     unsigned long count;
 
-    using_pit = true;
-
     /* Set the Gate high, disable speaker. */
     outb((portb & ~0x02) | 0x01, 0x61);
 
@@ -344,6 +342,7 @@ static s64 __init init_pit(struct platform_timesource *pts)
      * (LSB and MSB) to begin countdown.
      */
 #define CALIBRATE_LATCH CALIBRATE_VALUE(CLOCK_TICK_RATE)
+    BUILD_BUG_ON(CALIBRATE_LATCH >> 16);
     outb(0xb0, PIT_MODE);                  /* binary, mode 0, LSB/MSB, Ch 2 */
     outb(CALIBRATE_LATCH & 0xff, PIT_CH2); /* LSB of count */
     outb(CALIBRATE_LATCH >> 8, PIT_CH2);   /* MSB of count */
@@ -360,6 +359,8 @@ static s64 __init init_pit(struct platform_timesource *pts)
     /* Error if the CTC doesn't behave itself. */
     if ( count == 0 )
         return 0;
+
+    using_pit = true;
 
     return (end - start) * CALIBRATE_FRAC;
 }
