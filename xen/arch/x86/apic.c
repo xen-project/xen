@@ -1042,11 +1042,6 @@ static void __init wait_8254_wraparound(void)
     do {
         prev_count = curr_count;
         curr_count = get_8254_timer_count();
-
-        /* workaround for broken Mercury/Neptune */
-        if (prev_count >= curr_count + 0x100)
-            curr_count = get_8254_timer_count();
-        
     } while (prev_count >= curr_count);
 }
 
@@ -1056,9 +1051,6 @@ static void __init wait_8254_wraparound(void)
  * this function twice on the boot CPU, once with a bogus timeout
  * value, second time for real. The other (noncalibrating) CPUs
  * call this function only once, with the real, calibrated value.
- *
- * We do reads before writes even if unnecessary, to get around the
- * P5 APIC double write bug.
  */
 
 #define APIC_DIVISOR 1
