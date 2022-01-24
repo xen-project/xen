@@ -536,12 +536,10 @@ static struct platform_timesource __initdata plt_pmtimer =
 };
 
 static struct time_scale __read_mostly pmt_scale;
-static struct time_scale __read_mostly pmt_scale_r;
 
 static __init int init_pmtmr_scale(void)
 {
     set_time_scale(&pmt_scale, ACPI_PM_FREQUENCY);
-    pmt_scale_r = scale_reciprocal(pmt_scale);
     return 0;
 }
 __initcall(init_pmtmr_scale);
@@ -549,11 +547,6 @@ __initcall(init_pmtmr_scale);
 uint64_t acpi_pm_tick_to_ns(uint64_t ticks)
 {
     return scale_delta(ticks, &pmt_scale);
-}
-
-uint64_t ns_to_acpi_pm_tick(uint64_t ns)
-{
-    return scale_delta(ns, &pmt_scale_r);
 }
 
 /************************************************************
