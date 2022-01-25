@@ -222,6 +222,9 @@ struct hvm_function_table {
     int (*vmtrace_get_option)(struct vcpu *v, uint64_t key, uint64_t *value);
     int (*vmtrace_reset)(struct vcpu *v);
 
+    uint64_t (*get_reg)(struct vcpu *v, unsigned int reg);
+    void (*set_reg)(struct vcpu *v, unsigned int reg, uint64_t val);
+
     /*
      * Parameters and callbacks for hardware-assisted TSC scaling,
      * which are valid only when the hardware feature is available.
@@ -711,6 +714,18 @@ static inline int hvm_vmtrace_reset(struct vcpu *v)
 
     return -EOPNOTSUPP;
 }
+
+/*
+ * Accessors for registers which have per-guest-type or per-vendor locations
+ * (e.g. VMCS, msr load/save lists, VMCB, VMLOAD lazy, etc).
+ *
+ * The caller is responsible for all auditing - these accessors do not fail,
+ * but do use domain_crash() for usage errors.
+ *
+ * Must cope with being called in non-current context.
+ */
+uint64_t hvm_get_reg(struct vcpu *v, unsigned int reg);
+void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val);
 
 /*
  * This must be defined as a macro instead of an inline function,

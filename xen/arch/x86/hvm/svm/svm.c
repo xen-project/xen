@@ -2468,6 +2468,33 @@ static bool svm_get_pending_event(struct vcpu *v, struct x86_event *info)
     return true;
 }
 
+static uint64_t svm_get_reg(struct vcpu *v, unsigned int reg)
+{
+    struct domain *d = v->domain;
+
+    switch ( reg )
+    {
+    default:
+        printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
+               __func__, v, reg);
+        domain_crash(d);
+        return 0;
+    }
+}
+
+static void svm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
+{
+    struct domain *d = v->domain;
+
+    switch ( reg )
+    {
+    default:
+        printk(XENLOG_G_ERR "%s(%pv, 0x%08x, 0x%016"PRIx64") Bad register\n",
+               __func__, v, reg, val);
+        domain_crash(d);
+    }
+}
+
 static struct hvm_function_table __initdata svm_function_table = {
     .name                 = "SVM",
     .cpu_up_prepare       = svm_cpu_up_prepare,
@@ -2516,6 +2543,9 @@ static struct hvm_function_table __initdata svm_function_table = {
     .nhvm_vmcx_hap_enabled = nsvm_vmcb_hap_enabled,
     .nhvm_intr_blocked = nsvm_intr_blocked,
     .nhvm_hap_walk_L1_p2m = nsvm_hap_walk_L1_p2m,
+
+    .get_reg = svm_get_reg,
+    .set_reg = svm_set_reg,
 
     .tsc_scaling = {
         .max_ratio = ~TSC_RATIO_RSVD_BITS,
