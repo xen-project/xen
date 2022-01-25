@@ -3742,6 +3742,28 @@ gp_fault:
     return X86EMUL_EXCEPTION;
 }
 
+uint64_t hvm_get_reg(struct vcpu *v, unsigned int reg)
+{
+    ASSERT(v == current || !vcpu_runnable(v));
+
+    switch ( reg )
+    {
+    default:
+        return alternative_call(hvm_funcs.get_reg, v, reg);
+    }
+}
+
+void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
+{
+    ASSERT(v == current || !vcpu_runnable(v));
+
+    switch ( reg )
+    {
+    default:
+        return alternative_vcall(hvm_funcs.set_reg, v, reg, val);
+    }
+}
+
 static bool is_sysdesc_access(const struct x86_emulate_state *state,
                               const struct x86_emulate_ctxt *ctxt)
 {
