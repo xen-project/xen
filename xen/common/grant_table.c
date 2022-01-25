@@ -1402,7 +1402,12 @@ unmap_common(
     if ( put_handle )
         put_maptrack_handle(lgt, op->handle);
 
-    if ( rc == GNTST_okay && gnttab_need_iommu_mapping(ld) )
+    /*
+     * map_grant_ref() will only increment the refcount (and update the
+     * IOMMU) once per mapping. So we only want to decrement it once the
+     * maptrack handle has been put, alongside the further IOMMU update.
+     */
+    if ( put_handle && gnttab_need_iommu_mapping(ld) )
     {
         void **slot;
         union maptrack_node node;
