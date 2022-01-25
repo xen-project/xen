@@ -277,7 +277,15 @@ extern struct msr_policy     raw_msr_policy,
 /* Container object for per-vCPU MSRs */
 struct vcpu_msrs
 {
-    /* 0x00000048 - MSR_SPEC_CTRL */
+    /*
+     * 0x00000048 - MSR_SPEC_CTRL
+     *
+     * For PV guests, this holds the guest kernel value.  It is accessed on
+     * every entry/exit path.
+     *
+     * For VT-x guests, the guest value is held in the MSR guest load/save
+     * list.
+     */
     struct {
         uint32_t raw;
     } spec_ctrl;
