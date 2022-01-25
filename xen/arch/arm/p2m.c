@@ -1008,7 +1008,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
      * sequence when updating the translation table (D4.7.1 in ARM DDI
      * 0487A.j).
      */
-    if ( lpae_is_valid(orig_pte) )
+    if ( lpae_is_valid(orig_pte) || removing_mapping )
         p2m_remove_pte(entry, p2m->clean_pte);
 
     if ( removing_mapping )
