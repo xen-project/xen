@@ -65,6 +65,10 @@ static inline unsigned long get_pcid_bits(const struct vcpu *v, bool is_xpti)
 #endif
 }
 
+/* See hvm_{get,set}_reg() for description. */
+uint64_t pv_get_reg(struct vcpu *v, unsigned int reg);
+void pv_set_reg(struct vcpu *v, unsigned int reg, uint64_t val);
+
 #ifdef CONFIG_PV
 
 void pv_vcpu_destroy(struct vcpu *v);

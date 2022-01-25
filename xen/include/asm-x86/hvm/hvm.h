@@ -214,6 +214,9 @@ struct hvm_function_table {
     bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
     int (*altp2m_vcpu_emulate_vmfunc)(const struct cpu_user_regs *regs);
 
+    uint64_t (*get_reg)(struct vcpu *v, unsigned int reg);
+    void (*set_reg)(struct vcpu *v, unsigned int reg, uint64_t val);
+
     /*
      * Parameters and callbacks for hardware-assisted TSC scaling,
      * which are valid only when the hardware feature is available.
@@ -654,6 +657,18 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
     }
     return false;
 }
+
+/*
+ * Accessors for registers which have per-guest-type or per-vendor locations
+ * (e.g. VMCS, msr load/save lists, VMCB, VMLOAD lazy, etc).
+ *
+ * The caller is responsible for all auditing - these accessors do not fail,
+ * but do use domain_crash() for usage errors.
+ *
+ * Must cope with being called in non-current context.
+ */
+uint64_t hvm_get_reg(struct vcpu *v, unsigned int reg);
+void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val);
 
 /*
  * This must be defined as a macro instead of an inline function,
