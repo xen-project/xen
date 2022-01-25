@@ -898,7 +898,7 @@ static __init void mds_calculations(uint64_t caps)
 void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
-    bool ibrs = false, hw_smt_enabled;
+    bool has_spec_ctrl, ibrs = false, hw_smt_enabled;
     bool cpu_has_bug_taa;
     uint64_t caps = 0;
 
@@ -906,6 +906,8 @@ void __init init_speculation_mitigations(void)
         rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
     hw_smt_enabled = check_smt_enabled();
+
+    has_spec_ctrl = boot_cpu_has(X86_FEATURE_IBRSB);
 
     /*
      * First, disable the use of retpolines if Xen is using shadow stacks, as
@@ -944,11 +946,11 @@ void __init init_speculation_mitigations(void)
              */
             else if ( retpoline_safe(caps) )
                 thunk = THUNK_RETPOLINE;
-            else if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+            else if ( has_spec_ctrl )
                 ibrs = true;
         }
         /* Without compiler thunk support, use IBRS if available. */
-        else if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+        else if ( has_spec_ctrl )
             ibrs = true;
     }
 
@@ -979,10 +981,7 @@ void __init init_speculation_mitigations(void)
     else if ( thunk == THUNK_JMP )
         setup_force_cpu_cap(X86_FEATURE_IND_THUNK_JMP);
 
-    /*
-     * If we are on hardware supporting MSR_SPEC_CTRL, see about setting up
-     * the alternatives blocks so we can virtualise support for guests.
-     */
+    /* Intel hardware: MSR_SPEC_CTRL alternatives setup. */
     if ( boot_cpu_has(X86_FEATURE_IBRSB) )
     {
         if ( opt_msr_sc_pv )
@@ -1001,10 +1000,11 @@ void __init init_speculation_mitigations(void)
             default_spec_ctrl_flags |= SCF_ist_wrmsr;
             setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
         }
-
-        if ( ibrs )
-            default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
     }
+
+    /* If we have IBRS available, see whether we should use it. */
+    if ( has_spec_ctrl && ibrs )
+        default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
 
     /* If we have SSBD available, see whether we should use it. */
     if ( boot_cpu_has(X86_FEATURE_SSBD) && opt_ssbd )
@@ -1220,7 +1220,7 @@ void __init init_speculation_mitigations(void)
      * boot won't have any other code running in a position to mount an
      * attack.
      */
-    if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+    if ( has_spec_ctrl )
     {
         bsp_delay_spec_ctrl = !cpu_has_hypervisor && default_xen_spec_ctrl;
 
