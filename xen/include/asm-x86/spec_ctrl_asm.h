@@ -68,14 +68,16 @@
  *
  * The following ASM fragments implement this algorithm.  See their local
  * comments for further details.
- *  - SPEC_CTRL_ENTRY_FROM_HVM
  *  - SPEC_CTRL_ENTRY_FROM_PV
  *  - SPEC_CTRL_ENTRY_FROM_INTR
  *  - SPEC_CTRL_ENTRY_FROM_INTR_IST
  *  - SPEC_CTRL_EXIT_TO_XEN_IST
  *  - SPEC_CTRL_EXIT_TO_XEN
  *  - SPEC_CTRL_EXIT_TO_PV
- *  - SPEC_CTRL_EXIT_TO_HVM
+ *
+ * Additionally, the following grep-fodder exists to find the HVM logic.
+ *  - SPEC_CTRL_ENTRY_FROM_{SVM,VMX}
+ *  - SPEC_CTRL_EXIT_TO_{SVM,VMX}
  */
 
 .macro DO_OVERWRITE_RSB tmp=rax
@@ -225,12 +227,6 @@
     wrmsr
 .endm
 
-/* Use after a VMEXIT from an HVM guest. */
-#define SPEC_CTRL_ENTRY_FROM_HVM                                        \
-    ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM;           \
-    ALTERNATIVE "", DO_SPEC_CTRL_ENTRY_FROM_HVM,                        \
-        X86_FEATURE_SC_MSR_HVM
-
 /* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
 #define SPEC_CTRL_ENTRY_FROM_PV                                         \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;            \
@@ -254,13 +250,6 @@
         DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV;              \
     ALTERNATIVE "", __stringify(verw CPUINFO_verw_sel(%rsp)),           \
         X86_FEATURE_SC_VERW_PV
-
-/* Use when exiting to HVM guest context. */
-#define SPEC_CTRL_EXIT_TO_HVM                                           \
-    ALTERNATIVE "",                                                     \
-        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_HVM;             \
-    ALTERNATIVE "", __stringify(verw CPUINFO_verw_sel(%rsp)),           \
-        X86_FEATURE_SC_VERW_HVM
 
 /*
  * Use in IST interrupt/exception context.  May interrupt Xen or PV context.
