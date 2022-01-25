@@ -157,9 +157,11 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc,
     if (domtype == LIBXL_DOMAIN_TYPE_INVALID)
         return ERROR_FAIL;
 
-    if (!starting && domtype == LIBXL_DOMAIN_TYPE_PV) {
-        if (libxl__wait_for_backend(gc, be_path, GCSPRINTF("%d", XenbusStateConnected)) < 0)
-            return ERROR_FAIL;
+    /* Wait is only needed if the backend already exists (num_devs != NULL) */
+    if (num_devs && !starting && domtype == LIBXL_DOMAIN_TYPE_PV) {
+        rc = libxl__wait_for_backend(gc, be_path,
+                                     GCSPRINTF("%d", XenbusStateConnected));
+        if (rc) return rc;
     }
 
     back = flexarray_make(gc, 16, 1);
