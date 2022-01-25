@@ -35,7 +35,14 @@ ENTRY(vmx_asm_vmexit_handler)
 
         /* SPEC_CTRL_ENTRY_FROM_VMX    Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
         ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM
-        ALTERNATIVE "", DO_SPEC_CTRL_ENTRY_FROM_HVM, X86_FEATURE_SC_MSR_HVM
+
+        .macro restore_spec_ctrl
+            mov    $MSR_SPEC_CTRL, %ecx
+            movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
+            xor    %edx, %edx
+            wrmsr
+        .endm
+        ALTERNATIVE "", restore_spec_ctrl, X86_FEATURE_SC_MSR_HVM
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         /* Hardware clears MSR_DEBUGCTL on VMExit.  Reinstate it if debugging Xen. */
@@ -82,8 +89,7 @@ UNLIKELY_END(realmode)
         mov VCPUMSR_spec_ctrl_raw(%rax), %eax
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        /* SPEC_CTRL_EXIT_TO_VMX   Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
-        ALTERNATIVE "", DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_HVM
+        /* SPEC_CTRL_EXIT_TO_VMX   Req: %rsp=regs/cpuinfo              Clob:    */
         ALTERNATIVE "", __stringify(verw CPUINFO_verw_sel(%rsp)), X86_FEATURE_SC_VERW_HVM
 
         mov  VCPU_hvm_guest_cr2(%rbx),%rax
@@ -119,12 +125,12 @@ UNLIKELY_END(realmode)
         SAVE_ALL
 
         /*
-         * PV variant needed here as no guest code has executed (so
-         * MSR_SPEC_CTRL can't have changed value), and NMIs/MCEs are liable
-         * to hit (in which case the HVM variant might corrupt things).
+         * SPEC_CTRL_ENTRY notes
+         *
+         * If we end up here, no guest code has executed.  The MSR lists have
+         * not been processed, so we still have Xen's choice of MSR_SPEC_CTRL
+         * in context, and the RSB is unchanged.
          */
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo Clob: acd */
-        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         call vmx_vmentry_failure
         jmp  .Lvmx_process_softirqs
