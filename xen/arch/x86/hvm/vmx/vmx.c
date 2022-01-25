@@ -2416,6 +2416,9 @@ static uint64_t vmx_get_reg(struct vcpu *v, unsigned int reg)
 
     switch ( reg )
     {
+    case MSR_SPEC_CTRL:
+        return v->arch.msrs->spec_ctrl.raw;
+
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
                __func__, v, reg);
@@ -2430,6 +2433,10 @@ static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 
     switch ( reg )
     {
+    case MSR_SPEC_CTRL:
+        v->arch.msrs->spec_ctrl.raw = val;
+        break;
+
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x, 0x%016"PRIx64") Bad register\n",
                __func__, v, reg, val);
