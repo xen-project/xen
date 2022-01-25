@@ -732,7 +732,11 @@ int pt_pirq_iterate(struct domain *d,
 
             pirq = pirqs[i]->pirq;
             if ( (pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
+            {
                 rc = cb(d, pirq_dpci, arg);
+                if ( rc )
+                    break;
+            }
         }
     } while ( !rc && ++pirq < d->nr_pirqs && n == ARRAY_SIZE(pirqs) );
 
