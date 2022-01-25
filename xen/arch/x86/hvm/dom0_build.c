@@ -1269,6 +1269,12 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
         return rc;
     }
 
+    if ( opt_dom0_verbose )
+    {
+        printk("Dom%u memory map:\n", d->domain_id);
+        print_e820_memory_map(d->arch.e820, d->arch.nr_e820);
+    }
+
     printk("WARNING: PVH is an experimental mode with limited functionality\n");
     return 0;
 }
