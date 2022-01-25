@@ -92,12 +92,16 @@ void pv_emul_instruction_done(struct cpu_user_regs *regs, unsigned long rip)
 
 uint64_t pv_get_reg(struct vcpu *v, unsigned int reg)
 {
+    const struct vcpu_msrs *msrs = v->arch.msrs;
     struct domain *d = v->domain;
 
     ASSERT(v == current || !vcpu_runnable(v));
 
     switch ( reg )
     {
+    case MSR_SPEC_CTRL:
+        return msrs->spec_ctrl.raw;
+
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
                __func__, v, reg);
@@ -108,12 +112,17 @@ uint64_t pv_get_reg(struct vcpu *v, unsigned int reg)
 
 void pv_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 {
+    struct vcpu_msrs *msrs = v->arch.msrs;
     struct domain *d = v->domain;
 
     ASSERT(v == current || !vcpu_runnable(v));
 
     switch ( reg )
     {
+    case MSR_SPEC_CTRL:
+        msrs->spec_ctrl.raw = val;
+        break;
+
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x, 0x%016"PRIx64") Bad register\n",
                __func__, v, reg, val);
