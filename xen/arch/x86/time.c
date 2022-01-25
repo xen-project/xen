@@ -378,7 +378,7 @@ static u64 read_hpet_count(void)
 static int64_t __init init_hpet(struct platform_timesource *pts)
 {
     uint64_t hpet_rate, start;
-    uint32_t count, target;
+    uint32_t count, target, elapsed;
     /*
      * Allow HPET to be setup, but report a frequency of 0 so it's not selected
      * as a timer source. This is required so it can be used in legacy
@@ -451,11 +451,8 @@ static int64_t __init init_hpet(struct platform_timesource *pts)
 
     count = hpet_read32(HPET_COUNTER);
     start = rdtsc_ordered();
-    target = count + CALIBRATE_VALUE(hpet_rate);
-    if ( target < count )
-        while ( hpet_read32(HPET_COUNTER) >= count )
-            continue;
-    while ( hpet_read32(HPET_COUNTER) < target )
+    target = CALIBRATE_VALUE(hpet_rate);
+    while ( (elapsed = hpet_read32(HPET_COUNTER) - count) < target )
         continue;
 
     return (rdtsc_ordered() - start) * CALIBRATE_FRAC;
@@ -493,8 +490,8 @@ static u64 read_pmtimer_count(void)
 
 static s64 __init init_pmtimer(struct platform_timesource *pts)
 {
-    u64 start;
-    u32 count, target, mask;
+    uint64_t start;
+    uint32_t count, target, mask, elapsed;
 
     if ( !pmtmr_ioport || (pmtmr_width != 24 && pmtmr_width != 32) )
         return 0;
@@ -502,13 +499,10 @@ static s64 __init init_pmtimer(struct platform_timesource *pts)
     pts->counter_bits = pmtmr_width;
     mask = 0xffffffff >> (32 - pmtmr_width);
 
-    count = inl(pmtmr_ioport) & mask;
+    count = inl(pmtmr_ioport);
     start = rdtsc_ordered();
-    target = count + CALIBRATE_VALUE(ACPI_PM_FREQUENCY);
-    if ( target < count )
-        while ( (inl(pmtmr_ioport) & mask) >= count )
-            continue;
-    while ( (inl(pmtmr_ioport) & mask) < target )
+    target = CALIBRATE_VALUE(ACPI_PM_FREQUENCY);
+    while ( (elapsed = (inl(pmtmr_ioport) - count) & mask) < target )
         continue;
 
     return (rdtsc_ordered() - start) * CALIBRATE_FRAC;
