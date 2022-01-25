@@ -42,9 +42,10 @@
  *     path, or late in the exit path after restoring the guest value.  This
  *     will corrupt the guest value.
  *
- * Factor 1 is dealt with by relying on NMIs/MCEs being blocked immediately
- * after VMEXIT.  The VMEXIT-specific code reads MSR_SPEC_CTRL and updates
- * current before loading Xen's MSR_SPEC_CTRL setting.
+ * Factor 1 is dealt with:
+ *   - On VMX by using MSR load/save lists to have vmentry/exit atomically
+ *     load/save the guest value.  Xen's value is loaded in regular code, and
+ *     there is no need to use the shadow logic (below).
  *
  * Factor 2 is harder.  We maintain a shadow_spec_ctrl value, and a use_shadow
  * boolean in the per cpu spec_ctrl_flags.  The synchronous use is:
@@ -126,31 +127,6 @@
     incsspd %ecx                    /* Restore old SSP */
 .L\@_shstk_done:
 #endif
-.endm
-
-.macro DO_SPEC_CTRL_ENTRY_FROM_HVM
-/*
- * Requires %rbx=current, %rsp=regs/cpuinfo
- * Clobbers %rax, %rcx, %rdx
- *
- * The common case is that a guest has direct access to MSR_SPEC_CTRL, at
- * which point we need to save the guest value before setting IBRS for Xen.
- * Unilaterally saving the guest value is shorter and faster than checking.
- */
-    mov $MSR_SPEC_CTRL, %ecx
-    rdmsr
-
-    /* Stash the value from hardware. */
-    mov VCPU_arch_msrs(%rbx), %rdx
-    mov %eax, VCPUMSR_spec_ctrl_raw(%rdx)
-    xor %edx, %edx
-
-    /* Clear SPEC_CTRL shadowing *before* loading Xen's value. */
-    andb $~SCF_use_shadow, CPUINFO_spec_ctrl_flags(%rsp)
-
-    /* Load Xen's intended value. */
-    movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
-    wrmsr
 .endm
 
 .macro DO_SPEC_CTRL_ENTRY maybexen:req

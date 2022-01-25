@@ -598,6 +598,7 @@ void vmx_update_exception_bitmap(struct vcpu *v)
 static void vmx_cpuid_policy_changed(struct vcpu *v)
 {
     const struct cpuid_policy *cp = v->domain->arch.cpuid;
+    int rc = 0;
 
     if ( opt_hvm_fep ||
          (v->domain->arch.cpuid->x86_vendor != boot_cpu_data.x86_vendor) )
@@ -607,16 +608,28 @@ static void vmx_cpuid_policy_changed(struct vcpu *v)
 
     vmx_vmcs_enter(v);
     vmx_update_exception_bitmap(v);
-    vmx_vmcs_exit(v);
 
     /*
      * We can safely pass MSR_SPEC_CTRL through to the guest, even if STIBP
      * isn't enumerated in hardware, as SPEC_CTRL_STIBP is ignored.
      */
     if ( cp->feat.ibrsb )
+    {
         vmx_clear_msr_intercept(v, MSR_SPEC_CTRL, VMX_MSR_RW);
+
+        rc = vmx_add_guest_msr(v, MSR_SPEC_CTRL, 0);
+        if ( rc )
+            goto out;
+    }
     else
+    {
         vmx_set_msr_intercept(v, MSR_SPEC_CTRL, VMX_MSR_RW);
+
+        rc = vmx_del_msr(v, MSR_SPEC_CTRL, VMX_MSR_GUEST);
+        if ( rc && rc != -ESRCH )
+            goto out;
+        rc = 0; /* Tolerate -ESRCH */
+    }
 
     /* MSR_PRED_CMD is safe to pass through if the guest knows about it. */
     if ( cp->feat.ibrsb || cp->extd.ibpb )
@@ -629,6 +642,15 @@ static void vmx_cpuid_policy_changed(struct vcpu *v)
         vmx_clear_msr_intercept(v, MSR_FLUSH_CMD, VMX_MSR_RW);
     else
         vmx_set_msr_intercept(v, MSR_FLUSH_CMD, VMX_MSR_RW);
+
+ out:
+    vmx_vmcs_exit(v);
+
+    if ( rc )
+    {
+        printk(XENLOG_G_ERR "%pv MSR list error: %d", v, rc);
+        domain_crash(v->domain);
+    }
 }
 
 int vmx_guest_x86_mode(struct vcpu *v)
@@ -2413,11 +2435,20 @@ static int vmtrace_reset(struct vcpu *v)
 static uint64_t vmx_get_reg(struct vcpu *v, unsigned int reg)
 {
     struct domain *d = v->domain;
+    uint64_t val = 0;
+    int rc;
 
     switch ( reg )
     {
     case MSR_SPEC_CTRL:
-        return v->arch.msrs->spec_ctrl.raw;
+        rc = vmx_read_guest_msr(v, reg, &val);
+        if ( rc )
+        {
+            printk(XENLOG_G_ERR "%s(%pv, 0x%08x) MSR list error: %d\n",
+                   __func__, v, reg, rc);
+            domain_crash(d);
+        }
+        return val;
 
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
@@ -2430,11 +2461,18 @@ static uint64_t vmx_get_reg(struct vcpu *v, unsigned int reg)
 static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 {
     struct domain *d = v->domain;
+    int rc;
 
     switch ( reg )
     {
     case MSR_SPEC_CTRL:
-        v->arch.msrs->spec_ctrl.raw = val;
+        rc = vmx_write_guest_msr(v, reg, val);
+        if ( rc )
+        {
+            printk(XENLOG_G_ERR "%s(%pv, 0x%08x) MSR list error: %d\n",
+                   __func__, v, reg, rc);
+            domain_crash(d);
+        }
         break;
 
     default:
