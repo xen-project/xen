@@ -5,7 +5,7 @@
  * Only a limited amount of RAM, called xenheap, is always mapped on ARM32.
  * For convenience always return false.
  */
-static inline bool arch_mfn_in_directmap(unsigned long mfn)
+static inline bool arch_mfns_in_directmap(unsigned long mfn, unsigned long nr)
 {
     return false;
 }

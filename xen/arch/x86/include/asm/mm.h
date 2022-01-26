@@ -635,13 +635,13 @@ void write_32bit_pse_identmap(uint32_t *l2);
 
 /*
  * x86 maps part of physical memory via the directmap region.
- * Return whether the input MFN falls in that range.
+ * Return whether the range of MFN falls in the directmap region.
  */
-static inline bool arch_mfn_in_directmap(unsigned long mfn)
+static inline bool arch_mfns_in_directmap(unsigned long mfn, unsigned long nr)
 {
     unsigned long eva = min(DIRECTMAP_VIRT_END, HYPERVISOR_VIRT_END);
 
-    return mfn <= (virt_to_mfn(eva - 1) + 1);
+    return (mfn + nr) <= (virt_to_mfn(eva - 1) + 1);
 }
 
 #endif /* __ASM_X86_MM_H__ */
