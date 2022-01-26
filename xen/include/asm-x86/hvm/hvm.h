@@ -766,6 +766,16 @@ static inline bool hvm_has_set_descriptor_access_exiting(void)
     return false;
 }
 
+static inline uint64_t hvm_get_reg(struct vcpu *v, unsigned int reg)
+{
+    ASSERT_UNREACHABLE();
+    return 0;
+}
+static inline void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
+{
+    ASSERT_UNREACHABLE();
+}
+
 #define is_viridian_domain(d) ((void)(d), false)
 #define is_viridian_vcpu(v) ((void)(v), false)
 #define has_viridian_time_ref_count(d) ((void)(d), false)

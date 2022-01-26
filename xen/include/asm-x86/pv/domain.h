@@ -65,10 +65,6 @@ static inline unsigned long get_pcid_bits(const struct vcpu *v, bool is_xpti)
 #endif
 }
 
-/* See hvm_{get,set}_reg() for description. */
-uint64_t pv_get_reg(struct vcpu *v, unsigned int reg);
-void pv_set_reg(struct vcpu *v, unsigned int reg, uint64_t val);
-
 #ifdef CONFIG_PV
 
 void pv_vcpu_destroy(struct vcpu *v);
@@ -93,6 +89,10 @@ unsigned long pv_fixup_guest_cr4(const struct vcpu *v, unsigned long cr4);
 /* Create a cr4 value to load into hardware, based on vcpu settings. */
 unsigned long pv_make_cr4(const struct vcpu *v);
 
+/* See hvm_{get,set}_reg() for description. */
+uint64_t pv_get_reg(struct vcpu *v, unsigned int reg);
+void pv_set_reg(struct vcpu *v, unsigned int reg, uint64_t val);
+
 bool xpti_pcid_enabled(void);
 
 #else  /* !CONFIG_PV */
@@ -105,6 +105,16 @@ static inline void pv_domain_destroy(struct domain *d) {}
 static inline int pv_domain_initialise(struct domain *d) { return -EOPNOTSUPP; }
 
 static inline unsigned long pv_make_cr4(const struct vcpu *v) { return ~0ul; }
+
+static inline uint64_t pv_get_reg(struct vcpu *v, unsigned int reg)
+{
+    ASSERT_UNREACHABLE();
+    return 0;
+}
+static inline void pv_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
+{
+    ASSERT_UNREACHABLE();
+}
 
 #endif	/* CONFIG_PV */
 
