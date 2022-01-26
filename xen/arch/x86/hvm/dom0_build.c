@@ -465,11 +465,16 @@ static int __init pvh_populate_p2m(struct domain *d)
     for ( i = rc = 0; i < MB1_PAGES; ++i )
     {
         p2m_type_t p2mt;
+        mfn_t mfn = get_gfn_query(d, i, &p2mt);
 
-        if ( mfn_eq(get_gfn_query(d, i, &p2mt), INVALID_MFN) )
+        if ( mfn_eq(mfn, INVALID_MFN) )
             rc = set_mmio_p2m_entry(d, _gfn(i), _mfn(i), PAGE_ORDER_4K);
         else
-            ASSERT(p2mt == p2m_ram_rw);
+            /*
+             * If the p2m entry is already set it must belong to a RMRR and
+             * already be identity mapped, or be a RAM region.
+             */
+            ASSERT(p2mt == p2m_ram_rw || mfn_eq(mfn, _mfn(i)));
         put_gfn(d, i);
         if ( rc )
         {
