@@ -447,6 +447,10 @@ static void generic_identify(struct cpuinfo_x86 *c)
 				    &c->x86_capability[FEATURESET_7a1],
 				    &c->x86_capability[FEATURESET_7b1],
 				    &tmp, &tmp);
+		if (max_subleaf >= 2)
+			cpuid_count(7, 2,
+				    &tmp, &tmp, &tmp,
+				    &c->x86_capability[FEATURESET_7d2]);
 	}
 
 	if (c->cpuid_level >= 0xd)
