@@ -366,7 +366,7 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	u32 eax, ebx, ecx, edx, tmp;
 
 	/* Get vendor name */
-	cpuid(0x00000000, &c->cpuid_level, &ebx, &ecx, &edx);
+	cpuid(0, &c->cpuid_level, &ebx, &ecx, &edx);
 	*(u32 *)&c->x86_vendor_id[0] = ebx;
 	*(u32 *)&c->x86_vendor_id[8] = ecx;
 	*(u32 *)&c->x86_vendor_id[4] = edx;
@@ -381,7 +381,7 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	/* Note that the vendor-specific code below might override */
 
 	/* Model and family information. */
-	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
+	cpuid(1, &eax, &ebx, &ecx, &edx);
 	c->x86 = get_cpu_family(eax, &c->x86_model, &c->x86_mask);
 	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 	c->phys_proc_id = c->apicid;
@@ -391,53 +391,53 @@ static void generic_identify(struct cpuinfo_x86 *c)
 
 	/* c_early_init() may have adjusted cpuid levels/features.  Reread. */
 	c->cpuid_level = cpuid_eax(0);
-	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
-	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
-	c->x86_capability[cpufeat_word(X86_FEATURE_SSE3)] = ecx;
+	cpuid(1, &eax, &ebx,
+	      &c->x86_capability[FEATURESET_1c],
+	      &c->x86_capability[FEATURESET_1d]);
 
 	if ( cpu_has(c, X86_FEATURE_CLFLUSH) )
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
 	if ( (c->cpuid_level >= CPUID_PM_LEAF) &&
 	     (cpuid_ecx(CPUID_PM_LEAF) & CPUID6_ECX_APERFMPERF_CAPABILITY) )
-		set_bit(X86_FEATURE_APERFMPERF, c->x86_capability);
+		__set_bit(X86_FEATURE_APERFMPERF, c->x86_capability);
+
+	eax = cpuid_eax(0x80000000);
+	if ((eax >> 16) == 0x8000)
+		c->extended_cpuid_level = eax;
 
 	/* AMD-defined flags: level 0x80000001 */
-	c->extended_cpuid_level = cpuid_eax(0x80000000);
-	if ((c->extended_cpuid_level >> 16) != 0x8000)
-		c->extended_cpuid_level = 0;
-	if (c->extended_cpuid_level > 0x80000000)
+	if (c->extended_cpuid_level >= 0x80000001)
 		cpuid(0x80000001, &tmp, &tmp,
-		      &c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)],
-		      &c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]);
+		      &c->x86_capability[FEATURESET_e1c],
+		      &c->x86_capability[FEATURESET_e1d]);
 
 	if (c->extended_cpuid_level >= 0x80000004)
 		get_model_name(c); /* Default name */
 	if (c->extended_cpuid_level >= 0x80000007)
-		c->x86_capability[cpufeat_word(X86_FEATURE_ITSC)]
-			= cpuid_edx(0x80000007);
+		c->x86_capability[FEATURESET_e7d] = cpuid_edx(0x80000007);
 	if (c->extended_cpuid_level >= 0x80000008)
-		c->x86_capability[cpufeat_word(X86_FEATURE_CLZERO)]
-			= cpuid_ebx(0x80000008);
+		c->x86_capability[FEATURESET_e8b] = cpuid_ebx(0x80000008);
 	if (c->extended_cpuid_level >= 0x80000021)
-		c->x86_capability[cpufeat_word(X86_FEATURE_LFENCE_DISPATCH)]
-			= cpuid_eax(0x80000021);
+		c->x86_capability[FEATURESET_e21a] = cpuid_eax(0x80000021);
 
 	/* Intel-defined flags: level 0x00000007 */
-	if ( c->cpuid_level >= 0x00000007 ) {
-		cpuid_count(0x00000007, 0, &eax,
-			    &c->x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)],
-			    &c->x86_capability[cpufeat_word(X86_FEATURE_PKU)],
-			    &c->x86_capability[cpufeat_word(X86_FEATURE_AVX512_4VNNIW)]);
-		if (eax > 0)
-			cpuid_count(0x00000007, 1,
-				    &c->x86_capability[cpufeat_word(X86_FEATURE_AVX512_BF16)],
+	if (c->cpuid_level >= 7) {
+		uint32_t max_subleaf;
+
+		cpuid_count(7, 0, &max_subleaf,
+			    &c->x86_capability[FEATURESET_7b0],
+			    &c->x86_capability[FEATURESET_7c0],
+			    &c->x86_capability[FEATURESET_7d0]);
+		if (max_subleaf >= 1)
+			cpuid_count(7, 1,
+				    &c->x86_capability[FEATURESET_7a1],
 				    &tmp, &tmp, &tmp);
 	}
 
 	if (c->cpuid_level >= 0xd)
 		cpuid_count(0xd, 1,
-			    &c->x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)],
+			    &c->x86_capability[FEATURESET_Da1],
 			    &tmp, &tmp, &tmp);
 }
 
