@@ -290,6 +290,8 @@ XEN_CPUFEATURE(LFENCE_DISPATCH,    11*32+ 2) /*A  LFENCE always serializing */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:1.ebx, word 12 */
 
+/* Intel-defined CPU features, CPUID level 0x00000007:2.edx, word 13 */
+
 #endif /* XEN_CPUFEATURE */
 
 /* Clean up from a default include.  Close the enum (for C). */
