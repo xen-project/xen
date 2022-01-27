@@ -1329,19 +1329,6 @@ static int ipmmu_iommu_domain_init(struct domain *d)
     return 0;
 }
 
-static void __hwdom_init ipmmu_iommu_hwdom_init(struct domain *d)
-{
-    /* Set to false options not supported on ARM. */
-    if ( iommu_hwdom_inclusive )
-        printk(XENLOG_WARNING "ipmmu: map-inclusive dom0-iommu option is not supported on ARM\n");
-    iommu_hwdom_inclusive = false;
-    if ( iommu_hwdom_reserved == 1 )
-        printk(XENLOG_WARNING "ipmmu: map-reserved dom0-iommu option is not supported on ARM\n");
-    iommu_hwdom_reserved = 0;
-
-    arch_iommu_hwdom_init(d);
-}
-
 static void ipmmu_iommu_domain_teardown(struct domain *d)
 {
     struct ipmmu_vmsa_xen_domain *xen_domain = dom_iommu(d)->arch.priv;
@@ -1369,7 +1356,7 @@ static void ipmmu_iommu_domain_teardown(struct domain *d)
 static const struct iommu_ops ipmmu_iommu_ops =
 {
     .init            = ipmmu_iommu_domain_init,
-    .hwdom_init      = ipmmu_iommu_hwdom_init,
+    .hwdom_init      = arch_iommu_hwdom_init,
     .teardown        = ipmmu_iommu_domain_teardown,
     .iotlb_flush     = ipmmu_iotlb_flush,
     .iotlb_flush_all = ipmmu_iotlb_flush_all,
