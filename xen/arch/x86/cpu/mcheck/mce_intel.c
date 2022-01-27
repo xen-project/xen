@@ -859,12 +859,20 @@ static void intel_init_ppin(const struct cpuinfo_x86 *c)
     /*
      * Even if testing the presence of the MSR would be enough, we don't
      * want to risk the situation where other models reuse this MSR for
-     * other purposes.
+     * other purposes.  Despite the late addition of a CPUID bit (rendering
+     * the MSR architectural), keep using the same detection logic there.
      */
     switch ( c->x86_model )
     {
         uint64_t val;
 
+    default:
+        if ( !cpu_has(c, X86_FEATURE_INTEL_PPIN) )
+        {
+            ppin_msr = 0;
+            return;
+        }
+        fallthrough;
     case 0x3e: /* IvyBridge X */
     case 0x3f: /* Haswell X */
     case 0x4f: /* Broadwell X */

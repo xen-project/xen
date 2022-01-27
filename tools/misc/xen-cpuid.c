@@ -197,6 +197,7 @@ static const char *const str_e21a[32] =
 
 static const char *const str_7b1[32] =
 {
+    [ 0] = "ppin",
 };
 
 static const struct {
