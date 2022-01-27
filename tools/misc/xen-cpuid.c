@@ -188,6 +188,10 @@ static const char *const str_e21a[32] =
     [ 2] = "lfence+",
 };
 
+static const char *const str_7b1[32] =
+{
+};
+
 static const struct {
     const char *name;
     const char *abbr;
@@ -206,6 +210,7 @@ static const struct {
     { "0x00000007:0.edx", "7d0", str_7d0 },
     { "0x00000007:1.eax", "7a1", str_7a1 },
     { "0x80000021.eax",  "e21a", str_e21a },
+    { "0x00000007:1.ebx", "7b1", str_7b1 },
 };
 
 #define COL_ALIGN "18"

@@ -16,6 +16,7 @@
 #define FEATURESET_7d0    9 /* 0x00000007:0.edx    */
 #define FEATURESET_7a1   10 /* 0x00000007:1.eax    */
 #define FEATURESET_e21a  11 /* 0x80000021.eax      */
+#define FEATURESET_7b1   12 /* 0x00000007:1.ebx    */
 
 struct cpuid_leaf
 {
@@ -188,6 +189,10 @@ struct cpuid_policy
                 uint32_t _7a1;
                 struct { DECL_BITFIELD(7a1); };
             };
+            union {
+                uint32_t _7b1;
+                struct { DECL_BITFIELD(7b1); };
+            };
         };
     } feat;
 
@@ -327,6 +332,7 @@ static inline void cpuid_policy_to_featureset(
     fs[FEATURESET_7d0] = p->feat._7d0;
     fs[FEATURESET_7a1] = p->feat._7a1;
     fs[FEATURESET_e21a] = p->extd.e21a;
+    fs[FEATURESET_7b1] = p->feat._7b1;
 }
 
 /* Fill in a CPUID policy from a featureset bitmap. */
@@ -345,6 +351,7 @@ static inline void cpuid_featureset_to_policy(
     p->feat._7d0  = fs[FEATURESET_7d0];
     p->feat._7a1  = fs[FEATURESET_7a1];
     p->extd.e21a  = fs[FEATURESET_e21a];
+    p->feat._7b1  = fs[FEATURESET_7b1];
 }
 
 static inline uint64_t cpuid_policy_xcr0_max(const struct cpuid_policy *p)
