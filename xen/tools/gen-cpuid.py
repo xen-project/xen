@@ -427,6 +427,8 @@ def write_results(state):
 
 """)
 
+    state.bitfields += ["uint32_t :32 /* placeholder */"] * 4
+
     for idx, text in enumerate(state.bitfields):
         state.output.write(
             "#define CPUID_BITFIELD_%d \\\n    %s\n\n"
