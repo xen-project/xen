@@ -60,5 +60,47 @@ ifeq ($(CONFIG_UBSAN),y)
 $(call cc-option-add,CFLAGS_UBSAN,CC,-fno-sanitize=alignment)
 endif
 
+ifneq ($(CONFIG_PV_SHIM_EXCLUSIVE),y)
+
+efi-check := arch/x86/efi/check
+
+# Check if the compiler supports the MS ABI.
+XEN_BUILD_EFI := $(call if-success,$(CC) $(CFLAGS) -c $(efi-check).c -o $(efi-check).o,y)
+
+# Check if the linker supports PE.
+EFI_LDFLAGS := $(patsubst -m%,-mi386pep,$(LDFLAGS)) --subsystem=10
+LD_PE_check_cmd = $(call ld-option,$(EFI_LDFLAGS) --image-base=0x100000000 -o $(efi-check).efi $(efi-check).o)
+XEN_BUILD_PE := $(LD_PE_check_cmd)
+
+# If the above failed, it may be merely because of the linker not dealing well
+# with debug info. Try again with stripping it.
+ifeq ($(CONFIG_DEBUG_INFO)-$(XEN_BUILD_PE),y-n)
+EFI_LDFLAGS += --strip-debug
+XEN_BUILD_PE := $(LD_PE_check_cmd)
+endif
+
+ifeq ($(XEN_BUILD_PE),y)
+
+# Check if the linker produces fixups in PE by default
+efi-nr-fixups := $(shell $(OBJDUMP) -p $(efi-check).efi | grep '^[[:blank:]]*reloc[[:blank:]]*[0-9][[:blank:]].*DIR64$$' | wc -l)
+
+ifeq ($(efi-nr-fixups),2)
+MKRELOC := :
+else
+MKRELOC := efi/mkreloc
+# If the linker produced fixups but not precisely two of them, we need to
+# disable it doing so.  But if it didn't produce any fixups, it also wouldn't
+# recognize the option.
+ifneq ($(efi-nr-fixups),0)
+EFI_LDFLAGS += --disable-reloc-section
+endif
+endif
+
+endif # $(XEN_BUILD_PE)
+
+export XEN_BUILD_EFI XEN_BUILD_PE
+export EFI_LDFLAGS
+endif
+
 # Set up the assembler include path properly for older toolchains.
 CFLAGS += -Wa,-I$(BASEDIR)/include

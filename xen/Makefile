@@ -296,7 +296,7 @@ endif # need-config
 .PHONY: build install uninstall clean distclean MAP
 build install uninstall debug clean distclean MAP::
 ifneq ($(XEN_TARGET_ARCH),x86_32)
-	$(MAKE) -f Rules.mk _$@
+	$(MAKE) -f Rules.mk MKRELOC=$(MKRELOC) _$@
 else
 	echo "*** Xen x86/32 target no longer supported!"
 endif
@@ -404,7 +404,7 @@ $(TARGET): FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C include
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) include
 	$(MAKE) -f $(BASEDIR)/Rules.mk arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $@
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) MKRELOC=$(MKRELOC) $@
 
 quiet_cmd_banner = BANNER  $@
 define cmd_banner
