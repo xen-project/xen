@@ -1928,9 +1928,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( bsp_delay_spec_ctrl )
     {
-        get_cpu_info()->spec_ctrl_flags &= ~SCF_use_shadow;
+        struct cpu_info *info = get_cpu_info();
+
+        info->spec_ctrl_flags &= ~SCF_use_shadow;
         barrier();
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
+        info->last_spec_ctrl = default_xen_spec_ctrl;
     }
 
     /* Jump to the 1:1 virtual mappings of cpu0_stack. */
