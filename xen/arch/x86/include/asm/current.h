@@ -56,6 +56,7 @@ struct cpu_info {
     /* See asm/spec_ctrl_asm.h for usage. */
     unsigned int shadow_spec_ctrl;
     uint8_t      xen_spec_ctrl;
+    uint8_t      last_spec_ctrl;
     uint8_t      spec_ctrl_flags;
 
     /*
@@ -73,7 +74,6 @@ struct cpu_info {
      */
     bool         use_pv_cr3;
 
-    unsigned long __pad;
     /* get_stack_bottom() must be 16-byte aligned */
 };
 

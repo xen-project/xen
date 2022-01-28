@@ -1270,6 +1270,9 @@ void __init init_speculation_mitigations(void)
      */
     if ( has_spec_ctrl )
     {
+        struct cpu_info *info = get_cpu_info();
+        unsigned int val;
+
         bsp_delay_spec_ctrl = !cpu_has_hypervisor && default_xen_spec_ctrl;
 
         /*
@@ -1278,15 +1281,16 @@ void __init init_speculation_mitigations(void)
          */
         if ( bsp_delay_spec_ctrl )
         {
-            struct cpu_info *info = get_cpu_info();
-
             info->shadow_spec_ctrl = 0;
             barrier();
             info->spec_ctrl_flags |= SCF_use_shadow;
             barrier();
         }
 
-        wrmsrl(MSR_SPEC_CTRL, bsp_delay_spec_ctrl ? 0 : default_xen_spec_ctrl);
+        val = bsp_delay_spec_ctrl ? 0 : default_xen_spec_ctrl;
+
+        wrmsrl(MSR_SPEC_CTRL, val);
+        info->last_spec_ctrl = val;
     }
 
     if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )

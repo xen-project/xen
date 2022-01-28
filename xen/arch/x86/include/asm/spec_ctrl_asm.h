@@ -67,6 +67,10 @@
  * steps 2 and 6 will restore the shadow value rather than leaving Xen's value
  * loaded and corrupting the value used in guest context.
  *
+ * Additionally, in some cases it is safe to skip writes to MSR_SPEC_CTRL when
+ * we don't require any of the side effects of an identical write.  Maintain a
+ * per-cpu last_spec_ctrl value for this purpose.
+ *
  * The following ASM fragments implement this algorithm.  See their local
  * comments for further details.
  *  - SPEC_CTRL_ENTRY_FROM_PV
