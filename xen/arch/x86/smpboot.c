@@ -322,6 +322,8 @@ static void set_cpu_sibling_map(unsigned int cpu)
 
 void start_secondary(void *unused)
 {
+    struct cpu_info *info = get_cpu_info();
+
     /*
      * Dont put anything before smp_callin(), SMP booting is so fragile that we
      * want to limit the things done here to the most necessary things.
@@ -378,7 +380,10 @@ void start_secondary(void *unused)
      * microcode.
      */
     if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+    {
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
+        info->last_spec_ctrl = default_xen_spec_ctrl;
+    }
     if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
         wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
 

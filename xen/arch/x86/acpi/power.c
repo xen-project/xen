@@ -296,7 +296,10 @@ static int enter_state(u32 state)
     ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_ist_wrmsr);
 
     if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+    {
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
+        ci->last_spec_ctrl = default_xen_spec_ctrl;
+    }
 
     if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
         wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
