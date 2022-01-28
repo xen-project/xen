@@ -246,7 +246,6 @@ static int enter_state(u32 state)
         error = 0;
 
     ci = get_cpu_info();
-    spec_ctrl_enter_idle(ci);
     /* Avoid NMI/#MC using MSR_SPEC_CTRL until we've reloaded microcode. */
     ci->spec_ctrl_flags &= ~SCF_ist_wrmsr;
 
@@ -293,7 +292,9 @@ static int enter_state(u32 state)
 
     /* Re-enabled default NMI/#MC use of MSR_SPEC_CTRL. */
     ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_ist_wrmsr);
-    spec_ctrl_exit_idle(ci);
+
+    if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+        wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
 
     if ( boot_cpu_has(X86_FEATURE_SRBDS_CTRL) )
         wrmsrl(MSR_MCU_OPT_CTRL, default_xen_mcu_opt_ctrl);
