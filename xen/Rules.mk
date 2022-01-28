@@ -8,9 +8,6 @@
 include $(XEN_ROOT)/Config.mk
 include $(BASEDIR)/scripts/Kbuild.include
 
-
-TARGET := $(BASEDIR)/xen
-
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
@@ -36,7 +33,8 @@ SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
                                             rodata.cst$(a)) \
                          $(foreach r,rel rel.ro,data.$(r).local)
 
-include Makefile
+# The filename build.mk has precedence over Makefile
+include $(firstword $(wildcard build.mk) Makefile)
 
 # Linking
 # ---------------------------------------------------------------------------

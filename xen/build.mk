@@ -1,0 +1,61 @@
+quiet_cmd_banner = BANNER  $@
+define cmd_banner
+    if which figlet >/dev/null 2>&1 ; then \
+	echo " Xen $(XEN_FULLVERSION)" | figlet -f $< > $@.tmp; \
+    else \
+	echo " Xen $(XEN_FULLVERSION)" > $@.tmp; \
+    fi; \
+    mv -f $@.tmp $@
+endef
+
+.banner: tools/xen.flf FORCE
+	$(call if_changed,banner)
+
+targets += .banner
+
+# Don't refresh this files during e.g., 'sudo make install'
+quiet_cmd_compile.h = UPD     $@
+define cmd_compile.h
+    if [ ! -r $@ -o -O $@ ]; then \
+	cat .banner; \
+	sed -e 's/@@date@@/$(XEN_BUILD_DATE)/g' \
+	    -e 's/@@time@@/$(XEN_BUILD_TIME)/g' \
+	    -e 's/@@whoami@@/$(XEN_WHOAMI)/g' \
+	    -e 's/@@domain@@/$(XEN_DOMAIN)/g' \
+	    -e 's/@@hostname@@/$(XEN_BUILD_HOST)/g' \
+	    -e 's!@@compiler@@!$(shell $(CC) $(CFLAGS) --version 2>&1 | head -1)!g' \
+	    -e 's/@@version@@/$(XEN_VERSION)/g' \
+	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
+	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
+	    -e 's!@@changeset@@!$(shell tools/scmversion $(XEN_ROOT) || echo "unavailable")!g' \
+	    < $< > $(dot-target).tmp; \
+	sed -rf tools/process-banner.sed < .banner >> $(dot-target).tmp; \
+	mv -f $(dot-target).tmp $@; \
+    fi
+endef
+
+include/xen/compile.h: include/xen/compile.h.in .banner FORCE
+	$(if $(filter-out FORCE,$?),$(Q)rm -fv $@)
+	$(call if_changed,compile.h)
+
+targets += include/xen/compile.h
+
+asm-offsets.s: arch/$(TARGET_ARCH)/$(TARGET_SUBARCH)/asm-offsets.c
+	$(CC) $(call cpp_flags,$(c_flags)) -S -g0 -o $@.new -MQ $@ $<
+	$(call move-if-changed,$@.new,$@)
+
+arch/$(TARGET_ARCH)/include/asm/asm-offsets.h: asm-offsets.s
+	@(set -e; \
+	  echo "/*"; \
+	  echo " * DO NOT MODIFY."; \
+	  echo " *"; \
+	  echo " * This file was auto-generated from $<"; \
+	  echo " *"; \
+	  echo " */"; \
+	  echo ""; \
+	  echo "#ifndef __ASM_OFFSETS_H__"; \
+	  echo "#define __ASM_OFFSETS_H__"; \
+	  echo ""; \
+	  sed -rne "/^[^#].*==>/{s:.*==>(.*)<==.*:\1:; s: [\$$#]: :; p;}"; \
+	  echo ""; \
+	  echo "#endif") <$< >$@
