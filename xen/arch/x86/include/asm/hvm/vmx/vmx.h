@@ -219,6 +219,7 @@ static inline void pi_clear_sn(struct pi_desc *pi_desc)
 #define EXIT_REASON_PML_FULL            62
 #define EXIT_REASON_XSAVES              63
 #define EXIT_REASON_XRSTORS             64
+/* Remember to also update VMX_PERF_EXIT_REASON_SIZE! */
 
 /*
  * Interruption-information format

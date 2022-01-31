@@ -3928,7 +3928,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     else
         HVMTRACE_ND(VMEXIT, 0, 1/*cycles*/, exit_reason, regs->eip);
 
-    perfc_incra(vmexits, exit_reason);
+    perfc_incra(vmexits, (uint16_t)exit_reason);
 
     /* Handle the interrupt we missed before allowing any more in. */
     switch ( (uint16_t)exit_reason )
