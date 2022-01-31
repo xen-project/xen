@@ -861,15 +861,15 @@ static int deassign_device(struct domain *d, uint16_t seg, uint8_t bus,
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             break;
-        ret = hd->platform_ops->reassign_device(d, target, devfn,
-                                                pci_to_dev(pdev));
+        ret = iommu_call(hd->platform_ops, reassign_device, d, target, devfn,
+                         pci_to_dev(pdev));
         if ( ret )
             goto out;
     }
 
     devfn = pdev->devfn;
-    ret = hd->platform_ops->reassign_device(d, target, devfn,
-                                            pci_to_dev(pdev));
+    ret = iommu_call(hd->platform_ops, reassign_device, d, target, devfn,
+                     pci_to_dev(pdev));
     if ( ret )
         goto out;
 
@@ -1300,7 +1300,7 @@ static int iommu_add_device(struct pci_dev *pdev)
 {
     const struct domain_iommu *hd;
     int rc;
-    u8 devfn;
+    unsigned int devfn = pdev->devfn;
 
     if ( !pdev->domain )
         return -EINVAL;
@@ -1311,16 +1311,16 @@ static int iommu_add_device(struct pci_dev *pdev)
     if ( !is_iommu_enabled(pdev->domain) )
         return 0;
 
-    rc = hd->platform_ops->add_device(pdev->devfn, pci_to_dev(pdev));
+    rc = iommu_call(hd->platform_ops, add_device, devfn, pci_to_dev(pdev));
     if ( rc || !pdev->phantom_stride )
         return rc;
 
-    for ( devfn = pdev->devfn ; ; )
+    for ( ; ; )
     {
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             return 0;
-        rc = hd->platform_ops->add_device(devfn, pci_to_dev(pdev));
+        rc = iommu_call(hd->platform_ops, add_device, devfn, pci_to_dev(pdev));
         if ( rc )
             printk(XENLOG_WARNING "IOMMU: add %pp failed (%d)\n",
                    &pdev->sbdf, rc);
@@ -1341,7 +1341,7 @@ static int iommu_enable_device(struct pci_dev *pdev)
          !hd->platform_ops->enable_device )
         return 0;
 
-    return hd->platform_ops->enable_device(pci_to_dev(pdev));
+    return iommu_call(hd->platform_ops, enable_device, pci_to_dev(pdev));
 }
 
 static int iommu_remove_device(struct pci_dev *pdev)
@@ -1363,7 +1363,8 @@ static int iommu_remove_device(struct pci_dev *pdev)
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             break;
-        rc = hd->platform_ops->remove_device(devfn, pci_to_dev(pdev));
+        rc = iommu_call(hd->platform_ops, remove_device, devfn,
+                        pci_to_dev(pdev));
         if ( !rc )
             continue;
 
@@ -1371,7 +1372,9 @@ static int iommu_remove_device(struct pci_dev *pdev)
         return rc;
     }
 
-    return hd->platform_ops->remove_device(pdev->devfn, pci_to_dev(pdev));
+    devfn = pdev->devfn;
+
+    return iommu_call(hd->platform_ops, remove_device, devfn, pci_to_dev(pdev));
 }
 
 static int device_assigned(u16 seg, u8 bus, u8 devfn)
@@ -1421,7 +1424,8 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
 
     pdev->fault.count = 0;
 
-    if ( (rc = hd->platform_ops->assign_device(d, devfn, pci_to_dev(pdev), flag)) )
+    if ( (rc = iommu_call(hd->platform_ops, assign_device, d, devfn,
+                          pci_to_dev(pdev), flag)) )
         goto done;
 
     for ( ; pdev->phantom_stride; rc = 0 )
@@ -1429,7 +1433,8 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             break;
-        rc = hd->platform_ops->assign_device(d, devfn, pci_to_dev(pdev), flag);
+        rc = iommu_call(hd->platform_ops, assign_device, d, devfn,
+                        pci_to_dev(pdev), flag);
     }
 
  done:
@@ -1457,24 +1462,24 @@ static int iommu_get_device_group(
     if ( !is_iommu_enabled(d) || !ops->get_device_group_id )
         return 0;
 
-    group_id = ops->get_device_group_id(seg, bus, devfn);
+    group_id = iommu_call(ops, get_device_group_id, seg, bus, devfn);
 
     pcidevs_lock();
     for_each_pdev( d, pdev )
     {
-        if ( (pdev->seg != seg) ||
-             ((pdev->bus == bus) && (pdev->devfn == devfn)) )
+        unsigned int b = pdev->bus;
+        unsigned int df = pdev->devfn;
+
+        if ( (pdev->seg != seg) || ((b == bus) && (df == devfn)) )
             continue;
 
-        if ( xsm_get_device_group(XSM_HOOK, (seg << 16) | (pdev->bus << 8) | pdev->devfn) )
+        if ( xsm_get_device_group(XSM_HOOK, (seg << 16) | (b << 8) | df) )
             continue;
 
-        sdev_id = ops->get_device_group_id(seg, pdev->bus, pdev->devfn);
+        sdev_id = iommu_call(ops, get_device_group_id, seg, b, df);
         if ( (sdev_id == group_id) && (i < max_sdevs) )
         {
-            bdf = 0;
-            bdf |= (pdev->bus & 0xff) << 16;
-            bdf |= (pdev->devfn & 0xff) << 8;
+            bdf = (b << 16) | (df << 8);
 
             if ( unlikely(copy_to_guest_offset(buf, i, &bdf, 1)) )
             {

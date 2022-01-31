@@ -145,7 +145,7 @@ unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg)
 int __init iommu_setup_hpet_msi(struct msi_desc *msi)
 {
     const struct iommu_ops *ops = iommu_get_ops();
-    return ops->setup_hpet_msi ? ops->setup_hpet_msi(msi) : -ENODEV;
+    return ops->setup_hpet_msi ? iommu_call(ops, setup_hpet_msi, msi) : -ENODEV;
 }
 
 void __hwdom_init arch_iommu_check_autotranslated_hwdom(struct domain *d)
@@ -406,7 +406,7 @@ int iommu_free_pgtables(struct domain *d)
      * Pages will be moved to the free list below. So we want to
      * clear the root page-table to avoid any potential use after-free.
      */
-    hd->platform_ops->clear_root_pgtable(d);
+    iommu_vcall(hd->platform_ops, clear_root_pgtable, d);
 
     while ( (pg = page_list_remove_head(&hd->arch.pgtables.list)) )
     {

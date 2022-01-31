@@ -198,7 +198,7 @@ int iommu_domain_init(struct domain *d, unsigned int opts)
         return ret;
 
     hd->platform_ops = iommu_get_ops();
-    ret = hd->platform_ops->init(d);
+    ret = iommu_call(hd->platform_ops, init, d);
     if ( ret || is_system_domain(d) )
         return ret;
 
@@ -233,7 +233,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
 
     register_keyhandler('o', &iommu_dump_page_tables, "dump iommu page tables", 0);
 
-    hd->platform_ops->hwdom_init(d);
+    iommu_vcall(hd->platform_ops, hwdom_init, d);
 }
 
 static void iommu_teardown(struct domain *d)
@@ -576,7 +576,7 @@ int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
     if ( !ops->get_reserved_device_memory )
         return 0;
 
-    return ops->get_reserved_device_memory(func, ctxt);
+    return iommu_call(ops, get_reserved_device_memory, func, ctxt);
 }
 
 bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature)
@@ -603,7 +603,7 @@ static void iommu_dump_page_tables(unsigned char key)
             continue;
         }
 
-        dom_iommu(d)->platform_ops->dump_page_tables(d);
+        iommu_vcall(dom_iommu(d)->platform_ops, dump_page_tables, d);
     }
 
     rcu_read_unlock(&domlist_read_lock);
