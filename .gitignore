@@ -252,9 +252,6 @@ tools/qemu-xen-build
 tools/xentrace/xenalyze
 tools/pygrub/build/*
 tools/python/build/*
-tools/security/secpol_tool
-tools/security/xen/*
-tools/security/xensec_tool
 tools/tests/depriv/depriv-fd-checker
 tools/tests/x86_emulator/*.bin
 tools/tests/x86_emulator/*.tmp
