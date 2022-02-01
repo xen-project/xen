@@ -215,7 +215,7 @@ AC_SUBST(qemu_xen_path)
 AC_SUBST(qemu_xen_systemd)
 
 AC_ARG_WITH([stubdom-qmp-proxy],
-    AC_HELP_STRING([--stubdom-qmp-proxy@<:@=PATH@:>@],
+    AS_HELP_STRING([--stubdom-qmp-proxy@<:@=PATH@:>@],
         [Use supplied binary PATH as a QMP proxy into stubdomain]),[
     stubdom_qmp_proxy="$withval"
 ],[
