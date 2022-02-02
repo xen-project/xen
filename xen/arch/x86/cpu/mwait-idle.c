@@ -108,6 +108,11 @@ static const struct cpuidle_state {
 
 #define CPUIDLE_FLAG_DISABLED		0x1
 /*
+ * Enable interrupts before entering the C-state. On some platforms and for
+ * some C-states, this may measurably decrease interrupt latency.
+ */
+#define CPUIDLE_FLAG_IRQ_ENABLE		0x8000
+/*
  * Set this flag for states where the HW flushes the TLB for us
  * and so we don't need cross-calls to keep it consistent.
  * If this flag is set, SW flushes the TLB, so even if the
@@ -539,7 +544,7 @@ static struct cpuidle_state __read_mostly skl_cstates[] = {
 static struct cpuidle_state __read_mostly skx_cstates[] = {
 	{
 		.name = "C1",
-		.flags = MWAIT2flg(0x00),
+		.flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_IRQ_ENABLE,
 		.exit_latency = 2,
 		.target_residency = 2,
 	},
@@ -561,7 +566,7 @@ static struct cpuidle_state __read_mostly skx_cstates[] = {
 static const struct cpuidle_state icx_cstates[] = {
        {
                .name = "C1",
-               .flags = MWAIT2flg(0x00),
+               .flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_IRQ_ENABLE,
                .exit_latency = 1,
                .target_residency = 1,
        },
@@ -842,8 +847,14 @@ static void mwait_idle(void)
 
 	update_last_cx_stat(power, cx, before);
 
-	if (cpu_is_haltable(cpu))
+	if (cpu_is_haltable(cpu)) {
+		if (cx->irq_enable_early)
+			local_irq_enable();
+
 		mwait_idle_with_hints(cx->address, MWAIT_ECX_INTERRUPT_BREAK);
+
+		local_irq_disable();
+	}
 
 	after = alternative_call(cpuidle_get_tick);
 
@@ -1335,6 +1346,11 @@ static int mwait_idle_cpu_init(struct notifier_block *nfb,
 		cx->latency = cpuidle_state_table[cstate].exit_latency;
 		cx->target_residency =
 			cpuidle_state_table[cstate].target_residency;
+		if ((cpuidle_state_table[cstate].flags &
+		     CPUIDLE_FLAG_IRQ_ENABLE) &&
+		    /* cstate_restore_tsc() needs to be a no-op */
+		    boot_cpu_has(X86_FEATURE_NONSTOP_TSC))
+			cx->irq_enable_early = true;
 
 		dev->count++;
 	}
