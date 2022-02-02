@@ -1094,7 +1094,13 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
     {
         EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
 
-        if ( desc->Attribute & EFI_MEMORY_RUNTIME )
+        /*
+         * Runtime services regions are always mapped here.
+         * Attributes may be adjusted in efi_init_memory().
+         */
+        if ( (desc->Attribute & EFI_MEMORY_RUNTIME) ||
+             desc->Type == EfiRuntimeServicesCode ||
+             desc->Type == EfiRuntimeServicesData )
             desc->VirtualStart = desc->PhysicalStart;
         else
             desc->VirtualStart = INVALID_VIRTUAL_ADDRESS;
@@ -1545,12 +1551,35 @@ void __init efi_init_memory(void)
                     ROUNDUP(desc->PhysicalStart + len, PAGE_SIZE));
         }
 
-        if ( !efi_enabled(EFI_RS) ||
-             (!(desc->Attribute & EFI_MEMORY_RUNTIME) &&
-              (!map_bs ||
-               (desc->Type != EfiBootServicesCode &&
-                desc->Type != EfiBootServicesData))) )
+        if ( !efi_enabled(EFI_RS) )
             continue;
+
+        if ( !(desc->Attribute & EFI_MEMORY_RUNTIME) )
+        {
+            switch ( desc->Type )
+            {
+            default:
+                continue;
+
+            /*
+             * Adjust runtime services regions. Keep in sync with
+             * efi_exit_boot().
+             */
+            case EfiRuntimeServicesCode:
+            case EfiRuntimeServicesData:
+                printk(XENLOG_WARNING
+                       "Setting RUNTIME attribute for %013" PRIx64 "-%013" PRIx64 "\n",
+                       desc->PhysicalStart, desc->PhysicalStart + len - 1);
+                desc->Attribute |= EFI_MEMORY_RUNTIME;
+                break;
+
+            case EfiBootServicesCode:
+            case EfiBootServicesData:
+                if ( !map_bs )
+                    continue;
+                break;
+            }
+        }
 
         desc->VirtualStart = INVALID_VIRTUAL_ADDRESS;
 
