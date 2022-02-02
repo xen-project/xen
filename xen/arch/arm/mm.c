@@ -1479,7 +1479,7 @@ int xenmem_add_to_physmap_one(
         break;
     }
     case XENMAPSPACE_dev_mmio:
-        rc = map_dev_mmio_region(d, gfn, 1, _mfn(idx));
+        rc = map_dev_mmio_page(d, gfn, _mfn(idx));
         return rc;
 
     default:

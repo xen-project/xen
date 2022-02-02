@@ -832,6 +832,9 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
         return -EACCES;
     }
 
+    if ( gfn_eq(_gfn(xatp->gpfn), INVALID_GFN) )
+        return -EINVAL;
+
     if ( xatp->space == XENMAPSPACE_gmfn_foreign )
         extra.foreign_domid = DOMID_INVALID;
 
@@ -841,6 +844,18 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
 
     if ( xatp->size < start )
         return -EILSEQ;
+
+    if ( xatp->gpfn + xatp->size < xatp->gpfn ||
+         xatp->idx + xatp->size < xatp->idx )
+    {
+        /*
+         * Make sure INVALID_GFN is the highest representable value, i.e.
+         * guaranteeing that it won't fall in the middle of the
+         * [xatp->gpfn, xatp->gpfn + xatp->size) range checked above.
+         */
+        BUILD_BUG_ON(INVALID_GFN_RAW + 1);
+        return -EOVERFLOW;
+    }
 
     xatp->idx += start;
     xatp->gpfn += start;
@@ -961,6 +976,9 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
              unlikely(__copy_from_guest_offset(&gpfn, xatpb->gpfns,
                                                extent, 1)) )
             return -EFAULT;
+
+        if ( gfn_eq(_gfn(gpfn), INVALID_GFN) )
+            return -EINVAL;
 
         rc = xenmem_add_to_physmap_one(d, xatpb->space, extra,
                                        idx, _gfn(gpfn));

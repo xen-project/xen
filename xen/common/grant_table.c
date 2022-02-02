@@ -4157,7 +4157,10 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
     bool status = false;
 
     if ( gfn_eq(gfn, INVALID_GFN) )
+    {
+        ASSERT_UNREACHABLE();
         return -EINVAL;
+    }
 
     grant_write_lock(gt);
 

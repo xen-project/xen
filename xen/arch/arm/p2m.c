@@ -1355,21 +1355,18 @@ int unmap_mmio_regions(struct domain *d,
     return p2m_remove_mapping(d, start_gfn, nr, mfn);
 }
 
-int map_dev_mmio_region(struct domain *d,
-                        gfn_t gfn,
-                        unsigned long nr,
-                        mfn_t mfn)
+int map_dev_mmio_page(struct domain *d, gfn_t gfn, mfn_t mfn)
 {
     int res;
 
-    if ( !(nr && iomem_access_permitted(d, mfn_x(mfn), mfn_x(mfn) + nr - 1)) )
+    if ( !iomem_access_permitted(d, mfn_x(mfn), mfn_x(mfn)) )
         return 0;
 
-    res = p2m_insert_mapping(d, gfn, nr, mfn, p2m_mmio_direct_c);
+    res = p2m_insert_mapping(d, gfn, 1, mfn, p2m_mmio_direct_c);
     if ( res < 0 )
     {
-        printk(XENLOG_G_ERR "Unable to map MFNs [%#"PRI_mfn" - %#"PRI_mfn" in Dom%d\n",
-               mfn_x(mfn), mfn_x(mfn) + nr - 1, d->domain_id);
+        printk(XENLOG_G_ERR "Unable to map MFN %#"PRI_mfn" in %pd\n",
+               mfn_x(mfn), d);
         return res;
     }
 
