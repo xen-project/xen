@@ -88,6 +88,8 @@
  * 0xffffffff to the register, and reading it back.  Only
  * 1 bits are decoded.
  */
+#define PCI_HEADER_NORMAL_NR_BARS	6
+#define PCI_HEADER_BRIDGE_NR_BARS	2
 #define PCI_BASE_ADDRESS_0	0x10	/* 32 bits */
 #define PCI_BASE_ADDRESS_1	0x14	/* 32 bits [htype 0,1 only] */
 #define PCI_BASE_ADDRESS_2	0x18	/* 32 bits [htype 0 only] */

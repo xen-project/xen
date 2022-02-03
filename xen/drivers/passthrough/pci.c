@@ -233,6 +233,9 @@ static void check_pdev(const struct pci_dev *pdev)
      PCI_STATUS_REC_TARGET_ABORT | PCI_STATUS_REC_MASTER_ABORT | \
      PCI_STATUS_SIG_SYSTEM_ERROR | PCI_STATUS_DETECTED_PARITY)
     u16 val;
+    unsigned int nbars = 0, rom_pos = 0, i;
+    static const char warn[] = XENLOG_WARNING
+        "%pp disabled: %sBAR [%#lx, %#lx] overlaps with memory map\n";
 
     if ( command_mask )
     {
@@ -251,6 +254,8 @@ static void check_pdev(const struct pci_dev *pdev)
     switch ( pci_conf_read8(pdev->sbdf, PCI_HEADER_TYPE) & 0x7f )
     {
     case PCI_HEADER_TYPE_BRIDGE:
+        nbars = PCI_HEADER_BRIDGE_NR_BARS;
+        rom_pos = PCI_ROM_ADDRESS1;
         if ( !bridge_ctl_mask )
             break;
         val = pci_conf_read16(pdev->sbdf, PCI_BRIDGE_CONTROL);
@@ -267,11 +272,75 @@ static void check_pdev(const struct pci_dev *pdev)
         }
         break;
 
+    case PCI_HEADER_TYPE_NORMAL:
+        nbars = PCI_HEADER_NORMAL_NR_BARS;
+        rom_pos = PCI_ROM_ADDRESS;
+        break;
+
     case PCI_HEADER_TYPE_CARDBUS:
         /* TODO */
         break;
     }
 #undef PCI_STATUS_CHECK
+
+    /* Check if BARs overlap with other memory regions. */
+    val = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
+    if ( !(val & PCI_COMMAND_MEMORY) || pdev->ignore_bars )
+        return;
+
+    pci_conf_write16(pdev->sbdf, PCI_COMMAND, val & ~PCI_COMMAND_MEMORY);
+    for ( i = 0; i < nbars; )
+    {
+        uint64_t addr, size;
+        unsigned int reg = PCI_BASE_ADDRESS_0 + i * 4;
+        int rc = 1;
+
+        if ( (pci_conf_read32(pdev->sbdf, reg) & PCI_BASE_ADDRESS_SPACE) !=
+             PCI_BASE_ADDRESS_SPACE_MEMORY )
+            goto next;
+
+        rc = pci_size_mem_bar(pdev->sbdf, reg, &addr, &size,
+                              (i == nbars - 1) ? PCI_BAR_LAST : 0);
+        if ( rc < 0 )
+            /* Unable to size, better leave memory decoding disabled. */
+            return;
+        if ( size && !is_memory_hole(maddr_to_mfn(addr),
+                                     maddr_to_mfn(addr + size - 1)) )
+        {
+            /*
+             * Return without enabling memory decoding if BAR position is not
+             * in IO suitable memory. Let the hardware domain re-position the
+             * BAR.
+             */
+            printk(warn,
+                   &pdev->sbdf, "", PFN_DOWN(addr), PFN_DOWN(addr + size - 1));
+            return;
+        }
+
+ next:
+        ASSERT(rc > 0);
+        i += rc;
+    }
+
+    if ( rom_pos &&
+         (pci_conf_read32(pdev->sbdf, rom_pos) & PCI_ROM_ADDRESS_ENABLE) )
+    {
+        uint64_t addr, size;
+        int rc = pci_size_mem_bar(pdev->sbdf, rom_pos, &addr, &size,
+                                  PCI_BAR_ROM);
+
+        if ( rc < 0 )
+            return;
+        if ( size && !is_memory_hole(maddr_to_mfn(addr),
+                                     maddr_to_mfn(addr + size - 1)) )
+        {
+            printk(warn, &pdev->sbdf, "ROM ", PFN_DOWN(addr),
+                   PFN_DOWN(addr + size - 1));
+            return;
+        }
+    }
+
+    pci_conf_write16(pdev->sbdf, PCI_COMMAND, val);
 }
 
 static void apply_quirks(struct pci_dev *pdev)
@@ -399,8 +468,8 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
             break;
     }
 
-    check_pdev(pdev);
     apply_quirks(pdev);
+    check_pdev(pdev);
 
     return pdev;
 }
