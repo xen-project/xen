@@ -50,8 +50,6 @@ void on_selected_cpus(
     void *info,
     int wait)
 {
-    unsigned int nr_cpus;
-
     ASSERT(local_irq_is_enabled());
     ASSERT(cpumask_subset(selected, &cpu_online_map));
 
@@ -59,8 +57,7 @@ void on_selected_cpus(
 
     cpumask_copy(&call_data.selected, selected);
 
-    nr_cpus = cpumask_weight(&call_data.selected);
-    if ( nr_cpus == 0 )
+    if ( cpumask_empty(&call_data.selected) )
         goto out;
 
     call_data.func = func;
