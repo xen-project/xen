@@ -551,14 +551,20 @@ static inline void hvm_invlpg(struct vcpu *v, unsigned long linear)
                        (1U << TRAP_alignment_check) | \
                        (1U << TRAP_machine_check))
 
+/* Called in boot/resume paths.  Must cope with no HVM support. */
 static inline int hvm_cpu_up(void)
 {
-    return alternative_call(hvm_funcs.cpu_up);
+    if ( hvm_funcs.cpu_up )
+        return alternative_call(hvm_funcs.cpu_up);
+
+    return 0;
 }
 
+/* Called in shutdown paths.  Must cope with no HVM support. */
 static inline void hvm_cpu_down(void)
 {
-    alternative_vcall(hvm_funcs.cpu_down);
+    if ( hvm_funcs.cpu_down )
+        alternative_vcall(hvm_funcs.cpu_down);
 }
 
 static inline unsigned int hvm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
