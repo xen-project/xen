@@ -113,10 +113,9 @@ static int __init pvh_populate_memory_range(struct domain *d,
         { .align = PFN_DOWN(MB(2)), .order = PAGE_ORDER_2M },
         { .align = PFN_DOWN(KB(4)), .order = PAGE_ORDER_4K },
     };
-    unsigned int max_order = MAX_ORDER, i = 0;
+    unsigned int max_order = MAX_ORDER;
     struct page_info *page;
     int rc;
-#define MAP_MAX_ITER 64
 
     while ( nr_pages != 0 )
     {
@@ -185,12 +184,16 @@ static int __init pvh_populate_memory_range(struct domain *d,
         start += 1UL << order;
         nr_pages -= 1UL << order;
         order_stats[order]++;
-        if ( (++i % MAP_MAX_ITER) == 0 )
-            process_pending_softirqs();
+        /*
+         * Process pending softirqs on every successful loop: it's unknown
+         * whether the p2m/IOMMU code will have split the page into multiple
+         * smaller entries, and thus the time consumed would be much higher
+         * than populating a single entry.
+         */
+        process_pending_softirqs();
     }
 
     return 0;
-#undef MAP_MAX_ITER
 }
 
 /* Steal RAM from the end of a memory region. */
