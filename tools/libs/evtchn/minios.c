@@ -20,7 +20,7 @@
  * Split off from xc_minios.c
  */
 
-#include "xen-external/bsd-sys-queue.h"
+#include "_xen_list.h"
 #include <mini-os/types.h>
 #include <mini-os/os.h>
 #include <mini-os/lib.h>
@@ -38,10 +38,10 @@
 
 #include "private.h"
 
-LIST_HEAD(port_list, port_info);
+XEN_LIST_HEAD(port_list, struct port_info);
 
 struct port_info {
-    LIST_ENTRY(port_info) list;
+    XEN_LIST_ENTRY(struct port_info) list;
     evtchn_port_t port;
     bool pending;
     bool bound;
@@ -62,7 +62,7 @@ static struct port_info *port_alloc(xenevtchn_handle *xce)
     port_info->port = -1;
     port_info->bound = false;
 
-    LIST_INSERT_HEAD(port_list, port_info, list);
+    XEN_LIST_INSERT_HEAD(port_list, port_info, list);
 
     return port_info;
 }
@@ -72,7 +72,7 @@ static void port_dealloc(struct port_info *port_info)
     if ( port_info->bound )
         unbind_evtchn(port_info->port);
 
-    LIST_REMOVE(port_info, list);
+    XEN_LIST_REMOVE(port_info, list);
     free(port_info);
 }
 
@@ -81,7 +81,7 @@ static int evtchn_close_fd(struct file *file)
     struct port_info *port_info, *tmp;
     struct port_list *port_list = file->dev;
 
-    LIST_FOREACH_SAFE(port_info, port_list, list, tmp)
+    XEN_LIST_FOREACH_SAFE(port_info, port_list, list, tmp)
         port_dealloc(port_info);
     free(port_list);
 
@@ -126,7 +126,7 @@ int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
     }
 
     file->dev = list;
-    LIST_INIT(list);
+    XEN_LIST_INIT(list);
     xce->fd = fd;
     printf("evtchn_open() -> %d\n", fd);
 
@@ -173,7 +173,7 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     assert(file);
     port_list = file->dev;
     mask_evtchn(port);
-    LIST_FOREACH(port_info, port_list, list)
+    XEN_LIST_FOREACH(port_info, port_list, list)
     {
         if ( port_info->port == port )
             goto found;
@@ -257,7 +257,7 @@ int xenevtchn_unbind(xenevtchn_handle *xce, evtchn_port_t port)
     struct port_info *port_info;
     struct port_list *port_list = file->dev;
 
-    LIST_FOREACH(port_info, port_list, list)
+    XEN_LIST_FOREACH(port_info, port_list, list)
     {
         if ( port_info->port == port )
         {
@@ -314,7 +314,7 @@ xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
 
     file->read = false;
 
-    LIST_FOREACH(port_info, port_list, list)
+    XEN_LIST_FOREACH(port_info, port_list, list)
     {
         if ( port_info->port != -1 && port_info->pending )
         {
