@@ -31,7 +31,7 @@
 #include <assert.h>
 
 static pthread_mutex_t handles_lock = PTHREAD_MUTEX_INITIALIZER;
-static XENTOOLCORE_LIST_HEAD(, Xentoolcore__Active_Handle) handles;
+static XEN_LIST_HEAD(, Xentoolcore__Active_Handle) handles;
 
 static void lock(void) {
     int e = pthread_mutex_lock(&handles_lock);
@@ -45,13 +45,13 @@ static void unlock(void) {
 
 void xentoolcore__register_active_handle(Xentoolcore__Active_Handle *ah) {
     lock();
-    XENTOOLCORE_LIST_INSERT_HEAD(&handles, ah, entry);
+    XEN_LIST_INSERT_HEAD(&handles, ah, entry);
     unlock();
 }
 
 void xentoolcore__deregister_active_handle(Xentoolcore__Active_Handle *ah) {
     lock();
-    XENTOOLCORE_LIST_REMOVE(ah, entry);
+    XEN_LIST_REMOVE(ah, entry);
     unlock();
 }
 
@@ -60,7 +60,7 @@ int xentoolcore_restrict_all(domid_t domid) {
     Xentoolcore__Active_Handle *ah;
 
     lock();
-    XENTOOLCORE_LIST_FOREACH(ah, &handles, entry) {
+    XEN_LIST_FOREACH(ah, &handles, entry) {
         r = ah->restrict_callback(ah, domid);
         if (r) goto out;
     }

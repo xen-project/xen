@@ -27,7 +27,7 @@
 #include <stddef.h>
 
 #include "xentoolcore.h"
-#include "_xentoolcore_list.h"
+#include "_xen_list.h"
 
 /*---------- active handle registration ----------*/
 
@@ -87,7 +87,7 @@ typedef int Xentoolcore__Restrict_Callback(Xentoolcore__Active_Handle*,
 
 struct Xentoolcore__Active_Handle {
     Xentoolcore__Restrict_Callback *restrict_callback;
-    XENTOOLCORE_LIST_ENTRY(Xentoolcore__Active_Handle) entry;
+    XEN_LIST_ENTRY(Xentoolcore__Active_Handle) entry;
 };
 
 void xentoolcore__register_active_handle(Xentoolcore__Active_Handle*);
