@@ -1476,7 +1476,7 @@ static void qdisk_spawn_outcome(libxl__egc *egc, libxl__dm_spawn_state *dmss,
  */
 typedef struct libxl__ddomain_device {
     libxl__device *dev;
-    LIBXL_SLIST_ENTRY(struct libxl__ddomain_device) next;
+    XEN_SLIST_ENTRY(struct libxl__ddomain_device) next;
 } libxl__ddomain_device;
 
 /*
@@ -1485,8 +1485,8 @@ typedef struct libxl__ddomain_device {
 typedef struct libxl__ddomain_guest {
     uint32_t domid;
     int num_qdisks;
-    LIBXL_SLIST_HEAD(, struct libxl__ddomain_device) devices;
-    LIBXL_SLIST_ENTRY(struct libxl__ddomain_guest) next;
+    XEN_SLIST_HEAD(, struct libxl__ddomain_device) devices;
+    XEN_SLIST_ENTRY(struct libxl__ddomain_guest) next;
 } libxl__ddomain_guest;
 
 /*
@@ -1496,7 +1496,7 @@ typedef struct libxl__ddomain_guest {
 typedef struct {
     libxl__ao *ao;
     libxl__ev_xswatch watch;
-    LIBXL_SLIST_HEAD(, struct libxl__ddomain_guest) guests;
+    XEN_SLIST_HEAD(, struct libxl__ddomain_guest) guests;
 } libxl__ddomain;
 
 static libxl__ddomain_guest *search_for_guest(libxl__ddomain *ddomain,
@@ -1504,7 +1504,7 @@ static libxl__ddomain_guest *search_for_guest(libxl__ddomain *ddomain,
 {
     libxl__ddomain_guest *dguest;
 
-    LIBXL_SLIST_FOREACH(dguest, &ddomain->guests, next) {
+    XEN_SLIST_FOREACH(dguest, &ddomain->guests, next) {
         if (dguest->domid == domid)
             return dguest;
     }
@@ -1516,7 +1516,7 @@ static libxl__ddomain_device *search_for_device(libxl__ddomain_guest *dguest,
 {
     libxl__ddomain_device *ddev;
 
-    LIBXL_SLIST_FOREACH(ddev, &dguest->devices, next) {
+    XEN_SLIST_FOREACH(ddev, &dguest->devices, next) {
 #define LIBXL_DEVICE_CMP(dev1, dev2, entry) (dev1->entry == dev2->entry)
         if (LIBXL_DEVICE_CMP(ddev->dev, dev, backend_devid) &&
             LIBXL_DEVICE_CMP(ddev->dev, dev, backend_domid) &&
@@ -1537,8 +1537,8 @@ static void check_and_maybe_remove_guest(libxl__gc *gc,
 {
     assert(ddomain);
 
-    if (dguest != NULL && LIBXL_SLIST_FIRST(&dguest->devices) == NULL) {
-        LIBXL_SLIST_REMOVE(&ddomain->guests, dguest, libxl__ddomain_guest,
+    if (dguest != NULL && XEN_SLIST_FIRST(&dguest->devices) == NULL) {
+        XEN_SLIST_REMOVE(&ddomain->guests, dguest, libxl__ddomain_guest,
                            next);
         LOGD(DEBUG, dguest->domid, "Removed domain from the list of active guests");
         /* Clear any leftovers in libxl/<domid> */
@@ -1572,7 +1572,7 @@ static int add_device(libxl__egc *egc, libxl__ao *ao,
     ddev = libxl__zalloc(NOGC, sizeof(*ddev));
     ddev->dev = libxl__zalloc(NOGC, sizeof(*ddev->dev));
     *ddev->dev = *dev;
-    LIBXL_SLIST_INSERT_HEAD(&dguest->devices, ddev, next);
+    XEN_SLIST_INSERT_HEAD(&dguest->devices, ddev, next);
     LOGD(DEBUG, dev->domid, "Added device %s to the list of active devices",
          libxl__device_backend_path(gc, dev));
 
@@ -1649,8 +1649,7 @@ static int remove_device(libxl__egc *egc, libxl__ao *ao,
      * above or from add_device make a copy of the data they use, so
      * there's no risk of dereferencing.
      */
-    LIBXL_SLIST_REMOVE(&dguest->devices, ddev, libxl__ddomain_device,
-                       next);
+    XEN_SLIST_REMOVE(&dguest->devices, ddev, libxl__ddomain_device, next);
     LOGD(DEBUG, dev->domid, "Removed device %s from the list of active devices",
          libxl__device_backend_path(gc, dev));
 
@@ -1716,8 +1715,8 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
         /* Create a new guest struct and initialize it */
         dguest = libxl__zalloc(NOGC, sizeof(*dguest));
         dguest->domid = dev->domid;
-        LIBXL_SLIST_INIT(&dguest->devices);
-        LIBXL_SLIST_INSERT_HEAD(&ddomain->guests, dguest, next);
+        XEN_SLIST_INIT(&dguest->devices);
+        XEN_SLIST_INSERT_HEAD(&ddomain->guests, dguest, next);
         LOGD(DEBUG, dguest->domid, "Added domain to the list of active guests");
     }
     ddev = search_for_device(dguest, dev);
@@ -1766,7 +1765,7 @@ int libxl_device_events_handler(libxl_ctx *ctx,
     int i, j, k;
 
     ddomain.ao = ao;
-    LIBXL_SLIST_INIT(&ddomain.guests);
+    XEN_SLIST_INIT(&ddomain.guests);
 
     rc = libxl__get_domid(gc, &domid);
     if (rc) {

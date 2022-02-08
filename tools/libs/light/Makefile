@@ -153,14 +153,14 @@ LIBXL_TEST_OBJS += $(foreach t, $(LIBXL_TESTS_INSIDE),libxl_test_$t.opic)
 TEST_PROG_OBJS += $(foreach t, $(LIBXL_TESTS_PROGS),test_$t.o) test_common.o
 TEST_PROGS += $(foreach t, $(LIBXL_TESTS_PROGS),test_$t)
 
-AUTOINCS = $(XEN_INCLUDE)/_libxl_list.h _libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
+AUTOINCS = _libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
 AUTOSRCS = _libxl_save_msgs_callout.c _libxl_save_msgs_helper.c
 
 CLIENTS = testidl libxl-save-helper
 
 SAVE_HELPER_OBJS = libxl_save_helper.o _libxl_save_msgs_helper.o
 
-LIBHEADER := libxl.h libxl_event.h libxl_json.h _libxl_types.h _libxl_types_json.h _libxl_list.h libxl_utils.h libxl_uuid.h
+LIBHEADER := libxl.h libxl_event.h libxl_json.h _libxl_types.h _libxl_types_json.h libxl_utils.h libxl_uuid.h
 
 NO_HEADERS_CHK := y
 
@@ -201,17 +201,13 @@ _libxl.api-for-check: $(XEN_INCLUDE)/libxl.h $(AUTOINCS)
 		>$@.new
 	mv -f $@.new $@
 
-$(XEN_INCLUDE)/_libxl_list.h: $(XEN_INCLUDE)/xen-external/bsd-sys-queue-h-seddery $(XEN_INCLUDE)/xen-external/bsd-sys-queue.h
-	$(PERL) $^ --prefix=libxl >$(notdir $@).new
-	$(call move-if-changed,$(notdir $@).new,$@)
-
 _libxl_save_msgs_helper.c _libxl_save_msgs_callout.c \
 _libxl_save_msgs_helper.h _libxl_save_msgs_callout.h: \
 		libxl_save_msgs_gen.pl
 	$(PERL) -w $< $@ >$@.new
 	$(call move-if-changed,$@.new,$@)
 
-$(XEN_INCLUDE)/libxl.h: $(XEN_INCLUDE)/_libxl_types.h $(XEN_INCLUDE)/_libxl_list.h
+$(XEN_INCLUDE)/libxl.h: $(XEN_INCLUDE)/_libxl_types.h
 $(XEN_INCLUDE)/libxl_json.h: $(XEN_INCLUDE)/_libxl_types_json.h
 libxl_internal.h: _libxl_types_internal.h _libxl_types_private.h _libxl_types_internal_private.h
 libxl_internal_json.h: _libxl_types_internal_json.h

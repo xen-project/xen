@@ -88,7 +88,7 @@ int libxl_evenable_disk_eject(libxl_ctx *ctx, uint32_t guest_domid,
     memset(evg, 0, sizeof(*evg));
     evg->user = user;
     evg->domid = guest_domid;
-    LIBXL_LIST_INSERT_HEAD(&CTX->disk_eject_evgens, evg, entry);
+    XEN_LIST_INSERT_HEAD(&CTX->disk_eject_evgens, evg, entry);
 
     uint32_t domid = libxl_get_stubdom_id(ctx, guest_domid);
 
@@ -133,7 +133,7 @@ int libxl_evenable_disk_eject(libxl_ctx *ctx, uint32_t guest_domid,
 void libxl__evdisable_disk_eject(libxl__gc *gc, libxl_evgen_disk_eject *evg) {
     CTX_LOCK;
 
-    LIBXL_LIST_REMOVE(evg, entry);
+    XEN_LIST_REMOVE(evg, entry);
 
     if (libxl__ev_xswatch_isregistered(&evg->watch))
         libxl__ev_xswatch_deregister(gc, &evg->watch);

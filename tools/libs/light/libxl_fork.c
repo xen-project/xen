@@ -37,14 +37,14 @@
  */
 
 struct libxl__carefd {
-    LIBXL_LIST_ENTRY(libxl__carefd) entry;
+    XEN_LIST_ENTRY(libxl__carefd) entry;
     int fd;
 };
 
 static pthread_mutex_t no_forking = PTHREAD_MUTEX_INITIALIZER;
 static int atfork_registered;
-static LIBXL_LIST_HEAD(, libxl__carefd) carefds =
-    LIBXL_LIST_HEAD_INITIALIZER(carefds);
+static XEN_LIST_HEAD(, libxl__carefd) carefds =
+    XEN_LIST_HEAD_INITIALIZER(carefds);
 
 /* Protected against concurrency by no_forking.  sigchld_users is
  * protected against being interrupted by SIGCHLD (and thus read
@@ -52,8 +52,8 @@ static LIBXL_LIST_HEAD(, libxl__carefd) carefds =
  * below). */
 static bool sigchld_installed; /* 0 means not */
 static pthread_mutex_t sigchld_defer_mutex = PTHREAD_MUTEX_INITIALIZER;
-static LIBXL_LIST_HEAD(, libxl_ctx) sigchld_users =
-    LIBXL_LIST_HEAD_INITIALIZER(sigchld_users);
+static XEN_LIST_HEAD(, libxl_ctx) sigchld_users =
+    XEN_LIST_HEAD_INITIALIZER(sigchld_users);
 static struct sigaction sigchld_saved_action;
 
 static void sigchld_removehandler_core(void); /* idempotent */
@@ -105,7 +105,7 @@ libxl__carefd *libxl__carefd_record(libxl_ctx *ctx, int fd)
     libxl_fd_set_cloexec(ctx, fd, 1);
     cf = libxl__zalloc(&ctx->nogc_gc, sizeof(*cf));
     cf->fd = fd;
-    LIBXL_LIST_INSERT_HEAD(&carefds, cf, entry);
+    XEN_LIST_INSERT_HEAD(&carefds, cf, entry);
     return cf;
 }
 
@@ -141,7 +141,7 @@ void libxl_postfork_child_noexec(libxl_ctx *ctx)
 
     atfork_lock();
 
-    LIBXL_LIST_FOREACH_SAFE(cf, &carefds, entry, cf_tmp) {
+    XEN_LIST_FOREACH_SAFE(cf, &carefds, entry, cf_tmp) {
         if (cf->fd >= 0) {
             r = close(cf->fd);
             if (r)
@@ -151,7 +151,7 @@ void libxl_postfork_child_noexec(libxl_ctx *ctx)
         }
         free(cf);
     }
-    LIBXL_LIST_INIT(&carefds);
+    XEN_LIST_INIT(&carefds);
 
     if (sigchld_installed) {
         /* We are in theory not at risk of concurrent execution of the
@@ -172,7 +172,7 @@ void libxl_postfork_child_noexec(libxl_ctx *ctx)
          * use SIGCHLD, but instead just waits for the child(ren). */
         defer_sigchld();
 
-        LIBXL_LIST_INIT(&sigchld_users);
+        XEN_LIST_INIT(&sigchld_users);
         /* After this the ->sigchld_user_registered entries in the
          * now-obsolete contexts may be lies.  But that's OK because
          * no-one will look at them. */
@@ -190,7 +190,7 @@ int libxl__carefd_close(libxl__carefd *cf)
     atfork_lock();
     int r = cf->fd < 0 ? 0 : close(cf->fd);
     int esave = errno;
-    LIBXL_LIST_REMOVE(cf, entry);
+    XEN_LIST_REMOVE(cf, entry);
     atfork_unlock();
     free(cf);
     errno = esave;
@@ -238,7 +238,7 @@ static void sigchld_handler(int signo)
     int r = pthread_mutex_lock(&sigchld_defer_mutex);
     assert(!r);
 
-    LIBXL_LIST_FOREACH(notify, &sigchld_users, sigchld_users_entry) {
+    XEN_LIST_FOREACH(notify, &sigchld_users, sigchld_users_entry) {
         int e = libxl__self_pipe_wakeup(notify->sigchld_selfpipe[1]);
         if (e) abort(); /* errors are probably EBADF, very bad */
     }
@@ -362,11 +362,11 @@ static void sigchld_user_remove(libxl_ctx *ctx) /* idempotent */
     atfork_lock();
     defer_sigchld();
 
-    LIBXL_LIST_REMOVE(ctx, sigchld_users_entry);
+    XEN_LIST_REMOVE(ctx, sigchld_users_entry);
 
     release_sigchld();
 
-    if (LIBXL_LIST_EMPTY(&sigchld_users))
+    if (XEN_LIST_EMPTY(&sigchld_users))
         sigchld_removehandler_core();
 
     atfork_unlock();
@@ -404,7 +404,7 @@ int libxl__sigchld_needed(libxl__gc *gc) /* non-reentrant, idempotent */
 
         defer_sigchld();
 
-        LIBXL_LIST_INSERT_HEAD(&sigchld_users, CTX, sigchld_users_entry);
+        XEN_LIST_INSERT_HEAD(&sigchld_users, CTX, sigchld_users_entry);
 
         release_sigchld();
         atfork_unlock();
@@ -421,7 +421,7 @@ static bool chldmode_ours(libxl_ctx *ctx, bool creating)
 {
     switch (ctx->childproc_hooks->chldowner) {
     case libxl_sigchld_owner_libxl:
-        return creating || !LIBXL_LIST_EMPTY(&ctx->children);
+        return creating || !XEN_LIST_EMPTY(&ctx->children);
     case libxl_sigchld_owner_mainloop:
         return 0;
     case libxl_sigchld_owner_libxl_always:
@@ -452,7 +452,7 @@ static void childproc_reaped_ours(libxl__egc *egc, libxl__ev_child *ch,
                                  int status)
 {
     pid_t pid = ch->pid;
-    LIBXL_LIST_REMOVE(ch, entry);
+    XEN_LIST_REMOVE(ch, entry);
     ch->pid = -1;
     ch->callback(egc, ch, pid, status);
 }
@@ -462,7 +462,7 @@ static int childproc_reaped(libxl__egc *egc, pid_t pid, int status)
     EGC_GC;
     libxl__ev_child *ch;
 
-    LIBXL_LIST_FOREACH(ch, &CTX->children, entry)
+    XEN_LIST_FOREACH(ch, &CTX->children, entry)
         if (ch->pid == pid)
             goto found;
 
@@ -497,7 +497,7 @@ static void childproc_checkall(libxl__egc *egc)
         int status;
         pid_t got;
 
-        LIBXL_LIST_FOREACH(ch, &CTX->children, entry) {
+        XEN_LIST_FOREACH(ch, &CTX->children, entry) {
             got = checked_waitpid(egc, ch->pid, &status);
             if (got)
                 goto found;
@@ -625,7 +625,7 @@ pid_t libxl__ev_child_fork(libxl__gc *gc, libxl__ev_child *ch,
 
     ch->pid = pid;
     ch->callback = death;
-    LIBXL_LIST_INSERT_HEAD(&CTX->children, ch, entry);
+    XEN_LIST_INSERT_HEAD(&CTX->children, ch, entry);
     rc = pid;
 
  out:
@@ -640,7 +640,7 @@ void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
     GC_INIT(ctx);
     CTX_LOCK;
 
-    assert(LIBXL_LIST_EMPTY(&CTX->children));
+    assert(XEN_LIST_EMPTY(&CTX->children));
 
     if (!hooks)
         hooks = &libxl__childproc_default_hooks;
@@ -698,10 +698,10 @@ void libxl__ev_child_kill_deregister(libxl__ao *ao, libxl__ev_child *ch,
     new_ch->ao = ao;
     new_ch->ch.pid = pid;
     new_ch->ch.callback = deregistered_child_callback;
-    LIBXL_LIST_INSERT_HEAD(&CTX->children, &new_ch->ch, entry);
+    XEN_LIST_INSERT_HEAD(&CTX->children, &new_ch->ch, entry);
     ao->outstanding_killed_child++;
 
-    LIBXL_LIST_REMOVE(ch, entry);
+    XEN_LIST_REMOVE(ch, entry);
     ch->pid = -1;
     int r = kill(pid, sig);
     if (r)

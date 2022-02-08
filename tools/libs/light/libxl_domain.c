@@ -867,7 +867,7 @@ static void domain_death_occurred(libxl__egc *egc,
 
     LOGD(DEBUG, evg->domid, "%s", why);
 
-    libxl_evgen_domain_death *evg_next = LIBXL_TAILQ_NEXT(evg, entry);
+    libxl_evgen_domain_death *evg_next = XEN_TAILQ_NEXT(evg, entry);
     *evg_upd = evg_next;
 
     libxl_event *ev = NEW_EVENT(egc, DOMAIN_DEATH, evg->domid, evg->user);
@@ -875,8 +875,8 @@ static void domain_death_occurred(libxl__egc *egc,
     libxl__event_occurred(egc, ev);
 
     evg->death_reported = 1;
-    LIBXL_TAILQ_REMOVE(&CTX->death_list, evg, entry);
-    LIBXL_TAILQ_INSERT_HEAD(&CTX->death_reported, evg, entry);
+    XEN_TAILQ_REMOVE(&CTX->death_list, evg, entry);
+    XEN_TAILQ_INSERT_HEAD(&CTX->death_reported, evg, entry);
 }
 
 static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
@@ -887,12 +887,12 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
 
     CTX_LOCK;
 
-    evg = LIBXL_TAILQ_FIRST(&CTX->death_list);
+    evg = XEN_TAILQ_FIRST(&CTX->death_list);
 
     for (;;) {
         if (!evg) goto out;
 
-        int nentries = LIBXL_TAILQ_NEXT(evg, entry) ? 200 : 1;
+        int nentries = XEN_TAILQ_NEXT(evg, entry) ? 200 : 1;
         xc_domaininfo_t domaininfos[nentries];
         const xc_domaininfo_t *got = domaininfos, *gotend;
 
@@ -966,7 +966,7 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
 
                 evg->shutdown_reported = 1;
             }
-            evg = LIBXL_TAILQ_NEXT(evg, entry);
+            evg = XEN_TAILQ_NEXT(evg, entry);
         }
 
         assert(rc); /* rc==0 results in us eating all evgs and quitting */
@@ -1015,13 +1015,13 @@ void libxl__evdisable_domain_death(libxl__gc *gc,
     CTX_LOCK;
 
     if (!evg->death_reported)
-        LIBXL_TAILQ_REMOVE(&CTX->death_list, evg, entry);
+        XEN_TAILQ_REMOVE(&CTX->death_list, evg, entry);
     else
-        LIBXL_TAILQ_REMOVE(&CTX->death_reported, evg, entry);
+        XEN_TAILQ_REMOVE(&CTX->death_reported, evg, entry);
 
     free(evg);
 
-    if (!LIBXL_TAILQ_FIRST(&CTX->death_list) &&
+    if (!XEN_TAILQ_FIRST(&CTX->death_list) &&
         libxl__ev_xswatch_isregistered(&CTX->death_watch))
         libxl__ev_xswatch_deregister(gc, &CTX->death_watch);
 

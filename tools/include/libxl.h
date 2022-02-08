@@ -747,7 +747,7 @@
 typedef struct libxl__ctx libxl_ctx;
 
 #include <libxl_uuid.h>
-#include <_libxl_list.h>
+#include <_xen_list.h>
 
 /* API compatibility. */
 #ifdef LIBXL_API_VERSION
@@ -1448,7 +1448,7 @@ typedef struct {
 } libxl_enum_string_table;
 
 struct libxl_event;
-typedef LIBXL_TAILQ_ENTRY(struct libxl_event) libxl_ev_link;
+typedef XEN_TAILQ_ENTRY(struct libxl_event) libxl_ev_link;
 
 /*
  * A boolean variable with an explicit default state.

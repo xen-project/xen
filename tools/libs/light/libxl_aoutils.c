@@ -106,7 +106,7 @@ void libxl__datacopier_init(libxl__datacopier_state *dc)
     libxl__ao_abortable_init(&dc->abrt);
     libxl__ev_fd_init(&dc->toread);
     libxl__ev_fd_init(&dc->towrite);
-    LIBXL_TAILQ_INIT(&dc->bufs);
+    XEN_TAILQ_INIT(&dc->bufs);
 }
 
 void libxl__datacopier_kill(libxl__datacopier_state *dc)
@@ -117,9 +117,9 @@ void libxl__datacopier_kill(libxl__datacopier_state *dc)
     libxl__ao_abortable_deregister(&dc->abrt);
     libxl__ev_fd_deregister(gc, &dc->toread);
     libxl__ev_fd_deregister(gc, &dc->towrite);
-    LIBXL_TAILQ_FOREACH_SAFE(buf, &dc->bufs, entry, tbuf)
+    XEN_TAILQ_FOREACH_SAFE(buf, &dc->bufs, entry, tbuf)
         free(buf);
-    LIBXL_TAILQ_INIT(&dc->bufs);
+    XEN_TAILQ_INIT(&dc->bufs);
 }
 
 static void datacopier_callback(libxl__egc *egc, libxl__datacopier_state *dc,
@@ -182,7 +182,7 @@ void libxl__datacopier_prefixdata(libxl__egc *egc, libxl__datacopier_state *dc,
         memcpy(buf->buf, ptr, buf->used);
 
         dc->used += buf->used;
-        LIBXL_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
+        XEN_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
     }
 }
 
@@ -235,18 +235,18 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
             r = read(ev->fd, dc->readbuf + dc->used, dc->bytes_to_read);
         } else {
             while (dc->used >= dc->maxsz) {
-                libxl__datacopier_buf *rm = LIBXL_TAILQ_FIRST(&dc->bufs);
+                libxl__datacopier_buf *rm = XEN_TAILQ_FIRST(&dc->bufs);
                 dc->used -= rm->used;
                 assert(dc->used >= 0);
-                LIBXL_TAILQ_REMOVE(&dc->bufs, rm, entry);
+                XEN_TAILQ_REMOVE(&dc->bufs, rm, entry);
                 free(rm);
             }
 
-            buf = LIBXL_TAILQ_LAST(&dc->bufs, libxl__datacopier_bufs);
+            buf = XEN_TAILQ_LAST(&dc->bufs, libxl__datacopier_bufs);
             if (!buf || buf->used >= sizeof(buf->buf)) {
                 buf = libxl__malloc(NOGC, sizeof(*buf));
                 buf->used = 0;
-                LIBXL_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
+                XEN_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
             }
             r = read(ev->fd, buf->buf + buf->used,
                      min_t(size_t, sizeof(buf->buf) - buf->used,
@@ -331,11 +331,11 @@ static void datacopier_writable(libxl__egc *egc, libxl__ev_fd *ev,
     }
     assert(revents & POLLOUT);
     for (;;) {
-        libxl__datacopier_buf *buf = LIBXL_TAILQ_FIRST(&dc->bufs);
+        libxl__datacopier_buf *buf = XEN_TAILQ_FIRST(&dc->bufs);
         if (!buf)
             break;
         if (!buf->used) {
-            LIBXL_TAILQ_REMOVE(&dc->bufs, buf, entry);
+            XEN_TAILQ_REMOVE(&dc->bufs, buf, entry);
             free(buf);
             continue;
         }

@@ -245,7 +245,7 @@ struct libxl__ev_fd {
     short events;
     libxl__ev_fd_callback *func;
     /* remainder is private for libxl__ev_fd... */
-    LIBXL_LIST_ENTRY(libxl__ev_fd) entry;
+    XEN_LIST_ENTRY(libxl__ev_fd) entry;
     libxl__osevent_hook_nexus *nexus;
 };
 
@@ -260,7 +260,7 @@ struct libxl__ao_abortable {
     libxl__ao_abortable_callback *callback;
     /* remainder is private for abort machinery */
     bool registered;
-    LIBXL_LIST_ENTRY(libxl__ao_abortable) entry;
+    XEN_LIST_ENTRY(libxl__ao_abortable) entry;
     /*
      * For nested aos:
      *  Semantically, abort affects the whole tree of aos,
@@ -296,7 +296,7 @@ struct libxl__ev_time {
     libxl__ev_time_callback *func;
     /* remainder is private for libxl__ev_time... */
     int infinite; /* not registered in list or with app if infinite */
-    LIBXL_TAILQ_ENTRY(libxl__ev_time) entry;
+    XEN_TAILQ_ENTRY(libxl__ev_time) entry;
     struct timeval abs;
     libxl__osevent_hook_nexus *nexus;
     libxl__ao_abortable abrt;
@@ -323,7 +323,7 @@ struct libxl__ev_evtchn {
     int port;
     /* remainder is private for libxl__ev_evtchn_... */
     bool waiting;
-    LIBXL_LIST_ENTRY(libxl__ev_evtchn) entry;
+    XEN_LIST_ENTRY(libxl__ev_evtchn) entry;
 };
 
 /*
@@ -341,7 +341,7 @@ struct libxl__ev_evtchn {
  * xswatch pointers when we store and retrieve them.
  */
 typedef struct libxl__ev_watch_slot {
-    LIBXL_SLIST_ENTRY(struct libxl__ev_watch_slot) empty;
+    XEN_SLIST_ENTRY(struct libxl__ev_watch_slot) empty;
 } libxl__ev_watch_slot;
 
 _hidden libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc,
@@ -357,7 +357,7 @@ struct libxl__ev_child {
     pid_t pid; /* -1 means unused ("unregistered", ie Idle) */
     libxl__ev_child_callback *callback;
     /* remainder is private for libxl__ev_... */
-    LIBXL_LIST_ENTRY(struct libxl__ev_child) entry;
+    XEN_LIST_ENTRY(struct libxl__ev_child) entry;
 };
 
 /* libxl__ev_immediate
@@ -370,7 +370,7 @@ struct libxl__ev_immediate {
     /* filled by user */
     void (*callback)(libxl__egc *, libxl__ev_immediate *);
     /* private to libxl__ev_immediate */
-    LIBXL_STAILQ_ENTRY(libxl__ev_immediate) entry;
+    XEN_STAILQ_ENTRY(libxl__ev_immediate) entry;
 };
 void libxl__ev_immediate_register(libxl__egc *, libxl__ev_immediate *);
 
@@ -582,7 +582,7 @@ _hidden void libxl__qmp_param_add_integer(libxl__gc *gc,
 struct libxl__evgen_domain_death {
     uint32_t domid;
     unsigned shutdown_reported:1, death_reported:1;
-    LIBXL_TAILQ_ENTRY(libxl_evgen_domain_death) entry;
+    XEN_TAILQ_ENTRY(libxl_evgen_domain_death) entry;
         /* on list .death_reported ? CTX->death_list : CTX->death_reported */
     libxl_ev_user user;
 };
@@ -592,7 +592,7 @@ libxl__evdisable_domain_death(libxl__gc*, libxl_evgen_domain_death*);
 struct libxl__evgen_disk_eject {
     libxl__ev_xswatch watch;
     uint32_t domid;
-    LIBXL_LIST_ENTRY(libxl_evgen_disk_eject) entry;
+    XEN_LIST_ENTRY(libxl_evgen_disk_eject) entry;
     libxl_ev_user user;
     char *vdev, *be_ptr_path;
 };
@@ -620,7 +620,7 @@ struct libxl__poller {
      * The "poller_app" is never idle, but is sometimes on
      * pollers_event.
      */
-    LIBXL_LIST_ENTRY(libxl__poller) entry;
+    XEN_LIST_ENTRY(libxl__poller) entry;
 
     struct pollfd *fd_polls;
     int fd_polls_allocd;
@@ -653,7 +653,7 @@ struct libxl__poller {
      * a promise to also make this check, so the baton will never be
      * dropped.
      */
-    LIBXL_LIST_ENTRY(libxl__poller) active_entry;
+    XEN_LIST_ENTRY(libxl__poller) active_entry;
     bool fds_deregistered;
     bool osevents_added;
 };
@@ -687,7 +687,7 @@ struct libxl__ctx {
        * documented in the libxl public interface.
        */
 
-    LIBXL_TAILQ_HEAD(libxl__event_list, libxl_event) occurred;
+    XEN_TAILQ_HEAD(libxl__event_list, libxl_event) occurred;
 
     int osevent_in_hook;
     const libxl_osevent_hooks *osevent_hooks;
@@ -696,40 +696,40 @@ struct libxl__ctx {
        * for restrictions on the use of the osevent fields. */
 
     libxl__poller *poller_app; /* libxl_osevent_beforepoll and _afterpoll */
-    LIBXL_LIST_HEAD(, libxl__poller) pollers_event, pollers_idle;
-    LIBXL_LIST_HEAD(, libxl__poller) pollers_active;
+    XEN_LIST_HEAD(, libxl__poller) pollers_event, pollers_idle;
+    XEN_LIST_HEAD(, libxl__poller) pollers_active;
 
-    LIBXL_SLIST_HEAD(libxl__osevent_hook_nexi, libxl__osevent_hook_nexus)
+    XEN_SLIST_HEAD(libxl__osevent_hook_nexi, libxl__osevent_hook_nexus)
         hook_fd_nexi_idle, hook_timeout_nexi_idle;
-    LIBXL_LIST_HEAD(, libxl__ev_fd) efds;
-    LIBXL_TAILQ_HEAD(, libxl__ev_time) etimes;
+    XEN_LIST_HEAD(, libxl__ev_fd) efds;
+    XEN_TAILQ_HEAD(, libxl__ev_time) etimes;
 
     libxl__ev_watch_slot *watch_slots;
     int watch_nslots, nwatches;
-    LIBXL_SLIST_HEAD(, libxl__ev_watch_slot) watch_freeslots;
+    XEN_SLIST_HEAD(, libxl__ev_watch_slot) watch_freeslots;
     uint32_t watch_counter; /* helps disambiguate slot reuse */
     libxl__ev_fd watch_efd;
 
     xenevtchn_handle *xce; /* waiting must be done only with libxl__ev_evtchn* */
-    LIBXL_LIST_HEAD(, libxl__ev_evtchn) evtchns_waiting;
+    XEN_LIST_HEAD(, libxl__ev_evtchn) evtchns_waiting;
     libxl__ev_fd evtchn_efd;
 
-    LIBXL_LIST_HEAD(, libxl__ao) aos_inprogress;
+    XEN_LIST_HEAD(, libxl__ao) aos_inprogress;
 
-    LIBXL_TAILQ_HEAD(libxl__evgen_domain_death_list, libxl_evgen_domain_death)
+    XEN_TAILQ_HEAD(libxl__evgen_domain_death_list, libxl_evgen_domain_death)
         death_list /* sorted by domid */,
         death_reported;
     libxl__ev_xswatch death_watch;
 
-    LIBXL_LIST_HEAD(, libxl_evgen_disk_eject) disk_eject_evgens;
+    XEN_LIST_HEAD(, libxl_evgen_disk_eject) disk_eject_evgens;
 
     const libxl_childproc_hooks *childproc_hooks;
     void *childproc_user;
     int sigchld_selfpipe[2]; /* [0]==-1 means handler not installed */
     libxl__ev_fd sigchld_selfpipe_efd;
-    LIBXL_LIST_HEAD(, libxl__ev_child) children;
+    XEN_LIST_HEAD(, libxl__ev_child) children;
     bool sigchld_user_registered;
-    LIBXL_LIST_ENTRY(libxl_ctx) sigchld_users_entry;
+    XEN_LIST_ENTRY(libxl_ctx) sigchld_users_entry;
 
     libxl_version_info version_info;
 
@@ -774,9 +774,9 @@ struct libxl__egc {
      * The egc and its gc may be accessed only on the creating thread. */
     struct libxl__gc gc;
     struct libxl__event_list occurred_for_callback;
-    LIBXL_TAILQ_HEAD(, libxl__ao) aos_for_callback;
-    LIBXL_TAILQ_HEAD(, libxl__aop_occurred) aops_for_callback;
-    LIBXL_STAILQ_HEAD(, libxl__ev_immediate) ev_immediates;
+    XEN_TAILQ_HEAD(, libxl__ao) aos_for_callback;
+    XEN_TAILQ_HEAD(, libxl__aop_occurred) aops_for_callback;
+    XEN_STAILQ_HEAD(, libxl__ev_immediate) ev_immediates;
 };
 
 struct libxl__aop_occurred {
@@ -787,7 +787,7 @@ struct libxl__aop_occurred {
      * While an aop exists, it corresponds to one refcount in
      * ao->progress_reports_outstanding, preventing ao destruction.
      */
-    LIBXL_TAILQ_ENTRY(libxl__aop_occurred) entry;
+    XEN_TAILQ_ENTRY(libxl__aop_occurred) entry;
     libxl__ao *ao;
     libxl_event *ev;
     const libxl_asyncprogress_how *how;
@@ -819,13 +819,13 @@ struct libxl__ao {
     int nested_progeny;
     int progress_reports_outstanding;
     int rc;
-    LIBXL_LIST_HEAD(, libxl__ao_abortable) abortables;
-    LIBXL_LIST_ENTRY(libxl__ao) inprogress_entry;
+    XEN_LIST_HEAD(, libxl__ao_abortable) abortables;
+    XEN_LIST_ENTRY(libxl__ao) inprogress_entry;
     libxl__gc gc;
     libxl_asyncop_how how;
     libxl__poller *poller;
     uint32_t domid;
-    LIBXL_TAILQ_ENTRY(libxl__ao) entry_for_callback;
+    XEN_TAILQ_ENTRY(libxl__ao) entry_for_callback;
     int outstanding_killed_child;
 };
 
@@ -2379,10 +2379,10 @@ bool libxl__stubdomain_is_linux(libxl_domain_build_info *b_info)
 
 #define LIBXL_INIT_EGC(egc,ctx) do{                     \
         LIBXL_INIT_GC((egc).gc,ctx);                    \
-        LIBXL_TAILQ_INIT(&(egc).occurred_for_callback); \
-        LIBXL_TAILQ_INIT(&(egc).aos_for_callback);      \
-        LIBXL_TAILQ_INIT(&(egc).aops_for_callback);     \
-        LIBXL_STAILQ_INIT(&(egc).ev_immediates);        \
+        XEN_TAILQ_INIT(&(egc).occurred_for_callback);   \
+        XEN_TAILQ_INIT(&(egc).aos_for_callback);        \
+        XEN_TAILQ_INIT(&(egc).aops_for_callback);       \
+        XEN_STAILQ_INIT(&(egc).ev_immediates);          \
     } while(0)
 
 _hidden void libxl__egc_ao_cleanup_1_baton(libxl__gc *gc);
@@ -3141,7 +3141,7 @@ typedef void libxl__datacopier_callback(libxl__egc *egc,
 
 struct libxl__datacopier_buf {
     /* private to datacopier */
-    LIBXL_TAILQ_ENTRY(libxl__datacopier_buf) entry;
+    XEN_TAILQ_ENTRY(libxl__datacopier_buf) entry;
     int used;
     char buf[1000];
 };
@@ -3163,7 +3163,7 @@ struct libxl__datacopier_state {
     libxl__ao_abortable abrt;
     libxl__ev_fd toread, towrite;
     ssize_t used;
-    LIBXL_TAILQ_HEAD(libxl__datacopier_bufs, libxl__datacopier_buf) bufs;
+    XEN_TAILQ_HEAD(libxl__datacopier_bufs, libxl__datacopier_buf) bufs;
 };
 
 _hidden void libxl__datacopier_init(libxl__datacopier_state *dc);
@@ -3443,7 +3443,7 @@ typedef struct libxl__stream_read_state libxl__stream_read_state;
 
 typedef struct libxl__sr_record_buf {
     /* private to stream read helper */
-    LIBXL_STAILQ_ENTRY(struct libxl__sr_record_buf) entry;
+    XEN_STAILQ_ENTRY(struct libxl__sr_record_buf) entry;
     libxl__sr_rec_hdr hdr;
     void *body; /* iff hdr.length != 0 */
 } libxl__sr_record_buf;
@@ -3473,7 +3473,7 @@ struct libxl__stream_read_state {
     /* Main stream-reading data. */
     libxl__datacopier_state dc; /* Only used when reading a record */
     libxl__sr_hdr hdr;
-    LIBXL_STAILQ_HEAD(, libxl__sr_record_buf) record_queue; /* NOGC */
+    XEN_STAILQ_HEAD(, libxl__sr_record_buf) record_queue; /* NOGC */
     enum {
         SRS_PHASE_NORMAL,
         SRS_PHASE_BUFFERING,
@@ -4599,9 +4599,9 @@ static inline int libxl__defbool_is_default(libxl_defbool *db)
 #define LIBXL_TAILQ_INSERT_SORTED(head, entry, elm_new, elm_search,     \
                                   search_body, new_after_search_p)      \
     do {                                                                \
-        for ((elm_search) = LIBXL_TAILQ_FIRST((head));                  \
+        for ((elm_search) = XEN_TAILQ_FIRST((head));                    \
              (elm_search);                                              \
-             (elm_search) = LIBXL_TAILQ_NEXT((elm_search), entry)) {    \
+             (elm_search) = XEN_TAILQ_NEXT((elm_search), entry)) {      \
             search_body;                                                \
             if (!(new_after_search_p))                                  \
                 break;                                                  \
@@ -4610,9 +4610,9 @@ static inline int libxl__defbool_is_default(libxl_defbool *db)
          * to place elm_new, or NULL meaning we want to put elm_new at  \
          * the end */                                                   \
         if ((elm_search))                                               \
-            LIBXL_TAILQ_INSERT_BEFORE((elm_search), (elm_new), entry);  \
+            XEN_TAILQ_INSERT_BEFORE((elm_search), (elm_new), entry);    \
         else                                                            \
-            LIBXL_TAILQ_INSERT_TAIL((head), (elm_new), entry);          \
+            XEN_TAILQ_INSERT_TAIL((head), (elm_new), entry);            \
     } while(0)
 
 

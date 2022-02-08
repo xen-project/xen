@@ -214,7 +214,7 @@ void libxl__stream_read_init(libxl__stream_read_state *stream)
     stream->sync_teardown = false;
     FILLZERO(stream->dc);
     FILLZERO(stream->hdr);
-    LIBXL_STAILQ_INIT(&stream->record_queue);
+    XEN_STAILQ_INIT(&stream->record_queue);
     stream->phase = SRS_PHASE_NORMAL;
     stream->recursion_guard = false;
     stream->incoming_record = NULL;
@@ -402,7 +402,7 @@ static void stream_continue(libxl__egc *egc,
          * processing the record.  There should never be two records
          * in the queue.
          */
-        if (LIBXL_STAILQ_EMPTY(&stream->record_queue))
+        if (XEN_STAILQ_EMPTY(&stream->record_queue))
             setup_read_record(egc, stream);
         else {
             if (process_record(egc, stream))
@@ -412,7 +412,7 @@ static void stream_continue(libxl__egc *egc,
              * process_record() had better have consumed the one and
              * only record in the queue.
              */
-            assert(LIBXL_STAILQ_EMPTY(&stream->record_queue));
+            assert(XEN_STAILQ_EMPTY(&stream->record_queue));
         }
         break;
 
@@ -428,7 +428,7 @@ static void stream_continue(libxl__egc *egc,
          * the tail to spot the CHECKPOINT_END record, and switch to
          * the unbuffering phase.
          */
-        libxl__sr_record_buf *rec = LIBXL_STAILQ_LAST(
+        libxl__sr_record_buf *rec = XEN_STAILQ_LAST(
             &stream->record_queue, libxl__sr_record_buf, entry);
 
         assert(stream->in_checkpoint);
@@ -537,7 +537,7 @@ static void record_body_done(libxl__egc *egc,
     if (rc)
         goto err;
 
-    LIBXL_STAILQ_INSERT_TAIL(&stream->record_queue, rec, entry);
+    XEN_STAILQ_INSERT_TAIL(&stream->record_queue, rec, entry);
     stream->incoming_record = NULL;
 
     stream_continue(egc, stream);
@@ -567,9 +567,9 @@ static bool process_record(libxl__egc *egc,
     int rc = 0;
 
     /* Pop a record from the head of the queue. */
-    assert(!LIBXL_STAILQ_EMPTY(&stream->record_queue));
-    rec = LIBXL_STAILQ_FIRST(&stream->record_queue);
-    LIBXL_STAILQ_REMOVE_HEAD(&stream->record_queue, entry);
+    assert(!XEN_STAILQ_EMPTY(&stream->record_queue));
+    rec = XEN_STAILQ_FIRST(&stream->record_queue);
+    XEN_STAILQ_REMOVE_HEAD(&stream->record_queue, entry);
 
     LOG(DEBUG, "Record: %u, length %u", rec->hdr.type, rec->hdr.length);
 
@@ -813,9 +813,9 @@ static void stream_done(libxl__egc *egc,
 
     /* The record queue had better be empty if the stream believes
      * itself to have been successful. */
-    assert(LIBXL_STAILQ_EMPTY(&stream->record_queue) || stream->rc);
+    assert(XEN_STAILQ_EMPTY(&stream->record_queue) || stream->rc);
 
-    LIBXL_STAILQ_FOREACH_SAFE(rec, &stream->record_queue, entry, trec)
+    XEN_STAILQ_FOREACH_SAFE(rec, &stream->record_queue, entry, trec)
         free_record(rec);
 
     if (!stream->back_channel) {

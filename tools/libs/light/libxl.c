@@ -41,29 +41,29 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     ctx->nogc_gc.alloc_maxsize = -1;
     ctx->nogc_gc.owner = ctx;
 
-    LIBXL_TAILQ_INIT(&ctx->occurred);
+    XEN_TAILQ_INIT(&ctx->occurred);
 
     ctx->osevent_hooks = 0;
 
     ctx->poller_app = 0;
-    LIBXL_LIST_INIT(&ctx->pollers_event);
-    LIBXL_LIST_INIT(&ctx->pollers_idle);
-    LIBXL_LIST_INIT(&ctx->pollers_active);
+    XEN_LIST_INIT(&ctx->pollers_event);
+    XEN_LIST_INIT(&ctx->pollers_idle);
+    XEN_LIST_INIT(&ctx->pollers_active);
 
-    LIBXL_LIST_INIT(&ctx->efds);
-    LIBXL_TAILQ_INIT(&ctx->etimes);
+    XEN_LIST_INIT(&ctx->efds);
+    XEN_TAILQ_INIT(&ctx->etimes);
 
     ctx->watch_slots = 0;
-    LIBXL_SLIST_INIT(&ctx->watch_freeslots);
+    XEN_SLIST_INIT(&ctx->watch_freeslots);
     libxl__ev_fd_init(&ctx->watch_efd);
 
     ctx->xce = 0;
-    LIBXL_LIST_INIT(&ctx->evtchns_waiting);
+    XEN_LIST_INIT(&ctx->evtchns_waiting);
     libxl__ev_fd_init(&ctx->evtchn_efd);
 
-    LIBXL_LIST_INIT(&ctx->aos_inprogress);
+    XEN_LIST_INIT(&ctx->aos_inprogress);
 
-    LIBXL_TAILQ_INIT(&ctx->death_list);
+    XEN_TAILQ_INIT(&ctx->death_list);
     libxl__ev_xswatch_init(&ctx->death_watch);
 
     ctx->childproc_hooks = &libxl__childproc_default_hooks;
@@ -122,14 +122,14 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 static void free_disable_deaths(libxl__gc *gc,
                                 struct libxl__evgen_domain_death_list *l) {
     libxl_evgen_domain_death *death;
-    while ((death = LIBXL_TAILQ_FIRST(l)))
+    while ((death = XEN_TAILQ_FIRST(l)))
         libxl__evdisable_domain_death(gc, death);
 }
 
 static void discard_events(struct libxl__event_list *l) {
     /* doesn't bother unlinking from the list, so l is corrupt on return */
     libxl_event *ev, *next;
-    LIBXL_TAILQ_FOREACH_SAFE(ev, l, link, next)
+    XEN_TAILQ_FOREACH_SAFE(ev, l, link, next)
         libxl_event_free(0, ev);
 }
 
@@ -150,7 +150,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
     free_disable_deaths(gc, &CTX->death_reported);
 
     libxl_evgen_disk_eject *eject;
-    while ((eject = LIBXL_LIST_FIRST(&CTX->disk_eject_evgens)))
+    while ((eject = XEN_LIST_FIRST(&CTX->disk_eject_evgens)))
         libxl__evdisable_disk_eject(gc, eject);
 
     libxl_childproc_setmode(CTX,0,0);
@@ -162,10 +162,10 @@ int libxl_ctx_free(libxl_ctx *ctx)
 
     /* Now there should be no more events requested from the application: */
 
-    assert(LIBXL_LIST_EMPTY(&ctx->efds));
-    assert(LIBXL_TAILQ_EMPTY(&ctx->etimes));
-    assert(LIBXL_LIST_EMPTY(&ctx->evtchns_waiting));
-    assert(LIBXL_LIST_EMPTY(&ctx->aos_inprogress));
+    assert(XEN_LIST_EMPTY(&ctx->efds));
+    assert(XEN_TAILQ_EMPTY(&ctx->etimes));
+    assert(XEN_LIST_EMPTY(&ctx->evtchns_waiting));
+    assert(XEN_LIST_EMPTY(&ctx->aos_inprogress));
 
     if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_dispose(&ctx->version_info);
@@ -174,10 +174,10 @@ int libxl_ctx_free(libxl_ctx *ctx)
 
     libxl__poller_put(ctx, ctx->poller_app);
     ctx->poller_app = NULL;
-    assert(LIBXL_LIST_EMPTY(&ctx->pollers_event));
-    assert(LIBXL_LIST_EMPTY(&ctx->pollers_active));
+    assert(XEN_LIST_EMPTY(&ctx->pollers_event));
+    assert(XEN_LIST_EMPTY(&ctx->pollers_active));
     libxl__poller *poller, *poller_tmp;
-    LIBXL_LIST_FOREACH_SAFE(poller, &ctx->pollers_idle, entry, poller_tmp) {
+    XEN_LIST_FOREACH_SAFE(poller, &ctx->pollers_idle, entry, poller_tmp) {
         libxl__poller_dispose(poller);
         free(poller);
     }
