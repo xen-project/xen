@@ -1,8 +1,8 @@
 /*
  * xen/drivers/char/scif-uart.c
  *
- * Driver for SCIF(A) (Serial communication interface with FIFO (A))
- * compatible UART.
+ * Driver for (H)SCIF(A) ((High-speed) Serial communication interface
+ * with FIFO (A)) compatible UART.
  *
  * Oleksandr Tyshchenko <oleksandr.tyshchenko@globallogic.com>
  * Copyright (C) 2014, Globallogic.
@@ -47,6 +47,7 @@ enum port_types
 {
     SCIF_PORT,
     SCIFA_PORT,
+    HSCIF_PORT,
     NR_PORTS,
 };
 
@@ -87,6 +88,17 @@ static const struct port_params port_params[NR_PORTS] =
         .irq_flags    = SCASCR_RIE | SCASCR_TIE | SCASCR_DRIE | SCASCR_ERIE |
                         SCASCR_BRIE,
         .fifo_size    = 64,
+    },
+    [HSCIF_PORT] =
+    {
+        .status_reg   = SCIF_SCFSR,
+        .tx_fifo_reg  = SCIF_SCFTDR,
+        .rx_fifo_reg  = SCIF_SCFRDR,
+        .overrun_reg  = SCIF_SCLSR,
+        .overrun_mask = SCLSR_ORER,
+        .error_mask   = SCFSR_PER | SCFSR_FER | SCFSR_BRK | SCFSR_ER,
+        .irq_flags    = SCSCR_RIE | SCSCR_TIE | SCSCR_REIE,
+        .fifo_size    = 128,
     },
 };
 
@@ -288,6 +300,7 @@ static const struct dt_device_match scif_uart_dt_match[] __initconst =
 {
     { .compatible = "renesas,scif",  .data = &port_params[SCIF_PORT] },
     { .compatible = "renesas,scifa", .data = &port_params[SCIFA_PORT] },
+    { .compatible = "renesas,hscif", .data = &port_params[HSCIF_PORT] },
     { /* sentinel */ },
 };
 
