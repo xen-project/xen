@@ -70,11 +70,13 @@ install: all
 	$(INSTALL_DATA) xen/io/*.h $(DESTDIR)$(includedir)/xen/io
 	$(INSTALL_DATA) xen/sys/*.h $(DESTDIR)$(includedir)/xen/sys
 	$(INSTALL_DATA) xen/xsm/*.h $(DESTDIR)$(includedir)/xen/xsm
+	$(INSTALL_DATA) _xen_list.h $(DESTDIR)$(includedir)
 
 .PHONY: uninstall
 uninstall:
 	echo "[FIXME] uninstall headers"
 	rm -rf $(DESTDIR)$(includedir)/xen
+	rm -f $(DESTDIR)$(includedir)/_xen_list.h
 
 .PHONY: clean
 clean:
