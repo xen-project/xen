@@ -49,8 +49,6 @@ $(LIB_OBJS) $(PIC_OBJS): $(AUTOINCS)
 	@rm -f $*.[ch]
 	$(FLEX) --header-file=$*.h --outfile=$*.c $<
 
--include $(DEPS_INCLUDE)
-
 clean: cleanlocal
 
 .PHONY: cleanlocal

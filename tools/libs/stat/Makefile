@@ -121,5 +121,3 @@ clean: cleanlocal
 cleanlocal:
 	rm -f $(BINDINGS) $(BINDINGSRC) $(DEPS_RM)
 	rm -f libxenstat.map
-
--include $(DEPS_INCLUDE)

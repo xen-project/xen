@@ -29,8 +29,6 @@ ifeq ($(CONFIG_Linux),y)
 xs.opic: CFLAGS += -DUSE_DLSYM
 endif
 
--include $(DEPS_INCLUDE)
-
 .PHONY: install
 install: install-headers
 

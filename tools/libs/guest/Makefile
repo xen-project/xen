@@ -106,8 +106,6 @@ include $(XEN_ROOT)/tools/libs/libs.mk
 libxenguest.so.$(MAJOR).$(MINOR): COMPRESSION_LIBS = $(filter -l%,$(zlib-options))
 libxenguest.so.$(MAJOR).$(MINOR): APPEND_LDFLAGS += $(COMPRESSION_LIBS) -lz
 
--include $(DEPS_INCLUDE)
-
 .PHONY: cleanlocal
 cleanlocal:
 	rm -f libxenguest.map
