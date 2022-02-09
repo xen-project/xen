@@ -181,6 +181,11 @@ static int parse_gnttab_max_maptrack_frames(const char *arg)
 
 unsigned int __read_mostly opt_gnttab_max_version = GNTTAB_MAX_VERSION;
 static bool __read_mostly opt_transitive_grants = true;
+#ifdef CONFIG_PV
+static bool __ro_after_init opt_grant_transfer = true;
+#else
+#define opt_grant_transfer false
+#endif
 
 static int __init parse_gnttab(const char *s)
 {
@@ -204,6 +209,10 @@ static int __init parse_gnttab(const char *s)
         }
         else if ( (val = parse_boolean("transitive", s, ss)) >= 0 )
             opt_transitive_grants = val;
+#ifndef opt_grant_transfer
+        else if ( (val = parse_boolean("transfer", s, ss)) >= 0 )
+            opt_grant_transfer = val;
+#endif
         else
             rc = -EINVAL;
 
@@ -2232,6 +2241,9 @@ gnttab_transfer(
     mfn_t mfn;
     unsigned int max_bitsize;
     struct active_grant_entry *act;
+
+    if ( !opt_grant_transfer )
+        return -EOPNOTSUPP;
 
     for ( i = 0; i < count; i++ )
     {

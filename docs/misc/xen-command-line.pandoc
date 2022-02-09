@@ -1167,9 +1167,9 @@ does not provide `VM_ENTRY_LOAD_GUEST_PAT`.
 Specify which console gdbstub should use. See **console**.
 
 ### gnttab
-> `= List of [ max-ver:<integer>, transitive=<bool> ]`
+> `= List of [ max-ver:<integer>, transitive=<bool>, transfer=<bool> ]`
 
-> Default: `gnttab=max-ver:2,transitive`
+> Default: `gnttab=max-ver:2,transitive,transfer`
 
 Control various aspects of the grant table behaviour available to guests.
 
@@ -1178,6 +1178,10 @@ version are 1 and 2.
 * `transitive` Permit or disallow the use of transitive grants.  Note that the
 use of grant table v2 without transitive grants is an ABI breakage from the
 guests point of view.
+* `transfer` Permit or disallow the GNTTABOP_transfer operation of the
+grant table hypercall.  Note that disallowing GNTTABOP_transfer is an ABI
+breakage from the guests point of view.  This option is only available on
+hypervisors configured to support PV guests.
 
 The usage of gnttab v2 is not security supported on ARM platforms.
 
