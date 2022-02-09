@@ -1965,58 +1965,6 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
     return hostmode->gva_to_gfn(v, hostp2m, va, pfec);
 }
 
-#endif /* CONFIG_HVM */
-
-/*
- * If the map is non-NULL, we leave this function having acquired an extra ref
- * on mfn_to_page(*mfn).  In all cases, *pfec contains appropriate
- * synthetic/structure PFEC_* bits.
- */
-void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
-                     p2m_query_t q, uint32_t *pfec)
-{
-    p2m_type_t p2mt;
-    struct page_info *page;
-
-    if ( !gfn_valid(p2m->domain, gfn) )
-    {
-        *pfec = PFEC_reserved_bit | PFEC_page_present;
-        return NULL;
-    }
-
-    /* Translate the gfn, unsharing if shared. */
-    page = p2m_get_page_from_gfn(p2m, gfn, &p2mt, NULL, q);
-    if ( p2m_is_paging(p2mt) )
-    {
-        ASSERT(p2m_is_hostp2m(p2m));
-        if ( page )
-            put_page(page);
-        p2m_mem_paging_populate(p2m->domain, gfn);
-        *pfec = PFEC_page_paged;
-        return NULL;
-    }
-    if ( p2m_is_shared(p2mt) )
-    {
-        if ( page )
-            put_page(page);
-        *pfec = PFEC_page_shared;
-        return NULL;
-    }
-    if ( !page )
-    {
-        *pfec = 0;
-        return NULL;
-    }
-
-    *pfec = PFEC_page_present;
-    *mfn = page_to_mfn(page);
-    ASSERT(mfn_valid(*mfn));
-
-    return map_domain_page(*mfn);
-}
-
-#ifdef CONFIG_HVM
-
 static unsigned int mmio_order(const struct domain *d,
                                unsigned long start_fn, unsigned long nr)
 {
