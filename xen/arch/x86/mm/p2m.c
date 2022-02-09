@@ -1678,11 +1678,10 @@ p2m_flush_table_locked(struct p2m_domain *p2m)
      * when discarding them.
      */
     ASSERT(!p2m_is_hostp2m(p2m));
-#ifdef CONFIG_HVM
-    /* Nested p2m's do not do pod, hence the asserts (and no pod lock)*/
+
+    /* Nested p2m's do not do pod, hence the asserts (and no pod lock) */
     ASSERT(page_list_empty(&p2m->pod.super));
     ASSERT(page_list_empty(&p2m->pod.single));
-#endif
 
     /* No need to flush if it's already empty */
     if ( p2m_is_nestedp2m(p2m) && p2m->np2m_base == P2M_BASE_EADDR )
@@ -2599,7 +2598,6 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 
     return ret;
 }
-#endif /* CONFIG_HVM */
 
 /*** Audit ***/
 
@@ -2704,8 +2702,6 @@ out_p2m_audit:
     *p2m_bad = (uint64_t) pmbad;
 }
 #endif /* P2M_AUDIT */
-
-#ifdef CONFIG_HVM
 
 /*
  * Add frame from foreign domain to target domain's physmap. Similar to
