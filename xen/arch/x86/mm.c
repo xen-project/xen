@@ -4811,23 +4811,17 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -ESRCH;
 
         if ( cmd == XENMEM_set_pod_target )
+        {
             rc = xsm_set_pod_target(XSM_PRIV, d);
+            if ( rc )
+                ASSERT(rc < 0);
+            else if ( target.target_pages > d->max_pages )
+                rc = -EINVAL;
+            else
+                rc = p2m_pod_set_mem_target(d, target.target_pages);
+        }
         else
             rc = xsm_get_pod_target(XSM_PRIV, d);
-
-        if ( rc != 0 )
-            goto pod_target_out_unlock;
-
-        if ( cmd == XENMEM_set_pod_target )
-        {
-            if ( target.target_pages > d->max_pages )
-            {
-                rc = -EINVAL;
-                goto pod_target_out_unlock;
-            }
-
-            rc = p2m_pod_set_mem_target(d, target.target_pages);
-        }
 
         if ( rc == -ERESTART )
         {
@@ -4842,13 +4836,9 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             target.pod_entries     = p2m->pod.entry_count;
 
             if ( __copy_to_guest(arg, &target, 1) )
-            {
-                rc= -EFAULT;
-                goto pod_target_out_unlock;
-            }
+                rc = -EFAULT;
         }
 
-    pod_target_out_unlock:
         rcu_unlock_domain(d);
         return rc;
     }
