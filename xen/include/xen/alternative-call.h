@@ -57,7 +57,7 @@
 #define alternative_call(func, args...)  (func)(args)
 #define alternative_vcall(func, args...) (func)(args)
 
-#define __alt_call_maybe_initdata __read_mostly
+#define __alt_call_maybe_initdata __ro_after_init
 
 #endif /* !CONFIG_ALTERNATIVE_CALL */
 #endif /* XEN_ALTERNATIVE_CALL */
