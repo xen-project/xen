@@ -152,6 +152,7 @@ struct vgic_dist {
     struct pending_irq *pending_irqs;
     /* Base address for guest GIC */
     paddr_t dbase; /* Distributor base address */
+    paddr_t cbase; /* CPU interface base address */
 #ifdef CONFIG_GICV3
     /* GIC V3 addressing */
     /* List of contiguous occupied by the redistributors */
@@ -270,6 +271,16 @@ static inline int REG_RANK_NR(int b, uint32_t n)
 }
 
 enum gic_sgi_mode;
+
+static inline paddr_t vgic_cpu_base(const struct vgic_dist *vgic)
+{
+    return vgic->cbase;
+}
+
+static inline paddr_t vgic_dist_base(const struct vgic_dist *vgic)
+{
+    return vgic->dbase;
+}
 
 /*
  * Offset of GICD_<FOO><n> with its rank, for GICD_<FOO> size <s> with
