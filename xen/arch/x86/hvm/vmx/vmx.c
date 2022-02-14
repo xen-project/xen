@@ -2473,7 +2473,7 @@ static void cf_check vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
     vmx_vmcs_exit(v);
 }
 
-static struct hvm_function_table __initdata vmx_function_table = {
+static struct hvm_function_table __initdata_cf_clobber vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
     .cpu_dead             = vmx_cpu_dead,

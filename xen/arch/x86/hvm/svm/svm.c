@@ -2513,7 +2513,7 @@ static void cf_check svm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
     }
 }
 
-static struct hvm_function_table __initdata svm_function_table = {
+static struct hvm_function_table __initdata_cf_clobber svm_function_table = {
     .name                 = "SVM",
     .cpu_up_prepare       = svm_cpu_up_prepare,
     .cpu_dead             = svm_cpu_dead,

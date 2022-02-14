@@ -88,7 +88,7 @@ unsigned int opt_hvm_debug_level __read_mostly;
 integer_param("hvm_debug", opt_hvm_debug_level);
 #endif
 
-struct hvm_function_table hvm_funcs __read_mostly;
+struct hvm_function_table __ro_after_init hvm_funcs;
 
 /*
  * The I/O permission bitmap is globally shared by all HVM guests except
