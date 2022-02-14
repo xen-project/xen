@@ -127,9 +127,12 @@ bool __init probe_cpuid_faulting(void)
 
 	/*
 	 * Don't bother looking for CPUID faulting if we aren't virtualised on
-	 * AMD or Hygon hardware - it won't be present.
+	 * AMD or Hygon hardware - it won't be present.  Likewise for Fam0F
+	 * Intel hardware.
 	 */
-	if ((boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) &&
+	if (((boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) ||
+	     ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) &&
+	      boot_cpu_data.x86 == 0xf)) &&
 	    !cpu_has_hypervisor)
 		return false;
 

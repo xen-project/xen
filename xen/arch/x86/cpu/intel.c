@@ -455,7 +455,7 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
         }
     }
 
-    if ( rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msrval) )
+    if ( c->x86 == 0xf || rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msrval) )
         return;
     max_ratio = msrval >> 8;
 
