@@ -58,16 +58,42 @@ ENTRY(__bp_harden_hyp_vecs_start)
     .endr
 ENTRY(__bp_harden_hyp_vecs_end)
 
-ENTRY(__smccc_workaround_1_smc_start)
+.macro mitigate_spectre_bhb_loop count
+ENTRY(__mitigate_spectre_bhb_loop_start_\count)
+    stp     x0, x1, [sp, #-16]!
+    mov     x0, \count
+.Lspectre_bhb_loop\@:
+    b   . + 4
+    subs    x0, x0, #1
+    b.ne    .Lspectre_bhb_loop\@
+    sb
+    ldp     x0, x1, [sp], #16
+ENTRY(__mitigate_spectre_bhb_loop_end_\count)
+.endm
+
+.macro smccc_workaround num smcc_id
+ENTRY(__smccc_workaround_smc_start_\num)
     sub     sp, sp, #(8 * 4)
     stp     x0, x1, [sp, #(8 * 2)]
     stp     x2, x3, [sp, #(8 * 0)]
-    mov     w0, #ARM_SMCCC_ARCH_WORKAROUND_1_FID
+    mov     w0, \smcc_id
     smc     #0
     ldp     x2, x3, [sp, #(8 * 0)]
     ldp     x0, x1, [sp, #(8 * 2)]
     add     sp, sp, #(8 * 4)
-ENTRY(__smccc_workaround_1_smc_end)
+ENTRY(__smccc_workaround_smc_end_\num)
+.endm
+
+ENTRY(__mitigate_spectre_bhb_clear_insn_start)
+    clearbhb
+    isb
+ENTRY(__mitigate_spectre_bhb_clear_insn_end)
+
+mitigate_spectre_bhb_loop 8
+mitigate_spectre_bhb_loop 24
+mitigate_spectre_bhb_loop 32
+smccc_workaround 1, #ARM_SMCCC_ARCH_WORKAROUND_1_FID
+smccc_workaround 3, #ARM_SMCCC_ARCH_WORKAROUND_3_FID
 
 /*
  * Local variables:
