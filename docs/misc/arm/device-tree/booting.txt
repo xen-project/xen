@@ -182,6 +182,12 @@ with the following properties:
     Both #address-cells and #size-cells need to be specified because
     both sub-nodes (described shortly) have reg properties.
 
+- direct-map
+
+    Only available when statically allocated memory is used for the domain.
+    An empty property to request the memory of the domain to be
+    direct-map (guest physical address == physical address).
+
 Under the "xen,domain" compatible node, one or more sub-nodes are present
 for the DomU kernel and ramdisk.
 
