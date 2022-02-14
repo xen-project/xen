@@ -250,7 +250,9 @@ asm ( ".macro override insn    \n\t"
 # define OVR_INT(n) OVR_BW(n); OVR_DQ(n)
 
 OVR_INT(broadcast);
+# ifdef __AVX512VL__
 OVR_SFP(broadcast);
+# endif
 OVR_SFP(comi);
 OVR_VFP(cvtdq2);
 OVR_INT(abs);
