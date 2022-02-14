@@ -31,6 +31,20 @@ enum domain_type {
 
 #define is_domain_direct_mapped(d) (d)->arch.directmap
 
+/*
+ * Is the domain using the host memory layout?
+ *
+ * Direct-mapped domain will always have the RAM mapped with GFN == MFN.
+ * To avoid any trouble finding space, it is easier to force using the
+ * host memory layout.
+ *
+ * The hardware domain will use the host layout regardless of
+ * direct-mapped because some OS may rely on a specific address ranges
+ * for the devices.
+ */
+#define domain_use_host_layout(d) (is_domain_direct_mapped(d) || \
+                                   is_hardware_domain(d))
+
 struct vtimer {
     struct vcpu *v;
     int irq;
