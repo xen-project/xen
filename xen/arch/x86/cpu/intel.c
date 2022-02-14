@@ -412,9 +412,9 @@ static int num_cpu_cores(struct cpuinfo_x86 *c)
 
 static void intel_log_freq(const struct cpuinfo_x86 *c)
 {
-    unsigned int eax, ebx, ecx, edx;
+    unsigned int eax, ebx, ecx, edx, factor;
     uint64_t msrval;
-    uint8_t max_ratio;
+    uint8_t max_ratio, min_ratio;
 
     if ( c->cpuid_level >= 0x15 )
     {
@@ -455,21 +455,22 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
         }
     }
 
-    if ( c->x86 == 0xf || rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msrval) )
-        return;
-    max_ratio = msrval >> 8;
-
-    if ( max_ratio )
+    switch ( c->x86 )
     {
-        unsigned int factor = 10000;
-        uint8_t min_ratio = msrval >> 40;
+        static const unsigned short core_factors[] =
+            { 26667, 13333, 20000, 16667, 33333, 10000, 40000 };
 
-        if ( c->x86 == 6 )
+    case 6:
+        if ( rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msrval) )
+            return;
+        max_ratio = msrval >> 8;
+        min_ratio = msrval >> 40;
+        if ( !max_ratio )
+            return;
+
+        {
             switch ( c->x86_model )
             {
-                static const unsigned short core_factors[] =
-                    { 26667, 13333, 20000, 16667, 33333, 10000, 40000 };
-
             case 0x0e: /* Core */
             case 0x0f: case 0x16: case 0x17: case 0x1d: /* Core2 */
                 /*
@@ -491,13 +492,33 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
             case 0x25: case 0x2c: case 0x2f: /* Westmere */
                 factor = 13333;
                 break;
-            }
 
-        printk("CPU%u: ", smp_processor_id());
-        if ( min_ratio )
-            printk("%u ... ", (factor * min_ratio + 50) / 100);
-        printk("%u MHz\n", (factor * max_ratio + 50) / 100);
+            default:
+                factor = 10000;
+                break;
+            }
+        }
+        break;
+
+    case 0xf:
+        if ( rdmsr_safe(MSR_IA32_EBC_FREQUENCY_ID, msrval) )
+            return;
+        max_ratio = msrval >> 24;
+        min_ratio = 0;
+        msrval >>= 16;
+        if ( (msrval &= 7) > 4 )
+            return;
+        factor = core_factors[msrval];
+        break;
+
+    default:
+        return;
     }
+
+    printk("CPU%u: ", smp_processor_id());
+    if ( min_ratio )
+        printk("%u ... ", (factor * min_ratio + 50) / 100);
+    printk("%u MHz\n", (factor * max_ratio + 50) / 100);
 }
 
 static void init_intel(struct cpuinfo_x86 *c)
