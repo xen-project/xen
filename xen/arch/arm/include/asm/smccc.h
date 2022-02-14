@@ -334,6 +334,12 @@ void __arm_smccc_1_0_smc(register_t a0, register_t a1, register_t a2,
                        ARM_SMCCC_OWNER_ARCH,        \
                        0x7FFF)
 
+#define ARM_SMCCC_ARCH_WORKAROUND_3_FID             \
+    ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
+                       ARM_SMCCC_CONV_32,           \
+                       ARM_SMCCC_OWNER_ARCH,        \
+                       0x3FFF)
+
 /* SMCCC error codes */
 #define ARM_SMCCC_NOT_REQUIRED          (-2)
 #define ARM_SMCCC_ERR_UNKNOWN_FUNCTION  (-1)
