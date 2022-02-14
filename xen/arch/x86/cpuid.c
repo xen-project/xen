@@ -609,7 +609,7 @@ void __init init_guest_cpuid(void)
 bool recheck_cpu_features(unsigned int cpu)
 {
     bool okay = true;
-    struct cpuinfo_x86 c;
+    struct cpuinfo_x86 c = {0};
     const struct cpuinfo_x86 *bsp = &boot_cpu_data;
     unsigned int i;
 
