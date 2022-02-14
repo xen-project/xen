@@ -453,7 +453,8 @@ static bool __init check_smt_enabled(void)
      * At the time of writing, it is almost completely undocumented, so isn't
      * virtualised reliably.
      */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL && !cpu_has_hypervisor &&
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+         boot_cpu_data.x86 != 0xf && !cpu_has_hypervisor &&
          !rdmsr_safe(MSR_INTEL_CORE_THREAD_COUNT, val) )
         return (MASK_EXTR(val, MSR_CTC_CORE_MASK) !=
                 MASK_EXTR(val, MSR_CTC_THREAD_MASK));
