@@ -28,6 +28,10 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
 void arch_get_domain_info(const struct domain *d,
                           struct xen_domctl_getdomaininfo *info);
 
+/* CDF_* constant. Internal flags for domain creation. */
+/* Is this a privileged domain? */
+#define CDF_privileged           (1U << 0)
+
 /*
  * Arch-specifics.
  */
