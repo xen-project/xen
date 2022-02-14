@@ -45,8 +45,12 @@
 #define ARM_SSBD 7
 #define ARM_SMCCC_1_1 8
 #define ARM64_WORKAROUND_AT_SPECULATE 9
+#define ARM_WORKAROUND_BHB_LOOP_8 10
+#define ARM_WORKAROUND_BHB_LOOP_24 11
+#define ARM_WORKAROUND_BHB_LOOP_32 12
+#define ARM_WORKAROUND_BHB_SMCC_3 13
 
-#define ARM_NCAPS           10
+#define ARM_NCAPS           14
 
 #ifndef __ASSEMBLY__
 

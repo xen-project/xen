@@ -21,5 +21,10 @@
     ldr     \dst, [\dst, \tmp]
     .endm
 
+    /* clearbhb instruction clearing the branch history */
+    .macro clearbhb
+        hint    #22
+    .endm
+
 #endif /* __ASM_ARM_ARM64_MACROS_H */
 
