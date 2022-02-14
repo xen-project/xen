@@ -755,6 +755,7 @@ static void __init allocate_static_memory(struct domain *d,
                                           struct kernel_info *kinfo,
                                           const struct dt_device_node *node)
 {
+    ASSERT_UNREACHABLE();
 }
 
 static void __init assign_static_memory_11(struct domain *d,
