@@ -145,7 +145,16 @@ install_bp_hardening_vec(const struct arm_cpu_capabilities *entry,
     return ret;
 }
 
-extern char __smccc_workaround_1_smc_start[], __smccc_workaround_1_smc_end[];
+extern char __smccc_workaround_smc_start_1[], __smccc_workaround_smc_end_1[];
+extern char __smccc_workaround_smc_start_3[], __smccc_workaround_smc_end_3[];
+extern char __mitigate_spectre_bhb_clear_insn_start[],
+            __mitigate_spectre_bhb_clear_insn_end[];
+extern char __mitigate_spectre_bhb_loop_start_8[],
+            __mitigate_spectre_bhb_loop_end_8[];
+extern char __mitigate_spectre_bhb_loop_start_24[],
+            __mitigate_spectre_bhb_loop_end_24[];
+extern char __mitigate_spectre_bhb_loop_start_32[],
+            __mitigate_spectre_bhb_loop_end_32[];
 
 static int enable_smccc_arch_workaround_1(void *data)
 {
@@ -176,12 +185,99 @@ static int enable_smccc_arch_workaround_1(void *data)
     if ( (int)res.a0 < 0 )
         goto warn;
 
-    return !install_bp_hardening_vec(entry,__smccc_workaround_1_smc_start,
-                                     __smccc_workaround_1_smc_end,
+    return !install_bp_hardening_vec(entry,__smccc_workaround_smc_start_1,
+                                     __smccc_workaround_smc_end_1,
                                      "call ARM_SMCCC_ARCH_WORKAROUND_1");
 
 warn:
     printk_once("**** No support for ARM_SMCCC_ARCH_WORKAROUND_1. ****\n"
+                "**** Please update your firmware.                ****\n");
+
+    return 0;
+}
+
+/*
+ * Spectre BHB Mitigation
+ *
+ * CPU is either:
+ * - Having CVS2.3 so it is not affected.
+ * - Having ECBHB and is clearing the branch history buffer when an exception
+ *   to a different exception level is happening so no mitigation is needed.
+ * - Mitigating using a loop on exception entry (number of loop depending on
+ *   the CPU).
+ * - Mitigating using the firmware.
+ */
+static int enable_spectre_bhb_workaround(void *data)
+{
+    const struct arm_cpu_capabilities *entry = data;
+
+    /*
+     * Enable callbacks are called on every CPU based on the capabilities, so
+     * double-check whether the CPU matches the entry.
+     */
+    if ( !entry->matches(entry) )
+        return 0;
+
+    if ( cpu_data[smp_processor_id()].pfr64.csv2 == 3 )
+        return 0;
+
+    if ( cpu_data[smp_processor_id()].mm64.ecbhb )
+        return 0;
+
+    if ( cpu_data[smp_processor_id()].isa64.clearbhb )
+        return !install_bp_hardening_vec(entry,
+                                    __mitigate_spectre_bhb_clear_insn_start,
+                                    __mitigate_spectre_bhb_clear_insn_end,
+                                     "use clearBHB instruction");
+
+    /* Apply solution depending on hwcaps set on arm_errata */
+    if ( cpus_have_cap(ARM_WORKAROUND_BHB_LOOP_8) )
+        return !install_bp_hardening_vec(entry,
+                                         __mitigate_spectre_bhb_loop_start_8,
+                                         __mitigate_spectre_bhb_loop_end_8,
+                                         "use 8 loops workaround");
+
+    if ( cpus_have_cap(ARM_WORKAROUND_BHB_LOOP_24) )
+        return !install_bp_hardening_vec(entry,
+                                         __mitigate_spectre_bhb_loop_start_24,
+                                         __mitigate_spectre_bhb_loop_end_24,
+                                         "use 24 loops workaround");
+
+    if ( cpus_have_cap(ARM_WORKAROUND_BHB_LOOP_32) )
+        return !install_bp_hardening_vec(entry,
+                                         __mitigate_spectre_bhb_loop_start_32,
+                                         __mitigate_spectre_bhb_loop_end_32,
+                                         "use 32 loops workaround");
+
+    if ( cpus_have_cap(ARM_WORKAROUND_BHB_SMCC_3) )
+    {
+        struct arm_smccc_res res;
+
+        if ( smccc_ver < SMCCC_VERSION(1, 1) )
+            goto warn;
+
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
+                          ARM_SMCCC_ARCH_WORKAROUND_3_FID, &res);
+        /* The return value is in the lower 32-bits. */
+        if ( (int)res.a0 < 0 )
+        {
+            /*
+             * On processor affected with CSV2=0, workaround 1 will mitigate
+             * both Spectre v2 and BHB so use it when available
+             */
+            if ( enable_smccc_arch_workaround_1(data) )
+                return 1;
+
+            goto warn;
+        }
+
+        return !install_bp_hardening_vec(entry,__smccc_workaround_smc_start_3,
+                                         __smccc_workaround_smc_end_3,
+                                         "call ARM_SMCCC_ARCH_WORKAROUND_3");
+    }
+
+warn:
+    printk_once("**** No support for any spectre BHB workaround.  ****\n"
                 "**** Please update your firmware.                ****\n");
 
     return 0;
@@ -446,19 +542,77 @@ static const struct arm_cpu_capabilities arm_errata[] = {
     },
     {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
-        MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+        MIDR_RANGE(MIDR_CORTEX_A72, 0, 1 << MIDR_VARIANT_SHIFT),
         .enable = enable_smccc_arch_workaround_1,
     },
     {
-        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        .capability = ARM_WORKAROUND_BHB_SMCC_3,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-        .enable = enable_smccc_arch_workaround_1,
+        .enable = enable_spectre_bhb_workaround,
     },
     {
-        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        .capability = ARM_WORKAROUND_BHB_SMCC_3,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-        .enable = enable_smccc_arch_workaround_1,
+        .enable = enable_spectre_bhb_workaround,
     },
+    /* spectre BHB */
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_8,
+        MIDR_RANGE(MIDR_CORTEX_A72, 1 << MIDR_VARIANT_SHIFT,
+                   (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_24,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A76),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_24,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A77),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_32,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A78),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_32,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A78C),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_32,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_X1),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_32,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_X2),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_32,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A710),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_24,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N1),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_32,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N2),
+        .enable = enable_spectre_bhb_workaround,
+    },
+    {
+        .capability = ARM_WORKAROUND_BHB_LOOP_32,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V1),
+        .enable = enable_spectre_bhb_workaround,
+    },
+
 #endif
 #ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
     {

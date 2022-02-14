@@ -21,6 +21,11 @@
     ldr     \dst, [\dst, \tmp]
     .endm
 
+    /* clearbhb instruction clearing the branch history */
+    .macro clearbhb
+        hint    #22
+    .endm
+
 /*
  * Register aliases.
  */
