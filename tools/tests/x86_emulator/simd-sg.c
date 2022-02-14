@@ -282,7 +282,7 @@ int sg_test(void)
 # if ELEM_SIZE == IDX_SIZE
     y = gather(x, array, idx, (idx & inv) != 0, ELEM_SIZE);
     for ( i = 0; i < ITEM_COUNT; ++i )
-        if ( y[i] != ((i + 1) & (ITEM_COUNT - i) ? idx : inv)[i] + 1 )
+        if ( y[i] != ((i + 1) & (ITEM_COUNT - i) ? idx[i] : inv[i]) + 1 )
             return __LINE__;
     for ( ; i < ELEM_COUNT; ++i )
         if ( y[i] )

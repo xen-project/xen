@@ -1727,8 +1727,8 @@ int simd_test(void)
     if ( !eq(x - src, (alt + 1) / 2) ) return __LINE__;
 #endif
 
-    for ( i = 0; i < ELEM_COUNT; ++i )
-        y[i] = (i & 1 ? inv : src)[i];
+    for ( y = src, i = 1; i < ELEM_COUNT; i += 2 )
+        y[i] = inv[i];
 
 #ifdef select
 # ifdef UINT_SIZE
