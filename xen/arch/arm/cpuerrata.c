@@ -103,13 +103,6 @@ install_bp_hardening_vec(const struct arm_cpu_capabilities *entry,
     printk(XENLOG_INFO "CPU%u will %s on exception entry\n",
            smp_processor_id(), desc);
 
-    /*
-     * No need to install hardened vector when the processor has
-     * ID_AA64PRF0_EL1.CSV2 set.
-     */
-    if ( cpu_data[smp_processor_id()].pfr64.csv2 )
-        return true;
-
     spin_lock(&bp_lock);
 
     /*
@@ -166,6 +159,13 @@ static int enable_smccc_arch_workaround_1(void *data)
      * entry.
      */
     if ( !entry->matches(entry) )
+        return 0;
+
+    /*
+     * No need to install hardened vector when the processor has
+     * ID_AA64PRF0_EL1.CSV2 set.
+     */
+    if ( cpu_data[smp_processor_id()].pfr64.csv2 )
         return 0;
 
     if ( smccc_ver < SMCCC_VERSION(1, 1) )
