@@ -26,6 +26,7 @@ RUN \
   # gettext for Xen < 4.13
   apk add gettext && \
   apk add git && \
+  apk add grep && \
   apk add iasl && \
   apk add libaio-dev && \
   apk add linux-headers && \
