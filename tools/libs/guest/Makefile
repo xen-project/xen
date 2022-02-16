@@ -109,8 +109,6 @@ $(eval $(genpath-target))
 
 xc_private.h: _paths.h
 
--include $(DEPS_INCLUDE)
-
 .PHONY: cleanlocal
 cleanlocal:
 	rm -f libxenguest.map

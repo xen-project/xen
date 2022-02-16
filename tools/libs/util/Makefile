@@ -52,8 +52,6 @@ $(LIB_OBJS) $(PIC_OBJS): $(AUTOINCS) _paths.h
 genpath-target = $(call buildmakevars2header,_paths.h)
 $(eval $(genpath-target))
 
--include $(DEPS_INCLUDE)
-
 clean: cleanlocal
 
 .PHONY: cleanlocal

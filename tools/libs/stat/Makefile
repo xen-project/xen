@@ -124,7 +124,5 @@ cleanlocal:
 	rm -f $(BINDINGS) $(BINDINGSRC) $(DEPS_RM) _paths.h
 	rm -f libxenstat.map
 
--include $(DEPS_INCLUDE)
-
 genpath-target = $(call buildmakevars2header,_paths.h)
 $(eval $(genpath-target))

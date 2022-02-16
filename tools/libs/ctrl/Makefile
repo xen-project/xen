@@ -63,8 +63,6 @@ $(eval $(genpath-target))
 
 $(LIB_OBJS) $(PIC_OBJS): _paths.h
 
--include $(DEPS_INCLUDE)
-
 clean: cleanlocal
 
 .PHONY: cleanlocal

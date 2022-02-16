@@ -140,3 +140,7 @@ distclean: clean
 
 .PHONY: FORCE
 FORCE:
+
+ifeq ($(filter clean distclean,$(MAKECMDGOALS)),)
+-include $(DEPS_INCLUDE)
+endif

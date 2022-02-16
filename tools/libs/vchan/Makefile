@@ -11,7 +11,6 @@ SRCS-y += io.c
 NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
--include $(DEPS_INCLUDE)
 
 clean: cleanlocal
 
