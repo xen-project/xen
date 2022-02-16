@@ -273,5 +273,3 @@ cleanlocal:
 	$(RM) -f libxenlight.map
 	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) clean
-
--include $(DEPS_INCLUDE)
