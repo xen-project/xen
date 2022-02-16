@@ -1660,6 +1660,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     libxl_vcpuinfo *ptr, *ret;
     xc_domaininfo_t domaininfo;
     xc_vcpuinfo_t vcpuinfo;
+    unsigned int nr_vcpus;
 
     if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
         LOGED(ERROR, domid, "Getting infolist");
@@ -1676,33 +1677,34 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     ret = ptr = libxl__calloc(NOGC, domaininfo.max_vcpu_id + 1,
                               sizeof(libxl_vcpuinfo));
 
-    for (*nr_vcpus_out = 0;
-         *nr_vcpus_out <= domaininfo.max_vcpu_id;
-         ++*nr_vcpus_out, ++ptr) {
+    for (nr_vcpus = 0;
+         nr_vcpus <= domaininfo.max_vcpu_id;
+         ++nr_vcpus, ++ptr) {
         libxl_bitmap_init(&ptr->cpumap);
         if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap, 0))
             goto err;
         libxl_bitmap_init(&ptr->cpumap_soft);
         if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap_soft, 0))
             goto err;
-        if (xc_vcpu_getinfo(ctx->xch, domid, *nr_vcpus_out, &vcpuinfo) == -1) {
+        if (xc_vcpu_getinfo(ctx->xch, domid, nr_vcpus, &vcpuinfo) == -1) {
             LOGED(ERROR, domid, "Getting vcpu info");
             goto err;
         }
 
-        if (xc_vcpu_getaffinity(ctx->xch, domid, *nr_vcpus_out,
+        if (xc_vcpu_getaffinity(ctx->xch, domid, nr_vcpus,
                                 ptr->cpumap.map, ptr->cpumap_soft.map,
                                 XEN_VCPUAFFINITY_SOFT|XEN_VCPUAFFINITY_HARD) == -1) {
             LOGED(ERROR, domid, "Getting vcpu affinity");
             goto err;
         }
-        ptr->vcpuid = *nr_vcpus_out;
+        ptr->vcpuid = nr_vcpus;
         ptr->cpu = vcpuinfo.cpu;
         ptr->online = !!vcpuinfo.online;
         ptr->blocked = !!vcpuinfo.blocked;
         ptr->running = !!vcpuinfo.running;
         ptr->vcpu_time = vcpuinfo.cpu_time;
     }
+    *nr_vcpus_out = nr_vcpus;
     GC_FREE;
     return ret;
 
