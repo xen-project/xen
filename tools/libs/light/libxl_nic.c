@@ -248,6 +248,13 @@ static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
     flexarray_append(ro_front, "mtu");
     flexarray_append(ro_front, GCSPRINTF("%u", nic->mtu));
 
+    /*
+     * Force backend to wait for hotplug script execution before switching to
+     * connected state.
+     */
+    flexarray_append(back, "hotplug-status");
+    flexarray_append(back, "");
+
     return 0;
 }
 
