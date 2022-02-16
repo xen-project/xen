@@ -117,7 +117,7 @@ int machine_kexec_load(struct kexec_image *image)
     }
 
     code_page = __map_domain_page(image->control_code_page);
-    memcpy(code_page, kexec_reloc, kexec_reloc_size);
+    memcpy(code_page, kexec_reloc, kexec_reloc_end - (char *)kexec_reloc);
     unmap_domain_page(code_page);
 
     /*

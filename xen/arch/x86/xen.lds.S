@@ -84,6 +84,7 @@ SECTIONS
        _etextentry = .;
 
        *(.text.kexec)          /* Page aligned in the object file. */
+       kexec_reloc_end = .;
 
        *(.text.cold)
        *(.text.unlikely)
@@ -428,7 +429,7 @@ ASSERT(__2M_rwdata_end <= XEN_VIRT_END - XEN_VIRT_START + __XEN_VIRT_START -
        "Xen image overlaps stubs area")
 
 #ifdef CONFIG_KEXEC
-ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
+ASSERT(kexec_reloc_end - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
 #endif
 
 /* The Multiboot setup paths relies on this to simplify superpage PTE creation. */

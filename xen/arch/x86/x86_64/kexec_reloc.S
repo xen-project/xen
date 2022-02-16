@@ -34,7 +34,7 @@ ENTRY(kexec_reloc)
         movq    %rcx, %rbp
 
         /* Setup stack. */
-        leaq    (reloc_stack - kexec_reloc)(%rdi), %rsp
+        leaq    (.Lreloc_stack_base - kexec_reloc)(%rdi), %rsp
 
         /* Load reloc page table. */
         movq    %rsi, %cr3
@@ -175,9 +175,15 @@ compatibility_mode_far:
         .long 0x00000000             /* set in call_32_bit above */
         .word 0x0010
 
+        .type compatibility_mode_far, @object
+        .size compatibility_mode_far, . - compatibility_mode_far
+
 compat_mode_gdt_desc:
         .word .Lcompat_mode_gdt_end - compat_mode_gdt -1
         .quad 0x0000000000000000     /* set in call_32_bit above */
+
+        .type compat_mode_gdt_desc, @object
+        .size compat_mode_gdt_desc, . - compat_mode_gdt_desc
 
         .align 8
 compat_mode_gdt:
@@ -186,16 +192,23 @@ compat_mode_gdt:
         .quad 0x00cf9b000000ffff     /* 0x0010 ring 0 code, compatibility */
 .Lcompat_mode_gdt_end:
 
+        .type compat_mode_gdt, @object
+        .size compat_mode_gdt, . - compat_mode_gdt
+
 compat_mode_idt:
         .word 0                      /* limit */
         .long 0                      /* base */
 
+        .type compat_mode_idt, @object
+        .size compat_mode_idt, . - compat_mode_idt
+
         /*
          * 16 words of stack are more than enough.
          */
-        .fill 16,8,0
+        .align 8
 reloc_stack:
+        .fill 16,8,0
+.Lreloc_stack_base:
 
-        .globl kexec_reloc_size
-kexec_reloc_size:
-        .long . - kexec_reloc
+        .type reloc_stack, @object
+        .size reloc_stack, . - reloc_stack

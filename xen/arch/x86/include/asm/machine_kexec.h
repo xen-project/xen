@@ -9,7 +9,7 @@ extern void kexec_reloc(unsigned long reloc_code, unsigned long reloc_pt,
                         unsigned long ind_maddr, unsigned long entry_maddr,
                         unsigned long flags);
 
-extern unsigned int kexec_reloc_size;
+extern const char kexec_reloc_end[];
 
 #endif
 
