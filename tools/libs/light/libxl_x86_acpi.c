@@ -20,6 +20,7 @@
 
  /* Number of pages holding ACPI tables */
 #define NUM_ACPI_PAGES 16
+#define ALIGN(p, a) (((p) + ((a) - 1)) & ~((a) - 1))
 
 struct libxl_acpi_ctxt {
     struct acpi_ctxt c;
@@ -28,10 +29,10 @@ struct libxl_acpi_ctxt {
     unsigned int page_shift;
 
     /* Memory allocator */
-    unsigned long alloc_base_paddr;
-    unsigned long alloc_base_vaddr;
-    unsigned long alloc_currp;
-    unsigned long alloc_end;
+    unsigned long guest_start;
+    unsigned long guest_curr;
+    unsigned long guest_end;
+    void *buf;
 };
 
 extern const unsigned char dsdt_pvh[];
@@ -43,8 +44,7 @@ static unsigned long virt_to_phys(struct acpi_ctxt *ctxt, void *v)
     struct libxl_acpi_ctxt *libxl_ctxt =
         CONTAINER_OF(ctxt, struct libxl_acpi_ctxt, c);
 
-    return (((unsigned long)v - libxl_ctxt->alloc_base_vaddr) +
-            libxl_ctxt->alloc_base_paddr);
+    return libxl_ctxt->guest_start + (v - libxl_ctxt->buf);
 }
 
 static void *mem_alloc(struct acpi_ctxt *ctxt,
@@ -58,20 +58,16 @@ static void *mem_alloc(struct acpi_ctxt *ctxt,
     if (align < 16)
         align = 16;
 
-    s = (libxl_ctxt->alloc_currp + align) & ~((unsigned long)align - 1);
+    s = ALIGN(libxl_ctxt->guest_curr, align);
     e = s + size - 1;
 
     /* TODO: Reallocate memory */
-    if ((e < s) || (e >= libxl_ctxt->alloc_end))
+    if ((e < s) || (e >= libxl_ctxt->guest_end))
         return NULL;
 
-    while (libxl_ctxt->alloc_currp >> libxl_ctxt->page_shift != 
-           e >> libxl_ctxt->page_shift)
-        libxl_ctxt->alloc_currp += libxl_ctxt->page_size;
+    libxl_ctxt->guest_curr = e;
 
-    libxl_ctxt->alloc_currp = e;
-
-    return (void *)s;
+    return libxl_ctxt->buf + (s - libxl_ctxt->guest_start);
 }
 
 static void acpi_mem_free(struct acpi_ctxt *ctxt,
@@ -163,15 +159,12 @@ int libxl__dom_load_acpi(libxl__gc *gc,
     struct acpi_config config = {0};
     struct libxl_acpi_ctxt libxl_ctxt;
     int rc = 0, acpi_pages_num;
-    void *acpi_pages;
-    unsigned long page_mask;
 
     if (b_info->type != LIBXL_DOMAIN_TYPE_PVH)
         goto out;
 
     libxl_ctxt.page_size = XC_DOM_PAGE_SIZE(dom);
     libxl_ctxt.page_shift =  XC_DOM_PAGE_SHIFT(dom);
-    page_mask = (1UL << libxl_ctxt.page_shift) - 1;
 
     libxl_ctxt.c.mem_ops.alloc = mem_alloc;
     libxl_ctxt.c.mem_ops.v2p = virt_to_phys;
@@ -186,19 +179,17 @@ int libxl__dom_load_acpi(libxl__gc *gc,
     config.rsdp = (unsigned long)libxl__malloc(gc, libxl_ctxt.page_size);
     config.infop = (unsigned long)libxl__malloc(gc, libxl_ctxt.page_size);
     /* Pages to hold ACPI tables */
-    acpi_pages =  libxl__malloc(gc, (NUM_ACPI_PAGES + 1) *
-                                libxl_ctxt.page_size);
+    libxl_ctxt.buf = libxl__malloc(gc, NUM_ACPI_PAGES *
+                                   libxl_ctxt.page_size);
 
     /*
      * Set up allocator memory.
      * Start next to acpi_info page to avoid fracturing e820.
      */
-    libxl_ctxt.alloc_base_paddr = ACPI_INFO_PHYSICAL_ADDRESS +
-        libxl_ctxt.page_size;
-    libxl_ctxt.alloc_base_vaddr = libxl_ctxt.alloc_currp =
-        (unsigned long)acpi_pages;
-    libxl_ctxt.alloc_end = (unsigned long)acpi_pages +
-        (NUM_ACPI_PAGES * libxl_ctxt.page_size);
+    libxl_ctxt.guest_start = libxl_ctxt.guest_curr = libxl_ctxt.guest_end =
+        ACPI_INFO_PHYSICAL_ADDRESS + libxl_ctxt.page_size;
+
+    libxl_ctxt.guest_end += NUM_ACPI_PAGES * libxl_ctxt.page_size;
 
     /* Build the tables. */
     rc = acpi_build_tables(&libxl_ctxt.c, &config);
@@ -208,10 +199,8 @@ int libxl__dom_load_acpi(libxl__gc *gc,
     }
 
     /* Calculate how many pages are needed for the tables. */
-    acpi_pages_num =
-        ((libxl_ctxt.alloc_currp - (unsigned long)acpi_pages)
-         >> libxl_ctxt.page_shift) +
-        ((libxl_ctxt.alloc_currp & page_mask) ? 1 : 0);
+    acpi_pages_num = (ALIGN(libxl_ctxt.guest_curr, libxl_ctxt.page_size) -
+                      libxl_ctxt.guest_start) >> libxl_ctxt.page_shift;
 
     dom->acpi_modules[0].data = (void *)config.rsdp;
     dom->acpi_modules[0].length = 64;
@@ -231,7 +220,7 @@ int libxl__dom_load_acpi(libxl__gc *gc,
     dom->acpi_modules[1].length = 4096;
     dom->acpi_modules[1].guest_addr_out = ACPI_INFO_PHYSICAL_ADDRESS;
 
-    dom->acpi_modules[2].data = acpi_pages;
+    dom->acpi_modules[2].data = libxl_ctxt.buf;
     dom->acpi_modules[2].length = acpi_pages_num  << libxl_ctxt.page_shift;
     dom->acpi_modules[2].guest_addr_out = ACPI_INFO_PHYSICAL_ADDRESS +
         libxl_ctxt.page_size;
