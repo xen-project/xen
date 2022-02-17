@@ -338,16 +338,26 @@ guest_sync:
         cbnz    x1, guest_sync_slowpath         /* should be 0 for HVC #0 */
 
         /*
-         * Fastest path possible for ARM_SMCCC_ARCH_WORKAROUND_1.
-         * The workaround has already been applied on the exception
+         * Fastest path possible for ARM_SMCCC_ARCH_WORKAROUND_1 and
+         * ARM_SMCCC_ARCH_WORKAROUND_3.
+         * The workaround needed has already been applied on the exception
          * entry from the guest, so let's quickly get back to the guest.
          *
          * Note that eor is used because the function identifier cannot
          * be encoded as an immediate for cmp.
          */
         eor     w0, w0, #ARM_SMCCC_ARCH_WORKAROUND_1_FID
-        cbnz    w0, check_wa2
+        cbz     w0, fastpath_out_workaround
 
+        /* ARM_SMCCC_ARCH_WORKAROUND_2 handling */
+        eor     w0, w0, #(ARM_SMCCC_ARCH_WORKAROUND_1_FID ^ ARM_SMCCC_ARCH_WORKAROUND_2_FID)
+        cbz     w0, wa2_ssbd
+
+        /* Fastpath out for ARM_SMCCC_ARCH_WORKAROUND_3 */
+        eor     w0, w0, #(ARM_SMCCC_ARCH_WORKAROUND_2_FID ^ ARM_SMCCC_ARCH_WORKAROUND_3_FID)
+        cbnz    w0, guest_sync_slowpath
+
+fastpath_out_workaround:
         /*
          * Clobber both x0 and x1 to prevent leakage. Note that thanks
          * the eor, x0 = 0.
@@ -356,10 +366,7 @@ guest_sync:
         eret
         sb
 
-check_wa2:
-        /* ARM_SMCCC_ARCH_WORKAROUND_2 handling */
-        eor     w0, w0, #(ARM_SMCCC_ARCH_WORKAROUND_1_FID ^ ARM_SMCCC_ARCH_WORKAROUND_2_FID)
-        cbnz    w0, guest_sync_slowpath
+wa2_ssbd:
 #ifdef CONFIG_ARM_SSBD
 alternative_cb arm_enable_wa2_handling
         b       wa2_end
