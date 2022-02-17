@@ -124,6 +124,10 @@ static bool handle_arch(struct cpu_user_regs *regs)
                 break;
             }
             break;
+        case ARM_SMCCC_ARCH_WORKAROUND_3_FID:
+            if ( cpus_have_cap(ARM_WORKAROUND_BHB_SMCC_3) )
+                ret = 0;
+            break;
         }
 
         set_user_reg(regs, 0, ret);
@@ -132,6 +136,7 @@ static bool handle_arch(struct cpu_user_regs *regs)
     }
 
     case ARM_SMCCC_ARCH_WORKAROUND_1_FID:
+    case ARM_SMCCC_ARCH_WORKAROUND_3_FID:
         /* No return value */
         return true;
 
