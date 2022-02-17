@@ -8,49 +8,41 @@ RUN mkdir /build
 WORKDIR /build
 
 # build depends
-RUN \
-  # apk
-  apk update && \
+RUN apk --no-cache add \
   \
   # xen build deps
-  apk add argp-standalone && \
-  apk add autoconf && \
-  apk add automake && \
-  apk add bash && \
-  apk add curl && \
-  apk add curl-dev && \
-  apk add dev86 && \
-  apk add gcc  && \
-  apk add g++ && \
-  apk add clang  && \
+  argp-standalone \
+  autoconf \
+  bash \
+  bison \
+  clang \
+  curl \
+  dev86 \
+  flex \
+  g++ \
+  gcc \
   # gettext for Xen < 4.13
-  apk add gettext && \
-  apk add git && \
-  apk add grep && \
-  apk add iasl && \
-  apk add libaio-dev && \
-  apk add linux-headers && \
-  apk add make && \
-  apk add musl-dev  && \
-  apk add libc6-compat && \
-  apk add ncurses-dev && \
-  apk add patch  && \
-  apk add python3-dev && \
-  apk add texinfo && \
-  apk add util-linux-dev && \
-  apk add xz-dev && \
-  apk add yajl-dev && \
-  apk add zlib-dev && \
+  gettext \
+  git \
+  grep \
+  iasl \
+  libaio-dev \
+  libc6-compat \
+  linux-headers \
+  make \
+  musl-dev  \
+  ncurses-dev \
+  patch  \
+  python3-dev \
+  texinfo \
+  util-linux-dev \
+  xz-dev \
+  yajl-dev \
+  zlib-dev \
   \
   # qemu build deps
-  apk add bison && \
-  apk add flex && \
-  apk add glib-dev && \
-  apk add libattr && \
-  apk add libcap-ng-dev && \
-  apk add ninja && \
-  apk add pixman-dev && \
-  \
-  # cleanup
-  rm -rf /tmp/* && \
-  rm -f /var/cache/apk/*
+  glib-dev \
+  libattr \
+  libcap-ng-dev \
+  ninja \
+  pixman-dev \
