@@ -46,8 +46,3 @@ void unmap_vtd_domain_page(const void *va)
 {
     unmap_domain_page(va);
 }
-
-void flush_all_cache()
-{
-    wbinvd();
-}

@@ -78,8 +78,6 @@ int __must_check qinval_device_iotlb_sync(struct vtd_iommu *iommu,
                                           struct pci_dev *pdev,
                                           u16 did, u16 size, u64 addr);
 
-void flush_all_cache(void);
-
 uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node);
 void free_pgtable_maddr(u64 maddr);
 void *map_vtd_domain_page(u64 maddr);

@@ -623,7 +623,8 @@ static int __must_check iommu_flush_all(void)
     bool_t flush_dev_iotlb;
     int rc = 0;
 
-    flush_all_cache();
+    flush_local(FLUSH_CACHE);
+
     for_each_drhd_unit ( drhd )
     {
         int context_rc, iotlb_rc;
