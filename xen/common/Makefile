@@ -75,13 +75,13 @@ obj-$(CONFIG_NEEDS_LIBELF) += libelf/
 obj-$(CONFIG_HAS_DEVICE_TREE) += libfdt/
 
 CONF_FILE := $(if $(patsubst /%,,$(KCONFIG_CONFIG)),$(BASEDIR)/)$(KCONFIG_CONFIG)
-config.gz: $(CONF_FILE)
+$(obj)/config.gz: $(CONF_FILE)
 	gzip -n -c $< >$@
 
-config_data.o: config.gz
+$(obj)/config_data.o: $(obj)/config.gz
 
-config_data.S: $(BASEDIR)/tools/binfile FORCE
-	$(call if_changed,binfile,config.gz xen_config_data)
+$(obj)/config_data.S: $(BASEDIR)/tools/binfile FORCE
+	$(call if_changed,binfile,$(obj)/config.gz xen_config_data)
 targets += config_data.S
 
 clean::

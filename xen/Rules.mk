@@ -3,6 +3,9 @@
 # Makefile and are consumed by Rules.mk
 #
 
+obj := .
+src := $(obj)
+
 -include $(BASEDIR)/include/config/auto.conf
 
 include $(XEN_ROOT)/Config.mk
@@ -21,7 +24,7 @@ SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
                          $(foreach r,rel rel.ro,data.$(r).local)
 
 # The filename build.mk has precedence over Makefile
-include $(firstword $(wildcard build.mk) Makefile)
+include $(firstword $(wildcard $(src)/build.mk) $(src)/Makefile)
 
 # Linking
 # ---------------------------------------------------------------------------

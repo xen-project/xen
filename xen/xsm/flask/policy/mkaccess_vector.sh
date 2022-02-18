@@ -8,9 +8,12 @@ set -e
 awk=$1
 shift
 
+output_dir=$1
+shift
+
 # output files
-av_permissions="include/av_permissions.h"
-av_perm_to_string="include/av_perm_to_string.h"
+av_permissions="$output_dir/av_permissions.h"
+av_perm_to_string="$output_dir/av_perm_to_string.h"
 
 cat $* | $awk "
 BEGIN	{

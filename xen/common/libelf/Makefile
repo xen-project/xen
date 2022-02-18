@@ -7,10 +7,10 @@ OBJCOPYFLAGS := $(foreach s,$(SECTIONS),--rename-section .$(s)=.init.$(s))
 
 CFLAGS-y += -Wno-pointer-sign
 
-libelf.o: libelf-temp.o FORCE
+$(obj)/libelf.o: $(obj)/libelf-temp.o FORCE
 	$(call if_changed,objcopy)
 
-libelf-temp.o: $(libelf-objs) FORCE
+$(obj)/libelf-temp.o: $(addprefix $(obj)/,$(libelf-objs)) FORCE
 	$(call if_changed,ld)
 
 extra-y += libelf-temp.o $(libelf-objs)

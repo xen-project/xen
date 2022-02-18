@@ -3,11 +3,14 @@
 # Cleaning up
 # ==========================================================================
 
+obj := .
+src := $(obj)
+
 clean::
 
 include $(BASEDIR)/scripts/Kbuild.include
 
-include Makefile
+include $(src)/Makefile
 
 # Figure out what we need to clean from the various variables
 # ==========================================================================
