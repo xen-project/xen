@@ -1532,6 +1532,8 @@ static int iommu_get_device_group(
         return 0;
 
     group_id = iommu_call(ops, get_device_group_id, seg, bus, devfn);
+    if ( group_id < 0 )
+        return group_id;
 
     pcidevs_lock();
     for_each_pdev( d, pdev )
@@ -1546,6 +1548,12 @@ static int iommu_get_device_group(
             continue;
 
         sdev_id = iommu_call(ops, get_device_group_id, seg, b, df);
+        if ( sdev_id < 0 )
+        {
+            pcidevs_unlock();
+            return sdev_id;
+        }
+
         if ( (sdev_id == group_id) && (i < max_sdevs) )
         {
             bdf = (b << 16) | (df << 8);
@@ -1553,7 +1561,7 @@ static int iommu_get_device_group(
             if ( unlikely(copy_to_guest_offset(buf, i, &bdf, 1)) )
             {
                 pcidevs_unlock();
-                return -1;
+                return -EFAULT;
             }
             i++;
         }
@@ -1621,8 +1629,7 @@ int iommu_do_pci_domctl(
         ret = iommu_get_device_group(d, seg, bus, devfn, sdevs, max_sdevs);
         if ( ret < 0 )
         {
-            dprintk(XENLOG_ERR, "iommu_get_device_group() failed!\n");
-            ret = -EFAULT;
+            dprintk(XENLOG_ERR, "iommu_get_device_group() failed: %d\n", ret);
             domctl->u.get_device_group.num_sdevs = 0;
         }
         else

@@ -2564,10 +2564,11 @@ static int intel_iommu_assign_device(
 static int intel_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 {
     u8 secbus;
+
     if ( find_upstream_bridge(seg, &bus, &devfn, &secbus) < 0 )
-        return -1;
-    else
-        return PCI_BDF2(bus, devfn);
+        return -ENODEV;
+
+    return PCI_BDF2(bus, devfn);
 }
 
 static int __must_check vtd_suspend(void)
