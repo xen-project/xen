@@ -152,6 +152,10 @@ static inline intpte_t put_pte_flags(unsigned int x)
                                  _PAGE_GLOBAL | _PAGE_NX)
 #define PAGE_HYPERVISOR_UC      (__PAGE_HYPERVISOR_UC | \
                                  _PAGE_GLOBAL | _PAGE_NX)
+#define PAGE_HYPERVISOR_WC      (__PAGE_HYPERVISOR_WC | \
+                                 _PAGE_GLOBAL | _PAGE_NX)
+#define PAGE_HYPERVISOR_WT      (__PAGE_HYPERVISOR_WT | \
+                                 _PAGE_GLOBAL | _PAGE_NX)
 
 #endif /* __X86_64_PAGE_H__ */
 

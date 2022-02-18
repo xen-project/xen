@@ -349,8 +349,10 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 #define __PAGE_HYPERVISOR_RX      (_PAGE_PRESENT | _PAGE_ACCESSED)
 #define __PAGE_HYPERVISOR         (__PAGE_HYPERVISOR_RX | \
                                    _PAGE_DIRTY | _PAGE_RW)
+#define __PAGE_HYPERVISOR_WT      (__PAGE_HYPERVISOR | _PAGE_PWT)
 #define __PAGE_HYPERVISOR_UCMINUS (__PAGE_HYPERVISOR | _PAGE_PCD)
 #define __PAGE_HYPERVISOR_UC      (__PAGE_HYPERVISOR | _PAGE_PCD | _PAGE_PWT)
+#define __PAGE_HYPERVISOR_WC      (__PAGE_HYPERVISOR | _PAGE_PAT)
 #define __PAGE_HYPERVISOR_SHSTK   (__PAGE_HYPERVISOR_RO | _PAGE_DIRTY)
 
 #define MAP_SMALL_PAGES _PAGE_AVAIL0 /* don't use superpages mappings */

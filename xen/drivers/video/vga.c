@@ -79,7 +79,7 @@ void __init video_init(void)
     {
     case XEN_VGATYPE_TEXT_MODE_3:
         if ( page_is_ram_type(paddr_to_pfn(0xB8000), RAM_TYPE_CONVENTIONAL) ||
-             ((video = ioremap(0xB8000, 0x8000)) == NULL) )
+             ((video = ioremap_wc(0xB8000, 0x8000)) == NULL) )
             return;
         outw(0x200a, 0x3d4); /* disable cursor */
         columns = vga_console_info.u.text_mode_3.columns;
@@ -164,7 +164,11 @@ void __init video_endboot(void)
     {
     case XEN_VGATYPE_TEXT_MODE_3:
         if ( !vgacon_keep )
+        {
             memset(video, 0, columns * lines * 2);
+            iounmap(video);
+            video = ZERO_BLOCK_PTR;
+        }
         break;
     case XEN_VGATYPE_VESA_LFB:
     case XEN_VGATYPE_EFI_LFB:

@@ -602,6 +602,8 @@ void destroy_perdomain_mapping(struct domain *, unsigned long va,
                                unsigned int nr);
 void free_perdomain_mappings(struct domain *);
 
+void __iomem *ioremap_wc(paddr_t, size_t);
+
 extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
 
 void domain_set_alloc_bitsize(struct domain *d);
