@@ -1,0 +1,41 @@
+name: Coverity Scan
+
+# We only want to test official release code, not every pull request.
+on:
+  schedule:
+    - cron: '18 9 * * WED,SUN' # Bi-weekly at 9:18 UTC
+
+jobs:
+  coverity:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install build dependencies
+      run: |
+        sudo apt-get install -y wget git bcc bin86 gawk bridge-utils \
+          iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential \
+          make gcc libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev \
+          libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl \
+          libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev \
+          ocaml-findlib xz-utils libyajl-dev libpixman-1-dev \
+          libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake \
+          libtool libfuse-dev liblzma-dev ninja-build \
+          kpartx python3-dev golang python-dev libsystemd-dev
+
+    - uses: actions/checkout@v2
+      with:
+        ref: staging
+
+    - name: Configure Xen
+      run: |
+        ./configure
+
+    - name: Pre build stuff
+      run: |
+        make -C tools/firmware/etherboot all && make mini-os-dir
+
+    - uses: vapier/coverity-scan-action@v1
+      with:
+        command: make xen tools && make -C extras/mini-os/
+        project: XenProject
+        email: ${{ secrets.COVERITY_SCAN_EMAIL }}
+        token: ${{ secrets.COVERITY_SCAN_TOKEN }}
