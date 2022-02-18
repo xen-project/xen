@@ -615,8 +615,7 @@ static uint64_t xen_timer_cpu_frequency(void)
     struct vcpu_time_info *info = &this_cpu(vcpu_info)->time;
     uint64_t freq;
 
-    freq = 1000000000ULL << 32;
-    do_div(freq, info->tsc_to_system_mul);
+    freq = (1000000000ULL << 32) / info->tsc_to_system_mul;
     if ( info->tsc_shift < 0 )
         freq <<= -info->tsc_shift;
     else
@@ -2178,8 +2177,7 @@ void __init early_time_init(void)
     set_time_scale(&t->tsc_scale, tmp);
     t->stamp.local_tsc = boot_tsc_stamp;
 
-    do_div(tmp, 1000);
-    cpu_khz = (unsigned long)tmp;
+    cpu_khz = tmp / 1000;
     printk("Detected %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);
 

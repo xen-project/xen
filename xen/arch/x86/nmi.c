@@ -292,10 +292,9 @@ static void clear_msr_range(unsigned int base, unsigned int n)
 
 static inline void write_watchdog_counter(const char *descr)
 {
-    u64 count = (u64)cpu_khz * 1000;
+    uint64_t count = cpu_khz * 1000ULL / nmi_hz;
 
-    do_div(count, nmi_hz);
-    if(descr)
+    if ( descr )
         Dprintk("setting %s to -%#"PRIx64"\n", descr, count);
     wrmsrl(nmi_perfctr_msr, 0 - count);
 }

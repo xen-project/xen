@@ -105,10 +105,7 @@ custom_param("hpet", parse_hpet_param);
 static inline unsigned long div_sc(unsigned long ticks, unsigned long nsec,
                                    int shift)
 {
-    uint64_t tmp = ((uint64_t)ticks) << shift;
-
-    do_div(tmp, nsec);
-    return (unsigned long) tmp;
+    return ((uint64_t)ticks << shift) / nsec;
 }
 
 /*

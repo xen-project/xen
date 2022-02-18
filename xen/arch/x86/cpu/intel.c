@@ -424,9 +424,8 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
             unsigned long long val = ecx;
 
             val *= ebx;
-            do_div(val, eax);
             printk("CPU%u: TSC: %u Hz * %u / %u = %Lu Hz\n",
-                   smp_processor_id(), ecx, ebx, eax, val);
+                   smp_processor_id(), ecx, ebx, eax, val / eax);
         }
         else if ( ecx | eax | ebx )
         {
