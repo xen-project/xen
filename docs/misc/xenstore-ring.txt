@@ -22,6 +22,7 @@ Offset  Length  Description
 2060    4       Output producer offset
 2064    4       Server feature bitmap
 2068    4       Connection state
+2072    4       Connection error indicator
 
 The Input data and Output data are circular buffers. Each buffer is
 associated with a pair of free-running offsets labelled "consumer" and
@@ -66,6 +67,7 @@ The following features are defined:
 Mask    Description
 -----------------------------------------------------------------
 1       Ring reconnection (see the ring reconnection feature below)
+2       Connection error indicator (see connection error feature below)
 
 The "Connection state" field is used to request a ring close and reconnect.
 The "Connection state" field only contains valid data if the server has
@@ -77,6 +79,19 @@ Value   Description
 0       Ring is connected
 1       Ring close and reconnect is in progress (see the "ring
         reconnection feature" described below)
+
+The "Connection error indicator" is used to let the server indicate it has
+detected some error that led to deactivation of the connection by the server.
+If the feature has been advertised then the "Connection error indicator" may
+take the following values (new values might be added in future without them
+being advertised as a new feature):
+
+Value   Description
+-----------------------------------------------------------------
+0       No error, connection is valid
+1       Communication problems (event channel not functional)
+2       Inconsistent producer or consumer offset
+3       Protocol violation (client data package too long)
 
 The ring reconnection feature
 =============================
@@ -114,3 +129,23 @@ packet boundary.
 
 Note that only the guest may set the Connection state to 1 and only the
 server may set it back to 0.
+
+The connection error feature
+============================
+
+The connection error feature allows the server to signal error conditions
+leading to a stop of the communication with the client. In case such an error
+condition has occurred, the server will set the appropriate error condition in
+the Connection error indicator and will stop communication with the client.
+
+Any value different from 0 is indicating an error. The value used is meant
+just for diagnostic purposes. A client reading the error value should be
+prepared to see values not described here, as new error cases might be added
+in future.
+
+The server will discard any already read or written packets, in-flight
+requests, watches and transactions associated with the connection.
+
+Depending on the error cause it might be possible that a reconnect via the
+ring reconnection feature (if present) can be performed. There is no guarantee
+this will succeed.

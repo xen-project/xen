@@ -124,6 +124,7 @@ struct xenstore_domain_interface {
     XENSTORE_RING_IDX rsp_cons, rsp_prod;
     uint32_t server_features; /* Bitmap of features supported by the server */
     uint32_t connection;
+    uint32_t error;
 };
 
 /* Violating this is very bad.  See docs/misc/xenstore.txt. */
@@ -135,10 +136,18 @@ struct xenstore_domain_interface {
 
 /* The ability to reconnect a ring */
 #define XENSTORE_SERVER_FEATURE_RECONNECTION 1
+/* The presence of the "error" field in the ring page */
+#define XENSTORE_SERVER_FEATURE_ERROR        2
 
 /* Valid values for the connection field */
 #define XENSTORE_CONNECTED 0 /* the steady-state */
 #define XENSTORE_RECONNECT 1 /* guest has initiated a reconnect */
+
+/* Valid values for the error field */
+#define XENSTORE_ERROR_NONE    0 /* No error */
+#define XENSTORE_ERROR_COMM    1 /* Communication problem */
+#define XENSTORE_ERROR_RINGIDX 2 /* Invalid ring index */
+#define XENSTORE_ERROR_PROTO   3 /* Protocol violation (payload too long) */
 
 #endif /* _XS_WIRE_H */
 

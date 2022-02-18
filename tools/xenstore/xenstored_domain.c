@@ -427,6 +427,38 @@ static void domain_conn_reset(struct domain *domain)
 	domain->interface->rsp_cons = domain->interface->rsp_prod = 0;
 }
 
+/*
+ * Keep the connection alive but stop processing any new request or sending
+ * reponse. This is to allow sending @releaseDomain watch event at the correct
+ * moment and/or to allow the connection to restart (not yet implemented).
+ *
+ * All watches, transactions, buffers will be freed.
+ */
+void ignore_connection(struct connection *conn, unsigned int err)
+{
+	struct buffered_data *out, *tmp;
+
+	trace("CONN %p ignored, reason %u\n", conn, err);
+
+	if (conn->domain && conn->domain->interface)
+		conn->domain->interface->error = err;
+
+	conn->is_ignored = true;
+	conn_delete_all_watches(conn);
+	conn_delete_all_transactions(conn);
+
+	list_for_each_entry_safe(out, tmp, &conn->out_list, list) {
+		list_del(&out->list);
+		talloc_free(out);
+	}
+
+	talloc_free(conn->in);
+	conn->in = NULL;
+	/* if this is a socket connection, drop it now */
+	if (conn->fd >= 0)
+		talloc_free(conn);
+}
+
 static struct domain *introduce_domain(const void *ctx,
 				       unsigned int domid,
 				       evtchn_port_t port, bool restore)
@@ -1305,7 +1337,7 @@ void read_state_connection(const void *ctx, const void *state)
 		 * dead. So mark it as ignored.
 		 */
 		if (!domain->port || !domain->interface)
-			ignore_connection(conn);
+			ignore_connection(conn, XENSTORE_ERROR_COMM);
 
 		if (sc->spec.ring.tdomid != DOMID_INVALID) {
 			tdomain = find_or_alloc_domain(ctx,

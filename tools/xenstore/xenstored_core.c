@@ -1455,35 +1455,6 @@ static struct {
 	[XS_DIRECTORY_PART]    = { "DIRECTORY_PART",    send_directory_part },
 };
 
-/*
- * Keep the connection alive but stop processing any new request or sending
- * reponse. This is to allow sending @releaseDomain watch event at the correct
- * moment and/or to allow the connection to restart (not yet implemented).
- *
- * All watches, transactions, buffers will be freed.
- */
-void ignore_connection(struct connection *conn)
-{
-	struct buffered_data *out, *tmp;
-
-	trace("CONN %p ignored\n", conn);
-
-	conn->is_ignored = true;
-	conn_delete_all_watches(conn);
-	conn_delete_all_transactions(conn);
-
-	list_for_each_entry_safe(out, tmp, &conn->out_list, list) {
-		list_del(&out->list);
-		talloc_free(out);
-	}
-
-	talloc_free(conn->in);
-	conn->in = NULL;
-	/* if this is a socket connection, drop it now */
-	if (conn->fd >= 0)
-		talloc_free(conn);
-}
-
 static const char *sockmsg_string(enum xsd_sockmsg_type type)
 {
 	if ((unsigned int)type < ARRAY_SIZE(wire_funcs) && wire_funcs[type].str)
@@ -1598,6 +1569,7 @@ static void handle_input(struct connection *conn)
 {
 	int bytes;
 	struct buffered_data *in;
+	unsigned int err;
 
 	if (!conn->in) {
 		conn->in = new_buffer(conn);
@@ -1612,8 +1584,10 @@ static void handle_input(struct connection *conn)
 		if (in->used != sizeof(in->hdr)) {
 			bytes = conn->funcs->read(conn, in->hdr.raw + in->used,
 						  sizeof(in->hdr) - in->used);
-			if (bytes < 0)
+			if (bytes < 0) {
+				err = XENSTORE_ERROR_RINGIDX;
 				goto bad_client;
+			}
 			in->used += bytes;
 			if (in->used != sizeof(in->hdr))
 				return;
@@ -1621,6 +1595,7 @@ static void handle_input(struct connection *conn)
 			if (in->hdr.msg.len > XENSTORE_PAYLOAD_MAX) {
 				syslog(LOG_ERR, "Client tried to feed us %i",
 				       in->hdr.msg.len);
+				err = XENSTORE_ERROR_PROTO;
 				goto bad_client;
 			}
 		}
@@ -1638,8 +1613,10 @@ static void handle_input(struct connection *conn)
 
 	bytes = conn->funcs->read(conn, in->buffer + in->used,
 				  in->hdr.msg.len - in->used);
-	if (bytes < 0)
+	if (bytes < 0) {
+		err = XENSTORE_ERROR_RINGIDX;
 		goto bad_client;
+	}
 
 	in->used += bytes;
 	if (in->used != in->hdr.msg.len)
@@ -1649,14 +1626,14 @@ static void handle_input(struct connection *conn)
 	return;
 
 bad_client:
-	ignore_connection(conn);
+	ignore_connection(conn, err);
 }
 
 static void handle_output(struct connection *conn)
 {
 	/* Ignore the connection if an error occured */
 	if (!write_messages(conn))
-		ignore_connection(conn);
+		ignore_connection(conn, XENSTORE_ERROR_RINGIDX);
 }
 
 struct connection *new_connection(const struct interface_funcs *funcs)
