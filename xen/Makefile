@@ -473,14 +473,12 @@ _MAP:
 
 .PHONY: cloc
 cloc:
-	$(eval tmpfile := $(shell mktemp))
-	$(foreach f, $(shell find $(BASEDIR) -name *.o.d), \
-		$(eval path := $(dir $(f))) \
-		$(eval names := $(shell grep -o "[a-zA-Z0-9_/-]*\.[cS]" $(f))) \
-		$(foreach sf, $(names), \
-			$(shell if test -f $(path)/$(sf) ; then echo $(path)/$(sf) >> $(tmpfile); fi;)))
-	cloc --list-file=$(tmpfile)
-	rm $(tmpfile)
+	find . -name '*.o.d' | while read f; do \
+	    for sf in $$(grep -o "[a-zA-Z0-9_/-]*\.[cS]" $$f); do \
+		sf="$$(dirname $$f)/$$sf"; \
+		test -f "$$sf" && echo "$$sf"; \
+	    done; \
+	done | cloc --list-file=-
 
 endif #config-build
 
