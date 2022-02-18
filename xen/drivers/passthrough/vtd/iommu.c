@@ -240,54 +240,6 @@ domid_t did_to_domain_id(const struct vtd_iommu *iommu, unsigned int did)
     return iommu->domid_map[did];
 }
 
-static void sync_cache(const void *addr, unsigned int size)
-{
-    static unsigned long clflush_size = 0;
-    const void *end = addr + size;
-
-    if ( clflush_size == 0 )
-        clflush_size = get_cache_line_size();
-
-    addr -= (unsigned long)addr & (clflush_size - 1);
-    for ( ; addr < end; addr += clflush_size )
-/*
- * The arguments to a macro must not include preprocessor directives. Doing so
- * results in undefined behavior, so we have to create some defines here in
- * order to avoid it.
- */
-#if defined(HAVE_AS_CLWB)
-# define CLWB_ENCODING "clwb %[p]"
-#elif defined(HAVE_AS_XSAVEOPT)
-# define CLWB_ENCODING "data16 xsaveopt %[p]" /* clwb */
-#else
-# define CLWB_ENCODING ".byte 0x66, 0x0f, 0xae, 0x30" /* clwb (%%rax) */
-#endif
-
-#define BASE_INPUT(addr) [p] "m" (*(const char *)(addr))
-#if defined(HAVE_AS_CLWB) || defined(HAVE_AS_XSAVEOPT)
-# define INPUT BASE_INPUT
-#else
-# define INPUT(addr) "a" (addr), BASE_INPUT(addr)
-#endif
-        /*
-         * Note regarding the use of NOP_DS_PREFIX: it's faster to do a clflush
-         * + prefix than a clflush + nop, and hence the prefix is added instead
-         * of letting the alternative framework fill the gap by appending nops.
-         */
-        alternative_io_2(".byte " __stringify(NOP_DS_PREFIX) "; clflush %[p]",
-                         "data16 clflush %[p]", /* clflushopt */
-                         X86_FEATURE_CLFLUSHOPT,
-                         CLWB_ENCODING,
-                         X86_FEATURE_CLWB, /* no outputs */,
-                         INPUT(addr));
-#undef INPUT
-#undef BASE_INPUT
-#undef CLWB_ENCODING
-
-    alternative_2("", "sfence", X86_FEATURE_CLFLUSHOPT,
-                      "sfence", X86_FEATURE_CLWB);
-}
-
 /* Allocate page table, return its machine address */
 uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node)
 {
@@ -306,8 +258,7 @@ uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node)
 
         clear_page(vaddr);
 
-        if ( (iommu_ops.init ? &iommu_ops : &vtd_ops)->sync_cache )
-            sync_cache(vaddr, PAGE_SIZE);
+        iommu_sync_cache(vaddr, PAGE_SIZE);
         unmap_domain_page(vaddr);
         cur_pg++;
     }
@@ -1327,7 +1278,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     iommu->nr_pt_levels = agaw_to_level(agaw);
 
     if ( !ecap_coherent(iommu->ecap) )
-        vtd_ops.sync_cache = sync_cache;
+        iommu_non_coherent = true;
 
     nr_dom = cap_ndoms(iommu->cap);
 

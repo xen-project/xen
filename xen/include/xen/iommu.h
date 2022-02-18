@@ -268,7 +268,6 @@ struct iommu_ops {
     int (*setup_hpet_msi)(struct msi_desc *);
 
     int (*adjust_irq_affinities)(void);
-    void (*sync_cache)(const void *addr, unsigned int size);
     void (*clear_root_pgtable)(struct domain *d);
     int (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
 #endif /* CONFIG_X86 */

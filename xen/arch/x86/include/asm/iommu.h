@@ -19,6 +19,7 @@
 #include <xen/mem_access.h>
 #include <xen/spinlock.h>
 #include <asm/apicdef.h>
+#include <asm/cache.h>
 #include <asm/processor.h>
 #include <asm/hvm/vmx/vmcs.h>
 
@@ -134,12 +135,13 @@ extern bool untrusted_msi;
 int pi_update_irte(const struct pi_desc *pi_desc, const struct pirq *pirq,
                    const uint8_t gvec);
 
-#define iommu_sync_cache(addr, size) ({                 \
-    const struct iommu_ops *ops = iommu_get_ops();      \
-                                                        \
-    if ( ops->sync_cache )                              \
-        iommu_vcall(ops, sync_cache, addr, size);       \
-})
+extern bool iommu_non_coherent;
+
+static inline void iommu_sync_cache(const void *addr, unsigned int size)
+{
+    if ( iommu_non_coherent )
+        cache_writeback(addr, size);
+}
 
 int __must_check iommu_free_pgtables(struct domain *d);
 struct page_info *__must_check iommu_alloc_pgtable(struct domain *d);

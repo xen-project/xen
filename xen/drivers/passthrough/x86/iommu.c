@@ -28,6 +28,7 @@
 
 const struct iommu_init_ops *__initdata iommu_init_ops;
 struct iommu_ops __read_mostly iommu_ops;
+bool __read_mostly iommu_non_coherent;
 
 enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
 
@@ -438,8 +439,7 @@ struct page_info *iommu_alloc_pgtable(struct domain *d)
     p = __map_domain_page(pg);
     clear_page(p);
 
-    if ( hd->platform_ops->sync_cache )
-        iommu_vcall(hd->platform_ops, sync_cache, p, PAGE_SIZE);
+    iommu_sync_cache(p, PAGE_SIZE);
 
     unmap_domain_page(p);
 

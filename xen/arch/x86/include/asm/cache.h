@@ -11,4 +11,10 @@
 
 #define __read_mostly __section(".data.read_mostly")
 
+#ifndef __ASSEMBLY__
+
+void cache_writeback(const void *addr, unsigned int size);
+
+#endif
+
 #endif
