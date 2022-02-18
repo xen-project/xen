@@ -168,4 +168,5 @@ void lfb_free(void)
     xfree(lfb.lbuf);
     xfree(lfb.text_buf);
     xfree(lfb.line_len);
+    lfb.lfbp.lfb = ZERO_BLOCK_PTR;
 }

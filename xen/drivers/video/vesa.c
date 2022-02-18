@@ -197,5 +197,7 @@ void __init vesa_endboot(bool_t keep)
                    vlfb_info.width * bpp);
         lfb_flush();
         lfb_free();
+        iounmap(lfb);
+        lfb = ZERO_BLOCK_PTR;
     }
 }
