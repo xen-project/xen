@@ -33,7 +33,8 @@ config ARCH_DEFCONFIG
 	default "arch/x86/configs/x86_64_defconfig"
 
 config CC_HAS_INDIRECT_THUNK
-	def_bool $(cc-option,-mindirect-branch-register)
+	def_bool $(cc-option,-mindirect-branch-register) || \
+	         $(cc-option,-mretpoline-external-thunk)
 
 config INDIRECT_THUNK
 	def_bool y
