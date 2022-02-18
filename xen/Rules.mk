@@ -8,24 +8,11 @@
 include $(XEN_ROOT)/Config.mk
 include $(BASEDIR)/scripts/Kbuild.include
 
-# Note that link order matters!
-ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
-ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
-ALL_OBJS-y               += $(BASEDIR)/lib/built_in.o
-ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
-ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
-ALL_OBJS-$(CONFIG_CRYPTO)   += $(BASEDIR)/crypto/built_in.o
-
-ALL_LIBS-y               := $(BASEDIR)/lib/lib.a
-
 # Initialise some variables
 lib-y :=
 targets :=
 CFLAGS-y :=
 AFLAGS-y :=
-
-ALL_OBJS := $(ALL_OBJS-y)
-ALL_LIBS := $(ALL_LIBS-y)
 
 SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
                                             $(foreach w,1 2 4, \

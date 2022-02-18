@@ -75,14 +75,6 @@ ifneq ($(CONFIG_DTB_FILE),"")
 obj-y += dtb.o
 endif
 
-ALL_OBJS := $(TARGET_SUBARCH)/head.o $(ALL_OBJS)
-
-# head.o is built by descending into the sub-directory, depends on the part of
-# $(ALL_OBJS) that will eventually recurse into $(TARGET_SUBARCH)/ and build
-# head.o
-$(TARGET_SUBARCH)/head.o: $(BASEDIR)/arch/arm/built_in.o
-$(TARGET_SUBARCH)/head.o: ;
-
 ifdef CONFIG_LIVEPATCH
 all_symbols = --all-symbols
 ifdef CONFIG_FAST_SYMBOL_LOOKUP
@@ -98,33 +90,18 @@ ifeq ($(CONFIG_ARM_64),y)
 	ln -sf $(@F) $@.efi
 endif
 
-ifeq ($(CONFIG_LTO),y)
-# Gather all LTO objects together
-prelink_lto.o: $(ALL_OBJS) $(ALL_LIBS)
-	$(LD_LTO) -r -o $@ $(filter-out %.a,$^) --start-group $(filter %.a,$^) --end-group
-
-# Link it with all the binary objects
-prelink.o: $(patsubst %/built_in.o,%/built_in_bin.o,$(ALL_OBJS)) prelink_lto.o
-	$(call if_changed,ld)
-else
-prelink.o: $(ALL_OBJS) $(ALL_LIBS) FORCE
-	$(call if_changed,ld)
-endif
-
-targets += prelink.o
-
-$(TARGET)-syms: prelink.o xen.lds
-	$(LD) $(XEN_LDFLAGS) -T xen.lds -N prelink.o \
+$(TARGET)-syms: $(BASEDIR)/prelink.o xen.lds
+	$(LD) $(XEN_LDFLAGS) -T xen.lds -N $< \
 	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0
 	$(NM) -pa --format=sysv $(@D)/.$(@F).0 \
 		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).0.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0.o
-	$(LD) $(XEN_LDFLAGS) -T xen.lds -N prelink.o \
+	$(LD) $(XEN_LDFLAGS) -T xen.lds -N $< \
 	    $(@D)/.$(@F).0.o -o $(@D)/.$(@F).1
 	$(NM) -pa --format=sysv $(@D)/.$(@F).1 \
 		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).1.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
-	$(LD) $(XEN_LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
+	$(LD) $(XEN_LDFLAGS) -T xen.lds -N $< $(build_id_linker) \
 	    $(@D)/.$(@F).1.o -o $@
 	$(NM) -pa --format=sysv $(@D)/$(@F) \
 		| $(BASEDIR)/tools/symbols --all-symbols --xensyms --sysv --sort \

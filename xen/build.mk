@@ -59,3 +59,21 @@ arch/$(TARGET_ARCH)/include/asm/asm-offsets.h: asm-offsets.s
 	  sed -rne "/^[^#].*==>/{s:.*==>(.*)<==.*:\1:; s: [\$$#]: :; p;}"; \
 	  echo ""; \
 	  echo "#endif") <$< >$@
+
+ifeq ($(CONFIG_LTO),y)
+# Gather all LTO objects together
+prelink_lto.o: $(ALL_OBJS) $(ALL_LIBS)
+	$(LD_LTO) -r -o $@ $(filter-out %.a,$^) --start-group $(filter %.a,$^) --end-group
+
+# Link it with all the binary objects
+prelink.o: $(patsubst %/built_in.o,%/built_in_bin.o,$(ALL_OBJS)) prelink_lto.o FORCE
+	$(call if_changed,ld)
+else
+prelink.o: $(ALL_OBJS) $(ALL_LIBS) FORCE
+	$(call if_changed,ld)
+endif
+
+targets += prelink.o
+
+$(TARGET): prelink.o FORCE
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $@

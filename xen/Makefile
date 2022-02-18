@@ -285,6 +285,16 @@ CFLAGS += -flto
 LDFLAGS-$(CONFIG_CC_IS_CLANG) += -plugin LLVMgold.so
 endif
 
+# Note that link order matters!
+ALL_OBJS-y                := common/built_in.o
+ALL_OBJS-y                += drivers/built_in.o
+ALL_OBJS-y                += lib/built_in.o
+ALL_OBJS-y                += xsm/built_in.o
+ALL_OBJS-y                += arch/$(TARGET_ARCH)/built_in.o
+ALL_OBJS-$(CONFIG_CRYPTO) += crypto/built_in.o
+
+ALL_LIBS-y                := lib/lib.a
+
 include $(BASEDIR)/arch/$(TARGET_ARCH)/arch.mk
 
 # define new variables to avoid the ones defined in Config.mk
@@ -407,7 +417,7 @@ $(TARGET): FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C include
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) include
 	$(MAKE) -f $(BASEDIR)/Rules.mk arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) MKRELOC=$(MKRELOC) $@
+	$(MAKE) -f $(BASEDIR)/Rules.mk MKRELOC=$(MKRELOC) 'ALL_OBJS=$(ALL_OBJS-y)' 'ALL_LIBS=$(ALL_LIBS-y)' $@
 
 SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers lib test
 define all_sources
