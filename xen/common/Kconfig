@@ -85,6 +85,20 @@ config STATIC_MEMORY
 
 menu "Speculative hardening"
 
+config INDIRECT_THUNK
+	bool "Speculative Branch Target Injection Protection"
+	depends on CC_HAS_INDIRECT_THUNK
+	default y
+	help
+	  Contemporary processors may use speculative execution as a
+	  performance optimisation, but this can potentially be abused by an
+	  attacker to leak data via speculative sidechannels.
+
+	  One source of data leakage is via branch target injection.
+
+	  When enabled, indirect branches are implemented using a new construct
+	  called "retpoline" that prevents speculation.
+
 config SPECULATIVE_HARDEN_ARRAY
 	bool "Speculative Array Hardening"
 	default y
