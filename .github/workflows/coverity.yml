@@ -11,15 +11,13 @@ jobs:
     steps:
     - name: Install build dependencies
       run: |
-        sudo apt-get install -y wget git bcc bin86 gawk bridge-utils \
-          iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential \
-          make gcc libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev \
-          libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl \
-          libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev \
-          ocaml-findlib xz-utils libyajl-dev libpixman-1-dev \
-          libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake \
-          libtool libfuse-dev liblzma-dev ninja-build \
-          kpartx python3-dev golang python-dev libsystemd-dev
+        sudo apt-get install -y wget git gawk bridge-utils \
+          iproute2 bzip2 build-essential \
+          make gcc zlib1g-dev libncurses5-dev iasl \
+          libbz2-dev e2fslibs-dev git-core uuid-dev ocaml \
+          ocaml-findlib xz-utils libyajl-dev \
+          autoconf libtool liblzma-dev \
+          python3-dev golang python-dev libsystemd-dev
 
     - uses: actions/checkout@v2
       with:
@@ -27,11 +25,13 @@ jobs:
 
     - name: Configure Xen
       run: |
-        ./configure
+        ./configure --with-system-qemu=/bin/true \
+                    --with-system-seabios=/bin/true \
+                    --with-system-ovmf=/bin/true
 
     - name: Pre build stuff
       run: |
-        make -C tools/firmware/etherboot all && make mini-os-dir
+        make mini-os-dir
 
     - uses: vapier/coverity-scan-action@v1
       with:
