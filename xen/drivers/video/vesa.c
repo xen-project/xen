@@ -26,8 +26,7 @@ static bool_t vga_compat;
 static unsigned int vram_total;
 integer_param("vesa-ram", vram_total);
 
-static unsigned int vram_remap;
-integer_param("vesa-map", vram_remap);
+static unsigned int __initdata vram_remap;
 
 static int font_height;
 static int __init parse_font_height(const char *s)
@@ -79,12 +78,8 @@ void __init vesa_early_init(void)
      *                 use for vesafb.  With modern cards it is no
      *                 option to simply use vram_total as that
      *                 wastes plenty of kernel address space. */
-    vram_remap = (vram_remap ?
-                  (vram_remap << 20) :
-                  ((vram_vmode + (1 << L2_PAGETABLE_SHIFT) - 1) &
-                   ~((1 << L2_PAGETABLE_SHIFT) - 1)));
-    vram_remap = max_t(unsigned int, vram_remap, vram_vmode);
-    vram_remap = min_t(unsigned int, vram_remap, vram_total);
+    vram_remap = ROUNDUP(vram_vmode, 1 << L2_PAGETABLE_SHIFT);
+    vram_remap = min(vram_remap, vram_total);
 }
 
 void __init vesa_init(void)

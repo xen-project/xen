@@ -2489,9 +2489,6 @@ PCPUs when using the credit1 scheduler. This prevents rapid fluttering
 of a VCPU between CPUs, and reduces the implicit overheads such as
 cache-warming. 1ms (1000) has been measured as a good value.
 
-### vesa-map
-> `= <integer>`
-
 ### vesa-ram
 > `= <integer>`
 
