@@ -166,7 +166,7 @@ SRCPATH := $(patsubst $(BASEDIR)/%,%,$(CURDIR))
 quiet_cmd_cc_o_c = CC      $@
 ifeq ($(CONFIG_ENFORCE_UNIQUE_SYMBOLS),y)
     cmd_cc_o_c = $(CC) $(c_flags) -c $< -o $(dot-target).tmp -MQ $@
-    ifeq ($(CONFIG_CC_IS_CLANG),y)
+    ifeq ($(CONFIG_CC_IS_CLANG)$(call clang-ifversion,-lt,600,y),yy)
         cmd_objcopy_fix_sym = $(OBJCOPY) --redefine-sym $<=$(SRCPATH)/$< $(dot-target).tmp $@
     else
         cmd_objcopy_fix_sym = $(OBJCOPY) --redefine-sym $(<F)=$(SRCPATH)/$< $(dot-target).tmp $@
