@@ -2492,6 +2492,11 @@ cache-warming. 1ms (1000) has been measured as a good value.
 ### vesa-ram
 > `= <integer>`
 
+> Default: `0`
+
+This allows to override the amount of video RAM, in MiB, determined to be
+present.
+
 ### vga
 > `= ( ask | current | text-80x<rows> | gfx-<width>x<height>x<depth> | mode-<mode> )[,keep]`
 
