@@ -468,35 +468,33 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
         if ( !max_ratio )
             return;
 
+        switch ( c->x86_model )
         {
-            switch ( c->x86_model )
-            {
-            case 0x0e: /* Core */
-            case 0x0f: case 0x16: case 0x17: case 0x1d: /* Core2 */
-                /*
-                 * PLATFORM_INFO, while not documented for these, appears to
-                 * exist in at least some cases, but what it holds doesn't
-                 * match the scheme used by newer CPUs.  At a guess, the min
-                 * and max fields look to be reversed, while the scaling
-                 * factor is encoded in FSB_FREQ.
-                 */
-                if ( min_ratio > max_ratio )
-                    SWAP(min_ratio, max_ratio);
-                if ( rdmsr_safe(MSR_FSB_FREQ, msrval) ||
-                     (msrval &= 7) >= ARRAY_SIZE(core_factors) )
-                    return;
-                factor = core_factors[msrval];
-                break;
+        case 0x0e: /* Core */
+        case 0x0f: case 0x16: case 0x17: case 0x1d: /* Core2 */
+            /*
+             * PLATFORM_INFO, while not documented for these, appears to exist
+             * in at least some cases, but what it holds doesn't match the
+             * scheme used by newer CPUs.  At a guess, the min and max fields
+             * look to be reversed, while the scaling factor is encoded in
+             * FSB_FREQ.
+             */
+            if ( min_ratio > max_ratio )
+                SWAP(min_ratio, max_ratio);
+            if ( rdmsr_safe(MSR_FSB_FREQ, msrval) ||
+                 (msrval &= 7) >= ARRAY_SIZE(core_factors) )
+                return;
+            factor = core_factors[msrval];
+            break;
 
-            case 0x1a: case 0x1e: case 0x1f: case 0x2e: /* Nehalem */
-            case 0x25: case 0x2c: case 0x2f: /* Westmere */
-                factor = 13333;
-                break;
+        case 0x1a: case 0x1e: case 0x1f: case 0x2e: /* Nehalem */
+        case 0x25: case 0x2c: case 0x2f: /* Westmere */
+            factor = 13333;
+            break;
 
-            default:
-                factor = 10000;
-                break;
-            }
+        default:
+            factor = 10000;
+            break;
         }
         break;
 
