@@ -83,10 +83,11 @@ SECTIONS
        . = ALIGN(PAGE_SIZE);
        _etextentry = .;
 
+       *(.text.kexec)          /* Page aligned in the object file. */
+
        *(.text.cold)
        *(.text.unlikely)
        *(.fixup)
-       *(.text.kexec)
        *(.gnu.warning)
        _etext = .;             /* End of text section */
   } PHDR(text) = 0x9090
