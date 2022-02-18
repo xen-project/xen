@@ -47,7 +47,7 @@ void queue_read_lock_slowpath(rwlock_t *lock)
     while ( atomic_read(&lock->cnts) & _QW_WMASK )
         cpu_relax();
 
-    cnts = atomic_add_return(_QR_BIAS, &lock->cnts) - _QR_BIAS;
+    cnts = atomic_add_return(_QR_BIAS, &lock->cnts);
     rspin_until_writer_unlock(lock, cnts);
 
     /*
