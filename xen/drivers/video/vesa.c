@@ -145,38 +145,6 @@ void __init vesa_init(void)
     video_puts = lfb_redraw_puts;
 }
 
-#include <asm/mtrr.h>
-
-static unsigned int vesa_mtrr;
-integer_param("vesa-mtrr", vesa_mtrr);
-
-void __init vesa_mtrr_init(void)
-{
-    static const int mtrr_types[] = {
-        0, MTRR_TYPE_UNCACHABLE, MTRR_TYPE_WRBACK,
-        MTRR_TYPE_WRCOMB, MTRR_TYPE_WRTHROUGH };
-    unsigned int size_total;
-    int rc, type;
-
-    if ( !lfb || (vesa_mtrr == 0) || (vesa_mtrr >= ARRAY_SIZE(mtrr_types)) )
-        return;
-
-    type = mtrr_types[vesa_mtrr];
-    if ( !type )
-        return;
-
-    /* Find the largest power-of-two */
-    size_total = vram_total;
-    while ( size_total & (size_total - 1) )
-        size_total &= size_total - 1;
-
-    /* Try and find a power of two to add */
-    do {
-        rc = mtrr_add(lfb_base(), size_total, type, 1);
-        size_total >>= 1;
-    } while ( (size_total >= PAGE_SIZE) && (rc == -EINVAL) );
-}
-
 static void lfb_flush(void)
 {
     __asm__ __volatile__ ("sfence" : : : "memory");
