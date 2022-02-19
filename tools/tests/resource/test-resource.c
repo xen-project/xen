@@ -24,7 +24,7 @@ static void test_gnttab(uint32_t domid, unsigned int nr_frames,
                         unsigned long gfn)
 {
     xenforeignmemory_resource_handle *res;
-    grant_entry_v1_t *gnttab;
+    grant_entry_v1_t *gnttab = NULL;
     size_t size;
     int rc;
     uint32_t refs[nr_frames], domids[nr_frames];
