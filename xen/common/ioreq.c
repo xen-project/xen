@@ -501,13 +501,17 @@ static int ioreq_server_alloc_rangesets(struct ioreq_server *s,
 
     for ( i = 0; i < NR_IO_RANGE_TYPES; i++ )
     {
-        char *name;
+        char *name, *type;
 
-        rc = asprintf(&name, "ioreq_server %d %s", id,
-                      (i == XEN_DMOP_IO_RANGE_PORT) ? "port" :
-                      (i == XEN_DMOP_IO_RANGE_MEMORY) ? "memory" :
-                      (i == XEN_DMOP_IO_RANGE_PCI) ? "pci" :
-                      "");
+        switch ( i )
+        {
+        case XEN_DMOP_IO_RANGE_PORT:   type = " port";   break;
+        case XEN_DMOP_IO_RANGE_MEMORY: type = " memory"; break;
+        case XEN_DMOP_IO_RANGE_PCI:    type = " pci";    break;
+        default:                       type = "";        break;
+        }
+
+        rc = xasprintf(&name, "ioreq_server %d%s", id, type);
         if ( rc )
             goto fail;
 

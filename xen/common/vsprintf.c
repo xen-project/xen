@@ -859,7 +859,7 @@ int scnprintf(char * buf, size_t size, const char *fmt, ...)
 EXPORT_SYMBOL(scnprintf);
 
 /**
- * vasprintf - Format a string and allocate a buffer to place it in
+ * xvasprintf - Format a string and allocate a buffer to place it in
  *
  * @bufp: Pointer to a pointer to receive the allocated buffer
  * @fmt: The format string to use
@@ -870,7 +870,7 @@ EXPORT_SYMBOL(scnprintf);
  * guaranteed to be null terminated. The memory is allocated
  * from xenheap, so the buffer should be freed with xfree().
  */
-int vasprintf(char **bufp, const char *fmt, va_list args)
+int xvasprintf(char **bufp, const char *fmt, va_list args)
 {
     va_list args_copy;
     size_t size;
@@ -891,7 +891,7 @@ int vasprintf(char **bufp, const char *fmt, va_list args)
 }
 
 /**
- * asprintf - Format a string and place it in a buffer
+ * xasprintf - Format a string and place it in a buffer
  * @bufp: Pointer to a pointer to receive the allocated buffer
  * @fmt: The format string to use
  * @...: Arguments for the format string
@@ -901,14 +901,15 @@ int vasprintf(char **bufp, const char *fmt, va_list args)
  * guaranteed to be null terminated. The memory is allocated
  * from xenheap, so the buffer should be freed with xfree().
  */
-int asprintf(char **bufp, const char *fmt, ...)
+int xasprintf(char **bufp, const char *fmt, ...)
 {
     va_list args;
     int i;
 
     va_start(args, fmt);
-    i=vasprintf(bufp,fmt,args);
+    i = xvasprintf(bufp, fmt, args);
     va_end(args);
+
     return i;
 }
 
