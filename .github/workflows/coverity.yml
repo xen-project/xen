@@ -2,6 +2,7 @@ name: Coverity Scan
 
 # We only want to test official release code, not every pull request.
 on:
+  workflow_dispatch:
   schedule:
     - cron: '18 9 * * WED,SUN' # Bi-weekly at 9:18 UTC
 
@@ -11,11 +12,11 @@ jobs:
     steps:
     - name: Install build dependencies
       run: |
-        sudo apt-get install -y wget git gawk bridge-utils \
-          iproute2 bzip2 build-essential \
-          make gcc zlib1g-dev libncurses5-dev iasl \
-          libbz2-dev e2fslibs-dev git-core uuid-dev ocaml \
-          ocaml-findlib xz-utils libyajl-dev \
+        sudo apt-get install -y wget git gawk \
+          libbz2-dev build-essential \
+          zlib1g-dev libncurses5-dev iasl \
+          libbz2-dev e2fslibs-dev uuid-dev ocaml \
+          ocaml-findlib libyajl-dev \
           autoconf libtool liblzma-dev \
           python3-dev golang python-dev libsystemd-dev
 
@@ -31,11 +32,11 @@ jobs:
 
     - name: Pre build stuff
       run: |
-        make mini-os-dir
+        make -j`nproc` mini-os-dir
 
     - uses: vapier/coverity-scan-action@v1
       with:
-        command: make xen tools && make -C extras/mini-os/
+        command: make -j`nproc` build-xen build-tools && make -j`nproc` -C extras/mini-os/
         project: XenProject
         email: ${{ secrets.COVERITY_SCAN_EMAIL }}
         token: ${{ secrets.COVERITY_SCAN_TOKEN }}
