@@ -72,18 +72,16 @@ struct arch_iommu
 
 extern struct iommu_ops iommu_ops;
 
-#ifdef NDEBUG
 # include <asm/alternative.h>
 # define iommu_call(ops, fn, args...) ({      \
-    (void)(ops);                              \
+    ASSERT((ops) == &iommu_ops);              \
     alternative_call(iommu_ops.fn, ## args);  \
 })
 
 # define iommu_vcall(ops, fn, args...) ({     \
-    (void)(ops);                              \
+    ASSERT((ops) == &iommu_ops);              \
     alternative_vcall(iommu_ops.fn, ## args); \
 })
-#endif
 
 static inline const struct iommu_ops *iommu_get_ops(void)
 {
@@ -106,7 +104,7 @@ int iommu_setup_hpet_msi(struct msi_desc *);
 static inline int iommu_adjust_irq_affinities(void)
 {
     return iommu_ops.adjust_irq_affinities
-           ? iommu_ops.adjust_irq_affinities()
+           ? iommu_call(&iommu_ops, adjust_irq_affinities)
            : 0;
 }
 
@@ -122,7 +120,7 @@ int iommu_enable_x2apic(void);
 static inline void iommu_disable_x2apic(void)
 {
     if ( x2apic_enabled && iommu_ops.disable_x2apic )
-        iommu_ops.disable_x2apic();
+        iommu_vcall(&iommu_ops, disable_x2apic);
 }
 
 int iommu_identity_mapping(struct domain *d, p2m_access_t p2ma,

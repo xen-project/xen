@@ -540,7 +540,7 @@ int __init iommu_setup(void)
 int iommu_suspend()
 {
     if ( iommu_enabled )
-        return iommu_get_ops()->suspend();
+        return iommu_call(iommu_get_ops(), suspend);
 
     return 0;
 }
@@ -548,7 +548,7 @@ int iommu_suspend()
 void iommu_resume()
 {
     if ( iommu_enabled )
-        iommu_get_ops()->resume();
+        iommu_vcall(iommu_get_ops(), resume);
 }
 
 int iommu_do_domctl(
@@ -578,7 +578,8 @@ void iommu_crash_shutdown(void)
         return;
 
     if ( iommu_enabled )
-        iommu_get_ops()->crash_shutdown();
+        iommu_vcall(iommu_get_ops(), crash_shutdown);
+
     iommu_enabled = false;
 #ifndef iommu_intremap
     iommu_intremap = iommu_intremap_off;

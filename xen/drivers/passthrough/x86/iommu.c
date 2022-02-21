@@ -27,7 +27,7 @@
 #include <asm/setup.h>
 
 const struct iommu_init_ops *__initdata iommu_init_ops;
-struct iommu_ops __read_mostly iommu_ops;
+struct iommu_ops __ro_after_init iommu_ops;
 bool __read_mostly iommu_non_coherent;
 
 enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
@@ -129,7 +129,7 @@ int iommu_enable_x2apic(void)
     if ( !iommu_ops.enable_x2apic )
         return -EOPNOTSUPP;
 
-    return iommu_ops.enable_x2apic();
+    return iommu_call(&iommu_ops, enable_x2apic);
 }
 
 void iommu_update_ire_from_apic(

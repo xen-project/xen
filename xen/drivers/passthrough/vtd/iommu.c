@@ -56,7 +56,6 @@ bool __read_mostly iommu_snoop = true;
 
 static unsigned int __read_mostly nr_iommus;
 
-static struct iommu_ops vtd_ops;
 static struct tasklet vtd_fault_tasklet;
 
 static int cf_check setup_hwdom_device(u8 devfn, struct pci_dev *);
@@ -2794,7 +2793,7 @@ static int __init cf_check intel_iommu_quarantine_init(struct domain *d)
     return rc;
 }
 
-static struct iommu_ops __initdata vtd_ops = {
+static const struct iommu_ops __initconst_cf_clobber vtd_ops = {
     .init = intel_iommu_domain_init,
     .hwdom_init = intel_iommu_hwdom_init,
     .quarantine_init = intel_iommu_quarantine_init,

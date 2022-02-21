@@ -628,7 +628,7 @@ static void cf_check amd_dump_page_tables(struct domain *d)
                               hd->arch.amd.paging_mode, 0, 0);
 }
 
-static const struct iommu_ops __initconstrel _iommu_ops = {
+static const struct iommu_ops __initconst_cf_clobber _iommu_ops = {
     .init = amd_iommu_domain_init,
     .hwdom_init = amd_iommu_hwdom_init,
     .quarantine_init = amd_iommu_quarantine_init,
