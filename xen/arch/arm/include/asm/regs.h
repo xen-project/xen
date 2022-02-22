@@ -13,7 +13,7 @@
 
 #define psr_mode(psr,m) (((psr) & PSR_MODE_MASK) == m)
 
-static inline bool psr_mode_is_32bit(const struct cpu_user_regs *regs)
+static inline bool regs_mode_is_32bit(const struct cpu_user_regs *regs)
 {
 #ifdef CONFIG_ARM_32
     return true;
