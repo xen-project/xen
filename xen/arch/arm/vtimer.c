@@ -36,7 +36,7 @@
  * CNTKCTL_EL1_ bit name which gates user access
  */
 #define ACCESS_ALLOWED(regs, user_gate) \
-    ( !psr_mode_is_user(regs) || \
+    ( !regs_mode_is_user(regs) || \
       (READ_SYSREG(CNTKCTL_EL1) & CNTKCTL_EL1_##user_gate) )
 
 static void phys_timer_expired(void *data)

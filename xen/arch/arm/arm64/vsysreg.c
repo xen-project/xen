@@ -91,7 +91,7 @@ void do_sysreg(struct cpu_user_regs *regs,
      * ARMv8 (DDI 0487A.d): D7.2.1
      */
     case HSR_SYSREG_ACTLR_EL1:
-        if ( psr_mode_is_user(regs) )
+        if ( regs_mode_is_user(regs) )
             return inject_undef_exception(regs, hsr);
         if ( hsr.sysreg.read )
             set_user_reg(regs, regidx, v->arch.actlr);
@@ -206,7 +206,7 @@ void do_sysreg(struct cpu_user_regs *regs,
         return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
     case HSR_SYSREG_PMUSERENR_EL0:
         /* RO at EL0. RAZ/WI at EL1 */
-        if ( psr_mode_is_user(regs) )
+        if ( regs_mode_is_user(regs) )
             return handle_ro_raz(regs, regidx, hsr.sysreg.read, hsr, 0);
         else
             return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);

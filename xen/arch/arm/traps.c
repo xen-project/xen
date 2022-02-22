@@ -561,7 +561,7 @@ static void inject_abt64_exception(struct cpu_user_regs *regs,
         .len = instr_len,
     };
 
-    if ( psr_mode_is_user(regs) )
+    if ( regs_mode_is_user(regs) )
         esr.ec = prefetch
             ? HSR_EC_INSTR_ABORT_LOWER_EL : HSR_EC_DATA_ABORT_LOWER_EL;
     else
@@ -1193,7 +1193,7 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_pause(v); /* acceptably dangerous */
 
     vcpu_show_registers(v);
-    if ( !psr_mode_is_user(&v->arch.cpu_info->guest_cpu_user_regs) )
+    if ( !regs_mode_is_user(&v->arch.cpu_info->guest_cpu_user_regs) )
         show_guest_stack(v, &v->arch.cpu_info->guest_cpu_user_regs);
 
     vcpu_unpause(v);
@@ -1560,7 +1560,7 @@ enum mc_disposition arch_do_multicall_call(struct mc_state *state)
                          multi->args[2], multi->args[3],
                          multi->args[4]);
 
-    return likely(!psr_mode_is_user(guest_cpu_user_regs()))
+    return likely(!regs_mode_is_user(guest_cpu_user_regs()))
            ? mc_continue : mc_preempt;
 }
 
@@ -1699,7 +1699,7 @@ void handle_raz_wi(struct cpu_user_regs *regs,
 {
     ASSERT((min_el == 0) || (min_el == 1));
 
-    if ( min_el > 0 && psr_mode_is_user(regs) )
+    if ( min_el > 0 && regs_mode_is_user(regs) )
         return inject_undef_exception(regs, hsr);
 
     if ( read )
@@ -1718,7 +1718,7 @@ void handle_wo_wi(struct cpu_user_regs *regs,
 {
     ASSERT((min_el == 0) || (min_el == 1));
 
-    if ( min_el > 0 && psr_mode_is_user(regs) )
+    if ( min_el > 0 && regs_mode_is_user(regs) )
         return inject_undef_exception(regs, hsr);
 
     if ( read )
@@ -1738,7 +1738,7 @@ void handle_ro_read_val(struct cpu_user_regs *regs,
 {
     ASSERT((min_el == 0) || (min_el == 1));
 
-    if ( min_el > 0 && psr_mode_is_user(regs) )
+    if ( min_el > 0 && regs_mode_is_user(regs) )
         return inject_undef_exception(regs, hsr);
 
     if ( !read )
