@@ -69,13 +69,6 @@ int hap_track_dirty_vram(struct domain *d,
     {
         unsigned int size = DIV_ROUND_UP(nr_frames, BITS_PER_BYTE);
 
-        if ( !paging_mode_log_dirty(d) )
-        {
-            rc = paging_log_dirty_enable(d, false);
-            if ( rc )
-                goto out;
-        }
-
         rc = -ENOMEM;
         dirty_bitmap = vzalloc(size);
         if ( !dirty_bitmap )
@@ -106,6 +99,10 @@ int hap_track_dirty_vram(struct domain *d,
             dirty_vram->end_pfn = begin_pfn + nr_frames;
 
             paging_unlock(d);
+
+            domain_pause(d);
+            p2m_enable_hardware_log_dirty(d);
+            domain_unpause(d);
 
             if ( oend > ostart )
                 p2m_change_type_range(d, ostart, oend,
