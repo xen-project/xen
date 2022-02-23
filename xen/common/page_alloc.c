@@ -1437,8 +1437,9 @@ static void free_heap_pages(
 {
     unsigned long mask;
     mfn_t mfn = page_to_mfn(pg);
-    unsigned int i, node = phys_to_nid(mfn_to_maddr(mfn)), pg_offlined = 0;
+    unsigned int i, node = phys_to_nid(mfn_to_maddr(mfn));
     unsigned int zone = page_to_zone(pg);
+    bool pg_offlined = false;
 
     ASSERT(order <= MAX_ORDER);
 
@@ -1447,7 +1448,7 @@ static void free_heap_pages(
     for ( i = 0; i < (1 << order); i++ )
     {
         if ( mark_page_free(&pg[i], mfn_add(mfn, i)) )
-            pg_offlined = 1;
+            pg_offlined = true;
 
         if ( need_scrub )
         {
