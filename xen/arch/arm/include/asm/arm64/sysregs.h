@@ -84,6 +84,9 @@
 #ifndef ID_DFR1_EL1
 #define ID_DFR1_EL1                 S3_0_C0_C3_5
 #endif
+#ifndef ID_AA64ISAR2_EL1
+#define ID_AA64ISAR2_EL1            S3_0_C0_C6_2
+#endif
 
 /* ID registers (imported from arm64/include/asm/sysreg.h in Linux) */
 
@@ -138,6 +141,9 @@
 #define ID_AA64ISAR1_GPA_ARCHITECTED            0x1
 #define ID_AA64ISAR1_GPI_NI                     0x0
 #define ID_AA64ISAR1_GPI_IMP_DEF                0x1
+
+/* id_aa64isar2 */
+#define ID_AA64ISAR2_CLEARBHB_SHIFT 28
 
 /* id_aa64pfr0 */
 #define ID_AA64PFR0_CSV3_SHIFT       60
@@ -232,6 +238,7 @@
 #define ID_AA64MMFR0_PARANGE_52        0x6
 
 /* id_aa64mmfr1 */
+#define ID_AA64MMFR1_ECBHB_SHIFT     60
 #define ID_AA64MMFR1_ETS_SHIFT       36
 #define ID_AA64MMFR1_TWED_SHIFT      32
 #define ID_AA64MMFR1_XNX_SHIFT       28
