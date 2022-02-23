@@ -57,6 +57,10 @@
 #define ICH_AP1R2_EL2             __AP1Rx_EL2(2)
 #define ICH_AP1R3_EL2             __AP1Rx_EL2(3)
 
+#ifndef ID_AA64ISAR2_EL1
+#define ID_AA64ISAR2_EL1            S3_0_C0_C6_2
+#endif
+
 /* Access to system registers */
 
 #define READ_SYSREG32(name) ((uint32_t)READ_SYSREG64(name))
