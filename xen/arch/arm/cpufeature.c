@@ -122,6 +122,7 @@ void identify_cpu(struct cpuinfo_arm *c)
 
     c->isa64.bits[0] = READ_SYSREG(ID_AA64ISAR0_EL1);
     c->isa64.bits[1] = READ_SYSREG(ID_AA64ISAR1_EL1);
+    c->isa64.bits[2] = READ_SYSREG(ID_AA64ISAR2_EL1);
 
     c->zfr64.bits[0] = READ_SYSREG(ID_AA64ZFR0_EL1);
 
