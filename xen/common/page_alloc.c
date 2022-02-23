@@ -1441,7 +1441,6 @@ static void free_heap_pages(
     unsigned int zone = page_to_zone(pg);
 
     ASSERT(order <= MAX_ORDER);
-    ASSERT(node >= 0);
 
     spin_lock(&heap_lock);
 
