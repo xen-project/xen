@@ -84,6 +84,9 @@
 #ifndef ID_DFR1_EL1
 #define ID_DFR1_EL1                 S3_0_C0_C3_5
 #endif
+#ifndef ID_AA64ISAR2_EL1
+#define ID_AA64ISAR2_EL1            S3_0_C0_C6_2
+#endif
 
 /* Access to system registers */
 

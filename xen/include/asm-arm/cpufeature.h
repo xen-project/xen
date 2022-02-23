@@ -206,14 +206,15 @@ struct cpuinfo_arm {
             unsigned long lo:4;
             unsigned long pan:4;
             unsigned long __res1:8;
-            unsigned long __res2:32;
+            unsigned long __res2:28;
+            unsigned long ecbhb:4;
 
             unsigned long __res3:64;
         };
     } mm64;
 
     union {
-        uint64_t bits[2];
+        uint64_t bits[3];
         struct {
             /* ISAR0 */
             unsigned long __res0:4;
@@ -249,6 +250,12 @@ struct cpuinfo_arm {
             unsigned long dgh:4;
             unsigned long i8mm:4;
             unsigned long __res2:8;
+
+            /* ISAR2 */
+            unsigned long __res3:28;
+            unsigned long clearbhb:4;
+
+            unsigned long __res4:32;
         };
     } isa64;
 
