@@ -332,24 +332,23 @@ void __init early_cpu_init(void)
 	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
 	c->x86 = get_cpu_family(eax, &c->x86_model, &c->x86_mask);
 
-	edx &= ~cleared_caps[cpufeat_word(X86_FEATURE_FPU)];
-	ecx &= ~cleared_caps[cpufeat_word(X86_FEATURE_SSE3)];
+	edx &= ~cleared_caps[FEATURESET_1d];
+	ecx &= ~cleared_caps[FEATURESET_1c];
 	if (edx & cpufeat_mask(X86_FEATURE_CLFLUSH))
 		c->x86_cache_alignment = ((ebx >> 8) & 0xff) * 8;
 	/* Leaf 0x1 capabilities filled in early for Xen. */
-	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
-	c->x86_capability[cpufeat_word(X86_FEATURE_SSE3)] = ecx;
+	c->x86_capability[FEATURESET_1d] = edx;
+	c->x86_capability[FEATURESET_1c] = ecx;
 
 	printk(XENLOG_INFO
 	       "CPU Vendor: %s, Family %u (%#x), Model %u (%#x), Stepping %u (raw %08x)\n",
 	       x86_cpuid_vendor_to_str(c->x86_vendor), c->x86, c->x86,
 	       c->x86_model, c->x86_model, c->x86_mask, eax);
 
-	if (c->cpuid_level >= 7) {
-		cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
-		c->x86_capability[cpufeat_word(X86_FEATURE_CET_SS)] = ecx;
-		c->x86_capability[cpufeat_word(X86_FEATURE_CET_IBT)] = edx;
-	}
+	if (c->cpuid_level >= 7)
+		cpuid_count(7, 0, &eax, &ebx,
+			    &c->x86_capability[FEATURESET_7c0],
+			    &c->x86_capability[FEATURESET_7d0]);
 
 	eax = cpuid_eax(0x80000000);
 	if ((eax >> 16) == 0x8000 && eax >= 0x80000008) {

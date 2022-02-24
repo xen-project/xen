@@ -516,7 +516,7 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 				   (boot_cpu_data.x86_model << 4) |
 				   boot_cpu_data.x86_mask;
 	processor.mpc_featureflag =
-            boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_FPU)];
+            boot_cpu_data.x86_capability[FEATURESET_1d];
 	processor.mpc_reserved[0] = 0;
 	processor.mpc_reserved[1] = 0;
 	for (i = 0; i < 2; i++) {

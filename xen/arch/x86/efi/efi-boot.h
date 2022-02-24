@@ -685,11 +685,11 @@ static void __init efi_arch_cpu(void)
 
     boot_tsc_stamp = rdtsc();
 
-    caps[cpufeat_word(X86_FEATURE_HYPERVISOR)] = cpuid_ecx(1);
+    caps[FEATURESET_1c] = cpuid_ecx(1);
 
     if ( (eax >> 16) == 0x8000 && eax > 0x80000000 )
     {
-        caps[cpufeat_word(X86_FEATURE_SYSCALL)] = cpuid_edx(0x80000001);
+        caps[FEATURESET_e1d] = cpuid_edx(0x80000001);
 
         if ( cpu_has_nx )
             trampoline_efer |= EFER_NXE;

@@ -48,7 +48,7 @@ void tsx_init(void)
         bool has_rtm_always_abort;
 
         if ( boot_cpu_data.cpuid_level >= 7 )
-            boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_ARCH_CAPS)]
+            boot_cpu_data.x86_capability[FEATURESET_7d0]
                 = cpuid_count_edx(7, 0);
 
         if ( cpu_has_arch_caps )
