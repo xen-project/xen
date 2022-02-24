@@ -847,25 +847,24 @@ static void cf_check mwait_idle(void)
 
 	update_last_cx_stat(power, cx, before);
 
-	if (cpu_is_haltable(cpu)) {
-		if (cx->irq_enable_early)
-			local_irq_enable();
+	if (cx->irq_enable_early)
+		local_irq_enable();
 
-		mwait_idle_with_hints(cx->address, MWAIT_ECX_INTERRUPT_BREAK);
+	mwait_idle_with_hints(cx->address, MWAIT_ECX_INTERRUPT_BREAK);
 
-		local_irq_disable();
-	}
+	local_irq_disable();
 
 	after = alternative_call(cpuidle_get_tick);
 
 	cstate_restore_tsc();
 	trace_exit_reason(irq_traced);
-	TRACE_6D(TRC_PM_IDLE_EXIT, cx->type, after,
-		irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
 
 	/* Now back in C0. */
 	update_idle_stats(power, cx, before, after);
 	local_irq_enable();
+
+	TRACE_6D(TRC_PM_IDLE_EXIT, cx->type, after,
+		irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
 
 	if (!(lapic_timer_reliable_states & (1 << cx->type)))
 		lapic_timer_on();
