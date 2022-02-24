@@ -17,7 +17,7 @@ ENTRY(entry_int82)
         movl  $HYPERCALL_VECTOR, 4(%rsp)
         SAVE_ALL compat=1 /* DPL1 gate, restricted to 32bit PV guests only. */
 
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         CR4_PV32_RESTORE
@@ -208,7 +208,7 @@ ENTRY(cstar_enter)
         movl  $TRAP_syscall, 4(%rsp)
         SAVE_ALL
 
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         GET_STACK_END(bx)
