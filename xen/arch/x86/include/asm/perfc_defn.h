@@ -7,13 +7,13 @@ PERFCOUNTER_ARRAY(exceptions,           "exceptions", 32)
 #ifdef CONFIG_HVM
 
 #define VMX_PERF_EXIT_REASON_SIZE 65
-#define VMX_PERF_VECTOR_SIZE 0x20
-PERFCOUNTER_ARRAY(vmexits,              "vmexits", VMX_PERF_EXIT_REASON_SIZE)
-PERFCOUNTER_ARRAY(cause_vector,         "cause vector", VMX_PERF_VECTOR_SIZE)
-
 #define VMEXIT_NPF_PERFC 143
 #define SVM_PERF_EXIT_REASON_SIZE (VMEXIT_NPF_PERFC + 1)
-PERFCOUNTER_ARRAY(svmexits,             "SVMexits", SVM_PERF_EXIT_REASON_SIZE)
+PERFCOUNTER_ARRAY(vmexits,              "vmexits",
+                  MAX(VMX_PERF_EXIT_REASON_SIZE, SVM_PERF_EXIT_REASON_SIZE))
+
+#define VMX_PERF_VECTOR_SIZE 0x20
+PERFCOUNTER_ARRAY(cause_vector,         "cause vector", VMX_PERF_VECTOR_SIZE)
 
 #endif /* CONFIG_HVM */
 

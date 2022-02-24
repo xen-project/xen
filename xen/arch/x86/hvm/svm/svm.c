@@ -2691,7 +2691,10 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         goto out;
     }
 
-    perfc_incra(svmexits, exit_reason);
+    perfc_incra(vmexits,
+                exit_reason < VMEXIT_NPF
+                ? exit_reason
+                : exit_reason - VMEXIT_NPF + VMEXIT_NPF_PERFC);
 
     hvm_maybe_deassert_evtchn_irq();
 
@@ -3020,7 +3023,6 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_NPF:
-        perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         if ( cpu_has_svm_decode )
             v->arch.hvm.svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
         rc = vmcb->exitinfo1 & PFEC_page_present
