@@ -1335,6 +1335,10 @@ static int construct_vmcs(struct vcpu *v)
         rc = vmx_add_msr(v, MSR_FLUSH_CMD, FLUSH_CMD_L1D,
                          VMX_MSR_GUEST_LOADONLY);
 
+    if ( !rc && (d->arch.spec_ctrl_flags & SCF_entry_ibpb) )
+        rc = vmx_add_msr(v, MSR_PRED_CMD, PRED_CMD_IBPB,
+                         VMX_MSR_HOST);
+
  out:
     vmx_vmcs_exit(v);
 

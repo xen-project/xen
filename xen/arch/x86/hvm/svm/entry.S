@@ -97,7 +97,19 @@ __UNLIKELY_END(nsvm_hap)
 
         GET_CURRENT(bx)
 
-        /* SPEC_CTRL_ENTRY_FROM_SVM    Req: %rsp=regs/cpuinfo         Clob: acd */
+        /* SPEC_CTRL_ENTRY_FROM_SVM    Req: %rsp=regs/cpuinfo, %rdx=0 Clob: acd */
+
+        .macro svm_vmexit_cond_ibpb
+            testb  $SCF_entry_ibpb, CPUINFO_xen_spec_ctrl(%rsp)
+            jz     .L_skip_ibpb
+
+            mov    $MSR_PRED_CMD, %ecx
+            mov    $PRED_CMD_IBPB, %eax
+            wrmsr
+.L_skip_ibpb:
+	.endm
+        ALTERNATIVE "", svm_vmexit_cond_ibpb, X86_FEATURE_IBPB_ENTRY_HVM
+
         ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM
 
         .macro svm_vmexit_spec_ctrl
@@ -114,6 +126,10 @@ __UNLIKELY_END(nsvm_hap)
         ALTERNATIVE "", svm_vmexit_spec_ctrl, X86_FEATURE_SC_MSR_HVM
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
+        /*
+         * STGI is executed unconditionally, and is sufficiently serialising
+         * to safely resolve any Spectre-v1 concerns in the above logic.
+         */
         stgi
 GLOBAL(svm_stgi_label)
         mov  %rsp,%rdi
