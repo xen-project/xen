@@ -66,7 +66,8 @@ CONFIG_9PFS         := @ninepfs@
 LINUX_BACKEND_MODULES := @LINUX_BACKEND_MODULES@
 
 #System options
-ZLIB                := @zlib@
+ZLIB_CFLAGS         := @ZLIB_CFLAGS@
+ZLIB_LIBS           := @ZLIB_LIBS@
 CONFIG_LIBICONV     := @libiconv@
 EXTFS_LIBS          := @EXTFS_LIBS@
 CURSES_LIBS         := @CURSES_LIBS@

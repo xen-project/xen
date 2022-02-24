@@ -391,17 +391,26 @@ AX_CHECK_FETCHER
 
 # Checks for libraries.
 AC_CHECK_HEADER([bzlib.h], [
-AC_CHECK_LIB([bz2], [BZ2_bzDecompressInit], [zlib="$zlib -DHAVE_BZLIB -lbz2"])
+    AC_CHECK_LIB([bz2], [BZ2_bzDecompressInit],
+        [ZLIB_CFLAGS="$ZLIB_CFLAGS -DHAVE_BZLIB"
+         ZLIB_LIBS="$ZLIB_LIBS -lbz2"])
 ])
 AC_CHECK_HEADER([lzma.h], [
-AC_CHECK_LIB([lzma], [lzma_stream_decoder], [zlib="$zlib -DHAVE_LZMA -llzma"])
+    AC_CHECK_LIB([lzma], [lzma_stream_decoder],
+        [ZLIB_CFLAGS="$ZLIB_CFLAGS -DHAVE_LZMA"
+         ZLIB_LIBS="$ZLIB_LIBS -llzma"])
 ])
 AC_CHECK_HEADER([lzo/lzo1x.h], [
-AC_CHECK_LIB([lzo2], [lzo1x_decompress], [zlib="$zlib -DHAVE_LZO1X -llzo2"])
+    AC_CHECK_LIB([lzo2], [lzo1x_decompress],
+        [ZLIB_CFLAGS="$ZLIB_CFLAGS -DHAVE_LZO1X"
+         ZLIB_LIBS="$ZLIB_LIBS -llzo2"])
 ])
 PKG_CHECK_MODULES([libzstd], [libzstd],
-    [zlib="$zlib -DHAVE_ZSTD $libzstd_CFLAGS $libzstd_LIBS"], [true])
-AC_SUBST(zlib)
+    [ZLIB_CFLAGS="$ZLIB_CFLAGS -DHAVE_ZSTD $libzstd_CFLAGS"
+     ZLIB_LIBS="$ZLIB_LIBS $libzstd_LIBS"],
+    [true])
+AC_SUBST([ZLIB_CFLAGS])
+AC_SUBST([ZLIB_LIBS])
 AX_CHECK_EXTFS
 AX_CHECK_PTHREAD
 AX_CHECK_PTYFUNCS

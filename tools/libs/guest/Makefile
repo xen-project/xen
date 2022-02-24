@@ -89,13 +89,12 @@ CFLAGS	+= $(CFLAGS_libxendevicemodel)
 CFLAGS += $(CFLAGS_libxencall) $(CFLAGS_libxenforeignmemory)
 
 ifeq ($(CONFIG_MiniOS),y)
-zlib-options =
-else
-zlib-options = $(ZLIB)
+ZLIB_CFLAGS :=
+ZLIB_LIBS :=
 endif
 
-xg_dom_bzimageloader.o: CFLAGS += $(filter -D%,$(zlib-options))
-xg_dom_bzimageloader.opic: CFLAGS += $(filter -D%,$(zlib-options))
+xg_dom_bzimageloader.o: CFLAGS += $(ZLIB_CFLAGS)
+xg_dom_bzimageloader.opic: CFLAGS += $(ZLIB_CFLAGS)
 
 LIBHEADER := xenguest.h
 
@@ -103,8 +102,7 @@ NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-libxenguest.so.$(MAJOR).$(MINOR): COMPRESSION_LIBS = $(filter -l%,$(zlib-options))
-libxenguest.so.$(MAJOR).$(MINOR): APPEND_LDFLAGS += $(COMPRESSION_LIBS) -lz
+libxenguest.so.$(MAJOR).$(MINOR): APPEND_LDFLAGS += $(ZLIB_LIBS) -lz
 
 .PHONY: cleanlocal
 cleanlocal:
