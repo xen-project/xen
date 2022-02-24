@@ -88,6 +88,35 @@
  *  - SPEC_CTRL_EXIT_TO_{SVM,VMX}
  */
 
+.macro DO_SPEC_CTRL_COND_IBPB maybexen:req
+/*
+ * Requires %rsp=regs (also cpuinfo if !maybexen)
+ * Requires %r14=stack_end (if maybexen), %rdx=0
+ * Clobbers %rax, %rcx, %rdx
+ *
+ * Conditionally issue IBPB if SCF_entry_ibpb is active.  In the maybexen
+ * case, we can safely look at UREGS_cs to skip taking the hit when
+ * interrupting Xen.
+ */
+    .if \maybexen
+        testb  $SCF_entry_ibpb, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
+        jz     .L\@_skip
+        testb  $3, UREGS_cs(%rsp)
+    .else
+        testb  $SCF_entry_ibpb, CPUINFO_xen_spec_ctrl(%rsp)
+    .endif
+    jz     .L\@_skip
+
+    mov     $MSR_PRED_CMD, %ecx
+    mov     $PRED_CMD_IBPB, %eax
+    wrmsr
+    jmp     .L\@_done
+
+.L\@_skip:
+    lfence
+.L\@_done:
+.endm
+
 .macro DO_OVERWRITE_RSB tmp=rax
 /*
  * Requires nothing
@@ -225,12 +254,16 @@
 
 /* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
 #define SPEC_CTRL_ENTRY_FROM_PV                                         \
+    ALTERNATIVE "", __stringify(DO_SPEC_CTRL_COND_IBPB maybexen=0),     \
+        X86_FEATURE_IBPB_ENTRY_PV;                                      \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;            \
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=0),         \
         X86_FEATURE_SC_MSR_PV
 
 /* Use in interrupt/exception context.  May interrupt Xen or PV context. */
 #define SPEC_CTRL_ENTRY_FROM_INTR                                       \
+    ALTERNATIVE "", __stringify(DO_SPEC_CTRL_COND_IBPB maybexen=1),     \
+        X86_FEATURE_IBPB_ENTRY_PV;                                      \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;            \
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=1),         \
         X86_FEATURE_SC_MSR_PV
@@ -254,10 +287,22 @@
  * Requires %rsp=regs, %r14=stack_end, %rdx=0
  * Clobbers %rax, %rbx, %rcx, %rdx
  *
- * This is logical merge of DO_OVERWRITE_RSB and DO_SPEC_CTRL_ENTRY
- * maybexen=1, but with conditionals rather than alternatives.
+ * This is logical merge of:
+ *    DO_SPEC_CTRL_COND_IBPB maybexen=0
+ *    DO_OVERWRITE_RSB
+ *    DO_SPEC_CTRL_ENTRY maybexen=1
+ * but with conditionals rather than alternatives.
  */
     movzbl STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14), %ebx
+
+    test    $SCF_ist_ibpb, %bl
+    jz      .L\@_skip_ibpb
+
+    mov     $MSR_PRED_CMD, %ecx
+    mov     $PRED_CMD_IBPB, %eax
+    wrmsr
+
+.L\@_skip_ibpb:
 
     test $SCF_ist_rsb, %bl
     jz .L\@_skip_rsb
