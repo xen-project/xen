@@ -51,13 +51,21 @@ ENTRY(__high_start)
         test    $CET_SHSTK_EN, %al
         jz      .L_ap_cet_done
 
-        /* Derive MSR_PL0_SSP from %rsp (token written when stack is allocated). */
-        mov     $MSR_PL0_SSP, %ecx
+        /* Derive the supervisor token address from %rsp. */
         mov     %rsp, %rdx
+        and     $~(STACK_SIZE - 1), %rdx
+        or      $(PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8, %rdx
+
+        /*
+         * Write a new supervisor token.  Doesn't matter on boot, but for S3
+         * resume this clears the busy bit.
+         */
+        wrssq   %rdx, (%rdx)
+
+        /* Point MSR_PL0_SSP at the token. */
+        mov     $MSR_PL0_SSP, %ecx
+        mov     %edx, %eax
         shr     $32, %rdx
-        mov     %esp, %eax
-        and     $~(STACK_SIZE - 1), %eax
-        or      $(PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8, %eax
         wrmsr
 
         setssbsy
