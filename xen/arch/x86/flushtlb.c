@@ -247,8 +247,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
         {
             alternative("", "sfence", X86_FEATURE_CLFLUSHOPT);
             for ( i = 0; i < sz; i += c->x86_clflush_size )
-                alternative_input(".byte " __stringify(NOP_DS_PREFIX) ";"
-                                  " clflush %0",
+                alternative_input("ds; clflush %0",
                                   "data16 clflush %0",      /* clflushopt */
                                   X86_FEATURE_CLFLUSHOPT,
                                   "m" (((const char *)va)[i]));
@@ -298,11 +297,11 @@ void cache_writeback(const void *addr, unsigned int size)
 # define INPUT(addr) "a" (addr), BASE_INPUT(addr)
 #endif
         /*
-         * Note regarding the use of NOP_DS_PREFIX: it's faster to do a clflush
+         * Note regarding the "ds" prefix use: it's faster to do a clflush
          * + prefix than a clflush + nop, and hence the prefix is added instead
          * of letting the alternative framework fill the gap by appending nops.
          */
-        alternative_io_2(".byte " __stringify(NOP_DS_PREFIX) "; clflush %[p]",
+        alternative_io_2("ds; clflush %[p]",
                          "data16 clflush %[p]", /* clflushopt */
                          X86_FEATURE_CLFLUSHOPT,
                          CLWB_ENCODING,
