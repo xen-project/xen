@@ -60,6 +60,16 @@ arch/$(TARGET_ARCH)/include/asm/asm-offsets.h: asm-offsets.s
 	  echo ""; \
 	  echo "#endif") <$< >$@
 
+build-dirs := $(patsubst %/built_in.o,%,$(filter %/built_in.o,$(ALL_OBJS) $(ALL_LIBS)))
+
+# The actual objects are generated when descending,
+# make sure no implicit rule kicks in
+$(sort $(ALL_OBJS) $(ALL_LIBS)): $(build-dirs) ;
+
+PHONY += $(build-dirs)
+$(build-dirs): FORCE
+	$(Q)$(MAKE) $(build)=$@ need-builtin=1
+
 ifeq ($(CONFIG_LTO),y)
 # Gather all LTO objects together
 prelink_lto.o: $(ALL_OBJS) $(ALL_LIBS)
@@ -76,4 +86,4 @@ endif
 targets += prelink.o
 
 $(TARGET): prelink.o FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $@
+	$(Q)$(MAKE) $(build)=arch/$(TARGET_ARCH) $@

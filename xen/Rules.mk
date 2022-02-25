@@ -3,8 +3,14 @@
 # Makefile and are consumed by Rules.mk
 #
 
-obj := .
+ifndef obj
+$(warning kbuild: Rules.mk is included improperly)
+endif
+
 src := $(obj)
+
+PHONY := __build
+__build:
 
 -include $(BASEDIR)/include/config/auto.conf
 
@@ -12,10 +18,14 @@ include $(XEN_ROOT)/Config.mk
 include $(BASEDIR)/scripts/Kbuild.include
 
 # Initialise some variables
+obj-y :=
 lib-y :=
 targets :=
+subdir-y :=
 CFLAGS-y :=
 AFLAGS-y :=
+nocov-y :=
+noubsan-y :=
 
 SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
                                             $(foreach w,1 2 4, \
@@ -50,27 +60,54 @@ cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 quiet_cmd_binfile = BINFILE $@
 cmd_binfile = $(SHELL) $(BASEDIR)/tools/binfile $(BINFILE_FLAGS) $@ $(2)
 
-define gendep
-    ifneq ($(1),$(subst /,:,$(1)))
-        DEPS += $(dir $(1)).$(notdir $(1)).d
-    endif
-endef
-$(foreach o,$(filter-out %/,$(obj-y) $(obj-bin-y) $(extra-y)),$(eval $(call gendep,$(o))))
-
-# Handle objects in subdirs
-# ---------------------------------------------------------------------------
-# o if we encounter foo/ in $(obj-y), replace it by foo/built_in.o
-#   and add the directory to the list of dirs to descend into: $(subdir-y)
-subdir-y := $(subdir-y) $(filter %/, $(obj-y))
-obj-y    := $(patsubst %/, %/built_in.o, $(obj-y))
-
-# $(subdir-obj-y) is the list of objects in $(obj-y) which uses dir/ to
-# tell kbuild to descend
-subdir-obj-y := $(filter %/built_in.o, $(obj-y))
+# Figure out what we need to build from the various variables
+# ===========================================================================
 
 # Libraries are always collected in one lib file.
 # Filter out objects already built-in
 lib-y := $(filter-out $(obj-y), $(sort $(lib-y)))
+
+# Subdirectories we need to descend into
+subdir-y := $(sort $(subdir-y) $(patsubst %/,%,$(filter %/, $(obj-y))))
+
+# Handle objects in subdirs
+# - if we encounter foo/ in $(obj-y), replace it by foo/built_in.o
+ifdef need-builtin
+obj-y    := $(patsubst %/, %/built_in.o, $(obj-y))
+else
+obj-y    := $(filter-out %/, $(obj-y))
+endif
+
+# Add subdir path
+
+extra-y         := $(addprefix $(obj)/,$(extra-y))
+targets         := $(addprefix $(obj)/,$(targets))
+lib-y           := $(addprefix $(obj)/,$(lib-y))
+obj-y           := $(addprefix $(obj)/,$(obj-y))
+obj-bin-y       := $(addprefix $(obj)/,$(obj-bin-y))
+subdir-y        := $(addprefix $(obj)/,$(subdir-y))
+nocov-y         := $(addprefix $(obj)/,$(nocov-y))
+noubsan-y       := $(addprefix $(obj)/,$(noubsan-y))
+
+# subdir-builtin may contain duplications. Use $(sort ...)
+subdir-builtin := $(sort $(filter %/built_in.o, $(obj-y)))
+
+targets-for-builtin := $(extra-y)
+
+ifneq ($(strip $(lib-y)),)
+    targets-for-builtin += $(obj)/lib.a
+endif
+
+ifdef need-builtin
+    targets-for-builtin += $(obj)/built_in.o
+    ifneq ($(strip $(obj-bin-y)),)
+        ifeq ($(CONFIG_LTO),y)
+            targets-for-builtin += $(obj)/built_in_bin.o
+        endif
+    endif
+endif
+
+targets += $(targets-for-builtin)
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS-y += -DINIT_SECTIONS_ONLY
 
@@ -122,29 +159,28 @@ quiet_cmd_cc_builtin = CC      $@
 cmd_cc_builtin = \
     $(CC) $(XEN_CFLAGS) -c -x c /dev/null -o $@
 
+# To build objects in subdirs, we need to descend into the directories
+$(subdir-builtin): $(obj)/%/built_in.o: $(obj)/% ;
+
 quiet_cmd_ld_builtin = LD      $@
 ifeq ($(CONFIG_LTO),y)
 cmd_ld_builtin = \
-    $(LD_LTO) -r -o $@ $(filter $(obj-y),$(real-prereqs))
+    $(LD_LTO) -r -o $@ $(real-prereqs)
 else
 cmd_ld_builtin = \
-    $(LD) $(XEN_LDFLAGS) -r -o $@ $(filter $(obj-y),$(real-prereqs))
+    $(LD) $(XEN_LDFLAGS) -r -o $@ $(real-prereqs)
 endif
 
-built_in.o: $(obj-y) $(if $(strip $(lib-y)),lib.a) $(extra-y) FORCE
+$(obj)/built_in.o: $(obj-y) FORCE
 	$(call if_changed,$(if $(strip $(obj-y)),ld_builtin,cc_builtin))
 
-lib.a: $(lib-y) FORCE
+$(obj)/lib.a: $(lib-y) FORCE
 	$(call if_changed,ar)
 
-targets += built_in.o
-ifneq ($(strip $(lib-y)),)
-targets += lib.a
-endif
-targets += $(filter-out $(subdir-obj-y), $(obj-y) $(lib-y)) $(extra-y)
-targets += $(MAKECMDGOALS)
+targets += $(filter-out $(subdir-builtin), $(obj-y))
+targets += $(lib-y) $(MAKECMDGOALS)
 
-built_in_bin.o: $(obj-bin-y) $(extra-y)
+$(obj)/built_in_bin.o: $(obj-bin-y)
 ifeq ($(strip $(obj-bin-y)),)
 	$(CC) $(a_flags) -c -x assembler /dev/null -o $@
 else
@@ -155,23 +191,15 @@ endif
 PHONY += FORCE
 FORCE:
 
-%/built_in.o %/lib.a: FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o
-
-%/built_in_bin.o: FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in_bin.o
-
-SRCPATH := $(patsubst $(BASEDIR)/%,%,$(CURDIR))
-
 quiet_cmd_cc_o_c = CC      $@
 ifeq ($(CONFIG_ENFORCE_UNIQUE_SYMBOLS),y)
     cmd_cc_o_c = $(CC) $(c_flags) -c $< -o $(dot-target).tmp -MQ $@
-    ifeq ($(CONFIG_CC_IS_CLANG)$(call clang-ifversion,-lt,600,y),yy)
-        cmd_objcopy_fix_sym = $(OBJCOPY) --redefine-sym $<=$(SRCPATH)/$< $(dot-target).tmp $@
+    ifneq ($(CONFIG_CC_IS_CLANG)$(call clang-ifversion,-lt,600,y),yy)
+        cmd_objcopy_fix_sym = \
+	    $(OBJCOPY) --redefine-sym $(<F)=$< $(dot-target).tmp $@ && rm -f $(dot-target).tmp
     else
-        cmd_objcopy_fix_sym = $(OBJCOPY) --redefine-sym $(<F)=$(SRCPATH)/$< $(dot-target).tmp $@
+        cmd_objcopy_fix_sym = mv -f $(dot-target).tmp $@
     endif
-    cmd_objcopy_fix_sym += && rm -f $(dot-target).tmp
 else
     cmd_cc_o_c = $(CC) $(c_flags) -c $< -o $@
 endif
@@ -181,13 +209,13 @@ define rule_cc_o_c
     $(call cmd,objcopy_fix_sym)
 endef
 
-%.o: %.c FORCE
+$(obj)/%.o: $(src)/%.c FORCE
 	$(call if_changed_rule,cc_o_c)
 
 quiet_cmd_cc_o_S = CC      $@
 cmd_cc_o_S = $(CC) $(a_flags) -c $< -o $@
 
-%.o: %.S FORCE
+$(obj)/%.o: $(src)/%.S FORCE
 	$(call if_changed,cc_o_S)
 
 
@@ -205,7 +233,7 @@ define cmd_obj_init_o
     $(OBJCOPY) $(foreach s,$(SPECIAL_DATA_SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
 endef
 
-$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o FORCE
+$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): $(obj)/%.init.o: $(obj)/%.o FORCE
 	$(call if_changed,obj_init_o)
 
 quiet_cmd_cpp_i_c = CPP     $@
@@ -217,18 +245,20 @@ cmd_cc_s_c = $(CC) $(filter-out -Wa$(comma)%,$(c_flags)) -S $< -o $@
 quiet_cmd_cpp_s_S = CPP     $@
 cmd_cpp_s_S = $(CPP) $(call cpp_flags,$(a_flags)) -MQ $@ -o $@ $<
 
-%.i: %.c FORCE
+$(obj)/%.i: $(src)/%.c FORCE
 	$(call if_changed,cpp_i_c)
 
-%.s: %.c FORCE
+$(obj)/%.s: $(src)/%.c FORCE
 	$(call if_changed,cc_s_c)
 
-%.s: %.S FORCE
+$(obj)/%.s: $(src)/%.S FORCE
 	$(call if_changed,cpp_s_S)
 
 # Linker scripts, .lds.S -> .lds
 quiet_cmd_cpp_lds_S = LDS     $@
 cmd_cpp_lds_S = $(CPP) -P $(call cpp_flags,$(a_flags)) -D__LINKER__ -MQ $@ -o $@ $<
+
+targets := $(filter-out $(PHONY), $(targets))
 
 # Add intermediate targets:
 # When building objects with specific suffix patterns, add intermediate
@@ -239,7 +269,18 @@ intermediate_targets = $(foreach sfx, $(2), \
 # %.init.o <- %.o
 targets += $(call intermediate_targets, .init.o, .o)
 
--include $(DEPS_INCLUDE)
+# Build
+# ---------------------------------------------------------------------------
+
+__build: $(targets-for-builtin) $(subdir-y)
+	@:
+
+# Descending
+# ---------------------------------------------------------------------------
+
+PHONY += $(subdir-y)
+$(subdir-y):
+	$(Q)$(MAKE) $(build)=$@ need-builtin=$(if $(filter $@/built_in.o, $(subdir-builtin)),1)
 
 # Read all saved command lines and dependencies for the $(targets) we
 # may be building above, using $(if_changed{,_dep}). As an
@@ -249,6 +290,9 @@ targets += $(call intermediate_targets, .init.o, .o)
 existing-targets := $(wildcard $(sort $(targets)))
 
 -include $(foreach f,$(existing-targets),$(dir $(f)).$(notdir $(f)).cmd)
+
+DEPS := $(foreach f,$(existing-targets),$(dir $(f)).$(notdir $(f)).d)
+-include $(DEPS_INCLUDE)
 
 # Declare the contents of the PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.

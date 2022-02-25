@@ -11,9 +11,6 @@ endif
 CODE_ADDR=$(shell nm --defined $(1) | grep $(2) | awk '{print "0x"$$1}')
 CODE_SZ=$(shell nm --defined -S $(1) | grep $(2) | awk '{ print "0x"$$2}')
 
-.PHONY: default
-build default: livepatch
-
 extra-y += xen_hello_world.livepatch
 xen_hello_world-objs := xen_hello_world_func.o xen_hello_world.o note.o xen_note.o modinfo.o
 $(obj)/xen_hello_world.o: $(obj)/config.h
@@ -155,9 +152,6 @@ targets += $(sort $(foreach m,$(basename $(notdir $(filter %.livepatch,$(extra-y
 LIVEPATCHES := $(filter %.livepatch,$(extra-y))
 
 LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
-
-.PHONY: livepatch
-livepatch: $(LIVEPATCHES)
 
 install: $(addprefix $(obj)/,$(LIVEPATCHES))
 	$(INSTALL_DIR) $(DESTDIR)$(LIVEPATCH_DEBUG_DIR)

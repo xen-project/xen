@@ -1,8 +1,8 @@
 obj-bin-y += head.o
 
-DEFS_H_DEPS = $(src)/defs.h $(BASEDIR)/include/xen/stdbool.h
+DEFS_H_DEPS = $(abs_srctree)/$(src)/defs.h $(abs_srctree)/include/xen/stdbool.h
 
-CMDLINE_DEPS = $(DEFS_H_DEPS) $(src)/video.h \
+CMDLINE_DEPS = $(DEFS_H_DEPS) $(abs_srctree)/$(src)/video.h \
 	       $(BASEDIR)/include/xen/kconfig.h \
 	       $(BASEDIR)/include/generated/autoconf.h
 
@@ -17,7 +17,7 @@ RELOC_DEPS = $(DEFS_H_DEPS) \
 $(obj)/head.o: $(obj)/cmdline.S $(obj)/reloc.S
 
 $(obj)/cmdline.S: $(src)/cmdline.c $(CMDLINE_DEPS) $(src)/build32.lds
-	$(MAKE) -f build32.mk -C $(obj) $(@F) CMDLINE_DEPS="$(CMDLINE_DEPS)"
+	$(MAKE) -f $(abs_srctree)/$(src)/build32.mk -C $(obj) $(@F) CMDLINE_DEPS="$(CMDLINE_DEPS)"
 
 $(obj)/reloc.S: $(src)/reloc.c $(RELOC_DEPS) $(src)/build32.lds
-	$(MAKE) -f build32.mk -C $(obj) $(@F) RELOC_DEPS="$(RELOC_DEPS)"
+	$(MAKE) -f $(abs_srctree)/$(src)/build32.mk -C $(obj) $(@F) RELOC_DEPS="$(RELOC_DEPS)"

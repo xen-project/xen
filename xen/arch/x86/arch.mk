@@ -3,10 +3,10 @@
 
 export XEN_IMG_OFFSET := 0x200000
 
-CFLAGS += -I$(BASEDIR)/include
-CFLAGS += -I$(BASEDIR)/arch/$(TARGET_ARCH)/include
-CFLAGS += -I$(BASEDIR)/arch/x86/include/asm/mach-generic
-CFLAGS += -I$(BASEDIR)/arch/x86/include/asm/mach-default
+CFLAGS += -I$(srctree)/include
+CFLAGS += -I$(srctree)/arch/$(TARGET_ARCH)/include
+CFLAGS += -I$(srctree)/arch/x86/include/asm/mach-generic
+CFLAGS += -I$(srctree)/arch/x86/include/asm/mach-default
 CFLAGS += -DXEN_IMG_OFFSET=$(XEN_IMG_OFFSET)
 
 # Prevent floating-point variables from creeping into Xen.
@@ -99,7 +99,7 @@ efi-nr-fixups := $(shell $(OBJDUMP) -p $(efi-check).efi | grep '^[[:blank:]]*rel
 ifeq ($(efi-nr-fixups),2)
 MKRELOC := :
 else
-MKRELOC := efi/mkreloc
+MKRELOC := arch/x86/efi/mkreloc
 # If the linker produced fixups but not precisely two of them, we need to
 # disable it doing so.  But if it didn't produce any fixups, it also wouldn't
 # recognize the option.
@@ -115,6 +115,6 @@ export EFI_LDFLAGS
 endif
 
 # Set up the assembler include path properly for older toolchains.
-CFLAGS += -Wa,-I$(BASEDIR)/include
+CFLAGS += -Wa,-I$(srctree)/include
 
 ALL_OBJS-y := arch/x86/boot/built_in.o arch/x86/efi/built_in.o $(ALL_OBJS-y)

@@ -22,6 +22,15 @@ export CHECKPOLICY	?= checkpolicy
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
 
+abs_objtree := $(CURDIR)
+abs_srctree := $(CURDIR)
+
+export abs_srctree abs_objtree
+
+srctree := .
+objtree := .
+export srctree objtree
+
 # Do not use make's built-in rules and variables
 MAKEFLAGS += -rR
 
@@ -47,7 +56,7 @@ export KCONFIG_CONFIG ?= .config
 
 export CC CXX LD
 
-export TARGET := $(BASEDIR)/xen
+export TARGET := xen
 
 .PHONY: default
 default: build
@@ -250,7 +259,7 @@ endif
 CFLAGS += -nostdinc -fno-builtin -fno-common
 CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
 $(call cc-option-add,CFLAGS,CC,-Wvla)
-CFLAGS += -pipe -D__XEN__ -include $(BASEDIR)/include/xen/config.h
+CFLAGS += -pipe -D__XEN__ -include $(srctree)/include/xen/config.h
 CFLAGS-$(CONFIG_DEBUG_INFO) += -g
 
 ifneq ($(CONFIG_CC_IS_CLANG),y)
@@ -349,10 +358,10 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 
 .PHONY: tests
 tests:
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C test tests
+	$(Q)$(MAKE) $(build)=test
 .PHONY: install-tests
 install-tests:
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C test install
+	$(Q)$(MAKE) $(build)=test install
 
 .PHONY: _uninstall
 _uninstall: D=$(DESTDIR)
@@ -408,16 +417,16 @@ $(TARGET).gz: $(TARGET)
 
 $(TARGET): FORCE
 	$(MAKE) -C tools
-	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/compile.h
+	$(Q)$(MAKE) $(build)=. include/xen/compile.h
 	[ -e arch/$(TARGET_ARCH)/efi ] && for f in $$(cd common/efi; echo *.[ch]); \
 		do test -r arch/$(TARGET_ARCH)/efi/$$f || \
 		   ln -nsf ../../../common/efi/$$f arch/$(TARGET_ARCH)/efi/; \
 		done; \
 		true
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C include
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) include
-	$(MAKE) -f $(BASEDIR)/Rules.mk arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
-	$(MAKE) -f $(BASEDIR)/Rules.mk MKRELOC=$(MKRELOC) 'ALL_OBJS=$(ALL_OBJS-y)' 'ALL_LIBS=$(ALL_LIBS-y)' $@
+	$(Q)$(MAKE) $(build)=include all
+	$(Q)$(MAKE) $(build)=arch/$(TARGET_ARCH) include
+	$(Q)$(MAKE) $(build)=. arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
+	$(Q)$(MAKE) $(build)=. MKRELOC=$(MKRELOC) 'ALL_OBJS=$(ALL_OBJS-y)' 'ALL_LIBS=$(ALL_LIBS-y)' $@
 
 SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers lib test
 define all_sources
@@ -463,19 +472,18 @@ _MAP:
 	$(NM) -n $(TARGET)-syms | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
 
 %.o %.i %.s: %.c FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(*D) $(@F)
+	$(Q)$(MAKE) $(build)=$(*D) $(*D)/$(@F)
 
 %.o %.s: %.S FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(*D) $(@F)
+	$(Q)$(MAKE) $(build)=$(*D) $(*D)/$(@F)
 
 %/: FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o built_in_bin.o
+	$(Q)$(MAKE) $(build)=$* need-builtin=1
 
 .PHONY: cloc
 cloc:
-	find . -name '*.o.d' | while read f; do \
+	find . -name tools -prune -o -name '*.o.d' -print | while read f; do \
 	    for sf in $$(grep -o "[a-zA-Z0-9_/-]*\.[cS]" $$f); do \
-		sf="$$(dirname $$f)/$$sf"; \
 		test -f "$$sf" && echo "$$sf"; \
 	    done; \
 	done | cloc --list-file=-
