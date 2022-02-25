@@ -83,6 +83,9 @@ subdir- += boot
 extra-y += asm-macros.i
 extra-y += xen.lds
 
+hostprogs-y += boot/mkelf32
+hostprogs-y += efi/mkreloc
+
 # Allows usercopy.c to include itself
 $(obj)/usercopy.o: CFLAGS-y += -iquote .
 
@@ -259,17 +262,9 @@ $(obj)/efi.lds: AFLAGS-y += -DEFI
 $(obj)/xen.lds $(obj)/efi.lds: $(src)/xen.lds.S FORCE
 	$(call if_changed_dep,cpp_lds_S)
 
-$(obj)/boot/mkelf32: $(src)/boot/mkelf32.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
-
-$(obj)/efi/mkreloc: $(src)/efi/mkreloc.c
-	$(HOSTCC) $(HOSTCFLAGS) -g -o $@ $<
-
 clean-files := \
-    boot/mkelf32 \
     include/asm/asm-macros.* \
     $(objtree)/.xen-syms.[0-9]* \
     $(objtree)/.xen.elf32 \
     $(objtree)/.xen.efi.[0-9]* \
-    efi/*.efi \
-    efi/mkreloc
+    efi/*.efi
