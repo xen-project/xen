@@ -33,13 +33,12 @@ CFLAGS += -I$(XEN_libxenctrl)
 vpath %.c ../../../xen/common/libelf
 CFLAGS += -I../../../xen/common/libelf
 
-ELF_OBJS-y += libelf-tools.o libelf-loader.o
-ELF_OBJS-y += libelf-dominfo.o
+LIBELF_OBJS += libelf-tools.o libelf-loader.o
+LIBELF_OBJS += libelf-dominfo.o
 
-OBJS-y += $(ELF_OBJS-y)
+OBJS-y += $(LIBELF_OBJS)
 
-$(ELF_OBJS-y): CFLAGS += -Wno-pointer-sign
-$(ELF_OBJS-y:.o=.opic): CFLAGS += -Wno-pointer-sign
+$(LIBELF_OBJS) $(LIBELF_OBJS:.o=.opic): CFLAGS += -Wno-pointer-sign
 
 ifeq ($(CONFIG_X86),y) # Add libx86 to the build
 vpath %.c ../../../xen/lib/x86
