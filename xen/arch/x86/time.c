@@ -66,6 +66,7 @@ struct platform_timesource {
     char *id;
     char *name;
     u64 frequency;
+    /* Post-init this hook may only be invoked via the read_counter() wrapper! */
     u64 (*read_counter)(void);
     s64 (*init)(struct platform_timesource *);
     void (*resume)(struct platform_timesource *);
@@ -584,7 +585,7 @@ static s64 __init cf_check init_tsc(struct platform_timesource *pts)
     return ret;
 }
 
-static u64 cf_check read_tsc(void)
+static uint64_t __init cf_check read_tsc(void)
 {
     return rdtsc_ordered();
 }
@@ -816,6 +817,18 @@ static s_time_t __read_platform_stime(u64 platform_time)
     return (stime_platform_stamp + scale_delta(diff, &plt_scale));
 }
 
+static uint64_t read_counter(void)
+{
+    /*
+     * plt_tsc is put in use only after alternatives patching has occurred,
+     * hence we can't invoke read_tsc() that way. Special case it here, open-
+     * coding the function call at the same time.
+     */
+    return plt_src.read_counter != read_tsc
+           ? alternative_call(plt_src.read_counter)
+           : rdtsc_ordered();
+}
+
 static void cf_check plt_overflow(void *unused)
 {
     int i;
@@ -824,7 +837,7 @@ static void cf_check plt_overflow(void *unused)
 
     spin_lock_irq(&platform_timer_lock);
 
-    count = plt_src.read_counter();
+    count = read_counter();
     plt_stamp64 += (count - plt_stamp) & plt_mask;
     plt_stamp = count;
 
@@ -860,7 +873,7 @@ static s_time_t read_platform_stime(u64 *stamp)
     ASSERT(!local_irq_is_enabled());
 
     spin_lock(&platform_timer_lock);
-    plt_counter = plt_src.read_counter();
+    plt_counter = read_counter();
     count = plt_stamp64 + ((plt_counter - plt_stamp) & plt_mask);
     stime = __read_platform_stime(count);
     spin_unlock(&platform_timer_lock);
@@ -878,7 +891,7 @@ static void platform_time_calibration(void)
     unsigned long flags;
 
     spin_lock_irqsave(&platform_timer_lock, flags);
-    count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
+    count = plt_stamp64 + ((read_counter() - plt_stamp) & plt_mask);
     stamp = __read_platform_stime(count);
     stime_platform_stamp = stamp;
     platform_timer_stamp = count;
@@ -889,10 +902,10 @@ static void resume_platform_timer(void)
 {
     /* Timer source can be reset when backing from S3 to S0 */
     if ( plt_src.resume )
-        plt_src.resume(&plt_src);
+        alternative_vcall(plt_src.resume, &plt_src);
 
     plt_stamp64 = platform_timer_stamp;
-    plt_stamp = plt_src.read_counter();
+    plt_stamp = read_counter();
 }
 
 static void __init reset_platform_timer(void)
