@@ -78,8 +78,8 @@ uninstall-python-bindings:
 ifeq ($(XENSTAT_PYTHON_BINDINGS),y)
 .PHONY: all
 all: python-bindings
-install: install-python-bindings
-uninstall: uninstall-python-bindings
+install:: install-python-bindings
+uninstall:: uninstall-python-bindings
 endif
 
 # Perl bindings
@@ -111,8 +111,8 @@ ifeq ($(XENSTAT_PERL_BINDINGS),y)
 all: perl-bindings
 
 .PHONY: install
-install: install-perl-bindings
-uninstall: uninstall-perl-bindings
+install:: install-perl-bindings
+uninstall:: uninstall-perl-bindings
 endif
 
 clean: cleanlocal

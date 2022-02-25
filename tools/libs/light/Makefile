@@ -239,17 +239,11 @@ libxl-save-helper: $(SAVE_HELPER_OBJS) libxenlight.so
 testidl: testidl.o libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ testidl.o $(LDLIBS_libxenlight) $(LDLIBS_libxentoollog) $(LDLIBS_libxentoolcore) $(APPEND_LDFLAGS)
 
-install: installlocal $(LIBHEADERS)
-
-.PHONY: installlocal
-installlocal: libxl-save-helper
+install:: $(LIBHEADERS) libxl-save-helper
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_PROG) libxl-save-helper $(DESTDIR)$(LIBEXEC_BIN)
 
-uninstall: uninstalllocal
-
-.PHONY: uninstalllocal
-uninstalllocal:
+uninstall::
 	rm -f $(DESTDIR)$(LIBEXEC_BIN)/libxl-save-helper
 
 clean: cleanlocal

@@ -30,10 +30,7 @@ xs.opic: CFLAGS += -DUSE_DLSYM
 endif
 
 .PHONY: install
-install: install-headers
-
-.PHONY: install-headers
-install-headers:
+install::
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)/xenstore-compat
 	$(INSTALL_DATA) $(XEN_INCLUDE)/xenstore-compat/xs.h $(DESTDIR)$(includedir)/xenstore-compat/xs.h
@@ -42,10 +39,7 @@ install-headers:
 	ln -sf xenstore-compat/xs_lib.h $(DESTDIR)$(includedir)/xs_lib.h
 
 .PHONY: uninstall
-uninstall: uninstall-headers
-
-.PHONY: uninstall-headers
-uninstall-headers:
+uninstall::
 	rm -f $(DESTDIR)$(includedir)/xs_lib.h
 	rm -f $(DESTDIR)$(includedir)/xs.h
 	rm -f $(DESTDIR)$(includedir)/xenstore-compat/xs_lib.h

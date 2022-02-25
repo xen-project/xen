@@ -100,7 +100,7 @@ endif
 endif
 
 .PHONY: install
-install: all
+install:: all
 	$(INSTALL_DIR) $(DESTDIR)$(libdir)
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)
 	$(INSTALL_SHLIB) lib$(LIB_FILE_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
@@ -111,7 +111,7 @@ install: all
 	$(INSTALL_DATA) $(PKG_CONFIG) $(DESTDIR)$(PKG_INSTALLDIR)
 
 .PHONY: uninstall
-uninstall:
+uninstall::
 	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/$(LIB_FILE_NAME).pc
 	for i in $(LIBHEADER); do rm -f $(DESTDIR)$(includedir)/$$i; done
 	rm -f $(DESTDIR)$(libdir)/lib$(LIB_FILE_NAME).so
