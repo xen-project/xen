@@ -28,17 +28,12 @@ OBJS-y       += xg_core.o
 OBJS-$(CONFIG_X86) += xg_core_x86.o
 OBJS-$(CONFIG_ARM) += xg_core_arm.o
 
-CFLAGS += -I$(XEN_libxenctrl)
-
 vpath %.c ../../../xen/common/libelf
-CFLAGS += -I../../../xen/common/libelf
 
 LIBELF_OBJS += libelf-tools.o libelf-loader.o
 LIBELF_OBJS += libelf-dominfo.o
 
 OBJS-y += $(LIBELF_OBJS)
-
-$(LIBELF_OBJS) $(LIBELF_OBJS:.o=.opic): CFLAGS += -Wno-pointer-sign
 
 ifeq ($(CONFIG_X86),y) # Add libx86 to the build
 vpath %.c ../../../xen/lib/x86
@@ -70,10 +65,12 @@ OBJS-y                 += xg_dom_decompress_unsafe_xz.o
 OBJS-y                 += xg_dom_decompress_unsafe_zstd.o
 endif
 
-CFLAGS   += -Werror -Wmissing-prototypes
-CFLAGS   += -I. -I./include $(CFLAGS_xeninclude)
-CFLAGS   += -D__XEN_TOOLS__
-CFLAGS   += -include $(XEN_ROOT)/tools/config.h
+CFLAGS += -D__XEN_TOOLS__
+CFLAGS += -include $(XEN_ROOT)/tools/config.h
+CFLAGS += -iquote ../../../xen/common/libelf
+
+# To be able to include xc_private.h
+CFLAGS += -iquote $(XEN_libxenctrl)
 
 # Needed for posix_fadvise64() in xc_linux.c
 CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
@@ -92,8 +89,9 @@ ZLIB_CFLAGS :=
 ZLIB_LIBS :=
 endif
 
-xg_dom_bzimageloader.o: CFLAGS += $(ZLIB_CFLAGS)
-xg_dom_bzimageloader.opic: CFLAGS += $(ZLIB_CFLAGS)
+xg_dom_bzimageloader.o xg_dom_bzimageloader.opic: CFLAGS += $(ZLIB_CFLAGS)
+
+$(LIBELF_OBJS) $(LIBELF_OBJS:.o=.opic): CFLAGS += -Wno-pointer-sign
 
 LIBHEADER := xenguest.h
 
