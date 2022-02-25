@@ -1,6 +1,6 @@
-TOPLEVEL=$(CURDIR)/../..
-XEN_ROOT=$(TOPLEVEL)/../..
-include $(TOPLEVEL)/common.make
+OCAML_TOPLEVEL=$(CURDIR)/../..
+XEN_ROOT=$(OCAML_TOPLEVEL)/../..
+include $(OCAML_TOPLEVEL)/common.make
 
 OCAMLINCLUDE += -I ../xb/
 OCAMLOPTFLAGS += -for-pack Xenstore
@@ -43,7 +43,7 @@ install: $(LIBS) META
 uninstall:
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenstore
 
-include $(TOPLEVEL)/Makefile.rules
+include $(OCAML_TOPLEVEL)/Makefile.rules
 
 genpath-target = $(call buildmakevars2module,paths.ml)
 $(eval $(genpath-target))

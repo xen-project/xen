@@ -1,6 +1,6 @@
-TOPLEVEL=$(CURDIR)/../..
-XEN_ROOT=$(TOPLEVEL)/../..
-include $(TOPLEVEL)/common.make
+OCAML_TOPLEVEL=$(CURDIR)/../..
+XEN_ROOT=$(OCAML_TOPLEVEL)/../..
+include $(OCAML_TOPLEVEL)/common.make
 
 OBJS = xenmmap
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
@@ -26,5 +26,5 @@ install: $(LIBS) META
 uninstall:
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenmmap
 
-include $(TOPLEVEL)/Makefile.rules
+include $(OCAML_TOPLEVEL)/Makefile.rules
 
