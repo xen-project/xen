@@ -94,13 +94,20 @@ uninstall:: uninstall-python-bindings
 endif
 
 # Perl bindings
-PERL_FLAGS=`perl -MConfig -e 'print "$$Config{ccflags} -I$$Config{archlib}/CORE";'`
+PERL_FLAGS = $(shell $(PERL) -MConfig -e 'print "$$Config{ccflags} -I$$Config{archlib}/CORE";')
 $(PERLMOD): $(PERLSRC)
 $(PERLSRC): bindings/swig/xenstat.i
-	swig -perl $(SWIG_FLAGS) -outdir $(@D) -o $(PERLSRC) $<
+	mkdir -p $(@D)
+	swig -perl $(SWIG_FLAGS) -outdir $(@D) -o $@ $<
 
+$(PERLLIB): CFLAGS += -fPIC
+$(PERLLIB): CFLAGS += -Wno-strict-prototypes
+$(PERLLIB): CFLAGS += -Wno-missing-prototypes
+$(PERLLIB): LDFLAGS += $(PERL_FLAGS)
+$(PERLLIB): LDFLAGS += $(SHLIB_LDFLAGS)
+$(PERLLIB): LDLIBS := $(LDLIBS_libxenstat)
 $(PERLLIB): $(PERLSRC)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(PERL_FLAGS) $(SHLIB_LDFLAGS) -lxenstat -o $@ $< $(APPEND_LDFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
 
 .PHONY: perl-bindings
 perl-bindings: $(PERLLIB) $(PERLMOD)
