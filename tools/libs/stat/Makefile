@@ -115,9 +115,5 @@ install:: install-perl-bindings
 uninstall:: uninstall-perl-bindings
 endif
 
-clean: cleanlocal
-
-.PHONY: cleanlocal
-cleanlocal:
-	rm -f $(BINDINGS) $(BINDINGSRC) $(DEPS_RM)
-	rm -f libxenstat.map
+clean::
+	$(RM) libxenstat.map $(BINDINGS) $(BINDINGSRC)

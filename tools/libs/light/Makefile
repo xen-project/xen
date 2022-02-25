@@ -246,15 +246,12 @@ install:: $(LIBHEADERS) libxl-save-helper
 uninstall::
 	rm -f $(DESTDIR)$(LIBEXEC_BIN)/libxl-save-helper
 
-clean: cleanlocal
-
-.PHONY: cleanlocal
-cleanlocal:
-	$(RM) -f _*.h *.o $(CLIENTS)
-	$(RM) -f _*.c *.pyc _paths.*.tmp _*.api-for-check
-	$(RM) -f testidl.c.new testidl.c *.api-ok
-	$(RM) -f $(TEST_PROGS)
-	$(RM) -rf __pycache__
-	$(RM) -f libxenlight.map
-	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
+clean::
+	$(RM) _*.h *.o $(CLIENTS)
+	$(RM) _*.c *.pyc _*.api-for-check
+	$(RM) testidl.c.new testidl.c *.api-ok
+	$(RM) $(TEST_PROGS) libxenlight_test.so libxl_test_*.opic
+	$(RM) -r __pycache__
+	$(RM) libxenlight.map
+	$(RM) $(AUTOSRCS) $(AUTOINCS)
 	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) clean

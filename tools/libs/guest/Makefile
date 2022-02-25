@@ -104,6 +104,5 @@ include $(XEN_ROOT)/tools/libs/libs.mk
 
 libxenguest.so.$(MAJOR).$(MINOR): LDLIBS += $(ZLIB_LIBS) -lz
 
-.PHONY: cleanlocal
-cleanlocal:
+clean::
 	rm -f libxenguest.map

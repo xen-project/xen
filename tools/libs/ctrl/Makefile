@@ -54,8 +54,5 @@ NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-clean: cleanlocal
-
-.PHONY: cleanlocal
-cleanlocal:
+clean::
 	rm -f libxenctrl.map

@@ -49,8 +49,5 @@ $(LIB_OBJS) $(PIC_OBJS): $(AUTOINCS)
 	@rm -f $*.[ch]
 	$(FLEX) --header-file=$*.h --outfile=$*.c $<
 
-clean: cleanlocal
-
-.PHONY: cleanlocal
-cleanlocal:
-	$(RM) -f libxlutil.map
+clean::
+	$(RM) libxenutil.map

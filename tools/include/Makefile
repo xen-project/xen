@@ -82,6 +82,7 @@ uninstall:
 clean:
 	rm -rf xen xen-xsm acpi
 	$(MAKE) -C xen-foreign clean
+	rm -f _*.h
 
 .PHONY: dist
 dist: install

@@ -13,6 +13,7 @@ clean:
 	rm -f $(headers)
 	rm -f checker checker.c
 	rm -f *.pyc *.o *~
+	rm -rf __pycache__
 
 distclean: clean
 
