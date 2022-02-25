@@ -22,7 +22,7 @@ CFLAGS += -DXEN_LIB_STORED="\"$(XEN_LIB_STORED)\""
 CFLAGS += -DXEN_RUN_STORED="\"$(XEN_RUN_STORED)\""
 
 vpath xs_lib.c $(XEN_ROOT)/tools/xenstore
-CFLAGS += -I $(XEN_ROOT)/tools/xenstore
+CFLAGS += -iquote $(XEN_ROOT)/tools/xenstore
 
 xs.opic: CFLAGS += -DUSE_PTHREAD
 ifeq ($(CONFIG_Linux),y)
