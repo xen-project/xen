@@ -4,13 +4,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 MAJOR    = 1
 MINOR    = 2
 
-OBJS-GNTTAB            += gnttab_core.o
-OBJS-GNTSHR            += gntshr_core.o
-
-OBJS-$(CONFIG_Linux)   += $(OBJS-GNTTAB) $(OBJS-GNTSHR) linux.o
-OBJS-$(CONFIG_MiniOS)  += $(OBJS-GNTTAB) gntshr_unimp.o minios.o
-OBJS-$(CONFIG_FreeBSD) += $(OBJS-GNTTAB) $(OBJS-GNTSHR) freebsd.o
-OBJS-$(CONFIG_NetBSD)  += $(OBJS-GNTTAB) $(OBJS-GNTSHR) netbsd.o
-OBJS-$(CONFIG_SunOS)   += gnttab_unimp.o gntshr_unimp.o
+include Makefile.common
 
 include $(XEN_ROOT)/tools/libs/libs.mk

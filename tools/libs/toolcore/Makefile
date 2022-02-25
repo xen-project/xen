@@ -6,7 +6,7 @@ MINOR	= 0
 
 LIBHEADER := xentoolcore.h
 
-OBJS-y	+= handlereg.o
+include Makefile.common
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 

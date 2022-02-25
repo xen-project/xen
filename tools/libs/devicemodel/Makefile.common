@@ -1,0 +1,6 @@
+OBJS-y                 += core.o
+OBJS-$(CONFIG_Linux)   += common.o
+OBJS-$(CONFIG_FreeBSD) += common.o
+OBJS-$(CONFIG_SunOS)   += compat.o
+OBJS-$(CONFIG_NetBSD)  += compat.o
+OBJS-$(CONFIG_MiniOS)  += compat.o

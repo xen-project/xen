@@ -365,7 +365,7 @@ define BUILD_lib
 	    $$(MAKE) -C libs-$$(XEN_TARGET_ARCH)/$(1) clean; \
 	fi
 
- libs-$$(XEN_TARGET_ARCH)/$(1)/stamp: $$(XEN_ROOT)/tools/libs/$(1)/Makefile
+ libs-$$(XEN_TARGET_ARCH)/$(1)/stamp: $$(XEN_ROOT)/tools/libs/$(1)/Makefile.common
 	$$(do_links)
 endef
 

@@ -1,0 +1,2 @@
+OBJS-y	+= xtl_core.o
+OBJS-y	+= xtl_logger_stdio.o
