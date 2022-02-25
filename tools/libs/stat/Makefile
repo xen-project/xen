@@ -49,23 +49,34 @@ install-bindings: install-perl-bindings install-python-bindings
 .PHONY: uninstall-bindings
 uninstall-bindings: uninstall-perl-bindings uninstall-python-bindings
 
-$(BINDINGS): $(SHLIB) $(SHLIB_LINKS) include/xenstat.h
+$(BINDINGS): libxenstat.so
 
-SWIG_FLAGS=-module xenstat -Iinclude -I.
+SWIG_FLAGS = -module xenstat -I$(XEN_INCLUDE)
+SWIG_FLAGS += -MMD -MP -MF .$(if $(filter-out .,$(@D)),$(subst /,@,$(@D))@)$(@F).d
 
 # Python bindings
-PYTHON_VERSION=$(PYTHON:python%=%)
-PYTHON_FLAGS=-I/usr/include/python$(PYTHON_VERSION) -lpython$(PYTHON_VERSION)
 $(PYMOD): $(PYSRC)
 $(PYSRC): bindings/swig/xenstat.i
-	swig -python $(SWIG_FLAGS) -outdir $(@D) -o $(PYSRC) $<
+	mkdir -p $(@D)
+	swig -python $(SWIG_FLAGS) -outdir $(@D) -o $@ $<
 
+$(PYLIB): CFLAGS += $(shell $(PYTHON)-config --includes)
+$(PYLIB): CFLAGS += -fPIC
+$(PYLIB): CFLAGS += -Wno-missing-prototypes
+$(PYLIB): LDFLAGS += $(SHLIB_LDFLAGS)
+$(PYLIB): LDLIBS := $(shell $(PYTHON)-config --libs)
+$(PYLIB): LDLIBS += $(LDLIBS_libxenstat)
 $(PYLIB): $(PYSRC)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(PYTHON_FLAGS) $(SHLIB_LDFLAGS) -lxenstat -o $@ $< $(APPEND_LDFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
 
+.PHONY: python-bindings
 python-bindings: $(PYLIB) $(PYMOD)
 
-pythonlibdir=$(prefix)/lib/python$(PYTHON_VERSION)/site-packages
+pythonlibdir = $(shell $(PYTHON) -c \
+	       'import distutils.sysconfig as cfg; \
+	        print(cfg.get_python_lib(False, False, prefix="$(prefix)"))')
+
+.PHONY: install-python-bindings
 install-python-bindings: $(PYLIB) $(PYMOD)
 	$(INSTALL_PROG) $(PYLIB) $(DESTDIR)$(pythonlibdir)/_xenstat.so
 	$(INSTALL_PROG) $(PYMOD) $(DESTDIR)$(pythonlibdir)/xenstat.py
