@@ -1,11 +1,7 @@
 XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR = 3.0
-MINOR = 3
-
 CFLAGS += -Werror
-CFLAGS += -I.
 # Include configure output (config.h)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
 CFLAGS += -I./include
@@ -16,71 +12,77 @@ CFLAGS += $(CFLAGS_libxentoolcore)
 CFLAGS += -DXEN_LIB_STORED="\"$(XEN_LIB_STORED)\""
 CFLAGS += -DXEN_RUN_STORED="\"$(XEN_RUN_STORED)\""
 
-CFLAGS  += $(CFLAGS-y)
-LDFLAGS += $(LDFLAGS-y)
-
-CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
-CLIENTS += xenstore-write xenstore-ls xenstore-watch
-
-XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o
-XENSTORED_OBJS += xenstored_transaction.o xenstored_control.o
-XENSTORED_OBJS += xs_lib.o talloc.o utils.o tdb.o hashtable.o
-
-XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_posix.o
-XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_posix.o
-XENSTORED_OBJS_$(CONFIG_FreeBSD) = xenstored_posix.o
-XENSTORED_OBJS_$(CONFIG_MiniOS) = xenstored_minios.o
-
-XENSTORED_OBJS += $(XENSTORED_OBJS_y)
-LDLIBS_xenstored += -lrt
-
-ALL_TARGETS = clients
-ifeq ($(XENSTORE_XENSTORED),y)
-ALL_TARGETS += xs_tdb_dump xenstored
-endif
-
 ifdef CONFIG_STUBDOM
 CFLAGS += -DNO_SOCKETS=1
 endif
 
+XENSTORED_OBJS-y := xenstored_core.o xenstored_watch.o xenstored_domain.o
+XENSTORED_OBJS-y += xenstored_transaction.o xenstored_control.o
+XENSTORED_OBJS-y += xs_lib.o talloc.o utils.o tdb.o hashtable.o
+
+XENSTORED_OBJS-$(CONFIG_Linux) += xenstored_posix.o
+XENSTORED_OBJS-$(CONFIG_NetBSD) += xenstored_posix.o
+XENSTORED_OBJS-$(CONFIG_FreeBSD) += xenstored_posix.o
+XENSTORED_OBJS-$(CONFIG_MiniOS) += xenstored_minios.o
+
+$(XENSTORED_OBJS-y): CFLAGS += $(CFLAGS_libxengnttab)
+
+xenstored: LDLIBS += $(LDLIBS_libxenevtchn)
+xenstored: LDLIBS += $(LDLIBS_libxengnttab)
+xenstored: LDLIBS += $(LDLIBS_libxenctrl)
+xenstored: LDLIBS += -lrt
+xenstored: LDLIBS += $(SOCKET_LIBS)
+
+ifeq ($(CONFIG_SYSTEMD),y)
+$(XENSTORED_OBJS-y): CFLAGS += $(SYSTEMD_CFLAGS)
+xenstored: LDLIBS += $(SYSTEMD_LIBS)
+endif
+
+xenstore: LDLIBS += $(LDLIBS_libxenstore)
+xenstore: LDLIBS += $(LDLIBS_libxentoolcore)
+xenstore: LDLIBS += $(SOCKET_LIBS)
+
+xenstore-control: LDLIBS += $(LDLIBS_libxenstore)
+xenstore-control: LDLIBS += $(LDLIBS_libxenctrl)
+xenstore-control: LDLIBS += $(LDLIBS_libxenguest)
+xenstore-control: LDLIBS += $(LDLIBS_libxentoolcore)
+xenstore-control: LDLIBS += $(SOCKET_LIBS)
+
+CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
+CLIENTS += xenstore-write xenstore-ls xenstore-watch
+
+TARGETS := xenstore $(CLIENTS) xenstore-control
+ifeq ($(XENSTORE_XENSTORED),y)
+TARGETS += xs_tdb_dump xenstored
+endif
+
 .PHONY: all
-all: $(ALL_TARGETS)
+all: $(TARGETS)
 
 .PHONY: clients
 clients: xenstore $(CLIENTS) xenstore-control
 
-ifeq ($(CONFIG_SYSTEMD),y)
-$(XENSTORED_OBJS): CFLAGS += $(SYSTEMD_CFLAGS)
-xenstored: LDFLAGS += $(SYSTEMD_LIBS)
-endif
+xenstored: $(XENSTORED_OBJS-y)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@ $(APPEND_LDFLAGS)
 
-$(XENSTORED_OBJS): CFLAGS += $(CFLAGS_libxengnttab)
-
-xenstored: $(XENSTORED_OBJS)
-	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxenctrl) $(LDLIBS_xenstored) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
-
-xenstored.a: $(XENSTORED_OBJS)
+xenstored.a: $(XENSTORED_OBJS-y)
 	$(AR) cr $@ $^
 
 $(CLIENTS): xenstore
 	ln -f xenstore $@
 
 xenstore: xenstore_client.o xs_lib.o
-	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenstore) $(LDLIBS_libxentoolcore) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@ $(APPEND_LDFLAGS)
 
 xenstore-control: xenstore_control.o
-	$(CC) $< $(LDFLAGS) $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxentoolcore) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@ $(APPEND_LDFLAGS)
 
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
-	$(CC) $^ $(LDFLAGS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $^ -o $@ $(APPEND_LDFLAGS)
 
 .PHONY: clean
 clean:
-	rm -f *.a *.o
-	rm -f xenstored
-	rm -f xs_tdb_dump xenstore-control init-xenstore-domain
-	rm -f xenstore $(CLIENTS)
-	$(RM) $(DEPS_RM)
+	$(RM) *.a *.o $(TARGETS) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean
@@ -88,10 +90,6 @@ distclean: clean
 .PHONY: TAGS
 TAGS:
 	etags `find . -name '*.[ch]'`
-
-.PHONY: tarball
-tarball: clean
-	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
 .PHONY: install
 install: all
@@ -135,6 +133,3 @@ clients-install: clients
 	done
 
 -include $(DEPS_INCLUDE)
-
-# never delete any intermediate files.
-.SECONDARY:
