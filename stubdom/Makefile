@@ -345,7 +345,7 @@ define do_links
   mkdir -p $(dir $@)include
   cd $(dir $@); \
   ln -sf $(dir $<)include/*.h include/; \
-  ln -sf $(dir $<)*.[ch] .; \
+  find $(dir $<) -maxdepth 1 -type f -name '*.[ch]' -exec ln -sf {} . \; ; \
   ln -sf $(dir $<)Makefile.common .
   touch $@
 endef
