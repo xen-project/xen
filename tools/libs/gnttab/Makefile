@@ -4,13 +4,13 @@ include $(XEN_ROOT)/tools/Rules.mk
 MAJOR    = 1
 MINOR    = 2
 
-SRCS-GNTTAB            += gnttab_core.c
-SRCS-GNTSHR            += gntshr_core.c
+OBJS-GNTTAB            += gnttab_core.o
+OBJS-GNTSHR            += gntshr_core.o
 
-SRCS-$(CONFIG_Linux)   += $(SRCS-GNTTAB) $(SRCS-GNTSHR) linux.c
-SRCS-$(CONFIG_MiniOS)  += $(SRCS-GNTTAB) gntshr_unimp.c minios.c
-SRCS-$(CONFIG_FreeBSD) += $(SRCS-GNTTAB) $(SRCS-GNTSHR) freebsd.c
-SRCS-$(CONFIG_NetBSD)  += $(SRCS-GNTTAB) $(SRCS-GNTSHR) netbsd.c
-SRCS-$(CONFIG_SunOS)   += gnttab_unimp.c gntshr_unimp.c
+OBJS-$(CONFIG_Linux)   += $(OBJS-GNTTAB) $(OBJS-GNTSHR) linux.o
+OBJS-$(CONFIG_MiniOS)  += $(OBJS-GNTTAB) gntshr_unimp.o minios.o
+OBJS-$(CONFIG_FreeBSD) += $(OBJS-GNTTAB) $(OBJS-GNTSHR) freebsd.o
+OBJS-$(CONFIG_NetBSD)  += $(OBJS-GNTTAB) $(OBJS-GNTSHR) netbsd.o
+OBJS-$(CONFIG_SunOS)   += gnttab_unimp.o gntshr_unimp.o
 
 include $(XEN_ROOT)/tools/libs/libs.mk

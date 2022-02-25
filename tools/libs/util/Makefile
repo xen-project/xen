@@ -1,13 +1,13 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SRCS-y += libxlu_cfg_y.c
-SRCS-y += libxlu_cfg_l.c
-SRCS-y += libxlu_cfg.c
-SRCS-y += libxlu_disk_l.c
-SRCS-y += libxlu_disk.c
-SRCS-y += libxlu_vif.c
-SRCS-y += libxlu_pci.c
+OBJS-y += libxlu_cfg_y.o
+OBJS-y += libxlu_cfg_l.o
+OBJS-y += libxlu_cfg.o
+OBJS-y += libxlu_disk_l.o
+OBJS-y += libxlu_disk.o
+OBJS-y += libxlu_vif.o
+OBJS-y += libxlu_pci.o
 
 CFLAGS += -Wno-format-zero-length -Wmissing-declarations \
 	-Wno-declaration-after-statement -Wformat-nonliteral
@@ -39,7 +39,7 @@ NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-$(LIB_OBJS) $(PIC_OBJS): $(AUTOINCS)
+$(OBJS-y) $(PIC_OBJS): $(AUTOINCS)
 
 %.c %.h:: %.y
 	@rm -f $*.[ch]

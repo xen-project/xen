@@ -6,6 +6,6 @@ MINOR    = 0
 
 LDLIBS += -lz
 
-SRCS-y                 += core.c
+OBJS-y += core.o
 
 include ../libs.mk

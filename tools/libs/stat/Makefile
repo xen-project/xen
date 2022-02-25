@@ -17,12 +17,12 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
 
-SRCS-y += xenstat.c
-SRCS-y += xenstat_qmp.c
-SRCS-$(CONFIG_Linux) += xenstat_linux.c
-SRCS-$(CONFIG_SunOS) += xenstat_solaris.c
-SRCS-$(CONFIG_NetBSD) += xenstat_netbsd.c
-SRCS-$(CONFIG_FreeBSD) += xenstat_freebsd.c
+OBJS-y += xenstat.o
+OBJS-y += xenstat_qmp.o
+OBJS-$(CONFIG_Linux) += xenstat_linux.o
+OBJS-$(CONFIG_SunOS) += xenstat_solaris.o
+OBJS-$(CONFIG_NetBSD) += xenstat_netbsd.o
+OBJS-$(CONFIG_FreeBSD) += xenstat_freebsd.o
 
 LDLIBS-y += -lyajl
 LDLIBS-$(CONFIG_SunOS) += -lkstat

@@ -6,7 +6,7 @@ MINOR	= 0
 
 LIBHEADER := xentoolcore.h
 
-SRCS-y	+= handlereg.c
+OBJS-y	+= handlereg.o
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 

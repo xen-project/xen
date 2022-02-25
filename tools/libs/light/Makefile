@@ -1,31 +1,31 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SRCS-y += osdeps.c
-SRCS-y += libxl_paths.c
-SRCS-y += libxl_bootloader.c
-SRCS-y += flexarray.c
+OBJS-y += osdeps.o
+OBJS-y += libxl_paths.o
+OBJS-y += libxl_bootloader.o
+OBJS-y += flexarray.o
 ifeq ($(CONFIG_LIBNL),y)
-SRCS-y += libxl_netbuffer.c
+OBJS-y += libxl_netbuffer.o
 else
-SRCS-y += libxl_nonetbuffer.c
+OBJS-y += libxl_nonetbuffer.o
 endif
 ifeq ($(CONFIG_X86),y)
-SRCS-y += libxl_convert_callout.c
+OBJS-y += libxl_convert_callout.o
 else
-SRCS-y += libxl_no_convert_callout.c
+OBJS-y += libxl_no_convert_callout.o
 endif
-SRCS-y += libxl_remus.c
-SRCS-y += libxl_checkpoint_device.c
-SRCS-y += libxl_remus_disk_drbd.c
+OBJS-y += libxl_remus.o
+OBJS-y += libxl_checkpoint_device.o
+OBJS-y += libxl_remus_disk_drbd.o
 ifeq ($(CONFIG_LIBNL),y)
-SRCS-y += libxl_colo_restore.c
-SRCS-y += libxl_colo_save.c
-SRCS-y += libxl_colo_qdisk.c
-SRCS-y += libxl_colo_proxy.c
-SRCS-y += libxl_colo_nic.c
+OBJS-y += libxl_colo_restore.o
+OBJS-y += libxl_colo_save.o
+OBJS-y += libxl_colo_qdisk.o
+OBJS-y += libxl_colo_proxy.o
+OBJS-y += libxl_colo_nic.o
 else
-SRCS-y += libxl_no_colo.c
+OBJS-y += libxl_no_colo.o
 endif
 
 ACPI_PATH  = $(XEN_ROOT)/tools/libacpi
@@ -40,82 +40,82 @@ vpath static_tables.c $(ACPI_PATH)/
 acpi:
 	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) DSDT_FILES="$(DSDT_FILES-y)"
 
-SRCS-$(CONFIG_X86) += $(ACPI_OBJS:.o=.c)
+OBJS-$(CONFIG_X86) += $(ACPI_OBJS)
 
 CFLAGS += -Wno-format-zero-length -Wmissing-declarations \
 	-Wno-declaration-after-statement -Wformat-nonliteral
 
 CFLAGS-$(CONFIG_X86) += -DCONFIG_PCI_SUPP_LEGACY_IRQ
 
-SRCS-$(CONFIG_X86) += libxl_cpuid.c
-SRCS-$(CONFIG_X86) += libxl_x86.c
-SRCS-$(CONFIG_X86) += libxl_psr.c
-SRCS-$(CONFIG_X86) += libxl_x86_acpi.c
-SRCS-$(CONFIG_ARM) += libxl_nocpuid.c
-SRCS-$(CONFIG_ARM) += libxl_arm.c
-SRCS-$(CONFIG_ARM) += libxl_libfdt_compat.c
+OBJS-$(CONFIG_X86) += libxl_cpuid.o
+OBJS-$(CONFIG_X86) += libxl_x86.o
+OBJS-$(CONFIG_X86) += libxl_psr.o
+OBJS-$(CONFIG_X86) += libxl_x86_acpi.o
+OBJS-$(CONFIG_ARM) += libxl_nocpuid.o
+OBJS-$(CONFIG_ARM) += libxl_arm.o
+OBJS-$(CONFIG_ARM) += libxl_libfdt_compat.o
 ifeq ($(CONFIG_ARM_64),y)
 DSDT_FILES-y = dsdt_anycpu_arm.c
-SRCS-y += libxl_arm_acpi.c
-SRCS-y += $(DSDT_FILES-y)
+OBJS-y += libxl_arm_acpi.o
+OBJS-y += $(DSDT_FILES-y:.c=.o)
 dsdt_anycpu_arm.c:
 	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) DSDT_FILES="$(DSDT_FILES-y)"
 else
-SRCS-$(CONFIG_ARM) += libxl_arm_no_acpi.c
+OBJS-$(CONFIG_ARM) += libxl_arm_no_acpi.o
 endif
 
-SRCS-OS-$(CONFIG_NetBSD) = libxl_netbsd.c
-SRCS-OS-$(CONFIG_Linux) = libxl_linux.c libxl_setresuid.c
-SRCS-OS-$(CONFIG_FreeBSD) = libxl_freebsd.c libxl_setresuid.c
-ifeq ($(SRCS-OS-y),)
+OBJS-OS-$(CONFIG_NetBSD) = libxl_netbsd.o
+OBJS-OS-$(CONFIG_Linux) = libxl_linux.o libxl_setresuid.o
+OBJS-OS-$(CONFIG_FreeBSD) = libxl_freebsd.o libxl_setresuid.o
+ifeq ($(OBJS-OS-y),)
 $(error Your Operating System is not supported by libxenlight, \
 please check libxl_linux.c and libxl_netbsd.c to see how to get it ported)
 endif
-SRCS-y += $(SRCS-OS-y)
+OBJS-y += $(OBJS-OS-y)
 
-SRCS-y += libxl.c
-SRCS-y += libxl_create.c
-SRCS-y += libxl_dm.c
-SRCS-y += libxl_pci.c
-SRCS-y += libxl_dom.c
-SRCS-y += libxl_exec.c
-SRCS-y += libxl_xshelp.c
-SRCS-y += libxl_device.c
-SRCS-y += libxl_internal.c
-SRCS-y += libxl_utils.c
-SRCS-y += libxl_uuid.c
-SRCS-y += libxl_json.c
-SRCS-y += libxl_aoutils.c
-SRCS-y += libxl_numa.c
-SRCS-y += libxl_vnuma.c
-SRCS-y += libxl_stream_read.c
-SRCS-y += libxl_stream_write.c
-SRCS-y += libxl_save_callout.c
-SRCS-y += _libxl_save_msgs_callout.c
-SRCS-y += libxl_qmp.c
-SRCS-y += libxl_event.c
-SRCS-y += libxl_fork.c
-SRCS-y += libxl_dom_suspend.c
-SRCS-y += libxl_dom_save.c
-SRCS-y += libxl_usb.c
-SRCS-y += libxl_vtpm.c
-SRCS-y += libxl_nic.c
-SRCS-y += libxl_disk.c
-SRCS-y += libxl_console.c
-SRCS-y += libxl_cpupool.c
-SRCS-y += libxl_mem.c
-SRCS-y += libxl_sched.c
-SRCS-y += libxl_tmem.c
-SRCS-y += libxl_9pfs.c
-SRCS-y += libxl_domain.c
-SRCS-y += libxl_vdispl.c
-SRCS-y += libxl_pvcalls.c
-SRCS-y += libxl_vsnd.c
-SRCS-y += libxl_vkb.c
-SRCS-y += libxl_genid.c
-SRCS-y += _libxl_types.c
-SRCS-y += libxl_flask.c
-SRCS-y += _libxl_types_internal.c
+OBJS-y += libxl.o
+OBJS-y += libxl_create.o
+OBJS-y += libxl_dm.o
+OBJS-y += libxl_pci.o
+OBJS-y += libxl_dom.o
+OBJS-y += libxl_exec.o
+OBJS-y += libxl_xshelp.o
+OBJS-y += libxl_device.o
+OBJS-y += libxl_internal.o
+OBJS-y += libxl_utils.o
+OBJS-y += libxl_uuid.o
+OBJS-y += libxl_json.o
+OBJS-y += libxl_aoutils.o
+OBJS-y += libxl_numa.o
+OBJS-y += libxl_vnuma.o
+OBJS-y += libxl_stream_read.o
+OBJS-y += libxl_stream_write.o
+OBJS-y += libxl_save_callout.o
+OBJS-y += _libxl_save_msgs_callout.o
+OBJS-y += libxl_qmp.o
+OBJS-y += libxl_event.o
+OBJS-y += libxl_fork.o
+OBJS-y += libxl_dom_suspend.o
+OBJS-y += libxl_dom_save.o
+OBJS-y += libxl_usb.o
+OBJS-y += libxl_vtpm.o
+OBJS-y += libxl_nic.o
+OBJS-y += libxl_disk.o
+OBJS-y += libxl_console.o
+OBJS-y += libxl_cpupool.o
+OBJS-y += libxl_mem.o
+OBJS-y += libxl_sched.o
+OBJS-y += libxl_tmem.o
+OBJS-y += libxl_9pfs.o
+OBJS-y += libxl_domain.o
+OBJS-y += libxl_vdispl.o
+OBJS-y += libxl_pvcalls.o
+OBJS-y += libxl_vsnd.o
+OBJS-y += libxl_vkb.o
+OBJS-y += libxl_genid.o
+OBJS-y += _libxl_types.o
+OBJS-y += libxl_flask.o
+OBJS-y += _libxl_types_internal.o
 
 ifeq ($(CONFIG_LIBNL),y)
 CFLAGS_LIBXL += $(LIBNL3_CFLAGS)
@@ -175,7 +175,7 @@ LDLIBS-y += $(PTHREAD_LIBS)
 LDLIBS-y += -lyajl
 LDLIBS += $(LDLIBS-y)
 
-$(LIB_OBJS) $(PIC_OBJS) $(LIBXL_TEST_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
+$(OBJS-y) $(PIC_OBJS) $(LIBXL_TEST_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
 $(ACPI_OBJS) $(ACPI_PIC_OBJS): CFLAGS += -I. -DLIBACPI_STDUTILS=\"$(CURDIR)/libxl_x86_acpi.h\"
 $(TEST_PROG_OBJS) _libxl.api-for-check: CFLAGS += $(CFLAGS_libxentoollog) $(CFLAGS_libxentoolcore)
 libxl_dom.o libxl_dom.opic: CFLAGS += -I$(XEN_ROOT)/tools  # include libacpi/x86.h
@@ -189,7 +189,7 @@ testidl.c: libxl_types.idl gentest.py $(XEN_INCLUDE)/libxl.h $(AUTOINCS)
 
 all: $(CLIENTS) $(TEST_PROGS) $(AUTOSRCS) $(AUTOINCS)
 
-$(LIB_OBJS) $(PIC_OBJS) $(SAVE_HELPER_OBJS) $(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS): $(AUTOINCS) libxl.api-ok
+$(OBJS-y) $(PIC_OBJS) $(SAVE_HELPER_OBJS) $(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS): $(AUTOINCS) libxl.api-ok
 
 libxl.api-ok: check-libxl-api-rules _libxl.api-for-check
 	$(PERL) $^
@@ -212,8 +212,8 @@ $(XEN_INCLUDE)/libxl_json.h: $(XEN_INCLUDE)/_libxl_types_json.h
 libxl_internal.h: _libxl_types_internal.h _libxl_types_private.h _libxl_types_internal_private.h
 libxl_internal_json.h: _libxl_types_internal_json.h
 
-$(LIB_OBJS) $(PIC_OBJS) $(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): $(XEN_INCLUDE)/libxl.h
-$(LIB_OBJS) $(PIC_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
+$(OBJS-y) $(PIC_OBJS) $(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): $(XEN_INCLUDE)/libxl.h
+$(OBJS-y) $(PIC_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
 
 _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
 	$(eval stem = $(notdir $*))

@@ -8,8 +8,8 @@ ifeq ($(CONFIG_Linux),y)
 LDLIBS += -ldl
 endif
 
-SRCS-y   += xs_lib.c
-SRCS-y   += xs.c
+OBJS-y   += xs_lib.o
+OBJS-y   += xs.o
 
 LIBHEADER = xenstore.h xenstore_lib.h
 

@@ -6,69 +6,69 @@ ifeq ($(CONFIG_LIBXC_MINIOS),y)
 override CONFIG_MIGRATE := n
 endif
 
-SRCS-y += xg_private.c
-SRCS-y += xg_domain.c
-SRCS-y += xg_suspend.c
-SRCS-y += xg_resume.c
+OBJS-y += xg_private.o
+OBJS-y += xg_domain.o
+OBJS-y += xg_suspend.o
+OBJS-y += xg_resume.o
 ifeq ($(CONFIG_MIGRATE),y)
-SRCS-y += xg_sr_common.c
-SRCS-$(CONFIG_X86) += xg_sr_common_x86.c
-SRCS-$(CONFIG_X86) += xg_sr_common_x86_pv.c
-SRCS-$(CONFIG_X86) += xg_sr_restore_x86_pv.c
-SRCS-$(CONFIG_X86) += xg_sr_restore_x86_hvm.c
-SRCS-$(CONFIG_X86) += xg_sr_save_x86_pv.c
-SRCS-$(CONFIG_X86) += xg_sr_save_x86_hvm.c
-SRCS-y += xg_sr_restore.c
-SRCS-y += xg_sr_save.c
-SRCS-y += xg_offline_page.c
+OBJS-y += xg_sr_common.o
+OBJS-$(CONFIG_X86) += xg_sr_common_x86.o
+OBJS-$(CONFIG_X86) += xg_sr_common_x86_pv.o
+OBJS-$(CONFIG_X86) += xg_sr_restore_x86_pv.o
+OBJS-$(CONFIG_X86) += xg_sr_restore_x86_hvm.o
+OBJS-$(CONFIG_X86) += xg_sr_save_x86_pv.o
+OBJS-$(CONFIG_X86) += xg_sr_save_x86_hvm.o
+OBJS-y += xg_sr_restore.o
+OBJS-y += xg_sr_save.o
+OBJS-y += xg_offline_page.o
 else
-SRCS-y += xg_nomigrate.c
+OBJS-y += xg_nomigrate.o
 endif
-SRCS-y       += xg_core.c
-SRCS-$(CONFIG_X86) += xg_core_x86.c
-SRCS-$(CONFIG_ARM) += xg_core_arm.c
+OBJS-y       += xg_core.o
+OBJS-$(CONFIG_X86) += xg_core_x86.o
+OBJS-$(CONFIG_ARM) += xg_core_arm.o
 
 CFLAGS += -I$(XEN_libxenctrl)
 
 vpath %.c ../../../xen/common/libelf
 CFLAGS += -I../../../xen/common/libelf
 
-ELF_SRCS-y += libelf-tools.c libelf-loader.c
-ELF_SRCS-y += libelf-dominfo.c
+ELF_OBJS-y += libelf-tools.o libelf-loader.o
+ELF_OBJS-y += libelf-dominfo.o
 
-SRCS-y += $(ELF_SRCS-y)
+OBJS-y += $(ELF_OBJS-y)
 
-$(patsubst %.c,%.o,$(ELF_SRCS-y)): CFLAGS += -Wno-pointer-sign
-$(patsubst %.c,%.opic,$(ELF_SRCS-y)): CFLAGS += -Wno-pointer-sign
+$(ELF_OBJS-y): CFLAGS += -Wno-pointer-sign
+$(ELF_OBJS-y:.o=.opic): CFLAGS += -Wno-pointer-sign
 
 ifeq ($(CONFIG_X86),y) # Add libx86 to the build
 vpath %.c ../../../xen/lib/x86
 
-SRCS-y                 += cpuid.c msr.c policy.c
+OBJS-y                 += cpuid.o msr.o policy.o
 endif
 
 # new domain builder
-SRCS-y                 += xg_dom_core.c
-SRCS-y                 += xg_dom_boot.c
-SRCS-y                 += xg_dom_elfloader.c
-SRCS-$(CONFIG_X86)     += xg_dom_bzimageloader.c
-SRCS-$(CONFIG_X86)     += xg_dom_decompress_lz4.c
-SRCS-$(CONFIG_X86)     += xg_dom_hvmloader.c
-SRCS-$(CONFIG_ARM)     += xg_dom_armzimageloader.c
-SRCS-y                 += xg_dom_binloader.c
-SRCS-y                 += xg_dom_compat_linux.c
+OBJS-y                 += xg_dom_core.o
+OBJS-y                 += xg_dom_boot.o
+OBJS-y                 += xg_dom_elfloader.o
+OBJS-$(CONFIG_X86)     += xg_dom_bzimageloader.o
+OBJS-$(CONFIG_X86)     += xg_dom_decompress_lz4.o
+OBJS-$(CONFIG_X86)     += xg_dom_hvmloader.o
+OBJS-$(CONFIG_ARM)     += xg_dom_armzimageloader.o
+OBJS-y                 += xg_dom_binloader.o
+OBJS-y                 += xg_dom_compat_linux.o
 
-SRCS-$(CONFIG_X86)     += xg_dom_x86.c
-SRCS-$(CONFIG_X86)     += xg_cpuid_x86.c
-SRCS-$(CONFIG_ARM)     += xg_dom_arm.c
+OBJS-$(CONFIG_X86)     += xg_dom_x86.o
+OBJS-$(CONFIG_X86)     += xg_cpuid_x86.o
+OBJS-$(CONFIG_ARM)     += xg_dom_arm.o
 
 ifeq ($(CONFIG_LIBXC_MINIOS),y)
-SRCS-y                 += xg_dom_decompress_unsafe.c
-SRCS-y                 += xg_dom_decompress_unsafe_bzip2.c
-SRCS-y                 += xg_dom_decompress_unsafe_lzma.c
-SRCS-y                 += xg_dom_decompress_unsafe_lzo1x.c
-SRCS-y                 += xg_dom_decompress_unsafe_xz.c
-SRCS-y                 += xg_dom_decompress_unsafe_zstd.c
+OBJS-y                 += xg_dom_decompress_unsafe.o
+OBJS-y                 += xg_dom_decompress_unsafe_bzip2.o
+OBJS-y                 += xg_dom_decompress_unsafe_lzma.o
+OBJS-y                 += xg_dom_decompress_unsafe_lzo1x.o
+OBJS-y                 += xg_dom_decompress_unsafe_xz.o
+OBJS-y                 += xg_dom_decompress_unsafe_zstd.o
 endif
 
 CFLAGS   += -Werror -Wmissing-prototypes

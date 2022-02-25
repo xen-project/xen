@@ -4,11 +4,11 @@ include $(XEN_ROOT)/tools/Rules.mk
 MAJOR    = 1
 MINOR    = 4
 
-SRCS-y                 += core.c
-SRCS-$(CONFIG_Linux)   += linux.c
-SRCS-$(CONFIG_FreeBSD) += freebsd.c
-SRCS-$(CONFIG_SunOS)   += compat.c solaris.c
-SRCS-$(CONFIG_NetBSD)  += netbsd.c
-SRCS-$(CONFIG_MiniOS)  += minios.c
+OBJS-y                 += core.o
+OBJS-$(CONFIG_Linux)   += linux.o
+OBJS-$(CONFIG_FreeBSD) += freebsd.o
+OBJS-$(CONFIG_SunOS)   += compat.o solaris.o
+OBJS-$(CONFIG_NetBSD)  += netbsd.o
+OBJS-$(CONFIG_MiniOS)  += minios.o
 
 include $(XEN_ROOT)/tools/libs/libs.mk
