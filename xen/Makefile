@@ -209,7 +209,7 @@ endif # root-make-done
 
 PHONY += tools_fixdep
 tools_fixdep:
-	$(MAKE) -C tools fixdep
+	$(Q)$(MAKE) $(build)=tools tools/fixdep
 
 ifeq ($(config-build),y)
 # ===========================================================================
@@ -247,7 +247,7 @@ ifeq ($(need-config),y)
 # "tools_fixdep" which is a .PHONY target and would force make to call
 # "defconfig" again to update $(KCONFIG_CONFIG).
 tools/fixdep:
-	$(MAKE) -C tools fixdep
+	$(Q)$(MAKE) $(build)=tools tools/fixdep
 
 # Allow people to just run `make` as before and not force them to configure
 $(KCONFIG_CONFIG): tools/fixdep
@@ -406,7 +406,7 @@ _debug:
 
 .PHONY: _clean
 _clean:
-	$(MAKE) -C tools clean
+	$(MAKE) $(clean) tools
 	$(MAKE) $(clean) include
 	$(MAKE) $(clean) common
 	$(MAKE) $(clean) drivers
@@ -435,7 +435,7 @@ $(TARGET).gz: $(TARGET)
 	mv $@.new $@
 
 $(TARGET): FORCE
-	$(MAKE) -C tools
+	$(Q)$(MAKE) $(build)=tools
 	$(Q)$(MAKE) $(build)=. include/xen/compile.h
 	[ -e arch/$(TARGET_ARCH)/efi ] && for f in $$(cd common/efi; echo *.[ch]); \
 		do test -r arch/$(TARGET_ARCH)/efi/$$f || \
