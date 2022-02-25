@@ -78,9 +78,17 @@ else
 obj-y    := $(filter-out %/, $(obj-y))
 endif
 
+# hostprogs-always-y += foo
+# ... is a shorthand for
+# hostprogs-y += foo
+# always-y  += foo
+hostprogs-y += $(hostprogs-always-y)
+always-y += $(hostprogs-always-y)
+
 # Add subdir path
 
 extra-y         := $(addprefix $(obj)/,$(extra-y))
+always-y        := $(addprefix $(obj)/,$(always-y))
 targets         := $(addprefix $(obj)/,$(targets))
 lib-y           := $(addprefix $(obj)/,$(lib-y))
 obj-y           := $(addprefix $(obj)/,$(obj-y))
@@ -283,7 +291,7 @@ targets += $(call intermediate_targets, .init.o, .o) \
 # Build
 # ---------------------------------------------------------------------------
 
-__build: $(targets-for-builtin) $(subdir-y)
+__build: $(targets-for-builtin) $(subdir-y) $(always-y)
 	@:
 
 # Descending

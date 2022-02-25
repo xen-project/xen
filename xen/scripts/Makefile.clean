@@ -18,7 +18,8 @@ subdir-all := $(subdir-y) $(subdir-n) $(subdir-) \
               $(patsubst %/,%, $(filter %/, $(obj-y) $(obj-n) $(obj-)))
 
 __clean-files := \
-    $(clean-files) $(hostprogs-y) $(hostprogs-)
+    $(clean-files) $(hostprogs-y) $(hostprogs-) \
+    $(hostprogs-always-y) $(hostprogs-always-)
 
 __clean-files := $(wildcard $(__clean-files))
 
