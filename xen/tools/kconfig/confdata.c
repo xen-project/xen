@@ -1237,6 +1237,7 @@ void set_all_choice_values(struct symbol *csym)
 
 bool conf_set_all_new_symbols(enum conf_def_mode mode)
 {
+	bool has_changed = false;
 	struct symbol *sym, *csym;
 	int i, cnt, pby, pty, ptm;	/* pby: probability of bool     = y
 					 * pty: probability of tristate = y
@@ -1283,7 +1284,6 @@ bool conf_set_all_new_symbols(enum conf_def_mode mode)
 			exit( 1 );
 		}
 	}
-	bool has_changed = false;
 
 	for_all_symbols(i, sym) {
 		if (sym_has_value(sym) || (sym->flags & SYMBOL_VALID))
