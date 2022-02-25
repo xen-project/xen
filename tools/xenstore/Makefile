@@ -1,31 +1,7 @@
 XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS += -Werror
-# Include configure output (config.h)
-CFLAGS += -include $(XEN_ROOT)/tools/config.h
-CFLAGS += -I./include
-CFLAGS += $(CFLAGS_libxenevtchn)
-CFLAGS += $(CFLAGS_libxenctrl)
-CFLAGS += $(CFLAGS_libxenguest)
-CFLAGS += $(CFLAGS_libxentoolcore)
-CFLAGS += -DXEN_LIB_STORED="\"$(XEN_LIB_STORED)\""
-CFLAGS += -DXEN_RUN_STORED="\"$(XEN_RUN_STORED)\""
-
-ifdef CONFIG_STUBDOM
-CFLAGS += -DNO_SOCKETS=1
-endif
-
-XENSTORED_OBJS-y := xenstored_core.o xenstored_watch.o xenstored_domain.o
-XENSTORED_OBJS-y += xenstored_transaction.o xenstored_control.o
-XENSTORED_OBJS-y += xs_lib.o talloc.o utils.o tdb.o hashtable.o
-
-XENSTORED_OBJS-$(CONFIG_Linux) += xenstored_posix.o
-XENSTORED_OBJS-$(CONFIG_NetBSD) += xenstored_posix.o
-XENSTORED_OBJS-$(CONFIG_FreeBSD) += xenstored_posix.o
-XENSTORED_OBJS-$(CONFIG_MiniOS) += xenstored_minios.o
-
-$(XENSTORED_OBJS-y): CFLAGS += $(CFLAGS_libxengnttab)
+include Makefile.common
 
 xenstored: LDLIBS += $(LDLIBS_libxenevtchn)
 xenstored: LDLIBS += $(LDLIBS_libxengnttab)
@@ -65,9 +41,6 @@ clients: xenstore $(CLIENTS) xenstore-control
 xenstored: $(XENSTORED_OBJS-y)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@ $(APPEND_LDFLAGS)
 
-xenstored.a: $(XENSTORED_OBJS-y)
-	$(AR) cr $@ $^
-
 $(CLIENTS): xenstore
 	ln -f xenstore $@
 
@@ -81,8 +54,8 @@ xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 	$(CC) $(LDFLAGS) $^ -o $@ $(APPEND_LDFLAGS)
 
 .PHONY: clean
-clean:
-	$(RM) *.a *.o $(TARGETS) $(DEPS_RM)
+clean::
+	$(RM) $(TARGETS) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean
