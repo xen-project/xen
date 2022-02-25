@@ -153,3 +153,12 @@ why =                                                                        \
 
 echo-why = $(call escsq, $(strip $(why)))
 endif
+
+# Useful for describing the dependency of composite objects
+# Usage:
+#   $(call multi-depend, multi-used-targets, suffix-to-remove, suffix-to-add)
+define multi-depend
+$(foreach m, $(notdir $1), \
+	$(eval $(obj)/$(m): \
+	$(addprefix $(obj)/, $(foreach s, $3, $($(m:%$(strip $2)=%$(s)))))))
+endef

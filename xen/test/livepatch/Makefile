@@ -12,81 +12,29 @@ CODE_ADDR=$(shell nm --defined $(1) | grep $(2) | awk '{print "0x"$$1}')
 CODE_SZ=$(shell nm --defined -S $(1) | grep $(2) | awk '{ print "0x"$$2}')
 
 .PHONY: default
-
-LIVEPATCH := xen_hello_world.livepatch
-LIVEPATCH_BYE := xen_bye_world.livepatch
-LIVEPATCH_REPLACE := xen_replace_world.livepatch
-LIVEPATCH_NOP := xen_nop.livepatch
-LIVEPATCH_NO_XEN_BUILDID := xen_no_xen_buildid.livepatch
-LIVEPATCH_PREPOST_HOOKS := xen_prepost_hooks.livepatch
-LIVEPATCH_PREPOST_HOOKS_FAIL := xen_prepost_hooks_fail.livepatch
-LIVEPATCH_ACTION_HOOKS := xen_action_hooks.livepatch
-LIVEPATCH_ACTION_HOOKS_NOFUNC := xen_action_hooks_nofunc.livepatch
-LIVEPATCH_ACTION_HOOKS_MARKER:= xen_action_hooks_marker.livepatch
-LIVEPATCH_ACTION_HOOKS_NOAPPLY:= xen_action_hooks_noapply.livepatch
-LIVEPATCH_ACTION_HOOKS_NOREVERT:= xen_action_hooks_norevert.livepatch
-LIVEPATCH_EXPECTATIONS:= xen_expectations.livepatch
-LIVEPATCH_EXPECTATIONS_FAIL:= xen_expectations_fail.livepatch
-
-LIVEPATCHES += $(LIVEPATCH)
-LIVEPATCHES += $(LIVEPATCH_BYE)
-LIVEPATCHES += $(LIVEPATCH_REPLACE)
-LIVEPATCHES += $(LIVEPATCH_NOP)
-LIVEPATCHES += $(LIVEPATCH_NO_XEN_BUILDID)
-LIVEPATCHES += $(LIVEPATCH_PREPOST_HOOKS)
-LIVEPATCHES += $(LIVEPATCH_PREPOST_HOOKS_FAIL)
-LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS)
-LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOFUNC)
-LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_MARKER)
-LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOAPPLY)
-LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOREVERT)
-LIVEPATCHES += $(LIVEPATCH_EXPECTATIONS)
-LIVEPATCHES += $(LIVEPATCH_EXPECTATIONS_FAIL)
-
-LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
-
 build default: livepatch
 
-install: livepatch
-	$(INSTALL_DIR) $(DESTDIR)$(LIVEPATCH_DEBUG_DIR)
-	$(INSTALL_DATA) $(LIVEPATCHES) $(DESTDIR)$(LIVEPATCH_DEBUG_DIR)
-
-uninstall:
-	cd $(DESTDIR)$(LIVEPATCH_DEBUG_DIR) && rm -f $(LIVEPATCHES)
-
-.PHONY: clean
-clean::
-	rm -f *.o .*.o.d *.livepatch config.h expect_config.h
+extra-y += xen_hello_world.livepatch
+xen_hello_world-objs := xen_hello_world_func.o xen_hello_world.o note.o xen_note.o modinfo.o
+$(obj)/xen_hello_world.o: $(obj)/config.h
 
 #
 # To compute these values we need the binary files: xen-syms
 # and xen_hello_world_func.o to be already compiled.
 #
-.PHONY: config.h
-config.h: OLD_CODE_SZ=$(call CODE_SZ,$(BASEDIR)/xen-syms,xen_extra_version)
-config.h: NEW_CODE_SZ=$(call CODE_SZ,$<,xen_hello_world)
-config.h: MINOR_VERSION_SZ=$(call CODE_SZ,$(BASEDIR)/xen-syms,xen_minor_version)
-config.h: MINOR_VERSION_ADDR=$(call CODE_ADDR,$(BASEDIR)/xen-syms,xen_minor_version)
-config.h: xen_hello_world_func.o
+$(obj)/config.h: $(obj)/xen_hello_world_func.o
 	(set -e; \
-	 echo "#define NEW_CODE_SZ $(NEW_CODE_SZ)"; \
-	 echo "#define MINOR_VERSION_SZ $(MINOR_VERSION_SZ)"; \
-	 echo "#define MINOR_VERSION_ADDR $(MINOR_VERSION_ADDR)"; \
-	 echo "#define OLD_CODE_SZ $(OLD_CODE_SZ)") > $@
+	 echo "#define NEW_CODE_SZ $(call CODE_SZ,$<,xen_hello_world)"; \
+	 echo "#define MINOR_VERSION_SZ $(call CODE_SZ,$(BASEDIR)/xen-syms,xen_minor_version)"; \
+	 echo "#define MINOR_VERSION_ADDR $(call CODE_ADDR,$(BASEDIR)/xen-syms,xen_minor_version)"; \
+	 echo "#define OLD_CODE_SZ $(call CODE_SZ,$(BASEDIR)/xen-syms,xen_extra_version)") > $@
 
-xen_hello_world.o: config.h
-
-.PHONY: $(LIVEPATCH)
-$(LIVEPATCH): xen_hello_world_func.o xen_hello_world.o note.o xen_note.o modinfo.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH) $^
-
-.PHONY: modinfo.o
-modinfo.o:
+$(obj)/modinfo.o:
 	(set -e; \
 	 printf "LIVEPATCH_RULEZ\0") > $@.bin
 	$(OBJCOPY) $(OBJCOPY_MAGIC) \
 		   --rename-section=.data=.modinfo,alloc,load,readonly,data,contents -S $@.bin $@
-	#rm -f $@.bin
+	rm -f $@.bin
 
 #
 # This target is only accessible if CONFIG_LIVEPATCH is defined, which
@@ -97,9 +45,8 @@ modinfo.o:
 # not be built (it is for EFI builds), and that we do not have
 # the note.o.bin to muck with (as it gets deleted)
 #
-.PHONY: note.o
-note.o:
-	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(BASEDIR)/xen-syms $@.bin
+$(obj)/note.o: $(BASEDIR)/xen-syms
+	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $< $@.bin
 	$(OBJCOPY) $(OBJCOPY_MAGIC) \
 		   --rename-section=.data=.livepatch.depends,alloc,load,readonly,data,contents -S $@.bin $@
 	rm -f $@.bin
@@ -108,9 +55,8 @@ note.o:
 # Append .livepatch.xen_depends section
 # with Xen build-id derived from xen-syms.
 #
-.PHONY: xen_note.o
-xen_note.o:
-	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(BASEDIR)/xen-syms $@.bin
+$(obj)/xen_note.o: $(BASEDIR)/xen-syms
+	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $< $@.bin
 	$(OBJCOPY) $(OBJCOPY_MAGIC) \
 		   --rename-section=.data=.livepatch.xen_depends,alloc,load,readonly,data,contents -S $@.bin $@
 	rm -f $@.bin
@@ -119,102 +65,107 @@ xen_note.o:
 # Extract the build-id of the xen_hello_world.livepatch
 # (which xen_bye_world will depend on).
 #
-.PHONY: hello_world_note.o
-hello_world_note.o: $(LIVEPATCH)
-	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(LIVEPATCH) $@.bin
+$(obj)/hello_world_note.o: $(obj)/xen_hello_world.livepatch
+	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $< $@.bin
 	$(OBJCOPY) $(OBJCOPY_MAGIC) \
 		   --rename-section=.data=.livepatch.depends,alloc,load,readonly,data,contents -S $@.bin $@
 	rm -f $@.bin
 
-xen_bye_world.o: config.h
 
-.PHONY: $(LIVEPATCH_BYE)
-$(LIVEPATCH_BYE): xen_bye_world_func.o xen_bye_world.o hello_world_note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_BYE) $^
+extra-y += xen_bye_world.livepatch
+xen_bye_world-objs := xen_bye_world_func.o xen_bye_world.o hello_world_note.o xen_note.o
+$(obj)/xen_bye_world.o: $(obj)/config.h
 
-xen_replace_world.o: config.h
 
-.PHONY: $(LIVEPATCH_REPLACE)
-$(LIVEPATCH_REPLACE): xen_replace_world_func.o xen_replace_world.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_REPLACE) $^
+extra-y += xen_replace_world.livepatch
+xen_replace_world-objs := xen_replace_world_func.o xen_replace_world.o note.o xen_note.o
+$(obj)/xen_replace_world.o: $(obj)/config.h
 
-xen_nop.o: config.h
 
-.PHONY: $(LIVEPATCH_NOP)
-$(LIVEPATCH_NOP): xen_nop.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_NOP) $^
+extra-y += xen_nop.livepatch
+xen_nop-objs := xen_nop.o note.o xen_note.o
+$(obj)/xen_nop.o: $(obj)/config.h
 
 # This one always fails upon upload, because it deliberately
 # does not have a .livepatch.xen_depends (xen_note.o) section.
-xen_no_xen_buildid.o: config.h
+extra-y += xen_no_xen_buildid.livepatch
+xen_no_xen_buildid-objs := xen_nop.o note.o
 
-.PHONY: $(LIVEPATCH_NO_XEN_BUILDID)
-$(LIVEPATCH_NO_XEN_BUILDID): xen_nop.o note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_NO_XEN_BUILDID) $^
+$(obj)/xen_prepost_hooks.o: $(obj)/config.h
 
-xen_prepost_hooks.o: config.h
+extra-y += xen_prepost_hooks.livepatch
+xen_prepost_hooks-objs := xen_prepost_hooks.o xen_hello_world_func.o note.o xen_note.o
 
-.PHONY: $(LIVEPATCH_PREPOST_HOOKS)
-$(LIVEPATCH_PREPOST_HOOKS): xen_prepost_hooks.o xen_hello_world_func.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_PREPOST_HOOKS) $^
+$(obj)/xen_prepost_hooks_fail.o: $(obj)/config.h
 
-xen_prepost_hooks_fail.o: config.h
+extra-y += xen_prepost_hooks_fail.livepatch
+xen_prepost_hooks_fail-objs := xen_prepost_hooks_fail.o xen_hello_world_func.o note.o xen_note.o
 
-.PHONY: $(LIVEPATCH_PREPOST_HOOKS_FAIL)
-$(LIVEPATCH_PREPOST_HOOKS_FAIL): xen_prepost_hooks_fail.o xen_hello_world_func.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_PREPOST_HOOKS_FAIL) $^
+$(obj)/xen_action_hooks.o: $(obj)/config.h
 
-xen_action_hooks.o: config.h
+extra-y += xen_action_hooks.livepatch
+xen_action_hooks-objs := xen_action_hooks.o xen_hello_world_func.o note.o xen_note.o
 
-.PHONY: $(LIVEPATCH_ACTION_HOOKS)
-$(LIVEPATCH_ACTION_HOOKS): xen_action_hooks.o xen_hello_world_func.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS) $^
+$(obj)/xen_action_hooks_nofunc.o: $(obj)/config.h
 
-xen_action_hooks_nofunc.o: config.h
+extra-y += xen_action_hooks_nofunc.livepatch
+xen_action_hooks_nofunc-objs := xen_action_hooks_nofunc.o note.o xen_note.o
 
-.PHONY: $(LIVEPATCH_ACTION_HOOKS_NOFUNC)
-$(LIVEPATCH_ACTION_HOOKS_NOFUNC): xen_action_hooks_nofunc.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOFUNC) $^
+$(obj)/xen_action_hooks_marker.o: $(obj)/config.h
 
-xen_action_hooks_marker.o: config.h
+extra-y += xen_action_hooks_marker.livepatch
+xen_action_hooks_marker-objs := xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
 
-.PHONY: $(LIVEPATCH_ACTION_HOOKS_MARKER)
-$(LIVEPATCH_ACTION_HOOKS_MARKER): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_MARKER) $^
+$(obj)/xen_action_hooks_noapply.o: $(obj)/config.h
 
-xen_action_hooks_noapply.o: config.h
+extra-y += xen_action_hooks_noapply.livepatch
+xen_action_hooks_noapply-objs := xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
 
-.PHONY: $(LIVEPATCH_ACTION_HOOKS_NOAPPLY)
-$(LIVEPATCH_ACTION_HOOKS_NOAPPLY): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOAPPLY) $^
+$(obj)/xen_action_hooks_norevert.o: $(obj)/config.h
 
-xen_action_hooks_norevert.o: config.h
-
-.PHONY: $(LIVEPATCH_ACTION_HOOKS_NOREVERT)
-$(LIVEPATCH_ACTION_HOOKS_NOREVERT): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOREVERT) $^
+extra-y += xen_action_hooks_norevert.livepatch
+xen_action_hooks_norevert-objs := xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
 
 EXPECT_BYTES_COUNT := 8
 CODE_GET_EXPECT=$(shell $(OBJDUMP) -d --insn-width=1 $(1) | sed -n -e '/<'$(2)'>:$$/,/^$$/ p' | tail -n +2 | head -n $(EXPECT_BYTES_COUNT) | awk '{$$0=$$2; printf "%s", substr($$0,length-1)}' | sed 's/.\{2\}/0x&,/g' | sed 's/^/{/;s/,$$/}/g')
-.PHONY: expect_config.h
-expect_config.h: EXPECT_BYTES=$(call CODE_GET_EXPECT,$(BASEDIR)/xen-syms,xen_extra_version)
-expect_config.h:
+$(obj)/expect_config.h: $(BASEDIR)/xen-syms
 	(set -e; \
-	 echo "#define EXPECT_BYTES $(EXPECT_BYTES)"; \
+	 echo "#define EXPECT_BYTES $(call CODE_GET_EXPECT,$<,xen_extra_version)"; \
          echo "#define EXPECT_BYTES_COUNT $(EXPECT_BYTES_COUNT)") > $@
 
-xen_expectations.o: expect_config.h
+$(obj)/xen_expectations.o: $(obj)/expect_config.h
 
-.PHONY: $(LIVEPATCH_EXPECTATIONS)
-$(LIVEPATCH_EXPECTATIONS): xen_expectations.o xen_hello_world_func.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_EXPECTATIONS) $^
+extra-y += xen_expectations.livepatch
+xen_expectations-objs := xen_expectations.o xen_hello_world_func.o note.o xen_note.o
 
-.PHONY: $(LIVEPATCH_EXPECTATIONS_FAIL)
-$(LIVEPATCH_EXPECTATIONS_FAIL): xen_expectations_fail.o xen_hello_world_func.o note.o xen_note.o
-	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_EXPECTATIONS_FAIL) $^
+extra-y += xen_expectations_fail.livepatch
+xen_expectations_fail-objs := xen_expectations_fail.o xen_hello_world_func.o note.o xen_note.o
+
+
+quiet_cmd_livepatch = LD      $@
+cmd_livepatch = $(LD) $(XEN_LDFLAGS) $(build_id_linker) -r -o $@ $(real-prereqs)
+
+$(obj)/%.livepatch: FORCE
+	$(call if_changed,livepatch)
+
+$(call multi-depend, $(filter %.livepatch,$(extra-y)), .livepatch, -objs)
+targets += $(sort $(foreach m,$(basename $(notdir $(filter %.livepatch,$(extra-y)))), \
+                    $($(m)-objs)))
+
+LIVEPATCHES := $(filter %.livepatch,$(extra-y))
+
+LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
 
 .PHONY: livepatch
-livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP) $(LIVEPATCH_NO_XEN_BUILDID) \
-           $(LIVEPATCH_PREPOST_HOOKS) $(LIVEPATCH_PREPOST_HOOKS_FAIL) $(LIVEPATCH_ACTION_HOOKS) \
-           $(LIVEPATCH_ACTION_HOOKS_NOFUNC) $(LIVEPATCH_ACTION_HOOKS_MARKER) $(LIVEPATCH_ACTION_HOOKS_NOAPPLY) \
-           $(LIVEPATCH_ACTION_HOOKS_NOREVERT) $(LIVEPATCH_EXPECTATIONS) $(LIVEPATCH_EXPECTATIONS_FAIL)
+livepatch: $(LIVEPATCHES)
+
+install: $(addprefix $(obj)/,$(LIVEPATCHES))
+	$(INSTALL_DIR) $(DESTDIR)$(LIVEPATCH_DEBUG_DIR)
+	$(INSTALL_DATA) $(addprefix $(obj)/,$(LIVEPATCHES)) $(DESTDIR)$(LIVEPATCH_DEBUG_DIR)
+
+uninstall:
+	cd $(DESTDIR)$(LIVEPATCH_DEBUG_DIR) && rm -f $(LIVEPATCHES)
+
+.PHONY: clean
+clean::
+	rm -f *.o .*.o.d *.livepatch config.h expect_config.h
