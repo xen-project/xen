@@ -162,4 +162,4 @@ uninstall:
 
 .PHONY: clean
 clean::
-	rm -f *.o .*.o.d *.livepatch config.h expect_config.h
+	rm -f *.livepatch config.h expect_config.h

@@ -120,4 +120,3 @@ $(obj)/dtb.o: $(patsubst "%",%,$(CONFIG_DTB_FILE))
 clean::
 	rm -f $(obj)/xen.lds
 	rm -f $(BASEDIR)/.xen-syms.[0-9]*
-	rm -f $(TARGET).efi

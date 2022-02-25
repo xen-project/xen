@@ -51,4 +51,4 @@ $(obj)/policy.bin: FORCE
 
 .PHONY: clean
 clean::
-	rm -f $(ALL_H_FILES) *.o $(DEPS_RM) policy.* $(POLICY_SRC) flask-policy.S
+	rm -f $(ALL_H_FILES) policy.* $(POLICY_SRC) flask-policy.S
