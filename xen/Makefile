@@ -196,6 +196,13 @@ export XEN_HAS_CHECKPOLICY := $(call success,$(CHECKPOLICY) -h 2>&1 | grep -q xe
 export root-make-done := y
 endif # root-make-done
 
+# ===========================================================================
+# Rules shared between *config targets and build targets
+
+PHONY += tools_fixdep
+tools_fixdep:
+	$(MAKE) -C tools fixdep
+
 # Shorthand for kconfig
 kconfig = -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)"
 
@@ -471,18 +478,18 @@ cscope:
 _MAP:
 	$(NM) -n $(TARGET)-syms | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
 
-%.o %.i %.s: %.c FORCE
+%.o %.i %.s: %.c tools_fixdep FORCE
 	$(Q)$(MAKE) $(build)=$(*D) $(*D)/$(@F)
 
-%.o %.s: %.S FORCE
+%.o %.s: %.S tools_fixdep FORCE
 	$(Q)$(MAKE) $(build)=$(*D) $(*D)/$(@F)
 
-%/: FORCE
+%/: tools_fixdep FORCE
 	$(Q)$(MAKE) $(build)=$* need-builtin=1
 
 .PHONY: cloc
 cloc:
-	find . -name tools -prune -o -name '*.o.d' -print | while read f; do \
+	find . -name tools -prune -o -name '*.o.cmd' -print | while read f; do \
 	    for sf in $$(grep -o "[a-zA-Z0-9_/-]*\.[cS]" $$f); do \
 		test -f "$$sf" && echo "$$sf"; \
 	    done; \

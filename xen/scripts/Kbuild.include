@@ -15,8 +15,7 @@ dot-target = $(@D)/.$(@F)
 
 ###
 # dependencies
-DEPS = .*.d
-DEPS_INCLUDE = $(addsuffix .d2, $(basename $(wildcard $(DEPS))))
+depfile = $(dot-target).d
 
 ###
 # real prerequisites without phony targets
@@ -83,6 +82,8 @@ cmd = @set -e; $(echo-cmd) $(cmd_$(1))
 ###
 # if_changed      - execute command if any prerequisite is newer than
 #                   target, or command line has changed
+# if_changed_dep  - as if_changed, but uses fixdep to reveal dependencies
+#                   including used config symbols
 # if_changed_rule - as if_changed but execute rule instead
 
 ifneq ($(KBUILD_NOCMDDEP),1)
@@ -111,14 +112,18 @@ if_changed = $(if $(any-prereq)$(cmd-check),                                 \
         $(cmd);                                                              \
         printf '%s\n' 'cmd_$@ := $(make-cmd)' > $(dot-target).cmd, @:)
 
+# Execute the command and also postprocess generated .d dependencies file.
+if_changed_dep = $(if $(any-prereq)$(cmd-check),$(cmd_and_fixdep),@:)
+
+cmd_and_fixdep =                                                             \
+        $(cmd);                                                              \
+        tools/fixdep $(depfile) $@ '$(make-cmd)' > $(dot-target).cmd;        \
+        rm -f $(depfile)
+
 # Usage: $(call if_changed_rule,foo)
 # Will check if $(cmd_foo) or any of the prerequisites changed,
 # and if so will execute $(rule_foo).
 if_changed_rule = $(if $(any-prereq)$(cmd-check),$(rule_$(1)),@:)
-
-cmd_and_record =                                                             \
-        $(cmd);                                                              \
-        printf '%s\n' 'cmd_$@ := $(make-cmd)' > $(dot-target).cmd
 
 ###
 # why - tell why a target got built

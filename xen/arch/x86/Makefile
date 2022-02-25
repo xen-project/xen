@@ -251,7 +251,7 @@ $(BASEDIR)/arch/x86/include/asm/asm-macros.h: $(obj)/asm-macros.i $(src)/Makefil
 
 $(obj)/efi.lds: AFLAGS-y += -DEFI
 $(obj)/xen.lds $(obj)/efi.lds: $(src)/xen.lds.S FORCE
-	$(call if_changed,cpp_lds_S)
+	$(call if_changed_dep,cpp_lds_S)
 
 $(obj)/boot/mkelf32: $(src)/boot/mkelf32.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
@@ -267,9 +267,3 @@ clean::
 	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.efi efi/mkreloc
 	rm -f boot/cmdline.S boot/reloc.S boot/*.lnk boot/*.bin
 	rm -f note.o
-
-# Suppress loading of DEPS files for internal, temporary target files.  This
-# then also suppresses re-generation of the respective .*.d2 files.
-ifeq ($(filter-out .xen%.o,$(notdir $(MAKECMDGOALS))),)
-DEPS_INCLUDE:=
-endif

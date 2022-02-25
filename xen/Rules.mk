@@ -147,8 +147,8 @@ cpp_flags = $(filter-out -Wa$(comma)% -flto,$(1))
 # Calculation of flags, first the generic flags, then the arch specific flags,
 # and last the flags modified for a target or a directory.
 
-c_flags = -MMD -MP -MF $(@D)/.$(@F).d $(XEN_CFLAGS)
-a_flags = -MMD -MP -MF $(@D)/.$(@F).d $(XEN_AFLAGS)
+c_flags = -MMD -MP -MF $(depfile) $(XEN_CFLAGS)
+a_flags = -MMD -MP -MF $(depfile) $(XEN_AFLAGS)
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
@@ -205,7 +205,7 @@ else
 endif
 
 define rule_cc_o_c
-    $(call cmd_and_record,cc_o_c)
+    $(call cmd_and_fixdep,cc_o_c)
     $(call cmd,objcopy_fix_sym)
 endef
 
@@ -216,7 +216,7 @@ quiet_cmd_cc_o_S = CC      $@
 cmd_cc_o_S = $(CC) $(a_flags) -c $< -o $@
 
 $(obj)/%.o: $(src)/%.S FORCE
-	$(call if_changed,cc_o_S)
+	$(call if_changed_dep,cc_o_S)
 
 
 quiet_cmd_obj_init_o = INIT_O  $@
@@ -246,13 +246,13 @@ quiet_cmd_cpp_s_S = CPP     $@
 cmd_cpp_s_S = $(CPP) $(call cpp_flags,$(a_flags)) -MQ $@ -o $@ $<
 
 $(obj)/%.i: $(src)/%.c FORCE
-	$(call if_changed,cpp_i_c)
+	$(call if_changed_dep,cpp_i_c)
 
 $(obj)/%.s: $(src)/%.c FORCE
-	$(call if_changed,cc_s_c)
+	$(call if_changed_dep,cc_s_c)
 
 $(obj)/%.s: $(src)/%.S FORCE
-	$(call if_changed,cpp_s_S)
+	$(call if_changed_dep,cpp_s_S)
 
 # Linker scripts, .lds.S -> .lds
 quiet_cmd_cpp_lds_S = LDS     $@
@@ -290,9 +290,6 @@ $(subdir-y):
 existing-targets := $(wildcard $(sort $(targets)))
 
 -include $(foreach f,$(existing-targets),$(dir $(f)).$(notdir $(f)).cmd)
-
-DEPS := $(foreach f,$(existing-targets),$(dir $(f)).$(notdir $(f)).d)
--include $(DEPS_INCLUDE)
 
 # Declare the contents of the PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.
