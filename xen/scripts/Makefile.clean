@@ -3,7 +3,6 @@
 # Cleaning up
 # ==========================================================================
 
-obj := .
 src := $(obj)
 
 clean::
@@ -17,11 +16,20 @@ include $(src)/Makefile
 subdir-all := $(subdir-y) $(subdir-n) $(subdir-) \
               $(patsubst %/,%, $(filter %/, $(obj-y) $(obj-n) $(obj-)))
 
+subdir-all := $(addprefix $(obj)/,$(subdir-all))
+
 __clean-files := \
     $(clean-files) $(hostprogs-y) $(hostprogs-) \
+    $(extra-y) $(extra-) $(targets) \
     $(hostprogs-always-y) $(hostprogs-always-)
 
-__clean-files := $(wildcard $(__clean-files))
+# clean-files is given relative to the current directory, unless it
+# starts with $(objtree)/ (which means "./", so do not add "./" unless
+# you want to delete a file from the toplevel object directory).
+
+__clean-files := $(wildcard \
+		   $(addprefix $(obj)/, $(filter-out /% $(objtree)/%, $(__clean-files))) \
+		   $(filter /% $(objtree)/%, $(__clean-files)))
 
 .PHONY: clean
 clean:: $(subdir-all)
@@ -35,6 +43,6 @@ endif
 
 PHONY += $(subdir-all)
 $(subdir-all):
-	$(MAKE) $(clean) $@
+	$(Q)$(MAKE) $(clean)=$@
 
 .PHONY: $(PHONY)

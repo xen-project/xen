@@ -99,8 +99,8 @@ build := -f $(srctree)/Rules.mk obj
 
 # Shorthand for $(MAKE) clean
 # Usage:
-# $(MAKE) $(clean) dir
-clean := -f $(BASEDIR)/scripts/Makefile.clean clean -C
+# $(Q)$(MAKE) $(clean)=dir
+clean := -f $(srctree)/scripts/Makefile.clean obj
 
 # echo command.
 # Short version is used, if $(quiet) equals `quiet_', otherwise full one.

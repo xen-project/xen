@@ -84,5 +84,4 @@ $(obj)/config_data.S: $(BASEDIR)/tools/binfile FORCE
 	$(call if_changed,binfile,$(obj)/config.gz xen_config_data)
 targets += config_data.S
 
-clean::
-	rm -f config_data.S config.gz 2>/dev/null
+clean-files := config.gz

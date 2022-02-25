@@ -49,6 +49,4 @@ $(obj)/policy.bin: FORCE
 	        FLASK_BUILD_DIR=$(FLASK_BUILD_DIR) POLICY_FILENAME=$(POLICY_SRC)
 	cmp -s $(POLICY_SRC) $@ || cp $(POLICY_SRC) $@
 
-.PHONY: clean
-clean::
-	rm -f $(ALL_H_FILES) policy.* $(POLICY_SRC) flask-policy.S
+clean-files := policy.* $(POLICY_SRC)

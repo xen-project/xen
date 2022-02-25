@@ -77,6 +77,9 @@ obj-$(CONFIG_COMPAT) += x86_64/platform_hypercall.o
 obj-y += sysctl.o
 endif
 
+# Allows "clean" to descend into boot/
+subdir- += boot
+
 extra-y += asm-macros.i
 extra-y += xen.lds
 
@@ -193,8 +196,8 @@ note_file :=
 endif
 note_file_option ?= $(note_file)
 
+extra-$(XEN_BUILD_PE) += efi.lds
 ifeq ($(XEN_BUILD_PE),y)
-extra-y += efi.lds
 $(TARGET).efi: $(BASEDIR)/prelink.o $(note_file) $(obj)/efi.lds $(obj)/efi/relocs-dummy.o $(obj)/efi/mkreloc
 ifeq ($(CONFIG_DEBUG_INFO),y)
 	$(if $(filter --strip-debug,$(EFI_LDFLAGS)),echo,:) "Will strip debug info from $(@F)"
@@ -262,10 +265,11 @@ $(obj)/boot/mkelf32: $(src)/boot/mkelf32.c
 $(obj)/efi/mkreloc: $(src)/efi/mkreloc.c
 	$(HOSTCC) $(HOSTCFLAGS) -g -o $@ $<
 
-.PHONY: clean
-clean::
-	rm -f *.lds boot/mkelf32
-	rm -f asm-macros.i $(BASEDIR)/arch/x86/include/asm/asm-macros.*
-	rm -f $(BASEDIR)/.xen-syms.[0-9]* $(BASEDIR)/.xen.elf32
-	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.efi efi/mkreloc
-	rm -f boot/cmdline.S boot/reloc.S boot/*.lnk boot/*.bin
+clean-files := \
+    boot/mkelf32 \
+    include/asm/asm-macros.* \
+    $(objtree)/.xen-syms.[0-9]* \
+    $(objtree)/.xen.elf32 \
+    $(objtree)/.xen.efi.[0-9]* \
+    efi/*.efi \
+    efi/mkreloc

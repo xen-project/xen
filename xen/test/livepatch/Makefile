@@ -160,6 +160,4 @@ install: $(addprefix $(obj)/,$(LIVEPATCHES))
 uninstall:
 	cd $(DESTDIR)$(LIVEPATCH_DEBUG_DIR) && rm -f $(LIVEPATCHES)
 
-.PHONY: clean
-clean::
-	rm -f *.livepatch config.h expect_config.h
+clean-files := config.h expect_config.h

@@ -409,18 +409,18 @@ _debug:
 
 .PHONY: _clean
 _clean:
-	$(MAKE) $(clean) tools
-	$(MAKE) $(clean) include
-	$(MAKE) $(clean) common
-	$(MAKE) $(clean) drivers
-	$(MAKE) $(clean) lib
-	$(MAKE) $(clean) xsm
-	$(MAKE) $(clean) crypto
-	$(MAKE) $(clean) arch/arm
-	$(MAKE) $(clean) arch/riscv
-	$(MAKE) $(clean) arch/x86
-	$(MAKE) $(clean) test
-	$(MAKE) $(clean) tools/kconfig
+	$(Q)$(MAKE) $(clean)=tools
+	$(Q)$(MAKE) $(clean)=include
+	$(Q)$(MAKE) $(clean)=common
+	$(Q)$(MAKE) $(clean)=drivers
+	$(Q)$(MAKE) $(clean)=lib
+	$(Q)$(MAKE) $(clean)=xsm
+	$(Q)$(MAKE) $(clean)=crypto
+	$(Q)$(MAKE) $(clean)=arch/arm
+	$(Q)$(MAKE) $(clean)=arch/riscv
+	$(Q)$(MAKE) $(clean)=arch/x86
+	$(Q)$(MAKE) $(clean)=test
+	$(Q)$(MAKE) $(clean)=tools/kconfig
 	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" \
 		-o -name ".*.o.tmp" -o -name "*~" -o -name "core" \
 		-o -name '*.lex.c' -o -name '*.tab.[ch]' \

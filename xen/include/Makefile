@@ -131,6 +131,4 @@ lib-x86-all:
 all: lib-x86-all
 endif
 
-clean::
-	rm -rf compat config generated headers*.chk
-	rm -f $(BASEDIR)/include/xen/lib/x86/cpuid-autogen.h
+clean-files := compat config generated headers*.chk xen/lib/x86/cpuid-autogen.h

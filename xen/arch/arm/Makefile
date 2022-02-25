@@ -116,7 +116,4 @@ $(obj)/xen.lds: $(src)/xen.lds.S FORCE
 
 $(obj)/dtb.o: $(patsubst "%",%,$(CONFIG_DTB_FILE))
 
-.PHONY: clean
-clean::
-	rm -f $(obj)/xen.lds
-	rm -f $(BASEDIR)/.xen-syms.[0-9]*
+clean-files := $(objtree)/.xen-syms.[0-9]*

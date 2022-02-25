@@ -21,3 +21,5 @@ $(obj)/cmdline.S: $(src)/cmdline.c $(CMDLINE_DEPS) $(src)/build32.lds
 
 $(obj)/reloc.S: $(src)/reloc.c $(RELOC_DEPS) $(src)/build32.lds
 	$(MAKE) -f $(abs_srctree)/$(src)/build32.mk -C $(obj) $(@F) RELOC_DEPS="$(RELOC_DEPS)"
+
+clean-files := cmdline.S reloc.S *.lnk *.bin
