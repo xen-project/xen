@@ -24,6 +24,11 @@ BAD=$D/bad-addrs
 echo "X" | grep -aob "X" -q 2>/dev/null ||
     { echo "$MSG_PFX Warning: grep can't do binary searches" >&2; exit 0; }
 
+# Check whether grep supports Perl regexps. Older GNU grep doesn't reliably
+# find binary patterns otherwise.
+perl_re=true
+echo "X" | grep -aobP "\130" -q 2>/dev/null || perl_re=false
+
 #
 # First, look for all the valid endbr64 instructions.
 # A worst-case disassembly, viewed through cat -A, may look like:
@@ -60,8 +65,12 @@ eval $(${OBJDUMP} -j .text $1 -h |
     awk '$2 == ".text" {printf "vma_hi=%s\nvma_lo=%s\n", substr($4, 1, 8), substr($4, 9, 16)}')
 
 ${OBJCOPY} -j .text $1 -O binary $TEXT_BIN
-grep -aob "$(printf '\363\17\36\372')" $TEXT_BIN |
-    awk -F':' '{printf "%s%x\n", "'$vma_hi'", int(0x'$vma_lo') + $1}' > $ALL
+if $perl_re
+then
+    LC_ALL=C grep -aobP '\363\17\36\372' $TEXT_BIN
+else
+    grep -aob "$(printf '\363\17\36\372')" $TEXT_BIN
+fi | awk -F':' '{printf "%s%x\n", "'$vma_hi'", int(0x'$vma_lo') + $1}' > $ALL
 
 # Wait for $VALID to become complete
 wait
