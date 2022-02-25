@@ -5,7 +5,7 @@ MAJOR = 4
 MINOR = 0
 
 ifeq ($(CONFIG_Linux),y)
-APPEND_LDFLAGS += -ldl
+LDLIBS += -ldl
 endif
 
 SRCS-y   += xs_lib.c

@@ -166,14 +166,14 @@ NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-LDUSELIBS-y += $(PTYFUNCS_LIBS)
-LDUSELIBS-$(CONFIG_LIBNL) += $(LIBNL3_LIBS)
-LDUSELIBS-$(CONFIG_Linux) += -luuid
-LDUSELIBS-$(CONFIG_Linux) += -lrt
-LDUSELIBS-$(CONFIG_ARM) += -lfdt
-LDUSELIBS-y += $(PTHREAD_LIBS)
-LDUSELIBS-y += -lyajl
-LDUSELIBS += $(LDUSELIBS-y)
+LDLIBS-y += $(PTYFUNCS_LIBS)
+LDLIBS-$(CONFIG_LIBNL) += $(LIBNL3_LIBS)
+LDLIBS-$(CONFIG_Linux) += -luuid
+LDLIBS-$(CONFIG_Linux) += -lrt
+LDLIBS-$(CONFIG_ARM) += -lfdt
+LDLIBS-y += $(PTHREAD_LIBS)
+LDLIBS-y += -lyajl
+LDLIBS += $(LDLIBS-y)
 
 $(LIB_OBJS) $(PIC_OBJS) $(LIBXL_TEST_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
 $(ACPI_OBJS) $(ACPI_PIC_OBJS): CFLAGS += -I. -DLIBACPI_STDUTILS=\"$(CURDIR)/libxl_x86_acpi.h\"
@@ -228,7 +228,7 @@ $(XEN_INCLUDE)/_%.h: _%.h
 	$(call move-if-changed,_$*.h,$(XEN_INCLUDE)/_$*.h)
 
 libxenlight_test.so: $(PIC_OBJS) $(LIBXL_TEST_OBJS)
-	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDUSELIBS) $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS) $(APPEND_LDFLAGS)
 
 test_%: test_%.o test_common.o libxenlight_test.so
 	$(CC) $(LDFLAGS) -o $@ $^ $(filter-out %libxenlight.so, $(LDLIBS_libxenlight)) $(LDLIBS_libxentoollog) $(LDLIBS_libxentoolcore) -lyajl $(APPEND_LDFLAGS)

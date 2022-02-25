@@ -26,7 +26,7 @@ SRCS-$(CONFIG_FreeBSD) += xenstat_freebsd.c
 
 LDLIBS-y += -lyajl
 LDLIBS-$(CONFIG_SunOS) += -lkstat
-APPEND_LDFLAGS += $(LDLIBS-y)
+LDLIBS += $(LDLIBS-y)
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
