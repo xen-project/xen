@@ -662,6 +662,13 @@ struct xen_mem_acquire_resource {
      * two calls.
      */
     uint32_t nr_frames;
+    /*
+     * Padding field, must be zero on input.
+     * In a previous version this was an output field with the lowest bit
+     * named XENMEM_rsrc_acq_caller_owned. Future versions of this interface
+     * will not reuse this bit as an output with the field being zero on
+     * input.
+     */
     uint32_t pad;
     /*
      * IN - the index of the initial frame to be mapped. This parameter
