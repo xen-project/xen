@@ -2481,9 +2481,6 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
                                 p2m_type_t p2mt, p2m_access_t p2ma)
 {
     struct p2m_domain *p2m;
-    p2m_access_t a;
-    p2m_type_t t;
-    mfn_t m;
     unsigned int i;
     unsigned int reset_count = 0;
     unsigned int last_reset_idx = ~0;
@@ -2496,15 +2493,17 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 
     for ( i = 0; i < MAX_ALTP2M; i++ )
     {
+        p2m_type_t t;
+        p2m_access_t a;
+
         if ( d->arch.altp2m_eptp[i] == mfn_x(INVALID_MFN) )
             continue;
 
         p2m = d->arch.altp2m_p2m[i];
-        m = get_gfn_type_access(p2m, gfn_x(gfn), &t, &a, 0, NULL);
 
         /* Check for a dropped page that may impact this altp2m */
         if ( mfn_eq(mfn, INVALID_MFN) &&
-             gfn_x(gfn) >= p2m->min_remapped_gfn &&
+             gfn_x(gfn) + (1UL << page_order) > p2m->min_remapped_gfn &&
              gfn_x(gfn) <= p2m->max_remapped_gfn )
         {
             if ( !reset_count++ )
@@ -2515,8 +2514,6 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
             else
             {
                 /* At least 2 altp2m's impacted, so reset everything */
-                __put_gfn(p2m, gfn_x(gfn));
-
                 for ( i = 0; i < MAX_ALTP2M; i++ )
                 {
                     if ( i == last_reset_idx ||
@@ -2530,16 +2527,19 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
                 break;
             }
         }
-        else if ( !mfn_eq(m, INVALID_MFN) )
+        else if ( !mfn_eq(get_gfn_type_access(p2m, gfn_x(gfn), &t, &a, 0,
+                                              NULL), INVALID_MFN) )
         {
             int rc = p2m_set_entry(p2m, gfn, mfn, page_order, p2mt, p2ma);
 
             /* Best effort: Don't bail on error. */
             if ( !ret )
                 ret = rc;
-        }
 
-        __put_gfn(p2m, gfn_x(gfn));
+            __put_gfn(p2m, gfn_x(gfn));
+        }
+        else
+            __put_gfn(p2m, gfn_x(gfn));
     }
 
     altp2m_list_unlock(d);
