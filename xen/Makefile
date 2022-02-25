@@ -243,15 +243,10 @@ ifeq ($(need-config),y)
 # changes are detected.
 -include include/config/auto.conf.cmd
 
-# This allows make to build fixdep before invoking defconfig. We can't use
-# "tools_fixdep" which is a .PHONY target and would force make to call
-# "defconfig" again to update $(KCONFIG_CONFIG).
-tools/fixdep:
-	$(Q)$(MAKE) $(build)=tools tools/fixdep
-
 # Allow people to just run `make` as before and not force them to configure
-$(KCONFIG_CONFIG): tools/fixdep
-	$(Q)$(MAKE) $(build)=tools/kconfig defconfig
+# Only run defconfig if $(KCONFIG_CONFIG) is missing
+$(KCONFIG_CONFIG): tools_fixdep
+	$(if $(wildcard $@), , $(Q)$(MAKE) $(build)=tools/kconfig defconfig)
 
 # The actual configuration files used during the build are stored in
 # include/generated/ and include/config/. Update them if .config is newer than
