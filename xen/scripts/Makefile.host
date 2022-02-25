@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
 
+# target with $(obj)/ and its suffix stripped
+target-stem = $(basename $(patsubst $(obj)/%,%,$@))
+
 # LEX
 # ---------------------------------------------------------------------------
 quiet_cmd_flex = LEX     $@
@@ -114,7 +117,7 @@ quiet_cmd_host-cmulti	= HOSTLD  $@
 			  $(KBUILD_HOSTLDLIBS) $(HOSTLDLIBS_$(target-stem))
 $(host-cmulti): FORCE
 	$(call if_changed,host-cmulti)
-$(call multi_depend, $(host-cmulti), , -objs)
+$(call multi-depend, $(host-cmulti), , -objs)
 
 # Create .o file from a single .c file
 # host-cobjs -> .o
@@ -132,7 +135,7 @@ quiet_cmd_host-cxxmulti	= HOSTLD  $@
 			  $(KBUILD_HOSTLDLIBS) $(HOSTLDLIBS_$(target-stem))
 $(host-cxxmulti): FORCE
 	$(call if_changed,host-cxxmulti)
-$(call multi_depend, $(host-cxxmulti), , -objs -cxxobjs)
+$(call multi-depend, $(host-cxxmulti), , -objs -cxxobjs)
 
 # Create .o file from a single .cc (C++) file
 quiet_cmd_host-cxxobjs	= HOSTCXX $@
@@ -165,7 +168,7 @@ quiet_cmd_host-cshlib	= HOSTLLD -shared $@
 			  $(KBUILD_HOSTLDLIBS) $(HOSTLDLIBS_$(target-stem).so)
 $(host-cshlib): FORCE
 	$(call if_changed,host-cshlib)
-$(call multi_depend, $(host-cshlib), .so, -objs)
+$(call multi-depend, $(host-cshlib), .so, -objs)
 
 # Link a shared library, based on position independent .o files
 # *.o -> .so shared library (host-cxxshlib)
@@ -175,7 +178,7 @@ quiet_cmd_host-cxxshlib	= HOSTLLD -shared $@
 			  $(KBUILD_HOSTLDLIBS) $(HOSTLDLIBS_$(target-stem).so)
 $(host-cxxshlib): FORCE
 	$(call if_changed,host-cxxshlib)
-$(call multi_depend, $(host-cxxshlib), .so, -objs)
+$(call multi-depend, $(host-cxxshlib), .so, -objs)
 
 targets += $(host-csingle)  $(host-cmulti) $(host-cobjs)\
 	   $(host-cxxmulti) $(host-cxxobjs) $(host-cshlib) $(host-cshobjs) $(host-cxxshlib) $(host-cxxshobjs)

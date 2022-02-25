@@ -89,6 +89,13 @@ subdir-y        := $(addprefix $(obj)/,$(subdir-y))
 nocov-y         := $(addprefix $(obj)/,$(nocov-y))
 noubsan-y       := $(addprefix $(obj)/,$(noubsan-y))
 
+# Do not include hostprogs rules unless needed.
+# $(sort ...) is used here to remove duplicated words and excessive spaces.
+hostprogs-y := $(sort $(hostprogs-y))
+ifneq ($(hostprogs-y),)
+include scripts/Makefile.host
+endif
+
 # subdir-builtin may contain duplications. Use $(sort ...)
 subdir-builtin := $(sort $(filter %/built_in.o, $(obj-y)))
 
@@ -267,7 +274,11 @@ intermediate_targets = $(foreach sfx, $(2), \
 				$(patsubst %$(strip $(1)),%$(sfx), \
 					$(filter %$(strip $(1)), $(targets))))
 # %.init.o <- %.o
-targets += $(call intermediate_targets, .init.o, .o)
+# %.lex.o <- %.lex.c <- %.l
+# %.tab.o <- %.tab.[ch] <- %.y
+targets += $(call intermediate_targets, .init.o, .o) \
+	   $(call intermediate_targets, .lex.o, .lex.c) \
+	   $(call intermediate_targets, .tab.o, .tab.c .tab.h)
 
 # Build
 # ---------------------------------------------------------------------------

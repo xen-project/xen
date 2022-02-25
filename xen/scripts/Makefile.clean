@@ -17,8 +17,17 @@ include $(src)/Makefile
 subdir-all := $(subdir-y) $(subdir-n) $(subdir-) \
               $(patsubst %/,%, $(filter %/, $(obj-y) $(obj-n) $(obj-)))
 
+__clean-files := \
+    $(clean-files) $(hostprogs-y) $(hostprogs-)
+
+__clean-files := $(wildcard $(__clean-files))
+
 .PHONY: clean
-clean:: $(subdir-all) ;
+clean:: $(subdir-all)
+ifneq ($(strip $(__clean-files)),)
+	rm -rf $(__clean-files)
+endif
+	@:
 
 # Descending
 # ---------------------------------------------------------------------------

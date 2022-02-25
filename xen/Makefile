@@ -40,6 +40,7 @@ ARCH=$(XEN_TARGET_ARCH)
 SRCARCH=$(shell echo $(ARCH) | \
           sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
               -e s'/riscv.*/riscv/g')
+export ARCH SRCARCH
 
 # Don't break if the build process wasn't called from the top level
 # we need XEN_TARGET_ARCH to generate the proper config
@@ -163,6 +164,13 @@ ifneq ($(filter %config,$(MAKECMDGOALS)),)
     config-build := y
 endif
 
+export CONFIG_SHELL := $(SHELL)
+export YACC = $(if $(BISON),$(BISON),bison)
+export LEX = $(if $(FLEX),$(FLEX),flex)
+
+# Default file for 'make defconfig'.
+export KBUILD_DEFCONFIG := $(ARCH)_defconfig
+
 # CLANG_FLAGS needs to be calculated before calling Kconfig
 ifneq ($(shell $(CC) --version 2>&1 | head -n 1 | grep clang),)
 CLANG_FLAGS :=
@@ -203,9 +211,6 @@ PHONY += tools_fixdep
 tools_fixdep:
 	$(MAKE) -C tools fixdep
 
-# Shorthand for kconfig
-kconfig = -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)"
-
 ifeq ($(config-build),y)
 # ===========================================================================
 # *config targets only - make sure prerequisites are updated, and descend
@@ -221,14 +226,14 @@ filechk_kconfig_allconfig = \
 .allconfig.tmp: FORCE
 	set -e; { $(call filechk_kconfig_allconfig); } > $@
 
-config: FORCE
-	$(MAKE) $(kconfig) $@
+config: tools_fixdep FORCE
+	$(Q)$(MAKE) $(build)=tools/kconfig $@
 
 # Config.mk tries to include .config file, don't try to remake it
 %/.config: ;
 
-%config: .allconfig.tmp FORCE
-	$(MAKE) $(kconfig) KCONFIG_ALLCONFIG=$< $@
+%config: .allconfig.tmp tools_fixdep FORCE
+	$(Q)$(MAKE) $(build)=tools/kconfig KCONFIG_ALLCONFIG=$< $@
 
 else # !config-build
 
@@ -238,9 +243,15 @@ ifeq ($(need-config),y)
 # changes are detected.
 -include include/config/auto.conf.cmd
 
+# This allows make to build fixdep before invoking defconfig. We can't use
+# "tools_fixdep" which is a .PHONY target and would force make to call
+# "defconfig" again to update $(KCONFIG_CONFIG).
+tools/fixdep:
+	$(MAKE) -C tools fixdep
+
 # Allow people to just run `make` as before and not force them to configure
-$(KCONFIG_CONFIG):
-	$(MAKE) $(kconfig) defconfig
+$(KCONFIG_CONFIG): tools/fixdep
+	$(Q)$(MAKE) $(build)=tools/kconfig defconfig
 
 # The actual configuration files used during the build are stored in
 # include/generated/ and include/config/. Update them if .config is newer than
@@ -249,7 +260,7 @@ $(KCONFIG_CONFIG):
 # This exploits the 'multi-target pattern rule' trick.
 # The syncconfig should be executed only once to make all the targets.
 include/config/%.conf include/config/%.conf.cmd: $(KCONFIG_CONFIG)
-	$(MAKE) $(kconfig) syncconfig
+	$(Q)$(MAKE) $(build)=tools/kconfig syncconfig
 
 ifeq ($(CONFIG_DEBUG),y)
 CFLAGS += -O1
@@ -406,9 +417,10 @@ _clean:
 	$(MAKE) $(clean) arch/riscv
 	$(MAKE) $(clean) arch/x86
 	$(MAKE) $(clean) test
-	$(MAKE) $(kconfig) clean
+	$(MAKE) $(clean) tools/kconfig
 	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" \
 		-o -name ".*.o.tmp" -o -name "*~" -o -name "core" \
+		-o -name '*.lex.c' -o -name '*.tab.[ch]' \
 		-o -name "*.gcno" -o -name ".*.cmd" -o -name "lib.a" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map *~ core
 	rm -f asm-offsets.s arch/*/include/asm/asm-offsets.h
