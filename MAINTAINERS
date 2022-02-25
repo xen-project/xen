@@ -318,6 +318,7 @@ F:	xen/include/xen/hypfs.h
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 R:	Lukasz Hawrylko <lukasz@hawrylko.pl>
 R:	Daniel P. Smith <dpsmith@apertussolutions.com>
+R:	Mateusz Mówka <mateusz.mowka@intel.com>
 S:	Odd Fixes
 F:	xen/arch/x86/include/asm/tboot.h
 F:	xen/arch/x86/tboot.c
