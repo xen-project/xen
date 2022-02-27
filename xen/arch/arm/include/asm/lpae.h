@@ -180,7 +180,7 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
  */
 #define LPAE_SHIFT_GS(gs)         ((gs) - 3)
 #define LPAE_ENTRIES_GS(gs)       (_AC(1, U) << LPAE_SHIFT_GS(gs))
-#define LPAE_ENTRIES_MASK_GS(gs)  (LPAE_ENTRIES_GS(gs) - 1)
+#define LPAE_ENTRY_MASK_GS(gs)    (LPAE_ENTRIES_GS(gs) - 1)
 
 #define LEVEL_ORDER_GS(gs, lvl)   ((3 - (lvl)) * LPAE_SHIFT_GS(gs))
 #define LEVEL_SHIFT_GS(gs, lvl)   (LEVEL_ORDER_GS(gs, lvl) + (gs))
@@ -188,7 +188,7 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 
 /* Offset in the table at level 'lvl' */
 #define LPAE_TABLE_INDEX_GS(gs, lvl, addr)   \
-    (((addr) >> LEVEL_SHIFT_GS(gs, lvl)) & LPAE_ENTRIES_MASK_GS(gs))
+    (((addr) >> LEVEL_SHIFT_GS(gs, lvl)) & LPAE_ENTRY_MASK_GS(gs))
 
 /* Generate an array @var containing the offset for each level from @addr */
 #define DECLARE_OFFSETS(var, addr)          \
