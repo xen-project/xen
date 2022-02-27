@@ -37,12 +37,6 @@ static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
  */
 unsigned int __read_mostly p2m_ipa_bits = 64;
 
-/* Helpers to lookup the properties of each level */
-static const paddr_t level_masks[] =
-    { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
-static const uint8_t level_orders[] =
-    { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
-
 static mfn_t __read_mostly empty_root_mfn;
 
 static uint64_t generate_vttbr(uint16_t vmid, mfn_t root_mfn)
@@ -233,7 +227,7 @@ static lpae_t *p2m_get_root_pointer(struct p2m_domain *p2m,
      * we can't use (P2M_ROOT_LEVEL - 1) because the root level might be
      * 0. Yet we still want to check if all the unused bits are zeroed.
      */
-    root_table = gfn_x(gfn) >> (level_orders[P2M_ROOT_LEVEL] +
+    root_table = gfn_x(gfn) >> (XEN_PT_LEVEL_ORDER(P2M_ROOT_LEVEL) +
                                 XEN_PT_LPAE_SHIFT);
     if ( root_table >= P2M_ROOT_PAGES )
         return NULL;
@@ -380,7 +374,7 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
     if ( gfn_x(gfn) > gfn_x(p2m->max_mapped_gfn) )
     {
         for ( level = P2M_ROOT_LEVEL; level < 3; level++ )
-            if ( (gfn_x(gfn) & (level_masks[level] >> PAGE_SHIFT)) >
+            if ( (gfn_x(gfn) & (XEN_PT_LEVEL_MASK(level) >> PAGE_SHIFT)) >
                  gfn_x(p2m->max_mapped_gfn) )
                 break;
 
@@ -423,7 +417,8 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
          * The entry may point to a superpage. Find the MFN associated
          * to the GFN.
          */
-        mfn = mfn_add(mfn, gfn_x(gfn) & ((1UL << level_orders[level]) - 1));
+        mfn = mfn_add(mfn,
+                      gfn_x(gfn) & ((1UL << XEN_PT_LEVEL_ORDER(level)) - 1));
 
         if ( valid )
             *valid = lpae_is_valid(entry);
@@ -434,7 +429,7 @@ out_unmap:
 
 out:
     if ( page_order )
-        *page_order = level_orders[level];
+        *page_order = XEN_PT_LEVEL_ORDER(level);
 
     return mfn;
 }
@@ -808,7 +803,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
     /* Convenience aliases */
     mfn_t mfn = lpae_get_mfn(*entry);
     unsigned int next_level = level + 1;
-    unsigned int level_order = level_orders[next_level];
+    unsigned int level_order = XEN_PT_LEVEL_ORDER(next_level);
 
     /*
      * This should only be called with target != level and the entry is
