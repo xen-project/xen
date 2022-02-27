@@ -71,10 +71,11 @@ mm_printk(const char *fmt, ...) {}
  *  in C).
  */
 #define DEFINE_BOOT_PAGE_TABLE(name)                                          \
-lpae_t __aligned(PAGE_SIZE) __section(".data.page_aligned") name[LPAE_ENTRIES]
+lpae_t __aligned(PAGE_SIZE) __section(".data.page_aligned")                   \
+    name[XEN_PT_LPAE_ENTRIES]
 
 #define DEFINE_PAGE_TABLES(name, nr)                    \
-lpae_t __aligned(PAGE_SIZE) name[LPAE_ENTRIES * (nr)]
+lpae_t __aligned(PAGE_SIZE) name[XEN_PT_LPAE_ENTRIES * (nr)]
 
 #define DEFINE_PAGE_TABLE(name) DEFINE_PAGE_TABLES(name, 1)
 
@@ -207,7 +208,7 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(zeroeth_table_offset(XEN_VIRT_START));
 #endif
     BUILD_BUG_ON(first_table_offset(XEN_VIRT_START));
-    BUILD_BUG_ON(second_linear_offset(XEN_VIRT_START) >= LPAE_ENTRIES);
+    BUILD_BUG_ON(second_linear_offset(XEN_VIRT_START) >= XEN_PT_LPAE_ENTRIES);
 #ifdef CONFIG_DOMAIN_PAGE
     BUILD_BUG_ON(DOMHEAP_VIRT_START & ~FIRST_MASK);
 #endif
@@ -256,7 +257,7 @@ void dump_pt_walk(paddr_t ttbr, paddr_t addr,
 
     for ( level = root_level; ; level++ )
     {
-        if ( offsets[level] > LPAE_ENTRIES )
+        if ( offsets[level] > XEN_PT_LPAE_ENTRIES )
             break;
 
         pte = mapping[offsets[level]];
@@ -395,15 +396,15 @@ static void __init create_mappings(lpae_t *second,
     ASSERT(!(base_mfn % granularity));
     ASSERT(!(nr_mfns % granularity));
 
-    count = nr_mfns / LPAE_ENTRIES;
+    count = nr_mfns / XEN_PT_LPAE_ENTRIES;
     p = second + second_linear_offset(virt_offset);
     pte = mfn_to_xen_entry(_mfn(base_mfn), MT_NORMAL);
-    if ( granularity == 16 * LPAE_ENTRIES )
+    if ( granularity == 16 * XEN_PT_LPAE_ENTRIES )
         pte.pt.contig = 1;  /* These maps are in 16-entry contiguous chunks. */
     for ( i = 0; i < count; i++ )
     {
         write_pte(p + i, pte);
-        pte.pt.base += 1 << LPAE_SHIFT;
+        pte.pt.base += 1 << XEN_PT_LPAE_SHIFT;
     }
     flush_xen_tlb_local();
 }
@@ -424,7 +425,7 @@ void *map_domain_page(mfn_t mfn)
 {
     unsigned long flags;
     lpae_t *map = this_cpu(xen_dommap);
-    unsigned long slot_mfn = mfn_x(mfn) & ~LPAE_ENTRY_MASK;
+    unsigned long slot_mfn = mfn_x(mfn) & ~XEN_PT_LPAE_ENTRY_MASK;
     vaddr_t va;
     lpae_t pte;
     int i, slot;
@@ -435,7 +436,7 @@ void *map_domain_page(mfn_t mfn)
      * entry is a 2MB superpage pte.  We use the available bits of each
      * PTE as a reference count; when the refcount is zero the slot can
      * be reused. */
-    for ( slot = (slot_mfn >> LPAE_SHIFT) % DOMHEAP_ENTRIES, i = 0;
+    for ( slot = (slot_mfn >> XEN_PT_LPAE_SHIFT) % DOMHEAP_ENTRIES, i = 0;
           i < DOMHEAP_ENTRIES;
           slot = (slot + 1) % DOMHEAP_ENTRIES, i++ )
     {
@@ -477,7 +478,7 @@ void *map_domain_page(mfn_t mfn)
 
     va = (DOMHEAP_VIRT_START
           + (slot << SECOND_SHIFT)
-          + ((mfn_x(mfn) & LPAE_ENTRY_MASK) << THIRD_SHIFT));
+          + ((mfn_x(mfn) & XEN_PT_LPAE_ENTRY_MASK) << THIRD_SHIFT));
 
     /*
      * We may not have flushed this specific subpage at map time,
@@ -513,7 +514,7 @@ mfn_t domain_page_map_to_mfn(const void *ptr)
     unsigned long va = (unsigned long)ptr;
     lpae_t *map = this_cpu(xen_dommap);
     int slot = (va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
-    unsigned long offset = (va>>THIRD_SHIFT) & LPAE_ENTRY_MASK;
+    unsigned long offset = (va>>THIRD_SHIFT) & XEN_PT_LPAE_ENTRY_MASK;
 
     if ( va >= VMAP_VIRT_START && va < VMAP_VIRT_END )
         return virt_to_mfn(va);
@@ -654,7 +655,8 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     /* Initialise first level entries, to point to second level entries */
     for ( i = 0; i < 2; i++)
     {
-        p[i] = pte_of_xenaddr((uintptr_t)(xen_second+i*LPAE_ENTRIES));
+        p[i] = pte_of_xenaddr((uintptr_t)(xen_second +
+                                          i * XEN_PT_LPAE_ENTRIES));
         p[i].pt.table = 1;
         p[i].pt.xn = 0;
     }
@@ -663,13 +665,14 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
     {
         p[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)]
-            = pte_of_xenaddr((uintptr_t)(cpu0_dommap+i*LPAE_ENTRIES));
+            = pte_of_xenaddr((uintptr_t)(cpu0_dommap +
+                                         i * XEN_PT_LPAE_ENTRIES));
         p[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)].pt.table = 1;
     }
 #endif
 
     /* Break up the Xen mapping into 4k pages and protect them separately. */
-    for ( i = 0; i < LPAE_ENTRIES; i++ )
+    for ( i = 0; i < XEN_PT_LPAE_ENTRIES; i++ )
     {
         vaddr_t va = XEN_VIRT_START + (i << PAGE_SHIFT);
 
@@ -768,7 +771,7 @@ int init_secondary_pagetables(int cpu)
      * domheap mapping pages. */
     for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
     {
-        pte = mfn_to_xen_entry(virt_to_mfn(domheap+i*LPAE_ENTRIES),
+        pte = mfn_to_xen_entry(virt_to_mfn(domheap + i * XEN_PT_LPAE_ENTRIES),
                                MT_NORMAL);
         pte.pt.table = 1;
         write_pte(&first[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)], pte);

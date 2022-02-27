@@ -159,6 +159,17 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 #define lpae_get_mfn(pte)    (_mfn((pte).walk.base))
 #define lpae_set_mfn(pte, mfn)  ((pte).walk.base = mfn_x(mfn))
 
+/* Generate an array @var containing the offset for each level from @addr */
+#define DECLARE_OFFSETS(var, addr)          \
+    const unsigned int var[4] = {           \
+        zeroeth_table_offset(addr),         \
+        first_table_offset(addr),           \
+        second_table_offset(addr),          \
+        third_table_offset(addr)            \
+    }
+
+#endif /* __ASSEMBLY__ */
+
 /*
  * AArch64 supports pages with different sizes (4K, 16K, and 64K).
  * Provide a set of generic helpers that will compute various
@@ -190,17 +201,6 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 #define LPAE_TABLE_INDEX_GS(gs, lvl, addr)   \
     (((addr) >> LEVEL_SHIFT_GS(gs, lvl)) & LPAE_ENTRY_MASK_GS(gs))
 
-/* Generate an array @var containing the offset for each level from @addr */
-#define DECLARE_OFFSETS(var, addr)          \
-    const unsigned int var[4] = {           \
-        zeroeth_table_offset(addr),         \
-        first_table_offset(addr),           \
-        second_table_offset(addr),          \
-        third_table_offset(addr)            \
-    }
-
-#endif /* __ASSEMBLY__ */
-
 /*
  * These numbers add up to a 48-bit input address space.
  *
@@ -211,26 +211,35 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
  * therefore 39-bits are sufficient.
  */
 
-#define LPAE_SHIFT      9
-#define LPAE_ENTRIES    (_AC(1,U) << LPAE_SHIFT)
-#define LPAE_ENTRY_MASK (LPAE_ENTRIES - 1)
+#define XEN_PT_LPAE_SHIFT         LPAE_SHIFT_GS(PAGE_SHIFT)
+#define XEN_PT_LPAE_ENTRIES       LPAE_ENTRIES_GS(PAGE_SHIFT)
+#define XEN_PT_LPAE_ENTRY_MASK    LPAE_ENTRY_MASK_GS(PAGE_SHIFT)
 
-#define THIRD_SHIFT    (PAGE_SHIFT)
-#define THIRD_ORDER    (THIRD_SHIFT - PAGE_SHIFT)
-#define THIRD_SIZE     (_AT(paddr_t, 1) << THIRD_SHIFT)
-#define THIRD_MASK     (~(THIRD_SIZE - 1))
-#define SECOND_SHIFT   (THIRD_SHIFT + LPAE_SHIFT)
-#define SECOND_ORDER   (SECOND_SHIFT - PAGE_SHIFT)
-#define SECOND_SIZE    (_AT(paddr_t, 1) << SECOND_SHIFT)
-#define SECOND_MASK    (~(SECOND_SIZE - 1))
-#define FIRST_SHIFT    (SECOND_SHIFT + LPAE_SHIFT)
-#define FIRST_ORDER    (FIRST_SHIFT - PAGE_SHIFT)
-#define FIRST_SIZE     (_AT(paddr_t, 1) << FIRST_SHIFT)
-#define FIRST_MASK     (~(FIRST_SIZE - 1))
-#define ZEROETH_SHIFT  (FIRST_SHIFT + LPAE_SHIFT)
-#define ZEROETH_ORDER  (ZEROETH_SHIFT - PAGE_SHIFT)
-#define ZEROETH_SIZE   (_AT(paddr_t, 1) << ZEROETH_SHIFT)
-#define ZEROETH_MASK   (~(ZEROETH_SIZE - 1))
+#define XEN_PT_LEVEL_SHIFT(lvl)   LEVEL_SHIFT_GS(PAGE_SHIFT, lvl)
+#define XEN_PT_LEVEL_ORDER(lvl)   LEVEL_ORDER_GS(PAGE_SHIFT, lvl)
+#define XEN_PT_LEVEL_SIZE(lvl)    LEVEL_SIZE_GS(PAGE_SHIFT, lvl)
+#define XEN_PT_LEVEL_MASK(lvl)    (~(XEN_PT_LEVEL_SIZE(lvl) - 1))
+
+/* Convenience aliases */
+#define THIRD_SHIFT         XEN_PT_LEVEL_SHIFT(3)
+#define THIRD_ORDER         XEN_PT_LEVEL_ORDER(3)
+#define THIRD_SIZE          XEN_PT_LEVEL_SIZE(3)
+#define THIRD_MASK          XEN_PT_LEVEL_MASK(3)
+
+#define SECOND_SHIFT        XEN_PT_LEVEL_SHIFT(2)
+#define SECOND_ORDER        XEN_PT_LEVEL_ORDER(2)
+#define SECOND_SIZE         XEN_PT_LEVEL_SIZE(2)
+#define SECOND_MASK         XEN_PT_LEVEL_MASK(2)
+
+#define FIRST_SHIFT         XEN_PT_LEVEL_SHIFT(1)
+#define FIRST_ORDER         XEN_PT_LEVEL_ORDER(1)
+#define FIRST_SIZE          XEN_PT_LEVEL_SIZE(1)
+#define FIRST_MASK          XEN_PT_LEVEL_MASK(1)
+
+#define ZEROETH_SHIFT       XEN_PT_LEVEL_SHIFT(0)
+#define ZEROETH_ORDER       XEN_PT_LEVEL_ORDER(0)
+#define ZEROETH_SIZE        XEN_PT_LEVEL_SIZE(0)
+#define ZEROETH_MASK        XEN_PT_LEVEL_MASK(0)
 
 /* Calculate the offsets into the pagetables for a given VA */
 #define zeroeth_linear_offset(va) ((va) >> ZEROETH_SHIFT)
@@ -238,7 +247,7 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 #define second_linear_offset(va) ((va) >> SECOND_SHIFT)
 #define third_linear_offset(va) ((va) >> THIRD_SHIFT)
 
-#define TABLE_OFFSET(offs) (_AT(unsigned int, offs) & LPAE_ENTRY_MASK)
+#define TABLE_OFFSET(offs) (_AT(unsigned int, offs) & XEN_PT_LPAE_ENTRY_MASK)
 #define first_table_offset(va)  TABLE_OFFSET(first_linear_offset(va))
 #define second_table_offset(va) TABLE_OFFSET(second_linear_offset(va))
 #define third_table_offset(va)  TABLE_OFFSET(third_linear_offset(va))

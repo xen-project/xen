@@ -375,7 +375,7 @@ ENDPROC(cpu_init)
  */
 .macro create_table_entry, ptbl, tbl, virt, shift, mmu=0
         lsr   r1, \virt, #\shift
-        mov_w r2, LPAE_ENTRY_MASK
+        mov_w r2, XEN_PT_LPAE_ENTRY_MASK
         and   r1, r1, r2             /* r1 := slot in \tlb */
         lsl   r1, r1, #3             /* r1 := slot offset in \tlb */
 
@@ -410,7 +410,7 @@ ENDPROC(cpu_init)
  * and be distinct.
  */
 .macro create_mapping_entry, ptbl, virt, phys, type=PT_MEM_L3, mmu=0
-        mov_w r2, LPAE_ENTRY_MASK
+        mov_w r2, XEN_PT_LPAE_ENTRY_MASK
         lsr   r1, \virt, #THIRD_SHIFT
         and   r1, r1, r2             /* r1 := slot in \tlb */
         lsl   r1, r1, #3             /* r1 := slot offset in \tlb */
@@ -465,7 +465,7 @@ create_page_tables:
 1:      strd  r2, r3, [r4, r1]       /* Map vaddr(start) */
         add   r2, r2, #PAGE_SIZE     /* Next page */
         add   r1, r1, #8             /* Next slot */
-        cmp   r1, #(LPAE_ENTRIES<<3) /* 512*8-byte entries per page */
+        cmp   r1, #(XEN_PT_LPAE_ENTRIES<<3) /* 512*8-byte entries per page */
         blo   1b
 
         /*
@@ -487,7 +487,7 @@ create_page_tables:
          * the second level.
          */
         lsr   r1, r9, #FIRST_SHIFT
-        mov_w r0, LPAE_ENTRY_MASK
+        mov_w r0, XEN_PT_LPAE_ENTRY_MASK
         and   r1, r1, r0              /* r1 := first slot */
         cmp   r1, #XEN_FIRST_SLOT
         beq   1f
@@ -502,7 +502,7 @@ create_page_tables:
          * it.
          */
         lsr   r1, r9, #SECOND_SHIFT
-        mov_w r0, LPAE_ENTRY_MASK
+        mov_w r0, XEN_PT_LPAE_ENTRY_MASK
         and   r1, r1, r0             /* r1 := second slot */
         cmp   r1, #XEN_SECOND_SLOT
         beq   virtphys_clash
@@ -573,7 +573,7 @@ remove_identity_mapping:
          * table if the slot is not XEN_FIRST_SLOT.
          */
         lsr   r1, r9, #FIRST_SHIFT
-        mov_w r0, LPAE_ENTRY_MASK
+        mov_w r0, XEN_PT_LPAE_ENTRY_MASK
         and   r1, r1, r0              /* r1 := first slot */
         cmp   r1, #XEN_FIRST_SLOT
         beq   1f
@@ -589,7 +589,7 @@ remove_identity_mapping:
          * table if the slot is not XEN_SECOND_SLOT.
          */
         lsr   r1, r9, #SECOND_SHIFT
-        mov_w r0, LPAE_ENTRY_MASK
+        mov_w r0, XEN_PT_LPAE_ENTRY_MASK
         and   r1, r1, r0             /* r1 := second slot */
         cmp   r1, #XEN_SECOND_SLOT
         beq   identity_mapping_removed

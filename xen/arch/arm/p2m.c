@@ -233,7 +233,8 @@ static lpae_t *p2m_get_root_pointer(struct p2m_domain *p2m,
      * we can't use (P2M_ROOT_LEVEL - 1) because the root level might be
      * 0. Yet we still want to check if all the unused bits are zeroed.
      */
-    root_table = gfn_x(gfn) >> (level_orders[P2M_ROOT_LEVEL] + LPAE_SHIFT);
+    root_table = gfn_x(gfn) >> (level_orders[P2M_ROOT_LEVEL] +
+                                XEN_PT_LPAE_SHIFT);
     if ( root_table >= P2M_ROOT_PAGES )
         return NULL;
 
@@ -773,7 +774,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
     }
 
     table = map_domain_page(lpae_get_mfn(entry));
-    for ( i = 0; i < LPAE_ENTRIES; i++ )
+    for ( i = 0; i < XEN_PT_LPAE_ENTRIES; i++ )
         p2m_free_entry(p2m, *(table + i), level + 1);
 
     unmap_domain_page(table);
@@ -827,7 +828,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
      * We are either splitting a first level 1G page into 512 second level
      * 2M pages, or a second level 2M page into 512 third level 4K pages.
      */
-    for ( i = 0; i < LPAE_ENTRIES; i++ )
+    for ( i = 0; i < XEN_PT_LPAE_ENTRIES; i++ )
     {
         lpae_t *new_entry = table + i;
 
@@ -850,7 +851,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
     /* Update stats */
     p2m->stats.shattered[level]++;
     p2m->stats.mappings[level]--;
-    p2m->stats.mappings[next_level] += LPAE_ENTRIES;
+    p2m->stats.mappings[next_level] += XEN_PT_LPAE_ENTRIES;
 
     /*
      * Shatter superpage in the page to the level we want to make the
@@ -888,7 +889,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
                            p2m_access_t a)
 {
     unsigned int level = 0;
-    unsigned int target = 3 - (page_order / LPAE_SHIFT);
+    unsigned int target = 3 - (page_order / XEN_PT_LPAE_SHIFT);
     lpae_t *entry, *table, orig_pte;
     int rc;
     /* A mapping is removed if the MFN is invalid. */
@@ -1142,7 +1143,7 @@ static void p2m_invalidate_table(struct p2m_domain *p2m, mfn_t mfn)
 
     table = map_domain_page(mfn);
 
-    for ( i = 0; i < LPAE_ENTRIES; i++ )
+    for ( i = 0; i < XEN_PT_LPAE_ENTRIES; i++ )
     {
         lpae_t pte = table[i];
 

@@ -509,7 +509,7 @@ ENDPROC(cpu_init)
  */
 .macro create_table_entry, ptbl, tbl, virt, shift, tmp1, tmp2, tmp3
         lsr   \tmp1, \virt, #\shift
-        and   \tmp1, \tmp1, #LPAE_ENTRY_MASK/* \tmp1 := slot in \tlb */
+        and   \tmp1, \tmp1, #XEN_PT_LPAE_ENTRY_MASK/* \tmp1 := slot in \tlb */
 
         load_paddr \tmp2, \tbl
         mov   \tmp3, #PT_PT                 /* \tmp3 := right for linear PT */
@@ -541,7 +541,7 @@ ENDPROC(cpu_init)
         and   \tmp3, \phys, #THIRD_MASK     /* \tmp3 := PAGE_ALIGNED(phys) */
 
         lsr   \tmp1, \virt, #THIRD_SHIFT
-        and   \tmp1, \tmp1, #LPAE_ENTRY_MASK/* \tmp1 := slot in \tlb */
+        and   \tmp1, \tmp1, #XEN_PT_LPAE_ENTRY_MASK/* \tmp1 := slot in \tlb */
 
         mov   \tmp2, #\type                 /* \tmp2 := right for section PT */
         orr   \tmp2, \tmp2, \tmp3           /*          + PAGE_ALIGNED(phys) */
@@ -586,7 +586,7 @@ create_page_tables:
 1:      str   x2, [x4, x1]           /* Map vaddr(start) */
         add   x2, x2, #PAGE_SIZE     /* Next page */
         add   x1, x1, #8             /* Next slot */
-        cmp   x1, #(LPAE_ENTRIES<<3) /* 512 entries per page */
+        cmp   x1, #(XEN_PT_LPAE_ENTRIES<<3) /* 512 entries per page */
         b.lt  1b
 
         /*
@@ -621,7 +621,7 @@ create_page_tables:
          * the second level.
          */
         lsr   x0, x19, #FIRST_SHIFT
-        and   x0, x0, #LPAE_ENTRY_MASK  /* x0 := first slot */
+        and   x0, x0, #XEN_PT_LPAE_ENTRY_MASK  /* x0 := first slot */
         cmp   x0, #XEN_FIRST_SLOT
         beq   1f
         create_table_entry boot_first, boot_second_id, x19, FIRST_SHIFT, x0, x1, x2
@@ -635,7 +635,7 @@ create_page_tables:
          * it.
          */
         lsr   x0, x19, #SECOND_SHIFT
-        and   x0, x0, #LPAE_ENTRY_MASK  /* x0 := first slot */
+        and   x0, x0, #XEN_PT_LPAE_ENTRY_MASK  /* x0 := first slot */
         cmp   x0, #XEN_SECOND_SLOT
         beq   virtphys_clash
         create_table_entry boot_second, boot_third_id, x19, SECOND_SHIFT, x0, x1, x2
@@ -715,7 +715,7 @@ remove_identity_mapping:
          * table if the slot is not XEN_FIRST_SLOT.
          */
         lsr   x1, x19, #FIRST_SHIFT
-        and   x1, x1, #LPAE_ENTRY_MASK  /* x1 := first slot */
+        and   x1, x1, #XEN_PT_LPAE_ENTRY_MASK  /* x1 := first slot */
         cmp   x1, #XEN_FIRST_SLOT
         beq   1f
         /* It is not in slot XEN_FIRST_SLOT, remove the entry. */
@@ -729,7 +729,7 @@ remove_identity_mapping:
          * table if the slot is not XEN_SECOND_SLOT.
          */
         lsr   x1, x19, #SECOND_SHIFT
-        and   x1, x1, #LPAE_ENTRY_MASK  /* x1 := first slot */
+        and   x1, x1, #XEN_PT_LPAE_ENTRY_MASK  /* x1 := first slot */
         cmp   x1, #XEN_SECOND_SLOT
         beq   identity_mapping_removed
         /* It is not in slot 1, remove the entry */
