@@ -944,10 +944,11 @@ void __init init_speculation_mitigations(void)
                      boot_cpu_has(X86_FEATURE_IBRS));
 
     /*
-     * First, disable the use of retpolines if Xen is using shadow stacks, as
-     * they are incompatible.
+     * First, disable the use of retpolines if Xen is using CET.  Retpolines
+     * are a ROP gadget so incompatbile with Shadow Stacks, while IBT depends
+     * on executing indirect branches for the safety properties to apply.
      */
-    if ( cpu_has_xen_shstk &&
+    if ( (read_cr4() & X86_CR4_CET) &&
          (opt_thunk == THUNK_DEFAULT || opt_thunk == THUNK_RETPOLINE) )
         thunk = THUNK_JMP;
 
