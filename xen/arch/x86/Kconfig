@@ -111,7 +111,7 @@ config HVM
 
 config XEN_SHSTK
 	bool "Supervisor Shadow Stacks"
-	depends on HAS_AS_CET_SS && EXPERT
+	depends on HAS_AS_CET_SS
 	default y
 	---help---
 	  Control-flow Enforcement Technology (CET) is a set of features in
