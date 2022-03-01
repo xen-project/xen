@@ -17,7 +17,7 @@
 #define FEATURESET_7a1   10 /* 0x00000007:1.eax    */
 #define FEATURESET_e21a  11 /* 0x80000021.eax      */
 #define FEATURESET_7b1   12 /* 0x00000007:1.ebx    */
-#define FEATURESET_7d2   13 /* 0x80000007:2.edx    */
+#define FEATURESET_7d2   13 /* 0x00000007:2.edx    */
 
 struct cpuid_leaf
 {
