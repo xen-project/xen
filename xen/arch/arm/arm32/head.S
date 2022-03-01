@@ -79,7 +79,7 @@
  *   r9  - paddr(start)
  *   r10 - phys offset
  *   r11 - UART address
- *   r12 - is_secondary_cpu
+ *   r12 -
  *   r13 - SP
  *   r14 - LR
  *   r15 - PC
@@ -166,8 +166,6 @@ past_zImage:
 #endif
         PRINT("- Boot CPU booting -\r\n")
 
-        mov   r12, #0                /* r12 := is_secondary_cpu */
-
         bl    check_cpu_mode
         bl    cpu_init
         bl    create_page_tables
@@ -205,8 +203,6 @@ GLOBAL(init_secondary)
         ldr   r0, =start
         adr   r9, start              /* r9  := paddr (start) */
         sub   r10, r9, r0            /* r10 := phys-offset */
-
-        mov   r12, #1                /* r12 := is_secondary_cpu */
 
         mrc   CP32(r1, MPIDR)
         bic   r7, r1, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
