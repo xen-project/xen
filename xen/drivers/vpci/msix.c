@@ -275,23 +275,24 @@ static int cf_check msix_write(
 
     if ( VMSIX_ADDR_IN_RANGE(addr, msix->pdev->vpci, VPCI_MSIX_PBA) )
     {
-        /* Ignore writes to PBA for DomUs, it's behavior is undefined. */
-        if ( is_hardware_domain(d) )
+
+        if ( !is_hardware_domain(d) )
+            /* Ignore writes to PBA for DomUs, it's behavior is undefined. */
+            return X86EMUL_OKAY;
+
+        switch ( len )
         {
-            switch ( len )
-            {
-            case 4:
-                writel(data, addr);
-                break;
+        case 4:
+            writel(data, addr);
+            break;
 
-            case 8:
-                writeq(data, addr);
-                break;
+        case 8:
+            writeq(data, addr);
+            break;
 
-            default:
-                ASSERT_UNREACHABLE();
-                break;
-            }
+        default:
+            ASSERT_UNREACHABLE();
+            break;
         }
 
         return X86EMUL_OKAY;
