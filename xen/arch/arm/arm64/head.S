@@ -800,6 +800,7 @@ ENDPROC(launch)
 fail:   PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b
+ENDPROC(fail)
 
 GLOBAL(_end_boot)
 
@@ -830,6 +831,7 @@ ENTRY(switch_ttbr)
         isb
 
         ret
+ENDPROC(switch_ttbr)
 
 #ifdef CONFIG_EARLY_PRINTK
 /*
@@ -847,6 +849,7 @@ init_uart:
 #endif
         PRINT("- UART enabled -\r\n")
         ret
+ENDPROC(init_uart)
 
 /* Print early debug messages.
  * x0: Nul-terminated string to print.
