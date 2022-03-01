@@ -661,6 +661,7 @@ ENDPROC(launch)
 fail:   PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b
+ENDPROC(fail)
 
 GLOBAL(_end_boot)
 
@@ -694,6 +695,7 @@ ENTRY(switch_ttbr)
         isb
 
         mov pc, lr
+ENDPROC(switch_ttbr)
 
 #ifdef CONFIG_EARLY_PRINTK
 /*
@@ -711,6 +713,7 @@ init_uart:
 #endif
         PRINT("- UART enabled -\r\n")
         mov   pc, lr
+ENDPROC(init_uart)
 
 /*
  * Print early debug messages.
@@ -798,6 +801,7 @@ __lookup_processor_type:
         mov   r1, #0
 2:
         mov   pc, lr
+ENDPROC(__lookup_processor_type)
 
 /*
  * Local variables:
