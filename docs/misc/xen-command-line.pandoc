@@ -1177,7 +1177,9 @@ Specify which console gdbstub should use. See **console**.
 ### gnttab
 > `= List of [ max-ver:<integer>, transitive=<bool>, transfer=<bool> ]`
 
-> Default: `gnttab=max-ver:2,transitive,transfer`
+> Default (Arm): `gnttab=max-ver:1`
+> Default (x86,PV): `gnttab=max-ver:2,transitive,transfer`
+> Default (x86,HVM): `gnttab=max-ver:2,transitive`
 
 Control various aspects of the grant table behaviour available to guests.
 
@@ -1216,8 +1218,6 @@ Dom0 is using this value for sizing its grant table.
 Specify the maximum number of frames to use as part of a domains
 maptrack array. This value is an upper boundary of the per-domain
 value settable via Xen tools.
-
-Dom0 is using this value for sizing its maptrack table.
 
 ### global-pages
     = <boolean>
