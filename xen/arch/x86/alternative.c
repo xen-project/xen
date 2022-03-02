@@ -295,7 +295,7 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
                      * marginal perf improvement which saves on instruction
                      * decode bandwidth.
                      */
-                    if ( IS_ENABLED(CONFIG_HAS_CC_CET_IBT) )
+                    if ( IS_ENABLED(CONFIG_XEN_IBT) )
                     {
                         if ( is_endbr64(dest) )
                             dest += ENDBR64_LEN;
