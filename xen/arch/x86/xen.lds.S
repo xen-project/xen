@@ -194,6 +194,7 @@ SECTIONS
 #endif
        _sinittext = .;
        *(.init.text)
+       *(.text.startup)
        _einittext = .;
        /*
         * Here are the replacement instructions. The linker sticks them
@@ -258,9 +259,10 @@ SECTIONS
 
        . = ALIGN(8);
        __ctors_start = .;
-       *(.ctors)
+       *(SORT_BY_INIT_PRIORITY(.init_array.*))
+       *(SORT_BY_INIT_PRIORITY(.ctors.*))
        *(.init_array)
-       *(SORT(.init_array.*))
+       *(.ctors)
        __ctors_end = .;
   } PHDR(text)
 
@@ -404,16 +406,20 @@ SECTIONS
 
   /* Sections to be discarded */
   /DISCARD/ : {
+       *(.text.exit)
        *(.exit.text)
        *(.exit.data)
        *(.exitcall.exit)
        *(.discard)
        *(.discard.*)
        *(.eh_frame)
+       *(.dtors)
+       *(.dtors.*)
 #ifdef EFI
        *(.comment)
        *(.comment.*)
        *(.note.Xen)
+       *(.note.gnu.*)
 #endif
   }
 
