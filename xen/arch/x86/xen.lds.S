@@ -210,6 +210,12 @@ SECTIONS
   DECL_SECTION(.init.data) {
 #endif
 
+       . = ALIGN(POINTER_ALIGN);
+       __initdata_cf_clobber_start = .;
+       *(.init.data.cf_clobber)
+       *(.init.rodata.cf_clobber)
+       __initdata_cf_clobber_end = .;
+
        *(.init.rodata)
        *(.init.rodata.*)
 
@@ -223,12 +229,6 @@ SECTIONS
        __presmp_initcall_end = .;
        *(.initcall1.init)
        __initcall_end = .;
-
-       . = ALIGN(POINTER_ALIGN);
-       __initdata_cf_clobber_start = .;
-       *(.init.data.cf_clobber)
-       *(.init.rodata.cf_clobber)
-       __initdata_cf_clobber_end = .;
 
        *(.init.data)
        *(.init.data.rel)

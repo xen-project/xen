@@ -2119,7 +2119,6 @@ static int cf_check adjust_vtd_irq_affinities(void)
 
     return 0;
 }
-__initcall(adjust_vtd_irq_affinities);
 
 static int __must_check init_vtd_hw(bool resume)
 {

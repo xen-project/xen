@@ -462,6 +462,12 @@ bool arch_iommu_use_permitted(const struct domain *d)
             likely(!p2m_get_hostp2m(d)->global_logdirty));
 }
 
+static int __init cf_check adjust_irq_affinities(void)
+{
+    return iommu_adjust_irq_affinities();
+}
+__initcall(adjust_irq_affinities);
+
 /*
  * Local variables:
  * mode: C

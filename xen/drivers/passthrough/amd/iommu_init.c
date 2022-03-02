@@ -831,7 +831,6 @@ int cf_check iov_adjust_irq_affinities(void)
 
     return 0;
 }
-__initcall(iov_adjust_irq_affinities);
 
 /*
  * Family15h Model 10h-1fh erratum 746 (IOMMU Logging May Stall Translations)
