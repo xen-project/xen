@@ -594,7 +594,6 @@ static void gicv3_set_irq_priority(struct irq_desc *desc,
 static void __init gicv3_dist_init(void)
 {
     uint32_t type;
-    uint32_t priority;
     uint64_t affinity;
     unsigned int nr_lines;
     int i;
@@ -621,11 +620,7 @@ static void __init gicv3_dist_init(void)
 
     /* Default priority for global interrupts */
     for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 4 )
-    {
-        priority = (GIC_PRI_IRQ << 24 | GIC_PRI_IRQ << 16 |
-                    GIC_PRI_IRQ << 8 | GIC_PRI_IRQ);
-        writel_relaxed(priority, GICD + GICD_IPRIORITYR + (i / 4) * 4);
-    }
+        writel_relaxed(GIC_PRI_IRQ_ALL, GICD + GICD_IPRIORITYR + (i / 4) * 4);
 
     /* Disable/deactivate all global interrupts */
     for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 32 )
@@ -806,7 +801,6 @@ static int __init gicv3_populate_rdist(void)
 static int gicv3_cpu_init(void)
 {
     int i, ret;
-    uint32_t priority;
 
     /* Register ourselves with the rest of the world */
     if ( gicv3_populate_rdist() )
@@ -826,16 +820,12 @@ static int gicv3_cpu_init(void)
     }
 
     /* Set priority on PPI and SGI interrupts */
-    priority = (GIC_PRI_IPI << 24 | GIC_PRI_IPI << 16 | GIC_PRI_IPI << 8 |
-                GIC_PRI_IPI);
     for (i = 0; i < NR_GIC_SGI; i += 4)
-        writel_relaxed(priority,
+        writel_relaxed(GIC_PRI_IPI_ALL,
                 GICD_RDIST_SGI_BASE + GICR_IPRIORITYR0 + (i / 4) * 4);
 
-    priority = (GIC_PRI_IRQ << 24 | GIC_PRI_IRQ << 16 | GIC_PRI_IRQ << 8 |
-                GIC_PRI_IRQ);
     for (i = NR_GIC_SGI; i < NR_GIC_LOCAL_IRQS; i += 4)
-        writel_relaxed(priority,
+        writel_relaxed(GIC_PRI_IRQ_ALL,
                 GICD_RDIST_SGI_BASE + GICR_IPRIORITYR0 + (i / 4) * 4);
 
     /*

@@ -143,10 +143,15 @@
  *
  * A GIC must support a mimimum of 16 priority levels.
  */
-#define GIC_PRI_LOWEST     0xf0
-#define GIC_PRI_IRQ        0xa0
-#define GIC_PRI_IPI        0x90 /* IPIs must preempt normal interrupts */
-#define GIC_PRI_HIGHEST    0x80 /* Higher priorities belong to Secure-World */
+#define GIC_PRI_LOWEST     0xf0U
+#define GIC_PRI_IRQ        0xa0U
+#define GIC_PRI_IPI        0x90U /* IPIs must preempt normal interrupts */
+#define GIC_PRI_HIGHEST    0x80U /* Higher priorities belong to Secure-World */
+#define GIC_PRI_IRQ_ALL    ((GIC_PRI_IRQ << 24) | (GIC_PRI_IRQ << 16) |\
+                            (GIC_PRI_IRQ << 8) | GIC_PRI_IRQ)
+#define GIC_PRI_IPI_ALL    ((GIC_PRI_IPI << 24) | (GIC_PRI_IPI << 16) |\
+                            (GIC_PRI_IPI << 8) | GIC_PRI_IPI)
+
 #define GIC_PRI_TO_GUEST(pri) (pri >> 3) /* GICH_LR and GICH_VMCR only support
                                             5 bits for guest irq priority */
 

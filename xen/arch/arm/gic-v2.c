@@ -373,9 +373,7 @@ static void __init gicv2_dist_init(void)
 
     /* Default priority for global interrupts */
     for ( i = 32; i < nr_lines; i += 4 )
-        writel_gicd(GIC_PRI_IRQ << 24 | GIC_PRI_IRQ << 16 |
-                    GIC_PRI_IRQ << 8 | GIC_PRI_IRQ,
-                    GICD_IPRIORITYR + (i / 4) * 4);
+        writel_gicd(GIC_PRI_IRQ_ALL, GICD_IPRIORITYR + (i / 4) * 4);
 
     /* Disable all global interrupts */
     for ( i = 32; i < nr_lines; i += 32 )
@@ -403,15 +401,11 @@ static void gicv2_cpu_init(void)
 
     /* Set SGI priorities */
     for ( i = 0; i < 16; i += 4 )
-        writel_gicd(GIC_PRI_IPI << 24 | GIC_PRI_IPI << 16 |
-                    GIC_PRI_IPI << 8 | GIC_PRI_IPI,
-                    GICD_IPRIORITYR + (i / 4) * 4);
+        writel_gicd(GIC_PRI_IPI_ALL, GICD_IPRIORITYR + (i / 4) * 4);
 
     /* Set PPI priorities */
     for ( i = 16; i < 32; i += 4 )
-        writel_gicd(GIC_PRI_IRQ << 24 | GIC_PRI_IRQ << 16 |
-                    GIC_PRI_IRQ << 8 | GIC_PRI_IRQ,
-                    GICD_IPRIORITYR + (i / 4) * 4);
+        writel_gicd(GIC_PRI_IRQ_ALL, GICD_IPRIORITYR + (i / 4) * 4);
 
     /* Local settings: interface controller */
     /* Don't mask by priority */
