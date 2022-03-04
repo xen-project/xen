@@ -292,7 +292,6 @@ SECTIONS
        *(.data)
        *(.data.rel)
        *(.data.rel.*)
-       CONSTRUCTORS
   } PHDR(text)
 
   DECL_SECTION(.bss) {
