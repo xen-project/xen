@@ -375,7 +375,7 @@ static void cf_check resume_pit(struct platform_timesource *pts)
     outb(0, PIT_CH2);     /* MSB of count */
 }
 
-static struct platform_timesource __initdata plt_pit =
+static struct platform_timesource __initdata_cf_clobber plt_pit =
 {
     .id = "pit",
     .name = "PIT",
@@ -483,7 +483,7 @@ static void cf_check resume_hpet(struct platform_timesource *pts)
     hpet_resume(NULL);
 }
 
-static struct platform_timesource __initdata plt_hpet =
+static struct platform_timesource __initdata_cf_clobber plt_hpet =
 {
     .id = "hpet",
     .name = "HPET",
@@ -528,7 +528,7 @@ static s64 __init cf_check init_pmtimer(struct platform_timesource *pts)
     return adjust_elapsed(rdtsc_ordered() - start, elapsed, target);
 }
 
-static struct platform_timesource __initdata plt_pmtimer =
+static struct platform_timesource __initdata_cf_clobber plt_pmtimer =
 {
     .id = "acpi",
     .name = "ACPI PM Timer",
@@ -590,7 +590,7 @@ static uint64_t __init cf_check read_tsc(void)
     return rdtsc_ordered();
 }
 
-static struct platform_timesource __initdata plt_tsc =
+static struct platform_timesource __initdata_cf_clobber plt_tsc =
 {
     .id = "tsc",
     .name = "TSC",
@@ -681,7 +681,7 @@ static void cf_check resume_xen_timer(struct platform_timesource *pts)
     write_atomic(&xen_timer_last, 0);
 }
 
-static struct platform_timesource __initdata plt_xen_timer =
+static struct platform_timesource __initdata_cf_clobber plt_xen_timer =
 {
     .id = "xen",
     .name = "XEN PV CLOCK",
@@ -778,7 +778,7 @@ static uint64_t cf_check read_hyperv_timer(void)
     return hv_scale_tsc(tsc, scale, offset);
 }
 
-static struct platform_timesource __initdata plt_hyperv_timer =
+static struct platform_timesource __initdata_cf_clobber plt_hyperv_timer =
 {
     .id = "hyperv",
     .name = "HYPER-V REFERENCE TSC",
