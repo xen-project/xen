@@ -55,7 +55,7 @@ export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
 # Allow someone to change their config file
 export KCONFIG_CONFIG ?= .config
 
-export CC CXX LD
+export CC CXX LD NM OBJCOPY OBJDUMP
 
 export TARGET := xen
 
