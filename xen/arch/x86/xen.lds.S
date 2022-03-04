@@ -414,6 +414,8 @@ SECTIONS
        *(.eh_frame)
        *(.dtors)
        *(.dtors.*)
+       *(.fini_array)
+       *(.fini_array.*)
 #ifdef EFI
        *(.comment)
        *(.comment.*)
