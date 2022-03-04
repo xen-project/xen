@@ -1,25 +1,42 @@
 obj-bin-y += head.o
+head-srcs := cmdline.S reloc.S
 
-DEFS_H_DEPS = $(abs_srctree)/$(src)/defs.h $(abs_srctree)/include/xen/stdbool.h
+nocov-y += $(head-srcs:.S=.o)
+noubsan-y += $(head-srcs:.S=.o)
+targets += $(head-srcs:.S=.o)
 
-CMDLINE_DEPS = $(DEFS_H_DEPS) $(abs_srctree)/$(src)/video.h \
-	       $(BASEDIR)/include/xen/kconfig.h \
-	       $(BASEDIR)/include/generated/autoconf.h
+head-srcs := $(addprefix $(obj)/, $(head-srcs))
 
-RELOC_DEPS = $(DEFS_H_DEPS) \
-	     $(BASEDIR)/include/generated/autoconf.h \
-	     $(BASEDIR)/include/xen/kconfig.h \
-	     $(BASEDIR)/include/xen/multiboot.h \
-	     $(BASEDIR)/include/xen/multiboot2.h \
-	     $(BASEDIR)/include/xen/const.h \
-	     $(BASEDIR)/include/public/arch-x86/hvm/start_info.h
+$(obj)/head.o: $(head-srcs)
 
-$(obj)/head.o: $(obj)/cmdline.S $(obj)/reloc.S
+CFLAGS_x86_32 := $(subst -m64,-m32 -march=i686,$(XEN_TREEWIDE_CFLAGS))
+$(call cc-options-add,CFLAGS_x86_32,CC,$(EMBEDDED_EXTRA_CFLAGS))
+CFLAGS_x86_32 += -Werror -fno-builtin -g0 -msoft-float
+CFLAGS_x86_32 += -I$(srctree)/include
 
-$(obj)/cmdline.S: $(src)/cmdline.c $(CMDLINE_DEPS) $(src)/build32.lds
-	$(MAKE) -f $(abs_srctree)/$(src)/build32.mk -C $(obj) $(@F) CMDLINE_DEPS="$(CMDLINE_DEPS)"
+# override for 32bit binaries
+$(head-srcs:.S=.o): CFLAGS_stack_boundary :=
+$(head-srcs:.S=.o): XEN_CFLAGS := $(CFLAGS_x86_32) -fpic
 
-$(obj)/reloc.S: $(src)/reloc.c $(RELOC_DEPS) $(src)/build32.lds
-	$(MAKE) -f $(abs_srctree)/$(src)/build32.mk -C $(obj) $(@F) RELOC_DEPS="$(RELOC_DEPS)"
+$(head-srcs): %.S: %.bin
+	(od -v -t x $< | tr -s ' ' | awk 'NR > 1 {print s} {s=$$0}' | \
+	sed 's/ /,0x/g' | sed 's/,0x$$//' | sed 's/^[0-9]*,/ .long /') >$@
+
+# Drop .got.plt during conversion to plain binary format.
+# Please check build32.lds for more details.
+%.bin: %.lnk
+	$(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p;}' | \
+		while read idx name sz rest; do \
+			case "$$name" in \
+			.got.plt) \
+				test $$sz != 0c || continue; \
+				echo "Error: non-empty $$name: 0x$$sz" >&2; \
+				exit $$(expr $$idx + 1);; \
+			esac; \
+		done
+	$(OBJCOPY) -O binary -R .got.plt $< $@
+
+%.lnk: %.o $(src)/build32.lds
+	$(LD) $(subst x86_64,i386,$(LDFLAGS_DIRECT)) -N -T $(filter %.lds,$^) -o $@ $<
 
 clean-files := cmdline.S reloc.S *.lnk *.bin
