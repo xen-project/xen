@@ -1974,8 +1974,8 @@ static const struct evex {
     { { 0x05 }, 3, T, R, pfx_66, W1, Ln }, /* vpermilpd */
     { { 0x08 }, 3, T, R, pfx_66, W0, Ln }, /* vrndscaleps */
     { { 0x09 }, 3, T, R, pfx_66, W1, Ln }, /* vrndscalepd */
-    { { 0x0a }, 3, T, R, pfx_66, WIG, LIG }, /* vrndscaless */
-    { { 0x0b }, 3, T, R, pfx_66, WIG, LIG }, /* vrndscalesd */
+    { { 0x0a }, 3, T, R, pfx_66, W0, LIG }, /* vrndscaless */
+    { { 0x0b }, 3, T, R, pfx_66, W1, LIG }, /* vrndscalesd */
     { { 0x0f }, 3, T, R, pfx_66, WIG, Ln }, /* vpalignr */
     { { 0x14 }, 3, T, W, pfx_66, WIG, L0 }, /* vpextrb */
     { { 0x15 }, 3, T, W, pfx_66, WIG, L0 }, /* vpextrw */
