@@ -51,7 +51,10 @@ CFLAGS-$(CONFIG_CC_IS_CLANG) += -mretpoline-external-thunk
 endif
 
 ifdef CONFIG_XEN_IBT
-CFLAGS += -fcf-protection=branch -mmanual-endbr
+# Force -fno-jump-tables to work around
+#   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104816
+#   https://github.com/llvm/llvm-project/issues/54247
+CFLAGS += -fcf-protection=branch -mmanual-endbr -fno-jump-tables
 $(call cc-option-add,CFLAGS,CC,-fcf-check-attribute=no)
 else
 $(call cc-option-add,CFLAGS,CC,-fcf-protection=none)
