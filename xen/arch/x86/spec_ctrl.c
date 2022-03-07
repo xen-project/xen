@@ -904,16 +904,10 @@ void __init init_speculation_mitigations(void)
         if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) )
         {
             /*
-             * AMD's recommended mitigation is to set lfence as being dispatch
-             * serialising, and to use IND_THUNK_LFENCE.
-             */
-            if ( cpu_has_lfence_dispatch )
-                thunk = THUNK_LFENCE;
-            /*
-             * On Intel hardware, we'd like to use retpoline in preference to
+             * On all hardware, we'd like to use retpoline in preference to
              * IBRS, but only if it is safe on this hardware.
              */
-            else if ( retpoline_safe(caps) )
+            if ( retpoline_safe(caps) )
                 thunk = THUNK_RETPOLINE;
             else if ( boot_cpu_has(X86_FEATURE_IBRSB) )
                 ibrs = true;
