@@ -2077,9 +2077,9 @@ to use.
 
 If Xen was compiled with INDIRECT_THUNK support, `bti-thunk=` can be used to
 select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
-locations.  The default thunk is `retpoline` (generally preferred for Intel
-hardware), with the alternatives being `jmp` (a `jmp *%reg` gadget, minimal
-overhead), and `lfence` (an `lfence; jmp *%reg` gadget, preferred for AMD).
+locations.  The default thunk is `retpoline` (generally preferred), with the
+alternatives being `jmp` (a `jmp *%reg` gadget, minimal overhead), and
+`lfence` (an `lfence; jmp *%reg` gadget).
 
 On hardware supporting IBRS (Indirect Branch Restricted Speculation), the
 `ibrs=` option can be used to force or prevent Xen using the feature itself.
