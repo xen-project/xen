@@ -367,14 +367,19 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s, Other:%s%s%s%s%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s%s, Other:%s%s%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
            thunk == THUNK_JMP       ? "JMP" : "?",
-           !boot_cpu_has(X86_FEATURE_IBRSB)          ? "No" :
+           (!boot_cpu_has(X86_FEATURE_IBRSB) &&
+            !boot_cpu_has(X86_FEATURE_IBRS))         ? "No" :
            (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ? "IBRS+" :  "IBRS-",
-           !boot_cpu_has(X86_FEATURE_SSBD)           ? "" :
+           (!boot_cpu_has(X86_FEATURE_STIBP) &&
+            !boot_cpu_has(X86_FEATURE_AMD_STIBP))    ? "" :
+           (default_xen_spec_ctrl & SPEC_CTRL_STIBP) ? " STIBP+" : " STIBP-",
+           (!boot_cpu_has(X86_FEATURE_SSBD) &&
+            !boot_cpu_has(X86_FEATURE_AMD_SSBD))     ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            !(caps & ARCH_CAPS_TSX_CTRL)              ? "" :
            (opt_tsx & 1)                             ? " TSX+" : " TSX-",
@@ -945,10 +950,23 @@ void __init init_speculation_mitigations(void)
     /*
      * First, disable the use of retpolines if Xen is using shadow stacks, as
      * they are incompatible.
+     *
+     * In the absence of retpolines, IBRS needs to be used for speculative
+     * safety.  All CET-capable hardware has efficient IBRS.
      */
-    if ( cpu_has_xen_shstk &&
-         (opt_thunk == THUNK_DEFAULT || opt_thunk == THUNK_RETPOLINE) )
-        thunk = THUNK_JMP;
+    if ( cpu_has_xen_shstk )
+    {
+        if ( !has_spec_ctrl )
+            printk(XENLOG_WARNING "?!? CET active, but no MSR_SPEC_CTRL?\n");
+        else if ( opt_ibrs == -1 )
+        {
+            opt_ibrs = ibrs = true;
+            default_xen_spec_ctrl |= SPEC_CTRL_IBRS | SPEC_CTRL_STIBP;
+        }
+
+        if ( opt_thunk == THUNK_DEFAULT || opt_thunk == THUNK_RETPOLINE )
+            thunk = THUNK_JMP;
+    }
 
     /*
      * Has the user specified any custom BTI mitigations?  If so, follow their
@@ -968,16 +986,10 @@ void __init init_speculation_mitigations(void)
         if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) )
         {
             /*
-             * AMD's recommended mitigation is to set lfence as being dispatch
-             * serialising, and to use IND_THUNK_LFENCE.
-             */
-            if ( cpu_has_lfence_dispatch )
-                thunk = THUNK_LFENCE;
-            /*
-             * On Intel hardware, we'd like to use retpoline in preference to
+             * On all hardware, we'd like to use retpoline in preference to
              * IBRS, but only if it is safe on this hardware.
              */
-            else if ( retpoline_safe(caps) )
+            if ( retpoline_safe(caps) )
                 thunk = THUNK_RETPOLINE;
             else if ( has_spec_ctrl )
                 ibrs = true;
