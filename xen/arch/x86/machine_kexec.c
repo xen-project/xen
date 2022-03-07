@@ -173,6 +173,16 @@ void machine_kexec(struct kexec_image *image)
         _update_gate_addr_lower(&idt_tables[i][TRAP_machine_check], &trap_nop);
     }
 
+    /* Reset CPUID masking and faulting to the host's default. */
+    ctxt_switch_levelling(NULL);
+
+    /* Disable CET. */
+    if ( read_cr4() & X86_CR4_CET )
+    {
+        wrmsrl(MSR_S_CET, 0);
+        write_cr4(read_cr4() & ~X86_CR4_CET);
+    }
+
     /* Explicitly enable NMIs on this CPU.  Some crashdump kernels do
      * not like running with NMIs disabled. */
     enable_nmis();
