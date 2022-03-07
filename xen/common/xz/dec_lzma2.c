@@ -1146,6 +1146,7 @@ XZ_EXTERN enum xz_ret __init xz_dec_lzma2_reset(struct xz_dec_lzma2 *s, uint8_t 
 
 		if (DEC_IS_DYNALLOC(s->dict.mode)) {
 			if (s->dict.allocated < s->dict.size) {
+				s->dict.allocated = s->dict.size;
 				large_free(s->dict.buf);
 				s->dict.buf = large_malloc(s->dict.size);
 				if (s->dict.buf == NULL) {
