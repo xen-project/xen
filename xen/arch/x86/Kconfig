@@ -193,14 +193,15 @@ config HVM_FEP
 	  If unsure, say N.
 
 config TBOOT
-	bool "Xen tboot support (UNSUPPORTED)" if UNSUPPORTED
-	default y if !PV_SHIM_EXCLUSIVE
+	bool "Xen tboot support (UNSUPPORTED)"
+	depends on UNSUPPORTED
+	default !PV_SHIM_EXCLUSIVE
 	select CRYPTO
 	---help---
 	  Allows support for Trusted Boot using the Intel(R) Trusted Execution
 	  Technology (TXT)
 
-	  If unsure, say Y.
+	  If unsure, stay with the default.
 
 choice
 	prompt "Alignment of Xen image"
