@@ -362,7 +362,7 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
             if ( !is_kernel_text(ptr) || !is_endbr64(ptr) )
                 continue;
 
-            add_nops(ptr, ENDBR64_LEN);
+            place_endbr64_poison(ptr);
             clobbered++;
         }
 

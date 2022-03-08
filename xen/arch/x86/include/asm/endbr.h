@@ -52,4 +52,30 @@ static inline void place_endbr64(void *ptr)
     *(uint32_t *)ptr = gen_endbr64();
 }
 
+/*
+ * After clobbering ENDBR64, we may need to confirm that the site used to
+ * contain an ENDBR64 instruction.  Use an encoding which isn't the default
+ * P6_NOP4.  Specifically, nopw (%rcx)
+ */
+static inline uint32_t __attribute_const__ gen_endbr64_poison(void)
+{
+    uint32_t res;
+
+    asm ( "mov $~0x011f0f66, %[res]\n\t"
+          "not %[res]\n\t"
+          : [res] "=&r" (res) );
+
+    return res;
+}
+
+static inline bool is_endbr64_poison(const void *ptr)
+{
+    return *(const uint32_t *)ptr == gen_endbr64_poison();
+}
+
+static inline void place_endbr64_poison(void *ptr)
+{
+    *(uint32_t *)ptr = gen_endbr64_poison();
+}
+
 #endif /* XEN_ASM_ENDBR_H */
