@@ -9,7 +9,7 @@
 #include <asm/cpufeature.h>
 #include <public/elfnote.h>
 
-        .text
+        .section .text.header, "ax", @progbits
         .code32
 
 #define sym_offs(sym)     ((sym) - __XEN_VIRT_START)

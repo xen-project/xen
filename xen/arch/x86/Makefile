@@ -1,5 +1,7 @@
 obj-y += acpi/
+obj-y += boot/
 obj-y += cpu/
+obj-y += efi/
 obj-y += genapic/
 obj-$(CONFIG_GUEST) += guest/
 obj-$(CONFIG_HVM) += hvm/
@@ -76,9 +78,6 @@ obj-y += platform_hypercall.o
 obj-$(CONFIG_COMPAT) += x86_64/platform_hypercall.o
 obj-y += sysctl.o
 endif
-
-# Allows "clean" to descend into boot/
-subdir- += boot
 
 extra-y += asm-macros.i
 extra-y += xen.lds

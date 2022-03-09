@@ -120,6 +120,7 @@
 
 #endif /* !CONFIG_EARLY_PRINTK */
 
+        .section .text.header, "ax", %progbits
         .arm
 
         /*

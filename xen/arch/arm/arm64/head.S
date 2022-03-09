@@ -133,6 +133,7 @@
         add \xb, \xb, x20
 .endm
 
+        .section .text.header, "ax", %progbits
         /*.aarch64*/
 
         /*
