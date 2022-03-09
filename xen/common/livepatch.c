@@ -685,11 +685,11 @@ static int prepare_payload(struct payload *payload,
                 return -EINVAL;
             }
 
-            rc = arch_livepatch_verify_func(f);
+            rc = resolve_old_address(f, elf);
             if ( rc )
                 return rc;
 
-            rc = resolve_old_address(f, elf);
+            rc = arch_livepatch_verify_func(f);
             if ( rc )
                 return rc;
 
