@@ -27,6 +27,10 @@ config CLANG_VERSION
 config CC_HAS_VISIBILITY_ATTRIBUTE
 	def_bool $(cc-option,-fvisibility=hidden)
 
+# Use -f{function,data}-sections compiler parameters
+config CC_SPLIT_SECTIONS
+	bool
+
 source "arch/$(SRCARCH)/Kconfig"
 
 config DEFCONFIG_LIST
