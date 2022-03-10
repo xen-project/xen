@@ -129,6 +129,17 @@ void try_decode_instruction(const struct cpu_user_regs *regs,
     }
 
     /*
+     * At this point, we know that the stage1 translation table is either in
+     * an emulated MMIO region or its address is invalid. This is not
+     * expected by Xen and thus it forwards the abort to the guest.
+     */
+    if ( info->dabt.s1ptw )
+    {
+        info->dabt_instr.state = INSTR_ERROR;
+        return;
+    }
+
+    /*
      * Armv8 processor does not provide a valid syndrome for decoding some
      * instructions. So in order to process these instructions, Xen must
      * decode them.
