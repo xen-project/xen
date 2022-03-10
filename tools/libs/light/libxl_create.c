@@ -1158,17 +1158,17 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
     pod_enabled = (d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV) &&
         (d_config->b_info.target_memkb < d_config->b_info.max_memkb);
 
-    /* We cannot have PoD and PCI device assignment at the same time
-     * for HVM guest. It was reported that IOMMU cannot work with PoD
-     * enabled because it needs to populated entire page table for
-     * guest. To stay on the safe side, we disable PCI device
-     * assignment when PoD is enabled.
+    /* We don't support having PoD and an IOMMU at the same time for HVM
+     * guests. An active IOMMU cannot work with PoD because it needs a fully
+     * populated page-table. Prevent PoD usage if the domain has an IOMMU
+     * assigned, even if not active.
      */
     if (d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV &&
-        d_config->num_pcidevs && pod_enabled) {
+        d_config->c_info.passthrough != LIBXL_PASSTHROUGH_DISABLED &&
+        pod_enabled) {
         ret = ERROR_INVAL;
         LOGD(ERROR, domid,
-             "PCI device assignment for HVM guest failed due to PoD enabled");
+             "IOMMU required for device passthrough but not supported together with PoD");
         goto error_out;
     }
 
