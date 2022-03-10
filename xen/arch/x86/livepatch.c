@@ -14,6 +14,7 @@
 #include <xen/vm_event.h>
 #include <xen/virtual_region.h>
 
+#include <asm/endbr.h>
 #include <asm/fixmap.h>
 #include <asm/nmi.h>
 #include <asm/livepatch.h>
@@ -113,8 +114,20 @@ int arch_livepatch_verify_func(const struct livepatch_func *func)
         if ( func->old_size < func->new_size )
             return -EINVAL;
     }
-    else if ( func->old_size < ARCH_PATCH_INSN_SIZE )
-        return -EINVAL;
+    else
+    {
+        /*
+         * Space needed now depends on whether the target function
+         * starts with an ENDBR64 instruction.
+         */
+        uint8_t needed = ARCH_PATCH_INSN_SIZE;
+
+        if ( is_endbr64(func->old_addr) )
+            needed += ENDBR64_LEN;
+
+        if ( func->old_size < needed )
+            return -EINVAL;
+    }
 
     return 0;
 }
@@ -129,12 +142,24 @@ void noinline arch_livepatch_apply(struct livepatch_func *func)
     uint8_t insn[sizeof(func->opaque)];
     unsigned int len;
 
+    func->patch_offset = 0;
     old_ptr = func->old_addr;
     len = livepatch_insn_len(func);
     if ( !len )
         return;
 
-    memcpy(func->opaque, old_ptr, len);
+    /*
+     * CET hotpatching support: We may have functions starting with an ENDBR64
+     * instruction that MUST remain the first instruction of the function,
+     * hence we need to move any hotpatch trampoline further into the function.
+     * For that we need to keep track of the patching offset used for any
+     * loaded hotpatch (to avoid racing against other fixups adding/removing
+     * ENDBR64 or similar instructions).
+     */
+    if ( is_endbr64(old_ptr) )
+        func->patch_offset += ENDBR64_LEN;
+
+    memcpy(func->opaque, old_ptr + func->patch_offset, len);
     if ( func->new_addr )
     {
         int32_t val;
@@ -142,14 +167,15 @@ void noinline arch_livepatch_apply(struct livepatch_func *func)
         BUILD_BUG_ON(ARCH_PATCH_INSN_SIZE != (1 + sizeof(val)));
 
         insn[0] = 0xe9; /* Relative jump. */
-        val = func->new_addr - func->old_addr - ARCH_PATCH_INSN_SIZE;
+        val = func->new_addr - (func->old_addr + func->patch_offset +
+                                ARCH_PATCH_INSN_SIZE);
 
         memcpy(&insn[1], &val, sizeof(val));
     }
     else
         add_nops(insn, len);
 
-    memcpy(old_ptr, insn, len);
+    memcpy(old_ptr + func->patch_offset, insn, len);
 }
 
 /*
@@ -158,7 +184,8 @@ void noinline arch_livepatch_apply(struct livepatch_func *func)
  */
 void noinline arch_livepatch_revert(const struct livepatch_func *func)
 {
-    memcpy(func->old_addr, func->opaque, livepatch_insn_len(func));
+    memcpy(func->old_addr + func->patch_offset, func->opaque,
+           livepatch_insn_len(func));
 }
 
 /*
