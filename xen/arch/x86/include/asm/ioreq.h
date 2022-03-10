@@ -26,6 +26,9 @@
 #include <asm/hvm/ioreq.h>
 #endif
 
+struct arch_vcpu_io {
+};
+
 #endif /* __ASM_X86_IOREQ_H__ */
 
 /*
