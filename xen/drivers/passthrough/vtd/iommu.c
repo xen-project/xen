@@ -197,7 +197,7 @@ static void check_cleanup_domid_map(struct domain *d,
 
     if ( !found )
     {
-        clear_bit(iommu->index, &dom_iommu(d)->arch.vtd.iommu_bitmap);
+        clear_bit(iommu->index, dom_iommu(d)->arch.vtd.iommu_bitmap);
         cleanup_domid_map(d, iommu);
     }
 }
