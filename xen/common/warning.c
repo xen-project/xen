@@ -30,6 +30,7 @@ void __init warning_print(void)
     {
         printk("%s", warnings[i]);
         printk("***************************************************\n");
+        process_pending_softirqs();
     }
 
     for ( i = 0; i < 3; i++ )
