@@ -4040,6 +4040,18 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         }
     }
 
+    if ( unlikely(currd->arch.monitor.vmexit_enabled) )
+    {
+        int rc;
+
+        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        rc = hvm_monitor_vmexit(exit_reason, exit_qualification);
+        if ( rc < 0 )
+            goto exit_and_crash;
+        if ( rc )
+            return;
+    }
+
     /* XXX: This looks ugly, but we need a mechanism to ensure
      * any pending vmresume has really happened
      */
