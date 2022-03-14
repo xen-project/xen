@@ -83,6 +83,7 @@
 #include <asm/mach-default/irq_vectors.h>
 #include <asm/pv/traps.h>
 #include <asm/pv/mm.h>
+#include <asm/shstk.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -788,8 +789,7 @@ static void fixup_exception_return(struct cpu_user_regs *regs,
     {
         unsigned long ssp, *ptr, *base;
 
-        asm ( "rdsspq %0" : "=r" (ssp) : "0" (1) );
-        if ( ssp == 1 )
+        if ( (ssp = rdssp()) == SSP_NO_SHSTK )
             goto shstk_done;
 
         ptr = _p(ssp);
@@ -818,9 +818,7 @@ static void fixup_exception_return(struct cpu_user_regs *regs,
              */
             if ( ptr[0] == regs->rip && ptr[1] == regs->cs )
             {
-                asm ( "wrssq %[fix], %[stk]"
-                      : [stk] "=m" (ptr[0])
-                      : [fix] "r" (fixup) );
+                wrss(fixup, ptr);
                 goto shstk_done;
             }
         }
