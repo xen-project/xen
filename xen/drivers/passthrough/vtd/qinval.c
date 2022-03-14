@@ -227,7 +227,7 @@ static int __must_check dev_invalidate_sync(struct vtd_iommu *iommu,
 
     ASSERT(iommu->qinval_maddr);
     rc = queue_invalidate_wait(iommu, 0, 1, 1, 1);
-    if ( rc == -ETIMEDOUT )
+    if ( rc == -ETIMEDOUT && !pdev->broken )
     {
         struct domain *d = rcu_lock_domain_by_id(did_to_domain_id(iommu, did));
 
@@ -241,6 +241,12 @@ static int __must_check dev_invalidate_sync(struct vtd_iommu *iommu,
         iommu_dev_iotlb_flush_timeout(d, pdev);
         rcu_unlock_domain(d);
     }
+    else if ( rc == -ETIMEDOUT )
+        /*
+         * The device is already marked as broken, ignore the error in order to
+         * allow {de,}assign to succeed.
+         */
+        rc = 0;
 
     return rc;
 }

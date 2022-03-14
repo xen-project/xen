@@ -108,6 +108,9 @@ struct pci_dev {
     /* Device with errata, ignore the BARs. */
     bool ignore_bars;
 
+    /* Device misbehaving, prevent assigning it to guests. */
+    bool broken;
+
     enum pdev_type {
         DEV_TYPE_PCI_UNKNOWN,
         DEV_TYPE_PCIe_ENDPOINT,

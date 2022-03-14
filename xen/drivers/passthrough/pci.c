@@ -501,7 +501,7 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
     xfree(pdev);
 }
 
-static void _pci_hide_device(struct pci_dev *pdev)
+static void __init _pci_hide_device(struct pci_dev *pdev)
 {
     if ( pdev->domain )
         return;
@@ -1489,6 +1489,11 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     ASSERT(pdev && (pdev->domain == hardware_domain ||
                     pdev->domain == dom_io));
 
+    /* Do not allow broken devices to be assigned to guests. */
+    rc = -EBADF;
+    if ( pdev->broken && d != hardware_domain && d != dom_io )
+        goto done;
+
     rc = pdev_msix_assign(d, pdev);
     if ( rc )
         goto done;
@@ -1587,9 +1592,7 @@ void iommu_dev_iotlb_flush_timeout(struct domain *d, struct pci_dev *pdev)
         return;
     }
 
-    list_del(&pdev->domain_list);
-    pdev->domain = NULL;
-    _pci_hide_device(pdev);
+    pdev->broken = true;
 
     if ( !d->is_shutting_down && printk_ratelimit() )
         printk(XENLOG_ERR "dom%d: ATS device %pp flush failed\n",
