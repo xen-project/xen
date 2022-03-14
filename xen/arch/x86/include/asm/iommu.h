@@ -101,11 +101,10 @@ void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned in
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);
 int iommu_setup_hpet_msi(struct msi_desc *);
 
-static inline int iommu_adjust_irq_affinities(void)
+static inline void iommu_adjust_irq_affinities(void)
 {
-    return iommu_ops.adjust_irq_affinities
-           ? iommu_call(&iommu_ops, adjust_irq_affinities)
-           : 0;
+    if ( iommu_enabled && iommu_ops.adjust_irq_affinities )
+        iommu_vcall(&iommu_ops, adjust_irq_affinities);
 }
 
 static inline bool iommu_supports_x2apic(void)

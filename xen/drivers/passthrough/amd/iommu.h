@@ -234,7 +234,7 @@ int amd_iommu_prepare(bool xt);
 int amd_iommu_init(bool xt);
 int amd_iommu_init_late(void);
 int amd_iommu_update_ivrs_mapping_acpi(void);
-int cf_check iov_adjust_irq_affinities(void);
+void cf_check iov_adjust_irq_affinities(void);
 
 int cf_check amd_iommu_quarantine_init(struct domain *d);
 

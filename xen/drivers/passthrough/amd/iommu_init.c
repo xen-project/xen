@@ -809,12 +809,9 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
     return 1;
 }
 
-int cf_check iov_adjust_irq_affinities(void)
+void cf_check iov_adjust_irq_affinities(void)
 {
     const struct amd_iommu *iommu;
-
-    if ( !iommu_enabled )
-        return 0;
 
     for_each_amd_iommu ( iommu )
     {
@@ -828,8 +825,6 @@ int cf_check iov_adjust_irq_affinities(void)
             set_msi_affinity(desc, NULL);
         spin_unlock_irqrestore(&desc->lock, flags);
     }
-
-    return 0;
 }
 
 /*
