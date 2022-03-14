@@ -289,9 +289,47 @@ static char *freq_string(u64 freq)
     return s;
 }
 
-static uint64_t adjust_elapsed(uint64_t elapsed, uint32_t actual,
-                               uint32_t target)
+static uint32_t __init read_pt_and_tsc(uint64_t *tsc,
+                                       const struct platform_timesource *pts)
 {
+    uint64_t tsc_prev = *tsc = rdtsc_ordered(), tsc_min = ~0;
+    uint32_t best = best;
+    unsigned int i;
+
+    for ( i = 0; ; ++i )
+    {
+        uint32_t pt = pts->read_counter();
+        uint64_t tsc_cur = rdtsc_ordered();
+        uint64_t tsc_delta = tsc_cur - tsc_prev;
+
+        if ( tsc_delta < tsc_min )
+        {
+            tsc_min = tsc_delta;
+            *tsc = tsc_cur;
+            best = pt;
+        }
+        else if ( i > 2 )
+            break;
+
+        tsc_prev = tsc_cur;
+    }
+
+    return best;
+}
+
+static uint64_t __init calibrate_tsc(const struct platform_timesource *pts)
+{
+    uint64_t start, end, elapsed;
+    unsigned int count = read_pt_and_tsc(&start, pts);
+    unsigned int target = CALIBRATE_VALUE(pts->frequency), actual;
+    unsigned int mask = (uint32_t)~0 >> (32 - pts->counter_bits);
+
+    while ( ((pts->read_counter() - count) & mask) < target )
+        continue;
+
+    actual = (read_pt_and_tsc(&end, pts) - count) & mask;
+    elapsed = end - start;
+
     if ( likely(actual > target) )
     {
         /*
@@ -397,8 +435,7 @@ static u64 cf_check read_hpet_count(void)
 
 static int64_t __init cf_check init_hpet(struct platform_timesource *pts)
 {
-    uint64_t hpet_rate, start;
-    uint32_t count, target, elapsed;
+    uint64_t hpet_rate;
     /*
      * Allow HPET to be setup, but report a frequency of 0 so it's not selected
      * as a timer source. This is required so it can be used in legacy
@@ -469,13 +506,7 @@ static int64_t __init cf_check init_hpet(struct platform_timesource *pts)
 
     pts->frequency = hpet_rate;
 
-    count = hpet_read32(HPET_COUNTER);
-    start = rdtsc_ordered();
-    target = CALIBRATE_VALUE(hpet_rate);
-    while ( (elapsed = hpet_read32(HPET_COUNTER) - count) < target )
-        continue;
-
-    return adjust_elapsed(rdtsc_ordered() - start, elapsed, target);
+    return calibrate_tsc(pts);
 }
 
 static void cf_check resume_hpet(struct platform_timesource *pts)
@@ -510,22 +541,12 @@ static u64 cf_check read_pmtimer_count(void)
 
 static s64 __init cf_check init_pmtimer(struct platform_timesource *pts)
 {
-    uint64_t start;
-    uint32_t count, target, mask, elapsed;
-
     if ( !pmtmr_ioport || (pmtmr_width != 24 && pmtmr_width != 32) )
         return 0;
 
     pts->counter_bits = pmtmr_width;
-    mask = 0xffffffff >> (32 - pmtmr_width);
 
-    count = inl(pmtmr_ioport);
-    start = rdtsc_ordered();
-    target = CALIBRATE_VALUE(ACPI_PM_FREQUENCY);
-    while ( (elapsed = (inl(pmtmr_ioport) - count) & mask) < target )
-        continue;
-
-    return adjust_elapsed(rdtsc_ordered() - start, elapsed, target);
+    return calibrate_tsc(pts);
 }
 
 static struct platform_timesource __initdata_cf_clobber plt_pmtimer =
