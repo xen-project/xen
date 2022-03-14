@@ -13,6 +13,7 @@
 #include <asm/apic.h>
 #include <asm/random.h>
 #include <asm/setup.h>
+#include <asm/shstk.h>
 #include <mach_apic.h>
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
 
@@ -811,14 +812,30 @@ void load_system_tables(void)
 	 */
 	if (cpu_has_xen_shstk) {
 		volatile uint64_t *ist_ssp = tss_page->ist_ssp;
+		unsigned long
+			mce_ssp = stack_top + (IST_MCE * IST_SHSTK_SIZE) - 8,
+			nmi_ssp = stack_top + (IST_NMI * IST_SHSTK_SIZE) - 8,
+			db_ssp  = stack_top + (IST_DB  * IST_SHSTK_SIZE) - 8,
+			df_ssp  = stack_top + (IST_DF  * IST_SHSTK_SIZE) - 8;
 
 		ist_ssp[0] = 0x8600111111111111ul;
-		ist_ssp[IST_MCE] = stack_top + (IST_MCE * IST_SHSTK_SIZE) - 8;
-		ist_ssp[IST_NMI] = stack_top + (IST_NMI * IST_SHSTK_SIZE) - 8;
-		ist_ssp[IST_DB]	 = stack_top + (IST_DB	* IST_SHSTK_SIZE) - 8;
-		ist_ssp[IST_DF]	 = stack_top + (IST_DF	* IST_SHSTK_SIZE) - 8;
+		ist_ssp[IST_MCE] = mce_ssp;
+		ist_ssp[IST_NMI] = nmi_ssp;
+		ist_ssp[IST_DB]	 = db_ssp;
+		ist_ssp[IST_DF]	 = df_ssp;
 		for ( i = IST_DF + 1; i < ARRAY_SIZE(tss_page->ist_ssp); ++i )
 			ist_ssp[i] = 0x8600111111111111ul;
+
+		if (IS_ENABLED(CONFIG_XEN_SHSTK) && rdssp() != SSP_NO_SHSTK) {
+			/*
+			 * Rewrite supervisor tokens when shadow stacks are
+			 * active.  This resets any busy bits left across S3.
+			 */
+			wrss(mce_ssp, _p(mce_ssp));
+			wrss(nmi_ssp, _p(nmi_ssp));
+			wrss(db_ssp,  _p(db_ssp));
+			wrss(df_ssp,  _p(df_ssp));
+		}
 
 		wrmsrl(MSR_INTERRUPT_SSP_TABLE, (unsigned long)ist_ssp);
 	}
