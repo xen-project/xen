@@ -109,8 +109,6 @@ static inline register_t sign_extend(const struct hsr_dabt dabt, register_t r)
     return r;
 }
 
-void post_increment_register(const struct instr_details *instr);
-
 #endif /* __ASM_ARM_TRAPS__ */
 /*
  * Local variables:

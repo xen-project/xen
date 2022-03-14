@@ -160,8 +160,6 @@ struct vcpu_io {
     /* I/O request in flight to device model. */
     enum vio_completion  completion;
     ioreq_t              req;
-    /* Arch specific info pertaining to the io request */
-    struct arch_vcpu_io  info;
 };
 
 struct vcpu
