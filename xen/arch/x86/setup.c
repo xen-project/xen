@@ -152,7 +152,7 @@ unsigned long __read_mostly xen_phys_start;
 
 unsigned long __read_mostly xen_virt_end;
 
-char __section(".bss.stack_aligned") __aligned(STACK_SIZE)
+char __section(".init.bss.stack_aligned") __aligned(STACK_SIZE)
     cpu0_stack[STACK_SIZE];
 
 struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
@@ -704,7 +704,6 @@ static void __init noreturn reinit_bsp_stack(void)
     percpu_traps_init();
 
     stack_base[0] = stack;
-    memguard_guard_stack(stack);
 
     rc = setup_cpu_root_pgt(0);
     if ( rc )
@@ -871,6 +870,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
+    void *bsp_stack;
+    struct cpu_info *info = get_cpu_info(), *bsp_info;
     unsigned int initrdidx, num_parked = 0;
     multiboot_info_t *mbi;
     module_t *mod;
@@ -903,7 +904,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     /* Full exception support from here on in. */
 
     rdmsrl(MSR_EFER, this_cpu(efer));
-    asm volatile ( "mov %%cr4,%0" : "=r" (get_cpu_info()->cr4) );
+    asm volatile ( "mov %%cr4,%0" : "=r" (info->cr4) );
 
     /* Enable NMIs.  Our loader (e.g. Tboot) may have left them disabled. */
     enable_nmis();
@@ -1733,6 +1734,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      */
     vm_init();
 
+    bsp_stack = cpu_alloc_stack(0);
+    if ( !bsp_stack )
+        panic("No memory for BSP stack\n");
+
     console_init_ring();
     vesa_init();
 
@@ -1991,17 +1996,18 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( bsp_delay_spec_ctrl )
     {
-        struct cpu_info *info = get_cpu_info();
-
         info->spec_ctrl_flags &= ~SCF_use_shadow;
         barrier();
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
         info->last_spec_ctrl = default_xen_spec_ctrl;
     }
 
-    /* Jump to the 1:1 virtual mappings of cpu0_stack. */
+    /* Copy the cpu info block, and move onto the BSP stack. */
+    bsp_info = get_cpu_info_from_stack((unsigned long)bsp_stack);
+    *bsp_info = *info;
+
     asm volatile ("mov %[stk], %%rsp; jmp %c[fn]" ::
-                  [stk] "g" (__va(__pa(get_stack_bottom()))),
+                  [stk] "g" (&bsp_info->guest_cpu_user_regs),
                   [fn] "i" (reinit_bsp_stack) : "memory");
     unreachable();
 }
