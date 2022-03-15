@@ -205,6 +205,7 @@ SECTIONS
   } :text
   DECL_SECTION(.init.data) {
 #endif
+       *(.init.bss.stack_aligned)
 
        *(.init.rodata)
        *(.init.rodata.*)
@@ -293,7 +294,6 @@ SECTIONS
 
   DECL_SECTION(.bss) {
        __bss_start = .;
-       *(.bss.stack_aligned)
        *(.bss.page_aligned*)
        . = ALIGN(PAGE_SIZE);
        __per_cpu_start = .;

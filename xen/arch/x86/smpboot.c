@@ -988,6 +988,23 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
     }
 }
 
+void *cpu_alloc_stack(unsigned int cpu)
+{
+    nodeid_t node = cpu_to_node(cpu);
+    unsigned int memflags = 0;
+    void *stack;
+
+    if ( node != NUMA_NO_NODE )
+        memflags = MEMF_node(node);
+
+    stack = alloc_xenheap_pages(STACK_ORDER, memflags);
+
+    if ( stack )
+        memguard_guard_stack(stack);
+
+    return stack;
+}
+
 static int cpu_smpboot_alloc(unsigned int cpu)
 {
     struct cpu_info *info;
@@ -1000,14 +1017,9 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
 
-    if ( stack_base[cpu] == NULL )
-    {
-        stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
-        if ( !stack_base[cpu] )
+    if ( stack_base[cpu] == NULL &&
+         (stack_base[cpu] = cpu_alloc_stack(cpu)) == NULL )
             goto out;
-
-        memguard_guard_stack(stack_base[cpu]);
-    }
 
     info = get_cpu_info_from_stack((unsigned long)stack_base[cpu]);
     info->processor_id = cpu;
