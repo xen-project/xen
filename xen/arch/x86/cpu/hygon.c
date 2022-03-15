@@ -36,6 +36,12 @@ static void init_hygon(struct cpuinfo_x86 *c)
 
 	amd_init_ssbd(c);
 
+	/*
+	 * TODO: Check heuristic safety with Hygon first
+	if (c->x86 == 0x18)
+		amd_init_spectral_chicken();
+	 */
+
 	/* MFENCE stops RDTSC speculation */
 	if (!cpu_has_lfence_dispatch)
 		__set_bit(X86_FEATURE_MFENCE_RDTSC, c->x86_capability);
