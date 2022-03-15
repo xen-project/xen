@@ -1059,23 +1059,24 @@ static void __setup_APIC_LVTT(unsigned int clocks)
 {
     unsigned int lvtt_value, tmp_value;
 
-    /* NB. Xen uses local APIC timer in one-shot mode. */
-    lvtt_value = /*APIC_TIMER_MODE_PERIODIC |*/ LOCAL_TIMER_VECTOR;
-
     if ( tdt_enabled )
     {
-        lvtt_value &= (~APIC_TIMER_MODE_MASK);
-        lvtt_value |= APIC_TIMER_MODE_TSC_DEADLINE;
+        lvtt_value = APIC_TIMER_MODE_TSC_DEADLINE | LOCAL_TIMER_VECTOR;
+        apic_write(APIC_LVTT, lvtt_value);
+
+        /*
+         * See Intel SDM: TSC-Deadline Mode chapter. In xAPIC mode,
+         * writing to the APIC LVTT and TSC_DEADLINE MSR isn't serialized.
+         * According to Intel, MFENCE can do the serialization here.
+         */
+        asm volatile( "mfence" : : : "memory" );
+
+        return;
     }
 
+    /* NB. Xen uses local APIC timer in one-shot mode. */
+    lvtt_value = APIC_TIMER_MODE_ONESHOT | LOCAL_TIMER_VECTOR;
     apic_write(APIC_LVTT, lvtt_value);
-
-    /*
-     * See Intel SDM: TSC-Deadline Mode chapter. In xAPIC mode,
-     * writing to the APIC LVTT and TSC_DEADLINE MSR isn't serialized.
-     * According to Intel, MFENCE can do the serialization here.
-     */
-    asm volatile( "mfence" : : : "memory" );
 
     tmp_value = apic_read(APIC_TDCR);
     apic_write(APIC_TDCR, tmp_value | APIC_TDR_DIV_1);
