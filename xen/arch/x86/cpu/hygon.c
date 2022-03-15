@@ -41,6 +41,12 @@ static void init_hygon(struct cpuinfo_x86 *c)
 		detect_zen2_null_seg_behaviour();
 
 	/*
+	 * TODO: Check heuristic safety with Hygon first
+	if (c->x86 == 0x18)
+		amd_init_spectral_chicken();
+	 */
+
+	/*
 	 * Hygon CPUs before Zen2 don't clear segment bases/limits when
 	 * loading a NULL selector.
 	 */
