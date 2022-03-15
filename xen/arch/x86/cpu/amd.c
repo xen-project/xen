@@ -731,6 +731,31 @@ void amd_init_ssbd(const struct cpuinfo_x86 *c)
 		printk_once(XENLOG_ERR "No SSBD controls available\n");
 }
 
+/*
+ * On Zen2 we offer this chicken (bit) on the altar of Speculation.
+ *
+ * Refer to the AMD Branch Type Confusion whitepaper:
+ * https://XXX
+ *
+ * Setting this unnamed bit supposedly causes prediction information on
+ * non-branch instructions to be ignored.  It is to be set unilaterally in
+ * newer microcode.
+ *
+ * This chickenbit is something unrelated on Zen1, and Zen1 vs Zen2 isn't a
+ * simple model number comparison, so use STIBP as a heuristic to separate the
+ * two uarches in Fam17h(AMD)/18h(Hygon).
+ */
+void amd_init_spectral_chicken(void)
+{
+	uint64_t val, chickenbit = 1 << 1;
+
+	if (cpu_has_hypervisor || !boot_cpu_has(X86_FEATURE_AMD_STIBP))
+		return;
+
+	if (rdmsr_safe(MSR_AMD64_DE_CFG2, val) == 0 && !(val & chickenbit))
+		wrmsr_safe(MSR_AMD64_DE_CFG2, val | chickenbit);
+}
+
 void __init detect_zen2_null_seg_behaviour(void)
 {
 	uint64_t base;
@@ -795,6 +820,9 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 		amd_init_lfence(c);
 
 	amd_init_ssbd(c);
+
+	if (c->x86 == 0x17)
+		amd_init_spectral_chicken();
 
 	/* Probe for NSCB on Zen2 CPUs when not virtualised */
 	if (!cpu_has_hypervisor && !cpu_has_nscb && c == &boot_cpu_data &&
