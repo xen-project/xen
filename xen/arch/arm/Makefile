@@ -112,7 +112,7 @@ $(TARGET)-syms: $(BASEDIR)/prelink.o $(obj)/xen.lds
 include:
 
 $(obj)/xen.lds: $(src)/xen.lds.S FORCE
-	$(call if_changed,cpp_lds_S)
+	$(call if_changed_dep,cpp_lds_S)
 
 $(obj)/dtb.o: $(patsubst "%",%,$(CONFIG_DTB_FILE))
 
