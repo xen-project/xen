@@ -85,6 +85,8 @@ extern cpumask_t **socket_cpumask;
 extern unsigned int disabled_cpus;
 extern bool unaccounted_cpus;
 
+void *cpu_alloc_stack(unsigned int cpu);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif

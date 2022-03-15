@@ -235,6 +235,7 @@ SECTIONS
   } PHDR(text)
   DECL_SECTION(.init.data) {
 #endif
+       *(.init.bss.stack_aligned)
 
        . = ALIGN(POINTER_ALIGN);
        __initdata_cf_clobber_start = .;
@@ -348,7 +349,6 @@ SECTIONS
 
   DECL_SECTION(.bss) {
        __bss_start = .;
-       *(.bss.stack_aligned)
        *(.bss.page_aligned*)
        . = ALIGN(PAGE_SIZE);
        __per_cpu_start = .;
