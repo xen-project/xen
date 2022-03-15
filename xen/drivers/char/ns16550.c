@@ -91,6 +91,7 @@ struct ns16550_config {
         param_exar_xr17v352,
         param_exar_xr17v354,
         param_exar_xr17v358,
+        param_intel_lpss,
     } param;
 };
 
@@ -822,6 +823,16 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .mmio = 1,
         .max_ports = 8,
     },
+    [param_intel_lpss] = {
+        .uart_offset = 0x000,
+        .reg_shift = 2,
+        .reg_width = 1,
+        .fifo_size = 64,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .mmio = 1,
+        .max_ports = 1,
+    },
 };
 
 static const struct ns16550_config __initconst uart_config[] =
@@ -1065,6 +1076,12 @@ static const struct ns16550_config __initconst uart_config[] =
         .vendor_id = PCI_VENDOR_ID_EXAR,
         .dev_id = 0x0358,
         .param = param_exar_xr17v358
+    },
+    /* Intel Corp. TGL-LP LPSS PCI */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xa0c7,
+        .param = param_intel_lpss
     },
 };
 
