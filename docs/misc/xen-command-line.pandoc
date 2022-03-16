@@ -2034,8 +2034,9 @@ By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
 
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb,md-clear}=<bool>,
->              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,eager-fpu,
->              l1d-flush,branch-harden,srb-lock,unpriv-mmio}=<bool> ]`
+>              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,psfd,
+>              eager-fpu,l1d-flush,branch-harden,srb-lock,
+>              unpriv-mmio}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -2085,15 +2086,25 @@ On hardware supporting IBRS (Indirect Branch Restricted Speculation), the
 If Xen is not using IBRS itself, functionality is still set up so IBRS can be
 virtualised for guests.
 
-On hardware supporting IBPB (Indirect Branch Prediction Barrier), the `ibpb=`
-option can be used to force (the default) or prevent Xen from issuing branch
-prediction barriers on vcpu context switches.
+On hardware supporting STIBP (Single Thread Indirect Branch Predictors), the
+`stibp=` option can be used to force or prevent Xen using the feature itself.
+By default, Xen will use STIBP when IBRS is in use (IBRS implies STIBP), and
+when hardware hints recommend using it as a blanket setting.
 
 On hardware supporting SSBD (Speculative Store Bypass Disable), the `ssbd=`
 option can be used to force or prevent Xen using the feature itself.  On AMD
 hardware, this is a global option applied at boot, and not virtualised for
 guest use.  On Intel hardware, the feature is virtualised for guests,
 independently of Xen's choice of setting.
+
+On hardware supporting PSFD (Predictive Store Forwarding Disable), the `psfd=`
+option can be used to force or prevent Xen using the feature itself.  By
+default, Xen will not use PSFD.  PSFD is implied by SSBD, and SSBD is off by
+default.
+
+On hardware supporting IBPB (Indirect Branch Prediction Barrier), the `ibpb=`
+option can be used to force (the default) or prevent Xen from issuing branch
+prediction barriers on vcpu context switches.
 
 On all hardware, the `eager-fpu=` option can be used to force or prevent Xen
 from using fully eager FPU context switches.  This is currently implemented as
