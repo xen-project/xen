@@ -165,7 +165,7 @@ static void cf_check evtchn_fifo_set_pending(
     unsigned int port;
     event_word_t *word;
     unsigned long flags;
-    bool_t was_pending;
+    bool check_pollers = false;
     struct evtchn_fifo_queue *q, *old_q;
     unsigned int try;
     bool linked = true;
@@ -226,8 +226,6 @@ static void cf_check evtchn_fifo_set_pending(
         spin_unlock_irqrestore(&q->lock, flags);
     }
 
-    was_pending = guest_test_and_set_bit(d, EVTCHN_FIFO_PENDING, word);
-
     /* If we didn't get the lock bail out. */
     if ( try == 3 )
     {
@@ -248,6 +246,8 @@ static void cf_check evtchn_fifo_set_pending(
                "%pv has no FIFO event channel control block\n", v);
         goto unlock;
     }
+
+    check_pollers = !guest_test_and_set_bit(d, EVTCHN_FIFO_PENDING, word);
 
     /*
      * Link the event if it unmasked and not already linked.
@@ -314,7 +314,7 @@ static void cf_check evtchn_fifo_set_pending(
                                  &v->evtchn_fifo->control_block->ready) )
         vcpu_mark_events_pending(v);
 
-    if ( !was_pending )
+    if ( check_pollers )
         evtchn_check_pollers(d, port);
 }
 
