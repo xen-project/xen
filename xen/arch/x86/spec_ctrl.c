@@ -48,9 +48,13 @@ static enum ind_thunk {
     THUNK_LFENCE,
     THUNK_JMP,
 } opt_thunk __initdata = THUNK_DEFAULT;
+
 static int8_t __initdata opt_ibrs = -1;
+int8_t __initdata opt_stibp = -1;
+bool __ro_after_init opt_ssbd;
+int8_t __initdata opt_psfd = -1;
+
 bool __read_mostly opt_ibpb = true;
-bool __read_mostly opt_ssbd = false;
 int8_t __read_mostly opt_eager_fpu = -1;
 int8_t __read_mostly opt_l1d_flush = -1;
 static bool __initdata opt_branch_harden = true;
@@ -172,12 +176,20 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             else
                 rc = -EINVAL;
         }
+
+        /* Bits in MSR_SPEC_CTRL. */
         else if ( (val = parse_boolean("ibrs", s, ss)) >= 0 )
             opt_ibrs = val;
-        else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
-            opt_ibpb = val;
+        else if ( (val = parse_boolean("stibp", s, ss)) >= 0 )
+            opt_stibp = val;
         else if ( (val = parse_boolean("ssbd", s, ss)) >= 0 )
             opt_ssbd = val;
+        else if ( (val = parse_boolean("psfd", s, ss)) >= 0 )
+            opt_psfd = val;
+
+        /* Misc settings. */
+        else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
+            opt_ibpb = val;
         else if ( (val = parse_boolean("eager-fpu", s, ss)) >= 0 )
             opt_eager_fpu = val;
         else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
@@ -376,7 +388,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s%s, Other:%s%s%s%s%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
@@ -390,6 +402,9 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (!boot_cpu_has(X86_FEATURE_SSBD) &&
             !boot_cpu_has(X86_FEATURE_AMD_SSBD))     ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
+           (!boot_cpu_has(X86_FEATURE_PSFD) &&
+            !boot_cpu_has(X86_FEATURE_INTEL_PSFD))   ? "" :
+           (default_xen_spec_ctrl & SPEC_CTRL_PSFD)  ? " PSFD+" : " PSFD-",
            !(caps & ARCH_CAPS_TSX_CTRL)              ? "" :
            (opt_tsx & 1)                             ? " TSX+" : " TSX-",
            !cpu_has_srbds_ctrl                       ? "" :
@@ -980,10 +995,7 @@ void __init init_speculation_mitigations(void)
         if ( !has_spec_ctrl )
             printk(XENLOG_WARNING "?!? CET active, but no MSR_SPEC_CTRL?\n");
         else if ( opt_ibrs == -1 )
-        {
             opt_ibrs = ibrs = true;
-            default_xen_spec_ctrl |= SPEC_CTRL_IBRS | SPEC_CTRL_STIBP;
-        }
 
         if ( opt_thunk == THUNK_DEFAULT || opt_thunk == THUNK_RETPOLINE )
             thunk = THUNK_JMP;
@@ -1087,14 +1099,49 @@ void __init init_speculation_mitigations(void)
             setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
     }
 
-    /* If we have IBRS available, see whether we should use it. */
+    /* Figure out default_xen_spec_ctrl. */
     if ( has_spec_ctrl && ibrs )
-        default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
+    {
+        /* IBRS implies STIBP.  */
+        if ( opt_stibp == -1 )
+            opt_stibp = 1;
 
-    /* If we have SSBD available, see whether we should use it. */
+        default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
+    }
+
+    /*
+     * Use STIBP by default if the hardware hint is set.  Otherwise, leave it
+     * off as it a severe performance pentalty on pre-eIBRS Intel hardware
+     * where it was retrofitted in microcode.
+     */
+    if ( opt_stibp == -1 )
+        opt_stibp = !!boot_cpu_has(X86_FEATURE_STIBP_ALWAYS);
+
+    if ( opt_stibp && (boot_cpu_has(X86_FEATURE_STIBP) ||
+                       boot_cpu_has(X86_FEATURE_AMD_STIBP)) )
+        default_xen_spec_ctrl |= SPEC_CTRL_STIBP;
+
     if ( opt_ssbd && (boot_cpu_has(X86_FEATURE_SSBD) ||
                       boot_cpu_has(X86_FEATURE_AMD_SSBD)) )
+    {
+        /* SSBD implies PSFD */
+        if ( opt_psfd == -1 )
+            opt_psfd = 1;
+
         default_xen_spec_ctrl |= SPEC_CTRL_SSBD;
+    }
+
+    /*
+     * Don't use PSFD by default.  AMD designed the predictor to
+     * auto-clear on privilege change.  PSFD is implied by SSBD, which is
+     * off by default.
+     */
+    if ( opt_psfd == -1 )
+        opt_psfd = 0;
+
+    if ( opt_psfd && (boot_cpu_has(X86_FEATURE_PSFD) ||
+                      boot_cpu_has(X86_FEATURE_INTEL_PSFD)) )
+        default_xen_spec_ctrl |= SPEC_CTRL_PSFD;
 
     /*
      * PV guests can create RSB entries for any linear address they control,

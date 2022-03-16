@@ -29,6 +29,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/svmdebug.h>
+#include <asm/spec_ctrl.h>
 
 struct vmcb_struct *alloc_vmcb(void)
 {
@@ -175,6 +176,14 @@ static int construct_vmcb(struct vcpu *v)
         if ( cpu_has_pause_thresh )
             vmcb->_pause_filter_thresh = SVM_PAUSETHRESH_INIT;
     }
+
+    /*
+     * When default_xen_spec_ctrl simply SPEC_CTRL_STIBP, default this behind
+     * the back of the VM too.  Our SMT topology isn't accurate, the overhead
+     * is neglegable, and doing this saves a WRMSR on the vmentry path.
+     */
+    if ( default_xen_spec_ctrl == SPEC_CTRL_STIBP )
+        v->arch.msrs->spec_ctrl.raw = SPEC_CTRL_STIBP;
 
     return 0;
 }
