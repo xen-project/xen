@@ -18,9 +18,11 @@
 
 #include <xen/lib.h>
 #include <xen/kernel.h>
+#include <xen/sched.h>
 
 #include <public/xen.h>
 
+#include <asm/mmio.h>
 #include <asm/processor.h>
 #include <asm/traps.h>
 
@@ -80,6 +82,16 @@ void do_trap_data_abort(struct cpu_user_regs *regs)
         do_trap_guest_serror(regs);
     else
         do_unexpected_trap("Data Abort", regs);
+}
+
+void finalize_instr_emulation(const struct instr_details *instr)
+{
+    /*
+     * We have not implemented decoding of post indexing instructions for 32 bit.
+     * Thus, this should be unreachable.
+     */
+    if ( instr->state == INSTR_LDR_STR_POSTINDEXING )
+        domain_crash(current->domain);
 }
 
 /*

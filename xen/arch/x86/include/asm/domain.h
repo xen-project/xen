@@ -756,6 +756,9 @@ static inline void pv_inject_sw_interrupt(unsigned int vector)
                       : is_pv_32bit_domain(d) ? PV32_VM_ASSIST_MASK \
                                               : PV64_VM_ASSIST_MASK)
 
+struct arch_vcpu_io {
+};
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*
