@@ -1712,8 +1712,8 @@ static const struct evex {
     { { 0x7a }, 2, T, R, pfx_f3, Wn, Ln }, /* vcvtu{d,q}2pd */
     { { 0x7a }, 2, T, R, pfx_f2, Wn, Ln }, /* vcvtu{d,q}2ps */
     { { 0x7b }, 2, T, R, pfx_66, Wn, Ln }, /* vcvtp{s,d}2qq */
-    { { 0x7b }, 2, T, R, pfx_f3, Wn, LIG }, /* vcvtusi2s */
-    { { 0x7b }, 2, T, R, pfx_f2, Wn, LIG }, /* vcvtusi2s */
+    { { 0x7b }, 2, T, R, pfx_f3, Wn, LIG }, /* vcvtusi2ss */
+    { { 0x7b }, 2, T, R, pfx_f2, Wn, LIG }, /* vcvtusi2sd */
     { { 0x7e }, 2, T, W, pfx_66, Wn, L0 }, /* vmov{d,q} */
     { { 0x7e }, 2, T, R, pfx_f3, W1, L0 }, /* vmovq */
     { { 0x7f }, 2, T, W, pfx_66, Wn, Ln }, /* vmovdqa{32,64} */
