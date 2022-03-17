@@ -1822,8 +1822,8 @@ static const struct evex {
     { { 0x2a }, 2, F, R, pfx_66, W0, Ln }, /* vmovntdqa */
     { { 0x2a, 0xc0 }, 2, F, N, pfx_f3, W1, Ln }, /* vpbroadcastmb2q */
     { { 0x2b }, 2, T, R, pfx_66, W0, Ln }, /* vpackusdw */
-    { { 0x2c }, 2, F, R, pfx_66, Wn, Ln }, /* vscalefp{s,d} */
-    { { 0x2d }, 2, F, R, pfx_66, Wn, LIG }, /* vscalefs{s,d} */
+    { { 0x2c }, 2, T, R, pfx_66, Wn, Ln }, /* vscalefp{s,d} */
+    { { 0x2d }, 2, T, R, pfx_66, Wn, LIG }, /* vscalefs{s,d} */
     { { 0x30 }, 2, T, R, pfx_66, WIG, Ln }, /* vpmovzxbw */
     { { 0x30 }, 2, T, W, pfx_f3, W0, Ln }, /* vpmovwb */
     { { 0x31 }, 2, T, R, pfx_66, WIG, Ln }, /* vpmovzxbd */
