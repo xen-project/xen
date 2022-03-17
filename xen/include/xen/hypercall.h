@@ -198,8 +198,8 @@ compat_sched_op(
 
 extern int cf_check
 compat_set_timer_op(
-    u32 lo,
-    s32 hi);
+    uint32_t lo,
+    int32_t hi);
 
 extern int cf_check compat_xsm_op(
     XEN_GUEST_HANDLE_PARAM(void) op);

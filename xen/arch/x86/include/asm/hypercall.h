@@ -94,7 +94,7 @@ do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc);
 extern long cf_check
 do_update_va_mapping(
     unsigned long va,
-    u64 val64,
+    uint64_t val64,
     unsigned long flags);
 
 extern long cf_check
@@ -104,7 +104,7 @@ do_physdev_op(
 extern long cf_check
 do_update_va_mapping_otherdomain(
     unsigned long va,
-    u64 val64,
+    uint64_t val64,
     unsigned long flags,
     domid_t domid);
 
@@ -162,10 +162,10 @@ extern long cf_check compat_callback_op(
     int cmd, XEN_GUEST_HANDLE(void) arg);
 
 extern int cf_check compat_update_va_mapping(
-    unsigned int va, u32 lo, u32 hi, unsigned int flags);
+    unsigned int va, uint32_t lo, uint32_t hi, unsigned int flags);
 
 extern int cf_check compat_update_va_mapping_otherdomain(
-    unsigned int va, u32 lo, u32 hi, unsigned int flags, domid_t domid);
+    unsigned int va, uint32_t lo, uint32_t hi, unsigned int flags, domid_t domid);
 
 DEFINE_XEN_GUEST_HANDLE(trap_info_compat_t);
 extern int cf_check compat_set_trap_table(
@@ -175,7 +175,7 @@ extern int cf_check compat_set_gdt(
     XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries);
 
 extern int cf_check compat_update_descriptor(
-    u32 pa_lo, u32 pa_hi, u32 desc_lo, u32 desc_hi);
+    uint32_t pa_lo, uint32_t pa_hi, uint32_t desc_lo, uint32_t desc_hi);
 
 extern unsigned int cf_check compat_iret(void);
 
