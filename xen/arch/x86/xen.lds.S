@@ -454,7 +454,7 @@ SECTIONS
   .stab.exclstr 0 : { *(.stab.exclstr) }
   .stab.index 0 : { *(.stab.index) }
   .stab.indexstr 0 : { *(.stab.indexstr) }
-  .comment 0 : { *(.comment) }
+  .comment 0 : { *(.comment) *(.comment.*) }
   /*
    * LLVM ld also wants .symtab, .strtab, and .shstrtab placed. These look to
    * be benign to GNU ld, so we can have them here unconditionally.
