@@ -497,7 +497,13 @@ ASSERT(IS_ALIGNED(__bss_end,        8), "__bss_end misaligned")
 
 #ifndef EFI
 ASSERT(!SIZEOF(.got),      ".got non-empty")
-ASSERT(!SIZEOF(.got.plt),  ".got.plt non-empty")
+/*
+ * At least GNU ld 2.30 and earlier fail to discard the generic part of
+ * .got.plt when no actual entries were allocated. Permit this case alongside
+ * the section being empty.
+ */
+ASSERT(!SIZEOF(.got.plt) || SIZEOF(.got.plt) == 3 * 8,
+       "unexpected .got.plt size")
 ASSERT(!SIZEOF(.igot.plt), ".igot.plt non-empty")
 ASSERT(!SIZEOF(.iplt),     ".iplt non-empty")
 ASSERT(!SIZEOF(.plt),      ".plt non-empty")
