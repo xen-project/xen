@@ -3,6 +3,7 @@ LD         = $(CROSS_COMPILE)gld
 CC         = $(CROSS_COMPILE)gcc
 CPP        = $(CROSS_COMPILE)gcc -E
 CXX        = $(CROSS_COMPILE)g++
+ADDR2LINE  = $(CROSS_COMPILE)gaddr2line
 AR         = $(CROSS_COMPILE)gar
 RANLIB     = $(CROSS_COMPILE)granlib
 NM         = $(CROSS_COMPILE)gnm
