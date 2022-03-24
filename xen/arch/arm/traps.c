@@ -1371,7 +1371,7 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(xsm_op, 1),
     HYPERCALL(event_channel_op, 2),
     HYPERCALL_DEPRECATED(event_channel_op_compat, 1),
-    HYPERCALL(physdev_op, 2),
+    HYPERCALL_ARM(physdev_op, 2),
     HYPERCALL_DEPRECATED(physdev_op_compat, 1),
     HYPERCALL(sysctl, 2),
     HYPERCALL(hvm_op, 2),
