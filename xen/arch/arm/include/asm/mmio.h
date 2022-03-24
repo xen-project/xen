@@ -35,6 +35,7 @@ enum instr_decode_state
      * instruction.
      */
     INSTR_LDR_STR_POSTINDEXING,
+    INSTR_CACHE,                    /* Cache Maintenance instr */
 };
 
 typedef struct

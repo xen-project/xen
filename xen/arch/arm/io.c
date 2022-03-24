@@ -140,6 +140,17 @@ void try_decode_instruction(const struct cpu_user_regs *regs,
     }
 
     /*
+     * When the data abort is caused due to cache maintenance, Xen should check
+     * if the address belongs to an emulated MMIO region or not. The behavior
+     * will differ accordingly.
+     */
+    if ( info->dabt.cache )
+    {
+        info->dabt_instr.state = INSTR_CACHE;
+        return;
+    }
+
+    /*
      * Armv8 processor does not provide a valid syndrome for decoding some
      * instructions. So in order to process these instructions, Xen must
      * decode them.
@@ -161,7 +172,7 @@ enum io_state try_handle_mmio(struct cpu_user_regs *regs,
 
     ASSERT(info->dabt.ec == HSR_EC_DATA_ABORT_LOWER_EL);
 
-    if ( !info->dabt.valid )
+    if ( !(info->dabt.valid || (info->dabt_instr.state == INSTR_CACHE)) )
     {
         ASSERT_UNREACHABLE();
         return IO_ABORT;
@@ -176,6 +187,13 @@ enum io_state try_handle_mmio(struct cpu_user_regs *regs,
 
         return rc;
     }
+
+    /*
+     * When the data abort is caused due to cache maintenance and the address
+     * belongs to an emulated region, Xen should ignore this instruction.
+     */
+    if ( info->dabt_instr.state == INSTR_CACHE )
+        return IO_HANDLED;
 
     /*
      * At this point, we know that the instruction is either valid or has been
