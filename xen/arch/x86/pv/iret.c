@@ -18,6 +18,7 @@
  */
 
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 

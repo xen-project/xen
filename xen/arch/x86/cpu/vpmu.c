@@ -22,6 +22,7 @@
 #include <xen/param.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/sched.h>
 #include <asm/regs.h>
 #include <asm/types.h>

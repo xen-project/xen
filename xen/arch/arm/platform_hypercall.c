@@ -9,6 +9,7 @@
 #include <xen/types.h>
 #include <xen/sched.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/spinlock.h>
 #include <public/platform.h>
 #include <xsm/xsm.h>

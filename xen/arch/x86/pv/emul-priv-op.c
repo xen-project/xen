@@ -22,13 +22,13 @@
 #include <xen/domain_page.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/iocap.h>
 
 #include <asm/amd.h>
 #include <asm/debugreg.h>
 #include <asm/endbr.h>
 #include <asm/hpet.h>
-#include <asm/hypercall.h>
 #include <asm/mc146818rtc.h>
 #include <asm/pv/domain.h>
 #include <asm/pv/trace.h>

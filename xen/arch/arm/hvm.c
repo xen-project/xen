@@ -20,6 +20,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/sched.h>
 #include <xen/monitor.h>
 
@@ -28,8 +29,6 @@
 #include <public/xen.h>
 #include <public/hvm/params.h>
 #include <public/hvm/hvm_op.h>
-
-#include <asm/hypercall.h>
 
 static int hvm_allow_set_param(const struct domain *d, unsigned int param)
 {

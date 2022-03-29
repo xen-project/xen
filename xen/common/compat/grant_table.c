@@ -3,6 +3,7 @@
  *
  */
 
+#include <xen/hypercall.h>
 #include <compat/grant_table.h>
 
 #define xen_grant_entry_v1 grant_entry_v1

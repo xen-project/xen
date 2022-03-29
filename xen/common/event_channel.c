@@ -24,6 +24,7 @@
 #include <xen/iocap.h>
 #include <xen/compat.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/keyhandler.h>
 #include <asm/current.h>
 

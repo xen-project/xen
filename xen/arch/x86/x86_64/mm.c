@@ -25,14 +25,12 @@ EMIT_FILE;
 #include <xen/numa.h>
 #include <xen/nodemask.h>
 #include <xen/guest_access.h>
-#include <xen/hypercall.h>
 #include <xen/mem_access.h>
 #include <asm/current.h>
 #include <asm/asm_defns.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
-#include <asm/hypercall.h>
 #include <asm/msr.h>
 #include <asm/pv/domain.h>
 #include <asm/setup.h>
