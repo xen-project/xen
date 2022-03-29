@@ -75,6 +75,13 @@ ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom pv-grub-if-enabled
 endif
 
+define do-subtree
+$(1)/%: FORCE
+	$$(MAKE) -C $(1) $$*
+endef
+
+$(foreach m,$(wildcard */Makefile),$(eval $(call do-subtree,$(patsubst %/Makefile,%,$(m)))))
+
 .PHONY: build-docs
 build-docs:
 	$(MAKE) -C docs build
@@ -334,3 +341,6 @@ uninstall: uninstall-tools-public-headers $(TARGS_UNINSTALL)
 .PHONY: xenversion
 xenversion:
 	@$(MAKE) --no-print-directory -C xen xenversion
+
+.PHONY: FORCE
+FORCE:
