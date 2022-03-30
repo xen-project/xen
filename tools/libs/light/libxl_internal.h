@@ -2326,7 +2326,7 @@ bool libxl__stubdomain_is_linux_running(libxl__gc *gc, uint32_t domid)
 }
 
 static inline
-bool libxl__stubdomain_is_linux(libxl_domain_build_info *b_info)
+bool libxl__stubdomain_is_linux(const libxl_domain_build_info *b_info)
 {
     /* right now qemu-tranditional implies MiniOS stubdomain and qemu-xen
      * implies Linux stubdomain */
