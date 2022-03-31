@@ -129,6 +129,8 @@ struct vpci {
         bool enabled         : 1;
         /* Masked? */
         bool masked          : 1;
+        /* PBA map */
+        void __iomem *pba;
         /* Entries. */
         struct vpci_msix_entry {
             uint64_t addr;

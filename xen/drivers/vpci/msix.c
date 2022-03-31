@@ -182,6 +182,38 @@ static struct vpci_msix_entry *get_entry(struct vpci_msix *msix,
     return &msix->entries[(addr - start) / PCI_MSIX_ENTRY_SIZE];
 }
 
+static void __iomem *get_pba(struct vpci *vpci)
+{
+    struct vpci_msix *msix = vpci->msix;
+    /*
+     * PBA will only be unmapped when the device is deassigned, so access it
+     * without holding the vpci lock.
+     */
+    void __iomem *pba = read_atomic(&msix->pba);
+
+    if ( likely(pba) )
+        return pba;
+
+    pba = ioremap(vmsix_table_addr(vpci, VPCI_MSIX_PBA),
+                  vmsix_table_size(vpci, VPCI_MSIX_PBA));
+    if ( !pba )
+        return read_atomic(&msix->pba);
+
+    spin_lock(&vpci->lock);
+    if ( !msix->pba )
+    {
+        write_atomic(&msix->pba, pba);
+        spin_unlock(&vpci->lock);
+    }
+    else
+    {
+        spin_unlock(&vpci->lock);
+        iounmap(pba);
+    }
+
+    return read_atomic(&msix->pba);
+}
+
 static int msix_read(struct vcpu *v, unsigned long addr, unsigned int len,
                      unsigned long *data)
 {
@@ -200,6 +232,10 @@ static int msix_read(struct vcpu *v, unsigned long addr, unsigned int len,
 
     if ( VMSIX_ADDR_IN_RANGE(addr, msix->pdev->vpci, VPCI_MSIX_PBA) )
     {
+        struct vpci *vpci = msix->pdev->vpci;
+        unsigned int idx = addr - vmsix_table_addr(vpci, VPCI_MSIX_PBA);
+        const void __iomem *pba = get_pba(vpci);
+
         /*
          * Access to PBA.
          *
@@ -207,14 +243,22 @@ static int msix_read(struct vcpu *v, unsigned long addr, unsigned int len,
          * guest address space. If this changes the address will need to be
          * translated.
          */
+        if ( !pba )
+        {
+            gprintk(XENLOG_WARNING,
+                    "%pp: unable to map MSI-X PBA, report all pending\n",
+                    msix->pdev);
+            return X86EMUL_OKAY;
+        }
+
         switch ( len )
         {
         case 4:
-            *data = readl(addr);
+            *data = readl(pba + idx);
             break;
 
         case 8:
-            *data = readq(addr);
+            *data = readq(pba + idx);
             break;
 
         default:
@@ -278,14 +322,27 @@ static int msix_write(struct vcpu *v, unsigned long addr, unsigned int len,
         /* Ignore writes to PBA for DomUs, it's behavior is undefined. */
         if ( is_hardware_domain(d) )
         {
+            struct vpci *vpci = msix->pdev->vpci;
+            unsigned int idx = addr - vmsix_table_addr(vpci, VPCI_MSIX_PBA);
+            const void __iomem *pba = get_pba(vpci);
+
+            if ( !pba )
+            {
+                /* Unable to map the PBA, ignore write. */
+                gprintk(XENLOG_WARNING,
+                        "%pp: unable to map MSI-X PBA, write ignored\n",
+                        msix->pdev);
+                return X86EMUL_OKAY;
+            }
+
             switch ( len )
             {
             case 4:
-                writel(data, addr);
+                writel(data, pba + idx);
                 break;
 
             case 8:
-                writeq(data, addr);
+                writeq(data, pba + idx);
                 break;
 
             default:
