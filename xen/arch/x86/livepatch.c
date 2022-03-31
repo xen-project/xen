@@ -28,7 +28,7 @@ static bool has_active_waitqueue(const struct vm_event_domain *ved)
 }
 
 /*
- * x86's implementation of waitqueue violates the livepatching safey principle
+ * x86's implementation of waitqueue violates the livepatching safety principle
  * of having unwound every CPUs stack before modifying live content.
  *
  * Search through every domain and check that no vCPUs have an active
