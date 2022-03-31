@@ -41,10 +41,12 @@ CFLAGS += -mno-red-zone -fpic
 # SSE setup for variadic function calls.
 CFLAGS += -mno-sse $(call cc-option,$(CC),-mskip-rax-setup)
 
-# Compile with thunk-extern, indirect-branch-register if avaiable.
-CFLAGS-$(CONFIG_INDIRECT_THUNK) += -mindirect-branch=thunk-extern
-CFLAGS-$(CONFIG_INDIRECT_THUNK) += -mindirect-branch-register
-CFLAGS-$(CONFIG_INDIRECT_THUNK) += -fno-jump-tables
+ifeq ($(CONFIG_INDIRECT_THUNK),y)
+# Compile with gcc thunk-extern, indirect-branch-register if available.
+CFLAGS-$(CONFIG_CC_IS_GCC) += -mindirect-branch=thunk-extern
+CFLAGS-$(CONFIG_CC_IS_GCC) += -mindirect-branch-register
+CFLAGS-$(CONFIG_CC_IS_GCC) += -fno-jump-tables
+endif
 
 ifdef CONFIG_XEN_IBT
 # Force -fno-jump-tables to work around

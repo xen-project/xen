@@ -32,8 +32,12 @@ config ARCH_DEFCONFIG
 	string
 	default "arch/x86/configs/x86_64_defconfig"
 
-config INDIRECT_THUNK
+config CC_HAS_INDIRECT_THUNK
 	def_bool $(cc-option,-mindirect-branch-register)
+
+config INDIRECT_THUNK
+	def_bool y
+	depends on CC_HAS_INDIRECT_THUNK
 
 config HAS_AS_CET_SS
 	# binutils >= 2.29 or LLVM >= 6
