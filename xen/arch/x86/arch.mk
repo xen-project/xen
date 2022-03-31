@@ -46,6 +46,9 @@ ifeq ($(CONFIG_INDIRECT_THUNK),y)
 CFLAGS-$(CONFIG_CC_IS_GCC) += -mindirect-branch=thunk-extern
 CFLAGS-$(CONFIG_CC_IS_GCC) += -mindirect-branch-register
 CFLAGS-$(CONFIG_CC_IS_GCC) += -fno-jump-tables
+
+# Enable clang retpoline support if available.
+CFLAGS-$(CONFIG_CC_IS_CLANG) += -mretpoline-external-thunk
 endif
 
 ifdef CONFIG_XEN_IBT
