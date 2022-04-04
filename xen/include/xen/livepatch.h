@@ -90,7 +90,7 @@ static inline
 unsigned int livepatch_insn_len(const struct livepatch_func *func)
 {
     if ( !func->new_addr )
-        return func->new_size;
+        return func->new_size - func->patch_offset;
 
     return ARCH_PATCH_INSN_SIZE;
 }

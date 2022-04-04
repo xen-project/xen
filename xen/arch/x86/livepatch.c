@@ -144,9 +144,6 @@ void noinline arch_livepatch_apply(struct livepatch_func *func)
 
     func->patch_offset = 0;
     old_ptr = func->old_addr;
-    len = livepatch_insn_len(func);
-    if ( !len )
-        return;
 
     /*
      * CET hotpatching support: We may have functions starting with an ENDBR64
@@ -158,6 +155,11 @@ void noinline arch_livepatch_apply(struct livepatch_func *func)
      */
     if ( is_endbr64(old_ptr) )
         func->patch_offset += ENDBR64_LEN;
+
+    /* This call must be done with ->patch_offset already set. */
+    len = livepatch_insn_len(func);
+    if ( !len )
+        return;
 
     memcpy(func->opaque, old_ptr + func->patch_offset, len);
     if ( func->new_addr )
