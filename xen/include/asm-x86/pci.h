@@ -1,6 +1,8 @@
 #ifndef __X86_PCI_H__
 #define __X86_PCI_H__
 
+#include <xen/mm.h>
+
 #define CF8_BDF(cf8)     (  ((cf8) & 0x00ffff00) >> 8)
 #define CF8_ADDR_LO(cf8) (   (cf8) & 0x000000fc)
 #define CF8_ADDR_HI(cf8) (  ((cf8) & 0x0f000000) >> 16)
@@ -20,7 +22,18 @@ struct arch_pci_dev {
      * them don't race (de)initialization and hence don't strictly need any
      * locking.
      */
+    union {
+        /* Subset of struct arch_iommu's fields, to be used in dom_io. */
+        struct {
+            uint64_t pgd_maddr;
+        } vtd;
+        struct {
+            struct page_info *root_table;
+        } amd;
+    };
     domid_t pseudo_domid;
+    mfn_t leaf_mfn;
+    struct page_list_head pgtables_list;
 };
 
 int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,

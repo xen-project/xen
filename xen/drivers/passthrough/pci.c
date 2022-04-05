@@ -929,9 +929,16 @@ static int deassign_device(struct domain *d, uint16_t seg, uint8_t bus,
         return -ENODEV;
 
     /* De-assignment from dom_io should de-quarantine the device */
-    target = ((pdev->quarantine || iommu_quarantine) &&
-              pdev->domain != dom_io) ?
-        dom_io : hardware_domain;
+    if ( (pdev->quarantine || iommu_quarantine) && pdev->domain != dom_io )
+    {
+        ret = iommu_quarantine_dev_init(pci_to_dev(pdev));
+        if ( ret )
+           return ret;
+
+        target = dom_io;
+    }
+    else
+        target = hardware_domain;
 
     while ( pdev->phantom_stride )
     {
@@ -1545,6 +1552,13 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
         if ( rc )
             goto done;
         msixtbl_init(d);
+    }
+
+    if ( pdev->domain != dom_io )
+    {
+        rc = iommu_quarantine_dev_init(pci_to_dev(pdev));
+        if ( rc )
+            goto done;
     }
 
     pdev->fault.count = 0;

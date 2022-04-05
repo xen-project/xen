@@ -125,6 +125,8 @@ static int __must_check amd_iommu_setup_domain_device(
     u8 bus = pdev->bus;
     struct domain_iommu *hd = dom_iommu(domain);
     const struct ivrs_mappings *ivrs_dev;
+    const struct page_info *root_pg;
+    domid_t domid;
 
     BUG_ON(!hd->arch.paging_mode || !iommu->dev_table.buffer);
 
@@ -144,14 +146,25 @@ static int __must_check amd_iommu_setup_domain_device(
     dte = &table[req_id];
     ivrs_dev = &get_ivrs_mappings(iommu->seg)[req_id];
 
+    if ( domain != dom_io )
+    {
+        root_pg = hd->arch.root_table;
+        domid = domain->domain_id;
+    }
+    else
+    {
+        root_pg = pdev->arch.amd.root_table;
+        domid = pdev->arch.pseudo_domid;
+    }
+
     spin_lock_irqsave(&iommu->lock, flags);
 
     if ( !dte->v || !dte->tv )
     {
         /* bind DTE to domain page-tables */
         rc = amd_iommu_set_root_page_table(
-                 dte, page_to_maddr(hd->arch.root_table),
-                 domain->domain_id, hd->arch.paging_mode, sr_flags);
+                 dte, page_to_maddr(root_pg), domid,
+                 hd->arch.paging_mode, sr_flags);
         if ( rc )
         {
             ASSERT(rc < 0);
@@ -175,7 +188,7 @@ static int __must_check amd_iommu_setup_domain_device(
 
         amd_iommu_flush_device(iommu, req_id);
     }
-    else if ( dte->pt_root != mfn_x(page_to_mfn(hd->arch.root_table)) )
+    else if ( dte->pt_root != mfn_x(page_to_mfn(root_pg)) )
     {
         /*
          * Strictly speaking if the device is the only one with this requestor
@@ -188,8 +201,8 @@ static int __must_check amd_iommu_setup_domain_device(
             rc = -EOPNOTSUPP;
         else
             rc = amd_iommu_set_root_page_table(
-                     dte, page_to_maddr(hd->arch.root_table),
-                     domain->domain_id, hd->arch.paging_mode, sr_flags);
+                     dte, page_to_maddr(root_pg), domid,
+                     hd->arch.paging_mode, sr_flags);
         if ( rc < 0 )
         {
             spin_unlock_irqrestore(&iommu->lock, flags);
@@ -208,6 +221,7 @@ static int __must_check amd_iommu_setup_domain_device(
               * intended anyway.
               */
              !pdev->domain->is_dying &&
+             pdev->domain != dom_io &&
              (any_pdev_behind_iommu(pdev->domain, pdev, iommu) ||
               pdev->phantom_stride) )
             printk(" %04x:%02x:%02x.%u: reassignment may cause %pd data corruption\n",
@@ -238,9 +252,8 @@ static int __must_check amd_iommu_setup_domain_device(
     AMD_IOMMU_DEBUG("Setup I/O page table: device id = %#x, type = %#x, "
                     "root table = %#"PRIx64", "
                     "domain = %d, paging mode = %d\n",
-                    req_id, pdev->type,
-                    page_to_maddr(hd->arch.root_table),
-                    domain->domain_id, hd->arch.paging_mode);
+                    req_id, pdev->type, page_to_maddr(root_pg),
+                    domid, hd->arch.paging_mode);
 
     ASSERT(pcidevs_locked());
 
@@ -313,7 +326,7 @@ static int iov_enable_xt(void)
 
 int amd_iommu_alloc_root(struct domain_iommu *hd)
 {
-    if ( unlikely(!hd->arch.root_table) )
+    if ( unlikely(!hd->arch.root_table) && hd != dom_iommu(dom_io) )
     {
         hd->arch.root_table = alloc_amd_iommu_pgtable();
         if ( !hd->arch.root_table )
@@ -404,7 +417,7 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
 
         AMD_IOMMU_DEBUG("Disable: device id = %#x, "
                         "domain = %d, paging mode = %d\n",
-                        req_id,  domain->domain_id,
+                        req_id, dte->domain_id,
                         dom_iommu(domain)->arch.paging_mode);
     }
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -667,6 +680,8 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     }
 
     amd_iommu_disable_domain_device(pdev->domain, iommu, devfn, pdev);
+
+    amd_iommu_quarantine_teardown(pdev);
 
     iommu_free_domid(pdev->arch.pseudo_domid, iommu->domid_map);
     pdev->arch.pseudo_domid = DOMID_INVALID;
