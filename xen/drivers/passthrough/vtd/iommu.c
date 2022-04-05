@@ -327,7 +327,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     {
         struct page_info *pg;
 
-        if ( !alloc || !(pg = iommu_alloc_pgtable(domain)) )
+        if ( !alloc || !(pg = iommu_alloc_pgtable(hd)) )
             goto out;
 
         hd->arch.vtd.pgd_maddr = page_to_maddr(pg);
@@ -347,7 +347,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
             if ( !alloc )
                 break;
 
-            pg = iommu_alloc_pgtable(domain);
+            pg = iommu_alloc_pgtable(hd);
             if ( !pg )
                 break;
 
@@ -2761,7 +2761,7 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
         goto out;
     }
 
-    pg = iommu_alloc_pgtable(d);
+    pg = iommu_alloc_pgtable(hd);
 
     rc = -ENOMEM;
     if ( !pg )
@@ -2780,7 +2780,7 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
          * page table pages, and the resulting allocations are always
          * zeroed.
          */
-        pg = iommu_alloc_pgtable(d);
+        pg = iommu_alloc_pgtable(hd);
 
         if ( !pg )
             goto out;

@@ -184,7 +184,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     unsigned long  next_table_mfn;
     unsigned int level;
     struct page_info *table;
-    const struct domain_iommu *hd = dom_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     table = hd->arch.amd.root_table;
     level = hd->arch.amd.paging_mode;
@@ -220,7 +220,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
             mfn = next_table_mfn;
 
             /* allocate lower level page table */
-            table = iommu_alloc_pgtable(d);
+            table = iommu_alloc_pgtable(hd);
             if ( table == NULL )
             {
                 AMD_IOMMU_DEBUG("Cannot allocate I/O page table\n");
@@ -250,7 +250,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
 
             if ( next_table_mfn == 0 )
             {
-                table = iommu_alloc_pgtable(d);
+                table = iommu_alloc_pgtable(hd);
                 if ( table == NULL )
                 {
                     AMD_IOMMU_DEBUG("Cannot allocate I/O page table\n");
@@ -483,7 +483,7 @@ int __init amd_iommu_quarantine_init(struct domain *d)
 
     spin_lock(&hd->arch.mapping_lock);
 
-    hd->arch.amd.root_table = iommu_alloc_pgtable(d);
+    hd->arch.amd.root_table = iommu_alloc_pgtable(hd);
     if ( !hd->arch.amd.root_table )
         goto out;
 
@@ -498,7 +498,7 @@ int __init amd_iommu_quarantine_init(struct domain *d)
          * page table pages, and the resulting allocations are always
          * zeroed.
          */
-        pg = iommu_alloc_pgtable(d);
+        pg = iommu_alloc_pgtable(hd);
         if ( !pg )
             break;
 

@@ -208,7 +208,7 @@ int amd_iommu_alloc_root(struct domain *d)
 
     if ( unlikely(!hd->arch.amd.root_table) )
     {
-        hd->arch.amd.root_table = iommu_alloc_pgtable(d);
+        hd->arch.amd.root_table = iommu_alloc_pgtable(hd);
         if ( !hd->arch.amd.root_table )
             return -ENOMEM;
     }
