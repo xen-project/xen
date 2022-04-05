@@ -2894,7 +2894,6 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
     struct dma_pte *parent;
     unsigned int agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
     unsigned int level = agaw_to_level(agaw);
-    int rc;
 
     if ( hd->arch.pgd_maddr )
     {
@@ -2941,10 +2940,8 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
  out:
     spin_unlock(&hd->arch.mapping_lock);
 
-    rc = iommu_flush_iotlb_all(d);
-
     /* Pages leaked in failure case */
-    return level ? -ENOMEM : rc;
+    return level ? -ENOMEM : 0;
 }
 
 const struct iommu_ops __initconstrel intel_iommu_ops = {
