@@ -156,9 +156,6 @@ void paging_log_dirty_range(struct domain *d,
                             unsigned long nr,
                             uint8_t *dirty_bitmap);
 
-/* enable log dirty */
-int paging_log_dirty_enable(struct domain *d, bool log_global);
-
 /* log dirty initialization */
 void paging_log_dirty_init(struct domain *d, const struct log_dirty_ops *ops);
 
