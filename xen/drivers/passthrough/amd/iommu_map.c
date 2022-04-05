@@ -584,8 +584,6 @@ int __init amd_iommu_quarantine_init(struct domain *d)
  out:
     spin_unlock(&hd->arch.mapping_lock);
 
-    amd_iommu_flush_all_pages(d);
-
     /* Pages leaked in failure case */
     return level ? -ENOMEM : 0;
 }
