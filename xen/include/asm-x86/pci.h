@@ -13,6 +13,12 @@
 
 struct arch_pci_dev {
     vmask_t used_vectors;
+    /*
+     * These fields are (de)initialized under pcidevs-lock. Other uses of
+     * them don't race (de)initialization and hence don't strictly need any
+     * locking.
+     */
+    domid_t pseudo_domid;
 };
 
 int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
@@ -36,6 +42,6 @@ static always_inline bool is_pci_passthrough_enabled(void)
     return true;
 }
 
-static inline void arch_pci_init_pdev(struct pci_dev *pdev) {}
+void arch_pci_init_pdev(struct pci_dev *pdev);
 
 #endif /* __X86_PCI_H__ */

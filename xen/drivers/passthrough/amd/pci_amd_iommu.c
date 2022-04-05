@@ -539,6 +539,8 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
     struct amd_iommu *iommu;
     u16 bdf;
     struct ivrs_mappings *ivrs_mappings;
+    bool fresh_domid = false;
+    int ret;
 
     if ( !pdev->domain )
         return -EINVAL;
@@ -606,7 +608,22 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
         AMD_IOMMU_WARN("%pd: unity mapping failed for %pp\n",
                        pdev->domain, &pdev->sbdf);
 
-    return amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
+    if ( iommu_quarantine && pdev->arch.pseudo_domid == DOMID_INVALID )
+    {
+        pdev->arch.pseudo_domid = iommu_alloc_domid(iommu->domid_map);
+        if ( pdev->arch.pseudo_domid == DOMID_INVALID )
+            return -ENOSPC;
+        fresh_domid = true;
+    }
+
+    ret = amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
+    if ( ret && fresh_domid )
+    {
+        iommu_free_domid(pdev->arch.pseudo_domid, iommu->domid_map);
+        pdev->arch.pseudo_domid = DOMID_INVALID;
+    }
+
+    return ret;
 }
 
 static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
@@ -637,6 +654,9 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
              ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map) )
         AMD_IOMMU_WARN("%pd: unity unmapping failed for %pp\n",
                        pdev->domain, &pdev->sbdf);
+
+    iommu_free_domid(pdev->arch.pseudo_domid, iommu->domid_map);
+    pdev->arch.pseudo_domid = DOMID_INVALID;
 
     if ( amd_iommu_perdev_intremap &&
          ivrs_mappings[bdf].dte_requestor_id == bdf &&

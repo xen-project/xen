@@ -1271,9 +1271,14 @@ static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
 
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
     {
-        printk("%pp - %pd - node %-3d",
-               &pdev->sbdf, pdev->domain,
-               (pdev->node != NUMA_NO_NODE) ? pdev->node : -1);
+        printk("%pp - ", &pdev->sbdf);
+#ifdef CONFIG_X86
+        if ( pdev->domain == dom_io )
+            printk("DomIO:%x", pdev->arch.pseudo_domid);
+        else
+#endif
+            printk("%pd", pdev->domain);
+        printk(" - node %-3d", (pdev->node != NUMA_NO_NODE) ? pdev->node : -1);
         pdev_dump_msi(pdev);
         printk("\n");
     }
