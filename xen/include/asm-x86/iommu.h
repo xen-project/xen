@@ -142,6 +142,10 @@ int pi_update_irte(const struct pi_desc *pi_desc, const struct pirq *pirq,
         iommu_vcall(ops, sync_cache, addr, size);       \
 })
 
+unsigned long *iommu_init_domid(void);
+domid_t iommu_alloc_domid(unsigned long *map);
+void iommu_free_domid(domid_t domid, unsigned long *map);
+
 int __must_check iommu_free_pgtables(struct domain *d);
 struct domain_iommu;
 struct page_info *__must_check iommu_alloc_pgtable(struct domain_iommu *hd);
