@@ -114,6 +114,8 @@
 #define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_MASK		0xFFFFF000
 #define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_SHIFT	12
 
+#define IOMMU_MAX_PT_LEVELS 6
+
 /* DeviceTable Entry[63:32] */
 #define IOMMU_DEV_TABLE_GV_SHIFT                    23
 #define IOMMU_DEV_TABLE_GV_MASK                     0x800000
