@@ -358,7 +358,7 @@ static inline int amd_iommu_get_paging_mode(unsigned long max_frames)
     while ( max_frames > PTE_PER_TABLE_SIZE )
     {
         max_frames = PTE_PER_TABLE_ALIGN(max_frames) >> PTE_PER_TABLE_SHIFT;
-        if ( ++level > 6 )
+        if ( ++level > IOMMU_MAX_PT_LEVELS )
             return -ENOMEM;
     }
 
