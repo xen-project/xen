@@ -26,6 +26,7 @@
 #include <xen/symbols.h>
 #include <xen/keyhandler.h>
 #include <xen/guest_access.h>
+#include <asm/apic.h>
 #include <asm/io.h>
 #include <asm/iocap.h>
 #include <asm/msr.h>
@@ -1016,6 +1017,70 @@ static u64 __init init_platform_timer(void)
            freq_string(pts->frequency), pts->name);
 
     return rc;
+}
+
+static uint64_t __init read_pt_and_tmcct(uint32_t *tmcct)
+{
+    uint32_t tmcct_prev = *tmcct = apic_tmcct_read(), tmcct_min = ~0;
+    uint64_t best = best;
+    unsigned int i;
+
+    for ( i = 0; ; ++i )
+    {
+        uint64_t pt = plt_src.read_counter();
+        uint32_t tmcct_cur = apic_tmcct_read();
+        uint32_t tmcct_delta = tmcct_prev - tmcct_cur;
+
+        if ( tmcct_delta < tmcct_min )
+        {
+            tmcct_min = tmcct_delta;
+            *tmcct = tmcct_cur;
+            best = pt;
+        }
+        else if ( i > 2 )
+            break;
+
+        tmcct_prev = tmcct_cur;
+    }
+
+    return best;
+}
+
+uint64_t __init calibrate_apic_timer(void)
+{
+    uint32_t start, end;
+    uint64_t count = read_pt_and_tmcct(&start), elapsed;
+    uint64_t target = CALIBRATE_VALUE(plt_src.frequency), actual;
+    uint64_t mask = (uint64_t)~0 >> (64 - plt_src.counter_bits);
+
+    /*
+     * PIT cannot be used here as it requires the timer interrupt to maintain
+     * its 32-bit software counter, yet here we run with IRQs disabled.
+     */
+    if ( using_pit )
+        return 0;
+
+    while ( ((plt_src.read_counter() - count) & mask) < target )
+        continue;
+
+    actual = (read_pt_and_tmcct(&end) - count) & mask;
+    elapsed = start - end;
+
+    if ( likely(actual > target) )
+    {
+        /*
+         * See the comment in calibrate_tsc(). But first scale down values
+         * to actually fit muldiv64()'s input range.
+         */
+        while ( unlikely(actual > (uint32_t)actual) )
+        {
+            actual >>= 1;
+            target >>= 1;
+        }
+        elapsed = muldiv64(elapsed, target, actual);
+    }
+
+    return elapsed * CALIBRATE_FRAC;
 }
 
 u64 stime2tsc(s_time_t stime)

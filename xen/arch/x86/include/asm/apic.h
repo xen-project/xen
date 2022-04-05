@@ -192,6 +192,9 @@ extern void record_boot_APIC_mode(void);
 extern enum apic_mode current_local_apic_mode(void);
 extern void check_for_unexpected_msi(unsigned int vector);
 
+uint64_t calibrate_apic_timer(void);
+uint32_t apic_tmcct_read(void);
+
 extern void check_nmi_watchdog(void);
 
 extern unsigned int nmi_watchdog;

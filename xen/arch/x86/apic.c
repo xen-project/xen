@@ -1183,18 +1183,20 @@ static void __init check_deadline_errata(void)
            "please update microcode to version %#x (or later)\n", rev);
 }
 
-static void __init wait_tick_pvh(void)
+uint32_t __init apic_tmcct_read(void)
 {
-    u64 lapse_ns = 1000000000ULL / HZ;
-    s_time_t start, curr_time;
+    if ( x2apic_enabled )
+    {
+        /*
+         * Have a barrier here just like in rdtsc_ordered() as it's
+         * unclear whether this non-serializing RDMSR also can be
+         * executed speculatively (like RDTSC can).
+         */
+        alternative("lfence", "mfence", X86_FEATURE_MFENCE_RDTSC);
+        return apic_rdmsr(APIC_TMCCT);
+    }
 
-    start = NOW();
-
-    /* Won't wrap around */
-    do {
-        cpu_relax();
-        curr_time = NOW();
-    } while ( curr_time - start < lapse_ns );
+    return apic_mem_read(APIC_TMCCT);
 }
 
 /*
@@ -1212,9 +1214,6 @@ static void __init wait_tick_pvh(void)
 
 static void __init calibrate_APIC_clock(void)
 {
-    unsigned long long t1, t2;
-    unsigned long tt1, tt2;
-    unsigned int i;
     unsigned long bus_freq; /* KAF: pointer-size avoids compile warns. */
     unsigned int bus_cycle; /* length of one bus cycle in pico-seconds */
 #define LOOPS_FRAC 10U      /* measure for one tenth of a second */
@@ -1227,39 +1226,38 @@ static void __init calibrate_APIC_clock(void)
      */
     __setup_APIC_LVTT(0xffffffff);
 
-    if ( !xen_guest )
+    bus_freq = calibrate_apic_timer();
+    if ( !bus_freq )
+    {
+        unsigned int i, tt1, tt2;
+        unsigned long t1, t2;
+
+        ASSERT(!xen_guest);
+
         /*
-         * The timer chip counts down to zero. Let's wait
-         * for a wraparound to start exact measurement:
-         * (the current tick might have been already half done)
+         * The timer chip counts down to zero. Let's wait for a wraparound to
+         * start exact measurement (the current tick might have been already
+         * half done):
          */
         wait_8254_wraparound();
-    else
-        wait_tick_pvh();
 
-    /*
-     * We wrapped around just now. Let's start:
-     */
-    t1 = rdtsc_ordered();
-    tt1 = apic_read(APIC_TMCCT);
+        /* We wrapped around just now. Let's start: */
+        t1 = rdtsc_ordered();
+        tt1 = apic_read(APIC_TMCCT);
 
-    /*
-     * Let's wait HZ / LOOPS_FRAC ticks:
-     */
-    for (i = 0; i < HZ / LOOPS_FRAC; i++)
-        if ( !xen_guest )
+        /* Let's wait HZ / LOOPS_FRAC ticks: */
+        for ( i = 0; i < HZ / LOOPS_FRAC; ++i )
             wait_8254_wraparound();
-        else
-            wait_tick_pvh();
 
-    tt2 = apic_read(APIC_TMCCT);
-    t2 = rdtsc_ordered();
+        t2 = rdtsc_ordered();
+        tt2 = apic_read(APIC_TMCCT);
 
-    bus_freq = (tt1 - tt2) * APIC_DIVISOR * LOOPS_FRAC;
+        bus_freq = (tt1 - tt2) * APIC_DIVISOR * LOOPS_FRAC;
 
-    apic_printk(APIC_VERBOSE, "..... CPU clock speed is %lu.%04lu MHz.\n",
-                ((unsigned long)(t2 - t1) * LOOPS_FRAC) / 1000000,
-                (((unsigned long)(t2 - t1) * LOOPS_FRAC) / 100) % 10000);
+        apic_printk(APIC_VERBOSE, "..... CPU clock speed is %lu.%04lu MHz.\n",
+                    ((t2 - t1) * LOOPS_FRAC) / 1000000,
+                    (((t2 - t1) * LOOPS_FRAC) / 100) % 10000);
+    }
 
     apic_printk(APIC_VERBOSE, "..... host bus clock speed is %ld.%04ld MHz.\n",
                 bus_freq / 1000000, (bus_freq / 100) % 10000);
