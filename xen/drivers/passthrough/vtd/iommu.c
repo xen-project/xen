@@ -1770,8 +1770,14 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
             goto out;
         }
 
+        /*
+         * Update domid_map[] /before/ domid_bitmap[] to avoid a race with
+         * context_set_domain_id(), setting the slot to DOMID_INVALID for
+         * ->domid_map[] reads to produce a suitable value while the bit is
+         * still set.
+         */
+        iommu->domid_map[iommu_domid] = DOMID_INVALID;
         clear_bit(iommu_domid, iommu->domid_bitmap);
-        iommu->domid_map[iommu_domid] = 0;
     }
 
 out:
