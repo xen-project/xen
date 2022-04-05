@@ -1985,14 +1985,6 @@ static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
     if ( !pdev->domain )
         return -EINVAL;
 
-    ret = domain_context_mapping(pdev->domain, devfn, pdev);
-    if ( ret )
-    {
-        dprintk(XENLOG_ERR VTDPREFIX, "d%d: context mapping failed\n",
-                pdev->domain->domain_id);
-        return ret;
-    }
-
     for_each_rmrr_device ( rmrr, bdf, i )
     {
         if ( rmrr->segment == pdev->seg &&
@@ -2009,12 +2001,17 @@ static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
                                          rmrr->base_address, rmrr->end_address,
                                          0);
             if ( ret )
-                dprintk(XENLOG_ERR VTDPREFIX, "d%d: RMRR mapping failed\n",
-                        pdev->domain->domain_id);
+                dprintk(XENLOG_ERR VTDPREFIX, "%pd: RMRR mapping failed\n",
+                        pdev->domain);
         }
     }
 
-    return 0;
+    ret = domain_context_mapping(pdev->domain, devfn, pdev);
+    if ( ret )
+        dprintk(XENLOG_ERR VTDPREFIX, "%pd: context mapping failed\n",
+                pdev->domain);
+
+    return ret;
 }
 
 static int intel_iommu_enable_device(struct pci_dev *pdev)
@@ -2036,10 +2033,14 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
 {
     struct acpi_rmrr_unit *rmrr;
     u16 bdf;
-    int i;
+    int ret, i;
 
     if ( !pdev->domain )
         return -EINVAL;
+
+    ret = domain_context_unmap(pdev->domain, devfn, pdev);
+    if ( ret )
+        return ret;
 
     for_each_rmrr_device ( rmrr, bdf, i )
     {
@@ -2056,7 +2057,7 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
                                rmrr->end_address, 0);
     }
 
-    return domain_context_unmap(pdev->domain, devfn, pdev);
+    return 0;
 }
 
 static int __hwdom_init setup_hwdom_device(u8 devfn, struct pci_dev *pdev)
