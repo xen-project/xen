@@ -140,6 +140,10 @@ static inline void iommu_sync_cache(const void *addr, unsigned int size)
         cache_writeback(addr, size);
 }
 
+unsigned long *iommu_init_domid(domid_t reserve);
+domid_t iommu_alloc_domid(unsigned long *map);
+void iommu_free_domid(domid_t domid, unsigned long *map);
+
 int __must_check iommu_free_pgtables(struct domain *d);
 struct domain_iommu;
 struct page_info *__must_check iommu_alloc_pgtable(struct domain_iommu *hd);

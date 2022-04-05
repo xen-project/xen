@@ -503,6 +503,7 @@ struct vtd_iommu {
     } flush;
 
     struct list_head ats_devices;
+    unsigned long *pseudo_domid_map; /* "pseudo" domain id bitmap */
     unsigned long *domid_bitmap;  /* domain id bitmap */
     domid_t *domid_map;           /* domain id mapping array */
     uint32_t version;
