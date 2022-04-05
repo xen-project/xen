@@ -416,9 +416,8 @@ int iommu_free_pgtables(struct domain *d)
     return 0;
 }
 
-struct page_info *iommu_alloc_pgtable(struct domain *d)
+struct page_info *iommu_alloc_pgtable(struct domain_iommu *hd)
 {
-    struct domain_iommu *hd = dom_iommu(d);
     unsigned int memflags = 0;
     struct page_info *pg;
     void *p;

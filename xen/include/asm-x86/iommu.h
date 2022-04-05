@@ -142,7 +142,8 @@ int pi_update_irte(const struct pi_desc *pi_desc, const struct pirq *pirq,
 })
 
 int __must_check iommu_free_pgtables(struct domain *d);
-struct page_info *__must_check iommu_alloc_pgtable(struct domain *d);
+struct domain_iommu;
+struct page_info *__must_check iommu_alloc_pgtable(struct domain_iommu *hd);
 
 #endif /* !__ARCH_X86_IOMMU_H__ */
 /*
