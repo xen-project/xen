@@ -343,6 +343,7 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     *((u8*) &pdev->bus) = bus;
     *((u8*) &pdev->devfn) = devfn;
     pdev->domain = NULL;
+    pdev->arch.pseudo_domid = DOMID_INVALID;
     INIT_LIST_HEAD(&pdev->msi_list);
 
     if ( pci_find_cap_offset(pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
@@ -1311,10 +1312,13 @@ static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
 
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
     {
-        printk("%04x:%02x:%02x.%u - dom %-3d - node %-3d - MSIs < ",
-               pseg->nr, pdev->bus,
-               PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
-               pdev->domain ? pdev->domain->domain_id : -1,
+        printk("%04x:%02x:%02x.%u - ", pseg->nr, pdev->bus,
+               PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+        if ( pdev->domain == dom_io )
+            printk("DomIO:%x", pdev->arch.pseudo_domid);
+        else if ( pdev->domain )
+            printk("Dom%d", pdev->domain->domain_id);
+        printk(" - node %-3d - MSIs < ",
                (pdev->node != NUMA_NO_NODE) ? pdev->node : -1);
         list_for_each_entry ( msi, &pdev->msi_list, list )
                printk("%d ", msi->irq);

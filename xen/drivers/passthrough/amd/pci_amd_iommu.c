@@ -541,6 +541,8 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
 {
     struct amd_iommu *iommu;
     u16 bdf;
+    bool fresh_domid = false;
+    int ret;
 
     if ( !pdev->domain )
         return -EINVAL;
@@ -565,7 +567,22 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
         return -ENODEV;
     }
 
-    return amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
+    if ( iommu_quarantine && pdev->arch.pseudo_domid == DOMID_INVALID )
+    {
+        pdev->arch.pseudo_domid = iommu_alloc_domid(iommu->domid_map);
+        if ( pdev->arch.pseudo_domid == DOMID_INVALID )
+            return -ENOSPC;
+        fresh_domid = true;
+    }
+
+    ret = amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
+    if ( ret && fresh_domid )
+    {
+        iommu_free_domid(pdev->arch.pseudo_domid, iommu->domid_map);
+        pdev->arch.pseudo_domid = DOMID_INVALID;
+    }
+
+    return ret;
 }
 
 static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
@@ -587,6 +604,10 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     }
 
     amd_iommu_disable_domain_device(pdev->domain, iommu, devfn, pdev);
+
+    iommu_free_domid(pdev->arch.pseudo_domid, iommu->domid_map);
+    pdev->arch.pseudo_domid = DOMID_INVALID;
+
     return 0;
 }
 
