@@ -1455,7 +1455,7 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret;
 
-    if ( !paging_mode_translate(p2m->domain) )
+    if ( !paging_mode_translate(d) )
     {
         if ( !is_iommu_enabled(d) )
             return 0;
