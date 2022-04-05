@@ -158,11 +158,104 @@ static unsigned int set_iommu_pte_present(unsigned long pt_mfn,
     return flush_flags;
 }
 
-void amd_iommu_set_root_page_table(uint32_t *dte, uint64_t root_ptr,
-                                   uint16_t domain_id, uint8_t paging_mode,
-                                   uint8_t valid)
+/*
+ * This function returns
+ * - -errno for errors,
+ * - 0 for a successful update, atomic when necessary
+ * - 1 for a successful but non-atomic update, which may need to be warned
+ *   about by the caller.
+ */
+int amd_iommu_set_root_page_table(uint32_t *dte, uint64_t root_ptr,
+                                  uint16_t domain_id, uint8_t paging_mode,
+                                  unsigned int flags)
 {
+    bool valid = flags & SET_ROOT_VALID;
     uint32_t addr_hi, addr_lo, entry, dte0 = dte[0];
+
+    addr_lo = root_ptr & DMA_32BIT_MASK;
+    addr_hi = root_ptr >> 32;
+
+    if ( get_field_from_reg_u32(dte0, IOMMU_DEV_TABLE_VALID_MASK,
+                                IOMMU_DEV_TABLE_VALID_SHIFT) &&
+         get_field_from_reg_u32(dte0, IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
+                                IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT) &&
+         (cpu_has_cx16 || (flags & SET_ROOT_WITH_UNITY_MAP)) )
+    {
+        union {
+            uint32_t dte[4];
+            uint64_t raw64[2];
+            __uint128_t raw128;
+        } ldte;
+        __uint128_t old;
+        int ret = 0;
+
+        memcpy(ldte.dte, dte, sizeof(ldte));
+        old = ldte.raw128;
+
+        set_field_in_reg_u32(domain_id, ldte.dte[2],
+                             IOMMU_DEV_TABLE_DOMAIN_ID_MASK,
+                             IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT, &ldte.dte[2]);
+
+        set_field_in_reg_u32(addr_hi, ldte.dte[1],
+                             IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_MASK,
+                             IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_SHIFT,
+                             &ldte.dte[1]);
+        set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, ldte.dte[1],
+                             IOMMU_DEV_TABLE_IO_WRITE_PERMISSION_MASK,
+                             IOMMU_DEV_TABLE_IO_WRITE_PERMISSION_SHIFT,
+                             &ldte.dte[1]);
+        set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, ldte.dte[1],
+                             IOMMU_DEV_TABLE_IO_READ_PERMISSION_MASK,
+                             IOMMU_DEV_TABLE_IO_READ_PERMISSION_SHIFT,
+                             &ldte.dte[1]);
+
+        set_field_in_reg_u32(addr_lo >> PAGE_SHIFT, ldte.dte[0],
+                             IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_MASK,
+                             IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_SHIFT,
+                             &ldte.dte[0]);
+        set_field_in_reg_u32(paging_mode, ldte.dte[0],
+                             IOMMU_DEV_TABLE_PAGING_MODE_MASK,
+                             IOMMU_DEV_TABLE_PAGING_MODE_SHIFT, &ldte.dte[0]);
+        set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, ldte.dte[0],
+                             IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
+                             IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT,
+                             &ldte.dte[0]);
+        set_field_in_reg_u32(valid ? IOMMU_CONTROL_ENABLED
+                                   : IOMMU_CONTROL_DISABLED,
+                             ldte.dte[0], IOMMU_DEV_TABLE_VALID_MASK,
+                             IOMMU_DEV_TABLE_VALID_SHIFT, &ldte.dte[0]);
+
+        if ( cpu_has_cx16 )
+        {
+            __uint128_t res = cmpxchg16b(dte, &old, &ldte.raw128);
+
+            /*
+             * Hardware does not update the DTE behind our backs, so the
+             * return value should match "old".
+             */
+            if ( res != old )
+            {
+                printk(XENLOG_ERR
+                       "Dom%d: unexpected DTE %016lx_%016lx (expected %016lx_%016lx)\n",
+                       domain_id,
+                       (uint64_t)(res >> 64), (uint64_t)res,
+                       (uint64_t)(old >> 64), (uint64_t)old);
+                ret = -EILSEQ;
+            }
+        }
+        else /* Best effort, updating domain_id last. */
+        {
+            uint64_t *ptr = (void *)dte;
+
+            write_atomic(ptr + 0, ldte.raw64[0]);
+            /* No barrier should be needed between these two. */
+            write_atomic(ptr + 1, ldte.raw64[1]);
+
+            ret = 1;
+        }
+
+        return ret;
+    }
 
     if ( valid ||
          get_field_from_reg_u32(dte0, IOMMU_DEV_TABLE_VALID_MASK,
@@ -182,9 +275,6 @@ void amd_iommu_set_root_page_table(uint32_t *dte, uint64_t root_ptr,
                          IOMMU_DEV_TABLE_DOMAIN_ID_MASK,
                          IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT, &entry);
     dte[2] = entry;
-
-    addr_lo = root_ptr & DMA_32BIT_MASK;
-    addr_hi = root_ptr >> 32;
 
     set_field_in_reg_u32(addr_hi, 0,
                          IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_MASK,
@@ -212,6 +302,20 @@ void amd_iommu_set_root_page_table(uint32_t *dte, uint64_t root_ptr,
                          IOMMU_DEV_TABLE_VALID_MASK,
                          IOMMU_DEV_TABLE_VALID_SHIFT, &entry);
     write_atomic(&dte[0], entry);
+
+    return 0;
+}
+
+paddr_t amd_iommu_get_root_page_table(const uint32_t *dte)
+{
+    uint32_t lo = get_field_from_reg_u32(
+                      dte[0], IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_MASK,
+                      IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_SHIFT);
+    uint32_t hi = get_field_from_reg_u32(
+                      dte[1], IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_MASK,
+                      IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_SHIFT);
+
+    return ((paddr_t)hi << 32) | (lo << PAGE_SHIFT);
 }
 
 void iommu_dte_set_iotlb(uint32_t *dte, uint8_t i)

@@ -78,8 +78,12 @@ void amd_iommu_share_p2m(struct domain *d);
 int get_dma_requestor_id(u16 seg, u16 bdf);
 void amd_iommu_set_intremap_table(
     u32 *dte, u64 intremap_ptr, u8 int_valid);
-void amd_iommu_set_root_page_table(
-    u32 *dte, u64 root_ptr, u16 domain_id, u8 paging_mode, u8 valid);
+#define SET_ROOT_VALID          (1u << 0)
+#define SET_ROOT_WITH_UNITY_MAP (1u << 1)
+int __must_check amd_iommu_set_root_page_table(
+    uint32_t *dte, uint64_t root_ptr, uint16_t domain_id, uint8_t paging_mode,
+    unsigned int flags);
+paddr_t amd_iommu_get_root_page_table(const uint32_t *dte);
 void iommu_dte_set_iotlb(u32 *dte, u8 i);
 void iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev);
 void iommu_dte_set_guest_cr3(u32 *dte, u16 dom_id, u64 gcr3,
