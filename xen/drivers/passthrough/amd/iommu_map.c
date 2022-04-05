@@ -260,7 +260,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     table = hd->arch.root_table;
     level = hd->arch.paging_mode;
 
-    BUG_ON( table == NULL || level < 1 || level > 6 );
+    BUG_ON( table == NULL || level < 1 || level > IOMMU_MAX_PT_LEVELS );
 
     /*
      * A frame number past what the current page tables can represent can't
