@@ -94,6 +94,7 @@ struct amd_iommu {
     struct ring_buffer cmd_buffer;
     struct ring_buffer event_log;
     struct ring_buffer ppr_log;
+    unsigned long *domid_map;
 
     int exclusion_enable;
     int exclusion_allow_all;

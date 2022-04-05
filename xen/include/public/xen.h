@@ -614,6 +614,9 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* Idle domain. */
 #define DOMID_IDLE           xen_mk_uint(0x7FFF)
 
+/* Mask for valid domain id values */
+#define DOMID_MASK           xen_mk_uint(0x7FFF)
+
 #ifndef __ASSEMBLY__
 
 typedef uint16_t domid_t;
