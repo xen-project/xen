@@ -202,8 +202,12 @@ struct root_entry {
     do {(root).val |= ((value) & PAGE_MASK_4K);} while(0)
 
 struct context_entry {
-    u64 lo;
-    u64 hi;
+    union {
+        struct {
+            uint64_t lo, hi;
+        };
+        __uint128_t full;
+    };
 };
 #define ROOT_ENTRY_NR (PAGE_SIZE_4K/sizeof(struct root_entry))
 #define context_present(c) ((c).lo & 1)
