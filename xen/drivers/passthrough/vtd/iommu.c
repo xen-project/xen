@@ -2975,9 +2975,6 @@ static int __init intel_iommu_quarantine_init(struct domain *d)
  out:
     spin_unlock(&hd->arch.mapping_lock);
 
-    if ( !rc )
-        rc = iommu_flush_iotlb_all(d);
-
     /* Pages may be leaked in failure case */
     return rc;
 }
