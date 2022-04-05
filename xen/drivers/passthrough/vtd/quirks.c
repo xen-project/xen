@@ -407,7 +407,8 @@ void __init platform_quirks_init(void)
  */
 
 static int __must_check map_me_phantom_function(struct domain *domain,
-                                                u32 dev, int map)
+                                                unsigned int dev,
+                                                unsigned int mode)
 {
     struct acpi_drhd_unit *drhd;
     struct pci_dev *pdev;
@@ -418,9 +419,9 @@ static int __must_check map_me_phantom_function(struct domain *domain,
     drhd = acpi_find_matched_drhd_unit(pdev);
 
     /* map or unmap ME phantom function */
-    if ( map )
+    if ( !(mode & UNMAP_ME_PHANTOM_FUNC) )
         rc = domain_context_mapping_one(domain, drhd->iommu, 0,
-                                        PCI_DEVFN(dev, 7), NULL);
+                                        PCI_DEVFN(dev, 7), NULL, mode);
     else
         rc = domain_context_unmap_one(domain, drhd->iommu, 0,
                                       PCI_DEVFN(dev, 7));
@@ -428,7 +429,8 @@ static int __must_check map_me_phantom_function(struct domain *domain,
     return rc;
 }
 
-int me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
+int me_wifi_quirk(struct domain *domain, uint8_t bus, uint8_t devfn,
+                  unsigned int mode)
 {
     u32 id;
     int rc = 0;
@@ -452,7 +454,7 @@ int me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
             case 0x423b8086:
             case 0x423c8086:
             case 0x423d8086:
-                rc = map_me_phantom_function(domain, 3, map);
+                rc = map_me_phantom_function(domain, 3, mode);
                 break;
             default:
                 break;
@@ -478,7 +480,7 @@ int me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
             case 0x42388086:        /* Puma Peak */
             case 0x422b8086:
             case 0x422c8086:
-                rc = map_me_phantom_function(domain, 22, map);
+                rc = map_me_phantom_function(domain, 22, mode);
                 break;
             default:
                 break;
