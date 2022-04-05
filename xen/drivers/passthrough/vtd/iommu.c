@@ -147,6 +147,51 @@ static void cleanup_domid_map(struct domain *domain, struct vtd_iommu *iommu)
     }
 }
 
+static bool any_pdev_behind_iommu(const struct domain *d,
+                                  const struct pci_dev *exclude,
+                                  const struct vtd_iommu *iommu)
+{
+    const struct pci_dev *pdev;
+
+    for_each_pdev ( d, pdev )
+    {
+        const struct acpi_drhd_unit *drhd;
+
+        if ( pdev == exclude )
+            continue;
+
+        drhd = acpi_find_matched_drhd_unit(pdev);
+        if ( drhd && drhd->iommu == iommu )
+            return true;
+    }
+
+    return false;
+}
+
+/*
+ * If no other devices under the same iommu owned by this domain,
+ * clear iommu in iommu_bitmap and clear domain_id in domid_bitmap.
+ */
+static void check_cleanup_domid_map(struct domain *d,
+                                    const struct pci_dev *exclude,
+                                    struct vtd_iommu *iommu)
+{
+    bool found = any_pdev_behind_iommu(d, exclude, iommu);
+
+    /*
+     * Hidden devices are associated with DomXEN but usable by the hardware
+     * domain. Hence they need considering here as well.
+     */
+    if ( !found && is_hardware_domain(d) )
+        found = any_pdev_behind_iommu(dom_xen, exclude, iommu);
+
+    if ( !found )
+    {
+        clear_bit(iommu->index, &dom_iommu(d)->arch.iommu_bitmap);
+        cleanup_domid_map(d, iommu);
+    }
+}
+
 static int iommus_incoherent;
 
 static void sync_cache(const void *addr, unsigned int size)
@@ -1679,7 +1724,6 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
     struct vtd_iommu *iommu;
     int ret = 0;
     u8 seg = pdev->seg, bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
-    int found = 0;
 
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
@@ -1763,28 +1807,8 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
     if ( ret )
         goto out;
 
-    /*
-     * if no other devices under the same iommu owned by this domain,
-     * clear iommu in iommu_bitmap and clear domain_id in domid_bitmp
-     */
-    for_each_pdev ( domain, pdev )
-    {
-        if ( pdev->seg == seg && pdev->bus == bus && pdev->devfn == devfn )
-            continue;
-
-        drhd = acpi_find_matched_drhd_unit(pdev);
-        if ( drhd && drhd->iommu == iommu )
-        {
-            found = 1;
-            break;
-        }
-    }
-
-    if ( found == 0 )
-    {
-        clear_bit(iommu->index, &dom_iommu(domain)->arch.iommu_bitmap);
-        cleanup_domid_map(domain, iommu);
-    }
+    if ( !ret )
+        check_cleanup_domid_map(domain, pdev, iommu);
 
 out:
     return ret;
