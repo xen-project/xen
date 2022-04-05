@@ -535,7 +535,7 @@ struct iommu {
     u32 nr_pt_levels;
     u64	cap;
     u64	ecap;
-    spinlock_t lock; /* protect context, domain ids */
+    spinlock_t lock; /* protect context */
     spinlock_t register_lock; /* protect iommu register handling */
     u64 root_maddr; /* root entry machine address */
     struct msi_desc msi;

@@ -497,19 +497,19 @@ int iommu_iotlb_flush_all(struct domain *d, unsigned int flush_flags)
     return rc;
 }
 
-static int __init iommu_quarantine_init(void)
+int iommu_quarantine_dev_init(device_t *dev)
 {
     const struct domain_iommu *hd = dom_iommu(dom_io);
-    int rc;
 
-    rc = iommu_domain_init(dom_io);
-    if ( rc )
-        return rc;
-
-    if ( !hd->platform_ops->quarantine_init )
+    if ( !iommu_quarantine || !hd->platform_ops->quarantine_init )
         return 0;
 
-    return hd->platform_ops->quarantine_init(dom_io);
+    return hd->platform_ops->quarantine_init(dev);
+}
+
+static int __init iommu_quarantine_init(void)
+{
+    return iommu_domain_init(dom_io);
 }
 
 int __init iommu_setup(void)
