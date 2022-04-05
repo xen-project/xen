@@ -1078,8 +1078,8 @@ static void __setup_APIC_LVTT(unsigned int clocks)
     lvtt_value = APIC_TIMER_MODE_ONESHOT | LOCAL_TIMER_VECTOR;
     apic_write(APIC_LVTT, lvtt_value);
 
-    tmp_value = apic_read(APIC_TDCR);
-    apic_write(APIC_TDCR, tmp_value | APIC_TDR_DIV_1);
+    tmp_value = apic_read(APIC_TDCR) & ~APIC_TDR_DIV_MASK;
+    apic_write(APIC_TDCR, tmp_value | PASTE(APIC_TDR_DIV_, APIC_DIVISOR));
 
     apic_write(APIC_TMICT, clocks / APIC_DIVISOR);
 }
@@ -1212,6 +1212,8 @@ uint32_t __init apic_tmcct_read(void)
  * APIC irq that way.
  */
 
+#define BUS_SCALE_SHIFT 18
+
 static void __init calibrate_APIC_clock(void)
 {
     unsigned long bus_freq; /* KAF: pointer-size avoids compile warns. */
@@ -1265,8 +1267,8 @@ static void __init calibrate_APIC_clock(void)
     /* set up multipliers for accurate timer code */
     bus_cycle  = 1000000000000UL / bus_freq; /* in pico seconds */
     bus_cycle += (1000000000000UL % bus_freq) * 2 > bus_freq;
-    bus_scale  = (1000*262144)/bus_cycle;
-    bus_scale += ((1000 * 262144) % bus_cycle) * 2 > bus_cycle;
+    bus_scale  = (1000 << BUS_SCALE_SHIFT) / bus_cycle;
+    bus_scale += ((1000 << BUS_SCALE_SHIFT) % bus_cycle) * 2 > bus_cycle;
 
     apic_printk(APIC_VERBOSE, "..... bus_scale = %#x\n", bus_scale);
     /* reset APIC to zero timeout value */
@@ -1353,7 +1355,8 @@ int reprogram_timer(s_time_t timeout)
     }
 
     if ( timeout && ((expire = timeout - NOW()) > 0) )
-        apic_tmict = min_t(u64, (bus_scale * expire) >> 18, UINT_MAX);
+        apic_tmict = min_t(uint64_t, (bus_scale * expire) >> BUS_SCALE_SHIFT,
+                           UINT32_MAX);
 
     apic_write(APIC_TMICT, (unsigned long)apic_tmict);
 

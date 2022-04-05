@@ -106,7 +106,7 @@
 #define		APIC_TMICT	0x380
 #define		APIC_TMCCT	0x390
 #define		APIC_TDCR	0x3E0
-#define			APIC_TDR_DIV_TMBASE	(1<<2)
+#define			APIC_TDR_DIV_MASK	0xB
 #define			APIC_TDR_DIV_1		0xB
 #define			APIC_TDR_DIV_2		0x0
 #define			APIC_TDR_DIV_4		0x1

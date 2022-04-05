@@ -580,7 +580,7 @@ static uint32_t vlapic_get_tmcct(const struct vlapic *vlapic)
 static void vlapic_set_tdcr(struct vlapic *vlapic, unsigned int val)
 {
     /* Only bits 0, 1 and 3 are settable; others are MBZ. */
-    val &= 0xb;
+    val &= APIC_TDR_DIV_MASK;
     vlapic_set_reg(vlapic, APIC_TDCR, val);
 
     /* Update the demangled hw.timer_divisor. */
@@ -888,7 +888,7 @@ void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
     {
         uint32_t current_divisor = vlapic->hw.timer_divisor;
 
-        vlapic_set_tdcr(vlapic, val & 0xb);
+        vlapic_set_tdcr(vlapic, val);
 
         vlapic_update_timer(vlapic, vlapic_get_reg(vlapic, APIC_LVTT), false,
                             current_divisor);
@@ -1020,7 +1020,7 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t msr_content)
         break;
 
     case APIC_TDCR:
-        if ( msr_content & ~APIC_TDR_DIV_1 )
+        if ( msr_content & ~APIC_TDR_DIV_MASK )
             return X86EMUL_EXCEPTION;
         break;
 
