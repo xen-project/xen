@@ -3,6 +3,7 @@
 /* Modified for ARM Xen by Ian Campbell */
 
 #include <xen/cache.h>
+#include <xen/lib.h>
 #include <asm/page.h>
 #undef ENTRY
 #undef ALIGN

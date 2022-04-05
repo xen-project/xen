@@ -2,6 +2,7 @@
 /* Modified for i386/x86-64 Xen by Keir Fraser */
 
 #include <xen/cache.h>
+#include <xen/lib.h>
 #include <asm/page.h>
 #undef ENTRY
 #undef ALIGN

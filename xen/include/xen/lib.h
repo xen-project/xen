@@ -3,6 +3,8 @@
 
 #define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 
+#define IS_ALIGNED(val, align) (!((val) & ((align) - 1)))
+
 #define DIV_ROUND(n, d) (((n) + (d) / 2) / (d))
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
@@ -16,6 +18,9 @@
 /* Indirect macros required for expanded argument pasting. */
 #define PASTE_(a, b) a ## b
 #define PASTE(a, b) PASTE_(a, b)
+
+#define __STR(...) #__VA_ARGS__
+#define STR(...) __STR(__VA_ARGS__)
 
 #ifndef __ASSEMBLY__
 
