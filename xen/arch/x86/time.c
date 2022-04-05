@@ -607,16 +607,18 @@ static s64 __init cf_check init_tsc(struct platform_timesource *pts)
     return ret;
 }
 
-static uint64_t __init cf_check read_tsc(void)
-{
-    return rdtsc_ordered();
-}
+/*
+ * plt_tsc's read_counter hook is not (and should not be) invoked via the
+ * struct field. To avoid carrying an unused, indirectly reachable function,
+ * poison the field with an easily identifiable non-canonical pointer.
+ */
+#define READ_TSC_POISON ((uint64_t(*)(void))0x75C75C75C75C75C0ul)
 
 static struct platform_timesource __initdata_cf_clobber plt_tsc =
 {
     .id = "tsc",
     .name = "TSC",
-    .read_counter = read_tsc,
+    .read_counter = READ_TSC_POISON,
     /*
      * Calculations for platform timer overflow assume u64 boundary.
      * Hence we set to less than 64, such that the TSC wraparound is
@@ -846,7 +848,7 @@ static uint64_t read_counter(void)
      * hence we can't invoke read_tsc() that way. Special case it here, open-
      * coding the function call at the same time.
      */
-    return plt_src.read_counter != read_tsc
+    return plt_src.read_counter != READ_TSC_POISON
            ? alternative_call(plt_src.read_counter)
            : rdtsc_ordered();
 }
@@ -2510,7 +2512,7 @@ uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs)
 
 bool clocksource_is_tsc(void)
 {
-    return plt_src.read_counter == read_tsc;
+    return plt_src.read_counter == READ_TSC_POISON;
 }
 
 int host_tsc_is_safe(void)
