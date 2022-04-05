@@ -2352,6 +2352,10 @@ static int reassign_device_ownership(
 {
     int ret;
 
+    ret = domain_context_unmap(source, devfn, pdev);
+    if ( ret )
+        return ret;
+
     /*
      * Devices assigned to untrusted domains (here assumed to be any domU)
      * can attempt to send arbitrary LAPIC/MSI messages. We are unprotected
@@ -2387,10 +2391,6 @@ static int reassign_device_ownership(
                     return ret;
             }
     }
-
-    ret = domain_context_unmap(source, devfn, pdev);
-    if ( ret )
-        return ret;
 
     if ( devfn == pdev->devfn && pdev->domain != dom_io )
     {
@@ -2468,9 +2468,8 @@ static int intel_iommu_assign_device(
         }
     }
 
-    ret = reassign_device_ownership(s, d, devfn, pdev);
-    if ( ret || d == dom_io )
-        return ret;
+    if ( d == dom_io )
+        return reassign_device_ownership(s, d, devfn, pdev);
 
     /* Setup rmrr identity mapping */
     for_each_rmrr_device( rmrr, bdf, i )
@@ -2483,20 +2482,37 @@ static int intel_iommu_assign_device(
                                          rmrr->end_address, flag);
             if ( ret )
             {
-                int rc;
-
-                rc = reassign_device_ownership(d, s, devfn, pdev);
                 printk(XENLOG_G_ERR VTDPREFIX
-                       " cannot map reserved region (%"PRIx64",%"PRIx64"] for Dom%d (%d)\n",
-                       rmrr->base_address, rmrr->end_address,
-                       d->domain_id, ret);
-                if ( rc )
-                {
-                    printk(XENLOG_ERR VTDPREFIX
-                           " failed to reclaim %04x:%02x:%02x.%u from %pd (%d)\n",
-                           seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), d, rc);
-                    domain_crash(d);
-                }
+                       "%pd: cannot map reserved region [%"PRIx64",%"PRIx64"]: %d\n",
+                       d, rmrr->base_address, rmrr->end_address, ret);
+                break;
+            }
+        }
+    }
+
+    if ( !ret )
+        ret = reassign_device_ownership(s, d, devfn, pdev);
+
+    /* See reassign_device_ownership() for the hwdom aspect. */
+    if ( !ret || is_hardware_domain(d) )
+        return ret;
+
+    for_each_rmrr_device( rmrr, bdf, i )
+    {
+        if ( rmrr->segment == seg &&
+             PCI_BUS(bdf) == bus &&
+             PCI_DEVFN2(bdf) == devfn )
+        {
+            int rc = iommu_identity_mapping(d, p2m_access_x,
+                                            rmrr->base_address,
+                                            rmrr->end_address, 0);
+
+            if ( rc && rc != -ENOENT )
+            {
+                printk(XENLOG_ERR VTDPREFIX
+                       "%pd: cannot unmap reserved region [%"PRIx64",%"PRIx64"]: %d\n",
+                       d, rmrr->base_address, rmrr->end_address, rc);
+                domain_crash(d);
                 break;
             }
         }
