@@ -237,7 +237,8 @@ int amd_iommu_init_late(void);
 int amd_iommu_update_ivrs_mapping_acpi(void);
 void cf_check iov_adjust_irq_affinities(void);
 
-int cf_check amd_iommu_quarantine_init(struct domain *d);
+int cf_check amd_iommu_quarantine_init(struct pci_dev *pdev, bool scratch_page);
+void amd_iommu_quarantine_teardown(struct pci_dev *pdev);
 
 /* mapping functions */
 int __must_check cf_check amd_iommu_map_page(
