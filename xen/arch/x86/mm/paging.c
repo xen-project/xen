@@ -209,7 +209,7 @@ static int paging_free_log_dirty_bitmap(struct domain *d, int rc)
     return rc;
 }
 
-int paging_log_dirty_enable(struct domain *d, bool_t log_global)
+static int paging_log_dirty_enable(struct domain *d, bool_t log_global)
 {
     int ret;
 
