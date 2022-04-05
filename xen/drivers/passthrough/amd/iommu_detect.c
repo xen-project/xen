@@ -180,6 +180,11 @@ int __init amd_iommu_detect_one_acpi(
     if ( rt )
         goto out;
 
+    iommu->domid_map = iommu_init_domid();
+    rt = -ENOMEM;
+    if ( !iommu->domid_map )
+        goto out;
+
     rt = pci_ro_device(iommu->seg, bus, PCI_DEVFN(dev, func));
     if ( rt )
         printk(XENLOG_ERR
@@ -191,7 +196,10 @@ int __init amd_iommu_detect_one_acpi(
 
  out:
     if ( rt )
+    {
+        xfree(iommu->domid_map);
         xfree(iommu);
+    }
 
     return rt;
 }
