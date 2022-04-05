@@ -247,9 +247,13 @@ void amd_iommu_set_intremap_table(struct amd_iommu_dte *dte,
                                   const void *ptr,
                                   const struct amd_iommu *iommu,
                                   bool valid);
-void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
-				   uint64_t root_ptr, uint16_t domain_id,
-				   uint8_t paging_mode, bool valid);
+#define SET_ROOT_VALID          (1u << 0)
+#define SET_ROOT_WITH_UNITY_MAP (1u << 1)
+int __must_check amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
+                                               uint64_t root_ptr,
+                                               uint16_t domain_id,
+                                               uint8_t paging_mode,
+                                               unsigned int flags);
 void iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
                                 const struct ivrs_mappings *ivrs_dev);
 void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
