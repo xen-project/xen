@@ -142,28 +142,6 @@ static int context_set_domain_id(struct context_entry *context,
     return 0;
 }
 
-static int context_get_domain_id(const struct context_entry *context,
-                                 const struct vtd_iommu *iommu)
-{
-    int domid = -1;
-
-    if ( iommu && context )
-    {
-        unsigned int dom_index = context_domain_id(*context);
-
-        domid = did_to_domain_id(iommu, dom_index);
-        if ( domid == DOMID_INVALID )
-        {
-            dprintk(XENLOG_DEBUG VTDPREFIX,
-                    "no domid for did %u (nr_dom %u)\n",
-                    dom_index, cap_ndoms(iommu->cap));
-            domid = -1;
-        }
-    }
-
-    return domid;
-}
-
 static void cleanup_domid_map(struct domain *domain, struct vtd_iommu *iommu)
 {
     int iommu_domid;
@@ -1410,44 +1388,9 @@ int domain_context_mapping_one(
 
     if ( context_present(*context) )
     {
-        int res = 0;
-
-        /* Try to get domain ownership from device structure.  If that's
-         * not available, try to read it from the context itself. */
-        if ( pdev )
-        {
-            if ( pdev->domain != domain )
-            {
-                printk(XENLOG_G_INFO VTDPREFIX "%pd: %pp owned by %pd",
-                       domain, &PCI_SBDF3(seg, bus, devfn),
-                       pdev->domain);
-                res = -EINVAL;
-            }
-        }
-        else
-        {
-            int cdomain;
-            cdomain = context_get_domain_id(context, iommu);
-            
-            if ( cdomain < 0 )
-            {
-                printk(XENLOG_G_WARNING VTDPREFIX
-                       "%pd: %pp mapped, but can't find owner\n",
-                       domain, &PCI_SBDF3(seg, bus, devfn));
-                res = -EINVAL;
-            }
-            else if ( cdomain != domain->domain_id )
-            {
-                printk(XENLOG_G_INFO VTDPREFIX
-                       "%pd: %pp already mapped to d%d",
-                       domain, &PCI_SBDF3(seg, bus, devfn), cdomain);
-                res = -EINVAL;
-            }
-        }
-
-        unmap_vtd_domain_page(context_entries);
         spin_unlock(&iommu->lock);
-        return res;
+        unmap_vtd_domain_page(context_entries);
+        return 0;
     }
 
     if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
