@@ -26,7 +26,7 @@
 #include "../ats.h"
 
 /* dom_io is used as a sentinel for quarantined devices */
-#define QUARANTINE_SKIP(d) ((d) == dom_io && !dom_iommu(d)->arch.amd.root_table)
+#define QUARANTINE_SKIP(d, p) ((d) == dom_io && !(p)->arch.amd.root_table)
 
 static bool_t __read_mostly init_done;
 
@@ -125,8 +125,10 @@ static int __must_check amd_iommu_setup_domain_device(
     u8 bus = pdev->bus;
     struct domain_iommu *hd = dom_iommu(domain);
     const struct ivrs_mappings *ivrs_dev;
+    const struct page_info *root_pg;
+    domid_t domid;
 
-    if ( QUARANTINE_SKIP(domain) )
+    if ( QUARANTINE_SKIP(domain, pdev) )
         return 0;
 
     BUG_ON(!hd->arch.amd.paging_mode || !iommu->dev_table.buffer);
@@ -147,14 +149,25 @@ static int __must_check amd_iommu_setup_domain_device(
     dte = &table[req_id];
     ivrs_dev = &get_ivrs_mappings(iommu->seg)[req_id];
 
+    if ( domain != dom_io )
+    {
+        root_pg = hd->arch.amd.root_table;
+        domid = domain->domain_id;
+    }
+    else
+    {
+        root_pg = pdev->arch.amd.root_table;
+        domid = pdev->arch.pseudo_domid;
+    }
+
     spin_lock_irqsave(&iommu->lock, flags);
 
     if ( !dte->v || !dte->tv )
     {
         /* bind DTE to domain page-tables */
         rc = amd_iommu_set_root_page_table(
-                 dte, page_to_maddr(hd->arch.amd.root_table),
-                 domain->domain_id, hd->arch.amd.paging_mode, sr_flags);
+                 dte, page_to_maddr(root_pg), domid,
+                 hd->arch.amd.paging_mode, sr_flags);
         if ( rc )
         {
             ASSERT(rc < 0);
@@ -181,7 +194,7 @@ static int __must_check amd_iommu_setup_domain_device(
 
         amd_iommu_flush_device(iommu, req_id);
     }
-    else if ( dte->pt_root != mfn_x(page_to_mfn(hd->arch.amd.root_table)) )
+    else if ( dte->pt_root != mfn_x(page_to_mfn(root_pg)) )
     {
         /*
          * Strictly speaking if the device is the only one with this requestor
@@ -194,8 +207,8 @@ static int __must_check amd_iommu_setup_domain_device(
             rc = -EOPNOTSUPP;
         else
             rc = amd_iommu_set_root_page_table(
-                     dte, page_to_maddr(hd->arch.amd.root_table),
-                     domain->domain_id, hd->arch.amd.paging_mode, sr_flags);
+                     dte, page_to_maddr(root_pg), domid,
+                     hd->arch.amd.paging_mode, sr_flags);
         if ( rc < 0 )
         {
             spin_unlock_irqrestore(&iommu->lock, flags);
@@ -214,6 +227,7 @@ static int __must_check amd_iommu_setup_domain_device(
               * intended anyway.
               */
              !pdev->domain->is_dying &&
+             pdev->domain != dom_io &&
              (any_pdev_behind_iommu(pdev->domain, pdev, iommu) ||
               pdev->phantom_stride) )
             AMD_IOMMU_WARN(" %pp: reassignment may cause %pd data corruption\n",
@@ -246,9 +260,8 @@ static int __must_check amd_iommu_setup_domain_device(
     AMD_IOMMU_DEBUG("Setup I/O page table: device id = %#x, type = %#x, "
                     "root table = %#"PRIx64", "
                     "domain = %d, paging mode = %d\n",
-                    req_id, pdev->type,
-                    page_to_maddr(hd->arch.amd.root_table),
-                    domain->domain_id, hd->arch.amd.paging_mode);
+                    req_id, pdev->type, page_to_maddr(root_pg),
+                    domid, hd->arch.amd.paging_mode);
 
     ASSERT(pcidevs_locked());
 
@@ -327,7 +340,7 @@ int amd_iommu_alloc_root(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
-    if ( unlikely(!hd->arch.amd.root_table) )
+    if ( unlikely(!hd->arch.amd.root_table) && d != dom_io )
     {
         hd->arch.amd.root_table = iommu_alloc_pgtable(hd);
         if ( !hd->arch.amd.root_table )
@@ -391,7 +404,7 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
     int req_id;
     u8 bus = pdev->bus;
 
-    if ( QUARANTINE_SKIP(domain) )
+    if ( QUARANTINE_SKIP(domain, pdev) )
         return;
 
     ASSERT(pcidevs_locked());
@@ -430,7 +443,7 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
 
         AMD_IOMMU_DEBUG("Disable: device id = %#x, "
                         "domain = %d, paging mode = %d\n",
-                        req_id,  domain->domain_id,
+                        req_id, dte->domain_id,
                         dom_iommu(domain)->arch.amd.paging_mode);
     }
     else
@@ -453,7 +466,7 @@ static int reassign_device(struct domain *source, struct domain *target,
         return -ENODEV;
     }
 
-    if ( !QUARANTINE_SKIP(target) )
+    if ( !QUARANTINE_SKIP(target, pdev) )
     {
         rc = amd_iommu_setup_domain_device(target, iommu, devfn, pdev);
         if ( rc )
@@ -654,6 +667,8 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
              ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map) )
         AMD_IOMMU_WARN("%pd: unity unmapping failed for %pp\n",
                        pdev->domain, &pdev->sbdf);
+
+    amd_iommu_quarantine_teardown(pdev);
 
     iommu_free_domid(pdev->arch.pseudo_domid, iommu->domid_map);
     pdev->arch.pseudo_domid = DOMID_INVALID;

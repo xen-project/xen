@@ -443,21 +443,22 @@ int iommu_iotlb_flush_all(struct domain *d, unsigned int flush_flags)
     return rc;
 }
 
-static int __init iommu_quarantine_init(void)
+int iommu_quarantine_dev_init(device_t *dev)
 {
     const struct domain_iommu *hd = dom_iommu(dom_io);
-    int rc;
 
-    dom_io->options |= XEN_DOMCTL_CDF_iommu;
-
-    rc = iommu_domain_init(dom_io, 0);
-    if ( rc || iommu_quarantine < IOMMU_quarantine_scratch_page )
-        return rc;
-
-    if ( !hd->platform_ops->quarantine_init )
+    if ( !iommu_quarantine || !hd->platform_ops->quarantine_init )
         return 0;
 
-    return hd->platform_ops->quarantine_init(dom_io);
+    return iommu_call(hd->platform_ops, quarantine_init,
+                      dev, iommu_quarantine == IOMMU_quarantine_scratch_page);
+}
+
+static int __init iommu_quarantine_init(void)
+{
+    dom_io->options |= XEN_DOMCTL_CDF_iommu;
+
+    return iommu_domain_init(dom_io, 0);
 }
 
 int __init iommu_setup(void)
