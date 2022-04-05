@@ -1,4 +1,4 @@
-CFLAGS-y += -fshort-wchar
+include $(srctree)/common/efi/efi-common.mk
 
-obj-y += boot.init.o pe.init.o ebmalloc.o runtime.o
+obj-y += $(EFIOBJ-y)
 obj-$(CONFIG_ACPI) +=  efi-dom0.init.o

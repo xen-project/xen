@@ -441,11 +441,6 @@ $(TARGET).gz: $(TARGET)
 $(TARGET): FORCE
 	$(Q)$(MAKE) $(build)=tools
 	$(Q)$(MAKE) $(build)=. include/xen/compile.h
-	[ -e arch/$(TARGET_ARCH)/efi ] && for f in $$(cd common/efi; echo *.[ch]); \
-		do test -r arch/$(TARGET_ARCH)/efi/$$f || \
-		   ln -nsf ../../../common/efi/$$f arch/$(TARGET_ARCH)/efi/; \
-		done; \
-		true
 	$(Q)$(MAKE) $(build)=include all
 	$(Q)$(MAKE) $(build)=arch/$(TARGET_ARCH) include
 	$(Q)$(MAKE) $(build)=. arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
