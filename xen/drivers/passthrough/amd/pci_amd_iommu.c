@@ -337,7 +337,7 @@ int amd_iommu_alloc_root(struct domain *d)
     return 0;
 }
 
-unsigned int __read_mostly amd_iommu_max_paging_mode = 6;
+unsigned int __read_mostly amd_iommu_max_paging_mode = IOMMU_MAX_PT_LEVELS;
 int __read_mostly amd_iommu_min_paging_mode = 1;
 
 static int amd_iommu_domain_init(struct domain *d)
