@@ -96,13 +96,32 @@ static int __must_check allocate_domain_resources(struct domain *d)
     return rc;
 }
 
+static bool any_pdev_behind_iommu(const struct domain *d,
+                                  const struct pci_dev *exclude,
+                                  const struct amd_iommu *iommu)
+{
+    const struct pci_dev *pdev;
+
+    for_each_pdev ( d, pdev )
+    {
+        if ( pdev == exclude )
+            continue;
+
+        if ( find_iommu_for_device(pdev->seg, pdev->sbdf.bdf) == iommu )
+            return true;
+    }
+
+    return false;
+}
+
 static int __must_check amd_iommu_setup_domain_device(
     struct domain *domain, struct amd_iommu *iommu,
     uint8_t devfn, struct pci_dev *pdev)
 {
     struct amd_iommu_dte *table, *dte;
     unsigned long flags;
-    int req_id, valid = 1, rc;
+    unsigned int req_id, sr_flags;
+    int rc;
     u8 bus = pdev->bus;
     struct domain_iommu *hd = dom_iommu(domain);
     const struct ivrs_mappings *ivrs_dev;
@@ -116,8 +135,11 @@ static int __must_check amd_iommu_setup_domain_device(
     if ( rc )
         return rc;
 
-    if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
-        valid = 0;
+    req_id = get_dma_requestor_id(iommu->seg, pdev->sbdf.bdf);
+    ivrs_dev = &get_ivrs_mappings(iommu->seg)[req_id];
+    sr_flags = (iommu_hwdom_passthrough && is_hardware_domain(domain)
+                ? 0 : SET_ROOT_VALID)
+               | (ivrs_dev->unity_map ? SET_ROOT_WITH_UNITY_MAP : 0);
 
     /* get device-table entry */
     req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
@@ -130,9 +152,15 @@ static int __must_check amd_iommu_setup_domain_device(
     if ( !dte->v || !dte->tv )
     {
         /* bind DTE to domain page-tables */
-        amd_iommu_set_root_page_table(
-            dte, page_to_maddr(hd->arch.amd.root_table),
-            domain->domain_id, hd->arch.amd.paging_mode, valid);
+        rc = amd_iommu_set_root_page_table(
+                 dte, page_to_maddr(hd->arch.amd.root_table),
+                 domain->domain_id, hd->arch.amd.paging_mode, sr_flags);
+        if ( rc )
+        {
+            ASSERT(rc < 0);
+            spin_unlock_irqrestore(&iommu->lock, flags);
+            return rc;
+        }
 
         /* Undo what amd_iommu_disable_domain_device() may have done. */
         if ( dte->it_root )
@@ -152,16 +180,75 @@ static int __must_check amd_iommu_setup_domain_device(
         spin_unlock_irqrestore(&iommu->lock, flags);
 
         amd_iommu_flush_device(iommu, req_id);
+    }
+    else if ( dte->pt_root != mfn_x(page_to_mfn(hd->arch.amd.root_table)) )
+    {
+        /*
+         * Strictly speaking if the device is the only one with this requestor
+         * ID, it could be allowed to be re-assigned regardless of unity map
+         * presence.  But let's deal with that case only if it is actually
+         * found in the wild.
+         */
+        if ( req_id != PCI_BDF2(bus, devfn) &&
+             (sr_flags & SET_ROOT_WITH_UNITY_MAP) )
+            rc = -EOPNOTSUPP;
+        else
+            rc = amd_iommu_set_root_page_table(
+                     dte, page_to_maddr(hd->arch.amd.root_table),
+                     domain->domain_id, hd->arch.amd.paging_mode, sr_flags);
+        if ( rc < 0 )
+        {
+            spin_unlock_irqrestore(&iommu->lock, flags);
+            return rc;
+        }
+        if ( rc &&
+             domain != pdev->domain &&
+             /*
+              * By non-atomically updating the DTE's domain ID field last,
+              * during a short window in time TLB entries with the old domain
+              * ID but the new page tables may have been inserted.  This could
+              * affect I/O of other devices using this same (old) domain ID.
+              * Such updating therefore is not a problem if this was the only
+              * device associated with the old domain ID.  Diverting I/O of any
+              * of a dying domain's devices to the quarantine page tables is
+              * intended anyway.
+              */
+             !pdev->domain->is_dying &&
+             (any_pdev_behind_iommu(pdev->domain, pdev, iommu) ||
+              pdev->phantom_stride) )
+            AMD_IOMMU_WARN(" %pp: reassignment may cause %pd data corruption\n",
+                           &PCI_SBDF3(pdev->seg, bus, devfn), pdev->domain);
 
-        AMD_IOMMU_DEBUG("Setup I/O page table: device id = %#x, type = %#x, "
-                        "root table = %#"PRIx64", "
-                        "domain = %d, paging mode = %d\n",
-                        req_id, pdev->type,
-                        page_to_maddr(hd->arch.amd.root_table),
-                        domain->domain_id, hd->arch.amd.paging_mode);
+        /*
+         * Check remaining settings are still in place from an earlier call
+         * here. They're all independent of the domain, so should not have
+         * changed.
+         */
+        if ( dte->it_root )
+            ASSERT(dte->int_ctl == IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED);
+        ASSERT(dte->iv == iommu_intremap);
+        ASSERT(dte->ex == ivrs_dev->dte_allow_exclusion);
+        ASSERT(dte->sys_mgt == MASK_EXTR(ivrs_dev->device_flags,
+                                         ACPI_IVHD_SYSTEM_MGMT));
+
+        if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
+             !ivrs_dev->block_ats &&
+             iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
+            ASSERT(dte->i == ats_enabled);
+
+        spin_unlock_irqrestore(&iommu->lock, flags);
+
+        amd_iommu_flush_device(iommu, req_id);
     }
     else
         spin_unlock_irqrestore(&iommu->lock, flags);
+
+    AMD_IOMMU_DEBUG("Setup I/O page table: device id = %#x, type = %#x, "
+                    "root table = %#"PRIx64", "
+                    "domain = %d, paging mode = %d\n",
+                    req_id, pdev->type,
+                    page_to_maddr(hd->arch.amd.root_table),
+                    domain->domain_id, hd->arch.amd.paging_mode);
 
     ASSERT(pcidevs_locked());
 
@@ -367,7 +454,20 @@ static int cf_check reassign_device(
         return -ENODEV;
     }
 
-    amd_iommu_disable_domain_device(source, iommu, devfn, pdev);
+    if ( !QUARANTINE_SKIP(target) )
+    {
+        rc = amd_iommu_setup_domain_device(target, iommu, devfn, pdev);
+        if ( rc )
+            return rc;
+    }
+    else
+        amd_iommu_disable_domain_device(source, iommu, devfn, pdev);
+
+    if ( devfn == pdev->devfn && pdev->domain != target )
+    {
+        list_move(&pdev->domain_list, &target->pdev_list);
+        pdev->domain = target;
+    }
 
     /*
      * If the device belongs to the hardware domain, and it has a unity mapping,
@@ -383,24 +483,8 @@ static int cf_check reassign_device(
             return rc;
     }
 
-    if ( devfn == pdev->devfn && pdev->domain != dom_io )
-    {
-        list_move(&pdev->domain_list, &dom_io->pdev_list);
-        pdev->domain = dom_io;
-    }
-
-    rc = amd_iommu_setup_domain_device(target, iommu, devfn, pdev);
-    if ( rc )
-        return rc;
-
     AMD_IOMMU_DEBUG("Re-assign %pp from dom%d to dom%d\n",
                     &pdev->sbdf, source->domain_id, target->domain_id);
-
-    if ( devfn == pdev->devfn && pdev->domain != target )
-    {
-        list_move(&pdev->domain_list, &target->pdev_list);
-        pdev->domain = target;
-    }
 
     return 0;
 }
