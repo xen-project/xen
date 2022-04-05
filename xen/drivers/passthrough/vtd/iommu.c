@@ -114,28 +114,6 @@ static int context_set_domain_id(struct context_entry *context,
     return 0;
 }
 
-static int context_get_domain_id(struct context_entry *context,
-                                 struct vtd_iommu *iommu)
-{
-    unsigned long dom_index, nr_dom;
-    int domid = -1;
-
-    if (iommu && context)
-    {
-        nr_dom = cap_ndoms(iommu->cap);
-
-        dom_index = context_domain_id(*context);
-
-        if ( dom_index < nr_dom && iommu->domid_map )
-            domid = iommu->domid_map[dom_index];
-        else
-            dprintk(XENLOG_DEBUG VTDPREFIX,
-                    "dom_index %lu exceeds nr_dom %lu or iommu has no domid_map\n",
-                    dom_index, nr_dom);
-    }
-    return domid;
-}
-
 static void cleanup_domid_map(struct domain *domain, struct vtd_iommu *iommu)
 {
     int iommu_domid = domain_iommu_domid(domain, iommu);
@@ -1392,49 +1370,9 @@ int domain_context_mapping_one(
 
     if ( context_present(*context) )
     {
-        int res = 0;
-
-        /* Try to get domain ownership from device structure.  If that's
-         * not available, try to read it from the context itself. */
-        if ( pdev )
-        {
-            if ( pdev->domain != domain )
-            {
-                printk(XENLOG_G_INFO VTDPREFIX
-                       "d%d: %04x:%02x:%02x.%u owned by d%d!",
-                       domain->domain_id,
-                       seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                       pdev->domain ? pdev->domain->domain_id : -1);
-                res = -EINVAL;
-            }
-        }
-        else
-        {
-            int cdomain;
-            cdomain = context_get_domain_id(context, iommu);
-            
-            if ( cdomain < 0 )
-            {
-                printk(XENLOG_G_WARNING VTDPREFIX
-                       "d%d: %04x:%02x:%02x.%u mapped, but can't find owner!\n",
-                       domain->domain_id,
-                       seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-                res = -EINVAL;
-            }
-            else if ( cdomain != domain->domain_id )
-            {
-                printk(XENLOG_G_INFO VTDPREFIX
-                       "d%d: %04x:%02x:%02x.%u already mapped to d%d!",
-                       domain->domain_id,
-                       seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                       cdomain);
-                res = -EINVAL;
-            }
-        }
-
-        unmap_vtd_domain_page(context_entries);
         spin_unlock(&iommu->lock);
-        return res;
+        unmap_vtd_domain_page(context_entries);
+        return 0;
     }
 
     if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
