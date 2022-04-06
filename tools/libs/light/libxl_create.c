@@ -1255,8 +1255,6 @@ static void initiate_domain_create(libxl__egc *egc,
     libxl_domain_config *const d_config = dcs->guest_config;
     libxl__domain_build_state *dbs = &dcs->build_state;
 
-    libxl__xswait_init(&dcs->console_xswait);
-
     domid = dcs->domid;
     libxl__domain_build_state_init(dbs);
     dbs->restore = dcs->restore_fd >= 0;
@@ -2072,6 +2070,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     cdcs->dcs.callback = domain_create_cb;
     cdcs->dcs.domid = INVALID_DOMID;
     cdcs->dcs.soft_reset = false;
+    libxl__xswait_init(&cdcs->dcs.console_xswait);
 
     if (cdcs->dcs.restore_params.checkpointed_stream ==
         LIBXL_CHECKPOINTED_STREAM_COLO) {
@@ -2172,6 +2171,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     cdcs->dcs.domid = domid;
     cdcs->dcs.soft_reset = true;
     cdcs->dcs.callback = domain_create_cb;
+    libxl__xswait_init(&cdcs->dcs.console_xswait);
     libxl__ao_progress_gethow(&srs->cdcs.dcs.aop_console_how,
                               aop_console_how);
     cdcs->domid_out = &domid_out;
