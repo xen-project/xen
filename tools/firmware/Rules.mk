@@ -15,6 +15,8 @@ CFLAGS += -Werror
 
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
+$(call cc-option-add,CFLAGS,CC,-fcf-protection=none)
+
 # Extra CFLAGS suitable for an embedded type of environment.
 CFLAGS += -ffreestanding -msoft-float
 
