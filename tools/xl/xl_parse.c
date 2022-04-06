@@ -1469,6 +1469,32 @@ void parse_config_data(const char *config_source,
         exit(1);
     }
 
+    /* To be reworked (automatically enabled) once the auto ballooning
+     * after guest starts is done (with PCI devices passed in). */
+    if (c_info->type == LIBXL_DOMAIN_TYPE_PV) {
+        xlu_cfg_get_defbool(config, "e820_host", &b_info->u.pv.e820_host, 0);
+    }
+
+    if (!xlu_cfg_get_long (config, "pci_msitranslate", &l, 0))
+        pci_msitranslate = l;
+
+    if (!xlu_cfg_get_long (config, "pci_power_mgmt", &l, 0))
+        pci_power_mgmt = l;
+
+    if (!xlu_cfg_get_long (config, "pci_permissive", &l, 0))
+        pci_permissive = l;
+
+    if (!xlu_cfg_get_long (config, "pci_seize", &l, 0))
+        pci_seize = l;
+
+    if (!xlu_cfg_get_string(config, "rdm", &buf, 0)) {
+        libxl_rdm_reserve rdm;
+        if (!xlu_rdm_parse(config, &rdm, buf)) {
+            b_info->u.hvm.rdm.strategy = rdm.strategy;
+            b_info->u.hvm.rdm.policy = rdm.policy;
+        }
+    }
+
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
         d_config->num_pcidevs = 0;
         d_config->pcidevs = NULL;
@@ -2326,32 +2352,6 @@ skip_nic:
 
 skip_vfb:
             free(buf2);
-        }
-    }
-
-    if (!xlu_cfg_get_long (config, "pci_msitranslate", &l, 0))
-        pci_msitranslate = l;
-
-    if (!xlu_cfg_get_long (config, "pci_power_mgmt", &l, 0))
-        pci_power_mgmt = l;
-
-    if (!xlu_cfg_get_long (config, "pci_permissive", &l, 0))
-        pci_permissive = l;
-
-    if (!xlu_cfg_get_long (config, "pci_seize", &l, 0))
-        pci_seize = l;
-
-    /* To be reworked (automatically enabled) once the auto ballooning
-     * after guest starts is done (with PCI devices passed in). */
-    if (c_info->type == LIBXL_DOMAIN_TYPE_PV) {
-        xlu_cfg_get_defbool(config, "e820_host", &b_info->u.pv.e820_host, 0);
-    }
-
-    if (!xlu_cfg_get_string(config, "rdm", &buf, 0)) {
-        libxl_rdm_reserve rdm;
-        if (!xlu_rdm_parse(config, &rdm, buf)) {
-            b_info->u.hvm.rdm.strategy = rdm.strategy;
-            b_info->u.hvm.rdm.policy = rdm.policy;
         }
     }
 
