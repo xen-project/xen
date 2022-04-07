@@ -121,8 +121,7 @@ mopar_gr:
         movw    %ax, _param(PARAM_LFB_WIDTH)
         movw    20(%di), %ax
         movw    %ax, _param(PARAM_LFB_HEIGHT)
-        movb    25(%di), %al
-        movb    $0, %ah
+        movzbw  25(%di), %ax
         movw    %ax, _param(PARAM_LFB_DEPTH)
         movl    40(%di), %eax
         movl    %eax, _param(PARAM_LFB_BASE)
@@ -135,8 +134,7 @@ mopar_gr:
 
 # get video mem size
         leaw    vesa_glob_info, %di
-        xorl    %eax, %eax
-        movw    18(%di), %ax
+        movzwl  18(%di), %eax
         movl    %eax, _param(PARAM_LFB_SIZE)
 
 # store mode capabilities
@@ -144,14 +142,11 @@ mopar_gr:
         movl    %eax, _param(PARAM_CAPABILITIES)
 
 # switching the DAC to 8-bit is for <= 8 bpp only
-        movw    _param(PARAM_LFB_DEPTH), %ax
-        cmpw    $8, %ax
+        cmpw    $8, _param(PARAM_LFB_DEPTH)
         jg      dac_done
 
 # get DAC switching capability
-        xorl    %eax, %eax
-        movb    10(%di), %al
-        testb   $1, %al
+        testb   $1, 10(%di)
         jz      dac_set
 
 # attempt to switch DAC to 8-bit
@@ -164,17 +159,17 @@ mopar_gr:
 
 dac_set:
 # set color size to DAC size
-        movb    bootsym(dac_size), %al
+        movzbw  bootsym(dac_size), %ax
         movb    %al, _param(PARAM_LFB_COLORS+0)
         movb    %al, _param(PARAM_LFB_COLORS+2)
         movb    %al, _param(PARAM_LFB_COLORS+4)
         movb    %al, _param(PARAM_LFB_COLORS+6)
 
 # set color offsets to 0
-        movb    $0, _param(PARAM_LFB_COLORS+1)
-        movb    $0, _param(PARAM_LFB_COLORS+3)
-        movb    $0, _param(PARAM_LFB_COLORS+5)
-        movb    $0, _param(PARAM_LFB_COLORS+7)
+        movb    %ah, _param(PARAM_LFB_COLORS+1)
+        movb    %ah, _param(PARAM_LFB_COLORS+3)
+        movb    %ah, _param(PARAM_LFB_COLORS+5)
+        movb    %ah, _param(PARAM_LFB_COLORS+7)
 
 dac_done:
 # get protected mode interface information
@@ -504,7 +499,8 @@ setvesabysize:
         call    mode_table
         leaw    modelist,%si
 1:      add     $8,%si
-        cmpw    $ASK_VGA,-8(%si)        # End?
+        movw    -8(%si),%bx
+        cmpw    $ASK_VGA,%bx            # End?
         je      setbad
         movw    -6(%si),%ax
         cmpw    %ax,bootsym(vesa_size)+0
@@ -515,9 +511,7 @@ setvesabysize:
         movw    -2(%si),%ax
         cmpw    %ax,bootsym(vesa_size)+4
         jne     1b
-        movw    -8(%si),%ax
-        movw    %ax,%bx
-        movw    %ax,bootsym(boot_vid_mode)
+        movw    %bx,bootsym(boot_vid_mode)
         jmp     check_vesa
 
 # Table of routines for setting of the special modes.
@@ -741,8 +735,7 @@ vesa2:  pushw   %cx
         movw    %bx, 2(%di)
         movw    0x14(%di), %bx          # Height
         movw    %bx, 4(%di)
-        xorw    %bx, %bx
-        movb    0x19(%di), %bl          # Depth
+        movzbw  0x19(%di), %bx          # Depth
         movw    %bx, 6(%di)
 
         addw    $8, %di                 # The mode is valid. Store it.
@@ -869,8 +862,7 @@ gettime:
         movb    %dh, %al                # %dh contains the seconds
         andb    $0x0f, %al
         movb    %dh, %ah
-        movb    $0x04, %cl
-        shrb    %cl, %ah
+        shrb    $4, %ah
         aad
         popw    %cx
         ret
@@ -927,8 +919,8 @@ store_edid:
 .Lforce_edid:
         movw    $0x4f15, %ax            # do VBE/DDC
         movw    $0x01, %bx
-        movw    $0x00, %cx
-        movw    $0x00, %dx
+        xorw    %cx, %cx
+        xorw    %dx, %dx
         movw    $bootsym(boot_edid_info), %di
         int     $0x10
 
