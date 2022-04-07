@@ -2538,7 +2538,6 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
             goto out;
     }
 
-    sdss->qmp_proxy_spawn.ao = ao;
     if (libxl__stubdomain_is_linux(&guest_config->b_info)) {
         spawn_qmp_proxy(egc, sdss);
     } else {
@@ -2555,7 +2554,7 @@ out:
 static void spawn_qmp_proxy(libxl__egc *egc,
                             libxl__stub_dm_spawn_state *sdss)
 {
-    STATE_AO_GC(sdss->qmp_proxy_spawn.ao);
+    STATE_AO_GC(sdss->dm.spawn.ao);
     const uint32_t guest_domid = sdss->dm.guest_domid;
     const uint32_t dm_domid = sdss->pvqemu.guest_domid;
     const char *dom_path = libxl__xs_get_dompath(gc, dm_domid);
@@ -2569,6 +2568,7 @@ static void spawn_qmp_proxy(libxl__egc *egc,
         goto out;
     }
 
+    sdss->qmp_proxy_spawn.ao = ao;
     sdss->qmp_proxy_spawn.what = GCSPRINTF("domain %d device model qmp proxy", guest_domid);
     sdss->qmp_proxy_spawn.pidpath = GCSPRINTF("%s/image/qmp-proxy-pid", dom_path);
     sdss->qmp_proxy_spawn.xspath = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID,
@@ -2656,7 +2656,7 @@ static void qmp_proxy_spawn_outcome(libxl__egc *egc,
                                     libxl__stub_dm_spawn_state *sdss,
                                     int rc)
 {
-    STATE_AO_GC(sdss->qmp_proxy_spawn.ao);
+    STATE_AO_GC(sdss->dm.spawn.ao);
     /*
      * Until xenconsoled learns how to handle multiple consoles, require qemu
      * in dom0 to serve consoles for a stubdomain - it require at least 3 of them.
