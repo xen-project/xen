@@ -24,9 +24,7 @@ get_memory_map:
         cmpw    $E820_BIOS_MAX, bootsym(bios_e820nr) # up to this many entries
         jae     .Ldone
 
-        movw    %di,%ax
-        addw    $20,%ax
-        movw    %ax,%di
+        addw    $20,%di
         testl   %ebx,%ebx                       # check to see if
         jnz     1b                              # %ebx is set to EOF
 
