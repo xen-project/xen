@@ -56,8 +56,8 @@ endif
 
 # If supported by the compiler, reduce stack alignment to 8 bytes. But allow
 # this to be overridden elsewhere.
-$(call cc-option-add,CFLAGS-stack-boundary,CC,-mpreferred-stack-boundary=3)
-export CFLAGS-stack-boundary
+$(call cc-option-add,CFLAGS_stack_boundary,CC,-mpreferred-stack-boundary=3)
+export CFLAGS_stack_boundary
 
 ifeq ($(CONFIG_UBSAN),y)
 # Don't enable alignment sanitisation.  x86 has efficient unaligned accesses,
