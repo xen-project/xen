@@ -859,15 +859,15 @@ static void __init efi_tables(void)
         static EFI_GUID __initdata smbios3_guid = SMBIOS3_TABLE_GUID;
 
         if ( match_guid(&acpi2_guid, &efi_ct[i].VendorGuid) )
-	       efi.acpi20 = (long)efi_ct[i].VendorTable;
+            efi.acpi20 = (unsigned long)efi_ct[i].VendorTable;
         if ( match_guid(&acpi_guid, &efi_ct[i].VendorGuid) )
-	       efi.acpi = (long)efi_ct[i].VendorTable;
+            efi.acpi = (unsigned long)efi_ct[i].VendorTable;
         if ( match_guid(&mps_guid, &efi_ct[i].VendorGuid) )
-	       efi.mps = (long)efi_ct[i].VendorTable;
+            efi.mps = (unsigned long)efi_ct[i].VendorTable;
         if ( match_guid(&smbios_guid, &efi_ct[i].VendorGuid) )
-	       efi.smbios = (long)efi_ct[i].VendorTable;
+            efi.smbios = (unsigned long)efi_ct[i].VendorTable;
         if ( match_guid(&smbios3_guid, &efi_ct[i].VendorGuid) )
-	       efi.smbios3 = (long)efi_ct[i].VendorTable;
+            efi.smbios3 = (unsigned long)efi_ct[i].VendorTable;
     }
 
 #ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
