@@ -10,3 +10,4 @@ obj-$(CONFIG_MEM_SHARING) += mem_sharing.o
 obj-y += p2m.o
 obj-$(CONFIG_HVM) += p2m-ept.o p2m-pod.o p2m-pt.o
 obj-y += paging.o
+obj-y += physmap.o
