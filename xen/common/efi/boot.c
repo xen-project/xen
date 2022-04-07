@@ -118,7 +118,7 @@ static bool read_section(const EFI_LOADED_IMAGE *image, const CHAR16 *name,
 
 static void efi_init(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable);
 static void efi_console_set_mode(void);
-static EFI_GRAPHICS_OUTPUT_PROTOCOL *efi_get_gop(void);
+static EFI_GRAPHICS_OUTPUT_PROTOCOL *efi_get_gop(EFI_HANDLE *gop_handle);
 static UINTN efi_find_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
                                UINTN cols, UINTN rows, UINTN depth);
 static void efi_tables(void);
@@ -758,7 +758,7 @@ static void __init efi_console_set_mode(void)
         StdOut->SetMode(StdOut, best);
 }
 
-static EFI_GRAPHICS_OUTPUT_PROTOCOL __init *efi_get_gop(void)
+static EFI_GRAPHICS_OUTPUT_PROTOCOL __init *efi_get_gop(EFI_HANDLE *gop_handle)
 {
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
@@ -783,7 +783,10 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL __init *efi_get_gop(void)
             continue;
         status = gop->QueryMode(gop, gop->Mode->Mode, &info_size, &mode_info);
         if ( !EFI_ERROR(status) )
+        {
+            *gop_handle = handles[i];
             break;
+        }
     }
     if ( handles )
         efi_bs->FreePool(handles);
@@ -1222,6 +1225,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if ( use_cfg_file )
     {
         EFI_FILE_HANDLE dir_handle;
+        EFI_HANDLE gop_handle;
         UINTN depth, cols, rows, size;
 
         size = cols = rows = depth = 0;
@@ -1230,7 +1234,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
                                &cols, &rows) == EFI_SUCCESS )
             efi_arch_console_init(cols, rows);
 
-        gop = efi_get_gop();
+        gop = efi_get_gop(&gop_handle);
 
         /* Get the file system interface. */
         dir_handle = get_parent_handle(loaded_image, &file_name);
@@ -1360,7 +1364,11 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         dir_handle->Close(dir_handle);
 
         if ( gop && !base_video )
+        {
             gop_mode = efi_find_gop_mode(gop, cols, rows, depth);
+
+            efi_arch_edid(gop_handle);
+        }
     }
 
     /* Get the number of boot modules specified on the DT or an error (<0) */
@@ -1387,7 +1395,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     efi_arch_edd();
 
-    /* XXX Collect EDID info. */
     efi_arch_cpu();
 
     efi_tables();

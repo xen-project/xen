@@ -724,5 +724,52 @@ struct _EFI_GRAPHICS_OUTPUT_PROTOCOL {
   EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT         Blt;
   EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE        *Mode;
 };
+
+/*
+ * EFI EDID Discovered Protocol
+ * UEFI Specification Version 2.5 Section 11.9
+ */
+#define EFI_EDID_DISCOVERED_PROTOCOL_GUID \
+    { 0x1C0C34F6, 0xD380, 0x41FA, { 0xA0, 0x49, 0x8a, 0xD0, 0x6C, 0x1A, 0x66, 0xAA} }
+
+typedef struct _EFI_EDID_DISCOVERED_PROTOCOL {
+    UINT32   SizeOfEdid;
+    UINT8   *Edid;
+} EFI_EDID_DISCOVERED_PROTOCOL;
+
+/*
+ * EFI EDID Active Protocol
+ * UEFI Specification Version 2.5 Section 11.9
+ */
+#define EFI_EDID_ACTIVE_PROTOCOL_GUID \
+    { 0xBD8C1056, 0x9F36, 0x44EC, { 0x92, 0xA8, 0xA6, 0x33, 0x7F, 0x81, 0x79, 0x86} }
+
+typedef struct _EFI_EDID_ACTIVE_PROTOCOL {
+    UINT32   SizeOfEdid;
+    UINT8   *Edid;
+} EFI_EDID_ACTIVE_PROTOCOL;
+
+/*
+ * EFI EDID Override Protocol
+ * UEFI Specification Version 2.5 Section 11.9
+ */
+#define EFI_EDID_OVERRIDE_PROTOCOL_GUID \
+    { 0x48ECB431, 0xFB72, 0x45C0, { 0xA9, 0x22, 0xF4, 0x58, 0xFE, 0x04, 0x0B, 0xD5} }
+
+INTERFACE_DECL(_EFI_EDID_OVERRIDE_PROTOCOL);
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_EDID_OVERRIDE_PROTOCOL_GET_EDID) (
+  IN      struct _EFI_EDID_OVERRIDE_PROTOCOL   *This,
+  IN      EFI_HANDLE                           *ChildHandle,
+  OUT     UINT32                               *Attributes,
+  IN OUT  UINTN                                *EdidSize,
+  IN OUT  UINT8                               **Edid);
+
+typedef struct _EFI_EDID_OVERRIDE_PROTOCOL {
+    EFI_EDID_OVERRIDE_PROTOCOL_GET_EDID  GetEdid;
+} EFI_EDID_OVERRIDE_PROTOCOL;
+
 #endif
 

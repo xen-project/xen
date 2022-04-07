@@ -568,6 +568,57 @@ static void __init efi_arch_video_init(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
 #endif
 }
 
+#ifdef CONFIG_VIDEO
+static bool __init copy_edid(const void *buf, unsigned int size)
+{
+    /*
+     * Be conservative - for both undersized and oversized blobs it is unclear
+     * what to actually do with them. The more that unlike the VESA BIOS
+     * interface we also have no associated "capabilities" value (which might
+     * carry a hint as to possible interpretation).
+     */
+    if ( size != ARRAY_SIZE(boot_edid_info) )
+        return false;
+
+    memcpy(boot_edid_info, buf, size);
+    boot_edid_caps = 0;
+
+    return true;
+}
+#endif
+
+static void __init efi_arch_edid(EFI_HANDLE gop_handle)
+{
+#ifdef CONFIG_VIDEO
+    static EFI_GUID __initdata active_guid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
+    static EFI_GUID __initdata discovered_guid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
+    EFI_EDID_ACTIVE_PROTOCOL *active_edid;
+    EFI_EDID_DISCOVERED_PROTOCOL *discovered_edid;
+    EFI_STATUS status;
+
+    status = efi_bs->OpenProtocol(gop_handle, &active_guid,
+                                  (void **)&active_edid, efi_ih, NULL,
+                                  EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+    if ( status == EFI_SUCCESS &&
+         copy_edid(active_edid->Edid, active_edid->SizeOfEdid) )
+        return;
+
+    /*
+     * In case an override is in place which doesn't fit copy_edid(), also try
+     * obtaining the discovered EDID in the hope that it's better than nothing.
+     *
+     * Note that attempting to use the information in
+     * EFI_EDID_DISCOVERED_PROTOCOL when there's an override provided by
+     * EFI_EDID_ACTIVE_PROTOCOL might lead to issues.
+     */
+    status = efi_bs->OpenProtocol(gop_handle, &discovered_guid,
+                                  (void **)&discovered_edid, efi_ih, NULL,
+                                  EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+    if ( status == EFI_SUCCESS )
+        copy_edid(discovered_edid->Edid, discovered_edid->SizeOfEdid);
+#endif
+}
+
 static void __init efi_arch_memory_setup(void)
 {
     unsigned int i;
@@ -729,6 +780,7 @@ static void __init efi_arch_flush_dcache_area(const void *vaddr, UINTN size) { }
 void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
+    EFI_HANDLE gop_handle;
     UINTN cols, gop_mode = ~0, rows;
 
     __set_bit(EFI_BOOT, &efi_flags);
@@ -742,10 +794,14 @@ void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
                            &cols, &rows) == EFI_SUCCESS )
         efi_arch_console_init(cols, rows);
 
-    gop = efi_get_gop();
+    gop = efi_get_gop(&gop_handle);
 
     if ( gop )
+    {
         gop_mode = efi_find_gop_mode(gop, 0, 0, 0);
+
+        efi_arch_edid(gop_handle);
+    }
 
     efi_arch_edd();
     efi_arch_cpu();

@@ -464,6 +464,10 @@ static void __init efi_arch_edd(void)
 {
 }
 
+static void __init efi_arch_edid(EFI_HANDLE gop_handle)
+{
+}
+
 static void __init efi_arch_memory_setup(void)
 {
 }

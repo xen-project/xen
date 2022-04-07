@@ -890,7 +890,14 @@ store_edid:
         pushw   %dx
         pushw   %di
 
-        cmpb    $1, bootsym(opt_edid)   # EDID disabled on cmdline (edid=no)?
+        movb    bootsym(opt_edid), %al
+        cmpw    $0x1313, bootsym(boot_edid_caps) # Data already retrieved?
+        je      .Lcheck_edid
+        cmpb    $2, %al                 # EDID forced on cmdline (edid=force)?
+        jne     .Lno_edid
+
+.Lcheck_edid:
+        cmpb    $1, %al                 # EDID disabled on cmdline (edid=no)?
         je      .Lno_edid
 
         leaw    vesa_glob_info, %di
