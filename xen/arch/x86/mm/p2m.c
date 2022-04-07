@@ -850,21 +850,34 @@ p2m_remove_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
 }
 
 int
-guest_physmap_remove_page(struct domain *d, gfn_t gfn,
-                          mfn_t mfn, unsigned int page_order)
+p2m_remove_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                unsigned int page_order)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc;
 
-    /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
     if ( !paging_mode_translate(d) )
-        return 0;
+    {
+        ASSERT_UNREACHABLE();
+        return -EPERM;
+    }
 
     gfn_lock(p2m, gfn, page_order);
     rc = p2m_remove_entry(p2m, gfn, mfn, page_order);
     gfn_unlock(p2m, gfn, page_order);
 
     return rc;
+}
+
+int
+guest_physmap_remove_page(struct domain *d, gfn_t gfn,
+                          mfn_t mfn, unsigned int page_order)
+{
+    /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    return p2m_remove_page(d, gfn, mfn, page_order);
 }
 
 #endif /* CONFIG_HVM */
@@ -905,14 +918,14 @@ guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
         return 0;
     }
 
-    return guest_physmap_add_entry(d, gfn, mfn, page_order, p2m_ram_rw);
+    return p2m_add_page(d, gfn, mfn, page_order, p2m_ram_rw);
 }
 
 #ifdef CONFIG_HVM
 
 int
-guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
-                        unsigned int page_order, p2m_type_t t)
+p2m_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+             unsigned int page_order, p2m_type_t t)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     unsigned long i;
@@ -2724,7 +2737,7 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     {
         if ( is_special_page(mfn_to_page(prev_mfn)) )
             /* Special pages are simply unhooked from this phys slot */
-            rc = guest_physmap_remove_page(tdom, _gfn(gpfn), prev_mfn, 0);
+            rc = p2m_remove_page(tdom, _gfn(gpfn), prev_mfn, 0);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */
             rc = guest_remove_page(tdom, gpfn);
@@ -2732,7 +2745,7 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
             goto put_both;
     }
     /*
-     * Create the new mapping. Can't use guest_physmap_add_page() because it
+     * Create the new mapping. Can't use p2m_add_page() because it
      * will update the m2p table which will result in  mfn -> gpfn of dom0
      * and not fgfn of domU.
      */
@@ -2846,7 +2859,7 @@ int xenmem_add_to_physmap_one(
     {
         if ( is_special_page(mfn_to_page(prev_mfn)) )
             /* Special pages are simply unhooked from this phys slot. */
-            rc = guest_physmap_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
+            rc = p2m_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
         else if ( !mfn_eq(mfn, prev_mfn) )
             /* Normal domain memory is freed, to avoid leaking memory. */
             rc = guest_remove_page(d, gfn_x(gpfn));
@@ -2854,11 +2867,11 @@ int xenmem_add_to_physmap_one(
 
     /* Unmap from old location, if any. */
     if ( !rc && old_gpfn != INVALID_M2P_ENTRY && !gfn_eq(_gfn(old_gpfn), gpfn) )
-        rc = guest_physmap_remove_page(d, _gfn(old_gpfn), mfn, PAGE_ORDER_4K);
+        rc = p2m_remove_page(d, _gfn(old_gpfn), mfn, PAGE_ORDER_4K);
 
     /* Map at new location. */
     if ( !rc )
-        rc = guest_physmap_add_page(d, gpfn, mfn, PAGE_ORDER_4K);
+        rc = p2m_add_page(d, gpfn, mfn, PAGE_ORDER_4K, p2m_ram_rw);
 
  put_all:
     put_gfn(d, gfn_x(gpfn));

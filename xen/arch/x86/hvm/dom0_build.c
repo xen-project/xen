@@ -173,8 +173,7 @@ static int __init pvh_populate_memory_range(struct domain *d,
             continue;
         }
 
-        rc = guest_physmap_add_page(d, _gfn(start), page_to_mfn(page),
-                                    order);
+        rc = p2m_add_page(d, _gfn(start), page_to_mfn(page), order, p2m_ram_rw);
         if ( rc != 0 )
         {
             printk("Failed to populate memory: [%#lx,%#lx): %d\n",

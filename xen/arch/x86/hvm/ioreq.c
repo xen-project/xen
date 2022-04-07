@@ -188,8 +188,7 @@ static void hvm_remove_ioreq_gfn(struct ioreq_server *s, bool buf)
     if ( gfn_eq(iorp->gfn, INVALID_GFN) )
         return;
 
-    if ( guest_physmap_remove_page(d, iorp->gfn,
-                                   page_to_mfn(iorp->page), 0) )
+    if ( p2m_remove_page(d, iorp->gfn, page_to_mfn(iorp->page), 0) )
         domain_crash(d);
     clear_page(iorp->va);
 }
@@ -205,8 +204,7 @@ static int hvm_add_ioreq_gfn(struct ioreq_server *s, bool buf)
 
     clear_page(iorp->va);
 
-    rc = guest_physmap_add_page(d, iorp->gfn,
-                                page_to_mfn(iorp->page), 0);
+    rc = p2m_add_page(d, iorp->gfn, page_to_mfn(iorp->page), 0, p2m_ram_rw);
     if ( rc == 0 )
         paging_mark_pfn_dirty(d, _pfn(gfn_x(iorp->gfn)));
 

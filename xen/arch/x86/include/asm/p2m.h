@@ -577,10 +577,11 @@ int p2m_alloc_table(struct p2m_domain *p2m);
 void p2m_teardown(struct p2m_domain *p2m);
 void p2m_final_teardown(struct domain *d);
 
-/* Add a page to a domain's p2m table */
-int guest_physmap_add_entry(struct domain *d, gfn_t gfn,
-                            mfn_t mfn, unsigned int page_order,
-                            p2m_type_t t);
+/* Add/remove a page to/from a domain's p2m table. */
+int p2m_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                 unsigned int page_order, p2m_type_t t);
+int p2m_remove_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                    unsigned int page_order);
 
 /* Untyped version for RAM only, for compatibility and PV. */
 int __must_check guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,

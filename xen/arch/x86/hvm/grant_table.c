@@ -39,9 +39,8 @@ int create_grant_p2m_mapping(uint64_t addr, mfn_t frame,
         p2mt = p2m_grant_map_ro;
     else
         p2mt = p2m_grant_map_rw;
-    rc = guest_physmap_add_entry(current->domain,
-                                 _gfn(addr >> PAGE_SHIFT),
-                                 frame, PAGE_ORDER_4K, p2mt);
+    rc = p2m_add_page(current->domain, _gfn(addr >> PAGE_SHIFT),
+                      frame, PAGE_ORDER_4K, p2mt);
     if ( rc )
         return GNTST_general_error;
     else
@@ -68,7 +67,7 @@ int replace_grant_p2m_mapping(uint64_t addr, mfn_t frame,
                  type, mfn_x(old_mfn), mfn_x(frame));
         return GNTST_general_error;
     }
-    if ( guest_physmap_remove_page(d, _gfn(gfn), frame, PAGE_ORDER_4K) )
+    if ( p2m_remove_page(d, _gfn(gfn), frame, PAGE_ORDER_4K) )
     {
         put_gfn(d, gfn);
         return GNTST_general_error;
