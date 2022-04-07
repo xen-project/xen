@@ -1830,17 +1830,11 @@ int domain_context_unmap_one(
         return 0;
     }
 
+    iommu_domid = context_domain_id(*context);
+
     context_clear_present(*context);
     context_clear_entry(*context);
     iommu_sync_cache(context, sizeof(struct context_entry));
-
-    iommu_domid = get_iommu_did(domid, iommu, !domain->is_dying);
-    if ( iommu_domid == -1 )
-    {
-        spin_unlock(&iommu->lock);
-        unmap_vtd_domain_page(context_entries);
-        return -EINVAL;
-    }
 
     rc = iommu_flush_context_device(iommu, iommu_domid,
                                     PCI_BDF2(bus, devfn),
