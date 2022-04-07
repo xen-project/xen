@@ -247,7 +247,7 @@ static int cf_check msix_read(
         {
             gprintk(XENLOG_WARNING,
                     "%pp: unable to map MSI-X PBA, report all pending\n",
-                    msix->pdev);
+                    &msix->pdev->sbdf);
             return X86EMUL_OKAY;
         }
 
@@ -332,7 +332,7 @@ static int cf_check msix_write(
             /* Unable to map the PBA, ignore write. */
             gprintk(XENLOG_WARNING,
                     "%pp: unable to map MSI-X PBA, write ignored\n",
-                    msix->pdev);
+                    &msix->pdev->sbdf);
             return X86EMUL_OKAY;
         }
 
