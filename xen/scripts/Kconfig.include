@@ -40,4 +40,4 @@ $(error-if,$(failure,command -v $(CC)),compiler '$(CC)' not found)
 $(error-if,$(failure,command -v $(LD)),linker '$(LD)' not found)
 
 # gcc version including patch level
-gcc-version := $(shell,$(BASEDIR)/scripts/gcc-version.sh $(CC))
+gcc-version := $(shell,$(srctree)/scripts/gcc-version.sh $(CC))

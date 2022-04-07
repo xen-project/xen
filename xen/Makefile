@@ -19,8 +19,7 @@ export PYTHON		?= $(PYTHON_INTERPRETER)
 
 export CHECKPOLICY	?= checkpolicy
 
-export BASEDIR := $(CURDIR)
-export XEN_ROOT := $(BASEDIR)/..
+export XEN_ROOT := $(CURDIR)/..
 
 abs_objtree := $(CURDIR)
 abs_srctree := $(CURDIR)
@@ -189,7 +188,7 @@ ifeq ($(TARGET_ARCH),x86)
 t1 = $(call as-insn,$(CC),".L0: .L1: .skip (.L1 - .L0)",,-no-integrated-as)
 
 # Check whether clang asm()-s support .include.
-t2 = $(call as-insn,$(CC) -I$(BASEDIR)/arch/x86/include,".include \"asm/asm-defns.h\"",,-no-integrated-as)
+t2 = $(call as-insn,$(CC) -I$(srctree)/arch/x86/include,".include \"asm/asm-defns.h\"",,-no-integrated-as)
 
 # Check whether clang keeps .macro-s between asm()-s:
 # https://bugs.llvm.org/show_bug.cgi?id=36110
@@ -326,7 +325,7 @@ ALL_OBJS-$(CONFIG_CRYPTO) += crypto/built_in.o
 
 ALL_LIBS-y                := lib/lib.a
 
-include $(BASEDIR)/arch/$(TARGET_ARCH)/arch.mk
+include $(srctree)/arch/$(TARGET_ARCH)/arch.mk
 
 # define new variables to avoid the ones defined in Config.mk
 export XEN_CFLAGS := $(CFLAGS)

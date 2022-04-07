@@ -6,7 +6,7 @@ OBJCOPYFLAGS := $(foreach s,$(SECTIONS),--rename-section .$(s)=.init.$(s))
 obj-y += libfdt.o
 nocov-y += libfdt.o
 
-CFLAGS-y += -I$(BASEDIR)/include/xen/libfdt/
+CFLAGS-y += -I$(srctree)/include/xen/libfdt/
 
 $(obj)/libfdt.o: $(obj)/libfdt-temp.o FORCE
 	$(call if_changed,objcopy)

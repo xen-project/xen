@@ -80,7 +80,7 @@ $(obj)/config.gz: $(CONF_FILE)
 
 $(obj)/config_data.o: $(obj)/config.gz
 
-$(obj)/config_data.S: $(BASEDIR)/tools/binfile FORCE
+$(obj)/config_data.S: $(srctree)/tools/binfile FORCE
 	$(call if_changed,binfile,$(obj)/config.gz xen_config_data)
 targets += config_data.S
 

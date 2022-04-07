@@ -153,7 +153,7 @@ $(TARGET)-syms: $(objtree)/prelink.o $(obj)/xen.lds
 		>$(@D)/$(@F).map
 	rm -f $(@D)/.$(@F).[0-9]* $(@D)/..$(@F).[0-9]*
 ifeq ($(CONFIG_XEN_IBT),y)
-	$(SHELL) $(BASEDIR)/tools/check-endbr.sh $@
+	$(SHELL) $(srctree)/tools/check-endbr.sh $@
 endif
 
 $(obj)/note.o: $(TARGET)-syms
@@ -226,7 +226,7 @@ endif
 		| $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort >$(@D)/$(@F).map
 	rm -f $(@D)/.$(@F).[0-9]* $(@D)/..$(@F).[0-9]*
 ifeq ($(CONFIG_XEN_IBT),y)
-	$(SHELL) $(BASEDIR)/tools/check-endbr.sh $@
+	$(SHELL) $(srctree)/tools/check-endbr.sh $@
 endif
 else
 $(TARGET).efi: FORCE

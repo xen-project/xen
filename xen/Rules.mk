@@ -9,13 +9,16 @@ endif
 
 src := $(obj)
 
+# shortcuts
+srcdir := $(srctree)/$(src)
+
 PHONY := __build
 __build:
 
 -include $(objtree)/include/config/auto.conf
 
 include $(XEN_ROOT)/Config.mk
-include $(BASEDIR)/scripts/Kbuild.include
+include $(srctree)/scripts/Kbuild.include
 
 # Initialise some variables
 obj-y :=
@@ -58,7 +61,7 @@ cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 # binfile
 # use e.g. $(call if_changed,binfile,binary-file varname)
 quiet_cmd_binfile = BINFILE $@
-cmd_binfile = $(SHELL) $(BASEDIR)/tools/binfile $(BINFILE_FLAGS) $@ $(2)
+cmd_binfile = $(SHELL) $(srctree)/tools/binfile $(BINFILE_FLAGS) $@ $(2)
 
 # Figure out what we need to build from the various variables
 # ===========================================================================
@@ -177,7 +180,7 @@ cpp_flags = $(filter-out -Wa$(comma)% -flto,$(1))
 c_flags = -MMD -MP -MF $(depfile) $(XEN_CFLAGS)
 a_flags = -MMD -MP -MF $(depfile) $(XEN_AFLAGS)
 
-include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
+include $(srctree)/arch/$(TARGET_ARCH)/Rules.mk
 
 c_flags += $(_c_flags)
 a_flags += $(_c_flags)

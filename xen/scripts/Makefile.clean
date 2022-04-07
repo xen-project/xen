@@ -5,9 +5,12 @@
 
 src := $(obj)
 
+# shortcuts
+srcdir := $(srctree)/$(src)
+
 clean::
 
-include $(BASEDIR)/scripts/Kbuild.include
+include $(srctree)/scripts/Kbuild.include
 
 include $(src)/Makefile
 
