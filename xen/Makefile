@@ -19,17 +19,6 @@ export PYTHON		?= $(PYTHON_INTERPRETER)
 
 export CHECKPOLICY	?= checkpolicy
 
-export XEN_ROOT := $(CURDIR)/..
-
-abs_objtree := $(CURDIR)
-abs_srctree := $(CURDIR)
-
-export abs_srctree abs_objtree
-
-srctree := .
-objtree := .
-export srctree objtree
-
 # Do not use make's built-in rules and variables
 MAKEFLAGS += -rR
 
@@ -40,16 +29,6 @@ SRCARCH=$(shell echo $(ARCH) | \
           sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
               -e s'/riscv.*/riscv/g')
 export ARCH SRCARCH
-
-# Don't break if the build process wasn't called from the top level
-# we need XEN_TARGET_ARCH to generate the proper config
-include $(XEN_ROOT)/Config.mk
-
-# Set ARCH/SUBARCH appropriately.
-export TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
-export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
-                            sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
-                                -e s'/riscv.*/riscv/g')
 
 # Allow someone to change their config file
 export KCONFIG_CONFIG ?= .config
@@ -63,8 +42,6 @@ default: build
 
 .PHONY: dist
 dist: install
-
-include scripts/Kbuild.include
 
 ifneq ($(root-make-done),y)
 # section to run before calling Rules.mk, but only once.
@@ -141,6 +118,17 @@ endif
 
 export quiet Q KBUILD_VERBOSE
 
+abs_objtree := $(CURDIR)
+abs_srctree := $(CURDIR)
+
+export abs_srctree abs_objtree
+
+srctree := .
+objtree := .
+export srctree objtree
+
+export XEN_ROOT := $(CURDIR)/..
+
 # To make sure we do not include .config for any of the *config targets
 # catch them early, and hand them over to tools/kconfig/Makefile
 
@@ -162,6 +150,18 @@ endif
 ifneq ($(filter %config,$(MAKECMDGOALS)),)
     config-build := y
 endif
+
+include scripts/Kbuild.include
+
+# Don't break if the build process wasn't called from the top level
+# we need XEN_TARGET_ARCH to generate the proper config
+include $(XEN_ROOT)/Config.mk
+
+# Set ARCH/SUBARCH appropriately.
+export TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
+export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
+                            sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
+                                -e s'/riscv.*/riscv/g')
 
 export CONFIG_SHELL := $(SHELL)
 export YACC = $(if $(BISON),$(BISON),bison)
