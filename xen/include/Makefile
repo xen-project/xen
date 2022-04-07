@@ -39,8 +39,8 @@ cppflags-$(CONFIG_X86)    += -m32
 
 endif
 
-public-$(CONFIG_X86) := $(wildcard $(src)/public/arch-x86/*.h $(src)/public/arch-x86/*/*.h)
-public-$(CONFIG_ARM) := $(wildcard $(src)/public/arch-arm/*.h $(src)/public/arch-arm/*/*.h)
+public-$(CONFIG_X86) := $(wildcard $(srcdir)/public/arch-x86/*.h $(srcdir)/public/arch-x86/*/*.h)
+public-$(CONFIG_ARM) := $(wildcard $(srcdir)/public/arch-arm/*.h $(srcdir)/public/arch-arm/*/*.h)
 
 .PHONY: all
 all: $(addprefix $(obj)/,$(headers-y))
@@ -81,10 +81,23 @@ ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
 
 all: $(obj)/headers.chk $(obj)/headers99.chk $(obj)/headers++.chk
 
-PUBLIC_HEADERS := $(filter-out $(src)/public/arch-% $(src)/public/dom0_ops.h, $(wildcard $(src)/public/*.h $(src)/public/*/*.h) $(public-y))
+public-hdrs-path := $(srcdir)/public
 
-PUBLIC_C99_HEADERS := $(src)/public/io/9pfs.h $(src)/public/io/pvcalls.h
-PUBLIC_ANSI_HEADERS := $(filter-out $(src)/public/%ctl.h $(src)/public/xsm/% $(src)/public/%hvm/save.h $(PUBLIC_C99_HEADERS), $(PUBLIC_HEADERS))
+public-list-headers = $(wildcard $1/*.h $1/*/*.h)
+public-filter-headers = $(filter-out $(addprefix $(public-hdrs-path)/, $($1-filter)), $($1))
+
+public-headers := $(call public-list-headers, $(public-hdrs-path)) $(public-y)
+public-ansi-headers := $(public-headers)
+public-c99-headers := $(addprefix $(public-hdrs-path)/, io/9pfs.h io/pvcalls.h)
+
+public-headers-filter := dom0_ops.h arch-%
+public-ansi-headers-filter := %ctl.h xsm/% %hvm/save.h $(public-headers-filter) \
+    $(patsubst $(public-hdrs-path)/%,%,$(public-c99-headers))
+public-c99-headers-filter :=
+
+PUBLIC_HEADERS := $(call public-filter-headers,public-headers)
+PUBLIC_ANSI_HEADERS := $(call public-filter-headers,public-ansi-headers)
+PUBLIC_C99_HEADERS := $(call public-filter-headers,public-c99-headers)
 
 $(src)/public/io/9pfs.h-prereq := string
 $(src)/public/io/pvcalls.h-prereq := string
