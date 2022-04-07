@@ -788,8 +788,8 @@ void p2m_final_teardown(struct domain *d)
 #ifdef CONFIG_HVM
 
 static int __must_check
-p2m_remove_page(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
-                unsigned int page_order)
+p2m_remove_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
+                 unsigned int page_order)
 {
     unsigned long i;
     p2m_type_t t;
@@ -861,7 +861,7 @@ guest_physmap_remove_page(struct domain *d, gfn_t gfn,
         return 0;
 
     gfn_lock(p2m, gfn, page_order);
-    rc = p2m_remove_page(p2m, gfn, mfn, page_order);
+    rc = p2m_remove_entry(p2m, gfn, mfn, page_order);
     gfn_unlock(p2m, gfn, page_order);
 
     return rc;
@@ -1034,7 +1034,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                 P2M_DEBUG("old gfn=%#lx -> mfn %#lx\n",
                           gfn_x(ogfn) , mfn_x(omfn));
                 if ( mfn_eq(omfn, mfn_add(mfn, i)) &&
-                     (rc = p2m_remove_page(p2m, ogfn, omfn, 0)) )
+                     (rc = p2m_remove_entry(p2m, ogfn, omfn, 0)) )
                     goto out;
             }
         }
@@ -2444,7 +2444,7 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     {
         mfn = ap2m->get_entry(ap2m, old_gfn, &t, &a, 0, NULL, NULL);
         rc = mfn_valid(mfn)
-             ? p2m_remove_page(ap2m, old_gfn, mfn, PAGE_ORDER_4K)
+             ? p2m_remove_entry(ap2m, old_gfn, mfn, PAGE_ORDER_4K)
              : 0;
         goto out;
     }
