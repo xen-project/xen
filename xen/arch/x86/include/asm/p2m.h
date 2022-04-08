@@ -679,8 +679,6 @@ static inline long p2m_pod_entry_count(const struct p2m_domain *p2m)
     return p2m->pod.entry_count;
 }
 
-void p2m_pod_init(struct p2m_domain *p2m);
-
 #else
 
 static inline bool
@@ -708,8 +706,6 @@ static inline long p2m_pod_entry_count(const struct p2m_domain *p2m)
 {
     return 0;
 }
-
-static inline void p2m_pod_init(struct p2m_domain *p2m) {}
 
 #endif
 

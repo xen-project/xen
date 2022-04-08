@@ -43,6 +43,7 @@
 #include <xsm/xsm.h>
 
 #include "mm-locks.h"
+#include "p2m.h"
 
 /* Override macro from asm/page.h to make work with mfn_t */
 #undef virt_to_mfn
@@ -100,6 +101,9 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m->domain = d;
     p2m->default_access = p2m_access_rwx;
     p2m->p2m_class = p2m_host;
+
+    if ( !is_hvm_domain(d) )
+        return 0;
 
     p2m_pod_init(p2m);
     p2m_nestedp2m_init(p2m);
@@ -258,7 +262,7 @@ int p2m_init(struct domain *d)
     int rc;
 
     rc = p2m_init_hostp2m(d);
-    if ( rc )
+    if ( rc || !is_hvm_domain(d) )
         return rc;
 
 #ifdef CONFIG_HVM

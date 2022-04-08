@@ -30,6 +30,7 @@
 #include <asm/p2m.h>
 
 #include "mm-locks.h"
+#include "p2m.h"
 
 #define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
 
@@ -1161,6 +1162,12 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
     gfn_t gfn_aligned = _gfn((gfn_x(gfn) >> order) << order);
     mfn_t mfn;
     unsigned long i;
+
+    if ( !p2m_is_hostp2m(p2m) )
+    {
+        ASSERT_UNREACHABLE();
+        return false;
+    }
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
     pod_lock(p2m);
