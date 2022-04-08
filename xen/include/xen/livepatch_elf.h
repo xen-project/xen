@@ -22,6 +22,7 @@ struct livepatch_elf_sec {
 struct livepatch_elf_sym {
     const Elf_Sym *sym;
     const char *name;
+    bool ignored;
 };
 
 struct livepatch_elf {
