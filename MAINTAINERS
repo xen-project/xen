@@ -262,11 +262,10 @@ F:	CHANGELOG.md
 
 Continuous Integration (CI)
 M:	Doug Goldstein <cardoe@cardoe.com>
+M:	Stefano Stabellini <sstabellini@kernel.org>
 W:	https://gitlab.com/xen-project/xen
-W:	https://travis-ci.org/xen-project/xen
 S:	Supported
 F:	.gitlab-ci.yml
-F:	.travis.yml
 F:	automation/
 F:	scripts/travis-build
 
