@@ -551,7 +551,9 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
     }
 
     /* Translate the gfn, unsharing if shared. */
-    page = p2m_get_page_from_gfn(p2m, gfn, &p2mt, NULL, q);
+    page = paging_mode_translate(p2m->domain)
+           ? p2m_get_page_from_gfn(p2m, gfn, &p2mt, NULL, q)
+           : get_page_from_gfn(p2m->domain, gfn_x(gfn), &p2mt, q);
     if ( p2m_is_paging(p2mt) )
     {
         ASSERT(p2m_is_hostp2m(p2m));

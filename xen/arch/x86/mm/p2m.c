@@ -357,6 +357,8 @@ void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
     gfn_unlock(p2m, gfn, 0);
 }
 
+#ifdef CONFIG_HVM
+
 /* Atomically look up a GFN and take a reference count on the backing page. */
 struct page_info *p2m_get_page_from_gfn(
     struct p2m_domain *p2m, gfn_t gfn,
@@ -421,8 +423,6 @@ struct page_info *p2m_get_page_from_gfn(
 
     return page;
 }
-
-#ifdef CONFIG_HVM
 
 /* Returns: 0 for success, -errno for failure */
 int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
