@@ -35,6 +35,7 @@
 #include <xen/softirq.h>
 
 #include "mm-locks.h"
+#include "p2m.h"
 
 #define atomic_read_ept_entry(__pepte)                              \
     ( (ept_entry_t) { .epte = read_atomic(&(__pepte)->epte) } )

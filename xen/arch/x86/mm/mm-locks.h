@@ -25,8 +25,6 @@
 #ifndef _MM_LOCKS_H
 #define _MM_LOCKS_H
 
-#include <asm/mem_sharing.h>
-
 /* Per-CPU variable for enforcing the lock ordering */
 DECLARE_PER_CPU(int, mm_lock_level);
 

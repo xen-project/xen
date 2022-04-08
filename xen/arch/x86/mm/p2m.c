@@ -35,7 +35,6 @@
 #include <asm/page.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
-#include <asm/hvm/vmx/vmx.h> /* ept_p2m_init() */
 #include <asm/mem_sharing.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/altp2m.h>
@@ -56,17 +55,9 @@ boolean_param("hap_2mb", opt_hap_2mb);
 
 DEFINE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
 
-static void p2m_nestedp2m_init(struct p2m_domain *p2m)
-{
 #ifdef CONFIG_HVM
-    INIT_LIST_HEAD(&p2m->np2m_list);
 
-    p2m->np2m_base = P2M_BASE_EADDR;
-    p2m->np2m_generation = 0;
-#endif
-}
-
-static int p2m_init_logdirty(struct p2m_domain *p2m)
+int p2m_init_logdirty(struct p2m_domain *p2m)
 {
     if ( p2m->logdirty_ranges )
         return 0;
@@ -79,212 +70,13 @@ static int p2m_init_logdirty(struct p2m_domain *p2m)
     return 0;
 }
 
-static void p2m_free_logdirty(struct p2m_domain *p2m)
+void p2m_free_logdirty(struct p2m_domain *p2m)
 {
     if ( !p2m->logdirty_ranges )
         return;
 
     rangeset_destroy(p2m->logdirty_ranges);
     p2m->logdirty_ranges = NULL;
-}
-
-/* Init the datastructures for later use by the p2m code */
-static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
-{
-    int ret = 0;
-
-    mm_rwlock_init(&p2m->lock);
-#ifdef CONFIG_HVM
-    INIT_PAGE_LIST_HEAD(&p2m->pages);
-#endif
-
-    p2m->domain = d;
-    p2m->default_access = p2m_access_rwx;
-    p2m->p2m_class = p2m_host;
-
-    if ( !is_hvm_domain(d) )
-        return 0;
-
-    p2m_pod_init(p2m);
-    p2m_nestedp2m_init(p2m);
-
-    if ( hap_enabled(d) && cpu_has_vmx )
-        ret = ept_p2m_init(p2m);
-    else
-        p2m_pt_init(p2m);
-
-    spin_lock_init(&p2m->ioreq.lock);
-
-    return ret;
-}
-
-static struct p2m_domain *p2m_init_one(struct domain *d)
-{
-    struct p2m_domain *p2m = xzalloc(struct p2m_domain);
-
-    if ( !p2m )
-        return NULL;
-
-    if ( !zalloc_cpumask_var(&p2m->dirty_cpumask) )
-        goto free_p2m;
-
-    if ( p2m_initialise(d, p2m) )
-        goto free_cpumask;
-    return p2m;
-
-free_cpumask:
-    free_cpumask_var(p2m->dirty_cpumask);
-free_p2m:
-    xfree(p2m);
-    return NULL;
-}
-
-static void p2m_free_one(struct p2m_domain *p2m)
-{
-    p2m_free_logdirty(p2m);
-    if ( hap_enabled(p2m->domain) && cpu_has_vmx )
-        ept_p2m_uninit(p2m);
-    free_cpumask_var(p2m->dirty_cpumask);
-    xfree(p2m);
-}
-
-static int p2m_init_hostp2m(struct domain *d)
-{
-    struct p2m_domain *p2m = p2m_init_one(d);
-    int rc;
-
-    if ( !p2m )
-        return -ENOMEM;
-
-    rc = p2m_init_logdirty(p2m);
-
-    if ( !rc )
-        d->arch.p2m = p2m;
-    else
-        p2m_free_one(p2m);
-
-    return rc;
-}
-
-static void p2m_teardown_hostp2m(struct domain *d)
-{
-    /* Iterate over all p2m tables per domain */
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
-
-    if ( p2m )
-    {
-        p2m_free_one(p2m);
-        d->arch.p2m = NULL;
-    }
-}
-
-#ifdef CONFIG_HVM
-static void p2m_teardown_nestedp2m(struct domain *d)
-{
-    unsigned int i;
-    struct p2m_domain *p2m;
-
-    for ( i = 0; i < MAX_NESTEDP2M; i++ )
-    {
-        if ( !d->arch.nested_p2m[i] )
-            continue;
-        p2m = d->arch.nested_p2m[i];
-        list_del(&p2m->np2m_list);
-        p2m_free_one(p2m);
-        d->arch.nested_p2m[i] = NULL;
-    }
-}
-
-static int p2m_init_nestedp2m(struct domain *d)
-{
-    unsigned int i;
-    struct p2m_domain *p2m;
-
-    mm_lock_init(&d->arch.nested_p2m_lock);
-    for ( i = 0; i < MAX_NESTEDP2M; i++ )
-    {
-        d->arch.nested_p2m[i] = p2m = p2m_init_one(d);
-        if ( p2m == NULL )
-        {
-            p2m_teardown_nestedp2m(d);
-            return -ENOMEM;
-        }
-        p2m->p2m_class = p2m_nested;
-        p2m->write_p2m_entry_pre = NULL;
-        p2m->write_p2m_entry_post = nestedp2m_write_p2m_entry_post;
-        list_add(&p2m->np2m_list, &p2m_get_hostp2m(d)->np2m_list);
-    }
-
-    return 0;
-}
-
-static void p2m_teardown_altp2m(struct domain *d)
-{
-    unsigned int i;
-    struct p2m_domain *p2m;
-
-    for ( i = 0; i < MAX_ALTP2M; i++ )
-    {
-        if ( !d->arch.altp2m_p2m[i] )
-            continue;
-        p2m = d->arch.altp2m_p2m[i];
-        d->arch.altp2m_p2m[i] = NULL;
-        p2m_free_one(p2m);
-    }
-}
-
-static int p2m_init_altp2m(struct domain *d)
-{
-    unsigned int i;
-    struct p2m_domain *p2m;
-    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
-
-    mm_lock_init(&d->arch.altp2m_list_lock);
-    for ( i = 0; i < MAX_ALTP2M; i++ )
-    {
-        d->arch.altp2m_p2m[i] = p2m = p2m_init_one(d);
-        if ( p2m == NULL )
-        {
-            p2m_teardown_altp2m(d);
-            return -ENOMEM;
-        }
-        p2m->p2m_class = p2m_alternate;
-        p2m->access_required = hostp2m->access_required;
-        _atomic_set(&p2m->active_vcpus, 0);
-    }
-
-    return 0;
-}
-#endif
-
-int p2m_init(struct domain *d)
-{
-    int rc;
-
-    rc = p2m_init_hostp2m(d);
-    if ( rc || !is_hvm_domain(d) )
-        return rc;
-
-#ifdef CONFIG_HVM
-    /* Must initialise nestedp2m unconditionally
-     * since nestedhvm_enabled(d) returns false here.
-     * (p2m_init runs too early for HVM_PARAM_* options) */
-    rc = p2m_init_nestedp2m(d);
-    if ( rc )
-    {
-        p2m_teardown_hostp2m(d);
-        return rc;
-    }
-
-    rc = p2m_init_altp2m(d);
-    if ( rc )
-    {
-        p2m_teardown_hostp2m(d);
-        p2m_teardown_nestedp2m(d);
-    }
-#endif
-
-    return rc;
 }
 
 int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
@@ -297,8 +89,6 @@ int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
         return -1;
     return 0;
 }
-
-#ifdef CONFIG_HVM
 
 static void change_entry_type_global(struct p2m_domain *p2m,
                                      p2m_type_t ot, p2m_type_t nt)
@@ -750,57 +540,6 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     p2m_unlock(p2m);
     return 0;
 }
-
-#endif /* CONFIG_HVM */
-
-/*
- * hvm fixme: when adding support for pvh non-hardware domains, this path must
- * cleanup any foreign p2m types (release refcnts on them).
- */
-void p2m_teardown(struct p2m_domain *p2m)
-/* Return all the p2m pages to Xen.
- * We know we don't have any extra mappings to these pages */
-{
-#ifdef CONFIG_HVM
-    struct page_info *pg;
-#endif
-    struct domain *d;
-
-    if (p2m == NULL)
-        return;
-
-    d = p2m->domain;
-
-    p2m_lock(p2m);
-
-    ASSERT(atomic_read(&d->shr_pages) == 0);
-
-#ifdef CONFIG_HVM
-    p2m->phys_table = pagetable_null();
-
-    while ( (pg = page_list_remove_head(&p2m->pages)) )
-        d->arch.paging.free_page(d, pg);
-#endif
-
-    p2m_unlock(p2m);
-}
-
-void p2m_final_teardown(struct domain *d)
-{
-#ifdef CONFIG_HVM
-    /*
-     * We must teardown both of them unconditionally because
-     * we initialise them unconditionally.
-     */
-    p2m_teardown_altp2m(d);
-    p2m_teardown_nestedp2m(d);
-#endif
-
-    /* Iterate over all p2m tables per domain */
-    p2m_teardown_hostp2m(d);
-}
-
-#ifdef CONFIG_HVM
 
 static int __must_check
 p2m_remove_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
