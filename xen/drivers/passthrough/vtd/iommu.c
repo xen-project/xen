@@ -1597,7 +1597,7 @@ int domain_context_mapping_one(
     if ( !seg && !rc )
         rc = me_wifi_quirk(domain, bus, devfn, domid, pgd_maddr, mode);
 
-    if ( rc )
+    if ( rc && !(mode & MAP_ERROR_RECOVERY) )
     {
         if ( !prev_dom ||
              /*
@@ -1607,13 +1607,12 @@ int domain_context_mapping_one(
               */
              (prev_dom == dom_io && !pdev) )
             ret = domain_context_unmap_one(domain, iommu, bus, devfn);
-        else if ( prev_dom != domain ) /* Avoid infinite recursion. */
+        else
             ret = domain_context_mapping_one(prev_dom, iommu, bus, devfn, pdev,
                                              DEVICE_DOMID(prev_dom, pdev),
                                              DEVICE_PGTABLE(prev_dom, pdev),
-                                             mode & MAP_WITH_RMRR) < 0;
-        else
-            ret = 1;
+                                             (mode & MAP_WITH_RMRR) |
+                                             MAP_ERROR_RECOVERY) < 0;
 
         if ( !ret && pdev && pdev->devfn == devfn )
             check_cleanup_domid_map(domain, pdev, iommu);
