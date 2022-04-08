@@ -277,9 +277,16 @@ static void cf_check dump_domains(unsigned char key)
         printk("    refcnt=%d dying=%d pause_count=%d\n",
                atomic_read(&d->refcnt), d->is_dying,
                atomic_read(&d->pause_count));
-        printk("    nr_pages=%d xenheap_pages=%d shared_pages=%u paged_pages=%u "
-               "dirty_cpus={%*pbl} max_pages=%u\n",
-               domain_tot_pages(d), d->xenheap_pages, atomic_read(&d->shr_pages),
+        printk("    nr_pages=%u xenheap_pages=%u"
+#ifdef CONFIG_MEM_SHARING
+               " shared_pages=%u"
+#endif
+               " paged_pages=%u"
+               " dirty_cpus={%*pbl} max_pages=%u\n",
+               domain_tot_pages(d), d->xenheap_pages,
+#ifdef CONFIG_MEM_SHARING
+               atomic_read(&d->shr_pages),
+#endif
                atomic_read(&d->paged_pages), CPUMASK_PR(d->dirty_cpumask),
                d->max_pages);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"

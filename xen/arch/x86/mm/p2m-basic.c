@@ -159,7 +159,6 @@ void p2m_teardown(struct p2m_domain *p2m)
 {
 #ifdef CONFIG_HVM
     struct page_info *pg;
-#endif
     struct domain *d;
 
     if ( !p2m )
@@ -169,16 +168,17 @@ void p2m_teardown(struct p2m_domain *p2m)
 
     p2m_lock(p2m);
 
+#ifdef CONFIG_MEM_SHARING
     ASSERT(atomic_read(&d->shr_pages) == 0);
+#endif
 
-#ifdef CONFIG_HVM
     p2m->phys_table = pagetable_null();
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
         d->arch.paging.free_page(d, pg);
-#endif
 
     p2m_unlock(p2m);
+#endif
 }
 
 void p2m_final_teardown(struct domain *d)

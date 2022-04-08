@@ -387,7 +387,11 @@ struct domain
     unsigned int     outstanding_pages; /* pages claimed but not possessed */
     unsigned int     max_pages;         /* maximum value for domain_tot_pages() */
     unsigned int     extra_pages;       /* pages not included in domain_tot_pages() */
+
+#ifdef CONFIG_MEM_SHARING
     atomic_t         shr_pages;         /* shared pages */
+#endif
+
     atomic_t         paged_pages;       /* paged-out pages */
 
     /* Scheduling. */
