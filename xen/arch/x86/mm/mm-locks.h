@@ -237,6 +237,8 @@ static inline void mm_enforce_order_unlock(int unlock_level,
  *                                                                      *
  ************************************************************************/
 
+#ifdef CONFIG_HVM
+
 /* Nested P2M lock (per-domain)
  *
  * A per-domain lock that protects the mapping from nested-CR3 to
@@ -353,6 +355,8 @@ declare_mm_lock(pod)
 #define pod_lock(p)           mm_lock(pod, (p)->domain, &(p)->pod.lock)
 #define pod_unlock(p)         mm_unlock(&(p)->pod.lock)
 #define pod_locked_by_me(p)   mm_locked_by_me(&(p)->pod.lock)
+
+#endif /* CONFIG_HVM */
 
 /* Page alloc lock (per-domain)
  *

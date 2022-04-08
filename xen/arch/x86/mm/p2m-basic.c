@@ -28,16 +28,15 @@
 #include "mm-locks.h"
 #include "p2m.h"
 
-DEFINE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
-
 /* Init the datastructures for later use by the p2m code */
 static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
     int ret = 0;
 
-    mm_rwlock_init(&p2m->lock);
 #ifdef CONFIG_HVM
+    mm_rwlock_init(&p2m->lock);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
+    spin_lock_init(&p2m->ioreq.lock);
 #endif
 
     p2m->domain = d;
@@ -54,8 +53,6 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
         ret = ept_p2m_init(p2m);
     else
         p2m_pt_init(p2m);
-
-    spin_lock_init(&p2m->ioreq.lock);
 
     return ret;
 }

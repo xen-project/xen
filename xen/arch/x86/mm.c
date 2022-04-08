@@ -480,8 +480,11 @@ unsigned int page_get_ram_type(mfn_t mfn)
 
 unsigned long domain_get_maximum_gpfn(struct domain *d)
 {
+#ifdef CONFIG_HVM
     if ( is_hvm_domain(d) )
         return p2m_get_hostp2m(d)->max_mapped_pfn;
+#endif
+
     /* NB. PV guests specify nr_pfns rather than max_pfn so we adjust here. */
     return (arch_get_max_pfn(d) ?: 1) - 1;
 }

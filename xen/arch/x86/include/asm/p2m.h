@@ -205,8 +205,10 @@ typedef enum {
 
 /* Per-p2m-table state */
 struct p2m_domain {
+#ifdef CONFIG_HVM
     /* Lock that protects updates to the p2m */
     mm_rwlock_t           lock;
+#endif
 
     /*
      * Same as a domain's dirty_cpumask but limited to
@@ -226,13 +228,14 @@ struct p2m_domain {
      */
     p2m_access_t default_access;
 
+#ifdef CONFIG_HVM
+
     /* Host p2m: Log-dirty ranges registered for the domain. */
     struct rangeset   *logdirty_ranges;
 
     /* Host p2m: Global log-dirty mode enabled for the domain. */
     bool               global_logdirty;
 
-#ifdef CONFIG_HVM
     /* Translated domain: p2m mapping */
     pagetable_t        phys_table;
 
@@ -275,7 +278,6 @@ struct p2m_domain {
                                               unsigned int level);
     void               (*write_p2m_entry_post)(struct p2m_domain *p2m,
                                                unsigned int oflags);
-#endif
 #if P2M_AUDIT
     long               (*audit_p2m)(struct p2m_domain *p2m);
 #endif
@@ -310,7 +312,6 @@ struct p2m_domain {
     unsigned long min_remapped_gfn;
     unsigned long max_remapped_gfn;
 
-#ifdef CONFIG_HVM
     /* Populate-on-demand variables
      * All variables are protected with the pod lock. We cannot rely on
      * the p2m lock if it's turned into a fine-grained lock.
@@ -367,27 +368,27 @@ struct p2m_domain {
      * threaded on in LRU order.
      */
     struct list_head   np2m_list;
-#endif
 
     union {
         struct ept_data ept;
         /* NPT-equivalent structure could be added here. */
     };
 
-     struct {
-         spinlock_t lock;
-         /*
-          * ioreq server who's responsible for the emulation of
-          * gfns with specific p2m type(for now, p2m_ioreq_server).
-          */
-         struct ioreq_server *server;
-         /*
-          * flags specifies whether read, write or both operations
-          * are to be emulated by an ioreq server.
-          */
-         unsigned int flags;
-         unsigned long entry_count;
-     } ioreq;
+    struct {
+        spinlock_t lock;
+        /*
+         * ioreq server who's responsible for the emulation of
+         * gfns with specific p2m type(for now, p2m_ioreq_server).
+         */
+        struct ioreq_server *server;
+        /*
+         * flags specifies whether read, write or both operations
+         * are to be emulated by an ioreq server.
+         */
+        unsigned int flags;
+        unsigned long entry_count;
+    } ioreq;
+#endif /* CONFIG_HVM */
 };
 
 /* get host p2m table */
@@ -651,6 +652,15 @@ int p2m_finish_type_change(struct domain *d,
                            gfn_t first_gfn,
                            unsigned long max_nr);
 
+static inline bool p2m_is_global_logdirty(const struct domain *d)
+{
+#ifdef CONFIG_HVM
+    return p2m_get_hostp2m(d)->global_logdirty;
+#else
+    return false;
+#endif
+}
+
 int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
                           unsigned long end);
 
@@ -792,6 +802,8 @@ extern void audit_p2m(struct domain *d,
 #define P2M_DEBUG(f, a...) do { (void)(f); } while(0)
 #endif
 
+#ifdef CONFIG_HVM
+
 /*
  * Functions specific to the p2m-pt implementation
  */
@@ -852,7 +864,7 @@ void cf_check nestedp2m_write_p2m_entry_post(
 /*
  * Alternate p2m: shadow p2m tables used for alternate memory views
  */
-#ifdef CONFIG_HVM
+
 /* get current alternate p2m table */
 static inline struct p2m_domain *p2m_get_altp2m(struct vcpu *v)
 {
@@ -905,10 +917,10 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 /* Set a specific p2m view visibility */
 int p2m_set_altp2m_view_visibility(struct domain *d, unsigned int idx,
                                    uint8_t visible);
-#else
+#else /* !CONFIG_HVM */
 struct p2m_domain *p2m_get_altp2m(struct vcpu *v);
 static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx) {}
-#endif
+#endif /* CONFIG_HVM */
 
 /* p2m access to IOMMU flags */
 static inline unsigned int p2m_access_to_iommu_flags(p2m_access_t p2ma)
@@ -971,6 +983,8 @@ static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt,
 
     return flags;
 }
+
+#ifdef CONFIG_HVM
 
 int p2m_set_ioreq_server(struct domain *d, unsigned int flags,
                          struct ioreq_server *s);
@@ -1035,6 +1049,8 @@ static inline int p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
 
     return 0;
 }
+
+#endif /* CONFIG_HVM */
 
 #endif /* _XEN_ASM_X86_P2M_H */
 

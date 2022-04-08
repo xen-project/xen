@@ -48,6 +48,8 @@
 #undef virt_to_mfn
 #define virt_to_mfn(v) _mfn(__virt_to_mfn(v))
 
+DEFINE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
+
 /* Turn on/off host superpage page table support for hap, default on. */
 bool_t __initdata opt_hap_1gb = 1, __initdata opt_hap_2mb = 1;
 boolean_param("hap_1gb", opt_hap_1gb);
