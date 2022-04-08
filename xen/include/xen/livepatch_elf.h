@@ -48,7 +48,7 @@ int livepatch_elf_perform_relocs(struct livepatch_elf *elf);
 
 static inline bool livepatch_elf_ignore_section(const Elf_Shdr *sec)
 {
-    return !(sec->sh_flags & SHF_ALLOC) || sec->sh_size == 0;
+    return !(sec->sh_flags & SHF_ALLOC);
 }
 #endif /* __XEN_LIVEPATCH_ELF_H__ */
 
