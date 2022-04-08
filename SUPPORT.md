@@ -882,6 +882,17 @@ OVMF firmware implements the UEFI boot protocol.
 
     Status, qemu-xen: Supported
 
+## Dom0less
+
+Guest creation from the hypervisor at boot without Dom0 intervention.
+
+    Status, ARM: Supported
+
+Memory of dom0less DomUs is not scrubbed at boot when bootscrub=on or
+bootscrub=off are passed as Xen command line parameters. (Memory should
+be scrubbed with bootscrub=idle.) No XSAs will be issues due to
+unscrubbed memory.
+
 # Format and definitions
 
 This file contains prose, and machine-readable fragments.
