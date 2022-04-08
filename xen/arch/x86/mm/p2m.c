@@ -93,7 +93,9 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     int ret = 0;
 
     mm_rwlock_init(&p2m->lock);
+#ifdef CONFIG_HVM
     INIT_PAGE_LIST_HEAD(&p2m->pages);
+#endif
 
     p2m->domain = d;
     p2m->default_access = p2m_access_rwx;
@@ -627,6 +629,7 @@ struct page_info *p2m_get_page_from_gfn(
 }
 
 #ifdef CONFIG_HVM
+
 /* Returns: 0 for success, -errno for failure */
 int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
@@ -666,7 +669,6 @@ int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
 
     return rc;
 }
-#endif
 
 mfn_t p2m_alloc_ptp(struct p2m_domain *p2m, unsigned int level)
 {
@@ -745,6 +747,8 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     return 0;
 }
 
+#endif /* CONFIG_HVM */
+
 /*
  * hvm fixme: when adding support for pvh non-hardware domains, this path must
  * cleanup any foreign p2m types (release refcnts on them).
@@ -753,7 +757,9 @@ void p2m_teardown(struct p2m_domain *p2m)
 /* Return all the p2m pages to Xen.
  * We know we don't have any extra mappings to these pages */
 {
+#ifdef CONFIG_HVM
     struct page_info *pg;
+#endif
     struct domain *d;
 
     if (p2m == NULL)
@@ -762,11 +768,16 @@ void p2m_teardown(struct p2m_domain *p2m)
     d = p2m->domain;
 
     p2m_lock(p2m);
+
     ASSERT(atomic_read(&d->shr_pages) == 0);
+
+#ifdef CONFIG_HVM
     p2m->phys_table = pagetable_null();
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
         d->arch.paging.free_page(d, pg);
+#endif
+
     p2m_unlock(p2m);
 }
 

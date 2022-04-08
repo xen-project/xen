@@ -2701,8 +2701,10 @@ int shadow_enable(struct domain *d, u32 mode)
  out_locked:
     paging_unlock(d);
  out_unlocked:
+#ifdef CONFIG_HVM
     if ( rv != 0 && !pagetable_is_null(p2m_get_pagetable(p2m)) )
         p2m_teardown(p2m);
+#endif
     if ( rv != 0 && pg != NULL )
     {
         pg->count_info &= ~PGC_count_mask;

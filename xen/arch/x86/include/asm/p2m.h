@@ -208,9 +208,6 @@ struct p2m_domain {
     /* Lock that protects updates to the p2m */
     mm_rwlock_t           lock;
 
-    /* Shadow translated domain: p2m mapping */
-    pagetable_t        phys_table;
-
     /*
      * Same as a domain's dirty_cpumask but limited to
      * this p2m and those physical cpus whose vcpu's are in
@@ -229,9 +226,6 @@ struct p2m_domain {
      */
     p2m_access_t default_access;
 
-    /* Pages used to construct the p2m */
-    struct page_list_head pages;
-
     /* Host p2m: Log-dirty ranges registered for the domain. */
     struct rangeset   *logdirty_ranges;
 
@@ -239,6 +233,12 @@ struct p2m_domain {
     bool               global_logdirty;
 
 #ifdef CONFIG_HVM
+    /* Translated domain: p2m mapping */
+    pagetable_t        phys_table;
+
+    /* Pages used to construct the p2m */
+    struct page_list_head pages;
+
     /* Alternate p2m: count of vcpu's currently using this p2m. */
     atomic_t           active_vcpus;
 
