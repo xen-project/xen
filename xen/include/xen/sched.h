@@ -392,7 +392,9 @@ struct domain
     atomic_t         shr_pages;         /* shared pages */
 #endif
 
+#ifdef CONFIG_MEM_PAGING
     atomic_t         paged_pages;       /* paged-out pages */
+#endif
 
     /* Scheduling. */
     void            *sched_priv;    /* scheduler-specific data */

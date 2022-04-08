@@ -1213,6 +1213,7 @@ int add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
     }
     else
     {
+#ifdef CONFIG_MEM_PAGING
         /*
          * There is a chance we're plugging a hole where a paged out
          * page was.
@@ -1238,6 +1239,7 @@ int add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
                 put_page(cpage);
             }
         }
+#endif
     }
 
     atomic_inc(&nr_saved_mfns);

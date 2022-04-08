@@ -281,14 +281,18 @@ static void cf_check dump_domains(unsigned char key)
 #ifdef CONFIG_MEM_SHARING
                " shared_pages=%u"
 #endif
+#ifdef CONFIG_MEM_PAGING
                " paged_pages=%u"
+#endif
                " dirty_cpus={%*pbl} max_pages=%u\n",
                domain_tot_pages(d), d->xenheap_pages,
 #ifdef CONFIG_MEM_SHARING
                atomic_read(&d->shr_pages),
 #endif
-               atomic_read(&d->paged_pages), CPUMASK_PR(d->dirty_cpumask),
-               d->max_pages);
+#ifdef CONFIG_MEM_PAGING
+               atomic_read(&d->paged_pages),
+#endif
+               CPUMASK_PR(d->dirty_cpumask), d->max_pages);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],

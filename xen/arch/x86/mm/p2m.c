@@ -691,11 +691,13 @@ p2m_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
             /* Count how man PoD entries we'll be replacing if successful */
             pod_count++;
         }
+#ifdef CONFIG_MEM_PAGING
         else if ( p2m_is_paging(ot) && (ot != p2m_ram_paging_out) )
         {
             /* We're plugging a hole in the physmap where a paged out page was */
             atomic_dec(&d->paged_pages);
         }
+#endif
     }
 
     /* Then, look for m->p mappings for this range and deal with them */
