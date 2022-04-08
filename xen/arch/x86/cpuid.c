@@ -289,8 +289,15 @@ static void recalculate_misc(struct cpuid_policy *p)
 
         zero_leaves(p->extd.raw, 0xb, 0x18);
 
+        /* 0x19 - TLB details.  Pass through. */
+        /* 0x1a - Perf hints.   Pass through. */
+
         p->extd.raw[0x1b] = EMPTY_LEAF; /* IBS - not supported. */
         p->extd.raw[0x1c] = EMPTY_LEAF; /* LWP - not supported. */
+        p->extd.raw[0x1d] = EMPTY_LEAF; /* TopoExt Cache */
+        p->extd.raw[0x1e] = EMPTY_LEAF; /* TopoExt APIC ID/Core/Node */
+        p->extd.raw[0x1f] = EMPTY_LEAF; /* SEV */
+        p->extd.raw[0x20] = EMPTY_LEAF; /* Platform QoS */
         break;
     }
 }
