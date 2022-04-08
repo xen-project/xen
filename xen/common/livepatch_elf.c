@@ -334,7 +334,13 @@ int livepatch_elf_resolve_symbols(struct livepatch_elf *elf)
             }
 
             if ( livepatch_elf_ignore_section(elf->sec[idx].sec) )
+            {
+                dprintk(XENLOG_DEBUG, LIVEPATCH
+                        "%s: Symbol %s from section %s ignored\n",
+                        elf->name, elf->sym[i].name, elf->sec[idx].name);
+                elf->sym[i].ignored = true;
                 break;
+            }
 
             st_value += (unsigned long)elf->sec[idx].load_addr;
             if ( elf->sym[i].name )
