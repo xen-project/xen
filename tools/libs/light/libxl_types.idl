@@ -712,7 +712,8 @@ libxl_device_disk = Struct("device_disk", [
     ("colo_port", integer),
     ("colo_export", string),
     ("active_disk", string),
-    ("hidden_disk", string)
+    ("hidden_disk", string),
+    ("trusted", libxl_defbool),
     ])
 
 libxl_device_nic = Struct("device_nic", [
@@ -780,7 +781,8 @@ libxl_device_nic = Struct("device_nic", [
     ("colo_filter_sec_redirector1_outdev", string),
     ("colo_filter_sec_rewriter0_queue", string),
     ("colo_checkpoint_host", string),
-    ("colo_checkpoint_port", string)
+    ("colo_checkpoint_port", string),
+    ("trusted", libxl_defbool),
     ])
 
 libxl_device_pci = Struct("device_pci", [

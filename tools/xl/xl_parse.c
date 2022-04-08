@@ -565,6 +565,10 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         nic->devid = parse_ulong(oparg);
     } else if (MATCH_OPTION("mtu", token, oparg)) {
         nic->mtu = parse_ulong(oparg);
+    } else if (!strcmp("trusted", token)) {
+        libxl_defbool_set(&nic->trusted, true);
+    } else if (!strcmp("untrusted", token)) {
+        libxl_defbool_set(&nic->trusted, false);
     } else {
         fprintf(stderr, "unrecognized argument `%s'\n", token);
         return 1;

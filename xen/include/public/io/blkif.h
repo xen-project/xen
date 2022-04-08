@@ -363,6 +363,14 @@
  *      that the frontend requires that the logical block size is 512 as it
  *      is hardcoded (which is the case in some frontend implementations).
  *
+ * trusted
+ *      Values:         0/1 (boolean)
+ *      Default value:  1
+ *
+ *      A value of "0" indicates that the frontend should not trust the
+ *      backend, and should deploy whatever measures available to protect from
+ *      a malicious backend on the other end.
+ *
  *------------------------- Virtual Device Properties -------------------------
  *
  * device-type

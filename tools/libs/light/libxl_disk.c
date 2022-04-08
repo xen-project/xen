@@ -159,6 +159,7 @@ static int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
     libxl_defbool_setdefault(&disk->discard_enable, !!disk->readwrite);
     libxl_defbool_setdefault(&disk->colo_enable, false);
     libxl_defbool_setdefault(&disk->colo_restore_enable, false);
+    libxl_defbool_setdefault(&disk->trusted, true);
 
     rc = libxl__resolve_domid(gc, disk->backend_domname, &disk->backend_domid);
     if (rc < 0) return rc;
@@ -395,6 +396,8 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         flexarray_append(front, GCSPRINTF("%d", device->devid));
         flexarray_append(front, "device-type");
         flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
+        flexarray_append(front, "trusted");
+        flexarray_append(front, libxl_defbool_val(disk->trusted) ? "1" : "0");
 
         /*
          * Old PV kernel disk frontends before 2.6.26 rely on tool stack to

@@ -178,4 +178,30 @@ disk: {
 END
 one 0  cdrom no-discard vdev=hda target=/some/disk/image.iso
 
+# test setting trusted
+expected <<END
+disk: {
+    "pdev_path": "/some/disk/image.raw",
+    "vdev": "hda",
+    "format": "raw",
+    "readwrite": 1,
+    "trusted": "True"
+}
+
+END
+one 0  trusted vdev=hda target=/some/disk/image.raw
+
+# test setting untrusted
+expected <<END
+disk: {
+    "pdev_path": "/some/disk/image.raw",
+    "vdev": "hda",
+    "format": "raw",
+    "readwrite": 1,
+    "trusted": "False"
+}
+
+END
+one 0  untrusted vdev=hda target=/some/disk/image.raw
+
 complete

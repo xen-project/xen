@@ -160,4 +160,22 @@ one $e rate=4296MB/s@4294s
 expected </dev/null
 one $e rate=@
 
+# test trusted setting
+expected <<END
+vif: {
+    "trusted": "True"
+}
+
+END
+one 0 trusted
+
+# test untrusted setting
+expected <<END
+vif: {
+    "trusted": "False"
+}
+
+END
+one 0 untrusted
+
 complete

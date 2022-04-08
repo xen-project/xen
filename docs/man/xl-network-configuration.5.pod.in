@@ -258,3 +258,12 @@ NOTE: This should not be set unless you have a reason to.
 Specifies the MTU (i.e. the maximum size of an IP payload, exclusing headers). The
 default value is 1500 but, if the VIF is attached to a bridge, it will be set to match
 unless overridden by this parameter.
+
+=head2 trusted / untrusted
+
+An advisory setting for the frontend driver on whether the backend should be
+trusted.  The frontend should deploy whatever protections it has available to
+prevent an untrusted backend from accessing guest data not related to the I/O
+processing or causing malfunction to the frontend or the whole domain.
+
+Note frontends can ignore such recommendation.

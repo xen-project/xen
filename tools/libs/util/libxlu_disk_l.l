@@ -208,6 +208,9 @@ colo-export=[^,]*,?	{ STRIP(','); SAVESTRING("colo-export", colo_export, FROMEQU
 active-disk=[^,]*,?	{ STRIP(','); SAVESTRING("active-disk", active_disk, FROMEQUALS); }
 hidden-disk=[^,]*,?	{ STRIP(','); SAVESTRING("hidden-disk", hidden_disk, FROMEQUALS); }
 
+trusted,?		{ libxl_defbool_set(&DPC->disk->trusted, true); }
+untrusted,?		{ libxl_defbool_set(&DPC->disk->trusted, false); }
+
  /* the target magic parameter, eats the rest of the string */
 
 target=.*	{ STRIP(','); SAVESTRING("target", pdev_path, FROMEQUALS); }

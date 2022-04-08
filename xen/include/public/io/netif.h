@@ -161,6 +161,12 @@
  */
 
 /*
+ * The setting of "trusted" node to "0" in the frontend path signals that the
+ * frontend should not trust the backend, and should deploy whatever measures
+ * available to protect from a malicious backend on the other end.
+ */
+
+/*
  * Control ring
  * ============
  *

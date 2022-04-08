@@ -528,6 +528,14 @@
 #define LIBXL_HAVE_MAX_GRANT_VERSION 1
 
 /*
+ * LIBXL_HAVE_{DISK,NIC}_TRUSTED indicates that the libxl_device_disk and
+ * libxl_device_nic structs have a field to signal whether the backend of the
+ * device is to be trusted.  Such information is propagated to the frontend.
+ */
+#define LIBXL_HAVE_DISK_TRUSTED 1
+#define LIBXL_HAVE_NIC_TRUSTED 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

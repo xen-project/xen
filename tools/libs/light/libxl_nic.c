@@ -116,6 +116,8 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
         abort();
     }
 
+    libxl_defbool_setdefault(&nic->trusted, true);
+
     return rc;
 }
 
@@ -254,6 +256,9 @@ static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
      */
     flexarray_append(back, "hotplug-status");
     flexarray_append(back, "");
+
+    flexarray_append(front, "trusted");
+    flexarray_append(front, libxl_defbool_val(nic->trusted) ? "1" : "0");
 
     return 0;
 }
