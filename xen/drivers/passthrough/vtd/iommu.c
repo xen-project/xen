@@ -1570,7 +1570,7 @@ int domain_context_mapping_one(
                 check_cleanup_domid_map(domain, pdev, iommu);
             printk(XENLOG_ERR
                    "%04x:%02x:%02x.%u: unexpected context entry %016lx_%016lx (expected %016lx_%016lx)\n",
-                   pdev->seg, pdev->bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                    (uint64_t)(res >> 64), (uint64_t)res,
                    (uint64_t)(old >> 64), (uint64_t)old);
             rc = -EILSEQ;
@@ -1638,9 +1638,14 @@ int domain_context_mapping_one(
 
     if ( rc )
     {
-        if ( !prev_dom )
-            domain_context_unmap_one(domain, iommu, bus, devfn,
-                                     DEVICE_DOMID(domain, pdev));
+        if ( !prev_dom ||
+             /*
+              * Unmapping here means DEV_TYPE_PCI devices with RMRRs (if such
+              * exist) would cause problems if such a region was actually
+              * accessed.
+              */
+             (prev_dom == dom_io && !pdev) )
+            domain_context_unmap_one(domain, iommu, bus, devfn);
         else if ( prev_dom != domain ) /* Avoid infinite recursion. */
             domain_context_mapping_one(prev_dom, iommu, bus, devfn, pdev,
                                        DEVICE_DOMID(prev_dom, pdev),
@@ -1765,7 +1770,9 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
          * Strictly speaking if the device is the only one behind this bridge
          * and the only one with this (secbus,0,0) tuple, it could be allowed
          * to be re-assigned regardless of RMRR presence.  But let's deal with
-         * that case only if it is actually found in the wild.
+         * that case only if it is actually found in the wild.  Note that
+         * dealing with this just here would still not render the operation
+         * secure.
          */
         if ( prev_present && (mode & MAP_WITH_RMRR) &&
              domain != pdev->domain )
@@ -1831,7 +1838,7 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
 int domain_context_unmap_one(
     struct domain *domain,
     struct iommu *iommu,
-    uint8_t bus, uint8_t devfn, domid_t domid)
+    uint8_t bus, uint8_t devfn)
 {
     struct context_entry *context, *context_entries;
     u64 maddr;
@@ -1883,7 +1890,8 @@ int domain_context_unmap_one(
     unmap_vtd_domain_page(context_entries);
 
     if ( !iommu->intel->drhd->segment && !rc )
-        rc = me_wifi_quirk(domain, bus, devfn, domid, 0, UNMAP_ME_PHANTOM_FUNC);
+        rc = me_wifi_quirk(domain, bus, devfn, DOMID_INVALID, 0,
+                           UNMAP_ME_PHANTOM_FUNC);
 
     return rc;
 }
@@ -1924,8 +1932,7 @@ static const struct acpi_drhd_unit *domain_context_unmap(
             printk(VTDPREFIX "d%d:PCIe: unmap %04x:%02x:%02x.%u\n",
                    domain->domain_id, seg, bus,
                    PCI_SLOT(devfn), PCI_FUNC(devfn));
-        ret = domain_context_unmap_one(domain, iommu, bus, devfn,
-                                       DEVICE_DOMID(domain, pdev));
+        ret = domain_context_unmap_one(domain, iommu, bus, devfn);
         if ( !ret && devfn == pdev->devfn && ats_device(pdev, drhd) > 0 )
             disable_ats_device(pdev);
 
@@ -1935,8 +1942,7 @@ static const struct acpi_drhd_unit *domain_context_unmap(
         if ( iommu_debug )
             printk(VTDPREFIX "d%d:PCI: unmap %04x:%02x:%02x.%u\n",
                    domain->domain_id, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        ret = domain_context_unmap_one(domain, iommu, bus, devfn,
-                                       DEVICE_DOMID(domain, pdev));
+        ret = domain_context_unmap_one(domain, iommu, bus, devfn);
         if ( ret )
             break;
 
@@ -1945,12 +1951,10 @@ static const struct acpi_drhd_unit *domain_context_unmap(
         if ( find_upstream_bridge(seg, &tmp_bus, &tmp_devfn, &secbus) < 1 )
             break;
 
-        ret = domain_context_unmap_one(domain, iommu, tmp_bus, tmp_devfn,
-                                       DEVICE_DOMID(domain, pdev));
+        ret = domain_context_unmap_one(domain, iommu, tmp_bus, tmp_devfn);
         /* PCIe to PCI/PCIx bridge */
         if ( !ret && pdev_type(seg, tmp_bus, tmp_devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
-            ret = domain_context_unmap_one(domain, iommu, secbus, 0,
-                                           DEVICE_DOMID(domain, pdev));
+            ret = domain_context_unmap_one(domain, iommu, secbus, 0);
 
         break;
 

@@ -350,7 +350,7 @@ static int __must_check map_me_phantom_function(struct domain *domain,
                                         domid, pgd_maddr, mode);
     else
         rc = domain_context_unmap_one(domain, drhd->iommu, 0,
-                                      PCI_DEVFN(dev, 7), domid);
+                                      PCI_DEVFN(dev, 7));
 
     return rc;
 }
