@@ -1962,9 +1962,9 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
              * altp2m_list lock.
              */
             if ( p2m != hostp2m )
-                __put_gfn(p2m, gfn);
+                p2m_put_gfn(p2m, _gfn(gfn));
             p2m_change_type_one(currd, gfn, p2m_ram_logdirty, p2m_ram_rw);
-            __put_gfn(hostp2m, gfn);
+            p2m_put_gfn(hostp2m, _gfn(gfn));
 
             goto out;
         }
@@ -1986,8 +1986,8 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 
  out_put_gfn:
     if ( p2m != hostp2m )
-        __put_gfn(p2m, gfn);
-    __put_gfn(hostp2m, gfn);
+        p2m_put_gfn(p2m, _gfn(gfn));
+    p2m_put_gfn(hostp2m, _gfn(gfn));
  out:
     /*
      * All of these are delayed until we exit, since we might

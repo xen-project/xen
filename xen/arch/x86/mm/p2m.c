@@ -333,20 +333,12 @@ mfn_t p2m_get_gfn_type_access(struct p2m_domain *p2m, gfn_t gfn,
     return mfn;
 }
 
-#endif /* CONFIG_HVM */
-
-void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
+void p2m_put_gfn(struct p2m_domain *p2m, gfn_t gfn)
 {
-    if ( !p2m || !paging_mode_translate(p2m->domain) )
-        /* Nothing to do in this case */
-        return;
+    ASSERT(gfn_locked_by_me(p2m, gfn_x(gfn)));
 
-    ASSERT(gfn_locked_by_me(p2m, gfn));
-
-    gfn_unlock(p2m, gfn, 0);
+    gfn_unlock(p2m, gfn_x(gfn), 0);
 }
-
-#ifdef CONFIG_HVM
 
 /* Atomically look up a GFN and take a reference count on the backing page. */
 struct page_info *p2m_get_page_from_gfn(
@@ -2222,10 +2214,10 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
             if ( !ret )
                 ret = rc;
 
-            __put_gfn(p2m, gfn_x(gfn));
+            p2m_put_gfn(p2m, gfn);
         }
         else
-            __put_gfn(p2m, gfn_x(gfn));
+            p2m_put_gfn(p2m, gfn);
     }
 
     altp2m_list_unlock(d);
@@ -2310,7 +2302,7 @@ void audit_p2m(struct domain *d,
              * blow away the m2p entry. */
             set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
         }
-        __put_gfn(p2m, gfn);
+        p2m_put_gfn(p2m, _gfn(gfn));
 
         P2M_PRINTK("OK: mfn=%#lx, gfn=%#lx, p2mfn=%#lx\n",
                        mfn, gfn, mfn_x(p2mfn));

@@ -149,7 +149,7 @@ static int nestedhap_walk_L0_p2m(
 direct_mmio_out:
     *L0_gpa = (mfn_x(mfn) << PAGE_SHIFT) + (L1_gpa & ~PAGE_MASK);
 out:
-    __put_gfn(p2m, L1_gpa >> PAGE_SHIFT);
+    p2m_put_gfn(p2m, gaddr_to_gfn(L1_gpa));
     return rc;
 }
 

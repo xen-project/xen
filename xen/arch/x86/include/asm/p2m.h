@@ -509,9 +509,16 @@ static inline mfn_t __nonnull(3) get_gfn_type(
                                               P2M_ALLOC | P2M_UNSHARE)
 
 /* Will release the p2m_lock for this gfn entry. */
-void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
+void p2m_put_gfn(struct p2m_domain *p2m, gfn_t gfn);
 
-#define put_gfn(d, gfn) __put_gfn(p2m_get_hostp2m((d)), (gfn))
+static inline void put_gfn(struct domain *d, unsigned long gfn)
+{
+    if ( !paging_mode_translate(d) )
+        /* Nothing to do in this case */
+        return;
+
+    p2m_put_gfn(p2m_get_hostp2m(d), _gfn(gfn));
+}
 
 /* The intent of the "unlocked" accessor is to have the caller not worry about
  * put_gfn. They apply to very specific situations: debug printk's, dumps 
