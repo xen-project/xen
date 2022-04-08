@@ -28,6 +28,8 @@
 #include "mm-locks.h"
 #include "p2m.h"
 
+DEFINE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
+
 /* Init the datastructures for later use by the p2m code */
 static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {

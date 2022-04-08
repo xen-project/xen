@@ -53,10 +53,6 @@ bool_t __initdata opt_hap_1gb = 1, __initdata opt_hap_2mb = 1;
 boolean_param("hap_1gb", opt_hap_1gb);
 boolean_param("hap_2mb", opt_hap_2mb);
 
-DEFINE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
-
-#ifdef CONFIG_HVM
-
 int p2m_init_logdirty(struct p2m_domain *p2m)
 {
     if ( p2m->logdirty_ranges )
@@ -258,8 +254,6 @@ void p2m_flush_hardware_cached_dirty(struct domain *d)
     }
 }
 
-#endif /* CONFIG_HVM */
-
 /*
  * Force a synchronous P2M TLB flush if a deferred flush is pending.
  *
@@ -285,8 +279,6 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m)
     } else
         mm_write_unlock(&p2m->lock);
 }
-
-#ifdef CONFIG_HVM
 
 mfn_t p2m_get_gfn_type_access(struct p2m_domain *p2m, gfn_t gfn,
                               p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
@@ -2717,8 +2709,6 @@ int p2m_set_altp2m_view_visibility(struct domain *d, unsigned int altp2m_idx,
 
     return rc;
 }
-
-#endif /* CONFIG_HVM */
 
 /*
  * Local variables:
