@@ -1473,12 +1473,9 @@ static int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn_l,
     return rc;
 }
 
-#endif /* CONFIG_HVM */
-
-int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
+int p2m_add_identity_entry(struct domain *d, unsigned long gfn_l,
                            p2m_access_t p2ma, unsigned int flag)
 {
-#ifdef CONFIG_HVM
     p2m_type_t p2mt;
     p2m_access_t a;
     gfn_t gfn = _gfn(gfn_l);
@@ -1488,13 +1485,8 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
 
     if ( !paging_mode_translate(d) )
     {
-#endif
-        if ( !is_iommu_enabled(d) )
-            return 0;
-        return iommu_legacy_map(d, _dfn(gfn_l), _mfn(gfn_l),
-                                1ul << PAGE_ORDER_4K,
-                                p2m_access_to_iommu_flags(p2ma));
-#ifdef CONFIG_HVM
+        ASSERT_UNREACHABLE();
+        return -EPERM;
     }
 
     gfn_lock(p2m, gfn, 0);
@@ -1520,12 +1512,10 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
 
     gfn_unlock(p2m, gfn, 0);
     return ret;
-#endif
 }
 
-int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
+int p2m_remove_identity_entry(struct domain *d, unsigned long gfn_l)
 {
-#ifdef CONFIG_HVM
     p2m_type_t p2mt;
     p2m_access_t a;
     gfn_t gfn = _gfn(gfn_l);
@@ -1535,11 +1525,8 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
 
     if ( !paging_mode_translate(d) )
     {
-#endif
-        if ( !is_iommu_enabled(d) )
-            return 0;
-        return iommu_legacy_unmap(d, _dfn(gfn_l), 1ul << PAGE_ORDER_4K);
-#ifdef CONFIG_HVM
+        ASSERT_UNREACHABLE();
+        return -EPERM;
     }
 
     gfn_lock(p2m, gfn, 0);
@@ -1561,7 +1548,6 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
     }
 
     return ret;
-#endif
 }
 
 #ifdef CONFIG_MEM_SHARING
@@ -1605,8 +1591,6 @@ int set_shared_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn)
 }
 
 #endif /* CONFIG_MEM_SHARING */
-
-#ifdef CONFIG_HVM
 
 static struct p2m_domain *
 p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)

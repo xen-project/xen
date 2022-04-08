@@ -466,7 +466,7 @@ int vpci_make_msix_hole(const struct pci_dev *pdev)
             case p2m_mmio_direct:
                 if ( mfn_x(mfn) == start )
                 {
-                    clear_identity_p2m_entry(d, start);
+                    p2m_remove_identity_entry(d, start);
                     break;
                 }
                 /* fallthrough. */

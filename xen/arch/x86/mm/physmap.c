@@ -21,6 +21,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/iommu.h>
 #include <asm/p2m.h>
 
 #include "mm-locks.h"
@@ -73,6 +74,33 @@ guest_physmap_remove_page(struct domain *d, gfn_t gfn,
         return 0;
 
     return p2m_remove_page(d, gfn, mfn, page_order);
+}
+
+int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
+                           p2m_access_t p2ma, unsigned int flag)
+{
+    if ( !paging_mode_translate(d) )
+    {
+        if ( !is_iommu_enabled(d) )
+            return 0;
+        return iommu_legacy_map(d, _dfn(gfn), _mfn(gfn),
+                                1ul << PAGE_ORDER_4K,
+                                p2m_access_to_iommu_flags(p2ma));
+    }
+
+    return p2m_add_identity_entry(d, gfn, p2ma, flag);
+}
+
+int clear_identity_p2m_entry(struct domain *d, unsigned long gfn)
+{
+    if ( !paging_mode_translate(d) )
+    {
+        if ( !is_iommu_enabled(d) )
+            return 0;
+        return iommu_legacy_unmap(d, _dfn(gfn), 1ul << PAGE_ORDER_4K);
+    }
+
+    return p2m_remove_identity_entry(d, gfn);
 }
 
 /*

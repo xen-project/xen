@@ -373,7 +373,7 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
         if ( !hwdom_iommu_map(d, pfn, max_pfn) )
             rc = 0;
         else if ( paging_mode_translate(d) )
-            rc = set_identity_p2m_entry(d, pfn, p2m_access_rw, 0);
+            rc = p2m_add_identity_entry(d, pfn, p2m_access_rw, 0);
         else
             rc = iommu_map(d, _dfn(pfn), _mfn(pfn), 1ul << PAGE_ORDER_4K,
                            IOMMUF_readable | IOMMUF_writable, &flush_flags);

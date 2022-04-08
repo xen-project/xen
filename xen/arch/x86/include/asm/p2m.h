@@ -637,6 +637,10 @@ int set_mmio_p2m_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
                            p2m_access_t p2ma, unsigned int flag);
 int clear_identity_p2m_entry(struct domain *d, unsigned long gfn);
+/* HVM-only callers can use these directly: */
+int p2m_add_identity_entry(struct domain *d, unsigned long gfn,
+                           p2m_access_t p2ma, unsigned int flag);
+int p2m_remove_identity_entry(struct domain *d, unsigned long gfn);
 
 /* 
  * Populate-on-demand
