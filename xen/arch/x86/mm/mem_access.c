@@ -299,8 +299,9 @@ static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
     {
         p2m_access_t _a;
         p2m_type_t t;
-        mfn_t mfn = __get_gfn_type_access(p2m, gfn_x(gfn), &t, &_a,
-                                          P2M_ALLOC, NULL, false);
+        mfn_t mfn = p2m_get_gfn_type_access(p2m, gfn, &t, &_a,
+                                            P2M_ALLOC, NULL, false);
+
         rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, t, a, -1);
     }
 

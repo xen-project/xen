@@ -478,12 +478,12 @@ do {                                                    \
 #undef assign_pointers
 
     /* Now do the gets. */
-    *first_mfn  = __get_gfn_type_access(p2m_get_hostp2m(rval->first_domain),
-                                        gfn_x(rval->first_gfn), first_t,
-                                        first_a, q, NULL, lock);
-    *second_mfn = __get_gfn_type_access(p2m_get_hostp2m(rval->second_domain),
-                                        gfn_x(rval->second_gfn), second_t,
-                                        second_a, q, NULL, lock);
+    *first_mfn  = p2m_get_gfn_type_access(p2m_get_hostp2m(rval->first_domain),
+                                          rval->first_gfn, first_t,
+                                          first_a, q, NULL, lock);
+    *second_mfn = p2m_get_gfn_type_access(p2m_get_hostp2m(rval->second_domain),
+                                          rval->second_gfn, second_t,
+                                          second_a, q, NULL, lock);
 }
 
 static void put_two_gfns(const struct two_gfns *arg)
@@ -936,8 +936,8 @@ static int nominate_page(struct domain *d, gfn_t gfn,
             if ( !ap2m )
                 continue;
 
-            amfn = __get_gfn_type_access(ap2m, gfn_x(gfn), &ap2mt, &ap2ma,
-                                         0, NULL, false);
+            amfn = p2m_get_gfn_type_access(ap2m, gfn, &ap2mt, &ap2ma,
+                                           0, NULL, false);
             if ( mfn_valid(amfn) && (!mfn_eq(amfn, mfn) || ap2ma != p2ma) )
             {
                 altp2m_list_unlock(d);

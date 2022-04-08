@@ -459,9 +459,26 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m);
  * After calling any of the variants below, caller needs to use
  * put_gfn. ****/
 
-mfn_t __nonnull(3, 4) __get_gfn_type_access(
-    struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t,
+mfn_t __nonnull(3, 4) p2m_get_gfn_type_access(
+    struct p2m_domain *p2m, gfn_t gfn, p2m_type_t *t,
     p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool_t locked);
+
+static inline mfn_t __nonnull(3, 4) _get_gfn_type_access(
+    struct p2m_domain *p2m, gfn_t gfn, p2m_type_t *t,
+    p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool_t locked)
+{
+    if ( !p2m || !paging_mode_translate(p2m->domain) )
+    {
+        /*
+         * Not necessarily true, but for non-translated guests we claim
+         * it's the most generic kind of memory.
+         */
+        *t = p2m_ram_rw;
+        return _mfn(gfn_x(gfn));
+    }
+
+    return p2m_get_gfn_type_access(p2m, gfn, t, a, q, page_order, locked);
+}
 
 /* Read a particular P2M table, mapping pages as we go.  Most callers
  * should _not_ call this directly; use the other get_gfn* functions
@@ -474,7 +491,7 @@ static inline mfn_t __nonnull(3, 4) get_gfn_type_access(
     struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t,
     p2m_access_t *a, p2m_query_t q, unsigned int *page_order)
 {
-    return __get_gfn_type_access(p2m, gfn, t, a, q, page_order, true);
+    return _get_gfn_type_access(p2m, _gfn(gfn), t, a, q, page_order, true);
 }
 
 /* General conversion function from gfn to mfn */
@@ -515,7 +532,8 @@ static inline mfn_t get_gfn_query_unlocked(struct domain *d,
                                            p2m_type_t *t)
 {
     p2m_access_t a;
-    return __get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, 0, NULL, 0);
+    return _get_gfn_type_access(p2m_get_hostp2m(d), _gfn(gfn), t, &a, 0,
+                                NULL, 0);
 }
 
 /* Atomically look up a GFN and take a reference count on the backing page.

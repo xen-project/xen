@@ -286,25 +286,13 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m)
         mm_write_unlock(&p2m->lock);
 }
 
-mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
-                    p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
-                    unsigned int *page_order, bool_t locked)
-{
 #ifdef CONFIG_HVM
-    mfn_t mfn;
-    gfn_t gfn = _gfn(gfn_l);
 
-    if ( !p2m || !paging_mode_translate(p2m->domain) )
-    {
-#endif
-        /*
-         * Not necessarily true, but for non-translated guests we claim
-         * it's the most generic kind of memory.
-         */
-        *t = p2m_ram_rw;
-        return _mfn(gfn_l);
-#ifdef CONFIG_HVM
-    }
+mfn_t p2m_get_gfn_type_access(struct p2m_domain *p2m, gfn_t gfn,
+                              p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
+                              unsigned int *page_order, bool_t locked)
+{
+    mfn_t mfn;
 
     /* Unshare makes no sense without populate. */
     if ( q & P2M_UNSHARE )
@@ -329,8 +317,8 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
          * Try to unshare. If we fail, communicate ENOMEM without
          * sleeping.
          */
-        if ( mem_sharing_unshare_page(p2m->domain, gfn_l) < 0 )
-            mem_sharing_notify_enomem(p2m->domain, gfn_l, false);
+        if ( mem_sharing_unshare_page(p2m->domain, gfn_x(gfn)) < 0 )
+            mem_sharing_notify_enomem(p2m->domain, gfn_x(gfn), false);
         mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order, NULL);
     }
 
@@ -343,8 +331,9 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
     }
 
     return mfn;
-#endif
 }
+
+#endif /* CONFIG_HVM */
 
 void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
 {
@@ -377,7 +366,7 @@ struct page_info *p2m_get_page_from_gfn(
     {
         /* Fast path: look up and get out */
         p2m_read_lock(p2m);
-        mfn = __get_gfn_type_access(p2m, gfn_x(gfn), t, a, 0, NULL, 0);
+        mfn = p2m_get_gfn_type_access(p2m, gfn, t, a, 0, NULL, 0);
         if ( p2m_is_any_ram(*t) && mfn_valid(mfn)
              && !((q & P2M_UNSHARE) && p2m_is_shared(*t)) )
         {
@@ -1775,8 +1764,8 @@ int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
         unsigned int page_order;
         int rc;
 
-        *mfn = __get_gfn_type_access(hp2m, gfn_x(gfn), t, a,
-                                     P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
+        *mfn = p2m_get_gfn_type_access(hp2m, gfn, t, a, P2M_ALLOC | P2M_UNSHARE,
+                                       &page_order, 0);
 
         rc = -ESRCH;
         if ( !mfn_valid(*mfn) || *t != p2m_ram_rw )
