@@ -247,7 +247,7 @@ static int msix_read(struct vcpu *v, unsigned long addr, unsigned int len,
         {
             gprintk(XENLOG_WARNING,
                     "%pp: unable to map MSI-X PBA, report all pending\n",
-                    msix->pdev);
+                    &msix->pdev->sbdf);
             return X86EMUL_OKAY;
         }
 
@@ -331,7 +331,7 @@ static int msix_write(struct vcpu *v, unsigned long addr, unsigned int len,
                 /* Unable to map the PBA, ignore write. */
                 gprintk(XENLOG_WARNING,
                         "%pp: unable to map MSI-X PBA, write ignored\n",
-                        msix->pdev);
+                        &msix->pdev->sbdf);
                 return X86EMUL_OKAY;
             }
 
