@@ -60,7 +60,7 @@ video:  xorw    %ax, %ax
         call    mode_set                        # Set the mode
         jc      vid1
 
-        leaw    bootsym(badmdt), %si            # Invalid mode ID
+        movw    $bootsym(badmdt), %si           # Invalid mode ID
         call    prtstr
 vid2:   call    mode_menu
 vid1:   call    store_edid
@@ -113,7 +113,7 @@ mopar2: movb    %al, _param(PARAM_VIDEO_LINES)
 
 # Fetching of VESA frame buffer parameters
 mopar_gr:
-        leaw    vesa_mode_info, %di
+        movw    $vesa_mode_info, %di
         movb    $0x23, _param(PARAM_HAVE_VGA)
         movw    16(%di), %ax
         movw    %ax, _param(PARAM_LFB_LINELENGTH)
@@ -133,7 +133,7 @@ mopar_gr:
         movw    %ax, _param(PARAM_VESA_ATTRIB)
 
 # get video mem size
-        leaw    vesa_glob_info, %di
+        movw    $vesa_glob_info, %di
         movzwl  18(%di), %eax
         movl    %eax, _param(PARAM_LFB_SIZE)
 
@@ -189,7 +189,7 @@ no_pm:  pushw   %ds
 
 # The video mode menu
 mode_menu:
-        leaw    bootsym(keymsg), %si    # "Return/Space/Timeout" message
+        movw    $bootsym(keymsg), %si   # "Return/Space/Timeout" message
         call    prtstr
         call    flush
 nokey:  call    getkt
@@ -206,22 +206,22 @@ nokey:  call    getkt
 defmd1: ret                             # No mode chosen? Default 80x25
 
 listm:  call    mode_table              # List mode table
-listm0: leaw    bootsym(name_bann), %si # Print adapter name
+listm0: movw    $bootsym(name_bann), %si # Print adapter name
         call    prtstr
         movw    bootsym(card_name), %si
         orw     %si, %si
         jnz     an2
 
-        leaw    bootsym(vga_name), %si
+        movw    $bootsym(vga_name), %si
         jmp     an1
 
 an2:    call    prtstr
-        leaw    bootsym(svga_name), %si
+        movw    $bootsym(svga_name), %si
 an1:    call    prtstr
-        leaw    bootsym(listhdr), %si   # Table header
+        movw    $bootsym(listhdr), %si  # Table header
         call    prtstr
         movb    $0x30, %dl              # DL holds mode number
-        leaw    modelist, %si
+        movw    $modelist, %si
 lm1:    cmpw    $ASK_VGA, (%si)         # End?
         jz      lm2
 
@@ -240,7 +240,7 @@ lm1:    cmpw    $ASK_VGA, (%si)         # End?
         testb   $0xff,(%si)
         jnz     1f
         push    %si
-        leaw    bootsym(textmode), %si
+        movw    $bootsym(textmode), %si
         call    prtstr
         pop     %si
         lodsw
@@ -257,7 +257,7 @@ lm1:    cmpw    $ASK_VGA, (%si)         # End?
 
         cmpb    $'z'+1, %dl
         jnz     skip_bail
-        leaw    bootsym(menu_bail_msg), %si
+        movw    $bootsym(menu_bail_msg), %si
         call    prtstr
         jmp     lm2
 
@@ -266,13 +266,13 @@ skip_bail:
         jnz     skip_pause
         push    %si
         push    %dx
-        leaw    bootsym(menu_more_msg), %si  # '<press space>'
+        movw    $bootsym(menu_more_msg), %si # '<press space>'
         call    prtstr
         call    flush
 1:      call    getkey
         cmpb    $0x20, %al              # SPACE ?
         jne     1b                      # yes - manual mode selection
-        leaw    bootsym(crlft), %si
+        movw    $bootsym(crlft), %si
         call    prtstr
         pop     %dx
         pop     %si
@@ -283,9 +283,9 @@ skip_pause:
         movb    $'a', %dl
         jmp     lm1
 
-lm2:    leaw    bootsym(prompt), %si    # Mode prompt
+lm2:    movw    $bootsym(prompt), %si   # Mode prompt
         call    prtstr
-        leaw    bootsym(edit_buf), %di  # Editor buffer
+        movw    $bootsym(edit_buf), %di # Editor buffer
 lm3:    call    getkey
         cmpb    $0x0d, %al              # Enter?
         jz      lment
@@ -315,9 +315,9 @@ lmbs:   cmpw    $bootsym(edit_buf), %di # Backspace
         jmp     lm3
         
 lment:  movb    $0, (%di)
-        leaw    bootsym(crlft), %si
+        movw    $bootsym(crlft), %si
         call    prtstr
-        leaw    bootsym(edit_buf), %si
+        movw    $bootsym(edit_buf), %si
         cmpb    $0, (%si)               # Empty string = default mode
         jz      lmdef
 
@@ -373,7 +373,7 @@ mnusel: lodsb                           # Menu selection
 lmuse:  call    mode_set
         jc      lmdef
 
-lmbad:  leaw    bootsym(unknt), %si
+lmbad:  movw    $bootsym(unknt), %si
         call    prtstr
         jmp     mode_menu
 lmdef:  ret
@@ -424,13 +424,13 @@ setmenu:
         jmp     mode_set
 
 check_vesa:
-        leaw    vesa_glob_info, %di
+        movw    $vesa_glob_info, %di
         movw    $0x4f00, %ax
         int     $0x10
         cmpw    $0x004f, %ax
         jnz     setbad
 
-        leaw    vesa_mode_info, %di     # Get mode information structure
+        movw    $vesa_mode_info, %di    # Get mode information structure
         leaw    -VIDEO_FIRST_VESA(%bx), %cx
         movw    $0x4f01, %ax
         int     $0x10
@@ -497,7 +497,7 @@ inidx:  outb    %al, %dx                # Read from indexed VGA register
 
 setvesabysize:
         call    mode_table
-        leaw    modelist,%si
+        movw    $modelist,%si
 1:      add     $8,%si
         movw    -8(%si),%bx
         cmpw    $ASK_VGA,%bx            # End?
@@ -656,8 +656,8 @@ mode_table:
         orw     %di, %di
         jnz     mtab1
 
-        leaw    modelist, %di           # Store standard modes:
-        leaw    bootsym(vga_modes), %si # All modes for std VGA
+        movw    $modelist, %di          # Store standard modes:
+        movw    $bootsym(vga_modes), %si # All modes for std VGA
         movw    $vga_modes_end-vga_modes, %cx
         rep     movsb
 
@@ -665,7 +665,7 @@ mode_table:
 
         movw    $ASK_VGA, (%di)         # End marker
         movw    %di, bootsym(mt_end)
-mtab1:  leaw    modelist, %si           # SI=mode list, DI=list end
+mtab1:  movw    $modelist, %si          # SI=mode list, DI=list end
 ret0:   ret
 
 # Modes usable on all standard VGAs
@@ -681,7 +681,7 @@ vga_modes_end:
 
 # If the current mode is a VESA graphics one, obtain its parameters.
 set_current:
-        leaw    vesa_glob_info, %di
+        movw    $vesa_glob_info, %di
         movw    $0x4f00, %ax
         int     $0x10
         cmpw    $0x004f, %ax
@@ -692,7 +692,7 @@ set_current:
         cmpw    $0x004f, %ax
         jne     .Lsetc_done
 
-        leaw    vesa_mode_info, %di     # Get mode information structure
+        movw    $vesa_mode_info, %di    # Get mode information structure
         movw    %bx, %cx
         movw    $0x4f01, %ax
         int     $0x10
@@ -715,7 +715,7 @@ set_current:
 # Detect VESA modes.
 vesa_modes:
         movw    %di, %bp                # BP=original mode table end
-        leaw    vesa_glob_info, %di
+        movw    $vesa_glob_info, %di
         movw    $0x4f00, %ax            # VESA Get card info call
         int     $0x10
         movw    %di, %si
@@ -772,7 +772,7 @@ vesa2:  pushw   %cx
 
         addw    $8, %di                 # The mode is valid. Store it.
 vesan:  loop    vesa1                   # Next mode. Limit exceeded => error
-vesae:  leaw    bootsym(vesaer), %si
+vesae:  movw    $bootsym(vesaer), %si
         call    prtstr
         movw    %bp, %di                # Discard already found modes.
 vesar:  popw    %gs
@@ -917,7 +917,7 @@ store_edid:
         cmpb    $1, %al                 # EDID disabled on cmdline (edid=no)?
         je      .Lno_edid
 
-        leaw    vesa_glob_info, %di
+        movw    $vesa_glob_info, %di
         movw    $0x4f00, %ax
         int     $0x10
         cmpw    $0x004f, %ax
