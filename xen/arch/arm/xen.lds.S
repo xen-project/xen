@@ -69,12 +69,7 @@ SECTIONS
        *(.proc.info)
        __proc_info_end = .;
 
-#ifdef CONFIG_HAS_VPCI
-       . = ALIGN(POINTER_ALIGN);
-       __start_vpci_array = .;
-       *(SORT(.data.vpci.*))
-       __end_vpci_array = .;
-#endif
+       VPCI_ARRAY
   } :text
 
 #if defined(BUILD_ID)
@@ -110,12 +105,7 @@ SECTIONS
        *(.data.schedulers)
        __end_schedulers_array = .;
 
-#ifdef CONFIG_HYPFS
-       . = ALIGN(8);
-       __paramhypfs_start = .;
-       *(.data.paramhypfs)
-       __paramhypfs_end = .;
-#endif
+       HYPFS_PARAM
 
        *(.data .data.*)
        CONSTRUCTORS
@@ -179,12 +169,7 @@ SECTIONS
        *(.altinstructions)
        __alt_instructions_end = .;
 
-#ifdef CONFIG_DEBUG_LOCK_PROFILE
-       . = ALIGN(POINTER_ALIGN);
-       __lock_profile_start = .;
-       *(.lockprofile.data)
-       __lock_profile_end = .;
-#endif
+       LOCK_PROFILE_DATA
 
        *(.init.data)
        *(.init.data.rel)
@@ -223,22 +208,13 @@ SECTIONS
   /* Section for the device tree blob (if any). */
   .dtb : { *(.dtb) } :text
 
-  /* Sections to be discarded */
-  /DISCARD/ : {
-       *(.exit.text)
-       *(.exit.data)
-       *(.exitcall.exit)
-       *(.eh_frame)
-  }
+  DWARF2_DEBUG_SECTIONS
 
-  /* Stabs debugging sections.  */
-  .stab 0 : { *(.stab) }
-  .stabstr 0 : { *(.stabstr) }
-  .stab.excl 0 : { *(.stab.excl) }
-  .stab.exclstr 0 : { *(.stab.exclstr) }
-  .stab.index 0 : { *(.stab.index) }
-  .stab.indexstr 0 : { *(.stab.indexstr) }
-  .comment 0 : { *(.comment) }
+  DISCARD_SECTIONS
+
+  STABS_DEBUG_SECTIONS
+
+  ELF_DETAILS_SECTIONS
 }
 
 /*
