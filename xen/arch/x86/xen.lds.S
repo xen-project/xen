@@ -3,6 +3,7 @@
 
 #include <xen/cache.h>
 #include <xen/lib.h>
+#include <xen/xen.lds.h>
 #include <asm/page.h>
 #undef ENTRY
 #undef ALIGN
@@ -13,13 +14,6 @@
 #undef __XEN_VIRT_START
 #define __XEN_VIRT_START __image_base__
 #define DECL_SECTION(x) x :
-/*
- * Use the NOLOAD directive, despite currently ignored by (at least) GNU ld
- * for PE output, in order to record that we'd prefer these sections to not
- * be loaded into memory.
- */
-#define DECL_DEBUG(x, a) #x ALIGN(a) (NOLOAD) : { *(x) }
-#define DECL_DEBUG2(x, y, a) #x ALIGN(a) (NOLOAD) : { *(x) *(y) }
 
 ENTRY(efi_start)
 
@@ -27,8 +21,6 @@ ENTRY(efi_start)
 
 #define FORMAT "elf64-x86-64"
 #define DECL_SECTION(x) #x : AT(ADDR(#x) - __XEN_VIRT_START)
-#define DECL_DEBUG(x, a) #x 0 : { *(x) }
-#define DECL_DEBUG2(x, y, a) #x 0 : { *(x) *(y) }
 
 ENTRY(start_pa)
 
@@ -159,12 +151,7 @@ SECTIONS
        *(.note.gnu.build-id)
        __note_gnu_build_id_end = .;
 #endif
-#ifdef CONFIG_HAS_VPCI
-       . = ALIGN(POINTER_ALIGN);
-       __start_vpci_array = .;
-       *(SORT(.data.vpci.*))
-       __end_vpci_array = .;
-#endif
+       VPCI_ARRAY
   } PHDR(text)
 
 #if defined(CONFIG_PVH_GUEST) && !defined(EFI)
@@ -278,12 +265,7 @@ SECTIONS
         *(.altinstructions)
         __alt_instructions_end = .;
 
-#ifdef CONFIG_DEBUG_LOCK_PROFILE
-       . = ALIGN(POINTER_ALIGN);
-       __lock_profile_start = .;
-       *(.lockprofile.data)
-       __lock_profile_end = .;
-#endif
+       LOCK_PROFILE_DATA
 
        . = ALIGN(8);
        __ctors_start = .;
@@ -335,12 +317,7 @@ SECTIONS
        *(.data.schedulers)
        __end_schedulers_array = .;
 
-#ifdef CONFIG_HYPFS
-       . = ALIGN(8);
-       __paramhypfs_start = .;
-       *(.data.paramhypfs)
-       __paramhypfs_end = .;
-#endif
+       HYPFS_PARAM
   } PHDR(text)
 
   DECL_SECTION(.data) {
@@ -387,33 +364,7 @@ SECTIONS
   efi = .;
 #endif
 
-  /*
-   * Explicitly list debug sections, first of all to avoid these sections being
-   * viewed as "orphan" by the linker.
-   *
-   * For the PE output this is further necessary so that they don't end up at
-   * VA 0, which is below image base and thus invalid.  Note that we're past
-   * _end here, so if these sections get loaded they'll be discarded at runtime
-   * anyway.
-   */
-  DECL_DEBUG(.debug_abbrev, 1)
-  DECL_DEBUG2(.debug_info, .gnu.linkonce.wi.*, 1)
-  DECL_DEBUG(.debug_types, 1)
-  DECL_DEBUG(.debug_str, 1)
-  DECL_DEBUG2(.debug_line, .debug_line.*, 1)
-  DECL_DEBUG(.debug_line_str, 1)
-  DECL_DEBUG(.debug_names, 4)
-  DECL_DEBUG(.debug_frame, 4)
-  DECL_DEBUG(.debug_loc, 1)
-  DECL_DEBUG(.debug_loclists, 4)
-  DECL_DEBUG(.debug_macinfo, 1)
-  DECL_DEBUG(.debug_macro, 1)
-  DECL_DEBUG(.debug_ranges, 8)
-  DECL_DEBUG(.debug_rnglists, 4)
-  DECL_DEBUG(.debug_addr, 8)
-  DECL_DEBUG(.debug_aranges, 1)
-  DECL_DEBUG(.debug_pubnames, 1)
-  DECL_DEBUG(.debug_pubtypes, 1)
+  DWARF2_DEBUG_SECTIONS
 
 #ifdef EFI
   /* Trick the linker into setting the image size to no less than 16Mb. */
@@ -427,42 +378,12 @@ SECTIONS
   hv_hcall_page = ABSOLUTE(HV_HCALL_PAGE - XEN_VIRT_START + __XEN_VIRT_START);
 #endif
 
-  /* Sections to be discarded */
-  /DISCARD/ : {
-       *(.text.exit)
-       *(.exit.text)
-       *(.exit.data)
-       *(.exitcall.exit)
-       *(.discard)
-       *(.discard.*)
-       *(.eh_frame)
-       *(.dtors)
-       *(.dtors.*)
-       *(.fini_array)
-       *(.fini_array.*)
-#ifdef EFI
-       *(.comment)
-       *(.comment.*)
-       *(.note.*)
-#endif
-  }
+  DISCARD_SECTIONS
 
 #ifndef EFI
-  /* Stabs debugging sections.  */
-  .stab 0 : { *(.stab) }
-  .stabstr 0 : { *(.stabstr) }
-  .stab.excl 0 : { *(.stab.excl) }
-  .stab.exclstr 0 : { *(.stab.exclstr) }
-  .stab.index 0 : { *(.stab.index) }
-  .stab.indexstr 0 : { *(.stab.indexstr) }
-  .comment 0 : { *(.comment) *(.comment.*) }
-  /*
-   * LLVM ld also wants .symtab, .strtab, and .shstrtab placed. These look to
-   * be benign to GNU ld, so we can have them here unconditionally.
-   */
-  .symtab 0 : { *(.symtab) }
-  .strtab 0 : { *(.strtab) }
-  .shstrtab 0 : { *(.shstrtab) }
+  STABS_DEBUG_SECTIONS
+
+  ELF_DETAILS_SECTIONS
 #endif
 }
 
