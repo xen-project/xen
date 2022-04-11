@@ -40,7 +40,7 @@ complete () {
     fi
 }
 
-e=255
+e=1
 
 
 #---------- test data ----------
@@ -62,16 +62,6 @@ one $e rate=10ZB/m
 # test b/s and B/s rate units
 expected <<END
 vif: {
-    "backend_domid": 0,
-    "devid": 0,
-    "mtu": 0,
-    "model": null,
-    "mac": "00:00:00:00:00:00",
-    "ip": null,
-    "bridge": null,
-    "ifname": null,
-    "script": null,
-    "nictype": null,
     "rate_bytes_per_interval": 100000,
     "rate_interval_usecs": 50000
 }
@@ -86,16 +76,6 @@ one 0 rate=2000000B/s@50ms
 # test Kb/s and KB/s rate units
 expected <<END
 vif: {
-    "backend_domid": 0,
-    "devid": 0,
-    "mtu": 0,
-    "model": null,
-    "mac": "00:00:00:00:00:00",
-    "ip": null,
-    "bridge": null,
-    "ifname": null,
-    "script": null,
-    "nictype": null,
     "rate_bytes_per_interval": 100,
     "rate_interval_usecs": 50000
 }
@@ -109,16 +89,6 @@ one 0 rate=2KB/s@50ms
 # test Mb/s and MB/s rate units
 expected <<END
 vif: {
-    "backend_domid": 0,
-    "devid": 0,
-    "mtu": 0,
-    "model": null,
-    "mac": "00:00:00:00:00:00",
-    "ip": null,
-    "bridge": null,
-    "ifname": null,
-    "script": null,
-    "nictype": null,
     "rate_bytes_per_interval": 100000,
     "rate_interval_usecs": 50000
 }
@@ -132,16 +102,6 @@ one 0 rate=2MB/s@50ms
 # test Gb/s and GB/s rate units
 expected <<END
 vif: {
-    "backend_domid": 0,
-    "devid": 0,
-    "mtu": 0,
-    "model": null,
-    "mac": "00:00:00:00:00:00",
-    "ip": null,
-    "bridge": null,
-    "ifname": null,
-    "script": null,
-    "nictype": null,
     "rate_bytes_per_interval": 50000000,
     "rate_interval_usecs": 50000
 }
@@ -173,16 +133,6 @@ one $e rate=10MB/s@10h
 # test replenishment interval in seconds
 expected <<END
 vif: {
-    "backend_domid": 0,
-    "devid": 0,
-    "mtu": 0,
-    "model": null,
-    "mac": "00:00:00:00:00:00",
-    "ip": null,
-    "bridge": null,
-    "ifname": null,
-    "script": null,
-    "nictype": null,
     "rate_bytes_per_interval": 10000000,
     "rate_interval_usecs": 1000000
 }

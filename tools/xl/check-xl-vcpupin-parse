@@ -158,7 +158,7 @@ END
 RANDOM=$seed
 
 echo "# Testing a wrong configuration" >> $outfile
-write foo 255 ""
+write foo 1 ""
 
 echo "# Testing the 'all' syntax" >> $outfile
 write "all" 0 "cpumap: all"
