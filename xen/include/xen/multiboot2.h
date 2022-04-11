@@ -158,6 +158,59 @@ typedef struct {
     multiboot2_memory_map_t entries[];
 } multiboot2_tag_mmap_t;
 
+typedef struct
+{
+    uint32_t type;
+    uint32_t size;
+    uint16_t vbe_mode;
+    uint16_t vbe_interface_seg;
+    uint16_t vbe_interface_off;
+    uint16_t vbe_interface_len;
+    uint8_t vbe_control_info[512];
+    uint8_t vbe_mode_info[256];
+} multiboot2_tag_vbe_t;
+
+typedef struct
+{
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+} multiboot2_color_t;
+
+typedef struct
+{
+    uint32_t type;
+    uint32_t size;
+    uint64_t framebuffer_addr;
+    uint32_t framebuffer_pitch;
+    uint32_t framebuffer_width;
+    uint32_t framebuffer_height;
+    uint8_t framebuffer_bpp;
+#define MULTIBOOT2_FRAMEBUFFER_TYPE_INDEXED  0
+#define MULTIBOOT2_FRAMEBUFFER_TYPE_RGB      1
+#define MULTIBOOT2_FRAMEBUFFER_TYPE_EGA_TEXT 2
+    uint8_t framebuffer_type;
+    uint16_t reserved;
+
+    union
+    {
+        struct
+        {
+            uint16_t framebuffer_palette_num_colors;
+            multiboot2_color_t framebuffer_palette[];
+        };
+        struct
+        {
+            uint8_t framebuffer_red_field_position;
+            uint8_t framebuffer_red_mask_size;
+            uint8_t framebuffer_green_field_position;
+            uint8_t framebuffer_green_mask_size;
+            uint8_t framebuffer_blue_field_position;
+            uint8_t framebuffer_blue_mask_size;
+        };
+    };
+} multiboot2_tag_framebuffer_t;
+
 typedef struct {
     u32 type;
     u32 size;

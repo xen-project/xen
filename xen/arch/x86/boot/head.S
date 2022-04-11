@@ -562,12 +562,18 @@ trampoline_setup:
         mov     %esi, sym_esi(xen_phys_start)
         mov     %esi, sym_esi(trampoline_xen_phys_start)
 
-        mov     sym_esi(trampoline_phys), %ecx
-
         /* Get bottom-most low-memory stack address. */
+        mov     sym_esi(trampoline_phys), %ecx
         add     $TRAMPOLINE_SPACE,%ecx
 
+#ifdef CONFIG_VIDEO
+        lea     sym_esi(boot_vid_info), %edx
+#else
+        xor     %edx, %edx
+#endif
+
         /* Save Multiboot / PVH info struct (after relocation) for later use. */
+        push    %edx                /* Boot video info to be filled from MB2. */
         push    %ecx                /* Bottom-most low-memory stack address. */
         push    %ebx                /* Multiboot / PVH information address. */
         push    %eax                /* Magic number. */

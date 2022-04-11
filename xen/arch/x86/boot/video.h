@@ -28,4 +28,45 @@
 /* The "recalculate timings" flag */
 #define VIDEO_RECALC        0x8000
 
+#ifndef __ASSEMBLY__
+struct boot_video_info {
+    uint8_t  orig_x;             /* 0x00 */
+    uint8_t  orig_y;             /* 0x01 */
+    uint8_t  orig_video_mode;    /* 0x02 */
+    uint8_t  orig_video_cols;    /* 0x03 */
+    uint8_t  orig_video_lines;   /* 0x04 */
+    uint8_t  orig_video_isVGA;   /* 0x05 */
+    uint16_t orig_video_points;  /* 0x06 */
+
+    /* VESA graphic mode -- linear frame buffer */
+    uint32_t capabilities;       /* 0x08 */
+    uint16_t lfb_linelength;     /* 0x0c */
+    uint16_t lfb_width;          /* 0x0e */
+    uint16_t lfb_height;         /* 0x10 */
+    uint16_t lfb_depth;          /* 0x12 */
+    uint32_t lfb_base;           /* 0x14 */
+    uint32_t lfb_size;           /* 0x18 */
+    union {
+        struct {
+            uint8_t  red_size;   /* 0x1c */
+            uint8_t  red_pos;    /* 0x1d */
+            uint8_t  green_size; /* 0x1e */
+            uint8_t  green_pos;  /* 0x1f */
+            uint8_t  blue_size;  /* 0x20 */
+            uint8_t  blue_pos;   /* 0x21 */
+            uint8_t  rsvd_size;  /* 0x22 */
+            uint8_t  rsvd_pos;   /* 0x23 */
+        };
+        struct boot_video_colors {
+            uint8_t  rgbr[8];
+        } colors;
+    };
+    struct {
+        uint16_t seg;            /* 0x24 */
+        uint16_t off;            /* 0x26 */
+    } vesapm;
+    uint16_t vesa_attrib;        /* 0x28 */
+};
+#endif /* __ASSEMBLY__ */
+
 #endif /* __BOOT_VIDEO_H__ */

@@ -14,9 +14,10 @@
 
 /*
  * This entry point is entered from xen/arch/x86/boot/head.S with:
- *   - 0x4(%esp) = MAGIC,
- *   - 0x8(%esp) = INFORMATION_ADDRESS,
- *   - 0xc(%esp) = TOPMOST_LOW_MEMORY_STACK_ADDRESS.
+ *   - 0x04(%esp) = MAGIC,
+ *   - 0x08(%esp) = INFORMATION_ADDRESS,
+ *   - 0x0c(%esp) = TOPMOST_LOW_MEMORY_STACK_ADDRESS.
+ *   - 0x10(%esp) = BOOT_VIDEO_INFO_ADDRESS.
  */
 asm (
     "    .text                         \n"
@@ -31,6 +32,39 @@ asm (
 
 #include "../../../include/xen/kconfig.h"
 #include <public/arch-x86/hvm/start_info.h>
+
+#ifdef CONFIG_VIDEO
+# include "video.h"
+
+/* VESA control information */
+struct __packed vesa_ctrl_info {
+    uint8_t signature[4];
+    uint16_t version;
+    uint32_t oem_name;
+    uint32_t capabilities;
+    uint32_t mode_list;
+    uint16_t mem_size;
+    /* We don't use any further fields. */
+};
+
+/* VESA 2.0 mode information */
+struct vesa_mode_info {
+    uint16_t attrib;
+    uint8_t window[14]; /* We don't use the individual fields. */
+    uint16_t bytes_per_line;
+    uint16_t width;
+    uint16_t height;
+    uint8_t cell_width;
+    uint8_t cell_height;
+    uint8_t nr_planes;
+    uint8_t depth;
+    uint8_t memory[5]; /* We don't use the individual fields. */
+    struct boot_video_colors colors;
+    uint8_t direct_color;
+    uint32_t base;
+    /* We don't use any further fields. */
+};
+#endif /* CONFIG_VIDEO */
 
 #define get_mb2_data(tag, type, member)   (((multiboot2_tag_##type##_t *)(tag))->member)
 #define get_mb2_string(tag, type, member) ((u32)get_mb2_data(tag, type, member))
@@ -146,7 +180,7 @@ static multiboot_info_t *mbi_reloc(u32 mbi_in)
     return mbi_out;
 }
 
-static multiboot_info_t *mbi2_reloc(u32 mbi_in)
+static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
 {
     const multiboot2_fixed_t *mbi_fix = _p(mbi_in);
     const multiboot2_memory_map_t *mmap_src;
@@ -154,6 +188,9 @@ static multiboot_info_t *mbi2_reloc(u32 mbi_in)
     module_t *mbi_out_mods = NULL;
     memory_map_t *mmap_dst;
     multiboot_info_t *mbi_out;
+#ifdef CONFIG_VIDEO
+    struct boot_video_info *video = NULL;
+#endif
     u32 ptr;
     unsigned int i, mod_idx = 0;
 
@@ -254,17 +291,64 @@ static multiboot_info_t *mbi2_reloc(u32 mbi_in)
             ++mod_idx;
             break;
 
+#ifdef CONFIG_VIDEO
+        case MULTIBOOT2_TAG_TYPE_VBE:
+            if ( video_out )
+            {
+                const struct vesa_ctrl_info *ci;
+                const struct vesa_mode_info *mi;
+
+                video = _p(video_out);
+                ci = (void *)get_mb2_data(tag, vbe, vbe_control_info);
+                mi = (void *)get_mb2_data(tag, vbe, vbe_mode_info);
+
+                if ( ci->version >= 0x0200 && (mi->attrib & 0x9b) == 0x9b )
+                {
+                    video->capabilities = ci->capabilities;
+                    video->lfb_linelength = mi->bytes_per_line;
+                    video->lfb_width = mi->width;
+                    video->lfb_height = mi->height;
+                    video->lfb_depth = mi->depth;
+                    video->lfb_base = mi->base;
+                    video->lfb_size = ci->mem_size;
+                    video->colors = mi->colors;
+                    video->vesa_attrib = mi->attrib;
+                }
+
+                video->vesapm.seg = get_mb2_data(tag, vbe, vbe_interface_seg);
+                video->vesapm.off = get_mb2_data(tag, vbe, vbe_interface_off);
+            }
+            break;
+
+        case MULTIBOOT2_TAG_TYPE_FRAMEBUFFER:
+            if ( (get_mb2_data(tag, framebuffer, framebuffer_type) !=
+                  MULTIBOOT2_FRAMEBUFFER_TYPE_RGB) )
+            {
+                video_out = 0;
+                video = NULL;
+            }
+            break;
+#endif /* CONFIG_VIDEO */
+
         case MULTIBOOT2_TAG_TYPE_END:
-            return mbi_out;
+            goto end; /* Cannot "break;" here. */
 
         default:
             break;
         }
 
+ end:
+
+#ifdef CONFIG_VIDEO
+    if ( video )
+        video->orig_video_isVGA = 0x23;
+#endif
+
     return mbi_out;
 }
 
-void * __stdcall reloc(u32 magic, u32 in, u32 trampoline)
+void *__stdcall reloc(uint32_t magic, uint32_t in, uint32_t trampoline,
+                      uint32_t video_info)
 {
     alloc = trampoline;
 
@@ -274,7 +358,7 @@ void * __stdcall reloc(u32 magic, u32 in, u32 trampoline)
         return mbi_reloc(in);
 
     case MULTIBOOT2_BOOTLOADER_MAGIC:
-        return mbi2_reloc(in);
+        return mbi2_reloc(in, video_info);
 
     case XEN_HVM_START_MAGIC_VALUE:
         if ( IS_ENABLED(CONFIG_PVH_GUEST) )
