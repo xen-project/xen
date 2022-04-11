@@ -566,7 +566,6 @@ set14:  movw    $0x1111, %ax            # Use 9x14 font
         movb    $0x01, %ah              # Define cursor scan lines 11-12
         movw    $0x0b0c, %cx
         int     $0x10
-set_current:
         stc
         ret
 
@@ -679,6 +678,39 @@ vga_modes:
         .word   VIDEO_80x34, 0x50,0x22,0        # 80x34
         .word   VIDEO_80x60, 0x50,0x3c,0        # 80x60
 vga_modes_end:
+
+# If the current mode is a VESA graphics one, obtain its parameters.
+set_current:
+        leaw    vesa_glob_info, %di
+        movw    $0x4f00, %ax
+        int     $0x10
+        cmpw    $0x004f, %ax
+        jne     .Lsetc_done
+
+        movw    $0x4f03, %ax
+        int     $0x10
+        cmpw    $0x004f, %ax
+        jne     .Lsetc_done
+
+        leaw    vesa_mode_info, %di     # Get mode information structure
+        movw    %bx, %cx
+        movw    $0x4f01, %ax
+        int     $0x10
+        cmpw    $0x004f, %ax
+        jne     .Lsetc_done
+
+        movb    (%di), %al              # Check mode attributes
+        andb    $0x9b, %al
+        cmpb    $0x9b, %al
+        jne     .Lsetc_done             # Doh! No linear frame buffer
+
+        movb    $1, bootsym(graphic_mode)
+        movw    %bx, bootsym(boot_vid_mode)
+        movw    %bx, bootsym(video_mode)
+
+.Lsetc_done:
+        stc
+        ret
 
 # Detect VESA modes.
 vesa_modes:

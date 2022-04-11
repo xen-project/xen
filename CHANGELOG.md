@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [unstable UNRELEASED](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=staging) - TBD
 
+### Changed
+ - On x86 "vga=current" can now be used together with GrUB2's gfxpayload setting. Note that
+   this requires use of "multiboot2" (and "module2") as the GrUB commands loading Xen.
+
 ### Removed / support downgraded
  - dropped support for the (x86-only) "vesa-mtrr" and "vesa-remap" command line options
 
