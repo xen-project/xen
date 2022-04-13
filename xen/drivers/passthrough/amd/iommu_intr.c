@@ -617,7 +617,7 @@ int cf_check amd_iommu_msi_msg_update_ire(
     unsigned int i, nr = 1;
     u32 data;
 
-    bdf = pdev ? PCI_BDF2(pdev->bus, pdev->devfn) : hpet_sbdf.bdf;
+    bdf = pdev ? pdev->sbdf.bdf : hpet_sbdf.bdf;
     seg = pdev ? pdev->seg : hpet_sbdf.seg;
 
     iommu = _find_iommu_for_device(seg, bdf);

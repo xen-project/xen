@@ -455,11 +455,9 @@ static int cf_check reassign_device(
     struct pci_dev *pdev)
 {
     struct amd_iommu *iommu;
-    int bdf, rc;
-    const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
+    int rc;
 
-    bdf = PCI_BDF2(pdev->bus, pdev->devfn);
-    iommu = find_iommu_for_device(pdev->seg, bdf);
+    iommu = find_iommu_for_device(pdev->seg, pdev->sbdf.bdf);
     if ( !iommu )
     {
         AMD_IOMMU_WARN("failed to find IOMMU: %pp cannot be assigned to %pd\n",
@@ -489,6 +487,9 @@ static int cf_check reassign_device(
      */
     if ( !is_hardware_domain(source) )
     {
+        const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
+        unsigned int bdf = PCI_BDF2(pdev->bus, devfn);
+
         rc = amd_iommu_reserve_domain_unity_unmap(
                  source,
                  ivrs_mappings[get_dma_requestor_id(pdev->seg, bdf)].unity_map);
@@ -558,13 +559,11 @@ static int cf_check amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
     if ( !pdev->domain )
         return -EINVAL;
 
-    bdf = PCI_BDF2(pdev->bus, pdev->devfn);
-
     for_each_amd_iommu(iommu)
-        if ( pdev->seg == iommu->seg && bdf == iommu->bdf )
+        if ( pdev->seg == iommu->seg && pdev->sbdf.bdf == iommu->bdf )
             return is_hardware_domain(pdev->domain) ? 0 : -ENODEV;
 
-    iommu = find_iommu_for_device(pdev->seg, bdf);
+    iommu = find_iommu_for_device(pdev->seg, pdev->sbdf.bdf);
     if ( unlikely(!iommu) )
     {
         /* Filter bridge devices. */
@@ -648,8 +647,7 @@ static int cf_check amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     if ( !pdev->domain )
         return -EINVAL;
 
-    bdf = PCI_BDF2(pdev->bus, pdev->devfn);
-    iommu = find_iommu_for_device(pdev->seg, bdf);
+    iommu = find_iommu_for_device(pdev->seg, pdev->sbdf.bdf);
     if ( !iommu )
     {
         AMD_IOMMU_WARN("failed to find IOMMU: %pp cannot be removed from %pd\n",
