@@ -1406,7 +1406,7 @@ static int iommu_add_device(struct pci_dev *pdev)
         rc = iommu_call(hd->platform_ops, add_device, devfn, pci_to_dev(pdev));
         if ( rc )
             printk(XENLOG_WARNING "IOMMU: add %pp failed (%d)\n",
-                   &pdev->sbdf, rc);
+                   &PCI_SBDF3(pdev->seg, pdev->bus, devfn), rc);
     }
 }
 
@@ -1451,7 +1451,8 @@ static int iommu_remove_device(struct pci_dev *pdev)
         if ( !rc )
             continue;
 
-        printk(XENLOG_ERR "IOMMU: remove %pp failed (%d)\n", &pdev->sbdf, rc);
+        printk(XENLOG_ERR "IOMMU: remove %pp failed (%d)\n",
+               &PCI_SBDF3(pdev->seg, pdev->bus, devfn), rc);
         return rc;
     }
 

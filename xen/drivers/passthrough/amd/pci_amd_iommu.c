@@ -461,7 +461,7 @@ static int cf_check reassign_device(
     if ( !iommu )
     {
         AMD_IOMMU_WARN("failed to find IOMMU: %pp cannot be assigned to %pd\n",
-                       &pdev->sbdf, target);
+                       &PCI_SBDF3(pdev->seg, pdev->bus, devfn), target);
         return -ENODEV;
     }
 
@@ -497,8 +497,8 @@ static int cf_check reassign_device(
             return rc;
     }
 
-    AMD_IOMMU_DEBUG("Re-assign %pp from dom%d to dom%d\n",
-                    &pdev->sbdf, source->domain_id, target->domain_id);
+    AMD_IOMMU_DEBUG("Re-assign %pp from %pd to %pd\n",
+                    &PCI_SBDF3(pdev->seg, pdev->bus, devfn), source, target);
 
     return 0;
 }
@@ -575,7 +575,7 @@ static int cf_check amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
         }
 
         AMD_IOMMU_WARN("no IOMMU for %pp; cannot be handed to %pd\n",
-                        &pdev->sbdf, pdev->domain);
+                        &PCI_SBDF3(pdev->seg, pdev->bus, devfn), pdev->domain);
         return -ENODEV;
     }
 
@@ -618,7 +618,7 @@ static int cf_check amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
              ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map,
              0) )
         AMD_IOMMU_WARN("%pd: unity mapping failed for %pp\n",
-                       pdev->domain, &pdev->sbdf);
+                       pdev->domain, &PCI_SBDF2(pdev->seg, bdf));
 
     if ( iommu_quarantine && pdev->arch.pseudo_domid == DOMID_INVALID )
     {
@@ -651,7 +651,7 @@ static int cf_check amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     if ( !iommu )
     {
         AMD_IOMMU_WARN("failed to find IOMMU: %pp cannot be removed from %pd\n",
-                        &pdev->sbdf, pdev->domain);
+                        &PCI_SBDF3(pdev->seg, pdev->bus, devfn), pdev->domain);
         return -ENODEV;
     }
 
@@ -664,7 +664,7 @@ static int cf_check amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
              pdev->domain,
              ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map) )
         AMD_IOMMU_WARN("%pd: unity unmapping failed for %pp\n",
-                       pdev->domain, &pdev->sbdf);
+                       pdev->domain, &PCI_SBDF2(pdev->seg, bdf));
 
     amd_iommu_quarantine_teardown(pdev);
 
