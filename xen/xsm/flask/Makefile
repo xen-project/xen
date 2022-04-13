@@ -4,7 +4,8 @@ obj-y += flask_op.o
 
 obj-y += ss/
 
-CFLAGS-y += -I$(obj)/include
+CFLAGS-y += -iquote $(obj)/include
+CFLAGS-y += -I$(srcdir)/include
 
 AWK = awk
 

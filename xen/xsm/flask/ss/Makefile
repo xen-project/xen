@@ -8,4 +8,5 @@ obj-y += services.o
 obj-y += conditional.o
 obj-y += mls.o
 
+CFLAGS-y += -iquote $(objtree)/xsm/flask/include
 CFLAGS-y += -I$(srctree)/xsm/flask/include

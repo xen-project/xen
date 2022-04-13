@@ -77,6 +77,9 @@ ifneq ($(CONFIG_PV_SHIM_EXCLUSIVE),y)
 
 efi-check := arch/x86/efi/check
 
+# Create the directory for out-of-tree build
+$(shell mkdir -p $(dir $(efi-check)))
+
 # Check if the compiler supports the MS ABI.
 XEN_BUILD_EFI := $(call if-success,$(CC) $(CFLAGS) -c $(srctree)/$(efi-check).c -o $(efi-check).o,y)
 
@@ -116,4 +119,4 @@ export EFI_LDFLAGS
 endif
 
 # Set up the assembler include path properly for older toolchains.
-CFLAGS += -Wa,-I$(srctree)/include
+CFLAGS += -Wa,-I$(objtree)/include -Wa,-I$(srctree)/include

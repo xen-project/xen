@@ -7,11 +7,17 @@ targets += $(head-srcs:.S=.o)
 
 head-srcs := $(addprefix $(obj)/, $(head-srcs))
 
+ifdef building_out_of_srctree
+$(obj)/head.o: CFLAGS-y += -iquote $(obj)
+endif
 $(obj)/head.o: $(head-srcs)
 
 CFLAGS_x86_32 := $(subst -m64,-m32 -march=i686,$(XEN_TREEWIDE_CFLAGS))
 $(call cc-options-add,CFLAGS_x86_32,CC,$(EMBEDDED_EXTRA_CFLAGS))
 CFLAGS_x86_32 += -Werror -fno-builtin -g0 -msoft-float
+ifdef building_out_of_srctree
+CFLAGS_x86_32 += -I$(objtree)/include
+endif
 CFLAGS_x86_32 += -I$(srctree)/include
 
 # override for 32bit binaries
