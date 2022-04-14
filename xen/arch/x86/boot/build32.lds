@@ -31,44 +31,36 @@ SECTIONS
         *(.bss.*)
   }
 
+  /* Dynamic linkage sections.  Collected simply so we can check they're empty. */
+  .got : {
+        *(.got)
+  }
   .got.plt : {
-        /*
-         * PIC/PIE executable contains .got.plt section even if it is not linked
-         * with dynamic libraries. In such case it is just placeholder for
-         * _GLOBAL_OFFSET_TABLE_ symbol and .PLT0. .PLT0 is filled by dynamic
-         * linker and our code is not supposed to be loaded by dynamic linker.
-         * So, from our point of view .PLT0 is unused. This means that there is
-         * pretty good chance that we can safely drop .got.plt as a whole here.
-         * Sadly this is not true. _GLOBAL_OFFSET_TABLE_ is used as a reference
-         * for relative addressing (and only for that thing) and ld complains if
-         * we remove .got.plt section here because it cannot find required symbol.
-         * However, _GLOBAL_OFFSET_TABLE_ is no longer needed in final output.
-         * So, drop .got.plt section during conversion to plain binary format.
-         *
-         * Please check build32.mk for more details.
-         */
         *(.got.plt)
   }
-
-  /*
-   * Discarding .shstrtab is not supported by LLD (LLVM LD) and will trigger an
-   * error. Also keep the rest of the control sections to match GNU LD behavior.
-   */
-  .shstrtab : {
-        *(.shstrtab)
+  .igot.plt : {
+        *(.igot.plt)
   }
-  .strtab : {
-        *(.strtab)
+  .iplt : {
+        *(.iplt)
   }
-  .symtab : {
-        *(.symtab)
+  .plt : {
+        *(.plt)
   }
-
-  /DISCARD/ : {
-        /*
-         * Discard everything else, to prevent linkers from putting
-         * orphaned sections ahead of .text, which needs to be first.
-         */
-        *(*)
+  .rel : {
+        *(.rel.*)
   }
 }
+
+ASSERT(SIZEOF(.got) == 0,         ".got non-empty")
+/*
+ * At least GNU ld 2.30 and earlier fail to discard the generic part of
+ * .got.plt when no actual entries were allocated. Permit this case alongside
+ * the section being empty.
+ */
+ASSERT(SIZEOF(.got.plt) == 0 ||
+       SIZEOF(.got.plt) == 3 * 4, "unexpected .got.plt size")
+ASSERT(SIZEOF(.igot.plt) == 0,    ".igot.plt non-empty")
+ASSERT(SIZEOF(.iplt) == 0,        ".iplt non-empty")
+ASSERT(SIZEOF(.plt) == 0,         ".plt non-empty")
+ASSERT(SIZEOF(.rel) == 0,         "leftover relocations")

@@ -28,19 +28,8 @@ $(head-srcs): %.S: %.bin
 	(od -v -t x $< | tr -s ' ' | awk 'NR > 1 {print s} {s=$$0}' | \
 	sed 's/ /,0x/g' | sed 's/,0x$$//' | sed 's/^[0-9]*,/ .long /') >$@
 
-# Drop .got.plt during conversion to plain binary format.
-# Please check build32.lds for more details.
 %.bin: %.lnk
-	$(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p;}' | \
-		while read idx name sz rest; do \
-			case "$$name" in \
-			.got.plt) \
-				test $$sz != 0c || continue; \
-				echo "Error: non-empty $$name: 0x$$sz" >&2; \
-				exit $$(expr $$idx + 1);; \
-			esac; \
-		done
-	$(OBJCOPY) -O binary -R .got.plt $< $@
+	$(OBJCOPY) -j .text -O binary $< $@
 
 %.lnk: %.o $(src)/build32.lds
 	$(LD) $(subst x86_64,i386,$(LDFLAGS_DIRECT)) -N -T $(filter %.lds,$^) -o $@ $<
