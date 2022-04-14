@@ -15,7 +15,6 @@
  */
 
 #include <xen/sched.h>
-#include <xen/compile.h>
 #include <xen/mm.h>
 #include <xen/domain_page.h>
 #include <xen/guest_access.h>
