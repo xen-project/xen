@@ -7,10 +7,8 @@ targets += $(head-srcs:.S=.o)
 
 head-srcs := $(addprefix $(obj)/, $(head-srcs))
 
-ifdef building_out_of_srctree
-$(obj)/head.o: CFLAGS-y += -iquote $(obj)
-endif
-$(obj)/head.o: $(head-srcs)
+$(obj)/head.o: AFLAGS-y += -Wa$(comma)-I$(obj)
+$(obj)/head.o: $(head-srcs:.S=.bin)
 
 CFLAGS_x86_32 := $(subst -m64,-m32 -march=i686,$(XEN_TREEWIDE_CFLAGS))
 $(call cc-options-add,CFLAGS_x86_32,CC,$(EMBEDDED_EXTRA_CFLAGS))
@@ -27,14 +25,10 @@ $(head-srcs:.S=.o): XEN_CFLAGS := $(CFLAGS_x86_32) -fpic
 LDFLAGS_DIRECT-$(call ld-option,--warn-rwx-segments) := --no-warn-rwx-segments
 LDFLAGS_DIRECT += $(LDFLAGS_DIRECT-y)
 
-$(head-srcs): %.S: %.bin
-	(od -v -t x $< | tr -s ' ' | awk 'NR > 1 {print s} {s=$$0}' | \
-	sed 's/ /,0x/g' | sed 's/,0x$$//' | sed 's/^[0-9]*,/ .long /') >$@
-
 %.bin: %.lnk
 	$(OBJCOPY) -j .text -O binary $< $@
 
 %.lnk: %.o $(src)/build32.lds
 	$(LD) $(subst x86_64,i386,$(LDFLAGS_DIRECT)) -N -T $(filter %.lds,$^) -o $@ $<
 
-clean-files := cmdline.S reloc.S *.lnk *.bin
+clean-files := *.lnk *.bin

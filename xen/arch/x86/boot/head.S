@@ -777,11 +777,17 @@ trampoline_setup:
         /* Jump into the relocated trampoline. */
         lret
 
+        /*
+         * cmdline and reloc are written in C, and linked to be 32bit PIC with
+         * entrypoints at 0 and using the stdcall convention.
+         */
+        ALIGN
 cmdline_parse_early:
-#include "cmdline.S"
+        .incbin "cmdline.bin"
 
+        ALIGN
 reloc:
-#include "reloc.S"
+        .incbin "reloc.bin"
 
 ENTRY(trampoline_start)
 #include "trampoline.S"
