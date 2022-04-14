@@ -1672,8 +1672,7 @@ static int __init make_timer_node(const struct kernel_info *kinfo)
     void *fdt = kinfo->fdt;
     static const struct dt_device_match timer_ids[] __initconst =
     {
-        DT_MATCH_COMPATIBLE("arm,armv7-timer"),
-        DT_MATCH_COMPATIBLE("arm,armv8-timer"),
+        DT_MATCH_TIMER,
         { /* sentinel */ },
     };
     struct dt_device_node *dev;
