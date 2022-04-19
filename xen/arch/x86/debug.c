@@ -158,17 +158,11 @@ static unsigned int dbg_rw_guest_mem(struct domain *dp, unsigned long addr,
  * Returns: number of bytes remaining to be copied.
  */
 unsigned int dbg_rw_mem(unsigned long gva, XEN_GUEST_HANDLE_PARAM(void) buf,
-                        unsigned int len, domid_t domid, bool toaddr,
+                        unsigned int len, struct domain *d, bool toaddr,
                         uint64_t pgd3)
 {
-    struct domain *d = rcu_lock_domain_by_id(domid);
-
-    if ( d )
-    {
-        if ( !d->is_dying )
-            len = dbg_rw_guest_mem(d, gva, buf, len, toaddr, pgd3);
-        rcu_unlock_domain(d);
-    }
+    if ( d && !d->is_dying )
+        len = dbg_rw_guest_mem(d, gva, buf, len, toaddr, pgd3);
 
     return len;
 }

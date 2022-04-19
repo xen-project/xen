@@ -94,7 +94,7 @@ static inline bool debugger_trap_entry(
 
 #ifdef CONFIG_GDBSX
 unsigned int dbg_rw_mem(unsigned long gva, XEN_GUEST_HANDLE_PARAM(void) buf,
-                        unsigned int len, domid_t domid, bool toaddr,
+                        unsigned int len, struct domain *d, bool toaddr,
                         uint64_t pgd3);
 #endif
 

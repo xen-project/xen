@@ -38,10 +38,10 @@
 #include <asm/cpuid.h>
 
 #ifdef CONFIG_GDBSX
-static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
+static int gdbsx_guest_mem_io(struct domain *d, struct xen_domctl_gdbsx_memio *iop)
 {
     iop->remain = dbg_rw_mem(iop->gva, guest_handle_from_ptr(iop->uva, void),
-                             iop->len, domid, iop->gwr, iop->pgd3val);
+                             iop->len, d, iop->gwr, iop->pgd3val);
 
     return iop->remain ? -EFAULT : 0;
 }
@@ -828,7 +828,7 @@ long arch_do_domctl(
 #ifdef CONFIG_GDBSX
     case XEN_DOMCTL_gdbsx_guestmemio:
         domctl->u.gdbsx_guest_memio.remain = domctl->u.gdbsx_guest_memio.len;
-        ret = gdbsx_guest_mem_io(domctl->domain, &domctl->u.gdbsx_guest_memio);
+        ret = gdbsx_guest_mem_io(d, &domctl->u.gdbsx_guest_memio);
         if ( !ret )
            copyback = true;
         break;
