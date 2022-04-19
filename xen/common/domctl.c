@@ -308,7 +308,6 @@ long cf_check do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( op->domain == DOMID_INVALID )
         {
     case XEN_DOMCTL_createdomain:
-    case XEN_DOMCTL_gdbsx_guestmemio:
             d = NULL;
             break;
         }
