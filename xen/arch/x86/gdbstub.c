@@ -18,7 +18,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
-#include <asm/debugger.h>
+#include <asm/uaccess.h>
+#include <asm/x86-defns.h>
+
+#include <xen/gdbstub.h>
 
 u16
 gdb_arch_signal_num(struct cpu_user_regs *regs, unsigned long cookie)

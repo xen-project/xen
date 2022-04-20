@@ -17,7 +17,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <asm/debugger.h>
+#include <xen/gdbstub.h>
 
 #define GDB_REG64(r) gdb_write_to_packet_hex(r, sizeof(u64), ctx)
 #define GDB_REG32(r)  gdb_write_to_packet_hex(r, sizeof(u32), ctx)

@@ -38,13 +38,14 @@
 #include <xen/serial.h>
 #include <xen/irq.h>
 #include <xen/watchdog.h>
-#include <asm/debugger.h>
 #include <xen/init.h>
 #include <xen/param.h>
 #include <xen/smp.h>
 #include <xen/console.h>
 #include <xen/errno.h>
 #include <xen/delay.h>
+#include <xen/gdbstub.h>
+
 #include <asm/byteorder.h>
 
 /* Printk isn't particularly safe just after we've trapped to the

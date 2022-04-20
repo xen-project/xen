@@ -15,7 +15,6 @@
 #include <xen/multiboot.h>
 #include <xen/domain_page.h>
 #include <xen/version.h>
-#include <xen/gdbstub.h>
 #include <xen/hypercall.h>
 #include <xen/keyhandler.h>
 #include <xen/numa.h>
