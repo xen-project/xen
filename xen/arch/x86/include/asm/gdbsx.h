@@ -2,18 +2,28 @@
 #ifndef __X86_GDBX_H__
 #define __X86_GDBX_H__
 
-#ifdef CONFIG_GDBSX
+#include <xen/stdbool.h>
 
 struct domain;
-struct xen_domctl_gdbsx_memio;
+struct xen_domctl;
 
-int gdbsx_guest_mem_io(struct domain *d, struct xen_domctl_gdbsx_memio *iop);
+#ifdef CONFIG_GDBSX
 
 void domain_pause_for_debugger(void);
 
+int gdbsx_domctl(struct domain *d, struct xen_domctl *domctl, bool *copyback);
+
 #else
 
+#include <xen/errno.h>
+
 static inline void domain_pause_for_debugger(void) {}
+
+static inline int gdbsx_domctl(
+    struct domain *d, struct xen_domctl *domctl, bool *copyback)
+{
+    return -ENOSYS;
+}
 
 #endif /* CONFIG_GDBSX */
 #endif /* __X86_GDBX_H__ */

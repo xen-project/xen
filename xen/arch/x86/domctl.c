@@ -814,71 +814,12 @@ long arch_do_domctl(
     }
 #endif
 
-#ifdef CONFIG_GDBSX
     case XEN_DOMCTL_gdbsx_guestmemio:
-        ret = gdbsx_guest_mem_io(d, &domctl->u.gdbsx_guest_memio);
-        if ( !ret )
-           copyback = true;
-        break;
-
     case XEN_DOMCTL_gdbsx_pausevcpu:
-    {
-        struct vcpu *v;
-
-        ret = -EBUSY;
-        if ( !d->controller_pause_count )
-            break;
-        ret = -EINVAL;
-        if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= d->max_vcpus ||
-             (v = d->vcpu[domctl->u.gdbsx_pauseunp_vcpu.vcpu]) == NULL )
-            break;
-        ret = vcpu_pause_by_systemcontroller(v);
-        break;
-    }
-
     case XEN_DOMCTL_gdbsx_unpausevcpu:
-    {
-        struct vcpu *v;
-
-        ret = -EBUSY;
-        if ( !d->controller_pause_count )
-            break;
-        ret = -EINVAL;
-        if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= d->max_vcpus ||
-             (v = d->vcpu[domctl->u.gdbsx_pauseunp_vcpu.vcpu]) == NULL )
-            break;
-        ret = vcpu_unpause_by_systemcontroller(v);
-        if ( ret == -EINVAL )
-            printk(XENLOG_G_WARNING
-                   "WARN: d%d attempting to unpause %pv which is not paused\n",
-                   currd->domain_id, v);
-        break;
-    }
-
     case XEN_DOMCTL_gdbsx_domstatus:
-    {
-        struct vcpu *v;
-
-        domctl->u.gdbsx_domstatus.vcpu_id = -1;
-        domctl->u.gdbsx_domstatus.paused = d->controller_pause_count > 0;
-        if ( domctl->u.gdbsx_domstatus.paused )
-        {
-            for_each_vcpu ( d, v )
-            {
-                if ( v->arch.gdbsx_vcpu_event )
-                {
-                    domctl->u.gdbsx_domstatus.vcpu_id = v->vcpu_id;
-                    domctl->u.gdbsx_domstatus.vcpu_ev =
-                        v->arch.gdbsx_vcpu_event;
-                    v->arch.gdbsx_vcpu_event = 0;
-                    break;
-                }
-            }
-        }
-        copyback = true;
+        ret = gdbsx_domctl(d, domctl, &copyback);
         break;
-    }
-#endif
 
     case XEN_DOMCTL_setvcpuextstate:
     case XEN_DOMCTL_getvcpuextstate:

@@ -152,7 +152,8 @@ static unsigned int dbg_rw_guest_mem(struct domain *dp, unsigned long addr,
     return len;
 }
 
-int gdbsx_guest_mem_io(struct domain *d, struct xen_domctl_gdbsx_memio *iop)
+static int gdbsx_guest_mem_io(
+    struct domain *d, struct xen_domctl_gdbsx_memio *iop)
 {
     if ( d && !d->is_dying )
     {
@@ -176,6 +177,73 @@ void domain_pause_for_debugger(void)
     /* if gdbsx active, we just need to pause the domain */
     if ( curr->arch.gdbsx_vcpu_event == 0 )
         send_global_virq(VIRQ_DEBUGGER);
+}
+
+int gdbsx_domctl(struct domain *d, struct xen_domctl *domctl, bool *copyback)
+{
+    struct vcpu *v;
+    int ret;
+
+    switch ( domctl->cmd )
+    {
+    case XEN_DOMCTL_gdbsx_guestmemio:
+        ret = gdbsx_guest_mem_io(d, &domctl->u.gdbsx_guest_memio);
+        if ( !ret )
+            *copyback = true;
+        break;
+
+    case XEN_DOMCTL_gdbsx_pausevcpu:
+        ret = -EBUSY;
+        if ( !d->controller_pause_count )
+            break;
+        ret = -EINVAL;
+        if ( (v = domain_vcpu(d, domctl->u.gdbsx_pauseunp_vcpu.vcpu)) == NULL )
+            break;
+        ret = vcpu_pause_by_systemcontroller(v);
+        break;
+
+    case XEN_DOMCTL_gdbsx_unpausevcpu:
+        ret = -EBUSY;
+        if ( !d->controller_pause_count )
+            break;
+        ret = -EINVAL;
+        if ( (v = domain_vcpu(d, domctl->u.gdbsx_pauseunp_vcpu.vcpu)) == NULL )
+            break;
+        ret = vcpu_unpause_by_systemcontroller(v);
+        if ( ret == -EINVAL )
+            printk(XENLOG_G_WARNING
+                   "WARN: %pd attempting to unpause %pv which is not paused\n",
+                   current->domain, v);
+        break;
+
+    case XEN_DOMCTL_gdbsx_domstatus:
+        ret = 0;
+        domctl->u.gdbsx_domstatus.vcpu_id = -1;
+        domctl->u.gdbsx_domstatus.paused = d->controller_pause_count > 0;
+        if ( domctl->u.gdbsx_domstatus.paused )
+        {
+            for_each_vcpu ( d, v )
+            {
+                if ( v->arch.gdbsx_vcpu_event )
+                {
+                    domctl->u.gdbsx_domstatus.vcpu_id = v->vcpu_id;
+                    domctl->u.gdbsx_domstatus.vcpu_ev =
+                        v->arch.gdbsx_vcpu_event;
+                    v->arch.gdbsx_vcpu_event = 0;
+                    break;
+                }
+            }
+        }
+        *copyback = true;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        ret = -ENOSYS;
+        break;
+    }
+
+    return ret;
 }
 
 /*
