@@ -699,15 +699,11 @@ int cf_check amd_iommu_quarantine_init(struct pci_dev *pdev, bool scratch_page)
         union amd_iommu_pte *root;
         struct page_info *pgs[IOMMU_MAX_PT_LEVELS] = {};
 
-        spin_lock(&hd->arch.mapping_lock);
-
         root = __map_domain_page(pdev->arch.amd.root_table);
         rc = fill_qpt(root, level - 1, pgs);
         unmap_domain_page(root);
 
         pdev->arch.leaf_mfn = page_to_mfn(pgs[0]);
-
-        spin_unlock(&hd->arch.mapping_lock);
     }
 
     page_list_move(&pdev->arch.pgtables_list, &hd->arch.pgtables.list);
