@@ -58,6 +58,7 @@
 #include <xen/bitops.h>
 #include <asm/desc.h>
 #include <asm/debugreg.h>
+#include <asm/gdbsx.h>
 #include <asm/smp.h>
 #include <asm/flushtlb.h>
 #include <asm/uaccess.h>

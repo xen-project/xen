@@ -30,7 +30,6 @@
 #include <asm/msr.h>
 #include <asm/mpspec.h>
 #include <asm/nmi.h>
-#include <asm/debugger.h>
 #include <asm/div64.h>
 #include <asm/apic.h>
 

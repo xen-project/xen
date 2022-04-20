@@ -14,7 +14,8 @@
 #include <xen/sched.h>
 #include <xen/paging.h>
 #include <xen/softirq.h>
-#include <asm/debugger.h>
+
+#include <asm/gdbsx.h>
 #include <asm/event.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>

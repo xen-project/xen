@@ -26,8 +26,6 @@
 #include <asm/regs.h>
 #include <asm/processor.h>
 
-void domain_pause_for_debugger(void);
-
 #ifdef CONFIG_CRASH_DEBUG
 
 #include <xen/gdbstub.h>

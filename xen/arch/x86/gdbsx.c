@@ -18,6 +18,8 @@
 #include <xen/mm.h>
 #include <xen/domain_page.h>
 #include <xen/guest_access.h>
+#include <xen/event.h>
+
 #include <asm/gdbsx.h>
 #include <asm/p2m.h>
 
@@ -162,6 +164,18 @@ int gdbsx_guest_mem_io(struct domain *d, struct xen_domctl_gdbsx_memio *iop)
         iop->remain = iop->len;
 
     return iop->remain ? -EFAULT : 0;
+}
+
+void domain_pause_for_debugger(void)
+{
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
+
+    domain_pause_by_systemcontroller_nosync(d);
+
+    /* if gdbsx active, we just need to pause the domain */
+    if ( curr->arch.gdbsx_vcpu_event == 0 )
+        send_global_virq(VIRQ_DEBUGGER);
 }
 
 /*

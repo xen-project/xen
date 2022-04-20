@@ -58,7 +58,7 @@
 #include <asm/hvm/trace.h>
 #include <asm/hap.h>
 #include <asm/apic.h>
-#include <asm/debugger.h>
+#include <asm/gdbsx.h>
 #include <asm/hvm/monitor.h>
 #include <asm/monitor.h>
 #include <asm/xstate.h>

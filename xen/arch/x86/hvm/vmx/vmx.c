@@ -51,7 +51,7 @@
 #include <asm/hvm/trace.h>
 #include <asm/hvm/monitor.h>
 #include <asm/xenoprof.h>
-#include <asm/debugger.h>
+#include <asm/gdbsx.h>
 #include <asm/apic.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/altp2m.h>
