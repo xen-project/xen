@@ -5071,11 +5071,10 @@ l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
 #define lNf_to_l1f(f) (((f) & _PAGE_PRESENT) ? ((f) & ~_PAGE_PSE) : (f))
 
 /*
- * map_pages_to_xen() can be called with interrupts disabled during
- * early bootstrap. In this case it is safe to use flush_area_local()
- * and avoid locking because only the local CPU is online.
+ * map_pages_to_xen() can be called early in boot before any other
+ * CPUs are online. Use flush_area_local() in this case.
  */
-#define flush_area(v,f) (!local_irq_is_enabled() ?              \
+#define flush_area(v,f) (system_state < SYS_STATE_smp_boot ?    \
                          flush_area_local((const void *)v, f) : \
                          flush_area_all((const void *)v, f))
 
