@@ -1238,8 +1238,9 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     drhd->iommu = iommu;
 
     iommu->reg = ioremap(drhd->address, PAGE_SIZE);
+    rc = -ENOMEM;
     if ( !iommu->reg )
-        return -ENOMEM;
+        goto free;
     iommu->index = nr_iommus++;
 
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
@@ -1260,8 +1261,9 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         printk(VTDPREFIX "cap = %"PRIx64" ecap = %"PRIx64"\n",
                iommu->cap, iommu->ecap);
     }
+    rc = -ENODEV;
     if ( !(iommu->cap + 1) || !(iommu->ecap + 1) )
-        return -ENODEV;
+        goto free;
 
     quirk_iommu_caps(iommu);
 
@@ -1272,7 +1274,8 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     {
         printk(XENLOG_ERR VTDPREFIX "IOMMU: unsupported\n");
         print_iommu_regs(drhd);
-        return -ENODEV;
+        rc = -ENODEV;
+        goto free;
     }
 
     /* Calculate number of pagetable levels: 3 or 4. */
@@ -1283,7 +1286,8 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     {
         printk(XENLOG_ERR VTDPREFIX "IOMMU: unsupported sagaw %x\n", sagaw);
         print_iommu_regs(drhd);
-        return -ENODEV;
+        rc = -ENODEV;
+        goto free;
     }
     iommu->nr_pt_levels = agaw_to_level(agaw);
 
@@ -1298,8 +1302,9 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         iommu->domid_bitmap = xzalloc_array(unsigned long,
                                             BITS_TO_LONGS(nr_dom));
         iommu->domid_map = xzalloc_array(domid_t, nr_dom);
+        rc = -ENOMEM;
         if ( !iommu->domid_bitmap || !iommu->domid_map )
-            return -ENOMEM;
+            goto free;
 
         /*
          * If Caching mode is set, then invalid translations are tagged
