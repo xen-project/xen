@@ -1267,8 +1267,11 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 
     quirk_iommu_caps(iommu);
 
+    nr_dom = cap_ndoms(iommu->cap);
+
     if ( cap_fault_reg_offset(iommu->cap) +
          cap_num_fault_regs(iommu->cap) * PRIMARY_FAULT_REG_LEN > PAGE_SIZE ||
+         ((nr_dom - 1) >> 16) /* I.e. cap.nd > 6 */ ||
          (has_register_based_invalidation(iommu) &&
           ecap_iotlb_offset(iommu->ecap) >= PAGE_SIZE) )
     {
@@ -1293,8 +1296,6 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 
     if ( !ecap_coherent(iommu->ecap) )
         iommu_non_coherent = true;
-
-    nr_dom = cap_ndoms(iommu->cap);
 
     if ( nr_dom <= DOMID_MASK * 2 + cap_caching_mode(iommu->cap) )
     {
