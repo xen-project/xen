@@ -215,7 +215,7 @@ export XEN_ROOT := $(abs_srctree)/..
 clean-targets := %clean
 no-dot-config-targets := $(clean-targets) \
                          uninstall debug cloc \
-                         cscope TAGS tags MAP gtags \
+                         cscope TAGS tags gtags \
                          xenversion
 
 config-build    := n
