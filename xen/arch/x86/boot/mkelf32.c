@@ -320,6 +320,19 @@ int main(int argc, char **argv)
                 (int)in64_ehdr.e_phentsize, (int)sizeof(in64_phdr));
         return 1;
     }
+
+    /* Ignore entirely empty trailing program headers. */
+    while ( in64_ehdr.e_phnum > num_phdrs )
+    {
+        (void)lseek(infd,
+                    in64_ehdr.e_phoff + in64_ehdr.e_phnum * sizeof(in64_phdr),
+                    SEEK_SET);
+        do_read(infd, &in64_phdr, sizeof(in64_phdr));
+        endianadjust_phdr64(&in64_phdr);
+        if ( in64_phdr.p_memsz )
+            break;
+        --in64_ehdr.e_phnum;
+    }
     if ( in64_ehdr.e_phnum != num_phdrs )
     {
         fprintf(stderr, "Expect precisly %d program header; found %d.\n",

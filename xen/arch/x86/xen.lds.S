@@ -40,9 +40,7 @@ OUTPUT_ARCH(i386:x86-64)
 PHDRS
 {
   text PT_LOAD ;
-#if defined(BUILD_ID) || defined(CONFIG_PVH_GUEST)
   note PT_NOTE ;
-#endif
 }
 #define PHDR(x) :x
 #else
