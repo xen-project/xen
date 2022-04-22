@@ -239,7 +239,8 @@ void __init iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
  * page tables.
  */
 static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
-                              unsigned long *pt_mfn, bool map)
+                              unsigned int target, unsigned long *pt_mfn,
+                              bool map)
 {
     union amd_iommu_pte *pde, *next_table_vaddr;
     unsigned long  next_table_mfn;
@@ -250,7 +251,11 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     table = hd->arch.amd.root_table;
     level = hd->arch.amd.paging_mode;
 
-    BUG_ON( table == NULL || level < 1 || level > 6 );
+    if ( !table || target < 1 || level < target || level > 6 )
+    {
+        ASSERT_UNREACHABLE();
+        return 1;
+    }
 
     /*
      * A frame number past what the current page tables can represent can't
@@ -261,7 +266,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
 
     next_table_mfn = mfn_x(page_to_mfn(table));
 
-    while ( level > 1 )
+    while ( level > target )
     {
         unsigned int next_level = level - 1;
 
@@ -332,7 +337,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
         level--;
     }
 
-    /* mfn of level 1 page table */
+    /* mfn of target level page table */
     *pt_mfn = next_table_mfn;
     return 0;
 }
@@ -369,7 +374,7 @@ int cf_check amd_iommu_map_page(
         return rc;
     }
 
-    if ( iommu_pde_from_dfn(d, dfn_x(dfn), &pt_mfn, true) || !pt_mfn )
+    if ( iommu_pde_from_dfn(d, dfn_x(dfn), 1, &pt_mfn, true) || !pt_mfn )
     {
         spin_unlock(&hd->arch.mapping_lock);
         AMD_IOMMU_ERROR("invalid IO pagetable entry dfn = %"PRI_dfn"\n",
@@ -402,7 +407,7 @@ int cf_check amd_iommu_unmap_page(
         return 0;
     }
 
-    if ( iommu_pde_from_dfn(d, dfn_x(dfn), &pt_mfn, false) )
+    if ( iommu_pde_from_dfn(d, dfn_x(dfn), 1, &pt_mfn, false) )
     {
         spin_unlock(&hd->arch.mapping_lock);
         AMD_IOMMU_ERROR("invalid IO pagetable entry dfn = %"PRI_dfn"\n",
