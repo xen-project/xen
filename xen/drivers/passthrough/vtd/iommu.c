@@ -61,6 +61,7 @@ bool __read_mostly iommu_snoop = true;
 #endif
 
 static unsigned int __read_mostly nr_iommus;
+static unsigned int __ro_after_init min_pt_levels = UINT_MAX;
 
 static struct tasklet vtd_fault_tasklet;
 
@@ -439,8 +440,11 @@ static paddr_t domain_pgd_maddr(struct domain *d, paddr_t pgd_maddr,
     {
         if ( !hd->arch.vtd.pgd_maddr )
         {
-            /* Ensure we have pagetables allocated down to leaf PTE. */
-            addr_to_dma_page_maddr(d, 0, 1, NULL, true);
+            /*
+             * Ensure we have pagetables allocated down to the smallest
+             * level the loop below may need to run to.
+             */
+            addr_to_dma_page_maddr(d, 0, min_pt_levels, NULL, true);
 
             if ( !hd->arch.vtd.pgd_maddr )
                 return 0;
@@ -1349,6 +1353,8 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         goto free;
     }
     iommu->nr_pt_levels = agaw_to_level(agaw);
+    if ( min_pt_levels > iommu->nr_pt_levels )
+        min_pt_levels = iommu->nr_pt_levels;
 
     if ( !ecap_coherent(iommu->ecap) )
         iommu_non_coherent = true;
