@@ -300,63 +300,116 @@ static u64 bus_to_context_maddr(struct vtd_iommu *iommu, u8 bus)
     return maddr;
 }
 
-static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
+/*
+ * This function walks (and if requested allocates) page tables to the
+ * designated target level. It returns
+ * - 0 when a non-present entry was encountered and no allocation was
+ *   requested,
+ * - a small positive value (the level, i.e. below PAGE_SIZE) upon allocation
+ *   failure,
+ * - for target > 0 the physical address of the page table holding the leaf
+ *   PTE for the requested address,
+ * - for target == 0 the full PTE.
+ */
+static uint64_t addr_to_dma_page_maddr(struct domain *domain, daddr_t addr,
+                                       unsigned int target,
+                                       unsigned int *flush_flags, bool alloc)
 {
     struct domain_iommu *hd = dom_iommu(domain);
     int addr_width = agaw_to_width(hd->arch.vtd.agaw);
     struct dma_pte *parent, *pte = NULL;
-    int level = agaw_to_level(hd->arch.vtd.agaw);
-    int offset;
+    unsigned int level = agaw_to_level(hd->arch.vtd.agaw), offset;
     u64 pte_maddr = 0;
 
     addr &= (((u64)1) << addr_width) - 1;
     ASSERT(spin_is_locked(&hd->arch.mapping_lock));
+    ASSERT(target || !alloc);
+
     if ( !hd->arch.vtd.pgd_maddr )
     {
         struct page_info *pg;
 
-        if ( !alloc || !(pg = iommu_alloc_pgtable(hd)) )
+        if ( !alloc )
+            goto out;
+
+        pte_maddr = level;
+        if ( !(pg = iommu_alloc_pgtable(hd)) )
             goto out;
 
         hd->arch.vtd.pgd_maddr = page_to_maddr(pg);
     }
 
-    parent = (struct dma_pte *)map_vtd_domain_page(hd->arch.vtd.pgd_maddr);
-    while ( level > 1 )
+    pte_maddr = hd->arch.vtd.pgd_maddr;
+    parent = map_vtd_domain_page(pte_maddr);
+    while ( level > target )
     {
         offset = address_level_offset(addr, level);
         pte = &parent[offset];
 
         pte_maddr = dma_pte_addr(*pte);
-        if ( !pte_maddr )
+        if ( !dma_pte_present(*pte) || (level > 1 && dma_pte_superpage(*pte)) )
         {
             struct page_info *pg;
+            /*
+             * Higher level tables always set r/w, last level page table
+             * controls read/write.
+             */
+            struct dma_pte new_pte = { DMA_PTE_PROT };
 
             if ( !alloc )
-                break;
+            {
+                pte_maddr = 0;
+                if ( !dma_pte_present(*pte) )
+                    break;
 
+                /*
+                 * When the leaf entry was requested, pass back the full PTE,
+                 * with the address adjusted to account for the residual of
+                 * the walk.
+                 */
+                pte_maddr = pte->val +
+                    (addr & ((1UL << level_to_offset_bits(level)) - 1) &
+                     PAGE_MASK);
+                if ( !target )
+                    break;
+            }
+
+            pte_maddr = level - 1;
             pg = iommu_alloc_pgtable(hd);
             if ( !pg )
                 break;
 
             pte_maddr = page_to_maddr(pg);
-            dma_set_pte_addr(*pte, pte_maddr);
+            dma_set_pte_addr(new_pte, pte_maddr);
 
-            /*
-             * high level table always sets r/w, last level
-             * page table control read/write
-             */
-            dma_set_pte_readable(*pte);
-            dma_set_pte_writable(*pte);
+            if ( dma_pte_present(*pte) )
+            {
+                struct dma_pte *split = map_vtd_domain_page(pte_maddr);
+                unsigned long inc = 1UL << level_to_offset_bits(level - 1);
+
+                split[0].val = pte->val;
+                if ( inc == PAGE_SIZE )
+                    split[0].val &= ~DMA_PTE_SP;
+
+                for ( offset = 1; offset < PTE_NUM; ++offset )
+                    split[offset].val = split[offset - 1].val + inc;
+
+                iommu_sync_cache(split, PAGE_SIZE);
+                unmap_vtd_domain_page(split);
+
+                if ( flush_flags )
+                    *flush_flags |= IOMMU_FLUSHF_modified;
+            }
+
+            write_atomic(&pte->val, new_pte.val);
             iommu_sync_cache(pte, sizeof(struct dma_pte));
         }
 
-        if ( level == 2 )
+        if ( --level == target )
             break;
 
         unmap_vtd_domain_page(parent);
         parent = map_vtd_domain_page(pte_maddr);
-        level--;
     }
 
     unmap_vtd_domain_page(parent);
@@ -387,7 +440,7 @@ static paddr_t domain_pgd_maddr(struct domain *d, paddr_t pgd_maddr,
         if ( !hd->arch.vtd.pgd_maddr )
         {
             /* Ensure we have pagetables allocated down to leaf PTE. */
-            addr_to_dma_page_maddr(d, 0, 1);
+            addr_to_dma_page_maddr(d, 0, 1, NULL, true);
 
             if ( !hd->arch.vtd.pgd_maddr )
                 return 0;
@@ -728,8 +781,9 @@ static int __must_check cf_check iommu_flush_iotlb_all(struct domain *d)
 }
 
 /* clear one page's page table */
-static void dma_pte_clear_one(struct domain *domain, uint64_t addr,
-                              unsigned int *flush_flags)
+static int dma_pte_clear_one(struct domain *domain, daddr_t addr,
+                             unsigned int order,
+                             unsigned int *flush_flags)
 {
     struct domain_iommu *hd = dom_iommu(domain);
     struct dma_pte *page = NULL, *pte = NULL;
@@ -737,11 +791,11 @@ static void dma_pte_clear_one(struct domain *domain, uint64_t addr,
 
     spin_lock(&hd->arch.mapping_lock);
     /* get last level pte */
-    pg_maddr = addr_to_dma_page_maddr(domain, addr, 0);
-    if ( pg_maddr == 0 )
+    pg_maddr = addr_to_dma_page_maddr(domain, addr, 1, flush_flags, false);
+    if ( pg_maddr < PAGE_SIZE )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        return;
+        return pg_maddr ? -ENOMEM : 0;
     }
 
     page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
@@ -751,7 +805,7 @@ static void dma_pte_clear_one(struct domain *domain, uint64_t addr,
     {
         spin_unlock(&hd->arch.mapping_lock);
         unmap_vtd_domain_page(page);
-        return;
+        return 0;
     }
 
     dma_clear_pte(*pte);
@@ -761,6 +815,8 @@ static void dma_pte_clear_one(struct domain *domain, uint64_t addr,
     iommu_sync_cache(pte, sizeof(struct dma_pte));
 
     unmap_vtd_domain_page(page);
+
+    return 0;
 }
 
 static int iommu_set_root_entry(struct vtd_iommu *iommu)
@@ -2059,8 +2115,9 @@ static int __must_check cf_check intel_iommu_map_page(
         return 0;
     }
 
-    pg_maddr = addr_to_dma_page_maddr(d, dfn_to_daddr(dfn), 1);
-    if ( !pg_maddr )
+    pg_maddr = addr_to_dma_page_maddr(d, dfn_to_daddr(dfn), 1, flush_flags,
+                                      true);
+    if ( pg_maddr < PAGE_SIZE )
     {
         spin_unlock(&hd->arch.mapping_lock);
         return -ENOMEM;
@@ -2110,17 +2167,14 @@ static int __must_check cf_check intel_iommu_unmap_page(
     if ( iommu_hwdom_passthrough && is_hardware_domain(d) )
         return 0;
 
-    dma_pte_clear_one(d, dfn_to_daddr(dfn), flush_flags);
-
-    return 0;
+    return dma_pte_clear_one(d, dfn_to_daddr(dfn), 0, flush_flags);
 }
 
 static int cf_check intel_iommu_lookup_page(
     struct domain *d, dfn_t dfn, mfn_t *mfn, unsigned int *flags)
 {
     struct domain_iommu *hd = dom_iommu(d);
-    struct dma_pte *page, val;
-    u64 pg_maddr;
+    uint64_t val;
 
     /*
      * If VT-d shares EPT page table or if the domain is the hardware
@@ -2132,25 +2186,16 @@ static int cf_check intel_iommu_lookup_page(
 
     spin_lock(&hd->arch.mapping_lock);
 
-    pg_maddr = addr_to_dma_page_maddr(d, dfn_to_daddr(dfn), 0);
-    if ( !pg_maddr )
-    {
-        spin_unlock(&hd->arch.mapping_lock);
-        return -ENOENT;
-    }
+    val = addr_to_dma_page_maddr(d, dfn_to_daddr(dfn), 0, NULL, false);
 
-    page = map_vtd_domain_page(pg_maddr);
-    val = page[dfn_x(dfn) & LEVEL_MASK];
-
-    unmap_vtd_domain_page(page);
     spin_unlock(&hd->arch.mapping_lock);
 
-    if ( !dma_pte_present(val) )
+    if ( val < PAGE_SIZE )
         return -ENOENT;
 
-    *mfn = maddr_to_mfn(dma_pte_addr(val));
-    *flags = dma_pte_read(val) ? IOMMUF_readable : 0;
-    *flags |= dma_pte_write(val) ? IOMMUF_writable : 0;
+    *mfn = maddr_to_mfn(val);
+    *flags = val & DMA_PTE_READ ? IOMMUF_readable : 0;
+    *flags |= val & DMA_PTE_WRITE ? IOMMUF_writable : 0;
 
     return 0;
 }
