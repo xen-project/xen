@@ -231,6 +231,7 @@ struct page_info;
 typedef int iommu_grdm_t(xen_pfn_t start, xen_ulong_t nr, u32 id, void *ctxt);
 
 struct iommu_ops {
+    unsigned long page_sizes;
     int (*init)(struct domain *d);
     void (*hwdom_init)(struct domain *d);
     int (*quarantine_init)(device_t *dev, bool scratch_page);

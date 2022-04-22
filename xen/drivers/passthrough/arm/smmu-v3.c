@@ -3411,7 +3411,8 @@ static void arm_smmu_iommu_xen_domain_teardown(struct domain *d)
 }
 
 static const struct iommu_ops arm_smmu_iommu_ops = {
-	.init		= arm_smmu_iommu_xen_domain_init,
+	.page_sizes		= PAGE_SIZE_4K,
+	.init			= arm_smmu_iommu_xen_domain_init,
 	.hwdom_init		= arch_iommu_hwdom_init,
 	.teardown		= arm_smmu_iommu_xen_domain_teardown,
 	.iotlb_flush		= arm_smmu_iotlb_flush,

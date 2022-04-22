@@ -2858,6 +2858,7 @@ static void arm_smmu_iommu_domain_teardown(struct domain *d)
 }
 
 static const struct iommu_ops arm_smmu_iommu_ops = {
+    .page_sizes = PAGE_SIZE_4K,
     .init = arm_smmu_iommu_domain_init,
     .hwdom_init = arch_iommu_hwdom_init,
     .add_device = arm_smmu_dt_add_device_generic,

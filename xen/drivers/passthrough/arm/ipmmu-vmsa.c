@@ -1355,6 +1355,7 @@ static void ipmmu_iommu_domain_teardown(struct domain *d)
 
 static const struct iommu_ops ipmmu_iommu_ops =
 {
+    .page_sizes      = PAGE_SIZE_4K,
     .init            = ipmmu_iommu_domain_init,
     .hwdom_init      = arch_iommu_hwdom_init,
     .teardown        = ipmmu_iommu_domain_teardown,
