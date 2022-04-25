@@ -10,15 +10,26 @@
 static always_inline bool barrier_nospec_true(void)
 {
 #ifdef CONFIG_SPECULATIVE_HARDEN_BRANCH
-    alternative("lfence", "", X86_FEATURE_SC_NO_BRANCH_HARDEN);
+    alternative("lfence #nospec-true", "", X86_FEATURE_SC_NO_BRANCH_HARDEN);
 #endif
     return true;
+}
+
+static always_inline bool barrier_nospec_false(void)
+{
+#ifdef CONFIG_SPECULATIVE_HARDEN_BRANCH
+    alternative("lfence #nospec-false", "", X86_FEATURE_SC_NO_BRANCH_HARDEN);
+#endif
+    return false;
 }
 
 /* Allow to protect evaluation of conditionals with respect to speculation */
 static always_inline bool evaluate_nospec(bool condition)
 {
-    return condition ? barrier_nospec_true() : !barrier_nospec_true();
+    if ( condition )
+        return barrier_nospec_true();
+    else
+        return barrier_nospec_false();
 }
 
 /* Allow to block speculative execution in generic code */
