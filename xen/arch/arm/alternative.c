@@ -170,7 +170,7 @@ static int __apply_alternatives(const struct alt_region *region,
  * We might be patching the stop_machine state machine, so implement a
  * really simple polling protocol here.
  */
-static int __apply_alternatives_multi_stop(void *unused)
+static int __apply_alternatives_multi_stop(void *xenmap)
 {
     static int patched = 0;
 
@@ -185,21 +185,8 @@ static int __apply_alternatives_multi_stop(void *unused)
     {
         int ret;
         struct alt_region region;
-        mfn_t xen_mfn = virt_to_mfn(_start);
-        paddr_t xen_size = _end - _start;
-        unsigned int xen_order = get_order_from_bytes(xen_size);
-        void *xenmap;
 
         BUG_ON(patched);
-
-        /*
-         * The text and inittext section are read-only. So re-map Xen to
-         * be able to patch the code.
-         */
-        xenmap = __vmap(&xen_mfn, 1U << xen_order, 1, 1, PAGE_HYPERVISOR,
-                        VMAP_DEFAULT);
-        /* Re-mapping Xen is not expected to fail during boot. */
-        BUG_ON(!xenmap);
 
         region.begin = __alt_instructions;
         region.end = __alt_instructions_end;
@@ -207,8 +194,6 @@ static int __apply_alternatives_multi_stop(void *unused)
         ret = __apply_alternatives(&region, xenmap - (void *)_start);
         /* The patching is not expected to fail during boot. */
         BUG_ON(ret != 0);
-
-        vunmap(xenmap);
 
         /* Barriers provided by the cache flushing */
         write_atomic(&patched, 1);
@@ -224,14 +209,29 @@ static int __apply_alternatives_multi_stop(void *unused)
 void __init apply_alternatives_all(void)
 {
     int ret;
+    mfn_t xen_mfn = virt_to_mfn(_start);
+    paddr_t xen_size = _end - _start;
+    unsigned int xen_order = get_order_from_bytes(xen_size);
+    void *xenmap;
 
     ASSERT(system_state != SYS_STATE_active);
 
+    /*
+     * The text and inittext section are read-only. So re-map Xen to
+     * be able to patch the code.
+     */
+    xenmap = __vmap(&xen_mfn, 1U << xen_order, 1, 1, PAGE_HYPERVISOR,
+                    VMAP_DEFAULT);
+    /* Re-mapping Xen is not expected to fail during boot. */
+    BUG_ON(!xenmap);
+
 	/* better not try code patching on a live SMP system */
-    ret = stop_machine_run(__apply_alternatives_multi_stop, NULL, NR_CPUS);
+    ret = stop_machine_run(__apply_alternatives_multi_stop, xenmap, NR_CPUS);
 
     /* stop_machine_run should never fail at this stage of the boot */
     BUG_ON(ret);
+
+    vunmap(xenmap);
 }
 
 int apply_alternatives(const struct alt_instr *start, const struct alt_instr *end)
