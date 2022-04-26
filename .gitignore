@@ -7,6 +7,7 @@
 *.o
 *.d
 *.d2
+*.c.cppcheck
 *.opic
 *.a
 *.so
@@ -296,6 +297,7 @@ xen/.banner
 xen/.config
 xen/.config.old
 xen/.xen.elf32
+xen/xen-cppcheck.xml
 xen/System.map
 xen/arch/x86/boot/mkelf32
 xen/arch/x86/boot/cmdline.S
@@ -316,6 +318,7 @@ xen/arch/*/efi/runtime.c
 xen/arch/*/include/asm/asm-offsets.h
 xen/common/config_data.S
 xen/common/config.gz
+xen/cppcheck-htmlreport
 xen/include/headers*.chk
 xen/include/compat/*
 xen/include/config/

@@ -453,7 +453,7 @@ endif # need-config
 
 __all: build
 
-main-targets := build install uninstall clean distclean MAP
+main-targets := build install uninstall clean distclean MAP cppcheck cppcheck-html
 .PHONY: $(main-targets)
 ifneq ($(XEN_TARGET_ARCH),x86_32)
 $(main-targets): %: _% ;
@@ -543,15 +543,17 @@ _clean:
 	$(Q)$(MAKE) $(clean)=tools/kconfig
 	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" \
 		-o -name ".*.o.tmp" -o -name "*~" -o -name "core" \
-		-o -name '*.lex.c' -o -name '*.tab.[ch]' \
+		-o -name '*.lex.c' -o -name '*.tab.[ch]' -o -name '*.c.cppcheck' \
 		-o -name "*.gcno" -o -name ".*.cmd" -o -name "lib.a" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map
 	rm -f asm-offsets.s arch/*/include/asm/asm-offsets.h
 	rm -f .banner .allconfig.tmp include/xen/compile.h
+	rm -f xen-cppcheck.xml
 
 .PHONY: _distclean
 _distclean: clean
 	rm -f tags TAGS cscope.files cscope.in.out cscope.out cscope.po.out GTAGS GPATH GRTAGS GSYMS .config source
+	rm -rf $(CPPCHECK_HTMLREPORT_OUTDIR)
 
 $(TARGET).gz: $(TARGET)
 	gzip -n -f -9 < $< > $@.new
@@ -624,6 +626,84 @@ cloc:
 		test -f "$$sf" && echo "$$sf"; \
 	    done; \
 	done | cloc --list-file=-
+
+# What cppcheck command to use.
+# To get proper results, it is recommended to build cppcheck manually from the
+# latest source and use CPPCHECK to give the full path to the built version.
+CPPCHECK ?= cppcheck
+
+# What cppcheck-htmlreport to use.
+# If you give the full path to a self compiled cppcheck, this should be set
+# to the full path to cppcheck-html in the htmlreport directory of cppcheck.
+# On recent distribution, this is available in the standard path.
+CPPCHECK_HTMLREPORT ?= cppcheck-htmlreport
+
+# By default we generate the report in cppcheck-htmlreport directory in the
+# build directory. This can be changed by giving a directory in this variable.
+CPPCHECK_HTMLREPORT_OUTDIR ?= cppcheck-htmlreport
+
+# Compile flags to pass to cppcheck:
+# - include directories and defines Xen Makefile is passing (from CFLAGS)
+# - include config.h as this is passed directly to the compiler.
+# - define CPPCHECK as we use to disable or enable some specific part of the
+#   code to solve some cppcheck issues.
+# - explicitely enable some cppcheck checks as we do not want to use "all"
+#   which includes unusedFunction which gives wrong positives as we check file
+#   per file.
+#
+# Compiler defines are in compiler-def.h which is included in config.h
+#
+CPPCHECKFLAGS := -DCPPCHECK --max-ctu-depth=10 \
+                 --enable=style,information,missingInclude \
+                 --include=$(srctree)/include/xen/config.h \
+                 -I $(srctree)/xsm/flask/include \
+                 -I $(srctree)/include/xen/libfdt \
+                 $(filter -D% -I%,$(CFLAGS))
+
+# We need to find all C files (as we are not checking assembly files) so
+# we find all generated .o files which have a .c corresponding file.
+CPPCHECKFILES := $(wildcard $(patsubst $(objtree)/%.o,$(srctree)/%.c, \
+                 $(filter-out $(objtree)/tools/%, \
+                 $(shell find $(objtree) -name "*.o"))))
+
+quiet_cmd_cppcheck_xml = CPPCHECK $(patsubst $(srctree)/%,%,$<)
+cmd_cppcheck_xml = $(CPPCHECK) -v -q --xml $(CPPCHECKFLAGS) \
+                   --output-file=$@ $<
+
+quiet_cmd_merge_cppcheck_reports = CPPCHECK-MERGE $@
+cmd_merge_cppcheck_reports = $(srctree)/tools/merge_cppcheck_reports.py $^ $@
+
+quiet_cmd_cppcheck_html = CPPCHECK-HTML $<
+cmd_cppcheck_html = $(CPPCHECK_HTMLREPORT) --file=$< --source-dir=$(srctree) \
+                    --report-dir=$(CPPCHECK_HTMLREPORT_OUTDIR) --title=Xen
+
+PHONY += _cppcheck _cppcheck-html cppcheck-version
+
+_cppcheck-html: xen-cppcheck.xml
+	$(call if_changed,cppcheck_html)
+
+_cppcheck: xen-cppcheck.xml
+
+xen-cppcheck.xml: $(patsubst $(srctree)/%.c,$(objtree)/%.c.cppcheck,$(CPPCHECKFILES))
+ifeq ($(CPPCHECKFILES),)
+	$(error Please build Xen before running cppcheck)
+endif
+	$(call if_changed,merge_cppcheck_reports)
+
+$(objtree)/%.c.cppcheck: $(srctree)/%.c $(objtree)/include/generated/autoconf.h $(objtree)/include/generated/compiler-def.h | cppcheck-version
+	$(call if_changed,cppcheck_xml)
+
+cppcheck-version:
+ifeq ($(shell which $(CPPCHECK)),)
+	$(error Cannot find cppcheck executable: $(CPPCHECK))
+endif
+ifeq ($(shell $(CPPCHECK) --version | awk '{print ($$2 < 2.7)}'),1)
+	$(error Please upgrade your cppcheck to version 2.7 or greater)
+endif
+
+# Put this in generated headers this way it is cleaned by include/Makefile
+$(objtree)/include/generated/compiler-def.h:
+	$(Q)$(CC) -dM -E -o $@ - < /dev/null
 
 endif #config-build
 endif # need-sub-make

@@ -219,8 +219,14 @@
                          SCTLR_Axx_ELx_A    | SCTLR_Axx_ELx_C   |\
                          SCTLR_Axx_ELx_WXN  | SCTLR_Axx_ELx_EE)
 
+/*
+ * Cppcheck preprocessor is wrongly throwing the error here so disable
+ * this check for cppcheck runs.
+ */
+#ifndef CPPCHECK
 #if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffffUL
 #error "Inconsistent SCTLR_EL2 set/clear bits"
+#endif
 #endif
 
 #endif

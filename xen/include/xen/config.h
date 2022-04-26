@@ -7,6 +7,10 @@
 #ifndef __XEN_CONFIG_H__
 #define __XEN_CONFIG_H__
 
+#ifdef CPPCHECK
+#include <generated/compiler-def.h>
+#endif
+
 #include <xen/kconfig.h>
 
 #ifndef __ASSEMBLY__

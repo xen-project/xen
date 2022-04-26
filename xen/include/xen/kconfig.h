@@ -8,6 +8,10 @@
  * these only work with boolean option.
  */
 
+/* cppcheck is failing to parse the macro so use a dummy one */
+#ifdef CPPCHECK
+#define IS_ENABLED(option) option
+#else
 /*
  * Getting something that works in C and CPP for an arg that may or may
  * not be defined is tricky.  Here, if we have "#define CONFIG_BOOGER 1"
@@ -27,5 +31,6 @@
  * otherwise.
  */
 #define IS_ENABLED(option) config_enabled(option)
+#endif
 
 #endif /* __XEN_KCONFIG_H */
