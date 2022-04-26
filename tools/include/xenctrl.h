@@ -2290,7 +2290,8 @@ int xc_memshr_fork(xc_interface *xch,
  *
  * With VMs that have a lot of memory this call may block for a long time.
  */
-int xc_memshr_fork_reset(xc_interface *xch, uint32_t forked_domain);
+int xc_memshr_fork_reset(xc_interface *xch, uint32_t forked_domain,
+                         bool reset_state, bool reset_memory);
 
 /* Debug calls: return the number of pages referencing the shared frame backing
  * the input argument. Should be one or greater.
