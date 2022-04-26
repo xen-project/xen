@@ -75,15 +75,15 @@ static int __init cf_check parse_flask_param(const char *s)
 }
 custom_param("flask", parse_flask_param);
 
-static int domain_has_security(struct domain *d, u32 perms)
+static int domain_has_security(struct domain *d, uint32_t perms)
 {
     struct domain_security_struct *dsec;
-    
+
     dsec = d->ssid;
     if ( !dsec )
         return -EACCES;
-        
-    return avc_has_perm(dsec->sid, SECINITSID_SECURITY, SECCLASS_SECURITY, 
+
+    return avc_has_perm(dsec->sid, SECINITSID_SECURITY, SECCLASS_SECURITY,
                         perms, NULL);
 }
 
@@ -130,7 +130,7 @@ static int flask_security_access(struct xen_flask_access *arg)
     arg->audit_allow = avd.auditallow;
     arg->audit_deny = avd.auditdeny;
     arg->seqno = avd.seqno;
-                
+
     return rv;
 }
 
@@ -196,7 +196,7 @@ static int flask_security_sid(struct xen_flask_sid_context *arg)
 {
     int rv;
     char *context;
-    u32 len;
+    uint32_t len;
 
     rv = domain_has_security(current->domain, SECURITY__CHECK_CONTEXT);
     if ( rv )
@@ -223,7 +223,8 @@ static int flask_security_sid(struct xen_flask_sid_context *arg)
 
 #ifndef COMPAT
 
-static int flask_security_setavc_threshold(struct xen_flask_setavc_threshold *arg)
+static int flask_security_setavc_threshold(
+    struct xen_flask_setavc_threshold *arg)
 {
     int rv = 0;
 
@@ -350,7 +351,7 @@ static int flask_security_get_bool(struct xen_flask_boolean *arg)
         if ( nameout_len > arg->size )
             rv = -ERANGE;
         arg->size = nameout_len;
- 
+
         if ( !rv && _copy_to_guest(arg->name, nameout, nameout_len) )
             rv = -EFAULT;
         xfree(nameout);
@@ -386,9 +387,9 @@ static int flask_security_make_bools(void)
     int ret = 0;
     int num;
     int *values = NULL;
-    
+
     xfree(bool_pending_values);
-    
+
     ret = security_get_bools(&num, NULL, &values, NULL);
     if ( ret != 0 )
         goto out;
@@ -474,8 +475,8 @@ static int flask_devicetree_label(struct xen_flask_devicetree_label *arg)
 {
     int rv;
     char *buf;
-    u32 sid = arg->sid;
-    u32 perm = sid ? SECURITY__ADD_OCONTEXT : SECURITY__DEL_OCONTEXT;
+    uint32_t sid = arg->sid;
+    uint32_t perm = sid ? SECURITY__ADD_OCONTEXT : SECURITY__DEL_OCONTEXT;
 
     rv = domain_has_security(current->domain, perm);
     if ( rv )
@@ -670,7 +671,7 @@ ret_t cf_check do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op)
 
     case FLASK_MLS:
         rv = flask_mls_enabled;
-        break;    
+        break;
 
     case FLASK_GETAVC_THRESHOLD:
         rv = avc_cache_threshold;

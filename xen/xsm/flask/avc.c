@@ -13,9 +13,9 @@
  *    it under the terms of the GNU General Public License version 2,
  *      as published by the Free Software Foundation.
  */
- 
+
 /* Ported to Xen 3.0, George Coker, <gscoker@alpha.ncsc.mil> */
- 
+
 #include <xen/lib.h>
 #include <xen/xmalloc.h>
 #include <xen/types.h>
@@ -267,7 +267,7 @@ int avc_get_hash_stats(struct xen_flask_hash_stats *arg)
     }
 
     rcu_read_unlock(&avc_rcu_lock);
-    
+
     arg->entries = atomic_read(&avc_cache.active_nodes);
     arg->buckets_used = slots_used;
     arg->buckets_total = AVC_CACHE_SLOTS;
@@ -336,7 +336,7 @@ static inline int avc_reclaim_node(void)
         }
         rcu_read_unlock(&avc_rcu_lock);
         spin_unlock_irqrestore(lock, flags);
-    }    
+    }
  out:
     return ecx;
 }
@@ -622,7 +622,7 @@ static int avc_update_node(u32 perms, u32 ssid, u32 tsid, u16 tclass,
     struct hlist_head *head;
     struct hlist_node *next;
     spinlock_t *lock;
-    
+
     node = avc_alloc_node();
     if ( !node )
     {
@@ -630,7 +630,7 @@ static int avc_update_node(u32 perms, u32 ssid, u32 tsid, u16 tclass,
         goto out;
     }
 
-    hvalue = avc_hash(ssid, tsid, tclass);    
+    hvalue = avc_hash(ssid, tsid, tclass);
 
     head = &avc_cache.slots[hvalue];
     lock = &avc_cache.slots_lock[hvalue];
@@ -695,7 +695,7 @@ int avc_ss_reset(u32 seqno)
         rcu_read_unlock(&avc_rcu_lock);
         spin_unlock_irqrestore(lock, flag);
     }
-    
+
     avc_latest_notif_update(seqno, 0);
     return rc;
 }

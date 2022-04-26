@@ -74,12 +74,12 @@ int avtab_read_item(struct avtab *a, void *fp, struct policydb *pol,
 
 int avtab_read(struct avtab *a, void *fp, struct policydb *pol);
 
-struct avtab_node *avtab_insert_nonunique(struct avtab *h, 
+struct avtab_node *avtab_insert_nonunique(struct avtab *h,
                             struct avtab_key *key, struct avtab_datum *datum);
 
 struct avtab_node *avtab_search_node(struct avtab *h, struct avtab_key *key);
 
-struct avtab_node *avtab_search_node_next(struct avtab_node *node, 
+struct avtab_node *avtab_search_node_next(struct avtab_node *node,
                                                                 int specified);
 
 #define MAX_AVTAB_HASH_BITS 13

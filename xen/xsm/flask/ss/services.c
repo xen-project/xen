@@ -99,7 +99,7 @@ static int context_struct_compute_av(struct context *scontext,
  * constraint_expr_eval should pass in NULL for xcontext.
  */
 static int constraint_expr_eval(struct context *scontext,
-                            struct context *tcontext, struct context *xcontext, 
+                            struct context *tcontext, struct context *xcontext,
                                                 struct constraint_expr *cexpr)
 {
     u32 val1, val2;
@@ -1073,7 +1073,7 @@ static int security_compute_sid(u32 ssid,
                 /* Look for a role transition rule. */
                 for ( roletr = policydb.role_tr; roletr; roletr = roletr->next )
                 {
-                    if ( roletr->role == scontext->role && 
+                    if ( roletr->role == scontext->role &&
                                             roletr->type == tcontext->type )
                     {
                         /* Use the role transition rule. */
@@ -1485,7 +1485,7 @@ int security_irq_sid(int pirq, u32 *out_sid)
     POLICY_RDLOCK;
 
     c = policydb.ocontexts[OCON_PIRQ];
-    
+
     while ( c )
     {
         if ( c->u.pirq == pirq )

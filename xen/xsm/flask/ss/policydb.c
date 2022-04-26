@@ -339,7 +339,7 @@ static int cf_check sens_index(void *key, void *datum, void *datap)
 
     if ( !levdatum->isalias )
     {
-        if ( !levdatum->level->sens || levdatum->level->sens > 
+        if ( !levdatum->level->sens || levdatum->level->sens >
                                                         p->p_levels.nprim )
             return -EINVAL;
         p->p_sens_val_to_name[levdatum->level->sens - 1] = key;

@@ -70,7 +70,7 @@ int mls_compute_context_len(struct context * context)
         }
         if ( l == 0 )
         {
-            if ( mls_level_eq(&context->range.level[0], 
+            if ( mls_level_eq(&context->range.level[0],
                               &context->range.level[1]) )
                 break;
             else

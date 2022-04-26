@@ -452,7 +452,7 @@ static int cond_read_node(struct policydb *p, struct cond_node *node, void *fp)
             goto err;
         }
 
-        if ( i == 0 ) 
+        if ( i == 0 )
             node->expr = expr;
         else
             last->next = expr;
@@ -513,7 +513,7 @@ err:
 /* Determine whether additional permissions are granted by the conditional
  * av table, and if so, add them to the result
  */
-void cond_compute_av(struct avtab *ctab, struct avtab_key *key, 
+void cond_compute_av(struct avtab *ctab, struct avtab_key *key,
                                                         struct av_decision *avd)
 {
     struct avtab_node *node;
