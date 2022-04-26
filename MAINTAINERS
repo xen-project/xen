@@ -248,6 +248,12 @@ F:	xen/drivers/passthrough/arm/
 F:	xen/include/public/arch-arm/
 F:	xen/include/public/arch-arm.h
 
+ARM SMMU
+M:	Julien Grall <julien@xen.org>
+M:	Rahul Singh <rahul.singh@arm.com>
+S:	Supported
+F:	xen/drivers/passthrough/arm/smmu.c
+
 ARM SMMUv3
 M:	Bertrand Marquis <bertrand.marquis@arm.com>
 M:	Rahul Singh <rahul.singh@arm.com>
