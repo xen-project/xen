@@ -871,6 +871,13 @@ long cf_check do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             copyback = 1;
         break;
 
+    case XEN_DOMCTL_assign_device:
+    case XEN_DOMCTL_test_assign_device:
+    case XEN_DOMCTL_deassign_device:
+    case XEN_DOMCTL_get_device_group:
+        ret = iommu_do_domctl(op, d, u_domctl);
+        break;
+
     default:
         ret = arch_do_domctl(op, d, u_domctl);
         break;

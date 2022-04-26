@@ -342,8 +342,17 @@ struct domain_iommu {
 /* Does the IOMMU pagetable need to be kept synchronized with the P2M */
 #ifdef CONFIG_HAS_PASSTHROUGH
 #define need_iommu_pt_sync(d)     (dom_iommu(d)->need_sync)
+
+int iommu_do_domctl(struct xen_domctl *domctl, struct domain *d,
+                    XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 #else
 #define need_iommu_pt_sync(d)     ({ (void)(d); false; })
+
+static inline int iommu_do_domctl(struct xen_domctl *domctl, struct domain *d,
+                                  XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
+{
+    return -ENOSYS;
+}
 #endif
 
 int __must_check iommu_suspend(void);
@@ -356,9 +365,6 @@ int iommu_quarantine_dev_init(device_t *dev);
 int iommu_do_pci_domctl(struct xen_domctl *, struct domain *d,
                         XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
 #endif
-
-int iommu_do_domctl(struct xen_domctl *, struct domain *d,
-                    XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
 
 void iommu_dev_iotlb_flush_timeout(struct domain *d, struct pci_dev *pdev);
 

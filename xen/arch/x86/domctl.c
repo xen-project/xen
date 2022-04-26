@@ -1370,7 +1370,7 @@ long arch_do_domctl(
         break;
 
     default:
-        ret = iommu_do_domctl(domctl, d, u_domctl);
+        ret = -ENOSYS;
         break;
     }
 
