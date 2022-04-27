@@ -515,7 +515,9 @@ _uninstall:
 	rm -f $(D)$(DEBUG_DIR)/$(T)-$(XEN_FULLVERSION).efi.map
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T).efi
-	rm -f $(D)$(EFI_MOUNTPOINT)/efi/$(EFI_VENDOR)/$(T)-$(XEN_FULLVERSION).efi
+	if [ -n '$(EFI_MOUNTPOINT)' -a -n '$(EFI_VENDOR)' ]; then \
+		rm -f $(D)$(EFI_MOUNTPOINT)/efi/$(EFI_VENDOR)/$(T)-$(XEN_FULLVERSION).efi; \
+	fi
 
 .PHONY: _debug
 _debug:
