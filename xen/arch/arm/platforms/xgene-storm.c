@@ -51,7 +51,7 @@ static void __init xgene_check_pirq_eoi(void)
         panic("%s: Can not find interrupt controller node\n", __func__);
 
     res = dt_device_get_address(node, 0, &dbase, NULL);
-    if ( !dbase )
+    if ( res )
         panic("%s: Cannot find a valid address for the distributor\n", __func__);
 
     /*
