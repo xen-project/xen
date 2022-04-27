@@ -1645,6 +1645,14 @@ static int bring_up_vcpus(struct domain *cd, struct domain *d)
     return 0;
 }
 
+static void copy_vcpu_nonreg_state(struct vcpu *d_vcpu, struct vcpu *cd_vcpu)
+{
+    struct hvm_vcpu_nonreg_state nrs = {};
+
+    hvm_get_nonreg_state(d_vcpu, &nrs);
+    hvm_set_nonreg_state(cd_vcpu, &nrs);
+}
+
 static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
 {
     unsigned int i;
@@ -1653,7 +1661,7 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
 
     for ( i = 0; i < cd->max_vcpus; i++ )
     {
-        const struct vcpu *d_vcpu = d->vcpu[i];
+        struct vcpu *d_vcpu = d->vcpu[i];
         struct vcpu *cd_vcpu = cd->vcpu[i];
         mfn_t vcpu_info_mfn;
 
@@ -1695,6 +1703,8 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
         }
 
         hvm_vmtrace_reset(cd_vcpu);
+
+        copy_vcpu_nonreg_state(d_vcpu, cd_vcpu);
 
         /*
          * TODO: to support VMs with PV interfaces copy additional

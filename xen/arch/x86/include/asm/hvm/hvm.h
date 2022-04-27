@@ -84,6 +84,17 @@ enum hvm_intblk {
 /* update_guest_cr() flags. */
 #define HVM_UPDATE_GUEST_CR3_NOFLUSH 0x00000001
 
+struct hvm_vcpu_nonreg_state {
+    union {
+        struct {
+            uint64_t activity_state;
+            uint64_t interruptibility_info;
+            uint64_t pending_dbg;
+            uint64_t interrupt_status;
+        } vmx;
+    };
+};
+
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
@@ -122,6 +133,10 @@ struct hvm_function_table {
     /* Examine specifics of the guest state. */
     unsigned int (*get_interrupt_shadow)(struct vcpu *v);
     void (*set_interrupt_shadow)(struct vcpu *v, unsigned int intr_shadow);
+    void (*get_nonreg_state)(struct vcpu *v,
+                             struct hvm_vcpu_nonreg_state *nrs);
+    void (*set_nonreg_state)(struct vcpu *v,
+                             struct hvm_vcpu_nonreg_state *nrs);
     int (*guest_x86_mode)(struct vcpu *v);
     unsigned int (*get_cpl)(struct vcpu *v);
     void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
@@ -743,6 +758,20 @@ void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val);
     if ( is_hvm_domain(d_) && d_->arch.hvm.pi_ops.vcpu_block )  \
         d_->arch.hvm.pi_ops.vcpu_block(v_);                     \
 })
+
+static inline void hvm_get_nonreg_state(struct vcpu *v,
+                                        struct hvm_vcpu_nonreg_state *nrs)
+{
+    if ( hvm_funcs.get_nonreg_state )
+        alternative_vcall(hvm_funcs.get_nonreg_state, v, nrs);
+}
+
+static inline void hvm_set_nonreg_state(struct vcpu *v,
+                                        struct hvm_vcpu_nonreg_state *nrs)
+{
+    if ( hvm_funcs.set_nonreg_state )
+        alternative_vcall(hvm_funcs.set_nonreg_state, v, nrs);
+}
 
 #else  /* CONFIG_HVM */
 

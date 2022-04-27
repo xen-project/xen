@@ -1334,6 +1334,36 @@ static void cf_check vmx_set_interrupt_shadow(
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
 }
 
+static void cf_check vmx_get_nonreg_state(struct vcpu *v,
+    struct hvm_vcpu_nonreg_state *nrs)
+{
+    vmx_vmcs_enter(v);
+
+    __vmread(GUEST_ACTIVITY_STATE, &nrs->vmx.activity_state);
+    __vmread(GUEST_INTERRUPTIBILITY_INFO, &nrs->vmx.interruptibility_info);
+    __vmread(GUEST_PENDING_DBG_EXCEPTIONS, &nrs->vmx.pending_dbg);
+
+    if ( cpu_has_vmx_virtual_intr_delivery )
+        __vmread(GUEST_INTR_STATUS, &nrs->vmx.interrupt_status);
+
+    vmx_vmcs_exit(v);
+}
+
+static void cf_check vmx_set_nonreg_state(struct vcpu *v,
+    struct hvm_vcpu_nonreg_state *nrs)
+{
+    vmx_vmcs_enter(v);
+
+    __vmwrite(GUEST_ACTIVITY_STATE, nrs->vmx.activity_state);
+    __vmwrite(GUEST_INTERRUPTIBILITY_INFO, nrs->vmx.interruptibility_info);
+    __vmwrite(GUEST_PENDING_DBG_EXCEPTIONS, nrs->vmx.pending_dbg);
+
+    if ( cpu_has_vmx_virtual_intr_delivery )
+        __vmwrite(GUEST_INTR_STATUS, nrs->vmx.interrupt_status);
+
+    vmx_vmcs_exit(v);
+}
+
 static void vmx_load_pdptrs(struct vcpu *v)
 {
     uint32_t cr3 = v->arch.hvm.guest_cr[3];
@@ -2487,6 +2517,8 @@ static struct hvm_function_table __initdata_cf_clobber vmx_function_table = {
     .load_cpu_ctxt        = vmx_load_vmcs_ctxt,
     .get_interrupt_shadow = vmx_get_interrupt_shadow,
     .set_interrupt_shadow = vmx_set_interrupt_shadow,
+    .get_nonreg_state     = vmx_get_nonreg_state,
+    .set_nonreg_state     = vmx_set_nonreg_state,
     .guest_x86_mode       = vmx_guest_x86_mode,
     .get_cpl              = _vmx_get_cpl,
     .get_segment_register = vmx_get_segment_register,
