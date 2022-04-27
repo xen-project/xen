@@ -36,10 +36,7 @@ static bool __init device_tree_node_compatible(const void *fdt, int node,
                                                const char *match)
 {
     int len, l;
-    int mlen;
     const void *prop;
-
-    mlen = strlen(match);
 
     prop = fdt_getprop(fdt, node, "compatible", &len);
     if ( prop == NULL )
