@@ -101,7 +101,6 @@ static void exynos4210_uart_interrupt(int irq, void *data, struct cpu_user_regs 
 static void __init exynos4210_uart_init_preirq(struct serial_port *port)
 {
     struct exynos4210_uart *uart = port->uart;
-    unsigned int divisor;
     uint32_t ulcon;
 
     /* reset, TX/RX disables */
@@ -113,9 +112,12 @@ static void __init exynos4210_uart_init_preirq(struct serial_port *port)
     /* Line control and baud-rate generator. */
     if ( uart->baud != BAUD_AUTO )
     {
-        /* Baud rate specified: program it into the divisor latch. */
-        divisor = ((uart->clock_hz) / (uart->baud)) - 1;
-        /* FIXME: will use a hacked divisor, assuming the src clock and bauds */
+        /*
+         * TODO: should be updated
+         * Baud rate specified: program it into the divisor latch.
+         * divisor = ((uart->clock_hz) / (uart->baud)) - 1;
+         * FIXME: will use a hacked divisor, assuming the src clock and bauds.
+         */
         exynos4210_write(uart, UFRACVAL, 53);
         exynos4210_write(uart, UBRDIV, 4);
     }
