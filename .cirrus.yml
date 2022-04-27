@@ -24,3 +24,9 @@ task:
   freebsd_instance:
     image_family: freebsd-13-0
   << : *FREEBSD_TEMPLATE
+
+task:
+  name: 'FreeBSD 14'
+  freebsd_instance:
+    image_family: freebsd-14-0-snap
+  << : *FREEBSD_TEMPLATE
