@@ -48,7 +48,7 @@ static int omap5_init_time(void)
     void __iomem *ckgen_prm_base;
     void __iomem *rt_ct_base;
     unsigned int sys_clksel;
-    unsigned int num, den, frac1, frac2;
+    unsigned int num, frac1, frac2;
 
     ckgen_prm_base = ioremap_nocache(OMAP5_CKGEN_PRM_BASE, 0x20);
     if ( !ckgen_prm_base )
@@ -78,7 +78,6 @@ static int omap5_init_time(void)
     }
 
     frac2 = readl(rt_ct_base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
-    den = frac2 & ~NUMERATOR_DENUMERATOR_MASK;
     if ( num_den[sys_clksel][1] != num )
     {
         frac2 &= NUMERATOR_DENUMERATOR_MASK;
