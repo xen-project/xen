@@ -1109,8 +1109,10 @@ typedef struct pci_add_state {
     libxl__xswait_state xswait;
     libxl__ev_qmp qmp;
     libxl__ev_time timeout;
+    libxl__ev_time timeout_retries;
     libxl_device_pci pci;
     libxl_domid pci_domid;
+    int retries;
 } pci_add_state;
 
 static void pci_add_qemu_trad_watch_state_cb(libxl__egc *egc,
@@ -1118,6 +1120,8 @@ static void pci_add_qemu_trad_watch_state_cb(libxl__egc *egc,
 static void pci_add_qmp_device_add(libxl__egc *, pci_add_state *);
 static void pci_add_qmp_device_add_cb(libxl__egc *,
     libxl__ev_qmp *, const libxl__json_object *, int rc);
+static void pci_add_qmp_device_add_retry(libxl__egc *egc, libxl__ev_time *ev,
+    const struct timeval *requested_abs, int rc);
 static void pci_add_qmp_query_pci_cb(libxl__egc *,
     libxl__ev_qmp *, const libxl__json_object *, int rc);
 static void pci_add_timeout(libxl__egc *egc, libxl__ev_time *ev,
@@ -1137,7 +1141,9 @@ static void do_pci_add(libxl__egc *egc,
     libxl__xswait_init(&pas->xswait);
     libxl__ev_qmp_init(&pas->qmp);
     pas->pci_domid = domid;
+    pas->retries = 0;
     libxl__ev_time_init(&pas->timeout);
+    libxl__ev_time_init(&pas->timeout_retries);
 
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
         rc = ERROR_FAIL;
@@ -1157,6 +1163,11 @@ static void do_pci_add(libxl__egc *egc,
                 if (rc) goto out;
                 return;
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+                rc = libxl__ev_time_register_rel(ao, &pas->timeout,
+                                                 pci_add_timeout,
+                                                 LIBXL_QMP_CMD_TIMEOUT * 1000);
+                if (rc) goto out;
+
                 pci_add_qmp_device_add(egc, pas); /* must be last */
                 return;
             default:
@@ -1205,11 +1216,6 @@ static void pci_add_qmp_device_add(libxl__egc *egc, pci_add_state *pas)
     libxl_device_pci *pci = &pas->pci;
     libxl__ev_qmp *const qmp = &pas->qmp;
 
-    rc = libxl__ev_time_register_rel(ao, &pas->timeout,
-                                     pci_add_timeout,
-                                     LIBXL_QMP_CMD_TIMEOUT * 1000);
-    if (rc) goto out;
-
     libxl__qmp_param_add_string(gc, &args, "driver",
                                 "xen-pci-passthrough");
     QMP_PARAMETERS_SPRINTF(&args, "id", PCI_PT_QDEV_ID,
@@ -1255,7 +1261,23 @@ static void pci_add_qmp_device_add_cb(libxl__egc *egc,
     EGC_GC;
     pci_add_state *pas = CONTAINER_OF(qmp, *pas, qmp);
 
-    if (rc) goto out;
+    if (rc) {
+        /* Retry only applicable for HVM with stubdom. */
+        if (libxl_get_stubdom_id(CTX, qmp->domid) == 0)
+            goto out;
+
+        if (pas->retries++ < 10) {
+            LOGD(ERROR, qmp->domid, "Retrying PCI add %d", pas->retries);
+            rc = libxl__ev_time_register_rel(pas->aodev->ao,
+                                             &pas->timeout_retries,
+                                             pci_add_qmp_device_add_retry,
+                                             1000);
+            if (rc) goto out;
+            return; /* Wait for the timeout to then retry. */
+        } else {
+            goto out;
+        }
+    }
 
     qmp->callback = pci_add_qmp_query_pci_cb;
     rc = libxl__ev_qmp_send(egc, qmp, "query-pci", NULL);
@@ -1264,6 +1286,15 @@ static void pci_add_qmp_device_add_cb(libxl__egc *egc,
 
 out:
     pci_add_dm_done(egc, pas, rc); /* must be last */
+}
+
+static void pci_add_qmp_device_add_retry(libxl__egc *egc, libxl__ev_time *ev,
+                                         const struct timeval *requested_abs,
+                                         int rc)
+{
+    pci_add_state *pas = CONTAINER_OF(ev, *pas, timeout_retries);
+
+    pci_add_qmp_device_add(egc, pas);
 }
 
 static void pci_add_qmp_query_pci_cb(libxl__egc *egc,
@@ -1507,6 +1538,7 @@ out_no_irq:
         rc = 0;
 out:
     libxl__ev_time_deregister(gc, &pas->timeout);
+    libxl__ev_time_deregister(gc, &pas->timeout_retries);
     pas->callback(egc, pas, rc);
 }
 
