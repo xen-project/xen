@@ -887,7 +887,7 @@ get_page_from_l1e(
     uint32_t l1f = l1e_get_flags(l1e);
     struct vcpu *curr = current;
     struct domain *real_pg_owner;
-    bool write;
+    bool write, valid;
 
     if ( unlikely(!(l1f & _PAGE_PRESENT)) )
     {
@@ -902,13 +902,15 @@ get_page_from_l1e(
         return -EINVAL;
     }
 
-    if ( !mfn_valid(_mfn(mfn)) ||
+    valid = mfn_valid(_mfn(mfn));
+
+    if ( !valid ||
          (real_pg_owner = page_get_owner_and_reference(page)) == dom_io )
     {
         int flip = 0;
 
         /* Only needed the reference to confirm dom_io ownership. */
-        if ( mfn_valid(_mfn(mfn)) )
+        if ( valid )
             put_page(page);
 
         /* DOMID_IO reverts to caller for privilege checks. */
