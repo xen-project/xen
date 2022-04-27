@@ -3104,7 +3104,7 @@ int schedule_cpu_add(unsigned int cpu, struct cpupool *c)
     {
         const cpumask_t *mask;
         unsigned int cpu_iter, idx = 0;
-        struct sched_unit *old_unit, *master_unit;
+        struct sched_unit *master_unit;
         struct sched_resource *sr_old;
 
         /*
@@ -3128,7 +3128,6 @@ int schedule_cpu_add(unsigned int cpu, struct cpupool *c)
             if ( cpu == cpu_iter )
                 continue;
 
-            old_unit = idle_vcpu[cpu_iter]->sched_unit;
             sr_old = get_sched_res(cpu_iter);
             kill_timer(&sr_old->s_timer);
             idle_vcpu[cpu_iter]->sched_unit = master_unit;
