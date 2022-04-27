@@ -1226,9 +1226,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     {
         EFI_FILE_HANDLE dir_handle;
         EFI_HANDLE gop_handle;
-        UINTN depth, cols, rows, size;
+        UINTN depth, cols, rows;
 
-        size = cols = rows = depth = 0;
+        cols = rows = depth = 0;
 
         if ( StdOut->QueryMode(StdOut, StdOut->Mode->Mode,
                                &cols, &rows) == EFI_SUCCESS )
