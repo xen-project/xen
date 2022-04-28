@@ -61,6 +61,7 @@
 #include <xen/trace.h>
 #include <asm/cpuidle.h>
 #include <asm/hpet.h>
+#include <asm/intel-family.h>
 #include <asm/mwait.h>
 #include <asm/msr.h>
 #include <asm/spec_ctrl.h>
@@ -996,48 +997,49 @@ static const struct idle_cpu idle_cpu_snr = {
 };
 
 #define ICPU(model, cpu) \
-	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ALWAYS, &idle_cpu_##cpu}
+	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ ## model, X86_FEATURE_ALWAYS, \
+	  &idle_cpu_ ## cpu}
 
 static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
-	ICPU(0x1a, nehalem),
-	ICPU(0x1e, nehalem),
-	ICPU(0x1f, nehalem),
-	ICPU(0x25, nehalem),
-	ICPU(0x2c, nehalem),
-	ICPU(0x2e, nehalem),
-	ICPU(0x2f, nehalem),
-	ICPU(0x1c, atom),
-	ICPU(0x26, lincroft),
-	ICPU(0x2a, snb),
-	ICPU(0x2d, snb),
-	ICPU(0x36, atom),
-	ICPU(0x37, byt),
-	ICPU(0x4a, tangier),
-	ICPU(0x4c, cht),
-	ICPU(0x3a, ivb),
-	ICPU(0x3e, ivt),
-	ICPU(0x3c, hsw),
-	ICPU(0x3f, hsw),
-	ICPU(0x45, hsw),
-	ICPU(0x46, hsw),
-	ICPU(0x4d, avn),
-	ICPU(0x3d, bdw),
-	ICPU(0x47, bdw),
-	ICPU(0x4f, bdw),
-	ICPU(0x56, bdw),
-	ICPU(0x4e, skl),
-	ICPU(0x5e, skl),
-	ICPU(0x8e, skl),
-	ICPU(0x9e, skl),
-	ICPU(0x55, skx),
-	ICPU(0x6a, icx),
-	ICPU(0x6c, icx),
-	ICPU(0x57, knl),
-	ICPU(0x85, knl),
-	ICPU(0x5c, bxt),
-	ICPU(0x7a, bxt),
-	ICPU(0x5f, dnv),
-	ICPU(0x86, snr),
+	ICPU(NEHALEM_EP,		nehalem),
+	ICPU(NEHALEM,			nehalem),
+	ICPU(NEHALEM_G,			nehalem),
+	ICPU(WESTMERE,			nehalem),
+	ICPU(WESTMERE_EP,		nehalem),
+	ICPU(NEHALEM_EX,		nehalem),
+	ICPU(WESTMERE_EX,		nehalem),
+	ICPU(ATOM_BONNELL,		atom),
+	ICPU(ATOM_BONNELL_MID,		lincroft),
+	ICPU(SANDYBRIDGE,		snb),
+	ICPU(SANDYBRIDGE_X,		snb),
+	ICPU(ATOM_SALTWELL,		atom),
+	ICPU(ATOM_SILVERMONT,		byt),
+	ICPU(ATOM_SILVERMONT_MID,	tangier),
+	ICPU(ATOM_AIRMONT,		cht),
+	ICPU(IVYBRIDGE,			ivb),
+	ICPU(IVYBRIDGE_X,		ivt),
+	ICPU(HASWELL,			hsw),
+	ICPU(HASWELL_X,			hsw),
+	ICPU(HASWELL_L,			hsw),
+	ICPU(HASWELL_G,			hsw),
+	ICPU(ATOM_SILVERMONT_D,		avn),
+	ICPU(BROADWELL,			bdw),
+	ICPU(BROADWELL_G,		bdw),
+	ICPU(BROADWELL_X,		bdw),
+	ICPU(BROADWELL_D,		bdw),
+	ICPU(SKYLAKE_L,			skl),
+	ICPU(SKYLAKE,			skl),
+	ICPU(KABYLAKE_L,		skl),
+	ICPU(KABYLAKE,			skl),
+	ICPU(SKYLAKE_X,			skx),
+	ICPU(ICELAKE_X,			icx),
+	ICPU(ICELAKE_D,			icx),
+	ICPU(XEON_PHI_KNL,		knl),
+	ICPU(XEON_PHI_KNM,		knl),
+	ICPU(ATOM_GOLDMONT,		bxt),
+	ICPU(ATOM_GOLDMONT_PLUS,	bxt),
+	ICPU(ATOM_GOLDMONT_D,		dnv),
+	ICPU(ATOM_TREMONT_D,		snr),
 	{}
 };
 
@@ -1208,20 +1210,20 @@ static void __init skx_idle_state_table_update(void)
 static void __init mwait_idle_state_table_update(void)
 {
 	switch (boot_cpu_data.x86_model) {
-	case 0x3e: /* IVT */
+	case INTEL_FAM6_IVYBRIDGE_X:
 		ivt_idle_state_table_update();
 		break;
-	case 0x5c: /* BXT */
-	case 0x7a:
+	case INTEL_FAM6_ATOM_GOLDMONT:
+	case INTEL_FAM6_ATOM_GOLDMONT_PLUS:
 		bxt_idle_state_table_update();
 		break;
-	case 0x5e: /* SKL-H */
+	case INTEL_FAM6_SKYLAKE:
 		sklh_idle_state_table_update();
 		break;
-	case 0x55: /* SKL-X */
+	case INTEL_FAM6_SKYLAKE_X:
 		skx_idle_state_table_update();
 		break;
- 	}
+	}
 }
 
 static int __init mwait_idle_probe(void)
