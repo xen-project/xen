@@ -586,6 +586,38 @@ static const struct cpuidle_state icx_cstates[] = {
        {}
 };
 
+/*
+ * On Sapphire Rapids Xeon C1 has to be disabled if C1E is enabled, and vice
+ * versa. On SPR C1E is enabled only if "C1E promotion" bit is set in
+ * MSR_IA32_POWER_CTL. But in this case there effectively no C1, because C1
+ * requests are promoted to C1E. If the "C1E promotion" bit is cleared, then
+ * both C1 and C1E requests end up with C1, so there is effectively no C1E.
+ *
+ * By default we enable C1 and disable C1E by marking it with
+ * 'CPUIDLE_FLAG_DISABLED'.
+ */
+static struct cpuidle_state __read_mostly spr_cstates[] = {
+	{
+		.name = "C1",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E",
+		.flags = MWAIT2flg(0x01) | CPUIDLE_FLAG_DISABLED,
+		.exit_latency = 2,
+		.target_residency = 4,
+	},
+	{
+		.name = "C6",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 290,
+		.target_residency = 800,
+	},
+	{}
+};
+
 static const struct cpuidle_state atom_cstates[] = {
 	{
 		.name = "C1E",
@@ -972,6 +1004,11 @@ static const struct idle_cpu idle_cpu_icx = {
        .disable_promotion_to_c1e = true,
 };
 
+static struct idle_cpu __read_mostly idle_cpu_spr = {
+	.state_table = spr_cstates,
+	.disable_promotion_to_c1e = true,
+};
+
 static const struct idle_cpu idle_cpu_avn = {
 	.state_table = avn_cstates,
 	.disable_promotion_to_c1e = true,
@@ -1034,6 +1071,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(SKYLAKE_X,			skx),
 	ICPU(ICELAKE_X,			icx),
 	ICPU(ICELAKE_D,			icx),
+	ICPU(SAPPHIRERAPIDS_X,		spr),
 	ICPU(XEON_PHI_KNL,		knl),
 	ICPU(XEON_PHI_KNM,		knl),
 	ICPU(ATOM_GOLDMONT,		bxt),
