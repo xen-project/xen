@@ -28,8 +28,7 @@ void __iomem *pci_ecam_map_bus(struct pci_host_bridge *bridge,
         container_of(bridge->ops, const struct pci_ecam_ops, pci_ops);
     unsigned int devfn_shift = ops->bus_shift - 8;
     void __iomem *base;
-
-    unsigned int busn = PCI_BUS(sbdf.bdf);
+    unsigned int busn = sbdf.bus;
 
     if ( busn < cfg->busn_start || busn > cfg->busn_end )
         return NULL;
@@ -37,7 +36,7 @@ void __iomem *pci_ecam_map_bus(struct pci_host_bridge *bridge,
     busn -= cfg->busn_start;
     base = cfg->win + (busn << ops->bus_shift);
 
-    return base + (PCI_DEVFN2(sbdf.bdf) << devfn_shift) + where;
+    return base + (sbdf.devfn << devfn_shift) + where;
 }
 
 bool __init pci_ecam_need_p2m_hwdom_mapping(struct domain *d,

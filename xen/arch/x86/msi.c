@@ -839,7 +839,7 @@ static int msix_capability_init(struct pci_dev *dev,
             pbus = dev->info.physfn.bus;
             pslot = PCI_SLOT(dev->info.physfn.devfn);
             pfunc = PCI_FUNC(dev->info.physfn.devfn);
-            vf = PCI_BDF2(dev->bus, dev->devfn);
+            vf = dev->sbdf.bdf;
         }
 
         table_paddr = read_pci_mem_bar(seg, pbus, pslot, pfunc, bir, vf);

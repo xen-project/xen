@@ -267,7 +267,7 @@ int qinval_device_iotlb_sync(struct vtd_iommu *iommu, struct pci_dev *pdev,
     qinval_entry->q.dev_iotlb_inv_dsc.lo.res_1 = 0;
     qinval_entry->q.dev_iotlb_inv_dsc.lo.max_invs_pend = pdev->ats.queue_depth;
     qinval_entry->q.dev_iotlb_inv_dsc.lo.res_2 = 0;
-    qinval_entry->q.dev_iotlb_inv_dsc.lo.sid = PCI_BDF2(pdev->bus, pdev->devfn);
+    qinval_entry->q.dev_iotlb_inv_dsc.lo.sid = pdev->sbdf.bdf;
     qinval_entry->q.dev_iotlb_inv_dsc.lo.res_3 = 0;
 
     qinval_entry->q.dev_iotlb_inv_dsc.hi.size = size;
