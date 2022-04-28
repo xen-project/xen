@@ -998,21 +998,21 @@ static int iommu_page_fault_do_one(struct vtd_iommu *iommu, int type,
                "DMAR:[%s] Request device [%pp] "
                "fault addr %"PRIx64"\n",
                (type ? "DMA Read" : "DMA Write"),
-               &PCI_SBDF2(seg, source_id), addr);
+               &PCI_SBDF(seg, source_id), addr);
         kind = "DMAR";
         break;
     case INTR_REMAP:
         printk(XENLOG_G_WARNING VTDPREFIX
                "INTR-REMAP: Request device [%pp] "
                "fault index %"PRIx64"\n",
-               &PCI_SBDF2(seg, source_id), addr >> 48);
+               &PCI_SBDF(seg, source_id), addr >> 48);
         kind = "INTR-REMAP";
         break;
     default:
         printk(XENLOG_G_WARNING VTDPREFIX
                "UNKNOWN: Request device [%pp] "
                "fault addr %"PRIx64"\n",
-               &PCI_SBDF2(seg, source_id), addr);
+               &PCI_SBDF(seg, source_id), addr);
         kind = "UNKNOWN";
         break;
     }
@@ -1021,7 +1021,7 @@ static int iommu_page_fault_do_one(struct vtd_iommu *iommu, int type,
            kind, fault_reason, reason);
 
     if ( iommu_verbose && fault_type == DMA_REMAP )
-        print_vtd_entries(iommu, PCI_BUS(source_id), PCI_DEVFN2(source_id),
+        print_vtd_entries(iommu, PCI_BUS(source_id), PCI_DEVFN(source_id),
                           addr >> PAGE_SHIFT);
 
     return 0;
@@ -1099,7 +1099,7 @@ static void __do_iommu_page_fault(struct vtd_iommu *iommu)
                                 source_id, guest_addr);
 
         pci_check_disable_device(iommu->drhd->segment,
-                                 PCI_BUS(source_id), PCI_DEVFN2(source_id));
+                                 PCI_BUS(source_id), PCI_DEVFN(source_id));
 
         fault_index++;
         if ( fault_index > cap_num_fault_regs(iommu->cap) )
@@ -1603,7 +1603,7 @@ int domain_context_mapping_one(
                 check_cleanup_domid_map(domain, pdev, iommu);
             printk(XENLOG_ERR
                    "%pp: unexpected context entry %016lx_%016lx (expected %016lx_%016lx)\n",
-                   &PCI_SBDF3(seg, bus, devfn),
+                   &PCI_SBDF(seg, bus, devfn),
                    (uint64_t)(res >> 64), (uint64_t)res,
                    (uint64_t)(old >> 64), (uint64_t)old);
             rc = -EILSEQ;
@@ -1633,7 +1633,7 @@ int domain_context_mapping_one(
         if ( !(mode & (MAP_OWNER_DYING | MAP_SINGLE_DEVICE)) )
             printk(XENLOG_WARNING VTDPREFIX
                    " %pp: reassignment may cause %pd data corruption\n",
-                   &PCI_SBDF3(seg, bus, devfn), prev_dom);
+                   &PCI_SBDF(seg, bus, devfn), prev_dom);
 
         write_atomic(&context->lo, lctxt.lo);
         /* No barrier should be needed between these two. */
@@ -1643,7 +1643,7 @@ int domain_context_mapping_one(
     iommu_sync_cache(context, sizeof(struct context_entry));
     spin_unlock(&iommu->lock);
 
-    rc = iommu_flush_context_device(iommu, prev_did, PCI_BDF2(bus, devfn),
+    rc = iommu_flush_context_device(iommu, prev_did, PCI_BDF(bus, devfn),
                                     DMA_CCMD_MASK_NOBIT, !prev_dom);
     flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
     ret = iommu_flush_iotlb_dsi(iommu, prev_did, !prev_dom, flush_dev_iotlb);
@@ -1750,7 +1750,7 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
     case DEV_TYPE_PCI_HOST_BRIDGE:
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:Hostbridge: skip %pp map\n",
-                   domain, &PCI_SBDF3(seg, bus, devfn));
+                   domain, &PCI_SBDF(seg, bus, devfn));
         if ( !is_hardware_domain(domain) )
             return -EPERM;
         break;
@@ -1774,7 +1774,7 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
 
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:PCIe: map %pp\n",
-                   domain, &PCI_SBDF3(seg, bus, devfn));
+                   domain, &PCI_SBDF(seg, bus, devfn));
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn, pdev,
                                          DEVICE_DOMID(domain, pdev), pgd_maddr,
                                          mode);
@@ -1799,7 +1799,7 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
 
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:PCI: map %pp\n",
-                   domain, &PCI_SBDF3(seg, bus, devfn));
+                   domain, &PCI_SBDF(seg, bus, devfn));
 
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn,
                                          pdev, DEVICE_DOMID(domain, pdev),
@@ -1864,7 +1864,7 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
 
     default:
         dprintk(XENLOG_ERR VTDPREFIX, "%pd:unknown(%u): %pp\n",
-                domain, pdev->type, &PCI_SBDF3(seg, bus, devfn));
+                domain, pdev->type, &PCI_SBDF(seg, bus, devfn));
         ret = -EINVAL;
         break;
     }
@@ -1913,7 +1913,7 @@ int domain_context_unmap_one(
     iommu_sync_cache(context, sizeof(struct context_entry));
 
     rc = iommu_flush_context_device(iommu, iommu_domid,
-                                    PCI_BDF2(bus, devfn),
+                                    PCI_BDF(bus, devfn),
                                     DMA_CCMD_MASK_NOBIT, 0);
 
     flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
@@ -1972,7 +1972,7 @@ static const struct acpi_drhd_unit *domain_context_unmap(
     case DEV_TYPE_PCI_HOST_BRIDGE:
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:Hostbridge: skip %pp unmap\n",
-                   domain, &PCI_SBDF3(seg, bus, devfn));
+                   domain, &PCI_SBDF(seg, bus, devfn));
         return ERR_PTR(is_hardware_domain(domain) ? 0 : -EPERM);
 
     case DEV_TYPE_PCIe_BRIDGE:
@@ -1986,7 +1986,7 @@ static const struct acpi_drhd_unit *domain_context_unmap(
 
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:PCIe: unmap %pp\n",
-                   domain, &PCI_SBDF3(seg, bus, devfn));
+                   domain, &PCI_SBDF(seg, bus, devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
         if ( !ret && devfn == pdev->devfn && ats_device(pdev, drhd) > 0 )
             disable_ats_device(pdev);
@@ -1999,7 +1999,7 @@ static const struct acpi_drhd_unit *domain_context_unmap(
 
         if ( iommu_debug )
             printk(VTDPREFIX "%pd:PCI: unmap %pp\n",
-                   domain, &PCI_SBDF3(seg, bus, devfn));
+                   domain, &PCI_SBDF(seg, bus, devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
         if ( ret )
             break;
@@ -2032,7 +2032,7 @@ static const struct acpi_drhd_unit *domain_context_unmap(
 
     default:
         dprintk(XENLOG_ERR VTDPREFIX, "%pd:unknown(%u): %pp\n",
-                domain, pdev->type, &PCI_SBDF3(seg, bus, devfn));
+                domain, pdev->type, &PCI_SBDF(seg, bus, devfn));
         return ERR_PTR(-EINVAL);
     }
 
@@ -2232,9 +2232,7 @@ static int cf_check intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
 
     for_each_rmrr_device ( rmrr, bdf, i )
     {
-        if ( rmrr->segment == pdev->seg &&
-             PCI_BUS(bdf) == pdev->bus &&
-             PCI_DEVFN2(bdf) == devfn )
+        if ( rmrr->segment == pdev->seg && bdf == PCI_BDF(pdev->bus, devfn) )
         {
             /*
              * iommu_add_device() is only called for the hardware
@@ -2290,9 +2288,7 @@ static int cf_check intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
 
     for_each_rmrr_device ( rmrr, bdf, i )
     {
-        if ( rmrr->segment != pdev->seg ||
-             PCI_BUS(bdf) != pdev->bus ||
-             PCI_DEVFN2(bdf) != devfn )
+        if ( rmrr->segment != pdev->seg || bdf != PCI_BDF(pdev->bus, devfn) )
             continue;
 
         /*
@@ -2719,8 +2715,7 @@ static int cf_check reassign_device_ownership(
 
         for_each_rmrr_device( rmrr, bdf, i )
             if ( rmrr->segment == pdev->seg &&
-                 PCI_BUS(bdf) == pdev->bus &&
-                 PCI_DEVFN2(bdf) == devfn )
+                 bdf == PCI_BDF(pdev->bus, devfn) )
             {
                 /*
                  * Any RMRR flag is always ignored when remove a device,
@@ -2764,9 +2759,7 @@ static int cf_check intel_iommu_assign_device(
      */
     for_each_rmrr_device( rmrr, bdf, i )
     {
-        if ( rmrr->segment == seg &&
-             PCI_BUS(bdf) == bus &&
-             PCI_DEVFN2(bdf) == devfn &&
+        if ( rmrr->segment == seg && bdf == PCI_BDF(bus, devfn) &&
              rmrr->scope.devices_cnt > 1 )
         {
             bool_t relaxed = !!(flag & XEN_DOMCTL_DEV_RDM_RELAXED);
@@ -2776,7 +2769,7 @@ static int cf_check intel_iommu_assign_device(
                    " with shared RMRR at %"PRIx64" for %pd.\n",
                    relaxed ? XENLOG_WARNING : XENLOG_ERR,
                    relaxed ? "risky" : "disallowed",
-                   &PCI_SBDF3(seg, bus, devfn), rmrr->base_address, d);
+                   &PCI_SBDF(seg, bus, devfn), rmrr->base_address, d);
             if ( !relaxed )
                 return -EPERM;
         }
@@ -2788,9 +2781,7 @@ static int cf_check intel_iommu_assign_device(
     /* Setup rmrr identity mapping */
     for_each_rmrr_device( rmrr, bdf, i )
     {
-        if ( rmrr->segment == seg &&
-             PCI_BUS(bdf) == bus &&
-             PCI_DEVFN2(bdf) == devfn )
+        if ( rmrr->segment == seg && bdf == PCI_BDF(bus, devfn) )
         {
             ret = iommu_identity_mapping(d, p2m_access_rw, rmrr->base_address,
                                          rmrr->end_address, flag);
@@ -2813,9 +2804,7 @@ static int cf_check intel_iommu_assign_device(
 
     for_each_rmrr_device( rmrr, bdf, i )
     {
-        if ( rmrr->segment == seg &&
-             PCI_BUS(bdf) == bus &&
-             PCI_DEVFN2(bdf) == devfn )
+        if ( rmrr->segment == seg && bdf == PCI_BDF(bus, devfn) )
         {
             int rc = iommu_identity_mapping(d, p2m_access_x,
                                             rmrr->base_address,
@@ -2842,7 +2831,7 @@ static int cf_check intel_iommu_group_id(u16 seg, u8 bus, u8 devfn)
     if ( find_upstream_bridge(seg, &bus, &devfn, &secbus) < 0 )
         return -ENODEV;
 
-    return PCI_BDF2(bus, devfn);
+    return PCI_BDF(bus, devfn);
 }
 
 static int __must_check cf_check vtd_suspend(void)

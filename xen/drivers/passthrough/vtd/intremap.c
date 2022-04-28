@@ -498,7 +498,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
         case 4: sq = SQ_13_IGNORE_1; break;
         default: sq = SQ_ALL_16; break;
         }
-        set_ire_sid(ire, SVT_VERIFY_SID_SQ, sq, PCI_BDF2(bus, devfn));
+        set_ire_sid(ire, SVT_VERIFY_SID_SQ, sq, PCI_BDF(bus, devfn));
         break;
 
     case DEV_TYPE_PCI:
@@ -508,7 +508,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
         if ( ret == 0 ) /* integrated PCI device */
         {
             set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
-                        PCI_BDF2(bus, devfn));
+                        PCI_BDF(bus, devfn));
         }
         else if ( ret == 1 ) /* find upstream bridge */
         {
@@ -517,7 +517,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
                             (bus << 8) | pdev->bus);
             else
                 set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
-                            PCI_BDF2(bus, devfn));
+                            PCI_BDF(bus, devfn));
         }
         else
             dprintk(XENLOG_WARNING VTDPREFIX,

@@ -604,7 +604,7 @@ static struct amd_iommu *_find_iommu_for_device(int seg, int bdf)
     if ( iommu )
         return iommu;
 
-    AMD_IOMMU_DEBUG("No IOMMU for MSI dev = %pp\n", &PCI_SBDF2(seg, bdf));
+    AMD_IOMMU_DEBUG("No IOMMU for MSI dev = %pp\n", &PCI_SBDF(seg, bdf));
     return ERR_PTR(-EINVAL);
 }
 
@@ -814,7 +814,7 @@ static void dump_intremap_table(const struct amd_iommu *iommu,
         if ( ivrs_mapping )
         {
             printk("  %pp:\n",
-                   &PCI_SBDF2(iommu->seg, ivrs_mapping->dte_requestor_id));
+                   &PCI_SBDF(iommu->seg, ivrs_mapping->dte_requestor_id));
             ivrs_mapping = NULL;
         }
 

@@ -4902,7 +4902,7 @@ int cf_check mmcfg_intercept_write(
     if ( pci_conf_write_intercept(mmio_ctxt->seg, mmio_ctxt->bdf,
                                   offset, bytes, p_data) >= 0 )
         pci_mmcfg_write(mmio_ctxt->seg, PCI_BUS(mmio_ctxt->bdf),
-                        PCI_DEVFN2(mmio_ctxt->bdf), offset, bytes,
+                        PCI_DEVFN(mmio_ctxt->bdf), offset, bytes,
                         *(uint32_t *)p_data);
 
     return X86EMUL_OKAY;

@@ -562,7 +562,7 @@ static void cf_check parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 
         printk(XENLOG_ERR "AMD-Vi: %s: %pp d%u addr %016"PRIx64
                " flags %#x%s%s%s%s%s%s%s%s%s%s\n",
-               code_str, &PCI_SBDF2(iommu->seg, device_id),
+               code_str, &PCI_SBDF(iommu->seg, device_id),
                domain_id, addr, flags,
                (flags & 0xe00) ? " ??" : "",
                (flags & 0x100) ? " TR" : "",
@@ -578,7 +578,7 @@ static void cf_check parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
             if ( get_dma_requestor_id(iommu->seg, bdf) == device_id )
                 pci_check_disable_device(iommu->seg, PCI_BUS(bdf),
-                                         PCI_DEVFN2(bdf));
+                                         PCI_DEVFN(bdf));
     }
     else
         printk(XENLOG_ERR "%s %08x %08x %08x %08x\n",
@@ -631,18 +631,13 @@ static void iommu_check_event_log(struct amd_iommu *iommu)
 
 static void cf_check parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
-
-    u16 device_id;
-    u8 bus, devfn;
+    /* here device_id is physical value */
+    uint16_t device_id = iommu_get_devid_from_cmd(entry[0]);
     struct pci_dev *pdev;
 
-    /* here device_id is physical value */
-    device_id = iommu_get_devid_from_cmd(entry[0]);
-    bus = PCI_BUS(device_id);
-    devfn = PCI_DEVFN2(device_id);
-
     pcidevs_lock();
-    pdev = pci_get_real_pdev(iommu->seg, bus, devfn);
+    pdev = pci_get_real_pdev(iommu->seg, PCI_BUS(device_id),
+                             PCI_DEVFN(device_id));
     pcidevs_unlock();
 
     if ( pdev )
@@ -751,12 +746,12 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 
     pcidevs_lock();
     iommu->msi.dev = pci_get_pdev(iommu->seg, PCI_BUS(iommu->bdf),
-                                  PCI_DEVFN2(iommu->bdf));
+                                  PCI_DEVFN(iommu->bdf));
     pcidevs_unlock();
     if ( !iommu->msi.dev )
     {
         AMD_IOMMU_WARN("no pdev for %pp\n",
-                       &PCI_SBDF2(iommu->seg, iommu->bdf));
+                       &PCI_SBDF(iommu->seg, iommu->bdf));
         return 0;
     }
 
@@ -778,7 +773,7 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
         hw_irq_controller *handler;
         u16 control;
 
-        control = pci_conf_read16(PCI_SBDF2(iommu->seg, iommu->bdf),
+        control = pci_conf_read16(PCI_SBDF(iommu->seg, iommu->bdf),
                                   iommu->msi.msi_attrib.pos + PCI_MSI_FLAGS);
 
         iommu->msi.msi.nvec = 1;
@@ -842,22 +837,22 @@ static void amd_iommu_erratum_746_workaround(struct amd_iommu *iommu)
          (boot_cpu_data.x86_model > 0x1f) )
         return;
 
-    pci_conf_write32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf0, 0x90);
-    value = pci_conf_read32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf4);
+    pci_conf_write32(PCI_SBDF(iommu->seg, iommu->bdf), 0xf0, 0x90);
+    value = pci_conf_read32(PCI_SBDF(iommu->seg, iommu->bdf), 0xf4);
 
     if ( value & (1 << 2) )
         return;
 
     /* Select NB indirect register 0x90 and enable writing */
-    pci_conf_write32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf0, 0x90 | (1 << 8));
+    pci_conf_write32(PCI_SBDF(iommu->seg, iommu->bdf), 0xf0, 0x90 | (1 << 8));
 
-    pci_conf_write32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf4, value | (1 << 2));
+    pci_conf_write32(PCI_SBDF(iommu->seg, iommu->bdf), 0xf4, value | (1 << 2));
     printk(XENLOG_INFO
            "AMD-Vi: Applying erratum 746 workaround for IOMMU at %pp\n",
-           &PCI_SBDF2(iommu->seg, iommu->bdf));
+           &PCI_SBDF(iommu->seg, iommu->bdf));
 
     /* Clear the enable writing bit */
-    pci_conf_write32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf0, 0x90);
+    pci_conf_write32(PCI_SBDF(iommu->seg, iommu->bdf), 0xf0, 0x90);
 }
 
 static void enable_iommu(struct amd_iommu *iommu)
@@ -1288,7 +1283,7 @@ static int __init cf_check amd_iommu_setup_device_table(
                 if ( !pci_init )
                     continue;
                 pcidevs_lock();
-                pdev = pci_get_pdev(seg, PCI_BUS(bdf), PCI_DEVFN2(bdf));
+                pdev = pci_get_pdev(seg, PCI_BUS(bdf), PCI_DEVFN(bdf));
                 pcidevs_unlock();
             }
 

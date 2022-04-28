@@ -53,7 +53,7 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf)
             ivrs_mappings[bdf] = tmp;
 
             printk(XENLOG_WARNING "%pp not found in ACPI tables;"
-                   " using same IOMMU as function 0\n", &PCI_SBDF2(seg, bdf));
+                   " using same IOMMU as function 0\n", &PCI_SBDF(seg, bdf));
 
             /* write iommu field last */
             ivrs_mappings[bdf].iommu = ivrs_mappings[bd0].iommu;
@@ -144,7 +144,7 @@ static int __must_check amd_iommu_setup_domain_device(
                | (ivrs_dev->unity_map ? SET_ROOT_WITH_UNITY_MAP : 0);
 
     /* get device-table entry */
-    req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
+    req_id = get_dma_requestor_id(iommu->seg, PCI_BDF(bus, devfn));
     table = iommu->dev_table.buffer;
     dte = &table[req_id];
     ivrs_dev = &get_ivrs_mappings(iommu->seg)[req_id];
@@ -202,7 +202,7 @@ static int __must_check amd_iommu_setup_domain_device(
          * presence.  But let's deal with that case only if it is actually
          * found in the wild.
          */
-        if ( req_id != PCI_BDF2(bus, devfn) &&
+        if ( req_id != PCI_BDF(bus, devfn) &&
              (sr_flags & SET_ROOT_WITH_UNITY_MAP) )
             rc = -EOPNOTSUPP;
         else
@@ -231,7 +231,7 @@ static int __must_check amd_iommu_setup_domain_device(
              (any_pdev_behind_iommu(pdev->domain, pdev, iommu) ||
               pdev->phantom_stride) )
             AMD_IOMMU_WARN(" %pp: reassignment may cause %pd data corruption\n",
-                           &PCI_SBDF3(pdev->seg, bus, devfn), pdev->domain);
+                           &PCI_SBDF(pdev->seg, bus, devfn), pdev->domain);
 
         /*
          * Check remaining settings are still in place from an earlier call
@@ -414,7 +414,7 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
         disable_ats_device(pdev);
 
     BUG_ON ( iommu->dev_table.buffer == NULL );
-    req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
+    req_id = get_dma_requestor_id(iommu->seg, PCI_BDF(bus, devfn));
     table = iommu->dev_table.buffer;
     dte = &table[req_id];
 
@@ -461,7 +461,7 @@ static int cf_check reassign_device(
     if ( !iommu )
     {
         AMD_IOMMU_WARN("failed to find IOMMU: %pp cannot be assigned to %pd\n",
-                       &PCI_SBDF3(pdev->seg, pdev->bus, devfn), target);
+                       &PCI_SBDF(pdev->seg, pdev->bus, devfn), target);
         return -ENODEV;
     }
 
@@ -488,7 +488,7 @@ static int cf_check reassign_device(
     if ( !is_hardware_domain(source) )
     {
         const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
-        unsigned int bdf = PCI_BDF2(pdev->bus, devfn);
+        unsigned int bdf = PCI_BDF(pdev->bus, devfn);
 
         rc = amd_iommu_reserve_domain_unity_unmap(
                  source,
@@ -498,7 +498,7 @@ static int cf_check reassign_device(
     }
 
     AMD_IOMMU_DEBUG("Re-assign %pp from %pd to %pd\n",
-                    &PCI_SBDF3(pdev->seg, pdev->bus, devfn), source, target);
+                    &PCI_SBDF(pdev->seg, pdev->bus, devfn), source, target);
 
     return 0;
 }
@@ -507,7 +507,7 @@ static int cf_check amd_iommu_assign_device(
     struct domain *d, u8 devfn, struct pci_dev *pdev, u32 flag)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
-    int bdf = PCI_BDF2(pdev->bus, devfn);
+    unsigned int bdf = PCI_BDF(pdev->bus, devfn);
     int req_id = get_dma_requestor_id(pdev->seg, bdf);
     int rc = amd_iommu_reserve_domain_unity_map(
                  d, ivrs_mappings[req_id].unity_map, flag);
@@ -575,12 +575,12 @@ static int cf_check amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
         }
 
         AMD_IOMMU_WARN("no IOMMU for %pp; cannot be handed to %pd\n",
-                        &PCI_SBDF3(pdev->seg, pdev->bus, devfn), pdev->domain);
+                        &PCI_SBDF(pdev->seg, pdev->bus, devfn), pdev->domain);
         return -ENODEV;
     }
 
     ivrs_mappings = get_ivrs_mappings(pdev->seg);
-    bdf = PCI_BDF2(pdev->bus, devfn);
+    bdf = PCI_BDF(pdev->bus, devfn);
     if ( !ivrs_mappings ||
          !ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].valid )
         return -EPERM;
@@ -618,7 +618,7 @@ static int cf_check amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
              ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map,
              0) )
         AMD_IOMMU_WARN("%pd: unity mapping failed for %pp\n",
-                       pdev->domain, &PCI_SBDF2(pdev->seg, bdf));
+                       pdev->domain, &PCI_SBDF(pdev->seg, bdf));
 
     if ( iommu_quarantine && pdev->arch.pseudo_domid == DOMID_INVALID )
     {
@@ -651,20 +651,20 @@ static int cf_check amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     if ( !iommu )
     {
         AMD_IOMMU_WARN("failed to find IOMMU: %pp cannot be removed from %pd\n",
-                        &PCI_SBDF3(pdev->seg, pdev->bus, devfn), pdev->domain);
+                        &PCI_SBDF(pdev->seg, pdev->bus, devfn), pdev->domain);
         return -ENODEV;
     }
 
     amd_iommu_disable_domain_device(pdev->domain, iommu, devfn, pdev);
 
     ivrs_mappings = get_ivrs_mappings(pdev->seg);
-    bdf = PCI_BDF2(pdev->bus, devfn);
+    bdf = PCI_BDF(pdev->bus, devfn);
 
     if ( amd_iommu_reserve_domain_unity_unmap(
              pdev->domain,
              ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].unity_map) )
         AMD_IOMMU_WARN("%pd: unity unmapping failed for %pp\n",
-                       pdev->domain, &PCI_SBDF2(pdev->seg, bdf));
+                       pdev->domain, &PCI_SBDF(pdev->seg, bdf));
 
     amd_iommu_quarantine_teardown(pdev);
 
@@ -681,7 +681,7 @@ static int cf_check amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
 
 static int cf_check amd_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 {
-    int bdf = PCI_BDF2(bus, devfn);
+    unsigned int bdf = PCI_BDF(bus, devfn);
 
     return (bdf < ivrs_bdf_entries) ? get_dma_requestor_id(seg, bdf) : bdf;
 }

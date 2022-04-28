@@ -553,7 +553,7 @@ int __init pci_ro_device(int seg, int bus, int devfn)
         memset(pseg->ro_map, 0, sz);
     }
 
-    __set_bit(PCI_BDF2(bus, devfn), pseg->ro_map);
+    __set_bit(PCI_BDF(bus, devfn), pseg->ro_map);
     _pci_hide_device(pdev);
 
     return 0;
@@ -957,7 +957,7 @@ static int deassign_device(struct domain *d, uint16_t seg, uint8_t bus,
  out:
     if ( ret )
         printk(XENLOG_G_ERR "%pd: deassign (%pp) failed (%d)\n",
-               d, &PCI_SBDF3(seg, bus, devfn), ret);
+               d, &PCI_SBDF(seg, bus, devfn), ret);
 
     return ret;
 }
@@ -1406,7 +1406,7 @@ static int iommu_add_device(struct pci_dev *pdev)
         rc = iommu_call(hd->platform_ops, add_device, devfn, pci_to_dev(pdev));
         if ( rc )
             printk(XENLOG_WARNING "IOMMU: add %pp failed (%d)\n",
-                   &PCI_SBDF3(pdev->seg, pdev->bus, devfn), rc);
+                   &PCI_SBDF(pdev->seg, pdev->bus, devfn), rc);
     }
 }
 
@@ -1452,7 +1452,7 @@ static int iommu_remove_device(struct pci_dev *pdev)
             continue;
 
         printk(XENLOG_ERR "IOMMU: remove %pp failed (%d)\n",
-               &PCI_SBDF3(pdev->seg, pdev->bus, devfn), rc);
+               &PCI_SBDF(pdev->seg, pdev->bus, devfn), rc);
         return rc;
     }
 
@@ -1536,7 +1536,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
  done:
     if ( rc )
         printk(XENLOG_G_WARNING "%pd: assign (%pp) failed (%d)\n",
-               d, &PCI_SBDF3(seg, bus, devfn), rc);
+               d, &PCI_SBDF(seg, bus, devfn), rc);
     /* The device is assigned to dom_io so mark it as quarantined */
     else if ( d == dom_io )
         pdev->quarantine = true;
@@ -1647,7 +1647,7 @@ int iommu_do_pci_domctl(
 
         seg = domctl->u.get_device_group.machine_sbdf >> 16;
         bus = PCI_BUS(domctl->u.get_device_group.machine_sbdf);
-        devfn = PCI_DEVFN2(domctl->u.get_device_group.machine_sbdf);
+        devfn = PCI_DEVFN(domctl->u.get_device_group.machine_sbdf);
         max_sdevs = domctl->u.get_device_group.max_sdevs;
         sdevs = domctl->u.get_device_group.sdev_array;
 
@@ -1697,7 +1697,7 @@ int iommu_do_pci_domctl(
 
         seg = machine_sbdf >> 16;
         bus = PCI_BUS(machine_sbdf);
-        devfn = PCI_DEVFN2(machine_sbdf);
+        devfn = PCI_DEVFN(machine_sbdf);
 
         pcidevs_lock();
         ret = device_assigned(seg, bus, devfn);
@@ -1706,7 +1706,7 @@ int iommu_do_pci_domctl(
             if ( ret )
             {
                 printk(XENLOG_G_INFO "%pp already assigned, or non-existent\n",
-                       &PCI_SBDF3(seg, bus, devfn));
+                       &PCI_SBDF(seg, bus, devfn));
                 ret = -EINVAL;
             }
         }
@@ -1742,7 +1742,7 @@ int iommu_do_pci_domctl(
 
         seg = machine_sbdf >> 16;
         bus = PCI_BUS(machine_sbdf);
-        devfn = PCI_DEVFN2(machine_sbdf);
+        devfn = PCI_DEVFN(machine_sbdf);
 
         pcidevs_lock();
         ret = deassign_device(d, seg, bus, devfn);

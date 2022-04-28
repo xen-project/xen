@@ -46,12 +46,12 @@ int pci_find_next_cap(u16 seg, u8 bus, unsigned int devfn, u8 pos, int cap)
 
     while ( ttl-- )
     {
-        pos = pci_conf_read8(PCI_SBDF3(seg, bus, devfn), pos);
+        pos = pci_conf_read8(PCI_SBDF(seg, bus, devfn), pos);
         if ( pos < 0x40 )
             break;
 
         pos &= ~3;
-        id = pci_conf_read8(PCI_SBDF3(seg, bus, devfn), pos + PCI_CAP_LIST_ID);
+        id = pci_conf_read8(PCI_SBDF(seg, bus, devfn), pos + PCI_CAP_LIST_ID);
 
         if ( id == 0xff )
             break;
@@ -93,7 +93,7 @@ int pci_find_next_ext_capability(int seg, int bus, int devfn, int start, int cap
     int ttl = 480; /* 3840 bytes, minimum 8 bytes per capability */
     int pos = max(start, 0x100);
 
-    header = pci_conf_read32(PCI_SBDF3(seg, bus, devfn), pos);
+    header = pci_conf_read32(PCI_SBDF(seg, bus, devfn), pos);
 
     /*
      * If we have no capabilities, this is indicated by cap ID,
@@ -109,7 +109,7 @@ int pci_find_next_ext_capability(int seg, int bus, int devfn, int start, int cap
         pos = PCI_EXT_CAP_NEXT(header);
         if ( pos < 0x100 )
             break;
-        header = pci_conf_read32(PCI_SBDF3(seg, bus, devfn), pos);
+        header = pci_conf_read32(PCI_SBDF(seg, bus, devfn), pos);
     }
     return 0;
 }
@@ -162,7 +162,7 @@ const char *__init parse_pci_seg(const char *s, unsigned int *seg_p,
     else
         func = 0;
     if ( seg != (seg_p ? (u16)seg : 0) ||
-         bus != PCI_BUS(PCI_BDF2(bus, 0)) ||
+         bus != PCI_BUS(PCI_BDF(bus, 0)) ||
          dev != PCI_SLOT(PCI_DEVFN(dev, 0)) ||
          func != PCI_FUNC(PCI_DEVFN(0, func)) )
         return NULL;

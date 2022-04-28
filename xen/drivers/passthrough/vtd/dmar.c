@@ -222,7 +222,7 @@ struct acpi_drhd_unit *acpi_find_matched_drhd_unit(const struct pci_dev *pdev)
             continue;
 
         for (i = 0; i < drhd->scope.devices_cnt; i++)
-            if ( drhd->scope.devices[i] == PCI_BDF2(bus, devfn) )
+            if ( drhd->scope.devices[i] == PCI_BDF(bus, devfn) )
                 return drhd;
 
         if ( test_bit(bus, drhd->scope.buses) )
@@ -1062,7 +1062,7 @@ int cf_check intel_iommu_get_reserved_device_memory(
 
         rc = func(PFN_DOWN(rmrr->base_address),
                   PFN_UP(rmrr->end_address) - PFN_DOWN(rmrr->base_address),
-                  PCI_SBDF2(rmrr->segment, bdf).sbdf, ctxt);
+                  PCI_SBDF(rmrr->segment, bdf).sbdf, ctxt);
 
         if ( unlikely(rc < 0) )
             return rc;

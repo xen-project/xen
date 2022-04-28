@@ -540,7 +540,7 @@ int cf_check amd_iommu_get_reserved_device_memory(
 
     for ( bdf = 0; bdf < ivrs_bdf_entries; ++bdf )
     {
-        pci_sbdf_t sbdf = PCI_SBDF2(seg, bdf);
+        pci_sbdf_t sbdf = PCI_SBDF(seg, bdf);
         const struct ivrs_unity_map *um = ivrs_mappings[bdf].unity_map;
         unsigned int req = ivrs_mappings[bdf].dte_requestor_id;
         const struct amd_iommu *iommu = ivrs_mappings[bdf].iommu;
@@ -569,7 +569,7 @@ int cf_check amd_iommu_get_reserved_device_memory(
              * the same alias ID.
              */
             if ( bdf != req && ivrs_mappings[req].iommu &&
-                 func(0, 0, PCI_SBDF2(seg, req).sbdf, ctxt) )
+                 func(0, 0, PCI_SBDF(seg, req).sbdf, ctxt) )
                 continue;
 
             if ( global == pending )

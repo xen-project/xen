@@ -96,7 +96,7 @@ static void __init add_ivrs_mapping_entry(
 
             if ( !ivrs_mappings[alias_id].intremap_table )
                 panic("No memory for %pp's IRT\n",
-                      &PCI_SBDF2(iommu->seg, alias_id));
+                      &PCI_SBDF(iommu->seg, alias_id));
         }
     }
 
@@ -790,7 +790,7 @@ static u16 __init parse_ivhd_device_special(
     }
 
     AMD_IOMMU_DEBUG("IVHD Special: %pp variety %#x handle %#x\n",
-                    &PCI_SBDF2(seg, bdf), special->variety, special->handle);
+                    &PCI_SBDF(seg, bdf), special->variety, special->handle);
     add_ivrs_mapping_entry(bdf, bdf, special->header.data_setting, 0, true,
                            iommu);
 
@@ -816,7 +816,7 @@ static u16 __init parse_ivhd_device_special(
             AMD_IOMMU_DEBUG("IVHD: Command line override present for IO-APIC %#x"
                             "(IVRS: %#x devID %pp)\n",
                             ioapic_sbdf[idx].id, special->handle,
-                            &PCI_SBDF2(seg, bdf));
+                            &PCI_SBDF(seg, bdf));
             break;
         }
 
@@ -888,7 +888,7 @@ static u16 __init parse_ivhd_device_special(
             AMD_IOMMU_DEBUG("IVHD: Command line override present for HPET %#x "
                             "(IVRS: %#x devID %pp)\n",
                             hpet_sbdf.id, special->handle,
-                            &PCI_SBDF2(seg, bdf));
+                            &PCI_SBDF(seg, bdf));
             break;
         case HPET_NONE:
             /* set device id of hpet */

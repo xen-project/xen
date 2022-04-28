@@ -231,7 +231,7 @@ int __init amd_iommu_detect_one_acpi(
     rt = pci_ro_device(iommu->seg, bus, PCI_DEVFN(dev, func));
     if ( rt )
         printk(XENLOG_ERR "Could not mark config space of %pp read-only (%d)\n",
-               &PCI_SBDF2(iommu->seg, iommu->bdf), rt);
+               &PCI_SBDF(iommu->seg, iommu->bdf), rt);
 
     list_add_tail(&iommu->list, &amd_iommu_head);
     rt = 0;

@@ -313,7 +313,7 @@ static int __init pci_mmcfg_check_hostbridge(void)
     for (i = 0; !name && i < ARRAY_SIZE(pci_mmcfg_probes); i++) {
         bus =  pci_mmcfg_probes[i].bus;
         devfn = pci_mmcfg_probes[i].devfn;
-        l = pci_conf_read32(PCI_SBDF3(0, bus, devfn), 0);
+        l = pci_conf_read32(PCI_SBDF(0, bus, devfn), 0);
         vendor = l & 0xffff;
         device = (l >> 16) & 0xffff;
 
