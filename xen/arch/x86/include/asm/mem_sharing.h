@@ -85,6 +85,9 @@ static inline bool mem_sharing_is_fork(const struct domain *d)
 int mem_sharing_fork_page(struct domain *d, gfn_t gfn,
                           bool unsharing);
 
+int mem_sharing_fork_reset(struct domain *d, bool reset_state,
+                           bool reset_memory);
+
 /*
  * If called by a foreign domain, possible errors are
  *   -EBUSY -> ring full
@@ -144,6 +147,12 @@ static inline bool mem_sharing_is_fork(const struct domain *d)
 }
 
 static inline int mem_sharing_fork_page(struct domain *d, gfn_t gfn, bool lock)
+{
+    return -EOPNOTSUPP;
+}
+
+static inline int mem_sharing_fork_reset(struct domain *d, bool reset_state,
+                                         bool reset_memory)
 {
     return -EOPNOTSUPP;
 }
