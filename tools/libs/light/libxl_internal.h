@@ -1569,6 +1569,11 @@ _hidden int libxl__domain_need_memory_calculate(libxl__gc *gc,
                                       libxl_domain_build_info *b_info,
                                       uint64_t *need_memkb);
 
+_hidden unsigned long libxl__get_required_paging_memory(unsigned long maxmem_kb,
+                                                        unsigned int smp_cpus,
+                                                        libxl_domain_type type,
+                                                        bool hap);
+
 _hidden const char *libxl__device_nic_devname(libxl__gc *gc,
                                               uint32_t domid,
                                               uint32_t devid,

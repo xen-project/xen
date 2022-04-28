@@ -1027,6 +1027,24 @@ static bool ok_to_default_memkb_in_create(libxl__gc *gc)
      */
 }
 
+unsigned long libxl__get_required_paging_memory(unsigned long maxmem_kb,
+                                                unsigned int smp_cpus,
+                                                libxl_domain_type type,
+                                                bool hap)
+{
+    /*
+     * 256 pages (1MB) per vcpu,
+     * plus 1 page per MiB of RAM for the P2M map (for non-PV guests),
+     * plus 1 page per MiB of RAM to shadow the resident processes (for shadow
+     * mode guests).
+     * This is higher than the minimum that Xen would allocate if no value
+     * were given (but the Xen minimum is for safety, not performance).
+     */
+    return 4 * (256 * smp_cpus +
+                ((type != LIBXL_DOMAIN_TYPE_PV) + !hap) *
+                (maxmem_kb / 1024));
+}
+
 static unsigned long libxl__get_required_iommu_memory(unsigned long maxmem_kb)
 {
     unsigned long iommu_pages = 0, mem_pages = maxmem_kb / 4;
@@ -1194,10 +1212,16 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
     }
 
     if (d_config->b_info.shadow_memkb == LIBXL_MEMKB_DEFAULT
-        && ok_to_default_memkb_in_create(gc))
+        && ok_to_default_memkb_in_create(gc)) {
+        bool hap = d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV &&
+                   libxl_defbool_val(d_config->c_info.hap);
+
         d_config->b_info.shadow_memkb =
-            libxl_get_required_shadow_memory(d_config->b_info.max_memkb,
-                                             d_config->b_info.max_vcpus);
+            libxl__get_required_paging_memory(d_config->b_info.max_memkb,
+                                              d_config->b_info.max_vcpus,
+                                              d_config->c_info.type,
+                                              hap);
+    }
 
     /* No IOMMU reservation is needed if passthrough mode is not 'sync_pt' */
     if (d_config->b_info.iommu_memkb == LIBXL_MEMKB_DEFAULT
