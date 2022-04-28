@@ -32,10 +32,10 @@ static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
 #define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
 
 /*
- * Set larger than any possible value, so the number of IPA bits can be
+ * Set to the maximum configured support for IPA bits, so the number of IPA bits can be
  * restricted by external entity (e.g. IOMMU).
  */
-unsigned int __read_mostly p2m_ipa_bits = 64;
+unsigned int __read_mostly p2m_ipa_bits = PADDR_BITS;
 
 /* Helpers to lookup the properties of each level */
 static const paddr_t level_masks[] =
@@ -2030,7 +2030,7 @@ void __init setup_virt_paging(void)
         unsigned int root_order; /* Page order of the root of the p2m */
         unsigned int sl0;    /* Desired SL0, maximum in comment */
     } pa_range_info[] = {
-        /* T0SZ minimum and SL0 maximum from ARM DDI 0487A.b Table D4-5 */
+        /* T0SZ minimum and SL0 maximum from ARM DDI 0487H.a Table D5-6 */
         /*      PA size, t0sz(min), root-order, sl0(max) */
         [0] = { 32,      32/*32*/,  0,          1 },
         [1] = { 36,      28/*28*/,  0,          1 },
@@ -2038,7 +2038,7 @@ void __init setup_virt_paging(void)
         [3] = { 42,      22/*22*/,  3,          1 },
         [4] = { 44,      20/*20*/,  0,          2 },
         [5] = { 48,      16/*16*/,  0,          2 },
-        [6] = { 0 }, /* Invalid */
+        [6] = { 52,      12/*12*/,  3,          3 },
         [7] = { 0 }  /* Invalid */
     };
 
@@ -2069,7 +2069,7 @@ void __init setup_virt_paging(void)
         }
     }
 
-    /* pa_range is 4 bits, but the defined encodings are only 3 bits */
+    /* pa_range is 4 bits but we don't support all modes */
     if ( pa_range >= ARRAY_SIZE(pa_range_info) || !pa_range_info[pa_range].pabits )
         panic("Unknown encoding of ID_AA64MMFR0_EL1.PARange %x\n", pa_range);
 

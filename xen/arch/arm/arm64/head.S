@@ -473,6 +473,12 @@ cpu_init:
         ldr   x0, =(TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(64-48))
         /* ID_AA64MMFR0_EL1[3:0] (PARange) corresponds to TCR_EL2[18:16] (PS) */
         mrs   x1, ID_AA64MMFR0_EL1
+        /* Limit to 48 bits, 256TB PA range (#5) */
+        ubfm  x1, x1, #0, #3
+        mov   x2, #5
+        cmp   x1, x2
+        csel  x1, x1, x2, lt
+
         bfi   x0, x1, #16, #3
 
         msr   tcr_el2, x0
