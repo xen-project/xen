@@ -271,7 +271,7 @@ enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
 ### cet
-    = List of [ shstk=<bool>, ibt=<bool> ]
+    = List of [ <bool>, shstk=<bool>, ibt=<bool> ]
 
     Applicability: x86
 
@@ -282,6 +282,8 @@ call/jmp COP/JOP) attacks.
 CET is incompatible with 32bit PV guests.  If any CET sub-options are active,
 they will override the `pv=32` boolean to `false`.  Backwards compatibility
 can be maintained with the pv-shim mechanism.
+
+*   An unqualified boolean is a shorthand for setting all suboptions at once.
 
 *   The `shstk=` boolean controls whether Xen uses Shadow Stacks for its own
     protection.

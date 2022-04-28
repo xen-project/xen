@@ -121,7 +121,19 @@ static int __init cf_check parse_cet(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( (val = parse_boolean("shstk", s, ss)) >= 0 )
+        if ( (val = parse_bool(s, ss)) >= 0 )
+        {
+#if !defined(CONFIG_XEN_SHSTK) && !defined(CONFIG_XEN_IBT)
+            no_config_param("XEN_{SHSTK,IBT}", "cet", s, ss);
+#endif
+#ifdef CONFIG_XEN_SHSTK
+            opt_xen_shstk = val;
+#endif
+#ifdef CONFIG_XEN_IBT
+            opt_xen_ibt = val;
+#endif
+        }
+        else if ( (val = parse_boolean("shstk", s, ss)) >= 0 )
         {
 #ifdef CONFIG_XEN_SHSTK
             opt_xen_shstk = val;
