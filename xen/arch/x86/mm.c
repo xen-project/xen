@@ -842,7 +842,7 @@ get_page_from_l1e(
 {
     unsigned long mfn = l1e_get_pfn(l1e);
     struct page_info *page = mfn_to_page(_mfn(mfn));
-    uint32_t l1f = l1e_get_flags(l1e);
+    uint32_t l1f = l1e_get_flags(l1e), disallow;
     struct vcpu *curr = current;
     struct domain *real_pg_owner;
     bool write, valid;
@@ -853,10 +853,10 @@ get_page_from_l1e(
         return 0;
     }
 
-    if ( unlikely(l1f & l1_disallow_mask(l1e_owner)) )
+    disallow = l1_disallow_mask(l1e_owner);
+    if ( unlikely(l1f & disallow) )
     {
-        gdprintk(XENLOG_WARNING, "Bad L1 flags %x\n",
-                 l1f & l1_disallow_mask(l1e_owner));
+        gdprintk(XENLOG_WARNING, "Bad L1 flags %#x\n", l1f & disallow);
         return -EINVAL;
     }
 
@@ -2155,11 +2155,12 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         struct page_info *page = NULL;
+        uint32_t disallow = l1_disallow_mask(pt_dom);
 
-        if ( unlikely(l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom)) )
+        if ( unlikely(l1e_get_flags(nl1e) & disallow) )
         {
-            gdprintk(XENLOG_WARNING, "Bad L1 flags %x\n",
-                    l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom));
+            gdprintk(XENLOG_WARNING, "Bad L1 flags %#x\n",
+                     l1e_get_flags(nl1e) & disallow);
             return -EINVAL;
         }
 
