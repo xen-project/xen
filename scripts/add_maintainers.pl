@@ -32,7 +32,7 @@ $get_maintainer =~ s/add_maintainers/get_maintainer/;
 my $usage = <<EOT;
 OPTIONS:
 --------
-USAGE: $tool [options] (--patchdir | -d) <patchdir>
+USAGE: $tool [options] (--patchdir | -d | -o) <patchdir>
 
   --reroll-count <n> | -v <n>
     Choose patch files for specific version. This results into the
@@ -223,7 +223,7 @@ my $patch_ext           = ".patch";
 my $maintainers         = "MAINTAINERS";
 
 if (!GetOptions(
-                'd|patchdir=s'     => \$patch_dir,
+                'd|o|patchdir=s'   => \$patch_dir,
                 'v|reroll-count=i' => \$rerollcount,
                 'p|patchcc=s'      => \$plocation,
                 'c|covercc=s'      => \$clocation,
