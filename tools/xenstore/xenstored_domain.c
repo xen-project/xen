@@ -231,7 +231,7 @@ static int destroy_domain(void *_domain)
 			unmap_interface(domain->interface);
 	}
 
-	fire_watches(NULL, domain, "@releaseDomain", NULL, false, NULL);
+	fire_watches(NULL, domain, "@releaseDomain", NULL, true, NULL);
 
 	wrl_domain_destroy(domain);
 
@@ -282,7 +282,7 @@ void check_domains(void)
 	}
 
 	if (notify)
-		fire_watches(NULL, NULL, "@releaseDomain", NULL, false, NULL);
+		fire_watches(NULL, NULL, "@releaseDomain", NULL, true, NULL);
 }
 
 /* We scan all domains rather than use the information given here. */
@@ -495,7 +495,7 @@ static struct domain *introduce_domain(const void *ctx,
 
 		if (!is_master_domain && !restore)
 			fire_watches(NULL, ctx, "@introduceDomain", NULL,
-				     false, NULL);
+				     true, NULL);
 	} else {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
