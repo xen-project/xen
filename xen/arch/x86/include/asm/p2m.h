@@ -701,6 +701,12 @@ int p2m_pod_empty_cache(struct domain *d);
  * domain matches target */
 int p2m_pod_set_mem_target(struct domain *d, unsigned long target);
 
+/* Obtain a consistent snapshot of PoD related domain state. */
+void p2m_pod_get_mem_target(const struct domain *d, xen_pod_target_t *target);
+
+/* Check whether PoD is (still) active in a domain. */
+bool p2m_pod_active(const struct domain *d);
+
 /* Scan pod cache when offline/broken page triggered */
 int
 p2m_pod_offline_or_broken_hit(struct page_info *p);
@@ -708,11 +714,6 @@ p2m_pod_offline_or_broken_hit(struct page_info *p);
 /* Replace pod cache when offline/broken page triggered */
 void
 p2m_pod_offline_or_broken_replace(struct page_info *p);
-
-static inline long p2m_pod_entry_count(const struct p2m_domain *p2m)
-{
-    return p2m->pod.entry_count;
-}
 
 #else
 
@@ -727,6 +728,11 @@ static inline int p2m_pod_empty_cache(struct domain *d)
     return 0;
 }
 
+static inline bool p2m_pod_active(const struct domain *d)
+{
+    return false;
+}
+
 static inline int p2m_pod_offline_or_broken_hit(struct page_info *p)
 {
     return 0;
@@ -735,11 +741,6 @@ static inline int p2m_pod_offline_or_broken_hit(struct page_info *p)
 static inline void p2m_pod_offline_or_broken_replace(struct page_info *p)
 {
     ASSERT_UNREACHABLE();
-}
-
-static inline long p2m_pod_entry_count(const struct p2m_domain *p2m)
-{
-    return 0;
 }
 
 #endif

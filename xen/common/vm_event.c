@@ -655,7 +655,7 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
 
             rc = -EXDEV;
             /* Disallow paging in a PoD guest */
-            if ( p2m_pod_entry_count(p2m_get_hostp2m(d)) )
+            if ( p2m_pod_active(d) )
                 break;
 
             /* domain_pause() not required here, see XSA-99 */

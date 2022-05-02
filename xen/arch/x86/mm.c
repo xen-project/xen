@@ -4804,7 +4804,6 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         xen_pod_target_t target;
         struct domain *d;
-        struct p2m_domain *p2m;
 
         if ( copy_from_guest(&target, arg, 1) )
             return -EFAULT;
@@ -4835,10 +4834,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         }
         else if ( rc >= 0 )
         {
-            p2m = p2m_get_hostp2m(d);
-            target.tot_pages       = domain_tot_pages(d);
-            target.pod_cache_pages = p2m->pod.count;
-            target.pod_entries     = p2m->pod.entry_count;
+            p2m_pod_get_mem_target(d, &target);
 
             if ( __copy_to_guest(arg, &target, 1) )
                 rc = -EFAULT;

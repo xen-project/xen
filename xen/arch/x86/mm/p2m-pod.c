@@ -20,6 +20,7 @@
  */
 
 #include <xen/event.h>
+#include <xen/iocap.h>
 #include <xen/ioreq.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
@@ -360,12 +361,32 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
 
     ASSERT( pod_target >= p2m->pod.count );
 
-    ret = p2m_pod_set_cache_target(p2m, pod_target, 1/*preemptible*/);
+    if ( has_arch_pdevs(d) || cache_flush_permitted(d) )
+        ret = -ENOTEMPTY;
+    else
+        ret = p2m_pod_set_cache_target(p2m, pod_target, 1/*preemptible*/);
 
 out:
     pod_unlock(p2m);
 
     return ret;
+}
+
+void p2m_pod_get_mem_target(const struct domain *d, xen_pod_target_t *target)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    ASSERT(is_hvm_domain(d));
+
+    pod_lock(p2m);
+    lock_page_alloc(p2m);
+
+    target->tot_pages       = domain_tot_pages(d);
+    target->pod_cache_pages = p2m->pod.count;
+    target->pod_entries     = p2m->pod.entry_count;
+
+    unlock_page_alloc(p2m);
+    pod_unlock(p2m);
 }
 
 int p2m_pod_empty_cache(struct domain *d)
@@ -1391,6 +1412,9 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     if ( !paging_mode_translate(d) )
         return -EINVAL;
 
+    if ( has_arch_pdevs(d) || cache_flush_permitted(d) )
+        return -ENOTEMPTY;
+
     do {
         rc = mark_populate_on_demand(d, gfn, chunk_order);
 
@@ -1411,4 +1435,21 @@ void p2m_pod_init(struct p2m_domain *p2m)
 
     for ( i = 0; i < ARRAY_SIZE(p2m->pod.mrp.list); ++i )
         p2m->pod.mrp.list[i] = gfn_x(INVALID_GFN);
+}
+
+bool p2m_pod_active(const struct domain *d)
+{
+    struct p2m_domain *p2m;
+    bool res;
+
+    if ( !is_hvm_domain(d) )
+        return false;
+
+    p2m = p2m_get_hostp2m(d);
+
+    pod_lock(p2m);
+    res = p2m->pod.entry_count | p2m->pod.count;
+    pod_unlock(p2m);
+
+    return res;
 }
