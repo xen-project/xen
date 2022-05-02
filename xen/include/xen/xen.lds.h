@@ -18,11 +18,11 @@
  * for PE output, in order to record that we'd prefer these sections to not
  * be loaded into memory.
  */
-#define DECL_DEBUG(x, a) #x ALIGN(a) (NOLOAD) : { *(x) }
-#define DECL_DEBUG2(x, y, a) #x ALIGN(a) (NOLOAD) : { *(x) *(y) }
+#define DECL_DEBUG(x, a) x ALIGN(a) (NOLOAD) : { *(x) }
+#define DECL_DEBUG2(x, y, a) x ALIGN(a) (NOLOAD) : { *(x) *(y) }
 #else
-#define DECL_DEBUG(x, a) #x 0 : { *(x) }
-#define DECL_DEBUG2(x, y, a) #x 0 : { *(x) *(y) }
+#define DECL_DEBUG(x, a) x 0 : { *(x) }
+#define DECL_DEBUG2(x, y, a) x 0 : { *(x) *(y) }
 #endif
 
 /*
