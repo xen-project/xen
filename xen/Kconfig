@@ -23,6 +23,12 @@ config CLANG_VERSION
 	int
 	default $(shell,$(srctree)/scripts/clang-version.sh $(CC))
 
+config LD_IS_GNU
+	def_bool $(success,$(LD) --version | head -n 1 | grep -q "^GNU ld")
+
+config LD_IS_LLVM
+	def_bool $(success,$(LD) --version | head -n 1 | grep -q "^LLD")
+
 # -fvisibility=hidden reduces -fpic cost, if it's available
 config CC_HAS_VISIBILITY_ATTRIBUTE
 	def_bool $(cc-option,-fvisibility=hidden)
