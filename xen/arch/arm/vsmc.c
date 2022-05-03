@@ -104,8 +104,13 @@ static bool handle_arch(struct cpu_user_regs *regs)
         switch ( arch_func_id )
         {
         case ARM_SMCCC_ARCH_WORKAROUND_1_FID:
-            if ( cpus_have_cap(ARM_HARDEN_BRANCH_PREDICTOR) )
-                ret = 0;
+            /*
+             * Workaround 3 is also mitigating spectre v2 so advertise that we
+             * support Workaround 1 if we do Workaround 3 on exception entry.
+             */
+            if ( cpus_have_cap(ARM_HARDEN_BRANCH_PREDICTOR) ||
+                 cpus_have_cap(ARM_WORKAROUND_BHB_SMCC_3) )
+                ret = ARM_SMCCC_SUCCESS;
             break;
         case ARM_SMCCC_ARCH_WORKAROUND_2_FID:
             switch ( get_ssbd_state() )
@@ -126,7 +131,7 @@ static bool handle_arch(struct cpu_user_regs *regs)
             break;
         case ARM_SMCCC_ARCH_WORKAROUND_3_FID:
             if ( cpus_have_cap(ARM_WORKAROUND_BHB_SMCC_3) )
-                ret = 0;
+                ret = ARM_SMCCC_SUCCESS;
             break;
         }
 
