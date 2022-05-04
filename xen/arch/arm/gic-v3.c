@@ -701,6 +701,9 @@ static bool gicv3_enable_lpis(void)
     val = readl_relaxed(GICD_RDIST_BASE + GICR_CTLR);
     writel_relaxed(val | GICR_CTLR_ENABLE_LPIS, GICD_RDIST_BASE + GICR_CTLR);
 
+    /* Make sure the GIC has seen the above */
+    wmb();
+
     return true;
 }
 
@@ -818,11 +821,11 @@ static int gicv3_cpu_init(void)
     /* If the host has any ITSes, enable LPIs now. */
     if ( gicv3_its_host_has_its() )
     {
+        if ( !gicv3_enable_lpis() )
+            return -EBUSY;
         ret = gicv3_its_setup_collection(smp_processor_id());
         if ( ret )
             return ret;
-        if ( !gicv3_enable_lpis() )
-            return -EBUSY;
     }
 
     /* Set priority on PPI and SGI interrupts */
