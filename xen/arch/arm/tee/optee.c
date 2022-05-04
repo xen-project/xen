@@ -1136,6 +1136,13 @@ static int handle_rpc_return(struct optee_domain *ctx,
         }
         unmap_domain_page(shm_rpc->xen_arg);
     }
+    else if ( call->rpc_op == OPTEE_SMC_RPC_FUNC_FREE )
+    {
+        uint64_t cookie = regpair_to_uint64(get_user_reg(regs, 1),
+                                            get_user_reg(regs, 2));
+
+        free_shm_rpc(ctx, cookie);
+    }
 
     return ret;
 }
@@ -1584,13 +1591,6 @@ static void handle_rpc(struct optee_domain *ctx, struct cpu_user_regs *regs)
     case OPTEE_SMC_RPC_FUNC_ALLOC:
         handle_rpc_func_alloc(ctx, regs, call);
         return;
-    case OPTEE_SMC_RPC_FUNC_FREE:
-    {
-        uint64_t cookie = regpair_to_uint64(call->rpc_params[0],
-                                            call->rpc_params[1]);
-        free_shm_rpc(ctx, cookie);
-        break;
-    }
     case OPTEE_SMC_RPC_FUNC_FOREIGN_INTR:
         break;
     case OPTEE_SMC_RPC_FUNC_CMD:
