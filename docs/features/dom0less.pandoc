@@ -90,6 +90,46 @@ Otherwise, they may be unusable in Xen (for instance if they are compressed).
 
 See docs/misc/arm/device-tree/booting.txt for more information.
 
+PV Drivers
+----------
+
+It is possible to use PV drivers with dom0less guests with some
+restrictions:
+
+- dom0less domUs that want to use PV drivers support should have the
+  "xen,enhanced" property set under their device tree nodes (see
+  docs/misc/arm/device-tree/booting.txt)
+- a dom0 must be present (or another domain with enough privileges to
+  run the toolstack)
+- after dom0 is booted, the utility "init-dom0less" must be run
+- do not run "init-dom0less" while creating other guests with xl
+
+After the execution of init-dom0less, it is possible to use "xl" to
+hotplug PV drivers to dom0less guests. E.g. xl network-attach domU.
+
+The implementation works as follows:
+- Xen allocates the xenstore event channel for each dom0less domU that
+  has the "xen,enhanced" property, and sets HVM_PARAM_STORE_EVTCHN
+- Xen does *not* allocate the xenstore page and sets HVM_PARAM_STORE_PFN
+  to ~0ULL (invalid)
+- Dom0less domU kernels check that HVM_PARAM_STORE_PFN is set to invalid
+    - Old kernels will continue without xenstore support (Note: some old
+      buggy kernels might crash because they don't check the validity of
+      HVM_PARAM_STORE_PFN before using it! Disable "xen,enhanced" in
+      those cases)
+    - New kernels will wait for a notification on the xenstore event
+      channel (HVM_PARAM_STORE_EVTCHN) before continuing with the
+      initialization
+- Once dom0 is booted, init-dom0less is executed:
+    - it allocates the xenstore shared page and sets HVM_PARAM_STORE_PFN
+    - it calls xs_introduce_domain
+- Xenstored notices the new domain, initializes interfaces as usual, and
+  sends an event channel notification to the domain using the xenstore
+  event channel (HVM_PARAM_STORE_EVTCHN)
+- The Linux domU kernel receives the event channel notification, checks
+  HVM_PARAM_STORE_PFN again and continue with the initialization
+
+
 Limitations
 -----------
 
@@ -106,9 +146,6 @@ limitations:
 - The GIC version is the native version. In absence of other
   information, the GIC version exposed to the domains started by Xen at
   boot is the same as the native GIC version.
-
-- No PV drivers. There is no support for PV devices at the moment. All
-  devices need to be statically assigned to guests.
 
 - Pinning vCPUs of domains started by Xen at boot can be
   done from the control domain, using `xl vcpu-pin` as usual. It is not
