@@ -73,6 +73,16 @@ ifeq ($(CONFIG_UBSAN),y)
 $(call cc-option-add,CFLAGS_UBSAN,CC,-fno-sanitize=alignment)
 endif
 
+ifeq ($(CONFIG_LD_IS_GNU),y)
+# While not much better than going by raw GNU ld version, utilize that the
+# feature we're after has appeared in the same release as the
+# --print-output-format command line option.
+AFLAGS-$(call ld-option,--print-output-format) += -DHAVE_LD_SORT_BY_INIT_PRIORITY
+else
+# Assume all versions of LLD support this.
+AFLAGS += -DHAVE_LD_SORT_BY_INIT_PRIORITY
+endif
+
 ifneq ($(CONFIG_PV_SHIM_EXCLUSIVE),y)
 
 efi-check := arch/x86/efi/check
