@@ -1251,6 +1251,7 @@ int ioreq_send(struct ioreq_server *s, ioreq_t *proto_p,
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     struct ioreq_vcpu *sv;
+    struct vcpu_io *vio = &curr->io;
 
     ASSERT(s);
 
@@ -1258,7 +1259,10 @@ int ioreq_send(struct ioreq_server *s, ioreq_t *proto_p,
         return ioreq_send_buffered(s, proto_p);
 
     if ( unlikely(!vcpu_start_shutdown_deferral(curr)) )
+    {
+        vio->suspended = true;
         return IOREQ_STATUS_RETRY;
+    }
 
     list_for_each_entry ( sv,
                           &s->ioreq_vcpu_list,
