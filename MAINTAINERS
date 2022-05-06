@@ -346,6 +346,7 @@ F:	xen/arch/x86/mm/p2m-ept.c
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Paul Durrant <paul@xen.org>
+R:	Roger Pau Monné <roger.pau@citrix.com>
 S:	Supported
 F:	xen/drivers/passthrough/
 X:	xen/drivers/passthrough/amd/
