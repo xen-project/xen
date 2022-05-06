@@ -188,6 +188,11 @@ with the following properties:
     An empty property to request the memory of the domain to be
     direct-map (guest physical address == physical address).
 
+- domain-cpupool
+
+    Optional. Handle to a xen,cpupool device tree node that identifies the
+    cpupool where the guest will be started at boot.
+
 Under the "xen,domain" compatible node, one or more sub-nodes are present
 for the DomU kernel and ramdisk.
 

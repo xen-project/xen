@@ -697,7 +697,7 @@ struct domain *domain_create(domid_t domid,
         if ( !d->pbuf )
             goto fail;
 
-        if ( (err = sched_init_domain(d, 0)) != 0 )
+        if ( (err = sched_init_domain(d, config->cpupool_id)) != 0 )
             goto fail;
 
         if ( (err = late_hwdom_init(d)) != 0 )

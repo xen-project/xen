@@ -22,6 +22,8 @@ static unsigned int __initdata next_pool_id;
 
 #define BTCPUPOOLS_DT_NODE_NO_REG     (-1)
 #define BTCPUPOOLS_DT_NODE_NO_LOG_CPU (-2)
+#define BTCPUPOOLS_DT_WRONG_NODE      (-3)
+#define BTCPUPOOLS_DT_CORRUPTED_NODE  (-4)
 
 static int __init get_logical_cpu_from_hw_id(unsigned int hwid)
 {
@@ -54,6 +56,28 @@ get_logical_cpu_from_cpu_node(const struct dt_device_node *cpu_node)
         return BTCPUPOOLS_DT_NODE_NO_LOG_CPU;
 
     return cpu_num;
+}
+
+int __init btcpupools_get_domain_pool_id(const struct dt_device_node *node)
+{
+    const struct dt_device_node *phandle_node;
+    int cpu_num;
+
+    if ( !dt_device_is_compatible(node, "xen,cpupool") )
+        return BTCPUPOOLS_DT_WRONG_NODE;
+    /*
+     * Get first cpu listed in the cpupool, from its reg it's possible to
+     * retrieve the cpupool id.
+     */
+    phandle_node = dt_parse_phandle(node, "cpupool-cpus", 0);
+    if ( !phandle_node )
+        return BTCPUPOOLS_DT_CORRUPTED_NODE;
+
+    cpu_num = get_logical_cpu_from_cpu_node(phandle_node);
+    if ( cpu_num < 0 )
+        return cpu_num;
+
+    return pool_cpu_map[cpu_num];
 }
 
 static int __init check_and_get_sched_id(const char* scheduler_name)
