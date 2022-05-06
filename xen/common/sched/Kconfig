@@ -64,3 +64,10 @@ config SCHED_DEFAULT
 	default "credit2"
 
 endmenu
+
+config BOOT_TIME_CPUPOOLS
+	bool "Create cpupools at boot time"
+	depends on HAS_DEVICE_TREE
+	help
+	  Creates cpupools during boot time and assigns cpus to them. Cpupools
+	  options can be specified in the device tree.

@@ -1,3 +1,4 @@
+obj-$(CONFIG_BOOT_TIME_CPUPOOLS) += boot-cpupool.init.o
 obj-y += cpupool.o
 obj-$(CONFIG_SCHED_ARINC653) += arinc653.o
 obj-$(CONFIG_SCHED_CREDIT) += credit.o

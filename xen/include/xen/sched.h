@@ -1189,6 +1189,20 @@ extern void cf_check dump_runq(unsigned char key);
 
 void arch_do_physinfo(struct xen_sysctl_physinfo *pi);
 
+#ifdef CONFIG_BOOT_TIME_CPUPOOLS
+void btcpupools_allocate_pools(void);
+unsigned int btcpupools_get_cpupool_id(unsigned int cpu);
+void btcpupools_dtb_parse(void);
+
+#else /* !CONFIG_BOOT_TIME_CPUPOOLS */
+static inline void btcpupools_allocate_pools(void) {}
+static inline void btcpupools_dtb_parse(void) {}
+static inline unsigned int btcpupools_get_cpupool_id(unsigned int cpu)
+{
+    return 0;
+}
+#endif
+
 #endif /* __SCHED_H__ */
 
 /*

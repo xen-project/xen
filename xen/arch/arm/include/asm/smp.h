@@ -34,6 +34,9 @@ extern void init_secondary(void);
 extern void smp_init_cpus(void);
 extern void smp_clear_cpu_maps (void);
 extern int smp_get_max_cpus (void);
+
+#define cpu_physical_id(cpu) cpu_logical_map(cpu)
+
 #endif
 
 /*

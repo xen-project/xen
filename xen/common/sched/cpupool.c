@@ -1247,12 +1247,22 @@ static int __init cf_check cpupool_init(void)
     cpupool_put(cpupool0);
     register_cpu_notifier(&cpu_nfb);
 
+    btcpupools_dtb_parse();
+
+    btcpupools_allocate_pools();
+
     spin_lock(&cpupool_lock);
 
     cpumask_copy(&cpupool_free_cpus, &cpu_online_map);
 
     for_each_cpu ( cpu, &cpupool_free_cpus )
-        cpupool_assign_cpu_locked(cpupool0, cpu);
+    {
+        unsigned int pool_id = btcpupools_get_cpupool_id(cpu);
+        struct cpupool *pool = cpupool_find_by_id(pool_id);
+
+        ASSERT(pool);
+        cpupool_assign_cpu_locked(pool, cpu);
+    }
 
     spin_unlock(&cpupool_lock);
 

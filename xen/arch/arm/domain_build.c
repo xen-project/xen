@@ -73,7 +73,10 @@ custom_param("dom0_mem", parse_dom0_mem);
 unsigned int __init dom0_max_vcpus(void)
 {
     if ( opt_dom0_max_vcpus == 0 )
-        opt_dom0_max_vcpus = num_online_cpus();
+    {
+        ASSERT(cpupool0);
+        opt_dom0_max_vcpus = cpumask_weight(cpupool_valid_cpus(cpupool0));
+    }
     if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
         opt_dom0_max_vcpus = MAX_VIRT_CPUS;
 

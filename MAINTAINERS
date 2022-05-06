@@ -279,7 +279,7 @@ CPU POOLS
 M:	Juergen Gross <jgross@suse.com>
 M:	Dario Faggioli <dfaggioli@suse.com>
 S:	Supported
-F:	xen/common/sched/cpupool.c
+F:	xen/common/sched/*cpupool.c
 
 DEVICE TREE
 M:	Stefano Stabellini <sstabellini@kernel.org>

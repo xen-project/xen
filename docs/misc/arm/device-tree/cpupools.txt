@@ -1,0 +1,140 @@
+Boot time cpupools
+==================
+
+When BOOT_TIME_CPUPOOLS is enabled in the Xen configuration, it is possible to
+create cpupools during boot phase by specifying them in the device tree.
+ACPI is not supported for this feature.
+
+Cpupools specification nodes shall be direct childs of /chosen node.
+Each cpupool node contains the following properties:
+
+- compatible (mandatory)
+
+    Must always include the compatiblity string: "xen,cpupool".
+
+- cpupool-cpus (mandatory)
+
+    Must be a list of device tree phandle to nodes describing cpus (e.g. having
+    device_type = "cpu"), it can't be empty.
+
+- cpupool-sched (optional)
+
+    Must be a string having the name of a Xen scheduler. Check the sched=<...>
+    boot argument for allowed values [1]. When this property is omitted, the Xen
+    default scheduler will be used.
+
+
+Constraints
+===========
+
+If no cpupools are specified, all cpus will be assigned to one cpupool
+implicitly created (Pool-0).
+
+If cpupools node are specified, but not every cpu brought up by Xen is assigned,
+all the not assigned cpu will be assigned to an additional cpupool.
+
+If a cpu is assigned to a cpupool, but it's not brought up correctly, Xen will
+stop.
+
+The boot cpu must be assigned to Pool-0, so the cpupool containing that core
+will become Pool-0 automatically.
+
+
+Examples
+========
+
+A system having two types of core, the following device tree specification will
+instruct Xen to have two cpupools:
+
+- The cpupool described by node cpupool_a will have 4 cpus assigned.
+- The cpupool described by node cpupool_b will have 2 cpus assigned.
+
+The following example can work only if hmp-unsafe=1 is passed to Xen boot
+arguments, otherwise not all cores will be brought up by Xen and the cpupool
+creation process will stop Xen.
+
+
+a72_1: cpu@0 {
+        compatible = "arm,cortex-a72";
+        reg = <0x0 0x0>;
+        device_type = "cpu";
+        [...]
+};
+
+a72_2: cpu@1 {
+        compatible = "arm,cortex-a72";
+        reg = <0x0 0x1>;
+        device_type = "cpu";
+        [...]
+};
+
+a53_1: cpu@100 {
+        compatible = "arm,cortex-a53";
+        reg = <0x0 0x100>;
+        device_type = "cpu";
+        [...]
+};
+
+a53_2: cpu@101 {
+        compatible = "arm,cortex-a53";
+        reg = <0x0 0x101>;
+        device_type = "cpu";
+        [...]
+};
+
+a53_3: cpu@102 {
+        compatible = "arm,cortex-a53";
+        reg = <0x0 0x102>;
+        device_type = "cpu";
+        [...]
+};
+
+a53_4: cpu@103 {
+        compatible = "arm,cortex-a53";
+        reg = <0x0 0x103>;
+        device_type = "cpu";
+        [...]
+};
+
+chosen {
+
+    cpupool_a {
+        compatible = "xen,cpupool";
+        cpupool-cpus = <&a53_1 &a53_2 &a53_3 &a53_4>;
+    };
+    cpupool_b {
+        compatible = "xen,cpupool";
+        cpupool-cpus = <&a72_1 &a72_2>;
+        cpupool-sched = "credit2";
+    };
+
+    [...]
+
+};
+
+
+A system having the cpupools specification below will instruct Xen to have three
+cpupools:
+
+- The cpupool described by node cpupool_a will have 2 cpus assigned.
+- The cpupool described by node cpupool_b will have 2 cpus assigned.
+- An additional cpupool will be created, having 2 cpus assigned (created by Xen
+  with all the unassigned cpus a53_3 and a53_4).
+
+chosen {
+
+    cpupool_a {
+        compatible = "xen,cpupool";
+        cpupool-cpus = <&a53_1 &a53_2>;
+    };
+    cpupool_b {
+        compatible = "xen,cpupool";
+        cpupool-cpus = <&a72_1 &a72_2>;
+        cpupool-sched = "null";
+    };
+
+    [...]
+
+};
+
+[1] docs/misc/xen-command-line.pandoc
