@@ -29,12 +29,22 @@ static inline void gnttab_mark_dirty(struct domain *d, mfn_t mfn)
 #endif
 }
 
+static inline bool gnttab_host_mapping_get_page_type(bool ro,
+                                                     const struct domain *ld,
+                                                     const struct domain *rd)
+{
+    return false;
+}
+
+static inline bool gnttab_release_host_mappings(const struct domain *d)
+{
+    return true;
+}
+
 int create_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
                               unsigned int flags, unsigned int cache_flags);
-#define gnttab_host_mapping_get_page_type(ro, ld, rd) (0)
 int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
                                unsigned long new_gpaddr, unsigned int flags);
-#define gnttab_release_host_mappings(domain) 1
 
 /*
  * The region used by Xen on the memory will never be mapped in DOM0
