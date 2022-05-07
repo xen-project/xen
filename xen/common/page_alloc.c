@@ -163,13 +163,6 @@ static char __initdata opt_badpage[100] = "";
 string_param("badpage", opt_badpage);
 
 /*
- * Heap allocations may need TLB flushes which may require IRQs to be
- * enabled (except when only 1 PCPU is online).
- */
-#define ASSERT_ALLOC_CONTEXT() \
-    ASSERT(!in_irq() && (local_irq_is_enabled() || num_online_cpus() <= 1))
-
-/*
  * no-bootscrub -> Free pages are not zeroed during boot.
  */
 enum bootscrub_mode {

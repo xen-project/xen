@@ -10,6 +10,13 @@
 #include <asm/hardirq.h>
 #include <public/event_channel.h>
 
+/*
+ * Heap allocations may need TLB flushes which may require IRQs to be
+ * enabled (except when only 1 PCPU is online).
+ */
+#define ASSERT_ALLOC_CONTEXT() \
+    ASSERT(!in_irq() && (local_irq_is_enabled() || num_online_cpus() <= 1))
+
 struct irqaction {
     void (*handler)(int, void *, struct cpu_user_regs *);
     const char *name;
