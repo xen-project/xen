@@ -361,9 +361,6 @@ void start_secondary(void)
 
     init_secondary_IRQ();
 
-    init_maintenance_interrupt();
-    init_timer_interrupt();
-
     set_current(idle_vcpu[cpuid]);
 
     setup_cpu_sibling_map(cpuid);
@@ -380,6 +377,15 @@ void start_secondary(void)
     cpumask_set_cpu(cpuid, &cpu_online_map);
 
     local_irq_enable();
+
+    /*
+     * Calling request_irq() after local_irq_enable() on secondary cores
+     * will make sure the assertion condition in alloc_xenheap_pages(),
+     * i.e. !in_irq && local_irq_enabled() is satisfied.
+     */
+    init_maintenance_interrupt();
+    init_timer_interrupt();
+
     local_abort_enable();
 
     check_local_cpu_errata();
