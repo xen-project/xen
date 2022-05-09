@@ -50,8 +50,7 @@ For the Cortex A57 r0p0 - r1p1, see Errata 832075.
 
 ### Physical Memory
 
-    Status, x86: Supported up to 8 TiB. Hosts with more memory are
-                 supported, but not security supported.
+    Status, x86: Supported up to 8 TiB. Hosts with more memory are supported, but not security supported.
     Status, Arm32: Supported up to 12 GiB
     Status, Arm64: Supported up to 2 TiB
 
