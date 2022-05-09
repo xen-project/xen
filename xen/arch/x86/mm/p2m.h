@@ -3,6 +3,9 @@
  * arch/x86/mm/p2m.h
  */
 
+#ifndef __ARCH_MM_P2M_H__
+#define __ARCH_MM_P2M_H__
+
 struct p2m_domain *p2m_init_one(struct domain *d);
 void p2m_free_one(struct p2m_domain *p2m);
 
@@ -26,6 +29,8 @@ void p2m_teardown_nestedp2m(struct domain *d);
 int ept_p2m_init(struct p2m_domain *p2m);
 void ept_p2m_uninit(struct p2m_domain *p2m);
 void p2m_init_altp2m_ept(struct domain *d, unsigned int i);
+
+#endif /* __ARCH_MM_P2M_H__ */
 
 /*
  * Local variables:
