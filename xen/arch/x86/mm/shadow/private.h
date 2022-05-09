@@ -815,7 +815,7 @@ struct sh_emulate_ctxt {
 #if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
     /* Special case for avoiding having to verify writes: remember
      * whether the old value had its low bit (_PAGE_PRESENT) clear. */
-    int low_bit_was_clear:1;
+    bool low_bit_was_clear;
 #endif
 };
 
