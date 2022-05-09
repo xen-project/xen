@@ -1,9 +1,7 @@
 #ifndef ASM__RISCV__BYTEORDER_H
 #define ASM__RISCV__BYTEORDER_H
 
-#define __BYTEORDER_HAS_U64__
-
-#include <xen/byteorder/little_endian.h>
+#include <xen/byteorder.h>
 
 #endif /* ASM__RISCV__BYTEORDER_H */
 /*
