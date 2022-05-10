@@ -54,10 +54,10 @@ legacy stream into a migration v2 stream.
     * `docs/specs/libxc-migration-stream.pandoc`
     * `docs/specs/libxl-migration-stream.pandoc`
 * `libxc`
-    * `tools/libxc/xc_sr_*.[hc]`
+    * `tools/libs/guest/xg_sr_*.[hc]`
 * `libxl`
-    * `tools/libxl/libxl_stream_{read,write}.c`
-    * `tools/libxl/libxl_convert_callout.c`
+    * `tools/libs/light/libxl_stream_{read,write}.c`
+    * `tools/libs/light/libxl_convert_callout.c`
 * Scripts
     * `tools/python/xen/migration/*.py`
     * `tools/python/scripts/convert-legacy-stream`
