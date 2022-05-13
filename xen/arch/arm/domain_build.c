@@ -35,7 +35,10 @@
 static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
-/* If true, the extended regions support is enabled for dom0 */
+/*
+ * If true, the extended regions support is enabled for dom0 and
+ * dom0less domUs.
+ */
 static bool __initdata opt_ext_regions = true;
 boolean_param("ext_regions", opt_ext_regions);
 
@@ -1327,6 +1330,36 @@ out:
     return res;
 }
 
+static int __init find_domU_holes(const struct kernel_info *kinfo,
+                                  struct meminfo *ext_regions)
+{
+    unsigned int i;
+    paddr_t bankend;
+    const paddr_t bankbase[] = GUEST_RAM_BANK_BASES;
+    const paddr_t banksize[] = GUEST_RAM_BANK_SIZES;
+    int res = -ENOENT;
+
+    for ( i = 0; i < GUEST_RAM_BANKS; i++ )
+    {
+        struct membank *ext_bank = &(ext_regions->bank[ext_regions->nr_banks]);
+
+        ext_bank->start = ROUNDUP(bankbase[i] + kinfo->mem.bank[i].size, SZ_2M);
+
+        bankend = ~0ULL >> (64 - p2m_ipa_bits);
+        bankend = min(bankend, bankbase[i] + banksize[i] - 1);
+        if ( bankend > ext_bank->start )
+            ext_bank->size = bankend - ext_bank->start + 1;
+
+        /* 64MB is the minimum size of an extended region */
+        if ( ext_bank->size < MB(64) )
+            continue;
+        ext_regions->nr_banks++;
+        res = 0;
+    }
+
+    return res;
+}
+
 static int __init make_hypervisor_node(struct domain *d,
                                        const struct kernel_info *kinfo,
                                        int addrcells, int sizecells)
@@ -1363,12 +1396,13 @@ static int __init make_hypervisor_node(struct domain *d,
 
     if ( !opt_ext_regions )
     {
-        printk(XENLOG_INFO "The extended regions support is disabled\n");
+        printk(XENLOG_INFO "%pd: extended regions support is disabled\n", d);
         nr_ext_regions = 0;
     }
     else if ( is_32bit_domain(d) )
     {
-        printk(XENLOG_WARNING "The extended regions are only supported for 64-bit guest currently\n");
+        printk(XENLOG_WARNING
+               "%pd: extended regions not supported for 32-bit guests\n", d);
         nr_ext_regions = 0;
     }
     else
@@ -1377,13 +1411,21 @@ static int __init make_hypervisor_node(struct domain *d,
         if ( !ext_regions )
             return -ENOMEM;
 
-        if ( !is_iommu_enabled(d) )
-            res = find_unallocated_memory(kinfo, ext_regions);
+        if ( is_domain_direct_mapped(d) )
+        {
+            if ( !is_iommu_enabled(d) )
+                res = find_unallocated_memory(kinfo, ext_regions);
+            else
+                res = find_memory_holes(kinfo, ext_regions);
+        }
         else
-            res = find_memory_holes(kinfo, ext_regions);
+        {
+            res = find_domU_holes(kinfo, ext_regions);
+        }
 
         if ( res )
-            printk(XENLOG_WARNING "Failed to allocate extended regions\n");
+            printk(XENLOG_WARNING "%pd: failed to allocate extended regions\n",
+                   d);
         nr_ext_regions = ext_regions->nr_banks;
     }
 
@@ -1404,8 +1446,8 @@ static int __init make_hypervisor_node(struct domain *d,
         u64 start = ext_regions->bank[i].start;
         u64 size = ext_regions->bank[i].size;
 
-        printk("Extended region %d: %#"PRIx64"->%#"PRIx64"\n",
-               i, start, start + size);
+        printk("%pd: extended region %d: %#"PRIx64"->%#"PRIx64"\n",
+               d, i, start, start + size);
 
         dt_child_set_range(&cells, addrcells, sizecells, start, size);
     }

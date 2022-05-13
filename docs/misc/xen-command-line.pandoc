@@ -1110,11 +1110,12 @@ to use the default.
 
 > Default : `true`
 
-Flag to enable or disable support for extended regions for Dom0.
+Flag to enable or disable support for extended regions for Dom0 and
+Dom0less DomUs.
 
-Extended regions are ranges of unused address space exposed to Dom0 as
-"safe to use" for special memory mappings. Disable if your board device
-tree is incomplete.
+Extended regions are ranges of unused address space exposed to the guest
+as "safe to use" for special memory mappings. Disable if your board
+device tree is incomplete.
 
 ### flask
 > `= permissive | enforcing | late | disabled`
