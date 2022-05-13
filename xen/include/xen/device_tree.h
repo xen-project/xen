@@ -451,6 +451,9 @@ static inline bool_t dt_property_read_bool(const struct dt_device_node *np,
  * doest not have value, and -EILSEQ if the string is not
  * null-terminated with the length of the property data.
  *
+ * Note that the empty string "" has length of 1, thus -ENODATA cannot
+ * be interpreted as an empty string.
+ *
  * The out_string pointer is modified only if a valid string can be decoded.
  */
 int dt_property_read_string(const struct dt_device_node *np,
