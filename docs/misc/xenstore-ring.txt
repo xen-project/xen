@@ -111,7 +111,13 @@ Assuming the server has advertised the feature, the guest can initiate
 a reconnection by setting the the Connection state to 1 ("Ring close
 and reconnect is in progress") and signalling the event channel.
 The guest must now ignore all fields except the Connection state and
-wait for it to be set to 0 ("Ring is connected")
+wait for it to be set to 0 ("Ring is connected").
+
+In certain circumstances (e.g. dom0less guests with PV drivers support)
+it is possible for the guest to find the Connection state already set to
+1 by someone else during xenstore initialization. In that case, like in
+the previous case, the guest must ignore all fields except the
+Connection state and wait for it to be set to 0 before proceeding.
 
 The server will guarantee to
 

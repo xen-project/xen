@@ -141,7 +141,7 @@ struct xenstore_domain_interface {
 
 /* Valid values for the connection field */
 #define XENSTORE_CONNECTED 0 /* the steady-state */
-#define XENSTORE_RECONNECT 1 /* guest has initiated a reconnect */
+#define XENSTORE_RECONNECT 1 /* reconnect in progress */
 
 /* Valid values for the error field */
 #define XENSTORE_ERROR_NONE    0 /* No error */
