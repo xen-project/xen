@@ -156,7 +156,7 @@ static const char *const str_e8b[32] =
 
     [24] = "amd-ssbd",         [25] = "virt-ssbd",
     [26] = "ssb-no",
-    [28] = "psfd",
+    [28] = "psfd",             [29] = "btc-no",
 };
 
 static const char *const str_7d0[32] =
