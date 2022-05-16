@@ -847,6 +847,16 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 			warning_add(text);
 		}
 		break;
+
+	case 0x19:
+		/*
+		 * Zen3 (Fam19h model < 0x10) parts are not susceptible to
+		 * Branch Type Confusion, but predate the allocation of the
+		 * BTC_NO bit.  Fill it back in if we're not virtualised.
+		 */
+		if (!cpu_has_hypervisor && !cpu_has(c, X86_FEATURE_BTC_NO))
+			__set_bit(X86_FEATURE_BTC_NO, c->x86_capability);
+		break;
 	}
 
 	display_cacheinfo(c);

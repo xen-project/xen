@@ -289,6 +289,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"virt-ssbd",    0x80000008, NA, CPUID_REG_EBX, 25,  1},
         {"ssb-no",       0x80000008, NA, CPUID_REG_EBX, 26,  1},
         {"psfd",         0x80000008, NA, CPUID_REG_EBX, 28,  1},
+        {"btc-no",       0x80000008, NA, CPUID_REG_EBX, 29,  1},
 
         {"nc",           0x80000008, NA, CPUID_REG_ECX,  0,  8},
         {"apicidsize",   0x80000008, NA, CPUID_REG_ECX, 12,  4},
