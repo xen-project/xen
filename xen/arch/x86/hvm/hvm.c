@@ -299,24 +299,43 @@ void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat)
         *guest_pat = v->arch.hvm.pat_cr;
 }
 
+/*
+ * MSR_PAT takes 8 uniform fields, each of which must be a valid architectural
+ * memory type (0-1, 4-7).  This is a fully vectorised form of the 8-iteration
+ * loop over bytes looking for X86_MT_* constants.
+ */
+static bool pat_valid(uint64_t val)
+{
+    /* Yields a non-zero value in any lane which had value greater than 7. */
+    uint64_t any_gt_7   =  val & 0xf8f8f8f8f8f8f8f8ull;
+
+    /*
+     * With the > 7 case covered, identify lanes with the value 0-3 by finding
+     * lanes with bit 2 clear.
+     *
+     * Yields bit 2 set in each lane which has a value <= 3.
+     */
+    uint64_t any_le_3   = ~val & 0x0404040404040404ull;
+
+    /*
+     * Logically, any_2_or_3 is "any_le_3 && bit 1 set".
+     *
+     * We could calculate any_gt_1 as val & 0x02 and resolve the two vectors
+     * of booleans (shift one of them until the mask lines up, then bitwise
+     * and), but that is unnecessary calculation.
+     *
+     * Shift any_le_3 so it becomes bit 1 in each lane which has a value <= 3,
+     * and look for bit 1 in a subset of lanes.
+     */
+    uint64_t any_2_or_3 =  val & (any_le_3 >> 1);
+
+    return !(any_gt_7 | any_2_or_3);
+}
+
 int hvm_set_guest_pat(struct vcpu *v, uint64_t guest_pat)
 {
-    unsigned int i;
-    uint64_t tmp;
-
-    for ( i = 0, tmp = guest_pat; i < 8; i++, tmp >>= 8 )
-        switch ( tmp & 0xff )
-        {
-        case X86_MT_UCM:
-        case X86_MT_UC:
-        case X86_MT_WB:
-        case X86_MT_WC:
-        case X86_MT_WP:
-        case X86_MT_WT:
-            break;
-        default:
-            return 0;
-        }
+    if ( !pat_valid(guest_pat) )
+        return 0;
 
     if ( !alternative_call(hvm_funcs.set_guest_pat, v, guest_pat) )
         v->arch.hvm.pat_cr = guest_pat;
