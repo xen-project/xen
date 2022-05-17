@@ -619,8 +619,6 @@ int cpupool_add_domain(struct domain *d, unsigned int poolid)
     int rc;
     int n_dom = 0;
 
-    if ( poolid == CPUPOOLID_NONE )
-        return 0;
     spin_lock(&cpupool_lock);
     c = cpupool_find_by_id(poolid);
     if ( c == NULL )
