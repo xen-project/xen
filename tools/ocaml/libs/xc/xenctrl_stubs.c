@@ -189,7 +189,8 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 #define VAL_MAX_GRANT_FRAMES    Field(config, 6)
 #define VAL_MAX_MAPTRACK_FRAMES Field(config, 7)
 #define VAL_MAX_GRANT_VERSION   Field(config, 8)
-#define VAL_ARCH                Field(config, 9)
+#define VAL_CPUPOOL_ID          Field(config, 9)
+#define VAL_ARCH                Field(config, 10)
 
 	uint32_t domid = Int_val(wanted_domid);
 	int result;
@@ -201,6 +202,7 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 		.max_maptrack_frames = Int_val(VAL_MAX_MAPTRACK_FRAMES),
 		.grant_opts =
 		    XEN_DOMCTL_GRANT_version(Int_val(VAL_MAX_GRANT_VERSION)),
+		.cpupool_id = Int32_val(VAL_CPUPOOL_ID),
 	};
 
 	domain_handle_of_uuid_string(cfg.handle, String_val(VAL_HANDLE));
@@ -224,6 +226,9 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 
 	case 1: /* X86 - emulation flags in the block */
 #if defined(__i386__) || defined(__x86_64__)
+
+		/* Quick & dirty check for ABI changes. */
+		BUILD_BUG_ON(sizeof(cfg) != 64);
 
         /* Mnemonics for the named fields inside xen_x86_arch_domainconfig */
 #define VAL_EMUL_FLAGS          Field(arch_domconfig, 0)
@@ -254,6 +259,7 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 	}
 
 #undef VAL_ARCH
+#undef VAL_CPUPOOL_ID
 #undef VAL_MAX_GRANT_VERSION
 #undef VAL_MAX_MAPTRACK_FRAMES
 #undef VAL_MAX_GRANT_FRAMES
