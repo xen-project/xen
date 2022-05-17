@@ -18,6 +18,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/cpu.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/param.h>
@@ -234,17 +235,12 @@ void gicv3_lpi_update_host_entry(uint32_t host_lpi, int domain_id,
     write_u64_atomic(&hlpip->data, hlpi.data);
 }
 
-static int gicv3_lpi_allocate_pendtable(uint64_t *reg)
+static int gicv3_lpi_allocate_pendtable(unsigned int cpu)
 {
-    uint64_t val;
     void *pendtable;
 
-    if ( this_cpu(lpi_redist).pending_table )
+    if ( per_cpu(lpi_redist, cpu).pending_table )
         return -EBUSY;
-
-    val  = GIC_BASER_CACHE_RaWaWb << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT;
-    val |= GIC_BASER_CACHE_SameAsInner << GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT;
-    val |= GIC_BASER_InnerShareable << GICR_PENDBASER_SHAREABILITY_SHIFT;
 
     /*
      * The pending table holds one bit per LPI and even covers bits for
@@ -265,13 +261,45 @@ static int gicv3_lpi_allocate_pendtable(uint64_t *reg)
     clean_and_invalidate_dcache_va_range(pendtable,
                                          lpi_data.max_host_lpi_ids / 8);
 
-    this_cpu(lpi_redist).pending_table = pendtable;
+    per_cpu(lpi_redist, cpu).pending_table = pendtable;
 
+    return 0;
+}
+
+static int gicv3_lpi_set_pendtable(void __iomem *rdist_base)
+{
+    const void *pendtable = this_cpu(lpi_redist).pending_table;
+    uint64_t val;
+
+    /*
+     * The memory should have been allocated while preparing the CPU (or
+     * before calling this function for the boot CPU).
+     */
+    if ( !pendtable )
+    {
+        ASSERT_UNREACHABLE();
+        return -ENOMEM;
+    }
+
+    ASSERT(!(virt_to_maddr(pendtable) & ~GENMASK(51, 16)));
+
+    val  = GIC_BASER_CACHE_RaWaWb << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT;
+    val |= GIC_BASER_CACHE_SameAsInner << GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT;
+    val |= GIC_BASER_InnerShareable << GICR_PENDBASER_SHAREABILITY_SHIFT;
     val |= GICR_PENDBASER_PTZ;
-
     val |= virt_to_maddr(pendtable);
 
-    *reg = val;
+    writeq_relaxed(val, rdist_base + GICR_PENDBASER);
+    val = readq_relaxed(rdist_base + GICR_PENDBASER);
+
+    /* If the hardware reports non-shareable, drop cacheability as well. */
+    if ( !(val & GICR_PENDBASER_SHAREABILITY_MASK) )
+    {
+        val &= ~GICR_PENDBASER_INNER_CACHEABILITY_MASK;
+        val |= GIC_BASER_CACHE_nC << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT;
+
+        writeq_relaxed(val, rdist_base + GICR_PENDBASER);
+    }
 
     return 0;
 }
@@ -340,7 +368,6 @@ static int gicv3_lpi_set_proptable(void __iomem * rdist_base)
 int gicv3_lpi_init_rdist(void __iomem * rdist_base)
 {
     uint32_t reg;
-    uint64_t table_reg;
     int ret;
 
     /* We don't support LPIs without an ITS. */
@@ -352,23 +379,35 @@ int gicv3_lpi_init_rdist(void __iomem * rdist_base)
     if ( reg & GICR_CTLR_ENABLE_LPIS )
         return -EBUSY;
 
-    ret = gicv3_lpi_allocate_pendtable(&table_reg);
+    ret = gicv3_lpi_set_pendtable(rdist_base);
     if ( ret )
         return ret;
-    writeq_relaxed(table_reg, rdist_base + GICR_PENDBASER);
-    table_reg = readq_relaxed(rdist_base + GICR_PENDBASER);
-
-    /* If the hardware reports non-shareable, drop cacheability as well. */
-    if ( !(table_reg & GICR_PENDBASER_SHAREABILITY_MASK) )
-    {
-        table_reg &= ~GICR_PENDBASER_INNER_CACHEABILITY_MASK;
-        table_reg |= GIC_BASER_CACHE_nC << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT;
-
-        writeq_relaxed(table_reg, rdist_base + GICR_PENDBASER);
-    }
 
     return gicv3_lpi_set_proptable(rdist_base);
 }
+
+static int cpu_callback(struct notifier_block *nfb, unsigned long action,
+                        void *hcpu)
+{
+    unsigned long cpu = (unsigned long)hcpu;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        rc = gicv3_lpi_allocate_pendtable(cpu);
+        if ( rc )
+            printk(XENLOG_ERR "Unable to allocate the pendtable for CPU%lu\n",
+                   cpu);
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback,
+};
 
 static unsigned int max_lpi_bits = 20;
 integer_param("max_lpi_bits", max_lpi_bits);
@@ -381,6 +420,7 @@ integer_param("max_lpi_bits", max_lpi_bits);
 int gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits)
 {
     unsigned int nr_lpi_ptrs;
+    int rc;
 
     /* We rely on the data structure being atomically accessible. */
     BUILD_BUG_ON(sizeof(union host_lpi) > sizeof(unsigned long));
@@ -413,7 +453,14 @@ int gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits)
 
     printk("GICv3: using at most %lu LPIs on the host.\n", MAX_NR_HOST_LPIS);
 
-    return 0;
+    /* Register the CPU notifier and allocate memory for the boot CPU */
+    register_cpu_notifier(&cpu_nfb);
+    rc = gicv3_lpi_allocate_pendtable(smp_processor_id());
+    if ( rc )
+        printk(XENLOG_ERR "Unable to allocate the pendtable for CPU%u\n",
+               smp_processor_id());
+
+    return rc;
 }
 
 static int find_unused_host_lpi(uint32_t start, uint32_t *index)
