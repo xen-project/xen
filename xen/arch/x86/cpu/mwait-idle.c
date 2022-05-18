@@ -1363,7 +1363,7 @@ static int cf_check mwait_idle_cpu_init(
 		/* if state marked as disabled, skip it */
 		if (cpuidle_state_table[cstate].flags &
 		    CPUIDLE_FLAG_DISABLED) {
-			printk(XENLOG_DEBUG PREFIX "state %s is disabled",
+			printk(XENLOG_DEBUG PREFIX "state %s is disabled\n",
 			       cpuidle_state_table[cstate].name);
 			continue;
 		}
