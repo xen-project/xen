@@ -988,21 +988,6 @@ void *ioremap(paddr_t pa, size_t len)
     return ioremap_attr(pa, len, PAGE_HYPERVISOR_NOCACHE);
 }
 
-static int create_xen_table(lpae_t *entry)
-{
-    void *p;
-    lpae_t pte;
-
-    p = alloc_xenheap_page();
-    if ( p == NULL )
-        return -ENOMEM;
-    clear_page(p);
-    pte = mfn_to_xen_entry(virt_to_mfn(p), MT_NORMAL);
-    pte.pt.table = 1;
-    write_pte(entry, pte);
-    return 0;
-}
-
 static lpae_t *xen_map_table(mfn_t mfn)
 {
     /*
@@ -1041,6 +1026,27 @@ static void xen_unmap_table(const lpae_t *table)
         return;
 
     unmap_domain_page(table);
+}
+
+static int create_xen_table(lpae_t *entry)
+{
+    struct page_info *pg;
+    void *p;
+    lpae_t pte;
+
+    pg = alloc_domheap_page(NULL, 0);
+    if ( pg == NULL )
+        return -ENOMEM;
+
+    p = xen_map_table(page_to_mfn(pg));
+    clear_page(p);
+    xen_unmap_table(p);
+
+    pte = mfn_to_xen_entry(page_to_mfn(pg), MT_NORMAL);
+    pte.pt.table = 1;
+    write_pte(entry, pte);
+
+    return 0;
 }
 
 #define XEN_TABLE_MAP_FAILED 0
