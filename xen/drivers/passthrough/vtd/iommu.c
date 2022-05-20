@@ -2206,14 +2206,17 @@ static int cf_check intel_iommu_lookup_page(
     return 0;
 }
 
-static int __init vtd_ept_page_compatible(struct vtd_iommu *iommu)
+static bool __init vtd_ept_page_compatible(const struct vtd_iommu *iommu)
 {
-    u64 ept_cap, vtd_cap = iommu->cap;
+    uint64_t ept_cap, vtd_cap = iommu->cap;
+
+    if ( !IS_ENABLED(CONFIG_HVM) )
+        return false;
 
     /* EPT is not initialised yet, so we must check the capability in
      * the MSR explicitly rather than use cpu_has_vmx_ept_*() */
     if ( rdmsr_safe(MSR_IA32_VMX_EPT_VPID_CAP, ept_cap) != 0 ) 
-        return 0;
+        return false;
 
     return (ept_has_2mb(ept_cap) && opt_hap_2mb) <= cap_sps_2mb(vtd_cap) &&
            (ept_has_1gb(ept_cap) && opt_hap_1gb) <= cap_sps_1gb(vtd_cap);
