@@ -30,6 +30,7 @@ struct cpupool *cpupool0;                /* Initial cpupool with Dom0 */
 cpumask_t cpupool_free_cpus;             /* cpus not in any cpupool */
 
 static LIST_HEAD(cpupool_list);          /* linked list, sorted by poolid */
+static unsigned int n_cpupools;
 
 static int cpupool_moving_cpu = -1;
 static struct cpupool *cpupool_cpu_moving = NULL;
@@ -276,6 +277,14 @@ static struct cpupool *cpupool_create(unsigned int poolid,
 
     spin_lock(&cpupool_lock);
 
+    /* Don't allow too many cpupools. */
+    if ( n_cpupools >= 2 * nr_cpu_ids )
+    {
+        ret = -ENOSPC;
+        goto unlock;
+    }
+    n_cpupools++;
+
     if ( poolid != CPUPOOLID_NONE )
     {
         q = __cpupool_find_by_id(poolid, false);
@@ -332,7 +341,9 @@ static struct cpupool *cpupool_create(unsigned int poolid,
 
  err:
     list_del(&c->list);
+    n_cpupools--;
 
+ unlock:
     spin_unlock(&cpupool_lock);
 
     free_cpupool_struct(c);
@@ -356,6 +367,7 @@ static int cpupool_destroy(struct cpupool *c)
         return -EBUSY;
     }
 
+    n_cpupools--;
     list_del(&c->list);
 
     spin_unlock(&cpupool_lock);
