@@ -428,6 +428,50 @@ int cf_check amd_iommu_unmap_page(
     return 0;
 }
 
+void amd_iommu_print_entries(const struct amd_iommu *iommu, unsigned int dev_id,
+                             dfn_t dfn)
+{
+    mfn_t pt_mfn;
+    unsigned int level;
+    const struct amd_iommu_dte *dt = iommu->dev_table.buffer;
+
+    if ( !dt[dev_id].tv )
+    {
+        printk("%pp: no root\n", &PCI_SBDF(iommu->seg, dev_id));
+        return;
+    }
+
+    pt_mfn = _mfn(dt[dev_id].pt_root);
+    level = dt[dev_id].paging_mode;
+    printk("%pp root @ %"PRI_mfn" (%u levels) dfn=%"PRI_dfn"\n",
+           &PCI_SBDF(iommu->seg, dev_id), mfn_x(pt_mfn), level, dfn_x(dfn));
+
+    while ( level )
+    {
+        const union amd_iommu_pte *pt = map_domain_page(pt_mfn);
+        unsigned int idx = pfn_to_pde_idx(dfn_x(dfn), level);
+        union amd_iommu_pte pte = pt[idx];
+
+        unmap_domain_page(pt);
+
+        printk("  L%u[%03x] = %"PRIx64" %c%c\n", level, idx, pte.raw,
+               pte.pr ? pte.ir ? 'r' : '-' : 'n',
+               pte.pr ? pte.iw ? 'w' : '-' : 'p');
+
+        if ( !pte.pr )
+            break;
+
+        if ( pte.next_level >= level )
+        {
+            printk("  L%u[%03x]: next: %u\n", level, idx, pte.next_level);
+            break;
+        }
+
+        pt_mfn = _mfn(pte.mfn);
+        level = pte.next_level;
+    }
+}
+
 static unsigned long flush_count(unsigned long dfn, unsigned long page_count,
                                  unsigned int order)
 {

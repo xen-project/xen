@@ -724,10 +724,11 @@ static void amd_dump_page_table_level(struct page_info *pg, int level,
                 mfn_to_page(_mfn(pde->mfn)), pde->next_level,
                 address, indent + 1);
         else
-            printk("%*sdfn: %08lx  mfn: %08lx\n",
+            printk("%*sdfn: %08lx  mfn: %08lx  %c%c\n",
                    indent, "",
                    (unsigned long)PFN_DOWN(address),
-                   (unsigned long)PFN_DOWN(pfn_to_paddr(pde->mfn)));
+                   (unsigned long)PFN_DOWN(pfn_to_paddr(pde->mfn)),
+                   pde->ir ? 'r' : '-', pde->iw ? 'w' : '-');
     }
 
     unmap_domain_page(table_vaddr);

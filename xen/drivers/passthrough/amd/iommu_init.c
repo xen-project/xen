@@ -575,6 +575,9 @@ static void cf_check parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
                (flags & 0x002) ? " NX" : "",
                (flags & 0x001) ? " GN" : "");
 
+        if ( iommu_verbose )
+            amd_iommu_print_entries(iommu, device_id, daddr_to_dfn(addr));
+
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
             if ( get_dma_requestor_id(iommu->seg, bdf) == device_id )
                 pci_check_disable_device(iommu->seg, PCI_BUS(bdf),
