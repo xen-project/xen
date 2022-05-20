@@ -294,6 +294,8 @@ int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
     if ( !is_iommu_enabled(d) )
         return 0;
 
+    ASSERT(!IOMMUF_order(flags));
+
     for ( i = 0; i < page_count; i++ )
     {
         rc = iommu_call(hd->platform_ops, map_page, d, dfn_add(dfn, i),
@@ -354,7 +356,7 @@ int iommu_unmap(struct domain *d, dfn_t dfn, unsigned long page_count,
     for ( i = 0; i < page_count; i++ )
     {
         int err = iommu_call(hd->platform_ops, unmap_page, d, dfn_add(dfn, i),
-                             flush_flags);
+                             0, flush_flags);
 
         if ( likely(!err) )
             continue;

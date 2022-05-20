@@ -57,11 +57,13 @@ int __must_check arm_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
      * The function guest_physmap_add_entry replaces the current mapping
      * if there is already one...
      */
-    return guest_physmap_add_entry(d, _gfn(dfn_x(dfn)), _mfn(dfn_x(dfn)), 0, t);
+    return guest_physmap_add_entry(d, _gfn(dfn_x(dfn)), _mfn(dfn_x(dfn)),
+                                   IOMMUF_order(flags), t);
 }
 
 /* Should only be used if P2M Table is shared between the CPU and the IOMMU. */
 int __must_check arm_iommu_unmap_page(struct domain *d, dfn_t dfn,
+                                      unsigned int order,
                                       unsigned int *flush_flags)
 {
     /*
@@ -71,7 +73,8 @@ int __must_check arm_iommu_unmap_page(struct domain *d, dfn_t dfn,
     if ( !is_domain_direct_mapped(d) )
         return -EINVAL;
 
-    return guest_physmap_remove_page(d, _gfn(dfn_x(dfn)), _mfn(dfn_x(dfn)), 0);
+    return guest_physmap_remove_page(d, _gfn(dfn_x(dfn)), _mfn(dfn_x(dfn)),
+                                     order);
 }
 
 /*
