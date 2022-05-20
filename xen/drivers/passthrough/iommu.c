@@ -308,11 +308,9 @@ int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
                    d->domain_id, dfn_x(dfn_add(dfn, i)),
                    mfn_x(mfn_add(mfn, i)), rc);
 
-        while ( i-- )
-            /* if statement to satisfy __must_check */
-            if ( iommu_call(hd->platform_ops, unmap_page, d, dfn_add(dfn, i),
-                            flush_flags) )
-                continue;
+        /* while statement to satisfy __must_check */
+        while ( iommu_unmap(d, dfn, i, flush_flags) )
+            break;
 
         if ( !is_hardware_domain(d) )
             domain_crash(d);
