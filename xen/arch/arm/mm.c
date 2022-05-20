@@ -1252,6 +1252,8 @@ static int xen_pt_update_entry(mfn_t root, unsigned long virt,
         /* Set permission */
         pte.pt.ro = PAGE_RO_MASK(flags);
         pte.pt.xn = PAGE_XN_MASK(flags);
+        /* Set contiguous bit */
+        pte.pt.contig = !!(flags & _PAGE_CONTIG);
     }
 
     write_pte(entry, pte);
@@ -1304,6 +1306,51 @@ static int xen_pt_mapping_level(unsigned long vfn, mfn_t mfn, unsigned long nr,
      return level;
 }
 
+#define XEN_PT_4K_NR_CONTIG 16
+
+/*
+ * Check whether the contiguous bit can be set. Return the number of
+ * contiguous entry allowed. If not allowed, return 1.
+ */
+static unsigned int xen_pt_check_contig(unsigned long vfn, mfn_t mfn,
+                                        unsigned int level, unsigned long left,
+                                        unsigned int flags)
+{
+    unsigned long nr_contig;
+
+    /*
+     * Allow the contiguous bit to set when the caller requests block
+     * mapping.
+     */
+    if ( !(flags & _PAGE_BLOCK) )
+        return 1;
+
+    /*
+     * We don't allow to remove mapping with the contiguous bit set.
+     * So shortcut the logic and directly return 1.
+     */
+    if ( mfn_eq(mfn, INVALID_MFN) )
+        return 1;
+
+    /*
+     * The number of contiguous entries varies depending on the page
+     * granularity used. The logic below assumes 4KB.
+     */
+    BUILD_BUG_ON(PAGE_SIZE != SZ_4K);
+
+    /*
+     * In order to enable the contiguous bit, we should have enough entries
+     * to map left and both the virtual and physical address should be
+     * aligned to the size of 16 translation tables entries.
+     */
+    nr_contig = BIT(XEN_PT_LEVEL_ORDER(level), UL) * XEN_PT_4K_NR_CONTIG;
+
+    if ( (left < nr_contig) || ((mfn_x(mfn) | vfn) & (nr_contig - 1)) )
+        return 1;
+
+    return XEN_PT_4K_NR_CONTIG;
+}
+
 static DEFINE_SPINLOCK(xen_pt_lock);
 
 static int xen_pt_update(unsigned long virt,
@@ -1338,6 +1385,12 @@ static int xen_pt_update(unsigned long virt,
         return -EINVAL;
     }
 
+    if ( flags & _PAGE_CONTIG )
+    {
+        mm_printk("_PAGE_CONTIG is an internal only flag.\n");
+        return -EINVAL;
+    }
+
     if ( !IS_ALIGNED(virt, PAGE_SIZE) )
     {
         mm_printk("The virtual address is not aligned to the page-size.\n");
@@ -1348,22 +1401,36 @@ static int xen_pt_update(unsigned long virt,
 
     while ( left )
     {
-        unsigned int order, level;
+        unsigned int order, level, nr_contig, new_flags;
 
         level = xen_pt_mapping_level(vfn, mfn, left, flags);
         order = XEN_PT_LEVEL_ORDER(level);
 
         ASSERT(left >= BIT(order, UL));
 
-        rc = xen_pt_update_entry(root, vfn << PAGE_SHIFT, mfn, level, flags);
+        /*
+         * Check if we can set the contiguous mapping and update the
+         * flags accordingly.
+         */
+        nr_contig = xen_pt_check_contig(vfn, mfn, level, left, flags);
+        new_flags = flags | ((nr_contig > 1) ? _PAGE_CONTIG : 0);
+
+        for ( ; nr_contig > 0; nr_contig-- )
+        {
+            rc = xen_pt_update_entry(root, vfn << PAGE_SHIFT, mfn, level,
+                                     new_flags);
+            if ( rc )
+                break;
+
+            vfn += 1U << order;
+            if ( !mfn_eq(mfn, INVALID_MFN) )
+                mfn = mfn_add(mfn, 1U << order);
+
+            left -= (1U << order);
+        }
+
         if ( rc )
             break;
-
-        vfn += 1U << order;
-        if ( !mfn_eq(mfn, INVALID_MFN) )
-            mfn = mfn_add(mfn, 1U << order);
-
-        left -= (1U << order);
     }
 
     /*
