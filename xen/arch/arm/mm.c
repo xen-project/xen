@@ -1030,19 +1030,27 @@ static void xen_unmap_table(const lpae_t *table)
 
 static int create_xen_table(lpae_t *entry)
 {
-    struct page_info *pg;
+    mfn_t mfn;
     void *p;
     lpae_t pte;
 
-    pg = alloc_domheap_page(NULL, 0);
-    if ( pg == NULL )
-        return -ENOMEM;
+    if ( system_state != SYS_STATE_early_boot )
+    {
+        struct page_info *pg = alloc_domheap_page(NULL, 0);
 
-    p = xen_map_table(page_to_mfn(pg));
+        if ( pg == NULL )
+            return -ENOMEM;
+
+        mfn = page_to_mfn(pg);
+    }
+    else
+        mfn = alloc_boot_pages(1, 1);
+
+    p = xen_map_table(mfn);
     clear_page(p);
     xen_unmap_table(p);
 
-    pte = mfn_to_xen_entry(page_to_mfn(pg), MT_NORMAL);
+    pte = mfn_to_xen_entry(mfn, MT_NORMAL);
     pte.pt.table = 1;
     write_pte(entry, pte);
 
