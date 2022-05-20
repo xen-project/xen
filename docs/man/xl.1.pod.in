@@ -442,15 +442,14 @@ allocate.
 The default unit is kiB.  Add 't' for TiB, 'g' for GiB, 'm' for
 MiB, 'k' for kiB, and 'b' for bytes (e.g., `2048m` for 2048 MiB).
 
-NB that users normally shouldn't need this command; B<xl mem-set> will
-set this as appropriate automatically.
-
 I<mem> can't be set lower than the current memory target for
 I<domain-id>.  It is allowed to be higher than the configured maximum
 memory size of the domain (B<maxmem> parameter in the domain's
-configuration). Note however that the initial B<maxmem> value is still
-used as an upper limit for B<xl mem-set>.  Also note that calling B<xl
-mem-set> will reset this value.
+configuration).
+
+Setting the maximum memory size above the configured maximum memory size
+will require special guest support (memory hotplug) in order to be usable
+by the guest.
 
 The domain will not receive any signal regarding the changed memory
 limit.

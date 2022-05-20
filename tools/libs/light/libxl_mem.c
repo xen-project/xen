@@ -20,8 +20,7 @@
 /*
  * Set the maximum memory size of the domain in the hypervisor. There is no
  * change of the current memory size involved. The specified memory size can
- * even be above the configured maxmem size of the domain, but the related
- * Xenstore entry memory/static-max isn't modified!
+ * even be above the configured maxmem size of the domain.
  */
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
 {
@@ -79,6 +78,15 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
         LOGED(ERROR, domid,
               "xc_domain_setmaxmem domid=%d memkb=%"PRIu64" failed ""rc=%d\n",
               domid, max_memkb + size, rc);
+        goto out;
+    }
+
+    rc = libxl__xs_printf(gc, XBT_NULL,
+                          GCSPRINTF("%s/memory/static-max", dompath),
+                          "%"PRIu64, max_memkb);
+    if (rc != 0) {
+        LOGED(ERROR, domid, "Couldn't set %s/memory/static-max, rc=%d\n",
+              dompath, rc);
         goto out;
     }
 
