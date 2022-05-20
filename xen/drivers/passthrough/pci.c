@@ -451,7 +451,24 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
                          phantom_devs[i].slot == PCI_SLOT(devfn) &&
                          phantom_devs[i].stride > PCI_FUNC(devfn) )
                     {
-                        pdev->phantom_stride = phantom_devs[i].stride;
+                        pci_sbdf_t sbdf = pdev->sbdf;
+                        unsigned int stride = phantom_devs[i].stride;
+
+                        while ( (sbdf.fn += stride) > PCI_FUNC(devfn) )
+                        {
+                            if ( pci_conf_read16(sbdf, PCI_VENDOR_ID) == 0xffff &&
+                                 pci_conf_read16(sbdf, PCI_DEVICE_ID) == 0xffff )
+                                continue;
+                            stride <<= 1;
+                            printk(XENLOG_WARNING
+                                   "%pp looks to be a real device; bumping %04x:%02x:%02x stride to %u\n",
+                                   &sbdf, phantom_devs[i].seg,
+                                   phantom_devs[i].bus, phantom_devs[i].slot,
+                                   stride);
+                            sbdf = pdev->sbdf;
+                        }
+                        if ( PCI_FUNC(stride) )
+                           pdev->phantom_stride = stride;
                         break;
                     }
             }
