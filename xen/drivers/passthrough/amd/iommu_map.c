@@ -89,11 +89,11 @@ static unsigned int set_iommu_ptes_present(unsigned long pt_mfn,
                                            bool iw, bool ir)
 {
     union amd_iommu_pte *table, *pde;
-    unsigned int page_sz, flush_flags = 0;
+    unsigned long page_sz = 1UL << (PTE_PER_TABLE_SHIFT * (pde_level - 1));
+    unsigned int flush_flags = 0;
 
     table = map_domain_page(_mfn(pt_mfn));
     pde = &table[pfn_to_pde_idx(dfn, pde_level)];
-    page_sz = 1U << (PTE_PER_TABLE_SHIFT * (pde_level - 1));
 
     if ( (void *)(pde + nr_ptes) > (void *)table + PAGE_SIZE )
     {
@@ -281,7 +281,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
         {
             unsigned long mfn, pfn;
 
-            pfn =  dfn & ~((1 << (PTE_PER_TABLE_SHIFT * next_level)) - 1);
+            pfn = dfn & ~((1UL << (PTE_PER_TABLE_SHIFT * next_level)) - 1);
             mfn = next_table_mfn;
 
             /* allocate lower level page table */
