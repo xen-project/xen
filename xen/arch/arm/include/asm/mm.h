@@ -191,10 +191,6 @@ extern void mmu_init_secondary_cpu(void);
 extern void setup_xenheap_mappings(unsigned long base_mfn, unsigned long nr_mfns);
 /* Map a frame table to cover physical addresses ps through pe */
 extern void setup_frametable_mappings(paddr_t ps, paddr_t pe);
-/* Map a 4k page in a fixmap entry */
-extern void set_fixmap(unsigned map, mfn_t mfn, unsigned attributes);
-/* Remove a mapping from a fixmap entry */
-extern void clear_fixmap(unsigned map);
 /* map a physical range in virtual memory */
 void __iomem *ioremap_attr(paddr_t start, size_t len, unsigned attributes);
 

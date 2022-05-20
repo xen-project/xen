@@ -41,6 +41,7 @@
 #include <xen/sizes.h>
 #include <xen/libfdt/libfdt.h>
 
+#include <asm/fixmap.h>
 #include <asm/setup.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */

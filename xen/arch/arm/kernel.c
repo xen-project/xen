@@ -15,6 +15,7 @@
 #include <xen/vmap.h>
 
 #include <asm/byteorder.h>
+#include <asm/fixmap.h>
 #include <asm/kernel.h>
 #include <asm/setup.h>
 

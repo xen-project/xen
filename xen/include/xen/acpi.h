@@ -28,6 +28,15 @@
 #define _LINUX
 #endif
 
+/*
+ * Fixmap pages to reserve for ACPI boot-time tables (see
+ * arch/x86/include/asm/fixmap.h or arch/arm/include/asm/fixmap.h),
+ * 64 pages(256KB) is large enough for most cases.)
+ */
+#define NUM_FIXMAP_ACPI_PAGES  64
+
+#ifndef __ASSEMBLY__
+
 #include <xen/list.h>
 
 #include <acpi/acpi.h>
@@ -38,13 +47,6 @@
 
 #define ACPI_MADT_GET_POLARITY(inti)	ACPI_MADT_GET_(POLARITY, inti)
 #define ACPI_MADT_GET_TRIGGER(inti)	ACPI_MADT_GET_(TRIGGER, inti)
-
-/*
- * Fixmap pages to reserve for ACPI boot-time tables (see
- * arch/x86/include/asm/fixmap.h or arch/arm/include/asm/config.h,
- * 64 pages(256KB) is large enough for most cases.)
- */
-#define NUM_FIXMAP_ACPI_PAGES  64
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
                 (!(entry)) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||  \
@@ -206,5 +208,7 @@ void acpi_reboot(void);
 
 void acpi_dmar_zap(void);
 void acpi_dmar_reinstate(void);
+
+#endif /* __ASSEMBLY__ */
 
 #endif /*_LINUX_ACPI_H*/

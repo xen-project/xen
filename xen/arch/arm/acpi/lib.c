@@ -25,6 +25,8 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 
+#include <asm/fixmap.h>
+
 static bool fixmap_inuse;
 
 char *__acpi_map_table(paddr_t phys, unsigned long size)
