@@ -31,30 +31,28 @@ static unsigned int pfn_to_pde_idx(unsigned long pfn, unsigned int level)
     return idx;
 }
 
-static unsigned int clear_iommu_pte_present(unsigned long l1_mfn,
-                                            unsigned long dfn)
+static union amd_iommu_pte clear_iommu_pte_present(unsigned long l1_mfn,
+                                                   unsigned long dfn)
 {
-    union amd_iommu_pte *table, *pte;
-    unsigned int flush_flags;
+    union amd_iommu_pte *table, *pte, old;
 
     table = map_domain_page(_mfn(l1_mfn));
     pte = &table[pfn_to_pde_idx(dfn, 1)];
+    old = *pte;
 
-    flush_flags = pte->pr ? IOMMU_FLUSHF_modified : 0;
     write_atomic(&pte->raw, 0);
 
     unmap_domain_page(table);
 
-    return flush_flags;
+    return old;
 }
 
-static unsigned int set_iommu_pde_present(union amd_iommu_pte *pte,
-                                          unsigned long next_mfn,
-                                          unsigned int next_level, bool iw,
-                                          bool ir)
+static void set_iommu_pde_present(union amd_iommu_pte *pte,
+                                  unsigned long next_mfn,
+                                  unsigned int next_level,
+                                  bool iw, bool ir)
 {
-    union amd_iommu_pte new = {}, old;
-    unsigned int flush_flags = IOMMU_FLUSHF_added;
+    union amd_iommu_pte new = {};
 
     /*
      * FC bit should be enabled in PTE, this helps to solve potential
@@ -68,29 +66,42 @@ static unsigned int set_iommu_pde_present(union amd_iommu_pte *pte,
     new.next_level = next_level;
     new.pr = true;
 
-    old.raw = read_atomic(&pte->raw);
-    old.ign0 = 0;
-    old.ign1 = 0;
-    old.ign2 = 0;
-
-    if ( old.pr && old.raw != new.raw )
-        flush_flags |= IOMMU_FLUSHF_modified;
-
     write_atomic(&pte->raw, new.raw);
-
-    return flush_flags;
 }
 
-static unsigned int set_iommu_ptes_present(unsigned long pt_mfn,
-                                           unsigned long dfn,
-                                           unsigned long next_mfn,
-                                           unsigned int nr_ptes,
-                                           unsigned int pde_level,
-                                           bool iw, bool ir)
+static union amd_iommu_pte set_iommu_pte_present(unsigned long pt_mfn,
+                                                 unsigned long dfn,
+                                                 unsigned long next_mfn,
+                                                 unsigned int level,
+                                                 bool iw, bool ir)
+{
+    union amd_iommu_pte *table, *pde, old;
+
+    table = map_domain_page(_mfn(pt_mfn));
+    pde = &table[pfn_to_pde_idx(dfn, level)];
+
+    old = *pde;
+    if ( !old.pr || old.next_level ||
+         old.mfn != next_mfn ||
+         old.iw != iw || old.ir != ir )
+        set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
+    else
+        old.pr = false; /* signal "no change" to the caller */
+
+    unmap_domain_page(table);
+
+    return old;
+}
+
+static void set_iommu_ptes_present(unsigned long pt_mfn,
+                                   unsigned long dfn,
+                                   unsigned long next_mfn,
+                                   unsigned int nr_ptes,
+                                   unsigned int pde_level,
+                                   bool iw, bool ir)
 {
     union amd_iommu_pte *table, *pde;
     unsigned long page_sz = 1UL << (PTE_PER_TABLE_SHIFT * (pde_level - 1));
-    unsigned int flush_flags = 0;
 
     table = map_domain_page(_mfn(pt_mfn));
     pde = &table[pfn_to_pde_idx(dfn, pde_level)];
@@ -98,20 +109,18 @@ static unsigned int set_iommu_ptes_present(unsigned long pt_mfn,
     if ( (void *)(pde + nr_ptes) > (void *)table + PAGE_SIZE )
     {
         ASSERT_UNREACHABLE();
-        return 0;
+        return;
     }
 
     while ( nr_ptes-- )
     {
-        flush_flags |= set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
+        set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
 
         ++pde;
         next_mfn += page_sz;
     }
 
     unmap_domain_page(table);
-
-    return flush_flags;
 }
 
 /*
@@ -349,6 +358,7 @@ int cf_check amd_iommu_map_page(
     struct domain_iommu *hd = dom_iommu(d);
     int rc;
     unsigned long pt_mfn = 0;
+    union amd_iommu_pte old;
 
     spin_lock(&hd->arch.mapping_lock);
 
@@ -385,11 +395,15 @@ int cf_check amd_iommu_map_page(
     }
 
     /* Install 4k mapping */
-    *flush_flags |= set_iommu_ptes_present(pt_mfn, dfn_x(dfn), mfn_x(mfn),
-                                           1, 1, (flags & IOMMUF_writable),
-                                           (flags & IOMMUF_readable));
+    old = set_iommu_pte_present(pt_mfn, dfn_x(dfn), mfn_x(mfn), 1,
+                                (flags & IOMMUF_writable),
+                                (flags & IOMMUF_readable));
 
     spin_unlock(&hd->arch.mapping_lock);
+
+    *flush_flags |= IOMMU_FLUSHF_added;
+    if ( old.pr )
+        *flush_flags |= IOMMU_FLUSHF_modified;
 
     return 0;
 }
@@ -399,6 +413,7 @@ int cf_check amd_iommu_unmap_page(
 {
     unsigned long pt_mfn = 0;
     struct domain_iommu *hd = dom_iommu(d);
+    union amd_iommu_pte old = {};
 
     spin_lock(&hd->arch.mapping_lock);
 
@@ -420,10 +435,13 @@ int cf_check amd_iommu_unmap_page(
     if ( pt_mfn )
     {
         /* Mark PTE as 'page not present'. */
-        *flush_flags |= clear_iommu_pte_present(pt_mfn, dfn_x(dfn));
+        old = clear_iommu_pte_present(pt_mfn, dfn_x(dfn));
     }
 
     spin_unlock(&hd->arch.mapping_lock);
+
+    if ( old.pr )
+        *flush_flags |= IOMMU_FLUSHF_modified;
 
     return 0;
 }
