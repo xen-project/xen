@@ -1652,12 +1652,15 @@ with **crashinfo_maxaddr**.
 Specify the threshold below which Xen will inform dom0 that the quantity of
 free memory is getting low.  Specifying `0` will disable this notification.
 
-### maxcpus (x86)
+### maxcpus
 > `= <integer>`
 
 Specify the maximum number of CPUs that should be brought up.
 
 This option is ignored in **pv-shim** mode.
+
+**WARNING: On Arm big.LITTLE systems, when `hmp-unsafe` option is enabled, this command line
+option does not guarantee on which CPU types will be used.**
 
 ### max_cstate (x86)
 > `= <integer>[,<integer>]`

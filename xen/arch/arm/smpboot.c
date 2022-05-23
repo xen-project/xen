@@ -43,6 +43,10 @@ cpumask_t cpu_possible_map;
 
 struct cpuinfo_arm cpu_data[NR_CPUS];
 
+/* maxcpus: maximum number of CPUs to activate. */
+static unsigned int __initdata max_cpus;
+integer_param("maxcpus", max_cpus);
+
 /* CPU logical map: map xen cpuid to an MPIDR */
 register_t __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
 
@@ -277,16 +281,18 @@ void __init smp_init_cpus(void)
                     "unless the cpu affinity of all domains is specified.\n");
 }
 
-int __init
-smp_get_max_cpus (void)
+unsigned int __init smp_get_max_cpus(void)
 {
-    int i, max_cpus = 0;
+    unsigned int i, cpus = 0;
 
-    for ( i = 0; i < nr_cpu_ids; i++ )
+    if ( ( !max_cpus ) || ( max_cpus > nr_cpu_ids ) )
+        max_cpus = nr_cpu_ids;
+
+    for ( i = 0; i < max_cpus; i++ )
         if ( cpu_possible(i) )
-            max_cpus++;
+            cpus++;
 
-    return max_cpus;
+    return cpus;
 }
 
 void __init

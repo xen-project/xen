@@ -871,11 +871,10 @@ void __init start_xen(unsigned long boot_phys_offset,
                       unsigned long fdt_paddr)
 {
     size_t fdt_size;
-    int cpus, i;
     const char *cmdline;
     struct bootmodule *xen_bootmodule;
     struct domain *d;
-    int rc;
+    int rc, i;
 
     dcache_line_bytes = read_dcache_line_bytes();
 
@@ -951,9 +950,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     processor_id();
 
     smp_init_cpus();
-    cpus = smp_get_max_cpus();
-    printk(XENLOG_INFO "SMP: Allowing %u CPUs\n", cpus);
-    nr_cpu_ids = cpus;
+    nr_cpu_ids = smp_get_max_cpus();
+    printk(XENLOG_INFO "SMP: Allowing %u CPUs\n", nr_cpu_ids);
 
     /*
      * Some errata relies on SMCCC version which is detected by psci_init()
@@ -997,7 +995,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     for_each_present_cpu ( i )
     {
-        if ( (num_online_cpus() < cpus) && !cpu_online(i) )
+        if ( (num_online_cpus() < nr_cpu_ids) && !cpu_online(i) )
         {
             int ret = cpu_up(i);
             if ( ret != 0 )
