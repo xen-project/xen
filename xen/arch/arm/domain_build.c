@@ -115,7 +115,8 @@ static bool __init insert_11_bank(struct domain *d,
                                   struct page_info *pg,
                                   unsigned int order)
 {
-    int res, i;
+    unsigned int i;
+    int res;
     mfn_t smfn;
     paddr_t start, size;
 
@@ -268,7 +269,7 @@ static void __init allocate_memory_11(struct domain *d,
     const unsigned int min_order = get_order_from_bytes(MB(4));
     struct page_info *pg;
     unsigned int order = get_allocation_size(kinfo->unassigned_mem);
-    int i;
+    unsigned int i;
 
     bool lowmem = true;
     unsigned int lowmem_bitsize = min(32U, arch_get_dma_bitsize());
@@ -1026,8 +1027,8 @@ static int __init make_memory_node(const struct domain *d,
                                    int addrcells, int sizecells,
                                    struct meminfo *mem)
 {
-    int res, i;
-    int reg_size = addrcells + sizecells;
+    unsigned int i;
+    int res, reg_size = addrcells + sizecells;
     int nr_cells = 0;
     /* Placeholder for memory@ + a 64-bit number + \0 */
     char buf[24];

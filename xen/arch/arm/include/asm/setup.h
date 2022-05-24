@@ -30,7 +30,7 @@ struct membank {
 };
 
 struct meminfo {
-    int nr_banks;
+    unsigned int nr_banks;
     struct membank bank[NR_MEM_BANKS];
 };
 
@@ -93,7 +93,7 @@ extern domid_t max_init_domid;
 
 void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
 
-size_t estimate_efi_size(int mem_nr_banks);
+size_t estimate_efi_size(unsigned int mem_nr_banks);
 
 void acpi_create_efi_system_table(struct domain *d,
                                   struct membank tbl_add[]);
@@ -109,7 +109,7 @@ void create_dom0(void);
 
 void discard_initial_modules(void);
 void fw_unreserved_regions(paddr_t s, paddr_t e,
-                           void (*cb)(paddr_t, paddr_t), int first);
+                           void (*cb)(paddr_t, paddr_t), unsigned int first);
 
 size_t boot_fdt_info(const void *fdt, paddr_t paddr);
 const char *boot_fdt_cmdline(const void *fdt);

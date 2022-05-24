@@ -201,9 +201,17 @@ static void __init processor_id(void)
 
 static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
                                          void (*cb)(paddr_t, paddr_t),
-                                         int first)
+                                         unsigned int first)
 {
-    int i, nr = fdt_num_mem_rsv(device_tree_flattened);
+    unsigned int i, nr;
+    int rc;
+
+    rc = fdt_num_mem_rsv(device_tree_flattened);
+    if ( rc < 0 )
+        panic("Unable to retrieve the number of reserved regions (rc=%d)\n",
+              rc);
+
+    nr = rc;
 
     for ( i = first; i < nr ; i++ )
     {
@@ -249,7 +257,8 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
 }
 
 void __init fw_unreserved_regions(paddr_t s, paddr_t e,
-                                  void (*cb)(paddr_t, paddr_t), int first)
+                                  void (*cb)(paddr_t, paddr_t),
+                                  unsigned int first)
 {
     if ( acpi_disabled )
         dt_unreserved_regions(s, e, cb, first);
@@ -643,7 +652,7 @@ static void __init setup_mm(void)
     paddr_t s, e;
     unsigned long ram_pages;
     unsigned long heap_pages, xenheap_pages, domheap_pages;
-    int i;
+    unsigned int i;
     const uint32_t ctr = READ_CP32(CTR);
 
     if ( !bootinfo.mem.nr_banks )
