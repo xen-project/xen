@@ -48,14 +48,16 @@ static bool do_xs_write_dom(struct xs_handle *xsh, xs_transaction_t t,
 {
     char full_path[STR_MAX_LENGTH];
     struct xs_permissions perms[2];
+    int rc;
 
     perms[0].id = domid;
     perms[0].perms = XS_PERM_NONE;
     perms[1].id = 0;
     perms[1].perms = XS_PERM_READ;
 
-    if (snprintf(full_path, STR_MAX_LENGTH,
-                 "/local/domain/%u/%s", domid, path) < 0)
+    rc = snprintf(full_path, STR_MAX_LENGTH,
+                  "/local/domain/%u/%s", domid, path);
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return false;
     if (!xs_write(xsh, t, full_path, val, strlen(val)))
         return false;
@@ -66,9 +68,11 @@ static bool do_xs_write_libxl(struct xs_handle *xsh, xs_transaction_t t,
                               domid_t domid, char *path, char *val)
 {
     char full_path[STR_MAX_LENGTH];
+    int rc;
 
-    if (snprintf(full_path, STR_MAX_LENGTH,
-                 "/libxl/%u/%s", domid, path) < 0)
+    rc = snprintf(full_path, STR_MAX_LENGTH,
+                  "/libxl/%u/%s", domid, path);
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return false;
     return xs_write(xsh, t, full_path, val, strlen(val));
 }
@@ -77,9 +81,11 @@ static bool do_xs_write_vm(struct xs_handle *xsh, xs_transaction_t t,
                            libxl_uuid uuid, char *path, char *val)
 {
     char full_path[STR_MAX_LENGTH];
+    int rc;
 
-    if (snprintf(full_path, STR_MAX_LENGTH,
-                 "/vm/" LIBXL_UUID_FMT "/%s", LIBXL_UUID_BYTES(uuid), path) < 0)
+    rc = snprintf(full_path, STR_MAX_LENGTH,
+                  "/vm/" LIBXL_UUID_FMT "/%s", LIBXL_UUID_BYTES(uuid), path);
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return false;
     return xs_write(xsh, t, full_path, val, strlen(val));
 }
@@ -115,35 +121,35 @@ static int create_xenstore(struct xs_handle *xsh,
         return -errno;
     rc = snprintf(start_time_str, STR_MAX_LENGTH, "%jd.%02d",
             (intmax_t)start_time.tv_sec, (int)start_time.tv_usec / 10000);
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
 
     domid = info->domid;
     rc = snprintf(id_str, STR_MAX_LENGTH, "%u", domid);
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
     rc = snprintf(dom_name_str, STR_MAX_LENGTH, "dom0less-%u", domid);
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
     rc = snprintf(uuid_str, STR_MAX_LENGTH, LIBXL_UUID_FMT, LIBXL_UUID_BYTES(uuid));
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
     rc = snprintf(vm_val_str, STR_MAX_LENGTH,
                   "vm/" LIBXL_UUID_FMT, LIBXL_UUID_BYTES(uuid));
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
     rc = snprintf(max_memkb_str, STR_MAX_LENGTH, "%lu", info->max_memkb);
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
     rc = snprintf(target_memkb_str, STR_MAX_LENGTH, "%lu", info->current_memkb);
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
     rc = snprintf(ring_ref_str, STR_MAX_LENGTH, "%lld",
                   (GUEST_MAGIC_BASE >> XC_PAGE_SHIFT) + XENSTORE_PFN_OFFSET);
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
     rc = snprintf(xenstore_port_str, STR_MAX_LENGTH, "%u", xenstore_port);
-    if (rc < 0)
+    if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
 
 retry_transaction:
@@ -163,7 +169,7 @@ retry_transaction:
     if (!do_xs_write_dom(xsh, t, domid, "cpu", "")) goto err;
     for (i = 0; i < info->vcpu_max_id; i++) {
         rc = snprintf(cpu_str, STR_MAX_LENGTH, "cpu/%u/availability/", i);
-        if (rc < 0)
+        if (rc < 0 || rc >= STR_MAX_LENGTH)
             goto err;
         rc = -EIO;
         if (!do_xs_write_dom(xsh, t, domid, cpu_str,
