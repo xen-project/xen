@@ -694,12 +694,14 @@ $(objtree)/%.c.cppcheck: $(srctree)/%.c $(objtree)/include/generated/autoconf.h 
 	$(call if_changed,cppcheck_xml)
 
 cppcheck-version:
-ifeq ($(shell which $(CPPCHECK)),)
-	$(error Cannot find cppcheck executable: $(CPPCHECK))
-endif
-ifeq ($(shell $(CPPCHECK) --version | awk '{print ($$2 < 2.7)}'),1)
-	$(error Please upgrade your cppcheck to version 2.7 or greater)
-endif
+	$(Q)if ! which $(CPPCHECK) > /dev/null 2>&1; then \
+		echo "Cannot find cppcheck executable: $(CPPCHECK)"; \
+		exit 1; \
+	fi
+	$(Q)if [ "$$($(CPPCHECK) --version | awk '{print ($$2 < 2.7)}')" -eq 1 ]; then \
+		echo "Please upgrade your cppcheck to version 2.7 or greater"; \
+		exit 1; \
+	fi
 
 # Put this in generated headers this way it is cleaned by include/Makefile
 $(objtree)/include/generated/compiler-def.h:
