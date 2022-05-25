@@ -5068,13 +5068,8 @@ l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
 #define l1f_to_lNf(f) (((f) & _PAGE_PRESENT) ? ((f) |  _PAGE_PSE) : (f))
 #define lNf_to_l1f(f) (((f) & _PAGE_PRESENT) ? ((f) & ~_PAGE_PSE) : (f))
 
-/*
- * map_pages_to_xen() can be called early in boot before any other
- * CPUs are online. Use flush_area_local() in this case.
- */
-#define flush_area(v,f) (system_state < SYS_STATE_smp_boot ?    \
-                         flush_area_local((const void *)v, f) : \
-                         flush_area_all((const void *)v, f))
+/* flush_area_all() can be used prior to any other CPU being online.  */
+#define flush_area(v, f) flush_area_all((const void *)(v), f)
 
 #define L3T_INIT(page) (page) = ZERO_BLOCK_PTR
 
