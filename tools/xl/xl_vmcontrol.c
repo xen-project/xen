@@ -1169,13 +1169,13 @@ int main_create(int argc, char **argv)
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
         quiet = 0, monitor = 1, vnc = 0, vncautopass = 0, ignore_masks = 0;
     int opt, rc;
-    static struct option opts[] = {
-        {"dryrun", 0, 0, 'n'},
-        {"quiet", 0, 0, 'q'},
+    static const struct option opts[] = {
         {"defconfig", 1, 0, 'f'},
+        {"dryrun", 0, 0, 'n'},
+        {"ignore-global-affinity-masks", 0, 0, 'i'},
+        {"quiet", 0, 0, 'q'},
         {"vncviewer", 0, 0, 'V'},
         {"vncviewer-autopass", 0, 0, 'A'},
-        {"ignore-global-affinity-masks", 0, 0, 'i'},
         COMMON_LONG_OPTS
     };
 
@@ -1186,12 +1186,15 @@ int main_create(int argc, char **argv)
         argc--; argv++;
     }
 
-    SWITCH_FOREACH_OPT(opt, "Fnqf:pcdeVAi", opts, "create", 0) {
-    case 'f':
-        filename = optarg;
+    SWITCH_FOREACH_OPT(opt, "AFVcdef:inpq", opts, "create", 0) {
+    case 'A':
+        vnc = vncautopass = 1;
         break;
-    case 'p':
-        paused = 1;
+    case 'F':
+        daemonize = 0;
+        break;
+    case 'V':
+        vnc = 1;
         break;
     case 'c':
         console_autoconnect = 1;
@@ -1199,27 +1202,24 @@ int main_create(int argc, char **argv)
     case 'd':
         debug = 1;
         break;
-    case 'F':
-        daemonize = 0;
-        break;
     case 'e':
         daemonize = 0;
         monitor = 0;
         break;
-    case 'n':
-        dryrun_only = 1;
-        break;
-    case 'q':
-        quiet = 1;
-        break;
-    case 'V':
-        vnc = 1;
-        break;
-    case 'A':
-        vnc = vncautopass = 1;
+    case 'f':
+        filename = optarg;
         break;
     case 'i':
         ignore_masks = 1;
+        break;
+    case 'n':
+        dryrun_only = 1;
+        break;
+    case 'p':
+        paused = 1;
+        break;
+    case 'q':
+        quiet = 1;
         break;
     }
 

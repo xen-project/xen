@@ -24,16 +24,16 @@ const struct cmd_spec cmd_table[] = {
       &main_create, 1, 1,
       "Create a domain from config file <filename>",
       "<ConfigFile> [options] [vars]",
-      "-h                      Print this help.\n"
-      "-p                      Leave the domain paused after it is created.\n"
       "-c                      Connect to the console after the domain is created.\n"
+      "-d                      Enable debug messages.\n"
+      "-e                      Do not wait in the background for the death of the domain.\n"
+      "-F                      Run in foreground until death of the domain.\n"
       "-f FILE, --defconfig=FILE\n                     Use the given configuration file.\n"
-      "-q, --quiet             Quiet.\n"
+      "-h                      Print this help.\n"
       "-n, --dryrun            Dry run - prints the resulting configuration\n"
       "                         (deprecated in favour of global -N option).\n"
-      "-d                      Enable debug messages.\n"
-      "-F                      Run in foreground until death of the domain.\n"
-      "-e                      Do not wait in the background for the death of the domain.\n"
+      "-p                      Leave the domain paused after it is created.\n"
+      "-q, --quiet             Quiet.\n"
       "-V, --vncviewer         Connect to the VNC display after the domain is created.\n"
       "-A, --vncviewer-autopass\n"
       "                        Pass VNC password to viewer via stdin.\n"
