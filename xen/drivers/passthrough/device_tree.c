@@ -269,6 +269,8 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
             break;
 
         ret = xsm_deassign_dtdevice(XSM_HOOK, d, dt_node_full_name(dev));
+        if ( ret )
+            break;
 
         if ( d == dom_io )
             return -EINVAL;
