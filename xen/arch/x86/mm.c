@@ -2990,7 +2990,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
                     flush_mask(mask,
                                (x & PGT_type_mask) &&
                                (x & PGT_type_mask) <= PGT_root_page_table
-                               ? FLUSH_TLB | FLUSH_FORCE_IPI
+                               ? FLUSH_TLB | FLUSH_NO_ASSIST
                                : FLUSH_TLB);
                 }
 

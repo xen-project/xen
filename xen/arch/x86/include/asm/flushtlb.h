@@ -128,13 +128,12 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4);
 #endif
 #if defined(CONFIG_PV) || defined(CONFIG_SHADOW_PAGING)
 /*
- * Force an IPI to be sent. Note that adding this to the flags passed to
- * flush_area_mask will prevent using the assisted flush without having any
- * other side effect.
+ * Adding this to the flags passed to flush_area_mask will prevent using the
+ * assisted flush without having any other side effect.
  */
-# define FLUSH_FORCE_IPI 0x8000
+# define FLUSH_NO_ASSIST 0x8000
 #else
-# define FLUSH_FORCE_IPI 0
+# define FLUSH_NO_ASSIST 0
 #endif
 
 /* Flush local TLBs/caches. */
@@ -162,11 +161,12 @@ void flush_area_mask(const cpumask_t *, const void *va, unsigned int flags);
     flush_area_mask(mask, (const void *)(v), FLUSH_TLB|FLUSH_ORDER(0))
 
 /*
- * Make the common code TLB flush helper force use of an IPI in order to be
- * on the safe side. Note that not all calls from common code strictly require
+ * Make the common code TLB flush helper disallow the usage of any flush
+ * assistance in order to be on the safe side and interrupt remote processors
+ * requiring a flush. Note that not all calls from common code strictly require
  * this.
  */
-#define arch_flush_tlb_mask(mask) flush_mask(mask, FLUSH_TLB | FLUSH_FORCE_IPI)
+#define arch_flush_tlb_mask(mask) flush_mask(mask, FLUSH_TLB | FLUSH_NO_ASSIST)
 
 /* Flush all CPUs' TLBs */
 #define flush_tlb_all()                         \
