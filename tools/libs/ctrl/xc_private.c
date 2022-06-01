@@ -326,7 +326,7 @@ int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
     return flush_mmu_updates(xch, mmu);
 }
 
-long do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
+long xc_memory_op(xc_interface *xch, unsigned int cmd, void *arg, size_t len)
 {
     DECLARE_HYPERCALL_BOUNCE(arg, len, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     long ret = -1;
@@ -386,7 +386,7 @@ long do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
 
 int xc_maximum_ram_page(xc_interface *xch, unsigned long *max_mfn)
 {
-    long rc = do_memory_op(xch, XENMEM_maximum_ram_page, NULL, 0);
+    long rc = xc_memory_op(xch, XENMEM_maximum_ram_page, NULL, 0);
 
     if ( rc >= 0 )
     {
@@ -428,7 +428,7 @@ int xc_machphys_mfn_list(xc_interface *xch,
     }
 
     set_xen_guest_handle(xmml.extent_start, extent_start);
-    rc = do_memory_op(xch, XENMEM_machphys_mfn_list, &xmml, sizeof(xmml));
+    rc = xc_memory_op(xch, XENMEM_machphys_mfn_list, &xmml, sizeof(xmml));
     if (rc || xmml.nr_extents != max_extents)
         rc = -1;
     else

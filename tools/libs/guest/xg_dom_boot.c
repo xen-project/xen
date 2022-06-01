@@ -348,7 +348,7 @@ static int compat_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
     xc_dom_printf(xch, "%s: d%d: pfn=0x%"PRI_xen_pfn, __func__,
                   domid, scratch_gfn);
 
-    rc = do_memory_op(xch, XENMEM_add_to_physmap, &xatp, sizeof(xatp));
+    rc = xc_memory_op(xch, XENMEM_add_to_physmap, &xatp, sizeof(xatp));
     if ( rc != 0 )
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
@@ -366,12 +366,12 @@ static int compat_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
                      "%s: failed to seed gnttab entries for d%d\n",
                      __func__, domid);
-        (void) do_memory_op(xch, XENMEM_remove_from_physmap, &xrfp,
+        (void) xc_memory_op(xch, XENMEM_remove_from_physmap, &xrfp,
                             sizeof(xrfp));
         return -1;
     }
 
-    rc = do_memory_op(xch, XENMEM_remove_from_physmap, &xrfp, sizeof(xrfp));
+    rc = xc_memory_op(xch, XENMEM_remove_from_physmap, &xrfp, sizeof(xrfp));
     if (rc != 0)
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,

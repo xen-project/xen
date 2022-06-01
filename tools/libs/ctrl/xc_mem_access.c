@@ -38,7 +38,7 @@ int xc_set_mem_access(xc_interface *xch,
         .nr     = nr
     };
 
-    return do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
+    return xc_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
 }
 
 int xc_set_mem_access_multi(xc_interface *xch,
@@ -71,7 +71,7 @@ int xc_set_mem_access_multi(xc_interface *xch,
     set_xen_guest_handle(mao.pfn_list, pages);
     set_xen_guest_handle(mao.access_list, access);
 
-    rc = do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
+    rc = xc_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
 
     xc_hypercall_bounce_post(xch, access);
     xc_hypercall_bounce_post(xch, pages);
@@ -92,7 +92,7 @@ int xc_get_mem_access(xc_interface *xch,
         .pfn   = pfn
     };
 
-    rc = do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
+    rc = xc_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
 
     if ( rc == 0 )
         *access = mao.access;

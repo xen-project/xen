@@ -161,7 +161,7 @@ int x86_pv_map_m2p(struct xc_sr_context *ctx)
             .extent_start = { &ctx->x86.pv.compat_m2p_mfn0 },
         };
 
-        rc = do_memory_op(xch, XENMEM_machphys_compat_mfn_list,
+        rc = xc_memory_op(xch, XENMEM_machphys_compat_mfn_list,
                           &xmml, sizeof(xmml));
         if ( rc || xmml.nr_extents != 1 )
         {

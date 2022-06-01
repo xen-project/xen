@@ -47,7 +47,7 @@ static int xc_mem_paging_memop(xc_interface *xch, uint32_t domain_id,
         set_xen_guest_handle(mpo.buffer, buffer);
     }
 
-    rc = do_memory_op(xch, XENMEM_paging_op, &mpo, sizeof(mpo));
+    rc = xc_memory_op(xch, XENMEM_paging_op, &mpo, sizeof(mpo));
 
     if ( buffer )
         xc_hypercall_bounce_post(xch, buffer);

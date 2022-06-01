@@ -367,8 +367,6 @@ static inline int do_multicall_op(xc_interface *xch,
     return ret;
 }
 
-long do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len);
-
 void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
                             privcmd_mmap_entry_t entries[], int nentries);
