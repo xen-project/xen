@@ -82,6 +82,13 @@ existing codebase are work-in-progress.
      - Line-splicing shall not be used in // comments
      -
 
+   * - `Rule 5.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_01_2.c>`_
+     - Required
+     - External identifiers shall be distinct
+     - The Xen characters limit for identifiers is 40. Public headers
+       (xen/include/public/) are allowed to retain longer identifiers
+       for backward compatibility.
+
    * - `Rule 6.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_06_02.c>`_
      - Required
      - Single-bit named bit fields shall not be of a signed type
