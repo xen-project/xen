@@ -14,6 +14,12 @@ explicitly (e.g. tools/libxl/CODING_STYLE) but often implicitly (Linux
 coding style is fairly common). In general you should copy the style
 of the surrounding code. If you are unsure please ask.
 
+MISRA C
+-------
+
+The Xen Hypervisor follows some MISRA C coding rules. See
+docs/misra/rules.rst for details.
+
 Indentation
 -----------
 

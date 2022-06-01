@@ -53,6 +53,18 @@ kind of development environment.
    hypervisor-guide/index
 
 
+MISRA C coding guidelines
+-------------------------
+
+MISRA C rules and directive to be used as coding guidelines when writing
+Xen hypervisor code.
+
+.. toctree::
+   :maxdepth: 2
+
+   misra/rules
+
+
 Miscellanea
 -----------
 
