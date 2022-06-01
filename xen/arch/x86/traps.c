@@ -126,11 +126,11 @@ DEFINE_PER_CPU_PAGE_ALIGNED(struct tss_page, tss_page);
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
-static bool opt_ler;
+static bool __ro_after_init opt_ler;
 boolean_param("ler", opt_ler);
 
 /* LastExceptionFromIP on this hardware.  Zero if LER is not in use. */
-unsigned int __read_mostly ler_msr;
+unsigned int __ro_after_init ler_msr;
 
 const unsigned int nmi_cpu;
 
@@ -2133,7 +2133,7 @@ static void __init set_intr_gate(unsigned int n, void *addr)
     __set_intr_gate(n, 0, addr);
 }
 
-static unsigned int calc_ler_msr(void)
+static unsigned int noinline __init calc_ler_msr(void)
 {
     switch ( boot_cpu_data.x86_vendor )
     {
@@ -2171,8 +2171,17 @@ void percpu_traps_init(void)
     if ( !opt_ler )
         return;
 
-    if ( !ler_msr && (ler_msr = calc_ler_msr()) )
+    if ( !ler_msr )
+    {
+        ler_msr = calc_ler_msr();
+        if ( !ler_msr )
+        {
+            opt_ler = false;
+            return;
+        }
+
         setup_force_cpu_cap(X86_FEATURE_XEN_LBR);
+    }
 
     if ( cpu_has_xen_lbr )
         wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
