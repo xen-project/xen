@@ -387,6 +387,8 @@ int libxl__sigchld_needed(libxl__gc *gc) /* non-reentrant, idempotent */
     if (CTX->sigchld_selfpipe[0] < 0) {
         rc = libxl__pipe_nonblock(CTX, CTX->sigchld_selfpipe);
         if (rc) goto out;
+        libxl_fd_set_cloexec(CTX, CTX->sigchld_selfpipe[0], 1);
+        libxl_fd_set_cloexec(CTX, CTX->sigchld_selfpipe[1], 1);
     }
     if (!libxl__ev_fd_isregistered(&CTX->sigchld_selfpipe_efd)) {
         rc = libxl__ev_fd_register(gc, &CTX->sigchld_selfpipe_efd,

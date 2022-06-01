@@ -1800,6 +1800,9 @@ int libxl__poller_init(libxl__gc *gc, libxl__poller *p)
     rc = libxl__pipe_nonblock(CTX, p->wakeup_pipe);
     if (rc) goto out;
 
+    libxl_fd_set_cloexec(CTX, p->wakeup_pipe[0], 1);
+    libxl_fd_set_cloexec(CTX, p->wakeup_pipe[1], 1);
+
     return 0;
 
  out:
