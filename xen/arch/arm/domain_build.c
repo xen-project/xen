@@ -3622,6 +3622,21 @@ static void __init find_gnttab_region(struct domain *d,
            kinfo->gnttab_start, kinfo->gnttab_start + kinfo->gnttab_size);
 }
 
+static unsigned long __init domain_p2m_pages(unsigned long maxmem_kb,
+                                             unsigned int smp_cpus)
+{
+    /*
+     * Keep in sync with libxl__get_required_paging_memory().
+     * 256 pages (1MB) per vcpu, plus 1 page per MiB of RAM for the P2M map,
+     * plus 128 pages to cover extended regions.
+     */
+    unsigned long memkb = 4 * (256 * smp_cpus + (maxmem_kb / 1024) + 128);
+
+    BUILD_BUG_ON(PAGE_SIZE != SZ_4K);
+
+    return DIV_ROUND_UP(memkb, 1024) << (20 - PAGE_SHIFT);
+}
+
 static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
 {
     unsigned int i;
@@ -3733,6 +3748,8 @@ static int __init construct_domU(struct domain *d,
     const char *dom0less_enhanced;
     int rc;
     u64 mem;
+    u32 p2m_mem_mb;
+    unsigned long p2m_pages;
 
     rc = dt_property_read_u64(node, "memory", &mem);
     if ( !rc )
@@ -3741,6 +3758,18 @@ static int __init construct_domU(struct domain *d,
         return -EINVAL;
     }
     kinfo.unassigned_mem = (paddr_t)mem * SZ_1K;
+
+    rc = dt_property_read_u32(node, "xen,domain-p2m-mem-mb", &p2m_mem_mb);
+    /* If xen,domain-p2m-mem-mb is not specified, use the default value. */
+    p2m_pages = rc ?
+                p2m_mem_mb << (20 - PAGE_SHIFT) :
+                domain_p2m_pages(mem, d->max_vcpus);
+
+    spin_lock(&d->arch.paging.lock);
+    rc = p2m_set_allocation(d, p2m_pages, NULL);
+    spin_unlock(&d->arch.paging.lock);
+    if ( rc != 0 )
+        return rc;
 
     printk("*** LOADING DOMU cpus=%u memory=%"PRIx64"KB ***\n", d->max_vcpus, mem);
 
