@@ -1035,12 +1035,17 @@ unsigned long libxl__get_required_paging_memory(unsigned long maxmem_kb,
      * plus 1 page per MiB of RAM for the P2M map (for non-PV guests),
      * plus 1 page per MiB of RAM to shadow the resident processes (for shadow
      * mode guests).
+     * plus 1 page per MiB of RAM for the architecture specific
+     * EXTRA_DEFAULT_PAGING_MEM_MB. On x86, this value is zero. On Arm, this
+     * value is 128 MiB to cover domain extended regions (enough for domains
+     * that are not running backend).
      * This is higher than the minimum that Xen would allocate if no value
      * were given (but the Xen minimum is for safety, not performance).
      */
     return 4 * (256 * smp_cpus +
                 ((type != LIBXL_DOMAIN_TYPE_PV) + !hap) *
-                (maxmem_kb / 1024));
+                (maxmem_kb / 1024) +
+                EXTRA_DEFAULT_PAGING_MEM_MB);
 }
 
 static unsigned long libxl__get_required_iommu_memory(unsigned long maxmem_kb)
