@@ -209,6 +209,18 @@ int libxl__arch_domain_create(libxl__gc *gc,
                               libxl__domain_build_state *state,
                               uint32_t domid)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    unsigned int shadow_mb = DIV_ROUNDUP(d_config->b_info.shadow_memkb, 1024);
+
+    int r = xc_shadow_control(ctx->xch, domid,
+                              XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION,
+                              &shadow_mb, 0);
+    if (r) {
+        LOGED(ERROR, domid,
+              "Failed to set %u MiB shadow allocation", shadow_mb);
+        return ERROR_FAIL;
+    }
+
     return 0;
 }
 
