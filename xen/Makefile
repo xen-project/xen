@@ -260,6 +260,8 @@ endif
 
 AFLAGS += -D__ASSEMBLY__
 
+LDFLAGS-$(call ld-option,--warn-rwx-segments) += --no-warn-rwx-segments
+
 CFLAGS += $(CFLAGS-y)
 # allow extra CFLAGS externally via EXTRA_CFLAGS_XEN_CORE
 CFLAGS += $(EXTRA_CFLAGS_XEN_CORE)
