@@ -1221,6 +1221,19 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
                             pci_conf_read8(PCI_SBDF(0, b, d, f),
                                            PCI_INTERRUPT_LINE) : 0;
 
+#ifdef CONFIG_X86
+                /*
+                 * PCI Local Bus Specification Revision 3.0 defines 0xff value
+                 * as special only for X86.
+                 */
+                if ( uart->irq == 0xff )
+                    uart->irq = 0;
+#endif
+                if ( !uart->irq )
+                    printk(XENLOG_INFO
+                           "ns16550: %pp: no legacy IRQ, using poll mode\n",
+                           &PCI_SBDF(0, b, d, f));
+
                 return 0;
             }
         }
