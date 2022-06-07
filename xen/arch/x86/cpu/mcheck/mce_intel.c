@@ -1001,7 +1001,26 @@ int vmce_intel_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
 int vmce_intel_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
+    const struct cpuid_policy *cp = v->domain->arch.cpuid;
     unsigned int bank = msr - MSR_IA32_MC0_CTL2;
+
+    switch ( msr )
+    {
+    case MSR_P5_MC_ADDR:
+        /*
+         * Bank 0 is used for the 'bank 0 quirk' on older processors.
+         * See vcpu_fill_mc_msrs() for reference.
+         */
+        *val = v->arch.vmce.bank[1].mci_addr;
+        return 1;
+
+    case MSR_P5_MC_TYPE:
+        *val = v->arch.vmce.bank[1].mci_status;
+        return 1;
+    }
+
+    if ( !(cp->x86_vendor & X86_VENDOR_INTEL) )
+        return 0;
 
     if ( bank < GUEST_MC_BANK_NUM )
     {

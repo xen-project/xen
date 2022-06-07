@@ -150,6 +150,8 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     default:
         switch ( boot_cpu_data.x86_vendor )
         {
+        case X86_VENDOR_CENTAUR:
+        case X86_VENDOR_SHANGHAI:
         case X86_VENDOR_INTEL:
             ret = vmce_intel_rdmsr(v, msr, val);
             break;
