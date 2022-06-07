@@ -1279,8 +1279,11 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 
     quirk_iommu_caps(iommu);
 
+    nr_dom = cap_ndoms(iommu->cap);
+
     if ( cap_fault_reg_offset(iommu->cap) +
          cap_num_fault_regs(iommu->cap) * PRIMARY_FAULT_REG_LEN >= PAGE_SIZE ||
+         ((nr_dom - 1) >> 16) /* I.e. cap.nd > 6 */ ||
          ecap_iotlb_offset(iommu->ecap) >= PAGE_SIZE )
     {
         printk(XENLOG_ERR VTDPREFIX "IOMMU: unsupported\n");
@@ -1305,7 +1308,6 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         vtd_ops.sync_cache = sync_cache;
 
     /* allocate domain id bitmap */
-    nr_dom = cap_ndoms(iommu->cap);
     iommu->domid_bitmap = xzalloc_array(unsigned long, BITS_TO_LONGS(nr_dom));
     if ( !iommu->domid_bitmap )
         return -ENOMEM;
