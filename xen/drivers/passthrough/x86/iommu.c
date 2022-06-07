@@ -496,11 +496,12 @@ bool arch_iommu_use_permitted(const struct domain *d)
 {
     /*
      * Prevent device assign if mem paging, mem sharing or log-dirty
-     * have been enabled for this domain.
+     * have been enabled for this domain, or if PoD is still in active use.
      */
     return d == dom_io ||
            (likely(!mem_sharing_enabled(d)) &&
             likely(!vm_event_check_ring(d->vm_event_paging)) &&
+            likely(!p2m_pod_active(d)) &&
             likely(!p2m_get_hostp2m(d)->global_logdirty));
 }
 
