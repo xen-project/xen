@@ -2342,8 +2342,14 @@ int unmap_domain_pirq(struct domain *d, int pirq)
         nr = msi_desc->msi.nvec;
     }
 
-    ret = xsm_unmap_domain_irq(XSM_HOOK, d, irq,
-                               msi_desc ? msi_desc->dev : NULL);
+    /*
+     * When called by complete_domain_destroy via RCU, current is a random
+     * domain.  Skip the XSM check since this is a Xen-initiated action.
+     */
+    if ( !d->is_dying )
+        ret = xsm_unmap_domain_irq(XSM_HOOK, d, irq,
+                                   msi_desc ? msi_desc->dev : NULL);
+
     if ( ret )
         goto done;
 
