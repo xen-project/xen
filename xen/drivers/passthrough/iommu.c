@@ -535,7 +535,7 @@ int iommu_do_domctl(
 {
     int ret = -ENODEV;
 
-    if ( !is_iommu_enabled(d) )
+    if ( !(d ? is_iommu_enabled(d) : iommu_enabled) )
         return -EOPNOTSUPP;
 
 #ifdef CONFIG_HAS_PCI
