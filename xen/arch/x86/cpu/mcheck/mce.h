@@ -169,6 +169,12 @@ static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
         if (msr >= MSR_IA32_MC0_CTL2 &&
             msr < MSR_IA32_MCx_CTL2(v->arch.vmce.mcg_cap & MCG_CAP_COUNT) )
             return 1;
+        fallthrough;
+
+    case X86_VENDOR_CENTAUR:
+    case X86_VENDOR_SHANGHAI:
+        if (msr == MSR_P5_MC_ADDR || msr == MSR_P5_MC_TYPE)
+            return 1;
         break;
 
     case X86_VENDOR_AMD:

@@ -15,6 +15,9 @@
  * abbreviated name.  Exceptions will be considered on a case-by-case basis.
  */
 
+#define MSR_P5_MC_ADDR                      0
+#define MSR_P5_MC_TYPE                      0x00000001
+
 #define MSR_APIC_BASE                       0x0000001b
 #define  APIC_BASE_BSP                      (_AC(1, ULL) <<  8)
 #define  APIC_BASE_EXTD                     (_AC(1, ULL) << 10)
