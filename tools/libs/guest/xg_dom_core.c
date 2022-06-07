@@ -856,7 +856,7 @@ int xc_dom_devicetree_file(struct xc_dom_image *dom, const char *filename)
         return -1;
     return 0;
 #else
-    errno = -EINVAL;
+    errno = EINVAL;
     return -1;
 #endif
 }
