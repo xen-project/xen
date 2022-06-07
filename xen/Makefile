@@ -507,7 +507,7 @@ cscope:
 	cscope -k -b -q
 
 .PHONY: _MAP
-_MAP:
+_MAP: $(TARGET)
 	$(NM) -n $(TARGET)-syms | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
 
 %.o %.i %.s: %.c FORCE
