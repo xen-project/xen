@@ -1276,9 +1276,7 @@ int xc_domain_get_pod_target(xc_interface *xch,
                              uint64_t *pod_cache_pages,
                              uint64_t *pod_entries)
 {
-    /* On x86 (above) xc_domain_pod_target will incorrectly return -1
-     * with errno==-1 on error. Do the same for least surprise. */
-    errno = -1;
+    errno = EOPNOTSUPP;
     return -1;
 }
 #endif
