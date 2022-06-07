@@ -97,7 +97,7 @@ int osdep_evtchn_close(xenevtchn_handle *xce)
 
 int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid)
 {
-    errno = -EOPNOTSUPP;
+    errno = EOPNOTSUPP;
 
     return -1;
 }
