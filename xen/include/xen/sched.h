@@ -159,6 +159,11 @@ enum vio_completion {
 struct vcpu_io {
     /* I/O request in flight to device model. */
     enum vio_completion  completion;
+    /*
+     * Indicate whether the I/O was not handled because the domain
+     * is about to be paused.
+     */
+    bool                 suspended;
     ioreq_t              req;
 };
 

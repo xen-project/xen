@@ -80,9 +80,10 @@ enum io_state try_fwd_ioserv(struct cpu_user_regs *regs,
         return IO_ABORT;
 
     vio->req = p;
+    vio->suspended = false;
 
     rc = ioreq_send(s, &p, 0);
-    if ( rc != IO_RETRY || v->domain->is_shutting_down )
+    if ( rc != IO_RETRY || vio->suspended )
         vio->req.state = STATE_IOREQ_NONE;
     else if ( !ioreq_needs_completion(&vio->req) )
         rc = IO_HANDLED;

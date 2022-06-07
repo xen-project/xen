@@ -239,6 +239,7 @@ static int hvmemul_do_io(
     ASSERT(p.count);
 
     vio->req = p;
+    vio->suspended = false;
 
     rc = hvm_io_intercept(&p);
 
@@ -334,7 +335,7 @@ static int hvmemul_do_io(
         else
         {
             rc = ioreq_send(s, &p, 0);
-            if ( rc != X86EMUL_RETRY || currd->is_shutting_down )
+            if ( rc != X86EMUL_RETRY || vio->suspended )
                 vio->req.state = STATE_IOREQ_NONE;
             else if ( !ioreq_needs_completion(&vio->req) )
                 rc = X86EMUL_OKAY;
