@@ -288,7 +288,7 @@ int libxl__pci_topology_init(libxl__gc *gc,
         if (i == num_devs) {
             LOG(ERROR, "Too many devices");
             err = ERROR_FAIL;
-            errno = -ENOSPC;
+            errno = ENOSPC;
             goto out;
         }
 
