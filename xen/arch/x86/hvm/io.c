@@ -138,10 +138,11 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
 
     case X86EMUL_RETRY:
         /*
-         * We should not advance RIP/EIP if the domain is shutting down or
-         * if X86EMUL_RETRY has been returned by an internal handler.
+         * We should not advance RIP/EIP if the vio was suspended (e.g.
+         * because the domain is shutting down) or if X86EMUL_RETRY has
+         * been returned by an internal handler.
          */
-        if ( curr->domain->is_shutting_down || !vcpu_ioreq_pending(curr) )
+        if ( vio->suspended || !vcpu_ioreq_pending(curr) )
             return false;
         break;
 
