@@ -5019,14 +5019,8 @@ l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
 #define l1f_to_lNf(f) (((f) & _PAGE_PRESENT) ? ((f) |  _PAGE_PSE) : (f))
 #define lNf_to_l1f(f) (((f) & _PAGE_PRESENT) ? ((f) & ~_PAGE_PSE) : (f))
 
-/*
- * map_pages_to_xen() can be called with interrupts disabled during
- * early bootstrap. In this case it is safe to use flush_area_local()
- * and avoid locking because only the local CPU is online.
- */
-#define flush_area(v,f) (!local_irq_is_enabled() ?              \
-                         flush_area_local((const void *)v, f) : \
-                         flush_area_all((const void *)v, f))
+/* flush_area_all() can be used prior to any other CPU being online.  */
+#define flush_area(v, f) flush_area_all((const void *)(v), f)
 
 #define L3T_INIT(page) (page) = ZERO_BLOCK_PTR
 

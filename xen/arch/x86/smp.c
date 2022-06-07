@@ -262,7 +262,10 @@ void flush_area_mask(const cpumask_t *mask, const void *va, unsigned int flags)
 {
     unsigned int cpu = smp_processor_id();
 
-    ASSERT(local_irq_is_enabled());
+    /* Local flushes can be performed with interrupts disabled. */
+    ASSERT(local_irq_is_enabled() || cpumask_subset(mask, cpumask_of(cpu)));
+    /* Exclude use of FLUSH_VCPU_STATE for the local CPU. */
+    ASSERT(!cpumask_test_cpu(cpu, mask) || !(flags & FLUSH_VCPU_STATE));
 
     if ( (flags & ~(FLUSH_VCPU_STATE | FLUSH_ORDER_MASK)) &&
          cpumask_test_cpu(cpu, mask) )
