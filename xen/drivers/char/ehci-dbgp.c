@@ -1480,7 +1480,7 @@ void __init ehci_dbgp_init(void)
         unsigned int num = 0;
 
         if ( opt_dbgp[4] )
-            simple_strtoul(opt_dbgp + 4, &e, 10);
+            num = simple_strtoul(opt_dbgp + 4, &e, 10);
 
         dbgp->cap = find_dbgp(dbgp, num);
         if ( !dbgp->cap )
