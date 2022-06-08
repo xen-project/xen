@@ -633,6 +633,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
             .max_maptrack_frames = b_info->max_maptrack_frames,
             .grant_opts = XEN_DOMCTL_GRANT_version(b_info->max_grant_version),
             .vmtrace_size = ROUNDUP(b_info->vmtrace_buf_kb << 10, XC_PAGE_SHIFT),
+            .cpupool_id = info->poolid,
         };
 
         if (info->type != LIBXL_DOMAIN_TYPE_PV) {
@@ -756,13 +757,6 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
      * valid.
      */
     assert(libxl_domid_valid_guest(*domid));
-
-    ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
-    if (ret < 0) {
-        LOGED(ERROR, *domid, "domain move fail");
-        rc = ERROR_FAIL;
-        goto out;
-    }
 
     dom_path = libxl__xs_get_dompath(gc, *domid);
     if (!dom_path) {
