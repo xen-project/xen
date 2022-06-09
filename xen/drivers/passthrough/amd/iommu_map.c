@@ -506,15 +506,18 @@ int cf_check amd_iommu_flush_iotlb_pages(
 {
     unsigned long dfn_l = dfn_x(dfn);
 
-    ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
-    ASSERT(flush_flags);
+    if ( !(flush_flags & IOMMU_FLUSHF_all) )
+    {
+        ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
+        ASSERT(flush_flags);
+    }
 
     /* Unless a PTE was modified, no flush is required */
     if ( !(flush_flags & IOMMU_FLUSHF_modified) )
         return 0;
 
-    /* If the range wraps then just flush everything */
-    if ( dfn_l + page_count < dfn_l )
+    /* If so requested or if the range wraps then just flush everything. */
+    if ( (flush_flags & IOMMU_FLUSHF_all) || dfn_l + page_count < dfn_l )
     {
         amd_iommu_flush_all_pages(d);
         return 0;
@@ -536,13 +539,6 @@ int cf_check amd_iommu_flush_iotlb_pages(
         amd_iommu_flush_pages(d, dfn_l, 18);
     else
         amd_iommu_flush_all_pages(d);
-
-    return 0;
-}
-
-int cf_check amd_iommu_flush_iotlb_all(struct domain *d)
-{
-    amd_iommu_flush_all_pages(d);
 
     return 0;
 }

@@ -772,16 +772,19 @@ static int __must_check cf_check iommu_flush_iotlb_pages(
     struct domain *d, dfn_t dfn, unsigned long page_count,
     unsigned int flush_flags)
 {
-    ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
-    ASSERT(flush_flags);
+    if ( flush_flags & IOMMU_FLUSHF_all )
+    {
+        dfn = INVALID_DFN;
+        page_count = 0;
+    }
+    else
+    {
+        ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
+        ASSERT(flush_flags);
+    }
 
     return iommu_flush_iotlb(d, dfn, flush_flags & IOMMU_FLUSHF_modified,
                              page_count);
-}
-
-static int __must_check cf_check iommu_flush_iotlb_all(struct domain *d)
-{
-    return iommu_flush_iotlb(d, INVALID_DFN, 0, 0);
 }
 
 /* clear one page's page table */
@@ -3145,7 +3148,6 @@ static const struct iommu_ops __initconst_cf_clobber vtd_ops = {
     .resume = vtd_resume,
     .crash_shutdown = vtd_crash_shutdown,
     .iotlb_flush = iommu_flush_iotlb_pages,
-    .iotlb_flush_all = iommu_flush_iotlb_all,
     .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_page_tables = vtd_dump_page_tables,
 };

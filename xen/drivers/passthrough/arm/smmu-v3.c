@@ -3416,7 +3416,6 @@ static const struct iommu_ops arm_smmu_iommu_ops = {
 	.hwdom_init		= arch_iommu_hwdom_init,
 	.teardown		= arm_smmu_iommu_xen_domain_teardown,
 	.iotlb_flush		= arm_smmu_iotlb_flush,
-	.iotlb_flush_all	= arm_smmu_iotlb_flush_all,
 	.assign_device		= arm_smmu_assign_dev,
 	.reassign_device	= arm_smmu_reassign_dev,
 	.map_page		= arm_iommu_map_page,

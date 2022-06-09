@@ -258,7 +258,6 @@ int cf_check amd_iommu_get_reserved_device_memory(
 int __must_check cf_check amd_iommu_flush_iotlb_pages(
     struct domain *d, dfn_t dfn, unsigned long page_count,
     unsigned int flush_flags);
-int __must_check cf_check amd_iommu_flush_iotlb_all(struct domain *d);
 void amd_iommu_print_entries(const struct amd_iommu *iommu, unsigned int dev_id,
                              dfn_t dfn);
 

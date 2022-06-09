@@ -1000,28 +1000,24 @@ out:
 }
 
 /* Xen IOMMU ops */
-static int __must_check ipmmu_iotlb_flush_all(struct domain *d)
+static int __must_check ipmmu_iotlb_flush(struct domain *d, dfn_t dfn,
+                                          unsigned long page_count,
+                                          unsigned int flush_flags)
 {
     struct ipmmu_vmsa_xen_domain *xen_domain = dom_iommu(d)->arch.priv;
 
+    ASSERT(flush_flags);
+
     if ( !xen_domain || !xen_domain->root_domain )
         return 0;
+
+    /* The hardware doesn't support selective TLB flush. */
 
     spin_lock(&xen_domain->lock);
     ipmmu_tlb_invalidate(xen_domain->root_domain);
     spin_unlock(&xen_domain->lock);
 
     return 0;
-}
-
-static int __must_check ipmmu_iotlb_flush(struct domain *d, dfn_t dfn,
-                                          unsigned long page_count,
-                                          unsigned int flush_flags)
-{
-    ASSERT(flush_flags);
-
-    /* The hardware doesn't support selective TLB flush. */
-    return ipmmu_iotlb_flush_all(d);
 }
 
 static struct ipmmu_vmsa_domain *ipmmu_get_cache_domain(struct domain *d,
@@ -1360,7 +1356,6 @@ static const struct iommu_ops ipmmu_iommu_ops =
     .hwdom_init      = arch_iommu_hwdom_init,
     .teardown        = ipmmu_iommu_domain_teardown,
     .iotlb_flush     = ipmmu_iotlb_flush,
-    .iotlb_flush_all = ipmmu_iotlb_flush_all,
     .assign_device   = ipmmu_assign_device,
     .reassign_device = ipmmu_reassign_device,
     .map_page        = arm_iommu_map_page,

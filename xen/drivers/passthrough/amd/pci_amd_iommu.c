@@ -759,7 +759,6 @@ static const struct iommu_ops __initconst_cf_clobber _iommu_ops = {
     .map_page = amd_iommu_map_page,
     .unmap_page = amd_iommu_unmap_page,
     .iotlb_flush = amd_iommu_flush_iotlb_pages,
-    .iotlb_flush_all = amd_iommu_flush_iotlb_all,
     .reassign_device = reassign_device,
     .get_device_group_id = amd_iommu_group_id,
     .enable_x2apic = iov_enable_xt,
