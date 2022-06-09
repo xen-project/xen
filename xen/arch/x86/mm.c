@@ -2892,16 +2892,17 @@ static int _put_page_type(struct page_info *page, unsigned int flags,
 static int _get_page_type(struct page_info *page, unsigned long type,
                           bool preemptible)
 {
-    unsigned long nx, x, y = page->u.inuse.type_info;
+    unsigned long nx, x;
     int rc = 0;
 
     ASSERT(!(type & ~(PGT_type_mask | PGT_pae_xen_l2)));
     ASSERT(!in_irq());
 
-    for ( ; ; )
+    for ( unsigned long y = ACCESS_ONCE(page->u.inuse.type_info); ; )
     {
         x  = y;
         nx = x + 1;
+
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
             gdprintk(XENLOG_WARNING,
@@ -2909,8 +2910,15 @@ static int _get_page_type(struct page_info *page, unsigned long type,
                      mfn_x(page_to_mfn(page)));
             return -EINVAL;
         }
-        else if ( unlikely((x & PGT_count_mask) == 0) )
+
+        if ( unlikely((x & PGT_count_mask) == 0) )
         {
+            /*
+             * Typeref 0 -> 1.
+             *
+             * Type changes are permitted when the typeref is 0.  If the type
+             * actually changes, the page needs re-validating.
+             */
             struct domain *d = page_get_owner(page);
 
             if ( d && shadow_mode_enabled(d) )
@@ -2921,8 +2929,8 @@ static int _get_page_type(struct page_info *page, unsigned long type,
             {
                 /*
                  * On type change we check to flush stale TLB entries. It is
-                 * vital that no other CPUs are left with mappings of a frame
-                 * which is about to become writeable to the guest.
+                 * vital that no other CPUs are left with writeable mappings
+                 * to a frame which is intending to become pgtable/segdesc.
                  */
                 cpumask_t *mask = this_cpu(scratch_cpumask);
 
@@ -2934,7 +2942,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
 
                 if ( unlikely(!cpumask_empty(mask)) &&
                      /* Shadow mode: track only writable pages. */
-                     (!shadow_mode_enabled(page_get_owner(page)) ||
+                     (!shadow_mode_enabled(d) ||
                       ((nx & PGT_type_mask) == PGT_writable_page)) )
                 {
                     perfc_incr(need_flush_tlb_flush);
@@ -2965,7 +2973,14 @@ static int _get_page_type(struct page_info *page, unsigned long type,
         }
         else if ( unlikely((x & (PGT_type_mask|PGT_pae_xen_l2)) != type) )
         {
-            /* Don't log failure if it could be a recursive-mapping attempt. */
+            /*
+             * else, we're trying to take a new reference, of the wrong type.
+             *
+             * This (being able to prohibit use of the wrong type) is what the
+             * typeref system exists for, but skip printing the failure if it
+             * looks like a recursive mapping, as subsequent logic might
+             * ultimately permit the attempt.
+             */
             if ( ((x & PGT_type_mask) == PGT_l2_page_table) &&
                  (type == PGT_l1_page_table) )
                 return -EINVAL;
@@ -2984,18 +2999,46 @@ static int _get_page_type(struct page_info *page, unsigned long type,
         }
         else if ( unlikely(!(x & PGT_validated)) )
         {
+            /*
+             * else, the count is non-zero, and we're grabbing the right type;
+             * but the page hasn't been validated yet.
+             *
+             * The page is in one of two states (depending on PGT_partial),
+             * and should have exactly one reference.
+             */
+            ASSERT((x & (PGT_type_mask | PGT_count_mask)) == (type | 1));
+
             if ( !(x & PGT_partial) )
             {
-                /* Someone else is updating validation of this page. Wait... */
+                /*
+                 * The page has been left in the "validate locked" state
+                 * (i.e. PGT_[type] | 1) which means that a concurrent caller
+                 * of _get_page_type() is in the middle of validation.
+                 *
+                 * Spin waiting for the concurrent user to complete (partial
+                 * or fully validated), then restart our attempt to acquire a
+                 * type reference.
+                 */
                 do {
                     if ( preemptible && hypercall_preempt_check() )
                         return -EINTR;
                     cpu_relax();
-                } while ( (y = page->u.inuse.type_info) == x );
+                } while ( (y = ACCESS_ONCE(page->u.inuse.type_info)) == x );
                 continue;
             }
-            /* Type ref count was left at 1 when PGT_partial got set. */
-            ASSERT((x & PGT_count_mask) == 1);
+
+            /*
+             * The page has been left in the "partial" state
+             * (i.e., PGT_[type] | PGT_partial | 1).
+             *
+             * Rather than bumping the type count, we need to try to grab the
+             * validation lock; if we succeed, we need to validate the page,
+             * then drop the general ref associated with the PGT_partial bit.
+             *
+             * We grab the validation lock by setting nx to (PGT_[type] | 1)
+             * (i.e., non-zero type count, neither PGT_validated nor
+             * PGT_partial set).
+             */
             nx = x & ~PGT_partial;
         }
 
@@ -3042,6 +3085,13 @@ static int _get_page_type(struct page_info *page, unsigned long type,
     }
 
  out:
+    /*
+     * Did we drop the PGT_partial bit when acquiring the typeref?  If so,
+     * drop the general reference that went along with it.
+     *
+     * N.B. validate_page() may have have re-set PGT_partial, not reflected in
+     * nx, but will have taken an extra ref when doing so.
+     */
     if ( (x & PGT_partial) && !(nx & PGT_partial) )
         put_page(page);
 
