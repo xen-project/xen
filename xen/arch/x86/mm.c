@@ -2933,56 +2933,12 @@ static int _get_page_type(struct page_info *page, unsigned long type,
              * Type changes are permitted when the typeref is 0.  If the type
              * actually changes, the page needs re-validating.
              */
-            struct domain *d = page_get_owner(page);
-
-            if ( d && shadow_mode_enabled(d) )
-               shadow_prepare_page_type_change(d, page, type);
 
             ASSERT(!(x & PGT_pae_xen_l2));
             if ( (x & PGT_type_mask) != type )
             {
-                /*
-                 * On type change we check to flush stale TLB entries. It is
-                 * vital that no other CPUs are left with writeable mappings
-                 * to a frame which is intending to become pgtable/segdesc.
-                 */
-                cpumask_t *mask = this_cpu(scratch_cpumask);
-
-                BUG_ON(in_irq());
-                cpumask_copy(mask, d->dirty_cpumask);
-
-                /* Don't flush if the timestamp is old enough */
-                tlbflush_filter(mask, page->tlbflush_timestamp);
-
-                if ( unlikely(!cpumask_empty(mask)) &&
-                     /* Shadow mode: track only writable pages. */
-                     (!shadow_mode_enabled(d) ||
-                      ((nx & PGT_type_mask) == PGT_writable_page)) )
-                {
-                    perfc_incr(need_flush_tlb_flush);
-                    /*
-                     * If page was a page table make sure the flush is
-                     * performed using an IPI in order to avoid changing the
-                     * type of a page table page under the feet of
-                     * spurious_page_fault().
-                     */
-                    flush_mask(mask,
-                               (x & PGT_type_mask) &&
-                               (x & PGT_type_mask) <= PGT_root_page_table
-                               ? FLUSH_TLB | FLUSH_FORCE_IPI
-                               : FLUSH_TLB);
-                }
-
-                /* We lose existing type and validity. */
                 nx &= ~(PGT_type_mask | PGT_validated);
                 nx |= type;
-
-                /*
-                 * No special validation needed for writable pages.
-                 * Page tables and GDT/LDT need to be scanned for validity.
-                 */
-                if ( type == PGT_writable_page || type == PGT_shared_page )
-                    nx |= PGT_validated;
             }
         }
         else if ( unlikely((x & (PGT_type_mask|PGT_pae_xen_l2)) != type) )
@@ -3063,6 +3019,56 @@ static int _get_page_type(struct page_info *page, unsigned long type,
             return -EINTR;
     }
 
+    /*
+     * One typeref has been taken and is now globally visible.
+     *
+     * The page is either in the "validate locked" state (PGT_[type] | 1) or
+     * fully validated (PGT_[type] | PGT_validated | >0).
+     */
+
+    if ( unlikely((x & PGT_count_mask) == 0) )
+    {
+        struct domain *d = page_get_owner(page);
+
+        if ( d && shadow_mode_enabled(d) )
+            shadow_prepare_page_type_change(d, page, type);
+
+        if ( (x & PGT_type_mask) != type )
+        {
+            /*
+             * On type change we check to flush stale TLB entries. It is
+             * vital that no other CPUs are left with writeable mappings
+             * to a frame which is intending to become pgtable/segdesc.
+             */
+            cpumask_t *mask = this_cpu(scratch_cpumask);
+
+            BUG_ON(in_irq());
+            cpumask_copy(mask, d->dirty_cpumask);
+
+            /* Don't flush if the timestamp is old enough */
+            tlbflush_filter(mask, page->tlbflush_timestamp);
+
+            if ( unlikely(!cpumask_empty(mask)) &&
+                 /* Shadow mode: track only writable pages. */
+                 (!shadow_mode_enabled(d) ||
+                  ((nx & PGT_type_mask) == PGT_writable_page)) )
+            {
+                perfc_incr(need_flush_tlb_flush);
+                /*
+                 * If page was a page table make sure the flush is
+                 * performed using an IPI in order to avoid changing the
+                 * type of a page table page under the feet of
+                 * spurious_page_fault().
+                 */
+                flush_mask(mask,
+                           (x & PGT_type_mask) &&
+                           (x & PGT_type_mask) <= PGT_root_page_table
+                           ? FLUSH_TLB | FLUSH_FORCE_IPI
+                           : FLUSH_TLB);
+            }
+        }
+    }
+
     if ( unlikely(((x & PGT_type_mask) == PGT_writable_page) !=
                   (type == PGT_writable_page)) )
     {
@@ -3091,13 +3097,25 @@ static int _get_page_type(struct page_info *page, unsigned long type,
 
     if ( unlikely(!(nx & PGT_validated)) )
     {
-        if ( !(x & PGT_partial) )
+        /*
+         * No special validation needed for writable or shared pages.  Page
+         * tables and GDT/LDT need to have their contents audited.
+         *
+         * per validate_page(), non-atomic updates are fine here.
+         */
+        if ( type == PGT_writable_page || type == PGT_shared_page )
+            page->u.inuse.type_info |= PGT_validated;
+        else
         {
-            page->nr_validated_ptes = 0;
-            page->partial_flags = 0;
-            page->linear_pt_count = 0;
+            if ( !(x & PGT_partial) )
+            {
+                page->nr_validated_ptes = 0;
+                page->partial_flags = 0;
+                page->linear_pt_count = 0;
+            }
+
+            rc = validate_page(page, type, preemptible);
         }
-        rc = validate_page(page, type, preemptible);
     }
 
  out:
