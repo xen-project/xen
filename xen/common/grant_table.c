@@ -3447,7 +3447,7 @@ gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t) uop,
     return 0;
 }
 
-static int cache_flush(const gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
+static int _cache_flush(const gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
 {
     struct domain *d, *owner;
     struct page_info *page;
@@ -3541,7 +3541,7 @@ gnttab_cache_flush(XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) uop,
             return -EFAULT;
         for ( ; ; )
         {
-            int ret = cache_flush(&op, cur_ref);
+            int ret = _cache_flush(&op, cur_ref);
 
             if ( ret < 0 )
                 return ret;

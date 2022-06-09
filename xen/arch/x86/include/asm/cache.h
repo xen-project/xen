@@ -13,6 +13,7 @@
 
 #ifndef __ASSEMBLY__
 
+void cache_flush(const void *addr, unsigned int size);
 void cache_writeback(const void *addr, unsigned int size);
 
 #endif

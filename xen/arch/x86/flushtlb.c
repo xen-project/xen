@@ -235,7 +235,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
     if ( flags & FLUSH_CACHE )
     {
         const struct cpuinfo_x86 *c = &current_cpu_data;
-        unsigned long i, sz = 0;
+        unsigned long sz = 0;
 
         if ( order < (BITS_PER_LONG - PAGE_SHIFT) )
             sz = 1UL << (order + PAGE_SHIFT);
@@ -245,12 +245,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
              c->x86_clflush_size && c->x86_cache_size && sz &&
              ((sz >> 10) < c->x86_cache_size) )
         {
-            alternative("", "sfence", X86_FEATURE_CLFLUSHOPT);
-            for ( i = 0; i < sz; i += c->x86_clflush_size )
-                alternative_input("ds; clflush %0",
-                                  "data16 clflush %0",      /* clflushopt */
-                                  X86_FEATURE_CLFLUSHOPT,
-                                  "m" (((const char *)va)[i]));
+            cache_flush(va, sz);
             flags &= ~FLUSH_CACHE;
         }
         else
@@ -265,7 +260,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
     return flags;
 }
 
-void cache_writeback(const void *addr, unsigned int size)
+void cache_flush(const void *addr, unsigned int size)
 {
     /*
      * This function may be called before current_cpu_data is established.
@@ -274,6 +269,38 @@ void cache_writeback(const void *addr, unsigned int size)
     unsigned int clflush_size = current_cpu_data.x86_clflush_size ?: 16;
     const void *end = addr + size;
 
+    addr -= (unsigned long)addr & (clflush_size - 1);
+    for ( ; addr < end; addr += clflush_size )
+    {
+        /*
+         * Note regarding the "ds" prefix use: it's faster to do a clflush
+         * + prefix than a clflush + nop, and hence the prefix is added instead
+         * of letting the alternative framework fill the gap by appending nops.
+         */
+        alternative_io("ds; clflush %[p]",
+                       "data16 clflush %[p]", /* clflushopt */
+                       X86_FEATURE_CLFLUSHOPT,
+                       /* no outputs */,
+                       [p] "m" (*(const char *)(addr)));
+    }
+
+    alternative("", "sfence", X86_FEATURE_CLFLUSHOPT);
+}
+
+void cache_writeback(const void *addr, unsigned int size)
+{
+    unsigned int clflush_size;
+    const void *end = addr + size;
+
+    /* Fall back to CLFLUSH{,OPT} when CLWB isn't available. */
+    if ( !boot_cpu_has(X86_FEATURE_CLWB) )
+        return cache_flush(addr, size);
+
+    /*
+     * This function may be called before current_cpu_data is established.
+     * Hence a fallback is needed to prevent the loop below becoming infinite.
+     */
+    clflush_size = current_cpu_data.x86_clflush_size ?: 16;
     addr -= (unsigned long)addr & (clflush_size - 1);
     for ( ; addr < end; addr += clflush_size )
     {
@@ -296,24 +323,15 @@ void cache_writeback(const void *addr, unsigned int size)
 #else
 # define INPUT(addr) "a" (addr), BASE_INPUT(addr)
 #endif
-        /*
-         * Note regarding the "ds" prefix use: it's faster to do a clflush
-         * + prefix than a clflush + nop, and hence the prefix is added instead
-         * of letting the alternative framework fill the gap by appending nops.
-         */
-        alternative_io_2("ds; clflush %[p]",
-                         "data16 clflush %[p]", /* clflushopt */
-                         X86_FEATURE_CLFLUSHOPT,
-                         CLWB_ENCODING,
-                         X86_FEATURE_CLWB, /* no outputs */,
-                         INPUT(addr));
+
+        asm volatile (CLWB_ENCODING :: INPUT(addr));
+
 #undef INPUT
 #undef BASE_INPUT
 #undef CLWB_ENCODING
     }
 
-    alternative_2("", "sfence", X86_FEATURE_CLFLUSHOPT,
-                      "sfence", X86_FEATURE_CLWB);
+    asm volatile ("sfence" ::: "memory");
 }
 
 unsigned int guest_flush_tlb_flags(const struct domain *d)
