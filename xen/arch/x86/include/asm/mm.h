@@ -53,8 +53,12 @@
 #define _PGT_partial      PG_shift(8)
 #define PGT_partial       PG_mask(1, 8)
 
+/* Has this page been mapped writeable with a non-coherent memory type? */
+#define _PGT_non_coherent PG_shift(9)
+#define PGT_non_coherent  PG_mask(1, 9)
+
  /* Count of uses of this frame as its current type. */
-#define PGT_count_width   PG_shift(8)
+#define PGT_count_width   PG_shift(9)
 #define PGT_count_mask    ((1UL<<PGT_count_width)-1)
 
 /* Are the 'type mask' bits identical? */
