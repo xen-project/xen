@@ -812,6 +812,14 @@ static void init_amd(struct cpuinfo_x86 *c)
 	if (!cpu_has_lfence_dispatch)
 		__set_bit(X86_FEATURE_MFENCE_RDTSC, c->x86_capability);
 
+	/*
+	 * On pre-CLFLUSHOPT AMD CPUs, CLFLUSH is weakly ordered with
+	 * everything, including reads and writes to address, and
+	 * LFENCE/SFENCE instructions.
+	 */
+	if (!cpu_has_clflushopt)
+		setup_force_cpu_cap(X86_BUG_CLFLUSH_MFENCE);
+
 	switch(c->x86)
 	{
 	case 0xf ... 0x11:

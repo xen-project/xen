@@ -259,6 +259,13 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
     return flags;
 }
 
+/*
+ * On pre-CLFLUSHOPT AMD CPUs, CLFLUSH is weakly ordered with everything,
+ * including reads and writes to address, and LFENCE/SFENCE instructions.
+ *
+ * This function only works safely after alternatives have run.  Luckily, at
+ * the time of writing, we don't flush the caches that early.
+ */
 void cache_flush(const void *addr, unsigned int size)
 {
     /*
@@ -267,6 +274,8 @@ void cache_flush(const void *addr, unsigned int size)
      */
     unsigned int clflush_size = current_cpu_data.x86_clflush_size ?: 16;
     const void *end = addr + size;
+
+    alternative("", "mfence", X86_BUG_CLFLUSH_MFENCE);
 
     addr -= (unsigned long)addr & (clflush_size - 1);
     for ( ; addr < end; addr += clflush_size )
@@ -283,7 +292,9 @@ void cache_flush(const void *addr, unsigned int size)
                        [p] "m" (*(const char *)(addr)));
     }
 
-    alternative("", "sfence", X86_FEATURE_CLFLUSHOPT);
+    alternative_2("",
+                  "sfence", X86_FEATURE_CLFLUSHOPT,
+                  "mfence", X86_BUG_CLFLUSH_MFENCE);
 }
 
 void cache_writeback(const void *addr, unsigned int size)
