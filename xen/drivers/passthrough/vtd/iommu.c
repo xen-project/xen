@@ -31,6 +31,7 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
+#include <asm/cache.h>
 #include <asm/msi.h>
 #include <asm/nops.h>
 #include <asm/irq.h>
@@ -201,53 +202,10 @@ static int iommus_incoherent;
 
 static void sync_cache(const void *addr, unsigned int size)
 {
-    static unsigned long clflush_size = 0;
-    const void *end = addr + size;
-
     if ( !iommus_incoherent )
         return;
 
-    if ( clflush_size == 0 )
-        clflush_size = get_cache_line_size();
-
-    addr -= (unsigned long)addr & (clflush_size - 1);
-    for ( ; addr < end; addr += clflush_size )
-/*
- * The arguments to a macro must not include preprocessor directives. Doing so
- * results in undefined behavior, so we have to create some defines here in
- * order to avoid it.
- */
-#if defined(HAVE_AS_CLWB)
-# define CLWB_ENCODING "clwb %[p]"
-#elif defined(HAVE_AS_XSAVEOPT)
-# define CLWB_ENCODING "data16 xsaveopt %[p]" /* clwb */
-#else
-# define CLWB_ENCODING ".byte 0x66, 0x0f, 0xae, 0x30" /* clwb (%%rax) */
-#endif
-
-#define BASE_INPUT(addr) [p] "m" (*(const char *)(addr))
-#if defined(HAVE_AS_CLWB) || defined(HAVE_AS_XSAVEOPT)
-# define INPUT BASE_INPUT
-#else
-# define INPUT(addr) "a" (addr), BASE_INPUT(addr)
-#endif
-        /*
-         * Note regarding the use of NOP_DS_PREFIX: it's faster to do a clflush
-         * + prefix than a clflush + nop, and hence the prefix is added instead
-         * of letting the alternative framework fill the gap by appending nops.
-         */
-        alternative_io_2(".byte " __stringify(NOP_DS_PREFIX) "; clflush %[p]",
-                         "data16 clflush %[p]", /* clflushopt */
-                         X86_FEATURE_CLFLUSHOPT,
-                         CLWB_ENCODING,
-                         X86_FEATURE_CLWB, /* no outputs */,
-                         INPUT(addr));
-#undef INPUT
-#undef BASE_INPUT
-#undef CLWB_ENCODING
-
-    alternative_2("", "sfence", X86_FEATURE_CLFLUSHOPT,
-                      "sfence", X86_FEATURE_CLWB);
+    cache_writeback(addr, size);
 }
 
 /* Allocate page table, return its machine address */
