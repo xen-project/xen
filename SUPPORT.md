@@ -50,7 +50,7 @@ For the Cortex A57 r0p0 - r1p1, see Errata 832075.
 
 ### Physical Memory
 
-    Status, x86: Supported up to 8 TiB. Hosts with more memory are supported, but not security supported.
+    Status, x86: Supported up to 12 TiB. Hosts with more memory are supported, but not security supported.
     Status, Arm32: Supported up to 12 GiB
     Status, Arm64: Supported up to 2 TiB
 
@@ -120,6 +120,14 @@ Dom0 support requires an IOMMU (Intel VT-d / AMD IOMMU).
 ARM only has one guest type at the moment
 
     Status: Supported
+
+## Guest Limits
+
+### Memory
+
+    Status, x86: Supported up to 8 TiB. Guests with more memory, but less than 16 TiB, are supported, but not security supported.
+    Status, Arm32: Supported up to 12 GiB
+    Status, Arm64: Supported up to 1 TiB
 
 ## Hypervisor file system
 
