@@ -320,6 +320,14 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 
 #define PAGE_CACHE_ATTRS (_PAGE_PAT | _PAGE_PCD | _PAGE_PWT)
 
+/* Memory types, encoded under Xen's choice of MSR_PAT. */
+#define _PAGE_WB         (                                0)
+#define _PAGE_WT         (                        _PAGE_PWT)
+#define _PAGE_UCM        (            _PAGE_PCD            )
+#define _PAGE_UC         (            _PAGE_PCD | _PAGE_PWT)
+#define _PAGE_WC         (_PAGE_PAT                        )
+#define _PAGE_WP         (_PAGE_PAT |             _PAGE_PWT)
+
 /*
  * Debug option: Ensure that granted mappings are not implicitly unmapped.
  * WARNING: This will need to be disabled to run OSes that use the spare PTE
@@ -338,8 +346,8 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 #define __PAGE_HYPERVISOR_RX      (_PAGE_PRESENT | _PAGE_ACCESSED)
 #define __PAGE_HYPERVISOR         (__PAGE_HYPERVISOR_RX | \
                                    _PAGE_DIRTY | _PAGE_RW)
-#define __PAGE_HYPERVISOR_UCMINUS (__PAGE_HYPERVISOR | _PAGE_PCD)
-#define __PAGE_HYPERVISOR_UC      (__PAGE_HYPERVISOR | _PAGE_PCD | _PAGE_PWT)
+#define __PAGE_HYPERVISOR_UCMINUS (__PAGE_HYPERVISOR | _PAGE_UCM)
+#define __PAGE_HYPERVISOR_UC      (__PAGE_HYPERVISOR | _PAGE_UC)
 
 #define MAP_SMALL_PAGES _PAGE_AVAIL0 /* don't use superpages mappings */
 
