@@ -1000,6 +1000,15 @@ get_page_from_l1e(
         return -EACCES;
     }
 
+    /*
+     * Track writeable non-coherent mappings to RAM pages, to trigger a cache
+     * flush later if the target is used as anything but a PGT_writeable page.
+     * We care about all writeable mappings, including foreign mappings.
+     */
+    if ( !boot_cpu_has(X86_FEATURE_XEN_SELFSNOOP) &&
+         (l1f & (PAGE_CACHE_ATTRS | _PAGE_RW)) == (_PAGE_WC | _PAGE_RW) )
+        set_bit(_PGT_non_coherent, &page->u.inuse.type_info);
+
     return 0;
 
  could_not_pin:
@@ -2532,6 +2541,19 @@ static int cleanup_page_mappings(struct page_info *page)
         }
     }
 
+    /*
+     * Flush the cache if there were previously non-coherent writeable
+     * mappings of this page.  This forces the page to be coherent before it
+     * is freed back to the heap.
+     */
+    if ( __test_and_clear_bit(_PGT_non_coherent, &page->u.inuse.type_info) )
+    {
+        void *addr = __map_domain_page(page);
+
+        cache_flush(addr, PAGE_SIZE);
+        unmap_domain_page(addr);
+    }
+
     return rc;
 }
 
@@ -3089,6 +3111,22 @@ static int _get_page_type(struct page_info *page, unsigned long type,
 
     if ( unlikely(!(nx & PGT_validated)) )
     {
+        /*
+         * Flush the cache if there were previously non-coherent mappings of
+         * this page, and we're trying to use it as anything other than a
+         * writeable page.  This forces the page to be coherent before we
+         * validate its contents for safety.
+         */
+        if ( (nx & PGT_non_coherent) && type != PGT_writable_page )
+        {
+            void *addr = __map_domain_page(page);
+
+            cache_flush(addr, PAGE_SIZE);
+            unmap_domain_page(addr);
+
+            page->u.inuse.type_info &= ~PGT_non_coherent;
+        }
+
         /*
          * No special validation needed for writable or shared pages.  Page
          * tables and GDT/LDT need to have their contents audited.
