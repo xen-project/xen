@@ -719,9 +719,9 @@ static int __must_check iommu_flush_all(void)
     return rc;
 }
 
-static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
-                                          bool_t dma_old_pte_present,
-                                          unsigned long page_count)
+static int __must_check cf_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
+                                                   unsigned long page_count,
+                                                   unsigned int flush_flags)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct acpi_drhd_unit *drhd;
@@ -729,6 +729,17 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
     bool_t flush_dev_iotlb;
     int iommu_domid;
     int ret = 0;
+
+    if ( flush_flags & IOMMU_FLUSHF_all )
+    {
+        dfn = INVALID_DFN;
+        page_count = 0;
+    }
+    else
+    {
+        ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
+        ASSERT(flush_flags);
+    }
 
     /*
      * No need pcideves_lock here because we have flush
@@ -756,7 +767,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
             rc = iommu_flush_iotlb_psi(iommu, iommu_domid,
                                        dfn_to_daddr(dfn),
                                        get_order_from_pages(page_count),
-                                       !dma_old_pte_present,
+                                       !(flush_flags & IOMMU_FLUSHF_modified),
                                        flush_dev_iotlb);
 
         if ( rc > 0 )
@@ -766,25 +777,6 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
     }
 
     return ret;
-}
-
-static int __must_check cf_check iommu_flush_iotlb_pages(
-    struct domain *d, dfn_t dfn, unsigned long page_count,
-    unsigned int flush_flags)
-{
-    if ( flush_flags & IOMMU_FLUSHF_all )
-    {
-        dfn = INVALID_DFN;
-        page_count = 0;
-    }
-    else
-    {
-        ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
-        ASSERT(flush_flags);
-    }
-
-    return iommu_flush_iotlb(d, dfn, flush_flags & IOMMU_FLUSHF_modified,
-                             page_count);
 }
 
 /* clear one page's page table */
@@ -3147,7 +3139,7 @@ static const struct iommu_ops __initconst_cf_clobber vtd_ops = {
     .suspend = vtd_suspend,
     .resume = vtd_resume,
     .crash_shutdown = vtd_crash_shutdown,
-    .iotlb_flush = iommu_flush_iotlb_pages,
+    .iotlb_flush = iommu_flush_iotlb,
     .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_page_tables = vtd_dump_page_tables,
 };
