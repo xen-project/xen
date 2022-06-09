@@ -808,29 +808,6 @@ bool is_memory_hole(mfn_t start, mfn_t end)
     return true;
 }
 
-static int update_xen_mappings(unsigned long mfn, unsigned int cacheattr)
-{
-    int err = 0;
-    bool alias = mfn >= PFN_DOWN(xen_phys_start) &&
-                 mfn <  PFN_UP(xen_phys_start + (unsigned long)__2M_rwdata_end -
-                               XEN_VIRT_START);
-    unsigned long xen_va =
-        XEN_VIRT_START + ((mfn - PFN_DOWN(xen_phys_start)) << PAGE_SHIFT);
-
-    if ( boot_cpu_has(X86_FEATURE_XEN_SELFSNOOP) )
-        return 0;
-
-    if ( unlikely(alias) && cacheattr )
-        err = map_pages_to_xen(xen_va, _mfn(mfn), 1, 0);
-    if ( !err )
-        err = map_pages_to_xen((unsigned long)mfn_to_virt(mfn), _mfn(mfn), 1,
-                     PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
-    if ( unlikely(alias) && !cacheattr && !err )
-        err = map_pages_to_xen(xen_va, _mfn(mfn), 1, PAGE_HYPERVISOR);
-
-    return err;
-}
-
 #ifndef NDEBUG
 struct mmio_emul_range_ctxt {
     const struct domain *d;
@@ -1038,47 +1015,14 @@ get_page_from_l1e(
         goto could_not_pin;
     }
 
-    if ( pte_flags_to_cacheattr(l1f) !=
-         ((page->count_info & PGC_cacheattr_mask) >> PGC_cacheattr_base) )
+    if ( (l1f & PAGE_CACHE_ATTRS) != _PAGE_WB && is_special_page(page) )
     {
-        unsigned long x, nx, y = page->count_info;
-        unsigned long cacheattr = pte_flags_to_cacheattr(l1f);
-        int err;
-
-        if ( is_special_page(page) )
-        {
-            if ( write )
-                put_page_type(page);
-            put_page(page);
-            gdprintk(XENLOG_WARNING,
-                     "Attempt to change cache attributes of Xen heap page\n");
-            return -EACCES;
-        }
-
-        do {
-            x  = y;
-            nx = (x & ~PGC_cacheattr_mask) | (cacheattr << PGC_cacheattr_base);
-        } while ( (y = cmpxchg(&page->count_info, x, nx)) != x );
-
-        err = update_xen_mappings(mfn, cacheattr);
-        if ( unlikely(err) )
-        {
-            cacheattr = y & PGC_cacheattr_mask;
-            do {
-                x  = y;
-                nx = (x & ~PGC_cacheattr_mask) | cacheattr;
-            } while ( (y = cmpxchg(&page->count_info, x, nx)) != x );
-
-            if ( write )
-                put_page_type(page);
-            put_page(page);
-
-            gdprintk(XENLOG_WARNING, "Error updating mappings for mfn %" PRI_mfn
-                     " (pfn %" PRI_pfn ", from L1 entry %" PRIpte ") for d%d\n",
-                     mfn, get_gpfn_from_mfn(mfn),
-                     l1e_get_intpte(l1e), l1e_owner->domain_id);
-            return err;
-        }
+        if ( write )
+            put_page_type(page);
+        put_page(page);
+        gdprintk(XENLOG_WARNING,
+                 "Attempt to change cache attributes of Xen heap page\n");
+        return -EACCES;
     }
 
     return 0;
@@ -2496,23 +2440,8 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
  */
 static int cleanup_page_mappings(struct page_info *page)
 {
-    unsigned int cacheattr =
-        (page->count_info & PGC_cacheattr_mask) >> PGC_cacheattr_base;
     int rc = 0;
     unsigned long mfn = mfn_x(page_to_mfn(page));
-
-    /*
-     * If we've modified xen mappings as a result of guest cache
-     * attributes, restore them to the "normal" state.
-     */
-    if ( unlikely(cacheattr) )
-    {
-        page->count_info &= ~PGC_cacheattr_mask;
-
-        BUG_ON(is_special_page(page));
-
-        rc = update_xen_mappings(mfn, 0);
-    }
 
     /*
      * If this may be in a PV domain's IOMMU, remove it.
