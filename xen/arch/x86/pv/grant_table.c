@@ -109,7 +109,17 @@ int create_grant_pv_mapping(uint64_t addr, mfn_t frame,
 
     ol1e = *pl1e;
     if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, 0) )
+    {
+        /*
+         * We always create mappings in this path.  However, our caller,
+         * map_grant_ref(), only passes potentially non-zero cache_flags for
+         * MMIO frames, so this path doesn't create non-coherent mappings of
+         * RAM frames and there's no need to calculate PGT_non_coherent.
+         */
+        ASSERT(!cache_flags || is_iomem_page(frame));
+
         rc = GNTST_okay;
+    }
 
  out_unlock:
     page_unlock(page);
@@ -294,7 +304,18 @@ int replace_grant_pv_mapping(uint64_t addr, mfn_t frame,
                  l1e_get_flags(ol1e), addr, grant_pte_flags);
 
     if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, 0) )
+    {
+        /*
+         * Generally, replace_grant_pv_mapping() is used to destroy mappings
+         * (n1le = l1e_empty()), but it can be a present mapping on the
+         * GNTABOP_unmap_and_replace path.
+         *
+         * In such cases, the PTE is fully transplanted from its old location
+         * via steal_linear_addr(), so we need not perform PGT_non_coherent
+         * checking here.
+         */
         rc = GNTST_okay;
+    }
 
  out_unlock:
     page_unlock(page);
