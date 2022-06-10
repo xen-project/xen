@@ -912,6 +912,13 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 })
 #  endif
 # endif
+#elif VEC_SIZE == 64
+# if FLOAT_SIZE == 4
+#  define dup_hi(x) B(movshdup, _mask, x, undef(), ~0)
+#  define dup_lo(x) B(movsldup, _mask, x, undef(), ~0)
+# elif FLOAT_SIZE == 8
+#  define dup_lo(x) B(movddup, _mask, x, undef(), ~0)
+# endif
 #endif
 #if VEC_SIZE == 16 && defined(__SSSE3__) && !defined(__AVX512VL__)
 # if INT_SIZE == 1

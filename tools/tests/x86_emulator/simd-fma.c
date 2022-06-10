@@ -56,13 +56,27 @@ ENTRY(fma_test);
 #endif
 
 #if defined(fmaddsub) && !defined(addsub)
-# define addsub(x, y) fmaddsub(x, broadcast(1), y)
+# ifdef __AVX512F__
+#  define addsub(x, y) ({ \
+    vec_t t_; \
+    typeof(t_[0]) one_ = 1; \
+    asm ( "vfmaddsub231p" ELEM_SFX " %2%{1to%c4%}, %1, %0" \
+          : "=v" (t_) \
+          : "v" (x), "m" (one_), "0" (y), "i" (ELEM_COUNT) ); \
+    t_; \
+})
+# else
+#  define addsub(x, y) fmaddsub(x, broadcast(1), y)
+# endif
 #endif
 
 int fma_test(void)
 {
     unsigned int i;
     vec_t x, y, z, src, inv, one;
+#ifdef __AVX512F__
+    typeof(one[0]) one_ = 1;
+#endif
 
     for ( i = 0; i < ELEM_COUNT; ++i )
     {
@@ -70,6 +84,10 @@ int fma_test(void)
         inv[i] = ELEM_COUNT - i;
         one[i] = 1;
     }
+
+#ifdef __AVX512F__
+# define one one_
+#endif
 
     x = (src + one) * inv;
     y = (src - one) * inv;
@@ -93,21 +111,27 @@ int fma_test(void)
     x = src + inv;
     y = src - inv;
     touch(inv);
+    touch(one);
     z = src * one + inv;
     if ( !eq(x, z) ) return __LINE__;
 
     touch(inv);
+    touch(one);
     z = -src * one - inv;
     if ( !eq(-x, z) ) return __LINE__;
 
     touch(inv);
+    touch(one);
     z = src * one - inv;
     if ( !eq(y, z) ) return __LINE__;
 
     touch(inv);
+    touch(one);
     z = -src * one + inv;
     if ( !eq(-y, z) ) return __LINE__;
     touch(inv);
+
+#undef one
 
 #if defined(addsub) && defined(fmaddsub)
     x = addsub(src * inv, one);

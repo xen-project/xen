@@ -49,8 +49,10 @@ float
 # define ELEM_SIZE FLOAT_SIZE
 # if FLOAT_SIZE == 4
 #  define MODE SF
+#  define ELEM_SFX "s"
 # elif FLOAT_SIZE == 8
 #  define MODE DF
+#  define ELEM_SFX "d"
 # endif
 #endif
 #ifndef VEC_SIZE
