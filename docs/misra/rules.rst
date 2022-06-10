@@ -89,6 +89,29 @@ existing codebase are work-in-progress.
        (xen/include/public/) are allowed to retain longer identifiers
        for backward compatibility.
 
+   * - `Rule 5.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_02.c>`_
+     - Required
+     - Identifiers declared in the same scope and name space shall be
+       distinct
+     - The Xen characters limit for identifiers is 40. Public headers
+       (xen/include/public/) are allowed to retain longer identifiers
+       for backward compatibility.
+
+   * - `Rule 5.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_03.c>`_
+     - Required
+     - An identifier declared in an inner scope shall not hide an
+       identifier declared in an outer scope
+     - Using macros as macro parameters at invocation time is allowed
+       even if both macros use identically named local variables, e.g.
+       max(var0, min(var1, var2))
+
+   * - `Rule 5.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_04.c>`_
+     - Required
+     - Macro identifiers shall be distinct
+     - The Xen characters limit for macro identifiers is 40. Public
+       headers (xen/include/public/) are allowed to retain longer
+       identifiers for backward compatibility.
+
    * - `Rule 6.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_06_02.c>`_
      - Required
      - Single-bit named bit fields shall not be of a signed type
@@ -123,8 +146,75 @@ existing codebase are work-in-progress.
        declarations of objects and functions that have internal linkage
      -
 
+   * - `Rule 8.10 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_10.c>`_
+     - Required
+     - An inline function shall be declared with the static storage class
+     - gnu_inline (without static) is allowed.
+
    * - `Rule 8.12 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_12.c>`_
      - Required
      - Within an enumerator list the value of an implicitly-specified
        enumeration constant shall be unique
+     -
+
+   * - `Rule 9.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_09_01.c>`_
+     - Mandatory
+     - The value of an object with automatic storage duration shall not
+       be read before it has been set
+     - Rule clarification: do not use variables before they are
+       initialized. An explicit initializer is not necessarily required.
+       Try reducing the scope of the variable. If an explicit
+       initializer is added, consider initializing the variable to a
+       poison value.
+
+   * - `Rule 9.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_09_02.c>`_
+     - Required
+     - The initializer for an aggregate or union shall be enclosed in
+       braces
+     -
+
+   * - `Rule 13.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_13_06.c>`_
+     - Mandatory
+     - The operand of the sizeof operator shall not contain any
+       expression which has potential side effects
+     -
+
+   * - `Rule 14.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_14_01.c>`_
+     - Required
+     - A loop counter shall not have essentially floating type
+     -
+
+   * - `Rule 16.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_07.c>`_
+     - Required
+     - A switch-expression shall not have essentially Boolean type
+     -
+
+   * - `Rule 17.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_03.c>`_
+     - Mandatory
+     - A function shall not be declared implicitly
+     -
+
+   * - `Rule 17.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_04.c>`_
+     - Mandatory
+     - All exit paths from a function with non-void return type shall
+       have an explicit return statement with an expression
+     -
+
+   * - `Rule 20.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_07.c>`_
+     - Required
+     - Expressions resulting from the expansion of macro parameters
+       shall be enclosed in parentheses
+     -
+
+   * - `Rule 20.13 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_13.c>`_
+     - Required
+     - A line whose first token is # shall be a valid preprocessing
+       directive
+     -
+
+   * - `Rule 20.14 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_14.c>`_
+     - Required
+     - All #else #elif and #endif preprocessor directives shall reside
+       in the same file as the #if #ifdef or #ifndef directive to which
+       they are related
      -
