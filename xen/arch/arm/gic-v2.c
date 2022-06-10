@@ -679,7 +679,7 @@ static void gicv2_irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_m
     spin_unlock(&gicv2.lock);
 }
 
-static int gicv2_map_hwdown_extra_mappings(struct domain *d)
+static int gicv2_map_hwdom_extra_mappings(struct domain *d)
 {
     const struct v2m_data *v2m_data;
 
@@ -1352,7 +1352,7 @@ const static struct gic_hw_operations gicv2_ops = {
     .make_hwdom_madt     = gicv2_make_hwdom_madt,
     .get_hwdom_extra_madt_size = gicv2_get_hwdom_extra_madt_size,
 #endif
-    .map_hwdom_extra_mappings = gicv2_map_hwdown_extra_mappings,
+    .map_hwdom_extra_mappings = gicv2_map_hwdom_extra_mappings,
     .iomem_deny_access   = gicv2_iomem_deny_access,
     .do_LPI              = gicv2_do_LPI,
 };
