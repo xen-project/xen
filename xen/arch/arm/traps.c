@@ -1862,7 +1862,7 @@ static inline bool hpfar_is_valid(bool s1ptw, uint8_t fsc)
      *  1. the stage 2 fault happen during a stage 1 page table walk
      *  (the bit ESR_EL2.S1PTW is set)
      *  2. the fault was due to a translation fault and the processor
-     *  does not carry erratum #8342220
+     *  does not carry erratum #834220
      *
      * Note that technically HPFAR is valid for other cases, but they
      * are currently not supported by Xen.
