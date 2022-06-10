@@ -51,6 +51,9 @@
 #define  PPIN_ENABLE                        (_AC(1, ULL) <<  1)
 #define MSR_PPIN                            0x0000004f
 
+#define MSR_MISC_PACKAGE_CTRL               0x000000bc
+#define  PGK_CTRL_ENERGY_FILTER_EN          (_AC(1, ULL) <<  0)
+
 #define MSR_CORE_CAPABILITIES               0x000000cf
 #define  CORE_CAPS_SPLITLOCK_DETECT         (_AC(1, ULL) <<  5)
 
@@ -71,6 +74,9 @@
 #define  ARCH_CAPS_IF_PSCHANGE_MC_NO        (_AC(1, ULL) <<  6)
 #define  ARCH_CAPS_TSX_CTRL                 (_AC(1, ULL) <<  7)
 #define  ARCH_CAPS_TAA_NO                   (_AC(1, ULL) <<  8)
+#define  ARCH_CAPS_MISC_PACKAGE_CTRL        (_AC(1, ULL) << 10)
+#define  ARCH_CAPS_ENERGY_FILTERING         (_AC(1, ULL) << 11)
+#define  ARCH_CAPS_DOITM                    (_AC(1, ULL) << 12)
 #define  ARCH_CAPS_SBDR_SSDP_NO             (_AC(1, ULL) << 13)
 #define  ARCH_CAPS_FBSDP_NO                 (_AC(1, ULL) << 14)
 #define  ARCH_CAPS_PSDP_NO                  (_AC(1, ULL) << 15)
@@ -154,6 +160,9 @@
 #define MSR_PASID                           0x00000d93
 #define  PASID_PASID_MASK                   0x000fffff
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
+
+#define MSR_UARCH_MISC_CTRL                 0x00001b01
+#define  UARCH_CTRL_DOITM                   (_AC(1, ULL) <<  0)
 
 #define MSR_EFER                            0xc0000080 /* Extended Feature Enable Register */
 #define  EFER_SCE                           (_AC(1, ULL) <<  0) /* SYSCALL Enable */
