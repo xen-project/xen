@@ -555,8 +555,7 @@ int __init acpi_scan_nodes(paddr_t start, paddr_t end)
 		uint64_t size = nodes[i].end - nodes[i].start;
 
 		if ( size == 0 )
-			printk(KERN_WARNING "SRAT: Node %u has no memory. "
-			       "BIOS Bug or mis-configured hardware?\n", i);
+			printk(KERN_INFO "SRAT: node %u has no memory\n", i);
 
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
 	}
