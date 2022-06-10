@@ -2916,7 +2916,8 @@ static int _get_page_type(struct page_info *page, unsigned long type,
              * The page is in one of two states (depending on PGT_partial),
              * and should have exactly one reference.
              */
-            ASSERT((x & (PGT_type_mask | PGT_count_mask)) == (type | 1));
+            ASSERT((x & (PGT_type_mask | PGT_pae_xen_l2 | PGT_count_mask)) ==
+                   (type | 1));
 
             if ( !(x & PGT_partial) )
             {
