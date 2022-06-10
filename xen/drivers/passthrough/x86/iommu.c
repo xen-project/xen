@@ -348,8 +348,8 @@ static unsigned int __hwdom_init hwdom_iommu_map(const struct domain *d,
 
 void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 {
-    unsigned long i, top, max_pfn, start, count;
-    unsigned int flush_flags = 0, start_perms = 0;
+    unsigned long i, top, max_pfn;
+    unsigned int flush_flags = 0;
 
     BUG_ON(!is_hardware_domain(d));
 
@@ -380,9 +380,9 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
      * First Mb will get mapped in one go by pvh_populate_p2m(). Avoid
      * setting up potentially conflicting mappings here.
      */
-    start = paging_mode_translate(d) ? PFN_DOWN(MB(1)) : 0;
+    i = paging_mode_translate(d) ? PFN_DOWN(MB(1)) : 0;
 
-    for ( i = start, count = 0; i < top; )
+    for ( ; i < top; i++ )
     {
         unsigned long pfn = pdx_to_pfn(i);
         unsigned int perms = hwdom_iommu_map(d, pfn, max_pfn);
@@ -391,41 +391,20 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
         if ( !perms )
             rc = 0;
         else if ( paging_mode_translate(d) )
-        {
             rc = p2m_add_identity_entry(d, pfn,
                                         perms & IOMMUF_writable ? p2m_access_rw
                                                                 : p2m_access_r,
                                         0);
-            if ( rc )
-                printk(XENLOG_WARNING
-                       "%pd: identity mapping of %lx failed: %d\n",
-                       d, pfn, rc);
-        }
-        else if ( pfn != start + count || perms != start_perms )
-        {
-        commit:
-            rc = iommu_map(d, _dfn(start), _mfn(start), count, start_perms,
-                           &flush_flags);
-            if ( rc )
-                printk(XENLOG_WARNING
-                       "%pd: IOMMU identity mapping of [%lx,%lx) failed: %d\n",
-                       d, pfn, pfn + count, rc);
-            SWAP(start, pfn);
-            start_perms = perms;
-            count = 1;
-        }
         else
-        {
-            ++count;
-            rc = 0;
-        }
+            rc = iommu_map(d, _dfn(pfn), _mfn(pfn), 1ul << PAGE_ORDER_4K,
+                           perms, &flush_flags);
 
+        if ( rc )
+            printk(XENLOG_WARNING "%pd: identity %smapping of %lx failed: %d\n",
+                   d, !paging_mode_translate(d) ? "IOMMU " : "", pfn, rc);
 
-        if ( !(++i & 0xfffff) )
+        if (!(i & 0xfffff))
             process_pending_softirqs();
-
-        if ( i == top && count )
-            goto commit;
     }
 
     /* Use if to avoid compiler warning */
