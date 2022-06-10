@@ -2470,12 +2470,7 @@ static int cleanup_page_mappings(struct page_info *page)
         struct domain *d = page_get_owner(page);
 
         if ( d && unlikely(need_iommu_pt_sync(d)) && is_pv_domain(d) )
-        {
-            int rc2 = iommu_legacy_unmap(d, _dfn(mfn), 1u << PAGE_ORDER_4K);
-
-            if ( !rc )
-                rc = rc2;
-        }
+            rc = iommu_legacy_unmap(d, _dfn(mfn), 1u << PAGE_ORDER_4K);
 
         if ( likely(!is_special_page(page)) )
         {
