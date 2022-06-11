@@ -646,10 +646,58 @@ static void __init init_staticmem_pages(void)
 }
 
 #ifdef CONFIG_ARM_32
+/*
+ * Populate the boot allocator. All the RAM but the following regions
+ * will be added:
+ *  - Modules (e.g., Xen, Kernel)
+ *  - Reserved regions
+ *  - Xenheap
+ */
+static void __init populate_boot_allocator(void)
+{
+    unsigned int i;
+    const struct meminfo *banks = &bootinfo.mem;
+
+    for ( i = 0; i < banks->nr_banks; i++ )
+    {
+        const struct membank *bank = &banks->bank[i];
+        paddr_t bank_end = bank->start + bank->size;
+        paddr_t s, e;
+
+        s = bank->start;
+        while ( s < bank_end )
+        {
+            paddr_t n = bank_end;
+
+            e = next_module(s, &n);
+
+            if ( e == ~(paddr_t)0 )
+                e = n = bank_end;
+
+            /*
+             * Module in a RAM bank other than the one which we are
+             * not dealing with here.
+             */
+            if ( e > bank_end )
+                e = bank_end;
+
+            /* Avoid the xenheap */
+            if ( s < mfn_to_maddr(xenheap_mfn_end) &&
+                 mfn_to_maddr(xenheap_mfn_start) < e )
+            {
+                e = mfn_to_maddr(xenheap_mfn_start);
+                n = mfn_to_maddr(xenheap_mfn_end);
+            }
+
+            fw_unreserved_regions(s, e, init_boot_pages, 0);
+            s = n;
+        }
+    }
+}
+
 static void __init setup_mm(void)
 {
-    paddr_t ram_start, ram_end, ram_size;
-    paddr_t s, e;
+    paddr_t ram_start, ram_end, ram_size, e;
     unsigned long ram_pages;
     unsigned long heap_pages, xenheap_pages, domheap_pages;
     unsigned int i;
@@ -727,43 +775,7 @@ static void __init setup_mm(void)
     setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
 
     /* Add non-xenheap memory */
-    for ( i = 0; i < bootinfo.mem.nr_banks; i++ )
-    {
-        paddr_t bank_start = bootinfo.mem.bank[i].start;
-        paddr_t bank_end = bank_start + bootinfo.mem.bank[i].size;
-
-        s = bank_start;
-        while ( s < bank_end )
-        {
-            paddr_t n = bank_end;
-
-            e = next_module(s, &n);
-
-            if ( e == ~(paddr_t)0 )
-            {
-                e = n = ram_end;
-            }
-
-            /*
-             * Module in a RAM bank other than the one which we are
-             * not dealing with here.
-             */
-            if ( e > bank_end )
-                e = bank_end;
-
-            /* Avoid the xenheap */
-            if ( s < mfn_to_maddr(mfn_add(xenheap_mfn_start, xenheap_pages))
-                 && mfn_to_maddr(xenheap_mfn_start) < e )
-            {
-                e = mfn_to_maddr(xenheap_mfn_start);
-                n = mfn_to_maddr(mfn_add(xenheap_mfn_start, xenheap_pages));
-            }
-
-            fw_unreserved_regions(s, e, init_boot_pages, 0);
-
-            s = n;
-        }
-    }
+    populate_boot_allocator();
 
     /* Frame table covers all of RAM region, including holes */
     setup_frametable_mappings(ram_start, ram_end);
