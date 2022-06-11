@@ -4,6 +4,7 @@
 #ifndef __ASSEMBLY__
 
 #include <xen/page-defs.h>
+#include <xen/mm-frame.h>
 
 /*
  * WARNING!  Unlike the x86 pagetable code, where l1 is the lowest level and
@@ -167,6 +168,13 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
         second_table_offset(addr),          \
         third_table_offset(addr)            \
     }
+
+/*
+ * Standard entry type that we'll use to build Xen's own pagetables.
+ * We put the same permissions at every level, because they're ignored
+ * by the walker in non-leaf entries.
+ */
+lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned int attr);
 
 #endif /* __ASSEMBLY__ */
 

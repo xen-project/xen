@@ -29,6 +29,7 @@ obj-y += notifier.o
 obj-y += page_alloc.o
 obj-$(CONFIG_HAS_PDX) += pdx.o
 obj-$(CONFIG_PERF_COUNTERS) += perfc.o
+obj-bin-$(CONFIG_HAS_PMAP) += pmap.init.o
 obj-y += preempt.o
 obj-y += random.o
 obj-y += rangeset.o

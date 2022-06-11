@@ -49,6 +49,9 @@ config HAS_KEXEC
 config HAS_PDX
 	bool
 
+config HAS_PMAP
+	bool
+
 config HAS_SCHED_GRANULARITY
 	bool
 
