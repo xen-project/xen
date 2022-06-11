@@ -17,32 +17,25 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/compile.h>
-#include <xen/types.h>
-#include <xen/device_tree.h>
-#include <xen/init.h>
-#include <xen/mm.h>
-#include <xen/preempt.h>
+#include <xen/domain_page.h>
 #include <xen/errno.h>
 #include <xen/grant_table.h>
-#include <xen/softirq.h>
-#include <xen/event.h>
 #include <xen/guest_access.h>
-#include <xen/domain_page.h>
-#include <xen/err.h>
-#include <asm/page.h>
-#include <asm/current.h>
-#include <asm/flushtlb.h>
-#include <public/memory.h>
-#include <xen/sched.h>
-#include <xen/vmap.h>
-#include <xsm/xsm.h>
-#include <xen/pfn.h>
-#include <xen/sizes.h>
+#include <xen/init.h>
 #include <xen/libfdt/libfdt.h>
+#include <xen/mm.h>
+#include <xen/pfn.h>
+#include <xen/sched.h>
+#include <xen/sizes.h>
+#include <xen/types.h>
+#include <xen/vmap.h>
+
+#include <xsm/xsm.h>
 
 #include <asm/fixmap.h>
 #include <asm/setup.h>
+
+#include <public/memory.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
