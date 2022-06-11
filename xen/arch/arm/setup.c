@@ -645,13 +645,12 @@ static void __init init_staticmem_pages(void)
 #endif
 }
 
-#ifdef CONFIG_ARM_32
 /*
  * Populate the boot allocator. All the RAM but the following regions
  * will be added:
  *  - Modules (e.g., Xen, Kernel)
  *  - Reserved regions
- *  - Xenheap
+ *  - Xenheap (arm32 only)
  */
 static void __init populate_boot_allocator(void)
 {
@@ -681,6 +680,7 @@ static void __init populate_boot_allocator(void)
             if ( e > bank_end )
                 e = bank_end;
 
+#ifdef CONFIG_ARM_32
             /* Avoid the xenheap */
             if ( s < mfn_to_maddr(xenheap_mfn_end) &&
                  mfn_to_maddr(xenheap_mfn_start) < e )
@@ -688,6 +688,7 @@ static void __init populate_boot_allocator(void)
                 e = mfn_to_maddr(xenheap_mfn_start);
                 n = mfn_to_maddr(xenheap_mfn_end);
             }
+#endif
 
             fw_unreserved_regions(s, e, init_boot_pages, 0);
             s = n;
@@ -695,6 +696,7 @@ static void __init populate_boot_allocator(void)
     }
 }
 
+#ifdef CONFIG_ARM_32
 static void __init setup_mm(void)
 {
     paddr_t ram_start, ram_end, ram_size, e;
@@ -790,45 +792,36 @@ static void __init setup_mm(void)
 #else /* CONFIG_ARM_64 */
 static void __init setup_mm(void)
 {
+    const struct meminfo *banks = &bootinfo.mem;
     paddr_t ram_start = ~0;
     paddr_t ram_end = 0;
     paddr_t ram_size = 0;
-    int bank;
+    unsigned int i;
 
     init_pdx();
 
+    /*
+     * We need some memory to allocate the page-tables used for the xenheap
+     * mappings. But some regions may contain memory already allocated
+     * for other uses (e.g. modules, reserved-memory...).
+     *
+     * For simplicity, add all the free regions in the boot allocator.
+     */
+    populate_boot_allocator();
+
     total_pages = 0;
-    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+
+    for ( i = 0; i < banks->nr_banks; i++ )
     {
-        paddr_t bank_start = bootinfo.mem.bank[bank].start;
-        paddr_t bank_size = bootinfo.mem.bank[bank].size;
-        paddr_t bank_end = bank_start + bank_size;
-        paddr_t s, e;
+        const struct membank *bank = &banks->bank[i];
+        paddr_t bank_end = bank->start + bank->size;
 
-        ram_size = ram_size + bank_size;
-        ram_start = min(ram_start,bank_start);
-        ram_end = max(ram_end,bank_end);
+        ram_size = ram_size + bank->size;
+        ram_start = min(ram_start, bank->start);
+        ram_end = max(ram_end, bank_end);
 
-        setup_xenheap_mappings(bank_start>>PAGE_SHIFT, bank_size>>PAGE_SHIFT);
-
-        s = bank_start;
-        while ( s < bank_end )
-        {
-            paddr_t n = bank_end;
-
-            e = next_module(s, &n);
-
-            if ( e == ~(paddr_t)0 )
-            {
-                e = n = bank_end;
-            }
-
-            if ( e > bank_end )
-                e = bank_end;
-
-            fw_unreserved_regions(s, e, init_boot_pages, 0);
-            s = n;
-        }
+        setup_xenheap_mappings(PFN_DOWN(bank->start),
+                               PFN_DOWN(bank->size));
     }
 
     total_pages += ram_size >> PAGE_SHIFT;
