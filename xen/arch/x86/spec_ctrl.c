@@ -36,8 +36,8 @@ static bool __initdata opt_msr_sc_pv = true;
 static bool __initdata opt_msr_sc_hvm = true;
 static int8_t __initdata opt_rsb_pv = -1;
 static bool __initdata opt_rsb_hvm = true;
-static int8_t __initdata opt_md_clear_pv = -1;
-static int8_t __initdata opt_md_clear_hvm = -1;
+static int8_t __ro_after_init opt_md_clear_pv = -1;
+static int8_t __ro_after_init opt_md_clear_hvm = -1;
 
 /* Cmdline controls for Xen's speculative settings. */
 static enum ind_thunk {
@@ -933,6 +933,13 @@ static __init void mds_calculations(uint64_t caps)
     }
 }
 
+void spec_ctrl_init_domain(struct domain *d)
+{
+    bool pv = is_pv_domain(d);
+
+    d->arch.verw = pv ? opt_md_clear_pv : opt_md_clear_hvm;
+}
+
 void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
@@ -1197,21 +1204,20 @@ void __init init_speculation_mitigations(void)
                             boot_cpu_has(X86_FEATURE_MD_CLEAR));
 
     /*
-     * Enable MDS defences as applicable.  The PV blocks need using all the
-     * time, and the Idle blocks need using if either PV or HVM defences are
-     * used.
+     * Enable MDS defences as applicable.  The Idle blocks need using if
+     * either PV or HVM defences are used.
      *
      * HVM is more complicated.  The MD_CLEAR microcode extends L1D_FLUSH with
-     * equivelent semantics to avoid needing to perform both flushes on the
-     * HVM path.  The HVM blocks don't need activating if our hypervisor told
-     * us it was handling L1D_FLUSH, or we are using L1D_FLUSH ourselves.
+     * equivalent semantics to avoid needing to perform both flushes on the
+     * HVM path.  Therefore, we don't need VERW in addition to L1D_FLUSH.
+     *
+     * After calculating the appropriate idle setting, simplify
+     * opt_md_clear_hvm to mean just "should we VERW on the way into HVM
+     * guests", so spec_ctrl_init_domain() can calculate suitable settings.
      */
-    if ( opt_md_clear_pv )
-        setup_force_cpu_cap(X86_FEATURE_SC_VERW_PV);
     if ( opt_md_clear_pv || opt_md_clear_hvm )
         setup_force_cpu_cap(X86_FEATURE_SC_VERW_IDLE);
-    if ( opt_md_clear_hvm && !(caps & ARCH_CAPS_SKIP_L1DFL) && !opt_l1d_flush )
-        setup_force_cpu_cap(X86_FEATURE_SC_VERW_HVM);
+    opt_md_clear_hvm &= !(caps & ARCH_CAPS_SKIP_L1DFL) && !opt_l1d_flush;
 
     /*
      * Warn the user if they are on MLPDS/MFBDS-vulnerable hardware with HT

@@ -2282,9 +2282,8 @@ in place for guests to use.
 Use of a positive boolean value for either of these options is invalid.
 
 The booleans `pv=`, `hvm=`, `msr-sc=`, `rsb=` and `md-clear=` offer fine
-grained control over the alternative blocks used by Xen.  These impact Xen's
-ability to protect itself, and Xen's ability to virtualise support for guests
-to use.
+grained control over the primitives by Xen.  These impact Xen's ability to
+protect itself, and Xen's ability to virtualise support for guests to use.
 
 * `pv=` and `hvm=` offer control over all suboptions for PV and HVM guests
   respectively.
