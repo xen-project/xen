@@ -395,6 +395,7 @@ void start_secondary(void)
     local_abort_enable();
 
     check_local_cpu_errata();
+    check_local_cpu_features();
 
     printk(XENLOG_DEBUG "CPU %u booted.\n", smp_processor_id());
 

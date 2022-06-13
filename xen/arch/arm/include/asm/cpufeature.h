@@ -67,8 +67,9 @@
 #define ARM_WORKAROUND_BHB_LOOP_24 13
 #define ARM_WORKAROUND_BHB_LOOP_32 14
 #define ARM_WORKAROUND_BHB_SMCC_3 15
+#define ARM_HAS_SB 16
 
-#define ARM_NCAPS           16
+#define ARM_NCAPS           17
 
 #ifndef __ASSEMBLY__
 
@@ -77,6 +78,9 @@
 #include <xen/bitops.h>
 
 extern DECLARE_BITMAP(cpu_hwcaps, ARM_NCAPS);
+
+void check_local_cpu_features(void);
+void enable_cpu_features(void);
 
 static inline bool cpus_have_cap(unsigned int num)
 {

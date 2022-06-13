@@ -964,6 +964,8 @@ void __init start_xen(unsigned long boot_phys_offset,
      */
     check_local_cpu_errata();
 
+    check_local_cpu_features();
+
     init_xen_time();
 
     gic_init();
@@ -1033,6 +1035,7 @@ void __init start_xen(unsigned long boot_phys_offset,
      */
     apply_alternatives_all();
     enable_errata_workarounds();
+    enable_cpu_features();
 
     /* Create initial domain 0. */
     if ( !is_dom0less_mode() )

@@ -26,6 +26,24 @@ DECLARE_BITMAP(cpu_hwcaps, ARM_NCAPS);
 
 struct cpuinfo_arm __read_mostly guest_cpuinfo;
 
+#ifdef CONFIG_ARM_64
+static bool has_sb_instruction(const struct arm_cpu_capabilities *entry)
+{
+    return system_cpuinfo.isa64.sb;
+}
+#endif
+
+static const struct arm_cpu_capabilities arm_features[] = {
+#ifdef CONFIG_ARM_64
+    {
+        .desc = "Speculation barrier instruction (SB)",
+        .capability = ARM_HAS_SB,
+        .matches = has_sb_instruction,
+    },
+#endif
+    {},
+};
+
 void update_cpu_capabilities(const struct arm_cpu_capabilities *caps,
                              const char *info)
 {
@@ -68,6 +86,16 @@ void __init enable_cpu_capabilities(const struct arm_cpu_capabilities *caps)
             BUG_ON(ret);
         }
     }
+}
+
+void check_local_cpu_features(void)
+{
+    update_cpu_capabilities(arm_features, "enabled support for");
+}
+
+void __init enable_cpu_features(void)
+{
+    enable_cpu_capabilities(arm_features);
 }
 
 /*
