@@ -67,6 +67,8 @@ static bool __initdata cpu_has_bug_msbds_only; /* => minimal HT impact. */
 static bool __initdata cpu_has_bug_mds; /* Any other M{LP,SB,FB}DS combination. */
 
 static int8_t __initdata opt_srb_lock = -1;
+static bool __initdata opt_unpriv_mmio;
+static bool __read_mostly opt_fb_clear_mmio;
 
 static int __init parse_spec_ctrl(const char *s)
 {
@@ -184,6 +186,8 @@ static int __init parse_spec_ctrl(const char *s)
             opt_branch_harden = val;
         else if ( (val = parse_boolean("srb-lock", s, ss)) >= 0 )
             opt_srb_lock = val;
+        else if ( (val = parse_boolean("unpriv-mmio", s, ss)) >= 0 )
+            opt_unpriv_mmio = val;
         else
             rc = -EINVAL;
 
@@ -392,7 +396,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            opt_srb_lock                              ? " SRB_LOCK+" : " SRB_LOCK-",
            opt_ibpb                                  ? " IBPB"  : "",
            opt_l1d_flush                             ? " L1D_FLUSH" : "",
-           opt_md_clear_pv || opt_md_clear_hvm       ? " VERW"  : "",
+           opt_md_clear_pv || opt_md_clear_hvm ||
+           opt_fb_clear_mmio                         ? " VERW"  : "",
            opt_branch_harden                         ? " BRANCH_HARDEN" : "");
 
     /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
@@ -912,7 +917,9 @@ void spec_ctrl_init_domain(struct domain *d)
 {
     bool pv = is_pv_domain(d);
 
-    d->arch.verw = pv ? opt_md_clear_pv : opt_md_clear_hvm;
+    d->arch.verw =
+        (pv ? opt_md_clear_pv : opt_md_clear_hvm) ||
+        (opt_fb_clear_mmio && is_iommu_enabled(d));
 }
 
 void __init init_speculation_mitigations(void)
@@ -1148,6 +1155,18 @@ void __init init_speculation_mitigations(void)
     mds_calculations(caps);
 
     /*
+     * Parts which enumerate FB_CLEAR are those which are post-MDS_NO and have
+     * reintroduced the VERW fill buffer flushing side effect because of a
+     * susceptibility to FBSDP.
+     *
+     * If unprivileged guests have (or will have) MMIO mappings, we can
+     * mitigate cross-domain leakage of fill buffer data by issuing VERW on
+     * the return-to-guest path.
+     */
+    if ( opt_unpriv_mmio )
+        opt_fb_clear_mmio = caps & ARCH_CAPS_FB_CLEAR;
+
+    /*
      * By default, enable PV and HVM mitigations on MDS-vulnerable hardware.
      * This will only be a token effort for MLPDS/MFBDS when HT is enabled,
      * but it is somewhat better than nothing.
@@ -1160,18 +1179,20 @@ void __init init_speculation_mitigations(void)
                             boot_cpu_has(X86_FEATURE_MD_CLEAR));
 
     /*
-     * Enable MDS defences as applicable.  The Idle blocks need using if
-     * either PV or HVM defences are used.
+     * Enable MDS/MMIO defences as applicable.  The Idle blocks need using if
+     * either the PV or HVM MDS defences are used, or if we may give MMIO
+     * access to untrusted guests.
      *
      * HVM is more complicated.  The MD_CLEAR microcode extends L1D_FLUSH with
      * equivalent semantics to avoid needing to perform both flushes on the
-     * HVM path.  Therefore, we don't need VERW in addition to L1D_FLUSH.
+     * HVM path.  Therefore, we don't need VERW in addition to L1D_FLUSH (for
+     * MDS mitigations.  L1D_FLUSH is not safe for MMIO mitigations.)
      *
      * After calculating the appropriate idle setting, simplify
      * opt_md_clear_hvm to mean just "should we VERW on the way into HVM
      * guests", so spec_ctrl_init_domain() can calculate suitable settings.
      */
-    if ( opt_md_clear_pv || opt_md_clear_hvm )
+    if ( opt_md_clear_pv || opt_md_clear_hvm || opt_fb_clear_mmio )
         setup_force_cpu_cap(X86_FEATURE_SC_VERW_IDLE);
     opt_md_clear_hvm &= !(caps & ARCH_CAPS_SKIP_L1DFL) && !opt_l1d_flush;
 
@@ -1236,14 +1257,19 @@ void __init init_speculation_mitigations(void)
      * On some SRBDS-affected hardware, it may be safe to relax srb-lock by
      * default.
      *
-     * On parts which enumerate MDS_NO and not TAA_NO, TSX is the only known
-     * way to access the Fill Buffer.  If TSX isn't available (inc. SKU
-     * reasons on some models), or TSX is explicitly disabled, then there is
-     * no need for the extra overhead to protect RDRAND/RDSEED.
+     * All parts with SRBDS_CTRL suffer SSDP, the mechanism by which stale RNG
+     * data becomes available to other contexts.  To recover the data, an
+     * attacker needs to use:
+     *  - SBDS (MDS or TAA to sample the cores fill buffer)
+     *  - SBDR (Architecturally retrieve stale transaction buffer contents)
+     *  - DRPW (Architecturally latch stale fill buffer data)
+     *
+     * On MDS_NO parts, and with TAA_NO or TSX unavailable/disabled, and there
+     * is no unprivileged MMIO access, the RNG data doesn't need protecting.
      */
     if ( cpu_has_srbds_ctrl )
     {
-        if ( opt_srb_lock == -1 &&
+        if ( opt_srb_lock == -1 && !opt_unpriv_mmio &&
              (caps & (ARCH_CAPS_MDS_NO|ARCH_CAPS_TAA_NO)) == ARCH_CAPS_MDS_NO &&
              (!cpu_has_hle || ((caps & ARCH_CAPS_TSX_CTRL) && rtm_disabled)) )
             opt_srb_lock = 0;
