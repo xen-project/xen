@@ -87,7 +87,7 @@ UNLIKELY_END(realmode)
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
         /* SPEC_CTRL_EXIT_TO_VMX   Req: %rsp=regs/cpuinfo              Clob:    */
-        ALTERNATIVE "", __stringify(verw CPUINFO_verw_sel(%rsp)), X86_FEATURE_SC_VERW_HVM
+        DO_SPEC_CTRL_COND_VERW
 
         mov  VCPU_hvm_guest_cr2(%rbx),%rax
 
