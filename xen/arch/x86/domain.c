@@ -651,6 +651,8 @@ int arch_domain_create(struct domain *d,
 
     domain_cpu_policy_changed(d);
 
+    spec_ctrl_init_domain(d);
+
     return 0;
 
  fail:
@@ -1763,14 +1765,15 @@ static void __context_switch(void)
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
+    struct cpu_info *info = get_cpu_info();
     const struct domain *prevd = prev->domain, *nextd = next->domain;
     unsigned int dirty_cpu = read_atomic(&next->dirty_cpu);
 
     ASSERT(prev != next);
     ASSERT(local_irq_is_enabled());
 
-    get_cpu_info()->use_pv_cr3 = false;
-    get_cpu_info()->xen_cr3 = 0;
+    info->use_pv_cr3 = false;
+    info->xen_cr3 = 0;
 
     if ( unlikely(dirty_cpu != cpu) && dirty_cpu != VCPU_CPU_CLEAN )
     {
@@ -1834,6 +1837,11 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
                 *last_id = next_id;
             }
         }
+
+        /* Update the top-of-stack block with the VERW disposition. */
+        info->spec_ctrl_flags &= ~SCF_verw;
+        if ( nextd->arch.verw )
+            info->spec_ctrl_flags |= SCF_verw;
     }
 
     sched_context_switched(prev, next);

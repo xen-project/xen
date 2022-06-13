@@ -24,6 +24,7 @@
 #define SCF_use_shadow (1 << 0)
 #define SCF_ist_wrmsr  (1 << 1)
 #define SCF_ist_rsb    (1 << 2)
+#define SCF_verw       (1 << 3)
 
 #ifndef __ASSEMBLY__
 
@@ -32,6 +33,7 @@
 #include <asm/msr-index.h>
 
 void init_speculation_mitigations(void);
+void spec_ctrl_init_domain(struct domain *d);
 
 extern bool opt_ibpb;
 extern bool opt_ssbd;

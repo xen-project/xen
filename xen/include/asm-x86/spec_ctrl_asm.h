@@ -136,6 +136,19 @@
 #endif
 .endm
 
+.macro DO_SPEC_CTRL_COND_VERW
+/*
+ * Requires %rsp=cpuinfo
+ *
+ * Issue a VERW for its flushing side effect, if indicated.  This is a Spectre
+ * v1 gadget, but the IRET/VMEntry is serialising.
+ */
+    testb $SCF_verw, CPUINFO_spec_ctrl_flags(%rsp)
+    jz .L\@_verw_skip
+    verw CPUINFO_verw_sel(%rsp)
+.L\@_verw_skip:
+.endm
+
 .macro DO_SPEC_CTRL_ENTRY maybexen:req
 /*
  * Requires %rsp=regs (also cpuinfo if !maybexen)
@@ -231,8 +244,7 @@
 #define SPEC_CTRL_EXIT_TO_PV                                            \
     ALTERNATIVE "",                                                     \
         DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV;              \
-    ALTERNATIVE "", __stringify(verw CPUINFO_verw_sel(%rsp)),           \
-        X86_FEATURE_SC_VERW_PV
+    DO_SPEC_CTRL_COND_VERW
 
 /*
  * Use in IST interrupt/exception context.  May interrupt Xen or PV context.
