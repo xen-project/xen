@@ -144,6 +144,30 @@
 
 /* id_aa64isar2 */
 #define ID_AA64ISAR2_CLEARBHB_SHIFT 28
+#define ID_AA64ISAR2_APA3_SHIFT     12
+#define ID_AA64ISAR2_GPA3_SHIFT     8
+#define ID_AA64ISAR2_RPRES_SHIFT    4
+#define ID_AA64ISAR2_WFXT_SHIFT     0
+
+#define ID_AA64ISAR2_RPRES_8BIT     0x0
+#define ID_AA64ISAR2_RPRES_12BIT    0x1
+/*
+ * Value 0x1 has been removed from the architecture, and is
+ * reserved, but has not yet been removed from the ARM ARM
+ * as of ARM DDI 0487G.b.
+ */
+#define ID_AA64ISAR2_WFXT_NI        0x0
+#define ID_AA64ISAR2_WFXT_SUPPORTED 0x2
+
+#define ID_AA64ISAR2_APA3_NI                  0x0
+#define ID_AA64ISAR2_APA3_ARCHITECTED         0x1
+#define ID_AA64ISAR2_APA3_ARCH_EPAC           0x2
+#define ID_AA64ISAR2_APA3_ARCH_EPAC2          0x3
+#define ID_AA64ISAR2_APA3_ARCH_EPAC2_FPAC     0x4
+#define ID_AA64ISAR2_APA3_ARCH_EPAC2_FPAC_CMB 0x5
+
+#define ID_AA64ISAR2_GPA3_NI             0x0
+#define ID_AA64ISAR2_GPA3_ARCHITECTED    0x1
 
 /* id_aa64pfr0 */
 #define ID_AA64PFR0_CSV3_SHIFT       60
@@ -165,14 +189,13 @@
 #define ID_AA64PFR0_AMU              0x1
 #define ID_AA64PFR0_SVE              0x1
 #define ID_AA64PFR0_RAS_V1           0x1
+#define ID_AA64PFR0_RAS_V1P1         0x2
 #define ID_AA64PFR0_FP_NI            0xf
 #define ID_AA64PFR0_FP_SUPPORTED     0x0
 #define ID_AA64PFR0_ASIMD_NI         0xf
 #define ID_AA64PFR0_ASIMD_SUPPORTED  0x0
-#define ID_AA64PFR0_EL1_64BIT_ONLY   0x1
-#define ID_AA64PFR0_EL1_32BIT_64BIT  0x2
-#define ID_AA64PFR0_EL0_64BIT_ONLY   0x1
-#define ID_AA64PFR0_EL0_32BIT_64BIT  0x2
+#define ID_AA64PFR0_ELx_64BIT_ONLY   0x1
+#define ID_AA64PFR0_ELx_32BIT_64BIT  0x2
 
 /* id_aa64pfr1 */
 #define ID_AA64PFR1_MPAMFRAC_SHIFT   16
@@ -189,6 +212,7 @@
 #define ID_AA64PFR1_MTE_NI           0x0
 #define ID_AA64PFR1_MTE_EL0          0x1
 #define ID_AA64PFR1_MTE              0x2
+#define ID_AA64PFR1_MTE_ASYMM        0x3
 
 /* id_aa64zfr0 */
 #define ID_AA64ZFR0_F64MM_SHIFT      56
@@ -228,17 +252,37 @@
 #define ID_AA64MMFR0_ASID_SHIFT      4
 #define ID_AA64MMFR0_PARANGE_SHIFT   0
 
-#define ID_AA64MMFR0_TGRAN4_NI         0xf
-#define ID_AA64MMFR0_TGRAN4_SUPPORTED  0x0
-#define ID_AA64MMFR0_TGRAN64_NI        0xf
-#define ID_AA64MMFR0_TGRAN64_SUPPORTED 0x0
-#define ID_AA64MMFR0_TGRAN16_NI        0x0
-#define ID_AA64MMFR0_TGRAN16_SUPPORTED 0x1
+#define ID_AA64MMFR0_ASID_8          0x0
+#define ID_AA64MMFR0_ASID_16         0x2
+
+#define ID_AA64MMFR0_TGRAN4_NI             0xf
+#define ID_AA64MMFR0_TGRAN4_SUPPORTED_MIN  0x0
+#define ID_AA64MMFR0_TGRAN4_SUPPORTED_MAX  0x7
+#define ID_AA64MMFR0_TGRAN64_NI            0xf
+#define ID_AA64MMFR0_TGRAN64_SUPPORTED_MIN 0x0
+#define ID_AA64MMFR0_TGRAN64_SUPPORTED_MAX 0x7
+#define ID_AA64MMFR0_TGRAN16_NI            0x0
+#define ID_AA64MMFR0_TGRAN16_SUPPORTED_MIN 0x1
+#define ID_AA64MMFR0_TGRAN16_SUPPORTED_MAX 0xf
+
+#define ID_AA64MMFR0_PARANGE_32        0x0
+#define ID_AA64MMFR0_PARANGE_36        0x1
+#define ID_AA64MMFR0_PARANGE_40        0x2
+#define ID_AA64MMFR0_PARANGE_42        0x3
+#define ID_AA64MMFR0_PARANGE_44        0x4
 #define ID_AA64MMFR0_PARANGE_48        0x5
 #define ID_AA64MMFR0_PARANGE_52        0x6
 
+#define ARM64_MIN_PARANGE_BITS     32
+
+#define ID_AA64MMFR0_TGRAN_2_SUPPORTED_DEFAULT 0x0
+#define ID_AA64MMFR0_TGRAN_2_SUPPORTED_NONE    0x1
+#define ID_AA64MMFR0_TGRAN_2_SUPPORTED_MIN     0x2
+#define ID_AA64MMFR0_TGRAN_2_SUPPORTED_MAX     0x7
+
 /* id_aa64mmfr1 */
 #define ID_AA64MMFR1_ECBHB_SHIFT     60
+#define ID_AA64MMFR1_AFP_SHIFT       44
 #define ID_AA64MMFR1_ETS_SHIFT       36
 #define ID_AA64MMFR1_TWED_SHIFT      32
 #define ID_AA64MMFR1_XNX_SHIFT       28
@@ -271,6 +315,9 @@
 #define ID_AA64MMFR2_CNP_SHIFT       0
 
 /* id_aa64dfr0 */
+#define ID_AA64DFR0_MTPMU_SHIFT      48
+#define ID_AA64DFR0_TRBE_SHIFT       44
+#define ID_AA64DFR0_TRACE_FILT_SHIFT 40
 #define ID_AA64DFR0_DOUBLELOCK_SHIFT 36
 #define ID_AA64DFR0_PMSVER_SHIFT     32
 #define ID_AA64DFR0_CTX_CMPS_SHIFT   28
@@ -284,11 +331,18 @@
 #define ID_AA64DFR0_PMUVER_8_1       0x4
 #define ID_AA64DFR0_PMUVER_8_4       0x5
 #define ID_AA64DFR0_PMUVER_8_5       0x6
+#define ID_AA64DFR0_PMUVER_8_7       0x7
 #define ID_AA64DFR0_PMUVER_IMP_DEF   0xf
+
+#define ID_AA64DFR0_PMSVER_8_2      0x1
+#define ID_AA64DFR0_PMSVER_8_3      0x2
 
 #define ID_DFR0_PERFMON_SHIFT        24
 
-#define ID_DFR0_PERFMON_8_1          0x4
+#define ID_DFR0_PERFMON_8_0         0x3
+#define ID_DFR0_PERFMON_8_1         0x4
+#define ID_DFR0_PERFMON_8_4         0x5
+#define ID_DFR0_PERFMON_8_5         0x6
 
 #define ID_ISAR4_SWP_FRAC_SHIFT        28
 #define ID_ISAR4_PSR_M_SHIFT           24
