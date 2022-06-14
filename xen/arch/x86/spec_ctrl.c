@@ -805,6 +805,14 @@ static void __init ibpb_calculations(void)
     }
 
     /*
+     * AMD/Hygon CPUs to date (June 2022) don't flush the the RAS.  Future
+     * CPUs are expected to enumerate IBPB_RET when this has been fixed.
+     * Until then, cover the difference with the software sequence.
+     */
+    if ( boot_cpu_has(X86_FEATURE_IBPB) && !boot_cpu_has(X86_FEATURE_IBPB_RET) )
+        setup_force_cpu_cap(X86_BUG_IBPB_NO_RET);
+
+    /*
      * IBPB-on-entry mitigations for Branch Type Confusion.
      *
      * IBPB && !BTC_NO selects all AMD/Hygon hardware, not known to be safe,
