@@ -1814,7 +1814,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
              */
             if ( *last_id != next_id )
             {
-                wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+                spec_ctrl_new_guest_context();
                 *last_id = next_id;
             }
         }
