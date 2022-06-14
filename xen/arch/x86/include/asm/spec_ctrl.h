@@ -65,6 +65,28 @@
 void init_speculation_mitigations(void);
 void spec_ctrl_init_domain(struct domain *d);
 
+/*
+ * Switch to a new guest prediction context.
+ *
+ * This flushes all indirect branch predictors (BTB, RSB/RAS), so guest code
+ * which has previously run on this CPU can't attack subsequent guest code.
+ *
+ * As this flushes the RSB/RAS, it destroys the predictions of the calling
+ * context.  For best performace, arrange for this to be used when we're going
+ * to jump out of the current context, e.g. with reset_stack_and_jump().
+ *
+ * For hardware which mis-implements IBPB, fix up by flushing the RSB/RAS
+ * manually.
+ */
+static always_inline void spec_ctrl_new_guest_context(void)
+{
+    wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+
+    /* (ab)use alternative_input() to specify clobbers. */
+    alternative_input("", "DO_OVERWRITE_RSB", X86_BUG_IBPB_NO_RET,
+                      : "rax", "rcx");
+}
+
 extern int8_t opt_ibpb_ctxt_switch;
 extern bool opt_ssbd;
 extern int8_t opt_eager_fpu;
