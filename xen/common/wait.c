@@ -210,6 +210,27 @@ void check_wakeup_from_wait(void)
     }
 
     /*
+     * We are about to jump into a deeper call tree.  In principle, this risks
+     * executing more RET than CALL instructions, and underflowing the RSB.
+     *
+     * However, we are pinned to the same CPU as previously.  Therefore,
+     * either:
+     *
+     *   1) We've scheduled another vCPU in the meantime, and the context
+     *      switch path has (by default) issued IBPB which flushes the RSB, or
+     *
+     *   2) We're still in the same context.  Returning back to the deeper
+     *      call tree is resuming the execution path we left, and remains
+     *      balanced as far as that logic is concerned.
+     *
+     *      In fact, the path through the scheduler will execute more CALL
+     *      than RET instructions, making the RSB unbalanced in the safe
+     *      direction.
+     *
+     * Therefore, no actions are necessary here to maintain RSB safety.
+     */
+
+    /*
      * Hand-rolled longjmp().
      *
      * check_wakeup_from_wait() is always called with a shallow stack,
