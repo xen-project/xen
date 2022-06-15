@@ -14,9 +14,14 @@
 
 #define has_32bit_shinfo(d)    ((d)->arch.has_32bit_shinfo)
 
+/*
+ * Set to true if either the global vector-type callback or per-vCPU
+ * LAPIC vectors are used. Assume all vCPUs will use
+ * HVMOP_set_evtchn_upcall_vector as long as the initial vCPU does.
+ */
 #define is_hvm_pv_evtchn_domain(d) (is_hvm_domain(d) && \
-        (d)->arch.hvm.irq->callback_via_type == HVMIRQ_callback_vector)
-#define is_hvm_pv_evtchn_vcpu(v) (is_hvm_pv_evtchn_domain(v->domain))
+        ((d)->arch.hvm.irq->callback_via_type == HVMIRQ_callback_vector || \
+         (d)->vcpu[0]->arch.hvm.evtchn_upcall_vector))
 #define is_domain_direct_mapped(d) ((void)(d), 0)
 
 #define VCPU_TRAP_NONE         0
