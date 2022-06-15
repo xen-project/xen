@@ -101,7 +101,7 @@ cmd_xlat_h = \
 	cat $(filter %.h,$^) >$@.new; \
 	mv -f $@.new $@
 
-$(obj)/compat/xlat.h: $(addprefix $(obj)/compat/.xlat/,$(xlat-y)) $(obj)/config/auto.conf FORCE
+$(obj)/compat/xlat.h: $(addprefix $(obj)/compat/.xlat/,$(xlat-y)) FORCE
 	$(call if_changed,xlat_h)
 
 ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
