@@ -44,8 +44,6 @@ export ARCH SRCARCH
 # Allow someone to change their config file
 export KCONFIG_CONFIG ?= .config
 
-export CC CXX LD NM OBJCOPY OBJDUMP ADDR2LINE
-
 export TARGET := xen
 
 .PHONY: dist
@@ -244,6 +242,7 @@ export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
                                 -e s'/riscv.*/riscv/g')
 
 export CONFIG_SHELL := $(SHELL)
+export CC CXX LD NM OBJCOPY OBJDUMP ADDR2LINE
 export YACC = $(if $(BISON),$(BISON),bison)
 export LEX = $(if $(FLEX),$(FLEX),flex)
 
