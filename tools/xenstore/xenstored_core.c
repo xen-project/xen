@@ -2368,16 +2368,8 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		next = list_entry(connections.next, typeof(*conn), list);
-		if (&next->list != &connections)
-			talloc_increase_ref_count(next);
-		while (&next->list != &connections) {
-			conn = next;
-
-			next = list_entry(conn->list.next,
-					  typeof(*conn), list);
-			if (&next->list != &connections)
-				talloc_increase_ref_count(next);
+		list_for_each_entry_safe(conn, next, &connections, list) {
+			talloc_increase_ref_count(conn);
 
 			if (conn_can_read(conn))
 				handle_input(conn);
