@@ -3002,6 +3002,17 @@ static int _get_page_type(struct page_info *page, unsigned long type,
      * fully validated (PGT_[type] | PGT_validated | >0).
      */
 
+    /* If the page is fully validated, we're done. */
+    if ( likely(nx & PGT_validated) )
+        return 0;
+
+    /*
+     * The page is in the "validate locked" state.  We have exclusive access,
+     * and any concurrent callers are waiting in the cmpxchg() loop above.
+     *
+     * Exclusive access ends when PGT_validated or PGT_partial get set.
+     */
+
     if ( unlikely((x & PGT_count_mask) == 0) )
     {
         struct domain *d = page_get_owner(page);
@@ -3071,43 +3082,40 @@ static int _get_page_type(struct page_info *page, unsigned long type,
         }
     }
 
-    if ( unlikely(!(nx & PGT_validated)) )
+    /*
+     * Flush the cache if there were previously non-coherent mappings of
+     * this page, and we're trying to use it as anything other than a
+     * writeable page.  This forces the page to be coherent before we
+     * validate its contents for safety.
+     */
+    if ( (nx & PGT_non_coherent) && type != PGT_writable_page )
     {
-        /*
-         * Flush the cache if there were previously non-coherent mappings of
-         * this page, and we're trying to use it as anything other than a
-         * writeable page.  This forces the page to be coherent before we
-         * validate its contents for safety.
-         */
-        if ( (nx & PGT_non_coherent) && type != PGT_writable_page )
+        void *addr = __map_domain_page(page);
+
+        cache_flush(addr, PAGE_SIZE);
+        unmap_domain_page(addr);
+
+        page->u.inuse.type_info &= ~PGT_non_coherent;
+    }
+
+    /*
+     * No special validation needed for writable or shared pages.  Page
+     * tables and GDT/LDT need to have their contents audited.
+     *
+     * per validate_page(), non-atomic updates are fine here.
+     */
+    if ( type == PGT_writable_page || type == PGT_shared_page )
+        page->u.inuse.type_info |= PGT_validated;
+    else
+    {
+        if ( !(x & PGT_partial) )
         {
-            void *addr = __map_domain_page(page);
-
-            cache_flush(addr, PAGE_SIZE);
-            unmap_domain_page(addr);
-
-            page->u.inuse.type_info &= ~PGT_non_coherent;
+            page->nr_validated_ptes = 0;
+            page->partial_flags = 0;
+            page->linear_pt_count = 0;
         }
 
-        /*
-         * No special validation needed for writable or shared pages.  Page
-         * tables and GDT/LDT need to have their contents audited.
-         *
-         * per validate_page(), non-atomic updates are fine here.
-         */
-        if ( type == PGT_writable_page || type == PGT_shared_page )
-            page->u.inuse.type_info |= PGT_validated;
-        else
-        {
-            if ( !(x & PGT_partial) )
-            {
-                page->nr_validated_ptes = 0;
-                page->partial_flags = 0;
-                page->linear_pt_count = 0;
-            }
-
-            rc = validate_page(page, type, preemptible);
-        }
+        rc = validate_page(page, type, preemptible);
     }
 
  out:
