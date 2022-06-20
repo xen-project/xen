@@ -20,7 +20,7 @@
  * Split off from xc_minios.c
  */
 
-#include "_xen_list.h"
+#include "xen_list.h"
 #include <mini-os/types.h>
 #include <mini-os/os.h>
 #include <mini-os/lib.h>

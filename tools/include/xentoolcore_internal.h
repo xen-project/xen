@@ -27,7 +27,7 @@
 #include <stddef.h>
 
 #include "xentoolcore.h"
-#include "_xen_list.h"
+#include "xen_list.h"
 
 /*---------- active handle registration ----------*/
 

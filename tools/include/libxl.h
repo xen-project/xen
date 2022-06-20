@@ -747,7 +747,7 @@
 typedef struct libxl__ctx libxl_ctx;
 
 #include <libxl_uuid.h>
-#include <_xen_list.h>
+#include <xen_list.h>
 
 /* API compatibility. */
 #ifdef LIBXL_API_VERSION

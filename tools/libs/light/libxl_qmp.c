@@ -63,7 +63,7 @@
 
 #include <yajl/yajl_gen.h>
 
-#include "_xen_list.h"
+#include "xen_list.h"
 #include "libxl_internal.h"
 
 /* #define DEBUG_RECEIVED */
