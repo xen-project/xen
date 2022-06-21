@@ -29,6 +29,7 @@
 #include <asm/time.h>
 #include <asm/vgic.h>
 #include <asm/vreg.h>
+#include <asm/vtimer.h>
 #include <asm/regs.h>
 
 /*
