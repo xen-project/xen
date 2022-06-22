@@ -2,6 +2,7 @@
 #include <xen/cpu.h>
 #include <xen/delay.h>
 #include <xen/lib.h>
+#include <xen/shutdown.h>
 #include <xen/smp.h>
 #include <asm/platform.h>
 #include <asm/psci.h>
