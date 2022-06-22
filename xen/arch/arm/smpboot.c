@@ -83,15 +83,17 @@ DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
 static bool __read_mostly opt_hmp_unsafe = false;
 boolean_param("hmp-unsafe", opt_hmp_unsafe);
 
-static void setup_cpu_sibling_map(int cpu)
+static int setup_cpu_sibling_map(int cpu)
 {
     if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) ||
          !zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
-        panic("No memory for CPU sibling/core maps\n");
+        return -ENOMEM;
 
     /* A CPU is a sibling with itself and is always on its own core. */
     cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
     cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, cpu));
+
+    return 0;
 }
 
 static void remove_cpu_sibling_map(int cpu)
@@ -298,9 +300,14 @@ unsigned int __init smp_get_max_cpus(void)
 void __init
 smp_prepare_cpus(void)
 {
+    int rc;
+
     cpumask_copy(&cpu_present_map, &cpu_possible_map);
 
-    setup_cpu_sibling_map(0);
+    rc = setup_cpu_sibling_map(0);
+    if ( rc )
+        panic("Unable to allocate CPU sibling/core maps\n");
+
 }
 
 /* Boot the current CPU */
@@ -368,8 +375,6 @@ void start_secondary(void)
     init_secondary_IRQ();
 
     set_current(idle_vcpu[cpuid]);
-
-    setup_cpu_sibling_map(cpuid);
 
     /* Run local notifiers */
     notify_cpu_starting(cpuid);
@@ -539,9 +544,19 @@ static int cpu_smpboot_callback(struct notifier_block *nfb,
                                 void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;
+    unsigned int rc = 0;
 
     switch ( action )
     {
+    case CPU_UP_PREPARE:
+        rc = setup_cpu_sibling_map(cpu);
+        if ( rc )
+            printk(XENLOG_ERR
+                   "Unable to allocate CPU sibling/core map  for CPU%u\n",
+                   cpu);
+
+        break;
+
     case CPU_DEAD:
         remove_cpu_sibling_map(cpu);
         break;
@@ -549,7 +564,7 @@ static int cpu_smpboot_callback(struct notifier_block *nfb,
         break;
     }
 
-    return NOTIFY_DONE;
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
 }
 
 static struct notifier_block cpu_smpboot_nfb = {
