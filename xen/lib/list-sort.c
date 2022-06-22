@@ -16,6 +16,7 @@
  */
 
 #include <xen/list.h>
+#include <xen/list_sort.h>
 
 #define MAX_LIST_LENGTH_BITS 20
 
