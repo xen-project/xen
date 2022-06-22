@@ -1,4 +1,5 @@
 #include <xen/errno.h>
+#include <xen/gunzip.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
