@@ -2065,7 +2065,10 @@ void corrupt(struct connection *conn, const char *fmt, ...)
 	va_end(arglist);
 
 	log("corruption detected by connection %i: err %s: %s",
-	    conn ? (int)conn->id : -1, strerror(saved_errno), str);
+	    conn ? (int)conn->id : -1, strerror(saved_errno),
+	    str ?: "ENOMEM");
+
+	talloc_free(str);
 
 	check_store();
 }
