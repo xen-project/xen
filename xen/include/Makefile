@@ -141,13 +141,24 @@ cmd_header_chk = \
 quiet_cmd_headers99_chk = CHK     $@
 define cmd_headers99_chk
 	rm -f $@.new; \
-	$(foreach i, $(filter %.h,$^),                                        \
-	    echo "#include "\"$(i)\"                                          \
+	get_prereq() {                                                        \
+	    case $$1 in                                                       \
+	    $(foreach i, $(filter %.h,$^),                                    \
+	    $(if $($(patsubst $(srctree)/%,%,$(i))-prereq),                   \
+	        $(i)$(close)                                                  \
+	        echo "$(foreach j, $($(patsubst $(srctree)/%,%,$(i))-prereq), \
+	                -include $(j).h)";;))                                 \
+	    *) ;;                                                             \
+	    esac;                                                             \
+	};                                                                    \
+	for i in $(filter %.h,$^); do                                         \
+	    echo "#include "\"$$i\"                                           \
 	    | $(CC) -x c -std=c99 -Wall -Werror                               \
 	      -include stdint.h                                               \
-	      $(foreach j, $($(patsubst $(srctree)/%,%,$i)-prereq), -include $(j).h) \
+	      $$(get_prereq $$i)                                              \
 	      -S -o /dev/null -                                               \
-	    || exit $$?; echo $(i) >> $@.new;) \
+	    || exit $$?; echo $$i >> $@.new;                                  \
+	done;                                                                 \
 	mv $@.new $@
 endef
 
@@ -158,13 +169,23 @@ define cmd_headerscxx_chk
 	    touch $@.new;                                                     \
 	    exit 0;                                                           \
 	fi;                                                                   \
-	$(foreach i, $(filter %.h,$^),                                        \
-	    echo "#include "\"$(i)\"                                          \
+	get_prereq() {                                                        \
+	    case $$1 in                                                       \
+	    $(foreach i, $(filter %.h,$^),                                    \
+	    $(if $($(patsubst $(srctree)/%,%,$(i))-prereq),                   \
+	        $(i)$(close)                                                  \
+	        echo "$(foreach j, $($(patsubst $(srctree)/%,%,$(i))-prereq), \
+	                -include c$(j))";;))                                  \
+	    *) ;;                                                             \
+	    esac;                                                             \
+	};                                                                    \
+	for i in $(filter %.h,$^); do                                         \
+	    echo "#include "\"$$i\"                                           \
 	    | $(CXX) -x c++ -std=gnu++98 -Wall -Werror -D__XEN_TOOLS__        \
 	      -include stdint.h -include $(srcdir)/public/xen.h               \
-	      $(foreach j, $($(patsubst $(srctree)/%,%,$i)-prereq), -include c$(j)) \
+	      $$(get_prereq $$i)                                              \
 	      -S -o /dev/null -                                               \
-	    || exit $$?; echo $(i) >> $@.new;) \
+	    || exit $$?; echo $$i >> $@.new; done;                            \
 	mv $@.new $@
 endef
 
