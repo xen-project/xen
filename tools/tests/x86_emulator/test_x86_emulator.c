@@ -259,7 +259,10 @@ static bool simd_check_regs(const struct cpu_user_regs *regs)
 {
     if ( !regs->eax )
         return true;
-    printf("[line %u] ", (unsigned int)regs->eax);
+    if ( (int)regs->eax > 0 )
+        printf("[line %u] ", (unsigned int)regs->eax);
+    else
+        printf("[FMA line %u] ", (unsigned int)-regs->eax);
     return false;
 }
 
