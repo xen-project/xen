@@ -17,6 +17,7 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/cpu.h>
 #include <xen/lib.h>
 #include <xen/spinlock.h>
 #include <xen/irq.h>
@@ -100,7 +101,7 @@ static int __init init_irq_data(void)
     return 0;
 }
 
-static int init_local_irq_data(void)
+static int init_local_irq_data(unsigned int cpu)
 {
     int irq;
 
@@ -108,7 +109,7 @@ static int init_local_irq_data(void)
 
     for ( irq = 0; irq < NR_LOCAL_IRQS; irq++ )
     {
-        struct irq_desc *desc = irq_to_desc(irq);
+        struct irq_desc *desc = &per_cpu(local_irq_desc, cpu)[irq];
         int rc = init_one_irq_desc(desc);
 
         if ( rc )
@@ -131,6 +132,29 @@ static int init_local_irq_data(void)
     return 0;
 }
 
+static int cpu_callback(struct notifier_block *nfb, unsigned long action,
+                        void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        rc = init_local_irq_data(cpu);
+        if ( rc )
+            printk(XENLOG_ERR "Unable to allocate local IRQ for CPU%u\n",
+                   cpu);
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback,
+};
+
 void __init init_IRQ(void)
 {
     int irq;
@@ -140,13 +164,10 @@ void __init init_IRQ(void)
         local_irqs_type[irq] = IRQ_TYPE_INVALID;
     spin_unlock(&local_irqs_type_lock);
 
-    BUG_ON(init_local_irq_data() < 0);
+    BUG_ON(init_local_irq_data(smp_processor_id()) < 0);
     BUG_ON(init_irq_data() < 0);
-}
 
-void init_secondary_IRQ(void)
-{
-    BUG_ON(init_local_irq_data() < 0);
+    register_cpu_notifier(&cpu_nfb);
 }
 
 static inline struct irq_guest *irq_get_guest_info(struct irq_desc *desc)

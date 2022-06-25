@@ -73,7 +73,6 @@ static inline bool is_lpi(unsigned int irq)
 bool is_assignable_irq(unsigned int irq);
 
 void init_IRQ(void);
-void init_secondary_IRQ(void);
 
 int route_irq_to_guest(struct domain *d, unsigned int virq,
                        unsigned int irq, const char *devname);

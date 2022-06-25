@@ -372,8 +372,6 @@ void start_secondary(void)
 
     gic_init_secondary_cpu();
 
-    init_secondary_IRQ();
-
     set_current(idle_vcpu[cpuid]);
 
     /* Run local notifiers */
