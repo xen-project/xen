@@ -65,7 +65,7 @@
 void init_speculation_mitigations(void);
 void spec_ctrl_init_domain(struct domain *d);
 
-extern bool opt_ibpb_ctxt_switch;
+extern int8_t opt_ibpb_ctxt_switch;
 extern bool opt_ssbd;
 extern int8_t opt_eager_fpu;
 extern int8_t opt_l1d_flush;
