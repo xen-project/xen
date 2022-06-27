@@ -1151,8 +1151,14 @@ void __init init_speculation_mitigations(void)
     /* (Re)init BSP state now that default_spec_ctrl_flags has been calculated. */
     init_shadow_spec_ctrl_state();
 
-    /* If Xen is using any MSR_SPEC_CTRL settings, adjust the idle path. */
-    if ( default_xen_spec_ctrl )
+    /*
+     * For microcoded IBRS only (i.e. Intel, pre eIBRS), it is recommended to
+     * clear MSR_SPEC_CTRL before going idle, to avoid impacting sibling
+     * threads.  Activate this if SMT is enabled, and Xen is using a non-zero
+     * MSR_SPEC_CTRL setting.
+     */
+    if ( boot_cpu_has(X86_FEATURE_IBRSB) && !(caps & ARCH_CAPS_IBRS_ALL) &&
+         hw_smt_enabled && default_xen_spec_ctrl )
         setup_force_cpu_cap(X86_FEATURE_SC_MSR_IDLE);
 
     xpti_init_default(caps);
