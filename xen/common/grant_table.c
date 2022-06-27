@@ -895,7 +895,7 @@ done:
 static int _set_status(const grant_entry_header_t *shah,
                        grant_status_t *status,
                        struct domain *rd,
-                       unsigned rgt_version,
+                       unsigned int rgt_version,
                        struct active_grant_entry *act,
                        int readonly,
                        int mapflag,
@@ -1763,8 +1763,8 @@ static int
 gnttab_populate_status_frames(struct domain *d, struct grant_table *gt,
                               unsigned int req_nr_frames)
 {
-    unsigned i;
-    unsigned req_status_frames;
+    unsigned int i;
+    unsigned int req_status_frames;
 
     req_status_frames = grant_to_status_frames(req_nr_frames);
 

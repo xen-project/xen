@@ -14,13 +14,13 @@ static memptr __initdata free_mem_end_ptr;
 #define WSIZE           0x80000000
 
 static unsigned char *__initdata inbuf;
-static unsigned __initdata insize;
+static unsigned int __initdata insize;
 
 /* Index of next byte to be processed in inbuf: */
-static unsigned __initdata inptr;
+static unsigned int __initdata inptr;
 
 /* Bytes in output buffer: */
-static unsigned __initdata outcnt;
+static unsigned int __initdata outcnt;
 
 #define OF(args)        args
 
@@ -73,7 +73,7 @@ static __init void flush_window(void)
      * compute the crc.
      */
     unsigned long c = crc;
-    unsigned n;
+    unsigned int n;
     unsigned char *in, ch;
 
     in = window;

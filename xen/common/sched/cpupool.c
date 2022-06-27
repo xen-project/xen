@@ -850,7 +850,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 
     case XEN_SYSCTL_CPUPOOL_OP_ADDCPU:
     {
-        unsigned cpu;
+        unsigned int cpu;
         const cpumask_t *cpus;
 
         cpu = op->cpu;
@@ -895,7 +895,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 
     case XEN_SYSCTL_CPUPOOL_OP_RMCPU:
     {
-        unsigned cpu;
+        unsigned int cpu;
 
         c = cpupool_get_by_id(op->cpupool_id);
         ret = -ENOENT;

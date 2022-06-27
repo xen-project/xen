@@ -834,7 +834,7 @@ void __trace_hypercall(uint32_t event, unsigned long op,
 
 #define APPEND_ARG32(i)                         \
     do {                                        \
-        unsigned i_ = (i);                      \
+        unsigned int i_ = (i);                  \
         *a++ = args[(i_)];                      \
         d.op |= TRC_PV_HYPERCALL_V2_ARG_32(i_); \
     } while( 0 )
