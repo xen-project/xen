@@ -39,6 +39,10 @@ static bool __initdata opt_rsb_hvm = true;
 static int8_t __read_mostly opt_md_clear_pv = -1;
 static int8_t __read_mostly opt_md_clear_hvm = -1;
 
+static int8_t __read_mostly opt_ibpb_entry_pv = -1;
+static int8_t __read_mostly opt_ibpb_entry_hvm = -1;
+static bool __read_mostly opt_ibpb_entry_dom0;
+
 /* Cmdline controls for Xen's speculative settings. */
 static enum ind_thunk {
     THUNK_DEFAULT, /* Decide which thunk to use at boot time. */
@@ -54,7 +58,7 @@ int8_t __initdata opt_stibp = -1;
 bool __read_mostly opt_ssbd;
 int8_t __initdata opt_psfd = -1;
 
-bool __read_mostly opt_ibpb_ctxt_switch = true;
+int8_t __read_mostly opt_ibpb_ctxt_switch = -1;
 int8_t __read_mostly opt_eager_fpu = -1;
 int8_t __read_mostly opt_l1d_flush = -1;
 static bool __initdata opt_branch_harden = true;
@@ -114,6 +118,9 @@ static int __init parse_spec_ctrl(const char *s)
             opt_rsb_hvm = false;
             opt_md_clear_pv = 0;
             opt_md_clear_hvm = 0;
+            opt_ibpb_entry_pv = 0;
+            opt_ibpb_entry_hvm = 0;
+            opt_ibpb_entry_dom0 = false;
 
             opt_thunk = THUNK_JMP;
             opt_ibrs = 0;
@@ -140,12 +147,14 @@ static int __init parse_spec_ctrl(const char *s)
             opt_msr_sc_pv = val;
             opt_rsb_pv = val;
             opt_md_clear_pv = val;
+            opt_ibpb_entry_pv = val;
         }
         else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
         {
             opt_msr_sc_hvm = val;
             opt_rsb_hvm = val;
             opt_md_clear_hvm = val;
+            opt_ibpb_entry_hvm = val;
         }
         else if ( (val = parse_boolean("msr-sc", s, ss)) != -1 )
         {
@@ -204,6 +213,28 @@ static int __init parse_spec_ctrl(const char *s)
                     opt_md_clear_pv = val;
                 else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
                     opt_md_clear_hvm = val;
+                else
+            default:
+                    rc = -EINVAL;
+                break;
+            }
+        }
+        else if ( (val = parse_boolean("ibpb-entry", s, ss)) != -1 )
+        {
+            switch ( val )
+            {
+            case 0:
+            case 1:
+                opt_ibpb_entry_pv = opt_ibpb_entry_hvm =
+                    opt_ibpb_entry_dom0 = val;
+                break;
+
+            case -2:
+                s += strlen("ibpb-entry=");
+                if ( (val = parse_boolean("pv", s, ss)) >= 0 )
+                    opt_ibpb_entry_pv = val;
+                else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
+                    opt_ibpb_entry_hvm = val;
                 else
             default:
                     rc = -EINVAL;
@@ -477,27 +508,31 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
      * mitigation support for guests.
      */
 #ifdef CONFIG_HVM
-    printk("  Support for HVM VMs:%s%s%s%s%s\n",
+    printk("  Support for HVM VMs:%s%s%s%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_HVM) ||
             boot_cpu_has(X86_FEATURE_MD_CLEAR)   ||
+            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM) ||
             opt_eager_fpu)                           ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)      ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "",
-           boot_cpu_has(X86_FEATURE_MD_CLEAR)        ? " MD_CLEAR"      : "");
+           boot_cpu_has(X86_FEATURE_MD_CLEAR)        ? " MD_CLEAR"      : "",
+           boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM)  ? " IBPB-entry"    : "");
 
 #endif
 #ifdef CONFIG_PV
-    printk("  Support for PV VMs:%s%s%s%s%s\n",
+    printk("  Support for PV VMs:%s%s%s%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_PV) ||
             boot_cpu_has(X86_FEATURE_MD_CLEAR)  ||
+            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) ||
             opt_eager_fpu)                           ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "",
-           boot_cpu_has(X86_FEATURE_MD_CLEAR)        ? " MD_CLEAR"      : "");
+           boot_cpu_has(X86_FEATURE_MD_CLEAR)        ? " MD_CLEAR"      : "",
+           boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV)   ? " IBPB-entry"    : "");
 
     printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s (with%s PCID)\n",
            opt_xpti_hwdom ? "enabled" : "disabled",
@@ -759,6 +794,55 @@ static bool __init should_use_eager_fpu(void)
     }
 }
 
+static void __init ibpb_calculations(void)
+{
+    /* Check we have hardware IBPB support before using it... */
+    if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
+    {
+        opt_ibpb_entry_hvm = opt_ibpb_entry_pv = opt_ibpb_ctxt_switch = 0;
+        opt_ibpb_entry_dom0 = false;
+        return;
+    }
+
+    /*
+     * IBPB-on-entry mitigations for Branch Type Confusion.
+     *
+     * IBPB && !BTC_NO selects all AMD/Hygon hardware, not known to be safe,
+     * that we can provide some form of mitigation on.
+     */
+    if ( opt_ibpb_entry_pv == -1 )
+        opt_ibpb_entry_pv = (IS_ENABLED(CONFIG_PV) &&
+                             boot_cpu_has(X86_FEATURE_IBPB) &&
+                             !boot_cpu_has(X86_FEATURE_BTC_NO));
+    if ( opt_ibpb_entry_hvm == -1 )
+        opt_ibpb_entry_hvm = (IS_ENABLED(CONFIG_HVM) &&
+                              boot_cpu_has(X86_FEATURE_IBPB) &&
+                              !boot_cpu_has(X86_FEATURE_BTC_NO));
+
+    if ( opt_ibpb_entry_pv )
+    {
+        setup_force_cpu_cap(X86_FEATURE_IBPB_ENTRY_PV);
+
+        /*
+         * We only need to flush in IST context if we're protecting against PV
+         * guests.  HVM IBPB-on-entry protections are both atomic with
+         * NMI/#MC, so can't interrupt Xen ahead of having already flushed the
+         * BTB.
+         */
+        default_spec_ctrl_flags |= SCF_ist_ibpb;
+    }
+    if ( opt_ibpb_entry_hvm )
+        setup_force_cpu_cap(X86_FEATURE_IBPB_ENTRY_HVM);
+
+    /*
+     * If we're using IBPB-on-entry to protect against PV and HVM guests
+     * (ignoring dom0 if trusted), then there's no need to also issue IBPB on
+     * context switch too.
+     */
+    if ( opt_ibpb_ctxt_switch == -1 )
+        opt_ibpb_ctxt_switch = !(opt_ibpb_entry_hvm && opt_ibpb_entry_pv);
+}
+
 /* Calculate whether this CPU is vulnerable to L1TF. */
 static __init void l1tf_calculations(uint64_t caps)
 {
@@ -1014,8 +1098,12 @@ void spec_ctrl_init_domain(struct domain *d)
     bool verw = ((pv ? opt_md_clear_pv : opt_md_clear_hvm) ||
                  (opt_fb_clear_mmio && is_iommu_enabled(d)));
 
+    bool ibpb = ((pv ? opt_ibpb_entry_pv : opt_ibpb_entry_hvm) &&
+                 (d->domain_id != 0 || opt_ibpb_entry_dom0));
+
     d->arch.spec_ctrl_flags =
         (verw   ? SCF_verw         : 0) |
+        (ibpb   ? SCF_entry_ibpb   : 0) |
         0;
 }
 
@@ -1162,12 +1250,15 @@ void __init init_speculation_mitigations(void)
     }
 
     /*
-     * Use STIBP by default if the hardware hint is set.  Otherwise, leave it
-     * off as it a severe performance pentalty on pre-eIBRS Intel hardware
-     * where it was retrofitted in microcode.
+     * Use STIBP by default on all AMD systems.  Zen3 and later enumerate
+     * STIBP_ALWAYS, but STIBP is needed on Zen2 as part of the mitigations
+     * for Branch Type Confusion.
+     *
+     * Leave STIBP off by default on Intel.  Pre-eIBRS systems suffer a
+     * substantial perf hit when it was implemented in microcode.
      */
     if ( opt_stibp == -1 )
-        opt_stibp = !!boot_cpu_has(X86_FEATURE_STIBP_ALWAYS);
+        opt_stibp = !!boot_cpu_has(X86_FEATURE_AMD_STIBP);
 
     if ( opt_stibp && (boot_cpu_has(X86_FEATURE_STIBP) ||
                        boot_cpu_has(X86_FEATURE_AMD_STIBP)) )
@@ -1239,9 +1330,7 @@ void __init init_speculation_mitigations(void)
     if ( opt_rsb_hvm )
         setup_force_cpu_cap(X86_FEATURE_SC_RSB_HVM);
 
-    /* Check we have hardware IBPB support before using it... */
-    if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
-        opt_ibpb_ctxt_switch = false;
+    ibpb_calculations();
 
     /* Check whether Eager FPU should be enabled by default. */
     if ( opt_eager_fpu == -1 )

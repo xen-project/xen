@@ -2234,7 +2234,7 @@ By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
 
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm}=<bool>,
->              {msr-sc,rsb,md-clear}=<bool>|{pv,hvm}=<bool>,
+>              {msr-sc,rsb,md-clear,ibpb-entry}=<bool>|{pv,hvm}=<bool>,
 >              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,psfd,
 >              eager-fpu,l1d-flush,branch-harden,srb-lock,
 >              unpriv-mmio}=<bool> ]`
@@ -2259,9 +2259,10 @@ in place for guests to use.
 
 Use of a positive boolean value for either of these options is invalid.
 
-The `pv=`, `hvm=`, `msr-sc=`, `rsb=` and `md-clear=` options offer fine
-grained control over the primitives by Xen.  These impact Xen's ability to
-protect itself, and/or Xen's ability to virtualise support for guests to use.
+The `pv=`, `hvm=`, `msr-sc=`, `rsb=`, `md-clear=` and `ibpb-entry=` options
+offer fine grained control over the primitives by Xen.  These impact Xen's
+ability to protect itself, and/or Xen's ability to virtualise support for
+guests to use.
 
 * `pv=` and `hvm=` offer control over all suboptions for PV and HVM guests
   respectively.
@@ -2280,6 +2281,11 @@ protect itself, and/or Xen's ability to virtualise support for guests to use.
   compatibility with development versions of this fix, `mds=` is also accepted
   on Xen 4.12 and earlier as an alias.  Consult vendor documentation in
   preference to here.*
+* `ibpb-entry=` offers control over whether IBPB (Indirect Branch Prediction
+  Barrier) is used on entry to Xen.  This is used by default on hardware
+  vulnerable to Branch Type Confusion, but for performance reasons, dom0 is
+  unprotected by default.  If it necessary to protect dom0 too, boot with
+  `spec-ctrl=ibpb-entry`.
 
 If Xen was compiled with INDIRECT_THUNK support, `bti-thunk=` can be used to
 select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
