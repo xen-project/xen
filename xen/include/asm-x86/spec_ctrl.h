@@ -78,7 +78,8 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
     uint32_t val = 0;
 
     /*
-     * Branch Target Injection:
+     * It is recommended in some cases to clear MSR_SPEC_CTRL when going idle,
+     * to avoid impacting sibling threads.
      *
      * Latch the new shadow value, then enable shadowing, then update the MSR.
      * There are no SMP issues here; only local processor ordering concerns.
@@ -114,7 +115,7 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
     uint32_t val = info->xen_spec_ctrl;
 
     /*
-     * Branch Target Injection:
+     * Restore MSR_SPEC_CTRL on exit from idle.
      *
      * Disable shadowing before updating the MSR.  There are no SMP issues
      * here; only local processor ordering concerns.
