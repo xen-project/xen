@@ -62,12 +62,13 @@ the server feature bitmap. The server features are offered to the guest;
 it is up to the guest whether to use them or not. The guest should ignore
 any unknown feature bits.
 
-The following features are defined:
+The following features are defined (bit number 0 is equivalent to a mask
+value of 1):
 
-Mask    Description
+Bit     Description
 -----------------------------------------------------------------
-1       Ring reconnection (see the ring reconnection feature below)
-2       Connection error indicator (see connection error feature below)
+0       Ring reconnection (see the ring reconnection feature below)
+1       Connection error indicator (see connection error feature below)
 
 The "Connection state" field is used to request a ring close and reconnect.
 The "Connection state" field only contains valid data if the server has
