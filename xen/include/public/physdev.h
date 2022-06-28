@@ -211,8 +211,8 @@ struct physdev_manage_pci_ext {
     /* IN */
     uint8_t bus;
     uint8_t devfn;
-    unsigned is_extfn;
-    unsigned is_virtfn;
+    uint32_t is_extfn;
+    uint32_t is_virtfn;
     struct {
         uint8_t bus;
         uint8_t devfn;
