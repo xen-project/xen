@@ -1446,7 +1446,7 @@ int vcpu_reset(struct vcpu *v)
  * of memory, and it sets a pending event to make sure that a pending
  * event doesn't get missed.
  */
-int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
+int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned int offset)
 {
     struct domain *d = v->domain;
     void *mapping;
