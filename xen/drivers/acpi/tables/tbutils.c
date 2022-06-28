@@ -481,7 +481,6 @@ acpi_tb_parse_root_table(acpi_physical_address rsdp_address, u8 flags)
 			if (ACPI_FAILURE(status)) {
 				ACPI_WARNING((AE_INFO,
 					      "Truncating %u table entries!",
-					      (unsigned)
 					      (acpi_gbl_root_table_list.size -
 					       acpi_gbl_root_table_list.
 					       count)));

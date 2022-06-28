@@ -233,9 +233,9 @@ void __init acpi_tb_create_local_fadt(struct acpi_table_header *table, u32 lengt
 	 */
 	if (length > sizeof(struct acpi_table_fadt)) {
 		ACPI_WARNING((AE_INFO,
-			      "FADT (revision %u) is longer than ACPI 5.0 version,"
-			      " truncating length %u to %zu",
-			      table->revision, (unsigned)length,
+			      "FADT (revision %"PRIu8") is longer than ACPI 5.0 version,"
+			      " truncating length %"PRIu32" to %zu",
+			      table->revision, length,
 			      sizeof(struct acpi_table_fadt)));
 	}
 
