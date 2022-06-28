@@ -266,8 +266,8 @@
 
 .L\@_skip_rsb:
 
-    test $SCF_ist_wrmsr, %al
-    jz .L\@_skip_wrmsr
+    test $SCF_ist_sc_msr, %al
+    jz .L\@_skip_msr_spec_ctrl
 
     xor %edx, %edx
     testb $3, UREGS_cs(%rsp)
@@ -290,7 +290,7 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
      * to speculate around the WRMSR.  As a result, we need a dispatch
      * serialising instruction in the else clause.
      */
-.L\@_skip_wrmsr:
+.L\@_skip_msr_spec_ctrl:
     lfence
     UNLIKELY_END(\@_serialise)
 .endm
@@ -301,7 +301,7 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
  * Requires %rbx=stack_end
  * Clobbers %rax, %rcx, %rdx
  */
-    testb $SCF_ist_wrmsr, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
+    testb $SCF_ist_sc_msr, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
     jz .L\@_skip
 
     DO_SPEC_CTRL_EXIT_TO_XEN
