@@ -349,7 +349,7 @@ int avtab_read_item(struct avtab *a, void *fp, struct policydb *pol,
     struct avtab_key key;
     struct avtab_datum datum;
     int i, rc;
-    unsigned set;
+    unsigned int set;
 
     memset(&key, 0, sizeof(struct avtab_key));
     memset(&datum, 0, sizeof(struct avtab_datum));
