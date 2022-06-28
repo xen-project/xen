@@ -1064,7 +1064,7 @@ void __init init_speculation_mitigations(void)
     {
         if ( opt_msr_sc_pv )
         {
-            default_spec_ctrl_flags |= SCF_ist_wrmsr;
+            default_spec_ctrl_flags |= SCF_ist_sc_msr;
             setup_force_cpu_cap(X86_FEATURE_SC_MSR_PV);
         }
 
@@ -1075,7 +1075,7 @@ void __init init_speculation_mitigations(void)
              * Xen's value is not restored atomically.  An early NMI hitting
              * the VMExit path needs to restore Xen's value for safety.
              */
-            default_spec_ctrl_flags |= SCF_ist_wrmsr;
+            default_spec_ctrl_flags |= SCF_ist_sc_msr;
             setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
         }
     }
@@ -1088,7 +1088,7 @@ void __init init_speculation_mitigations(void)
          * on real hardware matches the availability of MSR_SPEC_CTRL in the
          * first place.
          *
-         * No need for SCF_ist_wrmsr because Xen's value is restored
+         * No need for SCF_ist_sc_msr because Xen's value is restored
          * atomically WRT NMIs in the VMExit path.
          *
          * TODO: Adjust cpu_has_svm_spec_ctrl to be usable earlier on boot.

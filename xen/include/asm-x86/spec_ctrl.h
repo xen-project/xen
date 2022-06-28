@@ -31,7 +31,7 @@
  * context switched per domain, and some inhibited in the S3 path.
  */
 #define SCF_use_shadow (1 << 0)
-#define SCF_ist_wrmsr  (1 << 1)
+#define SCF_ist_sc_msr (1 << 1)
 #define SCF_ist_rsb    (1 << 2)
 #define SCF_verw       (1 << 3)
 
@@ -46,7 +46,7 @@
  * These are the controls to inhibit on the S3 resume path until microcode has
  * been reloaded.
  */
-#define SCF_IST_MASK (SCF_ist_wrmsr)
+#define SCF_IST_MASK (SCF_ist_sc_msr)
 
 /*
  * Some speculative protections are per-domain.  These settings are merged
