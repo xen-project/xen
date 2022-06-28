@@ -235,9 +235,9 @@ static unsigned int dma_bitsize;
 integer_param("dma_bits", dma_bitsize);
 
 /* Offlined page list, protected by heap_lock. */
-PAGE_LIST_HEAD(page_offlined_list);
+static PAGE_LIST_HEAD(page_offlined_list);
 /* Broken page list, protected by heap_lock. */
-PAGE_LIST_HEAD(page_broken_list);
+static PAGE_LIST_HEAD(page_broken_list);
 
 /*************************
  * BOOT-TIME ALLOCATOR
