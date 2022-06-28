@@ -149,7 +149,7 @@ compat_physdev_op(
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int
-arch_compat_vcpu_op(
+compat_common_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int cf_check compat_mmuext_op(

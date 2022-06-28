@@ -38,15 +38,12 @@ CHECK_vcpu_hvm_context;
 
 #endif
 
-int cf_check compat_vcpu_op(
-    int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
+int compat_common_vcpu_op(int cmd, struct vcpu *v,
+                          XEN_GUEST_HANDLE_PARAM(void) arg)
 {
-    struct domain *d = current->domain;
-    struct vcpu *v;
     int rc = 0;
-
-    if ( (v = domain_vcpu(d, vcpuid)) == NULL )
-        return -ENOENT;
+    struct domain *d = current->domain;
+    unsigned int vcpuid = v->vcpu_id;
 
     switch ( cmd )
     {
@@ -103,7 +100,7 @@ int cf_check compat_vcpu_op(
     case VCPUOP_stop_singleshot_timer:
     case VCPUOP_register_vcpu_info:
     case VCPUOP_send_nmi:
-        rc = do_vcpu_op(cmd, vcpuid, arg);
+        rc = common_vcpu_op(cmd, v, arg);
         break;
 
     case VCPUOP_get_runstate_info:
@@ -134,7 +131,7 @@ int cf_check compat_vcpu_op(
     }
 
     default:
-        rc = arch_compat_vcpu_op(cmd, v, arg);
+        rc = -ENOSYS;
         break;
     }
 

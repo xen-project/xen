@@ -110,7 +110,7 @@ do_vcpu_op(
 
 struct vcpu;
 extern long
-arch_do_vcpu_op(int cmd,
+common_vcpu_op(int cmd,
     struct vcpu *v,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 

@@ -1569,15 +1569,11 @@ int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
-long cf_check do_vcpu_op(
-    int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
+long common_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
-    struct domain *d = current->domain;
-    struct vcpu *v;
     long rc = 0;
-
-    if ( (v = domain_vcpu(d, vcpuid)) == NULL )
-        return -ENOENT;
+    struct domain *d = v->domain;
+    unsigned int vcpuid = v->vcpu_id;
 
     switch ( cmd )
     {
@@ -1749,7 +1745,7 @@ long cf_check do_vcpu_op(
     }
 
     default:
-        rc = arch_do_vcpu_op(cmd, v, arg);
+        rc = -ENOSYS;
         break;
     }
 
