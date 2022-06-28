@@ -274,7 +274,8 @@ void do_double_fault(struct cpu_user_regs *regs)
 
     console_force_unlock();
 
-    asm ( "lsll %1, %0" : "=r" (cpu) : "rm" (PER_CPU_SELECTOR) );
+    asm ( "lsll %[sel], %[limit]" : [limit] "=r" (cpu)
+                                  : [sel] "r" (PER_CPU_SELECTOR) );
 
     /* Find information saved during fault and dump it to the console. */
     printk("*** DOUBLE FAULT ***\n");

@@ -736,7 +736,7 @@ void __init detect_zen2_null_seg_behaviour(void)
 	uint64_t base;
 
 	wrmsrl(MSR_FS_BASE, 1);
-	asm volatile ( "mov %0, %%fs" :: "rm" (0) );
+	asm volatile ( "mov %0, %%fs" :: "r" (0) );
 	rdmsrl(MSR_FS_BASE, base);
 
 	if (base == 0)
