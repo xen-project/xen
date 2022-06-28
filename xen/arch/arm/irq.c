@@ -631,7 +631,7 @@ void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
     BUG();
 }
 
-static bool irq_validate_new_type(unsigned int curr, unsigned new)
+static bool irq_validate_new_type(unsigned int curr, unsigned int new)
 {
     return (curr == IRQ_TYPE_INVALID || curr == new );
 }

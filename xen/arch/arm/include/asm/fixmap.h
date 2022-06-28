@@ -30,9 +30,9 @@
 extern lpae_t xen_fixmap[XEN_PT_LPAE_ENTRIES];
 
 /* Map a page in a fixmap entry */
-extern void set_fixmap(unsigned map, mfn_t mfn, unsigned attributes);
+extern void set_fixmap(unsigned int map, mfn_t mfn, unsigned int attributes);
 /* Remove a mapping from a fixmap entry */
-extern void clear_fixmap(unsigned map);
+extern void clear_fixmap(unsigned int map);
 
 #define fix_to_virt(slot) ((void *)FIXMAP_ADDR(slot))
 

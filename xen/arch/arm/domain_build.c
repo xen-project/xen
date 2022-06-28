@@ -1007,7 +1007,7 @@ static void __init set_interrupt(gic_interrupt_t interrupt,
  */
 static int __init fdt_property_interrupts(const struct kernel_info *kinfo,
                                           gic_interrupt_t *intr,
-                                          unsigned num_irq)
+                                          unsigned int num_irq)
 {
     int res;
 

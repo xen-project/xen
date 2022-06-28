@@ -4,11 +4,11 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 
-unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len);
+unsigned long raw_copy_to_guest(void *to, const void *from, unsigned int len);
 unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
-                                             unsigned len);
-unsigned long raw_copy_from_guest(void *to, const void *from, unsigned len);
-unsigned long raw_clear_guest(void *to, unsigned len);
+                                             unsigned int len);
+unsigned long raw_copy_from_guest(void *to, const void *from, unsigned int len);
+unsigned long raw_clear_guest(void *to, unsigned int len);
 
 /* Copy data to guest physical address, then clean the region. */
 unsigned long copy_to_guest_phys_flush_dcache(struct domain *d,

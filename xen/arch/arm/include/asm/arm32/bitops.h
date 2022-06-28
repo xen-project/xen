@@ -6,17 +6,17 @@
 /*
  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
  */
-extern int _find_first_zero_bit_le(const void * p, unsigned size);
+extern int _find_first_zero_bit_le(const void * p, unsigned int size);
 extern int _find_next_zero_bit_le(const void * p, int size, int offset);
-extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+extern int _find_first_bit_le(const unsigned long *p, unsigned int size);
 extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
 
 /*
  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
  */
-extern int _find_first_zero_bit_be(const void * p, unsigned size);
+extern int _find_first_zero_bit_be(const void * p, unsigned int size);
 extern int _find_next_zero_bit_be(const void * p, int size, int offset);
-extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+extern int _find_first_bit_be(const unsigned long *p, unsigned int size);
 extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
 
 #ifndef __ARMEB__

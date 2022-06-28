@@ -352,7 +352,7 @@ lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned int attr)
 }
 
 /* Map a 4k page in a fixmap entry */
-void set_fixmap(unsigned map, mfn_t mfn, unsigned int flags)
+void set_fixmap(unsigned int map, mfn_t mfn, unsigned int flags)
 {
     int res;
 
@@ -361,7 +361,7 @@ void set_fixmap(unsigned map, mfn_t mfn, unsigned int flags)
 }
 
 /* Remove a mapping from a fixmap entry */
-void clear_fixmap(unsigned map)
+void clear_fixmap(unsigned int map)
 {
     int res;
 
