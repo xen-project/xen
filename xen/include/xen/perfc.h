@@ -49,7 +49,7 @@ enum perfcounter {
 #undef PERFSTATUS
 #undef PERFSTATUS_ARRAY
 
-typedef unsigned perfc_t;
+typedef unsigned int perfc_t;
 #define PRIperfc ""
 
 DECLARE_PER_CPU(perfc_t[NUM_PERFCOUNTERS], perfcounters);

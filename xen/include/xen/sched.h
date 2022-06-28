@@ -519,7 +519,7 @@ struct domain
     /* hvm_print_line() and guest_console_write() logging. */
 #define DOMAIN_PBUF_SIZE 200
     char       *pbuf;
-    unsigned    pbuf_idx;
+    unsigned int pbuf_idx;
     spinlock_t  pbuf_lock;
 
     /* OProfile support. */
