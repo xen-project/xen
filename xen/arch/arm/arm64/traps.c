@@ -22,6 +22,7 @@
 #include <asm/hsr.h>
 #include <asm/system.h>
 #include <asm/processor.h>
+#include <asm/traps.h>
 
 #include <public/xen.h>
 
