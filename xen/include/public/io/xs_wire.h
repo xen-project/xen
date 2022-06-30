@@ -90,7 +90,8 @@ __attribute__((unused))
     XSD_ERROR(EBUSY),
     XSD_ERROR(EAGAIN),
     XSD_ERROR(EISCONN),
-    XSD_ERROR(E2BIG)
+    XSD_ERROR(E2BIG),
+    XSD_ERROR(EPERM),
 };
 #endif
 
