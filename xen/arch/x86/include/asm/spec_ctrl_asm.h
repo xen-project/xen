@@ -126,9 +126,8 @@
  * change. Based on Google's performance numbers, the loop is unrolled to 16
  * iterations and two calls per iteration.
  *
- * The call filling the RSB needs a nonzero displacement.  A nop would do, but
- * we use "1: pause; lfence; jmp 1b" to safely contains any ret-based
- * speculation, even if the loop is speculatively executed prematurely.
+ * The call filling the RSB needs a nonzero displacement, and int3 halts
+ * speculation.
  *
  * %rsp is preserved by using an extra GPR because a) we've got plenty spare,
  * b) the two movs are shorter to encode than `add $32*8, %rsp`, and c) can be
@@ -141,11 +140,7 @@
 
     .irp n, 1, 2                    /* Unrolled twice. */
     call .L\@_insert_rsb_entry_\n   /* Create an RSB entry. */
-
-.L\@_capture_speculation_\n:
-    pause
-    lfence
-    jmp .L\@_capture_speculation_\n /* Capture rogue speculation. */
+    int3                            /* Halt rogue speculation. */
 
 .L\@_insert_rsb_entry_\n:
     .endr

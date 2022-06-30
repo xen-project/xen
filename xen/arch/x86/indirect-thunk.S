@@ -12,11 +12,9 @@
 #include <asm/asm_defns.h>
 
 .macro IND_THUNK_RETPOLINE reg:req
-        call 2f
+        call 1f
+        int3
 1:
-        lfence
-        jmp 1b
-2:
         mov %\reg, (%rsp)
         ret
 .endm
