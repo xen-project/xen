@@ -76,6 +76,7 @@ static struct xsd_errors xsd_errors[]
 __attribute__((unused))
 #endif
     = {
+    /* /!\ New errors should be added at the end of the array. */
     XSD_ERROR(EINVAL),
     XSD_ERROR(EACCES),
     XSD_ERROR(EEXIST),
