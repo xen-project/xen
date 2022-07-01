@@ -308,8 +308,7 @@ struct arch_domain
     uint32_t pci_cf8;
     uint8_t cmos_idx;
 
-    /* Use VERW on return-to-guest for its flushing side effect. */
-    bool verw;
+    uint8_t spec_ctrl_flags; /* See SCF_DOM_MASK */
 
     union {
         struct pv_domain pv;
