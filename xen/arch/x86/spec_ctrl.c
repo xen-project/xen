@@ -1010,9 +1010,12 @@ void spec_ctrl_init_domain(struct domain *d)
 {
     bool pv = is_pv_domain(d);
 
-    d->arch.verw =
-        (pv ? opt_md_clear_pv : opt_md_clear_hvm) ||
-        (opt_fb_clear_mmio && is_iommu_enabled(d));
+    bool verw = ((pv ? opt_md_clear_pv : opt_md_clear_hvm) ||
+                 (opt_fb_clear_mmio && is_iommu_enabled(d)));
+
+    d->arch.spec_ctrl_flags =
+        (verw   ? SCF_verw         : 0) |
+        0;
 }
 
 void __init init_speculation_mitigations(void)
