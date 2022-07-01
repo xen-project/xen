@@ -255,9 +255,6 @@
 
 /*
  * Use in IST interrupt/exception context.  May interrupt Xen or PV context.
- * Fine grain control of SCF_ist_wrmsr is needed for safety in the S3 resume
- * path to avoid using MSR_SPEC_CTRL before the microcode introducing it has
- * been reloaded.
  */
 .macro SPEC_CTRL_ENTRY_FROM_INTR_IST
 /*

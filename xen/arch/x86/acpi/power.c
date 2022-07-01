@@ -245,8 +245,8 @@ static int enter_state(u32 state)
         error = 0;
 
     ci = get_cpu_info();
-    /* Avoid NMI/#MC using MSR_SPEC_CTRL until we've reloaded microcode. */
-    ci->spec_ctrl_flags &= ~SCF_ist_wrmsr;
+    /* Avoid NMI/#MC using unsafe MSRs until we've reloaded microcode. */
+    ci->spec_ctrl_flags &= ~SCF_IST_MASK;
 
     ACPI_FLUSH_CPU_CACHE();
 
@@ -292,8 +292,8 @@ static int enter_state(u32 state)
     if ( !recheck_cpu_features(0) )
         panic("Missing previously available feature(s)\n");
 
-    /* Re-enabled default NMI/#MC use of MSR_SPEC_CTRL. */
-    ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_ist_wrmsr);
+    /* Re-enabled default NMI/#MC use of MSRs now microcode is loaded. */
+    ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_IST_MASK);
 
     if ( boot_cpu_has(X86_FEATURE_IBRSB) || boot_cpu_has(X86_FEATURE_IBRS) )
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);

@@ -20,11 +20,39 @@
 #ifndef __X86_SPEC_CTRL_H__
 #define __X86_SPEC_CTRL_H__
 
-/* Encoding of cpuinfo.spec_ctrl_flags */
+/*
+ * Encoding of:
+ *   cpuinfo.spec_ctrl_flags
+ *   default_spec_ctrl_flags
+ *   domain.spec_ctrl_flags
+ *
+ * Live settings are in the top-of-stack block, because they need to be
+ * accessable when XPTI is active.  Some settings are fixed from boot, some
+ * context switched per domain, and some inhibited in the S3 path.
+ */
 #define SCF_use_shadow (1 << 0)
 #define SCF_ist_wrmsr  (1 << 1)
 #define SCF_ist_rsb    (1 << 2)
 #define SCF_verw       (1 << 3)
+
+/*
+ * The IST paths (NMI/#MC) can interrupt any arbitrary context.  Some
+ * functionality requires updated microcode to work.
+ *
+ * On boot, this is easy; we load microcode before figuring out which
+ * speculative protections to apply.  However, on the S3 resume path, we must
+ * be able to disable the configured mitigations until microcode is reloaded.
+ *
+ * These are the controls to inhibit on the S3 resume path until microcode has
+ * been reloaded.
+ */
+#define SCF_IST_MASK (SCF_ist_wrmsr)
+
+/*
+ * Some speculative protections are per-domain.  These settings are merged
+ * into the top-of-stack block in the context switch path.
+ */
+#define SCF_DOM_MASK (SCF_verw)
 
 #ifndef __ASSEMBLY__
 
