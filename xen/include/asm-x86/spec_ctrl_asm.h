@@ -258,34 +258,33 @@
  */
 .macro SPEC_CTRL_ENTRY_FROM_INTR_IST
 /*
- * Requires %rsp=regs, %r14=stack_end
- * Clobbers %rax, %rcx, %rdx
+ * Requires %rsp=regs, %r14=stack_end, %rdx=0
+ * Clobbers %rax, %rbx, %rcx, %rdx
  *
  * This is logical merge of DO_OVERWRITE_RSB and DO_SPEC_CTRL_ENTRY
  * maybexen=1, but with conditionals rather than alternatives.
  */
-    movzbl STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14), %eax
+    movzbl STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14), %ebx
 
-    test $SCF_ist_rsb, %al
+    test $SCF_ist_rsb, %bl
     jz .L\@_skip_rsb
 
-    DO_OVERWRITE_RSB tmp=rdx /* Clobbers %rcx/%rdx */
+    DO_OVERWRITE_RSB         /* Clobbers %rax/%rcx */
 
 .L\@_skip_rsb:
 
-    test $SCF_ist_sc_msr, %al
+    test $SCF_ist_sc_msr, %bl
     jz .L\@_skip_msr_spec_ctrl
 
-    xor %edx, %edx
+    xor %eax, %eax
     testb $3, UREGS_cs(%rsp)
-    setnz %dl
-    not %edx
-    and %dl, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
+    setnz %al
+    not %eax
+    and %al, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
 
     /* Load Xen's intended value. */
     mov $MSR_SPEC_CTRL, %ecx
     movzbl STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
-    xor %edx, %edx
     wrmsr
 
     /* Opencoded UNLIKELY_START() with no condition. */
