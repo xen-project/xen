@@ -2123,10 +2123,10 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             }
         }
 
-        /* Update the top-of-stack block with the VERW disposition. */
-        info->spec_ctrl_flags &= ~SCF_verw;
-        if ( nextd->arch.verw )
-            info->spec_ctrl_flags |= SCF_verw;
+        /* Update the top-of-stack block with the new spec_ctrl settings. */
+        info->spec_ctrl_flags =
+            (info->spec_ctrl_flags       & ~SCF_DOM_MASK) |
+            (nextd->arch.spec_ctrl_flags &  SCF_DOM_MASK);
     }
 
     sched_context_switched(prev, next);
