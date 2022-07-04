@@ -54,7 +54,7 @@ int8_t __initdata opt_stibp = -1;
 bool __read_mostly opt_ssbd;
 int8_t __initdata opt_psfd = -1;
 
-bool __read_mostly opt_ibpb = true;
+bool __read_mostly opt_ibpb_ctxt_switch = true;
 int8_t __read_mostly opt_eager_fpu = -1;
 int8_t __read_mostly opt_l1d_flush = -1;
 bool __read_mostly opt_branch_harden = true;
@@ -117,7 +117,7 @@ static int __init parse_spec_ctrl(const char *s)
 
             opt_thunk = THUNK_JMP;
             opt_ibrs = 0;
-            opt_ibpb = false;
+            opt_ibpb_ctxt_switch = false;
             opt_ssbd = false;
             opt_l1d_flush = 0;
             opt_branch_harden = false;
@@ -238,7 +238,7 @@ static int __init parse_spec_ctrl(const char *s)
 
         /* Misc settings. */
         else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
-            opt_ibpb = val;
+            opt_ibpb_ctxt_switch = val;
         else if ( (val = parse_boolean("eager-fpu", s, ss)) >= 0 )
             opt_eager_fpu = val;
         else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
@@ -458,7 +458,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (opt_tsx & 1)                             ? " TSX+" : " TSX-",
            !cpu_has_srbds_ctrl                       ? "" :
            opt_srb_lock                              ? " SRB_LOCK+" : " SRB_LOCK-",
-           opt_ibpb                                  ? " IBPB"  : "",
+           opt_ibpb_ctxt_switch                      ? " IBPB-ctxt" : "",
            opt_l1d_flush                             ? " L1D_FLUSH" : "",
            opt_md_clear_pv || opt_md_clear_hvm ||
            opt_fb_clear_mmio                         ? " VERW"  : "",
@@ -1193,7 +1193,7 @@ void __init init_speculation_mitigations(void)
 
     /* Check we have hardware IBPB support before using it... */
     if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
-        opt_ibpb = false;
+        opt_ibpb_ctxt_switch = false;
 
     /* Check whether Eager FPU should be enabled by default. */
     if ( opt_eager_fpu == -1 )

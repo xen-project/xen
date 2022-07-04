@@ -1810,7 +1810,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
         ctxt_switch_levelling(next);
 
-        if ( opt_ibpb && !is_idle_domain(nextd) )
+        if ( opt_ibpb_ctxt_switch && !is_idle_domain(nextd) )
         {
             static DEFINE_PER_CPU(unsigned int, last);
             unsigned int *last_id = &this_cpu(last);
