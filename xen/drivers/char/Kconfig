@@ -74,3 +74,13 @@ config HAS_EHCI
 	help
 	  This selects the USB based EHCI debug port to be used as a UART. If
 	  you have an x86 based system with USB, say Y.
+
+config SERIAL_TX_BUFSIZE
+	int "Size of the transmit serial buffer"
+	default 16384
+	help
+	  Controls the default size of the transmit buffer (in bytes) used by
+	  the serial driver.  Note the value provided will be rounded down to
+	  the nearest power of 2.
+
+	  Default value is 16384 (16kiB).

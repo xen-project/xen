@@ -16,7 +16,7 @@
 /* Never drop characters, even if the async transmit buffer fills. */
 /* #define SERIAL_NEVER_DROP_CHARS 1 */
 
-unsigned int __read_mostly serial_txbufsz = 16384;
+unsigned int __ro_after_init serial_txbufsz = CONFIG_SERIAL_TX_BUFSIZE;
 size_param("serial_tx_buffer", serial_txbufsz);
 
 #define mask_serial_rxbuf_idx(_i) ((_i)&(serial_rxbufsz-1))
