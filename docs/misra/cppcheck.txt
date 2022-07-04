@@ -1,0 +1,64 @@
+Cppcheck for Xen static and MISRA analysis
+==========================================
+
+Xen can be analysed for both static analysis problems and MISRA violation using
+cppcheck, the open source tool allows the creation of a report with all the
+findings. Xen has introduced the support in the Makefile so it's very easy to
+use and in this document we can see how.
+
+The minimum version required for cppcheck is 2.7. Note that at the time of
+writing (June 2022), the version 2.8 is known to be broken [1].
+
+Install cppcheck on the system
+==============================
+
+Cppcheck can be retrieved from the github repository or by downloading the
+tarball, the version tested so far is the 2.7:
+
+ - https://github.com/danmar/cppcheck/tree/2.7
+ - https://github.com/danmar/cppcheck/archive/2.7.tar.gz
+
+To compile and install it, the complete command line can be found in readme.md,
+section "GNU make", please add the "install" target to that line and use every
+argument as it is in the documentation of the tool, so that every Xen developer
+following this page can reproduce the same findings.
+
+This will compile and install cppcheck in /usr/bin and all the cppcheck config
+files and addons will be installed in /usr/share/cppcheck folder, please modify
+that path in FILESDIR if it's not convinient for your system.
+
+If you don't want to overwrite a possible cppcheck binary installed in your
+system, you can omit the "install" target and FILESDIR, cppcheck will be just
+compiled and the binaries will be available in the same folder.
+If you choose to do that, later in this page it's explained how to use a local
+installation of cppcheck for the Xen analysis.
+
+Dependencies are listed in the readme.md of the project repository.
+
+Use cppcheck to analyse Xen
+===========================
+
+Using cppcheck integration is very simple, it requires few steps:
+
+ 1) Compile Xen
+ 2) call the cppcheck make target to generate a report in xml format:
+    make CPPCHECK_MISRA=y cppcheck
+ 3) call the cppcheck-html make target to generate a report in xml and html
+    format:
+    make CPPCHECK_MISRA=y cppcheck-html
+
+    In case the cppcheck binaries are not in the PATH, CPPCHECK and
+    CPPCHECK_HTMLREPORT variables can be overridden with the full path to the
+    binaries:
+
+    make -C xen \
+        CPPCHECK=/path/to/cppcheck \
+        CPPCHECK_HTMLREPORT=/path/to/cppcheck-htmlreport \
+        CPPCHECK_MISRA=y \
+        cppcheck-html
+
+The output is by default in a folder named cppcheck-htmlreport, but the name
+can be changed by passing it in the CPPCHECK_HTMLREPORT_OUTDIR variable.
+
+
+[1] https://sourceforge.net/p/cppcheck/discussion/general/thread/bfc3ab6c41/?limit=25
