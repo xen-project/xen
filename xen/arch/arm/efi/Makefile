@@ -9,4 +9,7 @@ else
 # will not be cleaned in "make clean".
 EFIOBJ-y += stub.o
 obj-y += stub.o
+
+$(obj)/stub.o: CFLAGS-y += -fno-short-wchar
+
 endif
