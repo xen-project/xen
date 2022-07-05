@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <inttypes.h>
 #include <xenstore.h>
 #include <xenctrl.h>
 #include <xenguest.h>
@@ -138,10 +139,10 @@ static int create_xenstore(struct xs_handle *xsh,
                   "vm/" LIBXL_UUID_FMT, LIBXL_UUID_BYTES(uuid));
     if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
-    rc = snprintf(max_memkb_str, STR_MAX_LENGTH, "%lu", info->max_memkb);
+    rc = snprintf(max_memkb_str, STR_MAX_LENGTH, "%"PRIu64, info->max_memkb);
     if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
-    rc = snprintf(target_memkb_str, STR_MAX_LENGTH, "%lu", info->current_memkb);
+    rc = snprintf(target_memkb_str, STR_MAX_LENGTH, "%"PRIu64, info->current_memkb);
     if (rc < 0 || rc >= STR_MAX_LENGTH)
         return rc;
     rc = snprintf(ring_ref_str, STR_MAX_LENGTH, "%lld",
