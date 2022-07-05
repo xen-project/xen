@@ -2,6 +2,15 @@
 #
 # Usage ./$0 xen-syms
 #
+# When CET-IBT (Control-flow Enforcement Technology, Indirect Branch Tracking)
+# is active, ENDBR instructions mark legal indirect branch targets in the
+# .text section.
+#
+# However x86 is a variable length instruction set so the same byte pattern
+# can exist embedded in other instructions, or crossing multiple instructions.
+# This script searches .text for any problematic byte patterns which aren't
+# legitimate ENDBR instructions.
+#
 set -e
 
 # Pretty-print parameters a little for message
