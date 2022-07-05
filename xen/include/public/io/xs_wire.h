@@ -71,7 +71,7 @@ struct xsd_errors
 #ifdef EINVAL
 #define XSD_ERROR(x) { x, #x }
 /* LINTED: static unused */
-static struct xsd_errors xsd_errors[]
+static const struct xsd_errors xsd_errors[]
 #if defined(__GNUC__)
 __attribute__((unused))
 #endif
