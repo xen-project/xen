@@ -275,9 +275,9 @@ int parse_bool(const char *s, const char *e)
 int parse_boolean(const char *name, const char *s, const char *e)
 {
     size_t slen, nlen;
-    int val = !!strncmp(s, "no-", 3);
+    bool has_neg_prefix = !strncmp(s, "no-", 3);
 
-    if ( !val )
+    if ( has_neg_prefix )
         s += 3;
 
     slen = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
@@ -289,11 +289,23 @@ int parse_boolean(const char *name, const char *s, const char *e)
 
     /* Exact, unadorned name?  Result depends on the 'no-' prefix. */
     if ( slen == nlen )
-        return val;
+        return !has_neg_prefix;
+
+    /* Inexact match with a 'no-' prefix?  Not valid. */
+    if ( has_neg_prefix )
+        return -1;
 
     /* =$SOMETHING?  Defer to the regular boolean parsing. */
     if ( s[nlen] == '=' )
-        return parse_bool(&s[nlen + 1], e);
+    {
+        int b = parse_bool(&s[nlen + 1], e);
+
+        if ( b >= 0 )
+            return b;
+
+        /* Not a boolean, but the name matched.  Signal specially. */
+        return -2;
+    }
 
     /* Unrecognised.  Give up. */
     return -1;

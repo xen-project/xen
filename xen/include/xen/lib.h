@@ -79,7 +79,8 @@ int parse_bool(const char *s, const char *e);
 /**
  * Given a specific name, parses a string of the form:
  *   [no-]$NAME[=...]
- * returning 0 or 1 for a recognised boolean, or -1 for an error.
+ * returning 0 or 1 for a recognised boolean.  Returns -1 for general errors,
+ * and -2 for "not a boolean, but $NAME= matches".
  */
 int parse_boolean(const char *name, const char *s, const char *e);
 
