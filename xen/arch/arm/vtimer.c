@@ -63,7 +63,9 @@ static void virt_timer_expired(void *data)
 int domain_vtimer_init(struct domain *d, struct xen_arch_domainconfig *config)
 {
     d->arch.virt_timer_base.offset = get_cycles();
-    d->time_offset.seconds = ticks_to_ns(d->arch.virt_timer_base.offset - boot_count);
+    d->arch.virt_timer_base.nanoseconds =
+        ticks_to_ns(d->arch.virt_timer_base.offset - boot_count);
+    d->time_offset.seconds = d->arch.virt_timer_base.nanoseconds;
     do_div(d->time_offset.seconds, 1000000000);
 
     config->clock_frequency = timer_dt_clock_frequency;
@@ -144,8 +146,9 @@ void virt_timer_save(struct vcpu *v)
     if ( (v->arch.virt_timer.ctl & CNTx_CTL_ENABLE) &&
          !(v->arch.virt_timer.ctl & CNTx_CTL_MASK))
     {
-        set_timer(&v->arch.virt_timer.timer, ticks_to_ns(v->arch.virt_timer.cval +
-                  v->domain->arch.virt_timer_base.offset - boot_count));
+        set_timer(&v->arch.virt_timer.timer,
+                  v->domain->arch.virt_timer_base.nanoseconds +
+                  ticks_to_ns(v->arch.virt_timer.cval));
     }
 }
 
