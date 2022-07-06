@@ -58,6 +58,7 @@ struct arch_domain
 
     struct {
         uint64_t offset;
+        s_time_t nanoseconds;
     } virt_timer_base;
 
     struct vgic_dist vgic;
