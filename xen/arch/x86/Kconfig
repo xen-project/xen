@@ -226,6 +226,24 @@ config XEN_ALIGN_2M
 
 endchoice
 
+config X2APIC_PHYSICAL
+	bool "x2APIC Physical Destination mode"
+	help
+	  Use x2APIC Physical Destination mode by default when available.
+
+	  When using this mode APICs are addressed using the Physical
+	  Destination mode, which allows using all dynamic vectors on each
+	  CPU independently.
+
+	  Physical Destination has the benefit of having more vectors available
+	  for external interrupts, but it also makes the delivery of multi
+	  destination inter processor interrupts (IPIs) slightly slower than
+	  Logical Destination mode.
+
+	  The mode when this option is not selected is Logical Destination.
+
+	  If unsure, say N.
+
 config GUEST
 	bool
 

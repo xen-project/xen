@@ -228,7 +228,7 @@ static struct notifier_block x2apic_cpu_nfb = {
    .notifier_call = update_clusterinfo
 };
 
-static s8 __initdata x2apic_phys = -1; /* By default we use logical cluster mode. */
+static int8_t __initdata x2apic_phys = -1;
 boolean_param("x2apic_phys", x2apic_phys);
 
 const struct genapic *__init apic_x2apic_probe(void)
@@ -241,7 +241,9 @@ const struct genapic *__init apic_x2apic_probe(void)
          * the usage of the high 16 bits to hold the cluster ID.
          */
         x2apic_phys = !iommu_intremap ||
-                      (acpi_gbl_FADT.flags & ACPI_FADT_APIC_PHYSICAL);
+                      (acpi_gbl_FADT.flags & ACPI_FADT_APIC_PHYSICAL) ||
+                      (IS_ENABLED(CONFIG_X2APIC_PHYSICAL) &&
+                       !(acpi_gbl_FADT.flags & ACPI_FADT_APIC_CLUSTER));
     }
     else if ( !x2apic_phys )
         switch ( iommu_intremap )
