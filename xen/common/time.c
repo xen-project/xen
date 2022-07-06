@@ -28,7 +28,7 @@
   ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
 
 /* How many days are in each month.  */
-const unsigned short int __mon_lengths[2][12] = {
+static const unsigned short int __mon_lengths[2][12] = {
     /* Normal years.  */
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
     /* Leap years.  */
