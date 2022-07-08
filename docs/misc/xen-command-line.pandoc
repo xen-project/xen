@@ -2033,7 +2033,8 @@ not be able to control the state of the mitigation.
 By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
 
 ### spec-ctrl (x86)
-> `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb,md-clear}=<bool>,
+> `= List of [ <bool>, xen=<bool>, {pv,hvm}=<bool>,
+>              {msr-sc,rsb,md-clear}=<bool>|{pv,hvm}=<bool>,
 >              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,psfd,
 >              eager-fpu,l1d-flush,branch-harden,srb-lock,
 >              unpriv-mmio}=<bool> ]`
@@ -2058,12 +2059,17 @@ in place for guests to use.
 
 Use of a positive boolean value for either of these options is invalid.
 
-The booleans `pv=`, `hvm=`, `msr-sc=`, `rsb=` and `md-clear=` offer fine
+The `pv=`, `hvm=`, `msr-sc=`, `rsb=` and `md-clear=` options offer fine
 grained control over the primitives by Xen.  These impact Xen's ability to
-protect itself, and Xen's ability to virtualise support for guests to use.
+protect itself, and/or Xen's ability to virtualise support for guests to use.
 
 * `pv=` and `hvm=` offer control over all suboptions for PV and HVM guests
   respectively.
+* Each other option can be used either as a plain boolean
+  (e.g. `spec-ctrl=rsb` to control both the PV and HVM sub-options), or with
+  `pv=` or `hvm=` subsuboptions (e.g. `spec-ctrl=rsb=no-hvm` to disable HVM
+  RSB only).
+
 * `msr-sc=` offers control over Xen's support for manipulating `MSR_SPEC_CTRL`
   on entry and exit.  These blocks are necessary to virtualise support for
   guests and if disabled, guests will be unable to use IBRS/STIBP/SSBD/etc.

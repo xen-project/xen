@@ -148,20 +148,68 @@ static int __init parse_spec_ctrl(const char *s)
             opt_rsb_hvm = val;
             opt_md_clear_hvm = val;
         }
-        else if ( (val = parse_boolean("msr-sc", s, ss)) >= 0 )
+        else if ( (val = parse_boolean("msr-sc", s, ss)) != -1 )
         {
-            opt_msr_sc_pv = val;
-            opt_msr_sc_hvm = val;
+            switch ( val )
+            {
+            case 0:
+            case 1:
+                opt_msr_sc_pv = opt_msr_sc_hvm = val;
+                break;
+
+            case -2:
+                s += strlen("msr-sc=");
+                if ( (val = parse_boolean("pv", s, ss)) >= 0 )
+                    opt_msr_sc_pv = val;
+                else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
+                    opt_msr_sc_hvm = val;
+                else
+            default:
+                    rc = -EINVAL;
+                break;
+            }
         }
-        else if ( (val = parse_boolean("rsb", s, ss)) >= 0 )
+        else if ( (val = parse_boolean("rsb", s, ss)) != -1 )
         {
-            opt_rsb_pv = val;
-            opt_rsb_hvm = val;
+            switch ( val )
+            {
+            case 0:
+            case 1:
+                opt_rsb_pv = opt_rsb_hvm = val;
+                break;
+
+            case -2:
+                s += strlen("rsb=");
+                if ( (val = parse_boolean("pv", s, ss)) >= 0 )
+                    opt_rsb_pv = val;
+                else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
+                    opt_rsb_hvm = val;
+                else
+            default:
+                    rc = -EINVAL;
+                break;
+            }
         }
-        else if ( (val = parse_boolean("md-clear", s, ss)) >= 0 )
+        else if ( (val = parse_boolean("md-clear", s, ss)) != -1 )
         {
-            opt_md_clear_pv = val;
-            opt_md_clear_hvm = val;
+            switch ( val )
+            {
+            case 0:
+            case 1:
+                opt_md_clear_pv = opt_md_clear_hvm = val;
+                break;
+
+            case -2:
+                s += strlen("md-clear=");
+                if ( (val = parse_boolean("pv", s, ss)) >= 0 )
+                    opt_md_clear_pv = val;
+                else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
+                    opt_md_clear_hvm = val;
+                else
+            default:
+                    rc = -EINVAL;
+                break;
+            }
         }
 
         /* Xen's speculative sidechannel mitigation settings. */
