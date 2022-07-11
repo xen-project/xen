@@ -718,7 +718,7 @@ CAMLprim value stub_xc_send_debug_keys(value xch, value keys)
 CAMLprim value stub_xc_physinfo(value xch)
 {
 	CAMLparam1(xch);
-	CAMLlocal2(physinfo, cap_list);
+	CAMLlocal4(physinfo, cap_list, x86_arch_cap_list, arch_cap_list);
 	xc_physinfo_t c_physinfo;
 	int r;
 
@@ -737,7 +737,7 @@ CAMLprim value stub_xc_physinfo(value xch)
 		/* ! XEN_SYSCTL_PHYSCAP_ XEN_SYSCTL_PHYSCAP_MAX max */
 		(c_physinfo.capabilities);
 
-	physinfo = caml_alloc_tuple(10);
+	physinfo = caml_alloc_tuple(11);
 	Store_field(physinfo, 0, Val_int(c_physinfo.threads_per_core));
 	Store_field(physinfo, 1, Val_int(c_physinfo.cores_per_socket));
 	Store_field(physinfo, 2, Val_int(c_physinfo.nr_cpus));
@@ -748,6 +748,20 @@ CAMLprim value stub_xc_physinfo(value xch)
 	Store_field(physinfo, 7, caml_copy_nativeint(c_physinfo.scrub_pages));
 	Store_field(physinfo, 8, cap_list);
 	Store_field(physinfo, 9, Val_int(c_physinfo.max_cpu_id + 1));
+
+#if defined(__i386__) || defined(__x86_64__)
+	x86_arch_cap_list = c_bitmap_to_ocaml_list
+		/* ! x86_physinfo_arch_cap_flag CAP_X86_ none */
+		/* ! XEN_SYSCTL_PHYSCAP_X86_ XEN_SYSCTL_PHYSCAP_X86_MAX max */
+		(c_physinfo.arch_capabilities);
+	/*
+	 * arch_capabilities: physinfo_arch_cap_flag list;
+	 */
+	arch_cap_list = x86_arch_cap_list;
+#else
+	arch_cap_list = Val_emptylist;
+#endif
+	Store_field(physinfo, 10, arch_cap_list);
 
 	CAMLreturn(physinfo);
 }
