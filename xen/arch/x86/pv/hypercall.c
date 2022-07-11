@@ -27,118 +27,21 @@
 #include <asm/multicall.h>
 #include <irq_vectors.h>
 
-typedef struct {
-    hypercall_fn_t *native;
+#ifndef NDEBUG
+static const unsigned char hypercall_args_64[] = hypercall_args_pv64;
 #ifdef CONFIG_PV32
-    hypercall_fn_t *compat;
+static const unsigned char hypercall_args_32[] = hypercall_args_pv32;
 #endif
-} pv_hypercall_table_t;
-
-#ifdef CONFIG_PV32
-#define HYPERCALL(x)                                                \
-    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,         \
-                               (hypercall_fn_t *) do_ ## x }
-#define COMPAT_CALL(x)                                              \
-    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,         \
-                               (hypercall_fn_t *) compat_ ## x }
-#else
-#define HYPERCALL(x)                                                \
-    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x }
-#define COMPAT_CALL(x) HYPERCALL(x)
 #endif
-
-static const pv_hypercall_table_t pv_hypercall_table[] = {
-    COMPAT_CALL(set_trap_table),
-    HYPERCALL(mmu_update),
-    COMPAT_CALL(set_gdt),
-    HYPERCALL(stack_switch),
-    COMPAT_CALL(set_callbacks),
-    HYPERCALL(fpu_taskswitch),
-    HYPERCALL(sched_op_compat),
-#ifndef CONFIG_PV_SHIM_EXCLUSIVE
-    COMPAT_CALL(platform_op),
-#endif
-    HYPERCALL(set_debugreg),
-    HYPERCALL(get_debugreg),
-    COMPAT_CALL(update_descriptor),
-    COMPAT_CALL(memory_op),
-    COMPAT_CALL(multicall),
-    COMPAT_CALL(update_va_mapping),
-    COMPAT_CALL(set_timer_op),
-    HYPERCALL(event_channel_op_compat),
-    COMPAT_CALL(xen_version),
-    HYPERCALL(console_io),
-    COMPAT_CALL(physdev_op_compat),
-#if defined(CONFIG_GRANT_TABLE) || defined(CONFIG_PV_SHIM)
-    COMPAT_CALL(grant_table_op),
-#endif
-    HYPERCALL(vm_assist),
-    COMPAT_CALL(update_va_mapping_otherdomain),
-    COMPAT_CALL(iret),
-    COMPAT_CALL(vcpu_op),
-    HYPERCALL(set_segment_base),
-    COMPAT_CALL(mmuext_op),
-    COMPAT_CALL(xsm_op),
-    COMPAT_CALL(nmi_op),
-    COMPAT_CALL(sched_op),
-    COMPAT_CALL(callback_op),
-#ifdef CONFIG_XENOPROF
-    COMPAT_CALL(xenoprof_op),
-#endif
-    HYPERCALL(event_channel_op),
-    COMPAT_CALL(physdev_op),
-#ifndef CONFIG_PV_SHIM_EXCLUSIVE
-    HYPERCALL(sysctl),
-    HYPERCALL(domctl),
-#endif
-#ifdef CONFIG_KEXEC
-    COMPAT_CALL(kexec_op),
-#endif
-#ifdef CONFIG_ARGO
-    COMPAT_CALL(argo_op),
-#endif
-    HYPERCALL(xenpmu_op),
-#ifdef CONFIG_HVM
-    HYPERCALL(hvm_op),
-    COMPAT_CALL(dm_op),
-#endif
-#ifdef CONFIG_HYPFS
-    HYPERCALL(hypfs_op),
-#endif
-    HYPERCALL(mca),
-#ifndef CONFIG_PV_SHIM_EXCLUSIVE
-    HYPERCALL(paging_domctl_cont),
-#endif
-};
-
-#undef COMPAT_CALL
-#undef HYPERCALL
 
 /* Forced inline to cause 'compat' to be evaluated at compile time. */
 static void always_inline
 _pv_hypercall(struct cpu_user_regs *regs, bool compat)
 {
     struct vcpu *curr = current;
-    unsigned long eax = compat ? regs->eax : regs->rax;
+    unsigned long eax;
 
     ASSERT(guest_kernel_mode(curr, regs));
-
-    BUILD_BUG_ON(ARRAY_SIZE(pv_hypercall_table) >
-                 ARRAY_SIZE(hypercall_args_table));
-
-    if ( eax >= ARRAY_SIZE(pv_hypercall_table) )
-    {
-        regs->rax = -ENOSYS;
-        return;
-    }
-
-    eax = array_index_nospec(eax, ARRAY_SIZE(pv_hypercall_table));
-
-    if ( !pv_hypercall_table[eax].native )
-    {
-        regs->rax = -ENOSYS;
-        return;
-    }
 
     curr->hcall_preempted = false;
 
@@ -150,17 +53,8 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         unsigned long r10 = regs->r10;
         unsigned long r8 = regs->r8;
 
-#ifndef NDEBUG
-        /* Deliberately corrupt parameter regs not used by this hypercall. */
-        switch ( hypercall_args_table[eax].native )
-        {
-        case 0: rdi = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 1: rsi = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 2: rdx = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 3: r10 = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 4: r8 = 0xdeadbeefdeadf00dUL;
-        }
-#endif
+        eax = regs->rax;
+
         if ( unlikely(tb_init_done) )
         {
             unsigned long args[5] = { rdi, rsi, rdx, r10, r8 };
@@ -168,22 +62,10 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
             __trace_hypercall(TRC_PV_HYPERCALL_V2, eax, args);
         }
 
-        regs->rax = pv_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8);
+        call_handlers_pv64(eax, regs->rax, rdi, rsi, rdx, r10, r8);
 
-#ifndef NDEBUG
-        if ( !curr->hcall_preempted )
-        {
-            /* Deliberately corrupt parameter regs used by this hypercall. */
-            switch ( hypercall_args_table[eax].native )
-            {
-            case 5: regs->r8  = 0xdeadbeefdeadf00dUL; fallthrough;
-            case 4: regs->r10 = 0xdeadbeefdeadf00dUL; fallthrough;
-            case 3: regs->rdx = 0xdeadbeefdeadf00dUL; fallthrough;
-            case 2: regs->rsi = 0xdeadbeefdeadf00dUL; fallthrough;
-            case 1: regs->rdi = 0xdeadbeefdeadf00dUL;
-            }
-        }
-#endif
+        if ( !curr->hcall_preempted && regs->rax != -ENOSYS )
+            clobber_regs(regs, get_nargs(hypercall_args_64, eax));
     }
 #ifdef CONFIG_PV32
     else
@@ -194,17 +76,7 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         unsigned int esi = regs->esi;
         unsigned int edi = regs->edi;
 
-#ifndef NDEBUG
-        /* Deliberately corrupt parameter regs not used by this hypercall. */
-        switch ( hypercall_args_table[eax].compat )
-        {
-        case 0: ebx = 0xdeadf00d; fallthrough;
-        case 1: ecx = 0xdeadf00d; fallthrough;
-        case 2: edx = 0xdeadf00d; fallthrough;
-        case 3: esi = 0xdeadf00d; fallthrough;
-        case 4: edi = 0xdeadf00d;
-        }
-#endif
+        eax = regs->eax;
 
         if ( unlikely(tb_init_done) )
         {
@@ -214,23 +86,11 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         }
 
         curr->hcall_compat = true;
-        regs->eax = pv_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi);
+        call_handlers_pv32(eax, regs->eax, ebx, ecx, edx, esi, edi);
         curr->hcall_compat = false;
 
-#ifndef NDEBUG
-        if ( !curr->hcall_preempted )
-        {
-            /* Deliberately corrupt parameter regs used by this hypercall. */
-            switch ( hypercall_args_table[eax].compat )
-            {
-            case 5: regs->edi = 0xdeadf00d; fallthrough;
-            case 4: regs->esi = 0xdeadf00d; fallthrough;
-            case 3: regs->edx = 0xdeadf00d; fallthrough;
-            case 2: regs->ecx = 0xdeadf00d; fallthrough;
-            case 1: regs->ebx = 0xdeadf00d;
-            }
-        }
-#endif
+        if ( !curr->hcall_preempted && regs->eax != -ENOSYS )
+            clobber_regs32(regs, get_nargs(hypercall_args_32, eax));
     }
 #endif /* CONFIG_PV32 */
 
@@ -256,13 +116,8 @@ enum mc_disposition pv_do_multicall_call(struct mc_state *state)
         struct compat_multicall_entry *call = &state->compat_call;
 
         op = call->op;
-        if ( (op < ARRAY_SIZE(pv_hypercall_table)) &&
-             pv_hypercall_table[op].compat )
-            call->result = pv_hypercall_table[op].compat(
-                call->args[0], call->args[1], call->args[2],
-                call->args[3], call->args[4]);
-        else
-            call->result = -ENOSYS;
+        call_handlers_pv32(op, call->result, call->args[0], call->args[1],
+                           call->args[2], call->args[3], call->args[4]);
     }
     else
 #endif
@@ -270,13 +125,8 @@ enum mc_disposition pv_do_multicall_call(struct mc_state *state)
         struct multicall_entry *call = &state->call;
 
         op = call->op;
-        if ( (op < ARRAY_SIZE(pv_hypercall_table)) &&
-             pv_hypercall_table[op].native )
-            call->result = pv_hypercall_table[op].native(
-                call->args[0], call->args[1], call->args[2],
-                call->args[3], call->args[4]);
-        else
-            call->result = -ENOSYS;
+        call_handlers_pv64(op, call->result, call->args[0], call->args[1],
+                           call->args[2], call->args[3], call->args[4]);
     }
 
     return unlikely(op == __HYPERVISOR_iret)

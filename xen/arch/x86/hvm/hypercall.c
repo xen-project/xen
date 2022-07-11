@@ -111,56 +111,10 @@ long cf_check hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         return compat_physdev_op(cmd, arg);
 }
 
-#define HYPERCALL(x)                                         \
-    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,  \
-                               (hypercall_fn_t *) do_ ## x }
-
-#define HVM_CALL(x)                                          \
-    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) hvm_ ## x, \
-                               (hypercall_fn_t *) hvm_ ## x }
-
-#define COMPAT_CALL(x)                                       \
-    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,  \
-                               (hypercall_fn_t *) compat_ ## x }
-
-static const struct {
-    hypercall_fn_t *native, *compat;
-} hvm_hypercall_table[] = {
-    HVM_CALL(memory_op),
-    COMPAT_CALL(multicall),
-#ifdef CONFIG_GRANT_TABLE
-    HVM_CALL(grant_table_op),
+#ifndef NDEBUG
+static const unsigned char hypercall_args_64[] = hypercall_args_hvm64;
+static const unsigned char hypercall_args_32[] = hypercall_args_hvm32;
 #endif
-    HYPERCALL(vm_assist),
-    COMPAT_CALL(vcpu_op),
-    HVM_CALL(physdev_op),
-    COMPAT_CALL(xen_version),
-    HYPERCALL(console_io),
-    HYPERCALL(event_channel_op),
-    COMPAT_CALL(sched_op),
-    COMPAT_CALL(set_timer_op),
-    COMPAT_CALL(xsm_op),
-    HYPERCALL(hvm_op),
-    HYPERCALL(sysctl),
-    HYPERCALL(domctl),
-#ifdef CONFIG_ARGO
-    COMPAT_CALL(argo_op),
-#endif
-    COMPAT_CALL(platform_op),
-#ifdef CONFIG_PV
-    COMPAT_CALL(mmuext_op),
-#endif
-    HYPERCALL(xenpmu_op),
-    COMPAT_CALL(dm_op),
-#ifdef CONFIG_HYPFS
-    HYPERCALL(hypfs_op),
-#endif
-    HYPERCALL(paging_domctl_cont)
-};
-
-#undef HYPERCALL
-#undef HVM_CALL
-#undef COMPAT_CALL
 
 int hvm_hypercall(struct cpu_user_regs *regs)
 {
@@ -206,23 +160,6 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         return ret;
     }
 
-    BUILD_BUG_ON(ARRAY_SIZE(hvm_hypercall_table) >
-                 ARRAY_SIZE(hypercall_args_table));
-
-    if ( eax >= ARRAY_SIZE(hvm_hypercall_table) )
-    {
-        regs->rax = -ENOSYS;
-        return HVM_HCALL_completed;
-    }
-
-    eax = array_index_nospec(eax, ARRAY_SIZE(hvm_hypercall_table));
-
-    if ( !hvm_hypercall_table[eax].native )
-    {
-        regs->rax = -ENOSYS;
-        return HVM_HCALL_completed;
-    }
-
     /*
      * Caching is intended for instruction emulation only. Disable it
      * for any accesses by hypercall argument copy-in / copy-out.
@@ -233,85 +170,27 @@ int hvm_hypercall(struct cpu_user_regs *regs)
 
     if ( mode == 8 )
     {
-        unsigned long rdi = regs->rdi;
-        unsigned long rsi = regs->rsi;
-        unsigned long rdx = regs->rdx;
-        unsigned long r10 = regs->r10;
-        unsigned long r8 = regs->r8;
-
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%lx, %lx, %lx, %lx, %lx)",
-                    eax, rdi, rsi, rdx, r10, r8);
+                    eax, regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
 
-#ifndef NDEBUG
-        /* Deliberately corrupt parameter regs not used by this hypercall. */
-        switch ( hypercall_args_table[eax].native )
-        {
-        case 0: rdi = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 1: rsi = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 2: rdx = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 3: r10 = 0xdeadbeefdeadf00dUL; fallthrough;
-        case 4: r8 = 0xdeadbeefdeadf00dUL;
-        }
-#endif
+        call_handlers_hvm64(eax, regs->rax, regs->rdi, regs->rsi, regs->rdx,
+                            regs->r10, regs->r8);
 
-        regs->rax = hvm_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8);
-
-#ifndef NDEBUG
-        if ( !curr->hcall_preempted )
-        {
-            /* Deliberately corrupt parameter regs used by this hypercall. */
-            switch ( hypercall_args_table[eax].native )
-            {
-            case 5: regs->r8  = 0xdeadbeefdeadf00dUL; fallthrough;
-            case 4: regs->r10 = 0xdeadbeefdeadf00dUL; fallthrough;
-            case 3: regs->rdx = 0xdeadbeefdeadf00dUL; fallthrough;
-            case 2: regs->rsi = 0xdeadbeefdeadf00dUL; fallthrough;
-            case 1: regs->rdi = 0xdeadbeefdeadf00dUL;
-            }
-        }
-#endif
+        if ( !curr->hcall_preempted && regs->rax != -ENOSYS )
+            clobber_regs(regs, get_nargs(hypercall_args_64, eax));
     }
     else
     {
-        unsigned int ebx = regs->ebx;
-        unsigned int ecx = regs->ecx;
-        unsigned int edx = regs->edx;
-        unsigned int esi = regs->esi;
-        unsigned int edi = regs->edi;
-
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%x, %x, %x, %x, %x)", eax,
-                    ebx, ecx, edx, esi, edi);
-
-#ifndef NDEBUG
-        /* Deliberately corrupt parameter regs not used by this hypercall. */
-        switch ( hypercall_args_table[eax].compat )
-        {
-        case 0: ebx = 0xdeadf00d; fallthrough;
-        case 1: ecx = 0xdeadf00d; fallthrough;
-        case 2: edx = 0xdeadf00d; fallthrough;
-        case 3: esi = 0xdeadf00d; fallthrough;
-        case 4: edi = 0xdeadf00d;
-        }
-#endif
+                    regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
 
         curr->hcall_compat = true;
-        regs->eax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi);
+        call_handlers_hvm32(eax, regs->eax, regs->ebx, regs->ecx, regs->edx,
+                            regs->esi, regs->edi);
         curr->hcall_compat = false;
 
-#ifndef NDEBUG
-        if ( !curr->hcall_preempted )
-        {
-            /* Deliberately corrupt parameter regs used by this hypercall. */
-            switch ( hypercall_args_table[eax].compat )
-            {
-            case 5: regs->rdi = 0xdeadf00d; fallthrough;
-            case 4: regs->rsi = 0xdeadf00d; fallthrough;
-            case 3: regs->rdx = 0xdeadf00d; fallthrough;
-            case 2: regs->rcx = 0xdeadf00d; fallthrough;
-            case 1: regs->rbx = 0xdeadf00d;
-            }
-        }
-#endif
+        if ( !curr->hcall_preempted && regs->eax != -ENOSYS )
+            clobber_regs32(regs, get_nargs(hypercall_args_32, eax));
     }
 
     hvmemul_cache_restore(curr, token);
@@ -332,31 +211,20 @@ int hvm_hypercall(struct cpu_user_regs *regs)
 enum mc_disposition hvm_do_multicall_call(struct mc_state *state)
 {
     struct vcpu *curr = current;
-    hypercall_fn_t *func = NULL;
 
     if ( hvm_guest_x86_mode(curr) == 8 )
     {
         struct multicall_entry *call = &state->call;
 
-        if ( call->op < ARRAY_SIZE(hvm_hypercall_table) )
-            func = array_access_nospec(hvm_hypercall_table, call->op).native;
-        if ( func )
-            call->result = func(call->args[0], call->args[1], call->args[2],
-                                call->args[3], call->args[4]);
-        else
-            call->result = -ENOSYS;
+        call_handlers_hvm64(call->op, call->result, call->args[0], call->args[1],
+                            call->args[2], call->args[3], call->args[4]);
     }
     else
     {
         struct compat_multicall_entry *call = &state->compat_call;
 
-        if ( call->op < ARRAY_SIZE(hvm_hypercall_table) )
-            func = array_access_nospec(hvm_hypercall_table, call->op).compat;
-        if ( func )
-            call->result = func(call->args[0], call->args[1], call->args[2],
-                                call->args[3], call->args[4]);
-        else
-            call->result = -ENOSYS;
+        call_handlers_hvm32(call->op, call->result, call->args[0], call->args[1],
+                            call->args[2], call->args[3], call->args[4]);
     }
 
     return !hvm_get_cpl(curr) ? mc_continue : mc_preempt;

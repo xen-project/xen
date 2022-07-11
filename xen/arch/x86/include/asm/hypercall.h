@@ -17,19 +17,6 @@
 
 #define __HYPERVISOR_paging_domctl_cont __HYPERVISOR_arch_1
 
-typedef unsigned long hypercall_fn_t(
-    unsigned long, unsigned long, unsigned long,
-    unsigned long, unsigned long);
-
-typedef struct {
-    uint8_t native;
-#ifdef CONFIG_COMPAT
-    uint8_t compat;
-#endif
-} hypercall_args_t;
-
-extern const hypercall_args_t hypercall_args_table[NR_hypercalls];
-
 #ifdef CONFIG_PV
 void pv_hypercall(struct cpu_user_regs *regs);
 #endif
@@ -55,5 +42,47 @@ compat_common_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 #endif /* CONFIG_COMPAT */
+
+#ifndef NDEBUG
+static inline unsigned int _get_nargs(const unsigned char *tbl, unsigned int c)
+{
+    return tbl[c];
+}
+#define get_nargs(t, c) _get_nargs(t, array_index_nospec(c, ARRAY_SIZE(t)))
+#else
+#define get_nargs(tbl, c) 0
+#endif
+
+static inline void clobber_regs(struct cpu_user_regs *regs,
+                                unsigned int nargs)
+{
+#ifndef NDEBUG
+    /* Deliberately corrupt used parameter regs. */
+    switch ( nargs )
+    {
+    case 5: regs->r8  = 0xdeadbeefdeadf00dUL; fallthrough;
+    case 4: regs->r10 = 0xdeadbeefdeadf00dUL; fallthrough;
+    case 3: regs->rdx = 0xdeadbeefdeadf00dUL; fallthrough;
+    case 2: regs->rsi = 0xdeadbeefdeadf00dUL; fallthrough;
+    case 1: regs->rdi = 0xdeadbeefdeadf00dUL;
+    }
+#endif
+}
+
+static inline void clobber_regs32(struct cpu_user_regs *regs,
+                                  unsigned int nargs)
+{
+#ifndef NDEBUG
+    /* Deliberately corrupt used parameter regs. */
+    switch ( nargs )
+    {
+    case 5: regs->edi = 0xdeadf00dU; fallthrough;
+    case 4: regs->esi = 0xdeadf00dU; fallthrough;
+    case 3: regs->edx = 0xdeadf00dU; fallthrough;
+    case 2: regs->ecx = 0xdeadf00dU; fallthrough;
+    case 1: regs->ebx = 0xdeadf00dU;
+    }
+#endif
+}
 
 #endif /* __ASM_X86_HYPERCALL_H__ */
