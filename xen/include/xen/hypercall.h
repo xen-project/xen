@@ -15,6 +15,9 @@
 #include <public/version.h>
 #include <public/pmu.h>
 #include <public/hvm/dm_op.h>
+#ifdef CONFIG_COMPAT
+#include <compat/platform.h>
+#endif
 #include <asm/hypercall.h>
 #include <xsm/xsm.h>
 
@@ -206,7 +209,6 @@ extern int cf_check compat_multicall(
 
 int compat_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-typedef struct compat_platform_op compat_platform_op_t;
 DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 int compat_platform_op(XEN_GUEST_HANDLE_PARAM(compat_platform_op_t) u_xenpf_op);
 

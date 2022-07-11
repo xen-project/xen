@@ -5,7 +5,6 @@
 EMIT_FILE;
 
 #include <xen/lib.h>
-#include <compat/platform.h>
 #include <xen/hypercall.h>
 
 #define xen_platform_op     compat_platform_op
