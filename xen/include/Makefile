@@ -104,6 +104,18 @@ cmd_xlat_h = \
 $(obj)/compat/xlat.h: $(addprefix $(obj)/compat/.xlat/,$(xlat-y)) FORCE
 	$(call if_changed,xlat_h)
 
+quiet_cmd_genhyp = GEN     $@
+define cmd_genhyp
+    awk -f $(srctree)/scripts/gen_hypercall.awk <$< >$@
+endef
+
+all: $(obj)/xen/hypercall-defs.h
+
+$(obj)/xen/hypercall-defs.h: $(obj)/hypercall-defs.i $(srctree)/scripts/gen_hypercall.awk FORCE
+	$(call if_changed,genhyp)
+
+targets += xen/hypercall-defs.h
+
 ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
 
 all: $(obj)/headers.chk $(obj)/headers99.chk $(obj)/headers++.chk
@@ -213,3 +225,4 @@ all: lib-x86-all
 endif
 
 clean-files := compat config generated headers*.chk xen/lib/x86/cpuid-autogen.h
+clean-files += xen/hypercall-defs.h hypercall-defs.i

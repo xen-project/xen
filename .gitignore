@@ -327,6 +327,7 @@ xen/include/public/public
 xen/include/xen/*.new
 xen/include/xen/acm_policy.h
 xen/include/xen/compile.h
+xen/include/xen/hypercall-defs.h
 xen/include/xen/lib/x86/cpuid-autogen.h
 xen/source
 xen/test/livepatch/config.h
