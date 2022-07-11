@@ -75,7 +75,7 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
     ARGS(dm_op, 3),
     ARGS(hypfs_op, 5),
     ARGS(mca, 1),
-    ARGS(arch_1, 1),
+    ARGS(paging_domctl_cont, 1),
 };
 
 #undef COMP

@@ -15,6 +15,8 @@
 #include <public/arch-x86/xen-mca.h> /* for do_mca */
 #include <asm/paging.h>
 
+#define __HYPERVISOR_paging_domctl_cont __HYPERVISOR_arch_1
+
 typedef unsigned long hypercall_fn_t(
     unsigned long, unsigned long, unsigned long,
     unsigned long, unsigned long);
@@ -84,7 +86,7 @@ do_set_debugreg(
     int reg,
     unsigned long value);
 
-extern unsigned long cf_check
+extern long cf_check
 do_get_debugreg(
     int reg);
 
@@ -122,7 +124,7 @@ do_mmuext_op(
 extern long cf_check do_callback_op(
     int cmd, XEN_GUEST_HANDLE_PARAM(const_void) arg);
 
-extern unsigned long cf_check
+extern long cf_check
 do_iret(
     void);
 
@@ -137,16 +139,19 @@ do_set_segment_base(
     unsigned int which,
     unsigned long base);
 
+long cf_check do_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
+
+long cf_check do_xenpmu_op(unsigned int op,
+                           XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg);
+
+long cf_check do_paging_domctl_cont(
+    XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
+
 #ifdef CONFIG_COMPAT
 
 #include <compat/arch-x86/xen.h>
 #include <compat/physdev.h>
 #include <compat/platform.h>
-
-extern int cf_check
-compat_physdev_op(
-    int cmd,
-    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int
 compat_common_vcpu_op(
@@ -158,12 +163,8 @@ extern int cf_check compat_mmuext_op(
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom);
 
-DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
-extern int cf_check compat_platform_op(
-    XEN_GUEST_HANDLE_PARAM(compat_platform_op_t) u_xenpf_op);
-
-extern long cf_check compat_callback_op(
-    int cmd, XEN_GUEST_HANDLE(void) arg);
+extern int cf_check compat_callback_op(
+    int cmd, XEN_GUEST_HANDLE(const_void) arg);
 
 extern int cf_check compat_update_va_mapping(
     unsigned int va, uint32_t lo, uint32_t hi, unsigned int flags);
@@ -181,12 +182,12 @@ extern int cf_check compat_set_gdt(
 extern int cf_check compat_update_descriptor(
     uint32_t pa_lo, uint32_t pa_hi, uint32_t desc_lo, uint32_t desc_hi);
 
-extern unsigned int cf_check compat_iret(void);
+extern int cf_check compat_iret(void);
 
 extern int cf_check compat_nmi_op(
     unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-extern long cf_check compat_set_callbacks(
+extern int cf_check compat_set_callbacks(
     unsigned long event_selector, unsigned long event_address,
     unsigned long failsafe_selector, unsigned long failsafe_address);
 

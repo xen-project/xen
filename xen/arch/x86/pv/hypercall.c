@@ -47,8 +47,6 @@ typedef struct {
 #define COMPAT_CALL(x) HYPERCALL(x)
 #endif
 
-#define do_arch_1             paging_domctl_continuation
-
 static const pv_hypercall_table_t pv_hypercall_table[] = {
     COMPAT_CALL(set_trap_table),
     HYPERCALL(mmu_update),
@@ -109,11 +107,10 @@ static const pv_hypercall_table_t pv_hypercall_table[] = {
 #endif
     HYPERCALL(mca),
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
-    HYPERCALL(arch_1),
+    HYPERCALL(paging_domctl_cont),
 #endif
 };
 
-#undef do_arch_1
 #undef COMPAT_CALL
 #undef HYPERCALL
 

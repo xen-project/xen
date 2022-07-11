@@ -124,8 +124,6 @@ static long cf_check hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,  \
                                (hypercall_fn_t *) compat_ ## x }
 
-#define do_arch_1             paging_domctl_continuation
-
 static const struct {
     hypercall_fn_t *native, *compat;
 } hvm_hypercall_table[] = {
@@ -158,10 +156,8 @@ static const struct {
 #ifdef CONFIG_HYPFS
     HYPERCALL(hypfs_op),
 #endif
-    HYPERCALL(arch_1)
+    HYPERCALL(paging_domctl_cont)
 };
-
-#undef do_arch_1
 
 #undef HYPERCALL
 #undef HVM_CALL
@@ -300,7 +296,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
 #endif
 
         curr->hcall_compat = true;
-        regs->rax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi);
+        regs->eax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi);
         curr->hcall_compat = false;
 
 #ifndef NDEBUG

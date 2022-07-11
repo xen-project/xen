@@ -21,6 +21,7 @@
 
 #include <xen/init.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <asm/paging.h>
 #include <asm/shadow.h>
 #include <asm/p2m.h>
@@ -759,7 +760,7 @@ int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
         return shadow_domctl(d, sc, u_domctl);
 }
 
-long cf_check paging_domctl_continuation(
+long cf_check do_paging_domctl_cont(
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     struct xen_domctl op;

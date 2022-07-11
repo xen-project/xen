@@ -115,18 +115,13 @@ common_vcpu_op(int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long cf_check
-do_nmi_op(
-    unsigned int cmd,
-    XEN_GUEST_HANDLE_PARAM(void) arg);
-
-extern long cf_check
 do_hvm_op(
     unsigned long op,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long cf_check
 do_kexec_op(
-    unsigned long op,
+    unsigned int op,
     XEN_GUEST_HANDLE_PARAM(void) uarg);
 
 extern long cf_check
@@ -144,9 +139,6 @@ extern long cf_check do_argo_op(
 
 extern long cf_check
 do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
-
-extern long cf_check
-do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg);
 
 extern long cf_check
 do_dm_op(
@@ -205,15 +197,21 @@ extern int cf_check compat_xsm_op(
     XEN_GUEST_HANDLE_PARAM(void) op);
 
 extern int cf_check compat_kexec_op(
-    unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg);
+    unsigned int op, XEN_GUEST_HANDLE_PARAM(void) uarg);
 
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_compat_t);
 extern int cf_check compat_multicall(
     XEN_GUEST_HANDLE_PARAM(multicall_entry_compat_t) call_list,
     uint32_t nr_calls);
 
+int compat_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
+
+typedef struct compat_platform_op compat_platform_op_t;
+DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
+int compat_platform_op(XEN_GUEST_HANDLE_PARAM(compat_platform_op_t) u_xenpf_op);
+
 #ifdef CONFIG_ARGO
-extern long cf_check compat_argo_op(
+extern int cf_check compat_argo_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg1,
     XEN_GUEST_HANDLE_PARAM(void) arg2,

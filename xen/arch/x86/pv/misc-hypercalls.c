@@ -28,12 +28,16 @@ long cf_check do_set_debugreg(int reg, unsigned long value)
     return set_debugreg(current, reg, value);
 }
 
-unsigned long cf_check do_get_debugreg(int reg)
+long cf_check do_get_debugreg(int reg)
 {
-    unsigned long val;
-    int res = x86emul_read_dr(reg, &val, NULL);
+    /* Avoid implementation defined behavior casting unsigned long to long. */
+    union {
+        unsigned long val;
+        long ret;
+    } u;
+    int res = x86emul_read_dr(reg, &u.val, NULL);
 
-    return res == X86EMUL_OKAY ? val : -ENODEV;
+    return res == X86EMUL_OKAY ? u.ret : -ENODEV;
 }
 
 long cf_check do_fpu_taskswitch(int set)
