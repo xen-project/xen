@@ -244,7 +244,7 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 
 		cfg.arch.misc_flags = ocaml_list_to_c_bitmap
 			/* ! x86_arch_misc_flags X86_ none */
-			/* ! XEN_X86_ XEN_X86_MSR_RELAXED all */
+			/* ! XEN_X86_ XEN_X86_MISC_FLAGS_MAX max */
 			(VAL_MISC_FLAGS);
 
 #undef VAL_MISC_FLAGS

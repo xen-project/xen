@@ -391,6 +391,9 @@ int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value);
 extern bool assisted_xapic_available;
 extern bool assisted_x2apic_available;
 
+#define has_assisted_xapic(d) ((d)->arch.hvm.assisted_xapic)
+#define has_assisted_x2apic(d) ((d)->arch.hvm.assisted_x2apic)
+
 #define hvm_get_guest_time(v) hvm_get_guest_time_fixed(v, 0)
 
 #define hvm_paging_enabled(v) \
@@ -907,6 +910,8 @@ static inline void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 #define assisted_xapic_available false
 #define assisted_x2apic_available false
 
+#define has_assisted_xapic(d) ((void)(d), false)
+#define has_assisted_x2apic(d) ((void)(d), false)
 #define hvm_paging_enabled(v) ((void)(v), false)
 #define hvm_wp_enabled(v) ((void)(v), false)
 #define hvm_pcid_enabled(v) ((void)(v), false)
