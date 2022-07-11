@@ -31,8 +31,7 @@
 #include <public/hvm/hvm_op.h>
 #include <public/hvm/params.h>
 
-static long cf_check hvm_memory_op(
-    unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+long cf_check hvm_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc;
 
@@ -52,7 +51,7 @@ static long cf_check hvm_memory_op(
 }
 
 #ifdef CONFIG_GRANT_TABLE
-static long cf_check hvm_grant_table_op(
+long cf_check hvm_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) uop, unsigned int count)
 {
     switch ( cmd )
@@ -78,7 +77,7 @@ static long cf_check hvm_grant_table_op(
 }
 #endif
 
-static long cf_check hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+long cf_check hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     const struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
