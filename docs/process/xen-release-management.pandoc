@@ -19,6 +19,8 @@ The Xen hypervisor project now releases every 8 months.  We aim to
 release in the first half of March/July/November.  These dates have
 been chosen to avoid major holidays and cultural events; if one
 release slips, ideally the subsequent release cycle would be shortened.
+The reasons for this schedule have been discussed on
+[xen-devel](https://lists.xen.org/archives/html/xen-devel/2018-07/msg02240.html).
 
 We can roughly divide one release into two periods. The development period
 and the freeze period. The former is 6 months long and the latter is about 2
