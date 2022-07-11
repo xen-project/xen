@@ -37,7 +37,7 @@ CHECK_TYPE(capabilities_info);
 
 CHECK_TYPE(domain_handle);
 
-#define DO(fn) int cf_check compat_##fn
+#define DO(fn) int compat_##fn
 #define COMPAT
 
 #include "../kernel.c"

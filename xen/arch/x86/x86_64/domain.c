@@ -12,7 +12,7 @@
 CHECK_vcpu_get_physid;
 #undef xen_vcpu_get_physid
 
-int cf_check
+int
 compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;

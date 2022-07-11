@@ -675,7 +675,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
     return 0;
 }
 
-long cf_check do_console_io(
+long do_console_io(
     unsigned int cmd, unsigned int count, XEN_GUEST_HANDLE_PARAM(char) buffer)
 {
     long rc;

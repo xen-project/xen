@@ -226,7 +226,7 @@ END {
     # Generate prototypes
     for (i = 1; i <= n; i++) {
         for (p = 1; p <= n_pre[i]; p++) {
-            printf("%s cf_check %s_%s(", rettype[pre[i, p]], pre[i, p], fn[i]);
+            printf("%s %s_%s(", rettype[pre[i, p]], pre[i, p], fn[i]);
             if (n_args[i] == 0)
                 printf("void");
             else

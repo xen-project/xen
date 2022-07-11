@@ -3421,7 +3421,7 @@ static int vcpumask_to_pcpumask(
     }
 }
 
-long cf_check do_mmuext_op(
+long do_mmuext_op(
     XEN_GUEST_HANDLE_PARAM(mmuext_op_t) uops,
     unsigned int count,
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
@@ -3960,7 +3960,7 @@ long cf_check do_mmuext_op(
     return rc;
 }
 
-long cf_check do_mmu_update(
+long do_mmu_update(
     XEN_GUEST_HANDLE_PARAM(mmu_update_t) ureqs,
     unsigned int count,
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
@@ -4545,7 +4545,7 @@ static int __do_update_va_mapping(
     return rc;
 }
 
-long cf_check do_update_va_mapping(
+long do_update_va_mapping(
     unsigned long va, u64 val64, unsigned long flags)
 {
     int rc = __do_update_va_mapping(va, val64, flags, current->domain);
@@ -4557,7 +4557,7 @@ long cf_check do_update_va_mapping(
     return rc;
 }
 
-long cf_check do_update_va_mapping_otherdomain(
+long do_update_va_mapping_otherdomain(
     unsigned long va, u64 val64, unsigned long flags, domid_t domid)
 {
     struct domain *pg_owner;
@@ -4580,7 +4580,7 @@ long cf_check do_update_va_mapping_otherdomain(
 #endif /* CONFIG_PV */
 
 #ifdef CONFIG_PV32
-int cf_check compat_update_va_mapping(
+int compat_update_va_mapping(
     unsigned int va, uint32_t lo, uint32_t hi, unsigned int flags)
 {
     int rc = __do_update_va_mapping(va, ((uint64_t)hi << 32) | lo,
@@ -4593,7 +4593,7 @@ int cf_check compat_update_va_mapping(
     return rc;
 }
 
-int cf_check compat_update_va_mapping_otherdomain(
+int compat_update_va_mapping_otherdomain(
     unsigned int va, uint32_t lo, uint32_t hi, unsigned int flags,
     domid_t domid)
 {

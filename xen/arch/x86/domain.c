@@ -1491,8 +1491,7 @@ int arch_vcpu_reset(struct vcpu *v)
     return 0;
 }
 
-long cf_check do_vcpu_op(int cmd, unsigned int vcpuid,
-                         XEN_GUEST_HANDLE_PARAM(void) arg)
+long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc = 0;
     struct domain *d = current->domain;

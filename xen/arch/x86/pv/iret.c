@@ -49,7 +49,7 @@ static void async_exception_cleanup(struct vcpu *curr)
         curr->arch.async_exception_state(trap).old_mask;
 }
 
-long cf_check do_iret(void)
+long do_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct iret_context iret_saved;
@@ -106,7 +106,7 @@ long cf_check do_iret(void)
 }
 
 #ifdef CONFIG_PV32
-int cf_check compat_iret(void)
+int compat_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct vcpu *v = current;

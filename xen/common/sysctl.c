@@ -29,7 +29,7 @@
 #include <xen/livepatch.h>
 #include <xen/coverage.h>
 
-long cf_check do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
+long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 {
     long ret = 0;
     int copyback = -1;

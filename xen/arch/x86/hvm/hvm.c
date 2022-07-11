@@ -5022,7 +5022,7 @@ static int hvmop_get_mem_type(
     return rc;
 }
 
-long cf_check do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
+long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc = 0;
 

@@ -124,7 +124,7 @@ int pv_set_gdt(struct vcpu *v, const unsigned long frames[],
     return -EINVAL;
 }
 
-long cf_check do_set_gdt(
+long do_set_gdt(
     XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list, unsigned int entries)
 {
     unsigned int nr_frames = DIV_ROUND_UP(entries, 512);
@@ -151,7 +151,7 @@ long cf_check do_set_gdt(
 
 #ifdef CONFIG_PV32
 
-int cf_check compat_set_gdt(
+int compat_set_gdt(
     XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries)
 {
     struct vcpu *curr = current;
@@ -187,7 +187,7 @@ int cf_check compat_set_gdt(
     return ret;
 }
 
-int cf_check compat_update_descriptor(
+int compat_update_descriptor(
     uint32_t pa_lo, uint32_t pa_hi, uint32_t desc_lo, uint32_t desc_hi)
 {
     seg_desc_t d;
@@ -299,7 +299,7 @@ int validate_segdesc_page(struct page_info *page)
     return i == 512 ? 0 : -EINVAL;
 }
 
-long cf_check do_update_descriptor(uint64_t gaddr, seg_desc_t d)
+long do_update_descriptor(uint64_t gaddr, seg_desc_t d)
 {
     struct domain *currd = current->domain;
     gfn_t gfn = gaddr_to_gfn(gaddr);
