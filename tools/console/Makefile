@@ -1,50 +1,7 @@
 XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS  += -Werror
+SUBDIRS-y := daemon client
 
-CFLAGS  += $(CFLAGS_libxenctrl)
-CFLAGS  += $(CFLAGS_libxenstore)
-LDLIBS += $(LDLIBS_libxenctrl)
-LDLIBS += $(LDLIBS_libxenstore)
-LDLIBS += $(SOCKET_LIBS)
-
-LDLIBS_xenconsoled += $(UTIL_LIBS)
-LDLIBS_xenconsoled += -lrt
-CONSOLE_CFLAGS-$(CONFIG_ARM) = -DCONFIG_ARM
-
-BIN      = xenconsoled xenconsole
-
-.PHONY: all
-all: $(BIN)
-
-.PHONY: clean
-clean:
-	$(RM) *.a *.so *.o *.rpm $(BIN) $(DEPS_RM)
-	$(RM) client/*.o daemon/*.o
-
-.PHONY: distclean
-distclean: clean
-
-daemon/main.o: CFLAGS += -include $(XEN_ROOT)/tools/config.h
-daemon/io.o: CFLAGS += $(CFLAGS_libxenevtchn) $(CFLAGS_libxengnttab) $(CFLAGS_libxenforeignmemory) $(CONSOLE_CFLAGS-y)
-xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
-	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxenforeignmemory) $(LDLIBS_xenconsoled) $(APPEND_LDFLAGS)
-
-client/main.o: CFLAGS += -include $(XEN_ROOT)/tools/config.h
-xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
-	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsole) $(APPEND_LDFLAGS)
-
-.PHONY: install
-install: $(BIN)
-	$(INSTALL_DIR) $(DESTDIR)/$(sbindir)
-	$(INSTALL_PROG) xenconsoled $(DESTDIR)/$(sbindir)
-	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
-	$(INSTALL_PROG) xenconsole $(DESTDIR)$(LIBEXEC_BIN)
-
-.PHONY: uninstall
-uninstall:
-	rm -f $(DESTDIR)$(LIBEXEC_BIN)/xenconsole
-	rm -f $(DESTDIR)$(sbindir)/xenconsoled
-
--include $(DEPS_INCLUDE)
+.PHONY: all clean install distclean uninstall
+all clean install distclean uninstall: %: subdirs-%
