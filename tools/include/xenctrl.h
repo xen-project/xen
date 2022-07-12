@@ -2516,7 +2516,7 @@ int xc_psr_cmt_get_l3_event_mask(xc_interface *xch, uint32_t *event_mask);
 int xc_psr_cmt_get_l3_cache_size(xc_interface *xch, uint32_t cpu,
                                  uint32_t *l3_cache_size);
 int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
-                        uint32_t psr_cmt_type, uint64_t *monitor_data,
+                        xc_psr_cmt_type type, uint64_t *monitor_data,
                         uint64_t *tsc);
 int xc_psr_cmt_enabled(xc_interface *xch);
 
