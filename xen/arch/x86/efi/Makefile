@@ -11,7 +11,7 @@ boot.init.o: buildid.o
 EFIOBJ := boot.init.o pe.init.o ebmalloc.o compat.o runtime.o
 
 $(call cc-option-add,cflags-stack-boundary,CC,-mpreferred-stack-boundary=4)
-$(EFIOBJ): CFLAGS-stack-boundary := $(cflags-stack-boundary)
+$(EFIOBJ): CFLAGS_stack_boundary := $(cflags-stack-boundary)
 
 obj-y := stub.o
 obj-$(XEN_BUILD_EFI) := $(filter-out %.init.o,$(EFIOBJ))
