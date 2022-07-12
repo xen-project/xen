@@ -33,7 +33,7 @@ XEN_CPUFEATURE(SC_MSR_HVM,        X86_SYNTH(17)) /* MSR_SPEC_CTRL used by Xen fo
 XEN_CPUFEATURE(SC_RSB_PV,         X86_SYNTH(18)) /* RSB overwrite needed for PV */
 XEN_CPUFEATURE(SC_RSB_HVM,        X86_SYNTH(19)) /* RSB overwrite needed for HVM */
 XEN_CPUFEATURE(XEN_SELFSNOOP,     X86_SYNTH(20)) /* SELFSNOOP gets used by Xen itself */
-XEN_CPUFEATURE(SC_MSR_IDLE,       X86_SYNTH(21)) /* (SC_MSR_PV || SC_MSR_HVM) && default_xen_spec_ctrl */
+XEN_CPUFEATURE(SC_MSR_IDLE,       X86_SYNTH(21)) /* Clear MSR_SPEC_CTRL on idle */
 XEN_CPUFEATURE(XEN_LBR,           X86_SYNTH(22)) /* Xen uses MSR_DEBUGCTL.LBR */
 /* Bits 23,24 unused. */
 XEN_CPUFEATURE(SC_VERW_IDLE,      X86_SYNTH(25)) /* VERW used by Xen for idle */
