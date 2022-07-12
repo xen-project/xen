@@ -649,8 +649,7 @@ F:	xen/common/trace.c
 F:	xen/include/xen/trace.h
 
 XSM/FLASK
-M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
-R:	Daniel P. Smith <dpsmith@apertussolutions.com>
+M:	Daniel P. Smith <dpsmith@apertussolutions.com>
 S:	Supported
 F:	tools/flask/
 F:	xen/include/xsm/
