@@ -25,6 +25,18 @@
 #include <asm/hvm/support.h>
 #include <asm/io_apic.h>
 
+/*
+ * Gcc12 takes issue with pirq_dpci() being used in boolean context (see gcc
+ * bug 102967). While we can't replace the macro definition in the header by an
+ * inline function, we can do so here.
+ */
+static inline struct hvm_pirq_dpci *_pirq_dpci(struct pirq *pirq)
+{
+    return pirq_dpci(pirq);
+}
+#undef pirq_dpci
+#define pirq_dpci(pirq) _pirq_dpci(pirq)
+
 static DEFINE_PER_CPU(struct list_head, dpci_list);
 
 /*
