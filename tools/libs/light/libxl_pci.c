@@ -859,7 +859,7 @@ static int name2bdf(libxl__gc *gc, libxl_device_pci *pci)
     int rc = ERROR_NOTFOUND;
 
     bdfs = libxl__xs_directory(gc, XBT_NULL, PCI_INFO_PATH, &n);
-    if (!n)
+    if (!bdfs || !n)
         goto out;
 
     for (i = 0; i < n; i++) {
