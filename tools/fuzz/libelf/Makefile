@@ -1,25 +1,24 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-# libelf fuzz target
-vpath %.c ../../../xen/common/libelf
-CFLAGS += -I../../../xen/common/libelf
-ELF_SRCS-y += libelf-tools.c libelf-loader.c libelf-dominfo.c
-ELF_LIB_OBJS := $(patsubst %.c,%.o,$(ELF_SRCS-y))
+LIBELF_OBJS := libelf-tools.o libelf-loader.o libelf-dominfo.o
 
-$(patsubst %.c,%.o,$(ELF_SRCS-y)): CFLAGS += -Wno-pointer-sign
-
-$(ELF_LIB_OBJS): CFLAGS += -DFUZZ_NO_LIBXC $(CFLAGS_xeninclude)
+CFLAGS += -iquote ../../../xen/common/libelf
+$(LIBELF_OBJS): CFLAGS += -Wno-pointer-sign
+$(LIBELF_OBJS): CFLAGS += -DFUZZ_NO_LIBXC $(CFLAGS_xeninclude)
 
 libelf-fuzzer.o: CFLAGS += $(CFLAGS_xeninclude)
 
-libelf.a: libelf-fuzzer.o $(ELF_LIB_OBJS)
+$(LIBELF_OBJS:.o=.c): libelf-%.c: ../../../xen/common/libelf/libelf-%.c FORCE
+	ln -nsf $< $@
+
+libelf.a: libelf-fuzzer.o $(LIBELF_OBJS)
 	$(AR) rc $@ $^
 
 .PHONY: libelf-fuzzer-all
 libelf-fuzzer-all: libelf.a libelf-fuzzer.o
 
-afl-libelf-fuzzer: afl-libelf-fuzzer.o libelf-fuzzer.o $(ELF_LIB_OBJS)
+afl-libelf-fuzzer: afl-libelf-fuzzer.o libelf-fuzzer.o $(LIBELF_OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
 # Common targets
@@ -31,7 +30,7 @@ distclean: clean
 
 .PHONY: clean
 clean:
-	rm -f *.o .*.d *.a *-libelf-fuzzer
+	rm -f *.o .*.d *.a *-libelf-fuzzer $(LIBELF_OBJS:.o=.c)
 
 .PHONY: install
 install: all

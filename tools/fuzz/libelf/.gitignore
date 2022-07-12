@@ -1,0 +1,2 @@
+/afl-libelf-fuzzer
+/libelf-*.c
