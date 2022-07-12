@@ -224,5 +224,5 @@ lib-x86-all:
 all: lib-x86-all
 endif
 
-clean-files := compat config generated headers*.chk xen/lib/x86/cpuid-autogen.h
-clean-files += xen/hypercall-defs.h hypercall-defs.i
+clean-files := compat config generated xen/lib/x86/cpuid-autogen.h
+clean-files += hypercall-defs.i
