@@ -122,6 +122,7 @@ static int __init parse_spec_ctrl(const char *s)
             opt_l1d_flush = 0;
             opt_branch_harden = false;
             opt_srb_lock = 0;
+            opt_unpriv_mmio = false;
         }
         else if ( val > 0 )
             rc = -EINVAL;
