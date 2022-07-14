@@ -64,6 +64,11 @@ ${OBJDUMP} -j .text $1 -d -w | grep '	endbr64 *$' | cut -f 1 -d ':' > $VALID &
 #    split the VMA in half so AWK's numeric addition is only working on 32 bit
 #    numbers, which don't lose precision.
 #
+# 4) MAWK doesn't support plain hex constants (an optional part of the POSIX
+#    spec), and GAWK and MAWK can't agree on how to work with hex constants in
+#    a string.  Use the shell to convert $vma_lo to decimal before passing to
+#    AWK.
+#
 eval $(${OBJDUMP} -j .text $1 -h |
     $AWK '$2 == ".text" {printf "vma_hi=%s\nvma_lo=%s\n", substr($4, 1, 8), substr($4, 9, 16)}')
 
@@ -79,7 +84,7 @@ then
 else
     grep -aob -e "$(printf '\363\17\36\372')" -e "$(printf '\363\17\36\373')" \
          -e "$(printf '\146\17\37\1')" $TEXT_BIN
-fi | $AWK -F':' '{printf "%s%x\n", "'$vma_hi'", int(0x'$vma_lo') + $1}' > $ALL
+fi | $AWK -F':' '{printf "%s%x\n", "'$vma_hi'", int('$((0x$vma_lo))') + $1}' > $ALL
 
 # Wait for $VALID to become complete
 wait
