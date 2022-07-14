@@ -10,6 +10,7 @@ MSG_PFX="${0##*/} ${1##*/}"
 OBJCOPY="${OBJCOPY:-objcopy}"
 OBJDUMP="${OBJDUMP:-objdump}"
 ADDR2LINE="${ADDR2LINE:-addr2line}"
+AWK="${AWK:-awk}"
 
 D=$(mktemp -d)
 trap "rm -rf $D" EXIT
@@ -64,7 +65,7 @@ ${OBJDUMP} -j .text $1 -d -w | grep '	endbr64 *$' | cut -f 1 -d ':' > $VALID &
 #    numbers, which don't lose precision.
 #
 eval $(${OBJDUMP} -j .text $1 -h |
-    awk '$2 == ".text" {printf "vma_hi=%s\nvma_lo=%s\n", substr($4, 1, 8), substr($4, 9, 16)}')
+    $AWK '$2 == ".text" {printf "vma_hi=%s\nvma_lo=%s\n", substr($4, 1, 8), substr($4, 9, 16)}')
 
 ${OBJCOPY} -j .text $1 -O binary $TEXT_BIN
 
@@ -78,7 +79,7 @@ then
 else
     grep -aob -e "$(printf '\363\17\36\372')" -e "$(printf '\363\17\36\373')" \
          -e "$(printf '\146\17\37\1')" $TEXT_BIN
-fi | awk -F':' '{printf "%s%x\n", "'$vma_hi'", int(0x'$vma_lo') + $1}' > $ALL
+fi | $AWK -F':' '{printf "%s%x\n", "'$vma_hi'", int(0x'$vma_lo') + $1}' > $ALL
 
 # Wait for $VALID to become complete
 wait
