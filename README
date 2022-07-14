@@ -48,6 +48,7 @@ provided by your OS distributor:
       - For ARM 64-bit:
         - GCC 5.1 or later
         - GNU Binutils 2.24 or later
+    * POSIX compatible awk
     * Development install of zlib (e.g., zlib-dev)
     * Development install of Python 2.6 or later (e.g., python-dev)
     * Development install of curses (e.g., libncurses-dev)
