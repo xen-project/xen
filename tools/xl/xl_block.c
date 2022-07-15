@@ -119,6 +119,12 @@ int main_blockdetach(int argc, char **argv)
         fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
+
+    if (disk.specification == LIBXL_DISK_SPECIFICATION_VIRTIO) {
+        fprintf(stderr, "Hotunplug isn't supported for specification virtio\n");
+        return 1;
+    }
+
     rc = !force ? libxl_device_disk_safe_remove(ctx, domid, &disk, 0) :
         libxl_device_disk_destroy(ctx, domid, &disk, 0);
     if (rc) {

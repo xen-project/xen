@@ -694,7 +694,7 @@ extern int yylex (yyscan_t yyscanner);
 #undef yyTABLES_NAME
 #endif
 
-#line 291 "libxlu_disk_l.l"
+#line 300 "libxlu_disk_l.l"
 
 #line 699 "libxlu_disk_l.h"
 #undef xlu__disk_yyIN_HEADER

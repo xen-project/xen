@@ -550,6 +550,13 @@
 #define LIBXL_HAVE_ASSISTED_APIC 1
 
 /*
+ * LIBXL_HAVE_DEVICE_DISK_SPECIFICATION indicates that 'specification' and
+ * 'transport' fields (of libxl_disk_specification and libxl_disk_transport
+ * types respectively) are present in libxl_device_disk.
+ */
+#define LIBXL_HAVE_DEVICE_DISK_SPECIFICATION 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

@@ -1763,6 +1763,10 @@ x.DirectIoSafe = bool(xc.direct_io_safe)
 if err := x.DiscardEnable.fromC(&xc.discard_enable);err != nil {
 return fmt.Errorf("converting field DiscardEnable: %v", err)
 }
+x.Specification = DiskSpecification(xc.specification)
+x.Transport = DiskTransport(xc.transport)
+x.Irq = uint32(xc.irq)
+x.Base = uint64(xc.base)
 if err := x.ColoEnable.fromC(&xc.colo_enable);err != nil {
 return fmt.Errorf("converting field ColoEnable: %v", err)
 }
@@ -1803,6 +1807,10 @@ xc.direct_io_safe = C.bool(x.DirectIoSafe)
 if err := x.DiscardEnable.toC(&xc.discard_enable); err != nil {
 return fmt.Errorf("converting field DiscardEnable: %v", err)
 }
+xc.specification = C.libxl_disk_specification(x.Specification)
+xc.transport = C.libxl_disk_transport(x.Transport)
+xc.irq = C.uint32_t(x.Irq)
+xc.base = C.uint64_t(x.Base)
 if err := x.ColoEnable.toC(&xc.colo_enable); err != nil {
 return fmt.Errorf("converting field ColoEnable: %v", err)
 }

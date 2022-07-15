@@ -99,6 +99,20 @@ DiskBackendUnknown DiskBackend = 0
 DiskBackendPhy DiskBackend = 1
 DiskBackendTap DiskBackend = 2
 DiskBackendQdisk DiskBackend = 3
+DiskBackendStandalone DiskBackend = 4
+)
+
+type DiskSpecification int
+const(
+DiskSpecificationUnknown DiskSpecification = 0
+DiskSpecificationXen DiskSpecification = 1
+DiskSpecificationVirtio DiskSpecification = 2
+)
+
+type DiskTransport int
+const(
+DiskTransportUnknown DiskTransport = 0
+DiskTransportMmio DiskTransport = 1
 )
 
 type NicType int
@@ -645,6 +659,10 @@ Readwrite int
 IsCdrom int
 DirectIoSafe bool
 DiscardEnable Defbool
+Specification DiskSpecification
+Transport DiskTransport
+Irq uint32
+Base uint64
 ColoEnable Defbool
 ColoRestoreEnable Defbool
 ColoHost string

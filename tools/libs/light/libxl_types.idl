@@ -130,6 +130,18 @@ libxl_disk_backend = Enumeration("disk_backend", [
     (1, "PHY"),
     (2, "TAP"),
     (3, "QDISK"),
+    (4, "STANDALONE"), # Only relying on the Xenstore data
+    ])
+
+libxl_disk_specification = Enumeration("disk_specification", [
+    (0, "UNKNOWN"),
+    (1, "XEN"),
+    (2, "VIRTIO"),
+    ])
+
+libxl_disk_transport = Enumeration("disk_transport", [
+    (0, "UNKNOWN"),
+    (1, "MMIO"),
     ])
 
 libxl_nic_type = Enumeration("nic_type", [
@@ -706,6 +718,12 @@ libxl_device_disk = Struct("device_disk", [
     ("is_cdrom", integer),
     ("direct_io_safe", bool),
     ("discard_enable", libxl_defbool),
+    ("specification", libxl_disk_specification),
+    ("transport", libxl_disk_transport),
+    # Note that virtio-mmio parameters (irq and base) are for internal use
+    # by libxl and can't be modified.
+    ("irq", uint32),
+    ("base", uint64),
     # Note that the COLO configuration settings should be considered unstable.
     # They may change incompatibly in future versions of Xen.
     ("colo_enable", libxl_defbool),

@@ -1493,6 +1493,8 @@ _hidden char * libxl__domain_pvcontrol_read(libxl__gc *gc,
 
 /* from xl_device */
 _hidden char *libxl__device_disk_string_of_backend(libxl_disk_backend backend);
+_hidden char *libxl__device_disk_string_of_specification(libxl_disk_specification specification);
+_hidden char *libxl__device_disk_string_of_transport(libxl_disk_transport transport);
 _hidden char *libxl__device_disk_string_of_format(libxl_disk_format format);
 _hidden const char *libxl__qemu_disk_format_string(libxl_disk_format format);
 _hidden int libxl__device_disk_set_backend(libxl__gc*, libxl_device_disk*);

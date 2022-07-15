@@ -289,8 +289,15 @@ static int disk_try_backend(disk_try_backend_args *a,
                             libxl_disk_backend backend)
  {
     libxl__gc *gc = a->gc;
+    libxl_disk_specification specification = a->disk->specification;
     /* returns 0 (ie, DISK_BACKEND_UNKNOWN) on failure, or
      * backend on success */
+
+    if ((specification == LIBXL_DISK_SPECIFICATION_VIRTIO &&
+         backend != LIBXL_DISK_BACKEND_STANDALONE) ||
+        (specification != LIBXL_DISK_SPECIFICATION_VIRTIO &&
+         backend == LIBXL_DISK_BACKEND_STANDALONE))
+        goto bad_specification;
 
     switch (backend) {
     case LIBXL_DISK_BACKEND_PHY:
@@ -329,6 +336,29 @@ static int disk_try_backend(disk_try_backend_args *a,
         if (a->disk->script) goto bad_script;
         return backend;
 
+    case LIBXL_DISK_BACKEND_STANDALONE:
+        if (a->disk->format != LIBXL_DISK_FORMAT_RAW)
+            goto bad_format;
+
+        if (a->disk->script)
+            goto bad_script;
+
+        if (libxl_defbool_val(a->disk->colo_enable))
+            goto bad_colo;
+
+        if (a->disk->backend_domid != LIBXL_TOOLSTACK_DOMID) {
+            LOG(DEBUG, "Disk vdev=%s, is using a storage driver domain, "
+                       "skipping physical device check", a->disk->vdev);
+            return backend;
+        }
+
+        if (libxl__try_phy_backend(a->stab.st_mode))
+            return backend;
+
+        LOG(DEBUG, "Disk vdev=%s, backend standalone unsuitable as phys path not a "
+                   "block device", a->disk->vdev);
+        return 0;
+
     default:
         LOG(DEBUG, "Disk vdev=%s, backend %d unknown", a->disk->vdev, backend);
         return 0;
@@ -351,6 +381,12 @@ static int disk_try_backend(disk_try_backend_args *a,
  bad_colo:
     LOG(DEBUG, "Disk vdev=%s, backend %s not compatible with colo",
         a->disk->vdev, libxl_disk_backend_to_string(backend));
+    return 0;
+
+ bad_specification:
+    LOG(DEBUG, "Disk vdev=%s, backend %s not compatible with specification %s",
+        a->disk->vdev, libxl_disk_backend_to_string(backend),
+        libxl_disk_specification_to_string(specification));
     return 0;
 }
 
@@ -376,8 +412,9 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
     a.gc = gc;
     a.disk = disk;
 
-    LOG(DEBUG, "Disk vdev=%s spec.backend=%s", disk->vdev,
-               libxl_disk_backend_to_string(disk->backend));
+    LOG(DEBUG, "Disk vdev=%s spec.backend=%s specification=%s", disk->vdev,
+               libxl_disk_backend_to_string(disk->backend),
+               libxl_disk_specification_to_string(disk->specification));
 
     if (disk->format == LIBXL_DISK_FORMAT_EMPTY) {
         if (!disk->is_cdrom) {
@@ -392,7 +429,8 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
         }
         memset(&a.stab, 0, sizeof(a.stab));
     } else if ((disk->backend == LIBXL_DISK_BACKEND_UNKNOWN ||
-                disk->backend == LIBXL_DISK_BACKEND_PHY) &&
+                disk->backend == LIBXL_DISK_BACKEND_PHY ||
+                disk->backend == LIBXL_DISK_BACKEND_STANDALONE) &&
                disk->backend_domid == LIBXL_TOOLSTACK_DOMID &&
                !disk->script) {
         if (stat(disk->pdev_path, &a.stab)) {
@@ -408,7 +446,8 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
         ok=
             disk_try_backend(&a, LIBXL_DISK_BACKEND_PHY) ?:
             disk_try_backend(&a, LIBXL_DISK_BACKEND_QDISK) ?:
-            disk_try_backend(&a, LIBXL_DISK_BACKEND_TAP);
+            disk_try_backend(&a, LIBXL_DISK_BACKEND_TAP) ?:
+            disk_try_backend(&a, LIBXL_DISK_BACKEND_STANDALONE);
         if (ok)
             LOG(DEBUG, "Disk vdev=%s, using backend %s",
                        disk->vdev,
@@ -441,8 +480,23 @@ char *libxl__device_disk_string_of_backend(libxl_disk_backend backend)
         case LIBXL_DISK_BACKEND_QDISK: return "qdisk";
         case LIBXL_DISK_BACKEND_TAP: return "phy";
         case LIBXL_DISK_BACKEND_PHY: return "phy";
+        case LIBXL_DISK_BACKEND_STANDALONE: return "standalone";
         default: return NULL;
     }
+}
+
+char *libxl__device_disk_string_of_specification(libxl_disk_specification specification)
+{
+    switch (specification) {
+        case LIBXL_DISK_SPECIFICATION_XEN: return "xen";
+        case LIBXL_DISK_SPECIFICATION_VIRTIO: return "virtio";
+        default: return NULL;
+    }
+}
+
+char *libxl__device_disk_string_of_transport(libxl_disk_transport transport)
+{
+    return (transport == LIBXL_DISK_TRANSPORT_MMIO ? "mmio" : NULL);
 }
 
 const char *libxl__qemu_disk_format_string(libxl_disk_format format)
