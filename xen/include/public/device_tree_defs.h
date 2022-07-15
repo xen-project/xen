@@ -4,9 +4,10 @@
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 /*
  * The device tree compiler (DTC) is allocating the phandle from 1 to
- * onwards. Reserve a high value for the GIC phandle.
+ * onwards. Reserve high values for the specific phandles.
  */
 #define GUEST_PHANDLE_GIC (65000)
+#define GUEST_PHANDLE_IOMMU (GUEST_PHANDLE_GIC + 1)
 
 #define GUEST_ROOT_ADDRESS_CELLS 2
 #define GUEST_ROOT_SIZE_CELLS 2

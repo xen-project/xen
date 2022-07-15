@@ -865,9 +865,32 @@ static int make_vpci_node(libxl__gc *gc, void *fdt,
     return 0;
 }
 
+static int make_xen_iommu_node(libxl__gc *gc, void *fdt)
+{
+    int res;
+
+    /* See Linux Documentation/devicetree/bindings/iommu/xen,grant-dma.yaml */
+    res = fdt_begin_node(fdt, "xen_iommu");
+    if (res) return res;
+
+    res = fdt_property_compat(gc, fdt, 1, "xen,grant-dma");
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "#iommu-cells", 1);
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "phandle", GUEST_PHANDLE_IOMMU);
+    if (res) return res;
+
+    res = fdt_end_node(fdt);
+    if (res) return res;
+
+    return 0;
+}
 
 static int make_virtio_mmio_node(libxl__gc *gc, void *fdt,
-                                 uint64_t base, uint32_t irq)
+                                 uint64_t base, uint32_t irq,
+                                 uint32_t backend_domid)
 {
     int res;
     gic_interrupt intr;
@@ -889,6 +912,16 @@ static int make_virtio_mmio_node(libxl__gc *gc, void *fdt,
 
     res = fdt_property(fdt, "dma-coherent", NULL, 0);
     if (res) return res;
+
+    if (backend_domid != LIBXL_TOOLSTACK_DOMID) {
+        uint32_t iommus_prop[2];
+
+        iommus_prop[0] = cpu_to_fdt32(GUEST_PHANDLE_IOMMU);
+        iommus_prop[1] = cpu_to_fdt32(backend_domid);
+
+        res = fdt_property(fdt, "iommus", iommus_prop, sizeof(iommus_prop));
+        if (res) return res;
+    }
 
     res = fdt_end_node(fdt);
     if (res) return res;
@@ -1097,6 +1130,7 @@ static int libxl__prepare_dtb(libxl__gc *gc, libxl_domain_config *d_config,
     size_t fdt_size = 0;
     int pfdt_size = 0;
     libxl_domain_build_info *const info = &d_config->b_info;
+    bool iommu_created;
     unsigned int i;
 
     const libxl_version_info *vers;
@@ -1204,11 +1238,20 @@ next_resize:
         if (d_config->num_pcidevs)
             FDT( make_vpci_node(gc, fdt, ainfo, dom) );
 
+        iommu_created = false;
         for (i = 0; i < d_config->num_disks; i++) {
             libxl_device_disk *disk = &d_config->disks[i];
 
-            if (disk->specification == LIBXL_DISK_SPECIFICATION_VIRTIO)
-                FDT( make_virtio_mmio_node(gc, fdt, disk->base, disk->irq) );
+            if (disk->specification == LIBXL_DISK_SPECIFICATION_VIRTIO) {
+                if (disk->backend_domid != LIBXL_TOOLSTACK_DOMID &&
+                    !iommu_created) {
+                    FDT( make_xen_iommu_node(gc, fdt) );
+                    iommu_created = true;
+                }
+
+                FDT( make_virtio_mmio_node(gc, fdt, disk->base, disk->irq,
+                                           disk->backend_domid) );
+            }
         }
 
         if (pfdt)
