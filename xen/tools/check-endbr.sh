@@ -61,18 +61,35 @@ ${OBJDUMP} -j .text $1 -d -w | grep '	endbr64 *$' | cut -f 1 -d ':' > $VALID &
 #    the lower bits, rounding integers to the nearest 4k.
 #
 #    Instead, use the fact that Xen's .text is within a 1G aligned region, and
-#    split the VMA in half so AWK's numeric addition is only working on 32 bit
-#    numbers, which don't lose precision.
+#    split the VMA so AWK's numeric addition is only working on <32 bit
+#    numbers, which don't lose precision.  (See point 5)
 #
 # 4) MAWK doesn't support plain hex constants (an optional part of the POSIX
 #    spec), and GAWK and MAWK can't agree on how to work with hex constants in
 #    a string.  Use the shell to convert $vma_lo to decimal before passing to
 #    AWK.
 #
+# 5) Point 4 isn't fully portable.  POSIX only requires that $((0xN)) be
+#    evaluated as long, which in 32bit shells turns negative if bit 31 of the
+#    VMA is set.  AWK then interprets this negative number as a double before
+#    adding the offsets from the binary grep.
+#
+#    Instead of doing an 8/8 split with vma_hi/lo, do a 9/7 split.
+#
+#    The consequence of this is that for all offsets, $vma_lo + offset needs
+#    to be less that 256M (i.e. 7 nibbles) so as to be successfully recombined
+#    with the 9 nibbles of $vma_hi.  This is fine; .text is at the start of a
+#    1G aligned region, and Xen is far far smaller than 256M, but leave safety
+#    check nevertheless.
+#
 eval $(${OBJDUMP} -j .text $1 -h |
-    $AWK '$2 == ".text" {printf "vma_hi=%s\nvma_lo=%s\n", substr($4, 1, 8), substr($4, 9, 16)}')
+    $AWK '$2 == ".text" {printf "vma_hi=%s\nvma_lo=%s\n", substr($4, 1, 9), substr($4, 10, 16)}')
 
 ${OBJCOPY} -j .text $1 -O binary $TEXT_BIN
+
+bin_sz=$(stat -c '%s' $TEXT_BIN)
+[ "$bin_sz" -ge $(((1 << 28) - $vma_lo)) ] &&
+    { echo "$MSG_PFX Error: .text offsets must not exceed 256M" >&2; exit 1; }
 
 # instruction:    hex:           oct:
 # endbr64         f3 0f 1e fa    363 017 036 372
@@ -84,7 +101,7 @@ then
 else
     grep -aob -e "$(printf '\363\17\36\372')" -e "$(printf '\363\17\36\373')" \
          -e "$(printf '\146\17\37\1')" $TEXT_BIN
-fi | $AWK -F':' '{printf "%s%x\n", "'$vma_hi'", int('$((0x$vma_lo))') + $1}' > $ALL
+fi | $AWK -F':' '{printf "%s%07x\n", "'$vma_hi'", int('$((0x$vma_lo))') + $1}' > $ALL
 
 # Wait for $VALID to become complete
 wait
