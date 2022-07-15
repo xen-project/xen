@@ -124,7 +124,6 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
     struct cpu_info *cpu_info = get_cpu_info();
     struct vcpu *curr = current;
     unsigned long dummy;
-    u32 entry_vector = cpu_info->guest_cpu_user_regs.entry_vector;
 
     ASSERT(wqv->esp == 0);
 
@@ -169,8 +168,6 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         for ( ; ; )
             do_softirq();
     }
-
-    cpu_info->guest_cpu_user_regs.entry_vector = entry_vector;
 }
 
 static void __finish_wait(struct waitqueue_vcpu *wqv)
