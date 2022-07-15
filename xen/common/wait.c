@@ -137,7 +137,19 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
             do_softirq();
     }
 
-    /* Hand-rolled setjmp(). */
+    /*
+     * Hand-rolled setjmp().
+     *
+     * __prepare_to_wait() is the leaf of a deep calltree.  Preserve the GPRs,
+     * bounds check what we want to stash in wqv->stack, copy the active stack
+     * (up to cpu_info) into wqv->stack, then return normally.  Our caller
+     * will shortly schedule() and discard the current context.
+     *
+     * The copy out is performed with a rep movsb.  When
+     * check_wakeup_from_wait() longjmp()'s back into us, %rsp is pre-adjusted
+     * to be suitable and %rsi/%rdi are swapped, so the rep movsb instead
+     * copies in from wqv->stack over the active stack.
+     */
     asm volatile (
         "push %%rax; push %%rbx; push %%rdx; push %%rbp;"
         "push %%r8;  push %%r9;  push %%r10; push %%r11;"
@@ -199,9 +211,17 @@ void check_wakeup_from_wait(void)
     }
 
     /*
-     * Hand-rolled longjmp().  Returns to __prepare_to_wait(), and lands on a
-     * `rep movs` instruction.  All other GPRs are restored from the stack, so
-     * are available for use here.
+     * Hand-rolled longjmp().
+     *
+     * check_wakeup_from_wait() is always called with a shallow stack,
+     * immediately after the vCPU has been rescheduled.
+     *
+     * Adjust %rsp to be the correct depth for the (deeper) stack we want to
+     * restore, then prepare %rsi, %rdi and %rcx such that when we rejoin the
+     * rep movs in __prepare_to_wait(), it copies from wqv->stack over the
+     * active stack.
+     *
+     * All other GPRs are available for use; they're restored from the stack.
      */
     asm volatile (
         "mov %1,%%"__OP"sp; jmp .L_wq_resume;"
