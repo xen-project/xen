@@ -353,6 +353,7 @@ cpu_init_done:
 
         ldr   r0, =HSCTLR_SET
         mcr   CP32(r0, HSCTLR)
+        isb
 
         mov   pc, r5                        /* Return address is in r5 */
 ENDPROC(cpu_init)
