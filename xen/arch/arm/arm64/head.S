@@ -486,6 +486,7 @@ cpu_init:
 
         ldr   x0, =SCTLR_EL2_SET
         msr   SCTLR_EL2, x0
+        isb
 
         /*
          * Ensure that any exceptions encountered at EL2
