@@ -14,9 +14,6 @@
 
 #define INITIAL_NR_GRANT_FRAMES 1U
 
-struct grant_table_arch {
-};
-
 static inline int create_grant_host_mapping(uint64_t addr, mfn_t frame,
                                             unsigned int flags,
                                             unsigned int cache_flags)
@@ -35,8 +32,6 @@ static inline int replace_grant_host_mapping(uint64_t addr, mfn_t frame,
     return replace_grant_pv_mapping(addr, frame, new_addr, flags);
 }
 
-#define gnttab_init_arch(gt) 0
-#define gnttab_destroy_arch(gt) do {} while ( 0 )
 #define gnttab_set_frame_gfn(gt, st, idx, gfn, mfn)                      \
     (gfn_eq(gfn, INVALID_GFN)                                            \
      ? guest_physmap_remove_page((gt)->domain,                           \

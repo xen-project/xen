@@ -155,6 +155,10 @@
 #define PGC_reserved 0
 #endif
 
+#ifndef PGT_TYPE_INFO_INITIALIZER
+#define PGT_TYPE_INFO_INITIALIZER 0
+#endif
+
 /*
  * Comma-separated list of hexadecimal page numbers containing bad bytes.
  * e.g. 'badpage=0x3f45,0x8a321'.
@@ -1024,7 +1028,7 @@ static struct page_info *alloc_heap_pages(
                                 &tlbflush_timestamp);
 
         /* Initialise fields which have other uses for free pages. */
-        pg[i].u.inuse.type_info = 0;
+        pg[i].u.inuse.type_info = PGT_TYPE_INFO_INITIALIZER;
         page_set_owner(&pg[i], NULL);
 
     }
@@ -2702,7 +2706,7 @@ static struct page_info * __init acquire_staticmem_pages(mfn_t smfn,
          */
         pg[i].count_info = PGC_reserved | PGC_state_inuse;
         /* Initialise fields which have other uses for free pages. */
-        pg[i].u.inuse.type_info = 0;
+        pg[i].u.inuse.type_info = PGT_TYPE_INFO_INITIALIZER;
         page_set_owner(&pg[i], NULL);
     }
 

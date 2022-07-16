@@ -1449,9 +1449,21 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
 
     spin_lock(&d->page_alloc_lock);
 
-    /* The incremented type count pins as writable or read-only. */
-    page->u.inuse.type_info =
-        (flags == SHARE_ro ? PGT_none : PGT_writable_page) | 1;
+    /*
+     * The incremented type count pins as writable or read-only.
+     *
+     * Please note, the update of type_info field here is not atomic as
+     * we use Read-Modify-Write operation on it. But currently it is fine
+     * because the caller of page_set_xenheap_gfn() (which is another place
+     * where type_info is updated) would need to acquire a reference on
+     * the page. This is only possible after the count_info is updated *and*
+     * there is a barrier between the type_info and count_info. So there is
+     * no immediate need to use cmpxchg() here.
+     */
+    page->u.inuse.type_info &= ~(PGT_type_mask | PGT_count_mask);
+    page->u.inuse.type_info |= (flags == SHARE_ro ? PGT_none
+                                                  : PGT_writable_page) |
+                                MASK_INSR(1, PGT_count_mask);
 
     page_set_owner(page, d);
     smp_wmb(); /* install valid domain ptr before updating refcnt. */
@@ -1554,8 +1566,37 @@ int xenmem_add_to_physmap_one(
         return -ENOSYS;
     }
 
-    /* Map at new location. */
-    rc = guest_physmap_add_entry(d, gfn, mfn, 0, t);
+    /*
+     * Map at new location. Here we need to map xenheap RAM page differently
+     * because we need to store the valid GFN and make sure that nothing was
+     * mapped before (the stored GFN is invalid). And these actions need to be
+     * performed with the P2M lock held. The guest_physmap_add_entry() is just
+     * a wrapper on top of p2m_set_entry().
+     */
+    if ( !p2m_is_ram(t) || !is_xen_heap_mfn(mfn) )
+        rc = guest_physmap_add_entry(d, gfn, mfn, 0, t);
+    else
+    {
+        struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+        p2m_write_lock(p2m);
+        if ( gfn_eq(page_get_xenheap_gfn(mfn_to_page(mfn)), INVALID_GFN) )
+        {
+            rc = p2m_set_entry(p2m, gfn, 1, mfn, t, p2m->default_access);
+            if ( !rc )
+                page_set_xenheap_gfn(mfn_to_page(mfn), gfn);
+        }
+        else
+            /*
+             * Mandate the caller to first unmap the page before mapping it
+             * again. This is to prevent Xen creating an unwanted hole in
+             * the P2M. For instance, this could happen if the firmware stole
+             * a RAM address for mapping the shared_info page into but forgot
+             * to unmap it afterwards.
+             */
+            rc = -EBUSY;
+        p2m_write_unlock(p2m);
+    }
 
     /*
      * For XENMAPSPACE_gmfn_foreign if we failed to add the mapping, we need

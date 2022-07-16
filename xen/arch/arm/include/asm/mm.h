@@ -98,9 +98,22 @@ struct page_info
 #define PGT_writable_page PG_mask(1, 1)  /* has writable mappings?         */
 #define PGT_type_mask     PG_mask(1, 1)  /* Bits 31 or 63.                 */
 
- /* Count of uses of this frame as its current type. */
-#define PGT_count_width   PG_shift(2)
-#define PGT_count_mask    ((1UL<<PGT_count_width)-1)
+ /* 2-bit count of uses of this frame as its current type. */
+#define PGT_count_mask    PG_mask(3, 3)
+
+/*
+ * Stored in bits [28:0] (arm32) or [60:0] (arm64) GFN if page is xenheap page.
+ */
+#define PGT_gfn_width     PG_shift(3)
+#define PGT_gfn_mask      ((1UL<<PGT_gfn_width)-1)
+
+#define PGT_INVALID_XENHEAP_GFN   _gfn(PGT_gfn_mask)
+
+/*
+ * An arch-specific initialization pattern is needed for the type_info field
+ * as it's GFN portion can contain the valid GFN if page is xenheap page.
+ */
+#define PGT_TYPE_INFO_INITIALIZER   gfn_x(PGT_INVALID_XENHEAP_GFN)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated    PG_shift(1)
@@ -353,6 +366,34 @@ static inline void put_page_and_type(struct page_info *page)
 void clear_and_clean_page(struct page_info *page);
 
 unsigned int arch_get_dma_bitsize(void);
+
+/*
+ * All accesses to the GFN portion of type_info field should always be
+ * protected by the P2M lock. In case when it is not feasible to satisfy
+ * that requirement (risk of deadlock, lock inversion, etc) it is important
+ * to make sure that all non-protected updates to this field are atomic.
+ */
+static inline gfn_t page_get_xenheap_gfn(const struct page_info *p)
+{
+    gfn_t gfn_ = _gfn(ACCESS_ONCE(p->u.inuse.type_info) & PGT_gfn_mask);
+
+    ASSERT(is_xen_heap_page(p));
+
+    return gfn_eq(gfn_, PGT_INVALID_XENHEAP_GFN) ? INVALID_GFN : gfn_;
+}
+
+static inline void page_set_xenheap_gfn(struct page_info *p, gfn_t gfn)
+{
+    gfn_t gfn_ = gfn_eq(gfn, INVALID_GFN) ? PGT_INVALID_XENHEAP_GFN : gfn;
+    unsigned long x, nx, y = p->u.inuse.type_info;
+
+    ASSERT(is_xen_heap_page(p));
+
+    do {
+        x = y;
+        nx = (x & ~PGT_gfn_mask) | gfn_x(gfn_);
+    } while ( (y = cmpxchg(&p->u.inuse.type_info, x, nx)) != x );
+}
 
 #endif /*  __ARCH_ARM_MM__ */
 /*
