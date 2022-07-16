@@ -65,6 +65,11 @@
         .endif
 .endm
 
+.macro load_paddr rb, sym
+        ldr   \rb, =\sym
+        add   \rb, \rb, r10
+.endm
+
 /*
  * Common register usage in this file:
  *   r0  -
@@ -157,8 +162,7 @@ past_zImage:
 
         /* Using the DTB in the .dtb section? */
 .ifnes CONFIG_DTB_FILE,""
-        ldr   r8, =_sdtb
-        add   r8, r10                /* r8 := paddr(DTB) */
+        load_paddr r8, _stdb
 .endif
 
         /* Initialize the UART if earlyprintk has been enabled. */
@@ -208,8 +212,7 @@ GLOBAL(init_secondary)
         mrc   CP32(r1, MPIDR)
         bic   r7, r1, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
 
-        ldr   r0, =smp_up_cpu
-        add   r0, r0, r10            /* Apply physical offset */
+        load_paddr r0, smp_up_cpu
         dsb
 2:      ldr   r1, [r0]
         cmp   r1, r7
@@ -376,8 +379,7 @@ ENDPROC(cpu_init)
         and   r1, r1, r2             /* r1 := slot in \tlb */
         lsl   r1, r1, #3             /* r1 := slot offset in \tlb */
 
-        ldr   r4, =\tbl
-        add   r4, r4, r10            /* r4 := paddr(\tlb) */
+        load_paddr r4, \tbl
 
         movw  r2, #PT_PT             /* r2:r3 := right for linear PT */
         orr   r2, r2, r4             /*           + \tlb paddr */
@@ -536,8 +538,7 @@ enable_mmu:
         dsb   nsh
 
         /* Write Xen's PT's paddr into the HTTBR */
-        ldr   r0, =boot_pgtable
-        add   r0, r0, r10            /* r0 := paddr (boot_pagetable) */
+        load_paddr r0, boot_pgtable
         mov   r1, #0                 /* r0:r1 is paddr (boot_pagetable) */
         mcrr  CP64(r0, r1, HTTBR)
         isb
@@ -782,10 +783,8 @@ ENTRY(lookup_processor_type)
  */
 __lookup_processor_type:
         mrc   CP32(r0, MIDR)                /* r0 := our cpu id */
-        ldr   r1, = __proc_info_start
-        add   r1, r1, r10                   /* r1 := paddr of table (start) */
-        ldr   r2, = __proc_info_end
-        add   r2, r2, r10                   /* r2 := paddr of table (end) */
+        load_paddr r1, __proc_info_start
+        load_paddr r2, __proc_info_end
 1:      ldr   r3, [r1, #PROCINFO_cpu_mask]
         and   r4, r0, r3                    /* r4 := our cpu id with mask */
         ldr   r3, [r1, #PROCINFO_cpu_val]   /* r3 := cpu val in current proc info */
