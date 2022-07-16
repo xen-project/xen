@@ -1308,11 +1308,39 @@ static inline int p2m_remove_mapping(struct domain *d,
                                      mfn_t mfn)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    unsigned long i;
     int rc;
 
     p2m_write_lock(p2m);
+    /*
+     * Before removing the GFN - MFN mapping for any RAM pages make sure
+     * that there is no difference between what is already mapped and what
+     * is requested to be unmapped.
+     * If they don't match bail out early. For instance, this could happen
+     * if two CPUs are requesting to unmap the same P2M entry concurrently.
+     */
+    for ( i = 0; i < nr; )
+    {
+        unsigned int cur_order;
+        p2m_type_t t;
+        mfn_t mfn_return = p2m_get_entry(p2m, gfn_add(start_gfn, i), &t, NULL,
+                                         &cur_order, NULL);
+
+        if ( p2m_is_any_ram(t) &&
+             (!mfn_valid(mfn) || !mfn_eq(mfn_add(mfn, i), mfn_return)) )
+        {
+            rc = -EILSEQ;
+            goto out;
+        }
+
+        i += (1UL << cur_order) -
+             ((gfn_x(start_gfn) + i) & ((1UL << cur_order) - 1));
+    }
+
     rc = p2m_set_entry(p2m, start_gfn, nr, INVALID_MFN,
                        p2m_invalid, p2m_access_rwx);
+
+out:
     p2m_write_unlock(p2m);
 
     return rc;
