@@ -101,7 +101,7 @@ int map_pages_to_xen(
     unsigned int flags);
 /* Alter the permissions of a range of Xen virtual address space. */
 int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags);
-int destroy_xen_mappings(unsigned long s, unsigned long e);
+int destroy_xen_mappings(unsigned long v, unsigned long e);
 /* Retrieve the MFN mapped by VA in Xen virtual address space. */
 mfn_t xen_map_to_mfn(unsigned long va);
 

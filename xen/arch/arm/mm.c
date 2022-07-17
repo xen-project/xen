@@ -1368,18 +1368,14 @@ int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
     return xen_pt_update(virt, INVALID_MFN, nr_mfns, _PAGE_POPULATE);
 }
 
-int destroy_xen_mappings(unsigned long s, unsigned long e)
+int destroy_xen_mappings(unsigned long v, unsigned long e)
 {
-    ASSERT(IS_ALIGNED(s, PAGE_SIZE));
-    ASSERT(IS_ALIGNED(e, PAGE_SIZE));
-    ASSERT(s <= e);
-    return xen_pt_update(s, INVALID_MFN, (e - s) >> PAGE_SHIFT, 0);
+    ASSERT(v <= e);
+    return xen_pt_update(v, INVALID_MFN, (e - v) >> PAGE_SHIFT, 0);
 }
 
 int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags)
 {
-    ASSERT(IS_ALIGNED(s, PAGE_SIZE));
-    ASSERT(IS_ALIGNED(e, PAGE_SIZE));
     ASSERT(s <= e);
     return xen_pt_update(s, INVALID_MFN, (e - s) >> PAGE_SHIFT, flags);
 }
