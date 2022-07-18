@@ -173,7 +173,7 @@ static void vm_event_wake_queued(struct domain *d, struct vm_event_domain *ved)
  * call vm_event_wake() again, ensuring that any blocked vCPUs will get
  * unpaused once all the queued vCPUs have made it through.
  */
-void vm_event_wake(struct domain *d, struct vm_event_domain *ved)
+static void vm_event_wake(struct domain *d, struct vm_event_domain *ved)
 {
     if ( !list_empty(&ved->wq.list) )
         vm_event_wake_queued(d, ved);
