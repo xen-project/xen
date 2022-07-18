@@ -70,6 +70,7 @@ Bit     Description
 0       Ring reconnection (see the ring reconnection feature below)
 1       Connection error indicator (see connection error feature below)
 2       GET_FEATURE and SET_FEATURE Xenstore wire commands are available
+3       GET_QUOTA and SET_QUOTA Xenstore wire commands are available
 
 The "Connection state" field is used to request a ring close and reconnect.
 The "Connection state" field only contains valid data if the server has
