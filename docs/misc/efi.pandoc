@@ -20,9 +20,13 @@ Xen to load the configuration file even if multiboot modules are found.
 Once built, `make install-xen` will place the resulting binary directly into
 the EFI boot partition, provided `EFI_VENDOR` is set in the environment (and
 `EFI_MOUNTPOINT` is overridden as needed, should the default of `/boot/efi` not
-match your system). The xen.efi binary will also be installed in
-`/usr/lib64/efi/`, unless `EFI_DIR` is set in the environment to override this
-default.
+match your system). When built with debug info, the binary can be quite large.
+Setting `INSTALL_EFI_STRIP=1` in the environment will cause it to be stripped
+of debug info in the process of installing. `INSTALL_EFI_STRIP` can also be set
+to any combination of options suitable to pass to `strip`, in case the default
+ones don't do. The xen.efi binary will also be installed in `/usr/lib64/efi/`,
+unless `EFI_DIR` is set in the environment to override this default. This
+binary will not be stripped in the process.
 
 The binary itself will require a configuration file (names with the `.efi`
 extension of the binary's name replaced by `.cfg`, and - until an existing
