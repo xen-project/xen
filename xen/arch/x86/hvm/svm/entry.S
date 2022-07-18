@@ -113,15 +113,15 @@ __UNLIKELY_END(nsvm_hap)
         ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM
 
         .macro svm_vmexit_spec_ctrl
-            /*
-             * Write to MSR_SPEC_CTRL unconditionally, for the RAS[:32]
-             * flushing side effect.
-             */
-            mov    $MSR_SPEC_CTRL, %ecx
             movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
+            movzbl CPUINFO_last_spec_ctrl(%rsp), %edx
+            cmp    %edx, %eax
+            je     1f /* Skip write if value is correct. */
+            mov    $MSR_SPEC_CTRL, %ecx
             xor    %edx, %edx
             wrmsr
             mov    %al, CPUINFO_last_spec_ctrl(%rsp)
+1:
         .endm
         ALTERNATIVE "", svm_vmexit_spec_ctrl, X86_FEATURE_SC_MSR_HVM
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
