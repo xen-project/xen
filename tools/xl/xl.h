@@ -34,7 +34,6 @@ struct domain_create {
     int daemonize;
     int monitor; /* handle guest reboots etc */
     int paused;
-    int dryrun;
     int quiet;
     int vnc;
     int vncautopass;
