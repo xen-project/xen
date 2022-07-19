@@ -677,10 +677,10 @@ static void __init efi_arch_memory_setup(void)
      * appropriate l2 slots to map.
      */
 #define l2_4G_offset(a)                                                 \
-    (((UINTN)(a) >> L2_PAGETABLE_SHIFT) & (4 * L2_PAGETABLE_ENTRIES - 1))
+    (((a) >> L2_PAGETABLE_SHIFT) & (4 * L2_PAGETABLE_ENTRIES - 1))
 
-    for ( i  = l2_4G_offset(_start);
-          i <= l2_4G_offset(_end - 1); ++i )
+    for ( i  = l2_4G_offset((UINTN)_start);
+          i <= l2_4G_offset((UINTN)_end - 1); ++i )
     {
         l2_pgentry_t pte = l2e_from_paddr(i << L2_PAGETABLE_SHIFT,
                                           __PAGE_HYPERVISOR | _PAGE_PSE);
