@@ -845,6 +845,9 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
                     msecs = 10;
                 }
             }
+            if ( pending )
+                printk("Non-responding CPUs: {%*pbl}\n",
+                       CPUMASK_PR(&show_state_mask));
         }
     }
 
