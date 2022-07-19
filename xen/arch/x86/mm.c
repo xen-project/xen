@@ -1229,10 +1229,10 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
     if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
          !l1e_owner->is_shutting_down && !l1e_owner->is_dying )
     {
-        gdprintk(XENLOG_WARNING,
-                 "Attempt to implicitly unmap a granted PTE %" PRIpte "\n",
-                 l1e_get_intpte(l1e));
-        domain_crash(l1e_owner);
+        gprintk(XENLOG_WARNING,
+                "Attempt to implicitly unmap %pd's grant PTE %" PRIpte "\n",
+                l1e_owner, l1e_get_intpte(l1e));
+        pv_inject_hw_exception(TRAP_gp_fault, 0);
     }
 #endif
 
