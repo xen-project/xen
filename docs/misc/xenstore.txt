@@ -176,7 +176,7 @@ SET_PERMS		<path>|<perm-as-string>|+?
 
 ---------- Watches ----------
 
-WATCH			<wpath>|<token>|[<depth>|]?
+WATCH			<wpath>|<token>|?
 	Adds a watch.
 
 	When a <path> is modified (including path creation, removal,
@@ -187,11 +187,7 @@ WATCH			<wpath>|<token>|[<depth>|]?
 	matching watch results in a WATCH_EVENT message (see below).
 
 	The event's path matches the watch's <wpath> if it is an child
-	of <wpath>. This match can be limited by specifying <depth> (a
-	decimal value of 0 or larger): it denotes the directory levels
-	below <wpath> to consider for a match ("0" would not match for
-	a child of <wpath>, "1" would match only for a direct child,
-	etc.).
+	of <wpath>.
 
 	<wpath> can be a <path> to watch or @<wspecial>.  In the
 	latter case <wspecial> may have any syntax but it matches
@@ -202,13 +198,7 @@ WATCH			<wpath>|<token>|[<depth>|]?
 				shutdown, and also on RELEASE
 				and domain destruction
 	<wspecial> events are sent to privileged callers or explicitly
-	via SET_PERMS enabled domains only. The semantics for a
-	specification of <depth> differ for generating <wspecial>
-	events: specifying "1" will report the related domid by using
-	@<wspecial>/<domid> for the reported path. Other <depth>
-	values are not supported.
-	For @releaseDomain it is possible to watch only for a specific
-	domain by specifying @releaseDomain/<domid> for the path.
+	via SET_PERMS enabled domains only.
 
 	When a watch is first set up it is triggered once straight
 	away, with <path> equal to <wpath>.  Watches may be triggered
@@ -329,30 +319,6 @@ SET_TARGET		<domid>|<tdomid>|
 	paths related to <tdomid>.
 
 	xenstored prevents the use of SET_TARGET other than by dom0.
-
-GET_FEATURE		<domid>|		<value>|
-SET_FEATURE		<domid>|<value>|
-	Returns or sets the contents of the "feature" field located at
-	offset 2064 of the Xenstore ring page of the domain specified by
-	<domid>. <value> is a decimal number being a logical or of the
-	feature bits as defined in docs/misc/xenstore-ring.txt. Trying
-	to set a bit for a feature not being supported by the running
-	Xenstore will be denied.
-
-	xenstored prevents the use of GET_FEATURE and SET_FEATURE other
-	than by dom0.
-
-GET_QUOTA		<domid>|<quota>|	<value>|
-SET_QUOTA		<domid>|<quota>|<value>|
-	Returns or sets a quota value for the domain being specified by
-	<domid>. <quota> is one of "nodes", "watches", "transactions",
-	"node-size" or "permissions". <value> is a decimal number
-	specifying the quota value, with "0" having the special meaning
-	of quota checks being disabled. The initial quota settings for
-	a domain are the global ones of Xenstore.
-
-	xenstored prevents the use of GET_QUOTA and SET_QUOTA other
-	than by dom0.
 
 ---------- Miscellaneous ----------
 
