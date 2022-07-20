@@ -1782,16 +1782,44 @@ int query_page_offline(mfn_t mfn, uint32_t *status)
 }
 
 /*
- * Hand the specified arbitrary page range to the specified heap zone
- * checking the node_id of the previous page.  If they differ and the
- * latter is not on a MAX_ORDER boundary, then we reserve the page by
- * not freeing it to the buddy allocator.
+ * This function should only be called with valid pages from the same NUMA
+ * node.
  */
+static void _init_heap_pages(const struct page_info *pg,
+                             unsigned long nr_pages,
+                             bool need_scrub)
+{
+    unsigned long s, e;
+    unsigned int nid = phys_to_nid(page_to_maddr(pg));
+
+    s = mfn_x(page_to_mfn(pg));
+    e = mfn_x(mfn_add(page_to_mfn(pg + nr_pages - 1), 1));
+    if ( unlikely(!avail[nid]) )
+    {
+        bool use_tail = IS_ALIGNED(s, 1UL << MAX_ORDER) &&
+                        (find_first_set_bit(e) <= find_first_set_bit(s));
+        unsigned long n;
+
+        n = init_node_heap(nid, s, nr_pages, &use_tail);
+        BUG_ON(n > nr_pages);
+        if ( use_tail )
+            e -= n;
+        else
+            s += n;
+    }
+
+    while ( s < e )
+    {
+        free_heap_pages(mfn_to_page(_mfn(s)), 0, need_scrub);
+        s += 1UL;
+    }
+}
+
 static void init_heap_pages(
     struct page_info *pg, unsigned long nr_pages)
 {
     unsigned long i;
-    bool idle_scrub = false;
+    bool need_scrub = scrub_debug;
 
     /*
      * Keep MFN 0 away from the buddy allocator to avoid crossing zone
@@ -1816,35 +1844,30 @@ static void init_heap_pages(
     spin_unlock(&heap_lock);
 
     if ( system_state < SYS_STATE_active && opt_bootscrub == BOOTSCRUB_IDLE )
-        idle_scrub = true;
+        need_scrub = true;
 
-    for ( i = 0; i < nr_pages; i++ )
+    for ( i = 0; i < nr_pages; )
     {
-        unsigned int nid = phys_to_nid(page_to_maddr(pg+i));
+        unsigned int nid = phys_to_nid(page_to_maddr(pg));
+        unsigned long left = nr_pages - i;
+        unsigned long contig_pages;
 
-        if ( unlikely(!avail[nid]) )
+        /*
+         * _init_heap_pages() is only able to accept range following
+         * specific property (see comment on top of _init_heap_pages()).
+         *
+         * So break down the range in smaller set.
+         */
+        for ( contig_pages = 1; contig_pages < left; contig_pages++ )
         {
-            unsigned long s = mfn_x(page_to_mfn(pg + i));
-            unsigned long e = mfn_x(mfn_add(page_to_mfn(pg + nr_pages - 1), 1));
-            bool use_tail = (nid == phys_to_nid(pfn_to_paddr(e - 1))) &&
-                            IS_ALIGNED(s, 1UL << MAX_ORDER) &&
-                            (find_first_set_bit(e) <= find_first_set_bit(s));
-            unsigned long n;
-
-            n = init_node_heap(nid, mfn_x(page_to_mfn(pg + i)), nr_pages - i,
-                               &use_tail);
-            BUG_ON(i + n > nr_pages);
-            if ( n && !use_tail )
-            {
-                i += n - 1;
-                continue;
-            }
-            if ( i + n == nr_pages )
+            if ( nid != (phys_to_nid(page_to_maddr(pg))) )
                 break;
-            nr_pages -= n;
         }
 
-        free_heap_pages(pg + i, 0, scrub_debug || idle_scrub);
+        _init_heap_pages(pg, contig_pages, need_scrub);
+
+        pg += contig_pages;
+        i += contig_pages;
     }
 }
 
