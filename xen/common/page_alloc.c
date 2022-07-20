@@ -1827,7 +1827,7 @@ static void init_heap_pages(
             unsigned long s = mfn_x(page_to_mfn(pg + i));
             unsigned long e = mfn_x(mfn_add(page_to_mfn(pg + nr_pages - 1), 1));
             bool use_tail = (nid == phys_to_nid(pfn_to_paddr(e - 1))) &&
-                            !(s & ((1UL << MAX_ORDER) - 1)) &&
+                            IS_ALIGNED(s, 1UL << MAX_ORDER) &&
                             (find_first_set_bit(e) <= find_first_set_bit(s));
             unsigned long n;
 
