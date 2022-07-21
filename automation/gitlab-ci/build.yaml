@@ -17,7 +17,7 @@
     - /^stable-.*/
 
 .gcc-tmpl:
-  variabes: &gcc
+  variables: &gcc
     CC: gcc
     CXX: g++
 
