@@ -1,7 +1,15 @@
-# Test jobs
-build-each-commit-gcc:
+.test-jobs-common:
   stage: test
   image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
+
+# Test jobs
+build-each-commit-gcc:
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:stretch
     XEN_TARGET_ARCH: x86_64
@@ -16,15 +24,9 @@ build-each-commit-gcc:
   dependencies: []
   tags:
     - x86_64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 qemu-alpine-arm64-gcc:
-  stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:unstable-arm64v8
   script:
@@ -41,15 +43,9 @@ qemu-alpine-arm64-gcc:
     when: always
   tags:
     - arm64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 qemu-alpine-x86_64-gcc:
-  stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:stretch
   script:
@@ -65,15 +61,9 @@ qemu-alpine-x86_64-gcc:
     when: always
   tags:
     - x86_64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 qemu-smoke-arm64-gcc:
-  stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:unstable-arm64v8
   script:
@@ -89,15 +79,9 @@ qemu-smoke-arm64-gcc:
     when: always
   tags:
     - arm64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 qemu-smoke-arm32-gcc:
-  stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:unstable-arm64v8
   script:
@@ -112,15 +96,9 @@ qemu-smoke-arm32-gcc:
     when: always
   tags:
     - arm64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 qemu-smoke-x86-64-gcc:
-  stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:stretch
   script:
@@ -134,15 +112,9 @@ qemu-smoke-x86-64-gcc:
     - debian-stretch-gcc-debug
   tags:
     - x86_64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 qemu-smoke-x86-64-clang:
-  stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:stretch
   script:
@@ -156,15 +128,9 @@ qemu-smoke-x86-64-clang:
     - debian-unstable-clang-debug
   tags:
     - x86_64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 qemu-smoke-x86-64-gcc-pvh:
-  stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:stretch
   script:
@@ -178,15 +144,9 @@ qemu-smoke-x86-64-gcc-pvh:
     - debian-stretch-gcc-debug
   tags:
     - x86_64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 qemu-smoke-x86-64-clang-pvh:
-  stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  extends: .test-jobs-common
   variables:
     CONTAINER: debian:stretch
   script:
@@ -200,8 +160,3 @@ qemu-smoke-x86-64-clang-pvh:
     - debian-unstable-clang-debug
   tags:
     - x86_64
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
