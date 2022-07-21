@@ -567,10 +567,16 @@ alpine-3.12-gcc-debug-arm64:
     CONTAINER: alpine:3.12-arm64v8
 
 
+## Test artifacts common
+
+.test-jobs-artifact-common:
+  stage: build
+  except: !reference [.test-jobs-common, except]
+
 # Arm test artifacts
 
 alpine-3.12-arm64-rootfs-export:
-  stage: build
+  extends: .test-jobs-artifact-common
   image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.12-arm64v8
   script:
     - mkdir binaries && cp /initrd.tar.gz binaries/initrd.tar.gz
@@ -581,7 +587,7 @@ alpine-3.12-arm64-rootfs-export:
     - arm64
 
 kernel-5.9.9-arm64-export:
-  stage: build
+  extends: .test-jobs-artifact-common
   image: registry.gitlab.com/xen-project/xen/tests-artifacts/kernel:5.9.9-arm64v8
   script:
     - mkdir binaries && cp /Image binaries/Image
@@ -592,7 +598,7 @@ kernel-5.9.9-arm64-export:
     - arm64
 
 qemu-system-aarch64-6.0.0-arm64-export:
-  stage: build
+  extends: .test-jobs-artifact-common
   image: registry.gitlab.com/xen-project/xen/tests-artifacts/qemu-system-aarch64:6.0.0-arm64v8
   script:
     - mkdir binaries && cp /qemu-system-aarch64 binaries/qemu-system-aarch64
@@ -603,7 +609,7 @@ qemu-system-aarch64-6.0.0-arm64-export:
     - arm64
 
 qemu-system-aarch64-6.0.0-arm32-export:
-  stage: build
+  extends: .test-jobs-artifact-common
   image: registry.gitlab.com/xen-project/xen/tests-artifacts/qemu-system-aarch64:6.0.0-arm64v8
   script:
     - mkdir binaries && cp /qemu-system-arm binaries/qemu-system-arm
@@ -616,7 +622,7 @@ qemu-system-aarch64-6.0.0-arm32-export:
 # x86_64 test artifacts
 
 alpine-3.12-rootfs-export:
-  stage: build
+  extends: .test-jobs-artifact-common
   image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.12
   script:
     - mkdir binaries && cp /initrd.tar.gz binaries/initrd.tar.gz
@@ -627,7 +633,7 @@ alpine-3.12-rootfs-export:
     - x86_64
 
 kernel-5.10.74-export:
-  stage: build
+  extends: .test-jobs-artifact-common
   image: registry.gitlab.com/xen-project/xen/tests-artifacts/kernel:5.10.74
   script:
     - mkdir binaries && cp /bzImage binaries/bzImage
