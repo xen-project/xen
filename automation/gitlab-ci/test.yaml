@@ -21,7 +21,7 @@ build-each-commit-gcc:
     paths:
       - '*.log'
     when: always
-  dependencies: []
+  needs: []
   tags:
     - x86_64
 
@@ -31,7 +31,7 @@ qemu-alpine-arm64-gcc:
     CONTAINER: debian:unstable-arm64v8
   script:
     - ./automation/scripts/qemu-alpine-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
-  dependencies:
+  needs:
     - alpine-3.12-gcc-arm64
     - alpine-3.12-arm64-rootfs-export
     - kernel-5.9.9-arm64-export
@@ -50,7 +50,7 @@ qemu-alpine-x86_64-gcc:
     CONTAINER: debian:stretch
   script:
     - ./automation/scripts/qemu-alpine-x86_64.sh 2>&1 | tee qemu-smoke-x86_64.log
-  dependencies:
+  needs:
     - alpine-3.12-gcc
     - alpine-3.12-rootfs-export
     - kernel-5.10.74-export
@@ -68,7 +68,7 @@ qemu-smoke-arm64-gcc:
     CONTAINER: debian:unstable-arm64v8
   script:
     - ./automation/scripts/qemu-smoke-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
-  dependencies:
+  needs:
     - debian-unstable-gcc-arm64
     - kernel-5.9.9-arm64-export
     - qemu-system-aarch64-6.0.0-arm64-export
@@ -86,7 +86,7 @@ qemu-smoke-arm32-gcc:
     CONTAINER: debian:unstable-arm64v8
   script:
     - ./automation/scripts/qemu-smoke-arm32.sh 2>&1 | tee qemu-smoke-arm32.log
-  dependencies:
+  needs:
     - debian-unstable-gcc-arm32
     - qemu-system-aarch64-6.0.0-arm32-export
   artifacts:
@@ -108,7 +108,7 @@ qemu-smoke-x86-64-gcc:
       - smoke.serial
       - '*.log'
     when: always
-  dependencies:
+  needs:
     - debian-stretch-gcc-debug
   tags:
     - x86_64
@@ -124,7 +124,7 @@ qemu-smoke-x86-64-clang:
       - smoke.serial
       - '*.log'
     when: always
-  dependencies:
+  needs:
     - debian-unstable-clang-debug
   tags:
     - x86_64
@@ -140,7 +140,7 @@ qemu-smoke-x86-64-gcc-pvh:
       - smoke.serial
       - '*.log'
     when: always
-  dependencies:
+  needs:
     - debian-stretch-gcc-debug
   tags:
     - x86_64
@@ -156,7 +156,7 @@ qemu-smoke-x86-64-clang-pvh:
       - smoke.serial
       - '*.log'
     when: always
-  dependencies:
+  needs:
     - debian-unstable-clang-debug
   tags:
     - x86_64
