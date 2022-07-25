@@ -806,75 +806,6 @@ static void queue_free_pt(struct domain_iommu *hd, mfn_t mfn, unsigned int level
     iommu_queue_free_pgtable(hd, mfn_to_page(mfn));
 }
 
-/* clear one page's page table */
-static int dma_pte_clear_one(struct domain *domain, daddr_t addr,
-                             unsigned int order,
-                             unsigned int *flush_flags)
-{
-    struct domain_iommu *hd = dom_iommu(domain);
-    struct dma_pte *page = NULL, *pte = NULL, old;
-    u64 pg_maddr;
-    unsigned int level = (order / LEVEL_STRIDE) + 1;
-
-    spin_lock(&hd->arch.mapping_lock);
-    /* get target level pte */
-    pg_maddr = addr_to_dma_page_maddr(domain, addr, level, flush_flags, false);
-    if ( pg_maddr < PAGE_SIZE )
-    {
-        spin_unlock(&hd->arch.mapping_lock);
-        return pg_maddr ? -ENOMEM : 0;
-    }
-
-    page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
-    pte = &page[address_level_offset(addr, level)];
-
-    if ( !dma_pte_present(*pte) )
-    {
-        spin_unlock(&hd->arch.mapping_lock);
-        unmap_vtd_domain_page(page);
-        return 0;
-    }
-
-    old = *pte;
-    dma_clear_pte(*pte);
-    iommu_sync_cache(pte, sizeof(*pte));
-
-    while ( pt_update_contig_markers(&page->val,
-                                     address_level_offset(addr, level),
-                                     level, PTE_kind_null) &&
-            ++level < min_pt_levels )
-    {
-        struct page_info *pg = maddr_to_page(pg_maddr);
-
-        unmap_vtd_domain_page(page);
-
-        pg_maddr = addr_to_dma_page_maddr(domain, addr, level, flush_flags,
-                                          false);
-        BUG_ON(pg_maddr < PAGE_SIZE);
-
-        page = map_vtd_domain_page(pg_maddr);
-        pte = &page[address_level_offset(addr, level)];
-        dma_clear_pte(*pte);
-        iommu_sync_cache(pte, sizeof(*pte));
-
-        *flush_flags |= IOMMU_FLUSHF_all;
-        iommu_queue_free_pgtable(hd, pg);
-        perfc_incr(iommu_pt_coalesces);
-    }
-
-    spin_unlock(&hd->arch.mapping_lock);
-
-    unmap_vtd_domain_page(page);
-
-    *flush_flags |= IOMMU_FLUSHF_modified;
-
-    if ( order && !dma_pte_superpage(old) )
-        queue_free_pt(hd, maddr_to_mfn(dma_pte_addr(old)),
-                      order / LEVEL_STRIDE);
-
-    return 0;
-}
-
 static int iommu_set_root_entry(struct vtd_iommu *iommu)
 {
     u32 sts;
@@ -2264,11 +2195,17 @@ static int __must_check cf_check intel_iommu_map_page(
 static int __must_check cf_check intel_iommu_unmap_page(
     struct domain *d, dfn_t dfn, unsigned int order, unsigned int *flush_flags)
 {
+    struct domain_iommu *hd = dom_iommu(d);
+    daddr_t addr = dfn_to_daddr(dfn);
+    struct dma_pte *page = NULL, *pte = NULL, old;
+    uint64_t pg_maddr;
+    unsigned int level = (order / LEVEL_STRIDE) + 1;
+
     /*
      * While really we could unmap at any granularity, for now we assume unmaps
      * are issued by common code only at the same granularity as maps.
      */
-    ASSERT((dom_iommu(d)->platform_ops->page_sizes >> order) & PAGE_SIZE_4K);
+    ASSERT((hd->platform_ops->page_sizes >> order) & PAGE_SIZE_4K);
 
     /* Do nothing if VT-d shares EPT page table */
     if ( iommu_use_hap_pt(d) )
@@ -2278,7 +2215,62 @@ static int __must_check cf_check intel_iommu_unmap_page(
     if ( iommu_hwdom_passthrough && is_hardware_domain(d) )
         return 0;
 
-    return dma_pte_clear_one(d, dfn_to_daddr(dfn), order, flush_flags);
+    spin_lock(&hd->arch.mapping_lock);
+    /* get target level pte */
+    pg_maddr = addr_to_dma_page_maddr(d, addr, level, flush_flags, false);
+    if ( pg_maddr < PAGE_SIZE )
+    {
+        spin_unlock(&hd->arch.mapping_lock);
+        return pg_maddr ? -ENOMEM : 0;
+    }
+
+    page = map_vtd_domain_page(pg_maddr);
+    pte = &page[address_level_offset(addr, level)];
+
+    if ( !dma_pte_present(*pte) )
+    {
+        spin_unlock(&hd->arch.mapping_lock);
+        unmap_vtd_domain_page(page);
+        return 0;
+    }
+
+    old = *pte;
+    dma_clear_pte(*pte);
+    iommu_sync_cache(pte, sizeof(*pte));
+
+    while ( pt_update_contig_markers(&page->val,
+                                     address_level_offset(addr, level),
+                                     level, PTE_kind_null) &&
+            ++level < min_pt_levels )
+    {
+        struct page_info *pg = maddr_to_page(pg_maddr);
+
+        unmap_vtd_domain_page(page);
+
+        pg_maddr = addr_to_dma_page_maddr(d, addr, level, flush_flags, false);
+        BUG_ON(pg_maddr < PAGE_SIZE);
+
+        page = map_vtd_domain_page(pg_maddr);
+        pte = &page[address_level_offset(addr, level)];
+        dma_clear_pte(*pte);
+        iommu_sync_cache(pte, sizeof(*pte));
+
+        *flush_flags |= IOMMU_FLUSHF_all;
+        iommu_queue_free_pgtable(hd, pg);
+        perfc_incr(iommu_pt_coalesces);
+    }
+
+    spin_unlock(&hd->arch.mapping_lock);
+
+    unmap_vtd_domain_page(page);
+
+    *flush_flags |= IOMMU_FLUSHF_modified;
+
+    if ( order && !dma_pte_superpage(old) )
+        queue_free_pt(hd, maddr_to_mfn(dma_pte_addr(old)),
+                      order / LEVEL_STRIDE);
+
+    return 0;
 }
 
 static int cf_check intel_iommu_lookup_page(
