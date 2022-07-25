@@ -345,6 +345,8 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
                                      level, PTE_kind_table);
 
             *flush_flags |= IOMMU_FLUSHF_modified;
+
+            perfc_incr(iommu_pt_shatters);
         }
 
         /* Install lower level page table for non-present entries */
@@ -477,6 +479,7 @@ int cf_check amd_iommu_map_page(
                               flags & IOMMUF_readable, &contig);
         *flush_flags |= IOMMU_FLUSHF_modified | IOMMU_FLUSHF_all;
         iommu_queue_free_pgtable(hd, pg);
+        perfc_incr(iommu_pt_coalesces);
     }
 
     spin_unlock(&hd->arch.mapping_lock);
@@ -543,6 +546,7 @@ int cf_check amd_iommu_unmap_page(
             clear_iommu_pte_present(pt_mfn, dfn_x(dfn), level, &free);
             *flush_flags |= IOMMU_FLUSHF_all;
             iommu_queue_free_pgtable(hd, pg);
+            perfc_incr(iommu_pt_coalesces);
         }
     }
 

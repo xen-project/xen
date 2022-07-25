@@ -404,6 +404,8 @@ static uint64_t addr_to_dma_page_maddr(struct domain *domain, daddr_t addr,
 
                 if ( flush_flags )
                     *flush_flags |= IOMMU_FLUSHF_modified;
+
+                perfc_incr(iommu_pt_shatters);
             }
 
             write_atomic(&pte->val, new_pte.val);
@@ -857,6 +859,7 @@ static int dma_pte_clear_one(struct domain *domain, daddr_t addr,
 
         *flush_flags |= IOMMU_FLUSHF_all;
         iommu_queue_free_pgtable(hd, pg);
+        perfc_incr(iommu_pt_coalesces);
     }
 
     spin_unlock(&hd->arch.mapping_lock);
@@ -2239,6 +2242,7 @@ static int __must_check cf_check intel_iommu_map_page(
 
         *flush_flags |= IOMMU_FLUSHF_modified | IOMMU_FLUSHF_all;
         iommu_queue_free_pgtable(hd, pg);
+        perfc_incr(iommu_pt_coalesces);
     }
 
     spin_unlock(&hd->arch.mapping_lock);
