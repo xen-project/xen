@@ -747,7 +747,7 @@ static void cf_check amd_dump_page_tables(struct domain *d)
 }
 
 static const struct iommu_ops __initconst_cf_clobber _iommu_ops = {
-    .page_sizes = PAGE_SIZE_4K,
+    .page_sizes = PAGE_SIZE_4K | PAGE_SIZE_2M | PAGE_SIZE_1G,
     .init = amd_iommu_domain_init,
     .hwdom_init = amd_iommu_hwdom_init,
     .quarantine_init = amd_iommu_quarantine_init,
