@@ -147,6 +147,7 @@ void iommu_free_domid(domid_t domid, unsigned long *map);
 int __must_check iommu_free_pgtables(struct domain *d);
 struct domain_iommu;
 struct page_info *__must_check iommu_alloc_pgtable(struct domain_iommu *hd);
+void iommu_queue_free_pgtable(struct domain_iommu *hd, struct page_info *pg);
 
 #endif /* !__ARCH_X86_IOMMU_H__ */
 /*
