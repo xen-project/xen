@@ -47,6 +47,10 @@ struct arch_vpmu_ops {
     int (*arch_vpmu_save)(struct vcpu *v, bool_t to_guest);
     int (*arch_vpmu_load)(struct vcpu *v, bool_t from_guest);
     void (*arch_vpmu_dump)(const struct vcpu *);
+
+#ifdef CONFIG_MEM_SHARING
+    int (*allocate_context)(struct vcpu *v);
+#endif
 };
 
 const struct arch_vpmu_ops *core2_vpmu_init(void);
@@ -59,6 +63,8 @@ struct vpmu_struct {
     u32 hw_lapic_lvtpc;
     void *context;      /* May be shared with PV guest */
     void *priv_context; /* hypervisor-only */
+    size_t context_size;
+    size_t priv_context_size;
     struct xen_pmu_data *xenpmu_data;
     spinlock_t vpmu_lock;
 };
@@ -108,6 +114,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs);
 void vpmu_initialise(struct vcpu *v);
 void vpmu_destroy(struct vcpu *v);
 void vpmu_save(struct vcpu *v);
+void vpmu_save_force(void *arg);
 int vpmu_load(struct vcpu *v, bool_t from_guest);
 void vpmu_dump(struct vcpu *v);
 
@@ -135,6 +142,16 @@ static inline void vpmu_switch_to(struct vcpu *next)
     if ( vpmu_mode & (XENPMU_MODE_SELF | XENPMU_MODE_HV) )
         vpmu_load(next, 0);
 }
+
+#ifdef CONFIG_MEM_SHARING
+int vpmu_allocate_context(struct vcpu *v);
+#else
+static inline int vpmu_allocate_context(struct vcpu *v)
+{
+    ASSERT_UNREACHABLE();
+    return 0;
+}
+#endif
 
 #endif /* __ASM_X86_HVM_VPMU_H_*/
 

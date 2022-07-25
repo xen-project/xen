@@ -1653,6 +1653,49 @@ static void copy_vcpu_nonreg_state(struct vcpu *d_vcpu, struct vcpu *cd_vcpu)
     hvm_set_nonreg_state(cd_vcpu, &nrs);
 }
 
+static int copy_vpmu(struct vcpu *d_vcpu, struct vcpu *cd_vcpu)
+{
+    struct vpmu_struct *d_vpmu = vcpu_vpmu(d_vcpu);
+    struct vpmu_struct *cd_vpmu = vcpu_vpmu(cd_vcpu);
+    int ret;
+
+    if ( !vpmu_are_all_set(d_vpmu, VPMU_INITIALIZED | VPMU_CONTEXT_ALLOCATED) )
+        return 0;
+    if ( (ret = vpmu_allocate_context(cd_vcpu)) )
+        return ret;
+
+    /*
+     * The VPMU subsystem only saves the context when the CPU does a context
+     * switch. Otherwise, the relevant MSRs are not saved on vmexit.
+     * We force a save here in case the parent CPU context is still loaded.
+     */
+    if ( vpmu_is_set(d_vpmu, VPMU_CONTEXT_LOADED) )
+    {
+        unsigned int pcpu = smp_processor_id();
+
+        if ( d_vpmu->last_pcpu != pcpu )
+        {
+            on_selected_cpus(cpumask_of(d_vpmu->last_pcpu),
+                             vpmu_save_force, d_vcpu, 1);
+            vpmu_reset(d_vpmu, VPMU_CONTEXT_LOADED);
+        }
+        else
+            vpmu_save(d_vcpu);
+    }
+
+    if ( vpmu_is_set(d_vpmu, VPMU_RUNNING) )
+        vpmu_set(cd_vpmu, VPMU_RUNNING);
+
+    /* Make sure context gets (re-)loaded when scheduled next */
+    vpmu_reset(cd_vpmu, VPMU_CONTEXT_LOADED);
+
+    memcpy(cd_vpmu->context, d_vpmu->context, d_vpmu->context_size);
+    memcpy(cd_vpmu->priv_context, d_vpmu->priv_context,
+           d_vpmu->priv_context_size);
+
+    return 0;
+}
+
 static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
 {
     unsigned int i;
@@ -1701,6 +1744,10 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
 
             copy_domain_page(new_vcpu_info_mfn, vcpu_info_mfn);
         }
+
+        ret = copy_vpmu(d_vcpu, cd_vcpu);
+        if ( ret )
+            return ret;
 
         hvm_vmtrace_reset(cd_vcpu);
 

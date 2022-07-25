@@ -518,6 +518,14 @@ static int cf_check svm_vpmu_initialise(struct vcpu *v)
     return 0;
 }
 
+#ifdef CONFIG_MEM_SHARING
+static int cf_check amd_allocate_context(struct vcpu *v)
+{
+    ASSERT_UNREACHABLE();
+    return 0;
+}
+#endif
+
 static const struct arch_vpmu_ops __initconst_cf_clobber amd_vpmu_ops = {
     .initialise = svm_vpmu_initialise,
     .do_wrmsr = amd_vpmu_do_wrmsr,
@@ -527,6 +535,10 @@ static const struct arch_vpmu_ops __initconst_cf_clobber amd_vpmu_ops = {
     .arch_vpmu_save = amd_vpmu_save,
     .arch_vpmu_load = amd_vpmu_load,
     .arch_vpmu_dump = amd_vpmu_dump,
+
+#ifdef CONFIG_MEM_SHARING
+    .allocate_context = amd_allocate_context,
+#endif
 };
 
 static const struct arch_vpmu_ops *__init common_init(void)

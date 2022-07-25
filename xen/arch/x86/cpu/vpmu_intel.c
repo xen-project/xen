@@ -282,10 +282,17 @@ static inline void __core2_vpmu_save(struct vcpu *v)
     for ( i = 0; i < fixed_pmc_cnt; i++ )
         rdmsrl(MSR_CORE_PERF_FIXED_CTR0 + i, fixed_counters[i]);
     for ( i = 0; i < arch_pmc_cnt; i++ )
+    {
         rdmsrl(MSR_IA32_PERFCTR0 + i, xen_pmu_cntr_pair[i].counter);
+        rdmsrl(MSR_P6_EVNTSEL(i), xen_pmu_cntr_pair[i].control);
+    }
 
     if ( !is_hvm_vcpu(v) )
         rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, core2_vpmu_cxt->global_status);
+    /* Save MSR to private context to make it fork-friendly */
+    else if ( mem_sharing_enabled(v->domain) )
+        vmx_read_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL,
+                           &core2_vpmu_cxt->global_ctrl);
 }
 
 static int cf_check core2_vpmu_save(struct vcpu *v, bool to_guest)
@@ -346,6 +353,10 @@ static inline void __core2_vpmu_load(struct vcpu *v)
         core2_vpmu_cxt->global_ovf_ctrl = 0;
         wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, core2_vpmu_cxt->global_ctrl);
     }
+    /* Restore MSR from context when used with a fork */
+    else if ( mem_sharing_is_fork(v->domain) )
+        vmx_write_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL,
+                            core2_vpmu_cxt->global_ctrl);
 }
 
 static int core2_vpmu_verify(struct vcpu *v)
@@ -443,7 +454,7 @@ static int cf_check core2_vpmu_load(struct vcpu *v, bool from_guest)
     return 0;
 }
 
-static int core2_vpmu_alloc_resource(struct vcpu *v)
+static int cf_check core2_vpmu_alloc_resource(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct xen_pmu_intel_ctxt *core2_vpmu_cxt = NULL;
@@ -461,11 +472,18 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
             goto out_err;
     }
 
-    core2_vpmu_cxt = xzalloc_flex_struct(struct xen_pmu_intel_ctxt, regs,
-                                         fixed_pmc_cnt + arch_pmc_cnt *
-                                         (sizeof(struct xen_pmu_cntr_pair) /
-                                          sizeof(*core2_vpmu_cxt->regs)));
+    vpmu->priv_context_size = sizeof(uint64_t);
+    vpmu->context_size = sizeof(struct xen_pmu_intel_ctxt) +
+                         fixed_pmc_cnt * sizeof(uint64_t) +
+                         arch_pmc_cnt * sizeof(struct xen_pmu_cntr_pair);
+    /* Calculate and add the padding for alignment */
+    vpmu->context_size += vpmu->context_size %
+                          sizeof(struct xen_pmu_intel_ctxt);
+
+    core2_vpmu_cxt = _xzalloc(vpmu->context_size,
+                              sizeof(struct xen_pmu_intel_ctxt));
     p = xzalloc(uint64_t);
+
     if ( !core2_vpmu_cxt || !p )
         goto out_err;
 
@@ -889,6 +907,10 @@ static const struct arch_vpmu_ops __initconst_cf_clobber core2_vpmu_ops = {
     .arch_vpmu_save = core2_vpmu_save,
     .arch_vpmu_load = core2_vpmu_load,
     .arch_vpmu_dump = core2_vpmu_dump,
+
+#ifdef CONFIG_MEM_SHARING
+    .allocate_context = core2_vpmu_alloc_resource,
+#endif
 };
 
 const struct arch_vpmu_ops *__init core2_vpmu_init(void)
