@@ -115,12 +115,15 @@ type physinfo_cap_flag =
   | CAP_Gnttab_v1
   | CAP_Gnttab_v2
 
-type x86_physinfo_arch_cap_flag =
+type arm_physinfo_cap_flag
+
+type x86_physinfo_cap_flag =
   | CAP_X86_ASSISTED_XAPIC
   | CAP_X86_ASSISTED_X2APIC
 
-type physinfo_arch_cap_flag =
-  | X86 of x86_physinfo_arch_cap_flag
+type arch_physinfo_cap_flags =
+  | ARM of arm_physinfo_cap_flag list
+  | X86 of x86_physinfo_cap_flag list
 
 type physinfo = {
   threads_per_core : int;
@@ -133,7 +136,7 @@ type physinfo = {
   scrub_pages      : nativeint;
   capabilities     : physinfo_cap_flag list;
   max_nr_cpus      : int; (** compile-time max possible number of nr_cpus *)
-  arch_capabilities : physinfo_arch_cap_flag list;
+  arch_capabilities : arch_physinfo_cap_flags;
 }
 type version = { major : int; minor : int; extra : string; }
 type compile_info = {
