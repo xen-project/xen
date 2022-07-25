@@ -162,7 +162,7 @@ past_zImage:
 
         /* Using the DTB in the .dtb section? */
 .ifnes CONFIG_DTB_FILE,""
-        load_paddr r8, _stdb
+        load_paddr r8, _sdtb
 .endif
 
         /* Initialize the UART if earlyprintk has been enabled. */
