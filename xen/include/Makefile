@@ -114,7 +114,7 @@ all: $(obj)/xen/hypercall-defs.h
 $(obj)/xen/hypercall-defs.h: $(obj)/hypercall-defs.i $(srctree)/scripts/gen_hypercall.awk FORCE
 	$(call if_changed,genhyp)
 
-targets += xen/hypercall-defs.h
+targets += hypercall-defs.i xen/hypercall-defs.h
 
 ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
 
@@ -225,4 +225,3 @@ all: lib-x86-all
 endif
 
 clean-files := compat config generated xen/lib/x86/cpuid-autogen.h
-clean-files += hypercall-defs.i
