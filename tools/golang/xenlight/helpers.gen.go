@@ -1774,6 +1774,9 @@ x.ColoPort = int(xc.colo_port)
 x.ColoExport = C.GoString(xc.colo_export)
 x.ActiveDisk = C.GoString(xc.active_disk)
 x.HiddenDisk = C.GoString(xc.hidden_disk)
+if err := x.Trusted.fromC(&xc.trusted);err != nil {
+return fmt.Errorf("converting field Trusted: %v", err)
+}
 
  return nil}
 
@@ -1815,6 +1818,9 @@ if x.ActiveDisk != "" {
 xc.active_disk = C.CString(x.ActiveDisk)}
 if x.HiddenDisk != "" {
 xc.hidden_disk = C.CString(x.HiddenDisk)}
+if err := x.Trusted.toC(&xc.trusted); err != nil {
+return fmt.Errorf("converting field Trusted: %v", err)
+}
 
  return nil
  }
@@ -1899,6 +1905,9 @@ x.ColoFilterSecRedirector1Outdev = C.GoString(xc.colo_filter_sec_redirector1_out
 x.ColoFilterSecRewriter0Queue = C.GoString(xc.colo_filter_sec_rewriter0_queue)
 x.ColoCheckpointHost = C.GoString(xc.colo_checkpoint_host)
 x.ColoCheckpointPort = C.GoString(xc.colo_checkpoint_port)
+if err := x.Trusted.fromC(&xc.trusted);err != nil {
+return fmt.Errorf("converting field Trusted: %v", err)
+}
 
  return nil}
 
@@ -2028,6 +2037,9 @@ if x.ColoCheckpointHost != "" {
 xc.colo_checkpoint_host = C.CString(x.ColoCheckpointHost)}
 if x.ColoCheckpointPort != "" {
 xc.colo_checkpoint_port = C.CString(x.ColoCheckpointPort)}
+if err := x.Trusted.toC(&xc.trusted); err != nil {
+return fmt.Errorf("converting field Trusted: %v", err)
+}
 
  return nil
  }

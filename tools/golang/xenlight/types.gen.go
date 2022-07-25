@@ -652,6 +652,7 @@ ColoPort int
 ColoExport string
 ActiveDisk string
 HiddenDisk string
+Trusted Defbool
 }
 
 type DeviceNic struct {
@@ -718,6 +719,7 @@ ColoFilterSecRedirector1Outdev string
 ColoFilterSecRewriter0Queue string
 ColoCheckpointHost string
 ColoCheckpointPort string
+Trusted Defbool
 }
 
 type DevicePci struct {
