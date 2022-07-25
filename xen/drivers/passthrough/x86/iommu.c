@@ -31,6 +31,7 @@
 const struct iommu_init_ops *__initdata iommu_init_ops;
 struct iommu_ops __ro_after_init iommu_ops;
 bool __read_mostly iommu_non_coherent;
+bool __initdata iommu_superpages = true;
 
 enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
 
@@ -104,7 +105,12 @@ int __init iommu_hardware_setup(void)
         mask_IO_APIC_setup(ioapic_entries);
     }
 
+    if ( !iommu_superpages )
+        iommu_ops.page_sizes &= PAGE_SIZE_4K;
+
     rc = iommu_init_ops->setup();
+
+    ASSERT(iommu_superpages || iommu_ops.page_sizes == PAGE_SIZE_4K);
 
     if ( ioapic_entries )
     {

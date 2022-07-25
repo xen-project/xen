@@ -88,6 +88,8 @@ static int __init cf_check parse_iommu_param(const char *s)
             iommu_igfx = val;
         else if ( (val = parse_boolean("qinval", s, ss)) >= 0 )
             iommu_qinval = val;
+        else if ( (val = parse_boolean("superpages", s, ss)) >= 0 )
+            iommu_superpages = val;
 #endif
         else if ( (val = parse_boolean("verbose", s, ss)) >= 0 )
             iommu_verbose = val;

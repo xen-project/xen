@@ -1405,7 +1405,7 @@ detection of systems known to misbehave upon accesses to that port.
 
 ### iommu
     = List of [ <bool>, verbose, debug, force, required, quarantine[=scratch-page],
-                sharept, intremap, intpost, crash-disable,
+                sharept, superpages, intremap, intpost, crash-disable,
                 snoop, qinval, igfx, amd-iommu-perdev-intremap,
                 dom0-{passthrough,strict} ]
 
@@ -1480,6 +1480,12 @@ boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
     systems.
 
     This option is ignored on ARM, and the pagetables are always shared.
+
+*   The `superpages` boolean controls whether superpage mappings may be used
+    in IOMMU page tables.  If using this option is necessary to fix an issue,
+    please report a bug.
+
+    This option is only valid on x86.
 
 *   The `intremap` boolean controls the Interrupt Remapping sub-feature, and
     is active by default on compatible hardware.  On x86 systems, the first

@@ -2213,8 +2213,10 @@ static bool __init vtd_ept_page_compatible(const struct vtd_iommu *iommu)
     if ( rdmsr_safe(MSR_IA32_VMX_EPT_VPID_CAP, ept_cap) != 0 ) 
         return false;
 
-    return (ept_has_2mb(ept_cap) && opt_hap_2mb) <= cap_sps_2mb(vtd_cap) &&
-           (ept_has_1gb(ept_cap) && opt_hap_1gb) <= cap_sps_1gb(vtd_cap);
+    return (ept_has_2mb(ept_cap) && opt_hap_2mb) <=
+            (cap_sps_2mb(vtd_cap) && iommu_superpages) &&
+           (ept_has_1gb(ept_cap) && opt_hap_1gb) <=
+            (cap_sps_1gb(vtd_cap) && iommu_superpages);
 }
 
 static int cf_check intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
