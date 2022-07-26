@@ -3080,7 +3080,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
             if ( unlikely(!cpumask_empty(mask)) &&
                  /* Shadow mode: track only writable pages. */
                  (!shadow_mode_enabled(d) ||
-                  ((nx & PGT_type_mask) == PGT_writable_page)) )
+                  ((x & PGT_type_mask) == PGT_writable_page)) )
             {
                 perfc_incr(need_flush_tlb_flush);
                 flush_tlb_mask(mask);
