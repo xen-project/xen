@@ -1885,11 +1885,11 @@ static void init_heap_pages(
              * range to cross zones.
              */
 #ifdef CONFIG_SEPARATE_XENHEAP
-            if ( zone != page_to_zone(pg) )
+            if ( zone != page_to_zone(pg + contig_pages) )
                 break;
 #endif
 
-            if ( nid != (phys_to_nid(page_to_maddr(pg))) )
+            if ( nid != (phys_to_nid(page_to_maddr(pg + contig_pages))) )
                 break;
         }
 
