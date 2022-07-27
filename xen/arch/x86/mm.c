@@ -3018,7 +3018,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
         struct domain *d = page_get_owner(page);
 
         if ( d && shadow_mode_enabled(d) )
-            shadow_prepare_page_type_change(d, page, type);
+            shadow_prepare_page_type_change(d, page);
 
         if ( (x & PGT_type_mask) != type )
         {

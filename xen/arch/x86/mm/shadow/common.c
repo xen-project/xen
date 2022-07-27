@@ -2265,8 +2265,8 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     paging_unlock(d);
 }
 
-void shadow_prepare_page_type_change(struct domain *d, struct page_info *page,
-                                     unsigned long new_type)
+void shadow_prepare_page_type_change(struct domain *d,
+                                     const struct page_info *page)
 {
     if ( !(page->count_info & PGC_page_table) )
         return;
@@ -2278,7 +2278,7 @@ void shadow_prepare_page_type_change(struct domain *d, struct page_info *page,
      * pages are allowed to become writeable.
      */
     if ( (page->shadow_flags & SHF_oos_may_write) &&
-         new_type == PGT_writable_page )
+         (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
         return;
 #endif
 
