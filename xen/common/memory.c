@@ -58,7 +58,7 @@ struct memop_args {
 static unsigned int __read_mostly domu_max_order = CONFIG_DOMU_MAX_ORDER;
 static unsigned int __read_mostly ctldom_max_order = CONFIG_CTLDOM_MAX_ORDER;
 static unsigned int __read_mostly hwdom_max_order = CONFIG_HWDOM_MAX_ORDER;
-#ifdef HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PASSTHROUGH
 static unsigned int __read_mostly ptdom_max_order = CONFIG_PTDOM_MAX_ORDER;
 #endif
 
@@ -70,7 +70,7 @@ static int __init parse_max_order(const char *s)
         ctldom_max_order = simple_strtoul(s, &s, 0);
     if ( *s == ',' && *++s != ',' )
         hwdom_max_order = simple_strtoul(s, &s, 0);
-#ifdef HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PASSTHROUGH
     if ( *s == ',' && *++s != ',' )
         ptdom_max_order = simple_strtoul(s, &s, 0);
 #endif
@@ -83,7 +83,7 @@ static unsigned int max_order(const struct domain *d)
 {
     unsigned int order = domu_max_order;
 
-#ifdef HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PASSTHROUGH
     if ( cache_flush_permitted(d) && order < ptdom_max_order )
         order = ptdom_max_order;
 #endif
