@@ -130,7 +130,7 @@ static void __init iommu_memory_setup(struct domain *d, const char *what,
                             IOMMUF_readable | IOMMUF_writable | IOMMUF_preempt,
                             flush_flags)) > 0 )
     {
-        mfn_add(mfn, rc);
+        mfn = mfn_add(mfn, rc);
         nr -= rc;
         /* See comment below. */
         for ( ; rc--; ++page )
