@@ -332,7 +332,7 @@ static bool freemem(uint32_t domid, libxl_domain_config *d_config)
     if (rc < 0)
         return false;
 
-    do {
+    for (;;) {
         time_t start;
 
         rc = libxl_get_free_memory(ctx, &free_memkb);
@@ -341,6 +341,9 @@ static bool freemem(uint32_t domid, libxl_domain_config *d_config)
 
         if (free_memkb >= need_memkb)
             return true;
+
+        if (credit <= 0)
+            return false;
 
         rc = libxl_set_memory_target(ctx, 0, free_memkb - need_memkb, 1, 0);
         if (rc < 0)
@@ -354,9 +357,7 @@ static bool freemem(uint32_t domid, libxl_domain_config *d_config)
             return false;
 
         credit -= difftime(time(NULL), start);
-    } while (credit > 0);
-
-    return false;
+    }
 }
 
 static void reload_domain_config(uint32_t domid,
