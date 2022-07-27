@@ -511,13 +511,12 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
     printk("  Support for HVM VMs:%s%s%s%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_HVM) ||
-            boot_cpu_has(X86_FEATURE_MD_CLEAR)   ||
             boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM) ||
-            opt_eager_fpu)                           ? ""               : " None",
+            opt_eager_fpu || opt_md_clear_hvm)       ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)      ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "",
-           boot_cpu_has(X86_FEATURE_MD_CLEAR)        ? " MD_CLEAR"      : "",
+           opt_md_clear_hvm                          ? " MD_CLEAR"      : "",
            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM)  ? " IBPB-entry"    : "");
 
 #endif
@@ -525,13 +524,12 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
     printk("  Support for PV VMs:%s%s%s%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_PV) ||
-            boot_cpu_has(X86_FEATURE_MD_CLEAR)  ||
             boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) ||
-            opt_eager_fpu)                           ? ""               : " None",
+            opt_eager_fpu || opt_md_clear_pv)        ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "",
-           boot_cpu_has(X86_FEATURE_MD_CLEAR)        ? " MD_CLEAR"      : "",
+           opt_md_clear_pv                           ? " MD_CLEAR"      : "",
            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV)   ? " IBPB-entry"    : "");
 
     printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s (with%s PCID)\n",
