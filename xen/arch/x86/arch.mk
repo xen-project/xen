@@ -37,9 +37,9 @@ $(call as-option-add,CFLAGS,CC,\
 
 CFLAGS += -mno-red-zone -fpic
 
-# Xen doesn't use SSE interally.  If the compiler supports it, also skip the
-# SSE setup for variadic function calls.
-CFLAGS += -mno-sse $(call cc-option,$(CC),-mskip-rax-setup)
+# Xen doesn't use MMX or SSE interally.  If the compiler supports it, also skip
+# the SSE setup for variadic function calls.
+CFLAGS += -mno-mmx -mno-sse $(call cc-option,$(CC),-mskip-rax-setup)
 
 # Compile with thunk-extern, indirect-branch-register if avaiable.
 CFLAGS-$(CONFIG_INDIRECT_THUNK) += -mindirect-branch=thunk-extern
