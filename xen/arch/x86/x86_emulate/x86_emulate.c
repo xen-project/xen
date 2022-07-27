@@ -10464,6 +10464,7 @@ x86_emulate(
             goto done;
         if ( vex.pfx == vex_f2 ) /* enqcmd */
         {
+            generate_exception_if(mmvalp->data32[0], EXC_GP, 0);
             fail_if(!ops->read_msr);
             if ( (rc = ops->read_msr(MSR_PASID, &msr_val,
                                      ctxt)) != X86EMUL_OKAY )
@@ -10471,7 +10472,8 @@ x86_emulate(
             generate_exception_if(!(msr_val & PASID_VALID), EXC_GP, 0);
             mmvalp->data32[0] = MASK_EXTR(msr_val, PASID_PASID_MASK);
         }
-        mmvalp->data32[0] &= ~0x7ff00000;
+        else
+            generate_exception_if(mmvalp->data32[0] & 0x7ff00000, EXC_GP, 0);
         state->blk = blk_enqcmd;
         if ( (rc = ops->blk(x86_seg_es, src.val, mmvalp, 64, &_regs.eflags,
                             state, ctxt)) != X86EMUL_OKAY )
