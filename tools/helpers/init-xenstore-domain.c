@@ -72,8 +72,9 @@ static int build(xc_interface *xch)
     char cmdline[512];
     int rv, xs_fd;
     struct xc_dom_image *dom = NULL;
-    int limit_kb = (maxmem ? : (memory + 1)) * 1024;
+    int limit_kb = (maxmem ? : memory) * 1024 + X86_HVM_NR_SPECIAL_PAGES * 4;
     uint64_t mem_size = MB(memory);
+    uint64_t max_size = MB(maxmem ? : memory);
     struct e820entry e820[3];
     struct xen_domctl_createdomain config = {
         .ssidref = SECINITSID_DOMU,
@@ -157,13 +158,16 @@ static int build(xc_interface *xch)
         dom->mmio_start = LAPIC_BASE_ADDRESS;
         dom->max_vcpus = 1;
         e820[0].addr = 0;
-        e820[0].size = dom->lowmem_end;
+        e820[0].size = (max_size > LAPIC_BASE_ADDRESS) ?
+                       LAPIC_BASE_ADDRESS : max_size;
         e820[0].type = E820_RAM;
-        e820[1].addr = LAPIC_BASE_ADDRESS;
-        e820[1].size = dom->mmio_size;
+        e820[1].addr = (X86_HVM_END_SPECIAL_REGION -
+                        X86_HVM_NR_SPECIAL_PAGES) << XC_PAGE_SHIFT;
+        e820[1].size = X86_HVM_NR_SPECIAL_PAGES << XC_PAGE_SHIFT;
         e820[1].type = E820_RESERVED;
         e820[2].addr = GB(4);
-        e820[2].size = dom->highmem_end - GB(4);
+        e820[2].size = (max_size > LAPIC_BASE_ADDRESS) ?
+                       max_size - LAPIC_BASE_ADDRESS : 0;
         e820[2].type = E820_RAM;
     }
 
