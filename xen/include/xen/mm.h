@@ -61,7 +61,7 @@
 struct page_info;
 
 void put_page(struct page_info *);
-bool get_page(struct page_info *, const struct domain *);
+bool __must_check get_page(struct page_info *, const struct domain *);
 struct domain *__must_check page_get_owner_and_reference(struct page_info *);
 
 /* Boot-time allocator. Turns into generic allocator after bootstrap. */
