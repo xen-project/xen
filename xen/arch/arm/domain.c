@@ -63,7 +63,7 @@ static void do_idle(void)
     rcu_idle_exit(cpu);
 }
 
-void idle_loop(void)
+static void noreturn idle_loop(void)
 {
     unsigned int cpu = smp_processor_id();
 
@@ -330,6 +330,9 @@ static void schedule_tail(struct vcpu *prev)
     /* Ensure that the vcpu has an up-to-date time base. */
     update_vcpu_system_time(current);
 }
+
+extern void noreturn return_to_new_vcpu32(void);
+extern void noreturn return_to_new_vcpu64(void);
 
 static void continue_new_vcpu(struct vcpu *prev)
 {
