@@ -253,6 +253,7 @@ let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	let reply_error e =
 		Packet.Error e in
 	try
+		Transaction.check_quota_exn ~perm:(Connection.get_perm con) t;
 		fct con t doms cons req.Packet.data
 	with
 	| Define.Invalid_path          -> reply_error "EINVAL"
@@ -545,9 +546,10 @@ let process_packet ~store ~cons ~doms ~con ~req =
 		in
 
 		let response = try
+			Transaction.check_quota_exn ~perm:(Connection.get_perm con) t;
 			if tid <> Transaction.none then
 				(* Remember the request and response for this operation in case we need to replay the transaction *)
-				Transaction.add_operation ~perm:(Connection.get_perm con) t req response;
+				Transaction.add_operation t req response;
 			response
 		with Quota.Limit_reached ->
 			Packet.Error "EQUOTA"
