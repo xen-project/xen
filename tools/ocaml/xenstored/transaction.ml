@@ -85,6 +85,7 @@ type t = {
 	oldroot: Store.Node.t;
 	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) list;
 	mutable operations: (Packet.request * Packet.response) list;
+	mutable quota_reached: bool;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
@@ -127,6 +128,7 @@ let make ?(internal=false) id store =
 		oldroot = Store.get_root store;
 		paths = [];
 		operations = [];
+		quota_reached = false;
 		read_lowpath = None;
 		write_lowpath = None;
 	} in
@@ -143,13 +145,19 @@ let get_root t = Store.get_root t.store
 
 let is_read_only t = t.paths = []
 let add_wop t ty path = t.paths <- (ty, path) :: t.paths
-let add_operation ~perm t request response =
+let get_operations t = List.rev t.operations
+
+let check_quota_exn ~perm t =
 	if !Define.maxrequests >= 0
 		&& not (Perms.Connection.is_dom0 perm)
-		&& List.length t.operations >= !Define.maxrequests
-		then raise Quota.Limit_reached;
+		&& (t.quota_reached || List.length t.operations >= !Define.maxrequests)
+		then begin
+			t.quota_reached <- true;
+			raise Quota.Limit_reached;
+		end
+
+let add_operation t request response =
 	t.operations <- (request, response) :: t.operations
-let get_operations t = List.rev t.operations
 let set_read_lowpath t path = t.read_lowpath <- get_lowest path t.read_lowpath
 let set_write_lowpath t path = t.write_lowpath <- get_lowest path t.write_lowpath
 
