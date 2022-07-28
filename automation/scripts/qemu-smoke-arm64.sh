@@ -2,6 +2,25 @@
 
 set -ex
 
+test_variant=$1
+
+passed="BusyBox"
+check=""
+
+if [[ "${test_variant}" == "static-mem" ]]; then
+    # Memory range that is statically allocated to DOM1
+    domu_base="50000000"
+    domu_size="10000000"
+    passed="${test_variant} test passed"
+    check="
+current=\$(hexdump -e '16/1 \"%02x\"' /proc/device-tree/memory@${domu_base}/reg 2>/dev/null)
+expected=$(printf \"%016x%016x\" 0x${domu_base} 0x${domu_size})
+if [[ \"\${expected}\" == \"\${current}\" ]]; then
+	echo \"${passed}\"
+fi
+"
+fi
+
 # Install QEMU
 export DEBIAN_FRONTENT=noninteractive
 apt-get -qy update
@@ -43,6 +62,7 @@ echo "#!/bin/sh
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev
+${check}
 /bin/sh" > initrd/init
 chmod +x initrd/init
 cd initrd
@@ -68,6 +88,11 @@ DOMU_MEM[0]="256"
 LOAD_CMD="tftpb"
 UBOOT_SOURCE="boot.source"
 UBOOT_SCRIPT="boot.scr"' > binaries/config
+
+if [[ "${test_variant}" == "static-mem" ]]; then
+    echo -e "\nDOMU_STATIC_MEM[0]=\"0x${domu_base} 0x${domu_size}\"" >> binaries/config
+fi
+
 rm -rf imagebuilder
 git clone https://gitlab.com/ViryaOS/imagebuilder
 bash imagebuilder/scripts/uboot-script-gen -t tftp -d binaries/ -c binaries/config
@@ -89,5 +114,5 @@ timeout -k 1 240 \
     -bios /usr/lib/u-boot/qemu_arm64/u-boot.bin |& tee smoke.serial
 
 set -e
-(grep -q "^BusyBox" smoke.serial && grep -q "DOM1: BusyBox" smoke.serial) || exit 1
+(grep -q "^BusyBox" smoke.serial && grep -q "DOM1: ${passed}" smoke.serial) || exit 1
 exit 0

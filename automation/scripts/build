@@ -15,7 +15,15 @@ if [[ "${RANDCONFIG}" == "y" ]]; then
     make -j$(nproc) -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
     hypervisor_only="y"
 else
-    make -j$(nproc) -C xen defconfig
+    if [[ "${XEN_TARGET_ARCH}" = "arm64" ]]; then
+        echo "
+CONFIG_EXPERT=y
+CONFIG_UNSUPPORTED=y
+CONFIG_STATIC_MEMORY=y" > xen/.config
+        make -j$(nproc) -C xen olddefconfig
+    else
+        make -j$(nproc) -C xen defconfig
+    fi
 fi
 
 # Save the config file before building because build failure causes the script
