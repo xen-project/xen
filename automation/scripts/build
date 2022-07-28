@@ -91,6 +91,6 @@ for cfg in `ls ${cfg_dir}`; do
     echo "Building $cfg"
     make -j$(nproc) -C xen clean
     rm -f xen/.config
-    make -C xen KBUILD_DEFCONFIG=../../../../${cfg_dir}/${cfg} XEN_CONFIG_EXPERT=y defconfig
-    make -j$(nproc) -C xen XEN_CONFIG_EXPERT=y
+    make -C xen KBUILD_DEFCONFIG=../../../../${cfg_dir}/${cfg} defconfig
+    make -j$(nproc) -C xen
 done
