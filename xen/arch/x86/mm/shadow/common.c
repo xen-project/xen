@@ -2240,10 +2240,12 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     }                                                                   \
 } while (0)
 
+#ifdef CONFIG_HVM
     DO_UNSHADOW(SH_type_l2_32_shadow);
     DO_UNSHADOW(SH_type_l1_32_shadow);
     DO_UNSHADOW(SH_type_l2_pae_shadow);
     DO_UNSHADOW(SH_type_l1_pae_shadow);
+#endif
     DO_UNSHADOW(SH_type_l4_64_shadow);
     DO_UNSHADOW(SH_type_l3_64_shadow);
     DO_UNSHADOW(SH_type_l2h_64_shadow);
