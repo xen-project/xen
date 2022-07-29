@@ -196,6 +196,9 @@ let peek_output con = Queue.peek con.pkt_out
 let input_len con = Queue.length con.pkt_in
 let has_in_packet con = Queue.length con.pkt_in > 0
 let get_in_packet con = Queue.pop con.pkt_in
+let has_partial_input con = match con.partial_in with
+	| HaveHdr _ -> true
+	| NoHdr (n, _) -> n < Partial.header_size ()
 let has_more_input con =
 	match con.backend with
 	| Fd _         -> false
