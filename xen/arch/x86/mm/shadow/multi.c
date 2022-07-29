@@ -2637,7 +2637,7 @@ static int cf_check sh_page_fault(
         SHADOW_PRINTK("user-mode fault to PT, unshadowing mfn %#lx\n",
                       mfn_x(gmfn));
         perfc_incr(shadow_fault_emulate_failed);
-        sh_remove_shadows(d, gmfn, 0 /* thorough */, 1 /* must succeed */);
+        shadow_remove_all_shadows(d, gmfn);
         trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_USER,
                                       va, gfn);
         goto done;
@@ -2723,7 +2723,7 @@ static int cf_check sh_page_fault(
             v->arch.paging.last_write_emul_ok = 0;
         }
 #endif
-        sh_remove_shadows(d, gmfn, 0 /* thorough */, 1 /* must succeed */);
+        shadow_remove_all_shadows(d, gmfn);
         trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ,
                                    va, gfn);
         return EXCRET_fault_fixed;

@@ -389,7 +389,7 @@ static int oos_remove_write_access(struct vcpu *v, mfn_t gmfn,
          * the page.  If that doesn't work either, the guest is granting
          * his pagetables and must be killed after all.
          * This will flush the tlb, so we can return with no worries. */
-        sh_remove_shadows(d, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
+        shadow_remove_all_shadows(d, gmfn);
         return 1;
     }
 

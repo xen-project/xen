@@ -783,7 +783,7 @@ sh_remove_all_shadows_and_parents(struct domain *d, mfn_t gmfn)
 /* Even harsher: this is a HVM page that we thing is no longer a pagetable.
  * Unshadow it, and recursively unshadow pages that reference it. */
 {
-    sh_remove_shadows(d, gmfn, 0, 1);
+    shadow_remove_all_shadows(d, gmfn);
     /* XXX TODO:
      * Rework this hashtable walker to return a linked-list of all
      * the shadows it modified, then do breadth-first recursion
