@@ -84,6 +84,7 @@
 #define  ARCH_CAPS_FB_CLEAR_CTRL            (_AC(1, ULL) << 18)
 #define  ARCH_CAPS_RRSBA                    (_AC(1, ULL) << 19)
 #define  ARCH_CAPS_BHI_NO                   (_AC(1, ULL) << 20)
+#define  ARCH_CAPS_PBRSB_NO                 (_AC(1, ULL) << 24)
 
 #define MSR_FLUSH_CMD                       0x0000010b
 #define  FLUSH_CMD_L1D                      (_AC(1, ULL) <<  0)
