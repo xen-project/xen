@@ -10,6 +10,8 @@ static inline bool arch_mfns_in_directmap(unsigned long mfn, unsigned long nr)
     return false;
 }
 
+bool init_domheap_mappings(unsigned int cpu);
+
 #endif /* __ARM_ARM32_MM_H__ */
 
 /*

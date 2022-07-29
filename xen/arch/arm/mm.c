@@ -372,6 +372,58 @@ void clear_fixmap(unsigned int map)
 }
 
 #ifdef CONFIG_DOMAIN_PAGE
+/*
+ * Prepare the area that will be used to map domheap pages. They are
+ * mapped in 2MB chunks, so we need to allocate the page-tables up to
+ * the 2nd level.
+ *
+ * The caller should make sure the root page-table for @cpu has been
+ * allocated.
+ */
+bool init_domheap_mappings(unsigned int cpu)
+{
+    unsigned int order = get_order_from_pages(DOMHEAP_SECOND_PAGES);
+    lpae_t *root = per_cpu(xen_pgtable, cpu);
+    unsigned int i, first_idx;
+    lpae_t *domheap;
+    mfn_t mfn;
+
+    ASSERT(root);
+    ASSERT(!per_cpu(xen_dommap, cpu));
+
+    /*
+     * The domheap for cpu0 is initialized before the heap is initialized.
+     * So we need to use pre-allocated pages.
+     */
+    if ( !cpu )
+        domheap = cpu0_dommap;
+    else
+        domheap = alloc_xenheap_pages(order, 0);
+
+    if ( !domheap )
+        return false;
+
+    /* Ensure the domheap has no stray mappings */
+    memset(domheap, 0, DOMHEAP_SECOND_PAGES * PAGE_SIZE);
+
+    /*
+     * Update the first level mapping to reference the local CPUs
+     * domheap mapping pages.
+     */
+    mfn = virt_to_mfn(domheap);
+    first_idx = first_table_offset(DOMHEAP_VIRT_START);
+    for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
+    {
+        lpae_t pte = mfn_to_xen_entry(mfn_add(mfn, i), MT_NORMAL);
+        pte.pt.table = 1;
+        write_pte(&root[first_idx + i], pte);
+    }
+
+    per_cpu(xen_dommap, cpu) = domheap;
+
+    return true;
+}
+
 void *map_domain_page_global(mfn_t mfn)
 {
     return vmap(&mfn, 1);
@@ -633,16 +685,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
         p[i].pt.xn = 0;
     }
 
-#ifdef CONFIG_ARM_32
-    for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
-    {
-        p[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)]
-            = pte_of_xenaddr((uintptr_t)(cpu0_dommap +
-                                         i * XEN_PT_LPAE_ENTRIES));
-        p[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)].pt.table = 1;
-    }
-#endif
-
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < XEN_PT_LPAE_ENTRIES; i++ )
     {
@@ -686,7 +728,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
 
 #ifdef CONFIG_ARM_32
     per_cpu(xen_pgtable, 0) = cpu0_pgtable;
-    per_cpu(xen_dommap, 0) = cpu0_dommap;
 #endif
 }
 
@@ -719,38 +760,27 @@ int init_secondary_pagetables(int cpu)
 #else
 int init_secondary_pagetables(int cpu)
 {
-    lpae_t *first, *domheap, pte;
-    int i;
+    lpae_t *first;
 
     first = alloc_xenheap_page(); /* root == first level on 32-bit 3-level trie */
-    domheap = alloc_xenheap_pages(get_order_from_pages(DOMHEAP_SECOND_PAGES), 0);
 
-    if ( domheap == NULL || first == NULL )
+    if ( !first )
     {
-        printk("Not enough free memory for secondary CPU%d pagetables\n", cpu);
-        free_xenheap_pages(domheap, get_order_from_pages(DOMHEAP_SECOND_PAGES));
-        free_xenheap_page(first);
+        printk("CPU%u: Unable to allocate the first page-table\n", cpu);
         return -ENOMEM;
     }
 
     /* Initialise root pagetable from root of boot tables */
     memcpy(first, cpu0_pgtable, PAGE_SIZE);
-
-    /* Ensure the domheap has no stray mappings */
-    memset(domheap, 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
-
-    /* Update the first level mapping to reference the local CPUs
-     * domheap mapping pages. */
-    for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
-    {
-        pte = mfn_to_xen_entry(virt_to_mfn(domheap + i * XEN_PT_LPAE_ENTRIES),
-                               MT_NORMAL);
-        pte.pt.table = 1;
-        write_pte(&first[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)], pte);
-    }
-
     per_cpu(xen_pgtable, cpu) = first;
-    per_cpu(xen_dommap, cpu) = domheap;
+
+    if ( !init_domheap_mappings(cpu) )
+    {
+        printk("CPU%u: Unable to prepare the domheap page-tables\n", cpu);
+        per_cpu(xen_pgtable, cpu) = NULL;
+        free_xenheap_page(first);
+        return -ENOMEM;
+    }
 
     clear_boot_pagetables();
 
