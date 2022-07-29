@@ -21,7 +21,6 @@ fi
 "
 fi
 
-# Install QEMU
 export DEBIAN_FRONTENT=noninteractive
 apt-get -qy update
 apt-get -qy install --no-install-recommends u-boot-qemu \
@@ -44,7 +43,7 @@ sed 's/compatible = "arm,pl061.*/status = "disabled";/g' binaries/virt-gicv3.dts
 dtc -I dts -O dtb binaries/virt-gicv3-edited.dts > binaries/virt-gicv3.dtb
 
 
-# Busybox Dom0
+# Busybox
 mkdir -p initrd
 mkdir -p initrd/bin
 mkdir -p initrd/sbin
