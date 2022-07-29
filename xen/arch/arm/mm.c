@@ -194,7 +194,7 @@ static void __init __maybe_unused build_assertions(void)
 #endif
     BUILD_BUG_ON(first_table_offset(XEN_VIRT_START));
     BUILD_BUG_ON(second_linear_offset(XEN_VIRT_START) >= XEN_PT_LPAE_ENTRIES);
-#ifdef CONFIG_DOMAIN_PAGE
+#ifdef CONFIG_ARCH_MAP_DOMAIN_PAGE
     BUILD_BUG_ON(DOMHEAP_VIRT_START & ~FIRST_MASK);
 #endif
     /*
@@ -371,7 +371,7 @@ void clear_fixmap(unsigned int map)
     BUG_ON(res != 0);
 }
 
-#ifdef CONFIG_DOMAIN_PAGE
+#ifdef CONFIG_ARCH_MAP_DOMAIN_PAGE
 /*
  * Prepare the area that will be used to map domheap pages. They are
  * mapped in 2MB chunks, so we need to allocate the page-tables up to

@@ -17,7 +17,7 @@
 void clear_domain_page(mfn_t mfn);
 void copy_domain_page(mfn_t dst, const mfn_t src);
 
-#ifdef CONFIG_DOMAIN_PAGE
+#ifdef CONFIG_ARCH_MAP_DOMAIN_PAGE
 
 /*
  * Map a given page frame, returning the mapped virtual address. The page is
@@ -51,7 +51,7 @@ static inline void *__map_domain_page_global(const struct page_info *pg)
     return map_domain_page_global(page_to_mfn(pg));
 }
 
-#else /* !CONFIG_DOMAIN_PAGE */
+#else /* !CONFIG_ARCH_MAP_DOMAIN_PAGE */
 
 #define map_domain_page(mfn)                __mfn_to_virt(mfn_x(mfn))
 #define __map_domain_page(pg)               page_to_virt(pg)
@@ -70,7 +70,7 @@ static inline void *__map_domain_page_global(const struct page_info *pg)
 
 static inline void unmap_domain_page_global(const void *va) {};
 
-#endif /* !CONFIG_DOMAIN_PAGE */
+#endif /* !CONFIG_ARCH_MAP_DOMAIN_PAGE */
 
 #define UNMAP_DOMAIN_PAGE(p) do {   \
     unmap_domain_page(p);           \

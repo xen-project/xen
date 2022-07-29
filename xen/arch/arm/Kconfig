@@ -1,6 +1,7 @@
 config ARM_32
 	def_bool y
 	depends on "$(ARCH)" = "arm32"
+	select ARCH_MAP_DOMAIN_PAGE
 
 config ARM_64
 	def_bool y

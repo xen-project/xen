@@ -25,6 +25,9 @@ config GRANT_TABLE
 config ALTERNATIVE_CALL
 	bool
 
+config ARCH_MAP_DOMAIN_PAGE
+	bool
+
 config HAS_ALTERNATIVE
 	bool
 
