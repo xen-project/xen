@@ -125,9 +125,7 @@ let get_perm con =
 let set_target con target_domid =
 	con.perm <- Perms.Connection.set_target (get_perm con) ~perms:[Perms.READ; Perms.WRITE] target_domid
 
-let is_backend_mmap con = match con.xb.Xenbus.Xb.backend with
-	| Xenbus.Xb.Xenmmap _ -> true
-	| _ -> false
+let is_backend_mmap con = Xenbus.Xb.is_mmap con.xb
 
 let send_reply con tid rid ty data =
 	if (String.length data) > xenstore_payload_max && (is_backend_mmap con) then
