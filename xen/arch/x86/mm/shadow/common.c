@@ -1581,7 +1581,7 @@ void shadow_hash_insert(struct domain *d, unsigned long n, unsigned int t,
     sh_hash_audit_bucket(d, key);
 }
 
-void shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
+bool shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
                         mfn_t smfn)
 /* Excise the mapping (n,t)->smfn from the hash table */
 {
@@ -1606,10 +1606,8 @@ void shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
     {
         /* Need to search for the one we want */
         x = d->arch.paging.shadow.hash_table[key];
-        while ( 1 )
+        while ( x )
         {
-            ASSERT(x); /* We can't have hit the end, since our target is
-                        * still in the chain somehwere... */
             if ( next_shadow(x) == sp )
             {
                 x->next_shadow = sp->next_shadow;
@@ -1617,10 +1615,14 @@ void shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
             }
             x = next_shadow(x);
         }
+        if ( !x )
+            return false;
     }
     set_next_shadow(sp, NULL);
 
     sh_hash_audit_bucket(d, key);
+
+    return true;
 }
 
 typedef int (*hash_vcpu_callback_t)(struct vcpu *v, mfn_t smfn, mfn_t other_mfn);

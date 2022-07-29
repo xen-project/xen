@@ -132,7 +132,13 @@ delete_fl1_shadow_status(struct domain *d, gfn_t gfn, mfn_t smfn)
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%"PRI_mfn"\n",
                    gfn_x(gfn), SH_type_fl1_shadow, mfn_x(smfn));
     ASSERT(mfn_to_page(smfn)->u.sh.head);
-    shadow_hash_delete(d, gfn_x(gfn), SH_type_fl1_shadow, smfn);
+    if ( !shadow_hash_delete(d, gfn_x(gfn), SH_type_fl1_shadow, smfn) )
+    {
+        printk(XENLOG_G_ERR
+               "%pd: %"PRI_gfn":FL1 hash entry not found for %"PRI_mfn"\n",
+               d, gfn_x(gfn), mfn_x(smfn));
+        domain_crash(d);
+    }
 }
 
 

@@ -375,7 +375,7 @@ shadow_size(unsigned int shadow_type)
 mfn_t shadow_hash_lookup(struct domain *d, unsigned long n, unsigned int t);
 void  shadow_hash_insert(struct domain *d,
                          unsigned long n, unsigned int t, mfn_t smfn);
-void  shadow_hash_delete(struct domain *d,
+bool  shadow_hash_delete(struct domain *d,
                          unsigned long n, unsigned int t, mfn_t smfn);
 
 /* shadow promotion */
@@ -773,18 +773,19 @@ static inline void
 set_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
 /* Put a shadow into the hash table */
 {
-    int res;
-
     SHADOW_PRINTK("d%d gmfn=%lx, type=%08x, smfn=%lx\n",
                   d->domain_id, mfn_x(gmfn), shadow_type, mfn_x(smfn));
 
     ASSERT(mfn_to_page(smfn)->u.sh.head);
 
     /* 32-bit PV guests don't own their l4 pages so can't get_page them */
-    if ( !is_pv_32bit_domain(d) || shadow_type != SH_type_l4_64_shadow )
+    if ( (shadow_type != SH_type_l4_64_shadow || !is_pv_32bit_domain(d)) &&
+         !get_page(mfn_to_page(gmfn), d) )
     {
-        res = get_page(mfn_to_page(gmfn), d);
-        ASSERT(res == 1);
+        printk(XENLOG_G_ERR "%pd: cannot get page for MFN %" PRI_mfn "\n",
+               d, mfn_x(gmfn));
+        domain_crash(d);
+        return;
     }
 
     shadow_hash_insert(d, mfn_x(gmfn), shadow_type, smfn);
@@ -797,9 +798,9 @@ delete_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
     SHADOW_PRINTK("d%d gmfn=%"PRI_mfn", type=%08x, smfn=%"PRI_mfn"\n",
                   d->domain_id, mfn_x(gmfn), shadow_type, mfn_x(smfn));
     ASSERT(mfn_to_page(smfn)->u.sh.head);
-    shadow_hash_delete(d, mfn_x(gmfn), shadow_type, smfn);
-    /* 32-bit PV guests don't own their l4 pages; see set_shadow_status */
-    if ( !is_pv_32bit_domain(d) || shadow_type != SH_type_l4_64_shadow )
+    if ( shadow_hash_delete(d, mfn_x(gmfn), shadow_type, smfn) &&
+         /* 32-bit PV guests don't own their l4 pages; see set_shadow_status */
+         (shadow_type != SH_type_l4_64_shadow || !is_pv_32bit_domain(d)) )
         put_page(mfn_to_page(gmfn));
 }
 
