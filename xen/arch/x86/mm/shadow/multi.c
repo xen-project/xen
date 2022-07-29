@@ -3233,7 +3233,7 @@ static void cf_check sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 {
     struct domain *d = v->domain;
     mfn_t gmfn;
-#if GUEST_PAGING_LEVELS == 3 && defined(CONFIG_HVM)
+#if GUEST_PAGING_LEVELS == 3
     const guest_l3e_t *gl3e;
     unsigned int i, guest_idx;
 #endif
@@ -3284,7 +3284,7 @@ static void cf_check sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 #endif
         gmfn = pagetable_get_mfn(v->arch.guest_table);
 
-#if GUEST_PAGING_LEVELS == 3 && defined(CONFIG_HVM)
+#if GUEST_PAGING_LEVELS == 3
     /*
      * On PAE guests we don't use a mapping of the guest's own top-level
      * table.  We cache the current state of that table and shadow that,
@@ -3326,8 +3326,6 @@ static void cf_check sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
                   !VM_ASSIST(d, m2p_strict) )
             fill_ro_mpt(smfn);
     }
-#elif !defined(CONFIG_HVM)
-    ASSERT_UNREACHABLE();
 #elif GUEST_PAGING_LEVELS == 3
     /* PAE guests have four shadow_table entries, based on the
      * current values of the guest's four l3es. */
@@ -3378,8 +3376,6 @@ static void cf_check sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 #error This should never happen
 #endif
 
-
-#ifdef CONFIG_HVM
     ///
     /// v->arch.paging.shadow.l3table
     ///
@@ -3405,7 +3401,6 @@ static void cf_check sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
             }
         }
 #endif /* SHADOW_PAGING_LEVELS == 3 */
-#endif /* CONFIG_HVM */
 
     ///
     /// v->arch.cr3
@@ -3424,8 +3419,6 @@ static void cf_check sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     }
 #endif
 
-
-#ifdef CONFIG_HVM
     ///
     /// v->arch.hvm.hw_cr[3]
     ///
@@ -3442,7 +3435,6 @@ static void cf_check sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 #endif
         hvm_update_guest_cr3(v, noflush);
     }
-#endif /* CONFIG_HVM */
 
     /* Fix up the linear pagetable mappings */
     sh_update_linear_entries(v);
