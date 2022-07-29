@@ -36,11 +36,11 @@ curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
    -machine virtualization=true \
    -cpu cortex-a57 -machine type=virt \
    -m 1024 -display none \
-   -machine dumpdtb=binaries/virt-gicv3.dtb
+   -machine dumpdtb=binaries/virt-gicv2.dtb
 # XXX disable pl061 to avoid Linux crash
-dtc -I dtb -O dts binaries/virt-gicv3.dtb > binaries/virt-gicv3.dts
-sed 's/compatible = "arm,pl061.*/status = "disabled";/g' binaries/virt-gicv3.dts > binaries/virt-gicv3-edited.dts
-dtc -I dts -O dtb binaries/virt-gicv3-edited.dts > binaries/virt-gicv3.dtb
+dtc -I dtb -O dts binaries/virt-gicv2.dtb > binaries/virt-gicv2.dts
+sed 's/compatible = "arm,pl061.*/status = "disabled";/g' binaries/virt-gicv2.dts > binaries/virt-gicv2-edited.dts
+dtc -I dts -O dtb binaries/virt-gicv2-edited.dts > binaries/virt-gicv2.dtb
 
 
 # Busybox
@@ -73,7 +73,7 @@ cd ..
 echo 'MEMORY_START="0x40000000"
 MEMORY_END="0x80000000"
 
-DEVICE_TREE="virt-gicv3.dtb"
+DEVICE_TREE="virt-gicv2.dtb"
 XEN="xen"
 DOM0_KERNEL="Image"
 DOM0_RAMDISK="initrd"
