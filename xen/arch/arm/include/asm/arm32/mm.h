@@ -1,6 +1,12 @@
 #ifndef __ARM_ARM32_MM_H__
 #define __ARM_ARM32_MM_H__
 
+#include <xen/percpu.h>
+
+#include <asm/lpae.h>
+
+DECLARE_PER_CPU(lpae_t *, xen_pgtable);
+
 /*
  * Only a limited amount of RAM, called xenheap, is always mapped on ARM32.
  * For convenience always return false.

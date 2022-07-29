@@ -261,6 +261,23 @@ lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned int attr);
 #define third_table_offset(va)  TABLE_OFFSET(third_linear_offset(va))
 #define zeroeth_table_offset(va)  TABLE_OFFSET(zeroeth_linear_offset(va))
 
+/*
+ * Macros to define page-tables:
+ *  - DEFINE_BOOT_PAGE_TABLE is used to define page-table that are used
+ *  in assembly code before BSS is zeroed.
+ *  - DEFINE_PAGE_TABLE{,S} are used to define one or multiple
+ *  page-tables to be used after BSS is zeroed (typically they are only used
+ *  in C).
+ */
+#define DEFINE_BOOT_PAGE_TABLE(name)                                          \
+lpae_t __aligned(PAGE_SIZE) __section(".data.page_aligned")                   \
+    name[XEN_PT_LPAE_ENTRIES]
+
+#define DEFINE_PAGE_TABLES(name, nr)                    \
+lpae_t __aligned(PAGE_SIZE) name[XEN_PT_LPAE_ENTRIES * (nr)]
+
+#define DEFINE_PAGE_TABLE(name) DEFINE_PAGE_TABLES(name, 1)
+
 #endif /* __ARM_LPAE_H__ */
 
 /*
