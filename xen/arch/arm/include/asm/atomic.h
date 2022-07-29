@@ -123,15 +123,15 @@ static always_inline void write_atomic_size(volatile void *p,
 }
 
 #define read_atomic(p) ({                                               \
-    union { typeof(*p) val; char c[0]; } x_;                            \
-    read_atomic_size(p, x_.c, sizeof(*p));                              \
+    union { typeof(*(p)) val; char c[0]; } x_;                          \
+    read_atomic_size(p, x_.c, sizeof(*(p)));                            \
     x_.val;                                                             \
 })
 
 #define write_atomic(p, x)                                              \
     do {                                                                \
-        typeof(*p) x_ = (x);                                            \
-        write_atomic_size(p, &x_, sizeof(*p));                          \
+        typeof(*(p)) x_ = (x);                                          \
+        write_atomic_size(p, &x_, sizeof(*(p)));                        \
     } while ( false )
 
 #define add_sized(p, x) ({                                              \
