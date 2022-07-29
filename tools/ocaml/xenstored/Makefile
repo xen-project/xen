@@ -93,8 +93,3 @@ uninstall:
 	rm -f $(DESTDIR)$(sbindir)/oxenstored
 
 include $(OCAML_TOPLEVEL)/Makefile.rules
-
-genpath-target = $(call buildmakevars2module,paths.ml)
-$(eval $(genpath-target))
-
-GENERATED_FILES += paths.ml
