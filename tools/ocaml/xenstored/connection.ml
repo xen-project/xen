@@ -313,7 +313,6 @@ let is_bad con = match con.dom with None -> false | Some dom -> Domain.is_bad_do
 let has_extra_connection_data con =
 	let has_in = has_input con || has_partial_input con in
 	let has_out = has_output con in
-	let has_socket = con.dom = None in
 	let has_nondefault_perms = make_perm con.dom <> con.perm in
 	has_in || has_out
 	(* TODO: what about SIGTERM, should use systemd to store FDS

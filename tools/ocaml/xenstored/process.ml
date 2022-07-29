@@ -59,7 +59,7 @@ let split_one_path data con =
 
 let process_watch t cons =
 	let oldroot = t.Transaction.oldroot in
-	let newroot = Store.get_root t.store in
+	let newroot = Store.get_root t.Transaction.store in
 	let ops = Transaction.get_paths t |> List.rev in
 	let do_op_watch op cons =
 		let recurse, oldroot, root = match (fst op) with
@@ -491,7 +491,7 @@ let transaction_replay c t doms cons =
 			ignore @@ Connection.end_transaction c tid None
 		)
 
-let do_watch con t _domains cons data =
+let do_watch con _t _domains cons data =
 	let (node, token) =
 		match (split None '\000' data) with
 		| [node; token; ""]   -> node, token
@@ -651,6 +651,7 @@ let maybe_ignore_transaction = function
 
 
 let () = Printexc.record_backtrace true
+
 (**
  * Nothrow guarantee.
  *)
