@@ -35,7 +35,7 @@ curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
 ./binaries/qemu-system-aarch64 \
    -machine virtualization=true \
    -cpu cortex-a57 -machine type=virt \
-   -m 1024 -display none \
+   -m 1024 -smp 2 -display none \
    -machine dumpdtb=binaries/virt-gicv2.dtb
 # XXX disable pl061 to avoid Linux crash
 dtc -I dtb -O dts binaries/virt-gicv2.dtb > binaries/virt-gicv2.dts
