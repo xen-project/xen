@@ -83,6 +83,7 @@ NUM_DOMUS=1
 DOMU_KERNEL[0]="Image"
 DOMU_RAMDISK[0]="initrd"
 DOMU_MEM[0]="256"
+DOMU_ENHANCED[0]=0
 
 LOAD_CMD="tftpb"
 UBOOT_SOURCE="boot.source"
