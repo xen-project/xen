@@ -66,13 +66,7 @@ type backend_mmap = {
 type backend_fd = { fd : Unix.file_descr; }
 type backend = Fd of backend_fd | Xenmmap of backend_mmap
 type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
-type t = {
-  backend : backend;
-  pkt_in : Packet.t Queue.t;
-  pkt_out : Packet.t Queue.t;
-  mutable partial_in : partial_buf;
-  mutable partial_out : string;
-}
+type t
 val init_partial_in : unit -> partial_buf
 val reconnect : t -> unit
 val queue : t -> Packet.t -> unit
@@ -97,6 +91,7 @@ val has_output : t -> bool
 val peek_output : t -> Packet.t
 val input_len : t -> int
 val has_in_packet : t -> bool
+val has_partial_input : t -> bool
 val get_in_packet : t -> Packet.t
 val has_more_input : t -> bool
 val is_selectable : t -> bool
