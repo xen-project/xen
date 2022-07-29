@@ -175,7 +175,7 @@ void __init arch_livepatch_init(void)
     void *start, *end;
 
     start = (void *)LIVEPATCH_VMAP_START;
-    end = (void *)LIVEPATCH_VMAP_END;
+    end = start + LIVEPATCH_VMAP_SIZE;
 
     vm_init_type(VMAP_XEN, start, end);
 

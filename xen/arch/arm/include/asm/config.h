@@ -111,12 +111,11 @@
 #define FIXMAP_ADDR(n)        (_AT(vaddr_t,0x00400000) + (n) * PAGE_SIZE)
 
 #define BOOT_FDT_VIRT_START    _AT(vaddr_t,0x00600000)
-#define BOOT_FDT_SLOT_SIZE     MB(4)
-#define BOOT_FDT_VIRT_END      (BOOT_FDT_VIRT_START + BOOT_FDT_SLOT_SIZE)
+#define BOOT_FDT_VIRT_SIZE     _AT(vaddr_t, MB(4))
 
 #ifdef CONFIG_LIVEPATCH
 #define LIVEPATCH_VMAP_START   _AT(vaddr_t,0x00a00000)
-#define LIVEPATCH_VMAP_END     (LIVEPATCH_VMAP_START + MB(2))
+#define LIVEPATCH_VMAP_SIZE    _AT(vaddr_t, MB(2))
 #endif
 
 #define HYPERVISOR_VIRT_START  XEN_VIRT_START
@@ -132,18 +131,18 @@
 #define FRAMETABLE_VIRT_END    (FRAMETABLE_VIRT_START + FRAMETABLE_SIZE - 1)
 
 #define VMAP_VIRT_START        _AT(vaddr_t,0x10000000)
+#define VMAP_VIRT_SIZE         _AT(vaddr_t, GB(1) - MB(256))
 
 #define XENHEAP_VIRT_START     _AT(vaddr_t,0x40000000)
-#define XENHEAP_VIRT_END       _AT(vaddr_t,0x7fffffff)
-#define DOMHEAP_VIRT_START     _AT(vaddr_t,0x80000000)
-#define DOMHEAP_VIRT_END       _AT(vaddr_t,0xffffffff)
+#define XENHEAP_VIRT_SIZE      _AT(vaddr_t, GB(1))
 
-#define VMAP_VIRT_END    XENHEAP_VIRT_START
+#define DOMHEAP_VIRT_START     _AT(vaddr_t,0x80000000)
+#define DOMHEAP_VIRT_SIZE      _AT(vaddr_t, GB(2))
 
 #define DOMHEAP_ENTRIES        1024  /* 1024 2MB mapping slots */
 
 /* Number of domheap pagetable pages required at the second level (2MB mappings) */
-#define DOMHEAP_SECOND_PAGES ((DOMHEAP_VIRT_END - DOMHEAP_VIRT_START + 1) >> FIRST_SHIFT)
+#define DOMHEAP_SECOND_PAGES (DOMHEAP_VIRT_SIZE >> FIRST_SHIFT)
 
 #else /* ARM_64 */
 
@@ -152,12 +151,11 @@
 #define SLOT0_ENTRY_SIZE  SLOT0(1)
 
 #define VMAP_VIRT_START  GB(1)
-#define VMAP_VIRT_END    (VMAP_VIRT_START + GB(1))
+#define VMAP_VIRT_SIZE   GB(1)
 
 #define FRAMETABLE_VIRT_START  GB(32)
 #define FRAMETABLE_SIZE        GB(32)
 #define FRAMETABLE_NR          (FRAMETABLE_SIZE / sizeof(*frame_table))
-#define FRAMETABLE_VIRT_END    (FRAMETABLE_VIRT_START + FRAMETABLE_SIZE - 1)
 
 #define DIRECTMAP_VIRT_START   SLOT0(256)
 #define DIRECTMAP_SIZE         (SLOT0_ENTRY_SIZE * (265-256))

@@ -128,9 +128,11 @@ static DEFINE_PAGE_TABLE(xen_first);
 /* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
 static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
 #define THIS_CPU_PGTABLE this_cpu(xen_pgtable)
-/* xen_dommap == pages used by map_domain_page, these pages contain
+/*
+ * xen_dommap == pages used by map_domain_page, these pages contain
  * the second level pagetables which map the domheap region
- * DOMHEAP_VIRT_START...DOMHEAP_VIRT_END in 2MB chunks. */
+ * starting at DOMHEAP_VIRT_START in 2MB chunks.
+ */
 static DEFINE_PER_CPU(lpae_t *, xen_dommap);
 /* Root of the trie for cpu0, other CPU's PTs are dynamically allocated */
 static DEFINE_PAGE_TABLE(cpu0_pgtable);
@@ -476,7 +478,7 @@ mfn_t domain_page_map_to_mfn(const void *ptr)
     int slot = (va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
     unsigned long offset = (va>>THIRD_SHIFT) & XEN_PT_LPAE_ENTRY_MASK;
 
-    if ( va >= VMAP_VIRT_START && va < VMAP_VIRT_END )
+    if ( (va >= VMAP_VIRT_START) && ((va - VMAP_VIRT_START) < VMAP_VIRT_SIZE) )
         return virt_to_mfn(va);
 
     ASSERT(slot >= 0 && slot < DOMHEAP_ENTRIES);
@@ -570,7 +572,8 @@ void __init remove_early_mappings(void)
     int rc;
 
     /* destroy the _PAGE_BLOCK mapping */
-    rc = modify_xen_mappings(BOOT_FDT_VIRT_START, BOOT_FDT_VIRT_END,
+    rc = modify_xen_mappings(BOOT_FDT_VIRT_START,
+                             BOOT_FDT_VIRT_START + BOOT_FDT_VIRT_SIZE,
                              _PAGE_BLOCK);
     BUG_ON(rc);
 }
@@ -850,7 +853,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
 
 void *__init arch_vmap_virt_end(void)
 {
-    return (void *)VMAP_VIRT_END;
+    return (void *)(VMAP_VIRT_START + VMAP_VIRT_SIZE);
 }
 
 /*
