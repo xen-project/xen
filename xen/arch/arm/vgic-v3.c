@@ -135,7 +135,7 @@ static void vgic_store_irouter(struct domain *d, struct vgic_irq_rank *rank,
     ASSERT(virq >= 32);
 
     /* Get the index in the rank */
-    offset &= virq & INTERRUPT_RANK_MASK;
+    offset = virq & INTERRUPT_RANK_MASK;
 
     new_vcpu = vgic_v3_irouter_to_vcpu(d, irouter);
     old_vcpu = d->vcpu[read_atomic(&rank->vcpu[offset])];
