@@ -116,17 +116,14 @@ static DEFINE_PAGE_TABLE(cpu0_pgtable);
 #endif
 
 /* Common pagetable leaves */
-/* Second level page tables.
- *
- * The second-level table is 2 contiguous pages long, and covers all
- * addresses from 0 to 0x7fffffff. Offsets into it are calculated
- * with second_linear_offset(), not second_table_offset().
- */
-static DEFINE_PAGE_TABLES(xen_second, 2);
-/* First level page table used for fixmap */
+/* Second level page table used to cover Xen virtual address space */
+static DEFINE_PAGE_TABLE(xen_second);
+/* Third level page table used for fixmap */
 DEFINE_BOOT_PAGE_TABLE(xen_fixmap);
-/* First level page table used to map Xen itself with the XN bit set
- * as appropriate. */
+/*
+ * Third level page table used to map Xen itself with the XN bit set
+ * as appropriate.
+ */
 static DEFINE_PAGE_TABLE(xen_xenmap);
 
 /* Non-boot CPUs use this to find the correct pagetables. */
@@ -168,7 +165,6 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(zeroeth_table_offset(XEN_VIRT_START));
 #endif
     BUILD_BUG_ON(first_table_offset(XEN_VIRT_START));
-    BUILD_BUG_ON(second_linear_offset(XEN_VIRT_START) >= XEN_PT_LPAE_ENTRIES);
 #ifdef CONFIG_ARCH_MAP_DOMAIN_PAGE
     BUILD_BUG_ON(DOMHEAP_VIRT_START & ~FIRST_MASK);
 #endif
@@ -482,14 +478,10 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     p = (void *) cpu0_pgtable;
 #endif
 
-    /* Initialise first level entries, to point to second level entries */
-    for ( i = 0; i < 2; i++)
-    {
-        p[i] = pte_of_xenaddr((uintptr_t)(xen_second +
-                                          i * XEN_PT_LPAE_ENTRIES));
-        p[i].pt.table = 1;
-        p[i].pt.xn = 0;
-    }
+    /* Map xen second level page-table */
+    p[0] = pte_of_xenaddr((uintptr_t)(xen_second));
+    p[0].pt.table = 1;
+    p[0].pt.xn = 0;
 
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < XEN_PT_LPAE_ENTRIES; i++ )
@@ -618,8 +610,6 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
 
     /* Record where the xenheap is, for translation routines. */
     xenheap_virt_end = XENHEAP_VIRT_START + nr_mfns * PAGE_SIZE;
-    xenheap_mfn_start = _mfn(base_mfn);
-    xenheap_mfn_end = _mfn(base_mfn + nr_mfns);
 }
 #else /* CONFIG_ARM_64 */
 void __init setup_xenheap_mappings(unsigned long base_mfn,

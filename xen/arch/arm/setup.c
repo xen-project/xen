@@ -774,10 +774,19 @@ static void __init setup_mm(void)
            opt_xenheap_megabytes ? ", from command-line" : "");
     printk("Dom heap: %lu pages\n", domheap_pages);
 
-    setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
+    /*
+     * We need some memory to allocate the page-tables used for the
+     * xenheap mappings. So populate the boot allocator first.
+     *
+     * This requires us to set xenheap_mfn_{start, end} first so the Xenheap
+     * region can be avoided.
+     */
+    xenheap_mfn_start = _mfn((e >> PAGE_SHIFT) - xenheap_pages);
+    xenheap_mfn_end = mfn_add(xenheap_mfn_start, xenheap_pages);
 
-    /* Add non-xenheap memory */
     populate_boot_allocator();
+
+    setup_xenheap_mappings(mfn_x(xenheap_mfn_start), xenheap_pages);
 
     /* Frame table covers all of RAM region, including holes */
     setup_frametable_mappings(ram_start, ram_end);
