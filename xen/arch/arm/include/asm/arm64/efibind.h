@@ -16,7 +16,8 @@ Abstract:
 Revision History
 
 --*/
-
+#ifndef AARCH64_EFI_BIND
+#define AARCH64_EFI_BIND
 #ifndef __GNUC__
 #pragma pack()
 #endif
@@ -201,6 +202,8 @@ typedef uint64_t   UINTN;
 #else
 #define INTERFACE_DECL(x) typedef struct x
 #endif
+#endif
+
 #endif
 
 #endif

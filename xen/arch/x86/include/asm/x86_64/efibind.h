@@ -16,7 +16,8 @@ Abstract:
 Revision History
 
 --*/
-
+#ifndef X86_64_EFI_BIND
+#define X86_64_EFI_BIND
 #ifndef __GNUC__
 #pragma pack()
 #endif
@@ -278,3 +279,4 @@ typedef uint64_t   UINTN;
 #pragma warning ( disable : 4731 )  // Suppress warnings about modification of EBP
 #endif
 
+#endif
