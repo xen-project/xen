@@ -26,8 +26,8 @@
 #include <asm/imx-lpuart.h>
 #include <asm/io.h>
 
-#define imx_lpuart_read(uart, off)       readl((uart)->regs + off)
-#define imx_lpuart_write(uart, off, val) writel((val), (uart)->regs + off)
+#define imx_lpuart_read(uart, off)       readl((uart)->regs + (off))
+#define imx_lpuart_write(uart, off, val) writel((val), (uart)->regs + (off))
 
 static struct imx_lpuart {
     uint32_t baud, clock_hz, data_bits, parity, stop_bits, fifo_size;
