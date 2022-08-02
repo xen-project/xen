@@ -1327,7 +1327,23 @@ void __init init_speculation_mitigations(void)
      * mappings.
      */
     if ( opt_rsb_hvm )
+    {
         setup_force_cpu_cap(X86_FEATURE_SC_RSB_HVM);
+
+        /*
+         * For SVM, Xen's RSB safety actions are performed before STGI, so
+         * behave atomically with respect to IST sources.
+         *
+         * For VT-x, NMIs are atomic with VMExit (the NMI gets queued but not
+         * delivered) whereas other IST sources are not atomic.  Specifically,
+         * #MC can hit ahead the RSB safety action in the vmexit path.
+         *
+         * Therefore, it is necessary for the IST logic to protect Xen against
+         * possible rogue RSB speculation.
+         */
+        if ( !cpu_has_svm )
+            default_spec_ctrl_flags |= SCF_ist_rsb;
+    }
 
     ibpb_calculations();
 
