@@ -102,6 +102,10 @@ E.g.:
 
     Fixes: 67d01cdb5518 ("x86: infrastructure to allow converting certain indirect calls to direct ones")
 
+If git was configured as explained earlier, this can be retrieved using
+``git log --pretty=fixes`` otherwise ``git log --abbrev=12 --oneline`` will
+give the proper tag and commit-id.
+
 ### Backport:
 
 A backport tag is an optional tag in the commit message to request a
