@@ -132,6 +132,8 @@ static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
                                    flexarray_t *back, flexarray_t *front,
                                    flexarray_t *ro_front)
 {
+    const char *envvar;
+
     flexarray_grow(back, 2);
 
     if (nic->script)
@@ -254,6 +256,11 @@ static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
      */
     flexarray_append(back, "hotplug-status");
     flexarray_append(back, "");
+
+    flexarray_append(front, "trusted");
+    envvar = getenv("LIBXL_NIC_BACKEND_UNTRUSTED");
+    /* Set "trusted=1" if envvar missing or is "0". */
+    flexarray_append(front, !envvar || !strcmp("0", envvar) ? "1" : "0");
 
     return 0;
 }
