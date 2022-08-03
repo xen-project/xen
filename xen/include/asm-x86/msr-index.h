@@ -459,7 +459,7 @@
 #define MSR_IA32_TSC_ADJUST		0x0000003b
 
 #define MSR_X2APIC_FIRST                0x00000800
-#define MSR_X2APIC_LAST                 0x00000bff
+#define MSR_X2APIC_LAST                 0x000008ff
 
 #define MSR_X2APIC_TPR                  0x00000808
 #define MSR_X2APIC_PPR                  0x0000080a
