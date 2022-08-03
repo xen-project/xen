@@ -1922,6 +1922,24 @@ shows the decimal value. For non-linear mode, it shows hexadecimal value.
 
 =back
 
+=head1 ENVIRONMENT
+
+=over 4
+
+=item B<LIBXL_DISK_BACKEND_UNTRUSTED>
+
+Set this environment variable to "1" to suggest to the guest that the disk
+backend shouldn't be trusted. If the variable is absent or set to "0", the
+backend will be trusted.
+
+=item B<LIBXL_NIC_BACKEND_UNTRUSTED>
+
+Set this environment variable to "1" to suggest to the guest that the network
+backend shouldn't be trusted. If the variable is absent or set to "0", the
+backend will be trusted.
+
+=back
+
 =head1 IGNORED FOR COMPATIBILITY WITH XM
 
 xl is mostly command-line compatible with the old xm utility used with

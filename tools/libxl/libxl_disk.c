@@ -246,6 +246,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
     libxl_domain_config d_config;
     libxl_device_disk disk_saved;
     libxl__domain_userdata_lock *lock = NULL;
+    const char *envvar;
 
     libxl_domain_config_init(&d_config);
     libxl_device_disk_init(&disk_saved);
@@ -395,6 +396,10 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         flexarray_append(front, GCSPRINTF("%d", device->devid));
         flexarray_append(front, "device-type");
         flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
+        flexarray_append(front, "trusted");
+        envvar = getenv("LIBXL_DISK_BACKEND_UNTRUSTED");
+        /* Set "trusted=1" if envvar missing or is "0". */
+        flexarray_append(front, !envvar || !strcmp("0", envvar) ? "1" : "0");
 
         /*
          * Old PV kernel disk frontends before 2.6.26 rely on tool stack to
