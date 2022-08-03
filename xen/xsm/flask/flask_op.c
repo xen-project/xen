@@ -530,7 +530,7 @@ static int flask_get_peer_sid(struct xen_flask_peersid *arg)
     struct evtchn *chn;
     struct domain_security_struct *dsec;
 
-    spin_lock(&d->event_lock);
+    read_lock(&d->event_lock);
 
     if ( !port_is_valid(d, arg->evtchn) )
         goto out;
@@ -548,7 +548,7 @@ static int flask_get_peer_sid(struct xen_flask_peersid *arg)
     rv = 0;
 
  out:
-    spin_unlock(&d->event_lock);
+    read_unlock(&d->event_lock);
     return rv;
 }
 

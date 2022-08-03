@@ -51,7 +51,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     if ( !is_iommu_enabled(d) )
         return;
 
-    spin_lock(&d->event_lock);
+    write_lock(&d->event_lock);
 
     dpci = domain_get_irq_dpci(d);
 
@@ -60,5 +60,5 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
         /* Multiple mirq may be mapped to one isa irq */
         pt_pirq_iterate(d, _hvm_dpci_isairq_eoi, (void *)(long)isairq);
     }
-    spin_unlock(&d->event_lock);
+    write_unlock(&d->event_lock);
 }

@@ -301,7 +301,7 @@ int evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     if ( d == NULL )
         return -ESRCH;
 
-    spin_lock(&d->event_lock);
+    write_lock(&d->event_lock);
 
     if ( (port = get_free_port(d)) < 0 )
         ERROR_EXIT_DOM(port, d);
@@ -324,7 +324,7 @@ int evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 
  out:
     check_free_port(d, port);
-    spin_unlock(&d->event_lock);
+    write_unlock(&d->event_lock);
     rcu_unlock_domain(d);
 
     return rc;
@@ -361,14 +361,14 @@ static int evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     /* Avoid deadlock by first acquiring lock of domain with smaller id. */
     if ( ld < rd )
     {
-        spin_lock(&ld->event_lock);
-        spin_lock(&rd->event_lock);
+        write_lock(&ld->event_lock);
+        write_lock(&rd->event_lock);
     }
     else
     {
         if ( ld != rd )
-            spin_lock(&rd->event_lock);
-        spin_lock(&ld->event_lock);
+            write_lock(&rd->event_lock);
+        write_lock(&ld->event_lock);
     }
 
     if ( (lport = get_free_port(ld)) < 0 )
@@ -409,9 +409,9 @@ static int evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 
  out:
     check_free_port(ld, lport);
-    spin_unlock(&ld->event_lock);
+    write_unlock(&ld->event_lock);
     if ( ld != rd )
-        spin_unlock(&rd->event_lock);
+        write_unlock(&rd->event_lock);
     
     rcu_unlock_domain(rd);
 
@@ -442,7 +442,7 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     if ( (v = domain_vcpu(d, vcpu)) == NULL )
         return -ENOENT;
 
-    spin_lock(&d->event_lock);
+    write_lock(&d->event_lock);
 
     if ( read_atomic(&v->virq_to_evtchn[virq]) )
         ERROR_EXIT(-EEXIST);
@@ -483,7 +483,7 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     write_atomic(&v->virq_to_evtchn[virq], port);
 
  out:
-    spin_unlock(&d->event_lock);
+    write_unlock(&d->event_lock);
 
     return rc;
 }
@@ -499,7 +499,7 @@ static int evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     if ( domain_vcpu(d, vcpu) == NULL )
         return -ENOENT;
 
-    spin_lock(&d->event_lock);
+    write_lock(&d->event_lock);
 
     if ( (port = get_free_port(d)) < 0 )
         ERROR_EXIT(port);
@@ -517,7 +517,7 @@ static int evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     bind->port = port;
 
  out:
-    spin_unlock(&d->event_lock);
+    write_unlock(&d->event_lock);
 
     return rc;
 }
@@ -563,7 +563,7 @@ static int evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     if ( !is_hvm_domain(d) && !pirq_access_permitted(d, pirq) )
         return -EPERM;
 
-    spin_lock(&d->event_lock);
+    write_lock(&d->event_lock);
 
     if ( pirq_to_evtchn(d, pirq) != 0 )
         ERROR_EXIT(-EEXIST);
@@ -603,7 +603,7 @@ static int evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 
  out:
     check_free_port(d, port);
-    spin_unlock(&d->event_lock);
+    write_unlock(&d->event_lock);
 
     return rc;
 }
@@ -619,7 +619,7 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
         return -EINVAL;
 
  again:
-    spin_lock(&d1->event_lock);
+    write_lock(&d1->event_lock);
 
     /* Guest cannot close a Xen-attached event channel. */
     if ( unlikely(consumer_is_xen(chn1)) && guest )
@@ -682,13 +682,11 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
             rcu_lock_domain(d2);
 
             if ( d1 < d2 )
-            {
-                spin_lock(&d2->event_lock);
-            }
+                write_lock(&d2->event_lock);
             else if ( d1 != d2 )
             {
-                spin_unlock(&d1->event_lock);
-                spin_lock(&d2->event_lock);
+                write_unlock(&d1->event_lock);
+                write_lock(&d2->event_lock);
                 goto again;
             }
         }
@@ -733,11 +731,11 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     if ( d2 != NULL )
     {
         if ( d1 != d2 )
-            spin_unlock(&d2->event_lock);
+            write_unlock(&d2->event_lock);
         rcu_unlock_domain(d2);
     }
 
-    spin_unlock(&d1->event_lock);
+    write_unlock(&d1->event_lock);
 
     return rc;
 }
@@ -977,7 +975,7 @@ int evtchn_status(evtchn_status_t *status)
         return -EINVAL;
     }
 
-    spin_lock(&d->event_lock);
+    read_lock(&d->event_lock);
 
     if ( consumer_is_xen(chn) )
     {
@@ -1023,7 +1021,7 @@ int evtchn_status(evtchn_status_t *status)
     status->vcpu = chn->notify_vcpu_id;
 
  out:
-    spin_unlock(&d->event_lock);
+    read_unlock(&d->event_lock);
     rcu_unlock_domain(d);
 
     return rc;
@@ -1045,7 +1043,7 @@ int evtchn_bind_vcpu(evtchn_port_t port, unsigned int vcpu_id)
     if ( !chn )
         return -EINVAL;
 
-    spin_lock(&d->event_lock);
+    write_lock(&d->event_lock);
 
     /* Guest cannot re-bind a Xen-attached event channel. */
     if ( unlikely(consumer_is_xen(chn)) )
@@ -1081,7 +1079,7 @@ int evtchn_bind_vcpu(evtchn_port_t port, unsigned int vcpu_id)
     }
 
  out:
-    spin_unlock(&d->event_lock);
+    write_unlock(&d->event_lock);
 
     return rc;
 }
@@ -1125,7 +1123,7 @@ int evtchn_reset(struct domain *d, bool resuming)
     if ( d != current->domain && !d->controller_pause_count )
         return -EINVAL;
 
-    spin_lock(&d->event_lock);
+    write_lock(&d->event_lock);
 
     /*
      * If we are resuming, then start where we stopped. Otherwise, check
@@ -1136,7 +1134,7 @@ int evtchn_reset(struct domain *d, bool resuming)
     if ( i > d->next_evtchn )
         d->next_evtchn = i;
 
-    spin_unlock(&d->event_lock);
+    write_unlock(&d->event_lock);
 
     if ( !i )
         return -EBUSY;
@@ -1148,14 +1146,14 @@ int evtchn_reset(struct domain *d, bool resuming)
         /* NB: Choice of frequency is arbitrary. */
         if ( !(i & 0x3f) && hypercall_preempt_check() )
         {
-            spin_lock(&d->event_lock);
+            write_lock(&d->event_lock);
             d->next_evtchn = i;
-            spin_unlock(&d->event_lock);
+            write_unlock(&d->event_lock);
             return -ERESTART;
         }
     }
 
-    spin_lock(&d->event_lock);
+    write_lock(&d->event_lock);
 
     d->next_evtchn = 0;
 
@@ -1168,7 +1166,7 @@ int evtchn_reset(struct domain *d, bool resuming)
         evtchn_2l_init(d);
     }
 
-    spin_unlock(&d->event_lock);
+    write_unlock(&d->event_lock);
 
     return rc;
 }
@@ -1360,7 +1358,7 @@ int alloc_unbound_xen_event_channel(
     struct evtchn *chn;
     int            port, rc;
 
-    spin_lock(&ld->event_lock);
+    write_lock(&ld->event_lock);
 
     port = rc = get_free_port(ld);
     if ( rc < 0 )
@@ -1388,7 +1386,7 @@ int alloc_unbound_xen_event_channel(
 
  out:
     check_free_port(ld, port);
-    spin_unlock(&ld->event_lock);
+    write_unlock(&ld->event_lock);
 
     return rc < 0 ? rc : port;
 }
@@ -1399,7 +1397,7 @@ void free_xen_event_channel(struct domain *d, int port)
     {
         /*
          * Make sure ->is_dying is read /after/ ->valid_evtchns, pairing
-         * with the spin_barrier() and BUG_ON() in evtchn_destroy().
+         * with the kind-of-barrier and BUG_ON() in evtchn_destroy().
          */
         smp_rmb();
         BUG_ON(!d->is_dying);
@@ -1419,7 +1417,7 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
     {
         /*
          * Make sure ->is_dying is read /after/ ->valid_evtchns, pairing
-         * with the spin_barrier() and BUG_ON() in evtchn_destroy().
+         * with the kind-of-barrier and BUG_ON() in evtchn_destroy().
          */
         smp_rmb();
         ASSERT(ld->is_dying);
@@ -1474,7 +1472,8 @@ int evtchn_init(struct domain *d, unsigned int max_port)
         return -ENOMEM;
     d->valid_evtchns = EVTCHNS_PER_BUCKET;
 
-    spin_lock_init_prof(d, event_lock);
+    rwlock_init(&d->event_lock);
+
     if ( get_free_port(d) != 0 )
     {
         free_evtchn_bucket(d, d->evtchn);
@@ -1499,9 +1498,10 @@ int evtchn_destroy(struct domain *d)
 {
     unsigned int i;
 
-    /* After this barrier no new event-channel allocations can occur. */
+    /* After this kind-of-barrier no new event-channel allocations can occur. */
     BUG_ON(!d->is_dying);
-    spin_barrier(&d->event_lock);
+    read_lock(&d->event_lock);
+    read_unlock(&d->event_lock);
 
     /* Close all existing event channels. */
     for ( i = d->valid_evtchns; --i; )
@@ -1559,13 +1559,13 @@ void evtchn_move_pirqs(struct vcpu *v)
     unsigned int port;
     struct evtchn *chn;
 
-    spin_lock(&d->event_lock);
+    read_lock(&d->event_lock);
     for ( port = v->pirq_evtchn_head; port; port = chn->u.pirq.next_port )
     {
         chn = evtchn_from_port(d, port);
         pirq_set_affinity(d, chn->u.pirq.irq, mask);
     }
-    spin_unlock(&d->event_lock);
+    read_unlock(&d->event_lock);
 }
 
 
@@ -1578,7 +1578,7 @@ static void domain_dump_evtchn_info(struct domain *d)
            "Polling vCPUs: {%*pbl}\n"
            "    port [p/m/s]\n", d->domain_id, d->max_vcpus, d->poll_mask);
 
-    spin_lock(&d->event_lock);
+    read_lock(&d->event_lock);
 
     for ( port = 1; ; ++port )
     {
@@ -1627,7 +1627,7 @@ static void domain_dump_evtchn_info(struct domain *d)
         }
     }
 
-    spin_unlock(&d->event_lock);
+    read_unlock(&d->event_lock);
 }
 
 static void cf_check dump_evtchn_info(unsigned char key)
