@@ -703,7 +703,7 @@ cmd_cppcheck_xml = $(CPPCHECK) -v -q --xml $(CPPCHECKFLAGS) \
                    --output-file=$@ $<
 
 quiet_cmd_merge_cppcheck_reports = CPPCHECK-MERGE $@
-cmd_merge_cppcheck_reports = $(srctree)/tools/merge_cppcheck_reports.py $^ $@
+cmd_merge_cppcheck_reports = $(PYTHON) $(srctree)/tools/merge_cppcheck_reports.py $^ $@
 
 quiet_cmd_cppcheck_html = CPPCHECK-HTML $<
 cmd_cppcheck_html = $(CPPCHECK_HTMLREPORT) --file=$< --source-dir=$(srctree) \
@@ -742,7 +742,7 @@ cppcheck-version:
 # cppcheck in json format including the list of rules to ignore.
 #
 cppcheck-misra.txt: $(XEN_ROOT)/docs/misra/rules.rst $(srctree)/tools/convert_misra_doc.py
-	$(Q)$(srctree)/tools/convert_misra_doc.py -i $< -o $@ -j $(@:.txt=.json)
+	$(Q)$(PYTHON) $(srctree)/tools/convert_misra_doc.py -i $< -o $@ -j $(@:.txt=.json)
 
 # convert_misra_doc is generating both files.
 cppcheck-misra.json: cppcheck-misra.txt
