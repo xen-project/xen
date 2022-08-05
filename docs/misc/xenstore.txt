@@ -320,6 +320,23 @@ SET_TARGET		<domid>|<tdomid>|
 
 	xenstored prevents the use of SET_TARGET other than by dom0.
 
+GET_FEATURE		[<domid>|]		<value>|
+SET_FEATURE		<domid>|<value>|
+	Returns or sets the contents of the "feature" field copied to
+	offset 2064 of the Xenstore ring page of the domain specified by
+	<domid>. <value> is a decimal number being a logical or of the
+	feature bits as defined in docs/misc/xenstore-ring.txt. Trying
+	to set a bit for a feature not being supported by the running
+	Xenstore will be denied. Providing no <domid> with the
+	GET_FEATURE command will return the features which are supported
+	by Xenstore.
+
+	SET_FEATURE for a domain will be rejected after the INTRODUCE
+	command for this domain has been sent to xenstored.
+
+	xenstored prevents the use of GET_FEATURE and SET_FEATURE other
+	than by dom0.
+
 ---------- Miscellaneous ----------
 
 CONTROL			<command>|[<parameters>|]
