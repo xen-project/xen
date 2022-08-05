@@ -885,9 +885,8 @@ static int is_guest_pv64_psr(uint64_t psr)
 #endif
 
 /*
- * Initialise VCPU state. The context can be supplied by either the
- * toolstack (XEN_DOMCTL_setvcpucontext) or the guest
- * (VCPUOP_initialise) and therefore must be properly validated.
+ * Initialise vCPU state. The context may be supplied by an external entity, so
+ * we need to validate it.
  */
 int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
