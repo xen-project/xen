@@ -11,7 +11,7 @@
 #include <asm/current.h>
 #include <asm/processor.h>
 
-#define psr_mode(psr,m) (((psr) & PSR_MODE_MASK) == m)
+#define psr_mode(psr,m) (((psr) & PSR_MODE_MASK) == (m))
 
 static inline bool regs_mode_is_32bit(const struct cpu_user_regs *regs)
 {
