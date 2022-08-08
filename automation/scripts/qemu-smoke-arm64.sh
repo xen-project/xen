@@ -4,8 +4,13 @@ set -ex
 
 test_variant=$1
 
-passed="BusyBox"
-check=""
+passed="passed"
+check="
+until ifconfig eth0 192.168.0.2 && ping -c 10 192.168.0.1; do
+    sleep 30
+done
+echo \"${passed}\"
+"
 
 if [[ "${test_variant}" == "static-mem" ]]; then
     # Memory range that is statically allocated to DOM1
@@ -68,6 +73,36 @@ cd initrd
 find . | cpio --create --format='newc' | gzip > ../binaries/initrd
 cd ..
 
+# DOM0 rootfs
+mkdir -p rootfs
+cd rootfs
+tar xzf ../binaries/initrd.tar.gz
+mkdir proc
+mkdir run
+mkdir srv
+mkdir sys
+rm var/run
+cp -ar ../binaries/dist/install/* .
+
+echo "#!/bin/bash
+
+export LD_LIBRARY_PATH=/usr/local/lib
+bash /etc/init.d/xencommons start
+
+/usr/local/lib/xen/bin/init-dom0less
+
+brctl addbr xenbr0
+brctl addif xenbr0 eth0
+ifconfig eth0 up
+ifconfig xenbr0 up
+ifconfig xenbr0 192.168.0.1
+
+xl network-attach 1 type=vif
+" > etc/local.d/xen.start
+chmod +x etc/local.d/xen.start
+echo "rc_verbose=yes" >> etc/rc.conf
+find . | cpio -H newc -o | gzip > ../binaries/dom0-rootfs.cpio.gz
+cd ..
 
 # ImageBuilder
 echo 'MEMORY_START="0x40000000"
@@ -76,14 +111,13 @@ MEMORY_END="0x80000000"
 DEVICE_TREE="virt-gicv2.dtb"
 XEN="xen"
 DOM0_KERNEL="Image"
-DOM0_RAMDISK="initrd"
+DOM0_RAMDISK="dom0-rootfs.cpio.gz"
 XEN_CMD="console=dtuart dom0_mem=512M"
 
 NUM_DOMUS=1
 DOMU_KERNEL[0]="Image"
 DOMU_RAMDISK[0]="initrd"
 DOMU_MEM[0]="256"
-DOMU_ENHANCED[0]=0
 
 LOAD_CMD="tftpb"
 UBOOT_SOURCE="boot.source"
@@ -114,5 +148,5 @@ timeout -k 1 240 \
     -bios /usr/lib/u-boot/qemu_arm64/u-boot.bin |& tee smoke.serial
 
 set -e
-(grep -q "^BusyBox" smoke.serial && grep -q "DOM1: ${passed}" smoke.serial) || exit 1
+(grep -q "^Welcome to Alpine Linux" smoke.serial && grep -q "DOM1: ${passed}" smoke.serial) || exit 1
 exit 0
