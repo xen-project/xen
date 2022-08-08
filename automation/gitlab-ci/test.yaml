@@ -70,7 +70,7 @@ qemu-smoke-arm64-gcc:
     - ./automation/scripts/qemu-smoke-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
   needs:
     - debian-unstable-gcc-arm64
-    - kernel-5.9.9-arm64-export
+    - kernel-5.19-arm64-export
     - qemu-system-aarch64-6.0.0-arm64-export
   artifacts:
     paths:
@@ -88,7 +88,7 @@ qemu-smoke-arm64-gcc-staticmem:
     - ./automation/scripts/qemu-smoke-arm64.sh static-mem 2>&1 | tee qemu-smoke-arm64.log
   needs:
     - debian-unstable-gcc-arm64
-    - kernel-5.9.9-arm64-export
+    - kernel-5.19-arm64-export
     - qemu-system-aarch64-6.0.0-arm64-export
   artifacts:
     paths:
