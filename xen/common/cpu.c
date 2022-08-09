@@ -40,6 +40,11 @@ const unsigned long cpu_bit_bitmap[BITS_PER_LONG+1][BITS_TO_LONGS(NR_CPUS)] = {
 #endif
 };
 
+#undef MASK_DECLARE_8
+#undef MASK_DECLARE_4
+#undef MASK_DECLARE_2
+#undef MASK_DECLARE_1
+
 static DEFINE_RWLOCK(cpu_add_remove_lock);
 
 bool get_cpu_maps(void)
