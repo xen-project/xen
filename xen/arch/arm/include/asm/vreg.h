@@ -141,7 +141,7 @@ static inline void vreg_reg_clearbits(unsigned long *reg, register_t bits,
 static inline register_t vreg_reg##sz##_extract(uint##sz##_t reg,       \
                                                 const mmio_info_t *info)\
 {                                                                       \
-    return vreg_reg_extract(reg, info->gpa & offmask,                   \
+    return vreg_reg_extract(reg, info->gpa & (offmask),                 \
                             info->dabt.size);                           \
 }                                                                       \
                                                                         \
@@ -151,7 +151,7 @@ static inline void vreg_reg##sz##_update(uint##sz##_t *reg,             \
 {                                                                       \
     unsigned long tmp = *reg;                                           \
                                                                         \
-    vreg_reg_update(&tmp, val, info->gpa & offmask,                     \
+    vreg_reg_update(&tmp, val, info->gpa & (offmask),                   \
                     info->dabt.size);                                   \
                                                                         \
     *reg = tmp;                                                         \
@@ -163,7 +163,7 @@ static inline void vreg_reg##sz##_setbits(uint##sz##_t *reg,            \
 {                                                                       \
     unsigned long tmp = *reg;                                           \
                                                                         \
-    vreg_reg_setbits(&tmp, bits, info->gpa & offmask,                   \
+    vreg_reg_setbits(&tmp, bits, info->gpa & (offmask),                 \
                      info->dabt.size);                                  \
                                                                         \
     *reg = tmp;                                                         \
@@ -175,7 +175,7 @@ static inline void vreg_reg##sz##_clearbits(uint##sz##_t *reg,          \
 {                                                                       \
     unsigned long tmp = *reg;                                           \
                                                                         \
-    vreg_reg_clearbits(&tmp, bits, info->gpa & offmask,                 \
+    vreg_reg_clearbits(&tmp, bits, info->gpa & (offmask),               \
                        info->dabt.size);                                \
                                                                         \
     *reg = tmp;                                                         \
