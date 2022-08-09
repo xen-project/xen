@@ -40,10 +40,10 @@ ENTRY(kexec_reloc)
         movq    %rsi, %cr3
 
         /* Jump to identity mapped code. */
-        leaq    (identity_mapped - kexec_reloc)(%rdi), %rax
+        leaq    (.L_identity_mapped - kexec_reloc)(%rdi), %rax
         jmpq    *%rax
 
-identity_mapped:
+.L_identity_mapped:
         /*
          * Set cr0 to a known state:
          *  - Paging enabled
@@ -70,14 +70,14 @@ identity_mapped:
 
         /* Need to switch to 32-bit mode? */
         testq   $KEXEC_RELOC_FLAG_COMPAT, %r8
-        jnz     call_32_bit
+        jnz     .L_call_32_bit
 
-call_64_bit:
+.L_call_64_bit:
         /* Call the image entry point.  This should never return. */
         callq   *%rbp
         ud2
 
-call_32_bit:
+.L_call_32_bit:
         /* Setup IDT. */
         lidt    compat_mode_idt(%rip)
 
@@ -102,41 +102,41 @@ relocate_pages:
         xorl    %edi, %edi
         xorl    %esi, %esi
 
-next_entry: /* top, read another word for the indirection page */
+.L_next_entry: /* top, read another word for the indirection page */
 
         movq    (%rbx), %rcx
         addq    $8, %rbx
-is_dest:
+.L_is_dest:
         testb   $IND_DESTINATION, %cl
-        jz      is_ind
+        jz      .L_is_ind
         movq    %rcx, %rdi
         andq    $PAGE_MASK, %rdi
-        jmp     next_entry
-is_ind:
+        jmp     .L_next_entry
+.L_is_ind:
         testb   $IND_INDIRECTION, %cl
-        jz      is_done
+        jz      .L_is_done
         movq    %rcx, %rbx
         andq    $PAGE_MASK, %rbx
-        jmp     next_entry
-is_done:
+        jmp     .L_next_entry
+.L_is_done:
         testb   $IND_DONE, %cl
-        jnz     done
-is_source:
+        jnz     .L_done
+.L_is_source:
         testb   $IND_SOURCE, %cl
-        jz      is_zero
+        jz      .L_is_zero
         movq    %rcx, %rsi      /* For every source page do a copy */
         andq    $PAGE_MASK, %rsi
         movl    $(PAGE_SIZE / 8), %ecx
         rep movsq
-        jmp     next_entry
-is_zero:
+        jmp     .L_next_entry
+.L_is_zero:
         testb   $IND_ZERO, %cl
-        jz      next_entry
+        jz      .L_next_entry
         movl    $(PAGE_SIZE / 8), %ecx  /* Zero the destination page. */
         xorl    %eax, %eax
         rep stosq
-        jmp     next_entry
-done:
+        jmp     .L_next_entry
+.L_done:
         popq    %rbx
         ret
 
