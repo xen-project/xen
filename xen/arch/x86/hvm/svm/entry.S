@@ -28,7 +28,6 @@ ENTRY(svm_asm_do_resume)
         GET_CURRENT(bx)
 .Lsvm_do_resume:
         call svm_intr_assist
-        mov  %rsp,%rdi
         call nsvm_vcpu_switch
         ASSERT_NOT_IN_ATOMIC
 
@@ -54,7 +53,6 @@ UNLIKELY_START(ne, nsvm_hap)
         jmp  .Lsvm_do_resume
 __UNLIKELY_END(nsvm_hap)
 
-        mov  %rsp, %rdi
         call svm_vmenter_helper
 
         clgi
@@ -134,7 +132,6 @@ __UNLIKELY_END(nsvm_hap)
          */
         stgi
 GLOBAL(svm_stgi_label)
-        mov  %rsp,%rdi
         call svm_vmexit_handler
         jmp  .Lsvm_do_resume
 

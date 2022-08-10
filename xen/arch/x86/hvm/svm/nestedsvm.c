@@ -1460,8 +1460,9 @@ nestedsvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
 }
 
 /* VCPU switch */
-void nsvm_vcpu_switch(struct cpu_user_regs *regs)
+void nsvm_vcpu_switch(void)
 {
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct vcpu *v = current;
     struct nestedvcpu *nv;
     struct nestedsvm *svm;
