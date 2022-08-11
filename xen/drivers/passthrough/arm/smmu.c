@@ -1598,21 +1598,6 @@ out_err:
 	return ret;
 }
 
-static void arm_smmu_master_free_smes(struct arm_smmu_master_cfg *cfg)
-{
-    struct arm_smmu_device *smmu = cfg->smmu;
-	int i, idx;
-	struct iommu_fwspec *fwspec = arm_smmu_get_fwspec(cfg);
-
-	spin_lock(&smmu->stream_map_lock);
-	for_each_cfg_sme(cfg, i, idx, fwspec->num_ids) {
-		if (arm_smmu_free_sme(smmu, idx))
-			arm_smmu_write_sme(smmu, idx);
-		cfg->smendx[i] = INVALID_SMENDX;
-	}
-	spin_unlock(&smmu->stream_map_lock);
-}
-
 static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
 				      struct arm_smmu_master_cfg *cfg)
 {
@@ -1633,6 +1618,21 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
 		arm_smmu_write_s2cr(smmu, idx);
 	}
 	return 0;
+}
+
+static void arm_smmu_domain_remove_master(
+				const struct arm_smmu_domain *smmu_domain,
+				struct arm_smmu_master_cfg *cfg)
+{
+	uint32_t i, idx;
+	struct arm_smmu_device *smmu = smmu_domain->smmu;
+	struct arm_smmu_s2cr *s2cr = smmu->s2crs;
+	const struct iommu_fwspec *fwspec = arm_smmu_get_fwspec(cfg);
+
+	for_each_cfg_sme(cfg, i, idx, fwspec->num_ids) {
+		s2cr[idx] = s2cr_init_val;
+		arm_smmu_write_s2cr(smmu, idx);
+	}
 }
 
 static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
@@ -1684,10 +1684,11 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 
 static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
 {
+	struct arm_smmu_domain *smmu_domain = domain->priv;
 	struct arm_smmu_master_cfg *cfg = find_smmu_master_cfg(dev);
 
 	if (cfg)
-		arm_smmu_master_free_smes(cfg);
+		arm_smmu_domain_remove_master(smmu_domain, cfg);
 
 }
 
