@@ -286,7 +286,7 @@ static inline paddr_t vgic_dist_base(const struct vgic_dist *vgic)
  * Offset of GICD_<FOO><n> with its rank, for GICD_<FOO> size <s> with
  * <b>-bits-per-interrupt.
  */
-#define REG_RANK_INDEX(b, n, s) ((((n) >> s) & ((b)-1)) % 32)
+#define REG_RANK_INDEX(b, n, s) ((((n) >> (s)) & ((b) - 1)) % 32)
 
 
 extern struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int virq);
