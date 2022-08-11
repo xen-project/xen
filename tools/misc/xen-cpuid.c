@@ -175,6 +175,7 @@ static const char *const str_7d0[32] =
     [16] = "tsxldtrk",
     [18] = "pconfig",
     [20] = "cet-ibt",
+    /* 22 */                [23] = "avx512-fp16",
 
     [26] = "ibrsb",         [27] = "stibp",
     [28] = "l1d-flush",     [29] = "arch-caps",
