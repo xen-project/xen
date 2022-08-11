@@ -24,6 +24,9 @@ CFLAGS_x86_32 += -I$(srctree)/include
 $(head-srcs:.S=.o): CFLAGS_stack_boundary :=
 $(head-srcs:.S=.o): XEN_CFLAGS := $(CFLAGS_x86_32) -fpic
 
+LDFLAGS_DIRECT-$(call ld-option,--warn-rwx-segments) := --no-warn-rwx-segments
+LDFLAGS_DIRECT += $(LDFLAGS_DIRECT-y)
+
 $(head-srcs): %.S: %.bin
 	(od -v -t x $< | tr -s ' ' | awk 'NR > 1 {print s} {s=$$0}' | \
 	sed 's/ /,0x/g' | sed 's/,0x$$//' | sed 's/^[0-9]*,/ .long /') >$@
