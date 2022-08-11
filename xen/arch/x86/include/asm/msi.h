@@ -59,9 +59,7 @@
 #define FIX_MSIX_MAX_PAGES              512
 
 struct msi_info {
-    u16 seg;
-    u8 bus;
-    u8 devfn;
+    pci_sbdf_t sbdf;
     int irq;
     int entry_nr;
     uint64_t table_base;

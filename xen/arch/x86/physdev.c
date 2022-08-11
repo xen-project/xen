@@ -312,21 +312,21 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         {
         case MAP_PIRQ_TYPE_MSI_SEG:
             map.type = MAP_PIRQ_TYPE_MSI;
-            msi.seg = map.bus >> 16;
+            msi.sbdf.seg = map.bus >> 16;
             break;
 
         case MAP_PIRQ_TYPE_MULTI_MSI:
             if ( map.table_base )
                 return -EINVAL;
-            msi.seg = map.bus >> 16;
+            msi.sbdf.seg = map.bus >> 16;
             break;
 
         default:
-            msi.seg = 0;
+            msi.sbdf.seg = 0;
             break;
         }
-        msi.bus = map.bus;
-        msi.devfn = map.devfn;
+        msi.sbdf.bus = map.bus;
+        msi.sbdf.devfn = map.devfn;
         msi.entry_nr = map.entry_nr;
         msi.table_base = map.table_base;
         ret = physdev_map_pirq(map.domid, map.type, &map.index, &map.pirq,

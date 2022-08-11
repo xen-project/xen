@@ -435,8 +435,8 @@ static void __init cf_check ns16550_init_postirq(struct serial_port *port)
         if ( uart->msi )
         {
             struct msi_info msi = {
-                .bus = uart->ps_bdf[0],
-                .devfn = PCI_DEVFN(uart->ps_bdf[1], uart->ps_bdf[2]),
+                .sbdf = PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
+                                 uart->ps_bdf[2]),
                 .irq = rc = uart->irq,
                 .entry_nr = 1
             };

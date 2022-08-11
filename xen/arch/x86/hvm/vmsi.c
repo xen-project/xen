@@ -750,9 +750,7 @@ static int vpci_msi_enable(const struct pci_dev *pdev, unsigned int nr,
                            paddr_t table_base)
 {
     struct msi_info msi_info = {
-        .seg = pdev->seg,
-        .bus = pdev->bus,
-        .devfn = pdev->devfn,
+        .sbdf = pdev->sbdf,
         .table_base = table_base,
         .entry_nr = nr,
     };

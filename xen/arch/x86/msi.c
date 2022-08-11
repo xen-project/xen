@@ -1001,7 +1001,7 @@ static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
     struct msi_desc *old_desc;
 
     ASSERT(pcidevs_locked());
-    pdev = pci_get_pdev(NULL, PCI_SBDF(msi->seg, msi->bus, msi->devfn));
+    pdev = pci_get_pdev(NULL, msi->sbdf);
     if ( !pdev )
         return -ENODEV;
 
@@ -1056,7 +1056,7 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     struct msi_desc *old_desc;
 
     ASSERT(pcidevs_locked());
-    pdev = pci_get_pdev(NULL, PCI_SBDF(msi->seg, msi->bus, msi->devfn));
+    pdev = pci_get_pdev(NULL, msi->sbdf);
     if ( !pdev || !pdev->msix )
         return -ENODEV;
 

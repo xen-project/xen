@@ -918,7 +918,7 @@ static int flask_map_domain_msi (
 {
 #ifdef CONFIG_HAS_PCI_MSI
     const struct msi_info *msi = data;
-    uint32_t machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
+    uint32_t machine_bdf = msi->sbdf.sbdf;
 
     AVC_AUDIT_DATA_INIT(ad, DEV);
     ad->device = machine_bdf;
