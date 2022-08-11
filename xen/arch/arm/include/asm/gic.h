@@ -152,8 +152,8 @@
 #define GIC_PRI_IPI_ALL    ((GIC_PRI_IPI << 24) | (GIC_PRI_IPI << 16) |\
                             (GIC_PRI_IPI << 8) | GIC_PRI_IPI)
 
-#define GIC_PRI_TO_GUEST(pri) (pri >> 3) /* GICH_LR and GICH_VMCR only support
-                                            5 bits for guest irq priority */
+#define GIC_PRI_TO_GUEST(pri) ((pri) >> 3) /* GICH_LR and GICH_VMCR only support
+                                              5 bits for guest irq priority */
 
 #define GICH_LR_PENDING         1
 #define GICH_LR_ACTIVE          2
