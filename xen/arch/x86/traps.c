@@ -767,9 +767,13 @@ static int cf_check nmi_show_execution_state(
 
     if ( opt_show_all )
         show_execution_state(regs);
+    else if ( guest_mode(regs) )
+        printk(XENLOG_ERR "CPU%d\t%pv\t%04x:%p in guest\n",
+               cpu, current, regs->cs, _p(regs->rip));
     else
-        printk(XENLOG_ERR "CPU%d @ %04x:%08lx (%pS)\n", cpu, regs->cs,
-               regs->rip, guest_mode(regs) ? NULL : _p(regs->rip));
+        printk(XENLOG_ERR "CPU%d\t%pv\t%04x:%p in Xen: %pS\n",
+               cpu, current, regs->cs, _p(regs->rip), _p(regs->rip));
+
     cpumask_clear_cpu(cpu, &show_state_mask);
 
     return 1;
