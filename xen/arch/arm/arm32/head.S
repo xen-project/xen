@@ -359,12 +359,30 @@ cpu_init_done:
 ENDPROC(cpu_init)
 
 /*
+ * Macro to find the slot number at a given page-table level
+ *
+ * slot:     slot computed
+ * virt:     virtual address
+ * lvl:      page-table level
+ *
+ * Note that ubxf is unpredictable when the end bit is above 32-bit. So we
+ * can't use it for first level offset.
+ */
+.macro get_table_slot, slot, virt, lvl
+    .if \lvl == 1
+        lsr   \slot, \virt, #XEN_PT_LEVEL_SHIFT(\lvl)
+    .else
+        ubfx  \slot, \virt, #XEN_PT_LEVEL_SHIFT(\lvl), #XEN_PT_LPAE_SHIFT
+    .endif
+.endm
+
+/*
  * Macro to create a page table entry in \ptbl to \tbl
  *
  * ptbl:    table symbol where the entry will be created
  * tbl:     table symbol to point to
  * virt:    virtual address
- * shift:   #imm page table shift
+ * lvl:     page-table level
  * mmu:     Is the MMU turned on/off. If not specified it will be off
  *
  * Preserves \virt
@@ -374,11 +392,9 @@ ENDPROC(cpu_init)
  *
  * Note that \virt should be in a register other than r1 - r4
  */
-.macro create_table_entry, ptbl, tbl, virt, shift, mmu=0
-        lsr   r1, \virt, #\shift
-        mov_w r2, XEN_PT_LPAE_ENTRY_MASK
-        and   r1, r1, r2             /* r1 := slot in \tlb */
-        lsl   r1, r1, #3             /* r1 := slot offset in \tlb */
+.macro create_table_entry, ptbl, tbl, virt, lvl, mmu=0
+        get_table_slot r1, \virt, \lvl  /* r1 := slot in \tlb */
+        lsl   r1, r1, #3                /* r1 := slot offset in \tlb */
 
         load_paddr r4, \tbl
 
@@ -448,8 +464,8 @@ ENDPROC(cpu_init)
 create_page_tables:
         /* Prepare the page-tables for mapping Xen */
         ldr   r0, =XEN_VIRT_START
-        create_table_entry boot_pgtable, boot_second, r0, FIRST_SHIFT
-        create_table_entry boot_second, boot_third, r0, SECOND_SHIFT
+        create_table_entry boot_pgtable, boot_second, r0, 1
+        create_table_entry boot_second, boot_third, r0, 2
 
         /* Setup boot_third: */
         adr_l r4, boot_third, mmu=0
@@ -486,12 +502,10 @@ create_page_tables:
          * then the 1:1 mapping will use its own set of page-tables from
          * the second level.
          */
-        lsr   r1, r9, #FIRST_SHIFT
-        mov_w r0, XEN_PT_LPAE_ENTRY_MASK
-        and   r1, r1, r0              /* r1 := first slot */
+        get_table_slot r1, r9, 1     /* r1 := first slot */
         cmp   r1, #XEN_FIRST_SLOT
         beq   1f
-        create_table_entry boot_pgtable, boot_second_id, r9, FIRST_SHIFT
+        create_table_entry boot_pgtable, boot_second_id, r9, 1
         b     link_from_second_id
 
 1:
@@ -501,16 +515,14 @@ create_page_tables:
          * third level. For slot XEN_SECOND_SLOT, Xen is not yet able to handle
          * it.
          */
-        lsr   r1, r9, #SECOND_SHIFT
-        mov_w r0, XEN_PT_LPAE_ENTRY_MASK
-        and   r1, r1, r0             /* r1 := second slot */
+        get_table_slot r1, r9, 2     /* r1 := second slot */
         cmp   r1, #XEN_SECOND_SLOT
         beq   virtphys_clash
-        create_table_entry boot_second, boot_third_id, r9, SECOND_SHIFT
+        create_table_entry boot_second, boot_third_id, r9, 2
         b     link_from_third_id
 
 link_from_second_id:
-        create_table_entry boot_second_id, boot_third_id, r9, SECOND_SHIFT
+        create_table_entry boot_second_id, boot_third_id, r9, 2
 link_from_third_id:
         create_mapping_entry boot_third_id, r9, r9
         mov   pc, lr
@@ -571,9 +583,7 @@ remove_identity_mapping:
          * Find the first slot used. Remove the entry for the first
          * table if the slot is not XEN_FIRST_SLOT.
          */
-        lsr   r1, r9, #FIRST_SHIFT
-        mov_w r0, XEN_PT_LPAE_ENTRY_MASK
-        and   r1, r1, r0              /* r1 := first slot */
+        get_table_slot r1, r9, 1     /* r1 := first slot */
         cmp   r1, #XEN_FIRST_SLOT
         beq   1f
         /* It is not in slot 0, remove the entry */
@@ -587,9 +597,7 @@ remove_identity_mapping:
          * Find the second slot used. Remove the entry for the first
          * table if the slot is not XEN_SECOND_SLOT.
          */
-        lsr   r1, r9, #SECOND_SHIFT
-        mov_w r0, XEN_PT_LPAE_ENTRY_MASK
-        and   r1, r1, r0             /* r1 := second slot */
+        get_table_slot r1, r9, 2     /* r1 := second slot */
         cmp   r1, #XEN_SECOND_SLOT
         beq   identity_mapping_removed
         /* It is not in slot 1, remove the entry */
@@ -628,7 +636,7 @@ setup_fixmap:
 #endif
         /* Map fixmap into boot_second */
         mov_w r0, FIXMAP_ADDR(0)
-        create_table_entry boot_second, xen_fixmap, r0, SECOND_SHIFT, mmu=1
+        create_table_entry boot_second, xen_fixmap, r0, 2, mmu=1
         /* Ensure any page table updates made above have occurred. */
         dsb   nshst
 
