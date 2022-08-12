@@ -81,7 +81,7 @@ void do_trap_data_abort(struct cpu_user_regs *regs)
     if ( VABORT_GEN_BY_GUEST(regs) )
         do_trap_guest_serror(regs);
     else
-        do_unexpected_trap("Data Abort", regs);
+        do_trap_hyp_sync(regs);
 }
 
 void finalize_instr_emulation(const struct instr_details *instr)
