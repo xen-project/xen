@@ -49,20 +49,16 @@
 .endm
 
 /*
- * There are no easy way to have a PC relative address within the range
- * +/- 4GB of the PC.
+ * Pseudo-op for PC relative adr <reg>, <symbol> where <symbol> is
+ * within the range +/- 4GB of the PC.
  *
- * This macro workaround it by asking the user to tell whether the MMU
- * has been turned on or not.
- *
- * When the MMU is turned off, we need to apply the physical offset
- * (r10) in order to find the associated physical address.
+ * @dst: destination register
+ * @sym: name of the symbol
  */
-.macro adr_l, dst, sym, mmu
-        ldr   \dst, =\sym
-        .if \mmu == 0
-        add   \dst, \dst, r10
-        .endif
+.macro adr_l, dst, sym
+        mov_w \dst, \sym - .Lpc\@
+        .set  .Lpc\@, .+ 8          /* PC bias */
+        add   \dst, \dst, pc
 .endm
 
 .macro load_paddr rb, sym
@@ -383,7 +379,6 @@ ENDPROC(cpu_init)
  * tbl:     table symbol to point to
  * virt:    virtual address
  * lvl:     page-table level
- * mmu:     Is the MMU turned on/off. If not specified it will be off
  *
  * Preserves \virt
  * Clobbers r1 - r4
@@ -392,7 +387,7 @@ ENDPROC(cpu_init)
  *
  * Note that \virt should be in a register other than r1 - r4
  */
-.macro create_table_entry, ptbl, tbl, virt, lvl, mmu=0
+.macro create_table_entry, ptbl, tbl, virt, lvl
         get_table_slot r1, \virt, \lvl  /* r1 := slot in \tlb */
         lsl   r1, r1, #3                /* r1 := slot offset in \tlb */
 
@@ -402,7 +397,7 @@ ENDPROC(cpu_init)
         orr   r2, r2, r4             /*           + \tlb paddr */
         mov   r3, #0
 
-        adr_l r4, \ptbl, \mmu
+        adr_l r4, \ptbl
 
         strd  r2, r3, [r4, r1]
 .endm
@@ -415,17 +410,14 @@ ENDPROC(cpu_init)
  * virt:    virtual address
  * phys:    physical address
  * type:    mapping type. If not specified it will be normal memory (PT_MEM_L3)
- * mmu:     Is the MMU turned on/off. If not specified it will be off
  *
  * Preserves \virt, \phys
  * Clobbers r1 - r4
  *
- * * Also use r10 for the phys offset.
- *
  * Note that \virt and \paddr should be in other registers than r1 - r4
  * and be distinct.
  */
-.macro create_mapping_entry, ptbl, virt, phys, type=PT_MEM_L3, mmu=0
+.macro create_mapping_entry, ptbl, virt, phys, type=PT_MEM_L3
         mov_w r2, XEN_PT_LPAE_ENTRY_MASK
         lsr   r1, \virt, #THIRD_SHIFT
         and   r1, r1, r2             /* r1 := slot in \tlb */
@@ -438,7 +430,7 @@ ENDPROC(cpu_init)
         orr   r2, r2, r4             /*          + PAGE_ALIGNED(phys) */
         mov   r3, #0
 
-        adr_l r4, \ptbl, \mmu
+        adr_l r4, \ptbl
 
         strd  r2, r3, [r4, r1]
 .endm
@@ -468,7 +460,7 @@ create_page_tables:
         create_table_entry boot_second, boot_third, r0, 2
 
         /* Setup boot_third: */
-        adr_l r4, boot_third, mmu=0
+        adr_l r4, boot_third
 
         lsr   r2, r9, #THIRD_SHIFT  /* Base address for 4K mapping */
         lsl   r2, r2, #THIRD_SHIFT
@@ -632,11 +624,11 @@ setup_fixmap:
 #if defined(CONFIG_EARLY_PRINTK)
         /* Add UART to the fixmap table */
         ldr   r0, =EARLY_UART_VIRTUAL_ADDRESS
-        create_mapping_entry xen_fixmap, r0, r11, type=PT_DEV_L3, mmu=1
+        create_mapping_entry xen_fixmap, r0, r11, type=PT_DEV_L3
 #endif
         /* Map fixmap into boot_second */
         mov_w r0, FIXMAP_ADDR(0)
-        create_table_entry boot_second, xen_fixmap, r0, 2, mmu=1
+        create_table_entry boot_second, xen_fixmap, r0, 2
         /* Ensure any page table updates made above have occurred. */
         dsb   nshst
 
