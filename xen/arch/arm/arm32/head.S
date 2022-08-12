@@ -93,13 +93,10 @@
  */
 #define PRINT(_s)           \
         mov   r3, lr       ;\
-        adr   r0, 98f      ;\
+        adr_l r0, 98f      ;\
         bl    puts         ;\
         mov   lr, r3       ;\
-        b     99f          ;\
-98:     .asciz _s          ;\
-        .align 2           ;\
-99:
+        RODATA_STR(98, _s)
 
 /*
  * Macro to print the value of register \rb
@@ -736,7 +733,7 @@ ENDPROC(puts)
  * Clobbers r0-r3
  */
 putn:
-        adr   r1, hex
+        adr_l r1, hex
         mov   r3, #8
 1:
         early_uart_ready r11, r2
@@ -749,8 +746,7 @@ putn:
         mov   pc, lr
 ENDPROC(putn)
 
-hex:    .ascii "0123456789abcdef"
-        .align 2
+RODATA_STR(hex, "0123456789abcdef")
 
 #else  /* CONFIG_EARLY_PRINTK */
 
