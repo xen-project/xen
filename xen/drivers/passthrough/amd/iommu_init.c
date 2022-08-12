@@ -748,8 +748,7 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
     }
 
     pcidevs_lock();
-    iommu->msi.dev = pci_get_pdev(iommu->seg, PCI_BUS(iommu->bdf),
-                                  PCI_DEVFN(iommu->bdf));
+    iommu->msi.dev = pci_get_pdev(NULL, PCI_SBDF(iommu->seg, iommu->bdf));
     pcidevs_unlock();
     if ( !iommu->msi.dev )
     {
@@ -1286,7 +1285,7 @@ static int __init cf_check amd_iommu_setup_device_table(
                 if ( !pci_init )
                     continue;
                 pcidevs_lock();
-                pdev = pci_get_pdev(seg, PCI_BUS(bdf), PCI_DEVFN(bdf));
+                pdev = pci_get_pdev(NULL, PCI_SBDF(seg, bdf));
                 pcidevs_unlock();
             }
 

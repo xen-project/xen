@@ -727,7 +727,7 @@ int cf_check amd_iommu_get_reserved_device_memory(
             const struct pci_dev *pdev;
 
             pcidevs_lock();
-            pdev = pci_get_pdev(seg, sbdf.bus, sbdf.devfn);
+            pdev = pci_get_pdev(NULL, sbdf);
             pcidevs_unlock();
 
             if ( pdev )

@@ -417,7 +417,7 @@ static int __must_check map_me_phantom_function(struct domain *domain,
     int rc;
 
     /* find ME VT-d engine base on a real ME device */
-    pdev = pci_get_pdev(0, 0, PCI_DEVFN(dev, 0));
+    pdev = pci_get_pdev(NULL, PCI_SBDF(0, 0, dev, 0));
     drhd = acpi_find_matched_drhd_unit(pdev);
 
     /* map or unmap ME phantom function */

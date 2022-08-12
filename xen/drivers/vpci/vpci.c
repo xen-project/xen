@@ -325,7 +325,7 @@ uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size)
     }
 
     /* Find the PCI dev matching the address. */
-    pdev = pci_get_pdev_by_domain(d, sbdf.seg, sbdf.bus, sbdf.devfn);
+    pdev = pci_get_pdev(d, sbdf);
     if ( !pdev )
         return vpci_read_hw(sbdf, reg, size);
 
@@ -435,7 +435,7 @@ void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
      * Find the PCI dev matching the address.
      * Passthrough everything that's not trapped.
      */
-    pdev = pci_get_pdev_by_domain(d, sbdf.seg, sbdf.bus, sbdf.devfn);
+    pdev = pci_get_pdev(d, sbdf);
     if ( !pdev )
     {
         vpci_write_hw(sbdf, reg, size, data);

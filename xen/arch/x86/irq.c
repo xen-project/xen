@@ -2162,7 +2162,7 @@ int map_domain_pirq(
         if ( !cpu_has_apic )
             goto done;
 
-        pdev = pci_get_pdev_by_domain(d, msi->seg, msi->bus, msi->devfn);
+        pdev = pci_get_pdev(d, PCI_SBDF(msi->seg, msi->bus, msi->devfn));
         if ( !pdev )
             goto done;
 
