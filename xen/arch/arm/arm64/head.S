@@ -494,12 +494,23 @@ cpu_init:
 ENDPROC(cpu_init)
 
 /*
+ * Macro to find the slot number at a given page-table level
+ *
+ * slot:     slot computed
+ * virt:     virtual address
+ * lvl:      page-table level
+ */
+.macro get_table_slot, slot, virt, lvl
+        ubfx  \slot, \virt, #XEN_PT_LEVEL_SHIFT(\lvl), #XEN_PT_LPAE_SHIFT
+.endm
+
+/*
  * Macro to create a page table entry in \ptbl to \tbl
  *
  * ptbl:    table symbol where the entry will be created
  * tbl:     table symbol to point to
  * virt:    virtual address
- * shift:   #imm page table shift
+ * lvl:     page-table level
  * tmp1:    scratch register
  * tmp2:    scratch register
  * tmp3:    scratch register
@@ -511,9 +522,8 @@ ENDPROC(cpu_init)
  *
  * Note that all parameters using registers should be distinct.
  */
-.macro create_table_entry, ptbl, tbl, virt, shift, tmp1, tmp2, tmp3
-        lsr   \tmp1, \virt, #\shift
-        and   \tmp1, \tmp1, #XEN_PT_LPAE_ENTRY_MASK/* \tmp1 := slot in \tlb */
+.macro create_table_entry, ptbl, tbl, virt, lvl, tmp1, tmp2, tmp3
+        get_table_slot \tmp1, \virt, \lvl   /* \tmp1 := slot in \tlb */
 
         load_paddr \tmp2, \tbl
         mov   \tmp3, #PT_PT                 /* \tmp3 := right for linear PT */
@@ -544,8 +554,7 @@ ENDPROC(cpu_init)
 .macro create_mapping_entry, ptbl, virt, phys, tmp1, tmp2, tmp3, type=PT_MEM_L3
         and   \tmp3, \phys, #THIRD_MASK     /* \tmp3 := PAGE_ALIGNED(phys) */
 
-        lsr   \tmp1, \virt, #THIRD_SHIFT
-        and   \tmp1, \tmp1, #XEN_PT_LPAE_ENTRY_MASK/* \tmp1 := slot in \tlb */
+        get_table_slot \tmp1, \virt, 3      /* \tmp1 := slot in \tlb */
 
         mov   \tmp2, #\type                 /* \tmp2 := right for section PT */
         orr   \tmp2, \tmp2, \tmp3           /*          + PAGE_ALIGNED(phys) */
@@ -573,9 +582,9 @@ ENDPROC(cpu_init)
 create_page_tables:
         /* Prepare the page-tables for mapping Xen */
         ldr   x0, =XEN_VIRT_START
-        create_table_entry boot_pgtable, boot_first, x0, ZEROETH_SHIFT, x1, x2, x3
-        create_table_entry boot_first, boot_second, x0, FIRST_SHIFT, x1, x2, x3
-        create_table_entry boot_second, boot_third, x0, SECOND_SHIFT, x1, x2, x3
+        create_table_entry boot_pgtable, boot_first, x0, 0, x1, x2, x3
+        create_table_entry boot_first, boot_second, x0, 1, x1, x2, x3
+        create_table_entry boot_second, boot_third, x0, 2, x1, x2, x3
 
         /* Map Xen */
         adr_l x4, boot_third
@@ -612,10 +621,10 @@ create_page_tables:
          * XEN_ZEROETH_SLOT, then the 1:1 mapping will use its own set of
          * page-tables from the first level.
          */
-        lsr   x0, x19, #ZEROETH_SHIFT   /* x0 := zeroeth slot */
+        get_table_slot x0, x19, 0       /* x0 := zeroeth slot */
         cmp   x0, #XEN_ZEROETH_SLOT
         beq   1f
-        create_table_entry boot_pgtable, boot_first_id, x19, ZEROETH_SHIFT, x0, x1, x2
+        create_table_entry boot_pgtable, boot_first_id, x19, 0, x0, x1, x2
         b     link_from_first_id
 
 1:
@@ -624,11 +633,10 @@ create_page_tables:
          * then the 1:1 mapping will use its own set of page-tables from
          * the second level.
          */
-        lsr   x0, x19, #FIRST_SHIFT
-        and   x0, x0, #XEN_PT_LPAE_ENTRY_MASK  /* x0 := first slot */
+        get_table_slot x0, x19, 1      /* x0 := first slot */
         cmp   x0, #XEN_FIRST_SLOT
         beq   1f
-        create_table_entry boot_first, boot_second_id, x19, FIRST_SHIFT, x0, x1, x2
+        create_table_entry boot_first, boot_second_id, x19, 1, x0, x1, x2
         b     link_from_second_id
 
 1:
@@ -638,17 +646,16 @@ create_page_tables:
          * third level. For slot XEN_SECOND_SLOT, Xen is not yet able to handle
          * it.
          */
-        lsr   x0, x19, #SECOND_SHIFT
-        and   x0, x0, #XEN_PT_LPAE_ENTRY_MASK  /* x0 := first slot */
+        get_table_slot x0, x19, 2     /* x0 := second slot */
         cmp   x0, #XEN_SECOND_SLOT
         beq   virtphys_clash
-        create_table_entry boot_second, boot_third_id, x19, SECOND_SHIFT, x0, x1, x2
+        create_table_entry boot_second, boot_third_id, x19, 2, x0, x1, x2
         b     link_from_third_id
 
 link_from_first_id:
-        create_table_entry boot_first_id, boot_second_id, x19, FIRST_SHIFT, x0, x1, x2
+        create_table_entry boot_first_id, boot_second_id, x19, 1, x0, x1, x2
 link_from_second_id:
-        create_table_entry boot_second_id, boot_third_id, x19, SECOND_SHIFT, x0, x1, x2
+        create_table_entry boot_second_id, boot_third_id, x19, 2, x0, x1, x2
 link_from_third_id:
         create_mapping_entry boot_third_id, x19, x19, x0, x1, x2
         ret
@@ -705,7 +712,7 @@ remove_identity_mapping:
          * Find the zeroeth slot used. Remove the entry from zeroeth
          * table if the slot is not XEN_ZEROETH_SLOT.
          */
-        lsr   x1, x19, #ZEROETH_SHIFT   /* x1 := zeroeth slot */
+        get_table_slot x1, x19, 0       /* x1 := zeroeth slot */
         cmp   x1, #XEN_ZEROETH_SLOT
         beq   1f
         /* It is not in slot XEN_ZEROETH_SLOT, remove the entry. */
@@ -718,8 +725,7 @@ remove_identity_mapping:
          * Find the first slot used. Remove the entry for the first
          * table if the slot is not XEN_FIRST_SLOT.
          */
-        lsr   x1, x19, #FIRST_SHIFT
-        and   x1, x1, #XEN_PT_LPAE_ENTRY_MASK  /* x1 := first slot */
+        get_table_slot x1, x19, 1       /* x1 := first slot */
         cmp   x1, #XEN_FIRST_SLOT
         beq   1f
         /* It is not in slot XEN_FIRST_SLOT, remove the entry. */
@@ -732,8 +738,7 @@ remove_identity_mapping:
          * Find the second slot used. Remove the entry for the first
          * table if the slot is not XEN_SECOND_SLOT.
          */
-        lsr   x1, x19, #SECOND_SHIFT
-        and   x1, x1, #XEN_PT_LPAE_ENTRY_MASK  /* x1 := first slot */
+        get_table_slot x1, x19, 2       /* x1 := second slot */
         cmp   x1, #XEN_SECOND_SLOT
         beq   identity_mapping_removed
         /* It is not in slot 1, remove the entry */
@@ -771,7 +776,7 @@ setup_fixmap:
 #endif
         /* Map fixmap into boot_second */
         ldr   x0, =FIXMAP_ADDR(0)
-        create_table_entry boot_second, xen_fixmap, x0, SECOND_SHIFT, x1, x2, x3
+        create_table_entry boot_second, xen_fixmap, x0, 2, x1, x2, x3
         /* Ensure any page table updates made above have occurred. */
         dsb   nshst
 
