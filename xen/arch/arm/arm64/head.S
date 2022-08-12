@@ -71,7 +71,7 @@
  *  x19 - paddr(start)
  *  x20 - phys offset
  *  x21 - DTB address (boot cpu only)
- *  x22 - is_secondary_cpu
+ *  x22 -
  *  x23 - UART address
  *  x24 -
  *  x25 -
@@ -305,8 +305,6 @@ real_start_efi:
 #endif
         PRINT("- Boot CPU booting -\r\n")
 
-        mov   x22, #0                /* x22 := is_secondary_cpu */
-
         bl    check_cpu_mode
         bl    cpu_init
         bl    create_page_tables
@@ -344,8 +342,6 @@ GLOBAL(init_secondary)
         ldr   x0, =start
         adr   x19, start             /* x19 := paddr (start) */
         sub   x20, x19, x0           /* x20 := phys-offset */
-
-        mov   x22, #1                /* x22 := is_secondary_cpu */
 
         mrs   x0, mpidr_el1
         ldr   x13, =(~MPIDR_HWID_MASK)
