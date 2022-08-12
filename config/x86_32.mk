@@ -8,8 +8,6 @@ CONFIG_XCUTILS := y
 CFLAGS += -m32 -march=i686
 
 # Use only if calling $(LD) directly.
-LDFLAGS_DIRECT_OpenBSD = _obsd
-LDFLAGS_DIRECT_FreeBSD = _fbsd
-LDFLAGS_DIRECT += -melf_i386$(LDFLAGS_DIRECT_$(XEN_OS))
+LDFLAGS_DIRECT += -melf_i386$(XEN_ELF_SUB_FLAVOR)
 
 IOEMU_CPU_ARCH ?= i386
