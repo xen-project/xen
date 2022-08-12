@@ -576,20 +576,18 @@ int __init pci_ro_device(int seg, int bus, int devfn)
     return 0;
 }
 
-struct pci_dev *pci_get_real_pdev(int seg, int bus, int devfn)
+struct pci_dev *pci_get_real_pdev(pci_sbdf_t sbdf)
 {
     struct pci_dev *pdev;
     int stride;
 
-    if ( seg < 0 || bus < 0 || devfn < 0 )
-        return NULL;
-
-    for ( pdev = pci_get_pdev(NULL, PCI_SBDF(seg, bus, devfn)), stride = 4;
+    for ( pdev = pci_get_pdev(NULL, sbdf), stride = 4;
           !pdev && stride; stride >>= 1 )
     {
-        if ( !(devfn & (8 - stride)) )
+        if ( !(sbdf.devfn & stride) )
             continue;
-        pdev = pci_get_pdev(NULL, PCI_SBDF(seg, bus, devfn & ~(8 - stride)));
+        sbdf.devfn &= ~stride;
+        pdev = pci_get_pdev(NULL, sbdf);
         if ( pdev && stride != pdev->phantom_stride )
             pdev = NULL;
     }
@@ -1074,7 +1072,7 @@ void pci_check_disable_device(u16 seg, u8 bus, u8 devfn)
     u16 cword;
 
     pcidevs_lock();
-    pdev = pci_get_real_pdev(seg, bus, devfn);
+    pdev = pci_get_real_pdev(PCI_SBDF(seg, bus, devfn));
     if ( pdev )
     {
         if ( now < pdev->fault.time ||

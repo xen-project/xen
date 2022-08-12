@@ -639,8 +639,7 @@ static void cf_check parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
     struct pci_dev *pdev;
 
     pcidevs_lock();
-    pdev = pci_get_real_pdev(iommu->seg, PCI_BUS(device_id),
-                             PCI_DEVFN(device_id));
+    pdev = pci_get_real_pdev(PCI_SBDF(iommu->seg, device_id));
     pcidevs_unlock();
 
     if ( pdev )
