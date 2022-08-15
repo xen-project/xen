@@ -571,12 +571,46 @@ int sched_init_vcpu(struct vcpu *v)
         return 1;
     }
 
-    /*
-     * Initialize affinity settings. The idler, and potentially
-     * domain-0 VCPUs, are pinned onto their respective physical CPUs.
-     */
-    if ( is_idle_domain(d) || (is_hardware_domain(d) && opt_dom0_vcpus_pin) )
+    if ( is_idle_domain(d) )
+    {
+        /* Idle vCPUs are always pinned onto their respective pCPUs */
         sched_set_affinity(unit, cpumask_of(processor), &cpumask_all);
+    }
+    else if ( pv_shim && v->vcpu_id == 0 )
+    {
+        /*
+         * PV-shim: vcpus are pinned 1:1. Initially only 1 cpu is online,
+         * others will be dealt with when onlining them. This avoids pinning
+         * a vcpu to a not yet online cpu here.
+         */
+        sched_set_affinity(unit, cpumask_of(0), cpumask_of(0));
+    }
+    else if ( is_hardware_domain(d) && opt_dom0_vcpus_pin )
+    {
+        /*
+         * If dom0_vcpus_pin is specified, dom0 vCPUs are pinned 1:1 to
+         * their respective pCPUs too.
+         */
+        sched_set_affinity(unit, cpumask_of(processor), &cpumask_all);
+    }
+#ifdef CONFIG_X86
+    else if ( d->domain_id == 0 )
+    {
+        /*
+         * In absence of dom0_vcpus_pin instead, the hard and soft affinity of
+         * dom0 is controlled by the (x86 only) dom0_nodes parameter. At this
+         * point it has been parsed and decoded into the dom0_cpus mask.
+         *
+         * Note that we always honor what user explicitly requested, for both
+         * hard and soft affinity, without doing any dynamic computation of
+         * either of them.
+         */
+        if ( !dom0_affinity_relaxed )
+            sched_set_affinity(unit, &dom0_cpus, &cpumask_all);
+        else
+            sched_set_affinity(unit, &cpumask_all, &dom0_cpus);
+    }
+#endif
     else
         sched_set_affinity(unit, &cpumask_all, &cpumask_all);
 
@@ -3386,28 +3420,9 @@ void wait(void)
 void __init sched_setup_dom0_vcpus(struct domain *d)
 {
     unsigned int i;
-    struct sched_unit *unit;
 
     for ( i = 1; i < d->max_vcpus; i++ )
         vcpu_create(d, i);
-
-    /*
-     * PV-shim: vcpus are pinned 1:1.
-     * Initially only 1 cpu is online, others will be dealt with when
-     * onlining them. This avoids pinning a vcpu to a not yet online cpu here.
-     */
-    if ( pv_shim )
-        sched_set_affinity(d->vcpu[0]->sched_unit,
-                           cpumask_of(0), cpumask_of(0));
-    else
-    {
-        for_each_sched_unit ( d, unit )
-        {
-            if ( !opt_dom0_vcpus_pin && !dom0_affinity_relaxed )
-                sched_set_affinity(unit, &dom0_cpus, NULL);
-            sched_set_affinity(unit, NULL, &dom0_cpus);
-        }
-    }
 
     domain_update_node_affinity(d);
 }
