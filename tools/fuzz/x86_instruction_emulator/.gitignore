@@ -1,0 +1,7 @@
+/asm
+/afl-harness
+/afl-harness-cov
+/cpuid.c
+/wrappers.c
+/x86_emulate
+/x86-emulate.[ch]

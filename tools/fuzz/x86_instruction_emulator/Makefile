@@ -9,32 +9,29 @@ x86-insn-fuzz-all:
 endif
 
 # Add libx86 to the build
-vpath %.c $(XEN_ROOT)/xen/lib/x86
+%.c: $(XEN_ROOT)/xen/lib/x86/%.c FORCE
+	ln -nsf $< $@
 
-x86_emulate:
-	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/arch/x86/$@
+x86_emulate: FORCE
+	ln -nsf $(XEN_ROOT)/xen/arch/x86/$@
 
 x86_emulate/%: x86_emulate ;
 
-x86-emulate.c x86-emulate.h wrappers.c: %:
-	[ -L $* ] || ln -sf $(XEN_ROOT)/tools/tests/x86_emulator/$*
+%.c: $(XEN_ROOT)/tools/tests/x86_emulator/%.c FORCE
+	ln -nsf $< $@
+%.h: $(XEN_ROOT)/tools/tests/x86_emulator/%.h FORCE
+	ln -nsf $< $@
 
-CFLAGS += $(CFLAGS_xeninclude) -D__XEN_TOOLS__ -I.
+CFLAGS += $(CFLAGS_xeninclude) -D__XEN_TOOLS__ -iquote .
+cpuid.o: CFLAGS += -iquote $(XEN_ROOT)/xen/lib/x86
 
 GCOV_FLAGS := --coverage
 %-cov.o: %.c
 	$(CC) -c $(CFLAGS) $(GCOV_FLAGS) $< -o $@
 
-x86.h := $(addprefix $(XEN_ROOT)/tools/include/xen/asm/,\
-                     x86-vendors.h x86-defns.h msr-index.h) \
-         $(addprefix $(XEN_ROOT)/tools/include/xen/lib/x86/, \
-                     cpuid.h cpuid-autogen.h)
-x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
-
-# x86-emulate.c will be implicit for both
-x86-emulate.o x86-emulate-cov.o: x86_emulate/x86_emulate.c $(x86_emulate.h)
-
-fuzz-emul.o fuzz-emulate-cov.o cpuid.o wrappers.o: $(x86_emulate.h)
+x86-emulate.h: x86_emulate/x86_emulate.h
+x86-emulate.o x86-emulate-cov.o: x86-emulate.h x86_emulate/x86_emulate.c
+fuzz-emul.o fuzz-emul-cov.o wrappers.o: x86-emulate.h
 
 x86-insn-fuzzer.a: fuzz-emul.o x86-emulate.o cpuid.o
 	$(AR) rc $@ $^
@@ -51,11 +48,11 @@ all: x86-insn-fuzz-all
 
 .PHONY: distclean
 distclean: clean
-	rm -f x86_emulate x86-emulate.c x86-emulate.h
+	rm -f x86_emulate x86-emulate.c x86-emulate.h wrappers.c cpuid.c
 
 .PHONY: clean
 clean:
-	rm -f *.a *.o .*.d afl-harness afl-harness-cov *.gcda *.gcno *.gcov
+	rm -f *.a *.o $(DEPS_RM) afl-harness afl-harness-cov *.gcda *.gcno *.gcov
 
 .PHONY: install
 install: all
@@ -67,3 +64,5 @@ afl: afl-harness
 
 .PHONY: afl-cov
 afl-cov: afl-harness-cov
+
+-include $(DEPS_INCLUDE)
