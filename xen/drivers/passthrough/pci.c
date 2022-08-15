@@ -507,30 +507,19 @@ int __init pci_ro_device(int seg, int bus, int devfn)
     return 0;
 }
 
-struct pci_dev *pci_get_pdev(int seg, int bus, int devfn)
+struct pci_dev *pci_get_pdev(uint16_t seg, uint8_t bus, uint8_t devfn)
 {
-    struct pci_seg *pseg = get_pseg(seg);
-    struct pci_dev *pdev = NULL;
+    const struct pci_seg *pseg = get_pseg(seg);
+    struct pci_dev *pdev;
 
     ASSERT(pcidevs_locked());
-    ASSERT(seg != -1 || bus == -1);
-    ASSERT(bus != -1 || devfn == -1);
 
     if ( !pseg )
-    {
-        if ( seg == -1 )
-            radix_tree_gang_lookup(&pci_segments, (void **)&pseg, 0, 1);
-        if ( !pseg )
-            return NULL;
-    }
+        return NULL;
 
-    do {
-        list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
-            if ( (pdev->bus == bus || bus == -1) &&
-                 (pdev->devfn == devfn || devfn == -1) )
-                return pdev;
-    } while ( radix_tree_gang_lookup(&pci_segments, (void **)&pseg,
-                                     pseg->nr + 1, 1) );
+    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
+        if ( pdev->bus == bus && pdev->devfn == devfn )
+            return pdev;
 
     return NULL;
 }
@@ -556,31 +545,33 @@ struct pci_dev *pci_get_real_pdev(int seg, int bus, int devfn)
     return pdev;
 }
 
-struct pci_dev *pci_get_pdev_by_domain(const struct domain *d, int seg,
-                                       int bus, int devfn)
+struct pci_dev *pci_get_pdev_by_domain(const struct domain *d, uint16_t seg,
+                                       uint8_t bus, uint8_t devfn)
 {
-    struct pci_seg *pseg = get_pseg(seg);
-    struct pci_dev *pdev = NULL;
+    struct pci_dev *pdev;
 
-    ASSERT(seg != -1 || bus == -1);
-    ASSERT(bus != -1 || devfn == -1);
-
-    if ( !pseg )
+    /*
+     * The hardware domain owns the majority of the devices in the system.
+     * When there are multiple segments, traversing the per-segment list is
+     * likely going to be faster, whereas for a single segment the difference
+     * shouldn't be that large.
+     */
+    if ( is_hardware_domain(d) )
     {
-        if ( seg == -1 )
-            radix_tree_gang_lookup(&pci_segments, (void **)&pseg, 0, 1);
+        const struct pci_seg *pseg = get_pseg(seg);
+
         if ( !pseg )
             return NULL;
-    }
 
-    do {
         list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
-            if ( (pdev->bus == bus || bus == -1) &&
-                 (pdev->devfn == devfn || devfn == -1) &&
-                 (pdev->domain == d) )
+            if ( pdev->bus == bus && pdev->devfn == devfn &&
+                 pdev->domain == d )
                 return pdev;
-    } while ( radix_tree_gang_lookup(&pci_segments, (void **)&pseg,
-                                     pseg->nr + 1, 1) );
+    }
+    else
+        list_for_each_entry ( pdev, &d->pdev_list, domain_list )
+            if ( pdev->bus == bus && pdev->devfn == devfn )
+                return pdev;
 
     return NULL;
 }
