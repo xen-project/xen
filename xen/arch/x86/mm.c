@@ -3020,7 +3020,10 @@ static int _get_page_type(struct page_info *page, unsigned long type,
         if ( d && shadow_mode_enabled(d) )
             shadow_prepare_page_type_change(d, page);
 
-        if ( (x & PGT_type_mask) != type )
+        if ( (x & PGT_type_mask) != type &&
+             /* Shadow mode: track only writable pages. */
+             (!shadow_mode_enabled(d) ||
+              ((x & PGT_type_mask) == PGT_writable_page)) )
         {
             /*
              * On type change we check to flush stale TLB entries. It is
@@ -3035,10 +3038,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
             /* Don't flush if the timestamp is old enough */
             tlbflush_filter(mask, page->tlbflush_timestamp);
 
-            if ( unlikely(!cpumask_empty(mask)) &&
-                 /* Shadow mode: track only writable pages. */
-                 (!shadow_mode_enabled(d) ||
-                  ((x & PGT_type_mask) == PGT_writable_page)) )
+            if ( unlikely(!cpumask_empty(mask)) )
             {
                 perfc_incr(need_flush_tlb_flush);
                 /*
