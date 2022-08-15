@@ -52,6 +52,7 @@
 #include <asm/hvm/svm/svmdebug.h>
 #include <asm/hvm/svm/nestedsvm.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/spec_ctrl.h>
 #include <asm/x86_emulate.h>
 #include <public/sched.h>
 #include <asm/hvm/vpt.h>
@@ -609,6 +610,16 @@ static void cf_check svm_cpuid_policy_changed(struct vcpu *v)
     /* Give access to MSR_SPEC_CTRL if the guest has been told about it. */
     svm_intercept_msr(v, MSR_SPEC_CTRL,
                       cp->extd.ibrs ? MSR_INTERCEPT_NONE : MSR_INTERCEPT_RW);
+
+    /*
+     * Always trap write accesses to VIRT_SPEC_CTRL in order to cache the guest
+     * setting and avoid having to perform a rdmsr on vmexit to get the guest
+     * setting even if VIRT_SSBD is offered to Xen itself.
+     */
+    svm_intercept_msr(v, MSR_VIRT_SPEC_CTRL,
+                      cp->extd.virt_ssbd && cpu_has_virt_ssbd &&
+                      !cpu_has_amd_ssbd ?
+                      MSR_INTERCEPT_WRITE : MSR_INTERCEPT_RW);
 
     /* Give access to MSR_PRED_CMD if the guest has been told about it. */
     svm_intercept_msr(v, MSR_PRED_CMD,
@@ -3103,6 +3114,30 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     intr.fields.tpr =
         (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
     vmcb_set_vintr(vmcb, intr);
+}
+
+/* Called with GIF=0. */
+void vmexit_virt_spec_ctrl(void)
+{
+    unsigned int val = opt_ssbd ? SPEC_CTRL_SSBD : 0;
+
+    if ( val == current->arch.msrs->virt_spec_ctrl.raw )
+        return;
+
+    if ( cpu_has_virt_ssbd )
+        wrmsr(MSR_VIRT_SPEC_CTRL, val, 0);
+}
+
+/* Called with GIF=0. */
+void vmentry_virt_spec_ctrl(void)
+{
+    unsigned int val = current->arch.msrs->virt_spec_ctrl.raw;
+
+    if ( val == (opt_ssbd ? SPEC_CTRL_SSBD : 0) )
+        return;
+
+    if ( cpu_has_virt_ssbd )
+        wrmsr(MSR_VIRT_SPEC_CTRL, val, 0);
 }
 
 /*
