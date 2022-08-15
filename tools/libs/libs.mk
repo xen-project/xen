@@ -55,21 +55,19 @@ $(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_INCLUDE)
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)
 
 .PHONY: all
-all: headers.chk $(TARGETS) $(PKG_CONFIG_LOCAL) libxen$(LIBNAME).map $(LIBHEADERS)
+all: $(TARGETS) $(PKG_CONFIG_LOCAL) libxen$(LIBNAME).map $(LIBHEADERS)
 
 ifneq ($(NO_HEADERS_CHK),y)
-headers.chk:
+all: headers.chk
+
+headers.chk: $(LIBHEADERS) $(AUTOINCS)
 	for i in $(filter %.h,$^); do \
 	    $(CC) -x c -ansi -Wall -Werror $(CFLAGS_xeninclude) \
 	          -S -o /dev/null $$i || exit 1; \
 	    echo $$i; \
 	done >$@.new
 	mv $@.new $@
-else
-.PHONY: headers.chk
 endif
-
-headers.chk: $(LIBHEADERS) $(AUTOINCS)
 
 headers.lst: FORCE
 	@{ set -e; $(foreach h,$(LIBHEADERS),echo $(h);) } > $@.tmp
