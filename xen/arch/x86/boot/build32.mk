@@ -8,6 +8,9 @@ CFLAGS += -Werror -fno-builtin -g0 -msoft-float
 CFLAGS += -I$(BASEDIR)/include
 CFLAGS := $(filter-out -flto,$(CFLAGS)) 
 
+LDFLAGS_DIRECT-$(shell $(LD) -v --warn-rwx-segments >/dev/null 2>&1 && echo y) := --no-warn-rwx-segments
+LDFLAGS_DIRECT += $(LDFLAGS_DIRECT-y)
+
 # NB. awk invocation is a portable alternative to 'head -n -1'
 %.S: %.bin
 	(od -v -t x $< | tr -s ' ' | awk 'NR > 1 {print s} {s=$$0}' | \
