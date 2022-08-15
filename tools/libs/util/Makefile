@@ -11,7 +11,7 @@ OBJS-y += libxlu_pci.o
 
 CFLAGS += -Wno-format-zero-length -Wmissing-declarations \
 	-Wno-declaration-after-statement -Wformat-nonliteral
-CFLAGS += -I. $(CFLAGS_libxenctrl)
+CFLAGS += $(CFLAGS_libxenctrl)
 
 CFLAGS += $(PTHREAD_CFLAGS)
 LDFLAGS += $(PTHREAD_LDFLAGS)
@@ -29,7 +29,6 @@ ifeq ($(BISON),)
 endif
 
 AUTOINCS = libxlu_cfg_y.h libxlu_cfg_l.h libxlu_disk_l.h
-AUTOSRCS = libxlu_cfg_y.c libxlu_cfg_l.c
 
 LIBHEADER := libxlutil.h
 PKG_CONFIG_NAME := Xlutil
