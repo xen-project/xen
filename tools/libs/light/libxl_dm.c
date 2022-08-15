@@ -1349,7 +1349,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append_pair(dm_args, "-display", "none");
 
     if (sdl && !is_stubdom) {
-        flexarray_append(dm_args, "-sdl");
+        flexarray_append_pair(dm_args, "-display", "sdl");
         if (sdl->display)
             flexarray_append_pair(dm_envs, "DISPLAY", sdl->display);
         if (sdl->xauthority)
