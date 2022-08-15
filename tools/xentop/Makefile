@@ -13,36 +13,33 @@
 XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-ifneq ($(XENSTAT_XENTOP),y)
-.PHONY: all install xentop uninstall
-all install xentop uninstall:
-else
-
 CFLAGS += -DGCC_PRINTF -Werror $(CFLAGS_libxenstat)
 LDLIBS += $(LDLIBS_libxenstat) $(CURSES_LIBS) $(TINFO_LIBS) $(SOCKET_LIBS) -lm
 CFLAGS += -DHOST_$(XEN_OS)
 
 # Include configure output (config.h)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
-LDFLAGS += $(APPEND_LDFLAGS)
+
+TARGETS := xentop
 
 .PHONY: all
-all: xentop
+all: $(TARGETS)
+
+xentop: xentop.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
 
 .PHONY: install
-install: xentop
+install: all
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
-	$(INSTALL_PROG) xentop $(DESTDIR)$(sbindir)/xentop
+	$(INSTALL_PROG) $(TARGETS) $(DESTDIR)$(sbindir)
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(DESTDIR)$(sbindir)/xentop
 
-endif
-
 .PHONY: clean
 clean:
-	rm -f xentop xentop.o $(DEPS_RM)
+	$(RM) *.o $(TARGETS) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean
