@@ -28,13 +28,4 @@ LIB_SRCS-y = zfs_lzjb.c zfs_sha256.c zfs_fletcher.c fsi_zfs.c fsys_zfs.c
 
 FS = zfs
 
-.PHONY: all
-all: fs-all
-
-.PHONY: install
-install: fs-install
-
-.PHONY: uninstall
-uninstall: fs-uninstall
-
 include $(XEN_ROOT)/tools/libfsimage/Rules.mk
