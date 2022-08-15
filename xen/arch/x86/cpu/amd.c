@@ -845,7 +845,7 @@ static void init_amd(struct cpuinfo_x86 *c)
 	 * everything, including reads and writes to address, and
 	 * LFENCE/SFENCE instructions.
 	 */
-	if (!cpu_has_clflushopt)
+	if (c == &boot_cpu_data && !cpu_has_clflushopt)
 		setup_force_cpu_cap(X86_BUG_CLFLUSH_MFENCE);
 
 	switch(c->x86)
