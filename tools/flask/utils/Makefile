@@ -4,10 +4,10 @@ include $(XEN_ROOT)/tools/Rules.mk
 CFLAGS += -Werror
 CFLAGS += $(CFLAGS_libxenctrl)
 
-CLIENTS := flask-loadpolicy flask-setenforce flask-getenforce flask-label-pci flask-get-bool flask-set-bool
+TARGETS := flask-loadpolicy flask-setenforce flask-getenforce flask-label-pci flask-get-bool flask-set-bool
 
 .PHONY: all
-all: $(CLIENTS)
+all: $(TARGETS)
 
 flask-loadpolicy: loadpolicy.o
 	$(CC) $(LDFLAGS) $< $(LDLIBS) $(LDLIBS_libxenctrl) -o $@
@@ -29,7 +29,7 @@ flask-set-bool: set-bool.o
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(CLIENTS) $(DEPS_RM)
+	$(RM) *.o $(TARGETS) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean
@@ -37,10 +37,10 @@ distclean: clean
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
-	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)$(sbindir)
+	$(INSTALL_PROG) $(TARGETS) $(DESTDIR)$(sbindir)
 
 .PHONY: uninstall
 uninstall:
-	rm -f $(addprefix $(DESTDIR)$(sbindir)/, $(CLIENTS))
+	rm -f $(addprefix $(DESTDIR)$(sbindir)/, $(TARGETS))
 
 -include $(DEPS_INCLUDE)
