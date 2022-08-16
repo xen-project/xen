@@ -25,6 +25,8 @@
 #include <asm/msi.h>
 #include <acpi/apei.h>
 
+#define MAX_XHCI_PAGES 16
+
 /*
  * Here we define all the compile-time 'special' virtual
  * addresses. The point is to have a constant address at
@@ -43,6 +45,8 @@ enum fixed_addresses {
     FIX_COM_BEGIN,
     FIX_COM_END,
     FIX_EHCI_DBGP,
+    FIX_XHCI_BEGIN,
+    FIX_XHCI_END = FIX_XHCI_BEGIN + MAX_XHCI_PAGES - 1,
 #ifdef CONFIG_XEN_GUEST
     FIX_PV_CONSOLE,
     FIX_XEN_SHARED_INFO,

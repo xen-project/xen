@@ -84,3 +84,12 @@ config SERIAL_TX_BUFSIZE
 	  the nearest power of 2.
 
 	  Default value is 16384 (16kiB).
+
+config XHCI
+	bool "XHCI DbC UART driver"
+	depends on X86
+	help
+	  This selects the USB based XHCI debug capability to be usable as a UART.
+	  Enabling this option makes Xen use extra ~230KiB memory, even if XHCI UART
+	  is not selected.
+	  If you have an x86 based system with USB3, say Y.

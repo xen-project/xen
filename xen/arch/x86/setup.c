@@ -950,6 +950,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     ns16550.irq     = 3;
     ns16550_init(1, &ns16550);
     ehci_dbgp_init();
+    xhci_dbc_uart_init();
     console_init_preirq();
 
     if ( pvh_boot )
