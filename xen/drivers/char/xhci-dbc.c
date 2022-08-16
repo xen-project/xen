@@ -66,6 +66,10 @@
     ((1UL << DBC_PSC_CSC) | (1UL << DBC_PSC_PRC) | (1UL << DBC_PSC_PLC) |      \
      (1UL << DBC_PSC_CEC))
 
+#define XHC_EXT_PORT_MAJOR(x)  (((x) >> 24) & 0xff)
+#define PORT_RESET             (1 << 4)
+#define PORT_CONNECT           (1 << 0)
+
 #define dbc_debug(...) printk("dbc debug: " __VA_ARGS__)
 #define dbc_alert(...) printk("dbc alert: " __VA_ARGS__)
 #define dbc_error(...) printk("dbc error: " __VA_ARGS__)
@@ -666,6 +670,73 @@ static void dbc_init_strings(struct dbc *dbc, uint32_t *info)
                            &dbc->dbc_ctx->serial_size);
 }
 
+static void dbc_do_reset_debug_port(struct dbc *dbc,
+                                    unsigned int id, unsigned int count)
+{
+    uint32_t __iomem *ops_reg;
+    uint32_t __iomem *portsc;
+    uint32_t val, cap_length;
+    unsigned int i;
+
+    cap_length = readl(dbc->xhc_mmio) & 0xff;
+    ops_reg = dbc->xhc_mmio + cap_length;
+
+    id--;
+    for ( i = id; i < (id + count); i++ )
+    {
+        portsc = ops_reg + 0x100 + i * 0x4;
+        val = readl(portsc);
+        if ( !(val & PORT_CONNECT) )
+            writel(val | PORT_RESET, portsc);
+    }
+}
+
+static void dbc_reset_debug_port(struct dbc *dbc)
+{
+    uint32_t val, port_offset, port_count;
+    uint32_t __iomem *xcap;
+    uint32_t xcap_val;
+    uint32_t next;
+    uint32_t id;
+    uint8_t __iomem *mmio = (uint8_t *)dbc->xhc_mmio;
+    uint32_t __iomem *hccp1 = (uint32_t *)(mmio + 0x10);
+    const uint32_t PROTOCOL_ID = 0x2;
+    int ttl = 48;
+
+    xcap = (uint32_t *)dbc->xhc_mmio;
+    /*
+     * This is initially an offset to the first capability. All the offsets
+     * (both in HCCP1 and then next capability pointer are dword-based.
+     */
+    next = (readl(hccp1) & 0xFFFF0000) >> 16;
+
+    /*
+     * Look for "supported protocol" capability, major revision 3.
+     * There may be multiple of them.
+     */
+    while ( next && ttl-- )
+    {
+        xcap += next;
+        xcap_val = readl(xcap);
+        id = xcap_val & 0xFF;
+        next = (xcap_val & 0xFF00) >> 8;
+
+        if ( id != PROTOCOL_ID )
+            continue;
+
+        if ( XHC_EXT_PORT_MAJOR(xcap_val) != 0x3 )
+            continue;
+
+        /* extract ports offset and count from the capability structure */
+        val = readl(xcap + 2);
+        port_offset = val & 0xff;
+        port_count = (val >> 8) & 0xff;
+
+        /* and reset them all */
+        dbc_do_reset_debug_port(dbc, port_offset, port_count);
+    }
+}
+
 static void dbc_enable_dbc(struct dbc *dbc)
 {
     struct dbc_reg *reg = dbc->dbc_reg;
@@ -676,6 +747,10 @@ static void dbc_enable_dbc(struct dbc *dbc)
 
     while ( (readl(&reg->ctrl) & (1U << DBC_CTRL_DCE)) == 0 )
         cpu_relax();
+
+    /* reset ports on initial open, to force re-enumerating by the host */
+    if ( !dbc->open )
+        dbc_reset_debug_port(dbc);
 
     wmb();
     writel(readl(&reg->portsc) | (1U << DBC_PSC_PED), &reg->portsc);
