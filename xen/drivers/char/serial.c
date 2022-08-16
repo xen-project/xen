@@ -301,7 +301,7 @@ char serial_getc(int handle)
     return c & 0x7f;
 }
 
-int __init serial_parse_handle(char *conf)
+int __init serial_parse_handle(const char *conf)
 {
     int handle, flags = 0;
 

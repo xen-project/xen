@@ -109,7 +109,7 @@ void serial_init_postirq(void);
 void serial_endboot(void);
 
 /* Takes a config string and creates a numeric handle on the COM port. */
-int serial_parse_handle(char *conf);
+int serial_parse_handle(const char *conf);
 
 /* Transmit a single character via the specified COM port. */
 void serial_putc(int handle, char c);
