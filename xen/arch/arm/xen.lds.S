@@ -83,6 +83,13 @@ SECTIONS
   _erodata = .;                /* End of read-only data */
 
   . = ALIGN(PAGE_SIZE);
+  .data.ro_after_init : {
+      __ro_after_init_start = .;
+      *(.data.ro_after_init)
+      . = ALIGN(PAGE_SIZE);
+      __ro_after_init_end = .;
+  } : text
+
   .data.read_mostly : {
        /* Exception table */
        __start___ex_table = .;

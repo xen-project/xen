@@ -137,6 +137,8 @@ u32 device_tree_get_u32(const void *fdt, int node,
 int map_range_to_domain(const struct dt_device_node *dev,
                         u64 addr, u64 len, void *data);
 
+extern const char __ro_after_init_start[], __ro_after_init_end[];
+
 #endif
 /*
  * Local variables:
