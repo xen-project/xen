@@ -246,6 +246,7 @@ struct dbc {
     void __iomem *xhc_mmio;
 
     bool open;
+    unsigned int xhc_num; /* look for n-th xhc */
 };
 
 static void *dbc_sys_map_xhc(uint64_t phys, size_t size)
@@ -278,23 +279,36 @@ static bool __init dbc_init_xhc(struct dbc *dbc)
     uint16_t cmd;
     size_t xhc_mmio_size;
 
-    /*
-     * Search PCI bus 0 for the xHC. All the host controllers supported so far
-     * are part of the chipset and are on bus 0.
-     */
-    for ( devfn = 0; devfn < 256; devfn++ )
+    if ( dbc->sbdf.sbdf == 0 )
     {
-        pci_sbdf_t sbdf = PCI_SBDF(0, 0, devfn);
-        uint8_t hdr = pci_conf_read8(sbdf, PCI_HEADER_TYPE);
-
-        if ( hdr == 0 || hdr == 0x80 )
+        /*
+         * Search PCI bus 0 for the xHC. All the host controllers supported so
+         * far are part of the chipset and are on bus 0.
+         */
+        for ( devfn = 0; devfn < 256; devfn++ )
         {
-            if ( (pci_conf_read32(sbdf, PCI_CLASS_REVISION) >> 8) == DBC_XHC_CLASSC )
+            pci_sbdf_t sbdf = PCI_SBDF(0, 0, devfn);
+            uint8_t hdr = pci_conf_read8(sbdf, PCI_HEADER_TYPE);
+
+            if ( hdr == 0 || hdr == 0x80 )
             {
-                dbc->sbdf = sbdf;
-                break;
+                if ( (pci_conf_read32(sbdf, PCI_CLASS_REVISION) >> 8) ==
+                     DBC_XHC_CLASSC )
+                {
+                    if ( dbc->xhc_num-- )
+                        continue;
+                    dbc->sbdf = sbdf;
+                    break;
+                }
             }
         }
+    }
+    else
+    {
+        /* Verify if selected device is really xHC */
+        if ( (pci_conf_read32(dbc->sbdf, PCI_CLASS_REVISION) >> 8) !=
+             DBC_XHC_CLASSC )
+            dbc->sbdf.sbdf = 0;
     }
 
     if ( !dbc->sbdf.sbdf )
@@ -1052,11 +1066,32 @@ void __init xhci_dbc_uart_init(void)
 {
     struct dbc_uart *uart = &dbc_uart;
     struct dbc *dbc = &uart->dbc;
+    const char *e;
 
     if ( strncmp(opt_dbgp, "xhci", 4) )
         return;
 
     memset(dbc, 0, sizeof(*dbc));
+
+    if ( isdigit(opt_dbgp[4]) )
+    {
+        dbc->xhc_num = simple_strtoul(opt_dbgp + 4, &e, 10);
+    }
+    else if ( strncmp(opt_dbgp + 4, "@pci", 4) == 0 )
+    {
+        unsigned int bus, slot, func;
+
+        e = parse_pci(opt_dbgp + 8, NULL, &bus, &slot, &func);
+        if ( !e || *e )
+        {
+            printk(XENLOG_ERR
+                   "Invalid dbgp= PCI device spec: '%s'\n",
+                   opt_dbgp + 8);
+            return;
+        }
+
+        dbc->sbdf = PCI_SBDF(0, bus, slot, func);
+    }
 
     dbc->dbc_ctx = &ctx;
     dbc->dbc_erst = &erst;
