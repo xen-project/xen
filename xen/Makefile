@@ -186,6 +186,11 @@ endif # root-make-done
 # We process the rest of the Makefile if this is the final invocation of make
 ifeq ($(need-sub-make),)
 
+# Do not print "Entering directory ...",
+# but we want to display it when entering to the output directory
+# so that IDEs/editors are able to understand relative filenames.
+MAKEFLAGS += --no-print-directory
+
 ifeq ($(abs_srctree),$(abs_objtree))
     # building in the source tree
     srctree := .
