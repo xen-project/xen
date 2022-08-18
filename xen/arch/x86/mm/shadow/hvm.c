@@ -844,40 +844,65 @@ static void cf_check sh_unshadow_for_p2m_change(
      * scheme, that's OK, but otherwise they must be unshadowed.
      */
     case 2:
-        if ( !(oflags & _PAGE_PSE) )
-            break;
-
-        ASSERT(!p2m_is_grant(p2mt));
-
         {
             unsigned int i;
             mfn_t nmfn = l1e_get_mfn(new);
-            l1_pgentry_t *npte = NULL;
+            unsigned int nflags = l1e_get_flags(new);
+            l1_pgentry_t *npte = NULL, *opte = NULL;
 
+            BUILD_BUG_ON(_PAGE_PAT != _PAGE_PSE);
+
+            if ( !(nflags & _PAGE_PRESENT) )
+                nmfn = INVALID_MFN;
             /* If we're replacing a superpage with a normal L1 page, map it */
-            if ( (l1e_get_flags(new) & _PAGE_PRESENT) &&
-                 !(l1e_get_flags(new) & _PAGE_PSE) &&
-                 mfn_valid(nmfn) )
+            else if ( !(nflags & _PAGE_PSE) )
                 npte = map_domain_page(nmfn);
+            else if ( !(mfn_x(nmfn) & (_PAGE_PSE_PAT >> PAGE_SHIFT)) )
+                nflags &= ~_PAGE_PSE;
+            else
+                nmfn = mfn_add(nmfn, -(long)(_PAGE_PSE_PAT >> PAGE_SHIFT));
+
+            /* If we're replacing a normal L1 page, map it as well. */
+            if ( !(oflags & _PAGE_PSE) )
+                opte = map_domain_page(omfn);
+            else if ( !(mfn_x(omfn) & (_PAGE_PSE_PAT >> PAGE_SHIFT)) )
+                oflags &= ~_PAGE_PSE;
+            else
+                omfn = mfn_add(omfn, -(long)(_PAGE_PSE_PAT >> PAGE_SHIFT));
 
             gfn &= ~(L1_PAGETABLE_ENTRIES - 1);
 
             for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             {
-                if ( !npte ||
-                     !(l1e_get_flags(npte[i]) & _PAGE_PRESENT) ||
-                     !mfn_eq(l1e_get_mfn(npte[i]), omfn) )
+                if ( opte )
+                {
+                    oflags = l1e_get_flags(opte[i]);
+                    if ( !(oflags & _PAGE_PRESENT) )
+                        continue;
+                    omfn = l1e_get_mfn(opte[i]);
+                }
+
+                if ( npte )
+                {
+                    nflags = l1e_get_flags(npte[i]);
+                    nmfn = nflags & _PAGE_PRESENT
+                           ? l1e_get_mfn(npte[i]) : INVALID_MFN;
+                }
+
+                if ( !mfn_eq(nmfn, omfn) || nflags != oflags )
                 {
                     /* This GFN->MFN mapping has gone away */
                     sh_remove_all_shadows_and_parents(d, omfn);
                     if ( sh_remove_all_mappings(d, omfn, _gfn(gfn + i)) )
                         flush = true;
                 }
+
                 omfn = mfn_add(omfn, 1);
+                nmfn = mfn_add(nmfn, !mfn_eq(nmfn, INVALID_MFN));
             }
 
-            if ( npte )
-                unmap_domain_page(npte);
+            unmap_domain_page(opte);
+            unmap_domain_page(npte);
         }
 
         break;
