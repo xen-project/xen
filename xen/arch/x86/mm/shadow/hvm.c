@@ -810,19 +810,27 @@ static void cf_check sh_unshadow_for_p2m_change(
     if ( unlikely(!d->arch.paging.shadow.total_pages) )
         return;
 
+    /* Only previously present / valid entries need processing. */
+    if ( !(oflags & _PAGE_PRESENT) ||
+         (!p2m_is_valid(p2mt) && !p2m_is_grant(p2mt)) )
+        return;
+
     switch ( level )
     {
     default:
         /*
          * The following assertion is to make sure we don't step on 1GB host
-         * page support of HVM guest.
+         * page support of HVM guest. Plus we rely on ->set_entry() to never
+         * be called with orders above PAGE_ORDER_2M, not even to install
+         * non-present entries (which in principle ought to be fine even
+         * without respective large page support).
          */
-        ASSERT(!((oflags & _PAGE_PRESENT) && (oflags & _PAGE_PSE)));
+        ASSERT(!(oflags & _PAGE_PSE));
         break;
 
     /* If we're removing an MFN from the p2m, remove it from the shadows too */
     case 1:
-        if ( (p2m_is_valid(p2mt) || p2m_is_grant(p2mt)) && mfn_valid(omfn) )
+        if ( l1e_get_intpte(old) != l1e_get_intpte(new) )
         {
             sh_remove_all_shadows_and_parents(d, omfn);
             if ( sh_remove_all_mappings(d, omfn, _gfn(gfn)) )
@@ -836,10 +844,11 @@ static void cf_check sh_unshadow_for_p2m_change(
      * scheme, that's OK, but otherwise they must be unshadowed.
      */
     case 2:
-        if ( !(oflags & _PAGE_PRESENT) || !(oflags & _PAGE_PSE) )
+        if ( !(oflags & _PAGE_PSE) )
             break;
 
-        if ( p2m_is_valid(p2mt) && mfn_valid(omfn) )
+        ASSERT(!p2m_is_grant(p2mt));
+
         {
             unsigned int i;
             mfn_t nmfn = l1e_get_mfn(new);
