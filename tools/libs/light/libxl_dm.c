@@ -1204,6 +1204,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     uint64_t ram_size;
     const char *path, *chardev;
     bool is_stubdom = libxl_defbool_val(b_info->device_model_stubdomain);
+    int rc;
 
     dm_args = flexarray_make(gc, 16, 1);
     dm_envs = flexarray_make(gc, 16, 1);
@@ -1531,7 +1532,23 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             }
         }
         if (b_info->u.hvm.soundhw) {
-            flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
+            libxl__qemu_soundhw soundhw;
+
+            rc = libxl__qemu_soundhw_from_string(b_info->u.hvm.soundhw, &soundhw);
+            if (rc) {
+                LOGD(ERROR, guest_domid, "Unknown soundhw option '%s'", b_info->u.hvm.soundhw);
+                return ERROR_INVAL;
+            }
+
+            switch (soundhw) {
+            case LIBXL__QEMU_SOUNDHW_HDA:
+                flexarray_vappend(dm_args, "-device", "intel-hda",
+                                  "-device", "hda-duplex", NULL);
+                break;
+            default:
+                flexarray_append_pair(dm_args, "-device",
+                                      (char*)libxl__qemu_soundhw_to_string(soundhw));
+            }
         }
         if (!libxl__acpi_defbool_val(b_info)) {
             flexarray_append(dm_args, "-no-acpi");

@@ -56,3 +56,13 @@ libxl__device_action = Enumeration("device_action", [
     (1, "ADD"),
     (2, "REMOVE"),
     ])
+
+libxl__qemu_soundhw = Enumeration("qemu_soundhw", [
+    (1, "ac97"),
+    (2, "adlib"),
+    (3, "cs4231a"),
+    (4, "es1370"),
+    (5, "gus"),
+    (6, "hda"),
+    (7, "sb16"),
+    ])

@@ -2555,9 +2555,9 @@ The form serial=DEVICE is also accepted for backwards compatibility.
 
 =item B<soundhw="DEVICE">
 
-Select the virtual sound card to expose to the guest. The valid
-devices are defined by the device model configuration, please see the
-B<qemu(1)> manpage for details. The default is not to export any sound
+Select the virtual sound card to expose to the guest. The valid devices are
+B<hda>, B<ac97>, B<es1370>, B<adlib>, B<cs4231a>, B<gus>, B<sb16> if there are
+available with the device model QEMU. The default is not to export any sound
 device.
 
 =item B<vkb_device=BOOLEAN>
