@@ -856,7 +856,7 @@ static void cf_check sh_unshadow_for_p2m_change(
             for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             {
                 if ( !npte ||
-                     !p2m_is_ram(p2m_flags_to_type(l1e_get_flags(npte[i]))) ||
+                     !(l1e_get_flags(npte[i]) & _PAGE_PRESENT) ||
                      !mfn_eq(l1e_get_mfn(npte[i]), omfn) )
                 {
                     /* This GFN->MFN mapping has gone away */
