@@ -27,13 +27,6 @@
 #include <asm/multicall.h>
 #include <irq_vectors.h>
 
-#ifndef NDEBUG
-static const unsigned char hypercall_args_64[] = hypercall_args_pv64;
-#ifdef CONFIG_PV32
-static const unsigned char hypercall_args_32[] = hypercall_args_pv32;
-#endif
-#endif
-
 /* Forced inline to cause 'compat' to be evaluated at compile time. */
 static void always_inline
 _pv_hypercall(struct cpu_user_regs *regs, bool compat)
@@ -65,7 +58,7 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         call_handlers_pv64(eax, regs->rax, rdi, rsi, rdx, r10, r8);
 
         if ( !curr->hcall_preempted && regs->rax != -ENOSYS )
-            clobber_regs(regs, get_nargs(hypercall_args_64, eax));
+            clobber_regs(regs, eax, pv, 64);
     }
 #ifdef CONFIG_PV32
     else
@@ -90,7 +83,7 @@ _pv_hypercall(struct cpu_user_regs *regs, bool compat)
         curr->hcall_compat = false;
 
         if ( !curr->hcall_preempted && regs->eax != -ENOSYS )
-            clobber_regs32(regs, get_nargs(hypercall_args_32, eax));
+            clobber_regs(regs, eax, pv, 32);
     }
 #endif /* CONFIG_PV32 */
 

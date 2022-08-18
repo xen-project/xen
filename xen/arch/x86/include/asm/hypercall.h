@@ -43,18 +43,8 @@ compat_common_vcpu_op(
 
 #endif /* CONFIG_COMPAT */
 
-#ifndef NDEBUG
-static inline unsigned int _get_nargs(const unsigned char *tbl, unsigned int c)
-{
-    return tbl[c];
-}
-#define get_nargs(t, c) _get_nargs(t, array_index_nospec(c, ARRAY_SIZE(t)))
-#else
-#define get_nargs(tbl, c) 0
-#endif
-
-static inline void clobber_regs(struct cpu_user_regs *regs,
-                                unsigned int nargs)
+static inline void clobber_regs64(struct cpu_user_regs *regs,
+                                  unsigned int nargs)
 {
 #ifndef NDEBUG
     /* Deliberately corrupt used parameter regs. */
@@ -84,5 +74,10 @@ static inline void clobber_regs32(struct cpu_user_regs *regs,
     }
 #endif
 }
+
+#define clobber_regs(r, n, t, b) ({ \
+    static const unsigned char t ## b[] = hypercall_args_ ## t ## b; \
+    clobber_regs ## b(r, array_access_nospec(t ## b, n)); \
+})
 
 #endif /* __ASM_X86_HYPERCALL_H__ */

@@ -111,11 +111,6 @@ long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         return compat_physdev_op(cmd, arg);
 }
 
-#ifndef NDEBUG
-static const unsigned char hypercall_args_64[] = hypercall_args_hvm64;
-static const unsigned char hypercall_args_32[] = hypercall_args_hvm32;
-#endif
-
 int hvm_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -177,7 +172,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
                             regs->r10, regs->r8);
 
         if ( !curr->hcall_preempted && regs->rax != -ENOSYS )
-            clobber_regs(regs, get_nargs(hypercall_args_64, eax));
+            clobber_regs(regs, eax, hvm, 64);
     }
     else
     {
@@ -190,7 +185,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         curr->hcall_compat = false;
 
         if ( !curr->hcall_preempted && regs->eax != -ENOSYS )
-            clobber_regs32(regs, get_nargs(hypercall_args_32, eax));
+            clobber_regs(regs, eax, hvm, 32);
     }
 
     hvmemul_cache_restore(curr, token);
