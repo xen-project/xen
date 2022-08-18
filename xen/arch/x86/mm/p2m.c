@@ -403,28 +403,22 @@ struct page_info *p2m_get_page_from_gfn(
 int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
-    struct domain *d = p2m->domain;
+    bool hap = hap_enabled(p2m->domain);
     unsigned long todo = 1ul << page_order;
-    unsigned int order;
     int set_rc, rc = 0;
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
 
     while ( todo )
     {
-        if ( hap_enabled(d) )
-        {
-            unsigned long fn_mask = !mfn_eq(mfn, INVALID_MFN) ? mfn_x(mfn) : 0;
-
-            fn_mask |= gfn_x(gfn) | todo;
-
-            order = (!(fn_mask & ((1ul << PAGE_ORDER_1G) - 1)) &&
-                     hap_has_1gb) ? PAGE_ORDER_1G :
-                    (!(fn_mask & ((1ul << PAGE_ORDER_2M) - 1)) &&
-                     hap_has_2mb) ? PAGE_ORDER_2M : PAGE_ORDER_4K;
-        }
-        else
-            order = 0;
+        unsigned long fn_mask = (!mfn_eq(mfn, INVALID_MFN) ? mfn_x(mfn) : 0) |
+                                gfn_x(gfn) | todo;
+        unsigned int order = (!(fn_mask & ((1ul << PAGE_ORDER_1G) - 1)) &&
+                              hap && hap_has_1gb)
+                             ? PAGE_ORDER_1G
+                             : (!(fn_mask & ((1ul << PAGE_ORDER_2M) - 1)) &&
+                                (!hap || hap_has_2mb))
+                               ? PAGE_ORDER_2M : PAGE_ORDER_4K;
 
         set_rc = p2m->set_entry(p2m, gfn, mfn, order, p2mt, p2ma, -1);
         if ( set_rc )
