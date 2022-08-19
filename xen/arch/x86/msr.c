@@ -393,10 +393,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         if ( !cp->extd.virt_ssbd )
             goto gp_fault;
 
-        if ( cpu_has_amd_ssbd )
-            *val = msrs->spec_ctrl.raw & SPEC_CTRL_SSBD;
-        else
-            *val = msrs->virt_spec_ctrl.raw;
+        *val = msrs->spec_ctrl.raw & SPEC_CTRL_SSBD;
         break;
 
     case MSR_AMD64_DE_CFG:
@@ -689,15 +686,10 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
             goto gp_fault;
 
         /* Only supports SSBD bit, the rest are ignored. */
-        if ( cpu_has_amd_ssbd )
-        {
-            if ( val & SPEC_CTRL_SSBD )
-                msrs->spec_ctrl.raw |= SPEC_CTRL_SSBD;
-            else
-                msrs->spec_ctrl.raw &= ~SPEC_CTRL_SSBD;
-        }
+        if ( val & SPEC_CTRL_SSBD )
+            msrs->spec_ctrl.raw |= SPEC_CTRL_SSBD;
         else
-            msrs->virt_spec_ctrl.raw = val & SPEC_CTRL_SSBD;
+            msrs->spec_ctrl.raw &= ~SPEC_CTRL_SSBD;
         break;
 
     case MSR_AMD64_DE_CFG:

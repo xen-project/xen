@@ -376,16 +376,6 @@ struct vcpu_msrs
     uint32_t tsc_aux;
 
     /*
-     * 0xc001011f - MSR_VIRT_SPEC_CTRL (if !X86_FEATURE_AMD_SSBD)
-     *
-     * AMD only. Guest selected value, context switched on guest VM
-     * entry/exit.
-     */
-    struct {
-        uint32_t raw;
-    } virt_spec_ctrl;
-
-    /*
      * 0xc00110{27,19-1b} MSR_AMD64_DR{0-3}_ADDRESS_MASK
      *
      * Loaded into hardware for guests which have active %dr7 settings.
