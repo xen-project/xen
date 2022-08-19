@@ -151,8 +151,4 @@ void check_enable_amd_mmconf_dmi(void);
 extern bool amd_acpi_c1e_quirk;
 void amd_check_disable_c1e(unsigned int port, u8 value);
 
-extern bool amd_legacy_ssbd;
-bool amd_setup_legacy_ssbd(void);
-void amd_set_legacy_ssbd(bool enable);
-
 #endif /* __AMD_H__ */
