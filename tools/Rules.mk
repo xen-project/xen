@@ -93,12 +93,24 @@ define xenlibs-rpath
     $(addprefix -Wl$(comma)-rpath-link=$(XEN_ROOT)/tools/libs/,$(call xenlibs-dependencies,$(1)))
 endef
 
+# Provide a path for each library in $(1)
+define xenlibs-libs
+    $(foreach lib,$(1), \
+        $(XEN_ROOT)/tools/libs/$(lib)/lib$(FILENAME_$(lib))$(libextension))
+endef
+
+# Flags for linking against all Xen libraries listed in $(1)
+define xenlibs-ldlibs
+    $(call xenlibs-rpath,$(1)) $(call xenlibs-libs,$(1)) \
+    $(foreach lib,$(1),$(xenlibs-ldlibs-$(lib)))
+endef
+
 define LIB_defs
  FILENAME_$(1) ?= xen$(1)
  XEN_libxen$(1) = $$(XEN_ROOT)/tools/libs/$(1)
  CFLAGS_libxen$(1) = $$(CFLAGS_xeninclude)
  SHLIB_libxen$(1) = $$(call xenlibs-rpath,$(1)) -Wl,-rpath-link=$$(XEN_libxen$(1))
- LDLIBS_libxen$(1) = $$(call xenlibs-rpath,$(1)) $$(XEN_libxen$(1))/lib$$(FILENAME_$(1))$$(libextension)
+ LDLIBS_libxen$(1) = $$(call xenlibs-ldlibs,$(1))
 endef
 
 $(foreach lib,$(LIBS_LIBS),$(eval $(call LIB_defs,$(lib))))
@@ -108,7 +120,7 @@ $(foreach lib,$(LIBS_LIBS),$(eval $(call LIB_defs,$(lib))))
 CFLAGS_libxenctrl += -D__XEN_TOOLS__
 
 ifeq ($(CONFIG_Linux),y)
-LDLIBS_libxenstore += -ldl
+xenlibs-ldlibs-store := -ldl
 endif
 
 CFLAGS_libxenlight += $(CFLAGS_libxenctrl)
