@@ -305,11 +305,11 @@ typedef struct {
 
 /* Extract symbol info - st_info */
 #define ELF32_ST_BIND(x)	((x) >> 4)
-#define ELF32_ST_TYPE(x)	(((unsigned int) x) & 0xf)
+#define ELF32_ST_TYPE(x)	(((unsigned int)(x)) & 0xf)
 #define ELF32_ST_INFO(b,t)	(((b) << 4) + ((t) & 0xf))
 
 #define ELF64_ST_BIND(x)	((x) >> 4)
-#define ELF64_ST_TYPE(x)	(((unsigned int) x) & 0xf)
+#define ELF64_ST_TYPE(x)	(((unsigned int)(x)) & 0xf)
 #define ELF64_ST_INFO(b,t)	(((b) << 4) + ((t) & 0xf))
 
 /* Symbol Binding - ELF32_ST_BIND - st_info */
