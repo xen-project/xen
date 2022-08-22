@@ -140,15 +140,6 @@ process_trap:
         call create_bounce_frame
         jmp  test_all_events
 
-        .section .init.text, "ax", @progbits
-ENTRY(early_page_fault)
-        ENDBR64
-        movl  $TRAP_page_fault, 4(%rsp)
-        SAVE_ALL
-        movq  %rsp, %rdi
-        call  do_early_page_fault
-        jmp   restore_all_xen
-
         .section .text.entry, "ax", @progbits
 
 /* %rbx: struct vcpu, interrupts disabled */
@@ -654,6 +645,15 @@ ret_from_intr:
         ASSERT_CONTEXT_IS_XEN
         jmp   restore_all_xen
 #endif
+
+        .section .init.text, "ax", @progbits
+ENTRY(early_page_fault)
+        ENDBR64
+        movl  $TRAP_page_fault, 4(%rsp)
+        SAVE_ALL
+        movq  %rsp, %rdi
+        call  do_early_page_fault
+        jmp   restore_all_xen
 
         .section .text.entry, "ax", @progbits
 
