@@ -61,13 +61,8 @@ endif
 #           public headers. Users of libfoo are therefore transitively
 #           using libbaz's header but not linking against libbaz.
 #
-# SHDEPS_libfoo: Flags for linking recursive dependencies of
-#                libfoo. Must contain SHLIB for every library which
-#                libfoo links against. So must contain both
-#                $(SHLIB_libbar) and $(SHLIB_libbaz).
-#
 # SHLIB_libfoo: Flags for recursively linking against libfoo. Must
-#               contains SHDEPS_libfoo and:
+#               contains $(call xenlibs-rpath,foo) and:
 #                   -Wl,-rpath-link=<directory containing libfoo.so>
 #
 # CFLAGS_libfoo: Flags for compiling against libfoo. Must add the
@@ -79,23 +74,31 @@ endif
 #                libfoo.
 #
 # LDLIBS_libfoo: Flags for linking against libfoo. Must contain
-#                $(SHDEPS_libfoo) and the path to libfoo.so
+#                $(call xenlibs-rpath,foo) and the path to libfoo.so
 #
 # Consumers of libfoo should include $(CFLAGS_libfoo) and
 # $(LDLIBS_libfoo) in their appropriate directories. They should not
 # include any CFLAGS or LDLIBS relating to libbar or libbaz unless
 # they use those libraries directly (not via libfoo) too.
-#
-# Consumers of libfoo should not directly use $(SHDEPS_libfoo) or
-# $(SHLIB_libfoo)
+
+# Give the list of Xen library that the libraries in $(1) are linked against,
+# directly or indirectly.
+define xenlibs-dependencies
+    $(sort $(foreach lib,$(1), \
+        $(USELIBS_$(lib)) $(call xenlibs-dependencies,$(USELIBS_$(lib)))))
+endef
+
+# Flags for linking recursive dependencies of Xen libraries in $(1)
+define xenlibs-rpath
+    $(addprefix -Wl$(comma)-rpath-link=$(XEN_ROOT)/tools/libs/,$(call xenlibs-dependencies,$(1)))
+endef
 
 define LIB_defs
  FILENAME_$(1) ?= xen$(1)
  XEN_libxen$(1) = $$(XEN_ROOT)/tools/libs/$(1)
  CFLAGS_libxen$(1) = $$(CFLAGS_xeninclude)
- SHDEPS_libxen$(1) = $$(foreach use,$$(USELIBS_$(1)),$$(SHLIB_libxen$$(use)))
- LDLIBS_libxen$(1) = $$(SHDEPS_libxen$(1)) $$(XEN_libxen$(1))/lib$$(FILENAME_$(1))$$(libextension)
- SHLIB_libxen$(1) = $$(SHDEPS_libxen$(1)) -Wl,-rpath-link=$$(XEN_libxen$(1))
+ SHLIB_libxen$(1) = $$(call xenlibs-rpath,$(1)) -Wl,-rpath-link=$$(XEN_libxen$(1))
+ LDLIBS_libxen$(1) = $$(call xenlibs-rpath,$(1)) $$(XEN_libxen$(1))/lib$$(FILENAME_$(1))$$(libextension)
 endef
 
 $(foreach lib,$(LIBS_LIBS),$(eval $(call LIB_defs,$(lib))))
