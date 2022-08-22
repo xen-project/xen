@@ -576,7 +576,8 @@ static int cf_check hvm_print_line(
     return X86EMUL_OKAY;
 }
 
-int hvm_domain_initialise(struct domain *d)
+int hvm_domain_initialise(struct domain *d,
+                          const struct xen_domctl_createdomain *config)
 {
     unsigned int nr_gsis;
     int rc;
@@ -596,6 +597,12 @@ int hvm_domain_initialise(struct domain *d)
     INIT_LIST_HEAD(&d->arch.hvm.g2m_ioport_list);
     INIT_LIST_HEAD(&d->arch.hvm.mmcfg_regions);
     INIT_LIST_HEAD(&d->arch.hvm.msix_tables);
+
+    d->arch.hvm.assisted_xapic =
+        config->arch.misc_flags & XEN_X86_ASSISTED_XAPIC;
+
+    d->arch.hvm.assisted_x2apic =
+        config->arch.misc_flags & XEN_X86_ASSISTED_X2APIC;
 
     rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
     if ( rc )

@@ -853,7 +853,7 @@ int arch_domain_create(struct domain *d,
 
     if ( is_hvm_domain(d) )
     {
-        if ( (rc = hvm_domain_initialise(d)) != 0 )
+        if ( (rc = hvm_domain_initialise(d, config)) != 0 )
             goto fail;
     }
     else if ( is_pv_domain(d) )
@@ -884,12 +884,6 @@ int arch_domain_create(struct domain *d,
     domain_cpu_policy_changed(d);
 
     d->arch.msr_relaxed = config->arch.misc_flags & XEN_X86_MSR_RELAXED;
-
-    d->arch.hvm.assisted_xapic =
-        config->arch.misc_flags & XEN_X86_ASSISTED_XAPIC;
-
-    d->arch.hvm.assisted_x2apic =
-        config->arch.misc_flags & XEN_X86_ASSISTED_X2APIC;
 
     spec_ctrl_init_domain(d);
 
