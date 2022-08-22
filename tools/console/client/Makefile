@@ -6,8 +6,7 @@ CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_libxenstore)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
 
-LDLIBS += $(LDLIBS_libxenctrl)
-LDLIBS += $(LDLIBS_libxenstore)
+LDLIBS += $(call xenlibs-ldlibs,ctrl store)
 LDLIBS += $(SOCKET_LIBS)
 
 OBJS-y := main.o

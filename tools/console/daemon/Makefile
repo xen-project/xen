@@ -10,11 +10,7 @@ CFLAGS += $(CFLAGS_libxenforeignmemory)
 CFLAGS-$(CONFIG_ARM) += -DCONFIG_ARM
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
 
-LDLIBS += $(LDLIBS_libxenctrl)
-LDLIBS += $(LDLIBS_libxenstore)
-LDLIBS += $(LDLIBS_libxenevtchn)
-LDLIBS += $(LDLIBS_libxengnttab)
-LDLIBS += $(LDLIBS_libxenforeignmemory)
+LDLIBS += $(call xenlibs-ldlibs,ctrl store evtchn gnttab foreignmemory)
 LDLIBS += $(SOCKET_LIBS)
 LDLIBS += $(UTIL_LIBS)
 LDLIBS += -lrt
