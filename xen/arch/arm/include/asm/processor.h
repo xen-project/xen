@@ -127,10 +127,10 @@
 #define MPIDR_LEVEL_MASK        ((1 << MPIDR_LEVEL_BITS) - 1)
 
 #define MPIDR_LEVEL_SHIFT(level) \
-         (((1 << level) >> 1) << MPIDR_LEVEL_BITS_SHIFT)
+         (((1 << (level)) >> 1) << MPIDR_LEVEL_BITS_SHIFT)
 
 #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
-         ((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
+         (((mpidr) >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
 
 #define AFFINITY_MASK(level)    ~((_AC(0x1,UL) << MPIDR_LEVEL_SHIFT(level)) - 1)
 
