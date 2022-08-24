@@ -44,7 +44,6 @@ extern struct bios_config ovmf_config;
 #define PAGE_SHIFT 12
 #define PAGE_SIZE  (1ul << PAGE_SHIFT)
 
-extern uint32_t ioapic_base_address;
 extern uint8_t ioapic_version;
 
 #define IOAPIC_ID           0x01

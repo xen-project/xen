@@ -113,7 +113,6 @@ asm (
 
 unsigned long scratch_start = SCRATCH_PHYSICAL_ADDRESS;
 
-uint32_t ioapic_base_address = 0xfec00000;
 uint8_t ioapic_version;
 
 bool acpi_enabled;

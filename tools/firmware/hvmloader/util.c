@@ -42,60 +42,6 @@ bool check_overlap(uint64_t start, uint64_t size,
             (start < reserved_start + reserved_size);
 }
 
-void wrmsr(uint32_t idx, uint64_t v)
-{
-    asm volatile (
-        "wrmsr"
-        : : "c" (idx), "a" ((uint32_t)v), "d" ((uint32_t)(v>>32)) );
-}
-
-uint64_t rdmsr(uint32_t idx)
-{
-    uint32_t lo, hi;
-
-    asm volatile (
-        "rdmsr"
-        : "=a" (lo), "=d" (hi) : "c" (idx) );
-
-    return (lo | ((uint64_t)hi << 32));
-}
-
-void outb(uint16_t addr, uint8_t val)
-{
-    asm volatile ( "outb %%al, %%dx" : : "d" (addr), "a" (val) );
-}
-
-void outw(uint16_t addr, uint16_t val)
-{
-    asm volatile ( "outw %%ax, %%dx" : : "d" (addr), "a" (val) );
-}
-
-void outl(uint16_t addr, uint32_t val)
-{
-    asm volatile ( "outl %%eax, %%dx" : : "d" (addr), "a" (val) );
-}
-
-uint8_t inb(uint16_t addr)
-{
-    uint8_t val;
-    asm volatile ( "inb %%dx,%%al" : "=a" (val) : "d" (addr) );
-    return val;
-}
-
-uint16_t inw(uint16_t addr)
-{
-    uint16_t val;
-    asm volatile ( "inw %%dx,%%ax" : "=a" (val) : "d" (addr) );
-    return val;
-}
-
-uint32_t inl(uint16_t addr)
-{
-    uint32_t val;
-    asm volatile ( "inl %%dx,%%eax" : "=a" (val) : "d" (addr) );
-    return val;
-}
-
 uint8_t cmos_inb(uint8_t idx)
 {
     outb(0x70, idx);
@@ -491,28 +437,6 @@ void *scratch_alloc(uint32_t size, uint32_t align)
     scratch_start = e;
 
     return (void *)(unsigned long)s;
-}
-
-uint32_t ioapic_read(uint32_t reg)
-{
-    *(volatile uint32_t *)(ioapic_base_address + 0x00) = reg;
-    return *(volatile uint32_t *)(ioapic_base_address + 0x10);
-}
-
-void ioapic_write(uint32_t reg, uint32_t val)
-{
-    *(volatile uint32_t *)(ioapic_base_address + 0x00) = reg;
-    *(volatile uint32_t *)(ioapic_base_address + 0x10) = val;
-}
-
-uint32_t lapic_read(uint32_t reg)
-{
-    return *(volatile uint32_t *)(LAPIC_BASE_ADDRESS + reg);
-}
-
-void lapic_write(uint32_t reg, uint32_t val)
-{
-    *(volatile uint32_t *)(LAPIC_BASE_ADDRESS + reg) = val;
 }
 
 #define PCI_CONF1_ADDRESS(bus, devfn, reg) \
@@ -945,7 +869,7 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
 
     config->lapic_base_address = LAPIC_BASE_ADDRESS;
     config->lapic_id = acpi_lapic_id;
-    config->ioapic_base_address = ioapic_base_address;
+    config->ioapic_base_address = IOAPIC_BASE_ADDRESS;
     config->ioapic_id = IOAPIC_ID;
     config->pci_isa_irq_mask = PCI_ISA_IRQ_MASK; 
 
