@@ -43,7 +43,7 @@ enum vgic_type {
 
 #define VGIC_V2_MAX_LRS         (1 << 6)
 #define VGIC_V3_MAX_LRS         16
-#define VGIC_V3_LR_INDEX(lr)    (VGIC_V3_MAX_LRS - 1 - lr)
+#define VGIC_V3_LR_INDEX(lr)    (VGIC_V3_MAX_LRS - 1 - (lr))
 
 #define VGIC_CONFIG_EDGE        false
 #define VGIC_CONFIG_LEVEL       true
