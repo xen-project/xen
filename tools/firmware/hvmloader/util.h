@@ -30,9 +30,6 @@ enum {
 #define SEL_DATA32          0x0020
 #define SEL_CODE64          0x0028
 
-#undef NULL
-#define NULL ((void*)0)
-
 void __assert_failed(const char *assertion, const char *file, int line)
     __attribute__((noreturn));
 #define ASSERT(p) \
