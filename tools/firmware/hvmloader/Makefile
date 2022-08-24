@@ -23,7 +23,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 # SMBIOS spec requires format mm/dd/yyyy
 SMBIOS_REL_DATE ?= $(shell date +%m/%d/%Y)
 
-CFLAGS += $(CFLAGS_xeninclude)
+CFLAGS += $(CFLAGS_xeninclude) -fno-pic
 
 # We mustn't use tools-only public interfaces.
 CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
