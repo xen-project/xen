@@ -101,14 +101,6 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
         owner = page_get_owner(pg);
     }
 
-    /*
-     * Check whether refcounting is suppressed on this page. For example,
-     * VMX'es APIC access MFN is just a surrogate page.  It doesn't actually
-     * get accessed, and hence there's no need to refcount it.
-     */
-    if ( pg && page_refcounting_suppressed(pg) )
-        return 0;
-
     if ( owner == dom_io )
         owner = NULL;
 

@@ -83,7 +83,7 @@
 #define PGC_state_offlined  PG_mask(2, 6)
 #define PGC_state_free      PG_mask(3, 6)
 #define page_state_is(pg, st) (((pg)->count_info&PGC_state) == PGC_state_##st)
-/* Page is not reference counted (see below for caveats) */
+/* Page is not reference counted */
 #define _PGC_extra        PG_shift(7)
 #define PGC_extra         PG_mask(1, 7)
 
@@ -374,24 +374,6 @@ bool fill_ro_mpt(mfn_t mfn);
 void zap_ro_mpt(mfn_t mfn);
 
 bool is_iomem_page(mfn_t mfn);
-
-/*
- * Pages with no owner which may get passed to functions wanting to
- * refcount them can be marked PGC_extra to bypass this refcounting (which
- * would fail due to the lack of an owner).
- *
- * (For pages with owner PGC_extra has different meaning.)
- */
-static inline void page_suppress_refcounting(struct page_info *pg)
-{
-   ASSERT(!page_get_owner(pg));
-   pg->count_info |= PGC_extra;
-}
-
-static inline bool page_refcounting_suppressed(const struct page_info *pg)
-{
-    return !page_get_owner(pg) && (pg->count_info & PGC_extra);
-}
 
 struct platform_bad_page {
     unsigned long mfn;

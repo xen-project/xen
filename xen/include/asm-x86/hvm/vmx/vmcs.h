@@ -58,6 +58,7 @@ struct ept_data {
 #define _VMX_DOMAIN_PML_ENABLED    0
 #define VMX_DOMAIN_PML_ENABLED     (1ul << _VMX_DOMAIN_PML_ENABLED)
 struct vmx_domain {
+    mfn_t apic_access_mfn;
     /* VMX_DOMAIN_* */
     unsigned int status;
 
