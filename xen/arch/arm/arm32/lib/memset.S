@@ -15,6 +15,7 @@
 	.align	5
 
 ENTRY(memset)
+	and	r1, r1, #0xff
 	ands	r3, r0, #3		@ 1 unaligned?
 	mov	ip, r0			@ preserve r0 as return value
 	bne	6f			@ 1

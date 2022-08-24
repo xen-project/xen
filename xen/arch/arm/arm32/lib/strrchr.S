@@ -14,6 +14,7 @@
 		.text
 		.align	5
 ENTRY(strrchr)
+		and	r1, r1, #0xff
 		mov	r3, #0
 1:		ldrb	r2, [r0], #1
 		teq	r2, r1
