@@ -1824,9 +1824,28 @@ int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
     return ret;
 }
 
-void domain_update_node_affinity(struct domain *d)
+bool alloc_affinity_masks(struct affinity_masks *affinity)
 {
-    cpumask_var_t dom_cpumask, dom_cpumask_soft;
+    if ( !alloc_cpumask_var(&affinity->hard) )
+        return false;
+    if ( !alloc_cpumask_var(&affinity->soft) )
+    {
+        free_cpumask_var(affinity->hard);
+        return false;
+    }
+
+    return true;
+}
+
+void free_affinity_masks(struct affinity_masks *affinity)
+{
+    free_cpumask_var(affinity->soft);
+    free_cpumask_var(affinity->hard);
+}
+
+void domain_update_node_aff(struct domain *d, struct affinity_masks *affinity)
+{
+    struct affinity_masks masks;
     cpumask_t *dom_affinity;
     const cpumask_t *online;
     struct sched_unit *unit;
@@ -1836,13 +1855,15 @@ void domain_update_node_affinity(struct domain *d)
     if ( !d->vcpu || !d->vcpu[0] )
         return;
 
-    if ( !zalloc_cpumask_var(&dom_cpumask) )
-        return;
-    if ( !zalloc_cpumask_var(&dom_cpumask_soft) )
+    if ( !affinity )
     {
-        free_cpumask_var(dom_cpumask);
-        return;
+        affinity = &masks;
+        if ( !alloc_affinity_masks(affinity) )
+            return;
     }
+
+    cpumask_clear(affinity->hard);
+    cpumask_clear(affinity->soft);
 
     online = cpupool_domain_master_cpumask(d);
 
@@ -1864,22 +1885,21 @@ void domain_update_node_affinity(struct domain *d)
          */
         for_each_sched_unit ( d, unit )
         {
-            cpumask_or(dom_cpumask, dom_cpumask, unit->cpu_hard_affinity);
-            cpumask_or(dom_cpumask_soft, dom_cpumask_soft,
-                       unit->cpu_soft_affinity);
+            cpumask_or(affinity->hard, affinity->hard, unit->cpu_hard_affinity);
+            cpumask_or(affinity->soft, affinity->soft, unit->cpu_soft_affinity);
         }
         /* Filter out non-online cpus */
-        cpumask_and(dom_cpumask, dom_cpumask, online);
-        ASSERT(!cpumask_empty(dom_cpumask));
+        cpumask_and(affinity->hard, affinity->hard, online);
+        ASSERT(!cpumask_empty(affinity->hard));
         /* And compute the intersection between hard, online and soft */
-        cpumask_and(dom_cpumask_soft, dom_cpumask_soft, dom_cpumask);
+        cpumask_and(affinity->soft, affinity->soft, affinity->hard);
 
         /*
          * If not empty, the intersection of hard, soft and online is the
          * narrowest set we want. If empty, we fall back to hard&online.
          */
-        dom_affinity = cpumask_empty(dom_cpumask_soft) ?
-                           dom_cpumask : dom_cpumask_soft;
+        dom_affinity = cpumask_empty(affinity->soft) ? affinity->hard
+                                                     : affinity->soft;
 
         nodes_clear(d->node_affinity);
         for_each_cpu ( cpu, dom_affinity )
@@ -1888,8 +1908,8 @@ void domain_update_node_affinity(struct domain *d)
 
     spin_unlock(&d->node_affinity_lock);
 
-    free_cpumask_var(dom_cpumask_soft);
-    free_cpumask_var(dom_cpumask);
+    if ( affinity == &masks )
+        free_affinity_masks(affinity);
 }
 
 typedef long ret_t;
