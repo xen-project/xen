@@ -411,22 +411,28 @@ int cpupool_move_domain(struct domain *d, struct cpupool *c)
 }
 
 /* Update affinities of all domains in a cpupool. */
-static void cpupool_update_node_affinity(const struct cpupool *c)
+static void cpupool_update_node_affinity(const struct cpupool *c,
+                                         struct affinity_masks *masks)
 {
-    struct affinity_masks masks;
+    struct affinity_masks local_masks;
     struct domain *d;
 
-    if ( !alloc_affinity_masks(&masks) )
-        return;
+    if ( !masks )
+    {
+        if ( !alloc_affinity_masks(&local_masks) )
+            return;
+        masks = &local_masks;
+    }
 
     rcu_read_lock(&domlist_read_lock);
 
     for_each_domain_in_cpupool(d, c)
-        domain_update_node_aff(d, &masks);
+        domain_update_node_aff(d, masks);
 
     rcu_read_unlock(&domlist_read_lock);
 
-    free_affinity_masks(&masks);
+    if ( masks == &local_masks )
+        free_affinity_masks(masks);
 }
 
 /*
@@ -460,15 +466,17 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 
     rcu_read_unlock(&sched_res_rculock);
 
-    cpupool_update_node_affinity(c);
+    cpupool_update_node_affinity(c, NULL);
 
     return 0;
 }
 
-static int cpupool_unassign_cpu_finish(struct cpupool *c)
+static int cpupool_unassign_cpu_finish(struct cpupool *c,
+                                       struct cpu_rm_data *mem)
 {
     int cpu = cpupool_moving_cpu;
     const cpumask_t *cpus;
+    struct affinity_masks *masks = mem ? &mem->affinity : NULL;
     int ret;
 
     if ( c != cpupool_cpu_moving )
@@ -491,7 +499,7 @@ static int cpupool_unassign_cpu_finish(struct cpupool *c)
      */
     if ( !ret )
     {
-        ret = schedule_cpu_rm(cpu);
+        ret = schedule_cpu_rm(cpu, mem);
         if ( ret )
             cpumask_andnot(&cpupool_free_cpus, &cpupool_free_cpus, cpus);
         else
@@ -503,7 +511,7 @@ static int cpupool_unassign_cpu_finish(struct cpupool *c)
     }
     rcu_read_unlock(&sched_res_rculock);
 
-    cpupool_update_node_affinity(c);
+    cpupool_update_node_affinity(c, masks);
 
     return ret;
 }
@@ -567,7 +575,7 @@ static long cf_check cpupool_unassign_cpu_helper(void *info)
                       cpupool_cpu_moving->cpupool_id, cpupool_moving_cpu);
     spin_lock(&cpupool_lock);
 
-    ret = cpupool_unassign_cpu_finish(c);
+    ret = cpupool_unassign_cpu_finish(c, NULL);
 
     spin_unlock(&cpupool_lock);
     debugtrace_printk("cpupool_unassign_cpu ret=%ld\n", ret);
@@ -714,7 +722,7 @@ static int cpupool_cpu_add(unsigned int cpu)
  * This function is called in stop_machine context, so we can be sure no
  * non-idle vcpu is active on the system.
  */
-static void cpupool_cpu_remove(unsigned int cpu)
+static void cpupool_cpu_remove(unsigned int cpu, struct cpu_rm_data *mem)
 {
     int ret;
 
@@ -722,7 +730,7 @@ static void cpupool_cpu_remove(unsigned int cpu)
 
     if ( !cpumask_test_cpu(cpu, &cpupool_free_cpus) )
     {
-        ret = cpupool_unassign_cpu_finish(cpupool0);
+        ret = cpupool_unassign_cpu_finish(cpupool0, mem);
         BUG_ON(ret);
     }
     cpumask_clear_cpu(cpu, &cpupool_free_cpus);
@@ -788,7 +796,7 @@ static void cpupool_cpu_remove_forced(unsigned int cpu)
         {
             ret = cpupool_unassign_cpu_start(c, master_cpu);
             BUG_ON(ret);
-            ret = cpupool_unassign_cpu_finish(c);
+            ret = cpupool_unassign_cpu_finish(c, NULL);
             BUG_ON(ret);
         }
     }
@@ -1006,12 +1014,24 @@ void cf_check dump_runq(unsigned char key)
 static int cf_check cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
+    static struct cpu_rm_data *mem;
+
     unsigned int cpu = (unsigned long)hcpu;
     int rc = 0;
 
     switch ( action )
     {
     case CPU_DOWN_FAILED:
+        if ( system_state <= SYS_STATE_active )
+        {
+            if ( mem )
+            {
+                free_cpu_rm_data(mem, cpu);
+                mem = NULL;
+            }
+            rc = cpupool_cpu_add(cpu);
+        }
+        break;
     case CPU_ONLINE:
         if ( system_state <= SYS_STATE_active )
             rc = cpupool_cpu_add(cpu);
@@ -1019,12 +1039,31 @@ static int cf_check cpu_callback(
     case CPU_DOWN_PREPARE:
         /* Suspend/Resume don't change assignments of cpus to cpupools. */
         if ( system_state <= SYS_STATE_active )
+        {
             rc = cpupool_cpu_remove_prologue(cpu);
+            if ( !rc )
+            {
+                ASSERT(!mem);
+                mem = alloc_cpu_rm_data(cpu, true);
+                rc = mem ? 0 : -ENOMEM;
+            }
+        }
         break;
     case CPU_DYING:
         /* Suspend/Resume don't change assignments of cpus to cpupools. */
         if ( system_state <= SYS_STATE_active )
-            cpupool_cpu_remove(cpu);
+        {
+            ASSERT(mem);
+            cpupool_cpu_remove(cpu, mem);
+        }
+        break;
+    case CPU_DEAD:
+        if ( system_state <= SYS_STATE_active )
+        {
+            ASSERT(mem);
+            free_cpu_rm_data(mem, cpu);
+            mem = NULL;
+        }
         break;
     case CPU_RESUME_FAILED:
         cpupool_cpu_remove_forced(cpu);
