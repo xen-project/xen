@@ -2694,11 +2694,13 @@ struct domain *get_pg_owner(domid_t domid)
 
 #ifdef CONFIG_STATIC_MEMORY
 /* Equivalent of free_heap_pages to free nr_mfns pages of static memory. */
-void __init free_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
-                                 bool need_scrub)
+void free_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
+                          bool need_scrub)
 {
     mfn_t mfn = page_to_mfn(pg);
     unsigned long i;
+
+    spin_lock(&heap_lock);
 
     for ( i = 0; i < nr_mfns; i++ )
     {
@@ -2710,9 +2712,41 @@ void __init free_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
             scrub_one_page(pg);
         }
 
-        /* In case initializing page of static memory, mark it PGC_static. */
         pg[i].count_info |= PGC_static;
     }
+
+    spin_unlock(&heap_lock);
+}
+
+void free_domstatic_page(struct page_info *page)
+{
+    struct domain *d = page_get_owner(page);
+    bool drop_dom_ref;
+
+    if ( unlikely(!d) )
+    {
+        printk(XENLOG_G_ERR
+               "The about-to-free static page %"PRI_mfn" must be owned by a domain\n",
+               mfn_x(page_to_mfn(page)));
+        ASSERT_UNREACHABLE();
+        return;
+    }
+
+    ASSERT_ALLOC_CONTEXT();
+
+    /* NB. May recursively lock from relinquish_memory(). */
+    spin_lock_recursive(&d->page_alloc_lock);
+
+    arch_free_heap_page(d, page);
+
+    drop_dom_ref = !domain_adjust_tot_pages(d, -1);
+
+    spin_unlock_recursive(&d->page_alloc_lock);
+
+    free_staticmem_pages(page, 1, scrub_debug);
+
+    if ( drop_dom_ref )
+        put_domain(d);
 }
 
 /*
