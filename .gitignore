@@ -38,13 +38,13 @@ dist
 stubdom/*.tar.gz
 
 autom4te.cache/
+build-*/
 config.log
 config.status
 config.cache
 config/Toplevel.mk
 config/Paths.mk
 
-build-*
 dist/*
 docs/tmp.*
 docs/html/
