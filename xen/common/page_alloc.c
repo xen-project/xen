@@ -2741,9 +2741,12 @@ void free_domstatic_page(struct page_info *page)
 
     drop_dom_ref = !domain_adjust_tot_pages(d, -1);
 
-    spin_unlock_recursive(&d->page_alloc_lock);
-
     free_staticmem_pages(page, 1, scrub_debug);
+
+    /* Add page on the resv_page_list *after* it has been freed. */
+    page_list_add_tail(page, &d->resv_page_list);
+
+    spin_unlock_recursive(&d->page_alloc_lock);
 
     if ( drop_dom_ref )
         put_domain(d);
