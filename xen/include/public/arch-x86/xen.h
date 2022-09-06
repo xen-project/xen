@@ -325,12 +325,6 @@ struct xen_arch_domainconfig {
 /* Max  XEN_X86_* constant. Used for ABI checking. */
 #define XEN_X86_MISC_FLAGS_MAX XEN_X86_ASSISTED_X2APIC
 
-/* Location of online VCPU bitmap. */
-#define XEN_ACPI_CPU_MAP             0xaf00
-#define XEN_ACPI_CPU_MAP_LEN         ((HVM_MAX_VCPUS + 7) / 8)
-
-/* GPE0 bit set during CPU hotplug */
-#define XEN_ACPI_GPE0_CPUHP_BIT      2
 #endif
 
 /*

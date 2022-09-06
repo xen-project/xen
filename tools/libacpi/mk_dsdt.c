@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #if defined(CONFIG_X86)
-#include <xen/arch-x86/xen.h>
+#include <xen/arch-x86/guest-acpi.h>
 #include <xen/hvm/hvm_info_table.h>
 #elif defined(CONFIG_ARM_64)
 #include <xen/arch-arm.h>
