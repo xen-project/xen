@@ -2755,9 +2755,8 @@ void free_domstatic_page(struct page_info *page)
         put_domain(d);
 }
 
-static bool __init prepare_staticmem_pages(struct page_info *pg,
-                                           unsigned long nr_mfns,
-                                           unsigned int memflags)
+static bool prepare_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
+                                    unsigned int memflags)
 {
     bool need_tlbflush = false;
     uint32_t tlbflush_timestamp = 0;
@@ -2838,6 +2837,25 @@ static struct page_info * __init acquire_staticmem_pages(mfn_t smfn,
     return pg;
 }
 
+static int assign_domstatic_pages(struct domain *d, struct page_info *pg,
+                                  unsigned int nr_mfns, unsigned int memflags)
+{
+    if ( !d || (memflags & (MEMF_no_owner | MEMF_no_refcount)) )
+    {
+        /*
+         * Respective handling omitted here because right now
+         * acquired static memory is only for domain's RAM.
+         */
+        ASSERT_UNREACHABLE();
+        return -EINVAL;
+    }
+
+    if ( assign_pages(pg, nr_mfns, d, memflags) )
+        return -EINVAL;
+
+    return 0;
+}
+
 /*
  * Acquire nr_mfns contiguous pages, starting at #smfn, of static memory,
  * then assign them to one specific domain #d.
@@ -2853,23 +2871,51 @@ int __init acquire_domstatic_pages(struct domain *d, mfn_t smfn,
     if ( !pg )
         return -ENOENT;
 
-    if ( !d || (memflags & (MEMF_no_owner | MEMF_no_refcount)) )
-    {
-        /*
-         * Respective handling omitted here because right now
-         * acquired static memory is only for guest RAM.
-         */
-        ASSERT_UNREACHABLE();
-        return -EINVAL;
-    }
-
-    if ( assign_pages(pg, nr_mfns, d, memflags) )
+    if ( assign_domstatic_pages(d, pg, nr_mfns, memflags) )
     {
         unprepare_staticmem_pages(pg, nr_mfns, memflags & MEMF_no_scrub);
         return -EINVAL;
     }
 
     return 0;
+}
+
+/*
+ * Acquire a page from reserved page list(resv_page_list), when populating
+ * memory for static domain on runtime.
+ */
+mfn_t acquire_reserved_page(struct domain *d, unsigned int memflags)
+{
+    struct page_info *page;
+
+    ASSERT_ALLOC_CONTEXT();
+
+    /* Acquire a page from reserved page list(resv_page_list). */
+    spin_lock(&d->page_alloc_lock);
+    page = page_list_remove_head(&d->resv_page_list);
+    spin_unlock(&d->page_alloc_lock);
+    if ( unlikely(!page) )
+        return INVALID_MFN;
+
+    if ( !prepare_staticmem_pages(page, 1, memflags) )
+        goto fail;
+
+    if ( assign_domstatic_pages(d, page, 1, memflags) )
+        goto fail_assign;
+
+    return page_to_mfn(page);
+
+ fail_assign:
+    /*
+     * The page was never accessible by the domain. So scrubbing can be
+     * skipped
+     */
+    unprepare_staticmem_pages(page, 1, false);
+ fail:
+    spin_lock(&d->page_alloc_lock);
+    page_list_add_tail(page, &d->resv_page_list);
+    spin_unlock(&d->page_alloc_lock);
+    return INVALID_MFN;
 }
 #endif
 
