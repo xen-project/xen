@@ -653,7 +653,8 @@ static void __init init_staticmem_pages(void)
             if ( mfn_x(bank_end) <= mfn_x(bank_start) )
                 return;
 
-            free_staticmem_pages(mfn_to_page(bank_start), bank_pages, false);
+            unprepare_staticmem_pages(mfn_to_page(bank_start),
+                                      bank_pages, false);
         }
     }
 #endif

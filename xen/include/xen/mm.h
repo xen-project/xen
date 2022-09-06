@@ -86,8 +86,8 @@ bool scrub_free_pages(void);
 #define FREE_XENHEAP_PAGE(p) FREE_XENHEAP_PAGES(p, 0)
 
 /* These functions are for static memory */
-void free_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
-                          bool need_scrub);
+void unprepare_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
+                               bool need_scrub);
 void free_domstatic_page(struct page_info *page);
 int acquire_domstatic_pages(struct domain *d, mfn_t smfn, unsigned int nr_mfns,
                             unsigned int memflags);
