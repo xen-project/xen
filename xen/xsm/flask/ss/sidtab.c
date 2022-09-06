@@ -14,11 +14,11 @@
 #include "security.h"
 #include "sidtab.h"
 
-#define SIDTAB_HASH(sid) (sid & SIDTAB_HASH_MASK)
+#define SIDTAB_HASH(sid) ((sid) & SIDTAB_HASH_MASK)
 
-#define INIT_SIDTAB_LOCK(s) spin_lock_init(&s->lock)
-#define SIDTAB_LOCK(s) spin_lock(&s->lock)
-#define SIDTAB_UNLOCK(s) spin_unlock(&s->lock)
+#define INIT_SIDTAB_LOCK(s) spin_lock_init(&(s)->lock)
+#define SIDTAB_LOCK(s) spin_lock(&(s)->lock)
+#define SIDTAB_UNLOCK(s) spin_unlock(&(s)->lock)
 
 int sidtab_init(struct sidtab *s)
 {
