@@ -204,6 +204,10 @@ with the following properties:
     - "disabled"
     Xen PV interfaces are disabled.
 
+    - "no-xenstore"
+    All default Xen PV interfaces, including grant-table will be enabled but
+    xenstore will be disabled for the VM.
+
     If the xen,enhanced property is present with no value, it defaults
     to "enabled". If the xen,enhanced property is not present, PV
     interfaces are disabled.

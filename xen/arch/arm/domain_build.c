@@ -2891,7 +2891,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
             goto err;
     }
 
-    if ( kinfo->dom0less_enhanced )
+    if ( kinfo->dom0less_feature & DOM0LESS_ENHANCED_NO_XS )
     {
         ret = make_hypervisor_node(d, kinfo, addrcells, sizecells);
         if ( ret )
@@ -3209,10 +3209,12 @@ static int __init construct_domU(struct domain *d,
          (rc == 0 && !strcmp(dom0less_enhanced, "enabled")) )
     {
         if ( hardware_domain )
-            kinfo.dom0less_enhanced = true;
+            kinfo.dom0less_feature = DOM0LESS_ENHANCED;
         else
-            panic("Tried to use xen,enhanced without dom0\n");
+            panic("At the moment, Xenstore support requires dom0 to be present\n");
     }
+    else if ( rc == 0 && !strcmp(dom0less_enhanced, "no-xenstore") )
+        kinfo.dom0less_feature = DOM0LESS_ENHANCED_NO_XS;
 
     if ( vcpu_create(d, 0) == NULL )
         return -ENOMEM;
@@ -3252,7 +3254,7 @@ static int __init construct_domU(struct domain *d,
     if ( rc < 0 )
         return rc;
 
-    if ( kinfo.dom0less_enhanced )
+    if ( kinfo.dom0less_feature & DOM0LESS_XENSTORE )
     {
         ASSERT(hardware_domain);
         rc = alloc_xenstore_evtchn(d);
