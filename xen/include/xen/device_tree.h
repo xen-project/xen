@@ -92,6 +92,10 @@ struct dt_device_node {
 
     /* IOMMU specific fields */
     bool is_protected;
+
+    /* HACK: Remove this if there is a need of space */
+    bool_t static_evtchn_created;
+
     /*
      * The main purpose of this list is to link the structure in the list
      * of devices assigned to domain.
@@ -315,6 +319,18 @@ static inline bool_t dt_property_name_is_equal(const struct dt_property *pp,
                                                const char *name)
 {
     return !dt_prop_cmp(pp->name, name);
+}
+
+static inline void
+dt_device_set_static_evtchn_created(struct dt_device_node *device)
+{
+    device->static_evtchn_created = true;
+}
+
+static inline bool_t
+dt_device_static_evtchn_created(const struct dt_device_node *device)
+{
+    return device->static_evtchn_created;
 }
 
 /**
