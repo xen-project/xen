@@ -159,6 +159,21 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
      */
     alternative_input("", "verw %[sel]", X86_FEATURE_SC_VERW_IDLE,
                       [sel] "m" (info->verw_sel));
+
+    /*
+     * Cross-Thread Return Address Predictions:
+     *
+     * On vulnerable systems, the return predictions (RSB/RAS) are statically
+     * partitioned between active threads.  When entering idle, our entries
+     * are re-partitioned to allow the other threads to use them.
+     *
+     * In some cases, we might still have guest entries in the RAS, so flush
+     * them before injecting them sideways to our sibling thread.
+     *
+     * (ab)use alternative_input() to specify clobbers.
+     */
+    alternative_input("", "DO_OVERWRITE_RSB", X86_FEATURE_SC_RSB_IDLE,
+                      : "rax", "rcx");
 }
 
 /* WARNING! `ret`, `call *`, `jmp *` not safe before this call. */
