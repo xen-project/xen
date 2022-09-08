@@ -306,6 +306,13 @@ Allow sharing of identical pages between guests
 
     Status, x86 HVM: Experimental
 
+### Static Memory Sharing
+
+Allow to statically set up shared memory on dom0less system,
+enabling domains to do shm-based communication
+
+    Status, ARM: Tech Preview
+
 ### Memory Paging
 
 Allow pages belonging to guests to be paged to disk
