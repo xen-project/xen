@@ -2709,6 +2709,11 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
             if ( res )
                 return res;
         }
+
+        res = make_resv_memory_node(d, kinfo->fdt, addrcells, sizecells,
+                                    &kinfo->shm_mem);
+        if ( res )
+            return res;
     }
 
     res = fdt_end_node(kinfo->fdt);
@@ -3937,6 +3942,9 @@ static int __init construct_dom0(struct domain *d)
 {
     struct kernel_info kinfo = {};
     int rc;
+#ifdef CONFIG_STATIC_SHM
+    const struct dt_device_node *chosen = dt_find_node_by_path("/chosen");
+#endif
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
@@ -3970,6 +3978,12 @@ static int __init construct_dom0(struct domain *d)
 #endif
     allocate_memory_11(d, &kinfo);
     find_gnttab_region(d, &kinfo);
+
+#ifdef CONFIG_STATIC_SHM
+    rc = process_shm(d, &kinfo, chosen);
+    if ( rc < 0 )
+        return rc;
+#endif
 
     /* Map extra GIC MMIO, irqs and other hw stuffs to dom0. */
     rc = gic_map_hwdom_extra_mappings(d);
