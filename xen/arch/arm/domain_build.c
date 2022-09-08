@@ -824,9 +824,11 @@ static mfn_t __init acquire_shared_memory_bank(struct domain *d,
 
 static int __init assign_shared_memory(struct domain *d,
                                        uint32_t addr_cells, uint32_t size_cells,
-                                       paddr_t pbase, paddr_t psize)
+                                       paddr_t pbase, paddr_t psize,
+                                       paddr_t gbase)
 {
     mfn_t smfn;
+    int ret = 0;
 
     dprintk(XENLOG_INFO,
             "%pd: allocate static shared memory BANK %#"PRIpaddr"-%#"PRIpaddr".\n",
@@ -840,8 +842,18 @@ static int __init assign_shared_memory(struct domain *d,
      * DOMID_IO is not auto-translated (i.e. it sees RAM 1:1). So we do not need
      * to create mapping in the P2M.
      */
-    ASSERT(d == dom_io);
-    return 0;
+    if ( d != dom_io )
+    {
+        ret = guest_physmap_add_pages(d, gaddr_to_gfn(gbase), smfn,
+                                      PFN_DOWN(psize));
+        if ( ret )
+        {
+            printk(XENLOG_ERR "Failed to map shared memory to %pd.\n", d);
+            return ret;
+        }
+    }
+
+    return ret;
 }
 
 static int __init process_shm(struct domain *d,
@@ -857,6 +869,8 @@ static int __init process_shm(struct domain *d,
         paddr_t gbase, pbase, psize;
         int ret = 0;
         unsigned int i;
+        const char *role_str;
+        bool owner_dom_io = true;
 
         if ( !dt_device_is_compatible(shm_node, "xen,domain-shared-memory-v1") )
             continue;
@@ -893,20 +907,28 @@ static int __init process_shm(struct domain *d,
                 return -EINVAL;
             }
 
-        /* TODO: Consider owner domain is not the default dom_io. */
+        /*
+         * "role" property is optional and if it is defined explicitly,
+         * then the owner domain is not the default "dom_io" domain.
+         */
+        if ( dt_property_read_string(shm_node, "role", &role_str) == 0 )
+            owner_dom_io = false;
+
         /*
          * DOMID_IO is a fake domain and is not described in the Device-Tree.
          * Therefore when the owner of the shared region is DOMID_IO, we will
          * only find the borrowers.
          */
-        if ( !is_shm_allocated_to_domio(pbase) )
+        if ( (owner_dom_io && !is_shm_allocated_to_domio(pbase)) ||
+             (!owner_dom_io && strcmp(role_str, "owner") == 0) )
         {
             /*
              * We found the first borrower of the region, the owner was not
              * specified, so they should be assigned to dom_io.
              */
-            ret = assign_shared_memory(dom_io, addr_cells, size_cells,
-                                       pbase, psize);
+            ret = assign_shared_memory(owner_dom_io ? dom_io : d,
+                                       addr_cells, size_cells,
+                                       pbase, psize, gbase);
             if ( ret )
                 return ret;
         }
