@@ -43,7 +43,14 @@ the setting of the endianness bit.
 |-----------|---------------------------------------------------|
 | `ident`   | 0x78656e73746f7265 ('xenstore' in ASCII)          |
 |           |                                                   |
-| `version` | 0x00000001 (the version of the specification)     |
+| `version` | The version of the specification, defined values: |
+|           | 0x00000001: all fields and records without any    |
+|           |             explicitly mentioned version          |
+|           |             dependency are valid.                 |
+|           | 0x00000002: all fields and records valid for      |
+|           |             version 1 plus fields and records     |
+|           |             explicitly stated to be supported in  |
+|           |             version 2 are valid.                  |
 |           |                                                   |
 | `flags`   | 0 (LSB): Endianness: 0 = little, 1 = big          |
 |           |                                                   |
@@ -65,8 +72,9 @@ Records immediately follow the header and have the following format:
 +-------+-------------------------------------------------------+
 ```
 
-NOTE: padding octets here and in all subsequent format specifications must be
-      written as zero and should be ignored when the stream is read.
+NOTE: padding octets or fields not valid in the used version here and in all
+      subsequent format specifications must be written as zero and should be
+      ignored when the stream is read.
 
 
 | Field  | Description                                          |
@@ -77,7 +85,10 @@ NOTE: padding octets here and in all subsequent format specifications must be
 |        | 0x00000003: WATCH_DATA                               |
 |        | 0x00000004: TRANSACTION_DATA                         |
 |        | 0x00000005: NODE_DATA                                |
-|        | 0x00000006 - 0xFFFFFFFF: reserved for future use     |
+|        | 0x00000006: GLOBAL_QUOTA_DATA                        |
+|        | 0x00000007: DOMAIN_DATA                              |
+|        | 0x00000008: WATCH_DATA_EXTENDED (version 2 and up)   |
+|        | 0x00000009 - 0xFFFFFFFF: reserved for future use     |
 |        |                                                      |
 | `len`  | The length (in octets) of `body`                     |
 |        |                                                      |
@@ -241,9 +252,9 @@ the file descriptor of the socket connection.
 
 ### WATCH_DATA
 
-The image format will contain a `WATCH_DATA` record for each watch registered
-by a connection for which there is `CONNECTION_DATA` record previously present.
-
+The image format will contain either a `WATCH_DATA` or a `WATCH_DATA_EXTENDED`
+record for each watch registered by a connection for which there is
+`CONNECTION_DATA` record previously present.
 
 ```
     0       1       2       3    octet
@@ -269,6 +280,52 @@ by a connection for which there is `CONNECTION_DATA` record previously present.
 |             |                                                 |
 | `token-len` | The length (in octets) of `token` including the |
 |             | NUL terminator                                  |
+|             |                                                 |
+| `wpath`     | The watch path, as specified in the `WATCH`     |
+|             | operation                                       |
+|             |                                                 |
+| `token`     | The watch identifier token, as specified in the |
+|             | `WATCH` operation                               |
+
+\pagebreak
+
+### WATCH_DATA_EXTENDED
+
+The image format will contain either a `WATCH_DATA` or a `WATCH_DATA_EXTENDED`
+record for each watch registered by a connection for which there is
+`CONNECTION_DATA` record previously present. The `WATCH_DATA_EXTENDED` record
+type is valid only in version 2 and later.
+
+```
+    0       1       2       3    octet
++-------+-------+-------+-------+
+| conn-id                       |
++---------------+---------------+
+| wpath-len     | token-len     |
++---------------+---------------+
+| depth         | pad           |
++---------------+---------------+
+| wpath
+...
+| token
+...
+```
+
+
+| Field       | Description                                     |
+|-------------|-------------------------------------------------|
+| `conn-id`   | The connection that issued the `WATCH`          |
+|             | operation [2]                                   |
+|             |                                                 |
+| `wpath-len` | The length (in octets) of `wpath` including the |
+|             | NUL terminator                                  |
+|             |                                                 |
+| `token-len` | The length (in octets) of `token` including the |
+|             | NUL terminator                                  |
+|             |                                                 |
+| `depth`     | The number of directory levels below the        |
+|             | watched path to consider for a match.           |
+|             | A value of 0xffff is used for unlimited depth.  |
 |             |                                                 |
 | `wpath`     | The watch path, as specified in the `WATCH`     |
 |             | operation                                       |
@@ -405,6 +462,102 @@ A node permission specifier has the following format:
 
 Note that perm1 defines the domain owning the node. See [4] for more
 explanation of node permissions.
+
+\pagebreak
+
+### GLOBAL_QUOTA_DATA
+
+This record is only relevant for live update. It contains the global settings
+of xenstored quota.
+
+```
+    0       1       2       3    octet
++-------+-------+-------+-------+
+| n-dom-quota   | n-glob-quota  |
++---------------+---------------+
+| quota-val 1                   |
++-------------------------------+
+...
++-------------------------------+
+| quota-val N                   |
++-------------------------------+
+| quota-names
+...
+```
+
+
+| Field          | Description                                  |
+|----------------|----------------------------------------------|
+| `n-dom-quota`  | Number of quota values which apply per       |
+|                | domain by default.                                      |
+|                |                                              |
+| `n-glob-quota` | Number of quota values which apply globally  |
+|                | only.                                        |
+|                |                                              |
+| `quota-val`    | Quota values, first the ones applying per    |
+|                | domain, then the ones applying globally. A   |
+|                | value of 0 has the semantics of "unlimited". |
+|                |                                              |
+| `quota-names`  | 0 delimited strings of the quota names in    |
+|                | the same sequence as the `quota-val` values. |
+
+
+Allowed quota names are those explicitly named in [2] for the `GET_QUOTA`
+and `SET_QUOTA` commands, plus implementation specific ones. Quota names not
+recognized by the receiving side should not have any effect on behavior for
+the receiving side (they can be ignored or preserved for inclusion in
+future live migration/update streams).
+
+\pagebreak
+
+### DOMAIN_DATA
+
+This record is optional and can be present once for each domain.
+
+
+```
+    0       1       2       3     octet
++-------+-------+-------+-------+
+| domain-id     | n-quota       |
++---------------+---------------+
+| features                      |
++-------------------------------+
+| quota-val 1                   |
++-------------------------------+
+...
++-------------------------------+
+| quota-val N                   |
++-------------------------------+
+| quota-names
+...
+```
+
+
+| Field          | Description                                  |
+|----------------|----------------------------------------------|
+| `domain-id`    | The domain-id of the domain this record      |
+|                | belongs to.                                  |
+|                |                                              |
+| `n-quota`      | Number of quota values.                      |
+|                |                                              |
+| `features`     | Value of the feature field visible by the    |
+|                | guest at offset 2064 of the ring page.       |
+|                | Only valid for version 2 and later.          |
+|                |                                              |
+| `quota-val`    | Quota values, a value of 0 has the semantics |
+|                | "unlimited".                                 |
+|                |                                              |
+| `quota-names`  | 0 delimited strings of the quota names in    |
+|                | the same sequence as the `quota-val` values. |
+
+Allowed quota names are those explicitly named in [2] for the `GET_QUOTA`
+and `SET_QUOTA` commands, plus implementation specific ones. Quota names not
+recognized by the receiving side should not have any effect on behavior for
+the receiving side (they can be ignored or preserved for inclusion in
+future live migration/update streams).
+
+\pagebreak
+
 
 * * *
 
