@@ -6,7 +6,7 @@ test_variant=$1
 
 passed="passed"
 check="
-until ifconfig eth0 192.168.0.2 && ping -c 10 192.168.0.1; do
+until ifconfig eth0 192.168.0.2 &> /dev/null && ping -c 10 192.168.0.1; do
     sleep 30
 done
 echo \"${passed}\"
