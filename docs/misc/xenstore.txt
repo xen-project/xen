@@ -337,6 +337,23 @@ SET_FEATURE		<domid>|<value>|
 	xenstored prevents the use of GET_FEATURE and SET_FEATURE other
 	than by dom0.
 
+GET_QUOTA		[[<domid>|]<quota>|]	<value>|
+SET_QUOTA		[<domid>|]<quota>|<value>|
+	Returns or sets a quota value for the domain being specified by
+	<domid>. Omitting <domid> will return or set the global quota
+	values, which are the default values for new domains. <quota> is
+	 one of "nodes", "watches", "transactions", "node-size",
+	"permissions", or any other implementation defined value. For
+	GET_QUOTA it is possible to omit the <quota> parameter together
+	with the <domid> parameter, which will return a single string of
+	all supported <quota> values separated by blanks. <value> is a
+	decimal number specifying the quota value, with "0" having the
+	special meaning of quota checks being disabled. The initial quota
+	settings for a domain are the global ones of Xenstore.
+
+	xenstored prevents the use of GET_QUOTA and SET_QUOTA other
+	than by dom0.
+
 ---------- Miscellaneous ----------
 
 CONTROL			<command>|[<parameters>|]
