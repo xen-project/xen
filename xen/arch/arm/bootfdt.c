@@ -494,7 +494,7 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
     device_tree_for_each_node((void *)fdt, 0, early_scan_node, NULL);
 
     /*
-     * On Arm64 setup_xenheap_mappings() expects to be called with the lowest
+     * On Arm64 setup_directmap_mappings() expects to be called with the lowest
      * bank in memory first. There is no requirement that the DT will provide
      * the banks sorted in ascending order. So sort them through.
      */

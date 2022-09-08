@@ -154,19 +154,19 @@ struct page_info
 #define _PGC_need_scrub   _PGC_allocated
 #define PGC_need_scrub    PGC_allocated
 
-extern mfn_t xenheap_mfn_start, xenheap_mfn_end;
-extern vaddr_t xenheap_virt_end;
+extern mfn_t directmap_mfn_start, directmap_mfn_end;
+extern vaddr_t directmap_virt_end;
 #ifdef CONFIG_ARM_64
-extern vaddr_t xenheap_virt_start;
-extern unsigned long xenheap_base_pdx;
+extern vaddr_t directmap_virt_start;
+extern unsigned long directmap_base_pdx;
 #endif
 
 #ifdef CONFIG_ARM_32
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                                 \
     unsigned long mfn_ = mfn_x(mfn);                            \
-    (mfn_ >= mfn_x(xenheap_mfn_start) &&                        \
-     mfn_ < mfn_x(xenheap_mfn_end));                            \
+    (mfn_ >= mfn_x(directmap_mfn_start) &&                      \
+     mfn_ < mfn_x(directmap_mfn_end));                          \
 })
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
@@ -203,9 +203,12 @@ extern void remove_early_mappings(void);
 extern int init_secondary_pagetables(int cpu);
 /* Switch secondary CPUS to its own pagetables and finalise MMU setup */
 extern void mmu_init_secondary_cpu(void);
-/* Set up the xenheap: up to 1GB of contiguous, always-mapped memory.
- * Base must be 32MB aligned and size a multiple of 32MB. */
-extern void setup_xenheap_mappings(unsigned long base_mfn, unsigned long nr_mfns);
+/*
+ * For Arm32, set up the direct-mapped xenheap: up to 1GB of contiguous,
+ * always-mapped memory. Base must be 32MB aligned and size a multiple of 32MB.
+ * For Arm64, map the region in the directmap area.
+ */
+extern void setup_directmap_mappings(unsigned long base_mfn, unsigned long nr_mfns);
 /* Map a frame table to cover physical addresses ps through pe */
 extern void setup_frametable_mappings(paddr_t ps, paddr_t pe);
 /* map a physical range in virtual memory */
@@ -267,16 +270,16 @@ static inline paddr_t __virt_to_maddr(vaddr_t va)
 static inline void *maddr_to_virt(paddr_t ma)
 {
     ASSERT(is_xen_heap_mfn(maddr_to_mfn(ma)));
-    ma -= mfn_to_maddr(xenheap_mfn_start);
+    ma -= mfn_to_maddr(directmap_mfn_start);
     return (void *)(unsigned long) ma + XENHEAP_VIRT_START;
 }
 #else
 static inline void *maddr_to_virt(paddr_t ma)
 {
-    ASSERT((mfn_to_pdx(maddr_to_mfn(ma)) - xenheap_base_pdx) <
+    ASSERT((mfn_to_pdx(maddr_to_mfn(ma)) - directmap_base_pdx) <
            (DIRECTMAP_SIZE >> PAGE_SHIFT));
     return (void *)(XENHEAP_VIRT_START -
-                    (xenheap_base_pdx << PAGE_SHIFT) +
+                    (directmap_base_pdx << PAGE_SHIFT) +
                     ((ma & ma_va_bottom_mask) |
                      ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));
 }
@@ -319,10 +322,10 @@ static inline struct page_info *virt_to_page(const void *v)
     unsigned long pdx;
 
     ASSERT(va >= XENHEAP_VIRT_START);
-    ASSERT(va < xenheap_virt_end);
+    ASSERT(va < directmap_virt_end);
 
     pdx = (va - XENHEAP_VIRT_START) >> PAGE_SHIFT;
-    pdx += mfn_to_pdx(xenheap_mfn_start);
+    pdx += mfn_to_pdx(directmap_mfn_start);
     return frame_table + pdx - frametable_base_pdx;
 }
 

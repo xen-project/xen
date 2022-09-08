@@ -697,11 +697,11 @@ static void __init populate_boot_allocator(void)
 
 #ifdef CONFIG_ARM_32
             /* Avoid the xenheap */
-            if ( s < mfn_to_maddr(xenheap_mfn_end) &&
-                 mfn_to_maddr(xenheap_mfn_start) < e )
+            if ( s < mfn_to_maddr(directmap_mfn_end) &&
+                 mfn_to_maddr(directmap_mfn_start) < e )
             {
-                e = mfn_to_maddr(xenheap_mfn_start);
-                n = mfn_to_maddr(xenheap_mfn_end);
+                e = mfn_to_maddr(directmap_mfn_start);
+                n = mfn_to_maddr(directmap_mfn_end);
             }
 #endif
 
@@ -791,17 +791,17 @@ static void __init setup_mm(void)
 
     /*
      * We need some memory to allocate the page-tables used for the
-     * xenheap mappings. So populate the boot allocator first.
+     * directmap mappings. So populate the boot allocator first.
      *
-     * This requires us to set xenheap_mfn_{start, end} first so the Xenheap
-     * region can be avoided.
+     * This requires us to set directmap_mfn_{start, end} first so the
+     * direct-mapped Xenheap region can be avoided.
      */
-    xenheap_mfn_start = _mfn((e >> PAGE_SHIFT) - xenheap_pages);
-    xenheap_mfn_end = mfn_add(xenheap_mfn_start, xenheap_pages);
+    directmap_mfn_start = _mfn((e >> PAGE_SHIFT) - xenheap_pages);
+    directmap_mfn_end = mfn_add(directmap_mfn_start, xenheap_pages);
 
     populate_boot_allocator();
 
-    setup_xenheap_mappings(mfn_x(xenheap_mfn_start), xenheap_pages);
+    setup_directmap_mappings(mfn_x(directmap_mfn_start), xenheap_pages);
 
     /* Frame table covers all of RAM region, including holes */
     setup_frametable_mappings(ram_start, ram_end);
@@ -816,8 +816,8 @@ static void __init setup_mm(void)
               smp_processor_id());
 
     /* Add xenheap memory that was not already added to the boot allocator. */
-    init_xenheap_pages(mfn_to_maddr(xenheap_mfn_start),
-                       mfn_to_maddr(xenheap_mfn_end));
+    init_xenheap_pages(mfn_to_maddr(directmap_mfn_start),
+                       mfn_to_maddr(directmap_mfn_end));
 
     init_staticmem_pages();
 }
@@ -833,7 +833,7 @@ static void __init setup_mm(void)
     init_pdx();
 
     /*
-     * We need some memory to allocate the page-tables used for the xenheap
+     * We need some memory to allocate the page-tables used for the directmap
      * mappings. But some regions may contain memory already allocated
      * for other uses (e.g. modules, reserved-memory...).
      *
@@ -852,15 +852,15 @@ static void __init setup_mm(void)
         ram_start = min(ram_start, bank->start);
         ram_end = max(ram_end, bank_end);
 
-        setup_xenheap_mappings(PFN_DOWN(bank->start),
-                               PFN_DOWN(bank->size));
+        setup_directmap_mappings(PFN_DOWN(bank->start),
+                                 PFN_DOWN(bank->size));
     }
 
     total_pages += ram_size >> PAGE_SHIFT;
 
-    xenheap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
-    xenheap_mfn_start = maddr_to_mfn(ram_start);
-    xenheap_mfn_end = maddr_to_mfn(ram_end);
+    directmap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
+    directmap_mfn_start = maddr_to_mfn(ram_start);
+    directmap_mfn_end = maddr_to_mfn(ram_end);
 
     setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);

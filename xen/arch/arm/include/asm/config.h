@@ -160,7 +160,7 @@
 #define DIRECTMAP_SIZE         (SLOT0_ENTRY_SIZE * (265-256))
 #define DIRECTMAP_VIRT_END     (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE - 1)
 
-#define XENHEAP_VIRT_START     xenheap_virt_start
+#define XENHEAP_VIRT_START     directmap_virt_start
 
 #define HYPERVISOR_VIRT_END    DIRECTMAP_VIRT_END
 
