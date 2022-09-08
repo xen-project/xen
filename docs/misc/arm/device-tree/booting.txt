@@ -425,6 +425,49 @@ The static event channel node has the following properties:
     link-to-foreign-evtchn is a single phandle to a remote evtchn to which
     local-evtchn will be connected.
 
+Static Heap Memory
+==================
+
+The static heap memory refers to parts of RAM reserved in the beginning of
+boot time for heap. The memory is reserved by configuration in the device
+tree using physical address ranges.
+
+The static heap memory declared in the device tree defines the memory areas
+that will be reserved to be used exclusively as heap.
+
+- For Arm32, since there are separated heaps, the static heap will be used
+for both domheap and xenheap. The admin should make sure that the static
+heap region should contain enough memory below 4GB to cater 32-bit DMA.
+
+- For Arm64, since there is a single heap, the defined static heap areas
+shall always go to the heap allocator.
+
+The static heap memory is an optional feature and can be enabled by adding
+below device tree property.
+
+- xen,static-heap
+
+    Property under the top-level "chosen" node. It specifies the address
+    and size of Xen static heap memory. Number of address and size cells
+    for the "xen,static-heap" property is determined by the root node
+    "#address-cells" and "#size-cells". Note that at least a 64KB alignment
+    is required.
+
+Below is an example on how to specify the static heap in device tree:
+
+    / {
+        #address-cells = <0x2>;
+        #size-cells = <0x2>;
+        ...
+        chosen {
+            xen,static-heap = <0x0 0x30000000 0x0 0x40000000>;
+            ...
+        };
+    };
+
+RAM starting from the host physical address 0x30000000 of 1GB size will
+be reserved as static heap.
+
 Example
 =======
 

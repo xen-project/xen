@@ -293,6 +293,13 @@ pre-defined by configuration using physical address ranges.
 
     Status, ARM: Tech Preview
 
+### Static Heap
+
+Allow reserving parts of RAM through the device tree using physical
+address ranges as heap.
+
+    Status, ARM: Tech Preview
+
 ### Memory Sharing
 
 Allow sharing of identical pages between guests

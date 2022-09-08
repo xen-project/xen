@@ -644,7 +644,7 @@ static void __init init_staticmem_pages(void)
 
     for ( bank = 0 ; bank < bootinfo.reserved_mem.nr_banks; bank++ )
     {
-        if ( bootinfo.reserved_mem.bank[bank].xen_domain )
+        if ( bootinfo.reserved_mem.bank[bank].type == MEMBANK_STATIC_DOMAIN )
         {
             mfn_t bank_start = _mfn(PFN_UP(bootinfo.reserved_mem.bank[bank].start));
             unsigned long bank_pages = PFN_DOWN(bootinfo.reserved_mem.bank[bank].size);

@@ -1040,9 +1040,11 @@ static int __init make_memory_node(const struct domain *d,
     if ( mem->nr_banks == 0 )
         return -ENOENT;
 
-    /* find first memory range not bound to a Xen domain */
-    for ( i = 0; i < mem->nr_banks && mem->bank[i].xen_domain; i++ )
+    /* find the first memory range that is reserved for device (or firmware) */
+    for ( i = 0; i < mem->nr_banks &&
+                 (mem->bank[i].type != MEMBANK_DEFAULT); i++ )
         ;
+
     if ( i == mem->nr_banks )
         return 0;
 
@@ -1064,7 +1066,7 @@ static int __init make_memory_node(const struct domain *d,
         u64 start = mem->bank[i].start;
         u64 size = mem->bank[i].size;
 
-        if ( mem->bank[i].xen_domain )
+        if ( mem->bank[i].type == MEMBANK_STATIC_DOMAIN )
             continue;
 
         dt_dprintk("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
