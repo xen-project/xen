@@ -129,11 +129,9 @@ xenstored state that needs to be restored.
 | `evtchn-fd`    | The file descriptor used to communicate with |
 |                | the event channel driver                     |
 
-xenstored will resume in the original process context. Hence `rw-socket-fd` and
-`ro-socket-fd` simply specify the file descriptors of the sockets. Sockets
-are not always used, however, and so -1 will be used to denote an unused
-socket.
-
+xenstored will resume in the original process context. Hence `rw-socket-fd`
+simply specifies the file descriptor of the socket. Sockets are not always
+used, however, and so -1 will be used to denote an unused socket.
 
 \pagebreak
 
