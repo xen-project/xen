@@ -19,7 +19,8 @@ else
         echo "
 CONFIG_EXPERT=y
 CONFIG_UNSUPPORTED=y
-CONFIG_STATIC_MEMORY=y" > xen/.config
+CONFIG_STATIC_MEMORY=y
+CONFIG_BOOT_TIME_CPUPOOLS=y" > xen/.config
         make -j$(nproc) -C xen olddefconfig
     else
         make -j$(nproc) -C xen defconfig
