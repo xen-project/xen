@@ -9,6 +9,7 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/compile.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/acpi.h>
@@ -91,7 +92,7 @@ static int __init acpi_make_hypervisor_node(const struct kernel_info *kinfo,
                                             struct membank tbl_add[])
 {
     const char compat[] =
-        "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
+        "xen,xen-" XEN_VERSION_STRING "\0"
         "xen,xen";
     int res;
     /* Convenience alias */

@@ -1341,8 +1341,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             efi_console_set_mode();
     }
 
-    PrintStr(L"Xen " __stringify(XEN_VERSION) "." __stringify(XEN_SUBVERSION)
-             XEN_EXTRAVERSION " (c/s " XEN_CHANGESET ") EFI loader\r\n");
+    PrintStr(L"Xen " XEN_VERSION_STRING XEN_EXTRAVERSION
+	     " (c/s " XEN_CHANGESET ") EFI loader\r\n");
 
     efi_arch_relocate_image(0);
 

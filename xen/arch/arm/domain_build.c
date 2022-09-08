@@ -1367,7 +1367,7 @@ static int __init make_hypervisor_node(struct domain *d,
                                        int addrcells, int sizecells)
 {
     const char compat[] =
-        "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
+        "xen,xen-" XEN_VERSION_STRING "\0"
         "xen,xen";
     __be32 *reg, *cells;
     gic_interrupt_t intr;
