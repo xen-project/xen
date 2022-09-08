@@ -313,6 +313,8 @@ static int __init process_chosen_node(const void *fdt, int node,
                                      MEMBANK_STATIC_HEAP);
         if ( rc )
             return rc;
+
+        bootinfo.static_heap = true;
     }
 
     printk("Checking for initrd in /chosen\n");

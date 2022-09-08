@@ -97,6 +97,7 @@ struct bootinfo {
 #ifdef CONFIG_ACPI
     struct meminfo acpi;
 #endif
+    bool static_heap;
 };
 
 struct map_range_data
