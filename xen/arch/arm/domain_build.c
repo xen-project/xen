@@ -761,6 +761,160 @@ static void __init assign_static_memory_11(struct domain *d,
     panic("Failed to assign requested static memory for direct-map domain %pd.",
           d);
 }
+
+#ifdef CONFIG_STATIC_SHM
+/*
+ * This function checks whether the static shared memory region is
+ * already allocated to dom_io.
+ */
+static bool __init is_shm_allocated_to_domio(paddr_t pbase)
+{
+    struct page_info *page;
+    struct domain *d;
+
+    page = maddr_to_page(pbase);
+    d = page_get_owner_and_reference(page);
+    if ( d == NULL )
+        return false;
+    put_page(page);
+
+    if ( d != dom_io )
+    {
+        printk(XENLOG_ERR
+               "shm memory node has already been allocated to a specific owner %pd, Please check your configuration\n",
+               d);
+        return false;
+    }
+
+    return true;
+}
+
+static mfn_t __init acquire_shared_memory_bank(struct domain *d,
+                                               paddr_t pbase, paddr_t psize)
+{
+    mfn_t smfn;
+    unsigned long nr_pfns;
+    int res;
+
+    /*
+     * Pages of statically shared memory shall be included
+     * into domain_tot_pages().
+     */
+    nr_pfns = PFN_DOWN(psize);
+    if ( (UINT_MAX - d->max_pages) < nr_pfns )
+    {
+        printk(XENLOG_ERR "%pd: Over-allocation for d->max_pages: %lu.\n",
+               d, nr_pfns);
+        return INVALID_MFN;
+    }
+    d->max_pages += nr_pfns;
+
+    smfn = maddr_to_mfn(pbase);
+    res = acquire_domstatic_pages(d, smfn, nr_pfns, 0);
+    if ( res )
+    {
+        printk(XENLOG_ERR
+               "%pd: failed to acquire static memory: %d.\n", d, res);
+        d->max_pages -= nr_pfns;
+        return INVALID_MFN;
+    }
+
+    return smfn;
+}
+
+static int __init assign_shared_memory(struct domain *d,
+                                       uint32_t addr_cells, uint32_t size_cells,
+                                       paddr_t pbase, paddr_t psize)
+{
+    mfn_t smfn;
+
+    dprintk(XENLOG_INFO,
+            "%pd: allocate static shared memory BANK %#"PRIpaddr"-%#"PRIpaddr".\n",
+            d, pbase, pbase + psize);
+
+    smfn = acquire_shared_memory_bank(d, pbase, psize);
+    if ( mfn_eq(smfn, INVALID_MFN) )
+        return -EINVAL;
+
+    /*
+     * DOMID_IO is not auto-translated (i.e. it sees RAM 1:1). So we do not need
+     * to create mapping in the P2M.
+     */
+    ASSERT(d == dom_io);
+    return 0;
+}
+
+static int __init process_shm(struct domain *d,
+                              const struct dt_device_node *node)
+{
+    struct dt_device_node *shm_node;
+
+    dt_for_each_child_node(node, shm_node)
+    {
+        const struct dt_property *prop;
+        const __be32 *cells;
+        uint32_t addr_cells, size_cells;
+        paddr_t gbase, pbase, psize;
+        int ret = 0;
+        unsigned int i;
+
+        if ( !dt_device_is_compatible(shm_node, "xen,domain-shared-memory-v1") )
+            continue;
+
+        /*
+         * xen,shared-mem = <pbase, gbase, size>;
+         * TODO: pbase is optional.
+         */
+        addr_cells = dt_n_addr_cells(shm_node);
+        size_cells = dt_n_size_cells(shm_node);
+        prop = dt_find_property(shm_node, "xen,shared-mem", NULL);
+        BUG_ON(!prop);
+        cells = (const __be32 *)prop->value;
+        device_tree_get_reg(&cells, addr_cells, addr_cells, &pbase, &gbase);
+        psize = dt_read_number(cells, size_cells);
+        if ( !IS_ALIGNED(pbase, PAGE_SIZE) || !IS_ALIGNED(gbase, PAGE_SIZE) )
+        {
+            printk("%pd: physical address 0x%"PRIpaddr", or guest address 0x%"PRIpaddr" is not suitably aligned.\n",
+                   d, pbase, gbase);
+            return -EINVAL;
+        }
+        if ( !IS_ALIGNED(psize, PAGE_SIZE) )
+        {
+            printk("%pd: size 0x%"PRIpaddr" is not suitably aligned\n",
+                   d, psize);
+            return -EINVAL;
+        }
+
+        for ( i = 0; i < PFN_DOWN(psize); i++ )
+            if ( !mfn_valid(mfn_add(maddr_to_mfn(pbase), i)) )
+            {
+                printk("%pd: invalid physical address 0x%"PRI_mfn"\n",
+                       d, mfn_x(mfn_add(maddr_to_mfn(pbase), i)));
+                return -EINVAL;
+            }
+
+        /* TODO: Consider owner domain is not the default dom_io. */
+        /*
+         * DOMID_IO is a fake domain and is not described in the Device-Tree.
+         * Therefore when the owner of the shared region is DOMID_IO, we will
+         * only find the borrowers.
+         */
+        if ( !is_shm_allocated_to_domio(pbase) )
+        {
+            /*
+             * We found the first borrower of the region, the owner was not
+             * specified, so they should be assigned to dom_io.
+             */
+            ret = assign_shared_memory(dom_io, addr_cells, size_cells,
+                                       pbase, psize);
+            if ( ret )
+                return ret;
+        }
+    }
+
+    return 0;
+}
+#endif /* CONFIG_STATIC_SHM */
 #else
 static void __init allocate_static_memory(struct domain *d,
                                           struct kernel_info *kinfo,
@@ -3385,6 +3539,12 @@ static int __init construct_domU(struct domain *d,
         allocate_static_memory(d, &kinfo, node);
     else
         assign_static_memory_11(d, &kinfo, node);
+
+#ifdef CONFIG_STATIC_SHM
+    rc = process_shm(d, node);
+    if ( rc < 0 )
+        return rc;
+#endif
 
     /*
      * Base address and irq number are needed when creating vpl011 device
