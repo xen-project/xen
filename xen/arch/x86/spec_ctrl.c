@@ -1327,13 +1327,38 @@ void __init init_speculation_mitigations(void)
      * 3) Some CPUs have RSBs which are not full width, which allow the
      *    attacker's entries to alias Xen addresses.
      *
+     * 4) Some CPUs have RSBs which are re-partitioned based on thread
+     *    idleness, which allows an attacker to inject entries into the other
+     *    thread.  We still active the optimisation in this case, and mitigate
+     *    in the idle path which has lower overhead.
+     *
      * It is safe to turn off RSB stuffing when Xen is using SMEP itself, and
      * 32bit PV guests are disabled, and when the RSB is full width.
      */
     BUILD_BUG_ON(RO_MPT_VIRT_START != PML4_ADDR(256));
-    if ( opt_rsb_pv == -1 && boot_cpu_has(X86_FEATURE_XEN_SMEP) &&
-         !opt_pv32 && rsb_is_full_width() )
-        opt_rsb_pv = 0;
+    if ( opt_rsb_pv == -1 )
+    {
+        opt_rsb_pv = (opt_pv32 || !boot_cpu_has(X86_FEATURE_XEN_SMEP) ||
+                      !rsb_is_full_width());
+
+        /*
+         * Cross-Thread Return Address Predictions.
+         *
+         * Vulnerable systems are Zen1/Zen2 uarch, which is AMD Fam17 / Hygon
+         * Fam18, when SMT is active.
+         *
+         * To mitigate, we must flush the RSB/RAS/RAP once between entering
+         * Xen and going idle.
+         *
+         * Most cases flush on entry to Xen anyway.  The one case where we
+         * don't is when using the SMEP optimisation for PV guests.  Flushing
+         * before going idle is less overhead than flushing on PV entry.
+         */
+        if ( !opt_rsb_pv && hw_smt_enabled &&
+             (boot_cpu_data.x86_vendor & (X86_VENDOR_AMD|X86_VENDOR_HYGON)) &&
+             (boot_cpu_data.x86 == 0x17 || boot_cpu_data.x86 == 0x18) )
+            setup_force_cpu_cap(X86_FEATURE_SC_RSB_IDLE);
+    }
 
     if ( opt_rsb_pv )
     {
