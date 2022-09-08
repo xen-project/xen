@@ -69,6 +69,7 @@ Bit     Description
 -----------------------------------------------------------------
 0       Ring reconnection (see the ring reconnection feature below)
 1       Connection error indicator (see connection error feature below)
+2       WATCH can take a third parameter limiting its scope
 
 The "Connection state" field is used to request a ring close and reconnect.
 The "Connection state" field only contains valid data if the server has
