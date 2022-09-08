@@ -38,6 +38,7 @@ struct kernel_info {
     void *fdt; /* flat device tree */
     paddr_t unassigned_mem; /* RAM not (yet) assigned to a bank */
     struct meminfo mem;
+    struct meminfo shm_mem;
 
     /* kernel entry point */
     paddr_t entry;
