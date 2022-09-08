@@ -43,10 +43,17 @@ enum membank_type {
     MEMBANK_STATIC_HEAP,
 };
 
+/* Indicates the maximum number of characters(\0 included) for shm_id */
+#define MAX_SHM_ID_LENGTH 16
+
 struct membank {
     paddr_t start;
     paddr_t size;
     enum membank_type type;
+#ifdef CONFIG_STATIC_SHM
+    char shm_id[MAX_SHM_ID_LENGTH];
+    unsigned int nr_shm_borrowers;
+#endif
 };
 
 struct meminfo {

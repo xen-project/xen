@@ -523,3 +523,135 @@ Below is an example on how to specify the static heap in device tree:
 
 RAM starting from the host physical address 0x30000000 of 1GB size will
 be reserved as static heap.
+
+Static Shared Memory
+====================
+
+The static shared memory device tree nodes allow users to statically set up
+shared memory on dom0less system, enabling domains to do shm-based
+communication.
+
+- compatible
+
+    "xen,domain-shared-memory-v1"
+
+- xen,shm-id
+
+    An arbitrary string that represents the unique identifier of the shared
+    memory region, with a strict limit on the number of characters(\0 included),
+    `MAX_SHM_ID_LENGTH(16)`. e.g. "xen,shm-id = "my-shared-mem-1"".
+
+- xen,shared-mem
+
+    An array takes a physical address, which is the base address of the
+    shared memory region in host physical address space, a size, and a guest
+    physical address, as the target address of the mapping.
+    e.g. xen,shared-mem = < [host physical address] [guest address] [size] >
+
+    It shall also meet the following criteria:
+    1) If the SHM ID matches with an existing region, the address range of the
+    region shall also exactly match.
+    2) If the SHM ID does not match with any other existing region, it should
+    also not overlap with any other regions.
+
+    The number of cells for the host address (and size) is the same as the
+    guest pseudo-physical address and they are inherited from the parent node.
+
+    Host physical address is optional, when missing Xen decides the location
+    (currently unimplemented).
+
+- role (Optional)
+
+    A string property specifying the ownership of a shared memory region,
+    the value must be one of the following: "owner", or "borrower"
+    A shared memory region could be explicitly backed by one domain, which is
+    called "owner domain", and all the other domains who are also sharing
+    this region are called "borrower domain".
+    If not specified, the default value is "borrower" and owner is
+    DOMID_IO, a system domain.
+
+As an example:
+
+chosen {
+    #address-cells = <0x1>;
+    #size-cells = <0x1>;
+    xen,xen-bootargs = "console=dtuart dtuart=serial0 bootscrub=0";
+
+    ......
+
+    /* this is for Dom0 */
+    dom0-shared-mem@10000000 {
+        compatible = "xen,domain-shared-memory-v1";
+        role = "owner";
+        xen,shm-id = "my-shared-mem-0";
+        xen,shared-mem = <0x10000000 0x10000000 0x10000000>;
+    }
+
+    domU1 {
+        compatible = "xen,domain";
+        #address-cells = <0x1>;
+        #size-cells = <0x1>;
+        memory = <0 131072>;
+        cpus = <2>;
+        vpl011;
+
+        /*
+         * shared memory region identified as 0x0(xen,shm-id = <0x0>)
+         * is shared between Dom0 and DomU1.
+         */
+        domU1-shared-mem@10000000 {
+            compatible = "xen,domain-shared-memory-v1";
+            role = "borrower";
+            xen,shm-id = "my-shared-mem-0";
+            xen,shared-mem = <0x10000000 0x50000000 0x10000000>;
+        }
+
+        /*
+         * shared memory region identified as 0x1(xen,shm-id = <0x1>)
+         * is shared between DomU1 and DomU2.
+         */
+        domU1-shared-mem@50000000 {
+            compatible = "xen,domain-shared-memory-v1";
+            xen,shm-id = "my-shared-mem-1";
+            xen,shared-mem = <0x50000000 0x60000000 0x20000000>;
+        }
+
+        ......
+
+    };
+
+    domU2 {
+        compatible = "xen,domain";
+        #address-cells = <0x1>;
+        #size-cells = <0x1>;
+        memory = <0 65536>;
+        cpus = <1>;
+
+        /*
+         * shared memory region identified as 0x1(xen,shm-id = <0x1>)
+         * is shared between domU1 and domU2.
+         */
+        domU2-shared-mem@50000000 {
+            compatible = "xen,domain-shared-memory-v1";
+            xen,shm-id = "my-shared-mem-1";
+            xen,shared-mem = <0x50000000 0x70000000 0x20000000>;
+        }
+
+        ......
+    };
+};
+
+This is an example with two static shared memory regions.
+
+For the static shared memory region identified as "my-shared-mem-0", host
+physical address starting at 0x10000000 of 256MB will be reserved to be
+shared between Dom0 and DomU1. It will get mapped at 0x10000000 in Dom0 guest
+physical address space, and at 0x50000000 in DomU1 guest physical address space.
+Dom0 is explicitly defined as the owner domain, and DomU1 is the borrower domain.
+
+For the static shared memory region identified as "my-shared-mem-1", host
+physical address starting at 0x50000000 of 512MB will be reserved to be
+shared between DomU1 and DomU2. It will get mapped at 0x60000000 in DomU1 guest
+physical address space, and at 0x70000000 in DomU2 guest physical address space.
+DomU1 and DomU2 are both the borrower domain, the owner domain is the default
+owner domain DOMID_IO.
