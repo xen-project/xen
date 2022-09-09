@@ -33,14 +33,13 @@ on static allocation in the device-tree:
 
 / {
 	chosen {
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		...
 		domU1 {
 			compatible = "xen,domain";
-			#address-cells = <0x2>;
-			#size-cells = <0x2>;
 			cpus = <2>;
 			memory = <0x0 0x80000>;
-			#xen,static-mem-address-cells = <0x1>;
-			#xen,static-mem-size-cells = <0x1>;
 			xen,static-mem = <0x30000000 0x20000000>;
 			direct-map;
 			...

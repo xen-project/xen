@@ -350,8 +350,8 @@ areas are pre-defined by configuration using physical address ranges.
 
 Memory can be statically allocated to a domain using the property "xen,static-
 mem" defined in the domain configuration. The number of cells for the address
-and the size must be defined using respectively the properties
-"#xen,static-mem-address-cells" and "#xen,static-mem-size-cells".
+and the size must be defined respectively by the parent node properties
+"#address-cells" and "#size-cells".
 
 The property 'memory' is still needed and should match the amount of memory
 given to the guest. Currently, it either comes from static memory or lets Xen
@@ -366,14 +366,13 @@ device-tree:
 
     / {
         chosen {
+            #address-cells = <0x1>;
+            #size-cells = <0x1>;
+            ...
             domU1 {
                 compatible = "xen,domain";
-                #address-cells = <0x2>;
-                #size-cells = <0x2>;
                 cpus = <2>;
                 memory = <0x0 0x80000>;
-                #xen,static-mem-address-cells = <0x1>;
-                #xen,static-mem-size-cells = <0x1>;
                 xen,static-mem = <0x30000000 0x20000000>;
                 ...
             };

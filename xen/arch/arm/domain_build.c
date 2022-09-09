@@ -565,21 +565,9 @@ static int __init parse_static_mem_prop(const struct dt_device_node *node,
     const struct dt_property *prop;
 
     prop = dt_find_property(node, "xen,static-mem", NULL);
-    if ( !dt_property_read_u32(node, "#xen,static-mem-address-cells",
-                               addr_cells) )
-    {
-        printk(XENLOG_ERR
-               "failed to read \"#xen,static-mem-address-cells\".\n");
-        return -EINVAL;
-    }
 
-    if ( !dt_property_read_u32(node, "#xen,static-mem-size-cells",
-                               size_cells) )
-    {
-        printk(XENLOG_ERR
-               "failed to read \"#xen,static-mem-size-cells\".\n");
-        return -EINVAL;
-    }
+    *addr_cells = dt_n_addr_cells(node);
+    *size_cells = dt_n_size_cells(node);
 
     *cell = (const __be32 *)prop->value;
     *length = prop->length;

@@ -371,11 +371,6 @@ static int __init process_domain_node(const void *fdt, int node,
         /* No "xen,static-mem" present. */
         return 0;
 
-    address_cells = device_tree_get_u32(fdt, node,
-                                        "#xen,static-mem-address-cells", 0);
-    size_cells = device_tree_get_u32(fdt, node,
-                                     "#xen,static-mem-size-cells", 0);
-
     return device_tree_get_meminfo(fdt, node, "xen,static-mem", address_cells,
                                    size_cells, &bootinfo.reserved_mem,
                                    MEMBANK_STATIC_DOMAIN);
