@@ -243,10 +243,10 @@ err_exit:
 /*
  * Get host bridge node given a device attached to it.
  */
-struct dt_device_node *pci_find_host_bridge_node(struct device *dev)
+const struct dt_device_node *
+pci_find_host_bridge_node(const struct pci_dev *pdev)
 {
     struct pci_host_bridge *bridge;
-    struct pci_dev *pdev = dev_to_pci(dev);
 
     bridge = pci_find_host_bridge(pdev->seg, pdev->bus);
     if ( unlikely(!bridge) )
