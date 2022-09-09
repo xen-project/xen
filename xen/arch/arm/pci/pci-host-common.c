@@ -25,6 +25,16 @@
 #include <asm/setup.h>
 
 /*
+ * struct to hold pci device bar.
+ */
+struct pdev_bar_check
+{
+    paddr_t start;
+    paddr_t end;
+    bool is_valid;
+};
+
+/*
  * List for all the pci host bridges.
  */
 
@@ -363,6 +373,50 @@ int __init pci_host_bridge_mappings(struct domain *d)
     return 0;
 }
 
+/*
+ * TODO: BAR addresses and Root Complex window addresses are not guaranteed
+ * to be page aligned. We should check for alignment but this is not the
+ * right place for alignment check.
+ */
+static int is_bar_valid(const struct dt_device_node *dev,
+                        paddr_t addr, paddr_t len, void *data)
+{
+    struct pdev_bar_check *bar_data = data;
+    paddr_t s = bar_data->start;
+    paddr_t e = bar_data->end;
+
+    if ( (s >= addr) && (e <= (addr + len - 1)) )
+        bar_data->is_valid =  true;
+
+    return 0;
+}
+
+/* TODO: Revisit this function when ACPI PCI passthrough support is added. */
+bool pci_check_bar(const struct pci_dev *pdev, mfn_t start, mfn_t end)
+{
+    int ret;
+    const struct dt_device_node *dt_node;
+    paddr_t s = mfn_to_maddr(start);
+    paddr_t e = mfn_to_maddr(end);
+    struct pdev_bar_check bar_data =  {
+        .start = s,
+        .end = e,
+        .is_valid = false
+    };
+
+    if ( s >= e )
+        return false;
+
+    dt_node = pci_find_host_bridge_node(pdev);
+    if ( !dt_node )
+        return false;
+
+    ret = dt_for_each_range(dt_node, &is_bar_valid, &bar_data);
+    if ( ret < 0 )
+        return false;
+
+    return bar_data.is_valid;
+}
 /*
  * Local variables:
  * mode: C
