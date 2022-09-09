@@ -106,6 +106,21 @@ static void test_gnttab(uint32_t domid, unsigned int nr_frames,
     if ( rc )
         return fail("    Fail: Unmap grant table %d - %s\n",
                     errno, strerror(errno));
+
+    /*
+     * Verify that an attempt to map the status frames fails, as the domain is
+     * in gnttab v1 mode.
+     */
+    res = xenforeignmemory_map_resource(
+        fh, domid, XENMEM_resource_grant_table,
+        XENMEM_resource_grant_table_id_status, 0, 1,
+        (void **)&gnttab, PROT_READ | PROT_WRITE, 0);
+
+    if ( res )
+    {
+        fail("    Fail: Managed to map gnttab v2 status frames in v1 mode\n");
+        xenforeignmemory_unmap_resource(fh, res);
+    }
 }
 
 static void test_domain_configurations(void)
