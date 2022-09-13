@@ -1377,45 +1377,69 @@ static int add_child(const void *ctx, struct node *parent, const char *name)
 static struct node *construct_node(struct connection *conn, const void *ctx,
 				   const char *name)
 {
-	struct node *parent, *node;
-	char *parentname = get_parent(ctx, name);
+	const char **names = NULL;
+	unsigned int levels = 0;
+	struct node *node = NULL;
+	struct node *parent = NULL;
+	const char *parentname = talloc_strdup(ctx, name);
 
 	if (!parentname)
 		return NULL;
 
-	/* If parent doesn't exist, create it. */
-	parent = read_node(conn, parentname, parentname);
-	if (!parent && errno == ENOENT)
-		parent = construct_node(conn, ctx, parentname);
-	if (!parent)
-		return NULL;
+	/* Walk the path up until an existing node is found. */
+	while (!parent) {
+		names = talloc_realloc(ctx, names, const char *, levels + 1);
+		if (!names)
+			goto nomem;
 
-	/* Add child to parent. */
-	if (add_child(ctx, parent, name))
-		goto nomem;
+		/*
+		 * names[0] is the name of the node to construct initially,
+		 * names[1] is its parent, and so on.
+		 */
+		names[levels] = parentname;
+		parentname = get_parent(ctx, parentname);
+		if (!parentname)
+			return NULL;
 
-	/* Allocate node */
-	node = talloc(ctx, struct node);
-	if (!node)
-		goto nomem;
-	node->name = talloc_strdup(node, name);
-	if (!node->name)
-		goto nomem;
+		/* Try to read parent node until we found an existing one. */
+		parent = read_node(conn, ctx, parentname);
+		if (!parent && (errno != ENOENT || !strcmp(parentname, "/")))
+			return NULL;
 
-	/* Inherit permissions, except unprivileged domains own what they create */
-	node->perms.num = parent->perms.num;
-	node->perms.p = talloc_memdup(node, parent->perms.p,
-				      node->perms.num * sizeof(*node->perms.p));
-	if (!node->perms.p)
-		goto nomem;
-	if (domain_is_unprivileged(conn))
-		node->perms.p[0].id = conn->id;
+		levels++;
+	}
 
-	/* No children, no data */
-	node->children = node->data = NULL;
-	node->childlen = node->datalen = 0;
-	node->acc.memory = 0;
-	node->parent = parent;
+	/* Walk the path down again constructing the missing nodes. */
+	for (; levels > 0; levels--) {
+		/* Add child to parent. */
+		if (add_child(ctx, parent, names[levels - 1]))
+			goto nomem;
+
+		/* Allocate node */
+		node = talloc(ctx, struct node);
+		if (!node)
+			goto nomem;
+		node->name = talloc_steal(node, names[levels - 1]);
+
+		/* Inherit permissions, unpriv domains own what they create. */
+		node->perms.num = parent->perms.num;
+		node->perms.p = talloc_memdup(node, parent->perms.p,
+					      node->perms.num *
+					      sizeof(*node->perms.p));
+		if (!node->perms.p)
+			goto nomem;
+		if (domain_is_unprivileged(conn))
+			node->perms.p[0].id = conn->id;
+
+		/* No children, no data */
+		node->children = node->data = NULL;
+		node->childlen = node->datalen = 0;
+		node->acc.memory = 0;
+		node->parent = parent;
+
+		parent = node;
+	}
+
 	return node;
 
 nomem:
