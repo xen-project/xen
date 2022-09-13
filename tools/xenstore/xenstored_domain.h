@@ -55,10 +55,10 @@ const char *get_implicit_path(const struct connection *conn);
 bool domain_is_unprivileged(struct connection *conn);
 
 /* Remove node permissions for no longer existing domains. */
-int domain_adjust_node_perms(struct node *node);
+int domain_adjust_node_perms(struct connection *conn, struct node *node);
 
 /* Quota manipulation */
-void domain_entry_inc(struct connection *conn, struct node *);
+int domain_entry_inc(struct connection *conn, struct node *);
 void domain_entry_dec(struct connection *conn, struct node *);
 int domain_entry_fix(unsigned int domid, int num, bool update);
 int domain_entry(struct connection *conn);

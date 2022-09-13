@@ -16,6 +16,7 @@
     along with this program; If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <assert.h>
 #include <stdio.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -361,6 +362,18 @@ static struct domain *find_or_alloc_domain(const void *ctx, unsigned int domid)
 
 	domain = find_domain_struct(domid);
 	return domain ? : alloc_domain(ctx, domid);
+}
+
+static struct domain *find_or_alloc_existing_domain(unsigned int domid)
+{
+	struct domain *domain;
+	xc_dominfo_t dominfo;
+
+	domain = find_domain_struct(domid);
+	if (!domain && get_domain_info(domid, &dominfo))
+		domain = alloc_domain(NULL, domid);
+
+	return domain;
 }
 
 static int new_domain(struct domain *domain, int port, bool restore)
@@ -814,30 +827,28 @@ void domain_deinit(void)
 		xenevtchn_unbind(xce_handle, virq_port);
 }
 
-void domain_entry_inc(struct connection *conn, struct node *node)
+int domain_entry_inc(struct connection *conn, struct node *node)
 {
 	struct domain *d;
+	unsigned int domid;
 
 	if (!conn)
-		return;
+		return 0;
 
-	if (node->perms.p && node->perms.p[0].id != conn->id) {
-		if (conn->transaction) {
-			transaction_entry_inc(conn->transaction,
-				node->perms.p[0].id);
-		} else {
-			d = find_domain_by_domid(node->perms.p[0].id);
-			if (d)
-				d->nbentry++;
-		}
-	} else if (conn->domain) {
-		if (conn->transaction) {
-			transaction_entry_inc(conn->transaction,
-				conn->domain->domid);
- 		} else {
- 			conn->domain->nbentry++;
-		}
+	domid = node->perms.p ? node->perms.p[0].id : conn->id;
+
+	if (conn->transaction) {
+		transaction_entry_inc(conn->transaction, domid);
+	} else {
+		d = (domid == conn->id && conn->domain) ? conn->domain
+		    : find_or_alloc_existing_domain(domid);
+		if (d)
+			d->nbentry++;
+		else
+			return ENOMEM;
 	}
+
+	return 0;
 }
 
 /*
@@ -873,7 +884,7 @@ static int chk_domain_generation(unsigned int domid, uint64_t gen)
  * Remove permissions for no longer existing domains in order to avoid a new
  * domain with the same domid inheriting the permissions.
  */
-int domain_adjust_node_perms(struct node *node)
+int domain_adjust_node_perms(struct connection *conn, struct node *node)
 {
 	unsigned int i;
 	int ret;
@@ -883,8 +894,14 @@ int domain_adjust_node_perms(struct node *node)
 		return errno;
 
 	/* If the owner doesn't exist any longer give it to priv domain. */
-	if (!ret)
+	if (!ret) {
+		/*
+		 * In theory we'd need to update the number of dom0 nodes here,
+		 * but we could be called for a read of the node. So better
+		 * avoid the risk to overflow the node count of dom0.
+		 */
 		node->perms.p[0].id = priv_domid;
+	}
 
 	for (i = 1; i < node->perms.num; i++) {
 		if (node->perms.p[i].perms & XS_PERM_IGNORE)
@@ -903,25 +920,25 @@ int domain_adjust_node_perms(struct node *node)
 void domain_entry_dec(struct connection *conn, struct node *node)
 {
 	struct domain *d;
+	unsigned int domid;
 
 	if (!conn)
 		return;
 
-	if (node->perms.p && node->perms.p[0].id != conn->id) {
-		if (conn->transaction) {
-			transaction_entry_dec(conn->transaction,
-				node->perms.p[0].id);
+	domid = node->perms.p ? node->perms.p[0].id : conn->id;
+
+	if (conn->transaction) {
+		transaction_entry_dec(conn->transaction, domid);
+	} else {
+		d = (domid == conn->id && conn->domain) ? conn->domain
+		    : find_domain_struct(domid);
+		if (d) {
+			d->nbentry--;
 		} else {
-			d = find_domain_by_domid(node->perms.p[0].id);
-			if (d && d->nbentry)
-				d->nbentry--;
-		}
-	} else if (conn->domain && conn->domain->nbentry) {
-		if (conn->transaction) {
-			transaction_entry_dec(conn->transaction,
-				conn->domain->domid);
-		} else {
-			conn->domain->nbentry--;
+			errno = ENOENT;
+			corrupt(conn,
+				"Node \"%s\" owned by non-existing domain %u\n",
+				node->name, domid);
 		}
 	}
 }
@@ -931,13 +948,23 @@ int domain_entry_fix(unsigned int domid, int num, bool update)
 	struct domain *d;
 	int cnt;
 
-	d = find_domain_by_domid(domid);
-	if (!d)
-		return 0;
+	if (update) {
+		d = find_domain_struct(domid);
+		assert(d);
+	} else {
+		/*
+		 * We are called first with update == false in order to catch
+		 * any error. So do a possible allocation and check for error
+		 * only in this case, as in the case of update == true nothing
+		 * can go wrong anymore as the allocation already happened.
+		 */
+		d = find_or_alloc_existing_domain(domid);
+		if (!d)
+			return -1;
+	}
 
 	cnt = d->nbentry + num;
-	if (cnt < 0)
-		cnt = 0;
+	assert(cnt >= 0);
 
 	if (update)
 		d->nbentry = cnt;
