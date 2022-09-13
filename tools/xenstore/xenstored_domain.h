@@ -65,6 +65,7 @@ bool domain_is_unprivileged(struct connection *conn);
 
 /* Remove node permissions for no longer existing domains. */
 int domain_adjust_node_perms(struct connection *conn, struct node *node);
+int domain_alloc_permrefs(struct node_perms *perms);
 
 /* Quota manipulation */
 int domain_entry_inc(struct connection *conn, struct node *);
