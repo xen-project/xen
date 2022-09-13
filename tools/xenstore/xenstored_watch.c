@@ -211,7 +211,7 @@ static int check_watch_path(struct connection *conn, const void *ctx,
 }
 
 static struct watch *add_watch(struct connection *conn, char *path, char *token,
-			       bool relative)
+			       bool relative, bool no_quota_check)
 {
 	struct watch *watch;
 
@@ -221,6 +221,9 @@ static struct watch *add_watch(struct connection *conn, char *path, char *token,
 	watch->node = talloc_strdup(watch, path);
 	watch->token = talloc_strdup(watch, token);
 	if (!watch->node || !watch->token)
+		goto nomem;
+	if (domain_memory_add(conn->id, strlen(path) + strlen(token),
+			      no_quota_check))
 		goto nomem;
 
 	if (relative)
@@ -265,7 +268,7 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	if (domain_watch(conn) > quota_nb_watch_per_domain)
 		return E2BIG;
 
-	watch = add_watch(conn, vec[0], vec[1], relative);
+	watch = add_watch(conn, vec[0], vec[1], relative, false);
 	if (!watch)
 		return errno;
 
@@ -296,6 +299,8 @@ int do_unwatch(struct connection *conn, struct buffered_data *in)
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
 			list_del(&watch->list);
+			domain_memory_add_nochk(conn->id, -strlen(watch->node) -
+							  strlen(watch->token));
 			talloc_free(watch);
 			domain_watch_dec(conn);
 			send_ack(conn, XS_UNWATCH);
@@ -311,6 +316,8 @@ void conn_delete_all_watches(struct connection *conn)
 
 	while ((watch = list_top(&conn->watches, struct watch, list))) {
 		list_del(&watch->list);
+		domain_memory_add_nochk(conn->id, -strlen(watch->node) -
+						  strlen(watch->token));
 		talloc_free(watch);
 		domain_watch_dec(conn);
 	}
@@ -373,7 +380,7 @@ void read_state_watch(const void *ctx, const void *state)
 	if (!path)
 		barf("allocation error for read watch");
 
-	if (!add_watch(conn, path, token, relative))
+	if (!add_watch(conn, path, token, relative, true))
 		barf("error adding watch");
 }
 

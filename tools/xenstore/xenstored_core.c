@@ -463,6 +463,7 @@ static int destroy_conn(void *_conn)
 	}
 
 	conn_free_buffered_data(conn);
+	conn_delete_all_watches(conn);
 	list_for_each_entry(req, &conn->ref_list, list)
 		req->on_ref_list = false;
 
