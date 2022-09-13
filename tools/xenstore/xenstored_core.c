@@ -211,6 +211,21 @@ void reopen_log(void)
 	}
 }
 
+static void free_buffered_data(struct buffered_data *out,
+			       struct connection *conn)
+{
+	list_del(&out->list);
+	talloc_free(out);
+}
+
+void conn_free_buffered_data(struct connection *conn)
+{
+	struct buffered_data *out;
+
+	while ((out = list_top(&conn->out_list, struct buffered_data, list)))
+		free_buffered_data(out, conn);
+}
+
 static bool write_messages(struct connection *conn)
 {
 	int ret;
@@ -254,8 +269,7 @@ static bool write_messages(struct connection *conn)
 
 	trace_io(conn, out, 1);
 
-	list_del(&out->list);
-	talloc_free(out);
+	free_buffered_data(out, conn);
 
 	return true;
 }
@@ -1472,18 +1486,12 @@ static struct {
  */
 static void ignore_connection(struct connection *conn)
 {
-	struct buffered_data *out, *tmp;
-
 	trace("CONN %p ignored\n", conn);
 
 	conn->is_ignored = true;
 	conn_delete_all_watches(conn);
 	conn_delete_all_transactions(conn);
-
-	list_for_each_entry_safe(out, tmp, &conn->out_list, list) {
-		list_del(&out->list);
-		talloc_free(out);
-	}
+	conn_free_buffered_data(conn);
 
 	talloc_free(conn->in);
 	conn->in = NULL;

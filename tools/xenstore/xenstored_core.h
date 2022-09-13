@@ -270,6 +270,8 @@ int remember_string(struct hashtable *hash, const char *str);
 
 void set_tdb_key(const char *name, TDB_DATA *key);
 
+void conn_free_buffered_data(struct connection *conn);
+
 const char *dump_state_global(FILE *fp);
 const char *dump_state_buffered_data(FILE *fp, const struct connection *c,
 				     const struct connection *conn,
