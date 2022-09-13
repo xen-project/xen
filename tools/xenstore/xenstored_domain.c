@@ -330,7 +330,7 @@ bool domain_is_unprivileged(struct connection *conn)
 	       domid_is_unprivileged(conn->domain->domid);
 }
 
-static char *talloc_domain_path(void *context, unsigned int domid)
+static char *talloc_domain_path(const void *context, unsigned int domid)
 {
 	return talloc_asprintf(context, "/local/domain/%u", domid);
 }
@@ -566,7 +566,8 @@ static struct domain *introduce_domain(const void *ctx,
 }
 
 /* domid, gfn, evtchn, path */
-int do_introduce(struct connection *conn, struct buffered_data *in)
+int do_introduce(const void *ctx, struct connection *conn,
+		 struct buffered_data *in)
 {
 	struct domain *domain;
 	char *vec[3];
@@ -584,7 +585,7 @@ int do_introduce(struct connection *conn, struct buffered_data *in)
 	if (port <= 0)
 		return EINVAL;
 
-	domain = introduce_domain(in, domid, port, false);
+	domain = introduce_domain(ctx, domid, port, false);
 	if (!domain)
 		return errno;
 
@@ -607,7 +608,8 @@ static struct domain *find_connected_domain(unsigned int domid)
 	return domain;
 }
 
-int do_set_target(struct connection *conn, struct buffered_data *in)
+int do_set_target(const void *ctx, struct connection *conn,
+		  struct buffered_data *in)
 {
 	char *vec[2];
 	unsigned int domid, tdomid;
@@ -651,7 +653,8 @@ static struct domain *onearg_domain(struct connection *conn,
 }
 
 /* domid */
-int do_release(struct connection *conn, struct buffered_data *in)
+int do_release(const void *ctx, struct connection *conn,
+	       struct buffered_data *in)
 {
 	struct domain *domain;
 
@@ -666,7 +669,8 @@ int do_release(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-int do_resume(struct connection *conn, struct buffered_data *in)
+int do_resume(const void *ctx, struct connection *conn,
+	      struct buffered_data *in)
 {
 	struct domain *domain;
 
@@ -681,7 +685,8 @@ int do_resume(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-int do_get_domain_path(struct connection *conn, struct buffered_data *in)
+int do_get_domain_path(const void *ctx, struct connection *conn,
+		       struct buffered_data *in)
 {
 	char *path;
 	const char *domid_str = onearg(in);
@@ -689,18 +694,17 @@ int do_get_domain_path(struct connection *conn, struct buffered_data *in)
 	if (!domid_str)
 		return EINVAL;
 
-	path = talloc_domain_path(conn, atoi(domid_str));
+	path = talloc_domain_path(ctx, atoi(domid_str));
 	if (!path)
 		return errno;
 
 	send_reply(conn, XS_GET_DOMAIN_PATH, path, strlen(path) + 1);
 
-	talloc_free(path);
-
 	return 0;
 }
 
-int do_is_domain_introduced(struct connection *conn, struct buffered_data *in)
+int do_is_domain_introduced(const void *ctx, struct connection *conn,
+			    struct buffered_data *in)
 {
 	int result;
 	unsigned int domid;
@@ -721,7 +725,8 @@ int do_is_domain_introduced(struct connection *conn, struct buffered_data *in)
 }
 
 /* Allow guest to reset all watches */
-int do_reset_watches(struct connection *conn, struct buffered_data *in)
+int do_reset_watches(const void *ctx, struct connection *conn,
+		     struct buffered_data *in)
 {
 	conn_delete_all_watches(conn);
 	conn_delete_all_transactions(conn);

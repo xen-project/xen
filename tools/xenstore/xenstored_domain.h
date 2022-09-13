@@ -24,25 +24,32 @@ void handle_event(void);
 void check_domains(void);
 
 /* domid, mfn, eventchn, path */
-int do_introduce(struct connection *conn, struct buffered_data *in);
+int do_introduce(const void *ctx, struct connection *conn,
+		 struct buffered_data *in);
 
 /* domid */
-int do_is_domain_introduced(struct connection *conn, struct buffered_data *in);
+int do_is_domain_introduced(const void *ctx, struct connection *conn,
+			    struct buffered_data *in);
 
 /* domid */
-int do_release(struct connection *conn, struct buffered_data *in);
+int do_release(const void *ctx, struct connection *conn,
+	       struct buffered_data *in);
 
 /* domid */
-int do_resume(struct connection *conn, struct buffered_data *in);
+int do_resume(const void *ctx, struct connection *conn,
+	      struct buffered_data *in);
 
 /* domid, target */
-int do_set_target(struct connection *conn, struct buffered_data *in);
+int do_set_target(const void *ctx, struct connection *conn,
+		  struct buffered_data *in);
 
 /* domid */
-int do_get_domain_path(struct connection *conn, struct buffered_data *in);
+int do_get_domain_path(const void *ctx, struct connection *conn,
+		       struct buffered_data *in);
 
 /* Allow guest to reset all watches */
-int do_reset_watches(struct connection *conn, struct buffered_data *in);
+int do_reset_watches(const void *ctx, struct connection *conn,
+		     struct buffered_data *in);
 
 void domain_init(int evtfd);
 void dom0_init(void);

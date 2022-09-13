@@ -481,7 +481,8 @@ struct transaction *transaction_lookup(struct connection *conn, uint32_t id)
 	return ERR_PTR(-ENOENT);
 }
 
-int do_transaction_start(struct connection *conn, struct buffered_data *in)
+int do_transaction_start(const void *ctx, struct connection *conn,
+			 struct buffered_data *in)
 {
 	struct transaction *trans, *exists;
 	char id_str[20];
@@ -494,8 +495,8 @@ int do_transaction_start(struct connection *conn, struct buffered_data *in)
 	    conn->transaction_started > quota_max_transaction)
 		return ENOSPC;
 
-	/* Attach transaction to input for autofree until it's complete */
-	trans = talloc_zero(in, struct transaction);
+	/* Attach transaction to ctx for autofree until it's complete */
+	trans = talloc_zero(ctx, struct transaction);
 	if (!trans)
 		return ENOMEM;
 
@@ -544,7 +545,8 @@ static int transaction_fix_domains(struct transaction *trans, bool update)
 	return 0;
 }
 
-int do_transaction_end(struct connection *conn, struct buffered_data *in)
+int do_transaction_end(const void *ctx, struct connection *conn,
+		       struct buffered_data *in)
 {
 	const char *arg = onearg(in);
 	struct transaction *trans;
@@ -562,8 +564,8 @@ int do_transaction_end(struct connection *conn, struct buffered_data *in)
 	if (!conn->transaction_started)
 		conn->ta_start_time = 0;
 
-	/* Attach transaction to in for auto-cleanup */
-	talloc_steal(in, trans);
+	/* Attach transaction to ctx for auto-cleanup */
+	talloc_steal(ctx, trans);
 
 	if (streq(arg, "T")) {
 		if (trans->fail)
