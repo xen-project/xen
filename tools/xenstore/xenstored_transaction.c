@@ -175,7 +175,6 @@ struct transaction
 	bool fail;
 };
 
-extern int quota_max_transaction;
 uint64_t generation;
 
 static void set_tdb_key(const char *name, TDB_DATA *key)
