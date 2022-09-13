@@ -1505,15 +1505,15 @@ static void memdel(void *mem, unsigned off, unsigned len, unsigned total)
 	memmove(mem + off, mem + off + len, total - off - len);
 }
 
-static void remove_child_entry(struct connection *conn, struct node *node,
-			       size_t offset)
+static int remove_child_entry(struct connection *conn, struct node *node,
+			      size_t offset)
 {
 	size_t childlen = strlen(node->children + offset);
 
 	memdel(node->children, offset, childlen + 1, node->childlen);
 	node->childlen -= childlen + 1;
-	if (write_node(conn, node, true))
-		corrupt(conn, "Can't update parent node '%s'", node->name);
+
+	return write_node(conn, node, true);
 }
 
 static void delete_child(struct connection *conn,
@@ -1523,7 +1523,9 @@ static void delete_child(struct connection *conn,
 
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
 		if (streq(node->children+i, childname)) {
-			remove_child_entry(conn, node, i);
+			if (remove_child_entry(conn, node, i))
+				corrupt(conn, "Can't update parent node '%s'",
+					node->name);
 			return;
 		}
 	}
@@ -2125,6 +2127,17 @@ int remember_string(struct hashtable *hash, const char *str)
 	return hashtable_insert(hash, k, (void *)1);
 }
 
+static int rm_child_entry(struct node *node, size_t off, size_t len)
+{
+	if (!recovery)
+		return off;
+
+	if (remove_child_entry(NULL, node, off))
+		log("check_store: child entry could not be removed from '%s'",
+		    node->name);
+
+	return off - len - 1;
+}
 
 /**
  * A node has a children field that names the children of the node, separated
@@ -2173,12 +2186,7 @@ static int check_store_(const char *name, struct hashtable *reachable)
 				if (hashtable_search(children, childname)) {
 					log("check_store: '%s' is duplicated!",
 					    childname);
-
-					if (recovery) {
-						remove_child_entry(NULL, node,
-								   i);
-						i -= childlen + 1;
-					}
+					i = rm_child_entry(node, i, childlen);
 				}
 				else {
 					if (!remember_string(children,
@@ -2195,11 +2203,7 @@ static int check_store_(const char *name, struct hashtable *reachable)
 			} else if (errno != ENOMEM) {
 				log("check_store: No child '%s' found!\n",
 				    childname);
-
-				if (recovery) {
-					remove_child_entry(NULL, node, i);
-					i -= childlen + 1;
-				}
+				i = rm_child_entry(node, i, childlen);
 			} else {
 				log("check_store: ENOMEM");
 				ret = ENOMEM;
