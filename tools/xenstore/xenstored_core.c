@@ -632,8 +632,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 		return NULL;
 	}
 
-	if (transaction_prepend(conn, name, &key))
-		return NULL;
+	transaction_prepend(conn, name, &key);
 
 	data = tdb_fetch(tdb_ctx, key);
 
@@ -746,10 +745,21 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 static int write_node(struct connection *conn, struct node *node,
 		      bool no_quota_check)
 {
+	int ret;
+
 	if (access_node(conn, node, NODE_ACCESS_WRITE, &node->key))
 		return errno;
 
-	return write_node_raw(conn, &node->key, node, no_quota_check);
+	ret = write_node_raw(conn, &node->key, node, no_quota_check);
+	if (ret && conn && conn->transaction) {
+		/*
+		 * Reverting access_node() is hard, so just fail the
+		 * transaction.
+		 */
+		fail_transaction(conn->transaction);
+	}
+
+	return ret;
 }
 
 enum xs_perm_type perm_for_conn(struct connection *conn,

@@ -48,8 +48,8 @@ int __must_check access_node(struct connection *conn, struct node *node,
 void queue_watches(struct connection *conn, const char *name, bool watch_exact);
 
 /* Prepend the transaction to name if appropriate. */
-int transaction_prepend(struct connection *conn, const char *name,
-                        TDB_DATA *key);
+void transaction_prepend(struct connection *conn, const char *name,
+                         TDB_DATA *key);
 
 /* Mark the transaction as failed. This will prevent it to be committed. */
 void fail_transaction(struct transaction *trans);
