@@ -31,6 +31,7 @@
 #include "xenstored_domain.h"
 #include "xenstored_transaction.h"
 #include "xenstored_watch.h"
+#include "xenstored_control.h"
 
 #include <xenevtchn.h>
 #include <xenctrl.h>
@@ -350,6 +351,38 @@ static struct domain *find_domain_struct(unsigned int domid)
 			return i;
 	}
 	return NULL;
+}
+
+int domain_get_quota(const void *ctx, struct connection *conn,
+		     unsigned int domid)
+{
+	struct domain *d = find_domain_struct(domid);
+	char *resp;
+	int ta;
+
+	if (!d)
+		return ENOENT;
+
+	ta = d->conn ? d->conn->transaction_started : 0;
+	resp = talloc_asprintf(ctx, "Domain %u:\n", domid);
+	if (!resp)
+		return ENOMEM;
+
+#define ent(t, e) \
+	resp = talloc_asprintf_append(resp, "%-16s: %8d\n", #t, e); \
+	if (!resp) return ENOMEM
+
+	ent(nodes, d->nbentry);
+	ent(watches, d->nbwatch);
+	ent(transactions, ta);
+	ent(outstanding, d->nboutstanding);
+	ent(memory, d->memory);
+
+#undef ent
+
+	send_reply(conn, XS_CONTROL, resp, strlen(resp) + 1);
+
+	return 0;
 }
 
 static struct domain *alloc_domain(void *context, unsigned int domid)
