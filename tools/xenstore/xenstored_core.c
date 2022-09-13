@@ -102,6 +102,7 @@ int quota_nb_watch_per_domain = 128;
 int quota_max_entry_size = 2048; /* 2K */
 int quota_max_transaction = 10;
 int quota_nb_perms_per_node = 5;
+int quota_trans_nodes = 1024;
 int quota_req_outstanding = 20;
 
 unsigned int timeout_watch_event_msec = 20000;
@@ -500,6 +501,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	TDB_DATA key, data;
 	struct xs_tdb_record_hdr *hdr;
 	struct node *node;
+	int err;
 
 	node = talloc(ctx, struct node);
 	if (!node) {
@@ -521,14 +523,13 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	if (data.dptr == NULL) {
 		if (tdb_error(tdb_ctx) == TDB_ERR_NOEXIST) {
 			node->generation = NO_GENERATION;
-			access_node(conn, node, NODE_ACCESS_READ, NULL);
-			errno = ENOENT;
+			err = access_node(conn, node, NODE_ACCESS_READ, NULL);
+			errno = err ? : ENOENT;
 		} else {
 			log("TDB error on read: %s", tdb_errorstr(tdb_ctx));
 			errno = EIO;
 		}
-		talloc_free(node);
-		return NULL;
+		goto error;
 	}
 
 	node->parent = NULL;
@@ -543,19 +544,36 @@ struct node *read_node(struct connection *conn, const void *ctx,
 
 	/* Permissions are struct xs_permissions. */
 	node->perms.p = hdr->perms;
-	if (domain_adjust_node_perms(conn, node)) {
-		talloc_free(node);
-		return NULL;
-	}
+	if (domain_adjust_node_perms(conn, node))
+		goto error;
 
 	/* Data is binary blob (usually ascii, no nul). */
 	node->data = node->perms.p + hdr->num_perms;
 	/* Children is strings, nul separated. */
 	node->children = node->data + node->datalen;
 
-	access_node(conn, node, NODE_ACCESS_READ, NULL);
+	if (access_node(conn, node, NODE_ACCESS_READ, NULL))
+		goto error;
 
 	return node;
+
+ error:
+	err = errno;
+	talloc_free(node);
+	errno = err;
+	return NULL;
+}
+
+static bool read_node_can_propagate_errno(void)
+{
+	/*
+	 * 2 error cases for read_node() can always be propagated up:
+	 * ENOMEM, because this has nothing to do with the node being in the
+	 * data base or not, but is caused by a general lack of memory.
+	 * ENOSPC, because this is related to hitting quota limits which need
+	 * to be respected.
+	 */
+	return errno == ENOMEM || errno == ENOSPC;
 }
 
 int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
@@ -670,7 +688,7 @@ static int ask_parents(struct connection *conn, const void *ctx,
 		node = read_node(conn, ctx, name);
 		if (node)
 			break;
-		if (errno == ENOMEM)
+		if (read_node_can_propagate_errno())
 			return errno;
 	} while (!streq(name, "/"));
 
@@ -733,7 +751,7 @@ static struct node *get_node(struct connection *conn,
 		}
 	}
 	/* Clean up errno if they weren't supposed to know. */
-	if (!node && errno != ENOMEM)
+	if (!node && !read_node_can_propagate_errno())
 		errno = errno_from_parents(conn, ctx, name, errno, perm);
 	return node;
 }
@@ -1115,7 +1133,7 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 
 	/* If parent doesn't exist, create it. */
 	parent = read_node(conn, parentname, parentname);
-	if (!parent)
+	if (!parent && errno == ENOENT)
 		parent = construct_node(conn, ctx, parentname);
 	if (!parent)
 		return NULL;
@@ -1394,7 +1412,7 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 
 	parent = read_node(conn, ctx, parentname);
 	if (!parent)
-		return (errno == ENOMEM) ? ENOMEM : EINVAL;
+		return read_node_can_propagate_errno() ? errno : EINVAL;
 	node->parent = parent;
 
 	return delete_node(conn, ctx, parent, node, false);
@@ -1422,7 +1440,7 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 				return 0;
 			}
 			/* Restore errno, just in case. */
-			if (errno != ENOMEM)
+			if (!read_node_can_propagate_errno())
 				errno = ENOENT;
 		}
 		return errno;
@@ -2192,6 +2210,8 @@ static void usage(void)
 "  -A, --perm-nb <nb>      limit the number of permissions per node,\n"
 "  -Q, --quota <what>=<nb> set the quota <what> to the value <nb>, allowed\n"
 "                          quotas are:\n"
+"                          transaction-nodes: number of accessed node per\n"
+"                                             transaction\n"
 "                          outstanding: number of outstanding requests\n"
 "  -w, --timeout <what>=<seconds>   set the timeout in seconds for <what>,\n"
 "                          allowed timeout candidates are:\n"
@@ -2273,6 +2293,8 @@ static void set_quota(const char *arg)
 	val = get_optval_int(eq + 1);
 	if (what_matches(arg, "outstanding"))
 		quota_req_outstanding = val;
+	else if (what_matches(arg, "transaction-nodes"))
+		quota_trans_nodes = val;
 	else
 		barf("unknown quota \"%s\"\n", arg);
 }

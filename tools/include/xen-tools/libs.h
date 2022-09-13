@@ -59,4 +59,8 @@
     })
 #endif
 
+#ifndef __must_check
+#define __must_check __attribute__((__warn_unused_result__))
+#endif
+
 #endif	/* __XEN_TOOLS_LIBS__ */
