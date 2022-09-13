@@ -65,6 +65,26 @@ int domain_entry_inc(struct connection *conn, struct node *);
 void domain_entry_dec(struct connection *conn, struct node *);
 int domain_entry_fix(unsigned int domid, int num, bool update);
 int domain_entry(struct connection *conn);
+int domain_memory_add(unsigned int domid, int mem, bool no_quota_check);
+
+/*
+ * domain_memory_add_chk(): to be used when memory quota should be checked.
+ * Not to be used when specifying a negative mem value, as lowering the used
+ * memory should always be allowed.
+ */
+static inline int domain_memory_add_chk(unsigned int domid, int mem)
+{
+	return domain_memory_add(domid, mem, false);
+}
+/*
+ * domain_memory_add_nochk(): to be used when memory quota should not be
+ * checked, e.g. when lowering memory usage, or in an error case for undoing
+ * a previous memory adjustment.
+ */
+static inline void domain_memory_add_nochk(unsigned int domid, int mem)
+{
+	domain_memory_add(domid, mem, true);
+}
 void domain_watch_inc(struct connection *conn);
 void domain_watch_dec(struct connection *conn);
 int domain_watch(struct connection *conn);
