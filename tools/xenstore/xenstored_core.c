@@ -76,6 +76,7 @@ static bool verbose = false;
 LIST_HEAD(connections);
 int tracefd = -1;
 static bool recovery = true;
+bool keep_orphans = false;
 static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
 char *tracefile = NULL;
@@ -662,7 +663,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	node->perms.p = hdr->perms;
 	node->acc.domid = node->perms.p[0].id;
 	node->acc.memory = data.dsize;
-	if (domain_adjust_node_perms(conn, node))
+	if (domain_adjust_node_perms(node))
 		goto error;
 
 	/* If owner is gone reset currently accounted memory size. */
@@ -705,7 +706,7 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	void *p;
 	struct xs_tdb_record_hdr *hdr;
 
-	if (domain_adjust_node_perms(conn, node))
+	if (domain_adjust_node_perms(node))
 		return errno;
 
 	data.dsize = sizeof(*hdr)
@@ -1546,7 +1547,7 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 	return WALK_TREE_RM_CHILDENTRY;
 }
 
-static int _rm(struct connection *conn, const void *ctx, const char *name)
+int rm_node(struct connection *conn, const void *ctx, const char *name)
 {
 	struct node *parent;
 	char *parentname = get_parent(ctx, name);
@@ -1608,7 +1609,7 @@ static int do_rm(const void *ctx, struct connection *conn,
 	if (streq(name, "/"))
 		return EINVAL;
 
-	ret = _rm(conn, ctx, name);
+	ret = rm_node(conn, ctx, name);
 	if (ret)
 		return ret;
 
@@ -2461,6 +2462,8 @@ static void usage(void)
 "  -R, --no-recovery       to request that no recovery should be attempted when\n"
 "                          the store is corrupted (debug only),\n"
 "  -I, --internal-db       store database in memory, not on disk\n"
+"  -K, --keep-orphans      don't delete nodes owned by a domain when the\n"
+"                          domain is deleted (this is a security risk!)\n"
 "  -V, --verbose           to request verbose execution.\n");
 }
 
@@ -2484,6 +2487,7 @@ static struct option options[] = {
 	{ "timeout", 1, NULL, 'w' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "internal-db", 0, NULL, 'I' },
+	{ "keep-orphans", 0, NULL, 'K' },
 	{ "verbose", 0, NULL, 'V' },
 	{ "watch-nb", 1, NULL, 'W' },
 	{ NULL, 0, NULL, 0 } };
@@ -2558,7 +2562,7 @@ int main(int argc, char *argv[])
 	int timeout;
 
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:Q:q:T:RVW:w:", options,
+	while ((opt = getopt_long(argc, argv, "DE:F:HKNPS:t:A:Q:q:T:RVW:w:", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -2593,6 +2597,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'I':
 			tdb_flags = TDB_INTERNAL|TDB_NOLOCK;
+			break;
+		case 'K':
+			keep_orphans = true;
 			break;
 		case 'V':
 			verbose = true;
