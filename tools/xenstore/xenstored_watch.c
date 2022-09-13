@@ -184,7 +184,7 @@ static int destroy_watch(void *_watch)
 	return 0;
 }
 
-int do_watch(struct connection *conn, struct buffered_data *in)
+int do_watch(const void *ctx, struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
 	char *vec[2];
@@ -200,7 +200,7 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 		/* check if valid event */
 	} else {
 		relative = !strstarts(vec[0], "/");
-		vec[0] = canonicalize(conn, in, vec[0]);
+		vec[0] = canonicalize(conn, ctx, vec[0]);
 		if (!vec[0])
 			return ENOMEM;
 		if (!is_valid_nodename(vec[0]))
@@ -250,7 +250,8 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-int do_unwatch(struct connection *conn, struct buffered_data *in)
+int do_unwatch(const void *ctx, struct connection *conn,
+	       struct buffered_data *in)
 {
 	struct watch *watch;
 	char *node, *vec[2];
@@ -258,7 +259,7 @@ int do_unwatch(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return EINVAL;
 
-	node = canonicalize(conn, in, vec[0]);
+	node = canonicalize(conn, ctx, vec[0]);
 	if (!node)
 		return ENOMEM;
 	list_for_each_entry(watch, &conn->watches, list) {

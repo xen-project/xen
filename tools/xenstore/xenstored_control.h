@@ -16,4 +16,5 @@
     along with this program; If not, see <http://www.gnu.org/licenses/>.
 */
 
-int do_control(struct connection *conn, struct buffered_data *in);
+int do_control(const void *ctx, struct connection *conn,
+	       struct buffered_data *in);
