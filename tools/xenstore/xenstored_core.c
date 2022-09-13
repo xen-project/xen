@@ -1088,9 +1088,8 @@ nomem:
 	return NULL;
 }
 
-static int destroy_node(void *_node)
+static int destroy_node(struct connection *conn, struct node *node)
 {
-	struct node *node = _node;
 	TDB_DATA key;
 
 	if (streq(node->name, "/"))
@@ -1099,7 +1098,7 @@ static int destroy_node(void *_node)
 	set_tdb_key(node->name, &key);
 	tdb_delete(tdb_ctx, key);
 
-	domain_entry_dec(talloc_parent(node), node);
+	domain_entry_dec(conn, node);
 
 	return 0;
 }
@@ -1108,7 +1107,8 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 				const char *name,
 				void *data, unsigned int datalen)
 {
-	struct node *node, *i;
+	struct node *node, *i, *j;
+	int ret;
 
 	node = construct_node(conn, ctx, name);
 	if (!node)
@@ -1130,23 +1130,40 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 		/* i->parent is set for each new node, so check quota. */
 		if (i->parent &&
 		    domain_entry(conn) >= quota_nb_entry_per_domain) {
-			errno = ENOSPC;
-			return NULL;
+			ret = ENOSPC;
+			goto err;
 		}
-		if (write_node(conn, i, false))
-			return NULL;
 
-		/* Account for new node, set destructor for error case. */
-		if (i->parent) {
+		ret = write_node(conn, i, false);
+		if (ret)
+			goto err;
+
+		/* Account for new node */
+		if (i->parent)
 			domain_entry_inc(conn, i);
-			talloc_set_destructor(i, destroy_node);
-		}
 	}
 
-	/* OK, now remove destructors so they stay around */
-	for (i = node; i->parent; i = i->parent)
-		talloc_set_destructor(i, NULL);
 	return node;
+
+err:
+	/*
+	 * We failed to update TDB for some of the nodes. Undo any work that
+	 * have already been done.
+	 */
+	for (j = node; j != i; j = j->parent)
+		destroy_node(conn, j);
+
+	/* We don't need to keep the nodes around, so free them. */
+	i = node;
+	while (i) {
+		j = i;
+		i = i->parent;
+		talloc_free(j);
+	}
+
+	errno = ret;
+
+	return NULL;
 }
 
 /* path, data... */
