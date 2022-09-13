@@ -566,15 +566,17 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	return 0;
 }
 
+/*
+ * Write the node. If the node is written, caller can find the key used in
+ * node->key. This can later be used if the change needs to be reverted.
+ */
 static int write_node(struct connection *conn, struct node *node,
 		      bool no_quota_check)
 {
-	TDB_DATA key;
-
-	if (access_node(conn, node, NODE_ACCESS_WRITE, &key))
+	if (access_node(conn, node, NODE_ACCESS_WRITE, &node->key))
 		return errno;
 
-	return write_node_raw(conn, &key, node, no_quota_check);
+	return write_node_raw(conn, &node->key, node, no_quota_check);
 }
 
 unsigned int perm_for_conn(struct connection *conn,
@@ -1090,15 +1092,20 @@ nomem:
 
 static int destroy_node(struct connection *conn, struct node *node)
 {
-	TDB_DATA key;
-
 	if (streq(node->name, "/"))
 		corrupt(NULL, "Destroying root node!");
 
-	set_tdb_key(node->name, &key);
-	tdb_delete(tdb_ctx, key);
+	tdb_delete(tdb_ctx, node->key);
 
 	domain_entry_dec(conn, node);
+
+	/*
+	 * It is not possible to easily revert the changes in a transaction.
+	 * So if the failure happens in a transaction, mark it as fail to
+	 * prevent any commit.
+	 */
+	if ( conn->transaction )
+		fail_transaction(conn->transaction);
 
 	return 0;
 }
