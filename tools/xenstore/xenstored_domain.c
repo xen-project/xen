@@ -200,9 +200,64 @@ static void unmap_interface(void *interface)
 	xengnttab_unmap(*xgt_handle, interface, 1);
 }
 
+static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
+				  struct node *node, void *arg)
+{
+	struct domain *domain = arg;
+	TDB_DATA key;
+	int ret = WALK_TREE_OK;
+
+	if (node->perms.p[0].id != domain->domid)
+		return WALK_TREE_OK;
+
+	if (keep_orphans) {
+		key.dptr = (char *)node->name;
+		key.dsize = strlen(node->name);
+		domain->nbentry--;
+		node->perms.p[0].id = priv_domid;
+		node->acc.memory = 0;
+		domain_entry_inc(NULL, node);
+		if (write_node_raw(NULL, &key, node, true)) {
+			/* That's unfortunate. We only can try to continue. */
+			syslog(LOG_ERR,
+			       "error when moving orphaned node %s to dom0\n",
+			       node->name);
+		} else
+			trace("orphaned node %s moved to dom0\n", node->name);
+	} else {
+		if (rm_node(NULL, ctx, node->name)) {
+			/* That's unfortunate. We only can try to continue. */
+			syslog(LOG_ERR,
+			       "error when deleting orphaned node %s\n",
+			       node->name);
+		} else
+			trace("orphaned node %s deleted\n", node->name);
+
+		/* Skip children in all cases in order to avoid more errors. */
+		ret = WALK_TREE_SKIP_CHILDREN;
+	}
+
+	return domain->nbentry > 0 ? ret : WALK_TREE_SUCCESS_STOP;
+}
+
+static void domain_tree_remove(struct domain *domain)
+{
+	int ret;
+	struct walk_funcs walkfuncs = { .enter = domain_tree_remove_sub };
+
+	if (domain->nbentry > 0) {
+		ret = walk_node_tree(domain, NULL, "/", &walkfuncs, domain);
+		if (ret == WALK_TREE_ERROR_STOP)
+			syslog(LOG_ERR,
+			       "error when looking for orphaned nodes\n");
+	}
+}
+
 static int destroy_domain(void *_domain)
 {
 	struct domain *domain = _domain;
+
+	domain_tree_remove(domain);
 
 	list_del(&domain->list);
 
@@ -835,15 +890,15 @@ int domain_entry_inc(struct connection *conn, struct node *node)
 	struct domain *d;
 	unsigned int domid;
 
-	if (!conn)
+	if (!node->perms.p)
 		return 0;
 
-	domid = node->perms.p ? node->perms.p[0].id : conn->id;
+	domid = node->perms.p[0].id;
 
-	if (conn->transaction) {
+	if (conn && conn->transaction) {
 		transaction_entry_inc(conn->transaction, domid);
 	} else {
-		d = (domid == conn->id && conn->domain) ? conn->domain
+		d = (conn && domid == conn->id && conn->domain) ? conn->domain
 		    : find_or_alloc_existing_domain(domid);
 		if (d)
 			d->nbentry++;
@@ -904,22 +959,10 @@ int domain_alloc_permrefs(struct node_perms *perms)
  * Remove permissions for no longer existing domains in order to avoid a new
  * domain with the same domid inheriting the permissions.
  */
-int domain_adjust_node_perms(struct connection *conn, struct node *node)
+int domain_adjust_node_perms(struct node *node)
 {
 	unsigned int i;
 	int ret;
-
-	ret = chk_domain_generation(node->perms.p[0].id, node->generation);
-
-	/* If the owner doesn't exist any longer give it to priv domain. */
-	if (!ret) {
-		/*
-		 * In theory we'd need to update the number of dom0 nodes here,
-		 * but we could be called for a read of the node. So better
-		 * avoid the risk to overflow the node count of dom0.
-		 */
-		node->perms.p[0].id = priv_domid;
-	}
 
 	for (i = 1; i < node->perms.num; i++) {
 		if (node->perms.p[i].perms & XS_PERM_IGNORE)
@@ -938,15 +981,15 @@ void domain_entry_dec(struct connection *conn, struct node *node)
 	struct domain *d;
 	unsigned int domid;
 
-	if (!conn)
+	if (!node->perms.p)
 		return;
 
 	domid = node->perms.p ? node->perms.p[0].id : conn->id;
 
-	if (conn->transaction) {
+	if (conn && conn->transaction) {
 		transaction_entry_dec(conn->transaction, domid);
 	} else {
-		d = (domid == conn->id && conn->domain) ? conn->domain
+		d = (conn && domid == conn->id && conn->domain) ? conn->domain
 		    : find_domain_struct(domid);
 		if (d) {
 			d->nbentry--;
@@ -1065,7 +1108,7 @@ int domain_memory_add(unsigned int domid, int mem, bool no_quota_check)
 		 * exist, as accounting is done either for a domain related to
 		 * the current connection, or for the domain owning a node
 		 * (which is always existing, as the owner of the node is
-		 * tested to exist and replaced by domid 0 if not).
+		 * tested to exist and deleted or replaced by domid 0 if not).
 		 * So not finding the related domain MUST be an error in the
 		 * data base.
 		 */
