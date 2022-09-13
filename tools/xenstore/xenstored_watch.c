@@ -224,7 +224,8 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 		return ENOMEM;
 	watch->node = talloc_strdup(watch, vec[0]);
 	watch->token = talloc_strdup(watch, vec[1]);
-	if (!watch->node || !watch->token) {
+	if (!watch->node || !watch->token ||
+	    domain_memory_add_chk(conn->id, strlen(vec[0]) + strlen(vec[1]))) {
 		talloc_free(watch);
 		return ENOMEM;
 	}
@@ -265,6 +266,8 @@ int do_unwatch(struct connection *conn, struct buffered_data *in)
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
 			list_del(&watch->list);
+			domain_memory_add_nochk(conn->id, -strlen(watch->node) -
+							  strlen(watch->token));
 			talloc_free(watch);
 			domain_watch_dec(conn);
 			send_ack(conn, XS_UNWATCH);
@@ -280,6 +283,8 @@ void conn_delete_all_watches(struct connection *conn)
 
 	while ((watch = list_top(&conn->watches, struct watch, list))) {
 		list_del(&watch->list);
+		domain_memory_add_nochk(conn->id, -strlen(watch->node) -
+						  strlen(watch->token));
 		talloc_free(watch);
 		domain_watch_dec(conn);
 	}
