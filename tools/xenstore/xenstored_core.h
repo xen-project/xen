@@ -45,12 +45,25 @@ typedef int32_t wrl_creditt;
 struct buffered_data
 {
 	struct list_head list;
+	bool on_out_list;
+	bool on_ref_list;
 
 	/* Are we still doing the header? */
 	bool inhdr;
 
 	/* How far are we? */
 	unsigned int used;
+
+	/* Outstanding request accounting. */
+	union {
+		/* ref is being used for requests. */
+		struct {
+			unsigned int event_cnt; /* # of outstanding events. */
+			unsigned int domid;     /* domid of request. */
+		} ref;
+		/* req is being used for watch events. */
+		struct buffered_data *req;      /* request causing event. */
+	} pend;
 
 	union {
 		struct xsd_sockmsg msg;
@@ -92,6 +105,9 @@ struct connection
 	/* Buffered output data */
 	struct list_head out_list;
 	uint64_t timeout_msec;
+
+	/* Referenced requests no longer pending. */
+	struct list_head ref_list;
 
 	/* Transaction context for current request (NULL if none). */
 	struct transaction *transaction;
@@ -154,7 +170,8 @@ unsigned int get_strings(struct buffered_data *data,
 
 void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		const void *data, unsigned int len);
-void send_event(struct connection *conn, const char *path, const char *token);
+void send_event(struct buffered_data *req, struct connection *conn,
+		const char *path, const char *token);
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
 void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
@@ -202,6 +219,7 @@ extern int dom0_domid;
 extern int dom0_event;
 extern int priv_domid;
 extern int quota_nb_entry_per_domain;
+extern int quota_req_outstanding;
 
 extern unsigned int timeout_watch_event_msec;
 

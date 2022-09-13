@@ -142,6 +142,7 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 		  struct node *node, bool exact, struct node_perms *perms)
 {
 	struct connection *i;
+	struct buffered_data *req;
 	struct watch *watch;
 
 	/* During transactions, don't fire watches, but queue them. */
@@ -149,6 +150,8 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 		queue_watches(conn, name, exact);
 		return;
 	}
+
+	req = domain_is_unprivileged(conn) ? conn->in : NULL;
 
 	/* Create an event for each watch. */
 	list_for_each_entry(i, &connections, list) {
@@ -164,12 +167,12 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 		list_for_each_entry(watch, &i->watches, list) {
 			if (exact) {
 				if (streq(name, watch->node))
-					send_event(i,
+					send_event(req, i,
 						   get_watch_path(watch, name),
 						   watch->token);
 			} else {
 				if (is_child(name, watch->node))
-					send_event(i,
+					send_event(req, i,
 						   get_watch_path(watch, name),
 						   watch->token);
 			}
@@ -238,8 +241,12 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	talloc_set_destructor(watch, destroy_watch);
 	send_ack(conn, XS_WATCH);
 
-	/* We fire once up front: simplifies clients and restart. */
-	send_event(conn, get_watch_path(watch, watch->node), watch->token);
+	/*
+	 * We fire once up front: simplifies clients and restart.
+	 * This event will not be linked to the XS_WATCH request.
+	 */
+	send_event(NULL, conn, get_watch_path(watch, watch->node),
+		   watch->token);
 
 	return 0;
 }
