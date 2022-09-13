@@ -31,8 +31,6 @@
 #include "xenstored_domain.h"
 #include "xenstored_transaction.h"
 
-extern int quota_nb_watch_per_domain;
-
 struct watch
 {
 	/* Watches on this connection */
