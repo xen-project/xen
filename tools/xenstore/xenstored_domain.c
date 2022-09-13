@@ -82,6 +82,9 @@ struct domain
 	/* number of watch for this domain */
 	int nbwatch;
 
+	/* Number of outstanding requests. */
+	int nboutstanding;
+
 	/* write rate limit */
 	wrl_creditt wrl_credit; /* [ -wrl_config_writecost, +_dburst ] */
 	struct wrl_timestampt wrl_timestamp;
@@ -284,8 +287,12 @@ bool domain_can_read(struct connection *conn)
 {
 	struct xenstore_domain_interface *intf = conn->domain->interface;
 
-	if (domain_is_unprivileged(conn) && conn->domain->wrl_credit < 0)
-		return false;
+	if (domain_is_unprivileged(conn)) {
+		if (conn->domain->wrl_credit < 0)
+			return false;
+		if (conn->domain->nboutstanding >= quota_req_outstanding)
+			return false;
+	}
 
 	if (conn->is_ignored)
 		return false;
@@ -334,7 +341,7 @@ static struct domain *alloc_domain(void *context, unsigned int domid)
 {
 	struct domain *domain;
 
-	domain = talloc(context, struct domain);
+	domain = talloc_zero(context, struct domain);
 	if (!domain) {
 		errno = ENOMEM;
 		return NULL;
@@ -383,8 +390,6 @@ static int new_domain(struct domain *domain, int port)
 	domain->conn->id = domain->domid;
 
 	domain->remote_port = port;
-	domain->nbentry = 0;
-	domain->nbwatch = 0;
 
 	return 0;
 }
@@ -920,6 +925,28 @@ int domain_watch(struct connection *conn)
 	return (domain_is_unprivileged(conn))
 		? conn->domain->nbwatch
 		: 0;
+}
+
+void domain_outstanding_inc(struct connection *conn)
+{
+	if (!conn || !conn->domain)
+		return;
+	conn->domain->nboutstanding++;
+}
+
+void domain_outstanding_dec(struct connection *conn)
+{
+	if (!conn || !conn->domain)
+		return;
+	conn->domain->nboutstanding--;
+}
+
+void domain_outstanding_domid_dec(unsigned int domid)
+{
+	struct domain *d = find_domain_by_domid(domid);
+
+	if (d)
+		d->nboutstanding--;
 }
 
 static wrl_creditt wrl_config_writecost      = WRL_FACTOR;
