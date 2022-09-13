@@ -21,8 +21,10 @@
 
 #include "xenstored_core.h"
 
-int do_watch(struct connection *conn, struct buffered_data *in);
-int do_unwatch(struct connection *conn, struct buffered_data *in);
+int do_watch(const void *ctx, struct connection *conn,
+	     struct buffered_data *in);
+int do_unwatch(const void *ctx, struct connection *conn,
+	       struct buffered_data *in);
 
 /* Fire all watches: !exact means all the children are affected (ie. rm). */
 void fire_watches(struct connection *conn, const void *tmp, const char *name,
