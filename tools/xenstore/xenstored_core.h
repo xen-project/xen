@@ -51,6 +51,9 @@ struct buffered_data
 	/* Are we still doing the header? */
 	bool inhdr;
 
+	/* Is this a watch event? */
+	bool watch_event;
+
 	/* How far are we? */
 	unsigned int used;
 

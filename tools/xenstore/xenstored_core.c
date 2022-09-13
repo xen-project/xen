@@ -821,6 +821,7 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 	bdata->inhdr = true;
 	bdata->used = 0;
 	bdata->timeout_msec = 0;
+	bdata->watch_event = false;
 
 	if (len <= DEFAULT_BUFFER_SIZE)
 		bdata->buffer = bdata->default_buffer;
@@ -853,7 +854,7 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 void send_event(struct buffered_data *req, struct connection *conn,
 		const char *path, const char *token)
 {
-	struct buffered_data *bdata;
+	struct buffered_data *bdata, *bd;
 	unsigned int len;
 
 	len = strlen(path) + 1 + strlen(token) + 1;
@@ -875,12 +876,29 @@ void send_event(struct buffered_data *req, struct connection *conn,
 	bdata->hdr.msg.type = XS_WATCH_EVENT;
 	bdata->hdr.msg.len = len;
 
+	/*
+	 * Check whether an identical event is pending already.
+	 * Special events are excluded from that check.
+	 */
+	if (path[0] != '@') {
+		list_for_each_entry(bd, &conn->out_list, list) {
+			if (bd->watch_event && bd->hdr.msg.len == len &&
+			    !memcmp(bdata->buffer, bd->buffer, len)) {
+				trace("dropping duplicate watch %s %s for domain %u\n",
+				      path, token, conn->id);
+				talloc_free(bdata);
+				return;
+			}
+		}
+	}
+
 	if (timeout_watch_event_msec && domain_is_unprivileged(conn)) {
 		bdata->timeout_msec = get_now_msec() + timeout_watch_event_msec;
 		if (!conn->timeout_msec)
 			conn->timeout_msec = bdata->timeout_msec;
 	}
 
+	bdata->watch_event = true;
 	bdata->pend.req = req;
 	if (req)
 		req->pend.ref.event_cnt++;
