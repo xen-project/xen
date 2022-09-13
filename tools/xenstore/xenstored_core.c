@@ -1300,21 +1300,6 @@ static int do_read(const void *ctx, struct connection *conn,
 	return 0;
 }
 
-static void delete_node_single(struct connection *conn, struct node *node)
-{
-	TDB_DATA key;
-
-	if (access_node(conn, node, NODE_ACCESS_DELETE, &key))
-		return;
-
-	if (do_tdb_delete(conn, &key, &node->acc) != 0) {
-		corrupt(conn, "Could not delete '%s'", node->name);
-		return;
-	}
-
-	domain_entry_dec(conn, node);
-}
-
 /* Must not be / */
 static char *basename(const char *name)
 {
@@ -1585,69 +1570,59 @@ static int remove_child_entry(struct connection *conn, struct node *node,
 	return write_node(conn, node, true);
 }
 
-static void delete_child(struct connection *conn,
-			 struct node *node, const char *childname)
+static int delete_child(struct connection *conn,
+			struct node *node, const char *childname)
 {
 	unsigned int i;
 
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
 		if (streq(node->children+i, childname)) {
-			if (remove_child_entry(conn, node, i))
-				corrupt(conn, "Can't update parent node '%s'",
-					node->name);
-			return;
+			errno = remove_child_entry(conn, node, i) ? EIO : 0;
+			return errno;
 		}
 	}
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
+
+	errno = EIO;
+	return errno;
 }
 
-static int delete_node(struct connection *conn, const void *ctx,
-		       struct node *parent, struct node *node, bool watch_exact)
+static int delnode_sub(const void *ctx, struct connection *conn,
+		       struct node *node, void *arg)
 {
-	char *name;
+	const char *root = arg;
+	bool watch_exact;
+	int ret;
+	TDB_DATA key;
 
-	/* Delete children. */
-	while (node->childlen) {
-		struct node *child;
+	/* Any error here will probably be repeated for all following calls. */
+	ret = access_node(conn, node, NODE_ACCESS_DELETE, &key);
+	if (ret > 0)
+		return WALK_TREE_SUCCESS_STOP;
 
-		name = talloc_asprintf(node, "%s/%s", node->name,
-				       node->children);
-		child = name ? read_node(conn, node, name) : NULL;
-		if (child) {
-			if (delete_node(conn, ctx, node, child, true))
-				return errno;
-		} else {
-			trace("delete_node: Error deleting child '%s/%s'!\n",
-			      node->name, node->children);
-			/* Quit deleting. */
-			errno = ENOMEM;
-			return errno;
-		}
-		talloc_free(name);
-	}
+	/* In case of error stop the walk. */
+	if (!ret && do_tdb_delete(conn, &key, &node->acc))
+		return WALK_TREE_SUCCESS_STOP;
 
 	/*
 	 * Fire the watches now, when we can still see the node permissions.
 	 * This fine as we are single threaded and the next possible read will
 	 * be handled only after the node has been really removed.
-	 */
+	*/
+	watch_exact = strcmp(root, node->name);
 	fire_watches(conn, ctx, node->name, node, watch_exact, NULL);
-	delete_node_single(conn, node);
-	delete_child(conn, parent, basename(node->name));
-	talloc_free(node);
 
-	return 0;
+	domain_entry_dec(conn, node);
+
+	return WALK_TREE_RM_CHILDENTRY;
 }
 
-static int _rm(struct connection *conn, const void *ctx, struct node *node,
-	       const char *name)
+static int _rm(struct connection *conn, const void *ctx, const char *name)
 {
-	/*
-	 * Deleting node by node, so the result is always consistent even in
-	 * case of a failure.
-	 */
 	struct node *parent;
 	char *parentname = get_parent(ctx, name);
+	struct walk_funcs walkfuncs = { .exit = delnode_sub };
+	int ret;
 
 	if (!parentname)
 		return errno;
@@ -1655,9 +1630,21 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 	parent = read_node(conn, ctx, parentname);
 	if (!parent)
 		return read_node_can_propagate_errno() ? errno : EINVAL;
-	node->parent = parent;
 
-	return delete_node(conn, ctx, parent, node, false);
+	ret = walk_node_tree(ctx, conn, name, &walkfuncs, (void *)name);
+	if (ret < 0) {
+		if (ret == WALK_TREE_ERROR_STOP) {
+			corrupt(conn, "error when deleting sub-nodes of %s\n",
+				name);
+			errno = EIO;
+		}
+		return errno;
+	}
+
+	if (delete_child(conn, parent, basename(name)))
+		return errno;
+
+	return 0;
 }
 
 
@@ -1694,7 +1681,7 @@ static int do_rm(const void *ctx, struct connection *conn,
 	if (streq(name, "/"))
 		return EINVAL;
 
-	ret = _rm(conn, ctx, node, name);
+	ret = _rm(conn, ctx, name);
 	if (ret)
 		return ret;
 
