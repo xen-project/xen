@@ -470,6 +470,9 @@ static struct domain *introduce_domain(const void *ctx,
 		}
 		domain->interface = interface;
 
+		if (is_master_domain)
+			setup_structure(restore);
+
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
 
