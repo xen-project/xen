@@ -366,6 +366,17 @@ CONTROL			<command>|[<parameters>|]
 	print|<string>
 		print <string> to syslog (xenstore runs as daemon) or
 		to console (xenstore runs as stubdom)
+	quota|[set <name> <val>|<domid>]
+		without parameters: print the current quota settings
+		with "set <name> <val>": set the quota <name> to new value
+		<val> (The admin should make sure all the domain usage is
+		below the quota. If it is not, then Xenstored may continue to
+		handle requests from the domain as long as the resource
+		violating the new quota setting isn't increased further)
+		with "<domid>": print quota related accounting data for
+		the domain <domid>
+	quota-soft|[set <name> <val>]
+		like the "quota" command, but for soft-quota.
 	help			<supported-commands>
 		return list of supported commands for CONTROL
 
