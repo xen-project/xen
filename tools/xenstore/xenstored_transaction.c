@@ -114,7 +114,8 @@ struct accessed_node
 	struct list_head list;
 
 	/* The name of the node. */
-	char *node;
+	char *trans_name;	/* Transaction specific name. */
+	char *node;		/* Main data base name. */
 
 	/* Generation count (or NO_GENERATION) for conflict checking. */
 	uint64_t generation;
@@ -205,25 +206,20 @@ static char *transaction_get_node_name(void *ctx, struct transaction *trans,
  * Prepend the transaction to name if node has been modified in the current
  * transaction.
  */
-int transaction_prepend(struct connection *conn, const char *name,
-			TDB_DATA *key)
+void transaction_prepend(struct connection *conn, const char *name,
+			 TDB_DATA *key)
 {
-	char *tdb_name;
+	struct accessed_node *i;
 
-	if (!conn || !conn->transaction ||
-	    !find_accessed_node(conn->transaction, name)) {
-		set_tdb_key(name, key);
-		return 0;
+	if (conn && conn->transaction) {
+		i = find_accessed_node(conn->transaction, name);
+		if (i) {
+			set_tdb_key(i->trans_name, key);
+			return;
+		}
 	}
 
-	tdb_name = transaction_get_node_name(conn->transaction,
-					     conn->transaction, name);
-	if (!tdb_name)
-		return errno;
-
-	set_tdb_key(tdb_name, key);
-
-	return 0;
+	set_tdb_key(name, key);
 }
 
 /*
@@ -246,7 +242,6 @@ int access_node(struct connection *conn, struct node *node,
 	struct accessed_node *i = NULL;
 	struct transaction *trans;
 	TDB_DATA local_key;
-	const char *trans_name = NULL;
 	int ret;
 	bool introduce = false;
 
@@ -265,10 +260,6 @@ int access_node(struct connection *conn, struct node *node,
 
 	trans = conn->transaction;
 
-	trans_name = transaction_get_node_name(node, trans, node->name);
-	if (!trans_name)
-		goto nomem;
-
 	i = find_accessed_node(trans, node->name);
 	if (!i) {
 		if (trans->nodes >= quota_trans_nodes &&
@@ -279,9 +270,10 @@ int access_node(struct connection *conn, struct node *node,
 		i = talloc_zero(trans, struct accessed_node);
 		if (!i)
 			goto nomem;
-		i->node = talloc_strdup(i, node->name);
-		if (!i->node)
+		i->trans_name = transaction_get_node_name(i, trans, node->name);
+		if (!i->trans_name)
 			goto nomem;
+		i->node = strchr(i->trans_name, '/') + 1;
 		if (node->generation != NO_GENERATION && node->perms.num) {
 			i->perms.p = talloc_array(i, struct xs_permissions,
 						  node->perms.num);
@@ -308,7 +300,7 @@ int access_node(struct connection *conn, struct node *node,
 			i->generation = node->generation;
 			i->check_gen = true;
 			if (node->generation != NO_GENERATION) {
-				set_tdb_key(trans_name, &local_key);
+				set_tdb_key(i->trans_name, &local_key);
 				ret = write_node_raw(conn, &local_key, node, true);
 				if (ret)
 					goto err;
@@ -327,7 +319,7 @@ int access_node(struct connection *conn, struct node *node,
 		return -1;
 
 	if (key) {
-		set_tdb_key(trans_name, key);
+		set_tdb_key(i->trans_name, key);
 		if (type == NODE_ACCESS_WRITE)
 			i->ta_node = true;
 		if (type == NODE_ACCESS_DELETE)
@@ -339,7 +331,6 @@ int access_node(struct connection *conn, struct node *node,
 nomem:
 	ret = ENOMEM;
 err:
-	talloc_free((void *)trans_name);
 	talloc_free(i);
 	trans->fail = true;
 	errno = ret;
@@ -377,100 +368,90 @@ void queue_watches(struct connection *conn, const char *name, bool watch_exact)
  * base.
  */
 static int finalize_transaction(struct connection *conn,
-				struct transaction *trans)
+				struct transaction *trans, bool *is_corrupt)
 {
-	struct accessed_node *i;
+	struct accessed_node *i, *n;
 	TDB_DATA key, ta_key, data;
 	struct xs_tdb_record_hdr *hdr;
 	uint64_t gen;
-	char *trans_name;
-	int ret;
 
-	list_for_each_entry(i, &trans->accessed, list) {
-		if (!i->check_gen)
-			continue;
+	list_for_each_entry_safe(i, n, &trans->accessed, list) {
+		if (i->check_gen) {
+			set_tdb_key(i->node, &key);
+			data = tdb_fetch(tdb_ctx, key);
+			hdr = (void *)data.dptr;
+			if (!data.dptr) {
+				if (tdb_error(tdb_ctx) != TDB_ERR_NOEXIST)
+					return EIO;
+				gen = NO_GENERATION;
+			} else
+				gen = hdr->generation;
+			talloc_free(data.dptr);
+			if (i->generation != gen)
+				return EAGAIN;
+		}
 
-		set_tdb_key(i->node, &key);
-		data = tdb_fetch(tdb_ctx, key);
-		hdr = (void *)data.dptr;
-		if (!data.dptr) {
-			if (tdb_error(tdb_ctx) != TDB_ERR_NOEXIST)
-				return EIO;
-			gen = NO_GENERATION;
-		} else
-			gen = hdr->generation;
-		talloc_free(data.dptr);
-		if (i->generation != gen)
-			return EAGAIN;
+		/* Entries for unmodified nodes can be removed early. */
+		if (!i->modified) {
+			if (i->ta_node) {
+				set_tdb_key(i->trans_name, &ta_key);
+				if (do_tdb_delete(conn, &ta_key, NULL))
+					return EIO;
+			}
+			list_del(&i->list);
+			talloc_free(i);
+		}
 	}
 
 	while ((i = list_top(&trans->accessed, struct accessed_node, list))) {
-		trans_name = transaction_get_node_name(i, trans, i->node);
-		if (!trans_name)
-			/* We are doomed: the transaction is only partial. */
-			goto err;
-
-		set_tdb_key(trans_name, &ta_key);
-
-		if (i->modified) {
-			set_tdb_key(i->node, &key);
-			if (i->ta_node) {
-				data = tdb_fetch(tdb_ctx, ta_key);
-				if (!data.dptr)
-					goto err;
+		set_tdb_key(i->node, &key);
+		if (i->ta_node) {
+			set_tdb_key(i->trans_name, &ta_key);
+			data = tdb_fetch(tdb_ctx, ta_key);
+			if (data.dptr) {
 				hdr = (void *)data.dptr;
 				hdr->generation = ++generation;
-				ret = do_tdb_write(conn, &key, &data, NULL,
-						   true);
+				*is_corrupt |= do_tdb_write(conn, &key, &data,
+							    NULL, true);
 				talloc_free(data.dptr);
+				if (do_tdb_delete(conn, &ta_key, NULL))
+					*is_corrupt = true;
 			} else {
-				/*
-				 * A node having been created and later deleted
-				 * in this transaction will have no generation
-				 * information stored.
-				 */
-				ret = (i->generation == NO_GENERATION)
-				      ? 0 : do_tdb_delete(conn, &key, NULL);
+				*is_corrupt = true;
 			}
-			if (ret)
-				goto err;
-			if (i->fire_watch) {
-				fire_watches(conn, trans, i->node, NULL,
-					     i->watch_exact,
-					     i->perms.p ? &i->perms : NULL);
-			}
+		} else {
+			/*
+			 * A node having been created and later deleted
+			 * in this transaction will have no generation
+			 * information stored.
+			 */
+			*is_corrupt |= (i->generation == NO_GENERATION)
+				       ? false
+				       : do_tdb_delete(conn, &key, NULL);
 		}
+		if (i->fire_watch)
+			fire_watches(conn, trans, i->node, NULL, i->watch_exact,
+				     i->perms.p ? &i->perms : NULL);
 
-		if (i->ta_node && do_tdb_delete(conn, &ta_key, NULL))
-			goto err;
 		list_del(&i->list);
 		talloc_free(i);
 	}
 
 	return 0;
-
-err:
-	corrupt(conn, "Partial transaction");
-	return EIO;
 }
 
 static int destroy_transaction(void *_transaction)
 {
 	struct transaction *trans = _transaction;
 	struct accessed_node *i;
-	char *trans_name;
 	TDB_DATA key;
 
 	wrl_ntransactions--;
 	trace_destroy(trans, "transaction");
 	while ((i = list_top(&trans->accessed, struct accessed_node, list))) {
 		if (i->ta_node) {
-			trans_name = transaction_get_node_name(i, trans,
-							       i->node);
-			if (trans_name) {
-				set_tdb_key(trans_name, &key);
-				do_tdb_delete(trans->conn, &key, NULL);
-			}
+			set_tdb_key(i->trans_name, &key);
+			do_tdb_delete(trans->conn, &key, NULL);
 		}
 		list_del(&i->list);
 		talloc_free(i);
@@ -560,6 +541,7 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 {
 	const char *arg = onearg(in);
 	struct transaction *trans;
+	bool is_corrupt = false;
 	int ret;
 
 	if (!arg || (!streq(arg, "T") && !streq(arg, "F")))
@@ -581,13 +563,17 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 		ret = transaction_fix_domains(trans, false);
 		if (ret)
 			return ret;
-		if (finalize_transaction(conn, trans))
-			return EAGAIN;
+		ret = finalize_transaction(conn, trans, &is_corrupt);
+		if (ret)
+			return ret;
 
 		wrl_apply_debit_trans_commit(conn);
 
 		/* fix domain entry for each changed domain */
 		transaction_fix_domains(trans, true);
+
+		if (is_corrupt)
+			corrupt(conn, "transaction inconsistency");
 	}
 	send_ack(conn, XS_TRANSACTION_END);
 
@@ -661,7 +647,7 @@ int check_transactions(struct hashtable *hash)
 	struct connection *conn;
 	struct transaction *trans;
 	struct accessed_node *i;
-	char *tname, *tnode;
+	char *tname;
 
 	list_for_each_entry(conn, &connections, list) {
 		list_for_each_entry(trans, &conn->transaction_list, list) {
@@ -673,11 +659,8 @@ int check_transactions(struct hashtable *hash)
 			list_for_each_entry(i, &trans->accessed, list) {
 				if (!i->ta_node)
 					continue;
-				tnode = transaction_get_node_name(tname, trans,
-								  i->node);
-				if (!tnode || !remember_string(hash, tnode))
+				if (!remember_string(hash, i->trans_name))
 					goto nomem;
-				talloc_free(tnode);
 			}
 
 			talloc_free(tname);
