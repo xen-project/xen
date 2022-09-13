@@ -109,6 +109,8 @@ int quota_nb_perms_per_node = 5;
 int quota_trans_nodes = 1024;
 int quota_max_path_len = XENSTORE_REL_PATH_MAX;
 int quota_req_outstanding = 20;
+int quota_memory_per_domain_soft = 2 * 1024 * 1024; /* 2 MB */
+int quota_memory_per_domain_hard = 2 * 1024 * 1024 + 512 * 1024; /* 2.5 MB */
 
 unsigned int timeout_watch_event_msec = 20000;
 
@@ -2406,7 +2408,14 @@ static void usage(void)
 "                          quotas are:\n"
 "                          transaction-nodes: number of accessed node per\n"
 "                                             transaction\n"
+"                          memory: total used memory per domain for nodes,\n"
+"                                  transactions, watches and requests, above\n"
+"                                  which Xenstore will stop talking to domain\n"
 "                          outstanding: number of outstanding requests\n"
+"  -q, --quota-soft <what>=<nb> set a soft quota <what> to the value <nb>,\n"
+"                          causing a warning to be issued via syslog() if the\n"
+"                          limit is violated, allowed quotas are:\n"
+"                          memory: see above\n"
 "  -w, --timeout <what>=<seconds>   set the timeout in seconds for <what>,\n"
 "                          allowed timeout candidates are:\n"
 "                          watch-event: time a watch-event is kept pending\n"
@@ -2433,6 +2442,7 @@ static struct option options[] = {
 	{ "perm-nb", 1, NULL, 'A' },
 	{ "path-max", 1, NULL, 'M' },
 	{ "quota", 1, NULL, 'Q' },
+	{ "quota-soft", 1, NULL, 'q' },
 	{ "timeout", 1, NULL, 'w' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "internal-db", 0, NULL, 'I' },
@@ -2480,7 +2490,7 @@ static void set_timeout(const char *arg)
 		barf("unknown timeout \"%s\"\n", arg);
 }
 
-static void set_quota(const char *arg)
+static void set_quota(const char *arg, bool soft)
 {
 	const char *eq = strchr(arg, '=');
 	int val;
@@ -2488,11 +2498,16 @@ static void set_quota(const char *arg)
 	if (!eq)
 		barf("quotas must be specified via <what>=<nb>\n");
 	val = get_optval_int(eq + 1);
-	if (what_matches(arg, "outstanding"))
+	if (what_matches(arg, "outstanding") && !soft)
 		quota_req_outstanding = val;
-	else if (what_matches(arg, "transaction-nodes"))
+	else if (what_matches(arg, "transaction-nodes") && !soft)
 		quota_trans_nodes = val;
-	else
+	else if (what_matches(arg, "memory")) {
+		if (soft)
+			quota_memory_per_domain_soft = val;
+		else
+			quota_memory_per_domain_hard = val;
+	} else
 		barf("unknown quota \"%s\"\n", arg);
 }
 
@@ -2510,7 +2525,7 @@ int main(int argc, char *argv[])
 	orig_argc = argc;
 	orig_argv = argv;
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:M:Q:T:RVW:w:U",
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:M:Q:q:T:RVW:w:U",
 				  options, NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -2561,7 +2576,10 @@ int main(int argc, char *argv[])
 						 quota_max_path_len);
 			break;
 		case 'Q':
-			set_quota(optarg);
+			set_quota(optarg, false);
+			break;
+		case 'q':
+			set_quota(optarg, true);
 			break;
 		case 'w':
 			set_timeout(optarg);
