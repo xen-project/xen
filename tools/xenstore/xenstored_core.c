@@ -1757,6 +1757,11 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	if (!xs_strings_to_perms(perms.p, perms.num, permstr))
 		return errno;
 
+	if (domain_alloc_permrefs(&perms) < 0)
+		return ENOMEM;
+	if (perms.p[0].perms & XS_PERM_IGNORE)
+		return ENOENT;
+
 	/* First arg is node name. */
 	if (strstarts(in->buffer, "@")) {
 		if (set_perms_special(conn, in->buffer, &perms))

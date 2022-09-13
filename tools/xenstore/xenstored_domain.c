@@ -875,7 +875,6 @@ int domain_entry_inc(struct connection *conn, struct node *node)
  * count (used for testing whether a node permission is older than a domain).
  *
  * Return values:
- * -1: error
  *  0: domain has higher generation count (it is younger than a node with the
  *     given count), or domain isn't existing any longer
  *  1: domain is older than the node
@@ -883,20 +882,38 @@ int domain_entry_inc(struct connection *conn, struct node *node)
 static int chk_domain_generation(unsigned int domid, uint64_t gen)
 {
 	struct domain *d;
-	xc_dominfo_t dominfo;
 
 	if (!xc_handle && domid == 0)
 		return 1;
 
 	d = find_domain_struct(domid);
-	if (d)
-		return (d->generation <= gen) ? 1 : 0;
 
-	if (!get_domain_info(domid, &dominfo))
-		return 0;
+	return (d && d->generation <= gen) ? 1 : 0;
+}
 
-	d = alloc_domain(NULL, domid);
-	return d ? 1 : -1;
+/*
+ * Allocate all missing struct domain referenced by a permission set.
+ * Any permission entries for not existing domains will be marked to be
+ * ignored.
+ */
+int domain_alloc_permrefs(struct node_perms *perms)
+{
+	unsigned int i, domid;
+	struct domain *d;
+	xc_dominfo_t dominfo;
+
+	for (i = 0; i < perms->num; i++) {
+		domid = perms->p[i].id;
+		d = find_domain_struct(domid);
+		if (!d) {
+			if (!get_domain_info(domid, &dominfo))
+				perms->p[i].perms |= XS_PERM_IGNORE;
+			else if (!alloc_domain(NULL, domid))
+				return ENOMEM;
+		}
+	}
+
+	return 0;
 }
 
 /*
@@ -909,8 +926,6 @@ int domain_adjust_node_perms(struct connection *conn, struct node *node)
 	int ret;
 
 	ret = chk_domain_generation(node->perms.p[0].id, node->generation);
-	if (ret < 0)
-		return errno;
 
 	/* If the owner doesn't exist any longer give it to priv domain. */
 	if (!ret) {
@@ -927,8 +942,6 @@ int domain_adjust_node_perms(struct connection *conn, struct node *node)
 			continue;
 		ret = chk_domain_generation(node->perms.p[i].id,
 					    node->generation);
-		if (ret < 0)
-			return errno;
 		if (!ret)
 			node->perms.p[i].perms |= XS_PERM_IGNORE;
 	}
