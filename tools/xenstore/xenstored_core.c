@@ -1940,7 +1940,8 @@ static int tdb_flags;
 static void manual_node(const char *name, const char *child)
 {
 	struct node *node;
-	struct xs_permissions perms = { .id = 0, .perms = XS_PERM_NONE };
+	struct xs_permissions perms = { .id = dom0_domid,
+					.perms = XS_PERM_NONE };
 
 	node = talloc_zero(NULL, struct node);
 	if (!node)
@@ -1979,7 +1980,7 @@ static void tdb_logger(TDB_CONTEXT *tdb, int level, const char * fmt, ...)
 	}
 }
 
-static void setup_structure(bool live_update)
+void setup_structure(bool live_update)
 {
 	char *tdbname;
 
@@ -2002,6 +2003,7 @@ static void setup_structure(bool live_update)
 		manual_node("/", "tool");
 		manual_node("/tool", "xenstored");
 		manual_node("/tool/xenstored", NULL);
+		domain_entry_fix(dom0_domid, 3, true);
 	}
 
 	check_store();
@@ -2511,9 +2513,6 @@ int main(int argc, char *argv[])
 #endif
 
 	init_pipe(reopen_log_pipe);
-
-	/* Setup the database */
-	setup_structure(live_update);
 
 	/* Listen to hypervisor. */
 	if (!no_domain_init && !live_update) {
