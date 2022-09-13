@@ -198,7 +198,7 @@ int do_control(struct connection *conn, struct buffered_data *in)
 	int cmd;
 	char **vec;
 
-	if (conn->id != 0)
+	if (domain_is_unprivileged(conn))
 		return EACCES;
 
 	num = xs_count_strings(in->buffer, in->used);

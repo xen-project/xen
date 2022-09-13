@@ -483,7 +483,8 @@ int do_transaction_start(struct connection *conn, struct buffered_data *in)
 	if (conn->transaction)
 		return EBUSY;
 
-	if (conn->id && conn->transaction_started > quota_max_transaction)
+	if (domain_is_unprivileged(conn) &&
+	    conn->transaction_started > quota_max_transaction)
 		return ENOSPC;
 
 	/* Attach transaction to input for autofree until it's complete */
