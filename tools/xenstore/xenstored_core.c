@@ -1180,7 +1180,7 @@ static void delete_child(struct connection *conn,
 }
 
 static int delete_node(struct connection *conn, const void *ctx,
-		       struct node *parent, struct node *node)
+		       struct node *parent, struct node *node, bool watch_exact)
 {
 	char *name;
 
@@ -1192,7 +1192,7 @@ static int delete_node(struct connection *conn, const void *ctx,
 				       node->children);
 		child = name ? read_node(conn, node, name) : NULL;
 		if (child) {
-			if (delete_node(conn, ctx, node, child))
+			if (delete_node(conn, ctx, node, child, true))
 				return errno;
 		} else {
 			trace("delete_node: Error deleting child '%s/%s'!\n",
@@ -1204,7 +1204,12 @@ static int delete_node(struct connection *conn, const void *ctx,
 		talloc_free(name);
 	}
 
-	fire_watches(conn, ctx, node->name, node, true, NULL);
+	/*
+	 * Fire the watches now, when we can still see the node permissions.
+	 * This fine as we are single threaded and the next possible read will
+	 * be handled only after the node has been really removed.
+	 */
+	fire_watches(conn, ctx, node->name, node, watch_exact, NULL);
 	delete_node_single(conn, node);
 	delete_child(conn, parent, basename(node->name));
 	talloc_free(node);
@@ -1230,13 +1235,7 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 		return (errno == ENOMEM) ? ENOMEM : EINVAL;
 	node->parent = parent;
 
-	/*
-	 * Fire the watches now, when we can still see the node permissions.
-	 * This fine as we are single threaded and the next possible read will
-	 * be handled only after the node has been really removed.
-	 */
-	fire_watches(conn, ctx, name, node, false, NULL);
-	return delete_node(conn, ctx, parent, node);
+	return delete_node(conn, ctx, parent, node, false);
 }
 
 
