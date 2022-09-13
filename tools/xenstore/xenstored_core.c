@@ -2230,7 +2230,7 @@ static void accept_connection(int sock)
 }
 #endif
 
-static int tdb_flags;
+static int tdb_flags = TDB_INTERNAL | TDB_NOLOCK;
 
 /* We create initial nodes manually. */
 static void manual_node(const char *name, const char *child)
@@ -2537,7 +2537,8 @@ static void usage(void)
 "                          watch-event: time a watch-event is kept pending\n"
 "  -R, --no-recovery       to request that no recovery should be attempted when\n"
 "                          the store is corrupted (debug only),\n"
-"  -I, --internal-db       store database in memory, not on disk\n"
+"  -I, --internal-db [on|off] store database in memory, not on disk, default is\n"
+"                          memory, with \"--internal-db off\" it is on disk\n"
 "  -K, --keep-orphans      don't delete nodes owned by a domain when the\n"
 "                          domain is deleted (this is a security risk!)\n"
 "  -V, --verbose           to request verbose execution.\n");
@@ -2563,7 +2564,7 @@ static struct option options[] = {
 	{ "quota-soft", 1, NULL, 'q' },
 	{ "timeout", 1, NULL, 'w' },
 	{ "no-recovery", 0, NULL, 'R' },
-	{ "internal-db", 0, NULL, 'I' },
+	{ "internal-db", 2, NULL, 'I' },
 	{ "keep-orphans", 0, NULL, 'K' },
 	{ "verbose", 0, NULL, 'V' },
 	{ "watch-nb", 1, NULL, 'W' },
@@ -2645,7 +2646,8 @@ int main(int argc, char *argv[])
 	orig_argc = argc;
 	orig_argv = argv;
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HKNPS:t:A:M:Q:q:T:RVW:w:U",
+	while ((opt = getopt_long(argc, argv,
+				  "DE:F:HI::KNPS:t:A:M:Q:q:T:RVW:w:U",
 				  options, NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -2679,7 +2681,8 @@ int main(int argc, char *argv[])
 			tracefile = optarg;
 			break;
 		case 'I':
-			tdb_flags = TDB_INTERNAL|TDB_NOLOCK;
+			if (optarg && !strcmp(optarg, "off"))
+				tdb_flags = 0;
 			break;
 		case 'K':
 			keep_orphans = true;

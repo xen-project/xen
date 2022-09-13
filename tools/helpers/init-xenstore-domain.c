@@ -214,9 +214,9 @@ static int build(xc_interface *xch)
     }
 
     if ( param )
-        snprintf(cmdline, 512, "--event %d --internal-db %s", rv, param);
+        snprintf(cmdline, 512, "--event %d %s", rv, param);
     else
-        snprintf(cmdline, 512, "--event %d --internal-db", rv);
+        snprintf(cmdline, 512, "--event %d", rv);
 
     dom->cmdline = xc_dom_strdup(dom, cmdline);
     dom->xenstore_domid = domid;
