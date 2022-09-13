@@ -266,6 +266,7 @@ extern int dom0_event;
 extern int priv_domid;
 extern int quota_nb_entry_per_domain;
 extern int quota_req_outstanding;
+extern int quota_trans_nodes;
 
 extern unsigned int timeout_watch_event_msec;
 
