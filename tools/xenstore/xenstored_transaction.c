@@ -130,6 +130,10 @@ struct accessed_node
 
 	/* Transaction node in data base? */
 	bool ta_node;
+
+	/* Watch event flags. */
+	bool fire_watch;
+	bool watch_exact;
 };
 
 struct changed_domain
@@ -324,6 +328,29 @@ err:
 }
 
 /*
+ * A watch event should be fired for a node modified inside a transaction.
+ * Set the corresponding information. A non-exact event is replacing an exact
+ * one, but not the other way round.
+ */
+void queue_watches(struct connection *conn, const char *name, bool watch_exact)
+{
+	struct accessed_node *i;
+
+	i = find_accessed_node(conn->transaction, name);
+	if (!i) {
+		conn->transaction->fail = true;
+		return;
+	}
+
+	if (!i->fire_watch) {
+		i->fire_watch = true;
+		i->watch_exact = watch_exact;
+	} else if (!watch_exact) {
+		i->watch_exact = false;
+	}
+}
+
+/*
  * Finalize transaction:
  * Walk through accessed nodes and check generation against global data.
  * If all entries match, read the transaction entries and write them without
@@ -377,15 +404,15 @@ static int finalize_transaction(struct connection *conn,
 				ret = tdb_store(tdb_ctx, key, data,
 						TDB_REPLACE);
 				talloc_free(data.dptr);
-				if (ret)
-					goto err;
-				fire_watches(conn, trans, i->node, NULL, false,
-					     i->perms.p ? &i->perms : NULL);
 			} else {
-				fire_watches(conn, trans, i->node, NULL, false,
+				ret = tdb_delete(tdb_ctx, key);
+			}
+			if (ret)
+				goto err;
+			if (i->fire_watch) {
+				fire_watches(conn, trans, i->node, NULL,
+					     i->watch_exact,
 					     i->perms.p ? &i->perms : NULL);
-				if (tdb_delete(tdb_ctx, key))
-					goto err;
 			}
 		}
 
