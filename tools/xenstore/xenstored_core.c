@@ -1248,11 +1248,13 @@ static struct node *get_node_canonicalized(struct connection *conn,
 	return get_node(conn, ctx, *canonical_name, perm);
 }
 
-static int send_directory(struct connection *conn, struct buffered_data *in)
+static int send_directory(const void *ctx, struct connection *conn,
+			  struct buffered_data *in)
 {
 	struct node *node;
 
-	node = get_node_canonicalized(conn, in, onearg(in), NULL, XS_PERM_READ);
+	node = get_node_canonicalized(conn, ctx, onearg(in), NULL,
+				      XS_PERM_READ);
 	if (!node)
 		return errno;
 
@@ -1261,7 +1263,7 @@ static int send_directory(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-static int send_directory_part(struct connection *conn,
+static int send_directory_part(const void *ctx, struct connection *conn,
 			       struct buffered_data *in)
 {
 	unsigned int off, len, maxlen, genlen;
@@ -1273,7 +1275,8 @@ static int send_directory_part(struct connection *conn,
 		return EINVAL;
 
 	/* First arg is node name. */
-	node = get_node_canonicalized(conn, in, in->buffer, NULL, XS_PERM_READ);
+	node = get_node_canonicalized(conn, ctx, in->buffer, NULL,
+				      XS_PERM_READ);
 	if (!node)
 		return errno;
 
@@ -1300,7 +1303,7 @@ static int send_directory_part(struct connection *conn,
 			break;
 	}
 
-	data = talloc_array(in, char, genlen + len + 1);
+	data = talloc_array(ctx, char, genlen + len + 1);
 	if (!data)
 		return ENOMEM;
 
@@ -1316,11 +1319,13 @@ static int send_directory_part(struct connection *conn,
 	return 0;
 }
 
-static int do_read(struct connection *conn, struct buffered_data *in)
+static int do_read(const void *ctx, struct connection *conn,
+		   struct buffered_data *in)
 {
 	struct node *node;
 
-	node = get_node_canonicalized(conn, in, onearg(in), NULL, XS_PERM_READ);
+	node = get_node_canonicalized(conn, ctx, onearg(in), NULL,
+				      XS_PERM_READ);
 	if (!node)
 		return errno;
 
@@ -1510,7 +1515,8 @@ err:
 }
 
 /* path, data... */
-static int do_write(struct connection *conn, struct buffered_data *in)
+static int do_write(const void *ctx, struct connection *conn,
+		    struct buffered_data *in)
 {
 	unsigned int offset, datalen;
 	struct node *node;
@@ -1524,12 +1530,12 @@ static int do_write(struct connection *conn, struct buffered_data *in)
 	offset = strlen(vec[0]) + 1;
 	datalen = in->used - offset;
 
-	node = get_node_canonicalized(conn, in, vec[0], &name, XS_PERM_WRITE);
+	node = get_node_canonicalized(conn, ctx, vec[0], &name, XS_PERM_WRITE);
 	if (!node) {
 		/* No permissions, invalid input? */
 		if (errno != ENOENT)
 			return errno;
-		node = create_node(conn, in, name, in->buffer + offset,
+		node = create_node(conn, ctx, name, in->buffer + offset,
 				   datalen);
 		if (!node)
 			return errno;
@@ -1540,18 +1546,19 @@ static int do_write(struct connection *conn, struct buffered_data *in)
 			return errno;
 	}
 
-	fire_watches(conn, in, name, node, false, NULL);
+	fire_watches(conn, ctx, name, node, false, NULL);
 	send_ack(conn, XS_WRITE);
 
 	return 0;
 }
 
-static int do_mkdir(struct connection *conn, struct buffered_data *in)
+static int do_mkdir(const void *ctx, struct connection *conn,
+		    struct buffered_data *in)
 {
 	struct node *node;
 	char *name;
 
-	node = get_node_canonicalized(conn, in, onearg(in), &name,
+	node = get_node_canonicalized(conn, ctx, onearg(in), &name,
 				      XS_PERM_WRITE);
 
 	/* If it already exists, fine. */
@@ -1561,10 +1568,10 @@ static int do_mkdir(struct connection *conn, struct buffered_data *in)
 			return errno;
 		if (!name)
 			return ENOMEM;
-		node = create_node(conn, in, name, NULL, 0);
+		node = create_node(conn, ctx, name, NULL, 0);
 		if (!node)
 			return errno;
-		fire_watches(conn, in, name, node, false, NULL);
+		fire_watches(conn, ctx, name, node, false, NULL);
 	}
 	send_ack(conn, XS_MKDIR);
 
@@ -1662,24 +1669,25 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 }
 
 
-static int do_rm(struct connection *conn, struct buffered_data *in)
+static int do_rm(const void *ctx, struct connection *conn,
+		 struct buffered_data *in)
 {
 	struct node *node;
 	int ret;
 	char *name;
 	char *parentname;
 
-	node = get_node_canonicalized(conn, in, onearg(in), &name,
+	node = get_node_canonicalized(conn, ctx, onearg(in), &name,
 				      XS_PERM_WRITE);
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
 			if (!name)
 				return ENOMEM;
-			parentname = get_parent(in, name);
+			parentname = get_parent(ctx, name);
 			if (!parentname)
 				return errno;
-			node = read_node(conn, in, parentname);
+			node = read_node(conn, ctx, parentname);
 			if (node) {
 				send_ack(conn, XS_RM);
 				return 0;
@@ -1694,7 +1702,7 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 	if (streq(name, "/"))
 		return EINVAL;
 
-	ret = _rm(conn, in, node, name);
+	ret = _rm(conn, ctx, node, name);
 	if (ret)
 		return ret;
 
@@ -1704,13 +1712,15 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 }
 
 
-static int do_get_perms(struct connection *conn, struct buffered_data *in)
+static int do_get_perms(const void *ctx, struct connection *conn,
+			struct buffered_data *in)
 {
 	struct node *node;
 	char *strings;
 	unsigned int len;
 
-	node = get_node_canonicalized(conn, in, onearg(in), NULL, XS_PERM_READ);
+	node = get_node_canonicalized(conn, ctx, onearg(in), NULL,
+				      XS_PERM_READ);
 	if (!node)
 		return errno;
 
@@ -1723,7 +1733,8 @@ static int do_get_perms(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-static int do_set_perms(struct connection *conn, struct buffered_data *in)
+static int do_set_perms(const void *ctx, struct connection *conn,
+			struct buffered_data *in)
 {
 	struct node_perms perms, old_perms;
 	char *name, *permstr;
@@ -1740,7 +1751,7 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 
 	permstr = in->buffer + strlen(in->buffer) + 1;
 
-	perms.p = talloc_array(in, struct xs_permissions, perms.num);
+	perms.p = talloc_array(ctx, struct xs_permissions, perms.num);
 	if (!perms.p)
 		return ENOMEM;
 	if (!xs_strings_to_perms(perms.p, perms.num, permstr))
@@ -1755,7 +1766,7 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	}
 
 	/* We must own node to do this (tools can do this too). */
-	node = get_node_canonicalized(conn, in, in->buffer, &name,
+	node = get_node_canonicalized(conn, ctx, in->buffer, &name,
 				      XS_PERM_WRITE | XS_PERM_OWNER);
 	if (!node)
 		return errno;
@@ -1790,7 +1801,7 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 		return errno;
 	}
 
-	fire_watches(conn, in, name, node, false, &old_perms);
+	fire_watches(conn, ctx, name, node, false, &old_perms);
 	send_ack(conn, XS_SET_PERMS);
 
 	return 0;
@@ -1798,7 +1809,8 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 
 static struct {
 	const char *str;
-	int (*func)(struct connection *conn, struct buffered_data *in);
+	int (*func)(const void *ctx, struct connection *conn,
+		    struct buffered_data *in);
 	unsigned int flags;
 #define XS_FLAG_NOTID		(1U << 0)	/* Ignore transaction id. */
 #define XS_FLAG_PRIV		(1U << 1)	/* Privileged domain only. */
@@ -1874,6 +1886,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	struct transaction *trans;
 	enum xsd_sockmsg_type type = in->hdr.msg.type;
 	int ret;
+	void *ctx;
 
 	/* At least send_error() and send_reply() expects conn->in == in */
 	assert(conn->in == in);
@@ -1898,10 +1911,17 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
+	ctx = talloc_new(NULL);
+	if (!ctx) {
+		send_error(conn, ENOMEM);
+		return;
+	}
+
 	assert(conn->transaction == NULL);
 	conn->transaction = trans;
 
-	ret = wire_funcs[type].func(conn, in);
+	ret = wire_funcs[type].func(ctx, conn, in);
+	talloc_free(ctx);
 	if (ret)
 		send_error(conn, ret);
 

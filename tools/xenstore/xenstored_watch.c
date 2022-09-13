@@ -243,7 +243,7 @@ static struct watch *add_watch(struct connection *conn, char *path, char *token,
 	return NULL;
 }
 
-int do_watch(struct connection *conn, struct buffered_data *in)
+int do_watch(const void *ctx, struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
 	char *vec[2];
@@ -252,7 +252,7 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return EINVAL;
 
-	errno = check_watch_path(conn, in, &(vec[0]), &relative);
+	errno = check_watch_path(conn, ctx, &(vec[0]), &relative);
 	if (errno)
 		return errno;
 
@@ -283,7 +283,8 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-int do_unwatch(struct connection *conn, struct buffered_data *in)
+int do_unwatch(const void *ctx, struct connection *conn,
+	       struct buffered_data *in)
 {
 	struct watch *watch;
 	char *node, *vec[2];
@@ -291,7 +292,7 @@ int do_unwatch(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return EINVAL;
 
-	node = canonicalize(conn, in, vec[0]);
+	node = canonicalize(conn, ctx, vec[0]);
 	if (!node)
 		return ENOMEM;
 	list_for_each_entry(watch, &conn->watches, list) {

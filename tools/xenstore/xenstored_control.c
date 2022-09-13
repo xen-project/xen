@@ -155,7 +155,7 @@ bool lu_is_pending(void)
 
 struct cmd_s {
 	char *cmd;
-	int (*func)(void *, struct connection *, char **, int);
+	int (*func)(const void *, struct connection *, char **, int);
 	char *pars;
 	/*
 	 * max_pars can be used to limit the size of the parameter vector,
@@ -167,7 +167,7 @@ struct cmd_s {
 	unsigned int max_pars;
 };
 
-static int do_control_check(void *ctx, struct connection *conn,
+static int do_control_check(const void *ctx, struct connection *conn,
 			    char **vec, int num)
 {
 	if (num)
@@ -179,7 +179,7 @@ static int do_control_check(void *ctx, struct connection *conn,
 	return 0;
 }
 
-static int do_control_log(void *ctx, struct connection *conn,
+static int do_control_log(const void *ctx, struct connection *conn,
 			  char **vec, int num)
 {
 	if (num != 1)
@@ -281,7 +281,7 @@ static int quota_get(const void *ctx, struct connection *conn,
 	return domain_get_quota(ctx, conn, atoi(vec[0]));
 }
 
-static int do_control_quota(void *ctx, struct connection *conn,
+static int do_control_quota(const void *ctx, struct connection *conn,
 			    char **vec, int num)
 {
 	if (num == 0)
@@ -293,7 +293,7 @@ static int do_control_quota(void *ctx, struct connection *conn,
 	return quota_get(ctx, conn, vec, num);
 }
 
-static int do_control_quota_s(void *ctx, struct connection *conn,
+static int do_control_quota_s(const void *ctx, struct connection *conn,
 			      char **vec, int num)
 {
 	if (num == 0)
@@ -306,7 +306,7 @@ static int do_control_quota_s(void *ctx, struct connection *conn,
 }
 
 #ifdef __MINIOS__
-static int do_control_memreport(void *ctx, struct connection *conn,
+static int do_control_memreport(const void *ctx, struct connection *conn,
 				char **vec, int num)
 {
 	if (num)
@@ -318,7 +318,7 @@ static int do_control_memreport(void *ctx, struct connection *conn,
 	return 0;
 }
 #else
-static int do_control_logfile(void *ctx, struct connection *conn,
+static int do_control_logfile(const void *ctx, struct connection *conn,
 			      char **vec, int num)
 {
 	if (num != 1)
@@ -333,7 +333,7 @@ static int do_control_logfile(void *ctx, struct connection *conn,
 	return 0;
 }
 
-static int do_control_memreport(void *ctx, struct connection *conn,
+static int do_control_memreport(const void *ctx, struct connection *conn,
 				char **vec, int num)
 {
 	FILE *fp;
@@ -373,7 +373,7 @@ static int do_control_memreport(void *ctx, struct connection *conn,
 }
 #endif
 
-static int do_control_print(void *ctx, struct connection *conn,
+static int do_control_print(const void *ctx, struct connection *conn,
 			    char **vec, int num)
 {
 	if (num != 1)
@@ -875,7 +875,7 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 	return NULL;
 }
 
-static int do_control_lu(void *ctx, struct connection *conn,
+static int do_control_lu(const void *ctx, struct connection *conn,
 			 char **vec, int num)
 {
 	const char *ret = NULL;
@@ -922,7 +922,7 @@ static int do_control_lu(void *ctx, struct connection *conn,
 }
 #endif
 
-static int do_control_help(void *, struct connection *, char **, int);
+static int do_control_help(const void *, struct connection *, char **, int);
 
 static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
@@ -961,7 +961,7 @@ static struct cmd_s cmds[] = {
 	{ "help", do_control_help, "" },
 };
 
-static int do_control_help(void *ctx, struct connection *conn,
+static int do_control_help(const void *ctx, struct connection *conn,
 			   char **vec, int num)
 {
 	int cmd, len = 0;
@@ -997,7 +997,8 @@ static int do_control_help(void *ctx, struct connection *conn,
 	return 0;
 }
 
-int do_control(struct connection *conn, struct buffered_data *in)
+int do_control(const void *ctx, struct connection *conn,
+	       struct buffered_data *in)
 {
 	unsigned int cmd, num, off;
 	char **vec = NULL;
@@ -1017,11 +1018,11 @@ int do_control(struct connection *conn, struct buffered_data *in)
 	num = xs_count_strings(in->buffer, in->used);
 	if (cmds[cmd].max_pars)
 		num = min(num, cmds[cmd].max_pars);
-	vec = talloc_array(in, char *, num);
+	vec = talloc_array(ctx, char *, num);
 	if (!vec)
 		return ENOMEM;
 	if (get_strings(in, vec, num) < num)
 		return EIO;
 
-	return cmds[cmd].func(in, conn, vec + 1, num - 1);
+	return cmds[cmd].func(ctx, conn, vec + 1, num - 1);
 }
