@@ -175,7 +175,6 @@ struct transaction
 	bool fail;
 };
 
-extern int quota_max_transaction;
 uint64_t generation;
 
 static struct accessed_node *find_accessed_node(struct transaction *trans,
