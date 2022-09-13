@@ -156,6 +156,9 @@ struct transaction
 	/* Connection-local identifier for this transaction. */
 	uint32_t id;
 
+	/* Node counter. */
+	unsigned int nodes;
+
 	/* Generation when transaction started. */
 	uint64_t generation;
 
@@ -260,6 +263,11 @@ int access_node(struct connection *conn, struct node *node,
 
 	i = find_accessed_node(trans, node->name);
 	if (!i) {
+		if (trans->nodes >= quota_trans_nodes &&
+		    domain_is_unprivileged(conn)) {
+			ret = ENOSPC;
+			goto err;
+		}
 		i = talloc_zero(trans, struct accessed_node);
 		if (!i)
 			goto nomem;
@@ -297,6 +305,7 @@ int access_node(struct connection *conn, struct node *node,
 				i->ta_node = true;
 			}
 		}
+		trans->nodes++;
 		list_add_tail(&i->list, &trans->accessed);
 	}
 

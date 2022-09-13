@@ -39,8 +39,8 @@ void transaction_entry_inc(struct transaction *trans, unsigned int domid);
 void transaction_entry_dec(struct transaction *trans, unsigned int domid);
 
 /* This node was accessed. */
-int access_node(struct connection *conn, struct node *node,
-                enum node_access_type type, TDB_DATA *key);
+int __must_check access_node(struct connection *conn, struct node *node,
+                             enum node_access_type type, TDB_DATA *key);
 
 /* Queue watches for a modified node. */
 void queue_watches(struct connection *conn, const char *name, bool watch_exact);
