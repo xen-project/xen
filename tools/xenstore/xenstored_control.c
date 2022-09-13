@@ -821,7 +821,7 @@ int do_control(struct connection *conn, struct buffered_data *in)
 	unsigned int cmd, num, off;
 	char **vec = NULL;
 
-	if (conn->id != 0)
+	if (domain_is_unprivileged(conn))
 		return EACCES;
 
 	off = get_string(in, 0);

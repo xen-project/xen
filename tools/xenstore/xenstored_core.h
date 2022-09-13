@@ -118,7 +118,7 @@ struct connection
 	/* The index of pollfd in global pollfd array */
 	int pollfd_idx;
 
-	/* Who am I? 0 for socket connections. */
+	/* Who am I? Domid of connection. */
 	unsigned int id;
 
 	/* Is this connection ignored? */
