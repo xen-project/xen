@@ -1804,6 +1804,135 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	return 0;
 }
 
+static char *child_name(const void *ctx, const char *s1, const char *s2)
+{
+	if (strcmp(s1, "/"))
+		return talloc_asprintf(ctx, "%s/%s", s1, s2);
+	return talloc_asprintf(ctx, "/%s", s2);
+}
+
+static int rm_from_parent(struct connection *conn, struct node *parent,
+			  const char *name)
+{
+	size_t off;
+
+	if (!parent)
+		return WALK_TREE_ERROR_STOP;
+
+	for (off = parent->childoff - 1; off && parent->children[off - 1];
+	     off--);
+	if (remove_child_entry(conn, parent, off)) {
+		log("treewalk: child entry could not be removed from '%s'",
+		    parent->name);
+		return WALK_TREE_ERROR_STOP;
+	}
+	parent->childoff = off;
+
+	return WALK_TREE_OK;
+}
+
+static int walk_call_func(const void *ctx, struct connection *conn,
+			  struct node *node, struct node *parent, void *arg,
+			  int (*func)(const void *ctx, struct connection *conn,
+				      struct node *node, void *arg))
+{
+	int ret;
+
+	if (!func)
+		return WALK_TREE_OK;
+
+	ret = func(ctx, conn, node, arg);
+	if (ret == WALK_TREE_RM_CHILDENTRY && parent)
+		ret = rm_from_parent(conn, parent, node->name);
+
+	return ret;
+}
+
+int walk_node_tree(const void *ctx, struct connection *conn, const char *root,
+		   struct walk_funcs *funcs, void *arg)
+{
+	int ret = 0;
+	void *tmpctx;
+	char *name;
+	struct node *node = NULL;
+	struct node *parent = NULL;
+
+	tmpctx = talloc_new(ctx);
+	if (!tmpctx) {
+		errno = ENOMEM;
+		return WALK_TREE_ERROR_STOP;
+	}
+	name = talloc_strdup(tmpctx, root);
+	if (!name) {
+		errno = ENOMEM;
+		talloc_free(tmpctx);
+		return WALK_TREE_ERROR_STOP;
+	}
+
+	/* Continue the walk until an error is returned. */
+	while (ret >= 0) {
+		/* node == NULL possible only for the initial loop iteration. */
+		if (node) {
+			/* Go one step up if ret or if last child finished. */
+			if (ret || node->childoff >= node->childlen) {
+				parent = node->parent;
+				/* Call function AFTER processing a node. */
+				ret = walk_call_func(ctx, conn, node, parent,
+						     arg, funcs->exit);
+				/* Last node, so exit loop. */
+				if (!parent)
+					break;
+				talloc_free(node);
+				/* Continue with parent. */
+				node = parent;
+				continue;
+			}
+			/* Get next child of current node. */
+			name = child_name(tmpctx, node->name,
+					  node->children + node->childoff);
+			if (!name) {
+				ret = WALK_TREE_ERROR_STOP;
+				break;
+			}
+			/* Point to next child. */
+			node->childoff += strlen(node->children +
+						 node->childoff) + 1;
+			/* Descent into children. */
+			parent = node;
+		}
+		/* Read next node (root node or next child). */
+		node = read_node(conn, tmpctx, name);
+		if (!node) {
+			/* Child not found - should not happen! */
+			/* ENOENT case can be handled by supplied function. */
+			if (errno == ENOENT && funcs->enoent)
+				ret = funcs->enoent(ctx, conn, parent, name,
+						    arg);
+			else
+				ret = WALK_TREE_ERROR_STOP;
+			if (!parent)
+				break;
+			if (ret == WALK_TREE_RM_CHILDENTRY)
+				ret = rm_from_parent(conn, parent, name);
+			if (ret < 0)
+				break;
+			talloc_free(name);
+			node = parent;
+			continue;
+		}
+		talloc_free(name);
+		node->parent = parent;
+		node->childoff = 0;
+		/* Call function BEFORE processing a node. */
+		ret = walk_call_func(ctx, conn, node, parent, arg,
+				     funcs->enter);
+	}
+
+	talloc_free(tmpctx);
+
+	return ret < 0 ? ret : WALK_TREE_OK;
+}
+
 static struct {
 	const char *str;
 	int (*func)(const void *ctx, struct connection *conn,
@@ -2206,18 +2335,6 @@ static int keys_equal_fn(void *key1, void *key2)
 	return 0 == strcmp((char *)key1, (char *)key2);
 }
 
-
-static char *child_name(const char *s1, const char *s2)
-{
-	if (strcmp(s1, "/")) {
-		return talloc_asprintf(NULL, "%s/%s", s1, s2);
-	}
-	else {
-		return talloc_asprintf(NULL, "/%s", s2);
-	}
-}
-
-
 int remember_string(struct hashtable *hash, const char *str)
 {
 	char *k = malloc(strlen(str) + 1);
@@ -2277,7 +2394,7 @@ static int check_store_(const char *name, struct hashtable *reachable)
 		while (i < node->childlen && !ret) {
 			struct node *childnode;
 			size_t childlen = strlen(node->children + i);
-			char * childname = child_name(node->name,
+			char * childname = child_name(NULL, node->name,
 						      node->children + i);
 
 			if (!childname) {

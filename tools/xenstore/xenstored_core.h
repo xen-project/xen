@@ -195,6 +195,7 @@ struct node {
 
 	/* Children, each nul-terminated. */
 	unsigned int childlen;
+	unsigned int childoff;	/* Used by walk_node_tree() internally. */
 	char *children;
 
 	/* Allocation information for node currently in store. */
@@ -333,6 +334,45 @@ void read_state_global(const void *ctx, const void *state);
 void read_state_buffered_data(const void *ctx, struct connection *conn,
 			      const struct xs_state_connection *sc);
 void read_state_node(const void *ctx, const void *state);
+
+/*
+ * Walk the node tree below root calling funcs->enter() and funcs->exit() for
+ * each node. funcs->enter() is being called when entering a node, so before
+ * any of the children of the node is processed. funcs->exit() is being
+ * called when leaving the node, so after all children have been processed.
+ * funcs->enoent() is being called when a node isn't existing.
+ * funcs->*() return values:
+ *  < 0: tree walk is stopped, walk_node_tree() returns funcs->*() return value
+ *       in case WALK_TREE_ERROR_STOP is returned, errno should be set
+ *  WALK_TREE_OK: tree walk is continuing
+ *  WALK_TREE_SKIP_CHILDREN: tree walk won't descend below current node, but
+ *       walk continues
+ *  WALK_TREE_RM_CHILDENTRY: Remove the child entry from its parent and write
+ *       the modified parent node back to the data base, implies to not descend
+ *       below the current node, but to continue the walk
+ * funcs->*() is allowed to modify the node it is called for in the data base.
+ * In case funcs->enter() is deleting the node, it must not return WALK_TREE_OK
+ * in order to avoid descending into no longer existing children.
+ */
+/* Return values for funcs->*() and walk_node_tree(). */
+#define WALK_TREE_SUCCESS_STOP  -100    /* Stop walk early, no error. */
+#define WALK_TREE_ERROR_STOP    -1      /* Stop walk due to error. */
+#define WALK_TREE_OK            0       /* No error. */
+/* Return value for funcs->*() only. */
+#define WALK_TREE_SKIP_CHILDREN 1       /* Don't recurse below current node. */
+#define WALK_TREE_RM_CHILDENTRY 2       /* Remove child entry from parent. */
+
+struct walk_funcs {
+	int (*enter)(const void *ctx, struct connection *conn,
+		     struct node *node, void *arg);
+	int (*exit)(const void *ctx, struct connection *conn,
+		    struct node *node, void *arg);
+	int (*enoent)(const void *ctx, struct connection *conn,
+		      struct node *parent, char *name, void *arg);
+};
+
+int walk_node_tree(const void *ctx, struct connection *conn, const char *root,
+		   struct walk_funcs *funcs, void *arg);
 
 #endif /* _XENSTORED_CORE_H */
 
