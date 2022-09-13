@@ -107,6 +107,7 @@ int quota_max_entry_size = 2048; /* 2K */
 int quota_max_transaction = 10;
 int quota_nb_perms_per_node = 5;
 int quota_max_path_len = XENSTORE_REL_PATH_MAX;
+int quota_req_outstanding = 20;
 
 unsigned int timeout_watch_event_msec = 20000;
 
@@ -223,12 +224,24 @@ static uint64_t get_now_msec(void)
 	return now_ts.tv_sec * 1000 + now_ts.tv_nsec / 1000000;
 }
 
+/*
+ * Remove a struct buffered_data from the list of outgoing data.
+ * A struct buffered_data related to a request having caused watch events to be
+ * sent is kept until all those events have been written out.
+ * Each watch event is referencing the related request via pend.req, while the
+ * number of watch events caused by a request is kept in pend.ref.event_cnt
+ * (those two cases are mutually exclusive, so the two fields can share memory
+ * via a union).
+ * The struct buffered_data is freed only if no related watch event is
+ * referencing it. The related return data can be freed right away.
+ */
 static void free_buffered_data(struct buffered_data *out,
 			       struct connection *conn)
 {
 	struct buffered_data *req;
 
 	list_del(&out->list);
+	out->on_out_list = false;
 
 	/*
 	 * Update conn->timeout_msec with the next found timeout value in the
@@ -243,6 +256,30 @@ static void free_buffered_data(struct buffered_data *out,
 			}
 		}
 	}
+
+	if (out->hdr.msg.type == XS_WATCH_EVENT) {
+		req = out->pend.req;
+		if (req) {
+			req->pend.ref.event_cnt--;
+			if (!req->pend.ref.event_cnt && !req->on_out_list) {
+				if (req->on_ref_list) {
+					domain_outstanding_domid_dec(
+						req->pend.ref.domid);
+					list_del(&req->list);
+				}
+				talloc_free(req);
+			}
+		}
+	} else if (out->pend.ref.event_cnt) {
+		/* Hang out off from conn. */
+		talloc_steal(NULL, out);
+		if (out->buffer != out->default_buffer)
+			talloc_free(out->buffer);
+		list_add(&out->list, &conn->ref_list);
+		out->on_ref_list = true;
+		return;
+	} else
+		domain_outstanding_dec(conn);
 
 	talloc_free(out);
 }
@@ -399,6 +436,7 @@ int delay_request(struct connection *conn, struct buffered_data *in,
 static int destroy_conn(void *_conn)
 {
 	struct connection *conn = _conn;
+	struct buffered_data *req;
 
 	/* Flush outgoing if possible, but don't block. */
 	if (!conn->domain) {
@@ -412,6 +450,11 @@ static int destroy_conn(void *_conn)
 				break;
 		close(conn->fd);
 	}
+
+	conn_free_buffered_data(conn);
+	list_for_each_entry(req, &conn->ref_list, list)
+		req->on_ref_list = false;
+
         if (conn->target)
                 talloc_unlink(conn, conn->target);
 	list_del(&conn->list);
@@ -859,6 +902,8 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 
 	/* Queue for later transmission. */
 	list_add_tail(&bdata->list, &conn->out_list);
+	bdata->on_out_list = true;
+	domain_outstanding_inc(conn);
 }
 
 /*
@@ -866,7 +911,8 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
  * As this is not directly related to the current command, errors can't be
  * reported.
  */
-void send_event(struct connection *conn, const char *path, const char *token)
+void send_event(struct buffered_data *req, struct connection *conn,
+		const char *path, const char *token)
 {
 	struct buffered_data *bdata;
 	unsigned int len;
@@ -896,8 +942,13 @@ void send_event(struct connection *conn, const char *path, const char *token)
 			conn->timeout_msec = bdata->timeout_msec;
 	}
 
+	bdata->pend.req = req;
+	if (req)
+		req->pend.ref.event_cnt++;
+
 	/* Queue for later transmission. */
 	list_add_tail(&bdata->list, &conn->out_list);
+	bdata->on_out_list = true;
 }
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
@@ -1658,6 +1709,7 @@ static void handle_input(struct connection *conn)
 			return;
 	}
 	in = conn->in;
+	in->pend.ref.domid = conn->id;
 
 	/* Not finished header yet? */
 	if (in->inhdr) {
@@ -1727,6 +1779,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->is_ignored = false;
 	new->transaction_started = 0;
 	INIT_LIST_HEAD(&new->out_list);
+	INIT_LIST_HEAD(&new->ref_list);
 	INIT_LIST_HEAD(&new->watches);
 	INIT_LIST_HEAD(&new->transaction_list);
 	INIT_LIST_HEAD(&new->delayed);
@@ -2184,6 +2237,9 @@ static void usage(void)
 "  -t, --transaction <nb>  limit the number of transaction allowed per domain,\n"
 "  -A, --perm-nb <nb>      limit the number of permissions per node,\n"
 "  -M, --path-max <chars>  limit the allowed Xenstore node path length,\n"
+"  -Q, --quota <what>=<nb> set the quota <what> to the value <nb>, allowed\n"
+"                          quotas are:\n"
+"                          outstanding: number of outstanding requests\n"
 "  -w, --timeout <what>=<seconds>   set the timeout in seconds for <what>,\n"
 "                          allowed timeout candidates are:\n"
 "                          watch-event: time a watch-event is kept pending\n"
@@ -2209,6 +2265,7 @@ static struct option options[] = {
 	{ "transaction", 1, NULL, 't' },
 	{ "perm-nb", 1, NULL, 'A' },
 	{ "path-max", 1, NULL, 'M' },
+	{ "quota", 1, NULL, 'Q' },
 	{ "timeout", 1, NULL, 'w' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "internal-db", 0, NULL, 'I' },
@@ -2257,6 +2314,20 @@ static void set_timeout(const char *arg)
 		barf("unknown timeout \"%s\"\n", arg);
 }
 
+static void set_quota(const char *arg)
+{
+	const char *eq = strchr(arg, '=');
+	int val;
+
+	if (!eq)
+		barf("quotas must be specified via <what>=<nb>\n");
+	val = get_optval_int(eq + 1);
+	if (what_matches(arg, "outstanding"))
+		quota_req_outstanding = val;
+	else
+		barf("unknown quota \"%s\"\n", arg);
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -2271,8 +2342,8 @@ int main(int argc, char *argv[])
 	orig_argc = argc;
 	orig_argv = argv;
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:M:T:RVW:w:U", options,
-				  NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:M:Q:T:RVW:w:U",
+				  options, NULL)) != -1) {
 		switch (opt) {
 		case 'D':
 			no_domain_init = true;
@@ -2319,6 +2390,9 @@ int main(int argc, char *argv[])
 			quota_max_path_len = strtol(optarg, NULL, 10);
 			quota_max_path_len = min(XENSTORE_REL_PATH_MAX,
 						 quota_max_path_len);
+			break;
+		case 'Q':
+			set_quota(optarg);
 			break;
 		case 'w':
 			set_timeout(optarg);
@@ -2776,6 +2850,14 @@ static void add_buffered_data(struct buffered_data *bdata,
 
 	/* Queue for later transmission. */
 	list_add_tail(&bdata->list, &conn->out_list);
+	bdata->on_out_list = true;
+	/*
+	 * Watch events are never "outstanding", but the request causing them
+	 * are instead kept "outstanding" until all watch events caused by that
+	 * request have been delivered.
+	 */
+	if (bdata->hdr.msg.type != XS_WATCH_EVENT)
+		domain_outstanding_inc(conn);
 }
 
 void read_state_buffered_data(const void *ctx, struct connection *conn,
