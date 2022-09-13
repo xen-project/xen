@@ -153,6 +153,9 @@ struct transaction
 	/* List of all transactions active on this connection. */
 	struct list_head list;
 
+	/* Connection this transaction is associated with. */
+	struct connection *conn;
+
 	/* Connection-local identifier for this transaction. */
 	uint32_t id;
 
@@ -292,6 +295,8 @@ int access_node(struct connection *conn, struct node *node,
 
 		introduce = true;
 		i->ta_node = false;
+		/* acc.memory < 0 means "unknown, get size from TDB". */
+		node->acc.memory = -1;
 
 		/*
 		 * Additional transaction-specific node for read type. We only
@@ -416,11 +421,11 @@ static int finalize_transaction(struct connection *conn,
 					goto err;
 				hdr = (void *)data.dptr;
 				hdr->generation = ++generation;
-				ret = tdb_store(tdb_ctx, key, data,
-						TDB_REPLACE);
+				ret = do_tdb_write(conn, &key, &data, NULL,
+						   true);
 				talloc_free(data.dptr);
 			} else {
-				ret = tdb_delete(tdb_ctx, key);
+				ret = do_tdb_delete(conn, &key, NULL);
 			}
 			if (ret)
 				goto err;
@@ -431,7 +436,7 @@ static int finalize_transaction(struct connection *conn,
 			}
 		}
 
-		if (i->ta_node && tdb_delete(tdb_ctx, ta_key))
+		if (i->ta_node && do_tdb_delete(conn, &ta_key, NULL))
 			goto err;
 		list_del(&i->list);
 		talloc_free(i);
@@ -459,7 +464,7 @@ static int destroy_transaction(void *_transaction)
 							       i->node);
 			if (trans_name) {
 				set_tdb_key(trans_name, &key);
-				tdb_delete(tdb_ctx, key);
+				do_tdb_delete(trans->conn, &key, NULL);
 			}
 		}
 		list_del(&i->list);
@@ -503,6 +508,7 @@ int do_transaction_start(struct connection *conn, struct buffered_data *in)
 
 	INIT_LIST_HEAD(&trans->accessed);
 	INIT_LIST_HEAD(&trans->changed_domains);
+	trans->conn = conn;
 	trans->fail = false;
 	trans->generation = ++generation;
 
