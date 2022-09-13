@@ -2345,18 +2345,6 @@ int remember_string(struct hashtable *hash, const char *str)
 	return hashtable_insert(hash, k, (void *)1);
 }
 
-static int rm_child_entry(struct node *node, size_t off, size_t len)
-{
-	if (!recovery)
-		return off;
-
-	if (remove_child_entry(NULL, node, off))
-		log("check_store: child entry could not be removed from '%s'",
-		    node->name);
-
-	return off - len - 1;
-}
-
 /**
  * A node has a children field that names the children of the node, separated
  * by NULs.  We check whether there are entries in there that are duplicated
@@ -2370,70 +2358,29 @@ static int rm_child_entry(struct node *node, size_t off, size_t len)
  * As we go, we record each node in the given reachable hashtable.  These
  * entries will be used later in clean_store.
  */
-static int check_store_(const char *name, struct hashtable *reachable)
+static int check_store_step(const void *ctx, struct connection *conn,
+			    struct node *node, void *arg)
 {
-	struct node *node = read_node(NULL, name, name);
-	int ret = 0;
+	struct hashtable *reachable = arg;
 
-	if (node) {
-		size_t i = 0;
-
-		if (!remember_string(reachable, name)) {
-			log("check_store: ENOMEM");
-			return ENOMEM;
-		}
-
-		while (i < node->childlen && !ret) {
-			struct node *childnode = NULL;
-			size_t childlen = strlen(node->children + i);
-			char *childname = child_name(NULL, node->name,
-						     node->children + i);
-
-			if (!childname) {
-				log("check_store: ENOMEM");
-				ret = ENOMEM;
-				break;
-			}
-
-			if (hashtable_search(reachable, childname)) {
-				log("check_store: '%s' is duplicated!",
-				    childname);
-				i = rm_child_entry(node, i, childlen);
-				goto next;
-			}
-
-			childnode = read_node(NULL, childname, childname);
-
-			if (childnode) {
-				ret = check_store_(childname, reachable);
-			} else if (errno != ENOMEM) {
-				log("check_store: No child '%s' found!\n",
-				    childname);
-				i = rm_child_entry(node, i, childlen);
-			} else {
-				log("check_store: ENOMEM");
-				ret = ENOMEM;
-			}
-
- next:
-			talloc_free(childnode);
-			talloc_free(childname);
-			i += childlen + 1;
-		}
-
-		talloc_free(node);
-	} else if (errno != ENOMEM) {
-		/* Impossible, because no database should ever be without the
-		   root, and otherwise, we've just checked in our caller
-		   (which made a recursive call to get here). */
-
-		log("check_store: No child '%s' found: impossible!", name);
-	} else {
-		log("check_store: ENOMEM");
-		ret = ENOMEM;
+	if (hashtable_search(reachable, (void *)node->name)) {
+		log("check_store: '%s' is duplicated!", node->name);
+		return recovery ? WALK_TREE_RM_CHILDENTRY
+				: WALK_TREE_SKIP_CHILDREN;
 	}
 
-	return ret;
+	if (!remember_string(reachable, node->name))
+		return WALK_TREE_ERROR_STOP;
+
+	return WALK_TREE_OK;
+}
+
+static int check_store_enoent(const void *ctx, struct connection *conn,
+			      struct node *parent, char *name, void *arg)
+{
+	log("check_store: node '%s' not found", name);
+
+	return recovery ? WALK_TREE_RM_CHILDENTRY : WALK_TREE_OK;
 }
 
 
@@ -2482,24 +2429,28 @@ static void clean_store(struct hashtable *reachable)
 
 void check_store(void)
 {
-	char * root = talloc_strdup(NULL, "/");
-	struct hashtable * reachable =
-		create_hashtable(16, hash_from_key_fn, keys_equal_fn);
- 
+	struct hashtable *reachable;
+	struct walk_funcs walkfuncs = {
+		.enter = check_store_step,
+		.enoent = check_store_enoent,
+	};
+
+	reachable = create_hashtable(16, hash_from_key_fn, keys_equal_fn);
 	if (!reachable) {
 		log("check_store: ENOMEM");
 		return;
 	}
 
 	log("Checking store ...");
-	if (!check_store_(root, reachable) &&
-	    !check_transactions(reachable))
+	if (walk_node_tree(NULL, NULL, "/", &walkfuncs, reachable)) {
+		if (errno == ENOMEM)
+			log("check_store: ENOMEM");
+	} else if (!check_transactions(reachable))
 		clean_store(reachable);
 	log("Checking store complete.");
 
 	hashtable_destroy(reachable, 0 /* Don't free values (they are all
 					  (void *)1) */);
-	talloc_free(root);
 }
 
 
