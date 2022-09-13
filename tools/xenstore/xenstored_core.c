@@ -767,48 +767,31 @@ static void send_error(struct connection *conn, int error)
 void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		const void *data, unsigned int len)
 {
-	struct buffered_data *bdata;
+	struct buffered_data *bdata = conn->in;
+
+	assert(type != XS_WATCH_EVENT);
 
 	if ( len > XENSTORE_PAYLOAD_MAX ) {
 		send_error(conn, E2BIG);
 		return;
 	}
 
-	/* Replies reuse the request buffer, events need a new one. */
-	if (type != XS_WATCH_EVENT) {
-		bdata = conn->in;
-		/* Drop asynchronous responses, e.g. errors for watch events. */
-		if (!bdata)
-			return;
-		bdata->inhdr = true;
-		bdata->used = 0;
-		conn->in = NULL;
-	} else {
-		/* Message is a child of the connection for auto-cleanup. */
-		bdata = new_buffer(conn);
+	if (!bdata)
+		return;
+	bdata->inhdr = true;
+	bdata->used = 0;
 
-		/*
-		 * Allocation failure here is unfortunate: we have no way to
-		 * tell anybody about it.
-		 */
-		if (!bdata)
-			return;
-	}
 	if (len <= DEFAULT_BUFFER_SIZE)
 		bdata->buffer = bdata->default_buffer;
-	else
+	else {
 		bdata->buffer = talloc_array(bdata, char, len);
-	if (!bdata->buffer) {
-		if (type == XS_WATCH_EVENT) {
-			/* Same as above: no way to tell someone. */
-			talloc_free(bdata);
+		if (!bdata->buffer) {
+			send_error(conn, ENOMEM);
 			return;
 		}
-		/* re-establish request buffer for sending ENOMEM. */
-		conn->in = bdata;
-		send_error(conn, ENOMEM);
-		return;
 	}
+
+	conn->in = NULL;
 
 	/* Update relevant header fields and fill in the message body. */
 	bdata->hdr.msg.type = type;
@@ -817,8 +800,39 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 
 	/* Queue for later transmission. */
 	list_add_tail(&bdata->list, &conn->out_list);
+}
 
-	return;
+/*
+ * Send a watch event.
+ * As this is not directly related to the current command, errors can't be
+ * reported.
+ */
+void send_event(struct connection *conn, const char *path, const char *token)
+{
+	struct buffered_data *bdata;
+	unsigned int len;
+
+	len = strlen(path) + 1 + strlen(token) + 1;
+	/* Don't try to send over-long events. */
+	if (len > XENSTORE_PAYLOAD_MAX)
+		return;
+
+	bdata = new_buffer(conn);
+	if (!bdata)
+		return;
+
+	bdata->buffer = talloc_array(bdata, char, len);
+	if (!bdata->buffer) {
+		talloc_free(bdata);
+		return;
+	}
+	strcpy(bdata->buffer, path);
+	strcpy(bdata->buffer + strlen(path) + 1, token);
+	bdata->hdr.msg.type = XS_WATCH_EVENT;
+	bdata->hdr.msg.len = len;
+
+	/* Queue for later transmission. */
+	list_add_tail(&bdata->list, &conn->out_list);
 }
 
 /* Some routines (write, mkdir, etc) just need a non-error return */

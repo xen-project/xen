@@ -86,35 +86,6 @@ static const char *get_watch_path(const struct watch *watch, const char *name)
 }
 
 /*
- * Send a watch event.
- * Temporary memory allocations are done with ctx.
- */
-static void add_event(struct connection *conn,
-		      const void *ctx,
-		      struct watch *watch,
-		      const char *name)
-{
-	/* Data to send (node\0token\0). */
-	unsigned int len;
-	char *data;
-
-	name = get_watch_path(watch, name);
-
-	len = strlen(name) + 1 + strlen(watch->token) + 1;
-	/* Don't try to send over-long events. */
-	if (len > XENSTORE_PAYLOAD_MAX)
-		return;
-
-	data = talloc_array(ctx, char, len);
-	if (!data)
-		return;
-	strcpy(data, name);
-	strcpy(data + strlen(name) + 1, watch->token);
-	send_reply(conn, XS_WATCH_EVENT, data, len);
-	talloc_free(data);
-}
-
-/*
  * Check permissions of a specific watch to fire:
  * Either the node itself or its parent have to be readable by the connection
  * the watch has been setup for. In case a watch event is created due to
@@ -190,10 +161,14 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 		list_for_each_entry(watch, &i->watches, list) {
 			if (exact) {
 				if (streq(name, watch->node))
-					add_event(i, ctx, watch, name);
+					send_event(i,
+						   get_watch_path(watch, name),
+						   watch->token);
 			} else {
 				if (is_child(name, watch->node))
-					add_event(i, ctx, watch, name);
+					send_event(i,
+						   get_watch_path(watch, name),
+						   watch->token);
 			}
 		}
 	}
@@ -292,7 +267,7 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	send_ack(conn, XS_WATCH);
 
 	/* We fire once up front: simplifies clients and restart. */
-	add_event(conn, in, watch, watch->node);
+	send_event(conn, get_watch_path(watch, watch->node), watch->token);
 
 	return 0;
 }
