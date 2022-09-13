@@ -226,6 +226,8 @@ extern xengnttab_handle **xgt_handle;
 
 int remember_string(struct hashtable *hash, const char *str);
 
+void conn_free_buffered_data(struct connection *conn);
+
 #endif /* _XENSTORED_CORE_H */
 
 /*

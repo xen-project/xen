@@ -402,15 +402,10 @@ static struct domain *find_domain_by_domid(unsigned int domid)
 static void domain_conn_reset(struct domain *domain)
 {
 	struct connection *conn = domain->conn;
-	struct buffered_data *out;
 
 	conn_delete_all_watches(conn);
 	conn_delete_all_transactions(conn);
-
-	while ((out = list_top(&conn->out_list, struct buffered_data, list))) {
-		list_del(&out->list);
-		talloc_free(out);
-	}
+	conn_free_buffered_data(conn);
 
 	talloc_free(conn->in);
 
