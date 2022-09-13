@@ -43,6 +43,17 @@ bytes are forbidden; clients specifying relative paths should keep
 them to within 2048 bytes.  (See XENSTORE_*_PATH_MAX in xs_wire.h.)
 
 
+Each node has one or multiple permission entries.  Permissions are
+granted by domain-id, the first permission entry of each node specifies
+the owner of the node.  Permissions of a node can be changed by the
+owner of the node, the owner can only be modified by the control
+domain (usually domain id 0).  The owner always has the right to read
+and write the node, while other permissions can be setup to allow
+read and/or write access.  When a domain is being removed from Xenstore
+nodes owned by that domain will be removed together with all of those
+nodes' children.
+
+
 Communication with xenstore is via either sockets, or event channel
 and shared memory, as specified in io/xs_wire.h: each message in
 either direction is a header formatted as a struct xsd_sockmsg
