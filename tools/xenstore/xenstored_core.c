@@ -2477,50 +2477,34 @@ static int check_store_(const char *name, struct hashtable *reachable)
 	if (node) {
 		size_t i = 0;
 
-		struct hashtable * children =
-			create_hashtable(16, hash_from_key_fn, keys_equal_fn);
-		if (!children) {
-			log("check_store create table: ENOMEM");
-			return ENOMEM;
-		}
-
 		if (!remember_string(reachable, name)) {
-			hashtable_destroy(children, 0);
 			log("check_store: ENOMEM");
 			return ENOMEM;
 		}
 
 		while (i < node->childlen && !ret) {
-			struct node *childnode;
+			struct node *childnode = NULL;
 			size_t childlen = strlen(node->children + i);
-			char * childname = child_name(NULL, node->name,
-						      node->children + i);
+			char *childname = child_name(NULL, node->name,
+						     node->children + i);
 
 			if (!childname) {
 				log("check_store: ENOMEM");
 				ret = ENOMEM;
 				break;
 			}
+
+			if (hashtable_search(reachable, childname)) {
+				log("check_store: '%s' is duplicated!",
+				    childname);
+				i = rm_child_entry(node, i, childlen);
+				goto next;
+			}
+
 			childnode = read_node(NULL, childname, childname);
-			
+
 			if (childnode) {
-				if (hashtable_search(children, childname)) {
-					log("check_store: '%s' is duplicated!",
-					    childname);
-					i = rm_child_entry(node, i, childlen);
-				}
-				else {
-					if (!remember_string(children,
-							     childname)) {
-						log("check_store: ENOMEM");
-						talloc_free(childnode);
-						talloc_free(childname);
-						ret = ENOMEM;
-						break;
-					}
-					ret = check_store_(childname,
-							   reachable);
-				}
+				ret = check_store_(childname, reachable);
 			} else if (errno != ENOMEM) {
 				log("check_store: No child '%s' found!\n",
 				    childname);
@@ -2530,19 +2514,18 @@ static int check_store_(const char *name, struct hashtable *reachable)
 				ret = ENOMEM;
 			}
 
+ next:
 			talloc_free(childnode);
 			talloc_free(childname);
 			i += childlen + 1;
 		}
 
-		hashtable_destroy(children, 0 /* Don't free values (they are
-						 all (void *)1) */);
 		talloc_free(node);
 	} else if (errno != ENOMEM) {
 		/* Impossible, because no database should ever be without the
 		   root, and otherwise, we've just checked in our caller
 		   (which made a recursive call to get here). */
-		   
+
 		log("check_store: No child '%s' found: impossible!", name);
 	} else {
 		log("check_store: ENOMEM");
