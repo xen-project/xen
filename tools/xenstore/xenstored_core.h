@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
 #include <errno.h>
 
 #include "xenstore_lib.h"
@@ -66,6 +67,8 @@ struct buffered_data
 		struct xsd_sockmsg msg;
 		char raw[sizeof(struct xsd_sockmsg)];
 	} hdr;
+
+	uint64_t timeout_msec;
 
 	/* The actual data. */
 	char *buffer;
@@ -118,6 +121,7 @@ struct connection
 
 	/* Buffered output data */
 	struct list_head out_list;
+	uint64_t timeout_msec;
 
 	/* Transaction context for current request (NULL if none). */
 	struct transaction *transaction;
@@ -241,6 +245,8 @@ extern int dom0_domid;
 extern int dom0_event;
 extern int priv_domid;
 extern int quota_nb_entry_per_domain;
+
+extern unsigned int timeout_watch_event_msec;
 
 /* Map the kernel's xenstore page. */
 void *xenbus_map(void);
