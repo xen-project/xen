@@ -64,6 +64,9 @@ int domain_entry(struct connection *conn);
 void domain_watch_inc(struct connection *conn);
 void domain_watch_dec(struct connection *conn);
 int domain_watch(struct connection *conn);
+void domain_outstanding_inc(struct connection *conn);
+void domain_outstanding_dec(struct connection *conn);
+void domain_outstanding_domid_dec(unsigned int domid);
 
 /* Special node permission handling. */
 int set_perms_special(struct connection *conn, const char *name,
