@@ -25,6 +25,7 @@
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_control.h"
+#include "xenstored_domain.h"
 
 struct cmd_s {
 	char *cmd;
