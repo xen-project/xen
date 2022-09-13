@@ -418,7 +418,13 @@ static int finalize_transaction(struct connection *conn,
 						   true);
 				talloc_free(data.dptr);
 			} else {
-				ret = do_tdb_delete(conn, &key, NULL);
+				/*
+				 * A node having been created and later deleted
+				 * in this transaction will have no generation
+				 * information stored.
+				 */
+				ret = (i->generation == NO_GENERATION)
+				      ? 0 : do_tdb_delete(conn, &key, NULL);
 			}
 			if (ret)
 				goto err;
