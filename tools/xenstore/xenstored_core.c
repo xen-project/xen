@@ -103,6 +103,8 @@ int quota_max_entry_size = 2048; /* 2K */
 int quota_max_transaction = 10;
 int quota_nb_perms_per_node = 5;
 
+unsigned int timeout_watch_event_msec = 20000;
+
 void trace(const char *fmt, ...)
 {
 	va_list arglist;
@@ -205,11 +207,82 @@ void reopen_log(void)
 	}
 }
 
+static uint64_t get_now_msec(void)
+{
+	struct timespec now_ts;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &now_ts))
+		barf_perror("Could not find time (clock_gettime failed)");
+
+	return now_ts.tv_sec * 1000 + now_ts.tv_nsec / 1000000;
+}
+
 static void free_buffered_data(struct buffered_data *out,
 			       struct connection *conn)
 {
+	struct buffered_data *req;
+
 	list_del(&out->list);
+
+	/*
+	 * Update conn->timeout_msec with the next found timeout value in the
+	 * queued pending requests.
+	 */
+	if (out->timeout_msec) {
+		conn->timeout_msec = 0;
+		list_for_each_entry(req, &conn->out_list, list) {
+			if (req->timeout_msec) {
+				conn->timeout_msec = req->timeout_msec;
+				break;
+			}
+		}
+	}
+
 	talloc_free(out);
+}
+
+static void check_event_timeout(struct connection *conn, uint64_t msecs,
+				int *ptimeout)
+{
+	uint64_t delta;
+	struct buffered_data *out, *tmp;
+
+	if (!conn->timeout_msec)
+		return;
+
+	delta = conn->timeout_msec - msecs;
+	if (conn->timeout_msec <= msecs) {
+		delta = 0;
+		list_for_each_entry_safe(out, tmp, &conn->out_list, list) {
+			/*
+			 * Only look at buffers with timeout and no data
+			 * already written to the ring.
+			 */
+			if (out->timeout_msec && out->inhdr && !out->used) {
+				if (out->timeout_msec > msecs) {
+					conn->timeout_msec = out->timeout_msec;
+					delta = conn->timeout_msec - msecs;
+					break;
+				}
+
+				/*
+				 * Free out without updating conn->timeout_msec,
+				 * as the update is done in this loop already.
+				 */
+				out->timeout_msec = 0;
+				trace("watch event path %s for domain %u timed out\n",
+				      out->buffer, conn->id);
+				free_buffered_data(out, conn);
+			}
+		}
+		if (!delta) {
+			conn->timeout_msec = 0;
+			return;
+		}
+	}
+
+	if (*ptimeout == -1 || *ptimeout > delta)
+		*ptimeout = delta;
 }
 
 void conn_free_buffered_data(struct connection *conn)
@@ -218,6 +291,8 @@ void conn_free_buffered_data(struct connection *conn)
 
 	while ((out = list_top(&conn->out_list, struct buffered_data, list)))
 		free_buffered_data(out, conn);
+
+	conn->timeout_msec = 0;
 }
 
 static bool write_messages(struct connection *conn)
@@ -331,6 +406,7 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 {
 	struct connection *conn;
 	struct wrl_timestampt now;
+	uint64_t msecs;
 
 	if (fds)
 		memset(fds, 0, sizeof(struct pollfd) * current_array_size);
@@ -352,10 +428,12 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 
 	wrl_gettime_now(&now);
 	wrl_log_periodic(now);
+	msecs = get_now_msec();
 
 	list_for_each_entry(conn, &connections, list) {
 		if (conn->domain) {
 			wrl_check_timeout(conn->domain, now, ptimeout);
+			check_event_timeout(conn, msecs, ptimeout);
 			if (domain_can_read(conn) ||
 			    (domain_can_write(conn) &&
 			     !list_empty(&conn->out_list)))
@@ -699,6 +777,7 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		return;
 	bdata->inhdr = true;
 	bdata->used = 0;
+	bdata->timeout_msec = 0;
 
 	if (len <= DEFAULT_BUFFER_SIZE)
 		bdata->buffer = bdata->default_buffer;
@@ -749,6 +828,12 @@ void send_event(struct connection *conn, const char *path, const char *token)
 	strcpy(bdata->buffer + strlen(path) + 1, token);
 	bdata->hdr.msg.type = XS_WATCH_EVENT;
 	bdata->hdr.msg.len = len;
+
+	if (timeout_watch_event_msec && domain_is_unprivileged(conn)) {
+		bdata->timeout_msec = get_now_msec() + timeout_watch_event_msec;
+		if (!conn->timeout_msec)
+			conn->timeout_msec = bdata->timeout_msec;
+	}
 
 	/* Queue for later transmission. */
 	list_add_tail(&bdata->list, &conn->out_list);
@@ -2009,6 +2094,9 @@ static void usage(void)
 "  -W, --watch-nb <nb>     limit the number of watches per domain,\n"
 "  -t, --transaction <nb>  limit the number of transaction allowed per domain,\n"
 "  -A, --perm-nb <nb>      limit the number of permissions per node,\n"
+"  -w, --timeout <what>=<seconds>   set the timeout in seconds for <what>,\n"
+"                          allowed timeout candidates are:\n"
+"                          watch-event: time a watch-event is kept pending\n"
 "  -R, --no-recovery       to request that no recovery should be attempted when\n"
 "                          the store is corrupted (debug only),\n"
 "  -I, --internal-db       store database in memory, not on disk\n"
@@ -2030,6 +2118,7 @@ static struct option options[] = {
 	{ "trace-file", 1, NULL, 'T' },
 	{ "transaction", 1, NULL, 't' },
 	{ "perm-nb", 1, NULL, 'A' },
+	{ "timeout", 1, NULL, 'w' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "internal-db", 0, NULL, 'I' },
 	{ "verbose", 0, NULL, 'V' },
@@ -2040,6 +2129,39 @@ extern void dump_conn(struct connection *conn);
 int dom0_domid = 0;
 int dom0_event = 0;
 int priv_domid = 0;
+
+static int get_optval_int(const char *arg)
+{
+	char *end;
+	long val;
+
+	val = strtol(arg, &end, 10);
+	if (!*arg || *end || val < 0 || val > INT_MAX)
+		barf("invalid parameter value \"%s\"\n", arg);
+
+	return val;
+}
+
+static bool what_matches(const char *arg, const char *what)
+{
+	unsigned int what_len = strlen(what);
+
+	return !strncmp(arg, what, what_len) && arg[what_len] == '=';
+}
+
+static void set_timeout(const char *arg)
+{
+	const char *eq = strchr(arg, '=');
+	int val;
+
+	if (!eq)
+		barf("quotas must be specified via <what>=<seconds>\n");
+	val = get_optval_int(eq + 1);
+	if (what_matches(arg, "watch-event"))
+		timeout_watch_event_msec = val * 1000;
+	else
+		barf("unknown timeout \"%s\"\n", arg);
+}
 
 int main(int argc, char *argv[])
 {
@@ -2052,7 +2174,7 @@ int main(int argc, char *argv[])
 	int timeout;
 
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:T:RVW:", options,
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:A:T:RVW:w:", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -2096,6 +2218,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'A':
 			quota_nb_perms_per_node = strtol(optarg, NULL, 10);
+			break;
+		case 'w':
+			set_timeout(optarg);
 			break;
 		case 'e':
 			dom0_event = strtol(optarg, NULL, 10);
