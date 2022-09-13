@@ -63,4 +63,8 @@
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 #endif
 
+#ifndef __must_check
+#define __must_check __attribute__((__warn_unused_result__))
+#endif
+
 #endif	/* __XEN_TOOLS_LIBS__ */
