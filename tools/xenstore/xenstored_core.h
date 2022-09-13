@@ -195,6 +195,7 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 struct node *read_node(struct connection *conn, const void *ctx,
 		       const char *name);
 
+void setup_structure(void);
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 void check_store(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
