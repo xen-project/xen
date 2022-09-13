@@ -46,6 +46,9 @@ int access_node(struct connection *conn, struct node *node,
 int transaction_prepend(struct connection *conn, const char *name,
                         TDB_DATA *key);
 
+/* Mark the transaction as failed. This will prevent it to be committed. */
+void fail_transaction(struct transaction *trans);
+
 void conn_delete_all_transactions(struct connection *conn);
 int check_transactions(struct hashtable *hash);
 

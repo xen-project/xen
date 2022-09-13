@@ -119,6 +119,8 @@ struct node_perms {
 
 struct node {
 	const char *name;
+	/* Key used to update TDB */
+	TDB_DATA key;
 
 	/* Parent (optional) */
 	struct node *parent;
