@@ -84,6 +84,13 @@ struct domain
 	/* number of entry from this domain in the store */
 	int nbentry;
 
+	/* Amount of memory allocated for this domain. */
+	int memory;
+	bool soft_quota_reported;
+	bool hard_quota_reported;
+	time_t mem_last_msg;
+#define MEM_WARN_MINTIME_SEC 10
+
 	/* number of watch for this domain */
 	int nbwatch;
 
@@ -296,6 +303,9 @@ bool domain_can_read(struct connection *conn)
 		if (conn->domain->wrl_credit < 0)
 			return false;
 		if (conn->domain->nboutstanding >= quota_req_outstanding)
+			return false;
+		if (conn->domain->memory >= quota_memory_per_domain_hard &&
+		    quota_memory_per_domain_hard)
 			return false;
 	}
 
@@ -939,6 +949,89 @@ int domain_entry(struct connection *conn)
 	return (domain_is_unprivileged(conn))
 		? conn->domain->nbentry
 		: 0;
+}
+
+static bool domain_chk_quota(struct domain *domain, int mem)
+{
+	time_t now;
+
+	if (!domain || !domid_is_unprivileged(domain->domid) ||
+	    (domain->conn && domain->conn->is_ignored))
+		return false;
+
+	now = time(NULL);
+
+	if (mem >= quota_memory_per_domain_hard &&
+	    quota_memory_per_domain_hard) {
+		if (domain->hard_quota_reported)
+			return true;
+		syslog(LOG_ERR, "Domain %u exceeds hard memory quota, Xenstore interface to domain stalled\n",
+		       domain->domid);
+		domain->mem_last_msg = now;
+		domain->hard_quota_reported = true;
+		return true;
+	}
+
+	if (now - domain->mem_last_msg >= MEM_WARN_MINTIME_SEC) {
+		if (domain->hard_quota_reported) {
+			domain->mem_last_msg = now;
+			domain->hard_quota_reported = false;
+			syslog(LOG_INFO, "Domain %u below hard memory quota again\n",
+			       domain->domid);
+		}
+		if (mem >= quota_memory_per_domain_soft &&
+		    quota_memory_per_domain_soft &&
+		    !domain->soft_quota_reported) {
+			domain->mem_last_msg = now;
+			domain->soft_quota_reported = true;
+			syslog(LOG_WARNING, "Domain %u exceeds soft memory quota\n",
+			       domain->domid);
+		}
+		if (mem < quota_memory_per_domain_soft &&
+		    domain->soft_quota_reported) {
+			domain->mem_last_msg = now;
+			domain->soft_quota_reported = false;
+			syslog(LOG_INFO, "Domain %u below soft memory quota again\n",
+			       domain->domid);
+		}
+
+	}
+
+	return false;
+}
+
+int domain_memory_add(unsigned int domid, int mem, bool no_quota_check)
+{
+	struct domain *domain;
+
+	domain = find_domain_struct(domid);
+	if (domain) {
+		/*
+		 * domain_chk_quota() will print warning and also store whether
+		 * the soft/hard quota has been hit. So check no_quota_check
+		 * *after*.
+		 */
+		if (domain_chk_quota(domain, domain->memory + mem) &&
+		    !no_quota_check)
+			return ENOMEM;
+		domain->memory += mem;
+	} else {
+		/*
+		 * The domain the memory is to be accounted for should always
+		 * exist, as accounting is done either for a domain related to
+		 * the current connection, or for the domain owning a node
+		 * (which is always existing, as the owner of the node is
+		 * tested to exist and replaced by domid 0 if not).
+		 * So not finding the related domain MUST be an error in the
+		 * data base.
+		 */
+		errno = ENOENT;
+		corrupt(NULL, "Accounting called for non-existing domain %u\n",
+			domid);
+		return ENOENT;
+	}
+
+	return 0;
 }
 
 void domain_watch_inc(struct connection *conn)
