@@ -545,7 +545,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 
 	/* Permissions are struct xs_permissions. */
 	node->perms.p = hdr->perms;
-	if (domain_adjust_node_perms(node)) {
+	if (domain_adjust_node_perms(conn, node)) {
 		talloc_free(node);
 		return NULL;
 	}
@@ -567,7 +567,7 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	void *p;
 	struct xs_tdb_record_hdr *hdr;
 
-	if (domain_adjust_node_perms(node))
+	if (domain_adjust_node_perms(conn, node))
 		return errno;
 
 	data.dsize = sizeof(*hdr)
@@ -1161,13 +1161,17 @@ nomem:
 	return NULL;
 }
 
-static int destroy_node(struct connection *conn, struct node *node)
+static void destroy_node_rm(struct node *node)
 {
 	if (streq(node->name, "/"))
 		corrupt(NULL, "Destroying root node!");
 
 	tdb_delete(tdb_ctx, node->key);
+}
 
+static int destroy_node(struct connection *conn, struct node *node)
+{
+	destroy_node_rm(node);
 	domain_entry_dec(conn, node);
 
 	/*
@@ -1217,8 +1221,12 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 			goto err;
 
 		/* Account for new node */
-		if (i->parent)
-			domain_entry_inc(conn, i);
+		if (i->parent) {
+			if (domain_entry_inc(conn, i)) {
+				destroy_node_rm(i);
+				return NULL;
+			}
+		}
 	}
 
 	return node;
@@ -1499,10 +1507,27 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	old_perms = node->perms;
 	domain_entry_dec(conn, node);
 	node->perms = perms;
-	domain_entry_inc(conn, node);
+	if (domain_entry_inc(conn, node)) {
+		node->perms = old_perms;
+		/*
+		 * This should never fail because we had a reference on the
+		 * domain before and Xenstored is single-threaded.
+		 */
+		domain_entry_inc(conn, node);
+		return ENOMEM;
+	}
 
-	if (write_node(conn, node, false))
+	if (write_node(conn, node, false)) {
+		int saved_errno = errno;
+
+		domain_entry_dec(conn, node);
+		node->perms = old_perms;
+		/* No failure possible as above. */
+		domain_entry_inc(conn, node);
+
+		errno = saved_errno;
 		return errno;
+	}
 
 	fire_watches(conn, in, name, node, false, &old_perms);
 	send_ack(conn, XS_SET_PERMS);

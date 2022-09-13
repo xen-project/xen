@@ -523,8 +523,12 @@ static int transaction_fix_domains(struct transaction *trans, bool update)
 
 	list_for_each_entry(d, &trans->changed_domains, list) {
 		cnt = domain_entry_fix(d->domid, d->nbentry, update);
-		if (!update && cnt >= quota_nb_entry_per_domain)
-			return ENOSPC;
+		if (!update) {
+			if (cnt >= quota_nb_entry_per_domain)
+				return ENOSPC;
+			if (cnt < 0)
+				return ENOMEM;
+		}
 	}
 
 	return 0;
