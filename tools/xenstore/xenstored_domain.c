@@ -732,6 +732,8 @@ static int dom0_init(void)
 	if (dom0->interface == NULL)
 		return -1;
 
+	setup_structure();
+
 	talloc_steal(dom0->conn, dom0); 
 
 	xenevtchn_notify(xce_handle, dom0->port);
