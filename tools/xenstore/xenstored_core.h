@@ -180,6 +180,7 @@ unsigned int get_string(const struct buffered_data *data, unsigned int offset);
 
 void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		const void *data, unsigned int len);
+void send_event(struct connection *conn, const char *path, const char *token);
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
 void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
