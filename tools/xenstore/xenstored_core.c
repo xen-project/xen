@@ -257,6 +257,8 @@ static void free_buffered_data(struct buffered_data *out,
 		}
 	}
 
+	domain_memory_add_nochk(conn->id, -out->hdr.msg.len - sizeof(out->hdr));
+
 	if (out->hdr.msg.type == XS_WATCH_EVENT) {
 		req = out->pend.req;
 		if (req) {
@@ -845,11 +847,14 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 	bdata->timeout_msec = 0;
 	bdata->watch_event = false;
 
-	if (len <= DEFAULT_BUFFER_SIZE)
+	if (len <= DEFAULT_BUFFER_SIZE) {
 		bdata->buffer = bdata->default_buffer;
-	else {
+		/* Don't check quota, path might be used for returning error. */
+		domain_memory_add_nochk(conn->id, len + sizeof(bdata->hdr));
+	} else {
 		bdata->buffer = talloc_array(bdata, char, len);
-		if (!bdata->buffer) {
+		if (!bdata->buffer ||
+		    domain_memory_add_chk(conn->id, len + sizeof(bdata->hdr))) {
 			send_error(conn, ENOMEM);
 			return;
 		}
@@ -912,6 +917,11 @@ void send_event(struct buffered_data *req, struct connection *conn,
 				return;
 			}
 		}
+	}
+
+	if (domain_memory_add_chk(conn->id, len + sizeof(bdata->hdr))) {
+		talloc_free(bdata);
+		return;
 	}
 
 	if (timeout_watch_event_msec && domain_is_unprivileged(conn)) {
