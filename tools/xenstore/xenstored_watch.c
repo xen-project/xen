@@ -29,6 +29,7 @@
 #include "xenstore_lib.h"
 #include "utils.h"
 #include "xenstored_domain.h"
+#include "xenstored_transaction.h"
 
 extern int quota_nb_watch_per_domain;
 
@@ -143,9 +144,11 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 	struct connection *i;
 	struct watch *watch;
 
-	/* During transactions, don't fire watches. */
-	if (conn && conn->transaction)
+	/* During transactions, don't fire watches, but queue them. */
+	if (conn && conn->transaction) {
+		queue_watches(conn, name, exact);
 		return;
+	}
 
 	/* Create an event for each watch. */
 	list_for_each_entry(i, &connections, list) {

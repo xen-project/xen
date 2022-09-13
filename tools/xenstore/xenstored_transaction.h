@@ -42,6 +42,9 @@ void transaction_entry_dec(struct transaction *trans, unsigned int domid);
 int access_node(struct connection *conn, struct node *node,
                 enum node_access_type type, TDB_DATA *key);
 
+/* Queue watches for a modified node. */
+void queue_watches(struct connection *conn, const char *name, bool watch_exact);
+
 /* Prepend the transaction to name if appropriate. */
 int transaction_prepend(struct connection *conn, const char *name,
                         TDB_DATA *key);
