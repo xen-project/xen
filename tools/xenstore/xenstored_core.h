@@ -233,6 +233,9 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 struct node *read_node(struct connection *conn, const void *ctx,
 		       const char *name);
 
+/* Remove a node and its children. */
+int rm_node(struct connection *conn, const void *ctx, const char *name);
+
 void setup_structure(bool live_update);
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 struct connection *get_connection_by_id(unsigned int conn_id);
@@ -279,6 +282,7 @@ extern int quota_req_outstanding;
 extern int quota_trans_nodes;
 extern int quota_memory_per_domain_soft;
 extern int quota_memory_per_domain_hard;
+extern bool keep_orphans;
 
 extern unsigned int timeout_watch_event_msec;
 
