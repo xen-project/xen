@@ -556,6 +556,117 @@ void set_tdb_key(const char *name, TDB_DATA *key)
 	key->dsize = strlen(name);
 }
 
+static void get_acc_data(TDB_DATA *key, struct node_account_data *acc)
+{
+	TDB_DATA old_data;
+	struct xs_tdb_record_hdr *hdr;
+
+	if (acc->memory < 0) {
+		old_data = tdb_fetch(tdb_ctx, *key);
+		/* No check for error, as the node might not exist. */
+		if (old_data.dptr == NULL) {
+			acc->memory = 0;
+		} else {
+			hdr = (void *)old_data.dptr;
+			acc->memory = old_data.dsize;
+			acc->domid = hdr->perms[0].id;
+		}
+		talloc_free(old_data.dptr);
+	}
+}
+
+/*
+ * Per-transaction nodes need to be accounted for the transaction owner.
+ * Those nodes are stored in the data base with the transaction generation
+ * count prepended (e.g. 123/local/domain/...). So testing for the node's
+ * key not to start with "/" is sufficient.
+ */
+static unsigned int get_acc_domid(struct connection *conn, TDB_DATA *key,
+				  unsigned int domid)
+{
+	return (!conn || key->dptr[0] == '/') ? domid : conn->id;
+}
+
+int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
+		 struct node_account_data *acc, bool no_quota_check)
+{
+	struct xs_tdb_record_hdr *hdr = (void *)data->dptr;
+	struct node_account_data old_acc = {};
+	unsigned int old_domid, new_domid;
+	int ret;
+
+	if (!acc)
+		old_acc.memory = -1;
+	else
+		old_acc = *acc;
+
+	get_acc_data(key, &old_acc);
+	old_domid = get_acc_domid(conn, key, old_acc.domid);
+	new_domid = get_acc_domid(conn, key, hdr->perms[0].id);
+
+	/*
+	 * Don't check for ENOENT, as we want to be able to switch orphaned
+	 * nodes to new owners.
+	 */
+	if (old_acc.memory)
+		domain_memory_add_nochk(old_domid,
+					-old_acc.memory - key->dsize);
+	ret = domain_memory_add(new_domid, data->dsize + key->dsize,
+				no_quota_check);
+	if (ret) {
+		/* Error path, so no quota check. */
+		if (old_acc.memory)
+			domain_memory_add_nochk(old_domid,
+						old_acc.memory + key->dsize);
+		return ret;
+	}
+
+	/* TDB should set errno, but doesn't even set ecode AFAICT. */
+	if (tdb_store(tdb_ctx, *key, *data, TDB_REPLACE) != 0) {
+		domain_memory_add_nochk(new_domid, -data->dsize - key->dsize);
+		/* Error path, so no quota check. */
+		if (old_acc.memory)
+			domain_memory_add_nochk(old_domid,
+						old_acc.memory + key->dsize);
+		errno = EIO;
+		return errno;
+	}
+
+	if (acc) {
+		/* Don't use new_domid, as it might be a transaction node. */
+		acc->domid = hdr->perms[0].id;
+		acc->memory = data->dsize;
+	}
+
+	return 0;
+}
+
+int do_tdb_delete(struct connection *conn, TDB_DATA *key,
+		  struct node_account_data *acc)
+{
+	struct node_account_data tmp_acc;
+	unsigned int domid;
+
+	if (!acc) {
+		acc = &tmp_acc;
+		acc->memory = -1;
+	}
+
+	get_acc_data(key, acc);
+
+	if (tdb_delete(tdb_ctx, *key)) {
+		errno = EIO;
+		return errno;
+	}
+
+	if (acc->memory) {
+		domid = get_acc_domid(conn, key, acc->domid);
+		domain_memory_add_nochk(domid, -acc->memory - key->dsize);
+	}
+
+	return 0;
+}
+
 /*
  * If it fails, returns NULL and sets errno.
  * Temporary memory allocations will be done with ctx.
@@ -609,8 +720,14 @@ struct node *read_node(struct connection *conn, const void *ctx,
 
 	/* Permissions are struct xs_permissions. */
 	node->perms.p = hdr->perms;
+	node->acc.domid = node->perms.p[0].id;
+	node->acc.memory = data.dsize;
 	if (domain_adjust_node_perms(conn, node))
 		goto error;
+
+	/* If owner is gone reset currently accounted memory size. */
+	if (node->acc.domid != node->perms.p[0].id)
+		node->acc.memory = 0;
 
 	/* Data is binary blob (usually ascii, no nul). */
 	node->data = node->perms.p + hdr->num_perms;
@@ -680,12 +797,9 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	p += node->datalen;
 	memcpy(p, node->children, node->childlen);
 
-	/* TDB should set errno, but doesn't even set ecode AFAICT. */
-	if (tdb_store(tdb_ctx, *key, data, TDB_REPLACE) != 0) {
-		corrupt(conn, "Write of %s failed", key->dptr);
-		errno = EIO;
-		return errno;
-	}
+	if (do_tdb_write(conn, key, &data, &node->acc, no_quota_check))
+		return EIO;
+
 	return 0;
 }
 
@@ -1188,7 +1302,7 @@ static void delete_node_single(struct connection *conn, struct node *node)
 	if (access_node(conn, node, NODE_ACCESS_DELETE, &key))
 		return;
 
-	if (tdb_delete(tdb_ctx, key) != 0) {
+	if (do_tdb_delete(conn, &key, &node->acc) != 0) {
 		corrupt(conn, "Could not delete '%s'", node->name);
 		return;
 	}
@@ -1261,6 +1375,7 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 	/* No children, no data */
 	node->children = node->data = NULL;
 	node->childlen = node->datalen = 0;
+	node->acc.memory = 0;
 	node->parent = parent;
 	return node;
 
@@ -1269,17 +1384,17 @@ nomem:
 	return NULL;
 }
 
-static void destroy_node_rm(struct node *node)
+static void destroy_node_rm(struct connection *conn, struct node *node)
 {
 	if (streq(node->name, "/"))
 		corrupt(NULL, "Destroying root node!");
 
-	tdb_delete(tdb_ctx, node->key);
+	do_tdb_delete(conn, &node->key, &node->acc);
 }
 
 static int destroy_node(struct connection *conn, struct node *node)
 {
-	destroy_node_rm(node);
+	destroy_node_rm(conn, node);
 	domain_entry_dec(conn, node);
 
 	/*
@@ -1331,7 +1446,7 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 		/* Account for new node */
 		if (i->parent) {
 			if (domain_entry_inc(conn, i)) {
-				destroy_node_rm(i);
+				destroy_node_rm(conn, i);
 				return NULL;
 			}
 		}
@@ -2192,7 +2307,7 @@ static int clean_store_(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA val,
 	if (!hashtable_search(reachable, name)) {
 		log("clean_store: '%s' is orphaned!", name);
 		if (recovery) {
-			tdb_delete(tdb, key);
+			do_tdb_delete(NULL, &key, NULL);
 		}
 	}
 
@@ -3030,6 +3145,7 @@ void read_state_node(const void *ctx, const void *state)
 	if (!node)
 		barf("allocation error restoring node");
 
+	node->acc.memory = 0;
 	node->name = name;
 	node->generation = ++generation;
 	node->datalen = sn->data_len;

@@ -169,6 +169,11 @@ struct node_perms {
 	struct xs_permissions *p;
 };
 
+struct node_account_data {
+	unsigned int domid;
+	int memory;		/* -1 if unknown */
+};
+
 struct node {
 	const char *name;
 	/* Key used to update TDB */
@@ -191,6 +196,9 @@ struct node {
 	/* Children, each nul-terminated. */
 	unsigned int childlen;
 	char *children;
+
+	/* Allocation information for node currently in store. */
+	struct node_account_data acc;
 };
 
 /* Return the only argument in the input. */
@@ -300,6 +308,10 @@ extern xengnttab_handle **xgt_handle;
 int remember_string(struct hashtable *hash, const char *str);
 
 void set_tdb_key(const char *name, TDB_DATA *key);
+int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
+		 struct node_account_data *acc, bool no_quota_check);
+int do_tdb_delete(struct connection *conn, TDB_DATA *key,
+		  struct node_account_data *acc);
 
 void conn_free_buffered_data(struct connection *conn);
 
