@@ -582,6 +582,11 @@ void transaction_entry_dec(struct transaction *trans, unsigned int domid)
 	list_add_tail(&d->list, &trans->changed_domains);
 }
 
+void fail_transaction(struct transaction *trans)
+{
+	trans->fail = true;
+}
+
 void conn_delete_all_transactions(struct connection *conn)
 {
 	struct transaction *trans;
