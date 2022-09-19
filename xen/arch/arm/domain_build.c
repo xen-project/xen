@@ -844,9 +844,8 @@ static int __init assign_shared_memory(struct domain *d,
     unsigned long nr_pages, nr_borrowers, i;
     struct page_info *page;
 
-    dprintk(XENLOG_INFO,
-            "%pd: allocate static shared memory BANK %#"PRIpaddr"-%#"PRIpaddr".\n",
-            d, pbase, pbase + psize);
+    printk("%pd: allocate static shared memory BANK %#"PRIpaddr"-%#"PRIpaddr".\n",
+           d, pbase, pbase + psize);
 
     smfn = acquire_shared_memory_bank(d, pbase, psize);
     if ( mfn_eq(smfn, INVALID_MFN) )
