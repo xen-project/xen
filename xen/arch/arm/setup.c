@@ -1166,9 +1166,10 @@ void __init start_xen(unsigned long boot_phys_offset,
         printk(XENLOG_INFO "Xen dom0less mode detected\n");
 
     if ( acpi_disabled )
+    {
         create_domUs();
-
-    alloc_static_evtchn();
+        alloc_static_evtchn();
+    }
 
     /*
      * This needs to be called **before** heap_init_late() so modules
