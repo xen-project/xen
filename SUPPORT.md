@@ -922,6 +922,13 @@ bootscrub=off are passed as Xen command line parameters. (Memory should
 be scrubbed with bootscrub=idle.) No XSAs will be issues due to
 unscrubbed memory.
 
+## Static Event Channel
+
+Allow to setup the static event channel on dom0less system, enabling domains
+to send/receive notifications.
+
+    Status, ARM: Tech Preview
+
 # Format and definitions
 
 This file contains prose, and machine-readable fragments.
