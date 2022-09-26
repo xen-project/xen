@@ -546,6 +546,15 @@ static unsigned int dbc_work_ring_space_to_end(const struct dbc_work_ring *ring)
     return ring->deq - ring->enq;
 }
 
+static void dbc_ring_doorbell(struct dbc *dbc, int doorbell)
+{
+    uint32_t __iomem *db_reg = &dbc->dbc_reg->db;
+    uint32_t db = (readl(db_reg) & ~DBC_DOORBELL_TARGET_MASK) |
+                  (doorbell << DBC_DOORBELL_TARGET_SHIFT);
+
+    writel(db, db_reg);
+}
+
 static void dbc_push_trb(struct dbc *dbc, struct xhci_trb_ring *ring,
                          uint64_t dma, uint64_t len)
 {
@@ -973,6 +982,8 @@ static bool dbc_ensure_running(struct dbc *dbc)
         writel(ctrl | (1U << DBC_CTRL_DRC), &reg->ctrl);
         writel(readl(&reg->portsc) | (1U << DBC_PSC_PED), &reg->portsc);
         wmb();
+        dbc_ring_doorbell(dbc, dbc->dbc_iring.db);
+        dbc_ring_doorbell(dbc, dbc->dbc_oring.db);
     }
 
     return true;
@@ -990,10 +1001,6 @@ static bool dbc_ensure_running(struct dbc *dbc)
 static void dbc_flush(struct dbc *dbc, struct xhci_trb_ring *trb,
                       struct dbc_work_ring *wrk)
 {
-    struct dbc_reg *reg = dbc->dbc_reg;
-    uint32_t db = (readl(&reg->db) & ~DBC_DOORBELL_TARGET_MASK) |
-                  (trb->db << DBC_DOORBELL_TARGET_SHIFT);
-
     if ( xhci_trb_ring_full(trb) )
         return;
 
@@ -1017,7 +1024,7 @@ static void dbc_flush(struct dbc *dbc, struct xhci_trb_ring *trb,
     }
 
     wmb();
-    writel(db, &reg->db);
+    dbc_ring_doorbell(dbc, trb->db);
 }
 
 /**
