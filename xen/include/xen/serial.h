@@ -91,10 +91,11 @@ struct uart_driver {
 };
 
 /* 'Serial handles' are composed from the following fields. */
-#define SERHND_IDX      (3<<0) /* COM1, COM2, DBGP, DTUART?               */
+#define SERHND_IDX      (3<<0) /* COM1, COM2, DBGP, XHCI, DTUART?         */
 # define SERHND_COM1    (0<<0)
 # define SERHND_COM2    (1<<0)
 # define SERHND_DBGP    (2<<0)
+# define SERHND_XHCI    (3<<0)
 # define SERHND_DTUART  (0<<0) /* Steal SERHND_COM1 value */
 #define SERHND_HI       (1<<2) /* Mux/demux each transferred char by MSB. */
 #define SERHND_LO       (1<<3) /* Ditto, except that the MSB is cleared.  */

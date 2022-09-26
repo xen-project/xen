@@ -311,6 +311,12 @@ int __init serial_parse_handle(const char *conf)
         goto common;
     }
 
+    if ( !strncmp(conf, "xhci", 4) && (!conf[4] || conf[4] == ',') )
+    {
+        handle = SERHND_XHCI;
+        goto common;
+    }
+
     if ( !strncmp(conf, "dtuart", 6) )
     {
         handle = SERHND_DTUART;

@@ -245,6 +245,7 @@ struct dbc {
     uint64_t xhc_dbc_offset;
     void __iomem *xhc_mmio;
 
+    bool enable; /* whether dbgp=xhci was set at all */
     bool open;
     unsigned int xhc_num; /* look for n-th xhc */
 };
@@ -1058,18 +1059,14 @@ static struct xhci_dbc_ctx ctx __aligned(16);
 static uint8_t out_wrk_buf[DBC_WORK_RING_CAP];
 static struct xhci_string_descriptor str_buf[DBC_STRINGS_COUNT];
 
-static char __initdata opt_dbgp[30];
-
-string_param("dbgp", opt_dbgp);
-
-void __init xhci_dbc_uart_init(void)
+static int __init xhci_parse_dbgp(const char *opt_dbgp)
 {
     struct dbc_uart *uart = &dbc_uart;
     struct dbc *dbc = &uart->dbc;
     const char *e;
 
     if ( strncmp(opt_dbgp, "xhci", 4) )
-        return;
+        return 0;
 
     memset(dbc, 0, sizeof(*dbc));
 
@@ -1087,11 +1084,25 @@ void __init xhci_dbc_uart_init(void)
             printk(XENLOG_ERR
                    "Invalid dbgp= PCI device spec: '%s'\n",
                    opt_dbgp + 8);
-            return;
+            return -EINVAL;
         }
 
         dbc->sbdf = PCI_SBDF(0, bus, slot, func);
     }
+
+    dbc->enable = true;
+
+    return 0;
+}
+custom_param("dbgp", xhci_parse_dbgp);
+
+void __init xhci_dbc_uart_init(void)
+{
+    struct dbc_uart *uart = &dbc_uart;
+    struct dbc *dbc = &uart->dbc;
+
+    if ( !dbc->enable )
+        return;
 
     dbc->dbc_ctx = &ctx;
     dbc->dbc_erst = &erst;
@@ -1102,7 +1113,7 @@ void __init xhci_dbc_uart_init(void)
     dbc->dbc_str = str_buf;
 
     if ( dbc_open(dbc) )
-        serial_register_uart(SERHND_DBGP, &dbc_uart_driver, &dbc_uart);
+        serial_register_uart(SERHND_XHCI, &dbc_uart_driver, &dbc_uart);
 }
 
 #ifdef DBC_DEBUG

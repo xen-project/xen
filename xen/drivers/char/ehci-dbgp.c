@@ -1464,7 +1464,17 @@ static struct uart_driver __read_mostly ehci_dbgp_driver = {
 static struct ehci_dbgp ehci_dbgp = { .state = dbgp_unsafe, .phys_port = 1 };
 
 static char __initdata opt_dbgp[30];
-string_param("dbgp", opt_dbgp);
+
+static int __init parse_ehci_dbgp(const char *opt)
+{
+    if ( strncmp(opt, "ehci", 4) )
+        return 0;
+
+    strlcpy(opt_dbgp, opt, sizeof(opt_dbgp));
+
+    return 0;
+}
+custom_param("dbgp", parse_ehci_dbgp);
 
 void __init ehci_dbgp_init(void)
 {
@@ -1472,7 +1482,7 @@ void __init ehci_dbgp_init(void)
     u32 debug_port, offset, bar_val;
     const char *e;
 
-    if ( strncmp(opt_dbgp, "ehci", 4) )
+    if ( !opt_dbgp[0] )
         return;
 
     if ( isdigit(opt_dbgp[4]) || !opt_dbgp[4] )
