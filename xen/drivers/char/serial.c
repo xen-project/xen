@@ -311,6 +311,12 @@ int __init serial_parse_handle(const char *conf)
         goto common;
     }
 
+    if ( !strncmp(conf, "ehci", 4) && (!conf[4] || conf[4] == ',') )
+    {
+        handle = SERHND_DBGP;
+        goto common;
+    }
+
     if ( !strncmp(conf, "xhci", 4) && (!conf[4] || conf[4] == ',') )
     {
         handle = SERHND_XHCI;
