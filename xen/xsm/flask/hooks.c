@@ -296,8 +296,7 @@ static int cf_check flask_evtchn_interdomain(
     rc = security_transition_sid(sid1, sid2, SECCLASS_EVENT, &newsid);
     if ( rc )
     {
-        printk("security_transition_sid failed, rc=%d, Dom%d\n",
-               -rc, d2->domain_id);
+        printk("security_transition_sid failed, rc=%d, %pd\n", -rc, d2);
         return rc;
     }
 

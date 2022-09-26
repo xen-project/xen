@@ -113,7 +113,8 @@ struct avc_dump_buf {
     u32 free;
 };
 
-static void avc_printk(struct avc_dump_buf *buf, const char *fmt, ...)
+static void __attribute__ ((format (printf, 2, 3)))
+    avc_printk(struct avc_dump_buf *buf, const char *fmt, ...)
 {
     int i;
     va_list args;
@@ -565,15 +566,14 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
 
     if ( a && (a->sdom || a->tdom) )
     {
-        if ( a->sdom && a->tdom && a->sdom != a->tdom )
-            avc_printk(&buf, "domid=%d target=%d ", a->sdom->domain_id, a->tdom->domain_id);
-        else if ( a->sdom )
-            avc_printk(&buf, "domid=%d ", a->sdom->domain_id);
-        else
-            avc_printk(&buf, "target=%d ", a->tdom->domain_id);
+        if ( a->sdom )
+            avc_printk(&buf, "source=%pd ", a->sdom);
+        if ( a->tdom && a->tdom != a->sdom )
+            avc_printk(&buf, "target=%pd ", a->tdom);
     }
     else if ( cdom )
-        avc_printk(&buf, "domid=%d ", cdom->domain_id);
+        avc_printk(&buf, "current=%pd ", cdom);
+
     switch ( a ? a->type : 0 ) {
     case AVC_AUDIT_DATA_DEV:
         avc_printk(&buf, "device=%#lx ", a->device);
