@@ -299,6 +299,8 @@ debian-buster-gcc-ibt:
   variables:
     CONTAINER: debian:buster-gcc-ibt
     RANDCONFIG: y
+    EXTRA_FIXED_RANDCONFIG: |
+      CONFIG_XEN_IBT=y
 
 debian-unstable-clang:
   extends: .clang-x86-64-build

@@ -12,6 +12,12 @@ cc-ver()
 
 # random config or default config
 if [[ "${RANDCONFIG}" == "y" ]]; then
+
+    # Append job-specific fixed configuration
+    if [[ -n "${EXTRA_FIXED_RANDCONFIG}" ]]; then
+        echo "${EXTRA_FIXED_RANDCONFIG}" >> xen/tools/kconfig/allrandom.config
+    fi
+
     make -j$(nproc) -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
     hypervisor_only="y"
 else
