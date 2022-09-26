@@ -746,11 +746,12 @@ cppcheck-version:
 # documentation file. Also generate a json file with the right arguments for
 # cppcheck in json format including the list of rules to ignore.
 #
-cppcheck-misra.txt: $(XEN_ROOT)/docs/misra/rules.rst $(srctree)/tools/convert_misra_doc.py
-	$(Q)$(PYTHON) $(srctree)/tools/convert_misra_doc.py -i $< -o $@ -j $(@:.txt=.json)
-
-# convert_misra_doc is generating both files.
-cppcheck-misra.json: cppcheck-misra.txt
+# convert_misra_doc.py, producing both targets at the same time, should be
+# executed only once. Utilize a pattern rule to achieve this effect, with the
+# stem kind of arbitrarily chosen to be "cppcheck".
+.PRECIOUS: %-misra.json
+%-misra.txt %-misra.json: $(XEN_ROOT)/docs/misra/rules.rst $(srctree)/tools/convert_misra_doc.py
+	$(Q)$(PYTHON) $(srctree)/tools/convert_misra_doc.py -i $< -o $*-misra.txt -j $*-misra.json
 
 # Put this in generated headers this way it is cleaned by include/Makefile
 $(objtree)/include/generated/compiler-def.h:
