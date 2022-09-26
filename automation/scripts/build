@@ -15,12 +15,8 @@ if [[ "${RANDCONFIG}" == "y" ]]; then
     make -j$(nproc) -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
     hypervisor_only="y"
 else
-    if [[ "${XEN_TARGET_ARCH}" = "arm64" ]]; then
-        echo "
-CONFIG_EXPERT=y
-CONFIG_UNSUPPORTED=y
-CONFIG_STATIC_MEMORY=y
-CONFIG_BOOT_TIME_CPUPOOLS=y" > xen/.config
+    if [[ -n "${EXTRA_XEN_CONFIG}" ]]; then
+        echo "${EXTRA_XEN_CONFIG}" > xen/.config
         make -j$(nproc) -C xen olddefconfig
     else
         make -j$(nproc) -C xen defconfig
