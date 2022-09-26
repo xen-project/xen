@@ -1465,7 +1465,7 @@ static struct ehci_dbgp ehci_dbgp = { .state = dbgp_unsafe, .phys_port = 1 };
 
 static char __initdata opt_dbgp[30];
 
-static int __init parse_ehci_dbgp(const char *opt)
+static int __init cf_check parse_ehci_dbgp(const char *opt)
 {
     if ( strncmp(opt, "ehci", 4) )
         return 0;

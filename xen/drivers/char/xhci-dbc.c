@@ -1282,7 +1282,7 @@ struct dbc_dma_bufs {
 static struct dbc_dma_bufs __section(".bss.page_aligned") __aligned(PAGE_SIZE)
     dbc_dma_bufs;
 
-static int __init xhci_parse_dbgp(const char *opt_dbgp)
+static int __init cf_check xhci_parse_dbgp(const char *opt_dbgp)
 {
     struct dbc_uart *uart = &dbc_uart;
     struct dbc *dbc = &uart->dbc;
