@@ -8,7 +8,6 @@
 #include <efi/eficon.h>
 #include <efi/efidevp.h>
 #include <efi/efiapi.h>
-#include "../../../common/efi/stub.c"
 
 /*
  * Here we are in EFI stub. EFI calls are not supported due to lack
@@ -55,9 +54,3 @@ bool efi_boot_mem_unused(unsigned long *start, unsigned long *end)
 }
 
 void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e) { }
-
-int efi_compat_get_info(uint32_t idx, union compat_pf_efi_info *)
-    __attribute__((__alias__("efi_get_info")));
-
-int efi_compat_runtime_call(struct compat_pf_efi_runtime_call *)
-    __attribute__((__alias__("efi_runtime_call")));

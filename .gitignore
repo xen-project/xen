@@ -275,6 +275,7 @@ xen/arch/x86/efi/mkreloc
 xen/arch/x86/include/asm/asm-macros.h
 xen/arch/*/xen.lds
 xen/arch/*/efi/boot.c
+xen/arch/*/efi/common-stub.c
 xen/arch/*/efi/compat.c
 xen/arch/*/efi/ebmalloc.c
 xen/arch/*/efi/efi.h
