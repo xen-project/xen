@@ -2,6 +2,7 @@
 
 set -ex
 
+export DEBIAN_FRONTEND=noninteractive
 apt-get -qy update
 apt-get -qy install --no-install-recommends u-boot-qemu \
                                             u-boot-tools \
@@ -73,18 +74,17 @@ curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
 ./binaries/qemu-system-aarch64 \
    -machine virtualization=true \
    -cpu cortex-a57 -machine type=virt \
-   -m 1024 -display none \
-   -machine dumpdtb=binaries/virt-gicv3.dtb
+   -m 2048 -smp 2 -display none \
+   -machine dumpdtb=binaries/virt-gicv2.dtb
+
 # XXX disable pl061 to avoid Linux crash
-dtc -I dtb -O dts binaries/virt-gicv3.dtb > binaries/virt-gicv3.dts
-sed 's/compatible = "arm,pl061.*/status = "disabled";/g' binaries/virt-gicv3.dts > binaries/virt-gicv3-edited.dts
-dtc -I dts -O dtb binaries/virt-gicv3-edited.dts > binaries/virt-gicv3.dtb
+fdtput binaries/virt-gicv2.dtb -p -t s /pl061@9030000 status disabled
 
 # ImageBuilder
 echo 'MEMORY_START="0x40000000"
-MEMORY_END="0x80000000"
+MEMORY_END="0xC0000000"
 
-DEVICE_TREE="virt-gicv3.dtb"
+DEVICE_TREE="virt-gicv2.dtb"
 XEN="xen"
 DOM0_KERNEL="Image"
 DOM0_RAMDISK="xen-rootfs.cpio.gz"
