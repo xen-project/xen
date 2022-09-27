@@ -4,7 +4,9 @@ set -ex
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get -qy update
-apt-get -qy install --no-install-recommends device-tree-compiler \
+apt-get -qy install --no-install-recommends u-boot-qemu \
+                                            u-boot-tools \
+                                            device-tree-compiler \
                                             curl \
                                             cpio
 
@@ -20,10 +22,6 @@ tar xvzf ../initrd.tar.gz
 find . | cpio -H newc -o | gzip > ../initrd.gz
 cd ..
 
-kernel=`stat -L --printf="%s" vmlinuz`
-initrd=`stat -L --printf="%s" initrd.gz`
-
-# For Xen, we need a couple of more node. Dump the DT from QEMU and add them
 # XXX QEMU looks for "efi-virtio.rom" even if it is unneeded
 curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
 ./qemu-system-arm \
@@ -36,31 +34,31 @@ curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
    -display none \
    -machine dumpdtb=virt.dtb
 
-dtc -I dtb -O dts virt.dtb > virt.dts
+# ImageBuilder
+echo 'MEMORY_START="0x40000000"
+MEMORY_END="0x80000000"
 
-cat >> virt.dts << EOF
-/ {
-	chosen {
-		#address-cells = <0x2>;
-		#size-cells = <0x2>;
-		stdout-path = "/pl011@9000000";
-        xen,xen-bootargs = "console=dtuart dtuart=/pl011@9000000 dom0_mem=512M bootscrub=0";
-		xen,dom0-bootargs = "console=tty0 console=hvc0 earlyprintk clk_ignore_unused root=/dev/ram0 rdinit=/bin/sh";
-		dom0 {
-			compatible = "xen,linux-zimage", "xen,multiboot-module";
-			reg = <0x0 0x1000000 0x0 $kernel>;
-		};
-        dom0-ramdisk {
-			compatible = "xen,linux-initrd", "xen,multiboot-module";
-			reg = <0x0 0x3200000 0x0 $initrd>;
-		};
-	};
-};
-EOF
-dtc -I dts -O dtb virt.dts > virt.dtb
+DEVICE_TREE="virt.dtb"
+XEN="xen"
+DOM0_KERNEL="vmlinuz"
+DOM0_RAMDISK="initrd.gz"
+DOM0_CMD="console=hvc0 earlyprintk clk_ignore_unused root=/dev/ram0 rdinit=/bin/sh"
+XEN_CMD="console=dtuart dom0_mem=512M bootscrub=0"
+
+NUM_DOMUS=0
+
+LOAD_CMD="tftpb"
+BOOT_CMD="bootm"
+UBOOT_SOURCE="boot.source"
+UBOOT_SCRIPT="boot.scr"' > config
+
+rm -rf imagebuilder
+git clone https://gitlab.com/ViryaOS/imagebuilder
+bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
 rm -f smoke.serial
 set +e
+echo "  virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"| \
 timeout -k 1 240 \
 ./qemu-system-arm \
    -machine virt \
@@ -70,11 +68,10 @@ timeout -k 1 240 \
    -serial stdio \
    -monitor none \
    -display none \
-   -dtb virt.dtb \
    -no-reboot \
-   -kernel ./xen \
-   -device loader,file=./vmlinuz,addr=0x1000000 \
-   -device loader,file=./initrd.gz,addr=0x3200000 |& tee smoke.serial
+   -device virtio-net-pci,netdev=n0 \
+   -netdev user,id=n0,tftp=./ \
+   -bios /usr/lib/u-boot/qemu_arm/u-boot.bin |& tee smoke.serial
 
 set -e
 (grep -q "^/ #" smoke.serial) || exit 1
