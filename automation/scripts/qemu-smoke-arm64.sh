@@ -52,7 +52,7 @@ curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
 ./binaries/qemu-system-aarch64 \
    -machine virtualization=true \
    -cpu cortex-a57 -machine type=virt \
-   -m 1024 -smp 2 -display none \
+   -m 2048 -smp 2 -display none \
    -machine dumpdtb=binaries/virt-gicv2.dtb
 
 # XXX disable pl061 to avoid Linux crash
@@ -117,7 +117,7 @@ cd ..
 
 # ImageBuilder
 echo 'MEMORY_START="0x40000000"
-MEMORY_END="0x80000000"
+MEMORY_END="0xC0000000"
 
 DEVICE_TREE="virt-gicv2.dtb"
 XEN="xen"
@@ -158,7 +158,7 @@ timeout -k 1 240 \
 ./binaries/qemu-system-aarch64 \
     -machine virtualization=true \
     -cpu cortex-a57 -machine type=virt \
-    -m 1024 -monitor none -serial stdio \
+    -m 2048 -monitor none -serial stdio \
     -smp 2 \
     -no-reboot \
     -device virtio-net-pci,netdev=n0 \
