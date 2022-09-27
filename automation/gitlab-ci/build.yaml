@@ -568,6 +568,18 @@ alpine-3.12-gcc-debug-arm64:
   variables:
     CONTAINER: alpine:3.12-arm64v8
 
+alpine-3.12-gcc-arm64-randconfig:
+  extends: .gcc-arm64-build
+  variables:
+    CONTAINER: alpine:3.12-arm64v8
+    RANDCONFIG: y
+
+alpine-3.12-gcc-debug-arm64-randconfig:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: alpine:3.12-arm64v8
+    RANDCONFIG: y
+
 alpine-3.12-gcc-arm64-staticmem:
   extends: .gcc-arm64-build
   variables:
