@@ -589,6 +589,15 @@ alpine-3.12-gcc-arm64-staticmem:
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
 
+alpine-3.12-gcc-debug-arm64-staticmem:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: alpine:3.12-arm64v8
+    EXTRA_XEN_CONFIG: |
+      CONFIG_EXPERT=y
+      CONFIG_UNSUPPORTED=y
+      CONFIG_STATIC_MEMORY=y
+
 alpine-3.12-gcc-arm64-boot-cpupools:
   extends: .gcc-arm64-build
   variables:
@@ -597,6 +606,13 @@ alpine-3.12-gcc-arm64-boot-cpupools:
       CONFIG_EXPERT=y
       CONFIG_UNSUPPORTED=y
       CONFIG_SCHED_NULL=y
+      CONFIG_BOOT_TIME_CPUPOOLS=y
+
+alpine-3.12-gcc-debug-arm64-boot-cpupools:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: alpine:3.12-arm64v8
+    EXTRA_XEN_CONFIG: |
       CONFIG_BOOT_TIME_CPUPOOLS=y
 
 ## Test artifacts common
