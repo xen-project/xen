@@ -2,7 +2,7 @@
 
 set -ex
 
-export DEBIAN_FRONTENT=noninteractive
+export DEBIAN_FRONTEND=noninteractive
 apt-get -qy update
 apt-get -qy install --no-install-recommends device-tree-compiler \
                                             curl \
