@@ -102,3 +102,16 @@ make -C automation/build suse/opensuse-tumbleweed PUSH=1
 
 [registry]: https://gitlab.com/xen-project/xen/container_registry
 [registry help]: https://gitlab.com/help/user/project/container_registry
+
+
+Building/Running container for a different architecture
+-------------------------------------------------------
+
+On a x86 host, it is possible to build and run containers for other arch (like
+running a container made for Arm) with docker taking care of running the
+appropriate software to emulate that arch. For this, simply install the package
+`qemu-user-static`, and that's it. Then you can start an Arm container on x86
+host like you would start an x86 container.
+
+If that doesn't work, you might find some information on
+[multiarch/qemu-user-static](https://github.com/multiarch/qemu-user-static).
