@@ -58,6 +58,7 @@ compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
+    case VCPUOP_send_nmi:
     case VCPUOP_get_physid:
         rc = do_vcpu_op(cmd, vcpuid, arg);
         break;

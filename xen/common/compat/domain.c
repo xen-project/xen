@@ -99,7 +99,6 @@ int compat_common_vcpu_op(int cmd, struct vcpu *v,
     case VCPUOP_stop_periodic_timer:
     case VCPUOP_stop_singleshot_timer:
     case VCPUOP_register_vcpu_info:
-    case VCPUOP_send_nmi:
         rc = common_vcpu_op(cmd, v, arg);
         break;
 
