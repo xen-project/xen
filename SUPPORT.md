@@ -175,6 +175,17 @@ Support for running qemu-xen device model in a linux stubdomain.
 
     Status: Tech Preview
 
+## Xenstore
+
+### C xenstored daemon
+
+    Status: Supported
+
+### OCaml xenstored daemon
+
+    Status: Supported
+    Status, untrusted driver domains: Supported, not security supported
+
 ## Toolstack/3rd party
 
 ### libvirt driver for xl
