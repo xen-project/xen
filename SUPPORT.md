@@ -149,6 +149,17 @@ Output of information in machine-parseable JSON format
 
     Status: Supported
 
+## Xenstore
+
+### C xenstored daemon
+
+    Status: Supported
+
+### OCaml xenstored daemon
+
+    Status: Supported
+    Status, untrusted driver domains: Supported, not security supported
+
 ## Toolstack/3rd party
 
 ### libvirt driver for xl
