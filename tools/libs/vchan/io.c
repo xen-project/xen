@@ -40,6 +40,8 @@
 #include <xenctrl.h>
 #include <libxenvchan.h>
 
+#include "vchan.h"
+
 #ifndef PAGE_SHIFT
 #define PAGE_SHIFT 12
 #endif
@@ -384,5 +386,7 @@ void libxenvchan_close(struct libxenvchan *ctrl)
 		if (ctrl->gnttab)
 			xengnttab_close(ctrl->gnttab);
 	}
+	if (ctrl->is_server)
+		close_xs_srv(ctrl);
 	free(ctrl);
 }

@@ -86,6 +86,11 @@ struct libxenvchan {
 	int blocking:1;
 	/* communication rings */
 	struct libxenvchan_ring read, write;
+	/**
+	 * Base xenstore path for storing ring/event data used by the server
+	 * during cleanup.
+	 * */
+	char *xs_path;
 };
 
 /**
