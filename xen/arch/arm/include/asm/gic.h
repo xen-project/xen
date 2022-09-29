@@ -392,7 +392,7 @@ struct gic_hw_operations {
     /* Map extra GIC MMIO, irqs and other hw stuffs to the hardware domain. */
     int (*map_hwdom_extra_mappings)(struct domain *d);
     /* Deny access to GIC regions */
-    int (*iomem_deny_access)(const struct domain *d);
+    int (*iomem_deny_access)(struct domain *d);
     /* Handle LPIs, which require special handling */
     void (*do_LPI)(unsigned int lpi);
 };
@@ -449,7 +449,7 @@ unsigned long gic_get_hwdom_madt_size(const struct domain *d);
 #endif
 
 int gic_map_hwdom_extra_mappings(struct domain *d);
-int gic_iomem_deny_access(const struct domain *d);
+int gic_iomem_deny_access(struct domain *d);
 
 #endif /* __ASSEMBLY__ */
 #endif

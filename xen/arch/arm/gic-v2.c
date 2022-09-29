@@ -1083,7 +1083,7 @@ static void __init gicv2_dt_init(void)
     gicv2_extension_dt_init(node);
 }
 
-static int gicv2_iomem_deny_access(const struct domain *d)
+static int gicv2_iomem_deny_access(struct domain *d)
 {
     int rc;
     unsigned long mfn, nr;

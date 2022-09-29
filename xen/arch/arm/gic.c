@@ -462,7 +462,7 @@ unsigned long gic_get_hwdom_madt_size(const struct domain *d)
 }
 #endif
 
-int gic_iomem_deny_access(const struct domain *d)
+int gic_iomem_deny_access(struct domain *d)
 {
     return gic_hw_ops->iomem_deny_access(d);
 }

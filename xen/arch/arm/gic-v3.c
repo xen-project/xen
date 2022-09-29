@@ -1424,7 +1424,7 @@ static void __init gicv3_dt_init(void)
                               &vbase, &vsize);
 }
 
-static int gicv3_iomem_deny_access(const struct domain *d)
+static int gicv3_iomem_deny_access(struct domain *d)
 {
     int rc, i;
     unsigned long mfn, nr;
