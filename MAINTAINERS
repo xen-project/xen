@@ -221,7 +221,8 @@ F:	xen/include/xen/argo.h
 F:	xen/common/argo.c
 
 ARINC653 SCHEDULER
-M:	Stewart Hildebrand <stewart.hildebrand@dornerworks.com>
+M:	Nathan Studer <nathan.studer@dornerworks.com>
+M:	Stewart Hildebrand <stewart@stew.dk>
 S:	Supported
 L:	xen-devel@dornerworks.com
 F:	xen/common/sched/arinc653.c
