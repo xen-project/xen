@@ -78,7 +78,8 @@ static int __init populate_memnodemap(const struct node *nodes,
         if ( (epdx >> shift) >= memnodemapsize )
             return 0;
         do {
-            if ( memnodemap[spdx >> shift] != NUMA_NO_NODE )
+            if ( memnodemap[spdx >> shift] != NUMA_NO_NODE &&
+                 (!nodeids || memnodemap[spdx >> shift] != nodeids[i]) )
                 return -1;
 
             if ( !nodeids )
@@ -114,7 +115,7 @@ static int __init allocate_cachealigned_memnodemap(void)
  * maximum possible shift.
  */
 static int __init extract_lsb_from_nodes(const struct node *nodes,
-                                         int numnodes)
+                                         int numnodes, const nodeid_t *nodeids)
 {
     int i, nodes_used = 0;
     unsigned long spdx, epdx;
@@ -127,7 +128,8 @@ static int __init extract_lsb_from_nodes(const struct node *nodes,
         if ( spdx >= epdx )
             continue;
         bitfield |= spdx;
-        nodes_used++;
+        if ( !i || !nodeids || nodeids[i - 1] != nodeids[i] )
+            nodes_used++;
         if ( epdx > memtop )
             memtop = epdx;
     }
@@ -144,7 +146,7 @@ int __init compute_hash_shift(struct node *nodes, int numnodes,
 {
     int shift;
 
-    shift = extract_lsb_from_nodes(nodes, numnodes);
+    shift = extract_lsb_from_nodes(nodes, numnodes, nodeids);
     if ( memnodemapsize <= ARRAY_SIZE(_memnodemap) )
         memnodemap = _memnodemap;
     else if ( allocate_cachealigned_memnodemap() )
