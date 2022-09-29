@@ -58,6 +58,26 @@ compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
+    case VCPUOP_register_vcpu_time_memory_area:
+    {
+        struct compat_vcpu_register_time_memory_area area = { .addr.p = 0 };
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&area.addr.h, arg, 1) )
+            break;
+
+        if ( area.addr.h.c != area.addr.p ||
+             !compat_handle_okay(area.addr.h, 1) )
+            break;
+
+        rc = 0;
+        guest_from_compat_handle(v->arch.time_info_guest, area.addr.h);
+
+        force_update_vcpu_system_time(v);
+
+        break;
+    }
+
     case VCPUOP_send_nmi:
     case VCPUOP_get_physid:
         rc = do_vcpu_op(cmd, vcpuid, arg);
