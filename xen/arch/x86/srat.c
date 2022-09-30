@@ -312,6 +312,7 @@ acpi_numa_memory_affinity_init(const struct acpi_srat_mem_affinity *ma)
 	unsigned pxm;
 	nodeid_t node;
 	unsigned int i;
+	bool next = false;
 
 	if (srat_disabled())
 		return;
@@ -413,14 +414,37 @@ acpi_numa_memory_affinity_init(const struct acpi_srat_mem_affinity *ma)
 	       node, pxm, start, end - 1,
 	       ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE ? " (hotplug)" : "");
 
-	node_memblk_range[num_node_memblks].start = start;
-	node_memblk_range[num_node_memblks].end = end;
-	memblk_nodeid[num_node_memblks] = node;
+	/* Keep node_memblk_range[] sorted by address. */
+	for (i = 0; i < num_node_memblks; ++i)
+		if (node_memblk_range[i].start > start ||
+		    (node_memblk_range[i].start == start &&
+		     node_memblk_range[i].end > end))
+			break;
+
+	memmove(&node_memblk_range[i + 1], &node_memblk_range[i],
+	        (num_node_memblks - i) * sizeof(*node_memblk_range));
+	node_memblk_range[i].start = start;
+	node_memblk_range[i].end = end;
+
+	memmove(&memblk_nodeid[i + 1], &memblk_nodeid[i],
+	        (num_node_memblks - i) * sizeof(*memblk_nodeid));
+	memblk_nodeid[i] = node;
+
 	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) {
-		__set_bit(num_node_memblks, memblk_hotplug);
+		next = true;
 		if (end > mem_hotplug)
 			mem_hotplug = end;
 	}
+	for (; i <= num_node_memblks; ++i) {
+		bool prev = next;
+
+		next = test_bit(i, memblk_hotplug);
+		if (prev)
+			__set_bit(i, memblk_hotplug);
+		else
+			__clear_bit(i, memblk_hotplug);
+	}
+
 	num_node_memblks++;
 }
 

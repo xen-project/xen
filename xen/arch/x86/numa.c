@@ -127,7 +127,8 @@ static int __init extract_lsb_from_nodes(const struct node *nodes,
         epdx = paddr_to_pdx(nodes[i].end - 1) + 1;
         if ( spdx >= epdx )
             continue;
-        bitfield |= spdx;
+        if ( i && (!nodeids || nodeids[i - 1] != nodeids[i]) )
+            bitfield |= spdx;
         if ( !i || !nodeids || nodeids[i - 1] != nodeids[i] )
             nodes_used++;
         if ( epdx > memtop )
