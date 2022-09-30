@@ -111,7 +111,7 @@ static int __init allocate_cachealigned_memnodemap(void)
 }
 
 /*
- * The LSB of all start and end addresses in the node map is the value of the
+ * The LSB of all start addresses in the node map is the value of the
  * maximum possible shift.
  */
 static int __init extract_lsb_from_nodes(const struct node *nodes,
@@ -137,7 +137,7 @@ static int __init extract_lsb_from_nodes(const struct node *nodes,
         i = BITS_PER_LONG - 1;
     else
         i = find_first_bit(&bitfield, sizeof(unsigned long)*8);
-    memnodemapsize = (memtop >> i) + 1;
+    memnodemapsize = ((memtop - 1) >> i) + 1;
     return i;
 }
 
