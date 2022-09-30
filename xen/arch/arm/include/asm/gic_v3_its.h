@@ -139,7 +139,7 @@ unsigned long gicv3_its_make_hwdom_madt(const struct domain *d,
 #endif
 
 /* Deny iomem access for its */
-int gicv3_its_deny_access(const struct domain *d);
+int gicv3_its_deny_access(struct domain *d);
 
 bool gicv3_its_host_has_its(void);
 
@@ -206,7 +206,7 @@ static inline unsigned long gicv3_its_make_hwdom_madt(const struct domain *d,
 }
 #endif
 
-static inline int gicv3_its_deny_access(const struct domain *d)
+static inline int gicv3_its_deny_access(struct domain *d)
 {
     return 0;
 }

@@ -892,7 +892,7 @@ struct pending_irq *gicv3_assign_guest_event(struct domain *d,
     return pirq;
 }
 
-int gicv3_its_deny_access(const struct domain *d)
+int gicv3_its_deny_access(struct domain *d)
 {
     int rc = 0;
     unsigned long mfn, nr;
