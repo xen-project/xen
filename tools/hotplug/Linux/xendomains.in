@@ -211,7 +211,7 @@ get_xsdomid()
     fi
 }
 
-LIST_GREP='(domain\|(domid\|(name\|^    {$\|"name":\|"domid":'
+LIST_GREP='(domain\|(domid\|(name\|^    {$\|"name":\|^        "domid":'
 parseln()
 {
     if [[ "$1" =~ '(domain' ]] || [[ "$1" = "{" ]]; then
