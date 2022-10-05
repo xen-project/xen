@@ -65,15 +65,15 @@ int srat_disabled(void)
 static int __init populate_memnodemap(const struct node *nodes,
                                       int numnodes, int shift, nodeid_t *nodeids)
 {
-    unsigned long spdx, epdx;
     int i, res = -1;
 
     memset(memnodemap, NUMA_NO_NODE, memnodemapsize * sizeof(*memnodemap));
     for ( i = 0; i < numnodes; i++ )
     {
-        spdx = paddr_to_pdx(nodes[i].start);
-        epdx = paddr_to_pdx(nodes[i].end - 1) + 1;
-        if ( spdx >= epdx )
+        unsigned long spdx = paddr_to_pdx(nodes[i].start);
+        unsigned long epdx = paddr_to_pdx(nodes[i].end - 1);
+
+        if ( spdx > epdx )
             continue;
         if ( (epdx >> shift) >= memnodemapsize )
             return 0;
@@ -88,7 +88,7 @@ static int __init populate_memnodemap(const struct node *nodes,
                 memnodemap[spdx >> shift] = nodeids[i];
 
             spdx += (1UL << shift);
-        } while ( spdx < epdx );
+        } while ( spdx <= epdx );
         res = 1;
     }
 
