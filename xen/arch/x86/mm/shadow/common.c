@@ -2831,7 +2831,16 @@ void shadow_teardown(struct domain *d, bool *preempted)
     for_each_vcpu ( d, v )
         shadow_vcpu_teardown(v);
 
+    p2m_teardown(p2m_get_hostp2m(d), false);
+
     paging_lock(d);
+
+    /*
+     * Reclaim all shadow memory so that shadow_set_allocation() doesn't find
+     * in-use pages, as _shadow_prealloc() will no longer try to reclaim pages
+     * because the domain is dying.
+     */
+    shadow_blow_tables(d);
 
 #if (SHADOW_OPTIMIZATIONS & (SHOPT_VIRTUAL_TLB|SHOPT_OUT_OF_SYNC))
     /* Free the virtual-TLB array attached to each vcpu */
@@ -2953,6 +2962,9 @@ void shadow_final_teardown(struct domain *d)
                    d->arch.paging.shadow.total_pages,
                    d->arch.paging.shadow.free_pages,
                    d->arch.paging.shadow.p2m_pages);
+    ASSERT(!d->arch.paging.shadow.total_pages);
+    ASSERT(!d->arch.paging.shadow.free_pages);
+    ASSERT(!d->arch.paging.shadow.p2m_pages);
     paging_unlock(d);
 }
 
