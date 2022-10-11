@@ -2622,9 +2622,8 @@ acquire_grant_for_copy(
                      trans_domid);
 
         /*
-         * acquire_grant_for_copy() could take the lock on the
-         * remote table (if rd == td), so we have to drop the lock
-         * here and reacquire.
+         * acquire_grant_for_copy() will take the lock on the remote table,
+         * so we have to drop the lock here and reacquire.
          */
         active_entry_release(act);
         grant_read_unlock(rgt);
@@ -2661,11 +2660,25 @@ acquire_grant_for_copy(
                           act->trans_gref != trans_gref ||
                           !act->is_sub_page)) )
         {
+            /*
+             * Like above for acquire_grant_for_copy() we need to drop and then
+             * re-acquire the locks here to prevent lock order inversion issues.
+             * Unlike for acquire_grant_for_copy() we don't need to re-check
+             * anything, as release_grant_for_copy() doesn't depend on the grant
+             * table entry: It only updates internal state and the status flags.
+             */
+            active_entry_release(act);
+            grant_read_unlock(rgt);
+
             release_grant_for_copy(td, trans_gref, readonly);
             rcu_unlock_domain(td);
+
+            grant_read_lock(rgt);
+            act = active_entry_acquire(rgt, gref);
             reduce_status_for_pin(rd, act, status, readonly);
             active_entry_release(act);
             grant_read_unlock(rgt);
+
             put_page(*page);
             *page = NULL;
             return ERESTART;
