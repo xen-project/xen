@@ -2521,6 +2521,7 @@ void sh_set_toplevel_shadow(struct vcpu *v,
     /* Now figure out the new contents: is this a valid guest MFN? */
     if ( !mfn_valid(gmfn) )
     {
+        ASSERT(mfn_eq(gmfn, INVALID_MFN));
         new_entry = pagetable_null();
         goto install_new_entry;
     }
