@@ -245,6 +245,9 @@ static struct page_info *hap_alloc(struct domain *d)
 
     ASSERT(paging_locked_by_me(d));
 
+    if ( unlikely(d->is_dying) )
+        return NULL;
+
     pg = page_list_remove_head(&d->arch.paging.hap.freelist);
     if ( unlikely(!pg) )
         return NULL;
@@ -281,7 +284,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
         d->arch.paging.hap.p2m_pages++;
         ASSERT(!page_get_owner(pg) && !(pg->count_info & PGC_count_mask));
     }
-    else if ( !d->arch.paging.p2m_alloc_failed )
+    else if ( !d->arch.paging.p2m_alloc_failed && !d->is_dying )
     {
         d->arch.paging.p2m_alloc_failed = 1;
         dprintk(XENLOG_ERR, "d%i failed to allocate from HAP pool\n",
