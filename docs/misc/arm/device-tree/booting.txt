@@ -164,6 +164,14 @@ with the following properties:
     Both #address-cells and #size-cells need to be specified because
     both sub-nodes (described shortly) have reg properties.
 
+- xen,domain-p2m-mem-mb
+
+    Optional. A 32-bit integer specifying the amount of megabytes of RAM
+    used for the domain P2M pool. This is in-sync with the shadow_memory
+    option in xl.cfg. Leaving this field empty in device tree will lead to
+    the default size of domain P2M pool, i.e. 1MB per guest vCPU plus 4KB
+    per MB of guest RAM plus 512KB for guest extended regions.
+
 Under the "xen,domain" compatible node, one or more sub-nodes are present
 for the DomU kernel and ramdisk.
 

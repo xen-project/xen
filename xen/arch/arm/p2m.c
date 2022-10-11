@@ -50,6 +50,54 @@ static uint64_t generate_vttbr(uint16_t vmid, mfn_t root_mfn)
     return (mfn_to_maddr(root_mfn) | ((uint64_t)vmid << 48));
 }
 
+static struct page_info *p2m_alloc_page(struct domain *d)
+{
+    struct page_info *pg;
+
+    spin_lock(&d->arch.paging.lock);
+    /*
+     * For hardware domain, there should be no limit in the number of pages that
+     * can be allocated, so that the kernel may take advantage of the extended
+     * regions. Hence, allocate p2m pages for hardware domains from heap.
+     */
+    if ( is_hardware_domain(d) )
+    {
+        pg = alloc_domheap_page(NULL, 0);
+        if ( pg == NULL )
+        {
+            printk(XENLOG_G_ERR "Failed to allocate P2M pages for hwdom.\n");
+            spin_unlock(&d->arch.paging.lock);
+            return NULL;
+        }
+    }
+    else
+    {
+        pg = page_list_remove_head(&d->arch.paging.p2m_freelist);
+        if ( unlikely(!pg) )
+        {
+            spin_unlock(&d->arch.paging.lock);
+            return NULL;
+        }
+        d->arch.paging.p2m_total_pages--;
+    }
+    spin_unlock(&d->arch.paging.lock);
+
+    return pg;
+}
+
+static void p2m_free_page(struct domain *d, struct page_info *pg)
+{
+    spin_lock(&d->arch.paging.lock);
+    if ( is_hardware_domain(d) )
+        free_domheap_page(pg);
+    else
+    {
+        d->arch.paging.p2m_total_pages++;
+        page_list_add_tail(pg, &d->arch.paging.p2m_freelist);
+    }
+    spin_unlock(&d->arch.paging.lock);
+}
+
 /* Return the size of the pool, rounded up to the nearest MB */
 unsigned int p2m_get_allocation(struct domain *d)
 {
@@ -751,7 +799,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry)
 
     ASSERT(!p2m_is_valid(*entry));
 
-    page = alloc_domheap_page(NULL, 0);
+    page = p2m_alloc_page(p2m->domain);
     if ( page == NULL )
         return -ENOMEM;
 
@@ -878,7 +926,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
     pg = mfn_to_page(mfn);
 
     page_list_del(pg, &p2m->pages);
-    free_domheap_page(pg);
+    p2m_free_page(p2m->domain, pg);
 }
 
 static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
@@ -902,7 +950,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
     ASSERT(level < target);
     ASSERT(p2m_is_superpage(*entry, level));
 
-    page = alloc_domheap_page(NULL, 0);
+    page = p2m_alloc_page(p2m->domain);
     if ( !page )
         return false;
 
@@ -1644,7 +1692,7 @@ int p2m_teardown(struct domain *d)
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
     {
-        free_domheap_page(pg);
+        p2m_free_page(p2m->domain, pg);
         count++;
         /* Arbitrarily preempt every 512 iterations */
         if ( !(count % 512) && hypercall_preempt_check() )
@@ -1668,6 +1716,7 @@ void p2m_final_teardown(struct domain *d)
         return;
 
     ASSERT(page_list_empty(&p2m->pages));
+    ASSERT(page_list_empty(&d->arch.paging.p2m_freelist));
 
     if ( p2m->root )
         free_domheap_pages(p2m->root, P2M_ROOT_ORDER);
