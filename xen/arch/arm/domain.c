@@ -1022,6 +1022,14 @@ int domain_relinquish_resources(struct domain *d)
         if ( ret )
             return ret;
 
+        d->arch.relmem = RELMEM_p2m_pool;
+        /* Fallthrough */
+
+    case RELMEM_p2m_pool:
+        ret = p2m_teardown_allocation(d);
+        if( ret )
+            return ret;
+
         d->arch.relmem = RELMEM_done;
         /* Fallthrough */
 

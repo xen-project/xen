@@ -73,6 +73,7 @@ struct arch_domain
         RELMEM_page,
         RELMEM_mapping,
         RELMEM_p2m,
+        RELMEM_p2m_pool,
         RELMEM_done,
     } relmem;
 
