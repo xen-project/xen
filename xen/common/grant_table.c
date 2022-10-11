@@ -4142,7 +4142,7 @@ int gnttab_acquire_resource(
      * on non-error paths, and hence it needs setting to NULL at the top of the
      * function.  Leave some runtime safety.
      */
-    if ( !vaddrs )
+    if ( !rc && !vaddrs )
     {
         ASSERT_UNREACHABLE();
         rc = -ENODATA;
