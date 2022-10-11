@@ -548,17 +548,17 @@ void hap_final_teardown(struct domain *d)
 
     if ( hvm_altp2m_supported() )
         for ( i = 0; i < MAX_ALTP2M; i++ )
-            p2m_teardown(d->arch.altp2m_p2m[i], true);
+            p2m_teardown(d->arch.altp2m_p2m[i], true, NULL);
 
     /* Destroy nestedp2m's first */
     for (i = 0; i < MAX_NESTEDP2M; i++) {
-        p2m_teardown(d->arch.nested_p2m[i], true);
+        p2m_teardown(d->arch.nested_p2m[i], true, NULL);
     }
 
     if ( d->arch.paging.hap.total_pages != 0 )
         hap_teardown(d, NULL);
 
-    p2m_teardown(p2m_get_hostp2m(d), true);
+    p2m_teardown(p2m_get_hostp2m(d), true, NULL);
     /* Free any memory that the p2m teardown released */
     paging_lock(d);
     hap_set_allocation(d, 0, NULL);
@@ -612,14 +612,24 @@ void hap_teardown(struct domain *d, bool *preempted)
         FREE_XENHEAP_PAGE(d->arch.altp2m_visible_eptp);
 
         for ( i = 0; i < MAX_ALTP2M; i++ )
-            p2m_teardown(d->arch.altp2m_p2m[i], false);
+        {
+            p2m_teardown(d->arch.altp2m_p2m[i], false, preempted);
+            if ( preempted && *preempted )
+                return;
+        }
     }
 
     /* Destroy nestedp2m's after altp2m. */
     for ( i = 0; i < MAX_NESTEDP2M; i++ )
-        p2m_teardown(d->arch.nested_p2m[i], false);
+    {
+        p2m_teardown(d->arch.nested_p2m[i], false, preempted);
+        if ( preempted && *preempted )
+            return;
+    }
 
-    p2m_teardown(p2m_get_hostp2m(d), false);
+    p2m_teardown(p2m_get_hostp2m(d), false, preempted);
+    if ( preempted && *preempted )
+        return;
 
     paging_lock(d); /* Keep various asserts happy */
 

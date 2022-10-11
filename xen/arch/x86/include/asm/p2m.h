@@ -600,7 +600,7 @@ int p2m_init(struct domain *d);
 int p2m_alloc_table(struct p2m_domain *p2m);
 
 /* Return all the p2m resources to Xen. */
-void p2m_teardown(struct p2m_domain *p2m, bool remove_root);
+void p2m_teardown(struct p2m_domain *p2m, bool remove_root, bool *preempted);
 void p2m_final_teardown(struct domain *d);
 
 /* Add/remove a page to/from a domain's p2m table. */

@@ -2776,8 +2776,12 @@ int shadow_enable(struct domain *d, u32 mode)
     paging_unlock(d);
  out_unlocked:
 #ifdef CONFIG_HVM
+    /*
+     * This is fine to ignore the preemption here because only the root
+     * will be allocated by p2m_alloc_table().
+     */
     if ( rv != 0 && !pagetable_is_null(p2m_get_pagetable(p2m)) )
-        p2m_teardown(p2m, true);
+        p2m_teardown(p2m, true, NULL);
 #endif
     if ( rv != 0 && pg != NULL )
     {
@@ -2831,7 +2835,9 @@ void shadow_teardown(struct domain *d, bool *preempted)
     for_each_vcpu ( d, v )
         shadow_vcpu_teardown(v);
 
-    p2m_teardown(p2m_get_hostp2m(d), false);
+    p2m_teardown(p2m_get_hostp2m(d), false, preempted);
+    if ( preempted && *preempted )
+        return;
 
     paging_lock(d);
 
@@ -2952,7 +2958,7 @@ void shadow_final_teardown(struct domain *d)
         shadow_teardown(d, NULL);
 
     /* It is now safe to pull down the p2m map. */
-    p2m_teardown(p2m_get_hostp2m(d), true);
+    p2m_teardown(p2m_get_hostp2m(d), true, NULL);
     /* Free any shadow memory that the p2m teardown released */
     paging_lock(d);
     shadow_set_allocation(d, 0, NULL);

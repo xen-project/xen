@@ -23,6 +23,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/event.h>
 #include <xen/types.h>
 #include <asm/p2m.h>
 #include "mm-locks.h"
@@ -154,11 +155,12 @@ int p2m_init(struct domain *d)
  * hvm fixme: when adding support for pvh non-hardware domains, this path must
  * cleanup any foreign p2m types (release refcnts on them).
  */
-void p2m_teardown(struct p2m_domain *p2m, bool remove_root)
+void p2m_teardown(struct p2m_domain *p2m, bool remove_root, bool *preempted)
 {
 #ifdef CONFIG_HVM
     struct page_info *pg, *root_pg = NULL;
     struct domain *d;
+    unsigned int i = 0;
 
     if ( !p2m )
         return;
@@ -180,8 +182,19 @@ void p2m_teardown(struct p2m_domain *p2m, bool remove_root)
     }
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
-        if ( pg != root_pg )
-            d->arch.paging.free_page(d, pg);
+    {
+        if ( pg == root_pg )
+            continue;
+
+        d->arch.paging.free_page(d, pg);
+
+        /* Arbitrarily check preemption every 1024 iterations */
+        if ( preempted && !(++i % 1024) && general_preempt_check() )
+        {
+            *preempted = true;
+            break;
+        }
+    }
 
     if ( root_pg )
         page_list_add(root_pg, &p2m->pages);
