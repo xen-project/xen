@@ -1060,7 +1060,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         switch ( subleaf )
         {
         case 1:
-            if ( p->xstate.xsaves )
+            if ( p->xstate.xsavec || p->xstate.xsaves )
             {
                 /*
                  * TODO: Figure out what to do for XSS state.  VT-x manages
