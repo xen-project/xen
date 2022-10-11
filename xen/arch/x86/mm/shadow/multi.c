@@ -2447,9 +2447,14 @@ static int cf_check sh_page_fault(
      * Preallocate shadow pages *before* removing writable accesses
      * otherwhise an OOS L1 might be demoted and promoted again with
      * writable mappings. */
-    shadow_prealloc(d,
-                    SH_type_l1_shadow,
-                    GUEST_PAGING_LEVELS < 4 ? 1 : GUEST_PAGING_LEVELS - 1);
+    if ( !shadow_prealloc(d, SH_type_l1_shadow,
+                          GUEST_PAGING_LEVELS < 4
+                          ? 1 : GUEST_PAGING_LEVELS - 1) )
+    {
+        paging_unlock(d);
+        put_gfn(d, gfn_x(gfn));
+        return 0;
+    }
 
     rc = gw_remove_write_accesses(v, va, &gw);
 
