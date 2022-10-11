@@ -2686,7 +2686,7 @@ int shadow_enable(struct domain *d, u32 mode)
     paging_unlock(d);
  out_unlocked:
     if ( rv != 0 && !pagetable_is_null(p2m_get_pagetable(p2m)) )
-        p2m_teardown(p2m);
+        p2m_teardown(p2m, true);
     if ( rv != 0 && pg != NULL )
     {
         pg->count_info &= ~PGC_count_mask;
@@ -2839,7 +2839,7 @@ void shadow_final_teardown(struct domain *d)
         shadow_teardown(d, NULL);
 
     /* It is now safe to pull down the p2m map. */
-    p2m_teardown(p2m_get_hostp2m(d));
+    p2m_teardown(p2m_get_hostp2m(d), true);
     /* Free any shadow memory that the p2m teardown released */
     paging_lock(d);
     shadow_set_allocation(d, 0, NULL);
