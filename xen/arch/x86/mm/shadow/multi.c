@@ -1524,7 +1524,8 @@ sh_make_monitor_table(struct vcpu *v)
     ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
 
     /* Guarantee we can get the memory we need */
-    shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS);
+    if ( !shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS) )
+        return INVALID_MFN;
 
     {
         mfn_t m4mfn;
@@ -3052,9 +3053,14 @@ static int sh_page_fault(struct vcpu *v,
      * Preallocate shadow pages *before* removing writable accesses
      * otherwhise an OOS L1 might be demoted and promoted again with
      * writable mappings. */
-    shadow_prealloc(d,
-                    SH_type_l1_shadow,
-                    GUEST_PAGING_LEVELS < 4 ? 1 : GUEST_PAGING_LEVELS - 1);
+    if ( !shadow_prealloc(d, SH_type_l1_shadow,
+                          GUEST_PAGING_LEVELS < 4
+                          ? 1 : GUEST_PAGING_LEVELS - 1) )
+    {
+        paging_unlock(d);
+        put_gfn(d, gfn_x(gfn));
+        return 0;
+    }
 
     rc = gw_remove_write_accesses(v, va, &gw);
 
@@ -3871,7 +3877,12 @@ sh_set_toplevel_shadow(struct vcpu *v,
     if ( !mfn_valid(smfn) )
     {
         /* Make sure there's enough free shadow memory. */
-        shadow_prealloc(d, root_type, 1);
+        if ( !shadow_prealloc(d, root_type, 1) )
+        {
+            new_entry = pagetable_null();
+            goto install_new_entry;
+        }
+
         /* Shadow the page. */
         smfn = sh_make_shadow(v, gmfn, root_type);
     }

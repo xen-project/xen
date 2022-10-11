@@ -347,7 +347,8 @@ void shadow_promote(struct domain *d, mfn_t gmfn, u32 type);
 void shadow_demote(struct domain *d, mfn_t gmfn, u32 type);
 
 /* Shadow page allocation functions */
-void  shadow_prealloc(struct domain *d, u32 shadow_type, unsigned int count);
+bool __must_check shadow_prealloc(struct domain *d, unsigned int shadow_type,
+                                  unsigned int count);
 mfn_t shadow_alloc(struct domain *d,
                     u32 shadow_type,
                     unsigned long backpointer);
