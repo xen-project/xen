@@ -90,6 +90,10 @@ void libxl__arch_update_domain_config(libxl__gc *gc,
                                       libxl_domain_config *dst,
                                       const libxl_domain_config *src);
 
+_hidden
+unsigned long libxl__arch_get_required_paging_memory(unsigned long maxmem_kb,
+                                                     unsigned int smp_cpus);
+
 #if defined(__i386__) || defined(__x86_64__)
 
 #define LAPIC_BASE_ADDRESS  0xfee00000

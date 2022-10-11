@@ -154,6 +154,20 @@ out:
     return rc;
 }
 
+unsigned long libxl__arch_get_required_paging_memory(unsigned long maxmem_kb,
+                                                     unsigned int smp_cpus)
+{
+    /*
+     * 256 pages (1MB) per vcpu,
+     * plus 1 page per MiB of RAM for the P2M map,
+     * plus 1 page per MiB of extended region. This default value is 128 MiB
+     * which should be enough for domains that are not running backend.
+     * This is higher than the minimum that Xen would allocate if no value
+     * were given (but the Xen minimum is for safety, not performance).
+     */
+    return 4 * (256 * smp_cpus + maxmem_kb / 1024 + 128);
+}
+
 static struct arch_info {
     const char *guest_type;
     const char *timer_compat;
