@@ -700,7 +700,9 @@ mfn_t sh_make_monitor_table(const struct vcpu *v, unsigned int shadow_levels)
     ASSERT(!pagetable_get_pfn(v->arch.hvm.monitor_table));
 
     /* Guarantee we can get the memory we need */
-    shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS);
+    if ( !shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS) )
+        return INVALID_MFN;
+
     m4mfn = shadow_alloc(d, SH_type_monitor_table, 0);
     mfn_to_page(m4mfn)->shadow_flags = 4;
 
