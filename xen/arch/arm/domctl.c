@@ -48,6 +48,9 @@ static int handle_vuart_init(struct domain *d,
 static long p2m_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
                        XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
+    long rc;
+    bool preempted = false;
+
     if ( unlikely(d == current->domain) )
     {
         printk(XENLOG_ERR "Tried to do a p2m domctl op on itself.\n");
@@ -64,9 +67,27 @@ static long p2m_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
     switch ( sc->op )
     {
     case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
-        return 0;
+    {
+        /* Allow and handle preemption */
+        spin_lock(&d->arch.paging.lock);
+        rc = p2m_set_allocation(d, sc->mb << (20 - PAGE_SHIFT), &preempted);
+        spin_unlock(&d->arch.paging.lock);
+
+        if ( preempted )
+            /* Not finished. Set up to re-run the call. */
+            rc = hypercall_create_continuation(__HYPERVISOR_domctl, "h",
+                                               u_domctl);
+        else
+            /* Finished. Return the new allocation. */
+            sc->mb = p2m_get_allocation(d);
+
+        return rc;
+    }
     case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
+    {
+        sc->mb = p2m_get_allocation(d);
         return 0;
+    }
     default:
     {
         printk(XENLOG_ERR "Bad p2m domctl op %u\n", sc->op);
