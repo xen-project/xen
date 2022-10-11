@@ -401,6 +401,25 @@ int cpupool_move_domain(struct domain *d, struct cpupool *c)
     return ret;
 }
 
+/* Update affinities of all domains in a cpupool. */
+static void cpupool_update_node_affinity(const struct cpupool *c)
+{
+    struct affinity_masks masks;
+    struct domain *d;
+
+    if ( !alloc_affinity_masks(&masks) )
+        return;
+
+    rcu_read_lock(&domlist_read_lock);
+
+    for_each_domain_in_cpupool(d, c)
+        domain_update_node_aff(d, &masks);
+
+    rcu_read_unlock(&domlist_read_lock);
+
+    free_affinity_masks(&masks);
+}
+
 /*
  * assign a specific cpu to a cpupool
  * cpupool_lock must be held
@@ -408,7 +427,6 @@ int cpupool_move_domain(struct domain *d, struct cpupool *c)
 static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 {
     int ret;
-    struct domain *d;
     const cpumask_t *cpus;
 
     cpus = sched_get_opt_cpumask(c->gran, cpu);
@@ -433,12 +451,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 
     rcu_read_unlock(&sched_res_rculock);
 
-    rcu_read_lock(&domlist_read_lock);
-    for_each_domain_in_cpupool(d, c)
-    {
-        domain_update_node_affinity(d);
-    }
-    rcu_read_unlock(&domlist_read_lock);
+    cpupool_update_node_affinity(c);
 
     return 0;
 }
@@ -447,18 +460,14 @@ static int cpupool_unassign_cpu_finish(struct cpupool *c)
 {
     int cpu = cpupool_moving_cpu;
     const cpumask_t *cpus;
-    struct domain *d;
     int ret;
 
     if ( c != cpupool_cpu_moving )
         return -EADDRNOTAVAIL;
 
-    /*
-     * We need this for scanning the domain list, both in
-     * cpu_disable_scheduler(), and at the bottom of this function.
-     */
     rcu_read_lock(&domlist_read_lock);
     ret = cpu_disable_scheduler(cpu);
+    rcu_read_unlock(&domlist_read_lock);
 
     rcu_read_lock(&sched_res_rculock);
     cpus = get_sched_res(cpu)->cpus;
@@ -485,11 +494,7 @@ static int cpupool_unassign_cpu_finish(struct cpupool *c)
     }
     rcu_read_unlock(&sched_res_rculock);
 
-    for_each_domain_in_cpupool(d, c)
-    {
-        domain_update_node_affinity(d);
-    }
-    rcu_read_unlock(&domlist_read_lock);
+    cpupool_update_node_affinity(c);
 
     return ret;
 }
