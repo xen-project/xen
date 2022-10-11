@@ -1790,6 +1790,11 @@ are not using hardware assisted paging (i.e. you are using shadow
 mode) and your guest workload consists of a very large number of
 similar processes then increasing this value may improve performance.
 
+On Arm, this field is used to determine the size of the guest P2M pages
+pool, and the default value is 1MB per vCPU plus 4KB per MB of RAM for
+the P2M map. Users should adjust this value if bigger P2M pool size is
+needed.
+
 =back
 
 =head3 Processor and Platform Features

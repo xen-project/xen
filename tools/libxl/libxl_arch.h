@@ -83,6 +83,10 @@ int libxl__arch_extra_memory(libxl__gc *gc,
                              const libxl_domain_build_info *info,
                              uint64_t *out);
 
+_hidden
+unsigned long libxl__arch_get_required_paging_memory(unsigned long maxmem_kb,
+                                                     unsigned int smp_cpus);
+
 #if defined(__i386__) || defined(__x86_64__)
 
 #define LAPIC_BASE_ADDRESS  0xfee00000
