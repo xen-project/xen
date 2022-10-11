@@ -197,6 +197,10 @@ void p2m_restore_state(struct vcpu *n);
 /* Print debugging/statistial info about a domain's p2m */
 void p2m_dump_info(struct domain *d);
 
+unsigned int p2m_get_allocation(struct domain *d);
+int p2m_set_allocation(struct domain *d, unsigned long pages, bool *preempted);
+int p2m_teardown_allocation(struct domain *d);
+
 static inline void p2m_write_lock(struct p2m_domain *p2m)
 {
     write_lock(&p2m->lock);
