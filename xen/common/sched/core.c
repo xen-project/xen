@@ -3231,7 +3231,7 @@ out:
  * by alloc_cpu_rm_data() is modified only in case the cpu in question is
  * being moved from or to a cpupool.
  */
-struct cpu_rm_data *alloc_cpu_rm_data(unsigned int cpu)
+struct cpu_rm_data *alloc_cpu_rm_data(unsigned int cpu, bool aff_alloc)
 {
     struct cpu_rm_data *data;
     const struct sched_resource *sr;
@@ -3243,6 +3243,17 @@ struct cpu_rm_data *alloc_cpu_rm_data(unsigned int cpu)
     data = xmalloc_flex_struct(struct cpu_rm_data, sr, sr->granularity - 1);
     if ( !data )
         goto out;
+
+    if ( aff_alloc )
+    {
+        if ( !alloc_affinity_masks(&data->affinity) )
+        {
+            XFREE(data);
+            goto out;
+        }
+    }
+    else
+        memset(&data->affinity, 0, sizeof(data->affinity));
 
     data->old_ops = sr->scheduler;
     data->vpriv_old = idle_vcpu[cpu]->sched_unit->priv;
@@ -3264,6 +3275,7 @@ struct cpu_rm_data *alloc_cpu_rm_data(unsigned int cpu)
         {
             while ( idx > 0 )
                 sched_res_free(&data->sr[--idx]->rcu);
+            free_affinity_masks(&data->affinity);
             XFREE(data);
             goto out;
         }
@@ -3286,6 +3298,7 @@ void free_cpu_rm_data(struct cpu_rm_data *mem, unsigned int cpu)
 {
     sched_free_udata(mem->old_ops, mem->vpriv_old);
     sched_free_pdata(mem->old_ops, mem->ppriv_old, cpu);
+    free_affinity_masks(&mem->affinity);
 
     xfree(mem);
 }
@@ -3296,17 +3309,18 @@ void free_cpu_rm_data(struct cpu_rm_data *mem, unsigned int cpu)
  * The cpu is already marked as "free" and not valid any longer for its
  * cpupool.
  */
-int schedule_cpu_rm(unsigned int cpu)
+int schedule_cpu_rm(unsigned int cpu, struct cpu_rm_data *data)
 {
     struct sched_resource *sr;
-    struct cpu_rm_data *data;
     struct sched_unit *unit;
     spinlock_t *old_lock;
     unsigned long flags;
     int idx = 0;
     unsigned int cpu_iter;
+    bool free_data = !data;
 
-    data = alloc_cpu_rm_data(cpu);
+    if ( !data )
+        data = alloc_cpu_rm_data(cpu, false);
     if ( !data )
         return -ENOMEM;
 
@@ -3374,7 +3388,8 @@ int schedule_cpu_rm(unsigned int cpu)
     sched_deinit_pdata(data->old_ops, data->ppriv_old, cpu);
 
     rcu_read_unlock(&sched_res_rculock);
-    free_cpu_rm_data(data, cpu);
+    if ( free_data )
+        free_cpu_rm_data(data, cpu);
 
     return 0;
 }
