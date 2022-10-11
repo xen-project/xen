@@ -1085,6 +1085,15 @@ int p2m_set_entry(struct p2m_domain *p2m,
 {
     int rc = 0;
 
+    /*
+     * Any reference taken by the P2M mappings (e.g. foreign mapping) will
+     * be dropped in relinquish_p2m_mapping(). As the P2M will still
+     * be accessible after, we need to prevent mapping to be added when the
+     * domain is dying.
+     */
+    if ( unlikely(p2m->domain->is_dying) )
+        return -ENOMEM;
+
     while ( nr )
     {
         unsigned long mask;
@@ -1579,6 +1588,8 @@ int relinquish_p2m_mapping(struct domain *d)
     unsigned int order;
     gfn_t start, end;
 
+    BUG_ON(!d->is_dying);
+    /* No mappings can be added in the P2M after the P2M lock is released. */
     p2m_write_lock(p2m);
 
     start = p2m->lowest_mapped_gfn;
