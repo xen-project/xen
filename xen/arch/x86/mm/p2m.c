@@ -749,11 +749,11 @@ int p2m_alloc_table(struct p2m_domain *p2m)
  * hvm fixme: when adding support for pvh non-hardware domains, this path must
  * cleanup any foreign p2m types (release refcnts on them).
  */
-void p2m_teardown(struct p2m_domain *p2m)
+void p2m_teardown(struct p2m_domain *p2m, bool remove_root)
 /* Return all the p2m pages to Xen.
  * We know we don't have any extra mappings to these pages */
 {
-    struct page_info *pg;
+    struct page_info *pg, *root_pg = NULL;
     struct domain *d;
 
     if (p2m == NULL)
@@ -763,10 +763,22 @@ void p2m_teardown(struct p2m_domain *p2m)
 
     p2m_lock(p2m);
     ASSERT(atomic_read(&d->shr_pages) == 0);
-    p2m->phys_table = pagetable_null();
+
+    if ( remove_root )
+        p2m->phys_table = pagetable_null();
+    else if ( !pagetable_is_null(p2m->phys_table) )
+    {
+        root_pg = pagetable_get_page(p2m->phys_table);
+        clear_domain_page(pagetable_get_mfn(p2m->phys_table));
+    }
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
-        d->arch.paging.free_page(d, pg);
+        if ( pg != root_pg )
+            d->arch.paging.free_page(d, pg);
+
+    if ( root_pg )
+        page_list_add(root_pg, &p2m->pages);
+
     p2m_unlock(p2m);
 }
 
