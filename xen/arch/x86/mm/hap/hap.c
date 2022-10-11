@@ -264,6 +264,18 @@ static void hap_free(struct domain *d, mfn_t mfn)
 
     ASSERT(paging_locked_by_me(d));
 
+    /*
+     * For dying domains, actually free the memory here. This way less work is
+     * left to hap_final_teardown(), which cannot easily have preemption checks
+     * added.
+     */
+    if ( unlikely(d->is_dying) )
+    {
+        free_domheap_page(pg);
+        d->arch.paging.hap.total_pages--;
+        return;
+    }
+
     d->arch.paging.hap.free_pages++;
     page_list_add_tail(pg, &d->arch.paging.hap.freelist);
 }
