@@ -593,6 +593,13 @@ affinity_balance_cpumask(const struct sched_unit *unit, int step,
         cpumask_copy(mask, unit->cpu_hard_affinity);
 }
 
+struct affinity_masks {
+    cpumask_var_t hard;
+    cpumask_var_t soft;
+};
+
+bool alloc_affinity_masks(struct affinity_masks *affinity);
+void free_affinity_masks(struct affinity_masks *affinity);
 void sched_rm_cpu(unsigned int cpu);
 const cpumask_t *sched_get_opt_cpumask(enum sched_gran opt, unsigned int cpu);
 void schedule_dump(struct cpupool *c);
