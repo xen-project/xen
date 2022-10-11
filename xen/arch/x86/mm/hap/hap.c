@@ -39,6 +39,7 @@
 #include <asm/domain.h>
 #include <xen/numa.h>
 #include <asm/hvm/nestedhvm.h>
+#include <public/sched.h>
 
 #include "private.h"
 
@@ -405,8 +406,13 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
     return m4mfn;
 
  oom:
-    printk(XENLOG_G_ERR "out of memory building monitor pagetable\n");
-    domain_crash(d);
+    if ( !d->is_dying &&
+         (!d->is_shutting_down || d->shutdown_code != SHUTDOWN_crash) )
+    {
+        printk(XENLOG_G_ERR "%pd: out of memory building monitor pagetable\n",
+               d);
+        domain_crash(d);
+    }
     return INVALID_MFN;
 }
 
@@ -763,6 +769,9 @@ static void cf_check hap_update_paging_modes(struct vcpu *v)
     if ( pagetable_is_null(v->arch.hvm.monitor_table) )
     {
         mfn_t mmfn = hap_make_monitor_table(v);
+
+        if ( mfn_eq(mmfn, INVALID_MFN) )
+            goto unlock;
         v->arch.hvm.monitor_table = pagetable_from_mfn(mmfn);
         make_cr3(v, mmfn);
         hvm_update_host_cr3(v);
@@ -771,6 +780,7 @@ static void cf_check hap_update_paging_modes(struct vcpu *v)
     /* CR3 is effectively updated by a mode change. Flush ASIDs, etc. */
     hap_update_cr3(v, 0, false);
 
+ unlock:
     paging_unlock(d);
     put_gfn(d, cr3_gfn);
 }
