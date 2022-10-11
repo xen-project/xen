@@ -600,6 +600,15 @@ struct affinity_masks {
 
 bool alloc_affinity_masks(struct affinity_masks *affinity);
 void free_affinity_masks(struct affinity_masks *affinity);
+
+/* Memory allocation related data for schedule_cpu_rm(). */
+struct cpu_rm_data {
+    const struct scheduler *old_ops;
+    void *ppriv_old;
+    void *vpriv_old;
+    struct sched_resource *sr[];
+};
+
 void sched_rm_cpu(unsigned int cpu);
 const cpumask_t *sched_get_opt_cpumask(enum sched_gran opt, unsigned int cpu);
 void schedule_dump(struct cpupool *c);
@@ -608,6 +617,8 @@ struct scheduler *scheduler_alloc(unsigned int sched_id);
 void scheduler_free(struct scheduler *sched);
 int cpu_disable_scheduler(unsigned int cpu);
 int schedule_cpu_add(unsigned int cpu, struct cpupool *c);
+struct cpu_rm_data *alloc_cpu_rm_data(unsigned int cpu);
+void free_cpu_rm_data(struct cpu_rm_data *mem, unsigned int cpu);
 int schedule_cpu_rm(unsigned int cpu);
 int sched_move_domain(struct domain *d, struct cpupool *c);
 struct cpupool *cpupool_get_by_id(unsigned int poolid);
