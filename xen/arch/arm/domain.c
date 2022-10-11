@@ -997,6 +997,7 @@ enum {
     PROG_page,
     PROG_mapping,
     PROG_p2m,
+    PROG_p2m_pool,
     PROG_done,
 };
 
@@ -1060,6 +1061,11 @@ int domain_relinquish_resources(struct domain *d)
     PROGRESS(p2m):
         ret = p2m_teardown(d);
         if ( ret )
+            return ret;
+
+    PROGRESS(p2m_pool):
+        ret = p2m_teardown_allocation(d);
+        if( ret )
             return ret;
 
     PROGRESS(done):
