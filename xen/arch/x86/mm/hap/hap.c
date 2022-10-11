@@ -521,18 +521,18 @@ void hap_final_teardown(struct domain *d)
         }
 
         for ( i = 0; i < MAX_ALTP2M; i++ )
-            p2m_teardown(d->arch.altp2m_p2m[i]);
+            p2m_teardown(d->arch.altp2m_p2m[i], true);
     }
 
     /* Destroy nestedp2m's first */
     for (i = 0; i < MAX_NESTEDP2M; i++) {
-        p2m_teardown(d->arch.nested_p2m[i]);
+        p2m_teardown(d->arch.nested_p2m[i], true);
     }
 
     if ( d->arch.paging.hap.total_pages != 0 )
         hap_teardown(d, NULL);
 
-    p2m_teardown(p2m_get_hostp2m(d));
+    p2m_teardown(p2m_get_hostp2m(d), true);
     /* Free any memory that the p2m teardown released */
     paging_lock(d);
     hap_set_allocation(d, 0, NULL);
