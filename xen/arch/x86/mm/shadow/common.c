@@ -907,6 +907,10 @@ static bool __must_check _shadow_prealloc(struct domain *d, unsigned int pages)
     if ( d->arch.paging.shadow.free_pages >= pages )
         return true;
 
+    if ( unlikely(d->is_dying) )
+        /* No reclaim when the domain is dying, teardown will take care of it. */
+        return false;
+
     /* Shouldn't have enabled shadows if we've no vcpus. */
     ASSERT(d->vcpu && d->vcpu[0]);
 
@@ -957,7 +961,7 @@ static bool __must_check _shadow_prealloc(struct domain *d, unsigned int pages)
            d->arch.paging.shadow.free_pages,
            d->arch.paging.shadow.p2m_pages);
 
-    ASSERT(d->is_dying);
+    ASSERT_UNREACHABLE();
 
     flush_tlb_mask(d->dirty_cpumask);
 
@@ -971,10 +975,13 @@ static bool __must_check _shadow_prealloc(struct domain *d, unsigned int pages)
  * to avoid freeing shadows that the caller is currently working on. */
 bool shadow_prealloc(struct domain *d, unsigned int type, unsigned int count)
 {
-    bool ret = _shadow_prealloc(d, shadow_size(type) * count);
+    bool ret;
 
-    if ( !ret && !d->is_dying &&
-         (!d->is_shutting_down || d->shutdown_code != SHUTDOWN_crash) )
+    if ( unlikely(d->is_dying) )
+       return false;
+
+    ret = _shadow_prealloc(d, shadow_size(type) * count);
+    if ( !ret && (!d->is_shutting_down || d->shutdown_code != SHUTDOWN_crash) )
         /*
          * Failing to allocate memory required for shadow usage can only result in
          * a domain crash, do it here rather that relying on every caller to do it.
@@ -1205,6 +1212,9 @@ static struct page_info *
 shadow_alloc_p2m_page(struct domain *d)
 {
     struct page_info *pg = NULL;
+
+    if ( unlikely(d->is_dying) )
+       return NULL;
 
     /* This is called both from the p2m code (which never holds the
      * paging lock) and the log-dirty code (which always does). */
