@@ -852,6 +852,18 @@ int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
     return rc;
 }
 
+unsigned long libxl__arch_get_required_paging_memory(unsigned long maxmem_kb,
+                                                     unsigned int smp_cpus)
+{
+    /*
+     * 256 pages (1MB) per vcpu,
+     * plus 1 page per MiB of RAM for the P2M map,
+     * plus 1 page per MiB of RAM to shadow the resident processes.
+     * This is higher than the minimum that Xen would allocate if no value
+     * were given (but the Xen minimum is for safety, not performance).
+     */
+    return 4 * (256 * smp_cpus + 2 * (maxmem_kb / 1024));
+}
 
 /*
  * Local variables:
