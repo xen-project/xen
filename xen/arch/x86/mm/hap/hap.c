@@ -28,6 +28,7 @@
 #include <xen/domain_page.h>
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
+#include <asm/altp2m.h>
 #include <asm/event.h>
 #include <asm/page.h>
 #include <asm/current.h>
@@ -546,24 +547,8 @@ void hap_final_teardown(struct domain *d)
     unsigned int i;
 
     if ( hvm_altp2m_supported() )
-    {
-        d->arch.altp2m_active = 0;
-
-        if ( d->arch.altp2m_eptp )
-        {
-            free_xenheap_page(d->arch.altp2m_eptp);
-            d->arch.altp2m_eptp = NULL;
-        }
-
-        if ( d->arch.altp2m_visible_eptp )
-        {
-            free_xenheap_page(d->arch.altp2m_visible_eptp);
-            d->arch.altp2m_visible_eptp = NULL;
-        }
-
         for ( i = 0; i < MAX_ALTP2M; i++ )
             p2m_teardown(d->arch.altp2m_p2m[i], true);
-    }
 
     /* Destroy nestedp2m's first */
     for (i = 0; i < MAX_NESTEDP2M; i++) {
@@ -578,6 +563,8 @@ void hap_final_teardown(struct domain *d)
     paging_lock(d);
     hap_set_allocation(d, 0, NULL);
     ASSERT(d->arch.paging.hap.p2m_pages == 0);
+    ASSERT(d->arch.paging.hap.free_pages == 0);
+    ASSERT(d->arch.paging.hap.total_pages == 0);
     paging_unlock(d);
 }
 
@@ -603,6 +590,7 @@ void hap_vcpu_teardown(struct vcpu *v)
 void hap_teardown(struct domain *d, bool *preempted)
 {
     struct vcpu *v;
+    unsigned int i;
 
     ASSERT(d->is_dying);
     ASSERT(d != current->domain);
@@ -610,6 +598,28 @@ void hap_teardown(struct domain *d, bool *preempted)
     /* TODO - Remove when the teardown path is better structured. */
     for_each_vcpu ( d, v )
         hap_vcpu_teardown(v);
+
+    /* Leave the root pt in case we get further attempts to modify the p2m. */
+    if ( hvm_altp2m_supported() )
+    {
+        if ( altp2m_active(d) )
+            for_each_vcpu ( d, v )
+                altp2m_vcpu_disable_ve(v);
+
+        d->arch.altp2m_active = 0;
+
+        FREE_XENHEAP_PAGE(d->arch.altp2m_eptp);
+        FREE_XENHEAP_PAGE(d->arch.altp2m_visible_eptp);
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+            p2m_teardown(d->arch.altp2m_p2m[i], false);
+    }
+
+    /* Destroy nestedp2m's after altp2m. */
+    for ( i = 0; i < MAX_NESTEDP2M; i++ )
+        p2m_teardown(d->arch.nested_p2m[i], false);
+
+    p2m_teardown(p2m_get_hostp2m(d), false);
 
     paging_lock(d); /* Keep various asserts happy */
 
