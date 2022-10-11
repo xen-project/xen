@@ -1187,6 +1187,7 @@ mfn_t shadow_alloc(struct domain *d,
 void shadow_free(struct domain *d, mfn_t smfn)
 {
     struct page_info *next = NULL, *sp = mfn_to_page(smfn);
+    bool dying = ACCESS_ONCE(d->is_dying);
     struct page_list_head *pin_list;
     unsigned int pages;
     u32 shadow_type;
@@ -1229,11 +1230,32 @@ void shadow_free(struct domain *d, mfn_t smfn)
          * just before the allocator hands the page out again. */
         page_set_tlbflush_timestamp(sp);
         perfc_decr(shadow_alloc_count);
-        page_list_add_tail(sp, &d->arch.paging.shadow.freelist);
+
+        /*
+         * For dying domains, actually free the memory here. This way less
+         * work is left to shadow_final_teardown(), which cannot easily have
+         * preemption checks added.
+         */
+        if ( unlikely(dying) )
+        {
+            /*
+             * The backpointer field (sh.back) used by shadow code aliases the
+             * domain owner field, unconditionally clear it here to avoid
+             * free_domheap_page() attempting to parse it.
+             */
+            page_set_owner(sp, NULL);
+            free_domheap_page(sp);
+        }
+        else
+            page_list_add_tail(sp, &d->arch.paging.shadow.freelist);
+
         sp = next;
     }
 
-    d->arch.paging.shadow.free_pages += pages;
+    if ( unlikely(dying) )
+        d->arch.paging.shadow.total_pages -= pages;
+    else
+        d->arch.paging.shadow.free_pages += pages;
 }
 
 /* Divert a page from the pool to be used by the p2m mapping.
@@ -1303,9 +1325,9 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
      * paging lock) and the log-dirty code (which always does). */
     paging_lock_recursive(d);
 
-    shadow_free(d, page_to_mfn(pg));
     d->arch.paging.shadow.p2m_pages--;
     d->arch.paging.shadow.total_pages++;
+    shadow_free(d, page_to_mfn(pg));
 
     paging_unlock(d);
 }
