@@ -774,10 +774,10 @@ fail:
 void arch_domain_destroy(struct domain *d)
 {
     /* IOMMU page table is shared with P2M, always call
-     * iommu_domain_destroy() before p2m_teardown().
+     * iommu_domain_destroy() before p2m_final_teardown().
      */
     iommu_domain_destroy(d);
-    p2m_teardown(d);
+    p2m_final_teardown(d);
     domain_vgic_free(d);
     domain_vuart_free(d);
     free_xenheap_page(d->shared_info);
@@ -979,6 +979,7 @@ enum {
     PROG_xen,
     PROG_page,
     PROG_mapping,
+    PROG_p2m,
     PROG_done,
 };
 
@@ -1026,6 +1027,11 @@ int domain_relinquish_resources(struct domain *d)
 
     PROGRESS(mapping):
         ret = relinquish_p2m_mapping(d);
+        if ( ret )
+            return ret;
+
+    PROGRESS(p2m):
+        ret = p2m_teardown(d);
         if ( ret )
             return ret;
 

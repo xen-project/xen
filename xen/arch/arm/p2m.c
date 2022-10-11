@@ -1496,17 +1496,58 @@ static void p2m_free_vmid(struct domain *d)
     spin_unlock(&vmid_alloc_lock);
 }
 
-void p2m_teardown(struct domain *d)
+int p2m_teardown(struct domain *d)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    unsigned long count = 0;
     struct page_info *pg;
+    unsigned int i;
+    int rc = 0;
+
+    p2m_write_lock(p2m);
+
+    /*
+     * We are about to free the intermediate page-tables, so clear the
+     * root to prevent any walk to use them.
+     */
+    for ( i = 0; i < P2M_ROOT_PAGES; i++ )
+        clear_and_clean_page(p2m->root + i);
+
+    /*
+     * The domain will not be scheduled anymore, so in theory we should
+     * not need to flush the TLBs. Do it for safety purpose.
+     *
+     * Note that all the devices have already been de-assigned. So we don't
+     * need to flush the IOMMU TLB here.
+     */
+    p2m_force_tlb_flush_sync(p2m);
+
+    while ( (pg = page_list_remove_head(&p2m->pages)) )
+    {
+        free_domheap_page(pg);
+        count++;
+        /* Arbitrarily preempt every 512 iterations */
+        if ( !(count % 512) && hypercall_preempt_check() )
+        {
+            rc = -ERESTART;
+            break;
+        }
+    }
+
+    p2m_write_unlock(p2m);
+
+    return rc;
+}
+
+void p2m_final_teardown(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     /* p2m not actually initialized */
     if ( !p2m->domain )
         return;
 
-    while ( (pg = page_list_remove_head(&p2m->pages)) )
-        free_domheap_page(pg);
+    ASSERT(page_list_empty(&p2m->pages));
 
     if ( p2m->root )
         free_domheap_pages(p2m->root, P2M_ROOT_ORDER);

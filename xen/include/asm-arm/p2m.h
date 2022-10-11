@@ -183,8 +183,17 @@ void setup_virt_paging(void);
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);
 
-/* Return all the p2m resources to Xen. */
-void p2m_teardown(struct domain *d);
+/*
+ * The P2M resources are freed in two parts:
+ *  - p2m_teardown() will be called when relinquish the resources. It
+ *    will free large resources (e.g. intermediate page-tables) that
+ *    requires preemption.
+ *  - p2m_final_teardown() will be called when domain struct is been
+ *    freed. This *cannot* be preempted and therefore one small
+ *    resources should be freed here.
+ */
+int p2m_teardown(struct domain *d);
+void p2m_final_teardown(struct domain *d);
 
 /*
  * Remove mapping refcount on each mapping page in the p2m
