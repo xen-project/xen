@@ -3312,6 +3312,11 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     if ( sh_remove_write_access(d, gmfn, 4, 0) != 0 )
         guest_flush_tlb_mask(d, d->dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l4_shadow, sh_make_shadow);
+    if ( unlikely(pagetable_is_null(v->arch.paging.shadow.shadow_table[0])) )
+    {
+        ASSERT(d->is_dying || d->is_shutting_down);
+        return;
+    }
     if ( !shadow_mode_external(d) && !is_pv_32bit_domain(d) )
     {
         mfn_t smfn = pagetable_get_mfn(v->arch.paging.shadow.shadow_table[0]);
@@ -3370,6 +3375,11 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     if ( sh_remove_write_access(d, gmfn, 2, 0) != 0 )
         guest_flush_tlb_mask(d, d->dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l2_shadow, sh_make_shadow);
+    if ( unlikely(pagetable_is_null(v->arch.paging.shadow.shadow_table[0])) )
+    {
+        ASSERT(d->is_dying || d->is_shutting_down);
+        return;
+    }
 #else
 #error This should never happen
 #endif
