@@ -20,8 +20,8 @@ exception Transaction_opened
 
 let warn fmt = Logging.warn "quota" fmt
 let activate = ref true
-let maxent = ref (10000)
-let maxsize = ref (4096)
+let maxent = ref (1000)
+let maxsize = ref (2048)
 
 type t = {
 	maxent: int;               (* max entities per domU *)
