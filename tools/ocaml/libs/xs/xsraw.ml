@@ -36,8 +36,10 @@ type con = {
 let close con =
 	Xb.close con.xb
 
+let capacity = { Xb.maxoutstanding = 1; maxwatchevents = 0; }
+
 let open_fd fd = {
-	xb = Xb.open_fd fd;
+	xb = Xb.open_fd ~capacity fd;
 	watchevents = Queue.create ();
 }
 

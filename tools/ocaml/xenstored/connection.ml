@@ -20,12 +20,84 @@ open Stdext
 
 let xenstore_payload_max = 4096 (* xen/include/public/io/xs_wire.h *)
 
+type 'a bounded_sender = 'a -> unit option
+(** a bounded sender accepts an ['a] item and returns:
+    None - if there is no room to accept the item
+    Some () -  if it has successfully accepted/sent the item
+ *)
+
+module BoundedPipe : sig
+	type 'a t
+
+	(** [create ~capacity ~destination] creates a bounded pipe with a
+	    local buffer holding at most [capacity] items.  Once the buffer is
+	    full it will not accept further items.  items from the pipe are
+	    flushed into [destination] as long as it accepts items.  The
+	    destination could be another pipe.
+	 *)
+	val create: capacity:int -> destination:'a bounded_sender -> 'a t
+
+	(** [is_empty t] returns whether the local buffer of [t] is empty. *)
+	val is_empty : _ t -> bool
+
+	(** [length t] the number of items in the internal buffer *)
+	val length: _ t -> int
+
+	(** [flush_pipe t] sends as many items from the local buffer as possible,
+			which could be none. *)
+	val flush_pipe: _ t -> unit
+
+	(** [push t item] tries to [flush_pipe] and then push [item]
+	    into the pipe if its [capacity] allows.
+	    Returns [None] if there is no more room
+	 *)
+	val push : 'a t -> 'a bounded_sender
+end = struct
+	(* items are enqueued in [q], and then flushed to [connect_to] *)
+	type 'a t =
+		{ q: 'a Queue.t
+		; destination: 'a bounded_sender
+		; capacity: int
+		}
+
+	let create ~capacity ~destination =
+		{ q = Queue.create (); capacity; destination }
+
+	let rec flush_pipe t =
+		if not Queue.(is_empty t.q) then
+			let item = Queue.peek t.q in
+			match t.destination item with
+			| None -> () (* no room *)
+			| Some () ->
+				(* successfully sent item to next stage *)
+				let _ = Queue.pop t.q in
+				(* continue trying to send more items *)
+				flush_pipe t
+
+	let push t item =
+		(* first try to flush as many items from this pipe as possible to make room,
+		   it is important to do this first to preserve the order of the items
+		 *)
+		flush_pipe t;
+		if Queue.length t.q < t.capacity then begin
+			(* enqueue, instead of sending directly.
+			   this ensures that [out] sees the items in the same order as we receive them
+			 *)
+			Queue.push item t.q;
+			Some (flush_pipe t)
+		end else None
+
+	let is_empty t = Queue.is_empty t.q
+	let length t = Queue.length t.q
+end
+
 type watch = {
 	con: t;
 	token: string;
 	path: string;
 	base: string;
 	is_relative: bool;
+	pending_watchevents: Xenbus.Xb.Packet.t BoundedPipe.t;
 }
 
 and t = {
@@ -38,7 +110,35 @@ and t = {
 	anonid: int;
 	mutable stat_nb_ops: int;
 	mutable perm: Perms.Connection.t;
+	pending_source_watchevents: (watch * Xenbus.Xb.Packet.t) BoundedPipe.t
 }
+
+module Watch = struct
+	module T = struct
+		type t = watch
+
+		let compare w1 w2 =
+			(* cannot compare watches from different connections *)
+			assert (w1.con == w2.con);
+			match String.compare w1.token w2.token with
+			| 0 -> String.compare w1.path w2.path
+			| n -> n
+	end
+	module Set = Set.Make(T)
+
+	let flush_events t =
+		BoundedPipe.flush_pipe t.pending_watchevents;
+		not (BoundedPipe.is_empty t.pending_watchevents)
+
+	let pending_watchevents t =
+		BoundedPipe.length t.pending_watchevents
+end
+
+let source_flush_watchevents t =
+	BoundedPipe.flush_pipe t.pending_source_watchevents
+
+let source_pending_watchevents t =
+	BoundedPipe.length t.pending_source_watchevents
 
 let mark_as_bad con =
 	match con.dom with
@@ -67,7 +167,8 @@ let watch_create ~con ~path ~token = {
 	token = token;
 	path = path;
 	base = get_path con;
-	is_relative = path.[0] <> '/' && path.[0] <> '@'
+	is_relative = path.[0] <> '/' && path.[0] <> '@';
+	pending_watchevents = BoundedPipe.create ~capacity:!Define.maxwatchevents ~destination:(Xenbus.Xb.queue con.xb)
 }
 
 let get_con w = w.con
@@ -93,6 +194,9 @@ let make_perm dom =
 	Perms.Connection.create ~perms:[Perms.READ; Perms.WRITE] domid
 
 let create xbcon dom =
+	let destination (watch, pkt) =
+		BoundedPipe.push watch.pending_watchevents pkt
+	in
 	let id =
 		match dom with
 		| None -> let old = !anon_id_next in incr anon_id_next; old
@@ -109,6 +213,16 @@ let create xbcon dom =
 	anonid = id;
 	stat_nb_ops = 0;
 	perm = make_perm dom;
+
+	(* the actual capacity will be lower, this is used as an overflow
+	   buffer: anything that doesn't fit elsewhere gets put here, only
+	   limited by the amount of watches that you can generate with a
+	   single xenstore command (which is finite, although possibly very
+	   large in theory for Dom0).  Once the pipe here has any contents the
+	   domain is blocked from sending more commands until it is empty
+	   again though.
+	 *)
+	pending_source_watchevents = BoundedPipe.create ~capacity:Sys.max_array_length ~destination
 	}
 	in
 	Logging.new_connection ~tid:Transaction.none ~con:(get_domstr con);
@@ -127,11 +241,17 @@ let set_target con target_domid =
 
 let is_backend_mmap con = Xenbus.Xb.is_mmap con.xb
 
-let send_reply con tid rid ty data =
+let packet_of con tid rid ty data =
 	if (String.length data) > xenstore_payload_max && (is_backend_mmap con) then
-		Xenbus.Xb.queue con.xb (Xenbus.Xb.Packet.create tid rid Xenbus.Xb.Op.Error "E2BIG\000")
+		Xenbus.Xb.Packet.create tid rid Xenbus.Xb.Op.Error "E2BIG\000"
 	else
-		Xenbus.Xb.queue con.xb (Xenbus.Xb.Packet.create tid rid ty data)
+		Xenbus.Xb.Packet.create tid rid ty data
+
+let send_reply con tid rid ty data =
+	let result = Xenbus.Xb.queue con.xb (packet_of con tid rid ty data) in
+	(* should never happen: we only process an input packet when there is room for an output packet *)
+	(* and the limit for replies is different from the limit for watch events *)
+	assert (result <> None)
 
 let send_error con tid rid err = send_reply con tid rid Xenbus.Xb.Op.Error (err ^ "\000")
 let send_ack con tid rid ty = send_reply con tid rid ty "OK\000"
@@ -181,11 +301,11 @@ let del_watch con path token =
 	apath, w
 
 let del_watches con =
-  Hashtbl.clear con.watches;
+  Hashtbl.reset con.watches;
   con.nb_watches <- 0
 
 let del_transactions con =
-  Hashtbl.clear con.transactions
+  Hashtbl.reset con.transactions
 
 let list_watches con =
 	let ll = Hashtbl.fold
@@ -208,21 +328,29 @@ let lookup_watch_perm path = function
 let lookup_watch_perms oldroot root path =
 	lookup_watch_perm path oldroot @ lookup_watch_perm path (Some root)
 
-let fire_single_watch_unchecked watch =
+let fire_single_watch_unchecked source watch =
 	let data = Utils.join_by_null [watch.path; watch.token; ""] in
-	send_reply watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data
+	let pkt = packet_of watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data in
 
-let fire_single_watch (oldroot, root) watch =
+	match BoundedPipe.push source.pending_source_watchevents (watch, pkt) with
+	| Some () -> () (* packet queued *)
+	| None ->
+			(* a well behaved Dom0 shouldn't be able to trigger this,
+			   if it happens it is likely a Dom0 bug causing runaway memory usage
+			 *)
+			failwith "watch event overflow, cannot happen"
+
+let fire_single_watch source (oldroot, root) watch =
 	let abspath = get_watch_path watch.con watch.path |> Store.Path.of_string in
 	let perms = lookup_watch_perms oldroot root abspath in
 	if Perms.can_fire_watch watch.con.perm perms then
-		fire_single_watch_unchecked watch
+		fire_single_watch_unchecked source watch
 	else
 		let perms = perms |> List.map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in
 		let con = get_domstr watch.con in
 		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath)
 
-let fire_watch roots watch path =
+let fire_watch source roots watch path =
 	let new_path =
 		if watch.is_relative && path.[0] = '/'
 		then begin
@@ -232,7 +360,7 @@ let fire_watch roots watch path =
 		end else
 			path
 	in
-	fire_single_watch roots { watch with path = new_path }
+	fire_single_watch source roots { watch with path = new_path }
 
 (* Search for a valid unused transaction id. *)
 let rec valid_transaction_id con proposed_id =
@@ -280,6 +408,7 @@ let do_input con = Xenbus.Xb.input con.xb
 let has_partial_input con = Xenbus.Xb.has_partial_input con.xb
 let has_more_input con = Xenbus.Xb.has_more_input con.xb
 
+let can_input con = Xenbus.Xb.can_input con.xb && BoundedPipe.is_empty con.pending_source_watchevents
 let has_output con = Xenbus.Xb.has_output con.xb
 let has_old_output con = Xenbus.Xb.has_old_output con.xb
 let has_new_output con = Xenbus.Xb.has_new_output con.xb
@@ -323,7 +452,7 @@ let prevents_live_update con = not (is_bad con)
 	&& (has_extra_connection_data con || has_transaction_data con)
 
 let has_more_work con =
-	has_more_input con || not (has_old_output con) && has_new_output con
+	(has_more_input con && can_input con) || not (has_old_output con) && has_new_output con
 
 let incr_ops con = con.stat_nb_ops <- con.stat_nb_ops + 1
 
