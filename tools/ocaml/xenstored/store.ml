@@ -89,10 +89,21 @@ let check_owner node connection =
 
 let rec recurse fct node = fct node; List.iter (recurse fct) node.children
 
-(** [recurse_map f tree] applies [f] on each node in the tree recursively *)
-let recurse_map f =
+(** [recurse_filter_map f tree] applies [f] on each node in the tree recursively,
+    possibly removing some nodes.
+    Note that the nodes removed this way won't generate watch events.
+*)
+let recurse_filter_map f =
+	let invalid = -1 in
+	let is_valid node = node.perms.owner <> invalid in
 	let rec walk node =
-		f { node with children = List.rev_map walk node.children |> List.rev }
+		(* Map.filter_map is Ocaml 4.11+ only *)
+		let node =
+		{ node with children =
+			List.rev_map walk node.children |> List.filter is_valid |> List.rev } in
+		match f node with
+		| Some keep -> keep
+		| None -> { node with perms = {node.perms with owner = invalid } }
 	in
 	walk
 
@@ -446,11 +457,13 @@ let setperms store perm path nperms =
 
 let reset_permissions store domid =
 	Logging.info "store|node" "Cleaning up xenstore ACLs for domid %d" domid;
-	store.root <- Node.recurse_map (fun node ->
-		let perms = Perms.Node.remove_domid ~domid node.perms in
-		if perms <> node.perms then
-			Logging.debug "store|node" "Changed permissions for node %s" (Node.get_name node);
-		{ node with perms }
+	store.root <- Node.recurse_filter_map (fun node ->
+		match Perms.Node.remove_domid ~domid node.perms with
+		| None -> None
+		| Some perms ->
+			if perms <> node.perms then
+				Logging.debug "store|node" "Changed permissions for node %s" (Node.get_name node);
+			Some { node with perms }
 	) store.root
 
 type ops = {
