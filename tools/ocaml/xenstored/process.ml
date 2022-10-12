@@ -587,7 +587,7 @@ let do_input store cons doms con =
 			History.reconnect con;
 			info "%s reconnection complete" (Connection.get_domstr con);
 			None
-		| Failure exp ->
+		| Invalid_argument exp | Failure exp ->
 			error "caught exception %s" exp;
 			error "got a bad client %s" (sprintf "%-8s" (Connection.get_domstr con));
 			Connection.mark_as_bad con;

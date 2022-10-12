@@ -36,7 +36,7 @@ let of_string s =
 	   This will leave the guest connection is a bad state and will
 	   be hard to recover from without restarting the connection
 	   (ie rebooting the guest) *)
-	let dlen = min xenstore_payload_max dlen in
+	let dlen = max 0 (min xenstore_payload_max dlen) in
 	{
 		tid = tid;
 		rid = rid;
@@ -46,8 +46,8 @@ let of_string s =
 	}
 
 let append pkt s sz =
-	if pkt.len > 4096 then failwith "Buffer.add: cannot grow buffer";
-	Buffer.add_string pkt.buf (String.sub s 0 sz)
+	if Buffer.length pkt.buf + sz > xenstore_payload_max then failwith "Buffer.add: cannot grow buffer";
+	Buffer.add_substring pkt.buf s 0 sz
 
 let to_complete pkt =
 	pkt.len - (Buffer.length pkt.buf)
