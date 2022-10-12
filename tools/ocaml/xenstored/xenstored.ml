@@ -102,6 +102,8 @@ let parse_config filename =
 		("quota-maxentity", Config.Set_int Quota.maxent);
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("quota-maxrequests", Config.Set_int Define.maxrequests);
+		("quota-maxoutstanding", Config.Set_int Define.maxoutstanding);
+		("quota-maxwatchevents", Config.Set_int Define.maxwatchevents);
 		("quota-path-max", Config.Set_int Define.path_max);
 		("gc-max-overhead", Config.Set_int Define.gc_max_overhead);
 		("test-eagain", Config.Set_bool Transaction.test_eagain);
