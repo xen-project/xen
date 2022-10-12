@@ -64,8 +64,7 @@ let get_owner perm = perm.owner
 * *)
 let remove_domid ~domid perm =
 	let acl = List.filter (fun (acl_domid, _) -> acl_domid <> domid) perm.acl in
-	let owner = if perm.owner = domid then 0 else perm.owner in
-	{ perm with acl; owner }
+	if perm.owner = domid then None else Some { perm with acl; owner = perm.owner }
 
 let default0 = create 0 NONE []
 
