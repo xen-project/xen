@@ -232,15 +232,12 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 
         /* Mnemonics for the named fields inside xen_x86_arch_domainconfig */
 #define VAL_EMUL_FLAGS          Field(arch_domconfig, 0)
+#define VAL_MISC_FLAGS          Field(arch_domconfig, 1)
 
 		cfg.arch.emulation_flags = ocaml_list_to_c_bitmap
 			/* ! x86_arch_emulation_flags X86_EMU_ none */
 			/* ! XEN_X86_EMU_ XEN_X86_EMU_ALL all */
 			(VAL_EMUL_FLAGS);
-
-#undef VAL_EMUL_FLAGS
-
-#define VAL_MISC_FLAGS          Field(arch_domconfig, 1)
 
 		cfg.arch.misc_flags = ocaml_list_to_c_bitmap
 			/* ! x86_arch_misc_flags X86_ none */
@@ -248,6 +245,7 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 			(VAL_MISC_FLAGS);
 
 #undef VAL_MISC_FLAGS
+#undef VAL_EMUL_FLAGS
 
 #else
 		caml_failwith("Unhandled: x86");
