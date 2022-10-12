@@ -57,7 +57,7 @@ let split_one_path data con =
 	| path :: "" :: [] -> Store.Path.create path (Connection.get_path con)
 	| _                -> raise Invalid_Cmd_Args
 
-let process_watch t cons =
+let process_watch source t cons =
 	let oldroot = t.Transaction.oldroot in
 	let newroot = Store.get_root t.store in
 	let ops = Transaction.get_paths t |> List.rev in
@@ -67,8 +67,9 @@ let process_watch t cons =
 		| Xenbus.Xb.Op.Rm       -> true, None, oldroot
 		| Xenbus.Xb.Op.Setperms -> false, Some oldroot, newroot
 		| _              -> raise (Failure "huh ?") in
-		Connections.fire_watches ?oldroot root cons (snd op) recurse in
-	List.iter (fun op -> do_op_watch op cons) ops
+		Connections.fire_watches ?oldroot source root cons (snd op) recurse in
+	List.iter (fun op -> do_op_watch op cons) ops;
+	Connections.send_watchevents cons source
 
 let create_implicit_path t perm path =
 	let dirname = Store.Path.get_parent path in
@@ -234,6 +235,20 @@ let do_debug con t _domains cons data =
 	| "watches" :: _ ->
 		let watches = Connections.debug cons in
 		Some (watches ^ "\000")
+	| "xenbus" :: domid :: _ ->
+		let domid = int_of_string domid in
+		let con = Connections.find_domain cons domid in
+		let s = Printf.sprintf "xenbus: %s; overflow queue length: %d, can_input: %b, has_more_input: %b, has_old_output: %b, has_new_output: %b, has_more_work: %b. pending: %s"
+			(Xenbus.Xb.debug con.xb)
+			(Connection.source_pending_watchevents con)
+			(Connection.can_input con)
+			(Connection.has_more_input con)
+			(Connection.has_old_output con)
+			(Connection.has_new_output con)
+			(Connection.has_more_work con)
+			(Connections.debug_watchevents cons con)
+		in
+		Some s
 	| "mfn" :: domid :: _ ->
 		let domid = int_of_string domid in
 		let con = Connections.find_domain cons domid in
@@ -342,7 +357,7 @@ let reply_ack fct con t doms cons data =
 	fct con t doms cons data;
 	Packet.Ack (fun () ->
 		if Transaction.get_id t = Transaction.none then
-			process_watch t cons
+			process_watch con t cons
 	)
 
 let reply_data fct con t doms cons data =
@@ -501,7 +516,7 @@ let do_watch con t _domains cons data =
 	Packet.Ack (fun () ->
 		(* xenstore.txt says this watch is fired immediately,
 		   implying even if path doesn't exist or is unreadable *)
-		Connection.fire_single_watch_unchecked watch)
+		Connection.fire_single_watch_unchecked con watch)
 
 let do_unwatch con _t _domains cons data =
 	let (node, token) =
@@ -532,7 +547,7 @@ let do_transaction_end con t domains cons data =
 	if not success then
 		raise Transaction_again;
 	if commit then begin
-		process_watch t cons;
+		process_watch con t cons;
 		match t.Transaction.ty with
 		| Transaction.No ->
 			() (* no need to record anything *)
@@ -700,7 +715,8 @@ let process_packet ~store ~cons ~doms ~con ~req =
 let do_input store cons doms con =
 	let newpacket =
 		try
-			Connection.do_input con
+			if Connection.can_input con then Connection.do_input con
+			else None
 		with Xenbus.Xb.Reconnect ->
 			info "%s requests a reconnect" (Connection.get_domstr con);
 			History.reconnect con;
@@ -728,6 +744,7 @@ let do_input store cons doms con =
 		Connection.incr_ops con
 
 let do_output _store _cons _doms con =
+	Connection.source_flush_watchevents con;
 	if Connection.has_output con then (
 		if Connection.has_new_output con then (
 			let packet = Connection.peek_output con in
