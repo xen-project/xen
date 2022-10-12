@@ -277,9 +277,7 @@ let get_transaction con tid =
 	Hashtbl.find con.transactions tid
 
 let do_input con = Xenbus.Xb.input con.xb
-let has_input con = Xenbus.Xb.has_in_packet con.xb
 let has_partial_input con = Xenbus.Xb.has_partial_input con.xb
-let pop_in con = Xenbus.Xb.get_in_packet con.xb
 let has_more_input con = Xenbus.Xb.has_more_input con.xb
 
 let has_output con = Xenbus.Xb.has_output con.xb
@@ -307,7 +305,7 @@ let is_bad con = match con.dom with None -> false | Some dom -> Domain.is_bad_do
    Restrictions below can be relaxed once xenstored learns to dump more
    of its live state in a safe way *)
 let has_extra_connection_data con =
-	let has_in = has_input con || has_partial_input con in
+	let has_in = has_partial_input con in
 	let has_out = has_output con in
 	let has_nondefault_perms = make_perm con.dom <> con.perm in
 	has_in || has_out
