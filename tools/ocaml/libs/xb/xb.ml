@@ -45,7 +45,6 @@ type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 type t =
 {
 	backend: backend;
-	pkt_in: Packet.t Queue.t;
 	pkt_out: Packet.t Queue.t;
 	mutable partial_in: partial_buf;
 	mutable partial_out: string;
@@ -62,7 +61,6 @@ let reconnect t = match t.backend with
 		Xs_ring.close backend.mmap;
 		backend.eventchn_notify ();
 		(* Clear our old connection state *)
-		Queue.clear t.pkt_in;
 		Queue.clear t.pkt_out;
 		t.partial_in <- init_partial_in ();
 		t.partial_out <- ""
@@ -124,7 +122,6 @@ let output con =
 
 (* NB: can throw Reconnect *)
 let input con =
-	let newpacket = ref false in
 	let to_read =
 		match con.partial_in with
 		| HaveHdr partial_pkt -> Partial.to_complete partial_pkt
@@ -143,21 +140,19 @@ let input con =
 		if Partial.to_complete partial_pkt = 0 then (
 			let pkt = Packet.of_partialpkt partial_pkt in
 			con.partial_in <- init_partial_in ();
-			Queue.push pkt con.pkt_in;
-			newpacket := true
-		)
+			Some pkt
+		) else None
 	| NoHdr (i, buf)      ->
 		(* we complete the partial header *)
 		if sz > 0 then
 			Bytes.blit b 0 buf (Partial.header_size () - i) sz;
 		con.partial_in <- if sz = i then
-			HaveHdr (Partial.of_string (Bytes.to_string buf)) else NoHdr (i - sz, buf)
-	);
-	!newpacket
+			HaveHdr (Partial.of_string (Bytes.to_string buf)) else NoHdr (i - sz, buf);
+		None
+	)
 
 let newcon backend = {
 	backend = backend;
-	pkt_in = Queue.create ();
 	pkt_out = Queue.create ();
 	partial_in = init_partial_in ();
 	partial_out = "";
@@ -193,9 +188,6 @@ let has_output con = has_new_output con || has_old_output con
 
 let peek_output con = Queue.peek con.pkt_out
 
-let input_len con = Queue.length con.pkt_in
-let has_in_packet con = Queue.length con.pkt_in > 0
-let get_in_packet con = Queue.pop con.pkt_in
 let has_partial_input con = match con.partial_in with
 	| HaveHdr _ -> true
 	| NoHdr (n, _) -> n < Partial.header_size ()

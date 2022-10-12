@@ -94,26 +94,18 @@ let pkt_send con =
 	done
 
 (* receive one packet - can sleep *)
-let pkt_recv con =
-	let workdone = ref false in
-	while not !workdone
-	do
-		workdone := Xb.input con.xb
-	done;
-	Xb.get_in_packet con.xb
+let rec pkt_recv con =
+	match Xb.input con.xb with
+	| Some packet -> packet
+	| None -> pkt_recv con
 
 let pkt_recv_timeout con timeout =
 	let fd = Xb.get_fd con.xb in
 	let r, _, _ = Unix.select [ fd ] [] [] timeout in
 	if r = [] then
 		true, None
-	else (
-		let workdone = Xb.input con.xb in
-		if workdone then
-			false, (Some (Xb.get_in_packet con.xb))
-		else
-			false, None
-	)
+	else
+		false, Xb.input con.xb
 
 let queue_watchevent con data =
 	let ls = split_string ~limit:2 '\000' data in
