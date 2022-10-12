@@ -77,7 +77,7 @@ val write_fd : backend_fd -> 'a -> string -> int -> int
 val write_mmap : backend_mmap -> 'a -> string -> int -> int
 val write : t -> string -> int -> int
 val output : t -> bool
-val input : t -> bool
+val input : t -> Packet.t option
 val newcon : backend -> t
 val open_fd : Unix.file_descr -> t
 val open_mmap : Xenmmap.mmap_interface -> (unit -> unit) -> t
@@ -89,10 +89,7 @@ val has_new_output : t -> bool
 val has_old_output : t -> bool
 val has_output : t -> bool
 val peek_output : t -> Packet.t
-val input_len : t -> int
-val has_in_packet : t -> bool
 val has_partial_input : t -> bool
-val get_in_packet : t -> Packet.t
 val has_more_input : t -> bool
 val is_selectable : t -> bool
 val get_fd : t -> Unix.file_descr

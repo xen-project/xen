@@ -195,10 +195,9 @@ let parse_live_update args =
 			| _ when Unix.gettimeofday () < t.deadline -> false
 			| l ->
 				warn "timeout reached: have to wait, migrate or shutdown %d domains:" (List.length l);
-				let msgs = List.rev_map (fun con -> Printf.sprintf "%s: %d tx, in: %b, out: %b, perm: %s"
+				let msgs = List.rev_map (fun con -> Printf.sprintf "%s: %d tx, out: %b, perm: %s"
 					(Connection.get_domstr con)
 					(Connection.number_of_transactions con)
-					(Connection.has_input con)
 					(Connection.has_output con)
 					(Connection.get_perm con |> Perms.Connection.to_string)
 					) l in
@@ -706,16 +705,17 @@ let do_input store cons doms con =
 			info "%s requests a reconnect" (Connection.get_domstr con);
 			History.reconnect con;
 			info "%s reconnection complete" (Connection.get_domstr con);
-			false
+			None
 		| Failure exp ->
 			error "caught exception %s" exp;
 			error "got a bad client %s" (sprintf "%-8s" (Connection.get_domstr con));
 			Connection.mark_as_bad con;
-			false
+			None
 	in
 
-	if newpacket then (
-		let packet = Connection.pop_in con in
+	match newpacket with
+	| None -> ()
+	| Some packet ->
 		let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
 		let req = {Packet.tid=tid; Packet.rid=rid; Packet.ty=ty; Packet.data=data} in
 
@@ -725,8 +725,7 @@ let do_input store cons doms con =
 		         (Xenbus.Xb.Op.to_string ty) (sanitize_data data); *)
 		process_packet ~store ~cons ~doms ~con ~req;
 		write_access_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
-		Connection.incr_ops con;
-	)
+		Connection.incr_ops con
 
 let do_output _store _cons _doms con =
 	if Connection.has_output con then (
