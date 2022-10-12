@@ -277,8 +277,6 @@ let get_transaction con tid =
 	Hashtbl.find con.transactions tid
 
 let do_input con = Xenbus.Xb.input con.xb
-let has_input con = Xenbus.Xb.has_in_packet con.xb
-let pop_in con = Xenbus.Xb.get_in_packet con.xb
 let has_more_input con = Xenbus.Xb.has_more_input con.xb
 
 let has_output con = Xenbus.Xb.has_output con.xb
