@@ -25,6 +25,7 @@ let maxwatch = ref (100)
 let maxtransaction = ref (10)
 let maxrequests = ref (1024)   (* maximum requests per transaction *)
 
+let gc_max_overhead = ref 120 (* 120% see comment in xenstored.ml *)
 let conflict_burst_limit = ref 5.0
 let conflict_max_history_seconds = ref 0.05
 let conflict_rate_limit_is_aggregate = ref true
