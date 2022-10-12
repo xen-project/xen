@@ -103,6 +103,7 @@ let parse_config filename =
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("quota-maxrequests", Config.Set_int Define.maxrequests);
 		("quota-path-max", Config.Set_int Define.path_max);
+		("gc-max-overhead", Config.Set_int Define.gc_max_overhead);
 		("test-eagain", Config.Set_bool Transaction.test_eagain);
 		("persistent", Config.Set_bool Disk.enable);
 		("xenstored-log-file", Config.String Logging.set_xenstored_log_destination);
@@ -229,6 +230,67 @@ let to_file store cons file =
 	        (fun () -> close_out channel)
 end
 
+(*
+	By default OCaml's GC only returns memory to the OS when it exceeds a
+	configurable 'max overhead' setting.
+	The default is 500%, that is 5/6th of the OCaml heap needs to be free
+	and only 1/6th live for a compaction to be triggerred that would
+	release memory back to the OS.
+	If the limit is not hit then the OCaml process can reuse that memory
+	for its own purposes, but other processes won't be able to use it.
+
+	There is also a 'space overhead' setting that controls how much work
+	each major GC slice does, and by default aims at having no more than
+	80% or 120% (depending on version) garbage values compared to live
+	values.
+	This doesn't have as much relevance to memory returned to the OS as
+	long as space_overhead <= max_overhead, because compaction is only
+	triggerred at the end of major GC cycles.
+
+	The defaults are too large once the program starts using ~100MiB of
+	memory, at which point ~500MiB would be unavailable to other processes
+	(which would be fine if this was the main process in this VM, but it is
+	not).
+
+	Max overhead can also be set to 0, however this is for testing purposes
+	only (setting it lower than 'space overhead' wouldn't help because the
+	major GC wouldn't run fast enough, and compaction does have a
+	performance cost: we can only compact contiguous regions, so memory has
+	to be moved around).
+
+	Max overhead controls how often the heap is compacted, which is useful
+	if there are burst of activity followed by long periods of idle state,
+	or if a domain quits, etc. Compaction returns memory to the OS.
+
+	wasted = live * space_overhead / 100
+
+	For globally overriding the GC settings one can use OCAMLRUNPARAM,
+	however we provide a config file override to be consistent with other
+	oxenstored settings.
+
+	One might want to dynamically adjust the overhead setting based on used
+	memory, i.e. to use a fixed upper bound in bytes, not percentage. However
+	measurements show that such adjustments increase GC overhead massively,
+	while still not guaranteeing that memory is returned any more quickly
+	than with a percentage based setting.
+
+	The allocation policy could also be tweaked, e.g. first fit would reduce
+	fragmentation and thus memory usage, but the documentation warns that it
+	can be sensibly slower, and indeed one of our own testcases can trigger
+	such a corner case where it is multiple times slower, so it is best to keep
+	the default allocation policy (next-fit/best-fit depending on version).
+
+	There are other tweaks that can be attempted in the future, e.g. setting
+	'ulimit -v' to 75% of RAM, however getting the kernel to actually return
+	NULL from allocations is difficult even with that setting, and without a
+	NULL the emergency GC won't be triggerred.
+	Perhaps cgroup limits could help, but for now tweak the safest only.
+*)
+
+let tweak_gc () =
+	Gc.set { (Gc.get ()) with Gc.max_overhead = !Define.gc_max_overhead }
+
+
 let _ =
 	let cf = do_argv in
 	let pidfile =
@@ -237,6 +299,8 @@ let _ =
 		else
 			default_pidfile
 		in
+
+	tweak_gc ();
 
 	(try
 		Unixext.mkdir_rec (Filename.dirname pidfile) 0o755
