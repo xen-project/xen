@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS := libs
 SUBDIRS += xenstored
+SUBDIRS += tests
 
 .NOTPARALLEL:
 # targets here must be run in order, otherwise we can try
