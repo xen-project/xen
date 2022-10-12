@@ -71,7 +71,7 @@ static void test_gnttab(uint32_t domid, unsigned int nr_frames)
     res = xenforeignmemory_map_resource(
         fh, domid, XENMEM_resource_grant_table,
         XENMEM_resource_grant_table_id_status, 0, 1,
-        (void **)&gnttab, PROT_READ | PROT_WRITE, 0);
+        &addr, PROT_READ | PROT_WRITE, 0);
 
     if ( res )
     {
