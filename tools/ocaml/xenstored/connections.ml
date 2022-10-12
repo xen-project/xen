@@ -22,22 +22,30 @@ type t = {
 	domains: (int, Connection.t) Hashtbl.t;
 	ports: (Xeneventchn.t, Connection.t) Hashtbl.t;
 	mutable watches: (string, Connection.watch list) Trie.t;
+	mutable has_pending_watchevents: Connection.Watch.Set.t
 }
 
 let create () = {
 	anonymous = Hashtbl.create 37;
 	domains = Hashtbl.create 37;
 	ports = Hashtbl.create 37;
-	watches = Trie.create ()
+	watches = Trie.create ();
+	has_pending_watchevents = Connection.Watch.Set.empty;
 }
 
+let get_capacity () =
+	(* not multiplied by maxwatch on purpose: 2nd queue in watch itself! *)
+	{ Xenbus.Xb.maxoutstanding = !Define.maxoutstanding; maxwatchevents = !Define.maxwatchevents }
+
 let add_anonymous cons fd _can_write =
-	let xbcon = Xenbus.Xb.open_fd fd in
+	let capacity = get_capacity () in
+	let xbcon = Xenbus.Xb.open_fd fd ~capacity in
 	let con = Connection.create xbcon None in
 	Hashtbl.add cons.anonymous (Xenbus.Xb.get_fd xbcon) con
 
 let add_domain cons dom =
-	let xbcon = Xenbus.Xb.open_mmap (Domain.get_interface dom) (fun () -> Domain.notify dom) in
+	let capacity = get_capacity () in
+	let xbcon = Xenbus.Xb.open_mmap ~capacity (Domain.get_interface dom) (fun () -> Domain.notify dom) in
 	let con = Connection.create xbcon (Some dom) in
 	Hashtbl.add cons.domains (Domain.get_id dom) con;
 	match Domain.get_port dom with
@@ -48,7 +56,9 @@ let select ?(only_if = (fun _ -> true)) cons =
 	Hashtbl.fold (fun _ con (ins, outs) ->
 		if (only_if con) then (
 			let fd = Connection.get_fd con in
-			(fd :: ins,  if Connection.has_output con then fd :: outs else outs)
+			let in_fds = if Connection.can_input con then fd :: ins else ins in
+			let out_fds = if Connection.has_output con then fd :: outs else outs in
+			in_fds, out_fds
 		) else (ins, outs)
 	)
 	cons.anonymous ([], [])
@@ -67,10 +77,17 @@ let del_watches_of_con con watches =
 	| [] -> None
 	| ws -> Some ws
 
+let del_watches cons con =
+	Connection.del_watches con;
+	cons.watches <- Trie.map (del_watches_of_con con) cons.watches;
+	cons.has_pending_watchevents <-
+		cons.has_pending_watchevents |> Connection.Watch.Set.filter @@ fun w ->
+		Connection.get_con w != con
+
 let del_anonymous cons con =
 	try
 		Hashtbl.remove cons.anonymous (Connection.get_fd con);
-		cons.watches <- Trie.map (del_watches_of_con con) cons.watches;
+		del_watches cons con;
 		Connection.close con
 	with exn ->
 		debug "del anonymous %s" (Printexc.to_string exn)
@@ -85,7 +102,7 @@ let del_domain cons id =
 		    | Some p -> Hashtbl.remove cons.ports p
 		    | None -> ())
 		 | None -> ());
-		cons.watches <- Trie.map (del_watches_of_con con) cons.watches;
+		del_watches cons con;
 		Connection.close con
 	with exn ->
 		debug "del domain %u: %s" id (Printexc.to_string exn)
@@ -136,31 +153,33 @@ let del_watch cons con path token =
 		cons.watches <- Trie.set cons.watches key watches;
  	watch
 
-let del_watches cons con =
-	Connection.del_watches con;
-	cons.watches <- Trie.map (del_watches_of_con con) cons.watches
-
 (* path is absolute *)
-let fire_watches ?oldroot root cons path recurse =
+let fire_watches ?oldroot source root cons path recurse =
 	let key = key_of_path path in
 	let path = Store.Path.to_string path in
 	let roots = oldroot, root in
 	let fire_watch _ = function
 		| None         -> ()
-		| Some watches -> List.iter (fun w -> Connection.fire_watch roots w path) watches
+		| Some watches -> List.iter (fun w -> Connection.fire_watch source roots w path) watches
 	in
 	let fire_rec _x = function
 		| None         -> ()
 		| Some watches ->
-			List.iter (Connection.fire_single_watch roots) watches
+			List.iter (Connection.fire_single_watch source roots) watches
 	in
 	Trie.iter_path fire_watch cons.watches key;
 	if recurse then
 		Trie.iter fire_rec (Trie.sub cons.watches key)
 
+let send_watchevents cons con =
+	cons.has_pending_watchevents <-
+		cons.has_pending_watchevents |> Connection.Watch.Set.filter Connection.Watch.flush_events;
+	Connection.source_flush_watchevents con
+
 let fire_spec_watches root cons specpath =
+	let source = find_domain cons 0 in
 	iter cons (fun con ->
-		List.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
+		List.iter (Connection.fire_single_watch source (None, root)) (Connection.get_watches con specpath))
 
 let set_target cons domain target_domain =
 	let con = find_domain cons domain in
@@ -196,3 +215,13 @@ let debug cons =
 	let anonymous = Hashtbl.fold (fun _ con accu -> Connection.debug con :: accu) cons.anonymous [] in
 	let domains = Hashtbl.fold (fun _ con accu -> Connection.debug con :: accu) cons.domains [] in
 	String.concat "" (domains @ anonymous)
+
+let debug_watchevents cons con =
+	(* == (physical equality)
+	   has to be used here because w.con.xb.backend might contain a [unit->unit] value causing regular
+	   comparison to fail due to having a 'functional value' which cannot be compared.
+	 *)
+	let s = cons.has_pending_watchevents |> Connection.Watch.Set.filter (fun w -> w.con == con) in
+	let pending = s |> Connection.Watch.Set.elements
+		|> List.map (fun w -> Connection.Watch.pending_watchevents w) |> List.fold_left (+) 0 in
+	Printf.sprintf "Watches with pending events: %d, pending events total: %d" (Connection.Watch.Set.cardinal s) pending

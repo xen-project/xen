@@ -134,13 +134,43 @@ type backend = Fd of backend_fd | Xenmmap of backend_mmap
 
 type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 
+(*
+	separate capacity reservation for replies and watch events:
+	this allows a domain to keep working even when under a constant flood of
+	watch events
+*)
+type capacity = { maxoutstanding: int; maxwatchevents: int }
+
+module Queue = BoundedQueue
+
+type packet_class =
+	| CommandReply
+	| Watchevent
+
+let string_of_packet_class = function
+	| CommandReply -> "command_reply"
+	| Watchevent -> "watch_event"
+
 type t =
 {
 	backend: backend;
-	pkt_out: Packet.t Queue.t;
+	pkt_out: (Packet.t, packet_class) Queue.t;
 	mutable partial_in: partial_buf;
 	mutable partial_out: string;
+	capacity: capacity
 }
+
+let to_read con =
+	match con.partial_in with
+		| HaveHdr partial_pkt -> Partial.to_complete partial_pkt
+		| NoHdr   (i, _)    -> i
+
+let debug t =
+	Printf.sprintf "XenBus state: partial_in: %d needed, partial_out: %d bytes, pkt_out: %d packets, %s"
+		(to_read t)
+		(String.length t.partial_out)
+		(Queue.length t.pkt_out)
+		(BoundedQueue.debug string_of_packet_class t.pkt_out)
 
 let init_partial_in () = NoHdr
 	(Partial.header_size (), Bytes.make (Partial.header_size()) '\000')
@@ -199,7 +229,8 @@ let output con =
 	let s = if String.length con.partial_out > 0 then
 			con.partial_out
 		else if Queue.length con.pkt_out > 0 then
-			Packet.to_string (Queue.pop con.pkt_out)
+			let pkt = Queue.pop con.pkt_out in
+			Packet.to_string pkt
 		else
 			"" in
 	(* send data from s, and save the unsent data to partial_out *)
@@ -212,12 +243,15 @@ let output con =
 	(* after sending one packet, partial is empty *)
 	con.partial_out = ""
 
+(* we can only process an input packet if we're guaranteed to have room
+   to store the response packet *)
+let can_input con = Queue.can_push con.pkt_out CommandReply
+
 (* NB: can throw Reconnect *)
 let input con =
-	let to_read =
-		match con.partial_in with
-		| HaveHdr partial_pkt -> Partial.to_complete partial_pkt
-		| NoHdr   (i, _)    -> i in
+	if not (can_input con) then None
+	else
+	let to_read = to_read con in
 
 	(* try to get more data from input stream *)
 	let b = Bytes.make to_read '\000' in
@@ -243,11 +277,22 @@ let input con =
 		None
 	)
 
-let newcon backend = {
+let classify t =
+	match t.Packet.ty with
+	| Op.Watchevent -> Watchevent
+	| _ -> CommandReply
+
+let newcon ~capacity backend =
+	let limit = function
+		| CommandReply -> capacity.maxoutstanding
+		| Watchevent -> capacity.maxwatchevents
+	in
+	{
 	backend = backend;
-	pkt_out = Queue.create ();
+	pkt_out = Queue.create ~capacity:(capacity.maxoutstanding + capacity.maxwatchevents) ~classify ~limit;
 	partial_in = init_partial_in ();
 	partial_out = "";
+	capacity = capacity;
 	}
 
 let open_fd fd = newcon (Fd { fd = fd; })
