@@ -19,9 +19,9 @@ if test \! -d $DIR-remote; then
 		cd $DIR-remote.tmp
 		$GIT branch -D dummy >/dev/null 2>&1 ||:
 		$GIT checkout -b dummy $TAG
-		cd ..
+		cd -
 	fi
 	mv $DIR-remote.tmp $DIR-remote
 fi
 rm -f $DIR
-ln -sf $DIR-remote $DIR
+ln -sf $(basename $DIR-remote) $DIR
