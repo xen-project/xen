@@ -606,6 +606,84 @@ static const struct cpuidle_state icx_cstates[] = {
 };
 
 /*
+ * On AlderLake C1 has to be disabled if C1E is enabled, and vice versa.
+ * C1E is enabled only if "C1E promotion" bit is set in MSR_IA32_POWER_CTL.
+ * But in this case there is effectively no C1, because C1 requests are
+ * promoted to C1E. If the "C1E promotion" bit is cleared, then both C1
+ * and C1E requests end up with C1, so there is effectively no C1E.
+ *
+ * By default we enable C1E and disable C1 by marking it with
+ * 'CPUIDLE_FLAG_DISABLED'.
+ */
+static struct cpuidle_state __read_mostly adl_cstates[] = {
+	{
+		.name = "C1",
+		.flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_DISABLED,
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 2,
+		.target_residency = 4,
+	},
+	{
+		.name = "C6",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 220,
+		.target_residency = 600,
+	},
+	{
+		.name = "C8",
+		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 280,
+		.target_residency = 800,
+	},
+	{
+		.name = "C10",
+		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 680,
+		.target_residency = 2000,
+	},
+	{}
+};
+
+static struct cpuidle_state __read_mostly adl_l_cstates[] = {
+	{
+		.name = "C1",
+		.flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_DISABLED,
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 2,
+		.target_residency = 4,
+	},
+	{
+		.name = "C6",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 170,
+		.target_residency = 500,
+	},
+	{
+		.name = "C8",
+		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 200,
+		.target_residency = 600,
+	},
+	{
+		.name = "C10",
+		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 230,
+		.target_residency = 700,
+	},
+	{}
+};
+
+/*
  * On Sapphire Rapids Xeon C1 has to be disabled if C1E is enabled, and vice
  * versa. On SPR C1E is enabled only if "C1E promotion" bit is set in
  * MSR_IA32_POWER_CTL. But in this case there effectively no C1, because C1
@@ -1032,6 +1110,14 @@ static const struct idle_cpu idle_cpu_icx = {
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
+static struct idle_cpu __read_mostly idle_cpu_adl = {
+	.state_table = adl_cstates,
+};
+
+static struct idle_cpu __read_mostly idle_cpu_adl_l = {
+	.state_table = adl_l_cstates,
+};
+
 static struct idle_cpu __read_mostly idle_cpu_spr = {
 	.state_table = spr_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
@@ -1099,6 +1185,8 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(SKYLAKE_X,			skx),
 	ICPU(ICELAKE_X,			icx),
 	ICPU(ICELAKE_D,			icx),
+	ICPU(ALDERLAKE,			adl),
+	ICPU(ALDERLAKE_L,		adl_l),
 	ICPU(SAPPHIRERAPIDS_X,		spr),
 	ICPU(XEON_PHI_KNL,		knl),
 	ICPU(XEON_PHI_KNM,		knl),
@@ -1269,6 +1357,30 @@ static void __init skx_idle_state_table_update(void)
 }
 
 /*
+ * adl_idle_state_table_update - Adjust AlderLake idle states table.
+ */
+static void __init adl_idle_state_table_update(void)
+{
+	/* Check if user prefers C1 over C1E. */
+	if ((preferred_states_mask & BIT(1, U)) &&
+	    !(preferred_states_mask & BIT(2, U))) {
+		adl_cstates[0].flags &= ~CPUIDLE_FLAG_DISABLED;
+		adl_cstates[1].flags |= CPUIDLE_FLAG_DISABLED;
+		adl_l_cstates[0].flags &= ~CPUIDLE_FLAG_DISABLED;
+		adl_l_cstates[1].flags |= CPUIDLE_FLAG_DISABLED;
+
+		/* Disable C1E by clearing the "C1E promotion" bit. */
+		idle_cpu_adl.c1e_promotion = C1E_PROMOTION_DISABLE;
+		idle_cpu_adl_l.c1e_promotion = C1E_PROMOTION_DISABLE;
+		return;
+	}
+
+	/* Make sure C1E is enabled by default */
+	idle_cpu_adl.c1e_promotion = C1E_PROMOTION_ENABLE;
+	idle_cpu_adl_l.c1e_promotion = C1E_PROMOTION_ENABLE;
+}
+
+/*
  * spr_idle_state_table_update - Adjust Sapphire Rapids idle states table.
  */
 static void __init spr_idle_state_table_update(void)
@@ -1323,6 +1435,10 @@ static void __init mwait_idle_state_table_update(void)
 		break;
 	case INTEL_FAM6_SAPPHIRERAPIDS_X:
 		spr_idle_state_table_update();
+		break;
+	case INTEL_FAM6_ALDERLAKE:
+	case INTEL_FAM6_ALDERLAKE_L:
+		adl_idle_state_table_update();
 		break;
 	}
 }
