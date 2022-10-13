@@ -10,7 +10,7 @@ OBJS = xenctrl
 INTF = xenctrl.cmi
 LIBS = xenctrl.cma xenctrl.cmxa
 
-LIBS_xenctrl = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
+LIBS_xenctrl = $(call xenlibs-ldflags-ldlibs,ctrl guest)
 
 xenctrl_OBJS = $(OBJS)
 xenctrl_C_OBJS = xenctrl_stubs

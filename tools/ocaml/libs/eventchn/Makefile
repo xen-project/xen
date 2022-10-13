@@ -8,7 +8,7 @@ OBJS = xeneventchn
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
 LIBS = xeneventchn.cma xeneventchn.cmxa
 
-LIBS_xeneventchn = $(LDLIBS_libxenevtchn)
+LIBS_xeneventchn = $(call xenlibs-ldflags-ldlibs,evtchn)
 
 all: $(INTF) $(LIBS) $(PROGRAMS)
 

@@ -15,7 +15,7 @@ LIBS = xenlight.cma xenlight.cmxa
 
 OCAMLINCLUDE += -I ../xentoollog
 
-LIBS_xenlight = $(LDLIBS_libxenlight)
+LIBS_xenlight = $(call xenlibs-ldflags-ldlibs,light)
 
 xenlight_OBJS = $(OBJS)
 xenlight_C_OBJS = xenlight_stubs

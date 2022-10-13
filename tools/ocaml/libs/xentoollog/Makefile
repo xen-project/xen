@@ -13,7 +13,7 @@ OBJS = xentoollog
 INTF = xentoollog.cmi
 LIBS = xentoollog.cma xentoollog.cmxa
 
-LIBS_xentoollog = $(LDLIBS_libxentoollog)
+LIBS_xentoollog = $(call xenlibs-ldflags-ldlibs,toollog)
 
 xentoollog_OBJS = $(OBJS)
 xentoollog_C_OBJS = xentoollog_stubs

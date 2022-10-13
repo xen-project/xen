@@ -113,6 +113,14 @@ define xenlibs-ldflags
     $(foreach lib,$(1),-L$(XEN_ROOT)/tools/libs/$(lib))
 endef
 
+# Flags for linking against all Xen libraries listed in $(1) but by making use
+# of -L and -l instead of providing a path to the shared library.
+define xenlibs-ldflags-ldlibs
+    $(call xenlibs-ldflags,$(1)) \
+    $(foreach lib,$(1), -l$(FILENAME_$(lib))) \
+    $(foreach lib,$(1),$(xenlibs-ldlibs-$(lib)))
+endef
+
 define LIB_defs
  FILENAME_$(1) ?= xen$(1)
  XEN_libxen$(1) = $$(XEN_ROOT)/tools/libs/$(1)
