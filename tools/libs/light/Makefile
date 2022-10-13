@@ -215,6 +215,8 @@ libxl_internal_json.h: _libxl_types_internal_json.h
 $(OBJS-y) $(PIC_OBJS) $(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): $(XEN_INCLUDE)/libxl.h
 $(OBJS-y) $(PIC_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
 
+# This exploits the 'multi-target pattern rule' trick.
+# gentypes.py should be executed only once to make all the targets.
 _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
 	$(eval stem = $(notdir $*))
 	$(PYTHON) gentypes.py libxl_type$(stem).idl __libxl_type$(stem).h __libxl_type$(stem)_private.h \
@@ -224,8 +226,10 @@ _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_
 	$(call move-if-changed,__libxl_type$(stem)_json.h,_libxl_type$(stem)_json.h)
 	$(call move-if-changed,__libxl_type$(stem).c,_libxl_type$(stem).c)
 
-$(XEN_INCLUDE)/_%.h: _%.h
-	$(call move-if-changed,_$*.h,$(XEN_INCLUDE)/_$*.h)
+.PRECIOUS: _libxl_type%.h _libxl_type%.c
+
+$(XEN_INCLUDE)/_libxl_%.h: _libxl_%.h
+	cp -f $< $@
 
 .PHONY: acpi
 acpi:
