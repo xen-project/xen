@@ -27,7 +27,6 @@ install: all
 uninstall:
 	$(RM) -- $(DESTDIR)$(LIBEXEC_BIN)/$(TARGET)
 
-CFLAGS += -Werror
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_libxenforeginmemory)

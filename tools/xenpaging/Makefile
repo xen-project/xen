@@ -12,7 +12,6 @@ OBJS-y   += xenpaging.o
 OBJS-y   += policy_$(POLICY).o
 OBJS-y   += pagein.o
 
-CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 
 TARGETS := xenpaging

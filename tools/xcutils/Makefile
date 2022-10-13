@@ -13,8 +13,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 TARGETS := readnotes lsevtchn
 
-CFLAGS += -Werror
-
 CFLAGS_readnotes.o  := $(CFLAGS_libxenevtchn) $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 CFLAGS_lsevtchn.o   := $(CFLAGS_libxenevtchn) $(CFLAGS_libxenctrl)
 

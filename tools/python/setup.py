@@ -8,7 +8,7 @@ SHLIB_libxenctrl = os.environ['SHLIB_libxenctrl'].split()
 SHLIB_libxenguest = os.environ['SHLIB_libxenguest'].split()
 SHLIB_libxenstore = os.environ['SHLIB_libxenstore'].split()
 
-extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
+extra_compile_args  = [ "-fno-strict-aliasing" ]
 
 PATH_XEN      = XEN_ROOT + "/tools/include"
 PATH_LIBXENTOOLLOG = XEN_ROOT + "/tools/libs/toollog"

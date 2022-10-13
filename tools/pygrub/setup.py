@@ -3,7 +3,7 @@ from distutils.ccompiler import new_compiler
 import os
 import sys
 
-extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
+extra_compile_args  = [ "-fno-strict-aliasing" ]
 
 XEN_ROOT = "../.."
 

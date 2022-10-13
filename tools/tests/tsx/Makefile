@@ -26,7 +26,6 @@ uninstall:
 .PHONY: uninstall
 uninstall:
 
-CFLAGS += -Werror
 CFLAGS += -I$(XEN_ROOT)/tools/libs/ctrl -I$(XEN_ROOT)/tools/libs/guest
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenctrl)

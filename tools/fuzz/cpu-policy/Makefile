@@ -17,7 +17,7 @@ install: all
 
 .PHONY: uninstall
 
-CFLAGS += -Werror $(CFLAGS_xeninclude) -D__XEN_TOOLS__
+CFLAGS += $(CFLAGS_xeninclude) -D__XEN_TOOLS__
 CFLAGS += $(APPEND_CFLAGS) -Og
 
 vpath %.c ../../../xen/lib/x86

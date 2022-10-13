@@ -9,7 +9,6 @@ XENSTORED_OBJS-$(CONFIG_NetBSD) += xenstored_posix.o
 XENSTORED_OBJS-$(CONFIG_FreeBSD) += xenstored_posix.o
 XENSTORED_OBJS-$(CONFIG_MiniOS) += xenstored_minios.o
 
-CFLAGS += -Werror
 # Include configure output (config.h)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
 CFLAGS += -I./include

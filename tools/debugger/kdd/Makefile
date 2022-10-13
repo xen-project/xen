@@ -1,7 +1,6 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS  += -Werror
 CFLAGS  += $(CFLAGS_libxenctrl)
 CFLAGS  += -DXC_WANT_COMPAT_MAP_FOREIGN_API
 LDLIBS  += $(LDLIBS_libxenctrl)
