@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+from __future__ import print_function
+
 import os
 import sys
 
@@ -723,7 +725,13 @@ def xenlight_golang_fmt_name(name, exported = True):
     return words[0] + ''.join(x.title() for x in words[1:])
 
 if __name__ == '__main__':
+    if len(sys.argv) != 4:
+        print("Usage: gengotypes.py <idl> <types.gen.go> <helpers.gen.go>", file=sys.stderr)
+        sys.exit(1)
+
     idlname = sys.argv[1]
+    path_types = sys.argv[2]
+    path_helpers = sys.argv[3]
 
     (builtins, types) = idl.parse(idlname)
 
@@ -735,9 +743,11 @@ if __name__ == '__main__':
 // source: {}
 
 """.format(os.path.basename(sys.argv[0]),
-           ' '.join([os.path.basename(a) for a in sys.argv[1:]]))
+           os.path.basename(sys.argv[1]))
 
     xenlight_golang_generate_types(types=types,
+                                   path=path_types,
                                    comment=header_comment)
     xenlight_golang_generate_helpers(types=types,
+                                     path=path_helpers,
                                      comment=header_comment)
