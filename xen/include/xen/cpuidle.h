@@ -42,7 +42,8 @@ struct acpi_processor_cx
     u8 idx;
     u8 type;         /* ACPI_STATE_Cn */
     u8 entry_method; /* ACPI_CSTATE_EM_xxx */
-    bool irq_enable_early;
+    bool irq_enable_early:1;
+    bool ibrs_disable:1;
     u32 address;
     u32 latency;
     u32 target_residency;

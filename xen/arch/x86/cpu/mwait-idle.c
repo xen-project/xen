@@ -141,6 +141,12 @@ static const struct cpuidle_state {
 #define CPUIDLE_FLAG_TLB_FLUSHED	0x10000
 
 /*
+ * Disable IBRS across idle (when KERNEL_IBRS), is exclusive vs IRQ_ENABLE
+ * above.
+ */
+#define CPUIDLE_FLAG_IBRS		0x20000
+
+/*
  * MWAIT takes an 8-bit "hint" in EAX "suggesting"
  * the C-state (top nibble) and sub-state (bottom nibble)
  * 0x00 means "MWAIT(C1)", 0x10 means "MWAIT(C2)" etc.
@@ -530,31 +536,31 @@ static struct cpuidle_state __read_mostly skl_cstates[] = {
 	},
 	{
 		.name = "C6",
-		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED | CPUIDLE_FLAG_IBRS,
 		.exit_latency = 85,
 		.target_residency = 200,
 	},
 	{
 		.name = "C7s",
-		.flags = MWAIT2flg(0x33) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x33) | CPUIDLE_FLAG_TLB_FLUSHED | CPUIDLE_FLAG_IBRS,
 		.exit_latency = 124,
 		.target_residency = 800,
 	},
 	{
 		.name = "C8",
-		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED | CPUIDLE_FLAG_IBRS,
 		.exit_latency = 200,
 		.target_residency = 800,
 	},
 	{
 		.name = "C9",
-		.flags = MWAIT2flg(0x50) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x50) | CPUIDLE_FLAG_TLB_FLUSHED | CPUIDLE_FLAG_IBRS,
 		.exit_latency = 480,
 		.target_residency = 5000,
 	},
 	{
 		.name = "C10",
-		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED | CPUIDLE_FLAG_IBRS,
 		.exit_latency = 890,
 		.target_residency = 5000,
 	},
@@ -576,7 +582,7 @@ static struct cpuidle_state __read_mostly skx_cstates[] = {
 	},
 	{
 		.name = "C6",
-		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED | CPUIDLE_FLAG_IBRS,
 		.exit_latency = 133,
 		.target_residency = 600,
 	},
@@ -906,6 +912,7 @@ static const struct cpuidle_state snr_cstates[] = {
 static void cf_check mwait_idle(void)
 {
 	unsigned int cpu = smp_processor_id();
+	struct cpu_info *info = get_cpu_info();
 	struct acpi_processor_power *power = processor_powers[cpu];
 	struct acpi_processor_cx *cx = NULL;
 	unsigned int next_state;
@@ -932,8 +939,6 @@ static void cf_check mwait_idle(void)
 			pm_idle_save();
 		else
 		{
-			struct cpu_info *info = get_cpu_info();
-
 			spec_ctrl_enter_idle(info);
 			safe_halt();
 			spec_ctrl_exit_idle(info);
@@ -959,6 +964,11 @@ static void cf_check mwait_idle(void)
 
 	if ((cx->type >= 3) && errata_c6_workaround())
 		cx = power->safe_state;
+
+	if (cx->ibrs_disable) {
+		ASSERT(!cx->irq_enable_early);
+		spec_ctrl_enter_idle(info);
+	}
 
 #if 0 /* XXX Can we/do we need to do something similar on Xen? */
 	/*
@@ -991,6 +1001,10 @@ static void cf_check mwait_idle(void)
 
 	/* Now back in C0. */
 	update_idle_stats(power, cx, before, after);
+
+	if (cx->ibrs_disable)
+		spec_ctrl_exit_idle(info);
+
 	local_irq_enable();
 
 	TRACE_6D(TRC_PM_IDLE_EXIT, cx->type, after,
@@ -1603,6 +1617,8 @@ static int cf_check mwait_idle_cpu_init(
 		    /* cstate_restore_tsc() needs to be a no-op */
 		    boot_cpu_has(X86_FEATURE_NONSTOP_TSC))
 			cx->irq_enable_early = true;
+		if (cpuidle_state_table[cstate].flags & CPUIDLE_FLAG_IBRS)
+			cx->ibrs_disable = true;
 
 		dev->count++;
 	}
