@@ -1926,6 +1926,12 @@ paging controls access to usermode addresses.
 ### ple_window (Intel)
 > `= <integer>`
 
+### preferred-cstates (x86)
+> `= ( <integer> | List of ( C1 | C1E | C2 | ... )`
+
+This is a mask of C-states which are to be used preferably.  This option is
+applicable only on hardware were certain C-states are exclusive of one another.
+
 ### psr (Intel)
 > `= List of ( cmt:<boolean> | rmid_max:<integer> | cat:<boolean> | cos_max:<integer> | cdp:<boolean> )`
 

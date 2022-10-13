@@ -82,9 +82,28 @@ boolean_param("mwait-idle", opt_mwait_idle);
 
 static unsigned int mwait_substates;
 
+/*
+ * Some platforms come with mutually exclusive C-states, so that if one is
+ * enabled, the other C-states must not be used. Example: C1 and C1E on
+ * Sapphire Rapids platform. This parameter allows for selecting the
+ * preferred C-states among the groups of mutually exclusive C-states - the
+ * selected C-states will be registered, the other C-states from the mutually
+ * exclusive group won't be registered. If the platform has no mutually
+ * exclusive C-states, this parameter has no effect.
+ */
+static unsigned int __ro_after_init preferred_states_mask;
+static char __initdata preferred_states[64];
+string_param("preferred-cstates", preferred_states);
+
 #define LAPIC_TIMER_ALWAYS_RELIABLE 0xFFFFFFFF
 /* Reliable LAPIC Timer States, bit 1 for C1 etc. Default to only C1. */
 static unsigned int lapic_timer_reliable_states = (1 << 1);
+
+enum c1e_promotion {
+	C1E_PROMOTION_PRESERVE,
+	C1E_PROMOTION_ENABLE,
+	C1E_PROMOTION_DISABLE
+};
 
 struct idle_cpu {
 	const struct cpuidle_state *state_table;
@@ -95,7 +114,7 @@ struct idle_cpu {
 	 */
 	unsigned long auto_demotion_disable_flags;
 	bool byt_auto_demotion_disable_flag;
-	bool disable_promotion_to_c1e;
+	enum c1e_promotion c1e_promotion;
 };
 
 static const struct idle_cpu *icpu;
@@ -924,6 +943,15 @@ static void cf_check byt_auto_demotion_disable(void *dummy)
 	wrmsrl(MSR_MC6_DEMOTION_POLICY_CONFIG, 0);
 }
 
+static void cf_check c1e_promotion_enable(void *dummy)
+{
+	uint64_t msr_bits;
+
+	rdmsrl(MSR_IA32_POWER_CTL, msr_bits);
+	msr_bits |= 0x2;
+	wrmsrl(MSR_IA32_POWER_CTL, msr_bits);
+}
+
 static void cf_check c1e_promotion_disable(void *dummy)
 {
 	u64 msr_bits;
@@ -936,7 +964,7 @@ static void cf_check c1e_promotion_disable(void *dummy)
 static const struct idle_cpu idle_cpu_nehalem = {
 	.state_table = nehalem_cstates,
 	.auto_demotion_disable_flags = NHM_C1_AUTO_DEMOTE | NHM_C3_AUTO_DEMOTE,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_atom = {
@@ -954,64 +982,64 @@ static const struct idle_cpu idle_cpu_lincroft = {
 
 static const struct idle_cpu idle_cpu_snb = {
 	.state_table = snb_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_byt = {
 	.state_table = byt_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 	.byt_auto_demotion_disable_flag = true,
 };
 
 static const struct idle_cpu idle_cpu_cht = {
 	.state_table = cht_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 	.byt_auto_demotion_disable_flag = true,
 };
 
 static const struct idle_cpu idle_cpu_ivb = {
 	.state_table = ivb_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_ivt = {
 	.state_table = ivt_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_hsw = {
 	.state_table = hsw_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_bdw = {
 	.state_table = bdw_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_skl = {
 	.state_table = skl_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_skx = {
 	.state_table = skx_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_icx = {
-       .state_table = icx_cstates,
-       .disable_promotion_to_c1e = true,
+	.state_table = icx_cstates,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static struct idle_cpu __read_mostly idle_cpu_spr = {
 	.state_table = spr_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_avn = {
 	.state_table = avn_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_knl = {
@@ -1020,17 +1048,17 @@ static const struct idle_cpu idle_cpu_knl = {
 
 static const struct idle_cpu idle_cpu_bxt = {
 	.state_table = bxt_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_dnv = {
 	.state_table = dnv_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 static const struct idle_cpu idle_cpu_snr = {
 	.state_table = snr_cstates,
-	.disable_promotion_to_c1e = true,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
 #define ICPU(model, cpu) \
@@ -1241,6 +1269,25 @@ static void __init skx_idle_state_table_update(void)
 }
 
 /*
+ * spr_idle_state_table_update - Adjust Sapphire Rapids idle states table.
+ */
+static void __init spr_idle_state_table_update(void)
+{
+	/* Check if user prefers C1E over C1. */
+	if (preferred_states_mask & BIT(2, U)) {
+		if (preferred_states_mask & BIT(1, U))
+			/* Both can't be enabled, stick to the defaults. */
+			return;
+
+		spr_cstates[0].flags |= CPUIDLE_FLAG_DISABLED;
+		spr_cstates[1].flags &= ~CPUIDLE_FLAG_DISABLED;
+
+		/* Request enabling C1E using the "C1E promotion" bit. */
+		idle_cpu_spr.c1e_promotion = C1E_PROMOTION_ENABLE;
+	}
+}
+
+/*
  * mwait_idle_state_table_update()
  *
  * Update the default state_table for this CPU-id
@@ -1261,6 +1308,9 @@ static void __init mwait_idle_state_table_update(void)
 	case INTEL_FAM6_SKYLAKE_X:
 		skx_idle_state_table_update();
 		break;
+	case INTEL_FAM6_SAPPHIRERAPIDS_X:
+		spr_idle_state_table_update();
+		break;
 	}
 }
 
@@ -1268,6 +1318,7 @@ static int __init mwait_idle_probe(void)
 {
 	unsigned int eax, ebx, ecx;
 	const struct x86_cpu_id *id = x86_match_cpu(intel_idle_ids);
+	const char *str;
 
 	if (!id) {
 		pr_debug(PREFIX "does not run on family %d model %d\n",
@@ -1308,6 +1359,39 @@ static int __init mwait_idle_probe(void)
 
 	pr_debug(PREFIX "lapic_timer_reliable_states %#x\n",
 		 lapic_timer_reliable_states);
+
+	str = preferred_states;
+	if (isdigit(str[0]))
+		preferred_states_mask = simple_strtoul(str, &str, 0);
+	else if (str[0])
+	{
+		const char *ss;
+
+		do {
+			const struct cpuidle_state *state = icpu->state_table;
+			unsigned int bit = 1;
+
+			ss = strchr(str, ',');
+			if (!ss)
+				ss = strchr(str, '\0');
+
+			for (; state->name[0]; ++state) {
+				bit <<= 1;
+				if (!cmdline_strcmp(str, state->name)) {
+					preferred_states_mask |= bit;
+					break;
+				}
+			}
+			if (!state->name[0])
+				break;
+
+			str = ss + 1;
+		} while (*ss);
+
+		str -= str == ss + 1;
+	}
+	if (str[0])
+		printk("unrecognized \"preferred-cstates=%s\"\n", str);
 
 	mwait_idle_state_table_update();
 
@@ -1400,8 +1484,18 @@ static int cf_check mwait_idle_cpu_init(
 	if (icpu->byt_auto_demotion_disable_flag)
 		on_selected_cpus(cpumask_of(cpu), byt_auto_demotion_disable, NULL, 1);
 
-	if (icpu->disable_promotion_to_c1e)
+	switch (icpu->c1e_promotion) {
+	case C1E_PROMOTION_DISABLE:
 		on_selected_cpus(cpumask_of(cpu), c1e_promotion_disable, NULL, 1);
+		break;
+
+	case C1E_PROMOTION_ENABLE:
+		on_selected_cpus(cpumask_of(cpu), c1e_promotion_enable, NULL, 1);
+		break;
+
+	case C1E_PROMOTION_PRESERVE:
+		break;
+	}
 
 	return NOTIFY_DONE;
 }
