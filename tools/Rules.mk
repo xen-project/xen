@@ -133,6 +133,10 @@ endif
 
 CFLAGS_libxenlight += $(CFLAGS_libxenctrl)
 
+ifeq ($(CONFIG_WERROR),y)
+CFLAGS += -Werror
+endif
+
 ifeq ($(debug),y)
 # Use -Og if available, -O0 otherwise
 dbg_opt_level := $(call cc-option,$(CC),-Og,-O0)

@@ -716,6 +716,7 @@ ocamltools
 monitors
 githttp
 rpath
+werror
 DEBUG_DIR
 XEN_DUMP_DIR
 XEN_PAGING_DIR
@@ -805,6 +806,7 @@ with_xen_scriptdir
 with_xen_dumpdir
 with_rundir
 with_debugdir
+enable_werror
 enable_rpath
 enable_githttp
 enable_monitors
@@ -1490,6 +1492,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-largefile     omit support for large files
+  --disable-werror        Build tools without -Werror (default is ENABLED)
   --enable-rpath          Build tools with -Wl,-rpath,LIBDIR (default is
                           DISABLED)
   --enable-githttp        Download GIT repositories via HTTP (default is
@@ -4110,6 +4113,29 @@ DEBUG_DIR=$debugdir_path
 
 
 # Enable/disable options
+
+# Check whether --enable-werror was given.
+if test "${enable_werror+set}" = set; then :
+  enableval=$enable_werror;
+fi
+
+
+if test "x$enable_werror" = "xno"; then :
+
+    ax_cv_werror="n"
+
+elif test "x$enable_werror" = "xyes"; then :
+
+    ax_cv_werror="y"
+
+elif test -z $ax_cv_werror; then :
+
+    ax_cv_werror="y"
+
+fi
+werror=$ax_cv_werror
+
+
 
 # Check whether --enable-rpath was given.
 if test "${enable_rpath+set}" = set; then :
