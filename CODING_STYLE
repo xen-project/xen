@@ -14,6 +14,16 @@ explicitly (e.g. tools/libxl/CODING_STYLE) but often implicitly (Linux
 coding style is fairly common). In general you should copy the style
 of the surrounding code. If you are unsure please ask.
 
+SPDX
+----
+
+New files should start with a single-line SPDX comment to express the
+license, e.g.:
+
+/* SPDX-License-Identifier: GPL-2.0 */
+
+See LICENSES/ for a list of licenses and SPDX tags currently used.
+
 MISRA C
 -------
 
