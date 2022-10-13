@@ -7,17 +7,20 @@ include $(XEN_ROOT)/tools/Rules.mk
 # taken into account, i.e. there should be no rules added here for generating
 # any tools/include/*.h files.
 
-# Relative to $(XEN_ROOT)/xen/xsm/flask
-FLASK_H_DEPEND := policy/initial_sids
+.PHONY: all
+all: xen-foreign xen-dir xen-xsm/.dir
+ifeq ($(CONFIG_X86),y)
+all: xen/lib/x86/all
+endif
 
-.PHONY: all all-y build xen-dir
-all build: all-y xen-foreign xen-dir xen-xsm/.dir
-all-y:
+.PHONY: build
+build: all
 
 .PHONY: xen-foreign
 xen-foreign:
 	$(MAKE) -C xen-foreign
 
+.PHONY: xen-dir
 xen-dir:
 	mkdir -p xen/libelf acpi
 	find xen/ acpi/ -type l -exec rm '{}' +
@@ -36,16 +39,18 @@ ifeq ($(CONFIG_X86),y)
 	ln -s $(XEN_ROOT)/xen/include/xen/lib/x86/Makefile xen/lib/x86/
 endif
 
-all-$(CONFIG_X86): xen-dir
+.PHONY: xen/lib/x86/all
+xen/lib/x86/all: xen-dir
 	$(MAKE) -C xen/lib/x86 all XEN_ROOT=$(XEN_ROOT) PYTHON=$(PYTHON)
+
+MKFLASK := $(XEN_ROOT)/xen/xsm/flask/policy/mkflask.sh
+FLASK_H_DEPEND := $(XEN_ROOT)/xen/xsm/flask/policy/initial_sids
 
 # Not xen/xsm as that clashes with link to
 # $(XEN_ROOT)/xen/include/public/xsm above.
-xen-xsm/.dir: $(XEN_ROOT)/xen/xsm/flask/policy/mkflask.sh \
-	      $(patsubst %,$(XEN_ROOT)/xen/xsm/flask/%,$(FLASK_H_DEPEND))
+xen-xsm/.dir: $(MKFLASK) $(FLASK_H_DEPEND)
 	mkdir -p xen-xsm/flask
-	cd $(XEN_ROOT)/xen/xsm/flask/ && \
-		$(SHELL) policy/mkflask.sh $(AWK) $(CURDIR)/xen-xsm/flask $(FLASK_H_DEPEND)
+	$(SHELL) $(MKFLASK) $(AWK) xen-xsm/flask $(FLASK_H_DEPEND)
 	touch $@
 
 .PHONY: install
@@ -83,9 +88,6 @@ clean:
 	rm -rf xen xen-xsm acpi
 	$(MAKE) -C xen-foreign clean
 	rm -f _*.h
-
-.PHONY: dist
-dist: install
 
 .PHONY: distclean
 distclean: clean
