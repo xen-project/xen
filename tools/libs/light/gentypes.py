@@ -584,6 +584,9 @@ def libxl_C_enum_from_string(ty, str, e, indent = "    "):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
+def clean_header_define(header_path):
+    return header_path.split('/')[-1].upper().replace('.','_')
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 6:
@@ -598,7 +601,7 @@ if __name__ == '__main__':
 
     f = open(header, "w")
 
-    header_define = header.upper().replace('.','_')
+    header_define = clean_header_define(header)
     f.write("""#ifndef %s
 #define %s
 
@@ -648,7 +651,7 @@ if __name__ == '__main__':
 
     f = open(header_json, "w")
 
-    header_json_define = header_json.upper().replace('.','_')
+    header_json_define = clean_header_define(header_json)
     f.write("""#ifndef %s
 #define %s
 
@@ -672,7 +675,7 @@ if __name__ == '__main__':
 
     f = open(header_private, "w")
 
-    header_private_define = header_private.upper().replace('.','_')
+    header_private_define = clean_header_define(header_private)
     f.write("""#ifndef %s
 #define %s
 
