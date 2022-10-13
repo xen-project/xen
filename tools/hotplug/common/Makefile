@@ -1,19 +1,14 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-HOTPLUGPATH := hotplugpath.sh
-
 # OS-independent hotplug scripts go in this directory
 
 # Xen scripts to go there.
 XEN_SCRIPTS :=
-XEN_SCRIPT_DATA := $(HOTPLUGPATH)
-
-genpath-target = $(call buildmakevars2file,$(HOTPLUGPATH))
-$(eval $(genpath-target))
+XEN_SCRIPT_DATA := hotplugpath.sh
 
 .PHONY: all
-all: $(HOTPLUGPATH)
+all:
 
 .PHONY: install
 install: install-scripts
@@ -40,7 +35,6 @@ uninstall-scripts:
 
 .PHONY: clean
 clean:
-	rm -f $(HOTPLUGPATH)
 
 .PHONY: distclean
 distclean: clean
