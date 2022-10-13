@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <xen/mm.h>
 #include <xen/pmap.h>
 #include <xen/vmap.h>

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include <xen/percpu.h>
 #include <xen/cpu.h>
 #include <xen/init.h>
