@@ -313,14 +313,12 @@ static DEFINE_RWLOCK(L1_global_argo_rwlock); /* L1 */
     ((LOCKING_Read_L1 && spin_is_locked(&(d)->argo->send_L2_lock)) || \
      LOCKING_Write_L1)
 
-/* Change this to #define ARGO_DEBUG here to enable more debug messages */
-#undef ARGO_DEBUG
-
-#ifdef ARGO_DEBUG
-#define argo_dprintk(format, args...) printk("argo: " format, ## args )
-#else
-#define argo_dprintk(format, ... ) ((void)0)
-#endif
+#define ARGO_DEBUG 0
+#define argo_dprintk(fmt, args...)                      \
+    do {                                                \
+        if ( ARGO_DEBUG )                               \
+            printk(XENLOG_DEBUG "argo: " fmt, ##args);  \
+    } while ( 0 )
 
 /*
  * This hash function is used to distribute rings within the per-domain
