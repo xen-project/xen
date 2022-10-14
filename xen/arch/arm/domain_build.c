@@ -1051,8 +1051,8 @@ static void __init assign_static_memory_11(struct domain *d,
  * The current heuristic assumes that a device is a host bridge
  * if the type is "pci" and then parent type is not "pci".
  */
-static int handle_linux_pci_domain(struct kernel_info *kinfo,
-                                   const struct dt_device_node *node)
+static int __init handle_linux_pci_domain(struct kernel_info *kinfo,
+                                          const struct dt_device_node *node)
 {
     uint16_t segment;
     int res;
