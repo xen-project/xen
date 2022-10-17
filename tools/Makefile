@@ -159,6 +159,7 @@ qemu-traditional-recurse = \
 	set -e; \
 		$(buildmakevars2shellvars); \
 		export CONFIG_BLKTAP1=n; \
+		export BUILDING_QEMU_TRAD=y; \
 		cd qemu-xen-traditional-dir; \
 		$(1)
 

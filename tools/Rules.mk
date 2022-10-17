@@ -141,8 +141,11 @@ endif
 
 CFLAGS_libxenlight += $(CFLAGS_libxenctrl)
 
+# Don't add -Werror if we are used by qemu-trad build system.
+ifndef BUILDING_QEMU_TRAD
 ifeq ($(CONFIG_WERROR),y)
 CFLAGS += -Werror
+endif
 endif
 
 ifeq ($(debug),y)
