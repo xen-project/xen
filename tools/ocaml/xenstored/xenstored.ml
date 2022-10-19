@@ -418,6 +418,11 @@ let _ =
 		rw_sock
 	) in
 
+	(* required for xenstore-control to detect availability of live-update *)
+	Store.mkdir store Perms.Connection.full_rights (Store.Path.of_string "/tool");
+	Store.write store Perms.Connection.full_rights
+		(Store.Path.of_string "/tool/xenstored") Sys.executable_name;
+
 	Sys.set_signal Sys.sighup (Sys.Signal_handle sighup_handler);
 	Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ ->
 		info "Received SIGTERM";
