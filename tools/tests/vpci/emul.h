@@ -92,7 +92,7 @@ typedef union {
 #define xmalloc(type) ((type *)malloc(sizeof(type)))
 #define xfree(p) free(p)
 
-#define pci_get_pdev_by_domain(...) &test_pdev
+#define pci_get_pdev(...) (&test_pdev)
 #define pci_get_ro_map(...) NULL
 
 #define test_bit(...) false
