@@ -78,7 +78,6 @@ static struct page_info *p2m_alloc_page(struct domain *d)
             spin_unlock(&d->arch.paging.lock);
             return NULL;
         }
-        d->arch.paging.p2m_total_pages--;
     }
     spin_unlock(&d->arch.paging.lock);
 
@@ -91,10 +90,7 @@ static void p2m_free_page(struct domain *d, struct page_info *pg)
     if ( is_hardware_domain(d) )
         free_domheap_page(pg);
     else
-    {
-        d->arch.paging.p2m_total_pages++;
         page_list_add_tail(pg, &d->arch.paging.p2m_freelist);
-    }
     spin_unlock(&d->arch.paging.lock);
 }
 
