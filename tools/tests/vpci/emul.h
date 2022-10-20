@@ -37,6 +37,7 @@
 #define prefetch(x) __builtin_prefetch(x)
 #define ASSERT(x) assert(x)
 #define __must_check __attribute__((__warn_unused_result__))
+#define cf_check
 
 #include "list.h"
 
