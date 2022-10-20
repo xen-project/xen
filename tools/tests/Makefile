@@ -11,6 +11,7 @@ endif
 SUBDIRS-y += xenstore
 SUBDIRS-y += depriv
 SUBDIRS-y += vpci
+SUBDIRS-y += paging-mempool
 
 .PHONY: all clean install distclean uninstall
 all clean distclean install uninstall: %: subdirs-%
