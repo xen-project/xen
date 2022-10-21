@@ -353,7 +353,9 @@ let _ =
 	) in
 
 	(* required for xenstore-control to detect availability of live-update *)
-	Store.mkdir store Perms.Connection.full_rights (Store.Path.of_string "/tool");
+	let tool_path = Store.Path.of_string "/tool" in
+	if not (Store.path_exists store tool_path) then
+		Store.mkdir store Perms.Connection.full_rights tool_path;
 	Store.write store Perms.Connection.full_rights
 		(Store.Path.of_string "/tool/xenstored") Sys.executable_name;
 
