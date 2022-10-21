@@ -706,6 +706,35 @@ long long xc_logdirty_control(xc_interface *xch,
     return (rc == 0) ? domctl.u.shadow_op.pages : rc;
 }
 
+int xc_get_paging_mempool_size(xc_interface *xch, uint32_t domid, uint64_t *size)
+{
+    int rc;
+    struct xen_domctl domctl = {
+        .cmd         = XEN_DOMCTL_get_paging_mempool_size,
+        .domain      = domid,
+    };
+
+    rc = do_domctl(xch, &domctl);
+    if ( rc )
+        return rc;
+
+    *size = domctl.u.paging_mempool.size;
+    return 0;
+}
+
+int xc_set_paging_mempool_size(xc_interface *xch, uint32_t domid, uint64_t size)
+{
+    struct xen_domctl domctl = {
+        .cmd         = XEN_DOMCTL_set_paging_mempool_size,
+        .domain      = domid,
+        .u.paging_mempool = {
+            .size = size,
+        },
+    };
+
+    return do_domctl(xch, &domctl);
+}
+
 int xc_domain_setmaxmem(xc_interface *xch,
                         uint32_t domid,
                         uint64_t max_memkb)

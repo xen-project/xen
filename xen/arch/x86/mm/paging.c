@@ -977,6 +977,49 @@ int __init paging_set_allocation(struct domain *d, unsigned int pages,
 }
 #endif
 
+int arch_get_paging_mempool_size(struct domain *d, uint64_t *size)
+{
+    int rc;
+
+    if ( is_pv_domain(d) )                 /* TODO: Relax in due course */
+        return -EOPNOTSUPP;
+
+    if ( hap_enabled(d) )
+        rc = hap_get_allocation_bytes(d, size);
+    else
+        rc = shadow_get_allocation_bytes(d, size);
+
+    return rc;
+}
+
+int arch_set_paging_mempool_size(struct domain *d, uint64_t size)
+{
+    unsigned long pages = size >> PAGE_SHIFT;
+    bool preempted = false;
+    int rc;
+
+    if ( is_pv_domain(d) )                 /* TODO: Relax in due course */
+        return -EOPNOTSUPP;
+
+    if ( size & ~PAGE_MASK ||              /* Non page-sized request? */
+         pages != (unsigned int)pages )    /* Overflow $X_set_allocation()? */
+        return -EINVAL;
+
+    paging_lock(d);
+    if ( hap_enabled(d) )
+        rc = hap_set_allocation(d, pages, &preempted);
+    else
+        rc = shadow_set_allocation(d, pages, &preempted);
+    paging_unlock(d);
+
+    /*
+     * TODO: Adjust $X_set_allocation() so this is true.
+    ASSERT(preempted == (rc == -ERESTART));
+     */
+
+    return preempted ? -ERESTART : rc;
+}
+
 /*
  * Local variables:
  * mode: C

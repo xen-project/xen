@@ -100,6 +100,13 @@ unsigned int p2m_get_allocation(struct domain *d)
     return ROUNDUP(nr_pages, 1 << (20 - PAGE_SHIFT)) >> (20 - PAGE_SHIFT);
 }
 
+/* Return the size of the pool, in bytes. */
+int arch_get_paging_mempool_size(struct domain *d, uint64_t *size)
+{
+    *size = (uint64_t)ACCESS_ONCE(d->arch.paging.p2m_total_pages) << PAGE_SHIFT;
+    return 0;
+}
+
 /*
  * Set the pool of pages to the required number of pages.
  * Returns 0 for success, non-zero for failure.
@@ -155,6 +162,25 @@ int p2m_set_allocation(struct domain *d, unsigned long pages, bool *preempted)
     }
 
     return 0;
+}
+
+int arch_set_paging_mempool_size(struct domain *d, uint64_t size)
+{
+    unsigned long pages = size >> PAGE_SHIFT;
+    bool preempted = false;
+    int rc;
+
+    if ( (size & ~PAGE_MASK) ||          /* Non page-sized request? */
+         pages != (size >> PAGE_SHIFT) ) /* 32-bit overflow? */
+        return -EINVAL;
+
+    spin_lock(&d->arch.paging.lock);
+    rc = p2m_set_allocation(d, pages, &preempted);
+    spin_unlock(&d->arch.paging.lock);
+
+    ASSERT(preempted == (rc == -ERESTART));
+
+    return rc;
 }
 
 int p2m_teardown_allocation(struct domain *d)

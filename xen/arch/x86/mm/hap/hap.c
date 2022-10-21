@@ -345,6 +345,17 @@ unsigned int hap_get_allocation(struct domain *d)
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }
 
+int hap_get_allocation_bytes(struct domain *d, uint64_t *size)
+{
+    unsigned long pages = d->arch.paging.hap.total_pages;
+
+    pages += d->arch.paging.hap.p2m_pages;
+
+    *size = pages << PAGE_SHIFT;
+
+    return 0;
+}
+
 /* Set the pool of pages to the required number of pages.
  * Returns 0 for success, non-zero for failure. */
 int hap_set_allocation(struct domain *d, unsigned int pages, bool *preempted)

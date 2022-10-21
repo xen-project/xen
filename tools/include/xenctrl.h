@@ -893,6 +893,9 @@ long long xc_logdirty_control(xc_interface *xch,
                               unsigned int mode,
                               xc_shadow_op_stats_t *stats);
 
+int xc_get_paging_mempool_size(xc_interface *xch, uint32_t domid, uint64_t *size);
+int xc_set_paging_mempool_size(xc_interface *xch, uint32_t domid, uint64_t size);
+
 int xc_sched_credit_domain_set(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit *sdom);

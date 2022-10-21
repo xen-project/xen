@@ -1427,6 +1427,17 @@ static unsigned int shadow_get_allocation(struct domain *d)
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }
 
+int shadow_get_allocation_bytes(struct domain *d, uint64_t *size)
+{
+    unsigned long pages = d->arch.paging.shadow.total_pages;
+
+    pages += d->arch.paging.shadow.p2m_pages;
+
+    *size = pages << PAGE_SHIFT;
+
+    return 0;
+}
+
 /**************************************************************************/
 /* Hash table for storing the guest->shadow mappings.
  * The table itself is an array of pointers to shadows; the shadows are then

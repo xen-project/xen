@@ -97,6 +97,8 @@ void shadow_blow_tables_per_domain(struct domain *d);
 int shadow_set_allocation(struct domain *d, unsigned int pages,
                           bool *preempted);
 
+int shadow_get_allocation_bytes(struct domain *d, uint64_t *size);
+
 #else /* !CONFIG_SHADOW_PAGING */
 
 #define shadow_vcpu_teardown(v) ASSERT(is_pv_vcpu(v))
@@ -107,6 +109,8 @@ int shadow_set_allocation(struct domain *d, unsigned int pages,
 #define shadow_track_dirty_vram(d, begin_pfn, nr, bitmap) \
     ({ ASSERT_UNREACHABLE(); -EOPNOTSUPP; })
 #define shadow_set_allocation(d, pages, preempted) \
+    ({ ASSERT_UNREACHABLE(); -EOPNOTSUPP; })
+#define shadow_get_allocation_bytes(d, size) \
     ({ ASSERT_UNREACHABLE(); -EOPNOTSUPP; })
 
 static inline void sh_remove_shadows(struct domain *d, mfn_t gmfn,
