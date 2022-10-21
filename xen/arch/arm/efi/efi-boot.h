@@ -183,7 +183,8 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
 
     for ( Index = 0; Index < (mmap_size / desc_size); Index++ )
     {
-        if ( desc_ptr->Attribute & EFI_MEMORY_WB &&
+        if ( !(desc_ptr->Attribute & EFI_MEMORY_RUNTIME) &&
+             (desc_ptr->Attribute & EFI_MEMORY_WB) &&
              (desc_ptr->Type == EfiConventionalMemory ||
               desc_ptr->Type == EfiLoaderCode ||
               desc_ptr->Type == EfiLoaderData ||
