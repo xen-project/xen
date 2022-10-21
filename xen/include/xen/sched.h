@@ -1019,7 +1019,6 @@ void vcpu_set_periodic_timer(struct vcpu *v, s_time_t value);
 void sched_setup_dom0_vcpus(struct domain *d);
 int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason);
 int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity);
-void restore_vcpu_affinity(struct domain *d);
 int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
                          struct xen_domctl_vcpuaffinity *vcpuaff);
 
