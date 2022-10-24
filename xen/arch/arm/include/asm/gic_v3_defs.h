@@ -30,6 +30,8 @@
 #define GICD_CLRSPI_NSR              (0x048)
 #define GICD_SETSPI_SR               (0x050)
 #define GICD_CLRSPI_SR               (0x058)
+#define GICD_IGRPMODR                (0xD00)
+#define GICD_IGRPMODRN               (0xD7C)
 #define GICD_IROUTER                 (0x6000)
 #define GICD_IROUTER32               (0x6100)
 #define GICD_IROUTER1019             (0x7FD8)

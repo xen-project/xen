@@ -684,6 +684,7 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
     switch ( reg )
     {
     case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
+    case VRANGE32(GICD_IGRPMODR, GICD_IGRPMODRN):
         /* We do not implement security extensions for guests, read zero */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         goto read_as_zero;
@@ -780,6 +781,7 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
     switch ( reg )
     {
     case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
+    case VRANGE32(GICD_IGRPMODR, GICD_IGRPMODRN):
         /* We do not implement security extensions for guests, write ignore */
         goto write_ignore_32;
 
@@ -1191,6 +1193,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VRANGE32(GICD_ICACTIVER, GICD_ICACTIVERN):
     case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
     case VRANGE32(GICD_ICFGR, GICD_ICFGRN):
+    case VRANGE32(GICD_IGRPMODR, GICD_IGRPMODRN):
         /*
          * Above all register are common with GICR and GICD
          * Manage in common
@@ -1378,6 +1381,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
     case VRANGE32(GICD_ICACTIVER, GICD_ICACTIVERN):
     case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
     case VRANGE32(GICD_ICFGR, GICD_ICFGRN):
+    case VRANGE32(GICD_IGRPMODR, GICD_IGRPMODRN):
         /* Above registers are common with GICR and GICD
          * Manage in common */
         return __vgic_v3_distr_common_mmio_write("vGICD", v, info,
