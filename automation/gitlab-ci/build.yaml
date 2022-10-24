@@ -582,6 +582,9 @@ alpine-3.12-gcc-arm64-boot-cpupools:
   variables:
     CONTAINER: alpine:3.12-arm64v8
     EXTRA_XEN_CONFIG: |
+      CONFIG_EXPERT=y
+      CONFIG_UNSUPPORTED=y
+      CONFIG_SCHED_NULL=y
       CONFIG_BOOT_TIME_CPUPOOLS=y
 
 ## Test artifacts common
