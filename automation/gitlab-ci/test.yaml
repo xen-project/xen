@@ -7,6 +7,53 @@
     - /^coverity-tested\/.*/
     - /^stable-.*/
 
+.arm64-test-needs: &arm64-test-needs
+  - alpine-3.12-arm64-rootfs-export
+  - kernel-5.19-arm64-export
+  - qemu-system-aarch64-6.0.0-arm64-export
+
+.arm32-test-needs: &arm32-test-needs
+  - qemu-system-aarch64-6.0.0-arm32-export
+
+.qemu-arm64:
+  extends: .test-jobs-common
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+    LOGFILE: qemu-smoke-arm64.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  tags:
+    - arm64
+
+.qemu-arm32:
+  extends: .test-jobs-common
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+    LOGFILE: qemu-smoke-arm32.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  tags:
+    - arm64
+
+.qemu-x86-64:
+  extends: .test-jobs-common
+  variables:
+    CONTAINER: debian:stretch
+    LOGFILE: qemu-smoke-x86-64.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  tags:
+    - x86_64
+
 # Test jobs
 build-each-commit-gcc:
   extends: .test-jobs-common
@@ -26,269 +73,118 @@ build-each-commit-gcc:
     - x86_64
 
 qemu-smoke-dom0-arm64-gcc:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
+  extends: .qemu-arm64
   script:
-    - ./automation/scripts/qemu-smoke-dom0-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
+    - ./automation/scripts/qemu-smoke-dom0-arm64.sh 2>&1 | tee ${LOGFILE}
   needs:
+    - *arm64-test-needs
     - alpine-3.12-gcc-arm64
-    - alpine-3.12-arm64-rootfs-export
-    - kernel-5.19-arm64-export
-    - qemu-system-aarch64-6.0.0-arm64-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
 
 qemu-smoke-dom0-arm64-gcc-debug:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
+  extends: .qemu-arm64
   script:
-    - ./automation/scripts/qemu-smoke-dom0-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
+    - ./automation/scripts/qemu-smoke-dom0-arm64.sh 2>&1 | tee ${LOGFILE}
   needs:
+    - *arm64-test-needs
     - alpine-3.12-gcc-debug-arm64
-    - alpine-3.12-arm64-rootfs-export
-    - kernel-5.19-arm64-export
-    - qemu-system-aarch64-6.0.0-arm64-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
+
+qemu-smoke-dom0less-arm64-gcc:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-arm64
+
+qemu-smoke-dom0less-arm64-gcc-debug:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-debug-arm64
+
+qemu-smoke-dom0less-arm64-gcc-staticmem:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-mem 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-arm64-staticmem
+
+qemu-smoke-dom0less-arm64-gcc-debug-staticmem:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-mem 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-debug-arm64-staticmem
+
+qemu-smoke-dom0less-arm64-gcc-boot-cpupools:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh boot-cpupools 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-arm64-boot-cpupools
+
+qemu-smoke-dom0less-arm64-gcc-debug-boot-cpupools:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh boot-cpupools 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-debug-arm64-boot-cpupools
+
+qemu-smoke-dom0-arm32-gcc:
+  extends: .qemu-arm32
+  script:
+    - ./automation/scripts/qemu-smoke-dom0-arm32.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm32-test-needs
+    - debian-unstable-gcc-arm32
+
+qemu-smoke-dom0-arm32-gcc-debug:
+  extends: .qemu-arm32
+  script:
+    - ./automation/scripts/qemu-smoke-dom0-arm32.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm32-test-needs
+    - debian-unstable-gcc-arm32-debug
 
 qemu-alpine-x86_64-gcc:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:stretch
+  extends: .qemu-x86-64
   script:
-    - ./automation/scripts/qemu-alpine-x86_64.sh 2>&1 | tee qemu-smoke-x86_64.log
+    - ./automation/scripts/qemu-alpine-x86_64.sh 2>&1 | tee ${LOGFILE}
   needs:
     - alpine-3.12-gcc
     - alpine-3.12-rootfs-export
     - kernel-5.10.74-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - x86_64
-
-qemu-smoke-dom0less-arm64-gcc:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
-  needs:
-    - alpine-3.12-gcc-arm64
-    - alpine-3.12-arm64-rootfs-export
-    - kernel-5.19-arm64-export
-    - qemu-system-aarch64-6.0.0-arm64-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
-
-qemu-smoke-dom0less-arm64-gcc-debug:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
-  needs:
-    - alpine-3.12-gcc-debug-arm64
-    - alpine-3.12-arm64-rootfs-export
-    - kernel-5.19-arm64-export
-    - qemu-system-aarch64-6.0.0-arm64-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
-
-qemu-smoke-dom0less-arm64-gcc-staticmem:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-mem 2>&1 | tee qemu-smoke-arm64.log
-  needs:
-    - alpine-3.12-gcc-arm64-staticmem
-    - alpine-3.12-arm64-rootfs-export
-    - kernel-5.19-arm64-export
-    - qemu-system-aarch64-6.0.0-arm64-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
-
-qemu-smoke-dom0less-arm64-gcc-debug-staticmem:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-mem 2>&1 | tee qemu-smoke-arm64.log
-  needs:
-    - alpine-3.12-gcc-debug-arm64-staticmem
-    - alpine-3.12-arm64-rootfs-export
-    - kernel-5.19-arm64-export
-    - qemu-system-aarch64-6.0.0-arm64-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
-
-qemu-smoke-dom0less-arm64-gcc-boot-cpupools:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh boot-cpupools 2>&1 | tee qemu-smoke-arm64.log
-  needs:
-    - alpine-3.12-gcc-arm64-boot-cpupools
-    - alpine-3.12-arm64-rootfs-export
-    - kernel-5.19-arm64-export
-    - qemu-system-aarch64-6.0.0-arm64-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
-
-qemu-smoke-dom0less-arm64-gcc-debug-boot-cpupools:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh boot-cpupools 2>&1 | tee qemu-smoke-arm64.log
-  needs:
-    - alpine-3.12-gcc-debug-arm64-boot-cpupools
-    - alpine-3.12-arm64-rootfs-export
-    - kernel-5.19-arm64-export
-    - qemu-system-aarch64-6.0.0-arm64-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
-
-qemu-smoke-dom0-arm32-gcc:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
-  script:
-    - ./automation/scripts/qemu-smoke-dom0-arm32.sh 2>&1 | tee qemu-smoke-arm32.log
-  needs:
-    - debian-unstable-gcc-arm32
-    - qemu-system-aarch64-6.0.0-arm32-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
-
-qemu-smoke-dom0-arm32-gcc-debug:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:unstable-arm64v8
-  script:
-    - ./automation/scripts/qemu-smoke-dom0-arm32.sh 2>&1 | tee qemu-smoke-arm32.log
-  needs:
-    - debian-unstable-gcc-arm32-debug
-    - qemu-system-aarch64-6.0.0-arm32-export
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
-  tags:
-    - arm64
 
 qemu-smoke-x86-64-gcc:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:stretch
+  extends: .qemu-x86-64
   script:
-    - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee qemu-smoke-x86-64.log
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
+    - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee ${LOGFILE}
   needs:
     - debian-stretch-gcc-debug
-  tags:
-    - x86_64
 
 qemu-smoke-x86-64-clang:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:stretch
+  extends: .qemu-x86-64
   script:
-    - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee qemu-smoke-x86-64.log
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
+    - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee ${LOGFILE}
   needs:
     - debian-unstable-clang-debug
-  tags:
-    - x86_64
 
 qemu-smoke-x86-64-gcc-pvh:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:stretch
+  extends: .qemu-x86-64
   script:
-    - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee qemu-smoke-x86-64.log
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
+    - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee ${LOGFILE}
   needs:
     - debian-stretch-gcc-debug
-  tags:
-    - x86_64
 
 qemu-smoke-x86-64-clang-pvh:
-  extends: .test-jobs-common
-  variables:
-    CONTAINER: debian:stretch
+  extends: .qemu-x86-64
   script:
-    - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee qemu-smoke-x86-64.log
-  artifacts:
-    paths:
-      - smoke.serial
-      - '*.log'
-    when: always
+    - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee ${LOGFILE}
   needs:
     - debian-unstable-clang-debug
-  tags:
-    - x86_64
