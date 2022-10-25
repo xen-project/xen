@@ -1448,6 +1448,24 @@ out:
     return rc;
 }
 
+int libxl__domain_set_paging_mempool_size(
+    libxl__gc *gc, libxl_domain_config *d_config, uint32_t domid)
+{
+    uint64_t shadow_mem;
+
+    shadow_mem = d_config->b_info.shadow_memkb;
+    shadow_mem <<= 10;
+
+    int r = xc_set_paging_mempool_size(CTX->xch, domid, shadow_mem);
+    if (r) {
+        LOGED(ERROR, domid,
+              "Failed to set paging mempool size to %"PRIu64"kB", shadow_mem);
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

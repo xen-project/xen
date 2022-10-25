@@ -92,14 +92,6 @@ static void p2m_free_page(struct domain *d, struct page_info *pg)
     spin_unlock(&d->arch.paging.lock);
 }
 
-/* Return the size of the pool, rounded up to the nearest MB */
-unsigned int p2m_get_allocation(struct domain *d)
-{
-    unsigned long nr_pages = ACCESS_ONCE(d->arch.paging.p2m_total_pages);
-
-    return ROUNDUP(nr_pages, 1 << (20 - PAGE_SHIFT)) >> (20 - PAGE_SHIFT);
-}
-
 /* Return the size of the pool, in bytes. */
 int arch_get_paging_mempool_size(struct domain *d, uint64_t *size)
 {

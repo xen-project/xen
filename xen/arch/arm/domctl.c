@@ -47,64 +47,11 @@ static int handle_vuart_init(struct domain *d,
     return rc;
 }
 
-static long p2m_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
-                       XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
-{
-    long rc;
-    bool preempted = false;
-
-    if ( unlikely(d == current->domain) )
-    {
-        printk(XENLOG_ERR "Tried to do a p2m domctl op on itself.\n");
-        return -EINVAL;
-    }
-
-    if ( unlikely(d->is_dying) )
-    {
-        printk(XENLOG_ERR "Tried to do a p2m domctl op on dying domain %u\n",
-               d->domain_id);
-        return -EINVAL;
-    }
-
-    switch ( sc->op )
-    {
-    case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
-    {
-        /* Allow and handle preemption */
-        spin_lock(&d->arch.paging.lock);
-        rc = p2m_set_allocation(d, sc->mb << (20 - PAGE_SHIFT), &preempted);
-        spin_unlock(&d->arch.paging.lock);
-
-        if ( preempted )
-            /* Not finished. Set up to re-run the call. */
-            rc = hypercall_create_continuation(__HYPERVISOR_domctl, "h",
-                                               u_domctl);
-        else
-            /* Finished. Return the new allocation. */
-            sc->mb = p2m_get_allocation(d);
-
-        return rc;
-    }
-    case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
-    {
-        sc->mb = p2m_get_allocation(d);
-        return 0;
-    }
-    default:
-    {
-        printk(XENLOG_ERR "Bad p2m domctl op %u\n", sc->op);
-        return -EINVAL;
-    }
-    }
-}
-
 long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
                     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     switch ( domctl->cmd )
     {
-    case XEN_DOMCTL_shadow_op:
-        return p2m_domctl(d, &domctl->u.shadow_op, u_domctl);
     case XEN_DOMCTL_cacheflush:
     {
         gfn_t s = _gfn(domctl->u.cacheflush.start_pfn);
