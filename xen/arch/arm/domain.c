@@ -1018,7 +1018,7 @@ int domain_relinquish_resources(struct domain *d)
         /* Fallthrough */
 
     case RELMEM_p2m:
-        ret = p2m_teardown(d);
+        ret = p2m_teardown(d, true);
         if ( ret )
             return ret;
 
