@@ -274,7 +274,6 @@ W:	https://gitlab.com/xen-project/xen
 S:	Supported
 F:	.gitlab-ci.yml
 F:	automation/
-F:	scripts/travis-build
 
 CPU POOLS
 M:	Juergen Gross <jgross@suse.com>
