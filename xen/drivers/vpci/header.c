@@ -103,24 +103,26 @@ static void modify_decoding(const struct pci_dev *pdev, uint16_t cmd,
 
     for ( i = 0; i < ARRAY_SIZE(header->bars); i++ )
     {
-        if ( !MAPPABLE_BAR(&header->bars[i]) )
+        struct vpci_bar *bar = &header->bars[i];
+
+        if ( !MAPPABLE_BAR(bar) )
             continue;
 
-        if ( rom_only && header->bars[i].type == VPCI_BAR_ROM )
+        if ( rom_only && bar->type == VPCI_BAR_ROM )
         {
             unsigned int rom_pos = (i == PCI_HEADER_NORMAL_NR_BARS)
                                    ? PCI_ROM_ADDRESS : PCI_ROM_ADDRESS1;
-            uint32_t val = header->bars[i].addr |
+            uint32_t val = bar->addr |
                            (map ? PCI_ROM_ADDRESS_ENABLE : 0);
 
-            header->bars[i].enabled = header->rom_enabled = map;
+            bar->enabled = header->rom_enabled = map;
             pci_conf_write32(pdev->sbdf, rom_pos, val);
             return;
         }
 
         if ( !rom_only &&
-             (header->bars[i].type != VPCI_BAR_ROM || header->rom_enabled) )
-            header->bars[i].enabled = map;
+             (bar->type != VPCI_BAR_ROM || header->rom_enabled) )
+            bar->enabled = map;
     }
 
     if ( !rom_only )
