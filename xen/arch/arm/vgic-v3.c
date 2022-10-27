@@ -249,16 +249,15 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
 
     case VREG64(GICR_PENDBASER):
     {
-        unsigned long flags;
+        uint64_t val;
 
         if ( !v->domain->arch.vgic.has_its )
             goto read_as_zero_64;
         if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
 
-        spin_lock_irqsave(&v->arch.vgic.lock, flags);
-        *r = vreg_reg64_extract(v->arch.vgic.rdist_pendbase, info);
-        *r &= ~GICR_PENDBASER_PTZ;       /* WO, reads as 0 */
-        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+        val = read_atomic(&v->arch.vgic.rdist_pendbase);
+        val &= ~GICR_PENDBASER_PTZ;      /* WO, reads as 0 */
+        *r = vreg_reg64_extract(val, info);
         return 1;
     }
 
@@ -577,10 +576,10 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* Writing PENDBASER with LPIs enabled is UNPREDICTABLE. */
         if ( !(v->arch.vgic.flags & VGIC_V3_LPIS_ENABLED) )
         {
-            reg = v->arch.vgic.rdist_pendbase;
+            reg = read_atomic(&v->arch.vgic.rdist_pendbase);
             vreg_reg64_update(&reg, r, info);
             reg = sanitize_pendbaser(reg);
-            v->arch.vgic.rdist_pendbase = reg;
+            write_atomic(&v->arch.vgic.rdist_pendbase, reg);
         }
 
         spin_unlock_irqrestore(&v->arch.vgic.lock, false);
