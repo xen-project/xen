@@ -582,7 +582,7 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
             write_atomic(&v->arch.vgic.rdist_pendbase, reg);
         }
 
-        spin_unlock_irqrestore(&v->arch.vgic.lock, false);
+        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
 
         return 1;
     }
