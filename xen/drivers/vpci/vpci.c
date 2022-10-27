@@ -19,6 +19,7 @@
 
 #include <xen/sched.h>
 #include <xen/vpci.h>
+#include <xen/vmap.h>
 
 /* Internal struct to store the emulated PCI registers. */
 struct vpci_register {
