@@ -6,6 +6,6 @@ obj-$(CONFIG_ACPI) +=  efi-dom0.init.o
 else
 obj-y += common-stub.o
 
-$(obj)/stub.o: CFLAGS-y += -fno-short-wchar
+$(obj)/common-stub.o: CFLAGS-y += -fno-short-wchar
 
 endif
