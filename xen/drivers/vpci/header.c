@@ -131,7 +131,10 @@ static void modify_decoding(const struct pci_dev *pdev, uint16_t cmd,
     }
 
     if ( !rom_only )
+    {
         pci_conf_write16(pdev->sbdf, PCI_COMMAND, cmd);
+        header->bars_mapped = map;
+    }
     else
         ASSERT_UNREACHABLE();
 }
@@ -352,13 +355,13 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
 static void cf_check cmd_write(
     const struct pci_dev *pdev, unsigned int reg, uint32_t cmd, void *data)
 {
-    uint16_t current_cmd = pci_conf_read16(pdev->sbdf, reg);
+    struct vpci_header *header = data;
 
     /*
      * Let Dom0 play with all the bits directly except for the memory
      * decoding one.
      */
-    if ( (cmd ^ current_cmd) & PCI_COMMAND_MEMORY )
+    if ( header->bars_mapped != !!(cmd & PCI_COMMAND_MEMORY) )
         /*
          * Ignore the error. No memory has been added or removed from the p2m
          * (because the actual p2m changes are deferred in defer_map) and the
@@ -385,12 +388,16 @@ static void cf_check bar_write(
     else
         val &= PCI_BASE_ADDRESS_MEM_MASK;
 
-    if ( pci_conf_read16(pdev->sbdf, PCI_COMMAND) & PCI_COMMAND_MEMORY )
+    /*
+     * Xen only cares whether the BAR is mapped into the p2m, so allow BAR
+     * writes as long as the BAR is not mapped into the p2m.
+     */
+    if ( bar->enabled )
     {
         /* If the value written is the current one avoid printing a warning. */
         if ( val != (uint32_t)(bar->addr >> (hi ? 32 : 0)) )
             gprintk(XENLOG_WARNING,
-                    "%pp: ignored BAR %zu write with memory decoding enabled\n",
+                    "%pp: ignored BAR %zu write while mapped\n",
                     &pdev->sbdf, bar - pdev->vpci->header.bars + hi);
         return;
     }
@@ -419,25 +426,29 @@ static void cf_check rom_write(
 {
     struct vpci_header *header = &pdev->vpci->header;
     struct vpci_bar *rom = data;
-    uint16_t cmd = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
     bool new_enabled = val & PCI_ROM_ADDRESS_ENABLE;
 
-    if ( (cmd & PCI_COMMAND_MEMORY) && header->rom_enabled && new_enabled )
+    /*
+     * See comment in bar_write(). Additionally since the ROM BAR has an enable
+     * bit some writes are allowed while the BAR is mapped, as long as the
+     * write is to unmap the ROM BAR.
+     */
+    if ( rom->enabled && new_enabled )
     {
         gprintk(XENLOG_WARNING,
-                "%pp: ignored ROM BAR write with memory decoding enabled\n",
+                "%pp: ignored ROM BAR write while mapped\n",
                 &pdev->sbdf);
         return;
     }
 
-    if ( !header->rom_enabled )
+    if ( !rom->enabled )
         /*
-         * If the ROM BAR is not enabled update the address field so the
+         * If the ROM BAR is not mapped update the address field so the
          * correct address is mapped into the p2m.
          */
         rom->addr = val & PCI_ROM_ADDRESS_MASK;
 
-    if ( !(cmd & PCI_COMMAND_MEMORY) || header->rom_enabled == new_enabled )
+    if ( !header->bars_mapped || rom->enabled == new_enabled )
     {
         /* Just update the ROM BAR field. */
         header->rom_enabled = new_enabled;
