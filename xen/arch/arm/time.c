@@ -220,27 +220,18 @@ int reprogram_timer(s_time_t timeout)
 }
 
 /* Handle the firing timer */
-static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
+static void htimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    if ( irq == (timer_irq[TIMER_HYP_PPI]) &&
-         READ_SYSREG(CNTHP_CTL_EL2) & CNTx_CTL_PENDING )
-    {
-        perfc_incr(hyp_timer_irqs);
-        /* Signal the generic timer code to do its work */
-        raise_softirq(TIMER_SOFTIRQ);
-        /* Disable the timer to avoid more interrupts */
-        WRITE_SYSREG(0, CNTHP_CTL_EL2);
-    }
+    if ( unlikely(!(READ_SYSREG(CNTHP_CTL_EL2) & CNTx_CTL_PENDING)) )
+        return;
 
-    if ( irq == (timer_irq[TIMER_PHYS_NONSECURE_PPI]) &&
-         READ_SYSREG(CNTP_CTL_EL0) & CNTx_CTL_PENDING )
-    {
-        perfc_incr(phys_timer_irqs);
-        /* Signal the generic timer code to do its work */
-        raise_softirq(TIMER_SOFTIRQ);
-        /* Disable the timer to avoid more interrupts */
-        WRITE_SYSREG(0, CNTP_CTL_EL0);
-    }
+    perfc_incr(hyp_timer_irqs);
+
+    /* Signal the generic timer code to do its work */
+    raise_softirq(TIMER_SOFTIRQ);
+
+    /* Disable the timer to avoid more interrupts */
+    WRITE_SYSREG(0, CNTHP_CTL_EL2);
 }
 
 static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
@@ -302,12 +293,10 @@ void init_timer_interrupt(void)
     WRITE_SYSREG(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
     isb();
 
-    request_irq(timer_irq[TIMER_HYP_PPI], 0, timer_interrupt,
+    request_irq(timer_irq[TIMER_HYP_PPI], 0, htimer_interrupt,
                 "hyptimer", NULL);
     request_irq(timer_irq[TIMER_VIRT_PPI], 0, vtimer_interrupt,
                    "virtimer", NULL);
-    request_irq(timer_irq[TIMER_PHYS_NONSECURE_PPI], 0, timer_interrupt,
-                "phytimer", NULL);
 
     check_timer_irq_cfg(timer_irq[TIMER_HYP_PPI], "hypervisor");
     check_timer_irq_cfg(timer_irq[TIMER_VIRT_PPI], "virtual");
@@ -326,7 +315,6 @@ static void deinit_timer_interrupt(void)
 
     release_irq(timer_irq[TIMER_HYP_PPI], NULL);
     release_irq(timer_irq[TIMER_VIRT_PPI], NULL);
-    release_irq(timer_irq[TIMER_PHYS_NONSECURE_PPI], NULL);
 }
 
 /* Wait a set number of microseconds */
