@@ -210,6 +210,7 @@ static const char *const str_7c1[32] =
 
 static const char *const str_7d1[32] =
 {
+    [18] = "cet-sss",
 };
 
 static const char *const str_7d2[32] =

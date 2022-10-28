@@ -96,11 +96,7 @@ unsigned long __initdata highmem_start;
 size_param("highmem-start", highmem_start);
 #endif
 
-#ifdef CONFIG_XEN_SHSTK
-static bool __initdata opt_xen_shstk = true;
-#else
-#define opt_xen_shstk false
-#endif
+static int8_t __initdata opt_xen_shstk = -IS_ENABLED(CONFIG_XEN_SHSTK);
 
 #ifdef CONFIG_XEN_IBT
 static bool __initdata opt_xen_ibt = true;
@@ -1100,11 +1096,45 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     early_cpu_init();
 
     /* Choose shadow stack early, to set infrastructure up appropriately. */
-    if ( opt_xen_shstk && boot_cpu_has(X86_FEATURE_CET_SS) )
-    {
-        printk("Enabling Supervisor Shadow Stacks\n");
+    if ( !boot_cpu_has(X86_FEATURE_CET_SS) )
+        opt_xen_shstk = 0;
 
-        setup_force_cpu_cap(X86_FEATURE_XEN_SHSTK);
+    if ( opt_xen_shstk )
+    {
+        /*
+         * Some CPUs suffer from Shadow Stack Fracturing, an issue whereby a
+         * fault/VMExit/etc between setting a Supervisor Busy bit and the
+         * event delivery completing renders the operation non-restartable.
+         * On restart, event delivery will find the Busy bit already set.
+         *
+         * This is a problem on bare metal, but outside of synthetic cases or
+         * a very badly timed #MC, it's not believed to be a problem.  It is a
+         * much bigger problem under virt, because we can VMExit for a number
+         * of legitimate reasons and tickle this bug.
+         *
+         * CPUs with this addressed enumerate CET-SSS to indicate that
+         * supervisor shadow stacks are now safe to use.
+         */
+        bool cpu_has_bug_shstk_fracture =
+            boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+            !boot_cpu_has(X86_FEATURE_CET_SSS);
+
+        /*
+         * On bare metal, assume that Xen won't be impacted by shstk
+         * fracturing problems.  Under virt, be more conservative and disable
+         * shstk by default.
+         */
+        if ( opt_xen_shstk == -1 )
+            opt_xen_shstk =
+                cpu_has_hypervisor ? !cpu_has_bug_shstk_fracture
+                                   : true;
+
+        if ( opt_xen_shstk )
+        {
+            printk("Enabling Supervisor Shadow Stacks\n");
+
+            setup_force_cpu_cap(X86_FEATURE_XEN_SHSTK);
+        }
     }
 
     if ( opt_xen_ibt && boot_cpu_has(X86_FEATURE_CET_IBT) )
