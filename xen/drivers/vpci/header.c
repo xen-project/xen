@@ -115,13 +115,18 @@ static void modify_decoding(const struct pci_dev *pdev, uint16_t cmd,
             uint32_t val = bar->addr |
                            (map ? PCI_ROM_ADDRESS_ENABLE : 0);
 
-            bar->enabled = header->rom_enabled = map;
+            if ( pci_check_bar(pdev, _mfn(PFN_DOWN(bar->addr)),
+                               _mfn(PFN_DOWN(bar->addr + bar->size - 1))) )
+                bar->enabled = map;
+            header->rom_enabled = map;
             pci_conf_write32(pdev->sbdf, rom_pos, val);
             return;
         }
 
         if ( !rom_only &&
-             (bar->type != VPCI_BAR_ROM || header->rom_enabled) )
+             (bar->type != VPCI_BAR_ROM || header->rom_enabled) &&
+             pci_check_bar(pdev, _mfn(PFN_DOWN(bar->addr)),
+                           _mfn(PFN_DOWN(bar->addr + bar->size - 1))) )
             bar->enabled = map;
     }
 
@@ -234,8 +239,18 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
 
         if ( !MAPPABLE_BAR(bar) ||
              (rom_only ? bar->type != VPCI_BAR_ROM
-                       : (bar->type == VPCI_BAR_ROM && !header->rom_enabled)) )
+                       : (bar->type == VPCI_BAR_ROM && !header->rom_enabled)) ||
+             /* Skip BARs already in the requested state. */
+             bar->enabled == !!(cmd & PCI_COMMAND_MEMORY) )
             continue;
+
+        if ( !pci_check_bar(pdev, _mfn(start), _mfn(end)) )
+        {
+            printk(XENLOG_G_WARNING
+                   "%pp: not mapping BAR [%lx, %lx] invalid position\n",
+                   &pdev->sbdf, start, end);
+            continue;
+        }
 
         rc = rangeset_add_range(mem, start, end);
         if ( rc )
