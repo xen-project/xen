@@ -1484,7 +1484,7 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned int offset)
     if ( (v != current) && !(v->pause_flags & VPF_down) )
         return -EINVAL;
 
-    page = get_page_from_gfn(d, gfn, NULL, P2M_ALLOC);
+    page = get_page_from_gfn(d, gfn, NULL, P2M_UNSHARE);
     if ( !page )
         return -EINVAL;
 
