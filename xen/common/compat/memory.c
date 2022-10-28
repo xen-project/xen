@@ -7,6 +7,7 @@ EMIT_FILE;
 #include <xen/event.h>
 #include <xen/mem_access.h>
 #include <asm/current.h>
+#include <asm/guest.h>
 #include <compat/memory.h>
 
 #define xen_domid_t domid_t
@@ -146,7 +147,10 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                 nat.rsrv->nr_extents = end_extent;
                 ++split;
             }
-
+           /* Avoid calling pv_shim_online_memory() when in a continuation. */
+           if ( pv_shim && op != XENMEM_decrease_reservation && !start_extent )
+               pv_shim_online_memory(cmp.rsrv.nr_extents - nat.rsrv->nr_extents,
+                                     cmp.rsrv.extent_order);
             break;
 
         case XENMEM_exchange:
