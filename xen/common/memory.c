@@ -1407,21 +1407,16 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = args.nr_done;
 
-        if ( args.preempted )
-            return hypercall_create_continuation(
-                __HYPERVISOR_memory_op, "lh",
-                op | (rc << MEMOP_EXTENT_SHIFT), arg);
-
 #ifdef CONFIG_X86
         if ( pv_shim && op == XENMEM_decrease_reservation )
-            /*
-             * Only call pv_shim_offline_memory when the hypercall has
-             * finished. Note that nr_done is used to cope in case the
-             * hypercall has failed and only part of the extents where
-             * processed.
-             */
-            pv_shim_offline_memory(args.nr_done, args.extent_order);
+            pv_shim_offline_memory(args.nr_done - start_extent,
+                                   args.extent_order);
 #endif
+
+        if ( args.preempted )
+           return hypercall_create_continuation(
+                __HYPERVISOR_memory_op, "lh",
+                op | (rc << MEMOP_EXTENT_SHIFT), arg);
 
         break;
 
