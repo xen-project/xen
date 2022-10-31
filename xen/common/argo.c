@@ -1298,7 +1298,8 @@ partner_rings_remove(struct domain *src_d)
                     ASSERT_UNREACHABLE();
             }
             else
-                ASSERT_UNREACHABLE();
+                argo_dprintk("%pd has entry for stale partner d%u\n",
+                             src_d, send_info->id.domain_id);
 
             if ( dst_d )
                 rcu_unlock_domain(dst_d);
