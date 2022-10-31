@@ -37,6 +37,9 @@ extern vpci_register_init_t *const __end_vpci_array[];
 
 void vpci_remove_device(struct pci_dev *pdev)
 {
+    if ( !pdev->vpci )
+        return;
+
     spin_lock(&pdev->vpci->lock);
     while ( !list_empty(&pdev->vpci->handlers) )
     {
@@ -320,7 +323,7 @@ uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size)
 
     /* Find the PCI dev matching the address. */
     pdev = pci_get_pdev_by_domain(d, sbdf.seg, sbdf.bus, sbdf.devfn);
-    if ( !pdev )
+    if ( !pdev || !pdev->vpci )
         return vpci_read_hw(sbdf, reg, size);
 
     spin_lock(&pdev->vpci->lock);
@@ -430,7 +433,7 @@ void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
      * Passthrough everything that's not trapped.
      */
     pdev = pci_get_pdev_by_domain(d, sbdf.seg, sbdf.bus, sbdf.devfn);
-    if ( !pdev )
+    if ( !pdev || !pdev->vpci )
     {
         vpci_write_hw(sbdf, reg, size, data);
         return;
