@@ -927,6 +927,7 @@ int arch_domain_soft_reset(struct domain *d)
     struct page_info *page = virt_to_page(d->shared_info), *new_page;
     int ret = 0;
     struct domain *owner;
+    struct vcpu *v;
     mfn_t mfn;
     gfn_t gfn;
     p2m_type_t p2mt;
@@ -1006,7 +1007,12 @@ int arch_domain_soft_reset(struct domain *d)
                "Failed to add a page to replace %pd's shared_info frame %"PRI_gfn"\n",
                d, gfn_x(gfn));
         free_domheap_page(new_page);
+        goto exit_put_gfn;
     }
+
+    for_each_vcpu ( d, v )
+        set_xen_guest_handle(v->arch.time_info_guest, NULL);
+
  exit_put_gfn:
     put_gfn(d, gfn_x(gfn));
  exit_put_page:
