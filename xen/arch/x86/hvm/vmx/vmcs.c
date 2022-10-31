@@ -1831,7 +1831,7 @@ int vmx_create_vmcs(struct vcpu *v)
 
     if ( (rc = construct_vmcs(v)) != 0 )
     {
-        vmx_free_vmcs(vmx->vmcs_pa);
+        vmx_destroy_vmcs(v);
         return rc;
     }
 
