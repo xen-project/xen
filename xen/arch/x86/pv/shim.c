@@ -944,6 +944,9 @@ void pv_shim_online_memory(unsigned int nr, unsigned int order)
     struct page_info *page, *tmp;
     PAGE_LIST_HEAD(list);
 
+    if ( !nr )
+        return;
+
     spin_lock(&balloon_lock);
     page_list_for_each_safe ( page, tmp, &balloon )
     {
