@@ -1970,6 +1970,7 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 #define vcpu_has_tbm()         (ctxt->cpuid->extd.tbm)
 #define vcpu_has_clzero()      (ctxt->cpuid->extd.clzero)
 #define vcpu_has_wbnoinvd()    (ctxt->cpuid->extd.wbnoinvd)
+#define vcpu_has_nscb()        (ctxt->cpuid->extd.nscb)
 
 #define vcpu_has_bmi1()        (ctxt->cpuid->feat.bmi1)
 #define vcpu_has_hle()         (ctxt->cpuid->feat.hle)
@@ -2102,7 +2103,7 @@ protmode_load_seg(
         case x86_seg_tr:
             goto raise_exn;
         }
-        if ( !_amd_like(cp) || !ops->read_segment ||
+        if ( !_amd_like(cp) || vcpu_has_nscb() || !ops->read_segment ||
              ops->read_segment(seg, sreg, ctxt) != X86EMUL_OKAY )
             memset(sreg, 0, sizeof(*sreg));
         else
