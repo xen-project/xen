@@ -1087,6 +1087,7 @@ rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
         else if ( !unit_runnable_state(snext->unit) )
         {
             q_remove(snext);
+            replq_remove(ops, snext);
             snext = rt_unit(sched_idle_unit(sched_cpu));
         }
 
