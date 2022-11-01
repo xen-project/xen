@@ -223,7 +223,7 @@ let rev_append_fold acc e = List.rev_append e acc
 let rev_concat lst = List.fold_left rev_append_fold [] lst
 
 let domain_getinfolist handle first_domain =
-	let nb = 2 in
+	let nb = 1024 in
 	let rec __getlist lst from =
 		(* _domain_getinfolist returns domains in reverse order, largest first *)
 		match _domain_getinfolist handle from nb with
