@@ -212,14 +212,25 @@ external domain_shutdown: handle -> domid -> shutdown_reason -> unit
 external _domain_getinfolist: handle -> domid -> int -> domaininfo list
        = "stub_xc_domain_getinfolist"
 
+let rev_append_fold acc e = List.rev_append e acc
+
+(**
+ * [rev_concat lst] is equivalent to [lst |> List.concat |> List.rev]
+ * except it is tail recursive, whereas [List.concat] isn't.
+ * Example:
+ * rev_concat [[10;9;8];[7;6];[5]]] = [5; 6; 7; 8; 9; 10]
+ *)
+let rev_concat lst = List.fold_left rev_append_fold [] lst
+
 let domain_getinfolist handle first_domain =
 	let nb = 2 in
-	let last_domid l = (List.hd l).domid + 1 in
-	let rec __getlist from =
-		let l = _domain_getinfolist handle from nb in
-		(if List.length l = nb then __getlist (last_domid l) else []) @ l
-		in
-	List.rev (__getlist first_domain)
+	let rec __getlist lst from =
+		(* _domain_getinfolist returns domains in reverse order, largest first *)
+		match _domain_getinfolist handle from nb with
+		| [] -> rev_concat lst
+		| (hd :: _) as l -> __getlist (l :: lst) (hd.domid + 1)
+	in
+	__getlist [] first_domain
 
 external domain_getinfo: handle -> domid -> domaininfo= "stub_xc_domain_getinfo"
 
