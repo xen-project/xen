@@ -603,7 +603,6 @@ INITD_DIR
 SHAREDIR
 XEN_LIB_DIR
 XEN_RUN_STORED
-XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
 XENFIRMWAREDIR
@@ -2079,9 +2078,6 @@ XEN_LOG_DIR=$localstatedir/log/xen
 cat >>confdefs.h <<_ACEOF
 #define XEN_LOG_DIR "$XEN_LOG_DIR"
 _ACEOF
-
-
-XEN_LIB_STORED=$localstatedir/lib/xenstored
 
 
 XEN_RUN_STORED=$rundir_path/xenstored

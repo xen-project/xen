@@ -69,7 +69,6 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 ifeq ($(XENSTORE_XENSTORED),y)
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
-	$(INSTALL_DIR) $(DESTDIR)$(XEN_LIB_STORED)
 	$(INSTALL_PROG) xenstored $(DESTDIR)$(sbindir)
 endif
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(bindir)
@@ -85,9 +84,6 @@ uninstall:
 	rm -f $(DESTDIR)$(bindir)/xenstore-control
 ifeq ($(XENSTORE_XENSTORED),y)
 	rm -f $(DESTDIR)$(sbindir)/xenstored
-	if [ -d $(DESTDIR)$(XEN_LIB_STORED) ]; then \
-		rmdir --ignore-fail-on-non-empty $(DESTDIR)$(XEN_LIB_STORED); \
-	fi
 endif
 	if [ -d $(DESTDIR)$(includedir)/xenstore-compat ]; then \
 		rmdir --ignore-fail-on-non-empty $(DESTDIR)$(includedir)/xenstore-compat; \

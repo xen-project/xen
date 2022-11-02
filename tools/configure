@@ -725,7 +725,6 @@ INITD_DIR
 SHAREDIR
 XEN_LIB_DIR
 XEN_RUN_STORED
-XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
 XENFIRMWAREDIR
@@ -4063,9 +4062,6 @@ XEN_LOG_DIR=$localstatedir/log/xen
 cat >>confdefs.h <<_ACEOF
 #define XEN_LOG_DIR "$XEN_LOG_DIR"
 _ACEOF
-
-
-XEN_LIB_STORED=$localstatedir/lib/xenstored
 
 
 XEN_RUN_STORED=$rundir_path/xenstored
@@ -10085,7 +10081,7 @@ fi
 
 if test "x$systemd" = "xy"; then :
 
-    ac_config_files="$ac_config_files hotplug/Linux/systemd/proc-xen.mount hotplug/Linux/systemd/var-lib-xenstored.mount hotplug/Linux/systemd/xen-init-dom0.service hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service hotplug/Linux/systemd/xen-watchdog.service hotplug/Linux/systemd/xenconsoled.service hotplug/Linux/systemd/xendomains.service hotplug/Linux/systemd/xendriverdomain.service hotplug/Linux/systemd/xenstored.service"
+    ac_config_files="$ac_config_files hotplug/Linux/systemd/proc-xen.mount hotplug/Linux/systemd/xen-init-dom0.service hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service hotplug/Linux/systemd/xen-watchdog.service hotplug/Linux/systemd/xenconsoled.service hotplug/Linux/systemd/xendomains.service hotplug/Linux/systemd/xendriverdomain.service hotplug/Linux/systemd/xenstored.service"
 
 
 fi
@@ -10967,7 +10963,6 @@ do
     "ocaml/xenstored/oxenstored.conf") CONFIG_FILES="$CONFIG_FILES ocaml/xenstored/oxenstored.conf" ;;
     "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
     "hotplug/Linux/systemd/proc-xen.mount") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/proc-xen.mount" ;;
-    "hotplug/Linux/systemd/var-lib-xenstored.mount") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/var-lib-xenstored.mount" ;;
     "hotplug/Linux/systemd/xen-init-dom0.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xen-init-dom0.service" ;;
     "hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service" ;;
     "hotplug/Linux/systemd/xen-watchdog.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xen-watchdog.service" ;;

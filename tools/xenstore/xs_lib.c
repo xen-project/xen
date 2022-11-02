@@ -26,16 +26,15 @@
 
 /* Common routines for the Xen store daemon and client library. */
 
-const char *xs_daemon_rootdir(void)
-{
-	char *s = getenv("XENSTORED_ROOTDIR");
-	return (s ? s : XEN_LIB_STORED);
-}
-
 const char *xs_daemon_rundir(void)
 {
 	char *s = getenv("XENSTORED_RUNDIR");
 	return (s ? s : XEN_RUN_STORED);
+}
+
+const char *xs_daemon_rootdir(void)
+{
+	return xs_daemon_rundir();
 }
 
 static const char *xs_daemon_path(void)

@@ -14,7 +14,6 @@ export LD_LIBRARY_PATH
 
 name="xencommons"
 rcvar="xencommons_enable"
-start_precmd="xen_precmd"
 start_cmd="xen_startcmd"
 stop_cmd="xen_stop"
 status_cmd="xen_status"
@@ -29,11 +28,6 @@ XENSTORED_PIDFILE="@XEN_RUN_DIR@/xenstored.pid"
 
 load_rc_config $name
 : ${xencommons_enable:=no}
-
-xen_precmd()
-{
-	mkdir -p @XEN_LIB_STORED@ || exit 1
-}
 
 xen_startcmd()
 {

@@ -4,7 +4,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 XEN_SYSTEMD_MODULES := xen.conf
 
 XEN_SYSTEMD_MOUNT := proc-xen.mount
-XEN_SYSTEMD_MOUNT += var-lib-xenstored.mount
 
 XEN_SYSTEMD_SERVICE := xenstored.service
 XEN_SYSTEMD_SERVICE += xenconsoled.service
