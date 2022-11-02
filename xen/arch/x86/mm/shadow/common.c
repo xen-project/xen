@@ -942,8 +942,9 @@ static bool __must_check _shadow_prealloc(struct domain *d, unsigned int pages)
         /* No reclaim when the domain is dying, teardown will take care of it. */
         return false;
 
-    /* Shouldn't have enabled shadows if we've no vcpus. */
-    ASSERT(d->vcpu && d->vcpu[0]);
+    /* Nothing to reclaim when there are no vcpus yet. */
+    if ( !d->vcpu[0] )
+        return false;
 
     /* Stage one: walk the list of pinned pages, unpinning them */
     perfc_incr(shadow_prealloc_1);
@@ -1031,8 +1032,9 @@ static void shadow_blow_tables(struct domain *d)
     mfn_t smfn;
     int i;
 
-    /* Shouldn't have enabled shadows if we've no vcpus. */
-    ASSERT(d->vcpu && d->vcpu[0]);
+    /* Nothing to do when there are no vcpus yet. */
+    if ( !d->vcpu[0] )
+        return;
 
     /* Pass one: unpin all pinned pages */
     foreach_pinned_shadow(d, sp, t)
