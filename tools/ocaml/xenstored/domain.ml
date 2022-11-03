@@ -74,7 +74,8 @@ let is_paused_for_conflict dom = dom.conflict_credit <= 0.0
 let is_free_to_conflict = is_dom0
 
 let dump d chan =
-	fprintf chan "dom,%d,%nd,%d\n" d.id d.mfn d.ports.remote
+	fprintf chan "dom,%d,%nd,%d,%d\n"
+		d.id d.mfn d.ports.remote (Xeneventchn.to_int d.ports.local)
 
 let rebind_evtchn d remote_port =
 	Event.unbind d.eventchn d.ports.local;
@@ -93,8 +94,14 @@ let close dom =
 	dom.ports <- invalid_ports;
 	Xenmmap.unmap dom.interface
 
-let make id mfn remote_port interface eventchn =
-	let local = Event.bind_interdomain eventchn id remote_port in
+(* On clean start, local_port will be None, and we must bind the remote port
+   given.  On Live Update, the event channel is already bound, and both the
+   local and remote port numbers come from the transfer record. *)
+let make ?local_port ~remote_port id mfn interface eventchn =
+	let local = match local_port with
+		| None -> Event.bind_interdomain eventchn id remote_port
+		| Some p -> Xeneventchn.of_int p
+	in
 	let ports = { local; remote = remote_port } in
 	debug "domain %d bind %s" id (string_of_port_pair ports);
 {
