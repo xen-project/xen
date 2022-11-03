@@ -56,6 +56,7 @@ let exist doms id = Hashtbl.mem doms.table id
 let find doms id = Hashtbl.find doms.table id
 let number doms = Hashtbl.length doms.table
 let iter doms fct = Hashtbl.iter (fun _ b -> fct b) doms.table
+let eventchn doms = doms.eventchn
 
 let rec is_empty_queue q =
 	Queue.is_empty q ||
@@ -122,16 +123,16 @@ let cleanup doms =
 let resume _doms _domid =
 	()
 
-let create doms domid mfn remote_port =
+let create doms ?local_port ~remote_port domid mfn =
 	let interface = Xenctrl.map_foreign_range xc domid (Xenmmap.getpagesize()) mfn in
-	let dom = Domain.make domid mfn remote_port interface doms.eventchn in
+	let dom = Domain.make ?local_port ~remote_port domid mfn interface doms.eventchn in
 	Hashtbl.add doms.table domid dom;
 	dom
 
 let xenstored_kva = ref ""
 let xenstored_port = ref ""
 
-let create0 doms =
+let create0 ?local_port doms =
 	let remote_port = Utils.read_file_single_integer !xenstored_port in
 
 	let interface =
@@ -141,7 +142,7 @@ let create0 doms =
 		interface
 	in
 
-	let dom = Domain.make 0 Nativeint.zero remote_port interface doms.eventchn in
+	let dom = Domain.make ?local_port ~remote_port 0 Nativeint.zero interface doms.eventchn in
 	Hashtbl.add doms.table 0 dom;
 	Domain.notify dom;
 	dom
