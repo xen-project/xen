@@ -573,7 +573,7 @@ let do_introduce con t domains cons data =
 			end;
 			edom
 		else try
-			let ndom = Domains.create domains domid mfn remote_port in
+			let ndom = Domains.create ~remote_port domains domid mfn in
 			Connections.add_domain cons ndom;
 			Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.introduce_domain;
 			ndom
