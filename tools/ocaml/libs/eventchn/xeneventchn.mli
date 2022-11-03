@@ -43,9 +43,12 @@ val to_int: t -> int
 
 val of_int: int -> t
 
-val init: unit -> handle
-(** Return an initialised event channel interface. On error it
-    will throw a Failure exception. *)
+val init: ?cloexec:bool -> unit -> handle
+(** [init ?cloexec ()]
+    Return an initialised event channel interface.
+    The default is to close the underlying file descriptor
+    on [execve], which can be overriden with [~cloexec:false].
+    On error it will throw a Failure exception. *)
 
 val fdopen: Unix.file_descr -> handle
 (** Return an initialised event channel interface, from an already open evtchn
