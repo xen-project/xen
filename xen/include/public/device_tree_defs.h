@@ -1,3 +1,9 @@
+/* SPDX-License-Identifier: MIT */
+/*
+ * Copyright (c) 2013 Linaro Limited
+ * Copyright (c) 2015 Citrix Systems, Inc
+ */
+
 #ifndef __XEN_DEVICE_TREE_DEFS_H__
 #define __XEN_DEVICE_TREE_DEFS_H__
 
