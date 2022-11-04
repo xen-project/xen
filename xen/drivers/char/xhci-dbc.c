@@ -251,14 +251,17 @@ struct dbc {
     struct xhci_string_descriptor *dbc_str;
 
     pci_sbdf_t sbdf;
-    uint64_t xhc_mmio_phys;
+    uint64_t bar_val;
     uint64_t xhc_dbc_offset;
     void __iomem *xhc_mmio;
 
     bool enable; /* whether dbgp=xhci was set at all */
     bool open;
+    bool suspended;
     enum xhci_share share;
     unsigned int xhc_num; /* look for n-th xhc */
+    /* state saved across suspend */
+    uint16_t pci_cr;
 };
 
 static void *dbc_sys_map_xhc(uint64_t phys, size_t size)
@@ -358,8 +361,9 @@ static bool __init dbc_init_xhc(struct dbc *dbc)
 
     pci_conf_write16(dbc->sbdf, PCI_COMMAND, cmd);
 
-    dbc->xhc_mmio_phys = (bar0 & PCI_BASE_ADDRESS_MEM_MASK) | (bar1 << 32);
-    dbc->xhc_mmio = dbc_sys_map_xhc(dbc->xhc_mmio_phys, xhc_mmio_size);
+    dbc->bar_val = bar0 | (bar1 << 32);
+    dbc->xhc_mmio = dbc_sys_map_xhc(dbc->bar_val & PCI_BASE_ADDRESS_MEM_MASK,
+                                    xhc_mmio_size);
 
     if ( dbc->xhc_mmio == NULL )
         return false;
@@ -979,6 +983,9 @@ static bool dbc_ensure_running(struct dbc *dbc)
     uint32_t ctrl;
     uint16_t cmd;
 
+    if ( dbc->suspended )
+        return false;
+
     if ( dbc->share != XHCI_SHARE_NONE )
     {
         /*
@@ -1213,9 +1220,11 @@ static void __init cf_check dbc_uart_init_postirq(struct serial_port *port)
      * page, so keep it simple.
      */
     if ( rangeset_add_range(mmio_ro_ranges,
-                PFN_DOWN(uart->dbc.xhc_mmio_phys + uart->dbc.xhc_dbc_offset),
-                PFN_UP(uart->dbc.xhc_mmio_phys + uart->dbc.xhc_dbc_offset +
-                       sizeof(*uart->dbc.dbc_reg)) - 1) )
+                PFN_DOWN((uart->dbc.bar_val & PCI_BASE_ADDRESS_MEM_MASK) +
+                         uart->dbc.xhc_dbc_offset),
+                PFN_UP((uart->dbc.bar_val & PCI_BASE_ADDRESS_MEM_MASK) +
+                       uart->dbc.xhc_dbc_offset +
+                sizeof(*uart->dbc.dbc_reg)) - 1) )
         printk(XENLOG_INFO
                "Error while adding MMIO range of device to mmio_ro_ranges\n");
 #endif
@@ -1255,6 +1264,38 @@ static void cf_check dbc_uart_flush(struct serial_port *port)
         set_timer(&uart->timer, goal);
 }
 
+static void cf_check dbc_uart_suspend(struct serial_port *port)
+{
+    struct dbc_uart *uart = port->uart;
+    struct dbc *dbc = &uart->dbc;
+
+    dbc_pop_events(dbc);
+    stop_timer(&uart->timer);
+    dbc->pci_cr = pci_conf_read16(dbc->sbdf, PCI_COMMAND);
+    dbc->suspended = true;
+}
+
+static void cf_check dbc_uart_resume(struct serial_port *port)
+{
+    struct dbc_uart *uart = port->uart;
+    struct dbc *dbc = &uart->dbc;
+
+    pci_conf_write32(dbc->sbdf, PCI_BASE_ADDRESS_0, dbc->bar_val & 0xFFFFFFFF);
+    pci_conf_write32(dbc->sbdf, PCI_BASE_ADDRESS_1, dbc->bar_val >> 32);
+    pci_conf_write16(dbc->sbdf, PCI_COMMAND, dbc->pci_cr);
+
+    if ( !dbc_init_dbc(dbc) )
+    {
+        dbc_error("resume failed\n");
+        return;
+    }
+
+    dbc_enable_dbc(dbc);
+    dbc->suspended = false;
+    dbc_flush(dbc, &dbc->dbc_oring, &dbc->dbc_owork);
+    set_timer(&uart->timer, NOW() + MICROSECS(DBC_POLL_INTERVAL));
+}
+
 static struct uart_driver dbc_uart_driver = {
     .init_preirq = dbc_uart_init_preirq,
     .init_postirq = dbc_uart_init_postirq,
@@ -1262,6 +1303,8 @@ static struct uart_driver dbc_uart_driver = {
     .putc = dbc_uart_putc,
     .getc = dbc_uart_getc,
     .flush = dbc_uart_flush,
+    .suspend = dbc_uart_suspend,
+    .resume = dbc_uart_resume,
 };
 
 /* Those are accessed via DMA. */
