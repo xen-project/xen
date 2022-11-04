@@ -263,7 +263,7 @@ END {
         printf("#define call_handlers_%s(num, ret, a1, a2, a3, a4, a5) \\\n", ca);
         printf("({ \\\n");
         if (need_mask)
-            printf("    uint64_t mask = 1ULL << num; \\\n");
+            printf("    uint64_t mask = (num) > 63 ? 0 : 1ULL << (num); \\\n");
         printf("    ");
         for (pl = 1; pl <= n_prios[ca]; pl++) {
             if (prios[ca, p_list[pl]] > 1) {
