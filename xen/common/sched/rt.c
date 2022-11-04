@@ -750,6 +750,27 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     return &prv->lock;
 }
 
+static void move_repl_timer(struct rt_private *prv, unsigned int old_cpu)
+{
+    cpumask_t *online = get_sched_res(old_cpu)->cpupool->res_valid;
+    unsigned int new_cpu = cpumask_cycle(old_cpu, online);
+
+    /*
+     * Make sure the timer run on one of the cpus that are still available
+     * to this scheduler. If there aren't any left, it means it's the time
+     * to just kill it.
+     */
+    if ( new_cpu >= nr_cpu_ids )
+    {
+        kill_timer(&prv->repl_timer);
+        dprintk(XENLOG_DEBUG, "RTDS: timer killed on cpu %d\n", old_cpu);
+    }
+    else
+    {
+        migrate_timer(&prv->repl_timer, new_cpu);
+    }
+}
+
 static void cf_check
 rt_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
@@ -759,25 +780,25 @@ rt_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     spin_lock_irqsave(&prv->lock, flags);
 
     if ( prv->repl_timer.cpu == cpu )
-    {
-        cpumask_t *online = get_sched_res(cpu)->cpupool->res_valid;
-        unsigned int new_cpu = cpumask_cycle(cpu, online);
+        move_repl_timer(prv, cpu);
 
-        /*
-         * Make sure the timer run on one of the cpus that are still available
-         * to this scheduler. If there aren't any left, it means it's the time
-         * to just kill it.
-         */
-        if ( new_cpu >= nr_cpu_ids )
-        {
-            kill_timer(&prv->repl_timer);
-            dprintk(XENLOG_DEBUG, "RTDS: timer killed on cpu %d\n", cpu);
-        }
-        else
-        {
-            migrate_timer(&prv->repl_timer, new_cpu);
-        }
-    }
+    spin_unlock_irqrestore(&prv->lock, flags);
+}
+
+static void cf_check
+rt_move_timers(const struct scheduler *ops, struct sched_resource *sr)
+{
+    unsigned long flags;
+    struct rt_private *prv = rt_priv(ops);
+    unsigned int old_cpu;
+
+    spin_lock_irqsave(&prv->lock, flags);
+
+    old_cpu = prv->repl_timer.cpu;
+    if ( prv->repl_timer.status != TIMER_STATUS_invalid &&
+         prv->repl_timer.status != TIMER_STATUS_killed &&
+         !cpumask_test_cpu(old_cpu, sr->cpupool->res_valid) )
+        move_repl_timer(prv, old_cpu);
 
     spin_unlock_irqrestore(&prv->lock, flags);
 }
@@ -1556,6 +1577,7 @@ static const struct scheduler sched_rtds_def = {
     .sleep          = rt_unit_sleep,
     .wake           = rt_unit_wake,
     .context_saved  = rt_context_saved,
+    .move_timers    = rt_move_timers,
 };
 
 REGISTER_SCHEDULER(sched_rtds_def);

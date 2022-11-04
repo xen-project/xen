@@ -1035,6 +1035,8 @@ static int cf_check cpu_callback(
     case CPU_ONLINE:
         if ( system_state <= SYS_STATE_active )
             rc = cpupool_cpu_add(cpu);
+        else
+            sched_migrate_timers(cpu);
         break;
     case CPU_DOWN_PREPARE:
         /* Suspend/Resume don't change assignments of cpus to cpupools. */
