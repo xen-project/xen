@@ -3418,6 +3418,8 @@ static void __init initrd_load(struct kernel_info *kinfo)
                                           initrd, len);
     if ( res != 0 )
         panic("Unable to copy the initrd in the hwdom memory\n");
+
+    iounmap(initrd);
 }
 
 /*
