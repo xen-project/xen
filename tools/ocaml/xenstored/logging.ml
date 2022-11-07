@@ -342,3 +342,32 @@ let xb_answer ~tid ~con ~ty data =
 let watch_not_fired ~con perms path =
 	let data = Printf.sprintf "EPERM perms=[%s] path=%s" perms path in
 	access_logging ~tid:0 ~con ~data Watch_not_fired ~level:Info
+
+let msg_of exn bt =
+	Printf.sprintf "Fatal exception: %s\n%s\n" (Printexc.to_string exn)
+		(Printexc.raw_backtrace_to_string bt)
+
+let fallback_exception_handler exn bt =
+	(* stderr goes to /dev/null, so use the logger where possible,
+	   but always print to stderr too, in case everything else fails,
+	   e.g. this can be used to debug with --no-fork
+
+	   this function should try not to raise exceptions, but if it does
+	   the ocaml runtime should still print the exception, both the original,
+	   and the one from this function, but to stderr this time
+	 *)
+	let msg = msg_of exn bt in
+	prerr_endline msg;
+	(* See Printexc.set_uncaught_exception_handler, need to flush,
+	   so has to call stop and flush *)
+	match !xenstored_logger with
+	| Some l -> error "xenstored-fallback" "%s" msg; l.stop ()
+	| None ->
+		(* Too early, no logger set yet.
+		   We normally try to use the configured logger so we don't flood syslog
+		   during development for example, or if the user has a file set
+		 *)
+		try Syslog.log Syslog.Daemon Syslog.Err msg
+		with e ->
+			let bt = Printexc.get_raw_backtrace () in
+			prerr_endline @@ msg_of e bt
