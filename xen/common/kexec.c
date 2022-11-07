@@ -1213,7 +1213,7 @@ static int kexec_status(XEN_GUEST_HANDLE_PARAM(void) uarg)
     return !!test_bit(bit, &kexec_flags);
 }
 
-static int do_kexec_op_internal(unsigned int op,
+static int do_kexec_op_internal(unsigned long op,
                                 XEN_GUEST_HANDLE_PARAM(void) uarg,
                                 bool_t compat)
 {
@@ -1265,7 +1265,7 @@ static int do_kexec_op_internal(unsigned int op,
     return ret;
 }
 
-long do_kexec_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(void) uarg)
+long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     return do_kexec_op_internal(op, uarg, 0);
 }

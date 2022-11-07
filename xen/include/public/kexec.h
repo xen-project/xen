@@ -64,7 +64,7 @@
 
 /*
  * Prototype for this hypercall is:
- *  int kexec_op(int cmd, void *args)
+ *  int kexec_op(unsigned long cmd, void *args)
  * @cmd  == KEXEC_CMD_...
  *          KEXEC operation to perform
  * @args == Operation-specific extra arguments (NULL if none).

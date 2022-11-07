@@ -117,9 +117,6 @@ callback_op(int cmd, const void *arg)
 #ifdef CONFIG_ARGO
 argo_op(unsigned int cmd, void *arg1, void *arg2, unsigned long arg3, unsigned long arg4)
 #endif
-#ifdef CONFIG_KEXEC
-kexec_op(unsigned int op, void *uarg)
-#endif
 #ifdef CONFIG_PV
 iret()
 nmi_op(unsigned int cmd, void *arg)
@@ -148,6 +145,9 @@ update_va_mapping_otherdomain(unsigned int va, uint32_t lo, uint32_t hi, unsigne
 #endif
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
 platform_op(compat_platform_op_t *u_xenpf_op)
+#endif
+#ifdef CONFIG_KEXEC
+kexec_op(unsigned int op, void *uarg)
 #endif
 #endif /* CONFIG_COMPAT */
 
@@ -180,6 +180,9 @@ set_callbacks(unsigned long event_address, unsigned long failsafe_address, unsig
 update_descriptor(uint64_t gaddr, seg_desc_t desc)
 update_va_mapping(unsigned long va, uint64_t val64, unsigned long flags)
 update_va_mapping_otherdomain(unsigned long va, uint64_t val64, unsigned long flags, domid_t domid)
+#endif
+#ifdef CONFIG_KEXEC
+kexec_op(unsigned long op, void *uarg)
 #endif
 #ifdef CONFIG_IOREQ_SERVER
 dm_op(domid_t domid, unsigned int nr_bufs, xen_dm_op_buf_t *bufs)
