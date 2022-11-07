@@ -355,7 +355,8 @@ let tweak_gc () =
 	Gc.set { (Gc.get ()) with Gc.max_overhead = !Define.gc_max_overhead }
 
 
-let _ =
+let () =
+	Printexc.set_uncaught_exception_handler Logging.fallback_exception_handler;
 	let cf = do_argv in
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then
