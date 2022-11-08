@@ -14,6 +14,7 @@
 
 #include <syslog.h>
 #include <string.h>
+#include <caml/fail.h>
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>
@@ -35,14 +36,16 @@ static int __syslog_facility_table[] = {
 value stub_syslog(value facility, value level, value msg)
 {
 	CAMLparam3(facility, level, msg);
-	const char *c_msg = strdup(String_val(msg));
+	char *c_msg = strdup(String_val(msg));
 	int c_facility = __syslog_facility_table[Int_val(facility)]
 	               | __syslog_level_table[Int_val(level)];
 
+	if ( !c_msg )
+		caml_raise_out_of_memory();
 	caml_enter_blocking_section();
 	syslog(c_facility, "%s", c_msg);
 	caml_leave_blocking_section();
 
-	free((void*)c_msg);
+	free(c_msg);
 	CAMLreturn(Val_unit);
 }
