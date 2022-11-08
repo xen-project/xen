@@ -186,9 +186,9 @@ let from_channel_f chan global_f evtchn_f socket_f domain_f watch_f store_f =
 					        (Perms.Node.of_string (unhexify perms ^ "\000"))
 					        (unhexify value)
 				| _ ->
-					info "restoring: ignoring unknown line: %s" line
+					warn "restoring: ignoring unknown line: %s" line
 			with exn ->
-				info "restoring: ignoring unknown line: %s (exception: %s)"
+				warn "restoring: ignoring unknown line: %s (exception: %s)"
 				     line (Printexc.to_string exn);
 				()
 		with End_of_file ->
