@@ -695,9 +695,8 @@ int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
 
     if ( unlikely(d->is_dying) )
     {
-        gdprintk(XENLOG_INFO, "Ignoring paging op on dying domain %u\n",
-                 d->domain_id);
-        return 0;
+        gdprintk(XENLOG_INFO, "Tried to do a paging op on dying %pd\n", d);
+        return -EINVAL;
     }
 
     if ( unlikely(d->vcpu == NULL) || unlikely(d->vcpu[0] == NULL) )
