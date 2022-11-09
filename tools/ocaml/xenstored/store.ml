@@ -461,7 +461,7 @@ let reset_permissions store domid =
 		| Some perms ->
 			if perms <> node.perms then
 				Logging.debug "store|node" "Changed permissions for node %s" (Node.get_name node);
-			Some { node with perms }
+			Some { node with Node.perms }
 	) store.root
 
 type ops = {
