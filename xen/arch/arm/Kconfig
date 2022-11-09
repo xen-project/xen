@@ -105,28 +105,28 @@ config HARDEN_BRANCH_PREDICTOR
 
 config ARM64_PTR_AUTH
 	def_bool n
-	depends on ARM64
+	depends on ARM_64
 	help
 	  Pointer authentication support.
 	  This feature is not supported in Xen.
 
 config ARM64_SVE
 	def_bool n
-	depends on ARM64
+	depends on ARM_64
 	help
 	  Scalar Vector Extension support.
 	  This feature is not supported in Xen.
 
 config ARM64_MTE
 	def_bool n
-	depends on ARM64
+	depends on ARM_64
 	help
 	  Memory Tagging Extension support.
 	  This feature is not supported in Xen.
 
 config ARM64_BTI
 	def_bool n
-	depends on ARM64
+	depends on ARM_64
 	help
 	  Branch Target Identification support.
 	  This feature is not supported in Xen.
