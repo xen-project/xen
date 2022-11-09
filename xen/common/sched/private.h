@@ -331,6 +331,8 @@ struct scheduler {
                                     struct xen_sysctl_scheduler_op *);
     void         (*dump_settings)  (const struct scheduler *);
     void         (*dump_cpu_state) (const struct scheduler *, int);
+    void         (*move_timers)    (const struct scheduler *,
+                                    struct sched_resource *);
 };
 
 static inline int sched_init(struct scheduler *s)
@@ -485,6 +487,13 @@ static inline int sched_adjust_cpupool(const struct scheduler *s,
     return s->adjust_global ? s->adjust_global(s, op) : 0;
 }
 
+static inline void sched_move_timers(const struct scheduler *s,
+                                     struct sched_resource *sr)
+{
+    if ( s->move_timers )
+        s->move_timers(s, sr);
+}
+
 static inline void sched_unit_pause_nosync(const struct sched_unit *unit)
 {
     struct vcpu *v;
@@ -622,6 +631,7 @@ struct cpu_rm_data *alloc_cpu_rm_data(unsigned int cpu, bool aff_alloc);
 void free_cpu_rm_data(struct cpu_rm_data *mem, unsigned int cpu);
 int schedule_cpu_rm(unsigned int cpu, struct cpu_rm_data *mem);
 int sched_move_domain(struct domain *d, struct cpupool *c);
+void sched_migrate_timers(unsigned int cpu);
 struct cpupool *cpupool_get_by_id(unsigned int poolid);
 void cpupool_put(struct cpupool *pool);
 int cpupool_add_domain(struct domain *d, unsigned int poolid);

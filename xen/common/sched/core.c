@@ -1285,6 +1285,35 @@ static int cpu_disable_scheduler_check(unsigned int cpu)
 }
 
 /*
+ * Called after a cpu has come up again in a suspend/resume cycle.
+ * Migrate all timers for this cpu (they have been migrated to cpu 0 when the
+ * cpu was going down).
+ * Note that only timers related to a physical cpu are migrated, not the ones
+ * related to a vcpu or domain.
+ */
+void sched_migrate_timers(unsigned int cpu)
+{
+    struct sched_resource *sr;
+
+    rcu_read_lock(&sched_res_rculock);
+
+    sr = get_sched_res(cpu);
+
+    /*
+     * Note that on a system with parked cpus (e.g. smt=0 on Intel cpus) this
+     * will be called for the parked cpus, too, so the case for no scheduling
+     * resource being available must be considered.
+     */
+    if ( sr && sr->master_cpu == cpu )
+    {
+        migrate_timer(&sr->s_timer, cpu);
+        sched_move_timers(sr->scheduler, sr);
+    }
+
+    rcu_read_unlock(&sched_res_rculock);
+}
+
+/*
  * In general, this must be called with the scheduler lock held, because the
  * adjust_affinity hook may want to modify the vCPU state. However, when the
  * vCPU is being initialized (either for dom0 or domU) there is no risk of
