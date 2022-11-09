@@ -227,6 +227,27 @@ static void unmap_interface(void *interface)
 	xengnttab_unmap(*xgt_handle, interface, 1);
 }
 
+static void remove_domid_from_perm(struct node_perms *perms,
+				   struct domain *domain)
+{
+	unsigned int cur, new;
+
+	if (perms->p[0].id == domain->domid)
+		perms->p[0].id = priv_domid;
+
+	for (cur = new = 1; cur < perms->num; cur++) {
+		if (perms->p[cur].id == domain->domid)
+			continue;
+
+		if (new != cur)
+			perms->p[new] = perms->p[cur];
+
+		new++;
+	}
+
+	perms->num = new;
+}
+
 static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 				  struct node *node, void *arg)
 {
@@ -277,6 +298,9 @@ static void domain_tree_remove(struct domain *domain)
 			syslog(LOG_ERR,
 			       "error when looking for orphaned nodes\n");
 	}
+
+	remove_domid_from_perm(&dom_release_perms, domain);
+	remove_domid_from_perm(&dom_introduce_perms, domain);
 }
 
 static int destroy_domain(void *_domain)
