@@ -475,7 +475,7 @@ let _ =
 
 	let ring_scan_checker dom =
 		(* no need to scan domains already marked as for processing *)
-		if not (Domain.get_io_credit dom > 0) then
+		if not (Domain.get_io_credit dom > 0) then (
 			debug "Looking up domid %d" (Domain.get_id dom);
 			let con = Connections.find_domain cons (Domain.get_id dom) in
 			if not (Connection.has_more_work con) then (
@@ -490,7 +490,8 @@ let _ =
 					let n = 32 + 2 * (Domains.number domains) in
 					info "found lazy domain %d, credit %d" (Domain.get_id dom) n;
 					Domain.set_io_credit ~n dom
-			) in
+			)
+		) in
 
 	let last_stat_time = ref 0. in
 	let last_scan_time = ref 0. in
