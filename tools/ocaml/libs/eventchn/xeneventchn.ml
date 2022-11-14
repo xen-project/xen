@@ -17,6 +17,7 @@
 type handle
 
 external init: unit -> handle = "stub_eventchn_init"
+external fdopen: Unix.file_descr -> handle = "stub_eventchn_fdopen"
 external fd: handle -> Unix.file_descr = "stub_eventchn_fd"
 
 type t = int
