@@ -47,6 +47,10 @@ val init: unit -> handle
 (** Return an initialised event channel interface. On error it
     will throw a Failure exception. *)
 
+val fdopen: Unix.file_descr -> handle
+(** Return an initialised event channel interface, from an already open evtchn
+    file descriptor.  On error it will throw a Failure exception. *)
+
 val fd: handle -> Unix.file_descr
 (** Return a file descriptor suitable for Unix.select. When
     the descriptor becomes readable, it is safe to call 'pending'.
