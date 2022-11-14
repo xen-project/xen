@@ -50,8 +50,6 @@ type x86_arch_emulation_flags =
 
 type x86_arch_misc_flags =
 	| X86_MSR_RELAXED
-	| X86_ASSISTED_XAPIC
-	| X86_ASSISTED_X2APIC
 
 type xen_x86_arch_domainconfig =
 {
@@ -132,9 +130,7 @@ type physinfo_cap_flag =
 
 type arm_physinfo_cap_flag
 
-type x86_physinfo_cap_flag =
-	| CAP_X86_ASSISTED_XAPIC
-	| CAP_X86_ASSISTED_X2APIC
+type x86_physinfo_cap_flag
 
 type arch_physinfo_cap_flags =
 	| ARM of arm_physinfo_cap_flag list

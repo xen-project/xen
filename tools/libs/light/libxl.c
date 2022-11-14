@@ -15,7 +15,6 @@
 #include "libxl_osdeps.h"
 
 #include "libxl_internal.h"
-#include "libxl_arch.h"
 
 int libxl_ctx_alloc(libxl_ctx **pctx, int version,
                     unsigned flags, xentoollog_logger * lg)
@@ -410,8 +409,6 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
         !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_gnttab_v1);
     physinfo->cap_gnttab_v2 =
         !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_gnttab_v2);
-
-    libxl__arch_get_physinfo(physinfo, &xcphysinfo);
 
     GC_FREE;
     return 0;

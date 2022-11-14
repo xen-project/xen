@@ -94,13 +94,6 @@ struct xen_sysctl_tbuf_op {
 /* Max XEN_SYSCTL_PHYSCAP_* constant.  Used for ABI checking. */
 #define XEN_SYSCTL_PHYSCAP_MAX XEN_SYSCTL_PHYSCAP_gnttab_v2
 
-/* The platform supports x{2}apic hardware assisted emulation. */
-#define XEN_SYSCTL_PHYSCAP_X86_ASSISTED_XAPIC  (1u << 0)
-#define XEN_SYSCTL_PHYSCAP_X86_ASSISTED_X2APIC (1u << 1)
-
-/* Max XEN_SYSCTL_PHYSCAP_X86_* constant. Used for ABI checking. */
-#define XEN_SYSCTL_PHYSCAP_X86_MAX XEN_SYSCTL_PHYSCAP_X86_ASSISTED_X2APIC
-
 struct xen_sysctl_physinfo {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;

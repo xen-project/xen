@@ -1862,21 +1862,6 @@ firmware tables when using certain older guest Operating
 Systems. These tables have been superseded by newer constructs within
 the ACPI tables.
 
-=item B<assisted_xapic=BOOLEAN>
-
-B<(x86 only)> Enables or disables hardware assisted virtualization for
-xAPIC. With this option enabled, a memory-mapped APIC access will be
-decoded by hardware and either issue a more specific VM exit than just
-a p2m fault, or altogether avoid a VM exit. The
-default is settable via L<xl.conf(5)>.
-
-=item B<assisted_x2apic=BOOLEAN>
-
-B<(x86 only)> Enables or disables hardware assisted virtualization for
-x2APIC. With this option enabled, certain accesses to MSR APIC
-registers will avoid a VM exit into the hypervisor. The default is
-settable via L<xl.conf(5)>.
-
 =item B<nx=BOOLEAN>
 
 B<(x86 only)> Hides or exposes the No-eXecute capability. This allows a guest

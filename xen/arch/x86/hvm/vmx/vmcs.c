@@ -1134,10 +1134,6 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(PLE_WINDOW, ple_window);
     }
 
-    if ( !has_assisted_xapic(d) )
-        v->arch.hvm.vmx.secondary_exec_control &=
-            ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
-
     if ( cpu_has_vmx_secondary_exec_control )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL,
                   v->arch.hvm.vmx.secondary_exec_control);
@@ -2154,14 +2150,7 @@ int __init vmx_vmcs_init(void)
     ret = _vmx_cpu_up(true);
 
     if ( !ret )
-    {
-        /* Check whether hardware supports accelerated xapic and x2apic. */
-        assisted_xapic_available = cpu_has_vmx_virtualize_apic_accesses;
-        assisted_x2apic_available = cpu_has_vmx_virtualize_x2apic_mode &&
-                                    (cpu_has_vmx_apic_reg_virt ||
-                                     cpu_has_vmx_virtual_intr_delivery);
         register_keyhandler('v', vmcs_dump, "dump VT-x VMCSs", 1);
-    }
 
     return ret;
 }

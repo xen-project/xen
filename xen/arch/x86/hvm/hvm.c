@@ -117,9 +117,6 @@ static const char __initconst warning_hvm_fep[] =
 static bool_t __initdata opt_altp2m_enabled = 0;
 boolean_param("altp2m", opt_altp2m_enabled);
 
-bool __ro_after_init assisted_xapic_available;
-bool __ro_after_init assisted_x2apic_available;
-
 static int cf_check cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
@@ -597,12 +594,6 @@ int hvm_domain_initialise(struct domain *d,
     INIT_LIST_HEAD(&d->arch.hvm.g2m_ioport_list);
     INIT_LIST_HEAD(&d->arch.hvm.mmcfg_regions);
     INIT_LIST_HEAD(&d->arch.hvm.msix_tables);
-
-    d->arch.hvm.assisted_xapic =
-        config->arch.misc_flags & XEN_X86_ASSISTED_XAPIC;
-
-    d->arch.hvm.assisted_x2apic =
-        config->arch.misc_flags & XEN_X86_ASSISTED_X2APIC;
 
     rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
     if ( rc )

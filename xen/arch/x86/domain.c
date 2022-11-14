@@ -49,7 +49,6 @@
 #include <asm/cpuidle.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
-#include <asm/hvm/domain.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/support.h>
@@ -619,8 +618,6 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
     bool hvm = config->flags & XEN_DOMCTL_CDF_hvm;
     bool hap = config->flags & XEN_DOMCTL_CDF_hap;
     bool nested_virt = config->flags & XEN_DOMCTL_CDF_nested_virt;
-    bool assisted_xapic = config->arch.misc_flags & XEN_X86_ASSISTED_XAPIC;
-    bool assisted_x2apic = config->arch.misc_flags & XEN_X86_ASSISTED_X2APIC;
     unsigned int max_vcpus;
 
     if ( hvm ? !hvm_enabled : !IS_ENABLED(CONFIG_PV) )
@@ -687,29 +684,11 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         }
     }
 
-    if ( config->arch.misc_flags & ~(XEN_X86_MSR_RELAXED |
-                                     XEN_X86_ASSISTED_XAPIC |
-                                     XEN_X86_ASSISTED_X2APIC) )
+    if ( config->arch.misc_flags & ~XEN_X86_MSR_RELAXED )
     {
         dprintk(XENLOG_INFO, "Invalid arch misc flags %#x\n",
                 config->arch.misc_flags);
         return -EINVAL;
-    }
-
-    if ( (assisted_xapic || assisted_x2apic) && !hvm )
-    {
-        dprintk(XENLOG_INFO,
-                "Interrupt Controller Virtualization not supported for PV\n");
-        return -EINVAL;
-    }
-
-    if ( (assisted_xapic && !assisted_xapic_available) ||
-         (assisted_x2apic && !assisted_x2apic_available) )
-    {
-        dprintk(XENLOG_INFO,
-                "Hardware assisted x%sAPIC requested but not available\n",
-                assisted_xapic && !assisted_xapic_available ? "" : "2");
-        return -ENODEV;
     }
 
     return 0;

@@ -534,8 +534,6 @@ Vuart VuartType
 }
 ArchX86 struct {
 MsrRelaxed Defbool
-AssistedXapic Defbool
-AssistedX2Apic Defbool
 }
 Altp2M Altp2MMode
 VmtraceBufKb int
@@ -1036,8 +1034,6 @@ CapVmtrace bool
 CapVpmu bool
 CapGnttabV1 bool
 CapGnttabV2 bool
-CapAssistedXapic bool
-CapAssistedX2Apic bool
 }
 
 type Connectorinfo struct {

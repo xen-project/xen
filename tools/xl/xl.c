@@ -57,8 +57,6 @@ int max_grant_frames = -1;
 int max_maptrack_frames = -1;
 int max_grant_version = LIBXL_MAX_GRANT_DEFAULT;
 libxl_domid domid_policy = INVALID_DOMID;
-int assisted_xapic = -1;
-int assisted_x2apic = -1;
 
 xentoollog_level minmsglevel = minmsglevel_default;
 
@@ -202,12 +200,6 @@ static void parse_global_config(const char *configfile,
 
     if (!xlu_cfg_get_long (config, "claim_mode", &l, 0))
         claim_mode = l;
-
-    if (!xlu_cfg_get_long (config, "assisted_xapic", &l, 0))
-        assisted_xapic = l;
-
-    if (!xlu_cfg_get_long (config, "assisted_x2apic", &l, 0))
-        assisted_x2apic = l;
 
     xlu_cfg_replace_string (config, "remus.default.netbufscript",
         &default_remus_netbufscript, 0);

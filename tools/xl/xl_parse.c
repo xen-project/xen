@@ -2765,25 +2765,6 @@ skip_usbdev:
 
     xlu_cfg_get_defbool(config, "vpmu", &b_info->vpmu, 0);
 
-    if (b_info->type != LIBXL_DOMAIN_TYPE_PV) {
-        e = xlu_cfg_get_long(config, "assisted_xapic", &l , 0);
-        if (!e)
-            libxl_defbool_set(&b_info->arch_x86.assisted_xapic, l);
-        else if (e != ESRCH)
-            exit(1);
-        else if (assisted_xapic != -1) /* use global default if present */
-            libxl_defbool_set(&b_info->arch_x86.assisted_xapic, assisted_xapic);
-
-        e = xlu_cfg_get_long(config, "assisted_x2apic", &l, 0);
-        if (!e)
-            libxl_defbool_set(&b_info->arch_x86.assisted_x2apic, l);
-        else if (e != ESRCH)
-            exit(1);
-        else if (assisted_x2apic != -1) /* use global default if present */
-            libxl_defbool_set(&b_info->arch_x86.assisted_x2apic,
-                              assisted_x2apic);
-    }
-
     xlu_cfg_destroy(config);
 }
 

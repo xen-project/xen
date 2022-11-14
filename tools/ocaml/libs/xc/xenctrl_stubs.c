@@ -241,7 +241,7 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 
 		cfg.arch.misc_flags = ocaml_list_to_c_bitmap
 			/* ! x86_arch_misc_flags X86_ none */
-			/* ! XEN_X86_ XEN_X86_MISC_FLAGS_MAX max */
+			/* ! XEN_X86_ XEN_X86_MSR_RELAXED all */
 			(VAL_MISC_FLAGS);
 
 #undef VAL_MISC_FLAGS
@@ -748,10 +748,7 @@ CAMLprim value stub_xc_physinfo(value xch)
 	Store_field(physinfo, 9, Val_int(c_physinfo.max_cpu_id + 1));
 
 #if defined(__i386__) || defined(__x86_64__)
-	arch_cap_list = c_bitmap_to_ocaml_list
-		/* ! x86_physinfo_cap_flag CAP_X86_ none */
-		/* ! XEN_SYSCTL_PHYSCAP_X86_ XEN_SYSCTL_PHYSCAP_X86_MAX max */
-		(c_physinfo.arch_capabilities);
+	arch_cap_list = Tag_cons;
 
 	arch_cap_flags_tag = 1; /* tag x86 */
 #else

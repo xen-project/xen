@@ -1606,11 +1606,6 @@ int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
     return rc;
 }
 
-void libxl__arch_get_physinfo(libxl_physinfo *physinfo,
-                              const xc_physinfo_t *xcphysinfo)
-{
-}
-
 void libxl__arch_update_domain_config(libxl__gc *gc,
                                       libxl_domain_config *dst,
                                       const libxl_domain_config *src)

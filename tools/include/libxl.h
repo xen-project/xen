@@ -536,20 +536,6 @@
 #define LIBXL_HAVE_NIC_TRUSTED 1
 
 /*
- * LIBXL_HAVE_PHYSINFO_ASSISTED_APIC indicates that libxl_physinfo has
- * cap_assisted_xapic and cap_assisted_x2apic fields, which indicates
- * the availability of x{2}APIC hardware assisted virtualization.
- */
-#define LIBXL_HAVE_PHYSINFO_ASSISTED_APIC 1
-
-/*
- * LIBXL_HAVE_ASSISTED_APIC indicates that libxl_domain_build_info has
- * assisted_xapic and assisted_x2apic fields for enabling hardware
- * assisted virtualization for x{2}apic per domain.
- */
-#define LIBXL_HAVE_ASSISTED_APIC 1
-
-/*
  * LIBXL_HAVE_DEVICE_DISK_SPECIFICATION indicates that 'specification' and
  * 'transport' fields (of libxl_disk_specification and libxl_disk_transport
  * types respectively) are present in libxl_device_disk.
