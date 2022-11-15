@@ -378,8 +378,16 @@ struct vcpu_msrs
     /*
      * 0xc001011f - MSR_VIRT_SPEC_CTRL (if !X86_FEATURE_AMD_SSBD)
      *
-     * AMD only. Guest selected value, context switched on guest VM
-     * entry/exit.
+     * AMD only, used on Zen1 and older hardware (pre-AMD_SSBD).  Holds the
+     * the guests value.
+     *
+     * In the default case, Xen doesn't protect itself from SSB, and guests
+     * are expected to use VIRT_SPEC_CTRL.SSBD=1 sparingly.  Xen therefore
+     * runs in the guest kernel's choice of SSBD.
+     *
+     * However, if the global enable `spec-ctrl=ssbd` is selected, hardware is
+     * always configured with SSBD=1 and the guest's setting is never loaded
+     * into hardware.
      */
     struct {
         uint32_t raw;

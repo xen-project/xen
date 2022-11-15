@@ -24,6 +24,7 @@
 #include <xen/nospec.h>
 #include <xen/sched.h>
 
+#include <asm/amd.h>
 #include <asm/debugreg.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/viridian.h>
@@ -697,7 +698,15 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
                 msrs->spec_ctrl.raw &= ~SPEC_CTRL_SSBD;
         }
         else
+        {
             msrs->virt_spec_ctrl.raw = val & SPEC_CTRL_SSBD;
+            if ( v == curr )
+                /*
+                 * Propagate the value to hardware, as it won't be set on guest
+                 * resume path.
+                 */
+                amd_set_legacy_ssbd(val & SPEC_CTRL_SSBD);
+        }
         break;
 
     case MSR_AMD64_DE_CFG:
