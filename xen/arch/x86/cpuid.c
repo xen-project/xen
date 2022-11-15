@@ -3,6 +3,7 @@
 #include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/nospec.h>
+#include <asm/amd.h>
 #include <asm/cpuid.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/nestedhvm.h>
@@ -543,9 +544,9 @@ static void __init calculate_hvm_max_policy(void)
 
     /*
      * VIRT_SSBD is exposed in the default policy as a result of
-     * VIRT_SC_MSR_HVM being set, it also needs exposing in the max policy.
+     * amd_virt_spec_ctrl being set, it also needs exposing in the max policy.
      */
-    if ( boot_cpu_has(X86_FEATURE_VIRT_SC_MSR_HVM) )
+    if ( amd_virt_spec_ctrl )
         __set_bit(X86_FEATURE_VIRT_SSBD, hvm_featureset);
 
     /*
@@ -606,9 +607,9 @@ static void __init calculate_hvm_def_policy(void)
 
     /*
      * Only expose VIRT_SSBD if AMD_SSBD is not available, and thus
-     * VIRT_SC_MSR_HVM is set.
+     * amd_virt_spec_ctrl is set.
      */
-    if ( boot_cpu_has(X86_FEATURE_VIRT_SC_MSR_HVM) )
+    if ( amd_virt_spec_ctrl )
         __set_bit(X86_FEATURE_VIRT_SSBD, hvm_featureset);
 
     sanitise_featureset(hvm_featureset);
