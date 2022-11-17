@@ -43,6 +43,13 @@ RUN apt-get update && \
         wget \
         git \
         nasm \
+        # for test phase, qemu-smoke-* jobs
+        u-boot-qemu \
+        u-boot-tools \
+        device-tree-compiler \
+        curl \
+        cpio \
+        busybox-static \
         && \
         apt-get autoremove -y && \
         apt-get clean && \
