@@ -2,14 +2,6 @@
 
 set -ex
 
-export DEBIAN_FRONTEND=noninteractive
-apt-get -qy update
-apt-get -qy install --no-install-recommends u-boot-qemu \
-                                            u-boot-tools \
-                                            device-tree-compiler \
-                                            curl \
-                                            cpio
-
 cd binaries
 # Use the kernel from Debian
 curl --fail --silent --show-error --location --output vmlinuz http://http.us.debian.org/debian/dists/bullseye/main/installer-armhf/current/images/netboot/vmlinuz
