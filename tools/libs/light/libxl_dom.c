@@ -1458,10 +1458,18 @@ int libxl__domain_set_paging_mempool_size(
     shadow_mem = d_config->b_info.shadow_memkb;
     shadow_mem <<= 10;
 
+    if ((shadow_mem >> 10) != d_config->b_info.shadow_memkb) {
+        LOGED(ERROR, domid,
+              "shadow_memkb value %"PRIu64"kB too large",
+              d_config->b_info.shadow_memkb);
+        return ERROR_FAIL;
+    }
+
     int r = xc_set_paging_mempool_size(CTX->xch, domid, shadow_mem);
     if (r) {
         LOGED(ERROR, domid,
-              "Failed to set paging mempool size to %"PRIu64"kB", shadow_mem);
+              "Failed to set paging mempool size to %"PRIu64"kB",
+              d_config->b_info.shadow_memkb);
         return ERROR_FAIL;
     }
 
