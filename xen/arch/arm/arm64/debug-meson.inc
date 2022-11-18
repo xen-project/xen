@@ -23,9 +23,10 @@
 
 #define AML_UART_TX_FIFO_FULL   21
 
-.macro early_uart_init xb, c
-/* Uart has already been initialized by Firmware, for instance by TF-A */
-.endm
+/*
+ * No need for early_uart_init, as UART has already been initialized
+ * by Firmware, for instance by TF-A.
+ */
 
 /*
  * MESON UART wait UART to be ready to transmit
