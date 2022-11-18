@@ -34,8 +34,8 @@ Xen relies on some settings the firmware has to configure in EL3 before starting
 * The bit SCR_EL3.HCE (resp. SCR.HCE for 32-bit ARM) must be set to 1.
 
 
-[1] linux/Documentation/arm/Booting
-Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/Booting
+[1] linux/Documentation/arm/booting.rst
+Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/booting.rst
 
-[2] linux/Documentation/arm64/booting.txt
-Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm64/booting.txt
+[2] linux/Documentation/arm64/booting.rst
+Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm64/booting.rst

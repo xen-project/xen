@@ -71,8 +71,8 @@ Please refer to your platform docs for the MMIO ranges and interrupts.
 They can also be calculated from the original device tree (not
 recommended). You can read about the "interrupts" property format in the
 device tree bindings of the interrupt controller of your platform. For
-example, in the case of GICv2 see [arm,gic.txt]; in the case of GICv3
-see [arm,gic-v3.txt] in the Linux repository. For both GICv2 and GICv3
+example, in the case of GICv2 see [arm,gic.yaml]; in the case of GICv3
+see [arm,gic-v3.yaml] in the Linux repository. For both GICv2 and GICv3
 the "interrupts" property format is the same: the first cell is the
 interrupt type, and the second cell is the interrupt number.  Given that
 SPI numbers start from 32, in this example 80 + 32 = 112.
@@ -187,6 +187,6 @@ assign a network card to a dom0-less guest on Xilinx Ultrascale+ MPSoC:
 };
 
 
-[arm,gic.txt]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
-[arm,gic-v3.txt]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+[arm,gic.yaml]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic.yaml
+[arm,gic-v3.yaml]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.yaml
 [xl.cfg]: https://xenbits.xen.org/docs/unstable/man/xl.cfg.5.html
