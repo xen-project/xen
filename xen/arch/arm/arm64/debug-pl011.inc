@@ -28,7 +28,7 @@
         strh  w\c, [\xb, #FBRD]      /* -> UARTFBRD (Baud divisor fraction) */
         mov   x\c, #(7372800 / CONFIG_EARLY_UART_PL011_BAUD_RATE / 16)
         strh  w\c, [\xb, #IBRD]      /* -> UARTIBRD (Baud divisor integer) */
-        mov   x\c, #0x60             /* 8n1 */
+        mov   x\c, #WLEN_8           /* 8n1 */
         str   w\c, [\xb, #LCR_H]     /* -> UARTLCR_H (Line control) */
         ldr   x\c, =(RXE | TXE | UARTEN)
         str   w\c, [\xb, #CR]        /* -> UARTCR (Control Register) */

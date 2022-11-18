@@ -29,7 +29,7 @@
         str   \rc, [\rb, #FBRD]     /* -> UARTFBRD (Baud divisor fraction) */
         mov   \rc, #(7372800 / CONFIG_EARLY_UART_PL011_BAUD_RATE / 16)
         str   \rc, [\rb, #IBRD]     /* -> UARTIBRD (Baud divisor integer) */
-        mov   \rc, #0x60            /* 8n1 */
+        mov   \rc, #WLEN_8          /* 8n1 */
         str   \rc, [\rb, #LCR_H]     /* -> UARTLCR_H (Line control) */
         ldr   \rc, =(RXE | TXE | UARTEN)      /* RXE | TXE | UARTEN */
         str   \rc, [\rb, #CR]     /* -> UARTCR (Control Register) */

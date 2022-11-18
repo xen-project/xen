@@ -55,6 +55,7 @@
 
 /* LCR_H bits */
 #define SPS    (1<<7) /* Stick parity select */
+#define WLEN_8 (_AC(0x3, U) << 5) /* 8 bits word length */
 #define FEN    (1<<4) /* FIFO enable */
 #define STP2   (1<<3) /* Two stop bits select */
 #define EPS    (1<<2) /* Even parity select */
