@@ -1,5 +1,5 @@
 /*
- * xen/arch/arm/arm64/debug-pl011.S
+ * xen/arch/arm/arm64/debug-pl011.inc
  *
  * PL011 specific debug code
  *
@@ -16,6 +16,8 @@
  * GNU General Public License for more details.
  */
 
+ #include <asm/pl011-uart.h>
+
 /*
  * PL011 UART initialization
  * xb: register which containts the UART base address
@@ -23,13 +25,13 @@
  */
 .macro early_uart_init xb, c
         mov   x\c, #(7372800 / CONFIG_EARLY_UART_PL011_BAUD_RATE % 16)
-        strh  w\c, [\xb, #0x28]      /* -> UARTFBRD (Baud divisor fraction) */
+        strh  w\c, [\xb, #FBRD]      /* -> UARTFBRD (Baud divisor fraction) */
         mov   x\c, #(7372800 / CONFIG_EARLY_UART_PL011_BAUD_RATE / 16)
-        strh  w\c, [\xb, #0x24]      /* -> UARTIBRD (Baud divisor integer) */
+        strh  w\c, [\xb, #IBRD]      /* -> UARTIBRD (Baud divisor integer) */
         mov   x\c, #0x60             /* 8n1 */
-        str   w\c, [\xb, #0x2C]      /* -> UARTLCR_H (Line control) */
-        ldr   x\c, =0x00000301       /* RXE | TXE | UARTEN */
-        str   w\c, [\xb, #0x30]      /* -> UARTCR (Control Register) */
+        str   w\c, [\xb, #LCR_H]     /* -> UARTLCR_H (Line control) */
+        ldr   x\c, =(RXE | TXE | UARTEN)
+        str   w\c, [\xb, #CR]        /* -> UARTCR (Control Register) */
 .endm
 
 /*
@@ -39,8 +41,8 @@
  */
 .macro early_uart_ready xb, c
 1:
-        ldrh  w\c, [\xb, #0x18]      /* <- UARTFR (Flag register) */
-        tst   w\c, #0x8              /* Check BUSY bit */
+        ldrh  w\c, [\xb, #FR]        /* <- UARTFR (Flag register) */
+        tst   w\c, #BUSY             /* Check BUSY bit */
         b.ne  1b                     /* Wait for the UART to be ready */
 .endm
 
@@ -50,7 +52,7 @@
  * wt: register which contains the character to transmit
  */
 .macro early_uart_transmit xb, wt
-        strb  \wt, [\xb]             /* -> UARTDR (Data Register) */
+        strb  \wt, [\xb, #DR]        /* -> UARTDR (Data Register) */
 .endm
 
 /*
