@@ -377,6 +377,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->console_domid);
 
     rc = libxl__arch_domain_create(gc, d_config, state, domid);
+    if (rc) goto out;
 
     /* Construct a CPUID policy, but only for brand new domains.  Domains
      * being migrated-in/restored have CPUID handled during the
@@ -384,6 +385,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     if (!state->restore)
         rc = libxl__cpuid_legacy(ctx, domid, false, info);
 
+out:
     return rc;
 }
 
