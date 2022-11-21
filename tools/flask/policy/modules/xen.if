@@ -49,7 +49,8 @@ define(`create_domain_common', `
 	allow $1 $2:domain { create max_vcpus setdomainmaxmem setaddrsize
 			getdomaininfo hypercall setvcpucontext getscheduler
 			getvcpuinfo getaddrsize getaffinity setaffinity
-			settime setdomainhandle getvcpucontext set_misc_info };
+			settime setdomainhandle getvcpucontext set_misc_info
+			getpagingmempool setpagingmempool };
 	allow $1 $2:domain2 { set_cpu_policy settsc setscheduler setclaim
 			set_vnumainfo get_vnumainfo cacheflush
 			psr_cmt_op psr_alloc soft_reset
@@ -92,7 +93,7 @@ define(`manage_domain', `
 	allow $1 $2:domain { getdomaininfo getvcpuinfo getaffinity
 			getaddrsize pause unpause trigger shutdown destroy
 			setaffinity setdomainmaxmem getscheduler resume
-			setpodtarget getpodtarget };
+			setpodtarget getpodtarget getpagingmempool setpagingmempool };
     allow $1 $2:domain2 set_vnumainfo;
 ')
 

@@ -35,7 +35,8 @@ allow dom0_t dom0_t:domain {
 	setvcpucontext max_vcpus setaffinity getaffinity getscheduler
 	getdomaininfo getvcpuinfo getvcpucontext setdomainmaxmem setdomainhandle
 	setdebugging hypercall settime setaddrsize getaddrsize trigger
-	getpodtarget setpodtarget set_misc_info set_virq_handler
+	getpodtarget setpodtarget getpagingmempool setpagingmempool set_misc_info
+	set_virq_handler
 };
 allow dom0_t dom0_t:domain2 {
 	set_cpu_policy gettsc settsc setscheduler set_vnumainfo

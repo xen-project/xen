@@ -180,6 +180,10 @@ class domain
     set_misc_info
 # XEN_DOMCTL_set_virq_handler
     set_virq_handler
+# XEN_DOMCTL_get_paging_mempool_size
+    getpagingmempool
+# XEN_DOMCTL_set_paging_mempool_size
+    setpagingmempool
 }
 
 # This is a continuation of class domain, since only 32 permissions can be
