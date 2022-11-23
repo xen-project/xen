@@ -175,7 +175,6 @@ exception Error of string
 type handle
 
 external interface_open: unit -> handle = "stub_xc_interface_open"
-external interface_close: handle -> unit = "stub_xc_interface_close"
 
 let handle = ref None
 
@@ -183,7 +182,7 @@ let get_handle () = !handle
 
 let close_handle () =
 	match !handle with
-	| Some h -> handle := None; interface_close h
+	| Some h -> handle := None
 	| None -> ()
 
 let with_intf f =

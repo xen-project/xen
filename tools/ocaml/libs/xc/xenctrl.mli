@@ -146,7 +146,6 @@ type shutdown_reason = Poweroff | Reboot | Suspend | Crash | Watchdog | Soft_res
 exception Error of string
 type handle
 external interface_open : unit -> handle = "stub_xc_interface_open"
-external interface_close : handle -> unit = "stub_xc_interface_close"
 
 (** [with_intf f] runs [f] with a global handle that is opened on demand
  * and kept open. Conceptually, a client should use either

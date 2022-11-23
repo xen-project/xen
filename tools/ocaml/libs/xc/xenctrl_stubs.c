@@ -37,12 +37,27 @@
 
 #include "mmap_stubs.h"
 
-#define _H(__h) ((xc_interface *)(__h))
+#define _H(__h) (*((xc_interface **)Data_custom_val(__h)))
 #define _D(__d) ((uint32_t)Int_val(__d))
 
 #ifndef Val_none
 #define Val_none (Val_int(0))
 #endif
+
+static void stub_xenctrl_finalize(value v)
+{
+	xc_interface_close(_H(v));
+}
+
+static struct custom_operations xenctrl_ops = {
+	.identifier  = "xenctrl",
+	.finalize    = stub_xenctrl_finalize,
+	.compare     = custom_compare_default,     /* Can't compare     */
+	.hash        = custom_hash_default,        /* Can't hash        */
+	.serialize   = custom_serialize_default,   /* Can't serialize   */
+	.deserialize = custom_deserialize_default, /* Can't deserialize */
+	.compare_ext = custom_compare_ext_default, /* Can't compare     */
+};
 
 #define string_of_option_array(array, index) \
 	((Field(array, index) == Val_none) ? NULL : String_val(Field(Field(array, index), 0)))
@@ -70,26 +85,20 @@ static void Noreturn failwith_xc(xc_interface *xch)
 CAMLprim value stub_xc_interface_open(void)
 {
 	CAMLparam0();
-        xc_interface *xch;
-
-	/* Don't assert XC_OPENFLAG_NON_REENTRANT because these bindings
-	 * do not prevent re-entrancy to libxc */
-        xch = xc_interface_open(NULL, NULL, 0);
-        if (xch == NULL)
-		failwith_xc(NULL);
-        CAMLreturn((value)xch);
-}
-
-
-CAMLprim value stub_xc_interface_close(value xch)
-{
-	CAMLparam1(xch);
+	CAMLlocal1(result);
+	xc_interface *xch;
 
 	caml_enter_blocking_section();
-	xc_interface_close(_H(xch));
+	xch = xc_interface_open(NULL, NULL, 0);
 	caml_leave_blocking_section();
 
-	CAMLreturn(Val_unit);
+	if ( !xch )
+		failwith_xc(xch);
+
+	result = caml_alloc_custom(&xenctrl_ops, sizeof(xch), 0, 1);
+	_H(result) = xch;
+
+	CAMLreturn(result);
 }
 
 static void domain_handle_of_uuid_string(xen_domain_handle_t h,
