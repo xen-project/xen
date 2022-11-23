@@ -3897,7 +3897,7 @@ void __init create_domUs(void)
 
         if ( !dt_property_read_u32(node, "nr_spis", &d_cfg.arch.nr_spis) )
         {
-            unsigned int vpl011_virq = GUEST_VPL011_SPI;
+            int vpl011_virq = GUEST_VPL011_SPI;
 
             d_cfg.arch.nr_spis = gic_number_lines() - 32;
 
