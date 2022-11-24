@@ -4,16 +4,44 @@ Notable changes to Xen will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
-## [unstable UNRELEASED](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=staging) - TBD
+## [4.17.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=staging)
 
 ### Changed
  - On x86 "vga=current" can now be used together with GrUB2's gfxpayload setting. Note that
    this requires use of "multiboot2" (and "module2") as the GrUB commands loading Xen.
+ - The "gnttab" option now has a new command line sub-option for disabling the
+   GNTTABOP_transfer functionality.
+ - The x86 MCE command line option info is now updated.
 
 ### Added / support upgraded
+ - Out-of-tree builds for the hypervisor now supported.
+ - The project has officially adopted 4 directives and 24 rules of MISRA-C,
+   added MISRA-C checker build integration, and defined how to document
+   deviations.
  - IOMMU superpage support on x86, affecting PV guests as well as HVM/PVH ones
    when they don't share page tables with the CPU (HAP / EPT / NPT).
- - Support VIRT_SSBD feature for HVM guests on AMD.
+ - Support for VIRT_SSBD and MSR_SPEC_CTRL for HVM guests on AMD.
+ - Improved TSC, CPU, and APIC clock frequency calibration on x86.
+ - Add mwait-idle support for SPR and ADL on x86.
+ - Extend security support for hosts to 12 TiB of memory on x86.
+ - Add command line option to set cpuid parameters for dom0 at boot time on x86.
+ - Improved static configuration options on Arm.
+ - cpupools can be specified at boot using device tree on Arm.
+ - It is possible to use PV drivers with dom0less guests, allowing statically
+   booted dom0less guests with PV devices.
+ - On Arm, p2m structures are now allocated out of a pool of memory set aside at
+   domain creation.
+ - Improved mitigations against Spectre-BHB on Arm.
+ - Support VirtIO-MMIO devices device-tree binding creation in toolstack on Arm.
+ - Allow setting the number of CPUs to activate at runtime from command line
+   option on Arm.
+ - Grant-table support on Arm was improved and hardened by implementing
+   "simplified M2P-like approach for the xenheap pages"
+ - Add Renesas R-Car Gen4 IPMMU-VMSA support on Arm.
+ - Add i.MX lpuart and i.MX8QM support on Arm.
+ - Improved toolstack build system.
+ - Add Xue - console over USB 3 Debug Capability.
+ - gitlab-ci automation: Fixes and improvements together with new tests.
 
 ### Removed / support downgraded
  - dropped support for the (x86-only) "vesa-mtrr" and "vesa-remap" command line options
