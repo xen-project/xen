@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Added / support upgraded
  - Out-of-tree builds for the hypervisor now supported.
+ - __ro_after_init support, for marking data as immutable after boot.
  - The project has officially adopted 4 directives and 24 rules of MISRA-C,
    added MISRA-C checker build integration, and defined how to document
    deviations.
@@ -22,6 +23,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    when they don't share page tables with the CPU (HAP / EPT / NPT).
  - Support for VIRT_SSBD and MSR_SPEC_CTRL for HVM guests on AMD.
  - Improved TSC, CPU, and APIC clock frequency calibration on x86.
+ - Support for Xen using x86 Control Flow Enforcement technology for its own
+   protection. Both Shadow Stacks (ROP protection) and Indirect Branch
+   Tracking (COP/JOP protection).
  - Add mwait-idle support for SPR and ADL on x86.
  - Extend security support for hosts to 12 TiB of memory on x86.
  - Add command line option to set cpuid parameters for dom0 at boot time on x86.
