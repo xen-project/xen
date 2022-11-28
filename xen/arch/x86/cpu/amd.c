@@ -735,7 +735,7 @@ void amd_init_ssbd(const struct cpuinfo_x86 *c)
  * On Zen2 we offer this chicken (bit) on the altar of Speculation.
  *
  * Refer to the AMD Branch Type Confusion whitepaper:
- * https://XXX
+ * https://www.amd.com/system/files/documents/technical-guidance-for-mitigating-branch-type-confusion.pdf
  *
  * Setting this unnamed bit supposedly causes prediction information on
  * non-branch instructions to be ignored.  It is to be set unilaterally in
