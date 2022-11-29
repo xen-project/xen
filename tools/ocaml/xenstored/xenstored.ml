@@ -397,7 +397,6 @@ let _ =
 	if cf.restart && Sys.file_exists Disk.xs_daemon_database then (
 		let rwro = DB.from_file store domains cons Disk.xs_daemon_database in
 		info "Live reload: database loaded";
-		Event.bind_dom_exc_virq eventchn;
 		Process.LiveUpdate.completed ();
 		rwro
 	) else (
@@ -413,7 +412,6 @@ let _ =
 
 		if cf.domain_init then (
 			Connections.add_domain cons (Domains.create0 domains);
-			Event.bind_dom_exc_virq eventchn
 		);
 		rw_sock
 	) in
@@ -451,7 +449,7 @@ let _ =
 			let port = Event.pending eventchn in
 			debug "pending port %d" (Xeneventchn.to_int port);
 			finally (fun () ->
-				if Some port = eventchn.Event.virq_port then (
+				if port = eventchn.Event.domexc then (
 					let (notify, deaddom) = Domains.cleanup domains in
 					List.iter (Store.reset_permissions store) deaddom;
 					List.iter (Connections.del_domain cons) deaddom;
