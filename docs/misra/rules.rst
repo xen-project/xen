@@ -77,9 +77,30 @@ existing codebase are work-in-progress.
        behaviour
      -
 
+   * - `Rule 2.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_02_06.c>`_
+     - Advisory
+     - A function should not contain unused label declarations
+     -
+
+   * - `Rule 3.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_03_01.c>`_
+     - Required
+     - The character sequences /* and // shall not be used within a
+       comment
+     -
+
    * - `Rule 3.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_03_02.c>`_
      - Required
      - Line-splicing shall not be used in // comments
+     -
+
+   * - `Rule 4.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_04_01.c>`_
+     - Required
+     - Octal and hexadecimal escape sequences shall be terminated
+     -
+
+   * - `Rule 4.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_04_02.c>`_
+     - Advisory
+     - Trigraphs should not be used
      -
 
    * - `Rule 5.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_01_2.c>`_
@@ -199,6 +220,21 @@ existing codebase are work-in-progress.
      - All exit paths from a function with non-void return type shall
        have an explicit return statement with an expression
      -
+
+   * - `Rule 17.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_06.c>`_
+     - Mandatory
+     - The declaration of an array parameter shall not contain the
+       static keyword between the [ ]
+     -
+
+   * - `Rule 19.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_19_01.c>`_
+     - Mandatory
+     - An object shall not be assigned or copied to an overlapping
+       object
+     - Be aware that the static analysis tool Eclair might report
+       several findings for Rule 19.1 of type "caution". These are
+       instances where Eclair is unable to verify that the code is valid
+       in regard to Rule 19.1. Caution reports are not violations.
 
    * - `Rule 20.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_07.c>`_
      - Required
