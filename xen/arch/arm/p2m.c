@@ -48,7 +48,6 @@ static struct page_info *p2m_alloc_page(struct domain *d)
 {
     struct page_info *pg;
 
-    spin_lock(&d->arch.paging.lock);
     /*
      * For hardware domain, there should be no limit in the number of pages that
      * can be allocated, so that the kernel may take advantage of the extended
@@ -58,34 +57,28 @@ static struct page_info *p2m_alloc_page(struct domain *d)
     {
         pg = alloc_domheap_page(NULL, 0);
         if ( pg == NULL )
-        {
             printk(XENLOG_G_ERR "Failed to allocate P2M pages for hwdom.\n");
-            spin_unlock(&d->arch.paging.lock);
-            return NULL;
-        }
     }
     else
     {
+        spin_lock(&d->arch.paging.lock);
         pg = page_list_remove_head(&d->arch.paging.p2m_freelist);
-        if ( unlikely(!pg) )
-        {
-            spin_unlock(&d->arch.paging.lock);
-            return NULL;
-        }
+        spin_unlock(&d->arch.paging.lock);
     }
-    spin_unlock(&d->arch.paging.lock);
 
     return pg;
 }
 
 static void p2m_free_page(struct domain *d, struct page_info *pg)
 {
-    spin_lock(&d->arch.paging.lock);
     if ( is_hardware_domain(d) )
         free_domheap_page(pg);
     else
+    {
+        spin_lock(&d->arch.paging.lock);
         page_list_add_tail(pg, &d->arch.paging.p2m_freelist);
-    spin_unlock(&d->arch.paging.lock);
+        spin_unlock(&d->arch.paging.lock);
+    }
 }
 
 /* Return the size of the pool, in bytes. */
