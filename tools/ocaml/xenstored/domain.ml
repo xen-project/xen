@@ -63,6 +63,18 @@ let string_of_port = function
 let dump d chan =
 	fprintf chan "dom,%d,%nd,%d\n" d.id d.mfn d.remote_port
 
+let rebind_evtchn d remote_port =
+	begin match d.port with
+	| None -> ()
+	| Some p -> Event.unbind d.eventchn p
+	end;
+	let local = Event.bind_interdomain d.eventchn d.id remote_port in
+	debug "domain %d rebind (l %s, r %d) => (l %d, r %d)"
+	      d.id (string_of_port d.port) d.remote_port
+	      (Xeneventchn.to_int local) remote_port;
+	d.remote_port <- remote_port;
+	d.port <- Some (local)
+
 let notify dom =
 	match dom.port with
 	| None -> warn "domain %d: attempt to notify on unknown port" dom.id

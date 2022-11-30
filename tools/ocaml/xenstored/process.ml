@@ -569,8 +569,7 @@ let do_introduce con t domains cons data =
 			let edom = Domains.find domains domid in
 			if (Domain.get_mfn edom) = mfn && (Connections.find_domain cons domid) != con then begin
 				(* Use XS_INTRODUCE for recreating the xenbus event-channel. *)
-				edom.remote_port <- remote_port;
-				Domain.bind_interdomain edom;
+				Domain.rebind_evtchn edom remote_port;
 			end;
 			edom
 		else try
