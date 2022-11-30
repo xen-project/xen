@@ -57,17 +57,16 @@ let is_paused_for_conflict dom = dom.conflict_credit <= 0.0
 let is_free_to_conflict = is_dom0
 
 let string_of_port = function
-| None -> "None"
-| Some x -> string_of_int (Xeneventchn.to_int x)
+	| None -> "None"
+	| Some x -> string_of_int (Xeneventchn.to_int x)
 
 let dump d chan =
 	fprintf chan "dom,%d,%nd,%d\n" d.id d.mfn d.remote_port
 
-let notify dom = match dom.port with
-| None ->
-	warn "domain %d: attempt to notify on unknown port" dom.id
-| Some port ->
-	Event.notify dom.eventchn port
+let notify dom =
+	match dom.port with
+	| None -> warn "domain %d: attempt to notify on unknown port" dom.id
+	| Some port -> Event.notify dom.eventchn port
 
 let bind_interdomain dom =
 	begin match dom.port with
@@ -84,8 +83,7 @@ let close dom =
 	| None -> ()
 	| Some port -> Event.unbind dom.eventchn port
 	end;
-	Xenmmap.unmap dom.interface;
-	()
+	Xenmmap.unmap dom.interface
 
 let make id mfn remote_port interface eventchn = {
 	id = id;
