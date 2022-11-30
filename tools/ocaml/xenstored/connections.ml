@@ -48,9 +48,7 @@ let add_domain cons dom =
 	let xbcon = Xenbus.Xb.open_mmap ~capacity (Domain.get_interface dom) (fun () -> Domain.notify dom) in
 	let con = Connection.create xbcon (Some dom) in
 	Hashtbl.add cons.domains (Domain.get_id dom) con;
-	match Domain.get_port dom with
-	| Some p -> Hashtbl.add cons.ports p con;
-	| None -> ()
+	Hashtbl.add cons.ports (Domain.get_local_port dom) con
 
 let select ?(only_if = (fun _ -> true)) cons =
 	Hashtbl.fold (fun _ con (ins, outs) ->
@@ -97,10 +95,7 @@ let del_domain cons id =
 		let con = find_domain cons id in
 		Hashtbl.remove cons.domains id;
 		(match Connection.get_domain con with
-		 | Some d ->
-		   (match Domain.get_port d with
-		    | Some p -> Hashtbl.remove cons.ports p
-		    | None -> ())
+		 | Some d -> Hashtbl.remove cons.ports (Domain.get_local_port d)
 		 | None -> ());
 		del_watches cons con;
 		Connection.close con
