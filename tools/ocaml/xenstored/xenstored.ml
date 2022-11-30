@@ -167,10 +167,10 @@ let from_channel_f chan global_f socket_f domain_f watch_f store_f =
 					global_f ~rw
 				| "socket" :: fd :: [] ->
 					socket_f ~fd:(int_of_string fd)
-				| "dom" :: domid :: mfn :: port :: []->
+				| "dom" :: domid :: mfn :: remote_port :: []->
 					domain_f (int_of_string domid)
 					         (Nativeint.of_string mfn)
-					         (int_of_string port)
+					         (int_of_string remote_port)
 				| "watch" :: domid :: path :: token :: [] ->
 					watch_f (int_of_string domid)
 					        (unhexify path) (unhexify token)
@@ -209,10 +209,10 @@ let from_channel store cons doms chan =
 		else
 			warn "Ignoring invalid socket FD %d" fd
 	in
-	let domain_f domid mfn port =
+	let domain_f domid mfn remote_port =
 		let ndom =
 			if domid > 0 then
-				Domains.create doms domid mfn port
+				Domains.create doms domid mfn remote_port
 			else
 				Domains.create0 doms
 			in
