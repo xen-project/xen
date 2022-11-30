@@ -558,10 +558,10 @@ let do_transaction_end con t domains cons data =
 let do_introduce con t domains cons data =
 	if not (Connection.is_dom0 con)
 	then raise Define.Permission_denied;
-	let (domid, mfn, port) =
+	let (domid, mfn, remote_port) =
 		match (split None '\000' data) with
-		| domid :: mfn :: port :: _ ->
-			int_of_string domid, Nativeint.of_string mfn, int_of_string port
+		| domid :: mfn :: remote_port :: _ ->
+			int_of_string domid, Nativeint.of_string mfn, int_of_string remote_port
 		| _                         -> raise Invalid_Cmd_Args;
 		in
 	let dom =
@@ -569,18 +569,18 @@ let do_introduce con t domains cons data =
 			let edom = Domains.find domains domid in
 			if (Domain.get_mfn edom) = mfn && (Connections.find_domain cons domid) != con then begin
 				(* Use XS_INTRODUCE for recreating the xenbus event-channel. *)
-				edom.remote_port <- port;
+				edom.remote_port <- remote_port;
 				Domain.bind_interdomain edom;
 			end;
 			edom
 		else try
-			let ndom = Domains.create domains domid mfn port in
+			let ndom = Domains.create domains domid mfn remote_port in
 			Connections.add_domain cons ndom;
 			Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.introduce_domain;
 			ndom
 		with _ -> raise Invalid_Cmd_Args
 	in
-	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
+	if (Domain.get_remote_port dom) <> remote_port || (Domain.get_mfn dom) <> mfn then
 		raise Domain_not_match
 
 let do_release con t domains cons data =

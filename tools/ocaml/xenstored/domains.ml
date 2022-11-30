@@ -122,9 +122,9 @@ let cleanup doms =
 let resume _doms _domid =
 	()
 
-let create doms domid mfn port =
+let create doms domid mfn remote_port =
 	let interface = Xenctrl.map_foreign_range xc domid (Xenmmap.getpagesize()) mfn in
-	let dom = Domain.make domid mfn port interface doms.eventchn in
+	let dom = Domain.make domid mfn remote_port interface doms.eventchn in
 	Hashtbl.add doms.table domid dom;
 	Domain.bind_interdomain dom;
 	dom
@@ -133,18 +133,16 @@ let xenstored_kva = ref ""
 let xenstored_port = ref ""
 
 let create0 doms =
-	let port, interface =
-		(
-			let port = Utils.read_file_single_integer !xenstored_port
-			and fd = Unix.openfile !xenstored_kva
-					       [ Unix.O_RDWR ] 0o600 in
-			let interface = Xenmmap.mmap fd Xenmmap.RDWR Xenmmap.SHARED
-						  (Xenmmap.getpagesize()) 0 in
-			Unix.close fd;
-			port, interface
-		)
-		in
-	let dom = Domain.make 0 Nativeint.zero port interface doms.eventchn in
+	let remote_port = Utils.read_file_single_integer !xenstored_port in
+
+	let interface =
+		let fd = Unix.openfile !xenstored_kva [ Unix.O_RDWR ] 0o600 in
+		let interface = Xenmmap.mmap fd Xenmmap.RDWR Xenmmap.SHARED (Xenmmap.getpagesize()) 0 in
+		Unix.close fd;
+		interface
+	in
+
+	let dom = Domain.make 0 Nativeint.zero remote_port interface doms.eventchn in
 	Hashtbl.add doms.table 0 dom;
 	Domain.bind_interdomain dom;
 	Domain.notify dom;
