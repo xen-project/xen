@@ -344,7 +344,7 @@ let watch_not_fired ~con perms path =
 	access_logging ~tid:0 ~con ~data Watch_not_fired ~level:Info
 
 let msg_of exn bt =
-	Printf.sprintf "Fatal exception: %s\n%s\n" (Printexc.to_string exn)
+	Printf.sprintf "Fatal exception: %s\n%s" (Printexc.to_string exn)
 		(Printexc.raw_backtrace_to_string bt)
 
 let fallback_exception_handler exn bt =
