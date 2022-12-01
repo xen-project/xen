@@ -38,6 +38,7 @@ dist
 stubdom/*.tar.gz
 
 autom4te.cache/
+automation/build/yocto/*.dockerfile
 build-*/
 config.log
 config.status

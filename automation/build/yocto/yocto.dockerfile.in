@@ -1,0 +1,114 @@
+# Docker file to create an environment to build yocto with virtualization
+#
+# Arguments that can be passed during image creation using --build-arg:
+# "host_uid=$(id -u)": to use current user uid for build user in the image
+# "host_gid=$(id -g)": to use current user gid for build user in the image
+# "ubuntu_version=VERS": to select the ubuntu version number
+
+# Use standard ubuntu minimal.
+ARG ubuntu_version=22.04
+From ##DOCKERPLAT##ubuntu:$ubuntu_version AS base
+LABEL maintainer.name="The Xen Project " \
+      maintainer.email="xen-devel@lists.xenproject.org"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install minimal ubuntu requirements for yocto and other tools we need.
+# See https://docs.yoctoproject.org/4.0.1/brief-yoctoprojectqs/index.html#build-host-packages
+RUN apt-get update && \
+    apt-get --quiet --yes install \
+        gawk \
+        wget \
+        git \
+        diffstat \
+        unzip \
+        texinfo \
+        gcc \
+        build-essential \
+        chrpath \
+        socat \
+        cpio \
+        python3 \
+        python3-pip \
+        python3-pexpect \
+        xz-utils \
+        debianutils \
+        iputils-ping \
+        python3-git \
+        python3-jinja2 \
+        libegl1-mesa \
+        libsdl1.2-dev \
+        python3-subunit \
+        mesa-common-dev \
+        zstd \
+        liblz4-tool \
+        file \
+        vim \
+        bison \
+        expect \
+        locales \
+        liblz4-tool \
+        zstd \
+        openssl \
+        libssl3 \
+        ca-certificates \
+        && \
+        apt-get autoremove -y && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
+
+# Use bash as shell.
+RUN rm /bin/sh && ln -s bash /bin/sh
+
+# Fix local for yocto.
+RUN locale-gen en_US.UTF-8 && update-locale LC_ALL=en_US.UTF-8 \
+    LANG=en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LC_ALL en_US.UTF-8
+
+# Create a user for the build (we don't want to build as root).
+ENV USER_NAME docker-build
+ARG host_uid=1000
+ARG host_gid=1000
+RUN groupadd -g $host_gid $USER_NAME && \
+    useradd -g $host_gid -m -s /bin/bash -u $host_uid $USER_NAME
+
+# Switch to our user instead of root and start in its home.
+USER $USER_NAME
+WORKDIR /home/$USER_NAME
+
+# Create needed directories
+RUN mkdir -p /home/$USER_NAME/yocto-layers \
+             /home/$USER_NAME/yocto-cache \
+             /home/$USER_NAME/logs \
+             /home/$USER_NAME/bin \
+             /home/$USER_NAME/xen && \
+    chown $USER_NAME.$USER_NAME /home/$USER_NAME/*
+
+# clone yocto repositories we need.
+RUN for rep in \
+                https://github.com/openembedded/meta-openembedded \
+                https://git.yoctoproject.org/poky \
+                https://git.yoctoproject.org/meta-virtualization \
+            ; do \
+        git -C /home/$USER_NAME/yocto-layers \
+            clone -b ##YOCTOVERSION## --single-branch $rep; \
+    done
+
+# The builder stage is building an initial cache state that we include in the
+# final image.
+From base AS builder
+
+# This step can take one to several hours depending on your download bandwith
+# and the speed of your computer.
+COPY ./build-yocto.sh /
+RUN /build-yocto.sh --dump-log ##YOCTOTARGET##
+
+From base
+
+# Only copy the cache status.
+COPY --from=builder /home/$USER_NAME/yocto-cache /home/$USER_NAME/yocto-cache/.
+
+LABEL maintainer.name="The Xen Project " \
+      maintainer.email="xen-devel@lists.xenproject.org"
+

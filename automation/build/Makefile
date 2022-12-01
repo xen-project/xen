@@ -1,14 +1,19 @@
 
 # the base of where these containers will appear
 REGISTRY := registry.gitlab.com/xen-project/xen
-CONTAINERS = $(subst .dockerfile,,$(wildcard */*.dockerfile))
+CONTAINERS := $(filter-out yocto/%,$(subst .dockerfile,,$(wildcard */*.dockerfile)))
+CONTAINERS_EXTRA =
 DOCKER_CMD ?= docker
 
 help:
 	@echo "Builds containers for building Xen based on different distros"
 	@echo "To build one run 'make DISTRO/VERSION'. Available containers:"
-	@$(foreach file,$(sort $(CONTAINERS)),echo ${file};)
+	@$(foreach file,$(sort $(CONTAINERS)),echo $(file);)
+	@echo "Extra containers (not built using make all):"
+	@$(foreach file,$(sort $(CONTAINERS_EXTRA)),echo $(file);)
 	@echo "To push container builds, set the env var PUSH"
+
+include yocto/yocto.inc
 
 %: %.dockerfile ## Builds containers
 	$(DOCKER_CMD) build -t $(REGISTRY)/$(@D):$(@F) -f $< $(<D)
@@ -16,5 +21,10 @@ help:
 		$(DOCKER_CMD) push $(REGISTRY)/$(@D):$(@F); \
 	fi
 
-.PHONY: all
+.PHONY: all clean
 all: $(CONTAINERS)
+
+# Remove generated dockerfiles for yocto
+clean:
+	rm -f yocto/*.dockerfile
+
