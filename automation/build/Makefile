@@ -28,3 +28,13 @@ all: $(CONTAINERS)
 clean:
 	rm -f yocto/*.dockerfile
 
+define CLEAN_RULE
+.PHONY: clean-$(1)
+clean-$(1):
+	if [ -n "$$$$(docker image ls -q $(REGISTRY)/$(subst /,:,$(1)))" ]; then \
+		docker image rm $(REGISTRY)/$(subst /,:,$(1)); \
+	fi
+
+endef
+
+$(eval $(foreach img,$(CONTAINERS) $(CONTAINERS_EXTRA),$(call CLEAN_RULE,$(img))))
