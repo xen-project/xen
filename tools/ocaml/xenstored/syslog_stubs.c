@@ -37,14 +37,34 @@ value stub_syslog(value facility, value level, value msg)
 {
 	CAMLparam3(facility, level, msg);
 	char *c_msg = strdup(String_val(msg));
+	char *s = c_msg, *ss;
 	int c_facility = __syslog_facility_table[Int_val(facility)]
 	               | __syslog_level_table[Int_val(level)];
 
 	if ( !c_msg )
 		caml_raise_out_of_memory();
-	caml_enter_blocking_section();
-	syslog(c_facility, "%s", c_msg);
-	caml_leave_blocking_section();
+
+	/*
+	 * syslog() doesn't like embedded newlines, and c_msg generally
+	 * contains them.
+	 *
+	 * Split the message in place by converting \n to \0, and issue one
+	 * syslog() call per line, skipping the final iteration if c_msg ends
+	 * with a newline anyway.
+	 */
+	do {
+		ss = strchr(s, '\n');
+		if ( ss )
+			*ss = '\0';
+		else if ( *s == '\0' )
+			break;
+
+		caml_enter_blocking_section();
+		syslog(c_facility, "%s", s);
+		caml_leave_blocking_section();
+
+		s = ss + 1;
+	} while ( ss );
 
 	free(c_msg);
 	CAMLreturn(Val_unit);
