@@ -1,7 +1,7 @@
 XEN NOTICE
 ==========
 
-This licence applies to all files within this subdirectory ("/usr/include/xen")
+This licence applies to all files within this subdirectory ("@includedir@")
 with the exception of "sys/" which may include headers under different
 licences.
 

@@ -24,6 +24,7 @@ xen-foreign:
 xen-dir:
 	mkdir -p xen/libelf acpi
 	find xen/ acpi/ -type l -exec rm '{}' +
+	sed -e 's#@includedir@#$(includedir)/xen#g' xen.COPYING.in > xen/COPYING
 	ln -s $(XEN_ROOT)/xen/include/public/*.h xen/
 	ln -s $(XEN_ROOT)/xen/include/public/*/ xen/
 	ln -s ../xen-sys/$(XEN_OS) xen/sys
