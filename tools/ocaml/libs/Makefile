@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 SUBDIRS= \
 	mmap \
 	xentoollog \
-	xc eventchn \
+	eventchn xc \
 	xb xs xl
 
 .PHONY: all

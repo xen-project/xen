@@ -205,6 +205,21 @@ external shadow_allocation_get : handle -> domid -> int
 external evtchn_alloc_unbound : handle -> domid -> domid -> int
   = "stub_xc_evtchn_alloc_unbound"
 external evtchn_reset : handle -> domid -> unit = "stub_xc_evtchn_reset"
+
+type evtchn_interdomain = { dom: domid; port: int }
+
+type evtchn_stat =
+  | EVTCHNSTAT_unbound of domid
+  | EVTCHNSTAT_interdomain of evtchn_interdomain
+  | EVTCHNSTAT_pirq of int
+  | EVTCHNSTAT_virq of Xeneventchn.virq_t
+  | EVTCHNSTAT_ipi
+
+type evtchn_status = { vcpu: int; status: evtchn_stat }
+
+external evtchn_status: handle -> domid -> int -> evtchn_status option =
+  "stub_xc_evtchn_status"
+
 external readconsolering : handle -> string = "stub_xc_readconsolering"
 external send_debug_keys : handle -> string -> unit = "stub_xc_send_debug_keys"
 external physinfo : handle -> physinfo = "stub_xc_physinfo"

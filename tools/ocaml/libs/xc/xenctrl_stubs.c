@@ -44,6 +44,10 @@
 #define Val_none (Val_int(0))
 #endif
 
+#ifndef Tag_some
+#define Tag_some 0
+#endif
+
 static void stub_xenctrl_finalize(value v)
 {
 	xc_interface_close(_H(v));
@@ -649,6 +653,68 @@ CAMLprim value stub_xc_evtchn_reset(value xch, value domid)
 	CAMLreturn(Val_unit);
 }
 
+CAMLprim value stub_xc_evtchn_status(value xch, value domid, value port)
+{
+	CAMLparam3(xch, domid, port);
+	CAMLlocal4(result, result_status, stat, interdomain);
+	xc_evtchn_status_t status = {
+		.dom = _D(domid),
+		.port = Int_val(port),
+	};
+	int rc;
+
+	caml_enter_blocking_section();
+	rc = xc_evtchn_status(_H(xch), &status);
+	caml_leave_blocking_section();
+
+	if ( rc < 0 )
+		failwith_xc(_H(xch));
+
+	switch ( status.status )
+	{
+	case EVTCHNSTAT_closed:
+		CAMLreturn(Val_none); /* Early exit, no allocations needed */
+
+	case EVTCHNSTAT_unbound:
+		stat = caml_alloc(1, 0); /* 1st non-constant constructor */
+		Store_field(stat, 0, Val_int(status.u.unbound.dom));
+		break;
+
+	case EVTCHNSTAT_interdomain:
+		interdomain = caml_alloc_tuple(2);
+		Store_field(interdomain, 0, Val_int(status.u.interdomain.dom));
+		Store_field(interdomain, 1, Val_int(status.u.interdomain.port));
+		stat = caml_alloc(1, 1); /*  2nd non-constant constructor */
+		Store_field(stat, 0, interdomain);
+		break;
+
+	case EVTCHNSTAT_pirq:
+		stat = caml_alloc(1, 2); /* 3rd non-constant constructor */
+		Store_field(stat, 0, Val_int(status.u.pirq));
+		break;
+
+	case EVTCHNSTAT_virq:
+		stat = caml_alloc(1, 3); /* 4th non-constant constructor */
+		Store_field(stat, 0, Val_int(status.u.virq));
+		break;
+
+	case EVTCHNSTAT_ipi:
+		stat = Val_int(0); /* 1st constant constructor */
+		break;
+
+	default:
+		caml_failwith("Unknown evtchn status");
+	}
+
+	result_status = caml_alloc_tuple(2);
+	Store_field(result_status, 0, Val_int(status.vcpu));
+	Store_field(result_status, 1, stat);
+
+	result = caml_alloc_small(1, Tag_some);
+	Store_field(result, 0, result_status);
+
+	CAMLreturn(result);
+}
 
 CAMLprim value stub_xc_readconsolering(value xch)
 {

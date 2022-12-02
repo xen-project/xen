@@ -1,5 +1,5 @@
 version = "@VERSION@"
 description = "Xen Control Interface"
-requires = "unix,xenmmap"
+requires = "unix,xenmmap,xeneventchn"
 archive(byte) = "xenctrl.cma"
 archive(native) = "xenctrl.cmxa"

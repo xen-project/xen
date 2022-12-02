@@ -4,7 +4,7 @@ include $(OCAML_TOPLEVEL)/common.make
 
 CFLAGS += -I../mmap $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 CFLAGS += $(APPEND_CFLAGS)
-OCAMLINCLUDE += -I ../mmap
+OCAMLINCLUDE += -I ../mmap -I ../eventchn
 
 OBJS = xenctrl
 INTF = xenctrl.cmi
