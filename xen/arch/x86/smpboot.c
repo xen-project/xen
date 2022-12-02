@@ -1144,7 +1144,7 @@ static int cf_check cpu_smpboot_callback(
         break;
     }
 
-    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+    return notifier_from_errno(rc);
 }
 
 static struct notifier_block cpu_smpboot_nfb = {

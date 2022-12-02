@@ -1537,7 +1537,7 @@ static int cf_check mwait_idle_cpu_init(
 		dev = processor_powers[cpu];
 		if (!rc && cpuidle_current_governor->enable)
 			rc = cpuidle_current_governor->enable(dev);
-		return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+		return notifier_from_errno(rc);
 
 	case CPU_ONLINE:
 		if (!dev)

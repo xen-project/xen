@@ -82,7 +82,7 @@ static int cpu_notifier_call_chain(unsigned int cpu, unsigned long action,
 {
     void *hcpu = (void *)(long)cpu;
     int notifier_rc = notifier_call_chain(&cpu_chain, action, hcpu, nb);
-    int ret = (notifier_rc == NOTIFY_DONE) ? 0 : notifier_to_errno(notifier_rc);
+    int ret =  notifier_to_errno(notifier_rc);
 
     BUG_ON(ret && nofail);
 

@@ -221,7 +221,7 @@ static int cf_check update_clusterinfo(
         break;
     }
 
-    return !err ? NOTIFY_DONE : notifier_from_errno(err);
+    return notifier_from_errno(err);
 }
 
 static struct notifier_block x2apic_cpu_nfb = {

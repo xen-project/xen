@@ -58,13 +58,13 @@ int notifier_call_chain(
 /* Encapsulate (negative) errno value. */
 static inline int notifier_from_errno(int err)
 {
-    return NOTIFY_STOP_MASK | -err;
+    return err ? (NOTIFY_STOP_MASK | -err) : NOTIFY_DONE;
 }
 
 /* Restore (negative) errno value from notify return value. */
 static inline int notifier_to_errno(int ret)
 {
-    return -(ret & ~NOTIFY_STOP_MASK);
+    return (ret == NOTIFY_DONE) ? 0 : -(ret & ~NOTIFY_STOP_MASK);
 }
 
 #endif /* __XEN_NOTIFIER_H__ */

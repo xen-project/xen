@@ -724,7 +724,7 @@ static int cpu_errata_callback(struct notifier_block *nfb,
         break;
     }
 
-    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+    return notifier_from_errno(rc);
 }
 
 static struct notifier_block cpu_errata_nfb = {
