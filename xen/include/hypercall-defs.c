@@ -241,8 +241,10 @@ event_channel_op_compat            do       do       -        -        dep
 xen_version                        compat   do       compat   do       do
 console_io                         do       do       do       do       do
 physdev_op_compat                  compat   do       -        -        dep
-#if defined(CONFIG_GRANT_TABLE) || defined(CONFIG_PV_SHIM)
+#if defined(CONFIG_GRANT_TABLE)
 grant_table_op                     compat   do       hvm      hvm      do
+#elif defined(CONFIG_PV_SHIM)
+grant_table_op                     compat   do       -        -        -
 #endif
 vm_assist                          do       do       do       do       do
 update_va_mapping_otherdomain      compat   do       -        -        -
