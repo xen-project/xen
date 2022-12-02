@@ -127,21 +127,6 @@ void ack_bad_irq(unsigned int irq)
         ack_APIC_irq();
 }
 
-void __init apic_intr_init(void)
-{
-    smp_intr_init();
-
-    /* self generated IPI for local APIC timer */
-    set_direct_apic_vector(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
-
-    /* IPI vectors for APIC spurious and error interrupts */
-    set_direct_apic_vector(SPURIOUS_APIC_VECTOR, spurious_interrupt);
-    set_direct_apic_vector(ERROR_APIC_VECTOR, error_interrupt);
-
-    /* Performance Counters Interrupt */
-    set_direct_apic_vector(PMU_APIC_VECTOR, pmu_apic_interrupt);
-}
-
 /* Using APIC to generate smp_local_timer_interrupt? */
 static bool __read_mostly using_apic_timer;
 
@@ -1363,7 +1348,7 @@ int reprogram_timer(s_time_t timeout)
     return apic_tmict || !timeout;
 }
 
-void cf_check apic_timer_interrupt(struct cpu_user_regs *regs)
+static void cf_check apic_timer_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
     perfc_incr(apic_timer);
@@ -1382,7 +1367,7 @@ void smp_send_state_dump(unsigned int cpu)
 /*
  * Spurious interrupts should _never_ happen with our APIC/SMP architecture.
  */
-void cf_check spurious_interrupt(struct cpu_user_regs *regs)
+static void cf_check spurious_interrupt(struct cpu_user_regs *regs)
 {
     /*
      * Check if this is a vectored interrupt (most likely, as this is probably
@@ -1413,7 +1398,7 @@ void cf_check spurious_interrupt(struct cpu_user_regs *regs)
  * This interrupt should never happen with our APIC/SMP architecture
  */
 
-void cf_check error_interrupt(struct cpu_user_regs *regs)
+static void cf_check error_interrupt(struct cpu_user_regs *regs)
 {
     static const char *const esr_fields[] = {
         "Send CS error",
@@ -1446,10 +1431,25 @@ void cf_check error_interrupt(struct cpu_user_regs *regs)
  * This interrupt handles performance counters interrupt
  */
 
-void cf_check pmu_apic_interrupt(struct cpu_user_regs *regs)
+static void cf_check pmu_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
     vpmu_do_interrupt(regs);
+}
+
+void __init apic_intr_init(void)
+{
+    smp_intr_init();
+
+    /* self generated IPI for local APIC timer */
+    set_direct_apic_vector(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
+
+    /* IPI vectors for APIC spurious and error interrupts */
+    set_direct_apic_vector(SPURIOUS_APIC_VECTOR, spurious_interrupt);
+    set_direct_apic_vector(ERROR_APIC_VECTOR, error_interrupt);
+
+    /* Performance Counters Interrupt */
+    set_direct_apic_vector(PMU_APIC_VECTOR, pmu_interrupt);
 }
 
 /*
