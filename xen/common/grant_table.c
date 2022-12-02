@@ -3257,7 +3257,7 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
 
 static long
 gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
-                         unsigned int count, unsigned int limit_max)
+                         unsigned int count)
 {
     gnttab_get_status_frames_t op;
     struct domain *d;
@@ -3303,15 +3303,6 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
         gdprintk(XENLOG_INFO, "Requested addresses of d%d for %u grant "
                  "status frames, but has only %u\n",
                  d->domain_id, op.nr_frames, nr_status_frames(gt));
-        op.status = GNTST_general_error;
-        goto unlock;
-    }
-
-    if ( unlikely(limit_max < op.nr_frames) )
-    {
-        gdprintk(XENLOG_WARNING,
-                 "nr_status_frames for %pd is too large (%u,%u)\n",
-                 d, op.nr_frames, limit_max);
         op.status = GNTST_general_error;
         goto unlock;
     }
@@ -3683,8 +3674,7 @@ long do_grant_table_op(
 
     case GNTTABOP_get_status_frames:
         rc = gnttab_get_status_frames(
-            guest_handle_cast(uop, gnttab_get_status_frames_t), count,
-                              UINT_MAX);
+            guest_handle_cast(uop, gnttab_get_status_frames_t), count);
         break;
 
     case GNTTABOP_get_version:

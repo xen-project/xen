@@ -271,10 +271,7 @@ int compat_grant_table_op(
             }
             break;
 
-        case GNTTABOP_get_status_frames: {
-            unsigned int max_frame_list_size_in_pages =
-                (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.get_status)) /
-                sizeof(*nat.get_status->frame_list.p);
+        case GNTTABOP_get_status_frames:
             if ( count != 1)
             {
                 rc = -EINVAL;
@@ -289,38 +286,25 @@ int compat_grant_table_op(
             }
 
 #define XLAT_gnttab_get_status_frames_HNDL_frame_list(_d_, _s_) \
-            set_xen_guest_handle((_d_)->frame_list, (uint64_t *)(nat.get_status + 1))
+            guest_from_compat_handle((_d_)->frame_list, (_s_)->frame_list)
             XLAT_gnttab_get_status_frames(nat.get_status, &cmp.get_status);
 #undef XLAT_gnttab_get_status_frames_HNDL_frame_list
 
             rc = gnttab_get_status_frames(
-                guest_handle_cast(nat.uop, gnttab_get_status_frames_t),
-                count, max_frame_list_size_in_pages);
+                guest_handle_cast(nat.uop, gnttab_get_status_frames_t), count);
             if ( rc >= 0 )
             {
-#define XLAT_gnttab_get_status_frames_HNDL_frame_list(_d_, _s_) \
-                do \
-                { \
-                    if ( (_s_)->status == GNTST_okay ) \
-                    { \
-                        for ( i = 0; i < (_s_)->nr_frames; ++i ) \
-                        { \
-                            uint64_t frame = (_s_)->frame_list.p[i]; \
-                            if ( __copy_to_compat_offset((_d_)->frame_list, \
-                                                         i, &frame, 1) ) \
-                                (_s_)->status = GNTST_bad_virt_addr; \
-                        } \
-                    } \
-                } while (0)
-                XLAT_gnttab_get_status_frames(&cmp.get_status, nat.get_status);
-#undef XLAT_gnttab_get_status_frames_HNDL_frame_list
-                if ( unlikely(__copy_to_guest(cmp_uop, &cmp.get_status, 1)) )
+                XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_compat_t) get =
+                    guest_handle_cast(cmp_uop,
+                                      gnttab_get_status_frames_compat_t);
+
+                if ( unlikely(__copy_field_to_guest(get, nat.get_status,
+                                                    status)) )
                     rc = -EFAULT;
                 else
                     i = 1;
             }
             break;
-        }
 
         default:
             domain_crash(current->domain);
