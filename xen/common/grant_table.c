@@ -2101,7 +2101,10 @@ gnttab_setup_table(
         BUG_ON(SHARED_M2P(gmfn));
 
         if ( __copy_to_guest_offset(op.frame_list, i, &gmfn, 1) )
+        {
             op.status = GNTST_bad_virt_addr;
+            break;
+        }
     }
 
  unlock:
@@ -3311,7 +3314,10 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
     {
         gmfn = gfn_x(gnttab_status_gfn(d, gt, i));
         if ( __copy_to_guest_offset(op.frame_list, i, &gmfn, 1) )
+        {
             op.status = GNTST_bad_virt_addr;
+            break;
+        }
     }
 
  unlock:

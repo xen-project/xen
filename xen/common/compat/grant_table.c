@@ -179,7 +179,10 @@ int compat_grant_table_op(
                             unsigned int frame = (_s_)->frame_list.p[i]; \
                             if ( __copy_to_compat_offset((_d_)->frame_list, \
                                                          i, &frame, 1) ) \
+                            { \
                                 (_s_)->status = GNTST_bad_virt_addr; \
+                                break; \
+                            } \
                         } \
                     } \
                 } while (0)
