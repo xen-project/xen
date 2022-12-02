@@ -1101,15 +1101,20 @@ rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
     }
     else
     {
-        snext = runq_pick(ops, cpumask_of(sched_cpu), cur_cpu);
-
-        if ( snext == NULL )
-            snext = rt_unit(sched_idle_unit(sched_cpu));
-        else if ( !unit_runnable_state(snext->unit) )
+        while ( true )
         {
+            snext = runq_pick(ops, cpumask_of(sched_cpu), cur_cpu);
+
+            if ( snext == NULL )
+            {
+                snext = rt_unit(sched_idle_unit(sched_cpu));
+                break;
+            }
+            if ( unit_runnable_state(snext->unit) )
+                break;
+
             q_remove(snext);
             replq_remove(ops, snext);
-            snext = rt_unit(sched_idle_unit(sched_cpu));
         }
 
         /* if scurr has higher priority and budget, still pick scurr */
