@@ -835,6 +835,21 @@ out:
     return 0;
 }
 
+/* rcu_read_lock(&domlist_read_lock) must be held. */
+static struct domain *domid_to_domain(domid_t dom)
+{
+    struct domain *d;
+
+    for ( d = rcu_dereference(domain_hash[DOMAIN_HASH(dom)]);
+          d != NULL;
+          d = rcu_dereference(d->next_in_hashbucket) )
+    {
+        if ( d->domain_id == dom )
+            return d;
+    }
+
+    return NULL;
+}
 
 struct domain *get_domain_by_id(domid_t dom)
 {
@@ -842,17 +857,9 @@ struct domain *get_domain_by_id(domid_t dom)
 
     rcu_read_lock(&domlist_read_lock);
 
-    for ( d = rcu_dereference(domain_hash[DOMAIN_HASH(dom)]);
-          d != NULL;
-          d = rcu_dereference(d->next_in_hashbucket) )
-    {
-        if ( d->domain_id == dom )
-        {
-            if ( unlikely(!get_domain(d)) )
-                d = NULL;
-            break;
-        }
-    }
+    d = domid_to_domain(dom);
+    if ( d && unlikely(!get_domain(d)) )
+        d = NULL;
 
     rcu_read_unlock(&domlist_read_lock);
 
@@ -862,20 +869,26 @@ struct domain *get_domain_by_id(domid_t dom)
 
 struct domain *rcu_lock_domain_by_id(domid_t dom)
 {
-    struct domain *d = NULL;
+    struct domain *d;
 
     rcu_read_lock(&domlist_read_lock);
 
-    for ( d = rcu_dereference(domain_hash[DOMAIN_HASH(dom)]);
-          d != NULL;
-          d = rcu_dereference(d->next_in_hashbucket) )
-    {
-        if ( d->domain_id == dom )
-        {
-            rcu_lock_domain(d);
-            break;
-        }
-    }
+    d = domid_to_domain(dom);
+    if ( d )
+        rcu_lock_domain(d);
+
+    rcu_read_unlock(&domlist_read_lock);
+
+    return d;
+}
+
+struct domain *knownalive_domain_from_domid(domid_t dom)
+{
+    struct domain *d;
+
+    rcu_read_lock(&domlist_read_lock);
+
+    d = domid_to_domain(dom);
 
     rcu_read_unlock(&domlist_read_lock);
 

@@ -737,7 +737,11 @@ static inline struct domain *rcu_lock_current_domain(void)
     return /*rcu_lock_domain*/(current->domain);
 }
 
+/* Get struct domain AND increase ref-count of domain. */
 struct domain *get_domain_by_id(domid_t dom);
+
+/* Get struct domain known to have reference held or being RCU-locked. */
+struct domain *knownalive_domain_from_domid(domid_t dom);
 
 struct domain *get_pg_owner(domid_t domid);
 
