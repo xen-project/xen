@@ -1645,6 +1645,18 @@ This option is intended for debugging purposes only.  Enable MSR_DEBUGCTL.LBR
 in hypervisor context to be able to dump the Last Interrupt/Exception To/From
 record with other registers.
 
+### lock-depth-size
+> `= <integer>`
+
+> Default: `lock-depth-size=64`
+
+Specifies the maximum number of nested locks tested for illegal recursions.
+Higher nesting levels still work, but recursion testing is omitted for those
+levels. In case an illegal recursion is detected the system will crash
+immediately. Specifying `0` will disable all testing of illegal lock nesting.
+
+This option is available for hypervisors built with CONFIG_DEBUG_LOCKS only.
+
 ### loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
 

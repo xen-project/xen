@@ -66,7 +66,10 @@ static inline int _read_trylock(rwlock_t *lock)
          * arch_lock_acquire_barrier().
          */
         if ( likely(_can_read_lock(cnts)) )
+        {
+            lock_enter(&lock->lock.debug);
             return 1;
+        }
         atomic_sub(_QR_BIAS, &lock->cnts);
     }
     preempt_enable();
@@ -91,6 +94,7 @@ static inline void _read_lock(rwlock_t *lock)
     {
         /* The slow path calls check_lock() via spin_lock(). */
         check_lock(&lock->lock.debug, false);
+        lock_enter(&lock->lock.debug);
         return;
     }
 
@@ -123,6 +127,8 @@ static inline unsigned long _read_lock_irqsave(rwlock_t *lock)
  */
 static inline void _read_unlock(rwlock_t *lock)
 {
+    lock_exit(&lock->lock.debug);
+
     arch_lock_release_barrier();
     /*
      * Atomically decrement the reader count
@@ -170,6 +176,7 @@ static inline void _write_lock(rwlock_t *lock)
     {
         /* The slow path calls check_lock() via spin_lock(). */
         check_lock(&lock->lock.debug, false);
+        lock_enter(&lock->lock.debug);
         return;
     }
 
@@ -215,6 +222,8 @@ static inline int _write_trylock(rwlock_t *lock)
         return 0;
     }
 
+    lock_enter(&lock->lock.debug);
+
     /*
      * atomic_cmpxchg() is a full barrier so no need for an
      * arch_lock_acquire_barrier().
@@ -225,6 +234,9 @@ static inline int _write_trylock(rwlock_t *lock)
 static inline void _write_unlock(rwlock_t *lock)
 {
     ASSERT(_is_write_locked_by_me(atomic_read(&lock->cnts)));
+
+    lock_exit(&lock->lock.debug);
+
     arch_lock_release_barrier();
     atomic_and(~(_QW_CPUMASK | _QW_WMASK), &lock->cnts);
     preempt_enable();
@@ -343,6 +355,8 @@ static inline void _percpu_read_lock(percpu_rwlock_t **per_cpudata,
         /* All other paths have implicit check_lock() calls via read_lock(). */
         check_lock(&percpu_rwlock->rwlock.lock.debug, false);
     }
+
+    lock_enter(&percpu_rwlock->rwlock.lock.debug);
 }
 
 static inline void _percpu_read_unlock(percpu_rwlock_t **per_cpudata,
@@ -353,6 +367,9 @@ static inline void _percpu_read_unlock(percpu_rwlock_t **per_cpudata,
 
     /* Verify the read lock was taken for this lock */
     ASSERT(this_cpu_ptr(per_cpudata) != NULL);
+
+    lock_exit(&percpu_rwlock->rwlock.lock.debug);
+
     /*
      * Detect using a second percpu_rwlock_t simulatenously and fallback
      * to standard read_unlock.
@@ -379,6 +396,9 @@ static inline void _percpu_write_unlock(percpu_rwlock_t **per_cpudata,
 
     ASSERT(percpu_rwlock->writer_activating);
     percpu_rwlock->writer_activating = 0;
+
+    lock_exit(&percpu_rwlock->rwlock.lock.debug);
+
     write_unlock(&percpu_rwlock->rwlock);
 }
 

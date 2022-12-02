@@ -1,5 +1,8 @@
+#include <xen/cpu.h>
 #include <xen/lib.h>
 #include <xen/irq.h>
+#include <xen/notifier.h>
+#include <xen/param.h>
 #include <xen/smp.h>
 #include <xen/time.h>
 #include <xen/spinlock.h>
@@ -11,11 +14,77 @@
 
 #ifdef CONFIG_DEBUG_LOCKS
 
+/* Max. number of entries in locks_taken array. */
+static unsigned int __ro_after_init lock_depth_size = 64;
+integer_param("lock-depth-size", lock_depth_size);
+
+/*
+ * Array of addresses of taken locks.
+ * nr_locks_taken is the index after the last entry. As locks tend to be
+ * nested cleanly, when freeing a lock it will probably be the one before
+ * nr_locks_taken, and new entries can be entered at that index. It is fine
+ * for a lock to be released out of order, though.
+ */
+static DEFINE_PER_CPU(const union lock_debug **, locks_taken);
+static DEFINE_PER_CPU(unsigned int, nr_locks_taken);
+static bool __read_mostly max_depth_reached;
+
 static atomic_t spin_debug __read_mostly = ATOMIC_INIT(0);
+
+static int cf_check cpu_lockdebug_callback(struct notifier_block *nfb,
+                                           unsigned long action,
+                                           void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        if ( !per_cpu(locks_taken, cpu) )
+            per_cpu(locks_taken, cpu) = xzalloc_array(const union lock_debug *,
+                                                      lock_depth_size);
+        if ( !per_cpu(locks_taken, cpu) )
+            printk(XENLOG_WARNING
+                   "cpu %u: failed to allocate lock recursion check area\n",
+                   cpu);
+        break;
+
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        XFREE(per_cpu(locks_taken, cpu));
+        break;
+
+    default:
+        break;
+    }
+
+    return 0;
+}
+
+static struct notifier_block cpu_lockdebug_nfb = {
+    .notifier_call = cpu_lockdebug_callback,
+};
+
+static int __init cf_check lockdebug_init(void)
+{
+    if ( lock_depth_size )
+    {
+        register_cpu_notifier(&cpu_lockdebug_nfb);
+        cpu_lockdebug_callback(&cpu_lockdebug_nfb, CPU_UP_PREPARE,
+                               (void *)(unsigned long)smp_processor_id());
+    }
+
+    return 0;
+}
+presmp_initcall(lockdebug_init);
 
 void check_lock(union lock_debug *debug, bool try)
 {
     bool irq_safe = !local_irq_is_enabled();
+    unsigned int cpu = smp_processor_id();
+    const union lock_debug *const *taken = per_cpu(locks_taken, cpu);
+    unsigned int nr_taken = per_cpu(nr_locks_taken, cpu);
+    unsigned int i;
 
     BUILD_BUG_ON(LOCK_DEBUG_PAD_BITS <= 0);
 
@@ -63,6 +132,16 @@ void check_lock(union lock_debug *debug, bool try)
             BUG();
         }
     }
+
+    if ( try )
+        return;
+
+    for ( i = 0; i < nr_taken; i++ )
+        if ( taken[i] == debug )
+        {
+            printk("CHECKLOCK FAILURE: lock at %p taken recursively\n", debug);
+            BUG();
+        }
 }
 
 static void check_barrier(union lock_debug *debug)
@@ -84,15 +163,81 @@ static void check_barrier(union lock_debug *debug)
     BUG_ON(!local_irq_is_enabled() && !debug->irq_safe);
 }
 
+void lock_enter(const union lock_debug *debug)
+{
+    unsigned int cpu = smp_processor_id();
+    const union lock_debug **taken = per_cpu(locks_taken, cpu);
+    unsigned int *nr_taken = &per_cpu(nr_locks_taken, cpu);
+    unsigned long flags;
+
+    if ( !taken )
+        return;
+
+    local_irq_save(flags);
+
+    if ( *nr_taken < lock_depth_size )
+        taken[(*nr_taken)++] = debug;
+    else if ( !max_depth_reached )
+    {
+        max_depth_reached = true;
+        printk("CHECKLOCK max lock depth %u reached!\n", lock_depth_size);
+        WARN();
+    }
+
+    local_irq_restore(flags);
+}
+
+void lock_exit(const union lock_debug *debug)
+{
+    unsigned int cpu = smp_processor_id();
+    const union lock_debug **taken = per_cpu(locks_taken, cpu);
+    unsigned int *nr_taken = &per_cpu(nr_locks_taken, cpu);
+    unsigned int i;
+    unsigned long flags;
+
+    if ( !taken )
+        return;
+
+    local_irq_save(flags);
+
+    for ( i = *nr_taken; i > 0; i-- )
+    {
+        if ( taken[i - 1] == debug )
+        {
+            memmove(taken + i - 1, taken + i,
+                    (*nr_taken - i) * sizeof(*taken));
+            (*nr_taken)--;
+            taken[*nr_taken] = NULL;
+
+            local_irq_restore(flags);
+
+            return;
+        }
+    }
+
+    if ( !max_depth_reached )
+    {
+        printk("CHECKLOCK released lock at %p not recorded!\n", debug);
+        WARN();
+    }
+
+    local_irq_restore(flags);
+}
+
 static void got_lock(union lock_debug *debug)
 {
     debug->cpu = smp_processor_id();
+
+    lock_enter(debug);
 }
 
 static void rel_lock(union lock_debug *debug)
 {
     if ( atomic_read(&spin_debug) > 0 )
         BUG_ON(debug->cpu != smp_processor_id());
+
+    lock_exit(debug);
+
     debug->cpu = SPINLOCK_NO_CPU;
 }
 

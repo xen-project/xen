@@ -54,6 +54,8 @@ void queue_read_lock_slowpath(rwlock_t *lock)
      * Signal the next one in queue to become queue head.
      */
     spin_unlock(&lock->lock);
+
+    lock_enter(&lock->lock.debug);
 }
 
 /*
@@ -100,6 +102,8 @@ void queue_write_lock_slowpath(rwlock_t *lock)
     }
  unlock:
     spin_unlock(&lock->lock);
+
+    lock_enter(&lock->lock.debug);
 }
 
 
@@ -146,4 +150,6 @@ void _percpu_write_lock(percpu_rwlock_t **per_cpudata,
         /* Give the coherency fabric a break. */
         cpu_relax();
     };
+
+    lock_enter(&percpu_rwlock->rwlock.lock.debug);
 }
