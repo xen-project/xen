@@ -381,13 +381,13 @@ struct active_grant_entry {
 })
 
     domid_t       domid;  /* Domain being granted access.             */
+    domid_t       src_domid; /* Original domain granting access.      */
     unsigned int  start:15; /* For sub-page grants, the start offset
                                in the page.                           */
     bool          is_sub_page:1; /* True if this is a sub-page grant. */
     unsigned int  length:16; /* For sub-page grants, the length of the
                                 grant.                                */
     grant_ref_t   trans_gref;
-    struct domain *trans_domain;
     mfn_t         mfn;    /* Machine frame being granted.             */
 #ifndef NDEBUG
     gfn_t         gfn;    /* Guest's idea of the frame being granted. */
@@ -1095,7 +1095,7 @@ map_grant_ref(
             act->start = 0;
             act->length = PAGE_SIZE;
             act->is_sub_page = false;
-            act->trans_domain = rd;
+            act->src_domid = rd->domain_id;
             act->trans_gref = ref;
         }
     }
@@ -2497,7 +2497,8 @@ release_grant_for_copy(
     else
     {
         status = &status_entry(rgt, gref);
-        td = act->trans_domain;
+        td = (act->src_domid == rd->domain_id)
+             ? rd : knownalive_domain_from_domid(act->src_domid);
         trans_gref = act->trans_gref;
     }
 
@@ -2659,7 +2660,7 @@ acquire_grant_for_copy(
                           !mfn_eq(act->mfn, grant_mfn) ||
                           act->start != trans_page_off ||
                           act->length != trans_length ||
-                          act->trans_domain != td ||
+                          act->src_domid != td->domain_id ||
                           act->trans_gref != trans_gref ||
                           !act->is_sub_page)) )
         {
@@ -2692,7 +2693,7 @@ acquire_grant_for_copy(
             act->domid = ldom;
             act->start = trans_page_off;
             act->length = trans_length;
-            act->trans_domain = td;
+            act->src_domid = td->domain_id;
             act->trans_gref = trans_gref;
             act->mfn = grant_mfn;
             act_set_gfn(act, INVALID_GFN);
@@ -2754,7 +2755,7 @@ acquire_grant_for_copy(
             act->is_sub_page = is_sub_page;
             act->start = trans_page_off;
             act->length = trans_length;
-            act->trans_domain = td;
+            act->src_domid = td->domain_id;
             act->trans_gref = trans_gref;
             act->mfn = grant_mfn;
         }
