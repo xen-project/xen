@@ -691,8 +691,10 @@ p2m_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
     /* Then, look for m->p mappings for this range and deal with them */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
-        if ( dom_cow &&
-             page_get_owner(mfn_to_page(mfn_add(mfn, i))) == dom_cow )
+        const struct domain *owner =
+            page_get_owner(mfn_to_page(mfn_add(mfn, i)));
+
+        if ( dom_cow && owner == dom_cow )
         {
             /* This is no way to add a shared page to your physmap! */
             gdprintk(XENLOG_ERR, "Adding shared mfn %lx directly to dom%d physmap not allowed.\n",
@@ -700,7 +702,7 @@ p2m_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
             p2m_unlock(p2m);
             return -EINVAL;
         }
-        if ( page_get_owner(mfn_to_page(mfn_add(mfn, i))) != d )
+        if ( owner != d )
             continue;
         ogfn = mfn_to_gfn(d, mfn_add(mfn, i));
         if ( !gfn_eq(ogfn, _gfn(INVALID_M2P_ENTRY)) &&
