@@ -417,7 +417,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
          * out of hardware.
          */
 #ifdef CONFIG_HVM
-        if ( v == current && is_hvm_domain(d) && v->arch.hvm.flag_dr_dirty )
+        if ( v == curr && is_hvm_domain(d) && v->arch.hvm.flag_dr_dirty )
             rdmsrl(msr, *val);
         else
 #endif
@@ -639,7 +639,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         {
             uint64_t xcr0 = get_xcr0();
 
-            if ( v != current ||
+            if ( v != curr ||
                  handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
                                xcr0 | X86_XCR0_BNDREGS | X86_XCR0_BNDCSR) )
                 goto gp_fault;
