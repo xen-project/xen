@@ -259,6 +259,26 @@
 #define VBAR            p15,0,c12,c0,0  /* Vector Base Address Register */
 #define HVBAR           p15,4,c12,c0,0  /* Hyp. Vector Base Address Register */
 
+/*
+ * CP15 CR12: Interrupt Controller Hyp Active Priorities Group 0 Registers,
+ * n = 0 - 3
+ */
+#define __AP0Rx(x)      p15, 4, c12, c8, x
+#define ICH_AP0R0       __AP0Rx(0)
+#define ICH_AP0R1       __AP0Rx(1)
+#define ICH_AP0R2       __AP0Rx(2)
+#define ICH_AP0R3       __AP0Rx(3)
+
+/*
+ * CP15 CR12: Interrupt Controller Hyp Active Priorities Group 1 Registers,
+ * n = 0 - 3
+ */
+#define __AP1Rx(x)      p15, 4, c12, c9, x
+#define ICH_AP1R0       __AP1Rx(0)
+#define ICH_AP1R1       __AP1Rx(1)
+#define ICH_AP1R2       __AP1Rx(2)
+#define ICH_AP1R3       __AP1Rx(3)
+
 /* CP15 CR12: Interrupt Controller List Registers, n = 0 - 15 */
 #define __LR0(x)        p15, 4, c12, c12, x
 #define __LR8(x)        p15, 4, c12, c13, x
@@ -359,6 +379,14 @@
 #define HCR_EL2                 HCR
 #define HPFAR_EL2               HPFAR
 #define HSTR_EL2                HSTR
+#define ICH_AP0R0_EL2           ICH_AP0R0
+#define ICH_AP0R1_EL2           ICH_AP0R1
+#define ICH_AP0R2_EL2           ICH_AP0R2
+#define ICH_AP0R3_EL2           ICH_AP0R3
+#define ICH_AP1R0_EL2           ICH_AP1R0
+#define ICH_AP1R1_EL2           ICH_AP1R1
+#define ICH_AP1R2_EL2           ICH_AP1R2
+#define ICH_AP1R3_EL2           ICH_AP1R3
 #define ICH_LR0_EL2             ICH_LR0
 #define ICH_LR1_EL2             ICH_LR1
 #define ICH_LR2_EL2             ICH_LR2
