@@ -259,6 +259,48 @@
 #define VBAR            p15,0,c12,c0,0  /* Vector Base Address Register */
 #define HVBAR           p15,4,c12,c0,0  /* Hyp. Vector Base Address Register */
 
+/* CP15 CR12: Interrupt Controller List Registers, n = 0 - 15 */
+#define __LR0(x)        p15, 4, c12, c12, x
+#define __LR8(x)        p15, 4, c12, c13, x
+
+#define ICH_LR0         __LR0(0)
+#define ICH_LR1         __LR0(1)
+#define ICH_LR2         __LR0(2)
+#define ICH_LR3         __LR0(3)
+#define ICH_LR4         __LR0(4)
+#define ICH_LR5         __LR0(5)
+#define ICH_LR6         __LR0(6)
+#define ICH_LR7         __LR0(7)
+#define ICH_LR8         __LR8(0)
+#define ICH_LR9         __LR8(1)
+#define ICH_LR10        __LR8(2)
+#define ICH_LR11        __LR8(3)
+#define ICH_LR12        __LR8(4)
+#define ICH_LR13        __LR8(5)
+#define ICH_LR14        __LR8(6)
+#define ICH_LR15        __LR8(7)
+
+/* CP15 CR12: Interrupt Controller List Registers, n = 0 - 15 */
+#define __LRC0(x)       p15, 4, c12, c14, x
+#define __LRC8(x)       p15, 4, c12, c15, x
+
+#define ICH_LRC0        __LRC0(0)
+#define ICH_LRC1        __LRC0(1)
+#define ICH_LRC2        __LRC0(2)
+#define ICH_LRC3        __LRC0(3)
+#define ICH_LRC4        __LRC0(4)
+#define ICH_LRC5        __LRC0(5)
+#define ICH_LRC6        __LRC0(6)
+#define ICH_LRC7        __LRC0(7)
+#define ICH_LRC8        __LRC8(0)
+#define ICH_LRC9        __LRC8(1)
+#define ICH_LRC10       __LRC8(2)
+#define ICH_LRC11       __LRC8(3)
+#define ICH_LRC12       __LRC8(4)
+#define ICH_LRC13       __LRC8(5)
+#define ICH_LRC14       __LRC8(6)
+#define ICH_LRC15       __LRC8(7)
+
 /* CP15 CR13:  */
 #define FCSEIDR         p15,0,c13,c0,0  /* FCSE Process ID Register */
 #define CONTEXTIDR      p15,0,c13,c0,1  /* Context ID Register */
@@ -317,6 +359,38 @@
 #define HCR_EL2                 HCR
 #define HPFAR_EL2               HPFAR
 #define HSTR_EL2                HSTR
+#define ICH_LR0_EL2             ICH_LR0
+#define ICH_LR1_EL2             ICH_LR1
+#define ICH_LR2_EL2             ICH_LR2
+#define ICH_LR3_EL2             ICH_LR3
+#define ICH_LR4_EL2             ICH_LR4
+#define ICH_LR5_EL2             ICH_LR5
+#define ICH_LR6_EL2             ICH_LR6
+#define ICH_LR7_EL2             ICH_LR7
+#define ICH_LR8_EL2             ICH_LR8
+#define ICH_LR9_EL2             ICH_LR9
+#define ICH_LR10_EL2            ICH_LR10
+#define ICH_LR11_EL2            ICH_LR11
+#define ICH_LR12_EL2            ICH_LR12
+#define ICH_LR13_EL2            ICH_LR13
+#define ICH_LR14_EL2            ICH_LR14
+#define ICH_LR15_EL2            ICH_LR15
+#define ICH_LRC0_EL2            ICH_LRC0
+#define ICH_LRC1_EL2            ICH_LRC1
+#define ICH_LRC2_EL2            ICH_LRC2
+#define ICH_LRC3_EL2            ICH_LRC3
+#define ICH_LRC4_EL2            ICH_LRC4
+#define ICH_LRC5_EL2            ICH_LRC5
+#define ICH_LRC6_EL2            ICH_LRC6
+#define ICH_LRC7_EL2            ICH_LRC7
+#define ICH_LRC8_EL2            ICH_LRC8
+#define ICH_LRC9_EL2            ICH_LRC9
+#define ICH_LRC10_EL2           ICH_LRC10
+#define ICH_LRC11_EL2           ICH_LRC11
+#define ICH_LRC12_EL2           ICH_LRC12
+#define ICH_LRC13_EL2           ICH_LRC13
+#define ICH_LRC14_EL2           ICH_LRC14
+#define ICH_LRC15_EL2           ICH_LRC15
 #define ID_AFR0_EL1             ID_AFR0
 #define ID_DFR0_EL1             ID_DFR0
 #define ID_DFR1_EL1             ID_DFR1

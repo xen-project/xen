@@ -62,6 +62,25 @@
 #define READ_SYSREG(R...)       READ_SYSREG32(R)
 #define WRITE_SYSREG(V, R...)   WRITE_SYSREG32(V, R)
 
+/* Wrappers for accessing interrupt controller list registers. */
+#define ICH_LR_REG(index)       ICH_LR ## index ## _EL2
+#define ICH_LRC_REG(index)      ICH_LRC ## index ## _EL2
+
+#define READ_SYSREG_LR(index) ({                            \
+    uint64_t _val;                                          \
+    uint32_t _lrc = READ_CP32(ICH_LRC_REG(index));          \
+    uint32_t _lr = READ_CP32(ICH_LR_REG(index));            \
+                                                            \
+    _val = ((uint64_t) _lrc << 32) | _lr;                   \
+    _val;                                                   \
+})
+
+#define WRITE_SYSREG_LR(v, index) ({                        \
+    uint64_t _val = (v);                                    \
+    WRITE_CP32(_val & GENMASK(31, 0), ICH_LR_REG(index));   \
+    WRITE_CP32(_val >> 32, ICH_LRC_REG(index));             \
+})
+
 /* MVFR2 is not defined on ARMv7 */
 #define MVFR2_MAYBE_UNDEFINED
 
