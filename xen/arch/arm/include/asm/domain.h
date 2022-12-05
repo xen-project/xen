@@ -295,6 +295,11 @@ struct arch_vcpu_io {
     struct instr_details dabt_instr; /* when the instruction is decoded */
 };
 
+struct guest_memory_policy {};
+static inline void update_guest_memory_policy(struct vcpu *v,
+                                              struct guest_memory_policy *gmp)
+{}
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

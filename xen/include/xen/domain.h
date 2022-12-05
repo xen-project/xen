@@ -101,6 +101,8 @@ int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
 int arch_get_paging_mempool_size(struct domain *d, uint64_t *size /* bytes */);
 int arch_set_paging_mempool_size(struct domain *d, uint64_t size /* bytes */);
 
+bool update_runstate_area(struct vcpu *);
+
 int domain_relinquish_resources(struct domain *d);
 
 void dump_pageframe_info(struct domain *d);
