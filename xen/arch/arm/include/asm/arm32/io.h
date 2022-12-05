@@ -80,10 +80,30 @@ static inline u32 __raw_readl(const volatile void __iomem *addr)
                                         __raw_readw(c)); __r; })
 #define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
                                         __raw_readl(c)); __r; })
+/*
+ * ldrd instructions are not decoded by Arm when running as a guest to access
+ * emulated MMIO region. Thus, readq_relaxed_non_atomic() invokes readl_relaxed()
+ * twice to read the lower and upper 32 bits.
+ */
+static inline u64 readq_relaxed_non_atomic(const volatile void __iomem *addr)
+{
+        u64 val = (((u64)readl_relaxed(addr + 4)) << 32) | readl_relaxed(addr);
+        return val;
+}
 
 #define writeb_relaxed(v,c)     __raw_writeb(v,c)
 #define writew_relaxed(v,c)     __raw_writew((__force u16) cpu_to_le16(v),c)
 #define writel_relaxed(v,c)     __raw_writel((__force u32) cpu_to_le32(v),c)
+/*
+ * strd instructions are not decoded by Arm when running as a guest to access
+ * emulated MMIO region. Thus, writeq_relaxed_non_atomic() invokes writel_relaxed()
+ * twice to write the lower and upper 32 bits.
+ */
+static inline void writeq_relaxed_non_atomic(u64 val, volatile void __iomem *addr)
+{
+        writel_relaxed((u32)val, addr);
+        writel_relaxed((u32)(val >> 32), addr + 4);
+}
 
 #define readb(c)                ({ u8  __v = readb_relaxed(c); __iormb(); __v; })
 #define readw(c)                ({ u16 __v = readw_relaxed(c); __iormb(); __v; })
