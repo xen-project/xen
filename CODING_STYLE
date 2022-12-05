@@ -80,8 +80,13 @@ Bracing
 -------
 
 Braces ('{' and '}') are usually placed on a line of their own, except
-for the do/while loop.  This is unlike the Linux coding style and
-unlike K&R.  do/while loops are an exception. e.g.:
+for
+- the do/while loop
+- the opening brace in definitions of enum, struct, and union
+- the opening brace in initializers
+- compound literals
+This is unlike the Linux coding style and unlike K&R.  do/while loops
+are one exception. e.g.:
 
 if ( condition )
 {
