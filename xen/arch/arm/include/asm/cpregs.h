@@ -161,6 +161,7 @@
 #define DACR            p15,0,c3,c0,0   /* Domain Access Control Register */
 
 /* CP15 CR4: */
+#define ICC_PMR         p15,0,c4,c6,0   /* Interrupt Priority Mask Register */
 
 /* CP15 CR5: Fault Status Registers */
 #define DFSR            p15,0,c5,c0,0   /* Data Fault Status Register */
@@ -257,6 +258,7 @@
 #define ICC_ASGI1R      p15,1,c12       /* Interrupt Controller Alias SGI Group 1 Register */
 #define ICC_SGI0R       p15,2,c12       /* Interrupt Controller SGI Group 0 */
 #define VBAR            p15,0,c12,c0,0  /* Vector Base Address Register */
+#define ICC_DIR         p15,0,c12,c11,1 /* Interrupt Controller Deactivate Interrupt Register */
 #define HVBAR           p15,4,c12,c0,0  /* Hyp. Vector Base Address Register */
 
 /*
@@ -278,6 +280,20 @@
 #define ICH_AP1R1       __AP1Rx(1)
 #define ICH_AP1R2       __AP1Rx(2)
 #define ICH_AP1R3       __AP1Rx(3)
+
+#define ICC_IAR1        p15,0,c12,c12,0  /* Interrupt Controller Interrupt Acknowledge Register 1 */
+#define ICC_EOIR1       p15,0,c12,c12,1  /* Interrupt Controller End Of Interrupt Register 1 */
+#define ICC_BPR1        p15,0,c12,c12,3  /* Interrupt Controller Binary Point Register 1 */
+#define ICC_CTLR        p15,0,c12,c12,4  /* Interrupt Controller Control Register */
+#define ICC_SRE         p15,0,c12,c12,5  /* Interrupt Controller System Register Enable register */
+#define ICC_IGRPEN1     p15,0,c12,c12,7  /* Interrupt Controller Interrupt Group 1 Enable register */
+#define ICC_HSRE        p15,4,c12,c9,5   /* Interrupt Controller Hyp System Register Enable register */
+#define ICH_HCR         p15,4,c12,c11,0  /* Interrupt Controller Hyp Control Register */
+#define ICH_VTR         p15,4,c12,c11,1  /* Interrupt Controller VGIC Type Register */
+#define ICH_MISR        p15,4,c12,c11,2  /* Interrupt Controller Maintenance Interrupt State Register */
+#define ICH_EISR        p15,4,c12,c11,3  /* Interrupt Controller End of Interrupt Status Register */
+#define ICH_ELRSR       p15,4,c12,c11,5  /* Interrupt Controller Empty List Register Status Register */
+#define ICH_VMCR        p15,4,c12,c11,7  /* Interrupt Controller Virtual Machine Control Register */
 
 /* CP15 CR12: Interrupt Controller List Registers, n = 0 - 15 */
 #define __LR0(x)        p15, 4, c12, c12, x
@@ -379,6 +395,15 @@
 #define HCR_EL2                 HCR
 #define HPFAR_EL2               HPFAR
 #define HSTR_EL2                HSTR
+#define ICC_BPR1_EL1            ICC_BPR1
+#define ICC_CTLR_EL1            ICC_CTLR
+#define ICC_DIR_EL1             ICC_DIR
+#define ICC_EOIR1_EL1           ICC_EOIR1
+#define ICC_IGRPEN1_EL1         ICC_IGRPEN1
+#define ICC_PMR_EL1             ICC_PMR
+#define ICC_SGI1R_EL1           ICC_SGI1R
+#define ICC_SRE_EL1             ICC_SRE
+#define ICC_SRE_EL2             ICC_HSRE
 #define ICH_AP0R0_EL2           ICH_AP0R0
 #define ICH_AP0R1_EL2           ICH_AP0R1
 #define ICH_AP0R2_EL2           ICH_AP0R2
@@ -387,6 +412,10 @@
 #define ICH_AP1R1_EL2           ICH_AP1R1
 #define ICH_AP1R2_EL2           ICH_AP1R2
 #define ICH_AP1R3_EL2           ICH_AP1R3
+#define ICH_EISR_EL2            ICH_EISR
+#define ICH_ELRSR_EL2           ICH_ELRSR
+#define ICH_HCR_EL2             ICH_HCR
+#define ICC_IAR1_EL1            ICC_IAR1
 #define ICH_LR0_EL2             ICH_LR0
 #define ICH_LR1_EL2             ICH_LR1
 #define ICH_LR2_EL2             ICH_LR2
@@ -419,6 +448,9 @@
 #define ICH_LRC13_EL2           ICH_LRC13
 #define ICH_LRC14_EL2           ICH_LRC14
 #define ICH_LRC15_EL2           ICH_LRC15
+#define ICH_MISR_EL2            ICH_MISR
+#define ICH_VMCR_EL2            ICH_VMCR
+#define ICH_VTR_EL2             ICH_VTR
 #define ID_AFR0_EL1             ID_AFR0
 #define ID_DFR0_EL1             ID_DFR0
 #define ID_DFR1_EL1             ID_DFR1
