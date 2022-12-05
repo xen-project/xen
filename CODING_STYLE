@@ -47,6 +47,10 @@ void fun(void)
     }
 }
 
+Due to the behavior of GNU diffutils "diff -p", labels should be
+indented by at least one blank.  Non-case labels inside switch() bodies
+are preferred to be indented the same as the block's case labels.
+
 White space
 -----------
 
