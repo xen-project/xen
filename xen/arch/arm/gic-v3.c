@@ -518,7 +518,10 @@ static void gicv3_set_pending_state(struct irq_desc *irqd, bool pending)
 static inline uint64_t gicv3_mpidr_to_affinity(int cpu)
 {
      uint64_t mpidr = cpu_logical_map(cpu);
-     return (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
+     return (
+#ifdef CONFIG_ARM_64
+             MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
+#endif
              MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
              MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8  |
              MPIDR_AFFINITY_LEVEL(mpidr, 0));
@@ -711,7 +714,10 @@ static int __init gicv3_populate_rdist(void)
      * Convert affinity to a 32bit value that can be matched to GICR_TYPER
      * bits [63:32]
      */
-    aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
+    aff = (
+#ifdef CONFIG_ARM_64
+           MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
+#endif
            MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
            MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
            MPIDR_AFFINITY_LEVEL(mpidr, 0));
@@ -963,7 +969,10 @@ static void gicv3_send_sgi_list(enum gic_sgi sgi, const cpumask_t *cpumask)
          * Prepare affinity path of the cluster for which SGI is generated
          * along with SGI number
          */
-        val = (MPIDR_AFFINITY_LEVEL(cluster_id, 3) << 48  |
+        val = (
+#ifdef CONFIG_ARM_64
+               MPIDR_AFFINITY_LEVEL(cluster_id, 3) << 48  |
+#endif
                MPIDR_AFFINITY_LEVEL(cluster_id, 2) << 32  |
                sgi << 24                                  |
                MPIDR_AFFINITY_LEVEL(cluster_id, 1) << 16  |
