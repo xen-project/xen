@@ -403,9 +403,13 @@ static int vpl011_mmio_read(struct vcpu *v,
     default:
         gprintk(XENLOG_ERR, "vpl011: unhandled read r%d offset %#08x\n",
                 dabt.reg, vpl011_reg);
-        return 0;
+        goto read_as_zero;
     }
 
+    return 1;
+
+read_as_zero:
+    *r = 0;
     return 1;
 
 bad_width:
@@ -475,7 +479,7 @@ static int vpl011_mmio_write(struct vcpu *v,
     default:
         gprintk(XENLOG_ERR, "vpl011: unhandled write r%d offset %#08x\n",
                 dabt.reg, vpl011_reg);
-        return 0;
+        goto write_ignore;
     }
 
 write_ignore:
