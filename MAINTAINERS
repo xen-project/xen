@@ -120,8 +120,8 @@ must be met:
 
    See below for rules on nested maintainership.
 
-2. It must have appropriate approval from someone other than the
-   submitter.  This can be either:
+2. Each change must have appropriate approval from someone other than
+   the person who wrote it.  This can be either:
 
   a. An Acked-by from a maintainer of the code being touched (a
      co-maintainer if available, or a more general level maintainer if
@@ -149,6 +149,20 @@ member's R-b but no co-maintainer Ack, it is especially important to
 give their co-maintainer opportunity to give feedback, perhaps
 declaring their intention to check it in without their co-maintainers
 ack a day before doing so.
+
+In the case where two people collaborate on a patch, at least one of
+whom is a maintainer -- typically where one maintainer will do an
+early version of the patch, and another maintainer will pick it up and
+revise it -- there should be two Signed-off-by's and one Acked-by or
+Reviewed-by; with the maintainer who did the most recent change
+sending the patch, and an Acked-by or Reviewed-by coming from the
+maintainer who did not most recently edit the patch.  This satisfies
+the requirement #2 because a) the Signed-off-by of the sender approves
+the final version of the patch; including all parts of the patch that
+the sender did not write b) the Reviewed-by approves the final version
+of the patch, including all patches that the reviewer did not write.
+Thus all code in the patch has been approved by someone who did not
+write it.
 
 Maintainers may choose to override non-maintainer objections in the
 case that consensus can't be reached.
