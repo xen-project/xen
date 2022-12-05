@@ -48,7 +48,11 @@ t=RELEASE-$r
 
 * consider bumping sonames of shlibs
 
-* change xen-unstable README (should say "Xen 4.5" in releases and on stable branches, "Xen 4.5-unstable" on unstable)
+* change xen-unstable README. The banner (generated using figlet) should say:
+    - "Xen 4.5" in releases and on stable branches
+    - "Xen 4.5-unstable" on unstable
+    - "Xen 4.5-rc" for release candidate
+
 * change xen-unstable Config.mk
 #   QEMU_UPSTREAM_REVISION,
 #   QEMU_TRADITIONAL_REVISION
