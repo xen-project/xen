@@ -182,12 +182,20 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VREG64(GICR_TYPER):
     {
         uint64_t typer, aff;
+        /*
+         * This is to enable shifts greater than 32 bits which would have
+         * otherwise caused overflow (as v->arch.vmpidr is 32 bit on AArch32).
+         */
+        uint64_t vmpidr = v->arch.vmpidr;
 
         if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
-        aff = (MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 3) << 56 |
-               MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 2) << 48 |
-               MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 1) << 40 |
-               MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 0) << 32);
+        aff = (
+#ifdef CONFIG_ARM_64
+               MPIDR_AFFINITY_LEVEL(vmpidr, 3) << 56 |
+#endif
+               MPIDR_AFFINITY_LEVEL(vmpidr, 2) << 48 |
+               MPIDR_AFFINITY_LEVEL(vmpidr, 1) << 40 |
+               MPIDR_AFFINITY_LEVEL(vmpidr, 0) << 32);
         typer = aff;
         /* We use the VCPU ID as the redistributor ID in bits[23:8] */
         typer |= v->vcpu_id << GICR_TYPER_PROC_NUM_SHIFT;
