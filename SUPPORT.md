@@ -76,6 +76,13 @@ For the Cortex A57 r0p0 - r1p1, see Errata 832075.
     Status, ARM SMMUv3: Tech Preview
     Status, Renesas IPMMU-VMSA: Supported, not security supported
 
+### ARM/GICv3
+
+GICv3 is an interrupt controller specification designed by Arm.
+
+    Status, Arm64: Security supported
+    Status, Arm32: Supported, not security supported
+
 ### ARM/GICv3 ITS
 
 Extension to the GICv3 interrupt controller to support MSI.

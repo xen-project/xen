@@ -41,16 +41,17 @@ config ARM_EFI
 
 config GICV3
 	bool "GICv3 driver"
-	depends on ARM_64 && !NEW_VGIC
-	default y
+	depends on !NEW_VGIC
+	default n if ARM_32
+	default y if ARM_64
 	---help---
 
 	  Driver for the ARM Generic Interrupt Controller v3.
-	  If unsure, say Y
+	  If unsure, use the default setting.
 
 config HAS_ITS
         bool "GICv3 ITS MSI controller support (UNSUPPORTED)" if UNSUPPORTED
-        depends on GICV3 && !NEW_VGIC
+        depends on GICV3 && !NEW_VGIC && !ARM_32
 
 config HVM
         def_bool y
