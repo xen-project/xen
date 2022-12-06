@@ -205,7 +205,7 @@ static void cf_check vga_text_puts(const char *s, size_t nr)
     }
 }
 
-int __init fill_console_start_info(struct dom0_vga_console_info *ci)
+int fill_console_start_info(struct dom0_vga_console_info *ci)
 {
     memcpy(ci, &vga_console_info, sizeof(*ci));
     return 1;

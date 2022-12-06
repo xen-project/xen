@@ -839,6 +839,17 @@ ret_t do_platform_op(
     }
     break;
 
+    case XENPF_get_dom0_console:
+        if ( !fill_console_start_info(&op->u.dom0_console) )
+        {
+            ret = -ENODEV;
+            break;
+        }
+
+        if ( copy_field_to_guest(u_xenpf_op, op, u.dom0_console) )
+            ret = -EFAULT;
+        break;
+
     default:
         ret = -ENOSYS;
         break;
