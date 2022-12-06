@@ -629,8 +629,8 @@ _sh_propagate(struct vcpu *v,
     else if ( p2mt == p2m_mmio_direct &&
               rangeset_contains_singleton(mmio_ro_ranges, mfn_x(target_mfn)) )
     {
-        sflags &= ~(_PAGE_RW | _PAGE_PAT);
-        sflags |= _PAGE_PCD | _PAGE_PWT;
+        sflags &= ~(_PAGE_RW | PAGE_CACHE_ATTRS);
+        sflags |= _PAGE_UC;
     }
 
     // protect guest page tables
