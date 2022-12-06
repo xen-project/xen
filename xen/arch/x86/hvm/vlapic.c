@@ -829,6 +829,9 @@ void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
         {
             vlapic->hw.disabled &= ~VLAPIC_SW_DISABLED;
             pt_may_unmask_irq(vlapic_domain(vlapic), &vlapic->pt);
+            if ( v->arch.hvm.evtchn_upcall_vector &&
+                 vcpu_info(v, evtchn_upcall_pending) )
+                vlapic_set_irq(vlapic, v->arch.hvm.evtchn_upcall_vector, 0);
         }
         break;
 
