@@ -14,6 +14,34 @@ Usage:
 
 import sys, getopt, re
 
+# MISRA rule are identified by two numbers, e.g. Rule 1.2, the main rule number
+# and a sub-number. This dictionary contains the number of the MISRA rule as key
+# and the maximum sub-number for that rule as value.
+misra_c2012_rules = {
+    1:4,
+    2:7,
+    3:2,
+    4:2,
+    5:9,
+    6:2,
+    7:4,
+    8:14,
+    9:5,
+    10:8,
+    11:9,
+    12:5,
+    13:6,
+    14:4,
+    15:7,
+    16:7,
+    17:8,
+    18:8,
+    19:2,
+    20:14,
+    21:21,
+    22:10
+}
+
 def main(argv):
     infile = ''
     outfile = ''
@@ -142,8 +170,8 @@ def main(argv):
     skip_list = []
 
     # Search for missing rules and add a dummy text with the rule number
-    for i in list(range(1,22)):
-        for j in list(range(1,22)):
+    for i in misra_c2012_rules:
+        for j in list(range(1,misra_c2012_rules[i]+1)):
             if str(i) + '.' + str(j) not in rule_list:
                 outstr.write('Rule ' + str(i) + '.' + str(j) + '\n')
                 outstr.write('No description for rule ' + str(i) + '.' + str(j)
