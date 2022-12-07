@@ -42,6 +42,7 @@
 #include <xen/spinlock.h>
 #include <xen/rwlock.h>
 #include <xen/errno.h>
+#include <conditional.h>
 #include "flask.h"
 #include "avc.h"
 #include "avc_ss.h"
@@ -52,8 +53,6 @@
 #include "services.h"
 #include "conditional.h"
 #include "mls.h"
-
-unsigned int policydb_loaded_version;
 
 static DEFINE_RWLOCK(policy_rwlock);
 #define POLICY_RDLOCK read_lock(&policy_rwlock)
@@ -1388,7 +1387,6 @@ int security_load_policy(const void *data, size_t len)
             policydb_destroy(&policydb);
             return -EINVAL;
         }
-        policydb_loaded_version = policydb.policyvers;
         ss_initialized = 1;
         seqno = ++latest_granting;
         LOAD_UNLOCK;
@@ -1447,7 +1445,6 @@ int security_load_policy(const void *data, size_t len)
     memcpy(&policydb, &newpolicydb, sizeof policydb);
     sidtab_set(&sidtab, &newsidtab);
     seqno = ++latest_granting;
-    policydb_loaded_version = policydb.policyvers;
     POLICY_WRUNLOCK;
     LOAD_UNLOCK;
 

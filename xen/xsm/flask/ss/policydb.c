@@ -28,6 +28,7 @@
 #include <xen/xmalloc.h>
 #include <xen/string.h>
 #include <xen/errno.h>
+#include <conditional.h>
 #include "security.h"
 
 #include "policydb.h"
@@ -1729,8 +1730,6 @@ static int policydb_bounds_sanity_check(struct policydb *p)
 
     return 0;
 }
-
-extern int ss_initialized;
 
 /*
  * Read the configuration data from a policy database binary

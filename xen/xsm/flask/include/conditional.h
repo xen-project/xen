@@ -24,4 +24,6 @@ int security_find_bool(const char *name);
 char *security_get_bool_name(unsigned int b);
 int security_get_bool_value(unsigned int b);
 
+extern int ss_initialized;
+
 #endif

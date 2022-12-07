@@ -56,8 +56,6 @@ static int bool_num = 0;
 static int *bool_pending_values = NULL;
 static int flask_security_make_bools(void);
 
-extern int ss_initialized;
-
 static int __init cf_check parse_flask_param(const char *s)
 {
     if ( !strcmp(s, "enforcing") )
