@@ -60,6 +60,13 @@
  * are possible.
  */
 
+/*
+ * Cppcheck thinks this file needs to be analysed because it is preprocessed by
+ * the compiler, but it gets confused because this file does not contains C
+ * code. Hence protect the code when CPPCHECK is used.
+ */
+#ifndef CPPCHECK
+
 #ifdef CONFIG_HVM
 #define PREFIX_hvm hvm
 #else
@@ -288,3 +295,5 @@ mca                                do       do       -        -        -
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
 paging_domctl_cont                 do       do       do       do       -
 #endif
+
+#endif /* !CPPCHECK */

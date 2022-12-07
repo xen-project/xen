@@ -51,6 +51,7 @@ Here is an example to add a new justification in safe.json::
 |        {
 |            "id": "SAF-0-safe",
 |            "analyser": {
+|                "cppcheck": "misra-c2012-20.7",
 |                "coverity": "misra_c_2012_rule_20_7_violation",
 |                "eclair": "MC3R1.R20.7"
 |            },
@@ -77,9 +78,9 @@ Here is an explanation of the fields inside an object of the "content" array:
    It tells the tool to substitute a Xen in-code comment having this structure:
    /* SAF-0-safe [...] \*/
  - analyser: it is an object containing pair of key-value strings, the key is
-   the analyser, so it can be coverity or eclair, the value is the proprietary
-   id corresponding on the finding, for example when coverity is used as
-   analyser, the tool will translate the Xen in-code coment in this way:
+   the analyser, so it can be cppcheck, coverity or eclair, the value is the
+   proprietary id corresponding on the finding, for example when coverity is
+   used as analyser, the tool will translate the Xen in-code coment in this way:
    /* SAF-0-safe [...] \*/ -> /* coverity[misra_c_2012_rule_20_7_violation] \*/
    if the object doesn't have a key-value, then the corresponding in-code
    comment won't be translated.
@@ -189,3 +190,23 @@ the same line and the same "violation ID".
 
 Also, the same tag can be used on other symbols from the linker that are
 declared in the codebase, because the justification holds for them too.
+
+A possible violation found by Cppcheck can be handled in the same way, from the
+cppcheck text report it is possible to identify the violation id:
+
+| include/public/arch-arm.h(226,0):misra-c2012-20.7:style:Expressions resulting from the expansion of macro parameters shall be enclosed in parentheses (Misra rule 20.7)
+
+The violation id can be located also in the HTML report, opening index.html from
+the browser, the violations can be filtered by id in the left side panel, under
+the column "Defect ID". On the right there will be a list of files with the type
+of violation and the violation line number, for the same violation above, there
+will be an entry like the following and the violation id will be in the column
+"Id":
+
+| include/public/arch-arm.h
+| [...]
+| 226 misra-c2012-20.7  style Expressions resulting from the expansion of macro parameters shall be enclosed in parentheses (Misra rule 20.7)
+| [...]
+
+Given the violation id "misra-c2012-20.7", the procedure above can be followed
+to justify this finding.

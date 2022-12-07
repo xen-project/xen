@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import os, subprocess
-from . import settings, utils, tag_database
+import os
+from . import settings, utils, tag_database, cppcheck_analysis
 
 class ParseTagPhaseError(Exception):
     pass
@@ -61,8 +61,9 @@ def parse_xen_tags():
 
 def build_xen():
     utils.invoke_command(
-            "make -C {} {} build"
-                .format(settings.xen_dir, settings.make_forward_args),
+            "make -C {} {} {} build"
+                .format(settings.xen_dir, settings.make_forward_args,
+                        cppcheck_analysis.cppcheck_extra_make_args),
             False, BuildPhaseError,
             "Build error occured when running:\n{}"
         )

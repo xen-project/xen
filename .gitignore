@@ -8,8 +8,11 @@
 *.d
 *.d2
 *.c.cppcheck
+*.cppcheck.txt
+*.cppcheck.xml
 *.opic
 *.a
+*.c.json
 *.safparse
 *.so
 *.so.[0-9]*
@@ -283,9 +286,11 @@ xen/arch/*/efi/efi.h
 xen/arch/*/efi/pe.c
 xen/arch/*/efi/runtime.c
 xen/arch/*/include/asm/asm-offsets.h
+xen/build-dir-cppcheck/
 xen/common/config_data.S
 xen/common/config.gz
 xen/cppcheck-htmlreport/
+xen/cppcheck-report/
 xen/cppcheck-misra.*
 xen/include/headers*.chk
 xen/include/compat/*
@@ -316,6 +321,7 @@ xen/xsm/flask/xenpolicy-*
 tools/flask/policy/policy.conf
 tools/flask/policy/xenpolicy-*
 xen/xen
+xen/suppression-list.txt
 xen/xen-cppcheck.xml
 xen/xen-syms
 xen/xen-syms.map

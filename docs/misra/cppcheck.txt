@@ -3,8 +3,7 @@ Cppcheck for Xen static and MISRA analysis
 
 Xen can be analysed for both static analysis problems and MISRA violation using
 cppcheck, the open source tool allows the creation of a report with all the
-findings. Xen has introduced the support in the Makefile so it's very easy to
-use and in this document we can see how.
+findings.
 
 The minimum version required for cppcheck is 2.7. Note that at the time of
 writing (June 2022), the version 2.8 is known to be broken [1].
@@ -38,27 +37,7 @@ Dependencies are listed in the readme.md of the project repository.
 Use cppcheck to analyse Xen
 ===========================
 
-Using cppcheck integration is very simple, it requires few steps:
-
- 1) Compile Xen
- 2) call the cppcheck make target to generate a report in xml format:
-    make CPPCHECK_MISRA=y cppcheck
- 3) call the cppcheck-html make target to generate a report in xml and html
-    format:
-    make CPPCHECK_MISRA=y cppcheck-html
-
-    In case the cppcheck binaries are not in the PATH, CPPCHECK and
-    CPPCHECK_HTMLREPORT variables can be overridden with the full path to the
-    binaries:
-
-    make -C xen \
-        CPPCHECK=/path/to/cppcheck \
-        CPPCHECK_HTMLREPORT=/path/to/cppcheck-htmlreport \
-        CPPCHECK_MISRA=y \
-        cppcheck-html
-
-The output is by default in a folder named cppcheck-htmlreport, but the name
-can be changed by passing it in the CPPCHECK_HTMLREPORT_OUTDIR variable.
-
+To analyse Xen using cppcheck, please refer to the document
+xen-static-analysis.rst, section "Analyse Xen with Cppcheck".
 
 [1] https://sourceforge.net/p/cppcheck/discussion/general/thread/bfc3ab6c41/?limit=25

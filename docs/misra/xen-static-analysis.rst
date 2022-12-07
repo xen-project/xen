@@ -7,9 +7,8 @@ The Xen codebase integrates some scripts and tools that helps the developer to
 perform static analysis of the code, currently Xen supports three analysis tool
 that are eclair, coverity and cppcheck.
 The Xen tree has a script (xen-analysis.py) available to ease the analysis
-process and it integrates a way to suppress findings on these tools (only Eclair
-and Coverity are currently supported by the script), please check the
-documenting-violation.rst document to know more about it.
+process and it integrates a way to suppress findings on these tools, please
+check the documenting-violation.rst document to know more about it.
 
 Analyse Xen with Coverity or Eclair
 -----------------------------------
@@ -52,3 +51,40 @@ When invoking the script, the procedure below will be followed:
     this step, call the script adding the --no-clean argument, but before
     running again the script, call it with the --clean-only argument, that will
     execute only this cleaning step.
+
+
+Analyse Xen with Cppcheck
+-------------------------
+
+Cppcheck tool is integrated in xen-analysis.py script, when using the script,
+the tool will be called on every source file compiled by the make build system.
+Here how to start the analysis with Cppcheck:
+
+ - xen-analysis.py --run-cppcheck [--cppcheck-misra] [--cppcheck-html] --
+   [optional make arguments]
+
+The command above tells the script to prepare the codebase and use Cppcheck tool
+for the analysis.
+The optional argument --cppcheck-misra activates the analysis also for MISRA
+compliance.
+The optional argument --cppcheck-html instruct cppcheck to produce an additional
+HTML report.
+
+When invoking the script for Cppcheck analysis, the followed procedure is
+similar to the one above for Coverity or Eclair, but it has some additional
+steps:
+
+ 1. This step is the same as step 1 for Coverity/Eclair.
+ 2. The cppcheck dependency are created, build directory for cppcheck analysis
+    and an header file containing internal compiler macro
+    (include/generated/compiler-def.h) are generated
+ 3. Xen compilation starts using every <additional make parameters> supplied
+    at the script invocation, but because cppcheck is not able to intercept the
+    compiled files and flags on compiler invocation, a script (cppcheck-cc.sh)
+    is passed as CC to the make system, it is a wrapper for the compiler that
+    will also execute cppcheck on every compiled file.
+ 4. After the compilation and analysis, the cppcheck report will be created
+    putting together all the cppcheck report fragments for every analysed file.
+    Cppcheck will produce a text fragment and an additional XML report fragment
+    if the script is configured to produce the HTML output.
+ 5. This step is the same as step 3 for Coverity/Eclair.
