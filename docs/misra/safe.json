@@ -3,6 +3,15 @@
     "content": [
         {
             "id": "SAF-0-safe",
+            "analyser": {
+                "eclair": "MC3R1.R8.6",
+                "coverity": "misra_c_2012_rule_8_6_violation"
+            },
+            "name": "Rule 8.6: linker script defined symbols",
+            "text": "It is safe to declare this symbol because it is defined in the linker script."
+        },
+        {
+            "id": "SAF-1-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"
