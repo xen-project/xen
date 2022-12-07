@@ -839,6 +839,7 @@ ret_t do_platform_op(
     }
     break;
 
+#ifdef CONFIG_VIDEO
     case XENPF_get_dom0_console:
         if ( !fill_console_start_info(&op->u.dom0_console) )
         {
@@ -849,6 +850,7 @@ ret_t do_platform_op(
         if ( copy_field_to_guest(u_xenpf_op, op, u.dom0_console) )
             ret = -EFAULT;
         break;
+#endif
 
     default:
         ret = -ENOSYS;
