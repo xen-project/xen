@@ -1,0 +1,11 @@
+{
+    "version": "1.0",
+    "content": [
+        {
+            "id": "SAF-0-safe",
+            "analyser": {},
+            "name": "Sentinel",
+            "text": "Next ID to be used"
+        }
+    ]
+}
