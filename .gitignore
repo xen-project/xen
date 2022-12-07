@@ -7,7 +7,6 @@
 *.o
 *.d
 *.d2
-*.c.cppcheck
 *.cppcheck.txt
 *.cppcheck.xml
 *.opic
@@ -322,7 +321,6 @@ tools/flask/policy/policy.conf
 tools/flask/policy/xenpolicy-*
 xen/xen
 xen/suppression-list.txt
-xen/xen-cppcheck.xml
 xen/xen-syms
 xen/xen-syms.map
 xen/xen.*
