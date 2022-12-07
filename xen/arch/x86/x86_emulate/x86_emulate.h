@@ -228,7 +228,7 @@ struct x86_emulate_ops
      * All functions:
      *  @ctxt:  [IN ] Emulation context info as passed to the emulator.
      * All memory-access functions:
-     *  @seg:   [IN ] Segment being dereferenced (specified as x86_seg_??).
+     *  @seg:   [IN ] Segment being dereferenced (specified as x86_seg_?).
      *  @offset:[IN ] Offset within segment.
      *  @p_data:[IN ] Pointer to i/o data buffer (length is @bytes)
      * Read functions:

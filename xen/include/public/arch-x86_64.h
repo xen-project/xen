@@ -22,5 +22,5 @@
  * A similar callback occurs if the segment selectors are invalid.
  * failsafe_address is used as the value of eip.
  *
- * On x86_64, event_selector and failsafe_selector are ignored (???).
+ * On x86_64, event_selector and failsafe_selector are ignored (?!?).
  */
