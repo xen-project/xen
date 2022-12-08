@@ -350,7 +350,7 @@ bool viridian_synic_deliver_timer_msg(struct vcpu *v, unsigned int sintx,
     BUILD_BUG_ON(sizeof(payload) > sizeof(msg->u.payload));
     memcpy(msg->u.payload, &payload, sizeof(payload));
 
-    if ( !vs->masked )
+    if ( !vs->masked && vlapic_enabled(vcpu_vlapic(v)) )
         vlapic_set_irq(vcpu_vlapic(v), vs->vector, 0);
 
     return true;

@@ -831,7 +831,12 @@ static void send_ipi(struct hypercall_vpmask *vpmask, uint8_t vector)
         cpu_raise_softirq_batch_begin();
 
     for_each_vp ( vpmask, vp )
-        vlapic_set_irq(vcpu_vlapic(currd->vcpu[vp]), vector, 0);
+    {
+        struct vlapic *vlapic = vcpu_vlapic(currd->vcpu[vp]);
+
+        if ( vlapic_enabled(vlapic) )
+            vlapic_set_irq(vlapic, vector, 0);
+    }
 
     if ( nr > 1 )
         cpu_raise_softirq_batch_finish();
