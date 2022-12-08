@@ -222,27 +222,28 @@ static void _clear_irq_vector(struct irq_desc *desc)
         clear_bit(vector, desc->arch.used_vectors);
     }
 
-    desc->arch.used = IRQ_UNUSED;
-
     trace_irq_mask(TRC_HW_IRQ_CLEAR_VECTOR, irq, vector, tmp_mask);
 
-    if ( likely(!desc->arch.move_in_progress) )
-        return;
-
-    /* If we were in motion, also clear desc->arch.old_vector */
-    old_vector = desc->arch.old_vector;
-    cpumask_and(tmp_mask, desc->arch.old_cpu_mask, &cpu_online_map);
-
-    for_each_cpu(cpu, tmp_mask)
+    if ( unlikely(desc->arch.move_in_progress) )
     {
-        ASSERT(per_cpu(vector_irq, cpu)[old_vector] == irq);
-        TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
-        per_cpu(vector_irq, cpu)[old_vector] = ~irq;
+        /* If we were in motion, also clear desc->arch.old_vector */
+        old_vector = desc->arch.old_vector;
+        cpumask_and(tmp_mask, desc->arch.old_cpu_mask, &cpu_online_map);
+
+        for_each_cpu(cpu, tmp_mask)
+        {
+            ASSERT(per_cpu(vector_irq, cpu)[old_vector] == irq);
+            TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
+            per_cpu(vector_irq, cpu)[old_vector] = ~irq;
+        }
+
+        release_old_vec(desc);
+
+        desc->arch.move_in_progress = 0;
     }
 
-    release_old_vec(desc);
-
-    desc->arch.move_in_progress = 0;
+    smp_wmb();
+    write_atomic(&desc->arch.used, IRQ_UNUSED);
 }
 
 void __init clear_irq_vector(int irq)
