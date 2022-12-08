@@ -58,9 +58,6 @@
 static unsigned int __initdata acpi_intr_overrides;
 static struct acpi_madt_interrupt_override __initdata *intsrcovr;
 
-static unsigned int __initdata acpi_nmi_sources;
-static struct acpi_madt_nmi_source __initdata *nmisrc;
-
 static unsigned int __initdata order_stats[MAX_ORDER + 1];
 
 static void __init print_order_stats(const struct domain *d)
@@ -761,25 +758,6 @@ static int __init acpi_set_intr_ovr(struct acpi_subtable_header *header,
     return 0;
 }
 
-static int __init acpi_count_nmi_src(struct acpi_subtable_header *header,
-                                     const unsigned long end)
-{
-    acpi_nmi_sources++;
-    return 0;
-}
-
-static int __init acpi_set_nmi_src(struct acpi_subtable_header *header,
-                                   const unsigned long end)
-{
-    const struct acpi_madt_nmi_source *src =
-        container_of(header, struct acpi_madt_nmi_source, header);
-
-    *nmisrc = *src;
-    nmisrc++;
-
-    return 0;
-}
-
 static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
 {
     struct acpi_table_madt *madt;
@@ -795,16 +773,11 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     acpi_table_parse_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
                           acpi_count_intr_ovr, UINT_MAX);
 
-    /* Count number of NMI sources in the MADT. */
-    acpi_table_parse_madt(ACPI_MADT_TYPE_NMI_SOURCE, acpi_count_nmi_src,
-                          UINT_MAX);
-
     max_vcpus = dom0_max_vcpus();
     /* Calculate the size of the crafted MADT. */
     size = sizeof(*madt);
     size += sizeof(*io_apic) * nr_ioapics;
     size += sizeof(*intsrcovr) * acpi_intr_overrides;
-    size += sizeof(*nmisrc) * acpi_nmi_sources;
     size += sizeof(*x2apic) * max_vcpus;
 
     madt = xzalloc_bytes(size);
@@ -860,12 +833,7 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     acpi_table_parse_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, acpi_set_intr_ovr,
                           acpi_intr_overrides);
 
-    /* Setup NMI sources. */
-    nmisrc = (void *)intsrcovr;
-    acpi_table_parse_madt(ACPI_MADT_TYPE_NMI_SOURCE, acpi_set_nmi_src,
-                          acpi_nmi_sources);
-
-    ASSERT(((void *)nmisrc - (void *)madt) == size);
+    ASSERT(((void *)intsrcovr - (void *)madt) == size);
     madt->header.length = size;
     /*
      * Calling acpi_tb_checksum here is a layering violation, but
