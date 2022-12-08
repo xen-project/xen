@@ -321,9 +321,10 @@ void hvm_assert_evtchn_irq(struct vcpu *v)
 
     if ( v->arch.hvm.evtchn_upcall_vector != 0 )
     {
-        uint8_t vector = v->arch.hvm.evtchn_upcall_vector;
+        struct vlapic *vlapic = vcpu_vlapic(v);
 
-        vlapic_set_irq(vcpu_vlapic(v), vector, 0);
+        if ( vlapic_enabled(vlapic) )
+           vlapic_set_irq(vlapic, v->arch.hvm.evtchn_upcall_vector, 0);
     }
     else if ( is_hvm_pv_evtchn_vcpu(v) )
         vcpu_kick(v);
