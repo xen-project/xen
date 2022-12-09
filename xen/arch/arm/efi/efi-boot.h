@@ -542,7 +542,9 @@ static void __init efi_arch_handle_module(const struct file *file,
 
     if ( file == &ramdisk )
     {
-        char ramdisk_compat[] = "multiboot,ramdisk\0multiboot,module";
+        static const char __initconst ramdisk_compat[] = "multiboot,ramdisk\0"
+                                                         "multiboot,module";
+
         node = fdt_add_subnode(fdt, chosen, "ramdisk");
         if ( node < 0 )
             blexit(L"Unable to add ramdisk FDT node.");
@@ -555,7 +557,9 @@ static void __init efi_arch_handle_module(const struct file *file,
     }
     else if ( file == &xsm )
     {
-        char xsm_compat[] = "xen,xsm-policy\0multiboot,module";
+        static const char __initconst xsm_compat[] = "xen,xsm-policy\0"
+                                                     "multiboot,module";
+
         node = fdt_add_subnode(fdt, chosen, "xsm");
         if ( node < 0 )
             blexit(L"Unable to add xsm FDT node.");
@@ -568,7 +572,9 @@ static void __init efi_arch_handle_module(const struct file *file,
     }
     else if ( file == &kernel )
     {
-        char kernel_compat[] = "multiboot,kernel\0multiboot,module";
+        static const char __initconst kernel_compat[] = "multiboot,kernel\0"
+                                                        "multiboot,module";
+
         node = fdt_add_subnode(fdt, chosen, "kernel");
         if ( node < 0 )
             blexit(L"Unable to add dom0 FDT node.");
