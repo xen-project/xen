@@ -31,6 +31,8 @@ static vmac_t frametable_mac; /* MAC for frame table during S3 */
 static uint64_t __initdata txt_heap_base, __initdata txt_heap_size;
 static uint64_t __initdata sinit_base, __initdata sinit_size;
 
+static bool __ro_after_init is_vtd;
+
 /*
  * TXT configuration registers (offsets from TXT_{PUB, PRIV}_CONFIG_REGS_BASE)
  */
@@ -201,7 +203,7 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
         }
         spin_unlock(&d->page_alloc_lock);
 
-        if ( !is_idle_domain(d) )
+        if ( is_iommu_enabled(d) && is_vtd )
         {
             const struct domain_iommu *dio = dom_iommu(d);
 
@@ -412,6 +414,8 @@ int __init cf_check tboot_parse_dmar_table(acpi_table_handler dmar_handler)
 
     if ( txt_heap_base == 0 )
         return 1;
+
+    is_vtd = true;
 
     /* walk heap to SinitMleData */
     pa = txt_heap_base;
