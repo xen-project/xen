@@ -179,6 +179,17 @@ static void update_iommu_mac(vmac_ctx_t *ctx, uint64_t pt_maddr, int level)
 #define is_page_in_use(page) \
     (page_state_is(page, inuse) || page_state_is(page, offlining))
 
+/* Wipe ctx to ensure key is not left in memory. */
+static void wipe_ctx(vmac_ctx_t *ctx)
+{
+    memset(ctx, 0, sizeof(*ctx));
+    /*
+     * Make sure the compiler won't optimize out the memset(), for the local
+     * variable (at the call sites) going out of scope right afterwards.
+     */
+    asm volatile ( "" :: "m" (*ctx) );
+}
+
 static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
                                        vmac_t *mac)
 {
@@ -216,8 +227,7 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
 
     *mac = vmac(NULL, 0, nonce, NULL, &ctx);
 
-    /* wipe ctx to ensure key is not left in memory */
-    memset(&ctx, 0, sizeof(ctx));
+    wipe_ctx(&ctx);
 }
 
 static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
@@ -247,8 +257,7 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
     }
     *mac = vmac(NULL, 0, nonce, NULL, &ctx);
 
-    /* wipe ctx to ensure key is not left in memory */
-    memset(&ctx, 0, sizeof(ctx));
+    wipe_ctx(&ctx);
 }
 
 static void tboot_gen_frametable_integrity(const uint8_t key[TB_KEY_SIZE],
@@ -276,8 +285,7 @@ static void tboot_gen_frametable_integrity(const uint8_t key[TB_KEY_SIZE],
 
     *mac = vmac(NULL, 0, nonce, NULL, &ctx);
 
-    /* wipe ctx to ensure key is not left in memory */
-    memset(&ctx, 0, sizeof(ctx));
+    wipe_ctx(&ctx);
 }
 
 void tboot_shutdown(uint32_t shutdown_type)
