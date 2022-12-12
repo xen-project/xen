@@ -46,6 +46,11 @@ bool arch_numa_disabled(void)
     return acpi_numa < 0;
 }
 
+bool __init arch_numa_unavailable(void)
+{
+    return acpi_numa <= 0;
+}
+
 /*
  * Setup early cpu_to_node.
  *
