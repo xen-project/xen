@@ -177,29 +177,6 @@ static void update_iommu_mac(vmac_ctx_t *ctx, uint64_t pt_maddr, int level)
 #define is_page_in_use(page) \
     (page_state_is(page, inuse) || page_state_is(page, offlining))
 
-static void update_pagetable_mac(vmac_ctx_t *ctx)
-{
-    unsigned long mfn;
-
-    for ( mfn = 0; mfn < max_page; mfn++ )
-    {
-        struct page_info *page = mfn_to_page(_mfn(mfn));
-
-        if ( !mfn_valid(_mfn(mfn)) )
-            continue;
-        if ( is_page_in_use(page) && !is_special_page(page) )
-        {
-            if ( page->count_info & PGC_page_table )
-            {
-                void *pg = map_domain_page(_mfn(mfn));
-
-                vmac_update(pg, PAGE_SIZE, ctx);
-                unmap_domain_page(pg);
-            }
-        }
-    }
-}
- 
 static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
                                        vmac_t *mac)
 {
@@ -233,8 +210,7 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
         }
     }
 
-    /* MAC all shadow page tables */
-    update_pagetable_mac(&ctx);
+    /* TODO: MAC all shadow / HAP page tables */
 
     *mac = vmac(NULL, 0, nonce, NULL, &ctx);
 
