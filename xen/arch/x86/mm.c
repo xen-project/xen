@@ -591,8 +591,7 @@ static inline void set_tlbflush_timestamp(struct page_info *page)
      *  2. Shadow mode reuses this field for shadowed page tables to store
      *     flags info -- we don't want to conflict with that.
      */
-    if ( !(page->count_info & PGC_page_table) ||
-         !shadow_mode_enabled(page_get_owner(page)) )
+    if ( !(page->count_info & PGC_shadowed_pt) )
         page_set_tlbflush_timestamp(page);
 }
 

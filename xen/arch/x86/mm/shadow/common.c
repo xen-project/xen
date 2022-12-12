@@ -185,7 +185,7 @@ static void sh_oos_audit(struct domain *d)
                 BUG();
             }
             pg = mfn_to_page(oos[idx]);
-            if ( !(pg->count_info & PGC_page_table) )
+            if ( !(pg->count_info & PGC_shadowed_pt) )
             {
                 printk("%s: idx %x gmfn %lx not a pt (count %lx)\n",
                        __func__, idx, mfn_x(oos[idx]), pg->count_info);
@@ -716,7 +716,7 @@ void shadow_promote(struct domain *d, mfn_t gmfn, unsigned int type)
            || d->is_shutting_down);
 
     /* Is the page already shadowed? */
-    if ( !test_and_set_bit(_PGC_page_table, &page->count_info) )
+    if ( !test_and_set_bit(_PGC_shadowed_pt, &page->count_info) )
     {
         page->shadow_flags = 0;
 #ifdef CONFIG_HVM
@@ -734,7 +734,7 @@ void shadow_demote(struct domain *d, mfn_t gmfn, u32 type)
 {
     struct page_info *page = mfn_to_page(gmfn);
 
-    ASSERT(test_bit(_PGC_page_table, &page->count_info));
+    ASSERT(test_bit(_PGC_shadowed_pt, &page->count_info));
     ASSERT(page->shadow_flags & (1u << type));
 
     page->shadow_flags &= ~(1u << type);
@@ -748,7 +748,7 @@ void shadow_demote(struct domain *d, mfn_t gmfn, u32 type)
             oos_hash_remove(d, gmfn);
         }
 #endif
-        clear_bit(_PGC_page_table, &page->count_info);
+        clear_bit(_PGC_shadowed_pt, &page->count_info);
     }
 
     TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_DEMOTE);
@@ -779,7 +779,7 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
     // Ditto for L2s before L3s, etc.
     //
 
-    if ( !(page->count_info & PGC_page_table) )
+    if ( !(page->count_info & PGC_shadowed_pt) )
         return 0;  /* Not shadowed at all */
 
     if ( page->shadow_flags & SHF_L1_32 )
@@ -2266,7 +2266,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     SHADOW_PRINTK("d%d gmfn=%"PRI_mfn"\n", d->domain_id, mfn_x(gmfn));
 
     /* Bail out now if the page is not shadowed */
-    if ( (pg->count_info & PGC_page_table) == 0 )
+    if ( !(pg->count_info & PGC_shadowed_pt) )
     {
         paging_unlock(d);
         return;
@@ -2283,7 +2283,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
      */
 #define DO_UNSHADOW(_type) do {                                         \
     t = (_type);                                                        \
-    if ( !(pg->count_info & PGC_page_table) ||                          \
+    if ( !(pg->count_info & PGC_shadowed_pt) ||                         \
          !(pg->shadow_flags & (1 << t)) )                               \
         break;                                                          \
     smfn = shadow_hash_lookup(d, mfn_x(gmfn), t);                       \
@@ -2299,7 +2299,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     else if ( sh_type_has_up_pointer(d, t) )                            \
         sh_remove_shadow_via_pointer(d, smfn);                          \
     if ( !fast &&                                                       \
-         (pg->count_info & PGC_page_table) &&                           \
+         (pg->count_info & PGC_shadowed_pt) &&                          \
          (pg->shadow_flags & (1 << t)) )                                \
     {                                                                   \
         HASH_CALLBACKS_CHECK(SHF_page_type_mask);                       \
@@ -2322,7 +2322,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 #undef DO_UNSHADOW
 
     /* If that didn't catch the shadows, something is wrong */
-    if ( !fast && all && (pg->count_info & PGC_page_table) )
+    if ( !fast && all && (pg->count_info & PGC_shadowed_pt) )
     {
         printk(XENLOG_G_ERR "can't find all shadows of mfn %"PRI_mfn
                " (shadow_flags=%04x)\n", mfn_x(gmfn), pg->shadow_flags);
@@ -2339,7 +2339,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 void shadow_prepare_page_type_change(struct domain *d,
                                      const struct page_info *page)
 {
-    if ( !(page->count_info & PGC_page_table) )
+    if ( !(page->count_info & PGC_shadowed_pt) )
         return;
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)

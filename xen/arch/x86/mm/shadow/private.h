@@ -320,7 +320,7 @@ static inline void sh_terminate_list(struct page_list_head *tmp_list)
 static inline int sh_page_has_multiple_shadows(struct page_info *pg)
 {
     u32 shadows;
-    if ( !(pg->count_info & PGC_page_table) )
+    if ( !(pg->count_info & PGC_shadowed_pt) )
         return 0;
     shadows = pg->shadow_flags & SHF_page_type_mask;
     /* More than one type bit set in shadow-flags? */
@@ -332,7 +332,7 @@ static inline int sh_page_has_multiple_shadows(struct page_info *pg)
  * domain is translated, &c */
 static inline int page_is_out_of_sync(struct page_info *p)
 {
-    return (p->count_info & PGC_page_table)
+    return (p->count_info & PGC_shadowed_pt)
         && (p->shadow_flags & SHF_out_of_sync);
 }
 
@@ -343,7 +343,7 @@ static inline int mfn_is_out_of_sync(mfn_t gmfn)
 
 static inline int page_oos_may_write(struct page_info *p)
 {
-    return (p->count_info & PGC_page_table)
+    return (p->count_info & PGC_shadowed_pt)
         && (p->shadow_flags & SHF_oos_may_write);
 }
 
@@ -545,7 +545,7 @@ sh_mfn_is_a_page_table(mfn_t gmfn)
 
     owner = page_get_owner(page);
     if ( owner && shadow_mode_refcounts(owner)
-         && (page->count_info & PGC_page_table) )
+         && (page->count_info & PGC_shadowed_pt) )
         return 1;
 
     type_info = page->u.inuse.type_info & PGT_type_mask;
