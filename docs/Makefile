@@ -178,6 +178,7 @@ $(foreach i,$(MAN_SECTIONS),$(eval $(call GENERATE_MANPAGE_RULES,$(i))))
 install-html: html txt figs
 	$(INSTALL_DIR) $(DESTDIR)$(docdir)
 	[ ! -d html ] || cp -R html $(DESTDIR)$(docdir)
+	rm -f $(DESTDIR)$(docdir)/html/hypercall/*/.deps
 
 .PHONY: install
 install: install-man-pages install-html
