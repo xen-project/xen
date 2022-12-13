@@ -36,7 +36,7 @@ void libxl__alloc_failed(libxl_ctx *ctx, const char *func,
     }
 
     fflush(stderr);
-    _exit(-1);
+    abort();
 #undef M_NSIZE
 #undef M_SIZE
 #undef M
