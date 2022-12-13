@@ -498,7 +498,7 @@ error:
 void __init paging_init(void)
 {
     unsigned long i, mpt_size, va;
-    unsigned int n, memflags;
+    unsigned int n, memflags = 0;
     l3_pgentry_t *l3_ro_mpt;
     l2_pgentry_t *pl2e = NULL, *l2_ro_mpt = NULL;
     struct page_info *l1_pg;
@@ -547,8 +547,6 @@ void __init paging_init(void)
     {
         BUILD_BUG_ON(RO_MPT_VIRT_START & ((1UL << L3_PAGETABLE_SHIFT) - 1));
         va = RO_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
-        memflags = MEMF_node(phys_to_nid(i <<
-            (L2_PAGETABLE_SHIFT - 3 + PAGE_SHIFT)));
 
         if ( cpu_has_page1gb &&
              !((unsigned long)pl2e & ~PAGE_MASK) &&
@@ -559,10 +557,15 @@ void __init paging_init(void)
             for ( holes = k = 0; k < 1 << PAGETABLE_ORDER; ++k)
             {
                 for ( n = 0; n < CNT; ++n)
-                    if ( mfn_valid(_mfn(MFN(i + k) + n * PDX_GROUP_COUNT)) )
+                {
+                    mfn = _mfn(MFN(i + k) + n * PDX_GROUP_COUNT);
+                    if ( mfn_valid(mfn) )
                         break;
+                }
                 if ( n == CNT )
                     ++holes;
+                else if ( k == holes )
+                    memflags = MEMF_node(phys_to_nid(mfn_to_maddr(mfn)));
             }
             if ( k == holes )
             {
@@ -593,8 +596,14 @@ void __init paging_init(void)
         }
 
         for ( n = 0; n < CNT; ++n)
-            if ( mfn_valid(_mfn(MFN(i) + n * PDX_GROUP_COUNT)) )
+        {
+            mfn = _mfn(MFN(i) + n * PDX_GROUP_COUNT);
+            if ( mfn_valid(mfn) )
+            {
+                memflags = MEMF_node(phys_to_nid(mfn_to_maddr(mfn)));
                 break;
+            }
+        }
         if ( n == CNT )
             l1_pg = NULL;
         else if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER,
@@ -663,15 +672,19 @@ void __init paging_init(void)
                  sizeof(*compat_machine_to_phys_mapping));
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++, pl2e++ )
     {
-        memflags = MEMF_node(phys_to_nid(i <<
-            (L2_PAGETABLE_SHIFT - 2 + PAGE_SHIFT)));
         for ( n = 0; n < CNT; ++n)
-            if ( mfn_valid(_mfn(MFN(i) + n * PDX_GROUP_COUNT)) )
+        {
+            mfn = _mfn(MFN(i) + n * PDX_GROUP_COUNT);
+            if ( mfn_valid(mfn) )
+            {
+                memflags = MEMF_node(phys_to_nid(mfn_to_maddr(mfn)));
                 break;
+            }
+        }
         if ( n == CNT )
             continue;
         if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER,
-                                               memflags)) == NULL )
+                                          memflags)) == NULL )
             goto nomem;
         map_pages_to_xen(
             RDWR_COMPAT_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
