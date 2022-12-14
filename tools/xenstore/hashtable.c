@@ -16,6 +16,7 @@ struct entry
 
 struct hashtable {
     unsigned int tablelength;
+    unsigned int flags;
     struct entry **table;
     unsigned int entrycount;
     unsigned int loadlimit;
@@ -25,12 +26,11 @@ struct hashtable {
 };
 
 /*
-Credit for primes table: Aaron Krowne
- http://br.endernet.org/~akrowne/
- http://planetmath.org/encyclopedia/GoodHashTablePrimes.html
-*/
+ * Credit for primes table: Aaron Krowne
+ * https://planetmath.org/goodhashtableprimes
+ */
 static const unsigned int primes[] = {
-53, 97, 193, 389,
+11, 23, 53, 97, 193, 389,
 769, 1543, 3079, 6151,
 12289, 24593, 49157, 98317,
 196613, 393241, 786433, 1572869,
@@ -52,7 +52,8 @@ indexFor(unsigned int tablelength, unsigned int hashvalue) {
 struct hashtable *
 create_hashtable(unsigned int minsize,
                  unsigned int (*hashf) (void*),
-                 int (*eqf) (void*,void*))
+                 int (*eqf) (void*,void*),
+                 unsigned int flags)
 {
     struct hashtable *h;
     unsigned int pindex, size = primes[0];
@@ -73,6 +74,7 @@ create_hashtable(unsigned int minsize,
         goto err1;
 
     h->tablelength  = size;
+    h->flags        = flags;
     h->primeindex   = pindex;
     h->entrycount   = 0;
     h->hashfn       = hashf;
@@ -235,7 +237,8 @@ hashtable_remove(struct hashtable *h, void *k)
             *pE = e->next;
             h->entrycount--;
             v = e->v;
-            free(e->k);
+            if (h->flags & HASHTABLE_FREE_KEY)
+                free(e->k);
             free(e);
             return v;
         }
@@ -246,29 +249,52 @@ hashtable_remove(struct hashtable *h, void *k)
 }
 
 /*****************************************************************************/
+int
+hashtable_iterate(struct hashtable *h,
+                  int (*func)(const void *k, void *v, void *arg), void *arg)
+{
+    int ret;
+    unsigned int i;
+    struct entry *e, *f;
+    struct entry **table = h->table;
+
+    for (i = 0; i < h->tablelength; i++)
+    {
+        e = table[i];
+        while (e)
+        {
+            f = e;
+            e = e->next;
+            ret = func(f->k, f->v, arg);
+            if (ret)
+                return ret;
+        }
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
 /* destroy */
 void
-hashtable_destroy(struct hashtable *h, int free_values)
+hashtable_destroy(struct hashtable *h)
 {
     unsigned int i;
     struct entry *e, *f;
     struct entry **table = h->table;
-    if (free_values)
+
+    for (i = 0; i < h->tablelength; i++)
     {
-        for (i = 0; i < h->tablelength; i++)
+        e = table[i];
+        while (NULL != e)
         {
-            e = table[i];
-            while (NULL != e)
-            { f = e; e = e->next; free(f->k); free(f->v); free(f); }
-        }
-    }
-    else
-    {
-        for (i = 0; i < h->tablelength; i++)
-        {
-            e = table[i];
-            while (NULL != e)
-            { f = e; e = e->next; free(f->k); free(f); }
+            f = e;
+            e = e->next;
+            if (h->flags & HASHTABLE_FREE_KEY)
+                free(f->k);
+            if (h->flags & HASHTABLE_FREE_VALUE)
+                free(f->v);
+            free(f);
         }
     }
     free(h->table);

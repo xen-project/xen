@@ -12,13 +12,21 @@ struct hashtable;
  * @param   minsize         minimum initial size of hashtable
  * @param   hashfunction    function for hashing keys
  * @param   key_eq_fn       function for determining key equality
+ * @param   flags           flags HASHTABLE_*
  * @return                  newly created hashtable or NULL on failure
  */
+
+/* Let hashtable_destroy() free the entries' values. */
+#define HASHTABLE_FREE_VALUE (1U << 0)
+/* Let hashtable_remove() and hashtable_destroy() free the entries' keys. */
+#define HASHTABLE_FREE_KEY   (1U << 1)
 
 struct hashtable *
 create_hashtable(unsigned int minsize,
                  unsigned int (*hashfunction) (void*),
-                 int (*key_eq_fn) (void*,void*));
+                 int (*key_eq_fn) (void*,void*),
+                 unsigned int flags
+);
 
 /*****************************************************************************
  * hashtable_insert
@@ -77,15 +85,36 @@ unsigned int
 hashtable_count(struct hashtable *h);
 
 /*****************************************************************************
+ * hashtable_iterate
+
+ * @name           hashtable_iterate
+ * @param   h      the hashtable
+ * @param   func   function to call for each entry
+ * @param   arg    user supplied parameter for func
+ * @return         0 if okay, non-zero return value of func (and iteration
+ *                 was aborted)
+ *
+ * Iterates over all entries in the hashtable and calls func with the
+ * key, value, and the user supplied parameter.
+ * func returning a non-zero value will abort the iteration. In case func is
+ * removing an entry other than itself from the hashtable, it must return a
+ * non-zero value in order to abort the iteration. Inserting entries is
+ * allowed, but it is undefined whether func will be called for those new
+ * entries during this iteration.
+ */
+int
+hashtable_iterate(struct hashtable *h,
+                  int (*func)(const void *k, void *v, void *arg), void *arg);
+
+/*****************************************************************************
  * hashtable_destroy
    
  * @name        hashtable_destroy
  * @param   h   the hashtable
- * @param       free_values     whether to call 'free' on the remaining values
  */
 
 void
-hashtable_destroy(struct hashtable *h, int free_values);
+hashtable_destroy(struct hashtable *h);
 
 #endif /* __HASHTABLE_CWC22_H__ */
 

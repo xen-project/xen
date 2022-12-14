@@ -2514,7 +2514,9 @@ void check_store(void)
 		.enoent = check_store_enoent,
 	};
 
-	reachable = create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+	/* Don't free values (they are all void *1) */
+	reachable = create_hashtable(16, hash_from_key_fn, keys_equal_fn,
+				     HASHTABLE_FREE_KEY);
 	if (!reachable) {
 		log("check_store: ENOMEM");
 		return;
@@ -2528,8 +2530,7 @@ void check_store(void)
 		clean_store(reachable);
 	log("Checking store complete.");
 
-	hashtable_destroy(reachable, 0 /* Don't free values (they are all
-					  (void *)1) */);
+	hashtable_destroy(reachable);
 }
 
 
