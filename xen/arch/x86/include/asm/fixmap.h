@@ -25,7 +25,7 @@
 #include <asm/msi.h>
 #include <acpi/apei.h>
 
-#define MAX_XHCI_PAGES 16
+#define MAX_XHCI_PAGES 256
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -45,8 +45,10 @@ enum fixed_addresses {
     FIX_COM_BEGIN,
     FIX_COM_END,
     FIX_EHCI_DBGP,
+#ifdef CONFIG_XHCI
     FIX_XHCI_BEGIN,
     FIX_XHCI_END = FIX_XHCI_BEGIN + MAX_XHCI_PAGES - 1,
+#endif
 #ifdef CONFIG_XEN_GUEST
     FIX_PV_CONSOLE,
     FIX_XEN_SHARED_INFO,
