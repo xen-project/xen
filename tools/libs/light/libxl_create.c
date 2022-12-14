@@ -1752,6 +1752,10 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         libxl__device_add(gc, domid, &libxl__pvcallsif_devtype,
                           &d_config->pvcallsifs[i]);
 
+    for (i = 0; i < d_config->num_virtios; i++)
+        libxl__device_add(gc, domid, &libxl__virtio_devtype,
+                          &d_config->virtios[i]);
+
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
     {

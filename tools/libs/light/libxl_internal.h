@@ -166,6 +166,11 @@
 /* Convert pfn to physical address space. */
 #define pfn_to_paddr(x) ((uint64_t)(x) << XC_PAGE_SHIFT)
 
+/* Virtio device types */
+#define VIRTIO_DEVICE_TYPE_GENERIC   "virtio,device"
+#define VIRTIO_DEVICE_TYPE_I2C       "virtio,device22"
+#define VIRTIO_DEVICE_TYPE_GPIO      "virtio,device29"
+
 /* logging */
 _hidden void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file /* may be 0 */, int line /* ignored if !file */,
@@ -4003,6 +4008,7 @@ static inline int *libxl__device_type_get_num(
 
 extern const libxl__device_type libxl__vfb_devtype;
 extern const libxl__device_type libxl__vkb_devtype;
+extern const libxl__device_type libxl__virtio_devtype;
 extern const libxl__device_type libxl__disk_devtype;
 extern const libxl__device_type libxl__nic_devtype;
 extern const libxl__device_type libxl__vtpm_devtype;
