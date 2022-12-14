@@ -2347,6 +2347,7 @@ static void tdb_logger(TDB_CONTEXT *tdb, int level, const char * fmt, ...)
 {
 	va_list ap;
 	char *s;
+	int saved_errno = errno;
 
 	va_start(ap, fmt);
 	s = talloc_vasprintf(NULL, fmt, ap);
@@ -2362,6 +2363,8 @@ static void tdb_logger(TDB_CONTEXT *tdb, int level, const char * fmt, ...)
 		trace("talloc failure during logging\n");
 		syslog(LOG_ERR, "talloc failure during logging\n");
 	}
+
+	errno = saved_errno;
 }
 
 void setup_structure(bool live_update)
