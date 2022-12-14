@@ -1585,6 +1585,39 @@ Set maximum height for pointer device.
 
 =back
 
+=item B<virtio=[ "VIRTIO_DEVICE_STRING", "VIRTIO_DEVICE_STRING", ...]>
+
+Specifies the Virtio devices to be provided to the guest.
+
+Each B<VIRTIO_DEVICE_STRING> is a comma-separated list of C<KEY=VALUE> settings
+from the following list. As a special case, a single comma is allowed in the
+VALUE of the "type" KEY, where the VALUE is set with "virtio,device<N>".
+
+=over 4
+
+=item B<backend=domain-id>
+
+Specifies the backend domain name or id, defaults to dom0.
+
+=item B<type=STRING>
+
+Specifies the compatible string for the specific Virtio device. The same will be
+written in the Device Tree compatible property of the Virtio device. For
+example, "type=virtio,device22" for the I2C device, whose device-tree binding is
+present here:
+
+L<https://www.kernel.org/doc/Documentation/devicetree/bindings/i2c/i2c-virtio.yaml>
+
+For generic virtio devices, where we don't need to set special or compatible
+properties in the Device Tree, the type field must be set to "virtio,device".
+
+=item B<transport=STRING>
+
+Specifies the transport mechanism for the Virtio device, only "mmio" is
+supported for now.
+
+=back
+
 =item B<tee="STRING">
 
 B<Arm only.> Set TEE type for the guest. TEE is a Trusted Execution
