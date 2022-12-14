@@ -2551,6 +2551,8 @@ void corrupt(struct connection *conn, const char *fmt, ...)
 	talloc_free(str);
 
 	check_store();
+
+	errno = saved_errno;
 }
 
 #ifndef NO_SOCKETS
