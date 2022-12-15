@@ -99,13 +99,13 @@ static unsigned long p2m_type_to_flags(const struct p2m_domain *p2m,
         return flags | P2M_BASE_FLAGS | _PAGE_RW | _PAGE_NX_BIT;
     case p2m_mmio_direct:
         if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
-            flags |= _PAGE_RW;
+            flags |= _PAGE_RW | _PAGE_UCM;
         else
         {
-            flags |= _PAGE_PWT;
+            flags |= _PAGE_UC;
             ASSERT(!level);
         }
-        return flags | P2M_BASE_FLAGS | _PAGE_PCD;
+        return flags | P2M_BASE_FLAGS;
     }
 }
 
