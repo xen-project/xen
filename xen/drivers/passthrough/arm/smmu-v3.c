@@ -1376,7 +1376,8 @@ static int arm_smmu_enable_pasid(struct arm_smmu_master *master)
 	return 0;
 }
 
-static void arm_smmu_disable_pasid(struct arm_smmu_master *master)
+static void __maybe_unused
+arm_smmu_disable_pasid(struct arm_smmu_master *master)
 {
 	struct pci_dev *pdev;
 
@@ -1405,7 +1406,8 @@ static inline int arm_smmu_enable_pasid(struct arm_smmu_master *master)
 	return 0;
 }
 
-static inline void arm_smmu_disable_pasid(struct arm_smmu_master *master) { }
+static inline void __maybe_unused
+arm_smmu_disable_pasid(struct arm_smmu_master *master) { }
 #endif /* CONFIG_PCI_ATS */
 
 static void arm_smmu_detach_dev(struct arm_smmu_master *master)
