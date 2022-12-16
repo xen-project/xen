@@ -182,7 +182,7 @@ let get_handle () = !handle
 
 let close_handle () =
 	match !handle with
-	| Some h -> handle := None
+	| Some _ -> handle := None
 	| None -> ()
 
 let with_intf f =
