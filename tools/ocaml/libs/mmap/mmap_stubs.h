@@ -30,4 +30,8 @@ struct mmap_interface
 	int len;
 };
 
+#ifndef Data_abstract_val
+#define Data_abstract_val(x) ((void *)Op_val(x))
+#endif
+
 #endif
