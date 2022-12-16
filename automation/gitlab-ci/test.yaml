@@ -165,6 +165,22 @@ qemu-smoke-dom0less-arm64-gcc-debug-boot-cpupools:
     - *arm64-test-needs
     - alpine-3.12-gcc-debug-arm64-boot-cpupools
 
+qemu-xtf-dom0less-arm64-gcc-hyp-xen-version:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-xtf-dom0less-arm64.sh hyp-xen-version 2>&1 | tee ${LOGFILE}
+  needs:
+    - alpine-3.12-gcc-arm64
+    - qemu-system-aarch64-6.0.0-arm64-export
+
+qemu-xtf-dom0less-arm64-gcc-debug-hyp-xen-version:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-xtf-dom0less-arm64.sh hyp-xen-version 2>&1 | tee ${LOGFILE}
+  needs:
+    - alpine-3.12-gcc-debug-arm64
+    - qemu-system-aarch64-6.0.0-arm64-export
+
 qemu-smoke-dom0-arm32-gcc:
   extends: .qemu-arm32
   script:
