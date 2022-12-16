@@ -255,6 +255,12 @@ VkbBackendQemu VkbBackend = 1
 VkbBackendLinux VkbBackend = 2
 )
 
+type VirtioTransport int
+const(
+VirtioTransportUnknown VirtioTransport = 0
+VirtioTransportMmio VirtioTransport = 1
+)
+
 type Passthrough int
 const(
 PassthroughDefault Passthrough = 0
@@ -644,6 +650,16 @@ MultiTouchHeight uint32
 MultiTouchNumContacts uint32
 }
 
+type DeviceVirtio struct {
+BackendDomid Domid
+BackendDomname string
+Type string
+Transport VirtioTransport
+Devid Devid
+Irq uint32
+Base uint64
+}
+
 type DeviceDisk struct {
 BackendDomid Domid
 BackendDomname string
@@ -933,6 +949,7 @@ Rdms []DeviceRdm
 Dtdevs []DeviceDtdev
 Vfbs []DeviceVfb
 Vkbs []DeviceVkb
+Virtios []DeviceVirtio
 Vtpms []DeviceVtpm
 P9S []DeviceP9
 Pvcallsifs []DevicePvcallsif

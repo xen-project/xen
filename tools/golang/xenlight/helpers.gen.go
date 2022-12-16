@@ -1722,6 +1722,49 @@ xc.multi_touch_num_contacts = C.uint32_t(x.MultiTouchNumContacts)
  return nil
  }
 
+// NewDeviceVirtio returns an instance of DeviceVirtio initialized with defaults.
+func NewDeviceVirtio() (*DeviceVirtio, error) {
+var (
+x DeviceVirtio
+xc C.libxl_device_virtio)
+
+C.libxl_device_virtio_init(&xc)
+defer C.libxl_device_virtio_dispose(&xc)
+
+if err := x.fromC(&xc); err != nil {
+return nil, err }
+
+return &x, nil}
+
+func (x *DeviceVirtio) fromC(xc *C.libxl_device_virtio) error {
+ x.BackendDomid = Domid(xc.backend_domid)
+x.BackendDomname = C.GoString(xc.backend_domname)
+x.Type = C.GoString(xc._type)
+x.Transport = VirtioTransport(xc.transport)
+x.Devid = Devid(xc.devid)
+x.Irq = uint32(xc.irq)
+x.Base = uint64(xc.base)
+
+ return nil}
+
+func (x *DeviceVirtio) toC(xc *C.libxl_device_virtio) (err error){defer func(){
+if err != nil{
+C.libxl_device_virtio_dispose(xc)}
+}()
+
+xc.backend_domid = C.libxl_domid(x.BackendDomid)
+if x.BackendDomname != "" {
+xc.backend_domname = C.CString(x.BackendDomname)}
+if x.Type != "" {
+xc._type = C.CString(x.Type)}
+xc.transport = C.libxl_virtio_transport(x.Transport)
+xc.devid = C.libxl_devid(x.Devid)
+xc.irq = C.uint32_t(x.Irq)
+xc.base = C.uint64_t(x.Base)
+
+ return nil
+ }
+
 // NewDeviceDisk returns an instance of DeviceDisk initialized with defaults.
 func NewDeviceDisk() (*DeviceDisk, error) {
 var (
@@ -2855,6 +2898,15 @@ if err := x.Vkbs[i].fromC(&v); err != nil {
 return fmt.Errorf("converting field Vkbs: %v", err) }
 }
 }
+x.Virtios = nil
+if n := int(xc.num_virtios); n > 0 {
+cVirtios := (*[1<<28]C.libxl_device_virtio)(unsafe.Pointer(xc.virtios))[:n:n]
+x.Virtios = make([]DeviceVirtio, n)
+for i, v := range cVirtios {
+if err := x.Virtios[i].fromC(&v); err != nil {
+return fmt.Errorf("converting field Virtios: %v", err) }
+}
+}
 x.Vtpms = nil
 if n := int(xc.num_vtpms); n > 0 {
 cVtpms := (*[1<<28]C.libxl_device_vtpm)(unsafe.Pointer(xc.vtpms))[:n:n]
@@ -3013,6 +3065,16 @@ cVkbs := (*[1<<28]C.libxl_device_vkb)(unsafe.Pointer(xc.vkbs))[:numVkbs:numVkbs]
 for i,v := range x.Vkbs {
 if err := v.toC(&cVkbs[i]); err != nil {
 return fmt.Errorf("converting field Vkbs: %v", err)
+}
+}
+}
+if numVirtios := len(x.Virtios); numVirtios > 0 {
+xc.virtios = (*C.libxl_device_virtio)(C.malloc(C.ulong(numVirtios)*C.sizeof_libxl_device_virtio))
+xc.num_virtios = C.int(numVirtios)
+cVirtios := (*[1<<28]C.libxl_device_virtio)(unsafe.Pointer(xc.virtios))[:numVirtios:numVirtios]
+for i,v := range x.Virtios {
+if err := v.toC(&cVirtios[i]); err != nil {
+return fmt.Errorf("converting field Virtios: %v", err)
 }
 }
 }
