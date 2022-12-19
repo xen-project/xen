@@ -244,7 +244,7 @@ static struct microcode_patch *parse_blob(const char *buf, size_t len)
 {
     alternative_vcall(ucode_ops.collect_cpu_info);
 
-    return alternative_call(ucode_ops.cpu_request_microcode, buf, len);
+    return alternative_call(ucode_ops.cpu_request_microcode, buf, len, true);
 }
 
 static void microcode_free_patch(struct microcode_patch *patch)

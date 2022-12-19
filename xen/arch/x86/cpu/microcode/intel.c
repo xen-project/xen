@@ -324,7 +324,7 @@ static int cf_check apply_microcode(const struct microcode_patch *patch)
 }
 
 static struct microcode_patch *cf_check cpu_request_microcode(
-    const void *buf, size_t size)
+    const void *buf, size_t size, bool make_copy)
 {
     int error = 0;
     const struct microcode_patch *saved = NULL;
@@ -364,10 +364,15 @@ static struct microcode_patch *cf_check cpu_request_microcode(
 
     if ( saved )
     {
-        patch = xmemdup_bytes(saved, get_totalsize(saved));
+        if ( make_copy )
+        {
+            patch = xmemdup_bytes(saved, get_totalsize(saved));
 
-        if ( !patch )
-            error = -ENOMEM;
+            if ( !patch )
+                error = -ENOMEM;
+        }
+        else
+            patch = (struct microcode_patch *)saved;
     }
 
     if ( error && !patch )

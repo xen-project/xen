@@ -300,7 +300,7 @@ static int scan_equiv_cpu_table(const struct container_equiv_table *et)
 }
 
 static struct microcode_patch *cf_check cpu_request_microcode(
-    const void *buf, size_t size)
+    const void *buf, size_t size, bool make_copy)
 {
     const struct microcode_patch *saved = NULL;
     struct microcode_patch *patch = NULL;
@@ -411,9 +411,14 @@ static struct microcode_patch *cf_check cpu_request_microcode(
 
     if ( saved )
     {
-        patch = xmemdup_bytes(saved, saved_size);
-        if ( !patch )
-            error = -ENOMEM;
+        if ( make_copy )
+        {
+            patch = xmemdup_bytes(saved, saved_size);
+            if ( !patch )
+                error = -ENOMEM;
+        }
+        else
+            patch = (struct microcode_patch *)saved;
     }
 
     if ( error && !patch )
