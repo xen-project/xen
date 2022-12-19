@@ -225,6 +225,9 @@ static inline void pi_clear_sn(struct pi_desc *pi_desc)
 
 /*
  * Interruption-information format
+ *
+ * Note INTR_INFO_NMI_UNBLOCKED_BY_IRET is also used with Exit Qualification
+ * field for EPT violations, PML full and SPP-related event vmexits.
  */
 #define INTR_INFO_VECTOR_MASK           0xff            /* 7:0 */
 #define INTR_INFO_INTR_TYPE_MASK        0x700           /* 10:8 */
