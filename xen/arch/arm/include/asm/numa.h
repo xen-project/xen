@@ -11,11 +11,6 @@ typedef u8 nodeid_t;
 #define cpu_to_node(cpu) 0
 #define node_to_cpumask(node)   (cpu_online_map)
 
-static inline __attribute__((pure)) nodeid_t phys_to_nid(paddr_t addr)
-{
-    return 0;
-}
-
 /*
  * TODO: make first_valid_mfn static when NUMA is supported on Arm, this
  * is required because the dummy helpers are using it.

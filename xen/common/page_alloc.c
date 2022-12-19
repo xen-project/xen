@@ -971,7 +971,7 @@ static struct page_info *alloc_heap_pages(
         return NULL;
     }
 
-    node = phys_to_nid(page_to_maddr(pg));
+    node = page_to_nid(pg);
     zone = page_to_zone(pg);
     buddy_order = PFN_ORDER(pg);
 
@@ -1078,7 +1078,7 @@ static struct page_info *alloc_heap_pages(
 /* Remove any offlined page in the buddy pointed to by head. */
 static int reserve_offlined_page(struct page_info *head)
 {
-    unsigned int node = phys_to_nid(page_to_maddr(head));
+    unsigned int node = page_to_nid(head);
     int zone = page_to_zone(head), i, head_order = PFN_ORDER(head), count = 0;
     struct page_info *cur_head;
     unsigned int cur_order, first_dirty;
@@ -1443,7 +1443,7 @@ static void free_heap_pages(
 {
     unsigned long mask;
     mfn_t mfn = page_to_mfn(pg);
-    unsigned int i, node = phys_to_nid(mfn_to_maddr(mfn));
+    unsigned int i, node = mfn_to_nid(mfn);
     unsigned int zone = page_to_zone(pg);
     bool pg_offlined = false;
 
@@ -1487,7 +1487,7 @@ static void free_heap_pages(
                  !page_state_is(predecessor, free) ||
                  (predecessor->count_info & PGC_static) ||
                  (PFN_ORDER(predecessor) != order) ||
-                 (phys_to_nid(page_to_maddr(predecessor)) != node) )
+                 (page_to_nid(predecessor) != node) )
                 break;
 
             check_and_stop_scrub(predecessor);
@@ -1511,7 +1511,7 @@ static void free_heap_pages(
                  !page_state_is(successor, free) ||
                  (successor->count_info & PGC_static) ||
                  (PFN_ORDER(successor) != order) ||
-                 (phys_to_nid(page_to_maddr(successor)) != node) )
+                 (page_to_nid(successor) != node) )
                 break;
 
             check_and_stop_scrub(successor);
@@ -1574,7 +1574,7 @@ static unsigned long mark_page_offline(struct page_info *pg, int broken)
 static int reserve_heap_page(struct page_info *pg)
 {
     struct page_info *head = NULL;
-    unsigned int i, node = phys_to_nid(page_to_maddr(pg));
+    unsigned int i, node = page_to_nid(pg);
     unsigned int zone = page_to_zone(pg);
 
     for ( i = 0; i <= MAX_ORDER; i++ )
@@ -1794,7 +1794,7 @@ static void _init_heap_pages(const struct page_info *pg,
                              bool need_scrub)
 {
     unsigned long s, e;
-    unsigned int nid = phys_to_nid(page_to_maddr(pg));
+    unsigned int nid = page_to_nid(pg);
 
     s = mfn_x(page_to_mfn(pg));
     e = mfn_x(mfn_add(page_to_mfn(pg + nr_pages - 1), 1));
@@ -1869,7 +1869,7 @@ static void init_heap_pages(
 #ifdef CONFIG_SEPARATE_XENHEAP
         unsigned int zone = page_to_zone(pg);
 #endif
-        unsigned int nid = phys_to_nid(page_to_maddr(pg));
+        unsigned int nid = page_to_nid(pg);
         unsigned long left = nr_pages - i;
         unsigned long contig_pages;
 
@@ -1893,7 +1893,7 @@ static void init_heap_pages(
                 break;
 #endif
 
-            if ( nid != (phys_to_nid(page_to_maddr(pg + contig_pages))) )
+            if ( nid != (page_to_nid(pg + contig_pages)) )
                 break;
         }
 
@@ -1934,7 +1934,7 @@ void __init end_boot_allocator(void)
     {
         struct bootmem_region *r = &bootmem_region_list[i];
         if ( (r->s < r->e) &&
-             (phys_to_nid(pfn_to_paddr(r->s)) == cpu_to_node(0)) )
+             (mfn_to_nid(_mfn(r->s)) == cpu_to_node(0)) )
         {
             init_heap_pages(mfn_to_page(_mfn(r->s)), r->e - r->s);
             r->e = r->s;

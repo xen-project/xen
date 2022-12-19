@@ -1,6 +1,7 @@
 #ifndef _XEN_NUMA_H
 #define _XEN_NUMA_H
 
+#include <xen/mm-frame.h>
 #include <asm/numa.h>
 
 #define NUMA_NO_NODE     0xFF
@@ -68,12 +69,15 @@ struct node_data {
 
 extern struct node_data node_data[];
 
-static inline nodeid_t __attribute_pure__ phys_to_nid(paddr_t addr)
+static inline nodeid_t mfn_to_nid(mfn_t mfn)
 {
     nodeid_t nid;
-    ASSERT((paddr_to_pdx(addr) >> memnode_shift) < memnodemapsize);
-    nid = memnodemap[paddr_to_pdx(addr) >> memnode_shift];
+    unsigned long pdx = mfn_to_pdx(mfn);
+
+    ASSERT((pdx >> memnode_shift) < memnodemapsize);
+    nid = memnodemap[pdx >> memnode_shift];
     ASSERT(nid < MAX_NUMNODES && node_data[nid].node_spanned_pages);
+
     return nid;
 }
 
@@ -102,6 +106,15 @@ extern bool numa_update_node_memblks(nodeid_t node, unsigned int arch_nid,
                                      paddr_t start, paddr_t size, bool hotplug);
 extern void numa_set_processor_nodes_parsed(nodeid_t node);
 
+#else
+
+static inline nodeid_t mfn_to_nid(mfn_t mfn)
+{
+    return 0;
+}
+
 #endif
+
+#define page_to_nid(pg) mfn_to_nid(page_to_mfn(pg))
 
 #endif /* _XEN_NUMA_H */

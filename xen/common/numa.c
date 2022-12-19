@@ -671,15 +671,15 @@ static void cf_check dump_numa(unsigned char key)
 
     for_each_online_node ( i )
     {
-        paddr_t pa = pfn_to_paddr(node_start_pfn(i) + 1);
+        mfn_t mfn = _mfn(node_start_pfn(i) + 1);
 
         printk("NODE%u start->%lu size->%lu free->%lu\n",
                i, node_start_pfn(i), node_spanned_pages(i),
                avail_node_heap_pages(i));
-        /* Sanity check phys_to_nid() */
-        if ( phys_to_nid(pa) != i )
-            printk("phys_to_nid(%"PRIpaddr") -> %d should be %u\n",
-                   pa, phys_to_nid(pa), i);
+        /* Sanity check mfn_to_nid() */
+        if ( node_spanned_pages(i) > 1 && mfn_to_nid(mfn) != i )
+            printk("mfn_to_nid(%"PRI_mfn") -> %d should be %u\n",
+                   mfn_x(mfn), mfn_to_nid(mfn), i);
     }
 
     j = cpumask_first(&cpu_online_map);
@@ -721,7 +721,7 @@ static void cf_check dump_numa(unsigned char key)
         spin_lock(&d->page_alloc_lock);
         page_list_for_each ( page, &d->page_list )
         {
-            i = phys_to_nid(page_to_maddr(page));
+            i = page_to_nid(page);
             page_num_node[i]++;
         }
         spin_unlock(&d->page_alloc_lock);

@@ -492,7 +492,7 @@ p2m_pod_offline_or_broken_replace(struct page_info *p)
 {
     struct domain *d;
     struct p2m_domain *p2m;
-    nodeid_t node = phys_to_nid(page_to_maddr(p));
+    nodeid_t node = page_to_nid(p);
 
     if ( !(d = page_get_owner(p)) || !(p2m = p2m_get_hostp2m(d)) )
         return;

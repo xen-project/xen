@@ -565,7 +565,7 @@ void __init paging_init(void)
                 if ( n == CNT )
                     ++holes;
                 else if ( k == holes )
-                    memflags = MEMF_node(phys_to_nid(mfn_to_maddr(mfn)));
+                    memflags = MEMF_node(mfn_to_nid(mfn));
             }
             if ( k == holes )
             {
@@ -600,7 +600,7 @@ void __init paging_init(void)
             mfn = _mfn(MFN(i) + n * PDX_GROUP_COUNT);
             if ( mfn_valid(mfn) )
             {
-                memflags = MEMF_node(phys_to_nid(mfn_to_maddr(mfn)));
+                memflags = MEMF_node(mfn_to_nid(mfn));
                 break;
             }
         }
@@ -677,7 +677,7 @@ void __init paging_init(void)
             mfn = _mfn(MFN(i) + n * PDX_GROUP_COUNT);
             if ( mfn_valid(mfn) )
             {
-                memflags = MEMF_node(phys_to_nid(mfn_to_maddr(mfn)));
+                memflags = MEMF_node(mfn_to_nid(mfn));
                 break;
             }
         }
