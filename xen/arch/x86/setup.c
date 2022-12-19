@@ -1173,6 +1173,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         mod[i].reserved = 0;
     }
 
+    /*
+     * TODO: load ucode earlier once multiboot modules become accessible
+     * at an earlier stage.
+     */
+    early_microcode_init(module_map, mbi);
+
     if ( xen_phys_start )
     {
         relocated = true;
@@ -1755,11 +1761,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     init_IRQ();
 
-    microcode_grab_module(module_map, mbi);
-
     timer_init();
 
-    early_microcode_init();
+    microcode_init_cache(module_map, mbi); /* Needs xmalloc() */
 
     tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
 

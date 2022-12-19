@@ -27,6 +27,7 @@
 #include <xen/err.h>
 #include <xen/guest_access.h>
 #include <xen/init.h>
+#include <xen/multiboot.h>
 #include <xen/param.h>
 #include <xen/spinlock.h>
 #include <xen/stop_machine.h>
@@ -198,7 +199,8 @@ void __init microcode_scan_module(
         bootstrap_map(NULL);
     }
 }
-void __init microcode_grab_module(
+
+static void __init microcode_grab_module(
     unsigned long *module_map,
     const multiboot_info_t *mbi)
 {
@@ -732,24 +734,10 @@ int microcode_update_one(void)
     return microcode_update_cpu(NULL);
 }
 
-/* BSP calls this function to parse ucode blob and then apply an update. */
-static int __init early_microcode_update_cpu(void)
+static int __init early_update_cache(const void *data, size_t len)
 {
     int rc = 0;
-    const void *data = NULL;
-    size_t len;
     struct microcode_patch *patch;
-
-    if ( ucode_blob.size )
-    {
-        len = ucode_blob.size;
-        data = ucode_blob.data;
-    }
-    else if ( ucode_mod.mod_end )
-    {
-        len = ucode_mod.mod_end;
-        data = bootstrap_map(&ucode_mod);
-    }
 
     if ( !data )
         return -ENOMEM;
@@ -770,10 +758,64 @@ static int __init early_microcode_update_cpu(void)
     spin_unlock(&microcode_mutex);
     ASSERT(rc);
 
-    return microcode_update_one();
+    return rc;
 }
 
-int __init early_microcode_init(void)
+int __init microcode_init_cache(unsigned long *module_map,
+                                const struct multiboot_info *mbi)
+{
+    int rc = 0;
+
+    if ( ucode_scan )
+        /* Need to rescan the modules because they might have been relocated */
+        microcode_scan_module(module_map, mbi);
+
+    if ( ucode_mod.mod_end )
+        rc = early_update_cache(bootstrap_map(&ucode_mod),
+                                ucode_mod.mod_end);
+    else if ( ucode_blob.size )
+        rc = early_update_cache(ucode_blob.data, ucode_blob.size);
+
+    return rc;
+}
+
+/* BSP calls this function to parse ucode blob and then apply an update. */
+static int __init early_microcode_update_cpu(void)
+{
+    const void *data = NULL;
+    size_t len;
+    struct microcode_patch *patch;
+
+    if ( ucode_blob.size )
+    {
+        len = ucode_blob.size;
+        data = ucode_blob.data;
+    }
+    else if ( ucode_mod.mod_end )
+    {
+        len = ucode_mod.mod_end;
+        data = bootstrap_map(&ucode_mod);
+    }
+
+    if ( !data )
+        return -ENOMEM;
+
+    patch = ucode_ops.cpu_request_microcode(data, len, false);
+    if ( IS_ERR(patch) )
+    {
+        printk(XENLOG_WARNING "Parsing microcode blob error %ld\n",
+               PTR_ERR(patch));
+        return PTR_ERR(patch);
+    }
+
+    if ( !patch )
+        return -ENOENT;
+
+    return microcode_update_cpu(patch);
+}
+
+int __init early_microcode_init(unsigned long *module_map,
+                                const struct multiboot_info *mbi)
 {
     const struct cpuinfo_x86 *c = &boot_cpu_data;
     int rc = 0;
@@ -797,7 +839,9 @@ int __init early_microcode_init(void)
         return -ENODEV;
     }
 
-    alternative_vcall(ucode_ops.collect_cpu_info);
+    microcode_grab_module(module_map, mbi);
+
+    ucode_ops.collect_cpu_info();
 
     if ( ucode_mod.mod_end || ucode_blob.size )
         rc = early_microcode_update_cpu();

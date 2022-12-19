@@ -6,6 +6,8 @@
 
 #include <public/xen.h>
 
+struct multiboot_info;
+
 struct cpu_signature {
     /* CPU signature (CPUID.1.EAX). */
     unsigned int sig;
@@ -21,7 +23,10 @@ DECLARE_PER_CPU(struct cpu_signature, cpu_sig);
 
 void microcode_set_module(unsigned int idx);
 int microcode_update(XEN_GUEST_HANDLE(const_void), unsigned long len);
-int early_microcode_init(void);
+int early_microcode_init(unsigned long *module_map,
+                         const struct multiboot_info *mbi);
+int microcode_init_cache(unsigned long *module_map,
+                         const struct multiboot_info *mbi);
 int microcode_update_one(void);
 
 #endif /* ASM_X86__MICROCODE_H */
