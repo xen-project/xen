@@ -221,6 +221,7 @@ static inline void pi_clear_sn(struct pi_desc *pi_desc)
 #define EXIT_REASON_XSAVES              63
 #define EXIT_REASON_XRSTORS             64
 #define EXIT_REASON_BUS_LOCK            74
+#define EXIT_REASON_NOTIFY              75
 /* Remember to also update VMX_PERF_EXIT_REASON_SIZE! */
 
 /*
@@ -235,6 +236,11 @@ static inline void pi_clear_sn(struct pi_desc *pi_desc)
 #define INTR_INFO_NMI_UNBLOCKED_BY_IRET 0x1000          /* 12 */
 #define INTR_INFO_VALID_MASK            0x80000000      /* 31 */
 #define INTR_INFO_RESVD_BITS_MASK       0x7ffff000
+
+/*
+ * Exit Qualifications for NOTIFY VM EXIT
+ */
+#define NOTIFY_VM_CONTEXT_INVALID       1u
 
 /*
  * Exit Qualifications for MOV for Control Register Access

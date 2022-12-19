@@ -2487,6 +2487,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_EPT_MISCONFIG:
     case EXIT_REASON_EXTERNAL_INTERRUPT:
     case EXIT_REASON_BUS_LOCK:
+    case EXIT_REASON_NOTIFY:
         /* pass to L0 handler */
         break;
     case VMX_EXIT_REASONS_FAILED_VMENTRY:

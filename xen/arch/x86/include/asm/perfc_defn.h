@@ -6,7 +6,7 @@ PERFCOUNTER_ARRAY(exceptions,           "exceptions", 32)
 
 #ifdef CONFIG_HVM
 
-#define VMX_PERF_EXIT_REASON_SIZE 75
+#define VMX_PERF_EXIT_REASON_SIZE 76
 #define VMEXIT_NPF_PERFC 143
 #define SVM_PERF_EXIT_REASON_SIZE (VMEXIT_NPF_PERFC + 1)
 PERFCOUNTER_ARRAY(vmexits,              "vmexits",
@@ -129,5 +129,6 @@ PERFCOUNTER(iommu_pt_shatters,    "IOMMU page table shatters")
 PERFCOUNTER(iommu_pt_coalesces,   "IOMMU page table coalesces")
 
 PERFCOUNTER(buslock, "Bus Locks Detected")
+PERFCOUNTER(vmnotify_crash, "domain crashes by Notify VM Exit")
 
 /*#endif*/ /* __XEN_PERFC_DEFN_H__ */
