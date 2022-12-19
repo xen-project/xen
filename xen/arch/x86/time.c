@@ -2585,7 +2585,7 @@ int tsc_set_info(struct domain *d,
     case TSC_MODE_ALWAYS_EMULATE:
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
         d->arch.tsc_khz = gtsc_khz ?: cpu_khz;
-        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000);
+        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000UL);
 
         /*
          * In default mode use native TSC if the host has safe TSC and
