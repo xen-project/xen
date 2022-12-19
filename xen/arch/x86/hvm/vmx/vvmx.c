@@ -2405,7 +2405,7 @@ void nvmx_idtv_handling(void)
      * be reinjected, otherwise, pass to L1.
      */
     __vmread(VM_EXIT_REASON, &reason);
-    if ( reason != EXIT_REASON_EPT_VIOLATION ?
+    if ( (uint16_t)reason != EXIT_REASON_EPT_VIOLATION ?
          !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK) :
          !nvcpu->nv_vmexit_pending )
     {
@@ -2486,6 +2486,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_EPT_VIOLATION:
     case EXIT_REASON_EPT_MISCONFIG:
     case EXIT_REASON_EXTERNAL_INTERRUPT:
+    case EXIT_REASON_BUS_LOCK:
         /* pass to L0 handler */
         break;
     case VMX_EXIT_REASONS_FAILED_VMENTRY:
