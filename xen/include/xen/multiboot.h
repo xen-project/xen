@@ -46,23 +46,25 @@
 #ifndef __ASSEMBLY__
 
 /* The symbol table for a.out.  */
-typedef struct {
+struct aout_symbol_table {
     u32 tabsize;
     u32 strsize;
     u32 addr;
     u32 reserved;
-} aout_symbol_table_t;
+};
+typedef struct aout_symbol_table aout_symbol_table_t;
 
 /* The section header table for ELF.  */
-typedef struct {
+struct elf_section_header_table {
     u32 num;
     u32 size;
     u32 addr;
     u32 shndx;
-} elf_section_header_table_t;
+};
+typedef struct elf_section_header_table elf_section_header_table_t;
 
 /* The Multiboot information.  */
-typedef struct {
+struct multiboot_info {
     u32 flags;
 
     /* Valid if flags sets MBI_MEMLIMITS */
@@ -101,26 +103,29 @@ typedef struct {
 
     /* Valid if flags sets MBI_APM */
     u32 apm_table;
-} multiboot_info_t;
+};
+typedef struct multiboot_info multiboot_info_t;
 
 /* The module structure.  */
-typedef struct {
+struct module {
     u32 mod_start;
     u32 mod_end;
     u32 string;
     u32 reserved;
-} module_t;
+};
+typedef struct module module_t;
 
 /* The memory map. Be careful that the offset 0 is base_addr_low
    but no size.  */
-typedef struct {
+struct memory_map {
     u32 size;
     u32 base_addr_low;
     u32 base_addr_high;
     u32 length_low;
     u32 length_high;
     u32 type;
-} memory_map_t;
+};
+typedef struct memory_map memory_map_t;
 
 
 #endif /* __ASSEMBLY__ */
