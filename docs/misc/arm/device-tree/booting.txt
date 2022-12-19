@@ -223,6 +223,27 @@ with the following properties:
     the default size of domain P2M pool, i.e. 1MB per guest vCPU plus 4KB
     per MB of guest RAM plus 512KB for guest extended regions.
 
+- max_grant_version
+
+    Optional. A 32-bit integer specifying the maximum grant table version
+    the domain is allowed to use (valid values are 1 or 2). If this property
+    is missing, the value specified by Xen command line parameter gnttab=max-ver
+    (or its default value if unspecified, i.e. 1) is used.
+
+- max_grant_frames
+
+    Optional. A 32-bit integer specifying the maximum number of grant frames
+    the domain is allowed to have. If this property is missing, the value
+    specified by Xen command line parameter gnttab_max_frames (or its default
+    value if unspecified, i.e. 64) is used.
+
+- max_maptrack_frames
+
+    Optional. A 32-bit integer specifying the maximum number of grant maptrack
+    frames the domain is allowed to have. If this property is missing, the
+    value specified by Xen command line parameter gnttab_max_maptrack_frames
+    (or its default value if unspecified, i.e. 1024) is used.
+
 Under the "xen,domain" compatible node, one or more sub-nodes are present
 for the DomU kernel and ramdisk.
 
