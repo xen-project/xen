@@ -6283,6 +6283,17 @@ unsigned long get_upper_mfn_bound(void)
     return min(max_mfn, 1UL << (paddr_bits - PAGE_SHIFT)) - 1;
 }
 
+static void __init __maybe_unused build_assertions(void)
+{
+    /*
+     * If this trips, any guests that blindly rely on the public API in xen.h
+     * (instead of reading the PAT from Xen, as Linux 3.19+ does) will be
+     * broken.  Furthermore, live migration of PV guests between Xen versions
+     * using different PATs will not work.
+     */
+    BUILD_BUG_ON(XEN_MSR_PAT != 0x050100070406ULL);
+}
+
 /*
  * Local variables:
  * mode: C
