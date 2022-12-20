@@ -209,11 +209,11 @@ void __init xen_build_init(void)
             }
         }
     }
-#endif
+#endif /* CONFIG_X86 */
     if ( !rc )
         printk(XENLOG_INFO "build-id: %*phN\n", build_id_len, build_id_p);
 }
-#endif
+#endif /* BUILD_ID */
 /*
  * Local variables:
  * mode: C
