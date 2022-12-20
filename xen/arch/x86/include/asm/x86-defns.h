@@ -153,4 +153,15 @@
      (1u << X86_EXC_AC) | (1u << X86_EXC_CP) |                      \
      (1u << X86_EXC_VC) | (1u << X86_EXC_SX))
 
+/* Memory types */
+#define X86_MT_UC     0x00 /* uncachable */
+#define X86_MT_WC     0x01 /* write-combined */
+#define X86_MT_RSVD_2 0x02 /* reserved */
+#define X86_MT_RSVD_3 0x03 /* reserved */
+#define X86_MT_WT     0x04 /* write-through */
+#define X86_MT_WP     0x05 /* write-protect */
+#define X86_MT_WB     0x06 /* write-back */
+#define X86_MT_UCM    0x07 /* UC- */
+#define X86_NUM_MT    0x08
+
 #endif	/* __XEN_X86_DEFNS_H__ */
