@@ -87,10 +87,12 @@ int vmsi_deliver(
 
     case dest_Fixed:
         for_each_vcpu ( d, v )
-            if ( vlapic_match_dest(vcpu_vlapic(v), NULL,
-                                   0, dest, dest_mode) )
-                vmsi_inj_irq(vcpu_vlapic(v), vector,
-                             trig_mode, delivery_mode);
+        {
+            target = vcpu_vlapic(v);
+            if ( vlapic_enabled(target) &&
+                 vlapic_match_dest(target, NULL, 0, dest, dest_mode) )
+                vmsi_inj_irq(target, vector, trig_mode, delivery_mode);
+        }
         break;
 
     default:
