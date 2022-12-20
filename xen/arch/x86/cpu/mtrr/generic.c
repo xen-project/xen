@@ -127,11 +127,11 @@ static const char *__init mtrr_attrib_to_str(mtrr_type x)
 {
 	static const char __initconst strings[MTRR_NUM_TYPES][16] =
 	{
-		[MTRR_TYPE_UNCACHABLE]     = "uncachable",
-		[MTRR_TYPE_WRCOMB]         = "write-combining",
-		[MTRR_TYPE_WRTHROUGH]      = "write-through",
-		[MTRR_TYPE_WRPROT]         = "write-protect",
-		[MTRR_TYPE_WRBACK]         = "write-back",
+		[X86_MT_UC] = "uncachable",
+		[X86_MT_WC] = "write-combining",
+		[X86_MT_WT] = "write-through",
+		[X86_MT_WP] = "write-protect",
+		[X86_MT_WB] = "write-back",
 	};
 
 	return (x < ARRAY_SIZE(strings) && strings[x][0]) ? strings[x] : "?";

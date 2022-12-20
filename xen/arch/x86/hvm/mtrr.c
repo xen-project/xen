@@ -39,11 +39,11 @@ static const uint8_t pat_entry_2_pte_flags[8] = {
 /* Effective mm type lookup table, according to MTRR and PAT. */
 static const uint8_t mm_type_tbl[MTRR_NUM_TYPES][X86_NUM_MT] = {
 #define RS MEMORY_NUM_TYPES
-#define UC MTRR_TYPE_UNCACHABLE
-#define WB MTRR_TYPE_WRBACK
-#define WC MTRR_TYPE_WRCOMB
-#define WP MTRR_TYPE_WRPROT
-#define WT MTRR_TYPE_WRTHROUGH
+#define UC X86_MT_UC
+#define WB X86_MT_WB
+#define WC X86_MT_WC
+#define WP X86_MT_WP
+#define WT X86_MT_WT
 
 /*          PAT(UC, WC, RS, RS, WT, WP, WB, UC-) */
 /* MTRR(UC) */ {UC, WC, RS, RS, UC, UC, UC, UC},
@@ -202,7 +202,7 @@ int mtrr_get_type(const struct mtrr_state *m, paddr_t pa, unsigned int order)
    unsigned int seg, num_var_ranges = MASK_EXTR(m->mtrr_cap, MTRRcap_VCNT);
 
    if ( unlikely(!m->enabled) )
-       return MTRR_TYPE_UNCACHABLE;
+       return X86_MT_UC;
 
    pa &= mask;
    if ( (pa < 0x100000) && m->fixed_enabled )
@@ -277,13 +277,13 @@ int mtrr_get_type(const struct mtrr_state *m, paddr_t pa, unsigned int order)
        return -1;
 
    /* Two or more matches, one being UC? */
-   if ( overlap_mtrr & (1 << MTRR_TYPE_UNCACHABLE) )
-       return MTRR_TYPE_UNCACHABLE;
+   if ( overlap_mtrr & (1 << X86_MT_UC) )
+       return X86_MT_UC;
 
    /* Two or more matches, all of them WT and WB? */
    if ( overlap_mtrr ==
-        ((1 << MTRR_TYPE_WRTHROUGH) | (1 << MTRR_TYPE_WRBACK)) )
-       return MTRR_TYPE_WRTHROUGH;
+        ((1 << X86_MT_WT) | (1 << X86_MT_WB)) )
+       return X86_MT_WT;
 
    /* Behaviour is undefined, but return the last overlapped type. */
    return overlap_mtrr_pos;
@@ -381,11 +381,11 @@ static inline bool_t valid_mtrr_type(uint8_t type)
 {
     switch ( type )
     {
-    case MTRR_TYPE_UNCACHABLE:
-    case MTRR_TYPE_WRBACK:
-    case MTRR_TYPE_WRCOMB:
-    case MTRR_TYPE_WRPROT:
-    case MTRR_TYPE_WRTHROUGH:
+    case X86_MT_UC:
+    case X86_MT_WB:
+    case X86_MT_WC:
+    case X86_MT_WP:
+    case X86_MT_WT:
         return 1;
     }
     return 0;

@@ -163,10 +163,10 @@ static void cf_check ipi_handler(void *info)
 }
 
 static inline int types_compatible(mtrr_type type1, mtrr_type type2) {
-	return type1 == MTRR_TYPE_UNCACHABLE ||
-	       type2 == MTRR_TYPE_UNCACHABLE ||
-	       (type1 == MTRR_TYPE_WRTHROUGH && type2 == MTRR_TYPE_WRBACK) ||
-	       (type1 == MTRR_TYPE_WRBACK && type2 == MTRR_TYPE_WRTHROUGH);
+	return type1 == X86_MT_UC ||
+	       type2 == X86_MT_UC ||
+	       (type1 == X86_MT_WT && type2 == X86_MT_WB) ||
+	       (type1 == X86_MT_WB && type2 == X86_MT_WT);
 }
 
 /**
@@ -297,13 +297,13 @@ static void set_mtrr(unsigned int reg, unsigned long base,
  *
  *	The available types are
  *
- *	%MTRR_TYPE_UNCACHABLE	-	No caching
+ *	%X86_MT_UC	-	No caching
  *
- *	%MTRR_TYPE_WRBACK	-	Write data back in bursts whenever
+ *	%X86_MT_WB	-	Write data back in bursts whenever
  *
- *	%MTRR_TYPE_WRCOMB	-	Write data back soon but allow bursts
+ *	%X86_MT_WC	-	Write data back soon but allow bursts
  *
- *	%MTRR_TYPE_WRTHROUGH	-	Cache reads but not writes
+ *	%X86_MT_WT	-	Cache reads but not writes
  *
  *	BUGS: Needs a quiet flag for the cases where drivers do not mind
  *	failures and do not wish system log messages to be sent.
@@ -328,7 +328,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	}
 
 	/*  If the type is WC, check that this processor supports it  */
-	if ((type == MTRR_TYPE_WRCOMB) && !have_wrcomb()) {
+	if ((type == X86_MT_WC) && !have_wrcomb()) {
 		printk(KERN_WARNING
 		       "mtrr: your processor doesn't support write-combining\n");
 		return -EOPNOTSUPP;
@@ -442,13 +442,13 @@ static int mtrr_check(unsigned long base, unsigned long size)
  *
  *	The available types are
  *
- *	%MTRR_TYPE_UNCACHABLE	-	No caching
+ *	%X86_MT_UC	-	No caching
  *
- *	%MTRR_TYPE_WRBACK	-	Write data back in bursts whenever
+ *	%X86_MT_WB	-	Write data back in bursts whenever
  *
- *	%MTRR_TYPE_WRCOMB	-	Write data back soon but allow bursts
+ *	%X86_MT_WC	-	Write data back soon but allow bursts
  *
- *	%MTRR_TYPE_WRTHROUGH	-	Cache reads but not writes
+ *	%X86_MT_WT	-	Cache reads but not writes
  *
  *	BUGS: Needs a quiet flag for the cases where drivers do not mind
  *	failures and do not wish system log messages to be sent.

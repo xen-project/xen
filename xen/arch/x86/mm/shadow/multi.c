@@ -570,7 +570,7 @@ _sh_propagate(struct vcpu *v,
                             gflags,
                             gfn_to_paddr(target_gfn),
                             mfn_to_maddr(target_mfn),
-                            MTRR_TYPE_UNCACHABLE);
+                            X86_MT_UC);
                 else if ( iommu_snoop )
                     sflags |= pat_type_2_pte_flags(X86_MT_WB);
                 else

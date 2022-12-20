@@ -38,7 +38,7 @@ struct vmx_msr_entry {
     u64 data;
 };
 
-#define EPT_DEFAULT_MT      MTRR_TYPE_WRBACK
+#define EPT_DEFAULT_MT      X86_MT_WB
 
 struct ept_data {
     union {

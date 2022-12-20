@@ -506,7 +506,7 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
                                                mfn_x(mfn) | ((1UL << order) - 1)) )
         {
             *ipat = true;
-            return MTRR_TYPE_UNCACHABLE;
+            return X86_MT_UC;
         }
         /* Force invalid memory type so resolve_misconfig() will split it */
         return -1;
@@ -515,7 +515,7 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
     if ( !mfn_valid(mfn) )
     {
         *ipat = true;
-        return MTRR_TYPE_UNCACHABLE;
+        return X86_MT_UC;
     }
 
     /*
@@ -526,7 +526,7 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
          !cache_flush_permitted(d) )
     {
         *ipat = true;
-        return MTRR_TYPE_WRBACK;
+        return X86_MT_WB;
     }
 
     for ( special_pgs = i = 0; i < (1ul << order); i++ )
@@ -539,13 +539,13 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
             return -1;
 
         *ipat = true;
-        return MTRR_TYPE_WRBACK;
+        return X86_MT_WB;
     }
 
     switch ( type )
     {
     case p2m_mmio_direct:
-        return MTRR_TYPE_UNCACHABLE;
+        return X86_MT_UC;
 
     case p2m_grant_map_ro:
     case p2m_grant_map_rw:
@@ -563,7 +563,7 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
          * diverges. See p2m_type_to_flags for the AMD attributes.
          */
         *ipat = true;
-        return MTRR_TYPE_WRBACK;
+        return X86_MT_WB;
 
     default:
         break;
@@ -573,15 +573,14 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
     if ( gmtrr_mtype >= 0 )
     {
         *ipat = true;
-        return gmtrr_mtype != X86_MT_UCM ? gmtrr_mtype
-                                         : MTRR_TYPE_UNCACHABLE;
+        return gmtrr_mtype != X86_MT_UCM ? gmtrr_mtype : X86_MT_UC;
     }
     if ( gmtrr_mtype == -EADDRNOTAVAIL )
         return -1;
 
     gmtrr_mtype = v ? mtrr_get_type(&v->arch.hvm.mtrr,
                                     gfn_x(gfn) << PAGE_SHIFT, order)
-                    : MTRR_TYPE_WRBACK;
+                    : X86_MT_WB;
     hmtrr_mtype = mtrr_get_type(&mtrr_state, mfn_x(mfn) << PAGE_SHIFT,
                                 order);
     if ( gmtrr_mtype < 0 || hmtrr_mtype < 0 )
@@ -592,14 +591,14 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
         return hmtrr_mtype;
 
     /* If either type is UC, we have to go with that one. */
-    if ( gmtrr_mtype == MTRR_TYPE_UNCACHABLE ||
-         hmtrr_mtype == MTRR_TYPE_UNCACHABLE )
-        return MTRR_TYPE_UNCACHABLE;
+    if ( gmtrr_mtype == X86_MT_UC ||
+         hmtrr_mtype == X86_MT_UC )
+        return X86_MT_UC;
 
     /* If either type is WB, we have to go with the other one. */
-    if ( gmtrr_mtype == MTRR_TYPE_WRBACK )
+    if ( gmtrr_mtype == X86_MT_WB )
         return hmtrr_mtype;
-    if ( hmtrr_mtype == MTRR_TYPE_WRBACK )
+    if ( hmtrr_mtype == X86_MT_WB )
         return gmtrr_mtype;
 
     /*
@@ -610,13 +609,13 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
      * permit this), while WT and WP require writes to go straight to memory
      * (WC can buffer them).
      */
-    if ( (gmtrr_mtype == MTRR_TYPE_WRTHROUGH &&
-          hmtrr_mtype == MTRR_TYPE_WRPROT) ||
-         (gmtrr_mtype == MTRR_TYPE_WRPROT &&
-          hmtrr_mtype == MTRR_TYPE_WRTHROUGH) )
-        return MTRR_TYPE_WRPROT;
+    if ( (gmtrr_mtype == X86_MT_WT &&
+          hmtrr_mtype == X86_MT_WP) ||
+         (gmtrr_mtype == X86_MT_WP &&
+          hmtrr_mtype == X86_MT_WT) )
+        return X86_MT_WP;
 
-    return MTRR_TYPE_UNCACHABLE;
+    return X86_MT_UC;
 }
 
 /*
@@ -1426,12 +1425,12 @@ void ept_p2m_uninit(struct p2m_domain *p2m)
 static const char *memory_type_to_str(unsigned int x)
 {
     static const char memory_types[8][3] = {
-        [MTRR_TYPE_UNCACHABLE]     = "UC",
-        [MTRR_TYPE_WRCOMB]         = "WC",
-        [MTRR_TYPE_WRTHROUGH]      = "WT",
-        [MTRR_TYPE_WRPROT]         = "WP",
-        [MTRR_TYPE_WRBACK]         = "WB",
-        [MTRR_NUM_TYPES]           = "??"
+        [X86_MT_UC]      = "UC",
+        [X86_MT_WC]      = "WC",
+        [X86_MT_WT]      = "WT",
+        [X86_MT_WP]      = "WP",
+        [X86_MT_WB]      = "WB",
+        [MTRR_NUM_TYPES] = "??",
     };
 
     ASSERT(x < ARRAY_SIZE(memory_types));
