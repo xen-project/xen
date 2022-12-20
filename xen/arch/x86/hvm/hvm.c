@@ -307,12 +307,12 @@ int hvm_set_guest_pat(struct vcpu *v, uint64_t guest_pat)
     for ( i = 0, tmp = guest_pat; i < 8; i++, tmp >>= 8 )
         switch ( tmp & 0xff )
         {
-        case PAT_TYPE_UC_MINUS:
-        case PAT_TYPE_UNCACHABLE:
-        case PAT_TYPE_WRBACK:
-        case PAT_TYPE_WRCOMB:
-        case PAT_TYPE_WRPROT:
-        case PAT_TYPE_WRTHROUGH:
+        case X86_MT_UCM:
+        case X86_MT_UC:
+        case X86_MT_WB:
+        case X86_MT_WC:
+        case X86_MT_WP:
+        case X86_MT_WT:
             break;
         default:
             return 0;

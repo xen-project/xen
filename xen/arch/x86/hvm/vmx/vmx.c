@@ -1231,14 +1231,14 @@ static void cf_check vmx_handle_cd(struct vcpu *v, unsigned long value)
              * memory type are all UC.
              */
             u64 uc_pat =
-                ((uint64_t)PAT_TYPE_UNCACHABLE)       |       /* PAT0 */
-                ((uint64_t)PAT_TYPE_UNCACHABLE << 8)  |       /* PAT1 */
-                ((uint64_t)PAT_TYPE_UNCACHABLE << 16) |       /* PAT2 */
-                ((uint64_t)PAT_TYPE_UNCACHABLE << 24) |       /* PAT3 */
-                ((uint64_t)PAT_TYPE_UNCACHABLE << 32) |       /* PAT4 */
-                ((uint64_t)PAT_TYPE_UNCACHABLE << 40) |       /* PAT5 */
-                ((uint64_t)PAT_TYPE_UNCACHABLE << 48) |       /* PAT6 */
-                ((uint64_t)PAT_TYPE_UNCACHABLE << 56);        /* PAT7 */
+                ((uint64_t)X86_MT_UC)       |       /* PAT0 */
+                ((uint64_t)X86_MT_UC << 8)  |       /* PAT1 */
+                ((uint64_t)X86_MT_UC << 16) |       /* PAT2 */
+                ((uint64_t)X86_MT_UC << 24) |       /* PAT3 */
+                ((uint64_t)X86_MT_UC << 32) |       /* PAT4 */
+                ((uint64_t)X86_MT_UC << 40) |       /* PAT5 */
+                ((uint64_t)X86_MT_UC << 48) |       /* PAT6 */
+                ((uint64_t)X86_MT_UC << 56);        /* PAT7 */
 
             vmx_get_guest_pat(v, pat);
             vmx_set_guest_pat(v, uc_pat);

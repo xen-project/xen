@@ -573,8 +573,8 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
     if ( gmtrr_mtype >= 0 )
     {
         *ipat = true;
-        return gmtrr_mtype != PAT_TYPE_UC_MINUS ? gmtrr_mtype
-                                                : MTRR_TYPE_UNCACHABLE;
+        return gmtrr_mtype != X86_MT_UCM ? gmtrr_mtype
+                                         : MTRR_TYPE_UNCACHABLE;
     }
     if ( gmtrr_mtype == -EADDRNOTAVAIL )
         return -1;
