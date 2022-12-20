@@ -1322,7 +1322,8 @@ unsigned int ioreq_broadcast(ioreq_t *p, bool buffered)
 
     FOR_EACH_IOREQ_SERVER(d, id, s)
     {
-        if ( !s->enabled )
+        if ( !s->enabled ||
+             (buffered && s->bufioreq_handling == HVM_IOREQSRV_BUFIOREQ_OFF) )
             continue;
 
         if ( ioreq_send(s, p, buffered) == IOREQ_STATUS_UNHANDLED )
