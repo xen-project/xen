@@ -24,6 +24,7 @@
 CHECK_build_id;
 CHECK_compile_info;
 CHECK_feature_info;
+CHECK_varbuf;
 #endif
 
 enum system_state system_state = SYS_STATE_early_boot;
@@ -503,6 +504,56 @@ static int __init cf_check param_init(void)
 __initcall(param_init);
 #endif
 
+static long xenver_varbuf_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    struct xen_varbuf user_str;
+    const char *str = NULL;
+    size_t sz;
+
+    switch ( cmd )
+    {
+    case XENVER_extraversion2:
+        str = xen_extra_version();
+        break;
+
+    case XENVER_changeset2:
+        str = xen_changeset();
+        break;
+
+    case XENVER_commandline2:
+        str = saved_cmdline;
+        break;
+
+    case XENVER_capabilities2:
+        str = xen_cap_info;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        return -ENODATA;
+    }
+
+    sz = strlen(str);
+
+    if ( sz > KB(64) ) /* Arbitrary limit.  Avoid long-running operations. */
+        return -E2BIG;
+
+    if ( guest_handle_is_null(arg) ) /* Length request */
+        return sz;
+
+    if ( copy_from_guest(&user_str, arg, 1) )
+        return -EFAULT;
+
+    if ( sz > user_str.len )
+        return -ENOBUFS;
+
+    if ( copy_to_guest_offset(arg, offsetof(struct xen_varbuf, buf),
+                              str, sz) )
+        return -EFAULT;
+
+    return sz;
+}
+
 long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     bool deny = xsm_xen_version(XSM_OTHER, cmd);
@@ -721,6 +772,14 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         return sz;
     }
+
+    case XENVER_extraversion2:
+    case XENVER_capabilities2:
+    case XENVER_changeset2:
+    case XENVER_commandline2:
+        if ( deny )
+            return -EPERM;
+        return xenver_varbuf_op(cmd, arg);
     }
 
     return -ENOSYS;

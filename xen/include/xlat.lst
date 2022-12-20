@@ -195,6 +195,7 @@
 ?	build_id			version.h
 ?	compile_info			version.h
 ?	feature_info			version.h
+?	varbuf                          version.h
 
 ?	xenoprof_init			xenoprof.h
 ?	xenoprof_passive		xenoprof.h

@@ -1795,15 +1795,18 @@ static int cf_check flask_xen_version(uint32_t op)
         /* These sub-ops ignore the permission checks and return data. */
         return 0;
     case XENVER_extraversion:
+    case XENVER_extraversion2:
         return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
                             VERSION__XEN_EXTRAVERSION, NULL);
     case XENVER_compile_info:
         return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
                             VERSION__XEN_COMPILE_INFO, NULL);
     case XENVER_capabilities:
+    case XENVER_capabilities2:
         return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
                             VERSION__XEN_CAPABILITIES, NULL);
     case XENVER_changeset:
+    case XENVER_changeset2:
         return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
                             VERSION__XEN_CHANGESET, NULL);
     case XENVER_pagesize:
@@ -1813,6 +1816,7 @@ static int cf_check flask_xen_version(uint32_t op)
         return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
                             VERSION__XEN_GUEST_HANDLE, NULL);
     case XENVER_commandline:
+    case XENVER_commandline2:
         return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
                             VERSION__XEN_COMMANDLINE, NULL);
     case XENVER_build_id:

@@ -19,12 +19,20 @@
 /* arg == NULL; returns major:minor (16:16). */
 #define XENVER_version      0
 
-/* arg == xen_extraversion_t. */
+/*
+ * arg == xen_extraversion_t.
+ *
+ * This API/ABI is broken.  Use XENVER_extraversion2 where possible.
+ */
 #define XENVER_extraversion 1
 typedef char xen_extraversion_t[16];
 #define XEN_EXTRAVERSION_LEN (sizeof(xen_extraversion_t))
 
-/* arg == xen_compile_info_t. */
+/*
+ * arg == xen_compile_info_t.
+ *
+ * This API/ABI is broken and truncates data.
+ */
 #define XENVER_compile_info 2
 struct xen_compile_info {
     char compiler[64];
@@ -34,10 +42,20 @@ struct xen_compile_info {
 };
 typedef struct xen_compile_info xen_compile_info_t;
 
+/*
+ * arg == xen_capabilities_info_t.
+ *
+ * This API/ABI is broken.  Use XENVER_capabilities2 where possible.
+ */
 #define XENVER_capabilities 3
 typedef char xen_capabilities_info_t[1024];
 #define XEN_CAPABILITIES_INFO_LEN (sizeof(xen_capabilities_info_t))
 
+/*
+ * arg == xen_changeset_info_t.
+ *
+ * This API/ABI is broken.  Use XENVER_changeset2 where possible.
+ */
 #define XENVER_changeset 4
 typedef char xen_changeset_info_t[64];
 #define XEN_CHANGESET_INFO_LEN (sizeof(xen_changeset_info_t))
@@ -95,6 +113,11 @@ typedef struct xen_feature_info xen_feature_info_t;
  */
 #define XENVER_guest_handle 8
 
+/*
+ * arg == xen_commandline_t.
+ *
+ * This API/ABI is broken.  Use XENVER_commandline2 where possible.
+ */
 #define XENVER_commandline 9
 typedef char xen_commandline_t[1024];
 
@@ -109,6 +132,42 @@ struct xen_build_id {
                              /* OUT: Variable length buffer with build_id. */
 };
 typedef struct xen_build_id xen_build_id_t;
+
+/*
+ * Container for an arbitrary variable length buffer.
+ */
+struct xen_varbuf {
+    uint32_t len;                          /* IN:  size of buf[] in bytes. */
+    unsigned char buf[XEN_FLEX_ARRAY_DIM]; /* OUT: requested data.         */
+};
+typedef struct xen_varbuf xen_varbuf_t;
+
+/*
+ * arg == xen_varbuf_t
+ *
+ * Equivalent to the original ops, but with a non-truncating API/ABI.
+ *
+ * These hypercalls can fail for a number of reasons.  All callers must handle
+ * -XEN_xxx return values appropriately.
+ *
+ * Passing arg == NULL is a request for size, which will be signalled with a
+ * non-negative return value.  Note: a return size of 0 may be legitimate for
+ * the requested subop.
+ *
+ * Otherwise, the input xen_varbuf_t provides the size of the following
+ * buffer.  Xen will fill the buffer, and return the number of bytes written
+ * (e.g. if the input buffer was longer than necessary).
+ *
+ * Some subops may return binary data.  Some subops may be expected to return
+ * textural data.  These are returned without a NUL terminator, and while the
+ * contents is expected to be ASCII/UTF-8, Xen makes no guarentees to this
+ * effect.  e.g. Xen has no control over the formatting used for the command
+ * line.
+ */
+#define XENVER_extraversion2 11
+#define XENVER_capabilities2 12
+#define XENVER_changeset2    13
+#define XENVER_commandline2  14
 
 #endif /* __XEN_PUBLIC_VERSION_H__ */
 

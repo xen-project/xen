@@ -828,9 +828,12 @@ static XSM_INLINE int cf_check xsm_xen_version(XSM_DEFAULT_ARG uint32_t op)
         block_speculation();
         return 0;
     case XENVER_extraversion:
+    case XENVER_extraversion2:
     case XENVER_compile_info:
     case XENVER_capabilities:
+    case XENVER_capabilities2:
     case XENVER_changeset:
+    case XENVER_changeset2:
     case XENVER_pagesize:
     case XENVER_guest_handle:
         /* These MUST always be accessible to any guest by default. */
