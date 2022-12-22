@@ -450,7 +450,6 @@ static void _sh_resync(struct vcpu *v, mfn_t gmfn,
 static void oos_hash_add(struct vcpu *v, mfn_t gmfn)
 {
     int i, idx, oidx, swap = 0;
-    void *gptr, *gsnpptr;
     mfn_t *oos = v->arch.paging.shadow.oos;
     mfn_t *oos_snapshot = v->arch.paging.shadow.oos_snapshot;
     struct oos_fixup *oos_fixup = v->arch.paging.shadow.oos_fixup;
@@ -483,11 +482,7 @@ static void oos_hash_add(struct vcpu *v, mfn_t gmfn)
     if ( swap )
         SWAP(oos_snapshot[idx], oos_snapshot[oidx]);
 
-    gptr = map_domain_page(oos[oidx]);
-    gsnpptr = map_domain_page(oos_snapshot[oidx]);
-    memcpy(gsnpptr, gptr, PAGE_SIZE);
-    unmap_domain_page(gptr);
-    unmap_domain_page(gsnpptr);
+    copy_domain_page(oos_snapshot[oidx], oos[oidx]);
 }
 
 /* Remove an MFN from the list of out-of-sync guest pagetables */
