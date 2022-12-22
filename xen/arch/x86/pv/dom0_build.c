@@ -10,7 +10,6 @@
 #include <xen/init.h>
 #include <xen/libelf.h>
 #include <xen/multiboot.h>
-#include <xen/paging.h>
 #include <xen/pfn.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
@@ -804,11 +803,8 @@ int __init dom0_construct_pv(struct domain *d,
 
     d->arch.paging.mode = 0;
 
-    /* Set up CR3 value for write_ptbase */
-    if ( paging_mode_enabled(d) )
-        paging_update_paging_modes(v);
-    else
-        update_cr3(v);
+    /* Set up CR3 value for switch_cr3_cr4(). */
+    update_cr3(v);
 
     /* We run on dom0's page tables for the final part of the build process. */
     switch_cr3_cr4(cr3_pa(v->arch.cr3), read_cr4());
