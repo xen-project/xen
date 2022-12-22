@@ -651,6 +651,7 @@ int paging_domain_init(struct domain *d)
     if ( (rc = p2m_init(d)) != 0 )
         return rc;
 
+    INIT_PAGE_LIST_HEAD(&d->arch.paging.freelist);
     mm_lock_init(&d->arch.paging.lock);
 
     /* This must be initialized separately from the rest of the
@@ -979,17 +980,17 @@ int __init paging_set_allocation(struct domain *d, unsigned int pages,
 
 int arch_get_paging_mempool_size(struct domain *d, uint64_t *size)
 {
-    int rc;
+    unsigned long pages;
 
     if ( is_pv_domain(d) )                 /* TODO: Relax in due course */
         return -EOPNOTSUPP;
 
-    if ( hap_enabled(d) )
-        rc = hap_get_allocation_bytes(d, size);
-    else
-        rc = shadow_get_allocation_bytes(d, size);
+    pages  = d->arch.paging.total_pages;
+    pages += d->arch.paging.p2m_pages;
 
-    return rc;
+    *size = pages << PAGE_SHIFT;
+
+    return 0;
 }
 
 int arch_set_paging_mempool_size(struct domain *d, uint64_t size)

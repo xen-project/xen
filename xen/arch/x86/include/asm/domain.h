@@ -99,12 +99,6 @@ struct shadow_domain {
     unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
     struct page_list_head pinned_shadows;
 
-    /* Memory allocation */
-    struct page_list_head freelist;
-    unsigned int      total_pages;  /* number of pages allocated */
-    unsigned int      free_pages;   /* number of pages on freelists */
-    unsigned int      p2m_pages;    /* number of pages allocated to p2m */
-
     /* 1-to-1 map for use when HVM vcpus have paging disabled */
     pagetable_t unpaged_pagetable;
 
@@ -179,10 +173,6 @@ struct shadow_vcpu {
 /*            hardware assisted paging          */
 /************************************************/
 struct hap_domain {
-    struct page_list_head freelist;
-    unsigned int      total_pages;  /* number of pages allocated */
-    unsigned int      free_pages;   /* number of pages on freelists */
-    unsigned int      p2m_pages;    /* number of pages allocated to p2m */
 };
 
 /************************************************/
@@ -218,6 +208,13 @@ struct paging_domain {
     struct shadow_domain    shadow;
     /* extension for hardware-assited paging */
     struct hap_domain       hap;
+
+    /* Memory allocation (common to shadow and HAP) */
+    struct page_list_head   freelist;
+    unsigned int            total_pages;  /* number of pages allocated */
+    unsigned int            free_pages;   /* number of pages on freelists */
+    unsigned int            p2m_pages;    /* number of pages allocated to p2m */
+
     /* log dirty support */
     struct log_dirty_domain log_dirty;
 

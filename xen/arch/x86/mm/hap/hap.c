@@ -249,11 +249,11 @@ static struct page_info *hap_alloc(struct domain *d)
     if ( unlikely(d->is_dying) )
         return NULL;
 
-    pg = page_list_remove_head(&d->arch.paging.hap.freelist);
+    pg = page_list_remove_head(&d->arch.paging.freelist);
     if ( unlikely(!pg) )
         return NULL;
 
-    d->arch.paging.hap.free_pages--;
+    d->arch.paging.free_pages--;
 
     clear_domain_page(page_to_mfn(pg));
 
@@ -274,12 +274,12 @@ static void hap_free(struct domain *d, mfn_t mfn)
     if ( unlikely(d->is_dying) )
     {
         free_domheap_page(pg);
-        d->arch.paging.hap.total_pages--;
+        d->arch.paging.total_pages--;
         return;
     }
 
-    d->arch.paging.hap.free_pages++;
-    page_list_add_tail(pg, &d->arch.paging.hap.freelist);
+    d->arch.paging.free_pages++;
+    page_list_add_tail(pg, &d->arch.paging.freelist);
 }
 
 static struct page_info *cf_check hap_alloc_p2m_page(struct domain *d)
@@ -293,8 +293,8 @@ static struct page_info *cf_check hap_alloc_p2m_page(struct domain *d)
 
     if ( likely(pg != NULL) )
     {
-        d->arch.paging.hap.total_pages--;
-        d->arch.paging.hap.p2m_pages++;
+        d->arch.paging.total_pages--;
+        d->arch.paging.p2m_pages++;
         ASSERT(!page_get_owner(pg) && !(pg->count_info & PGC_count_mask));
     }
     else if ( !d->arch.paging.p2m_alloc_failed && !d->is_dying )
@@ -328,8 +328,8 @@ static void cf_check hap_free_p2m_page(struct domain *d, struct page_info *pg)
         pg->count_info &= ~PGC_count_mask;
         page_set_owner(pg, NULL);
     }
-    d->arch.paging.hap.p2m_pages--;
-    d->arch.paging.hap.total_pages++;
+    d->arch.paging.p2m_pages--;
+    d->arch.paging.total_pages++;
     hap_free(d, page_to_mfn(pg));
 
     paging_unlock(d);
@@ -338,22 +338,11 @@ static void cf_check hap_free_p2m_page(struct domain *d, struct page_info *pg)
 /* Return the size of the pool, rounded up to the nearest MB */
 unsigned int hap_get_allocation(struct domain *d)
 {
-    unsigned int pg = d->arch.paging.hap.total_pages
-        + d->arch.paging.hap.p2m_pages;
+    unsigned int pg = d->arch.paging.total_pages
+        + d->arch.paging.p2m_pages;
 
     return ((pg >> (20 - PAGE_SHIFT))
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
-}
-
-int hap_get_allocation_bytes(struct domain *d, uint64_t *size)
-{
-    unsigned long pages = d->arch.paging.hap.total_pages;
-
-    pages += d->arch.paging.hap.p2m_pages;
-
-    *size = pages << PAGE_SHIFT;
-
-    return 0;
 }
 
 /* Set the pool of pages to the required number of pages.
@@ -364,14 +353,14 @@ int hap_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
 
     ASSERT(paging_locked_by_me(d));
 
-    if ( pages < d->arch.paging.hap.p2m_pages )
+    if ( pages < d->arch.paging.p2m_pages )
         pages = 0;
     else
-        pages -= d->arch.paging.hap.p2m_pages;
+        pages -= d->arch.paging.p2m_pages;
 
     for ( ; ; )
     {
-        if ( d->arch.paging.hap.total_pages < pages )
+        if ( d->arch.paging.total_pages < pages )
         {
             /* Need to allocate more memory from domheap */
             pg = alloc_domheap_page(d, MEMF_no_owner);
@@ -380,22 +369,22 @@ int hap_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
                 HAP_PRINTK("failed to allocate hap pages.\n");
                 return -ENOMEM;
             }
-            d->arch.paging.hap.free_pages++;
-            d->arch.paging.hap.total_pages++;
-            page_list_add_tail(pg, &d->arch.paging.hap.freelist);
+            d->arch.paging.free_pages++;
+            d->arch.paging.total_pages++;
+            page_list_add_tail(pg, &d->arch.paging.freelist);
         }
-        else if ( d->arch.paging.hap.total_pages > pages )
+        else if ( d->arch.paging.total_pages > pages )
         {
             /* Need to return memory to domheap */
-            if ( page_list_empty(&d->arch.paging.hap.freelist) )
+            if ( page_list_empty(&d->arch.paging.freelist) )
             {
                 HAP_PRINTK("failed to free enough hap pages.\n");
                 return -ENOMEM;
             }
-            pg = page_list_remove_head(&d->arch.paging.hap.freelist);
+            pg = page_list_remove_head(&d->arch.paging.freelist);
             ASSERT(pg);
-            d->arch.paging.hap.free_pages--;
-            d->arch.paging.hap.total_pages--;
+            d->arch.paging.free_pages--;
+            d->arch.paging.total_pages--;
             free_domheap_page(pg);
         }
         else
@@ -462,8 +451,6 @@ void hap_domain_init(struct domain *d)
         .clean   = hap_clean_dirty_bitmap,
     };
 
-    INIT_PAGE_LIST_HEAD(&d->arch.paging.hap.freelist);
-
     /* Use HAP logdirty mechanism. */
     paging_log_dirty_init(d, &hap_ops);
 }
@@ -484,7 +471,7 @@ int hap_enable(struct domain *d, u32 mode)
 
     domain_pause(d);
 
-    old_pages = d->arch.paging.hap.total_pages;
+    old_pages = d->arch.paging.total_pages;
     if ( old_pages == 0 )
     {
         paging_lock(d);
@@ -566,16 +553,16 @@ void hap_final_teardown(struct domain *d)
         p2m_teardown(d->arch.nested_p2m[i], true, NULL);
     }
 
-    if ( d->arch.paging.hap.total_pages != 0 )
+    if ( d->arch.paging.total_pages != 0 )
         hap_teardown(d, NULL);
 
     p2m_teardown(p2m_get_hostp2m(d), true, NULL);
     /* Free any memory that the p2m teardown released */
     paging_lock(d);
     hap_set_allocation(d, 0, NULL);
-    ASSERT(d->arch.paging.hap.p2m_pages == 0);
-    ASSERT(d->arch.paging.hap.free_pages == 0);
-    ASSERT(d->arch.paging.hap.total_pages == 0);
+    ASSERT(d->arch.paging.p2m_pages == 0);
+    ASSERT(d->arch.paging.free_pages == 0);
+    ASSERT(d->arch.paging.total_pages == 0);
     paging_unlock(d);
 }
 
@@ -644,14 +631,14 @@ void hap_teardown(struct domain *d, bool *preempted)
 
     paging_lock(d); /* Keep various asserts happy */
 
-    if ( d->arch.paging.hap.total_pages != 0 )
+    if ( d->arch.paging.total_pages != 0 )
     {
         hap_set_allocation(d, 0, preempted);
 
         if ( preempted && *preempted )
             goto out;
 
-        ASSERT(d->arch.paging.hap.total_pages == 0);
+        ASSERT(d->arch.paging.total_pages == 0);
     }
 
     d->arch.paging.mode &= ~PG_log_dirty;

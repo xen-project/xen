@@ -809,7 +809,7 @@ static void cf_check sh_unshadow_for_p2m_change(
      * If there are any shadows, update them.  But if shadow_teardown()
      * has already been called then it's not safe to try.
      */
-    if ( unlikely(!d->arch.paging.shadow.total_pages) )
+    if ( unlikely(!d->arch.paging.total_pages) )
         return;
 
     /* Only previously present / valid entries need processing. */
