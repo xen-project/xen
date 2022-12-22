@@ -833,43 +833,10 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
  * not contiguous in memory; functions for handling offsets into them are
  * defined in shadow/multi.c (shadow_l1_index() etc.)
  *
- * This table shows the allocation behaviour of the different modes:
- *
- * Xen paging      64b  64b  64b
- * Guest paging    32b  pae  64b
- * PV or HVM       HVM  HVM   *
- * Shadow paging   pae  pae  64b
- *
- * sl1 size         8k   4k   4k
- * sl2 size        16k   4k   4k
- * sl3 size         -    -    4k
- * sl4 size         -    -    4k
- *
  * In HVM guests, the p2m table is built out of shadow pages, and we provide
  * a function for the p2m management to steal pages, in max-order chunks, from
  * the free pool.
  */
-
-#ifdef CONFIG_HVM
-const u8 sh_type_to_size[] = {
-    1, /* SH_type_none           */
-    2, /* SH_type_l1_32_shadow   */
-    2, /* SH_type_fl1_32_shadow  */
-    4, /* SH_type_l2_32_shadow   */
-    1, /* SH_type_l1_pae_shadow  */
-    1, /* SH_type_fl1_pae_shadow */
-    1, /* SH_type_l2_pae_shadow  */
-    1, /* SH_type_l1_64_shadow   */
-    1, /* SH_type_fl1_64_shadow  */
-    1, /* SH_type_l2_64_shadow   */
-    1, /* SH_type_l2h_64_shadow  */
-    1, /* SH_type_l3_64_shadow   */
-    1, /* SH_type_l4_64_shadow   */
-    1, /* SH_type_p2m_table      */
-    1, /* SH_type_monitor_table  */
-    1  /* SH_type_oos_snapshot   */
-};
-#endif
 
 /*
  * Figure out the least acceptable quantity of shadow memory.
@@ -1116,7 +1083,7 @@ mfn_t shadow_alloc(struct domain *d,
     unsigned int i;
 
     ASSERT(paging_locked_by_me(d));
-    ASSERT(shadow_type != SH_type_none);
+    ASSERT(pages);
     perfc_incr(shadow_alloc);
 
     if ( d->arch.paging.free_pages < pages )
@@ -1196,9 +1163,9 @@ void shadow_free(struct domain *d, mfn_t smfn)
     perfc_incr(shadow_free);
 
     shadow_type = sp->u.sh.type;
-    ASSERT(shadow_type != SH_type_none);
     ASSERT(sp->u.sh.head || (shadow_type > SH_type_max_shadow));
     pages = shadow_size(shadow_type);
+    ASSERT(pages);
     pin_list = &d->arch.paging.shadow.pinned_shadows;
 
     for ( i = 0; i < pages; i++ )

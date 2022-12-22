@@ -363,7 +363,7 @@ shadow_size(unsigned int shadow_type)
     return sh_type_to_size[shadow_type];
 #else
     ASSERT(shadow_type < SH_type_unused);
-    return 1;
+    return shadow_type != SH_type_none;
 #endif
 }
 
