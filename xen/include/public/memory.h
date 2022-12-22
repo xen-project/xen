@@ -485,7 +485,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);
 #define XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG   (xen_mk_ullong(1) << 62)
 
 #define XENMEM_SHARING_OP_FIELD_MAKE_GREF(field, val)  \
-    (field) = (XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG | val)
+    (field) = (XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG | (val))
 #define XENMEM_SHARING_OP_FIELD_IS_GREF(field)         \
     ((field) & XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG)
 #define XENMEM_SHARING_OP_FIELD_GET_GREF(field)        \
