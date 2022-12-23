@@ -120,27 +120,30 @@
  *   regions within it.
  */
 
-#include <xen/init.h>
-#include <xen/types.h>
-#include <xen/lib.h>
-#include <xen/sched.h>
-#include <xen/spinlock.h>
-#include <xen/mm.h>
-#include <xen/param.h>
-#include <xen/irq.h>
-#include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/event.h>
+#include <xen/init.h>
+#include <xen/irq.h>
 #include <xen/keyhandler.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
+#include <xen/nodemask.h>
+#include <xen/numa.h>
+#include <xen/param.h>
 #include <xen/perfc.h>
 #include <xen/pfn.h>
-#include <xen/numa.h>
-#include <xen/nodemask.h>
-#include <xen/event.h>
+#include <xen/types.h>
+#include <xen/sched.h>
+#include <xen/softirq.h>
+#include <xen/spinlock.h>
+
+#include <asm/flushtlb.h>
+#include <asm/numa.h>
+#include <asm/page.h>
+
 #include <public/sysctl.h>
 #include <public/sched.h>
-#include <asm/page.h>
-#include <asm/numa.h>
-#include <asm/flushtlb.h>
+
 #ifdef CONFIG_X86
 #include <asm/guest.h>
 #include <asm/p2m.h>
