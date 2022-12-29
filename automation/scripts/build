@@ -39,37 +39,6 @@ if [[ "${XEN_TARGET_ARCH}" = "arm32" ]]; then
     hypervisor_only="y"
 fi
 
-# build up our configure options
-cfgargs=()
-cfgargs+=("--enable-docs")
-
-if [[ "${CC}" == "clang"* ]]; then
-    # SeaBIOS cannot be built with clang
-    cfgargs+=("--with-system-seabios=/usr/share/seabios/bios.bin")
-    # iPXE cannot be built with clang
-    cfgargs+=("--with-system-ipxe=/usr/lib/ipxe/ipxe.pxe")
-    # newlib cannot be built with clang so we cannot build stubdoms
-    cfgargs+=("--disable-stubdom")
-fi
-
-if ! test -z "$(ldd /bin/ls|grep musl|head -1)"; then
-    # disable --disable-werror for QEMUU when building with MUSL
-    cfgargs+=("--with-extra-qemuu-configure-args=\"--disable-werror\"")
-    # SeaBIOS doesn't build on MUSL systems
-    cfgargs+=("--with-system-seabios=/bin/false")
-fi
-
-# Qemu requires Python 3.5 or later, and ninja
-if ! type python3 || python3 -c "import sys; res = sys.version_info < (3, 5); exit(not(res))" \
-        || ! type ninja; then
-    cfgargs+=("--with-system-qemu=/bin/false")
-fi
-
-# SeaBIOS requires GCC 4.6 or later
-if [[ "${CC}" == "gcc" && `cc-ver` -lt 0x040600 ]]; then
-    cfgargs+=("--with-system-seabios=/bin/false")
-fi
-
 # Directory for the artefacts to be dumped into
 mkdir binaries
 
@@ -80,7 +49,37 @@ if [[ "${hypervisor_only}" == "y" ]]; then
     # Preserve artefacts
     cp xen/xen binaries/xen
 else
-    # Full build
+    # Full build.  Figure out our ./configure options
+    cfgargs=()
+    cfgargs+=("--enable-docs")
+
+    if [[ "${CC}" == "clang"* ]]; then
+        # SeaBIOS cannot be built with clang
+        cfgargs+=("--with-system-seabios=/usr/share/seabios/bios.bin")
+        # iPXE cannot be built with clang
+        cfgargs+=("--with-system-ipxe=/usr/lib/ipxe/ipxe.pxe")
+        # newlib cannot be built with clang so we cannot build stubdoms
+        cfgargs+=("--disable-stubdom")
+    fi
+
+    if  ! test -z "$(ldd /bin/ls|grep musl|head -1)"; then
+        # disable --disable-werror for QEMUU when building with MUSL
+        cfgargs+=("--with-extra-qemuu-configure-args=\"--disable-werror\"")
+        # SeaBIOS doesn't build on MUSL systems
+        cfgargs+=("--with-system-seabios=/bin/false")
+    fi
+
+    # Qemu requires Python 3.5 or later, and ninja
+    if ! type python3 || python3 -c "import sys; res = sys.version_info < (3, 5); exit(not(res))" \
+            || ! type ninja; then
+        cfgargs+=("--with-system-qemu=/bin/false")
+    fi
+
+    # SeaBIOS requires GCC 4.6 or later
+    if [[ "${CC}" == "gcc" && `cc-ver` -lt 0x040600 ]]; then
+        cfgargs+=("--with-system-seabios=/bin/false")
+    fi
+
     ./configure "${cfgargs[@]}"
     make -j$(nproc) dist
 
