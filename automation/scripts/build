@@ -2,13 +2,12 @@
 
 test -f /etc/os-release && cat "$_"
 
-$CC --version
+# Construct $cc such that it matches what `make` will chose when taking
+# CROSS_COMPILE into account.  Do not modify $CC directly, as that will cause
+# `make` to double-account CROSS_COMPILE.
+cc="${CROSS_COMPILE}${CC}"
 
-# Express the compiler version as an integer.  e.g. GCC 4.9.2 => 0x040902
-cc-ver()
-{
-    $CC -dumpversion | awk -F. '{ printf "0x%02x%02x%02x", $1, $2, $3 }'
-}
+$cc --version
 
 # random config or default config
 if [[ "${RANDCONFIG}" == "y" ]]; then
@@ -50,7 +49,14 @@ else
     cfgargs=()
     cfgargs+=("--enable-docs")
 
-    if [[ "${CC}" == "clang"* ]]; then
+    # booleans for which compiler is in use
+    cc_is_gcc="$($cc --version | grep -q gcc && echo "y" || :)"
+    cc_is_clang="$($cc --version | grep -q clang && echo "y" || :)"
+
+    # The compiler version as an integer.  e.g. GCC 4.9.2 => 0x040902
+    cc_ver="$($cc -dumpversion | awk -F. '{ printf "0x%02x%02x%02x", $1, $2, $3 }')"
+
+    if [[ "${cc_is_clang}" == "y" ]]; then
         # SeaBIOS cannot be built with clang
         cfgargs+=("--with-system-seabios=/usr/share/seabios/bios.bin")
         # iPXE cannot be built with clang
@@ -73,7 +79,7 @@ else
     fi
 
     # SeaBIOS requires GCC 4.6 or later
-    if [[ "${CC}" == "gcc" && `cc-ver` -lt 0x040600 ]]; then
+    if [[ "${cc_is_gcc}" == "y" && "${cc_ver}" -lt 0x040600 ]]; then
         cfgargs+=("--with-system-seabios=/bin/false")
     fi
 
