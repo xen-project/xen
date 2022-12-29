@@ -73,24 +73,3 @@ if [[ "${XEN_TARGET_ARCH}" != "x86_32" ]]; then
         cp -r dist binaries/
     fi
 fi
-
-if [[ "${hypervisor_only}" == "y" ]]; then
-    # If we are build testing a specific Kconfig exit now, there's no point in
-    # testing all the possible configs.
-    exit 0
-fi
-
-# Build all the configs we care about
-case ${XEN_TARGET_ARCH} in
-    x86_64) arch=x86 ;;
-    *) exit 0 ;;
-esac
-
-cfg_dir="automation/configs/${arch}"
-for cfg in `ls ${cfg_dir}`; do
-    echo "Building $cfg"
-    make -j$(nproc) -C xen clean
-    rm -f xen/.config
-    make -C xen KBUILD_DEFCONFIG=../../../../${cfg_dir}/${cfg} XEN_CONFIG_EXPERT=y defconfig
-    make -j$(nproc) -C xen XEN_CONFIG_EXPERT=y
-done
