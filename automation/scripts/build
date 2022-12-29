@@ -19,7 +19,9 @@ if [[ "${RANDCONFIG}" == "y" ]]; then
     fi
 
     make -j$(nproc) -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
-    hypervisor_only="y"
+
+    # RANDCONFIG implies HYPERVISOR_ONLY
+    HYPERVISOR_ONLY="y"
 else
     echo "CONFIG_DEBUG=${debug}" > xen/.config
 
@@ -34,15 +36,10 @@ fi
 # to exit early -- bash is invoked with -e.
 cp xen/.config xen-config
 
-# arm32 only cross-compiles the hypervisor
-if [[ "${XEN_TARGET_ARCH}" = "arm32" ]]; then
-    hypervisor_only="y"
-fi
-
 # Directory for the artefacts to be dumped into
 mkdir binaries
 
-if [[ "${hypervisor_only}" == "y" ]]; then
+if [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     # Xen-only build
     make -j$(nproc) xen
 

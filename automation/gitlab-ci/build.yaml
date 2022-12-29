@@ -516,22 +516,26 @@ debian-unstable-gcc-arm32:
   extends: .gcc-arm32-cross-build
   variables:
     CONTAINER: debian:unstable-arm32-gcc
+    HYPERVISOR_ONLY: y
 
 debian-unstable-gcc-arm32-debug:
   extends: .gcc-arm32-cross-build-debug
   variables:
     CONTAINER: debian:unstable-arm32-gcc
+    HYPERVISOR_ONLY: y
 
 debian-unstable-gcc-arm32-randconfig:
   extends: .gcc-arm32-cross-build
   variables:
     CONTAINER: debian:unstable-arm32-gcc
+    HYPERVISOR_ONLY: y
     RANDCONFIG: y
 
 debian-unstable-gcc-arm32-debug-randconfig:
   extends: .gcc-arm32-cross-build-debug
   variables:
     CONTAINER: debian:unstable-arm32-gcc
+    HYPERVISOR_ONLY: y
     RANDCONFIG: y
 
 # Arm builds
