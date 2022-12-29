@@ -1,3 +1,0 @@
-CONFIG_HVM=y
-# CONFIG_PV is not set
-# CONFIG_DEBUG is not set
