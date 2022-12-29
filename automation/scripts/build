@@ -65,7 +65,7 @@ else
         cfgargs+=("--disable-stubdom")
     fi
 
-    if  ! test -z "$(ldd /bin/ls|grep musl|head -1)"; then
+    if ldd /bin/ls | grep -q musl; then
         # disable --disable-werror for QEMUU when building with MUSL
         cfgargs+=("--with-extra-qemuu-configure-args=\"--disable-werror\"")
         # SeaBIOS doesn't build on MUSL systems
