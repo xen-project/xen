@@ -70,18 +70,24 @@ if [[ "${CC}" == "gcc" && `cc-ver` -lt 0x040600 ]]; then
     cfgargs+=("--with-system-seabios=/bin/false")
 fi
 
+# Directory for the artefacts to be dumped into
+mkdir binaries
+
 if [[ "${hypervisor_only}" == "y" ]]; then
+    # Xen-only build
     make -j$(nproc) xen
+
+    # Preserve artefacts
+    cp xen/xen binaries/xen
 else
+    # Full build
     ./configure "${cfgargs[@]}"
     make -j$(nproc) dist
-fi
 
-# Extract artifacts to avoid getting rewritten by customised builds
-mkdir binaries
-if [[ "${XEN_TARGET_ARCH}" != "x86_32" ]]; then
-    cp xen/xen binaries/xen
-    if [[ "${hypervisor_only}" != "y" ]]; then
-        cp -r dist binaries/
-    fi
+    # Preserve artefacts
+    # Note: Some smoke tests depending on finding binaries/xen on a full build
+    # even though dist/ contains everything, while some containers don't even
+    # build Xen
+    cp -r dist binaries/
+    if [[ -f xen/xen ]] ; then cp xen/xen binaries/xen; fi
 fi
