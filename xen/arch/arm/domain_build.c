@@ -3774,7 +3774,8 @@ static int __init construct_domU(struct domain *d,
     if ( rc != 0 )
         return rc;
 
-    printk("*** LOADING DOMU cpus=%u memory=%"PRIx64"KB ***\n", d->max_vcpus, mem);
+    printk("*** LOADING DOMU cpus=%u memory=%#"PRIx64"KB ***\n",
+           d->max_vcpus, mem);
 
     kinfo.vpl011 = dt_property_read_bool(node, "vpl011");
 
