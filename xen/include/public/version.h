@@ -124,8 +124,10 @@ typedef char xen_commandline_t[1024];
 /*
  * Return value is the number of bytes written, or XEN_Exx on error.
  * Calling with empty parameter returns the size of build_id.
+ *
+ * Note: structure only kept for backwards compatibility.  Xen operates in
+ * terms of xen_varbuf_t.
  */
-#define XENVER_build_id 10
 struct xen_build_id {
         uint32_t        len; /* IN: size of buf[]. */
         unsigned char   buf[XEN_FLEX_ARRAY_DIM];
@@ -164,6 +166,7 @@ typedef struct xen_varbuf xen_varbuf_t;
  * effect.  e.g. Xen has no control over the formatting used for the command
  * line.
  */
+#define XENVER_build_id      10
 #define XENVER_extraversion2 11
 #define XENVER_capabilities2 12
 #define XENVER_changeset2    13

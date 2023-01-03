@@ -509,9 +509,22 @@ static long xenver_varbuf_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     struct xen_varbuf user_str;
     const char *str = NULL;
     size_t sz;
+    int rc;
 
     switch ( cmd )
     {
+    case XENVER_build_id:
+    {
+        unsigned int local_sz;
+
+        rc = xen_build_id((const void **)&str, &local_sz);
+        if ( rc )
+            return rc;
+
+        sz = local_sz;
+        goto have_len;
+    }
+
     case XENVER_extraversion2:
         str = xen_extra_version();
         break;
@@ -535,6 +548,7 @@ static long xenver_varbuf_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     sz = strlen(str);
 
+ have_len:
     if ( sz > KB(64) ) /* Arbitrary limit.  Avoid long-running operations. */
         return -E2BIG;
 
@@ -738,41 +752,6 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     case XENVER_build_id:
-    {
-        xen_build_id_t build_id;
-        unsigned int sz;
-        int rc;
-        const void *p;
-
-        if ( deny )
-            return -EPERM;
-
-        /* Only return size. */
-        if ( !guest_handle_is_null(arg) )
-        {
-            if ( copy_from_guest(&build_id, arg, 1) )
-                return -EFAULT;
-
-            if ( build_id.len == 0 )
-                return -EINVAL;
-        }
-
-        rc = xen_build_id(&p, &sz);
-        if ( rc )
-            return rc;
-
-        if ( guest_handle_is_null(arg) )
-            return sz;
-
-        if ( sz > build_id.len )
-            return -ENOBUFS;
-
-        if ( copy_to_guest_offset(arg, offsetof(xen_build_id_t, buf), p, sz) )
-            return -EFAULT;
-
-        return sz;
-    }
-
     case XENVER_extraversion2:
     case XENVER_capabilities2:
     case XENVER_changeset2:
