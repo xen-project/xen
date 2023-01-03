@@ -518,11 +518,15 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     
     case XENVER_platform_parameters:
     {
+        const struct vcpu *curr = current;
+
 #ifdef CONFIG_COMPAT
-        if ( current->hcall_compat )
+        if ( curr->hcall_compat )
         {
             compat_platform_parameters_t params = {
-                .virt_start = HYPERVISOR_COMPAT_VIRT_START(current->domain),
+                .virt_start = is_pv_vcpu(curr)
+                            ? HYPERVISOR_COMPAT_VIRT_START(curr->domain)
+                            : 0,
             };
 
             if ( copy_to_guest(arg, &params, 1) )
@@ -532,7 +536,17 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 #endif
         {
             xen_platform_parameters_t params = {
-                .virt_start = HYPERVISOR_VIRT_START,
+                /*
+                 * Out of an abundance of caution, retain the useless return
+                 * value for 64bit PV guests, but in release builds only.
+                 *
+                 * This is not expected to cause any problems, but if it does,
+                 * the developer impacted will be the one best suited to fix
+                 * the caller not to issue this hypercall.
+                 */
+                .virt_start = !IS_ENABLED(CONFIG_DEBUG) && is_pv_vcpu(curr)
+                              ? HYPERVISOR_VIRT_START
+                              : 0,
             };
 
             if ( copy_to_guest(arg, &params, 1) )
