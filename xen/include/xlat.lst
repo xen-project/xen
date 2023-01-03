@@ -169,6 +169,9 @@
 !	vcpu_runstate_info		vcpu.h
 ?	vcpu_set_periodic_timer		vcpu.h
 !	vcpu_set_singleshot_timer	vcpu.h
+?	build_id                        version.h
+?	compile_info                    version.h
+?	feature_info                    version.h
 ?	xenoprof_init			xenoprof.h
 ?	xenoprof_passive		xenoprof.h
 ?	flask_access			xsm/flask_op.h

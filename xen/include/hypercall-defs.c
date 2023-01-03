@@ -245,7 +245,7 @@ multicall                          compat:2 do:2     compat   do       do
 update_va_mapping                  compat   do       -        -        -
 set_timer_op                       compat   do       compat   do       -
 event_channel_op_compat            do       do       -        -        dep
-xen_version                        compat   do       compat   do       do
+xen_version                        do       do       do       do       do
 console_io                         do       do       do       do       do
 physdev_op_compat                  compat   do       -        -        dep
 #if defined(CONFIG_GRANT_TABLE)

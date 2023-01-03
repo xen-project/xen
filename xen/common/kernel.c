@@ -18,7 +18,13 @@
 #include <asm/current.h>
 #include <public/version.h>
 
-#ifndef COMPAT
+#ifdef CONFIG_COMPAT
+#include <compat/version.h>
+
+CHECK_build_id;
+CHECK_compile_info;
+CHECK_feature_info;
+#endif
 
 enum system_state system_state = SYS_STATE_early_boot;
 
@@ -463,15 +469,7 @@ static int __init cf_check param_init(void)
 __initcall(param_init);
 #endif
 
-# define DO(fn) long do_##fn
-
-#endif
-
-/*
- * Simple hypercalls.
- */
-
-DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     bool_t deny = !!xsm_xen_version(XSM_OTHER, cmd);
 
@@ -520,12 +518,27 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     
     case XENVER_platform_parameters:
     {
-        xen_platform_parameters_t params = {
-            .virt_start = HYPERVISOR_VIRT_START
-        };
+#ifdef CONFIG_COMPAT
+        if ( current->hcall_compat )
+        {
+            compat_platform_parameters_t params = {
+                .virt_start = HYPERVISOR_COMPAT_VIRT_START(current->domain),
+            };
 
-        if ( copy_to_guest(arg, &params, 1) )
-            return -EFAULT;
+            if ( copy_to_guest(arg, &params, 1) )
+                return -EFAULT;
+        }
+        else
+#endif
+        {
+            xen_platform_parameters_t params = {
+                .virt_start = HYPERVISOR_VIRT_START,
+            };
+
+            if ( copy_to_guest(arg, &params, 1) )
+                return -EFAULT;
+        }
+
         return 0;
         
     }
