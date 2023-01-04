@@ -77,6 +77,7 @@ static bool __initdata cpu_has_bug_mds; /* Any other M{LP,SB,FB}DS combination. 
 static int8_t __initdata opt_srb_lock = -1;
 static bool __initdata opt_unpriv_mmio;
 static bool __read_mostly opt_fb_clear_mmio;
+static int8_t __initdata opt_gds_mit = -1;
 
 static int __init parse_spec_ctrl(const char *s)
 {
@@ -130,6 +131,7 @@ static int __init parse_spec_ctrl(const char *s)
             opt_branch_harden = false;
             opt_srb_lock = 0;
             opt_unpriv_mmio = false;
+            opt_gds_mit = 0;
         }
         else if ( val > 0 )
             rc = -EINVAL;
@@ -280,6 +282,8 @@ static int __init parse_spec_ctrl(const char *s)
             opt_srb_lock = val;
         else if ( (val = parse_boolean("unpriv-mmio", s, ss)) >= 0 )
             opt_unpriv_mmio = val;
+        else if ( (val = parse_boolean("gds-mit", s, ss)) >= 0 )
+            opt_gds_mit = val;
         else
             rc = -EINVAL;
 
@@ -1247,6 +1251,158 @@ static __init void mds_calculations(void)
     }
 }
 
+static bool __init cpu_has_gds(void)
+{
+    /*
+     * Any part advertising GDS_NO should be not vulnerable to GDS.  This
+     * includes cases where the hypervisor is mitigating behind our backs, or
+     * has synthesized GDS_NO on older parts for levelling purposes.
+     */
+    if ( cpu_has_gds_no )
+        return false;
+
+    /*
+     * On real hardware the GDS_CTRL control only exists on parts vulnerable
+     * to GDS and with up-to-date microcode.  It might also be virtualised by
+     * an aware hypervisor, meaning "somewhere you might migrate to is
+     * vulnerable".
+     */
+    if ( cpu_has_gds_ctrl )
+        return true;
+
+    /*
+     * An attacker requires the use of the AVX2 GATHER instructions to leak
+     * data with GDS.  However, the only way to block those instructions is to
+     * prevent XCR0[2] from being set, which is original AVX.  A hypervisor
+     * might do this as a stopgap mitigation.
+     */
+    if ( !cpu_has_avx )
+        return false;
+
+    /*
+     * GDS affects the Core line from Skylake up to but not including Golden
+     * Cove (Alder Lake, Sapphire Rapids).  Broadwell and older, and the Atom
+     * line, and all hybrid parts are unaffected.
+     */
+    switch ( boot_cpu_data.x86_model )
+    {
+    case 0x55: /* Skylake/Cascade Lake/Cooper Lake SP */
+    case 0x6a: /* Ice Lake SP */
+    case 0x6c: /* Ice Lake D */
+    case 0x7e: /* Ice Lake U/Y */
+    case 0x8c: /* Tiger Lake U */
+    case 0x8d: /* Tiger Lake H */
+    case 0x8e: /* Amber/Kaby/Coffee/Whiskey/Comet lake U/Y */
+    case 0x9e: /* Kaby/Coffee lake H/S/Xeon */
+    case 0xa5: /* Comet Lake H/S */
+    case 0xa6: /* Comet Lake U */
+    case 0xa7: /* Rocket Lake */
+        return true;
+
+    default:
+        /*
+         * If we've got here and are virtualised, we're most likely under a
+         * hypervisor unaware of GDS at which point we've lost.  Err on the
+         * safe side.
+         */
+        return cpu_has_hypervisor;
+    }
+}
+
+static void __init gds_calculations(void)
+{
+    bool cpu_has_bug_gds, mitigated = false;
+
+    /* GDS is only known to affect Intel Family 6 processors at this time. */
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
+        return;
+
+    cpu_has_bug_gds = cpu_has_gds();
+
+    /*
+     * If we've got GDS_CTRL, we're either native with up-to-date microcode on
+     * a GDS-vulnerable part, or virtualised under a GDS-aware hypervisor.
+     */
+    if ( cpu_has_gds_ctrl )
+    {
+        bool locked;
+        uint64_t opt_ctrl;
+
+        if ( cpu_has_gds_no )
+        {
+            /*
+             * We don't expect to ever see GDS_CTL and GDS_NO set together.
+             * Complain loudly, and forgo playing with other features.
+             */
+            printk(XENLOG_ERR
+                   "FIRMWARE BUG: CPU %02x-%02x-%02x, ucode 0x%08x: GDS_CTRL && GDS_NO\n",
+                   boot_cpu_data.x86, boot_cpu_data.x86_model,
+                   boot_cpu_data.x86_mask, this_cpu(cpu_sig).rev);
+            return add_taint(TAINT_CPU_OUT_OF_SPEC);
+        }
+
+        rdmsrl(MSR_MCU_OPT_CTRL, opt_ctrl);
+
+        mitigated = !(opt_ctrl & MCU_OPT_CTRL_GDS_MIT_DIS);
+        locked    =   opt_ctrl & MCU_OPT_CTRL_GDS_MIT_LOCK;
+
+        /*
+         * Firmware will lock the GDS mitigation if e.g. SGX is active.
+         * Alternatively, a hypervisor might virtualise GDS_CTRL as locked.
+         * Warn if the mitigiation is locked and the user requested the
+         * opposite configuration.
+         */
+        if ( locked )
+        {
+            if ( opt_gds_mit >= 0 && opt_gds_mit != mitigated )
+                printk(XENLOG_WARNING
+                       "GDS_MIT locked by firwmare - ignoring spec-ctrl=gds-mit setting\n");
+            opt_gds_mit = mitigated;
+        }
+        else if ( opt_gds_mit == -1 )
+            opt_gds_mit = cpu_has_bug_gds; /* Mitigate GDS by default */
+
+        /*
+         * Latch our choice of GDS_MIT for all CPUs to pick up.  If LOCK is
+         * set, we latch the same value as it currently holds.
+         */
+        set_in_mcu_opt_ctrl(MCU_OPT_CTRL_GDS_MIT_DIS,
+                            opt_gds_mit ? 0 : MCU_OPT_CTRL_GDS_MIT_DIS);
+        mitigated = opt_gds_mit;
+    }
+    else if ( opt_gds_mit == -1 )
+        opt_gds_mit = cpu_has_bug_gds; /* Mitigate GDS by default */
+
+    /*
+     * If we think we're not on vulnerable hardware, or we've mitigated GDS,
+     * synthesize GDS_NO.  This is mostly for the benefit of guests, to inform
+     * them not to panic.
+     */
+    if ( !cpu_has_bug_gds || mitigated )
+        return setup_force_cpu_cap(X86_FEATURE_GDS_NO);
+
+    /*
+     * If all else has failed, mitigate by disabling AVX.  This prevents
+     * guests from enabling %xcr0.ymm, thereby blocking the use of VGATHER
+     * instructions.
+     *
+     * There's at least one affected CPU not expected to recieve a microcode
+     * update, and this is the only remaining mitigation.
+     *
+     * If we're virtualised, this prevents our guests attacking each other,
+     * but it doesn't stop the outer hypervisor's guests attacking us.  Leave
+     * a note to this effect.
+     */
+    if ( cpu_has_avx && opt_gds_mit )
+    {
+        setup_clear_cpu_cap(X86_FEATURE_AVX);
+        printk(XENLOG_WARNING "Mitigating GDS by disabling AVX%s\n",
+               cpu_has_hypervisor ?
+               " while virtualised - protections are best-effort" : "");
+    }
+}
+
 void spec_ctrl_init_domain(struct domain *d)
 {
     bool pv = is_pv_domain(d);
@@ -1660,6 +1816,8 @@ void __init init_speculation_mitigations(void)
         set_in_mcu_opt_ctrl(MCU_OPT_CTRL_RNGDS_MITG_DIS,
                             opt_srb_lock ? 0 : MCU_OPT_CTRL_RNGDS_MITG_DIS);
     }
+
+    gds_calculations();
 
     print_details(thunk);
 

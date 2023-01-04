@@ -2124,7 +2124,7 @@ By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
 >              {msr-sc,rsb,md-clear,ibpb-entry}=<bool>|{pv,hvm}=<bool>,
 >              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,psfd,
 >              eager-fpu,l1d-flush,branch-harden,srb-lock,
->              unpriv-mmio}=<bool> ]`
+>              unpriv-mmio,gds-mit}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -2235,6 +2235,14 @@ default, this option is disabled.  If enabled, Xen will use the `FB_CLEAR`
 and/or `SRBDS_CTRL` functionality available in the Intel May 2022 microcode
 release to mitigate cross-domain leakage of data via the MMIO Stale Data
 vulnerabilities.
+
+On all hardware, the `gds-mit=` option can be used to force or prevent Xen
+from mitigating the GDS (Gather Data Sampling) vulnerability.  By default, Xen
+will mitigate GDS on hardware believed to be vulnerable.  On hardware
+supporting GDS_CTRL (requires the August 2023 microcode), and where firmware
+has elected not to lock the configuration, Xen will use GDS_CTRL to mitigate
+GDS with.  Otherwise, Xen will mitigate by disabling AVX, which blocks the use
+of the AVX2 Gather instructions.
 
 ### sync_console
 > `= <boolean>`
