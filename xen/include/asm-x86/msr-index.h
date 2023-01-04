@@ -68,6 +68,8 @@
 #define  ARCH_CAPS_RRSBA                    (_AC(1, ULL) << 19)
 #define  ARCH_CAPS_BHI_NO                   (_AC(1, ULL) << 20)
 #define  ARCH_CAPS_PBRSB_NO                 (_AC(1, ULL) << 24)
+#define  ARCH_CAPS_GDS_CTRL                 (_AC(1, ULL) << 25)
+#define  ARCH_CAPS_GDS_NO                   (_AC(1, ULL) << 26)
 
 #define MSR_FLUSH_CMD                       0x0000010b
 #define  FLUSH_CMD_L1D                      (_AC(1, ULL) <<  0)
@@ -86,6 +88,8 @@
 #define  MCU_OPT_CTRL_RTM_ALLOW             (_AC(1, ULL) <<  1)
 #define  MCU_OPT_CTRL_RTM_LOCKED            (_AC(1, ULL) <<  2)
 #define  MCU_OPT_CTRL_FB_CLEAR_DIS          (_AC(1, ULL) <<  3)
+#define  MCU_OPT_CTRL_GDS_MIT_DIS           (_AC(1, ULL) <<  4)
+#define  MCU_OPT_CTRL_GDS_MIT_LOCK          (_AC(1, ULL) <<  5)
 
 #define MSR_RTIT_OUTPUT_BASE                0x00000560
 #define MSR_RTIT_OUTPUT_MASK                0x00000561

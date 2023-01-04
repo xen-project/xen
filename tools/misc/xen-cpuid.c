@@ -223,7 +223,8 @@ static const char *const str_m10Al[32] =
     [18] = "fb-clear-ctrl",       [19] = "rrsba",
     [20] = "bhi-no",              [21] = "xapic-status",
     /* 22 */                      [23] = "ovrclk-status",
-    [24] = "pbrsb-no",
+    [24] = "pbrsb-no",            [25] = "gds-ctrl",
+    [26] = "gds-no",
 };
 
 static const char *const str_m10Ah[32] =
