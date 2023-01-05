@@ -22,6 +22,8 @@
 #include "util.h"
 #include "config.h"
 
+#include <xen/asm/x86-defns.h>
+
 #define MSR_MTRRphysBase(reg) (0x200 + 2 * (reg))
 #define MSR_MTRRphysMask(reg) (0x200 + 2 * (reg) + 1)
 #define MSR_MTRRcap          0x00fe
@@ -71,23 +73,28 @@ void cacheattr_init(void)
 
     addr_mask = ((1ull << phys_bits) - 1) & ~((1ull << 12) - 1);
     mtrr_cap = rdmsr(MSR_MTRRcap);
-    mtrr_def = (1u << 11) | 6; /* E, default type WB */
+    mtrr_def = (1u << 11) | X86_MT_WB; /* E, default type WB */
 
     /* Fixed-range MTRRs supported? */
     if ( mtrr_cap & (1u << 8) )
     {
+#define BCST(mt) ((mt) * 0x0101010101010101ULL)
         /* 0x00000-0x9ffff: Write Back (WB) */
-        content = 0x0606060606060606ull;
+        content = BCST(X86_MT_WB);
         wrmsr(MSR_MTRRfix64K_00000, content);
         wrmsr(MSR_MTRRfix16K_80000, content);
+
         /* 0xa0000-0xbffff: Write Combining (WC) */
         if ( mtrr_cap & (1u << 10) ) /* WC supported? */
-            content = 0x0101010101010101ull;
+            content = BCST(X86_MT_WC);
         wrmsr(MSR_MTRRfix16K_A0000, content);
+
         /* 0xc0000-0xfffff: Write Back (WB) */
-        content = 0x0606060606060606ull;
+        content = BCST(X86_MT_WB);
         for ( i = 0; i < 8; i++ )
             wrmsr(MSR_MTRRfix4K_C0000 + i, content);
+#undef BCST
+
         mtrr_def |= 1u << 10; /* FE */
         printf("fixed MTRRs ... ");
     }
@@ -106,7 +113,7 @@ void cacheattr_init(void)
             while ( ((base + size) < base) || ((base + size) > pci_mem_end) )
                 size >>= 1;
 
-            wrmsr(MSR_MTRRphysBase(i), base);
+            wrmsr(MSR_MTRRphysBase(i), base | X86_MT_UC);
             wrmsr(MSR_MTRRphysMask(i), (~(size - 1) & addr_mask) | (1u << 11));
 
             base += size;
@@ -121,7 +128,7 @@ void cacheattr_init(void)
             while ( (base + size < base) || (base + size > pci_hi_mem_end) )
                 size >>= 1;
 
-            wrmsr(MSR_MTRRphysBase(i), base);
+            wrmsr(MSR_MTRRphysBase(i), base | X86_MT_UC);
             wrmsr(MSR_MTRRphysMask(i), (~(size - 1) & addr_mask) | (1u << 11));
 
             base += size;
