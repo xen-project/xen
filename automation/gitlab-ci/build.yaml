@@ -172,6 +172,33 @@
   variables:
     <<: *gcc
 
+.riscv64-cross-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: riscv64
+  tags:
+    - x86_64
+
+.riscv64-cross-build:
+  extends: .riscv64-cross-build-tmpl
+  variables:
+    debug: n
+
+.riscv64-cross-build-debug:
+  extends: .riscv64-cross-build-tmpl
+  variables:
+    debug: y
+
+.gcc-riscv64-cross-build:
+  extends: .riscv64-cross-build
+  variables:
+    <<: *gcc
+
+.gcc-riscv64-cross-build-debug:
+  extends: .riscv64-cross-build-debug
+  variables:
+    <<: *gcc
+
 # Jobs below this line
 
 archlinux-gcc:
@@ -618,6 +645,35 @@ alpine-3.12-gcc-debug-arm64-boot-cpupools:
     CONTAINER: alpine:3.12-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_BOOT_TIME_CPUPOOLS=y
+
+# RISC-V 64 cross-build
+riscv64-cross-gcc:
+  extends: .gcc-riscv64-cross-build
+  variables:
+    CONTAINER: archlinux:riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    HYPERVISOR_ONLY: y
+
+riscv64-cross-gcc-debug:
+  extends: .gcc-riscv64-cross-build-debug
+  variables:
+    CONTAINER: archlinux:riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    HYPERVISOR_ONLY: y
+
+riscv64-cross-gcc-randconfig:
+  extends: .gcc-riscv64-cross-build
+  variables:
+    CONTAINER: archlinux:riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    RANDCONFIG: y
+
+riscv64-cross-gcc-debug-randconfig:
+  extends: .gcc-riscv64-cross-build-debug
+  variables:
+    CONTAINER: archlinux:riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    RANDCONFIG: y
 
 ## Test artifacts common
 
