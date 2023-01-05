@@ -1,6 +1,4 @@
-#include <asm/config.h>
-
-        .text
+        .section .text.header, "ax", %progbits
 
 ENTRY(start)
         j  start

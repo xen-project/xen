@@ -1,1 +1,1 @@
-extra-y += head.o
+obj-y += head.o

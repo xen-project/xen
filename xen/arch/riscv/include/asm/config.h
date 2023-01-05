@@ -1,6 +1,9 @@
 #ifndef __RISCV_CONFIG_H__
 #define __RISCV_CONFIG_H__
 
+#include <xen/const.h>
+#include <xen/page-size.h>
+
 #if defined(CONFIG_RISCV_64)
 # define LONG_BYTEORDER 3
 # define ELFSIZE 64
@@ -28,13 +31,17 @@
 
 /* Linkage for RISCV */
 #ifdef __ASSEMBLY__
-#define ALIGN .align 2
+#define ALIGN .align 4
 
 #define ENTRY(name)                                \
   .globl name;                                     \
   ALIGN;                                           \
   name:
 #endif
+
+#define XEN_VIRT_START  _AT(UL, 0x80200000)
+
+#define SMP_CACHE_BYTES (1 << 6)
 
 #endif /* __RISCV_CONFIG_H__ */
 /*
