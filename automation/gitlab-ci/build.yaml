@@ -667,6 +667,8 @@ riscv64-cross-gcc-randconfig:
     CONTAINER: archlinux:riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     RANDCONFIG: y
+    EXTRA_FIXED_RANDCONFIG:
+      CONFIG_COVERAGE=n
 
 riscv64-cross-gcc-debug-randconfig:
   extends: .gcc-riscv64-cross-build-debug
@@ -674,6 +676,8 @@ riscv64-cross-gcc-debug-randconfig:
     CONTAINER: archlinux:riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     RANDCONFIG: y
+    EXTRA_FIXED_RANDCONFIG:
+      CONFIG_COVERAGE=n
 
 ## Test artifacts common
 
