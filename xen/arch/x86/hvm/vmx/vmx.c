@@ -3555,17 +3555,25 @@ static int cf_check vmx_msr_write_intercept(
             goto gp_fault;
 
         /*
+         * The Arch LBR spec (new in Ice Lake) states that CPUs with no
+         * model-specific LBRs implement MSR_DBG_CTL.LBR by discarding writes
+         * and always returning 0.
+         *
+         * Use this property in all cases where we don't know any
+         * model-specific LBR information, as it matches real hardware
+         * behaviour on post-Ice Lake systems.
+         */
+        if ( !model_specific_lbr )
+            msr_content &= ~IA32_DEBUGCTLMSR_LBR;
+
+        /*
          * When a guest first enables LBR, arrange to save and restore the LBR
          * MSRs and allow the guest direct access.
          *
-         * MSR_DEBUGCTL and LBR has existed almost as long as MSRs have
-         * existed, and there is no architectural way to hide the feature, or
-         * fail the attempt to enable LBR.
-         *
-         * Unknown host LBR MSRs or hitting -ENOSPC with the guest load/save
-         * list are definitely hypervisor bugs, whereas -ENOMEM for allocating
-         * the load/save list is simply unlucky (and shouldn't occur with
-         * sensible management by the toolstack).
+         * Hitting -ENOSPC with the guest load/save list is definitely a
+         * hypervisor bug, whereas -ENOMEM for allocating the load/save list
+         * is simply unlucky (and shouldn't occur with sensible management by
+         * the toolstack).
          *
          * Either way, there is nothing we can do right now to recover, and
          * the guest won't execute correctly either.  Simply crash the domain
@@ -3575,13 +3583,6 @@ static int cf_check vmx_msr_write_intercept(
              (msr_content & IA32_DEBUGCTLMSR_LBR) )
         {
             const struct lbr_info *lbr = model_specific_lbr;
-
-            if ( unlikely(!lbr) )
-            {
-                gprintk(XENLOG_ERR, "Unknown Host LBR MSRs\n");
-                domain_crash(v->domain);
-                return X86EMUL_OKAY;
-            }
 
             for ( ; lbr->count; lbr++ )
             {
