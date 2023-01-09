@@ -3777,6 +3777,8 @@ static void cf_check sh_pagetable_dying(paddr_t gpa)
     unsigned long l3gfn;
     mfn_t l3mfn;
 
+    ASSERT(is_hvm_domain(d));
+
     gcr3 = v->arch.hvm.guest_cr[3];
     /* fast path: the pagetable belongs to the current context */
     if ( gcr3 == gpa )
@@ -3819,7 +3821,7 @@ static void cf_check sh_pagetable_dying(paddr_t gpa)
                    : shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_pae_shadow);
         }
 
-        if ( mfn_valid(smfn) && is_hvm_domain(d) )
+        if ( mfn_valid(smfn) )
         {
             gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
             mfn_to_page(gmfn)->pagetable_dying = true;
@@ -3851,6 +3853,8 @@ static void cf_check sh_pagetable_dying(paddr_t gpa)
     mfn_t smfn, gmfn;
     p2m_type_t p2mt;
 
+    ASSERT(is_hvm_domain(d));
+
     gmfn = get_gfn_query(d, _gfn(gpa >> PAGE_SHIFT), &p2mt);
     paging_lock(d);
 
@@ -3860,7 +3864,7 @@ static void cf_check sh_pagetable_dying(paddr_t gpa)
     smfn = shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l4_64_shadow);
 #endif
 
-    if ( mfn_valid(smfn) && is_hvm_domain(d) )
+    if ( mfn_valid(smfn) )
     {
         mfn_to_page(gmfn)->pagetable_dying = true;
         shadow_unhook_mappings(d, smfn, 1/* user pages only */);
