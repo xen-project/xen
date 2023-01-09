@@ -583,9 +583,7 @@ static inline int sh_get_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
     sp->u.sh.count = nx;
 
     /* We remember the first shadow entry that points to each shadow. */
-    if ( entry_pa != 0
-         && sh_type_has_up_pointer(d, sp->u.sh.type)
-         && sp->up == 0 )
+    if ( !sp->up && sh_type_has_up_pointer(d, sp->u.sh.type) )
         sp->up = entry_pa;
 
     return 1;
@@ -604,10 +602,11 @@ static inline void sh_put_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
     ASSERT(!(sp->count_info & PGC_count_mask));
 
     /* If this is the entry in the up-pointer, remove it */
-    if ( entry_pa != 0
-         && sh_type_has_up_pointer(d, sp->u.sh.type)
-         && sp->up == entry_pa )
+    if ( sp->up == entry_pa )
+    {
+        ASSERT(!entry_pa || sh_type_has_up_pointer(d, sp->u.sh.type));
         sp->up = 0;
+    }
 
     x = sp->u.sh.count;
     nx = x - 1;
