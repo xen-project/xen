@@ -3916,13 +3916,13 @@ static void cf_check sh_pagetable_dying(paddr_t gpa)
     done = 1;                                                           \
 } while (0)
 
-static const char *sh_audit_flags(struct vcpu *v, int level,
+static const char *sh_audit_flags(const struct domain *d, int level,
                                   int gflags, int sflags)
 /* Common code for auditing flag bits */
 {
     if ( (sflags & _PAGE_PRESENT) && !(gflags & _PAGE_PRESENT) )
         return "shadow is present but guest is not present";
-    if ( (sflags & _PAGE_GLOBAL) && !is_hvm_vcpu(v) )
+    if ( (sflags & _PAGE_GLOBAL) && !is_hvm_domain(d) )
         return "global bit set in PV shadow";
     if ( level == 2 && (sflags & _PAGE_PSE) )
         return "PS bit set in shadow";
@@ -3945,6 +3945,7 @@ static const char *sh_audit_flags(struct vcpu *v, int level,
 
 int cf_check sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
 {
+    struct domain *d = v->domain;
     guest_l1e_t *gl1e, *gp;
     shadow_l1e_t *sl1e;
     mfn_t mfn, gmfn, gl1mfn;
@@ -3961,7 +3962,7 @@ int cf_check sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     /* Out-of-sync l1 shadows can contain anything: just check the OOS hash */
     if ( page_is_out_of_sync(mfn_to_page(gl1mfn)) )
     {
-        oos_audit_hash_is_present(v->domain, gl1mfn);
+        oos_audit_hash_is_present(d, gl1mfn);
         return 0;
     }
 #endif
@@ -3991,7 +3992,7 @@ int cf_check sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
         }
         else
         {
-            s = sh_audit_flags(v, 1, guest_l1e_get_flags(*gl1e),
+            s = sh_audit_flags(d, 1, guest_l1e_get_flags(*gl1e),
                                shadow_l1e_get_flags(*sl1e));
             if ( s ) AUDIT_FAIL(1, "%s", s);
 
@@ -3999,7 +4000,7 @@ int cf_check sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
             {
                 gfn = guest_l1e_get_gfn(*gl1e);
                 mfn = shadow_l1e_get_mfn(*sl1e);
-                gmfn = get_gfn_query_unlocked(v->domain, gfn_x(gfn), &p2mt);
+                gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
                 if ( !p2m_is_grant(p2mt) && !mfn_eq(gmfn, mfn) )
                     AUDIT_FAIL(1, "bad translation: gfn %" SH_PRI_gfn
                                " --> %" PRI_mfn " != mfn %" PRI_mfn,
@@ -4061,8 +4062,8 @@ int cf_check sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
     gl2e = gp = map_domain_page(gl2mfn);
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, &gl2e, done, d, {
 
-        s = sh_audit_flags(v, 2, guest_l2e_get_flags(*gl2e),
-                            shadow_l2e_get_flags(*sl2e));
+        s = sh_audit_flags(d, 2, guest_l2e_get_flags(*gl2e),
+                           shadow_l2e_get_flags(*sl2e));
         if ( s ) AUDIT_FAIL(2, "%s", s);
 
         if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_MFNS )
@@ -4113,8 +4114,8 @@ int cf_check sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
     gl3e = gp = map_domain_page(gl3mfn);
     SHADOW_FOREACH_L3E(sl3mfn, sl3e, &gl3e, done, {
 
-        s = sh_audit_flags(v, 3, guest_l3e_get_flags(*gl3e),
-                            shadow_l3e_get_flags(*sl3e));
+        s = sh_audit_flags(d, 3, guest_l3e_get_flags(*gl3e),
+                           shadow_l3e_get_flags(*sl3e));
         if ( s ) AUDIT_FAIL(3, "%s", s);
 
         if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_MFNS )
@@ -4161,8 +4162,8 @@ int cf_check sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
     gl4e = gp = map_domain_page(gl4mfn);
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, &gl4e, done, d,
     {
-        s = sh_audit_flags(v, 4, guest_l4e_get_flags(*gl4e),
-                            shadow_l4e_get_flags(*sl4e));
+        s = sh_audit_flags(d, 4, guest_l4e_get_flags(*gl4e),
+                           shadow_l4e_get_flags(*sl4e));
         if ( s ) AUDIT_FAIL(4, "%s", s);
 
         if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_MFNS )
