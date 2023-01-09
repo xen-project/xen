@@ -2035,7 +2035,6 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
     /* We killed at least one writeable mapping, so must flush TLBs. */
     return 1;
 }
-#endif /* CONFIG_HVM */
 
 /**************************************************************************/
 /* Remove all mappings of a guest frame from the shadow tables.
@@ -2047,12 +2046,10 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
 
     /* Dispatch table for getting per-type functions */
     static const hash_domain_callback_t callbacks[SH_type_unused] = {
-#ifdef CONFIG_HVM
         [SH_type_l1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2),
         [SH_type_fl1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2),
         [SH_type_l1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3),
         [SH_type_fl1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3),
-#endif
         [SH_type_l1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4),
         [SH_type_fl1_64_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 4),
     };
@@ -2107,6 +2104,7 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
     return 1;
 }
 
+#endif /* CONFIG_HVM */
 
 /**************************************************************************/
 /* Remove all shadows of a guest frame from the shadow tables */
