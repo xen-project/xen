@@ -38,6 +38,18 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
         wrmsr(msr, lo, hi);
 }
 
+/* Non-serialising WRMSR, when available.  Falls back to a serialising WRMSR. */
+static inline void wrmsr_ns(uint32_t msr, uint32_t lo, uint32_t hi)
+{
+    /*
+     * WRMSR is 2 bytes.  WRMSRNS is 3 bytes.  Pad WRMSR with a redundant CS
+     * prefix to avoid a trailing NOP.
+     */
+    alternative_input(".byte 0x2e; wrmsr",
+                      ".byte 0x0f,0x01,0xc6", X86_FEATURE_WRMSRNS,
+                      "c" (msr), "a" (lo), "d" (hi));
+}
+
 /* rdmsr with exception handling */
 #define rdmsr_safe(msr,val) ({\
     int rc_; \

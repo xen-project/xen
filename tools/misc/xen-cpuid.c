@@ -189,6 +189,8 @@ static const char *const str_7a1[32] =
 
     [10] = "fzrm",          [11] = "fsrs",
     [12] = "fsrcs",
+
+    /* 18 */                [19] = "wrmsrns",
 };
 
 static const char *const str_e21a[32] =
