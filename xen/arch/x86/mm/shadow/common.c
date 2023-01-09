@@ -1422,7 +1422,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
         /* Not a shadow? */
         BUG_ON( (sp->count_info & PGC_count_mask )!= 0 ) ;
         /* Bogus type? */
-        BUG_ON( sp->u.sh.type == 0 );
+        BUG_ON( sp->u.sh.type < SH_type_min_shadow );
         BUG_ON( sp->u.sh.type > SH_type_max_shadow );
         /* Wrong page of a multi-page shadow? */
         BUG_ON( !sp->u.sh.head );
@@ -2120,8 +2120,6 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
     l1_pgentry_t *vaddr;
     int rc;
 
-    ASSERT(sp->u.sh.type > 0);
-    ASSERT(sp->u.sh.type < SH_type_max_shadow);
     ASSERT(sh_type_has_up_pointer(d, sp->u.sh.type));
 
     if (sp->up == 0) return 0;
