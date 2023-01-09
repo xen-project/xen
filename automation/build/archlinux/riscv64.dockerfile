@@ -9,7 +9,9 @@ RUN pacman --noconfirm --needed -Syu \
     inetutils \
     riscv64-linux-gnu-binutils \
     riscv64-linux-gnu-gcc \
-    riscv64-linux-gnu-glibc
+    riscv64-linux-gnu-glibc \
+    # For test phase
+    qemu-system-riscv
 
 # Add compiler path
 ENV CROSS_COMPILE=riscv64-linux-gnu-
