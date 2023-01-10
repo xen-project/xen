@@ -43,6 +43,8 @@
 
 #define SMP_CACHE_BYTES (1 << 6)
 
+#define STACK_SIZE PAGE_SIZE
+
 #endif /* __RISCV_CONFIG_H__ */
 /*
  * Local variables:
