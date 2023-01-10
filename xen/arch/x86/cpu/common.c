@@ -936,6 +936,9 @@ void cpu_init(void)
 	write_debugreg(6, X86_DR6_DEFAULT);
 	write_debugreg(7, X86_DR7_DEFAULT);
 
+	if (cpu_has_pku)
+		wrpkru(0);
+
 	/*
 	 * If the platform is performing a Secure Launch via SKINIT, GIF is
 	 * clear to prevent external interrupts interfering with Secure
