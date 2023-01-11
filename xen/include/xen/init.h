@@ -1,8 +1,6 @@
 #ifndef _LINUX_INIT_H
 #define _LINUX_INIT_H
 
-#include <asm/init.h>
-
 /*
  * Mark functions and data as being only used at initialization
  * or exit time.

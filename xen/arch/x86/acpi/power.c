@@ -17,7 +17,6 @@
 #include <xen/sched.h>
 #include <asm/acpi.h>
 #include <asm/irq.h>
-#include <asm/init.h>
 #include <xen/spinlock.h>
 #include <xen/sched.h>
 #include <xen/domain.h>

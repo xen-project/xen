@@ -168,6 +168,14 @@ int map_range_to_domain(const struct dt_device_node *dev,
 
 extern const char __ro_after_init_start[], __ro_after_init_end[];
 
+struct init_info
+{
+    /* Pointer to the stack, used by head.S when entering in C */
+    unsigned char *stack;
+    /* Logical CPU ID, used by start_secondary */
+    unsigned int cpuid;
+};
+
 #endif
 /*
  * Local variables:

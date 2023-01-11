@@ -10,6 +10,7 @@
 #include <xen/bitops.h>
 #include <public/xen.h>
 #include <asm/current.h>
+#include <asm/setup.h>
 #include <asm/smccc.h>
 
 #define DEFINE(_sym, _val)                                                 \

@@ -11,6 +11,7 @@
 #include <public/xen.h>
 #include <asm/current.h>
 #include <asm/procinfo.h>
+#include <asm/setup.h>
 
 #define DEFINE(_sym, _val)                                                 \
     asm volatile ("\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\"" \
