@@ -171,7 +171,7 @@ static void sh_oos_audit(struct domain *d)
         for ( idx = 0; idx < SHADOW_OOS_PAGES; idx++ )
         {
             mfn_t *oos = v->arch.paging.shadow.oos;
-            if ( !mfn_valid(oos[idx]) )
+            if ( mfn_eq(oos[idx], INVALID_MFN) )
                 continue;
 
             expected_idx = mfn_x(oos[idx]) % SHADOW_OOS_PAGES;
@@ -327,8 +327,7 @@ void oos_fixup_add(struct domain *d, mfn_t gmfn,
             int i;
             for ( i = 0; i < SHADOW_OOS_FIXUPS; i++ )
             {
-                if ( mfn_valid(oos_fixup[idx].smfn[i])
-                     && mfn_eq(oos_fixup[idx].smfn[i], smfn)
+                if ( mfn_eq(oos_fixup[idx].smfn[i], smfn)
                      && (oos_fixup[idx].off[i] == off) )
                     return;
             }
@@ -461,7 +460,7 @@ static void oos_hash_add(struct vcpu *v, mfn_t gmfn)
     idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
     oidx = idx;
 
-    if ( mfn_valid(oos[idx])
+    if ( !mfn_eq(oos[idx], INVALID_MFN)
          && (mfn_x(oos[idx]) % SHADOW_OOS_PAGES) == idx )
     {
         /* Punt the current occupant into the next slot */
@@ -470,8 +469,8 @@ static void oos_hash_add(struct vcpu *v, mfn_t gmfn)
         swap = 1;
         idx = (idx + 1) % SHADOW_OOS_PAGES;
     }
-    if ( mfn_valid(oos[idx]) )
-   {
+    if ( !mfn_eq(oos[idx], INVALID_MFN) )
+    {
         /* Crush the current occupant. */
         _sh_resync(v, oos[idx], &oos_fixup[idx], oos_snapshot[idx]);
         perfc_incr(shadow_unsync_evict);
@@ -607,7 +606,7 @@ void sh_resync_all(struct vcpu *v, int skip, int this, int others)
 
     /* First: resync all of this vcpu's oos pages */
     for ( idx = 0; idx < SHADOW_OOS_PAGES; idx++ )
-        if ( mfn_valid(oos[idx]) )
+        if ( !mfn_eq(oos[idx], INVALID_MFN) )
         {
             /* Write-protect and sync contents */
             _sh_resync(v, oos[idx], &oos_fixup[idx], oos_snapshot[idx]);
@@ -630,7 +629,7 @@ void sh_resync_all(struct vcpu *v, int skip, int this, int others)
 
         for ( idx = 0; idx < SHADOW_OOS_PAGES; idx++ )
         {
-            if ( !mfn_valid(oos[idx]) )
+            if ( mfn_eq(oos[idx], INVALID_MFN) )
                 continue;
 
             if ( skip )
@@ -2231,7 +2230,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
          !(pg->shadow_flags & (1 << t)) )                               \
         break;                                                          \
     smfn = shadow_hash_lookup(d, mfn_x(gmfn), t);                       \
-    if ( unlikely(!mfn_valid(smfn)) )                                   \
+    if ( unlikely(mfn_eq(smfn, INVALID_MFN)) )                          \
     {                                                                   \
         printk(XENLOG_G_ERR "gmfn %"PRI_mfn" has flags %#x"             \
                " but no type-%#x shadow\n",                             \
@@ -2822,7 +2821,7 @@ void shadow_teardown(struct domain *d, bool *preempted)
             int i;
             mfn_t *oos_snapshot = v->arch.paging.shadow.oos_snapshot;
             for ( i = 0; i < SHADOW_OOS_PAGES; i++ )
-                if ( mfn_valid(oos_snapshot[i]) )
+                if ( !mfn_eq(oos_snapshot[i], INVALID_MFN) )
                 {
                     shadow_free(d, oos_snapshot[i]);
                     oos_snapshot[i] = INVALID_MFN;
@@ -3005,7 +3004,7 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
                 int i;
                 mfn_t *oos_snapshot = v->arch.paging.shadow.oos_snapshot;
                 for ( i = 0; i < SHADOW_OOS_PAGES; i++ )
-                    if ( mfn_valid(oos_snapshot[i]) )
+                    if ( !mfn_eq(oos_snapshot[i], INVALID_MFN) )
                     {
                         shadow_free(d, oos_snapshot[i]);
                         oos_snapshot[i] = INVALID_MFN;

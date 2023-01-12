@@ -110,7 +110,7 @@ get_fl1_shadow_status(struct domain *d, gfn_t gfn)
 /* Look for FL1 shadows in the hash table */
 {
     mfn_t smfn = shadow_hash_lookup(d, gfn_x(gfn), SH_type_fl1_shadow);
-    ASSERT(!mfn_valid(smfn) || mfn_to_page(smfn)->u.sh.head);
+    ASSERT(mfn_eq(smfn, INVALID_MFN) || mfn_to_page(smfn)->u.sh.head);
     return smfn;
 }
 
@@ -2677,7 +2677,7 @@ static int cf_check sh_page_fault(
                 mfn_t smfn = pagetable_get_mfn(
                                  v->arch.paging.shadow.shadow_table[i]);
 
-                if ( mfn_valid(smfn) && (mfn_x(smfn) != 0) )
+                if ( mfn_x(smfn) )
                 {
                     used |= (mfn_to_page(smfn)->v.sh.back == mfn_x(gmfn));
 
@@ -3821,7 +3821,7 @@ static void cf_check sh_pagetable_dying(paddr_t gpa)
                    : shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_pae_shadow);
         }
 
-        if ( mfn_valid(smfn) )
+        if ( !mfn_eq(smfn, INVALID_MFN) )
         {
             gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
             mfn_to_page(gmfn)->pagetable_dying = true;
@@ -3864,7 +3864,7 @@ static void cf_check sh_pagetable_dying(paddr_t gpa)
     smfn = shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l4_64_shadow);
 #endif
 
-    if ( mfn_valid(smfn) )
+    if ( !mfn_eq(smfn, INVALID_MFN) )
     {
         mfn_to_page(gmfn)->pagetable_dying = true;
         shadow_unhook_mappings(d, smfn, 1/* user pages only */);

@@ -764,8 +764,10 @@ get_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type)
 /* Look for shadows in the hash table */
 {
     mfn_t smfn = shadow_hash_lookup(d, mfn_x(gmfn), shadow_type);
-    ASSERT(!mfn_valid(smfn) || mfn_to_page(smfn)->u.sh.head);
+
+    ASSERT(mfn_eq(smfn, INVALID_MFN) || mfn_to_page(smfn)->u.sh.head);
     perfc_incr(shadow_get_shadow_status);
+
     return smfn;
 }
 
