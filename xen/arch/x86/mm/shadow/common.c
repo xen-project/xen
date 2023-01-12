@@ -1397,10 +1397,13 @@ static unsigned int shadow_get_allocation(struct domain *d)
 typedef u32 key_t;
 static inline key_t sh_hash(unsigned long n, unsigned int t)
 {
-    unsigned char *p = (unsigned char *)&n;
     key_t k = t;
     int i;
-    for ( i = 0; i < sizeof(n) ; i++ ) k = (u32)p[i] + (k<<6) + (k<<16) - k;
+
+    BUILD_BUG_ON(PADDR_BITS > BITS_PER_LONG + PAGE_SHIFT);
+    for ( i = 0; i < (PADDR_BITS - PAGE_SHIFT + 7) / 8; i++, n >>= 8 )
+        k = (uint8_t)n + (k << 6) + (k << 16) - k;
+
     return k % SHADOW_HASH_BUCKETS;
 }
 
