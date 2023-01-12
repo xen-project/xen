@@ -30,10 +30,9 @@
 #include <xenctrl.h>
 #include <xen/io/xs_wire.h>
 
-CAMLprim value stub_header_size(void)
+CAMLprim value stub_header_size(value unit)
 {
-	CAMLparam0();
-	CAMLreturn(Val_int(sizeof(struct xsd_sockmsg)));
+	return Val_int(sizeof(struct xsd_sockmsg));
 }
 
 CAMLprim value stub_header_of_string(value s)
