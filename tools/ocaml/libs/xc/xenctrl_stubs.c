@@ -86,9 +86,9 @@ static void Noreturn failwith_xc(xc_interface *xch)
 	caml_raise_with_string(*caml_named_value("xc.error"), error_str);
 }
 
-CAMLprim value stub_xc_interface_open(void)
+CAMLprim value stub_xc_interface_open(value unit)
 {
-	CAMLparam0();
+	CAMLparam1(unit);
 	CAMLlocal1(result);
 	xc_interface *xch;
 
