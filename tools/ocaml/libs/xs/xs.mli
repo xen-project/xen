@@ -23,31 +23,31 @@ exception Failed_to_connect
     - owner domid.
     - other perm: applied to domain that is not owner or in ACL.
     - ACL: list of per-domain permission
-  *)
+*)
 type perms = Xsraw.perms
 
 type domid = int
 type con
 
 type xsh = {
-	con : con;
-	debug: string list -> string;
-	directory : string -> string list;
-	read : string -> string;
-	readv : string -> string list -> string list;
-	write : string -> string -> unit;
-	writev : string -> (string * string) list -> unit;
-	mkdir : string -> unit;
-	rm : string -> unit;
-	getperms : string -> perms;
-	setperms : string -> perms -> unit;
-	setpermsv : string -> string list -> perms -> unit;
-	introduce : domid -> nativeint -> int -> unit;
-	release : domid -> unit;
-	resume : domid -> unit;
-	getdomainpath : domid -> string;
-	watch : string -> string -> unit;
-	unwatch : string -> string -> unit;
+  con : con;
+  debug: string list -> string;
+  directory : string -> string list;
+  read : string -> string;
+  readv : string -> string list -> string list;
+  write : string -> string -> unit;
+  writev : string -> (string * string) list -> unit;
+  mkdir : string -> unit;
+  rm : string -> unit;
+  getperms : string -> perms;
+  setperms : string -> perms -> unit;
+  setpermsv : string -> string list -> perms -> unit;
+  introduce : domid -> nativeint -> int -> unit;
+  release : domid -> unit;
+  resume : domid -> unit;
+  getdomainpath : domid -> string;
+  watch : string -> string -> unit;
+  unwatch : string -> string -> unit;
 }
 
 (** get operations provide a vector of xenstore function that apply to one
@@ -75,10 +75,10 @@ val read_watchevent_timeout : xsh -> float -> (string * string -> bool) -> unit
 (** register a set of watches, then wait for watchevent.
     remove all watches previously set before giving back the hand. *)
 val monitor_paths : xsh
-                 -> (string * string) list
-                 -> float
-                 -> (string * string -> bool)
-                 -> unit
+  -> (string * string) list
+  -> float
+  -> (string * string -> bool)
+  -> unit
 
 (** open a socket-based xenstored connection *)
 val daemon_open : unit -> xsh

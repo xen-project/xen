@@ -18,7 +18,7 @@ module WeakTable = Weak.Make(struct
     type t = string
     let equal (x:string) (y:string) = (x = y)
     let hash = Hashtbl.hash
-end)
+  end)
 
 type t = string
 

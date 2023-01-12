@@ -182,11 +182,11 @@ external domain_getinfo : handle -> domid -> domaininfo
 external domain_get_vcpuinfo : handle -> int -> int -> vcpuinfo
   = "stub_xc_vcpu_getinfo"
 external domain_ioport_permission: handle -> domid -> int -> int -> bool -> unit
-       = "stub_xc_domain_ioport_permission"
+  = "stub_xc_domain_ioport_permission"
 external domain_iomem_permission: handle -> domid -> nativeint -> nativeint -> bool -> unit
-       = "stub_xc_domain_iomem_permission"
+  = "stub_xc_domain_iomem_permission"
 external domain_irq_permission: handle -> domid -> int -> bool -> unit
-       = "stub_xc_domain_irq_permission"
+  = "stub_xc_domain_irq_permission"
 external vcpu_affinity_set : handle -> domid -> int -> bool array -> unit
   = "stub_xc_vcpu_setaffinity"
 external vcpu_affinity_get : handle -> domid -> int -> bool array
@@ -284,11 +284,11 @@ external hvm_param_set: handle -> domid -> hvm_param -> int64 -> unit
   = "stub_xc_hvm_param_set"
 
 external domain_assign_device: handle -> domid -> (int * int * int * int) -> unit
-       = "stub_xc_domain_assign_device"
+  = "stub_xc_domain_assign_device"
 external domain_deassign_device: handle -> domid -> (int * int * int * int) -> unit
-       = "stub_xc_domain_deassign_device"
+  = "stub_xc_domain_deassign_device"
 external domain_test_assign_device: handle -> domid -> (int * int * int * int) -> bool
-       = "stub_xc_domain_test_assign_device"
+  = "stub_xc_domain_test_assign_device"
 
 external version : handle -> version = "stub_xc_version_version"
 external version_compile_info : handle -> compile_info

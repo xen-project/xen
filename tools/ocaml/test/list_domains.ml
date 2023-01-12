@@ -20,7 +20,7 @@ let _ =
     let domains = Xenlight.Dominfo.list ctx in
     List.iter (fun d -> print_dominfo d) domains
   with Xenlight.Error(err, fn) -> begin
-    printf "Caught Exception: %s: %s\n" (Xenlight.string_of_error err) fn;
-  end
+      printf "Caught Exception: %s: %s\n" (Xenlight.string_of_error err) fn;
+    end
 
 

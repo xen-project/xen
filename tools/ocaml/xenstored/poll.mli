@@ -15,5 +15,5 @@
 
 (** Same interface and semantics as [Unix.select], implemented using poll(3). *)
 val poll_select:
-	Unix.file_descr list -> Unix.file_descr list -> Unix.file_descr list -> float
-	-> Unix.file_descr list * Unix.file_descr list * Unix.file_descr list
+  Unix.file_descr list -> Unix.file_descr list -> Unix.file_descr list -> float
+  -> Unix.file_descr list * Unix.file_descr list * Unix.file_descr list

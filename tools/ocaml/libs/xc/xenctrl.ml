@@ -20,153 +20,153 @@ type domid = int
 (* ** xenctrl.h ** *)
 
 type vcpuinfo =
-{
-	online: bool;
-	blocked: bool;
-	running: bool;
-	cputime: int64;
-	cpumap: int32;
-}
+  {
+    online: bool;
+    blocked: bool;
+    running: bool;
+    cputime: int64;
+    cpumap: int32;
+  }
 
 type xen_arm_arch_domainconfig =
-{
-	gic_version: int;
-	nr_spis: int;
-	clock_frequency: int32;
-}
+  {
+    gic_version: int;
+    nr_spis: int;
+    clock_frequency: int32;
+  }
 
 type x86_arch_emulation_flags =
-	| X86_EMU_LAPIC
-	| X86_EMU_HPET
-	| X86_EMU_PM
-	| X86_EMU_RTC
-	| X86_EMU_IOAPIC
-	| X86_EMU_PIC
-	| X86_EMU_VGA
-	| X86_EMU_IOMMU
-	| X86_EMU_PIT
-	| X86_EMU_USE_PIRQ
-	| X86_EMU_VPCI
+  | X86_EMU_LAPIC
+  | X86_EMU_HPET
+  | X86_EMU_PM
+  | X86_EMU_RTC
+  | X86_EMU_IOAPIC
+  | X86_EMU_PIC
+  | X86_EMU_VGA
+  | X86_EMU_IOMMU
+  | X86_EMU_PIT
+  | X86_EMU_USE_PIRQ
+  | X86_EMU_VPCI
 
 type x86_arch_misc_flags =
-	| X86_MSR_RELAXED
+  | X86_MSR_RELAXED
 
 type xen_x86_arch_domainconfig =
-{
-	emulation_flags: x86_arch_emulation_flags list;
-	misc_flags: x86_arch_misc_flags list;
-}
+  {
+    emulation_flags: x86_arch_emulation_flags list;
+    misc_flags: x86_arch_misc_flags list;
+  }
 
 type arch_domainconfig =
-	| ARM of xen_arm_arch_domainconfig
-	| X86 of xen_x86_arch_domainconfig
+  | ARM of xen_arm_arch_domainconfig
+  | X86 of xen_x86_arch_domainconfig
 
 type domain_create_flag =
-	| CDF_HVM
-	| CDF_HAP
-	| CDF_S3_INTEGRITY
-	| CDF_OOS_OFF
-	| CDF_XS_DOMAIN
-	| CDF_IOMMU
-	| CDF_NESTED_VIRT
-	| CDF_VPMU
+  | CDF_HVM
+  | CDF_HAP
+  | CDF_S3_INTEGRITY
+  | CDF_OOS_OFF
+  | CDF_XS_DOMAIN
+  | CDF_IOMMU
+  | CDF_NESTED_VIRT
+  | CDF_VPMU
 
 type domain_create_iommu_opts =
-	| IOMMU_NO_SHAREPT
+  | IOMMU_NO_SHAREPT
 
 type domctl_create_config =
-{
-	ssidref: int32;
-	handle: string;
-	flags: domain_create_flag list;
-	iommu_opts: domain_create_iommu_opts list;
-	max_vcpus: int;
-	max_evtchn_port: int;
-	max_grant_frames: int;
-	max_maptrack_frames: int;
-	max_grant_version: int;
-	cpupool_id: int32;
-	arch: arch_domainconfig;
-}
+  {
+    ssidref: int32;
+    handle: string;
+    flags: domain_create_flag list;
+    iommu_opts: domain_create_iommu_opts list;
+    max_vcpus: int;
+    max_evtchn_port: int;
+    max_grant_frames: int;
+    max_maptrack_frames: int;
+    max_grant_version: int;
+    cpupool_id: int32;
+    arch: arch_domainconfig;
+  }
 
 type domaininfo =
-{
-	domid             : domid;
-	dying             : bool;
-	shutdown          : bool;
-	paused            : bool;
-	blocked           : bool;
-	running           : bool;
-	hvm_guest         : bool;
-	shutdown_code     : int;
-	total_memory_pages: nativeint;
-	max_memory_pages  : nativeint;
-	shared_info_frame : int64;
-	cpu_time          : int64;
-	nr_online_vcpus   : int;
-	max_vcpu_id       : int;
-	ssidref           : int32;
-	handle            : int array;
-	arch_config       : arch_domainconfig;
-}
+  {
+    domid             : domid;
+    dying             : bool;
+    shutdown          : bool;
+    paused            : bool;
+    blocked           : bool;
+    running           : bool;
+    hvm_guest         : bool;
+    shutdown_code     : int;
+    total_memory_pages: nativeint;
+    max_memory_pages  : nativeint;
+    shared_info_frame : int64;
+    cpu_time          : int64;
+    nr_online_vcpus   : int;
+    max_vcpu_id       : int;
+    ssidref           : int32;
+    handle            : int array;
+    arch_config       : arch_domainconfig;
+  }
 
 type sched_control =
-{
-	weight : int;
-	cap    : int;
-}
+  {
+    weight : int;
+    cap    : int;
+  }
 
 type physinfo_cap_flag =
-	| CAP_HVM
-	| CAP_PV
-	| CAP_DirectIO
-	| CAP_HAP
-	| CAP_Shadow
-	| CAP_IOMMU_HAP_PT_SHARE
-	| CAP_Vmtrace
-	| CAP_Vpmu
-	| CAP_Gnttab_v1
-	| CAP_Gnttab_v2
+  | CAP_HVM
+  | CAP_PV
+  | CAP_DirectIO
+  | CAP_HAP
+  | CAP_Shadow
+  | CAP_IOMMU_HAP_PT_SHARE
+  | CAP_Vmtrace
+  | CAP_Vpmu
+  | CAP_Gnttab_v1
+  | CAP_Gnttab_v2
 
 type arm_physinfo_cap_flag
 
 type x86_physinfo_cap_flag
 
 type arch_physinfo_cap_flags =
-	| ARM of arm_physinfo_cap_flag list
-	| X86 of x86_physinfo_cap_flag list
+  | ARM of arm_physinfo_cap_flag list
+  | X86 of x86_physinfo_cap_flag list
 
 type physinfo =
-{
-	threads_per_core : int;
-	cores_per_socket : int;
-	nr_cpus          : int;
-	max_node_id      : int;
-	cpu_khz          : int;
-	total_pages      : nativeint;
-	free_pages       : nativeint;
-	scrub_pages      : nativeint;
-	(* XXX hw_cap *)
-	capabilities     : physinfo_cap_flag list;
-	max_nr_cpus      : int;
-	arch_capabilities : arch_physinfo_cap_flags;
-}
+  {
+    threads_per_core : int;
+    cores_per_socket : int;
+    nr_cpus          : int;
+    max_node_id      : int;
+    cpu_khz          : int;
+    total_pages      : nativeint;
+    free_pages       : nativeint;
+    scrub_pages      : nativeint;
+    (* XXX hw_cap *)
+    capabilities     : physinfo_cap_flag list;
+    max_nr_cpus      : int;
+    arch_capabilities : arch_physinfo_cap_flags;
+  }
 
 type version =
-{
-	major : int;
-	minor : int;
-	extra : string;
-}
+  {
+    major : int;
+    minor : int;
+    extra : string;
+  }
 
 
 type compile_info =
-{
-	compiler : string;
-	compile_by : string;
-	compile_domain : string;
-	compile_date : string;
-}
+  {
+    compiler : string;
+    compile_by : string;
+    compile_domain : string;
+    compile_date : string;
+  }
 
 type shutdown_reason = Poweroff | Reboot | Suspend | Crash | Watchdog | Soft_reset
 
@@ -181,34 +181,34 @@ let handle = ref None
 let get_handle () = !handle
 
 let close_handle () =
-	match !handle with
-	| Some _ -> handle := None
-	| None -> ()
+  match !handle with
+  | Some _ -> handle := None
+  | None -> ()
 
 let with_intf f =
-	match !handle with
-	| Some h -> f h
-	| None ->
-		let h =
-			try interface_open () with
-			| e ->
-				let msg = Printexc.to_string e in
-				failwith ("failed to open xenctrl: "^msg)
-		in
-		handle := Some h;
-		f h
+  match !handle with
+  | Some h -> f h
+  | None ->
+    let h =
+      try interface_open () with
+      | e ->
+        let msg = Printexc.to_string e in
+        failwith ("failed to open xenctrl: "^msg)
+    in
+    handle := Some h;
+    f h
 
 external domain_create_stub: handle -> domid -> domctl_create_config -> domid
-       = "stub_xc_domain_create"
+  = "stub_xc_domain_create"
 
 let domain_create handle ?(domid=0) config =
-	domain_create_stub handle domid config
+  domain_create_stub handle domid config
 
 external domain_sethandle: handle -> domid -> string -> unit
-       = "stub_xc_domain_sethandle"
+  = "stub_xc_domain_sethandle"
 
 external domain_max_vcpus: handle -> domid -> int -> unit
-       = "stub_xc_domain_max_vcpus"
+  = "stub_xc_domain_max_vcpus"
 
 external domain_pause: handle -> domid -> unit = "stub_xc_domain_pause"
 external domain_unpause: handle -> domid -> unit = "stub_xc_domain_unpause"
@@ -216,10 +216,10 @@ external domain_resume_fast: handle -> domid -> unit = "stub_xc_domain_resume_fa
 external domain_destroy: handle -> domid -> unit = "stub_xc_domain_destroy"
 
 external domain_shutdown: handle -> domid -> shutdown_reason -> unit
-       = "stub_xc_domain_shutdown"
+  = "stub_xc_domain_shutdown"
 
 external _domain_getinfolist: handle -> domid -> int -> domaininfo list
-       = "stub_xc_domain_getinfolist"
+  = "stub_xc_domain_getinfolist"
 
 let rev_append_fold acc e = List.rev_append e acc
 
@@ -228,53 +228,53 @@ let rev_append_fold acc e = List.rev_append e acc
  * except it is tail recursive, whereas [List.concat] isn't.
  * Example:
  * rev_concat [[10;9;8];[7;6];[5]]] = [5; 6; 7; 8; 9; 10]
- *)
+*)
 let rev_concat lst = List.fold_left rev_append_fold [] lst
 
 let domain_getinfolist handle first_domain =
-	let nb = 1024 in
-	let rec __getlist lst from =
-		(* _domain_getinfolist returns domains in reverse order, largest first *)
-		match _domain_getinfolist handle from nb with
-		| [] -> rev_concat lst
-		| (hd :: _) as l -> __getlist (l :: lst) (hd.domid + 1)
-	in
-	__getlist [] first_domain
+  let nb = 1024 in
+  let rec __getlist lst from =
+    (* _domain_getinfolist returns domains in reverse order, largest first *)
+    match _domain_getinfolist handle from nb with
+    | [] -> rev_concat lst
+    | (hd :: _) as l -> __getlist (l :: lst) (hd.domid + 1)
+  in
+  __getlist [] first_domain
 
 external domain_getinfo: handle -> domid -> domaininfo= "stub_xc_domain_getinfo"
 
 external domain_get_vcpuinfo: handle -> int -> int -> vcpuinfo
-       = "stub_xc_vcpu_getinfo"
+  = "stub_xc_vcpu_getinfo"
 
 external domain_ioport_permission: handle -> domid -> int -> int -> bool -> unit
-       = "stub_xc_domain_ioport_permission"
+  = "stub_xc_domain_ioport_permission"
 external domain_iomem_permission: handle -> domid -> nativeint -> nativeint -> bool -> unit
-       = "stub_xc_domain_iomem_permission"
+  = "stub_xc_domain_iomem_permission"
 external domain_irq_permission: handle -> domid -> int -> bool -> unit
-       = "stub_xc_domain_irq_permission"
+  = "stub_xc_domain_irq_permission"
 
 external vcpu_affinity_set: handle -> domid -> int -> bool array -> unit
-       = "stub_xc_vcpu_setaffinity"
+  = "stub_xc_vcpu_setaffinity"
 external vcpu_affinity_get: handle -> domid -> int -> bool array
-       = "stub_xc_vcpu_getaffinity"
+  = "stub_xc_vcpu_getaffinity"
 
 external vcpu_context_get: handle -> domid -> int -> string
-       = "stub_xc_vcpu_context_get"
+  = "stub_xc_vcpu_context_get"
 
 external sched_id: handle -> int = "stub_xc_sched_id"
 
 external sched_credit_domain_set: handle -> domid -> sched_control -> unit
-       = "stub_sched_credit_domain_set"
+  = "stub_sched_credit_domain_set"
 external sched_credit_domain_get: handle -> domid -> sched_control
-       = "stub_sched_credit_domain_get"
+  = "stub_sched_credit_domain_get"
 
 external shadow_allocation_set: handle -> domid -> int -> unit
-       = "stub_shadow_allocation_set"
+  = "stub_shadow_allocation_set"
 external shadow_allocation_get: handle -> domid -> int
-       = "stub_shadow_allocation_get"
+  = "stub_shadow_allocation_get"
 
 external evtchn_alloc_unbound: handle -> domid -> domid -> int
-       = "stub_xc_evtchn_alloc_unbound"
+  = "stub_xc_evtchn_alloc_unbound"
 external evtchn_reset: handle -> domid -> unit = "stub_xc_evtchn_reset"
 
 (* FIFO has theoretical maximum of 2^28 ports, fits in an int *)
@@ -299,15 +299,15 @@ external physinfo: handle -> physinfo = "stub_xc_physinfo"
 external pcpu_info: handle -> int -> int64 array = "stub_xc_pcpu_info"
 
 external domain_setmaxmem: handle -> domid -> int64 -> unit
-       = "stub_xc_domain_setmaxmem"
+  = "stub_xc_domain_setmaxmem"
 external domain_set_memmap_limit: handle -> domid -> int64 -> unit
-       = "stub_xc_domain_set_memmap_limit"
+  = "stub_xc_domain_set_memmap_limit"
 external domain_memory_increase_reservation: handle -> domid -> int64 -> unit
-       = "stub_xc_domain_memory_increase_reservation"
+  = "stub_xc_domain_memory_increase_reservation"
 
 external map_foreign_range: handle -> domid -> int
-                         -> nativeint -> Xenmmap.mmap_interface
-       = "stub_map_foreign_range"
+  -> nativeint -> Xenmmap.mmap_interface
+  = "stub_map_foreign_range"
 
 type hvm_param =
   | HVM_PARAM_CALLBACK_IRQ
@@ -357,15 +357,15 @@ external hvm_param_set: handle -> domid -> hvm_param -> int64 -> unit
   = "stub_xc_hvm_param_set"
 
 external domain_assign_device: handle -> domid -> (int * int * int * int) -> unit
-       = "stub_xc_domain_assign_device"
+  = "stub_xc_domain_assign_device"
 external domain_deassign_device: handle -> domid -> (int * int * int * int) -> unit
-       = "stub_xc_domain_deassign_device"
+  = "stub_xc_domain_deassign_device"
 external domain_test_assign_device: handle -> domid -> (int * int * int * int) -> bool
-       = "stub_xc_domain_test_assign_device"
+  = "stub_xc_domain_test_assign_device"
 
 external version: handle -> version = "stub_xc_version_version"
 external version_compile_info: handle -> compile_info
-       = "stub_xc_version_compile_info"
+  = "stub_xc_version_compile_info"
 external version_changeset: handle -> string = "stub_xc_version_changeset"
 external version_capabilities: handle -> string =
   "stub_xc_version_capabilities"
@@ -380,7 +380,7 @@ external watchdog : handle -> int -> int32 -> int
 
 (**
    Convert the given number of pages to an amount in KiB, rounded up.
- *)
+*)
 external pages_to_kib : int64 -> int64 = "stub_pages_to_kib"
 let pages_to_mib pages = Int64.div (pages_to_kib pages) 1024L
 

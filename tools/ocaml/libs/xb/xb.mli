@@ -1,58 +1,58 @@
 module Op :
-  sig
-    type operation =
-      Op.operation =
-        Debug
-      | Directory
-      | Read
-      | Getperms
-      | Watch
-      | Unwatch
-      | Transaction_start
-      | Transaction_end
-      | Introduce
-      | Release
-      | Getdomainpath
-      | Write
-      | Mkdir
-      | Rm
-      | Setperms
-      | Watchevent
-      | Error
-      | Isintroduced
-      | Resume
-      | Set_target
-      | Reset_watches
-      | Invalid
-    val operation_c_mapping : operation array
-    val size : int
-    val array_search : 'a -> 'a array -> int
-    val of_cval : int -> operation
-    val to_cval : operation -> int
-    val to_string : operation -> string
-  end
+sig
+  type operation =
+    Op.operation =
+      Debug
+    | Directory
+    | Read
+    | Getperms
+    | Watch
+    | Unwatch
+    | Transaction_start
+    | Transaction_end
+    | Introduce
+    | Release
+    | Getdomainpath
+    | Write
+    | Mkdir
+    | Rm
+    | Setperms
+    | Watchevent
+    | Error
+    | Isintroduced
+    | Resume
+    | Set_target
+    | Reset_watches
+    | Invalid
+  val operation_c_mapping : operation array
+  val size : int
+  val array_search : 'a -> 'a array -> int
+  val of_cval : int -> operation
+  val to_cval : operation -> int
+  val to_string : operation -> string
+end
 module Packet :
-  sig
-    type t =
-      Packet.t = {
-      tid : int;
-      rid : int;
-      ty : Op.operation;
-      data : string;
-    }
-    exception Error of string
-    exception DataError of string
-    external string_of_header : int -> int -> int -> int -> string
-      = "stub_string_of_header"
-    val create : int -> int -> Op.operation -> string -> t
-    val of_partialpkt : Partial.pkt -> t
-    val to_string : t -> string
-    val unpack : t -> int * int * Op.operation * string
-    val get_tid : t -> int
-    val get_ty : t -> Op.operation
-    val get_data : t -> string
-    val get_rid : t -> int
-  end
+sig
+  type t =
+    Packet.t = {
+    tid : int;
+    rid : int;
+    ty : Op.operation;
+    data : string;
+  }
+  exception Error of string
+  exception DataError of string
+  external string_of_header : int -> int -> int -> int -> string
+    = "stub_string_of_header"
+  val create : int -> int -> Op.operation -> string -> t
+  val of_partialpkt : Partial.pkt -> t
+  val to_string : t -> string
+  val unpack : t -> int * int * Op.operation * string
+  val get_tid : t -> int
+  val get_ty : t -> Op.operation
+  val get_data : t -> string
+  val get_rid : t -> int
+end
 exception End_of_file
 exception Eagain
 exception Noent
