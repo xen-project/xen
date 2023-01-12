@@ -32,7 +32,9 @@ SECTIONS
   _start = .;
   .text : {
        _stext = .;             /* Text section */
+       _idmap_start = .;
        *(.text.header)
+       _idmap_end = .;
 
        *(.text.cold)
        *(.text.unlikely .text.*_unlikely .text.unlikely.*)
@@ -225,10 +227,12 @@ SECTIONS
 }
 
 /*
- * We require that Xen is loaded at a 4K boundary, so this ensures that any
- * code running on the boot time identity map cannot cross a section boundary.
+ * We require that Xen is loaded at a page boundary, so this ensures that any
+ * code running on the identity map cannot cross a section boundary.
  */
-ASSERT( _end_boot - start <= PAGE_SIZE, "Boot code is larger than 4K")
+ASSERT(IS_ALIGNED(_idmap_start, PAGE_SIZE), "_idmap_start should be page-aligned")
+ASSERT(_idmap_end - _idmap_start <= PAGE_SIZE, "Identity mapped code is larger than a page size")
+
 /*
  * __init_[begin|end] MUST be at word size boundary otherwise we cannot
  * write fault instructions in the space properly.

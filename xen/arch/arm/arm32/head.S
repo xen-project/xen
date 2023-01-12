@@ -659,8 +659,6 @@ fail:   PRINT("- Boot failed -\r\n")
         b     1b
 ENDPROC(fail)
 
-GLOBAL(_end_boot)
-
 /*
  * Switch TTBR
  * r1:r0       ttbr
