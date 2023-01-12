@@ -1139,17 +1139,12 @@ CAMLprim value stub_xc_domain_test_assign_device(value xch, value domid, value d
 	CAMLreturn(Val_bool(ret == 0));
 }
 
-static int domain_assign_device_rdm_flag_table[] = {
-    XEN_DOMCTL_DEV_RDM_RELAXED,
-};
-
-CAMLprim value stub_xc_domain_assign_device(value xch, value domid, value desc,
-                                            value rflag)
+CAMLprim value stub_xc_domain_assign_device(value xch, value domid, value desc)
 {
-	CAMLparam4(xch, domid, desc, rflag);
+	CAMLparam3(xch, domid, desc);
 	int ret;
 	int domain, bus, dev, func;
-	uint32_t sbdf, flag;
+	uint32_t sbdf;
 
 	domain = Int_val(Field(desc, 0));
 	bus = Int_val(Field(desc, 1));
@@ -1157,10 +1152,8 @@ CAMLprim value stub_xc_domain_assign_device(value xch, value domid, value desc,
 	func = Int_val(Field(desc, 3));
 	sbdf = encode_sbdf(domain, bus, dev, func);
 
-	ret = Int_val(Field(rflag, 0));
-	flag = domain_assign_device_rdm_flag_table[ret];
-
-	ret = xc_assign_device(_H(xch), _D(domid), sbdf, flag);
+	ret = xc_assign_device(_H(xch), _D(domid), sbdf,
+			       XEN_DOMCTL_DEV_RDM_RELAXED);
 
 	if (ret < 0)
 		failwith_xc(_H(xch));
