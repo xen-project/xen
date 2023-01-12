@@ -37,6 +37,12 @@ config IPMMU_VMSA
 
 endif
 
+config AMD_IOMMU
+	def_bool y if X86
+
+config INTEL_IOMMU
+	def_bool y if X86
+
 config IOMMU_FORCE_PT_SHARE
 	bool
 
