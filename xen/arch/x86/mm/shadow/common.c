@@ -2302,6 +2302,25 @@ void shadow_prepare_page_type_change(struct domain *d,
     shadow_remove_all_shadows(d, page_to_mfn(page));
 }
 
+/*
+ * Removes v->arch.paging.shadow.shadow_table[].
+ * Does all appropriate management/bookkeeping/refcounting/etc...
+ */
+static void sh_detach_old_tables(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    unsigned int i;
+
+    for ( i = 0; i < ARRAY_SIZE(v->arch.paging.shadow.shadow_table); ++i )
+    {
+        mfn_t smfn = pagetable_get_mfn(v->arch.paging.shadow.shadow_table[i]);
+
+        if ( mfn_x(smfn) )
+            sh_put_ref(d, smfn, 0);
+        v->arch.paging.shadow.shadow_table[i] = pagetable_null();
+    }
+}
+
 /**************************************************************************/
 
 /* Reset the up-pointers of every L3 shadow to 0.
@@ -2373,7 +2392,7 @@ static void sh_update_paging_modes(struct vcpu *v)
     // First, tear down any old shadow tables held by this vcpu.
     //
     if ( v->arch.paging.mode )
-        v->arch.paging.mode->shadow.detach_old_tables(v);
+        sh_detach_old_tables(v);
 
 #ifdef CONFIG_HVM
     if ( is_hvm_domain(d) )
@@ -2761,7 +2780,7 @@ void shadow_vcpu_teardown(struct vcpu *v)
     if ( !paging_mode_shadow(d) || !v->arch.paging.mode )
         goto out;
 
-    v->arch.paging.mode->shadow.detach_old_tables(v);
+    sh_detach_old_tables(v);
 #ifdef CONFIG_HVM
     if ( shadow_mode_external(d) )
     {
@@ -2996,7 +3015,7 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
         for_each_vcpu(d, v)
         {
             if ( v->arch.paging.mode )
-                v->arch.paging.mode->shadow.detach_old_tables(v);
+                sh_detach_old_tables(v);
             if ( !(v->arch.flags & TF_kernel_mode) )
                 make_cr3(v, pagetable_get_mfn(v->arch.guest_table_user));
             else

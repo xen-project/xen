@@ -98,7 +98,6 @@
 
 struct shadow_paging_mode {
 #ifdef CONFIG_SHADOW_PAGING
-    void          (*detach_old_tables     )(struct vcpu *v);
 #ifdef CONFIG_PV
     void          (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
                                             intpte_t new, mfn_t gmfn);

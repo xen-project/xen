@@ -3200,30 +3200,6 @@ sh_update_linear_entries(struct vcpu *v)
     sh_flush_local(d);
 }
 
-
-/*
- * Removes v->arch.paging.shadow.shadow_table[].
- * Does all appropriate management/bookkeeping/refcounting/etc...
- */
-static void cf_check sh_detach_old_tables(struct vcpu *v)
-{
-    struct domain *d = v->domain;
-    mfn_t smfn;
-    unsigned int i;
-
-    ////
-    //// vcpu->arch.paging.shadow.shadow_table[]
-    ////
-
-    for_each_shadow_table(v, i)
-    {
-        smfn = pagetable_get_mfn(v->arch.paging.shadow.shadow_table[i]);
-        if ( mfn_x(smfn) )
-            sh_put_ref(d, smfn, 0);
-        v->arch.paging.shadow.shadow_table[i] = pagetable_null();
-    }
-}
-
 static void cf_check sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 /* Updates vcpu->arch.cr3 after the guest has changed CR3.
  * Paravirtual guests should set v->arch.guest_table (and guest_table_user,
@@ -4206,7 +4182,6 @@ const struct paging_mode sh_paging_mode = {
     .update_paging_modes           = shadow_update_paging_modes,
     .flush_tlb                     = shadow_flush_tlb,
     .guest_levels                  = GUEST_PAGING_LEVELS,
-    .shadow.detach_old_tables      = sh_detach_old_tables,
 #ifdef CONFIG_PV
     .shadow.write_guest_entry      = sh_write_guest_entry,
     .shadow.cmpxchg_guest_entry    = sh_cmpxchg_guest_entry,
