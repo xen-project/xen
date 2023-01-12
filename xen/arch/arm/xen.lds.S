@@ -31,7 +31,7 @@ SECTIONS
   . = XEN_VIRT_START;
   _start = .;
   .text : {
-        _stext = .;            /* Text section */
+       _stext = .;             /* Text section */
        *(.text.header)
 
        *(.text.cold)
