@@ -28,6 +28,7 @@
 #include <xen/cpu.h>
 #include <xen/pfn.h>
 #include <xen/virtual_region.h>
+#include <xen/version.h>
 #include <xen/vmap.h>
 #include <xen/trace.h>
 #include <xen/libfdt/libfdt-xen.h>
@@ -513,24 +514,19 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
     switch_stack_and_jump(idle_vcpu[0]->arch.cpu_info, init_done);
 }
 
-void arch_get_xen_caps(xen_capabilities_info_t *info)
+static int __init init_xen_cap_info(void)
 {
     /* Interface name is always xen-3.0-* for Xen-3.x. */
-    int major = 3, minor = 0;
-    char s[32];
-
-    (*info)[0] = '\0';
 
 #ifdef CONFIG_ARM_64
-    snprintf(s, sizeof(s), "xen-%d.%d-aarch64 ", major, minor);
-    safe_strcat(*info, s);
+    safe_strcat(xen_cap_info, "xen-3.0-aarch64 ");
 #endif
     if ( cpu_has_aarch32 )
-    {
-        snprintf(s, sizeof(s), "xen-%d.%d-armv7l ", major, minor);
-        safe_strcat(*info, s);
-    }
+        safe_strcat(xen_cap_info, "xen-3.0-armv7l ");
+
+    return 0;
 }
+__initcall(init_xen_cap_info);
 
 /*
  * Local variables:

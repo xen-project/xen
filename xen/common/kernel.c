@@ -35,6 +35,7 @@ boolean_param("dit", opt_dit);
 
 static xen_commandline_t saved_cmdline;
 static const char __initconst opt_builtin_cmdline[] = CONFIG_CMDLINE;
+char __ro_after_init xen_cap_info[128];
 
 static int assign_integer_param(const struct kernel_param *param, uint64_t val)
 {
@@ -542,7 +543,7 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         memset(info, 0, sizeof(info));
         if ( !deny )
-            arch_get_xen_caps(&info);
+            safe_strcpy(info, xen_cap_info);
 
         if ( copy_to_guest(arg, info, ARRAY_SIZE(info)) )
             return -EFAULT;

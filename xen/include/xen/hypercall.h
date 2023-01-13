@@ -56,6 +56,4 @@ common_vcpu_op(int cmd,
     struct vcpu *v,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
-void arch_get_xen_caps(xen_capabilities_info_t *info);
-
 #endif /* __XEN_HYPERCALL_H__ */

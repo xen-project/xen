@@ -19,6 +19,8 @@ const char *xen_deny(void);
 const char *xen_build_info(void);
 int xen_build_id(const void **p, unsigned int *len);
 
+extern char xen_cap_info[128];
+
 #ifdef BUILD_ID
 void xen_build_init(void);
 int xen_build_id_check(const Elf_Note *n, unsigned int n_sz,

@@ -20,11 +20,6 @@
 #include <asm/smp.h>
 #include <asm/traps.h>
 
-void arch_get_xen_caps(xen_capabilities_info_t *info)
-{
-    BUG_ON("unimplemented");
-}
-
 /* Xen stack for bringing up the first CPU. */
 unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
     __aligned(STACK_SIZE);

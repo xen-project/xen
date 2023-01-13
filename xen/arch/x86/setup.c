@@ -2165,35 +2165,26 @@ void asmlinkage __init noreturn __start_xen(void)
     unreachable();
 }
 
-void arch_get_xen_caps(xen_capabilities_info_t *info)
+static int __init cf_check init_xen_cap_info(void)
 {
     /* Interface name is always xen-3.0-* for Xen-3.x. */
-    int major = 3, minor = 0;
-    char s[32];
-
-    (*info)[0] = '\0';
 
     if ( IS_ENABLED(CONFIG_PV) )
     {
-        snprintf(s, sizeof(s), "xen-%d.%d-x86_64 ", major, minor);
-        safe_strcat(*info, s);
+        safe_strcat(xen_cap_info, "xen-3.0-x86_64 ");
 
         if ( opt_pv32 )
-        {
-            snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
-            safe_strcat(*info, s);
-        }
+            safe_strcat(xen_cap_info, "xen-3.0-x86_32p ");
     }
     if ( hvm_enabled )
-    {
-        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
-        safe_strcat(*info, s);
-        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32p ", major, minor);
-        safe_strcat(*info, s);
-        snprintf(s, sizeof(s), "hvm-%d.%d-x86_64 ", major, minor);
-        safe_strcat(*info, s);
-    }
+        safe_strcat(xen_cap_info,
+                    "hvm-3.0-x86_32 "
+                    "hvm-3.0-x86_32p "
+                    "hvm-3.0-x86_64 ");
+
+    return 0;
 }
+__initcall(init_xen_cap_info);
 
 int __hwdom_init remove_xen_ranges(struct rangeset *r)
 {

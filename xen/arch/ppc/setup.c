@@ -47,8 +47,3 @@ void __init noreturn start_xen(unsigned long r3, unsigned long r4,
 
     machine_halt();
 }
-
-void arch_get_xen_caps(xen_capabilities_info_t *info)
-{
-    BUG_ON("unimplemented");
-}
