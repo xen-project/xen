@@ -29,13 +29,6 @@
 /* Get page attribute fields (PAn) from PAT MSR. */
 #define pat_cr_2_paf(pat_cr,n)  ((((uint64_t)pat_cr) >> ((n)<<3)) & 0xff)
 
-/* PAT entry to PTE flags (PAT, PCD, PWT bits). */
-static const uint8_t pat_entry_2_pte_flags[8] = {
-    0,           _PAGE_PWT,
-    _PAGE_PCD,   _PAGE_PCD | _PAGE_PWT,
-    _PAGE_PAT,   _PAGE_PAT | _PAGE_PWT,
-    _PAGE_PAT | _PAGE_PCD, _PAGE_PAT | _PAGE_PCD | _PAGE_PWT };
-
 /* Effective mm type lookup table, according to MTRR and PAT. */
 static const uint8_t mm_type_tbl[MTRR_NUM_TYPES][X86_NUM_MT] = {
 #define RS MEMORY_NUM_TYPES
@@ -117,7 +110,7 @@ uint8_t pat_type_2_pte_flags(uint8_t pat_type)
     if ( unlikely(pat_entry == INVALID_MEM_TYPE) )
         pat_entry = pat_entry_tbl[X86_MT_UC];
 
-    return pat_entry_2_pte_flags[pat_entry];
+    return cacheattr_to_pte_flags(pat_entry);
 }
 
 int hvm_vcpu_cacheattr_init(struct vcpu *v)
