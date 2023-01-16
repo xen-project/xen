@@ -16,6 +16,7 @@ OBJS-y       += xc_pm.o
 OBJS-y       += xc_cpu_hotplug.o
 OBJS-y       += xc_vm_event.o
 OBJS-y       += xc_vmtrace.o
+OBJS-y       += xc_version.o
 OBJS-y       += xc_monitor.o
 OBJS-y       += xc_mem_paging.o
 OBJS-y       += xc_mem_access.o
