@@ -1573,6 +1573,12 @@ long xc_memory_op(xc_interface *xch, unsigned int cmd, void *arg, size_t len);
 
 int xc_version(xc_interface *xch, int cmd, void *arg);
 
+/*
+ * Wrappers around XENVER_* subops.  Callers must pass the returned pointer to
+ * free().
+ */
+char *xc_xenver_extraversion(xc_interface *xch);
+
 int xc_flask_op(xc_interface *xch, xen_flask_op_t *op);
 
 /*

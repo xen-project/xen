@@ -985,9 +985,8 @@ CAMLprim value stub_xc_version_version(value xch_val)
 	CAMLparam1(xch_val);
 	CAMLlocal1(result);
 	xc_interface *xch = xch_of_val(xch_val);
-	xen_extraversion_t extra;
+	char *extra;
 	long packed;
-	int retval;
 
 	caml_enter_blocking_section();
 	packed = xc_version(xch, XENVER_version, NULL);
@@ -997,10 +996,10 @@ CAMLprim value stub_xc_version_version(value xch_val)
 		failwith_xc(xch);
 
 	caml_enter_blocking_section();
-	retval = xc_version(xch, XENVER_extraversion, &extra);
+	extra = xc_xenver_extraversion(xch);
 	caml_leave_blocking_section();
 
-	if (retval)
+	if (!extra)
 		failwith_xc(xch);
 
 	result = caml_alloc_tuple(3);
@@ -1008,6 +1007,8 @@ CAMLprim value stub_xc_version_version(value xch_val)
 	Store_field(result, 0, Val_int(packed >> 16));
 	Store_field(result, 1, Val_int(packed & 0xffff));
 	Store_field(result, 2, caml_copy_string(extra));
+
+	free(extra);
 
 	CAMLreturn(result);
 }

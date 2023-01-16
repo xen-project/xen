@@ -81,3 +81,78 @@ int xc_version(xc_interface *xch, int cmd, void *arg)
 
     return rc;
 }
+
+/*
+ * Raw hypercall wrapper, letting us pass NULL and things which aren't of
+ * xc_hypercall_buffer_t *.
+ */
+static int do_xen_version_raw(xc_interface *xch, int cmd, void *hbuf)
+{
+    return xencall2(xch->xcall, __HYPERVISOR_xen_version,
+                    cmd, (unsigned long)hbuf);
+}
+
+/*
+ * Issues a xen_varbuf_t subop, using manual hypercall buffer handling to
+ * avoid unnecessary buffering.
+ *
+ * On failure, returns NULL.  errno probably useful.
+ * On success, returns a pointer which must be freed with xencall_free_buffer().
+ */
+static xen_varbuf_t *varbuf_op(xc_interface *xch, unsigned int subop)
+{
+    xen_varbuf_t *hbuf = NULL;
+    ssize_t sz;
+
+    sz = do_xen_version_raw(xch, subop, NULL);
+    if ( sz < 0 )
+        return NULL;
+
+    hbuf = xencall_alloc_buffer(xch->xcall, sizeof(*hbuf) + sz);
+    if ( !hbuf )
+        return NULL;
+
+    hbuf->len = sz;
+
+    sz = do_xen_version_raw(xch, subop, hbuf);
+    if ( sz < 0 )
+    {
+        xencall_free_buffer(xch->xcall, hbuf);
+        return NULL;
+    }
+
+    hbuf->len = sz;
+    return hbuf;
+}
+
+/*
+ * Wrap varbuf_op() to obtain a simple string.  Copy out of the hypercall
+ * buffer, stripping the xen_varbuf_t header and appending a NUL terminator.
+ *
+ * On failure, returns NULL, errno probably useful.
+ * On success, returns a pointer which must be free()'d.
+ */
+static char *varbuf_simple_string(xc_interface *xch, unsigned int subop)
+{
+    xen_varbuf_t *hbuf = varbuf_op(xch, subop);
+    char *res;
+
+    if ( !hbuf )
+        return NULL;
+
+    res = malloc(hbuf->len + 1);
+    if ( res )
+    {
+        memcpy(res, hbuf->buf, hbuf->len);
+        res[hbuf->len] = '\0';
+    }
+
+    xencall_free_buffer(xch->xcall, hbuf);
+
+    return res;
+}
+
+char *xc_xenver_extraversion(xc_interface *xch)
+{
+    return varbuf_simple_string(xch, XENVER_extraversion2);
+}

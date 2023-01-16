@@ -582,7 +582,6 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 {
     GC_INIT(ctx);
     union {
-        xen_extraversion_t xen_extra;
         xen_compile_info_t xen_cc;
         xen_changeset_info_t xen_chgset;
         xen_capabilities_info_t xen_caps;
@@ -601,8 +600,7 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     info->xen_version_major = xen_version >> 16;
     info->xen_version_minor = xen_version & 0xFF;
 
-    xc_version(ctx->xch, XENVER_extraversion, &u.xen_extra);
-    info->xen_version_extra = libxl__strdup(NOGC, u.xen_extra);
+    info->xen_version_extra = xc_xenver_extraversion(ctx->xch);
 
     xc_version(ctx->xch, XENVER_compile_info, &u.xen_cc);
     info->compiler = libxl__strdup(NOGC, u.xen_cc.compiler);
