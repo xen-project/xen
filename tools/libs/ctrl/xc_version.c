@@ -156,3 +156,8 @@ char *xc_xenver_extraversion(xc_interface *xch)
 {
     return varbuf_simple_string(xch, XENVER_extraversion2);
 }
+
+char *xc_xenver_capabilities(xc_interface *xch)
+{
+    return varbuf_simple_string(xch, XENVER_capabilities2);
+}

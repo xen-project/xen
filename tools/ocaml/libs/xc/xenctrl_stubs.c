@@ -1067,9 +1067,23 @@ CAMLprim value stub_xc_version_changeset(value xch_val)
 
 CAMLprim value stub_xc_version_capabilities(value xch_val)
 {
-	xen_capabilities_info_t ci;
+	CAMLparam1(xch_val);
+	CAMLlocal1(result);
+	xc_interface *xch = xch_of_val(xch_val);
+	char *capabilities;
 
-	return xc_version_single_string(xch_val, XENVER_capabilities, &ci);
+	caml_enter_blocking_section();
+	capabilities = xc_xenver_capabilities(xch);
+	caml_leave_blocking_section();
+
+	if (!capabilities)
+		failwith_xc(xch);
+
+	result = caml_copy_string(capabilities);
+
+	free(capabilities);
+
+	CAMLreturn(result);
 }
 
 
