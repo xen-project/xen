@@ -546,38 +546,6 @@ libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
     return ret;
 }
 
-static int libxl__xc_version_wrap(libxl__gc *gc, libxl_version_info *info,
-                                  xen_build_id_t *build)
-{
-    int r;
-
-    r = xc_version(CTX->xch, XENVER_build_id, build);
-    switch (r) {
-    case -EPERM:
-    case -ENODATA:
-    case 0:
-        info->build_id = libxl__strdup(NOGC, "");
-        break;
-
-    case -ENOBUFS:
-        break;
-
-    default:
-        if (r > 0) {
-            unsigned int i;
-
-            info->build_id = libxl__zalloc(NOGC, (r * 2) + 1);
-
-            for (i = 0; i < r ; i++)
-                snprintf(&info->build_id[i * 2], 3, "%02hhx", build->buf[i]);
-
-            r = 0;
-        }
-        break;
-    }
-    return r;
-}
-
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 {
     GC_INIT(ctx);
@@ -587,7 +555,6 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
         xen_build_id_t build_id;
     } u;
     long xen_version;
-    int r;
     libxl_version_info *info = &ctx->version_info;
 
     if (info->xen_version_extra != NULL)
@@ -614,17 +581,8 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     info->pagesize = xc_version(ctx->xch, XENVER_pagesize, NULL);
 
     info->commandline = xc_xenver_commandline(ctx->xch);
+    info->build_id = xc_xenver_buildid(ctx->xch);
 
-    u.build_id.len = sizeof(u) - sizeof(u.build_id);
-    r = libxl__xc_version_wrap(gc, info, &u.build_id);
-    if (r == -ENOBUFS) {
-            xen_build_id_t *build_id;
-
-            build_id = libxl__zalloc(gc, info->pagesize);
-            build_id->len = info->pagesize - sizeof(*build_id);
-            r = libxl__xc_version_wrap(gc, info, build_id);
-            if (r) LOGEV(ERROR, r, "getting build_id");
-    }
  out:
     GC_FREE;
     return info;

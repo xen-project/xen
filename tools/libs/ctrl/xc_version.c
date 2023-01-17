@@ -171,3 +171,36 @@ char *xc_xenver_commandline(xc_interface *xch)
 {
     return varbuf_simple_string(xch, XENVER_commandline2);
 }
+
+static void str2hex(char *dst, const unsigned char *src, size_t n)
+{
+    static const unsigned char hex[] = "0123456789abcdef";
+
+    for ( ; n; n-- )
+    {
+        unsigned char c = *src++;
+
+        *dst++ = hex[c >> 4];
+        *dst++ = hex[c & 0xf];
+    }
+}
+
+char *xc_xenver_buildid(xc_interface *xch)
+{
+    xen_varbuf_t *hbuf = varbuf_op(xch, XENVER_build_id);
+    char *res;
+
+    if ( !hbuf )
+        return NULL;
+
+    res = malloc((hbuf->len * 2) + 1);
+    if ( res )
+    {
+        str2hex(res, hbuf->buf, hbuf->len);
+        res[hbuf->len * 2] = '\0';
+    }
+
+    xencall_free_buffer(xch->xcall, hbuf);
+
+    return res;
+}
