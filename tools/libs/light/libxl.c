@@ -584,7 +584,6 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     union {
         xen_compile_info_t xen_cc;
         xen_platform_parameters_t p_parms;
-        xen_commandline_t xen_commandline;
         xen_build_id_t build_id;
     } u;
     long xen_version;
@@ -614,8 +613,7 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 
     info->pagesize = xc_version(ctx->xch, XENVER_pagesize, NULL);
 
-    xc_version(ctx->xch, XENVER_commandline, &u.xen_commandline);
-    info->commandline = libxl__strdup(NOGC, u.xen_commandline);
+    info->commandline = xc_xenver_commandline(ctx->xch);
 
     u.build_id.len = sizeof(u) - sizeof(u.build_id);
     r = libxl__xc_version_wrap(gc, info, &u.build_id);
