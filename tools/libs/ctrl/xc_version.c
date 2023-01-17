@@ -161,3 +161,8 @@ char *xc_xenver_capabilities(xc_interface *xch)
 {
     return varbuf_simple_string(xch, XENVER_capabilities2);
 }
+
+char *xc_xenver_changeset(xc_interface *xch)
+{
+    return varbuf_simple_string(xch, XENVER_changeset2);
+}

@@ -1579,6 +1579,7 @@ int xc_version(xc_interface *xch, int cmd, void *arg);
  */
 char *xc_xenver_extraversion(xc_interface *xch);
 char *xc_xenver_capabilities(xc_interface *xch);
+char *xc_xenver_changeset(xc_interface *xch);
 
 int xc_flask_op(xc_interface *xch, xen_flask_op_t *op);
 

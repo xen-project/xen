@@ -583,7 +583,6 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     GC_INIT(ctx);
     union {
         xen_compile_info_t xen_cc;
-        xen_changeset_info_t xen_chgset;
         xen_platform_parameters_t p_parms;
         xen_commandline_t xen_commandline;
         xen_build_id_t build_id;
@@ -608,9 +607,7 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     info->compile_date = libxl__strdup(NOGC, u.xen_cc.compile_date);
 
     info->capabilities = xc_xenver_capabilities(ctx->xch);
-
-    xc_version(ctx->xch, XENVER_changeset, &u.xen_chgset);
-    info->changeset = libxl__strdup(NOGC, u.xen_chgset);
+    info->changeset = xc_xenver_changeset(ctx->xch);
 
     xc_version(ctx->xch, XENVER_platform_parameters, &u.p_parms);
     info->virt_start = u.p_parms.virt_start;

@@ -1040,28 +1040,25 @@ CAMLprim value stub_xc_version_compile_info(value xch_val)
 }
 
 
-static value xc_version_single_string(value xch_val, int code, void *info)
-{
-	CAMLparam1(xch_val);
-	xc_interface *xch = xch_of_val(xch_val);
-	int retval;
-
-	caml_enter_blocking_section();
-	retval = xc_version(xch, code, info);
-	caml_leave_blocking_section();
-
-	if (retval)
-		failwith_xc(xch);
-
-	CAMLreturn(caml_copy_string((char *)info));
-}
-
-
 CAMLprim value stub_xc_version_changeset(value xch_val)
 {
-	xen_changeset_info_t ci;
+	CAMLparam1(xch_val);
+	CAMLlocal1(result);
+	xc_interface *xch = xch_of_val(xch_val);
+	char *changeset;
 
-	return xc_version_single_string(xch_val, XENVER_changeset, &ci);
+	caml_enter_blocking_section();
+	changeset = xc_xenver_changeset(xch);
+	caml_leave_blocking_section();
+
+	if (!changeset)
+		failwith_xc(xch);
+
+	result = caml_copy_string(changeset);
+
+	free(changeset);
+
+	CAMLreturn(result);
 }
 
 
