@@ -26,6 +26,17 @@
  */
 #define PFN_ORDER(_pfn) ((_pfn)->v.free.order)
 
+/*
+ * The size of struct page_info impacts the number of entries that can fit
+ * into the frametable area and thus it affects the amount of physical memory
+ * we claim to support. Define PAGE_INFO_SIZE to be used for sanity checking.
+*/
+#ifdef CONFIG_ARM_64
+#define PAGE_INFO_SIZE 56
+#else
+#define PAGE_INFO_SIZE 32
+#endif
+
 struct page_info
 {
     /* Each frame can be threaded onto a doubly-linked list. */

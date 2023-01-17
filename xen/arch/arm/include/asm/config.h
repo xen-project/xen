@@ -82,7 +82,7 @@
  * ARM32 layout:
  *   0  -  12M   <COMMON>
  *
- *  32M - 128M   Frametable: 24 bytes per page for 16GB of RAM
+ *  32M - 128M   Frametable: 32 bytes per page for 12GB of RAM
  * 256M -   1G   VMAP: ioremap and early_ioremap use this virtual address
  *                    space
  *
@@ -95,7 +95,7 @@
  *
  *   1G -   2G   VMAP: ioremap and early_ioremap
  *
- *  32G -  64G   Frametable: 24 bytes per page for 5.3TB of RAM
+ *  32G -  64G   Frametable: 56 bytes per page for 2TB of RAM
  *
  * 0x0000008000000000 - 0x00007fffffffffff (127.5TB, L0 slots [1..255])
  *  Unused
