@@ -1726,9 +1726,9 @@ static int __init find_domU_holes(const struct kernel_info *kinfo,
                                   struct meminfo *ext_regions)
 {
     unsigned int i;
-    paddr_t bankend;
-    const paddr_t bankbase[] = GUEST_RAM_BANK_BASES;
-    const paddr_t banksize[] = GUEST_RAM_BANK_SIZES;
+    uint64_t bankend;
+    const uint64_t bankbase[] = GUEST_RAM_BANK_BASES;
+    const uint64_t banksize[] = GUEST_RAM_BANK_SIZES;
     int res = -ENOENT;
 
     for ( i = 0; i < GUEST_RAM_BANKS; i++ )
