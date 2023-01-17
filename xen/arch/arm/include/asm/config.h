@@ -127,7 +127,6 @@
 #define FRAMETABLE_VIRT_START  _AT(vaddr_t,0x02000000)
 #define FRAMETABLE_SIZE        MB(128-32)
 #define FRAMETABLE_NR          (FRAMETABLE_SIZE / sizeof(*frame_table))
-#define FRAMETABLE_VIRT_END    (FRAMETABLE_VIRT_START + FRAMETABLE_SIZE - 1)
 
 #define VMAP_VIRT_START        _AT(vaddr_t,0x10000000)
 #define VMAP_VIRT_SIZE         _AT(vaddr_t, GB(1) - MB(256))
