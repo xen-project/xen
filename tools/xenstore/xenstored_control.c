@@ -996,7 +996,7 @@ static int do_control_help(const void *ctx, struct connection *conn,
 	if (!resp)
 		return ENOMEM;
 	for (cmd = 0; cmd < ARRAY_SIZE(cmds); cmd++) {
-		resp = talloc_asprintf_append(resp, "%s\t%s\n",
+		resp = talloc_asprintf_append(resp, "%-15s %s\n",
 					      cmds[cmd].cmd, cmds[cmd].pars);
 		if (!resp)
 			return ENOMEM;
