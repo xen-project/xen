@@ -46,13 +46,6 @@ struct watch
 	char *node;
 };
 
-static bool check_special_event(const char *name)
-{
-	assert(name);
-
-	return strstarts(name, "@");
-}
-
 /* Is child a subnode of parent, or equal? */
 static bool is_child(const char *child, const char *parent)
 {
@@ -153,14 +146,8 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 
 	/* Create an event for each watch. */
 	list_for_each_entry(i, &connections, list) {
-		/* introduce/release domain watches */
-		if (check_special_event(name)) {
-			if (!check_perms_special(name, i))
-				continue;
-		} else {
-			if (!watch_permitted(i, ctx, name, node, perms))
-				continue;
-		}
+		if (!watch_permitted(i, ctx, name, node, perms))
+			continue;
 
 		list_for_each_entry(watch, &i->watches, list) {
 			if (exact) {

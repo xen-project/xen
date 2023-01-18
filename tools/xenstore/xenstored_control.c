@@ -678,9 +678,6 @@ static const char *lu_dump_state(const void *ctx, struct connection *conn)
 	ret = dump_state_connections(fp);
 	if (ret)
 		goto out;
-	ret = dump_state_special_nodes(fp);
-	if (ret)
-		goto out;
 	ret = dump_state_nodes(fp, ctx);
 	if (ret)
 		goto out;

@@ -43,9 +43,6 @@ static evtchn_port_t virq_port;
 
 xenevtchn_handle *xce_handle = NULL;
 
-static struct node_perms dom_release_perms;
-static struct node_perms dom_introduce_perms;
-
 struct domain
 {
 	/* The id of this domain */
@@ -225,27 +222,6 @@ static void unmap_interface(void *interface)
 	xengnttab_unmap(*xgt_handle, interface, 1);
 }
 
-static void remove_domid_from_perm(struct node_perms *perms,
-				   struct domain *domain)
-{
-	unsigned int cur, new;
-
-	if (perms->p[0].id == domain->domid)
-		perms->p[0].id = priv_domid;
-
-	for (cur = new = 1; cur < perms->num; cur++) {
-		if (perms->p[cur].id == domain->domid)
-			continue;
-
-		if (new != cur)
-			perms->p[new] = perms->p[cur];
-
-		new++;
-	}
-
-	perms->num = new;
-}
-
 static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 				  struct node *node, void *arg)
 {
@@ -297,8 +273,26 @@ static void domain_tree_remove(struct domain *domain)
 			       "error when looking for orphaned nodes\n");
 	}
 
-	remove_domid_from_perm(&dom_release_perms, domain);
-	remove_domid_from_perm(&dom_introduce_perms, domain);
+	walk_node_tree(domain, NULL, "@releaseDomain", &walkfuncs, domain);
+	walk_node_tree(domain, NULL, "@introduceDomain", &walkfuncs, domain);
+}
+
+static void fire_special_watches(const char *name)
+{
+	void *ctx = talloc_new(NULL);
+	struct node *node;
+
+	if (!ctx)
+		return;
+
+	node = read_node(NULL, ctx, name);
+
+	if (node)
+		fire_watches(NULL, ctx, name, node, true, NULL);
+	else
+		log("special node %s not found\n", name);
+
+	talloc_free(ctx);
 }
 
 static int destroy_domain(void *_domain)
@@ -326,7 +320,7 @@ static int destroy_domain(void *_domain)
 			unmap_interface(domain->interface);
 	}
 
-	fire_watches(NULL, domain, "@releaseDomain", NULL, true, NULL);
+	fire_special_watches("@releaseDomain");
 
 	wrl_domain_destroy(domain);
 
@@ -384,7 +378,7 @@ void check_domains(void)
 		;
 
 	if (notify)
-		fire_watches(NULL, NULL, "@releaseDomain", NULL, true, NULL);
+		fire_special_watches("@releaseDomain");
 }
 
 /* We scan all domains rather than use the information given here. */
@@ -633,8 +627,7 @@ static struct domain *introduce_domain(const void *ctx,
 		}
 
 		if (!is_master_domain && !restore)
-			fire_watches(NULL, ctx, "@introduceDomain", NULL,
-				     true, NULL);
+			fire_special_watches("@introduceDomain");
 	} else {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
@@ -840,59 +833,6 @@ const char *get_implicit_path(const struct connection *conn)
 	return conn->domain->path;
 }
 
-static int set_dom_perms_default(struct node_perms *perms)
-{
-	perms->num = 1;
-	perms->p = talloc_array(NULL, struct xs_permissions, perms->num);
-	if (!perms->p)
-		return -1;
-	perms->p->id = 0;
-	perms->p->perms = XS_PERM_NONE;
-
-	return 0;
-}
-
-static struct node_perms *get_perms_special(const char *name)
-{
-	if (!strcmp(name, "@releaseDomain"))
-		return &dom_release_perms;
-	if (!strcmp(name, "@introduceDomain"))
-		return &dom_introduce_perms;
-	return NULL;
-}
-
-int set_perms_special(struct connection *conn, const char *name,
-		      struct node_perms *perms)
-{
-	struct node_perms *p;
-
-	p = get_perms_special(name);
-	if (!p)
-		return EINVAL;
-
-	if ((perm_for_conn(conn, p) & (XS_PERM_WRITE | XS_PERM_OWNER)) !=
-	    (XS_PERM_WRITE | XS_PERM_OWNER))
-		return EACCES;
-
-	p->num = perms->num;
-	talloc_free(p->p);
-	p->p = perms->p;
-	talloc_steal(NULL, perms->p);
-
-	return 0;
-}
-
-bool check_perms_special(const char *name, struct connection *conn)
-{
-	struct node_perms *p;
-
-	p = get_perms_special(name);
-	if (!p)
-		return false;
-
-	return perm_for_conn(conn, p) & XS_PERM_READ;
-}
-
 void dom0_init(void)
 {
 	evtchn_port_t port;
@@ -961,10 +901,6 @@ void domain_init(int evtfd)
 
 	if (xce_handle == NULL)
 		barf_perror("Failed to open evtchn device");
-
-	if (set_dom_perms_default(&dom_release_perms) ||
-	    set_dom_perms_default(&dom_introduce_perms))
-		barf_perror("Failed to set special permissions");
 
 	if ((rc = xenevtchn_bind_virq(xce_handle, VIRQ_DOM_EXC)) == -1)
 		barf_perror("Failed to bind to domain exception virq port");
@@ -1531,60 +1467,6 @@ const char *dump_state_connections(FILE *fp)
 		if (ret)
 			return ret;
 	}
-
-	return ret;
-}
-
-static const char *dump_state_special_node(FILE *fp, const char *name,
-					   const struct node_perms *perms)
-{
-	struct xs_state_record_header head;
-	struct xs_state_node sn;
-	unsigned int pathlen;
-	const char *ret;
-
-	pathlen = strlen(name) + 1;
-
-	head.type = XS_STATE_TYPE_NODE;
-	head.length = sizeof(sn);
-
-	sn.conn_id = 0;
-	sn.ta_id = 0;
-	sn.ta_access = 0;
-	sn.perm_n = perms->num;
-	sn.path_len = pathlen;
-	sn.data_len = 0;
-	head.length += perms->num * sizeof(*sn.perms);
-	head.length += pathlen;
-	head.length = ROUNDUP(head.length, 3);
-	if (fwrite(&head, sizeof(head), 1, fp) != 1)
-		return "Dump special node error";
-	if (fwrite(&sn, sizeof(sn), 1, fp) != 1)
-		return "Dump special node error";
-
-	ret = dump_state_node_perms(fp, perms->p, perms->num);
-	if (ret)
-		return ret;
-
-	if (fwrite(name, pathlen, 1, fp) != 1)
-		return "Dump special node path error";
-
-	ret = dump_state_align(fp);
-
-	return ret;
-}
-
-const char *dump_state_special_nodes(FILE *fp)
-{
-	const char *ret;
-
-	ret = dump_state_special_node(fp, "@releaseDomain",
-				      &dom_release_perms);
-	if (ret)
-		return ret;
-
-	ret = dump_state_special_node(fp, "@introduceDomain",
-				      &dom_introduce_perms);
 
 	return ret;
 }

@@ -597,12 +597,13 @@ static void get_acc_data(TDB_DATA *key, struct node_account_data *acc)
  * Per-transaction nodes need to be accounted for the transaction owner.
  * Those nodes are stored in the data base with the transaction generation
  * count prepended (e.g. 123/local/domain/...). So testing for the node's
- * key not to start with "/" is sufficient.
+ * key not to start with "/" or "@" is sufficient.
  */
 static unsigned int get_acc_domid(struct connection *conn, TDB_DATA *key,
 				  unsigned int domid)
 {
-	return (!conn || key->dptr[0] == '/') ? domid : conn->id;
+	return (!conn || key->dptr[0] == '/' || key->dptr[0] == '@')
+	       ? domid : conn->id;
 }
 
 int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
@@ -944,10 +945,6 @@ static struct node *get_node(struct connection *conn,
 {
 	struct node *node;
 
-	if (!name || !is_valid_nodename(name)) {
-		errno = EINVAL;
-		return NULL;
-	}
 	node = read_node(conn, ctx, name);
 	/* If we don't have permission, we don't have node. */
 	if (node) {
@@ -1236,7 +1233,21 @@ static struct node *get_node_canonicalized(struct connection *conn,
 	*canonical_name = canonicalize(conn, ctx, name);
 	if (!*canonical_name)
 		return NULL;
+	if (!is_valid_nodename(*canonical_name)) {
+		errno = EINVAL;
+		return NULL;
+	}
 	return get_node(conn, ctx, *canonical_name, perm);
+}
+
+static struct node *get_spec_node(struct connection *conn, const void *ctx,
+				  const char *name, char **canonical_name,
+				  unsigned int perm)
+{
+	if (name[0] == '@')
+		return get_node(conn, ctx, name, perm);
+
+	return get_node_canonicalized(conn, ctx, name, canonical_name, perm);
 }
 
 static int send_directory(const void *ctx, struct connection *conn,
@@ -1723,8 +1734,7 @@ static int do_get_perms(const void *ctx, struct connection *conn,
 	char *strings;
 	unsigned int len;
 
-	node = get_node_canonicalized(conn, ctx, onearg(in), NULL,
-				      XS_PERM_READ);
+	node = get_spec_node(conn, ctx, onearg(in), NULL, XS_PERM_READ);
 	if (!node)
 		return errno;
 
@@ -1766,17 +1776,9 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	if (perms.p[0].perms & XS_PERM_IGNORE)
 		return ENOENT;
 
-	/* First arg is node name. */
-	if (strstarts(in->buffer, "@")) {
-		if (set_perms_special(conn, in->buffer, &perms))
-			return errno;
-		send_ack(conn, XS_SET_PERMS);
-		return 0;
-	}
-
 	/* We must own node to do this (tools can do this too). */
-	node = get_node_canonicalized(conn, ctx, in->buffer, &name,
-				      XS_PERM_WRITE | XS_PERM_OWNER);
+	node = get_spec_node(conn, ctx, in->buffer, &name,
+			     XS_PERM_WRITE | XS_PERM_OWNER);
 	if (!node)
 		return errno;
 
@@ -2374,7 +2376,9 @@ void setup_structure(bool live_update)
 		manual_node("/", "tool");
 		manual_node("/tool", "xenstored");
 		manual_node("/tool/xenstored", NULL);
-		domain_entry_fix(dom0_domid, 3, true);
+		manual_node("@releaseDomain", NULL);
+		manual_node("@introduceDomain", NULL);
+		domain_entry_fix(dom0_domid, 5, true);
 	}
 
 	check_store();
@@ -3156,6 +3160,23 @@ static int dump_state_node(const void *ctx, struct connection *conn,
 	return WALK_TREE_OK;
 }
 
+static int dump_state_special_node(FILE *fp, const void *ctx,
+				   struct dump_node_data *data,
+				   const char *name)
+{
+	struct node *node;
+	int ret;
+
+	node = read_node(NULL, ctx, name);
+	if (!node)
+		return dump_state_node_err(data, "Dump node read node error");
+
+	ret = dump_state_node(ctx, NULL, node, data);
+	talloc_free(node);
+
+	return ret;
+}
+
 const char *dump_state_nodes(FILE *fp, const void *ctx)
 {
 	struct dump_node_data data = {
@@ -3165,6 +3186,11 @@ const char *dump_state_nodes(FILE *fp, const void *ctx)
 	struct walk_funcs walkfuncs = { .enter = dump_state_node };
 
 	if (walk_node_tree(ctx, NULL, "/", &walkfuncs, &data))
+		return data.err;
+
+	if (dump_state_special_node(fp, ctx, &data, "@releaseDomain"))
+		return data.err;
+	if (dump_state_special_node(fp, ctx, &data, "@introduceDomain"))
 		return data.err;
 
 	return NULL;
@@ -3340,25 +3366,21 @@ void read_state_node(const void *ctx, const void *state)
 		node->perms.p[i].id = sn->perms[i].domid;
 	}
 
-	if (strstarts(name, "@")) {
-		set_perms_special(&conn, name, &node->perms);
-		talloc_free(node);
-		return;
+	if (!strstarts(name, "@")) {
+		parentname = get_parent(node, name);
+		if (!parentname)
+			barf("allocation error restoring node");
+		parent = read_node(NULL, node, parentname);
+		if (!parent)
+			barf("read parent error restoring node");
+
+		if (add_child(node, parent, name))
+			barf("allocation error restoring node");
+
+		set_tdb_key(parentname, &key);
+		if (write_node_raw(NULL, &key, parent, true))
+			barf("write parent error restoring node");
 	}
-
-	parentname = get_parent(node, name);
-	if (!parentname)
-		barf("allocation error restoring node");
-	parent = read_node(NULL, node, parentname);
-	if (!parent)
-		barf("read parent error restoring node");
-
-	if (add_child(node, parent, name))
-		barf("allocation error restoring node");
-
-	set_tdb_key(parentname, &key);
-	if (write_node_raw(NULL, &key, parent, true))
-		barf("write parent error restoring node");
 
 	set_tdb_key(name, &key);
 	if (write_node_raw(NULL, &key, node, true))

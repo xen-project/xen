@@ -99,11 +99,6 @@ void domain_outstanding_domid_dec(unsigned int domid);
 int domain_get_quota(const void *ctx, struct connection *conn,
 		     unsigned int domid);
 
-/* Special node permission handling. */
-int set_perms_special(struct connection *conn, const char *name,
-		      struct node_perms *perms);
-bool check_perms_special(const char *name, struct connection *conn);
-
 /* Write rate limiting */
 
 #define WRL_FACTOR   1000 /* for fixed-point arithmetic */
@@ -132,7 +127,6 @@ void wrl_apply_debit_direct(struct connection *conn);
 void wrl_apply_debit_trans_commit(struct connection *conn);
 
 const char *dump_state_connections(FILE *fp);
-const char *dump_state_special_nodes(FILE *fp);
 
 void read_state_connection(const void *ctx, const void *state);
 
