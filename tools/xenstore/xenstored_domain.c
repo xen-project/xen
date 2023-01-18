@@ -985,20 +985,20 @@ void domain_deinit(void)
  * count (used for testing whether a node permission is older than a domain).
  *
  * Return values:
- *  0: domain has higher generation count (it is younger than a node with the
- *     given count), or domain isn't existing any longer
- *  1: domain is older than the node
+ *  false: domain has higher generation count (it is younger than a node with
+ *     the given count), or domain isn't existing any longer
+ *  true: domain is older than the node
  */
-static int chk_domain_generation(unsigned int domid, uint64_t gen)
+static bool chk_domain_generation(unsigned int domid, uint64_t gen)
 {
 	struct domain *d;
 
 	if (!xc_handle && domid == dom0_domid)
-		return 1;
+		return true;
 
 	d = find_domain_struct(domid);
 
-	return (d && d->generation <= gen) ? 1 : 0;
+	return d && d->generation <= gen;
 }
 
 /*
@@ -1033,14 +1033,12 @@ int domain_alloc_permrefs(struct node_perms *perms)
 int domain_adjust_node_perms(struct node *node)
 {
 	unsigned int i;
-	int ret;
 
 	for (i = 1; i < node->perms.num; i++) {
 		if (node->perms.p[i].perms & XS_PERM_IGNORE)
 			continue;
-		ret = chk_domain_generation(node->perms.p[i].id,
-					    node->generation);
-		if (!ret)
+		if (!chk_domain_generation(node->perms.p[i].id,
+					   node->generation))
 			node->perms.p[i].perms |= XS_PERM_IGNORE;
 	}
 
