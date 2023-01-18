@@ -85,6 +85,7 @@ static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
 char *tracefile = NULL;
 TDB_CONTEXT *tdb_ctx = NULL;
+unsigned int trace_flags = TRACE_OBJ | TRACE_IO;
 
 static const char *sockmsg_string(enum xsd_sockmsg_type type);
 
@@ -139,13 +140,13 @@ static void trace_io(const struct connection *conn,
 	time_t now;
 	struct tm *tm;
 
-	if (tracefd < 0)
+	if (tracefd < 0 || !(trace_flags & TRACE_IO))
 		return;
 
 	now = time(NULL);
 	tm = localtime(&now);
 
-	trace("%s %p %04d%02d%02d %02d:%02d:%02d %s (",
+	trace("io: %s %p %04d%02d%02d %02d:%02d:%02d %s (",
 	      out ? "OUT" : "IN", conn,
 	      tm->tm_year + 1900, tm->tm_mon + 1,
 	      tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
@@ -158,12 +159,14 @@ static void trace_io(const struct connection *conn,
 
 void trace_create(const void *data, const char *type)
 {
-	trace("CREATE %s %p\n", type, data);
+	if (trace_flags & TRACE_OBJ)
+		trace("obj: CREATE %s %p\n", type, data);
 }
 
 void trace_destroy(const void *data, const char *type)
 {
-	trace("DESTROY %s %p\n", type, data);
+	if (trace_flags & TRACE_OBJ)
+		trace("obj: DESTROY %s %p\n", type, data);
 }
 
 /**
@@ -2599,6 +2602,8 @@ static void usage(void)
 "  -N, --no-fork           to request that the daemon does not fork,\n"
 "  -P, --output-pid        to request that the pid of the daemon is output,\n"
 "  -T, --trace-file <file> giving the file for logging, and\n"
+"      --trace-control=+<switch> activate a specific <switch>\n"
+"      --trace-control=-<switch> deactivate a specific <switch>\n"
 "  -E, --entry-nb <nb>     limit the number of entries per domain,\n"
 "  -S, --entry-size <size> limit the size of entry per domain, and\n"
 "  -W, --watch-nb <nb>     limit the number of watches per domain,\n"
@@ -2642,6 +2647,7 @@ static struct option options[] = {
 	{ "output-pid", 0, NULL, 'P' },
 	{ "entry-size", 1, NULL, 'S' },
 	{ "trace-file", 1, NULL, 'T' },
+	{ "trace-control", 1, NULL, 1 },
 	{ "transaction", 1, NULL, 't' },
 	{ "perm-nb", 1, NULL, 'A' },
 	{ "path-max", 1, NULL, 'M' },
@@ -2716,6 +2722,43 @@ static void set_quota(const char *arg, bool soft)
 		barf("unknown quota \"%s\"\n", arg);
 }
 
+/* Sorted by bit values of TRACE_* flags. Flag is (1u << index). */
+const char *const trace_switches[] = {
+	"obj", "io", "wrl",
+	NULL
+};
+
+int set_trace_switch(const char *arg)
+{
+	bool remove = (arg[0] == '-');
+	unsigned int idx;
+
+	switch (arg[0]) {
+	case '-':
+		remove = true;
+		break;
+	case '+':
+		remove = false;
+		break;
+	default:
+		return EINVAL;
+	}
+
+	arg++;
+
+	for (idx = 0; trace_switches[idx]; idx++) {
+		if (!strcmp(arg, trace_switches[idx])) {
+			if (remove)
+				trace_flags &= ~(1u << idx);
+			else
+				trace_flags |= 1u << idx;
+			return 0;
+		}
+	}
+
+	return EINVAL;
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
@@ -2763,6 +2806,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'T':
 			tracefile = optarg;
+			break;
+		case 1:
+			if (set_trace_switch(optarg))
+				barf("Illegal trace switch \"%s\"\n", optarg);
 			break;
 		case 'I':
 			if (optarg && !strcmp(optarg, "off"))

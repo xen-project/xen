@@ -1261,6 +1261,12 @@ static long wrl_ndomains;
 static wrl_creditt wrl_reserve; /* [-wrl_config_newdoms_dburst, +_gburst ] */
 static time_t wrl_log_last_warning; /* 0: no previous warning */
 
+#define trace_wrl(...)				\
+do {						\
+	if (trace_flags & TRACE_WRL)		\
+		trace("wrl: " __VA_ARGS__);	\
+} while (0)
+
 void wrl_gettime_now(struct wrl_timestampt *now_wt)
 {
 	struct timespec now_ts;
@@ -1366,12 +1372,9 @@ void wrl_credit_update(struct domain *domain, struct wrl_timestampt now)
 
 	domain->wrl_timestamp = now;
 
-	trace("wrl: dom %4d %6ld  msec  %9ld credit   %9ld reserve"
-	      "  %9ld discard\n",
-	      domain->domid,
-	      msec,
-	      (long)domain->wrl_credit, (long)wrl_reserve,
-	      (long)surplus);
+	trace_wrl("dom %4d %6ld msec %9ld credit %9ld reserve %9ld discard\n",
+		  domain->domid, msec, (long)domain->wrl_credit,
+		  (long)wrl_reserve, (long)surplus);
 }
 
 void wrl_check_timeout(struct domain *domain,
@@ -1403,10 +1406,9 @@ void wrl_check_timeout(struct domain *domain,
 	if (*ptimeout==-1 || wakeup < *ptimeout)
 		*ptimeout = wakeup;
 
-	trace("wrl: domain %u credit=%ld (reserve=%ld) SLEEPING for %d\n",
-	      domain->domid,
-	      (long)domain->wrl_credit, (long)wrl_reserve,
-	      wakeup);
+	trace_wrl("domain %u credit=%ld (reserve=%ld) SLEEPING for %d\n",
+		  domain->domid, (long)domain->wrl_credit, (long)wrl_reserve,
+		  wakeup);
 }
 
 #define WRL_LOG(now, ...) \
@@ -1424,9 +1426,8 @@ void wrl_apply_debit_actual(struct domain *domain)
 	wrl_credit_update(domain, now);
 
 	domain->wrl_credit -= wrl_config_writecost;
-	trace("wrl: domain %u credit=%ld (reserve=%ld)\n",
-	      domain->domid,
-	      (long)domain->wrl_credit, (long)wrl_reserve);
+	trace_wrl("domain %u credit=%ld (reserve=%ld)\n", domain->domid,
+		  (long)domain->wrl_credit, (long)wrl_reserve);
 
 	if (domain->wrl_credit < 0) {
 		if (!domain->wrl_delay_logged) {

@@ -475,6 +475,7 @@ int do_transaction_start(const void *ctx, struct connection *conn,
 	if (!trans)
 		return ENOMEM;
 
+	trace_create(trans, "transaction");
 	INIT_LIST_HEAD(&trans->accessed);
 	INIT_LIST_HEAD(&trans->changed_domains);
 	trans->conn = conn;

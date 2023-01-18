@@ -182,6 +182,28 @@ static int do_control_check(const void *ctx, struct connection *conn,
 static int do_control_log(const void *ctx, struct connection *conn,
 			  char **vec, int num)
 {
+	int ret;
+
+	if (num == 0) {
+		char *resp = talloc_asprintf(ctx, "Log switch settings:\n");
+		unsigned int idx;
+		bool on;
+
+		if (!resp)
+			return ENOMEM;
+		for (idx = 0; trace_switches[idx]; idx++) {
+			on = trace_flags & (1u << idx);
+			resp = talloc_asprintf_append(resp, "%-8s: %s\n",
+						      trace_switches[idx],
+						      on ? "on" : "off");
+			if (!resp)
+				return ENOMEM;
+		}
+
+		send_reply(conn, XS_CONTROL, resp, strlen(resp) + 1);
+		return 0;
+	}
+
 	if (num != 1)
 		return EINVAL;
 
@@ -189,8 +211,11 @@ static int do_control_log(const void *ctx, struct connection *conn,
 		reopen_log();
 	else if (!strcmp(vec[0], "off"))
 		close_log();
-	else
-		return EINVAL;
+	else {
+		ret = set_trace_switch(vec[0]);
+		if (ret)
+			return ret;
+	}
 
 	send_ack(conn, XS_CONTROL);
 	return 0;
@@ -923,7 +948,7 @@ static int do_control_help(const void *, struct connection *, char **, int);
 
 static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
-	{ "log", do_control_log, "on|off" },
+	{ "log", do_control_log, "[on|off|+<switch>|-<switch>]" },
 
 #ifndef NO_LIVE_UPDATE
 	/*

@@ -409,10 +409,12 @@ CONTROL			<command>|[<parameters>|]
 		error string in case of failure. -s can return "BUSY" in case
 		of an active transaction, a retry of -s can be done in that
 		case.
-	log|on
-		turn xenstore logging on
-	log|off
-		turn xenstore logging off
+	log|[on|off|+<switch>|-<switch>]
+		without parameters: show possible log switches
+		on: turn xenstore logging on
+		off: turn xenstore logging off
+		+<switch>: activates log entries for <switch>,
+		-<switch>: deactivates log entries for <switch>
 	logfile|<file-name>
 		log to specified file
 	memreport|[<file-name>]

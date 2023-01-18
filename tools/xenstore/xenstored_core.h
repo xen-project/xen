@@ -294,6 +294,14 @@ extern char **orig_argv;
 extern char *tracefile;
 extern int tracefd;
 
+/* Trace flag values must be kept in sync with trace_switches[] contents. */
+extern unsigned int trace_flags;
+#define TRACE_OBJ	0x00000001
+#define TRACE_IO	0x00000002
+#define TRACE_WRL	0x00000004
+extern const char *const trace_switches[];
+int set_trace_switch(const char *arg);
+
 extern TDB_CONTEXT *tdb_ctx;
 extern int dom0_domid;
 extern int dom0_event;
