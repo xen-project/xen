@@ -88,20 +88,6 @@ TDB_CONTEXT *tdb_ctx = NULL;
 
 static const char *sockmsg_string(enum xsd_sockmsg_type type);
 
-#define log(...)							\
-	do {								\
-		char *s = talloc_asprintf(NULL, __VA_ARGS__);		\
-		if (s) {						\
-			trace("%s\n", s);				\
-			syslog(LOG_ERR, "%s\n",  s);			\
-			talloc_free(s);					\
-		} else {						\
-			trace("talloc failure during logging\n");	\
-			syslog(LOG_ERR, "talloc failure during logging\n"); \
-		}							\
-	} while (0)
-
-
 int quota_nb_entry_per_domain = 1000;
 int quota_nb_watch_per_domain = 128;
 int quota_max_entry_size = 2048; /* 2K */

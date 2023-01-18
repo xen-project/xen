@@ -267,6 +267,21 @@ void trace(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void reopen_log(void);
 void close_log(void);
 
+#define log(...)							\
+	do {								\
+		int _saved_errno = errno;				\
+		char *s = talloc_asprintf(NULL, __VA_ARGS__);		\
+		if (s) {						\
+			trace("%s\n", s);				\
+			syslog(LOG_ERR, "%s\n",	s);			\
+			talloc_free(s);					\
+		} else {						\
+			trace("talloc failure during logging\n");	\
+			syslog(LOG_ERR, "talloc failure during logging\n"); \
+		}							\
+		errno = _saved_errno;					\
+	} while (0)
+
 extern int orig_argc;
 extern char **orig_argv;
 
