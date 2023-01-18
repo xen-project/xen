@@ -326,7 +326,7 @@ static int destroy_domain(void *_domain)
 	if (domain->interface) {
 		/* Domain 0 was mapped by dom0_init, so it must be unmapped
 		   using munmap() and not the grant unmap call. */
-		if (domain->domid == 0)
+		if (domain->domid == dom0_domid)
 			unmap_xenbus(domain->interface);
 		else
 			unmap_interface(domain->interface);
@@ -410,7 +410,7 @@ void handle_event(void)
 
 static bool domid_is_unprivileged(unsigned int domid)
 {
-	return domid != 0 && domid != priv_domid;
+	return domid != dom0_domid && domid != priv_domid;
 }
 
 bool domain_is_unprivileged(struct connection *conn)
@@ -798,7 +798,7 @@ static struct domain *onearg_domain(struct connection *conn,
 		return ERR_PTR(-EINVAL);
 
 	domid = atoi(domid_str);
-	if (!domid)
+	if (domid == dom0_domid)
 		return ERR_PTR(-EINVAL);
 
 	return find_connected_domain(domid);
@@ -1004,7 +1004,7 @@ static int chk_domain_generation(unsigned int domid, uint64_t gen)
 {
 	struct domain *d;
 
-	if (!xc_handle && domid == 0)
+	if (!xc_handle && domid == dom0_domid)
 		return 1;
 
 	d = find_domain_struct(domid);

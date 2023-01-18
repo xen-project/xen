@@ -2297,9 +2297,10 @@ static void accept_connection(int sock)
 		return;
 
 	conn = new_connection(&socket_funcs);
-	if (conn)
+	if (conn) {
 		conn->fd = fd;
-	else
+		conn->id = dom0_domid;
+	} else
 		close(fd);
 }
 #endif
