@@ -1296,17 +1296,10 @@ static int construct_vmcs(struct vcpu *v)
     v->arch.hvm.vmx.exception_bitmap = HVM_TRAP_MASK
               | (paging_mode_hap(d) ? 0 : (1U << TRAP_page_fault))
               | (v->arch.fully_eager_fpu ? 0 : (1U << TRAP_no_device));
+
     if ( cpu_has_vmx_notify_vm_exiting )
-    {
         __vmwrite(NOTIFY_WINDOW, vm_notify_window);
-        /*
-         * Disable #AC and #DB interception: by using VM Notify Xen is
-         * guaranteed to get a VM exit even if the guest manages to lock the
-         * CPU.
-         */
-        v->arch.hvm.vmx.exception_bitmap &= ~((1U << TRAP_debug) |
-                                              (1U << TRAP_alignment_check));
-    }
+
     vmx_update_exception_bitmap(v);
 
     v->arch.hvm.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;

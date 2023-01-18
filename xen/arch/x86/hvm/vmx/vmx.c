@@ -1564,19 +1564,10 @@ static void cf_check vmx_update_host_cr3(struct vcpu *v)
 
 void vmx_update_debug_state(struct vcpu *v)
 {
-    unsigned int mask = 1u << TRAP_int3;
-
-    if ( !cpu_has_monitor_trap_flag && cpu_has_vmx_notify_vm_exiting )
-        /*
-         * Only allow toggling TRAP_debug if notify VM exit is enabled, as
-         * unconditionally setting TRAP_debug is part of the XSA-156 fix.
-         */
-        mask |= 1u << TRAP_debug;
-
     if ( v->arch.hvm.debug_state_latch )
-        v->arch.hvm.vmx.exception_bitmap |= mask;
+        v->arch.hvm.vmx.exception_bitmap |= 1U << TRAP_int3;
     else
-        v->arch.hvm.vmx.exception_bitmap &= ~mask;
+        v->arch.hvm.vmx.exception_bitmap &= ~(1U << TRAP_int3);
 
     vmx_vmcs_enter(v);
     vmx_update_exception_bitmap(v);
@@ -4192,9 +4183,6 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         switch ( vector )
         {
         case TRAP_debug:
-            if ( cpu_has_monitor_trap_flag && cpu_has_vmx_notify_vm_exiting )
-                goto exit_and_crash;
-
             /*
              * Updates DR6 where debugger can peek (See 3B 23.2.1,
              * Table 23-1, "Exit Qualification for Debug Exceptions").
