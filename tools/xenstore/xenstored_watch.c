@@ -39,8 +39,8 @@ struct watch
 	/* Current outstanding events applying to this watch. */
 	struct list_head events;
 
-	/* Is this relative to connnection's implicit path? */
-	const char *relative_path;
+	/* Offset into path for skipping prefix (used for relative paths). */
+	unsigned int prefix_len;
 
 	char *token;
 	char *node;
@@ -66,15 +66,7 @@ static bool is_child(const char *child, const char *parent)
 
 static const char *get_watch_path(const struct watch *watch, const char *name)
 {
-	const char *path = name;
-
-	if (watch->relative_path) {
-		path += strlen(watch->relative_path);
-		if (*path == '/') /* Could be "" */
-			path++;
-	}
-
-	return path;
+	return name + watch->prefix_len;
 }
 
 /*
@@ -211,10 +203,7 @@ static struct watch *add_watch(struct connection *conn, char *path, char *token,
 			      no_quota_check))
 		goto nomem;
 
-	if (relative)
-		watch->relative_path = get_implicit_path(conn);
-	else
-		watch->relative_path = NULL;
+	watch->prefix_len = relative ? strlen(get_implicit_path(conn)) + 1 : 0;
 
 	INIT_LIST_HEAD(&watch->events);
 
