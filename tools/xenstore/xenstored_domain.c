@@ -740,6 +740,9 @@ int do_release(const void *ctx, struct connection *conn,
 	if (IS_ERR(domain))
 		return -PTR_ERR(domain);
 
+	/* Avoid triggering watch events when the domain's nodes are deleted. */
+	conn_delete_all_watches(domain->conn);
+
 	talloc_free(domain->conn);
 
 	send_ack(conn, XS_RELEASE);
