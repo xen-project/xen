@@ -249,7 +249,7 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 		domain->nbentry--;
 		node->perms.p[0].id = priv_domid;
 		node->acc.memory = 0;
-		domain_entry_inc(NULL, node);
+		domain_nbentry_inc(NULL, priv_domid);
 		if (write_node_raw(NULL, &key, node, true)) {
 			/* That's unfortunate. We only can try to continue. */
 			syslog(LOG_ERR,
@@ -561,7 +561,7 @@ int acc_fix_domains(struct list_head *head, bool update)
 	int cnt;
 
 	list_for_each_entry(cd, head, list) {
-		cnt = domain_entry_fix(cd->domid, cd->nbentry, update);
+		cnt = domain_nbentry_fix(cd->domid, cd->nbentry, update);
 		if (!update) {
 			if (cnt >= quota_nb_entry_per_domain)
 				return ENOSPC;
@@ -606,8 +606,8 @@ static struct changed_domain *acc_get_changed_domain(const void *ctx,
 	return cd;
 }
 
-int acc_add_dom_nbentry(const void *ctx, struct list_head *head, int val,
-			unsigned int domid)
+static int acc_add_dom_nbentry(const void *ctx, struct list_head *head, int val,
+			       unsigned int domid)
 {
 	struct changed_domain *cd;
 
@@ -991,30 +991,6 @@ void domain_deinit(void)
 		xenevtchn_unbind(xce_handle, virq_port);
 }
 
-int domain_entry_inc(struct connection *conn, struct node *node)
-{
-	struct domain *d;
-	unsigned int domid;
-
-	if (!node->perms.p)
-		return 0;
-
-	domid = node->perms.p[0].id;
-
-	if (conn && conn->transaction) {
-		transaction_entry_inc(conn->transaction, domid);
-	} else {
-		d = (conn && domid == conn->id && conn->domain) ? conn->domain
-		    : find_or_alloc_existing_domain(domid);
-		if (d)
-			d->nbentry++;
-		else
-			return ENOMEM;
-	}
-
-	return 0;
-}
-
 /*
  * Check whether a domain was created before or after a specific generation
  * count (used for testing whether a node permission is older than a domain).
@@ -1082,62 +1058,76 @@ int domain_adjust_node_perms(struct node *node)
 	return 0;
 }
 
-void domain_entry_dec(struct connection *conn, struct node *node)
+static int domain_nbentry_add(struct connection *conn, unsigned int domid,
+			      int add, bool no_dom_alloc)
 {
 	struct domain *d;
-	unsigned int domid;
+	struct list_head *head;
+	int ret;
 
-	if (!node->perms.p)
-		return;
-
-	domid = node->perms.p ? node->perms.p[0].id : conn->id;
-
-	if (conn && conn->transaction) {
-		transaction_entry_dec(conn->transaction, domid);
-	} else {
-		d = (conn && domid == conn->id && conn->domain) ? conn->domain
-		    : find_domain_struct(domid);
-		if (d) {
-			d->nbentry--;
-		} else {
+	if (conn && domid == conn->id && conn->domain)
+		d = conn->domain;
+	else if (no_dom_alloc) {
+		d = find_domain_struct(domid);
+		if (!d) {
 			errno = ENOENT;
-			corrupt(conn,
-				"Node \"%s\" owned by non-existing domain %u\n",
-				node->name, domid);
+			corrupt(conn, "Missing domain %u\n", domid);
+			return -1;
+		}
+	} else {
+		d = find_or_alloc_existing_domain(domid);
+		if (!d) {
+			errno = ENOMEM;
+			return -1;
 		}
 	}
-}
 
-int domain_entry_fix(unsigned int domid, int num, bool update)
-{
-	struct domain *d;
-	int cnt;
-
-	if (update) {
-		d = find_domain_struct(domid);
-		assert(d);
-	} else {
-		/*
-		 * We are called first with update == false in order to catch
-		 * any error. So do a possible allocation and check for error
-		 * only in this case, as in the case of update == true nothing
-		 * can go wrong anymore as the allocation already happened.
-		 */
-		d = find_or_alloc_existing_domain(domid);
-		if (!d)
+	if (conn && conn->transaction) {
+		head = transaction_get_changed_domains(conn->transaction);
+		ret = acc_add_dom_nbentry(conn->transaction, head, add, domid);
+		if (errno) {
+			fail_transaction(conn->transaction);
 			return -1;
+		}
+		/*
+		 * In a transaction when a node is being added/removed AND the
+		 * same node has been added/removed outside the transaction in
+		 * parallel, the resulting number of nodes will be wrong. This
+		 * is no problem, as the transaction will fail due to the
+		 * resulting conflict.
+		 * In the node remove case the resulting number can be even
+		 * negative, which should be avoided.
+		 */
+		return max(d->nbentry + ret, 0);
 	}
 
-	cnt = d->nbentry + num;
-	assert(cnt >= 0);
+	d->nbentry += add;
 
-	if (update)
-		d->nbentry = cnt;
-
-	return domid_is_unprivileged(domid) ? cnt : 0;
+	return d->nbentry;
 }
 
-int domain_entry(struct connection *conn)
+int domain_nbentry_inc(struct connection *conn, unsigned int domid)
+{
+	return (domain_nbentry_add(conn, domid, 1, false) < 0) ? errno : 0;
+}
+
+int domain_nbentry_dec(struct connection *conn, unsigned int domid)
+{
+	return (domain_nbentry_add(conn, domid, -1, true) < 0) ? errno : 0;
+}
+
+int domain_nbentry_fix(unsigned int domid, int num, bool update)
+{
+	int ret;
+
+	ret = domain_nbentry_add(NULL, domid, update ? num : 0, update);
+	if (ret < 0 || update)
+		return ret;
+
+	return domid_is_unprivileged(domid) ? ret + num : 0;
+}
+
+int domain_nbentry(struct connection *conn)
 {
 	return (domain_is_unprivileged(conn))
 		? conn->domain->nbentry

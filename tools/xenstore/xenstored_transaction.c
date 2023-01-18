@@ -548,20 +548,9 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 	return 0;
 }
 
-void transaction_entry_inc(struct transaction *trans, unsigned int domid)
+struct list_head *transaction_get_changed_domains(struct transaction *trans)
 {
-	if (!acc_add_dom_nbentry(trans, &trans->changed_domains, 1, domid)) {
-		/* Let the transaction fail. */
-		trans->fail = true;
-	}
-}
-
-void transaction_entry_dec(struct transaction *trans, unsigned int domid)
-{
-	if (!acc_add_dom_nbentry(trans, &trans->changed_domains, -1, domid)) {
-		/* Let the transaction fail. */
-		trans->fail = true;
-	}
+	return &trans->changed_domains;
 }
 
 void fail_transaction(struct transaction *trans)

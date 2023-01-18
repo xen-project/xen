@@ -36,10 +36,6 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 
 struct transaction *transaction_lookup(struct connection *conn, uint32_t id);
 
-/* inc/dec entry number local to trans while changing a node */
-void transaction_entry_inc(struct transaction *trans, unsigned int domid);
-void transaction_entry_dec(struct transaction *trans, unsigned int domid);
-
 /* This node was accessed. */
 int __must_check access_node(struct connection *conn, struct node *node,
                              enum node_access_type type, TDB_DATA *key);
@@ -53,6 +49,9 @@ void transaction_prepend(struct connection *conn, const char *name,
 
 /* Mark the transaction as failed. This will prevent it to be committed. */
 void fail_transaction(struct transaction *trans);
+
+/* Get the list head of the changed domains. */
+struct list_head *transaction_get_changed_domains(struct transaction *trans);
 
 void conn_delete_all_transactions(struct connection *conn);
 int check_transactions(struct hashtable *hash);

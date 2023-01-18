@@ -738,13 +738,13 @@ struct node *read_node(struct connection *conn, const void *ctx,
 
 	/* Permissions are struct xs_permissions. */
 	node->perms.p = hdr->perms;
-	node->acc.domid = node->perms.p[0].id;
+	node->acc.domid = get_node_owner(node);
 	node->acc.memory = data.dsize;
 	if (domain_adjust_node_perms(node))
 		goto error;
 
 	/* If owner is gone reset currently accounted memory size. */
-	if (node->acc.domid != node->perms.p[0].id)
+	if (node->acc.domid != get_node_owner(node))
 		node->acc.memory = 0;
 
 	/* Data is binary blob (usually ascii, no nul). */
@@ -1445,7 +1445,7 @@ static void destroy_node_rm(struct connection *conn, struct node *node)
 static int destroy_node(struct connection *conn, struct node *node)
 {
 	destroy_node_rm(conn, node);
-	domain_entry_dec(conn, node);
+	domain_nbentry_dec(conn, get_node_owner(node));
 
 	/*
 	 * It is not possible to easily revert the changes in a transaction.
@@ -1484,7 +1484,7 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 	for (i = node; i; i = i->parent) {
 		/* i->parent is set for each new node, so check quota. */
 		if (i->parent &&
-		    domain_entry(conn) >= quota_nb_entry_per_domain) {
+		    domain_nbentry(conn) >= quota_nb_entry_per_domain) {
 			ret = ENOSPC;
 			goto err;
 		}
@@ -1495,7 +1495,7 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 
 		/* Account for new node */
 		if (i->parent) {
-			if (domain_entry_inc(conn, i)) {
+			if (domain_nbentry_inc(conn, get_node_owner(i))) {
 				destroy_node_rm(conn, i);
 				return NULL;
 			}
@@ -1648,7 +1648,7 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 	watch_exact = strcmp(root, node->name);
 	fire_watches(conn, ctx, node->name, node, watch_exact, NULL);
 
-	domain_entry_dec(conn, node);
+	domain_nbentry_dec(conn, get_node_owner(node));
 
 	return WALK_TREE_RM_CHILDENTRY;
 }
@@ -1784,29 +1784,29 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 
 	/* Unprivileged domains may not change the owner. */
 	if (domain_is_unprivileged(conn) &&
-	    perms.p[0].id != node->perms.p[0].id)
+	    perms.p[0].id != get_node_owner(node))
 		return EPERM;
 
 	old_perms = node->perms;
-	domain_entry_dec(conn, node);
+	domain_nbentry_dec(conn, get_node_owner(node));
 	node->perms = perms;
-	if (domain_entry_inc(conn, node)) {
+	if (domain_nbentry_inc(conn, get_node_owner(node))) {
 		node->perms = old_perms;
 		/*
 		 * This should never fail because we had a reference on the
 		 * domain before and Xenstored is single-threaded.
 		 */
-		domain_entry_inc(conn, node);
+		domain_nbentry_inc(conn, get_node_owner(node));
 		return ENOMEM;
 	}
 
 	if (write_node(conn, node, false)) {
 		int saved_errno = errno;
 
-		domain_entry_dec(conn, node);
+		domain_nbentry_dec(conn, get_node_owner(node));
 		node->perms = old_perms;
 		/* No failure possible as above. */
-		domain_entry_inc(conn, node);
+		domain_nbentry_inc(conn, get_node_owner(node));
 
 		errno = saved_errno;
 		return errno;
@@ -2378,7 +2378,7 @@ void setup_structure(bool live_update)
 		manual_node("/tool/xenstored", NULL);
 		manual_node("@releaseDomain", NULL);
 		manual_node("@introduceDomain", NULL);
-		domain_entry_fix(dom0_domid, 5, true);
+		domain_nbentry_fix(dom0_domid, 5, true);
 	}
 
 	check_store();
@@ -3386,7 +3386,7 @@ void read_state_node(const void *ctx, const void *state)
 	if (write_node_raw(NULL, &key, node, true))
 		barf("write node error restoring node");
 
-	if (domain_entry_inc(&conn, node))
+	if (domain_nbentry_inc(&conn, get_node_owner(node)))
 		barf("node accounting error restoring node");
 
 	talloc_free(node);

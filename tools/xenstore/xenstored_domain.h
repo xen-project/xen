@@ -66,10 +66,10 @@ int domain_adjust_node_perms(struct node *node);
 int domain_alloc_permrefs(struct node_perms *perms);
 
 /* Quota manipulation */
-int domain_entry_inc(struct connection *conn, struct node *);
-void domain_entry_dec(struct connection *conn, struct node *);
-int domain_entry_fix(unsigned int domid, int num, bool update);
-int domain_entry(struct connection *conn);
+int domain_nbentry_inc(struct connection *conn, unsigned int domid);
+int domain_nbentry_dec(struct connection *conn, unsigned int domid);
+int domain_nbentry_fix(unsigned int domid, int num, bool update);
+int domain_nbentry(struct connection *conn);
 int domain_memory_add(unsigned int domid, int mem, bool no_quota_check);
 
 /*
@@ -99,8 +99,6 @@ void domain_outstanding_domid_dec(unsigned int domid);
 int domain_get_quota(const void *ctx, struct connection *conn,
 		     unsigned int domid);
 int acc_fix_domains(struct list_head *head, bool update);
-int acc_add_dom_nbentry(const void *ctx, struct list_head *head, int val,
-			unsigned int domid);
 
 /* Write rate limiting */
 

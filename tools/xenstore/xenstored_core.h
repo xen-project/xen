@@ -232,6 +232,12 @@ char *canonicalize(struct connection *conn, const void *ctx, const char *node);
 unsigned int perm_for_conn(struct connection *conn,
 			   const struct node_perms *perms);
 
+/* Get owner of a node. */
+static inline unsigned int get_node_owner(const struct node *node)
+{
+	return node->perms.p[0].id;
+}
+
 /* Write a node to the tdb data base. */
 int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 		   bool no_quota_check);
