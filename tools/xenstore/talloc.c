@@ -541,38 +541,39 @@ static void talloc_free_children(void *ptr)
 */
 int talloc_free(void *ptr)
 {
+	int saved_errno = errno;
 	struct talloc_chunk *tc;
 
 	if (ptr == NULL) {
-		return -1;
+		goto err;
 	}
 
 	tc = talloc_chunk_from_ptr(ptr);
 
 	if (tc->null_refs) {
 		tc->null_refs--;
-		return -1;
+		goto err;
 	}
 
 	if (tc->refs) {
 		talloc_reference_destructor(tc->refs);
-		return -1;
+		goto err;
 	}
 
 	if (tc->flags & TALLOC_FLAG_LOOP) {
 		/* we have a free loop - stop looping */
-		return 0;
+		goto success;
 	}
 
 	if (tc->destructor) {
 		talloc_destructor_t d = tc->destructor;
 		if (d == (talloc_destructor_t)-1) {
-			return -1;
+			goto err;
 		}
 		tc->destructor = (talloc_destructor_t)-1;
 		if (d(ptr) == -1) {
 			tc->destructor = d;
-			return -1;
+			goto err;
 		}
 		tc->destructor = NULL;
 	}
@@ -594,10 +595,14 @@ int talloc_free(void *ptr)
 	tc->flags |= TALLOC_FLAG_FREE;
 
 	free(tc);
+ success:
+	errno = saved_errno;
 	return 0;
+
+ err:
+	errno = saved_errno;
+	return -1;
 }
-
-
 
 /*
   A talloc version of realloc. The context argument is only used if

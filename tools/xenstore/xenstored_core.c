@@ -771,9 +771,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	return node;
 
  error:
-	err = errno;
 	talloc_free(node);
-	errno = err;
 	return NULL;
 }
 
