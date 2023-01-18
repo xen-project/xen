@@ -68,10 +68,9 @@ hashtable_search(struct hashtable *h, void *k);
  * @name        hashtable_remove
  * @param   h   the hashtable to remove the item from
  * @param   k   the key to search for  - does not claim ownership
- * @return      the value associated with the key, or NULL if none found
  */
 
-void * /* returns value */
+void
 hashtable_remove(struct hashtable *h, void *k);
 
 /*****************************************************************************
