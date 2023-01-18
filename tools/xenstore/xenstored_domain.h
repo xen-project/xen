@@ -98,6 +98,9 @@ void domain_outstanding_dec(struct connection *conn);
 void domain_outstanding_domid_dec(unsigned int domid);
 int domain_get_quota(const void *ctx, struct connection *conn,
 		     unsigned int domid);
+int acc_fix_domains(struct list_head *head, bool update);
+int acc_add_dom_nbentry(const void *ctx, struct list_head *head, int val,
+			unsigned int domid);
 
 /* Write rate limiting */
 

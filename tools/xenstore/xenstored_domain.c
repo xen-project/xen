@@ -91,6 +91,18 @@ struct domain
 	bool wrl_delay_logged;
 };
 
+struct changed_domain
+{
+	/* List of all changed domains. */
+	struct list_head list;
+
+	/* Identifier of the changed domain. */
+	unsigned int domid;
+
+	/* Amount by which this domain's nbentry field has changed. */
+	int nbentry;
+};
+
 static struct hashtable *domhash;
 
 static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
@@ -541,6 +553,72 @@ static struct domain *find_domain_by_domid(unsigned int domid)
 	d = find_domain_struct(domid);
 
 	return (d && d->introduced) ? d : NULL;
+}
+
+int acc_fix_domains(struct list_head *head, bool update)
+{
+	struct changed_domain *cd;
+	int cnt;
+
+	list_for_each_entry(cd, head, list) {
+		cnt = domain_entry_fix(cd->domid, cd->nbentry, update);
+		if (!update) {
+			if (cnt >= quota_nb_entry_per_domain)
+				return ENOSPC;
+			if (cnt < 0)
+				return ENOMEM;
+		}
+	}
+
+	return 0;
+}
+
+static struct changed_domain *acc_find_changed_domain(struct list_head *head,
+						      unsigned int domid)
+{
+	struct changed_domain *cd;
+
+	list_for_each_entry(cd, head, list) {
+		if (cd->domid == domid)
+			return cd;
+	}
+
+	return NULL;
+}
+
+static struct changed_domain *acc_get_changed_domain(const void *ctx,
+						     struct list_head *head,
+						     unsigned int domid)
+{
+	struct changed_domain *cd;
+
+	cd = acc_find_changed_domain(head, domid);
+	if (cd)
+		return cd;
+
+	cd = talloc_zero(ctx, struct changed_domain);
+	if (!cd)
+		return NULL;
+
+	cd->domid = domid;
+	list_add_tail(&cd->list, head);
+
+	return cd;
+}
+
+int acc_add_dom_nbentry(const void *ctx, struct list_head *head, int val,
+			unsigned int domid)
+{
+	struct changed_domain *cd;
+
+	cd = acc_get_changed_domain(ctx, head, domid);
+	if (!cd)
+		return 0;
+
+	errno = 0;
+	cd->nbentry += val;
+
+	return cd->nbentry;
 }
 
 static void domain_conn_reset(struct domain *domain)

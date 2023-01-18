@@ -137,18 +137,6 @@ struct accessed_node
 	bool watch_exact;
 };
 
-struct changed_domain
-{
-	/* List of all changed domains in the context of this transaction. */
-	struct list_head list;
-
-	/* Identifier of the changed domain. */
-	unsigned int domid;
-
-	/* Amount by which this domain's nbentry field has changed. */
-	int nbentry;
-};
-
 struct transaction
 {
 	/* List of all transactions active on this connection. */
@@ -514,24 +502,6 @@ int do_transaction_start(const void *ctx, struct connection *conn,
 	return 0;
 }
 
-static int transaction_fix_domains(struct transaction *trans, bool update)
-{
-	struct changed_domain *d;
-	int cnt;
-
-	list_for_each_entry(d, &trans->changed_domains, list) {
-		cnt = domain_entry_fix(d->domid, d->nbentry, update);
-		if (!update) {
-			if (cnt >= quota_nb_entry_per_domain)
-				return ENOSPC;
-			if (cnt < 0)
-				return ENOMEM;
-		}
-	}
-
-	return 0;
-}
-
 int do_transaction_end(const void *ctx, struct connection *conn,
 		       struct buffered_data *in)
 {
@@ -558,7 +528,7 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 	if (streq(arg, "T")) {
 		if (trans->fail)
 			return ENOMEM;
-		ret = transaction_fix_domains(trans, false);
+		ret = acc_fix_domains(&trans->changed_domains, false);
 		if (ret)
 			return ret;
 		ret = finalize_transaction(conn, trans, &is_corrupt);
@@ -568,7 +538,7 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 		wrl_apply_debit_trans_commit(conn);
 
 		/* fix domain entry for each changed domain */
-		transaction_fix_domains(trans, true);
+		acc_fix_domains(&trans->changed_domains, true);
 
 		if (is_corrupt)
 			corrupt(conn, "transaction inconsistency");
@@ -580,44 +550,18 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 
 void transaction_entry_inc(struct transaction *trans, unsigned int domid)
 {
-	struct changed_domain *d;
-
-	list_for_each_entry(d, &trans->changed_domains, list)
-		if (d->domid == domid) {
-			d->nbentry++;
-			return;
-		}
-
-	d = talloc(trans, struct changed_domain);
-	if (!d) {
+	if (!acc_add_dom_nbentry(trans, &trans->changed_domains, 1, domid)) {
 		/* Let the transaction fail. */
 		trans->fail = true;
-		return;
 	}
-	d->domid = domid;
-	d->nbentry = 1;
-	list_add_tail(&d->list, &trans->changed_domains);
 }
 
 void transaction_entry_dec(struct transaction *trans, unsigned int domid)
 {
-	struct changed_domain *d;
-
-	list_for_each_entry(d, &trans->changed_domains, list)
-		if (d->domid == domid) {
-			d->nbentry--;
-			return;
-		}
-
-	d = talloc(trans, struct changed_domain);
-	if (!d) {
+	if (!acc_add_dom_nbentry(trans, &trans->changed_domains, -1, domid)) {
 		/* Let the transaction fail. */
 		trans->fail = true;
-		return;
 	}
-	d->domid = domid;
-	d->nbentry = -1;
-	list_add_tail(&d->list, &trans->changed_domains);
 }
 
 void fail_transaction(struct transaction *trans)
