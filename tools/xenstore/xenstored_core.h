@@ -318,6 +318,16 @@ void unmap_xenbus(void *interface);
 
 static inline int xenbus_master_domid(void) { return dom0_domid; }
 
+static inline bool domid_is_unprivileged(unsigned int domid)
+{
+	return domid != dom0_domid && domid != priv_domid;
+}
+
+static inline bool domain_is_unprivileged(const struct connection *conn)
+{
+	return conn && domid_is_unprivileged(conn->id);
+}
+
 /* Return the event channel used by xenbus. */
 evtchn_port_t xenbus_evtchn(void);
 

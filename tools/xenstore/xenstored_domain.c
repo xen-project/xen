@@ -408,17 +408,6 @@ void handle_event(void)
 		barf_perror("Failed to write to event fd");
 }
 
-static bool domid_is_unprivileged(unsigned int domid)
-{
-	return domid != dom0_domid && domid != priv_domid;
-}
-
-bool domain_is_unprivileged(struct connection *conn)
-{
-	return conn && conn->domain &&
-	       domid_is_unprivileged(conn->domain->domid);
-}
-
 static char *talloc_domain_path(const void *context, unsigned int domid)
 {
 	return talloc_asprintf(context, "/local/domain/%u", domid);
