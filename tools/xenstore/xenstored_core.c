@@ -2405,11 +2405,10 @@ static int keys_equal_fn(void *key1, void *key2)
 
 int remember_string(struct hashtable *hash, const char *str)
 {
-	char *k = malloc(strlen(str) + 1);
+	char *k = talloc_strdup(NULL, str);
 
 	if (!k)
 		return 0;
-	strcpy(k, str);
 	return hashtable_insert(hash, k, (void *)1);
 }
 
@@ -2504,7 +2503,7 @@ void check_store(void)
 	};
 
 	/* Don't free values (they are all void *1) */
-	reachable = create_hashtable(16, hash_from_key_fn, keys_equal_fn,
+	reachable = create_hashtable(NULL, 16, hash_from_key_fn, keys_equal_fn,
 				     HASHTABLE_FREE_KEY);
 	if (!reachable) {
 		log("check_store: ENOMEM");

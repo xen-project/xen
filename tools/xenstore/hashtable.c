@@ -6,6 +6,8 @@
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdarg.h>
+#include "talloc.h"
 
 struct entry
 {
@@ -50,7 +52,7 @@ indexFor(unsigned int tablelength, unsigned int hashvalue) {
 
 /*****************************************************************************/
 struct hashtable *
-create_hashtable(unsigned int minsize,
+create_hashtable(const void *ctx, unsigned int minsize,
                  unsigned int (*hashf) (void*),
                  int (*eqf) (void*,void*),
                  unsigned int flags)
@@ -66,10 +68,10 @@ create_hashtable(unsigned int minsize,
         if (primes[pindex] > minsize) { size = primes[pindex]; break; }
     }
 
-    h = (struct hashtable *)calloc(1, sizeof(struct hashtable));
+    h = talloc_zero(ctx, struct hashtable);
     if (NULL == h)
         goto err0;
-    h->table = (struct entry **)calloc(size, sizeof(struct entry *));
+    h->table = talloc_zero_array(h, struct entry *, size);
     if (NULL == h->table)
         goto err1;
 
@@ -83,7 +85,7 @@ create_hashtable(unsigned int minsize,
     return h;
 
 err1:
-   free(h);
+   talloc_free(h);
 err0:
    return NULL;
 }
@@ -115,47 +117,32 @@ hashtable_expand(struct hashtable *h)
     if (h->primeindex == (prime_table_length - 1)) return 0;
     newsize = primes[++(h->primeindex)];
 
-    newtable = (struct entry **)calloc(newsize, sizeof(struct entry*));
-    if (NULL != newtable)
+    newtable = talloc_realloc(h, h->table, struct entry *, newsize);
+    if (!newtable)
     {
-        /* This algorithm is not 'stable'. ie. it reverses the list
-         * when it transfers entries between the tables */
-        for (i = 0; i < h->tablelength; i++) {
-            while (NULL != (e = h->table[i])) {
-                h->table[i] = e->next;
-                index = indexFor(newsize,e->h);
+        h->primeindex--;
+        return 0;
+    }
+
+    h->table = newtable;
+    memset(newtable + h->tablelength, 0,
+           (newsize - h->tablelength) * sizeof(*newtable));
+    for (i = 0; i < h->tablelength; i++) {
+        for (pE = &(newtable[i]), e = *pE; e != NULL; e = *pE) {
+            index = indexFor(newsize, e->h);
+            if (index == i)
+            {
+                pE = &(e->next);
+            }
+            else
+            {
+                *pE = e->next;
                 e->next = newtable[index];
                 newtable[index] = e;
             }
         }
-        free(h->table);
-        h->table = newtable;
     }
-    /* Plan B: realloc instead */
-    else 
-    {
-        newtable = (struct entry **)
-                   realloc(h->table, newsize * sizeof(struct entry *));
-        if (NULL == newtable) { (h->primeindex)--; return 0; }
-        h->table = newtable;
-        memset(newtable + h->tablelength, 0,
-               (newsize - h->tablelength) * sizeof(*newtable));
-        for (i = 0; i < h->tablelength; i++) {
-            for (pE = &(newtable[i]), e = *pE; e != NULL; e = *pE) {
-                index = indexFor(newsize,e->h);
-                if (index == i)
-                {
-                    pE = &(e->next);
-                }
-                else
-                {
-                    *pE = e->next;
-                    e->next = newtable[index];
-                    newtable[index] = e;
-                }
-            }
-        }
-    }
+
     h->tablelength = newsize;
     h->loadlimit   = (unsigned int)
         (((uint64_t)newsize * max_load_factor) / 100);
@@ -184,12 +171,16 @@ hashtable_insert(struct hashtable *h, void *k, void *v)
          * element may be ok. Next time we insert, we'll try expanding again.*/
         hashtable_expand(h);
     }
-    e = (struct entry *)calloc(1, sizeof(struct entry));
+    e = talloc_zero(h, struct entry);
     if (NULL == e) { --(h->entrycount); return 0; } /*oom*/
     e->h = hash(h,k);
     index = indexFor(h->tablelength,e->h);
     e->k = k;
+    if (h->flags & HASHTABLE_FREE_KEY)
+        talloc_steal(e, k);
     e->v = v;
+    if (h->flags & HASHTABLE_FREE_VALUE)
+        talloc_steal(e, v);
     e->next = h->table[index];
     h->table[index] = e;
     return -1;
@@ -235,11 +226,7 @@ hashtable_remove(struct hashtable *h, void *k)
         {
             *pE = e->next;
             h->entrycount--;
-            if (h->flags & HASHTABLE_FREE_KEY)
-                free(e->k);
-            if (h->flags & HASHTABLE_FREE_VALUE)
-                free(e->v);
-            free(e);
+            talloc_free(e);
             return;
         }
         pE = &(e->next);
@@ -278,26 +265,7 @@ hashtable_iterate(struct hashtable *h,
 void
 hashtable_destroy(struct hashtable *h)
 {
-    unsigned int i;
-    struct entry *e, *f;
-    struct entry **table = h->table;
-
-    for (i = 0; i < h->tablelength; i++)
-    {
-        e = table[i];
-        while (NULL != e)
-        {
-            f = e;
-            e = e->next;
-            if (h->flags & HASHTABLE_FREE_KEY)
-                free(f->k);
-            if (h->flags & HASHTABLE_FREE_VALUE)
-                free(f->v);
-            free(f);
-        }
-    }
-    free(h->table);
-    free(h);
+    talloc_free(h);
 }
 
 /*

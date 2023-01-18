@@ -931,7 +931,7 @@ void domain_init(int evtfd)
 	int rc;
 
 	/* Start with a random rather low domain count for the hashtable. */
-	domhash = create_hashtable(8, domhash_fn, domeq_fn, 0);
+	domhash = create_hashtable(NULL, 8, domhash_fn, domeq_fn, 0);
 	if (!domhash)
 		barf_perror("Failed to allocate domain hashtable");
 
