@@ -2384,8 +2384,6 @@ void setup_structure(bool live_update)
 		manual_node("@introduceDomain", NULL);
 		domain_nbentry_fix(dom0_domid, 5, true);
 	}
-
-	check_store();
 }
 
 static unsigned int hash_from_key_fn(void *k)
@@ -2428,19 +2426,27 @@ int remember_string(struct hashtable *hash, const char *str)
  * As we go, we record each node in the given reachable hashtable.  These
  * entries will be used later in clean_store.
  */
+
+struct check_store_data {
+	struct hashtable *reachable;
+	struct hashtable *domains;
+};
+
 static int check_store_step(const void *ctx, struct connection *conn,
 			    struct node *node, void *arg)
 {
-	struct hashtable *reachable = arg;
+	struct check_store_data *data = arg;
 
-	if (hashtable_search(reachable, (void *)node->name)) {
+	if (hashtable_search(data->reachable, (void *)node->name)) {
 		log("check_store: '%s' is duplicated!", node->name);
 		return recovery ? WALK_TREE_RM_CHILDENTRY
 				: WALK_TREE_SKIP_CHILDREN;
 	}
 
-	if (!remember_string(reachable, node->name))
+	if (!remember_string(data->reachable, node->name))
 		return WALK_TREE_ERROR_STOP;
+
+	domain_check_acc_add(node, data->domains);
 
 	return WALK_TREE_OK;
 }
@@ -2491,37 +2497,61 @@ static int clean_store_(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA val,
  * Given the list of reachable nodes, iterate over the whole store, and
  * remove any that were not reached.
  */
-static void clean_store(struct hashtable *reachable)
+static void clean_store(struct check_store_data *data)
 {
-	tdb_traverse(tdb_ctx, &clean_store_, reachable);
+	tdb_traverse(tdb_ctx, &clean_store_, data->reachable);
+	domain_check_acc(data->domains);
 }
 
+int check_store_path(const char *name, struct check_store_data *data)
+{
+	struct node *node;
+
+	node = read_node(NULL, NULL, name);
+	if (!node) {
+		log("check_store: error %d reading special node '%s'", errno,
+		    name);
+		return errno;
+	}
+
+	return check_store_step(NULL, NULL, node, data);
+}
 
 void check_store(void)
 {
-	struct hashtable *reachable;
 	struct walk_funcs walkfuncs = {
 		.enter = check_store_step,
 		.enoent = check_store_enoent,
 	};
+	struct check_store_data data;
 
 	/* Don't free values (they are all void *1) */
-	reachable = create_hashtable(NULL, 16, hash_from_key_fn, keys_equal_fn,
-				     HASHTABLE_FREE_KEY);
-	if (!reachable) {
+	data.reachable = create_hashtable(NULL, 16, hash_from_key_fn,
+					  keys_equal_fn, HASHTABLE_FREE_KEY);
+	if (!data.reachable) {
 		log("check_store: ENOMEM");
 		return;
 	}
 
+	data.domains = domain_check_acc_init();
+	if (!data.domains) {
+		log("check_store: ENOMEM");
+		goto out_hash;
+	}
+
 	log("Checking store ...");
-	if (walk_node_tree(NULL, NULL, "/", &walkfuncs, reachable)) {
+	if (walk_node_tree(NULL, NULL, "/", &walkfuncs, &data)) {
 		if (errno == ENOMEM)
 			log("check_store: ENOMEM");
-	} else if (!check_transactions(reachable))
-		clean_store(reachable);
+	} else if (!check_store_path("@introduceDomain", &data) &&
+		   !check_store_path("@releaseDomain", &data) &&
+		   !check_transactions(data.reachable))
+		clean_store(&data);
 	log("Checking store complete.");
 
-	hashtable_destroy(reachable);
+	hashtable_destroy(data.domains);
+ out_hash:
+	hashtable_destroy(data.reachable);
 }
 
 
@@ -2919,6 +2949,8 @@ int main(int argc, char *argv[])
 	if (live_update)
 		lu_read_state();
 #endif
+
+	check_store();
 
 	/* Get ready to listen to the tools. */
 	initialize_fds(&sock_pollfd_idx, &timeout);

@@ -129,4 +129,8 @@ const char *dump_state_connections(FILE *fp);
 
 void read_state_connection(const void *ctx, const void *state);
 
+struct hashtable *domain_check_acc_init(void);
+void domain_check_acc_add(const struct node *node, struct hashtable *domains);
+void domain_check_acc(struct hashtable *domains);
+
 #endif /* _XENSTORED_DOMAIN_H */

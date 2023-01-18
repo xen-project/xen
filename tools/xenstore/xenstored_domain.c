@@ -1574,6 +1574,92 @@ void read_state_connection(const void *ctx, const void *state)
 	read_state_buffered_data(ctx, conn, sc);
 }
 
+struct domain_acc {
+	unsigned int domid;
+	int nodes;
+};
+
+static int domain_check_acc_init_sub(const void *k, void *v, void *arg)
+{
+	struct hashtable *domains = arg;
+	struct domain *d = v;
+	struct domain_acc *dom;
+
+	dom = talloc_zero(NULL, struct domain_acc);
+	if (!dom)
+		return -1;
+
+	dom->domid = d->domid;
+	/*
+	 * Set the initial value to the negative one of the current domain.
+	 * If everything is correct incrementing the value for each node will
+	 * result in dom->nodes being 0 at the end.
+	 */
+	dom->nodes = -d->nbentry;
+
+	if (!hashtable_insert(domains, &dom->domid, dom)) {
+		talloc_free(dom);
+		return -1;
+	}
+
+	return 0;
+}
+
+struct hashtable *domain_check_acc_init(void)
+{
+	struct hashtable *domains;
+
+	domains = create_hashtable(NULL, 8, domhash_fn, domeq_fn,
+				   HASHTABLE_FREE_VALUE);
+	if (!domains)
+		return NULL;
+
+	if (hashtable_iterate(domhash, domain_check_acc_init_sub, domains)) {
+		hashtable_destroy(domains);
+		return NULL;
+	}
+
+	return domains;
+}
+
+void domain_check_acc_add(const struct node *node, struct hashtable *domains)
+{
+	struct domain_acc *dom;
+	unsigned int domid;
+
+	domid = get_node_owner(node);
+	dom = hashtable_search(domains, &domid);
+	if (!dom)
+		log("Node %s owned by unknown domain %u", node->name, domid);
+	else
+		dom->nodes++;
+}
+
+static int domain_check_acc_cb(const void *k, void *v, void *arg)
+{
+	struct domain_acc *dom = v;
+	struct domain *d;
+
+	if (!dom->nodes)
+		return 0;
+
+	log("Correct accounting data for domain %u: nodes are %d off",
+	    dom->domid, dom->nodes);
+
+	d = find_domain_struct(dom->domid);
+	if (!d)
+		return 0;
+
+	d->nbentry += dom->nodes;
+
+	return 0;
+}
+
+void domain_check_acc(struct hashtable *domains)
+{
+	hashtable_iterate(domains, domain_check_acc_cb, NULL);
+}
+
 /*
  * Local variables:
  *  mode: C
