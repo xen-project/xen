@@ -48,8 +48,6 @@ static struct node_perms dom_introduce_perms;
 
 struct domain
 {
-	struct list_head list;
-
 	/* The id of this domain */
 	unsigned int domid;
 
@@ -96,7 +94,7 @@ struct domain
 	bool wrl_delay_logged;
 };
 
-static LIST_HEAD(domains);
+static struct hashtable *domhash;
 
 static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
 {
@@ -309,7 +307,7 @@ static int destroy_domain(void *_domain)
 
 	domain_tree_remove(domain);
 
-	list_del(&domain->list);
+	hashtable_remove(domhash, &domain->domid);
 
 	if (!domain->introduced)
 		return 0;
@@ -341,42 +339,49 @@ static bool get_domain_info(unsigned int domid, xc_dominfo_t *dominfo)
 	       dominfo->domid == domid;
 }
 
-void check_domains(void)
+static int check_domain(const void *k, void *v, void *arg)
 {
 	xc_dominfo_t dominfo;
-	struct domain *domain;
 	struct connection *conn;
-	int notify = 0;
 	bool dom_valid;
+	struct domain *domain = v;
+	bool *notify = arg;
 
- again:
-	list_for_each_entry(domain, &domains, list) {
-		dom_valid = get_domain_info(domain->domid, &dominfo);
-		if (!domain->introduced) {
-			if (!dom_valid) {
-				talloc_free(domain);
-				goto again;
-			}
-			continue;
-		}
-		if (dom_valid) {
-			if ((dominfo.crashed || dominfo.shutdown)
-			    && !domain->shutdown) {
-				domain->shutdown = true;
-				notify = 1;
-			}
-			if (!dominfo.dying)
-				continue;
-		}
-		if (domain->conn) {
-			/* domain is a talloc child of domain->conn. */
-			conn = domain->conn;
-			domain->conn = NULL;
-			talloc_unlink(talloc_autofree_context(), conn);
-			notify = 0; /* destroy_domain() fires the watch */
-			goto again;
-		}
+	dom_valid = get_domain_info(domain->domid, &dominfo);
+	if (!domain->introduced) {
+		if (!dom_valid)
+			talloc_free(domain);
+		return 0;
 	}
+	if (dom_valid) {
+		if ((dominfo.crashed || dominfo.shutdown)
+		    && !domain->shutdown) {
+			domain->shutdown = true;
+			*notify = true;
+		}
+		if (!dominfo.dying)
+			return 0;
+	}
+	if (domain->conn) {
+		/* domain is a talloc child of domain->conn. */
+		conn = domain->conn;
+		domain->conn = NULL;
+		talloc_unlink(talloc_autofree_context(), conn);
+		*notify = false; /* destroy_domain() fires the watch */
+
+		/* Above unlink might result in 2 domains being freed! */
+		return 1;
+	}
+
+	return 0;
+}
+
+void check_domains(void)
+{
+	bool notify = false;
+
+	while (hashtable_iterate(domhash, check_domain, &notify))
+		;
 
 	if (notify)
 		fire_watches(NULL, NULL, "@releaseDomain", NULL, true, NULL);
@@ -415,13 +420,7 @@ static char *talloc_domain_path(const void *context, unsigned int domid)
 
 static struct domain *find_domain_struct(unsigned int domid)
 {
-	struct domain *i;
-
-	list_for_each_entry(i, &domains, list) {
-		if (i->domid == domid)
-			return i;
-	}
-	return NULL;
+	return hashtable_search(domhash, &domid);
 }
 
 int domain_get_quota(const void *ctx, struct connection *conn,
@@ -470,9 +469,13 @@ static struct domain *alloc_domain(const void *context, unsigned int domid)
 	domain->generation = generation;
 	domain->introduced = false;
 
-	talloc_set_destructor(domain, destroy_domain);
+	if (!hashtable_insert(domhash, &domain->domid, domain)) {
+		talloc_free(domain);
+		errno = ENOMEM;
+		return NULL;
+	}
 
-	list_add(&domain->list, &domains);
+	talloc_set_destructor(domain, destroy_domain);
 
 	return domain;
 }
@@ -906,9 +909,24 @@ void dom0_init(void)
 	xenevtchn_notify(xce_handle, dom0->port);
 }
 
+static unsigned int domhash_fn(void *k)
+{
+	return *(unsigned int *)k;
+}
+
+static int domeq_fn(void *key1, void *key2)
+{
+	return *(unsigned int *)key1 == *(unsigned int *)key2;
+}
+
 void domain_init(int evtfd)
 {
 	int rc;
+
+	/* Start with a random rather low domain count for the hashtable. */
+	domhash = create_hashtable(8, domhash_fn, domeq_fn, 0);
+	if (!domhash)
+		barf_perror("Failed to allocate domain hashtable");
 
 	xc_handle = talloc(talloc_autofree_context(), xc_interface*);
 	if (!xc_handle)
