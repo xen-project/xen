@@ -8,7 +8,6 @@ re_identifier = re.compile(r'^[a-zA-Z_]')
 re_compat_handle = re.compile(r'^COMPAT_HANDLE\((.*)\)$')
 re_pad = re.compile(r'^_pad\d*$')
 re_compat = re.compile(r'^compat_.*_t$')
-re_brackets = re.compile(r'[{}]')
 
 def removeprefix(s, prefix):
     if s.startswith(prefix):
@@ -105,7 +104,7 @@ def handle_field(prefix, name, id, type, fields):
         else:
             k = id.replace('.', '_')
             print("%sXLAT_%s_HNDL_%s(_d_, _s_);" % (prefix, name, k), end='')
-    elif not re_brackets.search(' '.join(fields)):
+    elif not '{' in fields:
         tag = ' '.join(fields)
         tag = re.sub(r'\s*(struct|union)\s+(compat_)?(\w+)\s.*', '\\3', tag)
         print(" \\")
@@ -290,7 +289,7 @@ def build_body(name, tokens):
     print(" \\\n} while (0)")
 
 def check_field(kind, name, field, extrafields):
-    if not re_brackets.search(' '.join(extrafields)):
+    if not '{' in extrafields:
         print("; \\")
         if len(extrafields) != 0:
             for token in extrafields:
