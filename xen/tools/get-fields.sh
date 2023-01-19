@@ -41,34 +41,6 @@ get_fields ()
 	done
 }
 
-get_typedefs ()
-{
-	local level=1 state=
-	for token in $1
-	do
-		case "$token" in
-		typedef)
-			test $level != 1 || state=1
-			;;
-		COMPAT_HANDLE\(*\))
-			test $level != 1 -o "$state" != 1 || state=2
-			;;
-		[\{\[])
-			level=$(expr $level + 1)
-			;;
-		[\}\]])
-			level=$(expr $level - 1)
-			;;
-		";")
-			test $level != 1 || state=
-			;;
-		[a-zA-Z_]*)
-			test $level != 1 -o "$state" != 2 || echo "$token"
-			;;
-		esac
-	done
-}
-
 build_enums ()
 {
 	local level=1 kind= fields= members= named= id= token
@@ -201,21 +173,7 @@ for line in sys.stdin.readlines():
 				fi
 				;;
 			[a-zA-Z]*)
-				if [ -z "$id" -a -z "$type" -a -z "$array_type" ]
-				then
-					for id in $typedefs
-					do
-						test $id != "$token" || type=$id
-					done
-					if [ -z "$type" ]
-					then
-						id=$token
-					else
-						id=
-					fi
-				else
-					id=$token
-				fi
+				id=$token
 				;;
 			[\,\;])
 				if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
@@ -330,18 +288,6 @@ build_body ()
 			if [ -n "$array" ]
 			then
 				array="$array $token"
-			elif [ -z "$id" -a -z "$type" -a -z "$array_type" ]
-			then
-				for id in $typedefs
-				do
-					test $id != "$token" || type=$id
-				done
-				if [ -z "$type" ]
-				then
-					id=$token
-				else
-					id=
-				fi
 			else
 				id=$token
 			fi
@@ -514,7 +460,6 @@ name=${2#compat_}
 name=${name#xen}
 case "$1" in
 "!")
-	typedefs="$(get_typedefs "$list")"
 	build_enums $name "$fields"
 	build_body $name "$fields"
 	;;
