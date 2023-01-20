@@ -2597,14 +2597,7 @@ static int cf_check sh_page_fault(
 
     /* Ignore attempts to write to read-only memory. */
     if ( p2m_is_readonly(p2mt) && (ft == ft_demand_write) )
-    {
-        static unsigned long lastpage;
-        if ( xchg(&lastpage, va & PAGE_MASK) != (va & PAGE_MASK) )
-            gdprintk(XENLOG_DEBUG, "guest attempted write to read-only memory"
-                     " page. va page=%#lx, mfn=%#lx\n",
-                     va & PAGE_MASK, mfn_x(gmfn));
         goto emulate_readonly; /* skip over the instruction */
-    }
 
     /* In HVM guests, we force CR0.WP always to be set, so that the
      * pagetables are always write-protected.  If the guest thinks
