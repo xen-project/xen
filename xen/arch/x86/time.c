@@ -1373,18 +1373,14 @@ uint64_t tsc_ticks2ns(uint64_t ticks)
     return scale_delta(ticks, &t->tsc_scale);
 }
 
-static void __update_vcpu_system_time(struct vcpu *v, int force)
+static void collect_time_info(const struct vcpu *v,
+                              struct vcpu_time_info *u)
 {
-    const struct cpu_time *t;
-    struct vcpu_time_info *u, _u = {};
-    struct domain *d = v->domain;
+    const struct cpu_time *t = &this_cpu(cpu_time);
+    const struct domain *d = v->domain;
     s_time_t tsc_stamp;
 
-    if ( v->vcpu_info == NULL )
-        return;
-
-    t = &this_cpu(cpu_time);
-    u = &vcpu_info(v, time);
+    memset(u, 0, sizeof(*u));
 
     if ( d->arch.vtsc )
     {
@@ -1392,7 +1388,7 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
 
         if ( is_hvm_domain(d) )
         {
-            struct pl_time *pl = v->domain->arch.hvm.pl_time;
+            const struct pl_time *pl = d->arch.hvm.pl_time;
 
             stime += pl->stime_offset + v->arch.hvm.stime_offset;
             if ( stime >= 0 )
@@ -1403,27 +1399,27 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
         else
             tsc_stamp = gtime_to_gtsc(d, stime);
 
-        _u.tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
-        _u.tsc_shift         = d->arch.vtsc_to_ns.shift;
+        u->tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
+        u->tsc_shift         = d->arch.vtsc_to_ns.shift;
     }
     else
     {
         if ( is_hvm_domain(d) && hvm_tsc_scaling_supported )
         {
             tsc_stamp            = hvm_scale_tsc(d, t->stamp.local_tsc);
-            _u.tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
-            _u.tsc_shift         = d->arch.vtsc_to_ns.shift;
+            u->tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
+            u->tsc_shift         = d->arch.vtsc_to_ns.shift;
         }
         else
         {
             tsc_stamp            = t->stamp.local_tsc;
-            _u.tsc_to_system_mul = t->tsc_scale.mul_frac;
-            _u.tsc_shift         = t->tsc_scale.shift;
+            u->tsc_to_system_mul = t->tsc_scale.mul_frac;
+            u->tsc_shift         = t->tsc_scale.shift;
         }
     }
 
-    _u.tsc_timestamp = tsc_stamp;
-    _u.system_time   = t->stamp.local_stime;
+    u->tsc_timestamp = tsc_stamp;
+    u->system_time   = t->stamp.local_stime;
 
     /*
      * It's expected that domains cope with this bit changing on every
@@ -1431,10 +1427,21 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
      * or if it further requires monotonicity checks with other vcpus.
      */
     if ( clocksource_is_tsc() )
-        _u.flags |= XEN_PVCLOCK_TSC_STABLE_BIT;
+        u->flags |= XEN_PVCLOCK_TSC_STABLE_BIT;
 
     if ( is_hvm_domain(d) )
-        _u.tsc_timestamp += v->arch.hvm.cache_tsc_offset;
+        u->tsc_timestamp += v->arch.hvm.cache_tsc_offset;
+}
+
+static void __update_vcpu_system_time(struct vcpu *v, int force)
+{
+    struct vcpu_time_info *u = &vcpu_info(v, time), _u;
+    const struct domain *d = v->domain;
+
+    if ( v->vcpu_info == NULL )
+        return;
+
+    collect_time_info(v, &_u);
 
     /* Don't bother unless timestamp record has changed or we are forced. */
     _u.version = u->version; /* make versions match for memcmp test */
@@ -2476,7 +2483,7 @@ static int __init cf_check tsc_parse(const char *s)
 }
 custom_param("tsc", tsc_parse);
 
-u64 gtime_to_gtsc(struct domain *d, u64 time)
+uint64_t gtime_to_gtsc(const struct domain *d, uint64_t time)
 {
     if ( !is_hvm_domain(d) )
     {
@@ -2488,7 +2495,7 @@ u64 gtime_to_gtsc(struct domain *d, u64 time)
     return scale_delta(time, &d->arch.ns_to_vtsc);
 }
 
-u64 gtsc_to_gtime(struct domain *d, u64 tsc)
+uint64_t gtsc_to_gtime(const struct domain *d, uint64_t tsc)
 {
     u64 time = scale_delta(tsc, &d->arch.vtsc_to_ns);
 

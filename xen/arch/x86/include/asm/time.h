@@ -52,8 +52,8 @@ uint64_t cf_check acpi_pm_tick_to_ns(uint64_t ticks);
 uint64_t tsc_ticks2ns(uint64_t ticks);
 
 uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs);
-u64 gtime_to_gtsc(struct domain *d, u64 time);
-u64 gtsc_to_gtime(struct domain *d, u64 tsc);
+uint64_t gtime_to_gtsc(const struct domain *d, uint64_t time);
+uint64_t gtsc_to_gtime(const struct domain *d, uint64_t tsc);
 
 int tsc_set_info(struct domain *d, uint32_t tsc_mode, uint64_t elapsed_nsec,
                  uint32_t gtsc_khz, uint32_t incarnation);
