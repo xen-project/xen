@@ -206,8 +206,15 @@ static inline int acpi_get_pxm(acpi_handle handle)
 
 void acpi_reboot(void);
 
+#ifdef CONFIG_INTEL_IOMMU
+int acpi_dmar_init(void);
 void acpi_dmar_zap(void);
 void acpi_dmar_reinstate(void);
+#else
+static inline int acpi_dmar_init(void) { return -ENODEV; }
+static inline void acpi_dmar_zap(void) {}
+static inline void acpi_dmar_reinstate(void) {}
+#endif
 
 #endif /* __ASSEMBLY__ */
 

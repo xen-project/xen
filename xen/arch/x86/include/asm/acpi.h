@@ -140,8 +140,12 @@ extern u32 pmtmr_ioport;
 extern unsigned int pmtmr_width;
 
 void acpi_iommu_init(void);
-int acpi_dmar_init(void);
+
+#ifdef CONFIG_AMD_IOMMU
 int acpi_ivrs_init(void);
+#else
+static inline int acpi_ivrs_init(void) { return -ENODEV; }
+#endif
 
 void acpi_mmcfg_init(void);
 
