@@ -209,6 +209,10 @@ extern void shadow_audit_tables(struct vcpu *v);
 #define SH_type_unused        10U
 #endif
 
+#ifndef CONFIG_PV32 /* Unused (but uglier to #ifdef above): */
+#undef SH_type_l2h_64_shadow
+#endif
+
 /*
  * What counts as a pinnable shadow?
  */
@@ -286,7 +290,11 @@ static inline void sh_terminate_list(struct page_list_head *tmp_list)
 #define SHF_L1_64   (1u << SH_type_l1_64_shadow)
 #define SHF_FL1_64  (1u << SH_type_fl1_64_shadow)
 #define SHF_L2_64   (1u << SH_type_l2_64_shadow)
+#ifdef CONFIG_PV32
 #define SHF_L2H_64  (1u << SH_type_l2h_64_shadow)
+#else
+#define SHF_L2H_64  0
+#endif
 #define SHF_L3_64   (1u << SH_type_l3_64_shadow)
 #define SHF_L4_64   (1u << SH_type_l4_64_shadow)
 

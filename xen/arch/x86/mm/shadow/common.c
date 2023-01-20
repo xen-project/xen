@@ -1791,9 +1791,11 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn)
     case SH_type_fl1_64_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 4)(d, smfn);
         break;
+#ifdef CONFIG_PV32
     case SH_type_l2h_64_shadow:
         ASSERT(is_pv_32bit_domain(d));
         /* Fall through... */
+#endif
     case SH_type_l2_64_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 4)(d, smfn);
         break;
@@ -2146,7 +2148,9 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
 #endif
     case SH_type_l1_64_shadow:
     case SH_type_l2_64_shadow:
+#ifdef CONFIG_PV32
     case SH_type_l2h_64_shadow:
+#endif
     case SH_type_l3_64_shadow:
     case SH_type_l4_64_shadow:
         SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, 4)(d, vaddr, pmfn);
@@ -2184,7 +2188,9 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
         [SH_type_l2_pae_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 3),
 #endif
         [SH_type_l2_64_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 4),
+#ifdef CONFIG_PV32
         [SH_type_l2h_64_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 4),
+#endif
         [SH_type_l3_64_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l2_shadow, 4),
         [SH_type_l4_64_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l3_shadow, 4),
     };
@@ -2197,7 +2203,9 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 #endif
         [SH_type_l1_64_shadow] = SHF_L2H_64 | SHF_L2_64,
         [SH_type_l2_64_shadow] = SHF_L3_64,
+#ifdef CONFIG_PV32
         [SH_type_l2h_64_shadow] = SHF_L3_64,
+#endif
         [SH_type_l3_64_shadow] = SHF_L4_64,
     };
 
@@ -2261,7 +2269,9 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 #endif
     DO_UNSHADOW(SH_type_l4_64_shadow);
     DO_UNSHADOW(SH_type_l3_64_shadow);
+#ifdef CONFIG_PV32
     DO_UNSHADOW(SH_type_l2h_64_shadow);
+#endif
     DO_UNSHADOW(SH_type_l2_64_shadow);
     DO_UNSHADOW(SH_type_l1_64_shadow);
 
@@ -3268,7 +3278,9 @@ void shadow_audit_tables(struct vcpu *v)
         [SH_type_l1_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l1_table, 4),
         [SH_type_fl1_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 4),
         [SH_type_l2_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l2_table, 4),
+# ifdef CONFIG_PV32
         [SH_type_l2h_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l2_table, 4),
+# endif
         [SH_type_l3_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l3_table, 4),
         [SH_type_l4_64_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l4_table, 4),
 #endif
