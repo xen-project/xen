@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [unstable UNRELEASED](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=staging) - TBD
 
+### Added
+ - On x86, support for features new in Intel Sapphire Rapids CPUs:
+   - PKS (Protection Key Supervisor) available to HVM/PVH guests.
+   - VM-Notify used by Xen to mitigate certain micro-architectural pipeline
+     livelocks, instead of crashing the entire server.
+   - Bus-lock detection, used by Xen to mitigate (by rate-limiting) the system
+     wide impact of a guest misusing atomic instructions.
+
 ## [4.17.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.17.0) - 2022-12-12
 
 ### Changed
