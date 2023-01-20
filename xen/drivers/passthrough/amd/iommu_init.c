@@ -36,6 +36,8 @@ static struct radix_tree_root ivrs_maps;
 LIST_HEAD_READ_MOSTLY(amd_iommu_head);
 bool_t iommuv2_enabled;
 
+bool __ro_after_init amd_iommu_perdev_intremap = true;
+
 static bool iommu_has_ht_flag(struct amd_iommu *iommu, u8 mask)
 {
     return iommu->ht_flags & mask;

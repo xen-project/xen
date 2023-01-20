@@ -58,7 +58,6 @@ bool __read_mostly iommu_hap_pt_share = true;
 #endif
 
 bool_t __read_mostly iommu_debug;
-bool_t __read_mostly amd_iommu_perdev_intremap = 1;
 
 DEFINE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
 
@@ -116,7 +115,11 @@ static int __init cf_check parse_iommu_param(const char *s)
                 iommu_verbose = 1;
         }
         else if ( (val = parse_boolean("amd-iommu-perdev-intremap", s, ss)) >= 0 )
+#ifdef CONFIG_AMD_IOMMU
             amd_iommu_perdev_intremap = val;
+#else
+            no_config_param("AMD_IOMMU", "iommu", s, ss);
+#endif
         else if ( (val = parse_boolean("dom0-passthrough", s, ss)) >= 0 )
             iommu_hwdom_passthrough = val;
         else if ( (val = parse_boolean("dom0-strict", s, ss)) >= 0 )
