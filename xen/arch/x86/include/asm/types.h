@@ -32,19 +32,6 @@ typedef unsigned long paddr_t;
 #define INVALID_PADDR (~0UL)
 #define PRIpaddr "016lx"
 
-#if defined(__SIZE_TYPE__)
-typedef __SIZE_TYPE__ size_t;
-#else
-typedef unsigned long size_t;
-#endif
-typedef signed long ssize_t;
-
-#if defined(__PTRDIFF_TYPE__)
-typedef __PTRDIFF_TYPE__ ptrdiff_t;
-#else
-typedef signed long ptrdiff_t;
-#endif
-
 #endif /* __ASSEMBLY__ */
 
 #endif /* __X86_TYPES_H__ */
