@@ -1315,7 +1315,7 @@ static int __init make_memory_node(const struct domain *d,
     dt_dprintk("Create memory node\n");
 
     /* ePAPR 3.4 */
-    snprintf(buf, sizeof(buf), "memory@%"PRIpaddr, mem->bank[i].start);
+    snprintf(buf, sizeof(buf), "memory@%"PRIx64, mem->bank[i].start);
     res = fdt_begin_node(fdt, buf);
     if ( res )
         return res;
@@ -1383,7 +1383,7 @@ static int __init make_shm_memory_node(const struct domain *d,
         __be32 *cells;
         unsigned int len = (addrcells + sizecells) * sizeof(__be32);
 
-        snprintf(buf, sizeof(buf), "xen-shmem@%"PRIpaddr, mem->bank[i].start);
+        snprintf(buf, sizeof(buf), "xen-shmem@%"PRIx64, mem->bank[i].start);
         res = fdt_begin_node(fdt, buf);
         if ( res )
             return res;
@@ -2719,7 +2719,7 @@ static int __init make_gicv2_domU_node(struct kernel_info *kinfo)
     /* Placeholder for interrupt-controller@ + a 64-bit number + \0 */
     char buf[38];
 
-    snprintf(buf, sizeof(buf), "interrupt-controller@%"PRIpaddr,
+    snprintf(buf, sizeof(buf), "interrupt-controller@%"PRIx64,
              vgic_dist_base(&d->arch.vgic));
     res = fdt_begin_node(fdt, buf);
     if ( res )
@@ -2775,7 +2775,7 @@ static int __init make_gicv3_domU_node(struct kernel_info *kinfo)
     char buf[38];
     unsigned int i, len = 0;
 
-    snprintf(buf, sizeof(buf), "interrupt-controller@%"PRIpaddr,
+    snprintf(buf, sizeof(buf), "interrupt-controller@%"PRIx64,
              vgic_dist_base(&d->arch.vgic));
 
     res = fdt_begin_node(fdt, buf);
@@ -2861,7 +2861,7 @@ static int __init make_vpl011_uart_node(struct kernel_info *kinfo)
     /* Placeholder for sbsa-uart@ + a 64-bit number + \0 */
     char buf[27];
 
-    snprintf(buf, sizeof(buf), "sbsa-uart@%"PRIpaddr, d->arch.vpl011.base_addr);
+    snprintf(buf, sizeof(buf), "sbsa-uart@%"PRIx64, d->arch.vpl011.base_addr);
     res = fdt_begin_node(fdt, buf);
     if ( res )
         return res;
