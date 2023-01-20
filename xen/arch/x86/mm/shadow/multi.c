@@ -550,8 +550,7 @@ _sh_propagate(struct vcpu *v,
      * caching attributes in the shadows to match what was asked for.
      */
     if ( (level == 1) && is_hvm_domain(d) &&
-         (!mfn_valid(target_mfn) ||
-          !is_special_page(mfn_to_page(target_mfn))) )
+         (mmio_mfn || !is_special_page(mfn_to_page(target_mfn))) )
     {
         int type;
 
@@ -662,8 +661,7 @@ _sh_propagate(struct vcpu *v,
      * (We handle log-dirty entirely inside the shadow code, without using the
      * p2m_ram_logdirty p2m type: only HAP uses that.)
      */
-    if ( level == 1 && unlikely(shadow_mode_log_dirty(d)) &&
-         mfn_valid(target_mfn) )
+    if ( level == 1 && unlikely(shadow_mode_log_dirty(d)) && !mmio_mfn )
     {
         if ( ft & FETCH_TYPE_WRITE )
             paging_mark_dirty(d, target_mfn);
