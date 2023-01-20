@@ -82,11 +82,19 @@ static int __init cf_check parse_iommu_param(const char *s)
         else if ( ss == s + 23 && !strncmp(s, "quarantine=scratch-page", 23) )
             iommu_quarantine = IOMMU_quarantine_scratch_page;
 #endif
-#ifdef CONFIG_X86
         else if ( (val = parse_boolean("igfx", s, ss)) >= 0 )
+#ifdef CONFIG_INTEL_IOMMU
             iommu_igfx = val;
+#else
+            no_config_param("INTEL_IOMMU", "iommu", s, ss);
+#endif
         else if ( (val = parse_boolean("qinval", s, ss)) >= 0 )
+#ifdef CONFIG_INTEL_IOMMU
             iommu_qinval = val;
+#else
+            no_config_param("INTEL_IOMMU", "iommu", s, ss);
+#endif
+#ifdef CONFIG_X86
         else if ( (val = parse_boolean("superpages", s, ss)) >= 0 )
             iommu_superpages = val;
 #endif
