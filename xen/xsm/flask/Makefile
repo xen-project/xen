@@ -16,7 +16,11 @@ FLASK_H_FILES := flask.h class_to_string.h initial_sid_to_string.h
 AV_H_FILES := av_perm_to_string.h av_permissions.h
 ALL_H_FILES := $(addprefix include/,$(FLASK_H_FILES) $(AV_H_FILES))
 
-$(addprefix $(obj)/,$(obj-y)) $(obj)/ss/built_in.o: $(addprefix $(obj)/,$(ALL_H_FILES))
+# Adding prerequisite to descending into ss/ folder only when not running
+# `make *clean`.
+ifeq ($(filter %/Makefile.clean,$(MAKEFILE_LIST)),)
+$(addprefix $(obj)/,$(obj-y)) $(obj)/ss: $(addprefix $(obj)/,$(ALL_H_FILES))
+endif
 extra-y += $(ALL_H_FILES)
 
 mkflask := $(srcdir)/policy/mkflask.sh
