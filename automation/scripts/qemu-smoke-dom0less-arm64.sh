@@ -16,14 +16,13 @@ fi
 
 if [[ "${test_variant}" == "static-mem" ]]; then
     # Memory range that is statically allocated to DOM1
-    domu_base="50000000"
-    domu_size="10000000"
+    domu_base="0x50000000"
+    domu_size="0x10000000"
     passed="${test_variant} test passed"
     domU_check="
-current=\$(hexdump -e '16/1 \"%02x\"' /proc/device-tree/memory@${domu_base}/reg 2>/dev/null)
-expected=$(printf \"%016x%016x\" 0x${domu_base} 0x${domu_size})
-if [[ \"\${expected}\" == \"\${current}\" ]]; then
-	echo \"${passed}\"
+mem_range=$(printf \"%08x-%08x\" ${domu_base} $(( ${domu_base} + ${domu_size} - 1 )))
+if grep -q -x \"\${mem_range} : System RAM\" /proc/iomem; then
+    echo \"${passed}\"
 fi
 "
 fi
@@ -126,7 +125,7 @@ UBOOT_SOURCE="boot.source"
 UBOOT_SCRIPT="boot.scr"' > binaries/config
 
 if [[ "${test_variant}" == "static-mem" ]]; then
-    echo -e "\nDOMU_STATIC_MEM[0]=\"0x${domu_base} 0x${domu_size}\"" >> binaries/config
+    echo -e "\nDOMU_STATIC_MEM[0]=\"${domu_base} ${domu_size}\"" >> binaries/config
 fi
 
 if [[ "${test_variant}" == "boot-cpupools" ]]; then
