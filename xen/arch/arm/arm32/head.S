@@ -167,19 +167,11 @@ past_zImage:
         bl    check_cpu_mode
         bl    cpu_init
         bl    create_page_tables
-        bl    enable_mmu
 
-        /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
-        mov_w r0, primary_switched
-        mov   pc, r0
+        /* Address in the runtime mapping to jump to after the MMU is enabled */
+        mov_w lr, primary_switched
+        b     enable_mmu
 primary_switched:
-        /*
-         * The 1:1 map may clash with other parts of the Xen virtual memory
-         * layout. As it is not used anymore, remove it completely to
-         * avoid having to worry about replacing existing mapping
-         * afterwards.
-         */
-        bl    remove_identity_mapping
         bl    setup_fixmap
 #ifdef CONFIG_EARLY_PRINTK
         /* Use a virtual address to access the UART. */
@@ -223,12 +215,10 @@ GLOBAL(init_secondary)
         bl    check_cpu_mode
         bl    cpu_init
         bl    create_page_tables
-        bl    enable_mmu
 
-
-        /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
-        mov_w r0, secondary_switched
-        mov   pc, r0
+        /* Address in the runtime mapping to jump to after the MMU is enabled */
+        mov_w lr, secondary_switched
+        b     enable_mmu
 secondary_switched:
         /*
          * Non-boot CPUs need to move on to the proper pagetables, which were
@@ -523,9 +513,12 @@ virtphys_clash:
 ENDPROC(create_page_tables)
 
 /*
- * Turn on the Data Cache and the MMU. The function will return on the 1:1
- * mapping. In other word, the caller is responsible to switch to the runtime
- * mapping.
+ * Turn on the Data Cache and the MMU. The function will return
+ * to the virtual address provided in LR (e.g. the runtime mapping).
+ *
+ * Inputs:
+ *   r9 : paddr(start)
+ *   lr : Virtual address to return to
  *
  * Clobbers r0 - r3
  */
@@ -551,7 +544,24 @@ enable_mmu:
         dsb                          /* Flush PTE writes and finish reads */
         mcr   CP32(r0, HSCTLR)       /* now paging is enabled */
         isb                          /* Now, flush the icache */
-        mov   pc, lr
+
+        /*
+         * The MMU is turned on and we are in the 1:1 mapping. Switch
+         * to the runtime mapping.
+         */
+        mov_w r0, 1f
+        mov   pc, r0
+1:
+        /*
+         * The 1:1 map may clash with other parts of the Xen virtual memory
+         * layout. As it is not used anymore, remove it completely to
+         * avoid having to worry about replacing existing mapping
+         * afterwards.
+         *
+         * On return this will jump to the virtual address requested by
+         * the caller.
+         */
+        b     remove_identity_mapping
 ENDPROC(enable_mmu)
 
 /*
