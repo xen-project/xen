@@ -167,6 +167,9 @@ static void __init __maybe_unused build_assertions(void)
 #define CHECK_SAME_SLOT(level, virt1, virt2) \
     BUILD_BUG_ON(level##_table_offset(virt1) != level##_table_offset(virt2))
 
+#define CHECK_DIFFERENT_SLOT(level, virt1, virt2) \
+    BUILD_BUG_ON(level##_table_offset(virt1) == level##_table_offset(virt2))
+
 #ifdef CONFIG_ARM_64
     CHECK_SAME_SLOT(zeroeth, XEN_VIRT_START, FIXMAP_ADDR(0));
     CHECK_SAME_SLOT(zeroeth, XEN_VIRT_START, BOOT_FDT_VIRT_START);
@@ -174,7 +177,18 @@ static void __init __maybe_unused build_assertions(void)
     CHECK_SAME_SLOT(first, XEN_VIRT_START, FIXMAP_ADDR(0));
     CHECK_SAME_SLOT(first, XEN_VIRT_START, BOOT_FDT_VIRT_START);
 
+    /*
+     * For arm32, the temporary mapping will re-use the domheap
+     * first slot and the second slots will match.
+     */
+#ifdef CONFIG_ARM_32
+    CHECK_SAME_SLOT(first, TEMPORARY_XEN_VIRT_START, DOMHEAP_VIRT_START);
+    CHECK_DIFFERENT_SLOT(first, XEN_VIRT_START, TEMPORARY_XEN_VIRT_START);
+    CHECK_SAME_SLOT(second, XEN_VIRT_START, TEMPORARY_XEN_VIRT_START);
+#endif
+
 #undef CHECK_SAME_SLOT
+#undef CHECK_DIFFERENT_SLOT
 }
 
 static lpae_t *xen_map_table(mfn_t mfn)

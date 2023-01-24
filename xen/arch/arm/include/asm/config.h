@@ -147,6 +147,20 @@
 /* Number of domheap pagetable pages required at the second level (2MB mappings) */
 #define DOMHEAP_SECOND_PAGES (DOMHEAP_VIRT_SIZE >> FIRST_SHIFT)
 
+/*
+ * The temporary area is overlapping with the domheap area. This may
+ * be used to create an alias of the first slot containing Xen mappings
+ * when turning on/off the MMU.
+ */
+#define TEMPORARY_AREA_FIRST_SLOT    (first_table_offset(DOMHEAP_VIRT_START))
+
+/* Calculate the address in the temporary area */
+#define TEMPORARY_AREA_ADDR(addr)                           \
+     (((addr) & ~XEN_PT_LEVEL_MASK(1)) |                    \
+      (TEMPORARY_AREA_FIRST_SLOT << XEN_PT_LEVEL_SHIFT(1)))
+
+#define TEMPORARY_XEN_VIRT_START    TEMPORARY_AREA_ADDR(XEN_VIRT_START)
+
 #else /* ARM_64 */
 
 #define SLOT0_ENTRY_BITS  39

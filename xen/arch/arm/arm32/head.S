@@ -35,6 +35,9 @@
 #define XEN_FIRST_SLOT      first_table_offset(XEN_VIRT_START)
 #define XEN_SECOND_SLOT     second_table_offset(XEN_VIRT_START)
 
+/* Offset between the early boot xen mapping and the runtime xen mapping */
+#define XEN_TEMPORARY_OFFSET      (TEMPORARY_XEN_VIRT_START - XEN_VIRT_START)
+
 #if defined(CONFIG_EARLY_PRINTK) && defined(CONFIG_EARLY_PRINTK_INC)
 #include CONFIG_EARLY_PRINTK_INC
 #endif
@@ -94,7 +97,7 @@
  *   r9  - paddr(start)
  *   r10 - phys offset
  *   r11 - UART address
- *   r12 -
+ *   r12 - Temporary mapping created
  *   r13 - SP
  *   r14 - LR
  *   r15 - PC
@@ -445,6 +448,9 @@ ENDPROC(cpu_init)
  *   r9 : paddr(start)
  *   r10: phys offset
  *
+ * Output:
+ *   r12: Was a temporary mapping created?
+ *
  * Clobbers r0 - r4, r6
  *
  * Register usage within this function:
@@ -484,7 +490,11 @@ create_page_tables:
         /*
          * Setup the 1:1 mapping so we can turn the MMU on. Note that
          * only the first page of Xen will be part of the 1:1 mapping.
+         *
+         * In all the cases, we will link boot_third_id. So create the
+         * mapping in advance.
          */
+        create_mapping_entry boot_third_id, r9, r9
 
         /*
          * Find the first slot used. If the slot is not XEN_FIRST_SLOT,
@@ -501,8 +511,7 @@ create_page_tables:
         /*
          * Find the second slot used. If the slot is XEN_SECOND_SLOT, then the
          * 1:1 mapping will use its own set of page-tables from the
-         * third level. For slot XEN_SECOND_SLOT, Xen is not yet able to handle
-         * it.
+         * third level.
          */
         get_table_slot r1, r9, 2     /* r1 := second slot */
         cmp   r1, #XEN_SECOND_SLOT
@@ -513,13 +522,33 @@ create_page_tables:
 link_from_second_id:
         create_table_entry boot_second_id, boot_third_id, r9, 2
 link_from_third_id:
-        create_mapping_entry boot_third_id, r9, r9
+        /* Good news, we are not clashing with Xen virtual mapping */
+        mov   r12, #0                /* r12 := temporary mapping not created */
         mov   pc, lr
 
 virtphys_clash:
-        /* Identity map clashes with boot_third, which we cannot handle yet */
-        PRINT("- Unable to build boot page tables - virt and phys addresses clash. -\r\n")
-        b     fail
+        /*
+         * The identity map clashes with boot_third. Link boot_first_id and
+         * map Xen to a temporary mapping. See switch_to_runtime_mapping
+         * for more details.
+         */
+        PRINT("- Virt and Phys addresses clash  -\r\n")
+        PRINT("- Create temporary mapping -\r\n")
+
+        /*
+         * This will override the link to boot_second in XEN_FIRST_SLOT.
+         * The page-tables are not live yet. So no need to use
+         * break-before-make.
+         */
+        create_table_entry boot_pgtable, boot_second_id, r9, 1
+        create_table_entry boot_second_id, boot_third_id, r9, 2
+
+        /* Map boot_second (cover Xen mappings) to the temporary 1st slot */
+        mov_w r0, TEMPORARY_XEN_VIRT_START
+        create_table_entry boot_pgtable, boot_second, r0, 1
+
+        mov   r12, #1                /* r12 := temporary mapping created */
+        mov   pc, lr
 ENDPROC(create_page_tables)
 
 /*
@@ -528,9 +557,10 @@ ENDPROC(create_page_tables)
  *
  * Inputs:
  *   r9 : paddr(start)
+ *  r12 : Was the temporary mapping created?
  *   lr : Virtual address to return to
  *
- * Clobbers r0 - r3
+ * Clobbers r0 - r5
  */
 enable_mmu:
         PRINT("- Turning on paging -\r\n")
@@ -558,20 +588,78 @@ enable_mmu:
          * The MMU is turned on and we are in the 1:1 mapping. Switch
          * to the runtime mapping.
          */
-        mov_w r0, 1f
-        mov   pc, r0
+        mov   r5, lr                /* Save LR before overwritting it */
+        mov_w lr, 1f                /* Virtual address in the runtime mapping */
+        b     switch_to_runtime_mapping
 1:
+        mov   lr, r5                /* Restore LR */
         /*
-         * The 1:1 map may clash with other parts of the Xen virtual memory
-         * layout. As it is not used anymore, remove it completely to
-         * avoid having to worry about replacing existing mapping
-         * afterwards.
+         * At this point, either the 1:1 map or the temporary mapping
+         * will be present. The former may clash with other parts of the
+         * Xen virtual memory layout. As both of them are not used
+         * anymore, remove them completely to avoid having to worry
+         * about replacing existing mapping afterwards.
          *
          * On return this will jump to the virtual address requested by
          * the caller.
          */
-        b     remove_identity_mapping
+        teq   r12, #0
+        beq   remove_identity_mapping
+        b     remove_temporary_mapping
 ENDPROC(enable_mmu)
+
+/*
+ * Switch to the runtime mapping. The logic depends on whether the
+ * runtime virtual region is clashing with the physical address
+ *
+ *  - If it is not clashing, we can directly jump to the address in
+ *    the runtime mapping.
+ *  - If it is clashing, create_page_tables() would have mapped Xen to
+ *    a temporary virtual address. We need to switch to the temporary
+ *    mapping so we can remove the identity mapping and map Xen at the
+ *    correct position.
+ *
+ * Inputs
+ *    r9: paddr(start)
+ *   r12: Was a temporary mapping created?
+ *    lr: Address in the runtime mapping to jump to
+ *
+ * Clobbers r0 - r4
+ */
+switch_to_runtime_mapping:
+        /*
+         * Jump to the runtime mapping if the virt and phys are not
+         * clashing
+         */
+        teq   r12, #0
+        beq   ready_to_switch
+
+        /* We are still in the 1:1 mapping. Jump to the temporary Virtual address. */
+        mov_w r0, 1f
+        add   r0, r0, #XEN_TEMPORARY_OFFSET /* r0 := address in temporary mapping */
+        mov   pc, r0
+
+1:
+        /* Remove boot_second_id */
+        mov   r2, #0
+        mov   r3, #0
+        adr_l r0, boot_pgtable
+        get_table_slot r1, r9, 1            /* r1 := first slot */
+        lsl   r1, r1, #3                    /* r1 := first slot offset */
+        strd  r2, r3, [r0, r1]
+
+        flush_xen_tlb_local r0
+
+        /* Map boot_second into boot_pgtable */
+        mov_w r0, XEN_VIRT_START
+        create_table_entry boot_pgtable, boot_second, r0, 1
+
+        /* Ensure any page table updates are visible before continuing */
+        dsb   nsh
+
+ready_to_switch:
+        mov   pc, lr
+ENDPROC(switch_to_runtime_mapping)
 
 /*
  * Remove the 1:1 map from the page-tables. It is not easy to keep track
@@ -617,6 +705,27 @@ identity_mapping_removed:
         flush_xen_tlb_local r0
         mov   pc, lr
 ENDPROC(remove_identity_mapping)
+
+/*
+ * Remove the temporary mapping of Xen starting at TEMPORARY_XEN_VIRT_START.
+ *
+ * Clobbers r0 - r3
+ */
+remove_temporary_mapping:
+        /* r2:r3 := invalid page-table entry */
+        mov   r2, #0
+        mov   r3, #0
+
+        adr_l r0, boot_pgtable
+        mov_w r1, TEMPORARY_XEN_VIRT_START
+        get_table_slot r1, r1, 1     /* r1 := first slot */
+        lsl   r1, r1, #3             /* r1 := first slot offset */
+        strd  r2, r3, [r0, r1]
+
+        flush_xen_tlb_local r0
+
+        mov  pc, lr
+ENDPROC(remove_temporary_mapping)
 
 /*
  * Map the UART in the fixmap (when earlyprintk is used) and hook the
