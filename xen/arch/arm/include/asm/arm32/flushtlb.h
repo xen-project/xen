@@ -15,30 +15,33 @@
  * For the Stage-2 page-tables the ISB ensures the completion of the DSB
  * (and therefore the TLB invalidation) before continuing. So we know
  * the TLBs cannot contain an entry for a mapping we may have removed.
+ *
+ * Note that for local TLB flush, using non-shareable (nsh) is sufficient
+ * (see G5-9224 in ARM DDI 0487I.a).
  */
-#define TLB_HELPER(name, tlbop) \
-static inline void name(void)   \
-{                               \
-    dsb(ishst);                 \
-    WRITE_CP32(0, tlbop);       \
-    dsb(ish);                   \
-    isb();                      \
+#define TLB_HELPER(name, tlbop, sh) \
+static inline void name(void)       \
+{                                   \
+    dsb(sh ## st);                  \
+    WRITE_CP32(0, tlbop);           \
+    dsb(sh);                        \
+    isb();                          \
 }
 
 /* Flush local TLBs, current VMID only */
-TLB_HELPER(flush_guest_tlb_local, TLBIALL);
+TLB_HELPER(flush_guest_tlb_local, TLBIALL, nsh);
 
 /* Flush inner shareable TLBs, current VMID only */
-TLB_HELPER(flush_guest_tlb, TLBIALLIS);
+TLB_HELPER(flush_guest_tlb, TLBIALLIS, ish);
 
 /* Flush local TLBs, all VMIDs, non-hypervisor mode */
-TLB_HELPER(flush_all_guests_tlb_local, TLBIALLNSNH);
+TLB_HELPER(flush_all_guests_tlb_local, TLBIALLNSNH, nsh);
 
 /* Flush innershareable TLBs, all VMIDs, non-hypervisor mode */
-TLB_HELPER(flush_all_guests_tlb, TLBIALLNSNHIS);
+TLB_HELPER(flush_all_guests_tlb, TLBIALLNSNHIS, ish);
 
 /* Flush all hypervisor mappings from the TLB of the local processor. */
-TLB_HELPER(flush_xen_tlb_local, TLBIALLH);
+TLB_HELPER(flush_xen_tlb_local, TLBIALLH, nsh);
 
 /* Flush TLB of local processor for address va. */
 static inline void __flush_xen_tlb_one_local(vaddr_t va)
