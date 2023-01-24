@@ -45,6 +45,27 @@ static inline void name(void)                    \
         : : : "memory");                         \
 }
 
+/*
+ * FLush TLB by VA. This will likely be used in a loop, so the caller
+ * is responsible to use the appropriate memory barriers before/after
+ * the sequence.
+ *
+ * See above about the ARM64_WORKAROUND_REPEAT_TLBI sequence.
+ */
+#define TLB_HELPER_VA(name, tlbop)               \
+static inline void name(vaddr_t va)              \
+{                                                \
+    asm volatile(                                \
+        "tlbi "  # tlbop  ", %0;"                \
+        ALTERNATIVE(                             \
+            "nop; nop;",                         \
+            "dsb  ish;"                          \
+            "tlbi "  # tlbop  ", %0;",           \
+            ARM64_WORKAROUND_REPEAT_TLBI,        \
+            CONFIG_ARM64_WORKAROUND_REPEAT_TLBI) \
+        : : "r" (va >> PAGE_SHIFT) : "memory");  \
+}
+
 /* Flush local TLBs, current VMID only. */
 TLB_HELPER(flush_guest_tlb_local, vmalls12e1, nsh);
 
@@ -61,16 +82,10 @@ TLB_HELPER(flush_all_guests_tlb, alle1is, ish);
 TLB_HELPER(flush_xen_tlb_local, alle2, nsh);
 
 /* Flush TLB of local processor for address va. */
-static inline void  __flush_xen_tlb_one_local(vaddr_t va)
-{
-    asm volatile("tlbi vae2, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
-}
+TLB_HELPER_VA(__flush_xen_tlb_one_local, vae2);
 
 /* Flush TLB of all processors in the inner-shareable domain for address va. */
-static inline void __flush_xen_tlb_one(vaddr_t va)
-{
-    asm volatile("tlbi vae2is, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
-}
+TLB_HELPER_VA(__flush_xen_tlb_one, vae2is);
 
 #endif /* __ASM_ARM_ARM64_FLUSHTLB_H__ */
 /*
