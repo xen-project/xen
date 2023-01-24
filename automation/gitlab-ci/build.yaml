@@ -647,33 +647,33 @@ alpine-3.12-gcc-debug-arm64-boot-cpupools:
       CONFIG_BOOT_TIME_CPUPOOLS=y
 
 # RISC-V 64 cross-build
-riscv64-cross-gcc:
+archlinux-current-gcc-riscv64:
   extends: .gcc-riscv64-cross-build
   variables:
-    CONTAINER: archlinux:riscv64
+    CONTAINER: archlinux:current-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     HYPERVISOR_ONLY: y
 
-riscv64-cross-gcc-debug:
+archlinux-current-gcc-riscv64-debug:
   extends: .gcc-riscv64-cross-build-debug
   variables:
-    CONTAINER: archlinux:riscv64
+    CONTAINER: archlinux:current-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     HYPERVISOR_ONLY: y
 
-riscv64-cross-gcc-randconfig:
+archlinux-current-gcc-riscv64-randconfig:
   extends: .gcc-riscv64-cross-build
   variables:
-    CONTAINER: archlinux:riscv64
+    CONTAINER: archlinux:current-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     RANDCONFIG: y
     EXTRA_FIXED_RANDCONFIG:
       CONFIG_COVERAGE=n
 
-riscv64-cross-gcc-debug-randconfig:
+archlinux-current-gcc-riscv64-debug-randconfig:
   extends: .gcc-riscv64-cross-build-debug
   variables:
-    CONTAINER: archlinux:riscv64
+    CONTAINER: archlinux:current-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     RANDCONFIG: y
     EXTRA_FIXED_RANDCONFIG:
