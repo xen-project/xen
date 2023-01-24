@@ -67,6 +67,20 @@
 .endm
 
 /*
+ * Flush local TLBs
+ *
+ * @tmp: Scratch register
+ *
+ * See asm/arm32/flushtlb.h for the explanation of the sequence.
+ */
+.macro flush_xen_tlb_local tmp
+        dsb   nshst
+        mcr   CP32(\tmp, TLBIALLH)
+        dsb   nsh
+        isb
+.endm
+
+/*
  * Common register usage in this file:
  *   r0  -
  *   r1  -
@@ -232,11 +246,7 @@ secondary_switched:
         mcrr  CP64(r4, r5, HTTBR)
         dsb
         isb
-        mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLB */
-        mcr   CP32(r0, ICIALLU)      /* Flush I-cache */
-        mcr   CP32(r0, BPIALL)       /* Flush branch predictor */
-        dsb                          /* Ensure completion of TLB+BP flush */
-        isb
+        flush_xen_tlb_local r0
 
 #ifdef CONFIG_EARLY_PRINTK
         /* Use a virtual address to access the UART. */
@@ -529,8 +539,7 @@ enable_mmu:
          * The state of the TLBs is unknown before turning on the MMU.
          * Flush them to avoid stale one.
          */
-        mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLBs */
-        dsb   nsh
+        flush_xen_tlb_local r0
 
         /* Write Xen's PT's paddr into the HTTBR */
         load_paddr r0, boot_pgtable
@@ -605,12 +614,7 @@ remove_identity_mapping:
         strd  r2, r3, [r0, r1]
 
 identity_mapping_removed:
-        /* See asm/arm32/flushtlb.h for the explanation of the sequence. */
-        dsb   nshst
-        mcr   CP32(r0, TLBIALLH)
-        dsb   nsh
-        isb
-
+        flush_xen_tlb_local r0
         mov   pc, lr
 ENDPROC(remove_identity_mapping)
 
