@@ -12,8 +12,9 @@
  * ARM64_WORKAROUND_REPEAT_TLBI:
  * Modification of the translation table for a virtual address might lead to
  * read-after-read ordering violation.
- * The workaround repeats TLBI+DSB operation for all the TLB flush operations.
- * While this is stricly not necessary, we don't want to take any risk.
+ * The workaround repeats TLBI+DSB ISH operation for all the TLB flush
+ * operations. While this is strictly not necessary, we don't want to
+ * take any risk.
  *
  * For Xen page-tables the ISB will discard any instructions fetched
  * from the old mappings.
@@ -21,12 +22,17 @@
  * For the Stage-2 page-tables the ISB ensures the completion of the DSB
  * (and therefore the TLB invalidation) before continuing. So we know
  * the TLBs cannot contain an entry for a mapping we may have removed.
+ *
+ * Note that for local TLB flush, using non-shareable (nsh) is sufficient
+ * (see D5-4929 in ARM DDI 0487H.a). Although, the memory barrier in
+ * for the workaround is left as inner-shareable to match with Linux
+ * v6.1-rc8.
  */
-#define TLB_HELPER(name, tlbop)                  \
+#define TLB_HELPER(name, tlbop, sh)              \
 static inline void name(void)                    \
 {                                                \
     asm volatile(                                \
-        "dsb  ishst;"                            \
+        "dsb  "  # sh  "st;"                     \
         "tlbi "  # tlbop  ";"                    \
         ALTERNATIVE(                             \
             "nop; nop;",                         \
@@ -34,25 +40,25 @@ static inline void name(void)                    \
             "tlbi "  # tlbop  ";",               \
             ARM64_WORKAROUND_REPEAT_TLBI,        \
             CONFIG_ARM64_WORKAROUND_REPEAT_TLBI) \
-        "dsb  ish;"                              \
+        "dsb  "  # sh  ";"                       \
         "isb;"                                   \
         : : : "memory");                         \
 }
 
 /* Flush local TLBs, current VMID only. */
-TLB_HELPER(flush_guest_tlb_local, vmalls12e1);
+TLB_HELPER(flush_guest_tlb_local, vmalls12e1, nsh);
 
 /* Flush innershareable TLBs, current VMID only */
-TLB_HELPER(flush_guest_tlb, vmalls12e1is);
+TLB_HELPER(flush_guest_tlb, vmalls12e1is, ish);
 
 /* Flush local TLBs, all VMIDs, non-hypervisor mode */
-TLB_HELPER(flush_all_guests_tlb_local, alle1);
+TLB_HELPER(flush_all_guests_tlb_local, alle1, nsh);
 
 /* Flush innershareable TLBs, all VMIDs, non-hypervisor mode */
-TLB_HELPER(flush_all_guests_tlb, alle1is);
+TLB_HELPER(flush_all_guests_tlb, alle1is, ish);
 
 /* Flush all hypervisor mappings from the TLB of the local processor. */
-TLB_HELPER(flush_xen_tlb_local, alle2);
+TLB_HELPER(flush_xen_tlb_local, alle2, nsh);
 
 /* Flush TLB of local processor for address va. */
 static inline void  __flush_xen_tlb_one_local(vaddr_t va)
