@@ -37,13 +37,14 @@ static inline void flush_xen_tlb_range_va_local(vaddr_t va,
 {
     vaddr_t end = va + size;
 
-    dsb(sy); /* Ensure preceding are visible */
+    /* See asm/arm{32,64}/flushtlb.h for the explanation of the sequence. */
+    dsb(nshst); /* Ensure prior page-tables updates have completed */
     while ( va < end )
     {
         __flush_xen_tlb_one_local(va);
         va += PAGE_SIZE;
     }
-    dsb(sy); /* Ensure completion of the TLB flush */
+    dsb(nsh); /* Ensure the TLB invalidation has completed */
     isb();
 }
 
@@ -56,13 +57,14 @@ static inline void flush_xen_tlb_range_va(vaddr_t va,
 {
     vaddr_t end = va + size;
 
-    dsb(sy); /* Ensure preceding are visible */
+    /* See asm/arm{32,64}/flushtlb.h for the explanation of the sequence. */
+    dsb(ishst); /* Ensure prior page-tables updates have completed */
     while ( va < end )
     {
         __flush_xen_tlb_one(va);
         va += PAGE_SIZE;
     }
-    dsb(sy); /* Ensure completion of the TLB flush */
+    dsb(ish); /* Ensure the TLB invalidation has completed */
     isb();
 }
 
