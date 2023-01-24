@@ -62,7 +62,7 @@
 .endm
 
 .macro load_paddr rb, sym
-        ldr   \rb, =\sym
+        mov_w \rb, \sym
         add   \rb, \rb, r10
 .endm
 
@@ -149,7 +149,7 @@ past_zImage:
         mov   r8, r2                 /* r8 := DTB base address */
 
         /* Find out where we are */
-        ldr   r0, =start
+        mov_w r0, start
         adr   r9, start              /* r9  := paddr (start) */
         sub   r10, r9, r0            /* r10 := phys-offset */
 
@@ -170,7 +170,7 @@ past_zImage:
         bl    enable_mmu
 
         /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
-        ldr   r0, =primary_switched
+        mov_w r0, primary_switched
         mov   pc, r0
 primary_switched:
         /*
@@ -190,7 +190,7 @@ primary_switched:
         /* Setup the arguments for start_xen and jump to C world */
         mov   r0, r10                /* r0 := Physical offset */
         mov   r1, r8                 /* r1 := paddr(FDT) */
-        ldr   r2, =start_xen
+        mov_w r2, start_xen
         b     launch
 ENDPROC(start)
 
@@ -198,7 +198,7 @@ GLOBAL(init_secondary)
         cpsid aif                    /* Disable all interrupts */
 
         /* Find out where we are */
-        ldr   r0, =start
+        mov_w r0, start
         adr   r9, start              /* r9  := paddr (start) */
         sub   r10, r9, r0            /* r10 := phys-offset */
 
@@ -227,7 +227,7 @@ GLOBAL(init_secondary)
 
 
         /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
-        ldr   r0, =secondary_switched
+        mov_w r0, secondary_switched
         mov   pc, r0
 secondary_switched:
         /*
@@ -236,7 +236,7 @@ secondary_switched:
          *
          * XXX: This is not compliant with the Arm Arm.
          */
-        ldr   r4, =init_ttbr         /* VA of HTTBR value stashed by CPU 0 */
+        mov_w r4, init_ttbr          /* VA of HTTBR value stashed by CPU 0 */
         ldrd  r4, r5, [r4]           /* Actual value */
         dsb
         mcrr  CP64(r4, r5, HTTBR)
@@ -254,7 +254,7 @@ secondary_switched:
 #endif
         PRINT("- Ready -\r\n")
         /* Jump to C world */
-        ldr   r2, =start_secondary
+        mov_w r2, start_secondary
         b     launch
 ENDPROC(init_secondary)
 
@@ -297,8 +297,8 @@ ENDPROC(check_cpu_mode)
  */
 zero_bss:
         PRINT("- Zero BSS -\r\n")
-        ldr   r0, =__bss_start       /* r0 := vaddr(__bss_start) */
-        ldr   r1, =__bss_end         /* r1 := vaddr(__bss_start) */
+        mov_w r0, __bss_start        /* r0 := vaddr(__bss_start) */
+        mov_w r1, __bss_end          /* r1 := vaddr(__bss_start) */
 
         mov   r2, #0
 1:      str   r2, [r0], #4
@@ -330,8 +330,8 @@ cpu_init:
 
 cpu_init_done:
         /* Set up memory attribute type tables */
-        ldr   r0, =MAIR0VAL
-        ldr   r1, =MAIR1VAL
+        mov_w r0, MAIR0VAL
+        mov_w r1, MAIR1VAL
         mcr   CP32(r0, HMAIR0)
         mcr   CP32(r1, HMAIR1)
 
@@ -341,10 +341,10 @@ cpu_init_done:
          * PT walks are write-back, write-allocate in both cache levels,
          * Full 32-bit address space goes through this table.
          */
-        ldr   r0, =(TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(0))
+        mov_w r0, (TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(0))
         mcr   CP32(r0, HTCR)
 
-        ldr   r0, =HSCTLR_SET
+        mov_w r0, HSCTLR_SET
         mcr   CP32(r0, HSCTLR)
         isb
 
@@ -452,7 +452,7 @@ ENDPROC(cpu_init)
  */
 create_page_tables:
         /* Prepare the page-tables for mapping Xen */
-        ldr   r0, =XEN_VIRT_START
+        mov_w r0, XEN_VIRT_START
         create_table_entry boot_pgtable, boot_second, r0, 1
         create_table_entry boot_second, boot_third, r0, 2
 
@@ -576,7 +576,7 @@ remove_identity_mapping:
         cmp   r1, #XEN_FIRST_SLOT
         beq   1f
         /* It is not in slot 0, remove the entry */
-        ldr   r0, =boot_pgtable      /* r0 := root table */
+        mov_w r0, boot_pgtable       /* r0 := root table */
         lsl   r1, r1, #3             /* r1 := Slot offset */
         strd  r2, r3, [r0, r1]
         b     identity_mapping_removed
@@ -590,7 +590,7 @@ remove_identity_mapping:
         cmp   r1, #XEN_SECOND_SLOT
         beq   identity_mapping_removed
         /* It is not in slot 1, remove the entry */
-        ldr   r0, =boot_second       /* r0 := second table */
+        mov_w r0, boot_second        /* r0 := second table */
         lsl   r1, r1, #3             /* r1 := Slot offset */
         strd  r2, r3, [r0, r1]
 
@@ -620,7 +620,7 @@ ENDPROC(remove_identity_mapping)
 setup_fixmap:
 #if defined(CONFIG_EARLY_PRINTK)
         /* Add UART to the fixmap table */
-        ldr   r0, =EARLY_UART_VIRTUAL_ADDRESS
+        mov_w r0, EARLY_UART_VIRTUAL_ADDRESS
         create_mapping_entry xen_fixmap, r0, r11, type=PT_DEV_L3
 #endif
         /* Map fixmap into boot_second */
@@ -643,7 +643,7 @@ ENDPROC(setup_fixmap)
  * Clobbers r3
  */
 launch:
-        ldr   r3, =init_data
+        mov_w r3, init_data
         add   r3, #INITINFO_stack    /* Find the boot-time stack */
         ldr   sp, [r3]
         add   sp, #STACK_SIZE        /* (which grows down from the top). */
