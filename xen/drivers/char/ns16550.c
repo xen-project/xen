@@ -1532,7 +1532,7 @@ static bool __init parse_positional(struct ns16550 *uart, char **str)
         else
 #endif
         {
-            uart->io_base = simple_strtoul(conf, &conf, 0);
+            uart->io_base = simple_strtoull(conf, &conf, 0);
         }
     }
 
@@ -1603,7 +1603,7 @@ static bool __init parse_namevalue_pairs(char *str, struct ns16550 *uart)
                        "Can't use io_base with dev=pci or dev=amt options\n");
                 break;
             }
-            uart->io_base = simple_strtoul(param_value, NULL, 0);
+            uart->io_base = simple_strtoull(param_value, NULL, 0);
             break;
 
         case irq:
