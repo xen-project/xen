@@ -107,14 +107,19 @@
  *  Unused
  */
 
-#define XEN_VIRT_START         _AT(vaddr_t,0x00200000)
-#define FIXMAP_ADDR(n)        (_AT(vaddr_t,0x00400000) + (n) * PAGE_SIZE)
+#define XEN_VIRT_START          _AT(vaddr_t, MB(2))
+#define XEN_VIRT_SIZE           _AT(vaddr_t, MB(2))
 
-#define BOOT_FDT_VIRT_START    _AT(vaddr_t,0x00600000)
-#define BOOT_FDT_VIRT_SIZE     _AT(vaddr_t, MB(4))
+#define FIXMAP_VIRT_START       (XEN_VIRT_START + XEN_VIRT_SIZE)
+#define FIXMAP_VIRT_SIZE        _AT(vaddr_t, MB(2))
+
+#define FIXMAP_ADDR(n)          (FIXMAP_VIRT_START + (n) * PAGE_SIZE)
+
+#define BOOT_FDT_VIRT_START     (FIXMAP_VIRT_START + FIXMAP_VIRT_SIZE)
+#define BOOT_FDT_VIRT_SIZE      _AT(vaddr_t, MB(4))
 
 #ifdef CONFIG_LIVEPATCH
-#define LIVEPATCH_VMAP_START   _AT(vaddr_t,0x00a00000)
+#define LIVEPATCH_VMAP_START    (BOOT_FDT_VIRT_START + BOOT_FDT_VIRT_SIZE)
 #define LIVEPATCH_VMAP_SIZE    _AT(vaddr_t, MB(2))
 #endif
 
@@ -124,17 +129,17 @@
 
 #define CONFIG_SEPARATE_XENHEAP 1
 
-#define FRAMETABLE_VIRT_START  _AT(vaddr_t,0x02000000)
+#define FRAMETABLE_VIRT_START  _AT(vaddr_t, MB(32))
 #define FRAMETABLE_SIZE        MB(128-32)
 #define FRAMETABLE_NR          (FRAMETABLE_SIZE / sizeof(*frame_table))
 
-#define VMAP_VIRT_START        _AT(vaddr_t,0x10000000)
+#define VMAP_VIRT_START        _AT(vaddr_t, MB(256))
 #define VMAP_VIRT_SIZE         _AT(vaddr_t, GB(1) - MB(256))
 
-#define XENHEAP_VIRT_START     _AT(vaddr_t,0x40000000)
+#define XENHEAP_VIRT_START     _AT(vaddr_t, GB(1))
 #define XENHEAP_VIRT_SIZE      _AT(vaddr_t, GB(1))
 
-#define DOMHEAP_VIRT_START     _AT(vaddr_t,0x80000000)
+#define DOMHEAP_VIRT_START     _AT(vaddr_t, GB(2))
 #define DOMHEAP_VIRT_SIZE      _AT(vaddr_t, GB(2))
 
 #define DOMHEAP_ENTRIES        1024  /* 1024 2MB mapping slots */
