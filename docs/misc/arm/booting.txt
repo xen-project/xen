@@ -23,6 +23,36 @@ The exceptions to this on 32-bit ARM are as follows:
 
 There are no exception on 64-bit ARM.
 
+Booting Guests
+--------------
+
+Xen supports the legacy image header[3], zImage protocol for 32-bit
+ARM Linux[1] and Image protocol defined for ARM64[2].
+
+Until Xen 4.17, in case of legacy image protocol, Xen ignored the load
+address and entry point specified in the header. This has now changed.
+
+Now, it loads the image at the load address provided in the header.
+And the entry point is used as the kernel start address.
+
+A deviation from uboot is that, Xen treats "load address == 0x0" as
+position independent execution (PIE). Thus, Xen will load such an image
+at an address it considers appropriate. Also, user cannot specify the
+entry point of a PIE image since the start address cennot be
+predetermined.
+
+Users who want to use Xen with statically partitioned domains, can provide
+the fixed non zero load address and start address for the dom0/domU kernel.
+The load address and start address specified by the user in the header must
+be within the memory region allocated by Xen.
+
+Also, it is to be noted that if user provides the legacy image header on
+top of zImage or Image header, then Xen uses the attributes of legacy
+image header to determine the load address, entry point, etc.
+
+Known limitation: compressed kernels with a uboot headers are not
+working.
+
 
 Firmware/bootloader requirements
 --------------------------------
@@ -39,3 +69,7 @@ Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/t
 
 [2] linux/Documentation/arm64/booting.rst
 Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm64/booting.rst
+
+[3] legacy format header
+Latest version: https://source.denx.de/u-boot/u-boot/-/blob/master/include/image.h#L315
+https://linux.die.net/man/1/mkimage

@@ -127,7 +127,7 @@ static paddr_t __init kernel_zimage_place(struct kernel_info *info)
     paddr_t load_addr;
 
 #ifdef CONFIG_ARM_64
-    if ( info->type == DOMAIN_64BIT )
+    if ( (info->type == DOMAIN_64BIT) && (info->zimage.start == 0) )
         return info->mem.bank[0].start + info->zimage.text_offset;
 #endif
 
@@ -162,7 +162,12 @@ static void __init kernel_zimage_load(struct kernel_info *info)
     void *kernel;
     int rc;
 
-    info->entry = load_addr;
+    /*
+     * If the image does not have a fixed entry point, then use the load
+     * address as the entry point.
+     */
+    if ( info->entry == 0 )
+        info->entry = load_addr;
 
     place_modules(info, load_addr, load_addr + len);
 
@@ -223,10 +228,38 @@ static int __init kernel_uimage_probe(struct kernel_info *info,
     if ( len > size - sizeof(uimage) )
         return -EINVAL;
 
+    info->zimage.start = be32_to_cpu(uimage.load);
+    info->entry = be32_to_cpu(uimage.ep);
+
+    /*
+     * While uboot considers 0x0 to be a valid load/start address, for Xen
+     * to maintain parity with zImage, we consider 0x0 to denote position
+     * independent image. That means Xen is free to load such an image at
+     * any valid address.
+     */
+    if ( info->zimage.start == 0 )
+        printk(XENLOG_INFO
+               "No load address provided. Xen will decide where to load it.\n");
+    else
+        printk(XENLOG_INFO
+               "Provided load address: %"PRIpaddr" and entry address: %"PRIpaddr"\n",
+               info->zimage.start, info->entry);
+
+    /*
+     * If the image supports position independent execution, then user cannot
+     * provide an entry point as Xen will load such an image at any appropriate
+     * memory address. Thus, we need to return error.
+     */
+    if ( (info->zimage.start == 0) && (info->entry != 0) )
+    {
+        printk(XENLOG_ERR
+               "Entry point cannot be non zero for PIE image.\n");
+        return -EINVAL;
+    }
+
     info->zimage.kernel_addr = addr + sizeof(uimage);
     info->zimage.len = len;
 
-    info->entry = info->zimage.start;
     info->load = kernel_zimage_load;
 
 #ifdef CONFIG_ARM_64
@@ -242,6 +275,15 @@ static int __init kernel_uimage_probe(struct kernel_info *info,
         printk(XENLOG_ERR "Unsupported uImage arch type %d\n", uimage.arch);
         return -EINVAL;
     }
+
+    /*
+     * If there is a uImage header, then we do not parse zImage or zImage64
+     * header. In other words if the user provides a uImage header on top of
+     * zImage or zImage64 header, Xen uses the attributes of uImage header only.
+     * Thus, Xen uses uimage.load attribute to determine the load address and
+     * zimage.text_offset is ignored.
+     */
+    info->zimage.text_offset = 0;
 #endif
 
     return 0;
@@ -366,6 +408,7 @@ static int __init kernel_zimage64_probe(struct kernel_info *info,
     info->zimage.kernel_addr = addr;
     info->zimage.len = end - start;
     info->zimage.text_offset = zimage.text_offset;
+    info->zimage.start = 0;
 
     info->load = kernel_zimage_load;
 
@@ -435,6 +478,15 @@ int __init kernel_probe(struct kernel_info *info,
     struct dt_device_node *node;
     u64 kernel_addr, initrd_addr, dtb_addr, size;
     int rc;
+
+    /*
+     * We need to initialize start to 0. This field may be populated during
+     * kernel_xxx_probe() if the image has a fixed entry point (for e.g.
+     * uimage.ep).
+     * We will use this to determine if the image has a fixed entry point or
+     * the load address should be used as the start address.
+     */
+    info->entry = 0;
 
     /* domain is NULL only for the hardware domain */
     if ( domain == NULL )
