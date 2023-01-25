@@ -39,6 +39,44 @@
 #include <public/sched.h>
 #include "private.h"
 
+/*
+ * This table shows the allocation behaviour of the different modes:
+ *
+ * Xen paging      64b  64b  64b
+ * Guest paging    32b  pae  64b
+ * PV or HVM       HVM  HVM   *
+ * Shadow paging   pae  pae  64b
+ *
+ * sl1 size         8k   4k   4k
+ * sl2 size        16k   4k   4k
+ * sl3 size         -    -    4k
+ * sl4 size         -    -    4k
+ *
+ * Note: our accessor, shadow_size(), can optimise out this table in PV-only
+ * builds.
+ */
+#ifdef CONFIG_HVM
+const uint8_t sh_type_to_size[] = {
+    [SH_type_l1_32_shadow]   = 2,
+    [SH_type_fl1_32_shadow]  = 2,
+    [SH_type_l2_32_shadow]   = 4,
+    [SH_type_l1_pae_shadow]  = 1,
+    [SH_type_fl1_pae_shadow] = 1,
+    [SH_type_l2_pae_shadow]  = 1,
+    [SH_type_l1_64_shadow]   = 1,
+    [SH_type_fl1_64_shadow]  = 1,
+    [SH_type_l2_64_shadow]   = 1,
+#ifdef CONFIG_PV32
+    [SH_type_l2h_64_shadow]  = 1,
+#endif
+    [SH_type_l3_64_shadow]   = 1,
+    [SH_type_l4_64_shadow]   = 1,
+    [SH_type_p2m_table]      = 1,
+    [SH_type_monitor_table]  = 1,
+    [SH_type_oos_snapshot]   = 1,
+};
+#endif /* CONFIG_HVM */
+
 DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
 static int cf_check sh_enable_log_dirty(struct domain *, bool log_global);

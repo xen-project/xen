@@ -362,7 +362,7 @@ static inline int mfn_oos_may_write(mfn_t gmfn)
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
 /* Figure out the size (in pages) of a given shadow type */
-extern const u8 sh_type_to_size[SH_type_unused];
+extern const uint8_t sh_type_to_size[SH_type_unused];
 static inline unsigned int
 shadow_size(unsigned int shadow_type)
 {

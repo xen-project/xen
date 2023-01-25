@@ -33,37 +33,6 @@
 
 #include "private.h"
 
-/*
- * This table shows the allocation behaviour of the different modes:
- *
- * Xen paging      64b  64b  64b
- * Guest paging    32b  pae  64b
- * PV or HVM       HVM  HVM   *
- * Shadow paging   pae  pae  64b
- *
- * sl1 size         8k   4k   4k
- * sl2 size        16k   4k   4k
- * sl3 size         -    -    4k
- * sl4 size         -    -    4k
- */
-const uint8_t sh_type_to_size[] = {
-    [SH_type_l1_32_shadow]   = 2,
-    [SH_type_fl1_32_shadow]  = 2,
-    [SH_type_l2_32_shadow]   = 4,
-    [SH_type_l1_pae_shadow]  = 1,
-    [SH_type_fl1_pae_shadow] = 1,
-    [SH_type_l2_pae_shadow]  = 1,
-    [SH_type_l1_64_shadow]   = 1,
-    [SH_type_fl1_64_shadow]  = 1,
-    [SH_type_l2_64_shadow]   = 1,
-/*  [SH_type_l2h_64_shadow]  = 1,  PV32-only */
-    [SH_type_l3_64_shadow]   = 1,
-    [SH_type_l4_64_shadow]   = 1,
-    [SH_type_p2m_table]      = 1,
-    [SH_type_monitor_table]  = 1,
-    [SH_type_oos_snapshot]   = 1,
-};
-
 /**************************************************************************/
 /* x86 emulator support for the shadow code
  */
