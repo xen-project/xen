@@ -2207,6 +2207,8 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
                               aop_console_how);
     cdcs->domid_out = &domid_out;
 
+    state->soft_reset = true;
+
     dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) {
         LOGD(ERROR, domid, "failed to read domain path");
