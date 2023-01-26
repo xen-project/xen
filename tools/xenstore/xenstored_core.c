@@ -3008,8 +3008,23 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		list_for_each_entry_safe(conn, next, &connections, list) {
-			talloc_increase_ref_count(conn);
+		/*
+		 * list_for_each_entry_safe is not suitable here because
+		 * handle_input may delete entries besides the current one, but
+		 * those may be in the temporary next which would trigger a
+		 * use-after-free.  list_for_each_entry_safe is only safe for
+		 * deleting the current entry.
+		 */
+		next = list_entry(connections.next, typeof(*conn), list);
+		if (&next->list != &connections)
+			talloc_increase_ref_count(next);
+		while (&next->list != &connections) {
+			conn = next;
+
+			next = list_entry(conn->list.next,
+					  typeof(*conn), list);
+			if (&next->list != &connections)
+				talloc_increase_ref_count(next);
 
 			if (conn_can_read(conn))
 				handle_input(conn);
