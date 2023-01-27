@@ -185,7 +185,7 @@ void _spin_unlock(spinlock_t *lock);
 void _spin_unlock_irq(spinlock_t *lock);
 void _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags);
 
-int _spin_is_locked(spinlock_t *lock);
+int _spin_is_locked(const spinlock_t *lock);
 int _spin_trylock(spinlock_t *lock);
 void _spin_barrier(spinlock_t *lock);
 

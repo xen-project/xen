@@ -368,7 +368,7 @@ void _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
     local_irq_restore(flags);
 }
 
-int _spin_is_locked(spinlock_t *lock)
+int _spin_is_locked(const spinlock_t *lock)
 {
     /*
      * Recursive locks may be locked by another CPU, yet we return
