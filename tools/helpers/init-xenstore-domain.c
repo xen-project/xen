@@ -31,6 +31,8 @@ static int memory;
 static int maxmem;
 static xen_pfn_t console_gfn;
 static xc_evtchn_port_or_error_t console_evtchn;
+static xentoollog_level minmsglevel = XTL_PROGRESS;
+static void *logger;
 
 static struct option options[] = {
     { "kernel", 1, NULL, 'k' },
@@ -141,19 +143,33 @@ static int build(xc_interface *xch)
         goto err;
     }
 
+    /*
+     * This is a bodge.  We can't currently inspect the kernel's ELF notes
+     * ahead of attempting to construct a domain, so try PVH first, suppressing
+     * errors by setting min level to high, and fall back to PV.
+     */
     dom->container_type = XC_DOM_HVM_CONTAINER;
+    xtl_stdiostream_set_minlevel(logger, XTL_CRITICAL);
     rv = xc_dom_parse_image(dom);
+    xtl_stdiostream_set_minlevel(logger, minmsglevel);
     if ( rv )
     {
         dom->container_type = XC_DOM_PV_CONTAINER;
         rv = xc_dom_parse_image(dom);
         if ( rv )
         {
-            fprintf(stderr, "xc_dom_parse_image failed\n");
-            goto err;
+            /* Retry PVH, now with normal logging level. */
+            dom->container_type = XC_DOM_HVM_CONTAINER;
+            rv = xc_dom_parse_image(dom);
+            if ( rv )
+            {
+                fprintf(stderr, "xc_dom_parse_image failed\n");
+                goto err;
+            }
         }
     }
-    else
+
+    if ( dom->container_type == XC_DOM_HVM_CONTAINER )
     {
         config.flags |= XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap;
         config.arch.emulation_flags = XEN_X86_EMU_LAPIC;
@@ -412,8 +428,6 @@ int main(int argc, char** argv)
     char buf[16], be_path[64], fe_path[64];
     int rv, fd;
     char *maxmem_str = NULL;
-    xentoollog_level minmsglevel = XTL_PROGRESS;
-    xentoollog_logger *logger = NULL;
 
     while ( (opt = getopt_long(argc, argv, "v", options, NULL)) != -1 )
     {
@@ -456,9 +470,7 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    logger = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr,
-                                                               minmsglevel, 0);
-
+    logger = xtl_createlogger_stdiostream(stderr, minmsglevel, 0);
     xch = xc_interface_open(logger, logger, 0);
     if ( !xch )
     {
