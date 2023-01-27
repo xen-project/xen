@@ -916,14 +916,14 @@ void dom0_init(void)
 	xenevtchn_notify(xce_handle, dom0->port);
 }
 
-static unsigned int domhash_fn(void *k)
+static unsigned int domhash_fn(const void *k)
 {
-	return *(unsigned int *)k;
+	return *(const unsigned int *)k;
 }
 
-static int domeq_fn(void *key1, void *key2)
+static int domeq_fn(const void *key1, const void *key2)
 {
-	return *(unsigned int *)key1 == *(unsigned int *)key2;
+	return *(const unsigned int *)key1 == *(const unsigned int *)key2;
 }
 
 void domain_init(int evtfd)

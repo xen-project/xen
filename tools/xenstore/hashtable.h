@@ -24,8 +24,8 @@ struct hashtable;
 
 struct hashtable *
 create_hashtable(const void *ctx, unsigned int minsize,
-                 unsigned int (*hashfunction) (void*),
-                 int (*key_eq_fn) (void*,void*),
+                 unsigned int (*hashfunction) (const void *),
+                 int (*key_eq_fn) (const void *, const void *),
                  unsigned int flags
 );
 
@@ -61,7 +61,7 @@ hashtable_insert(struct hashtable *h, void *k, void *v);
  */
 
 void *
-hashtable_search(struct hashtable *h, void *k);
+hashtable_search(const struct hashtable *h, const void *k);
 
 /*****************************************************************************
  * hashtable_remove
@@ -72,7 +72,7 @@ hashtable_search(struct hashtable *h, void *k);
  */
 
 void
-hashtable_remove(struct hashtable *h, void *k);
+hashtable_remove(struct hashtable *h, const void *k);
 
 /*****************************************************************************
  * hashtable_count
@@ -82,7 +82,7 @@ hashtable_remove(struct hashtable *h, void *k);
  * @return      the number of items stored in the hashtable
  */
 unsigned int
-hashtable_count(struct hashtable *h);
+hashtable_count(const struct hashtable *h);
 
 /*****************************************************************************
  * hashtable_iterate

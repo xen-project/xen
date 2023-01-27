@@ -2386,9 +2386,9 @@ void setup_structure(bool live_update)
 	}
 }
 
-static unsigned int hash_from_key_fn(void *k)
+static unsigned int hash_from_key_fn(const void *k)
 {
-	char *str = k;
+	const char *str = k;
 	unsigned int hash = 5381;
 	char c;
 
@@ -2399,9 +2399,9 @@ static unsigned int hash_from_key_fn(void *k)
 }
 
 
-static int keys_equal_fn(void *key1, void *key2)
+static int keys_equal_fn(const void *key1, const void *key2)
 {
-	return 0 == strcmp((char *)key1, (char *)key2);
+	return 0 == strcmp(key1, key2);
 }
 
 int remember_string(struct hashtable *hash, const char *str)

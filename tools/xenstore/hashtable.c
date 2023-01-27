@@ -23,8 +23,8 @@ struct hashtable {
     unsigned int entrycount;
     unsigned int loadlimit;
     unsigned int primeindex;
-    unsigned int (*hashfn) (void *k);
-    int (*eqfn) (void *k1, void *k2);
+    unsigned int (*hashfn) (const void *k);
+    int (*eqfn) (const void *k1, const void *k2);
 };
 
 /*
@@ -53,8 +53,8 @@ indexFor(unsigned int tablelength, unsigned int hashvalue) {
 /*****************************************************************************/
 struct hashtable *
 create_hashtable(const void *ctx, unsigned int minsize,
-                 unsigned int (*hashf) (void*),
-                 int (*eqf) (void*,void*),
+                 unsigned int (*hashf) (const void *),
+                 int (*eqf) (const void *, const void *),
                  unsigned int flags)
 {
     struct hashtable *h;
@@ -92,7 +92,7 @@ err0:
 
 /*****************************************************************************/
 unsigned int
-hash(struct hashtable *h, void *k)
+hash(const struct hashtable *h, const void *k)
 {
     /* Aim to protect against poor hash functions by adding logic here
      * - logic taken from java 1.4 hashtable source */
@@ -151,7 +151,7 @@ hashtable_expand(struct hashtable *h)
 
 /*****************************************************************************/
 unsigned int
-hashtable_count(struct hashtable *h)
+hashtable_count(const struct hashtable *h)
 {
     return h->entrycount;
 }
@@ -188,7 +188,7 @@ hashtable_insert(struct hashtable *h, void *k, void *v)
 
 /*****************************************************************************/
 void * /* returns value associated with key */
-hashtable_search(struct hashtable *h, void *k)
+hashtable_search(const struct hashtable *h, const void *k)
 {
     struct entry *e;
     unsigned int hashvalue, index;
@@ -206,7 +206,7 @@ hashtable_search(struct hashtable *h, void *k)
 
 /*****************************************************************************/
 void
-hashtable_remove(struct hashtable *h, void *k)
+hashtable_remove(struct hashtable *h, const void *k)
 {
     /* TODO: consider compacting the table when the load factor drops enough,
      *       or provide a 'compact' method. */
