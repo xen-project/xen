@@ -138,6 +138,16 @@ existing codebase are work-in-progress.
      - Single-bit named bit fields shall not be of a signed type
      -
 
+   * - `Rule 7.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_07_01.c>`_
+     - Required
+     - Octal constants shall not be used
+     -
+
+   * - `Rule 7.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_07_03.c>`_
+     - Required
+     - The lowercase character l shall not be used in a literal suffix
+     -
+
    * - `Rule 8.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_01.c>`_
      - Required
      - Types shall be explicitly specified
@@ -200,6 +210,11 @@ existing codebase are work-in-progress.
        expression which has potential side effects
      -
 
+   * - `Rule 13.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_13_01_1.c>`_
+     - Required
+     - Initializer lists shall not contain persistent side effects
+     -
+
    * - `Rule 14.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_14_01.c>`_
      - Required
      - A loop counter shall not have essentially floating type
@@ -225,6 +240,11 @@ existing codebase are work-in-progress.
      - Mandatory
      - The declaration of an array parameter shall not contain the
        static keyword between the [ ]
+     -
+
+   * - `Rule 18.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_18_03.c>`_
+     - Required
+     - The relational operators > >= < and <= shall not be applied to objects of pointer type except where they point into the same object
      -
 
    * - `Rule 19.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_19_01.c>`_
