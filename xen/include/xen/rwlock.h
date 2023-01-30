@@ -149,7 +149,7 @@ static inline void _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
     local_irq_restore(flags);
 }
 
-static inline int _rw_is_locked(rwlock_t *lock)
+static inline int _rw_is_locked(const rwlock_t *lock)
 {
     return atomic_read(&lock->cnts);
 }
@@ -254,7 +254,7 @@ static inline void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
     local_irq_restore(flags);
 }
 
-static inline int _rw_is_write_locked(rwlock_t *lock)
+static inline int _rw_is_write_locked(const rwlock_t *lock)
 {
     return (atomic_read(&lock->cnts) & _QW_WMASK) == _QW_LOCKED;
 }
