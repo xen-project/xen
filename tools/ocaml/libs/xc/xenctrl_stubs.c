@@ -25,6 +25,8 @@
 #include <caml/fail.h>
 #include <caml/callback.h>
 
+#include "xen-caml-compat.h"
+
 #include <sys/mman.h>
 #include <stdint.h>
 #include <string.h>
@@ -36,14 +38,6 @@
 #include <xen-tools/common-macros.h>
 
 #include "mmap_stubs.h"
-
-#ifndef Val_none
-#define Val_none (Val_int(0))
-#endif
-
-#ifndef Tag_some
-#define Tag_some 0
-#endif
 
 static inline xc_interface *xch_of_val(value v)
 {
@@ -744,8 +738,7 @@ CAMLprim value stub_xc_evtchn_status(value xch_val, value domid, value port)
 	Store_field(result_status, 0, Val_int(status.vcpu));
 	Store_field(result_status, 1, stat);
 
-	result = caml_alloc_small(1, Tag_some);
-	Store_field(result, 0, result_status);
+	result = caml_alloc_some(result_status);
 
 	CAMLreturn(result);
 }
