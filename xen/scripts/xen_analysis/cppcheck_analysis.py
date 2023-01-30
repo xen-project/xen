@@ -153,11 +153,15 @@ def generate_cppcheck_deps():
     if settings.cppcheck_misra:
         cppcheck_flags = cppcheck_flags + " --addon=cppcheck-misra.json"
 
+        skip_rules_arg = ""
+        if settings.cppcheck_skip_rules != "":
+            skip_rules_arg = "-s {}".format(settings.cppcheck_skip_rules)
+
         utils.invoke_command(
             "{}/convert_misra_doc.py -i {}/docs/misra/rules.rst"
-            " -o {}/cppcheck-misra.txt -j {}/cppcheck-misra.json"
+            " -o {}/cppcheck-misra.txt -j {}/cppcheck-misra.json {}"
                 .format(settings.tools_dir, settings.repo_dir,
-                        settings.outdir, settings.outdir),
+                        settings.outdir, settings.outdir, skip_rules_arg),
             False, CppcheckDepsPhaseError,
             "An error occured when running:\n{}"
         )

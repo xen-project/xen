@@ -24,6 +24,7 @@ cppcheck_binpath = "cppcheck"
 cppcheck_html = False
 cppcheck_htmlreport_binpath = "cppcheck-htmlreport"
 cppcheck_misra = False
+cppcheck_skip_rules = ""
 make_forward_args = ""
 outdir = xen_dir
 
@@ -53,20 +54,22 @@ Cppcheck report creation phase runs only when --run-cppcheck is passed to the
 script.
 
 Options:
-  --build-only          Run only the commands to build Xen with the optional
-                        make arguments passed to the script
-  --clean-only          Run only the commands to clean the analysis artifacts
-  --cppcheck-bin=       Path to the cppcheck binary (Default: {})
-  --cppcheck-html       Produce an additional HTML output report for Cppcheck
-  --cppcheck-html-bin=  Path to the cppcheck-html binary (Default: {})
-  --cppcheck-misra      Activate the Cppcheck MISRA analysis
-  --distclean           Clean analysis artifacts and reports
-  -h, --help            Print this help
-  --no-build            Skip the build Xen phase
-  --no-clean            Don\'t clean the analysis artifacts on exit
-  --run-coverity        Run the analysis for the Coverity tool
-  --run-cppcheck        Run the Cppcheck analysis tool on Xen
-  --run-eclair          Run the analysis for the Eclair tool
+  --build-only            Run only the commands to build Xen with the optional
+                          make arguments passed to the script
+  --clean-only            Run only the commands to clean the analysis artifacts
+  --cppcheck-bin=         Path to the cppcheck binary (Default: {})
+  --cppcheck-html         Produce an additional HTML output report for Cppcheck
+  --cppcheck-html-bin=    Path to the cppcheck-html binary (Default: {})
+  --cppcheck-misra        Activate the Cppcheck MISRA analysis
+  --cppcheck-skip-rules=  List of MISRA rules to be skipped, comma separated.
+                          (e.g. --cppcheck-skip-rules=1.1,20.7,8.4)
+  --distclean             Clean analysis artifacts and reports
+  -h, --help              Print this help
+  --no-build              Skip the build Xen phase
+  --no-clean              Don\'t clean the analysis artifacts on exit
+  --run-coverity          Run the analysis for the Coverity tool
+  --run-cppcheck          Run the Cppcheck analysis tool on Xen
+  --run-eclair            Run the analysis for the Eclair tool
 """
     print(msg.format(sys.argv[0], cppcheck_binpath,
                      cppcheck_htmlreport_binpath))
@@ -78,6 +81,7 @@ def parse_commandline(argv):
     global cppcheck_html
     global cppcheck_htmlreport_binpath
     global cppcheck_misra
+    global cppcheck_skip_rules
     global make_forward_args
     global outdir
     global step_get_make_vars
@@ -115,6 +119,9 @@ def parse_commandline(argv):
             cppcheck_htmlreport_binpath = args_with_content_regex.group(2)
         elif option == "--cppcheck-misra":
             cppcheck_misra = True
+        elif args_with_content_regex and \
+             args_with_content_regex.group(1) == "--cppcheck-skip-rules":
+            cppcheck_skip_rules = args_with_content_regex.group(2)
         elif option == "--distclean":
             target_distclean = True
         elif (option == "--help") or (option == "-h"):
