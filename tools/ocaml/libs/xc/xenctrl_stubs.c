@@ -1028,26 +1028,25 @@ CAMLprim value stub_map_foreign_range(value xch, value dom,
 	CAMLparam4(xch, dom, size, mfn);
 	CAMLlocal1(result);
 	struct mmap_interface *intf;
-	uint32_t c_dom;
-	unsigned long c_mfn;
+	unsigned long c_mfn = Nativeint_val(mfn);
+	int len = Int_val(size);
+	void *ptr;
 
 	BUILD_BUG_ON((sizeof(struct mmap_interface) % sizeof(value)) != 0);
 	result = caml_alloc(Wsize_bsize(sizeof(struct mmap_interface)),
 			    Abstract_tag);
 
-	intf = (struct mmap_interface *) result;
-
-	intf->len = Int_val(size);
-
-	c_dom = _D(dom);
-	c_mfn = Nativeint_val(mfn);
 	caml_enter_blocking_section();
-	intf->addr = xc_map_foreign_range(_H(xch), c_dom,
-	                                  intf->len, PROT_READ|PROT_WRITE,
-	                                  c_mfn);
+	ptr = xc_map_foreign_range(_H(xch), _D(dom), len,
+				   PROT_READ|PROT_WRITE, c_mfn);
 	caml_leave_blocking_section();
-	if (!intf->addr)
+
+	if (!ptr)
 		caml_failwith("xc_map_foreign_range error");
+
+	intf = Data_abstract_val(result);
+	*intf = (struct mmap_interface){ ptr, len };
+
 	CAMLreturn(result);
 }
 
