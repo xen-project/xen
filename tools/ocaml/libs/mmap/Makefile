@@ -2,6 +2,8 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
+CFLAGS += $(CFLAGS_xeninclude)
+
 OBJS = xenmmap
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
 LIBS = xenmmap.cma xenmmap.cmxa
