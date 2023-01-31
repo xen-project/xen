@@ -1031,7 +1031,10 @@ CAMLprim value stub_map_foreign_range(value xch, value dom,
 	uint32_t c_dom;
 	unsigned long c_mfn;
 
-	result = caml_alloc(sizeof(struct mmap_interface), Abstract_tag);
+	BUILD_BUG_ON((sizeof(struct mmap_interface) % sizeof(value)) != 0);
+	result = caml_alloc(Wsize_bsize(sizeof(struct mmap_interface)),
+			    Abstract_tag);
+
 	intf = (struct mmap_interface *) result;
 
 	intf->len = Int_val(size);
