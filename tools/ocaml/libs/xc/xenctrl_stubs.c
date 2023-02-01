@@ -98,6 +98,8 @@ CAMLprim value stub_xc_interface_open(value unit)
 	CAMLlocal1(result);
 	xc_interface *xch;
 
+	result = caml_alloc_custom(&xenctrl_ops, sizeof(xch), 0, 1);
+
 	caml_enter_blocking_section();
 	xch = xc_interface_open(NULL, NULL, 0);
 	caml_leave_blocking_section();
@@ -105,7 +107,6 @@ CAMLprim value stub_xc_interface_open(value unit)
 	if ( !xch )
 		failwith_xc(xch);
 
-	result = caml_alloc_custom(&xenctrl_ops, sizeof(xch), 0, 1);
 	*(xc_interface **)Data_custom_val(result) = xch;
 
 	CAMLreturn(result);
