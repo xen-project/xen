@@ -350,6 +350,12 @@ bool __init check_reserved_regions_overlap(paddr_t region_start,
                                    region_start, region_size) )
         return true;
 
+#ifdef CONFIG_ACPI
+    /* Check if input region is overlapping with ACPI EfiACPIReclaimMemory */
+    if ( meminfo_overlap_check(&bootinfo.acpi, region_start, region_size) )
+        return true;
+#endif
+
     return false;
 }
 
