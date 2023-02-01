@@ -88,6 +88,9 @@ static int __init device_tree_get_meminfo(const void *fdt, int node,
     for ( i = 0; i < banks && mem->nr_banks < NR_MEM_BANKS; i++ )
     {
         device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+        if ( mem == &bootinfo.reserved_mem &&
+             check_reserved_regions_overlap(start, size) )
+            return -EINVAL;
         /* Some DT may describe empty bank, ignore them */
         if ( !size )
             continue;
@@ -482,7 +485,9 @@ static int __init process_shm_node(const void *fdt, int node,
                 return -EINVAL;
             }
 
-            if ( (end <= mem->bank[i].start) || (paddr >= bank_end) )
+            if ( check_reserved_regions_overlap(paddr, size) )
+                return -EINVAL;
+            else
             {
                 if ( strcmp(shm_id, mem->bank[i].shm_id) != 0 )
                     continue;
@@ -492,12 +497,6 @@ static int __init process_shm_node(const void *fdt, int node,
                            shm_id);
                     return -EINVAL;
                 }
-            }
-            else
-            {
-                printk("fdt: shared memory region overlap with an existing entry %#"PRIpaddr" - %#"PRIpaddr"\n",
-                        mem->bank[i].start, bank_end);
-                return -EINVAL;
             }
         }
     }

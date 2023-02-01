@@ -143,6 +143,8 @@ void fw_unreserved_regions(paddr_t s, paddr_t e,
 size_t boot_fdt_info(const void *fdt, paddr_t paddr);
 const char *boot_fdt_cmdline(const void *fdt);
 
+bool check_reserved_regions_overlap(paddr_t region_start, paddr_t region_size);
+
 struct bootmodule *add_boot_module(bootmodule_kind kind,
                                    paddr_t start, paddr_t size, bool domU);
 struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
