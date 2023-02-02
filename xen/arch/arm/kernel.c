@@ -191,7 +191,7 @@ static __init uint32_t output_length(char *image, unsigned long image_len)
     return *(uint32_t *)&image[image_len - 4];
 }
 
-static __init int kernel_decompress(struct bootmodule *mod)
+static __init int kernel_decompress(struct bootmodule *mod, uint32_t offset)
 {
     char *output, *input;
     char magic[2];
@@ -203,6 +203,17 @@ static __init int kernel_decompress(struct bootmodule *mod)
     int i;
     paddr_t addr = mod->start;
     paddr_t size = mod->size;
+
+    if ( size < offset )
+        return -EINVAL;
+
+    /*
+     * It might be that gzip header does not appear at the start address
+     * (e.g. in case of compressed uImage) so take into account offset to
+     * gzip header.
+     */
+    addr += offset;
+    size -= offset;
 
     if ( size < 2 )
         return -EINVAL;
@@ -251,6 +262,14 @@ static __init int kernel_decompress(struct bootmodule *mod)
         free_domheap_page(pages + i);
 
     /*
+     * When freeing the kernel, we need to pass the module start address and
+     * size as they were before taking an offset to gzip header into account,
+     * so that the entire region will be freed.
+     */
+    addr -= offset;
+    size += offset;
+
+    /*
      * Free the original kernel, update the pointers to the
      * decompressed kernel
      */
@@ -265,11 +284,14 @@ static __init int kernel_decompress(struct bootmodule *mod)
 #define IH_ARCH_ARM             2       /* ARM          */
 #define IH_ARCH_ARM64           22      /* ARM64        */
 
+/* uImage Compression Types */
+#define IH_COMP_GZIP            1
+
 /*
  * Check if the image is a uImage and setup kernel_info
  */
 static int __init kernel_uimage_probe(struct kernel_info *info,
-                                      paddr_t addr, paddr_t size)
+                                      struct bootmodule *mod)
 {
     struct {
         __be32 magic;   /* Image Header Magic Number */
@@ -287,19 +309,29 @@ static int __init kernel_uimage_probe(struct kernel_info *info,
     } uimage;
 
     uint32_t len;
+    paddr_t addr = mod->start;
+    paddr_t size = mod->size;
 
     if ( size < sizeof(uimage) )
-        return -EINVAL;
+        return -ENOENT;
 
     copy_from_paddr(&uimage, addr, sizeof(uimage));
 
     if ( be32_to_cpu(uimage.magic) != UIMAGE_MAGIC )
-        return -EINVAL;
+        return -ENOENT;
 
     len = be32_to_cpu(uimage.size);
 
     if ( len > size - sizeof(uimage) )
         return -EINVAL;
+
+    /* Only gzip compression is supported. */
+    if ( uimage.comp && uimage.comp != IH_COMP_GZIP )
+    {
+        printk(XENLOG_ERR
+               "Unsupported uImage compression type %"PRIu8"\n", uimage.comp);
+        return -EOPNOTSUPP;
+    }
 
     info->zimage.start = be32_to_cpu(uimage.load);
     info->entry = be32_to_cpu(uimage.ep);
@@ -330,8 +362,27 @@ static int __init kernel_uimage_probe(struct kernel_info *info,
         return -EINVAL;
     }
 
-    info->zimage.kernel_addr = addr + sizeof(uimage);
-    info->zimage.len = len;
+    if ( uimage.comp )
+    {
+        int rc;
+
+        /*
+         * In case of a compressed uImage, the gzip header is right after
+         * the u-boot header, so pass sizeof(uimage) as an offset to gzip
+         * header.
+         */
+        rc = kernel_decompress(mod, sizeof(uimage));
+        if ( rc )
+            return rc;
+
+        info->zimage.kernel_addr = mod->start;
+        info->zimage.len = mod->size;
+    }
+    else
+    {
+        info->zimage.kernel_addr = addr + sizeof(uimage);
+        info->zimage.len = len;
+    }
 
     info->load = kernel_zimage_load;
 
@@ -561,8 +612,22 @@ int __init kernel_probe(struct kernel_info *info,
         printk("Loading ramdisk from boot module @ %"PRIpaddr"\n",
                info->initrd_bootmodule->start);
 
-    /* if it is a gzip'ed image, 32bit or 64bit, uncompress it */
-    rc = kernel_decompress(mod);
+    /*
+     * uImage header always appears at the top of the image (even compressed),
+     * so it needs to be probed first. Note that in case of compressed uImage,
+     * kernel_decompress is called from kernel_uimage_probe making the function
+     * self-containing (i.e. fall through only in case of a header not found).
+     */
+    rc = kernel_uimage_probe(info, mod);
+    if ( rc != -ENOENT )
+        return rc;
+
+    /*
+     * If it is a gzip'ed image, 32bit or 64bit, uncompress it.
+     * At this point, gzip header appears (if at all) at the top of the image,
+     * so pass 0 as an offset.
+     */
+    rc = kernel_decompress(mod, 0);
     if ( rc && rc != -EINVAL )
         return rc;
 
@@ -570,8 +635,6 @@ int __init kernel_probe(struct kernel_info *info,
     rc = kernel_zimage64_probe(info, mod->start, mod->size);
     if (rc < 0)
 #endif
-        rc = kernel_uimage_probe(info, mod->start, mod->size);
-    if (rc < 0)
         rc = kernel_zimage32_probe(info, mod->start, mod->size);
 
     return rc;

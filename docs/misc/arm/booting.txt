@@ -50,9 +50,6 @@ Also, it is to be noted that if user provides the legacy image header on
 top of zImage or Image header, then Xen uses the attributes of legacy
 image header to determine the load address, entry point, etc.
 
-Known limitation: compressed kernels with a uboot headers are not
-working.
-
 
 Firmware/bootloader requirements
 --------------------------------
