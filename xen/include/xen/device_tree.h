@@ -37,11 +37,11 @@ struct dt_device_match {
     const void *data;
 };
 
-#define __DT_MATCH_PATH(p)              .path = p
-#define __DT_MATCH_TYPE(typ)            .type = typ
-#define __DT_MATCH_COMPATIBLE(compat)   .compatible = compat
+#define __DT_MATCH_PATH(p)              .path = (p)
+#define __DT_MATCH_TYPE(typ)            .type = (typ)
+#define __DT_MATCH_COMPATIBLE(compat)   .compatible = (compat)
 #define __DT_MATCH_NOT_AVAILABLE()      .not_available = 1
-#define __DT_MATCH_PROP(p)              .prop = p
+#define __DT_MATCH_PROP(p)              .prop = (p)
 
 #define DT_MATCH_PATH(p)                { __DT_MATCH_PATH(p) }
 #define DT_MATCH_TYPE(typ)              { __DT_MATCH_TYPE(typ) }
@@ -226,13 +226,13 @@ dt_find_interrupt_controller(const struct dt_device_match *matches);
 #define DT_ROOT_NODE_SIZE_CELLS_DEFAULT 1
 
 #define dt_for_each_property_node(dn, pp)                   \
-    for ( pp = dn->properties; pp != NULL; pp = pp->next )
+    for ( pp = (dn)->properties; (pp) != NULL; pp = (pp)->next )
 
 #define dt_for_each_device_node(dt, dn)                     \
-    for ( dn = dt; dn != NULL; dn = dn->allnext )
+    for ( dn = dt; (dn) != NULL; dn = (dn)->allnext )
 
 #define dt_for_each_child_node(dt, dn)                      \
-    for ( dn = dt->child; dn != NULL; dn = dn->sibling )
+    for ( dn = (dt)->child; (dn) != NULL; dn = (dn)->sibling )
 
 /* Helper to read a big number; size is in cells (not bytes) */
 static inline u64 dt_read_number(const __be32 *cell, int size)
