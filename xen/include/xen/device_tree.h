@@ -159,9 +159,6 @@ struct dt_raw_irq {
     u32 specifier[DT_MAX_IRQ_SPEC];
 };
 
-#define dt_irq(irq) ((irq)->irq)
-#define dt_irq_flags(irq) ((irq)->flags)
-
 typedef int (*device_tree_node_func)(const void *fdt,
                                      int node, const char *name, int depth,
                                      u32 address_cells, u32 size_cells,
