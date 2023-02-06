@@ -14,9 +14,173 @@
 #include "ring.h"
 
 /*
- * See docs/misc/9pfs.markdown in xen.git for the full specification:
+ * See docs/misc/9pfs.pandoc in xen.git for the full specification:
  * https://xenbits.xen.org/docs/unstable/misc/9pfs.html
  */
+
+/*
+ ******************************************************************************
+ *                                  Xenstore
+ ******************************************************************************
+ *
+ * The frontend and the backend connect via xenstore to exchange
+ * information. The toolstack creates front and back nodes with state
+ * XenbusStateInitialising. The protocol node name is **9pfs**.
+ *
+ * Multiple rings are supported for each frontend and backend connection.
+ *
+ ******************************************************************************
+ *                            Backend XenBus Nodes
+ ******************************************************************************
+ *
+ * Backend specific properties, written by the backend, read by the
+ * frontend:
+ *
+ *    versions
+ *         Values:         <string>
+ *
+ *         List of comma separated protocol versions supported by the backend.
+ *         For example "1,2,3". Currently the value is just "1", as there is
+ *         only one version. N.B.: this is the version of the Xen transport
+ *         protocol, not the version of 9pfs supported by the server.
+ *
+ *    max-rings
+ *         Values:         <uint32_t>
+ *
+ *         The maximum supported number of rings per frontend.
+ *
+ *    max-ring-page-order
+ *         Values:         <uint32_t>
+ *
+ *         The maximum supported size of a memory allocation in units of
+ *         log2n(machine pages), e.g. 1 = 2 pages, 2 == 4 pages, etc. It
+ *         must be at least 1.
+ *
+ * Backend configuration nodes, written by the toolstack, read by the
+ * backend:
+ *
+ *    path
+ *         Values:         <string>
+ *
+ *         Host filesystem path to share.
+ *
+ *    tag
+ *         Values:         <string>
+ *
+ *         Alphanumeric tag that identifies the 9pfs share. The client needs
+ *         to know the tag to be able to mount it.
+ *
+ *    security-model
+ *         Values:         "none"
+ *
+ *         *none*: files are stored using the same credentials as they are
+ *                 created on the guest (no user ownership squash or remap)
+ *         Only "none" is supported in this version of the protocol.
+ *
+ ******************************************************************************
+ *                            Frontend XenBus Nodes
+ ******************************************************************************
+ *
+ *    version
+ *         Values:         <string>
+ *
+ *         Protocol version, chosen among the ones supported by the backend
+ *         (see **versions** under [Backend XenBus Nodes]). Currently the
+ *         value must be "1".
+ *
+ *    num-rings
+ *         Values:         <uint32_t>
+ *
+ *         Number of rings. It needs to be lower or equal to max-rings.
+ *
+ *    event-channel-<num> (event-channel-0, event-channel-1, etc)
+ *         Values:         <uint32_t>
+ *
+ *         The identifier of the Xen event channel used to signal activity
+ *         in the ring buffer. One for each ring.
+ *
+ *    ring-ref<num> (ring-ref0, ring-ref1, etc)
+ *         Values:         <uint32_t>
+ *
+ *         The Xen grant reference granting permission for the backend to
+ *         map a page with information to setup a share ring. One for each
+ *         ring.
+ *
+ ******************************************************************************
+ *                              State Machine
+ ******************************************************************************
+ *
+ * Initialization:
+ *
+ *    *Front*                               *Back*
+ *    XenbusStateInitialising               XenbusStateInitialising
+ *    - Query virtual device                - Query backend device
+ *      properties.                           identification data.
+ *    - Setup OS device instance.           - Publish backend features
+ *    - Allocate and initialize the           and transport parameters
+ *      request ring.                                      |
+ *    - Publish transport parameters                       |
+ *      that will be in effect during                      V
+ *      this connection.                            XenbusStateInitWait
+ *                 |
+ *                 |
+ *                 V
+ *       XenbusStateInitialised
+ *
+ *                                          - Query frontend transport
+ *                                            parameters.
+ *                                          - Connect to the request ring and
+ *                                            event channel.
+ *                                                         |
+ *                                                         |
+ *                                                         V
+ *                                                 XenbusStateConnected
+ *
+ *    - Query backend device properties.
+ *    - Finalize OS virtual device
+ *      instance.
+ *                |
+ *                |
+ *                V
+ *       XenbusStateConnected
+ *
+ * Once frontend and backend are connected, they have a shared page per
+ * ring, which are used to setup the rings, and an event channel per ring,
+ * which are used to send notifications.
+ *
+ * Shutdown:
+ *
+ *    *Front*                            *Back*
+ *    XenbusStateConnected               XenbusStateConnected
+ *                |
+ *                |
+ *                V
+ *       XenbusStateClosing
+ *
+ *                                       - Unmap grants
+ *                                       - Unbind evtchns
+ *                                                 |
+ *                                                 |
+ *                                                 V
+ *                                         XenbusStateClosing
+ *
+ *    - Unbind evtchns
+ *    - Free rings
+ *    - Free data structures
+ *               |
+ *               |
+ *               V
+ *       XenbusStateClosed
+ *
+ *                                       - Free remaining data structures
+ *                                                 |
+ *                                                 |
+ *                                                 V
+ *                                         XenbusStateClosed
+ *
+ ******************************************************************************
+ */
+
 DEFINE_XEN_FLEX_RING_AND_INTF(xen_9pfs);
 
 #endif
