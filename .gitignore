@@ -1,12 +1,12 @@
 .hg
 .*.cmd
+.*.d
+.*.d2
 .*.tmp
 *.orig
 *~
 *.swp
 *.o
-*.d
-*.d2
 *.cppcheck.txt
 *.cppcheck.xml
 *.opic
