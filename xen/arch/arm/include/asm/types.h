@@ -1,9 +1,6 @@
 #ifndef __ARM_TYPES_H__
 #define __ARM_TYPES_H__
 
-#ifndef __ASSEMBLY__
-
-
 typedef __signed__ char __s8;
 typedef unsigned char __u8;
 
@@ -53,8 +50,6 @@ typedef u64 paddr_t;
 typedef u64 register_t;
 #define PRIregister "016lx"
 #endif
-
-#endif /* __ASSEMBLY__ */
 
 #endif /* __ARM_TYPES_H__ */
 /*

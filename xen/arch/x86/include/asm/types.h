@@ -1,8 +1,6 @@
 #ifndef __X86_TYPES_H__
 #define __X86_TYPES_H__
 
-#ifndef __ASSEMBLY__
-
 typedef __signed__ char __s8;
 typedef unsigned char __u8;
 
@@ -31,7 +29,5 @@ typedef unsigned long u64;
 typedef unsigned long paddr_t;
 #define INVALID_PADDR (~0UL)
 #define PRIpaddr "016lx"
-
-#endif /* __ASSEMBLY__ */
 
 #endif /* __X86_TYPES_H__ */

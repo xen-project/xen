@@ -1,8 +1,6 @@
 #ifndef __RISCV_TYPES_H__
 #define __RISCV_TYPES_H__
 
-#ifndef __ASSEMBLY__
-
 typedef __signed__ char __s8;
 typedef unsigned char __u8;
 
@@ -56,8 +54,6 @@ typedef u64 register_t;
 #define PRIregister "lx"
 
 #endif
-
-#endif /* __ASSEMBLY__ */
 
 #endif /* __RISCV_TYPES_H__ */
 /*

@@ -302,7 +302,6 @@ static void write_src(void)
 		return;
 	}
 	printf("#include <xen/config.h>\n");
-	printf("#include <asm/types.h>\n");
 	printf("#if BITS_PER_LONG == 64 && !defined(SYMBOLS_ORIGIN)\n");
 	printf("#define PTR .quad\n");
 	printf("#define ALGN .align 8\n");
