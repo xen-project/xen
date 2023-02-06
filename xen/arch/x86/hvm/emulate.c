@@ -24,7 +24,6 @@
 #include <asm/hvm/monitor.h>
 #include <asm/hvm/trace.h>
 #include <asm/hvm/support.h>
-#include <asm/hvm/svm/svm.h>
 #include <asm/iocap.h>
 #include <asm/vm_event.h>
 
