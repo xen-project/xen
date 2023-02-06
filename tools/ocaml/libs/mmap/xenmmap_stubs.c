@@ -99,27 +99,26 @@ CAMLprim value stub_mmap_read(value intf, value start, value len)
 		caml_invalid_argument("len invalid");
 
 	data = caml_alloc_string(c_len);
-	memcpy((char *) data, Intf_val(intf)->addr + c_start, c_len);
+	memcpy((char *)String_val(data), Intf_val(intf)->addr + c_start, c_len);
 
 	CAMLreturn(data);
 }
 
-CAMLprim value stub_mmap_write(value intf, value data,
-                               value start, value len)
+CAMLprim value stub_mmap_write(value intf, value data, value start)
 {
-	CAMLparam4(intf, data, start, len);
+	CAMLparam3(intf, data, start);
 	int c_start;
 	int c_len;
 
 	c_start = Int_val(start);
-	c_len = Int_val(len);
+	c_len = caml_string_length(data);
 
 	if (c_start > Intf_val(intf)->len)
 		caml_invalid_argument("start invalid");
 	if (c_start + c_len > Intf_val(intf)->len)
 		caml_invalid_argument("len invalid");
 
-	memcpy(Intf_val(intf)->addr + c_start, (char *) data, c_len);
+	memcpy(Intf_val(intf)->addr + c_start, String_val(data), c_len);
 
 	CAMLreturn(Val_unit);
 }
