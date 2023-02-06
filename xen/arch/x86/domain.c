@@ -36,6 +36,7 @@
 #include <xen/wait.h>
 #include <xen/guest_access.h>
 #include <xen/livepatch.h>
+#include <public/arch-x86/cpuid.h>
 #include <public/sysctl.h>
 #include <public/hvm/hvm_vcpu.h>
 #include <asm/regs.h>
@@ -844,7 +845,7 @@ int arch_domain_create(struct domain *d,
     else
         ASSERT_UNREACHABLE(); /* Not HVM and not PV? */
 
-    if ( (rc = tsc_set_info(d, TSC_MODE_DEFAULT, 0, 0, 0)) != 0 )
+    if ( (rc = tsc_set_info(d, XEN_CPUID_TSC_MODE_DEFAULT, 0, 0, 0)) != 0 )
     {
         ASSERT_UNREACHABLE();
         goto fail;

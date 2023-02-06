@@ -4,20 +4,6 @@
 
 #include <asm/msr.h>
 
-/*
- *  PV TSC emulation modes:
- *    0 = guest rdtsc/p executed natively when monotonicity can be guaranteed
- *         and emulated otherwise (with frequency scaled if necessary)
- *    1 = guest rdtsc/p always emulated at 1GHz (kernel and user)
- *    2 = guest rdtsc always executed natively (no monotonicity/frequency
- *         guarantees); guest rdtscp emulated at native frequency if
- *         unsupported by h/w, else executed natively
- *    3 = Removed, was PVRDTSCP.
- */
-#define TSC_MODE_DEFAULT          0
-#define TSC_MODE_ALWAYS_EMULATE   1
-#define TSC_MODE_NEVER_EMULATE    2
-
 typedef u64 cycles_t;
 
 extern bool disable_tsc_sync;

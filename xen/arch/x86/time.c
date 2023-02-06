@@ -2545,13 +2545,13 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
     {
         uint64_t tsc;
 
-    case TSC_MODE_NEVER_EMULATE:
+    case XEN_CPUID_TSC_MODE_NEVER_EMULATE:
         *elapsed_nsec = *gtsc_khz = 0;
         break;
-    case TSC_MODE_DEFAULT:
+    case XEN_CPUID_TSC_MODE_DEFAULT:
         if ( d->arch.vtsc )
         {
-    case TSC_MODE_ALWAYS_EMULATE:
+    case XEN_CPUID_TSC_MODE_ALWAYS_EMULATE:
             *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
             *gtsc_khz = d->arch.tsc_khz;
             break;
@@ -2588,8 +2588,8 @@ int tsc_set_info(struct domain *d,
 
     switch ( tsc_mode )
     {
-    case TSC_MODE_DEFAULT:
-    case TSC_MODE_ALWAYS_EMULATE:
+    case XEN_CPUID_TSC_MODE_DEFAULT:
+    case XEN_CPUID_TSC_MODE_ALWAYS_EMULATE:
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
         d->arch.tsc_khz = gtsc_khz ?: cpu_khz;
         set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000UL);
@@ -2601,12 +2601,12 @@ int tsc_set_info(struct domain *d,
          * When a guest is created, gtsc_khz is passed in as zero, making
          * d->arch.tsc_khz == cpu_khz. Thus no need to check incarnation.
          */
-        if ( tsc_mode == TSC_MODE_DEFAULT && host_tsc_is_safe() &&
+        if ( tsc_mode == XEN_CPUID_TSC_MODE_DEFAULT && host_tsc_is_safe() &&
              (d->arch.tsc_khz == cpu_khz ||
               (is_hvm_domain(d) &&
                hvm_get_tsc_scaling_ratio(d->arch.tsc_khz))) )
         {
-    case TSC_MODE_NEVER_EMULATE:
+    case XEN_CPUID_TSC_MODE_NEVER_EMULATE:
             d->arch.vtsc = 0;
             break;
         }
@@ -2674,7 +2674,8 @@ static void cf_check dump_softtsc(unsigned char key)
 
     for_each_domain ( d )
     {
-        if ( is_hardware_domain(d) && d->arch.tsc_mode == TSC_MODE_DEFAULT )
+        if ( is_hardware_domain(d) &&
+             d->arch.tsc_mode == XEN_CPUID_TSC_MODE_DEFAULT )
             continue;
         printk("dom%u%s: mode=%d",d->domain_id,
                 is_hvm_domain(d) ? "(hvm)" : "", d->arch.tsc_mode);
