@@ -3874,6 +3874,7 @@ void __init create_domUs(void)
         };
         unsigned int flags = 0U;
         uint32_t val;
+        int rc;
 
         if ( !dt_device_is_compatible(node, "xen,domain") )
             continue;
@@ -3966,13 +3967,16 @@ void __init create_domUs(void)
          */
         d = domain_create(++max_init_domid, &d_cfg, flags);
         if ( IS_ERR(d) )
-            panic("Error creating domain %s\n", dt_node_name(node));
+            panic("Error creating domain %s (rc = %ld)\n",
+                  dt_node_name(node), PTR_ERR(d));
 
         d->is_console = true;
         dt_device_set_used_by(node, d->domain_id);
 
-        if ( construct_domU(d, node) != 0 )
-            panic("Could not set up domain %s\n", dt_node_name(node));
+        rc = construct_domU(d, node);
+        if ( rc )
+            panic("Could not set up domain %s (rc = %d)\n",
+                  dt_node_name(node), rc);
     }
 }
 
@@ -4060,6 +4064,7 @@ void __init create_dom0(void)
         .max_maptrack_frames = -1,
         .grant_opts = XEN_DOMCTL_GRANT_version(opt_gnttab_max_version),
     };
+    int rc;
 
     /* The vGIC for DOM0 is exactly emulating the hardware GIC */
     dom0_cfg.arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
@@ -4077,11 +4082,15 @@ void __init create_dom0(void)
         dom0_cfg.flags |= XEN_DOMCTL_CDF_iommu;
 
     dom0 = domain_create(0, &dom0_cfg, CDF_privileged | CDF_directmap);
-    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
-        panic("Error creating domain 0\n");
+    if ( IS_ERR(dom0) )
+        panic("Error creating domain 0 (rc = %ld)\n", PTR_ERR(dom0));
 
-    if ( construct_dom0(dom0) != 0)
-        panic("Could not set up DOM0 guest OS\n");
+    if ( alloc_dom0_vcpu0(dom0) == NULL )
+        panic("Error creating domain 0 vcpu0\n");
+
+    rc = construct_dom0(dom0);
+    if ( rc )
+        panic("Could not set up DOM0 guest OS (rc = %d)\n", rc);
 }
 
 /*
