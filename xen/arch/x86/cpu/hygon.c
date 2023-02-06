@@ -1,6 +1,5 @@
 #include <xen/init.h>
 #include <asm/processor.h>
-#include <asm/hvm/support.h>
 #include <asm/spec_ctrl.h>
 
 #include "cpu.h"

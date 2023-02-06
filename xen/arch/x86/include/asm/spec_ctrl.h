@@ -60,7 +60,7 @@
 
 #include <asm/alternative.h>
 #include <asm/current.h>
-#include <asm/msr-index.h>
+#include <asm/msr.h>
 
 void init_speculation_mitigations(void);
 void spec_ctrl_init_domain(struct domain *d);
