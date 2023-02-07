@@ -130,6 +130,11 @@ wakeup_32:
         and     %edi, %edx
         wrmsr
 1:
+        /* Set up PAT before enabling paging. */
+        mov     $XEN_MSR_PAT & 0xffffffff, %eax
+        mov     $XEN_MSR_PAT >> 32, %edx
+        mov     $MSR_IA32_CR_PAT, %ecx
+        wrmsr
 
         /* Set up EFER (Extended Feature Enable Register). */
         movl    $MSR_EFER,%ecx
