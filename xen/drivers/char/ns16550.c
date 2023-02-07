@@ -1875,7 +1875,7 @@ static int __init ns16550_acpi_uart_init(const void *data)
     uart->parity = spcr->parity;
     uart->stop_bits = spcr->stop_bits;
     uart->io_base = spcr->serial_port.address;
-    uart->io_size = spcr->serial_port.bit_width;
+    uart->io_size = DIV_ROUND_UP(spcr->serial_port.bit_width, BITS_PER_BYTE);
     uart->reg_shift = spcr->serial_port.bit_offset;
     uart->reg_width = spcr->serial_port.access_width;
 
