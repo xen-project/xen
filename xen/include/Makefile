@@ -34,6 +34,8 @@ headers-$(CONFIG_TRACEBUFFER) += compat/trace.h
 headers-$(CONFIG_XENOPROF) += compat/xenoprof.h
 headers-$(CONFIG_XSM_FLASK) += compat/xsm/flask_op.h
 
+headers-n := $(filter-out $(headers-y),$(headers-n) $(headers-))
+
 cppflags-y                := -include public/xen-compat.h -DXEN_GENERATING_COMPAT_HEADERS
 cppflags-$(CONFIG_X86)    += -m32
 
@@ -43,12 +45,15 @@ public-$(CONFIG_X86) := $(wildcard $(srcdir)/public/arch-x86/*.h $(srcdir)/publi
 public-$(CONFIG_ARM) := $(wildcard $(srcdir)/public/arch-arm/*.h $(srcdir)/public/arch-arm/*/*.h)
 
 .PHONY: all
-all: $(addprefix $(obj)/,$(headers-y))
+all: $(addprefix $(obj)/,$(headers-y) $(headers-n))
 
 quiet_cmd_compat_h = GEN     $@
 cmd_compat_h = \
     $(PYTHON) $(srctree)/tools/compat-build-header.py <$< $(patsubst $(obj)/%,%,$@) >>$@.new; \
     mv -f $@.new $@
+
+quiet_cmd_stub_h = GEN     $@
+cmd_stub_h = echo '/* empty */' >$@
 
 quiet_cmd_compat_i = CPP     $@
 cmd_compat_i = $(CPP) $(filter-out -Wa$(comma)% -include %/include/xen/config.h,$(XEN_CFLAGS)) $(cppflags-y) -o $@ $<
@@ -68,6 +73,13 @@ cmd_xlat_headers = \
 targets += $(headers-y)
 $(obj)/compat/%.h: $(obj)/compat/%.i $(srctree)/tools/compat-build-header.py FORCE
 	$(call if_changed,compat_h)
+
+# Placeholders may be needed in case files in $(headers-y) include files we
+# don't otherwise generate.  Real dependencies would need spelling out explicitly,
+# for them to appear in $(headers-y) instead.
+targets += $(headers-n)
+$(addprefix $(obj)/,$(headers-n)): FORCE
+	$(call if_changed,stub_h)
 
 .PRECIOUS: $(obj)/compat/%.i
 targets += $(patsubst %.h, %.i, $(headers-y))
