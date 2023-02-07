@@ -1,5 +1,6 @@
 #include "libxl_internal.h"
 #include "libxl_arch.h"
+#include <xen/arch-x86/cpuid.h>
 
 int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,
@@ -486,13 +487,13 @@ int libxl__arch_domain_create(libxl__gc *gc,
 
     switch (d_config->b_info.tsc_mode) {
     case LIBXL_TSC_MODE_DEFAULT:
-        tsc_mode = 0;
+        tsc_mode = XEN_CPUID_TSC_MODE_DEFAULT;
         break;
     case LIBXL_TSC_MODE_ALWAYS_EMULATE:
-        tsc_mode = 1;
+        tsc_mode = XEN_CPUID_TSC_MODE_ALWAYS_EMULATE;
         break;
     case LIBXL_TSC_MODE_NATIVE:
-        tsc_mode = 2;
+        tsc_mode = XEN_CPUID_TSC_MODE_NEVER_EMULATE;
         break;
     case LIBXL_TSC_MODE_NATIVE_PARAVIRT:
         LOGD(ERROR, domid, "TSC Mode native_paravirt (a.k.a PVRDTSCP) has been removed");
