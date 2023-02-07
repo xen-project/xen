@@ -22,10 +22,11 @@
  * IN THE SOFTWARE.
  */
 
+#include <xen/sched.h>
 #include <asm/mc146818rtc.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/support.h>
+#include <asm/hvm/save.h>
 #include <asm/current.h>
 #include <xen/trace.h>
 #include <public/hvm/params.h>

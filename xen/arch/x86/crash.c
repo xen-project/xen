@@ -24,7 +24,6 @@
 #include <xen/keyhandler.h>
 #include <public/xen.h>
 #include <asm/shared.h>
-#include <asm/hvm/support.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
 #include <xen/iommu.h>

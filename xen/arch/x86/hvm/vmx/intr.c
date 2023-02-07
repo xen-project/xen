@@ -29,7 +29,6 @@
 #include <asm/msr.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/vpic.h>

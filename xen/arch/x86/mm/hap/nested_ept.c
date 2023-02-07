@@ -25,7 +25,6 @@
 #include <asm/p2m.h>
 #include <asm/mem_sharing.h>
 #include <asm/hap.h>
-#include <asm/hvm/support.h>
 
 #include <asm/hvm/nestedhvm.h>
 

@@ -15,7 +15,6 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <asm/hvm/support.h>
 #include <asm/hvm/hvm.h>
 #include <asm/p2m.h>
 #include <asm/altp2m.h>

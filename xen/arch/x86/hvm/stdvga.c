@@ -31,7 +31,6 @@
 #include <xen/types.h>
 #include <xen/sched.h>
 #include <xen/domain_page.h>
-#include <asm/hvm/support.h>
 #include <xen/numa.h>
 #include <xen/paging.h>
 

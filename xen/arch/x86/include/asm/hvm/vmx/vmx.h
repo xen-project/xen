@@ -23,8 +23,8 @@
 #include <asm/regs.h>
 #include <asm/asm_defns.h>
 #include <asm/processor.h>
+#include <asm/p2m.h>
 #include <asm/i387.h>
-#include <asm/hvm/support.h>
 #include <asm/hvm/trace.h>
 #include <asm/hvm/vmx/vmcs.h>
 

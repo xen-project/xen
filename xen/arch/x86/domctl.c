@@ -25,7 +25,6 @@
 #include <asm/irq.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
-#include <asm/hvm/support.h>
 #include <asm/processor.h>
 #include <asm/acpi.h> /* for hvm_acpi_power_button */
 #include <xen/hypercall.h> /* for arch_do_domctl */

@@ -29,7 +29,6 @@
 #include <asm/msr.h>
 #include <asm/msr-index.h>
 #include <asm/vpmu.h>
-#include <asm/hvm/support.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>

@@ -16,8 +16,8 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/sched.h>
 #include <xen/time.h>
-#include <asm/hvm/support.h>
 #include <asm/hvm/vpt.h>
 #include <asm/event.h>
 #include <asm/apic.h>

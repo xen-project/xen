@@ -16,7 +16,6 @@
 #include <asm/paging.h>
 #include <asm/p2m.h>
 #include <asm/apic.h>
-#include <asm/hvm/support.h>
 #include <public/sched.h>
 #include <public/hvm/hvm_op.h>
 

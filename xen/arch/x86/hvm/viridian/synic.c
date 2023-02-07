@@ -13,7 +13,6 @@
 
 #include <asm/apic.h>
 #include <asm/guest/hyperv-tlfs.h>
-#include <asm/hvm/support.h>
 #include <asm/hvm/vlapic.h>
 
 #include "private.h"

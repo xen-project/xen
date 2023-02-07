@@ -30,7 +30,6 @@
 #include <asm/nmi.h>
 #include <asm/p2m.h>
 #include <asm/vpmu.h>
-#include <asm/hvm/support.h>
 #include <asm/apic.h>
 #include <irq_vectors.h>
 #include <public/pmu.h>

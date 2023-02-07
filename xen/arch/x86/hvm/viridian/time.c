@@ -15,7 +15,6 @@
 #include <asm/event.h>
 #include <asm/guest/hyperv.h>
 #include <asm/guest/hyperv-tlfs.h>
-#include <asm/hvm/support.h>
 
 #include "private.h"
 

@@ -23,7 +23,6 @@
 #include <asm/page.h>
 #include <asm/shared.h>
 #include <asm/hvm/hvm.h>
-#include <asm/hvm/support.h>
 
 
 static void print_xen_info(void)

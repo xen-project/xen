@@ -12,7 +12,6 @@
 #include <xen/sched.h>
 #include <xen/xenoprof.h>
 #include <public/xenoprof.h>
-#include <asm/hvm/support.h>
 
 #include "op_counter.h"
 

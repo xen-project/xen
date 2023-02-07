@@ -22,7 +22,6 @@
 #include <xen/iocap.h>
 #include <asm/irq.h>
 #include <asm/hvm/hvm.h>
-#include <asm/hvm/support.h>
 #include <asm/processor.h>
 #include <asm/setup.h>
 #include <asm/smp.h>

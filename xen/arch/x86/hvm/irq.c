@@ -24,7 +24,7 @@
 #include <xen/irq.h>
 #include <xen/keyhandler.h>
 #include <asm/hvm/domain.h>
-#include <asm/hvm/support.h>
+#include <asm/hvm/save.h>
 #include <asm/msi.h>
 #include <public/hvm/params.h>
 

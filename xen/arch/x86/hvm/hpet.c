@@ -18,7 +18,7 @@
 
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/support.h>
+#include <asm/hvm/save.h>
 #include <asm/hvm/trace.h>
 #include <asm/current.h>
 #include <asm/hpet.h>

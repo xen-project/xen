@@ -17,9 +17,10 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/sched.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/support.h>
+#include <asm/hvm/save.h>
 #include <asm/acpi.h> /* for hvm_acpi_power_button prototype */
 #include <public/hvm/params.h>
 

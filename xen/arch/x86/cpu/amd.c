@@ -4,12 +4,12 @@
 #include <xen/param.h>
 #include <xen/smp.h>
 #include <xen/pci.h>
+#include <xen/sched.h>
 #include <xen/warning.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 #include <asm/amd.h>
-#include <asm/hvm/support.h>
 #include <asm/spec_ctrl.h>
 #include <asm/acpi.h>
 #include <asm/apic.h>

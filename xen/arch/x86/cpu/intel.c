@@ -1,5 +1,6 @@
 #include <xen/init.h>
 #include <xen/kernel.h>
+#include <xen/sched.h>
 #include <xen/string.h>
 #include <xen/bitops.h>
 #include <xen/smp.h>
@@ -10,7 +11,6 @@
 #include <asm/apic.h>
 #include <asm/i387.h>
 #include <mach_apic.h>
-#include <asm/hvm/support.h>
 
 #include "cpu.h"
 

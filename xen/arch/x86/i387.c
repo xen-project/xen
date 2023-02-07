@@ -11,7 +11,6 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/processor.h>
-#include <asm/hvm/support.h>
 #include <asm/i387.h>
 #include <asm/xstate.h>
 #include <asm/asm_defns.h>

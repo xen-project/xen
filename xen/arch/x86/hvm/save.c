@@ -24,8 +24,6 @@
 #include <xen/softirq.h>
 #include <xen/version.h>
 
-#include <asm/hvm/support.h>
-
 #include <public/hvm/save.h>
 
 void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)

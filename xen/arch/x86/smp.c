@@ -21,7 +21,6 @@
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
 #include <asm/hpet.h>
-#include <asm/hvm/support.h>
 #include <asm/setup.h>
 #include <irq_vectors.h>
 #include <mach_apic.h>

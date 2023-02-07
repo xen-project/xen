@@ -32,7 +32,7 @@
 #include <xen/trace.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/support.h>
+#include <asm/hvm/save.h>
 
 #define vpic_domain(v) (container_of((v), struct domain, \
                         arch.hvm.vpic[!vpic->is_master]))

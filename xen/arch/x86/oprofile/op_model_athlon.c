@@ -10,6 +10,7 @@
  * @author Graydon Hoare
  */
 
+#include <xen/sched.h>
 #include <xen/types.h>
 #include <asm/msr.h>
 #include <asm/io.h>
@@ -18,7 +19,6 @@
 #include <xen/xenoprof.h>
 #include <asm/regs.h>
 #include <asm/current.h>
-#include <asm/hvm/support.h>
 #include <xen/pci_regs.h>
 #include <xen/pci_ids.h>
 
