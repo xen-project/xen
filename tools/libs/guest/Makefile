@@ -14,6 +14,3 @@ NO_HEADERS_CHK := y
 include $(XEN_ROOT)/tools/libs/libs.mk
 
 libxenguest.so.$(MAJOR).$(MINOR): LDLIBS += $(ZLIB_LIBS) -lz
-
-clean::
-	rm -f libxenguest.map

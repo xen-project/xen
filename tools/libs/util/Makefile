@@ -47,6 +47,3 @@ $(OBJS-y) $(PIC_OBJS): $(AUTOINCS)
 %.c %.h:: %.l
 	@rm -f $*.[ch]
 	$(FLEX) --header-file=$*.h --outfile=$*.c $<
-
-clean::
-	$(RM) libxenutil.map

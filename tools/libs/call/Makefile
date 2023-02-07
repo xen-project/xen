@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 1
 MINOR    = 3
+version-script := libxencall.map
 
 include Makefile.common
 

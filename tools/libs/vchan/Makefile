@@ -11,6 +11,3 @@ OBJS-y += io.o
 NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
-
-clean::
-	rm -f libxenvchan.map

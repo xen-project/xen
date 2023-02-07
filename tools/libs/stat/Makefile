@@ -134,4 +134,4 @@ uninstall:: uninstall-perl-bindings
 endif
 
 clean::
-	$(RM) libxenstat.map $(BINDINGS) $(BINDINGSRC)
+	$(RM) $(BINDINGS) $(BINDINGSRC)

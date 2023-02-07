@@ -110,8 +110,6 @@ tools/config.cache
 config/Tools.mk
 config/Stubdom.mk
 config/Docs.mk
-tools/libs/ctrl/libxenctrl.map
-tools/libs/guest/libxenguest.map
 tools/libs/guest/xc_bitops.h
 tools/libs/guest/xc_core.h
 tools/libs/guest/xc_core_arm.h
@@ -121,7 +119,6 @@ tools/libs/light/_*.[ch]
 tools/libs/light/*.pyc
 tools/libs/light/_libxl.api-for-check
 tools/libs/light/*.api-ok
-tools/libs/light/libxenlight.map
 tools/libs/light/libxl-save-helper
 tools/libs/light/dsdt*
 tools/libs/light/mk_dsdt
@@ -131,13 +128,10 @@ tools/libs/light/testidl.c
 tools/libs/light/test_timedereg
 tools/libs/light/test_fdderegrace
 tools/libs/light/tmp.*
-tools/libs/stat/libxenstat.map
 tools/libs/store/list.h
 tools/libs/store/utils.h
 tools/libs/store/xs_lib.c
 tools/libs/util/libxlu_cfg_y.output
-tools/libs/util/libxenutil.map
-tools/libs/vchan/libxenvchan.map
 tools/debugger/gdb/gdb-6.2.1-linux-i386-xen/*
 tools/debugger/gdb/gdb-6.2.1/*
 tools/debugger/gdb/gdb-6.2.1.tar.bz2

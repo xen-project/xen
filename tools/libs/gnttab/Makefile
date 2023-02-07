@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 1
 MINOR    = 2
+version-script := libxengnttab.map
 
 include Makefile.common
 
