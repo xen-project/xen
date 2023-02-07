@@ -1406,6 +1406,7 @@ typedef struct {
     /* Whether this domain is being migrated/restored, or booting fresh.  Only
      * applicable to the primary domain, not support domains (e.g. stub QEMU). */
     bool restore;
+    bool soft_reset;
 } libxl__domain_build_state;
 
 _hidden void libxl__domain_build_state_init(libxl__domain_build_state *s);

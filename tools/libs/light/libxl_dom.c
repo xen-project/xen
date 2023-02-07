@@ -382,7 +382,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     /* Construct a CPUID policy, but only for brand new domains.  Domains
      * being migrated-in/restored have CPUID handled during the
      * static_data_done() callback. */
-    if (!state->restore)
+    if (!state->restore && !state->soft_reset)
         rc = libxl__cpuid_legacy(ctx, domid, false, info);
 
 out:
