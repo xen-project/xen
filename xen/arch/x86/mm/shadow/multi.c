@@ -2672,10 +2672,10 @@ static int cf_check sh_page_fault(
 #if GUEST_PAGING_LEVELS == 3
             unsigned int i;
 
-            for_each_shadow_table(v, i)
+            for_each_shadow_table(tmp, i)
             {
                 mfn_t smfn = pagetable_get_mfn(
-                                 v->arch.paging.shadow.shadow_table[i]);
+                                 tmp->arch.paging.shadow.shadow_table[i]);
 
                 if ( mfn_valid(smfn) && (mfn_x(smfn) != 0) )
                 {
