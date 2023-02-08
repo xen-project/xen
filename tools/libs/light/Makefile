@@ -148,9 +148,6 @@ LIBXL_TEST_OBJS += $(foreach t, $(LIBXL_TESTS_INSIDE),libxl_test_$t.opic)
 TEST_PROG_OBJS += $(foreach t, $(LIBXL_TESTS_PROGS),test_$t.o) test_common.o
 TEST_PROGS += $(foreach t, $(LIBXL_TESTS_PROGS),test_$t)
 
-AUTOINCS = _libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
-AUTOSRCS = _libxl_save_msgs_callout.c _libxl_save_msgs_helper.c
-
 CLIENTS = testidl libxl-save-helper
 
 SAVE_HELPER_OBJS = libxl_save_helper.o _libxl_save_msgs_helper.o
@@ -178,13 +175,13 @@ libxl_x86_acpi.o libxl_x86_acpi.opic: CFLAGS += -I$(XEN_ROOT)/tools
 $(SAVE_HELPER_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenevtchn) $(CFLAGS_libxenguest)
 
 testidl.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
-testidl.c: libxl_types.idl gentest.py $(XEN_INCLUDE)/libxl.h $(AUTOINCS)
-	$(PYTHON) gentest.py libxl_types.idl testidl.c.new
-	mv testidl.c.new testidl.c
+testidl.c: libxl_types.idl gentest.py
+	$(PYTHON) gentest.py $< $@.new
+	mv -f $@.new $@
 
-all: $(CLIENTS) $(TEST_PROGS) $(AUTOSRCS) $(AUTOINCS)
+all: $(CLIENTS) $(TEST_PROGS)
 
-$(OBJS-y) $(PIC_OBJS) $(SAVE_HELPER_OBJS) $(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS): $(AUTOINCS) libxl.api-ok
+$(OBJS-y) $(PIC_OBJS) $(SAVE_HELPER_OBJS) $(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS): libxl.api-ok
 
 $(DSDT_FILES-y): acpi
 
@@ -196,7 +193,7 @@ libxl.api-ok: check-libxl-api-rules _libxl.api-for-check
 	$(PERL) $^
 	touch $@
 
-_libxl.api-for-check: $(XEN_INCLUDE)/libxl.h $(AUTOINCS)
+_libxl.api-for-check: $(XEN_INCLUDE)/libxl.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -E $< $(APPEND_CFLAGS) \
 		-DLIBXL_EXTERNAL_CALLERS_ONLY=LIBXL_EXTERNAL_CALLERS_ONLY \
 		>$@.new
@@ -208,14 +205,22 @@ _libxl_save_msgs_helper.h _libxl_save_msgs_callout.h: \
 	$(PERL) -w $< $@ >$@.new
 	$(call move-if-changed,$@.new,$@)
 
+#
+# headers dependencies on generated headers
+#
 $(XEN_INCLUDE)/libxl.h: $(XEN_INCLUDE)/_libxl_types.h
 $(XEN_INCLUDE)/libxl_json.h: $(XEN_INCLUDE)/_libxl_types_json.h
 libxl_internal.h: $(XEN_INCLUDE)/libxl.h $(XEN_INCLUDE)/libxl_json.h
 libxl_internal.h: _libxl_types_internal.h _libxl_types_private.h _libxl_types_internal_private.h
-libxl_internal_json.h: _libxl_types_internal_json.h
+libxl_internal.h: _libxl_save_msgs_callout.h
 
-$(OBJS-y) $(PIC_OBJS) $(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): $(XEN_INCLUDE)/libxl.h
+#
+# objects dependencies on headers that depends on generated headers
+#
+$(TEST_PROG_OBJS): $(XEN_INCLUDE)/libxl.h
 $(OBJS-y) $(PIC_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
+$(SAVE_HELPER_OBJS): $(XEN_INCLUDE)/libxl.h _libxl_save_msgs_helper.h
+testidl.o: $(XEN_INCLUDE)/libxl.h
 
 # This exploits the 'multi-target pattern rule' trick.
 # gentypes.py should be executed only once to make all the targets.
@@ -262,5 +267,4 @@ clean::
 	$(RM) testidl.c.new testidl.c *.api-ok
 	$(RM) $(TEST_PROGS) libxenlight_test.so libxl_test_*.opic
 	$(RM) -r __pycache__
-	$(RM) $(AUTOSRCS) $(AUTOINCS)
 	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) clean
