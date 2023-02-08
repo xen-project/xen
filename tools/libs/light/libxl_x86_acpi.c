@@ -16,7 +16,7 @@
 #include "libxl_arch.h"
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/e820.h>
-#include "libacpi/libacpi.h"
+#include "libacpi.h"
 
  /* Number of pages holding ACPI tables */
 #define NUM_ACPI_PAGES 16

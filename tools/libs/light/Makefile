@@ -170,8 +170,7 @@ LDLIBS += $(LDLIBS-y)
 $(OBJS-y) $(PIC_OBJS) $(LIBXL_TEST_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
 $(ACPI_OBJS) $(ACPI_PIC_OBJS): CFLAGS += -I. -DLIBACPI_STDUTILS=\"$(CURDIR)/libxl_x86_acpi.h\"
 $(TEST_PROG_OBJS) _libxl.api-for-check: CFLAGS += $(CFLAGS_libxentoollog) $(CFLAGS_libxentoolcore)
-libxl_dom.o libxl_dom.opic: CFLAGS += -I$(XEN_ROOT)/tools  # include libacpi/x86.h
-libxl_x86_acpi.o libxl_x86_acpi.opic: CFLAGS += -I$(XEN_ROOT)/tools
+libxl_x86_acpi.o libxl_x86_acpi.opic: CFLAGS += -iquote $(ACPI_PATH)
 $(SAVE_HELPER_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenevtchn) $(CFLAGS_libxenguest)
 
 testidl.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
@@ -225,13 +224,12 @@ testidl.o: $(XEN_INCLUDE)/libxl.h
 # This exploits the 'multi-target pattern rule' trick.
 # gentypes.py should be executed only once to make all the targets.
 _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
-	$(eval stem = $(notdir $*))
-	$(PYTHON) gentypes.py libxl_type$(stem).idl __libxl_type$(stem).h __libxl_type$(stem)_private.h \
-		__libxl_type$(stem)_json.h  __libxl_type$(stem).c
-	$(call move-if-changed,__libxl_type$(stem).h,_libxl_type$(stem).h)
-	$(call move-if-changed,__libxl_type$(stem)_private.h,_libxl_type$(stem)_private.h)
-	$(call move-if-changed,__libxl_type$(stem)_json.h,_libxl_type$(stem)_json.h)
-	$(call move-if-changed,__libxl_type$(stem).c,_libxl_type$(stem).c)
+	$(PYTHON) gentypes.py libxl_type$(*F).idl __libxl_type$(*F).h __libxl_type$(*F)_private.h \
+		__libxl_type$(*F)_json.h  __libxl_type$(*F).c
+	$(call move-if-changed,__libxl_type$(*F).h,_libxl_type$(*F).h)
+	$(call move-if-changed,__libxl_type$(*F)_private.h,_libxl_type$(*F)_private.h)
+	$(call move-if-changed,__libxl_type$(*F)_json.h,_libxl_type$(*F)_json.h)
+	$(call move-if-changed,__libxl_type$(*F).c,_libxl_type$(*F).c)
 
 .PRECIOUS: _libxl_type%.h _libxl_type%.c
 
