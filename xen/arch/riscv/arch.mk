@@ -3,7 +3,7 @@
 
 CFLAGS-$(CONFIG_RISCV_64) += -mabi=lp64
 
-riscv-march-$(CONFIG_RISCV_ISA_RV64IMA) := rv64ima
+riscv-march-$(CONFIG_RISCV_ISA_RV64G) := rv64g
 riscv-march-$(CONFIG_RISCV_ISA_C)       := $(riscv-march-y)c
 
 # Note that -mcmodel=medany is used so that Xen can be mapped

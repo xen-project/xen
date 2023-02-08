@@ -19,15 +19,19 @@ menu "ISA Selection"
 
 choice
 	prompt "Base ISA"
-	default RISCV_ISA_RV64IMA if RISCV_64
+	default RISCV_ISA_RV64G if RISCV_64
 	help
 	  This selects the base ISA extensions that Xen will target.
 
-config RISCV_ISA_RV64IMA
-	bool "RV64IMA"
+config RISCV_ISA_RV64G
+	bool "RV64G"
 	help
-	  Use the RV64I base ISA, plus the "M" and "A" extensions
-	  for integer multiply/divide and atomic instructions, respectively.
+	  Use the RV64I base ISA, plus
+	  "M" for multiply/divide,
+	  "A" for atomic instructions,
+	  “F”/"D" for  {single/double}-precision floating-point instructions,
+	  "Zicsr" for control and status register access,
+	  "Zifencei" for instruction-fetch fence.
 
 endchoice
 
