@@ -49,7 +49,9 @@ ov=4.0
     OSSTEST_CONFIG=production-config-cambridge ./mg-branch-setup qemu-upstream-$v-testing bisect
 
 * add branch to osstest
-    ie add both eg qemu-upstream-4.2-testing and xen-4.2-testing to BRANCHES in cr-for-branches
+    Add both qemu-upstream-$v-testing and xen-$v-testing to BRANCHES in cr-for-branches
+    git add -p
+    git commit -m "cr-for-branches: Add Xen and QEMU $v branch"
 
 * add to patchbot
     on xenbits
