@@ -1,9 +1,6 @@
 v=4.1
 ov=4.0
 
-* make branch in qemu-iwj.git
-    git-branch $v-testing master
-
 # make branches in xenbits.xen.org qemus
     ssh xen@xenbits.xen.org
     cd ~/git/qemu-xen.git
