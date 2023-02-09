@@ -45,13 +45,16 @@ them to within 2048 bytes.  (See XENSTORE_*_PATH_MAX in xs_wire.h.)
 
 Each node has one or multiple permission entries.  Permissions are
 granted by domain-id, the first permission entry of each node specifies
-the owner of the node.  Permissions of a node can be changed by the
-owner of the node, the owner can only be modified by the control
-domain (usually domain id 0).  The owner always has the right to read
-and write the node, while other permissions can be setup to allow
-read and/or write access.  When a domain is being removed from Xenstore
-nodes owned by that domain will be removed together with all of those
-nodes' children.
+the owner of the node, who always has full access to the node (read and
+write permission).  The access rights of the first entry specify the
+allowed access for all domains not having a dedicated permission entry
+(the default is "n", removing access for all domains not explicitly
+added via additional permission entries).  Permissions of a node can be
+changed by the owner of the node, the owner can only be modified by the
+control domain (usually domain id 0).  Other permissions can be setup to
+allow read and/or write access for other domains.  When a domain is
+being removed from Xenstore nodes owned by that domain will be removed
+together with all of those nodes' children.
 
 
 Communication with xenstore is via either sockets, or event channel
