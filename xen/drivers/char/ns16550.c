@@ -1747,7 +1747,6 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
     struct ns16550 *uart;
     int res;
     u32 reg_shift, reg_width;
-    u64 io_size;
 
     uart = &ns16550_com[0];
 
@@ -1758,13 +1757,9 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
     uart->parity    = UART_PARITY_NONE;
     uart->stop_bits = 1;
 
-    res = dt_device_get_address(dev, 0, &uart->io_base, &io_size);
+    res = dt_device_get_address(dev, 0, &uart->io_base, &uart->io_size);
     if ( res )
         return res;
-
-    uart->io_size = io_size;
-
-    ASSERT(uart->io_size == io_size); /* Detect truncation */
 
     res = dt_property_read_u32(dev, "reg-shift", &reg_shift);
     if ( !res )
