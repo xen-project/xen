@@ -25,8 +25,7 @@ ov=4.0
 * make 13:37 <ijc> https://xenbits.xen.org/docs/4.2-testing/ is now live true
 #14:17 <ijc> HOWTO: login to xenbits. become "xendocs" . cd cronjobs . edit
 #            xenbits-docs-all.sh in the obvious way. git commit
-    ssh root@xenbits.xen.org
-    su - xendocs
+    ssh xendocs@xenbits.xen.org
     cd cronjobs
     ed xenbits-docs-all.sh
     /for branch
