@@ -2,78 +2,78 @@ v=4.1
 ov=4.0
 
 * make branch in qemu-iwj.git
-        git-branch $v-testing master
+    git-branch $v-testing master
 
 # make branches in xenbits.xen.org qemus
-        ssh xen@xenbits.xen.org
-	cd ~/git/qemu-xen.git
-	git branch staging-$v staging
-	git branch stable-$v master
-	cd ~/git/qemu-xen-traditional.git
-	git branch stable-$v master
+    ssh xen@xenbits.xen.org
+    cd ~/git/qemu-xen.git
+    git branch staging-$v staging
+    git branch stable-$v master
+    cd ~/git/qemu-xen-traditional.git
+    git branch stable-$v master
 
 # make branch in libvirt
-        ssh xen@xenbits.xen.org
-        cd ~/git/libvirt.git/
-	git branch osstest/frozen/xen-$v-testing   xen-tested-master
+    ssh xen@xenbits.xen.org
+    cd ~/git/libvirt.git/
+    git branch osstest/frozen/xen-$v-testing   xen-tested-master
 
 # make branches in xenbits.xen.org xen.git
-        ssh xen@xenbits.xen.org
-        cd ~/git/xen.git
-	git branch staging-$v staging
-	git branch stable-$v master
+    ssh xen@xenbits.xen.org
+    cd ~/git/xen.git
+    git branch staging-$v staging
+    git branch stable-$v master
 
 # update xendocs@xenbits docs generator to generate new stable branch
 #  docs too. commit to git.
 * make 13:37 <ijc> https://xenbits.xen.org/docs/4.2-testing/ is now live true
 #14:17 <ijc> HOWTO: login to xenbits. become "xendocs" . cd cronjobs . edit
 #            xenbits-docs-all.sh in the obvious way. git commit
-	ssh root@xenbits.xen.org
-	su - xendocs
-	cd cronjobs
-	ed xenbits-docs-all.sh
-	/for branch
-	s/$/ 4.6-testing
-	# ^ OR SIMILAR
-	w
-	q
-        git add -p
-	git commit -m "Branch for $v"
+    ssh root@xenbits.xen.org
+    su - xendocs
+    cd cronjobs
+    ed xenbits-docs-all.sh
+    /for branch
+    s/$/ 4.6-testing
+    # ^ OR SIMILAR
+    w
+    q
+    git add -p
+    git commit -m "Branch for $v"
 
 * make branches etc. in osstest
-        ssh osstest@osstest.test-lab
-	cd testing.git
-	OSSTEST_CONFIG=production-config ./mg-branch-setup xen-$v-testing bisect
-	OSSTEST_CONFIG=production-config ./mg-branch-setup qemu-upstream-$v-testing bisect
+    ssh osstest@osstest.test-lab
+    cd testing.git
+    OSSTEST_CONFIG=production-config ./mg-branch-setup xen-$v-testing bisect
+    OSSTEST_CONFIG=production-config ./mg-branch-setup qemu-upstream-$v-testing bisect
 
 # make branches etc. in Cambridge osstest
-        ssh osstest@osstest.xs.citrite.net
-	cd testing.git
-	OSSTEST_CONFIG=production-config-cambridge ./mg-branch-setup xen-$v-testing bisect
-	OSSTEST_CONFIG=production-config-cambridge ./mg-branch-setup qemu-upstream-$v-testing bisect
+    ssh osstest@osstest.xs.citrite.net
+    cd testing.git
+    OSSTEST_CONFIG=production-config-cambridge ./mg-branch-setup xen-$v-testing bisect
+    OSSTEST_CONFIG=production-config-cambridge ./mg-branch-setup qemu-upstream-$v-testing bisect
 
 * add branch to osstest
-        ie add both eg qemu-upstream-4.2-testing and xen-4.2-testing to BRANCHES in cr-for-branches
+    ie add both eg qemu-upstream-4.2-testing and xen-4.2-testing to BRANCHES in cr-for-branches
 
 * add to patchbot
-        on xenbits
-        cd ~/HG/patchbot/
+    on xenbits
+    cd ~/HG/patchbot/
 
-	cp xen--master.patchbot-reported-heads xen--stable-$v.patchbot-reported-heads
-	cp xen--staging.patchbot-reported-heads xen--staging-$v.patchbot-reported-heads
-        cp qemu-xen--master.patchbot-reported-heads  qemu-xen--stable-$v.patchbot-reported-heads
-        cp qemu-xen--staging.patchbot-reported-heads  qemu-xen--staging-$v.patchbot-reported-heads
-        cp qemu-xen-traditional--master.patchbot-reported-heads qemu-xen-traditional--stable-$v.patchbot-reported-heads
+    cp xen--master.patchbot-reported-heads xen--stable-$v.patchbot-reported-heads
+    cp xen--staging.patchbot-reported-heads xen--staging-$v.patchbot-reported-heads
+    cp qemu-xen--master.patchbot-reported-heads  qemu-xen--stable-$v.patchbot-reported-heads
+    cp qemu-xen--staging.patchbot-reported-heads  qemu-xen--staging-$v.patchbot-reported-heads
+    cp qemu-xen-traditional--master.patchbot-reported-heads qemu-xen-traditional--stable-$v.patchbot-reported-heads
 
-        #emacs versions
-	perl -i~ -pe 'next unless m/\b\Q'$ov'\E\b/; $x=$_; $x=~ s/\b\Q'$ov'\E\b/'$v'/g; print $x;' versions
-        git diff
-	git add versions
-	git commit -m "Branch for $v"
+    #emacs versions
+    perl -i~ -pe 'next unless m/\b\Q'$ov'\E\b/; $x=$_; $x=~ s/\b\Q'$ov'\E\b/'$v'/g; print $x;' versions
+    git diff
+    git add versions
+    git commit -m "Branch for $v"
 
 Ensure references to qemu trees in xen.git's Config.mk are updated.
 Check this with
-        grep unstable Config.mk 
+    grep unstable Config.mk
 which should produce no output.  Replace as necessary.
 (There may well be none.)
 
@@ -86,9 +86,9 @@ including turning off debug.
 
 Set off a manual osstest run, since the osstest cr-for-branches change
 will take a while to take effect:
-  ssh osstest@osstest.test-lab
-  cd testing.git
-  screen -S $v
-  BRANCHES=xen-$v-testing ./cr-for-branches branches -w "./cr-daily-branch --real"
+    ssh osstest@osstest.test-lab
+    cd testing.git
+    screen -S $v
+    BRANCHES=xen-$v-testing ./cr-for-branches branches -w "./cr-daily-branch --real"
 
 Send message to committers and RM.  Use previous mail as a template.
