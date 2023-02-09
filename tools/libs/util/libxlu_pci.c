@@ -3,9 +3,6 @@
 #include <ctype.h>
 
 #include "libxlu_internal.h"
-#include "libxlu_disk_l.h"
-#include "libxlu_disk_i.h"
-#include "libxlu_cfg_i.h"
 
 
 #define XLU__PCI_ERR(_c, _x, _a...) \
