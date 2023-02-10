@@ -309,7 +309,7 @@ FUNC(cstar_enter)
 .Lcstar_cr3_okay:
         sti
 
-        CR4_PV32_RESTORE
+        CR4_PV32_RESTORE /* Clob: ac */
 
         movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
 
@@ -712,7 +712,7 @@ FUNC(common_interrupt)
         cmovnz %r12d, %ebx
 .Lintr_cr3_okay:
 
-        CR4_PV32_RESTORE
+        CR4_PV32_RESTORE /* Clob: ac */
         movq %rsp,%rdi
         callq do_IRQ
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
@@ -762,7 +762,7 @@ handle_exception_saved:
         jz    .Lcr4_pv32_done
         cmpb  $0,DOMAIN_is_32bit_pv(%rax)
         je    .Lcr4_pv32_done
-        call  cr4_pv32_restore
+        call  cr4_pv32_restore /* Clob: ac */
         /*
          * An NMI or #MC may occur between clearing CR4.SMEP / CR4.SMAP in
          * compat_restore_all_guest and it actually returning to guest
@@ -1046,7 +1046,7 @@ FUNC(handle_ist_exception)
 .List_cr3_okay:
 
 #ifdef CONFIG_PV
-        CR4_PV32_RESTORE
+        CR4_PV32_RESTORE /* Clob: ac */
         testb $3,UREGS_cs(%rsp)
         jz    1f
         /*

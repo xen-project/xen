@@ -23,7 +23,7 @@ FUNC(entry_int82)
 
         sti
 
-        CR4_PV32_RESTORE
+        CR4_PV32_RESTORE /* Clob: ac */
 
         GET_CURRENT(bx)
 
@@ -163,17 +163,15 @@ FUNC(compat_restore_all_guest)
         _ASM_PRE_EXTABLE(.Lft0, handle_exception)
 END(compat_restore_all_guest)
 
-/* This mustn't modify registers other than %rax. */
+/* Callers can cope with both %rax and %rcx being clobbered. */
 FUNC(cr4_pv32_restore)
-        push  %rdx
-        GET_CPUINFO_FIELD(cr4, dx)
-        mov   (%rdx), %rax
+        GET_CPUINFO_FIELD(cr4, cx)
+        mov   (%rcx), %rax
         test  $XEN_CR4_PV32_BITS, %eax
         jnz   0f
         or    cr4_pv32_mask(%rip), %rax
         mov   %rax, %cr4
-        mov   %rax, (%rdx)
-        pop   %rdx
+        mov   %rax, (%rcx)
         ret
 0:
 #ifndef NDEBUG
@@ -191,7 +189,6 @@ FUNC(cr4_pv32_restore)
         BUG
 1:
 #endif
-        pop   %rdx
         xor   %eax, %eax
         ret
 END(cr4_pv32_restore)
@@ -227,7 +224,7 @@ UNLIKELY_END(compat_syscall_gpf)
 END(compat_syscall)
 
 FUNC(compat_sysenter)
-        CR4_PV32_RESTORE
+        CR4_PV32_RESTORE /* Clob: ac */
         movq  VCPU_trap_ctxt(%rbx),%rcx
         cmpb  $X86_EXC_GP, UREGS_entry_vector(%rsp)
         movzwl VCPU_sysenter_sel(%rbx),%eax
@@ -242,7 +239,7 @@ FUNC(compat_sysenter)
 END(compat_sysenter)
 
 FUNC(compat_int80_direct_trap)
-        CR4_PV32_RESTORE
+        CR4_PV32_RESTORE /* Clob: ac */
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 END(compat_int80_direct_trap)
