@@ -1027,7 +1027,7 @@ handle_ist_exception:
          * Interrupted guest context. Clear the restore value for xen_cr3
          * and copy the context to stack bottom.
          */
-        xor   %r15, %r15
+        xor   %r15d, %r15d
         xor   %ebx, %ebx
         GET_CPUINFO_FIELD(guest_cpu_user_regs,di)
         movq  %rsp,%rsi
