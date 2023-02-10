@@ -206,7 +206,6 @@ ENTRY(cstar_enter)
         ALTERNATIVE "", "setssbsy", X86_FEATURE_XEN_SHSTK
 #endif
         push  %rax          /* Guest %rsp */
-        CR4_PV32_RESTORE
         movq  8(%rsp), %rax /* Restore guest %rax. */
         movq  $FLAT_USER_SS32, 8(%rsp) /* Assume a 64bit domain.  Compat handled lower. */
         pushq %r11
@@ -229,6 +228,8 @@ ENTRY(cstar_enter)
         mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lcstar_cr3_okay:
         sti
+
+        CR4_PV32_RESTORE
 
         movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
         movq  VCPU_domain(%rbx),%rcx
