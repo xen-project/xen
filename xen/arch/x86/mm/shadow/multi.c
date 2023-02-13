@@ -556,8 +556,8 @@ _sh_propagate(struct vcpu *v,
 
         ASSERT(!(sflags & PAGE_CACHE_ATTRS));
 
-        /* compute the PAT index for shadow page entry when VT-d is enabled
-         * and device assigned.
+        /*
+         * Compute the PAT index for shadow page entry when IOMMU is enabled.
          * 1) direct MMIO: compute the PAT index with gMTRR=UC and gPAT.
          * 2) if enables snoop control, compute the PAT index as WB.
          * 3) if disables snoop control, compute the PAT index with
@@ -577,7 +577,7 @@ _sh_propagate(struct vcpu *v,
                             gfn_to_paddr(target_gfn),
                             mfn_to_maddr(target_mfn),
                             X86_MT_UC);
-                else if ( iommu_snoop )
+                else if ( is_iommu_enabled(d) && iommu_snoop )
                     sflags |= pat_type_2_pte_flags(X86_MT_WB);
                 else
                     sflags |= get_pat_flags(v,

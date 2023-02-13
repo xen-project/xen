@@ -56,6 +56,17 @@ void __init acpi_iommu_init(void)
     if ( !acpi_disabled )
     {
         ret = acpi_dmar_init();
+
+#ifndef iommu_snoop
+        /*
+         * As long as there's no per-domain snoop control, and as long as on
+         * AMD we uniformly force coherent accesses, a possible command line
+         * override should affect VT-d only.
+         */
+        if ( ret )
+            iommu_snoop = true;
+#endif
+
         if ( ret == -ENODEV )
             ret = acpi_ivrs_init();
     }

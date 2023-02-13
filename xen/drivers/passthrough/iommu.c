@@ -587,9 +587,6 @@ int __init iommu_setup(void)
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( !iommu_enabled )
     {
-#ifndef iommu_snoop
-        iommu_snoop = false;
-#endif
         iommu_hwdom_passthrough = false;
         iommu_hwdom_strict = false;
     }

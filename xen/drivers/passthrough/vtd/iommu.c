@@ -2746,9 +2746,6 @@ static int __init cf_check vtd_setup(void)
 
  error:
     iommu_enabled = 0;
-#ifndef iommu_snoop
-    iommu_snoop = false;
-#endif
     iommu_hwdom_passthrough = false;
     iommu_qinval = 0;
     iommu_intremap = iommu_intremap_off;
