@@ -38,10 +38,28 @@ config IPMMU_VMSA
 endif
 
 config AMD_IOMMU
-	def_bool y if X86
+	bool "AMD IOMMU" if EXPERT
+	depends on X86
+	default y
+	help
+	  Enables I/O virtualization on platforms that implement the
+	  AMD I/O Virtualization Technology (IOMMU).
+
+	  If your system includes an IOMMU implementing AMD-Vi, say Y.
+	  This is required if your system has more than 254 CPUs.
+	  If in doubt, say Y.
 
 config INTEL_IOMMU
-	def_bool y if X86
+	bool "Intel VT-d" if EXPERT
+	depends on X86
+	default y
+	help
+	  Enables I/O virtualization on platforms that implement the
+	  Intel Virtualization Technology for Directed I/O (Intel VT-d).
+
+	  If your system includes an IOMMU implementing Intel VT-d, say Y.
+	  This is required if your system has more than 254 CPUs.
+	  If in doubt, say Y.
 
 config IOMMU_FORCE_PT_SHARE
 	bool
