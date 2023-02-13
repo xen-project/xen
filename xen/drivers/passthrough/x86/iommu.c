@@ -36,6 +36,11 @@ bool __initdata iommu_superpages = true;
 
 enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
 
+#ifdef CONFIG_PV
+/* Possible unfiltered LAPIC/MSI messages from untrusted sources? */
+bool __read_mostly untrusted_msi;
+#endif
+
 #ifndef iommu_intpost
 /*
  * In the current implementation of VT-d posted interrupts, in some extreme

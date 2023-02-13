@@ -54,9 +54,6 @@
                                  ? dom_iommu(d)->arch.vtd.pgd_maddr \
                                  : (pdev)->arch.vtd.pgd_maddr)
 
-/* Possible unfiltered LAPIC/MSI messages from untrusted sources? */
-bool __read_mostly untrusted_msi;
-
 bool __read_mostly iommu_igfx = true;
 bool __read_mostly iommu_qinval = true;
 #ifndef iommu_snoop
@@ -2767,6 +2764,7 @@ static int cf_check reassign_device_ownership(
         if ( !has_arch_pdevs(target) )
             vmx_pi_hooks_assign(target);
 
+#ifdef CONFIG_PV
         /*
          * Devices assigned to untrusted domains (here assumed to be any domU)
          * can attempt to send arbitrary LAPIC/MSI messages. We are unprotected
@@ -2775,6 +2773,7 @@ static int cf_check reassign_device_ownership(
         if ( !iommu_intremap && !is_hardware_domain(target) &&
              !is_system_domain(target) )
             untrusted_msi = true;
+#endif
 
         ret = domain_context_mapping(target, devfn, pdev);
 
