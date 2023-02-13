@@ -74,7 +74,12 @@ extern enum __packed iommu_intremap {
    iommu_intremap_restricted,
    iommu_intremap_full,
 } iommu_intremap;
-extern bool iommu_igfx, iommu_qinval, iommu_snoop;
+extern bool iommu_igfx, iommu_qinval;
+#ifdef CONFIG_INTEL_IOMMU
+extern bool iommu_snoop;
+#else
+# define iommu_snoop true
+#endif /* CONFIG_INTEL_IOMMU */
 #else
 # define iommu_intremap false
 # define iommu_snoop false
