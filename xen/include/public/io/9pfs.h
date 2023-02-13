@@ -114,14 +114,26 @@
  *
  *    *Front*                               *Back*
  *    XenbusStateInitialising               XenbusStateInitialising
- *    - Query virtual device                - Query backend device
- *      properties.                           identification data.
- *    - Setup OS device instance.           - Publish backend features
- *    - Allocate and initialize the           and transport parameters
- *      request ring.                                      |
- *    - Publish transport parameters                       |
- *      that will be in effect during                      V
- *      this connection.                            XenbusStateInitWait
+ *                                          - Query backend device
+ *                                            identification data.
+ *                                          - Publish backend features
+ *                                            and transport parameters.
+ *                                                         |
+ *                                                         |
+ *                                                         V
+ *                                                  XenbusStateInitWait
+ *
+ *    - Query virtual device
+ *      properties.
+ *    - Query backend features and
+ *      transport parameters.
+ *    - Setup OS device instance.
+ *    - Allocate and initialize the
+ *      request ring(s) and
+ *      event-channel(s).
+ *    - Publish transport parameters
+ *      that will be in effect during
+ *      this connection.
  *                 |
  *                 |
  *                 V
@@ -129,8 +141,8 @@
  *
  *                                          - Query frontend transport
  *                                            parameters.
- *                                          - Connect to the request ring and
- *                                            event channel.
+ *                                          - Connect to the request ring(s)
+ *                                            and event channel(s).
  *                                                         |
  *                                                         |
  *                                                         V
