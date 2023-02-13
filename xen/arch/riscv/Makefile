@@ -1,7 +1,9 @@
 obj-$(CONFIG_EARLY_PRINTK) += early_printk.o
+obj-y += entry.o
 obj-$(CONFIG_RISCV_64) += riscv64/
 obj-y += sbi.o
 obj-y += setup.o
+obj-y += traps.o
 
 $(TARGET): $(TARGET)-syms
 	$(OBJCOPY) -O binary -S $< $@
