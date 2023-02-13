@@ -861,23 +861,22 @@ do {                                                                       \
 /* 64-bit l2: touch all entries except for PAE compat guests. */
 #define SHADOW_FOREACH_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)       \
 do {                                                                        \
-    int _i;                                                                 \
-    int _xen = !shadow_mode_external(_dom);                                 \
+    unsigned int _i, _end = SHADOW_L2_PAGETABLE_ENTRIES;                    \
     shadow_l2e_t *_sp = map_domain_page((_sl2mfn));                         \
     ASSERT_VALID_L2(mfn_to_page(_sl2mfn)->u.sh.type);                       \
-    for ( _i = 0; _i < SHADOW_L2_PAGETABLE_ENTRIES; _i++ )                  \
+    if ( is_pv_32bit_domain(_dom) /* implies !shadow_mode_external */ &&    \
+         mfn_to_page(_sl2mfn)->u.sh.type != SH_type_l2_64_shadow )          \
+        _end = COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_dom);                    \
+    for ( _i = 0; _i < _end; ++_i )                                         \
     {                                                                       \
-        if ( (!(_xen))                                                      \
-             || !is_pv_32bit_domain(_dom)                                   \
-             || mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_64_shadow     \
-             || (_i < COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_dom)) )           \
+        (_sl2e) = _sp + _i;                                                 \
+        if ( shadow_l2e_get_flags(*(_sl2e)) & _PAGE_PRESENT )               \
         {                                                                   \
-            (_sl2e) = _sp + _i;                                             \
-            if ( shadow_l2e_get_flags(*(_sl2e)) & _PAGE_PRESENT )           \
-                {_code}                                                     \
-            if ( _done ) break;                                             \
-            increment_ptr_to_guest_entry(_gl2p);                            \
+            _code;                                                          \
         }                                                                   \
+        if ( _done )                                                        \
+            break;                                                          \
+        increment_ptr_to_guest_entry(_gl2p);                                \
     }                                                                       \
     unmap_domain_page(_sp);                                                 \
 } while (0)
