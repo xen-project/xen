@@ -333,32 +333,32 @@ static void sh_audit_gw(struct vcpu *v, const walk_t *gw)
     if ( mfn_valid(gw->l4mfn)
          && mfn_valid((smfn = get_shadow_status(d, gw->l4mfn,
                                                 SH_type_l4_shadow))) )
-        (void) sh_audit_l4_table(v, smfn, INVALID_MFN);
+        sh_audit_l4_table(d, smfn, INVALID_MFN);
     if ( mfn_valid(gw->l3mfn)
          && mfn_valid((smfn = get_shadow_status(d, gw->l3mfn,
                                                 SH_type_l3_shadow))) )
-        (void) sh_audit_l3_table(v, smfn, INVALID_MFN);
+        sh_audit_l3_table(d, smfn, INVALID_MFN);
 #endif /* PAE or 64... */
     if ( mfn_valid(gw->l2mfn) )
     {
         if ( mfn_valid((smfn = get_shadow_status(d, gw->l2mfn,
                                                  SH_type_l2_shadow))) )
-            (void) sh_audit_l2_table(v, smfn, INVALID_MFN);
+            sh_audit_l2_table(d, smfn, INVALID_MFN);
 #if GUEST_PAGING_LEVELS >= 4 && defined(CONFIG_PV32)
         if ( mfn_valid((smfn = get_shadow_status(d, gw->l2mfn,
                                                  SH_type_l2h_shadow))) )
-            (void) sh_audit_l2_table(v, smfn, INVALID_MFN);
+            sh_audit_l2_table(d, smfn, INVALID_MFN);
 #endif
     }
     if ( mfn_valid(gw->l1mfn)
          && mfn_valid((smfn = get_shadow_status(d, gw->l1mfn,
                                                 SH_type_l1_shadow))) )
-        (void) sh_audit_l1_table(v, smfn, INVALID_MFN);
+        sh_audit_l1_table(d, smfn, INVALID_MFN);
     else if ( (guest_l2e_get_flags(gw->l2e) & _PAGE_PRESENT)
               && (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)
               && mfn_valid(
               (smfn = get_fl1_shadow_status(d, guest_l2e_get_gfn(gw->l2e)))) )
-        (void) sh_audit_fl1_table(v, smfn, INVALID_MFN);
+        sh_audit_fl1_table(d, smfn, INVALID_MFN);
 #endif /* SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES */
 }
 
@@ -3920,9 +3920,8 @@ static const char *sh_audit_flags(const struct domain *d, int level,
     return NULL;
 }
 
-int cf_check sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
+int cf_check sh_audit_l1_table(struct domain *d, mfn_t sl1mfn, mfn_t x)
 {
-    struct domain *d = v->domain;
     guest_l1e_t *gl1e, *gp;
     shadow_l1e_t *sl1e;
     mfn_t mfn, gmfn, gl1mfn;
@@ -3989,7 +3988,7 @@ int cf_check sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     return done;
 }
 
-int cf_check sh_audit_fl1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
+int cf_check sh_audit_fl1_table(struct domain *d, mfn_t sl1mfn, mfn_t x)
 {
     guest_l1e_t *gl1e, e;
     shadow_l1e_t *sl1e;
@@ -4015,9 +4014,8 @@ int cf_check sh_audit_fl1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     return 0;
 }
 
-int cf_check sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
+int cf_check sh_audit_l2_table(struct domain *d, mfn_t sl2mfn, mfn_t x)
 {
-    struct domain *d = v->domain;
     guest_l2e_t *gl2e, *gp;
     shadow_l2e_t *sl2e;
     mfn_t mfn, gmfn, gl2mfn;
@@ -4067,9 +4065,8 @@ int cf_check sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
 }
 
 #if GUEST_PAGING_LEVELS >= 4
-int cf_check sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
+int cf_check sh_audit_l3_table(struct domain *d, mfn_t sl3mfn, mfn_t x)
 {
-    struct domain *d = v->domain;
     guest_l3e_t *gl3e, *gp;
     shadow_l3e_t *sl3e;
     mfn_t mfn, gmfn, gl3mfn;
@@ -4117,9 +4114,8 @@ int cf_check sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
     return 0;
 }
 
-int cf_check sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
+int cf_check sh_audit_l4_table(struct domain *d, mfn_t sl4mfn, mfn_t x)
 {
-    struct domain *d = v->domain;
     guest_l4e_t *gl4e, *gp;
     shadow_l4e_t *sl4e;
     mfn_t mfn, gmfn, gl4mfn;

@@ -83,19 +83,19 @@ SHADOW_INTERNAL_NAME(sh_remove_l3_shadow, GUEST_LEVELS)
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
 int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_l1_table, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl1mfn, mfn_t x);
+    (struct domain *d, mfn_t sl1mfn, mfn_t x);
 int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_fl1_table, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl1mfn, mfn_t x);
+    (struct domain *d, mfn_t sl1mfn, mfn_t x);
 int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_l2_table, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl2mfn, mfn_t x);
+    (struct domain *d, mfn_t sl2mfn, mfn_t x);
 int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_l3_table, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl3mfn, mfn_t x);
+    (struct domain *d, mfn_t sl3mfn, mfn_t x);
 int cf_check
 SHADOW_INTERNAL_NAME(sh_audit_l4_table, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl4mfn, mfn_t x);
+    (struct domain *d, mfn_t sl4mfn, mfn_t x);
 #endif
 
 extern const struct paging_mode
