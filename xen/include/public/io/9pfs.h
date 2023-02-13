@@ -64,12 +64,6 @@
  *
  *         Host filesystem path to share.
  *
- *    tag
- *         Values:         <string>
- *
- *         Alphanumeric tag that identifies the 9pfs share. The client needs
- *         to know the tag to be able to mount it.
- *
  *    security-model
  *         Values:         "none"
  *
@@ -105,6 +99,12 @@
  *         The Xen grant reference granting permission for the backend to
  *         map a page with information to setup a share ring. One for each
  *         ring.
+ *
+ *    tag
+ *         Values:         <string>
+ *
+ *         Alphanumeric tag that identifies the 9pfs share. The client needs
+ *         to know the tag to be able to mount it.
  *
  ******************************************************************************
  *                              State Machine
