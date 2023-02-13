@@ -1680,15 +1680,15 @@ bool shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
     return true;
 }
 
-typedef int (*hash_domain_callback_t)(struct domain *d, mfn_t smfn, mfn_t other_mfn);
+typedef int (*hash_callback_t)(struct domain *d, mfn_t smfn, mfn_t other_mfn);
 
 #define HASH_CALLBACKS_CHECK(mask) \
     BUILD_BUG_ON((mask) > (1U << ARRAY_SIZE(callbacks)) - 1)
 
-static void hash_domain_foreach(struct domain *d,
-                                unsigned int callback_mask,
-                                const hash_domain_callback_t callbacks[],
-                                mfn_t callback_mfn)
+static void hash_foreach(struct domain *d,
+                         unsigned int callback_mask,
+                         const hash_callback_t callbacks[],
+                         mfn_t callback_mfn)
 /* Walk the hash table looking at the types of the entries and
  * calling the appropriate callback function for each entry.
  * The mask determines which shadow types we call back for, and the array
@@ -1826,7 +1826,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
                            unsigned long fault_addr)
 {
     /* Dispatch table for getting per-type functions */
-    static const hash_domain_callback_t callbacks[SH_type_unused] = {
+    static const hash_callback_t callbacks[SH_type_unused] = {
 #ifdef CONFIG_HVM
         [SH_type_l1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2),
         [SH_type_fl1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2),
@@ -2011,7 +2011,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
     else
         perfc_incr(shadow_writeable_bf);
     HASH_CALLBACKS_CHECK(SHF_L1_ANY | SHF_FL1_ANY);
-    hash_domain_foreach(d, SHF_L1_ANY | SHF_FL1_ANY, callbacks, gmfn);
+    hash_foreach(d, SHF_L1_ANY | SHF_FL1_ANY, callbacks, gmfn);
 
     /* If that didn't catch the mapping, then there's some non-pagetable
      * mapping -- ioreq page, grant mapping, &c. */
@@ -2039,7 +2039,7 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
     struct page_info *page = mfn_to_page(gmfn);
 
     /* Dispatch table for getting per-type functions */
-    static const hash_domain_callback_t callbacks[SH_type_unused] = {
+    static const hash_callback_t callbacks[SH_type_unused] = {
         [SH_type_l1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2),
         [SH_type_fl1_32_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2),
         [SH_type_l1_pae_shadow] = SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 3),
@@ -2063,7 +2063,7 @@ int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
     /* Brute-force search of all the shadows, by walking the hash */
     perfc_incr(shadow_mappings_bf);
     HASH_CALLBACKS_CHECK(SHF_L1_ANY | SHF_FL1_ANY);
-    hash_domain_foreach(d, SHF_L1_ANY | SHF_FL1_ANY, callbacks, gmfn);
+    hash_foreach(d, SHF_L1_ANY | SHF_FL1_ANY, callbacks, gmfn);
 
     /* If that didn't catch the mapping, something is very wrong */
     if ( !sh_check_page_has_no_refs(page) )
@@ -2172,7 +2172,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 
     /* Dispatch table for getting per-type functions: each level must
      * be called with the function to remove a lower-level shadow. */
-    static const hash_domain_callback_t callbacks[SH_type_unused] = {
+    static const hash_callback_t callbacks[SH_type_unused] = {
 #ifdef CONFIG_HVM
         [SH_type_l2_32_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 2),
         [SH_type_l2_pae_shadow] = SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, 3),
@@ -2221,9 +2221,9 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 
     /*
      * Lower-level shadows need to be excised from upper-level shadows. This
-     * call to hash_domain_foreach() looks dangerous but is in fact OK: each
-     * call will remove at most one shadow, and terminate immediately when
-     * it does remove it, so we never walk the hash after doing a deletion.
+     * call to hash_foreach() looks dangerous but is in fact OK: each call
+     * will remove at most one shadow, and terminate immediately when it does
+     * remove it, so we never walk the hash after doing a deletion.
      */
 #define DO_UNSHADOW(_type) do {                                         \
     t = (_type);                                                        \
@@ -2247,7 +2247,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
          (pg->shadow_flags & (1 << t)) )                                \
     {                                                                   \
         HASH_CALLBACKS_CHECK(SHF_page_type_mask);                       \
-        hash_domain_foreach(d, masks[t], callbacks, smfn);              \
+        hash_foreach(d, masks[t], callbacks, smfn);                     \
     }                                                                   \
 } while (0)
 
@@ -3232,7 +3232,7 @@ int shadow_domctl(struct domain *d,
 void shadow_audit_tables(struct vcpu *v)
 {
     /* Dispatch table for getting per-type functions */
-    static const hash_domain_callback_t callbacks[SH_type_unused] = {
+    static const hash_callback_t callbacks[SH_type_unused] = {
 #if SHADOW_AUDIT & (SHADOW_AUDIT_ENTRIES | SHADOW_AUDIT_ENTRIES_FULL)
 # ifdef CONFIG_HVM
         [SH_type_l1_32_shadow] = SHADOW_INTERNAL_NAME(sh_audit_l1_table, 2),
@@ -3281,7 +3281,7 @@ void shadow_audit_tables(struct vcpu *v)
     HASH_CALLBACKS_CHECK(SHADOW_AUDIT & (SHADOW_AUDIT_ENTRIES |
                                          SHADOW_AUDIT_ENTRIES_FULL)
                          ? SHF_page_type_mask : 0);
-    hash_domain_foreach(v->domain, mask, callbacks, INVALID_MFN);
+    hash_foreach(v->domain, mask, callbacks, INVALID_MFN);
 }
 
 #ifdef CONFIG_PV
