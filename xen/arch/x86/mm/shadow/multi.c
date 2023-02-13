@@ -971,7 +971,6 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
                     sh_unpin(d, page_to_mfn(sp));
             }
             d->arch.paging.shadow.opt_flags &= ~SHOPT_LINUX_L3_TOPLEVEL;
-            sh_reset_l3_up_pointers(v);
         }
     }
 #endif

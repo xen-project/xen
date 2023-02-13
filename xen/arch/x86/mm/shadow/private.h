@@ -505,11 +505,6 @@ void shadow_blow_tables(struct domain *d);
  */
 int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn);
 
-/* Reset the up-pointers of every L3 shadow to 0.
- * This is called when l3 shadows stop being pinnable, to clear out all
- * the list-head bits so the up-pointer field is properly inititalised. */
-void sh_reset_l3_up_pointers(struct vcpu *v);
-
 /******************************************************************************
  * Flags used in the return value of the shadow_set_lXe() functions...
  */
@@ -729,7 +724,7 @@ static inline void sh_unpin(struct domain *d, mfn_t smfn)
 {
     struct page_list_head tmp_list, *pin_list;
     struct page_info *sp, *next;
-    unsigned int i, head_type;
+    unsigned int i, head_type, sz;
 
     ASSERT(mfn_valid(smfn));
     sp = mfn_to_page(smfn);
@@ -741,20 +736,29 @@ static inline void sh_unpin(struct domain *d, mfn_t smfn)
         return;
     sp->u.sh.pinned = 0;
 
-    /* Cut the sub-list out of the list of pinned shadows,
-     * stitching it back into a list fragment of its own. */
+    sz = shadow_size(head_type);
+
+    /*
+     * Cut the sub-list out of the list of pinned shadows, stitching
+     * multi-page shadows back into a list fragment of their own.
+     */
     pin_list = &d->arch.paging.shadow.pinned_shadows;
     INIT_PAGE_LIST_HEAD(&tmp_list);
-    for ( i = 0; i < shadow_size(head_type); i++ )
+    for ( i = 0; i < sz; i++ )
     {
         ASSERT(sp->u.sh.type == head_type);
         ASSERT(!i || !sp->u.sh.head);
         next = page_list_next(sp, pin_list);
         page_list_del(sp, pin_list);
-        page_list_add_tail(sp, &tmp_list);
+        if ( sz > 1 )
+            page_list_add_tail(sp, &tmp_list);
+        else if ( head_type == SH_type_l3_64_shadow )
+            sp->up = 0;
         sp = next;
     }
-    sh_terminate_list(&tmp_list);
+
+    if ( sz > 1 )
+        sh_terminate_list(&tmp_list);
 
     sh_put_ref(d, smfn, 0);
 }

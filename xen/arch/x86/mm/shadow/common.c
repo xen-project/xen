@@ -2371,29 +2371,6 @@ static void sh_detach_old_tables(struct vcpu *v)
 
 /**************************************************************************/
 
-/* Reset the up-pointers of every L3 shadow to 0.
- * This is called when l3 shadows stop being pinnable, to clear out all
- * the list-head bits so the up-pointer field is properly inititalised. */
-static int cf_check sh_clear_up_pointer(
-    struct vcpu *v, mfn_t smfn, mfn_t unused)
-{
-    mfn_to_page(smfn)->up = 0;
-    return 0;
-}
-
-void sh_reset_l3_up_pointers(struct vcpu *v)
-{
-    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
-        [SH_type_l3_64_shadow] = sh_clear_up_pointer,
-    };
-
-    HASH_CALLBACKS_CHECK(SHF_L3_64);
-    hash_vcpu_foreach(v, SHF_L3_64, callbacks, INVALID_MFN);
-}
-
-
-/**************************************************************************/
-
 static void sh_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
