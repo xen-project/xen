@@ -866,39 +866,3 @@ void cf_check intel_iommu_disable_eim(void)
     for_each_drhd_unit ( drhd )
         disable_qinval(drhd->iommu);
 }
-
-/*
- * This function is used to update the IRTE for posted-interrupt
- * when guest changes MSI/MSI-X information.
- */
-int pi_update_irte(const struct pi_desc *pi_desc, const struct pirq *pirq,
-    const uint8_t gvec)
-{
-    struct irq_desc *desc;
-    struct msi_desc *msi_desc;
-    int rc;
-
-    desc = pirq_spin_lock_irq_desc(pirq, NULL);
-    if ( !desc )
-        return -EINVAL;
-
-    msi_desc = desc->msi_desc;
-    if ( !msi_desc )
-    {
-        rc = -ENODEV;
-        goto unlock_out;
-    }
-    msi_desc->pi_desc = pi_desc;
-    msi_desc->gvec = gvec;
-
-    spin_unlock_irq(&desc->lock);
-
-    ASSERT(pcidevs_locked());
-
-    return msi_msg_write_remap_rte(msi_desc, &msi_desc->msg);
-
- unlock_out:
-    spin_unlock_irq(&desc->lock);
-
-    return rc;
-}

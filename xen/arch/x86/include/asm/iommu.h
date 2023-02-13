@@ -21,7 +21,6 @@
 #include <asm/apicdef.h>
 #include <asm/cache.h>
 #include <asm/processor.h>
-#include <asm/hvm/vmx/vmcs.h>
 
 #define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
 
@@ -128,9 +127,6 @@ int iommu_identity_mapping(struct domain *d, p2m_access_t p2ma,
 void iommu_identity_map_teardown(struct domain *d);
 
 extern bool untrusted_msi;
-
-int pi_update_irte(const struct pi_desc *pi_desc, const struct pirq *pirq,
-                   const uint8_t gvec);
 
 extern bool iommu_non_coherent, iommu_superpages;
 

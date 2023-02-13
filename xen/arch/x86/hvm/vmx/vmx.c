@@ -397,6 +397,43 @@ void vmx_pi_hooks_deassign(struct domain *d)
     domain_unpause(d);
 }
 
+/*
+ * This function is used to update the IRTE for posted-interrupt
+ * when guest changes MSI/MSI-X information.
+ */
+static int cf_check vmx_pi_update_irte(const struct vcpu *v,
+                                       const struct pirq *pirq, uint8_t gvec)
+{
+    const struct pi_desc *pi_desc = v ? &v->arch.hvm.vmx.pi_desc : NULL;
+    struct irq_desc *desc;
+    struct msi_desc *msi_desc;
+    int rc;
+
+    desc = pirq_spin_lock_irq_desc(pirq, NULL);
+    if ( !desc )
+        return -EINVAL;
+
+    msi_desc = desc->msi_desc;
+    if ( !msi_desc )
+    {
+        rc = -ENODEV;
+        goto unlock_out;
+    }
+    msi_desc->pi_desc = pi_desc;
+    msi_desc->gvec = gvec;
+
+    spin_unlock_irq(&desc->lock);
+
+    ASSERT(pcidevs_locked());
+
+    return iommu_update_ire_from_msi(msi_desc, &msi_desc->msg);
+
+ unlock_out:
+    spin_unlock_irq(&desc->lock);
+
+    return rc;
+}
+
 static const struct lbr_info {
     u32 base, count;
 } p4_lbr[] = {
@@ -2986,7 +3023,11 @@ const struct hvm_function_table * __init start_vmx(void)
     {
         alloc_direct_apic_vector(&posted_intr_vector, pi_notification_interrupt);
         if ( iommu_intpost )
+        {
             alloc_direct_apic_vector(&pi_wakeup_vector, pi_wakeup_interrupt);
+
+            vmx_function_table.pi_update_irte = vmx_pi_update_irte;
+        }
 
         vmx_function_table.deliver_posted_intr = vmx_deliver_posted_intr;
         vmx_function_table.sync_pir_to_irr     = vmx_sync_pir_to_irr;

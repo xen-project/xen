@@ -28,6 +28,8 @@
 #include <asm/x86_emulate.h>
 #include <asm/hvm/asid.h>
 
+struct pirq; /* needed by pi_update_irte */
+
 #ifdef CONFIG_HVM_FEP
 /* Permit use of the Forced Emulation Prefix in HVM guests */
 extern bool_t opt_hvm_fep;
@@ -213,6 +215,8 @@ struct hvm_function_table {
     void (*sync_pir_to_irr)(struct vcpu *v);
     bool (*test_pir)(const struct vcpu *v, uint8_t vector);
     void (*handle_eoi)(uint8_t vector, int isr);
+    int (*pi_update_irte)(const struct vcpu *v, const struct pirq *pirq,
+                          uint8_t gvec);
 
     /*Walk nested p2m  */
     int (*nhvm_hap_walk_L1_p2m)(struct vcpu *v, paddr_t L2_gpa,
@@ -774,6 +778,12 @@ static inline void hvm_set_nonreg_state(struct vcpu *v,
 {
     if ( hvm_funcs.set_nonreg_state )
         alternative_vcall(hvm_funcs.set_nonreg_state, v, nrs);
+}
+
+static inline int hvm_pi_update_irte(const struct vcpu *v,
+                                     const struct pirq *pirq, uint8_t gvec)
+{
+    return alternative_call(hvm_funcs.pi_update_irte, v, pirq, gvec);
 }
 
 #else  /* CONFIG_HVM */
