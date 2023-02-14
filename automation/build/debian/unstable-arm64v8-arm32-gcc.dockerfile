@@ -1,4 +1,4 @@
-FROM debian:unstable
+FROM arm64v8/debian:unstable
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
@@ -21,4 +21,3 @@ RUN apt-get update && \
         apt-get autoremove -y && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
-
