@@ -33,6 +33,15 @@ fi
 "
 fi
 
+if [[ "${test_variant}" == "gzip" ]]; then
+    # Compress kernel image with gzip (keep unmodified one for dom0)
+    gzip -k vmlinuz
+    passed="${test_variant} test passed"
+    domU_check="
+echo \"${passed}\"
+"
+fi
+
 # dom0/domU rootfs
 # We are using the same rootfs for dom0 and domU. The only difference is
 # that for the former, we set explictly rdinit to /bin/sh, whereas for the
@@ -87,6 +96,10 @@ UBOOT_SCRIPT="boot.scr"' > config
 
 if [[ "${test_variant}" == "static-mem" ]]; then
     echo -e "\nDOMU_STATIC_MEM[0]=\"${domu_base} ${domu_size}\"" >> config
+fi
+
+if [[ "${test_variant}" == "gzip" ]]; then
+    sed -i 's/DOMU_KERNEL\[0\]=.*/DOMU_KERNEL\[0\]="vmlinuz.gz"/' config
 fi
 
 rm -rf imagebuilder
