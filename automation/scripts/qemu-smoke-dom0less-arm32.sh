@@ -42,6 +42,15 @@ echo \"${passed}\"
 "
 fi
 
+if [[ "${test_variant}" == "without-dom0" ]]; then
+    # Clear dom0 prompt
+    dom0_prompt=""
+    passed="${test_variant} test passed"
+    domU_check="
+echo \"${passed}\"
+"
+fi
+
 # dom0/domU rootfs
 # We are using the same rootfs for dom0 and domU. The only difference is
 # that for the former, we set explictly rdinit to /bin/sh, whereas for the
@@ -100,6 +109,10 @@ fi
 
 if [[ "${test_variant}" == "gzip" ]]; then
     sed -i 's/DOMU_KERNEL\[0\]=.*/DOMU_KERNEL\[0\]="vmlinuz.gz"/' config
+fi
+
+if [[ "${test_variant}" == "without-dom0" ]]; then
+    sed -i '/^DOM0/d' config
 fi
 
 rm -rf imagebuilder
