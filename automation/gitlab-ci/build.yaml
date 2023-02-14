@@ -565,6 +565,26 @@ debian-unstable-gcc-arm32-debug-randconfig:
     HYPERVISOR_ONLY: y
     RANDCONFIG: y
 
+debian-unstable-gcc-arm32-staticmem:
+  extends: .gcc-arm32-cross-build
+  variables:
+    CONTAINER: debian:unstable-arm64v8-arm32-gcc
+    HYPERVISOR_ONLY: y
+    EXTRA_XEN_CONFIG: |
+      CONFIG_EXPERT=y
+      CONFIG_UNSUPPORTED=y
+      CONFIG_STATIC_MEMORY=y
+
+debian-unstable-gcc-arm32-debug-staticmem:
+  extends: .gcc-arm32-cross-build-debug
+  variables:
+    CONTAINER: debian:unstable-arm64v8-arm32-gcc
+    HYPERVISOR_ONLY: y
+    EXTRA_XEN_CONFIG: |
+      CONFIG_EXPERT=y
+      CONFIG_UNSUPPORTED=y
+      CONFIG_STATIC_MEMORY=y
+
 # Arm builds
 
 debian-unstable-gcc-arm64:

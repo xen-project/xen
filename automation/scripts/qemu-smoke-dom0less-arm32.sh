@@ -20,6 +20,19 @@ echo \"${passed}\"
 "
 fi
 
+if [[ "${test_variant}" == "static-mem" ]]; then
+    # Memory range that is statically allocated to domU1
+    domu_base="0x50000000"
+    domu_size="0x20000000"
+    passed="${test_variant} test passed"
+    domU_check="
+mem_range=$(printf \"%08x-%08x\" ${domu_base} $(( ${domu_base} + ${domu_size} - 1 )))
+if grep -q -x \"\${mem_range} : System RAM\" /proc/iomem; then
+    echo \"${passed}\"
+fi
+"
+fi
+
 # dom0/domU rootfs
 # We are using the same rootfs for dom0 and domU. The only difference is
 # that for the former, we set explictly rdinit to /bin/sh, whereas for the
@@ -71,6 +84,10 @@ LOAD_CMD="tftpb"
 BOOT_CMD="bootm"
 UBOOT_SOURCE="boot.source"
 UBOOT_SCRIPT="boot.scr"' > config
+
+if [[ "${test_variant}" == "static-mem" ]]; then
+    echo -e "\nDOMU_STATIC_MEM[0]=\"${domu_base} ${domu_size}\"" >> config
+fi
 
 rm -rf imagebuilder
 git clone https://gitlab.com/ViryaOS/imagebuilder
