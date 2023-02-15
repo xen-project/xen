@@ -726,6 +726,11 @@ Available alternatives, with their meaning, are:
 * `all`: just one runqueue shared by all the logical pCPUs of
          the host
 
+Regardless of the above choice, Xen attempts to respect
+`sched_credit2_max_cpus_runqueue` limit, which may mean more than one runqueue
+for the `all` value. If that isn't intended, raise
+the `sched_credit2_max_cpus_runqueue` value.
+
 ### dbgp
 > `= ehci[ <integer> | @pci<bus>:<slot>.<func> ]`
 > `= xhci[ <integer> | @pci<bus>:<slot>.<func> ][,share=<bool>|hwdom]`
