@@ -5,6 +5,7 @@
 #   MAJOR:   major version of lib (Xen version if empty)
 #   MINOR:   minor version of lib (0 if empty)
 #   version-script: Specify the name of a version script to the linker.
+#     (If empty, a temporary one for unstable library is created)
 
 LIBNAME := $(notdir $(CURDIR))
 
@@ -26,6 +27,8 @@ TARGETS := lib$(LIB_FILE_NAME).a
 ifneq ($(nosharedlibs),y)
 TARGETS += lib$(LIB_FILE_NAME).so
 endif
+
+version-script ?= lib$(LIB_FILE_NAME).map.tmp
 
 PKG_CONFIG ?= $(LIB_FILE_NAME).pc
 PKG_CONFIG_NAME ?= Xen$(LIBNAME)
@@ -72,6 +75,10 @@ headers.lst: FORCE
 	@{ set -e; $(foreach h,$(LIBHEADERS),echo $(h);) } > $@.tmp
 	@$(call move-if-changed,$@.tmp,$@)
 
+lib$(LIB_FILE_NAME).map.tmp: FORCE
+	echo 'lib$(LIB_FILE_NAME)_$(MAJOR).$(MINOR) { global: *; };' >$(@D)/.$(@F)
+	$(call move-if-changed,$(@D)/.$(@F),$@)
+
 lib$(LIB_FILE_NAME).a: $(OBJS-y)
 	$(AR) rc $@ $^
 
@@ -81,7 +88,7 @@ lib$(LIB_FILE_NAME).so.$(MAJOR): lib$(LIB_FILE_NAME).so.$(MAJOR).$(MINOR)
 	$(SYMLINK_SHLIB) $< $@
 
 lib$(LIB_FILE_NAME).so.$(MAJOR).$(MINOR): $(PIC_OBJS) $(version-script)
-	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,lib$(LIB_FILE_NAME).so.$(MAJOR) -Wl,$(if $(version-script),--version-script=$(version-script),--default-symver) $(SHLIB_LDFLAGS) -o $@ $(PIC_OBJS) $(LDLIBS) $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,lib$(LIB_FILE_NAME).so.$(MAJOR) -Wl,--version-script=$(version-script) $(SHLIB_LDFLAGS) -o $@ $(PIC_OBJS) $(LDLIBS) $(APPEND_LDFLAGS)
 
 # If abi-dumper is available, write out the ABI analysis
 ifneq ($(ABI_DUMPER),)
@@ -120,7 +127,7 @@ TAGS:
 clean::
 	rm -rf $(TARGETS) *~ $(DEPS_RM) $(OBJS-y) $(PIC_OBJS)
 	rm -f lib$(LIB_FILE_NAME).so.$(MAJOR).$(MINOR) lib$(LIB_FILE_NAME).so.$(MAJOR)
-	rm -f headers.chk headers.lst
+	rm -f headers.chk headers.lst lib*.map.tmp .*.tmp
 
 .PHONY: distclean
 distclean: clean
