@@ -2763,6 +2763,7 @@ static struct hvm_function_table __initdata_cf_clobber vmx_function_table = {
     .nhvm_vcpu_vmexit_event = nvmx_vmexit_event,
     .nhvm_intr_blocked    = nvmx_intr_blocked,
     .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources,
+    .update_vlapic_mode = vmx_vlapic_msr_changed,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .enable_msr_interception = vmx_enable_msr_interception,
     .altp2m_vcpu_update_p2m = vmx_vcpu_update_eptp,
@@ -3472,7 +3473,7 @@ static void vmx_install_vlapic_mapping(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-void vmx_vlapic_msr_changed(struct vcpu *v)
+void cf_check vmx_vlapic_msr_changed(struct vcpu *v)
 {
     int virtualize_x2apic_mode;
     struct vlapic *vlapic = vcpu_vlapic(v);

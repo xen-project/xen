@@ -217,6 +217,7 @@ struct hvm_function_table {
     void (*handle_eoi)(uint8_t vector, int isr);
     int (*pi_update_irte)(const struct vcpu *v, const struct pirq *pirq,
                           uint8_t gvec);
+    void (*update_vlapic_mode)(struct vcpu *v);
 
     /*Walk nested p2m  */
     int (*nhvm_hap_walk_L1_p2m)(struct vcpu *v, paddr_t L2_gpa,
@@ -784,6 +785,12 @@ static inline int hvm_pi_update_irte(const struct vcpu *v,
                                      const struct pirq *pirq, uint8_t gvec)
 {
     return alternative_call(hvm_funcs.pi_update_irte, v, pirq, gvec);
+}
+
+static inline void hvm_update_vlapic_mode(struct vcpu *v)
+{
+    if ( hvm_funcs.update_vlapic_mode )
+        alternative_vcall(hvm_funcs.update_vlapic_mode, v);
 }
 
 #else  /* CONFIG_HVM */

@@ -85,7 +85,7 @@ typedef enum {
 void vmx_asm_vmexit_handler(struct cpu_user_regs);
 void vmx_intr_assist(void);
 void noreturn cf_check vmx_do_resume(void);
-void vmx_vlapic_msr_changed(struct vcpu *v);
+void cf_check vmx_vlapic_msr_changed(struct vcpu *v);
 struct hvm_emulate_ctxt;
 void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt);
 void vmx_realmode(struct cpu_user_regs *regs);

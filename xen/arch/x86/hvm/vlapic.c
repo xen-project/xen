@@ -37,8 +37,8 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
-#include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/hvm/trace.h>
 #include <asm/hvm/viridian.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
@@ -1165,7 +1165,7 @@ int guest_wrmsr_apic_base(struct vcpu *v, uint64_t value)
     if ( vlapic_x2apic_mode(vlapic) )
         set_x2apic_id(vlapic);
 
-    vmx_vlapic_msr_changed(vlapic_vcpu(vlapic));
+    hvm_update_vlapic_mode(vlapic_vcpu(vlapic));
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                 "apic base msr is 0x%016"PRIx64, vlapic->hw.apic_base_msr);
@@ -1561,7 +1561,7 @@ static int cf_check lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
          unlikely(vlapic_x2apic_mode(s)) )
         return -EINVAL;
 
-    vmx_vlapic_msr_changed(v);
+    hvm_update_vlapic_mode(v);
 
     return 0;
 }
