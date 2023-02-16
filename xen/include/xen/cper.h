@@ -27,7 +27,7 @@
 extern unsigned long get_sec(void);
 
 typedef struct {
-	__u8 b[16];
+	uint8_t b[16];
 } uuid_le;
 
 static inline int uuid_le_cmp(const uuid_le u1, const uuid_le u2)
@@ -35,12 +35,12 @@ static inline int uuid_le_cmp(const uuid_le u1, const uuid_le u2)
         return memcmp(&u1, &u2, sizeof(uuid_le));
 }
 
-static inline u64 cper_next_record_id(void)
+static inline uint64_t cper_next_record_id(void)
 {
-	static u64 record_id;
+	static uint64_t record_id;
 
 	if (!record_id)
-		record_id = (u64)get_sec() << 32;
+		record_id = (uint64_t)get_sec() << 32;
 
 	return ++record_id;
 }
@@ -154,36 +154,36 @@ static inline u64 cper_next_record_id(void)
 
 struct cper_record_header {
 	char	signature[CPER_SIG_SIZE];	/* must be CPER_SIG_RECORD */
-	__u16	revision;			/* must be CPER_RECORD_REV */
-	__u32	signature_end;			/* must be CPER_SIG_END */
-	__u16	section_count;
-	__u32	error_severity;
-	__u32	validation_bits;
-	__u32	record_length;
-	__u64	timestamp;
+	uint16_t revision;			/* must be CPER_RECORD_REV */
+	uint32_t signature_end;			/* must be CPER_SIG_END */
+	uint16_t section_count;
+	uint32_t error_severity;
+	uint32_t validation_bits;
+	uint32_t record_length;
+	uint64_t timestamp;
 	uuid_le	platform_id;
 	uuid_le	partition_id;
 	uuid_le	creator_id;
 	uuid_le	notification_type;
-	__u64	record_id;
-	__u32	flags;
-	__u64	persistence_information;
-	__u8	reserved[12];			/* must be zero */
+	uint64_t record_id;
+	uint32_t flags;
+	uint64_t persistence_information;
+	uint8_t reserved[12];			/* must be zero */
 };
 
 struct cper_section_descriptor {
-	__u32	section_offset;		/* Offset in bytes of the
+	uint32_t section_offset;	/* Offset in bytes of the
 					 *  section body from the base
 					 *  of the record header */
-	__u32	section_length;
-	__u16	revision;		/* must be CPER_RECORD_REV */
-	__u8	validation_bits;
-	__u8	reserved;		/* must be zero */
-	__u32	flags;
+	uint32_t section_length;
+	uint16_t revision;		/* must be CPER_RECORD_REV */
+	uint8_t	validation_bits;
+	uint8_t	reserved;		/* must be zero */
+	uint32_t flags;
 	uuid_le	section_type;
 	uuid_le	fru_id;
-	__u32	section_severity;
-	__u8	fru_text[20];
+	uint32_t section_severity;
+	uint8_t	fru_text[20];
 };
 
 /* Reset to default packing */
