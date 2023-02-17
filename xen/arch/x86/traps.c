@@ -1223,6 +1223,84 @@ void do_int3(struct cpu_user_regs *regs)
     pv_inject_hw_exception(X86_EXC_BP, X86_EVENT_NO_EC);
 }
 
+void do_general_protection(struct cpu_user_regs *regs)
+{
+#ifdef CONFIG_PV
+    struct vcpu *v = current;
+#endif
+
+    if ( regs->error_code & X86_XEC_EXT )
+        goto hardware_gp;
+
+    if ( !guest_mode(regs) )
+        goto gp_in_kernel;
+
+#ifdef CONFIG_PV
+    /*
+     * Cunning trick to allow arbitrary "INT n" handling.
+     *
+     * We set DPL == 0 on all vectors in the IDT. This prevents any INT <n>
+     * instruction from trapping to the appropriate vector, when that might not
+     * be expected by Xen or the guest OS. For example, that entry might be for
+     * a fault handler (unlike traps, faults don't increment EIP), or might
+     * expect an error code on the stack (which a software trap never
+     * provides), or might be a hardware interrupt handler that doesn't like
+     * being called spuriously.
+     *
+     * Instead, a GPF occurs with the faulting IDT vector in the error code.
+     * Bit 1 is set to indicate that an IDT entry caused the fault. Bit 0 is
+     * clear (which got already checked above) to indicate that it's a software
+     * fault, not a hardware one.
+     *
+     * NOTE: Vectors 3 and 4 are dealt with from their own handler. This is
+     * okay because they can only be triggered by an explicit DPL-checked
+     * instruction. The DPL specified by the guest OS for these vectors is NOT
+     * CHECKED!!
+     */
+    if ( regs->error_code & X86_XEC_IDT )
+    {
+        /* This fault must be due to <INT n> instruction. */
+        uint8_t vector = regs->error_code >> 3;
+        const struct trap_info *ti = &v->arch.pv.trap_ctxt[vector];
+
+        if ( permit_softint(TI_GET_DPL(ti), v, regs) )
+        {
+            regs->rip += 2;
+            pv_inject_sw_interrupt(vector);
+            return;
+        }
+    }
+    else if ( is_pv_32bit_vcpu(v) && regs->error_code )
+    {
+        pv_emulate_gate_op(regs);
+        return;
+    }
+
+    /* Emulate some simple privileged and I/O instructions. */
+    if ( (regs->error_code == 0) &&
+         pv_emulate_privileged_op(regs) )
+    {
+        trace_trap_one_addr(TRC_PV_EMULATE_PRIVOP, regs->rip);
+        return;
+    }
+
+    /* Pass on GPF as is. */
+    pv_inject_hw_exception(X86_EXC_GP, regs->error_code);
+    return;
+#endif
+
+ gp_in_kernel:
+    if ( likely(extable_fixup(regs, true)) )
+        return;
+
+ hardware_gp:
+    if ( debugger_trap_fatal(X86_EXC_GP, regs) )
+        return;
+
+    show_execution_state(regs);
+    panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
+}
+
 #ifdef CONFIG_PV
 static int handle_ldt_mapping_fault(unsigned int offset,
                                     struct cpu_user_regs *regs)
@@ -1586,85 +1664,6 @@ void __init do_early_page_fault(struct cpu_user_regs *regs)
                regs->cs, _p(regs->rip), _p(cr2), regs->error_code);
         fatal_trap(regs, 0);
     }
-}
-
-void do_general_protection(struct cpu_user_regs *regs)
-{
-#ifdef CONFIG_PV
-    struct vcpu *v = current;
-#endif
-
-    if ( regs->error_code & X86_XEC_EXT )
-        goto hardware_gp;
-
-    if ( !guest_mode(regs) )
-        goto gp_in_kernel;
-
-#ifdef CONFIG_PV
-    /*
-     * Cunning trick to allow arbitrary "INT n" handling.
-     *
-     * We set DPL == 0 on all vectors in the IDT. This prevents any INT <n>
-     * instruction from trapping to the appropriate vector, when that might not
-     * be expected by Xen or the guest OS. For example, that entry might be for
-     * a fault handler (unlike traps, faults don't increment EIP), or might
-     * expect an error code on the stack (which a software trap never
-     * provides), or might be a hardware interrupt handler that doesn't like
-     * being called spuriously.
-     *
-     * Instead, a GPF occurs with the faulting IDT vector in the error code.
-     * Bit 1 is set to indicate that an IDT entry caused the fault. Bit 0 is
-     * clear (which got already checked above) to indicate that it's a software
-     * fault, not a hardware one.
-     *
-     * NOTE: Vectors 3 and 4 are dealt with from their own handler. This is
-     * okay because they can only be triggered by an explicit DPL-checked
-     * instruction. The DPL specified by the guest OS for these vectors is NOT
-     * CHECKED!!
-     */
-    if ( regs->error_code & X86_XEC_IDT )
-    {
-        /* This fault must be due to <INT n> instruction. */
-        uint8_t vector = regs->error_code >> 3;
-        const struct trap_info *ti = &v->arch.pv.trap_ctxt[vector];
-
-        if ( permit_softint(TI_GET_DPL(ti), v, regs) )
-        {
-            regs->rip += 2;
-            pv_inject_sw_interrupt(vector);
-            return;
-        }
-    }
-    else if ( is_pv_32bit_vcpu(v) && regs->error_code )
-    {
-        pv_emulate_gate_op(regs);
-        return;
-    }
-
-    /* Emulate some simple privileged and I/O instructions. */
-    if ( (regs->error_code == 0) &&
-         pv_emulate_privileged_op(regs) )
-    {
-        trace_trap_one_addr(TRC_PV_EMULATE_PRIVOP, regs->rip);
-        return;
-    }
-
-    /* Pass on GPF as is. */
-    pv_inject_hw_exception(X86_EXC_GP, regs->error_code);
-    return;
-#endif
-
- gp_in_kernel:
-
-    if ( likely(extable_fixup(regs, true)) )
-        return;
-
- hardware_gp:
-    if ( debugger_trap_fatal(X86_EXC_GP, regs) )
-        return;
-
-    show_execution_state(regs);
-    panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
 }
 
 static bool pci_serr_cont;
