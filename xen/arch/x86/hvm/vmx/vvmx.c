@@ -474,7 +474,7 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     return X86EMUL_OKAY;
 
 gp_fault:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    hvm_inject_hw_exception(X86_EXC_GP, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -526,7 +526,7 @@ bool cf_check nvmx_intercepts_exception(
     exception_bitmap = get_vvmcs(v, EXCEPTION_BITMAP);
     r = exception_bitmap & (1 << vector) ? 1: 0;
 
-    if ( vector == TRAP_page_fault )
+    if ( vector == X86_EXC_PF )
     {
         pfec_match = get_vvmcs(v, PAGE_FAULT_ERROR_CODE_MATCH);
         pfec_mask  = get_vvmcs(v, PAGE_FAULT_ERROR_CODE_MASK);
@@ -1100,15 +1100,15 @@ static void load_shadow_guest_state(struct vcpu *v)
 
     rc = hvm_set_cr4(get_vvmcs(v, GUEST_CR4), true);
     if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 
     rc = hvm_set_cr0(get_vvmcs(v, GUEST_CR0), true);
     if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 
     rc = hvm_set_cr3(get_vvmcs(v, GUEST_CR3), false, true);
     if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 
     control = get_vvmcs(v, VM_ENTRY_CONTROLS);
     if ( control & VM_ENTRY_LOAD_GUEST_PAT )
@@ -1118,7 +1118,7 @@ static void load_shadow_guest_state(struct vcpu *v)
         rc = hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
                                      get_vvmcs(v, GUEST_PERF_GLOBAL_CTRL), false);
         if ( rc == X86EMUL_EXCEPTION )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
     }
 
     hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
@@ -1314,15 +1314,15 @@ static void load_vvmcs_host_state(struct vcpu *v)
 
     rc = hvm_set_cr4(get_vvmcs(v, HOST_CR4), true);
     if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 
     rc = hvm_set_cr0(get_vvmcs(v, HOST_CR0), true);
     if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 
     rc = hvm_set_cr3(get_vvmcs(v, HOST_CR3), false, true);
     if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 
     control = get_vvmcs(v, VM_EXIT_CONTROLS);
     if ( control & VM_EXIT_LOAD_HOST_PAT )
@@ -1332,7 +1332,7 @@ static void load_vvmcs_host_state(struct vcpu *v)
         rc = hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
                                      get_vvmcs(v, HOST_PERF_GLOBAL_CTRL), true);
         if ( rc == X86EMUL_EXCEPTION )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
     }
 
     hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
@@ -2083,13 +2083,13 @@ int nvmx_handle_vmx_insn(struct cpu_user_regs *regs, unsigned int exit_reason)
          (vmx_guest_x86_mode(curr) < (hvm_long_mode_active(curr) ? 8 : 2)) ||
          (exit_reason != EXIT_REASON_VMXON && !nvmx_vcpu_in_vmx(curr)) )
     {
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         return X86EMUL_EXCEPTION;
     }
 
     if ( vmx_get_cpl() > 0 )
     {
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
         return X86EMUL_EXCEPTION;
     }
 
@@ -2464,12 +2464,12 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
          * decided by L0 and L1 exception bitmap, if the vetor is set by
          * both, L0 has priority on #PF and #NM, L1 has priority on others
          */
-        if ( vector == TRAP_page_fault )
+        if ( vector == X86_EXC_PF )
         {
             if ( paging_mode_hap(v->domain) )
                 nvcpu->nv_vmexit_pending = 1;
         }
-        else if ( vector == TRAP_no_device )
+        else if ( vector == X86_EXC_NM )
         {
             if ( v->fpu_dirtied )
                 nvcpu->nv_vmexit_pending = 1;

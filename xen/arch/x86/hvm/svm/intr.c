@@ -48,7 +48,7 @@ static void svm_inject_nmi(struct vcpu *v)
     event.raw = 0;
     event.v = true;
     event.type = X86_EVENTTYPE_NMI;
-    event.vector = TRAP_nmi;
+    event.vector = X86_EXC_NMI;
 
     ASSERT(!vmcb->event_inj.v);
     vmcb->event_inj = event;

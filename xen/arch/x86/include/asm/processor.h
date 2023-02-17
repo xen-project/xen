@@ -17,34 +17,6 @@
 #include <asm/x86-defns.h>
 #include <asm/x86-vendors.h>
 
-/*
- * Trap/fault mnemonics.
- */
-#define TRAP_divide_error      0
-#define TRAP_debug             1
-#define TRAP_nmi               2
-#define TRAP_int3              3
-#define TRAP_overflow          4
-#define TRAP_bounds            5
-#define TRAP_invalid_op        6
-#define TRAP_no_device         7
-#define TRAP_double_fault      8
-#define TRAP_copro_seg         9
-#define TRAP_invalid_tss      10
-#define TRAP_no_segment       11
-#define TRAP_stack_error      12
-#define TRAP_gp_fault         13
-#define TRAP_page_fault       14
-#define TRAP_spurious_int     15
-#define TRAP_copro_error      16
-#define TRAP_alignment_check  17
-#define TRAP_machine_check    18
-#define TRAP_simd_error       19
-#define TRAP_virtualisation   20
-#define TRAP_nr               32
-
-#define TRAP_HAVE_EC X86_EXC_HAVE_EC
-
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
 /* NB. Same as VGCF_in_syscall. No bits in common with any other TRAP_ defn. */
 #define TRAP_syscall         256
@@ -403,18 +375,18 @@ static inline void set_ist(idt_entry_t *idt, unsigned int ist)
 
 static inline void enable_each_ist(idt_entry_t *idt)
 {
-    set_ist(&idt[TRAP_double_fault],  IST_DF);
-    set_ist(&idt[TRAP_nmi],           IST_NMI);
-    set_ist(&idt[TRAP_machine_check], IST_MCE);
-    set_ist(&idt[TRAP_debug],         IST_DB);
+    set_ist(&idt[X86_EXC_DF],  IST_DF);
+    set_ist(&idt[X86_EXC_NMI], IST_NMI);
+    set_ist(&idt[X86_EXC_MC],  IST_MCE);
+    set_ist(&idt[X86_EXC_DB],  IST_DB);
 }
 
 static inline void disable_each_ist(idt_entry_t *idt)
 {
-    set_ist(&idt[TRAP_double_fault],  IST_NONE);
-    set_ist(&idt[TRAP_nmi],           IST_NONE);
-    set_ist(&idt[TRAP_machine_check], IST_NONE);
-    set_ist(&idt[TRAP_debug],         IST_NONE);
+    set_ist(&idt[X86_EXC_DF],  IST_NONE);
+    set_ist(&idt[X86_EXC_NMI], IST_NONE);
+    set_ist(&idt[X86_EXC_MC],  IST_NONE);
+    set_ist(&idt[X86_EXC_DB],  IST_NONE);
 }
 
 #define IDT_ENTRIES 256

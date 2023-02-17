@@ -540,7 +540,7 @@ static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
 static inline void hvm_inject_page_fault(int errcode, unsigned long cr2)
 {
     struct x86_event event = {
-        .vector = TRAP_page_fault,
+        .vector = X86_EXC_PF,
         .type = X86_EVENTTYPE_HW_EXCEPTION,
         .error_code = errcode,
         .cr2 = cr2,
@@ -564,9 +564,9 @@ static inline void hvm_invlpg(struct vcpu *v, unsigned long linear)
     (X86_CR4_VMXE | X86_CR4_PAE | X86_CR4_MCE))
 
 /* These exceptions must always be intercepted. */
-#define HVM_TRAP_MASK ((1U << TRAP_debug)           | \
-                       (1U << TRAP_alignment_check) | \
-                       (1U << TRAP_machine_check))
+#define HVM_TRAP_MASK ((1U << X86_EXC_DB)           | \
+                       (1U << X86_EXC_AC) | \
+                       (1U << X86_EXC_MC))
 
 /* Called in boot/resume paths.  Must cope with no HVM support. */
 static inline int hvm_cpu_up(void)

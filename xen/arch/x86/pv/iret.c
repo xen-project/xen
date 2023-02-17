@@ -186,7 +186,7 @@ int compat_iret(void)
         regs->esp = ksp;
         regs->ss = v->arch.pv.kernel_ss;
 
-        ti = &v->arch.pv.trap_ctxt[TRAP_gp_fault];
+        ti = &v->arch.pv.trap_ctxt[X86_EXC_GP];
         if ( TI_GET_IF(ti) )
             eflags &= ~X86_EFLAGS_IF;
         regs->eflags &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|

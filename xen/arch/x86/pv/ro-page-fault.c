@@ -390,7 +390,7 @@ int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          * or a guest playing with the instruction stream under Xen's feet.
          */
         if ( ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
-             ctxt.event.vector == TRAP_page_fault )
+             ctxt.event.vector == X86_EXC_PF )
             pv_inject_event(&ctxt.event);
         else
             gdprintk(XENLOG_WARNING,
@@ -400,7 +400,7 @@ int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         /* Fallthrough */
     case X86EMUL_OKAY:
         if ( ctxt.retire.singlestep )
-            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+            pv_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 
         /* Fallthrough */
     case X86EMUL_RETRY:

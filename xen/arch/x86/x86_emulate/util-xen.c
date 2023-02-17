@@ -138,7 +138,7 @@ int cf_check x86emul_read_xcr(unsigned int reg, uint64_t *val,
             break;
         /* fall through */
     default:
-        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+        x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
         return X86EMUL_EXCEPTION;
     }
 
@@ -159,7 +159,7 @@ int cf_check x86emul_write_xcr(unsigned int reg, uint64_t val,
     default:
     gp_fault:
         if ( ctxt )
-            x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+            x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
         return X86EMUL_EXCEPTION;
     }
 
@@ -207,7 +207,7 @@ int cf_check x86emul_read_dr(unsigned int reg, unsigned long *val,
     ud_fault:
     default:
         if ( ctxt )
-            x86_emul_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
+            x86_emul_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC, ctxt);
 
         return X86EMUL_EXCEPTION;
     }
@@ -229,11 +229,11 @@ int cf_check x86emul_write_dr(unsigned int reg, unsigned long val,
         return X86EMUL_OKAY;
 
     case -ENODEV:
-        x86_emul_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
+        x86_emul_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC, ctxt);
         return X86EMUL_EXCEPTION;
 
     default:
-        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+        x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
         return X86EMUL_EXCEPTION;
     }
 }

@@ -98,7 +98,7 @@ static int hvm_translate_virtual_addr(
          */
         if ( is_x86_user_segment(seg) )
             x86_emul_hw_exception(
-                (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault,
+                (seg == x86_seg_ss) ? X86_EXC_SS : X86_EXC_GP,
                 0, &sh_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
     }

@@ -910,9 +910,8 @@ static int hvmemul_virtual_to_linear(
      * determine the kind of exception (#GP or #TS) in that case.
      */
     if ( is_x86_user_segment(seg) )
-        x86_emul_hw_exception((seg == x86_seg_ss)
-                              ? TRAP_stack_error
-                              : TRAP_gp_fault, 0, &hvmemul_ctxt->ctxt);
+        x86_emul_hw_exception((seg == x86_seg_ss) ? X86_EXC_SS : X86_EXC_GP,
+                              0, &hvmemul_ctxt->ctxt);
 
     return X86EMUL_EXCEPTION;
 }
@@ -2227,7 +2226,7 @@ static int cf_check hvmemul_write_cr(
     }
 
     if ( rc == X86EMUL_EXCEPTION )
-        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+        x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
 
     return rc;
 }
@@ -2263,7 +2262,7 @@ static int cf_check hvmemul_read_msr(
     int rc = hvm_msr_read_intercept(reg, val);
 
     if ( rc == X86EMUL_EXCEPTION )
-        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+        x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
 
     return rc;
 }
@@ -2276,7 +2275,7 @@ static int cf_check hvmemul_write_msr(
     int rc = hvm_msr_write_intercept(reg, val, true);
 
     if ( rc == X86EMUL_EXCEPTION )
-        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+        x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
 
     return rc;
 }
@@ -2530,7 +2529,7 @@ static int cf_check hvmemul_tlb_op(
             paging_invlpg(current, addr);
         else
         {
-            x86_emul_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
+            x86_emul_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC, ctxt);
             rc = X86EMUL_EXCEPTION;
         }
         break;
@@ -2548,7 +2547,7 @@ static int cf_check hvmemul_vmfunc(
         return X86EMUL_UNHANDLEABLE;
     rc = alternative_call(hvm_funcs.altp2m_vcpu_emulate_vmfunc, ctxt->regs);
     if ( rc == X86EMUL_EXCEPTION )
-        x86_emul_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
+        x86_emul_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC, ctxt);
 
     return rc;
 }
@@ -2676,7 +2675,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     }
 
     if ( hvmemul_ctxt->ctxt.retire.singlestep )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 
     new_intr_shadow = hvmemul_ctxt->intr_shadow;
 

@@ -219,7 +219,7 @@ bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
          npfec.kind == npfec_kind_in_gpt )
     {
         v->arch.vm_event->send_event = true;
-        hvm_emulate_one_vm_event(EMUL_KIND_NORMAL, TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_emulate_one_vm_event(EMUL_KIND_NORMAL, X86_EXC_UD, X86_EVENT_NO_EC);
         v->arch.vm_event->send_event = false;
 
         return true;

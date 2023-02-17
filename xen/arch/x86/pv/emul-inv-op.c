@@ -57,7 +57,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
          !guest_kernel_mode(current, regs) )
     {
         regs->rip = eip;
-        pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
+        pv_inject_hw_exception(X86_EXC_GP, regs->error_code);
         return EXCRET_fault_fixed;
     }
 

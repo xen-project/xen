@@ -734,7 +734,7 @@ static inline void pv_inject_hw_exception(unsigned int vector, int errcode)
 static inline void pv_inject_page_fault(int errcode, unsigned long cr2)
 {
     const struct x86_event event = {
-        .vector = TRAP_page_fault,
+        .vector = X86_EXC_PF,
         .type = X86_EVENTTYPE_HW_EXCEPTION,
         .error_code = errcode,
         .cr2 = cr2,

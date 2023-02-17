@@ -806,7 +806,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
 
         show_execution_state(regs);
 
-        if ( trapnr == TRAP_page_fault )
+        if ( trapnr == X86_EXC_PF )
             show_page_walk(read_cr2());
 
         if ( show_remote )
@@ -945,7 +945,7 @@ void do_trap(struct cpu_user_regs *regs)
     if ( guest_mode(regs) )
     {
         pv_inject_hw_exception(trapnr,
-                               (TRAP_HAVE_EC & (1u << trapnr))
+                               (X86_EXC_HAVE_EC & (1u << trapnr))
                                ? regs->error_code : X86_EVENT_NO_EC);
         return;
     }
@@ -1174,7 +1174,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     if ( likely(guest_mode(regs)) )
     {
         if ( pv_emulate_invalid_op(regs) )
-            pv_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+            pv_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         return;
     }
 
@@ -1203,11 +1203,11 @@ void do_invalid_op(struct cpu_user_regs *regs)
     if ( likely(extable_fixup(regs, true)) )
         return;
 
-    if ( debugger_trap_fatal(TRAP_invalid_op, regs) )
+    if ( debugger_trap_fatal(X86_EXC_UD, regs) )
         return;
 
     show_execution_state(regs);
-    panic("FATAL TRAP: vector = %d (invalid opcode)\n", TRAP_invalid_op);
+    panic("FATAL TRAP: vector = %d (invalid opcode)\n", X86_EXC_UD);
 }
 
 void do_int3(struct cpu_user_regs *regs)
@@ -1219,7 +1219,7 @@ void do_int3(struct cpu_user_regs *regs)
         if ( likely(extable_fixup(regs, true)) )
             return;
 
-        if ( !debugger_trap_fatal(TRAP_int3, regs) )
+        if ( !debugger_trap_fatal(X86_EXC_BP, regs) )
             printk(XENLOG_DEBUG "Hit embedded breakpoint at %p [%ps]\n",
                    _p(regs->rip), _p(regs->rip));
 
@@ -1228,12 +1228,12 @@ void do_int3(struct cpu_user_regs *regs)
 
     if ( guest_kernel_mode(curr, regs) && curr->domain->debugger_attached )
     {
-        curr->arch.gdbsx_vcpu_event = TRAP_int3;
+        curr->arch.gdbsx_vcpu_event = X86_EXC_BP;
         domain_pause_for_debugger();
         return;
     }
 
-    pv_inject_hw_exception(TRAP_int3, X86_EVENT_NO_EC);
+    pv_inject_hw_exception(X86_EXC_BP, X86_EVENT_NO_EC);
 }
 
 #ifdef CONFIG_PV
@@ -1267,7 +1267,7 @@ static int handle_ldt_mapping_fault(unsigned int offset,
         {
             uint16_t ec = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) | X86_XEC_TI;
 
-            pv_inject_hw_exception(TRAP_gp_fault, ec);
+            pv_inject_hw_exception(X86_EXC_GP, ec);
         }
         else
             /* else pass the #PF back, with adjusted %cr2. */
@@ -1555,7 +1555,7 @@ void do_page_fault(struct cpu_user_regs *regs)
         }
 
     fatal:
-        if ( debugger_trap_fatal(TRAP_page_fault, regs) )
+        if ( debugger_trap_fatal(X86_EXC_PF, regs) )
             return;
 
         show_execution_state(regs);
@@ -1663,7 +1663,7 @@ void do_general_protection(struct cpu_user_regs *regs)
     }
 
     /* Pass on GPF as is. */
-    pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
+    pv_inject_hw_exception(X86_EXC_GP, regs->error_code);
     return;
 #endif
 
@@ -1673,7 +1673,7 @@ void do_general_protection(struct cpu_user_regs *regs)
         return;
 
  hardware_gp:
-    if ( debugger_trap_fatal(TRAP_gp_fault, regs) )
+    if ( debugger_trap_fatal(X86_EXC_GP, regs) )
         return;
 
     show_execution_state(regs);
@@ -1881,7 +1881,7 @@ void do_device_not_available(struct cpu_user_regs *regs)
 
     if ( curr->arch.pv.ctrlreg[0] & X86_CR0_TS )
     {
-        pv_inject_hw_exception(TRAP_no_device, X86_EVENT_NO_EC);
+        pv_inject_hw_exception(X86_EXC_NM, X86_EVENT_NO_EC);
         curr->arch.pv.ctrlreg[0] &= ~X86_CR0_TS;
     }
     else
@@ -1945,7 +1945,7 @@ void do_debug(struct cpu_user_regs *regs)
                 return;
             }
 #endif
-            if ( !debugger_trap_fatal(TRAP_debug, regs) )
+            if ( !debugger_trap_fatal(X86_EXC_DB, regs) )
             {
                 WARN();
                 regs->eflags &= ~X86_EFLAGS_TF;
@@ -2013,7 +2013,7 @@ void do_debug(struct cpu_user_regs *regs)
         return;
     }
 
-    pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+    pv_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 }
 
 void do_entry_CP(struct cpu_user_regs *regs)
@@ -2130,25 +2130,25 @@ void __init init_idt_traps(void)
      * saved. The page-fault handler also needs interrupts disabled until %cr2
      * has been read and saved on the stack.
      */
-    set_intr_gate(TRAP_divide_error,&divide_error);
-    set_intr_gate(TRAP_debug,&debug);
-    set_intr_gate(TRAP_nmi,&nmi);
-    set_swint_gate(TRAP_int3,&int3);         /* usable from all privileges */
-    set_swint_gate(TRAP_overflow,&overflow); /* usable from all privileges */
-    set_intr_gate(TRAP_bounds,&bounds);
-    set_intr_gate(TRAP_invalid_op,&invalid_op);
-    set_intr_gate(TRAP_no_device,&device_not_available);
-    set_intr_gate(TRAP_double_fault,&double_fault);
-    set_intr_gate(TRAP_invalid_tss,&invalid_TSS);
-    set_intr_gate(TRAP_no_segment,&segment_not_present);
-    set_intr_gate(TRAP_stack_error,&stack_segment);
-    set_intr_gate(TRAP_gp_fault,&general_protection);
-    set_intr_gate(TRAP_page_fault,&early_page_fault);
-    set_intr_gate(TRAP_copro_error,&coprocessor_error);
-    set_intr_gate(TRAP_alignment_check,&alignment_check);
-    set_intr_gate(TRAP_machine_check,&machine_check);
-    set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
-    set_intr_gate(X86_EXC_CP, entry_CP);
+    set_intr_gate(X86_EXC_DE,  divide_error);
+    set_intr_gate(X86_EXC_DB,  debug);
+    set_intr_gate(X86_EXC_NMI, nmi);
+    set_swint_gate(X86_EXC_BP, int3);     /* usable from all privileges */
+    set_swint_gate(X86_EXC_OF, overflow); /* usable from all privileges */
+    set_intr_gate(X86_EXC_BR,  bounds);
+    set_intr_gate(X86_EXC_UD,  invalid_op);
+    set_intr_gate(X86_EXC_NM,  device_not_available);
+    set_intr_gate(X86_EXC_DF,  double_fault);
+    set_intr_gate(X86_EXC_TS,  invalid_TSS);
+    set_intr_gate(X86_EXC_NP,  segment_not_present);
+    set_intr_gate(X86_EXC_SS,  stack_segment);
+    set_intr_gate(X86_EXC_GP,  general_protection);
+    set_intr_gate(X86_EXC_PF,  early_page_fault);
+    set_intr_gate(X86_EXC_MF,  coprocessor_error);
+    set_intr_gate(X86_EXC_AC,  alignment_check);
+    set_intr_gate(X86_EXC_MC,  machine_check);
+    set_intr_gate(X86_EXC_XM,  simd_coprocessor_error);
+    set_intr_gate(X86_EXC_CP,  entry_CP);
 
     /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
     enable_each_ist(idt_table);
@@ -2167,7 +2167,7 @@ void __init trap_init(void)
     unsigned int vector;
 
     /* Replace early pagefault with real pagefault handler. */
-    set_intr_gate(TRAP_page_fault, &page_fault);
+    set_intr_gate(X86_EXC_PF, &page_fault);
 
     pv_trap_init();
 

@@ -113,7 +113,7 @@ unsigned int svm_get_insn_len(struct vcpu *v, unsigned int instr_enc)
     hvm_dump_emulation_state(XENLOG_G_WARNING, "SVM Insn len",
                              &ctxt, X86EMUL_UNHANDLEABLE);
 
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    hvm_inject_hw_exception(X86_EXC_GP, 0);
     return 0;
 }
 

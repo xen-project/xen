@@ -48,21 +48,21 @@ static void realmode_deliver_exception(
         if ( insn_len != 0 )
         {
             insn_len = 0;
-            vector = TRAP_gp_fault;
+            vector = X86_EXC_GP;
             goto again;
         }
 
         /* Exception or hardware interrupt. */
         switch ( vector )
         {
-        case TRAP_double_fault:
+        case X86_EXC_DF:
             hvm_triple_fault();
             return;
-        case TRAP_gp_fault:
-            vector = TRAP_double_fault;
+        case X86_EXC_GP:
+            vector = X86_EXC_DF;
             goto again;
         default:
-            vector = TRAP_gp_fault;
+            vector = X86_EXC_GP;
             goto again;
         }
     }
@@ -116,14 +116,14 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
         if ( curr->arch.hvm.guest_cr[0] & X86_CR0_PE )
             goto fail;
 
-        realmode_deliver_exception(TRAP_invalid_op, 0, hvmemul_ctxt);
+        realmode_deliver_exception(X86_EXC_UD, 0, hvmemul_ctxt);
     }
 
     if ( rc == X86EMUL_EXCEPTION )
     {
         if ( unlikely(curr->domain->debugger_attached) &&
-             ((hvmemul_ctxt->ctxt.event.vector == TRAP_debug) ||
-              (hvmemul_ctxt->ctxt.event.vector == TRAP_int3)) )
+             ((hvmemul_ctxt->ctxt.event.vector == X86_EXC_DB) ||
+              (hvmemul_ctxt->ctxt.event.vector == X86_EXC_BP)) )
         {
             domain_pause_for_debugger();
         }

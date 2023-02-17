@@ -90,7 +90,7 @@ struct x86_event {
     uint8_t       type;         /* X86_EVENTTYPE_* */
     uint8_t       insn_len;     /* Instruction length */
     int32_t       error_code;   /* X86_EVENT_NO_EC if n/a */
-    unsigned long cr2;          /* Only for TRAP_page_fault h/w exception */
+    unsigned long cr2;          /* Only for X86_EXC_PF h/w exception */
 };
 
 /*
@@ -838,7 +838,7 @@ static inline void x86_emul_pagefault(
 {
     ASSERT(!ctxt->event_pending);
 
-    ctxt->event.vector = 14; /* TRAP_page_fault */
+    ctxt->event.vector = X86_EXC_PF;
     ctxt->event.type = X86_EVENTTYPE_HW_EXCEPTION;
     ctxt->event.error_code = error_code;
     ctxt->event.cr2 = cr2;

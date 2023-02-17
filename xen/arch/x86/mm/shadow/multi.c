@@ -2736,9 +2736,9 @@ static int cf_check sh_page_fault(
          * stream under Xen's feet.
          */
         if ( emul_ctxt.ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
-             ((emul_ctxt.ctxt.event.vector == TRAP_page_fault) ||
-              (((emul_ctxt.ctxt.event.vector == TRAP_gp_fault) ||
-                (emul_ctxt.ctxt.event.vector == TRAP_stack_error)) &&
+             ((emul_ctxt.ctxt.event.vector == X86_EXC_PF) ||
+              (((emul_ctxt.ctxt.event.vector == X86_EXC_GP) ||
+                (emul_ctxt.ctxt.event.vector == X86_EXC_SS)) &&
                emul_ctxt.ctxt.event.error_code == 0)) )
             hvm_inject_event(&emul_ctxt.ctxt.event);
         else
@@ -2800,7 +2800,7 @@ static int cf_check sh_page_fault(
 #endif
 
     if ( emul_ctxt.ctxt.retire.singlestep )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 
 #if GUEST_PAGING_LEVELS == 3 /* PAE guest */
     /*
@@ -2841,7 +2841,7 @@ static int cf_check sh_page_fault(
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATION_LAST_FAILED);
 
                 if ( emul_ctxt.ctxt.retire.singlestep )
-                    hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+                    hvm_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 
                 break; /* Don't emulate again if we failed! */
             }

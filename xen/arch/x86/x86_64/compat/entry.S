@@ -208,13 +208,13 @@ ENTRY(compat_syscall)
         leal  (,%rcx,TBF_INTERRUPT),%ecx
 UNLIKELY_START(z, compat_syscall_gpf)
         movq  VCPU_trap_ctxt(%rbx),%rdi
-        movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        movl  $X86_EXC_GP, UREGS_entry_vector(%rsp)
         subl  $2,UREGS_rip(%rsp)
         /* %r12 is still zero at this point. */
         mov   %r12d, TRAPBOUNCE_error_code(%rdx)
-        movl  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rdi),%eax
-        movzwl TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_cs(%rdi),%esi
-        testb $4,TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_flags(%rdi)
+        movl  X86_EXC_GP * TRAPINFO_sizeof + TRAPINFO_eip(%rdi),%eax
+        movzwl X86_EXC_GP * TRAPINFO_sizeof + TRAPINFO_cs(%rdi),%esi
+        testb $4, X86_EXC_GP * TRAPINFO_sizeof + TRAPINFO_flags(%rdi)
         setnz %cl
         leal  TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE(,%rcx,TBF_INTERRUPT),%ecx
 UNLIKELY_END(compat_syscall_gpf)
@@ -226,9 +226,9 @@ UNLIKELY_END(compat_syscall_gpf)
 ENTRY(compat_sysenter)
         CR4_PV32_RESTORE
         movq  VCPU_trap_ctxt(%rbx),%rcx
-        cmpb  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        cmpb  $X86_EXC_GP, UREGS_entry_vector(%rsp)
         movzwl VCPU_sysenter_sel(%rbx),%eax
-        movzwl TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_cs(%rcx),%ecx
+        movzwl X86_EXC_GP * TRAPINFO_sizeof + TRAPINFO_cs(%rcx),%ecx
         cmovel %ecx,%eax
         testl $~3,%eax
         movl  $FLAT_COMPAT_USER_SS,UREGS_ss(%rsp)

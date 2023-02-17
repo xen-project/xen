@@ -255,25 +255,25 @@ int hvm_event_needs_reinjection(uint8_t type, uint8_t vector)
 uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2)
 {
     const unsigned int contributory_exceptions =
-        (1 << TRAP_divide_error) |
-        (1 << TRAP_invalid_tss) |
-        (1 << TRAP_no_segment) |
-        (1 << TRAP_stack_error) |
-        (1 << TRAP_gp_fault);
+        (1 << X86_EXC_DE) |
+        (1 << X86_EXC_TS) |
+        (1 << X86_EXC_NP) |
+        (1 << X86_EXC_SS) |
+        (1 << X86_EXC_GP);
     const unsigned int page_faults =
-        (1 << TRAP_page_fault) |
-        (1 << TRAP_virtualisation);
+        (1 << X86_EXC_PF) |
+        (1 << X86_EXC_VE);
 
     /* Exception during double-fault delivery always causes a triple fault. */
-    if ( vec1 == TRAP_double_fault )
+    if ( vec1 == X86_EXC_DF )
     {
         hvm_triple_fault();
-        return TRAP_double_fault; /* dummy return */
+        return X86_EXC_DF; /* dummy return */
     }
 
     /* Exception during page-fault delivery always causes a double fault. */
     if ( (1u << vec1) & page_faults )
-        return TRAP_double_fault;
+        return X86_EXC_DF;
 
     /* Discard the first exception if it's benign or if we now have a #PF. */
     if ( !((1u << vec1) & contributory_exceptions) ||
@@ -281,7 +281,7 @@ uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2)
         return vec2;
 
     /* Cannot combine the exceptions: double fault. */
-    return TRAP_double_fault;
+    return X86_EXC_DF;
 }
 
 void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable)
@@ -1718,7 +1718,7 @@ void hvm_inject_event(const struct x86_event *event)
     struct vcpu *curr = current;
     const uint8_t vector = event->vector;
     const bool has_ec = ((event->type == X86_EVENTTYPE_HW_EXCEPTION) &&
-                         (vector < 32) && ((TRAP_HAVE_EC & (1u << vector))));
+                         (vector < 32) && ((X86_EXC_HAVE_EC & (1u << vector))));
 
     ASSERT(vector == event->vector); /* Confirm no truncation. */
     if ( has_ec )
@@ -1800,7 +1800,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             return -1;
         case NESTEDHVM_PAGEFAULT_MMIO:
             if ( !handle_mmio() )
-                hvm_inject_hw_exception(TRAP_gp_fault, 0);
+                hvm_inject_hw_exception(X86_EXC_GP, 0);
             return 1;
         case NESTEDHVM_PAGEFAULT_L0_ERROR:
             /* gpa is now translated to l1 guest address, update gfn. */
@@ -1817,7 +1817,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     if ( !nestedhvm_vcpu_in_guestmode(curr) && hvm_mmio_internal(gpa) )
     {
         if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
         rc = 1;
         goto out;
     }
@@ -1944,7 +1944,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
           (p2m_is_discard_write(p2mt) || (p2mt == p2m_ioreq_server))) )
     {
         if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
         rc = 1;
         goto out_put_gfn;
     }
@@ -2052,7 +2052,7 @@ int hvm_handle_xsetbv(u32 index, u64 new_bv)
 
     rc = x86emul_write_xcr(index, new_bv, NULL);
     if ( rc != X86EMUL_OKAY )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 
     return rc;
 }
@@ -2185,7 +2185,7 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
     }
 
     if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 
     return rc;
 
@@ -2835,7 +2835,7 @@ static int task_switch_load_seg(
     seg_desc_t *pdesc = NULL, desc;
     u8 dpl, rpl;
     bool_t writable;
-    int fault_type = TRAP_invalid_tss;
+    int fault_type = X86_EXC_TS;
     struct vcpu *v = current;
 
     if ( eflags & X86_EFLAGS_VM )
@@ -2928,8 +2928,7 @@ static int task_switch_load_seg(
         /* Segment present in memory? */
         if ( !(desc.b & _SEGMENT_P) )
         {
-            fault_type = (seg != x86_seg_ss) ? TRAP_no_segment
-                                             : TRAP_stack_error;
+            fault_type = (seg != x86_seg_ss) ? X86_EXC_NP : X86_EXC_SS;
             goto fault;
         }
     } while ( !(desc.b & 0x100) && /* Ensure Accessed flag is set */
@@ -3026,9 +3025,9 @@ void hvm_task_switch(
 
     if ( ((tss_sel & 0xfff8) + 7) > gdt.limit )
     {
-        hvm_inject_hw_exception((taskswitch_reason == TSW_iret) ?
-                             TRAP_invalid_tss : TRAP_gp_fault,
-                             tss_sel & 0xfff8);
+        hvm_inject_hw_exception(
+            (taskswitch_reason == TSW_iret) ? X86_EXC_TS : X86_EXC_GP,
+            tss_sel & 0xfff8);
         goto out;
     }
 
@@ -3055,20 +3054,20 @@ void hvm_task_switch(
     if ( tr.type != ((taskswitch_reason == TSW_iret) ? 0xb : 0x9) )
     {
         hvm_inject_hw_exception(
-            (taskswitch_reason == TSW_iret) ? TRAP_invalid_tss : TRAP_gp_fault,
+            (taskswitch_reason == TSW_iret) ? X86_EXC_TS : X86_EXC_GP,
             tss_sel & 0xfff8);
         goto out;
     }
 
     if ( !tr.p )
     {
-        hvm_inject_hw_exception(TRAP_no_segment, tss_sel & 0xfff8);
+        hvm_inject_hw_exception(X86_EXC_NP, tss_sel & 0xfff8);
         goto out;
     }
 
     if ( tr.limit < (sizeof(tss)-1) )
     {
-        hvm_inject_hw_exception(TRAP_invalid_tss, tss_sel & 0xfff8);
+        hvm_inject_hw_exception(X86_EXC_TS, tss_sel & 0xfff8);
         goto out;
     }
 
@@ -3137,7 +3136,7 @@ void hvm_task_switch(
 
     rc = hvm_set_cr3(tss.cr3, false, true);
     if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
     if ( rc != X86EMUL_OKAY )
         goto out;
 
@@ -3221,7 +3220,7 @@ void hvm_task_switch(
     }
 
     if ( (tss.trace & 1) && !exn_raised )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 
  out:
     hvm_unmap_entry(optss_desc);
@@ -3487,7 +3486,7 @@ int hvm_vmexit_cpuid(struct cpu_user_regs *regs, unsigned int inst_len)
     if ( curr->arch.msrs->misc_features_enables.cpuid_faulting &&
          hvm_get_cpl(curr) > 0 )
     {
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
         return 1; /* Don't advance the guest IP! */
     }
 
@@ -3864,7 +3863,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
 
     if ( !should_emulate )
     {
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         return;
     }
 
@@ -3872,7 +3871,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
     {
     case X86EMUL_UNHANDLEABLE:
     case X86EMUL_UNIMPLEMENTED:
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         break;
     case X86EMUL_EXCEPTION:
         hvm_inject_event(&ctxt.ctxt.event);

@@ -113,7 +113,7 @@ void play_dead(void)
     local_irq_disable();
 
     /* Change the NMI handler to a nop (see comment below). */
-    _set_gate_lower(&idt_tables[cpu][TRAP_nmi], SYS_DESC_irq_gate, 0,
+    _set_gate_lower(&idt_tables[cpu][X86_EXC_NMI], SYS_DESC_irq_gate, 0,
                     &trap_nop);
 
     /*

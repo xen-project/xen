@@ -1295,8 +1295,8 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(VMCS_LINK_POINTER, ~0UL);
 
     v->arch.hvm.vmx.exception_bitmap = HVM_TRAP_MASK
-              | (paging_mode_hap(d) ? 0 : (1U << TRAP_page_fault))
-              | (v->arch.fully_eager_fpu ? 0 : (1U << TRAP_no_device));
+              | (paging_mode_hap(d) ? 0 : (1U << X86_EXC_PF))
+              | (v->arch.fully_eager_fpu ? 0 : (1U << X86_EXC_NM));
 
     if ( cpu_has_vmx_notify_vm_exiting )
         __vmwrite(NOTIFY_WINDOW, vm_notify_window);
@@ -1871,9 +1871,9 @@ void noreturn vmx_asm_do_vmentry(void);
 static void vmx_update_debug_state(struct vcpu *v)
 {
     if ( v->arch.hvm.debug_state_latch )
-        v->arch.hvm.vmx.exception_bitmap |= 1U << TRAP_int3;
+        v->arch.hvm.vmx.exception_bitmap |= 1U << X86_EXC_BP;
     else
-        v->arch.hvm.vmx.exception_bitmap &= ~(1U << TRAP_int3);
+        v->arch.hvm.vmx.exception_bitmap &= ~(1U << X86_EXC_BP);
 
     vmx_vmcs_enter(v);
     vmx_update_exception_bitmap(v);

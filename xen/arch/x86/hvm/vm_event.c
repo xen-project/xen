@@ -87,7 +87,7 @@ void hvm_vm_event_do_resume(struct vcpu *v)
                   VM_EVENT_FLAG_SET_EMUL_INSN_DATA )
             kind = EMUL_KIND_SET_CONTEXT_INSN;
 
-        hvm_emulate_one_vm_event(kind, TRAP_invalid_op,
+        hvm_emulate_one_vm_event(kind, X86_EXC_UD,
                                  X86_EVENT_NO_EC);
 
         v->arch.vm_event->emulate_flags = 0;
@@ -96,7 +96,7 @@ void hvm_vm_event_do_resume(struct vcpu *v)
     if ( unlikely(w->do_write.cr0) )
     {
         if ( hvm_set_cr0(w->cr0, false) == X86EMUL_EXCEPTION )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
 
         w->do_write.cr0 = 0;
     }
@@ -104,7 +104,7 @@ void hvm_vm_event_do_resume(struct vcpu *v)
     if ( unlikely(w->do_write.cr4) )
     {
         if ( hvm_set_cr4(w->cr4, false) == X86EMUL_EXCEPTION )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
 
         w->do_write.cr4 = 0;
     }
@@ -112,7 +112,7 @@ void hvm_vm_event_do_resume(struct vcpu *v)
     if ( unlikely(w->do_write.cr3) )
     {
         if ( hvm_set_cr3(w->cr3, w->cr3_noflush, false) == X86EMUL_EXCEPTION )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
 
         w->do_write.cr3 = 0;
     }
@@ -121,7 +121,7 @@ void hvm_vm_event_do_resume(struct vcpu *v)
     {
         if ( hvm_msr_write_intercept(w->msr, w->value, false) ==
              X86EMUL_EXCEPTION )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
 
         w->do_write.msr = 0;
     }

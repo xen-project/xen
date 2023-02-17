@@ -609,8 +609,7 @@ static int pv_emul_virt_to_linear(unsigned long base, unsigned long offset,
         rc = X86EMUL_EXCEPTION;
 
     if ( unlikely(rc == X86EMUL_EXCEPTION) )
-        x86_emul_hw_exception(seg != x86_seg_ss ? TRAP_gp_fault
-                                                : TRAP_stack_error,
+        x86_emul_hw_exception(seg != x86_seg_ss ? X86_EXC_GP : X86_EXC_SS,
                               0, ctxt);
 
     return rc;
@@ -645,7 +644,7 @@ static int cf_check rep_ins(
          (sreg.type & (_SEGMENT_CODE >> 8)) ||
          !(sreg.type & (_SEGMENT_WR >> 8)) )
     {
-        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+        x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
         return X86EMUL_EXCEPTION;
     }
 
@@ -711,8 +710,7 @@ static int cf_check rep_outs(
          ((sreg.type & (_SEGMENT_CODE >> 8)) &&
           !(sreg.type & (_SEGMENT_WR >> 8))) )
     {
-        x86_emul_hw_exception(seg != x86_seg_ss ? TRAP_gp_fault
-                                                : TRAP_stack_error,
+        x86_emul_hw_exception(seg != x86_seg_ss ? X86_EXC_GP : X86_EXC_SS,
                               0, ctxt);
         return X86EMUL_EXCEPTION;
     }
@@ -893,7 +891,7 @@ static int cf_check read_msr(
     if ( (ret = guest_rdmsr(curr, reg, val)) != X86EMUL_UNHANDLEABLE )
     {
         if ( ret == X86EMUL_EXCEPTION )
-            x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+            x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
 
         goto done;
     }
@@ -1041,7 +1039,7 @@ static int cf_check write_msr(
     if ( (ret = guest_wrmsr(curr, reg, val)) != X86EMUL_UNHANDLEABLE )
     {
         if ( ret == X86EMUL_EXCEPTION )
-            x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+            x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
 
         return ret;
     }
@@ -1376,7 +1374,7 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
         {
             curr->arch.dr6 |= ctxt.bpmatch | DR_STATUS_RESERVED_ONE;
             if ( !(curr->arch.pv.trap_bounce.flags & TBF_EXCEPTION) )
-                pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+                pv_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
         }
         /* fall through */
     case X86EMUL_RETRY:

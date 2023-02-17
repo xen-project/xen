@@ -219,7 +219,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             /* OSXSAVE clear in policy.  Fast-forward CR4 back in. */
             if ( (v->arch.pv.ctrlreg[4] & X86_CR4_OSXSAVE) ||
                  (p->basic.xsave &&
-                  regs->entry_vector == TRAP_invalid_op &&
+                  regs->entry_vector == X86_EXC_UD &&
                   guest_kernel_mode(v, regs) &&
                   (read_cr4() & X86_CR4_OSXSAVE)) )
                 res->c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
@@ -255,7 +255,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  * emulated CPUID from a faulted CPUID by whether a #UD or #GP
                  * fault is currently being serviced.  Yuck...
                  */
-                if ( cpu_has_monitor && regs->entry_vector == TRAP_gp_fault )
+                if ( cpu_has_monitor && regs->entry_vector == X86_EXC_GP )
                     res->c |= cpufeat_mask(X86_FEATURE_MONITOR);
 
                 /*
@@ -280,7 +280,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         regs = guest_cpu_user_regs();
         if ( is_pv_domain(d) && is_hardware_domain(d) &&
              guest_kernel_mode(v, regs) && cpu_has_monitor &&
-             regs->entry_vector == TRAP_gp_fault )
+             regs->entry_vector == X86_EXC_GP )
             *res = raw_cpu_policy.basic.raw[5];
         break;
 

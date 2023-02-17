@@ -136,15 +136,15 @@ static int __init cf_check stub_selftest(void)
     } tests[] __initconst = {
 #define endbr64 0xf3, 0x0f, 0x1e, 0xfa
         { .opc = { endbr64, 0x0f, 0xb9, 0xc3, 0xc3 }, /* ud1 */
-          .res.fields.trapnr = TRAP_invalid_op },
+          .res.fields.trapnr = X86_EXC_UD },
         { .opc = { endbr64, 0x90, 0x02, 0x00, 0xc3 }, /* nop; add (%rax),%al */
           .rax = 0x0123456789abcdef,
-          .res.fields.trapnr = TRAP_gp_fault },
+          .res.fields.trapnr = X86_EXC_GP },
         { .opc = { endbr64, 0x02, 0x04, 0x04, 0xc3 }, /* add (%rsp,%rax),%al */
           .rax = 0xfedcba9876543210,
-          .res.fields.trapnr = TRAP_stack_error },
+          .res.fields.trapnr = X86_EXC_SS },
         { .opc = { endbr64, 0xcc, 0xc3, 0xc3, 0xc3 }, /* int3 */
-          .res.fields.trapnr = TRAP_int3 },
+          .res.fields.trapnr = X86_EXC_BP },
 #undef endbr64
     };
     unsigned long addr = this_cpu(stubs.addr) + STUB_BUF_SIZE / 2;

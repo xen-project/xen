@@ -78,7 +78,7 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate, const char *descr)
 
     case X86EMUL_UNRECOGNIZED:
         hvm_dump_emulation_state(XENLOG_G_WARNING, descr, &ctxt, rc);
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         break;
 
     case X86EMUL_EXCEPTION:

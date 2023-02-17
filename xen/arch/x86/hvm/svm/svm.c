@@ -80,7 +80,7 @@ static DEFINE_SPINLOCK(osvw_lock);
 static void svm_crash_or_fault(struct vcpu *v)
 {
     if ( vmcb_get_cpl(v->arch.hvm.svm.vmcb) )
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
     else
         domain_crash(v->domain);
 }
@@ -107,7 +107,7 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     curr->arch.hvm.svm.vmcb->int_stat.intr_shadow = 0;
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 }
 
 static void cf_check svm_cpu_down(void)
@@ -122,7 +122,7 @@ static void svm_fpu_enter(struct vcpu *v)
     vcpu_restore_fpu_lazy(v);
     vmcb_set_exception_intercepts(
         n1vmcb,
-        vmcb_get_exception_intercepts(n1vmcb) & ~(1U << TRAP_no_device));
+        vmcb_get_exception_intercepts(n1vmcb) & ~(1U << X86_EXC_NM));
 }
 
 static void cf_check svm_fpu_leave(struct vcpu *v)
@@ -142,7 +142,7 @@ static void cf_check svm_fpu_leave(struct vcpu *v)
     {
         vmcb_set_exception_intercepts(
             n1vmcb,
-            vmcb_get_exception_intercepts(n1vmcb) | (1U << TRAP_no_device));
+            vmcb_get_exception_intercepts(n1vmcb) | (1U << X86_EXC_NM));
         vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) | X86_CR0_TS);
     }
 }
@@ -588,9 +588,9 @@ static void cf_check svm_cpuid_policy_changed(struct vcpu *v)
 
     if ( opt_hvm_fep ||
          (v->domain->arch.cpuid->x86_vendor != boot_cpu_data.x86_vendor) )
-        bitmap |= (1U << TRAP_invalid_op);
+        bitmap |= (1U << X86_EXC_UD);
     else
-        bitmap &= ~(1U << TRAP_invalid_op);
+        bitmap &= ~(1U << X86_EXC_UD);
 
     vmcb_set_exception_intercepts(vmcb, bitmap);
 
@@ -1026,8 +1026,8 @@ static void noreturn cf_check svm_do_resume(void)
 
         v->arch.hvm.debug_state_latch = debug_state;
         vmcb_set_exception_intercepts(
-            vmcb, debug_state ? (intercepts | (1U << TRAP_int3))
-                              : (intercepts & ~(1U << TRAP_int3)));
+            vmcb, debug_state ? (intercepts |  (1U << X86_EXC_BP))
+                              : (intercepts & ~(1U << X86_EXC_BP)));
     }
 
     if ( v->arch.hvm.svm.launch_core != smp_processor_id() )
@@ -1215,7 +1215,7 @@ static void svm_emul_swint_injection(struct x86_event *event)
     const struct vmcb_struct *vmcb = curr->arch.hvm.svm.vmcb;
     const struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned int trap = event->vector, type = event->type;
-    unsigned int fault = TRAP_gp_fault, ec = 0;
+    unsigned int fault = X86_EXC_GP, ec = 0;
     pagefault_info_t pfinfo;
     struct segment_register cs, idtr;
     unsigned int idte_size, idte_offset;
@@ -1261,7 +1261,7 @@ static void svm_emul_swint_injection(struct x86_event *event)
     {
         if ( rc == HVMTRANS_bad_linear_to_gfn )
         {
-            fault = TRAP_page_fault;
+            fault = X86_EXC_PF;
             ec = pfinfo.ec;
             event->cr2 = pfinfo.linear;
         }
@@ -1297,7 +1297,7 @@ static void svm_emul_swint_injection(struct x86_event *event)
     /* Is this entry present? */
     if ( !(idte.b & (1u << 15)) )
     {
-        fault = TRAP_no_segment;
+        fault = X86_EXC_NP;
         goto raise_exception;
     }
 
@@ -1338,14 +1338,14 @@ static void cf_check svm_inject_event(const struct x86_event *event)
 
     switch ( _event.vector | -(_event.type == X86_EVENTTYPE_SW_INTERRUPT) )
     {
-    case TRAP_debug:
+    case X86_EXC_DB:
         if ( regs->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(vmcb, curr);
             vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | DR_STEP);
         }
         /* fall through */
-    case TRAP_int3:
+    case X86_EXC_BP:
         if ( curr->domain->debugger_attached )
         {
             /* Debug/Int3: Trap to debugger. */
@@ -1354,7 +1354,7 @@ static void cf_check svm_inject_event(const struct x86_event *event)
         }
         break;
 
-    case TRAP_page_fault:
+    case X86_EXC_PF:
         ASSERT(_event.type == X86_EVENTTYPE_HW_EXCEPTION);
         curr->arch.hvm.guest_cr[2] = _event.cr2;
         vmcb_set_cr2(vmcb, _event.cr2);
@@ -1365,7 +1365,7 @@ static void cf_check svm_inject_event(const struct x86_event *event)
     {
         _event.vector = hvm_combine_hw_exceptions(
             eventinj.vector, _event.vector);
-        if ( _event.vector == TRAP_double_fault )
+        if ( _event.vector == X86_EXC_DF )
             _event.error_code = 0;
     }
 
@@ -1438,7 +1438,7 @@ static void cf_check svm_inject_event(const struct x86_event *event)
     ASSERT(!eventinj.ev || eventinj.ec == (uint16_t)eventinj.ec);
     vmcb->event_inj = eventinj;
 
-    if ( _event.vector == TRAP_page_fault &&
+    if ( _event.vector == X86_EXC_PF &&
          _event.type == X86_EVENTTYPE_HW_EXCEPTION )
         HVMTRACE_LONG_2D(PF_INJECT, _event.error_code,
                          TRC_PAR_LONG(_event.cr2));
@@ -1722,7 +1722,7 @@ static void cf_check svm_fpu_dirty_intercept(void)
     {
        /* Check if l1 guest must make FPU ready for the l2 guest */
        if ( v->arch.hvm.guest_cr[0] & X86_CR0_TS )
-           hvm_inject_hw_exception(TRAP_no_device, X86_EVENT_NO_EC);
+           hvm_inject_hw_exception(X86_EXC_NM, X86_EVENT_NO_EC);
        else
            vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) & ~X86_CR0_TS);
        return;
@@ -2166,7 +2166,7 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
     if ( rc == X86EMUL_OKAY )
         __update_guest_eip(regs, inst_len);
     else if ( rc == X86EMUL_EXCEPTION )
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
 }
 
 static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
@@ -2189,7 +2189,7 @@ static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs, bool rdtscp)
 
     if ( rdtscp && !currd->arch.cpuid->extd.rdtscp )
     {
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         return;
     }
 
@@ -2227,14 +2227,14 @@ svm_vmexit_do_vmrun(struct cpu_user_regs *regs,
 {
     if ( !nsvm_efer_svm_enabled(v) )
     {
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         return;
     }
 
     if ( !nestedsvm_vmcb_map(v, vmcbaddr) )
     {
         gdprintk(XENLOG_ERR, "VMRUN: mapping vmcb failed, injecting #GP\n");
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
         return;
     }
 
@@ -2280,7 +2280,7 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
 
     if ( !nsvm_efer_svm_enabled(v) )
     {
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         return;
     }
 
@@ -2289,7 +2289,7 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     {
         gdprintk(XENLOG_ERR,
             "VMLOAD: mapping failed, injecting #GP\n");
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
         return;
     }
 
@@ -2315,7 +2315,7 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
 
     if ( !nsvm_efer_svm_enabled(v) )
     {
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         return;
     }
 
@@ -2324,7 +2324,7 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     {
         gdprintk(XENLOG_ERR,
             "VMSAVE: mapping vmcb failed, injecting #GP\n");
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(X86_EXC_GP, 0);
         return;
     }
 
@@ -2767,7 +2767,7 @@ void svm_vmexit_handler(void)
             if ( rc < 0 )
                 goto unexpected_exit_type;
             if ( !rc )
-                hvm_inject_exception(TRAP_debug,
+                hvm_inject_exception(X86_EXC_DB,
                                      trap_type, insn_len, X86_EVENT_NO_EC);
         }
         else
@@ -2784,7 +2784,7 @@ void svm_vmexit_handler(void)
         {
             /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
             __update_guest_eip(regs, insn_len);
-            current->arch.gdbsx_vcpu_event = TRAP_int3;
+            current->arch.gdbsx_vcpu_event = X86_EXC_BP;
             domain_pause_for_debugger();
         }
         else
@@ -2796,7 +2796,7 @@ void svm_vmexit_handler(void)
            if ( rc < 0 )
                goto unexpected_exit_type;
            if ( !rc )
-               hvm_inject_exception(TRAP_int3,
+               hvm_inject_exception(X86_EXC_BP,
                                     X86_EVENTTYPE_SW_EXCEPTION,
                                     insn_len, X86_EVENT_NO_EC);
         }
@@ -2837,8 +2837,8 @@ void svm_vmexit_handler(void)
     }
 
     case VMEXIT_EXCEPTION_AC:
-        HVMTRACE_1D(TRAP, TRAP_alignment_check);
-        hvm_inject_hw_exception(TRAP_alignment_check, vmcb->exitinfo1);
+        HVMTRACE_1D(TRAP, X86_EXC_AC);
+        hvm_inject_hw_exception(X86_EXC_AC, vmcb->exitinfo1);
         break;
 
     case VMEXIT_EXCEPTION_UD:
@@ -2891,8 +2891,8 @@ void svm_vmexit_handler(void)
                  * semantics.
                  */
             case X86_EVENTTYPE_HW_EXCEPTION:
-                if ( vmcb->exit_int_info.vector == TRAP_int3 ||
-                     vmcb->exit_int_info.vector == TRAP_overflow )
+                if ( vmcb->exit_int_info.vector == X86_EXC_BP ||
+                     vmcb->exit_int_info.vector == X86_EXC_OF )
                     break;
                 /* Fallthrough */
             case X86_EVENTTYPE_EXT_INTR:
@@ -2956,7 +2956,7 @@ void svm_vmexit_handler(void)
                 __update_guest_eip(regs, vmcb->ei.io.nrip - vmcb->rip);
         }
         else if ( !hvm_emulate_one_insn(x86_insn_is_portio, "port I/O") )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
         break;
 
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
@@ -2964,7 +2964,7 @@ void svm_vmexit_handler(void)
         if ( cpu_has_svm_decode && (vmcb->exitinfo1 & (1ULL << 63)) )
             svm_vmexit_do_cr_access(vmcb, regs);
         else if ( !hvm_emulate_one_insn(x86_insn_is_cr_access, "CR access") )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
         break;
 
     case VMEXIT_INVLPG:
@@ -2974,13 +2974,13 @@ void svm_vmexit_handler(void)
             __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
         }
         else if ( !hvm_emulate_one_insn(is_invlpg, "invlpg") )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
         break;
 
     case VMEXIT_INVLPGA:
         if ( !nsvm_efer_svm_enabled(v) )
         {
-            hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+            hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
             break;
         }
         if ( (insn_len = svm_get_insn_len(v, INSTR_INVLPGA)) == 0 )
@@ -3021,7 +3021,7 @@ void svm_vmexit_handler(void)
     case VMEXIT_MWAIT:
     case VMEXIT_SKINIT:
     case VMEXIT_RDPRU:
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         break;
 
     case VMEXIT_VMRUN:
@@ -3042,7 +3042,7 @@ void svm_vmexit_handler(void)
 
     case VMEXIT_XSETBV:
         if ( vmcb_get_cpl(vmcb) )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
         else if ( (insn_len = svm_get_insn_len(v, INSTR_XSETBV)) &&
                   hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == X86EMUL_OKAY )
             __update_guest_eip(regs, insn_len);

@@ -789,9 +789,9 @@ static void cf_check vmx_cpuid_policy_changed(struct vcpu *v)
 
     if ( opt_hvm_fep ||
          (v->domain->arch.cpuid->x86_vendor != boot_cpu_data.x86_vendor) )
-        v->arch.hvm.vmx.exception_bitmap |= (1U << TRAP_invalid_op);
+        v->arch.hvm.vmx.exception_bitmap |= (1U << X86_EXC_UD);
     else
-        v->arch.hvm.vmx.exception_bitmap &= ~(1U << TRAP_invalid_op);
+        v->arch.hvm.vmx.exception_bitmap &= ~(1U << X86_EXC_UD);
 
     vmx_vmcs_enter(v);
     vmx_update_exception_bitmap(v);
@@ -1071,7 +1071,7 @@ static int cf_check vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 static void vmx_fpu_enter(struct vcpu *v)
 {
     vcpu_restore_fpu_lazy(v);
-    v->arch.hvm.vmx.exception_bitmap &= ~(1u << TRAP_no_device);
+    v->arch.hvm.vmx.exception_bitmap &= ~(1u << X86_EXC_NM);
     vmx_update_exception_bitmap(v);
     v->arch.hvm.vmx.host_cr0 &= ~X86_CR0_TS;
     __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
@@ -1098,7 +1098,7 @@ static void cf_check vmx_fpu_leave(struct vcpu *v)
     {
         v->arch.hvm.hw_cr[0] |= X86_CR0_TS;
         __vmwrite(GUEST_CR0, v->arch.hvm.hw_cr[0]);
-        v->arch.hvm.vmx.exception_bitmap |= (1u << TRAP_no_device);
+        v->arch.hvm.vmx.exception_bitmap |= (1u << X86_EXC_NM);
         vmx_update_exception_bitmap(v);
     }
 }
@@ -1988,7 +1988,7 @@ void vmx_inject_nmi(void)
             nvmx_enqueue_n2_exceptions (v, 
                INTR_INFO_VALID_MASK |
                MASK_INSR(X86_EVENTTYPE_NMI, INTR_INFO_INTR_TYPE_MASK) |
-               MASK_INSR(TRAP_nmi, INTR_INFO_VECTOR_MASK),
+               MASK_INSR(X86_EXC_NMI, INTR_INFO_VECTOR_MASK),
                X86_EVENT_NO_EC, hvm_intsrc_nmi);
             return;
         }
@@ -2013,14 +2013,14 @@ static void cf_check vmx_inject_event(const struct x86_event *event)
 
     switch ( _event.vector | -(_event.type == X86_EVENTTYPE_SW_INTERRUPT) )
     {
-    case TRAP_debug:
+    case X86_EXC_DB:
         if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(curr);
             write_debugreg(6, read_debugreg(6) | DR_STEP);
         }
         if ( !nestedhvm_vcpu_in_guestmode(curr) ||
-             !nvmx_intercepts_exception(curr, TRAP_debug, _event.error_code) )
+             !nvmx_intercepts_exception(curr, X86_EXC_DB, _event.error_code) )
         {
             unsigned long val;
 
@@ -2032,7 +2032,7 @@ static void cf_check vmx_inject_event(const struct x86_event *event)
         if ( cpu_has_monitor_trap_flag )
             break;
         /* fall through */
-    case TRAP_int3:
+    case X86_EXC_BP:
         if ( curr->domain->debugger_attached )
         {
             /* Debug/Int3: Trap to debugger. */
@@ -2041,7 +2041,7 @@ static void cf_check vmx_inject_event(const struct x86_event *event)
         }
         break;
 
-    case TRAP_page_fault:
+    case X86_EXC_PF:
         ASSERT(_event.type == X86_EVENTTYPE_HW_EXCEPTION);
         curr->arch.hvm.guest_cr[2] = _event.cr2;
         break;
@@ -2058,7 +2058,7 @@ static void cf_check vmx_inject_event(const struct x86_event *event)
     {
         _event.vector = hvm_combine_hw_exceptions(
             (uint8_t)intr_info, _event.vector);
-        if ( _event.vector == TRAP_double_fault )
+        if ( _event.vector == X86_EXC_DF )
             _event.error_code = 0;
     }
 
@@ -2078,7 +2078,7 @@ static void cf_check vmx_inject_event(const struct x86_event *event)
     else
         __vmx_inject_exception(_event.vector, _event.type, _event.error_code);
 
-    if ( (_event.vector == TRAP_page_fault) &&
+    if ( (_event.vector == X86_EXC_PF) &&
          (_event.type == X86_EVENTTYPE_HW_EXCEPTION) )
         HVMTRACE_LONG_2D(PF_INJECT, _event.error_code,
                          TRC_PAR_LONG(curr->arch.hvm.guest_cr[2]));
@@ -2433,7 +2433,7 @@ static bool cf_check vmx_vcpu_emulate_ve(struct vcpu *v)
     __vmread(GUEST_PHYSICAL_ADDRESS, &veinfo->gpa);
     vmx_vmcs_exit(v);
 
-    hvm_inject_hw_exception(TRAP_virtualisation,
+    hvm_inject_hw_exception(X86_EXC_VE,
                             X86_EVENT_NO_EC);
 
  out:
@@ -3065,7 +3065,7 @@ void update_guest_eip(void)
     }
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 }
 
 static void cf_check vmx_fpu_dirty_intercept(void)
@@ -3163,7 +3163,7 @@ static int vmx_cr_access(cr_access_qual_t qual)
         HVMTRACE_LONG_1D(LMSW, value);
 
         if ( (rc = hvm_set_cr0(value, true)) == X86EMUL_EXCEPTION )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
 
         return rc;
     }
@@ -4081,9 +4081,9 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         __vmread(VM_EXIT_INTR_INFO, &intr_info);
         BUG_ON(!(intr_info & INTR_INFO_VALID_MASK));
         vector = intr_info & INTR_INFO_VECTOR_MASK;
-        if ( vector == TRAP_machine_check )
+        if ( vector == X86_EXC_MC )
             do_machine_check(regs);
-        if ( (vector == TRAP_nmi) &&
+        if ( (vector == X86_EXC_NMI) &&
              ((intr_info & INTR_INFO_INTR_TYPE_MASK) ==
               MASK_INSR(X86_EVENTTYPE_NMI, INTR_INFO_INTR_TYPE_MASK)) )
         {
@@ -4178,9 +4178,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         switch ( exit_reason )
         {
         case EXIT_REASON_EXCEPTION_NMI:
-            if ( vector != TRAP_page_fault
-                 && vector != TRAP_nmi 
-                 && vector != TRAP_machine_check ) 
+            if ( vector != X86_EXC_PF && vector != X86_EXC_NMI &&
+                 vector != X86_EXC_MC )
             {
         default:
                 perfc_incr(realmode_exits);
@@ -4229,14 +4228,14 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
          */
         if ( unlikely(intr_info & INTR_INFO_NMI_UNBLOCKED_BY_IRET) &&
              !(idtv_info & INTR_INFO_VALID_MASK) &&
-             (vector != TRAP_double_fault) )
+             (vector != X86_EXC_DF) )
             undo_nmis_unblocked_by_iret();
 
         perfc_incra(cause_vector, vector);
 
         switch ( vector )
         {
-        case TRAP_debug:
+        case X86_EXC_DB:
             /*
              * Updates DR6 where debugger can peek (See 3B 23.2.1,
              * Table 23-1, "Exit Qualification for Debug Exceptions").
@@ -4303,7 +4302,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             else
                 domain_pause_for_debugger();
             break;
-        case TRAP_int3:
+        case X86_EXC_BP:
             HVMTRACE_1D(TRAP, vector);
             if ( !v->domain->debugger_attached )
             {
@@ -4324,15 +4323,15 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             else
             {
                 update_guest_eip(); /* Safe: INT3 */
-                v->arch.gdbsx_vcpu_event = TRAP_int3;
+                v->arch.gdbsx_vcpu_event = X86_EXC_BP;
                 domain_pause_for_debugger();
             }
             break;
-        case TRAP_no_device:
+        case X86_EXC_NM:
             HVMTRACE_1D(TRAP, vector);
             vmx_fpu_dirty_intercept();
             break;
-        case TRAP_page_fault:
+        case X86_EXC_PF:
             __vmread(EXIT_QUALIFICATION, &exit_qualification);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &ecode);
             regs->error_code = ecode;
@@ -4357,22 +4356,22 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
             hvm_inject_page_fault(regs->error_code, exit_qualification);
             break;
-        case TRAP_alignment_check:
+        case X86_EXC_AC:
             HVMTRACE_1D(TRAP, vector);
             vmx_propagate_intr(intr_info);
             break;
-        case TRAP_nmi:
+        case X86_EXC_NMI:
             if ( MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK) !=
                  X86_EVENTTYPE_NMI )
                 goto exit_and_crash;
             HVMTRACE_0D(NMI);
             /* Already handled above. */
             break;
-        case TRAP_machine_check:
+        case X86_EXC_MC:
             HVMTRACE_0D(MCE);
             /* Already handled above. */
             break;
-        case TRAP_invalid_op:
+        case X86_EXC_UD:
             HVMTRACE_1D(TRAP, vector);
             hvm_ud_intercept(regs);
             break;
@@ -4453,7 +4452,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_RDTSCP:
         if ( !currd->arch.cpuid->extd.rdtscp )
         {
-            hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+            hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
             break;
         }
 
@@ -4494,7 +4493,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
 
         case X86EMUL_EXCEPTION:
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
             break;
         }
         break;
@@ -4508,7 +4507,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
 
         case X86EMUL_EXCEPTION:
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
             break;
         }
         break;
@@ -4530,7 +4529,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_VMFUNC:
         if ( vmx_vmfunc_intercept(regs) != X86EMUL_OKAY )
-            hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+            hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         else
             update_guest_eip();
         break;
@@ -4544,7 +4543,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
          * as far as vmexit.
          */
         WARN_ON(exit_reason == EXIT_REASON_GETSEC);
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         break;
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
@@ -4552,7 +4551,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_APIC_ACCESS:
         if ( !vmx_handle_eoi_write() && !handle_mmio() )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(X86_EXC_GP, 0);
         break;
 
     case EXIT_REASON_EOI_INDUCED:
@@ -4592,7 +4591,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         if ( io_qual.str )
         {
             if ( !hvm_emulate_one_insn(x86_insn_is_portio, "port I/O") )
-                hvm_inject_hw_exception(TRAP_gp_fault, 0);
+                hvm_inject_hw_exception(X86_EXC_GP, 0);
         }
         else
         {
@@ -4721,7 +4720,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         gprintk(XENLOG_ERR, "Unexpected vmexit: reason %lu\n", exit_reason);
 
         if ( vmx_get_cpl() )
-            hvm_inject_hw_exception(TRAP_invalid_op,
+            hvm_inject_hw_exception(X86_EXC_UD,
                                     X86_EVENT_NO_EC);
         else
             domain_crash(v->domain);
@@ -4752,7 +4751,7 @@ out:
         {
             __vmread(VM_ENTRY_INTR_INFO, &intr_info);
             if ( !(intr_info & INTR_INFO_VALID_MASK) )
-                hvm_inject_hw_exception(TRAP_gp_fault, 0);
+                hvm_inject_hw_exception(X86_EXC_GP, 0);
             /* Need to fix rIP nevertheless. */
             if ( mode == 8 )
                 regs->rip = (long)(regs->rip << (64 - VADDR_BITS)) >>

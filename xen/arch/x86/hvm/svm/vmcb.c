@@ -140,7 +140,7 @@ static int construct_vmcb(struct vcpu *v)
 
     vmcb->_exception_intercepts =
         HVM_TRAP_MASK |
-        (v->arch.fully_eager_fpu ? 0 : (1U << TRAP_no_device));
+        (v->arch.fully_eager_fpu ? 0 : (1U << X86_EXC_NM));
 
     if ( paging_mode_hap(v->domain) )
     {
@@ -164,7 +164,7 @@ static int construct_vmcb(struct vcpu *v)
     }
     else
     {
-        vmcb->_exception_intercepts |= (1U << TRAP_page_fault);
+        vmcb->_exception_intercepts |= (1U << X86_EXC_PF);
     }
 
     if ( cpu_has_pause_filter )

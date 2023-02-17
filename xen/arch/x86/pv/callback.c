@@ -29,12 +29,12 @@ static int register_guest_nmi_callback(unsigned long address)
 {
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
-    struct trap_info *t = &curr->arch.pv.trap_ctxt[TRAP_nmi];
+    struct trap_info *t = &curr->arch.pv.trap_ctxt[X86_EXC_NMI];
 
     if ( !is_canonical_address(address) )
         return -EINVAL;
 
-    t->vector  = TRAP_nmi;
+    t->vector  = X86_EXC_NMI;
     t->flags   = 0;
     t->cs      = (is_pv_32bit_domain(d) ?
                   FLAT_COMPAT_KERNEL_CS : FLAT_KERNEL_CS);
@@ -54,7 +54,7 @@ static int register_guest_nmi_callback(unsigned long address)
 static void unregister_guest_nmi_callback(void)
 {
     struct vcpu *curr = current;
-    struct trap_info *t = &curr->arch.pv.trap_ctxt[TRAP_nmi];
+    struct trap_info *t = &curr->arch.pv.trap_ctxt[X86_EXC_NMI];
 
     memset(t, 0, sizeof(*t));
 }

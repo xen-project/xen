@@ -147,6 +147,8 @@
 #define X86_EXC_VC            29 /* VMM Communication */
 #define X86_EXC_SX            30 /* Security Exception */
 
+#define X86_EXC_NUM           32 /* 32 reserved vectors */
+
 /* Bitmap of exceptions which have error codes. */
 #define X86_EXC_HAVE_EC                                             \
     ((1u << X86_EXC_DF) | (1u << X86_EXC_TS) | (1u << X86_EXC_NP) | \
