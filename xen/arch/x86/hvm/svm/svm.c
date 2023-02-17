@@ -16,59 +16,48 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/domain_page.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/lib.h>
-#include <xen/trace.h>
 #include <xen/sched.h>
-#include <xen/irq.h>
-#include <xen/softirq.h>
-#include <xen/hypercall.h>
-#include <xen/domain_page.h>
+#include <xen/trace.h>
 #include <xen/xenoprof.h>
-#include <asm/current.h>
-#include <asm/io.h>
-#include <asm/paging.h>
-#include <asm/p2m.h>
-#include <asm/mem_sharing.h>
-#include <asm/regs.h>
-#include <asm/cpufeature.h>
-#include <asm/processor.h>
+
 #include <asm/amd.h>
+#include <asm/apic.h>
+#include <asm/cpufeature.h>
+#include <asm/current.h>
 #include <asm/debugreg.h>
-#include <asm/msr.h>
-#include <asm/i387.h>
-#include <asm/iocap.h>
+#include <asm/gdbsx.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
-#include <asm/hvm/support.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/emulate.h>
-#include <asm/hvm/svm/asid.h>
-#include <asm/hvm/svm/svm.h>
-#include <asm/hvm/svm/vmcb.h>
-#include <asm/hvm/svm/emulate.h>
-#include <asm/hvm/svm/intr.h>
-#include <asm/hvm/svm/svmdebug.h>
-#include <asm/hvm/svm/nestedsvm.h>
-#include <asm/hvm/nestedhvm.h>
-#include <asm/spec_ctrl.h>
-#include <asm/x86_emulate.h>
-#include <public/sched.h>
-#include <asm/hvm/vpt.h>
-#include <asm/hvm/trace.h>
-#include <asm/hap.h>
-#include <asm/apic.h>
-#include <asm/gdbsx.h>
 #include <asm/hvm/monitor.h>
+#include <asm/hvm/nestedhvm.h>
+#include <asm/hvm/support.h>
+#include <asm/hvm/svm/asid.h>
+#include <asm/hvm/svm/emulate.h>
+#include <asm/hvm/svm/nestedsvm.h>
+#include <asm/hvm/svm/svm.h>
+#include <asm/hvm/svm/svmdebug.h>
+#include <asm/hvm/svm/vmcb.h>
+#include <asm/hvm/trace.h>
+#include <asm/iocap.h>
+#include <asm/i387.h>
 #include <asm/monitor.h>
-#include <asm/xstate.h>
+#include <asm/msr.h>
+#include <asm/paging.h>
+#include <asm/processor.h>
+#include <asm/p2m.h>
+#include <asm/x86_emulate.h>
+
+#include <public/sched.h>
 
 void noreturn svm_asm_do_resume(void);
 
 u32 svm_feature_flags;
-
-static struct hvm_function_table svm_function_table;
 
 /*
  * Physical addresses of the Host State Area (for hardware) and vmcb (for Xen)
@@ -505,7 +494,6 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     return 0;
 }
 
-
 static void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
@@ -516,7 +504,6 @@ static void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_cstar        = vmcb->cstar;
     data->msr_syscall_mask = vmcb->sfmask;
 }
-
 
 static void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
@@ -1649,57 +1636,6 @@ static int cf_check svm_cpu_up(void)
     return _svm_cpu_up(false);
 }
 
-const struct hvm_function_table * __init start_svm(void)
-{
-    bool_t printed = 0;
-
-    svm_host_osvw_reset();
-
-    if ( _svm_cpu_up(true) )
-    {
-        printk("SVM: failed to initialise.\n");
-        return NULL;
-    }
-
-    setup_vmcb_dump();
-
-    if ( boot_cpu_data.extended_cpuid_level >= 0x8000000a )
-        svm_feature_flags = cpuid_edx(0x8000000a);
-
-    printk("SVM: Supported advanced features:\n");
-
-    /* DecodeAssists fast paths assume nextrip is valid for fast rIP update. */
-    if ( !cpu_has_svm_nrips )
-        __clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
-
-    if ( cpu_has_tsc_ratio )
-        svm_function_table.tsc_scaling.ratio_frac_bits = 32;
-
-#define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
-    P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
-    P(cpu_has_svm_lbrv, "Last Branch Record (LBR) Virtualisation");
-    P(cpu_has_svm_nrips, "Next-RIP Saved on #VMEXIT");
-    P(cpu_has_svm_cleanbits, "VMCB Clean Bits");
-    P(cpu_has_svm_decode, "DecodeAssists");
-    P(cpu_has_svm_vloadsave, "Virtual VMLOAD/VMSAVE");
-    P(cpu_has_svm_vgif, "Virtual GIF");
-    P(cpu_has_pause_filter, "Pause-Intercept Filter");
-    P(cpu_has_pause_thresh, "Pause-Intercept Filter Threshold");
-    P(cpu_has_tsc_ratio, "TSC Rate MSR");
-    P(cpu_has_svm_sss, "NPT Supervisor Shadow Stack");
-    P(cpu_has_svm_spec_ctrl, "MSR_SPEC_CTRL virtualisation");
-#undef P
-
-    if ( !printed )
-        printk(" - none\n");
-
-    svm_function_table.hap_supported = !!cpu_has_svm_npt;
-    svm_function_table.hap_capabilities = HVM_HAP_SUPERPAGE_2MB |
-        (cpu_has_page1gb ? HVM_HAP_SUPERPAGE_1GB : 0);
-
-    return &svm_function_table;
-}
-
 static void svm_do_nested_pgfault(struct vcpu *v,
     struct cpu_user_regs *regs, uint64_t pfec, paddr_t gpa)
 {
@@ -2597,6 +2533,57 @@ static struct hvm_function_table __initdata_cf_clobber svm_function_table = {
         .max_ratio = ~TSC_RATIO_RSVD_BITS,
     },
 };
+
+const struct hvm_function_table * __init start_svm(void)
+{
+    bool_t printed = 0;
+
+    svm_host_osvw_reset();
+
+    if ( _svm_cpu_up(true) )
+    {
+        printk("SVM: failed to initialise.\n");
+        return NULL;
+    }
+
+    setup_vmcb_dump();
+
+    if ( boot_cpu_data.extended_cpuid_level >= 0x8000000a )
+        svm_feature_flags = cpuid_edx(0x8000000a);
+
+    printk("SVM: Supported advanced features:\n");
+
+    /* DecodeAssists fast paths assume nextrip is valid for fast rIP update. */
+    if ( !cpu_has_svm_nrips )
+        __clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
+
+    if ( cpu_has_tsc_ratio )
+        svm_function_table.tsc_scaling.ratio_frac_bits = 32;
+
+#define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
+    P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
+    P(cpu_has_svm_lbrv, "Last Branch Record (LBR) Virtualisation");
+    P(cpu_has_svm_nrips, "Next-RIP Saved on #VMEXIT");
+    P(cpu_has_svm_cleanbits, "VMCB Clean Bits");
+    P(cpu_has_svm_decode, "DecodeAssists");
+    P(cpu_has_svm_vloadsave, "Virtual VMLOAD/VMSAVE");
+    P(cpu_has_svm_vgif, "Virtual GIF");
+    P(cpu_has_pause_filter, "Pause-Intercept Filter");
+    P(cpu_has_pause_thresh, "Pause-Intercept Filter Threshold");
+    P(cpu_has_tsc_ratio, "TSC Rate MSR");
+    P(cpu_has_svm_sss, "NPT Supervisor Shadow Stack");
+    P(cpu_has_svm_spec_ctrl, "MSR_SPEC_CTRL virtualisation");
+#undef P
+
+    if ( !printed )
+        printk(" - none\n");
+
+    svm_function_table.hap_supported = !!cpu_has_svm_npt;
+    svm_function_table.hap_capabilities = HVM_HAP_SUPERPAGE_2MB |
+        (cpu_has_page1gb ? HVM_HAP_SUPERPAGE_1GB : 0);
+
+    return &svm_function_table;
+}
 
 void svm_vmexit_handler(struct cpu_user_regs *regs)
 {
