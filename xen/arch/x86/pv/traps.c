@@ -132,6 +132,8 @@ static void cf_check nmi_softirq(void)
     *v_ptr = NULL;
 }
 
+void nocall entry_int82(void);
+
 void __init pv_trap_init(void)
 {
 #ifdef CONFIG_PV32

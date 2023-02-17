@@ -2106,35 +2106,49 @@ void percpu_traps_init(void)
         wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
 }
 
+/* Exception entries */
+void nocall entry_DE(void);
+void nocall entry_DB(void);
+void nocall entry_NMI(void);
+void nocall entry_BP(void);
+void nocall entry_OF(void);
+void nocall entry_BR(void);
+void nocall entry_UD(void);
+void nocall entry_NM(void);
+void nocall entry_DF(void);
+void nocall entry_TS(void);
+void nocall entry_NP(void);
+void nocall entry_SS(void);
+void nocall entry_GP(void);
+void nocall early_page_fault(void);
+void nocall entry_PF(void);
+void nocall entry_MF(void);
+void nocall entry_AC(void);
+void nocall entry_MC(void);
+void nocall entry_XM(void);
+void nocall entry_CP(void);
+
 void __init init_idt_traps(void)
 {
-    /*
-     * Note that interrupt gates are always used, rather than trap gates. We
-     * must have interrupts disabled until DS/ES/FS/GS are saved because the
-     * first activation must have the "bad" value(s) for these registers and
-     * we may lose them if another activation is installed before they are
-     * saved. The page-fault handler also needs interrupts disabled until %cr2
-     * has been read and saved on the stack.
-     */
-    set_intr_gate(X86_EXC_DE,  divide_error);
-    set_intr_gate(X86_EXC_DB,  debug);
-    set_intr_gate(X86_EXC_NMI, nmi);
-    set_swint_gate(X86_EXC_BP, int3);     /* usable from all privileges */
-    set_swint_gate(X86_EXC_OF, overflow); /* usable from all privileges */
-    set_intr_gate(X86_EXC_BR,  bounds);
-    set_intr_gate(X86_EXC_UD,  invalid_op);
-    set_intr_gate(X86_EXC_NM,  device_not_available);
-    set_intr_gate(X86_EXC_DF,  double_fault);
-    set_intr_gate(X86_EXC_TS,  invalid_TSS);
-    set_intr_gate(X86_EXC_NP,  segment_not_present);
-    set_intr_gate(X86_EXC_SS,  stack_segment);
-    set_intr_gate(X86_EXC_GP,  general_protection);
-    set_intr_gate(X86_EXC_PF,  early_page_fault);
-    set_intr_gate(X86_EXC_MF,  coprocessor_error);
-    set_intr_gate(X86_EXC_AC,  alignment_check);
-    set_intr_gate(X86_EXC_MC,  machine_check);
-    set_intr_gate(X86_EXC_XM,  simd_coprocessor_error);
-    set_intr_gate(X86_EXC_CP,  entry_CP);
+    set_intr_gate (X86_EXC_DE,  entry_DE);
+    set_intr_gate (X86_EXC_DB,  entry_DB);
+    set_intr_gate (X86_EXC_NMI, entry_NMI);
+    set_swint_gate(X86_EXC_BP,  entry_BP);
+    set_swint_gate(X86_EXC_OF,  entry_OF);
+    set_intr_gate (X86_EXC_BR,  entry_BR);
+    set_intr_gate (X86_EXC_UD,  entry_UD);
+    set_intr_gate (X86_EXC_NM,  entry_NM);
+    set_intr_gate (X86_EXC_DF,  entry_DF);
+    set_intr_gate (X86_EXC_TS,  entry_TS);
+    set_intr_gate (X86_EXC_NP,  entry_NP);
+    set_intr_gate (X86_EXC_SS,  entry_SS);
+    set_intr_gate (X86_EXC_GP,  entry_GP);
+    set_intr_gate (X86_EXC_PF,  early_page_fault);
+    set_intr_gate (X86_EXC_MF,  entry_MF);
+    set_intr_gate (X86_EXC_AC,  entry_AC);
+    set_intr_gate (X86_EXC_MC,  entry_MC);
+    set_intr_gate (X86_EXC_XM,  entry_XM);
+    set_intr_gate (X86_EXC_CP,  entry_CP);
 
     /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
     enable_each_ist(idt_table);
@@ -2153,7 +2167,7 @@ void __init trap_init(void)
     unsigned int vector;
 
     /* Replace early pagefault with real pagefault handler. */
-    set_intr_gate(X86_EXC_PF, &page_fault);
+    set_intr_gate(X86_EXC_PF, entry_PF);
 
     pv_trap_init();
 

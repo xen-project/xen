@@ -417,38 +417,8 @@ extern void mtrr_bp_init(void);
 
 void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
 
-#define DECLARE_TRAP_HANDLER(_name)                    \
-    void _name(void);                                  \
-    void do_ ## _name(struct cpu_user_regs *regs)
-#define DECLARE_TRAP_HANDLER_CONST(_name)              \
-    void _name(void);                                  \
-    void do_ ## _name(const struct cpu_user_regs *regs)
-
-DECLARE_TRAP_HANDLER(divide_error);
-DECLARE_TRAP_HANDLER(debug);
-DECLARE_TRAP_HANDLER_CONST(nmi);
-DECLARE_TRAP_HANDLER(int3);
-DECLARE_TRAP_HANDLER(overflow);
-DECLARE_TRAP_HANDLER(bounds);
-DECLARE_TRAP_HANDLER(invalid_op);
-DECLARE_TRAP_HANDLER(device_not_available);
-DECLARE_TRAP_HANDLER(double_fault);
-DECLARE_TRAP_HANDLER(invalid_TSS);
-DECLARE_TRAP_HANDLER(segment_not_present);
-DECLARE_TRAP_HANDLER(stack_segment);
-DECLARE_TRAP_HANDLER(general_protection);
-DECLARE_TRAP_HANDLER(page_fault);
-DECLARE_TRAP_HANDLER(early_page_fault);
-DECLARE_TRAP_HANDLER(coprocessor_error);
-DECLARE_TRAP_HANDLER(simd_coprocessor_error);
-DECLARE_TRAP_HANDLER_CONST(machine_check);
-DECLARE_TRAP_HANDLER(alignment_check);
-DECLARE_TRAP_HANDLER(entry_CP);
-
-DECLARE_TRAP_HANDLER(entry_int82);
-
-#undef DECLARE_TRAP_HANDLER_CONST
-#undef DECLARE_TRAP_HANDLER
+void do_nmi(const struct cpu_user_regs *regs);
+void do_machine_check(const struct cpu_user_regs *regs);
 
 void trap_nop(void);
 

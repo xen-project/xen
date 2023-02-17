@@ -708,7 +708,7 @@ ENTRY(common_interrupt)
         mov   %bl, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         jmp ret_from_intr
 
-ENTRY(page_fault)
+ENTRY(entry_PF)
         ENDBR64
         movl  $X86_EXC_PF, 4(%rsp)
 /* No special register assumptions. */
@@ -881,81 +881,81 @@ FATAL_exception_with_ints_disabled:
         movq  %rsp,%rdi
         tailcall fatal_trap
 
-ENTRY(divide_error)
+ENTRY(entry_DE)
         ENDBR64
         pushq $0
         movl  $X86_EXC_DE, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(coprocessor_error)
+ENTRY(entry_MF)
         ENDBR64
         pushq $0
         movl  $X86_EXC_MF, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(simd_coprocessor_error)
+ENTRY(entry_XM)
         ENDBR64
         pushq $0
         movl  $X86_EXC_XM, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(device_not_available)
+ENTRY(entry_NM)
         ENDBR64
         pushq $0
         movl  $X86_EXC_NM, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(debug)
+ENTRY(entry_DB)
         ENDBR64
         pushq $0
         movl  $X86_EXC_DB, 4(%rsp)
         jmp   handle_ist_exception
 
-ENTRY(int3)
+ENTRY(entry_BP)
         ENDBR64
         pushq $0
         movl  $X86_EXC_BP, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(overflow)
+ENTRY(entry_OF)
         ENDBR64
         pushq $0
         movl  $X86_EXC_OF, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(bounds)
+ENTRY(entry_BR)
         ENDBR64
         pushq $0
         movl  $X86_EXC_BR, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(invalid_op)
+ENTRY(entry_UD)
         ENDBR64
         pushq $0
         movl  $X86_EXC_UD, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(invalid_TSS)
+ENTRY(entry_TS)
         ENDBR64
         movl  $X86_EXC_TS, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(segment_not_present)
+ENTRY(entry_NP)
         ENDBR64
         movl  $X86_EXC_NP, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(stack_segment)
+ENTRY(entry_SS)
         ENDBR64
         movl  $X86_EXC_SS, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(general_protection)
+ENTRY(entry_GP)
         ENDBR64
         movl  $X86_EXC_GP, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(alignment_check)
+ENTRY(entry_AC)
         ENDBR64
         movl  $X86_EXC_AC, 4(%rsp)
         jmp   handle_exception
@@ -965,7 +965,7 @@ ENTRY(entry_CP)
         movl  $X86_EXC_CP, 4(%rsp)
         jmp   handle_exception
 
-ENTRY(double_fault)
+ENTRY(entry_DF)
         ENDBR64
         movl  $X86_EXC_DF, 4(%rsp)
         /* Set AC to reduce chance of further SMAP faults */
@@ -989,7 +989,7 @@ ENTRY(double_fault)
         movq  %rsp,%rdi
         tailcall do_double_fault
 
-ENTRY(nmi)
+ENTRY(entry_NMI)
         ENDBR64
         pushq $0
         movl  $X86_EXC_NMI, 4(%rsp)
@@ -1117,7 +1117,7 @@ handle_ist_exception:
         jmp   restore_all_xen
 #endif
 
-ENTRY(machine_check)
+ENTRY(entry_MC)
         ENDBR64
         pushq $0
         movl  $X86_EXC_MC, 4(%rsp)
