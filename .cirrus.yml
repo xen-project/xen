@@ -10,19 +10,20 @@ freebsd_template: &FREEBSD_TEMPLATE
                                  libxml2 glib git
 
   build_script:
+    - cc --version
     - ./configure --with-system-seabios=/usr/local/share/seabios/bios.bin
     - gmake -j`sysctl -n hw.ncpu` clang=y
 
 task:
   name: 'FreeBSD 12'
   freebsd_instance:
-    image_family: freebsd-12-3
+    image_family: freebsd-12-4
   << : *FREEBSD_TEMPLATE
 
 task:
   name: 'FreeBSD 13'
   freebsd_instance:
-    image_family: freebsd-13-0
+    image_family: freebsd-13-2
   << : *FREEBSD_TEMPLATE
 
 task:
