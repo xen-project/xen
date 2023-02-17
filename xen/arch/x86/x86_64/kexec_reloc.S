@@ -19,6 +19,7 @@
 #include <xen/kimage.h>
 
 #include <asm/asm_defns.h>
+#include <asm/cache.h>
 #include <asm/msr-index.h>
 #include <asm/page.h>
 #include <asm/machine_kexec.h>
@@ -173,6 +174,9 @@ FUNC_LOCAL(compatibility_mode)
         call    *%ebp
         ud2
 END(compatibility_mode)
+
+        /* Separate code and data into into different cache lines */
+        .balign L1_CACHE_BYTES
 
 DATA_LOCAL(compat_mode_gdt_desc, 4)
         .word .Lcompat_mode_gdt_end - compat_mode_gdt -1
