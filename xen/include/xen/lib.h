@@ -79,7 +79,7 @@ debugtrace_printk(const char *fmt, ...) {}
 /* Allows us to use '%p' as general-purpose machine-word format char. */
 #define _p(_x) ((void *)(unsigned long)(_x))
 extern void printk(const char *fmt, ...)
-    __attribute__ ((format (printf, 1, 2)));
+    __attribute__ ((format (printf, 1, 2), cold));
 
 #define printk_once(fmt, args...)               \
 ({                                              \
