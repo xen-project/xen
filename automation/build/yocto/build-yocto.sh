@@ -18,6 +18,7 @@ CACHEDIR="$HOME/yocto-cache"
 LOGDIR="$HOME/logs"
 XENDIR="$HOME/xen"
 BUILDDIR="$HOME/build"
+OUTPUTDIR=`pwd`/binaries
 
 # what yocto bsp we support
 TARGET_SUPPORTED="qemuarm qemuarm64 qemux86-64"
@@ -31,6 +32,7 @@ do_build="y"
 do_run="y"
 do_localsrc="n"
 do_dump="n"
+do_copy="n"
 build_result=0
 
 # layers to include in the project
@@ -166,6 +168,16 @@ function project_build() {
         source "${YOCTODIR}/poky/oe-init-build-env" "${destdir}"
 
         bitbake "${build_image}" || exit 1
+        if [ $do_copy = "y" ]
+        then
+            if [ $target = "qemuarm" ]
+            then
+                mkdir -p $OUTPUTDIR
+                cp $BUILDDIR/tmp/deploy/images/qemuarm/zImage $OUTPUTDIR
+                cp $BUILDDIR/tmp/deploy/images/qemuarm/xen-qemuarm $OUTPUTDIR
+                cp $BUILDDIR/tmp/deploy/images/qemuarm/xen-image-minimal-qemuarm.tar.bz2 $OUTPUTDIR
+            fi
+        fi
     ) || return 1
 }
 
@@ -235,6 +247,7 @@ Options:
                    Default: ${CACHEDIR}
   --layer-dir=DIR  directory containing the checkout of yocto layers
                    Default: ${YOCTODIR}
+  --copy-output    Copy output binaries to binaries/
 EOF
 }
 
@@ -289,6 +302,9 @@ do
             ;;
         --layer-dir=*)
             YOCTODIR="${OPTION#*=}"
+            ;;
+        --copy-output)
+            do_copy="y"
             ;;
         --*)
             echo "Invalid option ${OPTION}"

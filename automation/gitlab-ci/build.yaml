@@ -208,13 +208,14 @@
     - /^coverity-tested\/.*/
     - /^stable-.*/
   script:
-    - ./automation/build/yocto/build-yocto.sh -v --log-dir=./logs --xen-dir=`pwd` ${YOCTO_BOARD}
+    - ./automation/build/yocto/build-yocto.sh -v --log-dir=./logs --xen-dir=`pwd` ${YOCTO_BOARD} ${YOCTO_OUTPUT}
   variables:
     YOCTO_VERSION: kirkstone
     CONTAINER: yocto:${YOCTO_VERSION}-${YOCTO_BOARD}-${YOCTO_HOST}
   artifacts:
     paths:
       - 'logs/*'
+      - binaries/
     when: always
   needs: []
 
@@ -664,6 +665,7 @@ yocto-qemuarm:
   extends: .yocto-test-arm64
   variables:
     YOCTO_BOARD: qemuarm
+    YOCTO_OUTPUT: --copy-output
 
 yocto-qemux86-64:
   extends: .yocto-test-arm64
