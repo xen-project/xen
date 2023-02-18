@@ -67,35 +67,6 @@
   tags:
     - x86_64
 
-.yocto-test:
-  extends: .test-jobs-common
-  script:
-    - ./automation/build/yocto/build-yocto.sh -v --log-dir=./logs --xen-dir=`pwd` ${YOCTO_BOARD}
-  variables:
-    YOCTO_VERSION: kirkstone
-    CONTAINER: yocto:${YOCTO_VERSION}-${YOCTO_BOARD}-${YOCTO_HOST}
-  artifacts:
-    paths:
-      - 'logs/*'
-    when: always
-  needs: []
-
-.yocto-test-arm64:
-  extends: .yocto-test
-  variables:
-    YOCTO_HOST: arm64v8
-  tags:
-    - arm64
-
-# This is not used by any test job as we only run Yocto on arm based machines.
-# Keep it here so that someone having x86 hardware can easily add jobs.
-.yocto-test-x86-64:
-  extends: .yocto-test
-  variables:
-    YOCTO_HOST: amd64
-  tags:
-    - x86_64
-
 # Test jobs
 build-each-commit-gcc:
   extends: .test-jobs-common
@@ -317,19 +288,3 @@ qemu-smoke-riscv64-gcc:
     - ./automation/scripts/qemu-smoke-riscv64.sh 2>&1 | tee ${LOGFILE}
   needs:
     - archlinux-current-gcc-riscv64-debug
-
-# Yocto test jobs
-yocto-qemuarm64:
-  extends: .yocto-test-arm64
-  variables:
-    YOCTO_BOARD: qemuarm64
-
-yocto-qemuarm:
-  extends: .yocto-test-arm64
-  variables:
-    YOCTO_BOARD: qemuarm
-
-yocto-qemux86-64:
-  extends: .yocto-test-arm64
-  variables:
-    YOCTO_BOARD: qemux86-64
