@@ -1,3 +1,11 @@
+=== Before starting ===
+
+Access to the following accounts is necessary:
+    * xenbits.xen.org: xen, xendocs
+    * osstest.osstest-test-lab: osstest
+
+=== Check list ===
+
 v=4.1
 ov=4.0
 
