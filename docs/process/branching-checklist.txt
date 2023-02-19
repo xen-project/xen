@@ -48,7 +48,7 @@ ov=4.0
     git commit -m "cr-for-branches: Add Xen and QEMU $v branch"
 
 * add to patchbot
-    on xenbits
+    ssh xen@xenbits.xen.org
     cd ~/HG/patchbot/
 
     cp xen--master.patchbot-reported-heads xen--stable-$v.patchbot-reported-heads
