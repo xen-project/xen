@@ -69,11 +69,12 @@ ov=4.0
     git add versions
     git commit -m "Branch for $v"
 
-Ensure references to qemu trees in xen.git's Config.mk are updated.
-Check this with
-    grep unstable Config.mk
-which should produce no output.  Replace as necessary.
-(There may well be none.)
+Ensure references to qemu trees and Mini-OS in xen.git's Config.mk are updated.
+The variables and there content should be:
+  * QEMU_UPSTREAM_REVISION: qemu-xen-X.Y.0
+  * QEMU_TRADITIONAL_REVISION: xen-X.Y.0
+  * MINIOS_UPSTREAM_REVISION: xen-RELEASE-X.Y.0
+Where X.Y is the release version (e.g. 4.17).
 
 Update newly diverging staging (unstable) according to
 release-technician-checklist.txt section re README etc.
