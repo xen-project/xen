@@ -16,3 +16,6 @@ ENTRY(clear_page_sse2)
 
         sfence
         ret
+
+        .type clear_page_sse2, @function
+        .size clear_page_sse2, . - clear_page_sse2

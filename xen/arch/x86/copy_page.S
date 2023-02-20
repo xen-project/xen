@@ -41,3 +41,6 @@ ENTRY(copy_page_sse2)
 
         sfence
         ret
+
+        .type copy_page_sse2, @function
+        .size copy_page_sse2, . - copy_page_sse2

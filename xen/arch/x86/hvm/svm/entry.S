@@ -139,3 +139,6 @@ GLOBAL(svm_stgi_label)
         sti
         call do_softirq
         jmp  .Lsvm_do_resume
+
+        .type svm_asm_do_resume, @function
+        .size svm_asm_do_resume, . - svm_asm_do_resume

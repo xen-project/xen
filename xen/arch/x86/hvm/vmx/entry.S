@@ -150,3 +150,6 @@ ENTRY(vmx_asm_do_vmentry)
         sti
         call do_softirq
         jmp  .Lvmx_do_vmentry
+
+        .type vmx_asm_vmexit_handler, @function
+        .size vmx_asm_vmexit_handler, . - vmx_asm_vmexit_handler
