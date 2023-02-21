@@ -184,16 +184,6 @@ archlinux-gcc-debug:
   variables:
     CONTAINER: archlinux:current
 
-centos-7-2-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: centos:7.2
-
-centos-7-2-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: centos:7.2
-
 centos-7-gcc:
   extends: .gcc-x86-64-build
   variables:
