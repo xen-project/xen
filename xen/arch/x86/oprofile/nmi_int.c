@@ -311,11 +311,11 @@ void nmi_stop(void)
 
 static int __init p4_init(char ** cpu_type)
 {
-	__u8 cpu_model = current_cpu_data.x86_model;
+	unsigned int cpu_model = current_cpu_data.x86_model;
 
 	if ((cpu_model > 6) || (cpu_model == 5)) {
 		printk("xenoprof: Initialization failed. "
-		       "Intel processor model %d for pentium 4 family is not "
+		       "Intel processor model %u for pentium 4 family is not "
 		       "supported\n", cpu_model);
 		return 0;
 	}
@@ -355,12 +355,10 @@ custom_param("cpu_type", force_cpu_type);
 
 static int __init ppro_init(char ** cpu_type)
 {
-	__u8 cpu_model = current_cpu_data.x86_model;
-
 	if (force_arch_perfmon && cpu_has_arch_perfmon)
 		return 0;
 
-	switch (cpu_model) {
+	switch (current_cpu_data.x86_model) {
 	case 14:
 		*cpu_type = "i386/core";
 		break;
@@ -390,9 +388,8 @@ static int __init arch_perfmon_init(char **cpu_type)
 
 static int __init cf_check nmi_init(void)
 {
-	__u8 vendor = current_cpu_data.x86_vendor;
-	__u8 family = current_cpu_data.x86;
-	__u8 _model = current_cpu_data.x86_model;
+	unsigned int vendor = current_cpu_data.x86_vendor;
+	unsigned int family = current_cpu_data.x86;
 
 	if (!cpu_has_apic) {
 		printk("xenoprof: Initialization failed. No APIC\n");
@@ -406,7 +403,7 @@ static int __init cf_check nmi_init(void)
 			switch (family) {
 			default:
 				printk("xenoprof: Initialization failed. "
-				       "AMD processor family %d is not "
+				       "AMD processor family %u is not "
 				       "supported\n", family);
 				return -ENODEV;
 			case 0xf:
@@ -458,15 +455,15 @@ static int __init cf_check nmi_init(void)
 			}
 			if (!cpu_type && !arch_perfmon_init(&cpu_type)) {
 				printk("xenoprof: Initialization failed. "
-				       "Intel processor family %d model %d "
-				       "is not supported\n", family, _model);
+				       "Intel processor family %u model %d is not supported\n",
+				       family, current_cpu_data.x86_model);
 				return -ENODEV;
 			}
 			break;
 
 		default:
 			printk("xenoprof: Initialization failed. "
-			       "Unsupported processor. Unknown vendor %d\n",
+			       "Unsupported processor. Unknown vendor %u\n",
 				vendor);
 			return -ENODEV;
 	}
