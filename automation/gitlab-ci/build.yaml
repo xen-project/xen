@@ -304,16 +304,6 @@ debian-unstable-clang-debug:
   variables:
     CONTAINER: debian:unstable
 
-debian-unstable-clang-8:
-  extends: .clang-8-x86-64-build
-  variables:
-    CONTAINER: debian:unstable
-
-debian-unstable-clang-8-debug:
-  extends: .clang-8-x86-64-build-debug
-  variables:
-    CONTAINER: debian:unstable
-
 debian-unstable-gcc:
   extends: .gcc-x86-64-build
   variables:
