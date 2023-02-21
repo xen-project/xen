@@ -66,15 +66,15 @@ struct msi_info {
 };
 
 struct msi_msg {
-	union {
-		u64	address; /* message address */
-		struct {
-			u32	address_lo; /* message address low 32 bits */
-			u32	address_hi; /* message address high 32 bits */
-		};
-	};
-	u32	data;		/* 16 bits of msi message data */
-	u32	dest32;		/* used when Interrupt Remapping with EIM is enabled */
+    union {
+        uint64_t address; /* message address */
+        struct {
+            uint32_t address_lo; /* message address low 32 bits */
+            uint32_t address_hi; /* message address high 32 bits */
+        };
+    };
+    uint32_t data;        /* 16 bits of msi message data */
+    uint32_t dest32;      /* used when Interrupt Remapping is enabled */
 };
 
 struct irq_desc;
@@ -94,35 +94,35 @@ extern int pci_restore_msi_state(struct pci_dev *pdev);
 extern int pci_reset_msix_state(struct pci_dev *pdev);
 
 struct msi_desc {
-	struct msi_attrib {
-		__u8	type;		/* {0: unused, 5h:MSI, 11h:MSI-X} */
-		__u8	pos;		/* Location of the MSI capability */
-		__u8	maskbit	: 1;	/* mask/pending bit supported ?   */
-		__u8	is_64	: 1;	/* Address size: 0=32bit 1=64bit  */
-		__u8	host_masked : 1;
-		__u8	guest_masked : 1;
-		__u16	entry_nr;	/* specific enabled entry 	  */
-	} msi_attrib;
+    struct msi_attrib {
+        uint8_t type;        /* {0: unused, 5h:MSI, 11h:MSI-X} */
+        uint8_t pos;         /* Location of the MSI capability */
+        bool maskbit      : 1; /* mask/pending bit supported ?   */
+        bool is_64        : 1; /* Address size: 0=32bit 1=64bit  */
+        bool host_masked  : 1;
+        bool guest_masked : 1;
+        uint16_t entry_nr;   /* specific enabled entry */
+    } msi_attrib;
 
-	bool irte_initialized;
-	uint8_t gvec;			/* guest vector. valid when pi_desc isn't NULL */
-	const struct pi_desc *pi_desc;	/* pointer to posted descriptor */
+    bool irte_initialized;
+    uint8_t gvec;            /* guest vector. valid when pi_desc isn't NULL */
+    const struct pi_desc *pi_desc; /* pointer to posted descriptor */
 
-	struct list_head list;
+    struct list_head list;
 
-	union {
-		void __iomem *mask_base;/* va for the entry in mask table */
-		struct {
-			unsigned int nvec;/* number of vectors            */
-			unsigned int mpos;/* location of mask register    */
-		} msi;
-		unsigned int hpet_id;   /* HPET (dev is NULL)             */
-	};
-	struct pci_dev *dev;
-	int irq;
-	int remap_index;		/* index in interrupt remapping table */
+    union {
+        void __iomem *mask_base; /* va for the entry in mask table */
+        struct {
+            unsigned int nvec; /* number of vectors */
+            unsigned int mpos; /* location of mask register */
+        } msi;
+        unsigned int hpet_id; /* HPET (dev is NULL) */
+    };
+    struct pci_dev *dev;
+    int irq;
+    int remap_index;         /* index in interrupt remapping table */
 
-	struct msi_msg msg;		/* Last set MSI message */
+    struct msi_msg msg;      /* Last set MSI message */
 };
 
 /*
@@ -179,49 +179,27 @@ int msi_free_irq(struct msi_desc *entry);
  */
 
 struct __packed msg_data {
-#if defined(__LITTLE_ENDIAN_BITFIELD)
-	__u32	vector		:  8;
-	__u32	delivery_mode	:  3;	/* 000b: FIXED | 001b: lowest prior */
-	__u32	reserved_1	:  3;
-	__u32	level		:  1;	/* 0: deassert | 1: assert */
-	__u32	trigger		:  1;	/* 0: edge | 1: level */
-	__u32	reserved_2	: 16;
-#elif defined(__BIG_ENDIAN_BITFIELD)
-	__u32	reserved_2	: 16;
-	__u32	trigger		:  1;	/* 0: edge | 1: level */
-	__u32	level		:  1;	/* 0: deassert | 1: assert */
-	__u32	reserved_1	:  3;
-	__u32	delivery_mode	:  3;	/* 000b: FIXED | 001b: lowest prior */
-	__u32	vector		:  8;
-#else
-#error "Bitfield endianness not defined! Check your byteorder.h"
-#endif
+    uint32_t vector        :  8;
+    uint32_t delivery_mode :  3;    /* 000b: FIXED | 001b: lowest prior */
+    uint32_t               :  3;
+    bool level             :  1;    /* 0: deassert | 1: assert */
+    bool trigger           :  1;    /* 0: edge | 1: level */
+    uint32_t               : 16;
 };
 
 struct __packed msg_address {
-	union {
-		struct {
-#if defined(__LITTLE_ENDIAN_BITFIELD)
-			__u32	reserved_1	:  2;
-			__u32	dest_mode	:  1;	/*0:physic | 1:logic */
-			__u32	redirection_hint:  1;  	/*0: dedicated CPU
-							  1: lowest priority */
-			__u32	reserved_2	:  4;
- 			__u32	dest_id		: 24;	/* Destination ID */
-#elif defined(__BIG_ENDIAN_BITFIELD)
- 			__u32	dest_id		: 24;	/* Destination ID */
-			__u32	reserved_2	:  4;
-			__u32	redirection_hint:  1;  	/*0: dedicated CPU
-							  1: lowest priority */
-			__u32	dest_mode	:  1;	/*0:physic | 1:logic */
-			__u32	reserved_1	:  2;
-#else
-#error "Bitfield endianness not defined! Check your byteorder.h"
-#endif
-      		}u;
-       		__u32  value;
-	}lo_address;
-	__u32 	hi_address;
+    union {
+        struct {
+            uint32_t              :  2;
+            bool dest_mode        :  1; /* 0:phys | 1:logic */
+            bool redirection_hint :  1; /* 0: dedicated CPU
+                                           1: lowest priority */
+            uint32_t              :  4;
+            uint32_t dest_id      : 24; /* Destination ID */
+        } u;
+        uint32_t value;
+    } lo_address;
+    uint32_t hi_address;
 };
 
 #define MAX_MSIX_TABLE_ENTRIES  (PCI_MSIX_FLAGS_QSIZE + 1)
