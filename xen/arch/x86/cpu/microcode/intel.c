@@ -232,8 +232,8 @@ static enum microcode_match_result compare_revisions(
     if ( new_rev > old_rev )
         return NEW_UCODE;
 
-    if ( opt_ucode_allow_same && new_rev == old_rev )
-        return NEW_UCODE;
+    if ( new_rev == old_rev )
+        return SAME_UCODE;
 
     /*
      * Treat pre-production as always applicable - anyone using pre-production
@@ -290,8 +290,12 @@ static int cf_check apply_microcode(const struct microcode_patch *patch)
     unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &this_cpu(cpu_sig);
     uint32_t rev, old_rev = sig->rev;
+    enum microcode_match_result result;
 
-    if ( microcode_update_match(patch) != NEW_UCODE )
+    result = microcode_update_match(patch);
+
+    if ( result != NEW_UCODE &&
+         !(opt_ucode_allow_same && result == SAME_UCODE) )
         return -EINVAL;
 
     wbinvd();
