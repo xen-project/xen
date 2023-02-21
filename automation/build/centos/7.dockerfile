@@ -15,7 +15,8 @@ RUN rpm --rebuilddb && \
     rm -rf /var/cache/yum
 
 # install Xen depends
-RUN yum -y install \
+RUN yum -y update \
+    && yum -y install \
         gcc \
         gcc-c++ \
         ncurses-devel \
