@@ -419,7 +419,8 @@ static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
     uint64_t virt_offset;
 
     if ( (parms->elf_paddr_offset != UNSET_ADDR) &&
-         (parms->virt_base == UNSET_ADDR) )
+         (parms->virt_base == UNSET_ADDR) &&
+         !hvm )
     {
         elf_err(elf, "ERROR: ELF_PADDR_OFFSET set, VIRT_BASE unset\n");
         return -1;
