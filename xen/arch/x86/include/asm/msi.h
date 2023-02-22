@@ -178,7 +178,7 @@ int msi_free_irq(struct msi_desc *entry);
  * MSI Defined Data Structures
  */
 
-struct __packed msg_data {
+struct msg_data {
     uint32_t vector        :  8;
     uint32_t delivery_mode :  3;    /* 000b: FIXED | 001b: lowest prior */
     uint32_t               :  3;
@@ -187,7 +187,7 @@ struct __packed msg_data {
     uint32_t               : 16;
 };
 
-struct __packed msg_address {
+struct msg_address {
     union {
         struct {
             uint32_t              :  2;
