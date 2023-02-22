@@ -22,8 +22,6 @@ RUN zypper install -y --no-recommends \
         flex \
         gcc \
         gcc-c++ \
-        # gettext-tools for Xen < 4.13
-        gettext-tools \
         git \
         glib2-devel \
         glibc-devel \

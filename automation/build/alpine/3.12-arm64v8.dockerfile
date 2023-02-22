@@ -20,8 +20,6 @@ RUN apk --no-cache add \
   dtc-dev \
   flex \
   gcc \
-  # gettext for Xen < 4.13
-  gettext \
   git \
   iasl \
   libaio-dev \

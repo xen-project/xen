@@ -21,8 +21,6 @@ RUN apk --no-cache add \
   flex \
   g++ \
   gcc \
-  # gettext for Xen < 4.13
-  gettext \
   git \
   grep \
   iasl \

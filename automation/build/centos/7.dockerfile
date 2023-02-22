@@ -25,8 +25,6 @@ RUN yum -y update \
         python-devel \
         libuuid-devel \
         pkgconfig \
-        # gettext for Xen < 4.13
-        gettext \
         flex \
         bison \
         libaio-devel \
