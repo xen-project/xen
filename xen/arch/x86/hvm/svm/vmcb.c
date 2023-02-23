@@ -169,11 +169,11 @@ static int construct_vmcb(struct vcpu *v)
 
     if ( cpu_has_pause_filter )
     {
-        vmcb->_pause_filter_count = SVM_PAUSEFILTER_INIT;
+        vmcb->_pause_filter_count = 4000;
         vmcb->_general1_intercepts |= GENERAL1_INTERCEPT_PAUSE;
 
         if ( cpu_has_pause_thresh )
-            vmcb->_pause_filter_thresh = SVM_PAUSETHRESH_INIT;
+            vmcb->_pause_filter_thresh = 1000;
     }
 
     /*

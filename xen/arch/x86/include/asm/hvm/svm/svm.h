@@ -96,9 +96,6 @@ extern u32 svm_feature_flags;
 #define cpu_has_svm_sss       cpu_has_svm_feature(SVM_FEATURE_SSS)
 #define cpu_has_svm_spec_ctrl cpu_has_svm_feature(SVM_FEATURE_SPEC_CTRL)
 
-#define SVM_PAUSEFILTER_INIT    4000
-#define SVM_PAUSETHRESH_INIT    1000
-
 /* TSC rate */
 #define DEFAULT_TSC_RATIO       0x0000000100000000ULL
 #define TSC_RATIO_RSVD_BITS     0xffffff0000000000ULL
