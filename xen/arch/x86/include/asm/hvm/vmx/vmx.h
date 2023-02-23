@@ -82,7 +82,6 @@ typedef enum {
 
 #define PI_xAPIC_NDST_MASK      0xFF00
 
-void vmx_asm_vmexit_handler(struct cpu_user_regs);
 void vmx_intr_assist(void);
 void noreturn cf_check vmx_do_resume(void);
 void cf_check vmx_vlapic_msr_changed(struct vcpu *v);

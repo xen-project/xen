@@ -1074,6 +1074,8 @@ static void pi_desc_init(struct vcpu *v)
     v->arch.hvm.vmx.pi_desc.ndst = APIC_INVALID_DEST;
 }
 
+void nocall vmx_asm_vmexit_handler(void);
+
 static int construct_vmcs(struct vcpu *v)
 {
     struct domain *d = v->domain;
