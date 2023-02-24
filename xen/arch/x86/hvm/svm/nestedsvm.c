@@ -164,7 +164,6 @@ int cf_check nsvm_vcpu_reset(struct vcpu *v)
     svm->ns_exception_intercepts = 0;
     svm->ns_general1_intercepts = 0;
     svm->ns_general2_intercepts = 0;
-    svm->ns_virt_ext.bytes = 0;
 
     svm->ns_hap_enabled = 0;
     svm->ns_vmcb_guestcr3 = 0;
@@ -523,10 +522,6 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
 
     /* Pending Interrupts */
     n2vmcb->event_inj = ns_vmcb->event_inj;
-
-    /* LBR and other virtualization */
-    if ( !clean.lbr )
-        svm->ns_virt_ext = ns_vmcb->virt_ext;
 
     n2vmcb->virt_ext.bytes =
         n1vmcb->virt_ext.bytes | ns_vmcb->virt_ext.bytes;

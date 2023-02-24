@@ -20,8 +20,6 @@
 
 #include <xen/types.h>
 
-#include <asm/hvm/svm/vmcb.h>
-
 struct nestedsvm {
     bool ns_gif;
     uint64_t ns_msr_hsavepa; /* MSR HSAVE_PA value */
@@ -42,9 +40,6 @@ struct nestedsvm {
     uint32_t ns_exception_intercepts;
     uint32_t ns_general1_intercepts;
     uint32_t ns_general2_intercepts;
-
-    /* Cached real lbr and other virtual extentions of the l2 guest */
-    virt_ext_t ns_virt_ext;
 
     /* Cached real MSR permission bitmaps of the l2 guest */
     unsigned long *ns_cached_msrpm;
