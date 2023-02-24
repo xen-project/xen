@@ -47,3 +47,8 @@ RUN apt-get update && \
         apt-get autoremove -y && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
+
+# Remove expired certificate that Let's Encrypt certificates used to relie on.
+# (Not needed anymore)
+RUN sed -i 's#mozilla/DST_Root_CA_X3\.crt#!\0#' /etc/ca-certificates.conf && \
+    update-ca-certificates
