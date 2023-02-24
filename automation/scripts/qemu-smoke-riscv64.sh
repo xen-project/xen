@@ -16,5 +16,5 @@ qemu-system-riscv64 \
     |& tee smoke.serial
 
 set -e
-(grep -q "Hello from C env" smoke.serial) || exit 1
+(grep -q "All set up" smoke.serial) || exit 1
 exit 0

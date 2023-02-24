@@ -11,6 +11,7 @@ void __init noreturn start_xen(void)
 {
     early_printk("Hello from C env\n");
 
+    early_printk("All set up\n");
     for ( ;; )
         asm volatile ("wfi");
 
