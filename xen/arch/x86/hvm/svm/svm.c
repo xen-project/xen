@@ -37,7 +37,6 @@
 #include <asm/hvm/monitor.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/support.h>
-#include <asm/hvm/svm/asid.h>
 #include <asm/hvm/svm/emulate.h>
 #include <asm/hvm/svm/nestedsvm.h>
 #include <asm/hvm/svm/svm.h>
@@ -2421,7 +2420,8 @@ static bool cf_check is_invlpg(
 
 static void cf_check svm_invlpg(struct vcpu *v, unsigned long linear)
 {
-    svm_asid_g_invlpg(v, linear);
+    /* Safe fallback. Take a new ASID. */
+    hvm_asid_flush_vcpu(v);
 }
 
 static bool cf_check svm_get_pending_event(

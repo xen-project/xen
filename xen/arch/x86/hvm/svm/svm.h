@@ -12,6 +12,10 @@
 #include <xen/types.h>
 
 struct cpu_user_regs;
+struct cpuinfo_x86;
+
+void svm_asid_init(const struct cpuinfo_x86 *c);
+void svm_asid_handle_vmrun(void);
 
 unsigned long *svm_msrbit(unsigned long *msr_bitmap, uint32_t msr);
 void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len);

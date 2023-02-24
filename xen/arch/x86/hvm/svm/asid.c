@@ -17,8 +17,9 @@
 
 #include <asm/amd.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/hvm/svm/asid.h>
 #include <asm/hvm/svm/svm.h>
+
+#include "svm.h"
 
 void svm_asid_init(const struct cpuinfo_x86 *c)
 {
