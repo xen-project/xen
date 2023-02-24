@@ -55,6 +55,8 @@
 
 #include <public/sched.h>
 
+#include "svm.h"
+
 void noreturn svm_asm_do_resume(void);
 
 u32 svm_feature_flags;
