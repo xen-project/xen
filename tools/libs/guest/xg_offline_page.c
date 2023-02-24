@@ -181,10 +181,16 @@ static int backup_ptes(xen_pfn_t table_mfn, int offset,
 
     if (backup->max == backup->cur)
     {
-        backup->entries = realloc(backup->entries,
-                            backup->max * 2 * sizeof(struct pte_backup_entry));
+        void *orig = backup->entries;
+
+        backup->entries = realloc(
+            orig, backup->max * 2 * sizeof(struct pte_backup_entry));
+
         if (backup->entries == NULL)
+        {
+            free(orig);
             return -1;
+        }
         else
             backup->max *= 2;
     }
