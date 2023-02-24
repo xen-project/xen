@@ -17,7 +17,6 @@
  */
 
 #include <asm/hvm/support.h>
-#include <asm/hvm/svm/emulate.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/nestedhvm.h>

@@ -24,7 +24,8 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
-#include <asm/hvm/svm/emulate.h>
+
+#include "svm.h"
 
 static unsigned long svm_nextrip_insn_length(struct vcpu *v)
 {
