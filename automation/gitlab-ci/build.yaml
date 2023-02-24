@@ -264,18 +264,8 @@ debian-stretch-gcc-debug:
   variables:
     CONTAINER: debian:stretch
 
-debian-stretch-32-clang:
-  extends: .clang-x86-32-build
-  variables:
-    CONTAINER: debian:stretch-i386
-
 debian-stretch-32-clang-debug:
   extends: .clang-x86-32-build-debug
-  variables:
-    CONTAINER: debian:stretch-i386
-
-debian-stretch-32-gcc:
-  extends: .gcc-x86-32-build
   variables:
     CONTAINER: debian:stretch-i386
 
@@ -316,18 +306,8 @@ debian-unstable-gcc-debug-randconfig:
     CONTAINER: debian:unstable
     RANDCONFIG: y
 
-debian-unstable-32-clang:
-  extends: .clang-x86-32-build
-  variables:
-    CONTAINER: debian:unstable-i386
-
 debian-unstable-32-clang-debug:
   extends: .clang-x86-32-build-debug
-  variables:
-    CONTAINER: debian:unstable-i386
-
-debian-unstable-32-gcc:
-  extends: .gcc-x86-32-build
   variables:
     CONTAINER: debian:unstable-i386
 
