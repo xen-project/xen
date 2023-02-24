@@ -1868,6 +1868,18 @@ void vmx_vmentry_failure(void)
 
 void noreturn vmx_asm_do_vmentry(void);
 
+static void vmx_update_debug_state(struct vcpu *v)
+{
+    if ( v->arch.hvm.debug_state_latch )
+        v->arch.hvm.vmx.exception_bitmap |= 1U << TRAP_int3;
+    else
+        v->arch.hvm.vmx.exception_bitmap &= ~(1U << TRAP_int3);
+
+    vmx_vmcs_enter(v);
+    vmx_update_exception_bitmap(v);
+    vmx_vmcs_exit(v);
+}
+
 void cf_check vmx_do_resume(void)
 {
     struct vcpu *v = current;

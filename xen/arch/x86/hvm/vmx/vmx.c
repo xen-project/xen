@@ -1613,18 +1613,6 @@ static void cf_check vmx_update_host_cr3(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-void vmx_update_debug_state(struct vcpu *v)
-{
-    if ( v->arch.hvm.debug_state_latch )
-        v->arch.hvm.vmx.exception_bitmap |= 1U << TRAP_int3;
-    else
-        v->arch.hvm.vmx.exception_bitmap &= ~(1U << TRAP_int3);
-
-    vmx_vmcs_enter(v);
-    vmx_update_exception_bitmap(v);
-    vmx_vmcs_exit(v);
-}
-
 static void cf_check vmx_update_guest_cr(
     struct vcpu *v, unsigned int cr, unsigned int flags)
 {
