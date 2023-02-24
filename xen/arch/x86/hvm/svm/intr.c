@@ -37,6 +37,8 @@
 #include <xen/domain_page.h>
 #include <asm/hvm/trace.h>
 
+#include "nestedhvm.h"
+
 static void svm_inject_nmi(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
