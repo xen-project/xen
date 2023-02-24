@@ -1899,7 +1899,7 @@ static void cf_check vmx_update_guest_efer(struct vcpu *v)
         vmx_set_msr_intercept(v, MSR_EFER, VMX_MSR_R);
 }
 
-void nvmx_enqueue_n2_exceptions(struct vcpu *v, 
+static void nvmx_enqueue_n2_exceptions(struct vcpu *v,
             unsigned long intr_fields, int error_code, uint8_t source)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
