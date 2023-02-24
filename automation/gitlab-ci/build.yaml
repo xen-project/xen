@@ -221,46 +221,6 @@ centos-7-gcc-debug:
   variables:
     CONTAINER: centos:7
 
-debian-jessie-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: debian:jessie
-
-debian-jessie-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: debian:jessie
-
-debian-jessie-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: debian:jessie
-
-debian-jessie-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: debian:jessie
-
-debian-jessie-32-clang:
-  extends: .clang-x86-32-build
-  variables:
-    CONTAINER: debian:jessie-i386
-
-debian-jessie-32-clang-debug:
-  extends: .clang-x86-32-build-debug
-  variables:
-    CONTAINER: debian:jessie-i386
-
-debian-jessie-32-gcc:
-  extends: .gcc-x86-32-build
-  variables:
-    CONTAINER: debian:jessie-i386
-
-debian-jessie-32-gcc-debug:
-  extends: .gcc-x86-32-build-debug
-  variables:
-    CONTAINER: debian:jessie-i386
-
 debian-stretch-clang:
   extends: .clang-x86-64-build
   variables:
