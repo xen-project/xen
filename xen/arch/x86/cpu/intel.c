@@ -518,6 +518,18 @@ static void init_intel(struct cpuinfo_x86 *c)
 	if ((opt_cpu_info && !(c->apicid & (c->x86_num_siblings - 1))) ||
 	    c == &boot_cpu_data )
 		intel_log_freq(c);
+
+	/*
+	 * The Gather Data Sampling microcode mitigation (August 2023) has an
+	 * adverse performance impact on the CLWB instruction on SKX/CLX/CPX.
+	 *
+	 * On this model, CLWB has equivalent behaviour to CLFLUSHOPT but the
+	 * latter is not impacted.  Hide CLWB to cause Xen to fall back to
+	 * using CLFLUSHOPT instead.
+	 */
+	if (c == &boot_cpu_data &&
+	    c->x86 == 6 && c->x86_model == 0x55 /* INTEL_FAM6_SKYLAKE_X */)
+		setup_clear_cpu_cap(X86_FEATURE_CLWB);
 }
 
 const struct cpu_dev intel_cpu_dev = {
