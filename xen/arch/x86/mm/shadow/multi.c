@@ -2592,8 +2592,6 @@ static int cf_check sh_page_fault(
     if ( p2mt == p2m_mmio_dm )
     {
         ASSERT(is_hvm_vcpu(v));
-        if ( !guest_mode(regs) )
-            goto not_a_shadow_fault;
 
         sh_audit_gw(v, &gw);
         gpa = guest_walk_to_gpa(&gw);
@@ -2645,7 +2643,7 @@ static int cf_check sh_page_fault(
     return EXCRET_fault_fixed;
 
  emulate:
-    if ( !shadow_mode_refcounts(d) || !guest_mode(regs) )
+    if ( !shadow_mode_refcounts(d) )
         goto not_a_shadow_fault;
 
 #ifdef CONFIG_HVM
@@ -2670,16 +2668,11 @@ static int cf_check sh_page_fault(
      * caught by user-mode page-table check above.
      */
  emulate_readonly:
-    if ( !is_hvm_domain(d) )
-    {
-        ASSERT_UNREACHABLE();
-        goto not_a_shadow_fault;
-    }
-
-    /* Unshadow if we are writing to a toplevel pagetable that is
-     * flagged as a dying process, and that is not currently used. */
-    if ( sh_mfn_is_a_page_table(gmfn) && is_hvm_domain(d) &&
-         mfn_to_page(gmfn)->pagetable_dying )
+    /*
+     * Unshadow if we are writing to a toplevel pagetable that is
+     * flagged as a dying process, and that is not currently used.
+     */
+    if ( sh_mfn_is_a_page_table(gmfn) && mfn_to_page(gmfn)->pagetable_dying )
     {
         int used = 0;
         struct vcpu *tmp;
