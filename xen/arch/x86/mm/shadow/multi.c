@@ -2161,8 +2161,8 @@ static int cf_check sh_page_fault(
     gfn_t gfn = _gfn(0);
     mfn_t gmfn, sl1mfn = _mfn(0);
     shadow_l1e_t sl1e, *ptr_sl1e;
-    paddr_t gpa;
 #ifdef CONFIG_HVM
+    paddr_t gpa;
     struct sh_emulate_ctxt emul_ctxt;
     const struct x86_emulate_ops *emul_ops;
     int r;
@@ -2586,12 +2586,32 @@ static int cf_check sh_page_fault(
         goto emulate;
     }
 
+#ifdef CONFIG_HVM
+
     /* Need to hand off device-model MMIO to the device model */
     if ( p2mt == p2m_mmio_dm )
     {
+        ASSERT(is_hvm_vcpu(v));
+        if ( !guest_mode(regs) )
+            goto not_a_shadow_fault;
+
+        sh_audit_gw(v, &gw);
         gpa = guest_walk_to_gpa(&gw);
-        goto mmio;
+        SHADOW_PRINTK("mmio %#"PRIpaddr"\n", gpa);
+        shadow_audit_tables(v);
+        sh_reset_early_unshadow(v);
+
+        paging_unlock(d);
+        put_gfn(d, gfn_x(gfn));
+
+        perfc_incr(shadow_fault_mmio);
+        trace_shadow_gen(TRC_SHADOW_MMIO, va);
+
+        return handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
+               ? EXCRET_fault_fixed : 0;
     }
+
+#endif /* CONFIG_HVM */
 
     /* Ignore attempts to write to read-only memory. */
     if ( p2m_is_readonly(p2mt) && (ft == ft_demand_write) )
@@ -2864,25 +2884,6 @@ static int cf_check sh_page_fault(
     SHADOW_PRINTK("emulated\n");
     return EXCRET_fault_fixed;
 #endif /* CONFIG_HVM */
-
- mmio:
-    if ( !guest_mode(regs) )
-        goto not_a_shadow_fault;
-#ifdef CONFIG_HVM
-    ASSERT(is_hvm_vcpu(v));
-    perfc_incr(shadow_fault_mmio);
-    sh_audit_gw(v, &gw);
-    SHADOW_PRINTK("mmio %#"PRIpaddr"\n", gpa);
-    shadow_audit_tables(v);
-    sh_reset_early_unshadow(v);
-    paging_unlock(d);
-    put_gfn(d, gfn_x(gfn));
-    trace_shadow_gen(TRC_SHADOW_MMIO, va);
-    return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
-            ? EXCRET_fault_fixed : 0);
-#else
-    BUG();
-#endif
 
  not_a_shadow_fault:
     sh_audit_gw(v, &gw);
