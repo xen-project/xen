@@ -305,7 +305,7 @@ void __init discard_initial_images(void)
     initial_images = NULL;
 }
 
-extern char __init_begin[], __init_end[], __bss_start[], __bss_end[];
+extern unsigned char __init_begin[], __init_end[];
 
 static void __init init_idle_domain(void)
 {
