@@ -2611,8 +2611,6 @@ static int cf_check sh_page_fault(
                ? EXCRET_fault_fixed : 0;
     }
 
-#endif /* CONFIG_HVM */
-
     /* Ignore attempts to write to read-only memory. */
     if ( p2m_is_readonly(p2mt) && (ft == ft_demand_write) )
         goto emulate_readonly; /* skip over the instruction */
@@ -2631,12 +2629,14 @@ static int cf_check sh_page_fault(
         goto emulate;
     }
 
+#endif /* CONFIG_HVM */
+
     perfc_incr(shadow_fault_fixed);
     d->arch.paging.log_dirty.fault_count++;
     sh_reset_early_unshadow(v);
 
     trace_shadow_fixup(gw.l1e, va);
- done:
+ done: __maybe_unused;
     sh_audit_gw(v, &gw);
     SHADOW_PRINTK("fixed\n");
     shadow_audit_tables(v);
@@ -2648,6 +2648,7 @@ static int cf_check sh_page_fault(
     if ( !shadow_mode_refcounts(d) || !guest_mode(regs) )
         goto not_a_shadow_fault;
 
+#ifdef CONFIG_HVM
     /*
      * We do not emulate user writes. Instead we use them as a hint that the
      * page is no longer a page table. This behaviour differs from native, but
@@ -2675,7 +2676,6 @@ static int cf_check sh_page_fault(
         goto not_a_shadow_fault;
     }
 
-#ifdef CONFIG_HVM
     /* Unshadow if we are writing to a toplevel pagetable that is
      * flagged as a dying process, and that is not currently used. */
     if ( sh_mfn_is_a_page_table(gmfn) && is_hvm_domain(d) &&
