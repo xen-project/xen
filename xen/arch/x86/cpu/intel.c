@@ -4,6 +4,8 @@
 #include <xen/string.h>
 #include <xen/bitops.h>
 #include <xen/smp.h>
+
+#include <asm/intel-family.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
@@ -561,6 +563,18 @@ static void cf_check init_intel(struct cpuinfo_x86 *c)
 	if ((opt_cpu_info && !(c->apicid & (c->x86_num_siblings - 1))) ||
 	    c == &boot_cpu_data )
 		intel_log_freq(c);
+
+	/*
+	 * The Gather Data Sampling microcode mitigation (August 2023) has an
+	 * adverse performance impact on the CLWB instruction on SKX/CLX/CPX.
+	 *
+	 * On this model, CLWB has equivalent behaviour to CLFLUSHOPT but the
+	 * latter is not impacted.  Hide CLWB to cause Xen to fall back to
+	 * using CLFLUSHOPT instead.
+	 */
+	if (c == &boot_cpu_data &&
+	    c->x86 == 6 && c->x86_model == INTEL_FAM6_SKYLAKE_X)
+		setup_clear_cpu_cap(X86_FEATURE_CLWB);
 }
 
 const struct cpu_dev intel_cpu_dev = {
