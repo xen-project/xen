@@ -7,6 +7,7 @@
     paths:
       - binaries/
       - xen-config
+      - xen-cppcheck.txt
       - '*.log'
       - '*/*.log'
     when: always
@@ -234,6 +235,23 @@
     YOCTO_HOST: amd64
   tags:
     - x86_64
+
+.x86-64-cross-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: x86_64
+  tags:
+    - arm64
+
+.x86-64-cross-build:
+  extends: .x86-64-cross-build-tmpl
+  variables:
+    debug: n
+
+.gcc-x86-64-cross-build:
+  extends: .x86-64-cross-build
+  variables:
+    <<: *gcc
 
 # Jobs below this line
 
@@ -671,6 +689,31 @@ yocto-qemux86-64:
   extends: .yocto-test-arm64
   variables:
     YOCTO_BOARD: qemux86-64
+
+# Cppcheck analysis jobs
+
+debian-unstable-gcc-cppcheck:
+  extends: .gcc-x86-64-cross-build
+  variables:
+    CONTAINER: debian:unstable-cppcheck
+    CROSS_COMPILE: /usr/bin/x86_64-linux-gnu-
+    CPPCHECK: y
+    HYPERVISOR_ONLY: y
+
+debian-unstable-gcc-arm32-cppcheck:
+  extends: .gcc-arm32-cross-build
+  variables:
+    CONTAINER: debian:unstable-cppcheck
+    CROSS_COMPILE: /usr/bin/arm-linux-gnueabihf-
+    CPPCHECK: y
+    HYPERVISOR_ONLY: y
+
+debian-unstable-gcc-arm64-cppcheck:
+  extends: .gcc-arm64-build
+  variables:
+    CONTAINER: debian:unstable-cppcheck
+    CPPCHECK: y
+    HYPERVISOR_ONLY: y
 
 ## Test artifacts common
 
