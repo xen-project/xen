@@ -276,6 +276,20 @@ static bool microcode_update_cache(struct microcode_patch *patch)
     return true;
 }
 
+/* Returns true if ucode should be loaded on a given cpu */
+static bool is_cpu_primary(unsigned int cpu)
+{
+    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
+        /* Load ucode on every logical thread/core */
+        return true;
+
+    /* Intel CPUs should load ucode only on the first core of SMT siblings */
+    if ( cpu == cpumask_first(per_cpu(cpu_sibling_mask, cpu)) )
+        return true;
+
+    return false;
+}
+
 /* Wait for a condition to be met with a timeout (us). */
 static int wait_for_condition(bool (*func)(unsigned int data),
                               unsigned int data, unsigned int timeout)
@@ -382,7 +396,7 @@ static int primary_thread_work(const struct microcode_patch *patch)
 static int cf_check microcode_nmi_callback(
     const struct cpu_user_regs *regs, int cpu)
 {
-    unsigned int primary = cpumask_first(this_cpu(cpu_sibling_mask));
+    bool primary_cpu = is_cpu_primary(cpu);
     int ret;
 
     /* System-generated NMI, leave to main handler */
@@ -395,10 +409,10 @@ static int cf_check microcode_nmi_callback(
      * ucode_in_nmi.
      */
     if ( cpu == cpumask_first(&cpu_online_map) ||
-         (!ucode_in_nmi && cpu == primary) )
+         (!ucode_in_nmi && primary_cpu) )
         return 0;
 
-    if ( cpu == primary )
+    if ( primary_cpu )
         ret = primary_thread_work(nmi_patch);
     else
         ret = secondary_nmi_work();
@@ -549,7 +563,7 @@ static int cf_check do_microcode_update(void *patch)
      */
     if ( cpu == cpumask_first(&cpu_online_map) )
         ret = control_thread_fn(patch);
-    else if ( cpu == cpumask_first(this_cpu(cpu_sibling_mask)) )
+    else if ( is_cpu_primary(cpu) )
         ret = primary_thread_fn(patch);
     else
         ret = secondary_thread_fn();
@@ -642,7 +656,7 @@ static long cf_check microcode_update_helper(void *data)
     /* Calculate the number of online CPU core */
     nr_cores = 0;
     for_each_online_cpu(cpu)
-        if ( cpu == cpumask_first(per_cpu(cpu_sibling_mask, cpu)) )
+        if ( is_cpu_primary(cpu) )
             nr_cores++;
 
     printk(XENLOG_INFO "%u cores are to update their microcode\n", nr_cores);
