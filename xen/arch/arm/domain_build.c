@@ -3879,6 +3879,9 @@ void __init create_domUs(void)
         if ( !dt_device_is_compatible(node, "xen,domain") )
             continue;
 
+        if ( (max_init_domid + 1) >= DOMID_FIRST_RESERVED )
+            panic("No more domain IDs available\n");
+
         if ( dt_find_property(node, "xen,static-mem", NULL) )
             flags |= CDF_staticmem;
 
