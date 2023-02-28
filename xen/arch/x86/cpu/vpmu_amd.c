@@ -1,5 +1,5 @@
 /*
- * vpmu.c: PMU virtualization for HVM domain.
+ * vpmu_amd.c: AMD specific PMU virtualization.
  *
  * Copyright (c) 2010, Advanced Micro Devices, Inc.
  * Parts of this code are Copyright (c) 2007, Intel Corporation
@@ -480,7 +480,7 @@ static void cf_check amd_vpmu_dump(const struct vcpu *v)
     }
 }
 
-static int cf_check svm_vpmu_initialise(struct vcpu *v)
+static int cf_check amd_vpmu_initialise(struct vcpu *v)
 {
     struct xen_pmu_amd_ctxt *ctxt;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -527,7 +527,7 @@ static int cf_check amd_allocate_context(struct vcpu *v)
 #endif
 
 static const struct arch_vpmu_ops __initconst_cf_clobber amd_vpmu_ops = {
-    .initialise = svm_vpmu_initialise,
+    .initialise = amd_vpmu_initialise,
     .do_wrmsr = amd_vpmu_do_wrmsr,
     .do_rdmsr = amd_vpmu_do_rdmsr,
     .do_interrupt = amd_vpmu_do_interrupt,

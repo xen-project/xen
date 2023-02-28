@@ -1,5 +1,5 @@
 /*
- * vpmu_core2.c: CORE 2 specific PMU virtualization for HVM domain.
+ * vpmu_intel.c: CORE 2 specific PMU virtualization.
  *
  * Copyright (c) 2007, Intel Corporation.
  *
@@ -833,7 +833,7 @@ static void cf_check core2_vpmu_destroy(struct vcpu *v)
     vpmu_clear(vpmu);
 }
 
-static int cf_check vmx_vpmu_initialise(struct vcpu *v)
+static int cf_check core2_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     u64 msr_content;
@@ -898,7 +898,7 @@ static int cf_check vmx_vpmu_initialise(struct vcpu *v)
 }
 
 static const struct arch_vpmu_ops __initconst_cf_clobber core2_vpmu_ops = {
-    .initialise = vmx_vpmu_initialise,
+    .initialise = core2_vpmu_initialise,
     .do_wrmsr = core2_vpmu_do_wrmsr,
     .do_rdmsr = core2_vpmu_do_rdmsr,
     .do_interrupt = core2_vpmu_do_interrupt,
