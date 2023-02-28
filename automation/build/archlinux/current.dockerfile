@@ -1,16 +1,15 @@
-FROM archlinux/base
+FROM archlinux:base-devel
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
-# Enable multilib repo, for dev86 package
-RUN echo $'[multilib]\nInclude = /etc/pacman.d/mirrorlist' >> /etc/pacman.conf
+RUN pacman-key --init
 
 RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
-        base-devel \
         bin86 \
         bridge-utils \
         bzip2 \
         dev86 \
+        discount \
         dtc \
         e2fsprogs \
         ghostscript \
@@ -29,7 +28,6 @@ RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
         libnl \
         libpng \
         libseccomp \
-        markdown \
         net-tools \
         nss \
         perl \
@@ -46,7 +44,8 @@ RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
         wget \
         xz \
         yajl \
-        zlib
+        zlib \
+    && yes | pacman -S --clean --clean
 
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl
 
