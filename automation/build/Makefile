@@ -16,7 +16,7 @@ help:
 include yocto/yocto.inc
 
 %: %.dockerfile ## Builds containers
-	$(DOCKER_CMD) build -t $(REGISTRY)/$(@D):$(@F) -f $< $(<D)
+	$(DOCKER_CMD) build --pull -t $(REGISTRY)/$(@D):$(@F) -f $< $(<D)
 	@if [ ! -z $${PUSH+x} ]; then \
 		$(DOCKER_CMD) push $(REGISTRY)/$(@D):$(@F); \
 	fi
