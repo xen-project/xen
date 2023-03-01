@@ -44,10 +44,10 @@ understands.
   DOCKER_CMD=podman ./automation/scripts/containerize make
   ```
 
-- CONTAINER: This overrides the container to use. For CentOS 7.2, use:
+- CONTAINER: This overrides the container to use. For CentOS 7, use:
 
   ```
-  CONTAINER=centos72 ./automation/scripts/containerize make
+  CONTAINER=centos7 ./automation/scripts/containerize make
   ```
 
 - CONTAINER_PATH: This overrides the path that will be available under the

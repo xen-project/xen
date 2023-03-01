@@ -29,7 +29,6 @@ case "_${CONTAINER}" in
     _archlinux|_arch) CONTAINER="${BASE}/archlinux:current" ;;
     _riscv64) CONTAINER="${BASE}/archlinux:current-riscv64" ;;
     _centos7) CONTAINER="${BASE}/centos:7" ;;
-    _centos72) CONTAINER="${BASE}/centos:7.2" ;;
     _fedora) CONTAINER="${BASE}/fedora:29";;
     _focal) CONTAINER="${BASE}/ubuntu:focal" ;;
     _jessie) CONTAINER="${BASE}/debian:jessie" ;;
@@ -39,8 +38,10 @@ case "_${CONTAINER}" in
     _buster-gcc-ibt) CONTAINER="${BASE}/debian:buster-gcc-ibt" ;;
     _unstable|_) CONTAINER="${BASE}/debian:unstable" ;;
     _unstable-i386) CONTAINER="${BASE}/debian:unstable-i386" ;;
-    _unstable-arm32-gcc) CONTAINER="${BASE}/debian:unstable-arm32-gcc" ;;
+    _unstable-arm64v8-arm32-gcc) CONTAINER="${BASE}/debian:unstable-arm64v8-arm32-gcc" ;;
     _unstable-arm64v8) CONTAINER="${BASE}/debian:unstable-arm64v8" ;;
+    _unstable-cppcheck) CONTAINER="${BASE}/debian:unstable-cppcheck" ;;
+    _bionic) CONTAINER="${BASE}/ubuntu:bionic" ;;
     _trusty) CONTAINER="${BASE}/ubuntu:trusty" ;;
     _xenial) CONTAINER="${BASE}/ubuntu:xenial" ;;
     _opensuse-leap|_leap) CONTAINER="${BASE}/suse:opensuse-leap" ;;
