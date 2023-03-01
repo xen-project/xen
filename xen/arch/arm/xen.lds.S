@@ -67,6 +67,7 @@ SECTIONS
        *(.data.rel.ro)
        *(.data.rel.ro.*)
 
+       . = ALIGN(4);
        __proc_info_start = .;
        *(.proc.info)
        __proc_info_end = .;
