@@ -27,8 +27,6 @@ void early_puts(const char *s, size_t nr)
 {
     while ( nr-- > 0 )
     {
-        if ( *s == '\n' )
-            sbi_console_putchar('\r');
         sbi_console_putchar(*s);
         s++;
     }
