@@ -240,7 +240,7 @@ $(obj)/efi/buildid.o $(obj)/efi/relocs-dummy.o: ;
 .PHONY: include
 include: $(objtree)/arch/x86/include/asm/asm-macros.h
 
-$(obj)/asm-macros.i: CFLAGS-y += -D__ASSEMBLY__ -P
+$(obj)/asm-macros.i: CFLAGS-y += -P
 
 $(objtree)/arch/x86/include/asm/asm-macros.h: $(obj)/asm-macros.i $(src)/Makefile
 	$(call filechk,asm-macros.h)
