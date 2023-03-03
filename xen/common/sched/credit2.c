@@ -996,9 +996,14 @@ cpu_add_to_runqueue(const struct scheduler *ops, unsigned int cpu)
              *
              * Otherwise, let's try to make sure that siblings stay in the
              * same runqueue, pretty much under any cinrcumnstances.
+             *
+             * Furthermore, try to respect credit2_runqueue=all, as long as
+             * max_cpus_runq isn't violated.
              */
-            if ( rqd->refcnt < max_cpus_runq && (ops->cpupool->gran != SCHED_GRAN_cpu ||
-                  cpu_runqueue_siblings_match(rqd, cpu, max_cpus_runq)) )
+            if ( rqd->refcnt < max_cpus_runq &&
+                 (ops->cpupool->gran != SCHED_GRAN_cpu ||
+                  cpu_runqueue_siblings_match(rqd, cpu, max_cpus_runq) ||
+                  opt_runqueue == OPT_RUNQUEUE_ALL) )
             {
                 /*
                  * This runqueue is ok, but as we said, we also want an even
