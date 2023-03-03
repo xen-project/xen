@@ -273,7 +273,7 @@ efi/buildid.o efi/relocs-dummy.o: ;
 .PHONY: include
 include: $(BASEDIR)/include/asm-x86/asm-macros.h
 
-asm-macros.i: CFLAGS-y += -D__ASSEMBLY__ -P
+asm-macros.i: CFLAGS-y += -P
 
 $(BASEDIR)/include/asm-x86/asm-macros.h: asm-macros.i Makefile
 	echo '#if 0' >$@.new

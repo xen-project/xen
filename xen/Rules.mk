@@ -223,6 +223,9 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o FORCE
 quiet_cmd_cpp_i_c = CPP     $@
 cmd_cpp_i_c = $(CPP) $(call cpp_flags,$(c_flags)) -MQ $@ -o $@ $<
 
+quiet_cmd_cpp_i_S = CPP     $@
+cmd_cpp_i_S = $(CPP) $(call cpp_flags,$(a_flags)) -MQ $@ -o $@ $<
+
 quiet_cmd_cc_s_c = CC      $@
 cmd_cc_s_c = $(CC) $(filter-out -Wa$(comma)%,$(c_flags)) -S $< -o $@
 
@@ -231,6 +234,9 @@ cmd_cpp_s_S = $(CPP) $(call cpp_flags,$(a_flags)) -MQ $@ -o $@ $<
 
 %.i: %.c FORCE
 	$(call if_changed,cpp_i_c)
+
+%.i: %.S FORCE
+	$(call if_changed,cpp_i_S)
 
 %.s: %.c FORCE
 	$(call if_changed,cc_s_c)
