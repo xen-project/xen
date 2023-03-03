@@ -83,7 +83,7 @@ static always_inline void spec_ctrl_new_guest_context(void)
     wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
 
     /* (ab)use alternative_input() to specify clobbers. */
-    alternative_input("", "DO_OVERWRITE_RSB", X86_BUG_IBPB_NO_RET,
+    alternative_input("", "DO_OVERWRITE_RSB xu=%=", X86_BUG_IBPB_NO_RET,
                       : "rax", "rcx");
 }
 
@@ -172,7 +172,7 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
      *
      * (ab)use alternative_input() to specify clobbers.
      */
-    alternative_input("", "DO_OVERWRITE_RSB", X86_FEATURE_SC_RSB_IDLE,
+    alternative_input("", "DO_OVERWRITE_RSB xu=%=", X86_FEATURE_SC_RSB_IDLE,
                       : "rax", "rcx");
 }
 
