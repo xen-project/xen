@@ -610,17 +610,25 @@ static long cf_check microcode_update_helper(void *data)
      * that ucode revision.
      */
     spin_lock(&microcode_mutex);
-    if ( microcode_cache &&
-         alternative_call(ucode_ops.compare_patch,
-                          patch, microcode_cache) != NEW_UCODE )
+    if ( microcode_cache )
     {
-        spin_unlock(&microcode_mutex);
-        printk(XENLOG_WARNING "microcode: couldn't find any newer revision "
-                              "in the provided blob!\n");
-        microcode_free_patch(patch);
-        ret = -ENOENT;
+        enum microcode_match_result result;
 
-        goto put;
+        result = alternative_call(ucode_ops.compare_patch, patch,
+                                  microcode_cache);
+
+        if ( result != NEW_UCODE &&
+             !(opt_ucode_allow_same && result == SAME_UCODE) )
+        {
+            spin_unlock(&microcode_mutex);
+            printk(XENLOG_WARNING
+                   "microcode: couldn't find any newer%s revision in the provided blob!\n",
+                   opt_ucode_allow_same ? " (or the same)" : "");
+            microcode_free_patch(patch);
+            ret = -ENOENT;
+
+            goto put;
+        }
     }
     spin_unlock(&microcode_mutex);
 
