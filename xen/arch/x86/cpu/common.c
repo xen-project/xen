@@ -450,7 +450,8 @@ static void generic_identify(struct cpuinfo_x86 *c)
 			cpuid_count(7, 1,
 				    &c->x86_capability[FEATURESET_7a1],
 				    &c->x86_capability[FEATURESET_7b1],
-				    &tmp, &tmp);
+				    &c->x86_capability[FEATURESET_7c1],
+				    &c->x86_capability[FEATURESET_7d1]);
 		if (max_subleaf >= 2)
 			cpuid_count(7, 2,
 				    &tmp, &tmp, &tmp,
