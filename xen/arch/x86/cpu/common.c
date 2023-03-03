@@ -346,10 +346,17 @@ void __init early_cpu_init(void)
 	       x86_cpuid_vendor_to_str(c->x86_vendor), c->x86, c->x86,
 	       c->x86_model, c->x86_model, c->x86_mask, eax);
 
-	if (c->cpuid_level >= 7)
-		cpuid_count(7, 0, &eax, &ebx,
+	if (c->cpuid_level >= 7) {
+		uint32_t max_subleaf;
+
+		cpuid_count(7, 0, &max_subleaf, &ebx,
 			    &c->x86_capability[FEATURESET_7c0],
 			    &c->x86_capability[FEATURESET_7d0]);
+
+		if (max_subleaf >= 1)
+			cpuid_count(7, 1, &eax, &ebx, &ecx,
+				    &c->x86_capability[FEATURESET_7d1]);
+	}
 
 	eax = cpuid_eax(0x80000000);
 	if ((eax >> 16) == 0x8000 && eax >= 0x80000008) {

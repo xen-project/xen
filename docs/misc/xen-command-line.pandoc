@@ -287,9 +287,14 @@ can be maintained with the pv-shim mechanism.
     protection.
 
     The option is available when `CONFIG_XEN_SHSTK` is compiled in, and
-    defaults to `true` on hardware supporting CET-SS.  Specifying
+    generally defaults to `true` on hardware supporting CET-SS.  Specifying
     `cet=no-shstk` will cause Xen not to use Shadow Stacks even when support
     is available in hardware.
+
+    Some hardware suffers from an issue known as Supervisor Shadow Stack
+    Fracturing.  On such hardware, Xen will default to not using Shadow Stacks
+    when virtualised.  Specifying `cet=shstk` will override this heuristic and
+    enable Shadow Stacks unilaterally.
 
 *   The `ibt=` boolean controls whether Xen uses Indirect Branch Tracking for
     its own protection.
