@@ -117,10 +117,15 @@
 .L\@_done:
 .endm
 
-.macro DO_OVERWRITE_RSB tmp=rax
+.macro DO_OVERWRITE_RSB tmp=rax xu
 /*
  * Requires nothing
  * Clobbers \tmp (%rax by default), %rcx
+ *
+ * xu is an optional parameter to add eXtra Uniqueness.  It is intended for
+ * passing %= in from an asm() block, in order to work around
+ * https://github.com/llvm/llvm-project/issues/60792 where Clang-IAS doesn't
+ * expand \@ uniquely.
  *
  * Requires 256 bytes of {,shadow}stack space, but %rsp/SSP has no net
  * change. Based on Google's performance numbers, the loop is unrolled to 16
@@ -137,31 +142,31 @@
     mov $16, %ecx                   /* 16 iterations, two calls per loop */
     mov %rsp, %\tmp                 /* Store the current %rsp */
 
-.L\@_fill_rsb_loop:
+.L\@_fill_rsb_loop\xu:
 
     .irp n, 1, 2                    /* Unrolled twice. */
-    call .L\@_insert_rsb_entry_\n   /* Create an RSB entry. */
+    call .L\@_insert_rsb_entry\xu\n /* Create an RSB entry. */
 
-.L\@_capture_speculation_\n:
+.L\@_capture_speculation\xu\n:
     pause
     lfence
-    jmp .L\@_capture_speculation_\n /* Capture rogue speculation. */
+    jmp .L\@_capture_speculation\xu\n /* Capture rogue speculation. */
 
-.L\@_insert_rsb_entry_\n:
+.L\@_insert_rsb_entry\xu\n:
     .endr
 
     sub $1, %ecx
-    jnz .L\@_fill_rsb_loop
+    jnz .L\@_fill_rsb_loop\xu
     mov %\tmp, %rsp                 /* Restore old %rsp */
 
 #ifdef CONFIG_XEN_SHSTK
     mov $1, %ecx
     rdsspd %ecx
     cmp $1, %ecx
-    je .L\@_shstk_done
+    je .L\@_shstk_done\xu
     mov $64, %ecx                   /* 64 * 4 bytes, given incsspd */
     incsspd %ecx                    /* Restore old SSP */
-.L\@_shstk_done:
+.L\@_shstk_done\xu:
 #endif
 .endm
 
