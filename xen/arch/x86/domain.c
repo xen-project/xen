@@ -2343,9 +2343,9 @@ int domain_relinquish_resources(struct domain *d)
 
         enum {
             PROG_iommu_pagetables = 1,
+            PROG_shared,
             PROG_paging,
             PROG_vcpu_pagetables,
-            PROG_shared,
             PROG_xen,
             PROG_l4,
             PROG_l3,
@@ -2363,6 +2363,34 @@ int domain_relinquish_resources(struct domain *d)
         ret = iommu_free_pgtables(d);
         if ( ret )
             return ret;
+
+#ifdef CONFIG_MEM_SHARING
+    PROGRESS(shared):
+
+        if ( is_hvm_domain(d) )
+        {
+            /*
+             * If the domain has shared pages, relinquish them allowing
+             * for preemption.
+             */
+            ret = relinquish_shared_pages(d);
+            if ( ret )
+                return ret;
+
+            /*
+             * If the domain is forked, decrement the parent's pause count
+             * and release the domain.
+             */
+            if ( mem_sharing_is_fork(d) )
+            {
+                struct domain *parent = d->parent;
+
+                d->parent = NULL;
+                domain_unpause(parent);
+                put_domain(parent);
+            }
+        }
+#endif
 
     PROGRESS(paging):
 
@@ -2403,32 +2431,6 @@ int domain_relinquish_resources(struct domain *d)
             d->arch.pirq_eoi_map = NULL;
             d->arch.auto_unmask = 0;
         }
-
-#ifdef CONFIG_MEM_SHARING
-    PROGRESS(shared):
-
-        if ( is_hvm_domain(d) )
-        {
-            /* If the domain has shared pages, relinquish them allowing
-             * for preemption. */
-            ret = relinquish_shared_pages(d);
-            if ( ret )
-                return ret;
-
-            /*
-             * If the domain is forked, decrement the parent's pause count
-             * and release the domain.
-             */
-            if ( mem_sharing_is_fork(d) )
-            {
-                struct domain *parent = d->parent;
-
-                d->parent = NULL;
-                domain_unpause(parent);
-                put_domain(parent);
-            }
-        }
-#endif
 
         spin_lock(&d->page_alloc_lock);
         page_list_splice(&d->arch.relmem_list, &d->page_list);
