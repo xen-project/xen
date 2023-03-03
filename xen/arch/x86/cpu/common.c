@@ -344,9 +344,15 @@ void __init early_cpu_init(void)
 	       c->x86_model, c->x86_model, c->x86_mask, eax);
 
 	if (c->cpuid_level >= 7) {
-		cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
+		uint32_t max_subleaf;
+
+		cpuid_count(7, 0, &max_subleaf, &ebx, &ecx, &edx);
 		c->x86_capability[cpufeat_word(X86_FEATURE_CET_SS)] = ecx;
 		c->x86_capability[cpufeat_word(X86_FEATURE_CET_IBT)] = edx;
+
+		if (max_subleaf >= 1)
+			cpuid_count(7, 1, &eax, &ebx, &ecx,
+				    &c->x86_capability[FEATURESET_7d1]);
 	}
 
 	eax = cpuid_eax(0x80000000);

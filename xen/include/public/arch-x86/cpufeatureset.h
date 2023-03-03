@@ -307,6 +307,7 @@ XEN_CPUFEATURE(INTEL_PSFD,         13*32+ 0) /*A  MSR_SPEC_CTRL.PSFD */
 /* Intel-defined CPU features, CPUID level 0x00000007:1.ecx, word 14 */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:1.edx, word 15 */
+XEN_CPUFEATURE(CET_SSS,            15*32+18) /*   CET Supervisor Shadow Stacks safe to use */
 
 #endif /* XEN_CPUFEATURE */
 
