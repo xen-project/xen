@@ -198,6 +198,14 @@ static const char *const str_7b1[32] =
 {
 };
 
+static const char *const str_7c1[32] =
+{
+};
+
+static const char *const str_7d1[32] =
+{
+};
+
 static const char *const str_7d2[32] =
 {
     [ 0] = "intel-psfd",
@@ -223,6 +231,8 @@ static const struct {
     { "0x80000021.eax",  "e21a", str_e21a },
     { "0x00000007:1.ebx", "7b1", str_7b1 },
     { "0x00000007:2.edx", "7d2", str_7d2 },
+    { "0x00000007:1.ecx", "7c1", str_7c1 },
+    { "0x00000007:1.edx", "7d1", str_7d1 },
 };
 
 #define COL_ALIGN "18"

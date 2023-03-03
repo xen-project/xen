@@ -304,6 +304,10 @@ XEN_CPUFEATURE(NSCB,               11*32+ 6) /*A  Null Selector Clears Base (and
 /* Intel-defined CPU features, CPUID level 0x00000007:2.edx, word 13 */
 XEN_CPUFEATURE(INTEL_PSFD,         13*32+ 0) /*A  MSR_SPEC_CTRL.PSFD */
 
+/* Intel-defined CPU features, CPUID level 0x00000007:1.ecx, word 14 */
+
+/* Intel-defined CPU features, CPUID level 0x00000007:1.edx, word 15 */
+
 #endif /* XEN_CPUFEATURE */
 
 /* Clean up from a default include.  Close the enum (for C). */
