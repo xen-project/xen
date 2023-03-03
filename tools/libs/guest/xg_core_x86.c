@@ -229,11 +229,11 @@ xc_core_arch_map_p2m_tree_rw(xc_interface *xch, struct domain_info_context *dinf
                              uint32_t dom, shared_info_any_t *live_shinfo)
 {
     /* Double and single indirect references to the live P2M table */
-    xen_pfn_t *live_p2m_frame_list_list;
+    xen_pfn_t *live_p2m_frame_list_list = NULL;
     xen_pfn_t *live_p2m_frame_list = NULL;
     /* Copies of the above. */
     xen_pfn_t *p2m_frame_list_list = NULL;
-    xen_pfn_t *p2m_frame_list;
+    xen_pfn_t *p2m_frame_list = NULL;
 
     int err;
     int i;
@@ -297,8 +297,6 @@ xc_core_arch_map_p2m_tree_rw(xc_interface *xch, struct domain_info_context *dinf
 
     dinfo->p2m_frames = P2M_FL_ENTRIES;
 
-    return p2m_frame_list;
-
  out:
     err = errno;
 
@@ -312,7 +310,7 @@ xc_core_arch_map_p2m_tree_rw(xc_interface *xch, struct domain_info_context *dinf
 
     errno = err;
 
-    return NULL;
+    return p2m_frame_list;
 }
 
 static int
