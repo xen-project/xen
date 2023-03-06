@@ -411,6 +411,7 @@ SmbiosTypeEnclosureSerialNumber SmbiosType = 14
 SmbiosTypeEnclosureAssetTag SmbiosType = 15
 SmbiosTypeBatteryManufacturer SmbiosType = 16
 SmbiosTypeBatteryDeviceName SmbiosType = 17
+SmbiosTypeOem SmbiosType = 18
 )
 
 type Smbios struct {

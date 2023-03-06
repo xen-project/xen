@@ -1864,6 +1864,9 @@ void parse_config_data(const char *config_source,
         switch (xlu_cfg_get_list(config, "smbios", &smbios, &num_smbios, 0))
         {
         case 0: /* Success */
+        {
+            unsigned int num_oem = 1;
+
             b_info->u.hvm.num_smbios = num_smbios;
             b_info->u.hvm.smbios = xcalloc(num_smbios, sizeof(libxl_smbios));
             for (i = 0; i < num_smbios; i++) {
@@ -1903,12 +1906,22 @@ void parse_config_data(const char *config_source,
                     exit(EXIT_FAILURE);
                 }
 
+                if (type == LIBXL_SMBIOS_TYPE_OEM) {
+                    if (num_oem > 99) {
+                        fprintf(stderr,
+                                "xl: smbios limited to 99 oem strings\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    num_oem++;
+                }
+
                 b_info->u.hvm.smbios[i].key = type;
                 b_info->u.hvm.smbios[i].value = xstrdup(value);
 
                 free(option);
             }
             break;
+        }
         case ESRCH: /* Option not present */
             break;
         default:

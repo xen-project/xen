@@ -2122,6 +2122,10 @@ Each B<SMBIOS_SPEC_STRING> is a C<KEY=VALUE> string from the following list:
 
 =item B<battery_device_name=STRING>
 
+=item B<oem=STRING>
+
+oem= can be specified up to 99 times.
+
 =back
 
 =item B<ms_vm_genid="OPTION">

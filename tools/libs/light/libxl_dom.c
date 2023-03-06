@@ -755,6 +755,7 @@ static int hvm_build_set_xs_values(libxl__gc *gc,
                                    const libxl_domain_build_info *info)
 {
     char *path = NULL;
+    int num_oem = 1;
     int ret = 0;
 
     if (dom->smbios_module.guest_addr_out) {
@@ -775,8 +776,19 @@ static int hvm_build_set_xs_values(libxl__gc *gc,
 
     for (int i = 0; i < info->u.hvm.num_smbios; i++) {
         char *p;
-        path = GCSPRINTF("/local/domain/%d/"HVM_XS_BIOS_STRINGS"/%s", domid,
-                   libxl_smbios_type_to_string(info->u.hvm.smbios[i].key));
+        if (info->u.hvm.smbios[i].key == LIBXL_SMBIOS_TYPE_OEM) {
+            if (num_oem > 99) {
+                LOGD(ERROR, domid, "More than 99 SMBIOS OEM strings specified");
+                ret = ERROR_INVAL;
+                goto err;
+            }
+            path = GCSPRINTF("/local/domain/%d/"HVM_XS_OEM_STRINGS, domid,
+                             num_oem);
+            num_oem++;
+        } else {
+            path = GCSPRINTF("/local/domain/%d/"HVM_XS_BIOS_STRINGS"/%s", domid,
+                       libxl_smbios_type_to_string(info->u.hvm.smbios[i].key));
+        }
 
         /* Convert libxl_smbios_type string to xenstore path that hvmloader
          * will use, as defined by HVM_XS_*. That is convert the '_' to '-'. */

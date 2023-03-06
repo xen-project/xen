@@ -441,6 +441,7 @@ libxl_smbios_type = Enumeration("smbios_type", [
     (15, "enclosure_asset_tag"),
     (16, "battery_manufacturer"),
     (17, "battery_device_name"),
+    (18, "oem"),
     ])
 
 libxl_smbios = Struct("smbios", [
