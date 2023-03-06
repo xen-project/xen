@@ -2079,6 +2079,51 @@ number of vendor defined SMBIOS structures (type 128 - 255). Since SMBIOS
 structures do not present their overall size, each entry in the file must be
 preceded by a 32b integer indicating the size of the following structure.
 
+=item B<smbios=[ "SMBIOS_SPEC_STRING", "SMBIOS_SPEC_STRING", ...]>
+
+Specifies the SMBIOS values to be provided to the guest.  These set or
+override specific entries in the tables provided to the guest.
+
+Each B<SMBIOS_SPEC_STRING> is a C<KEY=VALUE> string from the following list:
+
+=over 4
+
+=item B<bios_vendor=STRING>
+
+=item B<bios_version=STRING>
+
+=item B<system_manufacturer=STRING>
+
+=item B<system_product_name=STRING>
+
+=item B<system_version=STRING>
+
+=item B<system_serial_number=STRING>
+
+=item B<baseboard_manufacturer=STRING>
+
+=item B<baseboard_product_name=STRING>
+
+=item B<baseboard_version=STRING>
+
+=item B<baseboard_serial_number=STRING>
+
+=item B<baseboard_asset_tag=STRING>
+
+=item B<baseboard_location_in_chassis=STRING>
+
+=item B<enclosure_manufacturer=STRING>
+
+=item B<enclosure_serial_number=STRING>
+
+=item B<enclosure_asset_tag=STRING>
+
+=item B<battery_manufacturer=STRING>
+
+=item B<battery_device_name=STRING>
+
+=back
+
 =item B<ms_vm_genid="OPTION">
 
 Provide a VM generation ID to the guest.

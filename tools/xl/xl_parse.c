@@ -1297,8 +1297,9 @@ void parse_config_data(const char *config_source,
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
                    *usbctrls, *usbdevs, *p9devs, *vdispls, *pvcallsifs_devs;
     XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs,
-                   *mca_caps;
+                   *mca_caps, *smbios;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian, num_mca_caps;
+    int num_smbios;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
     int pci_permissive = 0;
@@ -1859,6 +1860,61 @@ void parse_config_data(const char *config_source,
                                &b_info->u.hvm.smbios_firmware, 0);
         xlu_cfg_replace_string(config, "acpi_firmware",
                                &b_info->u.hvm.acpi_firmware, 0);
+
+        switch (xlu_cfg_get_list(config, "smbios", &smbios, &num_smbios, 0))
+        {
+        case 0: /* Success */
+            b_info->u.hvm.num_smbios = num_smbios;
+            b_info->u.hvm.smbios = xcalloc(num_smbios, sizeof(libxl_smbios));
+            for (i = 0; i < num_smbios; i++) {
+                libxl_smbios_type type;
+                char *option;
+                char *value;
+
+                buf = xlu_cfg_get_listitem(smbios, i);
+                if (!buf) {
+                    fprintf(stderr,
+                            "xl: Unable to get element #%d in smbios list\n",
+                            i);
+                    exit(EXIT_FAILURE);
+                }
+
+                option = xstrdup(buf);
+                value = strchr(option, '=');
+                if (value == NULL) {
+                    fprintf(stderr, "xl: failed to split \"%s\" at '='\n",
+                            option);
+                    exit(EXIT_FAILURE);
+                }
+
+                *value = '\0';
+                value++;
+
+                if (*value == '\0') {
+                    fprintf(stderr,
+                            "xl: empty value not allowed for smbios \"%s=\"\n",
+                            option);
+                    exit(EXIT_FAILURE);
+                }
+
+                e = libxl_smbios_type_from_string(option, &type);
+                if (e) {
+                    fprintf(stderr, "xl: unknown smbios type '%s'\n", option);
+                    exit(EXIT_FAILURE);
+                }
+
+                b_info->u.hvm.smbios[i].key = type;
+                b_info->u.hvm.smbios[i].value = xstrdup(value);
+
+                free(option);
+            }
+            break;
+        case ESRCH: /* Option not present */
+            break;
+        default:
+            fprintf(stderr,"xl: Unable to parse smbios options.\n");
+            exit(EXIT_FAILURE);
+        }
 
         if (!xlu_cfg_get_string(config, "ms_vm_genid", &buf, 0)) {
             if (!strcmp(buf, "generate")) {

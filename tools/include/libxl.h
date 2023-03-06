@@ -175,6 +175,11 @@
 #define LIBXL_HAVE_BUILDINFO_HVM_MS_VM_GENID 1
 
 /*
+ * libxl_domain_build_info has the u.hvm.smbios field.
+ */
+#define LIBXL_HAVE_BUILDINFO_HVM_SMBIOS 1
+
+/*
  * LIBXL_HAVE_VCPUINFO_SOFT_AFFINITY indicates that a 'cpumap_soft'
  * field (of libxl_bitmap type) is present in libxl_vcpuinfo,
  * containing the soft affinity of a vcpu.

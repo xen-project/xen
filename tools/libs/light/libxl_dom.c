@@ -773,6 +773,27 @@ static int hvm_build_set_xs_values(libxl__gc *gc,
             goto err;
     }
 
+    for (int i = 0; i < info->u.hvm.num_smbios; i++) {
+        char *p;
+        path = GCSPRINTF("/local/domain/%d/"HVM_XS_BIOS_STRINGS"/%s", domid,
+                   libxl_smbios_type_to_string(info->u.hvm.smbios[i].key));
+
+        /* Convert libxl_smbios_type string to xenstore path that hvmloader
+         * will use, as defined by HVM_XS_*. That is convert the '_' to '-'. */
+        p = strrchr(path, '/');
+        for ( ; *p; p++) {
+            if (*p == '_')
+                *p = '-';
+        }
+
+        LOGD(DEBUG, domid, "Writing %s = \"%s\"", path,
+             info->u.hvm.smbios[i].value);
+        ret = libxl__xs_printf(gc, XBT_NULL, path, "%s",
+                               info->u.hvm.smbios[i].value);
+        if (ret)
+            goto err;
+    }
+
     /* Only one module can be passed. PVHv2 guests do not support this. */
     if (dom->acpi_modules[0].guest_addr_out && 
         info->type == LIBXL_DOMAIN_TYPE_HVM) {

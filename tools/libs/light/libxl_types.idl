@@ -423,6 +423,31 @@ libxl_version_info = Struct("version_info", [
     ("build_id",          string),
     ], dir=DIR_OUT)
 
+libxl_smbios_type = Enumeration("smbios_type", [
+    (1,  "bios_vendor"),
+    (2,  "bios_version"),
+    (3,  "system_manufacturer"),
+    (4,  "system_product_name"),
+    (5,  "system_version"),
+    (6,  "system_serial_number"),
+    (7,  "baseboard_manufacturer"),
+    (8,  "baseboard_product_name"),
+    (9,  "baseboard_version"),
+    (10, "baseboard_serial_number"),
+    (11, "baseboard_asset_tag"),
+    (12, "baseboard_location_in_chassis"),
+    (13, "enclosure_manufacturer"),
+    (14, "enclosure_serial_number"),
+    (15, "enclosure_asset_tag"),
+    (16, "battery_manufacturer"),
+    (17, "battery_device_name"),
+    ])
+
+libxl_smbios = Struct("smbios", [
+    ("key",          libxl_smbios_type),
+    ("value",        string),
+    ], dir=DIR_IN)
+
 libxl_domain_create_info = Struct("domain_create_info",[
     ("type",         libxl_domain_type),
     ("hap",          libxl_defbool),
@@ -609,6 +634,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("altp2m",           libxl_defbool),
                                        ("system_firmware",  string),
                                        ("smbios_firmware",  string),
+                                       ("smbios",           Array(libxl_smbios, "num_smbios")),
                                        ("acpi_firmware",    string),
                                        ("hdtype",           libxl_hdtype),
                                        ("nographic",        libxl_defbool),

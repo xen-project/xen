@@ -589,6 +589,38 @@ xc.build_id = C.CString(x.BuildId)}
  return nil
  }
 
+// NewSmbios returns an instance of Smbios initialized with defaults.
+func NewSmbios() (*Smbios, error) {
+var (
+x Smbios
+xc C.libxl_smbios)
+
+C.libxl_smbios_init(&xc)
+defer C.libxl_smbios_dispose(&xc)
+
+if err := x.fromC(&xc); err != nil {
+return nil, err }
+
+return &x, nil}
+
+func (x *Smbios) fromC(xc *C.libxl_smbios) error {
+ x.Key = SmbiosType(xc.key)
+x.Value = C.GoString(xc.value)
+
+ return nil}
+
+func (x *Smbios) toC(xc *C.libxl_smbios) (err error){defer func(){
+if err != nil{
+C.libxl_smbios_dispose(xc)}
+}()
+
+xc.key = C.libxl_smbios_type(x.Key)
+if x.Value != "" {
+xc.value = C.CString(x.Value)}
+
+ return nil
+ }
+
 // NewDomainCreateInfo returns an instance of DomainCreateInfo initialized with defaults.
 func NewDomainCreateInfo() (*DomainCreateInfo, error) {
 var (
@@ -1183,6 +1215,15 @@ return fmt.Errorf("converting field Altp2M: %v", err)
 }
 x.SystemFirmware = C.GoString(tmp.system_firmware)
 x.SmbiosFirmware = C.GoString(tmp.smbios_firmware)
+x.Smbios = nil
+if n := int(tmp.num_smbios); n > 0 {
+cSmbios := (*[1<<28]C.libxl_smbios)(unsafe.Pointer(tmp.smbios))[:n:n]
+x.Smbios = make([]Smbios, n)
+for i, v := range cSmbios {
+if err := x.Smbios[i].fromC(&v); err != nil {
+return fmt.Errorf("converting field Smbios: %v", err) }
+}
+}
 x.AcpiFirmware = C.GoString(tmp.acpi_firmware)
 x.Hdtype = Hdtype(tmp.hdtype)
 if err := x.Nographic.fromC(&tmp.nographic);err != nil {
@@ -1495,6 +1536,16 @@ if tmp.SystemFirmware != "" {
 hvm.system_firmware = C.CString(tmp.SystemFirmware)}
 if tmp.SmbiosFirmware != "" {
 hvm.smbios_firmware = C.CString(tmp.SmbiosFirmware)}
+if numSmbios := len(tmp.Smbios); numSmbios > 0 {
+hvm.smbios = (*C.libxl_smbios)(C.malloc(C.ulong(numSmbios)*C.sizeof_libxl_smbios))
+hvm.num_smbios = C.int(numSmbios)
+cSmbios := (*[1<<28]C.libxl_smbios)(unsafe.Pointer(hvm.smbios))[:numSmbios:numSmbios]
+for i,v := range tmp.Smbios {
+if err := v.toC(&cSmbios[i]); err != nil {
+return fmt.Errorf("converting field Smbios: %v", err)
+}
+}
+}
 if tmp.AcpiFirmware != "" {
 hvm.acpi_firmware = C.CString(tmp.AcpiFirmware)}
 hvm.hdtype = C.libxl_hdtype(tmp.Hdtype)

@@ -392,6 +392,32 @@ Commandline string
 BuildId string
 }
 
+type SmbiosType int
+const(
+SmbiosTypeBiosVendor SmbiosType = 1
+SmbiosTypeBiosVersion SmbiosType = 2
+SmbiosTypeSystemManufacturer SmbiosType = 3
+SmbiosTypeSystemProductName SmbiosType = 4
+SmbiosTypeSystemVersion SmbiosType = 5
+SmbiosTypeSystemSerialNumber SmbiosType = 6
+SmbiosTypeBaseboardManufacturer SmbiosType = 7
+SmbiosTypeBaseboardProductName SmbiosType = 8
+SmbiosTypeBaseboardVersion SmbiosType = 9
+SmbiosTypeBaseboardSerialNumber SmbiosType = 10
+SmbiosTypeBaseboardAssetTag SmbiosType = 11
+SmbiosTypeBaseboardLocationInChassis SmbiosType = 12
+SmbiosTypeEnclosureManufacturer SmbiosType = 13
+SmbiosTypeEnclosureSerialNumber SmbiosType = 14
+SmbiosTypeEnclosureAssetTag SmbiosType = 15
+SmbiosTypeBatteryManufacturer SmbiosType = 16
+SmbiosTypeBatteryDeviceName SmbiosType = 17
+)
+
+type Smbios struct {
+Key SmbiosType
+Value string
+}
+
 type DomainCreateInfo struct {
 Type DomainType
 Hap Defbool
@@ -572,6 +598,7 @@ NestedHvm Defbool
 Altp2M Defbool
 SystemFirmware string
 SmbiosFirmware string
+Smbios []Smbios
 AcpiFirmware string
 Hdtype Hdtype
 Nographic Defbool
