@@ -133,6 +133,8 @@ def generate_cppcheck_deps():
     # - Explicitly suppress warnings on compiler-def.h because cppcheck throws
     #   an unmatchedSuppression due to the rule we put in suppression-list.txt
     #   to skip every finding in the file.
+    # - Explicitly suppress findings for unusedStructMember that is not very
+    #   reliable and causes lots of false positives.
     #
     # Compiler defines are in compiler-def.h which is included in config.h
     #
@@ -145,6 +147,7 @@ def generate_cppcheck_deps():
  --inline-suppr
  --suppressions-list={}/suppression-list.txt
  --suppress='unmatchedSuppression:*'
+ --suppress='unusedStructMember:*'
  --include={}/include/xen/config.h
  -DCPPCHECK
 """.format(settings.outdir, CPPCHECK_BUILD_DIR, settings.xen_dir,
