@@ -1,4 +1,201 @@
 {
     "version": "1.0",
-    "content": []
+    "content": [
+        {
+            "rel_path": "arch/arm/arm64/cpufeature.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/arm/arm64/insn.c",
+            "comment": "Imported on Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/arm/arm64/lib/find_next_bit.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/acpi/boot.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/acpi/cpu_idle.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/acpi/cpufreq/cpufreq.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/acpi/cpuidle_menu.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/acpi/lib.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/amd.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/centaur.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/common.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/hygon.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/intel.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/intel_cacheinfo.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/mcheck/non-fatal.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/mtrr/*",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/cpu/mwait-idle.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/delay.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/dmi_scan.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/mpparse.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/srat.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/time.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/x86_64/mmconf-fam10h.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/bitmap.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/bunzip2.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/earlycpio.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/inflate.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/libfdt/*",
+            "comment": "External library"
+        },
+        {
+            "rel_path": "common/livepatch_elf.c",
+            "comment": "Not in scope initially as it generates many violations and it is not enabled in safety configurations"
+        },
+        {
+            "rel_path": "common/lzo.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/lz4/decompress.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/radix-tree.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/ubsan/ubsan.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/un*.c",
+            "comment": "unlz4.c implementation by Yann Collet, the others un* are from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/xz/*",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "common/zstd/*",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "crypto/*",
+            "comment": "Origin is external and documented in crypto/README.source"
+        },
+        {
+            "rel_path": "drivers/acpi/apei/*",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "drivers/acpi/hwregs.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "drivers/acpi/numa.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "drivers/acpi/osl.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "drivers/acpi/tables.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "drivers/acpi/tables/*",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "drivers/acpi/utilities/*",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "drivers/video/font_*",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "lib/list-sort.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "lib/rbtree.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "lib/xxhash*.c",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "xsm/flask/*",
+            "comment": "Not in scope initially as it generates many violations and it is not enabled in safety configurations"
+        }
+    ]
 }
