@@ -376,6 +376,10 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
         s += 'tmp := (*C.{0})(unsafe.Pointer(&xc.{1}[0]))\n'.format(typename,union_name)
 
         for nf in f.type.fields:
+            if isinstance(nf.type, idl.Array):
+                s += xenlight_golang_array_from_C(nf,cvarname='tmp')
+                continue
+
             s += xenlight_golang_convert_from_C(nf,cvarname='tmp')
 
         s += 'return nil\n'
@@ -416,7 +420,7 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
 
     return (s,extras)
 
-def xenlight_golang_array_from_C(ty = None):
+def xenlight_golang_array_from_C(ty = None, cvarname = 'xc'):
     """
     Convert C array to Go slice using the method
     described here:
@@ -433,9 +437,9 @@ def xenlight_golang_array_from_C(ty = None):
     clenvar    = ty.type.lenvar.name
 
     s += 'x.{0} = nil\n'.format(goname)
-    s += 'if n := int(xc.{0}); n > 0 {{\n'.format(clenvar)
+    s += 'if n := int({0}.{1}); n > 0 {{\n'.format(cvarname,clenvar)
     s += '{0} := '.format(cslice)
-    s +='(*[1<<28]C.{0})(unsafe.Pointer(xc.{1}))[:n:n]\n'.format(ctypename, cname)
+    s +='(*[1<<28]C.{0})(unsafe.Pointer({1}.{2}))[:n:n]\n'.format(ctypename, cvarname, cname)
     s += 'x.{0} = make([]{1}, n)\n'.format(goname, gotypename)
     s += 'for i, v := range {0} {{\n'.format(cslice)
 
@@ -579,6 +583,11 @@ def xenlight_golang_union_to_C(ty = None, union_name = '',
 
         s += 'var {0} C.{1}\n'.format(f.name,cgotype)
         for uf in f.type.fields:
+            if isinstance(uf.type, idl.Array):
+                s += xenlight_golang_array_to_C(uf, cvarname=f.name,
+                                                govarname="tmp")
+                continue
+
             s += xenlight_golang_convert_to_C(uf,cvarname=f.name,
                                               govarname='tmp')
 
@@ -596,7 +605,7 @@ def xenlight_golang_union_to_C(ty = None, union_name = '',
 
     return s
 
-def xenlight_golang_array_to_C(ty = None):
+def xenlight_golang_array_to_C(ty = None, cvarname="xc", govarname="x"):
     s = ''
 
     gotypename = xenlight_golang_fmt_name(ty.type.elem_type.typename)
@@ -608,27 +617,27 @@ def xenlight_golang_array_to_C(ty = None):
 
     is_enum = isinstance(ty.type.elem_type,idl.Enumeration)
     if gotypename in go_builtin_types or is_enum:
-        s += 'if {0} := len(x.{1}); {2} > 0 {{\n'.format(golenvar,goname,golenvar)
-        s += 'xc.{0} = (*C.{1})(C.malloc(C.size_t({2}*{3})))\n'.format(cname,ctypename,
+        s += 'if {0} := len({1}.{2}); {3} > 0 {{\n'.format(golenvar,govarname,goname,golenvar)
+        s += '{0}.{1} = (*C.{2})(C.malloc(C.size_t({3}*{4})))\n'.format(cvarname,cname,ctypename,
                                                                    golenvar,golenvar)
-        s += 'xc.{0} = C.int({1})\n'.format(clenvar,golenvar)
-        s += 'c{0} := (*[1<<28]C.{1})(unsafe.Pointer(xc.{2}))[:{3}:{4}]\n'.format(goname,
-                                                                      ctypename,cname,
+        s += '{0}.{1} = C.int({2})\n'.format(cvarname,clenvar,golenvar)
+        s += 'c{0} := (*[1<<28]C.{1})(unsafe.Pointer({2}.{3}))[:{4}:{5}]\n'.format(goname,
+                                                                      ctypename,cvarname,cname,
                                                                       golenvar,golenvar)
-        s += 'for i,v := range x.{0} {{\n'.format(goname)
+        s += 'for i,v := range {0}.{1} {{\n'.format(govarname,goname)
         s += 'c{0}[i] = C.{1}(v)\n'.format(goname,ctypename)
         s += '}\n}\n'
 
         return s
 
-    s += 'if {0} := len(x.{1}); {2} > 0 {{\n'.format(golenvar,goname,golenvar)
-    s += 'xc.{0} = (*C.{1})(C.malloc(C.ulong({2})*C.sizeof_{3}))\n'.format(cname,ctypename,
+    s += 'if {0} := len({1}.{2}); {3} > 0 {{\n'.format(golenvar,govarname,goname,golenvar)
+    s += '{0}.{1} = (*C.{2})(C.malloc(C.ulong({3})*C.sizeof_{4}))\n'.format(cvarname,cname,ctypename,
                                                                    golenvar,ctypename)
-    s += 'xc.{0} = C.int({1})\n'.format(clenvar,golenvar)
-    s += 'c{0} := (*[1<<28]C.{1})(unsafe.Pointer(xc.{2}))[:{3}:{4}]\n'.format(goname,
-                                                                         ctypename,cname,
+    s += '{0}.{1} = C.int({2})\n'.format(cvarname,clenvar,golenvar)
+    s += 'c{0} := (*[1<<28]C.{1})(unsafe.Pointer({2}.{3}))[:{4}:{5}]\n'.format(goname,
+                                                                         ctypename,cvarname,cname,
                                                                          golenvar,golenvar)
-    s += 'for i,v := range x.{0} {{\n'.format(goname)
+    s += 'for i,v := range {0}.{1} {{\n'.format(govarname,goname)
     s += 'if err := v.toC(&c{0}[i]); err != nil {{\n'.format(goname)
     s += 'return fmt.Errorf("converting field {0}: %v", err)\n'.format(goname)
     s += '}\n}\n}\n'
