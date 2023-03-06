@@ -3354,16 +3354,7 @@ static enum hvm_translation_result __hvm_copy(
                 memcpy(buf, p, count);
                 hvmemul_write_cache(v, gfn_to_gaddr(gfn) | pgoff, buf, count);
             }
-            else if ( p2m_is_discard_write(p2mt) )
-            {
-                static unsigned long lastpage;
-
-                if ( xchg(&lastpage, gfn_x(gfn)) != gfn_x(gfn) )
-                    dprintk(XENLOG_G_DEBUG,
-                            "%pv attempted write to read-only gfn %#lx (mfn=%#"PRI_mfn")\n",
-                            v, gfn_x(gfn), mfn_x(page_to_mfn(page)));
-            }
-            else
+            else if ( !p2m_is_discard_write(p2mt) )
             {
                 if ( buf )
                     memcpy(p, buf, count);
