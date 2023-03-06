@@ -67,6 +67,23 @@
   tags:
     - x86_64
 
+.xilinx-arm64:
+  extends: .test-jobs-common
+  variables:
+    CONTAINER: ubuntu:xenial-xilinx
+    LOGFILE: qemu-smoke-xilinx.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+      - '*.dtb'
+    when: always
+  only:
+    variables:
+      - $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+  tags:
+    - xilinx
+
 # Test jobs
 build-each-commit-gcc:
   extends: .test-jobs-common
@@ -84,6 +101,14 @@ build-each-commit-gcc:
   needs: []
   tags:
     - x86_64
+
+xilinx-smoke-dom0less-arm64-gcc:
+  extends: .xilinx-arm64
+  script:
+    - ./automation/scripts/xilinx-smoke-dom0less-arm64.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-arm64
 
 qemu-smoke-dom0-arm64-gcc:
   extends: .qemu-arm64
