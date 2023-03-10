@@ -233,10 +233,12 @@ static const struct {
 #define COL_ALIGN "18"
 
 static const char *const fs_names[] = {
-    [XEN_SYSCTL_cpu_featureset_host] = "Host",
-    [XEN_SYSCTL_cpu_featureset_raw]  = "Raw",
-    [XEN_SYSCTL_cpu_featureset_pv]   = "PV",
-    [XEN_SYSCTL_cpu_featureset_hvm]  = "HVM",
+    [XEN_SYSCTL_cpu_featureset_raw]     = "Raw",
+    [XEN_SYSCTL_cpu_featureset_host]    = "Host",
+    [XEN_SYSCTL_cpu_featureset_pv]      = "PV Default",
+    [XEN_SYSCTL_cpu_featureset_hvm]     = "HVM Default",
+    [XEN_SYSCTL_cpu_featureset_pv_max]  = "PV Max",
+    [XEN_SYSCTL_cpu_featureset_hvm_max] = "HVM Max",
 };
 
 static void dump_leaf(uint32_t leaf, const char *const *strs)
