@@ -41,6 +41,7 @@
 #define  SPEC_CTRL_RRSBA_DIS_U              (_AC(1, ULL) <<  5)
 #define  SPEC_CTRL_RRSBA_DIS_S              (_AC(1, ULL) <<  6)
 #define  SPEC_CTRL_PSFD                     (_AC(1, ULL) <<  7)
+#define  SPEC_CTRL_DDP_DIS_U                (_AC(1, ULL) <<  8)
 #define  SPEC_CTRL_BHI_DIS_S                (_AC(1, ULL) << 10)
 
 #define MSR_PRED_CMD                        0x00000049

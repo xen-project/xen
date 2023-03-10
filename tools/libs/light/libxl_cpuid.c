@@ -242,6 +242,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"intel-psfd",   0x00000007,  2, CPUID_REG_EDX,  0,  1},
         {"ipred-ctrl",   0x00000007,  2, CPUID_REG_EDX,  1,  1},
         {"rrsba-ctrl",   0x00000007,  2, CPUID_REG_EDX,  2,  1},
+        {"ddp-ctrl",     0x00000007,  2, CPUID_REG_EDX,  3,  1},
         {"bhi-ctrl",     0x00000007,  2, CPUID_REG_EDX,  4,  1},
         {"mcdt-no",      0x00000007,  2, CPUID_REG_EDX,  5,  1},
 

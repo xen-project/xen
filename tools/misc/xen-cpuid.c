@@ -216,7 +216,7 @@ static const char *const str_7d1[32] =
 static const char *const str_7d2[32] =
 {
     [ 0] = "intel-psfd",    [ 1] = "ipred-ctrl",
-    [ 2] = "rrsba-ctrl",
+    [ 2] = "rrsba-ctrl",    [ 3] = "ddp-ctrl",
     [ 4] = "bhi-ctrl",      [ 5] = "mcdt-no",
 };
 
