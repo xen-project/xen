@@ -429,21 +429,24 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
 
 static void __init guest_common_default_feature_adjustments(uint32_t *fs)
 {
-    /*
-     * IvyBridge client parts suffer from leakage of RDRAND data due to SRBDS
-     * (XSA-320 / CVE-2020-0543), and won't be receiving microcode to
-     * compensate.
-     *
-     * Mitigate by hiding RDRAND from guests by default, unless explicitly
-     * overridden on the Xen command line (cpuid=rdrand).  Irrespective of the
-     * default setting, guests can use RDRAND if explicitly enabled
-     * (cpuid="host,rdrand=1") in the VM's config file, and VMs which were
-     * previously using RDRAND can migrate in.
-     */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
-         boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 0x3a &&
-         cpu_has_rdrand && !is_forced_cpu_cap(X86_FEATURE_RDRAND) )
-        __clear_bit(X86_FEATURE_RDRAND, fs);
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    {
+        /*
+         * IvyBridge client parts suffer from leakage of RDRAND data due to SRBDS
+         * (XSA-320 / CVE-2020-0543), and won't be receiving microcode to
+         * compensate.
+         *
+         * Mitigate by hiding RDRAND from guests by default, unless explicitly
+         * overridden on the Xen command line (cpuid=rdrand).  Irrespective of the
+         * default setting, guests can use RDRAND if explicitly enabled
+         * (cpuid="host,rdrand=1") in the VM's config file, and VMs which were
+         * previously using RDRAND can migrate in.
+         */
+        if ( boot_cpu_data.x86 == 6 &&
+             boot_cpu_data.x86_model == 0x3a /* INTEL_FAM6_IVYBRIDGE */ &&
+             cpu_has_rdrand && !is_forced_cpu_cap(X86_FEATURE_RDRAND) )
+            __clear_bit(X86_FEATURE_RDRAND, fs);
+    }
 
     /*
      * On certain hardware, speculative or errata workarounds can result in
