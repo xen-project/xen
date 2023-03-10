@@ -324,14 +324,16 @@ long arch_do_sysctl(
 
     case XEN_SYSCTL_get_cpu_featureset:
     {
-        static const struct cpuid_policy *const policy_table[4] = {
+        static const struct cpuid_policy *const policy_table[6] = {
             [XEN_SYSCTL_cpu_featureset_raw]  = &raw_cpuid_policy,
             [XEN_SYSCTL_cpu_featureset_host] = &host_cpuid_policy,
 #ifdef CONFIG_PV
             [XEN_SYSCTL_cpu_featureset_pv]   = &pv_def_cpuid_policy,
+            [XEN_SYSCTL_cpu_featureset_pv_max] = &pv_max_cpuid_policy,
 #endif
 #ifdef CONFIG_HVM
             [XEN_SYSCTL_cpu_featureset_hvm]  = &hvm_def_cpuid_policy,
+            [XEN_SYSCTL_cpu_featureset_hvm_max] = &hvm_max_cpuid_policy,
 #endif
         };
         const struct cpuid_policy *p = NULL;

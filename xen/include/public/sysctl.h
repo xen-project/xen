@@ -805,6 +805,8 @@ struct xen_sysctl_cpu_featureset {
 #define XEN_SYSCTL_cpu_featureset_host     1
 #define XEN_SYSCTL_cpu_featureset_pv       2
 #define XEN_SYSCTL_cpu_featureset_hvm      3
+#define XEN_SYSCTL_cpu_featureset_pv_max   4
+#define XEN_SYSCTL_cpu_featureset_hvm_max  5
     uint32_t index;       /* IN: Which featureset to query? */
     uint32_t nr_features; /* IN/OUT: Number of entries in/written to
                            * 'features', or the maximum number of features if
