@@ -232,16 +232,11 @@ static const struct {
 
 #define COL_ALIGN "18"
 
-static struct fsinfo {
-    const char *name;
-    uint32_t len;
-    uint32_t *fs;
-} featuresets[] =
-{
-    [XEN_SYSCTL_cpu_featureset_host] = { "Host", 0, NULL },
-    [XEN_SYSCTL_cpu_featureset_raw]  = { "Raw",  0, NULL },
-    [XEN_SYSCTL_cpu_featureset_pv]   = { "PV",   0, NULL },
-    [XEN_SYSCTL_cpu_featureset_hvm]  = { "HVM",  0, NULL },
+static const char *const fs_names[] = {
+    [XEN_SYSCTL_cpu_featureset_host] = "Host",
+    [XEN_SYSCTL_cpu_featureset_raw]  = "Raw",
+    [XEN_SYSCTL_cpu_featureset_pv]   = "PV",
+    [XEN_SYSCTL_cpu_featureset_hvm]  = "HVM",
 };
 
 static void dump_leaf(uint32_t leaf, const char *const *strs)
@@ -288,22 +283,10 @@ static void decode_featureset(const uint32_t *features,
     }
 }
 
-static int get_featureset(xc_interface *xch, unsigned int idx)
-{
-    struct fsinfo *f = &featuresets[idx];
-
-    f->len = nr_features;
-    f->fs = calloc(nr_features, sizeof(*f->fs));
-
-    if ( !f->fs )
-        err(1, "calloc(, featureset)");
-
-    return xc_get_cpu_featureset(xch, idx, &f->len, f->fs);
-}
-
 static void dump_info(xc_interface *xch, bool detail)
 {
     unsigned int i;
+    uint32_t *fs;
 
     printf("nr_features: %u\n", nr_features);
 
@@ -334,26 +317,34 @@ static void dump_info(xc_interface *xch, bool detail)
                       nr_features, "HVM Hap Default", detail);
 
     printf("\nDynamic sets:\n");
-    for ( i = 0; i < ARRAY_SIZE(featuresets); ++i )
+
+    fs = malloc(sizeof(*fs) * nr_features);
+    if ( !fs )
+        err(1, "malloc(featureset)");
+
+    for ( i = 0; i < ARRAY_SIZE(fs_names); ++i )
     {
-        if ( get_featureset(xch, i) )
+        uint32_t len = nr_features;
+        int ret;
+
+        memset(fs, 0, sizeof(*fs) * nr_features);
+
+        ret = xc_get_cpu_featureset(xch, i, &len, fs);
+        if ( ret )
         {
             if ( errno == EOPNOTSUPP )
             {
-                printf("%s featureset not supported by Xen\n",
-                       featuresets[i].name);
+                printf("%s featureset not supported by Xen\n", fs_names[i]);
                 continue;
             }
 
             err(1, "xc_get_featureset()");
         }
 
-        decode_featureset(featuresets[i].fs, featuresets[i].len,
-                          featuresets[i].name, detail);
+        decode_featureset(fs, len, fs_names[i], detail);
     }
 
-    for ( i = 0; i < ARRAY_SIZE(featuresets); ++i )
-        free(featuresets[i].fs);
+    free(fs);
 }
 
 static void print_policy(const char *name,
