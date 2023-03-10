@@ -240,6 +240,9 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"cet-sss",      0x00000007,  1, CPUID_REG_EDX, 18,  1},
 
         {"intel-psfd",   0x00000007,  2, CPUID_REG_EDX,  0,  1},
+        {"ipred-ctrl",   0x00000007,  2, CPUID_REG_EDX,  1,  1},
+        {"rrsba-ctrl",   0x00000007,  2, CPUID_REG_EDX,  2,  1},
+        {"bhi-ctrl",     0x00000007,  2, CPUID_REG_EDX,  4,  1},
         {"mcdt-no",      0x00000007,  2, CPUID_REG_EDX,  5,  1},
 
         {"lahfsahf",     0x80000001, NA, CPUID_REG_ECX,  0,  1},
