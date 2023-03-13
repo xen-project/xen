@@ -1554,27 +1554,27 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
         char *buf = GCSPRINTF(PCI_BDF, domain, bus, dev, func);
         rc = write(fd, buf, strlen(buf));
         if (rc < 0)
-            LOGD(ERROR, domain, "write to %s returned %d", reset, rc);
+            LOGE(ERROR, "write '%s' to %s failed", buf, reset);
         close(fd);
         return rc < 0 ? rc : 0;
     }
     if (errno != ENOENT)
-        LOGED(ERROR, domain, "Failed to access pciback path %s", reset);
+        LOGE(ERROR, "Failed to access pciback path %s", reset);
     reset = GCSPRINTF("%s/"PCI_BDF"/reset", SYSFS_PCI_DEV, domain, bus, dev, func);
     fd = open(reset, O_WRONLY);
     if (fd >= 0) {
         rc = write(fd, "1", 1);
         if (rc < 0)
-            LOGED(ERROR, domain, "write to %s returned %d", reset, rc);
+            LOGE(ERROR, "write to %s failed", reset);
         close(fd);
         return rc < 0 ? rc : 0;
     }
     if (errno == ENOENT) {
-        LOGD(ERROR, domain,
-             "The kernel doesn't support reset from sysfs for PCI device "PCI_BDF,
-             domain, bus, dev, func);
+        LOG(ERROR,
+            "The kernel doesn't support reset from sysfs for PCI device "PCI_BDF,
+            domain, bus, dev, func);
     } else {
-        LOGED(ERROR, domain, "Failed to access reset path %s", reset);
+        LOGE(ERROR, "Failed to access reset path %s", reset);
     }
     return -1;
 }
