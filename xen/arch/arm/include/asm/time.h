@@ -82,7 +82,8 @@ enum timer_ppi
     TIMER_PHYS_NONSECURE_PPI = 1,
     TIMER_VIRT_PPI = 2,
     TIMER_HYP_PPI = 3,
-    MAX_TIMER_PPI = 4,
+    TIMER_HYP_VIRT_PPI = 4,
+    MAX_TIMER_PPI = 5,
 };
 
 /*

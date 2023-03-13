@@ -149,15 +149,33 @@ static void __init init_dt_xen_time(void)
 {
     int res;
     unsigned int i;
+    bool has_names;
+    static const char * const timer_irq_names[MAX_TIMER_PPI] __initconst = {
+        [TIMER_PHYS_SECURE_PPI] = "sec-phys",
+        [TIMER_PHYS_NONSECURE_PPI] = "phys",
+        [TIMER_VIRT_PPI] = "virt",
+        [TIMER_HYP_PPI] = "hyp-phys",
+        [TIMER_HYP_VIRT_PPI] = "hyp-virt",
+    };
+
+    has_names = dt_property_read_bool(timer, "interrupt-names");
 
     /* Retrieve all IRQs for the timer */
     for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
     {
-        res = platform_get_irq(timer, i);
+        if ( has_names )
+            res = platform_get_irq_byname(timer, timer_irq_names[i]);
+        else
+            res = platform_get_irq(timer, i);
 
-        if ( res < 0 )
+        if ( res > 0 )
+            timer_irq[i] = res;
+        /*
+         * Do not panic if "hyp-virt" PPI is not found, since it's not
+         * currently used.
+         */
+        else if ( i != TIMER_HYP_VIRT_PPI )
             panic("Timer: Unable to retrieve IRQ %u from the device tree\n", i);
-        timer_irq[i] = res;
     }
 }
 
