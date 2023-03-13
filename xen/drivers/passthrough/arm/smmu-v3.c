@@ -200,30 +200,6 @@ static inline void dev_iommu_priv_set(struct device *dev, void *priv)
 	fwspec->iommu_priv = priv;
 }
 
-static int platform_get_irq_byname_optional(struct device *dev,
-				const char *name)
-{
-	int index, ret;
-	struct dt_device_node *np  = dev_to_dt(dev);
-
-	if (unlikely(!name))
-		return -EINVAL;
-
-	index = dt_property_match_string(np, "interrupt-names", name);
-	if (index < 0) {
-		dev_info(dev, "IRQ %s not found\n", name);
-		return index;
-	}
-
-	ret = platform_get_irq(np, index);
-	if (ret < 0) {
-		dev_err(dev, "failed to get irq index %d\n", index);
-		return -ENODEV;
-	}
-
-	return ret;
-}
-
 /* Start of Linux SMMUv3 code */
 static bool disable_bypass = 1;
 
@@ -2434,6 +2410,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	int irq, ret;
 	paddr_t ioaddr, iosize;
 	struct arm_smmu_device *smmu;
+	struct dt_device_node *np = dev_to_dt(pdev);
 
 	smmu = xzalloc(struct arm_smmu_device);
 	if (!smmu)
@@ -2451,7 +2428,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	}
 
 	/* Base address */
-	ret = dt_device_get_address(dev_to_dt(pdev), 0, &ioaddr, &iosize);
+	ret = dt_device_get_address(np, 0, &ioaddr, &iosize);
 	if (ret)
 		goto out_free_smmu;
 
@@ -2484,19 +2461,19 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 
 	/* Interrupt lines */
 
-	irq = platform_get_irq_byname_optional(pdev, "combined");
+	irq = platform_get_irq_byname(np, "combined");
 	if (irq > 0)
 		smmu->combined_irq = irq;
 	else {
-		irq = platform_get_irq_byname_optional(pdev, "eventq");
+		irq = platform_get_irq_byname(np, "eventq");
 		if (irq > 0)
 			smmu->evtq.q.irq = irq;
 
-		irq = platform_get_irq_byname_optional(pdev, "priq");
+		irq = platform_get_irq_byname(np, "priq");
 		if (irq > 0)
 			smmu->priq.q.irq = irq;
 
-		irq = platform_get_irq_byname_optional(pdev, "gerror");
+		irq = platform_get_irq_byname(np, "gerror");
 		if (irq > 0)
 			smmu->gerr_irq = irq;
 	}

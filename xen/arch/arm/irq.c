@@ -718,6 +718,20 @@ int platform_get_irq(const struct dt_device_node *device, int index)
     return irq;
 }
 
+int platform_get_irq_byname(struct dt_device_node *np, const char *name)
+{
+	int index;
+
+	if ( unlikely(!name) )
+		return -EINVAL;
+
+	index = dt_property_match_string(np, "interrupt-names", name);
+	if ( index < 0 )
+		return index;
+
+	return platform_get_irq(np, index);
+}
+
 /*
  * Local variables:
  * mode: C

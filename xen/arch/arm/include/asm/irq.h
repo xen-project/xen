@@ -89,6 +89,8 @@ int irq_set_type(unsigned int irq, unsigned int type);
 
 int platform_get_irq(const struct dt_device_node *device, int index);
 
+int platform_get_irq_byname(struct dt_device_node *np, const char *name);
+
 void irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask);
 
 /*
