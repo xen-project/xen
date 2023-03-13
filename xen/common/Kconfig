@@ -10,6 +10,7 @@ config COMPAT
 
 config CORE_PARKING
 	bool
+	depends on NR_CPUS > 1
 
 config GRANT_TABLE
 	bool "Grant table support" if EXPERT

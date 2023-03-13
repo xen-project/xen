@@ -727,12 +727,17 @@ ret_t do_platform_op(
         case XEN_CORE_PARKING_SET:
             idle_nums = min_t(uint32_t,
                     op->u.core_parking.idle_nums, num_present_cpus() - 1);
-            ret = continue_hypercall_on_cpu(
-                    0, core_parking_helper, (void *)(unsigned long)idle_nums);
+            if ( CONFIG_NR_CPUS > 1 )
+                ret = continue_hypercall_on_cpu(
+                        0, core_parking_helper,
+                        (void *)(unsigned long)idle_nums);
+            else if ( idle_nums )
+                ret = -EINVAL;
             break;
 
         case XEN_CORE_PARKING_GET:
-            op->u.core_parking.idle_nums = get_cur_idle_nums();
+            op->u.core_parking.idle_nums = CONFIG_NR_CPUS > 1
+                                           ? get_cur_idle_nums() : 0;
             ret = __copy_field_to_guest(u_xenpf_op, op, u.core_parking) ?
                   -EFAULT : 0;
             break;
