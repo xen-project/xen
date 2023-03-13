@@ -841,6 +841,8 @@ ret_t do_platform_op(
 
 #ifdef CONFIG_VIDEO
     case XENPF_get_dom0_console:
+        BUILD_BUG_ON(sizeof(op->u.dom0_console) > sizeof(op->u.pad));
+        ret = sizeof(op->u.dom0_console);
         if ( !fill_console_start_info(&op->u.dom0_console) )
         {
             ret = -ENODEV;

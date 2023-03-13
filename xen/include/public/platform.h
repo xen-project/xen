@@ -605,7 +605,11 @@ struct xenpf_symdata {
 typedef struct xenpf_symdata xenpf_symdata_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_symdata_t);
 
-/* Fetch the video console information and mode setup by Xen. */
+/*
+ * Fetch the video console information and mode setup by Xen.  A non-
+ * negative return value indicates the size of the (part of the) structure
+ * which was filled.
+ */
 #define XENPF_get_dom0_console 64
 typedef struct dom0_vga_console_info xenpf_dom0_console_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_dom0_console_t);
