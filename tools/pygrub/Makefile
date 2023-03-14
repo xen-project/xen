@@ -18,8 +18,10 @@ build:
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)/$(bindir)
+	$(INSTALL_DIR) $(DESTDIR)/$(LIBEXEC_BIN)
 	$(setup.py) install --record $(INSTALL_LOG) $(PYTHON_PREFIX_ARG) \
-		--root="$(DESTDIR)" --install-scripts=$(LIBEXEC_BIN) --force
+		--root="$(DESTDIR)" --force
+	$(INSTALL_PYTHON_PROG) src/pygrub $(DESTDIR)/$(LIBEXEC_BIN)/pygrub
 	set -e; if [ $(bindir) != $(LIBEXEC_BIN) -a \
 	             "`readlink -f $(DESTDIR)/$(bindir)`" != \
 	             "`readlink -f $(LIBEXEC_BIN)`" ]; then \

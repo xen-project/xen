@@ -179,7 +179,7 @@ CFLAGS += $(CFLAGS-y)
 CFLAGS += $(EXTRA_CFLAGS_XEN_TOOLS)
 
 INSTALL_PYTHON_PROG = \
-	$(XEN_ROOT)/tools/python/install-wrap "$(PYTHON_PATH)" $(INSTALL_PROG)
+	$(XEN_ROOT)/tools/python/install-wrap "$(PYTHON_PATH) -s" $(INSTALL_PROG)
 
 %.opic: %.c
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) $(CFLAGS_$*.opic) -fPIC -c -o $@ $< $(APPEND_CFLAGS)
