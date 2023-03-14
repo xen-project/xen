@@ -13,12 +13,12 @@
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
 #   the Free Software Foundation; under version 2 of the License.
-# 
+#
 #   This program is distributed in the hope that it will be useful,
 #   but WITHOUT ANY WARRANTY; without even the implied warranty of
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
-# 
+#
 #   You should have received a copy of the GNU General Public License
 #   along with this program; If not, see <http://www.gnu.org/licenses/>.
 #####################################################################
@@ -79,7 +79,7 @@ def setup_cmdline_parser():
     parser.add_option("-p", "--prefix", dest="prefix",
                       default = "log", help="prefix to use for output files")
     parser.add_option("-t", "--time", dest="duration",
-            action="store", type="int", default=10, 
+            action="store", type="int", default=10,
             help="stop logging to file after this much time has elapsed (in seconds). set to 0 to keep logging indefinitely")
     parser.add_option("-i", "--interval", dest="interval",
             action="store", type="int", default=1000,
@@ -179,7 +179,7 @@ class DomainInfo(object):
         return [total/(float(passed)/10**9), avg]
 
     def stats(self, passed):
-        return [self.gotten_stats(passed), self.allocated_stats(passed), self.blocked_stats(passed), 
+        return [self.gotten_stats(passed), self.allocated_stats(passed), self.blocked_stats(passed),
                 self.waited_stats(passed), self.ec_stats(passed), self.io_stats(passed)]
 
 # report values over desired interval
@@ -187,13 +187,13 @@ def summarize(startat, endat, duration, samples):
     dominfos = {}
     for i in range(0, NDOMAINS):
         dominfos[i] = DomainInfo()
-        
+
     passed = 1              # to prevent zero division
     curid = startat
     numbuckets = 0
     lost_samples = []
     ffp_samples = []
-    
+
     while passed < duration:
         for i in range(0, NDOMAINS):
             if dom_in_use[i]:
@@ -203,7 +203,7 @@ def summarize(startat, endat, duration, samples):
                 dominfos[i].blocked_sum += samples[curid][3*NDOMAINS + i]
                 dominfos[i].exec_count += samples[curid][4*NDOMAINS + i]
                 dominfos[i].iocount_sum += samples[curid][5*NDOMAINS + i]
-    
+
         passed += samples[curid][6*NDOMAINS]
         lost_samples.append(samples[curid][6*NDOMAINS + 2])
         ffp_samples.append(samples[curid][6*NDOMAINS + 3])
@@ -271,7 +271,7 @@ def show_livestats(cpu):
     cpu_10sec_usage = 0.0
     heartbeat = 1
     global dom_in_use, options
-    
+
     # mmap the (the first chunk of the) file
     shmf = open(SHM_FILE, "r+")
     shm = mmap.mmap(shmf.fileno(), QOS_DATA_SIZE)
@@ -284,7 +284,7 @@ def show_livestats(cpu):
     stdscr.keypad(1)
     stdscr.timeout(1000)
     [maxy, maxx] = stdscr.getmaxyx()
-    
+
     # display in a loop
     while True:
 
@@ -342,7 +342,7 @@ def show_livestats(cpu):
             cpuidx = cpuidx + 1
 
         # calculate starting and ending datapoints; never look at "next" since
-        # it represents live data that may be in transition. 
+        # it represents live data that may be in transition.
         startat = next - 1
         if next + 10 < NSAMPLES:
             endat = next + 10
@@ -374,7 +374,7 @@ def show_livestats(cpu):
 
             if h1[dom][0][1] > 0 or domain_id[dom] == IDLE_DOMAIN:
                 # display gotten
-                row += 1 
+                row += 1
                 col = 2
                 display_domain_id(stdscr, row, col, domain_id[dom])
                 col += 4
@@ -396,7 +396,7 @@ def show_livestats(cpu):
 
                 if dom != IDLE_DOMAIN:
                     cpu_1sec_usage = cpu_1sec_usage + h1[dom][0][1]
-    
+
                 # display allocated
                 if options.allocated:
                     row += 1
@@ -454,7 +454,7 @@ def show_livestats(cpu):
                     row += 1
                     col = 2
                     display_domain_id(stdscr, row, col, domain_id[dom])
-                    
+
                     col += 28
                     display(stdscr, row, col, "%d/s" % h2[dom][4])
                     col += 42
@@ -490,14 +490,14 @@ def show_livestats(cpu):
         display(stdscr, row, 1, star)
         display(stdscr, row, 2, TOTALS % (total_h2_cpu, total_h1_cpu))
         row += 1
-#        display(stdscr, row, 2, 
-#                "\tFFP: %d (Min: %d, Max: %d)\t\t\tFFP: %d (Min: %d, Max %d)" % 
+#        display(stdscr, row, 2,
+#                "\tFFP: %d (Min: %d, Max: %d)\t\t\tFFP: %d (Min: %d, Max %d)" %
 #                (math.ceil(f2[1]), f2[0], f2[2], math.ceil(f1[1]), f1[0], f1[2]), _c.A_BOLD)
 
         if l1[1] > 1 :
             row += 1
-            display(stdscr, row, 2, 
-                    "\tRecords lost: %d (Min: %d, Max: %d)\t\t\tRecords lost: %d (Min: %d, Max %d)" % 
+            display(stdscr, row, 2,
+                    "\tRecords lost: %d (Min: %d, Max: %d)\t\t\tRecords lost: %d (Min: %d, Max %d)" %
                     (math.ceil(l2[1]), l2[0], l2[2], math.ceil(l1[1]), l1[0], l1[2]), _c.A_BOLD)
 
         # grab a char from tty input; exit if interrupt hit
@@ -505,11 +505,11 @@ def show_livestats(cpu):
             c = stdscr.getch()
         except:
             break
-        
+
         # q = quit
         if c == ord('q'):
             break
-    
+
         # c = cycle to a new cpu of interest
         if c == ord('c'):
             cpu = (cpu + 1) % ncpu
@@ -560,7 +560,7 @@ class Delayed(object):
     def close(self):
         if  self.opened:
             self.file.close()
-            
+
 
 def writelog():
     global options
@@ -639,7 +639,7 @@ def writelog():
                                      h1[dom][1],
                                      h1[dom][2][0], h1[dom][2][1], h1[dom][2][2],
                                      h1[dom][3][0], h1[dom][3][1], h1[dom][3][2],
-                                     h1[dom][4], 
+                                     h1[dom][4],
                                      h1[dom][5][0], h1[dom][5][1]))
                     outfiles[dom].flush()
             curr = time.time()
@@ -698,7 +698,7 @@ def main():
        options.mspersample > options.duration * 1000:
         parser.error("option --ms_per_sample: too large (> %d ms)" %
                      (options.duration * 1000))
-    
+
     start_xenbaked()
     if options.live:
         show_livestats(options.cpu)

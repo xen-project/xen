@@ -207,7 +207,7 @@ class ExtLinuxConfigFile(object):
                  "f1": None,
                  "f2": None,
                  }
-        
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         raise RuntimeError("Need a configuration file to read")

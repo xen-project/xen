@@ -46,7 +46,7 @@ def enable_cursor(ison):
         val = 2
     else:
         val = 0
-        
+
     try:
         curses.curs_set(val)
     except _curses.error:
@@ -114,7 +114,7 @@ FDISK_PART_GPT=0xee
 def get_partition_offsets(file):
     image_type = identify_disk_image(file)
     if image_type == DISK_TYPE_RAW:
-        # No MBR: assume whole disk filesystem, which is like a 
+        # No MBR: assume whole disk filesystem, which is like a
         # single partition starting at 0
         return [0]
     elif image_type == DISK_TYPE_HYBRIDISO:
@@ -135,7 +135,7 @@ def get_partition_offsets(file):
         partbuf = buf[poff:poff+16]
         offset  = struct.unpack("<L", partbuf[8:12])[0] * SECTOR_SIZE
         type    = struct.unpack("<B", partbuf[4:5])[0]
-        
+
         # offset == 0 implies this partition is not enabled
         if offset == 0:
             continue
@@ -171,7 +171,7 @@ class GrubLineEditor(curses.textpad.Textbox):
         screen.noutrefresh()
         win = curses.newwin(1, 74, startx, starty + 2)
         curses.textpad.Textbox.__init__(self, win)
-        
+
         self.line = list(line)
         self.pos = len(line)
         self.cancelled = False
@@ -237,7 +237,7 @@ class GrubLineEditor(curses.textpad.Textbox):
         if self.cancelled:
             return None
         return string.join(self.line, "")
-        
+
 
 class Grub:
     ENTRY_WIN_LINES = 8
@@ -261,7 +261,7 @@ class Grub:
             self.entry_win = curses.newwin(Grub.ENTRY_WIN_LINES + 2, 74, 2, 1)
             self.text_win = curses.newwin(10, 70, 12, 5)
             curses.def_prog_mode()
-        
+
         curses.reset_prog_mode()
         self.screen.erase()
 
@@ -279,7 +279,7 @@ class Grub:
             self.start_image = self.selected_image
         if self.selected_image < self.start_image:
             self.start_image = self.selected_image
-        
+
         for y in range(self.start_image, len(self.cf.images)):
             i = self.cf.images[y]
             if y > self.start_image + maxy:
@@ -329,7 +329,7 @@ class Grub:
                 l = img.lines[idx].expandtabs().ljust(70)
                 if len(l) > 70:
                     l = l[:69] + ">"
-                    
+
                 self.entry_win.addstr(idp, 2, l)
                 if idx == curline:
                     self.entry_win.attroff(curses.A_REVERSE)
@@ -367,7 +367,7 @@ class Grub:
                 self.command_line_mode()
                 if self.isdone:
                     return
-                
+
             # bound at the top and bottom
             if curline < 0:
                 curline = 0
@@ -400,7 +400,7 @@ class Grub:
         lines = []
         while 1:
             t = GrubLineEditor(self.screen, y, 2)
-            enable_cursor(True)            
+            enable_cursor(True)
             ret = t.edit()
             if ret:
                 if ret in ("quit", "return"):
@@ -410,7 +410,7 @@ class Grub:
                     lines.append(ret)
                     continue
 
-                # if we got boot, then we want to boot the entered image 
+                # if we got boot, then we want to boot the entered image
                 img = self.cf.new_image("entered", lines)
                 self.cf.add_image(img)
                 self.selected_image = len(self.cf.images) - 1
@@ -423,7 +423,7 @@ class Grub:
     def read_config(self, fn, fs = None):
         """Read the given file to parse the config.  If fs = None, then
         we're being given a raw config file rather than a disk image."""
-        
+
         if not os.access(fn, os.R_OK):
             raise RuntimeError("Unable to access %s" %(fn,))
 
@@ -499,7 +499,7 @@ class Grub:
         while not self.isdone:
             self.run_main(timeout)
             timeout = -1
-            
+
         return self.selected_image
 
     def run_main(self, timeout = -1):
@@ -529,7 +529,7 @@ class Grub:
         self.start_image = 0
         while (timeout == -1 or mytime < int(timeout)):
             draw()
-            if timeout != -1 and mytime != -1: 
+            if timeout != -1 and mytime != -1:
                 self.screen.addstr(20, 5, "Will boot selected entry in %2d seconds"
                                    %(int(timeout) - mytime))
             else:
@@ -600,7 +600,7 @@ class Grub:
                 self.selected_image = 0
             elif self.selected_image >= len(self.cf.images):
                 self.selected_image = len(self.cf.images) - 1
-        
+
 def get_entry_idx(cf, entry):
     # first, see if the given entry is numeric
     try:
@@ -697,10 +697,10 @@ def sniff_solaris(fs, cfg):
     # Unpleasant. Typically we'll have 'root=foo -k' or 'root=foo /kernel -k',
     # and we need to maintain Xen properties (root= and ip=) and the kernel
     # before any user args.
-    
+
     xenargs = ""
     userargs = ""
-    
+
     if not cfg["args"]:
         cfg["args"] = cfg["kernel"]
     else:
@@ -712,7 +712,7 @@ def sniff_solaris(fs, cfg):
         cfg["args"] = xenargs + " " + cfg["kernel"] + " " + userargs
 
     return cfg
- 
+
 def sniff_netware(fs, cfg):
     if not fs.file_exists("/nwserver/xnloader.sys"):
         return cfg
@@ -729,7 +729,7 @@ def format_sxp(kernel, ramdisk, args):
     if args:
         s += "(args %s)" % repr(args)
     return s
-                
+
 def format_simple(kernel, ramdisk, args, sep):
     for check in (kernel, ramdisk, args):
         if check is not None and sep in check:
@@ -744,7 +744,7 @@ def format_simple(kernel, ramdisk, args, sep):
 
 if __name__ == "__main__":
     sel = None
-    
+
     def usage():
         print("Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] [--offset=] <image>" %(sys.argv[0],), file=sys.stderr)
 
@@ -783,7 +783,7 @@ if __name__ == "__main__":
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'qilnh::',
                                    ["quiet", "interactive", "list-entries", "not-really", "help",
                                     "output=", "output-format=", "output-directory=", "offset=",
-                                    "entry=", "kernel=", 
+                                    "entry=", "kernel=",
                                     "ramdisk=", "args=", "isconfig", "debug"])
     except getopt.GetoptError:
         usage()
@@ -967,4 +967,4 @@ if __name__ == "__main__":
         os.write(fd, ostring)
     else:
         os.write(fd, ostring.encode())
-    
+

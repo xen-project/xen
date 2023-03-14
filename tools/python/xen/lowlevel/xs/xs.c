@@ -1,4 +1,4 @@
-/* 
+/*
  * Python interface to the Xen Store Daemon.
  *
  * This library is free software; you can redistribute it and/or
@@ -859,7 +859,7 @@ static void remove_watch(XsHandle *self, PyObject *token)
  * Parse transaction and path arguments from the given args and kwds,
  * convert the given self value to an xs_handle, and return all three by
  * reference.
- * 
+ *
  * @return 1 on success, in which case *xh, *th, and *path are valid, or 0 on
  * failure.
  */

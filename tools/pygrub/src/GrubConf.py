@@ -95,7 +95,7 @@ class _GrubImage(object):
         self.title = title.strip()
 
     def __repr__(self):
-        return ("title: %s\n" 
+        return ("title: %s\n"
                 "  root: %s\n"
                 "  kernel: %s\n"
                 "  args: %s\n"
@@ -140,7 +140,7 @@ class _GrubImage(object):
 class GrubImage(_GrubImage):
     def __init__(self, title, lines):
         _GrubImage.__init__(self, title, lines)
-    
+
     def set_from_line(self, line, replace = None):
         (com, arg) = grub_exact_split(line, 2)
 
@@ -265,7 +265,7 @@ class _GrubConfigFile(object):
 class GrubConfigFile(_GrubConfigFile):
     def __init__(self, fn = None):
         _GrubConfigFile.__init__(self,fn)
-        
+
     def new_image(self, title, lines):
         return GrubImage(title, lines)
 
@@ -297,7 +297,7 @@ class GrubConfigFile(_GrubConfigFile):
                 img = []
                 title = l[6:]
                 continue
-                
+
             if img is not None:
                 img.append(l)
                 continue
@@ -310,7 +310,7 @@ class GrubConfigFile(_GrubConfigFile):
                     logging.info("Ignored directive %s" %(com,))
             else:
                 logging.warning("Unknown directive %s" %(com,))
-                
+
         if img:
             self.add_image(GrubImage(title, img))
 
@@ -322,7 +322,7 @@ def grub2_handle_set(arg):
     com="set:" + com
     m = re.match("([\"\'])(.*)\\1", arg)
     if m is not None:
-        arg=m.group(2) 
+        arg=m.group(2)
     return (com,arg)
 
 class Grub2Image(_GrubImage):
@@ -334,7 +334,7 @@ class Grub2Image(_GrubImage):
 
         if com == "set":
             (com,arg) = grub2_handle_set(arg)
-            
+
         if com in self.commands:
             if self.commands[com] is not None:
                 setattr(self, self.commands[com], arg.strip())
@@ -351,7 +351,7 @@ class Grub2Image(_GrubImage):
         else:
             self.lines.pop(replace)
             self.lines.insert(replace, line)
-                
+
     commands = {'set:root': 'root',
                 'linux': 'kernel',
                 'linux16': 'kernel',
@@ -360,14 +360,14 @@ class Grub2Image(_GrubImage):
                 'echo': None,
                 'insmod': None,
                 'search': None}
-    
+
 class Grub2ConfigFile(_GrubConfigFile):
     def __init__(self, fn = None):
         _GrubConfigFile.__init__(self, fn)
-       
+
     def new_image(self, title, lines):
         return Grub2Image(title, lines)
- 
+
     def parse(self, buf = None):
         if buf is None:
             if self.filename is None:
@@ -431,10 +431,10 @@ class Grub2ConfigFile(_GrubConfigFile):
                 continue
 
             (com, arg) = grub_exact_split(l, 2)
-        
+
             if com == "set":
                 (com,arg) = grub2_handle_set(arg)
-                
+
             if com in self.commands:
                 if self.commands[com] is not None:
                     arg_strip = arg.strip()
@@ -448,7 +448,7 @@ class Grub2ConfigFile(_GrubConfigFile):
                 pass
             else:
                 logging.warning("Unknown directive %s" %(com,))
-            
+
         if img is not None:
             raise RuntimeError("syntax error: end of file with open menuentry(%d %s)" % (len(img),img))
 
@@ -466,7 +466,7 @@ class Grub2ConfigFile(_GrubConfigFile):
                 'if': None,
                 'fi': None,
                 }
-        
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise RuntimeError('Need a grub version ("grub" or "grub2") and a grub.conf or grub.cfg to read')

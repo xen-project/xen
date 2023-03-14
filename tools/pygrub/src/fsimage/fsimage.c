@@ -31,7 +31,7 @@ typedef struct fsimage_fs {
 	fsi_t *fs;
 } fsimage_fs_t;
 
-typedef struct fsimage_file { 
+typedef struct fsimage_file {
 	PyObject_HEAD
 	fsimage_fs_t *fs;
 	fsi_file_t *file;
@@ -47,7 +47,7 @@ fsimage_file_read(fsimage_file_t *file, PyObject *args, PyObject *kwargs)
 	ssize_t bytesread = 0;
 	PyObject * buffer;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iL", kwlist, 
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iL", kwlist,
 	    &size, &offset))
 		return (NULL);
 
@@ -62,7 +62,7 @@ fsimage_file_read(fsimage_file_t *file, PyObject *args, PyObject *kwargs)
 
 	if (buffer == NULL)
 		return (NULL);
- 
+
 	while (1) {
 		int err;
 		void *buf =
@@ -255,7 +255,7 @@ fsimage_open(PyObject *o, PyObject *args, PyObject *kwargs)
 	uint64_t offset = 0;
 	fsimage_fs_t *fs;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|Ls", kwlist, 
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|Ls", kwlist,
 	    &name, &offset, &options))
 		return (NULL);
 
