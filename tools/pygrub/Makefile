@@ -6,19 +6,20 @@ PY_CFLAGS = $(CFLAGS) $(PY_NOOPT_CFLAGS)
 PY_LDFLAGS = $(SHLIB_LDFLAGS) $(APPEND_LDFLAGS)
 INSTALL_LOG = build/installed_files.txt
 
+setup.py = CC="$(CC)" CFLAGS="$(PY_CFLAGS)" LDSHARED="$(CC)" LDFLAGS="$(PY_LDFLAGS)" \
+           $(PYTHON) setup.py
+
 .PHONY: all
 all: build
 .PHONY: build
 build:
-	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" LDSHARED="$(CC)" LDFLAGS="$(PY_LDFLAGS)" $(PYTHON) setup.py build
+	$(setup.py) build
 
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)/$(bindir)
-	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" LDSHARED="$(CC)" \
-		LDFLAGS="$(PY_LDFLAGS)" $(PYTHON) setup.py install \
-		--record $(INSTALL_LOG) $(PYTHON_PREFIX_ARG) \
-		 --root="$(DESTDIR)" --install-scripts=$(LIBEXEC_BIN) --force
+	$(setup.py) install --record $(INSTALL_LOG) $(PYTHON_PREFIX_ARG) \
+		--root="$(DESTDIR)" --install-scripts=$(LIBEXEC_BIN) --force
 	set -e; if [ $(bindir) != $(LIBEXEC_BIN) -a \
 	             "`readlink -f $(DESTDIR)/$(bindir)`" != \
 	             "`readlink -f $(LIBEXEC_BIN)`" ]; then \
