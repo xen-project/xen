@@ -26,6 +26,8 @@ class TestLibxc(unittest.TestCase):
                          (libxc.X86_TSC_INFO_FORMAT, 24),
                          (libxc.HVM_PARAMS_ENTRY_FORMAT, 16),
                          (libxc.HVM_PARAMS_FORMAT, 8),
+                         (libxc.X86_CPUID_POLICY_FORMAT, 24),
+                         (libxc.X86_MSR_POLICY_FORMAT, 16),
                          ):
             self.assertEqual(calcsize(fmt), sz)
 
@@ -40,15 +42,3 @@ class TestLibxl(unittest.TestCase):
                          (libxl.EMULATOR_HEADER_FORMAT, 8),
                          ):
             self.assertEqual(calcsize(fmt), sz)
-
-
-def test_suite():
-    suite = unittest.TestSuite()
-
-    suite.addTest(unittest.makeSuite(TestLibxc))
-    suite.addTest(unittest.makeSuite(TestLibxl))
-
-    return suite
-
-if __name__ == "__main__":
-    unittest.main()
