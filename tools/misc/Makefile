@@ -12,7 +12,6 @@ CFLAGS += $(CFLAGS_libxenstore)
 # Everything to be installed in regular bin/
 INSTALL_BIN-$(CONFIG_X86)      += xen-cpuid
 INSTALL_BIN-$(CONFIG_X86)      += xen-detect
-INSTALL_BIN                    += xencons
 INSTALL_BIN                    += xencov_split
 INSTALL_BIN += $(INSTALL_BIN-y)
 
@@ -44,7 +43,6 @@ INSTALL_PRIVBIN                += xenpvnetboot
 TARGETS_ALL := $(INSTALL_BIN) $(INSTALL_SBIN) $(INSTALL_PRIVBIN)
 
 # Everything which only needs copying to install
-TARGETS_COPY += xencons
 TARGETS_COPY += xencov_split
 TARGETS_COPY += xenpvnetboot
 
