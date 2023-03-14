@@ -589,7 +589,7 @@ $(TARGET): outputmakefile FORCE
 	$(Q)$(MAKE) $(build)=. arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
 	$(Q)$(MAKE) $(build)=. MKRELOC=$(MKRELOC) 'ALL_OBJS=$(ALL_OBJS-y)' 'ALL_LIBS=$(ALL_LIBS-y)' $@
 
-SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers lib test
+SUBDIRS = xsm arch common crypto drivers lib test
 define all_sources
     ( find include -type f -name '*.h' -print; \
       find $(SUBDIRS) -type f -name '*.[chS]' -print )
