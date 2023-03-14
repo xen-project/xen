@@ -28,7 +28,7 @@
 
 static void usage (int argCnt, char *argv[])
 {
-	fprintf(stderr, "Usage: %s SBDF label\n", argv[0]);
+	fprintf(stderr, "Usage: %s SBDF label <irq_label>\n", argv[0]);
 	exit(1);
 }
 
@@ -39,11 +39,18 @@ int main (int argCnt, char *argv[])
 	int seg, bus, dev, fn;
 	uint32_t sbdf;
 	uint64_t start, end, flags;
+	char *pirq_label;
 	char buf[1024];
 	FILE *f;
 
-	if (argCnt != 3)
+	if (argCnt < 3 || argCnt > 4)
 		usage(argCnt, argv);
+
+	if (argCnt == 4) {
+	    pirq_label = argv[3];
+	} else {
+	    pirq_label = argv[2];
+	}
 
 	xch = xc_interface_open(0,0,0);
 	if ( !xch )
@@ -107,7 +114,7 @@ int main (int argCnt, char *argv[])
 	if (fscanf(f, "%" SCNu64, &start) != 1)
 		start = 0;
 	if (start) {
-		ret = xc_flask_add_pirq(xch, start, argv[2]);
+		ret = xc_flask_add_pirq(xch, start, pirq_label);
 		if (ret) {
 			fprintf(stderr, "xc_flask_add_pirq %"PRIu64" failed: %d\n",
 					start, ret);

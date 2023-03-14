@@ -205,6 +205,22 @@ parameter, which can also be changed using xl setenforce).  When using the
 default types for domains (domU_t), the example policy shipped with Xen should
 allow the same operations on or between domains as when not using FLASK.
 
+By default, flask-label-pci labels the device, I/O ports, memory and IRQ with
+the provided label.  These are all unique per-device, except for IRQs which
+can be shared between devices.  This leads to assignment problems since vmA_t
+can't access the IRQ devB_t.  To work around this issue, flask-label-pci
+takes an optional 3rd argument to label the IRQ:
+
+    flask-label-pci 0000:03:02.0 system_u:object_r:nic_dev_t \
+        system_u:object_r:shared_irq_t
+
+The IRQ labeling only applies to the PIRQ - MSI/MSI-X interrupts are labeled
+with the main device label.
+
+The policy needs to define the shared_irq_t with:
+    type shared_irq_t, resource_type;
+
+And the policy needs to be updated to allow domains appropriate access.
 
 MLS/MCS policy
 --------------
