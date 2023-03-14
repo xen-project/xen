@@ -1232,11 +1232,11 @@ The usage of gnttab v2 is not security supported on ARM platforms.
 
 > Can be modified at runtime
 
-Specify the maximum number of frames which any domain may use as part
-of its grant table. This value is an upper boundary of the per-domain
-value settable via Xen tools.
+Specify the default upper bound on the number of frames which any domain may
+use as part of its grant table unless a different value is specified at domain
+creation.
 
-Dom0 is using this value for sizing its grant table.
+Note this value is the effective upper bound for dom0.
 
 ### gnttab_max_maptrack_frames
 > `= <integer>`
@@ -1245,9 +1245,11 @@ Dom0 is using this value for sizing its grant table.
 
 > Can be modified at runtime
 
-Specify the maximum number of frames to use as part of a domains
-maptrack array. This value is an upper boundary of the per-domain
-value settable via Xen tools.
+Specify the default upper bound on the number of frames which any domain may
+use as part of its maptrack array unless a different value is specified at
+domain creation.
+
+Note this value is the effective upper bound for dom0.
 
 ### global-pages
     = <boolean>

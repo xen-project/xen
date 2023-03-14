@@ -1956,18 +1956,15 @@ int grant_table_init(struct domain *d, int max_grant_frames,
         return -EINVAL;
     }
 
-    /* Default to maximum value if no value was specified */
+    /* Apply defaults if no value was specified */
     if ( max_grant_frames < 0 )
         max_grant_frames = opt_max_grant_frames;
     if ( max_maptrack_frames < 0 )
         max_maptrack_frames = opt_max_maptrack_frames;
 
-    if ( max_grant_frames < INITIAL_NR_GRANT_FRAMES ||
-         max_grant_frames > opt_max_grant_frames ||
-         max_maptrack_frames > opt_max_maptrack_frames )
+    if ( max_grant_frames < INITIAL_NR_GRANT_FRAMES )
     {
-        dprintk(XENLOG_INFO, "Bad grant table sizes: grant %u, maptrack %u\n",
-                max_grant_frames, max_maptrack_frames);
+        dprintk(XENLOG_INFO, "Bad grant table size: %u frames\n", max_grant_frames);
         return -EINVAL;
     }
 
