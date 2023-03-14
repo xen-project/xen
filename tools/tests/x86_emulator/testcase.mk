@@ -6,6 +6,8 @@ $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
 CFLAGS += -fno-builtin -g0 $($(TESTCASE)-cflags)
 
+LDFLAGS_DIRECT += $(shell { $(LD) -v --warn-rwx-segments; } >/dev/null 2>&1 && echo --no-warn-rwx-segments)
+
 .PHONY: all
 all: $(TESTCASE).bin
 
