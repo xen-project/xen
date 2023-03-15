@@ -437,6 +437,20 @@ struct vmcb_struct {
         };
         union {
             struct {
+                bool     in:1;
+                bool     :1;
+                bool     str:1;
+                bool     rep:1;
+                uint16_t bytes:3;
+                uint16_t /* asz */:3;
+                uint16_t seg:3;
+                uint16_t :3;
+                uint16_t port;
+                uint32_t :32;
+
+                uint64_t nrip;
+            } io;
+            struct {
                 uint16_t sel;
                 uint64_t :48;
 

@@ -2939,13 +2939,12 @@ void svm_vmexit_handler(void)
         break;
 
     case VMEXIT_IOIO:
-        if ( (vmcb->exitinfo1 & (1u<<2)) == 0 )
+        if ( !vmcb->ei.io.str )
         {
-            uint16_t port = (vmcb->exitinfo1 >> 16) & 0xFFFF;
-            int bytes = ((vmcb->exitinfo1 >> 4) & 0x07);
-            int dir = (vmcb->exitinfo1 & 1) ? IOREQ_READ : IOREQ_WRITE;
-            if ( handle_pio(port, bytes, dir) )
-                __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
+            if ( handle_pio(vmcb->ei.io.port,
+                            vmcb->ei.io.bytes,
+                            vmcb->ei.io.in ? IOREQ_READ : IOREQ_WRITE) )
+                __update_guest_eip(regs, vmcb->ei.io.nrip - vmcb->rip);
         }
         else if ( !hvm_emulate_one_insn(x86_insn_is_portio, "port I/O") )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
