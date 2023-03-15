@@ -451,6 +451,11 @@ struct vmcb_struct {
                 uint64_t nrip;
             } io;
             struct {
+                uint64_t gpr:4;
+                uint64_t :59;
+                bool     mov_insn:1; /* MOV, as opposed to LMSW, CLTS, etc */
+            } mov_cr;
+            struct {
                 uint16_t sel;
                 uint64_t :48;
 

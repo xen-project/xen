@@ -1740,7 +1740,7 @@ static void svm_vmexit_do_cr_access(
     cr = vmcb->exitcode - VMEXIT_CR0_READ;
     dir = (cr > 15);
     cr &= 0xf;
-    gp = vmcb->exitinfo1 & 0xf;
+    gp = vmcb->ei.mov_cr.gpr;
 
     rc = dir ? hvm_mov_to_cr(cr, gp) : hvm_mov_from_cr(cr, gp);
 
@@ -2961,7 +2961,7 @@ void svm_vmexit_handler(void)
 
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
-        if ( cpu_has_svm_decode && (vmcb->exitinfo1 & (1ULL << 63)) )
+        if ( cpu_has_svm_decode && vmcb->ei.mov_cr.mov_insn )
             svm_vmexit_do_cr_access(vmcb, regs);
         else if ( !hvm_emulate_one_insn(x86_insn_is_cr_access, "CR access") )
             hvm_inject_hw_exception(X86_EXC_GP, 0);
