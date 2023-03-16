@@ -102,12 +102,8 @@ int shadow_domain_init(struct domain *d)
 
     d->arch.paging.update_paging_modes = shadow_update_paging_modes;
 
-#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
-    d->arch.paging.shadow.oos_active = 0;
-#endif
 #ifdef CONFIG_HVM
     d->arch.paging.flush_tlb = shadow_flush_tlb;
-    d->arch.paging.shadow.pagetable_dying_op = 0;
 #endif
 
     return 0;
