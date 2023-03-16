@@ -78,9 +78,6 @@ int shadow_domctl(struct domain *d,
 void shadow_vcpu_teardown(struct vcpu *v);
 void shadow_teardown(struct domain *d, bool *preempted);
 
-/* Call once all of the references to the domain have gone away */
-void shadow_final_teardown(struct domain *d);
-
 void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all);
 
 /* Adjust shadows ready for a guest page to change its type. */

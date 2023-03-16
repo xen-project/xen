@@ -1231,7 +1231,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
 
         /*
          * For dying domains, actually free the memory here. This way less
-         * work is left to shadow_final_teardown(), which cannot easily have
+         * work is left to paging_final_teardown(), which cannot easily have
          * preemption checks added.
          */
         if ( unlikely(dying) )
@@ -2894,35 +2894,6 @@ out:
                    unpaged_pagetable->u.inuse.type_info);
         shadow_free_p2m_page(d, unpaged_pagetable);
     }
-}
-
-void shadow_final_teardown(struct domain *d)
-/* Called by arch_domain_destroy(), when it's safe to pull down the p2m map. */
-{
-    SHADOW_PRINTK("dom %u final teardown starts."
-                   "  Shadow pages total = %u, free = %u, p2m=%u\n",
-                   d->domain_id, d->arch.paging.total_pages,
-                   d->arch.paging.free_pages, d->arch.paging.p2m_pages);
-
-    /* Double-check that the domain didn't have any shadow memory.
-     * It is possible for a domain that never got domain_kill()ed
-     * to get here with its shadow allocation intact. */
-    if ( d->arch.paging.total_pages != 0 )
-        shadow_teardown(d, NULL);
-
-    /* It is now safe to pull down the p2m map. */
-    p2m_teardown(p2m_get_hostp2m(d), true, NULL);
-    /* Free any shadow memory that the p2m teardown released */
-    paging_lock(d);
-    shadow_set_allocation(d, 0, NULL);
-    SHADOW_PRINTK("dom %u final teardown done."
-                   "  Shadow pages total = %u, free = %u, p2m=%u\n",
-                   d->domain_id, d->arch.paging.total_pages,
-                   d->arch.paging.free_pages, d->arch.paging.p2m_pages);
-    ASSERT(d->arch.paging.p2m_pages == 0);
-    ASSERT(d->arch.paging.free_pages == 0);
-    ASSERT(d->arch.paging.total_pages == 0);
-    paging_unlock(d);
 }
 
 static int shadow_one_bit_enable(struct domain *d, u32 mode)

@@ -268,8 +268,8 @@ static void hap_free(struct domain *d, mfn_t mfn)
 
     /*
      * For dying domains, actually free the memory here. This way less work is
-     * left to hap_final_teardown(), which cannot easily have preemption checks
-     * added.
+     * left to paging_final_teardown(), which cannot easily have preemption
+     * checks added.
      */
     if ( unlikely(d->is_dying) )
     {
@@ -552,18 +552,6 @@ void hap_final_teardown(struct domain *d)
     for (i = 0; i < MAX_NESTEDP2M; i++) {
         p2m_teardown(d->arch.nested_p2m[i], true, NULL);
     }
-
-    if ( d->arch.paging.total_pages != 0 )
-        hap_teardown(d, NULL);
-
-    p2m_teardown(p2m_get_hostp2m(d), true, NULL);
-    /* Free any memory that the p2m teardown released */
-    paging_lock(d);
-    hap_set_allocation(d, 0, NULL);
-    ASSERT(d->arch.paging.p2m_pages == 0);
-    ASSERT(d->arch.paging.free_pages == 0);
-    ASSERT(d->arch.paging.total_pages == 0);
-    paging_unlock(d);
 }
 
 void hap_vcpu_teardown(struct vcpu *v)
