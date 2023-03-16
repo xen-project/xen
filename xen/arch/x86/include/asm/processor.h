@@ -118,34 +118,6 @@ struct x86_cpu_id {
     const void *driver_data;
 };
 
-struct cpuinfo_x86 {
-    uint8_t x86;            /* CPU family */
-    uint8_t x86_vendor;     /* CPU vendor */
-    uint8_t x86_model;
-    uint8_t x86_mask;
-    int  cpuid_level;    /* Maximum supported CPUID level, -1=no CPUID */
-    uint32_t extended_cpuid_level; /* Maximum supported CPUID extended level */
-    unsigned int x86_capability[NCAPINTS];
-    char x86_vendor_id[16];
-    char x86_model_id[64];
-    int  x86_cache_size; /* in KB - valid for CPUS which support this call  */
-    int  x86_cache_alignment;    /* In bytes */
-    uint32_t x86_max_cores;   /* cpuid returned max cores value */
-    uint32_t booted_cores;    /* number of cores as seen by OS */
-    uint32_t x86_num_siblings; /* cpuid logical cpus per chip value */
-    uint32_t apicid;
-    uint32_t phys_proc_id;    /* package ID of each logical CPU */
-    uint32_t cpu_core_id;     /* core ID of each logical CPU */
-    uint32_t compute_unit_id; /* AMD compute unit ID of each logical CPU */
-    unsigned short x86_clflush_size;
-} __cacheline_aligned;
-
-/*
- * capabilities of CPUs
- */
-
-extern struct cpuinfo_x86 boot_cpu_data;
-
 extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 

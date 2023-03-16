@@ -3,7 +3,8 @@
 
 #include <xen/lib.h>
 #include <xen/bitops.h>
-#include <asm/processor.h>
+#include <asm/cpufeature.h>
+#include <asm/x86-defns.h>
 
 static inline void wbinvd(void)
 {

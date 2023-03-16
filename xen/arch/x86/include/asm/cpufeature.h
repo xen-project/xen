@@ -19,6 +19,30 @@
 #ifndef __ASSEMBLY__
 #include <xen/bitops.h>
 
+struct cpuinfo_x86 {
+    unsigned char x86;                 /* CPU family */
+    unsigned char x86_vendor;          /* CPU vendor */
+    unsigned char x86_model;
+    unsigned char x86_mask;
+    int cpuid_level;                   /* Maximum supported CPUID level, -1=no CPUID */
+    unsigned int extended_cpuid_level; /* Maximum supported CPUID extended level */
+    unsigned int x86_capability[NCAPINTS];
+    char x86_vendor_id[16];
+    char x86_model_id[64];
+    unsigned int x86_cache_size;       /* in KB - valid only when supported */
+    unsigned int x86_cache_alignment;  /* In bytes */
+    unsigned int x86_max_cores;        /* cpuid returned max cores value */
+    unsigned int booted_cores;         /* number of cores as seen by OS */
+    unsigned int x86_num_siblings;     /* cpuid logical cpus per chip value */
+    unsigned int apicid;
+    unsigned int phys_proc_id;         /* package ID of each logical CPU */
+    unsigned int cpu_core_id;          /* core ID of each logical CPU */
+    unsigned int compute_unit_id;      /* AMD compute unit ID of each logical CPU */
+    unsigned short x86_clflush_size;
+} __cacheline_aligned;
+
+extern struct cpuinfo_x86 boot_cpu_data;
+
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
 
