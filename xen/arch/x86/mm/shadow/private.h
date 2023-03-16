@@ -434,11 +434,6 @@ void cf_check sh_write_guest_entry(
 intpte_t cf_check sh_cmpxchg_guest_entry(
     struct vcpu *v, intpte_t *p, intpte_t old, intpte_t new, mfn_t gmfn);
 
-/* Update all the things that are derived from the guest's CR0/CR3/CR4.
- * Called to initialize paging structures if the paging mode
- * has changed, and when bringing up a VCPU for the first time. */
-void cf_check shadow_update_paging_modes(struct vcpu *v);
-
 /* Unhook the non-Xen mappings in this top-level shadow mfn.
  * With user_only == 1, unhooks only the user-mode mappings. */
 void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only);

@@ -18,8 +18,14 @@ static void cf_check _clean_dirty_bitmap(struct domain *d)
     ASSERT(is_pv_domain(d));
 }
 
+static void cf_check _update_paging_modes(struct vcpu *v)
+{
+    ASSERT_UNREACHABLE();
+}
+
 int shadow_domain_init(struct domain *d)
 {
+    /* For HVM set up pointers for safety, then fail. */
     static const struct log_dirty_ops sh_none_ops = {
         .enable  = _enable_log_dirty,
         .disable = _disable_log_dirty,
@@ -27,6 +33,9 @@ int shadow_domain_init(struct domain *d)
     };
 
     paging_log_dirty_init(d, &sh_none_ops);
+
+    d->arch.paging.update_paging_modes = _update_paging_modes;
+
     return is_hvm_domain(d) ? -EOPNOTSUPP : 0;
 }
 
@@ -57,11 +66,6 @@ static void cf_check _update_cr3(struct vcpu *v, int do_locking, bool noflush)
     ASSERT_UNREACHABLE();
 }
 
-static void cf_check _update_paging_modes(struct vcpu *v)
-{
-    ASSERT_UNREACHABLE();
-}
-
 static const struct paging_mode sh_paging_none = {
     .page_fault                    = _page_fault,
     .invlpg                        = _invlpg,
@@ -69,7 +73,6 @@ static const struct paging_mode sh_paging_none = {
     .gva_to_gfn                    = _gva_to_gfn,
 #endif
     .update_cr3                    = _update_cr3,
-    .update_paging_modes           = _update_paging_modes,
 };
 
 void shadow_vcpu_init(struct vcpu *v)

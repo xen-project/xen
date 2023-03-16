@@ -139,7 +139,6 @@ struct paging_mode {
 #endif
     void          (*update_cr3            )(struct vcpu *v, int do_locking,
                                             bool noflush);
-    void          (*update_paging_modes   )(struct vcpu *v);
     bool          (*flush_tlb             )(const unsigned long *vcpu_bitmap);
 
     unsigned int guest_levels;
@@ -315,7 +314,7 @@ static inline void paging_update_cr3(struct vcpu *v, bool noflush)
  * has changed, and when bringing up a VCPU for the first time. */
 static inline void paging_update_paging_modes(struct vcpu *v)
 {
-    paging_get_hostmode(v)->update_paging_modes(v);
+    v->domain->arch.paging.update_paging_modes(v);
 }
 
 #ifdef CONFIG_PV

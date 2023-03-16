@@ -83,6 +83,8 @@ static int cf_check sh_enable_log_dirty(struct domain *, bool log_global);
 static int cf_check sh_disable_log_dirty(struct domain *);
 static void cf_check sh_clean_dirty_bitmap(struct domain *);
 
+static void cf_check shadow_update_paging_modes(struct vcpu *);
+
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called for every domain from arch_domain_create() */
 int shadow_domain_init(struct domain *d)
@@ -97,6 +99,8 @@ int shadow_domain_init(struct domain *d)
 
     /* Use shadow pagetables for log-dirty support */
     paging_log_dirty_init(d, &sh_ops);
+
+    d->arch.paging.update_paging_modes = shadow_update_paging_modes;
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     d->arch.paging.shadow.oos_active = 0;
@@ -2514,7 +2518,12 @@ static void sh_update_paging_modes(struct vcpu *v)
     v->arch.paging.mode->update_cr3(v, 0, false);
 }
 
-void cf_check shadow_update_paging_modes(struct vcpu *v)
+/*
+ * Update all the things that are derived from the guest's CR0/CR3/CR4.
+ * Called to initialize paging structures if the paging mode has changed,
+ * and when bringing up a VCPU for the first time.
+ */
+static void cf_check shadow_update_paging_modes(struct vcpu *v)
 {
     paging_lock(v->domain);
     sh_update_paging_modes(v);
