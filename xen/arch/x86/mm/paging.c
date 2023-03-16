@@ -865,21 +865,12 @@ void paging_final_teardown(struct domain *d)
     /* It is now safe to pull down the p2m map. */
     p2m_teardown(p2m_get_hostp2m(d), true, NULL);
 
-    /* Free any paging memory that the p2m teardown released. */
-    paging_lock(d);
-
-    if ( hap )
-        hap_set_allocation(d, 0, NULL);
-    else
-        shadow_set_allocation(d, 0, NULL);
-
-    PAGING_PRINTK("%pd done: free = %u, p2m = %u\n",
-                  d, d->arch.paging.free_pages, d->arch.paging.p2m_pages);
+    PAGING_PRINTK("%pd done: total = %u, free = %u, p2m = %u\n",
+                  d, d->arch.paging.total_pages,
+                  d->arch.paging.free_pages, d->arch.paging.p2m_pages);
     ASSERT(!d->arch.paging.p2m_pages);
     ASSERT(!d->arch.paging.free_pages);
     ASSERT(!d->arch.paging.total_pages);
-
-    paging_unlock(d);
 
     p2m_final_teardown(d);
 }
