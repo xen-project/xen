@@ -158,6 +158,22 @@ qemu-smoke-dom0less-arm64-gcc-debug-staticmem:
     - *arm64-test-needs
     - alpine-3.12-gcc-debug-arm64-staticmem
 
+qemu-smoke-dom0less-arm64-gcc-staticheap:
+ extends: .qemu-arm64
+ script:
+   - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-heap 2>&1 | tee ${LOGFILE}
+ needs:
+   - *arm64-test-needs
+   - alpine-3.12-gcc-arm64
+
+qemu-smoke-dom0less-arm64-gcc-debug-staticheap:
+ extends: .qemu-arm64
+ script:
+   - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-heap 2>&1 | tee ${LOGFILE}
+ needs:
+   - *arm64-test-needs
+   - alpine-3.12-gcc-debug-arm64
+
 qemu-smoke-dom0less-arm64-gcc-boot-cpupools:
   extends: .qemu-arm64
   script:

@@ -27,6 +27,11 @@ fi
 "
 fi
 
+if [[ "${test_variant}" == "static-heap" ]]; then
+    passed="${test_variant} test passed"
+    domU_check="echo \"${passed}\""
+fi
+
 if [[ "${test_variant}" == "boot-cpupools" ]]; then
     # Check if domU0 (id=1) is assigned to Pool-1 with null scheduler
     passed="${test_variant} test passed"
@@ -107,7 +112,7 @@ cd ..
 
 # ImageBuilder
 echo 'MEMORY_START="0x40000000"
-MEMORY_END="0xC0000000"
+MEMORY_END="0x50000000"
 
 DEVICE_TREE="virt-gicv2.dtb"
 XEN="xen"
@@ -126,6 +131,20 @@ UBOOT_SCRIPT="boot.scr"' > binaries/config
 
 if [[ "${test_variant}" == "static-mem" ]]; then
     echo -e "\nDOMU_STATIC_MEM[0]=\"${domu_base} ${domu_size}\"" >> binaries/config
+fi
+
+if [[ "${test_variant}" == "static-heap" ]]; then
+    # ImageBuilder uses the config file to create the uboot script. Devicetree
+    # will be set via the generated uboot script.
+    # The valid memory range is 0x40000000 to 0x80000000 as defined before.
+    # ImageBuillder sets the kernel and ramdisk range based on the file size.
+    # It will use the memory range between 0x45600000 to 0x47AED1E8, and
+    # MEMORY_END has been set to 0x50000000 above, so set memory range between
+    # 0x50000000 and 0x80000000 as static heap.
+    echo  '
+XEN_STATIC_HEAP="0x50000000 0x30000000"
+# The size of static heap should be greater than the guest memory
+DOMU_MEM[0]="128"' >> binaries/config
 fi
 
 if [[ "${test_variant}" == "boot-cpupools" ]]; then
