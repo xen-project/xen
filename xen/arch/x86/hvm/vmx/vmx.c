@@ -4560,23 +4560,37 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_IO_INSTRUCTION:
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        if ( exit_qualification & 0x10 )
+    {
+        union {
+            unsigned long raw;
+            struct {
+                uint16_t size:3;
+                bool     in:1;
+                bool     str:1;
+                bool     rep:1;
+                bool     imm:1;
+                uint16_t :9;
+                uint16_t port;
+            };
+        } io_qual;
+        unsigned int bytes;
+
+        __vmread(EXIT_QUALIFICATION, &io_qual.raw);
+        bytes = io_qual.size + 1;
+
+        if ( io_qual.str )
         {
-            /* INS, OUTS */
             if ( !hvm_emulate_one_insn(x86_insn_is_portio, "port I/O") )
                 hvm_inject_hw_exception(TRAP_gp_fault, 0);
         }
         else
         {
-            /* IN, OUT */
-            uint16_t port = (exit_qualification >> 16) & 0xFFFF;
-            int bytes = (exit_qualification & 0x07) + 1;
-            int dir = (exit_qualification & 0x08) ? IOREQ_READ : IOREQ_WRITE;
-            if ( handle_pio(port, bytes, dir) )
+            if ( handle_pio(io_qual.port, bytes,
+                            io_qual.in ? IOREQ_READ : IOREQ_WRITE) )
                 update_guest_eip(); /* Safe: IN, OUT */
         }
         break;
+    }
 
     case EXIT_REASON_INVD:
     case EXIT_REASON_WBINVD:
