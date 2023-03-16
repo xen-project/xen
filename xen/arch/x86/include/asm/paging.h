@@ -139,7 +139,6 @@ struct paging_mode {
 #endif
     void          (*update_cr3            )(struct vcpu *v, int do_locking,
                                             bool noflush);
-    bool          (*flush_tlb             )(const unsigned long *vcpu_bitmap);
 
     unsigned int guest_levels;
 
@@ -299,6 +298,12 @@ static inline unsigned long paging_ga_to_gfn_cr3(struct vcpu *v,
         page_order);
 }
 
+/* Flush selected vCPUs TLBs.  NULL for all. */
+static inline bool paging_flush_tlb(const unsigned long *vcpu_bitmap)
+{
+    return current->domain->arch.paging.flush_tlb(vcpu_bitmap);
+}
+
 #endif /* CONFIG_HVM */
 
 /* Update all the things that are derived from the guest's CR3.
@@ -405,12 +410,6 @@ static always_inline unsigned int paging_max_paddr_bits(const struct domain *d)
     }
 
     return bits;
-}
-
-/* Flush selected vCPUs TLBs.  NULL for all. */
-static inline bool paging_flush_tlb(const unsigned long *vcpu_bitmap)
-{
-    return paging_get_hostmode(current)->flush_tlb(vcpu_bitmap);
 }
 
 #endif /* XEN_PAGING_H */

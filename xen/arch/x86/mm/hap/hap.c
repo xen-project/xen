@@ -445,6 +445,7 @@ static void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
 /************************************************/
 
 static void cf_check hap_update_paging_modes(struct vcpu *v);
+static bool cf_check flush_tlb(const unsigned long *vcpu_bitmap);
 
 void hap_domain_init(struct domain *d)
 {
@@ -458,6 +459,7 @@ void hap_domain_init(struct domain *d)
     paging_log_dirty_init(d, &hap_ops);
 
     d->arch.paging.update_paging_modes = hap_update_paging_modes;
+    d->arch.paging.flush_tlb           = flush_tlb;
 }
 
 /* return 0 for success, -errno for failure */
@@ -847,7 +849,6 @@ static const struct paging_mode hap_paging_real_mode = {
     .gva_to_gfn             = hap_gva_to_gfn_real_mode,
     .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_real_mode,
     .update_cr3             = hap_update_cr3,
-    .flush_tlb              = flush_tlb,
     .guest_levels           = 1
 };
 
@@ -857,7 +858,6 @@ static const struct paging_mode hap_paging_protected_mode = {
     .gva_to_gfn             = hap_gva_to_gfn_2_levels,
     .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_2_levels,
     .update_cr3             = hap_update_cr3,
-    .flush_tlb              = flush_tlb,
     .guest_levels           = 2
 };
 
@@ -867,7 +867,6 @@ static const struct paging_mode hap_paging_pae_mode = {
     .gva_to_gfn             = hap_gva_to_gfn_3_levels,
     .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_3_levels,
     .update_cr3             = hap_update_cr3,
-    .flush_tlb              = flush_tlb,
     .guest_levels           = 3
 };
 
@@ -877,7 +876,6 @@ static const struct paging_mode hap_paging_long_mode = {
     .gva_to_gfn             = hap_gva_to_gfn_4_levels,
     .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_4_levels,
     .update_cr3             = hap_update_cr3,
-    .flush_tlb              = flush_tlb,
     .guest_levels           = 4
 };
 

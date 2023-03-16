@@ -4167,7 +4167,6 @@ const struct paging_mode sh_paging_mode = {
     .gva_to_gfn                    = sh_gva_to_gfn,
 #endif
     .update_cr3                    = sh_update_cr3,
-    .flush_tlb                     = shadow_flush_tlb,
     .guest_levels                  = GUEST_PAGING_LEVELS,
 #ifdef CONFIG_PV
     .shadow.write_guest_entry      = sh_write_guest_entry,

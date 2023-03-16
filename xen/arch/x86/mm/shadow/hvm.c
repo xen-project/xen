@@ -688,6 +688,66 @@ static void sh_emulate_unmap_dest(struct vcpu *v, void *addr,
     atomic_inc(&v->domain->arch.paging.shadow.gtable_dirty_version);
 }
 
+static bool flush_vcpu(const struct vcpu *v, const unsigned long *vcpu_bitmap)
+{
+    return !vcpu_bitmap || test_bit(v->vcpu_id, vcpu_bitmap);
+}
+
+/* Flush TLB of selected vCPUs.  NULL for all. */
+bool cf_check shadow_flush_tlb(const unsigned long *vcpu_bitmap)
+{
+    static DEFINE_PER_CPU(cpumask_t, flush_cpumask);
+    cpumask_t *mask = &this_cpu(flush_cpumask);
+    const struct vcpu *curr = current;
+    struct domain *d = curr->domain;
+    struct vcpu *v;
+
+    /* Avoid deadlock if more than one vcpu tries this at the same time. */
+    if ( !spin_trylock(&d->hypercall_deadlock_mutex) )
+        return false;
+
+    /* Pause all other vcpus. */
+    for_each_vcpu ( d, v )
+        if ( v != curr && flush_vcpu(v, vcpu_bitmap) )
+            vcpu_pause_nosync(v);
+
+    /* Now that all VCPUs are signalled to deschedule, we wait... */
+    for_each_vcpu ( d, v )
+        if ( v != curr && flush_vcpu(v, vcpu_bitmap) )
+            while ( !vcpu_runnable(v) && v->is_running )
+                cpu_relax();
+
+    /* All other vcpus are paused, safe to unlock now. */
+    spin_unlock(&d->hypercall_deadlock_mutex);
+
+    cpumask_clear(mask);
+
+    /* Flush paging-mode soft state (e.g., va->gfn cache; PAE PDPE cache). */
+    for_each_vcpu ( d, v )
+    {
+        unsigned int cpu;
+
+        if ( !flush_vcpu(v, vcpu_bitmap) )
+            continue;
+
+        paging_update_cr3(v, false);
+
+        cpu = read_atomic(&v->dirty_cpu);
+        if ( is_vcpu_dirty_cpu(cpu) )
+            __cpumask_set_cpu(cpu, mask);
+    }
+
+    /* Flush TLBs on all CPUs with dirty vcpu state. */
+    guest_flush_tlb_mask(d, mask);
+
+    /* Done. */
+    for_each_vcpu ( d, v )
+        if ( v != curr && flush_vcpu(v, vcpu_bitmap) )
+            vcpu_unpause(v);
+
+    return true;
+}
+
 mfn_t sh_make_monitor_table(const struct vcpu *v, unsigned int shadow_levels)
 {
     struct domain *d = v->domain;

@@ -237,6 +237,11 @@ struct paging_domain {
     void (*free_page)(struct domain *d, struct page_info *pg);
 
     void (*update_paging_modes)(struct vcpu *v);
+
+#ifdef CONFIG_HVM
+    /* Flush selected vCPUs TLBs.  NULL for all. */
+    bool __must_check (*flush_tlb)(const unsigned long *vcpu_bitmap);
+#endif
 };
 
 struct paging_vcpu {
