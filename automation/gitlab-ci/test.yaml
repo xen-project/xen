@@ -174,6 +174,22 @@ qemu-smoke-dom0less-arm64-gcc-debug-staticheap:
    - *arm64-test-needs
    - alpine-3.12-gcc-debug-arm64
 
+qemu-smoke-dom0less-arm64-gcc-static-shared-mem:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-shared-mem 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-arm64-static-shared-mem
+
+qemu-smoke-dom0less-arm64-gcc-debug-static-shared-mem:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-shared-mem 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-debug-arm64-static-shared-mem
+
 qemu-smoke-dom0less-arm64-gcc-boot-cpupools:
   extends: .qemu-arm64
   script:

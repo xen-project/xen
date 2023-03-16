@@ -32,6 +32,25 @@ if [[ "${test_variant}" == "static-heap" ]]; then
     domU_check="echo \"${passed}\""
 fi
 
+
+if [[ "${test_variant}" == "static-shared-mem" ]]; then
+    passed="${test_variant} test passed"
+    SHARED_MEM_HOST="50000000"
+    SHARED_MEM_GUEST="4000000"
+    SHARED_MEM_SIZE="10000000"
+    SHARED_MEM_ID="my-shared-mem-0"
+
+    domU_check="
+current_id=\$(cat /proc/device-tree/reserved-memory/xen-shmem@4000000/xen,id 2>/dev/null)
+expected_id=\"\$(echo ${SHARED_MEM_ID})\"
+current_reg=\$(hexdump -e '16/1 \"%02x\"' /proc/device-tree/reserved-memory/xen-shmem@4000000/reg 2>/dev/null)
+expected_reg=$(printf \"%016x%016x\" 0x${SHARED_MEM_GUEST} 0x${SHARED_MEM_SIZE})
+if [[ \"\${expected_reg}\" == \"\${current_reg}\" && \"\${current_id}\" == \"\${expected_id}\" ]]; then
+    echo \"${passed}\"
+fi
+    "
+fi
+
 if [[ "${test_variant}" == "boot-cpupools" ]]; then
     # Check if domU0 (id=1) is assigned to Pool-1 with null scheduler
     passed="${test_variant} test passed"
@@ -124,6 +143,9 @@ NUM_DOMUS=1
 DOMU_KERNEL[0]="Image"
 DOMU_RAMDISK[0]="initrd"
 DOMU_MEM[0]="256"
+DOMU_KERNEL[1]="Image"
+DOMU_RAMDISK[1]="initrd"
+DOMU_MEM[1]="256"
 
 LOAD_CMD="tftpb"
 UBOOT_SOURCE="boot.source"
@@ -131,6 +153,13 @@ UBOOT_SCRIPT="boot.scr"' > binaries/config
 
 if [[ "${test_variant}" == "static-mem" ]]; then
     echo -e "\nDOMU_STATIC_MEM[0]=\"${domu_base} ${domu_size}\"" >> binaries/config
+fi
+
+if [[ "${test_variant}" == "static-shared-mem" ]]; then
+echo "
+NUM_DOMUS=2
+DOMU_SHARED_MEM[0]=\"${SHARED_MEM_ID} 0x${SHARED_MEM_HOST} 0x${SHARED_MEM_GUEST} 0x${SHARED_MEM_SIZE}\"
+DOMU_SHARED_MEM[1]=\"${SHARED_MEM_ID} 0x${SHARED_MEM_HOST} 0x${SHARED_MEM_GUEST} 0x${SHARED_MEM_SIZE}\"" >> binaries/config
 fi
 
 if [[ "${test_variant}" == "static-heap" ]]; then

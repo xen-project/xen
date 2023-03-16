@@ -623,6 +623,24 @@ alpine-3.12-gcc-debug-arm64-staticmem:
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
 
+alpine-3.12-gcc-arm64-static-shared-mem:
+  extends: .gcc-arm64-build
+  variables:
+    CONTAINER: alpine:3.12-arm64v8
+    EXTRA_XEN_CONFIG: |
+      CONFIG_UNSUPPORTED=y
+      CONFIG_STATIC_MEMORY=y
+      CONFIG_STATIC_SHM=y
+
+alpine-3.12-gcc-debug-arm64-static-shared-mem:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: alpine:3.12-arm64v8
+    EXTRA_XEN_CONFIG: |
+      CONFIG_UNSUPPORTED=y
+      CONFIG_STATIC_MEMORY=y
+      CONFIG_STATIC_SHM=y
+
 alpine-3.12-gcc-arm64-boot-cpupools:
   extends: .gcc-arm64-build
   variables:
