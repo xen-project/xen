@@ -525,7 +525,7 @@ static void __serial_rx(char c, struct cpu_user_regs *regs)
 #ifdef CONFIG_SBSA_VUART_CONSOLE
     default:
     {
-        struct domain *d = rcu_lock_domain_by_any_id(console_rx - 1);
+        struct domain *d = rcu_lock_domain_by_id(console_rx - 1);
 
         /*
          * If we have a properly initialized vpl011 console for the
