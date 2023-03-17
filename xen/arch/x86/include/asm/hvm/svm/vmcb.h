@@ -437,6 +437,12 @@ struct vmcb_struct {
         };
         union {
             struct {
+                uint32_t ec; /* #NP, #SS, #GP, #PF, #AC */
+                uint32_t :32;
+
+                uint64_t cr2; /* #PF */
+            } exc;
+            struct {
                 bool     in:1;
                 bool     :1;
                 bool     str:1;
@@ -455,6 +461,10 @@ struct vmcb_struct {
                 uint64_t :59;
                 bool     mov_insn:1; /* MOV, as opposed to LMSW, CLTS, etc */
             } mov_cr;
+            struct {
+                uint64_t ec;
+                uint64_t gpa;
+            } npf;
             struct {
                 uint16_t sel;
                 uint64_t :48;

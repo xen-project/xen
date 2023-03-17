@@ -2808,9 +2808,9 @@ void svm_vmexit_handler(void)
 
     case VMEXIT_EXCEPTION_PF:
     {
-        unsigned long va;
-        va = vmcb->exitinfo2;
-        regs->error_code = vmcb->exitinfo1;
+        unsigned long va = vmcb->ei.exc.cr2;
+
+        regs->error_code = vmcb->ei.exc.ec;
         HVM_DBG_LOG(DBG_LEVEL_VMMU,
                     "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
                     regs->rax, regs->rbx, regs->rcx,
@@ -2838,7 +2838,7 @@ void svm_vmexit_handler(void)
 
     case VMEXIT_EXCEPTION_AC:
         HVMTRACE_1D(TRAP, X86_EXC_AC);
-        hvm_inject_hw_exception(X86_EXC_AC, vmcb->exitinfo1);
+        hvm_inject_hw_exception(X86_EXC_AC, vmcb->ei.exc.ec);
         break;
 
     case VMEXIT_EXCEPTION_UD:
@@ -3051,18 +3051,15 @@ void svm_vmexit_handler(void)
     case VMEXIT_NPF:
         if ( cpu_has_svm_decode )
             v->arch.hvm.svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
-        rc = vmcb->exitinfo1 & PFEC_page_present
-             ? p2m_pt_handle_deferred_changes(vmcb->exitinfo2) : 0;
+        rc = vmcb->ei.npf.ec & PFEC_page_present
+             ? p2m_pt_handle_deferred_changes(vmcb->ei.npf.gpa) : 0;
         if ( rc == 0 )
             /* If no recal adjustments were being made - handle this fault */
-            svm_do_nested_pgfault(v, regs, vmcb->exitinfo1, vmcb->exitinfo2);
+            svm_do_nested_pgfault(v, regs, vmcb->ei.npf.ec, vmcb->ei.npf.gpa);
         else if ( rc < 0 )
-        {
-            printk(XENLOG_G_ERR
-                   "%pv: Error %d handling NPF (gpa=%08lx ec=%04lx)\n",
-                   v, rc, vmcb->exitinfo2, vmcb->exitinfo1);
-            domain_crash(v->domain);
-        }
+            domain_crash(v->domain,
+                         "%pv: Error %d handling NPF (gpa=%08lx ec=%04lx)\n",
+                         v, rc, vmcb->ei.npf.gpa, vmcb->ei.npf.ec);
         v->arch.hvm.svm.cached_insn_len = 0;
         break;
 
