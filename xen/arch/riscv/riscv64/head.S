@@ -1,3 +1,4 @@
+#include <asm/asm.h>
 #include <asm/riscv_encoding.h>
 
         .section .text.header, "ax", %progbits
@@ -17,6 +18,14 @@ ENTRY(start)
          */
         li      t0, SSTATUS_FS
         csrc    CSR_SSTATUS, t0
+
+        /* Clear the BSS */
+        la      t3, __bss_start
+        la      t4, __bss_end
+.L_clear_bss:
+        REG_S   zero, (t3)
+        add     t3, t3, __SIZEOF_POINTER__
+        bltu    t3, t4, .L_clear_bss
 
         la      sp, cpu0_boot_stack
         li      t0, STACK_SIZE

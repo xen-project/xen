@@ -7,6 +7,14 @@
 unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
     __aligned(STACK_SIZE);
 
+/*  
+ * To be sure that .bss isn't zero. It will simplify code of
+ * .bss initialization.
+ * TODO:
+ *   To be deleted when the first real .bss user appears
+ */
+int dummy_bss __attribute__((unused));
+
 void __init noreturn start_xen(unsigned long bootcpu_id,
                                paddr_t dtb_addr)
 {
