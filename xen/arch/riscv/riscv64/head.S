@@ -2,6 +2,11 @@
 
         .section .text.header, "ax", %progbits
 
+        /*
+         * OpenSBI pass to start():
+         *   a0 -> hart_id ( bootcpu_id )
+         *   a1 -> dtb_base 
+         */
 ENTRY(start)
         /* Mask all interrupts */
         csrw    CSR_SIE, zero

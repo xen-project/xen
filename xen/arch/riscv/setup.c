@@ -7,7 +7,8 @@
 unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
     __aligned(STACK_SIZE);
 
-void __init noreturn start_xen(void)
+void __init noreturn start_xen(unsigned long bootcpu_id,
+                               paddr_t dtb_addr)
 {
     early_printk("Hello from C env\n");
 
