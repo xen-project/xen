@@ -473,6 +473,8 @@ static void cf_check dump_console_ring_key(unsigned char key)
  */
 static unsigned int __read_mostly console_rx = 0;
 
+#define max_console_rx (max_init_domid + 1)
+
 /* Make sure to rcu_unlock_domain after use */
 struct domain *console_input_domain(void)
 {
@@ -483,15 +485,31 @@ struct domain *console_input_domain(void)
 
 static void switch_serial_input(void)
 {
-    if ( console_rx == max_init_domid + 1 )
+    unsigned int next_rx = console_rx;
+
+    /*
+     * Rotate among Xen, dom0 and boot-time created domUs while skipping
+     * switching serial input to non existing domains.
+     */
+    for ( ; ; )
     {
-        console_rx = 0;
-        printk("*** Serial input to Xen");
-    }
-    else
-    {
-        console_rx++;
-        printk("*** Serial input to DOM%d", console_rx - 1);
+        struct domain *d;
+
+        if ( next_rx++ >= max_console_rx )
+        {
+            console_rx = 0;
+            printk("*** Serial input to Xen");
+            break;
+        }
+
+        d = rcu_lock_domain_by_id(next_rx - 1);
+        if ( d )
+        {
+            rcu_unlock_domain(d);
+            console_rx = next_rx;
+            printk("*** Serial input to DOM%u", next_rx - 1);
+            break;
+        }
     }
 
     if ( switch_code )
@@ -1089,7 +1107,7 @@ void __init console_endboot(void)
      * a useful 'how to switch' message.
      */
     if ( opt_conswitch[1] == 'x' )
-        console_rx = max_init_domid + 1;
+        console_rx = max_console_rx;
 
     register_keyhandler('w', dump_console_ring_key,
                         "synchronously dump console ring buffer (dmesg)", 0);
