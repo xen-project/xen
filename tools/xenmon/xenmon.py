@@ -117,7 +117,7 @@ def setup_cmdline_parser():
     return parser
 
 # encapsulate information about a domain
-class DomainInfo:
+class DomainInfo(object):
     def __init__(self):
         self.allocated_sum = 0
         self.gotten_sum = 0
@@ -533,7 +533,7 @@ def show_livestats(cpu):
 # simple functions to allow initialization of log files without actually
 # physically creating files that are never used; only on the first real
 # write does the file get created
-class Delayed(file):
+class Delayed(object):
     def __init__(self, filename, mode):
         self.filename = filename
         self.saved_mode = mode
@@ -677,8 +677,8 @@ def main():
 
     if os.uname()[0] == "SunOS":
         xenbaked_cmd = "/usr/lib/xenbaked"
-	stop_cmd = "/usr/bin/pkill -INT -z global xenbaked"
-	kill_cmd = "/usr/bin/pkill -KILL -z global xenbaked"
+        stop_cmd = "/usr/bin/pkill -INT -z global xenbaked"
+        kill_cmd = "/usr/bin/pkill -KILL -z global xenbaked"
     else:
         # assumes that xenbaked is in your path
         xenbaked_cmd = "xenbaked"
