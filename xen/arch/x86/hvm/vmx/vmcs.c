@@ -67,6 +67,9 @@ integer_param("ple_gap", ple_gap);
 static unsigned int __read_mostly ple_window = 4096;
 integer_param("ple_window", ple_window);
 
+static unsigned int __ro_after_init vm_notify_window;
+integer_param("vm-notify-window", vm_notify_window);
+
 static bool __read_mostly opt_ept_pml = true;
 static s8 __read_mostly opt_ept_ad = -1;
 int8_t __read_mostly opt_ept_exec_sp = -1;
@@ -210,6 +213,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_pml, "Page Modification Logging");
     P(cpu_has_vmx_tsc_scaling, "TSC Scaling");
     P(cpu_has_vmx_bus_lock_detection, "Bus Lock Detection");
+    P(cpu_has_vmx_notify_vm_exiting, "Notify VM Exit");
 #undef P
 
     if ( !printed )
@@ -329,6 +333,8 @@ static int vmx_init_vmcs_config(bool bsp)
             opt |= SECONDARY_EXEC_UNRESTRICTED_GUEST;
         if ( opt_ept_pml )
             opt |= SECONDARY_EXEC_ENABLE_PML;
+        if ( vm_notify_window != ~0u )
+            opt |= SECONDARY_EXEC_NOTIFY_VM_EXITING;
 
         /*
          * "APIC Register Virtualization" and "Virtual Interrupt Delivery"
@@ -1290,6 +1296,10 @@ static int construct_vmcs(struct vcpu *v)
     v->arch.hvm.vmx.exception_bitmap = HVM_TRAP_MASK
               | (paging_mode_hap(d) ? 0 : (1U << TRAP_page_fault))
               | (v->arch.fully_eager_fpu ? 0 : (1U << TRAP_no_device));
+
+    if ( cpu_has_vmx_notify_vm_exiting )
+        __vmwrite(NOTIFY_WINDOW, vm_notify_window);
+
     vmx_update_exception_bitmap(v);
 
     v->arch.hvm.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;

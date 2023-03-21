@@ -268,6 +268,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_XSAVES                   0x00100000
 #define SECONDARY_EXEC_TSC_SCALING              0x02000000
 #define SECONDARY_EXEC_BUS_LOCK_DETECTION       0x40000000
+#define SECONDARY_EXEC_NOTIFY_VM_EXITING        0x80000000
 extern u32 vmx_secondary_exec_control;
 
 #define VMX_EPT_EXEC_ONLY_SUPPORTED                         0x00000001
@@ -349,6 +350,8 @@ extern u64 vmx_ept_vpid_cap;
     (vmx_secondary_exec_control & SECONDARY_EXEC_TSC_SCALING)
 #define cpu_has_vmx_bus_lock_detection \
     (vmx_secondary_exec_control & SECONDARY_EXEC_BUS_LOCK_DETECTION)
+#define cpu_has_vmx_notify_vm_exiting \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_NOTIFY_VM_EXITING)
 
 #define VMCS_RID_TYPE_MASK              0x80000000
 
@@ -456,6 +459,7 @@ enum vmcs_field {
     SECONDARY_VM_EXEC_CONTROL       = 0x0000401e,
     PLE_GAP                         = 0x00004020,
     PLE_WINDOW                      = 0x00004022,
+    NOTIFY_WINDOW                   = 0x00004024,
     VM_INSTRUCTION_ERROR            = 0x00004400,
     VM_EXIT_REASON                  = 0x00004402,
     VM_EXIT_INTR_INFO               = 0x00004404,
