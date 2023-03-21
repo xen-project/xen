@@ -588,6 +588,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
                                  uint64_t gfn_end, uint32_t type)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
+    unsigned int nr = 0;
     int rc = 1;
 
     if ( !is_hvm_domain(d) )
@@ -659,10 +660,14 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
             rc = -EBUSY;
             break;
         }
+        ++nr;
     }
     rcu_read_unlock(&pinned_cacheattr_rcu_lock);
     if ( rc <= 0 )
         return rc;
+
+    if ( nr >= 64 /* The limit is arbitrary. */ )
+        return -ENOSPC;
 
     range = xzalloc(struct hvm_mem_pinned_cacheattr_range);
     if ( range == NULL )
