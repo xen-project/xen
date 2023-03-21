@@ -179,6 +179,9 @@ long arch_do_sysctl(
                 ret = -EBUSY;
                 break;
             }
+            if ( CONFIG_NR_CPUS <= 1 )
+                /* Mimic behavior of smt_up_down_helper(). */
+                return 0;
             plug = op == XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE;
             fn = smt_up_down_helper;
             hcpu = _p(plug);
