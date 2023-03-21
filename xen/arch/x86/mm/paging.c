@@ -278,6 +278,7 @@ void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn)
     if ( unlikely(!VALID_M2P(pfn_x(pfn))) )
         return;
 
+    BUILD_BUG_ON(paging_logdirty_levels() != 4);
     i1 = L1_LOGDIRTY_IDX(pfn);
     i2 = L2_LOGDIRTY_IDX(pfn);
     i3 = L3_LOGDIRTY_IDX(pfn);

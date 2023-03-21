@@ -1012,7 +1012,17 @@ bool shadow_prealloc(struct domain *d, unsigned int type, unsigned int count)
     if ( unlikely(d->is_dying) )
        return false;
 
-    ret = _shadow_prealloc(d, shadow_size(type) * count);
+    count *= shadow_size(type);
+    /*
+     * Log-dirty handling may result in allocations when populating its
+     * tracking structures.  Tie this to the caller requesting space for L1
+     * shadows.
+     */
+    if ( paging_mode_log_dirty(d) &&
+         ((SHF_L1_ANY | SHF_FL1_ANY) & (1u << type)) )
+        count += paging_logdirty_levels();
+
+    ret = _shadow_prealloc(d, count);
     if ( !ret && (!d->is_shutting_down || d->shutdown_code != SHUTDOWN_crash) )
         /*
          * Failing to allocate memory required for shadow usage can only result in
