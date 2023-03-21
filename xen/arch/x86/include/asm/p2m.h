@@ -879,6 +879,26 @@ static inline struct p2m_domain *p2m_get_altp2m(struct vcpu *v)
     return v->domain->arch.altp2m_p2m[index];
 }
 
+/* set current alternate p2m table */
+static inline bool p2m_set_altp2m(struct vcpu *v, unsigned int idx)
+{
+    struct p2m_domain *orig;
+
+    BUG_ON(idx >= MAX_ALTP2M);
+
+    if ( idx == vcpu_altp2m(v).p2midx )
+        return false;
+
+    orig = p2m_get_altp2m(v);
+    BUG_ON(!orig);
+    atomic_dec(&orig->active_vcpus);
+
+    vcpu_altp2m(v).p2midx = idx;
+    atomic_inc(&v->domain->arch.altp2m_p2m[idx]->active_vcpus);
+
+    return true;
+}
+
 /* Switch alternate p2m for a single vcpu */
 bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx);
 
