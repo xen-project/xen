@@ -4,6 +4,7 @@
  * Copyright (c) 2003-2004, K A Fraser (University of Cambridge)
  */
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
@@ -1774,7 +1775,7 @@ static PyObject *pyflask_load(PyObject *self, PyObject *args, PyObject *kwds)
 {
     xc_interface *xc_handle;
     char *policy;
-    uint32_t len;
+    Py_ssize_t len;
     int ret;
 
     static char *kwd_list[] = { "policy", NULL };
