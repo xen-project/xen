@@ -233,6 +233,11 @@ static int __init get_next_block(struct bunzip_data *bd)
 		   becomes negative, so an unsigned inequality catches
 		   it.) */
 		t = get_bits(bd, 5)-1;
+		/* GCC 13 has apparently improved use-before-set detection, but
+		   it can't figure out that length[0] is always intialized by
+		   virtue of symCount always being positive when making it here.
+		   See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=106511. */
+		length[0] = 0;
 		for (i = 0; i < symCount; i++) {
 			for (;;) {
 				if (((unsigned)t) > (MAX_HUFCODE_BITS-1))
