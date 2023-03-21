@@ -18,6 +18,7 @@
  * Copyright (C) 2005 XenSource Ltd.
  */
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #include <stdbool.h>
@@ -141,7 +142,7 @@ static PyObject *xspy_write(XsHandle *self, PyObject *args)
     char *thstr;
     char *path;
     char *data;
-    int data_n;
+    Py_ssize_t data_n;
     bool result;
 
     if (!xh)
