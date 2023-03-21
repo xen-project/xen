@@ -587,7 +587,7 @@ static void cf_check free_pinned_cacheattr_entry(struct rcu_head *rcu)
 int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
                                  uint64_t gfn_end, uint32_t type)
 {
-    struct hvm_mem_pinned_cacheattr_range *range;
+    struct hvm_mem_pinned_cacheattr_range *range, *newr;
     unsigned int nr = 0;
     int rc = 1;
 
@@ -601,14 +601,15 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
     {
     case XEN_DOMCTL_DELETE_MEM_CACHEATTR:
         /* Remove the requested range. */
-        rcu_read_lock(&pinned_cacheattr_rcu_lock);
-        list_for_each_entry_rcu ( range,
-                                  &d->arch.hvm.pinned_cacheattr_ranges,
-                                  list )
+        domain_lock(d);
+        list_for_each_entry ( range,
+                              &d->arch.hvm.pinned_cacheattr_ranges,
+                              list )
             if ( range->start == gfn_start && range->end == gfn_end )
             {
-                rcu_read_unlock(&pinned_cacheattr_rcu_lock);
                 list_del_rcu(&range->list);
+                domain_unlock(d);
+
                 type = range->type;
                 call_rcu(&range->rcu, free_pinned_cacheattr_entry);
                 p2m_memory_type_changed(d);
@@ -629,7 +630,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
                 }
                 return 0;
             }
-        rcu_read_unlock(&pinned_cacheattr_rcu_lock);
+        domain_unlock(d);
         return -ENOENT;
 
     case X86_MT_UCM:
@@ -644,7 +645,10 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
         return -EINVAL;
     }
 
-    rcu_read_lock(&pinned_cacheattr_rcu_lock);
+    newr = xzalloc(struct hvm_mem_pinned_cacheattr_range);
+
+    domain_lock(d);
+
     list_for_each_entry_rcu ( range,
                               &d->arch.hvm.pinned_cacheattr_ranges,
                               list )
@@ -662,27 +666,34 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
         }
         ++nr;
     }
-    rcu_read_unlock(&pinned_cacheattr_rcu_lock);
+
     if ( rc <= 0 )
-        return rc;
+        /* nothing */;
+    else if ( nr >= 64 /* The limit is arbitrary. */ )
+        rc = -ENOSPC;
+    else if ( !newr )
+        rc = -ENOMEM;
+    else
+    {
+        newr->start = gfn_start;
+        newr->end = gfn_end;
+        newr->type = type;
 
-    if ( nr >= 64 /* The limit is arbitrary. */ )
-        return -ENOSPC;
+        list_add_rcu(&newr->list, &d->arch.hvm.pinned_cacheattr_ranges);
 
-    range = xzalloc(struct hvm_mem_pinned_cacheattr_range);
-    if ( range == NULL )
-        return -ENOMEM;
+        newr = NULL;
+        rc = 0;
+    }
 
-    range->start = gfn_start;
-    range->end = gfn_end;
-    range->type = type;
+    domain_unlock(d);
 
-    list_add_rcu(&range->list, &d->arch.hvm.pinned_cacheattr_ranges);
+    xfree(newr);
+
     p2m_memory_type_changed(d);
     if ( type != X86_MT_WB )
         flush_all(FLUSH_CACHE);
 
-    return 0;
+    return rc;
 }
 
 static int cf_check hvm_save_mtrr_msr(struct vcpu *v, hvm_domain_context_t *h)
