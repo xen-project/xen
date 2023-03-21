@@ -2194,13 +2194,8 @@ bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
 
     if ( d->arch.altp2m_eptp[idx] != mfn_x(INVALID_MFN) )
     {
-        if ( idx != vcpu_altp2m(v).p2midx )
-        {
-            atomic_dec(&p2m_get_altp2m(v)->active_vcpus);
-            vcpu_altp2m(v).p2midx = idx;
-            atomic_inc(&p2m_get_altp2m(v)->active_vcpus);
+        if ( p2m_set_altp2m(v, idx) )
             altp2m_vcpu_update_p2m(v);
-        }
         rc = 1;
     }
 
@@ -2471,13 +2466,8 @@ int p2m_switch_domain_altp2m_by_id(struct domain *d, unsigned int idx)
     if ( d->arch.altp2m_visible_eptp[idx] != mfn_x(INVALID_MFN) )
     {
         for_each_vcpu( d, v )
-            if ( idx != vcpu_altp2m(v).p2midx )
-            {
-                atomic_dec(&p2m_get_altp2m(v)->active_vcpus);
-                vcpu_altp2m(v).p2midx = idx;
-                atomic_inc(&p2m_get_altp2m(v)->active_vcpus);
+            if ( p2m_set_altp2m(v, idx) )
                 altp2m_vcpu_update_p2m(v);
-            }
 
         rc = 0;
     }

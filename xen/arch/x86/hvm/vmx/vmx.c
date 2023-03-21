@@ -4036,13 +4036,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             }
         }
 
-        if ( idx != vcpu_altp2m(v).p2midx )
-        {
-            BUG_ON(idx >= MAX_ALTP2M);
-            atomic_dec(&p2m_get_altp2m(v)->active_vcpus);
-            vcpu_altp2m(v).p2midx = idx;
-            atomic_inc(&p2m_get_altp2m(v)->active_vcpus);
-        }
+        p2m_set_altp2m(v, idx);
     }
 
     /* XXX: This looks ugly, but we need a mechanism to ensure
