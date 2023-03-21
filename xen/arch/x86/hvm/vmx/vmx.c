@@ -4084,6 +4084,12 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             return;
     }
 
+    if ( unlikely(exit_reason & VMX_EXIT_REASONS_BUS_LOCK) )
+    {
+        perfc_incr(buslock);
+        exit_reason &= ~VMX_EXIT_REASONS_BUS_LOCK;
+    }
+
     /* XXX: This looks ugly, but we need a mechanism to ensure
      * any pending vmresume has really happened
      */
@@ -4591,6 +4597,15 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_ACCESS_GDTR_OR_IDTR:
     case EXIT_REASON_ACCESS_LDTR_OR_TR:
         vmx_handle_descriptor_access(exit_reason);
+        break;
+
+    case EXIT_REASON_BUS_LOCK:
+        /*
+         * Nothing to do: just taking a vmexit should be enough of a pause to
+         * prevent a VM from crippling the host with bus locks.  Note
+         * EXIT_REASON_BUS_LOCK will always have bit 26 set in exit_reason, and
+         * hence the perf counter is already increased.
+         */
         break;
 
     case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
