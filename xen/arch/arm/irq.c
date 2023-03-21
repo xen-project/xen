@@ -718,7 +718,7 @@ int platform_get_irq(const struct dt_device_node *device, int index)
     return irq;
 }
 
-int platform_get_irq_byname(struct dt_device_node *np, const char *name)
+int platform_get_irq_byname(const struct dt_device_node *np, const char *name)
 {
 	int index;
 
