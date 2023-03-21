@@ -78,10 +78,11 @@ done
 AC_DEFUN([AX_STUBDOM_LIB], [
 AC_ARG_VAR([$1_URL], [Download url for $2])
 AS_IF([test "x$$1_URL" = "x"], [
-	AS_IF([test "x$extfiles" = "xy"],
+	m4_if([$#],[3],[$1_URL=\@S|@\@{:@XEN_EXTFILES_URL\@:}@],
+	      [$#],[4],[AS_IF([test "x$extfiles" = "xy"],
 		[$1_URL=\@S|@\@{:@XEN_EXTFILES_URL\@:}@],
 		[$1_URL="$4"])
-	])
+],[m4_fatal([AX_STUBDOM_LIB expects 3 or 4 arguments, not $#])])])
 $1_VERSION="$3"
 AC_SUBST($1_URL)
 AC_SUBST($1_VERSION)
