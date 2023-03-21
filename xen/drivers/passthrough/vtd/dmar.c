@@ -391,15 +391,12 @@ static int __init acpi_parse_dev_scope(
 
             if ( drhd )
             {
-                if ( (seg == 0) && (bus == 0) && (path->dev == 2) &&
-                     (path->fn == 0) )
-                    igd_drhd_address = drhd->address;
-
-                if ( gfx_only &&
-                     pci_conf_read8(PCI_SBDF(seg, bus, path->dev, path->fn),
+                if ( pci_conf_read8(PCI_SBDF(seg, bus, path->dev, path->fn),
                                     PCI_CLASS_DEVICE + 1) != 0x03
                                     /* PCI_BASE_CLASS_DISPLAY */ )
                     gfx_only = false;
+                else if ( !seg && !bus && path->dev == 2 && !path->fn )
+                    igd_drhd_address = drhd->address;
             }
 
             break;
