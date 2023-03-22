@@ -45,14 +45,14 @@ int match_option_size(const char *prefix, size_t len,
 
 void split_string_into_string_list(const char *str, const char *delim,
                                    libxl_string_list *psl);
-int split_string_into_pair(const char *str, const char *delim,
-                           char **a, char **b);
 void replace_string(char **str, const char *val);
 
 /* NB: this follows the interface used by <ctype.h>. See 'man 3 ctype'
    and look for CTYPE in libxl_internal.h */
 typedef int (*char_predicate_t)(const int c);
 void trim(char_predicate_t predicate, const char *input, char **output);
+int split_string_into_pair(const char *str, const char *delim,
+                           char **a, char **b, char_predicate_t predicate);
 
 const char *get_action_on_shutdown_name(libxl_action_on_shutdown a);
 
