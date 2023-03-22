@@ -2,7 +2,7 @@
 
 #include "xg_sr_common.h"
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 static const char *const dhdr_types[] =
 {

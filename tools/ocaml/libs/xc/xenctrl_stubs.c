@@ -33,7 +33,7 @@
 #define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
 #include <xenguest.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "mmap_stubs.h"
 

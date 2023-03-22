@@ -43,7 +43,7 @@
 #include <xenevtchn.h>
 #include <xen/vm_event.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #if defined(__arm__) || defined(__aarch64__)
 #include <xen/arch-arm.h>

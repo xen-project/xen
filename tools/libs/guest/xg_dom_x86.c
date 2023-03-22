@@ -35,7 +35,7 @@
 #include <xen/arch-x86/hvm/start_info.h>
 #include <xen/io/protocols.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "xg_private.h"
 #include "xenctrl.h"

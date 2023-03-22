@@ -8,7 +8,7 @@
 #include <xenctrl.h>
 #include <xenguest.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), 21)
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))

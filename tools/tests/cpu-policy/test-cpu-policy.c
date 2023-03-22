@@ -7,7 +7,7 @@
 #include <string.h>
 #include <err.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 #include <xen/asm/x86-vendors.h>
 #include <xen/lib/x86/cpu-policy.h>
 #include <xen/domctl.h>

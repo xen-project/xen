@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "xenstore_lib.h"
 

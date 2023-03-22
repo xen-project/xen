@@ -31,7 +31,7 @@
 #include <xen/sys/gntdev.h>
 
 #include <xenctrl.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "private.h"
 

@@ -28,7 +28,7 @@
 #include <inttypes.h>
 #include <sys/time.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #define MAX_PKG_RESIDENCIES 12
 #define MAX_CORE_RESIDENCIES 8

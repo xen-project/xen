@@ -21,7 +21,7 @@
 
 #include <xen/xen.h>
 #include <xen/io/protocols.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "xg_private.h"
 

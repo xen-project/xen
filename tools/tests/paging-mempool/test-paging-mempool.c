@@ -8,7 +8,7 @@
 #include <xenctrl.h>
 #include <xenforeignmemory.h>
 #include <xengnttab.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 static unsigned int nr_failures;
 #define fail(fmt, ...)                          \

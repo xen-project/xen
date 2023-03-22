@@ -39,7 +39,7 @@
 
 #include <xen/sys/privcmd.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #if defined(HAVE_VALGRIND_MEMCHECK_H) && !defined(NDEBUG) && !defined(__MINIOS__)
 /* Compile in Valgrind client requests? */

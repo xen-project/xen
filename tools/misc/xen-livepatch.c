@@ -15,7 +15,7 @@
 #include <xenstore.h>
 
 #include <xen/errno.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 static xc_interface *xch;
 

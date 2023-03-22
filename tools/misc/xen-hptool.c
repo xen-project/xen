@@ -5,7 +5,7 @@
 #include <xenctrl.h>
 #include <xenguest.h>
 #include <xenstore.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 static xc_interface *xch;
 

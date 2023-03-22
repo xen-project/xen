@@ -58,7 +58,7 @@
 #include <xenguest.h>
 #include <xenhypfs.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "xentoollog.h"
 

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #define TRC_GEN_MAIN     0
 #define TRC_SCHED_MAIN   1

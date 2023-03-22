@@ -10,7 +10,7 @@
 #include <xenctrl.h>
 #include <xenguest.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 static uint32_t nr_features;
 

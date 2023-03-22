@@ -28,7 +28,7 @@
 
 #include <xenctrl.h>
 #include <xenguest.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "xg_private.h"
 

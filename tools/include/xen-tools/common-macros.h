@@ -1,5 +1,14 @@
-#ifndef __XEN_TOOLS_LIBS__
-#define __XEN_TOOLS_LIBS__
+#ifndef __XEN_TOOLS_COMMON_MACROS__
+#define __XEN_TOOLS_COMMON_MACROS__
+
+/*
+ * Caution:
+ *
+ * This header must be completely self-contained. There are no external
+ * references to variables or functions allowed, as the file might be included
+ * for different runtime environments, such as firmware or target and build
+ * host programs.
+ */
 
 #ifndef BUILD_BUG_ON
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
@@ -67,4 +76,4 @@
 #define __must_check __attribute__((__warn_unused_result__))
 #endif
 
-#endif	/* __XEN_TOOLS_LIBS__ */
+#endif	/* __XEN_TOOLS_COMMON_MACROS__ */

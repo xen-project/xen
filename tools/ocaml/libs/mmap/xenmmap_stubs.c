@@ -21,7 +21,7 @@
 #include <errno.h>
 #include "mmap_stubs.h"
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include <caml/mlvalues.h>
 #include <caml/memory.h>

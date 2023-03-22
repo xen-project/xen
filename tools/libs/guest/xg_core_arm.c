@@ -19,7 +19,7 @@
 #include "xc_private.h"
 #include "xg_core.h"
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 int
 xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,

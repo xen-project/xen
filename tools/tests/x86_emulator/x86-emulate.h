@@ -39,7 +39,7 @@
 #include <xen/asm/x86-defns.h>
 #include <xen/asm/x86-vendors.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #define BUG() abort()
 #define ASSERT assert

@@ -34,7 +34,7 @@
 #include "xg_private.h"
 #include "xg_dom_decompress.h"
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #ifndef __MINIOS__
 

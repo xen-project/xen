@@ -24,7 +24,7 @@
 #include <limits.h>
 #include "xg_private.h"
 #include <xen/hvm/params.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 enum {
 #define XEN_CPUFEATURE(name, value) X86_FEATURE_##name = value,

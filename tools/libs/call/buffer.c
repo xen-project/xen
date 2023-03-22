@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "private.h"
 

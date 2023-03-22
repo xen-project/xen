@@ -50,7 +50,7 @@
 #include <sys/ioctl.h>
 #include <libutil.h>
 #endif
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 /* Each 10 bits takes ~ 3 digits, plus one, plus one for nul terminator. */
 #define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)

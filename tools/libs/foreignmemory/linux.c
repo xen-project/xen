@@ -25,7 +25,7 @@
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "private.h"
 

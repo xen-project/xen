@@ -30,7 +30,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <regex.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "xenstat_priv.h"
 

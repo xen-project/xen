@@ -31,7 +31,7 @@
 #include <time.h>
 #include <xenstore.h>
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #define TEST_PATH "xenstore-test"
 #define WRITE_BUFFERS_N    10

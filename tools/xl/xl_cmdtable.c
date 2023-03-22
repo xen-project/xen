@@ -15,7 +15,7 @@
 #include <string.h>
 
 #include <libxl.h>
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 #include "xl.h"
 

@@ -21,7 +21,7 @@
 #include <stdbool.h>
 #include "xc_private.h"
 
-#include <xen-tools/libs.h>
+#include <xen-tools/common-macros.h>
 
 /*
  * Get PM statistic info
