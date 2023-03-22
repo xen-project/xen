@@ -783,11 +783,22 @@ bool __init amd_setup_legacy_ssbd(void)
 	return true;
 }
 
+/*
+ * legacy_ssbd is always initialized to false because when SSBD is set
+ * from the command line guest attempts to change it are a no-op (see
+ * amd_set_legacy_ssbd()), whereas when SSBD is inactive hardware will
+ * be forced into that mode (see amd_init_ssbd()).
+ */
+static DEFINE_PER_CPU(bool, legacy_ssbd);
+
+/* Must be called only when the SSBD setting needs toggling. */
 static void core_set_legacy_ssbd(bool enable)
 {
 	const struct cpuinfo_x86 *c = &current_cpu_data;
 	struct ssbd_ls_cfg *status;
 	unsigned long flags;
+
+	BUG_ON(this_cpu(legacy_ssbd) == enable);
 
 	if ((c->x86 != 0x17 && c->x86 != 0x18) || c->x86_num_siblings <= 1) {
 		BUG_ON(!set_legacy_ssbd(c, enable));
@@ -816,12 +827,17 @@ void amd_set_legacy_ssbd(bool enable)
 		 */
 		return;
 
+	if (this_cpu(legacy_ssbd) == enable)
+		return;
+
 	if (cpu_has_virt_ssbd)
 		wrmsr(MSR_VIRT_SPEC_CTRL, enable ? SPEC_CTRL_SSBD : 0, 0);
 	else if (amd_legacy_ssbd)
 		core_set_legacy_ssbd(enable);
 	else
 		ASSERT_UNREACHABLE();
+
+	this_cpu(legacy_ssbd) = enable;
 }
 
 /*
