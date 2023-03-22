@@ -688,7 +688,6 @@ void domain_cpu_policy_changed(struct domain *d);
 bool update_secondary_system_time(struct vcpu *,
                                   struct vcpu_time_info *);
 
-void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
 
 static inline struct vcpu_guest_context *alloc_vcpu_guest_context(void)

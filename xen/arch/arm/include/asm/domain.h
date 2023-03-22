@@ -232,7 +232,6 @@ struct arch_vcpu
 
 }  __cacheline_aligned;
 
-void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
 void vcpu_switch_to_aarch64_mode(struct vcpu *);
 

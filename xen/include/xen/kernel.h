@@ -107,5 +107,12 @@ bool_t is_active_kernel_text(unsigned long addr);
 extern const char xen_config_data[];
 extern const unsigned int xen_config_data_size;
 
+struct cpu_user_regs;
+struct vcpu;
+
+void show_execution_state(const struct cpu_user_regs *regs);
+void cf_check show_execution_state_nonconst(struct cpu_user_regs *regs);
+void vcpu_show_execution_state(struct vcpu *);
+
 #endif /* _LINUX_KERNEL_H */
 
