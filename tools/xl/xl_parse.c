@@ -654,7 +654,7 @@ static void parse_vnuma_config(const XLU_Config *config,
 
                 if (!buf) continue;
 
-                if (split_string_into_pair(buf, "=", &option, &value,
+                if (split_string_into_pair(buf, '=', &option, &value,
                                            isspace)) {
                     fprintf(stderr, "xl: failed to split \"%s\" into pair\n",
                             buf);
@@ -831,7 +831,7 @@ int parse_vdispl_config(libxl_device_vdispl *vdispl, char *token)
         {
             char *resolution;
 
-            rc = split_string_into_pair(connectors[i], ":",
+            rc = split_string_into_pair(connectors[i], ':',
                                         &vdispl->connectors[i].unique_id,
                                         &resolution, NULL);
 
@@ -2358,7 +2358,7 @@ void parse_config_data(const char *config_source,
             for (i = 0; i < len; i++) {
                 char *key, *value;
                 int rc;
-                rc = split_string_into_pair(pairs[i], "=", &key, &value,
+                rc = split_string_into_pair(pairs[i], '=', &key, &value,
                                             isspace);
                 if (rc != 0) {
                     fprintf(stderr, "failed to parse channel configuration: %s",
@@ -3011,26 +3011,27 @@ void trim(char_predicate_t predicate, const char *input, char **output)
     *output = result;
 }
 
-int split_string_into_pair(const char *str, const char *delim,
-                           char **a, char **b, char_predicate_t predicate)
+int split_string_into_pair(const char *str, char delim, char **a, char **b,
+                           char_predicate_t predicate)
 {
-    char *s, *p, *saveptr, *aa = NULL, *bb = NULL;
+    char *s, *p, *aa = NULL, *bb = NULL;
     int rc = 0;
 
     s = xstrdup(str);
 
-    p = strtok_r(s, delim, &saveptr);
+    p = strchr(s, delim);
     if (p == NULL) {
         rc = ERROR_INVAL;
         goto out;
     }
+    *p = 0;
     if (predicate) {
-        trim(predicate, p, &aa);
+        trim(predicate, s, &aa);
     } else {
-        aa = xstrdup(p);
+        aa = xstrdup(s);
     }
-    p = strtok_r(NULL, delim, &saveptr);
-    if (p == NULL) {
+    p++;
+    if (!*p) {
         rc = ERROR_INVAL;
         goto out;
     }

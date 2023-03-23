@@ -51,8 +51,8 @@ void replace_string(char **str, const char *val);
    and look for CTYPE in libxl_internal.h */
 typedef int (*char_predicate_t)(const int c);
 void trim(char_predicate_t predicate, const char *input, char **output);
-int split_string_into_pair(const char *str, const char *delim,
-                           char **a, char **b, char_predicate_t predicate);
+int split_string_into_pair(const char *str, char delim, char **a, char **b,
+                           char_predicate_t predicate);
 
 const char *get_action_on_shutdown_name(libxl_action_on_shutdown a);
 
