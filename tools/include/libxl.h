@@ -548,6 +548,11 @@
 #define LIBXL_HAVE_DEVICE_DISK_SPECIFICATION 1
 
 /*
+ * LIBXL_HAVE_CONSOLE_ADD_XENSTORE indicates presence of the function
+ * libxl_console_add_xenstore() in libxl.
+ */
+#define LIBXL_HAVE_CONSOLE_ADD_XENSTORE 1
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -1986,6 +1991,15 @@ int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
  * the memory.
  */
 int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm, char **path);
+
+/* libxl_console_add_xenstore writes the Xenstore entries for a domain's
+ * primary console based on domid, event channel port and the guest frame
+ * number of the PV console's ring page.
+ */
+int libxl_console_add_xenstore(libxl_ctx *ctx, uint32_t domid, uint32_t backend,
+                               unsigned int evtch, unsigned long gfn,
+                               const libxl_asyncop_how *ao_how)
+                               LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* May be called with info_r == NULL to check for domain's existence.
  * Returns ERROR_DOMAIN_NOTFOUND if domain does not exist (used to return

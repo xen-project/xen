@@ -346,6 +346,29 @@ out:
     return rc;
 }
 
+int libxl_console_add_xenstore(libxl_ctx *ctx, uint32_t domid, uint32_t backend,
+                               unsigned int evtch, unsigned long gfn,
+                               const libxl_asyncop_how *ao_how)
+{
+    AO_CREATE(ctx, domid, ao_how);
+    int rc;
+    libxl__device_console console = { .backend_domid = backend,
+                                      .output = "pty",
+                                      .consback = LIBXL__CONSOLE_BACKEND_XENCONSOLED,
+                                    };
+    libxl__domain_build_state state = { .console_port = evtch,
+                                        .console_mfn = gfn,
+                                      };
+    libxl__device device = { };
+
+    rc = libxl__device_console_add(gc, domid, &console, &state, &device);
+    if (rc < 0)
+        LOGED(ERROR, domid, "Adding console Xenstore entries");
+
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
+}
+
 int libxl__device_vuart_add(libxl__gc *gc, uint32_t domid,
                             libxl__device_console *console,
                             libxl__domain_build_state *state)
