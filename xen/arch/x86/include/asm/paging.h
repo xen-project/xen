@@ -142,6 +142,10 @@ struct paging_mode {
 /*****************************************************************************
  * Log dirty code */
 
+#define paging_logdirty_levels() \
+    (DIV_ROUND_UP(PADDR_BITS - PAGE_SHIFT - (PAGE_SHIFT + 3), \
+                  PAGE_SHIFT - ilog2(sizeof(mfn_t))) + 1)
+
 #if PG_log_dirty
 
 /* get the dirty bitmap for a specific range of pfns */
@@ -179,10 +183,6 @@ bool paging_mfn_is_dirty(const struct domain *d, mfn_t gmfn);
                               (LOGDIRTY_NODE_ENTRIES-1))
 #define L4_LOGDIRTY_IDX(pfn) ((pfn_x(pfn) >> (PAGE_SHIFT + 3 + PAGETABLE_ORDER * 2)) & \
                               (LOGDIRTY_NODE_ENTRIES-1))
-
-#define paging_logdirty_levels() \
-    (DIV_ROUND_UP(PADDR_BITS - PAGE_SHIFT - (PAGE_SHIFT + 3), \
-                  PAGE_SHIFT - ilog2(sizeof(mfn_t))) + 1)
 
 #ifdef CONFIG_HVM
 /* VRAM dirty tracking support */
