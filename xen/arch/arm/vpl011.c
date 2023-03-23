@@ -696,8 +696,8 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
         vpl011->backend.xen = xzalloc(struct vpl011_xen_backend);
         if ( vpl011->backend.xen == NULL )
         {
-            rc = -EINVAL;
-            goto out1;
+            rc = -ENOMEM;
+            goto out;
         }
     }
 
@@ -705,7 +705,7 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
     if ( !rc )
     {
         rc = -EINVAL;
-        goto out2;
+        goto out1;
     }
 
     vpl011->uartfr = TXFE | RXFE;
@@ -717,15 +717,8 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
 
     return 0;
 
-out2:
-    vgic_free_virq(d, vpl011->virq);
-
 out1:
-    if ( vpl011->backend_in_domain )
-        destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
-                                vpl011->backend.dom.ring_page);
-    else
-        xfree(vpl011->backend.xen);
+    domain_vpl011_deinit(d);
 
 out:
     return rc;
@@ -735,17 +728,37 @@ void domain_vpl011_deinit(struct domain *d)
 {
     struct vpl011 *vpl011 = &d->arch.vpl011;
 
+    if ( vpl011->virq )
+    {
+        vgic_free_virq(d, vpl011->virq);
+
+        /*
+         * Set to invalid irq (we use SPI) to prevent extra free and to avoid
+         * freeing irq that could have already been reserved by someone else.
+         */
+        vpl011->virq = 0;
+    }
+
     if ( vpl011->backend_in_domain )
     {
-        if ( !vpl011->backend.dom.ring_buf )
-            return;
+        if ( vpl011->backend.dom.ring_buf )
+            destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
+                                    vpl011->backend.dom.ring_page);
 
-        free_xen_event_channel(d, vpl011->evtchn);
-        destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
-                                vpl011->backend.dom.ring_page);
+        if ( vpl011->evtchn )
+        {
+            free_xen_event_channel(d, vpl011->evtchn);
+
+            /*
+             * Set to invalid event channel port to prevent extra free and to
+             * avoid freeing port that could have already been allocated for
+             * other purposes.
+             */
+            vpl011->evtchn = 0;
+        }
     }
     else
-        xfree(vpl011->backend.xen);
+        XFREE(vpl011->backend.xen);
 }
 
 /*
