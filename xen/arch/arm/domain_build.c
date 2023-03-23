@@ -3826,7 +3826,11 @@ static int __init construct_domU(struct domain *d,
      * shall be done first.
      */
     if ( kinfo.vpl011 )
+    {
         rc = domain_vpl011_init(d, NULL);
+        if ( rc < 0 )
+            return rc;
+    }
 
     rc = prepare_dtb_domU(d, &kinfo);
     if ( rc < 0 )
