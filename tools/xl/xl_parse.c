@@ -2180,54 +2180,54 @@ void parse_config_data(const char *config_source,
 
     if (!xlu_cfg_get_list(config, "p9", &p9devs, 0, 0)) {
         libxl_device_p9 *p9;
-        char *security_model = NULL;
-        char *path = NULL;
-        char *tag = NULL;
-        char *backend = NULL;
-        char *p, *p2, *buf2;
 
         d_config->num_p9s = 0;
         d_config->p9s = NULL;
         while ((buf = xlu_cfg_get_listitem (p9devs, d_config->num_p9s)) != NULL) {
+            libxl_string_list pairs;
+            int len;
+
             p9 = ARRAY_EXTEND_INIT(d_config->p9s,
                                    d_config->num_p9s,
                                    libxl_device_p9_init);
             libxl_device_p9_init(p9);
 
-            buf2 = strdup(buf);
-            p = strtok(buf2, ",");
-            if(p) {
-               do {
-                  while(*p == ' ')
-                     ++p;
-                  if ((p2 = strchr(p, '=')) == NULL)
-                     break;
-                  *p2 = '\0';
-                  if (!strcmp(p, "security_model")) {
-                     security_model = strdup(p2 + 1);
-                  } else if(!strcmp(p, "path")) {
-                     path = strdup(p2 + 1);
-                  } else if(!strcmp(p, "tag")) {
-                     tag = strdup(p2 + 1);
-                  } else if(!strcmp(p, "backend")) {
-                     backend = strdup(p2 + 1);
-                  } else {
-                     fprintf(stderr, "Unknown string `%s' in 9pfs spec\n", p);
-                     exit(1);
-                  }
-               } while ((p = strtok(NULL, ",")) != NULL);
-            }
-            if (!path || !security_model || !tag) {
-               fprintf(stderr, "9pfs spec missing required field!\n");
-               exit(1);
-            }
-            free(buf2);
+            split_string_into_string_list(buf, ",", &pairs);
+            len = libxl_string_list_length(&pairs);
+            for (i = 0; i < len; i++) {
+                char *key, *value;
+                int rc;
 
-            replace_string(&p9->tag, tag);
-            replace_string(&p9->security_model, security_model);
-            replace_string(&p9->path, path);
-            if (backend)
-                    replace_string(&p9->backend_domname, backend);
+                rc = split_string_into_pair(pairs[i], '=', &key, &value,
+                                            isspace);
+                if (rc != 0) {
+                    fprintf(stderr, "failed to parse 9pfs configuration: %s",
+                            pairs[i]);
+                    exit(1);
+                }
+
+                if (!strcmp(key, "security_model")) {
+                    replace_string(&p9->security_model, value);
+                } else if (!strcmp(key, "path")) {
+                    replace_string(&p9->path, value);
+                } else if (!strcmp(key, "tag")) {
+                    replace_string(&p9->tag, value);
+                } else if (!strcmp(key, "backend")) {
+                    replace_string(&p9->backend_domname, value);
+                } else {
+                    fprintf(stderr, "Unknown 9pfs parameter '%s'\n", key);
+                    exit(1);
+                }
+                free(key);
+                free(value);
+            }
+
+            libxl_string_list_dispose(&pairs);
+
+            if (!p9->path || !p9->security_model || !p9->tag) {
+                fprintf(stderr, "9pfs spec missing required field!\n");
+                exit(1);
+            }
         }
     }
 
