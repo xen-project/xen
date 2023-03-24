@@ -76,4 +76,9 @@
 #define __must_check __attribute__((__warn_unused_result__))
 #endif
 
+#define container_of(ptr, type, member) ({              \
+    typeof(((type *)0)->member) *mptr__ = (ptr);        \
+    (type *)((char *)mptr__ - offsetof(type, member));  \
+})
+
 #endif	/* __XEN_TOOLS_COMMON_MACROS__ */

@@ -29,12 +29,6 @@
 
 #include <xen-tools/common-macros.h>
 
-#define container_of(ptr, type, member) ({                      \
-        typeof(((type *)0)->member) *mptr = (ptr);              \
-                                                                \
-        (type *)((char *)mptr - offsetof(type, member));        \
-})
-
 #define smp_wmb()
 #define prefetch(x) __builtin_prefetch(x)
 #define ASSERT(x) assert(x)
