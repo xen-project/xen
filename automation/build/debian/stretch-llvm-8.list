@@ -1,3 +1,0 @@
-# Strech LLVM 8 repos
-deb https://apt.llvm.org/stretch/ llvm-toolchain-stretch-8 main
-deb-src https://apt.llvm.org/stretch/ llvm-toolchain-stretch-8 main
