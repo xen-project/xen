@@ -17,6 +17,7 @@
  *  along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stddef.h>
 #include <xenfsimage_grub.h>
 #include "xfs.h"
 
@@ -181,9 +182,6 @@ fsb2daddr (xfs_fsblock_t fsbno)
 	return agb2daddr ((xfs_agnumber_t)(fsbno >> xfs.agblklog),
 			 (xfs_agblock_t)(fsbno & mask32lo(xfs.agblklog)));
 }
-
-#undef offsetof
-#define offsetof(t,m)	((size_t)&(((t *)0)->m))
 
 static inline int
 btroot_maxrecs (fsi_file_t *ffi)
