@@ -1416,21 +1416,9 @@ void sh_destroy_l1_shadow(struct domain *d, mfn_t smfn)
  * This implementation is pretty crude and slow, but we hope that it won't
  * be called very often. */
 
-#if GUEST_PAGING_LEVELS == 2
+#if GUEST_PAGING_LEVELS < 4
 
-void sh_unhook_32b_mappings(struct domain *d, mfn_t sl2mfn, int user_only)
-{
-    shadow_l2e_t *sl2e;
-    SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
-        if ( !user_only || (sl2e->l2 & _PAGE_USER) )
-            shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
-    });
-}
-
-#elif GUEST_PAGING_LEVELS == 3
-
-void sh_unhook_pae_mappings(struct domain *d, mfn_t sl2mfn, int user_only)
-/* Walk a PAE l2 shadow, unhooking entries from all the subshadows */
+void sh_unhook_l2_mappings(struct domain *d, mfn_t sl2mfn, bool user_only)
 {
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
@@ -1441,7 +1429,7 @@ void sh_unhook_pae_mappings(struct domain *d, mfn_t sl2mfn, int user_only)
 
 #elif GUEST_PAGING_LEVELS == 4
 
-void sh_unhook_64b_mappings(struct domain *d, mfn_t sl4mfn, int user_only)
+void sh_unhook_l4_mappings(struct domain *d, mfn_t sl4mfn, bool user_only)
 {
     shadow_l4e_t *sl4e;
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, d, {

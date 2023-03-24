@@ -898,14 +898,14 @@ void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only)
     {
 #ifdef CONFIG_HVM
     case SH_type_l2_32_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, 2)(d, smfn, user_only);
+        SHADOW_INTERNAL_NAME(sh_unhook_l2_mappings, 2)(d, smfn, user_only);
         break;
     case SH_type_l2_pae_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, 3)(d, smfn, user_only);
+        SHADOW_INTERNAL_NAME(sh_unhook_l2_mappings, 3)(d, smfn, user_only);
         break;
 #endif
     case SH_type_l4_64_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, 4)(d, smfn, user_only);
+        SHADOW_INTERNAL_NAME(sh_unhook_l4_mappings, 4)(d, smfn, user_only);
         break;
     default:
         printk(XENLOG_ERR "Bad top-level shadow type %08x\n", sp->u.sh.type);

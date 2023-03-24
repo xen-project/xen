@@ -50,14 +50,11 @@ SHADOW_INTERNAL_NAME(sh_destroy_l4_shadow, GUEST_LEVELS)(
     struct domain *d, mfn_t smfn);
 
 extern void
-SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, GUEST_LEVELS)
-    (struct domain *d, mfn_t sl2mfn, int user_only);
+SHADOW_INTERNAL_NAME(sh_unhook_l2_mappings, GUEST_LEVELS)
+    (struct domain *d, mfn_t sl2mfn, bool user_only);
 extern void
-SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, GUEST_LEVELS)
-    (struct domain *d, mfn_t sl3mfn, int user_only);
-extern void
-SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, GUEST_LEVELS)
-    (struct domain *d, mfn_t sl4mfn, int user_only);
+SHADOW_INTERNAL_NAME(sh_unhook_l4_mappings, GUEST_LEVELS)
+    (struct domain *d, mfn_t sl4mfn, bool user_only);
 
 int cf_check
 SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, GUEST_LEVELS)
