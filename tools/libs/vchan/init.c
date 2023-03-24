@@ -45,6 +45,7 @@
 #include <xen/sys/gntalloc.h>
 #include <xen/sys/gntdev.h>
 #include <libxenvchan.h>
+#include <xen-tools/common-macros.h>
 
 #include "vchan.h"
 
@@ -71,8 +72,6 @@
 #ifndef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 #endif
-
-#define max(a,b) ((a > b) ? a : b)
 
 static int init_gnt_srv(struct libxenvchan *ctrl, int domain)
 {

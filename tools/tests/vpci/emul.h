@@ -27,6 +27,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <xen-tools/common-macros.h>
+
 #define container_of(ptr, type, member) ({                      \
         typeof(((type *)0)->member) *mptr = (ptr);              \
                                                                 \
@@ -109,22 +111,6 @@ typedef union {
 
 #define BUG() assert(0)
 #define ASSERT_UNREACHABLE() assert(0)
-
-#define min(x, y) ({                    \
-        const typeof(x) tx = (x);       \
-        const typeof(y) ty = (y);       \
-                                        \
-        (void) (&tx == &ty);            \
-        tx < ty ? tx : ty;              \
-})
-
-#define max(x, y) ({                    \
-        const typeof(x) tx = (x);       \
-        const typeof(y) ty = (y);       \
-                                        \
-        (void) (&tx == &ty);            \
-        tx > ty ? tx : ty;              \
-})
 
 #endif
 

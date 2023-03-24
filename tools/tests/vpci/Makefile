@@ -11,7 +11,7 @@ run: $(TARGET)
 	./$(TARGET)
 
 $(TARGET): vpci.c vpci.h list.h main.c emul.h
-	$(HOSTCC) -g -o $@ vpci.c main.c
+	$(HOSTCC) $(CFLAGS_xeninclude) -g -o $@ vpci.c main.c
 
 .PHONY: clean
 clean:

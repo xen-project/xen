@@ -9,6 +9,8 @@
 #include <xen/hvm/hvm_info_table.h>
 #include "e820.h"
 
+#include <xen-tools/common-macros.h>
+
 /* Request un-prefixed values from errno.h. */
 #define XEN_ERRNO(name, value) name = value,
 enum {
@@ -41,12 +43,6 @@ void __assert_failed(const char *assertion, const char *file, int line)
 void __bug(const char *file, int line) __attribute__((noreturn));
 #define BUG() __bug(__FILE__, __LINE__)
 #define BUG_ON(p) do { if (p) BUG(); } while (0)
-#define BUILD_BUG_ON(p) ((void)sizeof(char[1 - 2 * !!(p)]))
-
-#define min_t(type,x,y) \
-        ({ type __x = (x); type __y = (y); __x < __y ? __x: __y; })
-#define max_t(type,x,y) \
-        ({ type __x = (x); type __y = (y); __x > __y ? __x: __y; })
 
 #define MB(mb) (mb##ULL << 20)
 #define GB(gb) (gb##ULL << 30)
