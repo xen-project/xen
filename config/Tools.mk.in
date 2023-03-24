@@ -37,12 +37,6 @@ LIBNL3_LIBS         := @LIBNL3_LIBS@
 LIBNL3_CFLAGS       := @LIBNL3_CFLAGS@
 XEN_TOOLS_RPATH     := @rpath@
 
-# Download GIT repositories via HTTP or GIT's own protocol?
-# GIT's protocol is faster and more robust, when it works at all (firewalls
-# may block it). We make it the default, but if your GIT repository downloads
-# fail or hang, please pass --enable-githttp to configure.
-GIT_HTTP            ?= @githttp@
-
 # Optional components
 XENSTAT_XENTOP      := @monitors@
 OCAML_TOOLS         := @ocamltools@

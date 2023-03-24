@@ -594,7 +594,6 @@ stubdom
 tools
 xen
 subdirs
-githttp
 DEBUG_DIR
 XEN_DUMP_DIR
 XEN_PAGING_DIR
@@ -673,7 +672,6 @@ with_xen_scriptdir
 with_xen_dumpdir
 with_rundir
 with_debugdir
-enable_githttp
 enable_xen
 enable_tools
 enable_stubdom
@@ -1309,8 +1307,6 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-githttp        Download GIT repositories via HTTP (default is
-                          DISABLED)
   --disable-xen           Disable build and install of xen
   --disable-tools         Disable build and install of tools
   --enable-stubdom        Enable build and install of stubdom
@@ -2121,29 +2117,6 @@ _ACEOF
 
 
 DEBUG_DIR=$debugdir_path
-
-
-
-# Check whether --enable-githttp was given.
-if test "${enable_githttp+set}" = set; then :
-  enableval=$enable_githttp;
-fi
-
-
-if test "x$enable_githttp" = "xno"; then :
-
-    ax_cv_githttp="n"
-
-elif test "x$enable_githttp" = "xyes"; then :
-
-    ax_cv_githttp="y"
-
-elif test -z $ax_cv_githttp; then :
-
-    ax_cv_githttp="n"
-
-fi
-githttp=$ax_cv_githttp
 
 
 

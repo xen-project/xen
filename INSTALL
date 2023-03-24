@@ -89,11 +89,6 @@ from a wrong location. Compiling the tools with rpath will force the
 linker to look in the correct location.
   --enable-rpath
 
-During build in a git checkout the buildsystem needs to download
-additional tools such as qemu. This is done with either the native git
-protocol, or via http if this option is enabled.
-  --enable-githttp
-
 Disable xenstat and xentop monitoring tools.
   --disable-monitors
 

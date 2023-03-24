@@ -714,7 +714,6 @@ ovmf
 xsmpolicy
 ocamltools
 monitors
-githttp
 rpath
 werror
 DEBUG_DIR
@@ -807,7 +806,6 @@ with_rundir
 with_debugdir
 enable_werror
 enable_rpath
-enable_githttp
 enable_monitors
 enable_ocamltools
 enable_xsmpolicy
@@ -1493,8 +1491,6 @@ Optional Features:
   --disable-largefile     omit support for large files
   --disable-werror        Build tools without -Werror (default is ENABLED)
   --enable-rpath          Build tools with -Wl,-rpath,LIBDIR (default is
-                          DISABLED)
-  --enable-githttp        Download GIT repositories via HTTP (default is
                           DISABLED)
   --disable-monitors      Disable xenstat and xentop monitoring tools (default
                           is ENABLED)
@@ -4153,29 +4149,6 @@ elif test -z $ax_cv_rpath; then :
 
 fi
 rpath=$ax_cv_rpath
-
-
-
-# Check whether --enable-githttp was given.
-if test "${enable_githttp+set}" = set; then :
-  enableval=$enable_githttp;
-fi
-
-
-if test "x$enable_githttp" = "xno"; then :
-
-    ax_cv_githttp="n"
-
-elif test "x$enable_githttp" = "xyes"; then :
-
-    ax_cv_githttp="y"
-
-elif test -z $ax_cv_githttp; then :
-
-    ax_cv_githttp="n"
-
-fi
-githttp=$ax_cv_githttp
 
 
 
