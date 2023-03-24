@@ -1668,9 +1668,8 @@ void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
 
    SHADOW_FOREACH_L1E(sl1mfn, sl1p, &gl1p, 0, {
         guest_l1e_t gl1e = *gl1p;
-        guest_l1e_t *snpl1p = (guest_l1e_t *)snp + guest_index(gl1p);
 
-        if ( memcmp(snpl1p, &gl1e, sizeof(gl1e)) )
+        if ( snp[guest_index(gl1p)].l1 != gl1e.l1 )
         {
             gfn_t gfn;
             mfn_t gmfn = INVALID_MFN;
@@ -1686,7 +1685,7 @@ void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
 
             l1e_propagate_from_guest(v, gl1e, gmfn, &nsl1e, ft_prefetch, p2mt);
             rc |= shadow_set_l1e(d, sl1p, nsl1e, p2mt, sl1mfn);
-            *snpl1p = gl1e;
+            snp[guest_index(gl1p)] = gl1e;
         }
     });
 
