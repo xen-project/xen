@@ -69,7 +69,8 @@ extern int shadow_audit_enable;
 #ifdef CONFIG_HVM
 #define SHADOW_OPTIMIZATIONS     0x1ff
 #else
-#define SHADOW_OPTIMIZATIONS     (0x1ff & ~SHOPT_FAST_EMULATION)
+#define SHADOW_OPTIMIZATIONS     (0x1ff & ~(SHOPT_OUT_OF_SYNC | \
+                                            SHOPT_FAST_EMULATION))
 #endif
 
 
@@ -205,8 +206,7 @@ extern void shadow_audit_tables(struct vcpu *v);
 #define SH_type_max_shadow     6U
 #define SH_type_p2m_table      7U /* in use as the p2m table */
 #define SH_type_monitor_table  8U /* in use as a monitor table */
-#define SH_type_oos_snapshot   9U /* in use as OOS snapshot */
-#define SH_type_unused        10U
+#define SH_type_unused         9U
 #endif
 
 #ifndef CONFIG_PV32 /* Unused (but uglier to #ifdef above): */
@@ -323,8 +323,6 @@ static inline void sh_terminate_list(struct page_list_head *tmp_list)
 #define SHF_out_of_sync (1u << (SH_type_max_shadow + 1))
 #define SHF_oos_may_write (1u << (SH_type_max_shadow + 2))
 
-#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
-
 static inline int sh_page_has_multiple_shadows(struct page_info *pg)
 {
     u32 shadows;
@@ -335,7 +333,6 @@ static inline int sh_page_has_multiple_shadows(struct page_info *pg)
     return shadows && (shadows & (shadows - 1));
 }
 
-#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
 /* The caller must verify this is reasonable to call; i.e., valid mfn,
  * domain is translated, &c */
 static inline int page_is_out_of_sync(struct page_info *p)

@@ -113,10 +113,10 @@ struct shadow_domain {
     /* Fast MMIO path heuristic */
     bool has_fast_mmio_entries;
 
+#ifdef CONFIG_HVM
     /* OOS */
     bool_t oos_active;
 
-#ifdef CONFIG_HVM
     /* Has this domain ever used HVMOP_pagetable_dying? */
     bool_t pagetable_dying_op;
 #endif
@@ -152,7 +152,6 @@ struct shadow_vcpu {
     unsigned long last_emulated_frame;
     /* Last MFN that we emulated a write successfully */
     unsigned long last_emulated_mfn;
-#endif
 
     /* Shadow out-of-sync: pages that this vcpu has let go out of sync */
     mfn_t oos[SHADOW_OOS_PAGES];
@@ -163,7 +162,6 @@ struct shadow_vcpu {
         unsigned long off[SHADOW_OOS_FIXUPS];
     } oos_fixup[SHADOW_OOS_PAGES];
 
-#ifdef CONFIG_HVM
     bool_t pagetable_dying;
 #endif
 #endif

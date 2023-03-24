@@ -296,7 +296,6 @@ static int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
 
     switch ( mfn_to_page(smfn)->u.sh.type )
     {
-#ifdef CONFIG_HVM
     case SH_type_l1_32_shadow:
     case SH_type_fl1_32_shadow:
         return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, 2)
@@ -306,7 +305,6 @@ static int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
     case SH_type_fl1_pae_shadow:
         return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, 3)
             (d, gmfn, smfn, off);
-#endif
 
     case SH_type_l1_64_shadow:
     case SH_type_fl1_64_shadow:
