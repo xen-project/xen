@@ -248,6 +248,12 @@ static inline void pv_l1tf_domain_destroy(struct domain *d)
 #endif
 }
 
+/* Functions that atomically write PV guest PT entries */
+void shadow_write_guest_entry(
+    struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn);
+intpte_t shadow_cmpxchg_guest_entry(
+    struct vcpu *v, intpte_t *p, intpte_t old, intpte_t new, mfn_t gmfn);
+
 #endif /* CONFIG_PV */
 
 /* Remove all shadows of the guest mfn. */

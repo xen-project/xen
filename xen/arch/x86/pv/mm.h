@@ -1,6 +1,8 @@
 #ifndef __PV_MM_H__
 #define __PV_MM_H__
 
+#include <asm/shadow.h>
+
 l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn);
 
 int new_guest_cr3(mfn_t mfn);
@@ -29,6 +31,25 @@ static inline l1_pgentry_t guest_get_eff_kern_l1e(unsigned long linear)
         toggle_guest_pt(curr);
 
     return l1e;
+}
+
+static inline void paging_write_guest_entry(
+    struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
+{
+    if ( unlikely(paging_mode_shadow(v->domain)) )
+        shadow_write_guest_entry(v, p, new, gmfn);
+    else
+        write_atomic(p, new);
+}
+
+
+/* Compare and exchange a guest pagetable entry.  Returns the old value. */
+static inline intpte_t paging_cmpxchg_guest_entry(
+    struct vcpu *v, intpte_t *p, intpte_t old, intpte_t new, mfn_t gmfn)
+{
+    if ( unlikely(paging_mode_shadow(v->domain)) )
+        return shadow_cmpxchg_guest_entry(v, p, old, new, gmfn);
+    return cmpxchg(p, old, new);
 }
 
 /*

@@ -4155,10 +4155,6 @@ const struct paging_mode sh_paging_mode = {
 #endif
     .update_cr3                    = sh_update_cr3,
     .guest_levels                  = GUEST_PAGING_LEVELS,
-#ifdef CONFIG_PV
-    .shadow.write_guest_entry      = sh_write_guest_entry,
-    .shadow.cmpxchg_guest_entry    = sh_cmpxchg_guest_entry,
-#endif
 #ifdef CONFIG_HVM
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     .shadow.guess_wrmap            = sh_guess_wrmap,

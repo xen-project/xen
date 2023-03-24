@@ -428,12 +428,6 @@ static inline int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
 }
 #endif
 
-/* Functions that atomically write PV guest PT entries */
-void cf_check sh_write_guest_entry(
-    struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn);
-intpte_t cf_check sh_cmpxchg_guest_entry(
-    struct vcpu *v, intpte_t *p, intpte_t old, intpte_t new, mfn_t gmfn);
-
 /* Unhook the non-Xen mappings in this top-level shadow mfn.
  * With user_only == 1, unhooks only the user-mode mappings. */
 void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only);

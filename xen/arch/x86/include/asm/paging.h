@@ -98,13 +98,6 @@
 
 struct shadow_paging_mode {
 #ifdef CONFIG_SHADOW_PAGING
-#ifdef CONFIG_PV
-    void          (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
-                                            intpte_t new, mfn_t gmfn);
-    intpte_t      (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
-                                            intpte_t old, intpte_t new,
-                                            mfn_t gmfn);
-#endif
 #ifdef CONFIG_HVM
     int           (*guess_wrmap           )(struct vcpu *v, 
                                             unsigned long vaddr, mfn_t gmfn);
@@ -325,44 +318,6 @@ static inline void paging_update_paging_modes(struct vcpu *v)
 {
     v->domain->arch.paging.update_paging_modes(v);
 }
-
-#ifdef CONFIG_PV
-
-/*
- * Write a new value into the guest pagetable, and update the
- * paging-assistance state appropriately.  Returns false if we page-faulted,
- * true for success.
- */
-static inline void paging_write_guest_entry(
-    struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
-{
-#ifdef CONFIG_SHADOW_PAGING
-    if ( unlikely(paging_mode_shadow(v->domain)) && paging_get_hostmode(v) )
-        paging_get_hostmode(v)->shadow.write_guest_entry(v, p, new, gmfn);
-    else
-#endif
-        write_atomic(p, new);
-}
-
-
-/*
- * Cmpxchg a new value into the guest pagetable, and update the
- * paging-assistance state appropriately.  Returns false if we page-faulted,
- * true if not.  N.B. caller should check the value of "old" to see if the
- * cmpxchg itself was successful.
- */
-static inline intpte_t paging_cmpxchg_guest_entry(
-    struct vcpu *v, intpte_t *p, intpte_t old, intpte_t new, mfn_t gmfn)
-{
-#ifdef CONFIG_SHADOW_PAGING
-    if ( unlikely(paging_mode_shadow(v->domain)) && paging_get_hostmode(v) )
-        return paging_get_hostmode(v)->shadow.cmpxchg_guest_entry(v, p, old,
-                                                                  new, gmfn);
-#endif
-    return cmpxchg(p, old, new);
-}
-
-#endif /* CONFIG_PV */
 
 /* Helper function that writes a pte in such a way that a concurrent read 
  * never sees a half-written entry that has _PAGE_PRESENT set */
