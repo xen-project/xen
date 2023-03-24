@@ -437,7 +437,7 @@ zero_bss:
 
         PRINT("- Zero BSS -\r\n")
         ldr   x0, =__bss_start       /* x0 := vaddr(__bss_start) */
-        ldr   x1, =__bss_end         /* x1 := vaddr(__bss_start) */
+        ldr   x1, =__bss_end         /* x1 := vaddr(__bss_end)   */
 
 1:      str   xzr, [x0], #8
         cmp   x0, x1

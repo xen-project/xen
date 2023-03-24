@@ -1,3 +1,4 @@
+#include <xen/lib.h>
 #include <xen/xen.lds.h>
 
 #undef ENTRY
@@ -156,3 +157,6 @@ SECTIONS
 
     ELF_DETAILS_SECTIONS
 }
+
+ASSERT(IS_ALIGNED(__bss_start,      POINTER_ALIGN), "__bss_start is misaligned")
+ASSERT(IS_ALIGNED(__bss_end,        POINTER_ALIGN), "__bss_end is misaligned")

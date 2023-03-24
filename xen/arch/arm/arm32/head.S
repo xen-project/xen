@@ -301,7 +301,7 @@ ENDPROC(check_cpu_mode)
 zero_bss:
         PRINT("- Zero BSS -\r\n")
         mov_w r0, __bss_start        /* r0 := vaddr(__bss_start) */
-        mov_w r1, __bss_end          /* r1 := vaddr(__bss_start) */
+        mov_w r1, __bss_end          /* r1 := vaddr(__bss_end)   */
 
         mov   r2, #0
 1:      str   r2, [r0], #4
