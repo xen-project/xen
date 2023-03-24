@@ -32,6 +32,7 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/user.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -68,10 +69,6 @@
 // if you go over this size, you'll have too many grants to fit in the shared page.
 #define MAX_RING_SHIFT 20
 #define MAX_RING_SIZE (1 << MAX_RING_SHIFT)
-
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-#endif
 
 static int init_gnt_srv(struct libxenvchan *ctrl, int domain)
 {
