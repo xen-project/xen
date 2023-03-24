@@ -1445,8 +1445,8 @@ int arch_set_info_guest(
 
     if ( paging_mode_enabled(d) )
         paging_update_paging_modes(v);
-
-    update_cr3(v);
+    else
+        update_cr3(v);
 #endif /* CONFIG_PV */
 
  out:
