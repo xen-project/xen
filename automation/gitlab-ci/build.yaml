@@ -798,9 +798,9 @@ alpine-3.12-rootfs-export:
   tags:
     - x86_64
 
-kernel-5.10.74-export:
+kernel-6.1.19-export:
   extends: .test-jobs-artifact-common
-  image: registry.gitlab.com/xen-project/xen/tests-artifacts/kernel:5.10.74
+  image: registry.gitlab.com/xen-project/xen/tests-artifacts/kernel:6.1.19
   script:
     - mkdir binaries && cp /bzImage binaries/bzImage
   artifacts:

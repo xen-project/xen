@@ -15,6 +15,10 @@
 .arm32-test-needs: &arm32-test-needs
   - qemu-system-aarch64-6.0.0-arm32-export
 
+.x86-64-test-needs: &x86-64-test-needs
+  - alpine-3.12-rootfs-export
+  - kernel-6.1.19-export
+
 .qemu-arm64:
   extends: .test-jobs-common
   variables:
@@ -299,9 +303,8 @@ qemu-alpine-x86_64-gcc:
   script:
     - ./automation/scripts/qemu-alpine-x86_64.sh 2>&1 | tee ${LOGFILE}
   needs:
+    - *x86-64-test-needs
     - alpine-3.12-gcc
-    - alpine-3.12-rootfs-export
-    - kernel-5.10.74-export
 
 qemu-smoke-x86-64-gcc:
   extends: .qemu-x86-64
