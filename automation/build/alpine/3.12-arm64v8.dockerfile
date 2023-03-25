@@ -41,3 +41,6 @@ RUN apk --no-cache add \
   libattr \
   libcap-ng-dev \
   pixman-dev \
+  # qubes test deps
+  openssh-client \
+  fakeroot \

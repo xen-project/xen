@@ -88,6 +88,23 @@
   tags:
     - xilinx
 
+.adl-x86-64:
+  extends: .test-jobs-common
+  variables:
+    # the test controller runs on RPi4
+    CONTAINER: alpine:3.12-arm64v8
+    LOGFILE: smoke-test.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  only:
+    variables:
+      - $QUBES_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+  tags:
+    - qubes-hw2
+
 # Test jobs
 build-each-commit-gcc:
   extends: .test-jobs-common
@@ -113,6 +130,22 @@ xilinx-smoke-dom0less-arm64-gcc:
   needs:
     - *arm64-test-needs
     - alpine-3.12-gcc-arm64
+
+adl-smoke-x86-64-gcc:
+  extends: .adl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.12-gcc
+
+adl-suspend-x86-64-gcc:
+  extends: .adl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.12-gcc
 
 qemu-smoke-dom0-arm64-gcc:
   extends: .qemu-arm64
