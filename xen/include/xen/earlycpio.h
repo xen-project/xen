@@ -9,7 +9,6 @@ struct cpio_data {
 	char name[MAX_CPIO_FILE_NAME];
 };
 
-struct cpio_data find_cpio_data(const char *path, void *data, size_t len,
-				long *offset);
+struct cpio_data find_cpio_data(const char *path, void *data, size_t len);
 
 #endif /* _EARLYCPIO_H */

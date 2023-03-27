@@ -56,10 +56,6 @@ enum cpio_fields {
  * @path:       The directory to search for, including a slash at the end
  * @data:       Pointer to the the cpio archive or a header inside
  * @len:        Remaining length of the cpio based on data pointer
- * @nextoff:    When a matching file is found, this is the offset from the
- *              beginning of the cpio to the beginning of the next file, not the
- *              matching file itself. It can be used to iterate through the cpio
- *              to find all files inside of a directory path.
  *
  * @return:     struct cpio_data containing the address, length and
  *              filename (with the directory path cut off) of the found file.
@@ -68,8 +64,7 @@ enum cpio_fields {
  *              the match returned an empty filename string.
  */
 
-struct cpio_data __init find_cpio_data(const char *path, void *data,
-				       size_t len,  long *nextoff)
+struct cpio_data __init find_cpio_data(const char *path, void *data, size_t len)
 {
 	const size_t cpio_header_len = 8*C_NFIELDS - 2;
 	struct cpio_data cd = { NULL, 0, "" };
@@ -129,7 +124,6 @@ struct cpio_data __init find_cpio_data(const char *path, void *data,
 		if ((ch[C_MODE] & 0170000) == 0100000 &&
 		    ch[C_NAMESIZE] >= mypathsize &&
 		    !memcmp(p, path, mypathsize)) {
-			*nextoff = (long)nptr - (long)data;
 			if (ch[C_NAMESIZE] - mypathsize >= MAX_CPIO_FILE_NAME) {
 				printk(
 				"File %s exceeding MAX_CPIO_FILE_NAME [%d]\n",

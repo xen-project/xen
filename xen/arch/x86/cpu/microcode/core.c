@@ -158,7 +158,6 @@ static void __init microcode_scan_module(struct boot_info *bi)
     uint64_t *_blob_start;
     unsigned long _blob_size;
     struct cpio_data cd;
-    long offset;
     const char *p = NULL;
     int i;
 
@@ -191,7 +190,7 @@ static void __init microcode_scan_module(struct boot_info *bi)
         }
         cd.data = NULL;
         cd.size = 0;
-        cd = find_cpio_data(p, _blob_start, _blob_size, &offset /* ignore */);
+        cd = find_cpio_data(p, _blob_start, _blob_size);
         if ( cd.data )
         {
             ucode_blob.size = cd.size;
