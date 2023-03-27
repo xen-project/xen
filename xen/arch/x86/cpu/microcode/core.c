@@ -109,6 +109,10 @@ static bool ucode_in_nmi = true;
 /* Protected by microcode_mutex */
 static const struct microcode_patch *microcode_cache;
 
+/*
+ * Used by the EFI path only, when xen.cfg identifies an explicit microcode
+ * file.  Overrides ucode=<int>|scan on the regular command line.
+ */
 void __init microcode_set_module(unsigned int idx)
 {
     ucode_mod_idx = idx;
