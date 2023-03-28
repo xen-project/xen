@@ -34,7 +34,7 @@ headers-$(CONFIG_TRACEBUFFER) += compat/trace.h
 headers-$(CONFIG_XENOPROF) += compat/xenoprof.h
 headers-$(CONFIG_XSM_FLASK) += compat/xsm/flask_op.h
 
-headers-n := $(filter-out $(headers-y),$(headers-n) $(headers-))
+headers-n := $(sort $(filter-out $(headers-y),$(headers-n) $(headers-)))
 
 cppflags-y                := -include public/xen-compat.h -DXEN_GENERATING_COMPAT_HEADERS
 cppflags-$(CONFIG_X86)    += -m32
