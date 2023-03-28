@@ -6,8 +6,9 @@
 #include <xen/types.h>
 #include <xen/percpu.h>
 #include <xen/errno.h>
+#include <xen/kernel.h>
 
-#include <xen/lib/x86/msr.h>
+#include <xen/lib/x86/cpu-policy.h>
 
 #include <asm/asm_defns.h>
 #include <asm/cpufeature.h>
