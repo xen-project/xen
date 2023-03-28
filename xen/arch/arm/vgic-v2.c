@@ -644,10 +644,6 @@ static int vgic_v2_vcpu_init(struct vcpu *v)
 
 static int vgic_v2_domain_init(struct domain *d)
 {
-    int ret;
-    paddr_t csize;
-    paddr_t vbase;
-
     /*
      * The hardware domain and direct-mapped domain both get the hardware
      * address.
@@ -667,8 +663,8 @@ static int vgic_v2_domain_init(struct domain *d)
          * aligned to PAGE_SIZE.
          */
         d->arch.vgic.cbase = vgic_v2_hw.cbase;
-        csize = vgic_v2_hw.csize;
-        vbase = vgic_v2_hw.vbase;
+        d->arch.vgic.csize = vgic_v2_hw.csize;
+        d->arch.vgic.vbase = vgic_v2_hw.vbase;
     }
     else if ( is_domain_direct_mapped(d) )
     {
@@ -683,8 +679,8 @@ static int vgic_v2_domain_init(struct domain *d)
          */
         d->arch.vgic.dbase = vgic_v2_hw.dbase;
         d->arch.vgic.cbase = vgic_v2_hw.cbase;
-        csize = GUEST_GICC_SIZE;
-        vbase = vgic_v2_hw.vbase + vgic_v2_hw.aliased_offset;
+        d->arch.vgic.csize = GUEST_GICC_SIZE;
+        d->arch.vgic.vbase = vgic_v2_hw.vbase + vgic_v2_hw.aliased_offset;
     }
     else
     {
@@ -697,18 +693,11 @@ static int vgic_v2_domain_init(struct domain *d)
          */
         BUILD_BUG_ON(GUEST_GICC_SIZE != SZ_8K);
         d->arch.vgic.cbase = GUEST_GICC_BASE;
-        csize = GUEST_GICC_SIZE;
-        vbase = vgic_v2_hw.vbase + vgic_v2_hw.aliased_offset;
+        d->arch.vgic.csize = GUEST_GICC_SIZE;
+        d->arch.vgic.vbase = vgic_v2_hw.vbase + vgic_v2_hw.aliased_offset;
     }
 
-    /*
-     * Map the gic virtual cpu interface in the gic cpu interface
-     * region of the guest.
-     */
-    ret = map_mmio_regions(d, gaddr_to_gfn(d->arch.vgic.cbase),
-                           csize / PAGE_SIZE, maddr_to_mfn(vbase));
-    if ( ret )
-        return ret;
+    /* Mapping of the virtual CPU interface is deferred until first access */
 
     register_mmio_handler(d, &vgic_v2_distr_mmio_handler, d->arch.vgic.dbase,
                           PAGE_SIZE, NULL);

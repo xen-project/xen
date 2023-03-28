@@ -1787,9 +1787,12 @@ static inline bool hpfar_is_valid(bool s1ptw, uint8_t fsc)
 }
 
 /*
- * When using ACPI, most of the MMIO regions will be mapped on-demand
- * in stage-2 page tables for the hardware domain because Xen is not
- * able to know from the EFI memory map the MMIO regions.
+ * Try to map the MMIO regions for some special cases:
+ * 1. When using ACPI, most of the MMIO regions will be mapped on-demand
+ *    in stage-2 page tables for the hardware domain because Xen is not
+ *    able to know from the EFI memory map the MMIO regions.
+ * 2. For guests using GICv2, the GICv2 CPU interface mapping is created
+ *    on the first access of the MMIO region.
  */
 static bool try_map_mmio(gfn_t gfn)
 {
@@ -1797,6 +1800,16 @@ static bool try_map_mmio(gfn_t gfn)
 
     /* For the hardware domain, all MMIOs are mapped with GFN == MFN */
     mfn_t mfn = _mfn(gfn_x(gfn));
+
+    /*
+     * Map the GICv2 virtual CPU interface in the GIC CPU interface
+     * region of the guest on the first access of the MMIO region.
+     */
+    if ( d->arch.vgic.version == GIC_V2 &&
+         gfn_to_gaddr(gfn) >= d->arch.vgic.cbase &&
+         (gfn_to_gaddr(gfn) - d->arch.vgic.cbase) < d->arch.vgic.csize )
+        return !map_mmio_regions(d, gfn, d->arch.vgic.csize / PAGE_SIZE,
+                                 maddr_to_mfn(d->arch.vgic.vbase));
 
     /*
      * Device-Tree should already have everything mapped when building

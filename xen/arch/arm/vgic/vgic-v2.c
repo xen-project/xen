@@ -258,8 +258,6 @@ void vgic_v2_enable(struct vcpu *vcpu)
 int vgic_v2_map_resources(struct domain *d)
 {
     struct vgic_dist *dist = &d->arch.vgic;
-    paddr_t csize;
-    paddr_t vbase;
     int ret;
 
     /*
@@ -272,7 +270,7 @@ int vgic_v2_map_resources(struct domain *d)
      */
     if ( is_hardware_domain(d) )
     {
-        d->arch.vgic.dbase = gic_v2_hw_data.dbase;
+        dist->dbase = gic_v2_hw_data.dbase;
         /*
          * For the hardware domain, we always map the whole HW CPU
          * interface region in order to match the device tree (the "reg"
@@ -280,13 +278,13 @@ int vgic_v2_map_resources(struct domain *d)
          * Note that we assume the size of the CPU interface is always
          * aligned to PAGE_SIZE.
          */
-        d->arch.vgic.cbase = gic_v2_hw_data.cbase;
-        csize = gic_v2_hw_data.csize;
-        vbase = gic_v2_hw_data.vbase;
+        dist->cbase = gic_v2_hw_data.cbase;
+        dist->csize = gic_v2_hw_data.csize;
+        dist->vbase = gic_v2_hw_data.vbase;
     }
     else if ( is_domain_direct_mapped(d) )
     {
-        d->arch.vgic.dbase = gic_v2_hw_data.dbase;
+        dist->dbase = gic_v2_hw_data.dbase;
         /*
          * For all the direct-mapped domain other than the hardware domain,
          * we only map a 8kB CPU interface but we make sure it is at a location
@@ -296,13 +294,13 @@ int vgic_v2_map_resources(struct domain *d)
          * address when the GIC is aliased to get a 8kB contiguous
          * region.
          */
-        d->arch.vgic.cbase = gic_v2_hw_data.cbase;
-        csize = GUEST_GICC_SIZE;
-        vbase = gic_v2_hw_data.vbase + gic_v2_hw_data.aliased_offset;
+        dist->cbase = gic_v2_hw_data.cbase;
+        dist->csize = GUEST_GICC_SIZE;
+        dist->vbase = gic_v2_hw_data.vbase + gic_v2_hw_data.aliased_offset;
     }
     else
     {
-        d->arch.vgic.dbase = GUEST_GICD_BASE;
+        dist->dbase = GUEST_GICD_BASE;
         /*
          * The CPU interface exposed to the guest is always 8kB. We may
          * need to add an offset to the virtual CPU interface base
@@ -310,9 +308,9 @@ int vgic_v2_map_resources(struct domain *d)
          * region.
          */
         BUILD_BUG_ON(GUEST_GICC_SIZE != SZ_8K);
-        d->arch.vgic.cbase = GUEST_GICC_BASE;
-        csize = GUEST_GICC_SIZE;
-        vbase = gic_v2_hw_data.vbase + gic_v2_hw_data.aliased_offset;
+        dist->cbase = GUEST_GICC_BASE;
+        dist->csize = GUEST_GICC_SIZE;
+        dist->vbase = gic_v2_hw_data.vbase + gic_v2_hw_data.aliased_offset;
     }
 
 
@@ -323,17 +321,7 @@ int vgic_v2_map_resources(struct domain *d)
         return ret;
     }
 
-    /*
-     * Map the gic virtual cpu interface in the gic cpu interface
-     * region of the guest.
-     */
-    ret = map_mmio_regions(d, gaddr_to_gfn(d->arch.vgic.cbase),
-                           csize / PAGE_SIZE, maddr_to_mfn(vbase));
-    if ( ret )
-    {
-        gdprintk(XENLOG_ERR, "Unable to remap VGIC CPU to VCPU\n");
-        return ret;
-    }
+    /* Mapping of the virtual CPU interface is deferred until first access */
 
     dist->ready = true;
 

@@ -127,6 +127,8 @@ struct vgic_dist {
             paddr_t     vgic_redist_free_offset;
         };
     };
+    paddr_t             csize; /* CPU interface size */
+    paddr_t             vbase; /* virtual CPU interface base address */
 
     /* distributor enabled */
     bool                enabled;
