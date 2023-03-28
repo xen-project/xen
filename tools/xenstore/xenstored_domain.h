@@ -96,7 +96,12 @@ void domain_outstanding_dec(struct connection *conn);
 void domain_outstanding_domid_dec(unsigned int domid);
 int domain_get_quota(const void *ctx, struct connection *conn,
 		     unsigned int domid);
-int acc_fix_domains(struct list_head *head, bool update);
+
+/*
+ * Update or check number of nodes per domain at the end of a transaction.
+ * If "update" is true, "chk_quota" is ignored.
+ */
+int acc_fix_domains(struct list_head *head, bool chk_quota, bool update);
 
 /* Write rate limiting */
 

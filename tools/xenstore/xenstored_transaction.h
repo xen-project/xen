@@ -36,6 +36,9 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 
 struct transaction *transaction_lookup(struct connection *conn, uint32_t id);
 
+/* Set flag for created node. */
+void ta_node_created(struct transaction *trans);
+
 /* This node was accessed. */
 int __must_check access_node(struct connection *conn, struct node *node,
                              enum node_access_type type, TDB_DATA *key);

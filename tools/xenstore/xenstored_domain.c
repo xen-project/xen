@@ -544,7 +544,7 @@ static struct domain *find_domain_by_domid(unsigned int domid)
 	return (d && d->introduced) ? d : NULL;
 }
 
-int acc_fix_domains(struct list_head *head, bool update)
+int acc_fix_domains(struct list_head *head, bool chk_quota, bool update)
 {
 	struct changed_domain *cd;
 	int cnt;
@@ -552,7 +552,7 @@ int acc_fix_domains(struct list_head *head, bool update)
 	list_for_each_entry(cd, head, list) {
 		cnt = domain_nbentry_fix(cd->domid, cd->nbentry, update);
 		if (!update) {
-			if (cnt >= quota_nb_entry_per_domain)
+			if (chk_quota && cnt >= quota_nb_entry_per_domain)
 				return ENOSPC;
 			if (cnt < 0)
 				return ENOMEM;

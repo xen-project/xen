@@ -1472,6 +1472,9 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 	if (!node)
 		return NULL;
 
+	if (conn && conn->transaction)
+		ta_node_created(conn->transaction);
+
 	node->data = data;
 	node->datalen = datalen;
 
