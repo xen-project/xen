@@ -68,7 +68,7 @@
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
 extern uint32_t mxcsr_mask;
-extern struct cpuid_policy cp;
+extern struct cpu_policy cp;
 
 #define MMAP_SZ 16384
 bool emul_test_init(void);
