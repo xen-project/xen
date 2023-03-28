@@ -1051,15 +1051,13 @@ struct xen_sysctl_cpu_policy {
 #define XEN_SYSCTL_cpu_policy_pv_default   4
 #define XEN_SYSCTL_cpu_policy_hvm_default  5
     uint32_t index;       /* IN: Which policy to query? */
-    uint32_t nr_leaves;   /* IN/OUT: Number of leaves in/written to
-                           * 'cpuid_policy', or the maximum number of leaves
-                           * if the guest handle is NULL. */
-    uint32_t nr_msrs;     /* IN/OUT: Number of MSRs in/written to
-                           * 'msr_policy', or the maximum number of MSRs if
-                           * the guest handle is NULL. */
+    uint32_t nr_leaves;   /* IN/OUT: Number of leaves in/written to 'leaves',
+                           * or the max number if 'leaves' is NULL. */
+    uint32_t nr_msrs;     /* IN/OUT: Number of MSRs in/written to 'msrs', or
+                           * the max number of if 'msrs' is NULL. */
     uint32_t _rsvd;       /* Must be zero. */
-    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_policy; /* OUT */
-    XEN_GUEST_HANDLE_64(xen_msr_entry_t) msr_policy;    /* OUT */
+    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) leaves; /* OUT */
+    XEN_GUEST_HANDLE_64(xen_msr_entry_t)  msrs;   /* OUT */
 };
 typedef struct xen_sysctl_cpu_policy xen_sysctl_cpu_policy_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_policy_t);

@@ -673,12 +673,10 @@ struct xen_domctl_set_target {
  * Query or set the CPUID and MSR policies for a specific domain.
  */
 struct xen_domctl_cpu_policy {
-    uint32_t nr_leaves; /* IN/OUT: Number of leaves in/written to
-                         * 'cpuid_policy'. */
-    uint32_t nr_msrs;   /* IN/OUT: Number of MSRs in/written to
-                         * 'msr_policy' */
-    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_policy; /* IN/OUT */
-    XEN_GUEST_HANDLE_64(xen_msr_entry_t) msr_policy;    /* IN/OUT */
+    uint32_t nr_leaves; /* IN/OUT: Number of leaves in/written to 'leaves' */
+    uint32_t nr_msrs;   /* IN/OUT: Number of MSRs in/written to 'msrs' */
+    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) leaves; /* IN/OUT */
+    XEN_GUEST_HANDLE_64(xen_msr_entry_t)  msrs;   /* IN/OUT */
 
     /*
      * OUT, set_policy only.  Written in some (but not all) error cases to
