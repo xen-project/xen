@@ -10,7 +10,6 @@
 
 #include <xen-tools/libs.h>
 #include <xen/lib/x86/cpu-policy.h>
-#include <xen/lib/x86/msr.h>
 #include <xen/domctl.h>
 
 static bool debug;
