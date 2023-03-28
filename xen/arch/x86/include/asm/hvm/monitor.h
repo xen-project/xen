@@ -54,6 +54,9 @@ bool hvm_monitor_check_p2m(unsigned long gla, gfn_t gfn, uint32_t pfec,
 int hvm_monitor_vmexit(unsigned long exit_reason,
                        unsigned long exit_qualification);
 
+int hvm_monitor_io(unsigned int port, unsigned int bytes,
+                   bool in, bool str);
+
 #endif /* __ASM_X86_HVM_MONITOR_H__ */
 
 /*

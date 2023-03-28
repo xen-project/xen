@@ -4578,9 +4578,16 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             };
         } io_qual;
         unsigned int bytes;
+        int rc;
 
         __vmread(EXIT_QUALIFICATION, &io_qual.raw);
         bytes = io_qual.size + 1;
+
+        rc = hvm_monitor_io(io_qual.port, bytes, io_qual.in, io_qual.str);
+        if ( rc < 0 )
+            goto exit_and_crash;
+        if ( rc )
+            break;
 
         if ( io_qual.str )
         {

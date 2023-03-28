@@ -346,6 +346,27 @@ int hvm_monitor_vmexit(unsigned long exit_reason,
     return monitor_traps(curr, ad->monitor.vmexit_sync, &req);
 }
 
+int hvm_monitor_io(unsigned int port, unsigned int bytes,
+                   bool in, bool str)
+{
+    struct vcpu *curr = current;
+    struct arch_domain *ad = &curr->domain->arch;
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_IO_INSTRUCTION,
+        .u.io.bytes = bytes,
+        .u.io.port = port,
+        .u.io.in = in,
+        .u.io.str = str,
+    };
+
+    if ( !ad->monitor.io_enabled )
+        return 0;
+
+    set_npt_base(curr, &req);
+
+    return monitor_traps(curr, true, &req);
+}
+
 /*
  * Local variables:
  * mode: C

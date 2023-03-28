@@ -2939,6 +2939,15 @@ void svm_vmexit_handler(void)
         break;
 
     case VMEXIT_IOIO:
+        rc = hvm_monitor_io(vmcb->ei.io.port,
+                            vmcb->ei.io.bytes,
+                            vmcb->ei.io.in,
+                            vmcb->ei.io.str);
+        if ( rc < 0 )
+            goto unexpected_exit_type;
+        if ( rc )
+            break;
+
         if ( !vmcb->ei.io.str )
         {
             if ( handle_pio(vmcb->ei.io.port,
