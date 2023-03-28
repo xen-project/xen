@@ -145,9 +145,9 @@ static int get_system_cpu_policy(xc_interface *xch, uint32_t index,
     sysctl.cmd = XEN_SYSCTL_get_cpu_policy;
     sysctl.u.cpu_policy.index = index;
     sysctl.u.cpu_policy.nr_leaves = *nr_leaves;
-    set_xen_guest_handle(sysctl.u.cpu_policy.cpuid_policy, leaves);
+    set_xen_guest_handle(sysctl.u.cpu_policy.leaves, leaves);
     sysctl.u.cpu_policy.nr_msrs = *nr_msrs;
-    set_xen_guest_handle(sysctl.u.cpu_policy.msr_policy, msrs);
+    set_xen_guest_handle(sysctl.u.cpu_policy.msrs, msrs);
 
     ret = do_sysctl(xch, &sysctl);
 
@@ -183,9 +183,9 @@ static int get_domain_cpu_policy(xc_interface *xch, uint32_t domid,
     domctl.cmd = XEN_DOMCTL_get_cpu_policy;
     domctl.domain = domid;
     domctl.u.cpu_policy.nr_leaves = *nr_leaves;
-    set_xen_guest_handle(domctl.u.cpu_policy.cpuid_policy, leaves);
+    set_xen_guest_handle(domctl.u.cpu_policy.leaves, leaves);
     domctl.u.cpu_policy.nr_msrs = *nr_msrs;
-    set_xen_guest_handle(domctl.u.cpu_policy.msr_policy, msrs);
+    set_xen_guest_handle(domctl.u.cpu_policy.msrs, msrs);
 
     ret = do_domctl(xch, &domctl);
 
@@ -232,9 +232,9 @@ int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
     domctl.cmd = XEN_DOMCTL_set_cpu_policy;
     domctl.domain = domid;
     domctl.u.cpu_policy.nr_leaves = nr_leaves;
-    set_xen_guest_handle(domctl.u.cpu_policy.cpuid_policy, leaves);
+    set_xen_guest_handle(domctl.u.cpu_policy.leaves, leaves);
     domctl.u.cpu_policy.nr_msrs = nr_msrs;
-    set_xen_guest_handle(domctl.u.cpu_policy.msr_policy, msrs);
+    set_xen_guest_handle(domctl.u.cpu_policy.msrs, msrs);
     domctl.u.cpu_policy.err_leaf = -1;
     domctl.u.cpu_policy.err_subleaf = -1;
     domctl.u.cpu_policy.err_msr = -1;
