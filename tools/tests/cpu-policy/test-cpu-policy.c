@@ -602,7 +602,7 @@ static void test_is_compatible_success(void)
     for ( size_t i = 0; i < ARRAY_SIZE(tests); ++i )
     {
         struct test *t = &tests[i];
-        struct cpu_policy sys = {
+        struct old_cpu_policy sys = {
             &t->host_cpuid,
             &t->host_msr,
         }, new = {
@@ -654,7 +654,7 @@ static void test_is_compatible_failure(void)
     for ( size_t i = 0; i < ARRAY_SIZE(tests); ++i )
     {
         struct test *t = &tests[i];
-        struct cpu_policy sys = {
+        struct old_cpu_policy sys = {
             &t->host_cpuid,
             &t->host_msr,
         }, new = {
