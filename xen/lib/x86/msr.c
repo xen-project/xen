@@ -1,6 +1,6 @@
 #include "private.h"
 
-#include <xen/lib/x86/msr.h>
+#include <xen/lib/x86/cpu-policy.h>
 
 /*
  * Copy a single MSR into the provided msr_entry_buffer_t buffer, performing a
