@@ -112,8 +112,8 @@ int domain_vgic_register(struct domain *d, int *mmio_count)
         BUG();
     }
 
-    d->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
-    d->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+    d->arch.vgic.dbase = VGIC_ADDR_UNDEF;
+    d->arch.vgic.cbase = VGIC_ADDR_UNDEF;
     d->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
 
     return 0;
