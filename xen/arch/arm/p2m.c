@@ -1315,6 +1315,26 @@ static void p2m_invalidate_table(struct p2m_domain *p2m, mfn_t mfn)
 }
 
 /*
+ * The domain will not be scheduled anymore, so in theory we should
+ * not need to flush the TLBs. Do it for safety purpose.
+ * Note that all the devices have already been de-assigned. So we don't
+ * need to flush the IOMMU TLB here.
+ */
+void p2m_clear_root_pages(struct p2m_domain *p2m)
+{
+    unsigned int i;
+
+    p2m_write_lock(p2m);
+
+    for ( i = 0; i < P2M_ROOT_PAGES; i++ )
+        clear_and_clean_page(p2m->root + i);
+
+    p2m_force_tlb_flush_sync(p2m);
+
+    p2m_write_unlock(p2m);
+}
+
+/*
  * Invalidate all entries in the root page-tables. This is
  * useful to get fault on entry and do an action.
  *
@@ -1698,29 +1718,9 @@ int p2m_teardown(struct domain *d, bool allow_preemption)
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     unsigned long count = 0;
     struct page_info *pg;
-    unsigned int i;
     int rc = 0;
 
-    if ( page_list_empty(&p2m->pages) )
-        return 0;
-
     p2m_write_lock(p2m);
-
-    /*
-     * We are about to free the intermediate page-tables, so clear the
-     * root to prevent any walk to use them.
-     */
-    for ( i = 0; i < P2M_ROOT_PAGES; i++ )
-        clear_and_clean_page(p2m->root + i);
-
-    /*
-     * The domain will not be scheduled anymore, so in theory we should
-     * not need to flush the TLBs. Do it for safety purpose.
-     *
-     * Note that all the devices have already been de-assigned. So we don't
-     * need to flush the IOMMU TLB here.
-     */
-    p2m_force_tlb_flush_sync(p2m);
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
     {

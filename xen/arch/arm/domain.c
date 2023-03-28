@@ -959,6 +959,7 @@ enum {
     PROG_xen,
     PROG_page,
     PROG_mapping,
+    PROG_p2m_root,
     PROG_p2m,
     PROG_p2m_pool,
     PROG_done,
@@ -1020,6 +1021,13 @@ int domain_relinquish_resources(struct domain *d)
         ret = relinquish_p2m_mapping(d);
         if ( ret )
             return ret;
+
+    PROGRESS(p2m_root):
+        /*
+         * We are about to free the intermediate page-tables, so clear the
+         * root to prevent any walk to use them.
+         */
+        p2m_clear_root_pages(&d->arch.p2m);
 
     PROGRESS(p2m):
         ret = p2m_teardown(d, true);

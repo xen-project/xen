@@ -281,6 +281,7 @@ int p2m_set_entry(struct p2m_domain *p2m,
 
 bool p2m_resolve_translation_fault(struct domain *d, gfn_t gfn);
 
+void p2m_clear_root_pages(struct p2m_domain *p2m);
 void p2m_invalidate_root(struct p2m_domain *p2m);
 
 /*
