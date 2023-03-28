@@ -23,7 +23,7 @@
 #ifndef __X86_EMULATE_H__
 #define __X86_EMULATE_H__
 
-#include <xen/lib/x86/cpuid.h>
+#include <xen/lib/x86/cpu-policy.h>
 
 #define MAX_INST_LEN 15
 
