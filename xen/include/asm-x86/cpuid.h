@@ -9,7 +9,6 @@
 #include <xen/percpu.h>
 
 #include <xen/lib/x86/cpu-policy.h>
-#include <xen/lib/x86/cpuid.h>
 
 #include <public/sysctl.h>
 

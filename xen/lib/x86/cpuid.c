@@ -1,6 +1,6 @@
 #include "private.h"
 
-#include <xen/lib/x86/cpuid.h>
+#include <xen/lib/x86/cpu-policy.h>
 
 static void zero_leaves(struct cpuid_leaf *l,
                         unsigned int first, unsigned int last)
