@@ -194,18 +194,14 @@ int p2m_init(struct domain *d);
 
 /*
  * The P2M resources are freed in two parts:
- *  - p2m_teardown() will be called preemptively when relinquish the
- *    resources, in which case it will free large resources (e.g. intermediate
- *    page-tables) that requires preemption.
+ *  - p2m_teardown() will be called when relinquish the resources. It
+ *    will free large resources (e.g. intermediate page-tables) that
+ *    requires preemption.
  *  - p2m_final_teardown() will be called when domain struct is been
- *    freed. This *cannot* be preempted and therefore one small
+ *    freed. This *cannot* be preempted and therefore only small
  *    resources should be freed here.
- *  Note that p2m_final_teardown() will also call p2m_teardown(), to properly
- *  free the P2M when failures happen in the domain creation with P2M pages
- *  already in use. In this case p2m_teardown() is called non-preemptively and
- *  p2m_teardown() will always return 0.
  */
-int p2m_teardown(struct domain *d, bool allow_preemption);
+int p2m_teardown(struct domain *d);
 void p2m_final_teardown(struct domain *d);
 
 /*

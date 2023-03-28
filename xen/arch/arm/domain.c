@@ -1030,7 +1030,7 @@ int domain_relinquish_resources(struct domain *d)
         p2m_clear_root_pages(&d->arch.p2m);
 
     PROGRESS(p2m):
-        ret = p2m_teardown(d, true);
+        ret = p2m_teardown(d);
         if ( ret )
             return ret;
 
