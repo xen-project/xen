@@ -5,7 +5,7 @@
 #include <xen/lib/x86/cpuid.h>
 #include <xen/lib/x86/msr.h>
 
-struct cpu_policy
+struct old_cpu_policy
 {
     struct cpuid_policy *cpuid;
     struct msr_policy *msr;
@@ -33,8 +33,8 @@ struct cpu_policy_errors
  * incompatibility is detected, the optional err pointer may identify the
  * problematic leaf/subleaf and/or MSR.
  */
-int x86_cpu_policies_are_compatible(const struct cpu_policy *host,
-                                    const struct cpu_policy *guest,
+int x86_cpu_policies_are_compatible(const struct old_cpu_policy *host,
+                                    const struct old_cpu_policy *guest,
                                     struct cpu_policy_errors *err);
 
 #endif /* !XEN_LIB_X86_POLICIES_H */

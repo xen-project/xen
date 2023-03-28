@@ -2,8 +2,8 @@
 
 #include <xen/lib/x86/cpu-policy.h>
 
-int x86_cpu_policies_are_compatible(const struct cpu_policy *host,
-                                    const struct cpu_policy *guest,
+int x86_cpu_policies_are_compatible(const struct old_cpu_policy *host,
+                                    const struct old_cpu_policy *guest,
                                     struct cpu_policy_errors *err)
 {
     struct cpu_policy_errors e = INIT_CPU_POLICY_ERRORS;

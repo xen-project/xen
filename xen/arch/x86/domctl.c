@@ -219,8 +219,8 @@ void domain_cpu_policy_changed(struct domain *d)
 static int update_domain_cpu_policy(struct domain *d,
                                     xen_domctl_cpu_policy_t *xdpc)
 {
-    struct cpu_policy new = {};
-    const struct cpu_policy *sys = is_pv_domain(d)
+    struct old_cpu_policy new = {};
+    const struct old_cpu_policy *sys = is_pv_domain(d)
         ? &system_policies[XEN_SYSCTL_cpu_policy_pv_max]
         : &system_policies[XEN_SYSCTL_cpu_policy_hvm_max];
     struct cpu_policy_errors err = INIT_CPU_POLICY_ERRORS;

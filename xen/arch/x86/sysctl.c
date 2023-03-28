@@ -33,7 +33,7 @@
 #include <asm/psr.h>
 #include <asm/cpuid.h>
 
-const struct cpu_policy system_policies[6] = {
+const struct old_cpu_policy system_policies[6] = {
     [ XEN_SYSCTL_cpu_policy_raw ] = {
         &raw_cpuid_policy,
         &raw_msr_policy,
@@ -422,7 +422,7 @@ long arch_do_sysctl(
 
     case XEN_SYSCTL_get_cpu_policy:
     {
-        const struct cpu_policy *policy;
+        const struct old_cpu_policy *policy;
 
         /* Reserved field set, or bad policy index? */
         if ( sysctl->u.cpu_policy._rsvd ||
