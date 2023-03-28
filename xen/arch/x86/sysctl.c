@@ -411,11 +411,11 @@ long arch_do_sysctl(
         }
 
         /* Process the CPUID leaves. */
-        if ( guest_handle_is_null(sysctl->u.cpu_policy.cpuid_policy) )
+        if ( guest_handle_is_null(sysctl->u.cpu_policy.leaves) )
             sysctl->u.cpu_policy.nr_leaves = CPUID_MAX_SERIALISED_LEAVES;
         else if ( (ret = x86_cpuid_copy_to_buffer(
                        policy->cpuid,
-                       sysctl->u.cpu_policy.cpuid_policy,
+                       sysctl->u.cpu_policy.leaves,
                        &sysctl->u.cpu_policy.nr_leaves)) )
             break;
 
@@ -427,11 +427,11 @@ long arch_do_sysctl(
         }
 
         /* Process the MSR entries. */
-        if ( guest_handle_is_null(sysctl->u.cpu_policy.msr_policy) )
+        if ( guest_handle_is_null(sysctl->u.cpu_policy.msrs) )
             sysctl->u.cpu_policy.nr_msrs = MSR_MAX_SERIALISED_ENTRIES;
         else if ( (ret = x86_msr_copy_to_buffer(
                        policy->msr,
-                       sysctl->u.cpu_policy.msr_policy,
+                       sysctl->u.cpu_policy.msrs,
                        &sysctl->u.cpu_policy.nr_msrs)) )
             break;
 

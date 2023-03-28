@@ -1050,8 +1050,8 @@ struct xen_sysctl_cpu_policy {
                            * 'msr_policy', or the maximum number of MSRs if
                            * the guest handle is NULL. */
     uint32_t _rsvd;       /* Must be zero. */
-    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_policy; /* OUT */
-    XEN_GUEST_HANDLE_64(xen_msr_entry_t) msr_policy;    /* OUT */
+    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) leaves; /* OUT */
+    XEN_GUEST_HANDLE_64(xen_msr_entry_t)  msrs;   /* OUT */
 };
 typedef struct xen_sysctl_cpu_policy xen_sysctl_cpu_policy_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_policy_t);

@@ -54,10 +54,10 @@ static int update_domain_cpu_policy(struct domain *d,
 
     /* Merge the toolstack provided data. */
     if ( (ret = x86_cpuid_copy_from_buffer(
-              new.cpuid, xdpc->cpuid_policy, xdpc->nr_leaves,
+              new.cpuid, xdpc->leaves, xdpc->nr_leaves,
               &err.leaf, &err.subleaf)) ||
          (ret = x86_msr_copy_from_buffer(
-              new.msr, xdpc->msr_policy, xdpc->nr_msrs, &err.msr)) )
+              new.msr, xdpc->msrs, xdpc->nr_msrs, &err.msr)) )
         goto out;
 
     /* Trim any newly-stale out-of-range leaves. */
@@ -1317,20 +1317,20 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_get_cpu_policy:
         /* Process the CPUID leaves. */
-        if ( guest_handle_is_null(domctl->u.cpu_policy.cpuid_policy) )
+        if ( guest_handle_is_null(domctl->u.cpu_policy.leaves) )
             domctl->u.cpu_policy.nr_leaves = CPUID_MAX_SERIALISED_LEAVES;
         else if ( (ret = x86_cpuid_copy_to_buffer(
                        d->arch.cpuid,
-                       domctl->u.cpu_policy.cpuid_policy,
+                       domctl->u.cpu_policy.leaves,
                        &domctl->u.cpu_policy.nr_leaves)) )
             break;
 
         /* Process the MSR entries. */
-        if ( guest_handle_is_null(domctl->u.cpu_policy.msr_policy) )
+        if ( guest_handle_is_null(domctl->u.cpu_policy.msrs) )
             domctl->u.cpu_policy.nr_msrs = MSR_MAX_SERIALISED_ENTRIES;
         else if ( (ret = x86_msr_copy_to_buffer(
                        d->arch.msr,
-                       domctl->u.cpu_policy.msr_policy,
+                       domctl->u.cpu_policy.msrs,
                        &domctl->u.cpu_policy.nr_msrs)) )
             break;
 

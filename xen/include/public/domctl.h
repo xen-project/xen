@@ -683,8 +683,8 @@ struct xen_domctl_cpu_policy {
                          * 'cpuid_policy'. */
     uint32_t nr_msrs;   /* IN/OUT: Number of MSRs in/written to
                          * 'msr_policy' */
-    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_policy; /* IN/OUT */
-    XEN_GUEST_HANDLE_64(xen_msr_entry_t) msr_policy;    /* IN/OUT */
+    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) leaves; /* IN/OUT */
+    XEN_GUEST_HANDLE_64(xen_msr_entry_t)  msrs;   /* IN/OUT */
 
     /*
      * OUT, set_policy only.  Written in some (but not all) error cases to
