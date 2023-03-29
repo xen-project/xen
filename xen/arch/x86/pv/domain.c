@@ -146,7 +146,7 @@ static void release_compat_l4(struct vcpu *v)
 
 unsigned long pv_fixup_guest_cr4(const struct vcpu *v, unsigned long cr4)
 {
-    const struct cpuid_policy *p = v->domain->arch.cpuid;
+    const struct cpu_policy *p = v->domain->arch.cpu_policy;
 
     /* Discard attempts to set guest controllable bits outside of the policy. */
     cr4 &= ~((p->basic.tsc     ? 0 : X86_CR4_TSD)      |
