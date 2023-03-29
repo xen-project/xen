@@ -120,50 +120,6 @@ void __init init_guest_msr_policy(void)
     }
 }
 
-int init_domain_msr_policy(struct domain *d)
-{
-    struct msr_policy *mp = is_pv_domain(d)
-        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_def_cpu_policy : NULL)
-        : (IS_ENABLED(CONFIG_HVM) ? &hvm_def_cpu_policy : NULL);
-
-    if ( !mp )
-    {
-        ASSERT_UNREACHABLE();
-        return -EOPNOTSUPP;
-    }
-
-    mp = xmemdup(mp);
-    if ( !mp )
-        return -ENOMEM;
-
-    /* See comment in ctxt_switch_levelling() */
-    if ( !opt_dom0_cpuid_faulting && is_control_domain(d) && is_pv_domain(d) )
-        mp->platform_info.cpuid_faulting = false;
-
-    /*
-     * Expose the "hardware speculation behaviour" bits of ARCH_CAPS to dom0,
-     * so dom0 can turn off workarounds as appropriate.  Temporary, until the
-     * domain policy logic gains a better understanding of MSRs.
-     */
-    if ( is_hardware_domain(d) && cpu_has_arch_caps )
-    {
-        uint64_t val;
-
-        rdmsrl(MSR_ARCH_CAPABILITIES, val);
-
-        mp->arch_caps.raw = val &
-            (ARCH_CAPS_RDCL_NO | ARCH_CAPS_IBRS_ALL | ARCH_CAPS_RSBA |
-             ARCH_CAPS_SSB_NO | ARCH_CAPS_MDS_NO | ARCH_CAPS_IF_PSCHANGE_MC_NO |
-             ARCH_CAPS_TAA_NO | ARCH_CAPS_SBDR_SSDP_NO | ARCH_CAPS_FBSDP_NO |
-             ARCH_CAPS_PSDP_NO | ARCH_CAPS_FB_CLEAR | ARCH_CAPS_RRSBA |
-             ARCH_CAPS_BHI_NO | ARCH_CAPS_PBRSB_NO);
-    }
-
-    d->arch.msr = mp;
-
-    return 0;
-}
-
 int init_vcpu_msr_policy(struct vcpu *v)
 {
     struct vcpu_msrs *msrs = xzalloc(struct vcpu_msrs);

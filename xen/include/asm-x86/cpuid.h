@@ -49,9 +49,6 @@ extern struct cpuidmasks cpuidmask_defaults;
 /* Check that all previously present features are still available. */
 bool recheck_cpu_features(unsigned int cpu);
 
-/* Allocate and initialise a CPUID policy suitable for the domain. */
-int init_domain_cpuid_policy(struct domain *d);
-
 /* Apply dom0-specific tweaks to the CPUID policy. */
 void init_dom0_cpuid_policy(struct domain *d);
 
