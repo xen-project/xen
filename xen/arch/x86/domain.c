@@ -281,7 +281,7 @@ void update_guest_memory_policy(struct vcpu *v,
 
 void domain_cpu_policy_changed(struct domain *d)
 {
-    const struct cpuid_policy *p = d->arch.cpuid;
+    const struct cpu_policy *p = d->arch.cpu_policy;
     struct vcpu *v;
 
     if ( is_pv_domain(d) )

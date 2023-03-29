@@ -882,7 +882,7 @@ static int read_msr(unsigned int reg, uint64_t *val,
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
-    const struct cpuid_policy *cp = currd->arch.cpuid;
+    const struct cpu_policy *cp = currd->arch.cpu_policy;
     bool vpmu_msr = false, warn = false;
     uint64_t tmp;
     int ret;
@@ -1031,7 +1031,7 @@ static int write_msr(unsigned int reg, uint64_t val,
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
-    const struct cpuid_policy *cp = currd->arch.cpuid;
+    const struct cpu_policy *cp = currd->arch.cpu_policy;
     bool vpmu_msr = false;
     int ret;
 

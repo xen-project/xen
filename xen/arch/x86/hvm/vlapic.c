@@ -1079,7 +1079,7 @@ static void set_x2apic_id(struct vlapic *vlapic)
 
 int guest_wrmsr_apic_base(struct vcpu *v, uint64_t value)
 {
-    const struct cpuid_policy *cp = v->domain->arch.cpuid;
+    const struct cpu_policy *cp = v->domain->arch.cpu_policy;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
     if ( !has_vlapic(v->domain) )
