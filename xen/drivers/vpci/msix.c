@@ -278,6 +278,11 @@ static int adjacent_read(const struct domain *d, const struct vpci_msix *msix,
     if ( !adjacent_handle(msix, addr + len - 1) )
         return X86EMUL_OKAY;
 
+    if ( VMSIX_ADDR_IN_RANGE(addr, vpci, VPCI_MSIX_PBA) &&
+         !access_allowed(msix->pdev, addr, len) )
+        /* PBA accesses must be aligned and 4 or 8 bytes in size. */
+        return X86EMUL_OKAY;
+
     slot = get_slot(vpci, addr);
     if ( slot >= ARRAY_SIZE(msix->table) )
         return X86EMUL_OKAY;
@@ -419,9 +424,8 @@ static int adjacent_write(const struct domain *d, const struct vpci_msix *msix,
      * assumed to be equal or bigger (8 bytes) than the length of any access
      * handled here.
      */
-    if ( (VMSIX_ADDR_IN_RANGE(addr, vpci, VPCI_MSIX_PBA) ||
-          VMSIX_ADDR_IN_RANGE(addr + len - 1, vpci, VPCI_MSIX_PBA)) &&
-         !is_hardware_domain(d) )
+    if ( VMSIX_ADDR_IN_RANGE(addr, vpci, VPCI_MSIX_PBA) &&
+         (!access_allowed(msix->pdev, addr, len) || !is_hardware_domain(d)) )
         /* Ignore writes to PBA for DomUs, it's undefined behavior. */
         return X86EMUL_OKAY;
 
