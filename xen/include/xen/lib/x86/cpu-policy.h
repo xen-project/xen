@@ -375,10 +375,6 @@ struct cpu_policy
     uint8_t x86_vendor;
 };
 
-/* Temporary */
-#define cpuid_policy cpu_policy
-#define msr_policy cpu_policy
-
 struct cpu_policy_errors
 {
     uint32_t leaf, subleaf;
