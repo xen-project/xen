@@ -1783,8 +1783,7 @@ static int fork(struct domain *cd, struct domain *d)
 
         domain_pause(d);
         cd->max_pages = d->max_pages;
-        *cd->arch.cpuid = *d->arch.cpuid;
-        *cd->arch.msr = *d->arch.msr;
+        *cd->arch.cpu_policy = *d->arch.cpu_policy;
         cd->vmtrace_size = d->vmtrace_size;
         cd->parent = d;
     }
