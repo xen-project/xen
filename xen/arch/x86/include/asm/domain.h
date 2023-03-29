@@ -386,9 +386,16 @@ struct arch_domain
      */
     uint8_t x87_fip_width;
 
-    /* CPUID and MSR policy objects. */
-    struct cpuid_policy *cpuid;
-    struct msr_policy *msr;
+    /*
+     * The domain's CPU Policy.  "cpu_policy" is considered the canonical
+     * pointer, but the "cpuid" and "msr" aliases exist so the most
+     * appropriate one can be used for local code clarity.
+     */
+    union {
+        struct cpu_policy *cpu_policy;
+        struct cpu_policy *cpuid;
+        struct cpu_policy *msr;
+    };
 
     struct PITState vpit;
 

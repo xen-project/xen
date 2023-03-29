@@ -419,7 +419,6 @@ struct vcpu_msrs
 };
 
 void init_guest_msr_policy(void);
-int init_domain_msr_policy(struct domain *d);
 int init_vcpu_msr_policy(struct vcpu *v);
 
 /*
