@@ -173,10 +173,9 @@ int pin_table(xc_interface *xch, unsigned int type, unsigned long mfn,
 #include <xen/lib/x86/cpu-policy.h>
 
 struct xc_cpu_policy {
-    struct cpuid_policy cpuid;
-    struct msr_policy msr;
+    struct cpu_policy policy;
     xen_cpuid_leaf_t leaves[CPUID_MAX_SERIALISED_LEAVES];
-    xen_msr_entry_t entries[MSR_MAX_SERIALISED_ENTRIES];
+    xen_msr_entry_t msrs[MSR_MAX_SERIALISED_ENTRIES];
 };
 #endif /* x86 */
 
