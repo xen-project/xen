@@ -35,7 +35,7 @@
 #include <asm/xstate.h>
 #include <asm/debugger.h>
 #include <asm/psr.h>
-#include <asm/cpuid.h>
+#include <asm/cpu-policy.h>
 
 #ifdef CONFIG_GDBSX
 static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
@@ -220,11 +220,18 @@ static int update_domain_cpu_policy(struct domain *d,
                                     xen_domctl_cpu_policy_t *xdpc)
 {
     struct old_cpu_policy new = {};
-    const struct old_cpu_policy *sys = is_pv_domain(d)
-        ? &system_policies[XEN_SYSCTL_cpu_policy_pv_max]
-        : &system_policies[XEN_SYSCTL_cpu_policy_hvm_max];
+    struct cpu_policy *sys = is_pv_domain(d)
+        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_max_cpu_policy : NULL)
+        : (IS_ENABLED(CONFIG_HVM) ? &hvm_max_cpu_policy : NULL);
+    struct old_cpu_policy old_sys = { sys, sys };
     struct cpu_policy_errors err = INIT_CPU_POLICY_ERRORS;
     int ret = -ENOMEM;
+
+    if ( !sys )
+    {
+        ASSERT_UNREACHABLE();
+        return -EOPNOTSUPP;
+    }
 
     /* Start by copying the domain's existing policies. */
     if ( !(new.cpuid = xmemdup(d->arch.cpuid)) ||
@@ -243,7 +250,7 @@ static int update_domain_cpu_policy(struct domain *d,
     x86_cpuid_policy_clear_out_of_range_leaves(new.cpuid);
 
     /* Audit the combined dataset. */
-    ret = x86_cpu_policies_are_compatible(sys, &new, &err);
+    ret = x86_cpu_policies_are_compatible(&old_sys, &new, &err);
     if ( ret )
         goto out;
 
