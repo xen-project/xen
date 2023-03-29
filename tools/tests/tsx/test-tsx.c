@@ -151,15 +151,15 @@ static void test_tsx_msrs(void)
 {
     printf("Testing MSR_TSX_FORCE_ABORT consistency\n");
     test_tsx_msr_consistency(
-        MSR_TSX_FORCE_ABORT, host.cpuid.feat.tsx_force_abort);
+        MSR_TSX_FORCE_ABORT, host.policy.feat.tsx_force_abort);
 
     printf("Testing MSR_TSX_CTRL consistency\n");
     test_tsx_msr_consistency(
-        MSR_TSX_CTRL, host.msr.arch_caps.tsx_ctrl);
+        MSR_TSX_CTRL, host.policy.arch_caps.tsx_ctrl);
 
     printf("Testing MSR_MCU_OPT_CTRL consistency\n");
     test_tsx_msr_consistency(
-        MSR_MCU_OPT_CTRL, host.cpuid.feat.srbds_ctrl);
+        MSR_MCU_OPT_CTRL, host.policy.feat.srbds_ctrl);
 }
 
 /*
@@ -281,7 +281,7 @@ static void test_rtm_behaviour(void)
     else
         return fail("  Got unexpected behaviour %d\n", rtm_behaviour);
 
-    if ( host.cpuid.feat.rtm )
+    if ( host.policy.feat.rtm )
     {
         if ( rtm_behaviour == RTM_UD )
             fail("  Host reports RTM, but appears unavailable\n");
@@ -293,57 +293,52 @@ static void test_rtm_behaviour(void)
     }
 }
 
-static void dump_tsx_details(const struct xc_cpu_policy *p, const char *pref)
+static void dump_tsx_details(const struct cpu_policy *p, const char *pref)
 {
     printf("  %s RTM %u, HLE %u, TSX_FORCE_ABORT %u, RTM_ALWAYS_ABORT %u, TSX_CTRL %u\n",
            pref,
-           p->cpuid.feat.rtm,
-           p->cpuid.feat.hle,
-           p->cpuid.feat.tsx_force_abort,
-           p->cpuid.feat.rtm_always_abort,
-           p->msr.arch_caps.tsx_ctrl);
+           p->feat.rtm,
+           p->feat.hle,
+           p->feat.tsx_force_abort,
+           p->feat.rtm_always_abort,
+           p->arch_caps.tsx_ctrl);
 }
 
 /* Sanity test various invariants we expect in the default/max policies. */
-static void test_guest_policies(const struct xc_cpu_policy *max,
-                                const struct xc_cpu_policy *def)
+static void test_guest_policies(const struct cpu_policy *max,
+                                const struct cpu_policy *def)
 {
-    const struct cpuid_policy *cm = &max->cpuid;
-    const struct cpuid_policy *cd = &def->cpuid;
-    const struct msr_policy *mm = &max->msr;
-    const struct msr_policy *md = &def->msr;
-
     dump_tsx_details(max, "Max:");
     dump_tsx_details(def, "Def:");
 
-    if ( ((cm->feat.raw[0].d | cd->feat.raw[0].d) &
+    if ( ((max->feat.raw[0].d | def->feat.raw[0].d) &
           (bitmaskof(X86_FEATURE_TSX_FORCE_ABORT) |
            bitmaskof(X86_FEATURE_RTM_ALWAYS_ABORT) |
            bitmaskof(X86_FEATURE_SRBDS_CTRL))) ||
-         ((mm->arch_caps.raw | md->arch_caps.raw) & ARCH_CAPS_TSX_CTRL) )
+         ((max->arch_caps.raw | def->arch_caps.raw) & ARCH_CAPS_TSX_CTRL) )
         fail("  Xen-only TSX controls offered to guest\n");
 
     switch ( rtm_behaviour )
     {
     case RTM_UD:
-        if ( (cm->feat.raw[0].b | cd->feat.raw[0].b) &
+        if ( (max->feat.raw[0].b | def->feat.raw[0].b) &
              (bitmaskof(X86_FEATURE_HLE) | bitmaskof(X86_FEATURE_RTM)) )
              fail("  HLE/RTM offered to guests despite not being available\n");
         break;
 
     case RTM_ABORT:
-        if ( cd->feat.raw[0].b &
+        if ( def->feat.raw[0].b &
              (bitmaskof(X86_FEATURE_HLE) | bitmaskof(X86_FEATURE_RTM)) )
              fail("  HLE/RTM offered to guests by default despite not being usable\n");
         break;
 
     case RTM_OK:
-        if ( !cm->feat.rtm || !cd->feat.rtm )
+        if ( !max->feat.rtm || !def->feat.rtm )
              fail("  RTM not offered to guests despite being available\n");
         break;
     }
 
-    if ( cd->feat.hle )
+    if ( def->feat.hle )
         fail("  Fail: HLE offered in default policy\n");
 }
 
@@ -352,13 +347,13 @@ static void test_def_max_policies(void)
     if ( xen_has_pv )
     {
         printf("Testing PV default/max policies\n");
-        test_guest_policies(&pv_max, &pv_default);
+        test_guest_policies(&pv_max.policy, &pv_default.policy);
     }
 
     if ( xen_has_hvm )
     {
         printf("Testing HVM default/max policies\n");
-        test_guest_policies(&hvm_max, &hvm_default);
+        test_guest_policies(&hvm_max.policy, &hvm_default.policy);
     }
 }
 
@@ -382,23 +377,23 @@ static void test_guest(struct xen_domctl_createdomain *c)
         goto out;
     }
 
-    dump_tsx_details(&guest_policy, "Cur:");
+    dump_tsx_details(&guest_policy.policy, "Cur:");
 
     /*
      * Check defaults given to the guest.
      */
-    if ( guest_policy.cpuid.feat.rtm != (rtm_behaviour == RTM_OK) )
+    if ( guest_policy.policy.feat.rtm != (rtm_behaviour == RTM_OK) )
         fail("  RTM %u in guest, despite rtm behaviour\n",
-             guest_policy.cpuid.feat.rtm);
+             guest_policy.policy.feat.rtm);
 
-    if ( guest_policy.cpuid.feat.hle ||
-         guest_policy.cpuid.feat.tsx_force_abort ||
-         guest_policy.cpuid.feat.rtm_always_abort ||
-         guest_policy.cpuid.feat.srbds_ctrl ||
-         guest_policy.msr.arch_caps.tsx_ctrl )
+    if ( guest_policy.policy.feat.hle ||
+         guest_policy.policy.feat.tsx_force_abort ||
+         guest_policy.policy.feat.rtm_always_abort ||
+         guest_policy.policy.feat.srbds_ctrl ||
+         guest_policy.policy.arch_caps.tsx_ctrl )
         fail("  Unexpected features advertised\n");
 
-    if ( host.cpuid.feat.rtm )
+    if ( host.policy.feat.rtm )
     {
         unsigned int _7b0;
 
@@ -406,7 +401,7 @@ static void test_guest(struct xen_domctl_createdomain *c)
          * If host RTM is available, all combinations of guest flags should be
          * possible.  Flip both HLE/RTM to check non-default settings.
          */
-        _7b0 = (guest_policy.cpuid.feat.raw[0].b ^=
+        _7b0 = (guest_policy.policy.feat.raw[0].b ^=
                 (bitmaskof(X86_FEATURE_HLE) | bitmaskof(X86_FEATURE_RTM)));
 
         /* Set the new policy. */
@@ -427,12 +422,12 @@ static void test_guest(struct xen_domctl_createdomain *c)
             goto out;
         }
 
-        dump_tsx_details(&guest_policy, "Cur:");
+        dump_tsx_details(&guest_policy.policy, "Cur:");
 
-        if ( guest_policy.cpuid.feat.raw[0].b != _7b0 )
+        if ( guest_policy.policy.feat.raw[0].b != _7b0 )
         {
             fail("  Expected CPUID.7[1].b 0x%08x differs from actual 0x%08x\n",
-                 _7b0, guest_policy.cpuid.feat.raw[0].b);
+                 _7b0, guest_policy.policy.feat.raw[0].b);
             goto out;
         }
     }

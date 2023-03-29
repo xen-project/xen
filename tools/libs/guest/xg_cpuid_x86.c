@@ -431,7 +431,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
     xc_dominfo_t di;
     unsigned int i, nr_leaves, nr_msrs;
     xen_cpuid_leaf_t *leaves = NULL;
-    struct cpuid_policy *p = NULL;
+    struct cpu_policy *p = NULL;
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
     uint32_t host_featureset[FEATURESET_NR_ENTRIES] = {};
     uint32_t len = ARRAY_SIZE(host_featureset);
@@ -692,7 +692,7 @@ static int deserialize_policy(xc_interface *xch, xc_cpu_policy_t *policy,
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
     int rc;
 
-    rc = x86_cpuid_copy_from_buffer(&policy->cpuid, policy->leaves,
+    rc = x86_cpuid_copy_from_buffer(&policy->policy, policy->leaves,
                                     nr_leaves, &err_leaf, &err_subleaf);
     if ( rc )
     {
@@ -702,7 +702,7 @@ static int deserialize_policy(xc_interface *xch, xc_cpu_policy_t *policy,
         return rc;
     }
 
-    rc = x86_msr_copy_from_buffer(&policy->msr, policy->entries,
+    rc = x86_msr_copy_from_buffer(&policy->policy, policy->msrs,
                                   nr_entries, &err_msr);
     if ( rc )
     {
@@ -719,18 +719,18 @@ int xc_cpu_policy_get_system(xc_interface *xch, unsigned int policy_idx,
                              xc_cpu_policy_t *policy)
 {
     unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
-    unsigned int nr_entries = ARRAY_SIZE(policy->entries);
+    unsigned int nr_msrs = ARRAY_SIZE(policy->msrs);
     int rc;
 
     rc = get_system_cpu_policy(xch, policy_idx, &nr_leaves, policy->leaves,
-                               &nr_entries, policy->entries);
+                               &nr_msrs, policy->msrs);
     if ( rc )
     {
         PERROR("Failed to obtain %u policy", policy_idx);
         return rc;
     }
 
-    rc = deserialize_policy(xch, policy, nr_leaves, nr_entries);
+    rc = deserialize_policy(xch, policy, nr_leaves, nr_msrs);
     if ( rc )
     {
         errno = -rc;
@@ -744,18 +744,18 @@ int xc_cpu_policy_get_domain(xc_interface *xch, uint32_t domid,
                              xc_cpu_policy_t *policy)
 {
     unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
-    unsigned int nr_entries = ARRAY_SIZE(policy->entries);
+    unsigned int nr_msrs = ARRAY_SIZE(policy->msrs);
     int rc;
 
     rc = get_domain_cpu_policy(xch, domid, &nr_leaves, policy->leaves,
-                               &nr_entries, policy->entries);
+                               &nr_msrs, policy->msrs);
     if ( rc )
     {
         PERROR("Failed to obtain domain %u policy", domid);
         return rc;
     }
 
-    rc = deserialize_policy(xch, policy, nr_leaves, nr_entries);
+    rc = deserialize_policy(xch, policy, nr_leaves, nr_msrs);
     if ( rc )
     {
         errno = -rc;
@@ -770,16 +770,16 @@ int xc_cpu_policy_set_domain(xc_interface *xch, uint32_t domid,
 {
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
     unsigned int nr_leaves = ARRAY_SIZE(policy->leaves);
-    unsigned int nr_entries = ARRAY_SIZE(policy->entries);
+    unsigned int nr_msrs = ARRAY_SIZE(policy->msrs);
     int rc;
 
     rc = xc_cpu_policy_serialise(xch, policy, policy->leaves, &nr_leaves,
-                                 policy->entries, &nr_entries);
+                                 policy->msrs, &nr_msrs);
     if ( rc )
         return rc;
 
     rc = xc_set_domain_cpu_policy(xch, domid, nr_leaves, policy->leaves,
-                                  nr_entries, policy->entries,
+                                  nr_msrs, policy->msrs,
                                   &err_leaf, &err_subleaf, &err_msr);
     if ( rc )
     {
@@ -802,7 +802,7 @@ int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t *p,
 
     if ( leaves )
     {
-        rc = x86_cpuid_copy_to_buffer(&p->cpuid, leaves, nr_leaves);
+        rc = x86_cpuid_copy_to_buffer(&p->policy, leaves, nr_leaves);
         if ( rc )
         {
             ERROR("Failed to serialize CPUID policy");
@@ -813,7 +813,7 @@ int xc_cpu_policy_serialise(xc_interface *xch, const xc_cpu_policy_t *p,
 
     if ( msrs )
     {
-        rc = x86_msr_copy_to_buffer(&p->msr, msrs, nr_msrs);
+        rc = x86_msr_copy_to_buffer(&p->policy, msrs, nr_msrs);
         if ( rc )
         {
             ERROR("Failed to serialize MSR policy");
@@ -831,7 +831,7 @@ int xc_cpu_policy_update_cpuid(xc_interface *xch, xc_cpu_policy_t *policy,
                                uint32_t nr)
 {
     unsigned int err_leaf = -1, err_subleaf = -1;
-    int rc = x86_cpuid_copy_from_buffer(&policy->cpuid, leaves, nr,
+    int rc = x86_cpuid_copy_from_buffer(&policy->policy, leaves, nr,
                                         &err_leaf, &err_subleaf);
 
     if ( rc )
@@ -850,7 +850,7 @@ int xc_cpu_policy_update_msrs(xc_interface *xch, xc_cpu_policy_t *policy,
                               const xen_msr_entry_t *msrs, uint32_t nr)
 {
     unsigned int err_msr = -1;
-    int rc = x86_msr_copy_from_buffer(&policy->msr, msrs, nr, &err_msr);
+    int rc = x86_msr_copy_from_buffer(&policy->policy, msrs, nr, &err_msr);
 
     if ( rc )
     {
@@ -868,8 +868,8 @@ bool xc_cpu_policy_is_compatible(xc_interface *xch, xc_cpu_policy_t *host,
                                  xc_cpu_policy_t *guest)
 {
     struct cpu_policy_errors err = INIT_CPU_POLICY_ERRORS;
-    struct old_cpu_policy h = { &host->cpuid, &host->msr };
-    struct old_cpu_policy g = { &guest->cpuid, &guest->msr };
+    struct old_cpu_policy h = { &host->policy, &host->policy };
+    struct old_cpu_policy g = { &guest->policy, &guest->policy };
     int rc = x86_cpu_policies_are_compatible(&h, &g, &err);
 
     if ( !rc )
