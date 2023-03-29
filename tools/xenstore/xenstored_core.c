@@ -1480,9 +1480,6 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 	 * All new created nodes will have i->parent set, while the final
 	 * node will be already existing and won't have i->parent set.
 	 * New nodes are subject to quota handling.
-	 * Initially set a destructor for all new nodes removing them from
-	 * TDB again and undoing quota accounting for the case of an error
-	 * during the write loop.
 	 */
 	for (i = node; i; i = i->parent) {
 		/* i->parent is set for each new node, so check quota. */
