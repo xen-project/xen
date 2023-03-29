@@ -41,10 +41,9 @@ static int update_domain_cpu_policy(struct domain *d,
                                     xen_domctl_cpu_policy_t *xdpc)
 {
     struct cpu_policy *new;
-    struct cpu_policy *sys = is_pv_domain(d)
+    const struct cpu_policy *sys = is_pv_domain(d)
         ? (IS_ENABLED(CONFIG_PV)  ?  &pv_max_cpu_policy : NULL)
         : (IS_ENABLED(CONFIG_HVM) ? &hvm_max_cpu_policy : NULL);
-    struct old_cpu_policy old_sys = { sys, sys }, old_new;
     struct cpu_policy_errors err = INIT_CPU_POLICY_ERRORS;
     int ret = -ENOMEM;
 
@@ -58,8 +57,6 @@ static int update_domain_cpu_policy(struct domain *d,
     if ( !(new = xmemdup(d->arch.cpu_policy)) )
         goto out;
 
-    old_new = (struct old_cpu_policy){ new, new };
-
     /* Merge the toolstack provided data. */
     if ( (ret = x86_cpuid_copy_from_buffer(
               new, xdpc->leaves, xdpc->nr_leaves,
@@ -72,7 +69,7 @@ static int update_domain_cpu_policy(struct domain *d,
     x86_cpuid_policy_clear_out_of_range_leaves(new);
 
     /* Audit the combined dataset. */
-    ret = x86_cpu_policies_are_compatible(&old_sys, &old_new, &err);
+    ret = x86_cpu_policies_are_compatible(sys, new, &err);
     if ( ret )
         goto out;
 

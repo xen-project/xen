@@ -868,9 +868,7 @@ bool xc_cpu_policy_is_compatible(xc_interface *xch, xc_cpu_policy_t *host,
                                  xc_cpu_policy_t *guest)
 {
     struct cpu_policy_errors err = INIT_CPU_POLICY_ERRORS;
-    struct old_cpu_policy h = { &host->policy, &host->policy };
-    struct old_cpu_policy g = { &guest->policy, &guest->policy };
-    int rc = x86_cpu_policies_are_compatible(&h, &g, &err);
+    int rc = x86_cpu_policies_are_compatible(&host->policy, &guest->policy, &err);
 
     if ( !rc )
         return true;

@@ -379,12 +379,6 @@ struct cpu_policy
 #define cpuid_policy cpu_policy
 #define msr_policy cpu_policy
 
-struct old_cpu_policy
-{
-    struct cpuid_policy *cpuid;
-    struct msr_policy *msr;
-};
-
 struct cpu_policy_errors
 {
     uint32_t leaf, subleaf;
@@ -559,7 +553,7 @@ int x86_msr_copy_from_buffer(struct msr_policy *policy,
                              const msr_entry_buffer_t msrs, uint32_t nr_entries,
                              uint32_t *err_msr);
 
-/*
+/**
  * Calculate whether two policies are compatible.
  *
  * i.e. Can a VM configured with @guest run on a CPU supporting @host.
@@ -573,8 +567,8 @@ int x86_msr_copy_from_buffer(struct msr_policy *policy,
  * incompatibility is detected, the optional err pointer may identify the
  * problematic leaf/subleaf and/or MSR.
  */
-int x86_cpu_policies_are_compatible(const struct old_cpu_policy *host,
-                                    const struct old_cpu_policy *guest,
+int x86_cpu_policies_are_compatible(const struct cpu_policy *host,
+                                    const struct cpu_policy *guest,
                                     struct cpu_policy_errors *err);
 
 #endif /* !XEN_LIB_X86_POLICIES_H */
