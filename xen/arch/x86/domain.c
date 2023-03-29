@@ -64,6 +64,7 @@
 #include <xen/numa.h>
 #include <xen/iommu.h>
 #include <compat/vcpu.h>
+#include <asm/cpu-policy.h>
 #include <asm/psr.h>
 #include <asm/pv/domain.h>
 #include <asm/pv/mm.h>
@@ -534,8 +535,7 @@ int arch_domain_create(struct domain *d,
 
         d->arch.ctxt_switch = &idle_csw;
 
-        d->arch.cpuid = ZERO_BLOCK_PTR; /* Catch stray misuses. */
-        d->arch.msr = ZERO_BLOCK_PTR;
+        d->arch.cpu_policy = ZERO_BLOCK_PTR; /* Catch stray misuses. */
 
         return 0;
     }
@@ -588,10 +588,7 @@ int arch_domain_create(struct domain *d,
         goto fail;
     paging_initialised = true;
 
-    if ( (rc = init_domain_cpuid_policy(d)) )
-        goto fail;
-
-    if ( (rc = init_domain_msr_policy(d)) )
+    if ( (rc = init_domain_cpu_policy(d)) )
         goto fail;
 
     d->arch.ioport_caps =
@@ -660,8 +657,7 @@ int arch_domain_create(struct domain *d,
     iommu_domain_destroy(d);
     cleanup_domain_irq_mapping(d);
     free_xenheap_page(d->shared_info);
-    xfree(d->arch.cpuid);
-    xfree(d->arch.msr);
+    XFREE(d->arch.cpu_policy);
     if ( paging_initialised )
         paging_final_teardown(d);
     free_perdomain_mappings(d);
@@ -675,8 +671,7 @@ void arch_domain_destroy(struct domain *d)
         hvm_domain_destroy(d);
 
     xfree(d->arch.e820);
-    xfree(d->arch.cpuid);
-    xfree(d->arch.msr);
+    XFREE(d->arch.cpu_policy);
 
     free_domain_pirqs(d);
     if ( !is_idle_domain(d) )

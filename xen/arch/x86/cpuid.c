@@ -755,29 +755,6 @@ void recalculate_cpuid_policy(struct domain *d)
         p->extd.raw[0x19] = EMPTY_LEAF;
 }
 
-int init_domain_cpuid_policy(struct domain *d)
-{
-    struct cpuid_policy *p = is_pv_domain(d)
-        ? (IS_ENABLED(CONFIG_PV)  ?  &pv_def_cpu_policy : NULL)
-        : (IS_ENABLED(CONFIG_HVM) ? &hvm_def_cpu_policy : NULL);
-
-    if ( !p )
-    {
-        ASSERT_UNREACHABLE();
-        return -EOPNOTSUPP;
-    }
-
-    p = xmemdup(p);
-    if ( !p )
-        return -ENOMEM;
-
-    d->arch.cpuid = p;
-
-    recalculate_cpuid_policy(d);
-
-    return 0;
-}
-
 void __init init_dom0_cpuid_policy(struct domain *d)
 {
     struct cpuid_policy *p = d->arch.cpuid;
