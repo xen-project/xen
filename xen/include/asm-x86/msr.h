@@ -280,13 +280,6 @@ static inline void wrmsr_tsc_aux(uint32_t val)
 
 uint64_t msr_spec_ctrl_valid_bits(const struct cpuid_policy *cp);
 
-extern struct msr_policy     raw_msr_policy,
-                            host_msr_policy,
-                          pv_max_msr_policy,
-                          pv_def_msr_policy,
-                         hvm_max_msr_policy,
-                         hvm_def_msr_policy;
-
 /* Container object for per-vCPU MSRs */
 struct vcpu_msrs
 {
