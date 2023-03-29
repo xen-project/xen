@@ -46,12 +46,6 @@ DECLARE_PER_CPU(struct cpuidmasks, cpuidmasks);
 /* Default masking MSR values, calculated at boot. */
 extern struct cpuidmasks cpuidmask_defaults;
 
-extern struct cpuid_policy raw_cpuid_policy, host_cpuid_policy,
-    pv_max_cpuid_policy, pv_def_cpuid_policy,
-    hvm_max_cpuid_policy, hvm_def_cpuid_policy;
-
-extern const struct old_cpu_policy system_policies[];
-
 /* Check that all previously present features are still available. */
 bool recheck_cpu_features(unsigned int cpu);
 
