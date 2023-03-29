@@ -54,8 +54,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
 {
     const struct vcpu *curr = current;
     const struct domain *d = v->domain;
-    const struct cpuid_policy *cp = d->arch.cpuid;
-    const struct msr_policy *mp = d->arch.msr;
+    const struct cpu_policy *cp = d->arch.cpu_policy;
     const struct vcpu_msrs *msrs = v->arch.msrs;
     int ret = X86EMUL_OKAY;
 
@@ -139,13 +138,13 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         goto get_reg;
 
     case MSR_INTEL_PLATFORM_INFO:
-        *val = mp->platform_info.raw;
+        *val = cp->platform_info.raw;
         break;
 
     case MSR_ARCH_CAPABILITIES:
         if ( !cp->feat.arch_caps )
             goto gp_fault;
-        *val = mp->arch_caps.raw;
+        *val = cp->arch_caps.raw;
         break;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
@@ -326,7 +325,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
  * separate CPUID features for this functionality, but only set will be
  * active.
  */
-uint64_t msr_spec_ctrl_valid_bits(const struct cpuid_policy *cp)
+uint64_t msr_spec_ctrl_valid_bits(const struct cpu_policy *cp)
 {
     bool ssbd = cp->feat.ssbd || cp->extd.amd_ssbd;
     bool psfd = cp->feat.intel_psfd || cp->extd.psfd;
@@ -345,8 +344,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
     const struct vcpu *curr = current;
     struct domain *d = v->domain;
-    const struct cpuid_policy *cp = d->arch.cpuid;
-    const struct msr_policy *mp = d->arch.msr;
+    const struct cpu_policy *cp = d->arch.cpu_policy;
     struct vcpu_msrs *msrs = v->arch.msrs;
     int ret = X86EMUL_OKAY;
 
@@ -387,7 +385,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
          * for backwards compatiblity, the OS should write 0 to it before
          * trying to access the current microcode version.
          */
-        if ( d->arch.cpuid->x86_vendor != X86_VENDOR_INTEL || val != 0 )
+        if ( cp->x86_vendor != X86_VENDOR_INTEL || val != 0 )
             goto gp_fault;
         break;
 
@@ -397,7 +395,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
          * to AMD CPUs as well (at least the architectural/CPUID part does).
          */
         if ( is_pv_domain(d) ||
-             d->arch.cpuid->x86_vendor != X86_VENDOR_AMD )
+             cp->x86_vendor != X86_VENDOR_AMD )
             goto gp_fault;
         break;
 
@@ -409,7 +407,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
          * by any CPUID bit.
          */
         if ( is_pv_domain(d) ||
-             d->arch.cpuid->x86_vendor != X86_VENDOR_INTEL )
+             cp->x86_vendor != X86_VENDOR_INTEL )
             goto gp_fault;
         break;
 
@@ -446,7 +444,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         bool old_cpuid_faulting = msrs->misc_features_enables.cpuid_faulting;
 
         rsvd = ~0ull;
-        if ( mp->platform_info.cpuid_faulting )
+        if ( cp->platform_info.cpuid_faulting )
             rsvd &= ~MSR_MISC_FEATURES_CPUID_FAULTING;
 
         if ( val & rsvd )
