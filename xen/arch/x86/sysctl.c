@@ -338,7 +338,7 @@ long arch_do_sysctl(
             ret = -EINVAL;
 
         if ( !ret )
-            cpuid_policy_to_featureset(p, featureset);
+            x86_cpu_policy_to_featureset(p, featureset);
 
         /* Copy the requested featureset into place. */
         if ( !ret && copy_to_guest(sysctl->u.cpu_featureset.features,

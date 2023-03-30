@@ -565,7 +565,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
             }
         }
 
-        cpuid_featureset_to_policy(feat, p);
+        x86_cpu_featureset_to_policy(feat, p);
     }
     else
     {
