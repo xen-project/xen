@@ -387,49 +387,17 @@ struct cpu_policy_errors
 
 #define INIT_CPU_POLICY_ERRORS { -1, -1, -1 }
 
-/* Fill in a featureset bitmap from a CPUID policy. */
-static inline void cpuid_policy_to_featureset(
-    const struct cpuid_policy *p, uint32_t fs[FEATURESET_NR_ENTRIES])
-{
-    fs[FEATURESET_1d]  = p->basic._1d;
-    fs[FEATURESET_1c]  = p->basic._1c;
-    fs[FEATURESET_e1d] = p->extd.e1d;
-    fs[FEATURESET_e1c] = p->extd.e1c;
-    fs[FEATURESET_Da1] = p->xstate.Da1;
-    fs[FEATURESET_7b0] = p->feat._7b0;
-    fs[FEATURESET_7c0] = p->feat._7c0;
-    fs[FEATURESET_e7d] = p->extd.e7d;
-    fs[FEATURESET_e8b] = p->extd.e8b;
-    fs[FEATURESET_7d0] = p->feat._7d0;
-    fs[FEATURESET_7a1] = p->feat._7a1;
-    fs[FEATURESET_e21a] = p->extd.e21a;
-    fs[FEATURESET_7b1] = p->feat._7b1;
-    fs[FEATURESET_7d2] = p->feat._7d2;
-    fs[FEATURESET_7c1] = p->feat._7c1;
-    fs[FEATURESET_7d1] = p->feat._7d1;
-}
+/**
+ * Copy the featureset words out of a cpu_policy object.
+ */
+void x86_cpu_policy_to_featureset(const struct cpu_policy *p,
+                                  uint32_t fs[FEATURESET_NR_ENTRIES]);
 
-/* Fill in a CPUID policy from a featureset bitmap. */
-static inline void cpuid_featureset_to_policy(
-    const uint32_t fs[FEATURESET_NR_ENTRIES], struct cpuid_policy *p)
-{
-    p->basic._1d  = fs[FEATURESET_1d];
-    p->basic._1c  = fs[FEATURESET_1c];
-    p->extd.e1d   = fs[FEATURESET_e1d];
-    p->extd.e1c   = fs[FEATURESET_e1c];
-    p->xstate.Da1 = fs[FEATURESET_Da1];
-    p->feat._7b0  = fs[FEATURESET_7b0];
-    p->feat._7c0  = fs[FEATURESET_7c0];
-    p->extd.e7d   = fs[FEATURESET_e7d];
-    p->extd.e8b   = fs[FEATURESET_e8b];
-    p->feat._7d0  = fs[FEATURESET_7d0];
-    p->feat._7a1  = fs[FEATURESET_7a1];
-    p->extd.e21a  = fs[FEATURESET_e21a];
-    p->feat._7b1  = fs[FEATURESET_7b1];
-    p->feat._7d2  = fs[FEATURESET_7d2];
-    p->feat._7c1  = fs[FEATURESET_7c1];
-    p->feat._7d1  = fs[FEATURESET_7d1];
-}
+/**
+ * Copy the featureset words back into a cpu_policy object.
+ */
+void x86_cpu_featureset_to_policy(const uint32_t fs[FEATURESET_NR_ENTRIES],
+                                  struct cpu_policy *p);
 
 static inline uint64_t cpuid_policy_xcr0_max(const struct cpuid_policy *p)
 {
