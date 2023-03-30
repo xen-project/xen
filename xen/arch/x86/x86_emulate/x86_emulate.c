@@ -4249,14 +4249,15 @@ x86_emulate(
         goto imul;
 
     case 0x6c ... 0x6d: /* ins %dx,%es:%edi */ {
-        unsigned long nr_reps = get_rep_prefix(false, true);
+        unsigned long nr_reps;
         unsigned int port = _regs.dx;
 
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
-        dst.mem.seg = x86_seg_es;
-        dst.mem.off = truncate_ea_and_reps(_regs.r(di), nr_reps, dst.bytes);
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
+        nr_reps = get_rep_prefix(false, true);
+        dst.mem.off = truncate_ea_and_reps(_regs.r(di), nr_reps, dst.bytes);
+        dst.mem.seg = x86_seg_es;
         /* Try the presumably most efficient approach first. */
         if ( !ops->rep_ins )
             nr_reps = 1;
@@ -4290,13 +4291,14 @@ x86_emulate(
     }
 
     case 0x6e ... 0x6f: /* outs %esi,%dx */ {
-        unsigned long nr_reps = get_rep_prefix(true, false);
+        unsigned long nr_reps;
         unsigned int port = _regs.dx;
 
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
-        ea.mem.off = truncate_ea_and_reps(_regs.r(si), nr_reps, dst.bytes);
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
+        nr_reps = get_rep_prefix(true, false);
+        ea.mem.off = truncate_ea_and_reps(_regs.r(si), nr_reps, dst.bytes);
         /* Try the presumably most efficient approach first. */
         if ( !ops->rep_outs )
             nr_reps = 1;
