@@ -490,10 +490,7 @@ static int control_thread_fn(const struct microcode_patch *patch)
     ret = wait_for_condition(wait_cpu_callin, num_online_cpus(),
                              MICROCODE_CALLIN_TIMEOUT_US);
     if ( ret )
-    {
-        set_state(LOADING_EXIT);
-        return ret;
-    }
+        goto out;
 
     /* Control thread loads ucode first while others are in NMI handler. */
     ret = alternative_call(ucode_ops.apply_microcode, patch);
@@ -505,8 +502,7 @@ static int control_thread_fn(const struct microcode_patch *patch)
     {
         printk(XENLOG_ERR
                "Late loading aborted: CPU%u failed to update ucode\n", cpu);
-        set_state(LOADING_EXIT);
-        return ret;
+        goto out;
     }
 
     /* Let primary threads load the given ucode update */
@@ -537,6 +533,7 @@ static int control_thread_fn(const struct microcode_patch *patch)
         }
     }
 
+ out:
     /* Mark loading is done to unblock other threads */
     set_state(LOADING_EXIT);
 
