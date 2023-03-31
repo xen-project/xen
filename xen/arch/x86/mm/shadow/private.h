@@ -324,7 +324,7 @@ static inline int sh_page_has_multiple_shadows(struct page_info *pg)
         return 0;
     shadows = pg->shadow_flags & SHF_page_type_mask;
     /* More than one type bit set in shadow-flags? */
-    return ( (shadows & ~(1UL << find_first_set_bit(shadows))) != 0 );
+    return shadows && (shadows & (shadows - 1));
 }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
