@@ -777,7 +777,7 @@ static inline void increment_ptr_to_guest_entry(void *ptr)
 }
 
 /* All kinds of l1: touch all entries */
-#define _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code)        \
+#define _FOREACH_PRESENT_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code)       \
 do {                                                                    \
     int _i;                                                             \
     shadow_l1e_t *_sp = map_domain_page((_sl1mfn));                     \
@@ -796,25 +796,25 @@ do {                                                                    \
 
 /* 32-bit l1, on PAE or 64-bit shadows: need to walk both pages of shadow */
 #if GUEST_PAGING_LEVELS == 2 && SHADOW_PAGING_LEVELS > 2
-#define SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p, _done,  _code)        \
+#define FOREACH_PRESENT_L1E(_sl1mfn, _sl1e, _gl1p, _done,  _code)       \
 do {                                                                    \
     int __done = 0;                                                     \
-    _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p,                          \
+    _FOREACH_PRESENT_L1E(_sl1mfn, _sl1e, _gl1p,                         \
                          ({ (__done = _done); }), _code);               \
     _sl1mfn = sh_next_page(_sl1mfn);                                    \
     if ( !__done )                                                      \
-        _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code);       \
+        _FOREACH_PRESENT_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code);      \
 } while (0)
 #else /* Everything else; l1 shadows are only one page */
-#define SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code)         \
-       _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code)
+#define FOREACH_PRESENT_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code)        \
+       _FOREACH_PRESENT_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code)
 #endif
 
 
 #if GUEST_PAGING_LEVELS == 2
 
 /* 32-bit l2 on PAE/64: four pages, touch every second entry */
-#define SHADOW_FOREACH_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)     \
+#define FOREACH_PRESENT_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)    \
 do {                                                                      \
     int _i, _j;                                                           \
     ASSERT(shadow_mode_external(_dom));                                   \
@@ -839,7 +839,7 @@ do {                                                                      \
 #elif GUEST_PAGING_LEVELS == 3
 
 /* PAE: touch all entries */
-#define SHADOW_FOREACH_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)      \
+#define FOREACH_PRESENT_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)     \
 do {                                                                       \
     int _i;                                                                \
     shadow_l2e_t *_sp = map_domain_page((_sl2mfn));                        \
@@ -859,7 +859,7 @@ do {                                                                       \
 #else
 
 /* 64-bit l2: touch all entries except for PAE compat guests. */
-#define SHADOW_FOREACH_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)       \
+#define FOREACH_PRESENT_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)      \
 do {                                                                        \
     unsigned int _i, _end = SHADOW_L2_PAGETABLE_ENTRIES;                    \
     shadow_l2e_t *_sp = map_domain_page((_sl2mfn));                         \
@@ -886,7 +886,7 @@ do {                                                                        \
 #if GUEST_PAGING_LEVELS == 4
 
 /* 64-bit l3: touch all entries */
-#define SHADOW_FOREACH_L3E(_sl3mfn, _sl3e, _gl3p, _done, _code)         \
+#define FOREACH_PRESENT_L3E(_sl3mfn, _sl3e, _gl3p, _done, _code)        \
 do {                                                                    \
     int _i;                                                             \
     shadow_l3e_t *_sp = map_domain_page((_sl3mfn));                     \
@@ -903,7 +903,7 @@ do {                                                                    \
 } while (0)
 
 /* 64-bit l4: avoid Xen mappings */
-#define SHADOW_FOREACH_L4E(_sl4mfn, _sl4e, _gl4p, _done, _dom, _code)   \
+#define FOREACH_PRESENT_L4E(_sl4mfn, _sl4e, _gl4p, _done, _dom, _code)  \
 do {                                                                    \
     shadow_l4e_t *_sp = map_domain_page((_sl4mfn));                     \
     int _xen = !shadow_mode_external(_dom);                             \
@@ -1288,7 +1288,7 @@ void sh_destroy_l4_shadow(struct domain *d, mfn_t smfn)
     shadow_demote(d, gmfn, t);
     /* Decrement refcounts of all the old entries */
     sl4mfn = smfn;
-    SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, d, {
+    FOREACH_PRESENT_L4E(sl4mfn, sl4e, NULL, 0, d, {
         if ( shadow_l4e_get_flags(*sl4e) & _PAGE_PRESENT )
         {
             sh_put_ref(d, shadow_l4e_get_mfn(*sl4e),
@@ -1319,7 +1319,7 @@ void sh_destroy_l3_shadow(struct domain *d, mfn_t smfn)
 
     /* Decrement refcounts of all the old entries */
     sl3mfn = smfn;
-    SHADOW_FOREACH_L3E(sl3mfn, sl3e, 0, 0, {
+    FOREACH_PRESENT_L3E(sl3mfn, sl3e, NULL, 0, {
         if ( shadow_l3e_get_flags(*sl3e) & _PAGE_PRESENT )
             sh_put_ref(d, shadow_l3e_get_mfn(*sl3e),
                         (((paddr_t)mfn_x(sl3mfn)) << PAGE_SHIFT)
@@ -1351,7 +1351,7 @@ void sh_destroy_l2_shadow(struct domain *d, mfn_t smfn)
 
     /* Decrement refcounts of all the old entries */
     sl2mfn = smfn;
-    SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
+    FOREACH_PRESENT_L2E(sl2mfn, sl2e, NULL, 0, d, {
         if ( shadow_l2e_get_flags(*sl2e) & _PAGE_PRESENT )
             sh_put_ref(d, shadow_l2e_get_mfn(*sl2e),
                         (((paddr_t)mfn_x(sl2mfn)) << PAGE_SHIFT)
@@ -1389,7 +1389,7 @@ void sh_destroy_l1_shadow(struct domain *d, mfn_t smfn)
     {
         /* Decrement refcounts of all the old entries */
         mfn_t sl1mfn = smfn;
-        SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, 0, {
+        FOREACH_PRESENT_L1E(sl1mfn, sl1e, NULL, 0, {
             unsigned int sl1f = shadow_l1e_get_flags(*sl1e);
 
             if ( (sl1f & _PAGE_PRESENT) && !sh_l1e_is_magic(*sl1e) )
@@ -1421,7 +1421,7 @@ void sh_destroy_l1_shadow(struct domain *d, mfn_t smfn)
 void sh_unhook_l2_mappings(struct domain *d, mfn_t sl2mfn, bool user_only)
 {
     shadow_l2e_t *sl2e;
-    SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
+    FOREACH_PRESENT_L2E(sl2mfn, sl2e, NULL, 0, d, {
         if ( !user_only || (sl2e->l2 & _PAGE_USER) )
             shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
     });
@@ -1432,7 +1432,7 @@ void sh_unhook_l2_mappings(struct domain *d, mfn_t sl2mfn, bool user_only)
 void sh_unhook_l4_mappings(struct domain *d, mfn_t sl4mfn, bool user_only)
 {
     shadow_l4e_t *sl4e;
-    SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, d, {
+    FOREACH_PRESENT_L4E(sl4mfn, sl4e, NULL, 0, d, {
         if ( !user_only || (sl4e->l4 & _PAGE_USER) )
             shadow_set_l4e(d, sl4e, shadow_l4e_empty(), sl4mfn);
     });
@@ -1666,7 +1666,7 @@ void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
     gp = map_domain_page(gl1mfn);
     gl1p = gp;
 
-   SHADOW_FOREACH_L1E(sl1mfn, sl1p, &gl1p, 0, {
+   FOREACH_PRESENT_L1E(sl1mfn, sl1p, &gl1p, 0, {
         guest_l1e_t gl1e = *gl1p;
 
         if ( snp[guest_index(gl1p)].l1 != gl1e.l1 )
@@ -3564,7 +3564,7 @@ int cf_check sh_rm_write_access_from_l1(
     mfn_t base_sl1mfn = sl1mfn; /* Because sl1mfn changes in the foreach */
 #endif
 
-    SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, done,
+    FOREACH_PRESENT_L1E(sl1mfn, sl1e, NULL, done,
     {
         flags = shadow_l1e_get_flags(*sl1e);
         if ( (flags & _PAGE_PRESENT)
@@ -3597,7 +3597,7 @@ int cf_check sh_rm_mappings_from_l1(
     int done = 0;
     int flags;
 
-    SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, done,
+    FOREACH_PRESENT_L1E(sl1mfn, sl1e, NULL, done,
     {
         flags = shadow_l1e_get_flags(*sl1e);
         if ( (flags & _PAGE_PRESENT)
@@ -3648,7 +3648,7 @@ int cf_check sh_remove_l1_shadow(struct domain *d, mfn_t sl2mfn, mfn_t sl1mfn)
     int done = 0;
     int flags;
 
-    SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, done, d,
+    FOREACH_PRESENT_L2E(sl2mfn, sl2e, NULL, done, d,
     {
         flags = shadow_l2e_get_flags(*sl2e);
         if ( (flags & _PAGE_PRESENT)
@@ -3671,7 +3671,7 @@ int cf_check sh_remove_l2_shadow(struct domain *d, mfn_t sl3mfn, mfn_t sl2mfn)
     int done = 0;
     int flags;
 
-    SHADOW_FOREACH_L3E(sl3mfn, sl3e, 0, done,
+    FOREACH_PRESENT_L3E(sl3mfn, sl3e, NULL, done,
     {
         flags = shadow_l3e_get_flags(*sl3e);
         if ( (flags & _PAGE_PRESENT)
@@ -3693,7 +3693,7 @@ int cf_check sh_remove_l3_shadow(struct domain *d, mfn_t sl4mfn, mfn_t sl3mfn)
     int done = 0;
     int flags;
 
-    SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, done, d,
+    FOREACH_PRESENT_L4E(sl4mfn, sl4e, NULL, done, d,
     {
         flags = shadow_l4e_get_flags(*sl4e);
         if ( (flags & _PAGE_PRESENT)
@@ -3924,7 +3924,7 @@ int cf_check sh_audit_l1_table(struct domain *d, mfn_t sl1mfn, mfn_t x)
 #endif
 
     gl1e = gp = map_domain_page(gl1mfn);
-    SHADOW_FOREACH_L1E(sl1mfn, sl1e, &gl1e, done, {
+    FOREACH_PRESENT_L1E(sl1mfn, sl1e, &gl1e, done, {
 
         if ( sh_l1e_is_magic(*sl1e) )
         {
@@ -3978,7 +3978,7 @@ int cf_check sh_audit_fl1_table(struct domain *d, mfn_t sl1mfn, mfn_t x)
 
     /* fl1 has no useful backpointer: all we can check are flags */
     e = guest_l1e_from_gfn(_gfn(0), 0); gl1e = &e; /* Needed for macro */
-    SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, done, {
+    FOREACH_PRESENT_L1E(sl1mfn, sl1e, NULL, done, {
         f = shadow_l1e_get_flags(*sl1e);
         f &= ~(_PAGE_AVAIL0|_PAGE_AVAIL1|_PAGE_AVAIL2);
         if ( !(f == 0
@@ -4015,7 +4015,7 @@ int cf_check sh_audit_l2_table(struct domain *d, mfn_t sl2mfn, mfn_t x)
 #endif
 
     gl2e = gp = map_domain_page(gl2mfn);
-    SHADOW_FOREACH_L2E(sl2mfn, sl2e, &gl2e, done, d, {
+    FOREACH_PRESENT_L2E(sl2mfn, sl2e, &gl2e, done, d, {
 
         s = sh_audit_flags(d, 2, guest_l2e_get_flags(*gl2e),
                            shadow_l2e_get_flags(*sl2e));
@@ -4066,7 +4066,7 @@ int cf_check sh_audit_l3_table(struct domain *d, mfn_t sl3mfn, mfn_t x)
 #endif
 
     gl3e = gp = map_domain_page(gl3mfn);
-    SHADOW_FOREACH_L3E(sl3mfn, sl3e, &gl3e, done, {
+    FOREACH_PRESENT_L3E(sl3mfn, sl3e, &gl3e, done, {
 
         s = sh_audit_flags(d, 3, guest_l3e_get_flags(*gl3e),
                            shadow_l3e_get_flags(*sl3e));
@@ -4115,7 +4115,7 @@ int cf_check sh_audit_l4_table(struct domain *d, mfn_t sl4mfn, mfn_t x)
 #endif
 
     gl4e = gp = map_domain_page(gl4mfn);
-    SHADOW_FOREACH_L4E(sl4mfn, sl4e, &gl4e, done, d,
+    FOREACH_PRESENT_L4E(sl4mfn, sl4e, &gl4e, done, d,
     {
         s = sh_audit_flags(d, 4, guest_l4e_get_flags(*gl4e),
                            shadow_l4e_get_flags(*sl4e));
