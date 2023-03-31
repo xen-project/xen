@@ -236,11 +236,11 @@ const struct genapic *__init apic_x2apic_probe(void)
     if ( x2apic_phys < 0 )
     {
         /*
-         * Force physical mode if there's no interrupt remapping support: The
-         * ID in clustered mode requires a 32 bit destination field due to
+         * Force physical mode if there's no (full) interrupt remapping support:
+         * The ID in clustered mode requires a 32 bit destination field due to
          * the usage of the high 16 bits to hold the cluster ID.
          */
-        x2apic_phys = !iommu_intremap ||
+        x2apic_phys = iommu_intremap != iommu_intremap_full ||
                       (acpi_gbl_FADT.flags & ACPI_FADT_APIC_PHYSICAL) ||
                       (IS_ENABLED(CONFIG_X2APIC_PHYSICAL) &&
                        !(acpi_gbl_FADT.flags & ACPI_FADT_APIC_CLUSTER));
