@@ -389,7 +389,7 @@ static int __init acpi_parse_dev_scope(
                 printk(VTDPREFIX " endpoint: %pp\n",
                        &PCI_SBDF(seg, bus, path->dev, path->fn));
 
-            if ( drhd )
+            if ( drhd && pci_device_detect(seg, bus, path->dev, path->fn) )
             {
                 if ( pci_conf_read8(PCI_SBDF(seg, bus, path->dev, path->fn),
                                     PCI_CLASS_DEVICE + 1) != 0x03
