@@ -1631,13 +1631,6 @@ static bool __init parse_namevalue_pairs(char *str, struct ns16550 *uart)
             break;
 
 #ifdef CONFIG_HAS_PCI
-        case bridge_bdf:
-            if ( !parse_pci(param_value, NULL, &uart->ps_bdf[0],
-                            &uart->ps_bdf[1], &uart->ps_bdf[2]) )
-                PARSE_ERR_RET("Bad port PCI coordinates\n");
-            uart->ps_bdf_enable = true;
-            break;
-
         case device:
             if ( strncmp(param_value, "pci", 3) == 0 )
             {
@@ -1652,9 +1645,16 @@ static bool __init parse_namevalue_pairs(char *str, struct ns16550 *uart)
             break;
 
         case port_bdf:
+            if ( !parse_pci(param_value, NULL, &uart->ps_bdf[0],
+                            &uart->ps_bdf[1], &uart->ps_bdf[2]) )
+                PARSE_ERR_RET("Bad port PCI coordinates\n");
+            uart->ps_bdf_enable = true;
+            break;
+
+        case bridge_bdf:
             if ( !parse_pci(param_value, NULL, &uart->pb_bdf[0],
                             &uart->pb_bdf[1], &uart->pb_bdf[2]) )
-                PARSE_ERR_RET("Bad port PCI coordinates\n");
+                PARSE_ERR_RET("Bad bridge PCI coordinates\n");
             uart->pb_bdf_enable = true;
             break;
 #endif
