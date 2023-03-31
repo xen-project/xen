@@ -54,9 +54,12 @@ void vpci_remove_device(struct pci_dev *pdev)
     spin_unlock(&pdev->vpci->lock);
     if ( pdev->vpci->msix )
     {
+        unsigned int i;
+
         list_del(&pdev->vpci->msix->next);
-        if ( pdev->vpci->msix->pba )
-            iounmap(pdev->vpci->msix->pba);
+        for ( i = 0; i < ARRAY_SIZE(pdev->vpci->msix->table); i++ )
+            if ( pdev->vpci->msix->table[i] )
+                iounmap(pdev->vpci->msix->table[i]);
     }
     xfree(pdev->vpci->msix);
     xfree(pdev->vpci->msi);
