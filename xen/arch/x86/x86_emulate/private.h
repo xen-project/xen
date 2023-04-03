@@ -309,6 +309,14 @@ struct x86_emulate_state {
 #endif
 };
 
+typedef union {
+    uint64_t mmx;
+    uint64_t __attribute__ ((aligned(16))) xmm[2];
+    uint64_t __attribute__ ((aligned(32))) ymm[4];
+    uint64_t __attribute__ ((aligned(64))) zmm[8];
+    uint32_t data32[16];
+} mmval_t;
+
 struct x86_fxsr {
     uint16_t fcw;
     uint16_t fsw;
@@ -560,6 +568,12 @@ int x86emul_0fae(struct x86_emulate_state *s,
                  struct x86_emulate_ctxt *ctxt,
                  const struct x86_emulate_ops *ops,
                  enum x86_emulate_fpu_type *fpu_type);
+int x86emul_0fc7(struct x86_emulate_state *s,
+                 struct cpu_user_regs *regs,
+                 struct operand *dst,
+                 struct x86_emulate_ctxt *ctxt,
+                 const struct x86_emulate_ops *ops,
+                 mmval_t *mmvalp);
 
 static inline bool is_aligned(enum x86_segment seg, unsigned long offs,
                               unsigned int size, struct x86_emulate_ctxt *ctxt,
