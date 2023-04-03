@@ -72,7 +72,7 @@ void __init setup_clear_cpu_cap(unsigned int cap)
 		       __builtin_return_address(0), cap);
 
 	__clear_bit(cap, boot_cpu_data.x86_capability);
-	dfs = x86_cpuid_lookup_deep_deps(cap);
+	dfs = x86_cpu_policy_lookup_deep_deps(cap);
 
 	if (!dfs)
 		return;

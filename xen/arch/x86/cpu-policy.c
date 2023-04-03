@@ -176,7 +176,7 @@ static void sanitise_featureset(uint32_t *fs)
     for_each_set_bit(i, (void *)disabled_features,
                      sizeof(disabled_features) * 8)
     {
-        const uint32_t *dfs = x86_cpuid_lookup_deep_deps(i);
+        const uint32_t *dfs = x86_cpu_policy_lookup_deep_deps(i);
         unsigned int j;
 
         ASSERT(dfs); /* deep_features[] should guarentee this. */
@@ -347,7 +347,7 @@ static void __init calculate_raw_policy(void)
 {
     struct cpu_policy *p = &raw_cpu_policy;
 
-    x86_cpuid_policy_fill_native(p);
+    x86_cpu_policy_fill_native(p);
 
     /* Nothing good will come from Xen and libx86 disagreeing on vendor. */
     ASSERT(p->x86_vendor == boot_cpu_data.x86_vendor);
