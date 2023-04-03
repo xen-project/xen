@@ -75,7 +75,7 @@ bool emul_test_init(void)
 
     unsigned long sp;
 
-    x86_cpuid_policy_fill_native(&cp);
+    x86_cpu_policy_fill_native(&cp);
 
     /*
      * The emulator doesn't use these instructions, so can always emulate

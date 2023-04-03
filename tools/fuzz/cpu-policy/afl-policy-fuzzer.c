@@ -48,8 +48,8 @@ static void check_policy(struct cpu_policy *cp)
      * Fix up the data in the source policy which isn't expected to survive
      * serialisation.
      */
-    x86_cpuid_policy_clear_out_of_range_leaves(cp);
-    x86_cpuid_policy_recalc_synth(cp);
+    x86_cpu_policy_clear_out_of_range_leaves(cp);
+    x86_cpu_policy_recalc_synth(cp);
 
     /* Serialise... */
     rc = x86_cpuid_copy_to_buffer(cp, leaves, &nr_leaves);

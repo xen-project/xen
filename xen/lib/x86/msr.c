@@ -23,7 +23,7 @@ static int copy_msr_to_buffer(uint32_t idx, uint64_t val,
     return 0;
 }
 
-int x86_msr_copy_to_buffer(const struct msr_policy *p,
+int x86_msr_copy_to_buffer(const struct cpu_policy *p,
                            msr_entry_buffer_t msrs, uint32_t *nr_entries_p)
 {
     const uint32_t nr_entries = *nr_entries_p;
@@ -48,7 +48,7 @@ int x86_msr_copy_to_buffer(const struct msr_policy *p,
     return 0;
 }
 
-int x86_msr_copy_from_buffer(struct msr_policy *p,
+int x86_msr_copy_from_buffer(struct cpu_policy *p,
                              const msr_entry_buffer_t msrs, uint32_t nr_entries,
                              uint32_t *err_msr)
 {
