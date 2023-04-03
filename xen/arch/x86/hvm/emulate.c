@@ -2776,7 +2776,7 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
 void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     unsigned int errcode)
 {
-    struct hvm_emulate_ctxt ctx = {{ 0 }};
+    struct hvm_emulate_ctxt ctx = {};
     int rc;
 
     hvm_emulate_init_once(&ctx, NULL, guest_cpu_user_regs());
@@ -2851,7 +2851,7 @@ void hvm_emulate_init_once(
 
     hvmemul_ctxt->validate = validate;
     hvmemul_ctxt->ctxt.regs = regs;
-    hvmemul_ctxt->ctxt.cpuid = curr->domain->arch.cpuid;
+    hvmemul_ctxt->ctxt.cpu_policy = curr->domain->arch.cpu_policy;
     hvmemul_ctxt->ctxt.force_writeback = true;
 }
 

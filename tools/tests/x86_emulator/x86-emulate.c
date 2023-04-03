@@ -38,7 +38,7 @@
 #define put_stub(stb) ((stb).addr = 0)
 
 uint32_t mxcsr_mask = 0x0000ffbf;
-struct cpuid_policy cp;
+struct cpu_policy cp;
 
 static char fpu_save_area[0x4000] __attribute__((__aligned__((64))));
 static bool use_xsave;
