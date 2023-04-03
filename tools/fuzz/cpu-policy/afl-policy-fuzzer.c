@@ -16,16 +16,19 @@ static bool debug;
 
 #define EMPTY_LEAF ((struct cpuid_leaf){})
 
-static void check_cpuid(struct cpuid_policy *cp)
+static void check_policy(struct cpu_policy *cp)
 {
-    struct cpuid_policy new = {};
+    struct cpu_policy new = {};
     size_t data_end;
     xen_cpuid_leaf_t *leaves = malloc(CPUID_MAX_SERIALISED_LEAVES *
                                       sizeof(xen_cpuid_leaf_t));
-    unsigned int nr = CPUID_MAX_SERIALISED_LEAVES;
+    xen_msr_entry_t *msrs = malloc(MSR_MAX_SERIALISED_ENTRIES *
+                                   sizeof(xen_cpuid_leaf_t));
+    unsigned int nr_leaves = CPUID_MAX_SERIALISED_LEAVES;
+    unsigned int nr_msrs = MSR_MAX_SERIALISED_ENTRIES;
     int rc;
 
-    if ( !leaves )
+    if ( !leaves || !msrs )
         return;
 
     /*
@@ -49,12 +52,19 @@ static void check_cpuid(struct cpuid_policy *cp)
     x86_cpuid_policy_recalc_synth(cp);
 
     /* Serialise... */
-    rc = x86_cpuid_copy_to_buffer(cp, leaves, &nr);
+    rc = x86_cpuid_copy_to_buffer(cp, leaves, &nr_leaves);
     assert(rc == 0);
-    assert(nr <= CPUID_MAX_SERIALISED_LEAVES);
+    assert(nr_leaves <= CPUID_MAX_SERIALISED_LEAVES);
+
+    rc = x86_msr_copy_to_buffer(cp, msrs, &nr_msrs);
+    assert(rc == 0);
+    assert(nr_msrs <= MSR_MAX_SERIALISED_ENTRIES);
 
     /* ... and deserialise. */
-    rc = x86_cpuid_copy_from_buffer(&new, leaves, nr, NULL, NULL);
+    rc = x86_cpuid_copy_from_buffer(&new, leaves, nr_leaves, NULL, NULL);
+    assert(rc == 0);
+
+    rc = x86_msr_copy_from_buffer(&new, msrs, nr_msrs, NULL);
     assert(rc == 0);
 
     /* The result after serialisation/deserialisaion should be identical... */
@@ -74,28 +84,6 @@ static void check_cpuid(struct cpuid_policy *cp)
     }
 
     free(leaves);
-}
-
-static void check_msr(struct msr_policy *mp)
-{
-    struct msr_policy new = {};
-    xen_msr_entry_t *msrs = malloc(MSR_MAX_SERIALISED_ENTRIES *
-                                   sizeof(xen_msr_entry_t));
-    unsigned int nr = MSR_MAX_SERIALISED_ENTRIES;
-    int rc;
-
-    if ( !msrs )
-        return;
-
-    rc = x86_msr_copy_to_buffer(mp, msrs, &nr);
-    assert(rc == 0);
-    assert(nr <= MSR_MAX_SERIALISED_ENTRIES);
-
-    rc = x86_msr_copy_from_buffer(&new, msrs, nr, NULL);
-    assert(rc == 0);
-    assert(memcmp(mp, &new, sizeof(*mp)) == 0);
-
-    free(msrs);
 }
 
 int main(int argc, char **argv)
@@ -144,8 +132,7 @@ int main(int argc, char **argv)
     while ( __AFL_LOOP(1000) )
 #endif
     {
-        struct cpuid_policy *cp = NULL;
-        struct msr_policy *mp = NULL;
+        struct cpu_policy *cp = NULL;
 
         if ( fp != stdin )
         {
@@ -160,22 +147,18 @@ int main(int argc, char **argv)
         }
 
         cp = calloc(1, sizeof(*cp));
-        mp = calloc(1, sizeof(*mp));
-        if ( !cp || !mp )
+        if ( !cp )
             goto skip;
 
         fread(cp, sizeof(*cp), 1, fp);
-        fread(mp, sizeof(*mp), 1, fp);
 
         if ( !feof(fp) )
             goto skip;
 
-        check_cpuid(cp);
-        check_msr(mp);
+        check_policy(cp);
 
     skip:
         free(cp);
-        free(mp);
 
         if ( fp != stdin )
         {
