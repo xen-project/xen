@@ -26,6 +26,7 @@
 #include <xen/symbols.h>
 #include <xen/keyhandler.h>
 #include <xen/guest_access.h>
+#include <asm/cpu-policy.h>
 #include <asm/io.h>
 #include <asm/iocap.h>
 #include <asm/msr.h>
