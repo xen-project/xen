@@ -50,7 +50,6 @@
 #include <asm/alternative.h>
 #include <asm/mc146818rtc.h>
 #include <asm/cpu-policy.h>
-#include <asm/cpuid.h>
 #include <asm/spec_ctrl.h>
 #include <asm/guest.h>
 #include <asm/microcode.h>
@@ -1953,7 +1952,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !tboot_protect_mem_regions() )
         panic("Could not protect TXT memory regions\n");
 
-    init_guest_cpuid();
     init_guest_cpu_policies();
 
     if ( xen_cpuidle )
