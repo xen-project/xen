@@ -10,6 +10,7 @@
 #include <xen/param.h>
 #include <xen/sched.h>
 
+#include <asm/cpu-policy.h>
 #include <asm/cpufeature.h>
 #include <asm/invpcid.h>
 #include <asm/spec_ctrl.h>
