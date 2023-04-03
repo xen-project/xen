@@ -9,7 +9,6 @@
  *    Keir Fraser <keir@xen.org>
  */
 
-#include <xen/err.h>
 #include <xen/event.h>
 
 #include <asm/x86_emulate.h>

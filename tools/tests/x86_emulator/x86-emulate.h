@@ -48,6 +48,9 @@
 #define ASSERT assert
 #define ASSERT_UNREACHABLE() assert(!__LINE__)
 
+#define DEFINE_PER_CPU(type, var) type per_cpu_##var
+#define this_cpu(var) per_cpu_##var
+
 #define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
 #define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
 

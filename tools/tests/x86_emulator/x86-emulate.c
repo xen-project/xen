@@ -3,11 +3,6 @@
 #include <errno.h>
 #include <sys/mman.h>
 
-#define DEFINE_PER_CPU(type, var) type per_cpu_##var
-#define this_cpu(var) per_cpu_##var
-
-#define ERR_PTR(val) NULL
-
 /* See gcc bug 100680, but here don't bother making this version dependent. */
 #define gcc11_wrap(x) ({                  \
     unsigned long x_;                     \

@@ -39,9 +39,11 @@
 #ifdef __i386__
 # define mode_64bit() false
 # define r(name) e ## name
+# define PTR_POISON NULL /* 32-bit builds are for user-space, so NULL is OK. */
 #else
 # define mode_64bit() (ctxt->addr_size == 64)
 # define r(name) r ## name
+# define PTR_POISON ((void *)0x8086000000008086UL) /* non-canonical */
 #endif
 
 /* Operand sizes: 8-bit operands or specified/overridden size. */
@@ -77,6 +79,23 @@
 #define ImplicitOps (DstImplicit|SrcImplicit)
 
 typedef uint8_t opcode_desc_t;
+
+enum disp8scale {
+    /* Values 0 ... 4 are explicit sizes. */
+    d8s_bw = 5,
+    d8s_dq,
+    /* EVEX.W ignored outside of 64-bit mode */
+    d8s_dq64,
+    /*
+     * All further values must strictly be last and in the order
+     * given so that arithmetic on the values works.
+     */
+    d8s_vl,
+    d8s_vl_by_2,
+    d8s_vl_by_4,
+    d8s_vl_by_8,
+};
+typedef uint8_t disp8scale_t;
 
 /* Type, address-of, and value of an instruction's operand. */
 struct operand {
@@ -183,6 +202,9 @@ enum vex_pfx {
     vex_f3,
     vex_f2
 };
+
+#define VEX_PREFIX_DOUBLE_MASK 0x1
+#define VEX_PREFIX_SCALAR_MASK 0x2
 
 union vex {
     uint8_t raw[2];
@@ -718,6 +740,10 @@ do {                                                            \
     if ( rc ) goto done;                                        \
 } while (0)
 
+int x86emul_decode(struct x86_emulate_state *s,
+                   struct x86_emulate_ctxt *ctxt,
+                   const struct x86_emulate_ops *ops);
+
 int x86emul_fpu(struct x86_emulate_state *s,
                 struct cpu_user_regs *regs,
                 struct operand *dst,
@@ -746,6 +772,13 @@ int x86emul_0fc7(struct x86_emulate_state *s,
                  struct x86_emulate_ctxt *ctxt,
                  const struct x86_emulate_ops *ops,
                  mmval_t *mmvalp);
+
+/* Initialise output state in x86_emulate_ctxt */
+static inline void init_context(struct x86_emulate_ctxt *ctxt)
+{
+    ctxt->retire.raw = 0;
+    x86_emul_reset_event(ctxt);
+}
 
 static inline bool is_aligned(enum x86_segment seg, unsigned long offs,
                               unsigned int size, struct x86_emulate_ctxt *ctxt,
