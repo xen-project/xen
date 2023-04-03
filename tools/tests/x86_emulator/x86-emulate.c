@@ -35,7 +35,10 @@ static bool use_xsave;
  * (When debugging the emulator, care needs to be taken when inserting
  * printf() or alike function calls into regions using this.)
  */
-#define FXSAVE_AREA ((struct x86_fxsr *)fpu_save_area)
+struct x86_fxsr *get_fpu_save_area(void)
+{
+    return (void *)fpu_save_area;
+}
 
 void emul_save_fpu_state(void)
 {

@@ -80,6 +80,8 @@ bool emul_test_init(void);
 void emul_save_fpu_state(void);
 void emul_restore_fpu_state(void);
 
+struct x86_fxsr *get_fpu_save_area(void);
+
 /*
  * In order to reasonably use the above, wrap library calls we use and which we
  * think might access any of the FPU state into wrappers saving/restoring state

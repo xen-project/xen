@@ -25,8 +25,6 @@
 #define cpu_has_amd_erratum(nr) \
         cpu_has_amd_erratum(&current_cpu_data, AMD_ERRATUM_##nr)
 
-#define FXSAVE_AREA current->arch.fpu_ctxt
-
 #include "x86_emulate/x86_emulate.c"
 
 int cf_check x86emul_read_xcr(
