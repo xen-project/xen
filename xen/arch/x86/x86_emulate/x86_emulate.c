@@ -695,29 +695,6 @@ typedef union {
     uint32_t data32[16];
 } mmval_t;
 
-struct x86_fxsr {
-    uint16_t fcw;
-    uint16_t fsw;
-    uint8_t ftw, :8;
-    uint16_t fop;
-    union {
-        struct {
-            uint32_t offs;
-            uint16_t sel, :16;
-        };
-        uint64_t addr;
-    } fip, fdp;
-    uint32_t mxcsr;
-    uint32_t mxcsr_mask;
-    struct {
-        uint8_t data[10];
-        uint16_t :16, :16, :16;
-    } fpreg[8];
-    uint64_t __attribute__ ((aligned(16))) xmm[16][2];
-    uint64_t rsvd[6];
-    uint64_t avl[6];
-};
-
 /*
  * While proper alignment gets specified above, this doesn't get honored by
  * the compiler for automatic variables. Use this helper to instantiate a
@@ -1063,7 +1040,7 @@ do {                                                                    \
     ops->write_segment(x86_seg_cs, cs, ctxt);                           \
 })
 
-static int _get_fpu(
+int x86emul_get_fpu(
     enum x86_emulate_fpu_type type,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
@@ -1102,7 +1079,7 @@ static int _get_fpu(
         break;
     }
 
-    rc = ops->get_fpu(type, ctxt);
+    rc = (ops->get_fpu)(type, ctxt);
 
     if ( rc == X86EMUL_OKAY )
     {
@@ -1145,12 +1122,6 @@ static int _get_fpu(
  done:
     return rc;
 }
-
-#define get_fpu(type)                                           \
-do {                                                            \
-    rc = _get_fpu(fpu_type = (type), ctxt, ops);                \
-    if ( rc ) goto done;                                        \
-} while (0)
 
 static void put_fpu(
     enum x86_emulate_fpu_type type,
@@ -1554,18 +1525,6 @@ static int ioport_access_check(
 
  done:
     return rc;
-}
-
-static bool
-_amd_like(const struct cpuid_policy *cp)
-{
-    return cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON);
-}
-
-static bool
-amd_like(const struct x86_emulate_ctxt *ctxt)
-{
-    return _amd_like(ctxt->cpuid);
 }
 
 /* Initialise output state in x86_emulate_ctxt */
@@ -1979,30 +1938,6 @@ static unsigned int decode_disp8scale(enum disp8scale scale,
         break; \
     } \
 } while ( false )
-
-static bool is_aligned(enum x86_segment seg, unsigned long offs,
-                       unsigned int size, struct x86_emulate_ctxt *ctxt,
-                       const struct x86_emulate_ops *ops)
-{
-    struct segment_register reg;
-
-    /* Expecting powers of two only. */
-    ASSERT(!(size & (size - 1)));
-
-    if ( mode_64bit() && seg < x86_seg_fs )
-        memset(&reg, 0, sizeof(reg));
-    else
-    {
-        /* No alignment checking when we have no way to read segment data. */
-        if ( !ops->read_segment )
-            return true;
-
-        if ( ops->read_segment(seg, &reg, ctxt) != X86EMUL_OKAY )
-            return false;
-    }
-
-    return !((reg.base + offs) & (size - 1));
-}
 
 static bool is_branch_step(struct x86_emulate_ctxt *ctxt,
                            const struct x86_emulate_ops *ops)
@@ -3346,7 +3281,8 @@ x86_emulate(
 #ifndef X86EMUL_NO_SIMD
     /* With a memory operand, fetch the mask register in use (if any). */
     if ( ea.type == OP_MEM && evex.opmsk &&
-         _get_fpu(fpu_type = X86EMUL_FPU_opmask, ctxt, ops) == X86EMUL_OKAY )
+         x86emul_get_fpu(fpu_type = X86EMUL_FPU_opmask,
+                         ctxt, ops) == X86EMUL_OKAY )
     {
         uint8_t *stb = get_stub(stub);
 
@@ -3369,7 +3305,7 @@ x86_emulate(
 
     if ( fpu_type == X86EMUL_FPU_opmask )
     {
-        /* Squash (side) effects of the _get_fpu() above. */
+        /* Squash (side) effects of the x86emul_get_fpu() above. */
         x86_emul_reset_event(ctxt);
         put_fpu(X86EMUL_FPU_opmask, false, state, ctxt, ops);
         fpu_type = X86EMUL_FPU_none;
@@ -7435,173 +7371,14 @@ x86_emulate(
             emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
         break;
 
-    case X86EMUL_OPC(0x0f, 0xae): case X86EMUL_OPC_66(0x0f, 0xae): /* Grp15 */
-        switch ( modrm_reg & 7 )
-        {
-#if !defined(X86EMUL_NO_FPU) || !defined(X86EMUL_NO_MMX) || \
-    !defined(X86EMUL_NO_SIMD)
-        case 0: /* fxsave */
-        case 1: /* fxrstor */
-            generate_exception_if(vex.pfx, EXC_UD);
-            vcpu_must_have(fxsr);
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            generate_exception_if(!is_aligned(ea.mem.seg, ea.mem.off, 16,
-                                              ctxt, ops),
-                                  EXC_GP, 0);
-            fail_if(!ops->blk);
-            op_bytes =
-#ifdef __x86_64__
-                !mode_64bit() ? offsetof(struct x86_fxsr, xmm[8]) :
+    case X86EMUL_OPC(0x0f, 0xae): /* Grp15 */
+    case X86EMUL_OPC_66(0x0f, 0xae):
+    case X86EMUL_OPC_F3(0x0f, 0xae):
+#ifndef X86EMUL_NO_SIMD
+    case X86EMUL_OPC_VEX(0x0f, 0xae):
 #endif
-                sizeof(struct x86_fxsr);
-            if ( amd_like(ctxt) )
-            {
-                /* Assume "normal" operation in case of missing hooks. */
-                if ( !ops->read_cr ||
-                     ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
-                    cr4 = X86_CR4_OSFXSR;
-                if ( !ops->read_msr ||
-                     ops->read_msr(MSR_EFER, &msr_val, ctxt) != X86EMUL_OKAY )
-                    msr_val = 0;
-                if ( !(cr4 & X86_CR4_OSFXSR) ||
-                     (mode_64bit() && mode_ring0() && (msr_val & EFER_FFXSE)) )
-                    op_bytes = offsetof(struct x86_fxsr, xmm[0]);
-            }
-            /*
-             * This could also be X86EMUL_FPU_mmx, but it shouldn't be
-             * X86EMUL_FPU_xmm, as we don't want CR4.OSFXSR checked.
-             */
-            get_fpu(X86EMUL_FPU_fpu);
-            state->fpu_ctrl = true;
-            state->blk = modrm_reg & 1 ? blk_fxrstor : blk_fxsave;
-            if ( (rc = ops->blk(ea.mem.seg, ea.mem.off, NULL,
-                                sizeof(struct x86_fxsr), &_regs.eflags,
-                                state, ctxt)) != X86EMUL_OKAY )
-                goto done;
-            break;
-#endif /* X86EMUL_NO_{FPU,MMX,SIMD} */
-
-#ifndef X86EMUL_NO_SIMD
-        case 2: /* ldmxcsr */
-            generate_exception_if(vex.pfx, EXC_UD);
-            vcpu_must_have(sse);
-        ldmxcsr:
-            generate_exception_if(src.type != OP_MEM, EXC_UD);
-            get_fpu(vex.opcx ? X86EMUL_FPU_ymm : X86EMUL_FPU_xmm);
-            generate_exception_if(src.val & ~mxcsr_mask, EXC_GP, 0);
-            asm volatile ( "ldmxcsr %0" :: "m" (src.val) );
-            break;
-
-        case 3: /* stmxcsr */
-            generate_exception_if(vex.pfx, EXC_UD);
-            vcpu_must_have(sse);
-        stmxcsr:
-            generate_exception_if(dst.type != OP_MEM, EXC_UD);
-            get_fpu(vex.opcx ? X86EMUL_FPU_ymm : X86EMUL_FPU_xmm);
-            asm volatile ( "stmxcsr %0" : "=m" (dst.val) );
-            break;
-#endif /* X86EMUL_NO_SIMD */
-
-        case 5: /* lfence */
-            fail_if(modrm_mod != 3);
-            generate_exception_if(vex.pfx, EXC_UD);
-            vcpu_must_have(sse2);
-            asm volatile ( "lfence" ::: "memory" );
-            break;
-        case 6:
-            if ( modrm_mod == 3 ) /* mfence */
-            {
-                generate_exception_if(vex.pfx, EXC_UD);
-                vcpu_must_have(sse2);
-                asm volatile ( "mfence" ::: "memory" );
-                break;
-            }
-            /* else clwb */
-            fail_if(!vex.pfx);
-            vcpu_must_have(clwb);
-            fail_if(!ops->cache_op);
-            if ( (rc = ops->cache_op(x86emul_clwb, ea.mem.seg, ea.mem.off,
-                                     ctxt)) != X86EMUL_OKAY )
-                goto done;
-            break;
-        case 7:
-            if ( modrm_mod == 3 ) /* sfence */
-            {
-                generate_exception_if(vex.pfx, EXC_UD);
-                vcpu_must_have(mmxext);
-                asm volatile ( "sfence" ::: "memory" );
-                break;
-            }
-            /* else clflush{,opt} */
-            if ( !vex.pfx )
-                vcpu_must_have(clflush);
-            else
-                vcpu_must_have(clflushopt);
-            fail_if(!ops->cache_op);
-            if ( (rc = ops->cache_op(vex.pfx ? x86emul_clflushopt
-                                             : x86emul_clflush,
-                                     ea.mem.seg, ea.mem.off,
-                                     ctxt)) != X86EMUL_OKAY )
-                goto done;
-            break;
-        default:
-            goto unimplemented_insn;
-        }
-        break;
-
-#ifndef X86EMUL_NO_SIMD
-
-    case X86EMUL_OPC_VEX(0x0f, 0xae): /* Grp15 */
-        switch ( modrm_reg & 7 )
-        {
-        case 2: /* vldmxcsr */
-            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
-            vcpu_must_have(avx);
-            goto ldmxcsr;
-        case 3: /* vstmxcsr */
-            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
-            vcpu_must_have(avx);
-            goto stmxcsr;
-        }
-        goto unrecognized_insn;
-
-#endif /* !X86EMUL_NO_SIMD */
-
-    case X86EMUL_OPC_F3(0x0f, 0xae): /* Grp15 */
-        fail_if(modrm_mod != 3);
-        generate_exception_if((modrm_reg & 4) || !mode_64bit(), EXC_UD);
-        fail_if(!ops->read_cr);
-        if ( (rc = ops->read_cr(4, &cr4, ctxt)) != X86EMUL_OKAY )
-            goto done;
-        generate_exception_if(!(cr4 & X86_CR4_FSGSBASE), EXC_UD);
-        seg = modrm_reg & 1 ? x86_seg_gs : x86_seg_fs;
-        fail_if(!ops->read_segment);
-        if ( (rc = ops->read_segment(seg, &sreg, ctxt)) != X86EMUL_OKAY )
-            goto done;
-        dst.reg = decode_gpr(&_regs, modrm_rm);
-        if ( !(modrm_reg & 2) )
-        {
-            /* rd{f,g}sbase */
-            dst.type = OP_REG;
-            dst.bytes = (op_bytes == 8) ? 8 : 4;
-            dst.val = sreg.base;
-        }
-        else
-        {
-            /* wr{f,g}sbase */
-            if ( op_bytes == 8 )
-            {
-                sreg.base = *dst.reg;
-                generate_exception_if(!is_canonical_address(sreg.base),
-                                      EXC_GP, 0);
-            }
-            else
-                sreg.base = (uint32_t)*dst.reg;
-            fail_if(!ops->write_segment);
-            if ( (rc = ops->write_segment(seg, &sreg, ctxt)) != X86EMUL_OKAY )
-                goto done;
-        }
-        break;
+        rc = x86emul_0fae(state, &_regs, &dst, &src, ctxt, ops, &fpu_type);
+        goto dispatch_from_helper;
 
     case X86EMUL_OPC(0x0f, 0xaf): /* imul */
         emulate_2op_SrcV_srcmem("imul", src, dst, _regs.eflags);
@@ -10543,7 +10320,7 @@ x86_emulate(
         goto unrecognized_insn;
 
     default:
-    unimplemented_insn:
+    unimplemented_insn: __maybe_unused;
         rc = X86EMUL_UNIMPLEMENTED;
         goto done;
     unrecognized_insn:

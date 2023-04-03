@@ -22,6 +22,7 @@
 
 # include <xen/kernel.h>
 # include <asm/msr-index.h>
+# include <asm/x86-vendors.h>
 # include <asm/x86_emulate.h>
 
 # ifndef CONFIG_HVM
@@ -308,6 +309,29 @@ struct x86_emulate_state {
 #endif
 };
 
+struct x86_fxsr {
+    uint16_t fcw;
+    uint16_t fsw;
+    uint8_t ftw, :8;
+    uint16_t fop;
+    union {
+        struct {
+            uint32_t offs;
+            uint16_t sel, :16;
+        };
+        uint64_t addr;
+    } fip, fdp;
+    uint32_t mxcsr;
+    uint32_t mxcsr_mask;
+    struct {
+        uint8_t data[10];
+        uint16_t :16, :16, :16;
+    } fpreg[8];
+    uint64_t __attribute__ ((aligned(16))) xmm[16][2];
+    uint64_t rsvd[6];
+    uint64_t avl[6];
+};
+
 /*
  * Externally visible return codes from x86_emulate() are non-negative.
  * Use negative values for internal state change indicators from helpers
@@ -396,6 +420,18 @@ in_protmode(
     fail_if(_cpl < 0);                          \
     (_cpl == 0);                                \
 })
+
+static inline bool
+_amd_like(const struct cpuid_policy *cp)
+{
+    return cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON);
+}
+
+static inline bool
+amd_like(const struct x86_emulate_ctxt *ctxt)
+{
+    return _amd_like(ctxt->cpuid);
+}
 
 #define vcpu_has_fpu()         (ctxt->cpuid->basic.fpu)
 #define vcpu_has_sep()         (ctxt->cpuid->basic.sep)
@@ -502,11 +538,52 @@ in_protmode(
 int x86emul_get_cpl(struct x86_emulate_ctxt *ctxt,
                     const struct x86_emulate_ops *ops);
 
+int x86emul_get_fpu(enum x86_emulate_fpu_type type,
+                    struct x86_emulate_ctxt *ctxt,
+                    const struct x86_emulate_ops *ops);
+
+#define get_fpu(type)                                           \
+do {                                                            \
+    rc = x86emul_get_fpu(fpu_type = (type), ctxt, ops);         \
+    if ( rc ) goto done;                                        \
+} while (0)
+
 int x86emul_0f01(struct x86_emulate_state *s,
                  struct cpu_user_regs *regs,
                  struct operand *dst,
                  struct x86_emulate_ctxt *ctxt,
                  const struct x86_emulate_ops *ops);
+int x86emul_0fae(struct x86_emulate_state *s,
+                 struct cpu_user_regs *regs,
+                 struct operand *dst,
+                 const struct operand *src,
+                 struct x86_emulate_ctxt *ctxt,
+                 const struct x86_emulate_ops *ops,
+                 enum x86_emulate_fpu_type *fpu_type);
+
+static inline bool is_aligned(enum x86_segment seg, unsigned long offs,
+                              unsigned int size, struct x86_emulate_ctxt *ctxt,
+                              const struct x86_emulate_ops *ops)
+{
+    struct segment_register reg;
+
+    /* Expecting powers of two only. */
+    ASSERT(!(size & (size - 1)));
+
+    if ( mode_64bit() && seg < x86_seg_fs )
+        memset(&reg, 0, sizeof(reg));
+    else
+    {
+        /* No alignment checking when we have no way to read segment data. */
+        if ( !ops->read_segment )
+            return true;
+
+        if ( ops->read_segment(seg, &reg, ctxt) != X86EMUL_OKAY )
+            return false;
+    }
+
+    return !((reg.base + offs) & (size - 1));
+}
 
 static inline bool umip_active(struct x86_emulate_ctxt *ctxt,
                                const struct x86_emulate_ops *ops)
