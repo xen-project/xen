@@ -399,33 +399,38 @@ void x86_cpu_policy_to_featureset(const struct cpu_policy *p,
 void x86_cpu_featureset_to_policy(const uint32_t fs[FEATURESET_NR_ENTRIES],
                                   struct cpu_policy *p);
 
-static inline uint64_t cpuid_policy_xcr0_max(const struct cpuid_policy *p)
+static inline uint64_t cpu_policy_xcr0_max(const struct cpu_policy *p)
 {
     return ((uint64_t)p->xstate.xcr0_high << 32) | p->xstate.xcr0_low;
 }
 
-static inline uint64_t cpuid_policy_xstates(const struct cpuid_policy *p)
+static inline uint64_t cpu_policy_xstates(const struct cpu_policy *p)
 {
     uint64_t val = p->xstate.xcr0_high | p->xstate.xss_high;
 
     return (val << 32) | p->xstate.xcr0_low | p->xstate.xss_low;
 }
 
-const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature);
-
 /**
- * Recalculate the content in a CPUID policy which is derived from raw data.
+ * For a specific feature, look up the dependent features.  Returns NULL if
+ * this feature has no dependencies.  Otherwise return a featureset of
+ * dependent features, which has been recursively flattened.
  */
-void x86_cpuid_policy_recalc_synth(struct cpuid_policy *p);
+const uint32_t *x86_cpu_policy_lookup_deep_deps(uint32_t feature);
 
 /**
- * Fill a CPUID policy using the native CPUID instruction.
+ * Recalculate the content in a CPU policy which is derived from raw data.
+ */
+void x86_cpu_policy_recalc_synth(struct cpu_policy *p);
+
+/**
+ * Fill CPU policy using the native CPUID/RDMSR instruction.
  *
  * No sanitisation is performed, but synthesised values are calculated.
  * Values may be influenced by a hypervisor or from masking/faulting
  * configuration.
  */
-void x86_cpuid_policy_fill_native(struct cpuid_policy *p);
+void x86_cpu_policy_fill_native(struct cpu_policy *p);
 
 /**
  * Clear leaf data beyond the policies max leaf/subleaf settings.
@@ -436,7 +441,7 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p);
  * with out-of-range leaves with stale content in them.  This helper clears
  * them.
  */
-void x86_cpuid_policy_clear_out_of_range_leaves(struct cpuid_policy *p);
+void x86_cpu_policy_clear_out_of_range_leaves(struct cpu_policy *p);
 
 #ifdef __XEN__
 #include <public/arch-x86/xen.h>
@@ -449,9 +454,10 @@ typedef xen_msr_entry_t msr_entry_buffer_t[];
 #endif
 
 /**
- * Serialise a cpuid_policy object into an array of cpuid leaves.
+ * Serialise the CPUID leaves of a cpu_policy object into an array of cpuid
+ * leaves.
  *
- * @param policy     The cpuid_policy to serialise.
+ * @param policy     The cpu_policy to serialise.
  * @param leaves     The array of leaves to serialise into.
  * @param nr_entries The number of entries in 'leaves'.
  * @returns -errno
@@ -460,13 +466,14 @@ typedef xen_msr_entry_t msr_entry_buffer_t[];
  * leaves array is too short.  On success, nr_entries is updated with the
  * actual number of leaves written.
  */
-int x86_cpuid_copy_to_buffer(const struct cpuid_policy *policy,
+int x86_cpuid_copy_to_buffer(const struct cpu_policy *policy,
                              cpuid_leaf_buffer_t leaves, uint32_t *nr_entries);
 
 /**
- * Unserialise a cpuid_policy object from an array of cpuid leaves.
+ * Unserialise the CPUID leaves of a cpu_policy object into an array of cpuid
+ * leaves.
  *
- * @param policy      The cpuid_policy to unserialise into.
+ * @param policy      The cpu_policy to unserialise into.
  * @param leaves      The array of leaves to unserialise from.
  * @param nr_entries  The number of entries in 'leaves'.
  * @param err_leaf    Optional hint for error diagnostics.
@@ -474,21 +481,21 @@ int x86_cpuid_copy_to_buffer(const struct cpuid_policy *policy,
  * @returns -errno
  *
  * Reads at most CPUID_MAX_SERIALISED_LEAVES.  May return -ERANGE if an
- * incoming leaf is out of range of cpuid_policy, in which case the optional
+ * incoming leaf is out of range of cpu_policy, in which case the optional
  * err_* pointers will identify the out-of-range indicies.
  *
  * No content validation of in-range leaves is performed.  Synthesised data is
  * recalculated.
  */
-int x86_cpuid_copy_from_buffer(struct cpuid_policy *policy,
+int x86_cpuid_copy_from_buffer(struct cpu_policy *policy,
                                const cpuid_leaf_buffer_t leaves,
                                uint32_t nr_entries, uint32_t *err_leaf,
                                uint32_t *err_subleaf);
 
 /**
- * Serialise an msr_policy object into an array.
+ * Serialise the MSRs of a cpu_policy object into an array.
  *
- * @param policy     The msr_policy to serialise.
+ * @param policy     The cpu_policy to serialise.
  * @param msrs       The array of msrs to serialise into.
  * @param nr_entries The number of entries in 'msrs'.
  * @returns -errno
@@ -497,13 +504,13 @@ int x86_cpuid_copy_from_buffer(struct cpuid_policy *policy,
  * buffer array is too short.  On success, nr_entries is updated with the
  * actual number of msrs written.
  */
-int x86_msr_copy_to_buffer(const struct msr_policy *policy,
+int x86_msr_copy_to_buffer(const struct cpu_policy *policy,
                            msr_entry_buffer_t msrs, uint32_t *nr_entries);
 
 /**
- * Unserialise an msr_policy object from an array of msrs.
+ * Unserialise the MSRs of a cpu_policy object from an array of msrs.
  *
- * @param policy     The msr_policy object to unserialise into.
+ * @param policy     The cpu_policy object to unserialise into.
  * @param msrs       The array of msrs to unserialise from.
  * @param nr_entries The number of entries in 'msrs'.
  * @param err_msr    Optional hint for error diagnostics.
@@ -517,7 +524,7 @@ int x86_msr_copy_to_buffer(const struct msr_policy *policy,
  *
  * No content validation is performed on the data stored in the policy object.
  */
-int x86_msr_copy_from_buffer(struct msr_policy *policy,
+int x86_msr_copy_from_buffer(struct cpu_policy *policy,
                              const msr_entry_buffer_t msrs, uint32_t nr_entries,
                              uint32_t *err_msr);
 

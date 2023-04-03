@@ -555,7 +555,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
             const uint32_t *dfs;
 
             if ( !test_bit(b, disabled_features) ||
-                 !(dfs = x86_cpuid_lookup_deep_deps(b)) )
+                 !(dfs = x86_cpu_policy_lookup_deep_deps(b)) )
                 continue;
 
             for ( i = 0; i < ARRAY_SIZE(disabled_features); ++i )
