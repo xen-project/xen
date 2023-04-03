@@ -22,11 +22,9 @@
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #ifdef __i386__
-# define r(name)       e ## name
 # define __OS          "l"  /* Operation Suffix */
 # define __OP          "e"  /* Operand Prefix */
 #else
-# define r(name)       r ## name
 # define __OS          "q"  /* Operation Suffix */
 # define __OP          "r"  /* Operand Prefix */
 #endif
@@ -265,12 +263,12 @@ void emul_test_put_fpu(
 
 static uint32_t pkru;
 
-static unsigned int rdpkru(void)
+unsigned int rdpkru(void)
 {
     return pkru;
 }
 
-static void wrpkru(unsigned int val)
+void wrpkru(unsigned int val)
 {
     pkru = val;
 }

@@ -13,9 +13,11 @@ endif
 	ln -nsf $< $@
 
 x86_emulate: FORCE
-	ln -nsf $(XEN_ROOT)/xen/arch/x86/$@
+	mkdir -p $@
+	ln -sf $(XEN_ROOT)/xen/arch/x86/$@/*.[ch] $@/
 
-x86_emulate/%: x86_emulate ;
+x86_emulate/%.c: x86_emulate ;
+x86_emulate/%.h: x86_emulate ;
 
 %.c: $(XEN_ROOT)/tools/tests/x86_emulator/%.c FORCE
 	ln -nsf $< $@
@@ -29,17 +31,26 @@ GCOV_FLAGS := --coverage
 %-cov.o: %.c
 	$(CC) -c $(CFLAGS) $(GCOV_FLAGS) $< -o $@
 
+OBJS := fuzz-emul.o x86-emulate.o
+OBJS += x86_emulate/0f01.o
+
 x86-emulate.h: x86_emulate/x86_emulate.h
-x86-emulate.o x86-emulate-cov.o: x86-emulate.h x86_emulate/x86_emulate.c
+x86-emulate.o x86-emulate-cov.o: x86-emulate.h x86_emulate/x86_emulate.c x86_emulate/private.h
 fuzz-emul.o fuzz-emul-cov.o wrappers.o: x86-emulate.h
 
-x86-insn-fuzzer.a: fuzz-emul.o x86-emulate.o cpuid.o
+$(filter x86_emulate/%.o,$(OBJS)): x86_emulate/%.o: x86_emulate/%.c x86_emulate/private.h $(x86_emulate.h)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$*.o) -c -o $@ $< $(APPEND_CFLAGS)
+
+$(patsubst %.o,%-cov.o,$(filter x86_emulate/%.o,$(OBJS))): x86_emulate/%-cov.o: x86_emulate/%.c x86_emulate/private.h $(x86_emulate.h)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$*.o) $(GCOV_FLAGS) -c -o $@ $< $(APPEND_CFLAGS)
+
+x86-insn-fuzzer.a: $(OBJS) cpuid.o
 	$(AR) rc $@ $^
 
-afl-harness: afl-harness.o fuzz-emul.o x86-emulate.o cpuid.o wrappers.o
+afl-harness: afl-harness.o $(OBJS) cpuid.o wrappers.o
 	$(CC) $(CFLAGS) $^ -o $@
 
-afl-harness-cov: afl-harness-cov.o fuzz-emul-cov.o x86-emulate-cov.o cpuid.o wrappers.o
+afl-harness-cov: afl-harness-cov.o $(patsubst %.o,%-cov.o,$(OBJS)) cpuid.o wrappers.o
 	$(CC) $(CFLAGS) $(GCOV_FLAGS) $^ -o $@
 
 # Common targets

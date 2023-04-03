@@ -15,7 +15,6 @@
 
 #include <asm/x86_emulate.h>
 #include <asm/processor.h> /* current_cpu_info */
-#include <asm/prot-key.h>
 #include <asm/xstate.h>
 #include <asm/amd.h> /* cpu_has_amd_erratum() */
 #include <asm/debugreg.h>
@@ -25,8 +24,6 @@
 #undef cmpxchg
 #undef cpuid
 #undef wbinvd
-
-#define r(name) r ## name
 
 #define cpu_has_amd_erratum(nr) \
         cpu_has_amd_erratum(&current_cpu_data, AMD_ERRATUM_##nr)
@@ -55,12 +52,6 @@
 })
 
 #define FXSAVE_AREA current->arch.fpu_ctxt
-
-#ifndef CONFIG_HVM
-# define X86EMUL_NO_FPU
-# define X86EMUL_NO_MMX
-# define X86EMUL_NO_SIMD
-#endif
 
 #include "x86_emulate/x86_emulate.c"
 

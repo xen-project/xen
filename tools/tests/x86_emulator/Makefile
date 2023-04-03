@@ -29,7 +29,7 @@ OPMASK := avx512f avx512dq avx512bw
 
 ifeq ($(origin XEN_COMPILE_ARCH),override)
 
-HOSTCFLAGS += -m32
+HOSTCFLAGS += -m32 -I..
 
 else
 
@@ -250,7 +250,10 @@ xop.h avx512f.h: simd-fma.c
 
 endif # 32-bit override
 
-$(TARGET): x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o predicates.o wrappers.o
+OBJS := x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o predicates.o wrappers.o
+OBJS += x86_emulate/0f01.o
+
+$(TARGET): $(OBJS)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
 
 .PHONY: clean
@@ -274,8 +277,10 @@ else
 run32 clean32: %32: %
 endif
 
+.PHONY: x86_emulate
 x86_emulate:
-	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/arch/x86/$@
+	mkdir -p $@
+	ln -sf $(XEN_ROOT)/xen/arch/x86/$@/*.[ch] $@/
 
 x86_emulate/%: x86_emulate ;
 
@@ -287,13 +292,13 @@ x86.h := $(addprefix $(XEN_ROOT)/tools/include/xen/asm/,\
                      x86-vendors.h x86-defns.h msr-index.h) \
          $(addprefix $(XEN_ROOT)/tools/include/xen/lib/x86/, \
                      cpuid.h cpuid-autogen.h)
-x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
+x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h x86_emulate/private.h $(x86.h)
 
-x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o predicates.o wrappers.o: %.o: %.c $(x86_emulate.h)
+$(OBJS): %.o: %.c $(x86_emulate.h)
 	$(HOSTCC) $(HOSTCFLAGS) -c -g -o $@ $<
 
 x86-emulate.o: x86_emulate/x86_emulate.c
-x86-emulate.o: HOSTCFLAGS += -D__XEN_TOOLS__
+x86-emulate.o x86_emulate/%.o: HOSTCFLAGS += -D__XEN_TOOLS__
 
 # In order for our custom .type assembler directives to reliably land after
 # gcc's, we need to keep it from re-ordering top-level constructs.

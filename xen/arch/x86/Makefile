@@ -9,6 +9,7 @@ obj-y += mm/
 obj-$(CONFIG_XENOPROF) += oprofile/
 obj-$(CONFIG_PV) += pv/
 obj-y += x86_64/
+obj-y += x86_emulate/
 
 alternative-y := alternative.init.o
 alternative-$(CONFIG_LIVEPATCH) :=

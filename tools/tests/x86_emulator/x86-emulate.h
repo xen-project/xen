@@ -1,3 +1,6 @@
+#ifndef X86_EMULATE_H
+#define X86_EMULATE_H
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -124,6 +127,9 @@ static inline bool xcr0_mask(uint64_t mask)
     return cpu_has_xsave && ((xgetbv(0) & mask) == mask);
 }
 
+unsigned int rdpkru(void);
+void wrpkru(unsigned int val);
+
 #define cache_line_size() (cp.basic.clflush_size * 8)
 #define cpu_has_fpu        cp.basic.fpu
 #define cpu_has_mmx        cp.basic.mmx
@@ -201,3 +207,5 @@ void emul_test_put_fpu(
     struct x86_emulate_ctxt *ctxt,
     enum x86_emulate_fpu_type backout,
     const struct x86_emul_fpu_aux *aux);
+
+#endif /* X86_EMULATE_H */
