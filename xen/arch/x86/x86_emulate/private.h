@@ -505,7 +505,7 @@ in_protmode(
 })
 
 static inline bool
-_amd_like(const struct cpuid_policy *cp)
+_amd_like(const struct cpu_policy *cp)
 {
     return cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON);
 }
@@ -513,7 +513,7 @@ _amd_like(const struct cpuid_policy *cp)
 static inline bool
 amd_like(const struct x86_emulate_ctxt *ctxt)
 {
-    return _amd_like(ctxt->cpuid);
+    return _amd_like(ctxt->cpu_policy);
 }
 
 #define vcpu_has_fpu()         (ctxt->cpuid->basic.fpu)

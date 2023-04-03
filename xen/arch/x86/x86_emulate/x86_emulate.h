@@ -565,8 +565,11 @@ struct x86_emulate_ctxt
      * Input-only state:
      */
 
-    /* CPUID Policy for the domain. */
-    const struct cpuid_policy *cpuid;
+    /* CPU policy for the domain.  Allow aliases for local code clarity. */
+    union {
+        struct cpu_policy *cpu_policy;
+        struct cpu_policy *cpuid;
+    };
 
     /* Set this if writes may have side effects. */
     bool force_writeback;
