@@ -332,6 +332,13 @@ struct x86_emulate_state {
 #endif
 };
 
+static inline void check_state(const struct x86_emulate_state *s)
+{
+#if defined(__XEN__) && !defined(NDEBUG)
+    ASSERT(s->caller);
+#endif
+}
+
 typedef union {
     uint64_t mmx;
     uint64_t __attribute__ ((aligned(16))) xmm[2];
