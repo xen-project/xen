@@ -677,7 +677,7 @@ static bool valid_xcr0(u64 xcr0)
 int validate_xstate(const struct domain *d, uint64_t xcr0, uint64_t xcr0_accum,
                     const struct xsave_hdr *hdr)
 {
-    uint64_t xcr0_max = cpuid_policy_xcr0_max(d->arch.cpuid);
+    uint64_t xcr0_max = cpu_policy_xcr0_max(d->arch.cpuid);
     unsigned int i;
 
     if ( (hdr->xstate_bv & ~xcr0_accum) ||
@@ -701,7 +701,7 @@ int validate_xstate(const struct domain *d, uint64_t xcr0, uint64_t xcr0_accum,
 int handle_xsetbv(u32 index, u64 new_bv)
 {
     struct vcpu *curr = current;
-    uint64_t xcr0_max = cpuid_policy_xcr0_max(curr->domain->arch.cpuid);
+    uint64_t xcr0_max = cpu_policy_xcr0_max(curr->domain->arch.cpuid);
     u64 mask;
 
     if ( index != XCR_XFEATURE_ENABLED_MASK )

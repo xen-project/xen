@@ -245,7 +245,7 @@ static int update_domain_cpu_policy(struct domain *d,
         goto out;
 
     /* Trim any newly-stale out-of-range leaves. */
-    x86_cpuid_policy_clear_out_of_range_leaves(new);
+    x86_cpu_policy_clear_out_of_range_leaves(new);
 
     /* Audit the combined dataset. */
     ret = x86_cpu_policies_are_compatible(sys, new, &err);
