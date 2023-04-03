@@ -333,7 +333,6 @@ struct vcpu_msrs
     uint32_t dr_mask[4];
 };
 
-void init_guest_msr_policy(void);
 int init_vcpu_msr_policy(struct vcpu *v);
 
 /*
