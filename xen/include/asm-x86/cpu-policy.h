@@ -18,4 +18,10 @@ void init_guest_cpu_policies(void);
 /* Allocate and initialise a CPU policy suitable for the domain. */
 int init_domain_cpu_policy(struct domain *d);
 
+/* Apply dom0-specific tweaks to the CPUID policy. */
+void init_dom0_cpuid_policy(struct domain *d);
+
+/* Clamp the CPUID policy to reality. */
+void recalculate_cpuid_policy(struct domain *d);
+
 #endif /* X86_CPU_POLICY_H */

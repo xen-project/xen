@@ -77,7 +77,6 @@
 #include <public/memory.h>
 #include <public/vm_event.h>
 #include <public/arch-x86/cpuid.h>
-#include <asm/cpuid.h>
 
 #include <compat/hvm/hvm_op.h>
 
