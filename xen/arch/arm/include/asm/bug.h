@@ -1,6 +1,8 @@
 #ifndef __ARM_BUG_H__
 #define __ARM_BUG_H__
 
+#include <xen/types.h>
+
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/bug.h>
 #elif defined(CONFIG_ARM_64)
@@ -8,6 +10,8 @@
 #else
 # error "unknown ARM variant"
 #endif
+
+#define BUG_FRAME_STRUCT
 
 struct bug_frame {
     signed int loc_disp;    /* Relative address to the bug address */
@@ -21,13 +25,6 @@ struct bug_frame {
 #define bug_file(b) ((const void *)(b) + (b)->file_disp);
 #define bug_line(b) ((b)->line)
 #define bug_msg(b) ((const char *)(b) + (b)->msg_disp)
-
-#define BUGFRAME_run_fn 0
-#define BUGFRAME_warn   1
-#define BUGFRAME_bug    2
-#define BUGFRAME_assert 3
-
-#define BUGFRAME_NR     4
 
 /* Many versions of GCC doesn't support the asm %c parameter which would
  * be preferable to this unpleasantness. We use mergeable string
@@ -84,12 +81,6 @@ struct bug_frame {
     BUG_FRAME(BUGFRAME_assert, __LINE__, __FILE__, 1, msg);     \
     unreachable();                                              \
 } while (0)
-
-extern const struct bug_frame __start_bug_frames[],
-                              __stop_bug_frames_0[],
-                              __stop_bug_frames_1[],
-                              __stop_bug_frames_2[],
-                              __stop_bug_frames_3[];
 
 #endif /* __ARM_BUG_H__ */
 /*

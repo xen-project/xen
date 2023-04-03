@@ -1,18 +1,9 @@
 #ifndef __X86_BUG_H__
 #define __X86_BUG_H__
 
-#define BUG_DISP_WIDTH    24
-#define BUG_LINE_LO_WIDTH (31 - BUG_DISP_WIDTH)
-#define BUG_LINE_HI_WIDTH (31 - BUG_DISP_WIDTH)
-
-#define BUGFRAME_run_fn 0
-#define BUGFRAME_warn   1
-#define BUGFRAME_bug    2
-#define BUGFRAME_assert 3
-
-#define BUGFRAME_NR     4
-
 #ifndef __ASSEMBLY__
+
+#define BUG_FRAME_STRUCT
 
 struct bug_frame {
     signed int loc_disp:BUG_DISP_WIDTH;
@@ -79,12 +70,6 @@ struct bug_frame {
     BUG_FRAME(BUGFRAME_assert, __LINE__, __FILE__, 1, msg);     \
     unreachable();                                              \
 } while (0)
-
-extern const struct bug_frame __start_bug_frames[],
-                              __stop_bug_frames_0[],
-                              __stop_bug_frames_1[],
-                              __stop_bug_frames_2[],
-                              __stop_bug_frames_3[];
 
 #else  /* !__ASSEMBLY__ */
 
