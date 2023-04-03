@@ -132,12 +132,6 @@ static const uint8_t sse_prefix[] = { 0x66, 0xf3, 0xf2 };
         (void *)(((long)__##var + __alignof(type) - __alignof(__##var))   \
                  & -__alignof(type))
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-# define ASM_FLAG_OUT(yes, no) yes
-#else
-# define ASM_FLAG_OUT(yes, no) no
-#endif
-
 /* MXCSR bit definitions. */
 #define MXCSR_MM  (1U << 17)
 

@@ -65,6 +65,12 @@
 #define AC_(n,t) (n##t)
 #define _AC(n,t) AC_(n,t)
 
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+# define ASM_FLAG_OUT(yes, no) yes
+#else
+# define ASM_FLAG_OUT(yes, no) no
+#endif
+
 #define hweight32 __builtin_popcount
 #define hweight64 __builtin_popcountll
 
