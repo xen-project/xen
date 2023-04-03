@@ -9,7 +9,6 @@
  *    Keir Fraser <keir@xen.org>
  */
 
-#include <xen/domain_page.h>
 #include <xen/err.h>
 #include <xen/event.h>
 
@@ -18,7 +17,6 @@
 #include <asm/xstate.h>
 #include <asm/amd.h> /* cpu_has_amd_erratum() */
 #include <asm/debugreg.h>
-#include <asm/endbr.h>
 
 /* Avoid namespace pollution. */
 #undef cmpxchg
@@ -27,29 +25,6 @@
 
 #define cpu_has_amd_erratum(nr) \
         cpu_has_amd_erratum(&current_cpu_data, AMD_ERRATUM_##nr)
-
-#define get_stub(stb) ({                                        \
-    void *ptr;                                                  \
-    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX_INST_LEN + 1);         \
-    ASSERT(!(stb).ptr);                                         \
-    (stb).addr = this_cpu(stubs.addr) + STUB_BUF_SIZE / 2;      \
-    (stb).ptr = map_domain_page(_mfn(this_cpu(stubs.mfn))) +    \
-        ((stb).addr & ~PAGE_MASK);                              \
-    ptr = memset((stb).ptr, 0xcc, STUB_BUF_SIZE / 2);           \
-    if ( cpu_has_xen_ibt )                                      \
-    {                                                           \
-        place_endbr64(ptr);                                     \
-        ptr += 4;                                               \
-    }                                                           \
-    ptr;                                                        \
-})
-#define put_stub(stb) ({                                   \
-    if ( (stb).ptr )                                       \
-    {                                                      \
-        unmap_domain_page((stb).ptr);                      \
-        (stb).ptr = NULL;                                  \
-    }                                                      \
-})
 
 #define FXSAVE_AREA current->arch.fpu_ctxt
 

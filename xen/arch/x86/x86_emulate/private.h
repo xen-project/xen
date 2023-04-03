@@ -21,6 +21,7 @@
 #ifdef __XEN__
 
 # include <xen/kernel.h>
+# include <asm/endbr.h>
 # include <asm/msr-index.h>
 # include <asm/x86-vendors.h>
 # include <asm/x86_emulate.h>
@@ -340,12 +341,57 @@ struct x86_fxsr {
     uint64_t avl[6];
 };
 
+#ifndef X86EMUL_NO_FPU
+struct x87_env16 {
+    uint16_t fcw;
+    uint16_t fsw;
+    uint16_t ftw;
+    union {
+        struct {
+            uint16_t fip_lo;
+            uint16_t fop:11, :1, fip_hi:4;
+            uint16_t fdp_lo;
+            uint16_t :12, fdp_hi:4;
+        } real;
+        struct {
+            uint16_t fip;
+            uint16_t fcs;
+            uint16_t fdp;
+            uint16_t fds;
+        } prot;
+    } mode;
+};
+
+struct x87_env32 {
+    uint32_t fcw:16, :16;
+    uint32_t fsw:16, :16;
+    uint32_t ftw:16, :16;
+    union {
+        struct {
+            /* some CPUs/FPUs also store the full FIP here */
+            uint32_t fip_lo:16, :16;
+            uint32_t fop:11, :1, fip_hi:16, :4;
+            /* some CPUs/FPUs also store the full FDP here */
+            uint32_t fdp_lo:16, :16;
+            uint32_t :12, fdp_hi:16, :4;
+        } real;
+        struct {
+            uint32_t fip;
+            uint32_t fcs:16, fop:11, :5;
+            uint32_t fdp;
+            uint32_t fds:16, :16;
+        } prot;
+    } mode;
+};
+#endif
+
 /*
  * Externally visible return codes from x86_emulate() are non-negative.
  * Use negative values for internal state change indicators from helpers
  * to the main function.
  */
 #define X86EMUL_rdtsc        (-1)
+#define X86EMUL_stub_failure (-2)
 
 /*
  * These EFLAGS bits are restored from saved value during emulation, and
@@ -543,6 +589,122 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 # define host_and_vcpu_must_have(feat) vcpu_must_have(feat)
 #endif
 
+/*
+ * Instruction emulation:
+ * Most instructions are emulated directly via a fragment of inline assembly
+ * code. This allows us to save/restore EFLAGS and thus very easily pick up
+ * any modified flags.
+ */
+
+#if defined(__x86_64__)
+#define _LO32 "k"          /* force 32-bit operand */
+#define _STK  "%%rsp"      /* stack pointer */
+#define _BYTES_PER_LONG "8"
+#elif defined(__i386__)
+#define _LO32 ""           /* force 32-bit operand */
+#define _STK  "%%esp"      /* stack pointer */
+#define _BYTES_PER_LONG "4"
+#endif
+
+/* Before executing instruction: restore necessary bits in EFLAGS. */
+#define _PRE_EFLAGS(_sav, _msk, _tmp)                           \
+/* EFLAGS = (_sav & _msk) | (EFLAGS & ~_msk); _sav &= ~_msk; */ \
+"movl %"_LO32 _sav",%"_LO32 _tmp"; "                            \
+"push %"_tmp"; "                                                \
+"push %"_tmp"; "                                                \
+"movl %"_msk",%"_LO32 _tmp"; "                                  \
+"andl %"_LO32 _tmp",("_STK"); "                                 \
+"pushf; "                                                       \
+"notl %"_LO32 _tmp"; "                                          \
+"andl %"_LO32 _tmp",("_STK"); "                                 \
+"andl %"_LO32 _tmp",2*"_BYTES_PER_LONG"("_STK"); "              \
+"pop  %"_tmp"; "                                                \
+"orl  %"_LO32 _tmp",("_STK"); "                                 \
+"popf; "                                                        \
+"pop  %"_tmp"; "                                                \
+"movl %"_LO32 _tmp",%"_LO32 _sav"; "
+
+/* After executing instruction: write-back necessary bits in EFLAGS. */
+#define _POST_EFLAGS(_sav, _msk, _tmp)          \
+/* _sav |= EFLAGS & _msk; */                    \
+"pushf; "                                       \
+"pop  %"_tmp"; "                                \
+"andl %"_msk",%"_LO32 _tmp"; "                  \
+"orl  %"_LO32 _tmp",%"_LO32 _sav"; "
+
+#ifdef __XEN__
+
+# include <xen/domain_page.h>
+# include <asm/uaccess.h>
+
+# define get_stub(stb) ({                                    \
+    void *ptr;                                               \
+    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX_INST_LEN + 1);      \
+    ASSERT(!(stb).ptr);                                      \
+    (stb).addr = this_cpu(stubs.addr) + STUB_BUF_SIZE / 2;   \
+    (stb).ptr = map_domain_page(_mfn(this_cpu(stubs.mfn))) + \
+        ((stb).addr & ~PAGE_MASK);                           \
+    ptr = memset((stb).ptr, 0xcc, STUB_BUF_SIZE / 2);        \
+    if ( cpu_has_xen_ibt )                                   \
+    {                                                        \
+        place_endbr64(ptr);                                  \
+        ptr += 4;                                            \
+    }                                                        \
+    ptr;                                                     \
+})
+
+# define put_stub(stb) ({             \
+    if ( (stb).ptr )                  \
+    {                                 \
+        unmap_domain_page((stb).ptr); \
+        (stb).ptr = NULL;             \
+    }                                 \
+})
+
+
+struct stub_exn {
+    union stub_exception_token info;
+    unsigned int line;
+};
+
+# define invoke_stub(pre, post, constraints...) do {                    \
+    stub_exn.info = (union stub_exception_token) { .raw = ~0 };         \
+    stub_exn.line = __LINE__; /* Utility outweighs livepatching cost */ \
+    block_speculation(); /* SCSB */                                     \
+    asm volatile ( pre "\n\tINDIRECT_CALL %[stub]\n\t" post "\n"        \
+                   ".Lret%=:\n\t"                                       \
+                   ".pushsection .fixup,\"ax\"\n"                       \
+                   ".Lfix%=:\n\t"                                       \
+                   "pop %[exn]\n\t"                                     \
+                   "jmp .Lret%=\n\t"                                    \
+                   ".popsection\n\t"                                    \
+                   _ASM_EXTABLE(.Lret%=, .Lfix%=)                       \
+                   : [exn] "+g" (stub_exn.info) ASM_CALL_CONSTRAINT,    \
+                     constraints,                                       \
+                     [stub] "r" (stub.func),                            \
+                     "m" (*(uint8_t(*)[MAX_INST_LEN + 1])stub.ptr) );   \
+    if ( unlikely(~stub_exn.info.raw) )                                 \
+        goto emulation_stub_failure;                                    \
+} while (0)
+
+#else /* !__XEN__ */
+
+# define get_stub(stb) ({                        \
+    assert(!(stb).addr);                         \
+    (void *)((stb).addr = (uintptr_t)(stb).buf); \
+})
+
+# define put_stub(stb) ((stb).addr = 0)
+
+struct stub_exn {};
+
+# define invoke_stub(pre, post, constraints...)                         \
+    asm volatile ( pre "\n\tcall *%[stub]\n\t" post                     \
+                   : constraints, [stub] "rm" (stub.func),              \
+                     "m" (*(typeof(stub.buf) *)stub.addr) )
+
+#endif /* __XEN__ */
+
 int x86emul_get_cpl(struct x86_emulate_ctxt *ctxt,
                     const struct x86_emulate_ops *ops);
 
@@ -556,6 +718,16 @@ do {                                                            \
     if ( rc ) goto done;                                        \
 } while (0)
 
+int x86emul_fpu(struct x86_emulate_state *s,
+                struct cpu_user_regs *regs,
+                struct operand *dst,
+                struct operand *src,
+                struct x86_emulate_ctxt *ctxt,
+                const struct x86_emulate_ops *ops,
+                unsigned int *insn_bytes,
+                enum x86_emulate_fpu_type *fpu_type,
+                struct stub_exn *stub_exn,
+                mmval_t *mmvalp);
 int x86emul_0f01(struct x86_emulate_state *s,
                  struct cpu_user_regs *regs,
                  struct operand *dst,

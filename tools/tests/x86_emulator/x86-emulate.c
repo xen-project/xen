@@ -29,12 +29,6 @@
 # define __OP          "r"  /* Operand Prefix */
 #endif
 
-#define get_stub(stb) ({                         \
-    assert(!(stb).addr);                         \
-    (void *)((stb).addr = (uintptr_t)(stb).buf); \
-})
-#define put_stub(stb) ((stb).addr = 0)
-
 uint32_t mxcsr_mask = 0x0000ffbf;
 struct cpuid_policy cp;
 

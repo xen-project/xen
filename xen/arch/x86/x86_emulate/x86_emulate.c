@@ -643,50 +643,6 @@ static const uint8_t sse_prefix[] = { 0x66, 0xf3, 0xf2 };
 #define PTR_POISON NULL /* 32-bit builds are for user-space, so NULL is OK. */
 #endif
 
-#ifndef X86EMUL_NO_FPU
-struct x87_env16 {
-    uint16_t fcw;
-    uint16_t fsw;
-    uint16_t ftw;
-    union {
-        struct {
-            uint16_t fip_lo;
-            uint16_t fop:11, :1, fip_hi:4;
-            uint16_t fdp_lo;
-            uint16_t :12, fdp_hi:4;
-        } real;
-        struct {
-            uint16_t fip;
-            uint16_t fcs;
-            uint16_t fdp;
-            uint16_t fds;
-        } prot;
-    } mode;
-};
-
-struct x87_env32 {
-    uint32_t fcw:16, :16;
-    uint32_t fsw:16, :16;
-    uint32_t ftw:16, :16;
-    union {
-        struct {
-            /* some CPUs/FPUs also store the full FIP here */
-            uint32_t fip_lo:16, :16;
-            uint32_t fop:11, :1, fip_hi:16, :4;
-            /* some CPUs/FPUs also store the full FDP here */
-            uint32_t fdp_lo:16, :16;
-            uint32_t :12, fdp_hi:16, :4;
-        } real;
-        struct {
-            uint32_t fip;
-            uint32_t fcs:16, fop:11, :5;
-            uint32_t fdp;
-            uint32_t fds:16, :16;
-        } prot;
-    } mode;
-};
-#endif
-
 /*
  * While proper alignment gets specified in mmval_t, this doesn't get honored
  * by the compiler for automatic variables. Use this helper to instantiate a
@@ -703,9 +659,6 @@ struct x87_env32 {
 #else
 # define ASM_FLAG_OUT(yes, no) no
 #endif
-
-/* Floating point status word definitions. */
-#define FSW_ES    (1U << 7)
 
 /* MXCSR bit definitions. */
 #define MXCSR_MM  (1U << 17)
@@ -736,49 +689,6 @@ struct x87_env32 {
 #define ECODE_EXT (1 << 0)
 #define ECODE_IDT (1 << 1)
 #define ECODE_TI  (1 << 2)
-
-/*
- * Instruction emulation:
- * Most instructions are emulated directly via a fragment of inline assembly
- * code. This allows us to save/restore EFLAGS and thus very easily pick up
- * any modified flags.
- */
-
-#if defined(__x86_64__)
-#define _LO32 "k"          /* force 32-bit operand */
-#define _STK  "%%rsp"      /* stack pointer */
-#define _BYTES_PER_LONG "8"
-#elif defined(__i386__)
-#define _LO32 ""           /* force 32-bit operand */
-#define _STK  "%%esp"      /* stack pointer */
-#define _BYTES_PER_LONG "4"
-#endif
-
-/* Before executing instruction: restore necessary bits in EFLAGS. */
-#define _PRE_EFLAGS(_sav, _msk, _tmp)                           \
-/* EFLAGS = (_sav & _msk) | (EFLAGS & ~_msk); _sav &= ~_msk; */ \
-"movl %"_LO32 _sav",%"_LO32 _tmp"; "                            \
-"push %"_tmp"; "                                                \
-"push %"_tmp"; "                                                \
-"movl %"_msk",%"_LO32 _tmp"; "                                  \
-"andl %"_LO32 _tmp",("_STK"); "                                 \
-"pushf; "                                                       \
-"notl %"_LO32 _tmp"; "                                          \
-"andl %"_LO32 _tmp",("_STK"); "                                 \
-"andl %"_LO32 _tmp",2*"_BYTES_PER_LONG"("_STK"); "              \
-"pop  %"_tmp"; "                                                \
-"orl  %"_LO32 _tmp",("_STK"); "                                 \
-"popf; "                                                        \
-"pop  %"_tmp"; "                                                \
-"movl %"_LO32 _tmp",%"_LO32 _sav"; "
-
-/* After executing instruction: write-back necessary bits in EFLAGS. */
-#define _POST_EFLAGS(_sav, _msk, _tmp)          \
-/* _sav |= EFLAGS & _msk; */                    \
-"pushf; "                                       \
-"pop  %"_tmp"; "                                \
-"andl %"_msk",%"_LO32 _tmp"; "                  \
-"orl  %"_LO32 _tmp",%"_LO32 _sav"; "
 
 /* Raw emulation: instruction has two explicit operands. */
 #define __emulate_2op_nobyte(_op, src, dst, sz, eflags, wsx,wsy,wdx,wdy,   \
@@ -912,33 +822,6 @@ do{ asm volatile (                                                      \
 #define __emulate_2op_8byte(op, src, dst, eflags, qsx, qsy, qdx, qdy, extra...)
 #define __emulate_1op_8byte(op, dst, eflags, extra...)
 #endif /* __i386__ */
-
-#ifdef __XEN__
-# define invoke_stub(pre, post, constraints...) do {                    \
-    stub_exn.info = (union stub_exception_token) { .raw = ~0 };         \
-    stub_exn.line = __LINE__; /* Utility outweighs livepatching cost */ \
-    block_speculation(); /* SCSB */                                     \
-    asm volatile ( pre "\n\tINDIRECT_CALL %[stub]\n\t" post "\n"        \
-                   ".Lret%=:\n\t"                                       \
-                   ".pushsection .fixup,\"ax\"\n"                       \
-                   ".Lfix%=:\n\t"                                       \
-                   "pop %[exn]\n\t"                                     \
-                   "jmp .Lret%=\n\t"                                    \
-                   ".popsection\n\t"                                    \
-                   _ASM_EXTABLE(.Lret%=, .Lfix%=)                       \
-                   : [exn] "+g" (stub_exn.info) ASM_CALL_CONSTRAINT,    \
-                     constraints,                                       \
-                     [stub] "r" (stub.func),                            \
-                     "m" (*(uint8_t(*)[MAX_INST_LEN + 1])stub.ptr) );   \
-    if ( unlikely(~stub_exn.info.raw) )                                 \
-        goto emulation_stub_failure;                                    \
-} while (0)
-#else
-# define invoke_stub(pre, post, constraints...)                         \
-    asm volatile ( pre "\n\tcall *%[stub]\n\t" post                     \
-                   : constraints, [stub] "rm" (stub.func),              \
-                     "m" (*(typeof(stub.buf) *)stub.addr) )
-#endif
 
 #define emulate_stub(dst, src...) do {                                  \
     unsigned long tmp;                                                  \
@@ -1161,54 +1044,6 @@ static void put_fpu(
     else if ( type != X86EMUL_FPU_none && ops->put_fpu )
         ops->put_fpu(ctxt, X86EMUL_FPU_none, NULL);
 }
-
-static inline bool fpu_check_write(void)
-{
-    uint16_t fsw;
-
-    asm ( "fnstsw %0" : "=am" (fsw) );
-
-    return !(fsw & FSW_ES);
-}
-
-#define emulate_fpu_insn_memdst(opc, ext, arg)                          \
-do {                                                                    \
-    /* ModRM: mod=0, reg=ext, rm=0, i.e. a (%rax) operand */            \
-    insn_bytes = 2;                                                     \
-    memcpy(get_stub(stub),                                              \
-           ((uint8_t[]){ opc, ((ext) & 7) << 3, 0xc3 }), 3);            \
-    invoke_stub("", "", "+m" (arg) : "a" (&(arg)));                     \
-    put_stub(stub);                                                     \
-} while (0)
-
-#define emulate_fpu_insn_memsrc(opc, ext, arg)                          \
-do {                                                                    \
-    /* ModRM: mod=0, reg=ext, rm=0, i.e. a (%rax) operand */            \
-    memcpy(get_stub(stub),                                              \
-           ((uint8_t[]){ opc, ((ext) & 7) << 3, 0xc3 }), 3);            \
-    invoke_stub("", "", "=m" (dummy) : "m" (arg), "a" (&(arg)));        \
-    put_stub(stub);                                                     \
-} while (0)
-
-#define emulate_fpu_insn_stub(bytes...)                                 \
-do {                                                                    \
-    unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
-    memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
-    invoke_stub("", "", "=m" (dummy) : "i" (0));                        \
-    put_stub(stub);                                                     \
-} while (0)
-
-#define emulate_fpu_insn_stub_eflags(bytes...)                          \
-do {                                                                    \
-    unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
-    unsigned long tmp_;                                                 \
-    memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
-    invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),             \
-                _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),            \
-                [eflags] "+g" (_regs.eflags), [tmp] "=&r" (tmp_)        \
-                : [mask] "i" (X86_EFLAGS_ZF|X86_EFLAGS_PF|X86_EFLAGS_CF)); \
-    put_stub(stub);                                                     \
-} while (0)
 
 static inline unsigned long get_loop_count(
     const struct cpu_user_regs *regs,
@@ -3154,12 +2989,7 @@ x86_emulate(
     enum x86_emulate_fpu_type fpu_type = X86EMUL_FPU_none;
     struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
-#ifdef __XEN__
-    struct {
-        union stub_exception_token info;
-        unsigned int line;
-    } stub_exn;
-#endif
+    struct stub_exn stub_exn = {};
 
     ASSERT(ops->read);
 
@@ -3952,10 +3782,10 @@ x86_emulate(
 
 #ifndef X86EMUL_NO_FPU
     case 0x9b:  /* wait/fwait */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_wait);
-        emulate_fpu_insn_stub(b);
-        break;
+    case 0xd8 ... 0xdf: /* FPU */
+        rc = x86emul_fpu(state, &_regs, &dst, &src, ctxt, ops,
+                         &insn_bytes, &fpu_type, &stub_exn, mmvalp);
+        goto dispatch_from_helper;
 #endif
 
     case 0x9c: /* pushf */
@@ -4365,373 +4195,6 @@ x86_emulate(
         _regs.al = al;
         break;
     }
-
-#ifndef X86EMUL_NO_FPU
-    case 0xd8: /* FPU 0xd8 */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu);
-        switch ( modrm )
-        {
-        case 0xc0 ... 0xc7: /* fadd %stN,%st */
-        case 0xc8 ... 0xcf: /* fmul %stN,%st */
-        case 0xd0 ... 0xd7: /* fcom %stN,%st */
-        case 0xd8 ... 0xdf: /* fcomp %stN,%st */
-        case 0xe0 ... 0xe7: /* fsub %stN,%st */
-        case 0xe8 ... 0xef: /* fsubr %stN,%st */
-        case 0xf0 ... 0xf7: /* fdiv %stN,%st */
-        case 0xf8 ... 0xff: /* fdivr %stN,%st */
-            emulate_fpu_insn_stub(0xd8, modrm);
-            break;
-        default:
-        fpu_memsrc32:
-            ASSERT(ea.type == OP_MEM);
-            if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                 4, ctxt)) != X86EMUL_OKAY )
-                goto done;
-            emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
-            break;
-        }
-        break;
-
-    case 0xd9: /* FPU 0xd9 */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu);
-        switch ( modrm )
-        {
-        case 0xfb: /* fsincos */
-            fail_if(cpu_has_amd_erratum(573));
-            /* fall through */
-        case 0xc0 ... 0xc7: /* fld %stN */
-        case 0xc8 ... 0xcf: /* fxch %stN */
-        case 0xd0: /* fnop */
-        case 0xd8 ... 0xdf: /* fstp %stN (alternative encoding) */
-        case 0xe0: /* fchs */
-        case 0xe1: /* fabs */
-        case 0xe4: /* ftst */
-        case 0xe5: /* fxam */
-        case 0xe8: /* fld1 */
-        case 0xe9: /* fldl2t */
-        case 0xea: /* fldl2e */
-        case 0xeb: /* fldpi */
-        case 0xec: /* fldlg2 */
-        case 0xed: /* fldln2 */
-        case 0xee: /* fldz */
-        case 0xf0: /* f2xm1 */
-        case 0xf1: /* fyl2x */
-        case 0xf2: /* fptan */
-        case 0xf3: /* fpatan */
-        case 0xf4: /* fxtract */
-        case 0xf5: /* fprem1 */
-        case 0xf6: /* fdecstp */
-        case 0xf7: /* fincstp */
-        case 0xf8: /* fprem */
-        case 0xf9: /* fyl2xp1 */
-        case 0xfa: /* fsqrt */
-        case 0xfc: /* frndint */
-        case 0xfd: /* fscale */
-        case 0xfe: /* fsin */
-        case 0xff: /* fcos */
-            emulate_fpu_insn_stub(0xd9, modrm);
-            break;
-        default:
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            switch ( modrm_reg & 7 )
-            {
-            case 0: /* fld m32fp */
-                goto fpu_memsrc32;
-            case 2: /* fst m32fp */
-            case 3: /* fstp m32fp */
-            fpu_memdst32:
-                dst = ea;
-                dst.bytes = 4;
-                emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
-                break;
-            case 4: /* fldenv */
-                /* Raise #MF now if there are pending unmasked exceptions. */
-                emulate_fpu_insn_stub(0xd9, 0xd0 /* fnop */);
-                /* fall through */
-            case 6: /* fnstenv */
-                fail_if(!ops->blk);
-                state->blk = modrm_reg & 2 ? blk_fst : blk_fld;
-                /*
-                 * REX is meaningless for these insns by this point - (ab)use
-                 * the field to communicate real vs protected mode to ->blk().
-                 */
-                /*state->*/rex_prefix = in_protmode(ctxt, ops);
-                if ( (rc = ops->blk(ea.mem.seg, ea.mem.off, NULL,
-                                    op_bytes > 2 ? sizeof(struct x87_env32)
-                                                 : sizeof(struct x87_env16),
-                                    &_regs.eflags,
-                                    state, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                state->fpu_ctrl = true;
-                break;
-            case 5: /* fldcw m2byte */
-                state->fpu_ctrl = true;
-            fpu_memsrc16:
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                     2, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
-                break;
-            case 7: /* fnstcw m2byte */
-                state->fpu_ctrl = true;
-            fpu_memdst16:
-                dst = ea;
-                dst.bytes = 2;
-                emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
-                break;
-            default:
-                generate_exception(EXC_UD);
-            }
-            /*
-             * Control instructions can't raise FPU exceptions, so we need
-             * to consider suppressing writes only for non-control ones.
-             */
-            if ( dst.type == OP_MEM && !state->fpu_ctrl && !fpu_check_write() )
-                dst.type = OP_NONE;
-        }
-        break;
-
-    case 0xda: /* FPU 0xda */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu);
-        switch ( modrm )
-        {
-        case 0xc0 ... 0xc7: /* fcmovb %stN */
-        case 0xc8 ... 0xcf: /* fcmove %stN */
-        case 0xd0 ... 0xd7: /* fcmovbe %stN */
-        case 0xd8 ... 0xdf: /* fcmovu %stN */
-            vcpu_must_have(cmov);
-            emulate_fpu_insn_stub_eflags(0xda, modrm);
-            break;
-        case 0xe9:          /* fucompp */
-            emulate_fpu_insn_stub(0xda, modrm);
-            break;
-        default:
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            goto fpu_memsrc32;
-        }
-        break;
-
-    case 0xdb: /* FPU 0xdb */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu);
-        switch ( modrm )
-        {
-        case 0xc0 ... 0xc7: /* fcmovnb %stN */
-        case 0xc8 ... 0xcf: /* fcmovne %stN */
-        case 0xd0 ... 0xd7: /* fcmovnbe %stN */
-        case 0xd8 ... 0xdf: /* fcmovnu %stN */
-        case 0xe8 ... 0xef: /* fucomi %stN */
-        case 0xf0 ... 0xf7: /* fcomi %stN */
-            vcpu_must_have(cmov);
-            emulate_fpu_insn_stub_eflags(0xdb, modrm);
-            break;
-        case 0xe0: /* fneni - 8087 only, ignored by 287 */
-        case 0xe1: /* fndisi - 8087 only, ignored by 287 */
-        case 0xe2: /* fnclex */
-        case 0xe3: /* fninit */
-        case 0xe4: /* fnsetpm - 287 only, ignored by 387 */
-        /* case 0xe5: frstpm - 287 only, #UD on 387 */
-            state->fpu_ctrl = true;
-            emulate_fpu_insn_stub(0xdb, modrm);
-            break;
-        default:
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            switch ( modrm_reg & 7 )
-            {
-            case 0: /* fild m32i */
-                goto fpu_memsrc32;
-            case 1: /* fisttp m32i */
-                host_and_vcpu_must_have(sse3);
-                /* fall through */
-            case 2: /* fist m32i */
-            case 3: /* fistp m32i */
-                goto fpu_memdst32;
-            case 5: /* fld m80fp */
-            fpu_memsrc80:
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp,
-                                     10, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                emulate_fpu_insn_memsrc(b, modrm_reg & 7, *mmvalp);
-                break;
-            case 7: /* fstp m80fp */
-            fpu_memdst80:
-                fail_if(!ops->write);
-                emulate_fpu_insn_memdst(b, modrm_reg & 7, *mmvalp);
-                if ( fpu_check_write() &&
-                     (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
-                                      10, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                break;
-            default:
-                generate_exception(EXC_UD);
-            }
-        }
-        break;
-
-    case 0xdc: /* FPU 0xdc */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu);
-        switch ( modrm )
-        {
-        case 0xc0 ... 0xc7: /* fadd %st,%stN */
-        case 0xc8 ... 0xcf: /* fmul %st,%stN */
-        case 0xd0 ... 0xd7: /* fcom %stN,%st (alternative encoding) */
-        case 0xd8 ... 0xdf: /* fcomp %stN,%st (alternative encoding) */
-        case 0xe0 ... 0xe7: /* fsubr %st,%stN */
-        case 0xe8 ... 0xef: /* fsub %st,%stN */
-        case 0xf0 ... 0xf7: /* fdivr %st,%stN */
-        case 0xf8 ... 0xff: /* fdiv %st,%stN */
-            emulate_fpu_insn_stub(0xdc, modrm);
-            break;
-        default:
-        fpu_memsrc64:
-            ASSERT(ea.type == OP_MEM);
-            if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                 8, ctxt)) != X86EMUL_OKAY )
-                goto done;
-            emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
-            break;
-        }
-        break;
-
-    case 0xdd: /* FPU 0xdd */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu);
-        switch ( modrm )
-        {
-        case 0xc0 ... 0xc7: /* ffree %stN */
-        case 0xc8 ... 0xcf: /* fxch %stN (alternative encoding) */
-        case 0xd0 ... 0xd7: /* fst %stN */
-        case 0xd8 ... 0xdf: /* fstp %stN */
-        case 0xe0 ... 0xe7: /* fucom %stN */
-        case 0xe8 ... 0xef: /* fucomp %stN */
-            emulate_fpu_insn_stub(0xdd, modrm);
-            break;
-        default:
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            switch ( modrm_reg & 7 )
-            {
-            case 0: /* fld m64fp */;
-                goto fpu_memsrc64;
-            case 1: /* fisttp m64i */
-                host_and_vcpu_must_have(sse3);
-                /* fall through */
-            case 2: /* fst m64fp */
-            case 3: /* fstp m64fp */
-            fpu_memdst64:
-                dst = ea;
-                dst.bytes = 8;
-                emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
-                break;
-            case 4: /* frstor */
-                /* Raise #MF now if there are pending unmasked exceptions. */
-                emulate_fpu_insn_stub(0xd9, 0xd0 /* fnop */);
-                /* fall through */
-            case 6: /* fnsave */
-                fail_if(!ops->blk);
-                state->blk = modrm_reg & 2 ? blk_fst : blk_fld;
-                /*
-                 * REX is meaningless for these insns by this point - (ab)use
-                 * the field to communicate real vs protected mode to ->blk().
-                 */
-                /*state->*/rex_prefix = in_protmode(ctxt, ops);
-                if ( (rc = ops->blk(ea.mem.seg, ea.mem.off, NULL,
-                                    op_bytes > 2 ? sizeof(struct x87_env32) + 80
-                                                 : sizeof(struct x87_env16) + 80,
-                                    &_regs.eflags,
-                                    state, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                state->fpu_ctrl = true;
-                break;
-            case 7: /* fnstsw m2byte */
-                state->fpu_ctrl = true;
-                goto fpu_memdst16;
-            default:
-                generate_exception(EXC_UD);
-            }
-            /*
-             * Control instructions can't raise FPU exceptions, so we need
-             * to consider suppressing writes only for non-control ones.
-             */
-            if ( dst.type == OP_MEM && !state->fpu_ctrl && !fpu_check_write() )
-                dst.type = OP_NONE;
-        }
-        break;
-
-    case 0xde: /* FPU 0xde */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu);
-        switch ( modrm )
-        {
-        case 0xc0 ... 0xc7: /* faddp %stN */
-        case 0xc8 ... 0xcf: /* fmulp %stN */
-        case 0xd0 ... 0xd7: /* fcomp %stN (alternative encoding) */
-        case 0xd9: /* fcompp */
-        case 0xe0 ... 0xe7: /* fsubrp %stN */
-        case 0xe8 ... 0xef: /* fsubp %stN */
-        case 0xf0 ... 0xf7: /* fdivrp %stN */
-        case 0xf8 ... 0xff: /* fdivp %stN */
-            emulate_fpu_insn_stub(0xde, modrm);
-            break;
-        default:
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
-            break;
-        }
-        break;
-
-    case 0xdf: /* FPU 0xdf */
-        host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu);
-        switch ( modrm )
-        {
-        case 0xe0:
-            /* fnstsw %ax */
-            state->fpu_ctrl = true;
-            dst.bytes = 2;
-            dst.type = OP_REG;
-            dst.reg = (void *)&_regs.ax;
-            emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
-            break;
-        case 0xe8 ... 0xef: /* fucomip %stN */
-        case 0xf0 ... 0xf7: /* fcomip %stN */
-            vcpu_must_have(cmov);
-            emulate_fpu_insn_stub_eflags(0xdf, modrm);
-            break;
-        case 0xc0 ... 0xc7: /* ffreep %stN */
-        case 0xc8 ... 0xcf: /* fxch %stN (alternative encoding) */
-        case 0xd0 ... 0xd7: /* fstp %stN (alternative encoding) */
-        case 0xd8 ... 0xdf: /* fstp %stN (alternative encoding) */
-            emulate_fpu_insn_stub(0xdf, modrm);
-            break;
-        default:
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            switch ( modrm_reg & 7 )
-            {
-            case 0: /* fild m16i */
-                goto fpu_memsrc16;
-            case 1: /* fisttp m16i */
-                host_and_vcpu_must_have(sse3);
-                /* fall through */
-            case 2: /* fist m16i */
-            case 3: /* fistp m16i */
-                goto fpu_memdst16;
-            case 4: /* fbld m80dec */
-                goto fpu_memsrc80;
-            case 5: /* fild m64i */
-                dst.type = OP_NONE;
-                goto fpu_memsrc64;
-            case 6: /* fbstp packed bcd */
-                goto fpu_memdst80;
-            case 7: /* fistp m64i */
-                goto fpu_memdst64;
-            }
-        }
-        break;
-#endif /* !X86EMUL_NO_FPU */
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
         unsigned long count = get_loop_count(&_regs, ad_bytes);
@@ -10161,6 +9624,11 @@ x86_emulate(
         {
         case X86EMUL_rdtsc:
             goto rdtsc;
+
+#ifdef __XEN__
+        case X86EMUL_stub_failure:
+            goto emulation_stub_failure;
+#endif
         }
 
         /* Internally used state change indicators may not make it here. */
