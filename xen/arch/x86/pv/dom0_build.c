@@ -459,7 +459,12 @@ int __init dom0_construct_pv(struct domain *d,
     compat = is_pv_32bit_domain(d);
 
     if ( elf_64bit(&elf) && machine == EM_X86_64 )
+    {
         compatible = true;
+
+        /* Zap meaningless setting which kernels may carry by mistake. */
+        parms.pae = 0;
+    }
 
     if ( elf_msb(&elf) )
         compatible = false;
