@@ -261,6 +261,9 @@ static void vpl011_update_tx_fifo_status(struct vpl011 *vpl011,
     struct xencons_interface *intf = vpl011->backend.dom.ring_buf;
     unsigned int fifo_threshold = sizeof(intf->out) - SBSA_UART_FIFO_LEVEL;
 
+    /* No TX FIFO handling when backend is in Xen */
+    ASSERT(vpl011->backend_in_domain);
+
     BUILD_BUG_ON(sizeof(intf->out) < SBSA_UART_FIFO_SIZE);
 
     /*
@@ -547,7 +550,13 @@ static void vpl011_data_avail(struct domain *d,
          */
         vpl011->uartfr &= ~BUSY;
 
-        vpl011_update_tx_fifo_status(vpl011, out_fifo_level);
+        /*
+         * When backend is in Xen, we are always ready for new data to be
+         * written (i.e. no TX FIFO handling), therefore we do not want
+         * to change the TX FIFO status in such case.
+         */
+        if ( vpl011->backend_in_domain )
+            vpl011_update_tx_fifo_status(vpl011, out_fifo_level);
     }
 
     vpl011_update_interrupt_status(d);
