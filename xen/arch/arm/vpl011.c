@@ -143,8 +143,8 @@ static uint8_t vpl011_read_data_xen(struct domain *d)
     /*
      * It is expected that there will be data in the ring buffer when this
      * function is called since the guest is expected to read the data register
-     * only if the TXFE flag is not set.
-     * If the guest still does read when TXFE bit is set then 0 will be returned.
+     * only if the RXFE flag is not set.
+     * If the guest still does read when RXFE bit is set then 0 will be returned.
      */
     if ( xencons_queued(in_prod, in_cons, sizeof(intf->in)) > 0 )
     {
@@ -202,8 +202,8 @@ static uint8_t vpl011_read_data(struct domain *d)
     /*
      * It is expected that there will be data in the ring buffer when this
      * function is called since the guest is expected to read the data register
-     * only if the TXFE flag is not set.
-     * If the guest still does read when TXFE bit is set then 0 will be returned.
+     * only if the RXFE flag is not set.
+     * If the guest still does read when RXFE bit is set then 0 will be returned.
      */
     if ( xencons_queued(in_prod, in_cons, sizeof(intf->in)) > 0 )
     {
