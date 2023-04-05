@@ -278,6 +278,7 @@ else
 run32 clean32: %32: %
 endif
 
+.PHONY: x86_emulate
 x86_emulate:
 	mkdir -p $@
 	ln -sf $(XEN_ROOT)/xen/arch/x86/$@/*.[ch] $@/
