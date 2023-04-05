@@ -112,8 +112,14 @@ static void vpl011_write_data_xen(struct domain *d, uint8_t data)
         }
     }
 
+    /*
+     * When backend is in Xen, we tell guest we are always ready for new data
+     * to be written. This is fulfilled by having:
+     * - TXI/TXFE -> always set,
+     * - TXFF/BUSY -> never set.
+     */
     vpl011->uartris |= TXI;
-    vpl011->uartfr &= ~TXFE;
+    vpl011->uartfr |= TXFE;
     vpl011_update_interrupt_status(d);
 
     VPL011_UNLOCK(d, flags);
