@@ -40,20 +40,20 @@ static DEFINE_RCU_READ_LOCK(rcu_virtual_region_lock);
 
 const struct virtual_region *find_text_region(unsigned long addr)
 {
-    const struct virtual_region *region;
+    const struct virtual_region *iter, *region = NULL;
 
     rcu_read_lock(&rcu_virtual_region_lock);
-    list_for_each_entry_rcu( region, &virtual_region_list, list )
+    list_for_each_entry_rcu ( iter, &virtual_region_list, list )
     {
-        if ( (void *)addr >= region->start && (void *)addr < region->end )
+        if ( (void *)addr >= iter->start && (void *)addr < iter->end )
         {
-            rcu_read_unlock(&rcu_virtual_region_lock);
-            return region;
+            region = iter;
+            break;
         }
     }
     rcu_read_unlock(&rcu_virtual_region_lock);
 
-    return NULL;
+    return region;
 }
 
 void register_virtual_region(struct virtual_region *r)
