@@ -563,6 +563,7 @@ typedef struct {
 #if defined(ELFSIZE) && (ELFSIZE == 32)
 #define PRIxElfAddr 	PRIx32
 #define PRIuElfWord 	PRIu32
+#define PRIxElfWord 	PRIx32
 
 #define Elf_Ehdr	Elf32_Ehdr
 #define Elf_Phdr	Elf32_Phdr
@@ -591,6 +592,7 @@ typedef struct {
 #elif defined(ELFSIZE) && (ELFSIZE == 64)
 #define PRIxElfAddr	PRIx64
 #define PRIuElfWord	PRIu64
+#define PRIxElfWord	PRIx64
 
 #define Elf_Ehdr	Elf64_Ehdr
 #define Elf_Phdr	Elf64_Phdr
