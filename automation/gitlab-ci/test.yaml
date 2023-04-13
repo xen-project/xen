@@ -131,21 +131,21 @@ xilinx-smoke-dom0less-arm64-gcc:
     - *arm64-test-needs
     - alpine-3.12-gcc-arm64
 
-adl-smoke-x86-64-gcc:
+adl-smoke-x86-64-gcc-debug:
   extends: .adl-x86-64
   script:
     - ./automation/scripts/qubes-x86-64.sh 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.12-gcc
+    - alpine-3.12-gcc-debug
 
-adl-suspend-x86-64-gcc:
+adl-suspend-x86-64-gcc-debug:
   extends: .adl-x86-64
   script:
     - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.12-gcc
+    - alpine-3.12-gcc-debug
 
 qemu-smoke-dom0-arm64-gcc:
   extends: .qemu-arm64
