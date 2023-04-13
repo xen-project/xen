@@ -382,24 +382,28 @@ static int __init cf_check nmi_apply_alternatives(
      */
     if ( !(alt_done & alt_todo) )
     {
-        unsigned long cr0, cr4;
-
-        cr0 = read_cr0();
-        cr4 = read_cr4();
-
-        if ( cr4 & X86_CR4_CET )
-            write_cr4(cr4 & ~X86_CR4_CET);
-
-        /* Disable WP to allow patching read-only pages. */
-        write_cr0(cr0 & ~X86_CR0_WP);
+        /*
+         * Relax perms on .text to be RWX, so we can modify them.
+         *
+         * This relaxes perms globally, but we run ahead of bringing APs
+         * online, so only have our own TLB to worry about.
+         */
+        modify_xen_mappings_lite(XEN_VIRT_START + MB(2),
+                                 (unsigned long)&__2M_text_end,
+                                 PAGE_HYPERVISOR_RWX);
+        flush_local(FLUSH_TLB_GLOBAL);
 
         _apply_alternatives(__alt_instructions, __alt_instructions_end,
                             alt_done);
 
-        write_cr0(cr0);
-
-        if ( cr4 & X86_CR4_CET )
-            write_cr4(cr4);
+        /*
+         * Reinstate perms on .text to be RX.  This also cleans out the dirty
+         * bits, which matters when CET Shstk is active.
+         */
+        modify_xen_mappings_lite(XEN_VIRT_START + MB(2),
+                                 (unsigned long)&__2M_text_end,
+                                 PAGE_HYPERVISOR_RX);
+        flush_local(FLUSH_TLB_GLOBAL);
 
         alt_done |= alt_todo;
     }
@@ -454,19 +458,6 @@ static void __init _alternative_instructions(bool force)
         panic("Timed out waiting for alternatives self-NMI to hit\n");
 
     set_nmi_callback(saved_nmi_callback);
-
-    /*
-     * When Xen is using shadow stacks, the alternatives clearing CR0.WP and
-     * writing into the mappings set dirty bits, turning the mappings into
-     * shadow stack mappings.
-     *
-     * While we can execute from them, this would also permit them to be the
-     * target of WRSS instructions, so reset the dirty after patching.
-     */
-    if ( cpu_has_xen_shstk )
-        modify_xen_mappings(XEN_VIRT_START + MB(2),
-                            (unsigned long)&__2M_text_end,
-                            PAGE_HYPERVISOR_RX);
 }
 
 void __init alternative_instructions(void)
