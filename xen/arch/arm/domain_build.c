@@ -1944,7 +1944,8 @@ static int __init make_cpus_node(const struct domain *d, void *fdt)
     /* Placeholder for cpu@ + a 32-bit hexadecimal number + \0 */
     char buf[13];
     u32 clock_frequency;
-    bool clock_valid;
+    /* Keep the compiler happy with -Og */
+    bool clock_valid = false;
     uint64_t mpidr_aff;
 
     dt_dprintk("Create cpus node\n");
