@@ -86,11 +86,11 @@ static inline void guest_clear_mask16(struct domain *d, uint16_t mask,
     domain_unpause(d);
 }
 
-static inline unsigned long __guest_cmpxchg(struct domain *d,
-                                            volatile void *ptr,
-                                            unsigned long old,
-                                            unsigned long new,
-                                            unsigned int size)
+static always_inline unsigned long __guest_cmpxchg(struct domain *d,
+                                                   volatile void *ptr,
+                                                   unsigned long old,
+                                                   unsigned long new,
+                                                   unsigned int size)
 {
     unsigned long oldval = old;
 
