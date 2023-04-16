@@ -44,7 +44,7 @@ static bool branch_insn_requires_update(const struct alt_instr *alt,
         return true;
 
     replptr = (unsigned long)ALT_REPL_PTR(alt);
-    if ( pc >= replptr && pc <= (replptr + alt->alt_len) )
+    if ( pc >= replptr && pc <= (replptr + alt->repl_len) )
         return false;
 
     /*
@@ -128,9 +128,9 @@ static int __apply_alternatives(const struct alt_region *region,
             continue;
 
         if ( alt->cpufeature == ARM_CB_PATCH )
-            BUG_ON(alt->alt_len != 0);
+            BUG_ON(alt->repl_len != 0);
         else
-            BUG_ON(alt->alt_len != alt->orig_len);
+            BUG_ON(alt->repl_len != alt->orig_len);
 
         origptr = ALT_ORIG_PTR(alt);
         updptr = (void *)origptr + update_offset;
