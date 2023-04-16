@@ -500,6 +500,7 @@ int __cpu_up(unsigned int cpu)
     init_data.cpuid = ~0;
     smp_up_cpu = MPIDR_INVALID;
     clean_dcache(smp_up_cpu);
+    arch_cpu_up_finish();
 
     if ( !cpu_online(cpu) )
     {

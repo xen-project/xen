@@ -308,6 +308,7 @@ real_start_efi:
         bl    check_cpu_mode
         bl    cpu_init
         bl    create_page_tables
+        load_paddr x0, boot_pgtable
         bl    enable_mmu
 
         /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
@@ -365,29 +366,14 @@ GLOBAL(init_secondary)
 #endif
         bl    check_cpu_mode
         bl    cpu_init
-        bl    create_page_tables
+        load_paddr x0, init_ttbr
+        ldr   x0, [x0]
         bl    enable_mmu
 
         /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
         ldr   x0, =secondary_switched
         br    x0
 secondary_switched:
-        /*
-         * Non-boot CPUs need to move on to the proper pagetables, which were
-         * setup in init_secondary_pagetables.
-         *
-         * XXX: This is not compliant with the Arm Arm.
-         */
-        ldr   x4, =init_ttbr         /* VA of TTBR0_EL2 stashed by CPU 0 */
-        ldr   x4, [x4]               /* Actual value */
-        dsb   sy
-        msr   TTBR0_EL2, x4
-        dsb   sy
-        isb
-        tlbi  alle2
-        dsb   sy                     /* Ensure completion of TLB flush */
-        isb
-
 #ifdef CONFIG_EARLY_PRINTK
         /* Use a virtual address to access the UART. */
         ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
@@ -672,9 +658,13 @@ ENDPROC(create_page_tables)
  * mapping. In other word, the caller is responsible to switch to the runtime
  * mapping.
  *
- * Clobbers x0 - x3
+ * Inputs:
+ *   x0 : Physical address of the page tables.
+ *
+ * Clobbers x0 - x4
  */
 enable_mmu:
+        mov   x4, x0
         PRINT("- Turning on paging -\r\n")
 
         /*
@@ -685,8 +675,7 @@ enable_mmu:
         dsb   nsh
 
         /* Write Xen's PT's paddr into TTBR0_EL2 */
-        load_paddr x0, boot_pgtable
-        msr   TTBR0_EL2, x0
+        msr   TTBR0_EL2, x4
         isb
 
         mrs   x0, SCTLR_EL2

@@ -106,10 +106,23 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
 
 int arch_cpu_up(int cpu)
 {
+    int rc;
+
     if ( !smp_enable_ops[cpu].prepare_cpu )
         return -ENODEV;
 
-    return smp_enable_ops[cpu].prepare_cpu(cpu);
+    update_identity_mapping(true);
+
+    rc = smp_enable_ops[cpu].prepare_cpu(cpu);
+    if ( rc )
+        update_identity_mapping(false);
+
+    return rc;
+}
+
+void arch_cpu_up_finish(void)
+{
+    update_identity_mapping(false);
 }
 
 /*

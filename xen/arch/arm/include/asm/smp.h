@@ -25,6 +25,7 @@ extern void noreturn stop_cpu(void);
 extern int arch_smp_init(void);
 extern int arch_cpu_init(int cpu, struct dt_device_node *dn);
 extern int arch_cpu_up(int cpu);
+extern void arch_cpu_up_finish(void);
 
 int cpu_up_send_sgi(int cpu);
 
