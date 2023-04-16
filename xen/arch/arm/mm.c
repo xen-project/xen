@@ -93,7 +93,7 @@ DEFINE_BOOT_PAGE_TABLE(boot_third);
 
 #ifdef CONFIG_ARM_64
 #define HYP_PT_ROOT_LEVEL 0
-static DEFINE_PAGE_TABLE(xen_pgtable);
+DEFINE_PAGE_TABLE(xen_pgtable);
 static DEFINE_PAGE_TABLE(xen_first);
 #define THIS_CPU_PGTABLE xen_pgtable
 #else
@@ -400,7 +400,7 @@ void flush_page_to_ram(unsigned long mfn, bool sync_icache)
         invalidate_icache();
 }
 
-static inline lpae_t pte_of_xenaddr(vaddr_t va)
+lpae_t pte_of_xenaddr(vaddr_t va)
 {
     paddr_t ma = va + phys_offset;
 
@@ -506,6 +506,8 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     int i;
 
     phys_offset = boot_phys_offset;
+
+    arch_setup_page_tables();
 
 #ifdef CONFIG_ARM_64
     pte = pte_of_xenaddr((uintptr_t)xen_first);

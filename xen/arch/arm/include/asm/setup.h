@@ -168,6 +168,17 @@ u32 device_tree_get_u32(const void *fdt, int node,
 int map_range_to_domain(const struct dt_device_node *dev,
                         u64 addr, u64 len, void *data);
 
+extern DEFINE_BOOT_PAGE_TABLE(boot_pgtable);
+
+#ifdef CONFIG_ARM_64
+extern DEFINE_BOOT_PAGE_TABLE(boot_first_id);
+#endif
+extern DEFINE_BOOT_PAGE_TABLE(boot_second_id);
+extern DEFINE_BOOT_PAGE_TABLE(boot_third_id);
+
+/* Find where Xen will be residing at runtime and return a PT entry */
+lpae_t pte_of_xenaddr(vaddr_t);
+
 extern const char __ro_after_init_start[], __ro_after_init_end[];
 
 struct init_info
