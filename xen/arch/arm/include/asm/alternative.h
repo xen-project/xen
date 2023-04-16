@@ -13,16 +13,16 @@
 
 struct alt_instr {
 	s32 orig_offset;	/* offset to original instruction */
-	s32 alt_offset;		/* offset to replacement instruction */
+	s32 repl_offset;	/* offset to replacement instruction */
 	u16 cpufeature;		/* cpufeature bit set for replacement */
 	u8  orig_len;		/* size of original instruction(s) */
-	u8  alt_len;		/* size of new instruction(s), <= orig_len */
+	u8  repl_len;		/* size of new instruction(s), <= orig_len */
 };
 
 /* Xen: helpers used by common code. */
 #define __ALT_PTR(a,f)		((void *)&(a)->f + (a)->f)
 #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
-#define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+#define ALT_REPL_PTR(a)		__ALT_PTR(a, repl_offset)
 
 typedef void (*alternative_cb_t)(const struct alt_instr *alt,
 				 const uint32_t *origptr, uint32_t *updptr,
@@ -90,12 +90,12 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
 #include <asm/asm_defns.h>
 #include <asm/macros.h>
 
-.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
+.macro altinstruction_entry orig_offset repl_offset feature orig_len repl_len
 	.word \orig_offset - .
-	.word \alt_offset - .
+	.word \repl_offset - .
 	.hword \feature
 	.byte \orig_len
-	.byte \alt_len
+	.byte \repl_len
 .endm
 
 .macro alternative_insn insn1, insn2, cap, enable = 1
