@@ -153,7 +153,19 @@ static void __init __maybe_unused build_assertions(void)
 #endif
     /* Page table structure constraints */
 #ifdef CONFIG_ARM_64
-    BUILD_BUG_ON(zeroeth_table_offset(XEN_VIRT_START));
+    /*
+     * The first few slots of the L0 table is reserved for the identity
+     * mapping. Check that none of the other regions are overlapping
+     * with it.
+     */
+#define CHECK_OVERLAP_WITH_IDMAP(virt) \
+    BUILD_BUG_ON(zeroeth_table_offset(virt) < IDENTITY_MAPPING_AREA_NR_L0)
+
+    CHECK_OVERLAP_WITH_IDMAP(XEN_VIRT_START);
+    CHECK_OVERLAP_WITH_IDMAP(VMAP_VIRT_START);
+    CHECK_OVERLAP_WITH_IDMAP(FRAMETABLE_VIRT_START);
+    CHECK_OVERLAP_WITH_IDMAP(DIRECTMAP_VIRT_START);
+#undef CHECK_OVERLAP_WITH_IDMAP
 #endif
     BUILD_BUG_ON(first_table_offset(XEN_VIRT_START));
 #ifdef CONFIG_ARCH_MAP_DOMAIN_PAGE
@@ -496,10 +508,11 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     phys_offset = boot_phys_offset;
 
 #ifdef CONFIG_ARM_64
-    p = (void *) xen_pgtable;
-    p[0] = pte_of_xenaddr((uintptr_t)xen_first);
-    p[0].pt.table = 1;
-    p[0].pt.xn = 0;
+    pte = pte_of_xenaddr((uintptr_t)xen_first);
+    pte.pt.table = 1;
+    pte.pt.xn = 0;
+    xen_pgtable[zeroeth_table_offset(XEN_VIRT_START)] = pte;
+
     p = (void *) xen_first;
 #else
     p = (void *) cpu0_pgtable;
