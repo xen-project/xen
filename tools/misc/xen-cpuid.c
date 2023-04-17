@@ -191,6 +191,8 @@ static const char *const str_7a1[32] =
     [12] = "fsrcs",
 
     /* 18 */                [19] = "wrmsrns",
+
+    /* 22 */                [23] = "avx-ifma",
 };
 
 static const char *const str_e21a[32] =

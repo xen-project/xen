@@ -236,6 +236,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"fsrs",         0x00000007,  1, CPUID_REG_EAX, 11,  1},
         {"fsrcs",        0x00000007,  1, CPUID_REG_EAX, 12,  1},
         {"wrmsrns",      0x00000007,  1, CPUID_REG_EAX, 19,  1},
+        {"avx-ifma",     0x00000007,  1, CPUID_REG_EAX, 23,  1},
 
         {"cet-sss",      0x00000007,  1, CPUID_REG_EDX, 18,  1},
 
