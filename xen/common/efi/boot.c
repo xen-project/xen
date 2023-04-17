@@ -1344,6 +1344,15 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         if ( !base_video )
             efi_console_set_mode();
     }
+    else
+    {
+        /*
+         * Some compilers may emit a false "uninitialized use" warning for argc,
+         * so initialize argc/argv here to avoid the warning.
+         */
+        argc = 0;
+        argv = NULL;
+    }
 
     PrintStr(L"Xen " XEN_VERSION_STRING XEN_EXTRAVERSION
 	     " (c/s " XEN_CHANGESET ") EFI loader\r\n");
