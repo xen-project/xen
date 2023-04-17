@@ -239,6 +239,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"avx-ifma",     0x00000007,  1, CPUID_REG_EAX, 23,  1},
 
         {"avx-vnni-int8",0x00000007,  1, CPUID_REG_EDX,  4,  1},
+        {"avx-ne-convert",0x00000007, 1, CPUID_REG_EDX,  5,  1},
         {"cet-sss",      0x00000007,  1, CPUID_REG_EDX, 18,  1},
 
         {"intel-psfd",   0x00000007,  2, CPUID_REG_EDX,  0,  1},

@@ -4400,6 +4400,39 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing vbcstnebf162ps 2(%ecx),%ymm3...");
+    if ( stack_exec && cpu_has_avx_ne_convert )
+    {
+        decl_insn(vbcstnebf162ps);
+
+        asm volatile ( /* vbcstnebf162ps 2(%0), %%ymm3 */
+                       put_insn(vbcstnebf162ps,
+                                ".byte 0xc4, 0xe2, 0x7e, 0xb1, 0x59, 0x02 ")
+                       :: "c" (NULL) );
+
+        res[0] = 0x43210000;
+        regs.ecx = (unsigned long)res;
+        set_insn(vbcstnebf162ps);
+        bytes_read  = 0;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vbcstnebf162ps) ||
+             bytes_read != 2 )
+            goto fail;
+
+        asm volatile ( "vbroadcastss %1, %%ymm2;"
+                       "vsubps %%ymm3, %%ymm2, %%ymm1;"
+                       "vptest %%ymm1, %%ymm1;"
+                       "setc %b0; setz %h0"
+                       : "=&Q" (rc)
+                       : "m" (res[0]) );
+        if ( (rc & 0xffff) != 0x0101 )
+            goto fail;
+
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing stmxcsr (%edx)...");
     if ( cpu_has_sse )
     {

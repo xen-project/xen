@@ -1349,6 +1349,7 @@ static const struct vex {
     { { 0x58 }, 2, T, R, pfx_66, W0, Ln }, /* vpbroadcastd */
     { { 0x59 }, 2, T, R, pfx_66, W0, Ln }, /* vpbroadcastq */
     { { 0x5a }, 2, F, R, pfx_66, W0, L1 }, /* vbroadcasti128 */
+    { { 0x72 }, 2, T, R, pfx_f3, W0, Ln }, /* vcvtneps2bf16 */
     { { 0x78 }, 2, T, R, pfx_66, W0, Ln }, /* vpbroadcastb */
     { { 0x79 }, 2, T, R, pfx_66, W0, Ln }, /* vpbroadcastw */
     { { 0x8c }, 2, F, R, pfx_66, Wn, Ln }, /* vpmaskmov{d,q} */
@@ -1377,6 +1378,12 @@ static const struct vex {
     { { 0xad }, 2, T, R, pfx_66, Wn, LIG }, /* vnmadd213s{s,d} */
     { { 0xae }, 2, T, R, pfx_66, Wn, Ln }, /* vnmsub213p{s,d} */
     { { 0xaf }, 2, T, R, pfx_66, Wn, LIG }, /* vnmsub213s{s,d} */
+    { { 0xb0 }, 2, F, R, pfx_no, W0, Ln }, /* vcvtneoph2ps */
+    { { 0xb0 }, 2, F, R, pfx_66, W0, Ln }, /* vcvtneeph2ps */
+    { { 0xb0 }, 2, F, R, pfx_f3, W0, Ln }, /* vcvtneebf162ps */
+    { { 0xb0 }, 2, F, R, pfx_f2, W0, Ln }, /* vcvtneobf162ps */
+    { { 0xb1 }, 2, F, R, pfx_66, W0, Ln }, /* vbcstnesh2ps */
+    { { 0xb1 }, 2, F, R, pfx_f3, W0, Ln }, /* vbcstnebf162ps */
     { { 0xb4 }, 2, T, R, pfx_66, W1, Ln }, /* vpmadd52luq */
     { { 0xb5 }, 2, T, R, pfx_66, W1, Ln }, /* vpmadd52huq */
     { { 0xb6 }, 2, T, R, pfx_66, Wn, Ln }, /* vmaddsub231p{s,d} */
