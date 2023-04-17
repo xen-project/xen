@@ -309,7 +309,6 @@ struct x86_emulate_state {
 #define imm2 ea.orig_val
 
     unsigned long ip;
-    struct cpu_user_regs *regs;
 
 #ifndef NDEBUG
     /*

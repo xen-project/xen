@@ -997,7 +997,6 @@ int x86emul_decode(struct x86_emulate_state *s,
     s->ea.type = OP_NONE;
     s->ea.mem.seg = x86_seg_ds;
     s->ea.reg = PTR_POISON;
-    s->regs = ctxt->regs;
     s->ip = ctxt->regs->r(ip);
 
     s->op_bytes = def_op_bytes = ad_bytes = def_ad_bytes =
@@ -1113,7 +1112,7 @@ int x86emul_decode(struct x86_emulate_state *s,
             default:
                 BUG(); /* Shouldn't be possible. */
             case 2:
-                if ( s->regs->eflags & X86_EFLAGS_VM )
+                if ( ctxt->regs->eflags & X86_EFLAGS_VM )
                     break;
                 /* fall through */
             case 4:
@@ -1442,33 +1441,33 @@ int x86emul_decode(struct x86_emulate_state *s,
             switch ( s->modrm_rm )
             {
             case 0:
-                s->ea.mem.off = s->regs->bx + s->regs->si;
+                s->ea.mem.off = ctxt->regs->bx + ctxt->regs->si;
                 break;
             case 1:
-                s->ea.mem.off = s->regs->bx + s->regs->di;
+                s->ea.mem.off = ctxt->regs->bx + ctxt->regs->di;
                 break;
             case 2:
                 s->ea.mem.seg = x86_seg_ss;
-                s->ea.mem.off = s->regs->bp + s->regs->si;
+                s->ea.mem.off = ctxt->regs->bp + ctxt->regs->si;
                 break;
             case 3:
                 s->ea.mem.seg = x86_seg_ss;
-                s->ea.mem.off = s->regs->bp + s->regs->di;
+                s->ea.mem.off = ctxt->regs->bp + ctxt->regs->di;
                 break;
             case 4:
-                s->ea.mem.off = s->regs->si;
+                s->ea.mem.off = ctxt->regs->si;
                 break;
             case 5:
-                s->ea.mem.off = s->regs->di;
+                s->ea.mem.off = ctxt->regs->di;
                 break;
             case 6:
                 if ( s->modrm_mod == 0 )
                     break;
                 s->ea.mem.seg = x86_seg_ss;
-                s->ea.mem.off = s->regs->bp;
+                s->ea.mem.off = ctxt->regs->bp;
                 break;
             case 7:
-                s->ea.mem.off = s->regs->bx;
+                s->ea.mem.off = ctxt->regs->bx;
                 break;
             }
             switch ( s->modrm_mod )
@@ -1501,7 +1500,7 @@ int x86emul_decode(struct x86_emulate_state *s,
                                      !s->evex.RX) << 4;
                 else if ( s->sib_index != 4 )
                 {
-                    s->ea.mem.off = *decode_gpr(s->regs, s->sib_index);
+                    s->ea.mem.off = *decode_gpr(ctxt->regs, s->sib_index);
                     s->ea.mem.off <<= s->sib_scale;
                 }
                 if ( (s->modrm_mod == 0) && ((sib_base & 7) == 5) )
@@ -1509,7 +1508,7 @@ int x86emul_decode(struct x86_emulate_state *s,
                 else if ( sib_base == 4 )
                 {
                     s->ea.mem.seg  = x86_seg_ss;
-                    s->ea.mem.off += s->regs->r(sp);
+                    s->ea.mem.off += ctxt->regs->r(sp);
                     if ( !s->ext && (b == 0x8f) )
                         /* POP <rm> computes its EA post increment. */
                         s->ea.mem.off += ((mode_64bit() && (s->op_bytes == 4))
@@ -1518,16 +1517,16 @@ int x86emul_decode(struct x86_emulate_state *s,
                 else if ( sib_base == 5 )
                 {
                     s->ea.mem.seg  = x86_seg_ss;
-                    s->ea.mem.off += s->regs->r(bp);
+                    s->ea.mem.off += ctxt->regs->r(bp);
                 }
                 else
-                    s->ea.mem.off += *decode_gpr(s->regs, sib_base);
+                    s->ea.mem.off += *decode_gpr(ctxt->regs, sib_base);
             }
             else
             {
                 generate_exception_if(d & vSIB, X86_EXC_UD);
                 s->modrm_rm |= (s->rex_prefix & 1) << 3;
-                s->ea.mem.off = *decode_gpr(s->regs, s->modrm_rm);
+                s->ea.mem.off = *decode_gpr(ctxt->regs, s->modrm_rm);
                 if ( (s->modrm_rm == 5) && (s->modrm_mod != 0) )
                     s->ea.mem.seg = x86_seg_ss;
             }
