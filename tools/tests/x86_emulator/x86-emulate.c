@@ -86,6 +86,7 @@ bool emul_test_init(void)
     cp.feat.adx = true;
     cp.feat.avx512pf = cp.feat.avx512f;
     cp.feat.rdpid = true;
+    cp.feat.wrmsrns = true;
     cp.extd.clzero = true;
 
     if ( cpu_has_xsave )

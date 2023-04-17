@@ -31,6 +31,20 @@ int x86emul_0f01(struct x86_emulate_state *s,
         struct segment_register sreg;
         uint64_t msr_val;
 
+    case 0xc6:
+        switch ( s->vex.pfx )
+        {
+        case vex_none: /* wrmsrns */
+            vcpu_must_have(wrmsrns);
+            generate_exception_if(!mode_ring0(), X86_EXC_GP, 0);
+            fail_if(!ops->write_msr);
+            rc = ops->write_msr(regs->ecx,
+                                ((uint64_t)regs->r(dx) << 32) | regs->eax,
+                                ctxt);
+            goto done;
+        }
+        generate_exception(X86_EXC_UD);
+
     case 0xca: /* clac */
     case 0xcb: /* stac */
         vcpu_must_have(smap);

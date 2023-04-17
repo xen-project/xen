@@ -340,6 +340,7 @@ static const struct {
     /*{ 0x01, 0xc3 }, { 2, 2 }, F, R }, vmresume */
     { { 0x01, 0xc4 }, { 2, 2 }, F, N }, /* vmxoff */
     { { 0x01, 0xc5 }, { 2, 2 }, F, N }, /* pconfig */
+    { { 0x01, 0xc6 }, { 2, 2 }, F, N }, /* wrmsrns */
     { { 0x01, 0xc8 }, { 2, 2 }, F, N }, /* monitor */
     { { 0x01, 0xc9 }, { 2, 2 }, F, N }, /* mwait */
     { { 0x01, 0xca }, { 2, 2 }, F, N }, /* clac */
