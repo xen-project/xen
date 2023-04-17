@@ -212,6 +212,8 @@ static const char *const str_7c1[32] =
 
 static const char *const str_7d1[32] =
 {
+    [ 4] = "avx-vnni-int8",
+
     [18] = "cet-sss",
 };
 

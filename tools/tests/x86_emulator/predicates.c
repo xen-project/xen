@@ -1336,8 +1336,14 @@ static const struct vex {
     { { 0x45 }, 2, T, R, pfx_66, Wn, Ln }, /* vpsrlv{d,q} */
     { { 0x46 }, 2, T, R, pfx_66, W0, Ln }, /* vpsravd */
     { { 0x47 }, 2, T, R, pfx_66, Wn, Ln }, /* vpsllv{d,q} */
+    { { 0x50 }, 2, T, R, pfx_no, W0, Ln }, /* vpdpbuud */
     { { 0x50 }, 2, T, R, pfx_66, W0, Ln }, /* vpdpbusd */
+    { { 0x50 }, 2, T, R, pfx_f3, W0, Ln }, /* vpdpbsud */
+    { { 0x50 }, 2, T, R, pfx_f2, W0, Ln }, /* vpdpbssd */
+    { { 0x51 }, 2, T, R, pfx_no, W0, Ln }, /* vpdpbuuds */
     { { 0x51 }, 2, T, R, pfx_66, W0, Ln }, /* vpdpbusds */
+    { { 0x51 }, 2, T, R, pfx_f3, W0, Ln }, /* vpdpbsuds */
+    { { 0x51 }, 2, T, R, pfx_f2, W0, Ln }, /* vpdpbssds */
     { { 0x52 }, 2, T, R, pfx_66, W0, Ln }, /* vpdpwssd */
     { { 0x53 }, 2, T, R, pfx_66, W0, Ln }, /* vpdpwssds */
     { { 0x58 }, 2, T, R, pfx_66, W0, Ln }, /* vpbroadcastd */

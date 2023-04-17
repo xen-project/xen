@@ -302,6 +302,7 @@ XEN_CPUFEATURE(MCDT_NO,            13*32+ 5) /*A  MCDT_NO */
 /* Intel-defined CPU features, CPUID level 0x00000007:1.ecx, word 14 */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:1.edx, word 15 */
+XEN_CPUFEATURE(AVX_VNNI_INT8,      15*32+ 4) /*A  AVX-VNNI-INT8 Instructions */
 XEN_CPUFEATURE(CET_SSS,            15*32+18) /*   CET Supervisor Shadow Stacks safe to use */
 
 #endif /* XEN_CPUFEATURE */
