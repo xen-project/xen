@@ -78,9 +78,8 @@ int x86emul_fpu(struct x86_emulate_state *s,
                 unsigned int *insn_bytes,
                 enum x86_emulate_fpu_type *fpu_type,
 #define fpu_type (*fpu_type) /* for get_fpu() */
-                struct stub_exn *stub_exn,
-#define stub_exn (*stub_exn) /* for invoke_stub() */
                 mmval_t *mmvalp)
+#define stub_exn (*s->stub_exn) /* for invoke_stub() */
 {
     uint8_t b;
     int rc;

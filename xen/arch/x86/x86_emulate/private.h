@@ -310,6 +310,8 @@ struct x86_emulate_state {
 
     unsigned long ip;
 
+    struct stub_exn *stub_exn;
+
 #ifndef NDEBUG
     /*
      * Track caller of x86_decode_insn() to spot missing as well as
@@ -747,7 +749,6 @@ int x86emul_fpu(struct x86_emulate_state *s,
                 const struct x86_emulate_ops *ops,
                 unsigned int *insn_bytes,
                 enum x86_emulate_fpu_type *fpu_type,
-                struct stub_exn *stub_exn,
                 mmval_t *mmvalp);
 int x86emul_0f01(struct x86_emulate_state *s,
                  struct cpu_user_regs *regs,

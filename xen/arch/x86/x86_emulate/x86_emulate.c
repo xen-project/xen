@@ -2024,8 +2024,9 @@ x86_emulate(
 #ifndef X86EMUL_NO_FPU
     case 0x9b:  /* wait/fwait */
     case 0xd8 ... 0xdf: /* FPU */
+        state->stub_exn = &stub_exn;
         rc = x86emul_fpu(state, &_regs, &dst, &src, ctxt, ops,
-                         &insn_bytes, &fpu_type, &stub_exn, mmvalp);
+                         &insn_bytes, &fpu_type, mmvalp);
         goto dispatch_from_helper;
 #endif
 
