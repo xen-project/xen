@@ -243,6 +243,24 @@ int xc_get_cpu_version(xc_interface *xch, struct xenpf_pcpu_version *cpu_ver)
     return 0;
 }
 
+int xc_get_ucode_revision(xc_interface *xch,
+                          struct xenpf_ucode_revision *ucode_rev)
+{
+    int ret;
+    struct xen_platform_op op = {
+        .cmd = XENPF_get_ucode_revision,
+        .u.ucode_revision.cpu = ucode_rev->cpu,
+    };
+
+    ret = do_platform_op(xch, &op);
+    if ( ret != 0 )
+        return ret;
+
+    *ucode_rev = op.u.ucode_revision;
+
+    return 0;
+}
+
 int xc_cputopoinfo(xc_interface *xch, unsigned *max_cpus,
                    xc_cputopo_t *cputopo)
 {
