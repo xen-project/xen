@@ -129,7 +129,15 @@ config DEBUG_INFO
 	bool "Compile Xen with debug info"
 	default DEBUG
 	help
-	  If you say Y here the resulting Xen will include debugging info
-	  resulting in a larger binary image.
+	  Say Y here if you want to build Xen with debug information. This
+	  information is needed e.g. for doing crash dump analysis of the
+	  hypervisor via the "crash" tool.
+	  Saying Y will increase the size of the xen-syms and xen.efi
+	  binaries. In case the space on the EFI boot partition is rather
+	  limited, you may want to install a stripped variant of xen.efi in
+	  the EFI boot partition (look for "INSTALL_EFI_STRIP" in
+	  docs/misc/efi.pandoc for more information - when not using
+	  "make install-xen" for installing xen.efi, stripping needs to be
+	  done outside the Xen build environment).
 
 endmenu
