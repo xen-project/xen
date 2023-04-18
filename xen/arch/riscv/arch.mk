@@ -1,6 +1,8 @@
 ########################################
 # RISCV-specific definitions
 
+$(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
+
 CFLAGS-$(CONFIG_RISCV_64) += -mabi=lp64
 
 riscv-march-$(CONFIG_RISCV_ISA_RV64G) := rv64g
