@@ -28,13 +28,6 @@ config GDBSX
 	  If you want to enable support for debugging guests from dom0 via
 	  gdbsx then say Y.
 
-config DEBUG_INFO
-	bool "Compile Xen with debug info"
-	default y
-	---help---
-	  If you say Y here the resulting Xen will include debugging info
-	  resulting in a larger binary image.
-
 config FRAME_POINTER
 	bool "Compile Xen with frame pointers"
 	default DEBUG
@@ -131,5 +124,12 @@ config XMEM_POOL_POISON
 source "arch/$(SRCARCH)/Kconfig.debug"
 
 endif # DEBUG || EXPERT
+
+config DEBUG_INFO
+	bool "Compile Xen with debug info"
+	default DEBUG
+	help
+	  If you say Y here the resulting Xen will include debugging info
+	  resulting in a larger binary image.
 
 endmenu
