@@ -124,6 +124,15 @@ SECTIONS
         *(SORT(.init_array.*))
         __ctors_end = .;
     } :text
+
+    .got : {
+        *(.got)
+    } : text
+
+    .got.plt : {
+        *(.got.plt)
+    } : text
+
     . = ALIGN(POINTER_ALIGN);
     __init_end = .;
 
@@ -160,3 +169,6 @@ SECTIONS
 
 ASSERT(IS_ALIGNED(__bss_start,      POINTER_ALIGN), "__bss_start is misaligned")
 ASSERT(IS_ALIGNED(__bss_end,        POINTER_ALIGN), "__bss_end is misaligned")
+
+ASSERT(!SIZEOF(.got),      ".got non-empty")
+ASSERT(!SIZEOF(.got.plt),  ".got.plt non-empty")
