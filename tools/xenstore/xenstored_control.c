@@ -666,12 +666,12 @@ static const char *lu_reject_reason(const void *ctx)
 	time_t now = time(NULL);
 
 	list_for_each_entry(conn, &connections, list) {
-		if (conn->ta_start_time &&
-		    (now - conn->ta_start_time >= lu_status->timeout)) {
+		unsigned long tdiff = now - conn->ta_start_time;
+
+		if (conn->ta_start_time && (tdiff >= lu_status->timeout)) {
 			ret = talloc_asprintf(ctx, "%s\nDomain %u: %ld s",
 					      ret ? : "Domains with long running transactions:",
-					      conn->id,
-					      now - conn->ta_start_time);
+					      conn->id, tdiff);
 		}
 	}
 
