@@ -7,7 +7,7 @@ include Config
 IPXE_GIT_URL ?= https://github.com/ipxe/ipxe.git
 
 # put an updated tar.gz on xenbits after changes to this variable
-IPXE_GIT_TAG := 3c040ad387099483102708bb1839110bc788cefb
+IPXE_GIT_TAG := 1d1cf74a5e58811822bee4b3da3cff7282fcdfca
 
 IPXE_TARBALL_URL ?= $(XEN_EXTFILES_URL)/ipxe-git-$(IPXE_GIT_TAG).tar.gz
 
