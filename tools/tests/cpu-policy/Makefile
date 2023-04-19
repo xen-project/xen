@@ -16,8 +16,8 @@ endif
 all: $(TARGETS)
 
 .PHONY: run
-run: $(TARGET-y)
-	./$(TARGET-y)
+run: $(TARGETS)
+	./$<
 
 .PHONY: clean
 clean:
