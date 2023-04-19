@@ -1313,11 +1313,13 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
     struct domain *currd = curr->domain;
     struct priv_op_ctxt ctxt = {
         .ctxt.regs = regs,
-        .ctxt.cpu_policy = currd->arch.cpu_policy,
         .ctxt.lma = !is_pv_32bit_domain(currd),
     };
     int rc;
     unsigned int eflags, ar;
+
+    /* Not part of the initializer, for old gcc to cope. */
+    ctxt.ctxt.cpu_policy = currd->arch.cpu_policy;
 
     if ( !pv_emul_read_descriptor(regs->cs, curr, &ctxt.cs.base,
                                   &ctxt.cs.limit, &ar, 1) ||

@@ -893,11 +893,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
     struct x86_emulate_ctxt ctxt = {
         .data = &state,
         .regs = &input.regs,
-        .cpu_policy = &cp,
         .addr_size = 8 * sizeof(void *),
         .sp_size = 8 * sizeof(void *),
     };
     int rc;
+
+    /* Not part of the initializer, for old gcc to cope. */
+    ctxt.cpu_policy = &cp;
 
     /* Reset all global state variables */
     memset(&input, 0, sizeof(input));
