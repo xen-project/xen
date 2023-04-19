@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [unstable UNRELEASED](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=staging) - TBD
 
+### Changed
+ - Repurpose command line gnttab_max_{maptrack_,}frames options so they don't
+   cap toolstack provided values.
+
 ### Added
  - On x86, support for features new in Intel Sapphire Rapids CPUs:
    - PKS (Protection Key Supervisor) available to HVM/PVH guests.
