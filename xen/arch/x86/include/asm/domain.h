@@ -83,8 +83,6 @@ void toggle_guest_mode(struct vcpu *);
 /* x86/64: toggle guest page tables between kernel and user modes. */
 void toggle_guest_pt(struct vcpu *);
 
-void cpuid_policy_updated(struct vcpu *v);
-
 /*
  * Initialise a hypercall-transfer page. The given pointer must be mapped
  * in Xen virtual address space (accesses are not validated or checked).

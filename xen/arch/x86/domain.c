@@ -281,6 +281,16 @@ void update_guest_memory_policy(struct vcpu *v,
     }
 }
 
+/*
+ * Called during vcpu construction, and each time the toolstack changes the
+ * CPU policy configuration for the domain.
+ */
+static void cpu_policy_updated(struct vcpu *v)
+{
+    if ( is_hvm_vcpu(v) )
+        hvm_cpuid_policy_changed(v);
+}
+
 void domain_cpu_policy_changed(struct domain *d)
 {
     const struct cpu_policy *p = d->arch.cpu_policy;
@@ -439,7 +449,7 @@ void domain_cpu_policy_changed(struct domain *d)
 
     for_each_vcpu ( d, v )
     {
-        cpuid_policy_updated(v);
+        cpu_policy_updated(v);
 
         /* If PMU version is zero then the guest doesn't have VPMU */
         if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
@@ -584,7 +594,7 @@ int arch_vcpu_create(struct vcpu *v)
     {
         vpmu_initialise(v);
 
-        cpuid_policy_updated(v);
+        cpu_policy_updated(v);
     }
 
     return rc;
@@ -2411,16 +2421,6 @@ int domain_relinquish_resources(struct domain *d)
         hvm_domain_relinquish_resources(d);
 
     return 0;
-}
-
-/*
- * Called during vcpu construction, and each time the toolstack changes the
- * CPUID configuration for the domain.
- */
-void cpuid_policy_updated(struct vcpu *v)
-{
-    if ( is_hvm_vcpu(v) )
-        hvm_cpuid_policy_changed(v);
 }
 
 void arch_dump_domain_info(struct domain *d)
