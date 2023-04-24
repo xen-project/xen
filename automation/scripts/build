@@ -77,8 +77,6 @@ else
     if ldd /bin/ls | grep -q musl; then
         # disable --disable-werror for QEMUU when building with MUSL
         cfgargs+=("--with-extra-qemuu-configure-args=\"--disable-werror\"")
-        # SeaBIOS doesn't build on MUSL systems
-        cfgargs+=("--with-system-seabios=/bin/false")
     fi
 
     # Qemu requires Python 3.5 or later, and ninja
