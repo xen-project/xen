@@ -36,6 +36,9 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 
 struct transaction *transaction_lookup(struct connection *conn, uint32_t id);
 
+/* Set flag for created node. */
+void ta_node_created(struct transaction *trans);
+
 /* inc/dec entry number local to trans while changing a node */
 void transaction_entry_inc(struct transaction *trans, unsigned int domid);
 void transaction_entry_dec(struct transaction *trans, unsigned int domid);
