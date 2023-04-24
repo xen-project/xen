@@ -172,11 +172,19 @@ struct transaction
 	/* List of changed domains - to record the changed domain entry number */
 	struct list_head changed_domains;
 
+	/* There was at least one node created in the transaction. */
+	bool node_created;
+
 	/* Flag for letting transaction fail. */
 	bool fail;
 };
 
 uint64_t generation;
+
+void ta_node_created(struct transaction *trans)
+{
+	trans->node_created = true;
+}
 
 static struct accessed_node *find_accessed_node(struct transaction *trans,
 						const char *name)
@@ -514,7 +522,12 @@ int do_transaction_start(const void *ctx, struct connection *conn,
 	return 0;
 }
 
-static int transaction_fix_domains(struct transaction *trans, bool update)
+/*
+ * Update or check number of nodes per domain at the end of a transaction.
+ * If "update" is true, "chk_quota" is ignored.
+ */
+static int transaction_fix_domains(struct transaction *trans, bool chk_quota,
+				   bool update)
 {
 	struct changed_domain *d;
 	int cnt;
@@ -522,7 +535,7 @@ static int transaction_fix_domains(struct transaction *trans, bool update)
 	list_for_each_entry(d, &trans->changed_domains, list) {
 		cnt = domain_entry_fix(d->domid, d->nbentry, update);
 		if (!update) {
-			if (cnt >= quota_nb_entry_per_domain)
+			if (chk_quota && cnt >= quota_nb_entry_per_domain)
 				return ENOSPC;
 			if (cnt < 0)
 				return ENOMEM;
@@ -538,6 +551,7 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 	const char *arg = onearg(in);
 	struct transaction *trans;
 	bool is_corrupt = false;
+	bool chk_quota;
 	int ret;
 
 	if (!arg || (!streq(arg, "T") && !streq(arg, "F")))
@@ -552,13 +566,15 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 	if (!conn->transaction_started)
 		conn->ta_start_time = 0;
 
+	chk_quota = trans->node_created && domain_is_unprivileged(conn);
+
 	/* Attach transaction to ctx for auto-cleanup */
 	talloc_steal(ctx, trans);
 
 	if (streq(arg, "T")) {
 		if (trans->fail)
 			return ENOMEM;
-		ret = transaction_fix_domains(trans, false);
+		ret = transaction_fix_domains(trans, chk_quota, false);
 		if (ret)
 			return ret;
 		ret = finalize_transaction(conn, trans, &is_corrupt);
@@ -568,7 +584,7 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 		wrl_apply_debit_trans_commit(conn);
 
 		/* fix domain entry for each changed domain */
-		transaction_fix_domains(trans, true);
+		transaction_fix_domains(trans, false, true);
 
 		if (is_corrupt)
 			corrupt(conn, "transaction inconsistency");
