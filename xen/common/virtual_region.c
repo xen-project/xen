@@ -92,16 +92,28 @@ void unregister_virtual_region(struct virtual_region *r)
     remove_virtual_region(r);
 }
 
-#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_XEN_SHSTK)
-void reset_virtual_region_perms(void)
+#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_X86)
+void relax_virtual_region_perms(void)
 {
     const struct virtual_region *region;
 
     rcu_read_lock(&rcu_virtual_region_lock);
     list_for_each_entry_rcu( region, &virtual_region_list, list )
-        modify_xen_mappings((unsigned long)region->start,
-                            ROUNDUP((unsigned long)region->end, PAGE_SIZE),
-                            PAGE_HYPERVISOR_RX);
+        modify_xen_mappings_lite((unsigned long)region->start,
+                                 ROUNDUP((unsigned long)region->end, PAGE_SIZE),
+                                 PAGE_HYPERVISOR_RWX);
+    rcu_read_unlock(&rcu_virtual_region_lock);
+}
+
+void tighten_virtual_region_perms(void)
+{
+    const struct virtual_region *region;
+
+    rcu_read_lock(&rcu_virtual_region_lock);
+    list_for_each_entry_rcu( region, &virtual_region_list, list )
+        modify_xen_mappings_lite((unsigned long)region->start,
+                                 ROUNDUP((unsigned long)region->end, PAGE_SIZE),
+                                 PAGE_HYPERVISOR_RX);
     rcu_read_unlock(&rcu_virtual_region_lock);
 }
 #endif
