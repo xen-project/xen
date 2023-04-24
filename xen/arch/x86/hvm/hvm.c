@@ -2357,6 +2357,21 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
     }
     else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
     {
+        struct segment_register cs;
+
+        hvm_get_segment_register(v, x86_seg_cs, &cs);
+
+        /*
+         * Intel documents a #GP fault in this case, and VMEntry checks reject
+         * it as a valid state.  AMD permits the state transition, and hits
+         * SHUTDOWN immediately thereafter.  Follow the Intel behaviour.
+         */
+        if ( (v->arch.hvm.guest_efer & EFER_LME) && cs.l )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempt to clear CR0.PG in 64bit mode");
+            return X86EMUL_EXCEPTION;
+        }
+
         if ( hvm_pcid_enabled(v) )
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to clear CR0.PG "
