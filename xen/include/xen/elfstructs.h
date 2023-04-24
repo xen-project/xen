@@ -561,8 +561,8 @@ typedef struct {
 #endif
 
 #if defined(ELFSIZE) && (ELFSIZE == 32)
-#define PRIxElfAddr	"08x"
-#define PRIuElfWord	"8u"
+#define PRIxElfAddr 	PRIx32
+#define PRIuElfWord 	PRIu32
 
 #define Elf_Ehdr	Elf32_Ehdr
 #define Elf_Phdr	Elf32_Phdr
