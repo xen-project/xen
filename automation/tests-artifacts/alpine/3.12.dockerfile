@@ -13,6 +13,7 @@ RUN \
   \
   # xen runtime deps
   apk add musl && \
+  apk add libgcc && \
   apk add openrc && \
   apk add busybox && \
   apk add sudo && \
