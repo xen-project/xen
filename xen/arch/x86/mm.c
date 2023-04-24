@@ -103,6 +103,7 @@
 #include <xen/ioreq.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>
+#include <xen/livepatch.h>
 #include <xen/mm.h>
 #include <xen/param.h>
 #include <xen/domain.h>
@@ -5866,6 +5867,73 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
 int destroy_xen_mappings(unsigned long s, unsigned long e)
 {
     return modify_xen_mappings(s, e, _PAGE_NONE);
+}
+
+/*
+ * Similar to modify_xen_mappings(), but used by the alternatives and
+ * livepatch in weird contexts.  All synchronization, TLB flushing, etc is the
+ * responsibility of the caller, and *MUST* not be introduced here.
+ *
+ * Must be limited to XEN_VIRT_{START,END}, i.e. over l2_xenmap[].
+ * Must be called with present flags, and over present mappings.
+ * It is the callers responsibility to not pass s or e in the middle of
+ * superpages if changing the permission on the whole superpage is going to be
+ * a problem.
+ */
+void init_or_livepatch modify_xen_mappings_lite(
+    unsigned long s, unsigned long e, unsigned int _nf)
+{
+    unsigned long v = s, fm, nf;
+
+    /* Set of valid PTE bits which may be altered. */
+#define FLAGS_MASK (_PAGE_NX|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW|_PAGE_PRESENT)
+    fm = put_pte_flags(FLAGS_MASK);
+    nf = put_pte_flags(_nf & FLAGS_MASK);
+#undef FLAGS_MASK
+
+    ASSERT(nf & _PAGE_PRESENT);
+    ASSERT(IS_ALIGNED(s, PAGE_SIZE) && s >= XEN_VIRT_START);
+    ASSERT(IS_ALIGNED(e, PAGE_SIZE) && e <= XEN_VIRT_END);
+
+    while ( v < e )
+    {
+        l2_pgentry_t *pl2e = &l2_xenmap[l2_table_offset(v)];
+        l2_pgentry_t l2e = l2e_read_atomic(pl2e);
+        unsigned int l2f = l2e_get_flags(l2e);
+
+        ASSERT(l2f & _PAGE_PRESENT);
+
+        if ( l2e_get_flags(l2e) & _PAGE_PSE )
+        {
+            l2e_write_atomic(pl2e, l2e_from_intpte((l2e.l2 & ~fm) | nf));
+
+            v += 1UL << L2_PAGETABLE_SHIFT;
+            continue;
+        }
+
+        /* else descend to l1 */
+        {
+            l1_pgentry_t *pl1t = map_l1t_from_l2e(l2e);
+
+            while ( v < e )
+            {
+                l1_pgentry_t *pl1e = &pl1t[l1_table_offset(v)];
+                l1_pgentry_t l1e = l1e_read_atomic(pl1e);
+                unsigned int l1f = l1e_get_flags(l1e);
+
+                ASSERT(l1f & _PAGE_PRESENT);
+
+                l1e_write_atomic(pl1e, l1e_from_intpte((l1e.l1 & ~fm) | nf));
+
+                v += 1UL << L1_PAGETABLE_SHIFT;
+
+                if ( l2_table_offset(v) == 0 )
+                    break;
+            }
+
+            unmap_domain_page(pl1t);
+        }
+    }
 }
 
 void __set_fixmap(

@@ -60,46 +60,32 @@ int arch_livepatch_safety_check(void)
 
 int noinline arch_livepatch_quiesce(void)
 {
-    /* If Shadow Stacks are in use, disable CR4.CET so we can modify CR0.WP. */
-    if ( cpu_has_xen_shstk )
-        write_cr4(read_cr4() & ~X86_CR4_CET);
-
-    /* Disable WP to allow changes to read-only pages. */
-    write_cr0(read_cr0() & ~X86_CR0_WP);
+    /*
+     * Relax perms on .text to be RWX, so we can modify them.
+     *
+     * This relaxes perms globally, but all other CPUs are waiting on us.
+     */
+    relax_virtual_region_perms();
+    flush_local(FLUSH_TLB_GLOBAL);
 
     return 0;
 }
 
 void noinline arch_livepatch_revive(void)
 {
-    /* Reinstate WP. */
-    write_cr0(read_cr0() | X86_CR0_WP);
-
-    /* Clobber dirty bits and reinstate CET, if applicable. */
-    if ( IS_ENABLED(CONFIG_XEN_SHSTK) && cpu_has_xen_shstk )
-    {
-        unsigned long tmp;
-
-        reset_virtual_region_perms();
-
-        write_cr4(read_cr4() | X86_CR4_CET);
-
-        /*
-         * Fix up the return address on the shadow stack, which currently
-         * points at arch_livepatch_quiesce()'s caller.
-         *
-         * Note: this is somewhat fragile, and depends on both
-         * arch_livepatch_{quiesce,revive}() being called from the same
-         * function, which is currently the case.
-         *
-         * Any error will result in Xen dying with #CP, and its too late to
-         * recover in any way.
-         */
-        asm volatile ("rdsspq %[ssp];"
-                      "wrssq %[addr], (%[ssp]);"
-                      : [ssp] "=&r" (tmp)
-                      : [addr] "r" (__builtin_return_address(0)));
-    }
+    /*
+     * Reinstate perms on .text to be RX.  This also cleans out the dirty
+     * bits, which matters when CET Shstk is active.
+     *
+     * The other CPUs waiting for us could in principle have re-walked while
+     * we were patching and cached the reduced perms in their TLB.  Therefore,
+     * we need to do a global TLB flush.
+     *
+     * However, we can't use Xen's normal global TLB flush infrastructure, so
+     * delay the TLB flush to arch_livepatch_post_action(), which is called on
+     * all CPUs (including us) on the way out of patching.
+     */
+    tighten_virtual_region_perms();
 }
 
 int arch_livepatch_verify_func(const struct livepatch_func *func)
@@ -196,6 +182,8 @@ void noinline arch_livepatch_revert(const struct livepatch_func *func)
  */
 void noinline arch_livepatch_post_action(void)
 {
+    /* See arch_livepatch_revive() */
+    flush_local(FLUSH_TLB_GLOBAL);
 }
 
 static nmi_callback_t *saved_nmi_callback;
