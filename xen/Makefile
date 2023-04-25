@@ -502,9 +502,11 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 	if [ -r $(TARGET).efi -a -n '$(EFI_DIR)' ]; then \
 		[ -d $(D)$(EFI_DIR) ] || $(INSTALL_DIR) $(D)$(EFI_DIR); \
 		$(INSTALL_DATA) $(TARGET).efi $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi; \
-		if [ -e $(TARGET).efi.map ]; then \
-			$(INSTALL_DATA) $(TARGET).efi.map $(D)$(DEBUG_DIR)/$(T)-$(XEN_FULLVERSION).efi.map; \
-		fi; \
+		for x in map elf; do \
+			if [ -e $(TARGET).efi.$$x ]; then \
+				$(INSTALL_DATA) $(TARGET).efi.$$x $(D)$(DEBUG_DIR)/$(T)-$(XEN_FULLVERSION).efi.$$x; \
+			fi; \
+		done; \
 		ln -sf $(T)-$(XEN_FULLVERSION).efi $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).efi; \
 		ln -sf $(T)-$(XEN_FULLVERSION).efi $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).efi; \
 		ln -sf $(T)-$(XEN_FULLVERSION).efi $(D)$(EFI_DIR)/$(T).efi; \
@@ -539,6 +541,7 @@ _uninstall:
 	rm -f $(D)$(DEBUG_DIR)/$(T)-syms-$(XEN_FULLVERSION).map
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).efi
+	rm -f $(D)$(DEBUG_DIR)/$(T)-$(XEN_FULLVERSION).efi.elf
 	rm -f $(D)$(DEBUG_DIR)/$(T)-$(XEN_FULLVERSION).efi.map
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T).efi
@@ -569,7 +572,7 @@ _clean:
 		-o -name '*.lex.c' -o -name '*.tab.[ch]' -o -name "*.gcno" \
 		-o -name ".*.cmd" -o -name "lib.a" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET)-syms $(TARGET)-syms.map
-	rm -f $(TARGET).efi $(TARGET).efi.map $(TARGET).efi.stripped
+	rm -f $(TARGET).efi $(TARGET).efi.map $(TARGET).efi.elf $(TARGET).efi.stripped
 	rm -f asm-offsets.s arch/*/include/asm/asm-offsets.h
 	rm -f .banner .allconfig.tmp include/xen/compile.h
 
