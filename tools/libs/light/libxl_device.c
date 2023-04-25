@@ -1160,9 +1160,10 @@ static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
     }
 
     if (rc) {
-        LOGD(ERROR, aodev->dev->domid, "unable to %s device with path %s",
+        LOGD(ERROR, aodev->dev->domid,
+                    "unable to %s device with path %s - rc %d",
                     libxl__device_action_to_string(aodev->action),
-                    libxl__device_backend_path(gc, aodev->dev));
+                    libxl__device_backend_path(gc, aodev->dev), rc);
         goto out;
     }
 
