@@ -193,8 +193,7 @@ extern void shadow_audit_tables(struct vcpu *v);
 #define SH_type_l4_64_shadow   6U /* shadowing a 64-bit L4 page */
 #define SH_type_max_shadow     6U
 #define SH_type_p2m_table      7U /* in use as the p2m table */
-#define SH_type_monitor_table  8U /* in use as a monitor table */
-#define SH_type_unused         9U
+#define SH_type_unused         8U
 #endif
 
 #ifndef CONFIG_PV32 /* Unused (but uglier to #ifdef above): */

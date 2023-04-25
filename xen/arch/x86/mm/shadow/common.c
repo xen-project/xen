@@ -1748,7 +1748,6 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn)
     ASSERT(t == SH_type_fl1_32_shadow  ||
            t == SH_type_fl1_pae_shadow ||
            t == SH_type_fl1_64_shadow  ||
-           t == SH_type_monitor_table  ||
            (is_pv_32bit_domain(d) && t == SH_type_l4_64_shadow) ||
            (page_get_owner(mfn_to_page(backpointer(sp))) == d));
 
