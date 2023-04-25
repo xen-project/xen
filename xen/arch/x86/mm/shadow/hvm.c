@@ -814,7 +814,8 @@ static void cf_check sh_unshadow_for_p2m_change(
 
     /* Only previously present / valid entries need processing. */
     if ( !(oflags & _PAGE_PRESENT) ||
-         (!p2m_is_valid(p2mt) && !p2m_is_grant(p2mt)) )
+         (!p2m_is_valid(p2mt) && !p2m_is_grant(p2mt)) ||
+         !mfn_valid(omfn) )
         return;
 
     switch ( level )
