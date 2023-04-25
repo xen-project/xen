@@ -231,8 +231,8 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
         break;
     default:
         /* No need to execute any hotplug scripts */
-        LOGD(DEBUG, dev->domid,
-             "backend_kind %d, no need to execute scripts", dev->backend_kind);
+        LOGD(DEBUG, dev->domid, "backend_kind %s, no need to execute scripts",
+             libxl__device_kind_to_string(dev->backend_kind));
         rc = 0;
         break;
     }
