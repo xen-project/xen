@@ -9,6 +9,10 @@
 
 extern spinlock_t rtc_lock;             /* serialize CMOS RAM access */
 
+struct domain;
+bool is_cmos_port(unsigned int port, unsigned int bytes,
+                  const struct domain *d);
+
 /**********************************************************************
  * register summary
  **********************************************************************/

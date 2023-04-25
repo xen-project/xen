@@ -27,7 +27,7 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/save.h>
-#include <asm/current.h>
+#include <asm/iocap.h>
 #include <xen/trace.h>
 #include <public/hvm/params.h>
 
@@ -836,9 +836,19 @@ void rtc_init(struct domain *d)
 
     if ( !has_vrtc(d) )
     {
-        if ( is_hardware_domain(d) )
-            /* Hardware domain gets mediated access to the physical RTC. */
-            register_portio_handler(d, RTC_PORT(0), 2, hw_rtc_io);
+        unsigned int port;
+
+        if ( !is_hardware_domain(d) )
+            return;
+
+        /*
+         * Hardware domain gets mediated access to the physical RTC/CMOS (of
+         * course unless we don't use it ourselves, for there being none).
+         */
+        for ( port = RTC_PORT(0); port < RTC_PORT(0) + 0x10; port += 2 )
+            if ( is_cmos_port(port, 2, d) )
+                register_portio_handler(d, port, 2, hw_rtc_io);
+
         return;
     }
 

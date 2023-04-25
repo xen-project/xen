@@ -1234,7 +1234,10 @@ static unsigned long get_cmos_time(void)
         if ( seconds < 60 )
         {
             if ( rtc.sec != seconds )
+            {
                 cmos_rtc_probe = false;
+                acpi_gbl_FADT.boot_flags &= ~ACPI_FADT_NO_CMOS_RTC;
+            }
             break;
         }
 
@@ -1249,6 +1252,86 @@ static unsigned long get_cmos_time(void)
     return mktime(rtc.year, rtc.mon, rtc.day, rtc.hour, rtc.min, rtc.sec);
 }
 
+static unsigned int __ro_after_init cmos_alias_mask;
+
+static int __init cf_check probe_cmos_alias(void)
+{
+    unsigned int offs;
+
+    if ( acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC )
+        return 0;
+
+    for ( offs = 2; offs < 8; offs <<= 1 )
+    {
+        unsigned int i;
+        bool read = true;
+
+        for ( i = RTC_REG_D + 1; i < 0x80; ++i )
+        {
+            uint8_t normal, alt;
+            unsigned long flags;
+
+            if ( i == acpi_gbl_FADT.century )
+                continue;
+
+            spin_lock_irqsave(&rtc_lock, flags);
+
+            normal = CMOS_READ(i);
+            if ( inb(RTC_PORT(offs)) != i )
+                read = false;
+
+            alt = inb(RTC_PORT(offs + 1));
+
+            spin_unlock_irqrestore(&rtc_lock, flags);
+
+            if ( normal != alt )
+                break;
+
+            process_pending_softirqs();
+        }
+        if ( i == 0x80 )
+        {
+            cmos_alias_mask |= offs;
+            dprintk(XENLOG_INFO, "CMOS aliased at %02x, index %s\n",
+                    RTC_PORT(offs), read ? "r/w" : "w/o");
+        }
+    }
+
+    return 0;
+}
+__initcall(probe_cmos_alias);
+
+bool is_cmos_port(unsigned int port, unsigned int bytes, const struct domain *d)
+{
+    unsigned int offs;
+
+    if ( !is_hardware_domain(d) )
+        return port <= RTC_PORT(1) && port + bytes > RTC_PORT(0);
+
+    /*
+     * While not really CMOS-related, port 0x70 always needs intercepting
+     * to deal with the NMI disable bit.
+     */
+    if ( port <= RTC_PORT(0) && port + bytes > RTC_PORT(0) )
+        return true;
+
+    if ( acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC )
+        return false;
+
+    if ( port <= RTC_PORT(1) && port + bytes > RTC_PORT(0) )
+        return true;
+
+    for ( offs = 2; offs <= cmos_alias_mask; offs <<= 1 )
+    {
+        if ( !(offs & cmos_alias_mask) )
+            continue;
+        if ( port <= RTC_PORT(offs | 1) && port + bytes > RTC_PORT(offs) )
+            return true;
+    }
+
+    return false;
+}
+
 /* Helpers for guest accesses to the physical RTC. */
 unsigned int rtc_guest_read(unsigned int port)
 {
@@ -1256,23 +1339,36 @@ unsigned int rtc_guest_read(unsigned int port)
     unsigned long flags;
     unsigned int data = ~0;
 
-    switch ( port )
+    switch ( port & ~cmos_alias_mask )
     {
     case RTC_PORT(0):
         /*
          * All PV domains (and PVH dom0) are allowed to read the latched value
          * of the first RTC port, as there's no access to the physical IO
-         * ports.
+         * ports.  Note that we return the index value regardless of whether
+         * underlying hardware would permit doing so.
          */
-        data = currd->arch.cmos_idx;
+        data = currd->arch.cmos_idx & (0xff >> (port == RTC_PORT(0)));
+
+        /*
+         * When there's (supposedly) no RTC/CMOS, we don't intercept the other
+         * ports. While reading the index register isn't normally possible,
+         * play safe and return back whatever can be read (just in case a value
+         * written through an alias would be attempted to be read back here).
+         */
+        if ( port == RTC_PORT(0) &&
+             (acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC) &&
+             ioports_access_permitted(currd, port, port) )
+            data = inb(port) & 0x7f;
         break;
 
     case RTC_PORT(1):
-        if ( !ioports_access_permitted(currd, RTC_PORT(0), RTC_PORT(1)) )
+        if ( !ioports_access_permitted(currd, port - 1, port) )
             break;
         spin_lock_irqsave(&rtc_lock, flags);
-        outb(currd->arch.cmos_idx & 0x7f, RTC_PORT(0));
-        data = inb(RTC_PORT(1));
+        outb(currd->arch.cmos_idx & (0xff >> (port == RTC_PORT(1))),
+             port - 1);
+        data = inb(port);
         spin_unlock_irqrestore(&rtc_lock, flags);
         break;
 
@@ -1288,9 +1384,10 @@ void rtc_guest_write(unsigned int port, unsigned int data)
     struct domain *currd = current->domain;
     unsigned long flags;
 
-    switch ( port )
+    switch ( port & ~cmos_alias_mask )
     {
         typeof(pv_rtc_handler) hook;
+        unsigned int idx;
 
     case RTC_PORT(0):
         /*
@@ -1298,20 +1395,32 @@ void rtc_guest_write(unsigned int port, unsigned int data)
          * value of the first RTC port, as there's no access to the physical IO
          * ports.
          */
-        currd->arch.cmos_idx = data;
+        currd->arch.cmos_idx = data & (0xff >> (port == RTC_PORT(0)));
+
+        /*
+         * When there's (supposedly) no RTC/CMOS, we don't intercept the other
+         * ports. Therefore the port write, with the NMI disable bit zapped,
+         * needs carrying out right away.
+         */
+        if ( port == RTC_PORT(0) &&
+             (acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC) &&
+             ioports_access_permitted(currd, port, port) )
+            outb(data & 0x7f, port);
         break;
 
     case RTC_PORT(1):
-        if ( !ioports_access_permitted(currd, RTC_PORT(0), RTC_PORT(1)) )
+        if ( !ioports_access_permitted(currd, port - 1, port) )
             break;
+
+        idx = currd->arch.cmos_idx & (0xff >> (port == RTC_PORT(1)));
 
         hook = ACCESS_ONCE(pv_rtc_handler);
         if ( hook )
-            hook(currd->arch.cmos_idx & 0x7f, data);
+            hook(idx, data);
 
         spin_lock_irqsave(&rtc_lock, flags);
-        outb(currd->arch.cmos_idx & 0x7f, RTC_PORT(0));
-        outb(data, RTC_PORT(1));
+        outb(idx, port - 1);
+        outb(data, port);
         spin_unlock_irqrestore(&rtc_lock, flags);
         break;
 
