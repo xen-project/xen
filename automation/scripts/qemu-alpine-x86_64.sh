@@ -2,10 +2,6 @@
 
 set -ex
 
-apt-get -qy update
-apt-get -qy install --no-install-recommends cpio \
-                                            busybox-static
-
 # DomU Busybox
 cd binaries
 mkdir -p initrd

@@ -2,14 +2,6 @@
 
 set -ex
 
-apt-get -qy update
-apt-get -qy install --no-install-recommends u-boot-qemu \
-                                            u-boot-tools \
-                                            device-tree-compiler \
-                                            cpio \
-                                            curl \
-                                            busybox-static
-
 # DomU Busybox
 cd binaries
 mkdir -p initrd

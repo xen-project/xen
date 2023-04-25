@@ -2,16 +2,6 @@
 
 set -ex
 
-# Install QEMU
-export DEBIAN_FRONTENT=noninteractive
-apt-get -qy update
-apt-get -qy install --no-install-recommends u-boot-qemu \
-                                            u-boot-tools \
-                                            device-tree-compiler \
-                                            busybox-static \
-                                            cpio \
-                                            curl
-
 # XXX QEMU looks for "efi-virtio.rom" even if it is unneeded
 curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
 ./binaries/qemu-system-aarch64 \
