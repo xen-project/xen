@@ -46,6 +46,23 @@ int pdev_msi_init(struct pci_dev *pdev)
         spin_lock_init(&msix->table_lock);
 
         ctrl = pci_conf_read16(pdev->sbdf, msix_control_reg(pos));
+
+        if ( ctrl & (PCI_MSIX_FLAGS_MASKALL | PCI_MSIX_FLAGS_ENABLE) )
+        {
+            /*
+             * pci_reset_msix_state() relies on MASKALL not being set
+             * initially, clear it (and ENABLE too - for safety), to meet that
+             * expectation.
+             */
+            printk(XENLOG_WARNING
+                   "%pp: unexpected initial MSI-X state (MASKALL=%d, ENABLE=%d), fixing\n",
+                   &pdev->sbdf,
+                   !!(ctrl & PCI_MSIX_FLAGS_MASKALL),
+                   !!(ctrl & PCI_MSIX_FLAGS_ENABLE));
+            ctrl &= ~(PCI_MSIX_FLAGS_ENABLE | PCI_MSIX_FLAGS_MASKALL);
+            pci_conf_write16(pdev->sbdf, msix_control_reg(pos), ctrl);
+        }
+
         msix->nr_entries = msix_table_size(ctrl);
 
         pdev->msix = msix;
