@@ -1,0 +1,35 @@
+stubdom: fix errors in newlib
+
+rpm post-build-checks found a few code bugs in newlib, and marks them as
+errors. Add another newlib patch and apply it during stubdom build.
+
+[  227s] ../../../../newlib-1.16.0/newlib/doc/makedoc.c: In function 'lookup_word':
+[  227s] ../../../../newlib-1.16.0/newlib/doc/makedoc.c:1147:10: warning: implicit declaration of function 'strcmp' [-Wimplicit-function-declaration]
+[  227s]       if (strcmp(ptr->word, word) == 0) return ptr;
+[  227s]           ^
+
+[  460s] I: Program is using implicit definitions of special functions.
+[  460s]    these functions need to use their correct prototypes to allow
+[  460s]    the lightweight buffer overflow checking to work.
+[  460s]      - Implicit memory/string functions need #include <string.h>.
+[  460s]      - Implicit *printf functions need #include <stdio.h>.
+[  460s]      - Implicit *printf functions need #include <stdio.h>.
+[  460s]      - Implicit *read* functions need #include <unistd.h>.
+[  460s]      - Implicit *recv* functions need #include <sys/socket.h>.
+[  460s] E: xen implicit-fortify-decl ../../../../newlib-1.16.0/newlib/doc/makedoc.c:1147
+---
+ newlib/doc/makedoc.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+Index: newlib-1.16.0/newlib/doc/makedoc.c
+===================================================================
+--- newlib-1.16.0.orig/newlib/doc/makedoc.c
++++ newlib-1.16.0/newlib/doc/makedoc.c
+@@ -38,6 +38,7 @@ There is  no
+ #include "ansidecl.h"
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include <ctype.h>
+ 
+ #define DEF_SIZE 5000

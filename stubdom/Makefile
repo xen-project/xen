@@ -96,6 +96,7 @@ newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
 	patch -d $@ -p1 < newlib-stdint-size_max-fix-from-1.17.0.patch
 	patch -d $@ -p1 < newlib-disable-texinfo.patch
 	patch -d $@ -p1 < newlib-cygmon-gmon.patch
+	patch -d $@ -p1 < newlib-makedoc.patch
 	find $@ -type f | xargs perl -i.bak \
 		-pe 's/\b_(tzname|daylight|timezone)\b/$$1/g'
 	touch $@
