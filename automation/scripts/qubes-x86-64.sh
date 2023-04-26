@@ -66,6 +66,7 @@ ${domU_check}
 /bin/sh" > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
 echo "rc_verbose=yes" >> etc/rc.conf
+sed -i -e 's/^Welcome/domU \0/' etc/issue
 find . | fakeroot -i ../fakeroot-save cpio -H newc -o | gzip > ../binaries/domU-rootfs.cpio.gz
 cd ..
 rm -rf rootfs
@@ -159,7 +160,7 @@ if [ -n "$wait_and_wakeup" ]; then
     ssh $CONTROLLER wake
 fi
 
-until grep "$passed" smoke.serial || [ $timeout -le 0 ]; do
+until grep "^Welcome to Alpine Linux" smoke.serial || [ $timeout -le 0 ]; do
     sleep 1;
     : $((--timeout))
 done
