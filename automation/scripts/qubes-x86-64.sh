@@ -225,6 +225,9 @@ until grep "^Welcome to Alpine Linux" smoke.serial || [ $timeout -le 0 ]; do
     sleep 1;
     : $((--timeout))
 done
+
+tail -n 100 smoke.serial
+
 if [ $timeout -le 0 ]; then
     echo "ERROR: test timeout, aborting"
     exit 1
