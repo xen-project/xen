@@ -1,0 +1,60 @@
+
+I: A function uses a 'return;' statement, but has actually a value
+   to return, like an integer ('return 42;') or similar.
+W: xen voidreturn ../../../../newlib-1.16.0/libgloss/i386/cygmon-gmon.c:117, 125, 146, 157, 330
+
+I: Program is using implicit definitions of special functions.
+   these functions need to use their correct prototypes to allow
+   the lightweight buffer overflow checking to work.
+     - Implicit memory/string functions need #include <string.h>.
+     - Implicit *printf functions need #include <stdio.h>.
+     - Implicit *printf functions need #include <stdio.h>.
+     - Implicit *read* functions need #include <unistd.h>.
+     - Implicit *recv* functions need #include <sys/socket.h>.
+E: xen implicit-fortify-decl ../../../../newlib-1.16.0/libgloss/i386/cygmon-gmon.c:119
+
+I: Program returns random data in a function
+E: xen no-return-in-nonvoid-function ../../../../newlib-1.16.0/libgloss/i386/cygmon-gmon.c:362
+
+---
+ libgloss/i386/cygmon-gmon.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+Index: newlib-1.16.0/libgloss/i386/cygmon-gmon.c
+===================================================================
+--- newlib-1.16.0.orig/libgloss/i386/cygmon-gmon.c
++++ newlib-1.16.0/libgloss/i386/cygmon-gmon.c
+@@ -61,6 +61,8 @@
+ static char sccsid[] = "@(#)gmon.c	5.3 (Berkeley) 5/22/91";
+ #endif /* not lint */
+ 
++#include <string.h>
++#include <unistd.h>
+ #define DEBUG
+ #ifdef DEBUG
+ #include <stdio.h>
+@@ -89,7 +91,7 @@ static int	s_scale;
+ 
+ extern int errno;
+ 
+-int
++void
+ monstartup(lowpc, highpc)
+      char	*lowpc;
+      char	*highpc;
+@@ -199,6 +201,7 @@ _mcleanup()
+ 
+ static char already_setup = 0;
+ 
++void
+ _mcount()
+ {
+   register char			*selfpc;
+@@ -341,6 +344,7 @@ overflow:
+  *	profiling is what mcount checks to see if
+  *	all the data structures are ready.
+  */
++void
+ moncontrol(mode)
+     int mode;
+ {
