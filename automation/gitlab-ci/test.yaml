@@ -94,6 +94,8 @@
     # the test controller runs on RPi4
     CONTAINER: alpine:3.12-arm64v8
     LOGFILE: smoke-test.log
+    PCIDEV: "03:00.0"
+    PCIDEV_INTR: "MSI-X"
   artifacts:
     paths:
       - smoke.serial
@@ -143,6 +145,24 @@ adl-suspend-x86-64-gcc-debug:
   extends: .adl-x86-64
   script:
     - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.12-gcc-debug
+
+adl-pci-pv-x86-64-gcc-debug:
+  extends: .adl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pci-pv 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.12-gcc-debug
+
+adl-pci-hvm-x86-64-gcc-debug:
+  extends: .adl-x86-64
+  variables:
+    PCIDEV_INTR: "MSI"
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
     - alpine-3.12-gcc-debug

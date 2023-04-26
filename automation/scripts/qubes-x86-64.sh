@@ -4,8 +4,21 @@ set -ex
 
 test_variant=$1
 
+### defaults
 wait_and_wakeup=
 timeout=120
+domU_config='
+type = "pvh"
+name = "domU"
+kernel = "/boot/vmlinuz"
+ramdisk = "/boot/initrd-domU"
+extra = "root=/dev/ram0 console=hvc0"
+memory = 512
+vif = [ "bridge=xenbr0", ]
+disk = [ ]
+'
+
+### test: smoke test
 if [ -z "${test_variant}" ]; then
     passed="ping test passed"
     domU_check="
@@ -23,6 +36,8 @@ done
 tail -n 100 /var/log/xen/console/guest-domU.log
 echo \"${passed}\"
 "
+
+### test: S3
 elif [ "${test_variant}" = "s3" ]; then
     passed="suspend test passed"
     wait_and_wakeup="started, suspending"
@@ -48,6 +63,62 @@ xl dmesg | grep 'Finishing wakeup from ACPI S3 state' || exit 1
 ping -c 10 192.168.0.2 || exit 1
 echo \"${passed}\"
 "
+
+### test: pci-pv, pci-hvm
+elif [ "${test_variant}" = "pci-pv" ] || [ "${test_variant}" = "pci-hvm" ]; then
+
+    if [ -z "$PCIDEV" ]; then
+        echo "Please set 'PCIDEV' variable with BDF of test network adapter" >&2
+        echo "Optionally set also 'PCIDEV_INTR' to 'MSI' or 'MSI-X'" >&2
+        exit 1
+    fi
+
+    passed="pci test passed"
+
+    domU_config='
+type = "'${test_variant#pci-}'"
+name = "domU"
+kernel = "/boot/vmlinuz"
+ramdisk = "/boot/initrd-domU"
+extra = "root=/dev/ram0 console=hvc0"
+memory = 512
+vif = [ ]
+disk = [ ]
+pci = [ "'$PCIDEV',seize=1" ]
+on_reboot = "destroy"
+'
+
+    domU_check="
+set -x -e
+ip link set eth0 up
+timeout 30s udhcpc -i eth0
+pingip=\$(ip -o -4 r show default|cut -f 3 -d ' ')
+ping -c 10 \"\$pingip\"
+echo domU started
+cat /proc/interrupts
+"
+    if [ "$PCIDEV_INTR" = "MSI-X" ]; then
+        domU_check="$domU_check
+grep -- '\\(-msi-x\\|PCI-MSI-X\\).*eth0' /proc/interrupts
+"
+    elif [ "$PCIDEV_INTR" = "MSI" ]; then
+        # depending on the kernel version and domain type, the MSI can be
+        # marked as '-msi', 'PCI-MSI', or 'PCI-MSI-<SBDF>'; be careful to not match
+        # -msi-x nor PCI-MSI-X
+        domU_check="$domU_check
+grep -- '\\(-msi \\|PCI-MSI\\( \\|-[^X]\\)\\).*eth0' /proc/interrupts
+"
+    fi
+    domU_check="$domU_check
+echo \"${passed}\"
+"
+
+    dom0_check="
+until grep -q \"^domU Welcome to Alpine Linux\" /var/log/xen/console/guest-domU.log; do
+    sleep 1
+done
+tail -n 100 /var/log/xen/console/guest-domU.log
+"
 fi
 
 # DomU
@@ -63,7 +134,7 @@ rm var/run
 echo "#!/bin/sh
 
 ${domU_check}
-/bin/sh" > etc/local.d/xen.start
+" > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
 echo "rc_verbose=yes" >> etc/rc.conf
 sed -i -e 's/^Welcome/domU \0/' etc/issue
@@ -98,17 +169,7 @@ xl create /etc/xen/domU.cfg
 ${dom0_check}
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
-# just PVH for now
-echo '
-type = "pvh"
-name = "domU"
-kernel = "/boot/vmlinuz"
-ramdisk = "/boot/initrd-domU"
-extra = "root=/dev/ram0 console=hvc0"
-memory = 512
-vif = [ "bridge=xenbr0", ]
-disk = [ ]
-' > etc/xen/domU.cfg
+echo "$domU_config" > etc/xen/domU.cfg
 
 echo "rc_verbose=yes" >> etc/rc.conf
 echo "XENCONSOLED_TRACE=all" >> etc/default/xencommons
