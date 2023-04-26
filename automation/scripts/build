@@ -67,9 +67,9 @@ else
 
     if [[ "${cc_is_clang}" == "y" ]]; then
         # SeaBIOS cannot be built with clang
-        cfgargs+=("--with-system-seabios=/usr/share/seabios/bios.bin")
+        cfgargs+=("--with-system-seabios=/usr/share/no-seabios.bin")
         # iPXE cannot be built with clang
-        cfgargs+=("--with-system-ipxe=/usr/lib/ipxe/ipxe.pxe")
+        cfgargs+=("--with-system-ipxe=/usr/share/no-ipxe.pxe")
         # newlib cannot be built with clang so we cannot build stubdoms
         cfgargs+=("--disable-stubdom")
     fi
@@ -87,7 +87,7 @@ else
 
     # SeaBIOS requires GCC 4.6 or later
     if [[ "${cc_is_gcc}" == "y" && "${cc_ver}" -lt 0x040600 ]]; then
-        cfgargs+=("--with-system-seabios=/bin/false")
+        cfgargs+=("--with-system-seabios=/usr/share/no-seabios.bin")
     fi
 
     ./configure "${cfgargs[@]}"
