@@ -26,8 +26,7 @@ def main(argv):
             cppcheck_analysis.generate_cppcheck_report()
     except PhaseExceptions as e:
         print("ERROR: {}".format(e))
-        if hasattr(e, "errorcode"):
-            ret_code = e.errorcode
+        ret_code = getattr(e, "errorcode", 1)
     finally:
         if settings.step_clean_analysis:
             cppcheck_analysis.clean_analysis_artifacts()
