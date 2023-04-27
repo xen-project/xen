@@ -22,6 +22,22 @@ echo \"${passed}\"
 "
 fi
 
+if [[ "${test_variant}" == "gem-passthrough" ]]; then
+    passed="${test_variant} test passed"
+
+    # For a passthroughed GEM:
+    # - bring up the network interface
+    # - dynamically assign IP
+    # - ping the default gateway
+    domU_check="
+set -ex
+ifconfig eth0 up
+udhcpc -i eth0 -n
+ping -c 10 \$(ip route | awk '/^default/ {print \$3}')
+echo \"${passed}\"
+"
+fi
+
 # DomU
 mkdir -p rootfs
 cd rootfs
@@ -95,6 +111,15 @@ cp -f binaries/dom0-rootfs.cpio.gz $TFTP/
 cp -f binaries/domU-rootfs.cpio.gz $TFTP/
 # export dtb to artifacts
 cp $TFTP/mpsoc_smmu.dtb .
+
+if [[ "${test_variant}" == "gem-passthrough" ]]; then
+    echo "
+    DOMU_PASSTHROUGH_DTB[0]=\"eth0.dtb\"
+    DOMU_PASSTHROUGH_PATHS[0]=\"/amba/ethernet@ff0e0000\"" >> $TFTP/config
+
+    # export passthrough dtb to artifacts
+    cp $TFTP/eth0.dtb .
+fi
 
 rm -rf imagebuilder
 git clone https://gitlab.com/ViryaOS/imagebuilder

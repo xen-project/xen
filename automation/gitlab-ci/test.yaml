@@ -133,6 +133,14 @@ xilinx-smoke-dom0less-arm64-gcc:
     - *arm64-test-needs
     - alpine-3.12-gcc-arm64
 
+xilinx-smoke-dom0less-arm64-gcc-gem-passthrough:
+  extends: .xilinx-arm64
+  script:
+    - ./automation/scripts/xilinx-smoke-dom0less-arm64.sh gem-passthrough 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.12-gcc-arm64
+
 adl-smoke-x86-64-gcc-debug:
   extends: .adl-x86-64
   script:
