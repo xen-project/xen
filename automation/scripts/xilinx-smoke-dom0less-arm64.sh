@@ -6,6 +6,14 @@ test_variant=$1
 
 if [ -z "${test_variant}" ]; then
     passed="ping test passed"
+    dom0_check="
+brctl addbr xenbr0
+brctl addif xenbr0 eth0
+ifconfig eth0 up
+ifconfig xenbr0 up
+ifconfig xenbr0 192.168.0.1
+xl network-attach 1 type=vif
+"
     domU_check="
 until ifconfig eth0 192.168.0.2 &> /dev/null && ping -c 10 192.168.0.1; do
     sleep 30
@@ -51,13 +59,6 @@ bash /etc/init.d/xencommons start
 
 /usr/local/lib/xen/bin/init-dom0less
 
-brctl addbr xenbr0
-brctl addif xenbr0 eth0
-ifconfig eth0 up
-ifconfig xenbr0 up
-ifconfig xenbr0 192.168.0.1
-
-xl network-attach 1 type=vif
 ${dom0_check}
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
