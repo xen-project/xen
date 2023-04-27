@@ -229,15 +229,15 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 7b4a99be8a39c12d3a7fc4b8db9f0eab4ac688d5
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.17.0
-MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.17.0
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.17.1
+MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.17.1
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.16.0
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.17.0
+QEMU_TRADITIONAL_REVISION ?= xen-4.17.1
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
