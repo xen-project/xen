@@ -13,6 +13,7 @@
 #include <xentoollog.h>
 #include <libxl.h>
 #include <xen/sys/xenbus_dev.h>
+#include <xen-tools/common-macros.h>
 #include <xen-xsm/flask/flask.h>
 #include <xen/io/xenbus.h>
 
@@ -322,16 +323,20 @@ err:
 
 static int check_domain(xc_interface *xch)
 {
-    xc_dominfo_t info;
+    /* Commonly dom0 is the only domain, but buffer a little for efficiency. */
+    xc_domaininfo_t info[8];
     uint32_t dom;
     int ret;
 
     dom = 1;
-    while ( (ret = xc_domain_getinfo(xch, dom, 1, &info)) == 1 )
+    while ( (ret = xc_domain_getinfolist(xch, dom, ARRAY_SIZE(info), info)) > 0 )
     {
-        if ( info.xenstore )
-            return 1;
-        dom = info.domid + 1;
+        for ( size_t i = 0; i < ret; i++ )
+        {
+            if ( info[i].flags & XEN_DOMINF_xs_domain )
+                return 1;
+        }
+        dom = info[ret - 1].domain + 1;
     }
     if ( ret < 0 && errno != ESRCH )
     {
