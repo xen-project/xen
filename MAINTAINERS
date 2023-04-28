@@ -653,6 +653,11 @@ M:	Wei Liu <wl@xen.org>
 M:	Juergen Gross <jgross@suse.com>
 R:	Julien Grall <julien@xen.org>
 S:	Supported
+F:	tools/helpers/init-xenstore-domain.c
+F:	tools/include/xenstore-compat/
+F:	tools/include/xenstore.h
+F:	tools/include/xenstore_lib.h
+F:	tools/libs/store/
 F:	tools/xenstore/
 
 XENTRACE
