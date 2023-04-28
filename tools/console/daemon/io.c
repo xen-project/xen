@@ -405,13 +405,7 @@ static void buffer_advance(struct buffer *buffer, size_t len)
 
 static bool domain_is_valid(int domid)
 {
-	bool ret;
-	xc_dominfo_t info;
-
-	ret = (xc_domain_getinfo(xc, domid, 1, &info) == 1 &&
-	       info.domid == domid);
-		
-	return ret;
+	return xc_domain_getinfo_single(xc, domid, NULL) == 0;
 }
 
 static int create_hv_log(void)
@@ -961,24 +955,33 @@ static unsigned enum_pass = 0;
 
 static void enum_domains(void)
 {
-	int domid = 1;
-	xc_dominfo_t dominfo;
+	/*
+	 * Memory set aside to query the state of every
+	 * domain in the hypervisor in a single hypercall.
+	 */
+	static xc_domaininfo_t domaininfo[DOMID_FIRST_RESERVED - 1];
+
+	int ret;
 	struct domain *dom;
 
 	enum_pass++;
 
-	while (xc_domain_getinfo(xc, domid, 1, &dominfo) == 1) {
-		dom = lookup_domain(dominfo.domid);
-		if (dominfo.dying) {
+	/* Fetch info on every valid domain except for dom0 */
+	ret = xc_domain_getinfolist(xc, 1, DOMID_FIRST_RESERVED - 1, domaininfo);
+	if (ret < 0)
+		return;
+
+	for (size_t i = 0; i < ret; i++) {
+		dom = lookup_domain(domaininfo[i].domain);
+		if (domaininfo[i].flags & XEN_DOMINF_dying) {
 			if (dom)
 				shutdown_domain(dom);
 		} else {
 			if (dom == NULL)
-				dom = create_domain(dominfo.domid);
+				dom = create_domain(domaininfo[i].domain);
 		}
 		if (dom)
 			dom->last_seen = enum_pass;
-		domid = dominfo.domid + 1;
 	}
 }
 
