@@ -342,7 +342,7 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
     uint32_t first_dom = 0;
     int max_doms = 1024, nr_doms, i;
     size_t j;
-    xc_dominfo_t *info;
+    xc_domaininfo_t *info;
 
     static char *kwd_list[] = { "first_dom", "max_doms", NULL };
 
@@ -350,11 +350,11 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
                                       &first_dom, &max_doms) )
         return NULL;
 
-    info = calloc(max_doms, sizeof(xc_dominfo_t));
+    info = calloc(max_doms, sizeof(*info));
     if (info == NULL)
         return PyErr_NoMemory();
 
-    nr_doms = xc_domain_getinfo(self->xc_handle, first_dom, max_doms, info);
+    nr_doms = xc_domain_getinfolist(self->xc_handle, first_dom, max_doms, info);
 
     if (nr_doms < 0)
     {
@@ -368,21 +368,21 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
         info_dict = Py_BuildValue(
             "{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
             ",s:L,s:L,s:L,s:i,s:i,s:i}",
-            "domid",           (int)info[i].domid,
+            "domid",           (int)info[i].domain,
             "online_vcpus",    info[i].nr_online_vcpus,
             "max_vcpu_id",     info[i].max_vcpu_id,
-            "hvm",             info[i].hvm,
-            "dying",           info[i].dying,
-            "crashed",         info[i].crashed,
-            "shutdown",        info[i].shutdown,
-            "paused",          info[i].paused,
-            "blocked",         info[i].blocked,
-            "running",         info[i].running,
-            "mem_kb",          (long long)info[i].nr_pages*(XC_PAGE_SIZE/1024),
+            "hvm",             !!(info[i].flags & XEN_DOMINF_hvm_guest),
+            "dying",           !!(info[i].flags & XEN_DOMINF_dying),
+            "crashed",         dominfo_shutdown_with(&info[i], SHUTDOWN_crash),
+            "shutdown",        !!(info[i].flags & XEN_DOMINF_shutdown),
+            "paused",          !!(info[i].flags & XEN_DOMINF_paused),
+            "blocked",         !!(info[i].flags & XEN_DOMINF_blocked),
+            "running",         !!(info[i].flags & XEN_DOMINF_running),
+            "mem_kb",          (long long)info[i].tot_pages * (XC_PAGE_SIZE / 1024),
             "cpu_time",        (long long)info[i].cpu_time,
-            "maxmem_kb",       (long long)info[i].max_memkb,
+            "maxmem_kb",       (long long)(info[i].max_pages << (XC_PAGE_SHIFT - 10)),
             "ssidref",         (int)info[i].ssidref,
-            "shutdown_reason", info[i].shutdown_reason,
+            "shutdown_reason", dominfo_shutdown_reason(&info[i]),
             "cpupool",         (int)info[i].cpupool);
         pyhandle = PyList_New(sizeof(xen_domain_handle_t));
         if ( (pyhandle == NULL) || (info_dict == NULL) )

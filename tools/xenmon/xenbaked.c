@@ -775,7 +775,7 @@ static void global_init_domain(int domid, int idx)
 static int indexof(int domid)
 {
     int idx;
-    xc_dominfo_t dominfo[NDOMAINS];
+    xc_domaininfo_t dominfo[NDOMAINS];
     xc_interface *xc_handle;
     int ndomains;
   
@@ -797,7 +797,7 @@ static int indexof(int domid)
 
     // call domaininfo hypercall to try and garbage collect unused entries
     xc_handle = xc_interface_open(0,0,0);
-    ndomains = xc_domain_getinfo(xc_handle, 0, NDOMAINS, dominfo);
+    ndomains = xc_domain_getinfolist(xc_handle, 0, NDOMAINS, dominfo);
     xc_interface_close(xc_handle);
 
     // for each domain in our data, look for it in the system dominfo structure
@@ -808,7 +808,7 @@ static int indexof(int domid)
         int jdx;
     
         for (jdx=0; jdx<ndomains; jdx++) {
-            if (dominfo[jdx].domid == domid)
+            if (dominfo[jdx].domain == domid)
                 break;
         }
         if (jdx == ndomains)        // we didn't find domid in the dominfo struct

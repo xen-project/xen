@@ -468,6 +468,19 @@ typedef struct xc_dominfo {
 
 typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
 
+static inline unsigned int dominfo_shutdown_reason(const xc_domaininfo_t *info)
+{
+    return (info->flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
+}
+
+static inline bool dominfo_shutdown_with(const xc_domaininfo_t *info,
+                                         unsigned int expected_reason)
+{
+    /* The reason doesn't make sense unless the domain is actually shutdown */
+    return (info->flags & XEN_DOMINF_shutdown) &&
+           (dominfo_shutdown_reason(info) == expected_reason);
+}
+
 typedef union 
 {
 #if defined(__i386__) || defined(__x86_64__)
