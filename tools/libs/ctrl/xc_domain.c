@@ -345,6 +345,30 @@ int xc_dom_vuart_init(xc_interface *xch,
     return rc;
 }
 
+int xc_domain_getinfo_single(xc_interface *xch,
+                             uint32_t domid,
+                             xc_domaininfo_t *info)
+{
+    struct xen_domctl domctl = {
+        .cmd = XEN_DOMCTL_getdomaininfo,
+        .domain = domid,
+    };
+
+    if ( do_domctl(xch, &domctl) < 0 )
+        return -1;
+
+    if ( domctl.u.getdomaininfo.domain != domid )
+    {
+        errno = ESRCH;
+        return -1;
+    }
+
+    if ( info )
+        *info = domctl.u.getdomaininfo;
+
+    return 0;
+}
+
 int xc_domain_getinfo(xc_interface *xch,
                       uint32_t first_domid,
                       unsigned int max_doms,

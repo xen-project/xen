@@ -704,6 +704,22 @@ int xc_vcpu_getaffinity(xc_interface *xch,
 int xc_domain_get_guest_width(xc_interface *xch, uint32_t domid,
                               unsigned int *guest_width);
 
+/**
+ * This function will return information about a single domain. It looks
+ * up the domain by the provided domid and succeeds if the domain exists
+ * and is accesible by the current domain, or fails otherwise. A buffer
+ * may optionally passed on the `info` parameter in order to retrieve
+ * information about the domain. The buffer is ignored if NULL is
+ * passed instead.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid domid to lookup
+ * @parm info Optional domain information buffer (may be NULL)
+ * @return 0 on success, otherwise the call failed and info is undefined
+ */
+int xc_domain_getinfo_single(xc_interface *xch,
+                             uint32_t domid,
+                             xc_domaininfo_t *info);
 
 /**
  * This function will return information about one or more domains. It is
