@@ -314,231 +314,7 @@ kernel-6.1.19-export:
 
 # Jobs below this line
 
-archlinux-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: archlinux:current
-
-archlinux-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: archlinux:current
-
-centos-7-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: centos:7
-
-centos-7-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: centos:7
-
-debian-stretch-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: debian:stretch
-
-debian-stretch-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: debian:stretch
-
-debian-stretch-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: debian:stretch
-
-debian-stretch-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: debian:stretch
-
-debian-stretch-32-clang-debug:
-  extends: .clang-x86-32-build-debug
-  variables:
-    CONTAINER: debian:stretch-i386
-
-debian-stretch-32-gcc-debug:
-  extends: .gcc-x86-32-build-debug
-  variables:
-    CONTAINER: debian:stretch-i386
-
-debian-buster-gcc-ibt:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: debian:buster-gcc-ibt
-    RANDCONFIG: y
-    EXTRA_FIXED_RANDCONFIG: |
-      CONFIG_XEN_IBT=y
-
-debian-unstable-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: debian:unstable
-
-debian-unstable-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: debian:unstable
-
-debian-unstable-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: debian:unstable
-
-debian-unstable-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: debian:unstable
-
-debian-unstable-gcc-randconfig:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: debian:unstable
-    RANDCONFIG: y
-
-debian-unstable-gcc-debug-randconfig:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: debian:unstable
-    RANDCONFIG: y
-
-debian-unstable-32-clang-debug:
-  extends: .clang-x86-32-build-debug
-  variables:
-    CONTAINER: debian:unstable-i386
-
-debian-unstable-32-gcc-debug:
-  extends: .gcc-x86-32-build-debug
-  variables:
-    CONTAINER: debian:unstable-i386
-
-fedora-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: fedora:29
-
-fedora-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: fedora:29
-
-# Ubuntu Trusty's Clang is 3.4 while Xen requires 3.5
-
-ubuntu-trusty-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: ubuntu:trusty
-
-ubuntu-trusty-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:trusty
-
-ubuntu-xenial-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: ubuntu:xenial
-
-ubuntu-xenial-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:xenial
-
-ubuntu-xenial-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: ubuntu:xenial
-
-ubuntu-xenial-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:xenial
-
-ubuntu-bionic-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: ubuntu:bionic
-
-ubuntu-bionic-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:bionic
-
-ubuntu-bionic-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: ubuntu:bionic
-
-ubuntu-bionic-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:bionic
-
-ubuntu-focal-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: ubuntu:focal
-
-ubuntu-focal-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:focal
-
-ubuntu-focal-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: ubuntu:focal
-
-ubuntu-focal-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:focal
-
-opensuse-leap-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: suse:opensuse-leap
-
-opensuse-leap-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: suse:opensuse-leap
-
-opensuse-leap-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: suse:opensuse-leap
-
-opensuse-leap-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: suse:opensuse-leap
-
-opensuse-tumbleweed-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: suse:opensuse-tumbleweed
-  allow_failure: true
-
-opensuse-tumbleweed-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: suse:opensuse-tumbleweed
-  allow_failure: true
-
-opensuse-tumbleweed-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: suse:opensuse-tumbleweed
-  allow_failure: true
-
-opensuse-tumbleweed-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: suse:opensuse-tumbleweed
-  allow_failure: true
+# Build jobs needed for tests
 
 alpine-3.12-gcc:
   extends: .gcc-x86-64-build
@@ -550,15 +326,15 @@ alpine-3.12-gcc-debug:
   variables:
     CONTAINER: alpine:3.12
 
-alpine-3.12-clang:
-  extends: .clang-x86-64-build
+debian-stretch-gcc-debug:
+  extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: debian:stretch
 
-alpine-3.12-clang-debug:
+debian-unstable-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: debian:unstable
 
 # Arm32 cross-build
 
@@ -781,3 +557,231 @@ debian-unstable-gcc-arm64-cppcheck:
     CONTAINER: debian:unstable-cppcheck
     CPPCHECK: y
     HYPERVISOR_ONLY: y
+
+# Build jobs not needed for tests
+
+alpine-3.12-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: alpine:3.12
+
+alpine-3.12-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: alpine:3.12
+
+archlinux-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: archlinux:current
+
+archlinux-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: archlinux:current
+
+centos-7-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: centos:7
+
+centos-7-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: centos:7
+
+debian-stretch-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:stretch
+
+debian-stretch-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: debian:stretch
+
+debian-stretch-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: debian:stretch
+
+debian-stretch-32-clang-debug:
+  extends: .clang-x86-32-build-debug
+  variables:
+    CONTAINER: debian:stretch-i386
+
+debian-stretch-32-gcc-debug:
+  extends: .gcc-x86-32-build-debug
+  variables:
+    CONTAINER: debian:stretch-i386
+
+debian-buster-gcc-ibt:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:buster-gcc-ibt
+    RANDCONFIG: y
+    EXTRA_FIXED_RANDCONFIG: |
+      CONFIG_XEN_IBT=y
+
+debian-unstable-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-gcc-randconfig:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:unstable
+    RANDCONFIG: y
+
+debian-unstable-gcc-debug-randconfig:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: debian:unstable
+    RANDCONFIG: y
+
+debian-unstable-32-clang-debug:
+  extends: .clang-x86-32-build-debug
+  variables:
+    CONTAINER: debian:unstable-i386
+
+debian-unstable-32-gcc-debug:
+  extends: .gcc-x86-32-build-debug
+  variables:
+    CONTAINER: debian:unstable-i386
+
+fedora-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: fedora:29
+
+fedora-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: fedora:29
+
+# Ubuntu Trusty's Clang is 3.4 while Xen requires 3.5
+
+ubuntu-trusty-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:trusty
+
+ubuntu-trusty-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:trusty
+
+ubuntu-xenial-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: ubuntu:xenial
+
+ubuntu-xenial-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:xenial
+
+ubuntu-xenial-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:xenial
+
+ubuntu-xenial-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:xenial
+
+ubuntu-bionic-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: ubuntu:bionic
+
+ubuntu-bionic-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:bionic
+
+ubuntu-bionic-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:bionic
+
+ubuntu-bionic-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:bionic
+
+ubuntu-focal-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:focal
+
+ubuntu-focal-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:focal
+
+ubuntu-focal-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: ubuntu:focal
+
+ubuntu-focal-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:focal
+
+opensuse-leap-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: suse:opensuse-leap
+
+opensuse-leap-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: suse:opensuse-leap
+
+opensuse-leap-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: suse:opensuse-leap
+
+opensuse-leap-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: suse:opensuse-leap
+
+opensuse-tumbleweed-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: suse:opensuse-tumbleweed
+  allow_failure: true
+
+opensuse-tumbleweed-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: suse:opensuse-tumbleweed
+  allow_failure: true
+
+opensuse-tumbleweed-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: suse:opensuse-tumbleweed
+  allow_failure: true
+
+opensuse-tumbleweed-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: suse:opensuse-tumbleweed
+  allow_failure: true
