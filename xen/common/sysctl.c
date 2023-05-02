@@ -89,8 +89,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
             if ( num_domains == op->u.getdomaininfolist.max_domains )
                 break;
 
-            ret = xsm_getdomaininfo(XSM_HOOK, d);
-            if ( ret )
+            if ( xsm_getdomaininfo(XSM_HOOK, d) )
                 continue;
 
             getdomaininfo(d, &info);
