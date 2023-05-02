@@ -164,10 +164,10 @@ out:
 /*
  * hap code to call when log_dirty is enable. return 0 if no problem found.
  *
- * NB: Domain that having device assigned should not set log_global. Because
+ * NB: Domains having a device assigned should not come here, because
  * there is no way to track the memory updating from device.
  */
-static int cf_check hap_enable_log_dirty(struct domain *d, bool log_global)
+static int cf_check hap_enable_log_dirty(struct domain *d)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
@@ -175,7 +175,7 @@ static int cf_check hap_enable_log_dirty(struct domain *d, bool log_global)
      * Refuse to turn on global log-dirty mode if
      * there are outstanding p2m_ioreq_server pages.
      */
-    if ( log_global && read_atomic(&p2m->ioreq.entry_count) )
+    if ( read_atomic(&p2m->ioreq.entry_count) )
         return -EBUSY;
 
     /* turn on PG_log_dirty bit in paging mode */
@@ -186,15 +186,13 @@ static int cf_check hap_enable_log_dirty(struct domain *d, bool log_global)
     /* Enable hardware-assisted log-dirty if it is supported. */
     p2m_enable_hardware_log_dirty(d);
 
-    if ( log_global )
-    {
-        /*
-         * Switch to log dirty mode, either by setting l1e entries of P2M table
-         * to be read-only, or via hardware-assisted log-dirty.
-         */
-        p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
-        guest_flush_tlb_mask(d, d->dirty_cpumask);
-    }
+    /*
+     * Switch to log dirty mode, either by setting l1e entries of P2M table
+     * to be read-only, or via hardware-assisted log-dirty.
+     */
+    p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
+    guest_flush_tlb_mask(d, d->dirty_cpumask);
+
     return 0;
 }
 

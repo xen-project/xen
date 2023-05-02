@@ -186,7 +186,7 @@ struct log_dirty_domain {
 
     /* functions which are paging mode specific */
     const struct log_dirty_ops {
-        int        (*enable  )(struct domain *d, bool log_global);
+        int        (*enable  )(struct domain *d);
         int        (*disable )(struct domain *d);
         void       (*clean   )(struct domain *d);
     } *ops;

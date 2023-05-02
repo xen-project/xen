@@ -1,13 +1,7 @@
 #include <xen/mm.h>
 #include <asm/shadow.h>
 
-static int cf_check _enable_log_dirty(struct domain *d, bool log_global)
-{
-    ASSERT(is_pv_domain(d));
-    return -EOPNOTSUPP;
-}
-
-static int cf_check _disable_log_dirty(struct domain *d)
+static int cf_check _toggle_log_dirty(struct domain *d)
 {
     ASSERT(is_pv_domain(d));
     return -EOPNOTSUPP;
@@ -27,8 +21,8 @@ int shadow_domain_init(struct domain *d)
 {
     /* For HVM set up pointers for safety, then fail. */
     static const struct log_dirty_ops sh_none_ops = {
-        .enable  = _enable_log_dirty,
-        .disable = _disable_log_dirty,
+        .enable  = _toggle_log_dirty,
+        .disable = _toggle_log_dirty,
         .clean   = _clean_dirty_bitmap,
     };
 

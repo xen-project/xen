@@ -201,11 +201,11 @@ static int paging_free_log_dirty_bitmap(struct domain *d, int rc)
     return rc;
 }
 
-static int paging_log_dirty_enable(struct domain *d, bool log_global)
+static int paging_log_dirty_enable(struct domain *d)
 {
     int ret;
 
-    if ( has_arch_pdevs(d) && log_global )
+    if ( has_arch_pdevs(d) )
     {
         /*
          * Refuse to turn on global log-dirty mode
@@ -218,7 +218,7 @@ static int paging_log_dirty_enable(struct domain *d, bool log_global)
         return -EINVAL;
 
     domain_pause(d);
-    ret = d->arch.paging.log_dirty.ops->enable(d, log_global);
+    ret = d->arch.paging.log_dirty.ops->enable(d);
     domain_unpause(d);
 
     return ret;
@@ -728,7 +728,7 @@ int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
             break;
         /* Else fall through... */
     case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
-        return paging_log_dirty_enable(d, true);
+        return paging_log_dirty_enable(d);
 
     case XEN_DOMCTL_SHADOW_OP_OFF:
         if ( (rc = paging_log_dirty_disable(d, resuming)) != 0 )

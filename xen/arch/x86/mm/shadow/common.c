@@ -67,7 +67,7 @@ const uint8_t sh_type_to_size[] = {
 
 DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
-static int cf_check sh_enable_log_dirty(struct domain *, bool log_global);
+static int cf_check sh_enable_log_dirty(struct domain *);
 static int cf_check sh_disable_log_dirty(struct domain *);
 static void cf_check sh_clean_dirty_bitmap(struct domain *);
 
@@ -3030,7 +3030,7 @@ static int shadow_test_disable(struct domain *d)
 /* Shadow specific code which is called in paging_log_dirty_enable().
  * Return 0 if no problem found.
  */
-static int cf_check sh_enable_log_dirty(struct domain *d, bool log_global)
+static int cf_check sh_enable_log_dirty(struct domain *d)
 {
     int ret;
 
