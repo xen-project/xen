@@ -18,11 +18,13 @@ RUN zypper install -y --no-recommends \
         clang \
         cmake \
         dev86 \
+        diffutils \
         discount \
         flex \
         gcc \
         gcc-c++ \
         git \
+        ghostscript \
         glib2-devel \
         glibc-devel \
         # glibc-devel-32bit for Xen < 4.15
