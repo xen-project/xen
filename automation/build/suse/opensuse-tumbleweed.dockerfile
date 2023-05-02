@@ -61,7 +61,6 @@ RUN zypper install -y --no-recommends \
         'pkgconfig(libpci)' \
         'pkgconfig(sdl)' \
         'pkgconfig(sdl2)' \
-        python-devel \
         python3-devel \
         systemd-devel \
         tar \
