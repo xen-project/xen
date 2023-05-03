@@ -1,3 +1,4 @@
+#include <xen/lib.h>
 #include <xen/multiboot.h>
 #include <xen/multiboot2.h>
 #include <public/xen.h>
@@ -121,6 +122,7 @@ multiboot2_header:
 .Lbad_ldr_nst: .asciz "ERR: EFI SystemTable is not provided by bootloader!"
 .Lbad_ldr_nih: .asciz "ERR: EFI ImageHandle is not provided by bootloader!"
 .Lbad_efi_msg: .asciz "ERR: EFI IA-32 platforms are not supported!"
+.Lbag_alg_msg: .asciz "ERR: Xen must be loaded at a 2Mb boundary!"
 
         .section .init.data, "aw", @progbits
         .align 4
@@ -145,6 +147,9 @@ bad_cpu:
         jmp     .Lget_vtb
 not_multiboot:
         add     $sym_offs(.Lbad_ldr_msg),%esi   # Error message
+        jmp     .Lget_vtb
+.Lnot_aligned:
+        add     $sym_offs(.Lbag_alg_msg),%esi   # Error message
         jmp     .Lget_vtb
 .Lmb2_no_st:
         /*
@@ -669,6 +674,15 @@ trampoline_setup:
 
         cmp     %edi, %eax
         jb      1b
+
+        .if !IS_ALIGNED(sym_offs(0), 1 << L2_PAGETABLE_SHIFT)
+        .error "Symbol offset calculation breaks alignment"
+        .endif
+
+        /* Check that the image base is aligned. */
+        lea     sym_esi(_start), %eax
+        test    $(1 << L2_PAGETABLE_SHIFT) - 1, %eax
+        jnz     .Lnot_aligned
 
         /* Map Xen into the higher mappings using 2M superpages. */
         lea     _PAGE_PSE + PAGE_HYPERVISOR_RWX + sym_esi(_start), %eax
