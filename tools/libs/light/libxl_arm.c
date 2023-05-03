@@ -1033,10 +1033,14 @@ static int make_virtio_mmio_node_device(libxl__gc *gc, void *fdt, uint64_t base,
     } else if (!strcmp(type, VIRTIO_DEVICE_TYPE_GPIO)) {
         res = make_virtio_mmio_node_gpio(gc, fdt);
         if (res) return res;
-    } else if (strcmp(type, VIRTIO_DEVICE_TYPE_GENERIC)) {
-        /* Doesn't match generic virtio device */
-        LOG(ERROR, "Invalid type for virtio device: %s", type);
-        return -EINVAL;
+    } else {
+        int len = sizeof(VIRTIO_DEVICE_TYPE_GENERIC) - 1;
+
+        if (strncmp(type, VIRTIO_DEVICE_TYPE_GENERIC, len)) {
+            /* Doesn't match generic virtio device */
+            LOG(ERROR, "Invalid type for virtio device: %s", type);
+            return -EINVAL;
+        }
     }
 
     return fdt_end_node(fdt);
