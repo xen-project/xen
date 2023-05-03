@@ -34,6 +34,7 @@
 #include <xen/watchdog.h>
 
 #include <asm/apic.h>
+#include <asm/cpu-policy.h>
 #include <asm/delay.h>
 #include <asm/nmi.h>
 #include <asm/processor.h>
@@ -677,6 +678,9 @@ static long cf_check microcode_update_helper(void *data)
         spin_lock(&microcode_mutex);
         microcode_update_cache(patch);
         spin_unlock(&microcode_mutex);
+
+        /* Refresh the raw CPU policy, in case the features have changed. */
+        calculate_raw_cpu_policy();
     }
     else
         microcode_free_patch(patch);

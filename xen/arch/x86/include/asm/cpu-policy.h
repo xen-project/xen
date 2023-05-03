@@ -24,4 +24,10 @@ void init_dom0_cpuid_policy(struct domain *d);
 /* Clamp the CPUID policy to reality. */
 void recalculate_cpuid_policy(struct domain *d);
 
+/*
+ * Collect the raw CPUID and MSR values.  Called during boot, and after late
+ * microcode loading.
+ */
+void calculate_raw_cpu_policy(void);
+
 #endif /* X86_CPU_POLICY_H */
