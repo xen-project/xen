@@ -214,6 +214,7 @@ int pci_host_common_probe(struct dt_device_node *dev,
     struct pci_host_bridge *bridge;
     struct pci_config_window *cfg;
     int err;
+    int domain;
 
     if ( dt_device_for_passthrough(dev) )
         return 0;
@@ -234,12 +235,13 @@ int pci_host_common_probe(struct dt_device_node *dev,
     bridge->cfg = cfg;
     bridge->ops = &ops->pci_ops;
 
-    bridge->segment = pci_bus_find_domain_nr(dev);
-    if ( bridge->segment < 0 )
+    domain = pci_bus_find_domain_nr(dev);
+    if ( domain < 0 )
     {
         printk(XENLOG_ERR "Inconsistent \"linux,pci-domain\" property in DT\n");
         BUG();
     }
+    bridge->segment = domain;
     pci_add_host_bridge(bridge);
 
     return 0;
