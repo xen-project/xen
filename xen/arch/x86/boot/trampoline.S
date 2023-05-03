@@ -164,6 +164,9 @@ GLOBAL(trampoline_cpu_started)
 
         .code32
 trampoline_boot_cpu_entry:
+        /* Switch to relocated trampoline GDT. */
+        lgdt    bootsym_rel(gdt_48, 4)
+
         cmpb    $0,bootsym_rel(skip_realmode,5)
         jnz     .Lskip_realmode
 
