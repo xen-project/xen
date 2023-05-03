@@ -1762,9 +1762,16 @@ long common_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&set, arg, 1) )
             return -EFAULT;
 
-        if ( (set.flags & VCPU_SSHOTTMR_future) &&
-             (set.timeout_abs_ns < NOW()) )
-            return -ETIME;
+        if ( set.timeout_abs_ns < NOW() )
+        {
+            /*
+             * Simplify the logic if the timeout has already expired and just
+             * inject the event.
+             */
+            stop_timer(&v->singleshot_timer);
+            send_timer_event(v);
+            break;
+        }
 
         migrate_timer(&v->singleshot_timer, smp_processor_id());
         set_timer(&v->singleshot_timer, set.timeout_abs_ns);

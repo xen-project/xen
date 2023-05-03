@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Changed
  - Repurpose command line gnttab_max_{maptrack_,}frames options so they don't
    cap toolstack provided values.
+ - Ignore VCPUOP_set_singleshot_timer's VCPU_SSHOTTMR_future flag. The only
+   known user doesn't use it properly, leading to in-guest breakage.
 
 ### Added
  - On x86, support for features new in Intel Sapphire Rapids CPUs:
