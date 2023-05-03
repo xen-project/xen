@@ -1608,8 +1608,11 @@ present here:
 
 L<https://www.kernel.org/doc/Documentation/devicetree/bindings/i2c/i2c-virtio.yaml>
 
-For generic virtio devices, where we don't need to set special or compatible
-properties in the Device Tree, the type field must be set to "virtio,device".
+For other generic virtio devices, where we don't need to set special or
+compatible properties in the Device Tree, the type field must be set to
+"virtio,device" or "virtio,device<N>", where "N" is the virtio device id in
+hexadecimal format, without the "0x" prefix and all in lower case, like
+"virtio,device1a" for the file system device.
 
 =item B<transport=STRING>
 
