@@ -157,13 +157,25 @@ def generate_cppcheck_deps():
             "Error occured retrieving cppcheck version:\n{}\n\n{}"
         )
 
-    version_regex = re.search('^Cppcheck (.*)$', invoke_cppcheck, flags=re.M)
+    version_regex = re.search('^Cppcheck (\d+).(\d+)(?:.\d+)?$',
+                              invoke_cppcheck, flags=re.M)
     # Currently, only cppcheck version >= 2.7 is supported, but version 2.8 is
     # known to be broken, please refer to docs/misra/cppcheck.txt
-    if (not version_regex) or (not version_regex.group(1).startswith("2.7")):
+    if (not version_regex) or len(version_regex.groups()) < 2:
         raise CppcheckDepsPhaseError(
-                "Can't find cppcheck version or version is not 2.7"
-              )
+            "Can't find cppcheck version or version not identified: "
+            "{}".format(invoke_cppcheck)
+        )
+    major = int(version_regex.group(1))
+    minor = int(version_regex.group(2))
+    if major < 2 or (major == 2 and minor < 7):
+        raise CppcheckDepsPhaseError(
+            "Cppcheck version < 2.7 is not supported"
+        )
+    if major == 2 and minor == 8:
+        raise CppcheckDepsPhaseError(
+            "Cppcheck version 2.8 is known to be broken, see the documentation"
+        )
 
     # If misra option is selected, append misra addon and generate cppcheck
     # files for misra analysis
