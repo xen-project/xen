@@ -149,7 +149,7 @@ def generate_cppcheck_deps():
  --suppress='unusedStructMember:*'
  --include={}/include/xen/config.h
  -DCPPCHECK
-""".format(settings.xen_dir, settings.outdir, settings.xen_dir)
+""".format(settings.repo_dir, settings.outdir, settings.xen_dir)
 
     invoke_cppcheck = utils.invoke_command(
             "{} --version".format(settings.cppcheck_binpath),
@@ -240,7 +240,7 @@ def generate_cppcheck_report():
     try:
         cppcheck_report_utils.cppcheck_merge_txt_fragments(fragments,
                                                            report_filename,
-                                                           [settings.xen_dir])
+                                                           [settings.repo_dir])
     except cppcheck_report_utils.CppcheckTXTReportError as e:
         raise CppcheckReportPhaseError(e)
 
@@ -257,7 +257,7 @@ def generate_cppcheck_report():
         try:
             cppcheck_report_utils.cppcheck_merge_xml_fragments(fragments,
                                                                xml_filename,
-                                                               settings.xen_dir,
+                                                               settings.repo_dir,
                                                                settings.outdir)
         except cppcheck_report_utils.CppcheckHTMLReportError as e:
             raise CppcheckReportPhaseError(e)
@@ -265,7 +265,7 @@ def generate_cppcheck_report():
         utils.invoke_command(
             "{} --file={} --source-dir={} --report-dir={}/html --title=Xen"
                 .format(settings.cppcheck_htmlreport_binpath, xml_filename,
-                        settings.xen_dir, html_report_dir),
+                        settings.repo_dir, html_report_dir),
             False, CppcheckReportPhaseError,
             "Error occured generating Cppcheck HTML report:\n{}"
         )
@@ -273,7 +273,7 @@ def generate_cppcheck_report():
         html_files = utils.recursive_find_file(html_report_dir, r'.*\.html$')
         try:
             cppcheck_report_utils.cppcheck_strip_path_html(html_files,
-                                                           (settings.xen_dir,
+                                                           (settings.repo_dir,
                                                             settings.outdir))
         except cppcheck_report_utils.CppcheckHTMLReportError as e:
             raise CppcheckReportPhaseError(e)
