@@ -139,7 +139,6 @@ def generate_cppcheck_deps():
     # Compiler defines are in compiler-def.h which is included in config.h
     #
     cppcheck_flags="""
---cppcheck-build-dir={}/{}
  --max-ctu-depth=10
  --enable=style,information,missingInclude
  --template=\'{{file}}({{line}},{{column}}):{{id}}:{{severity}}:{{message}}\'
@@ -150,8 +149,7 @@ def generate_cppcheck_deps():
  --suppress='unusedStructMember:*'
  --include={}/include/xen/config.h
  -DCPPCHECK
-""".format(settings.outdir, CPPCHECK_BUILD_DIR, settings.xen_dir,
-           settings.outdir, settings.xen_dir)
+""".format(settings.xen_dir, settings.outdir, settings.xen_dir)
 
     invoke_cppcheck = utils.invoke_command(
             "{} --version".format(settings.cppcheck_binpath),
@@ -204,9 +202,9 @@ def generate_cppcheck_deps():
 
     cppcheck_cc_flags = """--compiler={} --cppcheck-cmd={} {}
  --cppcheck-plat={}/cppcheck-plat --ignore-path=tools/
- --ignore-path=arch/x86/efi/check.c
+ --ignore-path=arch/x86/efi/check.c --build-dir={}/{}
 """.format(xen_cc, settings.cppcheck_binpath, cppcheck_flags,
-           settings.tools_dir)
+           settings.tools_dir, settings.outdir, CPPCHECK_BUILD_DIR)
 
     if settings.cppcheck_html:
         cppcheck_cc_flags = cppcheck_cc_flags + " --cppcheck-html"

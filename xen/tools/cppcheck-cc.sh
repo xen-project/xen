@@ -24,6 +24,7 @@ Options:
 EOF
 }
 
+BUILD_DIR=""
 CC_FILE=""
 COMPILER=""
 CPPCHECK_HTML="n"
@@ -66,6 +67,10 @@ do
             help
             exit 0
             ;;
+        --build-dir=*)
+            BUILD_DIR="${OPTION#*=}"
+            sm_tool_args="n"
+            ;;
         --compiler=*)
             COMPILER="${OPTION#*=}"
             sm_tool_args="n"
@@ -104,6 +109,12 @@ done
 if [ "${COMPILER}" = "" ]
 then
     echo "--compiler arg is mandatory."
+    exit 1
+fi
+
+if [ "${BUILD_DIR}" = "" ]
+then
+    echo "--build-dir arg is mandatory."
     exit 1
 fi
 
@@ -199,13 +210,18 @@ then
             exit 1
         fi
 
+        # Generate build directory for the analysed file
+        cppcheck_build_dir="${BUILD_DIR}/${OBJTREE_PATH}"
+        mkdir -p "${cppcheck_build_dir}"
+
         # Shellcheck complains about missing quotes on CPPCHECK_TOOL_ARGS, but
         # they can't be used here
         # shellcheck disable=SC2086
         ${CPPCHECK_TOOL} ${CPPCHECK_TOOL_ARGS} \
             --project="${JDB_FILE}" \
             --output-file="${out_file}" \
-            --platform="${platform}"
+            --platform="${platform}" \
+            --cppcheck-build-dir=${cppcheck_build_dir}
 
         if [ "${CPPCHECK_HTML}" = "y" ]
         then
@@ -216,6 +232,7 @@ then
                 --project="${JDB_FILE}" \
                 --output-file="${out_file%.txt}.xml" \
                 --platform="${platform}" \
+                --cppcheck-build-dir=${cppcheck_build_dir} \
                 -q \
                 --xml
         fi
