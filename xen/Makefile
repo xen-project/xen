@@ -310,7 +310,6 @@ cmd_makefile = { \
     } > Makefile
 
 outputmakefile:
-	$(Q)ln -fsn $(srctree) source
 ifdef building_out_of_srctree
 	$(Q)if [ -f $(srctree)/.config -o \
 		 -d $(srctree)/include/config -o \
@@ -321,6 +320,7 @@ ifdef building_out_of_srctree
 		echo >&2 "***"; \
 		false; \
 	fi
+	$(Q)ln -fsn $(srctree) source
 	$(call cmd,makefile)
 	$(Q)test -e .gitignore || \
 	{ echo "# this is build directory, ignore it"; echo "*"; } > .gitignore
