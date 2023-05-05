@@ -1,15 +1,20 @@
 Valid-License-Identifier: CC-BY-4.0
+
 SPDX-URL: https://spdx.org/licenses/CC-BY-4.0
+
 Usage-Guide:
+
   Do NOT use this license for code, but it's acceptable for content like artwork
   or documentation. When using it for the latter, it's best to use it together
   with a GPL2 compatible license using "OR", as CC-BY-4.0 texts processed by
   the kernel's build system might combine it with content taken from more
   restrictive licenses.
+
   To use the Creative Commons Attribution 4.0 International license put
   the following SPDX tag/value pair into a comment according to the
   placement guidelines in the licensing rules documentation:
     SPDX-License-Identifier: CC-BY-4.0
+
 License-Text:
 
 Creative Commons Attribution 4.0 International

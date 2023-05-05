@@ -1,10 +1,14 @@
 Valid-License-Identifier: MIT
+
 SPDX-URL: https://spdx.org/licenses/MIT.html
+
 Usage-Guide:
+
   To use the MIT License put the following SPDX tag/value pair into a
   comment according to the placement guidelines in the licensing rules
   documentation:
     SPDX-License-Identifier: MIT
+
 License-Text:
 
 MIT License
