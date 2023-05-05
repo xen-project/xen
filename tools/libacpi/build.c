@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: LGPL-2.1 */
+/* SPDX-License-Identifier: LGPL-2.1-only */
 /*
  * Copyright (c) 2004, Intel Corporation.
  * Copyright (c) 2006, Keir Fraser, XenSource Inc.

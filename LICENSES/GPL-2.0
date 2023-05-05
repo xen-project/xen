@@ -1,9 +1,11 @@
-Valid-License-Identifier: GPL-2.0
 Valid-License-Identifier: GPL-2.0-only
-Valid-License-Identifier: GPL-2.0+
 Valid-License-Identifier: GPL-2.0-or-later
 
-SPDX-URL: https://spdx.org/licenses/GPL-2.0.html
+SPDX-URL: https://spdx.org/licenses/GPL-2.0-only.html
+SPDX-URL: https://spdx.org/licenses/GPL-2.0-or-later.html
+
+Deprecated-Identifier: GPL-2.0
+Deprecated-Identifier: GPL-2.0+
 
 Usage-Guide:
 
@@ -13,13 +15,12 @@ Usage-Guide:
 
   For 'GNU General Public License (GPL) version 2 only' use:
     SPDX-License-Identifier: GPL-2.0-only
-  or (now deprecated)
-    SPDX-License-Identifier: GPL-2.0
 
   For 'GNU General Public License (GPL) version 2 or any later version' use:
-    SPDX-License-Identifier: GPL-2.0+
-  or
     SPDX-License-Identifier: GPL-2.0-or-later
+
+  The deprecated tags should not be used for any new additions.  Where
+  possible, their existing uses should be phased out.
 
 License-Text:
 

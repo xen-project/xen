@@ -1,7 +1,8 @@
-Valid-License-Identifier: LGPL-2.0
-Valid-License-Identifier: LGPL-2.0+
+Valid-License-Identifier: LGPL-2.0-only
+Valid-License-Identifier: LGPL-2.0-or-later
 
-SPDX-URL: https://spdx.org/licenses/LGPL-2.0.html
+SPDX-URL: https://spdx.org/licenses/LGPL-2.0-only.html
+SPDX-URL: https://spdx.org/licenses/LGPL-2.0-or-later.html
 
 Usage-Guide:
 
@@ -10,11 +11,11 @@ Usage-Guide:
   guidelines in the licensing rules documentation.
 
   For 'GNU Library General Public License (LGPL) version 2.0 only' use:
-    SPDX-License-Identifier: LGPL-2.0
+    SPDX-License-Identifier: LGPL-2.0-only
 
   For 'GNU Library General Public License (LGPL) version 2.0 or any later
   version' use:
-    SPDX-License-Identifier: LGPL-2.0+
+    SPDX-License-Identifier: LGPL-2.0-or-later
 
 License-Text:
 
