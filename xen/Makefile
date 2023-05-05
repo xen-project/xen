@@ -208,7 +208,7 @@ endif
 objtree := .
 VPATH := $(srctree)
 
-export building_out_of_srctree srctree objtree VPATH
+export srctree objtree VPATH
 
 export XEN_ROOT := $(abs_srctree)/..
 
