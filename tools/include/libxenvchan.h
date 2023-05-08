@@ -79,11 +79,11 @@ struct libxenvchan {
 	xenevtchn_handle *event;
 	uint32_t event_port;
 	/* informative flags: are we acting as server? */
-	int is_server:1;
+	unsigned int is_server:1;
 	/* true if server remains active when client closes (allows reconnection) */
-	int server_persist:1;
+	unsigned int server_persist:1;
 	/* true if operations should block instead of returning 0 */
-	int blocking:1;
+	unsigned int blocking:1;
 	/* communication rings */
 	struct libxenvchan_ring read, write;
 	/**
