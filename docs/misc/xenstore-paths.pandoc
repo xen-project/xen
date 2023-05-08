@@ -274,7 +274,8 @@ circumstances where the generation ID needs to be changed.
 
 The TPM version to be probed for.
 
-A value of 1 indicates to probe for TPM 1.2.
+A value of 1 indicates to probe for TPM 1.2, whereas a value of 2
+indicates that a TPM 2.0 using CRB should be probed.
 A value of 0 or an invalid value will result in no TPM being probed.
 If unset, a default of 1 is assumed.
 

@@ -113,6 +113,37 @@ struct acpi_20_tcpa {
 #define ACPI_2_0_TCPA_LAML_SIZE (64*1024)
 
 /*
+ * TPM2
+ */
+struct acpi_20_tpm2 {
+    struct acpi_header header;
+    uint16_t platform_class;
+    uint16_t reserved;
+    uint64_t control_area_address;
+    uint32_t start_method;
+    uint8_t start_method_params[12];
+    uint32_t log_area_minimum_length;
+    uint64_t log_area_start_address;
+};
+#define TPM2_ACPI_CLASS_CLIENT      0
+#define TPM2_START_METHOD_CRB       7
+
+/*
+ * TPM register I/O Mapped region, location of which defined in the
+ * TCG PC Client Platform TPM Profile Specification for TPM 2.0.
+ * See table 9 - Only Locality 0 is used here. This is emulated by QEMU.
+ * Definition of Register space is found in table 12.
+ */
+#define TPM_REGISTER_BASE           0xFED40000
+#define TPM_CRB_CTRL_REQ            (TPM_REGISTER_BASE  + 0x40)
+#define TPM_CRB_INTF_ID             (TPM_REGISTER_BASE  + 0x30)
+
+#define TPM_LOG_AREA_ADDRESS        0xFED50000
+
+#define TPM_LOG_AREA_MINIMUM_SIZE   (64 << 10)
+#define TPM_LOG_SIZE                (64 << 10)
+
+/*
  * Fixed ACPI Description Table Structure (FADT) in ACPI 1.0.
  */
 struct acpi_10_fadt {
@@ -422,6 +453,7 @@ struct acpi_20_slit {
 #define ACPI_2_0_RSDT_SIGNATURE ASCII32('R','S','D','T')
 #define ACPI_2_0_XSDT_SIGNATURE ASCII32('X','S','D','T')
 #define ACPI_2_0_TCPA_SIGNATURE ASCII32('T','C','P','A')
+#define ACPI_2_0_TPM2_SIGNATURE ASCII32('T','P','M','2')
 #define ACPI_2_0_HPET_SIGNATURE ASCII32('H','P','E','T')
 #define ACPI_2_0_WAET_SIGNATURE ASCII32('W','A','E','T')
 #define ACPI_2_0_SRAT_SIGNATURE ASCII32('S','R','A','T')
@@ -435,6 +467,7 @@ struct acpi_20_slit {
 #define ACPI_2_0_RSDT_REVISION 0x01
 #define ACPI_2_0_XSDT_REVISION 0x01
 #define ACPI_2_0_TCPA_REVISION 0x02
+#define ACPI_2_0_TPM2_REVISION 0x04
 #define ACPI_2_0_HPET_REVISION 0x01
 #define ACPI_2_0_WAET_REVISION 0x01
 #define ACPI_1_0_FADT_REVISION 0x01

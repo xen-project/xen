@@ -71,6 +71,7 @@ struct acpi_config {
     const struct hvm_info_table *hvminfo;
 
     const uint16_t *tis_hdr;
+    const uint16_t *crb_id;
 
     /*
      * Address where acpi_info should be placed.
