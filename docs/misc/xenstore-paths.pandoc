@@ -269,6 +269,15 @@ at the guest physical address in HVM_PARAM_VM_GENERATION_ID_ADDR.
 See Microsoft's "Virtual Machine Generation ID" specification for the
 circumstances where the generation ID needs to be changed.
 
+
+#### ~/platform/tpm_version = INTEGER [HVM,INTERNAL]
+
+The TPM version to be probed for.
+
+A value of 1 indicates to probe for TPM 1.2.
+A value of 0 or an invalid value will result in no TPM being probed.
+If unset, a default of 1 is assumed.
+
 ### Frontend device paths
 
 Paravirtual device frontends are generally specified by their own

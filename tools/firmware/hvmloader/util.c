@@ -920,6 +920,8 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
 {
     const char *s;
     struct acpi_ctxt ctxt;
+    long long tpm_version;
+    char *end;
 
     /* Allocate and initialise the acpi info area. */
     mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
@@ -967,8 +969,6 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
     s = xenstore_read("platform/generation-id", "0:0");
     if ( s )
     {
-        char *end;
-
         config->vm_gid[0] = strtoll(s, &end, 0);
         config->vm_gid[1] = 0;
         if ( end && end[0] == ':' )
@@ -994,13 +994,27 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
     if ( !strncmp(xenstore_read("platform/acpi_laptop_slate", "0"), "1", 1)  )
         config->table_flags |= ACPI_HAS_SSDT_LAPTOP_SLATE;
 
-    config->table_flags |= (ACPI_HAS_TCPA | ACPI_HAS_IOAPIC |
-                            ACPI_HAS_WAET | ACPI_HAS_PMTIMER |
-                            ACPI_HAS_BUTTONS | ACPI_HAS_VGA |
-                            ACPI_HAS_8042 | ACPI_HAS_CMOS_RTC);
+    config->table_flags |= (ACPI_HAS_IOAPIC | ACPI_HAS_WAET |
+                            ACPI_HAS_PMTIMER | ACPI_HAS_BUTTONS |
+                            ACPI_HAS_VGA | ACPI_HAS_8042 |
+                            ACPI_HAS_CMOS_RTC);
     config->acpi_revision = 4;
 
-    config->tis_hdr = (uint16_t *)ACPI_TIS_HDR_ADDRESS;
+    config->tpm_version = 0;
+    s = xenstore_read("platform/tpm_version", "1");
+    tpm_version = strtoll(s, &end, 0);
+
+    if ( end[0] == '\0' )
+    {
+        switch ( tpm_version )
+        {
+        case 1:
+            config->table_flags |= ACPI_HAS_TPM;
+            config->tis_hdr = (uint16_t *)ACPI_TIS_HDR_ADDRESS;
+            config->tpm_version = 1;
+            break;
+        }
+    }
 
     config->numa.nr_vmemranges = nr_vmemranges;
     config->numa.nr_vnodes = nr_vnodes;

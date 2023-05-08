@@ -18,7 +18,7 @@
 #define ACPI_HAS_SSDT_PM           (1<<4)
 #define ACPI_HAS_SSDT_S3           (1<<5)
 #define ACPI_HAS_SSDT_S4           (1<<6)
-#define ACPI_HAS_TCPA              (1<<7)
+#define ACPI_HAS_TPM               (1<<7)
 #define ACPI_HAS_IOAPIC            (1<<8)
 #define ACPI_HAS_WAET              (1<<9)
 #define ACPI_HAS_PMTIMER           (1<<10)
@@ -57,6 +57,7 @@ struct acpi_config {
 
     uint32_t table_flags;
     uint8_t acpi_revision;
+    uint8_t tpm_version;
 
     uint64_t vm_gid[2];
     unsigned long vm_gid_addr; /* OUT parameter */
