@@ -32,9 +32,9 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
     xc_domaininfo_t info;
     int ret;
 
-    ret = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
-    if (ret != 1 || info.domain != domid) {
-        LOG(ERROR, "unable to get domain type for domid=%"PRIu32, domid);
+    ret = xc_domain_getinfo_single(ctx->xch, domid, &info);
+    if (ret < 0) {
+        LOGED(ERROR, domid, "unable to get dominfo");
         return LIBXL_DOMAIN_TYPE_INVALID;
     }
     if (info.flags & XEN_DOMINF_hvm_guest) {
@@ -70,15 +70,10 @@ int libxl__domain_cpupool(libxl__gc *gc, uint32_t domid)
     xc_domaininfo_t info;
     int ret;
 
-    ret = xc_domain_getinfolist(CTX->xch, domid, 1, &info);
-    if (ret != 1)
+    ret = xc_domain_getinfo_single(CTX->xch, domid, &info);
+    if (ret < 0)
     {
-        LOGE(ERROR, "getinfolist failed %d", ret);
-        return ERROR_FAIL;
-    }
-    if (info.domain != domid)
-    {
-        LOGE(ERROR, "got info for dom%d, wanted dom%d\n", info.domain, domid);
+        LOGED(ERROR, domid, "get domaininfo failed");
         return ERROR_FAIL;
     }
     return info.cpupool;

@@ -332,13 +332,8 @@ static void suspend_common_wait_guest_check(libxl__egc *egc,
     /* Convenience aliases */
     const uint32_t domid = dsps->domid;
 
-    ret = xc_domain_getinfolist(CTX->xch, domid, 1, &info);
+    ret = xc_domain_getinfo_single(CTX->xch, domid, &info);
     if (ret < 0) {
-        LOGED(ERROR, domid, "unable to check for status of guest");
-        goto err;
-    }
-
-    if (!(ret == 1 && info.domain == domid)) {
         LOGED(ERROR, domid, "guest we were suspending has been destroyed");
         goto err;
     }

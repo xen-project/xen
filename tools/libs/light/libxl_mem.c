@@ -323,8 +323,8 @@ retry_transaction:
     libxl__xs_printf(gc, t, GCSPRINTF("%s/memory/target", dompath),
                      "%"PRIu64, new_target_memkb);
 
-    r = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
-    if (r != 1 || info.domain != domid) {
+    r = xc_domain_getinfo_single(ctx->xch, domid, &info);
+    if (r < 0) {
         abort_transaction = 1;
         rc = ERROR_FAIL;
         goto out;

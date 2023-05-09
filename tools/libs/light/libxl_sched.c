@@ -219,13 +219,11 @@ static int sched_credit_domain_set(libxl__gc *gc, uint32_t domid,
     xc_domaininfo_t domaininfo;
     int rc;
 
-    rc = xc_domain_getinfolist(CTX->xch, domid, 1, &domaininfo);
+    rc = xc_domain_getinfo_single(CTX->xch, domid, &domaininfo);
     if (rc < 0) {
-        LOGED(ERROR, domid, "Getting domain info list");
-        return ERROR_FAIL;
+        LOGED(ERROR, domid, "Getting domain info");
+        return errno == ESRCH ? ERROR_INVAL : ERROR_FAIL;
     }
-    if (rc != 1 || domaininfo.domain != domid)
-        return ERROR_INVAL;
 
     rc = xc_sched_credit_domain_get(CTX->xch, domid, &sdom);
     if (rc != 0) {
@@ -426,13 +424,11 @@ static int sched_credit2_domain_set(libxl__gc *gc, uint32_t domid,
     xc_domaininfo_t info;
     int rc;
 
-    rc = xc_domain_getinfolist(CTX->xch, domid, 1, &info);
+    rc = xc_domain_getinfo_single(CTX->xch, domid, &info);
     if (rc < 0) {
         LOGED(ERROR, domid, "Getting domain info");
-        return ERROR_FAIL;
+        return errno == ESRCH ? ERROR_INVAL : ERROR_FAIL;
     }
-    if (rc != 1 || info.domain != domid)
-        return ERROR_INVAL;
 
     rc = xc_sched_credit2_domain_get(CTX->xch, domid, &sdom);
     if (rc != 0) {

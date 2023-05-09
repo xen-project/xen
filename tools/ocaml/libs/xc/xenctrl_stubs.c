@@ -497,10 +497,8 @@ CAMLprim value stub_xc_domain_getinfo(value xch_val, value domid)
 	xc_domaininfo_t info;
 	int ret;
 
-	ret = xc_domain_getinfolist(xch, Int_val(domid), 1, &info);
-	if (ret != 1)
-		failwith_xc(xch);
-	if (info.domain != Int_val(domid))
+	ret = xc_domain_getinfo_single(xch, Int_val(domid), &info);
+	if (ret < 0)
 		failwith_xc(xch);
 
 	result = alloc_domaininfo(&info);

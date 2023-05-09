@@ -169,8 +169,8 @@ static int xenpaging_get_tot_pages(struct xenpaging *paging)
     xc_domaininfo_t domain_info;
     int rc;
 
-    rc = xc_domain_getinfolist(xch, paging->vm_event.domain_id, 1, &domain_info);
-    if ( rc != 1 )
+    rc = xc_domain_getinfo_single(xch, paging->vm_event.domain_id, &domain_info);
+    if ( rc < 0 )
     {
         PERROR("Error getting domain info");
         return -1;
@@ -424,9 +424,9 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     /* Get max_pages from guest if not provided via cmdline */
     if ( !paging->max_pages )
     {
-        rc = xc_domain_getinfolist(xch, paging->vm_event.domain_id, 1,
-                                   &domain_info);
-        if ( rc != 1 )
+        rc = xc_domain_getinfo_single(xch, paging->vm_event.domain_id,
+                                      &domain_info);
+        if ( rc < 0 )
         {
             PERROR("Error getting domain info");
             goto err;
