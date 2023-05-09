@@ -444,28 +444,6 @@ typedef struct xc_core_header {
  * DOMAIN MANAGEMENT FUNCTIONS
  */
 
-typedef struct xc_dominfo {
-    uint32_t      domid;
-    uint32_t      ssidref;
-    unsigned int  dying:1, crashed:1, shutdown:1,
-                  paused:1, blocked:1, running:1,
-                  hvm:1, debugged:1, xenstore:1, hap:1;
-    unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
-    unsigned long nr_pages; /* current number, not maximum */
-    unsigned long nr_outstanding_pages;
-    unsigned long nr_shared_pages;
-    unsigned long nr_paged_pages;
-    unsigned long shared_info_frame;
-    uint64_t      cpu_time;
-    unsigned long max_memkb;
-    unsigned int  nr_online_vcpus;
-    unsigned int  max_vcpu_id;
-    xen_domain_handle_t handle;
-    unsigned int  cpupool;
-    uint8_t       gpaddr_bits;
-    struct xen_arch_domainconfig arch_config;
-} xc_dominfo_t;
-
 typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
 
 static inline unsigned int dominfo_shutdown_reason(const xc_domaininfo_t *info)
@@ -720,27 +698,6 @@ int xc_domain_get_guest_width(xc_interface *xch, uint32_t domid,
 int xc_domain_getinfo_single(xc_interface *xch,
                              uint32_t domid,
                              xc_domaininfo_t *info);
-
-/**
- * This function will return information about one or more domains. It is
- * designed to iterate over the list of domains. If a single domain is
- * requested, this function will return the next domain in the list - if
- * one exists. It is, therefore, important in this case to make sure the
- * domain requested was the one returned.
- *
- * @parm xch a handle to an open hypervisor interface
- * @parm first_domid the first domain to enumerate information from.  Domains
- *                   are currently enumerate in order of creation.
- * @parm max_doms the number of elements in info
- * @parm info an array of max_doms size that will contain the information for
- *            the enumerated domains.
- * @return the number of domains enumerated or -1 on error
- */
-int xc_domain_getinfo(xc_interface *xch,
-                      uint32_t first_domid,
-                      unsigned int max_doms,
-                      xc_dominfo_t *info);
-
 
 /**
  * This function will set the execution context for the specified vcpu.

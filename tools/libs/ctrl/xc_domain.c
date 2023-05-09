@@ -357,83 +357,10 @@ int xc_domain_getinfo_single(xc_interface *xch,
     if ( do_domctl(xch, &domctl) < 0 )
         return -1;
 
-    if ( domctl.u.getdomaininfo.domain != domid )
-    {
-        errno = ESRCH;
-        return -1;
-    }
-
     if ( info )
         *info = domctl.u.getdomaininfo;
 
     return 0;
-}
-
-int xc_domain_getinfo(xc_interface *xch,
-                      uint32_t first_domid,
-                      unsigned int max_doms,
-                      xc_dominfo_t *info)
-{
-    unsigned int nr_doms;
-    uint32_t next_domid = first_domid;
-    DECLARE_DOMCTL;
-    int rc = 0;
-
-    memset(info, 0, max_doms*sizeof(xc_dominfo_t));
-
-    for ( nr_doms = 0; nr_doms < max_doms; nr_doms++ )
-    {
-        domctl.cmd = XEN_DOMCTL_getdomaininfo;
-        domctl.domain = next_domid;
-        if ( (rc = do_domctl(xch, &domctl)) < 0 )
-            break;
-        info->domid      = domctl.domain;
-
-        info->dying    = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_dying);
-        info->shutdown = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_shutdown);
-        info->paused   = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_paused);
-        info->blocked  = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_blocked);
-        info->running  = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_running);
-        info->hvm      = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hvm_guest);
-        info->debugged = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_debugged);
-        info->xenstore = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_xs_domain);
-        info->hap      = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hap);
-
-        info->shutdown_reason =
-            (domctl.u.getdomaininfo.flags>>XEN_DOMINF_shutdownshift) &
-            XEN_DOMINF_shutdownmask;
-
-        if ( info->shutdown && (info->shutdown_reason == SHUTDOWN_crash) )
-        {
-            info->shutdown = 0;
-            info->crashed  = 1;
-        }
-
-        info->ssidref  = domctl.u.getdomaininfo.ssidref;
-        info->nr_pages = domctl.u.getdomaininfo.tot_pages;
-        info->nr_outstanding_pages = domctl.u.getdomaininfo.outstanding_pages;
-        info->nr_shared_pages = domctl.u.getdomaininfo.shr_pages;
-        info->nr_paged_pages = domctl.u.getdomaininfo.paged_pages;
-        info->max_memkb = domctl.u.getdomaininfo.max_pages << (PAGE_SHIFT-10);
-        info->shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
-        info->cpu_time = domctl.u.getdomaininfo.cpu_time;
-        info->nr_online_vcpus = domctl.u.getdomaininfo.nr_online_vcpus;
-        info->max_vcpu_id = domctl.u.getdomaininfo.max_vcpu_id;
-        info->cpupool = domctl.u.getdomaininfo.cpupool;
-        info->gpaddr_bits = domctl.u.getdomaininfo.gpaddr_bits;
-        info->arch_config = domctl.u.getdomaininfo.arch_config;
-
-        memcpy(info->handle, domctl.u.getdomaininfo.handle,
-               sizeof(xen_domain_handle_t));
-
-        next_domid = (uint16_t)domctl.domain + 1;
-        info++;
-    }
-
-    if ( nr_doms == 0 )
-        return rc;
-
-    return nr_doms;
 }
 
 int xc_domain_getinfolist(xc_interface *xch,
