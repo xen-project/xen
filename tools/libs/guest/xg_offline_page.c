@@ -366,7 +366,7 @@ static int clear_pte(xc_interface *xch, uint32_t domid,
  */
 
 static int is_page_exchangable(xc_interface *xch, uint32_t domid, xen_pfn_t mfn,
-                               xc_dominfo_t *info)
+                               xc_domaininfo_t *info)
 {
     uint32_t status;
     int rc;
@@ -377,7 +377,7 @@ static int is_page_exchangable(xc_interface *xch, uint32_t domid, xen_pfn_t mfn,
         DPRINTF("Dom0's page can't be LM");
         return 0;
     }
-    if (info->hvm)
+    if (info->flags & XEN_DOMINF_hvm_guest)
     {
         DPRINTF("Currently we can only live change PV guest's page\n");
         return 0;
@@ -458,7 +458,7 @@ err0:
 /* The domain should be suspended when called here */
 int xc_exchange_page(xc_interface *xch, uint32_t domid, xen_pfn_t mfn)
 {
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     struct xc_domain_meminfo minfo;
     struct xc_mmu *mmu = NULL;
     struct pte_backup old_ptes = {NULL, 0, 0};
@@ -473,13 +473,13 @@ int xc_exchange_page(xc_interface *xch, uint32_t domid, xen_pfn_t mfn)
     xen_pfn_t *m2p_table;
     unsigned long max_mfn;
 
-    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
+    if ( xc_domain_getinfo_single(xch, domid, &info) < 0 )
     {
-        ERROR("Could not get domain info");
+        PERROR("Could not get domain info for dom%u", domid);
         return -1;
     }
 
-    if (!info.shutdown || info.shutdown_reason != SHUTDOWN_suspend)
+    if (!dominfo_shutdown_with(&info, SHUTDOWN_suspend))
     {
         errno = EINVAL;
         ERROR("Can't exchange page unless domain is suspended\n");

@@ -570,7 +570,7 @@ kdd_guest *kdd_guest_init(char *arg, FILE *log, int verbosity)
     kdd_guest *g = NULL;
     xc_interface *xch = NULL;
     uint32_t domid;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
 
     g = calloc(1, sizeof (kdd_guest));
     if (!g) 
@@ -590,7 +590,8 @@ kdd_guest *kdd_guest_init(char *arg, FILE *log, int verbosity)
     g->domid = domid;
 
     /* Check that the domain exists and is HVM */
-    if (xc_domain_getinfo(xch, domid, 1, &info) != 1 || !info.hvm)
+    if (xc_domain_getinfo_single(xch, domid, &info) < 0 ||
+        !(info.flags & XEN_DOMINF_hvm_guest))
         goto err;
 
     snprintf(g->id, (sizeof g->id) - 1, 

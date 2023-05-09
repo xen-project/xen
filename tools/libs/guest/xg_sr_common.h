@@ -220,7 +220,7 @@ struct xc_sr_context
     /* Plain VM, or checkpoints over time. */
     xc_stream_type_t stream_type;
 
-    xc_dominfo_t dominfo;
+    xc_domaininfo_t dominfo;
 
     union /* Common save or restore data. */
     {

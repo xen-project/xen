@@ -38,7 +38,7 @@ void cleanup(void)
 #define BUFSZ 512
 void handle_low_mem(void)
 {
-    xc_dominfo_t  dom0_info;
+    xc_domaininfo_t dom0_info;
     xc_physinfo_t info;
     unsigned long long free_pages, dom0_pages, diff, dom0_target;
     char data[BUFSZ], error[BUFSZ];
@@ -58,13 +58,13 @@ void handle_low_mem(void)
         return;
     diff = THRESHOLD_PG - free_pages; 
 
-    if (xc_domain_getinfo(xch, 0, 1, &dom0_info) < 1)
+    if (xc_domain_getinfo_single(xch, 0, &dom0_info) < 0)
     {
         perror("Failed to get dom0 info");
         return;
     }
 
-    dom0_pages = (unsigned long long) dom0_info.nr_pages;
+    dom0_pages = (unsigned long long) dom0_info.tot_pages;
     printf("Dom0 pages: 0x%llx:%llu\n", dom0_pages, dom0_pages);
     dom0_target = dom0_pages - diff;
     if (dom0_target <= DOM0_FLOOR_PG)

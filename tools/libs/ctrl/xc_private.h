@@ -16,6 +16,7 @@
 #ifndef XC_PRIVATE_H
 #define XC_PRIVATE_H
 
+#include <inttypes.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -420,12 +421,12 @@ void *xc_vm_event_enable(xc_interface *xch, uint32_t domain_id, int param,
 int do_dm_op(xc_interface *xch, uint32_t domid, unsigned int nr_bufs, ...);
 
 #if defined (__i386__) || defined (__x86_64__)
-static inline int xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
+static inline int xc_core_arch_auto_translated_physmap(const xc_domaininfo_t *info)
 {
-    return info->hvm;
+    return info->flags & XEN_DOMINF_hvm_guest;
 }
 #elif defined (__arm__) || defined(__aarch64__)
-static inline int xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
+static inline int xc_core_arch_auto_translated_physmap(const xc_domaininfo_t *info)
 {
     return 1;
 }

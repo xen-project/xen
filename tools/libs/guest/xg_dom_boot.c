@@ -164,7 +164,7 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
 
 int xc_dom_boot_image(struct xc_dom_image *dom)
 {
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     int rc;
 
     DOMPRINTF_CALLED(dom->xch);
@@ -174,19 +174,11 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
         return rc;
 
     /* collect some info */
-    rc = xc_domain_getinfo(dom->xch, dom->guest_domid, 1, &info);
-    if ( rc < 0 )
+    if ( xc_domain_getinfo_single(dom->xch, dom->guest_domid, &info) < 0 )
     {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: getdomaininfo failed (rc=%d)", __FUNCTION__, rc);
-        return rc;
-    }
-    if ( rc == 0 || info.domid != dom->guest_domid )
-    {
-        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: Huh? No domains found (nr_domains=%d) "
-                     "or domid mismatch (%d != %d)", __FUNCTION__,
-                     rc, info.domid, dom->guest_domid);
+                     "%s: getdomaininfo failed (errno=%d)",
+                     __func__, errno);
         return -1;
     }
     dom->shared_info_mfn = info.shared_info_frame;

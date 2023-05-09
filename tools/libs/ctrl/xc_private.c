@@ -441,11 +441,12 @@ int xc_machphys_mfn_list(xc_interface *xch,
 
 long xc_get_tot_pages(xc_interface *xch, uint32_t domid)
 {
-    xc_dominfo_t info;
-    if ( (xc_domain_getinfo(xch, domid, 1, &info) != 1) ||
-         (info.domid != domid) )
+    xc_domaininfo_t info;
+
+    if ( xc_domain_getinfo_single(xch, domid, &info) < 0 )
         return -1;
-    return info.nr_pages;
+
+    return info.tot_pages;
 }
 
 int xc_copy_to_domain_page(xc_interface *xch,

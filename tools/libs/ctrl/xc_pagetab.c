@@ -29,17 +29,16 @@
 unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
                                            int vcpu, unsigned long long virt)
 {
-    xc_dominfo_t dominfo;
+    xc_domaininfo_t dominfo;
     uint64_t paddr, mask, pte = 0;
     int size, level, pt_levels = 2;
     void *map;
 
-    if (xc_domain_getinfo(xch, dom, 1, &dominfo) != 1 
-        || dominfo.domid != dom)
+    if (xc_domain_getinfo_single(xch, dom, &dominfo) < 0)
         return 0;
 
     /* What kind of paging are we dealing with? */
-    if (dominfo.hvm) {
+    if (dominfo.flags & XEN_DOMINF_hvm_guest) {
         struct hvm_hw_cpu ctx;
         if (xc_domain_hvm_getcontext_partial(xch, dom,
                                              HVM_SAVE_CODE(CPU), vcpu,

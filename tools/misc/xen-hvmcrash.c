@@ -48,7 +48,7 @@ main(int argc, char **argv)
 {
     int domid;
     xc_interface *xch;
-    xc_dominfo_t dominfo;
+    xc_domaininfo_t dominfo;
     int ret;
     uint32_t len;
     uint8_t *buf;
@@ -66,13 +66,13 @@ main(int argc, char **argv)
         exit(1);
     }
 
-    ret = xc_domain_getinfo(xch, domid, 1, &dominfo);
+    ret = xc_domain_getinfo_single(xch, domid, &dominfo);
     if (ret < 0) {
         perror("xc_domain_getinfo");
         exit(1);
     }
 
-    if (!dominfo.hvm) {
+    if (!(dominfo.flags & XEN_DOMINF_hvm_guest)) {
         fprintf(stderr, "domain %d is not HVM\n", domid);
         exit(1);
     }

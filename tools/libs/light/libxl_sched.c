@@ -498,10 +498,10 @@ static int sched_rtds_vcpu_get(libxl__gc *gc, uint32_t domid,
 {
     uint32_t num_vcpus;
     int i, r, rc;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     struct xen_domctl_schedparam_vcpu *vcpus;
 
-    r = xc_domain_getinfo(CTX->xch, domid, 1, &info);
+    r = xc_domain_getinfo_single(CTX->xch, domid, &info);
     if (r < 0) {
         LOGED(ERROR, domid, "Getting domain info");
         rc = ERROR_FAIL;
@@ -552,10 +552,10 @@ static int sched_rtds_vcpu_get_all(libxl__gc *gc, uint32_t domid,
 {
     uint32_t num_vcpus;
     int i, r, rc;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     struct xen_domctl_schedparam_vcpu *vcpus;
 
-    r = xc_domain_getinfo(CTX->xch, domid, 1, &info);
+    r = xc_domain_getinfo_single(CTX->xch, domid, &info);
     if (r < 0) {
         LOGED(ERROR, domid, "Getting domain info");
         rc = ERROR_FAIL;
@@ -602,10 +602,10 @@ static int sched_rtds_vcpu_set(libxl__gc *gc, uint32_t domid,
     int r, rc;
     int i;
     uint16_t max_vcpuid;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     struct xen_domctl_schedparam_vcpu *vcpus;
 
-    r = xc_domain_getinfo(CTX->xch, domid, 1, &info);
+    r = xc_domain_getinfo_single(CTX->xch, domid, &info);
     if (r < 0) {
         LOGED(ERROR, domid, "Getting domain info");
         rc = ERROR_FAIL;
@@ -662,11 +662,11 @@ static int sched_rtds_vcpu_set_all(libxl__gc *gc, uint32_t domid,
     int r, rc;
     int i;
     uint16_t max_vcpuid;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     struct xen_domctl_schedparam_vcpu *vcpus;
     uint32_t num_vcpus;
 
-    r = xc_domain_getinfo(CTX->xch, domid, 1, &info);
+    r = xc_domain_getinfo_single(CTX->xch, domid, &info);
     if (r < 0) {
         LOGED(ERROR, domid, "Getting domain info");
         rc = ERROR_FAIL;

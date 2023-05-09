@@ -37,7 +37,7 @@ int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
 {
     struct domain_info_context _di;
 
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     shared_info_any_t *live_shinfo;
     xen_capabilities_info_t xen_caps = "";
     unsigned long i;
@@ -49,9 +49,9 @@ int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
         return -1;
     }
 
-    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
+    if ( xc_domain_getinfo_single(xch, domid, &info) < 0 )
     {
-        PERROR("Could not get domain info");
+        PERROR("Could not get dominfo for dom%u", domid);
         return -1;
     }
 
@@ -86,7 +86,7 @@ int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
                                        info.shared_info_frame);
     if ( !live_shinfo )
     {
-        PERROR("Could not map the shared info frame (MFN 0x%lx)",
+        PERROR("Could not map the shared info frame (MFN 0x%"PRIx64")",
                info.shared_info_frame);
         return -1;
     }

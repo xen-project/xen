@@ -20,7 +20,7 @@ static int map_shinfo(struct xc_sr_context *ctx)
         xch, ctx->domid, PAGE_SIZE, PROT_READ, ctx->dominfo.shared_info_frame);
     if ( !ctx->x86.pv.shinfo )
     {
-        PERROR("Failed to map shared info frame at mfn %#lx",
+        PERROR("Failed to map shared info frame at mfn %#"PRIx64,
                ctx->dominfo.shared_info_frame);
         return -1;
     }
@@ -943,7 +943,7 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
 #ifdef __i386__
             if ( mfn == INVALID_MFN )
             {
-                if ( !ctx->dominfo.paused )
+                if ( !(ctx->dominfo.flags & XEN_DOMINF_paused) )
                     errno = EAGAIN;
                 else
                 {
@@ -965,7 +965,7 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
 
             if ( !mfn_in_pseudophysmap(ctx, mfn) )
             {
-                if ( !ctx->dominfo.paused )
+                if ( !(ctx->dominfo.flags & XEN_DOMINF_paused) )
                     errno = EAGAIN;
                 else
                 {

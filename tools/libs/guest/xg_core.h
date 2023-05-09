@@ -134,15 +134,15 @@ typedef struct xc_core_memory_map xc_core_memory_map_t;
 struct xc_core_arch_context;
 int xc_core_arch_memory_map_get(xc_interface *xch,
                                 struct xc_core_arch_context *arch_ctxt,
-                                xc_dominfo_t *info, shared_info_any_t *live_shinfo,
+                                xc_domaininfo_t *info, shared_info_any_t *live_shinfo,
                                 xc_core_memory_map_t **mapp,
                                 unsigned int *nr_entries);
 int xc_core_arch_map_p2m(xc_interface *xch, struct domain_info_context *dinfo,
-                         xc_dominfo_t *info, shared_info_any_t *live_shinfo,
+                         xc_domaininfo_t *info, shared_info_any_t *live_shinfo,
                          xen_pfn_t **live_p2m);
 
 int xc_core_arch_map_p2m_writable(xc_interface *xch, struct domain_info_context *dinfo,
-                                  xc_dominfo_t *info,
+                                  xc_domaininfo_t *info,
                                   shared_info_any_t *live_shinfo,
                                   xen_pfn_t **live_p2m);
 

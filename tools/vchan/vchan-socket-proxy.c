@@ -222,7 +222,7 @@ static struct libxenvchan *connect_vchan(int domid, const char *path) {
     struct libxenvchan *ctrl = NULL;
     struct xs_handle *xs = NULL;
     xc_interface *xc = NULL;
-    xc_dominfo_t dominfo;
+    xc_domaininfo_t dominfo;
     char **watch_ret;
     unsigned int watch_num;
     int ret;
@@ -254,12 +254,12 @@ static struct libxenvchan *connect_vchan(int domid, const char *path) {
         if (ctrl)
             break;
 
-        ret = xc_domain_getinfo(xc, domid, 1, &dominfo);
+        ret = xc_domain_getinfo_single(xc, domid, &dominfo);
         /* break the loop if domain is definitely not there anymore, but
          * continue if it is or the call failed (like EPERM) */
         if (ret == -1 && errno == ESRCH)
             break;
-        if (ret == 1 && (dominfo.domid != (uint32_t)domid || dominfo.dying))
+        if (ret == 0 && (dominfo.flags & XEN_DOMINF_dying))
             break;
     }
 

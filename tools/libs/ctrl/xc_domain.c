@@ -1960,15 +1960,14 @@ int xc_domain_memory_mapping(
     uint32_t add_mapping)
 {
     DECLARE_DOMCTL;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     int ret = 0, rc;
     unsigned long done = 0, nr, max_batch_sz;
 
-    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 ||
-         info.domid != domid )
+    if ( xc_domain_getinfo_single(xch, domid, &info) < 0 )
     {
-        PERROR("Could not get info for domain");
-        return -EINVAL;
+        PERROR("Could not get info for dom%u", domid);
+        return -1;
     }
     if ( !xc_core_arch_auto_translated_physmap(&info) )
         return 0;

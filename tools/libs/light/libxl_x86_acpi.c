@@ -87,16 +87,16 @@ static int init_acpi_config(libxl__gc *gc,
 {
     xc_interface *xch = dom->xch;
     uint32_t domid = dom->guest_domid;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     struct hvm_info_table *hvminfo;
     int i, r, rc;
 
     config->dsdt_anycpu = config->dsdt_15cpu = dsdt_pvh;
     config->dsdt_anycpu_len = config->dsdt_15cpu_len = dsdt_pvh_len;
 
-    r = xc_domain_getinfo(xch, domid, 1, &info);
+    r = xc_domain_getinfo_single(xch, domid, &info);
     if (r < 0) {
-        LOG(ERROR, "getdomaininfo failed (rc=%d)", r);
+        LOGED(ERROR, domid, "getdomaininfo failed");
         rc = ERROR_FAIL;
         goto out;
     }

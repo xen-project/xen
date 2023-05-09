@@ -903,7 +903,7 @@ static int handle_shared_info(struct xc_sr_context *ctx,
         ctx->dominfo.shared_info_frame);
     if ( !guest_shinfo )
     {
-        PERROR("Failed to map Shared Info at mfn %#lx",
+        PERROR("Failed to map Shared Info at mfn %#"PRIx64,
                ctx->dominfo.shared_info_frame);
         goto err;
     }

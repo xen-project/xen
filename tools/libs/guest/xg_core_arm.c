@@ -33,14 +33,14 @@ xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
 
 int
 xc_core_arch_memory_map_get(xc_interface *xch, struct xc_core_arch_context *unused,
-                            xc_dominfo_t *info, shared_info_any_t *live_shinfo,
+                            xc_domaininfo_t *info, shared_info_any_t *live_shinfo,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {
     xen_pfn_t p2m_size = 0;
     xc_core_memory_map_t *map;
 
-    if ( xc_domain_nr_gpfns(xch, info->domid, &p2m_size) < 0 )
+    if ( xc_domain_nr_gpfns(xch, info->domain, &p2m_size) < 0 )
         return -1;
 
     map = malloc(sizeof(*map));
@@ -59,7 +59,7 @@ xc_core_arch_memory_map_get(xc_interface *xch, struct xc_core_arch_context *unus
 }
 
 static int
-xc_core_arch_map_p2m_rw(xc_interface *xch, struct domain_info_context *dinfo, xc_dominfo_t *info,
+xc_core_arch_map_p2m_rw(xc_interface *xch, struct domain_info_context *dinfo, xc_domaininfo_t *info,
                         shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m, int rw)
 {
     errno = ENOSYS;
@@ -67,14 +67,14 @@ xc_core_arch_map_p2m_rw(xc_interface *xch, struct domain_info_context *dinfo, xc
 }
 
 int
-xc_core_arch_map_p2m(xc_interface *xch, struct domain_info_context *dinfo, xc_dominfo_t *info,
+xc_core_arch_map_p2m(xc_interface *xch, struct domain_info_context *dinfo, xc_domaininfo_t *info,
                         shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m)
 {
     return xc_core_arch_map_p2m_rw(xch, dinfo, info, live_shinfo, live_p2m, 0);
 }
 
 int
-xc_core_arch_map_p2m_writable(xc_interface *xch, struct domain_info_context *dinfo, xc_dominfo_t *info,
+xc_core_arch_map_p2m_writable(xc_interface *xch, struct domain_info_context *dinfo, xc_domaininfo_t *info,
                               shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m)
 {
     return xc_core_arch_map_p2m_rw(xch, dinfo, info, live_shinfo, live_p2m, 1);

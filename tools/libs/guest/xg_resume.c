@@ -26,28 +26,28 @@
 static int modify_returncode(xc_interface *xch, uint32_t domid)
 {
     vcpu_guest_context_any_t ctxt;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     xen_capabilities_info_t caps;
     struct domain_info_context _dinfo = {};
     struct domain_info_context *dinfo = &_dinfo;
     int rc;
 
-    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 ||
-         info.domid != domid )
+    if ( xc_domain_getinfo_single(xch, domid, &info) < 0 )
     {
-        PERROR("Could not get domain info");
+        PERROR("Could not get info for dom%u", domid);
         return -1;
     }
 
-    if ( !info.shutdown || (info.shutdown_reason != SHUTDOWN_suspend) )
+    if ( !dominfo_shutdown_with(&info, SHUTDOWN_suspend) )
     {
         ERROR("Dom %d not suspended: (shutdown %d, reason %d)", domid,
-              info.shutdown, info.shutdown_reason);
+              info.flags & XEN_DOMINF_shutdown,
+              dominfo_shutdown_reason(&info));
         errno = EINVAL;
         return -1;
     }
 
-    if ( info.hvm )
+    if ( info.flags & XEN_DOMINF_hvm_guest )
     {
         /* HVM guests without PV drivers have no return code to modify. */
         uint64_t irq = 0;
@@ -133,7 +133,7 @@ static int xc_domain_resume_hvm(xc_interface *xch, uint32_t domid)
 static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
 {
     DECLARE_DOMCTL;
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     int i, rc = -1;
 #if defined(__i386__) || defined(__x86_64__)
     struct domain_info_context _dinfo = { .guest_width = 0,
@@ -146,7 +146,7 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
     xen_pfn_t *p2m = NULL;
 #endif
 
-    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
+    if ( xc_domain_getinfo_single(xch, domid, &info) < 0 )
     {
         PERROR("Could not get domain info");
         return rc;
@@ -156,7 +156,7 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
      * (x86 only) Rewrite store_mfn and console_mfn back to MFN (from PFN).
      */
 #if defined(__i386__) || defined(__x86_64__)
-    if ( info.hvm )
+    if ( info.flags & XEN_DOMINF_hvm_guest )
         return xc_domain_resume_hvm(xch, domid);
 
     if ( xc_domain_get_guest_width(xch, domid, &dinfo->guest_width) != 0 )

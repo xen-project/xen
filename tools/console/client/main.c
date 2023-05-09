@@ -408,17 +408,16 @@ int main(int argc, char **argv)
 	if (dom_path == NULL)
 		err(errno, "xs_get_domain_path()");
 	if (type == CONSOLE_INVAL) {
-		xc_dominfo_t xcinfo;
+		xc_domaininfo_t xcinfo;
 		xc_interface *xc_handle = xc_interface_open(0,0,0);
 		if (xc_handle == NULL)
 			err(errno, "Could not open xc interface");
-		if ( (xc_domain_getinfo(xc_handle, domid, 1, &xcinfo) != 1) ||
-		     (xcinfo.domid != domid) ) {
+		if (xc_domain_getinfo_single(xc_handle, domid, &xcinfo) < 0) {
 			xc_interface_close(xc_handle);
 			err(errno, "Failed to get domain information");
 		}
 		/* default to pv console for pv guests and serial for hvm guests */
-		if (xcinfo.hvm)
+		if (xcinfo.flags & XEN_DOMINF_hvm_guest)
 			type = CONSOLE_SERIAL;
 		else
 			type = CONSOLE_PV;

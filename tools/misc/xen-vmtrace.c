@@ -133,15 +133,15 @@ int main(int argc, char **argv)
 
     while ( !interrupted )
     {
-        xc_dominfo_t dominfo;
+        xc_domaininfo_t dominfo;
 
         if ( get_more_data() )
             goto out;
 
         usleep(1000 * 100);
 
-        if ( xc_domain_getinfo(xch, domid, 1, &dominfo) != 1 ||
-             dominfo.domid != domid || dominfo.shutdown )
+        if ( xc_domain_getinfo_single(xch, domid, &dominfo) < 0 ||
+             (dominfo.flags & XEN_DOMINF_shutdown) )
         {
             if ( get_more_data() )
                 goto out;

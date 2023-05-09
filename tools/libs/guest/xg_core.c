@@ -349,7 +349,7 @@ elfnote_dump_none(xc_interface *xch, void *args, dumpcore_rtn_t dump_rtn)
 static int
 elfnote_dump_core_header(
     xc_interface *xch,
-    void *args, dumpcore_rtn_t dump_rtn, const xc_dominfo_t *info,
+    void *args, dumpcore_rtn_t dump_rtn, const xc_domaininfo_t *info,
     int nr_vcpus, unsigned long nr_pages)
 {
     int sts;
@@ -361,7 +361,8 @@ elfnote_dump_core_header(
     
     elfnote.descsz = sizeof(header);
     elfnote.type = XEN_ELFNOTE_DUMPCORE_HEADER;
-    header.xch_magic = info->hvm ? XC_CORE_MAGIC_HVM : XC_CORE_MAGIC;
+    header.xch_magic = (info->flags & XEN_DOMINF_hvm_guest) ? XC_CORE_MAGIC_HVM
+                                                            : XC_CORE_MAGIC;
     header.xch_nr_vcpus = nr_vcpus;
     header.xch_nr_pages = nr_pages;
     header.xch_page_size = PAGE_SIZE;
@@ -423,7 +424,7 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
                                 void *args,
                                 dumpcore_rtn_t dump_rtn)
 {
-    xc_dominfo_t info;
+    xc_domaininfo_t info;
     shared_info_any_t *live_shinfo = NULL;
     struct domain_info_context _dinfo = {};
     struct domain_info_context *dinfo = &_dinfo;
@@ -468,15 +469,15 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
         goto out;
     }
 
-    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
+    if ( xc_domain_getinfo_single(xch, domid, &info) < 0 )
     {
-        PERROR("Could not get info for domain");
+        PERROR("Could not get info for dom%u", domid);
         goto out;
     }
     /* Map the shared info frame */
     live_shinfo = xc_map_foreign_range(xch, domid, PAGE_SIZE,
                                        PROT_READ, info.shared_info_frame);
-    if ( !live_shinfo && !info.hvm )
+    if ( !live_shinfo && !(info.flags & XEN_DOMINF_hvm_guest) )
     {
         PERROR("Couldn't map live_shinfo");
         goto out;
@@ -517,12 +518,6 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
         dinfo->guest_width = sizeof(unsigned long);
     }
 
-    if ( domid != info.domid )
-    {
-        PERROR("Domain %d does not exist", domid);
-        goto out;
-    }
-
     ctxt = calloc(sizeof(*ctxt), info.max_vcpu_id + 1);
     if ( !ctxt )
     {
@@ -560,9 +555,9 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
      * all the array...
      *
      * We don't want to use the total potential size of the memory map
-     * since that is usually much higher than info.nr_pages.
+     * since that is usually much higher than info.tot_pages.
      */
-    nr_pages = info.nr_pages;
+    nr_pages = info.tot_pages;
 
     if ( !auto_translated_physmap )
     {

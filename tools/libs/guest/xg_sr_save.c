@@ -336,19 +336,18 @@ static int suspend_domain(struct xc_sr_context *ctx)
     }
 
     /* Refresh domain information. */
-    if ( (xc_domain_getinfo(xch, ctx->domid, 1, &ctx->dominfo) != 1) ||
-         (ctx->dominfo.domid != ctx->domid) )
+    if ( xc_domain_getinfo_single(xch, ctx->domid, &ctx->dominfo) < 0 )
     {
         PERROR("Unable to refresh domain information");
         return -1;
     }
 
     /* Confirm the domain has actually been paused. */
-    if ( !ctx->dominfo.shutdown ||
-         (ctx->dominfo.shutdown_reason != SHUTDOWN_suspend) )
+    if ( !dominfo_shutdown_with(&ctx->dominfo, SHUTDOWN_suspend) )
     {
         ERROR("Domain has not been suspended: shutdown %d, reason %d",
-              ctx->dominfo.shutdown, ctx->dominfo.shutdown_reason);
+              ctx->dominfo.flags & XEN_DOMINF_shutdown,
+              dominfo_shutdown_reason(&ctx->dominfo));
         return -1;
     }
 
@@ -893,8 +892,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
         if ( rc )
             goto err;
 
-        if ( !ctx->dominfo.shutdown ||
-             (ctx->dominfo.shutdown_reason != SHUTDOWN_suspend) )
+        if ( !dominfo_shutdown_with(&ctx->dominfo, SHUTDOWN_suspend) )
         {
             ERROR("Domain has not been suspended");
             rc = -1;
@@ -989,6 +987,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
         .fd = io_fd,
         .stream_type = stream_type,
     };
+    bool hvm;
 
     /* GCC 4.4 (of CentOS 6.x vintage) can' t initialise anonymous unions. */
     ctx.save.callbacks = callbacks;
@@ -996,17 +995,13 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.save.debug = !!(flags & XCFLAGS_DEBUG);
     ctx.save.recv_fd = recv_fd;
 
-    if ( xc_domain_getinfo(xch, dom, 1, &ctx.dominfo) != 1 )
+    if ( xc_domain_getinfo_single(xch, dom, &ctx.dominfo) < 0 )
     {
         PERROR("Failed to get domain info");
         return -1;
     }
 
-    if ( ctx.dominfo.domid != dom )
-    {
-        ERROR("Domain %u does not exist", dom);
-        return -1;
-    }
+    hvm = ctx.dominfo.flags & XEN_DOMINF_hvm_guest;
 
     /* Sanity check stream_type-related parameters */
     switch ( stream_type )
@@ -1018,7 +1013,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
         assert(callbacks->checkpoint && callbacks->postcopy);
         /* Fallthrough */
     case XC_STREAM_PLAIN:
-        if ( ctx.dominfo.hvm )
+        if ( hvm )
             assert(callbacks->switch_qemu_logdirty);
         break;
 
@@ -1028,11 +1023,11 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
     }
 
     DPRINTF("fd %d, dom %u, flags %u, hvm %d",
-            io_fd, dom, flags, ctx.dominfo.hvm);
+            io_fd, dom, flags, hvm);
 
     ctx.domid = dom;
 
-    if ( ctx.dominfo.hvm )
+    if ( hvm )
     {
         ctx.save.ops = save_ops_x86_hvm;
         return save(&ctx, DHDR_TYPE_X86_HVM);

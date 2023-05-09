@@ -92,7 +92,7 @@ static struct xenctx {
     int do_stack;
 #endif
     int kernel_start_set;
-    xc_dominfo_t dominfo;
+    xc_domaininfo_t dominfo;
 } xenctx;
 
 struct symbol {
@@ -989,7 +989,7 @@ static void dump_ctx(int vcpu)
 
 #if defined(__i386__) || defined(__x86_64__)
     {
-        if (xenctx.dominfo.hvm) {
+        if (xenctx.dominfo.flags & XEN_DOMINF_hvm_guest) {
             struct hvm_hw_cpu cpuctx;
             xen_capabilities_info_t xen_caps = "";
             if (xc_domain_hvm_getcontext_partial(
@@ -1269,9 +1269,9 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    ret = xc_domain_getinfo(xenctx.xc_handle, xenctx.domid, 1, &xenctx.dominfo);
+    ret = xc_domain_getinfo_single(xenctx.xc_handle, xenctx.domid, &xenctx.dominfo);
     if (ret < 0) {
-        perror("xc_domain_getinfo");
+        perror("xc_domain_getinfo_single");
         exit(-1);
     }
 

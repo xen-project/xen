@@ -852,6 +852,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       xc_stream_type_t stream_type,
                       struct restore_callbacks *callbacks, int send_back_fd)
 {
+    bool hvm;
     xen_pfn_t nr_pfns;
     struct xc_sr_context ctx = {
         .xch = xch,
@@ -887,20 +888,15 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         break;
     }
 
-    if ( xc_domain_getinfo(xch, dom, 1, &ctx.dominfo) != 1 )
+    if ( xc_domain_getinfo_single(xch, dom, &ctx.dominfo) < 0 )
     {
-        PERROR("Failed to get domain info");
+        PERROR("Failed to get dominfo for dom%u", dom);
         return -1;
     }
 
-    if ( ctx.dominfo.domid != dom )
-    {
-        ERROR("Domain %u does not exist", dom);
-        return -1;
-    }
-
+    hvm = ctx.dominfo.flags & XEN_DOMINF_hvm_guest;
     DPRINTF("fd %d, dom %u, hvm %u, stream_type %d",
-            io_fd, dom, ctx.dominfo.hvm, stream_type);
+            io_fd, dom, hvm, stream_type);
 
     ctx.domid = dom;
 
@@ -914,8 +910,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     }
 
     ctx.restore.p2m_size = nr_pfns;
-    ctx.restore.ops = ctx.dominfo.hvm
-        ? restore_ops_x86_hvm : restore_ops_x86_pv;
+    ctx.restore.ops = hvm ? restore_ops_x86_hvm : restore_ops_x86_pv;
 
     if ( restore(&ctx) )
         return -1;

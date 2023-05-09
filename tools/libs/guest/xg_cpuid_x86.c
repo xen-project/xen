@@ -281,7 +281,8 @@ static int xc_cpuid_xend_policy(
     xc_interface *xch, uint32_t domid, const struct xc_xend_cpuid *xend)
 {
     int rc;
-    xc_dominfo_t di;
+    bool hvm;
+    xc_domaininfo_t di;
     unsigned int nr_leaves, nr_msrs;
     uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
     /*
@@ -291,13 +292,13 @@ static int xc_cpuid_xend_policy(
     xen_cpuid_leaf_t *host = NULL, *def = NULL, *cur = NULL;
     unsigned int nr_host, nr_def, nr_cur;
 
-    if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
-         di.domid != domid )
+    if ( (rc = xc_domain_getinfo_single(xch, domid, &di)) < 0 )
     {
-        ERROR("Failed to obtain d%d info", domid);
-        rc = -ESRCH;
+        PERROR("Failed to obtain d%d info", domid);
+        rc = -errno;
         goto fail;
     }
+    hvm = di.flags & XEN_DOMINF_hvm_guest;
 
     rc = xc_cpu_policy_get_size(xch, &nr_leaves, &nr_msrs);
     if ( rc )
@@ -330,12 +331,12 @@ static int xc_cpuid_xend_policy(
     /* Get the domain type's default policy. */
     nr_msrs = 0;
     nr_def = nr_leaves;
-    rc = get_system_cpu_policy(xch, di.hvm ? XEN_SYSCTL_cpu_policy_hvm_default
-                                           : XEN_SYSCTL_cpu_policy_pv_default,
+    rc = get_system_cpu_policy(xch, hvm ? XEN_SYSCTL_cpu_policy_hvm_default
+                                        : XEN_SYSCTL_cpu_policy_pv_default,
                                &nr_def, def, &nr_msrs, NULL);
     if ( rc )
     {
-        PERROR("Failed to obtain %s def policy", di.hvm ? "hvm" : "pv");
+        PERROR("Failed to obtain %s def policy", hvm ? "hvm" : "pv");
         rc = -errno;
         goto fail;
     }
@@ -428,7 +429,8 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
                           const struct xc_xend_cpuid *xend)
 {
     int rc;
-    xc_dominfo_t di;
+    bool hvm;
+    xc_domaininfo_t di;
     unsigned int i, nr_leaves, nr_msrs;
     xen_cpuid_leaf_t *leaves = NULL;
     struct cpu_policy *p = NULL;
@@ -436,13 +438,13 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
     uint32_t host_featureset[FEATURESET_NR_ENTRIES] = {};
     uint32_t len = ARRAY_SIZE(host_featureset);
 
-    if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
-         di.domid != domid )
+    if ( (rc = xc_domain_getinfo_single(xch, domid, &di)) < 0 )
     {
-        ERROR("Failed to obtain d%d info", domid);
-        rc = -ESRCH;
+        PERROR("Failed to obtain d%d info", domid);
+        rc = -errno;
         goto out;
     }
+    hvm = di.flags & XEN_DOMINF_hvm_guest;
 
     rc = xc_cpu_policy_get_size(xch, &nr_leaves, &nr_msrs);
     if ( rc )
@@ -475,12 +477,12 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
 
     /* Get the domain's default policy. */
     nr_msrs = 0;
-    rc = get_system_cpu_policy(xch, di.hvm ? XEN_SYSCTL_cpu_policy_hvm_default
-                                           : XEN_SYSCTL_cpu_policy_pv_default,
+    rc = get_system_cpu_policy(xch, hvm ? XEN_SYSCTL_cpu_policy_hvm_default
+                                        : XEN_SYSCTL_cpu_policy_pv_default,
                                &nr_leaves, leaves, &nr_msrs, NULL);
     if ( rc )
     {
-        PERROR("Failed to obtain %s default policy", di.hvm ? "hvm" : "pv");
+        PERROR("Failed to obtain %s default policy", hvm ? "hvm" : "pv");
         rc = -errno;
         goto out;
     }
@@ -514,7 +516,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         p->feat.hle = test_bit(X86_FEATURE_HLE, host_featureset);
         p->feat.rtm = test_bit(X86_FEATURE_RTM, host_featureset);
 
-        if ( di.hvm )
+        if ( hvm )
         {
             p->feat.mpx = test_bit(X86_FEATURE_MPX, host_featureset);
         }
@@ -571,7 +573,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
     {
         p->extd.itsc = itsc;
 
-        if ( di.hvm )
+        if ( hvm )
         {
             p->basic.pae = pae;
             p->basic.vmx = nested_virt;
@@ -579,7 +581,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         }
     }
 
-    if ( !di.hvm )
+    if ( !hvm )
     {
         /*
          * On hardware without CPUID Faulting, PV guests see real topology.
