@@ -55,7 +55,6 @@ nodeid_t setup_node(unsigned pxm)
 {
 	nodeid_t node;
 	unsigned idx;
-	static bool warned;
 	static unsigned nodes_found;
 
 	BUILD_BUG_ON(MAX_NUMNODES >= NUMA_NO_NODE);
@@ -75,11 +74,8 @@ nodeid_t setup_node(unsigned pxm)
 		if (pxm2node[idx].node == NUMA_NO_NODE)
 			goto finish;
 
-	if (!warned) {
-		printk(KERN_WARNING "SRAT: Too many proximity domains (%#x)\n",
-		       pxm);
-		warned = true;
-	}
+	printk_once(XENLOG_WARNING "SRAT: Too many proximity domains (%#x)\n",
+		    pxm);
 
 	return NUMA_NO_NODE;
 

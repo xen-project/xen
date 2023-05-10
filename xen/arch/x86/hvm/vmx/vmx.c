@@ -1207,16 +1207,11 @@ static void cf_check vmx_get_segment_register(
      */
     if ( unlikely(!vmx_vmcs_try_enter(v)) )
     {
-        static bool_t warned;
+        printk_once(XENLOG_WARNING "Segment register inaccessible for %pv\n"
+                    "(If you see this outside of debugging activity,"
+                    " please report to xen-devel@lists.xenproject.org)\n",
+                    v);
 
-        if ( !warned )
-        {
-            warned = 1;
-            printk(XENLOG_WARNING "Segment register inaccessible for %pv\n"
-                   "(If you see this outside of debugging activity,"
-                   " please report to xen-devel@lists.xenproject.org)\n",
-                   v);
-        }
         memset(reg, 0, sizeof(*reg));
         return;
     }
@@ -2325,10 +2320,9 @@ static bool cf_check vmx_test_pir(const struct vcpu *v, uint8_t vec)
 static void cf_check vmx_handle_eoi(uint8_t vector, int isr)
 {
     uint8_t old_svi = set_svi(isr);
-    static bool warned;
 
-    if ( vector != old_svi && !test_and_set_bool(warned) )
-        printk(XENLOG_WARNING "EOI for %02x but SVI=%02x\n", vector, old_svi);
+    if ( vector != old_svi )
+        printk_once(XENLOG_WARNING "EOI for %02x but SVI=%02x\n", vector, old_svi);
 }
 
 static void cf_check vmx_enable_msr_interception(struct domain *d, uint32_t msr)

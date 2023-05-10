@@ -876,13 +876,8 @@ static void cf_check plt_overflow(void *unused)
         plt_stamp64 += plt_mask + 1;
     }
     if ( i != 0 )
-    {
-        static bool warned_once;
-
-        if ( !test_and_set_bool(warned_once) )
-            printk("Platform timer appears to have unexpectedly wrapped "
-                   "%u%s times.\n", i, (i == 10) ? " or more" : "");
-    }
+        printk_once("Platform timer appears to have unexpectedly wrapped "
+                    "%u%s times.\n", i, (i == 10) ? " or more" : "");
 
     spin_unlock_irq(&platform_timer_lock);
 
@@ -2156,14 +2151,8 @@ void init_percpu_time(void)
         }
         else if ( adj != tsc_adjust[socket] )
         {
-            static bool __read_mostly warned;
-
-            if ( !warned )
-            {
-                warned = true;
-                printk(XENLOG_WARNING
-                       "Differing TSC ADJUST values within socket(s) - fixing all\n");
-            }
+            printk_once(XENLOG_WARNING
+                        "Differing TSC ADJUST values within socket(s) - fixing all\n");
             wrmsrl(MSR_IA32_TSC_ADJUST, tsc_adjust[socket]);
         }
     }

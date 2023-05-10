@@ -493,7 +493,6 @@ void amd_check_disable_c1e(unsigned int port, u8 value)
 static void check_syscfg_dram_mod_en(void)
 {
 	uint64_t syscfg;
-	static bool_t printed = 0;
 
 	if (!((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
 		(boot_cpu_data.x86 >= 0x0f)))
@@ -503,9 +502,7 @@ static void check_syscfg_dram_mod_en(void)
 	if (!(syscfg & SYSCFG_MTRR_FIX_DRAM_MOD_EN))
 		return;
 
-	if (!test_and_set_bool(printed))
-		printk(KERN_ERR "MTRR: SYSCFG[MtrrFixDramModEn] not "
-			"cleared by BIOS, clearing this bit\n");
+        printk_once(KERN_ERR "MTRR: SYSCFG[MtrrFixDramModEn] found set; clearing\n");
 
 	syscfg &= ~SYSCFG_MTRR_FIX_DRAM_MOD_EN;
 	wrmsrl(MSR_K8_SYSCFG, syscfg);
@@ -1107,25 +1104,19 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 
 		rdmsrl(MSR_AMD64_LS_CFG, value);
 		if (!(value & (1 << 15))) {
-			static bool_t warned;
-
-			if (c == &boot_cpu_data || opt_cpu_info ||
-			    !test_and_set_bool(warned))
-				printk(KERN_WARNING
-				       "CPU%u: Applying workaround for erratum 793\n",
-				       smp_processor_id());
+			if (c == &boot_cpu_data || opt_cpu_info)
+				printk_once(XENLOG_WARNING
+					    "CPU%u: Applying workaround for erratum 793\n",
+					    smp_processor_id());
 			wrmsrl(MSR_AMD64_LS_CFG, value | (1 << 15));
 		}
 	} else if (c->x86 == 0x12) {
 		rdmsrl(MSR_AMD64_DE_CFG, value);
 		if (!(value & (1U << 31))) {
-			static bool warned;
-
-			if (c == &boot_cpu_data || opt_cpu_info ||
-			    !test_and_set_bool(warned))
-				printk(KERN_WARNING
-				       "CPU%u: Applying workaround for erratum 665\n",
-				       smp_processor_id());
+			if (c == &boot_cpu_data || opt_cpu_info)
+				printk_once(XENLOG_WARNING
+					    "CPU%u: Applying workaround for erratum 665\n",
+					    smp_processor_id());
 			wrmsrl(MSR_AMD64_DE_CFG, value | (1U << 31));
 		}
 	}
