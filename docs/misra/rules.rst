@@ -204,6 +204,12 @@ existing codebase are work-in-progress.
        braces
      -
 
+   * - `Rule 12.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_12_05.c>`_
+     - Mandatory
+     - The sizeof operator shall not have an operand which is a function
+       parameter declared as "array of type"
+     -
+
    * - `Rule 13.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_13_06.c>`_
      - Mandatory
      - The operand of the sizeof operator shall not contain any
@@ -273,4 +279,60 @@ existing codebase are work-in-progress.
      - All #else #elif and #endif preprocessor directives shall reside
        in the same file as the #if #ifdef or #ifndef directive to which
        they are related
+     -
+
+   * - `Rule 21.13 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_13.c>`_
+     - Mandatory
+     - Any value passed to a function in <ctype.h> shall be representable as an
+       unsigned char or be the value EOF
+     -
+
+   * - `Rule 21.17 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_17.c>`_
+     - Mandatory
+     - Use of the string handling functions from <string.h> shall not result in
+       accesses beyond the bounds of the objects referenced by their pointer
+       parameters
+     -
+
+   * - `Rule 21.18 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_18.c>`_
+     - Mandatory
+     - The size_t argument passed to any function in <string.h> shall have an
+       appropriate value
+     -
+
+   * - `Rule 21.19 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_19.c>`_
+     - Mandatory
+     - The pointers returned by the Standard Library functions localeconv,
+       getenv, setlocale or, strerror shall only be used as if they have
+       pointer to const-qualified type
+     -
+
+   * - `Rule 21.20 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_20.c>`_
+     - Mandatory
+     - The pointer returned by the Standard Library functions asctime ctime
+       gmtime localtime localeconv getenv setlocale or strerror shall not be
+       used following a subsequent call to the same function
+     -
+
+   * - `Rule 22.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_22_02.c>`_
+     - Mandatory
+     - A block of memory shall only be freed if it was allocated by means of a
+       Standard Library function
+     -
+
+   * - `Rule 22.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_22_04.c>`_
+     - Mandatory
+     - There shall be no attempt to write to a stream which has been opened as
+       read-only
+     -
+
+   * - `Rule 22.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_22_05.c>`_
+     - Mandatory
+     - A pointer to a FILE object shall not be dereferenced
+     -
+
+   * - `Rule 22.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_22_06.c>`_
+     - Mandatory
+     - The value of a pointer to a FILE shall not be used after the associated
+       stream has been closed
      -
