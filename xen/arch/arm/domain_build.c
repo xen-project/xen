@@ -2320,7 +2320,7 @@ static int __init map_dt_irq_to_domain(const struct dt_device_node *dev,
 
     res = map_irq_to_domain(d, irq, !mr_data->skip_mapping, dt_node_name(dev));
 
-    return 0;
+    return res;
 }
 
 int __init map_range_to_domain(const struct dt_device_node *dev,
