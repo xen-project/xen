@@ -2265,8 +2265,7 @@ int __init map_irq_to_domain(struct domain *d, unsigned int irq,
     res = irq_permit_access(d, irq);
     if ( res )
     {
-        printk(XENLOG_ERR "Unable to permit to dom%u access to IRQ %u\n",
-               d->domain_id, irq);
+        printk(XENLOG_ERR "Unable to permit to %pd access to IRQ %u\n", d, irq);
         return res;
     }
 
@@ -2282,8 +2281,7 @@ int __init map_irq_to_domain(struct domain *d, unsigned int irq,
         res = route_irq_to_guest(d, irq, irq, devname);
         if ( res < 0 )
         {
-            printk(XENLOG_ERR "Unable to map IRQ%"PRId32" to dom%d\n",
-                   irq, d->domain_id);
+            printk(XENLOG_ERR "Unable to map IRQ%u to %pd\n", irq, d);
             return res;
         }
     }
@@ -2303,8 +2301,7 @@ static int __init map_dt_irq_to_domain(const struct dt_device_node *dev,
 
     if ( irq < NR_LOCAL_IRQS )
     {
-        printk(XENLOG_ERR "%s: IRQ%"PRId32" is not a SPI\n",
-               dt_node_name(dev), irq);
+        printk(XENLOG_ERR "%s: IRQ%u is not a SPI\n", dt_node_name(dev), irq);
         return -EINVAL;
     }
 
@@ -2312,9 +2309,8 @@ static int __init map_dt_irq_to_domain(const struct dt_device_node *dev,
     res = irq_set_spi_type(irq, dt_irq->type);
     if ( res )
     {
-        printk(XENLOG_ERR
-               "%s: Unable to setup IRQ%"PRId32" to dom%d\n",
-               dt_node_name(dev), irq, d->domain_id);
+        printk(XENLOG_ERR "%s: Unable to setup IRQ%u to %pd\n",
+               dt_node_name(dev), irq, d);
         return res;
     }
 
