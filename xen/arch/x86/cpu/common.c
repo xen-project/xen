@@ -477,6 +477,11 @@ static void generic_identify(struct cpuinfo_x86 *c)
 		cpuid_count(0xd, 1,
 			    &c->x86_capability[FEATURESET_Da1],
 			    &tmp, &tmp, &tmp);
+
+	if (test_bit(X86_FEATURE_ARCH_CAPS, c->x86_capability))
+		rdmsr(MSR_ARCH_CAPABILITIES,
+		      c->x86_capability[FEATURESET_m10Al],
+		      c->x86_capability[FEATURESET_m10Ah]);
 }
 
 /*
