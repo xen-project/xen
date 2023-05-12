@@ -651,29 +651,6 @@ int init_domain_cpu_policy(struct domain *d)
     if ( !p )
         return -ENOMEM;
 
-    /* See comment in ctxt_switch_levelling() */
-    if ( !opt_dom0_cpuid_faulting && is_control_domain(d) && is_pv_domain(d) )
-        p->platform_info.cpuid_faulting = false;
-
-    /*
-     * Expose the "hardware speculation behaviour" bits of ARCH_CAPS to dom0,
-     * so dom0 can turn off workarounds as appropriate.  Temporary, until the
-     * domain policy logic gains a better understanding of MSRs.
-     */
-    if ( is_hardware_domain(d) && cpu_has_arch_caps )
-    {
-        uint64_t val;
-
-        rdmsrl(MSR_ARCH_CAPABILITIES, val);
-
-        p->arch_caps.raw = val &
-            (ARCH_CAPS_RDCL_NO | ARCH_CAPS_IBRS_ALL | ARCH_CAPS_RSBA |
-             ARCH_CAPS_SSB_NO | ARCH_CAPS_MDS_NO | ARCH_CAPS_IF_PSCHANGE_MC_NO |
-             ARCH_CAPS_TAA_NO | ARCH_CAPS_SBDR_SSDP_NO | ARCH_CAPS_FBSDP_NO |
-             ARCH_CAPS_PSDP_NO | ARCH_CAPS_FB_CLEAR | ARCH_CAPS_RRSBA |
-             ARCH_CAPS_BHI_NO | ARCH_CAPS_PBRSB_NO);
-    }
-
     d->arch.cpu_policy = p;
 
     recalculate_cpuid_policy(d);
@@ -817,11 +794,15 @@ void recalculate_cpuid_policy(struct domain *d)
         p->extd.raw[0x19] = EMPTY_LEAF;
 }
 
+/*
+ * Adjust the CPU policy for dom0.  Really, this is "the domain Xen builds
+ * automatically on boot", and might not have the domid 0 (e.g. pvshim).
+ */
 void __init init_dom0_cpuid_policy(struct domain *d)
 {
     struct cpu_policy *p = d->arch.cpuid;
 
-    /* dom0 can't migrate.  Give it ITSC if available. */
+    /* Dom0 doesn't migrate relative to Xen.  Give it ITSC if available. */
     if ( cpu_has_itsc )
         p->extd.itsc = true;
 
@@ -830,7 +811,7 @@ void __init init_dom0_cpuid_policy(struct domain *d)
      * so dom0 can turn off workarounds as appropriate.  Temporary, until the
      * domain policy logic gains a better understanding of MSRs.
      */
-    if ( cpu_has_arch_caps )
+    if ( is_hardware_domain(d) && cpu_has_arch_caps )
         p->feat.arch_caps = true;
 
     /* Apply dom0-cpuid= command line settings, if provided. */
@@ -848,8 +829,32 @@ void __init init_dom0_cpuid_policy(struct domain *d)
         }
 
         x86_cpu_featureset_to_policy(fs, p);
+    }
 
-        recalculate_cpuid_policy(d);
+    /*
+     * PV Control domains used to require unfiltered CPUID.  This was fixed in
+     * Xen 4.13, but there is an cmdline knob to restore the prior behaviour.
+     *
+     * If the domain is getting unfiltered CPUID, don't let the guest kernel
+     * play with CPUID faulting either, as Xen's CPUID path won't cope.
+     */
+    if ( !opt_dom0_cpuid_faulting && is_control_domain(d) && is_pv_domain(d) )
+        p->platform_info.cpuid_faulting = false;
+
+    recalculate_cpuid_policy(d);
+
+    if ( is_hardware_domain(d) && cpu_has_arch_caps )
+    {
+        uint64_t val;
+
+        rdmsrl(MSR_ARCH_CAPABILITIES, val);
+
+        p->arch_caps.raw = val &
+            (ARCH_CAPS_RDCL_NO | ARCH_CAPS_IBRS_ALL | ARCH_CAPS_RSBA |
+             ARCH_CAPS_SSB_NO | ARCH_CAPS_MDS_NO | ARCH_CAPS_IF_PSCHANGE_MC_NO |
+             ARCH_CAPS_TAA_NO | ARCH_CAPS_SBDR_SSDP_NO | ARCH_CAPS_FBSDP_NO |
+             ARCH_CAPS_PSDP_NO | ARCH_CAPS_FB_CLEAR | ARCH_CAPS_RRSBA |
+             ARCH_CAPS_BHI_NO | ARCH_CAPS_PBRSB_NO);
     }
 }
 
