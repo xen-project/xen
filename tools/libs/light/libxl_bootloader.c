@@ -19,10 +19,6 @@
 #include <utmp.h>
 #endif
 
-#ifdef INCLUDE_LIBUTIL_H
-#include INCLUDE_LIBUTIL_H
-#endif
-
 #include "libxl_internal.h"
 
 #define BOOTLOADER_BUF_OUT 65536
