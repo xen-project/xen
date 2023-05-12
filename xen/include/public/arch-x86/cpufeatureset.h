@@ -299,6 +299,10 @@ XEN_CPUFEATURE(INTEL_PSFD,         13*32+ 0) /*A  MSR_SPEC_CTRL.PSFD */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:1.edx, word 15 */
 
+/* Intel-defined CPU features, MSR_ARCH_CAPS 0x10a.eax, word 16 */
+
+/* Intel-defined CPU features, MSR_ARCH_CAPS 0x10a.edx, word 17 */
+
 #endif /* XEN_CPUFEATURE */
 
 /* Clean up from a default include.  Close the enum (for C). */
