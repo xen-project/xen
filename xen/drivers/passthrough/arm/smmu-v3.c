@@ -1468,7 +1468,7 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
 	return sid < limit;
 }
 /* Forward declaration */
-static struct arm_smmu_device *arm_smmu_get_by_dev(struct device *dev);
+static struct arm_smmu_device *arm_smmu_get_by_dev(const struct device *dev);
 
 static int arm_smmu_add_device(u8 devfn, struct device *dev)
 {
@@ -2556,7 +2556,7 @@ static int __must_check arm_smmu_iotlb_flush(struct domain *d, dfn_t dfn,
 	return arm_smmu_iotlb_flush_all(d);
 }
 
-static struct arm_smmu_device *arm_smmu_get_by_dev(struct device *dev)
+static struct arm_smmu_device *arm_smmu_get_by_dev(const struct device *dev)
 {
 	struct arm_smmu_device *smmu = NULL;
 
