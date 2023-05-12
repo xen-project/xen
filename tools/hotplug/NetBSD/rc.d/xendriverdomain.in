@@ -23,7 +23,7 @@ XLDEVD_PIDFILE="@XEN_RUN_DIR@/xldevd.pid"
 
 xendriverdomain_precmd()
 {
-	:
+	mkdir -p "${XEN_RUN_DIR}"
 }
 
 xendriverdomain_startcmd()

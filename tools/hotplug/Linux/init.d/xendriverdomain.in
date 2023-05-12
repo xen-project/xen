@@ -49,6 +49,7 @@ fi
 
 do_start () {
 	echo Starting xl devd...
+	mkdir -p "${XEN_RUN_DIR}"
 	${sbindir}/xl devd --pidfile=$XLDEVD_PIDFILE $XLDEVD_ARGS
 }
 do_stop () {

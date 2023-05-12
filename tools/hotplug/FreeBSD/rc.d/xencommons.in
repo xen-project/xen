@@ -34,6 +34,7 @@ xen_startcmd()
 	local time=0
 	local timeout=30
 
+	mkdir -p "${XEN_RUN_DIR}"
 	xenstored_pid=$(check_pidfile ${XENSTORED_PIDFILE} ${XENSTORED})
 	if test -z "$xenstored_pid"; then
 		printf "Starting xenservices: xenstored, xenconsoled."
