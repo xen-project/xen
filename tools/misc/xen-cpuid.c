@@ -228,6 +228,19 @@ static const char *const str_7d2[32] =
 
 static const char *const str_m10Al[32] =
 {
+    [ 0] = "rdcl-no",             [ 1] = "eibrs",
+    [ 2] = "rsba",                [ 3] = "skip-l1dfl",
+    [ 4] = "intel-ssb-no",        [ 5] = "mds-no",
+    [ 6] = "if-pschange-mc-no",   [ 7] = "tsx-ctrl",
+    [ 8] = "taa-no",              [ 9] = "mcu-ctrl",
+    [10] = "misc-pkg-ctrl",       [11] = "energy-ctrl",
+    [12] = "doitm",               [13] = "sbdr-ssdp-no",
+    [14] = "fbsdp-no",            [15] = "psdp-no",
+    /* 16 */                      [17] = "fb-clear",
+    [18] = "fb-clear-ctrl",       [19] = "rrsba",
+    [20] = "bhi-no",              [21] = "xapic-status",
+    /* 22 */                      [23] = "ovrclk-status",
+    [24] = "pbrsb-no",
 };
 
 static const char *const str_m10Ah[32] =
