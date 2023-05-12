@@ -226,7 +226,12 @@ void x86_cpu_policy_fill_native(struct cpu_policy *p)
     p->hv_limit = 0;
     p->hv2_limit = 0;
 
-    /* TODO MSRs */
+#ifdef __XEN__
+    /* TODO MSR_PLATFORM_INFO */
+
+    if ( p->feat.arch_caps )
+        rdmsrl(MSR_ARCH_CAPABILITIES, p->arch_caps.raw);
+#endif
 
     x86_cpu_policy_recalc_synth(p);
 }
