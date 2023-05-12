@@ -90,9 +90,6 @@
 /* Define extfs header to use */
 #undef INCLUDE_EXTFS_H
 
-/* libutil header file name */
-#undef INCLUDE_LIBUTIL_H
-
 /* IPXE path */
 #undef IPXE_PATH
 

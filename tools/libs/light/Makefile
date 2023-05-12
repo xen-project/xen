@@ -158,7 +158,7 @@ NO_HEADERS_CHK := y
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
-LDLIBS-y += $(PTYFUNCS_LIBS)
+LDLIBS-y += $(UTIL_LIBS)
 LDLIBS-$(CONFIG_LIBNL) += $(LIBNL3_LIBS)
 LDLIBS-$(CONFIG_Linux) += -luuid
 LDLIBS-$(CONFIG_Linux) += -lrt
