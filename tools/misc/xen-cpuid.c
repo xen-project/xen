@@ -226,31 +226,41 @@ static const char *const str_7d2[32] =
     [ 4] = "bhi-ctrl",      [ 5] = "mcdt-no",
 };
 
+static const char *const str_m10Al[32] =
+{
+};
+
+static const char *const str_m10Ah[32] =
+{
+};
+
 static const struct {
     const char *name;
     const char *abbr;
     const char *const *strs;
 } decodes[] =
 {
-    { "0x00000001.edx",   "1d",  str_1d },
-    { "0x00000001.ecx",   "1c",  str_1c },
-    { "0x80000001.edx",   "e1d", str_e1d },
-    { "0x80000001.ecx",   "e1c", str_e1c },
-    { "0x0000000d:1.eax", "Da1", str_Da1 },
-    { "0x00000007:0.ebx", "7b0", str_7b0 },
-    { "0x00000007:0.ecx", "7c0", str_7c0 },
-    { "0x80000007.edx",   "e7d", str_e7d },
-    { "0x80000008.ebx",   "e8b", str_e8b },
-    { "0x00000007:0.edx", "7d0", str_7d0 },
-    { "0x00000007:1.eax", "7a1", str_7a1 },
-    { "0x80000021.eax",  "e21a", str_e21a },
-    { "0x00000007:1.ebx", "7b1", str_7b1 },
-    { "0x00000007:2.edx", "7d2", str_7d2 },
-    { "0x00000007:1.ecx", "7c1", str_7c1 },
-    { "0x00000007:1.edx", "7d1", str_7d1 },
+    { "CPUID 0x00000001.edx",        "1d", str_1d },
+    { "CPUID 0x00000001.ecx",        "1c", str_1c },
+    { "CPUID 0x80000001.edx",       "e1d", str_e1d },
+    { "CPUID 0x80000001.ecx",       "e1c", str_e1c },
+    { "CPUID 0x0000000d:1.eax",     "Da1", str_Da1 },
+    { "CPUID 0x00000007:0.ebx",     "7b0", str_7b0 },
+    { "CPUID 0x00000007:0.ecx",     "7c0", str_7c0 },
+    { "CPUID 0x80000007.edx",       "e7d", str_e7d },
+    { "CPUID 0x80000008.ebx",       "e8b", str_e8b },
+    { "CPUID 0x00000007:0.edx",     "7d0", str_7d0 },
+    { "CPUID 0x00000007:1.eax",     "7a1", str_7a1 },
+    { "CPUID 0x80000021.eax",      "e21a", str_e21a },
+    { "CPUID 0x00000007:1.ebx",     "7b1", str_7b1 },
+    { "CPUID 0x00000007:2.edx",     "7d2", str_7d2 },
+    { "CPUID 0x00000007:1.ecx",     "7c1", str_7c1 },
+    { "CPUID 0x00000007:1.edx",     "7d1", str_7d1 },
+    { "MSR_ARCH_CAPS.lo",         "m10Al", str_m10Al },
+    { "MSR_ARCH_CAPS.hi",         "m10Ah", str_m10Ah },
 };
 
-#define COL_ALIGN "18"
+#define COL_ALIGN "24"
 
 static const char *const fs_names[] = {
     [XEN_SYSCTL_cpu_featureset_raw]     = "Raw",
