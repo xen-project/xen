@@ -67,7 +67,6 @@ m4_include([../m4/uuid.m4])
 m4_include([../m4/pkg.m4])
 m4_include([../m4/curses.m4])
 m4_include([../m4/pthread.m4])
-m4_include([../m4/ptyfuncs.m4])
 m4_include([../m4/extfs.m4])
 m4_include([../m4/fetcher.m4])
 m4_include([../m4/ax_compare_version.m4])
@@ -405,7 +404,6 @@ AC_SUBST(zlib)
 AC_SUBST(system_aio)
 AX_CHECK_EXTFS
 AX_CHECK_PTHREAD
-AX_CHECK_PTYFUNCS
 AC_CHECK_LIB([yajl], [yajl_alloc], [],
     [AC_MSG_ERROR([Could not find yajl])])
 AC_CHECK_LIB([z], [deflateCopy], [], [AC_MSG_ERROR([Could not find zlib])])
