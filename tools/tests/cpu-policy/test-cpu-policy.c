@@ -391,11 +391,6 @@ static void test_msr_deserialise_failure(void)
             .msr = { .idx = 0xce, .val = ~0ull },
             .rc = -EOVERFLOW,
         },
-        {
-            .name = "truncated val",
-            .msr = { .idx = 0x10a, .val = ~0ull },
-            .rc = -EOVERFLOW,
-        },
     };
 
     printf("Testing MSR deserialise failure:\n");
