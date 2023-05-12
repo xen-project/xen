@@ -4,22 +4,24 @@
 
 #include <xen/lib/x86/cpuid-autogen.h>
 
-#define FEATURESET_1d     0 /* 0x00000001.edx      */
-#define FEATURESET_1c     1 /* 0x00000001.ecx      */
-#define FEATURESET_e1d    2 /* 0x80000001.edx      */
-#define FEATURESET_e1c    3 /* 0x80000001.ecx      */
-#define FEATURESET_Da1    4 /* 0x0000000d:1.eax    */
-#define FEATURESET_7b0    5 /* 0x00000007:0.ebx    */
-#define FEATURESET_7c0    6 /* 0x00000007:0.ecx    */
-#define FEATURESET_e7d    7 /* 0x80000007.edx      */
-#define FEATURESET_e8b    8 /* 0x80000008.ebx      */
-#define FEATURESET_7d0    9 /* 0x00000007:0.edx    */
-#define FEATURESET_7a1   10 /* 0x00000007:1.eax    */
-#define FEATURESET_e21a  11 /* 0x80000021.eax      */
-#define FEATURESET_7b1   12 /* 0x00000007:1.ebx    */
-#define FEATURESET_7d2   13 /* 0x00000007:2.edx    */
-#define FEATURESET_7c1   14 /* 0x00000007:1.ecx    */
-#define FEATURESET_7d1   15 /* 0x00000007:1.edx    */
+#define FEATURESET_1d         0 /* 0x00000001.edx      */
+#define FEATURESET_1c         1 /* 0x00000001.ecx      */
+#define FEATURESET_e1d        2 /* 0x80000001.edx      */
+#define FEATURESET_e1c        3 /* 0x80000001.ecx      */
+#define FEATURESET_Da1        4 /* 0x0000000d:1.eax    */
+#define FEATURESET_7b0        5 /* 0x00000007:0.ebx    */
+#define FEATURESET_7c0        6 /* 0x00000007:0.ecx    */
+#define FEATURESET_e7d        7 /* 0x80000007.edx      */
+#define FEATURESET_e8b        8 /* 0x80000008.ebx      */
+#define FEATURESET_7d0        9 /* 0x00000007:0.edx    */
+#define FEATURESET_7a1       10 /* 0x00000007:1.eax    */
+#define FEATURESET_e21a      11 /* 0x80000021.eax      */
+#define FEATURESET_7b1       12 /* 0x00000007:1.ebx    */
+#define FEATURESET_7d2       13 /* 0x00000007:2.edx    */
+#define FEATURESET_7c1       14 /* 0x00000007:1.ecx    */
+#define FEATURESET_7d1       15 /* 0x00000007:1.edx    */
+#define FEATURESET_m10Al     16 /* 0x0000010a.eax      */
+#define FEATURESET_m10Ah     17 /* 0x0000010a.edx      */
 
 struct cpuid_leaf
 {
@@ -350,17 +352,13 @@ struct cpu_policy
      * fixed in hardware.
      */
     union {
-        uint32_t raw;
+        uint64_t raw;
         struct {
-            bool rdcl_no:1;
-            bool ibrs_all:1;
-            bool rsba:1;
-            bool skip_l1dfl:1;
-            bool ssb_no:1;
-            bool mds_no:1;
-            bool if_pschange_mc_no:1;
-            bool tsx_ctrl:1;
-            bool taa_no:1;
+            uint32_t lo, hi;
+        };
+        struct {
+            DECL_BITFIELD(m10Al);
+            DECL_BITFIELD(m10Ah);
         };
     } arch_caps;
 
