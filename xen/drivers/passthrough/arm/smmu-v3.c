@@ -2526,6 +2526,15 @@ static const struct dt_device_match arm_smmu_of_match[] = {
 };
 
 /* Start of Xen specific code. */
+
+/*
+ * Platform features. It indicates the list of features supported by all
+ * SMMUs. Actually we only care about coherent table walk, which in case of
+ * SMMUv3 is implied by the overall coherency feature (refer ARM IHI 0070 E.A,
+ * section 3.15 and SMMU_IDR0.COHACC bit description).
+ */
+static uint32_t __ro_after_init platform_features = ARM_SMMU_FEAT_COHERENCY;
+
 static int __must_check arm_smmu_iotlb_flush_all(struct domain *d)
 {
 	struct arm_smmu_xen_domain *xen_domain = dom_iommu(d)->arch.priv;
@@ -2708,8 +2717,12 @@ static int arm_smmu_iommu_xen_domain_init(struct domain *d)
 	INIT_LIST_HEAD(&xen_domain->contexts);
 
 	dom_iommu(d)->arch.priv = xen_domain;
-	return 0;
 
+	/* Coherent walk can be enabled only when all SMMUs support it. */
+	if (platform_features & ARM_SMMU_FEAT_COHERENCY)
+		iommu_set_feature(d, IOMMU_FEAT_COHERENT_WALK);
+
+	return 0;
 }
 
 static void arm_smmu_iommu_xen_domain_teardown(struct domain *d)
@@ -2738,6 +2751,7 @@ static __init int arm_smmu_dt_init(struct dt_device_node *dev,
 				const void *data)
 {
 	int rc;
+	const struct arm_smmu_device *smmu;
 
 	/*
 	 * Even if the device can't be initialized, we don't want to
@@ -2750,6 +2764,14 @@ static __init int arm_smmu_dt_init(struct dt_device_node *dev,
 		return rc;
 
 	iommu_set_ops(&arm_smmu_iommu_ops);
+
+	/* Find the just added SMMU and retrieve its features. */
+	smmu = arm_smmu_get_by_dev(dt_to_dev(dev));
+
+	/* It would be a bug not to find the SMMU we just added. */
+	BUG_ON(!smmu);
+
+	platform_features &= smmu->features;
 
 	return 0;
 }
