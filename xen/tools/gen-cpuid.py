@@ -325,6 +325,9 @@ def crunch_numbers(state):
 
         # In principle the TSXLDTRK insns could also be considered independent.
         RTM: [TSXLDTRK],
+
+        # The ARCH_CAPS CPUID bit enumerates the availability of the whole register.
+        ARCH_CAPS: list(range(RDCL_NO, RDCL_NO + 64)),
     }
 
     deep_features = tuple(sorted(deps.keys()))
