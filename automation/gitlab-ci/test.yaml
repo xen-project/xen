@@ -108,6 +108,16 @@
   tags:
     - qubes-hw2
 
+.zen3p-x86-64:
+  # it's really similar to the above
+  extends: .adl-x86-64
+  variables:
+    PCIDEV: "01:00.0"
+    PCIDEV_INTR: "MSI-X"
+    CONSOLE_OPTS: "console=com1 com1=115200,8n1,pci,msi"
+  tags:
+    - qubes-hw11
+
 # Test jobs
 build-each-commit-gcc:
   extends: .test-jobs-common
@@ -178,6 +188,22 @@ adl-pci-hvm-x86-64-gcc-debug:
   extends: .adl-x86-64
   variables:
     PCIDEV_INTR: "MSI"
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.12-gcc-debug
+
+zen3p-smoke-x86-64-gcc-debug:
+  extends: .zen3p-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.12-gcc-debug
+
+zen3p-pci-hvm-x86-64-gcc-debug:
+  extends: .zen3p-x86-64
   script:
     - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
   needs:
