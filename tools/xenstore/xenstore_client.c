@@ -94,25 +94,25 @@ usage(enum mode mode, int incl_mode, const char *progname)
 	errx(1, "Usage: %s <mode> [-h] [...]", progname);
     case MODE_read:
 	mstr = incl_mode ? "read " : "";
-	errx(1, "Usage: %s %s[-h] [-p] [-s] [-R] key [...]", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-p] [-R] key [...]", progname, mstr);
     case MODE_write:
 	mstr = incl_mode ? "write " : "";
-	errx(1, "Usage: %s %s[-h] [-s] [-R] key value [...]", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-R] key value [...]", progname, mstr);
     case MODE_rm:
 	mstr = incl_mode ? "rm " : "";
-	errx(1, "Usage: %s %s[-h] [-s] [-t] key [...]", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-t] key [...]", progname, mstr);
     case MODE_exists:
 	mstr = incl_mode ? "exists " : "";
 	/* fallthrough */
     case MODE_list:
 	mstr = mstr ? : incl_mode ? "list " : "";
-	errx(1, "Usage: %s %s[-h] [-p] [-s] key [...]", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-p] key [...]", progname, mstr);
     case MODE_ls:
 	mstr = mstr ? : incl_mode ? "ls " : "";
-	errx(1, "Usage: %s %s[-h] [-f] [-p] [-s] [path]", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-f] [-p] [path]", progname, mstr);
     case MODE_chmod:
 	mstr = incl_mode ? "chmod " : "";
-	errx(1, "Usage: %s %s[-h] [-u] [-r] [-s] key <mode [modes...]>", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-u] [-r] key <mode [modes...]>", progname, mstr);
     case MODE_watch:
 	mstr = incl_mode ? "watch " : "";
 	errx(1, "Usage: %s %s[-h] [-n NR] key", progname, mstr);
