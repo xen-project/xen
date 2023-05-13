@@ -5,6 +5,7 @@ set -ex
 test_variant=$1
 
 ### defaults
+extra_xen_opts=
 wait_and_wakeup=
 timeout=120
 domU_config='
@@ -18,8 +19,8 @@ vif = [ "bridge=xenbr0", ]
 disk = [ ]
 '
 
-### test: smoke test
-if [ -z "${test_variant}" ]; then
+### test: smoke test & smoke test PVH
+if [ -z "${test_variant}" ] || [ "${test_variant}" = "dom0pvh" ]; then
     passed="ping test passed"
     domU_check="
 ifconfig eth0 192.168.0.2
@@ -36,6 +37,9 @@ done
 tail -n 100 /var/log/xen/console/guest-domU.log
 echo \"${passed}\"
 "
+if [ "${test_variant}" = "dom0pvh" ]; then
+    extra_xen_opts="dom0=pvh"
+fi
 
 ### test: S3
 elif [ "${test_variant}" = "s3" ]; then
@@ -184,11 +188,11 @@ cd ..
 TFTP=/scratch/gitlab-runner/tftp
 CONTROLLER=control@thor.testnet
 
-echo '
-multiboot2 (http)/gitlab-ci/xen console=com1 com1=115200,8n1 loglvl=all guest_loglvl=all dom0_mem=4G
+echo "
+multiboot2 (http)/gitlab-ci/xen console=com1 com1=115200,8n1 loglvl=all guest_loglvl=all dom0_mem=4G $extra_xen_opts
 module2 (http)/gitlab-ci/vmlinuz console=hvc0 root=/dev/ram0
 module2 (http)/gitlab-ci/initrd-dom0
-' > $TFTP/grub.cfg
+" > $TFTP/grub.cfg
 
 cp -f binaries/xen $TFTP/xen
 cp -f binaries/bzImage $TFTP/vmlinuz

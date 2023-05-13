@@ -149,6 +149,14 @@ adl-smoke-x86-64-gcc-debug:
     - *x86-64-test-needs
     - alpine-3.12-gcc-debug
 
+adl-smoke-x86-64-dom0pvh-gcc-debug:
+  extends: .adl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.12-gcc-debug
+
 adl-suspend-x86-64-gcc-debug:
   extends: .adl-x86-64
   script:
