@@ -63,6 +63,16 @@ For the Cortex A57 r0p0 - r1p1, see Errata 832075.
     Status, x86 PV: Supported
     Status, ARM: Experimental
 
+### Host EFI Boot
+
+    Status, x86: Supported
+    Status, Arm64: Supported
+
+### Host EFI Secure Boot
+
+    Status, x86: Experimental
+    Status, Arm64: Experimental
+
 ### x86/Intel Platform QoS Technologies
 
     Status: Tech Preview

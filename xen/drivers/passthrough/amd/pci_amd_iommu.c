@@ -240,7 +240,7 @@ static int __must_check amd_iommu_setup_domain_device(
          */
         if ( dte->it_root )
             ASSERT(dte->int_ctl == IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED);
-        ASSERT(dte->iv == iommu_intremap);
+        ASSERT(dte->iv == !!iommu_intremap);
         ASSERT(dte->ex == ivrs_dev->dte_allow_exclusion);
         ASSERT(dte->sys_mgt == MASK_EXTR(ivrs_dev->device_flags,
                                          ACPI_IVHD_SYSTEM_MGMT));
