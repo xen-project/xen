@@ -147,8 +147,15 @@
 #define cpu_has_avx512_bf16     boot_cpu_has(X86_FEATURE_AVX512_BF16)
 
 /* MSR_ARCH_CAPS */
+#define cpu_has_rdcl_no         boot_cpu_has(X86_FEATURE_RDCL_NO)
+#define cpu_has_eibrs           boot_cpu_has(X86_FEATURE_EIBRS)
+#define cpu_has_rsba            boot_cpu_has(X86_FEATURE_RSBA)
+#define cpu_has_skip_l1dfl      boot_cpu_has(X86_FEATURE_SKIP_L1DFL)
+#define cpu_has_mds_no          boot_cpu_has(X86_FEATURE_MDS_NO)
 #define cpu_has_if_pschange_mc_no boot_cpu_has(X86_FEATURE_IF_PSCHANGE_MC_NO)
 #define cpu_has_tsx_ctrl        boot_cpu_has(X86_FEATURE_TSX_CTRL)
+#define cpu_has_taa_no          boot_cpu_has(X86_FEATURE_TAA_NO)
+#define cpu_has_fb_clear        boot_cpu_has(X86_FEATURE_FB_CLEAR)
 
 /* Synthesized. */
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
