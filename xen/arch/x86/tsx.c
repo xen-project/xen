@@ -19,7 +19,6 @@
  * controlling TSX behaviour, and where TSX isn't force-disabled by firmware.
  */
 int8_t __read_mostly opt_tsx = -1;
-int8_t __read_mostly cpu_has_tsx_ctrl = -1;
 bool __read_mostly rtm_disabled;
 
 static int __init parse_tsx(const char *s)
@@ -37,24 +36,28 @@ custom_param("tsx", parse_tsx);
 
 void tsx_init(void)
 {
+    static bool __read_mostly once;
+
     /*
      * This function is first called between microcode being loaded, and CPUID
      * being scanned generally.  Read into boot_cpu_data.x86_capability[] for
      * the cpu_has_* bits we care about using here.
      */
-    if ( unlikely(cpu_has_tsx_ctrl < 0) )
+    if ( unlikely(!once) )
     {
-        uint64_t caps = 0;
         bool has_rtm_always_abort;
+
+        once = true;
 
         if ( boot_cpu_data.cpuid_level >= 7 )
             boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_ARCH_CAPS)]
                 = cpuid_count_edx(7, 0);
 
         if ( cpu_has_arch_caps )
-            rdmsrl(MSR_ARCH_CAPABILITIES, caps);
+            rdmsr(MSR_ARCH_CAPABILITIES,
+                  boot_cpu_data.x86_capability[FEATURESET_m10Al],
+                  boot_cpu_data.x86_capability[FEATURESET_m10Ah]);
 
-        cpu_has_tsx_ctrl = !!(caps & ARCH_CAPS_TSX_CTRL);
         has_rtm_always_abort = cpu_has_rtm_always_abort;
 
         if ( cpu_has_tsx_ctrl && cpu_has_srbds_ctrl )
