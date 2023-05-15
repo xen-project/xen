@@ -96,6 +96,7 @@
     LOGFILE: smoke-test.log
     PCIDEV: "03:00.0"
     PCIDEV_INTR: "MSI-X"
+    CONSOLE_OPTS: "console=com1 com1=115200,8n1"
   artifacts:
     paths:
       - smoke.serial
