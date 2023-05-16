@@ -96,7 +96,8 @@ docker login registry.gitlab.com/xen-project/xen
 make -C automation/build suse/opensuse-tumbleweed
 env CONTAINER_NO_PULL=1 \
   CONTAINER=tumbleweed \
-  automation/scripts/containerize bash -exc './configure && make'
+  CONTAINER_ARGS='-e CC=gcc -e CXX=g++ -e debug=y' \
+  automation/scripts/containerize automation/scripts/build < /dev/null
 make -C automation/build suse/opensuse-tumbleweed PUSH=1
 ```
 
