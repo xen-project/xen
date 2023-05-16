@@ -17,7 +17,6 @@
 #define X86_FEATURE_ALWAYS      X86_FEATURE_LM
 
 #ifndef __ASSEMBLY__
-#include <xen/bitops.h>
 
 struct cpuinfo_x86 {
     unsigned char x86;                 /* CPU family */
@@ -43,8 +42,15 @@ struct cpuinfo_x86 {
 
 extern struct cpuinfo_x86 boot_cpu_data;
 
-#define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
-#define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
+static inline bool cpu_has(const struct cpuinfo_x86 *info, unsigned int feat)
+{
+    return info->x86_capability[cpufeat_word(feat)] & cpufeat_mask(feat);
+}
+
+static inline bool boot_cpu_has(unsigned int feat)
+{
+    return cpu_has(&boot_cpu_data, feat);
+}
 
 #define CPUID_PM_LEAF                    6
 #define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
