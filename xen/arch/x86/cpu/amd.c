@@ -271,8 +271,19 @@ static void __init noinline amd_init_levelling(void)
 {
 	const struct cpuidmask *m = NULL;
 
-	if (probe_cpuid_faulting())
+	/*
+	 * If there's support for CpuidUserDis or CPUID faulting then
+	 * we can skip levelling because CPUID accesses are trapped anyway.
+	 *
+	 * CPUID faulting is an Intel feature analogous to CpuidUserDis, so
+	 * that can only be present when Xen is itself virtualized (because
+	 * it can be emulated)
+	 */
+	if (cpu_has_hypervisor && probe_cpuid_faulting()) {
+		expected_levelling_cap |= LCAP_faulting;
+		levelling_caps |= LCAP_faulting;
 		return;
+	}
 
 	probe_masking_msrs();
 

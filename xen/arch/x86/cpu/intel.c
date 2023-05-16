@@ -226,8 +226,18 @@ static void cf_check intel_ctxt_switch_masking(const struct vcpu *next)
  */
 static void __init noinline intel_init_levelling(void)
 {
-	if (probe_cpuid_faulting())
+	/*
+	 * Intel Fam0f is old enough that probing for CPUID faulting support
+	 * introduces spurious #GP(0) when the appropriate MSRs are read,
+	 * so skip it altogether. In the case where Xen is virtualized these
+	 * MSRs may be emulated though, so we allow it in that case.
+	 */
+	if ((boot_cpu_data.x86 != 0xf || cpu_has_hypervisor) &&
+	    probe_cpuid_faulting()) {
+		expected_levelling_cap |= LCAP_faulting;
+		levelling_caps |= LCAP_faulting;
 		return;
+	}
 
 	probe_masking_msrs();
 

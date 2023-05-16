@@ -131,17 +131,6 @@ bool __init probe_cpuid_faulting(void)
 	uint64_t val;
 	int rc;
 
-	/*
-	 * Don't bother looking for CPUID faulting if we aren't virtualised on
-	 * AMD or Hygon hardware - it won't be present.  Likewise for Fam0F
-	 * Intel hardware.
-	 */
-	if (((boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) ||
-	     ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) &&
-	      boot_cpu_data.x86 == 0xf)) &&
-	    !cpu_has_hypervisor)
-		return false;
-
 	if ((rc = rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val)) == 0)
 		raw_cpu_policy.platform_info.cpuid_faulting =
 			val & MSR_PLATFORM_INFO_CPUID_FAULTING;
@@ -155,8 +144,6 @@ bool __init probe_cpuid_faulting(void)
 		return false;
 	}
 
-	expected_levelling_cap |= LCAP_faulting;
-	levelling_caps |=  LCAP_faulting;
 	setup_force_cpu_cap(X86_FEATURE_CPUID_FAULTING);
 
 	return true;
