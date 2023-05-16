@@ -4,6 +4,7 @@
 #include <xen/param.h>
 #include <xen/smp.h>
 
+#include <asm/amd.h>
 #include <asm/cpu-policy.h>
 #include <asm/current.h>
 #include <asm/debugreg.h>
@@ -166,8 +167,10 @@ static void set_cpuid_faulting(bool enable)
 void ctxt_switch_levelling(const struct vcpu *next)
 {
 	const struct domain *nextd = next ? next->domain : NULL;
+	bool enable_cpuid_faulting;
 
-	if (cpu_has_cpuid_faulting) {
+	if (cpu_has_cpuid_faulting ||
+	    boot_cpu_has(X86_FEATURE_CPUID_USER_DIS)) {
 		/*
 		 * No need to alter the faulting setting if we are switching
 		 * to idle; it won't affect any code running in idle context.
@@ -188,12 +191,18 @@ void ctxt_switch_levelling(const struct vcpu *next)
 		 * an interim escape hatch in the form of
 		 * `dom0=no-cpuid-faulting` to restore the older behaviour.
 		 */
-		set_cpuid_faulting(nextd && (opt_dom0_cpuid_faulting ||
-					     !is_control_domain(nextd) ||
-					     !is_pv_domain(nextd)) &&
-				   (is_pv_domain(nextd) ||
-				    next->arch.msrs->
-				    misc_features_enables.cpuid_faulting));
+		enable_cpuid_faulting = nextd && (opt_dom0_cpuid_faulting ||
+		                                  !is_control_domain(nextd) ||
+		                                  !is_pv_domain(nextd)) &&
+		                        (is_pv_domain(nextd) ||
+		                         next->arch.msrs->
+		                         misc_features_enables.cpuid_faulting);
+
+		if (cpu_has_cpuid_faulting)
+			set_cpuid_faulting(enable_cpuid_faulting);
+		else
+			amd_set_cpuid_user_dis(enable_cpuid_faulting);
+
 		return;
 	}
 
@@ -402,6 +411,17 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 	c->phys_proc_id = c->apicid;
 
+	eax = cpuid_eax(0x80000000);
+	if ((eax >> 16) == 0x8000)
+		c->extended_cpuid_level = eax;
+
+	/*
+	 * These AMD-defined flags are out of place, but we need
+	 * them early for the CPUID faulting probe code
+	 */
+	if (c->extended_cpuid_level >= 0x80000021)
+		c->x86_capability[FEATURESET_e21a] = cpuid_eax(0x80000021);
+
 	if (this_cpu->c_early_init)
 		this_cpu->c_early_init(c);
 
@@ -417,10 +437,6 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	if ( (c->cpuid_level >= CPUID_PM_LEAF) &&
 	     (cpuid_ecx(CPUID_PM_LEAF) & CPUID6_ECX_APERFMPERF_CAPABILITY) )
 		__set_bit(X86_FEATURE_APERFMPERF, c->x86_capability);
-
-	eax = cpuid_eax(0x80000000);
-	if ((eax >> 16) == 0x8000)
-		c->extended_cpuid_level = eax;
 
 	/* AMD-defined flags: level 0x80000001 */
 	if (c->extended_cpuid_level >= 0x80000001)

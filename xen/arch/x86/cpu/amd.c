@@ -277,9 +277,14 @@ static void __init noinline amd_init_levelling(void)
 	 *
 	 * CPUID faulting is an Intel feature analogous to CpuidUserDis, so
 	 * that can only be present when Xen is itself virtualized (because
-	 * it can be emulated)
+	 * it can be emulated).
+	 *
+	 * Note that probing for the Intel feature _first_ isn't a mistake,
+	 * but a means to ensure MSR_INTEL_PLATFORM_INFO is read and added
+	 * to the raw CPU policy if present.
 	 */
-	if (cpu_has_hypervisor && probe_cpuid_faulting()) {
+	if ((cpu_has_hypervisor && probe_cpuid_faulting()) ||
+	    boot_cpu_has(X86_FEATURE_CPUID_USER_DIS)) {
 		expected_levelling_cap |= LCAP_faulting;
 		levelling_caps |= LCAP_faulting;
 		return;
@@ -372,6 +377,20 @@ static void __init noinline amd_init_levelling(void)
 
 	if (levelling_caps)
 		ctxt_switch_masking = amd_ctxt_switch_masking;
+}
+
+void amd_set_cpuid_user_dis(bool enable)
+{
+	const uint64_t bit = K8_HWCR_CPUID_USER_DIS;
+	uint64_t val;
+
+	rdmsrl(MSR_K8_HWCR, val);
+
+	if (!!(val & bit) == enable)
+		return;
+
+	val ^= bit;
+	wrmsrl(MSR_K8_HWCR, val);
 }
 
 /*
