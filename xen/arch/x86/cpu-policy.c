@@ -853,17 +853,6 @@ void __init init_dom0_cpuid_policy(struct domain *d)
     if ( cpu_has_itsc )
         p->extd.itsc = true;
 
-    /*
-     * Expose the "hardware speculation behaviour" bits of ARCH_CAPS to dom0,
-     * so dom0 can turn off workarounds as appropriate.  Temporary, until the
-     * domain policy logic gains a better understanding of MSRs.
-     */
-    if ( is_hardware_domain(d) && cpu_has_arch_caps )
-    {
-        p->feat.arch_caps = true;
-        p->arch_caps.raw = host_cpu_policy.arch_caps.raw;
-    }
-
     /* Apply dom0-cpuid= command line settings, if provided. */
     if ( dom0_cpuid_cmdline )
     {
