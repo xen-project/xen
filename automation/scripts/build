@@ -36,7 +36,7 @@ fi
 cp xen/.config xen-config
 
 # Directory for the artefacts to be dumped into
-mkdir binaries
+mkdir -p binaries
 
 if [[ "${CPPCHECK}" == "y" ]] && [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     # Cppcheck analysis invokes Xen-only build.
