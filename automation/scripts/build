@@ -39,10 +39,8 @@ cp xen/.config xen-config
 mkdir -p binaries
 
 if [[ "${CPPCHECK}" == "y" ]] && [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
-    # Cppcheck analysis invokes Xen-only build.
-    # Known limitation: cppcheck generates inconsistent reports when running
-    # in parallel mode, therefore do not specify -j<n>.
-    xen/scripts/xen-analysis.py --run-cppcheck --cppcheck-misra
+    # Cppcheck analysis invokes Xen-only build
+    xen/scripts/xen-analysis.py --run-cppcheck --cppcheck-misra -- -j$(nproc)
 
     # Preserve artefacts
     cp xen/xen binaries/xen
