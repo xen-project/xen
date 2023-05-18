@@ -586,6 +586,19 @@ int dt_find_node_by_gpath(XEN_GUEST_HANDLE(char) u_path, uint32_t u_plen,
 const struct dt_device_node *dt_get_parent(const struct dt_device_node *node);
 
 /**
+ * dt_device_get_paddr - Resolve an address for a device
+ * @device: the device whose address is to be resolved
+ * @index: index of the address to resolve
+ * @addr: address filled by this function
+ * @size: size filled by this function
+ *
+ * This function resolves an address, walking the tree, for a given
+ * device-tree node. It returns 0 on success.
+ */
+int dt_device_get_paddr(const struct dt_device_node *dev, unsigned int index,
+                        paddr_t *addr, paddr_t *size);
+
+/**
  * dt_device_get_address - Resolve an address for a device
  * @device: the device whose address is to be resolved
  * @index: index of the address to resolve
