@@ -1643,6 +1643,13 @@ static int __init handle_pci_range(const struct dt_device_node *dev,
     paddr_t start, end;
     int res;
 
+    if ( (addr != (paddr_t)addr) || (((paddr_t)~0 - addr) < len) )
+    {
+        printk(XENLOG_ERR "%s: [0x%"PRIx64", 0x%"PRIx64"] exceeds the maximum allowed PA width (%u bits)",
+               dt_node_full_name(dev), addr, (addr + len), PADDR_BITS);
+        return -ERANGE;
+    }
+
     start = addr & PAGE_MASK;
     end = PAGE_ALIGN(addr + len);
     res = rangeset_remove_range(mem_holes, PFN_DOWN(start), PFN_DOWN(end - 1));
@@ -2332,6 +2339,13 @@ int __init map_range_to_domain(const struct dt_device_node *dev,
     struct map_range_data *mr_data = data;
     struct domain *d = mr_data->d;
     int res;
+
+    if ( (addr != (paddr_t)addr) || (((paddr_t)~0 - addr) < len) )
+    {
+        printk(XENLOG_ERR "%s: [0x%"PRIx64", 0x%"PRIx64"] exceeds the maximum allowed PA width (%u bits)",
+               dt_node_full_name(dev), addr, (addr + len), PADDR_BITS);
+        return -ERANGE;
+    }
 
     /*
      * reserved-memory regions are RAM carved out for a special purpose.
