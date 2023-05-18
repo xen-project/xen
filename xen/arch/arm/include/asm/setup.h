@@ -166,7 +166,7 @@ u32 device_tree_get_u32(const void *fdt, int node,
                         const char *prop_name, u32 dflt);
 
 int map_range_to_domain(const struct dt_device_node *dev,
-                        u64 addr, u64 len, void *data);
+                        uint64_t addr, uint64_t len, void *data);
 
 extern DEFINE_BOOT_PAGE_TABLE(boot_pgtable);
 

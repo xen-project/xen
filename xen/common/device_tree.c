@@ -994,7 +994,7 @@ int dt_device_get_paddr(const struct dt_device_node *dev, unsigned int index,
 
 int dt_for_each_range(const struct dt_device_node *dev,
                       int (*cb)(const struct dt_device_node *,
-                                u64 addr, u64 length,
+                                uint64_t addr, uint64_t length,
                                 void *),
                       void *data)
 {
@@ -1057,7 +1057,7 @@ int dt_for_each_range(const struct dt_device_node *dev,
 
     for ( ; rlen >= rone; rlen -= rone, ranges += rone )
     {
-        u64 a, s;
+        uint64_t a, s;
         int ret;
 
         memcpy(addr, ranges + na, 4 * pna);

@@ -681,7 +681,7 @@ int dt_for_each_irq_map(const struct dt_device_node *dev,
  */
 int dt_for_each_range(const struct dt_device_node *dev,
                       int (*cb)(const struct dt_device_node *,
-                                u64 addr, u64 length,
+                                uint64_t addr, uint64_t length,
                                 void *),
                       void *data);
 

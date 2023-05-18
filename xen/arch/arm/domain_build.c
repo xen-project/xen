@@ -1637,7 +1637,7 @@ out:
 }
 
 static int __init handle_pci_range(const struct dt_device_node *dev,
-                                   u64 addr, u64 len, void *data)
+                                   uint64_t addr, uint64_t len, void *data)
 {
     struct rangeset *mem_holes = data;
     paddr_t start, end;
@@ -2334,7 +2334,7 @@ static int __init map_dt_irq_to_domain(const struct dt_device_node *dev,
 }
 
 int __init map_range_to_domain(const struct dt_device_node *dev,
-                               u64 addr, u64 len, void *data)
+                               uint64_t addr, uint64_t len, void *data)
 {
     struct map_range_data *mr_data = data;
     struct domain *d = mr_data->d;

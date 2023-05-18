@@ -381,7 +381,7 @@ int __init pci_host_bridge_mappings(struct domain *d)
  * right place for alignment check.
  */
 static int is_bar_valid(const struct dt_device_node *dev,
-                        paddr_t addr, paddr_t len, void *data)
+                        uint64_t addr, uint64_t len, void *data)
 {
     struct pdev_bar_check *bar_data = data;
     paddr_t s = bar_data->start;
