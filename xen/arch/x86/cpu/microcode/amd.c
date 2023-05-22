@@ -262,6 +262,8 @@ static int apply_microcode(const struct microcode_patch *patch)
            "microcode: CPU%u updated from revision %#x to %#x, date = %04x-%02x-%02x\n",
            cpu, old_rev, rev, patch->year, patch->month, patch->day);
 
+    amd_check_zenbleed();
+
     return 0;
 }
 
