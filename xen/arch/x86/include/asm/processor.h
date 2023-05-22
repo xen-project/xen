@@ -547,6 +547,8 @@ enum ap_boot_method {
 };
 extern enum ap_boot_method ap_boot_method;
 
+void amd_check_zenbleed(void);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_X86_PROCESSOR_H */
