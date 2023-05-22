@@ -251,6 +251,8 @@ static int apply_microcode(const struct microcode_patch *patch)
     printk(XENLOG_WARNING "microcode: CPU%u updated from revision %#x to %#x\n",
            cpu, old_rev, rev);
 
+    amd_check_zenbleed();
+
     return 0;
 }
 

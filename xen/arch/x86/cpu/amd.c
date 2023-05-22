@@ -13,6 +13,7 @@
 #include <asm/spec_ctrl.h>
 #include <asm/acpi.h>
 #include <asm/apic.h>
+#include <asm/microcode.h>
 
 #include "cpu.h"
 
@@ -756,6 +757,72 @@ void amd_init_spectral_chicken(void)
 		wrmsr_safe(MSR_AMD64_DE_CFG2, val | chickenbit);
 }
 
+void amd_check_zenbleed(void)
+{
+	const struct cpu_signature *sig = &this_cpu(cpu_sig);
+	unsigned int good_rev, chickenbit = (1 << 9);
+	uint64_t val, old_val;
+
+	/*
+	 * If we're virtualised, we can't do family/model checks safely, and
+	 * we likely wouldn't have access to DE_CFG even if we could see a
+	 * microcode revision.
+	 *
+	 * A hypervisor may hide AVX as a stopgap mitigation.  We're not in a
+	 * position to care either way.  An admin doesn't want to be disabling
+	 * AVX as a mitigation on any build of Xen with this logic present.
+	 */
+	if (cpu_has_hypervisor || boot_cpu_data.x86 != 0x17)
+		return;
+
+	switch (boot_cpu_data.x86_model) {
+	case 0x30 ... 0x3f: good_rev = 0x0830107a; break;
+	case 0x60 ... 0x67: good_rev = 0x0860010b; break;
+	case 0x68 ... 0x6f: good_rev = 0x08608105; break;
+	case 0x70 ... 0x7f: good_rev = 0x08701032; break;
+	case 0xa0 ... 0xaf: good_rev = 0x08a00008; break;
+	default:
+		/*
+		 * With the Fam17h check above, parts getting here are Zen1.
+		 * They're not affected.
+		 */
+		return;
+	}
+
+	rdmsrl(MSR_AMD64_DE_CFG, val);
+	old_val = val;
+
+	/*
+	 * Microcode is the preferred mitigation, in terms of performance.
+	 * However, without microcode, this chickenbit (specific to the Zen2
+	 * uarch) disables Floating Point Mov-Elimination to mitigate the
+	 * issue.
+	 */
+	val &= ~chickenbit;
+	if (sig->rev < good_rev)
+		val |= chickenbit;
+
+	if (val == old_val)
+		/* Nothing to change. */
+		return;
+
+	/*
+	 * DE_CFG is a Core-scoped MSR, and this write is racy during late
+	 * microcode load.  However, both threads calculate the new value from
+	 * state which is shared, and unrelated to the old value, so the
+	 * result should be consistent.
+	 */
+	wrmsrl(MSR_AMD64_DE_CFG, val);
+
+	/*
+	 * Inform the admin that we changed something, but don't spam,
+	 * especially during a late microcode load.
+	 */
+	if (smp_processor_id() == 0)
+		printk(XENLOG_INFO "Zenbleed mitigation - using %s\n",
+		       val & chickenbit ? "chickenbit" : "microcode");
+}
+
 static void init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -1015,6 +1082,8 @@ static void init_amd(struct cpuinfo_x86 *c)
 	/* Prevent TSC drift in non single-processor, single-core platforms. */
 	if ((smp_processor_id() == 1) && !cpu_has(c, X86_FEATURE_ITSC))
 		disable_c1_ramping();
+
+	amd_check_zenbleed();
 
 	check_syscfg_dram_mod_en();
 
