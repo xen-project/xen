@@ -440,8 +440,8 @@ static int paging_log_dirty_op(struct domain *d,
               d->arch.paging.preempt.op != sc->op )
     {
         paging_unlock(d);
-        ASSERT(!resuming);
-        domain_unpause(d);
+        if ( !resuming )
+            domain_unpause(d);
         return -EBUSY;
     }
 
