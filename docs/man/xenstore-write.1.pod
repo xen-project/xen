@@ -4,7 +4,7 @@ xenstore-write - write Xenstore values
 
 =head1 SYNOPSIS
 
-B<xenstore-read> [I<OPTION>]... I<PATH> I<VALUE>...
+B<xenstore-write> [I<OPTION>]... I<PATH> I<VALUE>...
 
 =head1 DESCRIPTION
 
