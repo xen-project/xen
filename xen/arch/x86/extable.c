@@ -64,9 +64,10 @@ void __init sort_exception_tables(void)
 
 static unsigned long
 search_one_extable(const struct exception_table_entry *first,
-                   const struct exception_table_entry *last,
+                   const struct exception_table_entry *end,
                    unsigned long value)
 {
+    const struct exception_table_entry *last = end - 1;
     const struct exception_table_entry *mid;
     long diff;
 
@@ -91,7 +92,7 @@ search_exception_table(const struct cpu_user_regs *regs)
     unsigned long stub = this_cpu(stubs.addr);
 
     if ( region && region->ex )
-        return search_one_extable(region->ex, region->ex_end - 1, regs->rip);
+        return search_one_extable(region->ex, region->ex_end, regs->rip);
 
     if ( regs->rip >= stub + STUB_BUF_SIZE / 2 &&
          regs->rip < stub + STUB_BUF_SIZE &&
@@ -102,7 +103,7 @@ search_exception_table(const struct cpu_user_regs *regs)
 
         region = find_text_region(retptr);
         retptr = region && region->ex
-                 ? search_one_extable(region->ex, region->ex_end - 1, retptr)
+                 ? search_one_extable(region->ex, region->ex_end, retptr)
                  : 0;
         if ( retptr )
         {
@@ -196,7 +197,7 @@ search_pre_exception_table(struct cpu_user_regs *regs)
 {
     unsigned long addr = regs->rip;
     unsigned long fixup = search_one_extable(
-        __start___pre_ex_table, __stop___pre_ex_table-1, addr);
+        __start___pre_ex_table, __stop___pre_ex_table, addr);
     if ( fixup )
     {
         dprintk(XENLOG_INFO, "Pre-exception: %p -> %p\n", _p(addr), _p(fixup));
