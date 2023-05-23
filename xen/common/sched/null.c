@@ -521,6 +521,8 @@ static void null_unit_remove(const struct scheduler *ops,
 {
     struct null_private *prv = null_priv(ops);
     struct null_unit *nvc = null_unit(unit);
+    struct null_pcpu *npc;
+    unsigned int cpu;
     spinlock_t *lock;
 
     ASSERT(!is_idle_unit(unit));
@@ -530,8 +532,6 @@ static void null_unit_remove(const struct scheduler *ops,
     /* If offline, the unit shouldn't be assigned, nor in the waitqueue */
     if ( unlikely(!is_unit_online(unit)) )
     {
-        struct null_pcpu *npc;
-
         npc = unit->res->sched_priv;
         ASSERT(npc->unit != unit);
         ASSERT(list_empty(&nvc->waitq_elem));
@@ -548,7 +548,10 @@ static void null_unit_remove(const struct scheduler *ops,
         goto out;
     }
 
-    unit_deassign(prv, unit);
+    cpu = sched_unit_master(unit);
+    npc = get_sched_res(cpu)->sched_priv;
+    if ( npc->unit )
+        unit_deassign(prv, unit);
 
  out:
     unit_schedule_unlock_irq(lock, unit);
