@@ -552,7 +552,7 @@ struct pci_dev *pci_get_pdev(const struct domain *d, pci_sbdf_t sbdf)
     }
     else
         list_for_each_entry ( pdev, &d->pdev_list, domain_list )
-            if ( pdev->sbdf.bdf == sbdf.bdf )
+            if ( pdev->sbdf.sbdf == sbdf.sbdf )
                 return pdev;
 
     return NULL;
