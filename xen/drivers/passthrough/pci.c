@@ -570,7 +570,7 @@ struct pci_dev *pci_get_pdev_by_domain(const struct domain *d, uint16_t seg,
     }
     else
         list_for_each_entry ( pdev, &d->pdev_list, domain_list )
-            if ( pdev->bus == bus && pdev->devfn == devfn )
+            if ( pdev->seg == seg && pdev->bus == bus && pdev->devfn == devfn )
                 return pdev;
 
     return NULL;
