@@ -674,6 +674,8 @@ F:	tools/flask/
 F:	xen/include/xsm/
 F:	xen/xsm/
 F:	docs/misc/xsm-flask.txt
+K:	xsm_.*
+K:	\b(xsm|XSM)\b
 
 THE REST
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
