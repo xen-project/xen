@@ -318,7 +318,7 @@ def crunch_numbers(state):
         # IBRSB/IBRS, and we pass this MSR directly to guests.  Treating them
         # as dependent features simplifies Xen's logic, and prevents the guest
         # from seeing implausible configurations.
-        IBRSB: [STIBP, SSBD, INTEL_PSFD],
+        IBRSB: [STIBP, SSBD, INTEL_PSFD, EIBRS],
         IBRS: [AMD_STIBP, AMD_SSBD, PSFD, AUTO_IBRS,
                IBRS_ALWAYS, IBRS_FAST, IBRS_SAME_MODE],
         AMD_STIBP: [STIBP_ALWAYS],
@@ -328,6 +328,9 @@ def crunch_numbers(state):
 
         # The ARCH_CAPS CPUID bit enumerates the availability of the whole register.
         ARCH_CAPS: list(range(RDCL_NO, RDCL_NO + 64)),
+
+        # The behaviour described by RRSBA depend on eIBRS being active.
+        EIBRS: [RRSBA],
     }
 
     deep_features = tuple(sorted(deps.keys()))
