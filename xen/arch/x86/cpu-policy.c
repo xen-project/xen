@@ -422,8 +422,17 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
          * Retpoline not safe)", so these need to be visible to a guest in all
          * cases, even when it's only some other server in the pool which
          * suffers the identified behaviour.
+         *
+         * We can always run any VM which has previously (or will
+         * subsequently) run on hardware where Retpoline is not safe.
+         * Note:
+         *  - The dependency logic may hide RRSBA for other reasons.
+         *  - The max policy does not constitute a sensible configuration to
+         *    run a guest in.
          */
         __set_bit(X86_FEATURE_ARCH_CAPS, fs);
+        __set_bit(X86_FEATURE_RSBA, fs);
+        __set_bit(X86_FEATURE_RRSBA, fs);
     }
 }
 
@@ -531,6 +540,21 @@ static void __init calculate_pv_def_policy(void)
     guest_common_default_feature_adjustments(fs);
 
     sanitise_featureset(fs);
+
+    /*
+     * If the host suffers from RSBA of any form, and the guest can see
+     * MSR_ARCH_CAPS, reflect the appropriate RSBA/RRSBA property to the guest
+     * depending on the visibility of eIBRS.
+     */
+    if ( test_bit(X86_FEATURE_ARCH_CAPS, fs) &&
+         (cpu_has_rsba || cpu_has_rrsba) )
+    {
+        bool eibrs = test_bit(X86_FEATURE_EIBRS, fs);
+
+        __set_bit(eibrs ? X86_FEATURE_RRSBA
+                        : X86_FEATURE_RSBA, fs);
+    }
+
     x86_cpu_featureset_to_policy(fs, p);
     recalculate_xstate(p);
 }
@@ -621,6 +645,21 @@ static void __init calculate_hvm_def_policy(void)
     guest_common_default_feature_adjustments(fs);
 
     sanitise_featureset(fs);
+
+    /*
+     * If the host suffers from RSBA of any form, and the guest can see
+     * MSR_ARCH_CAPS, reflect the appropriate RSBA/RRSBA property to the guest
+     * depending on the visibility of eIBRS.
+     */
+    if ( test_bit(X86_FEATURE_ARCH_CAPS, fs) &&
+         (cpu_has_rsba || cpu_has_rrsba) )
+    {
+        bool eibrs = test_bit(X86_FEATURE_EIBRS, fs);
+
+        __set_bit(eibrs ? X86_FEATURE_RRSBA
+                        : X86_FEATURE_RSBA, fs);
+    }
+
     x86_cpu_featureset_to_policy(fs, p);
     recalculate_xstate(p);
 }
