@@ -29,12 +29,12 @@
 #endif
 .endm
 
-/* GAS's idea of true is -1, while Clang's idea is 1. */
-#ifdef HAVE_AS_NEGATIVE_TRUE
-# define as_true(x) (-(x))
-#else
-# define as_true(x) (x)
-#endif
+/*
+ * GAS's idea of true is sometimes 1 and sometimes -1, while Clang's idea
+ * was consistently 1 up to 6.x (it matches GAS's now).  Transform it to
+ * uniformly 1.
+ */
+#define as_true(x) ((x) & 1)
 
 #define decl_orig(insn, padding)                  \
  .L\@_orig_s: insn; .L\@_orig_e:                  \

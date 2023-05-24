@@ -35,19 +35,19 @@ extern void alternative_branches(void);
 #define alt_repl_e(num)    ".LXEN%=_repl_e"#num
 #define alt_repl_len(num)  "(" alt_repl_e(num) " - " alt_repl_s(num) ")"
 
-/* GAS's idea of true is -1, while Clang's idea is 1. */
-#ifdef HAVE_AS_NEGATIVE_TRUE
-# define AS_TRUE "-"
-#else
-# define AS_TRUE ""
-#endif
+/*
+ * GAS's idea of true is sometimes 1 and sometimes -1, while Clang's idea
+ * was consistently 1 up to 6.x (it matches GAS's now).  Transform it to
+ * uniformly 1.
+ */
+#define AS_TRUE(x) "((" x ") & 1)"
 
-#define as_max(a, b) "(("a") ^ ((("a") ^ ("b")) & -("AS_TRUE"(("a") < ("b")))))"
+#define as_max(a, b) "(("a") ^ ((("a") ^ ("b")) & -("AS_TRUE("("a") < ("b")")")))"
 
 #define OLDINSTR(oldinstr, padding)                              \
     ".LXEN%=_orig_s:\n\t" oldinstr "\n .LXEN%=_orig_e:\n\t"      \
     ".LXEN%=_diff = " padding "\n\t"                             \
-    "mknops ("AS_TRUE"(.LXEN%=_diff > 0) * .LXEN%=_diff)\n\t"    \
+    "mknops ("AS_TRUE(".LXEN%=_diff > 0")" * .LXEN%=_diff)\n\t"  \
     ".LXEN%=_orig_p:\n\t"
 
 #define OLDINSTR_1(oldinstr, n1)                                 \
