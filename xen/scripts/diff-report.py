@@ -7,6 +7,10 @@ from argparse import ArgumentParser
 from xen_analysis.diff_tool.cppcheck_report import CppcheckReport
 from xen_analysis.diff_tool.debug import Debug
 from xen_analysis.diff_tool.report import ReportError
+from xen_analysis.diff_tool.unified_format_parser import \
+    (UnifiedFormatParser, UnifiedFormatParseError)
+from xen_analysis.settings import repo_dir
+from xen_analysis.utils import invoke_command
 
 
 def log_info(text, end='\n'):
@@ -36,8 +40,31 @@ def main(argv):
                              "against the baseline.")
     parser.add_argument("-v", "--verbose", action='store_true',
                         help="Print more informations during the run.")
+    parser.add_argument("--patch", type=str,
+                        help="The patch file containing the changes to the "
+                             "code, from the baseline analysis result to the "
+                             "'check report' analysis result.\n"
+                             "Do not use with --baseline-rev/--report-rev")
+    parser.add_argument("--baseline-rev", type=str,
+                        help="Revision or SHA of the codebase analysed to "
+                             "create the baseline report.\n"
+                             "Use together with --report-rev")
+    parser.add_argument("--report-rev", type=str,
+                        help="Revision or SHA of the codebase analysed to "
+                             "create the 'check report'.\n"
+                             "Use together with --baseline-rev")
 
     args = parser.parse_args()
+
+    if args.patch and (args.baseline_rev or args.report_rev):
+        print("ERROR: '--patch' argument can't be used with '--baseline-rev'"
+              " or '--report-rev'.")
+        sys.exit(1)
+
+    if bool(args.baseline_rev) != bool(args.report_rev):
+        print("ERROR: '--baseline-rev' must be used together with "
+              "'--report-rev'.")
+        sys.exit(1)
 
     if args.out == "stdout":
         file_out = sys.stdout
@@ -63,11 +90,34 @@ def main(argv):
         new_rep.parse()
         debug.debug_print_parsed_report(new_rep)
         log_info(" [OK]")
-    except ReportError as e:
+        diff_source = None
+        if args.patch:
+            diff_source = os.path.realpath(args.patch)
+        elif args.baseline_rev:
+            git_diff = invoke_command(
+                "git --git-dir={}/.git diff -C -C {}..{}"
+                .format(repo_dir, args.baseline_rev, args.report_rev),
+                True, "Error occured invoking:\n{}\n\n{}"
+            )
+            diff_source = git_diff.splitlines(keepends=True)
+        if diff_source:
+            log_info("Parsing changes...", "")
+            diffs = UnifiedFormatParser(diff_source)
+            debug.debug_print_parsed_diff(diffs)
+            log_info(" [OK]")
+    except (ReportError, UnifiedFormatParseError) as e:
         print("ERROR: {}".format(e))
         sys.exit(1)
 
-    output = new_rep - baseline
+    if args.patch or args.baseline_rev:
+        log_info("Patching baseline...", "")
+        baseline_patched = baseline.patch(diffs)
+        debug.debug_print_patched_report(baseline_patched)
+        log_info(" [OK]")
+        output = new_rep - baseline_patched
+    else:
+        output = new_rep - baseline
+
     print(output, end="", file=file_out)
 
     if len(output) > 0:
