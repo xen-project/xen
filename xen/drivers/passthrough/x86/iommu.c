@@ -406,7 +406,7 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
      */
     start = paging_mode_translate(d) ? PFN_DOWN(MB(1)) : 0;
 
-    for ( i = start, count = 0; i < top; )
+    for ( i = pfn_to_pdx(start), count = 0; i < top; )
     {
         unsigned long pfn = pdx_to_pfn(i);
         unsigned int perms = hwdom_iommu_map(d, pfn, max_pfn);
