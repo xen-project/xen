@@ -17,7 +17,7 @@
 /*
  * IOREQ Servers
  *
- * The interface between an I/O emulator an Xen is called an IOREQ Server.
+ * The interface between an I/O emulator and Xen is called an IOREQ Server.
  * A domain supports a single 'legacy' IOREQ Server which is instantiated if
  * parameter...
  *
