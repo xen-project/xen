@@ -666,6 +666,16 @@ F:	tools/xentrace/
 F:	xen/common/trace.c
 F:	xen/include/xen/trace.h
 
+XEN MISRA ANALYSIS TOOLS
+M:	Luca Fancellu <luca.fancellu@arm.com>
+S:	Supported
+F:	xen/scripts/xen_analysis/
+F:	xen/scripts/xen-analysis.py
+F:	xen/scripts/diff-report.py
+F:	xen/tools/cppcheck-plat/
+F:	xen/tools/convert_misra_doc.py
+F:	xen/tools/cppcheck-cc.sh
+
 XSM/FLASK
 M:	Daniel P. Smith <dpsmith@apertussolutions.com>
 S:	Supported
