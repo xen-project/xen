@@ -586,7 +586,10 @@ static bool __init check_smt_enabled(void)
     return false;
 }
 
-/* Calculate whether Retpoline is known-safe on this CPU. */
+/*
+ * Calculate whether Retpoline is known-safe on this CPU.  Fix up the
+ * RSBA/RRSBA bits as necessary.
+ */
 static bool __init retpoline_calculations(void)
 {
     unsigned int ucode_rev = this_cpu(cpu_sig).rev;
@@ -600,14 +603,92 @@ static bool __init retpoline_calculations(void)
         return false;
 
     /*
-     * RSBA may be set by a hypervisor to indicate that we may move to a
-     * processor which isn't retpoline-safe.
+     * The meaning of the RSBA and RRSBA bits have evolved over time.  The
+     * agreed upon meaning at the time of writing (May 2023) is thus:
      *
+     * - RSBA (RSB Alternative) means that an RSB may fall back to an
+     *   alternative predictor on underflow.  Skylake uarch and later all have
+     *   this property.  Broadwell too, when running microcode versions prior
+     *   to Jan 2018.
+     *
+     * - All eIBRS-capable processors suffer RSBA, but eIBRS also introduces
+     *   tagging of predictions with the mode in which they were learned.  So
+     *   when eIBRS is active, RSBA becomes RRSBA (Restricted RSBA).
+     *
+     * - CPUs are not expected to enumerate both RSBA and RRSBA.
+     *
+     * Some parts (Broadwell) are not expected to ever enumerate this
+     * behaviour directly.  Other parts have differing enumeration with
+     * microcode version.  Fix up Xen's idea, so we can advertise them safely
+     * to guests, and so toolstacks can level a VM safety for migration.
+     *
+     * The following states exist:
+     *
+     * |   | RSBA | EIBRS | RRSBA | Notes              | Action (in principle) |
+     * |---+------+-------+-------+--------------------+-----------------------|
+     * | 1 |    0 |     0 |     0 | OK (older parts)   | Maybe +RSBA           |
+     * | 2 |    0 |     0 |     1 | Broken             | (+RSBA, -RRSBA)       |
+     * | 3 |    0 |     1 |     0 | OK (pre-Aug ucode) | +RRSBA                |
+     * | 4 |    0 |     1 |     1 | OK                 |                       |
+     * | 5 |    1 |     0 |     0 | OK                 |                       |
+     * | 6 |    1 |     0 |     1 | Broken             | (-RRSBA)              |
+     * | 7 |    1 |     1 |     0 | Broken             | (-RSBA, +RRSBA)       |
+     * | 8 |    1 |     1 |     1 | Broken             | (-RSBA)               |
+     *
+     * However, we don't need perfect adherence to the spec.  We only need
+     * RSBA || RRSBA to indicate "alternative predictors potentially in use".
+     * Rows 1 & 3 are fixed up by later logic, as they're known configurations
+     * which exist in the world.
+     *
+     * Complain loudly at the broken cases. They're safe for Xen to use (so we
+     * don't attempt to correct), and may or may not exist in reality, but if
+     * we ever encounter them in practice, something is wrong and needs
+     * further investigation.
+     */
+    if ( cpu_has_eibrs ? cpu_has_rsba  /* Rows 7, 8 */
+                       : cpu_has_rrsba /* Rows 2, 6 */ )
+    {
+        printk(XENLOG_ERR
+               "FIRMWARE BUG: CPU %02x-%02x-%02x, ucode 0x%08x: RSBA %u, EIBRS %u, RRSBA %u\n",
+               boot_cpu_data.x86, boot_cpu_data.x86_model,
+               boot_cpu_data.x86_mask, ucode_rev,
+               cpu_has_rsba, cpu_has_eibrs, cpu_has_rrsba);
+        add_taint(TAINT_CPU_OUT_OF_SPEC);
+    }
+
+    /*
      * Processors offering Enhanced IBRS are not guarenteed to be
      * repoline-safe.
      */
-    if ( cpu_has_rsba || cpu_has_eibrs )
+    if ( cpu_has_eibrs )
+    {
+        /*
+         * Prior to the August 2023 microcode, many eIBRS-capable parts did
+         * not enumerate RRSBA.
+         */
+        if ( !cpu_has_rrsba )
+            setup_force_cpu_cap(X86_FEATURE_RRSBA);
+
         return false;
+    }
+
+    /*
+     * RSBA is explicitly enumerated in some cases, but may also be set by a
+     * hypervisor to indicate that we may move to a processor which isn't
+     * retpoline-safe.
+     */
+    if ( cpu_has_rsba )
+        return false;
+
+    /*
+     * At this point, we've filtered all the legal RSBA || RRSBA cases (or the
+     * known non-ideal cases).  If ARCH_CAPS is visible, trust the absence of
+     * RSBA || RRSBA.  There's no known microcode which advertises ARCH_CAPS
+     * without RSBA or EIBRS, and if we're virtualised we can't rely the model
+     * check anyway.
+     */
+    if ( cpu_has_arch_caps )
+        return true;
 
     switch ( boot_cpu_data.x86_model )
     {
@@ -694,6 +775,15 @@ static bool __init retpoline_calculations(void)
                boot_cpu_data.x86_model);
         safe = false;
         break;
+    }
+
+    if ( !safe )
+    {
+        /*
+         * Note: the eIBRS-capable parts are filtered out earlier, so the
+         * remainder here are the ones which suffer RSBA behaviour.
+         */
+        setup_force_cpu_cap(X86_FEATURE_RSBA);
     }
 
     return safe;
@@ -1129,7 +1219,7 @@ void __init init_speculation_mitigations(void)
             thunk = THUNK_JMP;
     }
 
-    /* Determine if retpoline is safe on this CPU. */
+    /* Determine if retpoline is safe on this CPU.  Fix up RSBA/RRSBA enumerations. */
     retpoline_safe = retpoline_calculations();
 
     /*
