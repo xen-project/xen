@@ -61,7 +61,9 @@ const uint8_t sh_type_to_size[] = {
     [SH_type_l4_64_shadow]   = 1,
     [SH_type_p2m_table]      = 1,
     [SH_type_monitor_table]  = 1,
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     [SH_type_oos_snapshot]   = 1,
+#endif
 };
 #endif /* CONFIG_HVM */
 
@@ -2341,7 +2343,8 @@ static void sh_update_paging_modes(struct vcpu *v)
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
-    if ( mfn_eq(v->arch.paging.shadow.oos_snapshot[0], INVALID_MFN) )
+    if ( !(d->options & XEN_DOMCTL_CDF_oos_off) &&
+         mfn_eq(v->arch.paging.shadow.oos_snapshot[0], INVALID_MFN) )
     {
         int i;
 
