@@ -150,9 +150,9 @@ $(TARGET)-syms: $(objtree)/prelink.o $(obj)/xen.lds
 	$(MAKE) $(build)=$(@D) $(@D)/.$(@F).1.o
 	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds -N $< $(build_id_linker) \
 	    $(orphan-handling-y) $(@D)/.$(@F).1.o -o $@
-	$(NM) -pa --format=sysv $(@D)/$(@F) \
+	$(NM) -pa --format=sysv $@ \
 		| $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort \
-		>$(@D)/$(@F).map
+		> $@.map
 	rm -f $(@D)/.$(@F).[0-9]* $(@D)/..$(@F).[0-9]*
 ifeq ($(CONFIG_XEN_IBT),y)
 	$(SHELL) $(srctree)/tools/check-endbr.sh $@
@@ -224,8 +224,9 @@ endif
 	$(MAKE) $(build)=$(@D) .$(@F).1r.o .$(@F).1s.o
 	$(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T $(obj)/efi.lds -N $< \
 	      $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o $(orphan-handling-y) $(note_file_option) -o $@
-	$(NM) -pa --format=sysv $(@D)/$(@F) \
-		| $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort >$(@D)/$(@F).map
+	$(NM) -pa --format=sysv $@ \
+		| $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort \
+		> $@.map
 ifeq ($(CONFIG_DEBUG_INFO),y)
 	$(if $(filter --strip-debug,$(EFI_LDFLAGS)),:$(space))$(OBJCOPY) -O elf64-x86-64 $@ $@.elf
 endif

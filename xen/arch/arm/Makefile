@@ -104,9 +104,9 @@ $(TARGET)-syms: $(objtree)/prelink.o $(obj)/xen.lds
 	$(MAKE) $(build)=$(@D) $(@D)/.$(@F).1.o
 	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds -N $< $(build_id_linker) \
 	    $(@D)/.$(@F).1.o -o $@
-	$(NM) -pa --format=sysv $(@D)/$(@F) \
+	$(NM) -pa --format=sysv $@ \
 		| $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort \
-		>$(@D)/$(@F).map
+		> $@.map
 	rm -f $(@D)/.$(@F).[0-9]*
 
 .PHONY: include
