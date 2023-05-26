@@ -454,9 +454,8 @@ The precise protocol is not yet documented.
 #### ~/control/feature-suspend = (""|"0"|"1") [w]
 
 These may be initialized to "" by the toolstack and may then be set
-to 0 or 1 by a guest to indicate whether it is capable or incapable,
-respectively, of responding to the corresponding command when written
-to ~/control/shutdown.
+to 0 or 1 by a guest to indicate whether it is capable of responding
+to the corresponding command when written to ~/control/shutdown.
 A toolstack may then sample the feature- value at the point of issuing
 a PV control command and respond accordingly:
 
@@ -507,9 +506,8 @@ string back to the control node.
 #### ~/control/feature-laptop-slate-mode = (""|"0"|"1") [w]
 
 This may be initialized to "" by the toolstack and may then be set
-to 0 or 1 by a guest to indicate whether it is capable or incapable,
-respectively, of responding to a mode value written to
-~/control/laptop-slate-mode.
+to 0 or 1 by a guest to indicate whether it is capable of responding
+to a mode value written to ~/control/laptop-slate-mode.
 
 ### Domain Controlled Paths
 
