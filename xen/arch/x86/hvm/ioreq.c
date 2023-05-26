@@ -169,7 +169,6 @@ static int hvm_map_ioreq_gfn(struct ioreq_server *s, bool buf)
 }
 
 static void hvm_remove_ioreq_gfn(struct ioreq_server *s, bool buf)
-
 {
     struct domain *d = s->target;
     struct ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
