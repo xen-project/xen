@@ -289,6 +289,14 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
      */
     for_each_pdev ( pdev->domain, tmp )
     {
+        if ( !tmp->vpci )
+            /*
+             * For the hardware domain it's possible to have devices assigned
+             * to it that are not handled by vPCI, either because those are
+             * read-only devices, or because vPCI setup has failed.
+             */
+            continue;
+
         if ( tmp == pdev )
         {
             /*
