@@ -587,9 +587,10 @@ static bool __init check_smt_enabled(void)
 }
 
 /* Calculate whether Retpoline is known-safe on this CPU. */
-static bool __init retpoline_safe(void)
+static bool __init retpoline_calculations(void)
 {
     unsigned int ucode_rev = this_cpu(cpu_sig).rev;
+    bool safe = false;
 
     if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
         return true;
@@ -627,29 +628,31 @@ static bool __init retpoline_safe(void)
     case 0x3f: /* Haswell EX/EP */
     case 0x45: /* Haswell D */
     case 0x46: /* Haswell H */
-        return true;
+        safe = true;
+        break;
 
         /*
          * Broadwell processors are retpoline-safe after specific microcode
          * versions.
          */
     case 0x3d: /* Broadwell */
-        return ucode_rev >= 0x2a;
+        safe = ucode_rev >= 0x2a;      break;
     case 0x47: /* Broadwell H */
-        return ucode_rev >= 0x1d;
+        safe = ucode_rev >= 0x1d;      break;
     case 0x4f: /* Broadwell EP/EX */
-        return ucode_rev >= 0xb000021;
+        safe = ucode_rev >= 0xb000021; break;
     case 0x56: /* Broadwell D */
         switch ( boot_cpu_data.x86_mask )
         {
-        case 2:  return ucode_rev >= 0x15;
-        case 3:  return ucode_rev >= 0x7000012;
-        case 4:  return ucode_rev >= 0xf000011;
-        case 5:  return ucode_rev >= 0xe000009;
+        case 2:  safe = ucode_rev >= 0x15;      break;
+        case 3:  safe = ucode_rev >= 0x7000012; break;
+        case 4:  safe = ucode_rev >= 0xf000011; break;
+        case 5:  safe = ucode_rev >= 0xe000009; break;
         default:
             printk("Unrecognised CPU stepping %#x - assuming not reptpoline safe\n",
                    boot_cpu_data.x86_mask);
-            return false;
+            safe = false;
+            break;
         }
         break;
 
@@ -663,7 +666,8 @@ static bool __init retpoline_safe(void)
     case 0x67: /* Cannonlake? */
     case 0x8e: /* Kabylake M */
     case 0x9e: /* Kabylake D */
-        return false;
+        safe = false;
+        break;
 
         /*
          * Atom processors before Goldmont Plus/Gemini Lake are retpoline-safe.
@@ -682,13 +686,17 @@ static bool __init retpoline_safe(void)
     case 0x5c: /* Goldmont */
     case 0x5f: /* Denverton */
     case 0x85: /* Knights Mill */
-        return true;
+        safe = true;
+        break;
 
     default:
         printk("Unrecognised CPU model %#x - assuming not reptpoline safe\n",
                boot_cpu_data.x86_model);
-        return false;
+        safe = false;
+        break;
     }
+
+    return safe;
 }
 
 /* Calculate whether this CPU speculates past #NM */
@@ -1092,7 +1100,7 @@ void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
     bool has_spec_ctrl, ibrs = false, hw_smt_enabled;
-    bool cpu_has_bug_taa;
+    bool cpu_has_bug_taa, retpoline_safe;
 
     hw_smt_enabled = check_smt_enabled();
 
@@ -1121,6 +1129,9 @@ void __init init_speculation_mitigations(void)
             thunk = THUNK_JMP;
     }
 
+    /* Determine if retpoline is safe on this CPU. */
+    retpoline_safe = retpoline_calculations();
+
     /*
      * Has the user specified any custom BTI mitigations?  If so, follow their
      * instructions exactly and disable all heuristics.
@@ -1142,7 +1153,7 @@ void __init init_speculation_mitigations(void)
              * On all hardware, we'd like to use retpoline in preference to
              * IBRS, but only if it is safe on this hardware.
              */
-            if ( retpoline_safe() )
+            if ( retpoline_safe )
                 thunk = THUNK_RETPOLINE;
             else if ( has_spec_ctrl )
                 ibrs = true;
