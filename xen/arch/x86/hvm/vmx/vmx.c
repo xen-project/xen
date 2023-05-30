@@ -785,6 +785,30 @@ static void cf_check vmx_cpuid_policy_changed(struct vcpu *v)
     vmx_vmcs_enter(v);
     vmx_update_exception_bitmap(v);
 
+    if ( cp->extd.rdtscp )
+    {
+        v->arch.hvm.vmx.secondary_exec_control |= SECONDARY_EXEC_ENABLE_RDTSCP;
+        vmx_update_secondary_exec_control(v);
+    }
+    else if ( v->arch.hvm.vmx.secondary_exec_control &
+              SECONDARY_EXEC_ENABLE_RDTSCP )
+    {
+        v->arch.hvm.vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_RDTSCP;
+        vmx_update_secondary_exec_control(v);
+    }
+
+    if ( cp->feat.invpcid )
+    {
+        v->arch.hvm.vmx.secondary_exec_control |= SECONDARY_EXEC_ENABLE_INVPCID;
+        vmx_update_secondary_exec_control(v);
+    }
+    else if ( v->arch.hvm.vmx.secondary_exec_control &
+              SECONDARY_EXEC_ENABLE_INVPCID )
+    {
+        v->arch.hvm.vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_INVPCID;
+        vmx_update_secondary_exec_control(v);
+    }
+
     /*
      * We can safely pass MSR_SPEC_CTRL through to the guest, even if STIBP
      * isn't enumerated in hardware, as SPEC_CTRL_STIBP is ignored.
