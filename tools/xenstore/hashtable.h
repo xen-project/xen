@@ -75,16 +75,6 @@ void
 hashtable_remove(struct hashtable *h, const void *k);
 
 /*****************************************************************************
- * hashtable_count
-   
- * @name        hashtable_count
- * @param   h   the hashtable
- * @return      the number of items stored in the hashtable
- */
-unsigned int
-hashtable_count(const struct hashtable *h);
-
-/*****************************************************************************
  * hashtable_iterate
 
  * @name           hashtable_iterate

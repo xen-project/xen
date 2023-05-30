@@ -40,22 +40,25 @@ static const unsigned int primes[] = {
 50331653, 100663319, 201326611, 402653189,
 805306457, 1610612741
 };
-const unsigned int prime_table_length = sizeof(primes)/sizeof(primes[0]);
-const unsigned int max_load_factor = 65; /* percentage */
 
-/*****************************************************************************/
-/* indexFor */
-static inline unsigned int
-indexFor(unsigned int tablelength, unsigned int hashvalue) {
+#define PRIME_TABLE_LEN   ARRAY_SIZE(primes)
+#define MAX_LOAD_PERCENT  65
+
+static inline unsigned int indexFor(unsigned int tablelength,
+                                    unsigned int hashvalue)
+{
     return (hashvalue % tablelength);
 }
 
-/*****************************************************************************/
-struct hashtable *
-create_hashtable(const void *ctx, unsigned int minsize,
-                 unsigned int (*hashf) (const void *),
-                 int (*eqf) (const void *, const void *),
-                 unsigned int flags)
+static unsigned int loadlimit(unsigned int pindex)
+{
+    return ((uint64_t)primes[pindex] * MAX_LOAD_PERCENT) / 100;
+}
+
+struct hashtable *create_hashtable(const void *ctx, unsigned int minsize,
+                                   unsigned int (*hashf) (const void *),
+                                   int (*eqf) (const void *, const void *),
+                                   unsigned int flags)
 {
     struct hashtable *h;
     unsigned int pindex, size = primes[0];
@@ -64,8 +67,11 @@ create_hashtable(const void *ctx, unsigned int minsize,
     if (minsize > (1u << 30)) return NULL;
 
     /* Enforce size as prime */
-    for (pindex=0; pindex < prime_table_length; pindex++) {
-        if (primes[pindex] > minsize) { size = primes[pindex]; break; }
+    for (pindex = 0; pindex < PRIME_TABLE_LEN; pindex++) {
+        if (primes[pindex] > minsize) {
+            size = primes[pindex];
+            break;
+        }
     }
 
     h = talloc_zero(ctx, struct hashtable);
@@ -81,7 +87,7 @@ create_hashtable(const void *ctx, unsigned int minsize,
     h->entrycount   = 0;
     h->hashfn       = hashf;
     h->eqfn         = eqf;
-    h->loadlimit    = (unsigned int)(((uint64_t)size * max_load_factor) / 100);
+    h->loadlimit    = loadlimit(pindex);
     return h;
 
 err1:
@@ -90,9 +96,7 @@ err0:
    return NULL;
 }
 
-/*****************************************************************************/
-unsigned int
-hash(const struct hashtable *h, const void *k)
+static unsigned int hash(const struct hashtable *h, const void *k)
 {
     /* Aim to protect against poor hash functions by adding logic here
      * - logic taken from java 1.4 hashtable source */
@@ -104,9 +108,7 @@ hash(const struct hashtable *h, const void *k)
     return i;
 }
 
-/*****************************************************************************/
-static int
-hashtable_expand(struct hashtable *h)
+static int hashtable_expand(struct hashtable *h)
 {
     /* Double the size of the table to accomodate more entries */
     struct entry **newtable;
@@ -114,7 +116,7 @@ hashtable_expand(struct hashtable *h)
     struct entry **pE;
     unsigned int newsize, i, index;
     /* Check we're not hitting max capacity */
-    if (h->primeindex == (prime_table_length - 1)) return 0;
+    if (h->primeindex == (PRIME_TABLE_LEN - 1)) return 0;
     newsize = primes[++(h->primeindex)];
 
     newtable = talloc_realloc(h, h->table, struct entry *, newsize);
@@ -144,21 +146,11 @@ hashtable_expand(struct hashtable *h)
     }
 
     h->tablelength = newsize;
-    h->loadlimit   = (unsigned int)
-        (((uint64_t)newsize * max_load_factor) / 100);
+    h->loadlimit   = loadlimit(h->primeindex);
     return -1;
 }
 
-/*****************************************************************************/
-unsigned int
-hashtable_count(const struct hashtable *h)
-{
-    return h->entrycount;
-}
-
-/*****************************************************************************/
-int
-hashtable_insert(struct hashtable *h, void *k, void *v)
+int hashtable_insert(struct hashtable *h, void *k, void *v)
 {
     /* This method allows duplicate keys - but they shouldn't be used */
     unsigned int index;
@@ -186,9 +178,7 @@ hashtable_insert(struct hashtable *h, void *k, void *v)
     return -1;
 }
 
-/*****************************************************************************/
-void * /* returns value associated with key */
-hashtable_search(const struct hashtable *h, const void *k)
+void *hashtable_search(const struct hashtable *h, const void *k)
 {
     struct entry *e;
     unsigned int hashvalue, index;
@@ -204,7 +194,6 @@ hashtable_search(const struct hashtable *h, const void *k)
     return NULL;
 }
 
-/*****************************************************************************/
 void
 hashtable_remove(struct hashtable *h, const void *k)
 {
@@ -234,10 +223,8 @@ hashtable_remove(struct hashtable *h, const void *k)
     }
 }
 
-/*****************************************************************************/
-int
-hashtable_iterate(struct hashtable *h,
-                  int (*func)(const void *k, void *v, void *arg), void *arg)
+int hashtable_iterate(struct hashtable *h,
+                      int (*func)(const void *k, void *v, void *arg), void *arg)
 {
     int ret;
     unsigned int i;
@@ -260,10 +247,7 @@ hashtable_iterate(struct hashtable *h,
     return 0;
 }
 
-/*****************************************************************************/
-/* destroy */
-void
-hashtable_destroy(struct hashtable *h)
+void hashtable_destroy(struct hashtable *h)
 {
     talloc_free(h);
 }
