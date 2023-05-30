@@ -2820,7 +2820,7 @@ int main(int argc, char *argv[])
 			no_domain_init = true;
 			break;
 		case 'E':
-			hard_quotas[ACC_NODES].val = strtoul(optarg, NULL, 10);
+			hard_quotas[ACC_NODES].val = get_optval_uint(optarg);
 			break;
 		case 'F':
 			pidfile = optarg;
@@ -2838,10 +2838,10 @@ int main(int argc, char *argv[])
 			recovery = false;
 			break;
 		case 'S':
-			hard_quotas[ACC_NODESZ].val = strtoul(optarg, NULL, 10);
+			hard_quotas[ACC_NODESZ].val = get_optval_uint(optarg);
 			break;
 		case 't':
-			hard_quotas[ACC_TRANS].val = strtoul(optarg, NULL, 10);
+			hard_quotas[ACC_TRANS].val = get_optval_uint(optarg);
 			break;
 		case 'T':
 			tracefile = optarg;
@@ -2861,14 +2861,13 @@ int main(int argc, char *argv[])
 			verbose = true;
 			break;
 		case 'W':
-			hard_quotas[ACC_WATCH].val = strtoul(optarg, NULL, 10);
+			hard_quotas[ACC_WATCH].val = get_optval_uint(optarg);
 			break;
 		case 'A':
-			hard_quotas[ACC_NPERM].val = strtoul(optarg, NULL, 10);
+			hard_quotas[ACC_NPERM].val = get_optval_uint(optarg);
 			break;
 		case 'M':
-			hard_quotas[ACC_PATHLEN].val =
-				strtoul(optarg, NULL, 10);
+			hard_quotas[ACC_PATHLEN].val = get_optval_uint(optarg);
 			hard_quotas[ACC_PATHLEN].val =
 				 min((unsigned int)XENSTORE_REL_PATH_MAX,
 				     hard_quotas[ACC_PATHLEN].val);
@@ -2883,13 +2882,13 @@ int main(int argc, char *argv[])
 			set_timeout(optarg);
 			break;
 		case 'e':
-			dom0_event = strtol(optarg, NULL, 10);
+			dom0_event = get_optval_uint(optarg);
 			break;
 		case 'm':
-			dom0_domid = strtol(optarg, NULL, 10);
+			dom0_domid = get_optval_uint(optarg);
 			break;
 		case 'p':
-			priv_domid = strtol(optarg, NULL, 10);
+			priv_domid = get_optval_uint(optarg);
 			break;
 #ifndef NO_LIVE_UPDATE
 		case 'U':
