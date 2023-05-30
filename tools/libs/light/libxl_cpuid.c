@@ -317,6 +317,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
 
         {"lfence+",      0x80000021, NA, CPUID_REG_EAX,  2,  1},
         {"nscb",         0x80000021, NA, CPUID_REG_EAX,  6,  1},
+        {"auto-ibrs",    0x80000021, NA, CPUID_REG_EAX,  8,  1},
         {"cpuid-user-dis", 0x80000021, NA, CPUID_REG_EAX, 17, 1},
 
         {"maxhvleaf",    0x40000000, NA, CPUID_REG_EAX,  0,  8},

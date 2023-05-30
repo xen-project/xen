@@ -199,6 +199,7 @@ static const char *const str_e21a[32] =
 {
     [ 2] = "lfence+",
     [ 6] = "nscb",
+    [ 8] = "auto-ibrs",
 
     /* 16 */                [17] = "cpuid-user-dis",
 };
