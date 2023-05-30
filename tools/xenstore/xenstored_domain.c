@@ -537,7 +537,7 @@ static struct domain *alloc_domain(const void *context, unsigned int domid)
 	domain->generation = generation;
 	domain->introduced = false;
 
-	if (!hashtable_insert(domhash, &domain->domid, domain)) {
+	if (hashtable_add(domhash, &domain->domid, domain)) {
 		talloc_free(domain);
 		errno = ENOMEM;
 		return NULL;
@@ -1794,7 +1794,7 @@ static int domain_check_acc_init_sub(const void *k, void *v, void *arg)
 	 */
 	dom->nodes = -d->acc[ACC_NODES].val;
 
-	if (!hashtable_insert(domains, &dom->domid, dom)) {
+	if (hashtable_add(domains, &dom->domid, dom)) {
 		talloc_free(dom);
 		return -1;
 	}

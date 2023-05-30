@@ -601,13 +601,13 @@ int check_transactions(struct hashtable *hash)
 		list_for_each_entry(trans, &conn->transaction_list, list) {
 			tname = talloc_asprintf(trans, "%"PRIu64,
 						trans->generation);
-			if (!tname || !remember_string(hash, tname))
+			if (!tname || remember_string(hash, tname))
 				goto nomem;
 
 			list_for_each_entry(i, &trans->accessed, list) {
 				if (!i->ta_node)
 					continue;
-				if (!remember_string(hash, i->trans_name))
+				if (remember_string(hash, i->trans_name))
 					goto nomem;
 			}
 

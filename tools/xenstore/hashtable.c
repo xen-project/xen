@@ -105,14 +105,15 @@ static int hashtable_expand(struct hashtable *h)
     struct entry **pE;
     unsigned int newsize, i, index;
     /* Check we're not hitting max capacity */
-    if (h->primeindex == (PRIME_TABLE_LEN - 1)) return 0;
+    if (h->primeindex == (PRIME_TABLE_LEN - 1))
+        return ENOSPC;
     newsize = primes[++(h->primeindex)];
 
     newtable = talloc_realloc(h, h->table, struct entry *, newsize);
     if (!newtable)
     {
         h->primeindex--;
-        return 0;
+        return ENOMEM;
     }
 
     h->table = newtable;
@@ -136,10 +137,10 @@ static int hashtable_expand(struct hashtable *h)
 
     h->tablelength = newsize;
     h->loadlimit   = loadlimit(h->primeindex);
-    return -1;
+    return 0;
 }
 
-int hashtable_insert(struct hashtable *h, void *k, void *v)
+int hashtable_add(struct hashtable *h, void *k, void *v)
 {
     /* This method allows duplicate keys - but they shouldn't be used */
     unsigned int index;
@@ -153,7 +154,11 @@ int hashtable_insert(struct hashtable *h, void *k, void *v)
         hashtable_expand(h);
     }
     e = talloc_zero(h, struct entry);
-    if (NULL == e) { --(h->entrycount); return 0; } /*oom*/
+    if (NULL == e)
+    {
+        --h->entrycount;
+       return ENOMEM;
+    }
     e->h = hash(h,k);
     index = indexFor(h->tablelength,e->h);
     e->k = k;
@@ -164,7 +169,7 @@ int hashtable_insert(struct hashtable *h, void *k, void *v)
         talloc_steal(e, v);
     e->next = h->table[index];
     h->table[index] = e;
-    return -1;
+    return 0;
 }
 
 void *hashtable_search(const struct hashtable *h, const void *k)

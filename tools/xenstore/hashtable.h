@@ -30,13 +30,13 @@ create_hashtable(const void *ctx, const char *name,
 );
 
 /*****************************************************************************
- * hashtable_insert
+ * hashtable_add
    
- * @name        hashtable_insert
+ * @name        hashtable_add
  * @param   h   the hashtable to insert into
  * @param   k   the key - hashtable claims ownership and will free on removal
  * @param   v   the value - does not claim ownership
- * @return      non-zero for successful insertion
+ * @return      zero for successful insertion
  *
  * This function will cause the table to expand if the insertion would take
  * the ratio of entries to table size over the maximum load factor.
@@ -49,7 +49,7 @@ create_hashtable(const void *ctx, const char *name,
  */
 
 int 
-hashtable_insert(struct hashtable *h, void *k, void *v);
+hashtable_add(struct hashtable *h, void *k, void *v);
 
 /*****************************************************************************
  * hashtable_search

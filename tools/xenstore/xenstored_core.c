@@ -2404,8 +2404,8 @@ int remember_string(struct hashtable *hash, const char *str)
 	char *k = talloc_strdup(NULL, str);
 
 	if (!k)
-		return 0;
-	return hashtable_insert(hash, k, (void *)1);
+		return ENOMEM;
+	return hashtable_add(hash, k, (void *)1);
 }
 
 /**
@@ -2438,7 +2438,7 @@ static int check_store_step(const void *ctx, struct connection *conn,
 				: WALK_TREE_SKIP_CHILDREN;
 	}
 
-	if (!remember_string(data->reachable, node->name))
+	if (remember_string(data->reachable, node->name))
 		return WALK_TREE_ERROR_STOP;
 
 	domain_check_acc_add(node, data->domains);
