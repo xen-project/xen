@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import os
+import os, re
+from . import settings
 from xml.etree import ElementTree
 
 class CppcheckHTMLReportError(Exception):
@@ -101,11 +102,27 @@ def cppcheck_merge_txt_fragments(fragments_list, out_txt_file, strip_paths):
             text_report_content = list(text_report_content)
             # Strip path from report lines
             for i in list(range(0, len(text_report_content))):
-                for path in strip_paths:
-                    text_report_content[i] = text_report_content[i].replace(
-                                                                path + "/", "")
                 # Split by : separator
                 text_report_content[i] = text_report_content[i].split(":")
+
+                for path in strip_paths:
+                    text_report_content[i][0] = \
+                        text_report_content[i][0].replace(path + "/", "")
+
+                # When the compilation is in-tree, the makefile places
+                # the directory in /xen/xen, making cppcheck produce
+                # relative path from there, so check if "xen/" is a prefix
+                # of the path and if it's not, check if it can be added to
+                # have a relative path from the repository instead of from
+                # /xen/xen
+                if not text_report_content[i][0].startswith("xen/"):
+                    # cppcheck first entry is in this format:
+                    # path/to/file(line,cols), remove (line,cols)
+                    cppcheck_file = re.sub(r'\(.*\)', '',
+                                           text_report_content[i][0])
+                    if os.path.isfile(settings.xen_dir + "/" + cppcheck_file):
+                        text_report_content[i][0] = \
+                            "xen/" + text_report_content[i][0]
 
             # sort alphabetically for second field (misra rule) and as second
             # criteria for the first field (file name)
