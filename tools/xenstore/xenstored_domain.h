@@ -163,9 +163,6 @@ struct wrl_timestampt {
 extern long wrl_ntransactions;
 
 void wrl_gettime_now(struct wrl_timestampt *now_ts);
-void wrl_domain_new(struct domain *domain);
-void wrl_domain_destroy(struct domain *domain);
-void wrl_credit_update(struct domain *domain, struct wrl_timestampt now);
 void wrl_check_timeout(struct domain *domain,
                        struct wrl_timestampt now,
                        int *ptimeout);
