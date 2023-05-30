@@ -19,6 +19,16 @@
 #ifndef _XENSTORED_DOMAIN_H
 #define _XENSTORED_DOMAIN_H
 
+/*
+ * All accounting data is stored in a per-domain array.
+ * Depending on the account item there might be other scopes as well, like e.g.
+ * a per transaction array.
+ */
+enum accitem {
+	ACC_NODES,
+	ACC_TR_N,		/* Number of elements per transaction. */
+};
+
 void handle_event(void);
 
 void check_domains(void);
