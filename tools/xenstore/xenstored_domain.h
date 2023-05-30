@@ -27,6 +27,7 @@
 enum accitem {
 	ACC_NODES,
 	ACC_TR_N,		/* Number of elements per transaction. */
+	ACC_N = ACC_TR_N,	/* Number of elements per domain. */
 };
 
 void handle_event(void);
@@ -77,7 +78,7 @@ int domain_alloc_permrefs(struct node_perms *perms);
 int domain_nbentry_inc(struct connection *conn, unsigned int domid);
 int domain_nbentry_dec(struct connection *conn, unsigned int domid);
 int domain_nbentry_fix(unsigned int domid, int num, bool update);
-int domain_nbentry(struct connection *conn);
+unsigned int domain_nbentry(struct connection *conn);
 int domain_memory_add(unsigned int domid, int mem, bool no_quota_check);
 
 /*

@@ -69,8 +69,8 @@ struct domain
 	/* Has domain been officially introduced? */
 	bool introduced;
 
-	/* number of entry from this domain in the store */
-	int nbentry;
+	/* Accounting data for this domain. */
+	unsigned int acc[ACC_N];
 
 	/* Amount of memory allocated for this domain. */
 	int memory;
@@ -246,7 +246,7 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 
 	if (keep_orphans) {
 		set_tdb_key(node->name, &key);
-		domain->nbentry--;
+		domain_nbentry_dec(NULL, domain->domid);
 		node->perms.p[0].id = priv_domid;
 		node->acc.memory = 0;
 		domain_nbentry_inc(NULL, priv_domid);
@@ -270,7 +270,7 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 		ret = WALK_TREE_SKIP_CHILDREN;
 	}
 
-	return domain->nbentry > 0 ? ret : WALK_TREE_SUCCESS_STOP;
+	return domain->acc[ACC_NODES] ? ret : WALK_TREE_SUCCESS_STOP;
 }
 
 static void domain_tree_remove(struct domain *domain)
@@ -278,7 +278,7 @@ static void domain_tree_remove(struct domain *domain)
 	int ret;
 	struct walk_funcs walkfuncs = { .enter = domain_tree_remove_sub };
 
-	if (domain->nbentry > 0) {
+	if (domain->acc[ACC_NODES]) {
 		ret = walk_node_tree(domain, NULL, "/", &walkfuncs, domain);
 		if (ret == WALK_TREE_ERROR_STOP)
 			syslog(LOG_ERR,
@@ -436,7 +436,7 @@ int domain_get_quota(const void *ctx, struct connection *conn,
 	resp = talloc_asprintf_append(resp, "%-16s: %8d\n", #t, e); \
 	if (!resp) return ENOMEM
 
-	ent(nodes, d->nbentry);
+	ent(nodes, d->acc[ACC_NODES]);
 	ent(watches, d->nbwatch);
 	ent(transactions, ta);
 	ent(outstanding, d->nboutstanding);
@@ -1046,8 +1046,27 @@ int domain_adjust_node_perms(struct node *node)
 	return 0;
 }
 
-static int domain_nbentry_add(struct connection *conn, unsigned int domid,
-			      int add, bool no_dom_alloc)
+static int domain_acc_add_valid(struct domain *d, enum accitem what, int add)
+{
+	assert(what < ARRAY_SIZE(d->acc));
+
+	if ((add < 0 && -add > d->acc[what]) ||
+	    (add > 0 && (INT_MAX - d->acc[what]) < add)) {
+		/*
+		 * In a transaction when a node is being added/removed AND the
+		 * same node has been added/removed outside the transaction in
+		 * parallel, the resulting value will be wrong. This is no
+		 * problem, as the transaction will fail due to the resulting
+		 * conflict.
+		 */
+		return (add < 0) ? 0 : INT_MAX;
+	}
+
+	return d->acc[what] + add;
+}
+
+static int domain_acc_add(struct connection *conn, unsigned int domid,
+			  enum accitem what, int add, bool no_dom_alloc)
 {
 	struct domain *d;
 	struct list_head *head;
@@ -1070,56 +1089,49 @@ static int domain_nbentry_add(struct connection *conn, unsigned int domid,
 		}
 	}
 
-	if (conn && conn->transaction) {
+	if (conn && conn->transaction && what < ACC_TR_N) {
 		head = transaction_get_changed_domains(conn->transaction);
-		ret = acc_add_changed_dom(conn->transaction, head, ACC_NODES,
+		ret = acc_add_changed_dom(conn->transaction, head, what,
 					  add, domid);
 		if (errno) {
 			fail_transaction(conn->transaction);
 			return -1;
 		}
-		/*
-		 * In a transaction when a node is being added/removed AND the
-		 * same node has been added/removed outside the transaction in
-		 * parallel, the resulting number of nodes will be wrong. This
-		 * is no problem, as the transaction will fail due to the
-		 * resulting conflict.
-		 * In the node remove case the resulting number can be even
-		 * negative, which should be avoided.
-		 */
-		return max(d->nbentry + ret, 0);
+		return domain_acc_add_valid(d, what, ret);
 	}
 
-	d->nbentry += add;
+	d->acc[what] = domain_acc_add_valid(d, what, add);
 
-	return d->nbentry;
+	return d->acc[what];
 }
 
 int domain_nbentry_inc(struct connection *conn, unsigned int domid)
 {
-	return (domain_nbentry_add(conn, domid, 1, false) < 0) ? errno : 0;
+	return (domain_acc_add(conn, domid, ACC_NODES, 1, false) < 0)
+	       ? errno : 0;
 }
 
 int domain_nbentry_dec(struct connection *conn, unsigned int domid)
 {
-	return (domain_nbentry_add(conn, domid, -1, true) < 0) ? errno : 0;
+	return (domain_acc_add(conn, domid, ACC_NODES, -1, true) < 0)
+	       ? errno : 0;
 }
 
 int domain_nbentry_fix(unsigned int domid, int num, bool update)
 {
 	int ret;
 
-	ret = domain_nbentry_add(NULL, domid, update ? num : 0, update);
+	ret = domain_acc_add(NULL, domid, ACC_NODES, update ? num : 0, update);
 	if (ret < 0 || update)
 		return ret;
 
 	return domid_is_unprivileged(domid) ? ret + num : 0;
 }
 
-int domain_nbentry(struct connection *conn)
+unsigned int domain_nbentry(struct connection *conn)
 {
 	return domain_is_unprivileged(conn)
-	       ? domain_nbentry_add(conn, conn->id, 0, true) : 0;
+	       ? domain_acc_add(conn, conn->id, ACC_NODES, 0, true) : 0;
 }
 
 static bool domain_chk_quota(struct domain *domain, int mem)
@@ -1596,7 +1608,7 @@ static int domain_check_acc_init_sub(const void *k, void *v, void *arg)
 	 * If everything is correct incrementing the value for each node will
 	 * result in dom->nodes being 0 at the end.
 	 */
-	dom->nodes = -d->nbentry;
+	dom->nodes = -d->acc[ACC_NODES];
 
 	if (!hashtable_insert(domains, &dom->domid, dom)) {
 		talloc_free(dom);
@@ -1651,7 +1663,7 @@ static int domain_check_acc_cb(const void *k, void *v, void *arg)
 	if (!d)
 		return 0;
 
-	d->nbentry += dom->nodes;
+	d->acc[ACC_NODES] += dom->nodes;
 
 	return 0;
 }
