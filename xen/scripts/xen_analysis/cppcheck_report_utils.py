@@ -104,8 +104,8 @@ def cppcheck_merge_txt_fragments(fragments_list, out_txt_file, strip_paths):
                 for path in strip_paths:
                     text_report_content[i] = text_report_content[i].replace(
                                                                 path + "/", "")
-                    # Split by : separator
-                    text_report_content[i] = text_report_content[i].split(":")
+                # Split by : separator
+                text_report_content[i] = text_report_content[i].split(":")
 
             # sort alphabetically for second field (misra rule) and as second
             # criteria for the first field (file name)
