@@ -100,7 +100,7 @@ struct changed_domain
 	unsigned int domid;
 
 	/* Accounting data. */
-	int acc[ACC_TR_N];
+	int acc[ACC_CHD_N];
 };
 
 static struct hashtable *domhash;
@@ -1069,6 +1069,7 @@ static int domain_acc_add(struct connection *conn, unsigned int domid,
 			  enum accitem what, int add, bool no_dom_alloc)
 {
 	struct domain *d;
+	struct changed_domain *cd;
 	struct list_head *head;
 	int ret;
 
@@ -1089,6 +1090,22 @@ static int domain_acc_add(struct connection *conn, unsigned int domid,
 		}
 	}
 
+	/* Temporary accounting data until final commit? */
+	if (conn && conn->in && what < ACC_REQ_N) {
+		/* Consider transaction local data. */
+		ret = 0;
+		if (conn->transaction && what < ACC_TR_N) {
+			head = transaction_get_changed_domains(
+				conn->transaction);
+			cd = acc_find_changed_domain(head, domid);
+			if (cd)
+				ret = cd->acc[what];
+		}
+		ret += acc_add_changed_dom(conn->in, &conn->acc_list, what,
+					   add, domid);
+		return errno ? -1 : domain_acc_add_valid(d, what, ret);
+	}
+
 	if (conn && conn->transaction && what < ACC_TR_N) {
 		head = transaction_get_changed_domains(conn->transaction);
 		ret = acc_add_changed_dom(conn->transaction, head, what,
@@ -1103,6 +1120,41 @@ static int domain_acc_add(struct connection *conn, unsigned int domid,
 	d->acc[what] = domain_acc_add_valid(d, what, add);
 
 	return d->acc[what];
+}
+
+void acc_drop(struct connection *conn)
+{
+	struct changed_domain *cd;
+
+	while ((cd = list_top(&conn->acc_list, struct changed_domain, list))) {
+		list_del(&cd->list);
+		talloc_free(cd);
+	}
+}
+
+void acc_commit(struct connection *conn)
+{
+	struct changed_domain *cd;
+	enum accitem what;
+	struct buffered_data *in = conn->in;
+
+	/*
+	 * Make sure domain_acc_add() below can't add additional data to
+	 * to be committed accounting records.
+	 */
+	conn->in = NULL;
+
+	while ((cd = list_top(&conn->acc_list, struct changed_domain, list))) {
+		list_del(&cd->list);
+		for (what = 0; what < ACC_REQ_N; what++)
+			if (cd->acc[what])
+				domain_acc_add(conn, cd->domid, what,
+					       cd->acc[what], true);
+
+		talloc_free(cd);
+	}
+
+	conn->in = in;
 }
 
 int domain_nbentry_inc(struct connection *conn, unsigned int domid)

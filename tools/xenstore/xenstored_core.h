@@ -139,6 +139,9 @@ struct connection
 	struct list_head out_list;
 	uint64_t timeout_msec;
 
+	/* Not yet committed accounting data (valid if in != NULL). */
+	struct list_head acc_list;
+
 	/* Referenced requests no longer pending. */
 	struct list_head ref_list;
 

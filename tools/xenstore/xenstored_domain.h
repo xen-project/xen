@@ -25,8 +25,10 @@
  * a per transaction array.
  */
 enum accitem {
-	ACC_NODES,
+	ACC_REQ_N,		/* Number of elements per request. */
+	ACC_NODES = ACC_REQ_N,
 	ACC_TR_N,		/* Number of elements per transaction. */
+	ACC_CHD_N = ACC_TR_N,	/* max(ACC_REQ_N, ACC_TR_N), for changed dom. */
 	ACC_N = ACC_TR_N,	/* Number of elements per domain. */
 };
 
@@ -113,6 +115,8 @@ int domain_get_quota(const void *ctx, struct connection *conn,
  * If "update" is true, "chk_quota" is ignored.
  */
 int acc_fix_domains(struct list_head *head, bool chk_quota, bool update);
+void acc_drop(struct connection *conn);
+void acc_commit(struct connection *conn);
 
 /* Write rate limiting */
 

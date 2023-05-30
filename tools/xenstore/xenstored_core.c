@@ -1023,6 +1023,9 @@ static void send_error(struct connection *conn, int error)
 			break;
 		}
 	}
+
+	acc_drop(conn);
+
 	send_reply(conn, XS_ERROR, xsd_errors[i].errstring,
 			  strlen(xsd_errors[i].errstring) + 1);
 }
@@ -1033,6 +1036,9 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 	struct buffered_data *bdata = conn->in;
 
 	assert(type != XS_WATCH_EVENT);
+
+	/* Commit accounting now, as later errors won't undo any changes. */
+	acc_commit(conn);
 
 	if ( len > XENSTORE_PAYLOAD_MAX ) {
 		send_error(conn, E2BIG);
@@ -2195,6 +2201,7 @@ struct connection *new_connection(const struct interface_funcs *funcs)
 	new->is_stalled = false;
 	new->transaction_started = 0;
 	INIT_LIST_HEAD(&new->out_list);
+	INIT_LIST_HEAD(&new->acc_list);
 	INIT_LIST_HEAD(&new->ref_list);
 	INIT_LIST_HEAD(&new->watches);
 	INIT_LIST_HEAD(&new->transaction_list);
