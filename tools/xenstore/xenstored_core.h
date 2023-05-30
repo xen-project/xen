@@ -47,10 +47,6 @@
 /* DEFAULT_BUFFER_SIZE should be large enough for each errno string. */
 #define DEFAULT_BUFFER_SIZE 16
 
-typedef int32_t wrl_creditt;
-#define WRL_CREDIT_MAX (1000*1000*1000)
-/* ^ satisfies non-overflow condition for wrl_xfer_credit */
-
 struct xs_state_connection;
 
 struct buffered_data
@@ -319,6 +315,9 @@ extern int priv_domid;
 extern bool keep_orphans;
 
 extern unsigned int timeout_watch_event_msec;
+
+/* Get internal time in milliseconds. */
+uint64_t get_now_msec(void);
 
 /* Map the kernel's xenstore page. */
 void *xenbus_map(void);

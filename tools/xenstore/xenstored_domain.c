@@ -99,6 +99,8 @@ struct quota soft_quotas[ACC_N] = {
 	},
 };
 
+typedef int32_t wrl_creditt;
+
 struct domain
 {
 	/* The id of this domain */
@@ -139,7 +141,7 @@ struct domain
 
 	/* write rate limit */
 	wrl_creditt wrl_credit; /* [ -wrl_config_writecost, +_dburst ] */
-	struct wrl_timestampt wrl_timestamp;
+	uint64_t wrl_timestamp;
 	bool wrl_delay_logged;
 };
 
@@ -156,6 +158,17 @@ struct changed_domain
 };
 
 static struct hashtable *domhash;
+
+/* Write rate limiting */
+
+/* Satisfies non-overflow condition for wrl_xfer_credit. */
+#define WRL_CREDIT_MAX (1000*1000*1000)
+#define WRL_FACTOR     1000 /* for fixed-point arithmetic */
+#define WRL_RATE        200
+#define WRL_DBURST       10
+#define WRL_GBURST     1000
+#define WRL_NEWDOMS       5
+#define WRL_LOGEVERY    120 /* seconds */
 
 static wrl_creditt wrl_config_writecost      = WRL_FACTOR;
 static wrl_creditt wrl_config_rate           = WRL_RATE   * WRL_FACTOR;
@@ -175,19 +188,6 @@ do {						\
 	if (trace_flags & TRACE_WRL)		\
 		trace("wrl: " __VA_ARGS__);	\
 } while (0)
-
-void wrl_gettime_now(struct wrl_timestampt *now_wt)
-{
-	struct timespec now_ts;
-	int r;
-
-	r = clock_gettime(CLOCK_MONOTONIC, &now_ts);
-	if (r)
-		barf_perror("Could not find time (clock_gettime failed)");
-
-	now_wt->sec = now_ts.tv_sec;
-	now_wt->msec = now_ts.tv_nsec / 1000000;
-}
 
 static void wrl_xfer_credit(wrl_creditt *debit,  wrl_creditt debit_floor,
 			    wrl_creditt *credit, wrl_creditt credit_ceil)
@@ -215,7 +215,7 @@ static void wrl_xfer_credit(wrl_creditt *debit,  wrl_creditt debit_floor,
 static void wrl_domain_new(struct domain *domain)
 {
 	domain->wrl_credit = 0;
-	wrl_gettime_now(&domain->wrl_timestamp);
+	domain->wrl_timestamp = get_now_msec();
 	wrl_ndomains++;
 	/* Steal up to DBURST from the reserve */
 	wrl_xfer_credit(&wrl_reserve, -wrl_config_newdoms_dburst,
@@ -234,7 +234,7 @@ static void wrl_domain_destroy(struct domain *domain)
 			&wrl_reserve, wrl_config_dburst);
 }
 
-static void wrl_credit_update(struct domain *domain, struct wrl_timestampt now)
+static void wrl_credit_update(struct domain *domain, uint64_t now)
 {
 	/*
 	 * We want to calculate
@@ -243,18 +243,12 @@ static void wrl_credit_update(struct domain *domain, struct wrl_timestampt now)
 	 * To avoid rounding errors from constantly adding small
 	 * amounts of credit, we only add credit for whole milliseconds.
 	 */
-	long seconds      = now.sec -  domain->wrl_timestamp.sec;
-	long milliseconds = now.msec - domain->wrl_timestamp.msec;
 	long msec;
 	int64_t denom, num;
 	wrl_creditt surplus;
 
-	seconds = MIN(seconds, 1000*1000); /* arbitrary, prevents overflow */
-	msec = seconds * 1000 + milliseconds;
-
-	if (msec < 0)
-                /* shouldn't happen with CLOCK_MONOTONIC */
-		msec = 0;
+	/* Prevent overflow by limiting to 32 bits. */
+	msec = MIN(now - domain->wrl_timestamp, 1000 * 1000 * 1000);
 
 	/* 32x32 -> 64 cannot overflow */
 	denom = (int64_t)msec * wrl_config_rate;
@@ -286,9 +280,7 @@ static void wrl_credit_update(struct domain *domain, struct wrl_timestampt now)
 		  (long)wrl_reserve, (long)surplus);
 }
 
-void wrl_check_timeout(struct domain *domain,
-		       struct wrl_timestampt now,
-		       int *ptimeout)
+void wrl_check_timeout(struct domain *domain, uint64_t now, int *ptimeout)
 {
 	uint64_t num, denom;
 	int wakeup;
@@ -325,13 +317,13 @@ void wrl_check_timeout(struct domain *domain,
 
 void wrl_apply_debit_actual(struct domain *domain)
 {
-	struct wrl_timestampt now;
+	uint64_t now;
 
 	if (!domain || !domain_is_unprivileged(domain->conn))
 		/* sockets and privileged domain escape the write rate limit */
 		return;
 
-	wrl_gettime_now(&now);
+	now = get_now_msec();
 	wrl_credit_update(domain, now);
 
 	domain->wrl_credit -= wrl_config_writecost;
@@ -346,14 +338,14 @@ void wrl_apply_debit_actual(struct domain *domain)
 		} else if (!wrl_log_last_warning) {
 			WRL_LOG(now, "rate limiting restarts\n");
 		}
-		wrl_log_last_warning = now.sec;
+		wrl_log_last_warning = now / 1000;
 	}
 }
 
-void wrl_log_periodic(struct wrl_timestampt now)
+void wrl_log_periodic(uint64_t now)
 {
 	if (wrl_log_last_warning &&
-	    (now.sec - wrl_log_last_warning) > WRL_LOGEVERY) {
+	    (now / 1000 - wrl_log_last_warning) > WRL_LOGEVERY) {
 		WRL_LOG(now, "not in force recently\n");
 		wrl_log_last_warning = 0;
 	}

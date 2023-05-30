@@ -192,7 +192,7 @@ void reopen_log(void)
 	}
 }
 
-static uint64_t get_now_msec(void)
+uint64_t get_now_msec(void)
 {
 	struct timespec now_ts;
 
@@ -510,7 +510,6 @@ fail:
 static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 {
 	struct connection *conn;
-	struct wrl_timestampt now;
 	uint64_t msecs;
 
 	if (fds)
@@ -530,13 +529,12 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 		xce_pollfd_idx = set_fd(xenevtchn_fd(xce_handle),
 					POLLIN|POLLPRI);
 
-	wrl_gettime_now(&now);
-	wrl_log_periodic(now);
 	msecs = get_now_msec();
+	wrl_log_periodic(msecs);
 
 	list_for_each_entry(conn, &connections, list) {
 		if (conn->domain) {
-			wrl_check_timeout(conn->domain, now, ptimeout);
+			wrl_check_timeout(conn->domain, msecs, ptimeout);
 			check_event_timeout(conn, msecs, ptimeout);
 			if (conn_can_read(conn) ||
 			    (conn_can_write(conn) &&
