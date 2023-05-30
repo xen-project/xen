@@ -2706,13 +2706,13 @@ int dom0_domid = 0;
 int dom0_event = 0;
 int priv_domid = 0;
 
-static int get_optval_int(const char *arg)
+static unsigned int get_optval_uint(const char *arg)
 {
 	char *end;
-	long val;
+	unsigned long val;
 
-	val = strtol(arg, &end, 10);
-	if (!*arg || *end || val < 0 || val > INT_MAX)
+	val = strtoul(arg, &end, 10);
+	if (!*arg || *end || val > INT_MAX)
 		barf("invalid parameter value \"%s\"\n", arg);
 
 	return val;
@@ -2732,7 +2732,7 @@ static void set_timeout(const char *arg)
 
 	if (!eq)
 		barf("quotas must be specified via <what>=<seconds>\n");
-	val = get_optval_int(eq + 1);
+	val = get_optval_uint(eq + 1);
 	if (what_matches(arg, "watch-event"))
 		timeout_watch_event_msec = val * 1000;
 	else
@@ -2746,7 +2746,7 @@ static void set_quota(const char *arg, bool soft)
 
 	if (!eq)
 		barf("quotas must be specified via <what>=<nb>\n");
-	val = get_optval_int(eq + 1);
+	val = get_optval_uint(eq + 1);
 	if (what_matches(arg, "outstanding") && !soft)
 		quota_req_outstanding = val;
 	else if (what_matches(arg, "transaction-nodes") && !soft)
