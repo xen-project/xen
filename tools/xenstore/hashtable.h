@@ -10,7 +10,7 @@ struct hashtable;
    
  * @name                    create_hashtable
  * @param   ctx             talloc context to use for allocations
- * @param   minsize         minimum initial size of hashtable
+ * @param   name            talloc name of the hashtable
  * @param   hashfunction    function for hashing keys
  * @param   key_eq_fn       function for determining key equality
  * @param   flags           flags HASHTABLE_*
@@ -23,7 +23,7 @@ struct hashtable;
 #define HASHTABLE_FREE_KEY   (1U << 1)
 
 struct hashtable *
-create_hashtable(const void *ctx, unsigned int minsize,
+create_hashtable(const void *ctx, const char *name,
                  unsigned int (*hashfunction) (const void *),
                  int (*key_eq_fn) (const void *, const void *),
                  unsigned int flags

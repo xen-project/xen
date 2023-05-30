@@ -2521,7 +2521,7 @@ void check_store(void)
 	struct check_store_data data;
 
 	/* Don't free values (they are all void *1) */
-	data.reachable = create_hashtable(NULL, 16, hash_from_key_fn,
+	data.reachable = create_hashtable(NULL, "checkstore", hash_from_key_fn,
 					  keys_equal_fn, HASHTABLE_FREE_KEY);
 	if (!data.reachable) {
 		log("check_store: ENOMEM");

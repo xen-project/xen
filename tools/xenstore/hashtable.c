@@ -55,39 +55,28 @@ static unsigned int loadlimit(unsigned int pindex)
     return ((uint64_t)primes[pindex] * MAX_LOAD_PERCENT) / 100;
 }
 
-struct hashtable *create_hashtable(const void *ctx, unsigned int minsize,
+struct hashtable *create_hashtable(const void *ctx, const char *name,
                                    unsigned int (*hashf) (const void *),
                                    int (*eqf) (const void *, const void *),
                                    unsigned int flags)
 {
     struct hashtable *h;
-    unsigned int pindex, size = primes[0];
-
-    /* Check requested hashtable isn't too large */
-    if (minsize > (1u << 30)) return NULL;
-
-    /* Enforce size as prime */
-    for (pindex = 0; pindex < PRIME_TABLE_LEN; pindex++) {
-        if (primes[pindex] > minsize) {
-            size = primes[pindex];
-            break;
-        }
-    }
 
     h = talloc_zero(ctx, struct hashtable);
     if (NULL == h)
         goto err0;
-    h->table = talloc_zero_array(h, struct entry *, size);
+    talloc_set_name_const(h, name);
+    h->table = talloc_zero_array(h, struct entry *, primes[0]);
     if (NULL == h->table)
         goto err1;
 
-    h->tablelength  = size;
+    h->primeindex   = 0;
+    h->tablelength  = primes[h->primeindex];
     h->flags        = flags;
-    h->primeindex   = pindex;
     h->entrycount   = 0;
     h->hashfn       = hashf;
     h->eqfn         = eqf;
-    h->loadlimit    = loadlimit(pindex);
+    h->loadlimit    = loadlimit(h->primeindex);
     return h;
 
 err1:
