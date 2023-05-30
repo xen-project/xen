@@ -40,6 +40,16 @@ enum accitem {
 	ACC_N,			/* Number of elements per domain. */
 };
 
+struct quota {
+	const char *name;
+	const char *descr;
+	unsigned int val;
+	unsigned int max;
+};
+
+extern struct quota hard_quotas[ACC_N];
+extern struct quota soft_quotas[ACC_N];
+
 void handle_event(void);
 
 void check_domains(void);
@@ -134,7 +144,7 @@ void acc_commit(struct connection *conn);
 int domain_max_global_acc(const void *ctx, struct connection *conn);
 void domain_reset_global_acc(void);
 bool domain_max_chk(const struct connection *conn, unsigned int what,
-		    unsigned int val, unsigned int quota);
+		    unsigned int val);
 
 /* Write rate limiting */
 

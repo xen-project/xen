@@ -252,8 +252,7 @@ int access_node(struct connection *conn, struct node *node,
 
 	i = find_accessed_node(trans, node->name);
 	if (!i) {
-		if (domain_max_chk(conn, ACC_TRANSNODES, trans->nodes + 1,
-				   quota_trans_nodes)) {
+		if (domain_max_chk(conn, ACC_TRANSNODES, trans->nodes + 1)) {
 			ret = ENOSPC;
 			goto err;
 		}
@@ -479,7 +478,7 @@ int do_transaction_start(const void *ctx, struct connection *conn,
 	if (conn->transaction)
 		return EBUSY;
 
-	if (domain_transaction_get(conn) > quota_max_transaction)
+	if (domain_transaction_get(conn) > hard_quotas[ACC_TRANS].val)
 		return ENOSPC;
 
 	/* Attach transaction to ctx for autofree until it's complete */

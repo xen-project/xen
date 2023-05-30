@@ -89,17 +89,6 @@ unsigned int trace_flags = TRACE_OBJ | TRACE_IO;
 
 static const char *sockmsg_string(enum xsd_sockmsg_type type);
 
-int quota_nb_entry_per_domain = 1000;
-int quota_nb_watch_per_domain = 128;
-int quota_max_entry_size = 2048; /* 2K */
-int quota_max_transaction = 10;
-int quota_nb_perms_per_node = 5;
-int quota_trans_nodes = 1024;
-int quota_max_path_len = XENSTORE_REL_PATH_MAX;
-int quota_req_outstanding = 20;
-int quota_memory_per_domain_soft = 2 * 1024 * 1024; /* 2 MB */
-int quota_memory_per_domain_hard = 2 * 1024 * 1024 + 512 * 1024; /* 2.5 MB */
-
 unsigned int timeout_watch_event_msec = 20000;
 
 void trace(const char *fmt, ...)
@@ -800,8 +789,7 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 		+ node->datalen + node->childlen;
 
 	/* Call domain_max_chk() in any case in order to record max values. */
-	if (domain_max_chk(conn, ACC_NODESZ, data.dsize, quota_max_entry_size)
-	    && !no_quota_check) {
+	if (domain_max_chk(conn, ACC_NODESZ, data.dsize) && !no_quota_check) {
 		errno = ENOSPC;
 		return errno;
 	}
@@ -1191,8 +1179,7 @@ bool is_valid_nodename(const struct connection *conn, const char *node)
 	if (sscanf(node, "/local/domain/%5u/%n", &domid, &local_off) != 1)
 		local_off = 0;
 
-	if (domain_max_chk(conn, ACC_PATHLEN, strlen(node) - local_off,
-			   quota_max_path_len))
+	if (domain_max_chk(conn, ACC_PATHLEN, strlen(node) - local_off))
 		return false;
 
 	return valid_chars(node);
@@ -1504,7 +1491,7 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 	for (i = node; i; i = i->parent) {
 		/* i->parent is set for each new node, so check quota. */
 		if (i->parent &&
-		    domain_nbentry(conn) >= quota_nb_entry_per_domain) {
+		    domain_nbentry(conn) >= hard_quotas[ACC_NODES].val) {
 			ret = ENOSPC;
 			goto err;
 		}
@@ -1786,7 +1773,7 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 		return EINVAL;
 
 	perms.num--;
-	if (domain_max_chk(conn, ACC_NPERM, perms.num, quota_nb_perms_per_node))
+	if (domain_max_chk(conn, ACC_NPERM, perms.num))
 		return ENOSPC;
 
 	permstr = in->buffer + strlen(in->buffer) + 1;
@@ -2655,7 +2642,16 @@ static void usage(void)
 "                          memory: total used memory per domain for nodes,\n"
 "                                  transactions, watches and requests, above\n"
 "                                  which Xenstore will stop talking to domain\n"
+"                          nodes: number nodes owned by a domain\n"
+"                          node-permissions: number of access permissions per\n"
+"                                            node\n"
+"                          node-size: total size of a node (permissions +\n"
+"                                     children names + content)\n"
 "                          outstanding: number of outstanding requests\n"
+"                          path-length: length of a node path\n"
+"                          transactions: number of concurrent transactions\n"
+"                                        per domain\n"
+"                          watches: number of watches per domain"
 "  -q, --quota-soft <what>=<nb> set a soft quota <what> to the value <nb>,\n"
 "                          causing a warning to be issued via syslog() if the\n"
 "                          limit is violated, allowed quotas are:\n"
@@ -2720,7 +2716,12 @@ static unsigned int get_optval_uint(const char *arg)
 
 static bool what_matches(const char *arg, const char *what)
 {
-	unsigned int what_len = strlen(what);
+	unsigned int what_len;
+
+	if (!what)
+		return false;
+
+	what_len = strlen(what);
 
 	return !strncmp(arg, what, what_len) && arg[what_len] == '=';
 }
@@ -2728,7 +2729,7 @@ static bool what_matches(const char *arg, const char *what)
 static void set_timeout(const char *arg)
 {
 	const char *eq = strchr(arg, '=');
-	int val;
+	unsigned int val;
 
 	if (!eq)
 		barf("quotas must be specified via <what>=<seconds>\n");
@@ -2742,22 +2743,22 @@ static void set_timeout(const char *arg)
 static void set_quota(const char *arg, bool soft)
 {
 	const char *eq = strchr(arg, '=');
-	int val;
+	struct quota *q = soft ? soft_quotas : hard_quotas;
+	unsigned int val;
+	unsigned int i;
 
 	if (!eq)
 		barf("quotas must be specified via <what>=<nb>\n");
 	val = get_optval_uint(eq + 1);
-	if (what_matches(arg, "outstanding") && !soft)
-		quota_req_outstanding = val;
-	else if (what_matches(arg, "transaction-nodes") && !soft)
-		quota_trans_nodes = val;
-	else if (what_matches(arg, "memory")) {
-		if (soft)
-			quota_memory_per_domain_soft = val;
-		else
-			quota_memory_per_domain_hard = val;
-	} else
-		barf("unknown quota \"%s\"\n", arg);
+
+	for (i = 0; i < ACC_N; i++) {
+		if (what_matches(arg, q[i].name)) {
+			q[i].val = val;
+			return;
+		}
+	}
+
+	barf("unknown quota \"%s\"\n", arg);
 }
 
 /* Sorted by bit values of TRACE_* flags. Flag is (1u << index). */
@@ -2819,7 +2820,7 @@ int main(int argc, char *argv[])
 			no_domain_init = true;
 			break;
 		case 'E':
-			quota_nb_entry_per_domain = strtol(optarg, NULL, 10);
+			hard_quotas[ACC_NODES].val = strtoul(optarg, NULL, 10);
 			break;
 		case 'F':
 			pidfile = optarg;
@@ -2837,10 +2838,10 @@ int main(int argc, char *argv[])
 			recovery = false;
 			break;
 		case 'S':
-			quota_max_entry_size = strtol(optarg, NULL, 10);
+			hard_quotas[ACC_NODESZ].val = strtoul(optarg, NULL, 10);
 			break;
 		case 't':
-			quota_max_transaction = strtol(optarg, NULL, 10);
+			hard_quotas[ACC_TRANS].val = strtoul(optarg, NULL, 10);
 			break;
 		case 'T':
 			tracefile = optarg;
@@ -2860,15 +2861,17 @@ int main(int argc, char *argv[])
 			verbose = true;
 			break;
 		case 'W':
-			quota_nb_watch_per_domain = strtol(optarg, NULL, 10);
+			hard_quotas[ACC_WATCH].val = strtoul(optarg, NULL, 10);
 			break;
 		case 'A':
-			quota_nb_perms_per_node = strtol(optarg, NULL, 10);
+			hard_quotas[ACC_NPERM].val = strtoul(optarg, NULL, 10);
 			break;
 		case 'M':
-			quota_max_path_len = strtol(optarg, NULL, 10);
-			quota_max_path_len = min(XENSTORE_REL_PATH_MAX,
-						 quota_max_path_len);
+			hard_quotas[ACC_PATHLEN].val =
+				strtoul(optarg, NULL, 10);
+			hard_quotas[ACC_PATHLEN].val =
+				 min((unsigned int)XENSTORE_REL_PATH_MAX,
+				     hard_quotas[ACC_PATHLEN].val);
 			break;
 		case 'Q':
 			set_quota(optarg, false);

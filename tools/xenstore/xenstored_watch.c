@@ -239,7 +239,7 @@ int do_watch(const void *ctx, struct connection *conn, struct buffered_data *in)
 			return EEXIST;
 	}
 
-	if (domain_watch(conn) > quota_nb_watch_per_domain)
+	if (domain_watch(conn) > hard_quotas[ACC_WATCH].val)
 		return E2BIG;
 
 	watch = add_watch(conn, vec[0], vec[1], relative, false);

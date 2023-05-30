@@ -221,35 +221,6 @@ static int do_control_log(const void *ctx, struct connection *conn,
 	return 0;
 }
 
-struct quota {
-	const char *name;
-	int *quota;
-	const char *descr;
-};
-
-static const struct quota hard_quotas[] = {
-	{ "nodes", &quota_nb_entry_per_domain, "Nodes per domain" },
-	{ "watches", &quota_nb_watch_per_domain, "Watches per domain" },
-	{ "transactions", &quota_max_transaction, "Transactions per domain" },
-	{ "outstanding", &quota_req_outstanding,
-		"Outstanding requests per domain" },
-	{ "transaction-nodes", &quota_trans_nodes,
-		"Max. number of accessed nodes per transaction" },
-	{ "memory", &quota_memory_per_domain_hard,
-		"Total Xenstore memory per domain (error level)" },
-	{ "node-size", &quota_max_entry_size, "Max. size of a node" },
-	{ "path-max", &quota_max_path_len, "Max. length of a node path" },
-	{ "permissions", &quota_nb_perms_per_node,
-		"Max. number of permissions per node" },
-	{ NULL, NULL, NULL }
-};
-
-static const struct quota soft_quotas[] = {
-	{ "memory", &quota_memory_per_domain_soft,
-		"Total Xenstore memory per domain (warning level)" },
-	{ NULL, NULL, NULL }
-};
-
 static int quota_show_current(const void *ctx, struct connection *conn,
 			      const struct quota *quotas)
 {
@@ -260,9 +231,11 @@ static int quota_show_current(const void *ctx, struct connection *conn,
 	if (!resp)
 		return ENOMEM;
 
-	for (i = 0; quotas[i].quota; i++) {
+	for (i = 0; i < ACC_N; i++) {
+		if (!quotas[i].name)
+			continue;
 		resp = talloc_asprintf_append(resp, "%-17s: %8d %s\n",
-					      quotas[i].name, *quotas[i].quota,
+					      quotas[i].name, quotas[i].val,
 					      quotas[i].descr);
 		if (!resp)
 			return ENOMEM;
@@ -274,7 +247,7 @@ static int quota_show_current(const void *ctx, struct connection *conn,
 }
 
 static int quota_set(const void *ctx, struct connection *conn,
-		     char **vec, int num, const struct quota *quotas)
+		     char **vec, int num, struct quota *quotas)
 {
 	unsigned int i;
 	int val;
@@ -286,9 +259,9 @@ static int quota_set(const void *ctx, struct connection *conn,
 	if (val < 1)
 		return EINVAL;
 
-	for (i = 0; quotas[i].quota; i++) {
-		if (!strcmp(vec[0], quotas[i].name)) {
-			*quotas[i].quota = val;
+	for (i = 0; i < ACC_N; i++) {
+		if (quotas[i].name && !strcmp(vec[0], quotas[i].name)) {
+			quotas[i].val = val;
 			send_ack(conn, XS_CONTROL);
 			return 0;
 		}
