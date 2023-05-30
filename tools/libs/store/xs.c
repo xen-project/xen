@@ -33,9 +33,9 @@
 #include <signal.h>
 #include <stdint.h>
 #include <errno.h>
+#include <xen-tools/common-macros.h>
 #include "xenstore.h"
 #include "xs_lib.h"
-#include "utils.h"
 
 #include <xentoolcore_internal.h>
 #include <xen_list.h>
@@ -437,7 +437,7 @@ static int get_error(const char *errorstring)
 {
 	unsigned int i;
 
-	for (i = 0; !streq(errorstring, xsd_errors[i].errstring); i++)
+	for (i = 0; strcmp(errorstring, xsd_errors[i].errstring); i++)
 		if (i == ARRAY_SIZE(xsd_errors) - 1)
 			return EINVAL;
 	return xsd_errors[i].errnum;
