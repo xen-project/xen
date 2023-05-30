@@ -377,25 +377,34 @@ static int cf_check vpic_intercept_elcr_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct hvm_hw_vpic *vpic;
-    uint32_t data;
+    unsigned int data, shift = 0;
 
-    BUG_ON(bytes != 1);
+    BUG_ON(bytes > 2 - (port & 1));
 
     vpic = &current->domain->arch.hvm.vpic[port & 1];
 
-    if ( dir == IOREQ_WRITE )
-    {
-        /* Some IRs are always edge trig. Slave IR is always level trig. */
-        data = *val & vpic_elcr_mask(vpic);
-        if ( vpic->is_master )
-            data |= 1 << 2;
-        vpic->elcr = data;
-    }
-    else
-    {
-        /* Reader should not see hardcoded level-triggered slave IR. */
-        *val = vpic->elcr & vpic_elcr_mask(vpic);
-    }
+    do {
+        if ( dir == IOREQ_WRITE )
+        {
+            /* Some IRs are always edge trig. Slave IR is always level trig. */
+            data = (*val >> shift) & vpic_elcr_mask(vpic);
+            if ( vpic->is_master )
+                data |= 1 << 2;
+            vpic->elcr = data;
+        }
+        else
+        {
+            /* Reader should not see hardcoded level-triggered slave IR. */
+            data = vpic->elcr & vpic_elcr_mask(vpic);
+            if ( !shift )
+                *val = data;
+            else
+                *val |= data << shift;
+        }
+
+        ++vpic;
+        shift += 8;
+    } while ( --bytes );
 
     return X86EMUL_OKAY;
 }
@@ -470,8 +479,7 @@ void vpic_init(struct domain *d)
     register_portio_handler(d, 0x20, 2, vpic_intercept_pic_io);
     register_portio_handler(d, 0xa0, 2, vpic_intercept_pic_io);
 
-    register_portio_handler(d, 0x4d0, 1, vpic_intercept_elcr_io);
-    register_portio_handler(d, 0x4d1, 1, vpic_intercept_elcr_io);
+    register_portio_handler(d, 0x4d0, 2, vpic_intercept_elcr_io);
 }
 
 void vpic_irq_positive_edge(struct domain *d, int irq)
