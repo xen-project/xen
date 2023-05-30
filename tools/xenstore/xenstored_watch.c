@@ -36,9 +36,6 @@ struct watch
 	/* Watches on this connection */
 	struct list_head list;
 
-	/* Current outstanding events applying to this watch. */
-	struct list_head events;
-
 	/* Offset into path for skipping prefix (used for relative paths). */
 	unsigned int prefix_len;
 
@@ -204,8 +201,6 @@ static struct watch *add_watch(struct connection *conn, char *path, char *token,
 		goto nomem;
 
 	watch->prefix_len = relative ? strlen(get_implicit_path(conn)) + 1 : 0;
-
-	INIT_LIST_HEAD(&watch->events);
 
 	domain_watch_inc(conn);
 	list_add_tail(&watch->list, &conn->watches);
