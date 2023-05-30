@@ -303,8 +303,15 @@ extern unsigned int trace_flags;
 #define TRACE_IO	0x00000002
 #define TRACE_WRL	0x00000004
 #define TRACE_ACC	0x00000008
+#define TRACE_TDB	0x00000010
 extern const char *const trace_switches[];
 int set_trace_switch(const char *arg);
+
+#define trace_tdb(...)				\
+do {						\
+	if (trace_flags & TRACE_TDB)		\
+		trace("tdb: " __VA_ARGS__);	\
+} while (0)
 
 extern TDB_CONTEXT *tdb_ctx;
 extern int dom0_domid;
