@@ -29,7 +29,10 @@ enum accitem {
 	ACC_REQ_N,		/* Number of elements per request. */
 	ACC_TR_N = ACC_REQ_N,	/* Number of elements per transaction. */
 	ACC_CHD_N = ACC_TR_N,	/* max(ACC_REQ_N, ACC_TR_N), for changed dom. */
-	ACC_N = ACC_TR_N,	/* Number of elements per domain. */
+	ACC_WATCH = ACC_TR_N,
+	ACC_OUTST,
+	ACC_MEM,
+	ACC_N,			/* Number of elements per domain. */
 };
 
 void handle_event(void);
@@ -109,8 +112,7 @@ void domain_watch_inc(struct connection *conn);
 void domain_watch_dec(struct connection *conn);
 int domain_watch(struct connection *conn);
 void domain_outstanding_inc(struct connection *conn);
-void domain_outstanding_dec(struct connection *conn);
-void domain_outstanding_domid_dec(unsigned int domid);
+void domain_outstanding_dec(struct connection *conn, unsigned int domid);
 int domain_get_quota(const void *ctx, struct connection *conn,
 		     unsigned int domid);
 

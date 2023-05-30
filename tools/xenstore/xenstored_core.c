@@ -255,7 +255,7 @@ static void free_buffered_data(struct buffered_data *out,
 			req->pend.ref.event_cnt--;
 			if (!req->pend.ref.event_cnt && !req->on_out_list) {
 				if (req->on_ref_list) {
-					domain_outstanding_domid_dec(
+					domain_outstanding_dec(conn,
 						req->pend.ref.domid);
 					list_del(&req->list);
 				}
@@ -271,7 +271,7 @@ static void free_buffered_data(struct buffered_data *out,
 		out->on_ref_list = true;
 		return;
 	} else
-		domain_outstanding_dec(conn);
+		domain_outstanding_dec(conn, conn->id);
 
 	talloc_free(out);
 }

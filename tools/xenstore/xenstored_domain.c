@@ -72,18 +72,11 @@ struct domain
 	/* Accounting data for this domain. */
 	unsigned int acc[ACC_N];
 
-	/* Amount of memory allocated for this domain. */
-	int memory;
+	/* Memory quota data for this domain. */
 	bool soft_quota_reported;
 	bool hard_quota_reported;
 	time_t mem_last_msg;
 #define MEM_WARN_MINTIME_SEC 10
-
-	/* number of watch for this domain */
-	int nbwatch;
-
-	/* Number of outstanding requests. */
-	int nboutstanding;
 
 	/* write rate limit */
 	wrl_creditt wrl_credit; /* [ -wrl_config_writecost, +_dburst ] */
@@ -200,14 +193,15 @@ static bool domain_can_write(struct connection *conn)
 
 static bool domain_can_read(struct connection *conn)
 {
-	struct xenstore_domain_interface *intf = conn->domain->interface;
+	struct domain *domain = conn->domain;
+	struct xenstore_domain_interface *intf = domain->interface;
 
 	if (domain_is_unprivileged(conn)) {
-		if (conn->domain->wrl_credit < 0)
+		if (domain->wrl_credit < 0)
 			return false;
-		if (conn->domain->nboutstanding >= quota_req_outstanding)
+		if (domain->acc[ACC_OUTST] >= quota_req_outstanding)
 			return false;
-		if (conn->domain->memory >= quota_memory_per_domain_hard &&
+		if (domain->acc[ACC_MEM] >= quota_memory_per_domain_hard &&
 		    quota_memory_per_domain_hard)
 			return false;
 	}
@@ -437,10 +431,10 @@ int domain_get_quota(const void *ctx, struct connection *conn,
 	if (!resp) return ENOMEM
 
 	ent(nodes, d->acc[ACC_NODES]);
-	ent(watches, d->nbwatch);
+	ent(watches, d->acc[ACC_WATCH]);
 	ent(transactions, ta);
-	ent(outstanding, d->nboutstanding);
-	ent(memory, d->memory);
+	ent(outstanding, d->acc[ACC_OUTST]);
+	ent(memory, d->acc[ACC_MEM]);
 
 #undef ent
 
@@ -1186,14 +1180,16 @@ unsigned int domain_nbentry(struct connection *conn)
 	       ? domain_acc_add(conn, conn->id, ACC_NODES, 0, true) : 0;
 }
 
-static bool domain_chk_quota(struct domain *domain, int mem)
+static bool domain_chk_quota(struct connection *conn, unsigned int mem)
 {
 	time_t now;
+	struct domain *domain;
 
-	if (!domain || !domid_is_unprivileged(domain->domid) ||
-	    (domain->conn && domain->conn->is_ignored))
+	if (!conn || !domid_is_unprivileged(conn->id) ||
+	    conn->is_ignored)
 		return false;
 
+	domain = conn->domain;
 	now = time(NULL);
 
 	if (mem >= quota_memory_per_domain_hard &&
@@ -1238,80 +1234,57 @@ static bool domain_chk_quota(struct domain *domain, int mem)
 int domain_memory_add(struct connection *conn, unsigned int domid, int mem,
 		      bool no_quota_check)
 {
-	struct domain *domain;
+	int ret;
 
-	domain = find_domain_struct(domid);
-	if (domain) {
-		/*
-		 * domain_chk_quota() will print warning and also store whether
-		 * the soft/hard quota has been hit. So check no_quota_check
-		 * *after*.
-		 */
-		if (domain_chk_quota(domain, domain->memory + mem) &&
-		    !no_quota_check)
-			return ENOMEM;
-		domain->memory += mem;
-	} else {
-		/*
-		 * The domain the memory is to be accounted for should always
-		 * exist, as accounting is done either for a domain related to
-		 * the current connection, or for the domain owning a node
-		 * (which is always existing, as the owner of the node is
-		 * tested to exist and deleted or replaced by domid 0 if not).
-		 * So not finding the related domain MUST be an error in the
-		 * data base.
-		 */
-		errno = ENOENT;
-		corrupt(NULL, "Accounting called for non-existing domain %u\n",
-			domid);
-		return ENOENT;
-	}
+	ret = domain_acc_add(conn, domid, ACC_MEM, 0, true);
+	if (ret < 0)
+		return -ret;
+
+	/*
+	 * domain_chk_quota() will print warning and also store whether the
+	 * soft/hard quota has been hit. So check no_quota_check *after*.
+	 */
+	if (domain_chk_quota(conn, ret + mem) && !no_quota_check)
+		return ENOMEM;
+
+	/*
+	 * The domain the memory is to be accounted for should always exist,
+	 * as accounting is done either for a domain related to the current
+	 * connection, or for the domain owning a node (which is always
+	 * existing, as the owner of the node is tested to exist and deleted
+	 * or replaced by domid 0 if not).
+	 * So not finding the related domain MUST be an error in the data base.
+	 */
+	domain_acc_add(conn, domid, ACC_MEM, mem, true);
 
 	return 0;
 }
 
 void domain_watch_inc(struct connection *conn)
 {
-	if (!conn || !conn->domain)
-		return;
-	conn->domain->nbwatch++;
+	domain_acc_add(conn, conn->id, ACC_WATCH, 1, true);
 }
 
 void domain_watch_dec(struct connection *conn)
 {
-	if (!conn || !conn->domain)
-		return;
-	if (conn->domain->nbwatch)
-		conn->domain->nbwatch--;
+	domain_acc_add(conn, conn->id, ACC_WATCH, -1, true);
 }
 
 int domain_watch(struct connection *conn)
 {
 	return (domain_is_unprivileged(conn))
-		? conn->domain->nbwatch
+		? domain_acc_add(conn, conn->id, ACC_WATCH, 0, true)
 		: 0;
 }
 
 void domain_outstanding_inc(struct connection *conn)
 {
-	if (!conn || !conn->domain)
-		return;
-	conn->domain->nboutstanding++;
+	domain_acc_add(conn, conn->id, ACC_OUTST, 1, true);
 }
 
-void domain_outstanding_dec(struct connection *conn)
+void domain_outstanding_dec(struct connection *conn, unsigned int domid)
 {
-	if (!conn || !conn->domain)
-		return;
-	conn->domain->nboutstanding--;
-}
-
-void domain_outstanding_domid_dec(unsigned int domid)
-{
-	struct domain *d = find_domain_by_domid(domid);
-
-	if (d)
-		d->nboutstanding--;
+	domain_acc_add(conn, domid, ACC_OUTST, -1, true);
 }
 
 static wrl_creditt wrl_config_writecost      = WRL_FACTOR;
