@@ -25,9 +25,9 @@
  * a per transaction array.
  */
 enum accitem {
+	ACC_NODES,
 	ACC_REQ_N,		/* Number of elements per request. */
-	ACC_NODES = ACC_REQ_N,
-	ACC_TR_N,		/* Number of elements per transaction. */
+	ACC_TR_N = ACC_REQ_N,	/* Number of elements per transaction. */
 	ACC_CHD_N = ACC_TR_N,	/* max(ACC_REQ_N, ACC_TR_N), for changed dom. */
 	ACC_N = ACC_TR_N,	/* Number of elements per domain. */
 };

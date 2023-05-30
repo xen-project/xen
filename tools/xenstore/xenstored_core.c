@@ -1454,7 +1454,6 @@ static void destroy_node_rm(struct connection *conn, struct node *node)
 static int destroy_node(struct connection *conn, struct node *node)
 {
 	destroy_node_rm(conn, node);
-	domain_nbentry_dec(conn, get_node_owner(node));
 
 	/*
 	 * It is not possible to easily revert the changes in a transaction.
@@ -1645,9 +1644,12 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 	if (ret > 0)
 		return WALK_TREE_SUCCESS_STOP;
 
+	if (domain_nbentry_dec(conn, get_node_owner(node)))
+		return WALK_TREE_ERROR_STOP;
+
 	/* In case of error stop the walk. */
 	if (!ret && do_tdb_delete(conn, &key, &node->acc))
-		return WALK_TREE_SUCCESS_STOP;
+		return WALK_TREE_ERROR_STOP;
 
 	/*
 	 * Fire the watches now, when we can still see the node permissions.
@@ -1656,8 +1658,6 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 	*/
 	watch_exact = strcmp(root, node->name);
 	fire_watches(conn, ctx, node->name, node, watch_exact, NULL);
-
-	domain_nbentry_dec(conn, get_node_owner(node));
 
 	return WALK_TREE_RM_CHILDENTRY;
 }
@@ -1679,6 +1679,12 @@ int rm_node(struct connection *conn, const void *ctx, const char *name)
 	ret = walk_node_tree(ctx, conn, name, &walkfuncs, (void *)name);
 	if (ret < 0) {
 		if (ret == WALK_TREE_ERROR_STOP) {
+			/*
+			 * This can't be triggered by an unprivileged guest,
+			 * so calling corrupt() is fine here.
+			 * In fact it is needed in order to fix a potential
+			 * accounting inconsistency.
+			 */
 			corrupt(conn, "error when deleting sub-nodes of %s\n",
 				name);
 			errno = EIO;
@@ -1797,29 +1803,14 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 		return EPERM;
 
 	old_perms = node->perms;
-	domain_nbentry_dec(conn, get_node_owner(node));
-	node->perms = perms;
-	if (domain_nbentry_inc(conn, get_node_owner(node))) {
-		node->perms = old_perms;
-		/*
-		 * This should never fail because we had a reference on the
-		 * domain before and Xenstored is single-threaded.
-		 */
-		domain_nbentry_inc(conn, get_node_owner(node));
+	if (domain_nbentry_dec(conn, get_node_owner(node)))
 		return ENOMEM;
-	}
+	node->perms = perms;
+	if (domain_nbentry_inc(conn, get_node_owner(node)))
+		return ENOMEM;
 
-	if (write_node(conn, node, false)) {
-		int saved_errno = errno;
-
-		domain_nbentry_dec(conn, get_node_owner(node));
-		node->perms = old_perms;
-		/* No failure possible as above. */
-		domain_nbentry_inc(conn, get_node_owner(node));
-
-		errno = saved_errno;
+	if (write_node(conn, node, false))
 		return errno;
-	}
 
 	fire_watches(conn, ctx, name, node, false, &old_perms);
 	send_ack(conn, XS_SET_PERMS);
