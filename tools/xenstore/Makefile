@@ -29,7 +29,7 @@ CLIENTS += xenstore-write xenstore-ls xenstore-watch
 
 TARGETS := xenstore $(CLIENTS) xenstore-control
 ifeq ($(XENSTORE_XENSTORED),y)
-TARGETS += xs_tdb_dump xenstored
+TARGETS += xenstored
 endif
 
 .PHONY: all
@@ -49,9 +49,6 @@ xenstore: xenstore_client.o xs_lib.o
 
 xenstore-control: xenstore_control.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@ $(APPEND_LDFLAGS)
-
-xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
-	$(CC) $(LDFLAGS) $^ -o $@ $(APPEND_LDFLAGS)
 
 .PHONY: clean
 clean::

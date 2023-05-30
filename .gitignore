@@ -248,7 +248,6 @@ tools/xenstore/xenstore-rm
 tools/xenstore/xenstore-watch
 tools/xenstore/xenstore-write
 tools/xenstore/xenstored
-tools/xenstore/xs_tdb_dump
 tools/xentop/xentop
 tools/xentrace/xentrace_setsize
 tools/xentrace/tbctl
