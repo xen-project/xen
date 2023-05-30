@@ -853,8 +853,8 @@ static uint64_t guest_efer(const struct domain *d)
 {
     uint64_t val;
 
-    /* Hide unknown bits, and unconditionally hide SVME from guests. */
-    val = read_efer() & EFER_KNOWN_MASK & ~EFER_SVME;
+    /* Hide unknown bits, and unconditionally hide SVME and AIBRSE from guests. */
+    val = read_efer() & EFER_KNOWN_MASK & ~(EFER_SVME | EFER_AIBRSE);
     /*
      * Hide the 64-bit features from 32-bit guests.  SCE has
      * vendor-dependent behaviour.

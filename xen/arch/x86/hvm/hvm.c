@@ -936,6 +936,9 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
     if ( (value & EFER_FFXSE) && !p->extd.ffxsr )
         return "FFXSE without feature";
 
+    if ( (value & EFER_AIBRSE) && !p->extd.auto_ibrs )
+        return "AutoIBRS without feature";
+
     return NULL;
 }
 

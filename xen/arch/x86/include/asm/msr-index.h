@@ -178,7 +178,8 @@
 #define  EFER_AIBRSE                        (_AC(1, ULL) << 21) /* Automatic IBRS Enable */
 
 #define EFER_KNOWN_MASK \
-    (EFER_SCE | EFER_LME | EFER_LMA | EFER_NXE | EFER_SVME | EFER_FFXSE)
+    (EFER_SCE | EFER_LME | EFER_LMA | EFER_NXE | EFER_SVME | EFER_FFXSE | \
+     EFER_AIBRSE)
 
 #define MSR_STAR                            0xc0000081 /* legacy mode SYSCALL target */
 #define MSR_LSTAR                           0xc0000082 /* long mode SYSCALL target */
