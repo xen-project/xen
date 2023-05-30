@@ -600,6 +600,12 @@ static void __init calculate_hvm_max_policy(void)
      */
     if ( cpu_has_vmx )
     {
+        if ( !cpu_has_vmx_rdtscp )
+            __clear_bit(X86_FEATURE_RDTSCP, fs);
+
+        if ( !cpu_has_vmx_invpcid )
+            __clear_bit(X86_FEATURE_INVPCID, fs);
+
         if ( !cpu_has_vmx_mpx )
             __clear_bit(X86_FEATURE_MPX, fs);
 
