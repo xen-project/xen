@@ -35,13 +35,13 @@
 #include <errno.h>
 #include "xenstore.h"
 #include "xs_lib.h"
-#include "list.h"
 #include "utils.h"
 
 #include <xentoolcore_internal.h>
+#include <xen_list.h>
 
 struct xs_stored_msg {
-	struct list_head list;
+	XEN_TAILQ_ENTRY(struct xs_stored_msg) list;
 	struct xsd_sockmsg hdr;
 	char *body;
 };
@@ -70,7 +70,7 @@ struct xs_handle {
          * A list of fired watch messages, protected by a mutex. Users can
          * wait on the conditional variable until a watch is pending.
          */
-	struct list_head watch_list;
+	XEN_TAILQ_HEAD(, struct xs_stored_msg) watch_list;
 	pthread_mutex_t watch_mutex;
 	pthread_cond_t watch_condvar;
 
@@ -84,7 +84,7 @@ struct xs_handle {
          * because we serialise requests. The requester can wait on the
          * conditional variable for its response.
          */
-	struct list_head reply_list;
+	XEN_TAILQ_HEAD(, struct xs_stored_msg) reply_list;
 	pthread_mutex_t reply_mutex;
 	pthread_cond_t reply_condvar;
 
@@ -133,8 +133,8 @@ static void *read_thread(void *arg);
 struct xs_handle {
 	int fd;
 	Xentoolcore__Active_Handle tc_ah; /* for restrict */
-	struct list_head reply_list;
-	struct list_head watch_list;
+	XEN_TAILQ_HEAD(, struct xs_stored_msg) reply_list;
+	XEN_TAILQ_HEAD(, struct xs_stored_msg) watch_list;
 	/* Clients can select() on this pipe to wait for a watch to fire. */
 	int watch_pipe[2];
 	/* Filtering watch event in unwatch function? */
@@ -180,7 +180,7 @@ int xs_fileno(struct xs_handle *h)
 
 	if ((h->watch_pipe[0] == -1) && (pipe(h->watch_pipe) != -1)) {
 		/* Kick things off if the watch list is already non-empty. */
-		if (!list_empty(&h->watch_list))
+		if (!XEN_TAILQ_EMPTY(&h->watch_list))
 			while (write(h->watch_pipe[1], &c, 1) != 1)
 				continue;
 	}
@@ -262,8 +262,8 @@ static struct xs_handle *get_handle(const char *connect_to)
 	if (h->fd == -1)
 		goto err;
 
-	INIT_LIST_HEAD(&h->reply_list);
-	INIT_LIST_HEAD(&h->watch_list);
+	XEN_TAILQ_INIT(&h->reply_list);
+	XEN_TAILQ_INIT(&h->watch_list);
 
 	/* Watch pipe is allocated on demand in xs_fileno(). */
 	h->watch_pipe[0] = h->watch_pipe[1] = -1;
@@ -329,12 +329,12 @@ struct xs_handle *xs_open(unsigned long flags)
 static void close_free_msgs(struct xs_handle *h) {
 	struct xs_stored_msg *msg, *tmsg;
 
-	list_for_each_entry_safe(msg, tmsg, &h->reply_list, list) {
+	XEN_TAILQ_FOREACH_SAFE(msg, &h->reply_list, list, tmsg) {
 		free(msg->body);
 		free(msg);
 	}
 
-	list_for_each_entry_safe(msg, tmsg, &h->watch_list, list) {
+	XEN_TAILQ_FOREACH_SAFE(msg, &h->watch_list, list, tmsg) {
 		free(msg->body);
 		free(msg);
 	}
@@ -459,17 +459,17 @@ static void *read_reply(
 
 	mutex_lock(&h->reply_mutex);
 #ifdef USE_PTHREAD
-	while (list_empty(&h->reply_list) && read_from_thread && h->fd != -1)
+	while (XEN_TAILQ_EMPTY(&h->reply_list) && read_from_thread && h->fd != -1)
 		condvar_wait(&h->reply_condvar, &h->reply_mutex);
 #endif
-	if (list_empty(&h->reply_list)) {
+	if (XEN_TAILQ_EMPTY(&h->reply_list)) {
 		mutex_unlock(&h->reply_mutex);
 		errno = EINVAL;
 		return NULL;
 	}
-	msg = list_top(&h->reply_list, struct xs_stored_msg, list);
-	list_del(&msg->list);
-	assert(list_empty(&h->reply_list));
+	msg = XEN_TAILQ_FIRST(&h->reply_list);
+	XEN_TAILQ_REMOVE(&h->reply_list, msg, list);
+	assert(XEN_TAILQ_EMPTY(&h->reply_list));
 	mutex_unlock(&h->reply_mutex);
 
 	*type = msg->hdr.type;
@@ -883,7 +883,7 @@ static void xs_maybe_clear_watch_pipe(struct xs_handle *h)
 {
 	char c;
 
-	if (list_empty(&h->watch_list) && (h->watch_pipe[0] != -1))
+	if (XEN_TAILQ_EMPTY(&h->watch_list) && (h->watch_pipe[0] != -1))
 		while (read(h->watch_pipe[0], &c, 1) != 1)
 			continue;
 }
@@ -907,7 +907,7 @@ static char **read_watch_internal(struct xs_handle *h, unsigned int *num,
 	 * we haven't called xs_watch.	Presumably the application
 	 * will do so later; in the meantime we just block.
 	 */
-	while (list_empty(&h->watch_list) && h->fd != -1) {
+	while (XEN_TAILQ_EMPTY(&h->watch_list) && h->fd != -1) {
 		if (nonblocking) {
 			mutex_unlock(&h->watch_mutex);
 			errno = EAGAIN;
@@ -925,13 +925,13 @@ static char **read_watch_internal(struct xs_handle *h, unsigned int *num,
 
 #endif /* !defined(USE_PTHREAD) */
 
-	if (list_empty(&h->watch_list)) {
+	if (XEN_TAILQ_EMPTY(&h->watch_list)) {
 		mutex_unlock(&h->watch_mutex);
 		errno = EINVAL;
 		return NULL;
 	}
-	msg = list_top(&h->watch_list, struct xs_stored_msg, list);
-	list_del(&msg->list);
+	msg = XEN_TAILQ_FIRST(&h->watch_list);
+	XEN_TAILQ_REMOVE(&h->watch_list, msg, list);
 
 	xs_maybe_clear_watch_pipe(h);
 	mutex_unlock(&h->watch_mutex);
@@ -1007,12 +1007,12 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 	/* Filter the watch list to remove potential message */
 	mutex_lock(&h->watch_mutex);
 
-	if (list_empty(&h->watch_list)) {
+	if (XEN_TAILQ_EMPTY(&h->watch_list)) {
 		mutex_unlock(&h->watch_mutex);
 		return res;
 	}
 
-	list_for_each_entry_safe(msg, tmsg, &h->watch_list, list) {
+	XEN_TAILQ_FOREACH_SAFE(msg, &h->watch_list, list, tmsg) {
 		assert(msg->hdr.type == XS_WATCH_EVENT);
 
 		s = msg->body;
@@ -1034,7 +1034,7 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 
 		if (l_token && !strcmp(token, l_token) &&
 		    l_path && xs_path_is_subpath(path, l_path)) {
-			list_del(&msg->list);
+			XEN_TAILQ_REMOVE(&h->watch_list, msg, list);
 			free(msg);
 		}
 	}
@@ -1290,12 +1290,12 @@ static int read_message(struct xs_handle *h, int nonblocking)
 		cleanup_push(pthread_mutex_unlock, &h->watch_mutex);
 
 		/* Kick users out of their select() loop. */
-		if (list_empty(&h->watch_list) &&
+		if (XEN_TAILQ_EMPTY(&h->watch_list) &&
 		    (h->watch_pipe[1] != -1))
 			while (write(h->watch_pipe[1], body, 1) != 1) /* Cancellation point */
 				continue;
 
-		list_add_tail(&msg->list, &h->watch_list);
+		XEN_TAILQ_INSERT_TAIL(&h->watch_list, msg, list);
 
 		condvar_signal(&h->watch_condvar);
 
@@ -1304,13 +1304,13 @@ static int read_message(struct xs_handle *h, int nonblocking)
 		mutex_lock(&h->reply_mutex);
 
 		/* There should only ever be one response pending! */
-		if (!list_empty(&h->reply_list)) {
+		if (!XEN_TAILQ_EMPTY(&h->reply_list)) {
 			mutex_unlock(&h->reply_mutex);
 			saved_errno = EEXIST;
 			goto error_freebody;
 		}
 
-		list_add_tail(&msg->list, &h->reply_list);
+		XEN_TAILQ_INSERT_TAIL(&h->reply_list, msg, list);
 		condvar_signal(&h->reply_condvar);
 
 		mutex_unlock(&h->reply_mutex);
