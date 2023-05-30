@@ -430,7 +430,7 @@ int domain_get_quota(const void *ctx, struct connection *conn,
 		return ENOMEM;
 
 #define ent(t, e) \
-	resp = talloc_asprintf_append(resp, "%-16s: %8u (max: %8u\n", #t, \
+	resp = talloc_asprintf_append(resp, "%-17s: %8u (max: %8u\n", #t, \
 				      d->acc[e].val, d->acc[e].max); \
 	if (!resp) return ENOMEM
 
@@ -439,6 +439,10 @@ int domain_get_quota(const void *ctx, struct connection *conn,
 	ent(transactions, ACC_TRANS);
 	ent(outstanding, ACC_OUTST);
 	ent(memory, ACC_MEM);
+	ent(transaction-nodes, ACC_TRANSNODES);
+	ent(node-permissions, ACC_NPERM);
+	ent(path-length, ACC_PATHLEN);
+	ent(node-size, ACC_NODESZ);
 
 #undef ent
 
@@ -456,7 +460,7 @@ int domain_max_global_acc(const void *ctx, struct connection *conn)
 		return ENOMEM;
 
 #define ent(t, e) \
-	resp = talloc_asprintf_append(resp, "%-16s: %8u\n", #t,   \
+	resp = talloc_asprintf_append(resp, "%-17s: %8u\n", #t,   \
 				      acc_global_max[e]);         \
 	if (!resp) return ENOMEM
 
@@ -465,6 +469,10 @@ int domain_max_global_acc(const void *ctx, struct connection *conn)
 	ent(transactions, ACC_TRANS);
 	ent(outstanding, ACC_OUTST);
 	ent(memory, ACC_MEM);
+	ent(transaction-nodes, ACC_TRANSNODES);
+	ent(node-permissions, ACC_NPERM);
+	ent(path-length, ACC_PATHLEN);
+	ent(node-size, ACC_NODESZ);
 
 #undef ent
 
@@ -1078,6 +1086,18 @@ int domain_adjust_node_perms(struct node *node)
 	return 0;
 }
 
+static void domain_acc_valid_max(struct domain *d, enum accitem what,
+				 unsigned int val)
+{
+	assert(what < ARRAY_SIZE(d->acc));
+	assert(what < ARRAY_SIZE(acc_global_max));
+
+	if (val > d->acc[what].max)
+		d->acc[what].max = val;
+	if (val > acc_global_max[what] && domid_is_unprivileged(d->domid))
+		acc_global_max[what] = val;
+}
+
 static int domain_acc_add_valid(struct domain *d, enum accitem what, int add)
 {
 	unsigned int val;
@@ -1097,10 +1117,7 @@ static int domain_acc_add_valid(struct domain *d, enum accitem what, int add)
 	}
 
 	val = d->acc[what].val + add;
-	if (val > d->acc[what].max)
-		d->acc[what].max = val;
-	if (val > acc_global_max[what] && domid_is_unprivileged(d->domid))
-		acc_global_max[what] = val;
+	domain_acc_valid_max(d, what, val);
 
 	return val;
 }
@@ -1219,6 +1236,20 @@ void domain_reset_global_acc(void)
 
 	/* Set current max values seen. */
 	hashtable_iterate(domhash, domain_reset_global_acc_sub, NULL);
+}
+
+bool domain_max_chk(const struct connection *conn, enum accitem what,
+		    unsigned int val, unsigned int quota)
+{
+	if (!conn || !conn->domain)
+		return false;
+
+	if (domain_is_unprivileged(conn) && val > quota)
+		return true;
+
+	domain_acc_valid_max(conn->domain, what, val);
+
+	return false;
 }
 
 int domain_nbentry_inc(struct connection *conn, unsigned int domid)
