@@ -4,6 +4,42 @@
 #include <xen/const.h>
 #include <xen/page-size.h>
 
+/*
+ * RISC-V64 Layout:
+ *
+#if RV_STAGE1_MODE == SATP_MODE_SV39
+ *
+ * From the riscv-privileged doc:
+ *   When mapping between narrower and wider addresses,
+ *   RISC-V zero-extends a narrower physical address to a wider size.
+ *   The mapping between 64-bit virtual addresses and the 39-bit usable
+ *   address space of Sv39 is not based on zero-extension but instead
+ *   follows an entrenched convention that allows an OS to use one or
+ *   a few of the most-significant bits of a full-size (64-bit) virtual
+ *   address to quickly distinguish user and supervisor address regions.
+ *
+ * It means that:
+ *   top VA bits are simply ignored for the purpose of translating to PA.
+ *
+ * ============================================================================
+ *    Start addr    |   End addr        |  Size  | Slot       |area description
+ * ============================================================================
+ * FFFFFFFFC0800000 |  FFFFFFFFFFFFFFFF |1016 MB | L2 511     | Unused
+ * FFFFFFFFC0600000 |  FFFFFFFFC0800000 |  2 MB  | L2 511     | Fixmap
+ * FFFFFFFFC0200000 |  FFFFFFFFC0600000 |  4 MB  | L2 511     | FDT
+ * FFFFFFFFC0000000 |  FFFFFFFFC0200000 |  2 MB  | L2 511     | Xen
+ *                 ...                  |  1 GB  | L2 510     | Unused
+ * 0000003200000000 |  0000007F80000000 | 309 GB | L2 200-509 | Direct map
+ *                 ...                  |  1 GB  | L2 199     | Unused
+ * 0000003100000000 |  00000031C0000000 |  3 GB  | L2 196-198 | Frametable
+ *                 ...                  |  1 GB  | L2 195     | Unused
+ * 0000003080000000 |  00000030C0000000 |  1 GB  | L2 194     | VMAP
+ *                 ...                  | 194 GB | L2 0 - 193 | Unused
+ * ============================================================================
+ *
+#endif
+ */
+
 #if defined(CONFIG_RISCV_64)
 # define LONG_BYTEORDER 3
 # define ELFSIZE 64
