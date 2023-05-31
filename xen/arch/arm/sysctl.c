@@ -11,11 +11,15 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/hypercall.h>
+#include <asm/arm64/sve.h>
 #include <public/sysctl.h>
 
 void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
 {
     pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm | XEN_SYSCTL_PHYSCAP_hap;
+
+    pi->arch_capabilities |= MASK_INSR(sve_encode_vl(get_sys_vl_len()),
+                                       XEN_SYSCTL_PHYSCAP_ARM_SVE_MASK);
 }
 
 long arch_do_sysctl(struct xen_sysctl *sysctl,
