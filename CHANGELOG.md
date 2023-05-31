@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    cap toolstack provided values.
  - Ignore VCPUOP_set_singleshot_timer's VCPU_SSHOTTMR_future flag. The only
    known user doesn't use it properly, leading to in-guest breakage.
+ - The "dom0" option is now supported on Arm and "sve=" sub-option can be used
+   to enable dom0 guest to use SVE/SVE2 instructions.
 
 ### Added
  - On x86, support for features new in Intel Sapphire Rapids CPUs:
@@ -21,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
      wide impact of a guest misusing atomic instructions.
  - xl/libxl can customize SMBIOS strings for HVM guests.
  - Add support for AVX512-FP16 on x86.
+ - On Arm, Xen supports guests running SVE/SVE2 instructions. (Tech Preview)
+
 
 ## [4.17.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.17.0) - 2022-12-12
 

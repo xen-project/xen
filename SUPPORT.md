@@ -99,6 +99,12 @@ Extension to the GICv3 interrupt controller to support MSI.
 
     Status: Experimental
 
+### ARM Scalable Vector Extension (SVE/SVE2)
+
+Arm64 domains can use Scalable Vector Extension (SVE/SVE2).
+
+    Status: Tech Preview
+
 ## Guest Type
 
 ### x86/PV
