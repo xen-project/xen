@@ -526,6 +526,12 @@
 #define LIBXL_HAVE_PHYSINFO_CAP_GNTTAB 1
 
 /*
+ * LIBXL_HAVE_PHYSINFO_ARCH_CAPABILITIES indicates that libxl_physinfo has a
+ * arch_capabilities field.
+ */
+#define LIBXL_HAVE_PHYSINFO_ARCH_CAPABILITIES 1
+
+/*
  * LIBXL_HAVE_MAX_GRANT_VERSION indicates libxl_domain_build_info has a
  * max_grant_version field for setting the max grant table version per
  * domain.

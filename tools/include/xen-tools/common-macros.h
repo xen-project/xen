@@ -72,6 +72,8 @@
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 #endif
 
+#define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
+
 #ifndef __must_check
 #define __must_check __attribute__((__warn_unused_result__))
 #endif

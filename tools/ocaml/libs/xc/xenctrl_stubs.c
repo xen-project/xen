@@ -851,13 +851,15 @@ CAMLprim value stub_xc_physinfo(value xch_val)
 	arch_cap_list = Tag_cons;
 
 	arch_cap_flags_tag = 1; /* tag x86 */
-#else
-	caml_failwith("Unhandled architecture");
-#endif
 
 	arch_cap_flags = caml_alloc_small(1, arch_cap_flags_tag);
 	Store_field(arch_cap_flags, 0, arch_cap_list);
 	Store_field(physinfo, 10, arch_cap_flags);
+#elif defined(__aarch64__)
+	Store_field(physinfo, 10, Val_int(c_physinfo.arch_capabilities));
+#else
+	caml_failwith("Unhandled architecture");
+#endif
 
 	CAMLreturn(physinfo);
 }

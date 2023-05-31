@@ -27,6 +27,7 @@
 #include <libxl_json.h>
 #include <libxl_utils.h>
 #include <libxlutil.h>
+#include <xen-tools/arm-arch-capabilities.h>
 
 #include "xl.h"
 #include "xl_utils.h"
@@ -223,6 +224,13 @@ static void output_physinfo(void)
          info.cap_gnttab_v1 ? " gnttab-v1" : "",
          info.cap_gnttab_v2 ? " gnttab-v2" : ""
         );
+
+    /* Print arm SVE vector length only on ARM platforms */
+#if defined(__aarch64__)
+    maybe_printf("arm_sve_vector_length  : %u\n",
+         arch_capabilities_arm_sve(info.arch_capabilities)
+        );
+#endif
 
     vinfo = libxl_get_version_info(ctx);
     if (vinfo) {

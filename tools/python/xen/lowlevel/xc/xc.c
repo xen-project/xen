@@ -22,6 +22,7 @@
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
 
+#include <xen-tools/arm-arch-capabilities.h>
 #include <xen-tools/common-macros.h>
 
 /* Needed for Python versions earlier than 2.3. */
@@ -871,6 +872,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
     const char *virtcap_names[] = { "hvm", "pv" };
     const unsigned virtcaps_bits[] = { XEN_SYSCTL_PHYSCAP_hvm,
                                        XEN_SYSCTL_PHYSCAP_pv };
+    PyObject *objret;
 
     if ( xc_physinfo(self->xc_handle, &pinfo) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
@@ -897,17 +899,35 @@ static PyObject *pyxc_physinfo(XcObject *self)
     if ( p != virt_caps )
       *(p-1) = '\0';
 
-    return Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s,s:s}",
-                            "nr_nodes",         pinfo.nr_nodes,
-                            "threads_per_core", pinfo.threads_per_core,
-                            "cores_per_socket", pinfo.cores_per_socket,
-                            "nr_cpus",          pinfo.nr_cpus,
-                            "total_memory",     pages_to_kib(pinfo.total_pages),
-                            "free_memory",      pages_to_kib(pinfo.free_pages),
-                            "scrub_memory",     pages_to_kib(pinfo.scrub_pages),
-                            "cpu_khz",          pinfo.cpu_khz,
-                            "hw_caps",          cpu_cap,
-                            "virt_caps",        virt_caps);
+    objret = Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s,s:s}",
+                           "nr_nodes",         pinfo.nr_nodes,
+                           "threads_per_core", pinfo.threads_per_core,
+                           "cores_per_socket", pinfo.cores_per_socket,
+                           "nr_cpus",          pinfo.nr_cpus,
+                           "total_memory",     pages_to_kib(pinfo.total_pages),
+                           "free_memory",      pages_to_kib(pinfo.free_pages),
+                           "scrub_memory",     pages_to_kib(pinfo.scrub_pages),
+                           "cpu_khz",          pinfo.cpu_khz,
+                           "hw_caps",          cpu_cap,
+                           "virt_caps",        virt_caps);
+
+#if defined(__aarch64__)
+    if ( objret ) {
+        unsigned int sve_vl_bits;
+        PyObject *py_arm_sve_vl;
+
+        sve_vl_bits = arch_capabilities_arm_sve(pinfo.arch_capabilities);
+        py_arm_sve_vl = PyLong_FromUnsignedLong(sve_vl_bits);
+
+        if ( !py_arm_sve_vl )
+            return NULL;
+
+        if( PyDict_SetItemString(objret, "arm_sve_vl", py_arm_sve_vl) )
+            return NULL;
+    }
+#endif
+
+    return objret;
 }
 
 static PyObject *pyxc_getcpuinfo(XcObject *self, PyObject *args, PyObject *kwds)

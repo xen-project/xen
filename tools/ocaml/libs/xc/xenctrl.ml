@@ -128,12 +128,10 @@ type physinfo_cap_flag =
   | CAP_Gnttab_v1
   | CAP_Gnttab_v2
 
-type arm_physinfo_cap_flag
-
 type x86_physinfo_cap_flag
 
 type arch_physinfo_cap_flags =
-  | ARM of arm_physinfo_cap_flag list
+  | ARM of int
   | X86 of x86_physinfo_cap_flag list
 
 type physinfo =
