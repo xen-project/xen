@@ -668,7 +668,7 @@ static void wait_for_event_or_timeout(unsigned long milliseconds)
  * monitor_tbufs - monitor the contents of tbufs and output to a file
  * @logfile:       the FILE * representing the file to log to
  */
-static int monitor_tbufs(void)
+static void monitor_tbufs(void)
 {
     int i;
 
@@ -795,8 +795,6 @@ static int monitor_tbufs(void)
     free(data);
     /* don't need to munmap - cleanup is automatic */
     close(outfd);
-
-    return 0;
 }
 
 
@@ -1164,7 +1162,6 @@ static void parse_args(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    int ret;
     struct sigaction act;
 
     opts.outfile = 0;
@@ -1226,9 +1223,9 @@ int main(int argc, char **argv)
     sigaction(SIGINT,  &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    ret = monitor_tbufs();
+    monitor_tbufs();
 
-    return ret;
+    return 0;
 }
 
 /*
