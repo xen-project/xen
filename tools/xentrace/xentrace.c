@@ -1152,11 +1152,9 @@ static void parse_args(int argc, char **argv)
         }
     }
 
-    /* get outfile (required last argument) */
-    if (optind != (argc-1))
-        usage();
-
-    opts.outfile = argv[optind];
+    /* get outfile (optional last argument) */
+    if (argc > optind)
+        opts.outfile = argv[optind];
 }
 
 /* *BSD has no O_LARGEFILE */
