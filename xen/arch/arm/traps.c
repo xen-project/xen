@@ -2172,6 +2172,11 @@ void do_trap_guest_sync(struct cpu_user_regs *regs)
         perfc_incr(trap_sysreg);
         do_sysreg(regs, hsr);
         break;
+    case HSR_EC_SVE:
+        GUEST_BUG_ON(regs_mode_is_32bit(regs));
+        gprintk(XENLOG_WARNING, "Domain tried to use SVE while not allowed\n");
+        inject_undef_exception(regs, hsr);
+        break;
 #endif
 
     case HSR_EC_INSTR_ABORT_LOWER_EL:
@@ -2200,6 +2205,10 @@ void do_trap_hyp_sync(struct cpu_user_regs *regs)
 #ifdef CONFIG_ARM_64
     case HSR_EC_BRK:
         do_trap_brk(regs, hsr);
+        break;
+    case HSR_EC_SVE:
+        /* An SVE exception is a bug somewhere in hypervisor code */
+        do_unexpected_trap("SVE trap at EL2", regs);
         break;
 #endif
     case HSR_EC_DATA_ABORT_CURR_EL:
