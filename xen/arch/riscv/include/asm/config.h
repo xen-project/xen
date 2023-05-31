@@ -75,11 +75,23 @@
   name:
 #endif
 
-#define XEN_VIRT_START  _AT(UL, 0x80200000)
+#ifdef CONFIG_RISCV_64
+#define XEN_VIRT_START 0xFFFFFFFFC0000000 /* (_AC(-1, UL) + 1 - GB(1)) */
+#else
+#error "RV32 isn't supported"
+#endif
 
 #define SMP_CACHE_BYTES (1 << 6)
 
 #define STACK_SIZE PAGE_SIZE
+
+#ifdef CONFIG_RISCV_64
+#define CONFIG_PAGING_LEVELS 3
+#define RV_STAGE1_MODE SATP_MODE_SV39
+#else
+#define CONFIG_PAGING_LEVELS 2
+#define RV_STAGE1_MODE SATP_MODE_SV32
+#endif
 
 #endif /* __RISCV_CONFIG_H__ */
 /*

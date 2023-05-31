@@ -69,6 +69,11 @@ static inline void die(void)
         wfi();
 }
 
+static inline void sfence_vma(void)
+{
+    asm volatile ( "sfence.vma" ::: "memory" );
+}
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_RISCV_PROCESSOR_H */
