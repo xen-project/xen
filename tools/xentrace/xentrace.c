@@ -794,7 +794,6 @@ static void monitor_tbufs(void)
     free(meta);
     free(data);
     /* don't need to munmap - cleanup is automatic */
-    close(outfd);
 }
 
 
@@ -1225,6 +1224,7 @@ int main(int argc, char **argv)
 
     monitor_tbufs();
 
+    close(outfd);
     return 0;
 }
 
