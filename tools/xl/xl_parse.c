@@ -2887,6 +2887,14 @@ skip_usbdev:
         }
     }
 
+    if (!xlu_cfg_get_string (config, "sve", &buf, 1)) {
+        e = libxl_sve_type_from_string(buf, &b_info->arch_arm.sve_vl);
+        if (e) {
+            fprintf(stderr, "Unknown sve \"%s\" specified\n", buf);
+            exit(EXIT_FAILURE);
+        }
+    }
+
     parse_vkb_list(config, d_config);
 
     d_config->virtios = NULL;

@@ -523,6 +523,27 @@ libxl_tee_type = Enumeration("tee_type", [
     (1, "optee")
     ], init_val = "LIBXL_TEE_TYPE_NONE")
 
+libxl_sve_type = Enumeration("sve_type", [
+    (-1, "hw"),
+    (0, "disabled"),
+    (128, "128"),
+    (256, "256"),
+    (384, "384"),
+    (512, "512"),
+    (640, "640"),
+    (768, "768"),
+    (896, "896"),
+    (1024, "1024"),
+    (1152, "1152"),
+    (1280, "1280"),
+    (1408, "1408"),
+    (1536, "1536"),
+    (1664, "1664"),
+    (1792, "1792"),
+    (1920, "1920"),
+    (2048, "2048")
+    ], init_val = "LIBXL_SVE_TYPE_DISABLED")
+
 libxl_rdm_reserve = Struct("rdm_reserve", [
     ("strategy",    libxl_rdm_reserve_strategy),
     ("policy",      libxl_rdm_reserve_policy),
@@ -690,6 +711,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
 
     ("arch_arm", Struct(None, [("gic_version", libxl_gic_version),
                                ("vuart", libxl_vuart_type),
+                               ("sve_vl", libxl_sve_type),
                               ])),
     ("arch_x86", Struct(None, [("msr_relaxed", libxl_defbool),
                               ])),

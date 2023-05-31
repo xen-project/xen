@@ -2955,6 +2955,22 @@ Currently, only the "sbsa_uart" model is supported for ARM.
 
 =back
 
+=item B<sve="vl">
+
+The `sve` parameter enables Arm Scalable Vector Extension (SVE) usage for the
+guest and sets the maximum SVE vector length, the option is applicable only to
+AArch64 guests.
+A value equal to "disabled" disables the feature, this is the default value.
+Allowed values are "disabled", "128", "256", "384", "512", "640", "768", "896",
+"1024", "1152", "1280", "1408", "1536", "1664", "1792", "1920", "2048", "hw".
+Specifying "hw" means that the maximum vector length supported by the platform
+will be used.
+Please be aware that if a specific vector length is passed and its value is
+above the maximum vector length supported by the platform, an error will be
+raised.
+
+=back
+
 =head3 x86
 
 =over 4

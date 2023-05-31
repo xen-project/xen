@@ -3,6 +3,8 @@
 #include "libxl_libfdt_compat.h"
 #include "libxl_arm.h"
 
+#include <xen-tools/arm-arch-capabilities.h>
+
 #include <stdbool.h>
 #include <libfdt.h>
 #include <assert.h>
@@ -209,6 +211,12 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
         LOG(ERROR, "Unknown TEE type %d",
             d_config->b_info.tee);
         return ERROR_FAIL;
+    }
+
+    /* Parameter is sanitised in libxl__arch_domain_build_info_setdefault */
+    if (d_config->b_info.arch_arm.sve_vl) {
+        /* Vector length is divided by 128 in struct xen_domctl_createdomain */
+        config->arch.sve_vl = d_config->b_info.arch_arm.sve_vl / 128U;
     }
 
     return 0;
@@ -1684,6 +1692,31 @@ int libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
 {
     /* ACPI is disabled by default */
     libxl_defbool_setdefault(&b_info->acpi, false);
+
+    /* Sanitise SVE parameter */
+    if (b_info->arch_arm.sve_vl) {
+        unsigned int max_sve_vl =
+            arch_capabilities_arm_sve(physinfo->arch_capabilities);
+
+        if (!max_sve_vl) {
+            LOG(ERROR, "SVE is unsupported on this machine.");
+            return ERROR_FAIL;
+        }
+
+        if (LIBXL_SVE_TYPE_HW == b_info->arch_arm.sve_vl) {
+            b_info->arch_arm.sve_vl = max_sve_vl;
+        } else if (b_info->arch_arm.sve_vl > max_sve_vl) {
+            LOG(ERROR,
+                "Invalid sve value: %d. Platform supports up to %u bits",
+                b_info->arch_arm.sve_vl, max_sve_vl);
+            return ERROR_FAIL;
+        } else if (b_info->arch_arm.sve_vl % 128) {
+            LOG(ERROR,
+                "Invalid sve value: %d. It must be multiple of 128",
+                b_info->arch_arm.sve_vl);
+            return ERROR_FAIL;
+        }
+    }
 
     if (b_info->type != LIBXL_DOMAIN_TYPE_PV)
         return 0;

@@ -490,6 +490,28 @@ TeeTypeNone TeeType = 0
 TeeTypeOptee TeeType = 1
 )
 
+type SveType int
+const(
+SveTypeHw SveType = -1
+SveTypeDisabled SveType = 0
+SveType128 SveType = 128
+SveType256 SveType = 256
+SveType384 SveType = 384
+SveType512 SveType = 512
+SveType640 SveType = 640
+SveType768 SveType = 768
+SveType896 SveType = 896
+SveType1024 SveType = 1024
+SveType1152 SveType = 1152
+SveType1280 SveType = 1280
+SveType1408 SveType = 1408
+SveType1536 SveType = 1536
+SveType1664 SveType = 1664
+SveType1792 SveType = 1792
+SveType1920 SveType = 1920
+SveType2048 SveType = 2048
+)
+
 type RdmReserve struct {
 Strategy RdmReserveStrategy
 Policy RdmReservePolicy
@@ -564,6 +586,7 @@ TypeUnion DomainBuildInfoTypeUnion
 ArchArm struct {
 GicVersion GicVersion
 Vuart VuartType
+SveVl SveType
 }
 ArchX86 struct {
 MsrRelaxed Defbool
