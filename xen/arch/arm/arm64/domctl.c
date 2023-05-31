@@ -10,6 +10,7 @@
 #include <xen/sched.h>
 #include <xen/hypercall.h>
 #include <public/domctl.h>
+#include <asm/arm64/sve.h>
 #include <asm/cpufeature.h>
 
 static long switch_mode(struct domain *d, enum domain_type type)
@@ -42,6 +43,9 @@ long subarch_do_domctl(struct xen_domctl *domctl, struct domain *d,
         {
         case 32:
             if ( !cpu_has_el1_32 )
+                return -EINVAL;
+            /* SVE is not supported for 32 bit domain */
+            if ( is_sve_domain(d) )
                 return -EINVAL;
             return switch_mode(d, DOMAIN_32BIT);
         case 64:

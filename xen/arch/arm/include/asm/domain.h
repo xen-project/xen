@@ -67,6 +67,11 @@ struct arch_domain
     enum domain_type type;
 #endif
 
+#ifdef CONFIG_ARM64_SVE
+    /* max SVE encoded vector length */
+    uint8_t sve_vl;
+#endif
+
     /* Virtual MMU */
     struct p2m_domain p2m;
 

@@ -8,6 +8,7 @@
 #include <xen/types.h>
 #include <asm/arm64/sve.h>
 #include <asm/arm64/sysregs.h>
+#include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/system.h>
 
@@ -47,6 +48,17 @@ register_t compute_max_zcr(void)
     isb();
 
     return vl_to_zcr(hw_vl);
+}
+
+/* Get the system sanitized value for VL in bits */
+unsigned int get_sys_vl_len(void)
+{
+    if ( !cpu_has_sve )
+        return 0;
+
+    /* ZCR_ELx len field is ((len + 1) * 128) = vector bits length */
+    return ((system_cpuinfo.zcr64.bits[0] & ZCR_ELx_LEN_MASK) + 1U) *
+            SVE_VL_MULTIPLE_VAL;
 }
 
 /*

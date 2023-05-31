@@ -8,12 +8,43 @@
 #ifndef _ARM_ARM64_SVE_H
 #define _ARM_ARM64_SVE_H
 
+#include <xen/sched.h>
+
 #define SVE_VL_MAX_BITS 2048U
 
 /* Vector length must be multiple of 128 */
 #define SVE_VL_MULTIPLE_VAL 128U
 
+static inline unsigned int sve_decode_vl(unsigned int sve_vl)
+{
+    /* SVE vector length is stored as VL/128 in xen_arch_domainconfig */
+    return sve_vl * SVE_VL_MULTIPLE_VAL;
+}
+
 register_t compute_max_zcr(void);
+
+#ifdef CONFIG_ARM64_SVE
+
+static inline bool is_sve_domain(const struct domain *d)
+{
+    return d->arch.sve_vl > 0;
+}
+
+unsigned int get_sys_vl_len(void);
+
+#else /* !CONFIG_ARM64_SVE */
+
+static inline bool is_sve_domain(const struct domain *d)
+{
+    return false;
+}
+
+static inline unsigned int get_sys_vl_len(void)
+{
+    return 0;
+}
+
+#endif /* CONFIG_ARM64_SVE */
 
 #endif /* _ARM_ARM64_SVE_H */
 

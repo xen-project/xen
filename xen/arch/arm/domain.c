@@ -13,6 +13,7 @@
 #include <xen/wait.h>
 
 #include <asm/alternative.h>
+#include <asm/arm64/sve.h>
 #include <asm/cpuerrata.h>
 #include <asm/cpufeature.h>
 #include <asm/current.h>
@@ -555,6 +556,8 @@ int arch_vcpu_create(struct vcpu *v)
     v->arch.vmpidr = MPIDR_SMP | vcpuid_to_vaffinity(v->vcpu_id);
 
     v->arch.cptr_el2 = get_default_cptr_flags();
+    if ( is_sve_domain(v->domain) )
+        v->arch.cptr_el2 &= ~HCPTR_CP(8);
 
     v->arch.hcr_el2 = get_default_hcr_flags();
 
@@ -599,12 +602,33 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
     unsigned int max_vcpus;
     unsigned int flags_required = (XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap);
     unsigned int flags_optional = (XEN_DOMCTL_CDF_iommu | XEN_DOMCTL_CDF_vpmu);
+    unsigned int sve_vl_bits = sve_decode_vl(config->arch.sve_vl);
 
     if ( (config->flags & ~flags_optional) != flags_required )
     {
         dprintk(XENLOG_INFO, "Unsupported configuration %#x\n",
                 config->flags);
         return -EINVAL;
+    }
+
+    /* Check feature flags */
+    if ( sve_vl_bits > 0 )
+    {
+        unsigned int zcr_max_bits = get_sys_vl_len();
+
+        if ( !zcr_max_bits )
+        {
+            dprintk(XENLOG_INFO, "SVE is unsupported on this machine.\n");
+            return -EINVAL;
+        }
+
+        if ( sve_vl_bits > zcr_max_bits )
+        {
+            dprintk(XENLOG_INFO,
+                    "Requested SVE vector length (%u) > supported length (%u)\n",
+                    sve_vl_bits, zcr_max_bits);
+            return -EINVAL;
+        }
     }
 
     /* The P2M table must always be shared between the CPU and the IOMMU */
@@ -748,6 +772,11 @@ int arch_domain_create(struct domain *d,
 
     if ( (rc = domain_vpci_init(d)) != 0 )
         goto fail;
+
+#ifdef CONFIG_ARM64_SVE
+    /* Copy the encoded vector length sve_vl from the domain configuration */
+    d->arch.sve_vl = config->arch.sve_vl;
+#endif
 
     return 0;
 
