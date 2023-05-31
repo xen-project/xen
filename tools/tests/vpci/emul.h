@@ -82,6 +82,8 @@ typedef union {
 
 #define __hwdom_init
 
+#define is_hardware_domain(d) ((void)(d), false)
+
 #define has_vpci(d) true
 
 #define xzalloc(type) ((type *)calloc(1, sizeof(type)))
