@@ -218,6 +218,7 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
     struct vpci_header *header = &pdev->vpci->header;
     struct rangeset *mem = rangeset_new(NULL, NULL, 0);
     struct pci_dev *tmp, *dev = NULL;
+    const struct domain *d;
     const struct vpci_msix *msix = pdev->vpci->msix;
     unsigned int i;
     int rc;
@@ -285,58 +286,69 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
 
     /*
      * Check for overlaps with other BARs. Note that only BARs that are
-     * currently mapped (enabled) are checked for overlaps.
+     * currently mapped (enabled) are checked for overlaps. Note also that
+     * for hwdom we also need to include hidden, i.e. DomXEN's, devices.
      */
-    for_each_pdev ( pdev->domain, tmp )
+    for ( d = pdev->domain != dom_xen ? pdev->domain : hardware_domain; ; )
     {
-        if ( !tmp->vpci )
-            /*
-             * For the hardware domain it's possible to have devices assigned
-             * to it that are not handled by vPCI, either because those are
-             * read-only devices, or because vPCI setup has failed.
-             */
-            continue;
-
-        if ( tmp == pdev )
+        for_each_pdev ( d, tmp )
         {
-            /*
-             * Need to store the device so it's not constified and defer_map
-             * can modify it in case of error.
-             */
-            dev = tmp;
-            if ( !rom_only )
+            if ( !tmp->vpci )
                 /*
-                 * If memory decoding is toggled avoid checking against the
-                 * same device, or else all regions will be removed from the
-                 * memory map in the unmap case.
+                 * For the hardware domain it's possible to have devices
+                 * assigned to it that are not handled by vPCI, either because
+                 * those are read-only devices, or because vPCI setup has
+                 * failed.
                  */
                 continue;
-        }
 
-        for ( i = 0; i < ARRAY_SIZE(tmp->vpci->header.bars); i++ )
-        {
-            const struct vpci_bar *bar = &tmp->vpci->header.bars[i];
-            unsigned long start = PFN_DOWN(bar->addr);
-            unsigned long end = PFN_DOWN(bar->addr + bar->size - 1);
-
-            if ( !bar->enabled || !rangeset_overlaps_range(mem, start, end) ||
-                 /*
-                  * If only the ROM enable bit is toggled check against other
-                  * BARs in the same device for overlaps, but not against the
-                  * same ROM BAR.
-                  */
-                 (rom_only && tmp == pdev && bar->type == VPCI_BAR_ROM) )
-                continue;
-
-            rc = rangeset_remove_range(mem, start, end);
-            if ( rc )
+            if ( tmp == pdev )
             {
-                printk(XENLOG_G_WARNING "Failed to remove [%lx, %lx]: %d\n",
-                       start, end, rc);
-                rangeset_destroy(mem);
-                return rc;
+                /*
+                 * Need to store the device so it's not constified and defer_map
+                 * can modify it in case of error.
+                 */
+                dev = tmp;
+                if ( !rom_only )
+                    /*
+                     * If memory decoding is toggled avoid checking against the
+                     * same device, or else all regions will be removed from the
+                     * memory map in the unmap case.
+                     */
+                    continue;
+            }
+
+            for ( i = 0; i < ARRAY_SIZE(tmp->vpci->header.bars); i++ )
+            {
+                const struct vpci_bar *bar = &tmp->vpci->header.bars[i];
+                unsigned long start = PFN_DOWN(bar->addr);
+                unsigned long end = PFN_DOWN(bar->addr + bar->size - 1);
+
+                if ( !bar->enabled ||
+                     !rangeset_overlaps_range(mem, start, end) ||
+                     /*
+                      * If only the ROM enable bit is toggled check against
+                      * other BARs in the same device for overlaps, but not
+                      * against the same ROM BAR.
+                      */
+                     (rom_only && tmp == pdev && bar->type == VPCI_BAR_ROM) )
+                    continue;
+
+                rc = rangeset_remove_range(mem, start, end);
+                if ( rc )
+                {
+                    printk(XENLOG_G_WARNING "Failed to remove [%lx, %lx]: %d\n",
+                           start, end, rc);
+                    rangeset_destroy(mem);
+                    return rc;
+                }
             }
         }
+
+        if ( !is_hardware_domain(d) )
+            break;
+
+        d = dom_xen;
     }
 
     ASSERT(dev);

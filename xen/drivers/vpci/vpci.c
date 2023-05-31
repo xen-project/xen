@@ -70,6 +70,7 @@ void vpci_remove_device(struct pci_dev *pdev)
 int vpci_add_handlers(struct pci_dev *pdev)
 {
     unsigned int i;
+    const unsigned long *ro_map;
     int rc = 0;
 
     if ( !has_vpci(pdev->domain) )
@@ -77,6 +78,11 @@ int vpci_add_handlers(struct pci_dev *pdev)
 
     /* We should not get here twice for the same device. */
     ASSERT(!pdev->vpci);
+
+    /* No vPCI for r/o devices. */
+    ro_map = pci_get_ro_map(pdev->sbdf.seg);
+    if ( ro_map && test_bit(pdev->sbdf.bdf, ro_map) )
+        return 0;
 
     pdev->vpci = xzalloc(struct vpci);
     if ( !pdev->vpci )
@@ -332,8 +338,13 @@ uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size)
         return data;
     }
 
-    /* Find the PCI dev matching the address. */
+    /*
+     * Find the PCI dev matching the address, which for hwdom also requires
+     * consulting DomXEN.  Passthrough everything that's not trapped.
+     */
     pdev = pci_get_pdev(d, sbdf);
+    if ( !pdev && is_hardware_domain(d) )
+        pdev = pci_get_pdev(dom_xen, sbdf);
     if ( !pdev || !pdev->vpci )
         return vpci_read_hw(sbdf, reg, size);
 
@@ -427,7 +438,6 @@ void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
     const struct pci_dev *pdev;
     const struct vpci_register *r;
     unsigned int data_offset = 0;
-    const unsigned long *ro_map = pci_get_ro_map(sbdf.seg);
 
     if ( !size )
     {
@@ -435,18 +445,20 @@ void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
         return;
     }
 
-    if ( ro_map && test_bit(sbdf.bdf, ro_map) )
-        /* Ignore writes to read-only devices. */
-        return;
-
     /*
-     * Find the PCI dev matching the address.
-     * Passthrough everything that's not trapped.
+     * Find the PCI dev matching the address, which for hwdom also requires
+     * consulting DomXEN.  Passthrough everything that's not trapped.
      */
     pdev = pci_get_pdev(d, sbdf);
+    if ( !pdev && is_hardware_domain(d) )
+        pdev = pci_get_pdev(dom_xen, sbdf);
     if ( !pdev || !pdev->vpci )
     {
-        vpci_write_hw(sbdf, reg, size, data);
+        /* Ignore writes to read-only devices, which have no ->vpci. */
+        const unsigned long *ro_map = pci_get_ro_map(sbdf.seg);
+
+        if ( !ro_map || !test_bit(sbdf.bdf, ro_map) )
+            vpci_write_hw(sbdf, reg, size, data);
         return;
     }
 
