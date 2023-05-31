@@ -32,6 +32,12 @@
 #define cpu_has_thumbee   (boot_cpu_feature32(thumbee) == 1)
 #define cpu_has_aarch32   (cpu_has_arm || cpu_has_thumb)
 
+#ifdef CONFIG_ARM64_SVE
+#define cpu_has_sve       (boot_cpu_feature64(sve) == 1)
+#else
+#define cpu_has_sve       0
+#endif
+
 #ifdef CONFIG_ARM_32
 #define cpu_has_gicv3     (boot_cpu_feature32(gic) >= 1)
 #define cpu_has_gentimer  (boot_cpu_feature32(gentimer) == 1)
@@ -322,6 +328,14 @@ struct cpuinfo_arm {
             unsigned long __res4:32;
         };
     } isa64;
+
+    union {
+        register_t bits[1];
+        struct {
+            unsigned long len:4;
+            unsigned long __res0:60;
+        };
+    } zcr64;
 
     struct {
         register_t bits[1];

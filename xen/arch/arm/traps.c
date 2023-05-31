@@ -93,6 +93,21 @@ register_t get_default_hcr_flags(void)
              HCR_TID3|HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB|HCR_TSW);
 }
 
+register_t get_default_cptr_flags(void)
+{
+    /*
+     * Trap all coprocessor registers (0-13) except cp10 and
+     * cp11 for VFP.
+     *
+     * /!\ All coprocessors except cp10 and cp11 cannot be used in Xen.
+     *
+     * On ARM64 the TCPx bits which we set here (0..9,12,13) are all
+     * RES1, i.e. they would trap whether we did this write or not.
+     */
+    return  ((HCPTR_CP_MASK & ~(HCPTR_CP(10) | HCPTR_CP(11))) |
+             HCPTR_TTA | HCPTR_TAM);
+}
+
 static enum {
     SERRORS_DIVERSE,
     SERRORS_PANIC,
@@ -135,17 +150,7 @@ void init_traps(void)
     /* Trap CP15 c15 used for implementation defined registers */
     WRITE_SYSREG(HSTR_T(15), HSTR_EL2);
 
-    /* Trap all coprocessor registers (0-13) except cp10 and
-     * cp11 for VFP.
-     *
-     * /!\ All coprocessors except cp10 and cp11 cannot be used in Xen.
-     *
-     * On ARM64 the TCPx bits which we set here (0..9,12,13) are all
-     * RES1, i.e. they would trap whether we did this write or not.
-     */
-    WRITE_SYSREG((HCPTR_CP_MASK & ~(HCPTR_CP(10) | HCPTR_CP(11))) |
-                 HCPTR_TTA | HCPTR_TAM,
-                 CPTR_EL2);
+    WRITE_SYSREG(get_default_cptr_flags(), CPTR_EL2);
 
     /*
      * Configure HCR_EL2 with the bare minimum to run Xen until a guest

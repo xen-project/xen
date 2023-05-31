@@ -9,6 +9,7 @@
 #include <xen/init.h>
 #include <xen/smp.h>
 #include <xen/stop_machine.h>
+#include <asm/arm64/sve.h>
 #include <asm/cpufeature.h>
 
 DECLARE_BITMAP(cpu_hwcaps, ARM_NCAPS);
@@ -143,6 +144,9 @@ void identify_cpu(struct cpuinfo_arm *c)
 
     c->zfr64.bits[0] = READ_SYSREG(ID_AA64ZFR0_EL1);
 
+    if ( cpu_has_sve )
+        c->zcr64.bits[0] = compute_max_zcr();
+
     c->dczid.bits[0] = READ_SYSREG(DCZID_EL0);
 
     c->ctr.bits[0] = READ_SYSREG(CTR_EL0);
@@ -199,7 +203,7 @@ static int __init create_guest_cpuinfo(void)
     guest_cpuinfo.pfr64.mpam = 0;
     guest_cpuinfo.pfr64.mpam_frac = 0;
 
-    /* Hide SVE as Xen does not support it */
+    /* Hide SVE by default */
     guest_cpuinfo.pfr64.sve = 0;
     guest_cpuinfo.zfr64.bits[0] = 0;
 

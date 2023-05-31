@@ -190,6 +190,7 @@ struct arch_vcpu
     register_t tpidrro_el0;
 
     /* HYP configuration */
+    register_t cptr_el2;
     register_t hcr_el2;
     register_t mdcr_el2;
 

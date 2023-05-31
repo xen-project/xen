@@ -24,6 +24,7 @@
 #define ICH_EISR_EL2              S3_4_C12_C11_3
 #define ICH_ELSR_EL2              S3_4_C12_C11_5
 #define ICH_VMCR_EL2              S3_4_C12_C11_7
+#define ZCR_EL2                   S3_4_C1_C2_0
 
 #define __LR0_EL2(x)              S3_4_C12_C12_ ## x
 #define __LR8_EL2(x)              S3_4_C12_C13_ ## x

@@ -582,6 +582,8 @@ void do_trap_guest_serror(struct cpu_user_regs *regs);
 
 register_t get_default_hcr_flags(void);
 
+register_t get_default_cptr_flags(void);
+
 /*
  * Synchronize SError unless the feature is selected.
  * This is relying on the SErrors are currently unmasked.

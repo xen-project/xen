@@ -13,6 +13,7 @@ obj-$(CONFIG_LIVEPATCH) += livepatch.o
 obj-y += mm.o
 obj-y += smc.o
 obj-y += smpboot.o
+obj-$(CONFIG_ARM64_SVE) += sve.o sve-asm.o
 obj-y += traps.o
 obj-y += vfp.o
 obj-y += vsysreg.o

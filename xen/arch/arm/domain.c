@@ -95,6 +95,9 @@ static void ctxt_switch_from(struct vcpu *p)
     /* CP 15 */
     p->arch.csselr = READ_SYSREG(CSSELR_EL1);
 
+    /* VFP */
+    vfp_save_state(p);
+
     /* Control Registers */
     p->arch.cpacr = READ_SYSREG(CPACR_EL1);
 
@@ -155,9 +158,6 @@ static void ctxt_switch_from(struct vcpu *p)
 
     /* XXX MPU */
 
-    /* VFP */
-    vfp_save_state(p);
-
     /* VGIC */
     gic_save_state(p);
 
@@ -180,9 +180,6 @@ static void ctxt_switch_to(struct vcpu *n)
 
     /* VGIC */
     gic_restore_state(n);
-
-    /* VFP */
-    vfp_restore_state(n);
 
     /* XXX MPU */
 
@@ -256,7 +253,16 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_CP32(n->arch.joscr, JOSCR);
     WRITE_CP32(n->arch.jmcr, JMCR);
 #endif
+
+    /*
+     * CPTR_EL2 needs to be written before calling vfp_restore_state, a
+     * synchronization instruction is expected after the write (isb)
+     */
+    WRITE_SYSREG(n->arch.cptr_el2, CPTR_EL2);
     isb();
+
+    /* VFP - call vfp_restore_state after writing on CPTR_EL2 + isb */
+    vfp_restore_state(n);
 
     /* CP 15 */
     WRITE_SYSREG(n->arch.csselr, CSSELR_EL1);
@@ -547,6 +553,8 @@ int arch_vcpu_create(struct vcpu *v)
     v->arch.sctlr = SCTLR_GUEST_INIT;
 
     v->arch.vmpidr = MPIDR_SMP | vcpuid_to_vaffinity(v->vcpu_id);
+
+    v->arch.cptr_el2 = get_default_cptr_flags();
 
     v->arch.hcr_el2 = get_default_hcr_flags();
 

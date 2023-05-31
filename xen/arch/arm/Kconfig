@@ -112,11 +112,15 @@ config ARM64_PTR_AUTH
 	  This feature is not supported in Xen.
 
 config ARM64_SVE
-	def_bool n
+	bool "Enable Scalar Vector Extension support (UNSUPPORTED)" if UNSUPPORTED
 	depends on ARM_64
 	help
-	  Scalar Vector Extension support.
-	  This feature is not supported in Xen.
+	  Scalar Vector Extension (SVE/SVE2) support for guests.
+
+	  Please be aware that currently, enabling this feature will add latency on
+	  VM context switch between SVE enabled guests, between not-enabled SVE
+	  guests and SVE enabled guests and viceversa, compared to the time
+	  required to switch between not-enabled SVE guests.
 
 config ARM64_MTE
 	def_bool n
