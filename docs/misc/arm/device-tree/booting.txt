@@ -193,6 +193,22 @@ with the following properties:
     Optional. Handle to a xen,cpupool device tree node that identifies the
     cpupool where the guest will be started at boot.
 
+- sve
+
+    Optional. The `sve` property enables Arm SVE usage for the domain and sets
+    the maximum SVE vector length, the option is applicable only to Arm64
+    guests.
+    A value equal to 0 disables the feature, this is the default value.
+    Specifying this property with no value, means that the SVE vector length
+    will be set equal to the maximum vector length supported by the platform.
+    Values above 0 explicitly set the maximum SVE vector length for the domain,
+    allowed values are from 128 to maximum 2048, being multiple of 128.
+    Please note that when the user explicitly specifies the value, if that value
+    is above the hardware supported maximum SVE vector length, the domain
+    creation will fail and the system will stop, the same will occur if the
+    option is provided with a non zero value, but the platform doesn't support
+    SVE.
+
 - xen,enhanced
 
     A string property. Possible property values are:
