@@ -777,9 +777,9 @@ Specify the bit width of the DMA heap.
 
 ### dom0
     = List of [ pv | pvh, shadow=<bool>, verbose=<bool>,
-                cpuid-faulting=<bool>, msr-relaxed=<bool> ]
+                cpuid-faulting=<bool>, msr-relaxed=<bool> ] (x86)
 
-    Applicability: x86
+    = List of [ sve=<integer> ] (Arm64)
 
 Controls for how dom0 is constructed on x86 systems.
 
@@ -837,6 +837,22 @@ Controls for how dom0 is constructed on x86 systems.
     `dom0=msr-relaxed`.
 
     If using this option is necessary to fix an issue, please report a bug.
+
+Enables features on dom0 on Arm systems.
+
+*   The `sve` integer parameter enables Arm SVE usage for Dom0 and sets the
+    maximum SVE vector length, the option is applicable only to Arm64 Dom0
+    kernels.
+    A value equal to 0 disables the feature, this is the default value.
+    Values below 0 means the feature uses the maximum SVE vector length
+    supported by hardware, if SVE is supported.
+    Values above 0 explicitly set the maximum SVE vector length for Dom0,
+    allowed values are from 128 to maximum 2048, being multiple of 128.
+    Please note that when the user explicitly specifies the value, if that value
+    is above the hardware supported maximum SVE vector length, the domain
+    creation will fail and the system will stop, the same will occur if the
+    option is provided with a positive non zero value, but the platform doesn't
+    support SVE.
 
 ### dom0-cpuid
     = List of comma separated booleans

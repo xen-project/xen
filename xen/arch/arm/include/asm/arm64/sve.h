@@ -21,13 +21,21 @@ static inline unsigned int sve_decode_vl(unsigned int sve_vl)
     return sve_vl * SVE_VL_MULTIPLE_VAL;
 }
 
+static inline unsigned int sve_encode_vl(unsigned int sve_vl_bits)
+{
+    return sve_vl_bits / SVE_VL_MULTIPLE_VAL;
+}
+
 register_t compute_max_zcr(void);
 int sve_context_init(struct vcpu *v);
 void sve_context_free(struct vcpu *v);
 void sve_save_state(struct vcpu *v);
 void sve_restore_state(struct vcpu *v);
+bool sve_domctl_vl_param(int val, unsigned int *out);
 
 #ifdef CONFIG_ARM64_SVE
+
+extern int opt_dom0_sve;
 
 static inline bool is_sve_domain(const struct domain *d)
 {
@@ -37,6 +45,8 @@ static inline bool is_sve_domain(const struct domain *d)
 unsigned int get_sys_vl_len(void);
 
 #else /* !CONFIG_ARM64_SVE */
+
+#define opt_dom0_sve     0
 
 static inline bool is_sve_domain(const struct domain *d)
 {

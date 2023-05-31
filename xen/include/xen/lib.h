@@ -95,6 +95,16 @@ int parse_bool(const char *s, const char *e);
 int parse_boolean(const char *name, const char *s, const char *e);
 
 /**
+ * Given a specific name, parses a string of the form:
+ *   $NAME=<integer number>
+ * returning 0 and a value in val, for a recognised integer.
+ * Returns -1 for name not found, general errors, or -2 if name is found but
+ * not recognised number.
+ */
+int parse_signed_integer(const char *name, const char *s, const char *e,
+                         long long *val);
+
+/**
  * Very similar to strcmp(), but will declare a match if the NUL in 'name'
  * lines up with comma, colon, semicolon or equals in 'frag'.  Designed for
  * picking exact string matches out of a delimited command line list.

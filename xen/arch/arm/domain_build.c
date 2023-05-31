@@ -62,6 +62,22 @@ custom_param("dom0_mem", parse_dom0_mem);
 
 int __init parse_arch_dom0_param(const char *s, const char *e)
 {
+    long long val;
+
+    if ( !parse_signed_integer("sve", s, e, &val) )
+    {
+#ifdef CONFIG_ARM64_SVE
+        if ( (val >= INT_MIN) && (val <= INT_MAX) )
+            opt_dom0_sve = val;
+        else
+            printk(XENLOG_INFO "'sve=%lld' value out of range!\n", val);
+
+        return 0;
+#else
+        panic("'sve' property found, but CONFIG_ARM64_SVE not selected");
+#endif
+    }
+
     return -EINVAL;
 }
 
@@ -4133,6 +4149,16 @@ void __init create_dom0(void)
 
     if ( iommu_enabled )
         dom0_cfg.flags |= XEN_DOMCTL_CDF_iommu;
+
+    if ( opt_dom0_sve )
+    {
+        unsigned int vl;
+
+        if ( sve_domctl_vl_param(opt_dom0_sve, &vl) )
+            dom0_cfg.arch.sve_vl = sve_encode_vl(vl);
+        else
+            panic("SVE vector length error\n");
+    }
 
     dom0 = domain_create(0, &dom0_cfg, CDF_privileged | CDF_directmap);
     if ( IS_ERR(dom0) )

@@ -13,6 +13,9 @@
 #include <asm/processor.h>
 #include <asm/system.h>
 
+/* opt_dom0_sve: allow Dom0 to use SVE and set maximum vector length. */
+int __initdata opt_dom0_sve;
+
 extern unsigned int sve_get_hw_vl(void);
 
 /*
@@ -150,6 +153,23 @@ void sve_restore_state(struct vcpu *v)
     WRITE_SYSREG(v->arch.zcr_el2, ZCR_EL2);
 
     sve_load_ctx(v->arch.vfp.sve_zreg_ctx_end, v->arch.vfp.fpregs, 1);
+}
+
+bool __init sve_domctl_vl_param(int val, unsigned int *out)
+{
+    /*
+     * Negative SVE parameter value means to use the maximum supported
+     * vector length, otherwise if a positive value is provided, check if the
+     * vector length is a multiple of 128
+     */
+    if ( val < 0 )
+        *out = get_sys_vl_len();
+    else if ( (val % SVE_VL_MULTIPLE_VAL) == 0 )
+        *out = val;
+    else
+        return false;
+
+    return true;
 }
 
 /*

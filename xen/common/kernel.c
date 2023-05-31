@@ -314,6 +314,34 @@ int parse_boolean(const char *name, const char *s, const char *e)
     return -1;
 }
 
+int __init parse_signed_integer(const char *name, const char *s, const char *e,
+                                long long *val)
+{
+    size_t slen, nlen;
+    const char *str;
+    long long pval;
+
+    slen = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
+    nlen = strlen(name);
+
+    if ( !e )
+        e = s + slen;
+
+    /* Check that this is the name we're looking for and a value was provided */
+    if ( slen <= nlen || strncmp(s, name, nlen) || s[nlen] != '=' )
+        return -1;
+
+    pval = simple_strtoll(&s[nlen + 1], &str, 10);
+
+    /* Number not recognised */
+    if ( str != e )
+        return -2;
+
+    *val = pval;
+
+    return 0;
+}
+
 int cmdline_strcmp(const char *frag, const char *name)
 {
     for ( ; ; frag++, name++ )
