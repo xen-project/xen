@@ -16,6 +16,7 @@ typedef union {
 struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id);
 
 unsigned int dom0_max_vcpus(void);
+int parse_arch_dom0_param(const char *s, const char *e);
 struct vcpu *alloc_dom0_vcpu0(struct domain *dom0);
 
 int vcpu_reset(struct vcpu *);

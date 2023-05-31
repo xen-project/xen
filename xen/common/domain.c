@@ -364,6 +364,29 @@ static int __init cf_check parse_extra_guest_irqs(const char *s)
 }
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
+static int __init cf_check parse_dom0_param(const char *s)
+{
+    const char *ss;
+    int rc = 0;
+
+    do {
+        int ret;
+
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        ret = parse_arch_dom0_param(s, ss);
+        if ( ret && !rc )
+            rc = ret;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
+}
+custom_param("dom0", parse_dom0_param);
+
 /*
  * Release resources held by a domain.  There may or may not be live
  * references to the domain, and it may or may not be fully constructed.

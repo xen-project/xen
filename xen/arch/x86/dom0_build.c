@@ -266,42 +266,30 @@ bool __initdata opt_dom0_pvh = !IS_ENABLED(CONFIG_PV);
 bool __initdata opt_dom0_verbose = IS_ENABLED(CONFIG_VERBOSE_DEBUG);
 bool __initdata opt_dom0_msr_relaxed;
 
-static int __init cf_check parse_dom0_param(const char *s)
+int __init parse_arch_dom0_param(const char *s, const char *e)
 {
-    const char *ss;
-    int rc = 0;
+    int val;
 
-    do {
-        int val;
-
-        ss = strchr(s, ',');
-        if ( !ss )
-            ss = strchr(s, '\0');
-
-        if ( IS_ENABLED(CONFIG_PV) && !cmdline_strcmp(s, "pv") )
-            opt_dom0_pvh = false;
-        else if ( IS_ENABLED(CONFIG_HVM) && !cmdline_strcmp(s, "pvh") )
-            opt_dom0_pvh = true;
+    if ( IS_ENABLED(CONFIG_PV) && !cmdline_strcmp(s, "pv") )
+        opt_dom0_pvh = false;
+    else if ( IS_ENABLED(CONFIG_HVM) && !cmdline_strcmp(s, "pvh") )
+        opt_dom0_pvh = true;
 #ifdef CONFIG_SHADOW_PAGING
-        else if ( (val = parse_boolean("shadow", s, ss)) >= 0 )
-            opt_dom0_shadow = val;
+    else if ( (val = parse_boolean("shadow", s, e)) >= 0 )
+        opt_dom0_shadow = val;
 #endif
-        else if ( (val = parse_boolean("verbose", s, ss)) >= 0 )
-            opt_dom0_verbose = val;
-        else if ( IS_ENABLED(CONFIG_PV) &&
-                  (val = parse_boolean("cpuid-faulting", s, ss)) >= 0 )
-            opt_dom0_cpuid_faulting = val;
-        else if ( (val = parse_boolean("msr-relaxed", s, ss)) >= 0 )
-            opt_dom0_msr_relaxed = val;
-        else
-            rc = -EINVAL;
+    else if ( (val = parse_boolean("verbose", s, e)) >= 0 )
+        opt_dom0_verbose = val;
+    else if ( IS_ENABLED(CONFIG_PV) &&
+              (val = parse_boolean("cpuid-faulting", s, e)) >= 0 )
+        opt_dom0_cpuid_faulting = val;
+    else if ( (val = parse_boolean("msr-relaxed", s, e)) >= 0 )
+        opt_dom0_msr_relaxed = val;
+    else
+        return -EINVAL;
 
-        s = ss + 1;
-    } while ( *ss );
-
-    return rc;
+    return 0;
 }
-custom_param("dom0", parse_dom0_param);
 
 static char __initdata opt_dom0_ioports_disable[200] = "";
 string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
