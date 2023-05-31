@@ -195,6 +195,11 @@ struct arch_vcpu
     register_t tpidrro_el0;
 
     /* HYP configuration */
+#ifdef CONFIG_ARM64_SVE
+    register_t zcr_el1;
+    register_t zcr_el2;
+#endif
+
     register_t cptr_el2;
     register_t hcr_el2;
     register_t mdcr_el2;

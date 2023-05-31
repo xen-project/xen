@@ -22,6 +22,10 @@ static inline unsigned int sve_decode_vl(unsigned int sve_vl)
 }
 
 register_t compute_max_zcr(void);
+int sve_context_init(struct vcpu *v);
+void sve_context_free(struct vcpu *v);
+void sve_save_state(struct vcpu *v);
+void sve_restore_state(struct vcpu *v);
 
 #ifdef CONFIG_ARM64_SVE
 

@@ -69,7 +69,9 @@ SVE assembly macro: last sync @ v6.3.0 (last commit: 457391b03803)
 linux/arch/arm64/include/asm/fpsimdmacros.h   xen/arch/arm/include/asm/arm64/sve-asm.S
 
 The following macros were taken from Linux:
-    _check_general_reg, _check_num, _sve_rdvl
+    _check_general_reg, _check_num, _sve_rdvl, __for, _for, _sve_check_zreg,
+    _sve_check_preg, _sve_str_v, _sve_ldr_v, _sve_str_p, _sve_ldr_p, _sve_rdffr,
+    _sve_wrffr
 
 =====================================================================
 arm32
