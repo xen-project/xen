@@ -64,7 +64,7 @@
  *
  *         Host filesystem path to share.
  *
- *    security-model
+ *    security_model
  *         Values:         "none"
  *
  *         *none*: files are stored using the same credentials as they are
