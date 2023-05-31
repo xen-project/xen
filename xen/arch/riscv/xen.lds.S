@@ -137,9 +137,9 @@ SECTIONS
     __init_end = .;
 
     .bss : {                     /* BSS */
+        . = ALIGN(POINTER_ALIGN);
         __bss_start = .;
         *(.bss.stack_aligned)
-        . = ALIGN(PAGE_SIZE);
         *(.bss.page_aligned)
         . = ALIGN(PAGE_SIZE);
         __per_cpu_start = .;
