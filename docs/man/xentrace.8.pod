@@ -69,10 +69,6 @@ set event capture mask. If not specified the TRC_ALL will be used.
 
 =item B<-?>, B<--help>
 
-Give this help list
-
-=item B<--usage>
-
 Give a short usage message
 
 =item B<-V>, B<--version>
