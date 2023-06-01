@@ -467,7 +467,7 @@ struct {
 #define EXIT_REASON_VMRESUME            24
 #define EXIT_REASON_VMWRITE             25
 #define EXIT_REASON_VMXOFF              26
-#define EXIT_REASON_VMON                27
+#define EXIT_REASON_VMXON               27
 #define EXIT_REASON_CR_ACCESS           28
 #define EXIT_REASON_DR_ACCESS           29
 #define EXIT_REASON_IO_INSTRUCTION      30
@@ -523,7 +523,7 @@ const char * hvm_vmx_exit_reason_name[HVM_VMX_EXIT_REASON_MAX] = {
     [EXIT_REASON_VMRESUME]="VMRESUME",
     [EXIT_REASON_VMWRITE]="VMWRITE",
     [EXIT_REASON_VMXOFF]="VMXOFF",
-    [EXIT_REASON_VMON]="VMON",
+    [EXIT_REASON_VMXON]="VMXON",
     [EXIT_REASON_CR_ACCESS]="CR_ACCESS",
     [EXIT_REASON_DR_ACCESS]="DR_ACCESS",
     [EXIT_REASON_IO_INSTRUCTION]="IO_INSTRUCTION",
