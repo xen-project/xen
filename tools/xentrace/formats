@@ -211,8 +211,8 @@
 0x00802008  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_irq [ irq = %(1)d, began = %(2)dus, ended = %(3)dus ]
 
 0x00084001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  hpet create [ tn = %(1)d, irq = %(2)d, delta = 0x%(4)08x%(3)08x, period = 0x%(6)08x%(5)08x ]
-0x00084002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  pit create [ delta = 0x%(1)016x, period = 0x%(2)016x ]
-0x00084003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtc create [ delta = 0x%(1)016x , period = 0x%(2)016x ]
+0x00084002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  pit create [ delta = 0x%(1)08x, period = 0x%(2)08x ]
+0x00084003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtc create [ delta = 0x%(1)08x, period = 0x%(2)08x ]
 0x00084004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  vlapic create [ delta = 0x%(2)08x%(1)08x , period = 0x%(4)08x%(3)08x, irq = %(5)d ]
 0x00084005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  hpet destroy [ tn = %(1)d ]
 0x00084006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  pit destroy  [ ]
