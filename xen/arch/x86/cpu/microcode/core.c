@@ -789,6 +789,9 @@ int __init microcode_init_cache(unsigned long *module_map,
 {
     int rc = 0;
 
+    if ( !ucode_ops.apply_microcode )
+        return -ENODEV;
+
     if ( ucode_scan )
         /* Need to rescan the modules because they might have been relocated */
         microcode_scan_module(module_map, mbi);
