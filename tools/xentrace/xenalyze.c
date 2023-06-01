@@ -447,7 +447,7 @@ struct {
 #define EXIT_REASON_SIPI                4
 #define EXIT_REASON_IO_SMI              5
 #define EXIT_REASON_OTHER_SMI           6
-#define EXIT_REASON_PENDING_INTERRUPT   7
+#define EXIT_REASON_PENDING_VIRT_INTR   7
 #define EXIT_REASON_PENDING_VIRT_NMI    8
 #define EXIT_REASON_TASK_SWITCH         9
 #define EXIT_REASON_CPUID               10
@@ -503,7 +503,7 @@ const char * hvm_vmx_exit_reason_name[HVM_VMX_EXIT_REASON_MAX] = {
     [EXIT_REASON_SIPI]="SIPI",
     [EXIT_REASON_IO_SMI]="IO_SMI",
     [EXIT_REASON_OTHER_SMI]="OTHER_SMI",
-    [EXIT_REASON_PENDING_INTERRUPT]="PENDING_INTERRUPT",
+    [EXIT_REASON_PENDING_VIRT_INTR]="PENDING_VIRT_INTR",
     [EXIT_REASON_PENDING_VIRT_NMI]="PENDING_VIRT_NMI",
     [EXIT_REASON_TASK_SWITCH]="TASK_SWITCH",
     [EXIT_REASON_CPUID]="CPUID",
@@ -4634,7 +4634,7 @@ void hvm_generic_postprocess(struct hvm_data *h)
             switch(h->exit_reason)
             {
                 /* These just need us to go through the return path */
-            case EXIT_REASON_PENDING_INTERRUPT:
+            case EXIT_REASON_PENDING_VIRT_INTR:
             case EXIT_REASON_TPR_BELOW_THRESHOLD:
                 /* Not much to log now; may need later */
             case EXIT_REASON_WBINVD:
