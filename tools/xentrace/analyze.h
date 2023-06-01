@@ -16,19 +16,6 @@
 
 #define TRC_LOST_RECORDS_END    (TRC_GEN + 50)
 
-#define NR_CPUS 128
-#if __x86_64__
-# define BITS_PER_LONG 64
-#else
-# define BITS_PER_LONG 32
-#endif
-
-#define BITS_TO_LONGS(bits) \
-    (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
-#define DECLARE_BITMAP(name,bits) \
-    unsigned long name[BITS_TO_LONGS(bits)]
-typedef struct cpumask{ DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
-
 enum {
     TRCE_SFLAG_SET_AD,
     TRCE_SFLAG_SET_A,
