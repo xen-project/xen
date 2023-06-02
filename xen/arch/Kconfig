@@ -1,6 +1,9 @@
 config 64BIT
 	bool
 
+config PHYS_ADDR_T_32
+	bool
+
 config NR_CPUS
 	int "Maximum number of CPUs"
 	range 1 4095

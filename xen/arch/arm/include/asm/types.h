@@ -34,9 +34,23 @@ typedef signed long long s64;
 typedef unsigned long long u64;
 typedef u32 vaddr_t;
 #define PRIvaddr PRIx32
+#if defined(CONFIG_PHYS_ADDR_T_32)
+
+/*
+ * We use "unsigned long" and not "uint32_t" to denote the type. This is done
+ * to avoid having a cast each time PAGE_* macros are used on paddr_t. For eg
+ * PAGE_SIZE is defined as unsigned long.
+ * On 32-bit architecture, "unsigned long" is 32-bit wide. Thus, we can use it
+ * to denote physical address.
+ */
+typedef unsigned long paddr_t;
+#define INVALID_PADDR (~0UL)
+#define PRIpaddr "08lx"
+#else
 typedef u64 paddr_t;
 #define INVALID_PADDR (~0ULL)
 #define PRIpaddr "016llx"
+#endif
 typedef u32 register_t;
 #define PRIregister "08x"
 #elif defined (CONFIG_ARM_64)

@@ -26,6 +26,39 @@ config ARCH_DEFCONFIG
 
 menu "Architecture Features"
 
+choice
+	prompt "Physical address space size" if ARM_32
+	default ARM_PA_BITS_40 if ARM_32
+	help
+	  User can choose to represent the width of physical address. This can
+	  sometimes help in optimizing the size of image when user chooses a
+	  smaller size to represent physical address.
+
+config ARM_PA_BITS_32
+	bool "32-bit"
+	depends on ARM_32
+	select PHYS_ADDR_T_32
+	help
+	  On platforms where any physical address can be represented within 32 bits,
+	  user should choose this option. This will help in reduced size of the
+	  binary.
+	  Xen uses "unsigned long" and not "uint32_t" to denote the datatype of
+	  physical address. This is done to avoid using a cast each time PAGE_*
+	  macros are used on paddr_t. For eg PAGE_SIZE is defined as unsigned long.
+	  On 32-bit architecture, "unsigned long" is 32-bit wide. Thus, it can be
+	  used to denote physical address.
+
+config ARM_PA_BITS_40
+	bool "40-bit"
+	depends on ARM_32
+endchoice
+
+config PADDR_BITS
+	int
+	default 32 if ARM_PA_BITS_32
+	default 40 if ARM_PA_BITS_40
+	default 48 if ARM_64
+
 source "arch/Kconfig"
 
 config ACPI
