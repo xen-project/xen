@@ -14,16 +14,10 @@
 /* Holds the bit size of IPAs in p2m tables.  */
 extern unsigned int p2m_ipa_bits;
 
-#ifdef CONFIG_ARM_64
 extern unsigned int p2m_root_order;
 extern unsigned int p2m_root_level;
 #define P2M_ROOT_ORDER    p2m_root_order
 #define P2M_ROOT_LEVEL p2m_root_level
-#else
-/* First level P2M is always 2 consecutive pages */
-#define P2M_ROOT_ORDER    1
-#define P2M_ROOT_LEVEL 1
-#endif
 
 struct domain;
 

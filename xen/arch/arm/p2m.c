@@ -19,9 +19,9 @@
 
 #define INVALID_VMID 0 /* VMID 0 is reserved */
 
-#ifdef CONFIG_ARM_64
 unsigned int __read_mostly p2m_root_order;
 unsigned int __read_mostly p2m_root_level;
+#ifdef CONFIG_ARM_64
 static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
 /* VMID is by default 8 bit width on AArch64 */
 #define MAX_VMID       max_vmid
@@ -2247,16 +2247,6 @@ void __init setup_virt_paging(void)
     /* Setup Stage 2 address translation */
     register_t val = VTCR_RES1|VTCR_SH0_IS|VTCR_ORGN0_WBWA|VTCR_IRGN0_WBWA;
 
-#ifdef CONFIG_ARM_32
-    if ( p2m_ipa_bits < 40 )
-        panic("P2M: Not able to support %u-bit IPA at the moment\n",
-              p2m_ipa_bits);
-
-    printk("P2M: 40-bit IPA\n");
-    p2m_ipa_bits = 40;
-    val |= VTCR_T0SZ(0x18); /* 40 bit IPA */
-    val |= VTCR_SL0(0x1); /* P2M starts at first level */
-#else /* CONFIG_ARM_64 */
     static const struct {
         unsigned int pabits; /* Physical Address Size */
         unsigned int t0sz;   /* Desired T0SZ, minimum in comment */
@@ -2265,6 +2255,7 @@ void __init setup_virt_paging(void)
     } pa_range_info[] __initconst = {
         /* T0SZ minimum and SL0 maximum from ARM DDI 0487H.a Table D5-6 */
         /*      PA size, t0sz(min), root-order, sl0(max) */
+#ifdef CONFIG_ARM_64
         [0] = { 32,      32/*32*/,  0,          1 },
         [1] = { 36,      28/*28*/,  0,          1 },
         [2] = { 40,      24/*24*/,  1,          1 },
@@ -2273,11 +2264,27 @@ void __init setup_virt_paging(void)
         [5] = { 48,      16/*16*/,  0,          2 },
         [6] = { 52,      12/*12*/,  4,          2 },
         [7] = { 0 }  /* Invalid */
+#else
+        { 40,      24/*24*/,  1,          1 }
+#endif
     };
 
     unsigned int i;
     unsigned int pa_range = 0x10; /* Larger than any possible value */
 
+#ifdef CONFIG_ARM_32
+    /*
+     * Typecast pa_range_info[].t0sz into arm32 bit variant.
+     *
+     * VTCR.T0SZ is bits [3:0] and S(sign extension), bit[4] for arm322.
+     * Thus, pa_range_info[].t0sz is translated to its arm32 variant using
+     * struct bitfields.
+     */
+    struct
+    {
+        signed int val:5;
+    } t0sz_32;
+#else
     /*
      * Restrict "p2m_ipa_bits" if needed. As P2M table is always configured
      * with IPA bits == PA bits, compare against "pabits".
@@ -2291,6 +2298,7 @@ void __init setup_virt_paging(void)
      */
     if ( system_cpuinfo.mm64.vmid_bits == MM64_VMID_16_BITS_SUPPORT )
         max_vmid = MAX_VMID_16_BIT;
+#endif
 
     /* Choose suitable "pa_range" according to the resulted "p2m_ipa_bits". */
     for ( i = 0; i < ARRAY_SIZE(pa_range_info); i++ )
@@ -2302,28 +2310,37 @@ void __init setup_virt_paging(void)
         }
     }
 
-    /* pa_range is 4 bits but we don't support all modes */
+    /* Check if we found the associated entry in the array */
     if ( pa_range >= ARRAY_SIZE(pa_range_info) || !pa_range_info[pa_range].pabits )
-        panic("Unknown encoding of ID_AA64MMFR0_EL1.PARange %x\n", pa_range);
+        panic("%u-bit P2M is not supported\n", p2m_ipa_bits);
 
+#ifdef CONFIG_ARM_64
     val |= VTCR_PS(pa_range);
     val |= VTCR_TG0_4K;
 
     /* Set the VS bit only if 16 bit VMID is supported. */
     if ( MAX_VMID == MAX_VMID_16_BIT )
         val |= VTCR_VS;
+#endif
+
     val |= VTCR_SL0(pa_range_info[pa_range].sl0);
     val |= VTCR_T0SZ(pa_range_info[pa_range].t0sz);
 
     p2m_root_order = pa_range_info[pa_range].root_order;
     p2m_root_level = 2 - pa_range_info[pa_range].sl0;
+
+#ifdef CONFIG_ARM_64
     p2m_ipa_bits = 64 - pa_range_info[pa_range].t0sz;
+#else
+    t0sz_32.val = pa_range_info[pa_range].t0sz;
+    p2m_ipa_bits = 32 - t0sz_32.val;
+#endif
 
     printk("P2M: %d-bit IPA with %d-bit PA and %d-bit VMID\n",
            p2m_ipa_bits,
            pa_range_info[pa_range].pabits,
            ( MAX_VMID == MAX_VMID_16_BIT ) ? 16 : 8);
-#endif
+
     printk("P2M: %d levels with order-%d root, VTCR 0x%"PRIregister"\n",
            4 - P2M_ROOT_LEVEL, P2M_ROOT_ORDER, val);
 
