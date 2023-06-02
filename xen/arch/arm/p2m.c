@@ -2265,6 +2265,7 @@ void __init setup_virt_paging(void)
         [6] = { 52,      12/*12*/,  4,          2 },
         [7] = { 0 }  /* Invalid */
 #else
+        { 32,      0/*0*/,    0,          1 },
         { 40,      24/*24*/,  1,          1 }
 #endif
     };
