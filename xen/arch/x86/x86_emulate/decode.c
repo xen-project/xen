@@ -1486,10 +1486,23 @@ int x86emul_decode(struct x86_emulate_state *s,
                     s->simd_size = simd_scalar_vexw;
                 break;
 
+            case 0x2a: /* vcvtsi2sh */
+                break;
+
+            case 0x2c: case 0x2d: /* vcvt{,t}sh2si */
+                if ( s->evex.pfx == vex_f3 )
+                    s->fp16 = true;
+                break;
+
             case 0x2e: case 0x2f: /* v{,u}comish */
                 if ( !s->evex.pfx )
                     s->fp16 = true;
                 s->simd_size = simd_none;
+                break;
+
+            case 0x5b: /* vcvt{d,q}q2ph, vcvt{,t}ph2dq */
+                if ( s->evex.pfx && s->evex.pfx != vex_f2 )
+                    s->fp16 = true;
                 break;
 
             case 0x6e: /* vmovw r/m16, xmm */
@@ -1499,6 +1512,17 @@ int x86emul_decode(struct x86_emulate_state *s,
                 if ( s->evex.pfx == vex_66 )
                     s->fp16 = true;
                 s->simd_size = simd_none;
+                break;
+
+            case 0x78: case 0x79: /* vcvt{,t}ph2u{d,q}q, vcvt{,t}sh2usi */
+                if ( s->evex.pfx != vex_f2 )
+                    s->fp16 = true;
+                break;
+
+            case 0x7a: /* vcvttph2qq, vcvtu{d,q}q2ph */
+            case 0x7b: /* vcvtph2qq, vcvtusi2sh */
+                if ( s->evex.pfx == vex_66 )
+                    s->fp16 = true;
                 break;
 
             case 0x7c: /* vcvttph2{,u}w */
@@ -1513,9 +1537,33 @@ int x86emul_decode(struct x86_emulate_state *s,
 
             switch ( b )
             {
+            case 0x78:
+            case 0x79:
+                /* vcvt{,t}ph2u{d,q}q need special casing */
+                if ( s->evex.pfx <= vex_66 )
+                {
+                    if ( !s->evex.brs )
+                        disp8scale -= 1 + (s->evex.pfx == vex_66);
+                    break;
+                }
+                /* vcvt{,t}sh2usi needs special casing: fall through */
+            case 0x2c: case 0x2d: /* vcvt{,t}sh2si need special casing */
+                disp8scale = 1;
+                break;
+
             case 0x5a: /* vcvtph2pd needs special casing */
                 if ( !s->evex.pfx && !s->evex.brs )
                     disp8scale -= 2;
+                break;
+
+            case 0x5b: /* vcvt{,t}ph2dq need special casing */
+                if ( s->evex.pfx && !s->evex.brs )
+                    --disp8scale;
+                break;
+
+            case 0x7a: case 0x7b: /* vcvt{,t}ph2qq need special casing */
+                if ( s->evex.pfx == vex_66 && !s->evex.brs )
+                    disp8scale = s->evex.brs ? 1 : 2 + s->evex.lr;
                 break;
             }
 

@@ -2049,6 +2049,9 @@ static const struct evex {
     { { 0x11 }, 2, T, W, pfx_f3, W0, LIG }, /* vmovsh */
     { { 0x1d }, 2, T, R, pfx_66, W0, Ln }, /* vcvtps2phx */
     { { 0x1d }, 2, T, R, pfx_no, W0, LIG }, /* vcvtss2sh */
+    { { 0x2a }, 2, T, R, pfx_f3, Wn, LIG }, /* vcvtsi2sh */
+    { { 0x2c }, 2, T, R, pfx_f3, Wn, LIG }, /* vcvttsh2si */
+    { { 0x2d }, 2, T, R, pfx_f3, Wn, LIG }, /* vcvtsh2si */
     { { 0x2e }, 2, T, R, pfx_no, W0, LIG }, /* vucomish */
     { { 0x2f }, 2, T, R, pfx_no, W0, LIG }, /* vcomish */
     { { 0x51 }, 2, T, R, pfx_no, W0, Ln }, /* vsqrtph */
@@ -2061,6 +2064,10 @@ static const struct evex {
     { { 0x5a }, 2, T, R, pfx_66, W1, Ln }, /* vcvtpd2ph */
     { { 0x5a }, 2, T, R, pfx_f3, W0, LIG }, /* vcvtsh2sd */
     { { 0x5a }, 2, T, R, pfx_f2, W1, LIG }, /* vcvtsd2sh */
+    { { 0x5b }, 2, T, R, pfx_no, W0, Ln }, /* vcvtdq2ph */
+    { { 0x5b }, 2, T, R, pfx_no, W1, Ln }, /* vcvtqq2ph */
+    { { 0x5b }, 2, T, R, pfx_66, W0, Ln }, /* vcvtph2dq */
+    { { 0x5b }, 2, T, R, pfx_f3, W0, Ln }, /* vcvttph2dq */
     { { 0x5c }, 2, T, R, pfx_no, W0, Ln }, /* vsubph */
     { { 0x5c }, 2, T, R, pfx_f3, W0, LIG }, /* vsubsh */
     { { 0x5d }, 2, T, R, pfx_no, W0, Ln }, /* vminph */
@@ -2070,6 +2077,17 @@ static const struct evex {
     { { 0x5f }, 2, T, R, pfx_no, W0, Ln }, /* vmaxph */
     { { 0x5f }, 2, T, R, pfx_f3, W0, LIG }, /* vmaxsh */
     { { 0x6e }, 2, T, R, pfx_66, WIG, L0 }, /* vmovw */
+    { { 0x78 }, 2, T, R, pfx_no, W0, Ln }, /* vcvttph2udq */
+    { { 0x78 }, 2, T, R, pfx_66, W0, Ln }, /* vcvttph2uqq */
+    { { 0x78 }, 2, T, R, pfx_f3, Wn, LIG }, /* vcvttsh2usi */
+    { { 0x79 }, 2, T, R, pfx_no, W0, Ln }, /* vcvtph2udq */
+    { { 0x79 }, 2, T, R, pfx_66, W0, Ln }, /* vcvtph2uqq */
+    { { 0x79 }, 2, T, R, pfx_f3, Wn, LIG }, /* vcvtsh2usi */
+    { { 0x7a }, 2, T, R, pfx_66, W0, Ln }, /* vcvttph2qq */
+    { { 0x7a }, 2, T, R, pfx_f2, W0, Ln }, /* vcvtudq2ph */
+    { { 0x7a }, 2, T, R, pfx_f2, W1, Ln }, /* vcvtuqq2ph */
+    { { 0x7b }, 2, T, R, pfx_66, W0, Ln }, /* vcvtph2qq */
+    { { 0x7b }, 2, T, R, pfx_f3, Wn, LIG }, /* vcvtusi2sh */
     { { 0x7c }, 2, T, R, pfx_no, W0, Ln }, /* vcvttph2uw */
     { { 0x7c }, 2, T, R, pfx_66, W0, Ln }, /* vcvttph2w */
     { { 0x7d }, 2, T, R, pfx_no, W0, Ln }, /* vcvtph2uw */
