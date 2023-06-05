@@ -343,8 +343,8 @@ unsigned int tainted;
  *  'C' - Console output is synchronous.
  *  'E' - An error (e.g. a machine check exceptions) has been injected.
  *  'H' - HVM forced emulation prefix is permitted.
+ *  'I' - Platform is insecure (usually due to an errata on the platform).
  *  'M' - Machine had a machine check experience.
- *  'U' - Platform is unsecure (usually due to an errata on the platform).
  *  'S' - Out of spec CPU (One core has a feature incompatible with others).
  *
  *      The string is overwritten by the next call to print_taint().
@@ -354,7 +354,7 @@ char *print_tainted(char *str)
     if ( tainted )
     {
         snprintf(str, TAINT_STRING_MAX_LEN, "Tainted: %c%c%c%c%c%c",
-                 tainted & TAINT_MACHINE_UNSECURE ? 'U' : ' ',
+                 tainted & TAINT_MACHINE_INSECURE ? 'I' : ' ',
                  tainted & TAINT_MACHINE_CHECK ? 'M' : ' ',
                  tainted & TAINT_SYNC_CONSOLE ? 'C' : ' ',
                  tainted & TAINT_ERROR_INJECT ? 'E' : ' ',

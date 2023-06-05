@@ -695,7 +695,7 @@ void __init enable_errata_workarounds(void)
                     "**** Only trusted guests should be used.                             ****\n");
 
         /* Taint the machine has being insecure */
-        add_taint(TAINT_MACHINE_UNSECURE);
+        add_taint(TAINT_MACHINE_INSECURE);
     }
 #endif
 }
