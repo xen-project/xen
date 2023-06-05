@@ -2065,6 +2065,37 @@ static const struct evex {
     { { 0x5f }, 2, T, R, pfx_f3, W0, LIG }, /* vmaxsh */
     { { 0x6e }, 2, T, R, pfx_66, WIG, L0 }, /* vmovw */
     { { 0x7e }, 2, T, W, pfx_66, WIG, L0 }, /* vmovw */
+}, evex_map6[] = {
+    { { 0x96 }, 2, T, R, pfx_66, W0, Ln }, /* vfmaddsub132ph */
+    { { 0x97 }, 2, T, R, pfx_66, W0, Ln }, /* vfmsubadd132ph */
+    { { 0x98 }, 2, T, R, pfx_66, W0, Ln }, /* vfmadd132ph */
+    { { 0x99 }, 2, T, R, pfx_66, W0, LIG }, /* vfmadd132sh */
+    { { 0x9a }, 2, T, R, pfx_66, W0, Ln }, /* vfmsub132ph */
+    { { 0x9b }, 2, T, R, pfx_66, W0, LIG }, /* vfmsub132sh */
+    { { 0x9c }, 2, T, R, pfx_66, W0, Ln }, /* vfnmadd132ph */
+    { { 0x9d }, 2, T, R, pfx_66, W0, LIG }, /* vfnmadd132sh */
+    { { 0x9e }, 2, T, R, pfx_66, W0, Ln }, /* vfnmsub132ph */
+    { { 0x9f }, 2, T, R, pfx_66, W0, LIG }, /* vfnmsub132sh */
+    { { 0xa6 }, 2, T, R, pfx_66, W0, Ln }, /* vfmaddsub213ph */
+    { { 0xa7 }, 2, T, R, pfx_66, W0, Ln }, /* vfmsubadd213ph */
+    { { 0xa8 }, 2, T, R, pfx_66, W0, Ln }, /* vfmadd213ph */
+    { { 0xa9 }, 2, T, R, pfx_66, W0, LIG }, /* vfmadd213sh */
+    { { 0xaa }, 2, T, R, pfx_66, W0, Ln }, /* vfmsub213ph */
+    { { 0xab }, 2, T, R, pfx_66, W0, LIG }, /* vfmsub213sh */
+    { { 0xac }, 2, T, R, pfx_66, W0, Ln }, /* vfnmadd213ph */
+    { { 0xad }, 2, T, R, pfx_66, W0, LIG }, /* vfnmadd213sh */
+    { { 0xae }, 2, T, R, pfx_66, W0, Ln }, /* vfnmsub213ph */
+    { { 0xaf }, 2, T, R, pfx_66, W0, LIG }, /* vfnmsub213sh */
+    { { 0xb6 }, 2, T, R, pfx_66, W0, Ln }, /* vfmaddsub231ph */
+    { { 0xb7 }, 2, T, R, pfx_66, W0, Ln }, /* vfmsubadd231ph */
+    { { 0xb8 }, 2, T, R, pfx_66, W0, Ln }, /* vfmadd231ph */
+    { { 0xb9 }, 2, T, R, pfx_66, W0, LIG }, /* vfmadd231sh */
+    { { 0xba }, 2, T, R, pfx_66, W0, Ln }, /* vfmsub231ph */
+    { { 0xbb }, 2, T, R, pfx_66, W0, LIG }, /* vfmsub231sh */
+    { { 0xbc }, 2, T, R, pfx_66, W0, Ln }, /* vfnmadd231ph */
+    { { 0xbd }, 2, T, R, pfx_66, W0, LIG }, /* vfnmadd231sh */
+    { { 0xbe }, 2, T, R, pfx_66, W0, Ln }, /* vfnmsub231ph */
+    { { 0xbf }, 2, T, R, pfx_66, W0, LIG }, /* vfnmsub231sh */
 };
 
 static const struct {
@@ -2076,6 +2107,7 @@ static const struct {
     { evex_0f3a, ARRAY_SIZE(evex_0f3a) },
     { NULL,      0 },
     { evex_map5, ARRAY_SIZE(evex_map5) },
+    { evex_map6, ARRAY_SIZE(evex_map6) },
 };
 
 #undef Wn

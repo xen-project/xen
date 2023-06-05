@@ -1224,6 +1224,20 @@ int x86emul_decode(struct x86_emulate_state *s,
                         d = twobyte_table[b].desc;
                         s->simd_size = twobyte_table[b].size ?: simd_other;
                         break;
+
+                    case evex_map6:
+                        if ( !evex_encoded() )
+                        {
+                            rc = X86EMUL_UNRECOGNIZED;
+                            goto done;
+                        }
+                        opcode |= MASK_INSR(6, X86EMUL_OPC_EXT_MASK);
+                        /*
+                         * Re-use twobyte_table[]'s 0x38 entry here, for the
+                         * similarity of the 0F38 entries with map 6.
+                         */
+                        d = twobyte_table[0x38].desc;
+                        break;
                     }
                 }
                 else if ( s->ext < ext_8f08 + ARRAY_SIZE(xop_table) )
@@ -1473,6 +1487,28 @@ int x86emul_decode(struct x86_emulate_state *s,
             disp8scale = decode_disp8scale(twobyte_table[b].d8s, s);
             break;
 
+        case ext_map6:
+            /*
+             * Re-use ext0f38_table[] here, for the similarity of the entries
+             * valid in map 6.
+             */
+            d = ext0f38_table[b].to_mem ? DstMem | SrcReg
+                                        : DstReg | SrcMem;
+            if ( ext0f38_table[b].two_op )
+                d |= TwoOp;
+            s->simd_size = ext0f38_table[b].simd_size ?: simd_other;
+
+            switch ( b )
+            {
+            default:
+                if ( s->evex.pfx == vex_66 )
+                    s->fp16 = true;
+                break;
+            }
+
+            disp8scale = decode_disp8scale(ext0f38_table[b].d8s, s);
+            break;
+
         case ext_8f09:
             if ( ext8f09_table[b].two_op )
                 d |= TwoOp;
@@ -1692,6 +1728,7 @@ int x86emul_decode(struct x86_emulate_state *s,
         break;
 
     case ext_map5:
+    case ext_map6:
     case ext_8f09:
     case ext_8f0a:
         break;

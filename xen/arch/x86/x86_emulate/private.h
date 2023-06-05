@@ -184,6 +184,7 @@ enum vex_opcx {
     vex_0f38,
     vex_0f3a,
     evex_map5 = 5,
+    evex_map6,
 };
 
 enum vex_pfx {
@@ -239,6 +240,7 @@ struct x86_emulate_state {
         ext_0f38 = vex_0f38,
         ext_0f3a = vex_0f3a,
         ext_map5 = evex_map5,
+        ext_map6 = evex_map6,
         /*
          * For XOP use values such that the respective instruction field
          * can be used without adjustment.
