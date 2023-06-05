@@ -346,7 +346,7 @@ static const struct ext0f38_table {
     [0x2a] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0x2b] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x2c] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
-    [0x2d] = { .simd_size = simd_packed_fp, .d8s = d8s_dq },
+    [0x2d] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0x2e ... 0x2f] = { .simd_size = simd_packed_fp, .to_mem = 1 },
     [0x30] = { .simd_size = simd_other, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x31] = { .simd_size = simd_other, .two_op = 1, .d8s = d8s_vl_by_4 },
@@ -899,8 +899,8 @@ decode_0f38(struct x86_emulate_state *s,
         ctxt->opcode |= MASK_INSR(s->vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
 
-    case X86EMUL_OPC_EVEX_66(0, 0x2d): /* vscalefs{s,d} */
-        s->simd_size = simd_scalar_vexw;
+    case X86EMUL_OPC_VEX_66(0, 0x2d): /* vmaskmovpd */
+        s->simd_size = simd_packed_fp;
         break;
 
     case X86EMUL_OPC_EVEX_66(0, 0x7a): /* vpbroadcastb */
