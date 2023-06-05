@@ -411,8 +411,6 @@ F:	tools/include/xengnttab.h
 F:	tools/include/xenguest.h
 F:	tools/include/xenhypfs.h
 F:	tools/include/xenstat.h
-F:	tools/include/xenstore*.h
-F:	tools/include/xenstore-compat/*.h
 F:	tools/include/xentoolcore*.h
 F:	tools/include/xentoollog.h
 F:	tools/libs/
