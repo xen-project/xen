@@ -183,6 +183,7 @@ enum vex_opcx {
     vex_0f = vex_none + 1,
     vex_0f38,
     vex_0f3a,
+    evex_map5 = 5,
 };
 
 enum vex_pfx {
@@ -211,8 +212,8 @@ union vex {
 union evex {
     uint8_t raw[3];
     struct {             /* SDM names */
-        uint8_t opcx:2;  /* mm */
-        uint8_t mbz:2;
+        uint8_t opcx:3;  /* mmm */
+        uint8_t mbz:1;
         uint8_t R:1;     /* R' */
         uint8_t b:1;     /* B */
         uint8_t x:1;     /* X */
@@ -237,6 +238,7 @@ struct x86_emulate_state {
         ext_0f   = vex_0f,
         ext_0f38 = vex_0f38,
         ext_0f3a = vex_0f3a,
+        ext_map5 = evex_map5,
         /*
          * For XOP use values such that the respective instruction field
          * can be used without adjustment.

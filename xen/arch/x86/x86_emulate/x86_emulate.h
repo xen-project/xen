@@ -610,6 +610,7 @@ struct x86_emulate_ctxt
  *    0x0fxxxx for 0f-prefixed opcodes (or their VEX/EVEX equivalents)
  *  0x0f38xxxx for 0f38-prefixed opcodes (or their VEX/EVEX equivalents)
  *  0x0f3axxxx for 0f3a-prefixed opcodes (or their VEX/EVEX equivalents)
+ *     0x5xxxx for Map5 opcodes (EVEX only)
  *  0x8f08xxxx for 8f/8-prefixed XOP opcodes
  *  0x8f09xxxx for 8f/9-prefixed XOP opcodes
  *  0x8f0axxxx for 8f/a-prefixed XOP opcodes

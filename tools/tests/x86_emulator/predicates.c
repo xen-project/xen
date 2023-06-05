@@ -2044,6 +2044,23 @@ static const struct evex {
     { { 0xc2 }, 3, T, R, pfx_f3, W0, LIG }, /* vcmpsh */
     { { 0xce }, 3, T, R, pfx_66, W1, Ln }, /* vgf2p8affineqb */
     { { 0xcf }, 3, T, R, pfx_66, W1, Ln }, /* vgf2p8affineinvqb */
+}, evex_map5[] = {
+    { { 0x2e }, 2, T, R, pfx_no, W0, LIG }, /* vucomish */
+    { { 0x2f }, 2, T, R, pfx_no, W0, LIG }, /* vcomish */
+    { { 0x51 }, 2, T, R, pfx_no, W0, Ln }, /* vsqrtph */
+    { { 0x51 }, 2, T, R, pfx_f3, W0, LIG }, /* vsqrtsh */
+    { { 0x58 }, 2, T, R, pfx_no, W0, Ln }, /* vaddph */
+    { { 0x58 }, 2, T, R, pfx_f3, W0, LIG }, /* vaddsh */
+    { { 0x59 }, 2, T, R, pfx_no, W0, Ln }, /* vmulph */
+    { { 0x59 }, 2, T, R, pfx_f3, W0, LIG }, /* vmulsh */
+    { { 0x5c }, 2, T, R, pfx_no, W0, Ln }, /* vsubph */
+    { { 0x5c }, 2, T, R, pfx_f3, W0, LIG }, /* vsubsh */
+    { { 0x5d }, 2, T, R, pfx_no, W0, Ln }, /* vminph */
+    { { 0x5d }, 2, T, R, pfx_f3, W0, LIG }, /* vminsh */
+    { { 0x5e }, 2, T, R, pfx_no, W0, Ln }, /* vdivph */
+    { { 0x5e }, 2, T, R, pfx_f3, W0, LIG }, /* vdivsh */
+    { { 0x5f }, 2, T, R, pfx_no, W0, Ln }, /* vmaxph */
+    { { 0x5f }, 2, T, R, pfx_f3, W0, LIG }, /* vmaxsh */
 };
 
 static const struct {
@@ -2053,6 +2070,8 @@ static const struct {
     { evex_0f,   ARRAY_SIZE(evex_0f) },
     { evex_0f38, ARRAY_SIZE(evex_0f38) },
     { evex_0f3a, ARRAY_SIZE(evex_0f3a) },
+    { NULL,      0 },
+    { evex_map5, ARRAY_SIZE(evex_map5) },
 };
 
 #undef Wn

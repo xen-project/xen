@@ -3723,6 +3723,13 @@ x86_emulate(
         ASSERT(!state->simd_size);
         break;
 
+#ifndef X86EMUL_NO_SIMD
+
+    case X86EMUL_OPC_EVEX(5, 0x2e): /* vucomish xmm/m16,xmm */
+    case X86EMUL_OPC_EVEX(5, 0x2f): /* vcomish xmm/m16,xmm */
+        host_and_vcpu_must_have(avx512_fp16);
+        generate_exception_if(evex.w, X86_EXC_UD);
+        /* fall through */
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x2e): /* vucomis{s,d} xmm/mem,xmm */
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x2f): /* vcomis{s,d} xmm/mem,xmm */
         generate_exception_if((evex.reg != 0xf || !evex.RX || evex.opmsk ||
@@ -3735,8 +3742,10 @@ x86_emulate(
         get_fpu(X86EMUL_FPU_zmm);
 
         opc = init_evex(stub);
-        op_bytes = 4 << evex.w;
+        op_bytes = 2 << (!state->fp16 + evex.w);
         goto vcomi;
+
+#endif
 
     case X86EMUL_OPC(0x0f, 0x30): /* wrmsr */
         generate_exception_if(!mode_ring0(), X86_EXC_GP, 0);
@@ -7738,6 +7747,20 @@ x86_emulate(
         break;
 
 #ifndef X86EMUL_NO_SIMD
+
+    case X86EMUL_OPC_EVEX_F3(5, 0x51):   /* vsqrtsh xmm/m16,xmm,xmm{k} */
+        d &= ~TwoOp;
+        /* fall through */
+    case X86EMUL_OPC_EVEX(5, 0x51):      /* vsqrtph [xyz]mm/mem,[xyz]mm{k} */
+    CASE_SIMD_SINGLE_FP(_EVEX, 5, 0x58): /* vadd{p,s}h [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_SINGLE_FP(_EVEX, 5, 0x59): /* vmul{p,s}h [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_SINGLE_FP(_EVEX, 5, 0x5c): /* vsub{p,s}h [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_SINGLE_FP(_EVEX, 5, 0x5d): /* vmin{p,s}h [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_SINGLE_FP(_EVEX, 5, 0x5e): /* vdiv{p,s}h [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_SINGLE_FP(_EVEX, 5, 0x5f): /* vmax{p,s}h [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512_fp16);
+        generate_exception_if(evex.w, X86_EXC_UD);
+        goto avx512f_all_fp;
 
     case X86EMUL_OPC_XOP(08, 0x85): /* vpmacssww xmm,xmm/m128,xmm,xmm */
     case X86EMUL_OPC_XOP(08, 0x86): /* vpmacsswd xmm,xmm/m128,xmm,xmm */
