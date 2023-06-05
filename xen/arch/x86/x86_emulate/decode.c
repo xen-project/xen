@@ -247,7 +247,7 @@ static const struct twobyte_table {
     [0x78 ... 0x79] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, d8s_vl },
     [0x7a] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_fp, d8s_vl },
     [0x7b] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, d8s_dq64 },
-    [0x7c ... 0x7d] = { DstImplicit|SrcMem|ModRM, simd_other },
+    [0x7c ... 0x7d] = { DstImplicit|SrcMem|ModRM, simd_other, d8s_vl },
     [0x7e] = { DstMem|SrcImplicit|ModRM|Mov, simd_none, d8s_dq64 },
     [0x7f] = { DstMem|SrcImplicit|ModRM|Mov, simd_packed_int, d8s_vl },
     [0x80 ... 0x8f] = { DstImplicit|SrcImm },
@@ -1484,6 +1484,12 @@ int x86emul_decode(struct x86_emulate_state *s,
                 if ( s->evex.pfx == vex_66 )
                     s->fp16 = true;
                 s->simd_size = simd_none;
+                break;
+
+            case 0x7c: /* vcvttph2{,u}w */
+            case 0x7d: /* vcvtph2{,u}w / vcvt{,u}w2ph */
+                d = DstReg | SrcMem | TwoOp;
+                s->fp16 = true;
                 break;
             }
 

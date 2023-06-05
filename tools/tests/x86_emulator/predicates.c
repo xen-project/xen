@@ -2064,6 +2064,12 @@ static const struct evex {
     { { 0x5f }, 2, T, R, pfx_no, W0, Ln }, /* vmaxph */
     { { 0x5f }, 2, T, R, pfx_f3, W0, LIG }, /* vmaxsh */
     { { 0x6e }, 2, T, R, pfx_66, WIG, L0 }, /* vmovw */
+    { { 0x7c }, 2, T, R, pfx_no, W0, Ln }, /* vcvttph2uw */
+    { { 0x7c }, 2, T, R, pfx_66, W0, Ln }, /* vcvttph2w */
+    { { 0x7d }, 2, T, R, pfx_no, W0, Ln }, /* vcvtph2uw */
+    { { 0x7d }, 2, T, R, pfx_66, W0, Ln }, /* vcvtph2w */
+    { { 0x7d }, 2, T, R, pfx_f3, W0, Ln }, /* vcvtw2ph */
+    { { 0x7d }, 2, T, R, pfx_f2, W0, Ln }, /* vcvtuwph */
     { { 0x7e }, 2, T, W, pfx_66, WIG, L0 }, /* vmovw */
 }, evex_map6[] = {
     { { 0x2c }, 2, T, R, pfx_66, W0, Ln }, /* vscalefph */
