@@ -53,6 +53,9 @@ float
 # elif FLOAT_SIZE == 8
 #  define MODE DF
 #  define ELEM_SFX "d"
+# elif FLOAT_SIZE == 2
+#  define MODE HF
+#  define ELEM_SFX "h"
 # endif
 #endif
 #ifndef VEC_SIZE
@@ -67,7 +70,10 @@ typedef unsigned int __attribute__((mode(QI), vector_size(VEC_SIZE))) byte_vec_t
 /* Various builtins want plain char / int / long long vector types ... */
 typedef char __attribute__((vector_size(VEC_SIZE))) vqi_t;
 typedef short __attribute__((vector_size(VEC_SIZE))) vhi_t;
+#if VEC_SIZE >= 4
 typedef int __attribute__((vector_size(VEC_SIZE))) vsi_t;
+typedef float __attribute__((vector_size(VEC_SIZE))) vsf_t;
+#endif
 #if VEC_SIZE >= 8
 typedef long long __attribute__((vector_size(VEC_SIZE))) vdi_t;
 typedef double __attribute__((vector_size(VEC_SIZE))) vdf_t;
@@ -96,6 +102,9 @@ typedef char __attribute__((vector_size(HALF_SIZE))) vqi_half_t;
 typedef short __attribute__((vector_size(HALF_SIZE))) vhi_half_t;
 typedef int __attribute__((vector_size(HALF_SIZE))) vsi_half_t;
 typedef long long __attribute__((vector_size(HALF_SIZE))) vdi_half_t;
+#ifdef __AVX512FP16__
+typedef _Float16 __attribute__((vector_size(HALF_SIZE))) vhf_half_t;
+#endif
 typedef float __attribute__((vector_size(HALF_SIZE))) vsf_half_t;
 # endif
 
@@ -110,6 +119,9 @@ typedef char __attribute__((vector_size(QUARTER_SIZE))) vqi_quarter_t;
 typedef short __attribute__((vector_size(QUARTER_SIZE))) vhi_quarter_t;
 typedef int __attribute__((vector_size(QUARTER_SIZE))) vsi_quarter_t;
 typedef long long __attribute__((vector_size(QUARTER_SIZE))) vdi_quarter_t;
+#ifdef __AVX512FP16__
+typedef _Float16 __attribute__((vector_size(QUARTER_SIZE))) vhf_quarter_t;
+#endif
 # endif
 
 # if ELEM_COUNT >= 8
@@ -163,6 +175,7 @@ DECL_OCTET(half);
 #elif VEC_SIZE == 64
 # define B(n, s, a...)   __builtin_ia32_ ## n ## 512 ## s(a)
 # define BR(n, s, a...)  __builtin_ia32_ ## n ## 512 ## s(a, 4)
+# define BR2(n, s, a...) __builtin_ia32_ ## n ## 512 ## s ## _round(a, 4)
 #endif
 #ifndef B_
 # define B_ B
@@ -170,6 +183,9 @@ DECL_OCTET(half);
 #ifndef BR
 # define BR B
 # define BR_ B_
+#endif
+#ifndef BR2
+# define BR2 BR
 #endif
 #ifndef BR_
 # define BR_ BR

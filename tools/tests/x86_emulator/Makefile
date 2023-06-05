@@ -16,7 +16,7 @@ vpath %.c $(XEN_ROOT)/xen/lib/x86
 
 CFLAGS += $(CFLAGS_xeninclude)
 
-SIMD := 3dnow sse sse2 sse4 avx avx2 xop avx512f avx512bw avx512dq avx512er avx512vbmi
+SIMD := 3dnow sse sse2 sse4 avx avx2 xop avx512f avx512bw avx512dq avx512er avx512vbmi avx512fp16
 FMA := fma4 fma
 SG := avx2-sg avx512f-sg avx512vl-sg
 AES := ssse3-aes avx-aes avx2-vaes avx512bw-vaes
@@ -91,6 +91,9 @@ avx512vbmi-vecs := $(avx512bw-vecs)
 avx512vbmi-ints := $(avx512bw-ints)
 avx512vbmi-flts := $(avx512bw-flts)
 avx512vbmi2-vecs := $(avx512bw-vecs)
+avx512fp16-vecs := $(avx512bw-vecs)
+avx512fp16-ints :=
+avx512fp16-flts := 2
 
 avx512f-opmask-vecs := 2
 avx512dq-opmask-vecs := 1 2
@@ -248,7 +251,7 @@ $(addsuffix .c,$(GF)):
 
 $(addsuffix .h,$(SIMD) $(FMA) $(SG) $(AES) $(CLMUL) $(SHA) $(GF)): simd.h
 
-xop.h avx512f.h: simd-fma.c
+xop.h avx512f.h avx512fp16.h: simd-fma.c
 
 endif # 32-bit override
 

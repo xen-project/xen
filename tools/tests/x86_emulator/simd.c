@@ -20,6 +20,14 @@ ENTRY(simd_test);
     asm ( "vcmpsd $0, %1, %2, %0"  : "=k" (r_) : "m" (x_), "v" (y_) ); \
     r_ == 1; \
 })
+# elif VEC_SIZE == 2
+#  define eq(x, y) ({ \
+    _Float16 x_ = (x)[0]; \
+    _Float16 __attribute__((vector_size(16))) y_ = { (y)[0] }; \
+    unsigned int r_; \
+    asm ( "vcmpsh $0, %1, %2, %0"  : "=k" (r_) : "m" (x_), "v" (y_) ); \
+    r_ == 1; \
+})
 # elif FLOAT_SIZE == 4
 /*
  * gcc's (up to at least 8.2) __builtin_ia32_cmpps256_mask() has an anomaly in
@@ -31,6 +39,8 @@ ENTRY(simd_test);
 #  define eq(x, y) ((BR(cmpps, _mask, x, y, 0, -1) & ALL_TRUE) == ALL_TRUE)
 # elif FLOAT_SIZE == 8
 #  define eq(x, y) (BR(cmppd, _mask, x, y, 0, -1) == ALL_TRUE)
+# elif FLOAT_SIZE == 2
+#  define eq(x, y) (B(cmpph, _mask, x, y, 0, -1) == ALL_TRUE)
 # elif (INT_SIZE == 1 || UINT_SIZE == 1) && defined(__AVX512BW__)
 #  define eq(x, y) (B(pcmpeqb, _mask, (vqi_t)(x), (vqi_t)(y), -1) == ALL_TRUE)
 # elif (INT_SIZE == 2 || UINT_SIZE == 2) && defined(__AVX512BW__)
@@ -116,6 +126,14 @@ static inline bool _to_bool(byte_vec_t bv)
     asm ( "vcvtusi2sd%z1 %1, %0, %0" : "=v" (t_) : "m" (u_) ); \
     (vec_t){ t_[0] }; \
 })
+#  elif FLOAT_SIZE == 2
+#   define to_u_int(type, x) ({ \
+    unsigned type u_; \
+    _Float16 __attribute__((vector_size(16))) t_; \
+    asm ( "vcvtsh2usi %1, %0" : "=r" (u_) : "m" ((x)[0]) ); \
+    asm ( "vcvtusi2sh%z1 %1, %0, %0" : "=v" (t_) : "m" (u_) ); \
+    (vec_t){ t_[0] }; \
+})
 #  endif
 #  define to_uint(x) to_u_int(int, x)
 #  ifdef __x86_64__
@@ -153,6 +171,43 @@ static inline bool _to_bool(byte_vec_t bv)
 #   define to_wint(x) BR(cvtqq2pd, _mask, BR(cvtpd2qq, _mask, x, (vdi_t)undef(), ~0), undef(), ~0)
 #   define to_uwint(x) BR(cvtuqq2pd, _mask, BR(cvtpd2uqq, _mask, x, (vdi_t)undef(), ~0), undef(), ~0)
 #  endif
+# elif FLOAT_SIZE == 2
+#  define to_int(x) BR2(vcvtw2ph, _mask, BR2(vcvtph2w, _mask, x, (vhi_t)undef(), ~0), undef(), ~0)
+#  define to_uint(x) BR2(vcvtuw2ph, _mask, BR2(vcvtph2uw, _mask, x, (vhi_t)undef(), ~0), undef(), ~0)
+#  if VEC_SIZE == 16
+#   define low_half(x) (x)
+#   define high_half(x) ((vec_t)B_(movhlps, , (vsf_t)undef(), (vsf_t)(x)))
+#   define insert_half(x, y, p) ((vec_t)((p) ? B_(movlhps, , (vsf_t)(x), (vsf_t)(y)) \
+                                             : B_(shufps, , (vsf_t)(y), (vsf_t)(x), 0b11100100)))
+#  elif VEC_SIZE == 32
+#   define _half(x, lh) ((vhf_half_t)B(extracti32x4_, _mask, (vsi_t)(x), lh, (vsi_half_t){}, ~0))
+#   define low_half(x)  _half(x, 0)
+#   define high_half(x) _half(x, 1)
+#   define insert_half(x, y, p) \
+    ((vec_t)B(inserti32x4_, _mask, (vsi_t)(x), (vsi_half_t)(y), p, (vsi_t)undef(), ~0))
+#  elif VEC_SIZE == 64
+#   define _half(x, lh) \
+    ((vhf_half_t)__builtin_ia32_extracti64x4_mask((vdi_t)(x), lh, (vdi_half_t){}, ~0))
+#   define low_half(x)  _half(x, 0)
+#   define high_half(x) _half(x, 1)
+#   define insert_half(x, y, p) \
+    ((vec_t)__builtin_ia32_inserti64x4_mask((vdi_t)(x), (vdi_half_t)(y), p, (vdi_t)undef(), ~0))
+#  endif
+#  define to_w_int(x, s) ({ \
+    vhf_half_t t_ = low_half(x); \
+    vsi_t lo_, hi_; \
+    touch(t_); \
+    lo_ = BR2(vcvtph2 ## s ## dq, _mask, t_, (vsi_t)undef(), ~0); \
+    t_ = high_half(x); \
+    touch(t_); \
+    hi_ = BR2(vcvtph2 ## s ## dq, _mask, t_, (vsi_t)undef(), ~0); \
+    touch(lo_); touch(hi_); \
+    insert_half(insert_half(undef(), \
+                            BR2(vcvt ## s ## dq2ph, _mask, lo_, (vhf_half_t){}, ~0), 0), \
+                BR2(vcvt ## s ## dq2ph, _mask, hi_, (vhf_half_t){}, ~0), 1); \
+})
+#  define to_wint(x) to_w_int(x, )
+#  define to_uwint(x) to_w_int(x, u)
 # endif
 #elif VEC_SIZE == 16 && defined(__SSE2__)
 # if FLOAT_SIZE == 4
@@ -240,10 +295,18 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  define scale(x, y) scalar_2op(x, y, "vscalefsd %[in2], %[in1], %[out]")
 #  define sqrt(x) scalar_1op(x, "vsqrtsd %[in], %[out], %[out]")
 #  define trunc(x) scalar_1op(x, "vrndscalesd $0b1011, %[in], %[out], %[out]")
+# elif FLOAT_SIZE == 2
+#  define getexp(x) scalar_1op(x, "vgetexpsh %[in], %[out], %[out]")
+#  define getmant(x) scalar_1op(x, "vgetmantsh $0, %[in], %[out], %[out]")
+#  define recip(x) scalar_1op(x, "vrcpsh %[in], %[out], %[out]")
+#  define rsqrt(x) scalar_1op(x, "vrsqrtsh %[in], %[out], %[out]")
+#  define scale(x, y) scalar_2op(x, y, "vscalefsh %[in2], %[in1], %[out]")
+#  define sqrt(x) scalar_1op(x, "vsqrtsh %[in], %[out], %[out]")
+#  define trunc(x) scalar_1op(x, "vrndscalesh $0b1011, %[in], %[out], %[out]")
 # endif
 #elif defined(FLOAT_SIZE) && defined(__AVX512F__) && \
       (VEC_SIZE == 64 || defined(__AVX512VL__))
-# if ELEM_COUNT == 8 /* vextractf{32,64}x4 */ || \
+# if (ELEM_COUNT == 8 && ELEM_SIZE >= 4) /* vextractf{32,64}x4 */ || \
      (ELEM_COUNT == 16 && ELEM_SIZE == 4 && defined(__AVX512DQ__)) /* vextractf32x8 */ || \
      (ELEM_COUNT == 4 && ELEM_SIZE == 8 && defined(__AVX512DQ__)) /* vextractf64x2 */
 #  define _half(x, lh) ({ \
@@ -398,6 +461,21 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
                          VEC_SIZE == 32 ? 0b01 : 0b00011011, undef(), ~0), \
                        0b01010101, undef(), ~0)
 #  endif
+# elif FLOAT_SIZE == 2
+#  define frac(x) BR2(reduceph, _mask, x, 0b00001011, undef(), ~0)
+#  define getexp(x) BR(getexpph, _mask, x, undef(), ~0)
+#  define getmant(x) BR(getmantph, _mask, x, 0, undef(), ~0)
+#  define max(x, y) BR2(maxph, _mask, x, y, undef(), ~0)
+#  define min(x, y) BR2(minph, _mask, x, y, undef(), ~0)
+#  define scale(x, y) BR2(scalefph, _mask, x, y, undef(), ~0)
+#  define recip(x) B(rcpph, _mask, x, undef(), ~0)
+#  define rsqrt(x) B(rsqrtph, _mask, x, undef(), ~0)
+#  define shrink1(x) BR2(vcvtps2phx, _mask, (vsf_t)(x), (vhf_half_t){}, ~0)
+#  define shrink2(x) BR2(vcvtpd2ph, _mask, (vdf_t)(x), (vhf_quarter_t){}, ~0)
+#  define sqrt(x) BR2(sqrtph, _mask, x, undef(), ~0)
+#  define trunc(x) BR2(rndscaleph, _mask, x, 0b1011, undef(), ~0)
+#  define widen1(x) ((vec_t)BR2(vcvtph2psx, _mask, x, (vsf_t)undef(), ~0))
+#  define widen2(x) ((vec_t)BR2(vcvtph2pd, _mask, x, (vdf_t)undef(), ~0))
 # endif
 #elif FLOAT_SIZE == 4 && defined(__SSE__)
 # if VEC_SIZE == 32 && defined(__AVX__)
@@ -919,6 +997,16 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 # elif FLOAT_SIZE == 8
 #  define dup_lo(x) B(movddup, _mask, x, undef(), ~0)
 # endif
+#endif
+#if FLOAT_SIZE == 2 && ELEM_COUNT > 1
+# define dup_hi(x) ((vec_t)B(pshufhw, _mask, \
+                             B(pshuflw, _mask, (vhi_t)(x), 0b11110101, \
+                               (vhi_t)undef(), ~0), \
+                             0b11110101, (vhi_t)undef(), ~0))
+# define dup_lo(x) ((vec_t)B(pshufhw, _mask, \
+                             B(pshuflw, _mask, (vhi_t)(x), 0b10100000, \
+                               (vhi_t)undef(), ~0), \
+                             0b10100000, (vhi_t)undef(), ~0))
 #endif
 #if VEC_SIZE == 16 && defined(__SSSE3__) && !defined(__AVX512VL__)
 # if INT_SIZE == 1

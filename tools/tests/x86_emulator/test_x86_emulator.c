@@ -43,6 +43,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512er.h"
 #include "avx512vbmi.h"
 #include "avx512vbmi2-vpclmulqdq.h"
+#include "avx512fp16.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -247,6 +248,16 @@ static bool simd_check_avx512bw_gf(void)
 static bool simd_check_avx512bw_gf_vl(void)
 {
     return cpu_has_gfni && cpu_has_avx512vl;
+}
+
+static bool simd_check_avx512fp16(void)
+{
+    return cpu_has_avx512_fp16;
+}
+
+static bool simd_check_avx512fp16_vl(void)
+{
+    return cpu_has_avx512_fp16 && cpu_has_avx512vl;
 }
 
 static void simd_set_regs(struct cpu_user_regs *regs)
@@ -513,6 +524,10 @@ static const struct {
     AVX512VL(_VBMI+VL u16x8, avx512vbmi,    16u2),
     AVX512VL(_VBMI+VL s16x16, avx512vbmi,   32i2),
     AVX512VL(_VBMI+VL u16x16, avx512vbmi,   32u2),
+    SIMD(AVX512_FP16 f16 scal,avx512fp16,     f2),
+    SIMD(AVX512_FP16 f16x32, avx512fp16,    64f2),
+    AVX512VL(_FP16+VL f16x8, avx512fp16,    16f2),
+    AVX512VL(_FP16+VL f16x16,avx512fp16,    32f2),
     SIMD(SHA,                sse4_sha,        16),
     SIMD(AVX+SHA,             avx_sha,        16),
     AVX512VL(VL+SHA,      avx512f_sha,        16),
