@@ -2047,6 +2047,8 @@ static const struct evex {
 }, evex_map5[] = {
     { { 0x10 }, 2, T, R, pfx_f3, W0, LIG }, /* vmovsh */
     { { 0x11 }, 2, T, W, pfx_f3, W0, LIG }, /* vmovsh */
+    { { 0x1d }, 2, T, R, pfx_66, W0, Ln }, /* vcvtps2phx */
+    { { 0x1d }, 2, T, R, pfx_no, W0, LIG }, /* vcvtss2sh */
     { { 0x2e }, 2, T, R, pfx_no, W0, LIG }, /* vucomish */
     { { 0x2f }, 2, T, R, pfx_no, W0, LIG }, /* vcomish */
     { { 0x51 }, 2, T, R, pfx_no, W0, Ln }, /* vsqrtph */
@@ -2055,6 +2057,10 @@ static const struct evex {
     { { 0x58 }, 2, T, R, pfx_f3, W0, LIG }, /* vaddsh */
     { { 0x59 }, 2, T, R, pfx_no, W0, Ln }, /* vmulph */
     { { 0x59 }, 2, T, R, pfx_f3, W0, LIG }, /* vmulsh */
+    { { 0x5a }, 2, T, R, pfx_no, W0, Ln }, /* vcvtph2pd */
+    { { 0x5a }, 2, T, R, pfx_66, W1, Ln }, /* vcvtpd2ph */
+    { { 0x5a }, 2, T, R, pfx_f3, W0, LIG }, /* vcvtsh2sd */
+    { { 0x5a }, 2, T, R, pfx_f2, W1, LIG }, /* vcvtsd2sh */
     { { 0x5c }, 2, T, R, pfx_no, W0, Ln }, /* vsubph */
     { { 0x5c }, 2, T, R, pfx_f3, W0, LIG }, /* vsubsh */
     { { 0x5d }, 2, T, R, pfx_no, W0, Ln }, /* vminph */
@@ -2072,6 +2078,8 @@ static const struct evex {
     { { 0x7d }, 2, T, R, pfx_f2, W0, Ln }, /* vcvtuwph */
     { { 0x7e }, 2, T, W, pfx_66, WIG, L0 }, /* vmovw */
 }, evex_map6[] = {
+    { { 0x13 }, 2, T, R, pfx_66, W0, Ln }, /* vcvtph2psx */
+    { { 0x13 }, 2, T, R, pfx_no, W0, LIG }, /* vcvtsh2ss */
     { { 0x2c }, 2, T, R, pfx_66, W0, Ln }, /* vscalefph */
     { { 0x2d }, 2, T, R, pfx_66, W0, LIG }, /* vscalefsh */
     { { 0x42 }, 2, T, R, pfx_66, W0, Ln }, /* vgetexpph */

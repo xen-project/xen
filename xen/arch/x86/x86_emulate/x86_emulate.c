@@ -7781,14 +7781,25 @@ x86_emulate(
         generate_exception_if(evex.w, X86_EXC_UD);
         goto avx512f_all_fp;
 
+    CASE_SIMD_ALL_FP(_EVEX, 5, 0x5a):  /* vcvtp{h,d}2p{h,d} [xyz]mm/mem,[xyz]mm{k} */
+                                       /* vcvts{h,d}2s{h,d} xmm/mem,xmm,xmm{k} */
+        host_and_vcpu_must_have(avx512_fp16);
+        if ( vex.pfx & VEX_PREFIX_SCALAR_MASK )
+            d &= ~TwoOp;
+        op_bytes = 2 << (((evex.pfx & VEX_PREFIX_SCALAR_MASK) ? 0 : 1 + evex.lr) +
+                         2 * evex.w);
+        goto avx512f_all_fp;
+
     case X86EMUL_OPC_EVEX   (5, 0x7c): /* vcvttph2uw [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(5, 0x7c): /* vcvttph2w [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX   (5, 0x7d): /* vcvtph2uw [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(5, 0x7d): /* vcvtph2w [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_F3(5, 0x7d): /* vcvtw2ph [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_F2(5, 0x7d): /* vcvtuw2ph [xyz]mm/mem,[xyz]mm{k} */
-        op_bytes = 16 << evex.lr;
+    case X86EMUL_OPC_EVEX_66(6, 0x13): /* vcvtph2psx [xy]mm/mem,[xyz]mm{k} */
+        op_bytes = 8 << ((ext == ext_map5) + evex.lr);
         /* fall through */
+    case X86EMUL_OPC_EVEX_66(5, 0x1d): /* vcvtps2phx [xyz]mm/mem,[xy]mm{k} */
     case X86EMUL_OPC_EVEX_66(6, 0x2c): /* vscalefph [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(6, 0x42): /* vgetexpph [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(6, 0x96): /* vfmaddsub132ph [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
@@ -7815,6 +7826,8 @@ x86_emulate(
             avx512_vlen_check(false);
         goto simd_zmm;
 
+    case X86EMUL_OPC_EVEX(5, 0x1d):    /* vcvtss2sh xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX(6, 0x13):    /* vcvtsh2ss xmm/mem,xmm,xmm{k} */
     case X86EMUL_OPC_EVEX_66(6, 0x2d): /* vscalefsh xmm/m16,xmm,xmm{k} */
     case X86EMUL_OPC_EVEX_66(6, 0x43): /* vgetexpsh xmm/m16,xmm,xmm{k} */
     case X86EMUL_OPC_EVEX_66(6, 0x99): /* vfmadd132sh xmm/m16,xmm,xmm{k} */

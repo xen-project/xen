@@ -212,7 +212,9 @@ static const struct twobyte_table {
     [0x14 ... 0x15] = { DstImplicit|SrcMem|ModRM, simd_packed_fp, d8s_vl },
     [0x16] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, 3 },
     [0x17] = { DstMem|SrcImplicit|ModRM|Mov, simd_other, 3 },
-    [0x18 ... 0x1f] = { ImplicitOps|ModRM },
+    [0x18 ... 0x1c] = { ImplicitOps|ModRM },
+    [0x1d] = { ImplicitOps|ModRM, simd_none, d8s_vl },
+    [0x1e ... 0x1f] = { ImplicitOps|ModRM },
     [0x20 ... 0x21] = { DstMem|SrcImplicit|ModRM },
     [0x22 ... 0x23] = { DstImplicit|SrcMem|ModRM },
     [0x28] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_fp, d8s_vl },
@@ -1471,6 +1473,19 @@ int x86emul_decode(struct x86_emulate_state *s,
                     s->fp16 = true;
                 break;
 
+            case 0x1d: /* vcvtps2phx / vcvtss2sh */
+                if ( s->evex.pfx & VEX_PREFIX_SCALAR_MASK )
+                    break;
+                d = DstReg | SrcMem;
+                if ( s->evex.pfx & VEX_PREFIX_DOUBLE_MASK )
+                {
+                    s->simd_size = simd_packed_fp;
+                    d |= TwoOp;
+                }
+                else
+                    s->simd_size = simd_scalar_vexw;
+                break;
+
             case 0x2e: case 0x2f: /* v{,u}comish */
                 if ( !s->evex.pfx )
                     s->fp16 = true;
@@ -1495,6 +1510,15 @@ int x86emul_decode(struct x86_emulate_state *s,
 
             /* Like above re-use twobyte_table[] here. */
             disp8scale = decode_disp8scale(twobyte_table[b].d8s, s);
+
+            switch ( b )
+            {
+            case 0x5a: /* vcvtph2pd needs special casing */
+                if ( !s->evex.pfx && !s->evex.brs )
+                    disp8scale -= 2;
+                break;
+            }
+
             break;
 
         case ext_map6:
@@ -1513,6 +1537,17 @@ int x86emul_decode(struct x86_emulate_state *s,
             default:
                 if ( s->evex.pfx == vex_66 )
                     s->fp16 = true;
+                break;
+
+            case 0x13: /* vcvtph2psx / vcvtsh2ss */
+                if ( s->evex.pfx & VEX_PREFIX_SCALAR_MASK )
+                    break;
+                s->fp16 = true;
+                if ( !(s->evex.pfx & VEX_PREFIX_DOUBLE_MASK) )
+                {
+                    s->simd_size = simd_scalar_vexw;
+                    d &= ~TwoOp;
+                }
                 break;
 
             case 0x56: case 0x57: /* vf{,c}maddc{p,s}h */
