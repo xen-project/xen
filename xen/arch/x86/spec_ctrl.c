@@ -1132,7 +1132,10 @@ void __init init_speculation_mitigations(void)
     if ( read_cr4() & X86_CR4_CET )
     {
         if ( !has_spec_ctrl )
+        {
             printk(XENLOG_WARNING "?!? CET active, but no MSR_SPEC_CTRL?\n");
+            add_taint(TAINT_CPU_OUT_OF_SPEC);
+        }
         else if ( opt_ibrs == -1 )
             opt_ibrs = ibrs = true;
 
