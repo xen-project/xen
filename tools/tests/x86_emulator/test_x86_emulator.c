@@ -4710,6 +4710,44 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing vfpclassphz $0x46,128(%ecx),%k3...");
+    if ( stack_exec && cpu_has_avx512_fp16 )
+    {
+        decl_insn(vfpclassph);
+
+        asm volatile ( put_insn(vfpclassph,
+                                /* 0x46: check for +/- 0 and neg. */
+                                /* vfpclassphz $0x46, 128(%0), %%k3 */
+                                ".byte 0x62, 0xf3, 0x7c, 0x48\n\t"
+                                ".byte 0x66, 0x59, 0x02, 0x46")
+                       :: "c" (NULL) );
+
+        set_insn(vfpclassph);
+        for ( i = 0; i < 3; ++i )
+        {
+            res[16 + i * 5 + 0] = 0x7fff0000; /* +0 / +NaN */
+            res[16 + i * 5 + 1] = 0xffff8000; /* -0 / -NaN */
+            res[16 + i * 5 + 2] = 0x80010001; /* +DEN / -DEN */
+            res[16 + i * 5 + 3] = 0xfc00f800; /* -FIN / -INF */
+            res[16 + i * 5 + 4] = 0x7c007800; /* +FIN / +INF */
+        }
+        res[31] = 0;
+        regs.ecx = (unsigned long)res - 64;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vfpclassph) )
+            goto fail;
+        asm volatile ( "kmovd %%k3, %0" : "=g" (rc) );
+        /*
+         * 0b11(0001100101)*3
+         * 0b1100_0110_0101_0001_1001_0100_0110_0101
+         */
+        if ( rc != 0xc6519465 )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     /*
      * The following compress/expand tests are not only making sure the
      * accessed data is correct, but they also verify (by placing operands

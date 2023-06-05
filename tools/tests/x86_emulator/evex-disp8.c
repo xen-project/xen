@@ -76,6 +76,7 @@ enum esz {
     ESZ_b,
     ESZ_w,
     ESZ_bw,
+    ESZ_fp16,
 };
 
 #ifndef __i386__
@@ -601,6 +602,19 @@ static const struct test avx512_vpopcntdq_all[] = {
     INSN(popcnt, 66, 0f38, 55, vl, dq, vl)
 };
 
+static const struct test avx512_fp16_all[] = {
+    INSN(cmpph,           , 0f3a, c2,    vl, fp16, vl),
+    INSN(cmpsh,         f3, 0f3a, c2,    el, fp16, el),
+    INSN(fpclassph,       , 0f3a, 66,    vl, fp16, vl),
+    INSN(fpclasssh,       , 0f3a, 67,    el, fp16, el),
+    INSN(getmantph,       , 0f3a, 26,    vl, fp16, vl),
+    INSN(getmantsh,       , 0f3a, 27,    el, fp16, el),
+    INSN(reduceph,        , 0f3a, 56,    vl, fp16, vl),
+    INSN(reducesh,        , 0f3a, 57,    el, fp16, el),
+    INSN(rndscaleph,      , 0f3a, 08,    vl, fp16, vl),
+    INSN(rndscalesh,      , 0f3a, 0a,    el, fp16, el),
+};
+
 static const struct test gfni_all[] = {
     INSN(gf2p8affineinvqb, 66, 0f3a, cf, vl, q, vl),
     INSN(gf2p8affineqb,    66, 0f3a, ce, vl, q, vl),
@@ -728,8 +742,10 @@ static void test_one(const struct test *test, enum vl vl,
         break;
 
     case ESZ_w:
-        esz = 2;
         evex.w = 1;
+        /* fall through */
+    case ESZ_fp16:
+        esz = 2;
         break;
 
 #ifdef __i386__
@@ -845,7 +861,7 @@ static void test_one(const struct test *test, enum vl vl,
     case ESZ_b: case ESZ_w: case ESZ_bw:
         return;
 
-    case ESZ_d: case ESZ_q:
+    case ESZ_d: case ESZ_q: case ESZ_fp16:
         break;
 
     default:
@@ -1002,6 +1018,7 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512_vnni, all);
     RUN(avx512_vp2intersect, all);
     RUN(avx512_vpopcntdq, all);
+    RUN(avx512_fp16, all);
 
     if ( cpu_has_avx512f )
     {

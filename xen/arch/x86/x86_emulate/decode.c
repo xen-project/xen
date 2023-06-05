@@ -508,6 +508,7 @@ static const struct ext0f3a_table {
     [0x7a ... 0x7b] = { .simd_size = simd_scalar_opc, .four_op = 1 },
     [0x7c ... 0x7d] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x7e ... 0x7f] = { .simd_size = simd_scalar_opc, .four_op = 1 },
+    [0xc2] = { .simd_size = simd_any_fp, .d8s = d8s_vl },
     [0xcc] = { .simd_size = simd_other },
     [0xce ... 0xcf] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0xdf] = { .simd_size = simd_packed_int, .two_op = 1 },
@@ -569,7 +570,7 @@ static unsigned int decode_disp8scale(enum disp8scale scale,
         if ( s->evex.brs )
         {
     case d8s_dq:
-            return 2 + s->evex.w;
+            return 1 + !s->fp16 + s->evex.w;
         }
         break;
 
@@ -586,7 +587,7 @@ static unsigned int decode_disp8scale(enum disp8scale scale,
         /* fall through */
     case simd_scalar_opc:
     case simd_scalar_vexw:
-        return 2 + s->evex.w;
+        return 1 + !s->fp16 + s->evex.w;
 
     case simd_128:
         /* These should have an explicit size specified. */
@@ -1406,7 +1407,29 @@ int x86emul_decode(struct x86_emulate_state *s,
              */
             s->simd_size = ext0f3a_table[b].simd_size;
             if ( evex_encoded() )
+            {
+                switch ( b )
+                {
+                case 0x08: /* vrndscaleph */
+                case 0x0a: /* vrndscalesh */
+                case 0x26: /* vfpclassph */
+                case 0x27: /* vfpclasssh */
+                case 0x56: /* vgetmantph */
+                case 0x57: /* vgetmantsh */
+                case 0x66: /* vreduceph */
+                case 0x67: /* vreducesh */
+                    if ( !s->evex.pfx )
+                        s->fp16 = true;
+                    break;
+
+                case 0xc2: /* vpcmp{p,s}h */
+                    if ( !(s->evex.pfx & VEX_PREFIX_DOUBLE_MASK) )
+                        s->fp16 = true;
+                    break;
+                }
+
                 disp8scale = decode_disp8scale(ext0f3a_table[b].d8s, s);
+            }
             break;
 
         case ext_8f09:
@@ -1701,7 +1724,7 @@ int x86emul_decode(struct x86_emulate_state *s,
             break;
         case vex_f3:
             generate_exception_if(evex_encoded() && s->evex.w, X86_EXC_UD);
-            s->op_bytes = 4;
+            s->op_bytes = 4 >> s->fp16;
             break;
         case vex_f2:
             generate_exception_if(evex_encoded() && !s->evex.w, X86_EXC_UD);
@@ -1711,11 +1734,11 @@ int x86emul_decode(struct x86_emulate_state *s,
         break;
 
     case simd_scalar_opc:
-        s->op_bytes = 4 << (ctxt->opcode & 1);
+        s->op_bytes = 2 << (!s->fp16 + (ctxt->opcode & 1));
         break;
 
     case simd_scalar_vexw:
-        s->op_bytes = 4 << s->vex.w;
+        s->op_bytes = 2 << (!s->fp16 + s->vex.w);
         break;
 
     case simd_128:
