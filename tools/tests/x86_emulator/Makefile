@@ -104,11 +104,13 @@ TARGET-y := $(TARGET)
 
 ifeq ($(filter run%,$(MAKECMDGOALS)),)
 
-define simd-check-cc
+define isa-check-cc
 TARGET-$(shell echo 'int i;' | $(CC) -x c -c -o /dev/null -m$(1) - || echo y) :=
 endef
 
-$(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-check-cc,$(flavor))))
+ISA := bmi bmi2 tbm sse4.1 sse4.2 sse4a avx avx2 f16c
+ISA += $(addprefix avx512,f bw dq 4fmaps)
+$(foreach isa,$(ISA),$(eval $(call isa-check-cc,$(isa))))
 
 # Also explicitly check for {evex} pseudo-prefix support, which got introduced
 # only after AVX512F and some of its extensions.
