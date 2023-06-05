@@ -7841,6 +7841,34 @@ x86_emulate(
         avx512_vlen_check(true);
         goto simd_zmm;
 
+    case X86EMUL_OPC_EVEX_F3(6, 0x56): /* vfmaddcph [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F2(6, 0x56): /* vfcmaddcph [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F3(6, 0xd6): /* vfmulcph [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F2(6, 0xd6): /* vfcmulcph [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        op_bytes = 16 << evex.lr;
+        /* fall through */
+    case X86EMUL_OPC_EVEX_F3(6, 0x57): /* vfmaddcsh xmm/m16,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_F2(6, 0x57): /* vfcmaddcsh xmm/m16,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_F3(6, 0xd7): /* vfmulcsh xmm/m16,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_F2(6, 0xd7): /* vfcmulcsh xmm/m16,xmm,xmm{k} */
+    {
+        unsigned int src1 = ~evex.reg;
+
+        host_and_vcpu_must_have(avx512_fp16);
+        generate_exception_if(evex.w || ((b & 1) && ea.type != OP_REG && evex.brs),
+                              X86_EXC_UD);
+        if ( mode_64bit() )
+            src1 = (src1 & 0xf) | (!evex.RX << 4);
+        else
+            src1 &= 7;
+        generate_exception_if(modrm_reg == src1 ||
+                              (ea.type != OP_MEM && modrm_reg == modrm_rm),
+                              X86_EXC_UD);
+        if ( ea.type != OP_REG || (b & 1) || !evex.brs )
+            avx512_vlen_check(!(b & 1));
+        goto simd_zmm;
+    }
+
     case X86EMUL_OPC_XOP(08, 0x85): /* vpmacssww xmm,xmm/m128,xmm,xmm */
     case X86EMUL_OPC_XOP(08, 0x86): /* vpmacsswd xmm,xmm/m128,xmm,xmm */
     case X86EMUL_OPC_XOP(08, 0x87): /* vpmacssdql xmm,xmm/m128,xmm,xmm */

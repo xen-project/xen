@@ -367,6 +367,8 @@ static const struct ext0f38_table {
     [0x4f] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0x50 ... 0x53] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x54 ... 0x55] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
+    [0x56] = { .simd_size = simd_other, .d8s = d8s_vl },
+    [0x57] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0x58] = { .simd_size = simd_other, .two_op = 1, .d8s = 2 },
     [0x59] = { .simd_size = simd_other, .two_op = 1, .d8s = 3 },
     [0x5a] = { .simd_size = simd_128, .two_op = 1, .d8s = 4 },
@@ -431,6 +433,8 @@ static const struct ext0f38_table {
     [0xcc] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0xcd] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xcf] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
+    [0xd6] = { .simd_size = simd_other, .d8s = d8s_vl },
+    [0xd7] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xdb] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0xdc ... 0xdf] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0xf0] = { .two_op = 1 },
@@ -1503,6 +1507,10 @@ int x86emul_decode(struct x86_emulate_state *s,
             default:
                 if ( s->evex.pfx == vex_66 )
                     s->fp16 = true;
+                break;
+
+            case 0x56: case 0x57: /* vf{,c}maddc{p,s}h */
+            case 0xd6: case 0xd7: /* vf{,c}mulc{p,s}h */
                 break;
             }
 

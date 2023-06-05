@@ -2074,6 +2074,10 @@ static const struct evex {
     { { 0x4d }, 2, T, R, pfx_66, W0, LIG }, /* vrcpsh */
     { { 0x4e }, 2, T, R, pfx_66, W0, Ln }, /* vrsqrtph */
     { { 0x4f }, 2, T, R, pfx_66, W0, LIG }, /* vrsqrtsh */
+    { { 0x56 }, 2, T, R, pfx_f3, W0, Ln }, /* vfmaddcph */
+    { { 0x56 }, 2, T, R, pfx_f2, W0, Ln }, /* vfcmaddcph */
+    { { 0x57 }, 2, T, R, pfx_f3, W0, LIG }, /* vfmaddcsh */
+    { { 0x57 }, 2, T, R, pfx_f2, W0, LIG }, /* vfcmaddcsh */
     { { 0x96 }, 2, T, R, pfx_66, W0, Ln }, /* vfmaddsub132ph */
     { { 0x97 }, 2, T, R, pfx_66, W0, Ln }, /* vfmsubadd132ph */
     { { 0x98 }, 2, T, R, pfx_66, W0, Ln }, /* vfmadd132ph */
@@ -2104,6 +2108,10 @@ static const struct evex {
     { { 0xbd }, 2, T, R, pfx_66, W0, LIG }, /* vfnmadd231sh */
     { { 0xbe }, 2, T, R, pfx_66, W0, Ln }, /* vfnmsub231ph */
     { { 0xbf }, 2, T, R, pfx_66, W0, LIG }, /* vfnmsub231sh */
+    { { 0xd6 }, 2, T, R, pfx_f3, W0, Ln }, /* vfmulcph */
+    { { 0xd6 }, 2, T, R, pfx_f2, W0, Ln }, /* vfcmulcph */
+    { { 0xd7 }, 2, T, R, pfx_f3, W0, LIG }, /* vfmulcsh */
+    { { 0xd7 }, 2, T, R, pfx_f2, W0, LIG }, /* vfcmulcsh */
 };
 
 static const struct {
