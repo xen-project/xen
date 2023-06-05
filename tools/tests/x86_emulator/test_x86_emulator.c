@@ -5173,6 +5173,76 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing vmovsh 8(%ecx),%xmm5...");
+    if ( stack_exec && cpu_has_avx512_fp16 )
+    {
+        decl_insn(vmovsh_from_mem);
+        decl_insn(vmovw_to_gpr);
+
+        asm volatile ( "vpcmpeqw %%ymm5, %%ymm5, %%ymm5\n\t"
+                       put_insn(vmovsh_from_mem,
+                                /* vmovsh 8(%0), %%xmm5 */
+                                ".byte 0x62, 0xf5, 0x7e, 0x08\n\t"
+                                ".byte 0x10, 0x69, 0x04")
+                       :: "c" (NULL) );
+
+        set_insn(vmovsh_from_mem);
+        res[2] = 0x3c00bc00;
+        regs.ecx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || !check_eip(vmovsh_from_mem) )
+            goto fail;
+        asm volatile ( "kmovw     %2, %%k1\n\t"
+                       "vmovdqu16 %1, %%zmm4%{%%k1%}%{z%}\n\t"
+                       "vpcmpeqw  %%zmm4, %%zmm5, %%k0\n\t"
+                       "kmovw     %%k0, %0"
+                       : "=g" (rc)
+                       : "m" (res[2]), "r" (1) );
+        if ( rc != 0xffff )
+            goto fail;
+        printf("okay\n");
+
+        printf("%-40s", "Testing vmovsh %xmm4,2(%eax){%k3}...");
+        memset(res, ~0, 8);
+        res[2] = 0xbc00ffff;
+        memset(res + 3, ~0, 8);
+        regs.eax = (unsigned long)res;
+        regs.ecx = ~0;
+        for ( i = 0; i < 2; ++i )
+        {
+            decl_insn(vmovsh_to_mem);
+
+            asm volatile ( "kmovw %1, %%k3\n\t"
+                           put_insn(vmovsh_to_mem,
+                                    /* vmovsh %%xmm4, 2(%0)%{%%k3%} */
+                                    ".byte 0x62, 0xf5, 0x7e, 0x0b\n\t"
+                                    ".byte 0x11, 0x60, 0x01")
+                           :: "a" (NULL), "r" (i) );
+
+            set_insn(vmovsh_to_mem);
+            rc = x86_emulate(&ctxt, &emulops);
+            if ( (rc != X86EMUL_OKAY) || !check_eip(vmovsh_to_mem) ||
+                 memcmp(res, res + 3 - i, 8) )
+                goto fail;
+        }
+        printf("okay\n");
+
+        printf("%-40s", "Testing vmovw %xmm5,%ecx...");
+        asm volatile ( put_insn(vmovw_to_gpr,
+                                /* vmovw %%xmm5, %0 */
+                                ".byte 0x62, 0xf5, 0x7d, 0x08\n\t"
+                                ".byte 0x7e, 0xe9")
+                       :: "c" (NULL) );
+        set_insn(vmovw_to_gpr);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || !check_eip(vmovw_to_gpr) ||
+             regs.ecx != 0xbc00 )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing invpcid 16(%ecx),%%edx...");
     if ( stack_exec )
     {

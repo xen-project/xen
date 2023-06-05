@@ -575,7 +575,7 @@ static unsigned int decode_disp8scale(enum disp8scale scale,
         break;
 
     case d8s_dq64:
-        return 2 + (s->op_bytes == 8);
+        return 1 + !s->fp16 + (s->op_bytes == 8);
     }
 
     switch ( s->simd_size )
@@ -1455,6 +1455,15 @@ int x86emul_decode(struct x86_emulate_state *s,
 
             case 0x2e: case 0x2f: /* v{,u}comish */
                 if ( !s->evex.pfx )
+                    s->fp16 = true;
+                s->simd_size = simd_none;
+                break;
+
+            case 0x6e: /* vmovw r/m16, xmm */
+                d = (d & ~SrcMask) | SrcMem16;
+                /* fall through */
+            case 0x7e: /* vmovw xmm, r/m16 */
+                if ( s->evex.pfx == vex_66 )
                     s->fp16 = true;
                 s->simd_size = simd_none;
                 break;

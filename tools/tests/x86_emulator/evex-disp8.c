@@ -622,6 +622,8 @@ static const struct test avx512_fp16_all[] = {
     INSN(maxsh,         f3, map5, 5f,    el, fp16, el),
     INSN(minph,           , map5, 5d,    vl, fp16, vl),
     INSN(minsh,         f3, map5, 5d,    el, fp16, el),
+    INSN(movsh,         f3, map5, 10,    el, fp16, el),
+    INSN(movsh,         f3, map5, 11,    el, fp16, el),
     INSN(mulph,           , map5, 59,    vl, fp16, vl),
     INSN(mulsh,         f3, map5, 59,    el, fp16, el),
     INSN(reduceph,        , 0f3a, 56,    vl, fp16, vl),
@@ -633,6 +635,11 @@ static const struct test avx512_fp16_all[] = {
     INSN(subph,           , map5, 5c,    vl, fp16, vl),
     INSN(subsh,         f3, map5, 5c,    el, fp16, el),
     INSN(ucomish,         , map5, 2e,    el, fp16, el),
+};
+
+static const struct test avx512_fp16_128[] = {
+    INSN(movw, 66, map5, 6e, el, fp16, el),
+    INSN(movw, 66, map5, 7e, el, fp16, el),
 };
 
 static const struct test gfni_all[] = {
@@ -1039,6 +1046,7 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512_vp2intersect, all);
     RUN(avx512_vpopcntdq, all);
     RUN(avx512_fp16, all);
+    RUN(avx512_fp16, 128);
 
     if ( cpu_has_avx512f )
     {

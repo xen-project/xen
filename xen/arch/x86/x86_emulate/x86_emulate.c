@@ -4357,6 +4357,15 @@ x86_emulate(
 
 #ifndef X86EMUL_NO_SIMD
 
+    case X86EMUL_OPC_EVEX_66(5, 0x7e): /* vmovw xmm,r/m16 */
+        ASSERT(dst.bytes >= 4);
+        if ( dst.type == OP_MEM )
+            dst.bytes = 2;
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(5, 0x6e): /* vmovw r/m16,xmm */
+        host_and_vcpu_must_have(avx512_fp16);
+        generate_exception_if(evex.w, X86_EXC_UD);
+        /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f, 0x6e): /* vmov{d,q} r/m,xmm */
     case X86EMUL_OPC_EVEX_66(0x0f, 0x7e): /* vmov{d,q} xmm,r/m */
         generate_exception_if((evex.lr || evex.opmsk || evex.brs ||
@@ -7748,8 +7757,18 @@ x86_emulate(
 
 #ifndef X86EMUL_NO_SIMD
 
+    case X86EMUL_OPC_EVEX_F3(5, 0x10):   /* vmovsh m16,xmm{k} */
+                                         /* vmovsh xmm,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_F3(5, 0x11):   /* vmovsh xmm,m16{k} */
+                                         /* vmovsh xmm,xmm,xmm{k} */
+        generate_exception_if(evex.brs, X86_EXC_UD);
+        if ( ea.type == OP_MEM )
+            d |= TwoOp;
+        else
+        {
     case X86EMUL_OPC_EVEX_F3(5, 0x51):   /* vsqrtsh xmm/m16,xmm,xmm{k} */
-        d &= ~TwoOp;
+            d &= ~TwoOp;
+        }
         /* fall through */
     case X86EMUL_OPC_EVEX(5, 0x51):      /* vsqrtph [xyz]mm/mem,[xyz]mm{k} */
     CASE_SIMD_SINGLE_FP(_EVEX, 5, 0x58): /* vadd{p,s}h [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
