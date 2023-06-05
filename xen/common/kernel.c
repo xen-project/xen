@@ -339,7 +339,7 @@ unsigned int tainted;
  *  'H' - HVM forced emulation prefix is permitted.
  *  'M' - Machine had a machine check experience.
  *  'U' - Platform is unsecure (usually due to an errata on the platform).
- *  'S' - Out of spec CPU (One core has a feature incompatible with others).
+ *  'S' - Out of spec CPU (Incompatible features on one or more cores).
  *
  *      The string is overwritten by the next call to print_taint().
  */
