@@ -132,8 +132,6 @@
 
 #define DIV_ROUNDUP(n, d) (((n) + (d) - 1) / (d))
 
-#define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
-
 #define LIBXL__LOGGING_ENABLED
 
 #ifdef LIBXL__LOGGING_ENABLED

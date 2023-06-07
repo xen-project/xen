@@ -73,6 +73,7 @@
 #endif
 
 #define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
+#define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
 
 #ifndef __must_check
 #define __must_check __attribute__((__warn_unused_result__))
