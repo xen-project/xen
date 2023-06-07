@@ -286,7 +286,7 @@ static int __init pl011_dt_uart_init(struct dt_device_node *dev,
     int res;
     paddr_t addr, size;
     uint32_t io_width;
-    bool mmio32 = false;
+    bool mmio32 = false, sbsa;
 
     if ( strcmp(config, "") )
     {
@@ -320,7 +320,9 @@ static int __init pl011_dt_uart_init(struct dt_device_node *dev,
         }
     }
 
-    res = pl011_uart_init(res, addr, size, false, mmio32);
+    sbsa = dt_device_is_compatible(dev, "arm,sbsa-uart");
+
+    res = pl011_uart_init(res, addr, size, sbsa, mmio32);
     if ( res < 0 )
     {
         printk("pl011: Unable to initialize\n");
@@ -335,6 +337,8 @@ static int __init pl011_dt_uart_init(struct dt_device_node *dev,
 static const struct dt_device_match pl011_dt_match[] __initconst =
 {
     DT_MATCH_COMPATIBLE("arm,pl011"),
+    /* No need for a separate struct as SBSA UART is a subset of PL011 */
+    DT_MATCH_COMPATIBLE("arm,sbsa-uart"),
     { /* sentinel */ },
 };
 
