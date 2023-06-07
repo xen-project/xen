@@ -2955,6 +2955,8 @@ Currently, only the "sbsa_uart" model is supported for ARM.
 
 =back
 
+=over 4
+
 =item B<sve="vl">
 
 The `sve` parameter enables Arm Scalable Vector Extension (SVE) usage for the
