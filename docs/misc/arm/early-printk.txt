@@ -26,6 +26,9 @@ Other options depends on the driver selected:
       If CONFIG_EARLY_UART_PL011_BAUD_RATE  is set to 0 then the code will
       not try to initialize the UART, so that bootloader or firmware
       settings can be used for maximum compatibility.
+
+    - CONFIG_EARLY_UART_PL011_MMIO32 is, optionally, used to enable 32-bit
+      only accesses to registers.
   - scif
     - CONFIG_EARLY_UART_SCIF_VERSION_* is, optionally, the interface version
       of the UART. Default to version NONE.

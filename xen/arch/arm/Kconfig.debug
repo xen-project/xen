@@ -253,6 +253,13 @@ config EARLY_UART_PL011_BAUD_RATE
 	default 115200 if EARLY_PRINTK_FASTMODEL
 	default 0
 
+config EARLY_UART_PL011_MMIO32
+	bool "32-bit only MMIO for PL011 early printk"
+	depends on EARLY_UART_PL011
+	help
+	  If specified, all accesses to PL011 registers made from early printk code
+	  will be done using 32-bit only accessors.
+
 config EARLY_UART_INIT
 	depends on EARLY_UART_PL011 && EARLY_UART_PL011_BAUD_RATE != 0
 	def_bool y

@@ -21,6 +21,25 @@
 #ifndef __ASM_ARM_PL011_H
 #define __ASM_ARM_PL011_H
 
+#ifdef __ASSEMBLY__
+
+/*
+ * PL011 registers are 8/16-bit wide. However, there are implementations that
+ * can only handle 32-bit accesses. The following macros used in early printk
+ * are defined to distinguish accessors for normal case from 32-bit MMIO one.
+ */
+#ifdef CONFIG_EARLY_UART_PL011_MMIO32
+#define PL011_STRH str
+#define PL011_STRB str
+#define PL011_LDRH ldr
+#else
+#define PL011_STRH strh
+#define PL011_STRB strb
+#define PL011_LDRH ldrh
+#endif
+
+#endif /* __ASSEMBLY__ */
+
 /* PL011 register addresses */
 #define DR     (0x00)
 #define RSR    (0x04)
