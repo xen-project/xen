@@ -26,13 +26,13 @@
  */
 .macro early_uart_init rb, rc, rd
         mov   \rc, #(7372800 / CONFIG_EARLY_UART_PL011_BAUD_RATE % 16)
-        str   \rc, [\rb, #FBRD]     /* -> UARTFBRD (Baud divisor fraction) */
+        strb  \rc, [\rb, #FBRD]     /* -> UARTFBRD (Baud divisor fraction) */
         mov   \rc, #(7372800 / CONFIG_EARLY_UART_PL011_BAUD_RATE / 16)
-        str   \rc, [\rb, #IBRD]     /* -> UARTIBRD (Baud divisor integer) */
+        strh  \rc, [\rb, #IBRD]     /* -> UARTIBRD (Baud divisor integer) */
         mov   \rc, #WLEN_8          /* 8n1 */
-        str   \rc, [\rb, #LCR_H]     /* -> UARTLCR_H (Line control) */
+        strb  \rc, [\rb, #LCR_H]     /* -> UARTLCR_H (Line control) */
         ldr   \rc, =(RXE | TXE | UARTEN)      /* RXE | TXE | UARTEN */
-        str   \rc, [\rb, #CR]     /* -> UARTCR (Control Register) */
+        strh  \rc, [\rb, #CR]     /* -> UARTCR (Control Register) */
 .endm
 
 /*
@@ -42,7 +42,7 @@
  */
 .macro early_uart_ready rb, rc
 1:
-        ldr   \rc, [\rb, #FR]       /* <- UARTFR (Flag register) */
+        ldrh  \rc, [\rb, #FR]       /* <- UARTFR (Flag register) */
         tst   \rc, #BUSY             /* Check BUSY bit */
         bne   1b                    /* Wait for the UART to be ready */
 .endm
@@ -53,7 +53,7 @@
  * rt: register which contains the character to transmit
  */
 .macro early_uart_transmit rb, rt
-        str   \rt, [\rb, #DR]            /* -> UARTDR (Data Register) */
+        strb  \rt, [\rb, #DR]            /* -> UARTDR (Data Register) */
 .endm
 
 /*
