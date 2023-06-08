@@ -991,6 +991,7 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
     const char *errstr;
+    unsigned long valid;
 
     /* Which vcpu is this? */
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
@@ -1016,10 +1017,11 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( ctxt.cr4 & ~hvm_cr4_guest_valid_bits(d) )
+    valid = hvm_cr4_guest_valid_bits(d);
+    if ( ctxt.cr4 & ~valid )
     {
-        printk(XENLOG_G_ERR "HVM%d restore: bad CR4 %#" PRIx64 "\n",
-               d->domain_id, ctxt.cr4);
+        printk(XENLOG_G_ERR "HVM%d restore: bad CR4 %#lx (valid %#lx, rejected %#lx)\n",
+               d->domain_id, ctxt.cr4, valid, ctxt.cr4 & ~valid);
         return -EINVAL;
     }
 
@@ -2456,13 +2458,12 @@ int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
 int hvm_set_cr4(unsigned long value, bool may_defer)
 {
     struct vcpu *v = current;
-    unsigned long old_cr;
+    unsigned long old_cr, valid = hvm_cr4_guest_valid_bits(v->domain);
 
-    if ( value & ~hvm_cr4_guest_valid_bits(v->domain) )
+    if ( value & ~valid )
     {
-        HVM_DBG_LOG(DBG_LEVEL_1,
-                    "Guest attempts to set reserved bit in CR4: %lx",
-                    value);
+        HVM_DBG_LOG(DBG_LEVEL_1, "Bad CR4 %#lx (valid %#lx, rejected %#lx)",
+                    value, valid, value & ~valid);
         return X86EMUL_EXCEPTION;
     }
 

@@ -124,8 +124,8 @@ bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
 
     valid = hvm_cr4_guest_valid_bits(v->domain);
     if ( cr4 & ~valid )
-        PRINTF("CR4: invalid bits are set (%#"PRIx64", valid: %#"PRIx64")\n",
-               cr4, valid);
+        PRINTF("CR4: invalid value %#lx (valid %#lx, rejected %#lx)\n",
+               cr4, valid, cr4 & ~valid);
 
     if ( vmcb_get_dr6(vmcb) >> 32 )
         PRINTF("DR6: bits [63:32] are not zero (%#"PRIx64")\n",

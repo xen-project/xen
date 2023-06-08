@@ -107,6 +107,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
     struct segment_register cs, ds, ss, es, tr;
     const char *errstr;
     int rc;
+    unsigned long valid;
 
     if ( ctx->pad != 0 )
         return -EINVAL;
@@ -264,10 +265,12 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
     if ( v->arch.hvm.guest_efer & EFER_LME )
         v->arch.hvm.guest_efer |= EFER_LMA;
 
-    if ( v->arch.hvm.guest_cr[4] & ~hvm_cr4_guest_valid_bits(d) )
+    valid = hvm_cr4_guest_valid_bits(d);
+    if ( v->arch.hvm.guest_cr[4] & ~valid )
     {
-        gprintk(XENLOG_ERR, "Bad CR4 value: %#016lx\n",
-                v->arch.hvm.guest_cr[4]);
+        gprintk(XENLOG_ERR, "Bad CR4 %#lx (valid %#lx, rejected %#lx)\n",
+                v->arch.hvm.guest_cr[4], valid,
+                v->arch.hvm.guest_cr[4] & ~valid);
         return -EINVAL;
     }
 
