@@ -15,6 +15,7 @@ alternative-y := alternative.init.o
 alternative-$(CONFIG_LIVEPATCH) :=
 obj-bin-y += $(alternative-y)
 obj-y += apic.o
+obj-y += bhb-thunk.o
 obj-y += bitops.o
 obj-bin-y += bzimage.init.o
 obj-bin-y += clear_page.o
