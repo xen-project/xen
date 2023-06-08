@@ -181,6 +181,9 @@
 #define cpu_bug_fpu_ptrs        boot_cpu_has(X86_BUG_FPU_PTRS)
 #define cpu_bug_null_seg        boot_cpu_has(X86_BUG_NULL_SEG)
 
+#define cpu_has_bhb_seq        (boot_cpu_has(X86_SPEC_BHB_TSX) ||       \
+                                boot_cpu_has(X86_SPEC_BHB_LOOPS))
+
 enum _cache_type {
     CACHE_TYPE_NULL = 0,
     CACHE_TYPE_DATA = 1,
