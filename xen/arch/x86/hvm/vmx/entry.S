@@ -57,6 +57,18 @@ ENTRY(vmx_asm_vmexit_handler)
             wrmsr
         .endm
         ALTERNATIVE "", restore_spec_ctrl, X86_FEATURE_SC_MSR_HVM
+
+        /*
+         * Clear the BHB to mitigate BHI.  Used on eIBRS parts, and uses RETs
+         * itself so must be after we've perfomed all the RET-safety we can.
+         */
+        testb $SCF_entry_bhb, CPUINFO_scf(%rsp)
+        jz .L_skip_bhb
+        ALTERNATIVE_2 "",                                    \
+            "call clear_bhb_loops", X86_SPEC_BHB_LOOPS,      \
+            "call clear_bhb_tsx", X86_SPEC_BHB_TSX
+.L_skip_bhb:
+
         ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_VMX
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
