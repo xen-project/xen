@@ -2370,8 +2370,9 @@ By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
 
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm}=<bool>,
->              {msr-sc,rsb,verw,ibpb-entry}=<bool>|{pv,hvm}=<bool>,
->              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,psfd,
+>              {msr-sc,rsb,verw,{ibpb,bhb}-entry}=<bool>|{pv,hvm}=<bool>,
+>              bti-thunk=retpoline|lfence|jmp,bhb-seq=short|tsx,
+>              {ibrs,ibpb,ssbd,psfd,
 >              eager-fpu,l1d-flush,branch-harden,srb-lock,
 >              unpriv-mmio,gds-mit,div-scrub,lock-harden,
 >              bhi-dis-s}=<bool> ]`
@@ -2396,10 +2397,10 @@ in place for guests to use.
 
 Use of a positive boolean value for either of these options is invalid.
 
-The `pv=`, `hvm=`, `msr-sc=`, `rsb=`, `verw=` and `ibpb-entry=` options
-offer fine grained control over the primitives by Xen.  These impact Xen's
-ability to protect itself, and/or Xen's ability to virtualise support for
-guests to use.
+The `pv=`, `hvm=`, `msr-sc=`, `rsb=`, `verw=`, `ibpb-entry=` and `bhb-entry=`
+options offer fine grained control over the primitives by Xen.  These impact
+Xen's ability to protect itself, and/or Xen's ability to virtualise support
+for guests to use.
 
 * `pv=` and `hvm=` offer control over all suboptions for PV and HVM guests
   respectively.
@@ -2425,12 +2426,24 @@ guests to use.
   Return Stack Overflow if appropriate microcode has been loaded, but for
   performance reasons dom0 is unprotected by default.  If it is necessary to
   protect dom0 too, boot with `spec-ctrl=ibpb-entry`.
+* `bhb-entry=` offers control over whether BHB-clearing (Branch History
+  Buffer) sequences are used on entry to Xen.  This is used by default on
+  hardware vulnerable to Branch History Injection, when the BHI_DIS_S control
+  is not available (see `bhi-dis-s`).  The choice of scrubbing sequence can be
+  selected using the `bhb-seq=` option.  If it is necessary to protect dom0
+  too, boot with `spec-ctrl=bhb-entry`.
 
 If Xen was compiled with `CONFIG_INDIRECT_THUNK` support, `bti-thunk=` can be
 used to select which of the thunks gets patched into the
 `__x86_indirect_thunk_%reg` locations.  The default thunk is `retpoline`
 (generally preferred), with the alternatives being `jmp` (a `jmp *%reg` gadget,
 minimal overhead), and `lfence` (an `lfence; jmp *%reg` gadget).
+
+On all hardware, `bhb-seq=` can be used to select which of the BHB-clearing
+sequences gets used.  This interacts with the `bhb-entry=` and `bhi-dis-s=`
+options in order to mitigate Branch History Injection on affected hardware.
+The default sequence is `short`, with `tsx` as an alternative available
+capable hardware that can be opted in to.
 
 On hardware supporting IBRS (Indirect Branch Restricted Speculation), the
 `ibrs=` option can be used to force or prevent Xen using the feature itself.
