@@ -290,6 +290,17 @@
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=0),         \
         X86_FEATURE_SC_MSR_PV
 
+    /*
+     * Clear the BHB to mitigate BHI.  Used on eIBRS parts, and uses RETs
+     * itself so must be after we've perfomed all the RET-safety we can.
+     */
+    testb $SCF_entry_bhb, %bl
+    jz .L\@_skip_bhb
+    ALTERNATIVE_2 "",                                    \
+        "call clear_bhb_loops", X86_SPEC_BHB_LOOPS,      \
+        "call clear_bhb_tsx", X86_SPEC_BHB_TSX
+.L\@_skip_bhb:
+
     ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_PV
 .endm
 
@@ -327,6 +338,13 @@
 .L\@_skip:
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=1),         \
         X86_FEATURE_SC_MSR_PV
+
+    testb $SCF_entry_bhb, %bl
+    jz .L\@_skip_bhb
+    ALTERNATIVE_2 "",                                    \
+        "call clear_bhb_loops", X86_SPEC_BHB_LOOPS,      \
+        "call clear_bhb_tsx", X86_SPEC_BHB_TSX
+.L\@_skip_bhb:
 
     ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_INTR
 .endm
@@ -427,6 +445,18 @@
     wrmsr
 
 .L\@_skip_msr_spec_ctrl:
+
+    /*
+     * Clear the BHB to mitigate BHI.  Used on eIBRS parts, and uses RETs
+     * itself so must be after we've perfomed all the RET-safety we can.
+     */
+    testb $SCF_entry_bhb, %bl
+    jz .L\@_skip_bhb
+
+    ALTERNATIVE_2 "",                                    \
+        "call clear_bhb_loops", X86_SPEC_BHB_LOOPS,      \
+        "call clear_bhb_tsx", X86_SPEC_BHB_TSX
+.L\@_skip_bhb:
 
     lfence
 .endm

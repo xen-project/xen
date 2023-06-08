@@ -2153,38 +2153,43 @@ void __init init_speculation_mitigations(void)
         /*
          * SPEC_CTRL_ENTRY_FROM_PV conditional safety
          *
-         * DO_SPEC_CTRL_ENTRY (X86_FEATURE_SC_MSR_PV if used) is an
-         * unconditional WRMSR as the last action.
+         * A BHB sequence, if used, is a conditional action and last.  If we
+         * have this, then we must have the LFENCE.
          *
-         * If we have it, or we're not using any prior conditional mitigation,
-         * then it's safe to drop the LFENCE.
+         * Otherwise, DO_SPEC_CTRL_ENTRY (X86_FEATURE_SC_MSR_PV if used) is an
+         * unconditional WRMSR.  If we do have it, or we're not using any
+         * prior conditional block, then it's safe to drop the LFENCE.
          */
-        if ( boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
-             !boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) )
+        if ( !cpu_has_bhb_seq &&
+             (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
+              !boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV)) )
             setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_PV);
 
         /*
          * SPEC_CTRL_ENTRY_FROM_INTR conditional safety
          *
-         * DO_SPEC_CTRL_ENTRY (X86_FEATURE_SC_MSR_PV if used) is an
-         * unconditional WRMSR as the last action.
+         * A BHB sequence, if used, is a conditional action and last.  If we
+         * have this, then we must have the LFENCE.
          *
-         * If we have it, or we have no protections active in the block that
-         * is skipped when interrupting guest context, then it's safe to drop
-         * the LFENCE.
+         * Otherwise DO_SPEC_CTRL_ENTRY (X86_FEATURE_SC_MSR_PV if used) is an
+         * unconditional WRMSR.  If we have it, or we have no protections
+         * active in the block that is skipped when interrupting guest
+         * context, then it's safe to drop the LFENCE.
          */
-        if ( boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
-             (!boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) &&
-              !boot_cpu_has(X86_FEATURE_SC_RSB_PV)) )
+        if ( !cpu_has_bhb_seq &&
+             (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
+              (!boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) &&
+               !boot_cpu_has(X86_FEATURE_SC_RSB_PV))) )
             setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_INTR);
 
         /*
          * SPEC_CTRL_ENTRY_FROM_VMX conditional safety
          *
-         * Currently there are no safety actions with conditional branches, so
-         * no need for the extra safety LFENCE.
+         * A BHB sequence, if used, is the only conditional action, so if we
+         * don't have it, we don't need the safety LFENCE.
          */
-        setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_VMX);
+        if ( !cpu_has_bhb_seq )
+            setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_VMX);
     }
 
     /*

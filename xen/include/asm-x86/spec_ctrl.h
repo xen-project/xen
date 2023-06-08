@@ -36,6 +36,7 @@
 #define SCF_verw       (1 << 3)
 #define SCF_ist_ibpb   (1 << 4)
 #define SCF_entry_ibpb (1 << 5)
+#define SCF_entry_bhb  (1 << 6)
 
 /*
  * The IST paths (NMI/#MC) can interrupt any arbitrary context.  Some
@@ -54,7 +55,7 @@
  * Some speculative protections are per-domain.  These settings are merged
  * into the top-of-stack block in the context switch path.
  */
-#define SCF_DOM_MASK (SCF_verw | SCF_entry_ibpb)
+#define SCF_DOM_MASK (SCF_verw | SCF_entry_ibpb | SCF_entry_bhb)
 
 #ifndef __ASSEMBLY__
 
