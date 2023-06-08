@@ -812,13 +812,46 @@ CAMLprim value stub_xc_send_debug_keys(value xch_val, value keys)
 	CAMLreturn(Val_unit);
 }
 
+CAMLprim value physinfo_arch_caps(const xc_physinfo_t *info)
+{
+	CAMLparam0();
+	CAMLlocal2(arch_cap_flags, arch_obj);
+	int tag = -1;
+
+#if defined(__arm__) || defined(__aarch64__)
+
+	tag = 0; /* tag ARM */
+
+	arch_obj = caml_alloc_tuple(1);
+
+	Store_field(arch_obj, 0,
+		    Val_int(MASK_EXTR(info->arch_capabilities,
+				      XEN_SYSCTL_PHYSCAP_ARM_SVE_MASK) * 128));
+
+#elif defined(__i386__) || defined(__x86_64__)
+
+	tag = 1; /* tag x86 */
+
+	arch_obj = Tag_cons;
+
+#endif
+
+	if ( tag < 0 )
+		caml_failwith("Unhandled architecture");
+
+	arch_cap_flags = caml_alloc_small(1, tag);
+	Store_field(arch_cap_flags, 0, arch_obj);
+
+	CAMLreturn(arch_cap_flags);
+}
+
 CAMLprim value stub_xc_physinfo(value xch_val)
 {
 	CAMLparam1(xch_val);
-	CAMLlocal4(physinfo, cap_list, arch_cap_flags, arch_cap_list);
+	CAMLlocal2(physinfo, cap_list);
 	xc_interface *xch = xch_of_val(xch_val);
 	xc_physinfo_t c_physinfo;
-	int r, arch_cap_flags_tag;
+	int r;
 
 	caml_enter_blocking_section();
 	r = xc_physinfo(xch, &c_physinfo);
@@ -846,20 +879,7 @@ CAMLprim value stub_xc_physinfo(value xch_val)
 	Store_field(physinfo, 7, caml_copy_nativeint(c_physinfo.scrub_pages));
 	Store_field(physinfo, 8, cap_list);
 	Store_field(physinfo, 9, Val_int(c_physinfo.max_cpu_id + 1));
-
-#if defined(__i386__) || defined(__x86_64__)
-	arch_cap_list = Tag_cons;
-
-	arch_cap_flags_tag = 1; /* tag x86 */
-
-	arch_cap_flags = caml_alloc_small(1, arch_cap_flags_tag);
-	Store_field(arch_cap_flags, 0, arch_cap_list);
-	Store_field(physinfo, 10, arch_cap_flags);
-#elif defined(__aarch64__)
-	Store_field(physinfo, 10, Val_int(c_physinfo.arch_capabilities));
-#else
-	caml_failwith("Unhandled architecture");
-#endif
+	Store_field(physinfo, 10, physinfo_arch_caps(&c_physinfo));
 
 	CAMLreturn(physinfo);
 }
