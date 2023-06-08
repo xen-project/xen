@@ -911,7 +911,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
                            "hw_caps",          cpu_cap,
                            "virt_caps",        virt_caps);
 
-#if defined(__aarch64__)
+#if defined(__arm__) || defined(__aarch64__)
     if ( objret ) {
         unsigned int sve_vl_bits;
         PyObject *py_arm_sve_vl;

@@ -14,7 +14,7 @@
 static inline
 unsigned int arch_capabilities_arm_sve(unsigned int arch_capabilities)
 {
-#if defined(__aarch64__)
+#if defined(__arm__) || defined(__aarch64__)
     unsigned int sve_vl = MASK_EXTR(arch_capabilities,
                                     XEN_SYSCTL_PHYSCAP_ARM_SVE_MASK);
 

@@ -226,7 +226,7 @@ static void output_physinfo(void)
         );
 
     /* Print arm SVE vector length only on ARM platforms */
-#if defined(__aarch64__)
+#if defined(__arm__) || defined(__aarch64__)
     maybe_printf("arm_sve_vector_length  : %u\n",
          arch_capabilities_arm_sve(info.arch_capabilities)
         );
