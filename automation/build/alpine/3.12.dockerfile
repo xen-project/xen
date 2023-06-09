@@ -30,6 +30,8 @@ RUN apk --no-cache add \
   make \
   musl-dev  \
   ncurses-dev \
+  ocaml \
+  ocaml-findlib \
   patch  \
   python3-dev \
   texinfo \
