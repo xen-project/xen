@@ -76,7 +76,7 @@ TVM_REG(CONTEXTIDR_EL1)
     case HSR_SYSREG_##reg:                                              \
     {                                                                   \
         return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr,   \
-                                  1, guest_cpuinfo.field.bits[offset]); \
+                                  1, domain_cpuinfo.field.bits[offset]); \
     }
 
 void do_sysreg(struct cpu_user_regs *regs,
@@ -300,7 +300,7 @@ void do_sysreg(struct cpu_user_regs *regs,
 
     case HSR_SYSREG_ID_AA64PFR0_EL1:
     {
-        register_t guest_reg_value = guest_cpuinfo.pfr64.bits[0];
+        register_t guest_reg_value = domain_cpuinfo.pfr64.bits[0];
 
         if ( is_sve_domain(v->domain) )
         {
@@ -336,7 +336,7 @@ void do_sysreg(struct cpu_user_regs *regs,
          * When the guest has the SVE feature enabled, the whole id_aa64zfr0_el1
          * needs to be exposed.
          */
-        register_t guest_reg_value = guest_cpuinfo.zfr64.bits[0];
+        register_t guest_reg_value = domain_cpuinfo.zfr64.bits[0];
 
         if ( is_sve_domain(v->domain) )
             guest_reg_value = system_cpuinfo.zfr64.bits[0];

@@ -169,7 +169,7 @@ TVM_REG32(CONTEXTIDR, CONTEXTIDR_EL1)
     case HSR_CPREG32(reg):                                          \
     {                                                               \
         return handle_ro_read_val(regs, regidx, cp32.read, hsr, 1,  \
-                                  guest_cpuinfo.field.bits[offset]);\
+                                  domain_cpuinfo.field.bits[offset]);\
     }
 
 /* helper to define cases for all registers for one CRm value */

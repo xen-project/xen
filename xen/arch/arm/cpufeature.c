@@ -14,7 +14,7 @@
 
 DECLARE_BITMAP(cpu_hwcaps, ARM_NCAPS);
 
-struct cpuinfo_arm __read_mostly guest_cpuinfo;
+struct cpuinfo_arm __read_mostly domain_cpuinfo;
 
 #ifdef CONFIG_ARM_64
 static bool has_sb_instruction(const struct arm_cpu_capabilities *entry)
@@ -190,46 +190,46 @@ void identify_cpu(struct cpuinfo_arm *c)
 
 /*
  * This function is creating a cpuinfo structure with values modified to mask
- * all cpu features that should not be published to guest.
- * The created structure is then used to provide ID registers values to guests.
+ * all cpu features that should not be published to domains.
+ * The created structure is then used to provide ID registers values to domains.
  */
-static int __init create_guest_cpuinfo(void)
+static int __init create_domain_cpuinfo(void)
 {
-    /* Use the sanitized cpuinfo as initial guest cpuinfo */
-    guest_cpuinfo = system_cpuinfo;
+    /* Use the sanitized cpuinfo as initial domain cpuinfo */
+    domain_cpuinfo = system_cpuinfo;
 
 #ifdef CONFIG_ARM_64
     /* Hide MPAM support as xen does not support it */
-    guest_cpuinfo.pfr64.mpam = 0;
-    guest_cpuinfo.pfr64.mpam_frac = 0;
+    domain_cpuinfo.pfr64.mpam = 0;
+    domain_cpuinfo.pfr64.mpam_frac = 0;
 
     /* Hide SVE by default */
-    guest_cpuinfo.pfr64.sve = 0;
-    guest_cpuinfo.zfr64.bits[0] = 0;
+    domain_cpuinfo.pfr64.sve = 0;
+    domain_cpuinfo.zfr64.bits[0] = 0;
 
     /* Hide MTE support as Xen does not support it */
-    guest_cpuinfo.pfr64.mte = 0;
+    domain_cpuinfo.pfr64.mte = 0;
 
     /* Hide PAC support as Xen does not support it */
-    guest_cpuinfo.isa64.apa = 0;
-    guest_cpuinfo.isa64.api = 0;
-    guest_cpuinfo.isa64.gpa = 0;
-    guest_cpuinfo.isa64.gpi = 0;
+    domain_cpuinfo.isa64.apa = 0;
+    domain_cpuinfo.isa64.api = 0;
+    domain_cpuinfo.isa64.gpa = 0;
+    domain_cpuinfo.isa64.gpi = 0;
 #endif
 
     /* Hide AMU support */
 #ifdef CONFIG_ARM_64
-    guest_cpuinfo.pfr64.amu = 0;
+    domain_cpuinfo.pfr64.amu = 0;
 #endif
-    guest_cpuinfo.pfr32.amu = 0;
+    domain_cpuinfo.pfr32.amu = 0;
 
     /* Hide RAS support as Xen does not support it */
 #ifdef CONFIG_ARM_64
-    guest_cpuinfo.pfr64.ras = 0;
-    guest_cpuinfo.pfr64.ras_frac = 0;
+    domain_cpuinfo.pfr64.ras = 0;
+    domain_cpuinfo.pfr64.ras_frac = 0;
 #endif
-    guest_cpuinfo.pfr32.ras = 0;
-    guest_cpuinfo.pfr32.ras_frac = 0;
+    domain_cpuinfo.pfr32.ras = 0;
+    domain_cpuinfo.pfr32.ras_frac = 0;
 
     return 0;
 }
@@ -237,7 +237,7 @@ static int __init create_guest_cpuinfo(void)
  * This function needs to be run after all smp are started to have
  * cpuinfo structures for all cores.
  */
-__initcall(create_guest_cpuinfo);
+__initcall(create_domain_cpuinfo);
 
 /*
  * Local variables:
