@@ -143,7 +143,7 @@ void acc_drop(struct connection *conn);
 void acc_commit(struct connection *conn);
 int domain_max_global_acc(const void *ctx, struct connection *conn);
 void domain_reset_global_acc(void);
-bool domain_max_chk(const struct connection *conn, unsigned int what,
+bool domain_max_chk(const struct connection *conn, enum accitem what,
 		    unsigned int val);
 
 extern long wrl_ntransactions;
