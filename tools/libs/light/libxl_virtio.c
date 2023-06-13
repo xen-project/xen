@@ -1,4 +1,9 @@
 /*
+ * Setup VirtIO backend. This is intended to interact with a VirtIO
+ * backend that is watching xenstore, and create new VirtIO devices
+ * with the parameter found in xenstore (VirtIO frontend don't
+ * interact with xenstore.)
+ *
  * Copyright (C) 2022 Linaro Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -48,11 +53,6 @@ static int libxl__set_xenstore_virtio(libxl__gc *gc, uint32_t domid,
     flexarray_append_pair(back, "base", GCSPRINTF("%#"PRIx64, virtio->base));
     flexarray_append_pair(back, "type", GCSPRINTF("%s", virtio->type));
     flexarray_append_pair(back, "transport", GCSPRINTF("%s", transport));
-
-    flexarray_append_pair(front, "irq", GCSPRINTF("%u", virtio->irq));
-    flexarray_append_pair(front, "base", GCSPRINTF("%#"PRIx64, virtio->base));
-    flexarray_append_pair(front, "type", GCSPRINTF("%s", virtio->type));
-    flexarray_append_pair(front, "transport", GCSPRINTF("%s", transport));
 
     return 0;
 }
