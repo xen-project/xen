@@ -1554,7 +1554,11 @@ static int _invalidate_all_devices(
         if ( iommu )
         {
             spin_lock_irqsave(&iommu->lock, flags);
-            amd_iommu_flush_device(iommu, req_id);
+            /*
+             * IOMMU TLB flush performed separately (see
+             * invalidate_all_domain_pages()).
+             */
+            amd_iommu_flush_device(iommu, req_id, DOMID_INVALID);
             amd_iommu_flush_intremap(iommu, req_id);
             spin_unlock_irqrestore(&iommu->lock, flags);
         }
