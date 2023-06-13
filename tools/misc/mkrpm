@@ -50,20 +50,32 @@ uninstall.
 %build
 
 %install
-rm -rf \$RPM_BUILD_ROOT
-mkdir -p \$RPM_BUILD_ROOT
-cd %{_xenroot}
-dist/install.sh \$RPM_BUILD_ROOT/
+rm -rf %buildroot
+mkdir -p %buildroot
+pushd %_xenroot
+dist/install.sh %buildroot
 
-cd \$RPM_BUILD_ROOT
+rm -f dist/filesystem.txt
+rm -f dist/directories.txt
+rm -f dist/files.txt
+find %buildroot -type d | sed 's|^%buildroot||' | sort > dist/directories.txt
+find %buildroot -type f | sed 's|^%buildroot||' | sort > dist/files.txt
+find %buildroot -type l | sed 's|^%buildroot||' | sort >> dist/files.txt
+if rpm -ql filesystem > dist/filesystem.txt
+then
+  while read
+  do
+    sed -i "s|^\${REPLY}$||" dist/directories.txt
+  done < dist/filesystem.txt
+fi
+sed 's|^|%%dir |' dist/directories.txt >> dist/files.txt
+popd
 
 %clean
-rm -rf \$RPM_BUILD_ROOT
+rm -rf %buildroot
 
-%files
+%files -f %_xenroot/dist/files.txt
 %defattr(-,root,root,-)
-/*/*/*
-/boot/*
 
 %post
 EOF
