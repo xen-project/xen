@@ -1068,7 +1068,7 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
                                     uint32_t domid /* for logging, only */)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int ret;
+    int ret, i;
     bool pod_enabled = false;
     libxl_domain_create_info *c_info = &d_config->c_info;
 
@@ -1264,6 +1264,15 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         ret = ERROR_INVAL;
         LOGD(ERROR, domid, "vPMU not supported on this platform");
         goto error_out;
+    }
+
+    for (i = 0; i < d_config->num_virtios; i++) {
+        ret = libxl__virtio_devtype.set_default(gc, domid,
+                                                &d_config->virtios[i], false);
+        if (ret) {
+            LOGD(ERROR, domid, "Unable to set virtio defaults for device %d", i);
+            goto error_out;
+        }
     }
 
     ret = 0;
