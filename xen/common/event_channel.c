@@ -36,23 +36,6 @@
 #include <asm/guest.h>
 #endif
 
-#define ERROR_EXIT(_errno)                                          \
-    do {                                                            \
-        gdprintk(XENLOG_WARNING,                                    \
-                "EVTCHNOP failure: error %d\n",                     \
-                (_errno));                                          \
-        rc = (_errno);                                              \
-        goto out;                                                   \
-    } while ( 0 )
-#define ERROR_EXIT_DOM(_errno, _dom)                                \
-    do {                                                            \
-        gdprintk(XENLOG_WARNING,                                    \
-                "EVTCHNOP failure: domain %d, error %d\n",          \
-                (_dom)->domain_id, (_errno));                       \
-        rc = (_errno);                                              \
-        goto out;                                                   \
-    } while ( 0 )
-
 #define consumer_is_xen(e) (!!(e)->xen_consumer)
 
 /*
@@ -336,7 +319,11 @@ int evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc, evtchn_port_t port)
 
     port = rc = evtchn_get_port(d, port);
     if ( rc < 0 )
-        ERROR_EXIT(rc);
+    {
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        goto out;
+    }
+
     rc = 0;
 
     chn = evtchn_from_port(d, port);
@@ -412,17 +399,30 @@ int evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind, struct domain *ld,
 
     lport = rc = evtchn_get_port(ld, lport);
     if ( rc < 0 )
-        ERROR_EXIT(rc);
+    {
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        goto out;
+    }
+
     rc = 0;
 
     lchn = evtchn_from_port(ld, lport);
 
     rchn = _evtchn_from_port(rd, rport);
     if ( !rchn )
-        ERROR_EXIT_DOM(-EINVAL, rd);
+    {
+        rc = -EINVAL;
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: %pd, error %d\n", rd, rc);
+        goto out;
+    }
+
     if ( (rchn->state != ECS_UNBOUND) ||
          (rchn->u.unbound.remote_domid != ld->domain_id) )
-        ERROR_EXIT_DOM(-EINVAL, rd);
+    {
+        rc = -EINVAL;
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: %pd, error %d\n", rd, rc);
+        goto out;
+    }
 
     rc = xsm_evtchn_interdomain(XSM_HOOK, ld, lchn, rd, rchn);
     if ( rc )
@@ -487,11 +487,19 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     write_lock(&d->event_lock);
 
     if ( read_atomic(&v->virq_to_evtchn[virq]) )
-        ERROR_EXIT(-EEXIST);
+    {
+        rc = -EEXIST;
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        goto out;
+    }
 
     port = rc = evtchn_get_port(d, port);
     if ( rc < 0 )
-        ERROR_EXIT(rc);
+    {
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        goto out;
+    }
+
     rc = 0;
 
     chn = evtchn_from_port(d, port);
@@ -535,7 +543,11 @@ static int evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     write_lock(&d->event_lock);
 
     if ( (port = get_free_port(d)) < 0 )
-        ERROR_EXIT(port);
+    {
+        rc = port;
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        goto out;
+    }
 
     chn = evtchn_from_port(d, port);
 
@@ -599,16 +611,29 @@ static int evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     write_lock(&d->event_lock);
 
     if ( pirq_to_evtchn(d, pirq) != 0 )
-        ERROR_EXIT(-EEXIST);
+    {
+        rc = -EEXIST;
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        goto out;
+    }
 
     if ( (port = get_free_port(d)) < 0 )
-        ERROR_EXIT(port);
+    {
+        rc = port;
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        goto out;
+    }
 
     chn = evtchn_from_port(d, port);
 
     info = pirq_get_info(d, pirq);
     if ( !info )
-        ERROR_EXIT(-ENOMEM);
+    {
+        rc = -ENOMEM;
+        gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        goto out;
+    }
+
     info->evtchn = port;
     rc = (!is_hvm_domain(d)
           ? pirq_guest_bind(v, info,
