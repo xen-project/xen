@@ -358,11 +358,12 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
     }
 }
 
-void init_or_livepatch apply_alternatives(struct alt_instr *start,
-                                          struct alt_instr *end)
+#ifdef CONFIG_LIVEPATCH
+void apply_alternatives(struct alt_instr *start, struct alt_instr *end)
 {
     _apply_alternatives(start, end, true);
 }
+#endif
 
 static unsigned int __initdata alt_todo;
 static unsigned int __initdata alt_done;

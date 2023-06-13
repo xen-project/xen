@@ -223,6 +223,7 @@ void __init apply_alternatives_all(void)
     vunmap(xenmap);
 }
 
+#ifdef CONFIG_LIVEPATCH
 int apply_alternatives(const struct alt_instr *start, const struct alt_instr *end)
 {
     const struct alt_region region = {
@@ -232,6 +233,7 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
 
     return __apply_alternatives(&region, 0);
 }
+#endif
 
 /*
  * Local variables:
