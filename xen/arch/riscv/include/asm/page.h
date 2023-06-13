@@ -1,6 +1,8 @@
 #ifndef _ASM_RISCV_PAGE_H
 #define _ASM_RISCV_PAGE_H
 
+#ifndef __ASSEMBLY__
+
 #include <xen/const.h>
 #include <xen/types.h>
 
@@ -57,5 +59,7 @@ static inline bool pte_is_valid(pte_t p)
 {
     return p.pte & PTE_VALID;
 }
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_RISCV_PAGE_H */
