@@ -114,8 +114,6 @@ bool __init is_forced_cpu_cap(unsigned int cap)
 static void cf_check default_init(struct cpuinfo_x86 * c)
 {
 	/* Not much we can do here... */
-	/* Check if at least it has cpuid */
-	BUG_ON(c->cpuid_level == -1);
 	__clear_bit(X86_FEATURE_SEP, c->x86_capability);
 }
 
@@ -492,15 +490,11 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	int i;
 
 	c->x86_cache_size = -1;
-	c->x86_vendor = X86_VENDOR_UNKNOWN;
-	c->cpuid_level = -1;	/* CPUID not detected */
 	c->x86_model = c->x86_mask = 0;	/* So far unknown... */
-	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
 	c->x86_max_cores = 1;
 	c->x86_num_siblings = 1;
 	c->x86_clflush_size = 0;
-	c->phys_proc_id = XEN_INVALID_SOCKET_ID;
 	c->cpu_core_id = XEN_INVALID_CORE_ID;
 	c->compute_unit_id = INVALID_CUID;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
