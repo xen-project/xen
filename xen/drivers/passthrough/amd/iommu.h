@@ -283,7 +283,8 @@ void amd_iommu_flush_pages(struct domain *d, unsigned long dfn,
                            unsigned int order);
 void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
                            daddr_t daddr, unsigned int order);
-void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf);
+void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf,
+                            domid_t domid);
 void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf);
 void amd_iommu_flush_all_caches(struct amd_iommu *iommu);
 

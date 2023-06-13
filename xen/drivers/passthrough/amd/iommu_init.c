@@ -1551,7 +1551,11 @@ static int cf_check _invalidate_all_devices(
         req_id = ivrs_mappings[bdf].dte_requestor_id;
         if ( iommu )
         {
-            amd_iommu_flush_device(iommu, req_id);
+            /*
+             * IOMMU TLB flush performed separately (see
+             * invalidate_all_domain_pages()).
+             */
+            amd_iommu_flush_device(iommu, req_id, DOMID_INVALID);
             amd_iommu_flush_intremap(iommu, req_id);
         }
     }

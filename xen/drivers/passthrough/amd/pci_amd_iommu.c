@@ -192,10 +192,13 @@ static int __must_check amd_iommu_setup_domain_device(
 
         spin_unlock_irqrestore(&iommu->lock, flags);
 
-        amd_iommu_flush_device(iommu, req_id);
+        /* DTE didn't have DMA translations enabled, do not flush the TLB. */
+        amd_iommu_flush_device(iommu, req_id, DOMID_INVALID);
     }
     else if ( dte->pt_root != mfn_x(page_to_mfn(root_pg)) )
     {
+        domid_t prev_domid = dte->domain_id;
+
         /*
          * Strictly speaking if the device is the only one with this requestor
          * ID, it could be allowed to be re-assigned regardless of unity map
@@ -252,7 +255,7 @@ static int __must_check amd_iommu_setup_domain_device(
 
         spin_unlock_irqrestore(&iommu->lock, flags);
 
-        amd_iommu_flush_device(iommu, req_id);
+        amd_iommu_flush_device(iommu, req_id, prev_domid);
     }
     else
         spin_unlock_irqrestore(&iommu->lock, flags);
@@ -421,6 +424,8 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
     spin_lock_irqsave(&iommu->lock, flags);
     if ( dte->tv || dte->v )
     {
+        domid_t prev_domid = dte->domain_id;
+
         /* See the comment in amd_iommu_setup_device_table(). */
         dte->int_ctl = IOMMU_DEV_TABLE_INT_CONTROL_ABORTED;
         smp_wmb();
@@ -439,7 +444,7 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
 
         spin_unlock_irqrestore(&iommu->lock, flags);
 
-        amd_iommu_flush_device(iommu, req_id);
+        amd_iommu_flush_device(iommu, req_id, prev_domid);
 
         AMD_IOMMU_DEBUG("Disable: device id = %#x, "
                         "domain = %d, paging mode = %d\n",
@@ -610,7 +615,8 @@ static int cf_check amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
 
         spin_unlock_irqrestore(&iommu->lock, flags);
 
-        amd_iommu_flush_device(iommu, bdf);
+        /* DTE didn't have DMA translations enabled, do not flush the TLB. */
+        amd_iommu_flush_device(iommu, bdf, DOMID_INVALID);
     }
 
     if ( amd_iommu_reserve_domain_unity_map(

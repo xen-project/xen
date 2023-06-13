@@ -363,10 +363,18 @@ void amd_iommu_flush_pages(struct domain *d,
     _amd_iommu_flush_pages(d, __dfn_to_daddr(dfn), order);
 }
 
-void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf)
+void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf,
+                            domid_t domid)
 {
     invalidate_dev_table_entry(iommu, bdf);
     flush_command_buffer(iommu, 0);
+
+    /* Also invalidate IOMMU TLB entries when flushing the DTE. */
+    if ( domid != DOMID_INVALID )
+    {
+        invalidate_iommu_pages(iommu, INV_IOMMU_ALL_PAGES_ADDRESS, domid, 0);
+        flush_command_buffer(iommu, 0);
+    }
 }
 
 void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf)

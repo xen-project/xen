@@ -385,7 +385,7 @@ static int do_completion_wait(struct domain *d, cmd_entry_t *cmd)
 
 static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
 {
-    uint16_t gbdf, mbdf, req_id, gdom_id, hdom_id;
+    uint16_t gbdf, mbdf, req_id, gdom_id, hdom_id, prev_domid;
     struct amd_iommu_dte *gdte, *mdte, *dte_base;
     struct amd_iommu *iommu = NULL;
     struct guest_iommu *g_iommu;
@@ -445,13 +445,14 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     req_id = get_dma_requestor_id(iommu->seg, mbdf);
     dte_base = iommu->dev_table.buffer;
     mdte = &dte_base[req_id];
+    prev_domid = mdte->domain_id;
 
     spin_lock_irqsave(&iommu->lock, flags);
     dte_set_gcr3_table(mdte, hdom_id, gcr3_mfn << PAGE_SHIFT, gv, glx);
 
     spin_unlock_irqrestore(&iommu->lock, flags);
 
-    amd_iommu_flush_device(iommu, req_id);
+    amd_iommu_flush_device(iommu, req_id, prev_domid);
 
     return 0;
 }
