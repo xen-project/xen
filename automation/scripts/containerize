@@ -33,6 +33,7 @@ case "_${CONTAINER}" in
     _focal) CONTAINER="${BASE}/ubuntu:focal" ;;
     _jessie) CONTAINER="${BASE}/debian:jessie" ;;
     _jessie-i386) CONTAINER="${BASE}/debian:jessie-i386" ;;
+    _bullseye-ppc64le) CONTAINER="${BASE}/debian:bullseye-ppc64le" ;;
     _stretch|_) CONTAINER="${BASE}/debian:stretch" ;;
     _stretch-i386) CONTAINER="${BASE}/debian:stretch-i386" ;;
     _buster-gcc-ibt) CONTAINER="${BASE}/debian:buster-gcc-ibt" ;;
