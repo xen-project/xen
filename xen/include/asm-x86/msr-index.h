@@ -40,6 +40,7 @@
 
 #define MSR_PRED_CMD                        0x00000049
 #define  PRED_CMD_IBPB                      (_AC(1, ULL) <<  0)
+#define  PRED_CMD_SBPB                      (_AC(1, ULL) <<  7)
 
 #define MSR_PPIN_CTL                        0x0000004e
 #define  PPIN_LOCKOUT                       (_AC(1, ULL) <<  0)

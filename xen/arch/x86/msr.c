@@ -405,7 +405,10 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( !cp->feat.ibrsb && !cp->extd.ibpb )
             goto gp_fault; /* MSR available? */
 
-        if ( val & ~PRED_CMD_IBPB )
+        rsvd = ~(PRED_CMD_IBPB |
+                 (cp->extd.sbpb ? PRED_CMD_SBPB : 0));
+
+        if ( val & rsvd )
             goto gp_fault; /* Rsvd bit set? */
 
         if ( v == curr )
