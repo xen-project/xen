@@ -462,17 +462,12 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
     /* Get the host policy. */
     rc = xc_get_cpu_featureset(xch, XEN_SYSCTL_cpu_featureset_host,
                                &len, host_featureset);
-    if ( rc )
+    /* Tolerate "buffer too small", as we've got the bits we need. */
+    if ( rc && errno != ENOBUFS )
     {
-        /* Tolerate "buffer too small", as we've got the bits we need. */
-        if ( errno == ENOBUFS )
-            rc = 0;
-        else
-        {
-            PERROR("Failed to obtain host featureset");
-            rc = -errno;
-            goto out;
-        }
+        PERROR("Failed to obtain host featureset");
+        rc = -errno;
+        goto out;
     }
 
     /* Get the domain's default policy. */
