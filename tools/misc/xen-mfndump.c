@@ -265,7 +265,6 @@ int lookup_pte_func(int argc, char *argv[])
 {
     struct xc_domain_meminfo minfo;
     xc_domaininfo_t info;
-    void *page = NULL;
     unsigned long i, j;
     int domid, pte_num;
     xen_pfn_t mfn;
@@ -301,6 +300,8 @@ int lookup_pte_func(int argc, char *argv[])
 
     for ( i = 0; i < minfo.p2m_size; i++ )
     {
+        void *page;
+
         if ( !(minfo.pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) )
             continue;
 
@@ -323,7 +324,6 @@ int lookup_pte_func(int argc, char *argv[])
         }
 
         munmap(page, XC_PAGE_SIZE);
-        page = NULL;
     }
 
     xc_unmap_domain_meminfo(xch, &minfo);
