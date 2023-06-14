@@ -1081,13 +1081,12 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         ret = libxl_flask_context_to_sid(ctx, s, strlen(s),
                                          &d_config->c_info.ssidref);
         if (ret) {
-            if (errno == ENOSYS) {
-                LOGD(WARN, domid, "XSM Disabled: init_seclabel not supported");
-                ret = 0;
-            } else {
+            if (errno != ENOSYS) {
                 LOGD(ERROR, domid, "Invalid init_seclabel: %s", s);
                 goto error_out;
             }
+
+            LOGD(WARN, domid, "XSM Disabled: init_seclabel not supported");
         }
     }
 
@@ -1096,13 +1095,12 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         ret = libxl_flask_context_to_sid(ctx, s, strlen(s),
                                          &d_config->b_info.exec_ssidref);
         if (ret) {
-            if (errno == ENOSYS) {
-                LOGD(WARN, domid, "XSM Disabled: seclabel not supported");
-                ret = 0;
-            } else {
+            if (errno != ENOSYS) {
                 LOGD(ERROR, domid, "Invalid seclabel: %s", s);
                 goto error_out;
             }
+
+            LOGD(WARN, domid, "XSM Disabled: seclabel not supported");
         }
     }
 
@@ -1111,14 +1109,13 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         ret = libxl_flask_context_to_sid(ctx, s, strlen(s),
                                          &d_config->b_info.device_model_ssidref);
         if (ret) {
-            if (errno == ENOSYS) {
-                LOGD(WARN, domid,
-                     "XSM Disabled: device_model_stubdomain_seclabel not supported");
-                ret = 0;
-            } else {
+            if (errno != ENOSYS) {
                 LOGD(ERROR, domid, "Invalid device_model_stubdomain_seclabel: %s", s);
                 goto error_out;
             }
+
+            LOGD(WARN, domid,
+                 "XSM Disabled: device_model_stubdomain_seclabel not supported");
         }
     }
 
