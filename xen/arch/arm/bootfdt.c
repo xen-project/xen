@@ -225,7 +225,7 @@ static int __init process_reserved_memory_node(const void *fdt, int node,
                                  size_cells, data);
 
     if ( rc == -ENOSPC )
-        panic("Max number of supported reserved-memory regions reached.");
+        panic("Max number of supported reserved-memory regions reached.\n");
     else if ( rc != -ENOENT )
         return rc;
     return 0;

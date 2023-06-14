@@ -524,7 +524,7 @@ static int control_thread_fn(const struct microcode_patch *patch)
          */
         if ( wait_for_condition(wait_cpu_callout, (done + 1),
                                 MICROCODE_UPDATE_TIMEOUT_US) )
-            panic("Timeout when finished updating microcode (finished %u/%u)",
+            panic("Timeout when finished updating microcode (finished %u/%u)\n",
                   done, nr_cores);
 
         /* Print warning message once if long time is spent here */

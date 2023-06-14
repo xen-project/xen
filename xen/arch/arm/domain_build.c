@@ -74,7 +74,7 @@ int __init parse_arch_dom0_param(const char *s, const char *e)
 
         return 0;
 #else
-        panic("'sve' property found, but CONFIG_ARM64_SVE not selected");
+        panic("'sve' property found, but CONFIG_ARM64_SVE not selected\n");
 #endif
     }
 
@@ -697,7 +697,7 @@ static void __init allocate_static_memory(struct domain *d,
     return;
 
  fail:
-    panic("Failed to allocate requested static memory for domain %pd.", d);
+    panic("Failed to allocate requested static memory for domain %pd.\n", d);
 }
 
 /*
@@ -769,7 +769,7 @@ static void __init assign_static_memory_11(struct domain *d,
     return;
 
  fail:
-    panic("Failed to assign requested static memory for direct-map domain %pd.",
+    panic("Failed to assign requested static memory for direct-map domain %pd.\n",
           d);
 }
 
