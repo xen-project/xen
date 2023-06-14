@@ -187,6 +187,9 @@ static const char *const str_7a1[32] =
 static const char *const str_e21a[32] =
 {
     [ 2] = "lfence+",
+
+    /* 26 */                [27] = "sbpb",
+    [28] = "ibpb-brtype",   [29] = "srso-no",
 };
 
 static const char *const str_7b1[32] =

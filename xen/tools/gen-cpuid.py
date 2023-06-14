@@ -318,6 +318,7 @@ def crunch_numbers(state):
         IBRSB: [STIBP, SSBD, INTEL_PSFD, EIBRS],
         IBRS: [AMD_STIBP, AMD_SSBD, PSFD,
                IBRS_ALWAYS, IBRS_FAST, IBRS_SAME_MODE],
+        IBPB: [IBPB_RET, SBPB, IBPB_BRTYPE],
         AMD_STIBP: [STIBP_ALWAYS],
 
         # In principle the TSXLDTRK insns could also be considered independent.
