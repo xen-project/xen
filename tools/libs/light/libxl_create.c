@@ -909,10 +909,8 @@ retry_transaction:
              strlen(dom_type));
 
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
-        if (errno == EAGAIN) {
-            t = 0;
+        if (errno == EAGAIN)
             goto retry_transaction;
-        }
         LOGED(ERROR, *domid, "domain creation ""xenstore transaction commit failed");
         rc = ERROR_FAIL;
         goto out;
