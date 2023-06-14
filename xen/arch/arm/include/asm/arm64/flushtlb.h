@@ -67,25 +67,28 @@ static inline void name(vaddr_t va)              \
 }
 
 /* Flush local TLBs, current VMID only. */
-TLB_HELPER(flush_guest_tlb_local, vmalls12e1, nsh);
+TLB_HELPER(flush_guest_tlb_local, vmalls12e1, nsh)
 
 /* Flush innershareable TLBs, current VMID only */
-TLB_HELPER(flush_guest_tlb, vmalls12e1is, ish);
+TLB_HELPER(flush_guest_tlb, vmalls12e1is, ish)
 
 /* Flush local TLBs, all VMIDs, non-hypervisor mode */
-TLB_HELPER(flush_all_guests_tlb_local, alle1, nsh);
+TLB_HELPER(flush_all_guests_tlb_local, alle1, nsh)
 
 /* Flush innershareable TLBs, all VMIDs, non-hypervisor mode */
-TLB_HELPER(flush_all_guests_tlb, alle1is, ish);
+TLB_HELPER(flush_all_guests_tlb, alle1is, ish)
 
 /* Flush all hypervisor mappings from the TLB of the local processor. */
-TLB_HELPER(flush_xen_tlb_local, alle2, nsh);
+TLB_HELPER(flush_xen_tlb_local, alle2, nsh)
 
 /* Flush TLB of local processor for address va. */
-TLB_HELPER_VA(__flush_xen_tlb_one_local, vae2);
+TLB_HELPER_VA(__flush_xen_tlb_one_local, vae2)
 
 /* Flush TLB of all processors in the inner-shareable domain for address va. */
-TLB_HELPER_VA(__flush_xen_tlb_one, vae2is);
+TLB_HELPER_VA(__flush_xen_tlb_one, vae2is)
+
+#undef TLB_HELPER
+#undef TLB_HELPER_VA
 
 #endif /* __ASM_ARM_ARM64_FLUSHTLB_H__ */
 /*

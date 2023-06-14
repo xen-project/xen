@@ -29,19 +29,21 @@ static inline void name(void)       \
 }
 
 /* Flush local TLBs, current VMID only */
-TLB_HELPER(flush_guest_tlb_local, TLBIALL, nsh);
+TLB_HELPER(flush_guest_tlb_local, TLBIALL, nsh)
 
 /* Flush inner shareable TLBs, current VMID only */
-TLB_HELPER(flush_guest_tlb, TLBIALLIS, ish);
+TLB_HELPER(flush_guest_tlb, TLBIALLIS, ish)
 
 /* Flush local TLBs, all VMIDs, non-hypervisor mode */
-TLB_HELPER(flush_all_guests_tlb_local, TLBIALLNSNH, nsh);
+TLB_HELPER(flush_all_guests_tlb_local, TLBIALLNSNH, nsh)
 
 /* Flush innershareable TLBs, all VMIDs, non-hypervisor mode */
-TLB_HELPER(flush_all_guests_tlb, TLBIALLNSNHIS, ish);
+TLB_HELPER(flush_all_guests_tlb, TLBIALLNSNHIS, ish)
 
 /* Flush all hypervisor mappings from the TLB of the local processor. */
-TLB_HELPER(flush_xen_tlb_local, TLBIALLH, nsh);
+TLB_HELPER(flush_xen_tlb_local, TLBIALLH, nsh)
+
+#undef TLB_HELPER
 
 /* Flush TLB of local processor for address va. */
 static inline void __flush_xen_tlb_one_local(vaddr_t va)

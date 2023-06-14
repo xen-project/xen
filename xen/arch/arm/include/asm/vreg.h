@@ -140,8 +140,8 @@ static inline void vreg_reg##sz##_clearbits(uint##sz##_t *reg,          \
     *reg &= ~(((uint##sz##_t)bits & mask) << shift);                    \
 }
 
-VREG_REG_HELPERS(64, 0x7);
-VREG_REG_HELPERS(32, 0x3);
+VREG_REG_HELPERS(64, 0x7)
+VREG_REG_HELPERS(32, 0x3)
 
 #undef VREG_REG_HELPERS
 
