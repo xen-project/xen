@@ -92,11 +92,9 @@ xc_core_arch_map_p2m_list_rw(xc_interface *xch, struct domain_info_context *dinf
                              uint64_t p2m_cr3)
 {
     uint64_t p2m_vaddr, p2m_end, mask, off;
-    xen_pfn_t p2m_mfn, mfn, saved_mfn, max_pfn;
-    uint64_t *ptes = NULL;
+    xen_pfn_t p2m_mfn, saved_mfn;
     xen_pfn_t *mfns = NULL;
-    unsigned int fpp, n_pages, level, n_levels, shift,
-                 idx_start, idx_end, idx, saved_idx;
+    unsigned int fpp, level, n_levels, idx_start, idx_end, saved_idx;
 
     p2m_vaddr = GET_FIELD(live_shinfo, arch.p2m_vaddr, dinfo->guest_width);
     fpp = PAGE_SIZE / dinfo->guest_width;
@@ -152,8 +150,10 @@ xc_core_arch_map_p2m_list_rw(xc_interface *xch, struct domain_info_context *dinf
 
     for ( level = n_levels; level > 0; level-- )
     {
-        n_pages = idx_end - idx_start + 1;
-        ptes = xc_map_foreign_pages(xch, dom, PROT_READ, mfns, n_pages);
+        unsigned int n_pages = idx_end - idx_start + 1;
+        uint64_t *ptes = xc_map_foreign_pages(xch, dom, PROT_READ, mfns, n_pages);
+        unsigned int shift, idx;
+
         if ( !ptes )
         {
             PERROR("Failed to map %u page table pages for p2m list", n_pages);
@@ -169,18 +169,21 @@ xc_core_arch_map_p2m_list_rw(xc_interface *xch, struct domain_info_context *dinf
         if ( !mfns )
         {
             ERROR("Cannot allocate memory for array of %u mfns", idx);
+        out_unmap:
+            munmap(ptes, n_pages * PAGE_SIZE);
             goto out;
         }
 
         for ( idx = idx_start; idx <= idx_end; idx++ )
         {
-            mfn = (ptes[idx] & 0x000ffffffffff000ULL) >> PAGE_SHIFT;
+            xen_pfn_t mfn = (ptes[idx] & 0x000ffffffffff000ULL) >> PAGE_SHIFT;
+
             if ( mfn == 0 )
             {
                 ERROR("Bad mfn %#lx during page table walk for vaddr %#" PRIx64 " at level %d of p2m list",
                       mfn, off + ((uint64_t)idx << shift), level);
                 errno = ERANGE;
-                goto out;
+                goto out_unmap;
             }
             mfns[idx - idx_start] = mfn;
 
@@ -197,6 +200,8 @@ xc_core_arch_map_p2m_list_rw(xc_interface *xch, struct domain_info_context *dinf
 
         if ( level == 2 )
         {
+            xen_pfn_t max_pfn;
+
             if ( saved_idx == idx_end )
                 saved_idx++;
             max_pfn = ((xen_pfn_t)saved_idx << 9) * fpp;
@@ -210,7 +215,6 @@ xc_core_arch_map_p2m_list_rw(xc_interface *xch, struct domain_info_context *dinf
         }
 
         munmap(ptes, n_pages * PAGE_SIZE);
-        ptes = NULL;
         off = p2m_vaddr & ((mask >> shift) << shift);
     }
 
@@ -218,8 +222,6 @@ xc_core_arch_map_p2m_list_rw(xc_interface *xch, struct domain_info_context *dinf
 
  out:
     free(mfns);
-    if ( ptes )
-        munmap(ptes, n_pages * PAGE_SIZE);
 
     return NULL;
 }
