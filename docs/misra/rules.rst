@@ -32,6 +32,9 @@ violations are meant to be documented as deviations, while some others
 should be fixed. Both compliance and documenting deviations on the
 existing codebase are work-in-progress.
 
+The list below might need to be updated over time. Reach out to THE REST
+maintainers if you want to suggest a change.
+
 .. list-table::
    :header-rows: 1
 
@@ -88,6 +91,18 @@ existing codebase are work-in-progress.
      - Required
      - There shall be no occurrence of undefined or critical unspecified
        behaviour
+     -
+
+   * - `Rule 1.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/>`_
+     - Required
+     - Emergent language features shall not be used
+     - Emergent language features, such as C11 features, should not be
+       confused with similar compiler extensions, which we use. When the
+       time comes to adopt C11, this rule will be revisited.
+
+   * - `Rule 2.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_02_01_1.c>`_
+     - Required
+     - A project shall not contain unreachable code
      -
 
    * - `Rule 2.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_02_06.c>`_
