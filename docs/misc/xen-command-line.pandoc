@@ -2170,9 +2170,10 @@ guests to use.
   preference to here.*
 * `ibpb-entry=` offers control over whether IBPB (Indirect Branch Prediction
   Barrier) is used on entry to Xen.  This is used by default on hardware
-  vulnerable to Branch Type Confusion, but for performance reasons, dom0 is
-  unprotected by default.  If it necessary to protect dom0 too, boot with
-  `spec-ctrl=ibpb-entry`.
+  vulnerable to Branch Type Confusion, and hardware vulnerable to Speculative
+  Return Stack Overflow if appropriate microcode has been loaded, but for
+  performance reasons dom0 is unprotected by default.  If it is necessary to
+  protect dom0 too, boot with `spec-ctrl=ibpb-entry`.
 
 If Xen was compiled with INDIRECT_THUNK support, `bti-thunk=` can be used to
 select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
