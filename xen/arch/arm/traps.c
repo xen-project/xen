@@ -1677,11 +1677,11 @@ void handle_ro_read_val(struct cpu_user_regs *regs,
 }
 
 /* Read only as read as zero */
-inline void handle_ro_raz(struct cpu_user_regs *regs,
-                          int regidx,
-                          bool read,
-                          const union hsr hsr,
-                          int min_el)
+void handle_ro_raz(struct cpu_user_regs *regs,
+                   int regidx,
+                   bool read,
+                   const union hsr hsr,
+                   int min_el)
 {
     handle_ro_read_val(regs, regidx, read, hsr, min_el, 0);
 }
