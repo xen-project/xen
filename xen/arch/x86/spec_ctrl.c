@@ -870,6 +870,63 @@ static bool __init should_use_eager_fpu(void)
     }
 }
 
+static void __init srso_calculations(bool hw_smt_enabled)
+{
+    if ( !(boot_cpu_data.x86_vendor &
+           (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+        return;
+
+    /*
+     * If virtualised, none of these heuristics are safe.  Trust the
+     * hypervisor completely.
+     */
+    if ( cpu_has_hypervisor )
+        return;
+
+    if ( boot_cpu_data.x86 == 0x19 )
+    {
+        /*
+         * We could have a table of models/microcode revisions.  ...or we
+         * could just look for the new feature added.
+         */
+        if ( wrmsr_safe(MSR_PRED_CMD, PRED_CMD_SBPB) == 0 )
+        {
+            setup_force_cpu_cap(X86_FEATURE_IBPB_BRTYPE);
+            setup_force_cpu_cap(X86_FEATURE_SBPB);
+        }
+        else
+            printk(XENLOG_WARNING
+                   "Vulnerable to SRSO, without suitable microcode to mitigate\n");
+    }
+    else if ( boot_cpu_data.x86 < 0x19 )
+    {
+        /*
+         * Zen1/2 (which have the IBPB microcode) have IBPB_BRTYPE behaviour
+         * already.
+         *
+         * Older CPUs are unknown, but their IBPB likely does flush branch
+         * types too.  As we're synthesising for the benefit of guests, go
+         * with the likely option - this avoids VMs running on e.g. a Zen3
+         * thinking there's no SRSO mitigation available because it may
+         * migrate to e.g. a Bulldozer.
+         */
+        if ( boot_cpu_has(X86_FEATURE_IBPB) )
+            setup_force_cpu_cap(X86_FEATURE_IBPB_BRTYPE);
+    }
+
+    /*
+     * In single-thread mode on Zen1/2, microarchitectural limits prevent SRSO
+     * attacks from being effective.  Synthesise SRSO_NO if SMT is disabled in
+     * hardware.
+     *
+     * Booting with smt=0, or using xen-hptool should be effective too, but
+     * they can be altered at runtime so it's not safe to presume SRSO_NO.
+     */
+    if ( !hw_smt_enabled &&
+         (boot_cpu_data.x86 == 0x17 || boot_cpu_data.x86 == 0x18) )
+        setup_force_cpu_cap(X86_FEATURE_SRSO_NO);
+}
+
 static void __init ibpb_calculations(void)
 {
     bool def_ibpb_entry = false;
@@ -897,6 +954,15 @@ static void __init ibpb_calculations(void)
          * Confusion.  Mitigate with IBPB-on-entry.
          */
         if ( !boot_cpu_has(X86_FEATURE_BTC_NO) )
+            def_ibpb_entry = true;
+
+        /*
+         * Further to BTC, Zen3/4 CPUs suffer from Speculative Return Stack
+         * Overflow in most configurations.  Mitigate with IBPB-on-entry if we
+         * have the microcode that makes this an effective option.
+         */
+        if ( !boot_cpu_has(X86_FEATURE_SRSO_NO) &&
+             boot_cpu_has(X86_FEATURE_IBPB_BRTYPE) )
             def_ibpb_entry = true;
     }
 
@@ -1415,6 +1481,8 @@ void __init init_speculation_mitigations(void)
         if ( !cpu_has_svm )
             default_spec_ctrl_flags |= SCF_ist_rsb;
     }
+
+    srso_calculations(hw_smt_enabled);
 
     ibpb_calculations();
 
