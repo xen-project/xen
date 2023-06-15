@@ -304,7 +304,8 @@ static always_inline u16 observe_head(spinlock_tickets_t *t)
     return read_atomic(&t->head);
 }
 
-void inline _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data)
+static void always_inline spin_lock_common(spinlock_t *lock,
+                                           void (*cb)(void *), void *data)
 {
     spinlock_tickets_t tickets = SPINLOCK_TICKET_INC;
     LOCK_PROFILE_VAR;
@@ -316,7 +317,7 @@ void inline _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data)
     while ( tickets.tail != observe_head(&lock->tickets) )
     {
         LOCK_PROFILE_BLOCK;
-        if ( unlikely(cb) )
+        if ( cb )
             cb(data);
         arch_lock_relax();
     }
@@ -327,7 +328,12 @@ void inline _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data)
 
 void _spin_lock(spinlock_t *lock)
 {
-     _spin_lock_cb(lock, NULL, NULL);
+    spin_lock_common(lock, NULL, NULL);
+}
+
+void _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data)
+{
+    spin_lock_common(lock, cb, data);
 }
 
 void _spin_lock_irq(spinlock_t *lock)
