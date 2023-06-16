@@ -142,25 +142,27 @@ efi_platform:
 
         .section .init.text, "ax", @progbits
 
-bad_cpu:
-        add     $sym_offs(.Lbad_cpu_msg),%esi   # Error message
+early_error: /* Here to improve the disassembly. */
+
+.Lbad_cpu:
+        add     $sym_offs(.Lbad_cpu_msg), %esi
         jmp     .Lget_vtb
-not_multiboot:
-        add     $sym_offs(.Lbad_ldr_msg),%esi   # Error message
+.Lnot_multiboot:
+        add     $sym_offs(.Lbad_ldr_msg), %esi
         jmp     .Lget_vtb
 .Lnot_aligned:
-        add     $sym_offs(.Lbag_alg_msg),%esi   # Error message
+        add     $sym_offs(.Lbag_alg_msg), %esi
         jmp     .Lget_vtb
 .Lmb2_no_st:
         /*
          * Here we are on EFI platform. vga_text_buffer was zapped earlier
          * because there is pretty good chance that VGA is unavailable.
          */
-        add     $sym_offs(.Lbad_ldr_nst),%esi   # Error message
+        add     $sym_offs(.Lbad_ldr_nst), %esi
         jmp     .Lget_vtb
 .Lmb2_no_ih:
         /* Ditto. */
-        add     $sym_offs(.Lbad_ldr_nih),%esi   # Error message
+        add     $sym_offs(.Lbad_ldr_nih), %esi
         jmp     .Lget_vtb
 .Lmb2_no_bs:
         /*
@@ -168,7 +170,7 @@ not_multiboot:
          * via start label. Then reliable vga_text_buffer zap is impossible
          * in Multiboot2 scanning loop and we have to zero %edi below.
          */
-        add     $sym_offs(.Lbad_ldr_nbs),%esi   # Error message
+        add     $sym_offs(.Lbad_ldr_nbs), %esi
         xor     %edi,%edi                       # No VGA text buffer
         jmp     .Lprint_err
 .Lmb2_efi_ia_32:
@@ -176,11 +178,11 @@ not_multiboot:
          * Here we are on EFI IA-32 platform. Then reliable vga_text_buffer zap is
          * impossible in Multiboot2 scanning loop and we have to zero %edi below.
          */
-        add     $sym_offs(.Lbad_efi_msg),%esi   # Error message
+        add     $sym_offs(.Lbad_efi_msg), %esi
         xor     %edi,%edi                       # No VGA text buffer
         jmp     .Lprint_err
 .Lget_vtb:
-        mov     sym_esi(vga_text_buffer),%edi
+        mov     sym_esi(vga_text_buffer), %edi
 .Lprint_err:
         lodsb
         test    %al,%al        # Terminate on '\0' sentinel
@@ -202,6 +204,9 @@ not_multiboot:
 .Lhalt: hlt
         jmp     .Lhalt
 
+        .size early_error, . - early_error
+        .type early_error, @function
+
         .code64
 
 __efi64_mb2_start:
@@ -221,8 +226,8 @@ __efi64_mb2_start:
         cmp     $MULTIBOOT2_BOOTLOADER_MAGIC,%eax
         je      .Lefi_multiboot2_proto
 
-        /* Jump to not_multiboot after switching CPU to x86_32 mode. */
-        lea     not_multiboot(%rip),%r15
+        /* Jump to .Lnot_multiboot after switching CPU to x86_32 mode. */
+        lea     .Lnot_multiboot(%rip), %r15
         jmp     x86_32_switch
 
 .Lefi_multiboot2_proto:
@@ -464,7 +469,7 @@ __start:
 
         /* Check for Multiboot bootloader. */
         cmp     $MULTIBOOT_BOOTLOADER_MAGIC,%eax
-        jne     not_multiboot
+        jne     .Lnot_multiboot
 
         /* Get mem_lower from Multiboot information. */
         testb   $MBI_MEMLIMITS,MB_flags(%ebx)
@@ -655,7 +660,7 @@ trampoline_setup:
 
         /* Check for availability of long mode. */
         bt      $cpufeat_bit(X86_FEATURE_LM),%edx
-        jnc     bad_cpu
+        jnc     .Lbad_cpu
 
         /* Stash TSC to calculate a good approximation of time-since-boot */
         rdtsc
