@@ -149,7 +149,7 @@ SECTIONS
         *(.bss.percpu.read_mostly)
         . = ALIGN(SMP_CACHE_BYTES);
         __per_cpu_data_end = .;
-        *(.bss .bss.*)
+        *(.sbss .sbss.* .bss .bss.*)
         . = ALIGN(POINTER_ALIGN);
         __bss_end = .;
     } :text
