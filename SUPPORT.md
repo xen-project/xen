@@ -168,6 +168,12 @@ ARM only has one guest type at the moment
 
 ## Toolstack
 
+While 32-bit builds of the tool stack are generally supported, restrictions
+apply in particular when running on top of a 64-bit hypervisor.  For example,
+very large guests aren't expected to be manageable in this case.  This includes
+guests giving the appearance of being large, by altering their own memory
+layouts.
+
 ### xl
 
     Status: Supported
