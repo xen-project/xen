@@ -27,8 +27,16 @@ ENTRY(start)
         add     t3, t3, __SIZEOF_POINTER__
         bltu    t3, t4, .L_clear_bss
 
+        jal     reset_stack
+
+        tail    start_xen
+
+        .section .text, "ax", %progbits
+
+ENTRY(reset_stack)
         la      sp, cpu0_boot_stack
         li      t0, STACK_SIZE
         add     sp, sp, t0
 
-        tail    start_xen
+        ret
+
