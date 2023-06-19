@@ -310,7 +310,7 @@ static u64 bus_to_context_maddr(struct vtd_iommu *iommu, u8 bus)
  *   failure,
  * - for target > 0 the physical address of the page table holding the leaf
  *   PTE for the requested address,
- * - for target == 0 the full PTE.
+ * - for target == 0 the full PTE contents below PADDR_BITS limit.
  */
 static uint64_t addr_to_dma_page_maddr(struct domain *domain, daddr_t addr,
                                        unsigned int target,
@@ -368,7 +368,7 @@ static uint64_t addr_to_dma_page_maddr(struct domain *domain, daddr_t addr,
                  * with the address adjusted to account for the residual of
                  * the walk.
                  */
-                pte_maddr = pte->val +
+                pte_maddr = (pte->val & PADDR_MASK) +
                     (addr & ((1UL << level_to_offset_bits(level)) - 1) &
                      PAGE_MASK);
                 if ( !target )
@@ -413,7 +413,11 @@ static uint64_t addr_to_dma_page_maddr(struct domain *domain, daddr_t addr,
         }
 
         if ( --level == target )
+        {
+            if ( !target )
+                pte_maddr = pte->val & PADDR_MASK;
             break;
+        }
 
         unmap_vtd_domain_page(parent);
         parent = map_vtd_domain_page(pte_maddr);
