@@ -98,7 +98,7 @@ static unsigned int get_symbol_offset(unsigned long pos)
     return name - symbols_names;
 }
 
-bool_t is_active_kernel_text(unsigned long addr)
+bool is_active_kernel_text(unsigned long addr)
 {
     return !!find_text_region(addr);
 }

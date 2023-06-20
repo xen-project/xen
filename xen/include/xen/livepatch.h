@@ -48,13 +48,13 @@ struct livepatch_symbol {
     const char *name;
     unsigned long value;
     unsigned int size;
-    bool_t new_symbol;
+    bool new_symbol;
 };
 
 int livepatch_op(struct xen_sysctl_livepatch_op *);
 void check_for_livepatch_work(void);
 unsigned long livepatch_symbols_lookup_by_name(const char *symname);
-bool_t is_patch(const void *addr);
+bool is_patch(const void *addr);
 
 /* Arch hooks. */
 int arch_livepatch_verify_elf(const struct livepatch_elf *elf);
@@ -169,7 +169,7 @@ static inline int livepatch_op(struct xen_sysctl_livepatch_op *op)
 }
 
 static inline void check_for_livepatch_work(void) { };
-static inline bool_t is_patch(const void *addr)
+static inline bool is_patch(const void *addr)
 {
     return 0;
 }

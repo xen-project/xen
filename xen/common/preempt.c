@@ -25,7 +25,7 @@
 
 DEFINE_PER_CPU(unsigned int, __preempt_count);
 
-bool_t in_atomic(void)
+bool in_atomic(void)
 {
     return preempt_count() || in_irq() || !local_irq_is_enabled();
 }

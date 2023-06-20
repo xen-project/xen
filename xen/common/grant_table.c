@@ -2272,7 +2272,7 @@ gnttab_transfer(
 
     for ( i = 0; i < count; i++ )
     {
-        bool_t okay;
+        bool okay;
         int rc;
 
         if ( i && hypercall_preempt_check() )
@@ -2858,9 +2858,9 @@ struct gnttab_copy_buf {
     mfn_t mfn;
     struct page_info *page;
     void *virt;
-    bool_t read_only;
-    bool_t have_grant;
-    bool_t have_type;
+    bool read_only;
+    bool have_grant;
+    bool have_type;
 };
 
 static int gnttab_copy_lock_domain(domid_t domid, bool is_gref,
@@ -3006,9 +3006,9 @@ static int gnttab_copy_claim_buf(const struct gnttab_copy *op,
     return rc;
 }
 
-static bool_t gnttab_copy_buf_valid(const struct gnttab_copy_ptr *p,
-                                    const struct gnttab_copy_buf *b,
-                                    bool_t has_gref)
+static bool gnttab_copy_buf_valid(
+    const struct gnttab_copy_ptr *p, const struct gnttab_copy_buf *b,
+    bool has_gref)
 {
     if ( !b->virt )
         return 0;

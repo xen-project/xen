@@ -757,7 +757,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
                              MEMF_no_refcount) )
             {
                 unsigned long dec_count;
-                bool_t drop_dom_ref;
+                bool drop_dom_ref;
 
                 /*
                  * Pages in in_chunk_list is stolen without

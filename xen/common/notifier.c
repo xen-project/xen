@@ -72,7 +72,7 @@ int notifier_call_chain(
     int ret = NOTIFY_DONE;
     struct list_head *cursor;
     struct notifier_block *nb = NULL;
-    bool_t reverse = !!(val & NOTIFY_REVERSE);
+    bool reverse = val & NOTIFY_REVERSE;
 
     cursor = pcursor && *pcursor ? &(*pcursor)->chain : &nh->head;
 

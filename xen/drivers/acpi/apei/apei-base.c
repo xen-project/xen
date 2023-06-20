@@ -154,7 +154,7 @@ int cf_check apei_exec_noop(
  * execute all instructions belong to the action.
  */
 int __apei_exec_run(struct apei_exec_context *ctx, u8 action,
-		    bool_t optional)
+		    bool optional)
 {
 	int rc = -ENOENT;
 	u32 i, ip;

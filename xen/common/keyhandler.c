@@ -24,7 +24,7 @@
 #include <asm/div64.h>
 
 static unsigned char keypress_key;
-static bool_t alt_key_handling;
+static bool alt_key_handling;
 
 static keyhandler_fn_t cf_check show_handlers, cf_check dump_hwdom_registers,
     cf_check dump_domains, cf_check read_clocks;
@@ -39,7 +39,7 @@ static struct keyhandler {
     };
 
     const char *desc;    /* Description for help message.                 */
-    bool_t irq_callback, /* Call in irq context? if not, tasklet context. */
+    bool irq_callback,   /* Call in irq context? if not, tasklet context. */
         diagnostic;      /* Include in 'dump all' handler.                */
 } key_table[128] __read_mostly =
 {

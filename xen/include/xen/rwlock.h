@@ -293,7 +293,7 @@ typedef struct percpu_rwlock percpu_rwlock_t;
 
 struct percpu_rwlock {
     rwlock_t            rwlock;
-    bool_t              writer_activating;
+    bool                writer_activating;
 #ifndef NDEBUG
     percpu_rwlock_t     **percpu_owner;
 #endif

@@ -30,7 +30,7 @@ struct cpu_user_regs;
 struct gdb_context {
     int                 serhnd;           /* handle on our serial line */
     int                 console_steal_id; /* handle on stolen console */
-    bool_t              currently_attached;
+    bool                currently_attached;
     atomic_t            running;
     unsigned long       connected;
     u8                  signum;

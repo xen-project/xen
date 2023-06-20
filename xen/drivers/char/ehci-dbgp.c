@@ -332,7 +332,7 @@ struct ehci_dbgp {
     unsigned long timeout;
     struct timer timer;
     spinlock_t *lock;
-    bool_t reset_run;
+    bool reset_run;
     u8 bus, slot, func, bar;
     u16 pci_cr;
     u32 bar_val;
@@ -639,7 +639,7 @@ static int dbgp_control_msg(struct ehci_dbgp *dbgp, unsigned int devnum,
 {
     u32 addr, pids, ctrl;
     struct usb_ctrlrequest req;
-    bool_t read = (requesttype & USB_DIR_IN) != 0;
+    bool read = (requesttype & USB_DIR_IN) != 0;
     int ret;
 
     if ( size > (read ? DBGP_MAX_PACKET : 0) )
@@ -873,7 +873,7 @@ static int ehci_dbgp_external_startup(struct ehci_dbgp *dbgp)
     unsigned int dbg_port = dbgp->phys_port;
     unsigned int tries = 3;
     unsigned int reset_port_tries = 1;
-    bool_t try_hard_once = 1;
+    bool try_hard_once = true;
 
 try_port_reset_again:
     ret = ehci_dbgp_startup(dbgp);
@@ -1252,7 +1252,7 @@ static void cf_check _ehci_dbgp_poll(struct cpu_user_regs *regs)
     struct ehci_dbgp *dbgp = port->uart;
     unsigned long flags;
     unsigned int timeout = MICROSECS(DBGP_CHECK_INTERVAL);
-    bool_t empty = 0;
+    bool empty = false;
 
     if ( !dbgp->ehci_debug )
         return;
@@ -1300,7 +1300,7 @@ static void cf_check ehci_dbgp_poll(void *data)
 #endif
 }
 
-static bool_t ehci_dbgp_setup_preirq(struct ehci_dbgp *dbgp)
+static bool ehci_dbgp_setup_preirq(struct ehci_dbgp *dbgp)
 {
     if ( !ehci_dbgp_setup(dbgp) )
         return 1;

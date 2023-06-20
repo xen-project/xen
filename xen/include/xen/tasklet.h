@@ -18,9 +18,9 @@ struct tasklet
 {
     struct list_head list;
     int scheduled_on;
-    bool_t is_softirq;
-    bool_t is_running;
-    bool_t is_dead;
+    bool is_softirq;
+    bool is_running;
+    bool is_dead;
     void (*func)(void *);
     void *data;
 };

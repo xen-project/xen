@@ -139,7 +139,7 @@ static int __init cf_check setup_cpufreq_option(const char *str)
 }
 custom_param("cpufreq", setup_cpufreq_option);
 
-bool_t __read_mostly cpufreq_verbose;
+bool __read_mostly cpufreq_verbose;
 
 struct cpufreq_governor *__find_governor(const char *governor)
 {

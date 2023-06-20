@@ -124,8 +124,8 @@ static int try_set_link(event_word_t *word, event_word_t *w, uint32_t link)
  * We block unmasking by the guest by marking the tail word as BUSY,
  * therefore, the cmpxchg() may fail at most 4 times.
  */
-static bool_t evtchn_fifo_set_link(struct domain *d, event_word_t *word,
-                                   uint32_t link)
+static bool evtchn_fifo_set_link(struct domain *d, event_word_t *word,
+                                 uint32_t link)
 {
     event_word_t w;
     unsigned int try;

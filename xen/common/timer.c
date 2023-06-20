@@ -239,7 +239,7 @@ static inline void deactivate_timer(struct timer *timer)
     list_add(&timer->inactive, &per_cpu(timers, timer->cpu).inactive);
 }
 
-static inline bool_t timer_lock(struct timer *timer)
+static inline bool timer_lock(struct timer *timer)
 {
     unsigned int cpu;
 
@@ -264,7 +264,7 @@ static inline bool_t timer_lock(struct timer *timer)
 }
 
 #define timer_lock_irqsave(t, flags) ({         \
-    bool_t __x;                                 \
+    bool __x;                                   \
     local_irq_save(flags);                      \
     if ( !(__x = timer_lock(t)) )               \
         local_irq_restore(flags);               \
@@ -358,7 +358,7 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
 {
     unsigned int old_cpu;
 #if CONFIG_NR_CPUS > 1
-    bool_t active;
+    bool active;
     unsigned long flags;
 
     rcu_read_lock(&timer_cpu_read_lock);
@@ -580,7 +580,7 @@ static void migrate_timers_from_cpu(unsigned int old_cpu)
     unsigned int new_cpu = cpumask_any(&cpu_online_map);
     struct timers *old_ts, *new_ts;
     struct timer *t;
-    bool_t notify = 0;
+    bool notify = false;
 
     ASSERT(!cpu_online(old_cpu) && cpu_online(new_cpu));
 

@@ -433,7 +433,7 @@ int tb_control(struct xen_sysctl_tbuf_op *tbc)
     return rc;
 }
 
-static inline unsigned int calc_rec_size(bool_t cycles, unsigned int extra)
+static inline unsigned int calc_rec_size(bool cycles, unsigned int extra)
 {
     unsigned int rec_size = 4;
 
@@ -443,7 +443,7 @@ static inline unsigned int calc_rec_size(bool_t cycles, unsigned int extra)
     return rec_size;
 }
 
-static inline bool_t bogus(u32 prod, u32 cons)
+static inline bool bogus(u32 prod, u32 cons)
 {
     if ( unlikely(prod & 3) || unlikely(prod >= 2 * data_size) ||
          unlikely(cons & 3) || unlikely(cons >= 2 * data_size) )
@@ -546,7 +546,7 @@ static unsigned char *next_record(const struct t_buf *buf, uint32_t *next,
 static inline void __insert_record(struct t_buf *buf,
                                    unsigned long event,
                                    unsigned int extra,
-                                   bool_t cycles,
+                                   bool cycles,
                                    unsigned int rec_size,
                                    const void *extra_data)
 {
@@ -617,7 +617,7 @@ static inline void insert_wrap_record(struct t_buf *buf,
 {
     u32 space_left = calc_bytes_to_wrap(buf);
     unsigned int extra_space = space_left - sizeof(u32);
-    bool_t cycles = 0;
+    bool cycles = false;
 
     BUG_ON(space_left > size);
 
@@ -674,14 +674,14 @@ static DECLARE_SOFTIRQ_TASKLET(trace_notify_dom0_tasklet,
  *
  * Logs a trace record into the appropriate buffer.
  */
-void __trace_var(u32 event, bool_t cycles, unsigned int extra,
+void __trace_var(u32 event, bool cycles, unsigned int extra,
                  const void *extra_data)
 {
     struct t_buf *buf;
     unsigned long flags;
     u32 bytes_to_tail, bytes_to_wrap;
     unsigned int rec_size, total_size;
-    bool_t started_below_highwater;
+    bool started_below_highwater;
 
     if( !tb_init_done )
         return;

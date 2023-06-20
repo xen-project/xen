@@ -124,7 +124,7 @@ void arch_dump_domain_info(struct domain *d);
 
 int arch_vcpu_reset(struct vcpu *);
 
-bool_t domctl_lock_acquire(void);
+bool domctl_lock_acquire(void);
 void domctl_lock_release(void);
 
 /*
@@ -144,7 +144,7 @@ void arch_hypercall_tasklet_result(struct vcpu *v, long res);
 
 extern unsigned int xen_processor_pmbits;
 
-extern bool_t opt_dom0_vcpus_pin;
+extern bool opt_dom0_vcpus_pin;
 extern cpumask_t dom0_cpus;
 extern bool dom0_affinity_relaxed;
 

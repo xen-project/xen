@@ -102,7 +102,7 @@ extern enum system_state {
     SYS_STATE_resume
 } system_state;
 
-bool_t is_active_kernel_text(unsigned long addr);
+bool is_active_kernel_text(unsigned long addr);
 
 extern const char xen_config_data[];
 extern const unsigned int xen_config_data_size;

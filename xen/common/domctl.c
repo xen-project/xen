@@ -126,7 +126,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     arch_get_domain_info(d, info);
 }
 
-bool_t domctl_lock_acquire(void)
+bool domctl_lock_acquire(void)
 {
     /*
      * Caller may try to pause its own VCPUs. We must prevent deadlock
@@ -281,7 +281,7 @@ static struct vnuma_info *vnuma_init(const struct xen_domctl_vnuma *uinfo,
 long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     long ret = 0;
-    bool_t copyback = 0;
+    bool copyback = false;
     struct xen_domctl curop, *op = &curop;
     struct domain *d;
 

@@ -58,12 +58,12 @@ static struct ns16550 {
     struct timer timer;
     struct timer resume_timer;
     unsigned int timeout_ms;
-    bool_t intr_works;
-    bool_t dw_usr_bsy;
+    bool intr_works;
+    bool dw_usr_bsy;
 #ifdef NS16550_PCI
     /* PCI card parameters. */
-    bool_t pb_bdf_enable;   /* if =1, pb-bdf effective, port behind bridge */
-    bool_t ps_bdf_enable;   /* if =1, ps_bdf effective, port on pci card */
+    bool pb_bdf_enable;     /* if =1, pb-bdf effective, port behind bridge */
+    bool ps_bdf_enable;     /* if =1, ps_bdf effective, port on pci card */
     unsigned int pb_bdf[3]; /* pci bridge BDF */
     unsigned int ps_bdf[3]; /* pci serial port BDF */
     u32 bar;
@@ -101,8 +101,8 @@ struct ns16550_config_param {
     unsigned int reg_width;
     unsigned int fifo_size;
     u8 lsr_mask;
-    bool_t mmio;
-    bool_t bar0;
+    bool mmio;
+    bool bar0;
     unsigned int max_ports;
     unsigned int base_baud;
     unsigned int uart_offset;
@@ -1172,7 +1172,7 @@ static const struct ns16550_config __initconst uart_config[] =
 };
 
 static int __init
-pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
+pci_uart_config(struct ns16550 *uart, bool skip_amt, unsigned int idx)
 {
     u64 orig_base = uart->io_base;
     unsigned int b, d, f, nextf, i;

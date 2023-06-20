@@ -58,7 +58,7 @@
 #define FIRMWARE_MAX_STALL	50			/* 50us */
 
 static struct acpi_table_erst *__read_mostly erst_tab;
-static bool_t __read_mostly erst_enabled;
+static bool __read_mostly erst_enabled;
 
 /* ERST Error Log Address Range atrributes */
 #define ERST_RANGE_RESERVED	0x0001

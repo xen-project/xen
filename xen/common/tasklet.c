@@ -20,7 +20,7 @@
 #include <xen/cpu.h>
 
 /* Some subsystems call into us before we are initialised. We ignore them. */
-static bool_t tasklets_initialised;
+static bool tasklets_initialised;
 
 DEFINE_PER_CPU(unsigned long, tasklet_work_to_do);
 
@@ -37,7 +37,7 @@ static void tasklet_enqueue(struct tasklet *t)
     if ( t->is_softirq )
     {
         struct list_head *list = &per_cpu(softirq_tasklet_list, cpu);
-        bool_t was_empty = list_empty(list);
+        bool was_empty = list_empty(list);
         list_add_tail(&t->list, list);
         if ( was_empty )
             cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);

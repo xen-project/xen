@@ -254,7 +254,7 @@ struct page_list_head
 # define INIT_PAGE_LIST_HEAD(head) ((head)->tail = (head)->next = NULL)
 # define INIT_PAGE_LIST_ENTRY(ent) ((ent)->prev = (ent)->next = PAGE_LIST_NULL)
 
-static inline bool_t
+static inline bool
 page_list_empty(const struct page_list_head *head)
 {
     return !head->next;
@@ -313,7 +313,7 @@ page_list_add_tail(struct page_info *page, struct page_list_head *head)
     }
     head->tail = page;
 }
-static inline bool_t
+static inline bool
 __page_list_del_head(struct page_info *page, struct page_list_head *head,
                      struct page_info *next, struct page_info *prev)
 {
@@ -427,7 +427,7 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
 # define INIT_PAGE_LIST_HEAD             INIT_LIST_HEAD
 # define INIT_PAGE_LIST_ENTRY            INIT_LIST_HEAD
 
-static inline bool_t
+static inline bool
 page_list_empty(const struct page_list_head *head)
 {
     return !!list_empty(head);

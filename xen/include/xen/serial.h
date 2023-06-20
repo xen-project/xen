@@ -48,7 +48,7 @@ struct serial_port {
     /* Transmit data buffer (interrupt-driven uart). */
     char               *txbuf;
     unsigned int        txbufp, txbufc;
-    bool_t              tx_quench;
+    bool                tx_quench;
     int                 tx_log_everything;
     /* Force synchronous transmit. */
     int                 sync;

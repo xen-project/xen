@@ -38,7 +38,7 @@ static inline mfn_t mfn_min(mfn_t x, mfn_t y)
     return _mfn(min(mfn_x(x), mfn_x(y)));
 }
 
-static inline bool_t mfn_eq(mfn_t x, mfn_t y)
+static inline bool mfn_eq(mfn_t x, mfn_t y)
 {
     return mfn_x(x) == mfn_x(y);
 }
@@ -77,7 +77,7 @@ static inline gfn_t gfn_min(gfn_t x, gfn_t y)
     return _gfn(min(gfn_x(x), gfn_x(y)));
 }
 
-static inline bool_t gfn_eq(gfn_t x, gfn_t y)
+static inline bool gfn_eq(gfn_t x, gfn_t y)
 {
     return gfn_x(x) == gfn_x(y);
 }

@@ -48,7 +48,7 @@ static inline u64 apei_exec_ctx_get_output(struct apei_exec_context *ctx)
 	return ctx->value;
 }
 
-int __apei_exec_run(struct apei_exec_context *ctx, u8 action, bool_t optional);
+int __apei_exec_run(struct apei_exec_context *ctx, u8 action, bool optional);
 
 static inline int apei_exec_run(struct apei_exec_context *ctx, u8 action)
 {

@@ -145,7 +145,7 @@ static void cf_check lfb_flush(void)
     __asm__ __volatile__ ("sfence" : : : "memory");
 }
 
-void __init vesa_endboot(bool_t keep)
+void __init vesa_endboot(bool keep)
 {
     if ( keep )
     {

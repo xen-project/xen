@@ -833,21 +833,21 @@ int kimage_load_segments(struct kexec_image *image)
     return 0;
 }
 
-kimage_entry_t *kimage_entry_next(kimage_entry_t *entry, bool_t compat)
+kimage_entry_t *kimage_entry_next(kimage_entry_t *entry, bool compat)
 {
     if ( compat )
         return (kimage_entry_t *)((uint32_t *)entry + 1);
     return entry + 1;
 }
 
-mfn_t kimage_entry_mfn(kimage_entry_t *entry, bool_t compat)
+mfn_t kimage_entry_mfn(kimage_entry_t *entry, bool compat)
 {
     if ( compat )
         return maddr_to_mfn(*(uint32_t *)entry);
     return maddr_to_mfn(*entry);
 }
 
-unsigned long kimage_entry_ind(kimage_entry_t *entry, bool_t compat)
+unsigned long kimage_entry_ind(kimage_entry_t *entry, bool compat)
 {
     if ( compat )
         return *(uint32_t *)entry & 0xf;
@@ -855,7 +855,7 @@ unsigned long kimage_entry_ind(kimage_entry_t *entry, bool_t compat)
 }
 
 int kimage_build_ind(struct kexec_image *image, mfn_t ind_mfn,
-                     bool_t compat)
+                     bool compat)
 {
     void *page;
     kimage_entry_t *entry;

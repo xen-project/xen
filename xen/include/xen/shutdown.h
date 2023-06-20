@@ -4,7 +4,7 @@
 #include <xen/compiler.h>
 
 /* opt_noreboot: If true, machine will need manual reset on error. */
-extern bool_t opt_noreboot;
+extern bool opt_noreboot;
 
 void noreturn hwdom_shutdown(u8 reason);
 

@@ -54,7 +54,7 @@ static unsigned char __read_mostly opt_conswitch[3] = "a";
 string_runtime_param("conswitch", opt_conswitch);
 
 /* sync_console: force synchronous console output (useful for debugging). */
-static bool_t __initdata opt_sync_console;
+static bool __initdata opt_sync_console;
 boolean_param("sync_console", opt_sync_console);
 static const char __initconst warning_sync_console[] =
     "WARNING: CONSOLE OUTPUT IS SYNCHRONOUS\n"
@@ -64,7 +64,7 @@ static const char __initconst warning_sync_console[] =
     "timekeeping. It is NOT recommended for production use!\n";
 
 /* console_to_ring: send guest (incl. dom 0) console data to console ring. */
-static bool_t __read_mostly opt_console_to_ring;
+static bool __read_mostly opt_console_to_ring;
 boolean_param("console_to_ring", opt_console_to_ring);
 
 /* console_timestamps: include a timestamp prefix on every Xen console line. */
@@ -760,7 +760,7 @@ long do_console_io(
  * *****************************************************
  */
 
-static bool_t console_locks_busted;
+static bool console_locks_busted;
 
 static void __putstr(const char *str)
 {
@@ -911,7 +911,7 @@ static void printk_start_of_line(const char *prefix)
 static void vprintk_common(const char *prefix, const char *fmt, va_list args)
 {
     struct vps {
-        bool_t continued, do_print;
+        bool continued, do_print;
     }            *state;
     static DEFINE_PER_CPU(struct vps, state);
     static char   buf[1024];

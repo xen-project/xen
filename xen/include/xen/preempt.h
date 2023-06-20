@@ -26,7 +26,7 @@ DECLARE_PER_CPU(unsigned int, __preempt_count);
     preempt_count()--;                          \
 } while (0)
 
-bool_t in_atomic(void);
+bool in_atomic(void);
 
 #ifndef NDEBUG
 void ASSERT_NOT_IN_ATOMIC(void);

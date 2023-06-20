@@ -29,7 +29,7 @@ static struct serial_port com[SERHND_IDX + 1] = {
     }
 };
 
-static bool_t __read_mostly post_irq;
+static bool __read_mostly post_irq;
 
 static inline void serial_start_tx(struct serial_port *port)
 {

@@ -39,7 +39,7 @@
 
 #define HEST_PFX "HEST: "
 
-static bool_t hest_disable;
+static bool hest_disable;
 boolean_param("hest_disable", hest_disable);
 
 /* HEST table parsing */

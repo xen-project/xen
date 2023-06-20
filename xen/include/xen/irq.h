@@ -21,7 +21,7 @@ struct irqaction {
     void (*handler)(int irq, void *dev_id, struct cpu_user_regs *regs);
     const char *name;
     void *dev_id;
-    bool_t free_on_release;
+    bool free_on_release;
 #ifdef CONFIG_IRQ_HAS_MULTIPLE_ACTION
     struct irqaction *next;
 #endif

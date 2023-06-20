@@ -297,8 +297,8 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     {
         unsigned int i, j, num_nodes;
         struct xen_sysctl_numainfo *ni = &op->u.numainfo;
-        bool_t do_meminfo = !guest_handle_is_null(ni->meminfo);
-        bool_t do_distance = !guest_handle_is_null(ni->distance);
+        bool do_meminfo = !guest_handle_is_null(ni->meminfo);
+        bool do_distance = !guest_handle_is_null(ni->distance);
 
         num_nodes = last_node(node_online_map) + 1;
 

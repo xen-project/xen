@@ -52,7 +52,7 @@ void rangeset_limit(
 #define _RANGESETF_prettyprint_hex 0
 #define RANGESETF_prettyprint_hex  (1U << _RANGESETF_prettyprint_hex)
 
-bool_t __must_check rangeset_is_empty(
+bool __must_check rangeset_is_empty(
     const struct rangeset *r);
 
 /* Add/claim/remove/query a numeric range. */
@@ -62,9 +62,9 @@ int __must_check rangeset_claim_range(struct rangeset *r, unsigned long size,
                                       unsigned long *s);
 int __must_check rangeset_remove_range(
     struct rangeset *r, unsigned long s, unsigned long e);
-bool_t __must_check rangeset_contains_range(
+bool __must_check rangeset_contains_range(
     struct rangeset *r, unsigned long s, unsigned long e);
-bool_t __must_check rangeset_overlaps_range(
+bool __must_check rangeset_overlaps_range(
     struct rangeset *r, unsigned long s, unsigned long e);
 int rangeset_report_ranges(
     struct rangeset *r, unsigned long s, unsigned long e,
@@ -88,7 +88,7 @@ int __must_check rangeset_add_singleton(
     struct rangeset *r, unsigned long s);
 int __must_check rangeset_remove_singleton(
     struct rangeset *r, unsigned long s);
-bool_t __must_check rangeset_contains_singleton(
+bool __must_check rangeset_contains_singleton(
     struct rangeset *r, unsigned long s);
 
 /* swap contents */

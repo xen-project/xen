@@ -22,7 +22,7 @@
 
 DECLARE_PER_CPU(spinlock_t, cpufreq_statistic_lock);
 
-extern bool_t cpufreq_verbose;
+extern bool cpufreq_verbose;
 
 enum cpufreq_xen_opt {
     CPUFREQ_none,
@@ -52,8 +52,8 @@ struct cpufreq_cpuinfo {
 };
 
 struct perf_limits {
-    bool_t no_turbo;
-    bool_t turbo_disabled;
+    bool no_turbo;
+    bool turbo_disabled;
     uint32_t turbo_pct;
     uint32_t max_perf_pct; /* max performance in percentage */
     uint32_t min_perf_pct; /* min performance in percentage */
@@ -77,7 +77,7 @@ struct cpufreq_policy {
     struct perf_limits  limits;
     struct cpufreq_governor     *governor;
 
-    bool_t              resume; /* flag for cpufreq 1st run
+    bool                resume; /* flag for cpufreq 1st run
                                  * S3 wakeup, hotplug cpu, etc */
     s8                  turbo;  /* tristate flag: 0 for unsupported
                                  * -1 for disable, 1 for enabled
@@ -114,7 +114,7 @@ struct cpufreq_governor {
     char    name[CPUFREQ_NAME_LEN];
     int     (*governor)(struct cpufreq_policy *policy,
                         unsigned int event);
-    bool_t  (*handle_option)(const char *name, const char *value);
+    bool    (*handle_option)(const char *name, const char *value);
     struct list_head governor_list;
 };
 

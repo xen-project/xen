@@ -937,7 +937,7 @@ static int kexec_segments_add_segment(unsigned int *nr_segments,
 static int kexec_segments_from_ind_page(mfn_t mfn,
                                         unsigned int *nr_segments,
                                         xen_kexec_segment_t *segments,
-                                        bool_t compat)
+                                        bool compat)
 {
     void *page;
     kimage_entry_t *entry;
@@ -1215,7 +1215,7 @@ static int kexec_status(XEN_GUEST_HANDLE_PARAM(void) uarg)
 
 static int do_kexec_op_internal(unsigned long op,
                                 XEN_GUEST_HANDLE_PARAM(void) uarg,
-                                bool_t compat)
+                                bool compat)
 {
     int ret = -EINVAL;
 

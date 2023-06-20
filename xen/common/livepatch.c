@@ -55,8 +55,8 @@ struct livepatch_work
                                     check_for_livepatch_work. */
     uint32_t timeout;            /* Timeout to do the operation. */
     struct payload *data;        /* The payload on which to act. */
-    volatile bool_t do_work;     /* Signals work to do. */
-    volatile bool_t ready;       /* Signals all CPUs synchronized. */
+    volatile bool do_work;       /* Signals work to do. */
+    volatile bool ready;         /* Signals all CPUs synchronized. */
     unsigned int cmd;            /* Action request: LIVEPATCH_ACTION_* */
 };
 
@@ -69,7 +69,7 @@ static struct livepatch_work livepatch_work;
  * would hammer a global livepatch_work structure on every guest VMEXIT.
  * Having an per-cpu lessens the load.
  */
-static DEFINE_PER_CPU(bool_t, work_to_do);
+static DEFINE_PER_CPU(bool, work_to_do);
 static DEFINE_PER_CPU(struct tasklet, livepatch_tasklet);
 
 static int get_name(const struct xen_livepatch_name *name, char *n)
@@ -106,10 +106,10 @@ static int verify_payload(const struct xen_sysctl_livepatch_upload *upload, char
     return 0;
 }
 
-bool_t is_patch(const void *ptr)
+bool is_patch(const void *ptr)
 {
     const struct payload *data;
-    bool_t r = 0;
+    bool r = false;
 
     /*
      * Only RCU locking since this list is only ever changed during apply
@@ -936,8 +936,8 @@ static int prepare_payload(struct payload *payload,
     return 0;
 }
 
-static bool_t is_payload_symbol(const struct livepatch_elf *elf,
-                                const struct livepatch_elf_sym *sym)
+static bool is_payload_symbol(const struct livepatch_elf *elf,
+                              const struct livepatch_elf_sym *sym)
 {
     if ( sym->sym->st_shndx == SHN_UNDEF ||
          sym->sym->st_shndx >= elf->hdr->e_shnum )
@@ -1018,7 +1018,7 @@ static int build_symbol_table(struct payload *payload,
 
     for ( i = 0; i < nsyms; i++ )
     {
-        bool_t found = 0;
+        bool found = 0;
 
         for ( j = 0; j < payload->nfuncs; j++ )
         {
@@ -1576,7 +1576,7 @@ static void livepatch_do_action(void)
     data->rc = rc;
 }
 
-static bool_t is_work_scheduled(const struct payload *data)
+static bool is_work_scheduled(const struct payload *data)
 {
     ASSERT(spin_is_locked(&payload_lock));
 
@@ -1864,7 +1864,7 @@ void check_for_livepatch_work(void)
  * Unless the 'internal' parameter is used - in which case we only
  * check against the hypervisor.
  */
-static int build_id_dep(struct payload *payload, bool_t internal)
+static int build_id_dep(struct payload *payload, bool internal)
 {
     const void *id = NULL;
     unsigned int len = 0;

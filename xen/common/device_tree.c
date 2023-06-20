@@ -78,7 +78,7 @@ struct dt_bus
 {
     const char *name;
     const char *addresses;
-    bool_t (*match)(const struct dt_device_node *node);
+    bool (*match)(const struct dt_device_node *node);
     void (*count_cells)(const struct dt_device_node *child,
                         int *addrc, int *sizec);
     u64 (*map)(__be32 *addr, const __be32 *range, int na, int ns, int pna);
@@ -162,8 +162,8 @@ const void *dt_get_property(const struct dt_device_node *np,
     return pp ? pp->value : NULL;
 }
 
-bool_t dt_property_read_u32(const struct dt_device_node *np,
-                         const char *name, u32 *out_value)
+bool dt_property_read_u32(const struct dt_device_node *np,
+                          const char *name, u32 *out_value)
 {
     u32 len;
     const __be32 *val;
@@ -178,8 +178,8 @@ bool_t dt_property_read_u32(const struct dt_device_node *np,
 }
 
 
-bool_t dt_property_read_u64(const struct dt_device_node *np,
-                         const char *name, u64 *out_value)
+bool dt_property_read_u64(const struct dt_device_node *np,
+                          const char *name, u64 *out_value)
 {
     u32 len;
     const __be32 *val;
@@ -297,8 +297,8 @@ int dt_property_match_string(const struct dt_device_node *np,
     return -ENODATA;
 }
 
-bool_t dt_device_is_compatible(const struct dt_device_node *device,
-                               const char *compat)
+bool dt_device_is_compatible(const struct dt_device_node *device,
+                             const char *compat)
 {
     const char* cp;
     u32 cplen, l;
@@ -318,10 +318,10 @@ bool_t dt_device_is_compatible(const struct dt_device_node *device,
     return 0;
 }
 
-bool_t dt_machine_is_compatible(const char *compat)
+bool dt_machine_is_compatible(const char *compat)
 {
     const struct dt_device_node *root;
-    bool_t rc = 0;
+    bool rc = false;
 
     root = dt_find_node_by_path("/");
     if ( root )
@@ -408,9 +408,9 @@ dt_match_node(const struct dt_device_match *matches,
         return NULL;
 
     while ( matches->path || matches->type ||
-            matches->compatible || matches->not_available || matches->prop)
+            matches->compatible || matches->not_available || matches->prop )
     {
-        bool_t match = 1;
+        bool match = true;
 
         if ( matches->path )
             match &= dt_node_path_is_equal(node, matches->path);
@@ -481,7 +481,7 @@ dt_find_matching_node(struct dt_device_node *from,
     return NULL;
 }
 
-static int __dt_n_addr_cells(const struct dt_device_node *np, bool_t parent)
+static int __dt_n_addr_cells(const struct dt_device_node *np, bool parent)
 {
     const __be32 *ip;
 
@@ -498,7 +498,7 @@ static int __dt_n_addr_cells(const struct dt_device_node *np, bool_t parent)
     return DT_ROOT_NODE_ADDR_CELLS_DEFAULT;
 }
 
-static int __dt_n_size_cells(const struct dt_device_node *np, bool_t parent)
+static int __dt_n_size_cells(const struct dt_device_node *np, bool parent)
 {
     const __be32 *ip;
 
@@ -558,7 +558,7 @@ int dt_child_n_size_cells(const struct dt_device_node *parent)
 /*
  * Default translator (generic bus)
  */
-static bool_t dt_bus_default_match(const struct dt_device_node *node)
+static bool dt_bus_default_match(const struct dt_device_node *node)
 {
     /* Root node doesn't have "ranges" property */
     if ( node->parent == NULL )
@@ -636,7 +636,7 @@ static bool dt_node_is_pci(const struct dt_device_node *np)
     return is_pci;
 }
 
-static bool_t dt_bus_pci_match(const struct dt_device_node *np)
+static bool dt_bus_pci_match(const struct dt_device_node *np)
 {
     /*
      * "pciex" is PCI Express "vci" is for the /chaos bridge on 1st-gen PCI
@@ -1662,7 +1662,7 @@ int dt_device_get_irq(const struct dt_device_node *device, unsigned int index,
     return dt_irq_translate(&raw, out_irq);
 }
 
-bool_t dt_device_is_available(const struct dt_device_node *device)
+bool dt_device_is_available(const struct dt_device_node *device)
 {
     const char *status;
     u32 statlen;
@@ -1680,7 +1680,7 @@ bool_t dt_device_is_available(const struct dt_device_node *device)
     return 0;
 }
 
-bool_t dt_device_for_passthrough(const struct dt_device_node *device)
+bool dt_device_for_passthrough(const struct dt_device_node *device)
 {
     return (dt_find_property(device, "xen,passthrough", NULL) != NULL);
 

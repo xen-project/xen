@@ -39,7 +39,7 @@ static struct pl011 {
     /* /\* UART with no IRQ line: periodically-polled I/O. *\/ */
     /* struct timer timer; */
     /* unsigned int timeout_ms; */
-    /* bool_t probing, intr_works; */
+    /* bool probing, intr_works; */
     bool sbsa;  /* ARM SBSA generic interface */
     bool mmio32; /* 32-bit only MMIO */
 } pl011_com = {0};

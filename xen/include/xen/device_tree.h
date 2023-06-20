@@ -29,7 +29,7 @@ struct dt_device_match {
     const char *path;
     const char *type;
     const char *compatible;
-    const bool_t not_available;
+    const bool not_available;
     /*
      * Property name to search for. We only search for the property's
      * existence.
@@ -95,7 +95,7 @@ struct dt_device_node {
     bool is_protected;
 
     /* HACK: Remove this if there is a need of space */
-    bool_t static_evtchn_created;
+    bool static_evtchn_created;
 
     /*
      * The main purpose of this list is to link the structure in the list
@@ -138,7 +138,7 @@ struct dt_irq {
 };
 
 /* If type == DT_IRQ_TYPE_NONE, assume we use level triggered */
-static inline bool_t dt_irq_is_level_triggered(const struct dt_irq *irq)
+static inline bool dt_irq_is_level_triggered(const struct dt_irq *irq)
 {
     unsigned int type = irq->type;
 
@@ -319,19 +319,19 @@ static inline const char *dt_node_name(const struct dt_device_node *np)
     return (np && np->name) ? np->name : "<no-node>";
 }
 
-static inline bool_t dt_node_name_is_equal(const struct dt_device_node *np,
-                                           const char *name)
+static inline bool dt_node_name_is_equal(const struct dt_device_node *np,
+                                         const char *name)
 {
     return !dt_node_cmp(np->name, name);
 }
 
-static inline bool_t dt_node_path_is_equal(const struct dt_device_node *np,
-                                           const char *path)
+static inline bool dt_node_path_is_equal(const struct dt_device_node *np,
+                                         const char *path)
 {
     return !dt_node_cmp(np->full_name, path);
 }
 
-static inline bool_t
+static inline bool
 dt_device_type_is_equal(const struct dt_device_node *device,
                         const char *type)
 {
@@ -360,8 +360,8 @@ static inline bool dt_device_is_protected(const struct dt_device_node *device)
     return device->is_protected;
 }
 
-static inline bool_t dt_property_name_is_equal(const struct dt_property *pp,
-                                               const char *name)
+static inline bool dt_property_name_is_equal(const struct dt_property *pp,
+                                             const char *name)
 {
     return !dt_prop_cmp(pp->name, name);
 }
@@ -372,7 +372,7 @@ dt_device_set_static_evtchn_created(struct dt_device_node *device)
     device->static_evtchn_created = true;
 }
 
-static inline bool_t
+static inline bool
 dt_device_static_evtchn_created(const struct dt_device_node *device)
 {
     return device->static_evtchn_created;
@@ -414,8 +414,8 @@ const struct dt_property *dt_find_property(const struct dt_device_node *np,
  *
  * Return true if get the desired value.
  */
-bool_t dt_property_read_u32(const struct dt_device_node *np,
-                            const char *name, u32 *out_value);
+bool dt_property_read_u32(const struct dt_device_node *np,
+                          const char *name, u32 *out_value);
 /**
  * dt_property_read_u64 - Helper to read a u64 property.
  * @np: node to get the value
@@ -424,8 +424,8 @@ bool_t dt_property_read_u32(const struct dt_device_node *np,
  *
  * Return true if get the desired value.
  */
-bool_t dt_property_read_u64(const struct dt_device_node *np,
-                            const char *name, u64 *out_value);
+bool dt_property_read_u64(const struct dt_device_node *np,
+                          const char *name, u64 *out_value);
 
 
 /**
@@ -491,8 +491,8 @@ static inline int dt_property_read_u32_array(const struct dt_device_node *np,
  * Search for a property in a device node.
  * Return true if the property exists false otherwise.
  */
-static inline bool_t dt_property_read_bool(const struct dt_device_node *np,
-                                           const char *name)
+static inline bool dt_property_read_bool(const struct dt_device_node *np,
+                                         const char *name)
 {
     const struct dt_property *prop = dt_find_property(np, name, NULL);
 
@@ -536,8 +536,8 @@ int dt_property_match_string(const struct dt_device_node *np,
  * Checks if the given "compat" string matches one of the strings in
  * the device's "compatible" property
  */
-bool_t dt_device_is_compatible(const struct dt_device_node *device,
-                               const char *compat);
+bool dt_device_is_compatible(const struct dt_device_node *device,
+                             const char *compat);
 
 /**
  * dt_machine_is_compatible - Test root of device tree for a given compatible value
@@ -546,7 +546,7 @@ bool_t dt_device_is_compatible(const struct dt_device_node *device,
  * Returns true if the root node has the given value in its
  * compatible property.
  */
-bool_t dt_machine_is_compatible(const char *compat);
+bool dt_machine_is_compatible(const char *compat);
 
 /**
  * dt_find_node_by_name - Find a node by its "name" property
@@ -764,7 +764,7 @@ int dt_child_n_addr_cells(const struct dt_device_node *parent);
  * Returns true if the status property is absent or set to "okay" or "ok",
  * false otherwise.
  */
-bool_t dt_device_is_available(const struct dt_device_node *device);
+bool dt_device_is_available(const struct dt_device_node *device);
 
 /**
  * dt_device_for_passthrough - Check if a device will be used for
@@ -775,7 +775,7 @@ bool_t dt_device_is_available(const struct dt_device_node *device);
  * Return true if the property "xen,passthrough" is present in the node,
  * false otherwise.
  */
-bool_t dt_device_for_passthrough(const struct dt_device_node *device);
+bool dt_device_for_passthrough(const struct dt_device_node *device);
 
 /**
  * dt_match_node - Tell if a device_node has a matching of dt_device_match
