@@ -1,0 +1,42 @@
+config PPC
+	def_bool y
+
+config PPC64
+	def_bool y
+	select 64BIT
+
+config ARCH_DEFCONFIG
+	string
+	default "arch/ppc/configs/ppc64_defconfig"
+
+menu "Architecture Features"
+
+source "arch/Kconfig"
+
+endmenu
+
+menu "ISA Selection"
+
+choice
+	prompt "Base ISA"
+	default POWER_ISA_2_07B
+	help
+	  This selects the base ISA version that Xen will target.
+
+config POWER_ISA_2_07B
+	bool "Power ISA 2.07B (POWER8)"
+	help
+	  Target version 2.07B of the Power ISA (POWER8) or later
+
+config POWER_ISA_3_00
+	bool "Power ISA 3.00 (POWER9)"
+	help
+	  Target version 3.00 of the Power ISA (POWER9) or later
+
+endchoice
+
+endmenu
+
+source "common/Kconfig"
+
+source "drivers/Kconfig"

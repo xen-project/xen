@@ -38,7 +38,7 @@ EFI_MOUNTPOINT ?= $(BOOT_DIR)/efi
 ARCH=$(XEN_TARGET_ARCH)
 SRCARCH=$(shell echo $(ARCH) | \
           sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
-              -e s'/riscv.*/riscv/g')
+              -e s'/riscv.*/riscv/g' -e s'/ppc.*/ppc/g')
 export ARCH SRCARCH
 
 # Allow someone to change their config file
@@ -244,7 +244,7 @@ include $(XEN_ROOT)/Config.mk
 export TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
                             sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
-                                -e s'/riscv.*/riscv/g')
+                                -e s'/riscv.*/riscv/g' -e s'/ppc.*/ppc/g')
 
 export CONFIG_SHELL := $(SHELL)
 export CC CXX LD NM OBJCOPY OBJDUMP ADDR2LINE
@@ -563,6 +563,7 @@ _clean:
 	$(Q)$(MAKE) $(clean)=xsm
 	$(Q)$(MAKE) $(clean)=crypto
 	$(Q)$(MAKE) $(clean)=arch/arm
+	$(Q)$(MAKE) $(clean)=arch/ppc
 	$(Q)$(MAKE) $(clean)=arch/riscv
 	$(Q)$(MAKE) $(clean)=arch/x86
 	$(Q)$(MAKE) $(clean)=test
