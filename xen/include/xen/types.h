@@ -64,7 +64,6 @@ typedef __u64 __be64;
 
 typedef unsigned int __attribute__((__mode__(__pointer__))) uintptr_t;
 
-typedef bool bool_t;
 #define test_and_set_bool(b)   xchg(&(b), true)
 #define test_and_clear_bool(b) xchg(&(b), false)
 
