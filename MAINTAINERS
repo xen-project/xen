@@ -458,6 +458,10 @@ X:	xen/arch/x86/acpi/lib.c
 F:	xen/drivers/cpufreq/
 F:	xen/include/acpi/cpufreq/
 
+PPC64
+M:	Shawn Anastasio <sanastasio@raptorengineering.com>
+F:	xen/arch/ppc/
+
 PUBLIC I/O INTERFACES AND PV DRIVERS DESIGNS
 M:	Juergen Gross <jgross@suse.com>
 S:	Supported
