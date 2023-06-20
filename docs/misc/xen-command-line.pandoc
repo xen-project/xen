@@ -1950,16 +1950,6 @@ for all of them (`true`), only for those subject to XPTI (`xpti`) or for
 those not subject to XPTI (`no-xpti`). The feature is used only in case
 INVPCID is supported and not disabled via `invpcid=false`.
 
-### pku (x86)
-> `= <boolean>`
-
-> Default: `true`
-
-Flag to enable Memory Protection Keys.
-
-The protection-key feature provides an additional mechanism by which IA-32e
-paging controls access to usermode addresses.
-
 ### ple_gap
 > `= <integer>`
 

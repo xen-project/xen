@@ -29,10 +29,6 @@ bool __read_mostly opt_dom0_cpuid_faulting = true;
 bool opt_arat = true;
 boolean_param("arat", opt_arat);
 
-/* pku: Flag to enable Memory Protection Keys (default on). */
-static bool opt_pku = true;
-boolean_param("pku", opt_pku);
-
 unsigned int opt_cpuid_mask_ecx = ~0u;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
 unsigned int opt_cpuid_mask_edx = ~0u;
@@ -521,9 +517,6 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	if (this_cpu->c_init)
 		this_cpu->c_init(c);
 
-
-   	if (c == &boot_cpu_data && !opt_pku)
-		setup_clear_cpu_cap(X86_FEATURE_PKU);
 
 	/*
 	 * The vendor-specific functions might have changed features.  Now

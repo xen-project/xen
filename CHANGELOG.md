@@ -25,6 +25,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Add support for AVX512-FP16 on x86.
  - On Arm, Xen supports guests running SVE/SVE2 instructions. (Tech Preview)
 
+### Removed
+ - On x86, the "pku" command line option has been removed.  It has never
+   behaved precisely as described, and was redundant with the unsupported
+   "cpuid=no-pku".  Visibility of PKU to guests should be via its vm.cfg file.
 
 ## [4.17.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.17.0) - 2022-12-12
 
