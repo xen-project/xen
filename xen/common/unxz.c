@@ -166,7 +166,7 @@ int __init unxz(unsigned char *in, unsigned int in_size,
 	struct xz_buf b;
 	struct xz_dec *s;
 	enum xz_ret ret;
-	bool_t must_free_in = false;
+	bool must_free_in = false;
 
 	xz_crc32_init();
 

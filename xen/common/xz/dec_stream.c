@@ -55,7 +55,7 @@ struct xz_dec {
 	 * True if the next call to xz_dec_run() is allowed to return
 	 * XZ_BUF_ERROR.
 	 */
-	bool_t allow_buf_error;
+	bool allow_buf_error;
 
 	/* Information stored in Block Header */
 	struct {
@@ -132,7 +132,7 @@ struct xz_dec {
 
 #ifdef XZ_DEC_BCJ
 	struct xz_dec_bcj *bcj;
-	bool_t bcj_active;
+	bool bcj_active;
 #endif
 };
 
@@ -154,7 +154,7 @@ static const uint8_t check_sizes[16] = {
  * to copy into s->temp.buf. Return true once s->temp.pos has reached
  * s->temp.size.
  */
-static bool_t __init fill_temp(struct xz_dec *s, struct xz_buf *b)
+static bool __init fill_temp(struct xz_dec *s, struct xz_buf *b)
 {
 	size_t copy_size = min_t(size_t,
 			b->in_size - b->in_pos, s->temp.size - s->temp.pos);
@@ -367,7 +367,7 @@ static enum xz_ret __init crc32_validate(struct xz_dec *s, struct xz_buf *b)
  * Skip over the Check field when the Check ID is not supported.
  * Returns true once the whole Check field has been skipped over.
  */
-static bool_t __init check_skip(struct xz_dec *s, struct xz_buf *b)
+static bool __init check_skip(struct xz_dec *s, struct xz_buf *b)
 {
 	while (s->pos < check_sizes[s->check_type]) {
 		if (b->in_pos == b->in_size)

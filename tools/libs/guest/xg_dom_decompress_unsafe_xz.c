@@ -11,7 +11,6 @@
 // TODO
 #define XZ_DEC_X86
 
-typedef char bool_t;
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;

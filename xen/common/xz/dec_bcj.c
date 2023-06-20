@@ -35,7 +35,7 @@ struct xz_dec_bcj {
 	enum xz_ret ret;
 
 	/* True if we are operating in single-call mode. */
-	bool_t single_call;
+	bool single_call;
 
 	/*
 	 * Absolute position relative to the beginning of the uncompressed
@@ -87,7 +87,7 @@ static inline int __init bcj_x86_test_msbyte(uint8_t b)
 
 static size_t __init bcj_x86(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
-	static const bool_t mask_to_allowed_status[8]
+	static const bool mask_to_allowed_status[8]
 		= { true, true, true, false, true, false, false, false };
 
 	static const uint8_t mask_to_bit_num[8] = { 0, 1, 2, 2, 3, 3, 3, 3 };
@@ -524,7 +524,7 @@ XZ_EXTERN enum xz_ret __init xz_dec_bcj_run(struct xz_dec_bcj *s,
 	return s->ret;
 }
 
-XZ_EXTERN struct xz_dec_bcj *__init xz_dec_bcj_create(bool_t single_call)
+XZ_EXTERN struct xz_dec_bcj *__init xz_dec_bcj_create(bool single_call)
 {
 	struct xz_dec_bcj *s = malloc(sizeof(*s));
 	if (s != NULL)

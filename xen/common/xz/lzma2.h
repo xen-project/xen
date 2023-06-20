@@ -90,7 +90,7 @@ static inline void __init lzma_state_short_rep(enum lzma_state *state)
 }
 
 /* Test if the previous symbol was a literal. */
-static inline bool_t __init lzma_state_is_literal(enum lzma_state state)
+static inline bool __init lzma_state_is_literal(enum lzma_state state)
 {
 	return state < LIT_STATES;
 }

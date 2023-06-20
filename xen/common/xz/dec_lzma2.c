@@ -241,13 +241,13 @@ struct lzma2_dec {
 	 * True if dictionary reset is needed. This is false before
 	 * the first chunk (LZMA or uncompressed).
 	 */
-	bool_t need_dict_reset;
+	bool need_dict_reset;
 
 	/*
 	 * True if new LZMA properties are needed. This is false
 	 * before the first LZMA chunk.
 	 */
-	bool_t need_props;
+	bool need_props;
 };
 
 struct xz_dec_lzma2 {
@@ -306,7 +306,7 @@ static void __init dict_limit(struct dictionary *dict, size_t out_max)
 }
 
 /* Return true if at least one byte can be written into the dictionary. */
-static inline bool_t __init dict_has_space(const struct dictionary *dict)
+static inline bool __init dict_has_space(const struct dictionary *dict)
 {
 	return dict->pos < dict->limit;
 }
@@ -343,7 +343,7 @@ static inline void __init dict_put(struct dictionary *dict, uint8_t byte)
  * invalid, false is returned. On success, true is returned and *len is
  * updated to indicate how many bytes were left to be repeated.
  */
-static bool_t __init dict_repeat(struct dictionary *dict, uint32_t *len, uint32_t dist)
+static bool __init dict_repeat(struct dictionary *dict, uint32_t *len, uint32_t dist)
 {
 	size_t back;
 	uint32_t left;
@@ -463,7 +463,7 @@ static void __init rc_reset(struct rc_dec *rc)
  * Read the first five initial bytes into rc->code if they haven't been
  * read already. (Yes, the first byte gets completely ignored.)
  */
-static bool_t __init rc_read_init(struct rc_dec *rc, struct xz_buf *b)
+static bool __init rc_read_init(struct rc_dec *rc, struct xz_buf *b)
 {
 	while (rc->init_bytes_left > 0) {
 		if (b->in_pos == b->in_size)
@@ -477,7 +477,7 @@ static bool_t __init rc_read_init(struct rc_dec *rc, struct xz_buf *b)
 }
 
 /* Return true if there may not be enough input for the next decoding loop. */
-static inline bool_t __init rc_limit_exceeded(const struct rc_dec *rc)
+static inline bool __init rc_limit_exceeded(const struct rc_dec *rc)
 {
 	return rc->in_pos > rc->in_limit;
 }
@@ -486,7 +486,7 @@ static inline bool_t __init rc_limit_exceeded(const struct rc_dec *rc)
  * Return true if it is possible (from point of view of range decoder) that
  * we have reached the end of the LZMA chunk.
  */
-static inline bool_t __init rc_is_finished(const struct rc_dec *rc)
+static inline bool __init rc_is_finished(const struct rc_dec *rc)
 {
 	return rc->code == 0;
 }
@@ -736,7 +736,7 @@ static void __init lzma_rep_match(struct xz_dec_lzma2 *s, uint32_t pos_state)
 }
 
 /* LZMA decoder core */
-static bool_t __init lzma_main(struct xz_dec_lzma2 *s)
+static bool __init lzma_main(struct xz_dec_lzma2 *s)
 {
 	uint32_t pos_state;
 
@@ -814,7 +814,7 @@ static void __init lzma_reset(struct xz_dec_lzma2 *s)
  * from the decoded lp and pb values. On success, the LZMA decoder state is
  * reset and true is returned.
  */
-static bool_t __init lzma_props(struct xz_dec_lzma2 *s, uint8_t props)
+static bool __init lzma_props(struct xz_dec_lzma2 *s, uint8_t props)
 {
 	if (props > (4 * 5 + 4) * 9 + 8)
 		return false;
@@ -861,7 +861,7 @@ static bool_t __init lzma_props(struct xz_dec_lzma2 *s, uint8_t props)
  * function. We decode a few bytes from the temporary buffer so that we can
  * continue decoding from the caller-supplied input buffer again.
  */
-static bool_t __init lzma2_lzma(struct xz_dec_lzma2 *s, struct xz_buf *b)
+static bool __init lzma2_lzma(struct xz_dec_lzma2 *s, struct xz_buf *b)
 {
 	size_t in_avail;
 	uint32_t tmp;
